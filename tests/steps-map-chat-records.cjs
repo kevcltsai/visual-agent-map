@@ -408,3 +408,63 @@ test('R6 chain end of a turn that cannot come back: goes to the closest earlier 
   const forged = records.restoreConversation('id', [start(1), end(1, 'done'), start(2), end(2, 'failed'), ev(2, 'map_changed')]);
   assert.equal(forged.turns[0].chainEnd, undefined);
 });
+
+// ---- resume of an interrupted chain (shape of an owner record: 1 user turn + auto rounds, each plan applied, the last round only has turn_end plan) ----
+{
+  const at = '2026-11-06T10:00:00.000Z';
+  const start = (n, extra = {}) => ({ v: 1, type: 'turn_start', turn: n, at, message: 'orig', origin: { chips: [], selectedIds: ['s1', 's2'] }, ...extra });
+  const auto = (n, round, remaining) => start(n, { auto: true, round, remaining });
+  const end = (n, status = 'plan', extra = {}) => ({ v: 1, type: 'turn_end', turn: n, at, status, raw: JSON.stringify({ reply: 'r', remaining: 'raw left ' + n }), reply: 'r', lines: [{ status: 'done', text: 'line' + n }], modelLabel: '', ...extra });
+  const plan = (n, state = 'applied', lines = [{ status: 'done', text: 'applied' + n }]) => ({ v: 1, type: 'plan', turn: n, at, state, lines });
+  const ev = (turn, reason, extra = {}) => ({ v: 1, type: 'event', turn, at, kind: 'chain_end', reason, round: 5, remaining: 'ev left', ...extra });
+  const resumeOf = lines => records.restoreConversation('id', lines).resume ?? null;
+  const owner = () => [start(37), end(37), plan(37), auto(38, 2, 'left 2'), end(38), plan(38), auto(39, 3, 'left 3'), end(39), plan(39), auto(40, 4, 'left 4'), end(40), plan(40), auto(41, 5, 'left 5'), end(41)];
+
+  test('resume: a plan card that never got applied before the reload resumes that same round with its turn_start remaining', () => {
+    const r = resumeOf(owner());
+    const { lastResults, ...rest } = S.plain(r);
+    assert.deepEqual(rest, { turn: 41, round: 5, maxRounds: 8, remaining: 'left 5', stoppedRound: 5, reason: null, message: 'orig', selectedIds: ['s1', 's2'] });
+    assert.deepEqual(S.plain(r.lastResults), [{ text: 'applied40', status: 'done' }], 'the last applied round');
+    assert.equal(records.chainResumeOf(owner(), records.restoreConversation('id', owner()).turns).round, 5, 'exported');
+  });
+  test('resume: applied round with a reply remaining and no next round resumes at round + 1 with the remaining of the raw reply; no remaining means nothing', () => {
+    const r = resumeOf([...owner(), plan(41)]);
+    assert.equal(r.round, 6); assert.equal(r.remaining, 'raw left 41'); assert.equal(r.stoppedRound, 6); assert.equal(r.turn, 41);
+    assert.deepEqual(S.plain(r.lastResults), [{ text: 'applied41', status: 'done' }]);
+    assert.equal(resumeOf([...owner(), plan(41), ev(41, 'map_changed')]).round, 6, 'a map_changed alone counts as a reload');
+    const none = owner(); none[none.length - 1] = end(41, 'done', { raw: JSON.stringify({ reply: 'r', remaining: '' }) });
+    assert.equal(resumeOf(none), null);
+    const bad = owner(); bad[bad.length - 1] = end(41, 'done', { raw: '{oops' });
+    assert.equal(resumeOf(bad), null, 'broken raw reads as no remaining');
+    const nul = owner(); nul[nul.length - 1] = end(41, 'done', { raw: null });
+    assert.equal(resumeOf(nul), null);
+  });
+  test('resume: stopped / plan_cancelled / failed / research_stopped / wait_timeout / no_progress / max_rounds are resumable; failed turn is not restored but its chain_end still counts', () => {
+    for (const reason of ['stopped', 'plan_cancelled', 'research_stopped', 'wait_timeout', 'no_progress']) {
+      const r = resumeOf([...owner(), plan(41, 'cancelled'), ev(41, reason)]);
+      assert.equal(r.round, 5, reason); assert.equal(r.reason, reason); assert.equal(r.remaining, 'left 5');
+    }
+    const failedLast = [...owner().slice(0, -2), auto(41, 5, 'left 5'), end(41, 'failed', { raw: null }), ev(41, 'failed')];
+    const f = resumeOf(failedLast);
+    assert.equal(f.round, 5); assert.equal(f.reason, 'failed'); assert.equal(f.turn, 40, 'hangs on the last restored turn');
+    const mr = resumeOf([...owner().slice(0, -2), auto(41, 8, 'left 8'), end(41), plan(41), ev(41, 'max_rounds', { round: 8 })]);
+    assert.equal(mr.round, 9); assert.equal(mr.maxRounds, 16); assert.equal(mr.remaining, 'ev left');
+    assert.equal(resumeOf([...owner(), plan(41, 'stopped'), ev(41, 'stopped')]).round, 5, 'a stopped plan is rerun');
+  });
+  test('resume: done / user_took_over / other_background_work / not_ready / research_failed / research_not_started give none; so does a later user message', () => {
+    for (const reason of ['done', 'user_took_over', 'other_background_work', 'not_ready', 'research_failed', 'research_not_started', 'something_unknown'])
+      assert.equal(resumeOf([...owner(), plan(41), ev(41, reason)]), null, reason);
+    assert.equal(resumeOf([...owner(), start(42, { origin: { chips: [], selectedIds: [] } }), end(42, 'done', { raw: JSON.stringify({ reply: 'r', remaining: '' }) })]), null, 'a newer user message covers the old chain');
+    assert.equal(resumeOf([...owner(), start(42), end(42, 'failed', { raw: null }), ev(42, 'failed')]), null, 'a failed new message is not a chain');
+  });
+  test('resume: old records (an auto round with no round, no turns) and a first round that was not applied give none and never throw', () => {
+    const noRound = owner(); noRound[noRound.length - 2] = start(41, { auto: true, remaining: 'x' });
+    assert.equal(resumeOf(noRound), null);
+    assert.equal(resumeOf([]), null);
+    assert.equal(resumeOf([start(1), end(1, 'failed', { raw: null }), ev(1, 'stopped')]), null);
+    assert.equal(resumeOf([start(1), end(1)]), null, 'round 1 plan not applied is a resend');
+    const first = resumeOf([start(1), end(1), plan(1)]);
+    assert.equal(first.round, 2); assert.equal(first.remaining, 'raw left 1');
+    assert.equal(first.reason, null);
+  });
+}

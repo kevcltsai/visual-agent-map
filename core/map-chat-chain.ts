@@ -216,3 +216,48 @@ export function finishWait(state: MapChatChainState, end: MapChatWaitEnd): Step 
   if (!state.wrote && researchSucceeded === 0 && expandSucceeded === 0) return ended(state, "no_progress");
   return startNext(state);
 }
+
+/** The endings a user can pick up again (the others are a finished chain, the user's own words, or a failure that rerunning would repeat). */
+export const MAP_CHAT_CHAIN_RESUMABLE: ReadonlySet<MapChatChainEndReason> = new Set<MapChatChainEndReason>([
+  "stopped",
+  "plan_cancelled",
+  "research_stopped",
+  "failed",
+  "wait_timeout",
+  "no_progress",
+  "max_rounds"
+]);
+export interface MapChatChainResumeEnd {
+  /** Why the chain ended; null when it was cut off (the plugin reloaded: no `chain_end`, or only `map_changed`). */
+  reason: MapChatChainEndReason | null;
+  /** The round the chain was in when it stopped. */
+  round: number;
+  /** The round's work was applied (its reply or its plan); false: it must be done again. */
+  applied: boolean;
+  /** What the round was started with. */
+  startRemaining: string;
+  /** What the round's reply said was still to do. */
+  replyRemaining: string;
+}
+/**
+ * Where an interrupted chain goes on: the next round when the stopped one was applied (and its reply left something to do), the same
+ * round again when it was not. Round 1 not applied is a resend, not a resume. The round limit counts in whole limits, so a chain
+ * that hit it gets one more limit (rounds keep counting).
+ */
+export function resumeRound(end: MapChatChainResumeEnd): { round: number; maxRounds: number; remaining: string } | null {
+  if (end.reason !== null && !MAP_CHAT_CHAIN_RESUMABLE.has(end.reason)) return null;
+  let round = end.round;
+  let remaining = end.startRemaining;
+  if (end.applied) {
+    round += 1;
+    remaining = end.replyRemaining;
+    if (!remaining) return null;
+  }
+  if (!Number.isInteger(round) || round < 2) return null;
+  return { round, maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS * Math.ceil(round / MAP_CHAT_CHAIN_MAX_ROUNDS), remaining };
+}
+
+const RESUME_KEYWORDS: ReadonlySet<string> = new Set(["繼續", "继续", "接著做", "接着做", "continue", "resume", "goon"]);
+/** The whole message is "continue" (any of the words, ignoring spaces, punctuation, width and case). */
+export const isResumeKeyword = (text: string): boolean =>
+  RESUME_KEYWORDS.has(text.normalize("NFKC").toLowerCase().replace(/[\s\p{P}\p{S}]/gu, ""));

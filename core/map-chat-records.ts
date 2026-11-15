@@ -5,7 +5,8 @@
  */
 
 import { parseChatBasis, type MapChatBasis } from "./map-chat-basis";
-import { MAP_CHAT_CHAIN_END_REASONS, type MapChatChainEndReason } from "./map-chat-chain";
+import { MAP_CHAT_CHAIN_END_REASONS, resumeRound, type MapChatChainEndReason } from "./map-chat-chain";
+import { normalizeRemaining } from "./steps/map-chat/step";
 import { markChatBatchTopic, type ChatBatch, type ChatBatchRequest, type ChatBatchTopic } from "./map-chat-batch";
 
 export const RECORD_VERSION = 1;
@@ -59,6 +60,8 @@ export interface RecordTurnStartLine extends RecordLineBase {
   round?: number;
   /** What the previous round said was still to do (an automatic round; shown on its separator when the conversation is opened again). */
   remaining?: string;
+  /** The first automatic round of a continuation the user picked up again after it was interrupted. */
+  resumed?: true;
 }
 export interface RecordTurnEndLine extends RecordLineBase {
   type: "turn_end";
@@ -380,6 +383,26 @@ export interface RestoredConversation {
   startedResearch: boolean;
   /** A turn of the file sent the map's data sources (an older file has no mark: false). */
   readsSources: boolean;
+  /** The last chain was interrupted and the user can pick it up again (derived from the lines; nothing of it is written). */
+  resume?: RestoredChainResume;
+}
+/** Where an interrupted chain goes on, as far as the file knows. */
+export interface RestoredChainResume {
+  /** The restored turn the resume hangs under (the last one that comes back). */
+  turn: number;
+  round: number;
+  maxRounds: number;
+  remaining: string;
+  /** The round the chain stopped in. */
+  stoppedRound: number;
+  /** Why it ended; null: it was cut off (reload). */
+  reason: MapChatChainEndReason | null;
+  /** The user's original message of the chain. */
+  message: string;
+  /** The cards the last round was started with (the AI's selection, when it made one). */
+  selectedIds: string[];
+  /** The result lines of the last applied round. */
+  lastResults: { text: string; status: "done" | "skipped" | "failed" }[];
 }
 
 const BATCH_TOPIC_LIMIT = 1000;
@@ -565,6 +588,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       ...(batches.has(number) ? { batch: batches.get(number) } : {})
     });
   }
+  const resume = chainResumeOf(lines, turns);
   return {
     id,
     mapPath,
@@ -572,6 +596,76 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
     turns,
     restoredAt: turns.length ? turns[turns.length - 1].at : null,
     startedResearch,
-    readsSources
+    readsSources,
+    ...(resume ? { resume } : {})
+  };
+}
+
+const resultStatus = (status: unknown): "done" | "skipped" | "failed" =>
+  status === "done" ? "done" : status === "skipped" ? "skipped" : "failed";
+
+/**
+ * Whether the last chain of a file was interrupted and where it goes on (null: nothing to pick up). Only the last turn counts: a
+ * later user message covers an older chain. Old files (an automatic round with no round, a reply that cannot be read) give null.
+ */
+export function chainResumeOf(lines: RecordLine[], turns: RestoredTurn[]): RestoredChainResume | null {
+  if (!turns.length) return null;
+  let last: RecordTurnStartLine | null = null;
+  for (const line of lines) if (line.type === "turn_start") last = line;
+  if (!last) return null;
+  const number = last.turn;
+  let round = 1;
+  if (last.auto === true) {
+    if (typeof last.round !== "number" || !Number.isInteger(last.round) || last.round < 2) return null;
+    round = last.round;
+  }
+  let reason: MapChatChainEndReason | null = null;
+  let endRemaining: string | null = null;
+  let turnEnd: RecordTurnEndLine | null = null;
+  let plan: RecordPlanLine | null = null;
+  for (const line of lines) {
+    if (line.type === "turn_end" && line.turn === number) turnEnd = line;
+    else if (line.type === "plan" && line.turn === number) plan = line;
+    else if (line.type === "event" && line.kind === "chain_end" && line.turn === number) {
+      const known = (MAP_CHAT_CHAIN_END_REASONS as readonly unknown[]).find(item => item === line.reason);
+      if (!known) return null;
+      if (known === "map_changed") continue;
+      reason = known as MapChatChainEndReason;
+      endRemaining = typeof line.remaining === "string" ? line.remaining.slice(0, 1000) : null;
+    }
+  }
+  const applied = !!turnEnd && (turnEnd.status === "done" || (turnEnd.status === "plan" && plan?.state === "applied"));
+  let replyRemaining = endRemaining;
+  if (replyRemaining === null) {
+    replyRemaining = "";
+    if (turnEnd && typeof turnEnd.raw === "string") {
+      try {
+        replyRemaining = normalizeRemaining((JSON.parse(turnEnd.raw) as { remaining?: unknown } | null)?.remaining);
+      } catch {
+        replyRemaining = "";
+      }
+    }
+  }
+  const startRemaining = typeof last.remaining === "string" ? last.remaining.slice(0, 1000) : "";
+  const next = resumeRound({ reason, round, applied, startRemaining, replyRemaining });
+  if (!next) return null;
+  let lastApplied: RestoredTurn | null = null;
+  for (let i = turns.length - 1; i >= 0 && !lastApplied; i--) {
+    const turn = turns[i];
+    if (turn.status === "done" || turn.planState === "applied") lastApplied = turn;
+  }
+  const results = lastApplied ? (lastApplied.planLines ?? lastApplied.lines) : [];
+  return {
+    turn: turns[turns.length - 1].turn,
+    round: next.round,
+    maxRounds: next.maxRounds,
+    remaining: next.remaining,
+    stoppedRound: next.round,
+    reason,
+    message: typeof last.message === "string" ? last.message : "",
+    selectedIds: Array.isArray(last.origin?.selectedIds)
+      ? last.origin.selectedIds.filter((id): id is string => typeof id === "string")
+      : [],
+    lastResults: results.map(item => ({ text: String(item?.text ?? ""), status: resultStatus(item?.status) }))
   };
 }

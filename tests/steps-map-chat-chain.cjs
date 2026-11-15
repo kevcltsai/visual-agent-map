@@ -403,3 +403,31 @@ test('A11 expand basis: the card\'s own note and how many subtopics it already h
   assert.deepEqual(plain(expandBasis({ id: 'a', title: 'A', hasNote: false, existingChildren: 0 })), { kind: 'outline_only', alsoRead: [], existingChildren: 0 });
   assert.deepEqual(plain(chatBasisFor(ctxWith({ researchNotes: [note('a', 5)] }).basis, 'a', parentsOf(ctxWith()), {}, 2)), { kind: 'research', sources: [{ id: 'a', title: 'A' }], existingChildren: 2 });
 });
+
+// ---- resume of an interrupted chain ----
+const resumeEnd = (extra = {}) => ({ reason: null, round: 5, applied: false, startRemaining: 'left 5', replyRemaining: '', ...extra });
+test('resumeRound: every resumable reason resumes; done / user_took_over / other_background_work / not_ready / research_failed / research_not_started do not', () => {
+  assert.deepEqual([...chain.MAP_CHAT_CHAIN_RESUMABLE].sort(), ['failed', 'max_rounds', 'no_progress', 'plan_cancelled', 'research_stopped', 'stopped', 'wait_timeout']);
+  for (const reason of chain.MAP_CHAT_CHAIN_RESUMABLE) assert.ok(chain.resumeRound(resumeEnd({ reason })), reason);
+  for (const reason of ['done', 'user_took_over', 'other_background_work', 'not_ready', 'research_failed', 'research_not_started', 'map_changed'])
+    assert.equal(chain.resumeRound(resumeEnd({ reason })), null, reason);
+  assert.deepEqual(plain(chain.resumeRound(resumeEnd())), { round: 5, maxRounds: 8, remaining: 'left 5' }, 'reload (null reason)');
+});
+test('resumeRound: applied goes to the next round with the reply remaining (none left: nothing to resume); not applied reruns the same round', () => {
+  assert.deepEqual(plain(chain.resumeRound(resumeEnd({ applied: true, replyRemaining: 'more' }))), { round: 6, maxRounds: 8, remaining: 'more' });
+  assert.equal(chain.resumeRound(resumeEnd({ applied: true, replyRemaining: '' })), null);
+  assert.deepEqual(plain(chain.resumeRound(resumeEnd({ reason: 'stopped', startRemaining: '' }))), { round: 5, maxRounds: 8, remaining: '' });
+});
+test('resumeRound: round 1 that was not applied is a resend, not a resume; max_rounds gives another full limit', () => {
+  assert.equal(chain.resumeRound(resumeEnd({ round: 1 })), null);
+  assert.deepEqual(plain(chain.resumeRound(resumeEnd({ round: 1, applied: true, replyRemaining: 'x' }))), { round: 2, maxRounds: 8, remaining: 'x' });
+  assert.deepEqual(plain(chain.resumeRound(resumeEnd({ reason: 'max_rounds', round: 8, applied: true, replyRemaining: 'x' }))), { round: 9, maxRounds: 16, remaining: 'x' });
+  assert.equal(chain.resumeRound(resumeEnd({ reason: 'max_rounds', round: 16, applied: true, replyRemaining: 'x' })).maxRounds, 24);
+  assert.equal(chain.resumeRound(resumeEnd({ round: 8 })).maxRounds, 8);
+});
+test('isResumeKeyword: the keywords with spaces, punctuation, width and case; a longer sentence is not one', () => {
+  for (const text of ['繼續。', ' 继续 ', '接著做', '接着做!', 'Go on!', 'resume', 'Continue', 'ＣＯＮＴＩＮＵＥ', 'go  on'])
+    assert.equal(chain.isResumeKeyword(text), true, text);
+  for (const text of ['繼續改第三章', '不要繼續', '', '   ', 'continue the essay', 'stop'])
+    assert.equal(chain.isResumeKeyword(text), false, text);
+});

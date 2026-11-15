@@ -25462,6 +25462,21 @@ export class VisualAgentMapView extends ItemView {
     if (!this.closed) this.render();
   }
   /** The chat remembers what it researched; a card researched again moves to the end, and a later failure does not undo a success. */
+  /** The user asked for images: the researched topics whose note still has no image, named in one line (failed ones are in the batch box). */
+  private async chatNoImageLine(topics: ChatWorkTopic[]): Promise<MapChatLine | null> {
+    const missing: string[] = [];
+    for (const topic of topics) {
+      if (topic.status !== "succeeded") continue;
+      const path = this.map?.nodes.find(node => node.id === topic.id)?.path;
+      const text = path ? await this.chatFileText(path) : null;
+      if (text !== null && !/!\[\[[^\]]+\]\]|!\[[^\]]*\]\([^)]+\)/.test(text)) missing.push(topic.title);
+    }
+    if (!missing.length) return null;
+    return {
+      status: "skipped",
+      text: t("ui.map_chat_no_images_0_1", missing.length, missing.map(title => `「${title}」`).join(""))
+    };
+  }
   private rememberChatResearched(topics: ChatWorkTopic[]): void {
     for (const topic of topics) {
       if (topic.status !== "succeeded" && this.chatResearched.get(topic.id)?.status === "succeeded") continue;
@@ -25685,6 +25700,11 @@ export class VisualAgentMapView extends ItemView {
           const settle = (result: ChatResearchOutcome): void => {
             if (result.kind === "settled" && conversation === this.chatConversation)
               this.rememberChatResearched(result.topics);
+            if (result.kind === "settled" && request.imageSearch)
+              void this.chatNoImageLine(result.topics).then(line => {
+                if (line && chat && this.chat === chat && !this.closed && chat.transcript().length === turns)
+                  chat.appendLines([line]);
+              });
             watch?.settled(result);
             resolve(result);
           };

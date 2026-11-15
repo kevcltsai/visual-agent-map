@@ -1436,6 +1436,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_batch_stopped_0_1_2": "研究停了：做完 {0}／{1} 篇，{2} 篇沒做。",
   "ui.map_chat_batch_finished_failed_0_1_2": "研究跑完了：做完 {0}／{1} 篇，{2} 篇失敗。",
   "ui.map_chat_batch_interrupted_0_1_2": "研究在外掛重新載入時中斷：做完 {0}／{1} 篇，{2} 篇沒做。",
+  "ui.map_chat_no_images_0_1": "沒找到圖：{0} 篇（{1}），研究文字已寫入。",
   "ui.map_chat_batch_left_0": "沒做的：{0}",
   "ui.map_chat_batch_more_0": "等 {0} 篇",
   "ui.map_chat_batch_rerun_0": "重跑沒做的 {0} 篇",

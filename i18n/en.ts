@@ -1515,6 +1515,7 @@ export const en = {
   "ui.map_chat_batch_finished_failed_0_1_2": "Research finished: {0}/{1} done, {2} failed.",
   "ui.map_chat_batch_interrupted_0_1_2":
     "Research was interrupted when the plugin reloaded: {0}/{1} done, {2} not done.",
+  "ui.map_chat_no_images_0_1": "No images found for {0} topic(s) ({1}); the research text was written.",
   "ui.map_chat_batch_left_0": "Not done: {0}",
   "ui.map_chat_batch_more_0": "and {0} more",
   "ui.map_chat_batch_rerun_0": "Run the {0} not done again",

@@ -1435,6 +1435,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_batch_stopped_0_1_2": "研究停了：做完 {0}／{1} 篇，{2} 篇没做。",
   "ui.map_chat_batch_finished_failed_0_1_2": "研究跑完了：做完 {0}／{1} 篇，{2} 篇失败。",
   "ui.map_chat_batch_interrupted_0_1_2": "研究在插件重新加载时中断：做完 {0}／{1} 篇，{2} 篇没做。",
+  "ui.map_chat_no_images_0_1": "没找到图：{0} 篇（{1}），研究文字已写入。",
   "ui.map_chat_batch_left_0": "没做的：{0}",
   "ui.map_chat_batch_more_0": "等 {0} 篇",
   "ui.map_chat_batch_rerun_0": "重跑没做的 {0} 篇",

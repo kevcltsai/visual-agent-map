@@ -192,3 +192,44 @@ test('merging with no upper topic uses the current model choice, not a direct re
   h.host.currentModelChoice = () => ({ model: 'cur-x', reasoning: 'high' });
   assert.deepEqual({ ...await h.view.mergeModel(null) }, { model: 'cur-x', reasoning: 'high' });
 });
+
+// map-chat-hard-rules 01: images the user asked for are a rule (VISUAL_ON); the dialog's Standard default stays "auto".
+test('a batch with imagesRequired runs every topic with visualMode on; the dialog Standard default stays auto', async () => {
+  const seen = [];
+  const reply = { summary: 'S', detail: 'D', visualReferences: [], suggestions: [] };
+  const h = await harness([['A', 'gpt-6-luna', 'workspace'], ['B', 'gpt-6-luna', 'workspace']], {
+    askModel: async (context, _model, _reasoning, _signal, _exchange, accepted) => { seen.push(context.visualMode); accepted?.(); return reply; }
+  });
+  h.view.selection.replaceMulti(h.nodes.map(node => node.id));
+  await h.view.startMultiResearch({ requirements: '', researchMode: 'local', researchDepth: 'normal', imageSearch: true, imagesRequired: true });
+  await until(() => h.view.plugin.expansionBatches.get(`multi-research:${MAP}`)?.status === 'completed');
+  assert.deepEqual(seen, ['on', 'on']);
+  seen.length = 0;
+  h.view.selection.replaceMulti(h.nodes.map(node => node.id));
+  await h.view.startMultiResearch({ requirements: '', researchMode: 'local', researchDepth: 'normal', imageSearch: true });
+  await until(() => seen.length === 2 && h.view.plugin.expansionBatches.get(`multi-research:${MAP}`)?.status === 'completed');
+  assert.deepEqual(seen, ['auto', 'auto']);
+});
+
+// map-chat-hard-rules 03: the model of a batch is taken once when it starts; a switch while it runs changes the next batch only.
+test('a batch keeps the model it started with when the current model changes while it runs; a topic own model still wins', async () => {
+  const used = [];
+  const reply = { summary: 'S', detail: 'D', visualReferences: [], suggestions: [] };
+  let host;
+  const h = await harness([['A', 'gpt-6-luna', 'workspace'], ['B', 'gpt-6-luna', 'inherited'], ['C', 'model-b', 'manual', 'high'], ['D', 'gpt-6-luna', 'workspace']], {
+    askModel: async (_context, model, reasoning, _signal, _exchange, accepted) => {
+      used.push([model, reasoning]);
+      // The user switches the model (and its reasoning) as soon as the first card runs.
+      host.settings.cliModel = 'claude:opus';
+      host.settings.cliReasoning = 'high';
+      accepted?.();
+      return reply;
+    }
+  });
+  host = h.host;
+  h.view.selection.replaceMulti(h.nodes.map(node => node.id));
+  await h.view.startMultiResearch({ requirements: '', researchMode: 'local', researchDepth: 'normal', imageSearch: false });
+  await until(() => h.view.plugin.expansionBatches.get(`multi-research:${MAP}`)?.status === 'completed');
+  assert.deepEqual(used.map(([model]) => model).sort(), ['gpt-6-luna', 'gpt-6-luna', 'gpt-6-luna', 'model-b']);
+  assert.deepEqual(used.find(([model]) => model === 'model-b'), ['model-b', 'high'], 'a topic own model keeps its own reasoning');
+});

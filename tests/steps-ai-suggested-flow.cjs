@@ -658,3 +658,18 @@ test('rewrite counterexample: the same batch research without rewrite still merg
   assert.ok(note.detail.includes('> The plane is 60 degrees.'), note.detail);
   assert.equal(h.backups.length, 0);
 });
+
+// map-chat-hard-rules 02: a whole rewrite the user asked for ("fresh") is not held to the note's old sections.
+test('flow: a rewrite of a note with sections lets the AI decide them again; the next ordinary run follows the note again', async () => {
+  const h = await harness({ detail: FIRST });
+  await h.run({ detail: FIRST });
+  assert.equal(h.contexts[0].aiSections, 'follow', 'an ordinary run keeps the sections of the note');
+  await h.run({ detail: '### Story\nA new story.\n\n### Sources\n[S1] https://example.com/plane' }, { updateMode: 'fresh' });
+  assert.equal(h.contexts[1].aiSections, 'decide', 'the rewrite decides the sections as a first research does');
+  assert.equal(h.contexts[1].updateMode, 'fresh');
+  assert.ok(!sectionsOf(h.contexts[1].detailTemplate.sections.map(section => `### ${section.name}`).join('\n')).includes('Common faults'), 'the old sections are not the template');
+  // The stored style is not changed: the next ordinary run follows what the note has now.
+  await h.run({ detail: (await h.read()).detail });
+  assert.equal(h.contexts[2].aiSections, 'follow');
+  assert.equal(h.settings.noteStyleByKind.topic, 'builtin:ai-suggested');
+});

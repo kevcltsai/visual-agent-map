@@ -126,6 +126,8 @@ export interface RunStyleRequest {
    * empty text (nothing researched yet) are different states.
    */
   detail?: string;
+  /** This run rewrites the whole note (the map chat's rewrite): the AI-suggested style decides the sections again, not the note's. */
+  rewrite?: boolean;
 }
 
 /** How the AI-suggested style stands for one run (see `RunStyle.aiSections`). */
@@ -536,11 +538,16 @@ export class NoteStyleStore {
         this.recipeFromRef(KIND_DEFAULT_RECIPE[kind], kind, language)!;
     }
     const style = this.assemble(chosen, source, missing, language);
-    return chosen.aiDecidesSections ? this.withAiSections(style, request.detail, language) : style;
+    return chosen.aiDecidesSections ? this.withAiSections(style, request.detail, language, request.rewrite) : style;
   }
 
   /** The AI-suggested style for one run: the state the note's detail puts it in (the table in the note-style spec). */
-  private withAiSections(style: RunStyle, detail: string | undefined, language: ContentLanguage): RunStyle {
+  private withAiSections(
+    style: RunStyle,
+    detail: string | undefined,
+    language: ContentLanguage,
+    rewrite = false
+  ): RunStyle {
     const named = (mode: AiSectionsMode, template: DetailTemplate, key: TranslationKey | undefined): RunStyle => {
       const aiSections = Object.freeze({ mode, ...(detail !== undefined ? { forDetail: detail } : {}) });
       const { styleSelection } = style.contextFields;
@@ -562,7 +569,8 @@ export class NoteStyleStore {
       });
     };
     if (detail === undefined) return named("no-note", style.template, "ui.note_style_ai_sections_decide");
-    if (!detail.trim()) return named("decide", style.template, "ui.note_style_ai_sections_decide");
+    // A whole rewrite is a first research again: the note's old sections do not bind it.
+    if (!detail.trim() || rewrite) return named("decide", style.template, "ui.note_style_ai_sections_decide");
     const read = templateFromDetail(detail, noteLanguageOf(language));
     return read.ok
       ? named("follow", read.template, "ui.note_style_ai_sections_follow")

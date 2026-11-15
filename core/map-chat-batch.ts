@@ -9,6 +9,8 @@ export interface ChatBatchRequest {
   imageSearch: boolean;
   rewrite?: true;
   model?: string;
+  /** The current model when the batch first started: the cards without their own model run on it, a rerun too. */
+  batchModel?: string;
 }
 export interface ChatBatchTopic {
   id: string;

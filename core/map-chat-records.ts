@@ -419,7 +419,10 @@ function restoredBatchRequest(raw: unknown): ChatBatchRequest {
     requirements: typeof value.requirements === "string" ? value.requirements.slice(0, 4000) : "",
     imageSearch: value.imageSearch === true,
     ...(value.rewrite === true ? { rewrite: true as const } : {}),
-    ...(typeof value.model === "string" && value.model.length <= 200 ? { model: value.model } : {})
+    ...(typeof value.model === "string" && value.model.length <= 200 ? { model: value.model } : {}),
+    ...(typeof value.batchModel === "string" && value.batchModel && value.batchModel.length <= 200
+      ? { batchModel: value.batchModel }
+      : {})
   };
 }
 function restoredBatchTopics(raw: unknown): ChatBatchTopic[] {

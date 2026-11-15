@@ -351,12 +351,13 @@ export default class VisualAgentMapPlugin extends Plugin {
     settings: () => this.settings,
     exchanges: () => this.exchanges,
     recordFailure: (context, error) => this.recordFailure(context, error),
-    runStyle: ({ note, outputLanguage }) =>
+    runStyle: ({ note, outputLanguage, rewrite }) =>
       this.noteStyles.runStyle({
         topic: { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
         kind: note.topicKind ?? "topic",
         outputLanguage,
-        detail: note.detail
+        detail: note.detail,
+        ...(rewrite ? { rewrite } : {})
       }),
     resolveModel: (path, map, runOnce) => this.repo.resolveTopicModel(path, map, runOnce),
     clearOtherHistory: origin => {

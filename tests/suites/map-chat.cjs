@@ -3820,8 +3820,9 @@ const researchAct = (fields = {}) => ({ kind: 'run_map_action', action: 'researc
 const startedResearch = h => { const started = []; h.view.startMultiResearch = async (request, key, onSettled) => { started.push({ request, key, onSettled, selected: [...h.view.selection.state.multiSelected], depth: h.control.depth }); }; return started; };
 const newCard = ref => ({ kind: 'add_child', parentId: '', title: `Card ${ref}`, summary: '', ref });
 
-const quickRequest = { mapAiMode: 'quick', researchMode: 'local', researchDepth: 'normal', requirements: '', imageSearch: false };
-const standardRequest = { mapAiMode: 'standard', researchMode: 'research', researchDepth: 'normal', requirements: '', imageSearch: false };
+// A chat batch also carries the model of the chat menu when it starts and whether the user asked for images (map-chat-hard-rules).
+const quickRequest = { mapAiMode: 'quick', researchMode: 'local', researchDepth: 'normal', requirements: '', imageSearch: false, batchModel: 'claude:sonnet', imagesRequired: false };
+const standardRequest = { mapAiMode: 'standard', researchMode: 'research', researchDepth: 'normal', requirements: '', imageSearch: false, batchModel: 'claude:sonnet', imagesRequired: false };
 integrationTest('B2/D-231 research: a named mode, images and the extra requirement reach startMultiResearch; unnamed uses the map mode (none = Quick); Quick never gets images', async () => {
   const h = await harness(); await h.view.hydrate(); const started = startedResearch(h);
   const lines = await apply(h, [
@@ -3830,7 +3831,7 @@ integrationTest('B2/D-231 research: a named mode, images and the extra requireme
     researchAct({ nodeIds: [h.ids.c], mode: 'quick', images: true })
   ]);
   eq(lines.map(l => l.status), ['done', 'done', 'done'], JSON.stringify(lines)); await tick();
-  eq(started.map(s => s.request), [quickRequest, { ...standardRequest, requirements: 'only peer-reviewed', imageSearch: true }, quickRequest]);
+  eq(started.map(s => s.request), [quickRequest, { ...standardRequest, requirements: 'only peer-reviewed', imageSearch: true, imagesRequired: true }, quickRequest]);
   eq(started.map(s => s.selected), [[h.ids.a], [h.ids.b], [h.ids.c]]); assert.ok(started.every(s => s.depth === 0), 'outside any mutate');
 });
 integrationTest('D-231 counterexample (mode resolution): named Quick + map Standard = Quick; only "research" + map Standard = Standard; only "research" + no map mode = Quick; a chat research never changes the map mode', async () => {

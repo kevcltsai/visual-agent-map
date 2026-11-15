@@ -137,7 +137,7 @@ export interface TopicRunPorts {
   exchanges(): RunExchanges | null | undefined;
   recordFailure(context: string, error: unknown): string;
   /** The note style of a topic when the caller gave none (the entry that has the map and notices passes its own). */
-  runStyle(input: { note: Note; outputLanguage: ContentLanguage }): RunStyle;
+  runStyle(input: { note: Note; outputLanguage: ContentLanguage; rewrite?: boolean }): RunStyle;
   /** The model and reasoning a run-once choice resolves to for a topic. */
   resolveModel(
     path: string,
@@ -1106,9 +1106,14 @@ export class TopicRuns {
         ? await options.resolveStyle(outputLanguage)
         : this.ports.runStyle({ note, outputLanguage }));
     // The note's sections decide an "AI suggested" run, and the Detail can change between the caller's resolution and
-    // here: resolve again from the Detail this run sends.
-    if (runStyle.aiSections && runStyle.aiSections.forDetail !== note.detail)
-      runStyle = this.ports.runStyle({ note, outputLanguage });
+    // here: resolve again from the Detail this run sends. A whole rewrite ("fresh" is set only by it) is not held to the
+    // note's sections: the AI decides them again.
+    const rewrite = overrides.updateMode === "fresh";
+    if (
+      runStyle.aiSections &&
+      (runStyle.aiSections.forDetail !== note.detail || (rewrite && runStyle.aiSections.mode !== "decide"))
+    )
+      runStyle = this.ports.runStyle({ note, outputLanguage, ...(rewrite ? { rewrite } : {}) });
     const detailTemplate = runStyle.template;
     const anchorText = options.anchorContext?.(outputLanguage) || undefined;
     const context: TaskContext = withThinkingOrigin(

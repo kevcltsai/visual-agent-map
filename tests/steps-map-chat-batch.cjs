@@ -350,3 +350,34 @@ test('chat research: records off -> nothing written, the panel still follows the
   assert.equal(writes.length, 0);
   assert.equal(chat.messages[0].batch.ended, true);
 });
+
+// ---- map-chat-hard-rules: what the chat asks for is a rule, not left to the AI ----
+test('chat research: images the user asked for start the batch with imagesRequired; the batch runs on the chat menu model', async () => {
+  const { instance, chat, starts } = await chatRig();
+  instance.plugin.settings.cliModel = 'claude:opus';
+  const action = { kind: 'run_map_action', action: 'research_standard', nodeIds: ['n1', 'n2'], direction: 'with pictures', images: true };
+  chat.messages.length = 0;
+  await instance.runChatSelection(action);
+  assert.equal(starts[0].request.imageSearch, true);
+  assert.equal(starts[0].request.imagesRequired, true, 'asked for images: VISUAL_ON, not "auto"');
+  assert.equal(starts[0].request.batchModel, 'claude:opus', 'the batch is fixed to the model the chat menu shows when it starts');
+  assert.equal('model' in starts[0].request, false, 'a topic with its own model keeps it');
+  assert.equal(chat.messages[0].batch.request.batchModel, 'claude:opus', 'kept with the batch for a rerun');
+  // No images asked: nothing is required.
+  const other = await chatRig();
+  await other.run();
+  assert.equal(other.starts[0].request.imagesRequired, false);
+});
+test('chat research: a rerun keeps the batch model and the required images even after the menu changed', async () => {
+  const { instance, starts } = await rig();
+  instance.plugin.settings.cliModel = 'claude:sonnet';
+  const message = { batch: batchOf(4, 2, { request: { ...REQUEST, imageSearch: true, batchModel: 'claude:opus' } }) };
+  await instance.rerunChatBatch(message);
+  assert.equal(starts[0].request.batchModel, 'claude:opus');
+  assert.equal(starts[0].request.imagesRequired, true);
+});
+test('chat research: the batch model is read back from the record; a bad value is dropped', () => {
+  const read = batchModel => restore([startLine(1), endLine(1), ev(1, 'research_batch', { topics: [{ id: 'a', title: 'A' }], request: { ...REQUEST, batchModel } })]).turns[0].batch.request;
+  assert.equal(read('claude:opus').batchModel, 'claude:opus');
+  for (const bad of [5, '', 'x'.repeat(201)]) assert.equal('batchModel' in read(bad), false, String(bad));
+});

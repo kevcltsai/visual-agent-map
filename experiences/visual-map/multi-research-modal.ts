@@ -21,6 +21,11 @@ export interface MultiResearchRequest {
   /** Model for every started topic, for this batch only (never saved on a topic); undefined keeps each topic's model. */
   model?: string;
   /**
+   * The model for every topic without its own, as it was when a chat batch first started: a rerun keeps it. Undefined
+   * takes the current model when the batch starts.
+   */
+  batchModel?: string;
+  /**
    * A note style (`builtin:<id>` or `file:<name>`) for every started topic, for this batch only (never written to a
    * topic); undefined keeps each topic's own style.
    */

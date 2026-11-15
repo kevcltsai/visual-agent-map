@@ -360,8 +360,9 @@ test('chat research: images the user asked for start the batch with imagesRequir
   await instance.runChatSelection(action);
   assert.equal(starts[0].request.imageSearch, true);
   assert.equal(starts[0].request.imagesRequired, true, 'asked for images: VISUAL_ON, not "auto"');
-  assert.equal(starts[0].request.model, 'claude:opus', 'the batch is fixed to the model the chat menu shows when it starts');
-  assert.equal(chat.messages[0].batch.request.model, 'claude:opus', 'kept with the batch for a rerun');
+  assert.equal(starts[0].request.batchModel, 'claude:opus', 'the batch is fixed to the model the chat menu shows when it starts');
+  assert.equal('model' in starts[0].request, false, 'a topic with its own model keeps it');
+  assert.equal(chat.messages[0].batch.request.batchModel, 'claude:opus', 'kept with the batch for a rerun');
   // No images asked: nothing is required.
   const other = await chatRig();
   await other.run();
@@ -370,8 +371,13 @@ test('chat research: images the user asked for start the batch with imagesRequir
 test('chat research: a rerun keeps the batch model and the required images even after the menu changed', async () => {
   const { instance, starts } = await rig();
   instance.plugin.settings.cliModel = 'claude:sonnet';
-  const message = { batch: batchOf(4, 2, { request: { ...REQUEST, imageSearch: true, model: 'claude:opus' } }) };
+  const message = { batch: batchOf(4, 2, { request: { ...REQUEST, imageSearch: true, batchModel: 'claude:opus' } }) };
   await instance.rerunChatBatch(message);
-  assert.equal(starts[0].request.model, 'claude:opus');
+  assert.equal(starts[0].request.batchModel, 'claude:opus');
   assert.equal(starts[0].request.imagesRequired, true);
+});
+test('chat research: the batch model is read back from the record; a bad value is dropped', () => {
+  const read = batchModel => restore([startLine(1), endLine(1), ev(1, 'research_batch', { topics: [{ id: 'a', title: 'A' }], request: { ...REQUEST, batchModel } })]).turns[0].batch.request;
+  assert.equal(read('claude:opus').batchModel, 'claude:opus');
+  for (const bad of [5, '', 'x'.repeat(201)]) assert.equal('batchModel' in read(bad), false, String(bad));
 });

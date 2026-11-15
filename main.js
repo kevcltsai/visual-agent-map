@@ -52276,7 +52276,8 @@ function restoredBatchRequest(raw) {
     requirements: typeof value.requirements === "string" ? value.requirements.slice(0, 4e3) : "",
     imageSearch: value.imageSearch === true,
     ...value.rewrite === true ? { rewrite: true } : {},
-    ...typeof value.model === "string" && value.model.length <= 200 ? { model: value.model } : {}
+    ...typeof value.model === "string" && value.model.length <= 200 ? { model: value.model } : {},
+    ...typeof value.batchModel === "string" && value.batchModel && value.batchModel.length <= 200 ? { batchModel: value.batchModel } : {}
   };
 }
 function restoredBatchTopics(raw) {
@@ -75279,7 +75280,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }
   }
   async runMultiResearch(request, retryBatchKey, onSettled, tell, signal, markStarted, onTopic) {
-    var _a2;
+    var _a2, _b2;
     if (!this.map || !this.selection.state.multiSelected.size) return;
     const languageSource = this.batchLanguageSource();
     const key4 = this.multiResearchKey();
@@ -75290,7 +75291,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const selected = [...this.selection.state.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
     try {
       const current = {
-        model: (_a2 = request.model) != null ? _a2 : this.currentModelId(),
+        model: (_b2 = (_a2 = request.model) != null ? _a2 : request.batchModel) != null ? _b2 : this.currentModelId(),
         reasoning: normalizeReasoningLevel(this.plugin.settings.cliReasoning)
       };
       const resolved = request.model ? [] : await Promise.all(
@@ -75309,7 +75310,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         await confirmEach(index + 1, run);
       });
       await confirmEach(0, async () => {
-        var _a3, _b2;
+        var _a3, _b3;
         if (this.plugin.expansionCoordinator.isRunning(key4)) {
           new import_obsidian34.Notice(t("ui.multi_research_already_running"));
           return;
@@ -75346,7 +75347,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
             ...shared
           } : { ...aiModeOptions(noteAiMode(note.researchMode), "research"), ...shared };
         };
-        if (retryBatchKey && ((_b2 = this.plugin.expansionBatches.get(retryBatchKey)) == null ? void 0 : _b2.status) !== "running")
+        if (retryBatchKey && ((_b3 = this.plugin.expansionBatches.get(retryBatchKey)) == null ? void 0 : _b3.status) !== "running")
           this.plugin.expansionBatches.delete(retryBatchKey);
         let reported = false;
         let skipped2 = 0;
@@ -75413,7 +75414,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
               return void 0;
             },
             () => {
-              var _a4, _b3;
+              var _a4, _b4;
               const state = this.plugin.expansionBatches.get(key4);
               if (state && state.status !== "running" && !reported) {
                 reported = true;
@@ -75435,7 +75436,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
                   if (stopped && !topics.has(node.id))
                     topics.set(node.id, {
                       id: node.id,
-                      title: (_b3 = (_a4 = this.notes.get(node.id)) == null ? void 0 : _a4.title) != null ? _b3 : node.path,
+                      title: (_b4 = (_a4 = this.notes.get(node.id)) == null ? void 0 : _a4.title) != null ? _b4 : node.path,
                       status: "stopped"
                     });
                 tell({
@@ -80671,7 +80672,8 @@ ${note.detail.trim()}` : "",
         this.markResearchRecorded(this.chatLastRecord);
         const request = {
           ...chatResearchRequest(action, (_c = this.map) == null ? void 0 : _c.aiMode, (mode) => aiModeOptions(mode, "research")),
-          model: retryModel != null ? retryModel : this.currentModelId()
+          ...retryModel ? { model: retryModel } : {},
+          batchModel: this.currentModelId()
         };
         const watch = researchIds.length ? (() => {
           var _a3, _b3, _c2;

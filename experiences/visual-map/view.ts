@@ -19549,7 +19549,7 @@ export class VisualAgentMapView extends ItemView {
       // The model of the batch is taken once, here: a switch while it runs changes the next batch only. A topic with its own
       // model keeps it; every other one runs this model once (never written to the topic, D4).
       const current = {
-        model: request.model ?? this.currentModelId(),
+        model: request.model ?? request.batchModel ?? this.currentModelId(),
         reasoning: normalizeReasoningLevel(this.plugin.settings.cliReasoning)
       };
       const resolved = request.model
@@ -25542,10 +25542,11 @@ export class VisualAgentMapView extends ItemView {
         this.markResearchRecorded(this.chatLastRecord);
         // Told once (see startMultiResearch), whichever way the batch ends or never starts; the conversation remembers what
         // it researched, and the continuation (if any) waits on the same promise.
-        // The batch runs on the model the chat menu shows now, every card and every rerun (kept in the record).
+        // The cards without their own model run on the model the chat menu shows now, in every rerun too (kept in the record).
         const request: ChatBatchRequest = {
           ...chatResearchRequest(action, this.map?.aiMode, mode => aiModeOptions(mode, "research")),
-          model: retryModel ?? this.currentModelId()
+          ...(retryModel ? { model: retryModel } : {}),
+          batchModel: this.currentModelId()
         };
         // The cards the chat asked for: a batch that stops is told in the chat.
         const watch = researchIds.length

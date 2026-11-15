@@ -9428,6 +9428,8 @@ test('layout fix: the chat history keeps at least half of the panel; the warning
   assert.match(css, /\.vam-map-chat-body > \.vam-map-chat-log \{[^}]*min-height: 50%/);
   const warn = css.match(/\.vam-view \.vam-map-chat-auto-apply-warning \{([^}]*)\}/)[1]; assert.doesNotMatch(warn, /border:/);
   const steps = css.match(/\.vam-view \.vam-map-chat-flow-steps \{([^}]*)\}/)[1]; assert.match(steps, /max-height/); assert.match(steps, /overflow-y: auto/);
+  // A squeezed flow block scrolls inside its own box: its open AI-call line never paints over the auto-apply row below it.
+  const flow = css.match(/\.vam-view \.vam-map-chat-flow \{([^}]*)\}/)[1]; assert.match(flow, /min-height: 0/); assert.match(flow, /overflow-y: auto/);
 });
 test('P2 switch: a row above the composer, "Apply this conversation automatically" with an Off/On group of aria-pressed buttons, off by default; On tells the host and shows the warning, Off hides it', () => {
   const f = autoSwitch();

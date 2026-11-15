@@ -75327,12 +75327,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         if (nodes.length < unlocked.length) new import_obsidian34.Notice(t("ui.multi_research_skipped", unlocked.length - nodes.length));
         this.selection.exitMultiSelect("backgroundRun");
         if (!this.closed) this.render();
-        const sources = await this.batchSources(
-          (_a3 = request.referenceGroups) != null ? _a3 : [],
-          nodes.length,
-          current.model,
-          signal
-        );
+        const sources = await this.batchSources((_a3 = request.referenceGroups) != null ? _a3 : [], nodes.length, current.model, signal);
         const shared = {
           referenceGroups: sources.groups,
           requirements: request.requirements,

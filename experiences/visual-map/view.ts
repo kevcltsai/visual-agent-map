@@ -19597,12 +19597,7 @@ export class VisualAgentMapView extends ItemView {
         this.selection.exitMultiSelect("backgroundRun");
         if (!this.closed) this.render();
         // Too large for one request: condensed once for the whole batch, by the first topic that runs, and shared.
-        const sources = await this.batchSources(
-          request.referenceGroups ?? [],
-          nodes.length,
-          current.model,
-          signal
-        );
+        const sources = await this.batchSources(request.referenceGroups ?? [], nodes.length, current.model, signal);
         const shared = {
           referenceGroups: sources.groups,
           requirements: request.requirements,

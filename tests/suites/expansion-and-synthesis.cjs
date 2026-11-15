@@ -1478,6 +1478,28 @@ integrationTest('selection bar shows Research; starting leaves selection mode an
   await until(() => h.plugin.expansionBatches.get(h.key).status === 'stopped');
   assert.equal(toolbar().length, 1);
 });
+integrationTest('the multi research bar counts the topics running and names the first two, which change as topics finish', async () => {
+  const h = await multiResearchHarness(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
+  const element = (tag, o = {}) => ({ tag, text: o.text ?? '', cls: o.cls ?? '', children: [], listeners: {}, attrs: {},
+    createDiv(v) { const c = element('div', { cls: typeof v === 'string' ? v : v?.cls }); this.children.push(c); return c; },
+    createEl(n, v = {}) { const c = element(n, v); this.children.push(c); return c; }, createSpan(v = {}) { const c = element('span', v); this.children.push(c); return c; },
+    addEventListener(n, fn) { this.listeners[n] = fn; }, addClass(n) { this.cls = `${this.cls} ${n}`.trim(); }, setAttr(k, v) { this.attrs[k] = v; } });
+  const all = root => [root, ...root.children.flatMap(all)];
+  const text = () => { const root = element('content'); h.view.renderMultiResearchStatus(root); return all(root).map(i => i.text).join('|'); };
+  h.view.notes = new Map(h.nodes.map((n, index) => [n.id, { title: 'ABCDEFGH'[index] }]));
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
+  await h.view.startMultiResearch(h.request); await until(() => h.runs.length === 6);
+  assert.ok(text().includes('Researching: 0 of 8 done · 6 running: A, B and more'), text());
+  for (const id of ['A', 'B', 'C']) h.finish.get(id)();
+  await until(() => h.plugin.expansionBatches.get(h.key).completed === 3 && h.runs.length === 8);
+  assert.ok(text().includes('Researching: 3 of 8 done · 5 running: D, E and more'), text());
+  for (const id of ['D', 'E', 'F', 'G']) h.finish.get(id)();
+  await until(() => h.plugin.expansionBatches.get(h.key).completed === 7);
+  assert.ok(text().includes('Researching: 7 of 8 done · H'), text());
+  assert.ok(text().includes('Stop research'));
+  h.view.stopMultiResearch();
+  await until(() => h.plugin.expansionBatches.get(h.key).status === 'stopped');
+});
 integrationTest('multi research with a chosen model runs each started topic on it once, saves nothing on the topic and confirms usage for it', async () => {
   const h = await multiResearchHarness(['A', 'B', 'C']);
   h.plugin.running.add(h.nodes[2].path);

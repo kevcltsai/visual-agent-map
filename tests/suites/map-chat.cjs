@@ -9429,6 +9429,22 @@ integrationTest('P2 (l) progress: set in round 1, statuses updated later; header
   const bar = find(flow, i => i.attrs?.role === 'progressbar'); assert.deepEqual([bar.attrs['aria-valuenow'], bar.attrs['aria-valuemax'], bar.attrs['aria-valuemin']], ['3', '3', '0']); assert.equal(bar.attrs['aria-valuetext'], '3 of 3 steps done'); assert.ok(hasClass(bar, 'vam-research-progress-track'));
   assert.ok(find(bar, i => hasClass(i, 'vam-research-progress-fill'))); const items = findAll(flow, i => i.tag === 'li'); eq(items.map(i => visibleText(i)), ['✓1. Outline', '✓2. Write', '✓3. Check']);
 });
+integrationTest('flow fix: every later round is told the steps so far (continuation.progress, names and statuses), so the AI can report them back', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); h.open();
+  chainReplies(h, sayP(prog(['Outline', 'done'], ['Write', 'current'], ['Check', 'todo']), [addRoot('x', 'X')]), sayP(undefined, [addRoot('y', 'Y')]), sayP(undefined, [addRoot('z', 'Z')], ''));
+  h.type('three phases'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 3);
+  assert.equal(contextOf(h.control.requests[0]).continuation, undefined, 'round 1 has no continuation');
+  const want = { steps: [{ name: 'Outline', status: 'done' }, { name: 'Write', status: 'current' }, { name: 'Check', status: 'todo' }] };
+  eq(contextOf(h.control.requests[1]).continuation.progress, want, 'round 2 gets the steps of round 1');
+  eq(contextOf(h.control.requests[2]).continuation.progress, want, 'round 3 still gets them though round 2 sent none');
+  const g = await harness(); await g.view.hydrate(); g.view.setChatAutoApply(true); g.open(); chainReplies(g, say('One.', [addRoot('x', 'X')], 'More'), say('Two.', [addRoot('y', 'Y')], ''));
+  g.type('go'); await g.view.sendMapChat(); await until(() => g.view.chatChain === null && g.control.requests.length === 2);
+  assert.equal('progress' in contextOf(g.control.requests[1]).continuation, false, 'no progress, no field');
+});
+test('flow fix: the prompt says later rounds read continuation.progress and send the steps back every round, in both languages', () => {
+  const en = fs.readFileSync(path.join(root, 'core/steps/map-chat/prompt.en.md'), 'utf8'); const zh = fs.readFileSync(path.join(root, 'core/steps/map-chat/prompt.zh.md'), 'utf8');
+  assert.match(en, /continuation\.progress/); assert.match(en, /every round/i); assert.match(zh, /continuation\.progress/); assert.match(zh, /每一輪都要/);
+});
 integrationTest('e2e: a chain that ends done with nothing left shows every step done even when the last reply did not say so', async () => {
   const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); h.open();
   chainReplies(h, sayP(prog(['Write', 'current'], ['Add', 'todo']), [addRoot('x', 'X')]), sayP(undefined, [addRoot('y', 'Y')], ''));

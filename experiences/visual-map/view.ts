@@ -509,7 +509,7 @@ import { mapChatSourceMaterial, type MapChatSourceCache } from "../../core/map-c
 import { normalizeVaultPath } from "../../core/map-chat-guard";
 import { MapChatFiles } from "../../core/map-chat-files";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
-import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
+import { FIRST_EVENT_WAIT_MS } from "../../core/attempt-runner";
 import { GateError, applyPause } from "../../core/argument-map/machine";
 import { effectiveVerdict, managedNodeIds, readArgumentMap } from "../../core/argument-map/model";
 import {

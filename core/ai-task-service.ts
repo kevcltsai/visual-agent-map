@@ -23,6 +23,7 @@ import type { AiUsageStore, UsageAction } from "./ai-usage-store";
 import type { ResearchObserver, ResearchStageName } from "../ai/research-observer";
 import type { AiRuntimeId, RuntimeTaskControls } from "./ai-runtime";
 import { prepareStep } from "./step-runner";
+import { runAttempts, type Attempt, type AttemptClock } from "./attempt-runner";
 import { AiCalls, type AiCallExchange } from "./ai-calls";
 import { aiRuntimeForModel } from "./ai-runtime-service";
 import { resolveSourceDelivery, sourceText, MAX_CONDENSE_CALLS, estimateCondenseCalls } from "./source-gateway";
@@ -42,26 +43,11 @@ export const CONDENSE_EXTRACT_CONCURRENCY = 3;
 
 export { extractJsonObject } from "./steps/task/parse";
 
-/** How long a research request may go without any model event before the slow notice (and the re-send) is offered. */
-export const FIRST_EVENT_WAIT_MS = 20_000;
-
-/** Timer and wall clock of the first-event watchdog; tests replace it with a fake. */
-export interface AttemptClock {
-  now(): number;
-  setTimeout(callback: () => void, ms: number): unknown;
-  clearTimeout(handle: unknown): void;
-}
 function cancelled(): Error {
   const error = new Error(t("ui.ai_task_cancelled"));
   error.name = "AbortError";
   return error;
 }
-const realClock: AttemptClock = {
-  now: () => Date.now(),
-  setTimeout: (callback, ms) => window.setTimeout(callback, ms),
-  clearTimeout: handle => window.clearTimeout(handle as number)
-};
-
 /** What one attempt of the observed main call needs on top of the shared controls. */
 interface AttemptSetup {
   signal: AbortSignal;
@@ -448,11 +434,8 @@ export class AiTaskService {
   }
 
   /**
-   * The observed main call (S3, D-2026-10-25): each attempt runs one model request. Without a model event for
-   * {@link FIRST_EVENT_WAIT_MS} after the prompt is written the observer is told (`onSlow`), with a handle that replaces
-   * the attempt: it stops the old request, marks its exchange failed and sends the same prompt again inside this same
-   * call, so the caller's stale check and running flag stay as they are and nothing from the old attempt can be written.
-   * Never automatic. The task's own signal wins over a re-send.
+   * The observed main call (S3, D-2026-10-25): see {@link runAttempts}. Here each attempt is one research request; the
+   * re-send marks the old attempt's exchange failed and promises the id of the next one.
    */
   private async sendObserved<Sent>(
     observer: ResearchObserver,
@@ -460,8 +443,8 @@ export class AiTaskService {
     accepted: (() => void) | undefined,
     send: (setup: AttemptSetup) => Promise<Sent>
   ): Promise<Sent> {
-    const clock = this.options.clock ?? realClock;
-    const iso = (): string => new Date(clock.now()).toISOString();
+    const clock = this.options.clock;
+    const iso = (): string => new Date((clock ?? { now: () => Date.now() }).now()).toISOString();
     const safe = (callback: () => void): void => {
       try {
         callback();
@@ -469,98 +452,56 @@ export class AiTaskService {
         /* An observer must not be able to fail the request. */
       }
     };
-    let attemptNumber = 0;
     let promisedId: string | undefined;
     let previousExchange = "";
-    for (;;) {
-      if (taskSignal?.aborted) throw cancelled();
-      attemptNumber++;
-      const attemptId = randomUUID();
-      const controller = new AbortController();
-      const onTaskAbort = (): void => controller.abort();
-      taskSignal?.addEventListener("abort", onTaskAbort, { once: true });
+    // The attempt that is running: a re-send and the slow notice only ever concern it.
+    let extra: AiMilestones = {};
+    let exchangeId = "";
+    const start = (attempt: Attempt): Promise<Sent> => {
+      const attemptId = attempt.id;
       const exchangeIdForAttempt = promisedId;
       promisedId = undefined;
-      const extra: AiMilestones = previousExchange ? { resendOf: previousExchange } : {};
-      let exchangeId = "";
-      let resendRequested = false,
-        firstEvent = false,
-        watching = true,
-        timer: unknown;
-      // After a re-send or a stop, whatever the old attempt still reports is dropped.
-      const live = (): boolean => !controller.signal.aborted && !resendRequested;
-      const disarm = (): void => {
-        if (timer === undefined) return;
-        clock.clearTimeout(timer);
-        timer = undefined;
-      };
-      const resend = (): void => {
-        if (taskSignal?.aborted || !live() || firstEvent) return;
-        resendRequested = true;
-        disarm();
-        promisedId = randomUUID();
-        extra.resentAs = promisedId;
-        controller.abort();
-      };
-      const arm = (): void => {
-        disarm();
-        if (!watching || firstEvent || !live()) return;
-        timer = clock.setTimeout(() => {
-          timer = undefined;
-          if (firstEvent || !live()) return;
-          extra.slowShownAt = iso();
-          safe(() => observer.onSlow?.(attemptId, true, resend));
-        }, FIRST_EVENT_WAIT_MS);
-      };
+      const mine: AiMilestones = previousExchange ? { resendOf: previousExchange } : {};
+      extra = mine;
+      exchangeId = "";
       const seen = (): boolean => {
-        if (!live()) return false;
-        if (!firstEvent) {
-          firstEvent = true;
-          disarm();
-          extra.firstEventAt ??= iso();
-          if (extra.slowShownAt) safe(() => observer.onSlow?.(attemptId, false));
-        }
-        return true;
+        if (attempt.live()) mine.firstEventAt ??= iso();
+        return attempt.seen();
       };
       const stage = (name: ResearchStageName, query?: string): void => {
-        const stages = (extra.stages ??= []);
+        const stages = (mine.stages ??= []);
         if (stages.length < 20 && stages.at(-1)?.stage !== name) stages.push({ stage: name, at: iso() });
         safe(() => observer.onStage?.(attemptId, name, query));
       };
-      safe(() => observer.onAttempt?.(attemptId, attemptNumber));
       const setup: AttemptSetup = {
-        signal: controller.signal,
+        signal: attempt.signal,
         exchangeId: exchangeIdForAttempt,
-        extraMilestones: () => ({ ...extra }),
+        extraMilestones: () => ({ ...mine }),
         hooks: {
           stream: true,
           onAccepted: (): void => {
             accepted?.();
-            if (!live()) return;
-            if (!extra.acceptedAt) {
-              extra.acceptedAt = iso();
+            if (!attempt.live()) return;
+            if (!mine.acceptedAt) {
+              mine.acceptedAt = iso();
               // The card shows "waiting for the model" from acceptance, so the stage list starts there (KPI T1).
-              (extra.stages ??= []).push({ stage: "waiting", at: extra.acceptedAt });
+              (mine.stages ??= []).push({ stage: "waiting", at: mine.acceptedAt });
             }
-            arm();
+            attempt.arm();
           },
-          // Without stream events (json mode) the first model event cannot be seen, so the notice would be a false alarm.
           onStreamMode: mode => {
-            if (mode !== "stream-json") {
-              watching = false;
-              disarm();
-            }
-            if (live()) safe(() => observer.onStreamMode?.(attemptId, mode));
+            attempt.streamMode(mode);
+            if (attempt.live()) safe(() => observer.onStreamMode?.(attemptId, mode));
           },
           // Only when the observer can take additions: a hook here makes Claude open stdin for them (a different input format).
           ...(observer.onSteer
             ? {
                 onSteer: (steer: (text: string) => Promise<void>): void => {
-                  if (!live()) return;
+                  if (!attempt.live()) return;
                   safe(() =>
                     observer.onSteer?.(attemptId, async text => {
                       // An attempt the user replaced or stopped takes nothing: the text never reaches its process.
-                      if (!live()) throw cancelled();
+                      if (!attempt.live()) throw cancelled();
                       await steer(renderTaskSteer(text));
                     })
                   );
@@ -587,31 +528,31 @@ export class AiTaskService {
           exchangeId = id;
         },
         afterReply: () => {
-          if (!live()) throw cancelled();
+          if (!attempt.live()) throw cancelled();
         }
       };
-      // The race makes the loop independent of a runtime that is slow to honour the abort.
-      const replaced = new Promise<never>((_resolve, reject) =>
-        controller.signal.addEventListener("abort", () => reject(cancelled()), {
-          once: true
-        })
-      );
-      replaced.catch(() => undefined);
-      try {
-        const attempt = send(setup);
-        attempt.catch(() => undefined);
-        const sent = await Promise.race([attempt, replaced]);
-        // A reply that arrives after the user replaced this attempt is discarded.
-        if (!(resendRequested && !taskSignal?.aborted)) return sent;
-      } catch (error) {
-        if (taskSignal?.aborted || !resendRequested) throw error;
-      } finally {
-        disarm();
-        taskSignal?.removeEventListener("abort", onTaskAbort);
+      return send(setup);
+    };
+    return runAttempts<Sent>({
+      signal: taskSignal,
+      clock,
+      stopped: cancelled,
+      start,
+      onAttempt: attempt => observer.onAttempt?.(attempt.id, attempt.number),
+      onSlow: (attempt, resend) => {
+        extra.slowShownAt = iso();
+        observer.onSlow?.(attempt.id, true, resend);
+      },
+      onCleared: attempt => observer.onSlow?.(attempt.id, false),
+      onResend: () => {
+        promisedId = randomUUID();
+        extra.resentAs = promisedId;
+      },
+      onReplaced: () => {
+        this.failExchange(exchangeId, t("log.research_resent_by_user"));
+        previousExchange = exchangeId;
       }
-      this.failExchange(exchangeId, t("log.research_resent_by_user"));
-      previousExchange = exchangeId;
-    }
+    });
   }
 
   /**

@@ -24114,7 +24114,7 @@ var MergeDrafts = class {
   /** The model call of an AI merge; a stopped, replaced or late run changes nothing. */
   async run(task) {
     const language2 = this.ports.language();
-    const progress = this.ports.progress(task.mapPath, task.model);
+    const progress = this.ports.progress(task);
     try {
       const snapshot = await this.ports.snapshot(task.sources, task.controller.signal);
       const sourceGroup = snapshot.group;
@@ -60313,7 +60313,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian34.Ite
       changed: () => this.render(),
       language: () => this.plugin.settings.language,
       detailTemplate: (language2) => this.mapStyleCached(language2, { notify: true }).template,
-      progress: (mapPath, model) => this.startTaskProgress(this.taskProgressKey("merge", mapPath), model),
+      progress: (task) => {
+        return this.startTaskProgress(this.taskProgressKey("merge", task.mapPath), task.model);
+      },
       snapshot: (sources, signal) => this.mergeSourceSnapshot(sources, signal),
       ask: (context, model, reasoning, signal, observer) => (
         // Each request is its own attempt of one entry: the repair request clears the first request's preview.

@@ -1612,7 +1612,9 @@ export class VisualAgentMapView extends ItemView {
     changed: () => this.render(),
     language: () => this.plugin.settings.language,
     detailTemplate: language => this.mapStyleCached(language, { notify: true }).template,
-    progress: (mapPath, model) => this.startTaskProgress(this.taskProgressKey("merge", mapPath), model),
+    progress: task => {
+      return this.startTaskProgress(this.taskProgressKey("merge", task.mapPath), task.model);
+    },
     snapshot: (sources, signal) => this.mergeSourceSnapshot(sources, signal),
     ask: (context, model, reasoning, signal, observer) =>
       // Each request is its own attempt of one entry: the repair request clears the first request's preview.

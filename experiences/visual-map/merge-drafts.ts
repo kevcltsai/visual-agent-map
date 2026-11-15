@@ -58,7 +58,7 @@ export interface MergeDraftPorts {
   changed(): void;
   language(): ContentLanguage;
   detailTemplate(language: ContentLanguage): DetailTemplate;
-  progress(mapPath: string, model: string): { observer?: ResearchObserver; end: () => void };
+  progress(task: MergeTask): { observer?: ResearchObserver; end: () => void };
   snapshot(
     sources: { id: string; path: string }[],
     signal: AbortSignal
@@ -122,7 +122,7 @@ export class MergeDrafts {
   /** The model call of an AI merge; a stopped, replaced or late run changes nothing. */
   async run(task: MergeTask): Promise<void> {
     const language = this.ports.language();
-    const progress = this.ports.progress(task.mapPath, task.model);
+    const progress = this.ports.progress(task);
     try {
       const snapshot = await this.ports.snapshot(task.sources, task.controller.signal);
       const sourceGroup = snapshot.group;

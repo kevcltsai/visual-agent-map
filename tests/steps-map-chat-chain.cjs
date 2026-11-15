@@ -148,6 +148,11 @@ test('A9 plan: find_images is the one action outside CHAIN_SAFE that never asks,
   assert.equal(plan([pictures], undefined, { chatStartedResearch: true }), null);
   assert.deepEqual(reasons([run('merge'), pictures], { round: 2, researchSoFar: 0 }), ['auto_round_other_actions'], 'the merge beside it still asks');
 });
+test('plan: a read_md_file is not counted toward the action limit (it is never shown, decision 2026-11-15-map-chat-file-bugs#2)', () => {
+  const limit = Array.from({ length: MAP_CHAT_PLAN_ACTION_LIMIT }, (_, i) => add(i));
+  assert.equal(plan([...limit, { kind: 'read_md_file', path: 'x/A.md' }]), null);
+  assert.deepEqual(reasons([...limit, add(99)]), ['many_actions']);
+});
 test('A9 plan: from the second round on, safe actions are not stopped by their number; the first round still is; unsafe ones still count', () => {
   const many = Array.from({ length: MAP_CHAT_PLAN_ACTION_LIMIT + 5 }, (_, i) => add(i));
   assert.deepEqual(reasons(many), ['many_actions']);

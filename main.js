@@ -53504,7 +53504,7 @@ function planFor(actions, context, options = {}) {
   const readsResearch = autoRound || options.chatStartedResearch === true || readsSources;
   const onlySafe = readsResearch && actions.every((action) => isFindImages(action) || isChainSafeFor(action, options.trusted));
   const autoOnlySafe = autoRound && onlySafe;
-  const planned = actions.filter((action) => !isFindImages(action));
+  const planned = actions.filter((action) => !isFindImages(action) && action.kind !== "read_md_file");
   if (planned.length > MAP_CHAT_PLAN_ACTION_LIMIT && !imageAddsOnly && !autoOnlySafe) reasons.push("many_actions");
   let research = 0;
   let calls = 0;

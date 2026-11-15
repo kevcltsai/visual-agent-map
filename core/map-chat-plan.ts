@@ -203,7 +203,8 @@ export function planFor(
     readsResearch && actions.every(action => isFindImages(action) || isChainSafeFor(action, options.trusted));
   const autoOnlySafe = autoRound && onlySafe;
   // find_images never needs a plan (owner: pictures are put in without asking), so it does not count toward the action limit or the other-actions rules.
-  const planned = actions.filter(action => !isFindImages(action));
+  // read_md_file writes nothing and is never shown (decision 2026-11-15-map-chat-file-bugs#2): it does not count either.
+  const planned = actions.filter(action => !isFindImages(action) && action.kind !== "read_md_file");
   if (planned.length > MAP_CHAT_PLAN_ACTION_LIMIT && !imageAddsOnly && !autoOnlySafe) reasons.push("many_actions");
   let research = 0;
   let calls = 0;

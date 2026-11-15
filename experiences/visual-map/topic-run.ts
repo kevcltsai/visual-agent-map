@@ -33,8 +33,9 @@ import {
   type WritebackResult
 } from "../../ai/note-writeback";
 import { runStyleLabelText } from "../../ai/note-style-label";
-import type { MapDocument } from "../../map-model";
-import type { AgentTaskHandle, RunOnceModel } from "./modals";
+import type { MapDocument, MapNode } from "../../map-model";
+import type { ModelChoice } from "../../ai/model-resolution";
+import type { AgentTaskHandle, RunOnceModel, SynthesisObserver, TaskOptions } from "./modals";
 import { withThinkingOrigin } from "./thinking-origin";
 import { formatIssuesPatch, originBaseline, summaryForPrompt } from "./note-write-helpers";
 
@@ -311,7 +312,7 @@ export interface IntegrateChildrenStart extends WritebackHooks {
 /**
  * What a selection-synthesis run needs from the entry that starts it (the view). The run belongs to a map, not to one
  * topic: it is registered under the map's path like any other run, so Stop, stopAll and dispose reach it through
- * `stop`. The view keeps the task state it shows.
+ * `stop`. The state it shows lives in {@link TopicRuns.startSelectionSynthesis} (per owning view).
  */
 export interface SynthesizeSelectionStart {
   /** "directions" asks for suggested directions; "draft" writes the new topic. */
@@ -357,6 +358,123 @@ export interface SynthesizeSelectionStart {
   settled: () => void;
 }
 
+/** A multi-select synthesis the view shows (a selection bar row); its state lives in {@link TopicRuns.syntheses}. */
+export interface SelectionSynthesisTask {
+  title: string;
+  goal: string;
+  rules: string;
+  sources: MapNode[];
+  options: TaskOptions;
+  mapPath: string;
+  mapId: string;
+  sourceContent: string;
+  controller: AbortController;
+  /** `applying`: the AI result passed its fences and is being written (no Stop; nothing to review). */
+  state: "running" | "directions" | "applying" | "failed" | "cancelled";
+  /** The step this run is on: the AI's suggested directions, or the draft itself. */
+  step: "directions" | "draft";
+  directions: Suggestion[];
+  progress: string;
+  /** The model (and reasoning) this run uses, resolved when it started; a retry asks its usage notice for the same one. */
+  model: string;
+  reasoning: ModelChoice["reasoning"];
+}
+
+/** One topic's integration (directions, then draft) the view shows on the card. */
+export interface TopicSynthesisTask {
+  mapPath: string;
+  mapId: string;
+  state: "running" | "directions" | "failed" | "cancelled";
+  step: "directions" | "draft";
+  controller: AbortController;
+  progress: string;
+  options: TaskOptions;
+  directions: Suggestion[];
+  direction: string;
+}
+
+/** What one view has in flight: the selection synthesis, a start in progress, and one integration per topic path. */
+export interface SynthesisState {
+  selection: SelectionSynthesisTask | null;
+  /** A multi-select synthesis step is starting (before its task exists), so a second request is refused. */
+  selectionStarting: boolean;
+  readonly topics: Map<string, TopicSynthesisTask>;
+}
+
+/** What a single-topic integration needs from the entry that starts it (the view); the state transitions live in TopicRuns. */
+export interface TopicSynthesisStart {
+  mapPath: string;
+  mapId: string;
+  options: TaskOptions;
+  /** null: ask for directions first; otherwise write the draft. */
+  direction: string | null;
+  failed: (message: string) => void;
+  accepted: () => void;
+  observer?: SynthesisObserver & { onWritten?: () => void };
+  /** The view redraws. */
+  changed: () => void;
+  directions: (
+    runOptions: TaskOptions,
+    found: (items: Suggestion[]) => void,
+    fail: (message: string) => void,
+    accepted: () => void
+  ) => Promise<void>;
+  draft: (
+    runOptions: TaskOptions,
+    direction: string,
+    drafted: (
+      result: AiResult,
+      save: (summary: string, detail: string) => Promise<void>,
+      summary: string,
+      detail: string
+    ) => Promise<void>,
+    fail: (message: string) => void,
+    accepted: () => void
+  ) => Promise<void>;
+  /** The undo mark taken just before the write. */
+  undoMark: () => unknown;
+  /** Runs after the write (the view shows its undo notice). */
+  written: (undoMark: unknown) => void;
+}
+
+/** What a multi-select synthesis needs from the entry that starts it (the view); the state transitions live in TopicRuns. */
+export interface SelectionSynthesisStart {
+  sources: MapNode[];
+  options: TaskOptions;
+  /** null: ask for directions first; otherwise write the draft. */
+  direction: string | null;
+  failed: (message: string) => void;
+  accepted: () => void;
+  observer?: SynthesisObserver;
+  /** The thin entry's own sink: it rethrows the original error to its caller. */
+  errorSink?: (error: unknown) => void;
+  /** The open map when the run started. */
+  mapPath: string;
+  mapId: string;
+  /** The view redraws. */
+  changed: () => void;
+  model: () => Promise<ModelChoice>;
+  readSources: (mode: "strong" | "summary", language: TaskOptions["outputLanguage"]) => Promise<ReferenceGroup>;
+  startProgress: (model: string) => { observer?: ResearchObserver; end: () => void };
+  /** `progress` is the draft step's progress sink (it ignores a replaced task); the directions step uses `runOptions.onProgress`. */
+  buildContext: (
+    group: ReferenceGroup,
+    task: SelectionSynthesisTask,
+    runOptions: TaskOptions,
+    progress: (message: string) => void
+  ) => Promise<TaskContext>;
+  /** Creates the topic (the view's write port); throws without writing when the sources or the map changed. */
+  write: (result: AiResult, task: SelectionSynthesisTask, model: string) => Promise<void>;
+  /** Runs after the write (the view shows its undo notice). */
+  written: (undoMark: unknown, task: SelectionSynthesisTask) => void;
+  /** The directions are ready but their dialog is closed: the view tells the user and can reopen it. */
+  offerDirections: (waiting: SelectionSynthesisTask) => void;
+  mapChanged: (mapPath: string, mapId: string) => boolean;
+  closed: () => boolean;
+  /** The undo mark taken just before the write. */
+  undoMark: () => unknown;
+}
+
 interface ResearchPrelude {
   note: Note;
   used: { model: string; reasoning?: ReasoningLevel };
@@ -388,6 +506,10 @@ export class TopicRuns {
   /** Jobs waiting for a free slot, first in first out. */
   private readonly chartQueue: Array<{ controller: AbortController; start: () => void }> = [];
   private chartRunning = 0;
+  /** What each open view has in flight for synthesis: a closed view's entry goes away with the view. */
+  private readonly synthesisStates = new WeakMap<object, SynthesisState>();
+  /** The redraw hook of each view's selection synthesis, kept for {@link stopSelection}. */
+  private readonly selectionChanged = new WeakMap<object, () => void>();
 
   constructor(readonly ports: TopicRunPorts) {}
 
@@ -1465,7 +1587,7 @@ export class TopicRuns {
     this.ports.activeTasks().get(path)?.abort();
   }
 
-  /** Registers the stop handle of a run the view owns (selection synthesis, until ticket 05). */
+  /** Registers the stop handle of a single topic's integration (startTopicSynthesis); it is released only when still the same one. */
   registerTask(path: string, controller: AbortController): void {
     this.ports.activeTasks().set(path, controller);
   }
@@ -1474,6 +1596,399 @@ export class TopicRuns {
   releaseTask(path: string, controller: AbortController): void {
     const tasks = this.ports.activeTasks();
     if (tasks.get(path) === controller) tasks.delete(path);
+  }
+
+  /** The synthesis state of one view, created on the first read. The view reads it and tests may write it. */
+  syntheses(owner: object): SynthesisState {
+    let state = this.synthesisStates.get(owner);
+    if (!state) {
+      state = { selection: null, selectionStarting: false, topics: new Map() };
+      this.synthesisStates.set(owner, state);
+    }
+    return state;
+  }
+
+  /**
+   * One step of a single topic's integration: the AI's suggested directions (`direction === null`), then the draft.
+   * The task is kept for the card until it is written or discarded; the stop handle is registered for the topic.
+   */
+  async startTopicSynthesis(owner: object, path: string, input: TopicSynthesisStart): Promise<void> {
+    const { options, direction, failed, accepted, observer } = input;
+    const topics = this.syntheses(owner).topics;
+    const existing = topics.get(path);
+    const step = direction === null ? "directions" : "draft";
+    if (this.isBusy(path) || this.hasTask(path) || existing?.state === "running") {
+      failed(t("ui.ai_running_ai"));
+      return;
+    }
+    if (step === "directions" && existing?.state === "directions") {
+      failed(t("ui.synthesis_pending_review_first"));
+      return;
+    }
+    if (step === "draft") {
+      // A draft follows chosen directions, or starts fresh when the suggestions were skipped; it never overwrites
+      // a draft that is still waiting for review.
+      if (existing && (existing.mapPath !== input.mapPath || existing.mapId !== input.mapId)) {
+        failed(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+        return;
+      }
+    }
+    const controller = new AbortController();
+    const modalSignal = options.signal;
+    const abortBeforeAcceptance = (): void => controller.abort();
+    if (modalSignal?.aborted) controller.abort();
+    else modalSignal?.addEventListener("abort", abortBeforeAcceptance, { once: true });
+    // `steer` belongs to this run only: a task kept for the next step must not carry it (and the next step brings its own).
+    const stored = { ...options, signal: undefined, onProgress: undefined, steer: undefined };
+    const task: TopicSynthesisTask =
+      step === "draft" &&
+      existing?.directions.length &&
+      (existing.state === "directions" || options.continuesDirections)
+        ? existing
+        : {
+            mapPath: input.mapPath,
+            mapId: input.mapId,
+            state: "running",
+            step,
+            controller,
+            progress: "",
+            options: stored,
+            directions: [],
+            direction: ""
+          };
+    task.state = "running";
+    task.step = step;
+    task.controller = controller;
+    task.progress = "";
+    task.direction = direction ?? "";
+    topics.set(path, task);
+    this.registerTask(path, controller);
+    const runOptions: TaskOptions = {
+      ...(step === "draft"
+        ? { ...task.options, requirements: options.requirements || task.options.requirements }
+        : options),
+      // The model of this step is the dialog's choice now, not the one the first step was started with.
+      runOnce: options.runOnce,
+      steer: options.steer,
+      signal: controller.signal,
+      onProgress: message => {
+        task.progress = message;
+        options.onProgress?.(message);
+        if (topics.get(path) === task) input.changed();
+      }
+    };
+    let launched = false;
+    let outcome: "found" | "written" | "failed" | null = null;
+    const markAccepted = (): void => {
+      if (launched || controller.signal.aborted) return;
+      launched = true;
+      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
+      observer?.accepted?.(() => controller.abort());
+      accepted();
+    };
+    const fail = (message: string): void => {
+      if (outcome) return;
+      outcome = "failed";
+      if (topics.get(path) === task) {
+        if (controller.signal.aborted && observer?.isOpen()) {
+          // Stopped from the open dialog: nothing was produced, so leave no badge behind. A draft that was stopped
+          // returns to its directions; a directions request that was stopped just goes away.
+          if (step === "draft" && task.directions.length) task.state = "directions";
+          else topics.delete(path);
+        } else if (!launched && step === "draft" && task.directions.length) task.state = "directions";
+        else {
+          task.state = controller.signal.aborted ? "cancelled" : "failed";
+          task.progress = message;
+        }
+      }
+      failed(message);
+    };
+    try {
+      if (step === "directions")
+        await input.directions(
+          runOptions,
+          items => {
+            // A result that arrives after Stop or after the task was replaced is dropped.
+            if (controller.signal.aborted || topics.get(path) !== task) return;
+            outcome = "found";
+            task.state = "directions";
+            task.directions = items;
+            // Shown in the dialog that started the step.
+            if (observer?.isOpen() && observer.directions) observer.directions(items);
+          },
+          fail,
+          markAccepted
+        );
+      else
+        await input.draft(
+          runOptions,
+          direction ?? "",
+          async (_result, save, summary, detail) => {
+            // Stop, close or a replaced task before the write: nothing is written.
+            if (controller.signal.aborted || topics.get(path) !== task) return;
+            const previous = input.undoMark();
+            await save(summary, detail);
+            outcome = "written";
+            if (topics.get(path) === task) topics.delete(path);
+            input.written(previous);
+            if (observer?.isOpen()) observer.written?.();
+            observer?.onWritten?.();
+          },
+          fail,
+          markAccepted
+        );
+      if (!outcome) fail(t("ui.ai_task_cancelled"));
+    } catch (error) {
+      fail(error instanceof Error ? error.message : String(error));
+    } finally {
+      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
+      this.releaseTask(path, controller);
+      input.changed();
+    }
+  }
+
+  /** Stops the topic's running integration through its own controller (a task that is not running has nothing to stop). */
+  stopSynthesis(owner: object, path: string): void {
+    const task = this.syntheses(owner).topics.get(path);
+    if (task?.state === "running") task.controller.abort();
+  }
+
+  /** Forgets the topic's integration unless it is running; true when it was removed. */
+  discardSynthesis(owner: object, path: string): boolean {
+    const topics = this.syntheses(owner).topics;
+    const task = topics.get(path);
+    if (!task || task.state === "running") return false;
+    topics.delete(path);
+    return true;
+  }
+
+  /** The view closed: its running integrations are stopped and every entry goes away. */
+  dropSyntheses(owner: object): void {
+    const topics = this.syntheses(owner).topics;
+    for (const task of topics.values()) if (task.state === "running") task.controller.abort();
+    topics.clear();
+  }
+
+  /**
+   * One step of multi-select synthesis: the AI's suggested directions (`direction === null`), then the draft. Both
+   * report to the open dialog through `observer`; once it is closed the run carries on and the selection bar shows it.
+   * The view has already checked the map, the selection size and the AI lock.
+   */
+  async startSelectionSynthesis(owner: object, input: SelectionSynthesisStart): Promise<void> {
+    const { sources, options, direction, failed, accepted, observer, errorSink } = input;
+    const state = this.syntheses(owner);
+    this.selectionChanged.set(owner, input.changed);
+    const existing = state.selection && state.selection.mapPath === input.mapPath ? state.selection : null;
+    const step = direction === null ? "directions" : "draft";
+    if (existing?.state === "running" || state.selectionStarting) {
+      failed(t("ui.ai_running_ai"));
+      return;
+    }
+    if ((step === "directions" && existing?.state === "directions") || existing?.state === "applying") {
+      failed(t("ui.synthesis_pending_review_first"));
+      return;
+    }
+    // A draft continues the waiting directions; after a failed draft only the dialog's own retry does (a fresh run does not).
+    const continuing =
+      step === "draft" &&
+      !!existing?.directions.length &&
+      (existing.state === "directions" || !!options.continuesDirections);
+    const base: TaskOptions = continuing && existing ? existing.options : options;
+    const title = (continuing && existing ? existing.title : options.synthesisTitle?.trim()) || existing?.title || "";
+    // Held across the awaits below, so two requests for the same selection cannot both start.
+    state.selectionStarting = true;
+    const controller = new AbortController();
+    const modalSignal = options.signal;
+    const abortBeforeAcceptance = (): void => controller.abort();
+    if (modalSignal?.aborted) controller.abort();
+    else modalSignal?.addEventListener("abort", abortBeforeAcceptance, { once: true });
+    // Shared by settled and refused, so a start the registry refuses does not keep this view blocked or leak the listener.
+    const releaseStarting = (): void => {
+      state.selectionStarting = false;
+      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
+      input.changed();
+    };
+    let own: SelectionSynthesisTask | undefined;
+    const runOptions: TaskOptions = {
+      ...base,
+      requirements: options.requirements || base.requirements,
+      signal: controller.signal,
+      onProgress: message => {
+        if (state.selection) state.selection.progress = message;
+        options.onProgress?.(message);
+        input.changed();
+      }
+    };
+    let launched = false;
+    const markAccepted = (): void => {
+      if (launched || controller.signal.aborted) return;
+      launched = true;
+      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
+      observer?.accepted?.(() => controller.abort());
+      accepted();
+    };
+    const fail = (error: unknown): void => {
+      const aborted = controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
+      const task = state.selection;
+      if (aborted && observer?.isOpen()) {
+        // Stopped from the open dialog: nothing was produced, so no badge stays behind.
+        if (own && state.selection === own) state.selection = null;
+        input.changed();
+        failed(t("ui.research_stopped_existing_content_was_preserved"));
+        return;
+      }
+      if (task) {
+        task.state = aborted ? "cancelled" : "failed";
+        task.progress = aborted
+          ? t("ui.research_stopped_existing_content_was_preserved")
+          : error instanceof Error
+            ? error.message
+            : String(error);
+        input.changed();
+      }
+      if (errorSink && !aborted) {
+        // The thin entry rethrows the original error to its caller instead of logging a user message.
+        errorSink(error);
+        failed(error instanceof Error ? error.message : String(error));
+        return;
+      }
+      failed(
+        aborted
+          ? t("ui.research_stopped_existing_content_was_preserved")
+          : this.ports.recordFailure(
+              t(step === "draft" ? "log.child_integration_failed" : "log.integration_directions_failed"),
+              error
+            )
+      );
+    };
+    let task: SelectionSynthesisTask | undefined;
+    let modelChoice: ModelChoice | undefined;
+    const mapPath = input.mapPath,
+      mapId = input.mapId;
+    const summaryMode = base.synthesisContent === "summary" ? "summary" : "strong";
+    const isDraft = step === "draft";
+    await this.start(mapPath, "synthesizeSelection", {
+      step,
+      signal: controller.signal,
+      stop: () => controller.abort(),
+      refused: () => {
+        releaseStarting();
+        failed(t("ui.ai_running_ai"));
+      },
+      model: async () => {
+        // Sources still being researched write back after the read and would fail the sources check: wait for them.
+        await this.whenIdle(
+          sources.map(source => source.path),
+          controller.signal
+        );
+        return (modelChoice = await input.model());
+      },
+      readSources: () => input.readSources(summaryMode, runOptions.outputLanguage),
+      begin: group => {
+        task = {
+          title,
+          goal: isDraft ? (direction ?? "") : "",
+          rules: "",
+          sources,
+          options: { ...runOptions, signal: undefined, onProgress: undefined },
+          mapPath,
+          mapId,
+          sourceContent: JSON.stringify(group.documents),
+          controller,
+          state: "running",
+          step: isDraft ? "draft" : "directions",
+          directions: isDraft && continuing && existing ? existing.directions : [],
+          progress: "",
+          model: modelChoice!.model,
+          reasoning: modelChoice!.reasoning
+        };
+        state.selection = task;
+        if (!isDraft) own = task;
+        input.changed();
+      },
+      startProgress: model => input.startProgress(model),
+      buildContext: group => {
+        const current = task!;
+        return input.buildContext(group, current, runOptions, message => {
+          if (state.selection !== current) return;
+          current.progress = message;
+          runOptions.onProgress?.(message);
+          input.changed();
+        });
+      },
+      accepted: markAccepted,
+      current: () => state.selection === task,
+      mapChanged: () => input.mapChanged(mapPath, mapId),
+      recordedSources: () => task!.sourceContent,
+      found: angles => {
+        const waiting = task!;
+        waiting.state = "directions";
+        waiting.directions = angles;
+        input.changed();
+        if (observer?.isOpen() && observer.directions) observer.directions(angles);
+        else input.offerDirections(waiting);
+      },
+      noDirections: () => {
+        state.selection = null;
+        input.changed();
+        failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
+      },
+      closed: () => input.closed(),
+      applying: () => {
+        task!.state = "applying";
+        input.changed();
+        return input.undoMark();
+      },
+      write: result => input.write(result, task!, modelChoice!.model),
+      written: previous => {
+        input.written(previous, task!);
+        if (observer?.isOpen()) observer.written?.();
+      },
+      draftFailed: error => {
+        const draftTask = task!;
+        if (controller.signal.aborted && observer?.isOpen()) {
+          // Stopped from the open dialog: nothing was produced, so no badge stays behind.
+          if (draftTask.directions.length) draftTask.state = "directions";
+          else state.selection = null;
+          input.changed();
+          throw error;
+        }
+        draftTask.state = controller.signal.aborted ? "cancelled" : "failed";
+        draftTask.progress = controller.signal.aborted
+          ? t("ui.research_stopped_existing_content_was_preserved")
+          : error instanceof Error
+            ? error.message
+            : String(error);
+        input.changed();
+        if (!controller.signal.aborted) throw error;
+      },
+      finished: markAccepted,
+      fail,
+      settled: releaseStarting
+    });
+  }
+
+  /** The selection bar's Stop: aborts the running task's controller and marks it cancelled. */
+  stopSelection(owner: object): void {
+    const task = this.syntheses(owner).selection;
+    if (!task) return;
+    task.controller.abort();
+    task.state = "cancelled";
+    this.selectionChanged.get(owner)?.();
+  }
+
+  /** Forgets the selection synthesis unless it is running; true when it was removed. */
+  discardSelection(owner: object): boolean {
+    const state = this.syntheses(owner);
+    const task = state.selection;
+    if (!task || task.state === "running") return false;
+    state.selection = null;
+    return true;
+  }
+
+  /** The synthesis was written: its task is no longer shown. */
+  clearSelection(owner: object): void {
+    this.syntheses(owner).selection = null;
   }
 
   pending(path: string): Suggestion[] | undefined {

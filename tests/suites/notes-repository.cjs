@@ -343,7 +343,7 @@ integrationTest('saved integration is not offered for retry when derived-data re
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.focusNode = () => {};
   await view.createIntegratedNode('Combined', [first, second], 'Compare', '');
   assert.equal((await repo.readMap(mapPath)).nodes.length, 3);
-  assert.equal(view.integrationTask, null);
+  assert.equal(view.plugin.topicRuns.syntheses(view).selection, null);
 });
 integrationTest('topic notes hide properties without removing existing css classes', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, 'Styled', 'a');

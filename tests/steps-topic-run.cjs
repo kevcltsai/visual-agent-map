@@ -918,7 +918,9 @@ test('synthesizeSelection draft: a thrown draftFailed or a failing write reaches
   assert.equal(h.fails.length, 1); assert.equal(h.fails[0].message, 'boom'); assert.ok(!h.events.includes('finished'));
   const src = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   const body = src.slice(src.indexOf('private async startSelectionSynthesis('), src.indexOf('private discardSelectionSynthesis('));
-  assert.match(body, /topicRuns\.start\(mapPath, "synthesizeSelection"/); assert.doesNotMatch(body, /plugin\.askModel|running\.(add|delete)/);
+  assert.match(body, /topicRuns\.startSelectionSynthesis\(this,/); assert.doesNotMatch(body, /plugin\.askModel|running\.(add|delete)/);
+  const runSrc = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/topic-run.ts'), 'utf8');
+  assert.match(runSrc, /this\.start\(mapPath, "synthesizeSelection"/);
 });
 
 test('04c: isBusy, hasTask, stopTask, registerTask and releaseTask go through the ports', () => {
@@ -1061,4 +1063,112 @@ test('integrateChildren: "follow" with a template that has no sources section ad
   // Unchanged paths: no flag, or a template that has a sources section.
   assert.equal((await run(undefined, noSources)).includes('earlier research'), true);
   assert.equal((await run('follow', std)).includes('https://old.example/a'), true);
+});
+
+// ---- synthesis state (TopicRuns owns the integration and selection-synthesis tasks per view) ----
+const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
+const synthRuns = (extra = {}) => new TopicRuns(ports({ activeTasks: (map => () => map)(new Map()), recordFailure: (_label, error) => String(error?.message ?? error), ...extra }));
+const topicStart = (over = {}) => {
+  const h = { failed: [], accepted: 0, changed: 0, written: [] };
+  h.input = {
+    mapPath: 'M.md', mapId: 'm1', options: {}, direction: null, failed: message => h.failed.push(message), accepted: () => { h.accepted++; },
+    changed: () => { h.changed++; }, directions: async () => {}, draft: async () => {}, undoMark: () => 'mark', written: mark => h.written.push(mark), ...over
+  };
+  return h;
+};
+const AI_RUNNING = /AI running|AI 執行中/;
+
+test('topic synthesis: a second start on the same path is refused, the first controller is the registered stop handle and it is released when the run ends', async () => {
+  const activeTasks = new Map(), runs = synthRuns({ activeTasks: () => activeTasks }), owner = {};
+  const gate = deferred();
+  const first = topicStart({ directions: () => gate.promise });
+  const running = runs.startTopicSynthesis(owner, 'T.md', first.input);
+  const task = runs.syntheses(owner).topics.get('T.md');
+  assert.equal(task.state, 'running'); assert.equal(runs.hasTask('T.md'), true); assert.equal(runs.taskController('T.md'), task.controller);
+  const second = topicStart();
+  await runs.startTopicSynthesis(owner, 'T.md', second.input);
+  assert.equal(second.failed.length, 1); assert.match(second.failed[0], AI_RUNNING);
+  assert.equal(runs.syntheses(owner).topics.get('T.md'), task); assert.equal(task.controller.signal.aborted, false);
+  gate.resolve(); await running;
+  assert.equal(activeTasks.size, 0); assert.equal(runs.hasTask('T.md'), false);
+});
+
+test('dropSyntheses aborts the running integrations of that view and clears them; another view is not touched', async () => {
+  const runs = synthRuns(), a = {}, b = {}, gateA = deferred(), gateB = deferred();
+  const pa = runs.startTopicSynthesis(a, 'A.md', topicStart({ directions: () => gateA.promise }).input);
+  const pb = runs.startTopicSynthesis(b, 'B.md', topicStart({ directions: () => gateB.promise }).input);
+  const taskA = runs.syntheses(a).topics.get('A.md'), taskB = runs.syntheses(b).topics.get('B.md');
+  runs.dropSyntheses(a);
+  assert.equal(taskA.controller.signal.aborted, true); assert.equal(runs.syntheses(a).topics.size, 0);
+  assert.equal(taskB.controller.signal.aborted, false); assert.equal(runs.syntheses(b).topics.get('B.md'), taskB);
+  gateA.resolve(); gateB.resolve(); await pa; await pb;
+});
+
+const selectionStart = (over = {}) => {
+  const h = { failed: [], changed: 0, writes: [], asks: [], events: [], modal: new AbortController(), gate: deferred(), reached: deferred() };
+  h.askModel = async (_context, _model, _reasoning, signal, _e, accepted) => {
+    h.asks.push({ signal }); h.reached.resolve(); await h.gate.promise; accepted(); return { summary: 'S', detail: 'D', visualReferences: [], suggestions: [] };
+  };
+  h.input = (direction = null, extra = {}) => ({
+    sources: [{ id: 'a', path: 'a.md' }, { id: 'b', path: 'b.md' }], options: { signal: h.modal.signal }, direction, mapPath: 'M.md', mapId: 'm1',
+    failed: message => h.failed.push(message), accepted: () => h.events.push('accepted'), changed: () => { h.changed++; },
+    model: async () => ({ model: 'mx', reasoning: 'low' }),
+    readSources: async () => ({ id: 'g', name: 'g', location: 'M.md', documents: [{ path: 'a.md', content: 'S1' }] }),
+    startProgress: () => ({ end: () => {} }), buildContext: async () => ({ title: 'T', mode: 'synthesize' }),
+    write: async result => { h.writes.push(result); }, written: () => h.events.push('written'), offerDirections: () => h.events.push('offered'),
+    mapChanged: () => false, closed: () => false, undoMark: () => 'mark', ...over, ...extra
+  });
+  return h;
+};
+
+test('selection synthesis: the bar Stop and the registry stop both abort the one controller that TopicRuns made', async () => {
+  const h = selectionStart(), runs = synthRuns({ askModel: h.askModel }), owner = {};
+  const run = runs.startSelectionSynthesis(owner, h.input());
+  await h.reached.promise;
+  const task = runs.syntheses(owner).selection;
+  assert.equal(task.state, 'running'); assert.equal(runs.syntheses(owner).selectionStarting, true);
+  const before = h.changed; runs.stopSelection(owner);
+  assert.equal(task.controller.signal.aborted, true); assert.equal(task.state, 'cancelled'); assert.ok(h.changed > before);
+  h.gate.resolve(); await run;
+  assert.equal(runs.syntheses(owner).selectionStarting, false);
+  const other = selectionStart(), again = synthRuns({ askModel: other.askModel }), second = {};
+  const rerun = again.startSelectionSynthesis(second, other.input());
+  await other.reached.promise;
+  const registered = again.syntheses(second).selection;
+  again.stop('M.md');
+  assert.equal(registered.controller.signal.aborted, true); assert.equal(other.asks[0].signal, registered.controller.signal);
+  other.gate.resolve(); await rerun;
+});
+
+test('selection synthesis: the dialog signal stops the run before acceptance and does not once the provider accepted', async () => {
+  const before = selectionStart(), runs = synthRuns({ askModel: before.askModel }), a = {};
+  const run = runs.startSelectionSynthesis(a, before.input());
+  await before.reached.promise;
+  const task = runs.syntheses(a).selection;
+  before.modal.abort();
+  // TopicRuns still calls askModel (with the aborted signal): the AI service refuses an aborted signal, the run does not.
+  assert.equal(task.controller.signal.aborted, true); assert.equal(before.asks.length, 1); assert.equal(before.asks[0].signal.aborted, true);
+  before.gate.resolve(); await run;
+  const after = selectionStart(), others = synthRuns({ askModel: after.askModel }), b = {};
+  const accepted = others.startSelectionSynthesis(b, after.input());
+  await after.reached.promise; after.gate.resolve(); await accepted;
+  const kept = selectionStart(), third = synthRuns({ askModel: async (c, m, r, signal, e, accept) => { accept(); await kept.gate.promise; return { suggestions: [] }; } }), c = {};
+  const late = third.startSelectionSynthesis(c, kept.input());
+  await new Promise(resolve => setTimeout(resolve, 5));
+  const live = third.syntheses(c).selection;
+  kept.modal.abort();
+  assert.equal(live.controller.signal.aborted, false);
+  kept.gate.resolve(); await late;
+});
+
+test('selection synthesis: state is per view, and a draft whose view closed writes nothing and goes through fail', async () => {
+  const h = selectionStart(), runs = synthRuns({ askModel: h.askModel }), a = {}, b = {};
+  const run = runs.startSelectionSynthesis(a, h.input());
+  await h.reached.promise;
+  assert.ok(runs.syntheses(a).selection); assert.equal(runs.syntheses(b).selection, null); assert.equal(runs.syntheses(b).selectionStarting, false);
+  h.gate.resolve(); await run;
+  const d = selectionStart(), drafts = synthRuns({ askModel: d.askModel }), c = {};
+  d.gate.resolve();
+  await drafts.startSelectionSynthesis(c, d.input('direction', { closed: () => true }));
+  assert.equal(d.writes.length, 0); assert.equal(d.failed.length, 1); assert.equal(drafts.syntheses(c).selection.state, 'failed');
 });

@@ -291,7 +291,7 @@ test('N5 hasRunningWork: false when idle, true for each kind of work', () => {
     chatPreparing: v => { v.chat = { isBusy: true }; },
     chatPrepAbandon: v => { v.chatPrepAbandon = () => {}; },
     chatImageSearches: v => { v.chatImageFinder.searches.set(1, new AbortController()); },
-    synthesisRunning: v => { v.synthesisTasks.set('k', { state: 'running', controller: new AbortController() }); },
+    synthesisRunning: v => { v.plugin.topicRuns.syntheses(v).topics.set('k', { state: 'running', controller: new AbortController() }); },
     startingTasks: v => { v.startingTasks.set('k', new AbortController()); },
     startingExpand: v => { v.startingExpand.add('k'); },
     mergeTasks: v => { v.mergeTasks.set('k', { controller: new AbortController() }); },
@@ -306,7 +306,7 @@ test('N5 hasRunningWork: false when idle, true for each kind of work', () => {
   };
   for (const [name, arm] of Object.entries(cases)) { const { view } = idle(); arm(view); assert.equal(view.hasRunningWork(), true, name); }
   const finished = idle().view;
-  finished.synthesisTasks.set('k', { state: 'failed', controller: new AbortController() });
+  finished.plugin.topicRuns.syntheses(finished).topics.set('k', { state: 'failed', controller: new AbortController() });
   assert.equal(finished.hasRunningWork(), false, 'a finished synthesis task is not work');
 });
 

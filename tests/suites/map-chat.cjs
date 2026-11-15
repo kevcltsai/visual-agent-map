@@ -9447,8 +9447,10 @@ integrationTest('P2 (l) progress: set in round 1, statuses updated later; header
 });
 integrationTest('flow fix: every later round is told the steps so far (continuation.progress, names and statuses), so the AI can report them back', async () => {
   const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); h.open();
-  chainReplies(h, sayP(prog(['Outline', 'done'], ['Write', 'current'], ['Check', 'todo']), [addRoot('x', 'X')]), sayP(undefined, [addRoot('y', 'Y')]), sayP(undefined, [addRoot('z', 'Z')], ''));
-  h.type('three phases'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 3);
+  chainReplies(h, sayP(prog(['Outline', 'done'], ['Write', 'current'], ['Check', 'todo']), [addRoot('x', 'X')]), sayP(undefined, [addRoot('y', 'Y')]), sayP(undefined, [addRoot('z', 'Z')], ''), say('Checked.', [], ''));
+  h.type('three phases'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 4);
+  assert.equal(contextOf(h.control.requests[3]).continuation.checkDone, true, 'steps still open after an empty remaining: a check round');
+  assert.equal('checkDone' in contextOf(h.control.requests[2]).continuation, false);
   assert.equal(contextOf(h.control.requests[0]).continuation, undefined, 'round 1 has no continuation');
   const want = { steps: [{ name: 'Outline', status: 'done' }, { name: 'Write', status: 'current' }, { name: 'Check', status: 'todo' }] };
   eq(contextOf(h.control.requests[1]).continuation.progress, want, 'round 2 gets the steps of round 1');
@@ -9475,9 +9477,9 @@ integrationTest('layout fix: the flow block is one line by default (step N of M:
 });
 integrationTest('e2e: a chain that ends done with nothing left shows every step done even when the last reply did not say so', async () => {
   const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); h.open();
-  chainReplies(h, sayP(prog(['Write', 'current'], ['Add', 'todo']), [addRoot('x', 'X')]), sayP(undefined, [addRoot('y', 'Y')], ''));
-  h.type('two steps'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 2);
-  const flow = flowOf(h); assert.equal(flow.hidden, false); assert.match(visibleText(flow), /2 of 2 steps done · 2 rounds in all/);
+  chainReplies(h, sayP(prog(['Write', 'current'], ['Add', 'todo']), [addRoot('x', 'X')]), sayP(undefined, [addRoot('y', 'Y')], ''), say('Checked.', [], ''));
+  h.type('two steps'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 3);
+  const flow = flowOf(h); assert.equal(flow.hidden, false); assert.match(visibleText(flow), /2 of 2 steps done · 3 rounds in all/, 'the check round that wrote nothing ends it done');
   eq(findAll(flow, i => i.tag === 'li').map(i => visibleText(i)), ['✓1. Write', '✓2. Add']);
 });
 integrationTest('e2e: a chain that stops before done keeps the steps as the AI reported them', async () => {
@@ -9495,19 +9497,19 @@ integrationTest('P2 (l) progress: a mid-way state reads "Step N of M · round X"
 });
 integrationTest('P2 (l) progress: another step count or names, a status that goes back, absent or malformed progress change nothing; names are text', async () => {
   const h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); const chat = h.open();
-  chainReplies(h, sayP(prog(['Outline', 'done'], ['<b>Write</b>', 'current'], ['Check', 'todo']), [addRoot('x', 'X')]), sayP(prog(['Outline', 'done'], ['Write', 'current']), [addRoot('y', 'Y')]), sayP(prog(['Outline', 'todo'], ['<b>Write</b>', 'todo'], ['Check', 'todo']), [addRoot('z', 'Z')]), sayP({ steps: 'bad' }, [addRoot('w', 'W')]), sayP(undefined, [addRoot('v', 'V')], ''));
-  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 5);
+  chainReplies(h, sayP(prog(['Outline', 'done'], ['<b>Write</b>', 'current'], ['Check', 'todo']), [addRoot('x', 'X')]), sayP(prog(['Outline', 'done'], ['Write', 'current']), [addRoot('y', 'Y')]), sayP(prog(['Outline', 'todo'], ['<b>Write</b>', 'todo'], ['Check', 'todo']), [addRoot('z', 'Z')]), sayP({ steps: 'bad' }, [addRoot('w', 'W')]), sayP(undefined, [addRoot('v', 'V')], ''), say('Checked.', [], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.view.chatChain === null && h.control.requests.length === 6);
   // The chain ended done with nothing left, so every step reads done; the odd progress of rounds 2–5 changed no names or count.
   const flow = flowOf(h); eq(findAll(flow, i => i.tag === 'li').map(i => visibleText(i)), ['✓1. Outline', '✓2. <b>Write</b>', '✓3. Check']); assert.equal(find(flow, i => i.tag === 'b' && /Write/.test(i.text ?? '')), undefined, 'the name is text, not markup');
-  assert.equal(h.control.requests.length, 5, 'no round failed over the odd progress');
+  assert.equal(h.control.requests.length, 6, 'no round failed over the odd progress (the last is the check round)');
 });
 integrationTest('P2 (l) progress: hidden with the switch off, with one step only, and after a new conversation; nothing extra for a chain without it', async () => {
   let h = await harness(); await h.view.hydrate(); let chat = h.open(); chainReplies(h, sayP(prog(['A', 'current'], ['B', 'todo']), [addRoot('x', 'X')], ''));
   h.type('go'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 1 && !chat.isBusy); assert.equal(flowOf(h)?.hidden ?? true, true, 'switch off: not shown');
-  h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); chat = h.open(); chainReplies(h, sayP(prog(['Only', 'current']), [addRoot('x', 'X')], ''));
-  h.type('go'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 1 && !chat.isBusy); assert.equal(flowOf(h)?.hidden ?? true, true, 'one step: not shown');
-  h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); chat = h.open(); chainReplies(h, sayP(prog(['A', 'current'], ['B', 'todo']), [addRoot('x', 'X')], ''));
-  h.type('go'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 1 && !chat.isBusy); assert.equal(flowOf(h).hidden, false); h.view.setChatAutoApply(false); chat.refreshAutoApply(); assert.equal(flowOf(h).hidden, true, 'switch turned off: hidden'); h.view.setChatAutoApply(true); chat.refreshAutoApply(); chat.reset(); assert.equal(flowOf(h).hidden, true, 'reset clears it');
+  h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); chat = h.open(); chainReplies(h, sayP(prog(['Only', 'current']), [addRoot('x', 'X')], ''), say('Checked.', [], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 2 && h.view.chatChain === null); assert.equal(flowOf(h)?.hidden ?? true, true, 'one step: not shown');
+  h = await harness(); await h.view.hydrate(); h.view.setChatAutoApply(true); chat = h.open(); chainReplies(h, sayP(prog(['A', 'current'], ['B', 'todo']), [addRoot('x', 'X')], ''), say('Checked.', [], ''));
+  h.type('go'); await h.view.sendMapChat(); await until(() => h.control.requests.length === 2 && h.view.chatChain === null); assert.equal(flowOf(h).hidden, false); h.view.setChatAutoApply(false); chat.refreshAutoApply(); assert.equal(flowOf(h).hidden, true, 'switch turned off: hidden'); h.view.setChatAutoApply(true); chat.refreshAutoApply(); chat.reset(); assert.equal(flowOf(h).hidden, true, 'reset clears it');
 });
 test('P2 progress: the prompt asks for steps on the first round of a multi-step instruction and statuses only afterwards, in both languages', () => {
   const { MAP_CHAT_PROMPT_EN, MAP_CHAT_PROMPT_ZH } = { MAP_CHAT_PROMPT_EN: fs.readFileSync(path.join(root, 'core/steps/map-chat/prompt.en.md'), 'utf8'), MAP_CHAT_PROMPT_ZH: fs.readFileSync(path.join(root, 'core/steps/map-chat/prompt.zh.md'), 'utf8') };

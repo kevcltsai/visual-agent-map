@@ -356,6 +356,22 @@ test('service streams reply growth through onStructuredJson, resets on a new cal
   assert.equal(result.actions.length, 1);
   assert.deepEqual(result.rejected, [{ index: 1, code: 'unknown_node' }]);
 });
+test('service droppedOnRetry: the reply taken has fewer actions than a StructuredOutput call the provider did not take', async () => {
+  const act = n => Array.from({ length: n }, () => item('rename_topic', { nodeId: 'a', title: 'T' }));
+  const body = n => JSON.stringify({ reply: 'r', actions: act(n), remaining: '' });
+  const run = (feed, final) => new MapChatService(async (_request, _signal, _prepared, onJson) => { feed(onJson); return body(final); });
+  // The owner's turn 11: a full reply rejected, a cut-off retry, then one action taken with remaining "".
+  const dropped = await run(on => { on(''); on(body(6)); on(null); on(''); on(body(4).slice(0, 30)); on(''); on(body(1)); }, 1).chat(request(), new AbortController().signal);
+  assert.equal(dropped.droppedOnRetry, true);
+  // Without onReply the attempts are still tracked.
+  assert.equal(dropped.actions.length, 1);
+  for (const [name, feed, final] of [
+    ['one call', on => { on(''); on(body(3)); }, 3],
+    ['a retry that keeps every action', on => { on(''); on(body(3)); on(null); on(''); on(body(3)); }, 3],
+    ['a retry that adds', on => { on(''); on(body(2)); on(null); on(''); on(body(3)); }, 3],
+    ['no stream at all', () => {}, 2]
+  ]) assert.equal((await run(feed, final).chat(request(), new AbortController().signal)).droppedOnRetry, undefined, name);
+});
 test('service stop: an aborted signal throws MapChatError stopped before and after the run', async () => {
   const controller = new AbortController();
   controller.abort();

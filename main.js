@@ -24929,6 +24929,7 @@ function pendingResearchCount(context) {
   var _a2, _b2;
   return ((_b2 = (_a2 = context.research) == null ? void 0 : _a2.deferred) != null ? _b2 : []).filter((note) => !note.oversize && !note.sentBefore).length;
 }
+var MAP_CHAT_CHECK_DONE_NOTE = "checkDone: your last reply left remaining empty, but the progress steps are not all done, or that reply was resent with fewer actions than first written. Compare the progress steps, the files and the map with the user's message. If work is left, do the next part now and fill remaining with what is still to do after it. If everything is really done, return no actions, remaining empty and every progress step done.";
 function continuationFields(input2) {
   const lines = input2.lastResults.slice(0, MAP_CHAT_CONTINUATION_LINES);
   const omitted = input2.lastResults.length - lines.length;
@@ -24945,9 +24946,11 @@ function continuationFields(input2) {
         status: item.status,
         ...item.error ? { error: clip(item.error, ERROR_LIMIT) } : {}
       })),
-      ...input2.progress ? { progress: { steps: input2.progress.steps.map((step) => ({ name: step.name, status: step.status })) } } : {}
+      ...input2.progress ? { progress: { steps: input2.progress.steps.map((step) => ({ name: step.name, status: step.status })) } } : {},
+      ...input2.checkDone ? { checkDone: true } : {}
     },
-    continuationNote: MAP_CHAT_CONTINUATION_NOTE
+    continuationNote: MAP_CHAT_CONTINUATION_NOTE,
+    ...input2.checkDone ? { checkDoneNote: MAP_CHAT_CHECK_DONE_NOTE } : {}
   };
 }
 
@@ -39629,6 +39632,7 @@ function mergeProgress(old, next) {
   }));
   return { steps, current: currentOf(steps) };
 }
+var hasOpenSteps = (progress) => !!(progress == null ? void 0 : progress.steps.some((step) => step.status !== "done"));
 
 // core/map-chat-chain.ts
 var MAP_CHAT_CHAIN_MAX_ROUNDS = 8;
@@ -39717,7 +39721,11 @@ function finishRound(state, end) {
   const read = readFile(end.actions);
   const progress = mergeProgress(state.progress, end.progress);
   if (progress) next.progress = progress;
-  if (!remaining && end.researchDeferred <= 0 && !read) return ended(next, "done");
+  const nothingLeft = !remaining && end.researchDeferred <= 0 && !read;
+  const doubt = !!state.autoApply && (hasOpenSteps(progress) || !!end.droppedOnRetry);
+  const idle = !next.wrote && end.started.research <= 0 && end.started.expand <= 0;
+  if (nothingLeft && (!doubt || state.checkingDone && idle)) return ended(next, "done");
+  next.checkingDone = nothingLeft;
   if (end.started.otherBackground) return ended(next, "other_background_work");
   if (state.round >= state.maxRounds) return ended(next, "max_rounds");
   if (state.autoApply && next.calls >= MAP_CHAT_AUTO_MAX_CALLS) return ended(next, "call_limit");
@@ -39727,6 +39735,7 @@ function finishRound(state, end) {
   if (waitFor.length) return { state: { ...next, phase: "waiting" }, decision: { kind: "wait", waitFor } };
   if (!next.wrote) {
     if (read) return startNext(next);
+    if (next.checkingDone && !state.checkingDone) return startNext(next);
     if (state.selectedOnly || !selectedCards(end.actions)) return ended(next, "no_progress");
     return startNext({ ...next, selectedOnly: true });
   }
@@ -45085,6 +45094,15 @@ var ClaudeTranscriptFacts = class {
 };
 var LIST_LIMIT = 20;
 var QUERY_LIMIT = 200;
+var REJECT_REASON_LIMIT = 200;
+function resultText(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map(
+    (item) => item && typeof item === "object" && typeof item.text === "string" ? item.text : ""
+  ).join(" ");
+}
+var actionCount = (input2) => input2 && typeof input2 === "object" && Array.isArray(input2.actions) ? input2.actions.length : null;
 var MODEL_RECORDS = /* @__PURE__ */ new Set(["stream_event", "assistant", "user", "result"]);
 var ClaudeStreamObserver = class {
   constructor(hooks, now = () => (/* @__PURE__ */ new Date()).toISOString()) {
@@ -45098,6 +45116,8 @@ var ClaudeStreamObserver = class {
     __publicField(this, "stage", "");
     __publicField(this, "structuredId", "");
     __publicField(this, "structuredJson", "");
+    /** One entry per StructuredOutput call, by tool id: what became of it and how big it was (never its content). */
+    __publicField(this, "attempts", /* @__PURE__ */ new Map());
     __publicField(this, "stopped", false);
   }
   /** Records the moment the prompt was written. */
@@ -45127,7 +45147,12 @@ var ClaudeStreamObserver = class {
   }
   /** The records already read stay; the milestones of the finished call. */
   milestones() {
-    return { ...this.milestoneData, ...this.facts.milestones() };
+    const attempts = [...this.attempts.values()].slice(0, LIST_LIMIT).map((attempt) => ({ ...attempt }));
+    return {
+      ...this.milestoneData,
+      ...attempts.length ? { structuredAttempts: attempts } : {},
+      ...this.facts.milestones()
+    };
   }
   read(value) {
     var _a2, _b2, _c, _d;
@@ -45143,17 +45168,42 @@ var ClaudeStreamObserver = class {
         return (_b3 = (_a3 = this.hooks).onFirstEvent) == null ? void 0 : _b3.call(_a3);
       });
     }
-    if (record.type === "stream_event") this.event(record.event);
+    if (record.type === "system") this.system(record);
+    else if (record.type === "stream_event") this.event(record.event);
     else if (record.type === "assistant") {
       for (const block of (_b2 = (_a2 = record.message) == null ? void 0 : _a2.content) != null ? _b2 : [])
         if (block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
           this.toolStart(block.id, block.name);
           this.toolInput(block.id, block.input);
+          if (block.name === "StructuredOutput") this.structuredInput(block.id, block.input);
         }
     } else if (record.type === "user") {
       for (const block of (_d = (_c = record.message) == null ? void 0 : _c.content) != null ? _d : [])
         if (block.type === "tool_result" && typeof block.tool_use_id === "string")
-          this.toolResult(block.tool_use_id, block.is_error === true);
+          this.toolResult(block.tool_use_id, block.is_error === true, block.content);
+    }
+  }
+  /** The CLI's own retries: a request retried after an API error, a turn switched to the fallback model. */
+  system(record) {
+    var _a2, _b2, _c, _d;
+    if (record.subtype === "api_retry") {
+      const list2 = (_b2 = (_a2 = this.milestoneData).apiRetries) != null ? _b2 : _a2.apiRetries = [];
+      if (list2.length < LIST_LIMIT) list2.push(typeof record.error_status === "number" ? record.error_status : null);
+    } else if (record.subtype === "model_fallback") {
+      const list2 = (_d = (_c = this.milestoneData).modelFallbacks) != null ? _d : _c.modelFallbacks = [];
+      if (list2.length < LIST_LIMIT) list2.push(typeof record.trigger === "string" ? record.trigger.slice(0, 40) : "");
+    }
+  }
+  /** The complete input of a StructuredOutput call: its action count, and its size when no stream events gave one. */
+  structuredInput(id, input2) {
+    const attempt = this.attempts.get(id);
+    if (!attempt) return;
+    attempt.actions = actionCount(input2);
+    if (!attempt.chars) {
+      try {
+        attempt.chars = JSON.stringify(input2 != null ? input2 : null).length;
+      } catch (e) {
+      }
     }
   }
   event(event) {
@@ -45178,6 +45228,8 @@ var ClaudeStreamObserver = class {
         if (block.id !== this.structuredId) return;
         this.preview.append(event.delta.partial_json);
         this.structuredJson += event.delta.partial_json;
+        const attempt = this.attempts.get(block.id);
+        if (attempt) attempt.chars = this.structuredJson.length;
         const json = this.structuredJson;
         this.call(() => {
           var _a3, _b3;
@@ -45216,6 +45268,9 @@ var ClaudeStreamObserver = class {
     } else if (name2 === "StructuredOutput") {
       this.tools.set(id, { name: name2 });
       this.facts.structuredStart();
+      const earlier = this.attempts.get(this.structuredId);
+      if (earlier && earlier.outcome === "pending") earlier.outcome = "replaced";
+      this.attempts.set(id, { outcome: "pending", chars: 0, actions: null });
       this.structuredId = id;
       this.milestoneData.structuredCalls = ((_c = this.milestoneData.structuredCalls) != null ? _c : 0) + 1;
       (_e = (_d = this.milestoneData).structuredStartAt) != null ? _e : _d.structuredStartAt = at;
@@ -45247,10 +45302,16 @@ var ClaudeStreamObserver = class {
       return (_b2 = (_a3 = this.hooks).onStage) == null ? void 0 : _b2.call(_a3, "searching", text10);
     });
   }
-  toolResult(id, failed) {
+  toolResult(id, failed, content) {
     var _a2;
     const tool = this.tools.get(id);
     if (!tool) return;
+    const attempt = this.attempts.get(id);
+    if (attempt && attempt.outcome === "pending") {
+      attempt.outcome = failed ? "rejected" : "accepted";
+      const reason = failed ? resultText(content).replace(/\s+/g, " ").trim().slice(0, REJECT_REASON_LIMIT) : "";
+      if (reason) attempt.error = reason;
+    }
     const entry = tool.search === void 0 ? void 0 : (_a2 = this.milestoneData.searches) == null ? void 0 : _a2[tool.search];
     if (entry) {
       entry.completedAt = this.now();
@@ -79740,6 +79801,7 @@ ${note.detail.trim()}` : "",
         mapAiMode: (_a2 = this.map) == null ? void 0 : _a2.aiMode
       }),
       progress: (_b2 = round3.result.progress) != null ? _b2 : null,
+      ...round3.result.droppedOnRetry ? { droppedOnRetry: true } : {},
       remaining: round3.result.remaining,
       researchDeferred: pendingResearchCount(round3.context),
       // A read has no line of its own: the lines are the other actions', in order.
@@ -79921,7 +79983,8 @@ ${note.detail.trim()}` : "",
           remaining,
           lastResults: run.lastResults,
           research: run.waited,
-          ...run.state.progress ? { progress: run.state.progress } : {}
+          ...run.state.progress ? { progress: run.state.progress } : {},
+          ...run.state.checkingDone ? { checkDone: true } : {}
         }
       }
     };
@@ -92119,13 +92182,16 @@ var MapChatService = class {
     if (signal.aborted) throw stopped();
     const prepared = prepareStep(mapChatStep, request);
     let shown = "";
-    const onStructuredJson = onReply ? (buffer) => {
-      if (signal.aborted) return;
+    const attempts = [];
+    const onStructuredJson = (buffer) => {
+      if (buffer === "") attempts.push("");
+      else if (buffer && attempts.length) attempts[attempts.length - 1] = buffer;
+      if (signal.aborted || !onReply) return;
       const text10 = buffer ? partialReply(buffer).text : "";
       if (text10 === shown) return;
       shown = text10;
       onReply(text10);
-    } : void 0;
+    };
     const onText = onReply ? (full) => {
       if (signal.aborted) return;
       const text10 = replyFromAgentText(full);
@@ -92171,9 +92237,27 @@ var MapChatService = class {
       throw error;
     }
     if (signal.aborted) throw stopped();
-    return prepared.parse(raw);
+    const result = prepared.parse(raw);
+    return droppedOnRetry(attempts.slice(0, -1), raw) ? { ...result, droppedOnRetry: true } : result;
   }
 };
+function rawActionCount(json) {
+  try {
+    const value = JSON.parse(json);
+    const actions = value && typeof value === "object" ? value.actions : void 0;
+    return Array.isArray(actions) ? actions.length : null;
+  } catch (e) {
+    return null;
+  }
+}
+function droppedOnRetry(earlier, taken) {
+  const final = rawActionCount(taken);
+  if (final === null) return false;
+  return earlier.some((json) => {
+    var _a2;
+    return ((_a2 = rawActionCount(json)) != null ? _a2 : -1) > final;
+  });
+}
 
 // experiences/visual-map/handoff.ts
 async function receiveVisualMapHandoff(artifact, options) {

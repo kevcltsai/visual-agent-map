@@ -23273,6 +23273,7 @@ export class VisualAgentMapView extends ItemView {
           mapAiMode: this.map?.aiMode
         }),
       progress: round.result.progress ?? null,
+      ...(round.result.droppedOnRetry ? { droppedOnRetry: true } : {}),
       remaining: round.result.remaining,
       researchDeferred: pendingResearchCount(round.context),
       // A read has no line of its own: the lines are the other actions', in order.
@@ -23473,7 +23474,8 @@ export class VisualAgentMapView extends ItemView {
           remaining,
           lastResults: run.lastResults,
           research: run.waited,
-          ...(run.state.progress ? { progress: run.state.progress } : {})
+          ...(run.state.progress ? { progress: run.state.progress } : {}),
+          ...(run.state.checkingDone ? { checkDone: true } : {})
         }
       }
     };

@@ -1,6 +1,6 @@
 import type { MapChatAction } from "./steps/map-chat/step";
 import type { MapChatPlanChain } from "./map-chat-plan";
-import { mergeProgress, type MapChatProgress } from "./map-chat-progress";
+import { hasOpenSteps, mergeProgress, type MapChatProgress } from "./map-chat-progress";
 
 /**
  * Automatic continuation of a map chat message ("chain"): a reply that says something is still to do (`remaining`) gets its next
@@ -99,6 +99,11 @@ export interface MapChatChainState {
   progress?: MapChatProgress;
   /** The round being waited on wrote something. */
   wrote: boolean;
+  /**
+   * The round in flight checks whether the work is really done: the round before left nothing to do, but the flow still had steps
+   * not done (or its reply was resent with fewer actions). It ends as `done` once such a round writes and starts nothing.
+   */
+  checkingDone?: boolean;
   /** The last finished round went on only because it selected cards (so the next one could read their notes); a second one in a row does not. */
   selectedOnly?: boolean;
   ended?: { reason: MapChatChainEndReason; remaining: string };
@@ -186,6 +191,8 @@ export interface MapChatRoundEnd {
   calls?: number;
   /** The reply's `progress` (already normalized); merged into the chain's. Absent or null = the old one stays. */
   progress?: MapChatProgress | null;
+  /** The reply that was taken has fewer actions than one the provider did not take (rejected or replaced): work may have been dropped. */
+  droppedOnRetry?: boolean;
   started: {
     /** Research targets started. */
     research: number;
@@ -215,7 +222,13 @@ export function finishRound(state: MapChatChainState, end: MapChatRoundEnd): Ste
   const read = readFile(end.actions);
   const progress = mergeProgress(state.progress, end.progress);
   if (progress) next.progress = progress;
-  if (!remaining && end.researchDeferred <= 0 && !read) return ended(next, "done");
+  const nothingLeft = !remaining && end.researchDeferred <= 0 && !read;
+  // An auto-apply chain does not take "nothing left" on trust while its own steps are open or its reply lost actions on a retry:
+  // a check round compares them first, and the chain is done once a check round writes and starts nothing.
+  const doubt = !!state.autoApply && (hasOpenSteps(progress) || !!end.droppedOnRetry);
+  const idle = !next.wrote && end.started.research <= 0 && end.started.expand <= 0;
+  if (nothingLeft && (!doubt || (state.checkingDone && idle))) return ended(next, "done");
+  next.checkingDone = nothingLeft;
   if (end.started.otherBackground) return ended(next, "other_background_work");
   if (state.round >= state.maxRounds) return ended(next, "max_rounds");
   if (state.autoApply && next.calls >= MAP_CHAT_AUTO_MAX_CALLS) return ended(next, "call_limit");
@@ -226,6 +239,8 @@ export function finishRound(state: MapChatChainState, end: MapChatRoundEnd): Ste
   if (!next.wrote) {
     // The file it asked to read comes in the next round: that is progress, and the round limit still ends a chain that only reads.
     if (read) return startNext(next);
+    // The first check round is owed even when this round wrote nothing.
+    if (next.checkingDone && !state.checkingDone) return startNext(next);
     if (state.selectedOnly || !selectedCards(end.actions)) return ended(next, "no_progress");
     return startNext({ ...next, selectedOnly: true });
   }

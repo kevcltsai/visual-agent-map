@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const { test, load } = require('../support.cjs');
 
-const { partialFields, StructuredPreview } = load('ai/partial-structured.ts');
+const { partialFields, partialStringFields, StructuredPreview } = load('ai/partial-structured.ts');
 const fields = buffer => JSON.parse(JSON.stringify(partialFields(buffer)));
 
 test('partial structured: complete and in-progress strings report completeness', () => {
@@ -72,4 +72,32 @@ test('StructuredPreview: append accumulates, start replaces, reject retracts', (
   const copy = preview.snapshot();
   copy.summary = 'mutated';
   assert.equal(preview.snapshot().summary, undefined, 'snapshot is a copy');
+});
+
+test('partialStringFields: holds a lone escaped high surrogate until its partner arrives', () => {
+  const r = buffer => JSON.parse(JSON.stringify(partialStringFields(buffer, ['reply'])));
+  assert.deepEqual(r('{"reply":"ab\\ud83d'), { reply: { value: 'ab', complete: false } });
+  assert.deepEqual(r('{"reply":"ab\\ud83d\\ude00'), { reply: { value: 'ab\u{1F600}', complete: false } });
+  assert.equal(r('{"reply":"ab\\ud83d\\u0041').reply.value, 'ab\ud83dA');
+});
+
+test('partialStringFields: escaped emoji cut at every index yields growing prefixes with no lone surrogate', () => {
+  const full = '{"reply":"x\\ud83d\\ude00y\\u4e2dz"}';
+  let last = '';
+  for (let i = 0; i <= full.length; i++) {
+    const value = (partialStringFields(full.slice(0, i), ['reply']).reply || { value: '' }).value;
+    assert.ok(value.startsWith(last), `prefix at ${i}`);
+    assert.ok(!/[\ud800-\udbff]$/.test(value) && !/^[\udc00-\udfff]/.test(value), `no lone surrogate at ${i}`);
+    last = value;
+  }
+  assert.equal(last, 'x\u{1F600}y\u4e2dz');
+});
+
+test('partialStringFields: first complete duplicate key wins, non-string values are skipped, order is free, never throws', () => {
+  assert.equal(partialStringFields('{"reply":"one","reply":"two"}', ['reply']).reply.value, 'one');
+  assert.equal(fields('{"summary":"one","summary":"two","detail":"d"}').summary, 'one');
+  assert.deepEqual(JSON.parse(JSON.stringify(partialStringFields('{"reply":{"a":"x"},"n":1,"b":"B","reply":"R', ['b', 'reply']))), { b: { value: 'B', complete: true }, reply: { value: 'R', complete: false } });
+  assert.deepEqual({ ...partialStringFields(null, ['a']) }, {});
+  assert.deepEqual({ ...partialStringFields('[1]', ['a']) }, {});
+  assert.deepEqual({ ...partialStringFields('{"a":"x"', []) }, {});
 });

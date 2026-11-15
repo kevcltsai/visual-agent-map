@@ -55162,7 +55162,7 @@ function tokenize(source) {
   const fail3 = (reason, at = pos) => {
     throw new ExchangeReject(reason, lineOf(at));
   };
-  const skipSpace3 = () => {
+  const skipSpace2 = () => {
     while (pos < length && XML_SPACE.test(source[pos])) pos++;
   };
   const readName = () => {
@@ -55172,7 +55172,7 @@ function tokenize(source) {
     pos += match[0].length;
     return match[0];
   };
-  skipSpace3();
+  skipSpace2();
   if (source.startsWith("<?xml", pos) && XML_SPACE.test((_a2 = source[pos + 5]) != null ? _a2 : "")) {
     const end = source.indexOf("?>", pos);
     if (end < 0) fail3("bad-xml");
@@ -55215,7 +55215,7 @@ function tokenize(source) {
       const at = pos;
       pos += 2;
       const name2 = readName();
-      skipSpace3();
+      skipSpace2();
       if (source[pos] !== ">") fail3("bad-xml");
       pos++;
       const open2 = stack.pop();
@@ -55228,7 +55228,7 @@ function tokenize(source) {
     let selfClosing = false;
     for (; ; ) {
       const before = pos;
-      skipSpace3();
+      skipSpace2();
       if (pos >= length) fail3("bad-xml");
       if (source[pos] === ">") {
         pos++;
@@ -55241,10 +55241,10 @@ function tokenize(source) {
       }
       if (pos === before) fail3("bad-xml");
       const name2 = readName();
-      skipSpace3();
+      skipSpace2();
       if (source[pos] !== "=") fail3("bad-xml");
       pos++;
-      skipSpace3();
+      skipSpace2();
       const quote3 = source[pos];
       if (quote3 !== '"' && quote3 !== "'") fail3("bad-xml");
       const close = source.indexOf(quote3, pos + 1);
@@ -89882,14 +89882,15 @@ var skipSpace = (buffer, from) => {
   while (i < buffer.length && /\s/.test(buffer[i])) i++;
   return i;
 };
-function partialFields(buffer) {
-  const out = { summaryComplete: false, detailComplete: false };
+function partialStringFields(buffer, keys) {
+  const out = {};
   try {
     if (typeof buffer !== "string") return out;
     let i = skipSpace(buffer, 0);
     if (buffer[i] !== "{") return out;
     i++;
-    while (i < buffer.length) {
+    let pending2 = new Set(keys).size;
+    while (i < buffer.length && pending2 > 0) {
       i = skipSpace(buffer, i);
       if (buffer[i] === ",") {
         i = skipSpace(buffer, i + 1);
@@ -89901,16 +89902,15 @@ function partialFields(buffer) {
       if (buffer[i] !== ":") break;
       i = skipSpace(buffer, i + 1);
       if (i >= buffer.length) break;
-      if ((key4.value === "summary" || key4.value === "detail") && buffer[i] === '"') {
+      const wanted = keys.includes(key4.value) && !out[key4.value];
+      if (wanted && buffer[i] === '"') {
         const text10 = decodeString(buffer, i + 1);
-        if (key4.value === "summary") {
-          out.summary = text10.value;
-          out.summaryComplete = text10.complete;
-        } else {
-          out.detail = text10.value;
-          out.detailComplete = text10.complete;
-        }
+        out[key4.value] = {
+          value: text10.value,
+          complete: text10.complete
+        };
         if (!text10.complete) break;
+        pending2--;
         i = text10.end;
         continue;
       }
@@ -89920,6 +89920,14 @@ function partialFields(buffer) {
     }
   } catch (e) {
   }
+  return out;
+}
+function partialFields(buffer) {
+  var _a2, _b2;
+  const { summary, detail } = partialStringFields(buffer, ["summary", "detail"]);
+  const out = { summaryComplete: (_a2 = summary == null ? void 0 : summary.complete) != null ? _a2 : false, detailComplete: (_b2 = detail == null ? void 0 : detail.complete) != null ? _b2 : false };
+  if (summary) out.summary = summary.value;
+  if (detail) out.detail = detail.value;
   return out;
 }
 var StructuredPreview = class {
@@ -92402,94 +92410,9 @@ var OutlineGenerationService = class {
 };
 
 // core/map-chat-service.ts
-var isHex2 = (text10) => /^[0-9a-fA-F]{4}$/.test(text10);
-var SIMPLE2 = { '"': '"', "\\": "\\", "/": "/", b: "\b", f: "\f", n: "\n", r: "\r", t: "	" };
-function decodeString2(buffer, start) {
-  let value = "";
-  let i = start;
-  while (i < buffer.length) {
-    const char = buffer[i];
-    if (char === '"') return { value, end: i + 1, complete: true };
-    if (char !== "\\") {
-      value += char;
-      i++;
-      continue;
-    }
-    if (i + 1 >= buffer.length) break;
-    const next = buffer[i + 1];
-    if (next === "u") {
-      const hex = buffer.slice(i + 2, i + 6);
-      if (!isHex2(hex)) {
-        if (hex.length < 4 && /^[0-9a-fA-F]*$/.test(hex)) break;
-        value += "u";
-        i += 2;
-        continue;
-      }
-      value += String.fromCharCode(parseInt(hex, 16));
-      i += 6;
-      continue;
-    }
-    value += next in SIMPLE2 ? SIMPLE2[next] : next;
-    i += 2;
-  }
-  return { value, end: buffer.length, complete: false };
-}
-function skipValue2(buffer, start) {
-  let i = start;
-  let depth = 0;
-  while (i < buffer.length) {
-    const char = buffer[i];
-    if (char === '"') {
-      i++;
-      while (i < buffer.length && buffer[i] !== '"') i += buffer[i] === "\\" ? 2 : 1;
-      if (i >= buffer.length) return -1;
-      i++;
-      if (depth === 0) return i;
-      continue;
-    }
-    if (char === "{" || char === "[") depth++;
-    else if (char === "}" || char === "]") {
-      if (depth === 0) return i;
-      depth--;
-      if (depth === 0) return i + 1;
-    } else if (depth === 0 && char === ",") return i;
-    i++;
-  }
-  return -1;
-}
-var skipSpace2 = (buffer, from) => {
-  let i = from;
-  while (i < buffer.length && /\s/.test(buffer[i])) i++;
-  return i;
-};
 function partialReply(buffer) {
-  const none = { text: "", complete: false };
-  try {
-    if (typeof buffer !== "string") return none;
-    let i = skipSpace2(buffer, 0);
-    if (buffer[i] !== "{") return none;
-    i++;
-    while (i < buffer.length) {
-      i = skipSpace2(buffer, i);
-      if (buffer[i] === ",") i = skipSpace2(buffer, i + 1);
-      if (i >= buffer.length || buffer[i] !== '"') break;
-      const key4 = decodeString2(buffer, i + 1);
-      if (!key4.complete) break;
-      i = skipSpace2(buffer, key4.end);
-      if (buffer[i] !== ":") break;
-      i = skipSpace2(buffer, i + 1);
-      if (i >= buffer.length) break;
-      if (key4.value === "reply" && buffer[i] === '"') {
-        const reply = decodeString2(buffer, i + 1);
-        return { text: reply.value, complete: reply.complete };
-      }
-      const end = skipValue2(buffer, i);
-      if (end < 0) break;
-      i = end;
-    }
-  } catch (e) {
-  }
-  return none;
+  const reply = partialStringFields(buffer, ["reply"]).reply;
+  return reply ? { text: reply.value, complete: reply.complete } : { text: "", complete: false };
 }
 function replyFromAgentText(text10) {
   if (typeof text10 !== "string") return "";

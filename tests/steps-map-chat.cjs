@@ -1896,3 +1896,9 @@ test('auto-apply: a read_md_file in the map folder beside an edit there does not
   assert.equal(autoPlan([edit, { kind: 'read_md_file', path: 'Maps/Steak/各章四項_第1批.md' }], { chain: { round: 2, researchSoFar: 0 } }), null);
   assert.notEqual(autoPlan([edit, { kind: 'read_md_file', path: 'Notes/Elsewhere.md' }], { chain: { round: 2, researchSoFar: 0 } }), null, 'outside the folder still asks');
 });
+
+test('partialReply holds an escaped high surrogate until its partner arrives', () => {
+  assert.deepEqual(plain(partialReply('{"reply":"ab\\ud83d')), { text: 'ab', complete: false });
+  assert.deepEqual(plain(partialReply('{"reply":"ab\\ud83d\\ude00')), { text: 'ab\u{1F600}', complete: false });
+  assert.equal(partialReply('{"reply":"ab\\ud83d\\u0041').text, 'ab\ud83dA');
+});

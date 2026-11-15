@@ -75290,10 +75290,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }
     const selected = [...this.selection.state.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
     try {
-      const current = {
-        model: (_b2 = (_a2 = request.model) != null ? _a2 : request.batchModel) != null ? _b2 : this.currentModelId(),
-        reasoning: normalizeReasoningLevel(this.plugin.settings.cliReasoning)
-      };
+      const current = { model: (_b2 = (_a2 = request.model) != null ? _a2 : request.batchModel) != null ? _b2 : this.currentModelId() };
       const resolved = request.model ? [] : await Promise.all(
         selected.map(async (node) => {
           var _a3;

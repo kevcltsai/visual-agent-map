@@ -19546,12 +19546,10 @@ export class VisualAgentMapView extends ItemView {
       .map(id => this.map!.nodes.find(node => node.id === id))
       .filter((node): node is MapNode => !!node);
     try {
-      // The model of the batch is taken once, here: a switch while it runs changes the next batch only. A topic with its own
+      // The model of the batch is taken once, here: a switch while it runs changes the next batch only (the reasoning level is
+      // still read when each card runs, as for any run-once model). A topic with its own
       // model keeps it; every other one runs this model once (never written to the topic, D4).
-      const current = {
-        model: request.model ?? request.batchModel ?? this.currentModelId(),
-        reasoning: normalizeReasoningLevel(this.plugin.settings.cliReasoning)
-      };
+      const current = { model: request.model ?? request.batchModel ?? this.currentModelId() };
       const resolved = request.model
         ? []
         : await Promise.all(

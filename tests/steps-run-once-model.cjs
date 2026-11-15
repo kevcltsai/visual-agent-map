@@ -230,5 +230,6 @@ test('a batch keeps the model it started with when the current model changes whi
   h.view.selection.replaceMulti(h.nodes.map(node => node.id));
   await h.view.startMultiResearch({ requirements: '', researchMode: 'local', researchDepth: 'normal', imageSearch: false });
   await until(() => h.view.plugin.expansionBatches.get(`multi-research:${MAP}`)?.status === 'completed');
-  assert.deepEqual(used.slice().sort(), [['gpt-6-luna', 'low'], ['gpt-6-luna', 'low'], ['gpt-6-luna', 'low'], ['model-b', 'high']]);
+  assert.deepEqual(used.map(([model]) => model).sort(), ['gpt-6-luna', 'gpt-6-luna', 'gpt-6-luna', 'model-b']);
+  assert.deepEqual(used.find(([model]) => model === 'model-b'), ['model-b', 'high'], 'a topic own model keeps its own reasoning');
 });

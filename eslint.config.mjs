@@ -65,9 +65,9 @@ export default defineConfig([
     rules: { "depend/ban-dependencies": "error" },
   },
   {
-    // These two tools create/verify our disposable Vault with its default config
+    // These tools create, verify or read (owner-idle, chat-timeline) a harness-made test Vault with its default config
     // directory. They do not address a user's existing Vault configuration.
-    files: ["scripts/create-onboarding-test-vault.mjs", "scripts/test-harness.mjs"],
+    files: ["scripts/create-onboarding-test-vault.mjs", "scripts/test-harness.mjs", "scripts/owner-idle.mjs", "scripts/chat-timeline.mjs"],
     rules: { "obsidianmd/hardcoded-config-path": "off" }
   },
   {

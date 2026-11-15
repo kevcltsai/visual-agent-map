@@ -41,13 +41,20 @@ export const MAP_CHAT_CONTEXT_TOKEN_BUDGET = 120_000;
 export const MAP_CHAT_OUTLINE_CARD_LIMIT = 1500;
 /** Characters of one attached file or of the active file sent at most; the rest is cut (`truncated`, no content hash). */
 export const MAP_CHAT_FILE_CHAR_LIMIT = 60_000;
+/**
+ * Total characters of the files this conversation made itself (`ownFiles`), apart from the other budgets. A file is sent whole or
+ * not at all (one longer than {@link MAP_CHAT_FILE_CHAR_LIMIT} is never sent); the rest wait in `ownFilesDeferred`.
+ */
+export const MAP_CHAT_OWN_FILE_BUDGET = 60_000;
+/** Total characters of the own files the chat asked for with `read_md_file` in one turn (their own allowance, before the ordinary budget). */
+export const MAP_CHAT_OWN_READ_BUDGET = 40_000;
 /** Characters of one earlier conversation message sent at most. */
 export const MAP_CHAT_TURN_CHAR_LIMIT = 6_000;
 /** Characters of one user text node or one summary bracket sent at most. */
 export const MAP_CHAT_USER_TEXT_CHAR_LIMIT = 4_000;
 /** The fixed note sent when any part of the context was shortened (a constant, never built from the content). */
 export const MAP_CHAT_SHORTENED_NOTE =
-  "This context was shortened to fit what you can read. A part with truncated: true holds only the beginning of its text (totalChars is its whole length); outlineSummariesOmitted: true means the outline cards are sent without their summaries; outlineOmitted counts cards left out of the outline (those deeper than outlineDepthLimit, or past the card limit), and they still exist on the map; earlierTurnsOmitted counts older conversation messages left out; a card with detailOmitted: true is sent without its Detail; researchDeferred lists research notes not sent this round. Text that was cut or left out is not in front of you: never say or imply that you read, used or checked it, and build nothing from it. When the user's request needs that part, say it was not sent this time. A truncated file has no contentHash and cannot be edited.";
+  "This context was shortened to fit what you can read. A part with truncated: true holds only the beginning of its text (totalChars is its whole length); outlineSummariesOmitted: true means the outline cards are sent without their summaries; outlineOmitted counts cards left out of the outline (those deeper than outlineDepthLimit, or past the card limit), and they still exist on the map; earlierTurnsOmitted counts older conversation messages left out; a card with detailOmitted: true is sent without its Detail; researchDeferred lists research notes not sent this round; ownFilesDeferred lists files you made earlier in this conversation that were not sent this round (read_md_file asks for one of them; it arrives in the next round). Text that was cut or left out is not in front of you: never say or imply that you read, used or checked it, and build nothing from it. When the user's request needs that part, say it was not sent this time. A truncated file has no contentHash and cannot be edited.";
 const TITLE_LIMIT = 200;
 const SUMMARY_LIMIT = 240;
 const ERROR_LIMIT = 200;
@@ -146,6 +153,8 @@ export interface MapChatSnippet {
 export interface MapChatFile {
   path: string;
   content: string;
+  /** An own file the chat asked for with `read_md_file`: it is taken from {@link MAP_CHAT_OWN_READ_BUDGET}, not from the ordinary budget. */
+  requested?: boolean;
 }
 export interface MapChatTurn {
   role: "user" | "assistant";
@@ -235,6 +244,11 @@ export interface MapChatContextInput {
   references: MapChatTopicRef[];
   snippets: MapChatSnippet[];
   files: MapChatFile[];
+  /**
+   * Markdown files this conversation created or edited, still holding exactly what it wrote (the caller checks that), newest first.
+   * Sent whole with a content hash so `edit_md_file` can update them; omitted or empty leaves the context exactly as it was.
+   */
+  ownFiles?: MapChatFile[];
   /** The user's text nodes, read-only; omitted or empty leaves the context exactly as it was. */
   userTexts?: MapChatUserText[];
   /** The user's summary brackets, read-only; omitted or empty leaves the context exactly as it was. */
@@ -458,6 +472,8 @@ interface Shrink {
   outlineDepth: number | null;
   /** Characters of research notes; null uses the input's budget. */
   researchBudget: number | null;
+  /** Characters of the conversation's own files sent. */
+  ownFilesBudget: number;
   /** Characters of each attached file and of the active file. */
   fileChars: number;
   /** Referenced cards keep their Detail. */
@@ -469,7 +485,7 @@ interface Shrink {
 /**
  * The order in which an over-budget context is shortened, gentlest first; each step keeps what the earlier ones cut. What the user
  * pointed at is kept longest: (1) older conversation messages go first, down to the newest question and answer; (2) the outline
- * loses its summaries, then its deepest levels down to depth 1; (3) research notes are deferred, by halving their budget to zero;
+ * loses its summaries, then its deepest levels down to depth 1; (3) the files this conversation made are deferred, then research notes are, each by halving its budget to zero;
  * (4) attached files and the active note are cut to their beginning, and referenced cards lose their Detail; (5) selected cards
  * lose their Detail, by lowering the Detail budget to zero; (6) last, the outline keeps only its roots and the history goes.
  * The user's message is not in the context and is never shortened.
@@ -480,6 +496,7 @@ function* shrinkSteps(input: MapChatContextInput): Generator<Shrink> {
     outlineSummaries: true,
     outlineDepth: null,
     researchBudget: null,
+    ownFilesBudget: MAP_CHAT_OWN_FILE_BUDGET,
     fileChars: MAP_CHAT_FILE_CHAR_LIMIT,
     referencesDetail: true,
     detailBudget: null
@@ -492,6 +509,9 @@ function* shrinkSteps(input: MapChatContextInput): Generator<Shrink> {
   // One level at a time on an ordinary map; a very deep one drops about a quarter of its levels per step, so the rebuilds stay few.
   for (let depth = deepest - 1; depth >= 1; depth -= Math.max(1, Math.floor(depth / 4)))
     yield { ...step, outlineDepth: (step.outlineDepth = depth) };
+  if (input.ownFiles?.length)
+    for (const share of [2, 4, Infinity])
+      yield { ...step, ownFilesBudget: (step.ownFilesBudget = Math.floor(MAP_CHAT_OWN_FILE_BUDGET / share)) };
   const research = input.researchBudget ?? MAP_CHAT_RESEARCH_BUDGET;
   if ((input.researchNotes ?? []).length)
     for (const share of [2, 4, 8, Infinity])
@@ -655,6 +675,28 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
       text: snippet.text
     };
   });
+  // The files this conversation made: whole or not at all, each with the baseline an edit_md_file on it is checked against.
+  const ownSent: { path: string; contentHash: string; content: string }[] = [];
+  const ownDeferred: { path: string; chars: number }[] = [];
+  let ownLeft = shrink.ownFilesBudget;
+  let readLeft = Math.floor((MAP_CHAT_OWN_READ_BUDGET * shrink.ownFilesBudget) / MAP_CHAT_OWN_FILE_BUDGET);
+  for (const file of input.ownFiles ?? []) {
+    const key = normalizeVaultPath(file.path);
+    if (key === null) continue;
+    const chars = file.content.length;
+    // A requested file the read allowance cannot hold still gets the ordinary budget, so a read is not lost to the allowance alone.
+    const fromRead = !!file.requested && chars <= readLeft;
+    if (chars > MAP_CHAT_FILE_CHAR_LIMIT || (!fromRead && chars > ownLeft)) {
+      ownDeferred.push({ path: file.path, chars });
+      continue;
+    }
+    if (fromRead) readLeft -= chars;
+    else ownLeft -= chars;
+    basis.read.push({ path: file.path, title: noteTitle(file.path) });
+    record(file.path, file.content);
+    ownSent.push({ path: file.path, contentHash: hashes[key], content: file.content });
+  }
+  if (ownDeferred.length) shortened = true;
   const mapTitles = [...new Set((input.mapTitles ?? []).map(title => clip(title, TITLE_LIMIT)).filter(Boolean))].slice(
     0,
     MAP_CHAT_MAP_TITLE_LIMIT
@@ -767,6 +809,8 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
     references: referencesOut,
     snippets,
     files,
+    ...(ownSent.length ? { ownFiles: ownSent } : {}),
+    ...(ownDeferred.length ? { ownFilesDeferred: ownDeferred } : {}),
     ...(input.userTexts?.length
       ? {
           userTexts: userTexts.map(({ item, sent }) => ({

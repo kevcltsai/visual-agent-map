@@ -1,4 +1,5 @@
 import { spawn as nodeSpawn } from "node:child_process";
+import { outputSchemaFor } from "./output-schema";
 import { t } from "../../i18n";
 import { searchNotPerformedError } from "../search-not-performed";
 import { createUtf8StreamDecoder } from "./utf8-stream";
@@ -85,7 +86,7 @@ export const CLAUDE_TASK_TIMEOUT_MS = 3 * 60 * 1000;
 export function claudeOutputSchema(schema: unknown): unknown {
   if (!schema || typeof schema !== "object" || Array.isArray(schema)) return schema;
   const { $schema: _draft, ...body } = schema as Record<string, unknown>;
-  return body;
+  return outputSchemaFor(body, true);
 }
 
 export function claudeTaskArgs(model: string, effort: string, schema: unknown, webSearch: boolean): string[] {

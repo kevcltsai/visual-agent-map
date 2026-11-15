@@ -115,7 +115,7 @@ test('parser rejects a malformed whole reply and caps the number of actions', ()
 test('schema lists exactly the kinds and run actions, and every property is required', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.kind.enum), plain(MAP_CHAT_ACTION_KINDS));
-  assert.equal(MAP_CHAT_ACTION_KINDS.length, 25);
+  assert.equal(MAP_CHAT_ACTION_KINDS.length, 26);
   assert.deepEqual(plain(properties.action.enum), [...plain(MAP_RUN_ACTIONS), '']);
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.actions.items.required).sort(), Object.keys(properties).sort());
 });
@@ -472,7 +472,7 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
 test('C1: the style is not part of the action schema, and the step version is 22 (version 22: auditing the whole map researches its main cards, not only the root, and no requested item is announced as skipped; version 21: a batch whose notes are not in the context selects the cards instead of asking the user to, and a title plus a list is one root card with the items as children; version 20: find_images takes several targets and the picture is put in automatically; version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 24);
+  assert.equal(mapChatStep.version, 26);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -545,7 +545,7 @@ test('B1 limit: the 100th action is kept and the 101st is dropped as too_many', 
   assert.equal(hundred.actions.length, 100); assert.deepEqual(hundred.rejected, []);
   const more = parse(reply(...rows(101)));
   assert.equal(more.actions.length, 100); assert.deepEqual(more.rejected, [{ index: 100, code: 'too_many' }]);
-  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-9, -2)), ['set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics']);
+  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-10, -3)), ['set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics']);
 });
 test('B1 compat: a step version 2 reply (no ref key anywhere) still parses', () => {
   const old = key => ({ kind: key, nodeId: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '' });
@@ -629,7 +629,7 @@ test('B1 schema: ref is a required string property and the kinds list ends with 
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.ref), { type: 'string' });
   assert.ok(MAP_CHAT_SCHEMA.properties.actions.items.required.includes('ref'));
-  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics', 'add_anchor', 'link_anchor']);
+  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics', 'add_anchor', 'link_anchor', 'read_md_file']);
 });
 test('B1 context: map titles (cleaned, at most 200) and the noEditableMap flag reach the model; the selection size is kept', () => {
   const titles = Array.from({ length: 260 }, (_, i) => `Map ${i}`);
@@ -1626,7 +1626,7 @@ test('hypothesis-leaning: S21 both prompts explain leaning (three values) and st
   assert.match(zh, /只走一層/); assert.match(zh, /絕不用標題表達議題類型/);
 });
 test('hypothesis-leaning: S21 the step version is 22 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
-  assert.equal(mapChatStep.version, 24);
+  assert.equal(mapChatStep.version, 26);
   const old = item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', strength: 'weak' }); delete old.leaning;
   const oldAdd = item('add_child', { parentId: 'a', title: 'Old', topicKind: 'hypothesis' }); delete oldAdd.leaning;
   assert.deepEqual(parse(reply(old, oldAdd)).actions, [
@@ -1766,6 +1766,31 @@ test('map sources 05: no absolute external path reaches the text sent; external 
   assert.deepEqual(plain(mapSourcePaths(srcGroup([{ path: '/Users/me/x.md', content: '', external: true }, { path: 'Notes/V.md', content: '' }, { path: 'Docs/a.md', content: '', external: true }]))), ['Notes/V.md', 'Docs/a.md']);
 });
 
+test('map chat: an action with a field the schema does not name (mapFolder copied from the context) passes the Claude schema and is parsed without it; Codex keeps the strict schema', () => {
+  const Ajv = require('ajv');
+  const { claudeOutputSchema } = load('ai/runtime/claude-code-cli.ts', { 'node:child_process': { spawn() {} } });
+  const { codexOutputSchema } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn() {} } });
+  const blank = Object.fromEntries(MAP_CHAT_SCHEMA.properties.actions.items.required.map(key => {
+    const type = MAP_CHAT_SCHEMA.properties.actions.items.properties[key].type;
+    return [key, type === 'array' ? [] : type === 'boolean' ? false : type === 'number' ? 0 : ''];
+  }));
+  const reply = { reply: 'ok', actions: [{ ...blank, kind: 'create_md_file', path: 'Notes/Progress.md', content: '# Progress\n', mapFolder: 'Agent Workspace/Mind Maps/x' }], remaining: '' };
+  const claude = new Ajv({ strict: false }).compile(claudeOutputSchema(MAP_CHAT_SCHEMA));
+  assert.equal(claude(reply), true, JSON.stringify(claude.errors));
+  assert.equal(claude({ ...reply, extra: 1 }), false, 'the top level stays closed');
+  assert.equal(claude({ ...reply, actions: [{ ...reply.actions[0], kind: 'delete_vault' }] }), false, 'every named field keeps its rule');
+  const parsed = parseMapChat(JSON.stringify(reply), { nodeIds: [], parents: {} });
+  assert.deepEqual(JSON.parse(JSON.stringify(parsed.actions)), [{ kind: 'create_md_file', path: 'Notes/Progress.md', content: '# Progress\n' }]);
+  const strict = JSON.stringify(codexOutputSchema(MAP_CHAT_SCHEMA));
+  assert.ok(!strict.includes('x-vam'), 'no private keyword reaches Codex');
+  assert.equal(codexOutputSchema(MAP_CHAT_SCHEMA).properties.actions.items.additionalProperties, false, 'Codex strict mode keeps every object closed');
+});
+
+test('read_md_file: parsed with its path only', () => {
+  const out = parse(JSON.stringify({ reply: 'r', remaining: '', actions: [item('read_md_file', { path: 'Maps/M/a.md' })] }));
+  assert.deepEqual(out.actions, [{ kind: 'read_md_file', path: 'Maps/M/a.md' }]);
+});
+
 // ---- auto-apply conversation: plan rules (a)-(d) ----
 const AUTO = { autoApply: true, mapFolder: 'Maps/Steak' };
 const autoRun = (action, nodeIds = ['a'], extra = {}) => ({ kind: 'run_map_action', action, nodeIds, title: '', goal: '', direction: '', mode: '', images: false, ...extra });
@@ -1845,4 +1870,10 @@ test('auto-apply plan (d): estimateChatCalls is what planFor counts; call_budget
   assert.deepEqual(plain(autoPlan([...exp(151), { kind: 'create_map', title: 'Q' }]).reasons), ['new_map', 'call_budget']);
   assert.ok(!(plan(exp(151), {}, { callsSoFar: 999 })?.reasons || []).includes('call_budget'));
   assert.equal(planFor(exp(1), autoCtx, { ...AUTO }), null);
+});
+
+test('auto-apply: a read_md_file in the map folder beside an edit there does not stop the flow with a plan card', () => {
+  const edit = { kind: 'edit_md_file', path: 'Maps/Steak/進度.md', find: 'a', replace: 'b' };
+  assert.equal(autoPlan([edit, { kind: 'read_md_file', path: 'Maps/Steak/各章四項_第1批.md' }], { chain: { round: 2, researchSoFar: 0 } }), null);
+  assert.notEqual(autoPlan([edit, { kind: 'read_md_file', path: 'Notes/Elsewhere.md' }], { chain: { round: 2, researchSoFar: 0 } }), null, 'outside the folder still asks');
 });

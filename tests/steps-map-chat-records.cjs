@@ -468,3 +468,23 @@ test('R6 chain end of a turn that cannot come back: goes to the closest earlier 
     assert.equal(first.reason, null);
   });
 }
+
+test('restoreConversation collects file_written paths and hashes, and skips an unsafe path, a non-string path and a non-hex hash', () => {
+  const ev = extra => ({ v: 1, type: 'event', turn: 1, at: T0, kind: 'file_written', ...extra });
+  const lines = [
+    ev({ path: 'Maps/Steak/A.md', hash: '00ff12' }),
+    ev({ path: 'Maps/Steak/A.md', hash: '00ff13' }),
+    ev({ path: 7, hash: 'aa' }), ev({ path: '../x.md', hash: 'aa' }), ev({ path: '.obsidian/x.md', hash: 'aa' }),
+    ev({ path: 'Maps/Steak/B.md', hash: 'XYZ' }), ev({ path: 'Maps/Steak/C.md' }), ev({ hash: 'aa' })
+  ];
+  assert.deepEqual(JSON.parse(JSON.stringify(records.restoreConversation('20261106-100000-abcdef', lines).ownFiles)), [
+    { path: 'Maps/Steak/A.md', hash: '00ff12' }, { path: 'Maps/Steak/A.md', hash: '00ff13' }
+  ]);
+  assert.equal(records.restoreConversation('20261106-100000-abcdef', []).ownFiles.length, 0);
+});
+
+test('restoreConversation tolerates file_read events (path and chars are only a trace) and they add nothing to ownFiles', () => {
+  const lines = [{ v: 1, type: 'event', turn: 1, at: T0, kind: 'file_read', path: 'Maps/Steak/A.md', chars: 120 }, { v: 1, type: 'event', turn: 1, at: T0, kind: 'file_read', path: 7 }];
+  const restored = records.restoreConversation('20261106-100000-abcdef', lines);
+  assert.equal(restored.ownFiles.length, 0);
+});

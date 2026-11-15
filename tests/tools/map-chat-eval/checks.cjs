@@ -166,6 +166,7 @@ const C = {
       return times === 1 && edit.replace.includes(replaceHas) ? ok() : fail(`find occurs ${times} times; replace="${edit.replace.slice(0, 40)}"`);
     }),
   createMd: (path, has) => check("createMd", `create_md_file ${path} containing ${has}`, env => (ofKind(env, "create_md_file").some(a => a.path === path && a.content.includes(has)) ? ok() : fail("no matching create_md_file"))),
+  readMd: path => check("readMd", `read_md_file ${path}`, env => (ofKind(env, "read_md_file").some(a => a.path === path) ? ok() : fail("no matching read_md_file"))),
   mergeTargets: ids =>
     check("mergeTargets", `merge covers ${ids.join(", ")}`, env => {
       let selected = [];

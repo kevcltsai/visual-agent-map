@@ -505,7 +505,8 @@ import {
   type MapChatOutlineNode,
   type MapChatTurn,
   type MapChatTopicHash,
-  type MapChatTopicRef
+  type MapChatTopicRef,
+  MAP_CHAT_FILE_CHAR_LIMIT
 } from "../../core/map-chat-context";
 import { mapChatSourceMaterial, type MapChatSourceCache } from "../../core/map-chat-sources";
 import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
@@ -1161,6 +1162,8 @@ interface ChatRoundWork {
   otherBackground: boolean;
   /** The cards a select_topics of the round selected (the chain keeps them for its later rounds). */
   selected?: string[];
+  /** Positions of the `read_md_file` actions of the round that were accepted (they have no result line; the chain goes on for them). */
+  reads: Set<number>;
 }
 const newChatWork = (): ChatRoundWork => ({
   controller: new AbortController(),
@@ -1169,7 +1172,8 @@ const newChatWork = (): ChatRoundWork => ({
   researchKeys: new Set(),
   created: [],
   expand: [],
-  otherBackground: false
+  otherBackground: false,
+  reads: new Set()
 });
 /** What `applyMapChatActions` is given beyond the reply: the context the basis is judged by and where the started work is collected. */
 interface ChatApplyOptions {
@@ -1609,6 +1613,18 @@ export class VisualAgentMapView extends ItemView {
   private chatResearchMarkedIn: string | null = null;
   /** The record conversation whose file already carries the `sources_read` mark. */
   private chatSourcesMarkedIn: string | null = null;
+  /** Markdown files this conversation created or edited -> the content hash of each version it wrote. Only the program writes it. */
+  private chatOwnFiles = new Map<string, Set<string>>();
+  /** Order of the writes to {@link chatOwnFiles}: a counter per write and the reply (apply call) it belonged to; restored paths are round 0. */
+  private chatOwnOrder = new Map<string, { seq: number; round: number }>();
+  private chatWriteSeq = 0;
+  private chatApplyRound = 0;
+  /** Own files the chat asked to read with `read_md_file`; the next context carries them first and empties this. */
+  private chatReadQueue: string[] = [];
+  /** `path\0hash` of the reads the last context carried: the same version asked again right after is refused (no read loop). */
+  private chatLastReads = new Set<string>();
+  /** The record conversation whose file already holds a `file_written` line for each of these "path\0hash" pairs. */
+  private chatOwnRecorded: { id: string | null; keys: Set<string> } = { id: null, keys: new Set() };
   /** Research notes an earlier round already sent whole (they go last when the budget is short). */
   private chatResearchSent = new Set<string>();
   /** Counts conversations: the result of research another conversation started is not recorded in this one. */
@@ -18314,7 +18330,16 @@ export class VisualAgentMapView extends ItemView {
   private async chatLockSkip(
     action: Exclude<
       MapChatAction,
-      { kind: "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" }
+      {
+        kind:
+          | "select_topics"
+          | "run_map_action"
+          | "create_map"
+          | "rename_map"
+          | "open_map"
+          | "ask_topic_kind"
+          | "read_md_file";
+      }
     >,
     real: (id: string) => string | null
   ): Promise<ChatOutcome | null> {
@@ -22472,6 +22497,19 @@ export class VisualAgentMapView extends ItemView {
       picture.selected.imageAttached = true;
     }
     const mapSources = await this.chatMapSources(signal);
+    // Files this conversation made that hold what it wrote: sent whole so edit_md_file can update them. A file already sent as a
+    // chip, the open note or a map source goes in that part, not twice.
+    const sentPaths = new Set<string>();
+    for (const item of [
+      ...files,
+      ...(activeSource ? [{ path: activeSource.file.path }] : []),
+      ...snippets,
+      ...(mapSources?.paths ?? []).map(path => ({ path }))
+    ]) {
+      const key = normalizeVaultPath(item.path);
+      if (key) sentPaths.add(key);
+    }
+    const ownFiles = await this.chatOwnFilesNow(sentPaths);
     const context = buildMapChatContext({
       mapTitle: map.title,
       mapFolder: this.plugin.repo.topicRoot(this.path),
@@ -22487,6 +22525,7 @@ export class VisualAgentMapView extends ItemView {
         .filter(item => !selectedIds.includes(item.id)),
       snippets,
       files,
+      ...(ownFiles.length ? { ownFiles } : {}),
       userTexts: this.chatUserTexts(),
       summaries: this.chatSummaries(),
       aim: !this.relationsEnabled(),
@@ -23243,9 +23282,14 @@ export class VisualAgentMapView extends ItemView {
       progress: round.result.progress ?? null,
       remaining: round.result.remaining,
       researchDeferred: pendingResearchCount(round.context),
+      // A read has no line of its own: the lines are the other actions', in order.
       actions: round.result.actions.map((action, index) => ({
         kind: action.kind,
-        done: round.lines[index]?.status === "done"
+        done:
+          action.kind === "read_md_file"
+            ? round.work.reads.has(index)
+            : round.lines[round.result.actions.slice(0, index).filter(other => other.kind !== "read_md_file").length]
+                ?.status === "done"
       })),
       started: {
         research: round.work.researchTargets,
@@ -23455,7 +23499,10 @@ export class VisualAgentMapView extends ItemView {
   ): string {
     switch (reason) {
       case "many_actions":
-        return t("ui.map_chat_plan_reason_many_actions_0", result.actions.length);
+        return t(
+          "ui.map_chat_plan_reason_many_actions_0",
+          result.actions.filter(action => action.kind !== "read_md_file").length
+        );
       case "many_research":
         // The same count the plan was judged by: the whole continuation (earlier rounds too), and a selection made earlier in the reply.
         return t(
@@ -23507,10 +23554,12 @@ export class VisualAgentMapView extends ItemView {
     if (anchorsToPlace.length) this.chatPreview = { token, anchors: anchorsToPlace };
     this.syncAnchorPreview();
     const refTitles = this.chatRefTitles(result.actions);
-    const items = result.actions.map(action => this.chatActionLabel(action, refTitles));
+    // A read_md_file is never shown (decision 2026-11-15-map-chat-file-bugs#2), on the plan card as in the result lines.
+    const shown = result.actions.flatMap((action, index) => (action.kind === "read_md_file" ? [] : [index]));
+    const items = shown.map(index => this.chatActionLabel(result.actions[index], refTitles));
     // The same lines by kind of work, so a 100-action plan reads as five folded lists.
     const groups = CHAT_PLAN_GROUP_ORDER.flatMap(group => {
-      const own = items.filter((_, index) => chatPlanGroupOf(result.actions[index].kind) === group);
+      const own = items.filter((_, at) => chatPlanGroupOf(result.actions[shown[at]].kind) === group);
       return own.length
         ? [
             {
@@ -23742,6 +23791,7 @@ export class VisualAgentMapView extends ItemView {
       // Research began while the record was off: the mark goes in with the first turn written after it came back on.
       this.markResearchRecorded(record);
       this.markSourcesRecorded(record);
+      this.markOwnFilesRecorded(record);
       return record;
     } catch (error) {
       this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage(error)}`);
@@ -23755,6 +23805,88 @@ export class VisualAgentMapView extends ItemView {
     if (writer.conversationId !== record.conversationId || this.chatSourcesMarkedIn === record.conversationId) return;
     this.chatSourcesMarkedIn = record.conversationId;
     record.event("sources_read");
+  }
+  /** Writes a `file_written` line for each version of an own file the record does not hold yet (the record may have been off, or new). */
+  private markOwnFilesRecorded(record: MapChatTurnRecord | null): void {
+    const writer = this.chatRecords;
+    if (!record || !writer || this.plugin.settings.mapChatRecords !== true) return;
+    if (writer.conversationId !== record.conversationId) return;
+    if (this.chatOwnRecorded.id !== record.conversationId)
+      this.chatOwnRecorded = { id: record.conversationId, keys: new Set() };
+    for (const [path, hashes] of this.chatOwnFiles)
+      for (const hash of hashes) {
+        const key = `${path}\0${hash}`;
+        if (this.chatOwnRecorded.keys.has(key)) continue;
+        this.chatOwnRecorded.keys.add(key);
+        record.event("file_written", { path, hash });
+      }
+  }
+  /**
+   * A write of this conversation's own: a created file always counts; an edit counts only for a file already its own (an attached
+   * or open note the chat edits does not become the chat's). Only the program calls this, with what it just wrote.
+   */
+  private noteChatOwnFile(path: string, text: string, created: boolean): void {
+    const key = normalizeVaultPath(path);
+    if (key === null || (!created && !this.chatOwnFiles.has(key))) return;
+    const hashes = this.chatOwnFiles.get(key) ?? new Set<string>();
+    hashes.add(contentHash(text));
+    this.chatOwnFiles.set(key, hashes);
+    this.chatOwnOrder.set(key, { seq: ++this.chatWriteSeq, round: this.chatApplyRound });
+    this.markOwnFilesRecorded(this.chatLastRecord);
+  }
+  /**
+   * The files this conversation wrote that still hold exactly one of the versions it wrote, in the order the context spends its budget
+   * on them: the ones the chat asked to read (`requested`, taken from the queue, which this empties), then a 進度 file and the files of
+   * the latest reply, then the rest, each group newest write first. `skip` are sent another way.
+   */
+  private async chatOwnFilesNow(skip: Set<string>): Promise<{ path: string; content: string; requested?: boolean }[]> {
+    const found: { path: string; content: string; seq: number; round: number }[] = [];
+    // Only this map's own folder: a file the conversation wrote elsewhere (another folder it was allowed to write to) is not read back.
+    const root = normalizeVaultPath(this.plugin.repo.topicRoot(this.path));
+    const queue = this.chatReadQueue.splice(0);
+    for (const [path, hashes] of this.chatOwnFiles) {
+      if (skip.has(path) || root === null || !path.startsWith(`${root}/`)) continue;
+      const source = await this.readChatFile(path);
+      if (source && hashes.has(contentHash(source.text)))
+        found.push({
+          path: source.file.path,
+          content: source.text,
+          ...(this.chatOwnOrder.get(path) ?? { seq: 0, round: 0 })
+        });
+    }
+    const latest = Math.max(0, ...[...this.chatOwnOrder.values()].map(item => item.round));
+    const first = (file: { path: string; round: number }): boolean =>
+      (file.path.split("/").at(-1) ?? "").includes("進度") || (latest > 0 && file.round === latest);
+    const requested = queue.flatMap(path => found.filter(file => normalizeVaultPath(file.path) === path));
+    this.chatLastReads = new Set(
+      requested.map(file => `${normalizeVaultPath(file.path) ?? file.path}\0${contentHash(file.content)}`)
+    );
+    return [
+      ...requested.map(({ path, content }) => ({ path, content, requested: true })),
+      ...found
+        .filter(file => !requested.includes(file))
+        .sort((a, b) => Number(first(b)) - Number(first(a)) || b.seq - a.seq)
+        .map(({ path, content }) => ({ path, content }))
+    ];
+  }
+  /**
+   * A `read_md_file` of the chat: accepted only for a file this conversation wrote that is in this map's folder and still holds one
+   * of the versions it wrote (the same rule as {@link chatOwnFilesNow}). The next context carries it; nothing is shown for it.
+   */
+  private async acceptChatRead(path: string, record: MapChatTurnRecord | null): Promise<boolean> {
+    const key = normalizeVaultPath(path);
+    const root = normalizeVaultPath(this.plugin.repo.topicRoot(this.path));
+    const hashes = key === null ? undefined : this.chatOwnFiles.get(key);
+    if (key === null || !hashes || root === null || !key.startsWith(`${root}/`)) return false;
+    const source = await this.readChatFile(key);
+    if (!source || !hashes.has(contentHash(source.text))) return false;
+    // A file that can never be sent whole, or the version the last context already carried, is not a read: the chain must not
+    // go round asking for it again.
+    if (source.text.length > MAP_CHAT_FILE_CHAR_LIMIT || this.chatLastReads.has(`${key}\0${contentHash(source.text)}`))
+      return false;
+    if (!this.chatReadQueue.includes(key)) this.chatReadQueue.push(key);
+    record?.event("file_read", { path: key, chars: source.text.length });
+    return true;
   }
   /** Writes the `research_started` mark once per record conversation, and only while the record is on (otherwise the next turn writes it). */
   private markResearchRecorded(record: MapChatTurnRecord | null): void {
@@ -23775,6 +23907,11 @@ export class VisualAgentMapView extends ItemView {
     this.chatReadsSources = false;
     this.chatSourcesMarkedIn = null;
     this.chatSourceCache = null;
+    this.chatOwnFiles.clear();
+    this.chatOwnOrder.clear();
+    this.chatReadQueue = [];
+    this.chatLastReads.clear();
+    this.chatOwnRecorded = { id: null, keys: new Set() };
   }
   /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */
   private startChatRecords(): void {
@@ -23880,6 +24017,14 @@ export class VisualAgentMapView extends ItemView {
     );
     writer.markEnded(numbers);
     this.chatRecordTurnSeq = Math.max(0, ...numbers);
+    for (const item of restored.ownFiles) {
+      const hashes = this.chatOwnFiles.get(item.path) ?? new Set<string>();
+      hashes.add(item.hash);
+      this.chatOwnFiles.set(item.path, hashes);
+      this.chatOwnOrder.set(item.path, { seq: ++this.chatWriteSeq, round: 0 });
+      this.chatOwnRecorded.keys.add(`${item.path}\0${item.hash}`);
+    }
+    this.chatOwnRecorded.id = restored.id;
     for (const item of chat.completedTurns()) this.chatRecordLogged.add(item.answer);
     this.relocateMapChat();
   }
@@ -23990,6 +24135,8 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_do_edit_md_0", action.path);
       case "create_md_file":
         return t("ui.map_chat_do_create_md_0", action.path);
+      case "read_md_file":
+        return action.path;
       case "select_topics":
         return t("ui.map_chat_do_select_0", action.all ? nodes.length : action.nodeIds.length);
       case "create_map":
@@ -24270,6 +24417,9 @@ export class VisualAgentMapView extends ItemView {
       skipped(!this.closed && !alive() ? "ui.map_chat_skip_stopped" : "ui.map_chat_skip_map_changed");
     const lines: MapChatLine[] = [];
     const later: number[] = [];
+    /** Positions of the actions that get no result line (`read_md_file`). */
+    const hidden = new Set<number>();
+    if (!scope) this.chatApplyRound += 1;
     const autoChain = options.chain && (options.chain.state.autoApply || this.chatAutoApply) ? options.chain : null;
     const run: ChatRun = {
       refs: new Map(),
@@ -24304,6 +24454,8 @@ export class VisualAgentMapView extends ItemView {
     let noNewMap = false;
     // ... and why: the map was never made, or it was made but could not be opened here.
     let noNewMapReason: TranslationKey = "ui.map_chat_skip_map_not_created";
+    // The map folder before and after this reply's rename_map, when it moved.
+    let movedRoot: { from: string; to: string } | null = null;
     // Copied: the turn's own writes move the baseline along, the request's context stays as it was sent.
     const own = {
       mdHashes: baseline.mdHashes,
@@ -24318,6 +24470,12 @@ export class VisualAgentMapView extends ItemView {
       if (batched) this.holdChatBatch();
       run.deferRebuild = batched;
       for (const [index, action] of result.actions.entries()) {
+        // A read has no result line (decision #2): the next round's context carries the file, and the record notes the read.
+        if (action.kind === "read_md_file") {
+          hidden.add(index);
+          if (!scope && same() && (await this.acceptChatRead(action.path, record))) options.work?.reads.add(index);
+          continue;
+        }
         if (verdicts && verdicts[index] !== "ok") {
           lines[index] = this.chatLine(
             this.chatActionLabel(action, refTitles),
@@ -24346,10 +24504,13 @@ export class VisualAgentMapView extends ItemView {
         }
         if (action.kind === "rename_map") {
           // The folder moves with the name, so the reply's anchor follows the map to its new path.
+          const fromRoot = this.plugin.repo.topicRoot(anchor.path);
           const outcome = await this.chatRenameMap(action.title, anchor, same);
           if (outcome.status === "done") {
             wrote = true;
             touched.add(anchor.path);
+            const toRoot = this.plugin.repo.topicRoot(anchor.path);
+            if (toRoot !== fromRoot) movedRoot = { from: fromRoot, to: toRoot };
           }
           lines[index] = this.chatLine(label, outcome);
           continue;
@@ -24373,15 +24534,21 @@ export class VisualAgentMapView extends ItemView {
           lines[index] = this.chatLine(label, outcome);
           continue;
         }
+        // A file the reply names under the map's folder from before its own rename_map goes to the folder the map moved to.
+        const key = action.kind === "create_md_file" && movedRoot ? normalizeVaultPath(action.path) : null;
+        const write =
+          key && movedRoot && key.startsWith(`${movedRoot.from}/`)
+            ? { ...action, path: `${movedRoot.to}${key.slice(movedRoot.from.length)}` }
+            : action;
         const box: { outcome: ChatOutcome } = { outcome: { status: "done" } };
         try {
           // Auto-apply: no plan card stood in front of this write, so the file is copied to the backups folder first (once per chain).
-          const unsaved = autoChain ? await this.backupBeforeAutoWrite(autoChain, action, run) : null;
+          const unsaved = autoChain ? await this.backupBeforeAutoWrite(autoChain, write, run) : null;
           if (unsaved) box.outcome = unsaved;
           else
             await this.plugin.mutate(async () => {
               // Only this write's own entries join the reply; what another job pushes between two writes stays its own step.
-              box.outcome = await this.history.ownWrites(() => this.applyChatWrite(action, own, same, run));
+              box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own, same, run));
             });
         } catch (error) {
           box.outcome = { status: "failed", reason: errorMessage(error) };
@@ -24648,7 +24815,7 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     // One line per action (a continuation reads them by position); the chat window says the picture searches of the reply once.
-    const all = [...lines];
+    const all = [...lines].filter((_, index) => !hidden.has(index));
     if (result.rejected.length)
       all.push({ status: "skipped", text: t("ui.map_chat_rejected_0", result.rejected.length) });
     // Undo takes the reply's writes back; the AI work it started records its own steps, so only then is anything said.
@@ -24877,7 +25044,16 @@ export class VisualAgentMapView extends ItemView {
   private async applyChatWrite(
     action: Exclude<
       MapChatAction,
-      { kind: "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" }
+      {
+        kind:
+          | "select_topics"
+          | "run_map_action"
+          | "create_map"
+          | "rename_map"
+          | "open_map"
+          | "ask_topic_kind"
+          | "read_md_file";
+      }
     >,
     baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths">,
     same: () => boolean,
@@ -24899,7 +25075,16 @@ export class VisualAgentMapView extends ItemView {
   private async applyChatWriteGuarded(
     action: Exclude<
       MapChatAction,
-      { kind: "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" }
+      {
+        kind:
+          | "select_topics"
+          | "run_map_action"
+          | "create_map"
+          | "rename_map"
+          | "open_map"
+          | "ask_topic_kind"
+          | "read_md_file";
+      }
     >,
     baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths">,
     same: () => boolean,
@@ -25573,6 +25758,7 @@ export class VisualAgentMapView extends ItemView {
   /** edit_md_file as an undo entry: undo puts the old text back, redo the new one, each only over the text it expects. */
   private recordChatFileEdit(path: string, before: string, after: string, run: ChatRun): void {
     run.files?.add(path);
+    this.noteChatOwnFile(path, after, false);
     const swap = async (expected: string, replacement: string): Promise<void> => {
       if ((await this.chatFileText(path)) !== expected) throw this.chatUndoRefusal();
       await this.chatWriteFile(path, replacement);
@@ -25582,6 +25768,7 @@ export class VisualAgentMapView extends ItemView {
   /** create_md_file as an undo entry: undo moves the file to the trash, redo creates it again, each only when nothing changed. */
   private recordChatFileCreate(path: string, content: string, run: ChatRun): void {
     run.files?.add(path);
+    this.noteChatOwnFile(path, content, true);
     this.history.push({
       undo: async () => {
         const file = this.app.vault.getAbstractFileByPath(path);

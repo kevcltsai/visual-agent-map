@@ -299,3 +299,51 @@ test('when the budget drops only Detail or only research notes, the context stil
   assert.equal(ordinary.selected[0].detailOmitted, true);
   assert.equal(ordinary.shortenedNote, undefined);
 });
+
+// ---- ownFiles: files this conversation made (bug 2) ----
+const own = (path, content) => ({ path, content });
+
+test('ownFiles are sent whole with their hash, the hash is a baseline, and a context without them has no such key', () => {
+  const out = buildMapChatContext({ ...base, ownFiles: [own('Notes/a.md', 'hello')] });
+  const json = JSON.parse(out.json);
+  assert.deepEqual(json.ownFiles, [{ path: 'Notes/a.md', contentHash: ctx.contentHash('hello'), content: 'hello' }]);
+  assert.equal(out.mdHashes['Notes/a.md'], ctx.contentHash('hello'));
+  assert.equal(isMdStale(out.mdHashes, 'Notes/a.md', 'hello'), false);
+  assert.ok(out.basis.read.some(entry => entry.path === 'Notes/a.md'));
+  assert.equal('ownFiles' in JSON.parse(buildMapChatContext({ ...base, ownFiles: [] }).json), false);
+  assert.equal(buildMapChatContext({ ...base, ownFiles: [] }).json, buildMapChatContext(base).json);
+});
+
+test('ownFiles over their own budget: whole files or none, the rest listed in ownFilesDeferred, and the context says it was shortened', () => {
+  const big = n => 'x'.repeat(n);
+  const out = buildMapChatContext({ ...base, ownFiles: [own('a.md', big(40000)), own('b.md', big(30000)), own('c.md', big(MAP_CHAT_FILE_CHAR_LIMIT + 1)), own('d.md', big(100))] });
+  const json = JSON.parse(out.json);
+  assert.deepEqual(json.ownFiles.map(f => f.path), ['a.md', 'd.md']);
+  assert.deepEqual(json.ownFilesDeferred.map(f => f.path).sort(), ['b.md', 'c.md']);
+  assert.ok(json.shortenedNote, 'shortened');
+  assert.equal(out.mdHashes['b.md'], undefined, 'a file not sent has no baseline');
+  assert.equal(out.mdHashes['c.md'], undefined);
+  assert.match(MAP_CHAT_SHORTENED_NOTE, /ownFilesDeferred/);
+});
+
+test('ownFiles are shortened before research notes when the whole context is over budget', () => {
+  const files = Array.from({ length: 4 }, (_, i) => own(`f${i}.md`, zhText(14000, i + 1)));
+  const out = buildMapChatContext({ ...base, ownFiles: files, tokenBudget: 30_000 });
+  const json = JSON.parse(out.json);
+  assert.ok((json.ownFiles?.length ?? 0) < 4, 'fewer than all sent');
+  assert.ok(json.ownFilesDeferred.length >= 1);
+  assert.ok(estimateMapChatTokens(out.json) <= 30_000);
+});
+
+test('requested own files are sent first from their own 40k allowance, whole or not at all; the rest stays in ownFilesDeferred; the order of ownFiles is the order given', () => {
+  const big = n => 'x'.repeat(n);
+  const req = (path, content) => ({ path, content, requested: true });
+  const out = buildMapChatContext({ ...base, ownFiles: [req('r1.md', big(35000)), own('a.md', big(60000)), req('r2.md', big(10000)), req('r3.md', big(41000))] });
+  const json = JSON.parse(out.json);
+  assert.deepEqual(json.ownFiles.map(f => f.path), ['r1.md', 'a.md'], 'requested allowance and the ordinary budget are separate');
+  assert.deepEqual(json.ownFilesDeferred.map(f => f.path).sort(), ['r2.md', 'r3.md']);
+  assert.equal(out.mdHashes['r1.md'], ctx.contentHash(big(35000)));
+  assert.equal(out.mdHashes['r2.md'], undefined);
+  assert.equal('requested' in json.ownFiles[0], false, 'no new field in what is sent');
+  assert.match(MAP_CHAT_SHORTENED_NOTE, /ownFilesDeferred/);
+});

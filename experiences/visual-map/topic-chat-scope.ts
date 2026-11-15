@@ -85,6 +85,7 @@ export function judgeTopicScope(
         return allOk(action.nodeIds) && !action.all ? "ignore" : "out";
       case "auto_layout":
       case "ask_topic_kind":
+      case "read_md_file":
         return "ignore";
       default:
         // create_map, open_map, rename_map, create_md_file, add_anchor, link_anchor: never from a topic chat.

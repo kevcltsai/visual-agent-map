@@ -10,6 +10,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
+        "x-vam-ignore-extra-fields": true,
         "properties": {
           "kind": {
             "type": "string",
@@ -38,7 +39,8 @@
               "rename_map",
               "reorder_topics",
               "add_anchor",
-              "link_anchor"
+              "link_anchor",
+              "read_md_file"
             ]
           },
           "nodeId": {

@@ -948,9 +948,9 @@ test('B3 plan: find_images never asks for a plan by itself (not counted in the a
 });
 test('B3 prompt: find_images guidance is in both languages and the chat itself still does not search the web', () => {
   const en = mapChatStep.render(request({ language: 'en' }));
-  for (const pattern of [/find_images \(put a picture into each target card automatically/, /find_images: short search words/, /use find_images only when the user asks for pictures\. Send one find_images for each card/i, /You cannot see any picture/, /pictures will be put into those cards automatically, never that a picture was found or inserted/, /research_standard with images=true; do not combine it with find_images/, /do not inspect files, use tools or search the web/]) assert.match(en, pattern, String(pattern));
+  for (const pattern of [/find_images \(put a picture into each target card automatically/, /find_images: short search words/, /use find_images only when the user asks for pictures\. Send one find_images for each card/i, /You cannot see any picture/, /pictures will be put into those cards automatically, never that a picture was found or inserted/, /research_standard with images=true; do not combine it with find_images/, /also rules for placing pictures, image URLs or captions/, /the user's original message decides, so set it in every round's research/, /do not inspect files, use tools or search the web/]) assert.match(en, pattern, String(pattern));
   const zh = mapChatStep.render(request({ language: 'zh-TW' }));
-  for (const pattern of [/find_images（自動為目標議題放入一張圖/, /find_images：簡短的搜尋詞/, /只有使用者要求圖片時才用 find_images。每張要放圖的議題各發一個 find_images/, /你看不到任何圖片/, /只說會自動把圖放進這些議題，不說已找到或已放入/, /research_standard 並設 images=true，不要與 find_images 混用/, /不要檢視檔案、使用工具或搜尋網路/]) assert.match(zh, pattern, String(pattern));
+  for (const pattern of [/find_images（自動為目標議題放入一張圖/, /find_images：簡短的搜尋詞/, /只有使用者要求圖片時才用 find_images。每張要放圖的議題各發一個 find_images/, /你看不到任何圖片/, /只說會自動把圖放進這些議題，不說已找到或已放入/, /research_standard 並設 images=true，不要與 find_images 混用/, /也包括訂了放圖的規則或要放圖、圖片網址、圖說/, /自動接續時以原本的使用者訊息為準，每一輪的研究都照填/, /不要檢視檔案、使用工具或搜尋網路/]) assert.match(zh, pattern, String(pattern));
 });
 
 // B3: the chat does not go on the web; only the picture search does, and its probe cleans up after itself.

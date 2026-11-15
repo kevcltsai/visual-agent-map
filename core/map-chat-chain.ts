@@ -1,5 +1,6 @@
 import type { MapChatAction } from "./steps/map-chat/step";
 import type { MapChatPlanChain } from "./map-chat-plan";
+import { mergeProgress, type MapChatProgress } from "./map-chat-progress";
 
 /**
  * Automatic continuation of a map chat message ("chain"): a reply that says something is still to do (`remaining`) gets its next
@@ -90,6 +91,8 @@ export interface MapChatChainState {
   calls: number;
   /** This chain applies the whole conversation automatically: it also ends at {@link MAP_CHAT_AUTO_MAX_CALLS} calls. */
   autoApply?: boolean;
+  /** The steps of the whole instruction and where it stands (kept across rounds and a resume). */
+  progress?: MapChatProgress;
   /** The round being waited on wrote something. */
   wrote: boolean;
   /** The last finished round went on only because it selected cards (so the next one could read their notes); a second one in a row does not. */
@@ -112,14 +115,26 @@ export const startAutoChain = (): MapChatChainState => ({ ...startChain(MAP_CHAT
  * round keeps counting.
  */
 export const resumedChain = (
-  resume: { round: number; maxRounds: number; remaining: string },
+  resume: { round: number; maxRounds: number; remaining: string; progress?: MapChatProgress },
   autoApply = false
 ): MapChatChainState => ({
   ...startChain(resume.maxRounds),
   round: resume.round,
   remaining: resume.remaining,
-  ...(autoApply ? { autoApply: true } : {})
+  ...(autoApply ? { autoApply: true } : {}),
+  ...(resume.progress ? { progress: resume.progress } : {})
 });
+/**
+ * The toggle of the moment decides the segment limits of a running chain: on gives the auto-apply limits, off the plain ones.
+ * Returns `state` itself when it already matches.
+ */
+export const syncAutoApply = (state: MapChatChainState, on: boolean): MapChatChainState => {
+  if (on === !!state.autoApply) return state;
+  const { autoApply: _was, ...rest } = state;
+  return on
+    ? { ...rest, autoApply: true, maxRounds: MAP_CHAT_AUTO_MAX_ROUNDS }
+    : { ...rest, maxRounds: MAP_CHAT_CHAIN_MAX_ROUNDS };
+};
 /** The chain facts `planFor` needs for the reply of the round in flight. */
 export const planChainOf = (state: MapChatChainState): MapChatPlanChain => ({
   round: state.round,
@@ -165,6 +180,8 @@ export interface MapChatRoundEnd {
   actions: readonly MapChatRoundAction[];
   /** AI calls the round started (from `estimateChatCalls`); added to the segment's count. Absent = 0. */
   calls?: number;
+  /** The reply's `progress` (already normalized); merged into the chain's. Absent or null = the old one stays. */
+  progress?: MapChatProgress | null;
   started: {
     /** Research targets started. */
     research: number;
@@ -191,6 +208,8 @@ export function finishRound(state: MapChatChainState, end: MapChatRoundEnd): Ste
     wrote: wroteSomething(end.actions),
     selectedOnly: false
   };
+  const progress = mergeProgress(state.progress, end.progress);
+  if (progress) next.progress = progress;
   if (!remaining && end.researchDeferred <= 0) return ended(next, "done");
   if (end.started.otherBackground) return ended(next, "other_background_work");
   if (state.round >= state.maxRounds) return ended(next, "max_rounds");

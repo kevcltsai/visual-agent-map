@@ -6,6 +6,7 @@
 
 import { parseChatBasis, type MapChatBasis } from "./map-chat-basis";
 import { MAP_CHAT_CHAIN_END_REASONS, resumeRound, type MapChatChainEndReason } from "./map-chat-chain";
+import { mergeProgress, normalizeProgress, type MapChatProgress } from "./map-chat-progress";
 import { normalizeRemaining } from "./steps/map-chat/step";
 import { markChatBatchTopic, type ChatBatch, type ChatBatchRequest, type ChatBatchTopic } from "./map-chat-batch";
 
@@ -62,6 +63,8 @@ export interface RecordTurnStartLine extends RecordLineBase {
   remaining?: string;
   /** The first automatic round of a continuation the user picked up again after it was interrupted. */
   resumed?: true;
+  /** The conversation applied automatically when the turn started (so the segment limits come back on a resume). */
+  autoApply?: true;
 }
 export interface RecordTurnEndLine extends RecordLineBase {
   type: "turn_end";
@@ -117,6 +120,8 @@ export interface RecordEventLine extends RecordLineBase {
   reason?: string;
   round?: number;
   remaining?: string;
+  /** `chain_end`: AI calls the segment started. */
+  calls?: number;
   /** `research_batch`: the cards the chat's research batch runs, and what it was asked to do (read back through a whitelist). */
   topics?: { id: string; title: string }[];
   request?: Record<string, unknown>;
@@ -403,6 +408,10 @@ export interface RestoredChainResume {
   selectedIds: string[];
   /** The result lines of the last applied round. */
   lastResults: { text: string; status: "done" | "skipped" | "failed" }[];
+  /** The steps of the whole instruction as the replies in the file left them (worked out from the stored replies; nothing extra is written). */
+  progress?: MapChatProgress;
+  /** The last turn started with auto-apply on. */
+  autoApply?: true;
 }
 
 const BATCH_TOPIC_LIMIT = 1000;
@@ -657,6 +666,18 @@ export function chainResumeOf(lines: RecordLine[], turns: RestoredTurn[]): Resto
     const turn = turns[i];
     if (turn.status === "done" || turn.planState === "applied") lastApplied = turn;
   }
+  let progress: MapChatProgress | null = null;
+  for (const line of lines) {
+    if (line.type !== "turn_end" || typeof line.raw !== "string") continue;
+    try {
+      progress = mergeProgress(
+        progress,
+        normalizeProgress((JSON.parse(line.raw) as { progress?: unknown } | null)?.progress)
+      );
+    } catch {
+      // an unreadable reply carries no progress
+    }
+  }
   const results = lastApplied ? (lastApplied.planLines ?? lastApplied.lines) : [];
   return {
     turn: turns[turns.length - 1].turn,
@@ -669,6 +690,8 @@ export function chainResumeOf(lines: RecordLine[], turns: RestoredTurn[]): Resto
     selectedIds: Array.isArray(last.origin?.selectedIds)
       ? last.origin.selectedIds.filter((id): id is string => typeof id === "string")
       : [],
-    lastResults: results.map(item => ({ text: String(item?.text ?? ""), status: resultStatus(item?.status) }))
+    lastResults: results.map(item => ({ text: String(item?.text ?? ""), status: resultStatus(item?.status) })),
+    ...(progress ? { progress } : {}),
+    ...(last.autoApply === true ? { autoApply: true as const } : {})
   };
 }

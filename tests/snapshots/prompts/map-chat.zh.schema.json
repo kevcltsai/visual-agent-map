@@ -341,6 +341,42 @@
     },
     "remaining": {
       "type": "string"
+    },
+    "progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "done",
+                  "current",
+                  "todo"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "status"
+            ]
+          }
+        },
+        "current": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "steps"
+      ]
     }
   },
   "required": [

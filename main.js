@@ -1485,6 +1485,7 @@ var en = {
   "ui.map_chat_batch_stopped_0_1_2": "Research stopped: {0}/{1} done, {2} not done.",
   "ui.map_chat_batch_finished_failed_0_1_2": "Research finished: {0}/{1} done, {2} failed.",
   "ui.map_chat_batch_interrupted_0_1_2": "Research was interrupted when the plugin reloaded: {0}/{1} done, {2} not done.",
+  "ui.map_chat_no_images_0_1": "No images found for {0} topic(s) ({1}); the research text was written.",
   "ui.map_chat_batch_left_0": "Not done: {0}",
   "ui.map_chat_batch_more_0": "and {0} more",
   "ui.map_chat_batch_rerun_0": "Run the {0} not done again",
@@ -4419,6 +4420,7 @@ var zhCN = {
   "ui.map_chat_batch_stopped_0_1_2": "\u7814\u7A76\u505C\u4E86\uFF1A\u505A\u5B8C {0}\uFF0F{1} \u7BC7\uFF0C{2} \u7BC7\u6CA1\u505A\u3002",
   "ui.map_chat_batch_finished_failed_0_1_2": "\u7814\u7A76\u8DD1\u5B8C\u4E86\uFF1A\u505A\u5B8C {0}\uFF0F{1} \u7BC7\uFF0C{2} \u7BC7\u5931\u8D25\u3002",
   "ui.map_chat_batch_interrupted_0_1_2": "\u7814\u7A76\u5728\u63D2\u4EF6\u91CD\u65B0\u52A0\u8F7D\u65F6\u4E2D\u65AD\uFF1A\u505A\u5B8C {0}\uFF0F{1} \u7BC7\uFF0C{2} \u7BC7\u6CA1\u505A\u3002",
+  "ui.map_chat_no_images_0_1": "\u6CA1\u627E\u5230\u56FE\uFF1A{0} \u7BC7\uFF08{1}\uFF09\uFF0C\u7814\u7A76\u6587\u5B57\u5DF2\u5199\u5165\u3002",
   "ui.map_chat_batch_left_0": "\u6CA1\u505A\u7684\uFF1A{0}",
   "ui.map_chat_batch_more_0": "\u7B49 {0} \u7BC7",
   "ui.map_chat_batch_rerun_0": "\u91CD\u8DD1\u6CA1\u505A\u7684 {0} \u7BC7",
@@ -7353,6 +7355,7 @@ var zhTW = {
   "ui.map_chat_batch_stopped_0_1_2": "\u7814\u7A76\u505C\u4E86\uFF1A\u505A\u5B8C {0}\uFF0F{1} \u7BC7\uFF0C{2} \u7BC7\u6C92\u505A\u3002",
   "ui.map_chat_batch_finished_failed_0_1_2": "\u7814\u7A76\u8DD1\u5B8C\u4E86\uFF1A\u505A\u5B8C {0}\uFF0F{1} \u7BC7\uFF0C{2} \u7BC7\u5931\u6557\u3002",
   "ui.map_chat_batch_interrupted_0_1_2": "\u7814\u7A76\u5728\u5916\u639B\u91CD\u65B0\u8F09\u5165\u6642\u4E2D\u65B7\uFF1A\u505A\u5B8C {0}\uFF0F{1} \u7BC7\uFF0C{2} \u7BC7\u6C92\u505A\u3002",
+  "ui.map_chat_no_images_0_1": "\u6C92\u627E\u5230\u5716\uFF1A{0} \u7BC7\uFF08{1}\uFF09\uFF0C\u7814\u7A76\u6587\u5B57\u5DF2\u5BEB\u5165\u3002",
   "ui.map_chat_batch_left_0": "\u6C92\u505A\u7684\uFF1A{0}",
   "ui.map_chat_batch_more_0": "\u7B49 {0} \u7BC7",
   "ui.map_chat_batch_rerun_0": "\u91CD\u8DD1\u6C92\u505A\u7684 {0} \u7BC7",
@@ -82329,6 +82332,22 @@ ${note.detail.trim()}` : "",
     if (!this.closed) this.render();
   }
   /** The chat remembers what it researched; a card researched again moves to the end, and a later failure does not undo a success. */
+  /** The user asked for images: the researched topics whose note still has no image, named in one line (failed ones are in the batch box). */
+  async chatNoImageLine(topics) {
+    var _a2, _b2;
+    const missing = [];
+    for (const topic of topics) {
+      if (topic.status !== "succeeded") continue;
+      const path = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === topic.id)) == null ? void 0 : _b2.path;
+      const text10 = path ? await this.chatFileText(path) : null;
+      if (text10 !== null && !/!\[\[[^\]]+\]\]|!\[[^\]]*\]\([^)]+\)/.test(text10)) missing.push(topic.title);
+    }
+    if (!missing.length) return null;
+    return {
+      status: "skipped",
+      text: t("ui.map_chat_no_images_0_1", missing.length, missing.map((title) => `\u300C${title}\u300D`).join(""))
+    };
+  }
   rememberChatResearched(topics) {
     var _a2;
     for (const topic of topics) {
@@ -82517,6 +82536,11 @@ ${note.detail.trim()}` : "",
           const settle = (result) => {
             if (result.kind === "settled" && conversation === this.chatConversation)
               this.rememberChatResearched(result.topics);
+            if (result.kind === "settled" && request.imageSearch)
+              void this.chatNoImageLine(result.topics).then((line2) => {
+                if (line2 && chat && this.chat === chat && !this.closed && chat.transcript().length === turns)
+                  chat.appendLines([line2]);
+              });
             watch == null ? void 0 : watch.settled(result);
             resolve(result);
           };

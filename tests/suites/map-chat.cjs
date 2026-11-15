@@ -3926,6 +3926,24 @@ integrationTest('B2 research: the finished batch adds its search count to the an
   const before = chat.transcript().at(-1).lines.length; started[0].onSettled({ searches: 9, counted: 1, withoutSearch: 0 });
   assert.equal(chat.transcript().at(-1).lines.length, before, 'a later turn does not get the old batch\'s lines');
 });
+integrationTest('B2 research with images: when the batch ends, topics that got no image are named in one line; with images or without asking, nothing is added', async () => {
+  const run = async (images, bodies) => {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const settles = [];
+    h.view.startMultiResearch = async (request, key, onWeb, onSettled) => { settles.push(onSettled); };
+    for (const [id, body] of Object.entries(bodies)) h.contents.set(h.node(id).path, `${h.contents.get(h.node(id).path)}${body}`);
+    h.control.reply = async () => ({ reply: 'Researching.', actions: [researchAct({ nodeIds: [h.ids.a, h.ids.b, h.ids.c], images })], rejected: [] });
+    h.type('research them with images'); await h.view.sendMapChat(); await tick();
+    const count = chat.transcript().at(-1).lines.length;
+    const topic = (id, status = 'succeeded') => ({ id: h.ids[id], title: h.node(id).title, status });
+    settles[0]({ kind: 'settled', succeeded: 2, failed: 1, stopped: 0, topics: [topic('a'), topic('b'), topic('c', 'failed')] });
+    await tick(); await tick();
+    return { h, added: chat.transcript().at(-1).lines.slice(count).map(l => [l.status, l.text]) };
+  };
+  const { h, added } = await run(true, { a: '\n![Cave](https://upload.wikimedia.org/a.jpg)\n' });
+  eq(added, [['skipped', `No images found for 1 topic(s) (「${h.node('b').title}」); the research text was written.`]], 'only the succeeded topic without an image; the failed one is told by the batch box');
+  eq((await run(true, { a: '\n![[cave.png]]\n', b: '\n![x](https://e.org/b.png)\n' })).added, [], 'every succeeded topic has an image');
+  eq((await run(false, {})).added, [], 'no images asked');
+});
 integrationTest('B2 merge: two merges in one reply are both completed; the second is not skipped as locked', async () => {
   const h = await harness({ viaSync: false }); await h.view.hydrate();
   const refs = ['p1', 'p2', 'p3', 'p4'].map(ref => ({ kind: 'add_child', parentId: h.ids.root, title: `Merge ${ref}`, summary: '', ref }));

@@ -1307,10 +1307,12 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_undo_label": "AI 对话回复",
   "ui.map_chat_undo_files_changed": "文件已变更，无法撤销",
   "ui.map_chat_guard_exists": "那里已经有文件",
-  "ui.map_chat_guard_exists_not_own": "那里已经有一个不是这段对话创建的文件，这里不能读或改它；请换一个新文件名",
+  "ui.map_chat_guard_exists_not_own":
+    "那里已经有一个不是这段对话创建的文件；请用户把它拖进对话后才能读或改，否则请换一个新文件名",
   "ui.map_chat_guard_exists_in_map": "那里已经有文件；请先用 read_md_file 读取它，再用 edit_md_file 修改",
   "ui.map_chat_guard_no_baseline": "这个文件不在本次发送的内容里",
   "ui.map_chat_guard_map_source": "这个文件是这张地图的资料来源，对话只能读取",
+  "ui.map_chat_skip_attached_read_only": "文件在这张地图的文件夹之外，对话只能读、不能改",
   "ui.map_chat_skip_stale": "发送后文件又被修改过",
   "ui.map_chat_skip_topic_gone": "议题已不在心智图上",
   "ui.map_chat_skip_find_failed": "要替换的文字没有刚好出现一次",

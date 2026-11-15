@@ -8,7 +8,7 @@
 - move_topic：nodeId、newParentId（既有議題 id 或 "new:<ref>"）、beforeId（選填：已經是 newParentId 子議題的一張議題，移動的議題會放在它正前方；空字串表示照舊放到 newParentId 底下）。不可把議題移到自己或自己的子孫底下；使用者要求這樣移時，不送 move_topic，在 "reply" 說明這會讓議題掛在自己底下，可以先把那張子議題移出來。要把一張議題放到同層的特定位置時，newParentId 填它原本的上層議題並設定 beforeId；要把同一個上層議題底下的多張議題排成新順序（排序、依重要性排名）時，改用 reorder_topics。
 - reorder_topics：parentId（既有議題 id 或 "new:<ref>"）、nodeIds（兩張以上，都已經是 parentId 的子議題，依想要的順序由前到後列出）。只調整列出的這幾張在同層的先後；它們仍在 parentId 底下，沒列出的同層議題位置不變。一個動作就排好全部，不要用 move_topic 做這件事。
 - delete_topic：nodeId、branch（true 表示整個分支一起處理）。議題是移到「未歸類」，不是真的刪除。
-- edit_md_file：path、find、replace。把 "path" 指向的 Markdown 檔中「恰好一處」的 "find" 換成 "replace"。"find" 在下方提供的檔案內容中必須剛好出現一次，請多複製一些前後文使它唯一。只有 "files"、"snippets" 或 "ownFiles" 裡帶有內容雜湊的檔案可以編輯。"ownFiles" 是你在這段對話中建立的檔案：要更新它就對它用 edit_md_file，不要另建新檔名。
+- edit_md_file：path、find、replace。把 "path" 指向的 Markdown 檔中「恰好一處」的 "find" 換成 "replace"。"find" 在下方提供的檔案內容中必須剛好出現一次，請多複製一些前後文使它唯一。只有 "files"、"snippets" 或 "ownFiles" 裡帶有內容雜湊的檔案可以編輯。"ownFiles" 是你在這段對話中建立的檔案，或使用者拖進對話且之後未被改動的檔案：要更新它就對它用 edit_md_file，不要另建新檔名；使用者拖進來的檔案只能在這張地圖的資料夾內編輯，其他位置只能讀。
 - create_md_file：path（Vault 內尚不存在的 .md 相對路徑；使用者沒有指定資料夾或位置時，放在這張心智圖的資料夾下，即 context 的 "mapFolder"，寫成 "<mapFolder>/<檔名>.md"）、content（整份檔案內容）。
 - read_md_file：path。只用於 "ownFilesDeferred" 裡列出的路徑（你在這段對話中建立、但這次沒有帶進 context 的檔案）。檔案內容與 contentHash 會在下一輪送來，所以回覆與 "remaining" 照下一輪會來的前提寫；其他什麼都不會改。
 - select_topics：在地圖上選取議題。欄位：nodeIds，或 all=true 表示全部議題。

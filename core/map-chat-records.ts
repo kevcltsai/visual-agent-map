@@ -101,6 +101,7 @@ export interface RecordImagesLine extends RecordLineBase {
   inserted: number[];
 }
 /** `file_written` notes a Markdown file this conversation created or edited: its path and the hash of the text it wrote (the chat sends the file back while it still holds that text). */
+/** `file_attached` notes a Markdown file the user dragged into the chat: its path and the hash of the text the chat was sent (it stays readable while the file holds that text). */
 /** `file_read` notes an own file the chat asked to read with `read_md_file` (accepted; its text goes in the next turn): path and characters. */
 /** `sources_read` marks that a turn sent the map's data sources (a restored conversation keeps its writes behind the plan). */
 /** `research_started` marks that the conversation started web research (it keeps the plan allow-list on after a restore). */
@@ -113,6 +114,7 @@ export type RecordEventKind =
   | "research_started"
   | "sources_read"
   | "file_written"
+  | "file_attached"
   | "file_read"
   | "research_batch"
   | "research_batch_topic"
@@ -133,7 +135,7 @@ export interface RecordEventLine extends RecordLineBase {
   /** `research_batch_topic`: one card of the batch and how it came out. `research_batch_end`: `not_started` when nothing ran. */
   id?: string;
   status?: string;
-  /** `file_written`: the file and the content hash of what was written. */
+  /** `file_written` / `file_attached`: the file and the content hash of what was written / attached. */
   path?: string;
   hash?: string;
   /** `file_read`: the characters of the own file whose read the chat asked for (path above); a trace only, a restore ignores it. */
@@ -400,6 +402,8 @@ export interface RestoredConversation {
   readsSources: boolean;
   /** Files this conversation wrote (path and hash of each version), oldest first; only a safe vault path and a hex hash are kept. */
   ownFiles: { path: string; hash: string }[];
+  /** Files the user attached (dragged in) with the hash each held then; same safety rules as `ownFiles` (an older file has none). */
+  attachedFiles: { path: string; hash: string }[];
   /** The last chain was interrupted and the user can pick it up again (derived from the lines; nothing of it is written). */
   resume?: RestoredChainResume;
 }
@@ -488,6 +492,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
   let startedResearch = false;
   let readsSources = false;
   const ownFiles: { path: string; hash: string }[] = [];
+  const attachedFiles: { path: string; hash: string }[] = [];
   for (const line of lines) {
     if (line.type === "conversation") {
       mapPath = typeof line.mapPath === "string" ? line.mapPath : mapPath;
@@ -516,7 +521,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       else if (line.kind === "redo") undone.set(line.turn, false);
       else if (line.kind === "research_started") startedResearch = true;
       else if (line.kind === "sources_read") readsSources = true;
-      else if (line.kind === "file_written") {
+      else if (line.kind === "file_written" || line.kind === "file_attached") {
         // A hand-edited file cannot make the chat read a path it was never allowed to write: only a normal vault path counts.
         const path = typeof line.path === "string" ? normalizeVaultPath(line.path) : null;
         if (
@@ -525,7 +530,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
           typeof line.hash === "string" &&
           /^[0-9a-f]{1,32}$/.test(line.hash)
         )
-          ownFiles.push({ path, hash: line.hash });
+          (line.kind === "file_written" ? ownFiles : attachedFiles).push({ path, hash: line.hash });
       } else if (line.kind === "research_batch") {
         // A second one in the same turn is a rerun: the batch is open again and its cards join the first one's.
         const topics = restoredBatchTopics(line.topics);
@@ -633,6 +638,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
     startedResearch,
     readsSources,
     ownFiles,
+    attachedFiles,
     ...(resume ? { resume } : {})
   };
 }

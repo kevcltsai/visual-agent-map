@@ -25,6 +25,7 @@ import {
   beginStep,
   cardRevision,
   confirmGate1,
+  finishRun,
   isCurrent,
   newBookPipeline,
   nextActions,
@@ -600,6 +601,31 @@ export class BookPipelineRuns {
       });
       if (!moved) throw new BookPipelineRunError("not_gate1");
       this.log(drive, "gate1", "-", "write", "confirmed");
+    });
+  }
+
+  /**
+   * The owner accepted gate 2: the run is done. Only at gate 2; a run that is already done answers as if nothing happened (a second
+   * press is harmless), any other phase is refused. Cards are not touched.
+   */
+  async finishRun(mapPath: string): Promise<void> {
+    return this.enter(mapPath, async drive => {
+      const data = await this.openSaved(drive, mapPath, { allowDone: true });
+      if (data.phase === "done") return;
+      if (data.phase !== "gate2") throw new BookPipelineRunError("not_gate");
+      let refusal: BookRunRefusal | undefined;
+      await drive.store.commit(state => {
+        const running = resumeRun(state);
+        if (!running) {
+          refusal = "budget";
+          return { state, accepted: true };
+        }
+        const next = finishRun(running, this.ports.now());
+        if (next.phase === state.phase) refusal = "not_gate";
+        return { state: refusal ? state : next, accepted: true };
+      });
+      if (refusal) throw new BookPipelineRunError(refusal);
+      this.log(drive, "gate2", "-", "proof", "finished");
     });
   }
 

@@ -26,6 +26,8 @@ export interface BookBarState {
   budget: { used: number; limit: number };
   /** The neutral code of why the run stopped by itself; the bar shows it in words and offers "retry". */
   failure?: string;
+  /** Seconds left, as the runner estimated them (only after at least five cards of the phase finished); absent means no number is shown. */
+  etaSeconds?: number;
 }
 
 const FAILURE_KEY: Record<string, TranslationKey> = {
@@ -76,7 +78,10 @@ export function bookBarState(
     total,
     counts,
     budget,
-    ...(mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {})
+    ...(mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {}),
+    ...(progress?.etaSeconds !== undefined && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0
+      ? { etaSeconds: progress.etaSeconds }
+      : {})
   };
 }
 
@@ -105,6 +110,12 @@ export function bookTitleText(state: BookBarState): string {
   return t("ui.book_bar_title_0", word);
 }
 
+/** "About N minutes left" from seconds, rounded to the minute; under half a minute it says "under 1 minute". */
+export function bookEtaText(seconds: number): string {
+  const minutes = Math.round(seconds / 60);
+  return minutes < 1 ? t("ui.book_eta_under_minute") : t("ui.book_eta_0", minutes);
+}
+
 /** The top progress bar. `parent` is the map's toolbar; the caller decides it is a book-pipeline map. */
 export function renderBookBar(parent: HTMLElement, state: BookBarState, actions: BookBarActions): HTMLElement {
   const { counts, total } = state;
@@ -123,7 +134,9 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
           : t("ui.book_stopped_at_0_1_2", t(PHASE_KEY[state.phase]), counts.checked, total)
         : t("ui.book_counts_0_1_2_3_4", counts.checked, total, counts.written, counts.planned, counts["needs-review"]);
   top.createSpan({ cls: "vam-book-bar-counts", text: summary });
-  // "About N minutes left" is stage 2 work (it needs at least 5 finished cards for a real number); nothing is shown until then.
+  // "About N minutes left" only when the runner has a real estimate (at least five finished cards); no number is made up.
+  if (state.etaSeconds !== undefined && (state.mode === "planning" || state.mode === "writing"))
+    top.createSpan({ cls: "vam-book-bar-eta", text: bookEtaText(state.etaSeconds) });
   const buttons = top.createDiv("vam-book-bar-actions");
   if (state.phase === "gate1" && state.mode !== "done") {
     if (actions.panel) {
@@ -272,6 +285,7 @@ export function bookIssueText(issue: string): string {
     if (reason) return t("ui.book_issue_step_0_1", t(STEP_KEY[step]), t(reason));
   }
   const unmet = /^proof unmet: (\S+(?: \S+)*)$/.exec(issue.trim());
+  if (unmet && unmet[1] === "facts_unverified") return t("ui.book_reason_all_facts_unverified");
   if (unmet) return t("ui.book_issue_unmet_0", unmet[1]);
   return t("ui.book_issue_unknown");
 }
@@ -286,12 +300,15 @@ export interface BookCardInput {
   pipelineStage?: unknown;
   bookRole?: unknown;
   pipelineIssue?: unknown;
+  pipelineSeam?: unknown;
 }
 export interface BookCardView {
   stage: PipelineStage | "pending";
   stageText: string;
   roleText?: string;
   issueText?: string;
+  /** True when a neighbouring card changed and the owner has not confirmed the join yet. */
+  seam: boolean;
   /** Screen prefix of the summary (never written to the note); none while the card has no plan yet. */
   summaryPrefix?: string;
 }
@@ -303,6 +320,7 @@ export function bookCardView(note: BookCardInput): BookCardView {
   return {
     stage,
     stageText: t(STAGE_KEY[stage]),
+    seam: typeof note.pipelineSeam === "string" && note.pipelineSeam.trim() !== "",
     ...(role ? { roleText: t(ROLE_KEY[role]) } : {}),
     ...(stage === "needs-review" && issue ? { issueText: t("ui.book_issue_0", bookIssueText(issue)) } : {}),
     ...(stage === "checked" && issue ? structureNote(issue) : {}),
@@ -328,5 +346,9 @@ export function renderBookCardLabels(
     elapsed.setAttr("aria-hidden", "true");
     writing.track(elapsed);
   } else header.createSpan({ cls: `vam-status vam-book-state is-${view.stage}`, text: view.stageText });
+  if (view.seam) {
+    const seam = header.createSpan({ cls: "vam-status vam-book-state is-seam", text: t("ui.book_seam_label") });
+    seam.setAttr("title", t("ui.book_seam_reason"));
+  }
   if (view.roleText) header.createSpan({ cls: "vam-book-role", text: view.roleText });
 }

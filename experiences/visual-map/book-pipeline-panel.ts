@@ -15,6 +15,8 @@ export interface GateCardInput extends BookCardInput {
   prompt: string;
   summary: string;
   pipelineStage?: unknown;
+  /** The card's Detail (gate 2 reads its research notes for the proof record). */
+  detail?: string;
 }
 
 export interface GatePanelCard {
@@ -108,6 +110,11 @@ export class GatePanelState {
   readonly notes = new Map<string, { text: string; error: boolean }>();
   confirming = false;
   confirmError = "";
+  /** Gate 2: cards whose proof record is unfolded, cards whose seam confirmation is running, and the "review finished" button. */
+  readonly proofOpen = new Set<string>();
+  readonly seaming = new Set<string>();
+  finishing = false;
+  finishError = "";
   /** Where the keyboard goes after the next paint: the panel's title (it just opened) or the toolbar button (it just closed). */
   pendingFocus: "title" | "opener" | null = null;
   reset(): void {
@@ -119,6 +126,10 @@ export class GatePanelState {
     this.notes.clear();
     this.confirming = false;
     this.confirmError = "";
+    this.proofOpen.clear();
+    this.seaming.clear();
+    this.finishing = false;
+    this.finishError = "";
     this.pendingFocus = null;
   }
 }
@@ -143,19 +154,8 @@ function reasonText(reason: string): string {
   return REASON_CODES.has(reason) ? bookFailureText(reason) : t("ui.book_fail_other");
 }
 
-/** Draws the panel into `parent` (the view's right-hand column). `gate1` is false once the run has left gate 1. */
-export function renderGatePanel(
-  parent: HTMLElement,
-  data: GatePanelData,
-  gate1: boolean,
-  state: GatePanelState,
-  actions: GatePanelActions,
-  /** Cards the runner is working on right now (from its progress), shown busy like the ones this panel started. */
-  externalBusy: ReadonlySet<string> = new Set()
-): HTMLElement {
-  const panel = parent.createDiv("vam-book-panel");
-  panel.setAttr("role", "region");
-  panel.setAttr("aria-label", t("ui.book_panel_label"));
+/** The tab row (book panel / chat / close) and the Escape key, shared by both gate panels. */
+export function renderPanelTabs(panel: HTMLElement, actions: Pick<GatePanelActions, "showChat" | "close">): void {
   const tabs = panel.createDiv("vam-book-panel-tabs");
   tabs.setAttr("role", "group");
   tabs.setAttr("aria-label", t("ui.book_panel_tabs_label"));
@@ -178,6 +178,22 @@ export function renderGatePanel(
     event.stopPropagation();
     actions.close();
   });
+}
+
+/** Draws the panel into `parent` (the view's right-hand column). `gate1` is false once the run has left gate 1. */
+export function renderGatePanel(
+  parent: HTMLElement,
+  data: GatePanelData,
+  gate1: boolean,
+  state: GatePanelState,
+  actions: GatePanelActions,
+  /** Cards the runner is working on right now (from its progress), shown busy like the ones this panel started. */
+  externalBusy: ReadonlySet<string> = new Set()
+): HTMLElement {
+  const panel = parent.createDiv("vam-book-panel");
+  panel.setAttr("role", "region");
+  panel.setAttr("aria-label", t("ui.book_panel_label"));
+  renderPanelTabs(panel, actions);
 
   const head = panel.createDiv("vam-book-panel-head");
   const title = head.createEl("h3", { cls: "vam-book-panel-title", text: t("ui.book_panel_gate1_title") });

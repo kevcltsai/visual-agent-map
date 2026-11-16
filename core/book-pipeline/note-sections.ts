@@ -9,7 +9,7 @@ import {
   SECTION_NAME
 } from "../../ai/section-aliases";
 import { demoteHeadings } from "./text";
-import { findProofRecord } from "./proof";
+import { findProofRecord, PROOF_STATUSES, type ProofItemResult, type ProofResult } from "./proof";
 
 export const BOOK_PLAN_HEADING = "全書企劃";
 const DEFAULT_RESEARCH_HEADING = "研究備註";
@@ -151,6 +151,65 @@ export function markOldProofRecords(detail: string, currentKey: string): string 
 /** The stored proof result for `key` in a Detail's Research notes (read through the `> ` quote prefix), or undefined. */
 export function findStoredProof(detail: string, key: string): ReturnType<typeof findProofRecord> {
   return findProofRecord(unquoted(detail), key);
+}
+
+/** What the panel shows of the newest proof record: every field is re-read and cut to plain values (the note may have been edited by hand). */
+export interface StoredProofView {
+  aggregate: "checked" | "needs-review";
+  factsUnverified: boolean;
+  failed?: string;
+  counts?: { openedPages: number; searches: number };
+  items: Pick<ProofItemResult, "id" | "type" | "status" | "note" | "sources">[];
+}
+const shortText = (value: unknown, max: number): string => (typeof value === "string" ? Array.from(value).slice(0, max).join("") : "");
+const count = (value: unknown): number => (typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0);
+
+/**
+ * The newest proof record inside the Research notes section (the last one stored is the latest; an older run's records stay above it).
+ * Only that section is read, so a record-looking line elsewhere in the chapter is ignored. A damaged record is skipped.
+ */
+export function latestStoredProof(detail: string): StoredProofView | undefined {
+  const lines = detail.split("\n");
+  const section = findSection(lines, fencedLines(lines), text => isResearchNotesHeading(text));
+  if (!section) return undefined;
+  let found: StoredProofView | undefined;
+  for (const line of lines.slice(section.at + 1, section.end)) {
+    const m = RECORD_KEY.exec(unquoted(line).trim());
+    if (!m) continue;
+    try {
+      const data = JSON.parse(m[1]) as { result?: Partial<ProofResult>; failed?: unknown };
+      const result = data.result;
+      if (!result || !Array.isArray(result.items)) continue;
+      const items: StoredProofView["items"] = [];
+      for (const raw of result.items.slice(0, 100) as unknown as Record<string, unknown>[]) {
+        if (!raw || typeof raw !== "object") continue;
+        const status = PROOF_STATUSES.find(item => item === raw.status);
+        if (!status || typeof raw.id !== "string") continue;
+        items.push({
+          id: shortText(raw.id, 20),
+          type: raw.type === "structure" ? "structure" : "fact",
+          status,
+          note: shortText(raw.note, 300),
+          sources: Array.isArray(raw.sources)
+            ? raw.sources.filter((src): src is string => typeof src === "string").slice(0, 10).map(src => shortText(src, 300))
+            : []
+        });
+      }
+      const counts = result.counts;
+      found = {
+        aggregate: result.aggregate === "checked" ? "checked" : "needs-review",
+        factsUnverified: result.factsUnverified === true,
+        ...(typeof data.failed === "string" ? { failed: shortText(data.failed, 40) } : {}),
+        ...(counts && typeof counts === "object"
+          ? { counts: { openedPages: count(counts.openedPages), searches: count(counts.searches) } }
+          : {}),
+        items
+      };
+    } catch {
+      // a damaged record is just not shown
+    }
+  }
+  return found;
 }
 
 /** The Detail without its Research notes section: the chapter text a proof is judged and keyed on (the records it adds do not change it). */

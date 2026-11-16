@@ -1739,6 +1739,9 @@ export default class VisualAgentMapPlugin extends Plugin {
   rerunBookCard(mapPath: string, nodeId: string): Promise<void> {
     return this.bookPipelineRuns.rerunCard(mapPath, nodeId);
   }
+  finishBookRun(mapPath: string): Promise<void> {
+    return this.bookPipelineRuns.finishRun(mapPath);
+  }
   confirmBookSeam(mapPath: string, nodeId: string): Promise<void> {
     return this.bookPipelineRuns.confirmSeam(mapPath, nodeId);
   }

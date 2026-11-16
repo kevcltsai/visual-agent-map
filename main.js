@@ -3055,6 +3055,7 @@ var en = {
   "ui.book_refused_budget": "The call budget is used up. Press Add 100 calls.",
   "ui.book_refused_disposed": "The plugin is shutting down.",
   "ui.book_refused_unreadable": "This map's data could not be read. Try again shortly.",
+  "ui.book_chat_gate1_confirmed": "Plan confirmed. Starting to write.",
   "ui.book_refused_not_gate1": "The run is not waiting for your confirmation.",
   "ui.book_refused_not_gate": "The run is not at a checkpoint, so one card cannot be redone now.",
   "ui.book_refused_instruction": "Write what you want changed on this card first.",
@@ -6147,6 +6148,7 @@ var zhCN = {
   "ui.book_refused_budget": "\u8C03\u7528\u989D\u5EA6\u5DF2\u7528\u5B8C\uFF1B\u8BF7\u6309\u201C\u518D\u52A0 100 \u6B21\u201D\u3002",
   "ui.book_refused_disposed": "\u63D2\u4EF6\u6B63\u5728\u5173\u95ED\uFF0C\u65E0\u6CD5\u6267\u884C\u3002",
   "ui.book_refused_unreadable": "\u8BFB\u4E0D\u5230\u8FD9\u5F20\u5730\u56FE\u7684\u6570\u636E\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5\u3002",
+  "ui.book_chat_gate1_confirmed": "\u5DF2\u786E\u8BA4\u4F01\u5212\uFF0C\u5F00\u59CB\u5199\u4F5C\u3002",
   "ui.book_refused_not_gate1": "\u5F53\u524D\u4E0D\u5728\u201C\u7B49\u4F60\u786E\u8BA4\u201D\u9636\u6BB5\uFF0C\u4E0D\u9700\u8981\u786E\u8BA4\u3002",
   "ui.book_refused_not_gate": "\u5F53\u524D\u4E0D\u5728\u5173\u5361\u4E0A\uFF0C\u73B0\u5728\u4E0D\u80FD\u5355\u72EC\u91CD\u8DD1\u4E00\u5F20\u5361\u3002",
   "ui.book_refused_instruction": "\u8BF7\u5148\u5199\u4E0B\u8FD9\u5F20\u5361\u8981\u600E\u4E48\u6539\u3002",
@@ -9239,6 +9241,7 @@ var zhTW = {
   "ui.book_refused_budget": "\u547C\u53EB\u984D\u5EA6\u5DF2\u7528\u5B8C\uFF1B\u8ACB\u6309\u300C\u518D\u52A0 100 \u6B21\u300D\u3002",
   "ui.book_refused_disposed": "\u5916\u639B\u6B63\u5728\u95DC\u9589\uFF0C\u7121\u6CD5\u57F7\u884C\u3002",
   "ui.book_refused_unreadable": "\u8B80\u4E0D\u5230\u9019\u5F35\u5FC3\u667A\u5716\u7684\u8CC7\u6599\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002",
+  "ui.book_chat_gate1_confirmed": "\u5DF2\u78BA\u8A8D\u4F01\u5283\uFF0C\u958B\u59CB\u5BEB\u4F5C\u3002",
   "ui.book_refused_not_gate1": "\u76EE\u524D\u4E0D\u5728\u300C\u7B49\u4F60\u78BA\u8A8D\u300D\u968E\u6BB5\uFF0C\u4E0D\u9700\u8981\u78BA\u8A8D\u3002",
   "ui.book_refused_not_gate": "\u76EE\u524D\u4E0D\u5728\u95DC\u5361\u4E0A\uFF0C\u73FE\u5728\u4E0D\u80FD\u55AE\u7368\u91CD\u8DD1\u4E00\u5F35\u5361\u3002",
   "ui.book_refused_instruction": "\u8ACB\u5148\u5BEB\u4E0B\u9019\u5F35\u5361\u8981\u600E\u9EBC\u6539\u3002",
@@ -50105,6 +50108,10 @@ function renderBookCardLabels(header2, view, writing) {
   }
   if (view.roleText) header2.createSpan({ cls: "vam-book-role", text: view.roleText });
 }
+function isBookGate1Waiting(progress, data) {
+  var _a2;
+  return ((_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : data.phase) === "gate1" && !(progress == null ? void 0 : progress.active);
+}
 
 // experiences/visual-map/book-pipeline-panel.ts
 var FIELD_KEY = {
@@ -59720,7 +59727,7 @@ var MapChatConversation = class {
   }
   /** Sends the draft: usage notice, one request, a streamed answer, then every action it asked for, once (or a plan to confirm first). */
   async sendMapChat(again, restore, retryOf) {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d;
     const chat = this.ports.panel();
     if (chat && !again && this.applying && !chat.isBusy && !this.ports.closed() && chat.draft.trim()) {
       this.steerMapChat();
@@ -59736,6 +59743,14 @@ var MapChatConversation = class {
         chat.clearDraft();
         return;
       }
+      const gate1 = (_b2 = (_a2 = this.ports).bookGate1Confirm) == null ? void 0 : _b2.call(_a2);
+      if (gate1) {
+        const turn2 = chat.begin(message, void 0, false, "preparing");
+        chat.clearDraft();
+        const reply = await gate1;
+        if (!this.ports.closed() && chat.hasTurn(turn2)) chat.finish(reply, []);
+        return;
+      }
     }
     const autoOrigin = again == null ? void 0 : again.chain;
     if (!autoOrigin && !retryOf) this.ports.chain().interruptChain(this.ports.chain().current, "user_took_over");
@@ -59747,7 +59762,7 @@ var MapChatConversation = class {
       // Only the id: the picture is read again (a retry too) when the request is built, and never kept.
       ...imageId ? { imageId } : {}
     };
-    const anchor = { path: this.ports.path(), id: (_a2 = this.ports.map()) == null ? void 0 : _a2.id };
+    const anchor = { path: this.ports.path(), id: (_c = this.ports.map()) == null ? void 0 : _c.id };
     const run2 = retryOf && !autoOrigin ? retryOf : this.ports.chain().chainForRound(autoOrigin, anchor, message);
     if (run2 === retryOf) run2.message = message;
     run2.chips = [...origin.chips];
@@ -59757,7 +59772,7 @@ var MapChatConversation = class {
       run2.state.maxRounds,
       run2.state.remaining,
       origin,
-      (_b2 = run2.partial) != null ? _b2 : void 0,
+      (_d = run2.partial) != null ? _d : void 0,
       ...run2.state.autoApply ? [{ calls: run2.state.calls, applied: run2.appliedText }] : []
     ) : chat.begin(message, origin, Boolean(again), "preparing");
     run2.turn = turn;
@@ -59810,7 +59825,7 @@ var MapChatConversation = class {
       went = await this.ports.confirmAiUsage(
         request.model,
         async () => {
-          var _a3, _b3, _c, _d;
+          var _a3, _b3, _c2, _d2;
           if (this.ports.closed() || this.applying || !chat.hasTurn(turn) || this.ports.path() !== anchor.path || ((_a3 = this.ports.map()) == null ? void 0 : _a3.id) !== anchor.id) {
             abandon();
             return;
@@ -59883,7 +59898,7 @@ var MapChatConversation = class {
             });
             if (!alive()) return;
             const result = outcome;
-            for (const id of (_c = (_b3 = request.context.research) == null ? void 0 : _b3.sent) != null ? _c : []) this.ports.researchSent().add(id);
+            for (const id of (_c2 = (_b3 = request.context.research) == null ? void 0 : _b3.sent) != null ? _c2 : []) this.ports.researchSent().add(id);
             await steerState.steers.close();
             if (!alive()) return;
             const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
@@ -59945,7 +59960,7 @@ var MapChatConversation = class {
                 reason: /time(d)?[\s-]?out/i.test(errorMessage4(error)) ? "timeout" : "error",
                 reply: failure.text,
                 lines: [],
-                error: { text: failure.text, technical: (_d = failure.technical) != null ? _d : "" }
+                error: { text: failure.text, technical: (_d2 = failure.technical) != null ? _d2 : "" }
               });
               this.returnSteers(steerState);
               if (!this.ports.chain().retryAutoRound(run2, origin)) this.ports.chain().interruptChain(run2, "failed");
@@ -80329,6 +80344,23 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       if (!this.closed) this.render();
     });
   }
+  /** The chat's "continue" while the run waits at gate 1: confirms the plan. null when this map is not waiting there. */
+  bookGate1FromChat() {
+    const path = this.path;
+    const read = this.map ? readBookPipeline(this.map) : null;
+    if (!path || !read || read.kind !== "usable") return null;
+    if (!isBookGate1Waiting(this.plugin.getBookPipelineProgress(path), read.data)) return null;
+    return this.plugin.confirmBookGate1(path).then(
+      () => {
+        if (!this.closed) this.render();
+        return t("ui.book_chat_gate1_confirmed");
+      },
+      (error) => {
+        if (!this.closed) this.render();
+        return bookRefusalText(error);
+      }
+    );
+  }
   /** The toolbar button and the command: start a picture-book run on this map. */
   startBookPipelineFromUi() {
     if (!this.path) return Promise.resolve();
@@ -83122,6 +83154,7 @@ ${note.detail.trim()}` : "",
       notice: (text10) => {
         new import_obsidian36.Notice(text10);
       },
+      bookGate1Confirm: () => this.bookGate1FromChat(),
       send: (...args) => this.sendMapChat(...args)
     };
   }

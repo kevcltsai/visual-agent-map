@@ -352,3 +352,11 @@ export function renderBookCardLabels(
   }
   if (view.roleText) header.createSpan({ cls: "vam-book-role", text: view.roleText });
 }
+
+/** The run waits at gate 1 for the owner (not driving): the only state in which a chat "continue" confirms the plan. */
+export function isBookGate1Waiting(
+  progress: Pick<BookPipelineProgress, "phase" | "active"> | undefined,
+  data: Pick<BookPipelineData, "phase">
+): boolean {
+  return (progress?.phase ?? data.phase) === "gate1" && !progress?.active;
+}

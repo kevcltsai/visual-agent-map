@@ -132,6 +132,11 @@ export interface MapChatConversationPorts {
   markTurn(origin: MapChatOrigin, request: { imageDataUrl?: string }, written?: TransactionEntry): void;
   errorText(error: unknown): { text: string; wrapped: boolean; technical?: string };
   notice(text: string): void;
+  /**
+   * The picture-book pipeline of this map waits at gate 1: confirms it and resolves with the sentence to show (the confirmation, or
+   * the refusal's reason). null when the map is not waiting there. Absent in fixtures of other flows.
+   */
+  bookGate1Confirm?(): Promise<string> | null;
   send(again?: MapChatOrigin, restore?: string, retryOf?: ChatChainRun): Promise<void>;
 }
 type PlanBaseline = Pick<
@@ -361,6 +366,15 @@ export class MapChatConversation {
       const last = chat.transcript().at(-1);
       if (last?.resume && this.ports.chain().resumeChatChain(last)) {
         chat.clearDraft();
+        return;
+      }
+      // No chain to go on with, and the pipeline waits at gate 1: "continue" confirms the plan (no AI call).
+      const gate1 = this.ports.bookGate1Confirm?.();
+      if (gate1) {
+        const turn = chat.begin(message, undefined, false, "preparing");
+        chat.clearDraft();
+        const reply = await gate1;
+        if (!this.ports.closed() && chat.hasTurn(turn)) chat.finish(reply, []);
         return;
       }
     }

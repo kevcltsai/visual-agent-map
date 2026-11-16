@@ -336,7 +336,15 @@ import { stopLabelKey, type ResearchStart, type SelectionSynthesisTask, type Wri
 import type { AuthorInput, AuthorOutcome, BookPipelineProgress } from "./book-pipeline-run";
 import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
 import { readBookPipeline, readPipelineStage, type BookPipelineData } from "../../core/book-pipeline/model";
-import { bookBarState, bookCardView, renderBookBar, renderBookCardLabels, runBookEntry } from "./book-pipeline-ui";
+import {
+  bookBarState,
+  bookCardView,
+  bookRefusalText,
+  isBookGate1Waiting,
+  renderBookBar,
+  renderBookCardLabels,
+  runBookEntry
+} from "./book-pipeline-ui";
 import { buildGatePanel, GatePanelState, renderGatePanel } from "./book-pipeline-panel";
 import { buildGate2Panel, renderGate2Panel } from "./book-pipeline-panel2";
 import {
@@ -17301,6 +17309,23 @@ export class VisualAgentMapView extends ItemView {
       if (!this.closed) this.render();
     });
   }
+  /** The chat's "continue" while the run waits at gate 1: confirms the plan. null when this map is not waiting there. */
+  private bookGate1FromChat(): Promise<string> | null {
+    const path = this.path;
+    const read = this.map ? readBookPipeline(this.map) : null;
+    if (!path || !read || read.kind !== "usable") return null;
+    if (!isBookGate1Waiting(this.plugin.getBookPipelineProgress(path), read.data)) return null;
+    return this.plugin.confirmBookGate1(path).then(
+      () => {
+        if (!this.closed) this.render();
+        return t("ui.book_chat_gate1_confirmed");
+      },
+      error => {
+        if (!this.closed) this.render();
+        return bookRefusalText(error);
+      }
+    );
+  }
   /** The toolbar button and the command: start a picture-book run on this map. */
   startBookPipelineFromUi(): Promise<void> {
     if (!this.path) return Promise.resolve();
@@ -20266,6 +20291,7 @@ export class VisualAgentMapView extends ItemView {
       notice: text => {
         new Notice(text);
       },
+      bookGate1Confirm: () => this.bookGate1FromChat(),
       send: (...args) => this.sendMapChat(...args)
     };
   }

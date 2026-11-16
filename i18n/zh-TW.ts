@@ -3060,6 +3060,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_refused_budget": "呼叫額度已用完；請按「再加 100 次」。",
   "ui.book_refused_disposed": "外掛正在關閉，無法執行。",
   "ui.book_refused_unreadable": "讀不到這張心智圖的資料，請稍後再試。",
+  "ui.book_chat_gate1_confirmed": "已確認企劃，開始寫作。",
   "ui.book_refused_not_gate1": "目前不在「等你確認」階段，不需要確認。",
   "ui.book_refused_not_gate": "目前不在關卡上，現在不能單獨重跑一張卡。",
   "ui.book_refused_instruction": "請先寫下這張卡要怎麼改。",

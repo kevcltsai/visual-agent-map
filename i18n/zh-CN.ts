@@ -3059,6 +3059,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_refused_budget": "调用额度已用完；请按“再加 100 次”。",
   "ui.book_refused_disposed": "插件正在关闭，无法执行。",
   "ui.book_refused_unreadable": "读不到这张地图的数据，请稍后再试。",
+  "ui.book_chat_gate1_confirmed": "已确认企划，开始写作。",
   "ui.book_refused_not_gate1": "当前不在“等你确认”阶段，不需要确认。",
   "ui.book_refused_not_gate": "当前不在关卡上，现在不能单独重跑一张卡。",
   "ui.book_refused_instruction": "请先写下这张卡要怎么改。",

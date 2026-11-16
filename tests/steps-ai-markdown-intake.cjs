@@ -59,7 +59,7 @@ const rows = [
   ['12 chat-topic-detail: guard rewrites callout mermaid label (block then demoted)', 'chat-topic-detail', '> ```mermaid\n> flowchart TD\n>   A[<sup>[s](<u>)</sup>]\n> ```\n', {}, '> ```text\n> flowchart TD\n>   A[<sup>[s](u)</sup>]\n> ```\n'],
   // no change cases
   ['plain text is unchanged (task-detail)', 'task-detail', 'plain\ntext\n', {}, 'plain\ntext\n'],
-  ['argument-detail: no mermaid keeps CRLF', 'argument-detail', 'a\r\nb', {}, 'a\nb']
+  ['argument-detail: CRLF becomes LF (neutralize)', 'argument-detail', 'a\r\nb', {}, 'a\nb']
 ];
 
 for (const [name, kind, text, opts, expected] of rows) {
@@ -76,11 +76,19 @@ test('intake: chat-file-edit range end must subtract the tail, not use insertedL
   assert.equal((next.match(/!\[i\]\(u\)/g) || []).length, 1);
 });
 
-test('intake: chat-file-edit keeps an image the surviving text already has out of the insert', async () => {
-  // the inserted image repeats one the surviving tail has: the inserted one is dropped, the tail keeps its own
-  const raw = REPLACE + '\n![i](u)\nEND';
-  const next = await run('chat-file-edit', raw, { at: 0, insertedLength: REPLACE.length, tail: '\n![i](u)\nEND'.length });
-  assert.equal(next, '<sup><a href="https://a.org/s">s</a></sup>\n![i](u)\nEND');
+test('intake: chat-file-edit keeps a different inserted image next to the surviving one', async () => {
+  // the inserted image differs from the one the surviving tail has: both stay
+  const raw = REPLACE.split('\n')[0] + '\n![k](w)\n![i](u)\nEND';
+  const tail = '\n![i](u)\nEND'.length;
+  const next = await run('chat-file-edit', raw, { at: 0, insertedLength: raw.length - tail, tail });
+  assert.equal(next, '<sup><a href="https://a.org/s">s</a></sup>\n![k](w)\n![i](u)\nEND');
+});
+
+test('intake: task-detail compose receives the guarded text, not the raw text', async () => {
+  let seen = null;
+  const out = intake.intakeAiMarkdown('<sup>[s](<https://a.org/s>)</sup>', { kind: 'task-detail', compose: g => ((seen = g), g) });
+  assert.equal(seen, '<sup><a href="https://a.org/s">s</a></sup>');
+  assert.equal(out, seen);
 });
 
 test('intake: chat-file-edit frontmatter is not guarded', async () => {

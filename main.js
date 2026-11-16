@@ -71158,6 +71158,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       this.inlineSummary = null;
     this.inlineSummaryInput = null;
     this.removeGoalBar();
+    for (const [id, card] of this.cardEls) if (card.offsetHeight > 0) this.drawnHeights.set(id, card.offsetHeight);
     this.contentEl.empty();
     (_q = (_p = this.contentEl).removeClass) == null ? void 0 : _q.call(_p, "is-notes-loading");
     const toolbar = this.contentEl.createDiv("vam-toolbar");
@@ -71368,7 +71369,6 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     this.stageEl.setAttr("aria-label", this.map.title);
     this.stageEl.setAttr("aria-multiselectable", String(this.selection.state.multiSelectMode));
     this.releaseCovers();
-    this.drawnHeights = new Map([...this.cardEls].map(([id, card]) => [id, card.offsetHeight]));
     this.cardEls.clear();
     this.textEls.clear();
     this.summaryEls.clear();

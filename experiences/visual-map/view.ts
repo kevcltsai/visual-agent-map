@@ -11658,6 +11658,8 @@ export class VisualAgentMapView extends ItemView {
     this.inlineSummaryInput = null;
     // The goal bar lives in the header row, outside contentEl: empty() would leave it behind.
     this.removeGoalBar();
+    // The relevance sort lays out with the heights drawn last time; read them before empty() detaches the cards (a detached card is 0 tall).
+    for (const [id, card] of this.cardEls) if (card.offsetHeight > 0) this.drawnHeights.set(id, card.offsetHeight);
     this.contentEl.empty();
     this.contentEl.removeClass?.("is-notes-loading");
     const toolbar = this.contentEl.createDiv("vam-toolbar");
@@ -11894,8 +11896,6 @@ export class VisualAgentMapView extends ItemView {
     this.stageEl.setAttr("aria-label", this.map.title);
     this.stageEl.setAttr("aria-multiselectable", String(this.selection.state.multiSelectMode));
     this.releaseCovers();
-    // The relevance sort lays out with the heights drawn last time: this render clears the cards before it asks for the sorted positions.
-    this.drawnHeights = new Map([...this.cardEls].map(([id, card]) => [id, card.offsetHeight]));
     this.cardEls.clear();
     this.textEls.clear();
     this.summaryEls.clear();

@@ -258,7 +258,6 @@ const EXCHANGE_WRITE_ALLOWED = [
 const ACTIVE_TASKS_SET_ALLOWED = [
   { file: 'core/ai-calls.ts', count: 1, reason: 'the per-call registration' },
   { file: 'experiences/visual-map/expansion-batch.ts', count: 1, reason: 'batch Stop key (parent path), a whole-job key' },
-  { file: 'experiences/visual-map/view.ts', count: 1, reason: 'UI leftover (chatExpand), waits for C1' },
   { file: 'experiences/visual-map/topic-run.ts', count: 2, reason: 'the research and proposal runs register their controller for the Stop buttons (registerTask goes through the ports() call and is outside this pattern)' },
   { file: 'experiences/coffee-tables/handoff-modal.ts', count: 1, reason: 'reframe-modal key, a whole-job Stop key around one registered AiCalls call' }
 ];

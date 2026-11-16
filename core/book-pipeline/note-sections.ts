@@ -109,6 +109,19 @@ export function appendResearchNote(detail: string, record: string): { text: stri
   return { text: `${head}${glue}${addition}${rest}`, appended: true };
 }
 
+/** The stored proof result for `key` in a Detail's Research notes (read through the `> ` quote prefix), or undefined. */
+export function findStoredProof(detail: string, key: string): ReturnType<typeof findProofRecord> {
+  return findProofRecord(unquoted(detail), key);
+}
+
+/** The Detail without its Research notes section: the chapter text a proof is judged and keyed on (the records it adds do not change it). */
+export function withoutResearchNotes(detail: string): string {
+  const lines = detail.split("\n");
+  const section = findSection(lines, fencedLines(lines), text => isResearchNotesHeading(text));
+  if (!section) return detail.replace(/\s+$/, "");
+  return [...lines.slice(0, section.at), ...lines.slice(section.end)].join("\n").replace(/\s+$/, "");
+}
+
 /**
  * Replaces the body of the root note's `## 全書企劃` section with `markdown` (or adds the section at the end); every other
  * section, the frontmatter and the text around it stay byte for byte. `markdown` is the body only: its `#`/`##` heading lines

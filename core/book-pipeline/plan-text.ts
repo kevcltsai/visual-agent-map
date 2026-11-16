@@ -175,3 +175,30 @@ export function parseBookPlanDecisions(markdown: string): BookSettings {
   }
   return out;
 }
+
+/** The saved thread and material register of a `## 全書企劃` section found anywhere in the root's body ('' and [] when there is none). */
+export function parseBookPlanBody(markdown: string): { thread: string; materials: { name: string; use: string }[] } {
+  const lines = markdown.split(/\r?\n/);
+  const start = lines.findIndex(line => {
+    const m = /^##[ \t]+(.+?)\s*$/.exec(line);
+    return !!m && matches(L.plan, m[1]);
+  });
+  const thread: string[] = [];
+  const materials: { name: string; use: string }[] = [];
+  if (start < 0) return { thread: "", materials };
+  let part: "thread" | "materials" | undefined;
+  for (const line of lines.slice(start + 1)) {
+    if (/^##(?!#)/.test(line)) break;
+    const sub = /^###[ \t]+(.+?)\s*$/.exec(line);
+    if (sub) {
+      part = matches(L.thread, sub[1]) ? "thread" : matches(L.materials, sub[1]) ? "materials" : undefined;
+      continue;
+    }
+    if (part === "thread" && line.trim()) thread.push(line.trim());
+    if (part === "materials") {
+      const m = /^[-*]\s+(.+?)[:：]\s*(.+?)\s*$/.exec(line);
+      if (m) materials.push({ name: unescapeMarkdownText(m[1]), use: unescapeMarkdownText(m[2]) });
+    }
+  }
+  return { thread: unescapeMarkdownText(thread.join(" ")), materials };
+}

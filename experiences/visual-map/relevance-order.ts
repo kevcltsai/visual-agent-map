@@ -1,4 +1,4 @@
-import { arrangeMap, type LayoutKind, type MapLayout } from "../../map-layout";
+import { arrangeMap, type HeightOf, type LayoutKind, type MapLayout } from "../../map-layout";
 import type { MapNode } from "../../map-model";
 import type { RelevanceTier } from "../../note-values";
 
@@ -26,13 +26,15 @@ export function orderSiblingsByRelevance(
 /**
  * Copies of `nodes` with display positions: every sibling group (same parent, and the top level) is ordered by
  * relevance and the map is laid out on screen with that order. Parents never change, and the result is only a view:
- * callers must not write it back.
+ * callers must not write it back. `heightOf` gives the drawn card heights, as the map's own auto layout takes them, so
+ * tall cards do not overlap after the sort.
  */
 export function relevanceDisplayNodes(
   nodes: MapNode[],
   tierOf: (id: string) => RelevanceTier | undefined,
   hidden?: Set<string>,
-  direction: LayoutKind | MapLayout = "right"
+  direction: LayoutKind | MapLayout = "right",
+  heightOf?: HeightOf
 ): MapNode[] {
   const groups = new Map<string | null, MapNode[]>();
   for (const node of nodes) {
@@ -46,7 +48,7 @@ export function relevanceDisplayNodes(
     .map((node, index) => ({ node, index }))
     .sort((a, b) => slot.get(a.node.id)! - slot.get(b.node.id)! || a.index - b.index)
     .map(item => item.node);
-  const laidOut = arrangeMap(sequenced, hidden, undefined, direction);
+  const laidOut = arrangeMap(sequenced, hidden, heightOf, direction);
   const placed = new Map(laidOut.map(node => [node.id, node]));
   return nodes.map(node => ({ ...node, x: placed.get(node.id)!.x, y: placed.get(node.id)!.y }));
 }

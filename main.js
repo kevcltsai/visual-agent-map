@@ -42965,7 +42965,7 @@ function orderSiblingsByRelevance(siblings, tierOf) {
   const current = siblings.map((node, index) => ({ node, index })).sort((a, b) => a.node.y - b.node.y || a.node.x - b.node.x || a.index - b.index);
   return current.sort((a, b) => rank(a.node) - rank(b.node)).map((item) => item.node);
 }
-function relevanceDisplayNodes(nodes, tierOf, hidden, direction = "right") {
+function relevanceDisplayNodes(nodes, tierOf, hidden, direction = "right", heightOf) {
   var _a2, _b2;
   const groups = /* @__PURE__ */ new Map();
   for (const node of nodes) {
@@ -42976,7 +42976,7 @@ function relevanceDisplayNodes(nodes, tierOf, hidden, direction = "right") {
   for (const group of groups.values())
     orderSiblingsByRelevance(group, tierOf).forEach((node, index) => slot.set(node.id, index));
   const sequenced = nodes.map((node, index) => ({ node, index })).sort((a, b) => slot.get(a.node.id) - slot.get(b.node.id) || a.index - b.index).map((item) => item.node);
-  const laidOut = arrangeMap(sequenced, hidden, void 0, direction);
+  const laidOut = arrangeMap(sequenced, hidden, heightOf, direction);
   const placed = new Map(laidOut.map((node) => [node.id, node]));
   return nodes.map((node) => ({ ...node, x: placed.get(node.id).x, y: placed.get(node.id).y }));
 }
@@ -72058,10 +72058,16 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (!this.relevanceSortOn()) return nodes;
     const trees = ringTreeIds(this.map.nodes, (_a2 = this.map.canvasItems) != null ? _a2 : []);
     const kept = trees.size ? /* @__PURE__ */ new Set([...superseded, ...trees]) : superseded;
-    return relevanceDisplayNodes(nodes, (id) => {
-      var _a3, _b2;
-      return (_b2 = (_a3 = this.notes.get(id)) == null ? void 0 : _a3.relevance) == null ? void 0 : _b2.tier;
-    }, kept, layoutOf(this.map));
+    return relevanceDisplayNodes(
+      nodes,
+      (id) => {
+        var _a3, _b2;
+        return (_b2 = (_a3 = this.notes.get(id)) == null ? void 0 : _a3.relevance) == null ? void 0 : _b2.tier;
+      },
+      kept,
+      layoutOf(this.map),
+      this.cardHeightOf
+    );
   }
   /** Arrow keys walk the tree: left to the parent, right to the first child, up/down among siblings. */
   keyboardNeighbor(node, key4) {

@@ -12700,7 +12700,13 @@ export class VisualAgentMapView extends ItemView {
     // Ring members and their branches keep the coordinates they have; the sort never folds them into the column.
     const trees = ringTreeIds(this.map.nodes, this.map.canvasItems ?? []);
     const kept = trees.size ? new Set([...superseded, ...trees]) : superseded;
-    return relevanceDisplayNodes(nodes, id => this.notes.get(id)?.relevance?.tier, kept, layoutOf(this.map));
+    return relevanceDisplayNodes(
+      nodes,
+      id => this.notes.get(id)?.relevance?.tier,
+      kept,
+      layoutOf(this.map),
+      this.cardHeightOf
+    );
   }
   /** Arrow keys walk the tree: left to the parent, right to the first child, up/down among siblings. */
   private keyboardNeighbor(node: MapNode, key: string): MapNode | undefined {

@@ -59,3 +59,16 @@ test('the toggle is display only: no repository, map or file write in its code p
   assert.ok(!/repo|vault|writeFile/.test(order));
   assert.ok(/relevanceSortedMaps = new Set/.test(src), 'toggle state is memory only');
 });
+
+test('display layout with the drawn card heights leaves tall cards apart (the sort uses the same heights as auto layout)', () => {
+  const { cardsOverlapAny } = load('map-layout.ts');
+  const tiers = { a: 'side', b: 'core', c: 'support' };
+  const tall = { a: 300, b: 300, c: 300 };
+  const heightOf = id => tall[id] || 180;
+  const nodes = freeze([node('r', null, 0), { ...node('a', 'r', 0), height: 300 }, { ...node('b', 'r', 400), height: 300 }, { ...node('c', 'r', 800), height: 300 }]);
+  const all = new Set(nodes.map(n => n.id));
+  const shown = relevanceDisplayNodes(nodes, id => tiers[id], undefined, 'right', heightOf);
+  assert.equal(cardsOverlapAny(shown, all, heightOf), false, 'no tall card covers another');
+  const y = id => shown.find(n => n.id === id).y;
+  assert.ok(y('b') < y('c') && y('c') < y('a'), 'order is still core, support, side');
+});

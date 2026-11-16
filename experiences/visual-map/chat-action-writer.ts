@@ -10,7 +10,7 @@ import type { Transaction, TransactionEntry } from "./map-transaction";
 import { randomUUID } from "node:crypto";
 import { t, type TranslationKey } from "../../i18n";
 import type { App, Editor, TFile } from "obsidian";
-import { addedMermaidBlocks, demoteUnparsableMermaid, neutralizeUnsafeMermaid } from "../../ai/mermaid-safety";
+import { addedMermaidBlocks } from "../../ai/mermaid-safety";
 import {
   canParent,
   clone,
@@ -24,8 +24,7 @@ import {
 import { ringMemberIds } from "../../map-layout-text";
 import { ringMembers } from "./image-ring";
 import { type Note, type NotePatch, topicAppearanceValues, type TopicAppearanceChange } from "../../repository";
-import { guardInlineHtmlLinks } from "../../ai/markdown-blocks";
-import { dedupeImageEmbeds } from "../../core/image-keys";
+import { intakeAiMarkdown, intakeAiMarkdownChecked } from "../../ai/markdown-intake";
 import {
   readAiLocked,
   resolveHypothesisWrite,
@@ -304,11 +303,7 @@ export class ChatActionWriter {
         // Done before the merge and stale checks so no await sits between the stale check and the write.
         const detail =
           action.kind === "edit_topic_note"
-            ? await demoteUnparsableMermaid(
-                // A full replace: only an image repeated inside the new Detail is dropped.
-                neutralizeUnsafeMermaid(dedupeImageEmbeds(guardInlineHtmlLinks(action.detail))),
-                this.plugin.mermaidSyntax
-              )
+            ? await intakeAiMarkdownChecked(action.detail, { kind: "chat-topic-detail" }, this.plugin.mermaidSyntax)
             : "";
         if (this.ports.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
@@ -406,13 +401,9 @@ export class ChatActionWriter {
         // A line the replacement starts with an inline tag gets a harmless lead; fence and frontmatter state come from the
         // text after the edit, and only the inserted range changes. Checks, the write and the undo entry all use this result.
         const at = source.text.indexOf(action.find);
-        const guarded = guardInlineHtmlLinks(raw, {
-          frontmatter: true,
-          range: { start: at, end: at + action.replace.length }
-        });
         // An image the rest of the file already has (outside the replaced text) is not embedded again by the edit.
         const tail = source.text.length - at - action.find.length;
-        const next = dedupeImageEmbeds(guarded, { file: true, range: { start: at, end: guarded.length - tail } });
+        const next = intakeAiMarkdown(raw, { kind: "chat-file-edit", at, insertedLength: action.replace.length, tail });
         // Only the mermaid blocks the edit adds are judged (allow-list, then parser); what the note already had stays as it is.
         const added = addedMermaidBlocks(source.text, next);
         if (added.some(block => block.unsafe)) return skipped("ui.map_chat_skip_unsafe_mermaid");
@@ -492,10 +483,9 @@ export class ChatActionWriter {
         const key = normalizeVaultPath(action.path);
         const exists = key ? !!this.app.vault.getAbstractFileByPath(key) : false;
         // Model-written file: same allow-list and parser check as an AI task result.
-        const content = await demoteUnparsableMermaid(
-          neutralizeUnsafeMermaid(
-            dedupeImageEmbeds(guardInlineHtmlLinks(action.content, { frontmatter: true }), { file: true })
-          ),
+        const content = await intakeAiMarkdownChecked(
+          action.content,
+          { kind: "chat-new-file" },
           this.plugin.mermaidSyntax
         );
         const verdict = guardMapChatWrite({

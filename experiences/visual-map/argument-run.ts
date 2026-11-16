@@ -11,7 +11,7 @@
  * answer that arrived can become a miss (no_answer, not_found, a refused source).
  */
 import type { TranslationKey } from "../../i18n";
-import { neutralizeUnsafeMermaid } from "../../ai/mermaid-safety";
+import { intakeAiMarkdown } from "../../ai/markdown-intake";
 import {
   conclusionDetail,
   datumDetail,
@@ -341,13 +341,13 @@ export class ArgumentRuns {
   private makeNote(input: NoteInput, map: MapDocument, mapPath: string): Promise<MapNode> {
     const safe: NoteInput = { ...input, title: plainLine(input.title) };
     if (input.summary !== undefined) safe.summary = plainLine(input.summary);
-    if (input.detail !== undefined) safe.detail = neutralizeUnsafeMermaid(input.detail);
+    if (input.detail !== undefined) safe.detail = intakeAiMarkdown(input.detail, { kind: "argument-detail" });
     return this.ports.createNote(safe, map, mapPath);
   }
   private writeNote(path: string, patch: { summary?: string; detail?: string }): Promise<void> {
     const safe: { summary?: string; detail?: string } = {};
     if (patch.summary !== undefined) safe.summary = plainLine(patch.summary);
-    if (patch.detail !== undefined) safe.detail = neutralizeUnsafeMermaid(patch.detail);
+    if (patch.detail !== undefined) safe.detail = intakeAiMarkdown(patch.detail, { kind: "argument-detail" });
     return this.ports.updateNote(path, safe);
   }
 

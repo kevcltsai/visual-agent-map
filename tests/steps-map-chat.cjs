@@ -86,6 +86,14 @@ test('parser drops an item that misses a field its kind needs (add_child without
   assert.ok(result.rejected.every(entry => entry.code === 'missing_field' || entry.code === 'unknown_node'), JSON.stringify(result.rejected));
   assert.equal(result.rejected.length, 9);
 });
+test('parser keeps edit_topic_note with an empty detail (clearing a note) but still drops a missing or non-string detail', () => {
+  const ctx = context({ selected: [topic('a')] });
+  const cleared = parse(reply(item('edit_topic_note', { nodeId: 'a', detail: '' }), item('edit_topic_note', { nodeId: 'a', detail: '   ' })), ctx);
+  assert.deepEqual(cleared.rejected, []);
+  assert.deepEqual(cleared.actions, [{ kind: 'edit_topic_note', nodeId: 'a', detail: '' }, { kind: 'edit_topic_note', nodeId: 'a', detail: '' }]);
+  const raw = JSON.stringify({ reply: 'ok', actions: [{ kind: 'edit_topic_note', nodeId: 'a' }, { kind: 'edit_topic_note', nodeId: 'a', detail: 5 }] });
+  assert.deepEqual(parse(raw, ctx).rejected.map(entry => entry.code), ['missing_field', 'bad_value']);
+});
 test('parser drops a move under itself or its own descendant, a bad run_map_action and non-object items', () => {
   const result = parse(JSON.stringify({ reply: 'ok', actions: [
     item('move_topic', { nodeId: 'a', newParentId: 'a' }),

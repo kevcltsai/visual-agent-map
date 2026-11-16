@@ -56655,6 +56655,345 @@ function judgeTopicScope(actions, nodes, rootId) {
   });
 }
 
+// experiences/visual-map/goal-suggest.ts
+function errorMessage5(error) {
+  const message = error == null ? void 0 : error.message;
+  return typeof message === "string" ? message : String(error);
+}
+var goalSuggestSeq = 0;
+var GoalSuggest = class {
+  constructor(ports) {
+    this.ports = ports;
+    /** The "suggest new topics for the goal" task: one at a time; it owns the AI call, the list and the Add press. */
+    __publicField(this, "task", null);
+    __publicField(this, "cleanup", null);
+    __publicField(this, "panelEl", null);
+  }
+  get plugin() {
+    return this.ports.plugin();
+  }
+  get path() {
+    return this.ports.path();
+  }
+  get closed() {
+    return this.ports.closed();
+  }
+  get map() {
+    return this.ports.map();
+  }
+  get notes() {
+    return this.ports.notes();
+  }
+  get history() {
+    return this.ports.history();
+  }
+  get contentEl() {
+    return this.ports.contentEl();
+  }
+  /** A result, a stop or a failure only counts while this is true: the task is still the view's own, on the same map. */
+  current(task) {
+    return !this.closed && this.task === task && task.mapPath === this.path && !task.controller.signal.aborted;
+  }
+  /** Drops the task (aborting its AI call), its listeners and its panel; the late result then fails the fence. */
+  end(task, options) {
+    var _a2, _b2;
+    if (this.task !== task) return;
+    this.task = null;
+    task.controller.abort();
+    (_a2 = this.cleanup) == null ? void 0 : _a2.call(this);
+    this.cleanup = null;
+    (_b2 = this.panelEl) == null ? void 0 : _b2.remove();
+    this.panelEl = null;
+    if (this.closed) return;
+    if (options.repaint !== false) this.ports.render();
+    else this.ports.placeMapTools();
+    if (options.refocus) this.ports.focusGoalReturn();
+    else if (options.repaint === false) {
+      window.setTimeout(() => {
+        var _a3, _b3;
+        if (this.closed) return;
+        const doc = (_a3 = this.contentEl) == null ? void 0 : _a3.ownerDocument;
+        const active = (_b3 = doc == null ? void 0 : doc.activeElement) != null ? _b3 : null;
+        if (!active || active === (doc == null ? void 0 : doc.body)) this.ports.focusGoalReturn();
+      }, 0);
+    }
+  }
+  /** Another surface (the goal editor, a new grading) takes the spot: the open task closes without a repaint. */
+  dismiss() {
+    if (this.task) this.end(this.task, { refocus: false, repaint: false });
+  }
+  /** The goal bar is redrawn: its old DOM is gone, so the listener and the panel handle are dropped (the task keeps running). */
+  detach() {
+    var _a2;
+    (_a2 = this.cleanup) == null ? void 0 : _a2.call(this);
+    this.cleanup = null;
+    this.panelEl = null;
+  }
+  /** The view closes: only the document listener goes (the task is stopped by drop). */
+  releaseListener() {
+    var _a2;
+    (_a2 = this.cleanup) == null ? void 0 : _a2.call(this);
+    this.cleanup = null;
+  }
+  /** The map's background work stops (view closed or another map opened): the task is aborted and forgotten. */
+  drop() {
+    var _a2;
+    (_a2 = this.task) == null ? void 0 : _a2.controller.abort();
+    this.task = null;
+  }
+  /** True when `node` is inside the list that is on screen. */
+  holdsFocus(node) {
+    var _a2, _b2;
+    return !!((_b2 = (_a2 = this.panelEl) == null ? void 0 : _a2.contains) == null ? void 0 : _b2.call(_a2, node));
+  }
+  /** Starts the task for the finished run's recommendations and shows the list. */
+  open(mapPath, suggestions, takeFocus) {
+    const task = {
+      mapPath,
+      token: ++goalSuggestSeq,
+      controller: new AbortController(),
+      state: "ready",
+      suggestions: [],
+      basis: /* @__PURE__ */ new Map(),
+      checked: /* @__PURE__ */ new Set(),
+      focus: null
+    };
+    this.task = task;
+    this.show(task, suggestions, takeFocus);
+  }
+  /** Locked parents are dropped (counted in a Notice); when none is left the task closes; otherwise the list opens. */
+  show(task, suggestions, takeFocus = true) {
+    var _a2, _b2, _c, _d;
+    const kept = suggestions.filter((item) => !this.ports.lockedParent(item.parentId));
+    const locked = suggestions.length - kept.length;
+    if (locked) this.ports.notice(t("ui.ai_locked_suggestions_skipped_0", locked));
+    if (!kept.length) {
+      this.end(task, { refocus: takeFocus });
+      return;
+    }
+    for (const item of kept) {
+      const parent = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === item.parentId);
+      task.basis.set(item.parentId, {
+        title: (_c = (_b2 = this.ports.describe(item.parentId)) == null ? void 0 : _b2.title) != null ? _c : "",
+        parentId: (_d = parent == null ? void 0 : parent.parentId) != null ? _d : null
+      });
+    }
+    task.suggestions = kept;
+    task.checked = new Set(kept.map((_, index) => index));
+    task.state = "ready";
+    task.focus = takeFocus ? "list" : null;
+    this.ports.render();
+  }
+  /** The card under the bar: the checkable list (title, one-line summary, tier) with Skip and Add. Model text goes in as text only. */
+  draw(bar) {
+    var _a2, _b2;
+    const task = this.task;
+    if (!task) return;
+    if (task.mapPath !== this.path) {
+      this.task = null;
+      task.controller.abort();
+      return;
+    }
+    const panel = bar.createDiv("vam-goal-suggest vam-goal-attachment");
+    this.panelEl = panel;
+    const applying = task.state === "applying";
+    panel.setAttr("role", "group");
+    panel.setAttr("aria-label", t("ui.goal_suggest_list_label"));
+    const boxes = [];
+    const rows2 = panel.createDiv("vam-goal-suggest-rows");
+    task.suggestions.forEach((item, index) => {
+      var _a3, _b3;
+      const row = rows2.createEl("label", { cls: "vam-goal-suggest-row" });
+      const box = row.createEl("input", { type: "checkbox" });
+      box.checked = task.checked.has(index);
+      box.disabled = applying;
+      boxes.push(box);
+      const text10 = row.createSpan("vam-goal-suggest-text");
+      text10.createSpan({ cls: "vam-goal-suggest-title", text: item.title });
+      text10.createSpan({ cls: "vam-goal-suggest-summary", text: item.summary });
+      text10.createSpan({
+        cls: "vam-goal-suggest-why",
+        text: t("ui.goal_suggest_under_0", (_b3 = (_a3 = task.basis.get(item.parentId)) == null ? void 0 : _a3.title) != null ? _b3 : "")
+      });
+      row.createSpan({
+        cls: `vam-goal-suggest-tier is-${item.suggestedTier}`,
+        text: t(RELEVANCE_LABEL[item.suggestedTier])
+      });
+      box.addEventListener("change", () => {
+        if (box.checked) task.checked.add(index);
+        else task.checked.delete(index);
+        syncAdd();
+      });
+    });
+    const foot = panel.createDiv("vam-goal-suggest-foot");
+    const skip = foot.createEl("button", { cls: "vam-goal-suggest-skip", text: t("ui.goal_suggest_skip") });
+    const add = foot.createEl("button", { cls: "vam-goal-suggest-add mod-cta" });
+    const syncAdd = () => {
+      add.setText(t("ui.goal_suggest_add_0", task.checked.size));
+      add.disabled = applying || task.checked.size === 0;
+    };
+    syncAdd();
+    skip.disabled = applying;
+    skip.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.end(task, { refocus: true });
+    });
+    add.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.ports.whenEditing(() => void this.apply(task));
+    });
+    panel.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || task.state !== "ready") return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.end(task, { refocus: true });
+    });
+    if (task.focus === "list") {
+      task.focus = null;
+      ((_a2 = boxes[0]) != null ? _a2 : add).focus();
+    }
+    const doc = (_b2 = this.contentEl) == null ? void 0 : _b2.ownerDocument;
+    if ((doc == null ? void 0 : doc.addEventListener) && !applying) {
+      const outside = (event) => {
+        var _a3, _b3, _c, _d, _e, _f;
+        const target = event.target;
+        const spark = (_a3 = bar.querySelector) == null ? void 0 : _a3.call(bar, '.vam-goal-icon[data-goal-action="recommend"]');
+        if (!target || panel.contains(target) || (spark == null ? void 0 : spark.contains(target))) return;
+        if ((_e = (_d = (_c = (_b3 = this.contentEl) == null ? void 0 : _b3.querySelector) == null ? void 0 : _c.call(_b3, ".vam-relevance-statusbar")) == null ? void 0 : _d.contains) == null ? void 0 : _e.call(_d, target)) return;
+        if ((_f = target.closest) == null ? void 0 : _f.call(target, ".vam-relevance-summary-modal")) return;
+        this.end(task, { refocus: false, repaint: false });
+      };
+      doc.addEventListener("pointerdown", outside, true);
+      this.cleanup = () => doc.removeEventListener("pointerdown", outside, true);
+    }
+  }
+  /**
+   * Add: every checked suggestion is checked again inside the map write (parent still there, same name and place, not
+   * AI-locked, title not taken meanwhile); the ones that no longer fit are skipped and counted. All the cards are one
+   * undo step. No AI call: each new card gets the tier the list showed (not hand-set), and a parent that now ranks below
+   * a card it holds is raised (same undo step). The summary is not written to the card.
+   */
+  async apply(task) {
+    var _a2;
+    if (this.task !== task || task.state !== "ready" || !task.checked.size) return;
+    task.state = "applying";
+    const picked = [...task.checked].sort((a, b) => a - b).flatMap((index) => {
+      var _a3;
+      return (_a3 = task.suggestions[index]) != null ? _a3 : [];
+    });
+    (_a2 = this.cleanup) == null ? void 0 : _a2.call(this);
+    this.cleanup = null;
+    this.ports.render();
+    let added = 0;
+    let skipped2 = 0;
+    try {
+      await this.plugin.mutate(async () => {
+        var _a3;
+        if (!this.current(task)) {
+          skipped2 = picked.length;
+          return;
+        }
+        const fresh = await this.ports.freshNotesOf(picked.map((item) => item.parentId));
+        const mark2 = this.history.mark();
+        try {
+          for (const item of picked) {
+            const parent = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((node) => node.id === item.parentId);
+            if (!this.map || this.closed || !parent || this.stale(item, task, parent, fresh)) {
+              skipped2++;
+              continue;
+            }
+            await this.ports.addNode(parent, item.title);
+            const card = this.map.nodes.at(-1);
+            if (card) {
+              await this.plugin.repo.writeRelevance(card.path, { tier: item.suggestedTier });
+              added++;
+            }
+          }
+          if (added) await this.raiseParentsAfterAdd();
+          if (added) await this.plugin.rebuildDerivedData();
+        } finally {
+          this.history.collapseSince(mark2, t("ui.goal_suggest_history_label"));
+          this.ports.updateHistoryButtons();
+        }
+      });
+    } catch (e) {
+    }
+    if (this.closed) return;
+    this.end(task, { refocus: !added });
+    if (skipped2) this.ports.notice(t("ui.goal_suggest_skipped_0", skipped2));
+    if (!added) return;
+    this.ports.announce(t("ui.goal_suggest_added_0", added));
+  }
+  /**
+   * After Add: a parent never ranks below a card it holds. Reads every note fresh, raises the AI-set parents above the
+   * new cards (any number of levels), and records them as one history entry the surrounding collapse merges into the add
+   * step. A hand-set or AI-locked parent keeps its tier (its height still passes up); top-level cards are never raised.
+   */
+  async raiseParentsAfterAdd() {
+    if (!this.map) return;
+    const repo = this.plugin.repo;
+    const notes = /* @__PURE__ */ new Map();
+    for (const node of this.map.nodes) {
+      try {
+        notes.set(node.id, await repo.readNote(node.path, this.map));
+      } catch (e) {
+      }
+    }
+    const tree = buildStructureReviewNodes(this.map.nodes, () => void 0).map((node) => ({
+      id: node.id,
+      parentId: node.parentId
+    }));
+    const tiers = /* @__PURE__ */ new Map();
+    for (const [id, note] of notes) if (note.relevance) tiers.set(id, note.relevance.tier);
+    const frozen = new Set(
+      tree.filter((node) => {
+        var _a2;
+        const note = notes.get(node.id);
+        return !note || note.aiLocked || !!((_a2 = note.relevance) == null ? void 0 : _a2.manual);
+      }).map((node) => node.id)
+    );
+    const raised = raiseParents(tree, tiers, frozen);
+    const changes = [];
+    for (const [id, tier] of raised) {
+      const node = this.map.nodes.find((item) => item.id === id);
+      const note = notes.get(id);
+      if (!node || !(note == null ? void 0 : note.relevance)) continue;
+      try {
+        await repo.writeRelevance(node.path, { tier });
+        changes.push({
+          id,
+          path: node.path,
+          title: note.title,
+          before: { tier: note.relevance.tier },
+          after: { tier },
+          raised: true
+        });
+      } catch (error) {
+        this.plugin.logs.appendLog("error", t("log.operation_failed_0", errorMessage5(error)));
+      }
+    }
+    if (!changes.length) return;
+    this.history.push({
+      label: t("ui.relevance_history_label"),
+      undo: () => this.ports.restoreRelevance(changes, "undo"),
+      redo: () => this.ports.restoreRelevance(changes, "redo")
+    });
+  }
+  /** True when the suggestion no longer fits the map as it is now. */
+  stale(item, task, parent, fresh) {
+    var _a2, _b2, _c, _d, _e;
+    const basis = task.basis.get(item.parentId);
+    const title = (_d = (_c = (_a2 = fresh.get(parent.id)) == null ? void 0 : _a2.title) != null ? _c : (_b2 = this.ports.describe(parent.id)) == null ? void 0 : _b2.title) != null ? _d : "";
+    if (!basis || title !== basis.title || parent.parentId !== basis.parentId) return true;
+    if (this.ports.isMerging(parent.id) || this.ports.lockedParent(parent.id, fresh)) return true;
+    const key4 = goalRecommendTitleKey(item.title);
+    return !!((_e = this.map) == null ? void 0 : _e.nodes.some((node) => {
+      var _a3, _b3;
+      return goalRecommendTitleKey((_b3 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b3 : "") === key4;
+    }));
+  }
+};
+
 // experiences/visual-map/clipboard.ts
 var CLIPBOARD_FORMAT = "vam-branch";
 var CLIPBOARD_VERSION = 1;
@@ -60637,7 +60976,7 @@ function isEditableTarget(target) {
   var _a2;
   return !!((_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, EDITABLE_SELECTOR));
 }
-function errorMessage5(error) {
+function errorMessage6(error) {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 }
@@ -60824,7 +61163,6 @@ var MapSourceWriteError = class extends Error {
   }
 };
 var mapChatTaskSequence = 0;
-var goalSuggestSeq = 0;
 var NOT_ELSEWHERE_SELECTOR = [".menu", ".modal-container", ".prompt", ".vam-map-actions-button", ".view-action"].join(
   ", "
 );
@@ -60877,9 +61215,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
       paintCount: () => this.paintCount,
       gradeable: () => this.relevanceGradeable(),
       notesLoading: () => this.notesLoading(),
-      dropGoalSuggest: () => {
-        if (this.goalSuggestTask) this.endGoalSuggest(this.goalSuggestTask, { refocus: false, repaint: false });
-      },
+      dropGoalSuggest: () => this.goalSuggest.dismiss(),
       setGoal: (goal, context) => {
         this.relevanceGoal = goal;
         this.relevanceContext = context;
@@ -60916,9 +61252,31 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     /** The row the goal bar sits in (Obsidian's header row, or the toolbar when that row is hidden); it carries `vam-goal-host`. */
     __publicField(this, "goalHostEl", null);
     /** The "suggest new topics for the goal" task: one at a time; it owns the AI call, the list and the Add press. */
-    __publicField(this, "goalSuggestTask", null);
-    __publicField(this, "goalSuggestCleanup", null);
-    __publicField(this, "goalSuggestPanelEl", null);
+    __publicField(this, "goalSuggest", new GoalSuggest({
+      plugin: () => this.plugin,
+      path: () => this.path,
+      closed: () => this.closed,
+      map: () => this.map,
+      notes: () => this.notes,
+      history: () => this.history,
+      contentEl: () => this.contentEl,
+      render: () => this.render(),
+      placeMapTools: () => this.placeMapTools(),
+      focusGoalReturn: () => this.focusGoalReturn(),
+      whenEditing: (action) => this.whenEditing(action),
+      lockedParent: (parentId, fresh) => !!this.aiLockReason("addChild", [parentId], fresh),
+      isMerging: (id) => this.isMerging(id),
+      describe: (id) => this.describeForReview(id),
+      freshNotesOf: (ids2) => this.freshNotesOf(ids2),
+      addNode: (parent, title) => this.addNode(parent, title, false, false),
+      restoreRelevance: (changes, direction) => this.relevanceRun.restore(changes, direction),
+      updateHistoryButtons: () => this.updateHistoryButtons(),
+      announce: (text10) => {
+        var _a2;
+        return (_a2 = this.announcer) == null ? void 0 : _a2.setText(text10);
+      },
+      notice: (message) => new import_obsidian36.Notice(message)
+    }));
     /** The attachments of the latest chat turn, as reference documents for a research the chat starts. */
     __publicField(this, "chatTurnReferences", []);
     __publicField(this, "mapSourcesControl", new MapSourcesControl(
@@ -61817,7 +62175,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     if (((_a2 = this.chat) == null ? void 0 : _a2.isBusy) || this.chatPrepAbandon) return true;
     for (const task of this.plugin.topicRuns.syntheses(this).topics.values()) if (task.state === "running") return true;
     if (this.startingTasks.size || this.startingExpand.size || this.mergeDrafts.isRunning()) return true;
-    if (this.goalSuggestTask || this.structureReviewTask || this.outlineDraftTask) return true;
+    if (this.goalSuggest.task || this.structureReviewTask || this.outlineDraftTask) return true;
     if (this.relevanceRun.isRunning()) return true;
     const runs = this.plugin.topicRuns, batches = this.plugin.expansionCoordinator;
     return ((_c = (_b2 = this.map) == null ? void 0 : _b2.nodes) != null ? _c : []).some(
@@ -61961,11 +62319,11 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     if (target == null ? void 0 : target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")) return;
     if (event.key === "Escape" && (event.defaultPrevented || this.contentEl.ownerDocument.querySelector(".menu")))
       return;
-    const suggest = this.goalSuggestTask;
+    const suggest = this.goalSuggest.task;
     if (event.key === "Escape" && suggest && suggest.state === "ready") {
       event.preventDefault();
       event.stopPropagation();
-      this.endGoalSuggest(suggest, { refocus: true });
+      this.goalSuggest.end(suggest, { refocus: true });
       return;
     }
     if (event.key === "Escape" && this.menuClosedByKey) {
@@ -62709,7 +63067,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     return true;
   }
   async onClose() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
     this.closeTopicLinkMenu();
     this.closed = true;
     this.chatSourceCache = null;
@@ -62755,9 +63113,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     this.closeChatRecords();
     this.abortMapChat();
     (_k = this.chat) == null ? void 0 : _k.dispose();
-    (_l = this.goalSuggestCleanup) == null ? void 0 : _l.call(this);
-    this.goalSuggestCleanup = null;
-    (_m = this.mapSourcesControl) == null ? void 0 : _m.dispose();
+    this.goalSuggest.releaseListener();
+    (_l = this.mapSourcesControl) == null ? void 0 : _l.dispose();
     this.dropGoalEdit();
     this.abortRelevanceGrade();
     this.plugin.topicRuns.dropSyntheses(this);
@@ -62771,9 +63128,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     this.endNoteLoad();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
-    (_n = this.hoverCard) == null ? void 0 : _n.remove();
-    (_o = this.dragCleanup) == null ? void 0 : _o.call(this);
-    (_p = this.anchorDragCancel) == null ? void 0 : _p.call(this, false);
+    (_m = this.hoverCard) == null ? void 0 : _m.remove();
+    (_n = this.dragCleanup) == null ? void 0 : _n.call(this);
+    (_o = this.anchorDragCancel) == null ? void 0 : _o.call(this, false);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -63093,14 +63450,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
   }
   /** Background AI work that belongs to the open map: stopped and forgotten when the view closes or another map opens. */
   dropMapBackground() {
-    var _a2;
     this.quickOutlineSummaries.clear();
     const review = this.structureReviewTask;
     const draft = this.outlineDraftTask;
     this.structureReviewTask = null;
     this.outlineDraftTask = null;
-    (_a2 = this.goalSuggestTask) == null ? void 0 : _a2.controller.abort();
-    this.goalSuggestTask = null;
+    this.goalSuggest.drop();
     review == null ? void 0 : review.controller.abort();
     draft == null ? void 0 : draft.controller.abort();
     this.highlightStructure([]);
@@ -63794,12 +64149,10 @@ ${request.requirements}` : preset.text,
    * it is edited. `before` is the sibling the bar goes in front of (the row's action group); without it the bar is appended.
    */
   renderGoalBar(host, before) {
-    var _a2, _b2;
+    var _a2;
     this.captureGoalEdit();
-    (_a2 = this.goalSuggestCleanup) == null ? void 0 : _a2.call(this);
-    this.goalSuggestCleanup = null;
-    this.goalSuggestPanelEl = null;
-    if (this.goalEdit && (this.goalEdit.path !== this.path || ((_b2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _b2.status) === "running"))
+    this.goalSuggest.detach();
+    if (this.goalEdit && (this.goalEdit.path !== this.path || ((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running"))
       this.dropGoalEdit();
     this.goalBarHost = host;
     const bar = host.createDiv({
@@ -63808,12 +64161,12 @@ ${request.requirements}` : preset.text,
     });
     if (before && before.parentElement === host) host.insertBefore(bar, before);
     bar.addEventListener("keydown", (event) => {
-      const suggest = this.goalSuggestTask;
+      const suggest = this.goalSuggest.task;
       if (event.key !== "Escape" || event.defaultPrevented || !suggest) return;
       if (suggest.state !== "ready") return;
       event.preventDefault();
       event.stopPropagation();
-      this.endGoalSuggest(suggest, { refocus: true });
+      this.goalSuggest.end(suggest, { refocus: true });
     });
     bar.createSpan({
       cls: "vam-sr-only",
@@ -63822,7 +64175,7 @@ ${request.requirements}` : preset.text,
     });
     this.relevanceBarEl = bar;
     this.drawGoalBar(bar);
-    this.drawGoalSuggest(bar);
+    this.goalSuggest.draw(bar);
   }
   /** Display-only toggle: within each sibling group show core, support, side, then ungraded. */
   relevanceSortOn() {
@@ -63879,14 +64232,14 @@ ${request.requirements}` : preset.text,
       });
       return button;
     };
-    const suggestTask = this.goalSuggestTask;
+    const suggestTask = this.goalSuggest.task;
     const busy = !!suggestTask && suggestTask.state !== "ready";
     const spark = icon(
       "spark",
       t("ui.goal_recommend"),
       () => {
         var _a3, _b2;
-        if (((_a3 = this.goalSuggestTask) == null ? void 0 : _a3.state) === "ready") this.endGoalSuggest(this.goalSuggestTask, { refocus: true });
+        if (((_a3 = this.goalSuggest.task) == null ? void 0 : _a3.state) === "ready") this.goalSuggest.end(this.goalSuggest.task, { refocus: true });
         else if (goal) void this.submitRelevanceGoal(goal, (_b2 = this.relevanceContext) != null ? _b2 : "");
       },
       running2 || !goal || busy
@@ -64064,7 +64417,7 @@ ${request.requirements}` : preset.text,
       new import_obsidian36.Notice(t("ui.relevance_goal_unavailable_grading"));
       return;
     }
-    if (this.goalSuggestTask) this.endGoalSuggest(this.goalSuggestTask, { refocus: false, repaint: false });
+    this.goalSuggest.dismiss();
     const context = (_b2 = this.relevanceContext) != null ? _b2 : "";
     this.goalEdit = {
       path: this.path,
@@ -64215,34 +64568,6 @@ ${request.requirements}` : preset.text,
     };
   }
   // ---- Suggest new topics for the goal --------------------------------------------------------------------------
-  /** A result, a stop or a failure only counts while this is true: the task is still the view's own, on the same map. */
-  goalSuggestCurrent(task) {
-    return !this.closed && this.goalSuggestTask === task && task.mapPath === this.path && !task.controller.signal.aborted;
-  }
-  /** Drops the task (aborting its AI call), its listeners and its panel; the late result then fails the fence. */
-  endGoalSuggest(task, options) {
-    var _a2, _b2;
-    if (this.goalSuggestTask !== task) return;
-    this.goalSuggestTask = null;
-    task.controller.abort();
-    (_a2 = this.goalSuggestCleanup) == null ? void 0 : _a2.call(this);
-    this.goalSuggestCleanup = null;
-    (_b2 = this.goalSuggestPanelEl) == null ? void 0 : _b2.remove();
-    this.goalSuggestPanelEl = null;
-    if (this.closed) return;
-    if (options.repaint !== false) this.render();
-    else this.placeMapTools();
-    if (options.refocus) this.focusGoalReturn();
-    else if (options.repaint === false) {
-      window.setTimeout(() => {
-        var _a3, _b3;
-        if (this.closed) return;
-        const doc = (_a3 = this.contentEl) == null ? void 0 : _a3.ownerDocument;
-        const active = (_b3 = doc == null ? void 0 : doc.activeElement) != null ? _b3 : null;
-        if (!active || active === (doc == null ? void 0 : doc.body)) this.focusGoalReturn();
-      }, 0);
-    }
-  }
   /** Focus goes back to the recommend button; while the icons are hidden (no hover) it goes to the goal text, which shows them. */
   focusGoalReturn() {
     var _a2, _b2, _c, _d;
@@ -64251,237 +64576,6 @@ ${request.requirements}` : preset.text,
     const usable = spark && !spark.disabled && spark.offsetParent !== null;
     if (usable) spark.focus();
     else (_d = (_c = root == null ? void 0 : root.querySelector) == null ? void 0 : _c.call(root, ".vam-goal-text")) == null ? void 0 : _d.focus();
-  }
-  /** Locked parents are dropped (counted in a Notice); when none is left the task closes; otherwise the list opens. */
-  showGoalSuggestions(task, suggestions, takeFocus = true) {
-    var _a2, _b2, _c, _d;
-    const kept = suggestions.filter((item) => !this.aiLockReason("addChild", [item.parentId]));
-    const locked = suggestions.length - kept.length;
-    if (locked) new import_obsidian36.Notice(t("ui.ai_locked_suggestions_skipped_0", locked));
-    if (!kept.length) {
-      this.endGoalSuggest(task, { refocus: takeFocus });
-      return;
-    }
-    for (const item of kept) {
-      const parent = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === item.parentId);
-      task.basis.set(item.parentId, {
-        title: (_c = (_b2 = this.describeForReview(item.parentId)) == null ? void 0 : _b2.title) != null ? _c : "",
-        parentId: (_d = parent == null ? void 0 : parent.parentId) != null ? _d : null
-      });
-    }
-    task.suggestions = kept;
-    task.checked = new Set(kept.map((_, index) => index));
-    task.state = "ready";
-    task.focus = takeFocus ? "list" : null;
-    this.render();
-  }
-  /** The card under the bar: the checkable list (title, one-line summary, tier) with Skip and Add. Model text goes in as text only. */
-  drawGoalSuggest(bar) {
-    var _a2, _b2;
-    const task = this.goalSuggestTask;
-    if (!task) return;
-    if (task.mapPath !== this.path) {
-      this.goalSuggestTask = null;
-      task.controller.abort();
-      return;
-    }
-    const panel = bar.createDiv("vam-goal-suggest vam-goal-attachment");
-    this.goalSuggestPanelEl = panel;
-    const applying = task.state === "applying";
-    panel.setAttr("role", "group");
-    panel.setAttr("aria-label", t("ui.goal_suggest_list_label"));
-    const boxes = [];
-    const rows2 = panel.createDiv("vam-goal-suggest-rows");
-    task.suggestions.forEach((item, index) => {
-      var _a3, _b3;
-      const row = rows2.createEl("label", { cls: "vam-goal-suggest-row" });
-      const box = row.createEl("input", { type: "checkbox" });
-      box.checked = task.checked.has(index);
-      box.disabled = applying;
-      boxes.push(box);
-      const text10 = row.createSpan("vam-goal-suggest-text");
-      text10.createSpan({ cls: "vam-goal-suggest-title", text: item.title });
-      text10.createSpan({ cls: "vam-goal-suggest-summary", text: item.summary });
-      text10.createSpan({
-        cls: "vam-goal-suggest-why",
-        text: t("ui.goal_suggest_under_0", (_b3 = (_a3 = task.basis.get(item.parentId)) == null ? void 0 : _a3.title) != null ? _b3 : "")
-      });
-      row.createSpan({
-        cls: `vam-goal-suggest-tier is-${item.suggestedTier}`,
-        text: t(RELEVANCE_LABEL[item.suggestedTier])
-      });
-      box.addEventListener("change", () => {
-        if (box.checked) task.checked.add(index);
-        else task.checked.delete(index);
-        syncAdd();
-      });
-    });
-    const foot = panel.createDiv("vam-goal-suggest-foot");
-    const skip = foot.createEl("button", { cls: "vam-goal-suggest-skip", text: t("ui.goal_suggest_skip") });
-    const add = foot.createEl("button", { cls: "vam-goal-suggest-add mod-cta" });
-    const syncAdd = () => {
-      add.setText(t("ui.goal_suggest_add_0", task.checked.size));
-      add.disabled = applying || task.checked.size === 0;
-    };
-    syncAdd();
-    skip.disabled = applying;
-    skip.addEventListener("click", (event) => {
-      event.stopPropagation();
-      this.endGoalSuggest(task, { refocus: true });
-    });
-    add.addEventListener("click", (event) => {
-      event.stopPropagation();
-      this.whenEditing(() => void this.applyGoalSuggest(task));
-    });
-    panel.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape" || task.state !== "ready") return;
-      event.preventDefault();
-      event.stopPropagation();
-      this.endGoalSuggest(task, { refocus: true });
-    });
-    if (task.focus === "list") {
-      task.focus = null;
-      ((_a2 = boxes[0]) != null ? _a2 : add).focus();
-    }
-    const doc = (_b2 = this.contentEl) == null ? void 0 : _b2.ownerDocument;
-    if ((doc == null ? void 0 : doc.addEventListener) && !applying) {
-      const outside = (event) => {
-        var _a3, _b3, _c, _d, _e, _f;
-        const target = event.target;
-        const spark = (_a3 = bar.querySelector) == null ? void 0 : _a3.call(bar, '.vam-goal-icon[data-goal-action="recommend"]');
-        if (!target || panel.contains(target) || (spark == null ? void 0 : spark.contains(target))) return;
-        if ((_e = (_d = (_c = (_b3 = this.contentEl) == null ? void 0 : _b3.querySelector) == null ? void 0 : _c.call(_b3, ".vam-relevance-statusbar")) == null ? void 0 : _d.contains) == null ? void 0 : _e.call(_d, target)) return;
-        if ((_f = target.closest) == null ? void 0 : _f.call(target, ".vam-relevance-summary-modal")) return;
-        this.endGoalSuggest(task, { refocus: false, repaint: false });
-      };
-      doc.addEventListener("pointerdown", outside, true);
-      this.goalSuggestCleanup = () => doc.removeEventListener("pointerdown", outside, true);
-    }
-  }
-  /**
-   * Add: every checked suggestion is checked again inside the map write (parent still there, same name and place, not
-   * AI-locked, title not taken meanwhile); the ones that no longer fit are skipped and counted. All the cards are one
-   * undo step. No AI call: each new card gets the tier the list showed (not hand-set), and a parent that now ranks below
-   * a card it holds is raised (same undo step). The summary is not written to the card.
-   */
-  async applyGoalSuggest(task) {
-    var _a2, _b2;
-    if (this.goalSuggestTask !== task || task.state !== "ready" || !task.checked.size) return;
-    task.state = "applying";
-    const picked = [...task.checked].sort((a, b) => a - b).flatMap((index) => {
-      var _a3;
-      return (_a3 = task.suggestions[index]) != null ? _a3 : [];
-    });
-    (_a2 = this.goalSuggestCleanup) == null ? void 0 : _a2.call(this);
-    this.goalSuggestCleanup = null;
-    this.render();
-    let added = 0;
-    let skipped2 = 0;
-    try {
-      await this.plugin.mutate(async () => {
-        var _a3;
-        if (!this.goalSuggestCurrent(task)) {
-          skipped2 = picked.length;
-          return;
-        }
-        const fresh = await this.freshNotesOf(picked.map((item) => item.parentId));
-        const mark2 = this.history.mark();
-        try {
-          for (const item of picked) {
-            const parent = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((node) => node.id === item.parentId);
-            if (!this.map || this.closed || !parent || this.goalSuggestStale(item, task, parent, fresh)) {
-              skipped2++;
-              continue;
-            }
-            await this.addNode(parent, item.title, false, false);
-            const card = this.map.nodes.at(-1);
-            if (card) {
-              await this.plugin.repo.writeRelevance(card.path, { tier: item.suggestedTier });
-              added++;
-            }
-          }
-          if (added) await this.raiseParentsAfterAdd();
-          if (added) await this.plugin.rebuildDerivedData();
-        } finally {
-          this.history.collapseSince(mark2, t("ui.goal_suggest_history_label"));
-          this.updateHistoryButtons();
-        }
-      });
-    } catch (e) {
-    }
-    if (this.closed) return;
-    this.endGoalSuggest(task, { refocus: !added });
-    if (skipped2) new import_obsidian36.Notice(t("ui.goal_suggest_skipped_0", skipped2));
-    if (!added) return;
-    (_b2 = this.announcer) == null ? void 0 : _b2.setText(t("ui.goal_suggest_added_0", added));
-  }
-  /**
-   * After Add: a parent never ranks below a card it holds. Reads every note fresh, raises the AI-set parents above the
-   * new cards (any number of levels), and records them as one history entry the surrounding collapse merges into the add
-   * step. A hand-set or AI-locked parent keeps its tier (its height still passes up); top-level cards are never raised.
-   */
-  async raiseParentsAfterAdd() {
-    if (!this.map) return;
-    const repo = this.plugin.repo;
-    const notes = /* @__PURE__ */ new Map();
-    for (const node of this.map.nodes) {
-      try {
-        notes.set(node.id, await repo.readNote(node.path, this.map));
-      } catch (e) {
-      }
-    }
-    const tree = buildStructureReviewNodes(this.map.nodes, () => void 0).map((node) => ({
-      id: node.id,
-      parentId: node.parentId
-    }));
-    const tiers = /* @__PURE__ */ new Map();
-    for (const [id, note] of notes) if (note.relevance) tiers.set(id, note.relevance.tier);
-    const frozen = new Set(
-      tree.filter((node) => {
-        var _a2;
-        const note = notes.get(node.id);
-        return !note || note.aiLocked || !!((_a2 = note.relevance) == null ? void 0 : _a2.manual);
-      }).map((node) => node.id)
-    );
-    const raised = raiseParents(tree, tiers, frozen);
-    const changes = [];
-    for (const [id, tier] of raised) {
-      const node = this.map.nodes.find((item) => item.id === id);
-      const note = notes.get(id);
-      if (!node || !(note == null ? void 0 : note.relevance)) continue;
-      try {
-        await repo.writeRelevance(node.path, { tier });
-        changes.push({
-          id,
-          path: node.path,
-          title: note.title,
-          before: { tier: note.relevance.tier },
-          after: { tier },
-          raised: true
-        });
-      } catch (error) {
-        this.plugin.logs.appendLog("error", t("log.operation_failed_0", errorMessage5(error)));
-      }
-    }
-    if (!changes.length) return;
-    this.history.push({
-      label: t("ui.relevance_history_label"),
-      undo: () => this.relevanceRun.restore(changes, "undo"),
-      redo: () => this.relevanceRun.restore(changes, "redo")
-    });
-  }
-  /** True when the suggestion no longer fits the map as it is now. */
-  goalSuggestStale(item, task, parent, fresh) {
-    var _a2, _b2, _c, _d, _e;
-    const basis = task.basis.get(item.parentId);
-    const title = (_d = (_c = (_a2 = fresh.get(parent.id)) == null ? void 0 : _a2.title) != null ? _c : (_b2 = this.describeForReview(parent.id)) == null ? void 0 : _b2.title) != null ? _d : "";
-    if (!basis || title !== basis.title || parent.parentId !== basis.parentId) return true;
-    if (this.isMerging(parent.id) || this.aiLockReason("addChild", [parent.id], fresh)) return true;
-    const key4 = goalRecommendTitleKey(item.title);
-    return !!((_e = this.map) == null ? void 0 : _e.nodes.some((node) => {
-      var _a3, _b3;
-      return goalRecommendTitleKey((_b3 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b3 : "") === key4;
-    }));
   }
   /**
    * Starts the Claude CLI for the grade an edited goal would run (no model call; a Codex model starts nothing). The
@@ -64514,11 +64608,11 @@ ${request.requirements}` : preset.text,
     if (!bar || !active || !((_f = bar.contains) == null ? void 0 : _f.call(bar, active))) return () => {
     };
     return () => {
-      var _a3, _b3, _c2, _d2, _e2, _f2, _g, _h, _i, _j, _k, _l;
+      var _a3, _b3, _c2, _d2, _e2, _f2, _g, _h, _i, _j;
       if (!this.mapWindowIsActive()) return;
       const now = (_c2 = (_b3 = (_a3 = this.contentEl) == null ? void 0 : _a3.ownerDocument) == null ? void 0 : _b3.activeElement) != null ? _c2 : null;
-      if (now && ((_e2 = (_d2 = this.goalSuggestPanelEl) == null ? void 0 : _d2.contains) == null ? void 0 : _e2.call(_d2, now))) return;
-      const target = (_l = (_i = (_h = (_g = (_f2 = this.contentEl) == null ? void 0 : _f2.querySelector) == null ? void 0 : _g.call(_f2, ".vam-relevance-statusbar")) == null ? void 0 : _h.querySelector) == null ? void 0 : _i.call(_h, "button")) != null ? _l : (_k = (_j = this.goalLayerRoot()) == null ? void 0 : _j.querySelector) == null ? void 0 : _k.call(_j, ".vam-goal-text");
+      if (now && this.goalSuggest.holdsFocus(now)) return;
+      const target = (_j = (_g = (_f2 = (_e2 = (_d2 = this.contentEl) == null ? void 0 : _d2.querySelector) == null ? void 0 : _e2.call(_d2, ".vam-relevance-statusbar")) == null ? void 0 : _f2.querySelector) == null ? void 0 : _g.call(_f2, "button")) != null ? _j : (_i = (_h = this.goalLayerRoot()) == null ? void 0 : _h.querySelector) == null ? void 0 : _i.call(_h, ".vam-goal-text");
       target == null ? void 0 : target.focus();
     };
   }
@@ -64541,19 +64635,8 @@ ${request.requirements}` : preset.text,
     if (!suggestions.length) return;
     if (this.closed || this.path !== mapPath || run.owner !== this || run.status !== "done") return;
     if (this.plugin.relevanceGrades.get(mapPath) !== run || run.controller.signal.aborted) return;
-    if (this.goalSuggestTask || this.presentation) return;
-    const task = {
-      mapPath,
-      token: ++goalSuggestSeq,
-      controller: new AbortController(),
-      state: "ready",
-      suggestions: [],
-      basis: /* @__PURE__ */ new Map(),
-      checked: /* @__PURE__ */ new Set(),
-      focus: null
-    };
-    this.goalSuggestTask = task;
-    this.showGoalSuggestions(task, suggestions, this.focusIsFreeForList());
+    if (this.goalSuggest.task || this.presentation) return;
+    this.goalSuggest.open(mapPath, suggestions, this.focusIsFreeForList());
   }
   /** True when the keyboard is on the status bar, the goal bar or the page body: the list may take it. */
   focusIsFreeForList() {
@@ -65506,7 +65589,7 @@ ${request.requirements}` : preset.text,
             return;
           }
           state.saveFailed = true;
-          new import_obsidian36.Notice(t("ui.outline_import_map_save_failed", `${errorMessage5(cause)} (${kept.join(", ")})`));
+          new import_obsidian36.Notice(t("ui.outline_import_map_save_failed", `${errorMessage6(cause)} (${kept.join(", ")})`));
         };
         if (result.failure) return rollBack(new Error(result.failure));
         const top2 = created[0];
@@ -73722,7 +73805,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const stopped = controller.signal.aborted;
       this.settleTopicChat(
         entry,
-        stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", errorMessage5(error)),
+        stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", errorMessage6(error)),
         live2,
         !stopped,
         stopped ? "stopped" : "failed"
@@ -76044,7 +76127,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
                   id: child.id,
                   title: note.title,
                   status: batchSignal.aborted ? "stopped" : "failed",
-                  error: errorMessage5(error)
+                  error: errorMessage6(error)
                 });
                 throw error;
               }
@@ -78410,7 +78493,7 @@ ${note.detail.trim()}` : "",
     return {
       text: plainFailure(t("error.plain_chat_context"), error),
       wrapped: true,
-      technical: rawErrorText(error) || errorMessage5(error)
+      technical: rawErrorText(error) || errorMessage6(error)
     };
   }
   /** Sends the draft (see MapChatConversation). */
@@ -78655,7 +78738,7 @@ ${note.detail.trim()}` : "",
       this.markOwnFilesRecorded(record);
       return record;
     } catch (error) {
-      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage5(error)}`);
+      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage6(error)}`);
       return null;
     }
   }
@@ -78737,7 +78820,7 @@ ${note.detail.trim()}` : "",
     try {
       latest = await this.chatRecordSession.readLatest(this.plugin.repo.topicRoot(mapPath));
     } catch (error) {
-      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage5(error)}`);
+      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage6(error)}`);
       return;
     }
     if (!latest || latest.parsed.unrecoverable || this.closed || epoch !== this.chatRecordSession.epoch || chat !== this.chat || chat.hasMessages || chat.isBusy || this.chatApplying || this.path !== mapPath || ((_a2 = this.map) == null ? void 0 : _a2.id) !== map.id)
@@ -78956,7 +79039,7 @@ ${note.detail.trim()}` : "",
       );
       if (this.chat === chat) chat.appendLines(lines);
     } catch (error) {
-      if (this.chat === chat) chat.appendLines([{ status: "failed", text: errorMessage5(error) }]);
+      if (this.chat === chat) chat.appendLines([{ status: "failed", text: errorMessage6(error) }]);
     } finally {
       this.chatApplying = false;
     }
@@ -79182,7 +79265,7 @@ ${note.detail.trim()}` : "",
               box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own2, same2, run));
             });
         } catch (error) {
-          box.outcome = { status: "failed", reason: errorMessage5(error) };
+          box.outcome = { status: "failed", reason: errorMessage6(error) };
         }
         if (autoChain && box.outcome.status === "done" && action.kind === "create_md_file") {
           const key5 = normalizeVaultPath(action.path);
@@ -79379,7 +79462,7 @@ ${note.detail.trim()}` : "",
             }
           }
         } catch (error) {
-          outcome = { status: "failed", reason: errorMessage5(error) };
+          outcome = { status: "failed", reason: errorMessage6(error) };
         }
       }
       lines[index] = this.chatLine(label, outcome);
@@ -79473,7 +79556,7 @@ ${note.detail.trim()}` : "",
         opened = await this.chatSwitchTo(mapPath, anchor);
       });
     } catch (error) {
-      return { status: "failed", reason: errorMessage5(error), created: made.created };
+      return { status: "failed", reason: errorMessage6(error), created: made.created };
     }
     if (opened) return { status: "done" };
     return made.created ? { status: "skipped", reason: t("ui.map_chat_skip_map_not_opened"), created: true } : skipped("ui.map_chat_skip_map_changed");
@@ -79497,7 +79580,7 @@ ${note.detail.trim()}` : "",
         anchor.path = this.path;
       });
     } catch (error) {
-      return { status: "failed", reason: errorMessage5(error) };
+      return { status: "failed", reason: errorMessage6(error) };
     }
     return outcome;
   }
@@ -79544,7 +79627,7 @@ ${note.detail.trim()}` : "",
         opened ? { status: "done", text: t("ui.map_chat_choose_opened_0", topic.title) } : { status: "skipped", text: t("ui.map_chat_skip_map_changed") }
       ]);
     } catch (error) {
-      (_b2 = this.chat) == null ? void 0 : _b2.appendLines([{ status: "failed", text: errorMessage5(error) }]);
+      (_b2 = this.chat) == null ? void 0 : _b2.appendLines([{ status: "failed", text: errorMessage6(error) }]);
     } finally {
       this.chatApplying = false;
     }
@@ -79790,7 +79873,7 @@ ${note.detail.trim()}` : "",
       try {
         live2.write({ type: "event", turn: batch.turn, kind, ...extra });
       } catch (error) {
-        this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage5(error)}`);
+        this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage6(error)}`);
       }
     };
     const current = () => conversation === this.chatConversation;
@@ -80042,7 +80125,7 @@ ${note.detail.trim()}` : "",
               },
               (error) => {
                 errorNotice(error);
-                resolve({ status: "failed", reason: errorMessage5(error) });
+                resolve({ status: "failed", reason: errorMessage6(error) });
               }
             );
           }).then((outcome) => {
@@ -80204,7 +80287,7 @@ ${addition}` : addition },
             );
             outcome.result = { ok: true };
           } catch (error) {
-            outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage5(error)) };
+            outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage6(error)) };
             return;
           }
           if (cover) {
@@ -80225,7 +80308,7 @@ ${addition}` : addition },
         }
       });
     } catch (error) {
-      return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage5(error)) };
+      return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage6(error)) };
     }
     if (outcome.coverWritten) await this.refreshAfterSavedChange();
     return outcome.result;
@@ -80374,7 +80457,7 @@ ${addition}` : addition },
       written2.error = error;
     }
     if (written2.error !== void 0) {
-      const reason = t("ui.map_chat_save_failed_0", errorMessage5(written2.error));
+      const reason = t("ui.map_chat_save_failed_0", errorMessage6(written2.error));
       new import_obsidian36.Notice(reason);
       return { ok: false, reason };
     }
@@ -80448,7 +80531,7 @@ ${addition}` : addition },
     } catch (error) {
       if (controller.signal.aborted) return { status: "stopped" };
       new import_obsidian36.Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
-      return { status: "failed", reason: errorMessage5(error) };
+      return { status: "failed", reason: errorMessage6(error) };
     } finally {
       signal == null ? void 0 : signal.removeEventListener("abort", stopWithOwner);
       if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
@@ -80536,7 +80619,7 @@ ${addition}` : addition },
         );
       }).then(
         () => settle(skipped("ui.map_chat_skip_not_started")),
-        (error) => settle({ status: "failed", reason: errorMessage5(error) })
+        (error) => settle({ status: "failed", reason: errorMessage6(error) })
       );
     });
   }
@@ -88222,7 +88305,7 @@ async function saveShareFile(html, suggestedName, shouldWrite, env = browserSave
 }
 
 // experiences/sharing/share-modal.ts
-var errorMessage6 = (error) => {
+var errorMessage7 = (error) => {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : "";
 };
@@ -88559,7 +88642,7 @@ var ShareModal = class extends import_obsidian44.Modal {
       this.phase = "idle";
       this.estimateMemo = null;
       const stopped = abort.signal.aborted || (error == null ? void 0 : error.code) === "stopped";
-      this.translateNote = stopped ? t("share.translate_stopped") : t("share.translate_failed_0", errorMessage6(error).slice(0, 200));
+      this.translateNote = stopped ? t("share.translate_stopped") : t("share.translate_failed_0", errorMessage7(error).slice(0, 200));
       this.render();
     } finally {
       if (this.translateAbort === abort) this.translateAbort = null;

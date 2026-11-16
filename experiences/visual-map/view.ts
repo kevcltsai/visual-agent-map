@@ -519,8 +519,7 @@ import {
   restoreTopicChat,
   topicChatReadsSources,
   isSafeTopicNodeId,
-  type TopicChatLineInput,
-  type TopicRecordStatus
+  type TopicChatLineInput
 } from "../../core/topic-chat-records";
 import { MapChatTurnRecord, type TurnEndFields } from "./map-chat-turn-record";
 import {
@@ -529,7 +528,6 @@ import {
   chatResearchRequest,
   mapChoiceParts,
   matchMapTitle,
-  planFor,
   type MapChatImageMode
 } from "../../core/map-chat-plan";
 import {
@@ -604,14 +602,13 @@ import {
 import {
   TopicChatWindow,
   type TopicChatHost,
-  type TopicChatButtonKind,
-  type TopicChatChoice,
   type TopicChatKind,
   type TopicChatMode,
   type TopicChatTurn
 } from "./topic-chat";
 import type { ResearchObserver, ResearchSteer } from "../../ai/research-observer";
 import { TopicChatSteers } from "./topic-chat-steer";
+import { TopicChatRun, type TopicChatEntry, type TopicChatRunPorts } from "./topic-chat-run";
 import type { ResearchProgress } from "./research-progress";
 import type { ExpansionBatchState } from "./expansion-batch";
 import { canvasPointerIntent } from "./canvas-gestures";
@@ -997,37 +994,6 @@ interface ResearchWebTally {
   searches: number;
   counted: number;
   withoutSearch: number;
-}
-/** One topic's chat: the conversation lives here (not in the window), so a task that outlives a closed window can still tell its result. */
-interface TopicChatEntry {
-  nodeId: string;
-  mapId: string;
-  mapPath: string;
-  session: {
-    turns: TopicChatTurn[];
-    mode: TopicChatMode;
-    running: boolean;
-    draftKind: TopicChatButtonKind | null;
-    draftText: string;
-    /** The depth card of an integration over a deeper subtree, waiting for an answer; `turn` is the user line that asked. */
-    choice?: (TopicChatChoice & { text: string; turn: TopicChatTurn }) | null;
-    progress?: string;
-  };
-  watchers: Set<() => void>;
-  /** The id of the turn whose result is not written yet (null when idle). */
-  runningTurnId: string | null;
-  /** True while a submit is between its checks and its start; a second window of this entry cannot send twice. */
-  submitting?: boolean;
-  /** The additions typed while the current task runs. Created with `running = true`, in the same tick. */
-  steers?: TopicChatSteers;
-  /** Additions typed while a synthesis researched its subtopics first: they ride along in the integration's text (shown as taken in). */
-  steerFolded?: string[];
-  /** How the current task ended (set by `settleTopicChat`); `plan`: the reply needs a plan, so nothing is sent on. */
-  steerEnd?: { status: TopicRecordStatus; plan: boolean } | null;
-  /** A turn of this conversation sent the map's data sources: they are untrusted, so a later reply's writes need a plan (the same rule as after research). */
-  readsSources?: boolean;
-  /** The AbortController of the current run (the window's stop button aborts it). */
-  controller?: AbortController;
 }
 /** How the steps below the root of a subtree integration ended: `halt` set means the root is not integrated. */
 interface SubtreeChainOutcome {
@@ -1523,6 +1489,7 @@ export class VisualAgentMapView extends ItemView {
   private topicChatSessions = new Map<string, TopicChatEntry>();
   /** The one topic chat window that is open (not whether it is attached: a repaint takes it out for a moment). */
   private topicChatOpen: { entry: TopicChatEntry; win: TopicChatWindow } | null = null;
+  private readonly topicChatRun = new TopicChatRun(this.topicChatRunPorts());
   private disclosureSeq = 0;
   /** The AI structure review that hid its window. The view owns it: Stop, the result and the highlights. */
   private structureReviewTask: {
@@ -15395,67 +15362,6 @@ export class VisualAgentMapView extends ItemView {
     const views = [...folded.map(text => ({ text, state: "live" as const })), ...steers.views()];
     if (views.length || turn.steers) turn.steers = views;
   }
-  /** True when the task has additions of any kind: then `running` stays on until they are settled (the gap after the reply). */
-  private holdsTopicSteers(entry: TopicChatEntry): boolean {
-    return !!entry.steers?.entries.length || !!entry.steerFolded?.length;
-  }
-  /** Puts additions that were not sent back in front of the draft; a closed window (nothing shows it) says so when `notice`. */
-  private returnTopicSteers(entry: TopicChatEntry, texts: string[], notice: boolean): void {
-    if (!texts.length) return;
-    const draft = [...texts, entry.session.draftText].filter(Boolean).join("\n\n");
-    entry.session.draftText = draft;
-    const open = this.topicChatOpen?.entry === entry ? this.topicChatOpen.win : null;
-    if (open) open.setInputText(draft);
-    else if (notice) new Notice(t("ui.map_chat_not_sent_draft"));
-  }
-  /**
-   * After the task has settled with additions: wait for hand-overs to end (`close`), write the ones that went in, then either
-   * send the waiting ones as one new question (the reply was done and the view is the same) or put them back in the box.
-   * `running` stays true over all of it, so a second Enter can only add (queued), never start a run.
-   */
-  private async endTopicChatSteers(
-    entry: TopicChatEntry,
-    steers: TopicChatSteers,
-    turnId: string | null,
-    live: () => boolean
-  ): Promise<void> {
-    const end = entry.steerEnd ?? null;
-    const done = !!end && end.status === "done" && !end.plan;
-    const folded = entry.steerFolded ?? [];
-    const finish = (): void => {
-      entry.session.running = false;
-      this.notifyTopicChat(entry);
-    };
-    try {
-      await steers.close();
-      if (live() && turnId)
-        for (const text of [...(done ? folded : []), ...steers.delivered()])
-          this.writeTopicChatLine(entry, { type: "steer", id: turnId, at: new Date().toISOString(), text });
-      const node = this.map?.nodes.find(item => item.id === entry.nodeId);
-      if (done && live() && steers.entries.some(item => item.state === "queued")) {
-        if (node) {
-          entry.submitting = true;
-          try {
-            if (await this.submitTopicChatNow(entry, node, "ask", "", steers)) return;
-          } finally {
-            entry.submitting = false;
-          }
-        }
-        // Declined (usage question, lock, busy, a presentation, a deleted card, ...): the waiting texts are back in the box.
-        this.returnTopicSteers(entry, steers.takeQueued(), true);
-        finish();
-        return;
-      }
-      // Stopped, failed, a plan, a view that is gone, a deleted card, or nothing waiting.
-      this.returnTopicSteers(entry, [...(done ? [] : folded), ...steers.takeQueued()], false);
-      finish();
-    } catch {
-      // A follow-up that already started owns `running` now; otherwise the texts are back in the box and the entry is free.
-      if (entry.runningTurnId) return;
-      this.returnTopicSteers(entry, steers.takeQueued(), true);
-      finish();
-    }
-  }
   /** Runs one request to its end, then tells the result in one sentence (window open) or by Notice (window closed). */
   private async runTopicChatTask(
     entry: TopicChatEntry,
@@ -15476,7 +15382,7 @@ export class VisualAgentMapView extends ItemView {
     } finally {
       // No additions: `settleTopicChat` already freed the entry, exactly as before.
       if (entry.steers === steers && (steers.entries.length || entry.steerFolded?.length) && entry.session.running)
-        await this.endTopicChatSteers(entry, steers, turnId, live);
+        await this.topicChatRun.endSteers(entry, steers, turnId, live);
     }
   }
   private async runTopicChatBody(
@@ -15510,7 +15416,7 @@ export class VisualAgentMapView extends ItemView {
         this.map?.title
       );
       if (kind === "ask") {
-        await this.runTopicChatAsk(entry, node, note, mode, text, controller, language, live, hooks, steers);
+        await this.topicChatRun.ask(entry, node, note, mode, text, controller, language, live, hooks, steers);
         return;
       }
       if (kind === "expand") {
@@ -15969,110 +15875,6 @@ export class VisualAgentMapView extends ItemView {
       ...this.usageMapField()
     };
   }
-  /** A free question: one map-chat request about the topic; what the reply writes is checked against the subtree where it is applied. */
-  private async runTopicChatAsk(
-    entry: TopicChatEntry,
-    node: MapNode,
-    note: Note,
-    mode: TopicChatMode,
-    text: string,
-    controller: AbortController,
-    language: ContentLanguage,
-    live: () => boolean,
-    hooks: BackgroundHooks,
-    steers: TopicChatSteers
-  ): Promise<void> {
-    const key = `topic-chat-ask:${++mapChatTaskSequence}`;
-    let began = false;
-    const end = (): void => {
-      if (!began) return;
-      began = false;
-      this.plugin.activeTasks?.delete(key);
-      hooks.end();
-    };
-    try {
-      const request = await this.buildTopicChatRequest(entry, node, note, text, controller.signal);
-      began = true;
-      this.plugin.activeTasks?.set(key, controller);
-      hooks.begin(controller);
-      const result = await this.plugin.mapChat.chat(
-        request,
-        controller.signal,
-        () => {},
-        event => {
-          // Claude without a live stream (json, json-fallback) cannot take additions: they all wait for the end.
-          if (event.kind === "stream-mode" && event.mode !== "stream-json") steers.live(false);
-        },
-        send => steers.bind(send)
-      );
-      end();
-      // Hand-overs still on their way settle first: what the reply took in is final before it is applied or put in the history.
-      if (steers.entries.length) await steers.close();
-      if (controller.signal.aborted) {
-        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
-        return;
-      }
-      const map = this.map;
-      if (!live() || !map) {
-        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
-        return;
-      }
-      const verdicts = judgeTopicScope(result.actions, map.nodes, node.id);
-      const allowed = result.actions.filter((_, index) => verdicts[index] === "ok");
-      // A reply that would need the user's yes first (a plan) is not applied here: the side panel has the plan screen.
-      const plan = allowed.length
-        ? planFor(allowed, request.context, {
-            diagrams: this.plugin.settings.addDiagramsAfterResearch,
-            mapAiMode: map.aiMode,
-            chatReadSources: entry.readsSources === true
-          })
-        : null;
-      if (plan) {
-        this.settleTopicChat(entry, t("ui.topic_chat_too_big"), live, true, "done", true, true);
-        return;
-      }
-      const lines = allowed.length
-        ? await this.applyMapChatActions(
-            { ...result, message: [text, ...steers.delivered()].join("\n\n") },
-            request.context,
-            () => live() && !controller.signal.aborted,
-            { path: this.path, id: map.id },
-            {
-              context: request.context,
-              topicScope: {
-                rootId: node.id,
-                run: (action, targets) =>
-                  this.runTopicChatAction(action, targets, action.mode || mode, language, controller.signal)
-              }
-            }
-          )
-        : [];
-      const refused = verdicts.filter(verdict => verdict === "out").length;
-      // A reply that says it is done cannot hide an action that failed or was skipped: those lines are shown with it.
-      // Refused or ignored actions already have their say (the out-of-scope sentence, or silence), so only allowed ones and the lines added after the actions count.
-      const problems = lines.filter(
-        (line, index) => line.status !== "done" && (index >= result.actions.length || verdicts[index] === "ok")
-      );
-      let sentence = result.reply.trim() || lines.map(line => line.text).join("\n");
-      if (problems.length) sentence = [sentence, ...problems.map(line => line.text)].filter(Boolean).join("\n\n");
-      if (refused) sentence = [sentence, t("ui.topic_chat_out_of_scope")].filter(Boolean).join("\n\n");
-      if (!sentence) sentence = t("ui.topic_chat_result_unknown");
-      if (controller.signal.aborted)
-        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
-      else this.settleTopicChat(entry, sentence, live, true, problems.length ? "failed" : "done", true);
-    } catch (error) {
-      end();
-      const stopped = controller.signal.aborted;
-      this.settleTopicChat(
-        entry,
-        stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", this.chatErrorText(error).text),
-        live,
-        !stopped,
-        stopped ? "stopped" : "failed",
-        true
-      );
-    }
-  }
   /** Carries out a research, expansion or integration a free question asked for, on the topics it names (all inside the subtree). */
   private async runTopicChatAction(
     action: Extract<MapChatAction, { kind: "run_map_action" }>,
@@ -16137,35 +15939,32 @@ export class VisualAgentMapView extends ItemView {
   private topicChatOpenFor(entry: TopicChatEntry): boolean {
     return this.topicChatOpen?.entry === entry;
   }
-  /** Ends a run: the window (if open) shows one sentence; a closed window gets a Notice when `notice` says the task did not tell it. */
-  private settleTopicChat(
-    entry: TopicChatEntry,
-    sentence: string,
-    live: () => boolean,
-    notice: boolean,
-    status: TopicRecordStatus,
-    markdown = false,
-    plan = false
-  ): void {
-    // With additions the entry stays running over the gap until they are settled (`endTopicChatSteers` frees it).
-    if (!this.holdsTopicSteers(entry)) entry.session.running = false;
-    entry.steerEnd = { status, plan };
-    entry.session.progress = undefined;
-    const turnId = entry.runningTurnId;
-    entry.runningTurnId = null;
-    // Late-result fence: a view that closed or moved to another map writes nothing (its next open says the result is unknown).
-    if (!live()) return;
-    if (turnId)
-      this.writeTopicChatLine(entry, {
-        type: "result",
-        id: turnId,
-        at: new Date().toISOString(),
-        status,
-        text: sentence
-      });
-    entry.session.turns.push({ role: "ai", text: sentence, ...(markdown ? { markdown: true } : {}) });
-    this.notifyTopicChat(entry);
-    if (notice && !this.topicChatOpenFor(entry)) new Notice(sentence);
+  private settleTopicChat(...args: Parameters<TopicChatRun["settle"]>): void {
+    this.topicChatRun.settle(...args);
+  }
+  /** What the topic chat run needs of this view; every port reads the view when called (tests patch it). */
+  private topicChatRunPorts(): TopicChatRunPorts {
+    return {
+      closed: () => this.closed,
+      path: () => this.path,
+      map: () => this.map,
+      taskKey: () => `topic-chat-ask:${++mapChatTaskSequence}`,
+      registerTask: (key, controller) => this.plugin.activeTasks?.set(key, controller),
+      unregisterTask: key => this.plugin.activeTasks?.delete(key),
+      requestChat: (...a) => this.plugin.mapChat.chat(...a),
+      buildRequest: (e, n, no, m, s) => this.buildTopicChatRequest(e, n, no, m, s),
+      applyActions: (...a) => this.applyMapChatActions(...a),
+      runAction: (...a) => this.runTopicChatAction(...a),
+      errorText: e => this.chatErrorText(e),
+      notice: t => {
+        new Notice(t);
+      },
+      addDiagrams: () => this.plugin.settings.addDiagramsAfterResearch,
+      window: e => (this.topicChatOpen?.entry === e ? this.topicChatOpen.win : null),
+      notify: e => this.notifyTopicChat(e),
+      writeLine: (e, l) => this.writeTopicChatLine(e, l),
+      followUp: (e, n, s) => this.submitTopicChatNow(e, n, "ask", "", s)
+    };
   }
   private selectionTaskKey(): string {
     return `selection:${this.path}`;

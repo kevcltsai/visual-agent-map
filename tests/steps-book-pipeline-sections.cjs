@@ -86,3 +86,10 @@ test('replaceBookPlanSection: a heading inside a fence is not the section; markd
   assert.ok(!/^## Injected/m.test(out) && !/^# Top/m.test(out));
   assert.match(out, /### Injected\n### Top\nline/);
 });
+
+test('chapterBody: Research notes, Update log and Sources are not the chapter; a fenced heading and the chapter text stay', () => {
+  const detail = ['### 核心結論', '', 'Body line.', '', '```', '### 更新紀錄', '```', '', '最後一句。', '', '### 來源', '', '[^1]: a', '', '### 更新紀錄', '', '2026-11-17　已用新研究取代', '', '### 研究備註', '', '> [!note]- 研究備註', '> 校對'].join('\n');
+  assert.equal(sections.chapterBody(detail), ['### 核心結論', '', 'Body line.', '', '```', '### 更新紀錄', '```', '', '最後一句。'].join('\n'));
+  assert.equal(sections.chapterBody('### Sources\n\n- a\n\n### Update log\n\nx\n\n### Research notes\n\n> y'), '');
+  assert.equal(sections.chapterBody('Plain text\n'), 'Plain text');
+});

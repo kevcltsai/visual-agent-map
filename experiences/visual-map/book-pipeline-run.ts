@@ -49,7 +49,7 @@ import {
   appendResearchNote,
   findStoredProof,
   replaceBookPlanSection,
-  withoutResearchNotes
+  chapterBody
 } from "../../core/book-pipeline/note-sections";
 import {
   composeBookPlan,
@@ -58,7 +58,13 @@ import {
   parseBookPlanDecisions,
   parseChecklist
 } from "../../core/book-pipeline/plan-text";
-import { composeProofRecord, isProofFailure, proofKey, type ProofResult } from "../../core/book-pipeline/proof";
+import {
+  composeProofRecord,
+  failedProofKey,
+  isProofFailure,
+  proofKey,
+  type ProofResult
+} from "../../core/book-pipeline/proof";
 import { effectiveSettings } from "../../core/book-pipeline/settings";
 import { escapeMarkdownText, unescapeMarkdownText } from "../../core/book-pipeline/text";
 import type { ReasoningLevel } from "../../ai/types";
@@ -1033,7 +1039,7 @@ export class BookPipelineRuns {
     if (!info) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
     const checklist = parseChecklist(card.prompt);
-    const body = withoutResearchNotes(card.detail);
+    const body = chapterBody(card.detail);
     if (!checklist.length) return { kind: "failed", reason: "empty_list" };
     if (!body.trim()) return { kind: "failed", reason: "no_body" };
     const key = proofKey({
@@ -1045,13 +1051,24 @@ export class BookPipelineRuns {
     });
     let result: ProofResult | undefined = findStoredProof(card.detail, key);
     if (!result) {
-      result = await untilAborted(
-        signal,
-        this.ports.runProofread(
+      // A whole-card failure keeps the judgments already made (the structure items) in the research notes; the card still needs a human.
+      const call = this.ports
+        .runProofread(
           { ...this.base(drive, drive.config.proofModel), body, checklist },
           { signal, admission: drive.admission }
         )
-      );
+        .catch(async (error: unknown) => {
+          if (isProofFailure(error) && error.partial && !signal.aborted)
+            await this.keepPartialProof(
+              drive,
+              token,
+              nodeId,
+              card,
+              composeProofRecord(failedProofKey(key), error.partial, error.code)
+            );
+          throw error;
+        });
+      result = await untilAborted(signal, call);
       const path = await this.stillOnMap(drive, nodeId);
       if (!path) return { kind: "failed", reason: "card_removed" };
       if (!(await this.ensureBackup(drive, nodeId, path, card.raw)))
@@ -1082,6 +1099,29 @@ export class BookPipelineRuns {
             : null
         )
     };
+  }
+
+  /** Best effort: appends the failed proof's partial record once (its own key), under the same guards as every card write. Never throws. */
+  private async keepPartialProof(
+    drive: Drive,
+    token: StepToken,
+    nodeId: string,
+    card: { raw: string; detail: string },
+    record: string
+  ): Promise<void> {
+    try {
+      const path = await this.stillOnMap(drive, nodeId);
+      if (!path || !(await this.ensureBackup(drive, nodeId, path, card.raw))) return;
+      const added = appendResearchNote(card.detail, record);
+      if (added.appended)
+        await this.ports.updateNoteGuarded(
+          path,
+          { detail: added.text },
+          { expectedContent: card.raw, authorize: this.authorize(drive, token) }
+        );
+    } catch {
+      // The failure itself is still reported; the partial record is only a help for the reader.
+    }
   }
 
   // ---- progress and log --------------------------------------------------------------------------------------------------------

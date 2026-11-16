@@ -348,3 +348,47 @@ test('pipeline log line: only ids, counts, codes and milliseconds', () => {
   const hostile = pipelineLog.formatPipelineLog({ event: `x ${TITLE}`, runId: 'r', card: 'global', step: 'plan', attempt: -1, result: `bad ${BODY}`, ms: -5 });
   assert.match(hostile, /^book-pipeline \S+ run=r card=global step=plan attempt=0 result=\S+ ms=0$/);
 });
+
+test('card plan: an unconditional picture requirement is dropped by program, a conditional one stays, none left is a failure', () => {
+  const request = { ...base, thread: 't', settings: {}, materials: [], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
+  const good = list => JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: list });
+  const result = plain(cardPlan.cardPlanStep.parse(good([
+    { type: 'structure', text: '本章以圖為主、文字為輔' },
+    { type: 'structure', text: 'The chapter is illustrated with pictures' },
+    { type: 'structure', text: '本章結尾承接下一張的問題' },
+    { type: 'structure', text: '若找得到可載入的 https 圖片才放圖；沒有就寫「無圖：原因」' },
+    { type: 'fact', text: '地圖上的年代正確' }
+  ]), request));
+  assert.deepEqual(result.checklist.map(c => `${c.id}:${c.text}`), ['C1:本章結尾承接下一張的問題', 'C2:若找得到可載入的 https 圖片才放圖；沒有就寫「無圖：原因」', 'C3:地圖上的年代正確']);
+  assert.throws(() => cardPlan.cardPlanStep.parse(good([{ type: 'structure', text: 'Uses an image per section' }]), request), /no usable item/);
+});
+
+test('card plan and proofread prompts: only objective items, picture items conditional, no-picture is met, system sections are not the ending', () => {
+  const text = fs.readFileSync(path.join(__dirname, '..', 'core/steps/book-pipeline/card-plan.md'), 'utf8');
+  assert.match(text, /Not allowed: anything subjective or about style/); assert.match(text, /never require pictures/);
+  const proofText = fs.readFileSync(path.join(__dirname, '..', 'core/steps/book-pipeline/proofread.md'), 'utf8');
+  assert.match(proofText, /WebFetch/); assert.match(proofText, /meets a picture item unless the item explicitly requires/); assert.match(proofText, /update log and source list are not part of it/);
+});
+
+test('proofread: a whole-card failure carries the judged items as a partial result that is never "checked"; its record has its own key and marks the failure', () => {
+  const opened = ['https://example.org/a'];
+  let error;
+  try { proof.evaluateProof([item('C1', 'unmet'), item('C2', 'met', ['https://spoofed.example/z'])], checklist, opened); } catch (e) { error = e; }
+  assert.equal(error.code, 'all_facts_unverified');
+  assert.deepEqual(plain(error.partial.items).map(i => `${i.id}:${i.status}`), ['C1:unmet', 'C2:unverified']);
+  assert.equal(error.partial.aggregate, 'needs-review');
+  try { proof.evaluateProof([item('C1'), item('C2', 'met', ['https://example.org/a'])], checklist, []); } catch (e) { error = e; }
+  assert.equal(error.code, 'no_open_page'); assert.equal(error.partial.aggregate, 'needs-review');
+  const key = proof.proofKey({ runId: 'r', nodeId: 'n', revision: 1, body: 'b', checklist });
+  const record = proof.composeProofRecord(proof.failedProofKey(key), error.partial, error.code);
+  assert.match(record, /^校對失敗（原因：no_open_page；以下是已判斷的結果，仍需人看）/);
+  assert.equal(proof.findProofRecord(record, key), undefined, 'a finished proof is never mistaken for the failed one');
+  assert.ok(proof.findProofRecord(record, proof.failedProofKey(key)));
+});
+
+test('author requirements: the fixed chapter rules always come first, the settings after', () => {
+  const none = settings.bookAuthorRequirements({});
+  assert.match(none, /Open by picking up the brief's entry point/); assert.match(none, /End with one sentence that leads into the next card/); assert.match(none, /Do not end the chapter with an update log/);
+  const some = settings.bookAuthorRequirements({ tone: 'warm' });
+  assert.ok(some.startsWith(none)); assert.match(some, /- tone: warm/);
+});

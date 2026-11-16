@@ -7,7 +7,7 @@ const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages
 const { BudgetExhaustedError } = S.load('core/admission.ts');
 const { readBookPipeline } = S.load('core/book-pipeline/model.ts');
 const { cardRevision } = S.load('core/book-pipeline/machine.ts');
-const { proofKey } = S.load('core/book-pipeline/proof.ts');
+const { proofKey, evaluateProof } = S.load('core/book-pipeline/proof.ts');
 const { findStoredProof, withoutResearchNotes } = S.load('core/book-pipeline/note-sections.ts');
 const { parseChecklist } = S.load('core/book-pipeline/plan-text.ts');
 
@@ -518,4 +518,18 @@ test('start is refused while a conversation holds the map, and a busy map refuse
   await settle();
   await assert.rejects(() => q.runs.resume(q.mapPath), e => e.code === 'busy');
   await q.runs.stop(q.mapPath); hold.resolve(); await running;
+});
+
+test('a whole-card proof failure keeps the judged structure items in the research notes and still needs a person', async () => {
+  const facts = [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'fact', text: 'a date' }];
+  const r = await rig({ script: {
+    card: request => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: facts }),
+    proof: async request => evaluateProof(request.checklist.map(c => ({ id: c.id, status: 'met', note: 'judged ' + c.id, sources: [] })), request.checklist, ['https://example.org/p']) } });
+  await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath);
+  const raw = r.raw(1);
+  assert.equal(stageOf(raw), 'needs-review');
+  assert.equal(r.stat.proof.length >= 3, true);
+  assert.match(raw, /校對失敗（原因：all_facts_unverified/);
+  assert.match(raw, /C1 達成：judged C1/);
+  assert.equal((raw.match(/book-proof:v1/g) ?? []).length, 1, 'the same failure is recorded once across retries');
 });

@@ -41,7 +41,14 @@ export type ProofFailureCode =
   | "all_facts_unverified";
 /** A whole-card failure (retry, three times, then needs-review). The message is the code only. */
 export class ProofFailure extends Error {
-  constructor(readonly code: ProofFailureCode) {
+  /**
+   * The judgments already made when the failure is "no page opened" or "all facts unverified": the structure items are real
+   * results, so the caller keeps them in the research notes (the card still needs a human).
+   */
+  constructor(
+    readonly code: ProofFailureCode,
+    readonly partial?: ProofResult
+  ) {
     super(code);
     this.name = "ProofFailure";
   }
@@ -135,7 +142,7 @@ export function evaluateProof(
     else if (!opened.has(key)) opened.set(key, href);
   }
   // A leaked page is no source; only items citing it drop to unverified.
-  if (!opened.size && !leakedKeys.size) throw new ProofFailure("no_open_page");
+  const noPage = !opened.size && !leakedKeys.size;
   const items: ProofItemResult[] = checklist.map(entry => {
     const item = raw.find(candidate => candidate.id === entry.id) as RawProofItem;
     const sources: string[] = [];
@@ -153,8 +160,16 @@ export function evaluateProof(
     return { id: entry.id, type: entry.type, status, note, sources };
   });
   const facts = items.filter(item => item.type === "fact");
-  if (facts.length && facts.every(item => item.status === "unverified")) throw new ProofFailure("all_facts_unverified");
-  return { items, aggregate: items.some(item => item.status === "unmet") ? "needs-review" : "checked" };
+  const result: ProofResult = {
+    items,
+    aggregate: items.some(item => item.status === "unmet") ? "needs-review" : "checked"
+  };
+  // The partial result of a whole-card failure never reads as checked: the card needs a human.
+  const partial: ProofResult = { items, aggregate: "needs-review" };
+  if (noPage) throw new ProofFailure("no_open_page", partial);
+  if (facts.length && facts.every(item => item.status === "unverified"))
+    throw new ProofFailure("all_facts_unverified", partial);
+  return result;
 }
 
 export interface ProofKeyParts {
@@ -164,6 +179,9 @@ export interface ProofKeyParts {
   body: string;
   checklist: readonly ChecklistItem[];
 }
+/** The key a failed proof's partial record is stored under: never the key of a finished proof, so a retry is not skipped. */
+export const failedProofKey = (key: string): string => `${key}:failed`;
+
 /** `runId:card:revision:body hash:checklist hash`. */
 export function proofKey(parts: ProofKeyParts): string {
   const list = hashText(JSON.stringify(parts.checklist.map(item => [item.id, item.type, item.text])));
@@ -178,7 +196,7 @@ const STATUS_WORDS: Record<ProofStatus, string> = { met: "達成", unmet: "未�
  * The lines appended to the research notes for one proof: readable plain lines and one machine record. The only place the
  * note and sources are made safe (escaped text; https addresses as inline code, so nothing is clickable or loadable).
  */
-export function composeProofRecord(key: string, result: ProofResult): string {
+export function composeProofRecord(key: string, result: ProofResult, failure?: ProofFailureCode): string {
   // Re-checked here too: whatever the result holds, the note only ever gets escaped text and inline-code https addresses.
   const clean: ProofResult = {
     aggregate: result.aggregate,
@@ -190,12 +208,18 @@ export function composeProofRecord(key: string, result: ProofResult): string {
       sources: item.sources.map(safeHref).filter((href): href is string => !!href)
     }))
   };
-  const lines = [`校對（${clean.aggregate === "checked" ? "已校" : "需人看"}）`];
+  const lines = [
+    failure
+      ? `校對失敗（原因：${failure}；以下是已判斷的結果，仍需人看）`
+      : `校對（${clean.aggregate === "checked" ? "已校" : "需人看"}）`
+  ];
   for (const item of clean.items)
     lines.push(
       `- ${item.id} ${STATUS_WORDS[item.status]}：${item.note}${item.sources.length ? `（${item.sources.map(href => `\`${href}\``).join(" ")}）` : ""}`
     );
-  lines.push(`<!-- book-proof:v1 ${escapeJson(JSON.stringify({ key, result: clean }))} -->`);
+  lines.push(
+    `<!-- book-proof:v1 ${escapeJson(JSON.stringify({ key, result: clean, ...(failure ? { failed: failure } : {}) }))} -->`
+  );
   return lines.join("\n");
 }
 

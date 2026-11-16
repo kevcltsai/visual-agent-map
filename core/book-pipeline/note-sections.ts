@@ -2,7 +2,7 @@
  * Pure edits of the two note sections the picture-book pipeline owns: the Research notes section of a card's Detail (the
  * folded callout that holds the proof records) and the `## 全書企劃` section of the root note. Nothing else in the text is touched.
  */
-import { isResearchNotesHeading } from "../../ai/section-aliases";
+import { isNewSourcesHeading, isResearchNotesHeading, SECTION_NAME } from "../../ai/section-aliases";
 import { demoteHeadings } from "./text";
 import { findProofRecord } from "./proof";
 
@@ -147,4 +147,23 @@ export function replaceBookPlanSection(content: string, markdown: string): strin
   const before = lines.slice(0, section.at).join("\n");
   const after = lines.slice(section.end).join("\n");
   return `${before ? `${before}\n` : ""}${entry}${after ? `\n\n${after}` : "\n"}`;
+}
+
+const isUpdateLogHeading = (text: string): boolean =>
+  [SECTION_NAME.log.zh, SECTION_NAME.log.en].some(name => name.toLowerCase() === text.trim().toLowerCase());
+const isSystemSection = (text: string): boolean =>
+  isResearchNotesHeading(text) || isUpdateLogHeading(text) || isNewSourcesHeading(text);
+
+/**
+ * The chapter text alone: the Detail without the sections the system adds or keeps (Research notes, Update log, Sources).
+ * The proofread sees and keys on this, so a system line is never taken for the chapter's ending.
+ */
+export function chapterBody(detail: string): string {
+  let lines = detail.split("\n");
+  for (;;) {
+    const section = findSection(lines, fencedLines(lines), text => isSystemSection(text));
+    if (!section) break;
+    lines = [...lines.slice(0, section.at), ...lines.slice(section.end)];
+  }
+  return lines.join("\n").replace(/\s+$/, "");
 }

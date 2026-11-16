@@ -1,5 +1,5 @@
 import type { BookRole, BookSettings } from "../../book-pipeline/model";
-import type { ChecklistItem } from "../../book-pipeline/plan-text";
+import type { ChecklistItem, ChecklistType } from "../../book-pipeline/plan-text";
 import { singleLine } from "../../book-pipeline/text";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import {
@@ -64,21 +64,27 @@ export const CARD_PLAN_SCHEMA = {
   required: ["covers", "entry", "handoff", "previous", "next", "checklist"]
 };
 
+const PICTURE =
+  /以圖為主|圖文並茂|圖片|圖像|插圖|配圖|附圖|有圖|\b(?:images?|pictures?|illustrations?|photos?|diagrams?)\b/i;
+const CONDITION = /無圖|沒有圖|没有图|找不到|若|如果|如有|有找到|\b(?:if|when|unless|no (?:image|picture)|without)\b/i;
+/** A picture item that is not conditional: the first author version has no image step, so it could never be met. */
+const unconditionalPicture = (text: string): boolean => PICTURE.test(text) && !CONDITION.test(text);
+
 export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanResult {
   const item = parseJson(raw);
   exactKeys(item, ["covers", "entry", "handoff", "previous", "next", "checklist"]);
   const entries = arrayOf(item.checklist, "checklist");
   if (entries.length < 1 || entries.length > MAX_CHECKLIST) fail(`checklist must have 1 to ${MAX_CHECKLIST} items`);
-  const checklist = entries.map((entry, index): ChecklistItem => {
+  const parsed = entries.map((entry): { type: ChecklistType; text: string } => {
     const one = recordOf(entry, "checklist item");
     exactKeys(one, ["type", "text"]);
     if (one.type !== "structure" && one.type !== "fact") return fail("unknown checklist type");
-    return {
-      id: `C${index + 1}`,
-      type: one.type,
-      text: singleLine(textOf(one.text, "checklist text"))
-    };
+    return { type: one.type, text: singleLine(textOf(one.text, "checklist text")) };
   });
+  // Unconditional picture requirements are dropped by program (never rewritten); a plan with nothing left is a failure (retried).
+  const kept = parsed.filter(item => !unconditionalPicture(item.text));
+  if (!kept.length) fail("checklist has no usable item");
+  const checklist = kept.map((item, index): ChecklistItem => ({ id: `C${index + 1}`, ...item }));
   const side = (value: unknown, present: boolean, what: string): string =>
     present ? singleLine(textOf(value, what), 240) : "";
   return {

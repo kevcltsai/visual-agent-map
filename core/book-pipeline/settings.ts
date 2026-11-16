@@ -20,8 +20,19 @@ export function settingsVersion(settings: BookSettings): string {
   return hashText(JSON.stringify(BOOK_SETTING_FIELDS.map(field => settings[field] ?? "")));
 }
 
-/** The effective whole-book settings as the author's extra requirements (empty when the owner set none). */
+/** What every chapter's author is told besides the card's own brief: the role, the opening, the ending, and no log-style ending. */
+export const BOOK_AUTHOR_RULES = [
+  "Chapter writing rules (follow them):",
+  "- Write the chapter as the role named in the brief says.",
+  "- Open by picking up the brief's entry point (how this chapter continues from the previous card).",
+  "- End with one sentence that leads into the next card, taking up the question the brief leaves for it.",
+  '- Do not end the chapter with an update log, a change note or a "this version" remark; those are added by the system.'
+].join("\n");
+
+/** The author's extra requirements: the fixed chapter rules, then the effective whole-book settings (when the owner set any). */
 export function bookAuthorRequirements(settings: BookSettings): string {
   const lines = BOOK_SETTING_FIELDS.filter(field => settings[field]).map(field => `- ${field}: ${settings[field]}`);
-  return lines.length ? `Whole-book settings (follow them):\n${lines.join("\n")}` : "";
+  return lines.length
+    ? `${BOOK_AUTHOR_RULES}\n\nWhole-book settings (follow them):\n${lines.join("\n")}`
+    : BOOK_AUTHOR_RULES;
 }

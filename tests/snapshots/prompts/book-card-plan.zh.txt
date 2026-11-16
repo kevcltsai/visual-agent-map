@@ -5,7 +5,10 @@ Write the brief the chapter's author will follow and the proofreader will check:
 - entry: how the chapter picks up from the previous card, one sentence (for the first card: how it opens the book).
 - handoff: the open question this chapter leaves for the next card, one sentence (for the last card: how the book closes).
 - previous and next: one sentence each about the neighbouring card as it matters to this chapter; an empty string when there is no such card.
-- checklist: 2 to 8 acceptance items. Each is one checkable statement about the finished chapter, with a type: structure (about the chapter's shape, scope or coverage, checkable from its text alone) or fact (a concrete claim that must hold in outside sources, such as a date, name or number). A chapter that only orients the reader may have structure items only. Do not number the items and do not write ids.
+- checklist: 2 to 8 acceptance items. Each is one objectively checkable statement about the finished chapter, with a type: structure (about the chapter's shape, scope or coverage, checkable from its text alone) or fact (a concrete claim that must hold in outside sources, such as a date, name or number). A chapter that only orients the reader may have structure items only. Do not number the items and do not write ids.
+  - Allowed: what the chapter covers, what it leaves out, the order of its parts, that it picks up the entry point at its opening and takes up the question left for the next card at its ending, and facts that outside sources can confirm.
+  - Not allowed: anything subjective or about style (tone, voice, readability, "plain" or "friendly" wording, a required opening or closing sentence pattern such as a question), and any requirement on exact wording.
+  - Pictures: the author step has no image search, so never require pictures. If you mention one at all, write it only as a condition: "if a loadable https image is found, it sits next to the passage it supports; if none, a line 'No picture: reason' is acceptable and counts as met".
 
 The chapter's role is fixed by the plan: do not change it. Use plain single-line text in every field and no Markdown headings. Use only numbers and links that appear in the supplied text.
 

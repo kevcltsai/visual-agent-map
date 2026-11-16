@@ -88,7 +88,11 @@ export function cardRevision(data: BookPipelineData, nodeId: string): number {
  * What may start now, from the saved state and the cards' stages (a card that is already in flight is the caller's business:
  * pass its node id in `busy` and it is skipped). Idempotent: running it twice without a reducer in between gives the same plan.
  */
-export function nextActions(data: BookPipelineData, stages: CardStages, busy: ReadonlySet<string> = new Set()): PipelinePlan {
+export function nextActions(
+  data: BookPipelineData,
+  stages: CardStages,
+  busy: ReadonlySet<string> = new Set()
+): PipelinePlan {
   if (data.status === "stopped") return { actions: [], hold: data.pauseReason === "budget" ? "budget" : "stopped" };
   if (data.phase === "done") return { actions: [], hold: "done" };
   if (!data.order.length) return { actions: [], hold: "empty" };
@@ -352,7 +356,9 @@ export class PipelineStore {
     this.disposed = true;
   }
   /** Applies `change` to the latest state. Its result is saved first, then becomes current; returns whether it was kept. */
-  commit<T extends { state: BookPipelineData; accepted?: boolean }>(change: (data: BookPipelineData) => T): Promise<T | null> {
+  commit<T extends { state: BookPipelineData; accepted?: boolean }>(
+    change: (data: BookPipelineData) => T
+  ): Promise<T | null> {
     const run = this.queue.then(async () => {
       if (this.disposed) return null;
       const result = change(this.current);

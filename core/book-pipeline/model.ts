@@ -105,7 +105,7 @@ export function bookSettingsFrontmatter(patch: BookSettingsPatch): Record<string
   for (const field of BOOK_SETTING_FIELDS) {
     const value = patch[field];
     if (value === undefined) continue;
-    const line = value === null ? null : (value.replace(/\s+/g, " ").trim() || null);
+    const line = value === null ? null : value.replace(/\s+/g, " ").trim() || null;
     values[`book-${field}`] = line;
   }
   return values;
@@ -130,7 +130,7 @@ export interface BookPipelineData {
   pauseReason?: "budget";
   order: string[];
   globalPlanned: boolean;
-  attempts: { "global": number } & Record<string, StepAttempts | number>;
+  attempts: { global: number } & Record<string, StepAttempts | number>;
   /** Per card, raised by every successful plan or write; a result carries the one it started under. */
   revisions: Record<string, number>;
   /** Cards whose stage is stale from an earlier run and must be cleared before anything else (idempotent). */
@@ -143,9 +143,7 @@ export interface BookPipelineData {
 }
 
 export type BookPipelineRead =
-  | { kind: "absent" }
-  | { kind: "usable"; data: BookPipelineData }
-  | { kind: "unusable"; reason: string; raw: unknown };
+  { kind: "absent" } | { kind: "usable"; data: BookPipelineData } | { kind: "unusable"; reason: string; raw: unknown };
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
@@ -167,7 +165,10 @@ function problem(raw: unknown): string | undefined {
     if (!isObject(value) || STEPS.some(step => !isCount(value[step]))) return "attempts entry";
   }
   if (!isObject(raw.revisions) || Object.values(raw.revisions).some(value => !isCount(value))) return "revisions";
-  if (raw.pendingReset !== undefined && (!Array.isArray(raw.pendingReset) || raw.pendingReset.some(id => typeof id !== "string")))
+  if (
+    raw.pendingReset !== undefined &&
+    (!Array.isArray(raw.pendingReset) || raw.pendingReset.some(id => typeof id !== "string"))
+  )
     return "pendingReset";
   if (!isObject(raw.budget) || !isCount(raw.budget.used) || !isCount(raw.budget.limit) || raw.budget.limit < 1)
     return "budget";

@@ -96,7 +96,10 @@ test('renderNode and refreshCard: managed cards skip the summary, the add-summar
   // Baseline 11 on 4728cbcd; main's partial-repaint commit ffd32778 added one call site, this feature adds none.
   assert.equal(view.split('\n').filter(line => line.includes('drawEdges')).length, 12, 'no new drawEdges call sites');
   // 23 before the subtree chain; it checks the AI lock before each step (one more call site, same guard, no new AI entry).
-  assert.equal(view.split('\n').filter(line => line.includes('aiLockReason(')).length, 24);
+  // The two goal-suggest guards (show filter, stale check) moved to goal-suggest.ts behind the lockedParent port: 24 - 2 + 1.
+  assert.equal(view.split('\n').filter(line => line.includes('aiLockReason(')).length, 23);
+  const goalSuggest = fs.readFileSync(path.join(root, 'experiences/visual-map/goal-suggest.ts'), 'utf8');
+  assert.equal(goalSuggest.split('\n').filter(line => line.includes('this.ports.lockedParent(')).length, 2);
 });
 
 test('lock panel: a managed card shows locked and disabled with the managed text; a free card keeps the switch', async () => {

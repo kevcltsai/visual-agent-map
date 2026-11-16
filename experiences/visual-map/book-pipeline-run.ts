@@ -286,14 +286,18 @@ const neutralize = (text: string): string =>
  * Only a line that is one comment with a JSON payload holding no `<` and no `-->` is held back; any other `<!--` is cleaned as before.
  */
 const PROOF_LINE = /^(?:[ \t]{0,3}>[ \t]?)?<!-- book-proof:v1 (\{[^<]*\}) -->$/;
-function holdProofLines(content: string): { text: string; restore: (cleaned: string) => string } {
+function holdProofLines(
+  content: string,
+  known: ReadonlySet<string>
+): { text: string; restore: (cleaned: string) => string } {
   const held: string[] = [];
   const token = `VAMPROOFLINE${Math.random().toString(36).slice(2)}X`;
   const text = content
     .split("\n")
     .map(line => {
       const m = PROOF_LINE.exec(line.replace(/\r$/, ""));
-      if (!m || m[1].includes("-->")) return line;
+      // Only a line that was already in the card before the author ran: a record the author wrote is model text, never a stored proof.
+      if (!m || m[1].includes("-->") || !known.has(line)) return line;
       try {
         JSON.parse(m[1]);
       } catch {
@@ -1281,9 +1285,10 @@ export class BookPipelineRuns {
     const authorize = this.authorize(drive, token);
     // The body is cleaned inside the author's own write (same `vault.process`): only standard https pictures are ever saved, and
     // an unsafe body is refused whole, so the card keeps its text from before this step.
+    const knownLines: ReadonlySet<string> = new Set(card.raw.split("\n"));
     let unsafe = false;
     const finalize = (original: string): string | null => {
-      const { text: content, restore } = holdProofLines(original);
+      const { text: content, restore } = holdProofLines(original, knownLines);
       const urls = bodyImageUrls(content);
       const unsafeUrls = new Map(
         urls.filter(url => !isHttps(url)).map(url => [url, noPicture(drive.config.language, "unsafe")])
@@ -1330,7 +1335,7 @@ export class BookPipelineRuns {
       if (!probed.ok) replacements.set(url, noPicture(drive.config.language, probed.reason));
     }
     if (replacements.size) {
-      const held = holdProofLines(written.raw);
+      const held = holdProofLines(written.raw, knownLines);
       const cleaned = held.restore(replaceBodyImages(held.text, replacements));
       const outcome = await this.ports.updateNoteRawGuarded(path, () => cleaned, {
         expectedContent: written.raw,

@@ -48408,12 +48408,12 @@ var frontmatterLength = (content) => {
 var labelOf = (value) => value.trim().replace(/\s+/g, " ").toLowerCase();
 var neutralize = (text10) => text10.replace(/<(?=[A-Za-z/!?]|$)(?!!-- visual-agent-map:(?:detail|references):(?:start|end) -->)/g, "&lt;");
 var PROOF_LINE = /^(?:[ \t]{0,3}>[ \t]?)?<!-- book-proof:v1 (\{[^<]*\}) -->$/;
-function holdProofLines(content) {
+function holdProofLines(content, known) {
   const held = [];
   const token = `VAMPROOFLINE${Math.random().toString(36).slice(2)}X`;
   const text10 = content.split("\n").map((line2) => {
     const m = PROOF_LINE.exec(line2.replace(/\r$/, ""));
-    if (!m || m[1].includes("-->")) return line2;
+    if (!m || m[1].includes("-->") || !known.has(line2)) return line2;
     try {
       JSON.parse(m[1]);
     } catch (e) {
@@ -49308,9 +49308,10 @@ var BookPipelineRuns = class {
     if (!await this.ensureBackup(drive, nodeId, info.path, card.raw))
       return { kind: "failed", reason: "backup_failed", forceReview: true };
     const authorize = this.authorize(drive, token);
+    const knownLines = new Set(card.raw.split("\n"));
     let unsafe = false;
     const finalize = (original) => {
-      const { text: content, restore } = holdProofLines(original);
+      const { text: content, restore } = holdProofLines(original, knownLines);
       const urls2 = bodyImageUrls(content);
       const unsafeUrls = new Map(
         urls2.filter((url) => !isHttps(url)).map((url) => [url, noPicture(drive.config.language, "unsafe")])
@@ -49355,7 +49356,7 @@ var BookPipelineRuns = class {
       if (!probed.ok) replacements.set(url, noPicture(drive.config.language, probed.reason));
     }
     if (replacements.size) {
-      const held = holdProofLines(written2.raw);
+      const held = holdProofLines(written2.raw, knownLines);
       const cleaned = held.restore(replaceBodyImages(held.text, replacements));
       const outcome = await this.ports.updateNoteRawGuarded(path, () => cleaned, {
         expectedContent: written2.raw,

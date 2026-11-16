@@ -698,7 +698,7 @@ async function stackRig(width, chat, state, host = HOSTS[0]) {
   if (state.sources) {
     const button = element('button'); tools.appendChild(button);
     sources = element('div', 'vam-map-sources-panel'); tools.appendChild(sources);
-    Object.assign(view, { mapSourcesToolsEl: tools, mapSourcesButtonEl: button, mapSourcesPanelEl: sources, mapSourcesOpen: true });
+    Object.assign(view.mapSourcesControl, { mapSourcesToolsEl: tools, mapSourcesButtonEl: button, mapSourcesPanelEl: sources, mapSourcesOpen: true });
     button.getBoundingClientRect = () => { const t = toolsRect(); return R(t.left + (state.hover ? 110 : 35), t.top + 3, t.right - 3, t.bottom - 3); };
     Object.defineProperty(sources, 'offsetHeight', { get() { const max = px(this.style['--vam-sources-max']); return max === null ? state.sources : Math.min(state.sources, max); } });
     sources.getBoundingClientRect = () => { const t = toolsRect(), top = t.bottom + 6, left = t.left + (px(sources.style.left) ?? 0) + 1; return R(left, top, left + (px(sources.style.width) ?? 440), top + sources.offsetHeight); };

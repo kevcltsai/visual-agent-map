@@ -39,23 +39,19 @@ import {
   updateTextNode,
   addAnchor,
   addAnchorRelation,
-  anchorRelationAllowed,
   anchorRelationsForTopic,
   ANCHOR_LIMIT,
   convertToAnnotatedImage,
   convertToPlainImage,
   isImage2dAnchor,
   removeAnchor,
-  removeAnchorRelation,
   updateAnchor,
-  updateAnchorRelation,
   findAnnotatedImage,
   isAnnotatedImage,
   setImageNote,
   IMAGE_MIN_SIZE,
   LINK_LIMIT,
   TEXT_LIMIT,
-  type AnchorRelation,
   type AnnotatedImageItem,
   type BoundaryItem,
   type CanvasItem,
@@ -64,13 +60,7 @@ import {
   type SummaryRefusal,
   type TextItem
 } from "./canvas-items";
-import {
-  AnchorModal,
-  AnchorPickModal,
-  ImageNoteModal,
-  type AnchorPickEntry,
-  type AnchorTarget
-} from "./annotated-image-modals";
+import { AnchorModal, ImageNoteModal, type AnchorTarget } from "./annotated-image-modals";
 import {
   avoidBracketObstacles,
   bracketGeometry,
@@ -80,26 +70,8 @@ import {
 } from "./summary-bracket-geometry";
 import { attachmentPath } from "./attachment-store";
 import { acceptImage, imageFilesFrom, imageSize, safeImageName, sniffImage, IMAGE_MAX_BYTES } from "./image-input";
-import {
-  EXPORT_MAX_EDGE,
-  EXPORT_MAX_EMBEDDED_BYTES,
-  EXPORT_MAX_PIXELS,
-  browserPngEnv,
-  buildMapSvg,
-  exportFileStem,
-  exportLimits,
-  mapOutline,
-  normalizeCssColor,
-  svgToPngBlob,
-  toDataUri,
-  wrapText,
-  type MapScene,
-  type SceneBoundary,
-  type SceneSummary,
-  type SceneCard,
-  type SceneEdge,
-  type SceneImage
-} from "./map-export";
+import { browserPngEnv, svgToPngBlob, toDataUri, wrapText, type MapScene } from "./map-export";
+import { collectExportScene, exportMap, type MapExportPorts } from "./map-export-run";
 import { describeFocus, focusIsLost, resolveFocus, type MapFocusAnchor } from "./map-focus";
 import { buildMapSearchBar, searchMap, stepSearch, type MapSearchBar, type MapSearchResult } from "./map-search-bar";
 import { collapsedAncestors } from "./map-search";
@@ -132,6 +104,15 @@ import {
   type ChatRun
 } from "./chat-action-writer";
 import { TopicSelection, type SelectionChange } from "./topic-selection";
+import {
+  anchorLineKey,
+  RELATION_NAME_KEY,
+  relationIdentity,
+  relationPairKey,
+  RelationEditor,
+  type RelationEditorPorts,
+  type RelationListFocus
+} from "./relation-editor";
 import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/background-run";
 import { withThinkingOrigin } from "./thinking-origin";
 import { formatIssuesPatch, originBaseline, summaryForPrompt } from "./note-write-helpers";
@@ -221,29 +202,9 @@ import {
   setTooltip
 } from "obsidian";
 import { type ReferenceGroup } from "../../ai/reference-materials";
-import { resolveMapSources, sameMapSource, type MapSource } from "./map-sources";
-import {
-  addExternalSource,
-  externalScrubRoots,
-  externalSourceStatus,
-  loadExternalSources,
-  removeExternalSource,
-  scrubExternalPaths,
-  type ExternalScope,
-  type ExternalSource
-} from "./external-sources";
-import {
-  drawMapSourcesPanel,
-  isDragSourceTarget,
-  newMapSourcesSession,
-  type ExternalAddFailure,
-  type ExternalRowStatus,
-  type MapSourcesSession,
-  mapSourceName,
-  mapSourcesButtonLabel,
-  unreadableMapSources,
-  type MapSourcesPanelFocus
-} from "../../ui/map-sources-panel";
+import { resolveMapSources, type MapSource } from "./map-sources";
+import { MapSourcesControl, type MapSourcesControlPorts } from "./map-sources-control";
+import { externalScrubRoots, loadExternalSources, scrubExternalPaths, type ExternalScope } from "./external-sources";
 import { cardFailure, plainFailure, rawErrorText } from "../../ai/plain-error";
 import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
 import { UsageControl } from "./usage-panel";
@@ -275,11 +236,8 @@ import {
   descendants,
   History,
   inheritModel,
-  legalRelationTargets,
   type MapDocument,
   type MapNode,
-  normalizeRelationDescription,
-  RELATION_DESCRIPTION_MAX_LENGTH,
   parentIdsForNode,
   removeNodes,
   removeRelationsForTopics,
@@ -519,8 +477,7 @@ import {
   restoreTopicChat,
   topicChatReadsSources,
   isSafeTopicNodeId,
-  type TopicChatLineInput,
-  type TopicRecordStatus
+  type TopicChatLineInput
 } from "../../core/topic-chat-records";
 import { MapChatTurnRecord, type TurnEndFields } from "./map-chat-turn-record";
 import {
@@ -529,7 +486,6 @@ import {
   chatResearchRequest,
   mapChoiceParts,
   matchMapTitle,
-  planFor,
   type MapChatImageMode
 } from "../../core/map-chat-plan";
 import {
@@ -604,14 +560,13 @@ import {
 import {
   TopicChatWindow,
   type TopicChatHost,
-  type TopicChatButtonKind,
-  type TopicChatChoice,
   type TopicChatKind,
   type TopicChatMode,
   type TopicChatTurn
 } from "./topic-chat";
 import type { ResearchObserver, ResearchSteer } from "../../ai/research-observer";
 import { TopicChatSteers } from "./topic-chat-steer";
+import { TopicChatRun, type TopicChatEntry, type TopicChatRunPorts } from "./topic-chat-run";
 import type { ResearchProgress } from "./research-progress";
 import type { ExpansionBatchState } from "./expansion-batch";
 import { canvasPointerIntent } from "./canvas-gestures";
@@ -856,7 +811,6 @@ function argumentTipPath(x: number, y: number): SVGPathElement {
 }
 /** Unique ids for the arrowhead `<marker>`s: two map tabs share one document, so an id must belong to one view. */
 let relationMarkerSequence = 0;
-let relationSwatchSequence = 0;
 /** The structure dialog lists the types in the order of spec section 2 (not TOPIC_KINDS order, which the menus keep). */
 const KIND_PICKER_ORDER: readonly TopicKind[] = ["topic", "atomic", "hypothesis", "evidence", "conclusion", "action"];
 type CardBox = RelationBox;
@@ -903,26 +857,7 @@ interface AnchorLine {
   /** The picture when the line belongs to a ring card (straight line, map units); absent for a curved line. */
   image?: RingRect;
 }
-const anchorLineKey = (imageId: string, anchorId: string, topicId: string): string =>
-  `anchor:${imageId}:${anchorId}:${topicId}`;
 const BOUNDARY_PAD = 16;
-/**
- * The lines of an exported text block. The block's real horizontal padding + border is 14, and the exporter's width guess runs wider than
- * the browser's, so the text is widened until it needs no more lines than the screen shows: a fitted one-line block never loses its text.
- */
-function textBlockLines(text: string, boxWidth: number, boxHeight: number, lineHeight: number): string[] {
-  const shown = Math.max(
-    1,
-    Math.round((boxHeight - 8) / (Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 19))
-  );
-  let room = Math.max(1, boxWidth - 14);
-  let lines = wrapText(text, room);
-  for (let tries = 0; lines.length > shown && tries < 40; tries++) {
-    room *= 1.1;
-    lines = wrapText(text, room);
-  }
-  return lines;
-}
 /** A 0-1 position clamped and rounded to the nearest 0.001 (anchor place mode and anchor drag). */
 const unitStep = (v: number): number => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
 const boxOf = (card: HTMLElement): CardBox => ({
@@ -931,34 +866,6 @@ const boxOf = (card: HTMLElement): CardBox => ({
   width: card.offsetWidth,
   height: card.offsetHeight
 });
-
-const RELATION_KINDS: readonly TopicRelationKind[] = [
-  "supports",
-  "contradicts",
-  "verifies",
-  "derives_from",
-  "related",
-  "prerequisite"
-];
-/** One sentence per kind, "A ... B" with A the source and B the target, worded for each language rather than by word order. */
-const RELATION_SENTENCE_KEY: Record<Exclude<TopicRelationKind, "related">, Parameters<typeof t>[0]> = {
-  supports: "ui.relation_sentence_supports_0_1",
-  contradicts: "ui.relation_sentence_contradicts_0_1",
-  verifies: "ui.relation_sentence_verifies_0_1",
-  derives_from: "ui.relation_sentence_derives_from_0_1",
-  prerequisite: "ui.relation_sentence_prerequisite_0_1"
-};
-const RELATION_NAME_KEY: Record<TopicRelationKind, Parameters<typeof t>[0]> = {
-  supports: "ui.relation_name_supports",
-  contradicts: "ui.relation_name_contradicts",
-  verifies: "ui.relation_name_verifies",
-  derives_from: "ui.relation_name_derives_from",
-  related: "ui.relation_name_related",
-  prerequisite: "ui.relation_name_prerequisite"
-};
-/** The key a relation line is known by (view state only): `from`, `to` and kind. */
-const relationIdentity = (r: Pick<TopicRelation, "kind" | "from" | "to">): string =>
-  `${r.from}\u0000${r.to}\u0000${r.kind}`;
 
 /**
  * The options a chat integration runs with: what the integration dialog hands over when its fields are left as they come up
@@ -997,37 +904,6 @@ interface ResearchWebTally {
   searches: number;
   counted: number;
   withoutSearch: number;
-}
-/** One topic's chat: the conversation lives here (not in the window), so a task that outlives a closed window can still tell its result. */
-interface TopicChatEntry {
-  nodeId: string;
-  mapId: string;
-  mapPath: string;
-  session: {
-    turns: TopicChatTurn[];
-    mode: TopicChatMode;
-    running: boolean;
-    draftKind: TopicChatButtonKind | null;
-    draftText: string;
-    /** The depth card of an integration over a deeper subtree, waiting for an answer; `turn` is the user line that asked. */
-    choice?: (TopicChatChoice & { text: string; turn: TopicChatTurn }) | null;
-    progress?: string;
-  };
-  watchers: Set<() => void>;
-  /** The id of the turn whose result is not written yet (null when idle). */
-  runningTurnId: string | null;
-  /** True while a submit is between its checks and its start; a second window of this entry cannot send twice. */
-  submitting?: boolean;
-  /** The additions typed while the current task runs. Created with `running = true`, in the same tick. */
-  steers?: TopicChatSteers;
-  /** Additions typed while a synthesis researched its subtopics first: they ride along in the integration's text (shown as taken in). */
-  steerFolded?: string[];
-  /** How the current task ended (set by `settleTopicChat`); `plan`: the reply needs a plan, so nothing is sent on. */
-  steerEnd?: { status: TopicRecordStatus; plan: boolean } | null;
-  /** A turn of this conversation sent the map's data sources: they are untrusted, so a later reply's writes need a plan (the same rule as after research). */
-  readsSources?: boolean;
-  /** The AbortController of the current run (the window's stop button aborts it). */
-  controller?: AbortController;
 }
 /** How the steps below the root of a subtree integration ended: `halt` set means the root is not integrated. */
 interface SubtreeChainOutcome {
@@ -1093,11 +969,6 @@ class MapSourceWriteError extends Error {
   }
 }
 let mapChatTaskSequence = 0;
-
-/** The same key for both directions: a pair of topics holds one relation (spec V1.7). */
-function relationPairKey(a: string, b: string): string {
-  return a < b ? `${a}|${b}` : `${b}|${a}`;
-}
 
 /** The map actions the command palette offers (`VisualAgentMapView.mapCommand`). */
 export type MapCommandAction =
@@ -1267,23 +1138,12 @@ export class VisualAgentMapView extends ItemView {
     announce: text => this.announcer?.setText(text),
     notice: message => new Notice(message)
   });
-  /** This map's saved data sources (`map-sources`), loaded with the map; the toolbar button and its panel draw from it. */
-  private mapSources: MapSource[] = [];
   /** The attachments of the latest chat turn, as reference documents for a research the chat starts. */
   private chatTurnReferences: ReferenceGroup[] = [];
-  private readonly mapSourcesPanelId = `vam-map-sources-panel-${++relevancePanelSeq}`;
-  /** Folders outside the vault for the open map (device-local list; never shown with their paths). */
-  private externalSources: ExternalSource[] = [];
-  private externalStatuses = new Map<string, ExternalRowStatus>();
-  private externalMapId: string | undefined;
-  private externalStatusRun: AbortController | null = null;
-  private mapSourcesOpen = false;
-  private mapSourcesPickerOpen = false;
-  private mapSourcesSession: MapSourcesSession = newMapSourcesSession();
-  private mapSourcesToolsEl: HTMLElement | null = null;
-  private mapSourcesButtonEl: HTMLButtonElement | null = null;
-  private mapSourcesPanelEl: HTMLElement | null = null;
-  private mapSourcesPanelCleanup: (() => void) | null = null;
+  private readonly mapSourcesControl = new MapSourcesControl(
+    `vam-map-sources-panel-${++relevancePanelSeq}`,
+    this.mapSourcesControlPorts()
+  );
   private history = new History<Action>();
   /** The AI chat window. It lives on the view, so a repaint keeps its messages, draft and chips. */
   private chat: MapChatPanel | null = null;
@@ -1330,6 +1190,8 @@ export class VisualAgentMapView extends ItemView {
   private readonly chatChainRunner = new MapChatChainRunner(this.chatChainPorts());
   /** The plan flow of the chat (plan card, Apply, Cancel) and its state; the module lives and dies with the view. */
   private readonly mapChatConversation = new MapChatConversation(this.mapChatConversationPorts());
+  /** The relation list, both relation editor dialogs and the anchor pick dialog; the module lives and dies with the view. */
+  private readonly relationEditor = new RelationEditor(this.relationEditorPorts());
   // The runner's chain under its old name (the `?.` is for fixtures that never ran the constructor).
   private get chatChain(): ChatChainRun | null {
     return this.chatChainRunner?.current ?? null;
@@ -1522,6 +1384,7 @@ export class VisualAgentMapView extends ItemView {
   private topicChatSessions = new Map<string, TopicChatEntry>();
   /** The one topic chat window that is open (not whether it is attached: a repaint takes it out for a moment). */
   private topicChatOpen: { entry: TopicChatEntry; win: TopicChatWindow } | null = null;
+  private readonly topicChatRun = new TopicChatRun(this.topicChatRunPorts());
   private disclosureSeq = 0;
   /** The AI structure review that hid its window. The view owns it: Stop, the result and the highlights. */
   private structureReviewTask: {
@@ -2222,8 +2085,8 @@ export class VisualAgentMapView extends ItemView {
     // A deleted or renamed source note, folder or map changes what the data-sources button and panel say.
     const vault = this.app.vault;
     if (typeof vault?.on === "function") {
-      this.registerEvent(vault.on("delete", () => this.refreshMapSourcesUi()));
-      this.registerEvent(vault.on("rename", () => this.refreshMapSourcesUi()));
+      this.registerEvent(vault.on("delete", () => this.mapSourcesControl?.refreshMapSourcesUi()));
+      this.registerEvent(vault.on("rename", () => this.mapSourcesControl?.refreshMapSourcesUi()));
     }
     // A note whose image or `topic-cover` just changed redraws only its own cover.
     const cache = this.app.metadataCache;
@@ -3153,9 +3016,7 @@ export class VisualAgentMapView extends ItemView {
     this.abortMapChat();
     this.chat?.dispose();
     this.goalSuggest.releaseListener();
-    this.mapSourcesPanelCleanup?.();
-    this.mapSourcesPanelCleanup = null;
-    this.clearExternalSources();
+    this.mapSourcesControl?.dispose();
     // An open goal edit pre-started the CLI for a grade that will never be sent: it is dropped, nothing is saved.
     this.dropGoalEdit();
     this.abortRelevanceGrade();
@@ -3513,8 +3374,7 @@ export class VisualAgentMapView extends ItemView {
     this.notes = loaded;
     this.relevanceGoal = goal;
     this.relevanceContext = context;
-    this.mapSources = sources;
-    this.loadExternalSourcesForMap();
+    this.mapSourcesControl?.loadForMap(sources);
     return { failedPaths: Array.from(ctx.failedPaths) };
   }
   /** Background AI work that belongs to the open map: stopped and forgotten when the view closes or another map opens. */
@@ -3549,7 +3409,7 @@ export class VisualAgentMapView extends ItemView {
     }
     if (path !== this.path) {
       this.cameraWhenShown = null;
-      this.mapSourcesOpen = false;
+      this.mapSourcesControl.mapSourcesOpen = false;
       this.dropGoalEdit();
       this.abortRelevanceGrade();
     }
@@ -3581,8 +3441,7 @@ export class VisualAgentMapView extends ItemView {
       this.notes = new Map();
       this.relevanceGoal = undefined;
       this.relevanceContext = undefined;
-      this.mapSources = [];
-      this.clearExternalSources();
+      this.mapSourcesControl?.reset();
       const state: NoteLoadState = {
         epoch: openEpoch,
         read: 0,
@@ -4719,302 +4578,10 @@ export class VisualAgentMapView extends ItemView {
     const { model, reasoning } = this.plugin.currentModelChoice();
     this.plugin.prewarmClaudeStep?.(model, reasoning, GOAL_RECOMMEND_SCHEMA);
   }
-  // ---- Map data sources: toolbar button and panel ---------------------------------------------------------------
-  /**
-   * One toolbar button right after the goal button: 「資料來源 · N 份」, with ⚠ in front when a source cannot be read.
-   * It opens a panel (same open/close, focus and Esc rules as the goal panel) to add and remove this map's sources.
-   */
-  private renderMapSourcesControl(parent: HTMLElement): void {
-    this.mapSourcesPanelCleanup?.();
-    this.mapSourcesPanelCleanup = null;
-    this.mapSourcesPanelEl = null;
-    this.mapSourcesToolsEl = parent;
-    this.drawMapSourcesButton(parent);
-    if (this.mapSourcesOpen) this.drawMapSourcesPanelEl(null);
-  }
-  private drawMapSourcesButton(parent: HTMLElement): void {
-    const button = this.button(parent, "", () => {
-      if (this.mapSourcesOpen && this.mapSourcesPanelEl) this.closeMapSourcesPanel(true);
-      else this.openMapSourcesPanel();
-    });
-    button.addClass("vam-sources-button");
-    button.setAttr("aria-haspopup", "dialog");
-    button.setAttr("aria-controls", this.mapSourcesPanelId);
-    // Pressing the button must not move focus out of an open panel (that would count as leaving it).
-    button.addEventListener("mousedown", event => event.preventDefault());
-    button.addEventListener("focusout", (event: FocusEvent) => {
-      if (!this.mapSourcesOpen || this.mapSourcesButtonEl !== button || this.mapSourcesPickerOpen) return;
-      const next = event.relatedTarget as Node | null;
-      if (next && (next === button || this.mapSourcesPanelEl?.contains(next) || isDragSourceTarget(next))) return;
-      this.closeMapSourcesPanel(false);
-    });
-    button.addEventListener("keydown", event => {
-      if (event.key !== "Escape" || !this.mapSourcesOpen || this.mapSourcesButtonEl !== button) return;
-      event.preventDefault();
-      event.stopPropagation();
-      this.closeMapSourcesPanel(true);
-    });
-    this.mapSourcesButtonEl = button;
-    this.paintMapSourcesButton();
-  }
-  /** Icon, count/! badge and accessible text from the current sources; also run when a vault event changes what is readable. */
-  private paintMapSourcesButton(): void {
-    const button = this.mapSourcesButtonEl;
-    if (!button) return;
-    const total = this.mapSources.length + this.externalSources.length;
-    const label = mapSourcesButtonLabel(total);
-    const unreadable = unreadableMapSources(
-      this.app,
-      this.mapSources,
-      this.externalSources.map(source => this.externalStatuses.get(source.label))
-    );
-    button.empty();
-    const icon = button.createSpan({ cls: "vam-sources-button-icon" });
-    icon.setAttr("aria-hidden", "true");
-    setIcon(icon, "files");
-    const count = total;
-    if (unreadable || count > 0) {
-      const badge = button.createSpan({ cls: "vam-sources-button-badge", text: unreadable ? "!" : String(count) });
-      badge.setAttr("aria-hidden", "true");
-      if (unreadable) badge.addClass("is-bad");
-    }
-    button.setAttr("aria-label", label);
-    button.setAttr("aria-expanded", String(this.mapSourcesOpen));
-    if (unreadable) button.setAttr("aria-description", t("ui.map_sources_unreadable_description_0", unreadable));
-    else button.removeAttribute?.("aria-description");
-    button.toggleClass("has-unreadable", unreadable > 0);
-    button.toggleClass("is-empty", !total);
-  }
-  private openMapSourcesPanel(): void {
-    if (!this.mapSourcesToolsEl) return;
-    this.mapSourcesOpen = true;
-    this.mapSourcesButtonEl?.setAttr("aria-expanded", "true");
-    this.mapSourcesSession = newMapSourcesSession();
-    this.refreshExternalStatuses();
-    this.drawMapSourcesPanelEl({ search: true });
-  }
-  private closeMapSourcesPanel(refocus: boolean): void {
-    this.mapSourcesPanelCleanup?.();
-    this.mapSourcesPanelCleanup = null;
-    this.mapSourcesPanelEl?.remove();
-    this.mapSourcesPanelEl = null;
-    this.mapSourcesOpen = false;
-    this.mapSourcesSession = newMapSourcesSession();
-    this.mapSourcesPickerOpen = false;
-    this.mapSourcesButtonEl?.setAttr("aria-expanded", "false");
-    this.placeMapTools();
-    if (refocus) this.mapSourcesButtonEl?.focus();
-  }
-  private drawMapSourcesPanelEl(focus: MapSourcesPanelFocus): void {
-    const tools = this.mapSourcesToolsEl;
-    if (!tools) return;
-    this.mapSourcesPanelCleanup?.();
-    this.mapSourcesPanelCleanup = null;
-    this.mapSourcesPanelEl?.remove();
-    const mapPath = this.path;
-    const panelCleanups: Array<() => void> = [];
-    const panel = drawMapSourcesPanel(
-      tools,
-      {
-        app: this.app,
-        id: this.mapSourcesPanelId,
-        sources: this.mapSources,
-        currentMapPath: mapPath,
-        mapItems: () => this.plugin.repo.mapSwitcherItems(),
-        add: (source, quiet) => this.changeMapSources(mapPath, "add", source, quiet),
-        announce: text => this.announcer?.setText(text),
-        onDragEnd: handler => {
-          const doc = this.contentEl?.ownerDocument;
-          if (!doc?.addEventListener) return;
-          doc.addEventListener("dragend", handler, true);
-          panelCleanups.push(() => doc.removeEventListener("dragend", handler, true));
-        },
-        remove: source => this.changeMapSources(mapPath, "remove", source),
-        externals: this.externalSources,
-        externalStatus: label => this.externalStatuses.get(label),
-        addExternal: input => this.addExternalFolder(mapPath, input),
-        removeExternal: source => this.removeExternalFolder(mapPath, source),
-        close: refocus => this.closeMapSourcesPanel(refocus),
-        setPickerOpen: open => {
-          this.mapSourcesPickerOpen = open;
-        },
-        isPickerOpen: () => this.mapSourcesPickerOpen,
-        button: () => this.mapSourcesButtonEl,
-        session: this.mapSourcesSession,
-        panelCreated: created => {
-          this.mapSourcesPanelEl = created;
-        }
-      },
-      focus
-    );
-    this.mapSourcesPanelEl = panel;
-    // A press anywhere else (the canvas, another card) closes it too, except inside the picker list that is open.
-    const doc = this.contentEl?.ownerDocument;
-    if (doc?.addEventListener) {
-      const outside = (event: Event): void => {
-        if (this.mapSourcesPickerOpen) return;
-        const target = event.target as Node | null;
-        // A press on a draggable row (the file explorer's) starts a drag to the drop zone; it must not close the panel.
-        if (
-          target &&
-          (panel.contains(target) || this.mapSourcesButtonEl?.contains(target) || isDragSourceTarget(target))
-        )
-          return;
-        this.closeMapSourcesPanel(false);
-      };
-      doc.addEventListener("pointerdown", outside, true);
-      panelCleanups.push(() => doc.removeEventListener("pointerdown", outside, true));
-    }
-    this.mapSourcesPanelCleanup = () => panelCleanups.forEach(clean => clean());
-    this.placeMapTools();
-  }
-  /** Left-aligned under the button, shifted left when it would overflow; the width follows the CSS (max about 440px). */
-  private placeMapSourcesPanel(panel: HTMLElement): void {
-    const button = this.mapSourcesButtonEl;
-    const tools = this.mapSourcesToolsEl;
-    const overlay = tools?.parentElement;
-    if (!button?.getBoundingClientRect || !tools?.getBoundingClientRect || !overlay?.getBoundingClientRect) return;
-    const bounds = overlay.getBoundingClientRect();
-    const width = Math.max(0, Math.min(440, bounds.width - 32));
-    const from = button.getBoundingClientRect().left;
-    const left = Math.min(Math.max(from, bounds.left + 16), bounds.left + bounds.width - 16 - width);
-    panel.style.width = `${width}px`;
-    panel.style.left = `${left - tools.getBoundingClientRect().left - 1}px`;
-  }
-  /**
-   * Adds or removes one source through the view mutation queue. The list is re-read inside the queue, so a repeated
-   * add (same kind and path) writes nothing, and the write only touches `map-sources`.
-   */
-  private changeMapSources(mapPath: string, change: "add" | "remove", source: MapSource, quiet = false): void {
-    const name = mapSourceName(this.app, source);
-    this.enqueue(async () => {
-      if (this.closed || this.path !== mapPath) return;
-      let focus: MapSourcesPanelFocus = { search: true };
-      try {
-        const current = await this.plugin.repo.readMapSources(mapPath);
-        const at = current.findIndex(item => sameMapSource(item, source));
-        if (change === "add" && at >= 0) {
-          if (!quiet) this.announcer?.setText(t("ui.map_sources_already_added_0", name));
-        } else if (change === "remove" && at < 0) {
-          this.mapSources = current;
-        } else {
-          const next = change === "add" ? [...current, source] : current.filter((_, index) => index !== at);
-          await this.plugin.repo.writeMapSources(mapPath, next);
-          this.mapSources = next;
-          if (change === "remove") focus = { remove: at };
-          if (!quiet || change === "remove")
-            this.announcer?.setText(t(change === "add" ? "ui.map_sources_added_0" : "ui.map_sources_removed_0", name));
-        }
-      } catch (error) {
-        new Notice(t("ui.map_sources_save_failed_0", error instanceof Error ? error.message : String(error)));
-        return;
-      }
-      if (this.closed || this.path !== mapPath) return;
-      this.paintMapSourcesButton();
-      if (this.mapSourcesOpen) this.drawMapSourcesPanelEl(focus);
-    });
-  }
   /** Where an outside folder is judged from: this vault's real location (absent on a vault the plugin cannot locate). */
   private externalScope(): ExternalScope {
     const adapter = this.app.vault.adapter;
     return { vaultBase: adapter instanceof FileSystemAdapter ? adapter.getBasePath() : undefined };
-  }
-  private clearExternalSources(): void {
-    this.externalStatusRun?.abort();
-    this.externalStatusRun = null;
-    this.externalSources = [];
-    this.externalStatuses = new Map();
-    this.externalMapId = undefined;
-  }
-  /** Reads the open map's local external list. Another map starts with no statuses; the same map keeps what it knew. */
-  private loadExternalSourcesForMap(): void {
-    const id = this.map?.id;
-    if (id !== this.externalMapId) {
-      this.clearExternalSources();
-      this.externalMapId = id;
-    }
-    this.externalSources = loadExternalSources(this.app, id);
-    this.refreshExternalStatuses();
-  }
-  /**
-   * Checks each external folder in the background (fresh range check, file count, limits) and repaints as results come.
-   * A result that arrives after the map changed or the view closed is dropped.
-   */
-  private refreshExternalStatuses(): void {
-    this.externalStatusRun?.abort();
-    this.externalStatusRun = null;
-    const sources = this.externalSources;
-    if (!sources.length) return;
-    const controller = new AbortController();
-    this.externalStatusRun = controller;
-    const mapId = this.externalMapId;
-    const epoch = this.viewEpoch;
-    const scope = this.externalScope();
-    void (async () => {
-      for (const source of sources) {
-        let status: ExternalRowStatus;
-        try {
-          status = await externalSourceStatus(source, scope, controller.signal);
-        } catch {
-          return;
-        }
-        if (controller.signal.aborted || this.closed || this.viewEpoch !== epoch || this.externalMapId !== mapId)
-          return;
-        this.externalStatuses.set(source.label, status);
-        this.repaintExternalStatus();
-      }
-    })();
-  }
-  private repaintExternalStatus(): void {
-    if (this.closed || !this.mapSourcesButtonEl) return;
-    this.paintMapSourcesButton();
-    if (!this.mapSourcesOpen || this.mapSourcesPickerOpen) return;
-    const typing = this.mapSourcesPanelEl?.querySelector?.(".vam-map-sources-path") ?? null;
-    const focused = !!typing && this.contentEl?.ownerDocument?.activeElement === typing;
-    this.drawMapSourcesPanelEl(focused ? { input: true } : null);
-  }
-  /** Panel "Add": checks the pasted path, stores it on this device and shows the row. Resolves null when added. */
-  private async addExternalFolder(mapPath: string, input: string): Promise<ExternalAddFailure | "stale" | null> {
-    const mapId = this.map?.id;
-    const epoch = this.viewEpoch;
-    if (!mapId) return "stale";
-    let result;
-    try {
-      result = await addExternalSource(this.app, mapId, input, this.externalScope());
-    } catch {
-      return "missing";
-    }
-    if (this.closed || this.viewEpoch !== epoch || this.path !== mapPath || this.map?.id !== mapId) return "stale";
-    if (!result.ok) return result.reason;
-    this.externalSources = result.sources;
-    this.mapSourcesSession.pathDraft = "";
-    this.mapSourcesSession.externalRejected = "";
-    this.announcer?.setText(t("ui.map_sources_added_0", result.source.label));
-    this.refreshExternalStatuses();
-    this.paintMapSourcesButton();
-    if (this.mapSourcesOpen) this.drawMapSourcesPanelEl({ input: true });
-    return null;
-  }
-  private removeExternalFolder(mapPath: string, source: ExternalSource): void {
-    const mapId = this.map?.id;
-    if (!mapId || this.closed || this.path !== mapPath) return;
-    const epoch = this.viewEpoch;
-    void removeExternalSource(this.app, mapId, source).then(({ removed, sources }) => {
-      if (this.closed || this.viewEpoch !== epoch || this.path !== mapPath || this.map?.id !== mapId) return;
-      this.externalSources = sources;
-      this.externalStatuses.delete(source.label);
-      if (removed) this.announcer?.setText(t("ui.map_sources_removed_0", source.label));
-      this.refreshExternalStatuses();
-      this.paintMapSourcesButton();
-      if (this.mapSourcesOpen) this.drawMapSourcesPanelEl({ input: true });
-    });
-  }
-  /** A vault delete or rename: repaint the button and an open panel (a source may have become unreadable). */
-  private refreshMapSourcesUi(): void {
-    if (this.closed || (!this.mapSources.length && !this.externalSources.length) || !this.mapSourcesButtonEl) return;
-    this.paintMapSourcesButton();
-    // A panel with a picker list open stays as it is; it is redrawn with the next change.
-    if (this.mapSourcesOpen && !this.mapSourcesPickerOpen) this.drawMapSourcesPanelEl(null);
   }
   private submitRelevanceGoal(raw: string, contextRaw?: string): Promise<void> {
     return this.relevanceRun.start(raw, contextRaw);
@@ -11634,397 +11201,63 @@ export class VisualAgentMapView extends ItemView {
     );
     return cover && "path" in cover ? cover : null;
   }
-  /**
-   * The map as the screen shows it (decision D9): card rectangles and edge paths (the fishbone spine included) are
-   * read from the drawn DOM, so every layout is followed without a second layout engine; colours come from computed
-   * styles; covers and free pictures are read with `readBinary` and embedded as data URIs. `isCurrent` is checked
-   * after every await. Returns null when the view moved on, `{ empty }` for nothing to draw, `{ refuse }` when the
-   * pictures alone are over the limit (read no further).
-   */
-  private async collectExportScene(
+  /** Not private: only the tests call this wrapper, which the compiler would flag as unused. */
+  collectExportScene(
     isCurrent: () => boolean
   ): Promise<{ scene: MapScene; refuse?: undefined } | { scene?: undefined; refuse: "embedded" | "empty" } | null> {
-    const map = this.map;
-    if (!map) return null;
-    const win = window;
-    const computed = (el: Element, pseudo?: string): CSSStyleDeclaration => win.getComputedStyle(el, pseudo);
-    const colorOf = (value: unknown): string | undefined => normalizeCssColor(value) || undefined;
-    // The export shows the saved style: a selection or drag highlight (it switches the border colour) is taken off while
-    // the box is measured and put back at once, so the card on screen keeps showing it.
-    const transient = ["is-selected", "is-cut", "is-drop-target", "is-marquee-hit", "is-marquee-remove"];
-    const savedLook = (
-      el: HTMLElement
-    ): { backgroundColor: string; borderTopColor: string; borderTopWidth: string } => {
-      const on = transient.filter(name => el.hasClass(name));
-      // A card animates its border colour (0.16s): without this the read below would return a colour mid-way.
-      if (on.length) {
-        el.addClass("vam-export-measure");
-        el.removeClass(...on);
-      }
-      try {
-        const look = computed(el);
-        return {
-          backgroundColor: look.backgroundColor,
-          borderTopColor: look.borderTopColor,
-          borderTopWidth: look.borderTopWidth
-        };
-      } finally {
-        if (on.length) {
-          el.addClass(...on);
-          el.removeClass("vam-export-measure");
-        }
-      }
-    };
-    let embedded = 0;
-    const loaded = new Map<string, string | null>();
-    const imageHref = async (path: string): Promise<string | null | false> => {
-      const file = this.app.vault.getAbstractFileByPath(path);
-      if (!(file instanceof TFile)) return null;
-      if (!loaded.has(path)) {
-        const data = await this.app.vault.readBinary(file);
-        const mime = sniffImage(data);
-        loaded.set(path, mime ? toDataUri(mime, data) : null);
-        sizes.set(path, mime ? data.byteLength : 0);
-      }
-      embedded += sizes.get(path) ?? 0;
-      return embedded > EXPORT_MAX_EMBEDDED_BYTES ? false : (loaded.get(path) ?? null);
-    };
-    const sizes = new Map<string, number>();
-    const cards: SceneCard[] = [];
-    const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-    const grow = (x: number, y: number, w: number, h: number): void => {
-      bounds.minX = Math.min(bounds.minX, x);
-      bounds.minY = Math.min(bounds.minY, y);
-      bounds.maxX = Math.max(bounds.maxX, x + w);
-      bounds.maxY = Math.max(bounds.maxY, y + h);
-    };
-    for (const [id, card] of this.cardEls) {
-      const node = map.nodes.find(item => item.id === id);
-      if (!node) continue;
-      const box = boxOf(card);
-      grow(box.x, box.y, box.width, box.height);
-      const style = savedLook(card);
-      const titleEl = card.querySelector<HTMLElement>(".vam-card-title");
-      const title = (titleEl?.textContent ?? this.notes.get(id)?.title ?? "").trim();
-      const item: SceneCard = {
-        x: box.x,
-        y: box.y,
-        w: box.width,
-        h: box.height,
-        title: wrapText(title, box.width - 28),
-        fill: colorOf(style.backgroundColor),
-        stroke: colorOf(style.borderTopColor),
-        textColor: colorOf(titleEl ? computed(titleEl).color : undefined),
-        accent: card.dataset.topicColor ? colorOf(computed(card, "::before").backgroundColor) : undefined
-      };
-      // card-height: only a fixed-height card that cuts its content says so, so a map without heights exports unchanged.
-      if (node.height && card.classList.contains("is-clipped")) item.clipped = true;
-      // topic-cover-position: under or beside the picture the title is not below the cover, so it goes where the card
-      // draws it (and wraps at its own width). A top cover leaves the scene as it was.
-      const placedTitle = ["has-cover-bottom", "has-cover-left", "has-cover-right"].some(cls =>
-        card.classList.contains(cls)
-      );
-      if (placedTitle && titleEl && titleEl.offsetWidth > 0) {
-        item.titleAt = { x: box.x + titleEl.offsetLeft, y: box.y + titleEl.offsetTop };
-        item.title = wrapText(title, titleEl.offsetWidth);
-      }
-      // The summary the card shows (at most its clamp of lines) is drawn where the screen puts it.
-      const summaryEl = card.querySelector<HTMLElement>(".vam-card-summary");
-      const summaryText = (
-        summaryEl?.querySelector<HTMLElement>(".vam-card-preview-text") ?? summaryEl
-      )?.textContent?.trim();
-      if (summaryEl && summaryText && summaryEl.offsetWidth > 0) {
-        const summaryStyle = computed(summaryEl);
-        const clamp = parseInt(summaryStyle.getPropertyValue("-webkit-line-clamp"), 10);
-        const size = parseFloat(summaryStyle.fontSize);
-        const lines = wrapText(summaryText, summaryEl.offsetWidth);
-        item.summary = {
-          lines: Number.isFinite(clamp) && clamp > 0 ? lines.slice(0, clamp) : lines,
-          x: box.x + summaryEl.offsetLeft,
-          y: box.y + summaryEl.offsetTop,
-          size: Number.isFinite(size) && size > 0 ? Math.round((size * 13) / 15) : undefined,
-          textColor: colorOf(summaryStyle.color)
-        };
-        if (item.summary.lines.length < lines.length) item.summary.lines[item.summary.lines.length - 1] += "…";
-      }
-      // card-style: only a styled card carries these, so an unstyled map's scene is unchanged.
-      if (card.dataset.topicStyleSize) {
-        const size = parseFloat(titleEl ? computed(titleEl).fontSize : "");
-        // The screen's small / large title relative to the 13 px export default (medium is 15 px on screen).
-        if (Number.isFinite(size) && size > 0) item.titleSize = Math.round((size * 13) / 15);
-      }
-      if (card.dataset.topicStyleBold) item.titleWeight = 800;
-      if (card.dataset.topicStyleBorder) {
-        const width = parseFloat(style.borderTopWidth);
-        if (Number.isFinite(width) && width > 0) item.strokeWidth = width;
-      }
-      const frame = card.querySelector<HTMLElement>(".vam-card-cover");
-      const coverInfo = frame ? this.exportCoverPath(node.path) : null;
-      if (frame && coverInfo) {
-        const href = await imageHref(coverInfo.path);
-        if (!isCurrent()) return null;
-        if (href === false) return { refuse: "embedded" };
-        // Only a sized cover has the region's own shape; the lazy 96 px placeholder would stretch the region, so it
-        // exports the whole picture proportionally (meet) instead.
-        const win =
-          coverInfo.frame && frame.classList.contains("is-sized")
-            ? frame.querySelector<HTMLElement>(".vam-card-cover-window")
-            : null;
-        if (href && coverInfo.frame && win && win.offsetWidth > 0 && win.offsetHeight > 0) {
-          // A masked cover: the whole picture is placed so the framed region fills the window (at the window's own place
-          // in the cover, cover-layout.ts); the export clips to the window, and to the cover when a short card cuts it.
-          const mask = coverInfo.frame;
-          const winX = box.x + frame.offsetLeft + win.offsetLeft;
-          const winY = box.y + frame.offsetTop + win.offsetTop;
-          const w = win.offsetWidth / mask.w;
-          const h = win.offsetHeight / mask.h;
-          const shownHeight = Math.min(win.offsetHeight, Math.max(0, frame.offsetHeight - win.offsetTop));
-          item.cover = {
-            x: winX - mask.x * w,
-            y: winY - mask.y * h,
-            w,
-            h,
-            href,
-            fit: "fill",
-            window: { x: winX, y: winY, w: win.offsetWidth, h: shownHeight || win.offsetHeight }
-          };
-        } else if (href)
-          item.cover = {
-            x: box.x + frame.offsetLeft,
-            y: box.y + frame.offsetTop,
-            w: frame.offsetWidth,
-            h: frame.offsetHeight,
-            href,
-            fit: "contain"
-          };
-      }
-      cards.push(item);
-    }
-    // Text nodes as drawn (tree-text-node): plain text with no box, wrapped; the line to the parent is in edgesEl.
-    for (const el of this.textEls.values()) {
-      const box = boxOf(el);
-      grow(box.x, box.y, box.width, box.height);
-      const body = el.querySelector<HTMLElement>(".vam-text-node-body");
-      cards.push({
-        x: box.x,
-        y: box.y,
-        w: box.width,
-        h: box.height,
-        title: textBlockLines(
-          body?.textContent ?? "",
-          box.width,
-          box.height,
-          parseFloat(computed(body ?? el).lineHeight)
-        ),
-        plain: true,
-        textColor: colorOf(computed(body ?? el).color)
-      });
-    }
-    const images: SceneImage[] = [];
-    for (const item of map.canvasItems ?? []) {
-      if (item.kind !== "image" && !isAnnotatedImage(item)) continue;
-      const image = item as ImageItem | AnnotatedImageItem;
-      const href = await imageHref(image.path);
-      if (!isCurrent()) return null;
-      if (href === false) return { refuse: "embedded" };
-      if (!href) continue;
-      grow(image.x, image.y, image.w, image.h);
-      images.push({ x: image.x, y: image.y, w: image.w, h: image.h, href, fit: "fill" });
-    }
-    // Frames as drawn on screen: measured from the same cards, so they follow the layout; a frame with no card is left out.
-    const boundaries: SceneBoundary[] = [];
-    for (const item of map.canvasItems ?? []) {
-      if (item.kind !== "boundary") continue;
-      const frame = item as BoundaryItem;
-      const box = boundaryBounds(
-        frame.members,
-        id => {
-          const card = this.cardEls.get(id);
-          if (!card) return null;
-          const b = boxOf(card);
-          return { x: b.x, y: b.y, w: b.width, h: b.height };
-        },
-        BOUNDARY_PAD,
-        this.otherCardRects(frame.members)
-      );
-      if (!box) continue;
-      grow(box.x, box.y, box.w, box.h);
-      boundaries.push({
-        x: box.x,
-        y: box.y,
-        w: box.w,
-        h: box.h,
-        ...(frame.label ? { label: frame.label } : {}),
-        stroke: colorOf(computed(this.viewportEl ?? this.contentEl).getPropertyValue("--text-muted"))
-      });
-    }
-    // Summary brackets as drawn (summary-bracket): the brace path and the text wrapped to its box width, beside the tip.
-    const summaryScenes: SceneSummary[] = [];
-    for (const item of map.canvasItems ?? []) {
-      if (item.kind !== "summary") continue;
-      const summary = item as SummaryItem;
-      const geometry = this.summaryGeometry(summary.parentId, effectiveSummaryRange(summary, map.nodes), summary.text);
-      if (!geometry?.ok) continue;
-      const lines = wrapText(summary.text, 200 - 12);
-      grow(geometry.extent.x, geometry.extent.y, geometry.extent.w, geometry.extent.h);
-      // Make room for the text beside the brace tip.
-      const across = geometry.side === "right" || geometry.side === "left";
-      grow(
-        geometry.side === "left"
-          ? geometry.label.x - 200
-          : geometry.side === "right"
-            ? geometry.label.x
-            : geometry.label.x - 100,
-        across
-          ? geometry.label.y - lines.length * 9
-          : geometry.side === "up"
-            ? geometry.label.y - lines.length * 17
-            : geometry.label.y,
-        200,
-        across ? lines.length * 18 : lines.length * 17
-      );
-      summaryScenes.push({
-        d: geometry.path,
-        x: geometry.label.x,
-        y: geometry.label.y,
-        side: geometry.side,
-        text: lines,
-        stroke: colorOf(computed(this.viewportEl ?? this.contentEl).getPropertyValue("--text-muted")),
-        textColor: colorOf(computed(this.viewportEl ?? this.contentEl).getPropertyValue("--text-normal"))
-      });
-    }
-    const edges: SceneEdge[] = [];
-    for (const el of Array.from(this.edgesEl?.children ?? [])) {
-      if (el.tagName?.toLowerCase() !== "path") continue;
-      // Anchor lines are a view of the image notes, not of the map picture: the export has none of them.
-      if (el.getAttribute("data-anchor-relation") !== null) continue;
-      const d = el.getAttribute("d");
-      const style = computed(el);
-      const stroke = colorOf(style.stroke);
-      if (!d || !stroke || stroke === "none" || style.display === "none") continue;
-      edges.push({
-        d,
-        stroke,
-        ...((el.getAttribute("class") ?? "").split(/\s+/).includes("vam-text-link") ? { dashed: true } : {}),
-        ...((el.getAttribute("data-line-thick") ?? null) !== null
-          ? { width: parseFloat(style.strokeWidth) > 0 ? parseFloat(style.strokeWidth) : 4 }
-          : {})
-      });
-      try {
-        const bbox = (el as unknown as SVGGraphicsElement).getBBox?.();
-        if (bbox) grow(bbox.x, bbox.y, bbox.width, bbox.height);
-      } catch {
-        // A path that cannot be measured is still drawn; it only does not widen the picture.
-      }
-    }
-    if (!cards.length && !images.length) return { refuse: "empty" };
-    const margin = 24;
-    const root = computed(this.viewportEl ?? this.contentEl);
-    const variable = (name: string): string | undefined => colorOf(root.getPropertyValue(name));
-    const scene: MapScene = {
-      x: bounds.minX - margin,
-      y: bounds.minY - margin,
-      width: bounds.maxX - bounds.minX + margin * 2,
-      height: bounds.maxY - bounds.minY + margin * 2,
-      title: map.title,
-      theme: {
-        background: variable("--background-primary"),
-        text: variable("--text-normal"),
-        stroke: variable("--background-modifier-border"),
-        card: variable("--background-primary")
-      },
-      boundaries,
-      edges,
-      summaries: summaryScenes,
-      cards,
-      images
-    };
-    return { scene };
+    return collectExportScene(this.mapExportSource(), isCurrent);
   }
   private async pngBlob(svg: string, width: number, height: number, scale: number): Promise<Blob> {
     return svgToPngBlob(svg, width, height, scale, browserPngEnv(window.URL));
   }
-  /** A download through a blob URL; the URL is released shortly after the click. */
-  private downloadBlob(blob: Blob, name: string): void {
-    const url = window.URL.createObjectURL(blob);
-    const link = this.contentEl.createEl("a", { cls: "vam-sr-only", attr: { href: url, download: name } });
-    link.click();
-    link.remove();
-    window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+  private exportMap(format: "png" | "svg" | "md", target: "vault" | "download"): Promise<void> {
+    return exportMap(this.mapExportSource(), format, target);
   }
-  /**
-   * Exports the map as PNG, SVG or a Markdown outline, saved next to the other attachments of Map.md or downloaded.
-   * An export is not a map edit: no transaction, no undo step. A result that is ready after the view closed or moved
-   * to another map is thrown away (nothing written, nothing said).
-   */
-  private async exportMap(format: "png" | "svg" | "md", target: "vault" | "download"): Promise<void> {
-    const map = this.map;
-    if (!map) return;
-    const mapPath = this.path,
-      epoch = this.mapOpenEpoch,
-      isCurrent = (): boolean => !this.closed && this.path === mapPath && this.mapOpenEpoch === epoch && !!this.map;
-    try {
-      let blob: Blob;
-      if (format === "md") {
-        const outline = mapOutline(
-          this.onScreenSiblingOrder(map),
-          id => this.notes.get(id)?.title ?? "",
+  private mapExportSource(): MapExportPorts {
+    return {
+      map: () => this.map,
+      noteTitle: id => this.notes.get(id)?.title,
+      cards: () => this.cardEls,
+      texts: () => this.textEls.values(),
+      edges: () => Array.from(this.edgesEl?.children ?? []),
+      styleRoot: () => this.viewportEl ?? this.contentEl,
+      frameBox: members =>
+        boundaryBounds(
+          members,
           id => {
-            const summary = this.notes.get(id)?.summary ?? "";
-            return isPlaceholder(summary) ? "" : summary;
+            const card = this.cardEls.get(id);
+            if (!card) return null;
+            const b = boxOf(card);
+            return { x: b.x, y: b.y, w: b.width, h: b.height };
           },
-          map.title
-        );
-        blob = new Blob([`${outline}\n`], { type: "text/markdown;charset=utf-8" });
-      } else {
-        const got = await this.collectExportScene(isCurrent);
-        if (!got || !isCurrent()) return;
-        if (got.refuse) {
-          new Notice(t(got.refuse === "empty" ? "ui.export_empty" : "ui.export_refused_embedded"));
-          return;
-        }
-        const limit = exportLimits(got.scene);
-        if (limit.action === "refuse") {
-          new Notice(
-            t(
-              limit.reason === "embedded"
-                ? "ui.export_refused_embedded"
-                : limit.reason === "pixels"
-                  ? "ui.export_refused_pixels"
-                  : "ui.export_empty"
-            )
-          );
-          return;
-        }
-        const svg = buildMapSvg(got.scene);
-        if (format === "svg") blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-        else {
-          const { width, height } = got.scene;
-          let scale = 1;
-          if (limit.action === "scaleDown") {
-            scale = limit.scale;
-            new Notice(t("ui.export_scaled", String(EXPORT_MAX_EDGE)));
-          } else if (Math.max(width, height) * 2 <= EXPORT_MAX_EDGE && width * height * 4 <= EXPORT_MAX_PIXELS)
-            scale = 2;
-          blob = await this.pngBlob(svg, width, height, scale);
-          if (!isCurrent()) return;
-        }
+          BOUNDARY_PAD,
+          this.otherCardRects(members)
+        ),
+      summaryGeometry: (parentId, range, text) => this.summaryGeometry(parentId, range, text),
+      coverOf: notePath => this.exportCoverPath(notePath),
+      imageReader: path => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        return file instanceof TFile ? () => this.app.vault.readBinary(file) : null;
+      },
+      path: () => this.path,
+      fence: () => {
+        const mapPath = this.path,
+          epoch = this.mapOpenEpoch;
+        return (): boolean => !this.closed && this.path === mapPath && this.mapOpenEpoch === epoch && !!this.map;
+      },
+      outlineNodes: map => this.onScreenSiblingOrder(map),
+      outlineSummary: id => {
+        const summary = this.notes.get(id)?.summary ?? "";
+        return isPlaceholder(summary) ? "" : summary;
+      },
+      png: (svg, width, height, scale) => this.pngBlob(svg, width, height, scale),
+      host: () => this.contentEl,
+      attachmentPath: (name, mapPath) => attachmentPath(this.app, name, mapPath),
+      createBinary: (path, data) => this.app.vault.createBinary(path, data),
+      notice: text => {
+        new Notice(text);
       }
-      const name = `${exportFileStem(map.title)}.${format}`;
-      if (target === "download") {
-        this.downloadBlob(blob, name);
-        new Notice(t("ui.export_downloaded", name));
-        return;
-      }
-      const data = await blob.arrayBuffer();
-      const destination = await attachmentPath(this.app, name, mapPath);
-      // Last check before anything is written.
-      if (!isCurrent()) return;
-      await this.app.vault.createBinary(destination, data);
-      new Notice(t("ui.export_saved", destination));
-    } catch (error) {
-      if (isCurrent()) new Notice(t("ui.export_failed", errorMessage(error)));
-    }
+    };
   }
   /**
    * The map commands of the command palette (they can take a hotkey): `checking` answers whether the command applies to
@@ -12408,9 +11641,7 @@ export class VisualAgentMapView extends ItemView {
     const restoreSearch = this.holdMapSearch();
     // The goal editor's fields go with the repaint: their draft, caret and keyboard are kept in the edit state, which draws them again.
     this.captureGoalEdit();
-    this.mapSourcesPanelCleanup?.();
-    this.mapSourcesPanelCleanup = null;
-    this.mapSourcesPanelEl = null;
+    this.mapSourcesControl?.detach();
     // A name being typed survives the repaint as its draft; one whose card is gone is dropped.
     this.suspendInlineName?.();
     if (this.inlineName?.target === "card" && !this.map?.nodes.some(node => node.id === this.inlineName?.id))
@@ -12793,7 +12024,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || this.map.aim) return;
     this.renderSelectTool(tools);
     // Like main's design, an empty map has no sources button either.
-    if (this.map.nodes.length) this.renderMapSourcesControl(tools);
+    if (this.map.nodes.length) this.mapSourcesControl?.renderMapSourcesControl(tools);
   }
   /**
    * The tools on an old AIM map (AIM was removed): the select tool only, no goal or sources control. A separate method so
@@ -15120,67 +14351,6 @@ export class VisualAgentMapView extends ItemView {
     const views = [...folded.map(text => ({ text, state: "live" as const })), ...steers.views()];
     if (views.length || turn.steers) turn.steers = views;
   }
-  /** True when the task has additions of any kind: then `running` stays on until they are settled (the gap after the reply). */
-  private holdsTopicSteers(entry: TopicChatEntry): boolean {
-    return !!entry.steers?.entries.length || !!entry.steerFolded?.length;
-  }
-  /** Puts additions that were not sent back in front of the draft; a closed window (nothing shows it) says so when `notice`. */
-  private returnTopicSteers(entry: TopicChatEntry, texts: string[], notice: boolean): void {
-    if (!texts.length) return;
-    const draft = [...texts, entry.session.draftText].filter(Boolean).join("\n\n");
-    entry.session.draftText = draft;
-    const open = this.topicChatOpen?.entry === entry ? this.topicChatOpen.win : null;
-    if (open) open.setInputText(draft);
-    else if (notice) new Notice(t("ui.map_chat_not_sent_draft"));
-  }
-  /**
-   * After the task has settled with additions: wait for hand-overs to end (`close`), write the ones that went in, then either
-   * send the waiting ones as one new question (the reply was done and the view is the same) or put them back in the box.
-   * `running` stays true over all of it, so a second Enter can only add (queued), never start a run.
-   */
-  private async endTopicChatSteers(
-    entry: TopicChatEntry,
-    steers: TopicChatSteers,
-    turnId: string | null,
-    live: () => boolean
-  ): Promise<void> {
-    const end = entry.steerEnd ?? null;
-    const done = !!end && end.status === "done" && !end.plan;
-    const folded = entry.steerFolded ?? [];
-    const finish = (): void => {
-      entry.session.running = false;
-      this.notifyTopicChat(entry);
-    };
-    try {
-      await steers.close();
-      if (live() && turnId)
-        for (const text of [...(done ? folded : []), ...steers.delivered()])
-          this.writeTopicChatLine(entry, { type: "steer", id: turnId, at: new Date().toISOString(), text });
-      const node = this.map?.nodes.find(item => item.id === entry.nodeId);
-      if (done && live() && steers.entries.some(item => item.state === "queued")) {
-        if (node) {
-          entry.submitting = true;
-          try {
-            if (await this.submitTopicChatNow(entry, node, "ask", "", steers)) return;
-          } finally {
-            entry.submitting = false;
-          }
-        }
-        // Declined (usage question, lock, busy, a presentation, a deleted card, ...): the waiting texts are back in the box.
-        this.returnTopicSteers(entry, steers.takeQueued(), true);
-        finish();
-        return;
-      }
-      // Stopped, failed, a plan, a view that is gone, a deleted card, or nothing waiting.
-      this.returnTopicSteers(entry, [...(done ? [] : folded), ...steers.takeQueued()], false);
-      finish();
-    } catch {
-      // A follow-up that already started owns `running` now; otherwise the texts are back in the box and the entry is free.
-      if (entry.runningTurnId) return;
-      this.returnTopicSteers(entry, steers.takeQueued(), true);
-      finish();
-    }
-  }
   /** Runs one request to its end, then tells the result in one sentence (window open) or by Notice (window closed). */
   private async runTopicChatTask(
     entry: TopicChatEntry,
@@ -15201,7 +14371,7 @@ export class VisualAgentMapView extends ItemView {
     } finally {
       // No additions: `settleTopicChat` already freed the entry, exactly as before.
       if (entry.steers === steers && (steers.entries.length || entry.steerFolded?.length) && entry.session.running)
-        await this.endTopicChatSteers(entry, steers, turnId, live);
+        await this.topicChatRun.endSteers(entry, steers, turnId, live);
     }
   }
   private async runTopicChatBody(
@@ -15235,7 +14405,7 @@ export class VisualAgentMapView extends ItemView {
         this.map?.title
       );
       if (kind === "ask") {
-        await this.runTopicChatAsk(entry, node, note, mode, text, controller, language, live, hooks, steers);
+        await this.topicChatRun.ask(entry, node, note, mode, text, controller, language, live, hooks, steers);
         return;
       }
       if (kind === "expand") {
@@ -15694,110 +14864,6 @@ export class VisualAgentMapView extends ItemView {
       ...this.usageMapField()
     };
   }
-  /** A free question: one map-chat request about the topic; what the reply writes is checked against the subtree where it is applied. */
-  private async runTopicChatAsk(
-    entry: TopicChatEntry,
-    node: MapNode,
-    note: Note,
-    mode: TopicChatMode,
-    text: string,
-    controller: AbortController,
-    language: ContentLanguage,
-    live: () => boolean,
-    hooks: BackgroundHooks,
-    steers: TopicChatSteers
-  ): Promise<void> {
-    const key = `topic-chat-ask:${++mapChatTaskSequence}`;
-    let began = false;
-    const end = (): void => {
-      if (!began) return;
-      began = false;
-      this.plugin.activeTasks?.delete(key);
-      hooks.end();
-    };
-    try {
-      const request = await this.buildTopicChatRequest(entry, node, note, text, controller.signal);
-      began = true;
-      this.plugin.activeTasks?.set(key, controller);
-      hooks.begin(controller);
-      const result = await this.plugin.mapChat.chat(
-        request,
-        controller.signal,
-        () => {},
-        event => {
-          // Claude without a live stream (json, json-fallback) cannot take additions: they all wait for the end.
-          if (event.kind === "stream-mode" && event.mode !== "stream-json") steers.live(false);
-        },
-        send => steers.bind(send)
-      );
-      end();
-      // Hand-overs still on their way settle first: what the reply took in is final before it is applied or put in the history.
-      if (steers.entries.length) await steers.close();
-      if (controller.signal.aborted) {
-        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
-        return;
-      }
-      const map = this.map;
-      if (!live() || !map) {
-        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
-        return;
-      }
-      const verdicts = judgeTopicScope(result.actions, map.nodes, node.id);
-      const allowed = result.actions.filter((_, index) => verdicts[index] === "ok");
-      // A reply that would need the user's yes first (a plan) is not applied here: the side panel has the plan screen.
-      const plan = allowed.length
-        ? planFor(allowed, request.context, {
-            diagrams: this.plugin.settings.addDiagramsAfterResearch,
-            mapAiMode: map.aiMode,
-            chatReadSources: entry.readsSources === true
-          })
-        : null;
-      if (plan) {
-        this.settleTopicChat(entry, t("ui.topic_chat_too_big"), live, true, "done", true, true);
-        return;
-      }
-      const lines = allowed.length
-        ? await this.applyMapChatActions(
-            { ...result, message: [text, ...steers.delivered()].join("\n\n") },
-            request.context,
-            () => live() && !controller.signal.aborted,
-            { path: this.path, id: map.id },
-            {
-              context: request.context,
-              topicScope: {
-                rootId: node.id,
-                run: (action, targets) =>
-                  this.runTopicChatAction(action, targets, action.mode || mode, language, controller.signal)
-              }
-            }
-          )
-        : [];
-      const refused = verdicts.filter(verdict => verdict === "out").length;
-      // A reply that says it is done cannot hide an action that failed or was skipped: those lines are shown with it.
-      // Refused or ignored actions already have their say (the out-of-scope sentence, or silence), so only allowed ones and the lines added after the actions count.
-      const problems = lines.filter(
-        (line, index) => line.status !== "done" && (index >= result.actions.length || verdicts[index] === "ok")
-      );
-      let sentence = result.reply.trim() || lines.map(line => line.text).join("\n");
-      if (problems.length) sentence = [sentence, ...problems.map(line => line.text)].filter(Boolean).join("\n\n");
-      if (refused) sentence = [sentence, t("ui.topic_chat_out_of_scope")].filter(Boolean).join("\n\n");
-      if (!sentence) sentence = t("ui.topic_chat_result_unknown");
-      if (controller.signal.aborted)
-        this.settleTopicChat(entry, t("ui.topic_chat_stopped"), live, false, "stopped", true);
-      else this.settleTopicChat(entry, sentence, live, true, problems.length ? "failed" : "done", true);
-    } catch (error) {
-      end();
-      const stopped = controller.signal.aborted;
-      this.settleTopicChat(
-        entry,
-        stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", this.chatErrorText(error).text),
-        live,
-        !stopped,
-        stopped ? "stopped" : "failed",
-        true
-      );
-    }
-  }
   /** Carries out a research, expansion or integration a free question asked for, on the topics it names (all inside the subtree). */
   private async runTopicChatAction(
     action: Extract<MapChatAction, { kind: "run_map_action" }>,
@@ -15862,35 +14928,32 @@ export class VisualAgentMapView extends ItemView {
   private topicChatOpenFor(entry: TopicChatEntry): boolean {
     return this.topicChatOpen?.entry === entry;
   }
-  /** Ends a run: the window (if open) shows one sentence; a closed window gets a Notice when `notice` says the task did not tell it. */
-  private settleTopicChat(
-    entry: TopicChatEntry,
-    sentence: string,
-    live: () => boolean,
-    notice: boolean,
-    status: TopicRecordStatus,
-    markdown = false,
-    plan = false
-  ): void {
-    // With additions the entry stays running over the gap until they are settled (`endTopicChatSteers` frees it).
-    if (!this.holdsTopicSteers(entry)) entry.session.running = false;
-    entry.steerEnd = { status, plan };
-    entry.session.progress = undefined;
-    const turnId = entry.runningTurnId;
-    entry.runningTurnId = null;
-    // Late-result fence: a view that closed or moved to another map writes nothing (its next open says the result is unknown).
-    if (!live()) return;
-    if (turnId)
-      this.writeTopicChatLine(entry, {
-        type: "result",
-        id: turnId,
-        at: new Date().toISOString(),
-        status,
-        text: sentence
-      });
-    entry.session.turns.push({ role: "ai", text: sentence, ...(markdown ? { markdown: true } : {}) });
-    this.notifyTopicChat(entry);
-    if (notice && !this.topicChatOpenFor(entry)) new Notice(sentence);
+  private settleTopicChat(...args: Parameters<TopicChatRun["settle"]>): void {
+    this.topicChatRun.settle(...args);
+  }
+  /** What the topic chat run needs of this view; every port reads the view when called (tests patch it). */
+  private topicChatRunPorts(): TopicChatRunPorts {
+    return {
+      closed: () => this.closed,
+      path: () => this.path,
+      map: () => this.map,
+      taskKey: () => `topic-chat-ask:${++mapChatTaskSequence}`,
+      registerTask: (key, controller) => this.plugin.activeTasks?.set(key, controller),
+      unregisterTask: key => this.plugin.activeTasks?.delete(key),
+      requestChat: (...a) => this.plugin.mapChat.chat(...a),
+      buildRequest: (e, n, no, m, s) => this.buildTopicChatRequest(e, n, no, m, s),
+      applyActions: (...a) => this.applyMapChatActions(...a),
+      runAction: (...a) => this.runTopicChatAction(...a),
+      errorText: e => this.chatErrorText(e),
+      notice: t => {
+        new Notice(t);
+      },
+      addDiagrams: () => this.plugin.settings.addDiagramsAfterResearch,
+      window: e => (this.topicChatOpen?.entry === e ? this.topicChatOpen.win : null),
+      notify: e => this.notifyTopicChat(e),
+      writeLine: (e, l) => this.writeTopicChatLine(e, l),
+      followUp: (e, n, s) => this.submitTopicChatNow(e, n, "ask", "", s)
+    };
   }
   private selectionTaskKey(): string {
     return `selection:${this.path}`;
@@ -16311,68 +15374,6 @@ export class VisualAgentMapView extends ItemView {
       );
     }, false);
   }
-  /**
-   * "This card [relation ▾] → [another card ▾] [Add]": one sentence adds a relation A -> B. The card list holds only
-   * legal targets (never this card itself, never a card already linked to it, never a cycle), so it is refilled when
-   * the relation changes. Adding goes through `addRelation`, so Map.md is written exactly as before.
-   */
-  private renderRelationAddRow(
-    parent: HTMLElement,
-    node: MapNode,
-    onAdded: () => void,
-    exposeFirst: (control: HTMLElement) => void,
-    close?: () => void
-  ): void {
-    const row = parent.createDiv("vam-relation-add");
-    row.setAttr("role", "group");
-    row.setAttr("aria-label", t("ui.relation_add_row"));
-    row.createSpan({ text: t("ui.relation_this_card"), cls: "vam-relation-add-self" });
-    const kindSelect = row.createEl("select", { cls: "dropdown vam-relation-add-kind" });
-    kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
-    for (const kind of RELATION_KINDS) kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
-    exposeFirst(kindSelect);
-    row.createSpan({ text: "→", cls: "vam-relation-add-arrow", attr: { "aria-hidden": "true" } });
-    const currentKind = (): TopicRelationKind => (kindSelect.value as TopicRelationKind) || RELATION_KINDS[0];
-    // The list holds only the cards this card may be linked to with the chosen relation; it is read when the list opens.
-    const legalSources = (): CardSearchSource[] => {
-      const legal = this.map ? new Set(legalRelationTargets(this.map, currentKind(), node.id)) : new Set<string>();
-      return this.cardSearchSources(item => item.id !== node.id && legal.has(item.id));
-    };
-    const field = createCardSearchField({
-      app: this.app,
-      parent: row,
-      placeholder: t("ui.relation_search_placeholder"),
-      ariaLabel: t("ui.relation_target_label"),
-      candidates: legalSources,
-      onSelect: item => {
-        const kind = currentKind();
-        field.setValue("");
-        this.enqueue(async () => {
-          await this.addRelation(node.id, item.id, kind);
-          onAdded();
-        });
-      }
-    });
-    const refresh = (): void => {
-      field.setValue("");
-      const none = !legalSources().length;
-      field.setDisabled(
-        none,
-        none ? t("ui.no_relation_target_0", t(RELATION_NAME_KEY[currentKind()])) : t("ui.relation_search_placeholder")
-      );
-    };
-    refresh();
-    kindSelect.addEventListener("change", refresh);
-    // A second way to add: a point on an annotated image, a quiet link under the row (after the search, so the keyboard reaches it in order).
-    if (this.anchorRelationsEditable()) {
-      const point = parent.createEl("button", {
-        text: t("ui.anchor_relation_add_button"),
-        cls: "vam-relation-add-anchor"
-      });
-      point.type = "button";
-      point.addEventListener("click", () => this.openAnchorPick(node, currentKind, onAdded, close));
-    }
-  }
   /** Rows for a card search: the cards `include` keeps, each with its title and the titles above it. */
   private cardSearchSources(
     include: (node: MapNode) => boolean,
@@ -16392,544 +15393,17 @@ export class VisualAgentMapView extends ItemView {
   private anchorRelationsEditable(): boolean {
     return this.relationsEnabled() && this.canEditCanvasItems();
   }
-  /** The dialog behind "Point on an image…": the existing anchors of every annotated image, and "Place a new point". */
-  private openAnchorPick(node: MapNode, kind: () => TopicRelationKind, onAdded: () => void, close?: () => void): void {
-    if (!this.anchorRelationsEditable()) return;
-    const items = this.map?.canvasItems ?? [],
-      entries: AnchorPickEntry[] = [];
-    for (const item of items) {
-      if (!isAnnotatedImage(item)) continue;
-      const name = item.note || (item.path.split("/").pop() ?? item.path);
-      for (const anchor of item.anchors) {
-        if (!isImage2dAnchor(anchor)) continue;
-        entries.push({
-          imageId: item.id,
-          anchorId: anchor.id,
-          label: t("ui.anchor_pick_entry_0_1", name, anchor.note || t("ui.anchor_label_empty")),
-          taken: (item.relations ?? []).some(
-            r => (r.from === anchor.id && r.to === node.id) || (r.to === anchor.id && r.from === node.id)
-          )
-        });
-      }
-    }
-    new AnchorPickModal(
-      this.app,
-      entries,
-      items.some(item => isAnnotatedImage(item)),
-      entry =>
-        this.enqueue(async () => {
-          const relation = { kind: kind(), from: entry.anchorId, to: node.id };
-          const image = findAnnotatedImage(this.map?.canvasItems ?? [], entry.imageId);
-          if (!image || !anchorRelationAllowed(image, relation)) {
-            new Notice(t("ui.anchor_relation_not_added"));
-            return;
-          }
-          await this.changeCanvasItems(entry.imageId, list => addAnchorRelation(list, entry.imageId, relation));
-          onAdded();
-        }),
-      () => {
-        close?.();
-        this.startPickingAnchorImage(node.id, kind());
-      }
-    ).open();
+  /** The relation editor dialog for `link` (the canvas line click and the panel pencil open it; see {@link RelationEditor}). */
+  private openRelationEditor(link: TopicRelation, onChanged?: () => void, onClosed?: () => void): void {
+    this.relationEditor.openRelationEditor(link, onChanged, onClosed);
   }
-  /** "Annotated image · <anchor note>" (or the empty form) for the anchor `anchorId` of image `imageId`. */
-  private anchorEndText(imageId: string, anchorId: string): string {
-    const note = findAnnotatedImage(this.map?.canvasItems ?? [], imageId)?.anchors.find(a => a.id === anchorId)?.note;
-    return note ? t("ui.anchor_relation_end_0", note) : t("ui.anchor_relation_end_empty");
-  }
-  /** A panel row of an anchor relation: "Kind ← Annotated image · note" (the anchor is the source), "→" (it is the target), "—" for related. */
-  private anchorRelationRowText(ref: { imageId: string; anchorId: string; relation: AnchorRelation }): string {
-    const name = t(RELATION_NAME_KEY[ref.relation.kind]),
-      end = this.anchorEndText(ref.imageId, ref.anchorId);
-    // The owner-approved design shows the stored direction for every kind, "related" included ("Related ← Annotated image · x").
-    return t(
-      ref.relation.from === ref.anchorId ? "ui.anchor_relation_row_in_0_1" : "ui.anchor_relation_row_out_0_1",
-      name,
-      end
-    );
-  }
-  /** The text of a panel row for `link` seen from `selfId`: "Name → B" going out, "A → Name" coming in, "Name — X" for related. */
-  private relationRowText(link: TopicRelation, selfId: string): string {
-    const name = t(RELATION_NAME_KEY[link.kind]),
-      titleOf = (id: string): string => this.notes.get(id)?.title ?? id;
-    if (link.kind === "related")
-      return t("ui.relation_row_related_0_1", name, titleOf(link.from === selfId ? link.to : link.from));
-    return link.from === selfId
-      ? t("ui.relation_row_out_0_1", name, titleOf(link.to))
-      : t("ui.relation_row_in_0_1", titleOf(link.from), name);
-  }
-  /**
-   * One anchor relation in a topic's panel (the topic is the other end). The row reads "Kind ← Annotated image · note"; a click
-   * on it (or its pencil) opens the anchor relation editor, the trash removes it (the anchor stays). A map that cannot be
-   * edited shows the row alone. Everything the user typed goes in as text.
-   */
-  private renderAnchorRelationRow(
-    list: HTMLElement,
-    node: MapNode,
-    ref: { imageId: string; anchorId: string; relation: AnchorRelation },
-    repaint: () => void,
-    editButtons: Map<string, HTMLElement>
-  ): void {
-    const key = anchorLineKey(ref.imageId, ref.anchorId, node.id),
-      text = this.anchorRelationRowText(ref),
-      described = ref.relation.description ? `${text}. ${ref.relation.description}` : text,
-      end = { imageId: ref.imageId, anchorId: ref.anchorId, topicId: node.id };
-    const row = list.createEl("li", { cls: "vam-relation-row vam-anchor-relation-row" });
-    this.bindRelationRow(row, ref.relation, described, key);
-    this.relationSwatch(row, ref.relation.kind);
-    const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
-    label.createSpan({ text, cls: "vam-relation-sentence", attr: { dir: "auto" } });
-    if (ref.relation.description)
-      label.createSpan({ text: ref.relation.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
-    if (!this.anchorRelationsEditable()) return;
-    const tools = row.createSpan({ cls: "vam-relation-tools" });
-    const reopen = (): void => editButtons.get(key)?.focus();
-    row.addEventListener("click", event => {
-      if (tools.contains?.(event.target as Node)) return;
-      this.openAnchorRelationEditor(end, repaint, reopen);
-    });
-    editButtons.set(
-      key,
-      this.iconButton(tools, "pencil", t("ui.edit_relation_0", text), () =>
-        this.openAnchorRelationEditor(end, repaint, reopen)
-      )
-    );
-    this.iconButton(tools, "trash-2", t("ui.remove_relation_0", text), () =>
-      this.enqueue(async () => {
-        await this.changeCanvasItems(ref.imageId, items =>
-          removeAnchorRelation(items, ref.imageId, ref.anchorId, node.id)
-        );
-        repaint();
-      })
-    );
-  }
-  /** The anchor relation editor in a dialog; the same host and close-time save as {@link openRelationEditor}. */
+  /** The anchor relation editor dialog (see {@link RelationEditor}). */
   private openAnchorRelationEditor(
     ref: { imageId: string; anchorId: string; topicId: string },
     onChanged?: () => void,
     onClosed?: () => void
   ): void {
-    if (!this.anchorRelationsEditable()) return;
-    let saveNote = (): Promise<void> => Promise.resolve();
-    const render = (content: HTMLElement, close: () => void): void => {
-      saveNote = this.renderAnchorRelationEditor(content, ref, close, onChanged);
-    };
-    new (class extends Modal {
-      onOpen(): void {
-        this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
-        render(this.contentEl, () => this.close());
-      }
-      onClose(): void {
-        void saveNote().then(() => {
-          if (onClosed) window.setTimeout(onClosed, 0);
-        });
-      }
-    })(this.app).open();
-  }
-  /** The relation of this (anchor, topic) pair as the map holds it now. */
-  private anchorRelationOf(ref: { imageId: string; anchorId: string; topicId: string }): AnchorRelation | undefined {
-    return findAnnotatedImage(this.map?.canvasItems ?? [], ref.imageId)?.relations?.find(
-      r => (r.from === ref.anchorId && r.to === ref.topicId) || (r.from === ref.topicId && r.to === ref.anchorId)
-    );
-  }
-  /**
-   * The editor of an anchor relation: type, reverse, a one-line note and delete (the anchor stays). Each change is one undo
-   * step written at once (the note on blur, Ctrl/Cmd+Enter or close). The pair holds one relation, so a type or direction
-   * change can never make a second one; anchor relations take no part in the derives/prerequisite cycle rule (decision 2).
-   * Returns the close-time save, settled when its write is done.
-   */
-  private renderAnchorRelationEditor(
-    parent: HTMLElement,
-    ref: { imageId: string; anchorId: string; topicId: string },
-    close?: () => void,
-    onChanged?: () => void
-  ): () => Promise<void> {
-    const root = parent.createDiv("vam-relation-editor"),
-      key = anchorLineKey(ref.imageId, ref.anchorId, ref.topicId);
-    const apply = (next: (rel: AnchorRelation) => AnchorRelation | null, repaint = true): Promise<void> =>
-      new Promise(done =>
-        this.enqueue(async () => {
-          try {
-            const old = this.anchorRelationOf(ref);
-            if (!old) return;
-            const result = next(old);
-            await this.changeCanvasItems(ref.imageId, items =>
-              result
-                ? updateAnchorRelation(items, ref.imageId, ref.anchorId, ref.topicId, result)
-                : removeAnchorRelation(items, ref.imageId, ref.anchorId, ref.topicId)
-            );
-            if (!result) {
-              this.selection.deselectRelation(key);
-              this.syncRelationClasses();
-              onChanged?.();
-              close?.();
-              return;
-            }
-            this.selection.selectRelation(key);
-            this.syncRelationClasses();
-            if (repaint) paint();
-            onChanged?.();
-          } finally {
-            done();
-          }
-        })
-      );
-    let savedNote: string | undefined;
-    let noteWrite: Promise<void> = Promise.resolve();
-    let saveNote = (): void => {};
-    let refocus: "kind" | "reverse" | null = null;
-    const paint = (): void => {
-      root.empty();
-      saveNote = () => {};
-      root.createEl("strong", { text: t("ui.relation_editor_title"), cls: "vam-topic-tree-heading" });
-      const current = this.anchorRelationOf(ref),
-        image = findAnnotatedImage(this.map?.canvasItems ?? [], ref.imageId);
-      if (!current || !image) {
-        root.createEl("p", { text: t("ui.relation_gone") });
-        return;
-      }
-      const titleOf = (id: string): string =>
-        id === ref.anchorId ? this.anchorEndText(ref.imageId, ref.anchorId) : (this.notes.get(id)?.title ?? id);
-      const summary = root.createDiv("vam-relation-editor-summary");
-      this.relationSwatch(summary, current.kind);
-      summary.createSpan({
-        text: t(
-          current.kind === "related" ? "ui.relation_label_full_related_0_1_2" : "ui.relation_label_full_0_1_2",
-          t(RELATION_NAME_KEY[current.kind]),
-          titleOf(current.from),
-          titleOf(current.to)
-        ),
-        cls: "vam-relation-sentence",
-        attr: { dir: "auto" }
-      });
-      const field = (label: string, id: string): HTMLElement => {
-        const row = root.createDiv("vam-relation-field");
-        row.createEl("label", { text: label, attr: { for: id } });
-        return row;
-      };
-      const kindRow = field(t("ui.relation_kind_label"), "vam-relation-kind");
-      const kindSelect = kindRow.createEl("select", { cls: "dropdown vam-relation-kind" });
-      kindSelect.setAttr("id", "vam-relation-kind");
-      kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
-      for (const kind of RELATION_KINDS) {
-        const option = kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
-        if (kind !== current.kind && !anchorRelationAllowed(image, { ...current, kind }, current))
-          option.disabled = true;
-      }
-      kindSelect.value = current.kind;
-      kindSelect.addEventListener("change", () => {
-        const kind = kindSelect.value as TopicRelationKind;
-        if (kind === current.kind) return;
-        refocus = "kind";
-        void apply(rel => ({ ...rel, kind }));
-      });
-      let reverseButton: HTMLElement | null = null;
-      if (current.kind !== "related") {
-        const directionRow = root.createDiv("vam-relation-field");
-        directionRow.createSpan({ text: t("ui.relation_direction_label"), cls: "vam-relation-field-label" });
-        reverseButton = this.button(
-          directionRow,
-          t("ui.relation_reverse"),
-          () => {
-            refocus = "reverse";
-            void apply(rel => ({ ...rel, from: rel.to, to: rel.from }));
-          },
-          !anchorRelationAllowed(image, { ...current, from: current.to, to: current.from }, current)
-        );
-        reverseButton.addClass("vam-relation-reverse");
-      }
-      const noteRow = field(t("ui.relation_description_label"), "vam-relation-description");
-      const description = noteRow.createEl("textarea", { cls: "vam-relation-description" });
-      description.setAttr("id", "vam-relation-description");
-      description.setAttr("rows", "4");
-      description.setAttr("maxlength", String(RELATION_DESCRIPTION_MAX_LENGTH));
-      savedNote = current.description;
-      description.value = savedNote ?? "";
-      description.setAttr("aria-label", t("ui.relation_description_label"));
-      description.setAttr("placeholder", t("ui.relation_description_placeholder"));
-      const remaining = noteRow.createDiv({ cls: "vam-relation-remaining" });
-      saveNote = (): void => {
-        const text = normalizeRelationDescription(description.value);
-        if (text === savedNote) return;
-        savedNote = text;
-        noteWrite = apply(rel => {
-          const next: AnchorRelation = { kind: rel.kind, from: rel.from, to: rel.to };
-          if (text !== undefined) next.description = text;
-          return next;
-        }, false);
-      };
-      const footer = root.createDiv("vam-next-actions vam-relation-footer");
-      const remove = footer.createEl("button", { text: t("ui.relation_delete"), cls: "vam-discard mod-warning" });
-      remove.addEventListener("click", () => void apply(() => null));
-      footer.createSpan({ cls: "vam-next-status" });
-      footer.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close?.());
-      const refresh = (): void =>
-        remaining.setText(
-          t(
-            "ui.relation_description_remaining_0",
-            Math.max(0, RELATION_DESCRIPTION_MAX_LENGTH - description.value.length)
-          )
-        );
-      description.addEventListener("input", refresh);
-      description.addEventListener("change", () => saveNote());
-      description.addEventListener("keydown", event => {
-        if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
-        event.preventDefault();
-        saveNote();
-      });
-      refresh();
-      if (refocus) ({ kind: kindSelect, reverse: reverseButton })[refocus]?.focus();
-      refocus = null;
-    };
-    paint();
-    return () => {
-      saveNote();
-      return noteWrite;
-    };
-  }
-  /** The row's visible sentence "A relation B" (T1), with this topic written "This topic"; "related" reads "This topic is related to B". With a null `selfId` (the editor) both ends are named by title. */
-  private relationSentence(link: TopicRelation, selfId: string | null): string {
-    const self = t("ui.relation_this_topic"),
-      // English needs the lower-case form after the verb ("OTHER is derived from this topic"); Chinese has one form.
-      titleOf = (id: string, object = false): string =>
-        id === selfId ? (object ? t("ui.relation_this_topic_object") : self) : (this.notes.get(id)?.title ?? id);
-    if (link.kind === "related")
-      return selfId === null
-        ? t("ui.relation_sentence_related_0_1", titleOf(link.from), titleOf(link.to))
-        : t("ui.relation_sentence_related_0_1", self, titleOf(link.from === selfId ? link.to : link.from));
-    return t(RELATION_SENTENCE_KEY[link.kind], titleOf(link.from), titleOf(link.to, true));
-  }
-  /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
-  private openRelationEditor(link: TopicRelation, onChanged?: () => void, onClosed?: () => void): void {
-    if (!this.map || !this.relationsEnabled()) return;
-    let saveNote = (): Promise<void> => Promise.resolve();
-    const render = (content: HTMLElement, close: () => void): void => {
-      saveNote = this.renderRelationEditor(content, link, close, onChanged);
-    };
-    new (class extends Modal {
-      onOpen(): void {
-        this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
-        render(this.contentEl, () => this.close());
-      }
-      onClose(): void {
-        // Closing saves a changed note. Obsidian puts focus back on the button that opened the dialog, but a change
-        // repainted the panel and that button is gone; once the save is done, the caller moves focus to the row's replacement.
-        void saveNote().then(() => {
-          if (onClosed) window.setTimeout(onClosed, 0);
-        });
-      }
-    })(this.app).open();
-  }
-
-  /**
-   * The relation editor: type (only the legal ones), reverse (not for "related"; disabled with the reason when it is
-   * illegal), a one-line note, and delete. Each change is one undoable Map.md step and is written at once; the note is
-   * written when the box loses focus, on Ctrl/Cmd+Enter, or when the dialog closes (decision 40). Everything the user
-   * typed (the note, topic titles) is shown as text only. Returns the close-time save, settled when its write is done.
-   */
-  private renderRelationEditor(
-    parent: HTMLElement,
-    initial: TopicRelation,
-    close?: () => void,
-    onChanged?: () => void
-  ): () => Promise<void> {
-    let current: TopicRelation = { ...initial };
-    const root = parent.createDiv("vam-relation-editor");
-    const indexOfCurrent = (): number =>
-      (this.map?.topicRelations ?? []).findIndex(r => relationIdentity(r) === relationIdentity(current));
-    // Runs one change on the relation held in the map being edited; `next` returns its new form, or null to delete it.
-    // A note save does not repaint the dialog, so a control the user is reaching for stays where it is.
-    const apply = (next: (rel: TopicRelation) => TopicRelation | null | undefined, repaint = true): Promise<void> =>
-      new Promise(done =>
-        this.enqueue(async () => {
-          try {
-            await change(next, repaint);
-          } finally {
-            done();
-          }
-        })
-      );
-    const change = async (
-      next: (rel: TopicRelation) => TopicRelation | null | undefined,
-      repaint: boolean
-    ): Promise<void> => {
-      const outcome: { value?: TopicRelation | null } = {};
-      if (!this.map) return;
-      // The line stays selected under its new identity; a deleted one is dropped by the next draw.
-      await this.mapChange(map => {
-        const list = map.topicRelations ?? [],
-          index = list.findIndex(r => relationIdentity(r) === relationIdentity(current));
-        if (index < 0) return;
-        outcome.value = next(list[index]);
-        // A type or direction change is checked again on the map being edited (the same rule as the choices offered).
-        const old = list[index];
-        if (
-          outcome.value &&
-          (outcome.value.kind !== old.kind || outcome.value.from !== old.from || outcome.value.to !== old.to) &&
-          !relationAllowed(list, outcome.value, index)
-        )
-          outcome.value = undefined;
-        if (outcome.value === undefined) return;
-        const updated = [...list];
-        if (outcome.value) updated[index] = outcome.value;
-        else updated.splice(index, 1);
-        setTopicRelations(map, updated);
-      }, false);
-      const result = outcome.value;
-      if (result === null) {
-        this.selection.deselectRelation(relationIdentity(current));
-        this.syncRelationClasses();
-        onChanged?.();
-        close?.();
-        return;
-      }
-      if (result) {
-        current = result;
-        this.selection.selectRelation(relationIdentity(current));
-        this.syncRelationClasses();
-      }
-      if (repaint) paint();
-      onChanged?.();
-    };
-    // The note as last written or requested; a save is asked for only when the box differs from it.
-    let savedNote = initial.description;
-    let noteWrite: Promise<void> = Promise.resolve();
-    let saveNote = (): void => {};
-    // Which control takes the keyboard focus after the next repaint (a change repaints the whole dialog).
-    let refocus: "kind" | "reverse" | null = null;
-    const paint = (): void => {
-      root.empty();
-      saveNote = () => {};
-      const index = indexOfCurrent();
-      root.createEl("strong", { text: t("ui.relation_editor_title"), cls: "vam-topic-tree-heading" });
-      if (index < 0) {
-        root.createEl("p", { text: t("ui.relation_gone") });
-        return;
-      }
-      const relations = this.map?.topicRelations ?? [];
-      // E1: the sentence "A relation B" and the line sample follow the kind and direction at once.
-      const summary = root.createDiv("vam-relation-editor-summary");
-      this.relationSwatch(summary, current.kind);
-      summary.createSpan({
-        text: this.relationSentence(current, null),
-        cls: "vam-relation-sentence",
-        attr: { dir: "auto" }
-      });
-      // E2: one field per row, label above the control.
-      const field = (label: string, id: string): HTMLElement => {
-        const row = root.createDiv("vam-relation-field");
-        row.createEl("label", { text: label, attr: { for: id } });
-        return row;
-      };
-      // Type: every kind is listed; one that would close a derives/prerequisite cycle is disabled, with the reason beside it (Q7).
-      const kindRow = field(t("ui.relation_kind_label"), "vam-relation-kind");
-      const kindSelect = kindRow.createEl("select", { cls: "dropdown vam-relation-kind" });
-      kindSelect.setAttr("id", "vam-relation-kind");
-      kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
-      const blocked: TopicRelationKind[] = [];
-      for (const kind of RELATION_KINDS) {
-        const open =
-          kind === current.kind || relationAllowed(relations, { kind, from: current.from, to: current.to }, index);
-        if (!open) blocked.push(kind);
-        const option = kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
-        if (!open) option.disabled = true;
-      }
-      kindSelect.value = current.kind;
-      if (blocked.length) {
-        const reason = kindRow.createEl("p", {
-          text: t("ui.relation_kind_blocked_cycle_0", blocked.map(kind => t(RELATION_NAME_KEY[kind])).join(", ")),
-          cls: "vam-relation-reason"
-        });
-        reason.setAttr("id", "vam-relation-kind-reason");
-        kindSelect.setAttr("aria-describedby", "vam-relation-kind-reason");
-      }
-      kindSelect.addEventListener("change", () => {
-        const kind = kindSelect.value as TopicRelationKind;
-        if (kind === current.kind) return;
-        refocus = "kind";
-        void apply(rel => ({ ...rel, kind }));
-      });
-      let reverseButton: HTMLElement | null = null;
-      // E3 direction: one Reverse button; "related" has no direction and no button. A reverse that would close a cycle stays visible, disabled, with the reason beside it.
-      if (current.kind !== "related") {
-        const directionRow = root.createDiv("vam-relation-field");
-        directionRow.createSpan({ text: t("ui.relation_direction_label"), cls: "vam-relation-field-label" });
-        const reversed = { kind: current.kind, from: current.to, to: current.from };
-        const allowed = relationAllowed(relations, reversed, index);
-        const reverse = this.button(
-          directionRow,
-          t("ui.relation_reverse"),
-          () => {
-            refocus = "reverse";
-            void apply(rel => ({ ...rel, from: reversed.from, to: reversed.to }));
-          },
-          !allowed
-        );
-        reverse.addClass("vam-relation-reverse");
-        reverseButton = reverse;
-        if (!allowed) {
-          const reason = directionRow.createEl("p", {
-            text: t("ui.relation_reverse_blocked_cycle"),
-            cls: "vam-relation-reason"
-          });
-          reason.setAttr("id", "vam-relation-reverse-reason");
-          reverse.setAttr("aria-describedby", "vam-relation-reverse-reason");
-        }
-      }
-      // Note: a multi-line box of up to 200 characters, saved as one line (line breaks become spaces); an empty one removes the key.
-      const noteRow = field(t("ui.relation_description_label"), "vam-relation-description");
-      const description = noteRow.createEl("textarea", { cls: "vam-relation-description" });
-      description.setAttr("id", "vam-relation-description");
-      description.setAttr("rows", "4");
-      description.setAttr("maxlength", String(RELATION_DESCRIPTION_MAX_LENGTH));
-      savedNote = relations[index].description;
-      description.value = savedNote ?? "";
-      description.setAttr("aria-label", t("ui.relation_description_label"));
-      description.setAttr("placeholder", t("ui.relation_description_placeholder"));
-      const remaining = noteRow.createDiv({ cls: "vam-relation-remaining" });
-      const draft = (): string | undefined => normalizeRelationDescription(description.value);
-      saveNote = (): void => {
-        const text = draft();
-        if (text === savedNote) return;
-        savedNote = text;
-        noteWrite = apply(rel => {
-          const next: TopicRelation = { kind: rel.kind, from: rel.from, to: rel.to };
-          if (text !== undefined) next.description = text;
-          return next;
-        }, false);
-      };
-      // E5 footer (decision 40): Delete on the left, Close on the right; nothing waits for an Apply.
-      const footer = root.createDiv("vam-next-actions vam-relation-footer");
-      const remove = footer.createEl("button", { text: t("ui.relation_delete"), cls: "vam-discard mod-warning" });
-      remove.addEventListener("click", () => void apply(() => null));
-      footer.createSpan({ cls: "vam-next-status" });
-      footer.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close?.());
-      const refresh = (): void => {
-        remaining.setText(
-          t(
-            "ui.relation_description_remaining_0",
-            Math.max(0, RELATION_DESCRIPTION_MAX_LENGTH - description.value.length)
-          )
-        );
-      };
-      description.addEventListener("input", refresh);
-      description.addEventListener("change", () => saveNote());
-      // Enter adds a line break; Ctrl/Cmd+Enter saves at once.
-      description.addEventListener("keydown", event => {
-        if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
-        event.preventDefault();
-        saveNote();
-      });
-      refresh();
-      if (refocus) ({ kind: kindSelect, reverse: reverseButton, description })[refocus]?.focus();
-      refocus = null;
-    };
-    paint();
-    return () => {
-      saveNote();
-      return noteWrite;
-    };
+    this.relationEditor.openAnchorRelationEditor(ref, onChanged, onClosed);
   }
   /** "Add subtopic…" (the structure dialog's footer, left of "Remove from map"): the six-type menu, then a new subtopic of that type. */
   private renderAddSubtopic(actions: HTMLElement, node: MapNode, close?: () => void): void {
@@ -16977,29 +15451,6 @@ export class VisualAgentMapView extends ItemView {
       svg.appendChild(frame);
     }
     swatch.insertBefore(svg, null);
-  }
-  /** A 32x10 sample of a relation's line (the canvas classes and arrowheads), so a row shows which line to look for. */
-  private relationSwatch(parent: HTMLElement, kind: TopicRelationKind): void {
-    const svg = createSvg("svg"),
-      defs = createSvg("defs"),
-      id = `${this.relationMarkerId}-row${++relationSwatchSequence}`;
-    svg.addClass("vam-relation-swatch");
-    svg.setAttribute("viewBox", "0 0 32 10");
-    svg.setAttribute("aria-hidden", "true");
-    const arrow = kind === "related" ? null : `url(#${id})`;
-    if (arrow) {
-      defs.appendChild(this.relationMarker(id, kind === "contradicts"));
-      svg.appendChild(defs);
-    }
-    for (const gap of kind === "derives_from" ? [false, true] : [false]) {
-      const line = createSvg("path");
-      line.setAttribute("d", "M 0 5 L 32 5");
-      if (arrow) line.setAttribute("marker-end", arrow);
-      line.addClass(gap ? "vam-relation-gap" : "vam-relation");
-      if (!gap) line.addClass(`vam-relation-${kind}`);
-      svg.appendChild(line);
-    }
-    parent.insertBefore(svg, null);
   }
   /** Markers can be edited only on an ordinary editable map: not an AIM map or the select mode. */
   private markersEditable(node: MapNode): boolean {
@@ -17746,9 +16197,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.relationsEnabled()) return;
     const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
     const body = section.createDiv("vam-hypothesis-body");
-    const editByPair = new Map<string, HTMLElement>();
-    const anchorEdit = new Map<string, HTMLElement>();
-    let addRelationControl: HTMLElement | null = null;
+    const relationFocus: RelationListFocus = { editByPair: new Map(), anchorEdit: new Map(), addControl: null };
     const paint = (
       focusStrength = false,
       focusKind = false,
@@ -17833,56 +16282,15 @@ export class VisualAgentMapView extends ItemView {
           }
         }
       }
-      // Relations: every link that starts or ends at this topic, whatever its kind.
-      editByPair.clear();
-      anchorEdit.clear();
-      const links = (this.map?.topicRelations ?? []).filter(r => r.from === node.id || r.to === node.id);
-      body.createEl("strong", { text: t("ui.relations_heading"), cls: "vam-topic-tree-heading vam-section-heading" });
-      const anchored = anchorRelationsForTopic(this.map?.canvasItems ?? [], node.id);
-      if (links.length || anchored.length) {
-        const list = body.createEl("ul", { cls: "vam-relation-list" });
-        for (const link of links) {
-          const row = list.createEl("li", { cls: "vam-relation-row" }),
-            text = this.relationRowText(link, node.id),
-            described = link.description ? `${text}. ${link.description}` : text;
-          this.bindRelationRow(row, link, described);
-          this.relationSwatch(row, link.kind);
-          const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
-          label.createSpan({
-            text: this.relationSentence(link, node.id),
-            cls: "vam-relation-sentence",
-            attr: { dir: "auto" }
-          });
-          if (link.description)
-            label.createSpan({ text: link.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
-          const tools = row.createSpan({ cls: "vam-relation-tools" });
-          const pair = relationPairKey(link.from, link.to);
-          // After the editor closes, focus goes to this pair's edit button as last painted (a pair has one relation),
-          // or to "Add relation…" when the relation was deleted.
-          const edit = this.iconButton(tools, "pencil", t("ui.edit_relation_0", text), () =>
-            this.openRelationEditor(link, paint, () => (editByPair.get(pair) ?? addRelationControl)?.focus())
-          );
-          editByPair.set(pair, edit);
-          this.iconButton(tools, "trash-2", t("ui.remove_relation_0", text), () =>
-            this.enqueue(async () => {
-              await this.removeRelation(link);
-              paint();
-            })
-          );
-        }
-        for (const ref of anchored) this.renderAnchorRelationRow(list, node, ref, paint, anchorEdit);
-      } else body.createEl("p", { cls: "vam-hint vam-relation-empty", text: t("ui.relations_none") });
-      this.renderRelationAddRow(
+      this.relationEditor.renderList(
         body,
         node,
+        relationFocus,
+        () => paint(),
         () => paint(false, false, true),
-        kindControl => {
-          addRelationControl = kindControl;
-        },
+        focusAdd,
         close
       );
-      // Repainting replaced the control that started the flow; a keyboard user lands back on its replacement.
-      if (focusAdd) addRelationControl?.focus();
     };
     paint();
   }
@@ -20462,7 +18870,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private watchToolPlacement(bar: HTMLElement | null): void {
     const q = (selector: string) => this.contentEl?.querySelector?.<HTMLElement>(selector) ?? null;
-    const sources = this.mapSourcesPanelEl;
+    const sources = this.mapSourcesControl?.mapSourcesPanelEl;
     const targets = [
       bar,
       this.goalHeaderEl(),
@@ -20531,11 +18939,11 @@ export class VisualAgentMapView extends ItemView {
     } else {
       tools.style.removeProperty("--vam-tools-max");
     }
-    const sources = this.mapSourcesPanelEl;
+    const sources = this.mapSourcesControl?.mapSourcesPanelEl;
     const open = !!sources && sources.isConnected !== false;
     tools.toggleClass?.("has-panel", open);
     if (!open || !sources) return;
-    this.placeMapSourcesPanel(sources);
+    this.mapSourcesControl.placeMapSourcesPanel(sources);
     const room = this.sourcesRoom(tools);
     if (room !== null && typeof sources.style?.setProperty === "function") {
       sources.style.setProperty("--vam-sources-max", `${room}px`);
@@ -21261,6 +19669,22 @@ export class VisualAgentMapView extends ItemView {
       }
     };
   }
+  private mapSourcesControlPorts(): MapSourcesControlPorts {
+    return {
+      app: () => this.app,
+      closed: () => this.closed,
+      path: () => this.path,
+      mapId: () => this.map?.id,
+      epoch: () => this.viewEpoch,
+      repo: () => this.plugin.repo,
+      announce: text => this.announcer?.setText(text),
+      doc: () => this.contentEl?.ownerDocument,
+      enqueue: work => this.enqueue(work),
+      button: (parent, action) => this.button(parent, "", action),
+      placeTools: () => this.placeMapTools(),
+      scope: () => this.externalScope()
+    };
+  }
   private mapChatConversationPorts(): MapChatConversationPorts {
     return {
       panel: () => this.chat,
@@ -21333,6 +19757,32 @@ export class VisualAgentMapView extends ItemView {
       root: managed ? this.plugin.repo.topicRoot(this.path) : null,
       mapPath: this.path,
       mapId: this.map?.id ?? ""
+    };
+  }
+  /** What the relation editor reads from this view (all lazily: a test may replace a member after the view is built). */
+  private relationEditorPorts(): RelationEditorPorts {
+    return {
+      app: () => this.app,
+      map: () => this.map,
+      notes: () => this.notes,
+      selection: () => this.selection,
+      relationsEnabled: () => this.relationsEnabled(),
+      anchorEditable: () => this.anchorRelationsEditable(),
+      enqueue: work => this.enqueue(work),
+      mapChange: (change, rebuildDerivedData) => this.mapChange(change, rebuildDerivedData),
+      changeCanvasItems: (id, change) => this.changeCanvasItems(id, change),
+      addRelation: (from, to, kind) => this.addRelation(from, to, kind),
+      removeRelation: link => this.removeRelation(link),
+      syncRelationClasses: () => this.syncRelationClasses(),
+      button: (parent, text, action, disabled) => this.button(parent, text, action, disabled),
+      iconButton: (parent, icon, label, action) => this.iconButton(parent, icon, label, action),
+      bindRelationRow: (row, link, ariaLabel, key) => this.bindRelationRow(row, link, ariaLabel, key),
+      markerId: () => this.relationMarkerId,
+      marker: (id, barred) => this.relationMarker(id, barred),
+      cardSearchSources: (include, enabled) => this.cardSearchSources(include, enabled),
+      startPickingAnchorImage: (topicId, kind) => this.startPickingAnchorImage(topicId, kind),
+      openRelationEditor: (link, onChanged, onClosed) => this.openRelationEditor(link, onChanged, onClosed),
+      openAnchorRelationEditor: (ref, onChanged, onClosed) => this.openAnchorRelationEditor(ref, onChanged, onClosed)
     };
   }
   /** What the record session reads from this view and the plugin (all lazily: the view's app may not exist yet when it is built). */

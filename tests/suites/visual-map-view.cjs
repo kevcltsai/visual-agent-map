@@ -2585,7 +2585,7 @@ const heEditor = (relations, current, options = {}) => {
   fx.view.enqueue = work => work();
   fx.view.mapChange = async (change, rebuild) => { calls.push(rebuild); change(fx.view.map); };
   const host = dom.element('editor');
-  const saveNote = fx.view.renderRelationEditor(host, current, () => closed.push(1), () => changed.push(1));
+  const saveNote = fx.view.relationEditor.renderRelationEditor(host, current, () => closed.push(1), () => changed.push(1));
   const kindOptions = () => dom.findAll(host, c => c.tag === 'option').map(o => o.text);
   const openKinds = () => dom.findAll(host, c => c.tag === 'option' && !c.disabled).map(o => o.text);
   const select = () => dom.find(host, c => c.tag === 'select');
@@ -2825,8 +2825,12 @@ integrationTest('hypothesis-evidence: a note like <img src=x onerror=alert(1)> i
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
   assert.ok(dom.texts(panel).includes(evil), 'shown verbatim'); assert.equal(dom.findAll(panel, c => c.tag === 'img').length, 0);
   const src = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  const editor = src.slice(src.indexOf('private renderRelationEditor'), src.indexOf('/** `focus` false leaves the camera'));
-  assert.equal(/innerHTML|outerHTML|insertAdjacentHTML/.test(editor), false, 'the editor and the panel rows never parse markup');
+  const editorSrc = fs.readFileSync(path.join(root, 'experiences/visual-map/relation-editor.ts'), 'utf8');
+  const panelStart = src.indexOf('private renderHypothesisSection'), panelEnd = src.indexOf('`focus` false leaves the camera');
+  const panelSrc = src.slice(panelStart, panelEnd);
+  assert.ok(panelStart >= 0 && panelEnd >= 0 && panelSrc.length > 200, 'the panel slice is not empty');
+  assert.ok(editorSrc.indexOf('class RelationEditor') >= 0 && editorSrc.length > 200, 'the editor module is not empty');
+  for (const scanned of [editorSrc, panelSrc]) assert.equal(/innerHTML|outerHTML|insertAdjacentHTML/.test(scanned), false, 'the editor and the panel rows never parse markup');
 });
 integrationTest('hypothesis-evidence: the V1.5 evidence and prerequisite panel keys are gone and the six relation names exist in all three languages', () => {
   const read = lang => fs.readFileSync(path.join(root, 'i18n', `${lang}.ts`), 'utf8');
@@ -4857,7 +4861,7 @@ function msViewFixture({ aim = false, nodes = 1, stored = [], items = [] } = {})
     repo: { readMapSources: async () => state.stored.map(s => ({ ...s })), writeMapSources: async (p, next) => { state.writes.push([p, plain(next)]); state.stored = plain(next); }, mapSwitcherItems: async () => items } };
   const view = new VisualAgentMapView({ app: tree.app }, plugin);
   view.path = 'Current/Map.md'; view.map = map(Array.from({ length: nodes }, (_, i) => node(`n${i}`))); if (aim) view.map.aim = { runs: [] };
-  view.mapSources = plain(stored); view.announcer = dom.element('status');
+  view.mapSourcesControl.mapSources = plain(stored); view.announcer = dom.element('status');
   const tools = dom.element('tools');
   const draw = () => { tools.children = []; view.renderMapTools(tools); return tools; };
   return { view, tree, state, tools, draw, plugin };
@@ -4894,7 +4898,7 @@ integrationTest('map sources toolbar: an unreadable source turns the badge into 
   assert.equal(msBadge(fx.tools).text, '!'); assert.ok(msBadge(fx.tools).classes.includes('is-bad'));
   assert.equal(button.attrs['aria-description'], '2 unreadable'); assert.ok(button.hasClass('has-unreadable'));
   button.removeAttribute = name => { delete button.attrs[name]; };
-  fx.view.mapSources = [{ kind: 'folder', path: 'Research' }]; fx.view.paintMapSourcesButton();
+  fx.view.mapSourcesControl.mapSources = [{ kind: 'folder', path: 'Research' }]; fx.view.mapSourcesControl.paintMapSourcesButton();
   assert.equal(msBadge(fx.tools).text, '1'); assert.equal(msBadge(fx.tools).classes.includes('is-bad'), false); assert.equal(button.attrs['aria-description'], undefined); assert.equal(button.hasClass('has-unreadable'), false);
 });
 // Like a browser: moving focus fires focusout (with relatedTarget) on the element that held it. Applied to every element created later.
@@ -4909,9 +4913,9 @@ integrationTest('map sources panel (B1 counterexample): opening by keyboard whil
   const button = () => msButton(fx.tools), panel = () => dom.find(fx.tools, c => c.cls === 'vam-map-sources-panel');
   withRealFocus(button()); button().focus();
   button().click();
-  assert.ok(panel(), 'the panel is visible'); assert.equal(button().attrs['aria-expanded'], 'true'); assert.equal(fx.view.mapSourcesOpen, true);
+  assert.ok(panel(), 'the panel is visible'); assert.equal(button().attrs['aria-expanded'], 'true'); assert.equal(fx.view.mapSourcesControl.mapSourcesOpen, true);
   const file = { kind: 'file', path: 'Notes/interview.md' };
-  fx.view.changeMapSources('Current/Map.md', 'add', file); await dom.tick();
+  fx.view.mapSourcesControl.changeMapSources('Current/Map.md', 'add', file); await dom.tick();
   assert.ok(dom.find(panel(), c => c.text === 'interview.md'), 'the add redraws the open list');
   button().click(); assert.equal(panel(), undefined, 'the next press closes instead of reopening'); assert.equal(button().attrs['aria-expanded'], 'false');
 });
@@ -4933,25 +4937,25 @@ integrationTest('map sources panel in the view: open, add writes only through th
   assert.equal(panel(), undefined);
   button().click(); assert.ok(panel()); assert.equal(button().attrs['aria-expanded'], 'true'); assert.equal(panel().attrs.id, button().attrs['aria-controls']);
   const file = { kind: 'file', path: 'Notes/interview.md' };
-  fx.view.changeMapSources('Current/Map.md', 'add', file); await dom.tick();
+  fx.view.mapSourcesControl.changeMapSources('Current/Map.md', 'add', file); await dom.tick();
   assert.deepEqual(fx.state.writes, [['Current/Map.md', [file]]]); assert.equal(msLabel(fx.tools), 'Data sources · 1');
   assert.ok(dom.find(panel(), c => c.text === 'interview.md'), 'the open panel shows the new row'); assert.equal(fx.view.announcer.text, 'Added "interview.md"');
-  fx.view.changeMapSources('Current/Map.md', 'add', { ...file }); await dom.tick();
+  fx.view.mapSourcesControl.changeMapSources('Current/Map.md', 'add', { ...file }); await dom.tick();
   assert.equal(fx.state.writes.length, 1, 'adding the same kind and path again writes nothing'); assert.equal(fx.view.announcer.text, '"interview.md" is already added');
-  fx.view.changeMapSources('Current/Map.md', 'remove', file); await dom.tick();
+  fx.view.mapSourcesControl.changeMapSources('Current/Map.md', 'remove', file); await dom.tick();
   assert.equal(fx.state.writes.length, 2); assert.deepEqual(fx.state.writes[1], ['Current/Map.md', []]); assert.equal(msLabel(fx.tools), 'Data sources'); assert.equal(fx.view.announcer.text, 'Removed interview.md');
   assert.equal(dom.focusedNow().children[1].text, 'Search and add…', 'removing the last row moves focus to the search button');
   panel().fire('keydown', { key: 'Escape' }); assert.equal(panel(), undefined); assert.equal(button().attrs['aria-expanded'], 'false'); assert.equal(dom.focusedNow(), button());
   button().click(); assert.ok(panel()); button().click(); assert.equal(panel(), undefined, 'the button toggles it');
   button().click(); fx.draw(); assert.ok(panel(), 'a repaint keeps an open panel');
   button().fire('focusout', { relatedTarget: dom.element('canvas') }); assert.equal(panel(), undefined, 'focus leaving the button for an outside element closes it');
-  fx.view.changeMapSources('Other/Map.md', 'add', file); fx.view.path = 'Other/Map.md'; await dom.tick(); assert.equal(fx.state.writes.length, 2, 'a change for a map that is no longer open is dropped');
+  fx.view.mapSourcesControl.changeMapSources('Other/Map.md', 'add', file); fx.view.path = 'Other/Map.md'; await dom.tick(); assert.equal(fx.state.writes.length, 2, 'a change for a map that is no longer open is dropped');
 });
 integrationTest('map sources in the view: deleting a source note repaints the button with ⚠ and the panel row as unreadable', () => {
   const fx = msViewFixture({ stored: [{ kind: 'file', path: 'Notes/interview.md' }] }); fx.draw();
   msButton(fx.tools).click();
   assert.equal(dom.find(fx.tools, c => c.cls === 'vam-map-sources-meta').text, 'Markdown');
-  fx.tree.items.delete('Notes/interview.md'); fx.view.refreshMapSourcesUi();
+  fx.tree.items.delete('Notes/interview.md'); fx.view.mapSourcesControl.refreshMapSourcesUi();
   assert.equal(msBadge(fx.tools).text, '!'); assert.ok(msBadge(fx.tools).classes.includes('is-bad')); assert.equal(dom.find(fx.tools, c => c.cls === 'vam-map-sources-meta').text, 'Unreadable; tasks skip it');
   assert.ok(dom.find(fx.tools, c => (c.cls ?? '').includes('vam-map-sources-remove')), 'the unreadable row keeps Remove');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');

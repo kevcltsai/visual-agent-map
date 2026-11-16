@@ -133,6 +133,8 @@ export interface AuthorInput {
   admission: AdmissionContext;
   /** Checked synchronously inside the write: false (a stop, a replaced run, a removed card) means nothing is written. */
   authorize: () => boolean;
+  /** Runs inside the author's write on the text about to be saved: the cleaned text, or null (nothing is written). Pass it to the guarded write. */
+  finalize: (content: string) => string | null;
 }
 export type AuthorOutcome =
   | { outcome: "written" }
@@ -235,6 +237,20 @@ const labelOf = (value: string): string => value.trim().replace(/\s+/g, " ").toL
 const neutralize = (text: string): string =>
   text.replace(/<(?=[A-Za-z/!?]|$)(?!!-- visual-agent-map:(?:detail|references):(?:start|end) -->)/g, "&lt;");
 const NO_PICTURE = "無圖：";
+const PICTURE_REASONS: Record<string, [string, string]> = {
+  unsafe: ["網址不安全", "unsafe address"],
+  load_failed: ["無法載入", "could not load"],
+  empty: ["空圖", "empty image"],
+  timeout: ["逾時", "timed out"],
+  aborted: ["已中止", "aborted"]
+};
+/** The "no picture" line for a probe reason code (a known code in the output language; anything else is escaped text). */
+function noPicture(language: string, reason: string): string {
+  const known = Object.prototype.hasOwnProperty.call(PICTURE_REASONS, reason) ? PICTURE_REASONS[reason] : undefined;
+  const zh = /^zh/i.test(language);
+  const text = known ? known[zh ? 0 : 1] : escapeMarkdownText(reason, 60) || (zh ? "載入失敗" : "load failed");
+  return zh ? `${NO_PICTURE}${text}` : `No picture: ${text}`;
+}
 const isHttps = (url: string): boolean => /^https:\/\//i.test(url);
 
 /** An address that may be probed and written back: no whitespace, backslash, `<` or `>`; `new URL()` parses it as https with balanced parentheses. */
@@ -507,10 +523,23 @@ export class BookPipelineRuns {
     });
   }
 
-  /** Aborts every call and pauses the run (resumable). Resolves when the drive is over. */
-  async stop(mapPath: string): Promise<void> {
+  /**
+   * Aborts every call and pauses the run (resumable). Resolves when the drive is over. With no drive, `saved` (the owner's Stop
+   * button) writes the stop into the saved state, so a budget pause or a state left "running" ends as a plain stop; refusals
+   * (no run, finished, unreadable) leave the file as it is.
+   */
+  async stop(mapPath: string, options: { saved?: boolean } = {}): Promise<void> {
     const drive = this.drives.get(mapPath);
-    if (!drive) return;
+    if (!drive) {
+      if (!options.saved) return;
+      await this.enter(mapPath, async fresh => {
+        await this.openSaved(fresh, mapPath);
+        fresh.stopRequested = true;
+      }).catch((error: unknown) => {
+        if (!(error instanceof BookPipelineRunError)) throw error;
+      });
+      return;
+    }
     drive.stopRequested = true;
     drive.controller.abort();
     await drive.done.catch(() => undefined);
@@ -933,6 +962,19 @@ export class BookPipelineRuns {
     if (!(await this.ensureBackup(drive, nodeId, info.path, card.raw)))
       return { kind: "failed", reason: "backup_failed", forceReview: true };
     const authorize = this.authorize(drive, token);
+    // The body is cleaned inside the author's own write (same `vault.process`): only standard https pictures are ever saved, and
+    // an unsafe body is refused whole, so the card keeps its text from before this step.
+    let unsafe = false;
+    const finalize = (content: string): string | null => {
+      const urls = bodyImageUrls(content);
+      const unsafeUrls = new Map(urls.filter(url => !isHttps(url)).map(url => [url, noPicture(drive.config.language, "unsafe")]));
+      const cleaned = replaceBodyImages(content, unsafeUrls);
+      if (this.exitCheck(cleaned, new Set(urls.filter(isHttps)))) {
+        unsafe = true;
+        return null;
+      }
+      return cleaned;
+    };
     // Nothing of this card's frontmatter is written while the author runs: the research write compares the whole file.
     const done = await untilAborted(
       signal,
@@ -946,34 +988,29 @@ export class BookPipelineRuns {
         reasoning: drive.config.reasoning,
         signal,
         admission: drive.admission,
-        authorize
+        authorize,
+        finalize
       })
     );
+    if (unsafe) return { kind: "failed", reason: "unsafe_body", forceReview: true };
     if (done.outcome === "budget-exhausted") return { kind: "budget" };
     if (done.outcome === "cancelled") return { kind: "cancelled" };
     if (done.outcome === "failed") return { kind: "failed", reason: done.reason };
     if (done.outcome === "discarded") return { kind: "failed", reason: "discarded" };
-    // The program (not the model) checks the body's pictures: https only, probed; everything else becomes a plain "no picture" line.
+    // What is saved holds only standard https pictures. The program (not the model) probes them; a failed one becomes a plain "no picture" line.
     const path = await this.stillOnMap(drive, nodeId);
     if (!path) return { kind: "failed", reason: "card_removed" };
     const written = await this.ports.readCard(path);
     const replacements = new Map<string, string>();
-    const urls = bodyImageUrls(written.raw);
-    for (const url of urls) {
-      if (!isHttps(url)) {
-        replacements.set(url, `${NO_PICTURE}網址不安全`);
-        continue;
-      }
+    for (const url of bodyImageUrls(written.raw)) {
       const probed = await untilAborted(signal, this.ports.probeImage(url, signal)).catch((error: unknown) => {
         if (signal.aborted) throw error;
         return { ok: false as const, reason: "探測失敗" };
       });
-      if (!probed.ok) replacements.set(url, `${NO_PICTURE}${escapeMarkdownText(probed.reason, 60) || "載入失敗"}`);
+      if (!probed.ok) replacements.set(url, noPicture(drive.config.language, probed.reason));
     }
-    const cleaned = replaceBodyImages(written.raw, replacements);
-    const allowed = new Set(urls.filter(url => !replacements.has(url)));
-    if (this.exitCheck(cleaned, allowed)) return { kind: "failed", reason: "unsafe_body", forceReview: true };
-    if (cleaned !== written.raw) {
+    if (replacements.size) {
+      const cleaned = replaceBodyImages(written.raw, replacements);
       const outcome = await this.ports.updateNoteRawGuarded(path, () => cleaned, {
         expectedContent: written.raw,
         authorize

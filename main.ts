@@ -481,7 +481,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     runProofread: (request, run) => runProofread(this.aiCalls, request, run),
     author: async input => {
       const view = this.views().find(item => item.mapPath === input.mapPath);
-      return view ? view.runBookAuthor(input) : { outcome: "failed", reason: "no_view" };
+      if (view) return view.runBookAuthor(input);
+      // No view of this map (it was switched away or closed): not a failure; the run ends for this map.
+      void this.bookPipelineRuns.stop(input.mapPath).catch(() => undefined);
+      return { outcome: "cancelled" };
     },
     probeImage: async (url, signal) => {
       const view = this.views()[0];
@@ -1712,8 +1715,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   startBookPipeline(mapPath: string): Promise<void> {
     return this.bookPipelineRuns.start(mapPath);
   }
-  stopBookPipeline(mapPath: string): Promise<void> {
-    return this.bookPipelineRuns.stop(mapPath);
+  stopBookPipeline(mapPath: string, options: { saved?: boolean } = {}): Promise<void> {
+    return this.bookPipelineRuns.stop(mapPath, options);
   }
   resumeBookPipeline(mapPath: string, options: { addBudget?: number } = {}): Promise<void> {
     return this.bookPipelineRuns.resume(mapPath, options);

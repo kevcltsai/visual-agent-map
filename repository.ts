@@ -1734,8 +1734,9 @@ export class Repository {
    * `updateNote` with a guarded commit. Both checks run inside the `vault.process` callback that writes, on the content that
    * callback is given, so nothing the owner typed after the caller's last read is overwritten:
    * - `expectedContent`: the file must still be exactly this text;
-   * - `authorize`: called after the content check; false (a stopped run, a removed card) means nothing is written.
-   * Either failing leaves the file untouched and returns "discarded". With neither, it is `updateNote`, byte for byte.
+   * - `authorize`: called after the content check; false (a stopped run, a removed card) means nothing is written;
+   * - `finalize`: called on the text the patch produced, in the same callback; null means the text is refused and nothing is written.
+   * Any of them failing leaves the file untouched and returns "discarded". With neither, it is `updateNote`, byte for byte.
    */
   async updateNoteGuarded(
     path: string,
@@ -1746,16 +1747,23 @@ export class Repository {
       newVisualReferences?: boolean;
       expectedContent?: string;
       authorize?: () => boolean;
+      finalize?: (content: string) => string | null;
     } = {}
   ): Promise<"written" | "discarded"> {
-    const { expectedContent, authorize, ...writeOptions } = options;
+    const { expectedContent, authorize, finalize, ...writeOptions } = options;
     let outcome: "written" | "discarded" = "written";
     await this.app.vault.process(this.file(path), content => {
       if ((expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize())) {
         outcome = "discarded";
         return content;
       }
-      return this.patchedNote(path, content, patch, writeOptions);
+      const next = this.patchedNote(path, content, patch, writeOptions);
+      const final = finalize ? finalize(next) : next;
+      if (final === null) {
+        outcome = "discarded";
+        return content;
+      }
+      return final;
     });
     return outcome;
   }

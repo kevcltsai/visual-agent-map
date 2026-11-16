@@ -43,12 +43,27 @@ test('wiring: onunload disposes the runner (start refused afterwards)', async ()
 });
 
 test('blocked: true while a conversation chain runs or a multi-research batch is running, false otherwise', () => {
-  const make = (over = {}) => ({ path: 'M.vam', multiResearchKey: () => 'multi-research:M.vam', chatChainRunner: { current: null }, plugin: { expansionBatches: new Map() }, ...over });
+  const make = (over = {}) => ({ path: 'M.vam', multiResearchKey: () => 'multi-research:M.vam', chatChainRunner: { current: null }, plugin: { expansionBatches: new Map(), argumentRuns: { isRunning: () => false } }, ...over });
   const blocked = view => proto.bookPipelineBlocked.call(view);
   assert.equal(blocked(make()), false);
   assert.equal(blocked(make({ chatChainRunner: { current: {} } })), true);
   assert.equal(blocked(make({ plugin: { expansionBatches: new Map([['multi-research:M.vam', { status: 'running' }]]) } })), true);
-  assert.equal(blocked(make({ plugin: { expansionBatches: new Map([['multi-research:M.vam', { status: 'done' }]]) } })), false);
+  assert.equal(blocked(make({ plugin: { expansionBatches: new Map([['multi-research:M.vam', { status: 'done' }]]) , argumentRuns: { isRunning: () => false } } })), false);
+  assert.equal(blocked(make({ plugin: { expansionBatches: new Map(), argumentRuns: { isRunning: path => path === 'M.vam' } } })), true, 'an argument-map run blocks');
+});
+
+test('switching maps stops the old map\'s run (source-level), and an author call with no view of the map is cancelled and stops that map, never a failure', async () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  const open = source.indexOf('private async openMapInMutation(');
+  const head = source.slice(open, open + 1200);
+  assert.match(head, /if \(path !== this\.path\) \{\s*\/\/[^\n]*\n\s*if \(this\.path\) void this\.plugin\.bookPipelineRuns\?\.stop\(this\.path\)/);
+  const plugin = new Plugin({}, { id: 'vam', version: '0.0.0' });
+  plugin.views = () => [{ mapPath: 'Other.vam' }];
+  const stops = [];
+  plugin.bookPipelineRuns.stop = async path => { stops.push(path); };
+  const out = await plugin.bookPipelineRuns.ports.author({ mapPath: 'M.vam', nodeId: 'n1' });
+  same(out, { outcome: 'cancelled' });
+  same(stops, ['M.vam']);
 });
 
 test('plugin blocked port: a view of that map that is blocked blocks; another map does not', () => {
@@ -101,7 +116,7 @@ function authorView(behaviour) {
   };
   const input = (over = {}) => ({
     mapPath: 'M.vam', nodeId: 'n1', path: 'N1.md', settings: { reader: 'kids' }, language: 'zh-TW', model: 'sonnet', reasoning: 'low',
-    signal: new AbortController().signal, admission: { reserve: async () => {} }, authorize: () => true, ...over
+    signal: new AbortController().signal, admission: { reserve: async () => {} }, authorize: () => true, finalize: c => c, ...over
   });
   return { view, calls, input };
 }
@@ -116,7 +131,7 @@ test('runBookAuthor: calls researchChild as a rewrite without charts, with admis
   same(choices.runOnce, { model: 'sonnet', reasoning: 'low' });
   assert.match(choices.requirements, /reader: kids/);
   assert.equal(book.request.admission, input.admission); assert.equal(book.request.noContentLog, true);
-  assert.equal(book.pipeline.authorize, input.authorize);
+  assert.equal(book.pipeline.authorize, input.authorize); assert.equal(book.pipeline.finalize, input.finalize);
 });
 
 test('runBookAuthor: budget exhaustion is its own outcome (not failed, no thrown error)', async () => {

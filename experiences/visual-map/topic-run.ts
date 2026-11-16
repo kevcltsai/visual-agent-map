@@ -113,6 +113,7 @@ export interface RunRepository {
       newVisualReferences?: boolean;
       expectedContent?: string;
       authorize?: () => boolean;
+      finalize?: (content: string) => string | null;
     }
   ): Promise<"written" | "discarded">;
   resolveTopicModel(
@@ -233,7 +234,13 @@ export interface ResearchStart extends WritebackHooks {
    * the topic gets its old status back and no error is recorded. `onDiscarded` hears that the result was dropped because the
    * topic changed or the guarded write was refused (the failure text still goes to `failed`; callers must not match it).
    */
-  pipeline?: { authorize: () => boolean; onBudgetExhausted: () => void; onDiscarded?: () => void };
+  pipeline?: {
+    authorize: () => boolean;
+    /** Runs on the file text inside the write itself; null refuses the write (the author's body is never saved unchecked). */
+    finalize: (content: string) => string | null;
+    onBudgetExhausted: () => void;
+    onDiscarded?: () => void;
+  };
 }
 
 /** What a child-topic proposal run needs from the entry that starts it (the view). */
@@ -1537,13 +1544,17 @@ export class TopicRuns {
           };
           const writeOptions = { detailTemplate: writeContext.detailTemplate, newVisualReferences: true };
           const guard = options.pipeline;
-          if (guard && repo.updateNoteGuarded) {
-            // The pipeline's write: the file must still be the text the run left, and the run must still be current.
-            const outcome = await repo.updateNoteGuarded(path, patch, {
-              ...writeOptions,
-              ...(raw ? { expectedContent: raw.started } : {}),
-              authorize: guard.authorize
-            });
+          if (guard) {
+            // The pipeline's write: the file must still be the text the run left, the run must still be current, and the text
+            // is cleaned inside the write. Without the guarded write nothing is saved (never the unguarded path).
+            const outcome = repo.updateNoteGuarded
+              ? await repo.updateNoteGuarded(path, patch, {
+                  ...writeOptions,
+                  ...(raw ? { expectedContent: raw.started } : {}),
+                  authorize: guard.authorize,
+                  finalize: guard.finalize
+                })
+              : "discarded";
             if (outcome === "discarded") {
               await repo.updateNote(path, { status: note.status });
               if (exchangeId) exchanges()?.failed(exchangeId, t("log.stale_result_not_written"));

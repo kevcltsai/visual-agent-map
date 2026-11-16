@@ -3325,7 +3325,9 @@ export const en = {
   "ui.book_reason_unparsable": "the proofreading reply could not be parsed",
   "ui.book_reason_checklist_mismatch": "the proofreading checklist did not match the plan",
   "ui.book_reason_no_open_page": "no source page was opened while proofreading",
-  "ui.book_reason_all_facts_unverified": "none of the factual items could be verified"
+  "ui.book_reason_all_facts_unverified": "none of the factual items could be verified",
+  "ui.book_reason_unsafe_body": "the picture text was not safe, so the card was left as it was",
+  "ui.book_reason_no_view": "the map is no longer open, so the run stopped"
 } as const;
 
 export type TranslationKey = keyof typeof en;

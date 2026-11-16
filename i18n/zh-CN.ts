@@ -3109,5 +3109,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_reason_unparsable": "校对回复无法解析",
   "ui.book_reason_checklist_mismatch": "校对清单与企划不一致",
   "ui.book_reason_no_open_page": "校对时没有成功打开任何来源页",
-  "ui.book_reason_all_facts_unverified": "所有事实项目都无法查证"
+  "ui.book_reason_all_facts_unverified": "所有事实项目都无法查证",
+  "ui.book_reason_unsafe_body": "图片内容不安全，卡片保持原样",
+  "ui.book_reason_no_view": "地图已不在界面上，运行已停止"
 };

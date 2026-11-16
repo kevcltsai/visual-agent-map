@@ -3105,7 +3105,9 @@ var en = {
   "ui.book_reason_unparsable": "the proofreading reply could not be parsed",
   "ui.book_reason_checklist_mismatch": "the proofreading checklist did not match the plan",
   "ui.book_reason_no_open_page": "no source page was opened while proofreading",
-  "ui.book_reason_all_facts_unverified": "none of the factual items could be verified"
+  "ui.book_reason_all_facts_unverified": "none of the factual items could be verified",
+  "ui.book_reason_unsafe_body": "the picture text was not safe, so the card was left as it was",
+  "ui.book_reason_no_view": "the map is no longer open, so the run stopped"
 };
 
 // i18n/zh-CN.ts
@@ -6106,7 +6108,9 @@ var zhCN = {
   "ui.book_reason_unparsable": "\u6821\u5BF9\u56DE\u590D\u65E0\u6CD5\u89E3\u6790",
   "ui.book_reason_checklist_mismatch": "\u6821\u5BF9\u6E05\u5355\u4E0E\u4F01\u5212\u4E0D\u4E00\u81F4",
   "ui.book_reason_no_open_page": "\u6821\u5BF9\u65F6\u6CA1\u6709\u6210\u529F\u6253\u5F00\u4EFB\u4F55\u6765\u6E90\u9875",
-  "ui.book_reason_all_facts_unverified": "\u6240\u6709\u4E8B\u5B9E\u9879\u76EE\u90FD\u65E0\u6CD5\u67E5\u8BC1"
+  "ui.book_reason_all_facts_unverified": "\u6240\u6709\u4E8B\u5B9E\u9879\u76EE\u90FD\u65E0\u6CD5\u67E5\u8BC1",
+  "ui.book_reason_unsafe_body": "\u56FE\u7247\u5185\u5BB9\u4E0D\u5B89\u5168\uFF0C\u5361\u7247\u4FDD\u6301\u539F\u6837",
+  "ui.book_reason_no_view": "\u5730\u56FE\u5DF2\u4E0D\u5728\u754C\u9762\u4E0A\uFF0C\u8FD0\u884C\u5DF2\u505C\u6B62"
 };
 
 // i18n/zh-TW.ts
@@ -9107,7 +9111,9 @@ var zhTW = {
   "ui.book_reason_unparsable": "\u6821\u5C0D\u56DE\u8986\u7121\u6CD5\u89E3\u6790",
   "ui.book_reason_checklist_mismatch": "\u6821\u5C0D\u6E05\u55AE\u8207\u4F01\u5283\u4E0D\u4E00\u81F4",
   "ui.book_reason_no_open_page": "\u6821\u5C0D\u6642\u6C92\u6709\u6210\u529F\u958B\u555F\u4EFB\u4F55\u4F86\u6E90\u9801",
-  "ui.book_reason_all_facts_unverified": "\u6240\u6709\u4E8B\u5BE6\u9805\u76EE\u90FD\u7121\u6CD5\u67E5\u8B49"
+  "ui.book_reason_all_facts_unverified": "\u6240\u6709\u4E8B\u5BE6\u9805\u76EE\u90FD\u7121\u6CD5\u67E5\u8B49",
+  "ui.book_reason_unsafe_body": "\u5716\u7247\u5167\u5BB9\u4E0D\u5B89\u5168\uFF0C\u5361\u7247\u7DAD\u6301\u539F\u6A23",
+  "ui.book_reason_no_view": "\u5730\u5716\u5DF2\u4E0D\u5728\u756B\u9762\u4E0A\uFF0C\u57F7\u884C\u5DF2\u505C\u6B62"
 };
 
 // i18n/languages.ts
@@ -29905,18 +29911,25 @@ var Repository = class {
    * `updateNote` with a guarded commit. Both checks run inside the `vault.process` callback that writes, on the content that
    * callback is given, so nothing the owner typed after the caller's last read is overwritten:
    * - `expectedContent`: the file must still be exactly this text;
-   * - `authorize`: called after the content check; false (a stopped run, a removed card) means nothing is written.
-   * Either failing leaves the file untouched and returns "discarded". With neither, it is `updateNote`, byte for byte.
+   * - `authorize`: called after the content check; false (a stopped run, a removed card) means nothing is written;
+   * - `finalize`: called on the text the patch produced, in the same callback; null means the text is refused and nothing is written.
+   * Any of them failing leaves the file untouched and returns "discarded". With neither, it is `updateNote`, byte for byte.
    */
   async updateNoteGuarded(path, patch, options = {}) {
-    const { expectedContent, authorize, ...writeOptions } = options;
+    const { expectedContent, authorize, finalize, ...writeOptions } = options;
     let outcome = "written";
     await this.app.vault.process(this.file(path), (content) => {
       if (expectedContent !== void 0 && content !== expectedContent || authorize && !authorize()) {
         outcome = "discarded";
         return content;
       }
-      return this.patchedNote(path, content, patch, writeOptions);
+      const next = this.patchedNote(path, content, patch, writeOptions);
+      const final = finalize ? finalize(next) : next;
+      if (final === null) {
+        outcome = "discarded";
+        return content;
+      }
+      return final;
     });
     return outcome;
   }
@@ -42232,12 +42245,13 @@ var TopicRuns = class {
         };
         const writeOptions = { detailTemplate: writeContext.detailTemplate, newVisualReferences: true };
         const guard = options.pipeline;
-        if (guard && repo.updateNoteGuarded) {
-          const outcome = await repo.updateNoteGuarded(path, patch, {
+        if (guard) {
+          const outcome = repo.updateNoteGuarded ? await repo.updateNoteGuarded(path, patch, {
             ...writeOptions,
             ...raw ? { expectedContent: raw.started } : {},
-            authorize: guard.authorize
-          });
+            authorize: guard.authorize,
+            finalize: guard.finalize
+          }) : "discarded";
           if (outcome === "discarded") {
             await repo.updateNote(path, { status: note.status });
             if (exchangeId) (_l = exchanges()) == null ? void 0 : _l.failed(exchangeId, t("log.stale_result_not_written"));
@@ -48210,6 +48224,19 @@ var frontmatterLength = (content) => {
 var labelOf = (value) => value.trim().replace(/\s+/g, " ").toLowerCase();
 var neutralize = (text10) => text10.replace(/<(?=[A-Za-z/!?]|$)(?!!-- visual-agent-map:(?:detail|references):(?:start|end) -->)/g, "&lt;");
 var NO_PICTURE = "\u7121\u5716\uFF1A";
+var PICTURE_REASONS = {
+  unsafe: ["\u7DB2\u5740\u4E0D\u5B89\u5168", "unsafe address"],
+  load_failed: ["\u7121\u6CD5\u8F09\u5165", "could not load"],
+  empty: ["\u7A7A\u5716", "empty image"],
+  timeout: ["\u903E\u6642", "timed out"],
+  aborted: ["\u5DF2\u4E2D\u6B62", "aborted"]
+};
+function noPicture(language2, reason) {
+  const known = Object.prototype.hasOwnProperty.call(PICTURE_REASONS, reason) ? PICTURE_REASONS[reason] : void 0;
+  const zh = /^zh/i.test(language2);
+  const text10 = known ? known[zh ? 0 : 1] : escapeMarkdownText(reason, 60) || (zh ? "\u8F09\u5165\u5931\u6557" : "load failed");
+  return zh ? `${NO_PICTURE}${text10}` : `No picture: ${text10}`;
+}
 var isHttps = (url) => /^https:\/\//i.test(url);
 function safeHref2(raw) {
   if (!raw || /[\s\\<>\p{Cc}]/u.test(raw)) return void 0;
@@ -48455,10 +48482,23 @@ var BookPipelineRuns = class {
       this.log(drive, "gate1", "-", "write", "confirmed");
     });
   }
-  /** Aborts every call and pauses the run (resumable). Resolves when the drive is over. */
-  async stop(mapPath) {
+  /**
+   * Aborts every call and pauses the run (resumable). Resolves when the drive is over. With no drive, `saved` (the owner's Stop
+   * button) writes the stop into the saved state, so a budget pause or a state left "running" ends as a plain stop; refusals
+   * (no run, finished, unreadable) leave the file as it is.
+   */
+  async stop(mapPath, options = {}) {
     const drive = this.drives.get(mapPath);
-    if (!drive) return;
+    if (!drive) {
+      if (!options.saved) return;
+      await this.enter(mapPath, async (fresh) => {
+        await this.openSaved(fresh, mapPath);
+        fresh.stopRequested = true;
+      }).catch((error) => {
+        if (!(error instanceof BookPipelineRunError)) throw error;
+      });
+      return;
+    }
     drive.stopRequested = true;
     drive.controller.abort();
     await drive.done.catch(() => void 0);
@@ -48862,6 +48902,17 @@ var BookPipelineRuns = class {
     if (!await this.ensureBackup(drive, nodeId, info.path, card.raw))
       return { kind: "failed", reason: "backup_failed", forceReview: true };
     const authorize = this.authorize(drive, token);
+    let unsafe = false;
+    const finalize = (content) => {
+      const urls = bodyImageUrls(content);
+      const unsafeUrls = new Map(urls.filter((url) => !isHttps(url)).map((url) => [url, noPicture(drive.config.language, "unsafe")]));
+      const cleaned = replaceBodyImages(content, unsafeUrls);
+      if (this.exitCheck(cleaned, new Set(urls.filter(isHttps)))) {
+        unsafe = true;
+        return null;
+      }
+      return cleaned;
+    };
     const done = await untilAborted(
       signal,
       this.ports.author({
@@ -48874,9 +48925,11 @@ var BookPipelineRuns = class {
         reasoning: drive.config.reasoning,
         signal,
         admission: drive.admission,
-        authorize
+        authorize,
+        finalize
       })
     );
+    if (unsafe) return { kind: "failed", reason: "unsafe_body", forceReview: true };
     if (done.outcome === "budget-exhausted") return { kind: "budget" };
     if (done.outcome === "cancelled") return { kind: "cancelled" };
     if (done.outcome === "failed") return { kind: "failed", reason: done.reason };
@@ -48885,22 +48938,15 @@ var BookPipelineRuns = class {
     if (!path) return { kind: "failed", reason: "card_removed" };
     const written2 = await this.ports.readCard(path);
     const replacements = /* @__PURE__ */ new Map();
-    const urls = bodyImageUrls(written2.raw);
-    for (const url of urls) {
-      if (!isHttps(url)) {
-        replacements.set(url, `${NO_PICTURE}\u7DB2\u5740\u4E0D\u5B89\u5168`);
-        continue;
-      }
+    for (const url of bodyImageUrls(written2.raw)) {
       const probed = await untilAborted(signal, this.ports.probeImage(url, signal)).catch((error) => {
         if (signal.aborted) throw error;
         return { ok: false, reason: "\u63A2\u6E2C\u5931\u6557" };
       });
-      if (!probed.ok) replacements.set(url, `${NO_PICTURE}${escapeMarkdownText(probed.reason, 60) || "\u8F09\u5165\u5931\u6557"}`);
+      if (!probed.ok) replacements.set(url, noPicture(drive.config.language, probed.reason));
     }
-    const cleaned = replaceBodyImages(written2.raw, replacements);
-    const allowed = new Set(urls.filter((url) => !replacements.has(url)));
-    if (this.exitCheck(cleaned, allowed)) return { kind: "failed", reason: "unsafe_body", forceReview: true };
-    if (cleaned !== written2.raw) {
+    if (replacements.size) {
+      const cleaned = replaceBodyImages(written2.raw, replacements);
       const outcome = await this.ports.updateNoteRawGuarded(path, () => cleaned, {
         expectedContent: written2.raw,
         authorize
@@ -49144,7 +49190,10 @@ var REASON_KEY = {
   duplicate_item: "ui.book_reason_checklist_mismatch",
   unknown_item: "ui.book_reason_checklist_mismatch",
   no_open_page: "ui.book_reason_no_open_page",
-  all_facts_unverified: "ui.book_reason_all_facts_unverified"
+  all_facts_unverified: "ui.book_reason_all_facts_unverified",
+  invalid_step: "ui.book_reason_invalid_reply",
+  unsafe_body: "ui.book_reason_unsafe_body",
+  no_view: "ui.book_reason_no_view"
 };
 function bookIssueText(issue2) {
   const failed = /^(plan|write|proof) failed: (\S+)$/.exec(issue2.trim());
@@ -65949,11 +65998,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     await this.plugin.mutate(() => this.openMapInMutation(path));
   }
   async openMapInMutation(path) {
-    var _a2;
+    var _a2, _b2;
     const viewEpoch = this.viewEpoch, openEpoch = ++this.mapOpenEpoch;
     const isCurrent2 = () => !this.closed && this.viewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
     if (!isCurrent2()) return;
     if (path !== this.path) {
+      if (this.path) void ((_a2 = this.plugin.bookPipelineRuns) == null ? void 0 : _a2.stop(this.path));
       this.closeMapSearch(false);
       this.exitPresentation(false);
     }
@@ -65992,7 +66042,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
       this.notes = /* @__PURE__ */ new Map();
       this.relevanceGoal = void 0;
       this.relevanceContext = void 0;
-      (_a2 = this.mapSourcesControl) == null ? void 0 : _a2.reset();
+      (_b2 = this.mapSourcesControl) == null ? void 0 : _b2.reset();
       const state = {
         epoch: openEpoch,
         read: 0,
@@ -78476,7 +78526,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       }
     );
     renderBookBar(toolbar, state, {
-      stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path)),
+      stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
       confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path))
@@ -78497,7 +78547,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   /** True while a conversation chain or a multi-select research holds this map: a picture-book run must not start or write then. */
   bookPipelineBlocked() {
     var _a2, _b2;
-    return !!((_a2 = this.chatChainRunner) == null ? void 0 : _a2.current) || ((_b2 = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _b2.status) === "running";
+    return !!((_a2 = this.chatChainRunner) == null ? void 0 : _a2.current) || ((_b2 = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _b2.status) === "running" || !!this.path && this.plugin.argumentRuns.isRunning(this.path);
   }
   /** The picture-book author step: one card's single-card research (rewrite, no charts), mapped to the runner's outcomes. */
   async runBookAuthor(input2) {
@@ -78532,6 +78582,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         {
           pipeline: {
             authorize: input2.authorize,
+            finalize: input2.finalize,
             onBudgetExhausted: () => {
               exhausted = true;
             },
@@ -97511,7 +97562,9 @@ var VisualAgentMapPlugin = class extends import_obsidian49.Plugin {
       runProofread: (request, run) => runProofread(this.aiCalls, request, run),
       author: async (input2) => {
         const view = this.views().find((item) => item.mapPath === input2.mapPath);
-        return view ? view.runBookAuthor(input2) : { outcome: "failed", reason: "no_view" };
+        if (view) return view.runBookAuthor(input2);
+        void this.bookPipelineRuns.stop(input2.mapPath).catch(() => void 0);
+        return { outcome: "cancelled" };
       },
       probeImage: async (url, signal) => {
         const view = this.views()[0];
@@ -98692,8 +98745,8 @@ ${t("ui.organize_link_wait_hint")}`;
   startBookPipeline(mapPath) {
     return this.bookPipelineRuns.start(mapPath);
   }
-  stopBookPipeline(mapPath) {
-    return this.bookPipelineRuns.stop(mapPath);
+  stopBookPipeline(mapPath, options = {}) {
+    return this.bookPipelineRuns.stop(mapPath, options);
   }
   resumeBookPipeline(mapPath, options = {}) {
     return this.bookPipelineRuns.resume(mapPath, options);

@@ -215,7 +215,10 @@ const REASON_KEY: Record<string, TranslationKey> = {
   duplicate_item: "ui.book_reason_checklist_mismatch",
   unknown_item: "ui.book_reason_checklist_mismatch",
   no_open_page: "ui.book_reason_no_open_page",
-  all_facts_unverified: "ui.book_reason_all_facts_unverified"
+  all_facts_unverified: "ui.book_reason_all_facts_unverified",
+  invalid_step: "ui.book_reason_invalid_reply",
+  unsafe_body: "ui.book_reason_unsafe_body",
+  no_view: "ui.book_reason_no_view"
 };
 
 /** Turns the neutral issue code (`write failed: invalid_reply`, `proof unmet: C1 C3`) into the sentence shown on the card. */

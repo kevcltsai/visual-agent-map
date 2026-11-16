@@ -160,6 +160,15 @@ test('issue text: neutral codes become Chinese reasons; unknown codes get the ge
   for (const unknown of ['write failed: brand_new_code', 'something else', '', 'write failed: __proto__', 'proof failed: constructor']) assert.equal(ui.bookIssueText(unknown), generic, unknown);
 });
 
+test('issue text: every code the runner, the proof and the author wiring can produce has its own sentence in all three languages', () => {
+  const codes = ['missing', 'card_removed', 'backup_failed', 'discarded', 'empty_list', 'no_body', 'invalid_reply', 'invalid_step', 'failed', 'author_failed', 'unparsable', 'missing_item', 'duplicate_item', 'unknown_item', 'no_open_page', 'all_facts_unverified', 'unsafe_body', 'no_view'];
+  for (const language of ['zh-TW', 'zh-CN', 'en']) {
+    lang(language);
+    const generic = ui.bookIssueText('write failed: brand_new_code');
+    for (const code of codes) assert.notEqual(ui.bookIssueText(`write failed: ${code}`), generic, `${language} ${code}`);
+  }
+});
+
 test('card view: five stage labels and four role labels, each with words; a card with no stage reads "to plan"', () => {
   lang('zh-TW');
   const stages = { undefined: '待企劃', planned: '已企劃', written: '已寫', checked: '已校', 'needs-review': '需人看' };

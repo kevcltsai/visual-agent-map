@@ -3412,6 +3412,8 @@ export class VisualAgentMapView extends ItemView {
     const isCurrent = () => !this.closed && this.viewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
     if (!isCurrent()) return;
     if (path !== this.path) {
+      // Another map on this screen ends the old map's picture-book run, as closing the view does.
+      if (this.path) void this.plugin.bookPipelineRuns?.stop(this.path);
       this.closeMapSearch(false);
       this.exitPresentation(false);
     }
@@ -16951,7 +16953,7 @@ export class VisualAgentMapView extends ItemView {
       readPipelineStage(this.notes.get(id)?.pipelineStage)
     );
     renderBookBar(toolbar, state, {
-      stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path)),
+      stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
       confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path))
@@ -16972,7 +16974,9 @@ export class VisualAgentMapView extends ItemView {
   /** True while a conversation chain or a multi-select research holds this map: a picture-book run must not start or write then. */
   bookPipelineBlocked(): boolean {
     return (
-      !!this.chatChainRunner?.current || this.plugin.expansionBatches.get(this.multiResearchKey())?.status === "running"
+      !!this.chatChainRunner?.current ||
+      this.plugin.expansionBatches.get(this.multiResearchKey())?.status === "running" ||
+      (!!this.path && this.plugin.argumentRuns.isRunning(this.path))
     );
   }
   /** The picture-book author step: one card's single-card research (rewrite, no charts), mapped to the runner's outcomes. */
@@ -17007,6 +17011,7 @@ export class VisualAgentMapView extends ItemView {
         {
           pipeline: {
             authorize: input.authorize,
+            finalize: input.finalize,
             onBudgetExhausted: () => {
               exhausted = true;
             },

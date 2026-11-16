@@ -33,7 +33,7 @@ async function rig(over = {}) {
   let ids = 0;
   const script = { global: () => ({ thread: 'one thread', cards: nodes.map((n, i) => ({ id: n.id, role: i ? 'body' : 'intro' })), materials: [{ name: 'm', use: 'u' }], decisions: { reader: 'kids' } }),
     card: request => ({ covers: `covers ${request.card.position}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }] }),
-    author: async input => { await input.admission.reserve(); const note = await repo.readNote(input.path); const r = await repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize }); return r === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; },
+    author: async input => { await input.admission.reserve(); const note = await repo.readNote(input.path); const r = await repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return r === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; },
     proof: async request => ({ items: request.checklist.map(c => ({ id: c.id, type: c.type, status: 'met', note: 'fine', sources: [] })), aggregate: 'checked' }),
     probe: async () => ({ ok: true }), ...over.script };
   const ports = {
@@ -96,7 +96,7 @@ test('three cards run to gate 1, wait there, then write and proof to gate 2 afte
 
 test('a step that fails three times marks the card needs-review with a neutral code; the other cards go on', async () => {
   const bad = { id: '' };
-  const r = await rig({ script: { author: async (input, n) => { if (input.nodeId === bad.id) throw new Error('boom'); await input.admission.reserve(); const note = await r.repo.readNote(input.path); await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize }); return { outcome: 'written' }; } } });
+  const r = await rig({ script: { author: async (input, n) => { if (input.nodeId === bad.id) throw new Error('boom'); await input.admission.reserve(); const note = await r.repo.readNote(input.path); await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } } });
   bad.id = r.nodes[1].id;
   await r.runs.start(r.mapPath);
   await r.runs.confirmGate1(r.mapPath);
@@ -144,8 +144,8 @@ test('stop, then resume: finished steps are not redone, and a late result of the
   const hold = defer();
   let first = true;
   const r = await rig({ script: { author: async (input, n) => {
-    if (input.nodeId === r.nodes[1].id && first) { first = false; await hold.promise; const out = await r.repo.updateNoteGuarded(input.path, { detail: 'LATE' }, { authorize: input.authorize }); return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; }
-    await input.admission.reserve(); const note = await r.repo.readNote(input.path); await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize }); return { outcome: 'written' };
+    if (input.nodeId === r.nodes[1].id && first) { first = false; await hold.promise; const out = await r.repo.updateNoteGuarded(input.path, { detail: 'LATE' }, { authorize: input.authorize, finalize: input.finalize }); return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; }
+    await input.admission.reserve(); const note = await r.repo.readNote(input.path); await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' };
   } } });
   await r.runs.start(r.mapPath);
   const running = r.runs.confirmGate1(r.mapPath);
@@ -172,8 +172,8 @@ test('stop, then resume: finished steps are not redone, and a late result of the
 test('dispose: nothing is written afterwards, not even the map file; a new session resumes the interrupted run', async () => {
   const hold = defer();
   const r = await rig({ script: { author: async (input, n) => {
-    if (input.nodeId === r.nodes[2].id && n === 1) { await hold.promise; await r.repo.updateNoteGuarded(input.path, { detail: 'AFTER DISPOSE' }, { authorize: input.authorize }); return { outcome: 'written' }; }
-    await input.admission.reserve(); const note = await r.repo.readNote(input.path); await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize }); return { outcome: 'written' };
+    if (input.nodeId === r.nodes[2].id && n === 1) { await hold.promise; await r.repo.updateNoteGuarded(input.path, { detail: 'AFTER DISPOSE' }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; }
+    await input.admission.reserve(); const note = await r.repo.readNote(input.path); await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' };
   } } });
   await r.runs.start(r.mapPath);
   const running = r.runs.confirmGate1(r.mapPath);
@@ -202,7 +202,7 @@ test('while the author runs, its card frontmatter is not written; the owner edit
     await tick(); await tick();
     seen.push([start, key()]);
     await input.admission.reserve(); const note = await r.repo.readNote(input.path);
-    await r.repo.updateNoteGuarded(input.path, { detail: `${bodyOf(note.title)}\n\n![](https://img.example/a.png)` }, { authorize: input.authorize });
+    await r.repo.updateNoteGuarded(input.path, { detail: `${bodyOf(note.title)}\n\n![](https://img.example/a.png)` }, { authorize: input.authorize, finalize: input.finalize });
     return { outcome: 'written' };
   }, probe: async (url, signal, n) => {
     if (n === 1) await r.repo.updateNote(r.nodes[0].path, { summary: 'owner summary' }); // the owner edits after the runner's last read
@@ -220,7 +220,7 @@ test('pictures: a non-https address is not probed; an https failure becomes "無
   const r = await rig({ script: { author: async input => {
     await input.admission.reserve(); const note = await r.repo.readNote(input.path);
     const text = `${bodyOf(note.title)}\n\n![a](http://plain.example/a.png)\n\n![b](javascript:alert(1))\n\n![c](https://dead.example/c.png)\n\n![d](https://ok.example/d.png)`;
-    await r.repo.updateNoteGuarded(input.path, { detail: text }, { authorize: input.authorize });
+    await r.repo.updateNoteGuarded(input.path, { detail: text }, { authorize: input.authorize, finalize: input.finalize });
     return { outcome: 'written' };
   }, probe: async url => (url.includes('dead') ? { ok: false, reason: '404' } : { ok: true }) } });
   await r.runs.start(r.mapPath);
@@ -236,7 +236,7 @@ test('pictures: a non-https address is not probed; an https failure becomes "無
 test('pictures: when the exit check finds an unsafe body nothing is written, the card needs review with a neutral code and the log has no body', async () => {
   const r = await rig({ script: { author: async input => {
     await input.admission.reserve(); const note = await r.repo.readNote(input.path);
-    await r.repo.updateNoteGuarded(input.path, { detail: `${bodyOf(note.title)}\n\n![d](https://ok.example/d.png)\n\n![e](http://e.example/e.png)` }, { authorize: input.authorize });
+    await r.repo.updateNoteGuarded(input.path, { detail: `${bodyOf(note.title)}\n\n![d](https://ok.example/d.png)\n\n![e](http://e.example/e.png)` }, { authorize: input.authorize, finalize: input.finalize });
     return { outcome: 'written' };
   } } });
   r.runs.exitCheck = () => true;
@@ -247,6 +247,91 @@ test('pictures: when the exit check finds an unsafe body nothing is written, the
   assert.equal((await r.note(1)).pipelineIssue, 'write failed: unsafe_body');
   const log = r.stat.logs.join('\n');
   assert.ok(log.includes('unsafe_body') && !/Secret|ok\.example|e\.example/.test(log));
+});
+
+/** The saved card text must hold only https standard pictures and no HTML tag, whatever way the step ended. */
+const MALICIOUS = bodyText => `${bodyText}\n\n![](http://evil.example/x.png)\n\n<img src="http://evil.example/i.png">\n\n<svg><image href="http://evil.example/s.svg"/></svg>\n\n<style>@import url(http://evil.example/c.css)</style>\n\n![ok](https://ok.example/d.png)`;
+const assertSafeCard = (r, i) => {
+  const detail = r.raw(i).replace(/^---\n[\s\S]*?\n---\n/, '');
+  assert.ok(!unsafeBody(detail, new Set(['https://ok.example/d.png'])), 'only https standard pictures and no HTML tag');
+  assert.ok(!/<img|<svg|<style|!\[[^\]]*\]\(http:/.test(r.raw(i)), 'no tag and no http picture left');
+};
+const evilAuthor = async (r, input) => {
+  await input.admission.reserve(); const note = await r.repo.readNote(input.path);
+  await r.repo.updateNoteGuarded(input.path, { detail: MALICIOUS(bodyOf(note.title)) }, { authorize: input.authorize, finalize: input.finalize });
+  return { outcome: 'written' };
+};
+
+test('exit safety: the author write itself is cleaned, so stop during the probe leaves only https standard pictures', async () => {
+  const hold = defer();
+  const r = await rig({ script: { author: input => evilAuthor(r, input), probe: async (url, signal) => { await hold.promise; return { ok: true }; } } });
+  await r.runs.start(r.mapPath);
+  const confirm = r.runs.confirmGate1(r.mapPath);
+  await settle();
+  assertSafeCard(r, 1); // already cleaned before any probe finished
+  await r.runs.stop(r.mapPath); hold.resolve(); await confirm.catch(() => undefined);
+  assertSafeCard(r, 1);
+});
+
+test('exit safety: the probe-result write being discarded leaves the cleaned text', async () => {
+  let armed = false;
+  const r = await rig({ script: { author: async input => { const out = await evilAuthor(r, input); armed = true; return out; }, probe: async () => ({ ok: false, reason: 'load_failed' }) },
+    ports: { updateNoteRawGuarded: async (path, transform, options) => (armed ? 'discarded' : r.repo.updateNoteRawGuarded(path, transform, options)) } });
+  await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath);
+  assertSafeCard(r, 1);
+});
+
+test('exit safety: the card leaving the map, or readCard throwing, after the author write leaves the cleaned text', async () => {
+  let removeAfter = false;
+  const a = await rig({ script: { author: async input => { const out = await evilAuthor(a, input); await a.repo.updateMap(a.mapPath, d => { d.nodes = d.nodes.filter(n => n.path !== input.path); }); return out; } } });
+  await a.runs.start(a.mapPath); await a.runs.confirmGate1(a.mapPath);
+  assertSafeCard(a, 1);
+  let reads = 0, armed = false;
+  const b = await rig({ script: { author: async input => { const out = await evilAuthor(b, input); armed = true; return out; } },
+    ports: { readCard: async path => { if (armed) throw new Error('read boom'); return b.__readCard(path); } } });
+  b.__readCard = path => b.repo.readNote(path).then(note => ({ path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: b.contents.get(path), settings: note.bookSettings ?? {}, fields: {} }));
+  await b.runs.start(b.mapPath); await b.runs.confirmGate1(b.mapPath);
+  assertSafeCard(b, 1);
+});
+
+test('exit safety: a body the exit check refuses is not written at all (the card keeps its earlier text) and needs review', async () => {
+  const r = await rig({ script: { author: input => evilAuthor(r, input) } });
+  r.runs.exitCheck = () => true;
+  const before = () => r.raw(1).replace(/^---\n[\s\S]*?\n---\n/, '');
+  await r.runs.start(r.mapPath);
+  const earlier = before();
+  await r.runs.confirmGate1(r.mapPath);
+  assert.equal(before().includes('evil.example'), false); assert.equal(before(), earlier);
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: unsafe_body');
+});
+
+test('probe failure reasons are words in the output language (zh: 無法載入 / 空圖 / 逾時 / 已中止; en: English)', async () => {
+  for (const [language, expected] of [['zh-TW', ['無圖：無法載入', '無圖：空圖', '無圖：逾時', '無圖：已中止']], ['en', ['No picture: could not load', 'No picture: empty image', 'No picture: timed out', 'No picture: aborted']]]) {
+    const reasons = ['load_failed', 'empty', 'timeout', 'aborted'];
+    const r = await rig({ titles: ['SecretRootTitle'], script: { author: async input => {
+      await input.admission.reserve();
+      await r.repo.updateNoteGuarded(input.path, { detail: reasons.map((_, i) => `![p${i}](https://x.example/${i}.png)`).join('\n\n') }, { authorize: input.authorize, finalize: input.finalize });
+      return { outcome: 'written' };
+    }, probe: async url => ({ ok: false, reason: reasons[Number(/(\d)\.png/.exec(url)[1])] }) }, ports: { config: () => ({ planModel: 'm1', authorModel: 'm2', proofModel: 'm3', reasoning: 'low', language }) } });
+    await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath);
+    const detail = (await r.note(0)).detail;
+    for (const text of expected) assert.ok(detail.includes(text), `${language}: ${text}`);
+  }
+});
+
+test('stop with no drive and `saved` writes the stop (budget pause and a saved "running" become stopped); without `saved` or a run it writes nothing', async () => {
+  const r = await rig();
+  await r.runs.start(r.mapPath);
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.status = 'stopped'; d.bookPipeline.pauseReason = 'budget'; });
+  await r.runs.stop(r.mapPath);
+  assert.equal((await r.state()).pauseReason, 'budget', 'a plain stop with no drive changes nothing');
+  await r.runs.stop(r.mapPath, { saved: true });
+  const s = await r.state();
+  assert.equal(s.status, 'stopped'); assert.equal(s.pauseReason, undefined);
+  assert.equal(r.runs.isRunning(r.mapPath), false);
+  const none = await rig();
+  await none.runs.stop(none.mapPath, { saved: true }); // no bookPipeline: refused quietly
 });
 
 test('picture allow-list: every form that could load a remote resource is rewritten, whatever its shape', () => {

@@ -12,7 +12,11 @@ import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-r
 import type { TaskOptions } from "./experiences/visual-map/modals";
 import { attachmentPath } from "./experiences/visual-map/attachment-store";
 import { selectionOutputLanguage } from "./core/content-language";
-import { BookPipelineRuns, type BookPipelineProgress, type CardPlanSummary } from "./experiences/visual-map/book-pipeline-run";
+import {
+  BookPipelineRuns,
+  type BookPipelineProgress,
+  type CardPlanSummary
+} from "./experiences/visual-map/book-pipeline-run";
 import { runPlanStep } from "./core/steps/book-pipeline/run";
 import { runProofread } from "./core/steps/book-pipeline/proofread";
 import {
@@ -1725,7 +1729,11 @@ export default class VisualAgentMapPlugin extends Plugin {
   confirmBookGate1(mapPath: string): Promise<void> {
     return this.bookPipelineRuns.confirmGate1(mapPath);
   }
-  replanBookCard(mapPath: string, nodeId: string, instruction: string): Promise<{ plan?: CardPlanSummary; reason?: string }> {
+  replanBookCard(
+    mapPath: string,
+    nodeId: string,
+    instruction: string
+  ): Promise<{ plan?: CardPlanSummary; reason?: string }> {
     return this.bookPipelineRuns.replanCard(mapPath, nodeId, instruction);
   }
   rerunBookCard(mapPath: string, nodeId: string): Promise<void> {

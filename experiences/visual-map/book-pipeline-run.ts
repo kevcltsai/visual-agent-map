@@ -268,7 +268,8 @@ const internalCode = (error: unknown): string =>
 const STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" } as const;
 const ACTION_OF = { plan: "card_plan", write: "card_write", proof: "card_proof" } as const;
 const MAX_INSTRUCTION = 300;
-const singleLineText = (value: string, max: number): string => Array.from(value.replace(/\s+/g, " ").trim()).slice(0, max).join("");
+const singleLineText = (value: string, max: number): string =>
+  Array.from(value.replace(/\s+/g, " ").trim()).slice(0, max).join("");
 
 const DEFINITION = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:<([^>\n]*)>|(\S+))[^\n]*(?:\n|$)/gm;
 const WIKI_TARGET = /^[^[\]()!<>\r\n\\]+$/;
@@ -302,7 +303,10 @@ function holdProofLines(content: string): { text: string; restore: (cleaned: str
       return `${token}${held.length - 1}X`;
     })
     .join("\n");
-  return { text, restore: cleaned => cleaned.replace(new RegExp(`${token}(\\d+)X`, "g"), (_, i: string) => held[Number(i)]) };
+  return {
+    text,
+    restore: cleaned => cleaned.replace(new RegExp(`${token}(\\d+)X`, "g"), (_, i: string) => held[Number(i)])
+  };
 }
 const NO_PICTURE = "無圖：";
 const PICTURE_REASONS: Record<string, [string, string]> = {
@@ -609,12 +613,31 @@ export class BookPipelineRuns {
     const line = singleLineText(instruction, MAX_INSTRUCTION);
     if (!line) throw new BookPipelineRunError("instruction");
     let result: { plan?: CardPlanSummary; reason?: string } = {};
-    await this.cardJob(mapPath, nodeId, ["gate1"], "not_gate1", () => ["plan"], line, drive => {
-      const plan = drive.plans.get(nodeId);
-      result = plan
-        ? { plan: { covers: plan.covers, entry: plan.entry, handoff: plan.handoff, previous: plan.previous, next: plan.next, checklist: plan.checklist } }
-        : { reason: drive.reasons.get(nodeId) ?? (drive.store.state.pauseReason === "budget" ? "budget" : "cancelled") };
-    });
+    await this.cardJob(
+      mapPath,
+      nodeId,
+      ["gate1"],
+      "not_gate1",
+      () => ["plan"],
+      line,
+      drive => {
+        const plan = drive.plans.get(nodeId);
+        result = plan
+          ? {
+              plan: {
+                covers: plan.covers,
+                entry: plan.entry,
+                handoff: plan.handoff,
+                previous: plan.previous,
+                next: plan.next,
+                checklist: plan.checklist
+              }
+            }
+          : {
+              reason: drive.reasons.get(nodeId) ?? (drive.store.state.pauseReason === "budget" ? "budget" : "cancelled")
+            };
+      }
+    );
     return result;
   }
 
@@ -644,7 +667,15 @@ export class BookPipelineRuns {
       if (card.fields.pipelineSeam === undefined) return;
       await this.ports.writePipelineFields(node.path, { pipelineSeam: null });
       this.ports.log(
-        formatPipelineLog({ event: "seam_confirmed", runId: read.data.runId, card: nodeId, step: "proof", attempt: 0, result: "ok", ms: 0 })
+        formatPipelineLog({
+          event: "seam_confirmed",
+          runId: read.data.runId,
+          card: nodeId,
+          step: "proof",
+          attempt: 0,
+          result: "ok",
+          ms: 0
+        })
       );
     });
   }
@@ -929,10 +960,12 @@ export class BookPipelineRuns {
           started++;
           inflight.set(
             key,
-            this.step(drive, action).then(() => undefined).finally(() => {
-              drive.busy.delete(key);
-              inflight.delete(key);
-            })
+            this.step(drive, action)
+              .then(() => undefined)
+              .finally(() => {
+                drive.busy.delete(key);
+                inflight.delete(key);
+              })
           );
         }
       }
@@ -1049,7 +1082,12 @@ export class BookPipelineRuns {
   ): void {
     const begun = nodeId ? drive.started.get(nodeId) : undefined;
     if (begun === undefined || !nodeId) return;
-    const list = phase === "planning" && kind === "plan" ? drive.durations.plan : phase === "writing" && kind === "proof" ? drive.durations.write : undefined;
+    const list =
+      phase === "planning" && kind === "plan"
+        ? drive.durations.plan
+        : phase === "writing" && kind === "proof"
+          ? drive.durations.write
+          : undefined;
     if (!list) return;
     list.push(Math.max(0, now - begun));
     drive.started.delete(nodeId);

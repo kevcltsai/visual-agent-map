@@ -126,9 +126,7 @@ const neighbour = (n: CardNeighbour | undefined): string =>
 /** Appended only when the owner gave one (so every normal plan's prompt stays exactly as it was). */
 const extraRequest = (instruction: string | undefined): string => {
   const line = instruction ? cap(instruction, 300) : "";
-  return line
-    ? `\n\n${renderTemplate(requestTemplate, { instruction: JSON.stringify(line) })}`
-    : "";
+  return line ? `\n\n${renderTemplate(requestTemplate, { instruction: JSON.stringify(line) })}` : "";
 };
 
 /** One card's brief and acceptance checklist. Text-only. */

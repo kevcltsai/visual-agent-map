@@ -48422,7 +48422,10 @@ function holdProofLines(content) {
     held.push(line2);
     return `${token}${held.length - 1}X`;
   }).join("\n");
-  return { text: text10, restore: (cleaned) => cleaned.replace(new RegExp(`${token}(\\d+)X`, "g"), (_, i) => held[Number(i)]) };
+  return {
+    text: text10,
+    restore: (cleaned) => cleaned.replace(new RegExp(`${token}(\\d+)X`, "g"), (_, i) => held[Number(i)])
+  };
 }
 var NO_PICTURE = "\u7121\u5716\uFF1A";
 var PICTURE_REASONS = {
@@ -48695,11 +48698,30 @@ var BookPipelineRuns = class {
     const line2 = singleLineText(instruction, MAX_INSTRUCTION);
     if (!line2) throw new BookPipelineRunError("instruction");
     let result = {};
-    await this.cardJob(mapPath, nodeId, ["gate1"], "not_gate1", () => ["plan"], line2, (drive) => {
-      var _a2;
-      const plan = drive.plans.get(nodeId);
-      result = plan ? { plan: { covers: plan.covers, entry: plan.entry, handoff: plan.handoff, previous: plan.previous, next: plan.next, checklist: plan.checklist } } : { reason: (_a2 = drive.reasons.get(nodeId)) != null ? _a2 : drive.store.state.pauseReason === "budget" ? "budget" : "cancelled" };
-    });
+    await this.cardJob(
+      mapPath,
+      nodeId,
+      ["gate1"],
+      "not_gate1",
+      () => ["plan"],
+      line2,
+      (drive) => {
+        var _a2;
+        const plan = drive.plans.get(nodeId);
+        result = plan ? {
+          plan: {
+            covers: plan.covers,
+            entry: plan.entry,
+            handoff: plan.handoff,
+            previous: plan.previous,
+            next: plan.next,
+            checklist: plan.checklist
+          }
+        } : {
+          reason: (_a2 = drive.reasons.get(nodeId)) != null ? _a2 : drive.store.state.pauseReason === "budget" ? "budget" : "cancelled"
+        };
+      }
+    );
     return result;
   }
   /**
@@ -48731,7 +48753,15 @@ var BookPipelineRuns = class {
       if (card.fields.pipelineSeam === void 0) return;
       await this.ports.writePipelineFields(node.path, { pipelineSeam: null });
       this.ports.log(
-        formatPipelineLog({ event: "seam_confirmed", runId: read.data.runId, card: nodeId, step: "proof", attempt: 0, result: "ok", ms: 0 })
+        formatPipelineLog({
+          event: "seam_confirmed",
+          runId: read.data.runId,
+          card: nodeId,
+          step: "proof",
+          attempt: 0,
+          result: "ok",
+          ms: 0
+        })
       );
     });
   }

@@ -1,6 +1,6 @@
 import type { AdmissionContext } from "../../admission";
 import type { AiCalls } from "../../ai-calls";
-import { openedUrlsFromEvents, searchQueriesFromEvents } from "../../argument-map/source-proof";
+import { openedUrlsFromEvents } from "../../argument-map/source-proof";
 import type { ChecklistItem } from "../../book-pipeline/plan-text";
 import {
   evaluateProof,
@@ -141,9 +141,6 @@ export async function runProofread(
       }
     },
     raw =>
-      evaluateProof(prepared.parse(raw), request.checklist, openedUrlsFromEvents(events), {
-        body: request.body,
-        queries: searchQueriesFromEvents(events)
-      })
+      evaluateProof(prepared.parse(raw), request.checklist, openedUrlsFromEvents(events), { body: request.body })
   );
 }

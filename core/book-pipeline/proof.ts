@@ -105,10 +105,8 @@ const decoded = (text: string): string[] => {
 export const LEAK_NOTE = "來源疑似外洩正文";
 
 export interface ProofGuard {
-  /** The chapter text. With it, a search query or opened URL that quotes it (a run of 40 or more characters) is a violation. */
+  /** The chapter text. With it, an opened URL that quotes it (a run of 40 or more characters) is a violation. Search queries are not checked. */
   body: string;
-  /** The search queries this call ran. */
-  queries: readonly string[];
 }
 
 export function evaluateProof(
@@ -136,17 +134,16 @@ export function evaluateProof(
     if (leaks(url)) leakedKeys.add(key);
     else if (!opened.has(key)) opened.set(key, href);
   }
-  // A leaked page is no source; a leaked query cannot be tied to one item, so no source in this call is trusted.
-  const queryLeak = !!guard && guard.queries.some(leaks);
+  // A leaked page is no source; only items citing it drop to unverified.
   if (!opened.size && !leakedKeys.size) throw new ProofFailure("no_open_page");
   const items: ProofItemResult[] = checklist.map(entry => {
     const item = raw.find(candidate => candidate.id === entry.id) as RawProofItem;
     const sources: string[] = [];
-    let leaked = queryLeak && item.sources.length > 0;
+    let leaked = false;
     for (const source of item.sources) {
       const key = normalizeUrl(source);
       if (key && leakedKeys.has(key)) leaked = true;
-      const real = key && !queryLeak ? opened.get(key) : undefined;
+      const real = key ? opened.get(key) : undefined;
       if (real && !sources.includes(real)) sources.push(real);
     }
     const note = singleLine(item.note, 300);

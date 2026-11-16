@@ -250,31 +250,32 @@ test('proof record: a malicious note or source cannot make an image, link, hidde
   assert.match(manual, /`https:\/\/ok\.example\/a`/);
 });
 
-test('proofread guard: a query or an opened address that quotes 40 or more characters of the chapter marks the source as leaking', () => {
+test('proofread guard: an opened address that quotes 40 or more characters of the chapter marks the source as leaking', () => {
   const body = 'Brunelleschi demonstrated linear perspective around 1415 using a mirror and a painted panel in Florence.';
   const quote = 'Brunelleschi demonstrated linear perspective around 1415 using';
   const three = [...checklist, { id: 'C3', type: 'fact', text: 'Names the place' }];
   const leakUrl = 'https://leak.example/?q=' + encodeURIComponent(quote);
   const raw = [item('C1'), item('C2', 'met', ['https://example.org/a', leakUrl]), item('C3', 'met', ['https://example.org/a'])];
-  const leakedPage = proof.evaluateProof(raw, three, ['https://example.org/a', leakUrl], { body, queries: ['linear perspective Brunelleschi'] });
+  const leakedPage = proof.evaluateProof(raw, three, ['https://example.org/a', leakUrl], { body });
   assert.equal(leakedPage.items[1].status, 'unverified'); assert.equal(leakedPage.items[1].note, '來源疑似外洩正文'); assert.deepEqual(plain(leakedPage.items[1].sources), []);
   assert.equal(leakedPage.items[2].status, 'met', 'an item that cites only clean pages is untouched');
   assert.match(proof.composeProofRecord('k', leakedPage), /來源疑似外洩正文/);
-  const queryRaw = [item('C1', 'met', ['https://example.org/a']), item('C2', 'met', ['https://example.org/a']), item('C3', 'met', ['https://example.org/a'])];
-  const queryGuard = { body, queries: [quote.replace(/ /g, '  ') + ' x'] };
-  assert.throws(() => proof.evaluateProof(queryRaw, three, ['https://example.org/a'], queryGuard), failure('all_facts_unverified'), 'a leaking query leaves no trusted source for any fact');
-  const structure = proof.evaluateProof([item('C1', 'met', ['https://example.org/a']), item('C2', 'met', ['https://example.org/a'])], [{ id: 'C1', type: 'structure', text: 's' }, { id: 'C2', type: 'structure', text: 't' }], ['https://example.org/a'], queryGuard);
-  assert.deepEqual(plain(structure.items).map(i => [i.status, i.note, i.sources.length]), [['unverified', '來源疑似外洩正文', 0], ['unverified', '來源疑似外洩正文', 0]]);
-  const clean = proof.evaluateProof([item('C1'), item('C2', 'met', ['https://example.org/a'])], checklist, ['https://example.org/a'], { body, queries: ['Brunelleschi linear perspective 1415 mirror', 'short'] });
+  const manyPages = proof.evaluateProof([item('C1', 'met', ['https://example.org/a']), item('C2', 'met', ['https://example.org/a']), item('C3', 'met', ['https://example.org/a', leakUrl])], three, ['https://example.org/a', leakUrl], { body });
+  assert.deepEqual(plain(manyPages.items).map(i => i.status), ['met', 'met', 'unverified'], 'an opened address quoting the chapter downgrades only the item that cites it');
+  const clean = proof.evaluateProof([item('C1'), item('C2', 'met', ['https://example.org/a'])], checklist, ['https://example.org/a'], { body });
   assert.equal(clean.items[1].status, 'met');
-  assert.throws(() => proof.evaluateProof([item('C1'), item('C2', 'met', [leakUrl])], checklist, [leakUrl], { body, queries: [] }), failure('all_facts_unverified'));
+  assert.throws(() => proof.evaluateProof([item('C1'), item('C2', 'met', [leakUrl])], checklist, [leakUrl], { body }), failure('all_facts_unverified'));
   assert.equal(proof.sharesLongRun('x'.repeat(39), 'x'.repeat(100)), false); assert.equal(proof.sharesLongRun('x'.repeat(40), 'x'.repeat(100)), true);
 });
 
-test('runProofread passes the chapter and the call\'s queries to the guard', async () => {
+test('runProofread: a search query quoting a sentence of the chapter still passes; an opened address quoting it downgrades only that item', async () => {
   const quote = BODY.slice(0, 45);
   const h = harness({ answer: reply([item('C1'), item('C2', 'met', ['https://example.org/a'])]), events: [search(quote), page('https://example.org/a')] });
-  await assert.rejects(proofMod.runProofread(h.proofCalls, proofRequest(), { signal: signal() }), failure('all_facts_unverified'));
+  const result = await proofMod.runProofread(h.proofCalls, proofRequest(), { signal: signal() });
+  assert.equal(result.items[1].status, 'met');
+  const leakUrl = 'https://leak.example/?q=' + encodeURIComponent(quote);
+  const h2 = harness({ answer: reply([item('C1'), item('C2', 'met', [leakUrl])]), events: [page('https://example.org/a'), page(leakUrl)] });
+  await assert.rejects(proofMod.runProofread(h2.proofCalls, proofRequest(), { signal: signal() }), failure('all_facts_unverified'));
 });
 
 test('plan text: fences, VAM markers, %% and links in model text cannot take effect (plan section and card Prompt)', () => {

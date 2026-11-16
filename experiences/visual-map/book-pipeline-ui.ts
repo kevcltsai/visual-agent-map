@@ -261,6 +261,12 @@ export function bookIssueText(issue: string): string {
   return t("ui.book_issue_unknown");
 }
 
+/** A checked card's `structure unmet: C2 C3` issue as a small note (the count only); anything else shows nothing. */
+function structureNote(issue: string): { issueText?: string } {
+  const found = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue.trim());
+  return found ? { issueText: t("ui.book_structure_unmet_0", String(found[1].split(" ").length)) } : {};
+}
+
 export interface BookCardInput {
   pipelineStage?: unknown;
   bookRole?: unknown;
@@ -284,6 +290,7 @@ export function bookCardView(note: BookCardInput): BookCardView {
     stageText: t(STAGE_KEY[stage]),
     ...(role ? { roleText: t(ROLE_KEY[role]) } : {}),
     ...(stage === "needs-review" && issue ? { issueText: t("ui.book_issue_0", bookIssueText(issue)) } : {}),
+    ...(stage === "checked" && issue ? structureNote(issue) : {}),
     ...(stage === "pending"
       ? {}
       : { summaryPrefix: t(stage === "planned" ? "ui.book_summary_plan" : "ui.book_summary_done") })

@@ -2,7 +2,12 @@
  * Pure edits of the two note sections the picture-book pipeline owns: the Research notes section of a card's Detail (the
  * folded callout that holds the proof records) and the `## 全書企劃` section of the root note. Nothing else in the text is touched.
  */
-import { isNewSourcesHeading, isResearchNotesHeading, SECTION_NAME } from "../../ai/section-aliases";
+import {
+  isNewSourcesHeading,
+  isOpenQuestionsHeading,
+  isResearchNotesHeading,
+  SECTION_NAME
+} from "../../ai/section-aliases";
 import { demoteHeadings } from "./text";
 import { findProofRecord } from "./proof";
 
@@ -152,10 +157,10 @@ export function replaceBookPlanSection(content: string, markdown: string): strin
 const isUpdateLogHeading = (text: string): boolean =>
   [SECTION_NAME.log.zh, SECTION_NAME.log.en].some(name => name.toLowerCase() === text.trim().toLowerCase());
 const isSystemSection = (text: string): boolean =>
-  isResearchNotesHeading(text) || isUpdateLogHeading(text) || isNewSourcesHeading(text);
+  isResearchNotesHeading(text) || isUpdateLogHeading(text) || isNewSourcesHeading(text) || isOpenQuestionsHeading(text);
 
 /**
- * The chapter text alone: the Detail without the sections the system adds or keeps (Research notes, Update log, Sources).
+ * The chapter text alone: the Detail without the sections the system adds or keeps (Research notes, Update log, Sources, Open questions).
  * The proofread sees and keys on this, so a system line is never taken for the chapter's ending.
  */
 export function chapterBody(detail: string): string {

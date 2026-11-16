@@ -39,6 +39,8 @@ export interface CardPlanResult {
   checklist: ChecklistItem[];
   /** How many items the subjective-word filter dropped (absent when none); the runner logs the count. */
   droppedSubjective?: number;
+  /** How many items the unconditional-picture filter dropped (absent when none). */
+  droppedPicture?: number;
 }
 
 export const MAX_CHECKLIST = 8;
@@ -97,6 +99,7 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
   const objective = parsed.filter(item => !SUBJECTIVE.test(item.text));
   const dropped = parsed.length - objective.length;
   const kept = objective.filter(item => !unconditionalPicture(item.text));
+  const droppedPicture = objective.length - kept.length;
   if (!kept.length) fail("checklist has no usable item");
   const checklist = kept.map((item, index): ChecklistItem => ({ id: `C${index + 1}`, ...item }));
   const side = (value: unknown, present: boolean, what: string): string =>
@@ -108,7 +111,8 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
     previous: side(item.previous, !!request.previous, "previous"),
     next: side(item.next, !!request.next, "next"),
     checklist,
-    ...(dropped ? { droppedSubjective: dropped } : {})
+    ...(dropped ? { droppedSubjective: dropped } : {}),
+    ...(droppedPicture ? { droppedPicture } : {})
   };
 }
 

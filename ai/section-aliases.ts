@@ -126,6 +126,14 @@ export function isNewSourcesHeading(heading: string): boolean {
   return sectionAliasRows()[0].names.some(entry => lowered(entry) === key);
 }
 
+/** True for a heading that is an open-questions section (待確認問題 / 待確認事項 / Open questions (to check), in any spelling). */
+export function isOpenQuestionsHeading(heading: string): boolean {
+  const key = lowered(heading);
+  return [...spellings("detail.open_questions_to_check"), ...spellings("detail.open_questions")].some(
+    entry => lowered(entry) === key
+  );
+}
+
 /** True for a heading that is one of the Research notes names (研究備註, 研究备注, Research notes). */
 export function isResearchNotesHeading(heading: string): boolean {
   const key = lowered(heading);

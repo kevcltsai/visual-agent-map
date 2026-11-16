@@ -27,7 +27,7 @@ export interface ProofItemResult {
 }
 export interface ProofResult {
   items: ProofItemResult[];
-  /** `needs-review` when any item is unmet; otherwise `checked` (unverified items are recorded, not blocking). */
+  /** `needs-review` when a fact item is unmet (a source contradicts the list); otherwise `checked`. Unmet structure items and unverified items are recorded, not blocking. */
   aggregate: "checked" | "needs-review";
   /** What the call did, as numbers only (no query or address): successful page opens and completed searches. */
   counts?: ProofCounts;
@@ -65,12 +65,31 @@ export class ProofFailure extends Error {
 export const isProofFailure = (error: unknown): error is ProofFailure =>
   !!error && typeof error === "object" && (error as { name?: unknown }).name === "ProofFailure";
 
+const TRACKING = /^(?:utm_[a-z0-9_]*|fbclid|gclid)$/i;
+/**
+ * The key two spellings of one page share, never a way to reach a page nobody opened: the host in lower case, no fragment, no
+ * default port, no trailing slash, no tracking parameters (utm_*, fbclid, gclid); http and https share one key (a model's http
+ * spelling matches an https event; an http event is never a source, see {@link safeHref}, and the saved address is always the
+ * event's own). Any other difference (path, other parameters, another host, credentials) is another page.
+ */
 const normalizeUrl = (value: unknown): string | undefined => {
   if (typeof value !== "string") return undefined;
-  const text = value.trim().replace(/#.*$/, "");
-  const m = /^(https?:\/\/[^/?\s]+)(.*)$/i.exec(text);
-  if (!m) return undefined;
-  return `${m[1].toLowerCase()}${m[2].replace(/\/+$/, "")}`;
+  const text = value.trim();
+  if (!text || /[\s\p{Cc}]/u.test(text)) return undefined;
+  let url: URL;
+  try {
+    url = new URL(text);
+  } catch {
+    return undefined;
+  }
+  if ((url.protocol !== "https:" && url.protocol !== "http:") || url.username || url.password || !url.hostname)
+    return undefined;
+  const kept = url.search
+    .slice(1)
+    .split("&")
+    .filter(pair => pair && !TRACKING.test(pair.split("=")[0]));
+  const query = kept.length ? `?${kept.join("&")}` : "";
+  return `${url.host.toLowerCase()}${url.pathname.replace(/\/+$/, "")}${query}`;
 };
 
 /**
@@ -169,7 +188,7 @@ export function evaluateProof(
   const facts = items.filter(item => item.type === "fact");
   const result: ProofResult = {
     items,
-    aggregate: items.some(item => item.status === "unmet") ? "needs-review" : "checked"
+    aggregate: items.some(item => item.type === "fact" && item.status === "unmet") ? "needs-review" : "checked"
   };
   // The partial result of a whole-card failure never reads as checked: the card needs a human.
   const partial: ProofResult = { items, aggregate: "needs-review" };

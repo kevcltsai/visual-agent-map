@@ -155,8 +155,24 @@ test('proofread: an item the reply asserts without a source this call opened dro
   const two = [...checklist, { id: 'C3', type: 'fact', text: 'Names the place' }];
   const mixed = proof.evaluateProof([item('C1'), item('C2', 'met', ['https://evil.example/x']), item('C3', 'met', ['https://example.org/a'])], two, ['https://example.org/a']);
   assert.deepEqual(mixed.items.map(i => i.status), ['met', 'unverified', 'met']); assert.equal(mixed.aggregate, 'checked'); assert.deepEqual(plain(mixed.items[1].sources), []);
+  // Q-fix3: an unmet structure item no longer needs a person (it stays recorded); an unmet fact item does.
   const unmet = proof.evaluateProof([item('C1', 'unmet'), item('C2', 'met', ['https://example.org/a'])], checklist, ['https://example.org/a']);
-  assert.equal(unmet.aggregate, 'needs-review');
+  assert.equal(unmet.aggregate, 'checked'); assert.equal(unmet.items[0].status, 'unmet');
+  const factUnmet = proof.evaluateProof([item('C1'), item('C2', 'unmet', ['https://example.org/a'])], checklist, ['https://example.org/a']);
+  assert.equal(factUnmet.aggregate, 'needs-review');
+});
+
+test('proofread: the same page written another way matches the event; another page, an unopened page and a self-declared page do not', () => {
+  const opened = ['https://Example.org:443/a/b/?utm_source=x&id=7#top'];
+  const ok = spelling => proof.evaluateProof([item('C1'), item('C2', 'met', [spelling])], checklist, opened).items[1];
+  for (const same of ['https://example.org/a/b?id=7', 'http://EXAMPLE.org/a/b/?id=7&utm_medium=m#z', 'https://example.org/a/b?fbclid=1&id=7']) {
+    assert.equal(ok(same).status, 'met', same); assert.deepEqual(plain(ok(same).sources), ['https://example.org/a/b/?utm_source=x&id=7#top'], 'the saved source is the event address (https)');
+  }
+  for (const other of ['https://example.org/a/c?id=7', 'https://example.org/a/b?id=8', 'https://www.example.org/a/b?id=7', 'https://example.org/a/b', 'https://user:pw@example.org/a/b?id=7']) {
+    assert.throws(() => proof.evaluateProof([item('C1'), item('C2', 'met', [other])], checklist, opened), failure('all_facts_unverified'), other);
+  }
+  // an http event is never a source, even when the model cites the https spelling
+  assert.throws(() => proof.evaluateProof([item('C1'), item('C2', 'met', ['https://example.org/a'])], checklist, ['http://example.org/a']), failure('no_open_page'));
 });
 
 test('proofread: whole-card failures (empty list, missing, duplicate, unknown, no page opened, all facts unverified, bad reply)', () => {
@@ -409,6 +425,7 @@ test('card plan: subjective or evaluative items (Traditional and Simplified) are
   assert.equal(result.droppedSubjective, 5);
   const clean = run(['開頭段落提及接入點「X」']);
   assert.equal(clean.droppedSubjective, undefined); assert.equal(clean.checklist.length, 1);
+  assert.equal(run(['開頭段落提及接入點「X」', '每段都附圖片']).droppedPicture, 1, 'an unconditional picture item is counted too');
   assert.throws(() => run(['開頭說明為何值得注意', '內容生動']), /no usable item/, 'nothing left is a failure (retried)');
 });
 

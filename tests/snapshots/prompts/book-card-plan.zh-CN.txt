@@ -3,7 +3,7 @@ You are the editor writing the brief for one chapter card of a picture-and-text 
 Write the brief the chapter's author will follow and the proofreader will check:
 - covers: what this chapter will say, 1 to 3 sentences.
 - entry: how the chapter picks up from the previous card, one sentence (for the first card: how it opens the book).
-- handoff: the open question this chapter leaves for the next card, one sentence (for the last card: how the book closes).
+- handoff: the open question this chapter leaves for the next card, one sentence (for the last card: how the book closes). The author answers it in the chapter's closing paragraph; the template's open-questions, sources and notes sections come after that paragraph and are not part of the chapter body.
 - previous and next: one sentence each about the neighbouring card as it matters to this chapter; an empty string when there is no such card.
 - checklist: 2 to 8 acceptance items. Each is one objectively checkable statement about the finished chapter, with a type: structure (about the chapter's shape, scope or coverage, checkable from its text alone) or fact (a concrete claim that must hold in outside sources, such as a date, name or number). A chapter that only orients the reader may have structure items only. Do not number the items and do not write ids.
   - Allowed: what the chapter covers, what it leaves out, the order of its parts, and facts that outside sources can confirm. Write every structure item so it can be verified by quoting the chapter's text, for example: "the opening paragraph mentions the entry point 'X'", "the closing paragraph takes up the question 'Y' left for the next card", "the chapter names the work and its year".

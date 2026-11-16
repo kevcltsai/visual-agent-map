@@ -3101,6 +3101,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_issue_unknown": "需要人工查看（原因代码无法识别）。",
   "ui.book_issue_step_0_1": "{0}失败：{1}",
   "ui.book_issue_unmet_0": "校对未达成项目：{0}",
+  "ui.book_structure_unmet_0": "结构 {0} 项未达成",
   "ui.book_step_plan": "企划",
   "ui.book_step_write": "写作",
   "ui.book_step_proof": "校对",

@@ -3097,6 +3097,7 @@ var en = {
   "ui.book_issue_unknown": "Needs a manual look (the reason code is not recognized).",
   "ui.book_issue_step_0_1": "{0} failed: {1}",
   "ui.book_issue_unmet_0": "Proofreading found unmet items: {0}",
+  "ui.book_structure_unmet_0": "Structure: {0} item(s) unmet",
   "ui.book_step_plan": "Planning",
   "ui.book_step_write": "Writing",
   "ui.book_step_proof": "Proofreading",
@@ -6107,6 +6108,7 @@ var zhCN = {
   "ui.book_issue_unknown": "\u9700\u8981\u4EBA\u5DE5\u67E5\u770B\uFF08\u539F\u56E0\u4EE3\u7801\u65E0\u6CD5\u8BC6\u522B\uFF09\u3002",
   "ui.book_issue_step_0_1": "{0}\u5931\u8D25\uFF1A{1}",
   "ui.book_issue_unmet_0": "\u6821\u5BF9\u672A\u8FBE\u6210\u9879\u76EE\uFF1A{0}",
+  "ui.book_structure_unmet_0": "\u7ED3\u6784 {0} \u9879\u672A\u8FBE\u6210",
   "ui.book_step_plan": "\u4F01\u5212",
   "ui.book_step_write": "\u5199\u4F5C",
   "ui.book_step_proof": "\u6821\u5BF9",
@@ -9117,6 +9119,7 @@ var zhTW = {
   "ui.book_issue_unknown": "\u9700\u8981\u4EBA\u5DE5\u67E5\u770B\uFF08\u539F\u56E0\u4EE3\u78BC\u7121\u6CD5\u8FA8\u8B58\uFF09\u3002",
   "ui.book_issue_step_0_1": "{0}\u5931\u6557\uFF1A{1}",
   "ui.book_issue_unmet_0": "\u6821\u5C0D\u672A\u9054\u6210\u9805\u76EE\uFF1A{0}",
+  "ui.book_structure_unmet_0": "\u7D50\u69CB {0} \u9805\u672A\u9054\u6210",
   "ui.book_step_plan": "\u4F01\u5283",
   "ui.book_step_write": "\u5BEB\u4F5C",
   "ui.book_step_proof": "\u6821\u5C0D",
@@ -21720,6 +21723,12 @@ function sectionAliasesFor(heading) {
 function isNewSourcesHeading(heading) {
   const key4 = lowered(heading);
   return sectionAliasRows()[0].names.some((entry) => lowered(entry) === key4);
+}
+function isOpenQuestionsHeading(heading) {
+  const key4 = lowered(heading);
+  return [...spellings("detail.open_questions_to_check"), ...spellings("detail.open_questions")].some(
+    (entry) => lowered(entry) === key4
+  );
 }
 function isResearchNotesHeading(heading) {
   const key4 = lowered(heading);
@@ -42884,6 +42893,7 @@ var BOOK_AUTHOR_RULES = [
   "- Write the chapter as the role named in the brief says.",
   "- Open by picking up the brief's entry point (how this chapter continues from the previous card).",
   "- End with one sentence that leads into the next card, taking up the question the brief leaves for it. If the brief has no next card (the last card), do not lead into a next card; close the whole book as the brief says.",
+  "- The closing sentence belongs to the last paragraph of the chapter's own text, before any open-questions, sources or notes sections the template adds; those sections are not the chapter's ending.",
   "- If the chapter suits pictures, prefer a direct https image address from Wikimedia Commons or a museum's public collection (Markdown image syntax, with the source and the work's name). If you cannot find an image that loads, write a line saying no picture and why. Never invent an address.",
   '- Do not end the chapter with an update log, a change note or a "this version" remark; those are added by the system.'
 ].join("\n");
@@ -43196,12 +43206,22 @@ var ProofFailure = class extends Error {
   }
 };
 var isProofFailure = (error) => !!error && typeof error === "object" && error.name === "ProofFailure";
+var TRACKING = /^(?:utm_[a-z0-9_]*|fbclid|gclid)$/i;
 var normalizeUrl = (value) => {
   if (typeof value !== "string") return void 0;
-  const text10 = value.trim().replace(/#.*$/, "");
-  const m = /^(https?:\/\/[^/?\s]+)(.*)$/i.exec(text10);
-  if (!m) return void 0;
-  return `${m[1].toLowerCase()}${m[2].replace(/\/+$/, "")}`;
+  const text10 = value.trim();
+  if (!text10 || /[\s\p{Cc}]/u.test(text10)) return void 0;
+  let url;
+  try {
+    url = new URL(text10);
+  } catch (e) {
+    return void 0;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:" || url.username || url.password || !url.hostname)
+    return void 0;
+  const kept = url.search.slice(1).split("&").filter((pair5) => pair5 && !TRACKING.test(pair5.split("=")[0]));
+  const query = kept.length ? `?${kept.join("&")}` : "";
+  return `${url.host.toLowerCase()}${url.pathname.replace(/\/+$/, "")}${query}`;
 };
 function safeHref(value) {
   if (typeof value !== "string") return void 0;
@@ -43275,7 +43295,7 @@ function evaluateProof(raw, checklist, openedUrls, guard) {
   const facts = items.filter((item) => item.type === "fact");
   const result = {
     items,
-    aggregate: items.some((item) => item.status === "unmet") ? "needs-review" : "checked"
+    aggregate: items.some((item) => item.type === "fact" && item.status === "unmet") ? "needs-review" : "checked"
   };
   const partial = { items, aggregate: "needs-review" };
   if (noPage) throw new ProofFailure("no_open_page", partial);
@@ -43447,7 +43467,7 @@ ${body}`;
 ${after}` : "\n"}`;
 }
 var isUpdateLogHeading = (text10) => [SECTION_NAME.log.zh, SECTION_NAME.log.en].some((name2) => name2.toLowerCase() === text10.trim().toLowerCase());
-var isSystemSection = (text10) => isResearchNotesHeading(text10) || isUpdateLogHeading(text10) || isNewSourcesHeading(text10);
+var isSystemSection = (text10) => isResearchNotesHeading(text10) || isUpdateLogHeading(text10) || isNewSourcesHeading(text10) || isOpenQuestionsHeading(text10);
 function chapterBody(detail) {
   let lines = detail.split("\n");
   for (; ; ) {
@@ -43728,7 +43748,7 @@ var card_plan_default = `You are the editor writing the brief for one chapter ca
 Write the brief the chapter's author will follow and the proofreader will check:
 - covers: what this chapter will say, 1 to 3 sentences.
 - entry: how the chapter picks up from the previous card, one sentence (for the first card: how it opens the book).
-- handoff: the open question this chapter leaves for the next card, one sentence (for the last card: how the book closes).
+- handoff: the open question this chapter leaves for the next card, one sentence (for the last card: how the book closes). The author answers it in the chapter's closing paragraph; the template's open-questions, sources and notes sections come after that paragraph and are not part of the chapter body.
 - previous and next: one sentence each about the neighbouring card as it matters to this chapter; an empty string when there is no such card.
 - checklist: 2 to 8 acceptance items. Each is one objectively checkable statement about the finished chapter, with a type: structure (about the chapter's shape, scope or coverage, checkable from its text alone) or fact (a concrete claim that must hold in outside sources, such as a date, name or number). A chapter that only orients the reader may have structure items only. Do not number the items and do not write ids.
   - Allowed: what the chapter covers, what it leaves out, the order of its parts, and facts that outside sources can confirm. Write every structure item so it can be verified by quoting the chapter's text, for example: "the opening paragraph mentions the entry point 'X'", "the closing paragraph takes up the question 'Y' left for the next card", "the chapter names the work and its year".
@@ -43807,6 +43827,7 @@ function parseCardPlan(raw, request) {
   const objective = parsed.filter((item2) => !SUBJECTIVE.test(item2.text));
   const dropped = parsed.length - objective.length;
   const kept = objective.filter((item2) => !unconditionalPicture(item2.text));
+  const droppedPicture = objective.length - kept.length;
   if (!kept.length) fail2("checklist has no usable item");
   const checklist = kept.map((item2, index) => ({ id: `C${index + 1}`, ...item2 }));
   const side = (value, present, what) => present ? singleLine(textOf(value, what), 240) : "";
@@ -43817,7 +43838,8 @@ function parseCardPlan(raw, request) {
     previous: side(item.previous, !!request.previous, "previous"),
     next: side(item.next, !!request.next, "next"),
     checklist,
-    ...dropped ? { droppedSubjective: dropped } : {}
+    ...dropped ? { droppedSubjective: dropped } : {},
+    ...droppedPicture ? { droppedPicture } : {}
   };
 }
 var cap = (value, max) => singleLine(value, max);
@@ -48335,7 +48357,8 @@ var PICTURE_REASONS = {
   load_failed: ["\u7121\u6CD5\u8F09\u5165", "could not load"],
   empty: ["\u7A7A\u5716", "empty image"],
   timeout: ["\u903E\u6642", "timed out"],
-  aborted: ["\u5DF2\u4E2D\u6B62", "aborted"]
+  aborted: ["\u5DF2\u4E2D\u6B62", "aborted"],
+  none_found: ["\u672A\u627E\u5230\u53EF\u9A57\u8B49\u7684\u516C\u958B\u5716\u7247", "no verifiable public image found"]
 };
 function noPicture(language2, reason) {
   const known = Object.prototype.hasOwnProperty.call(PICTURE_REASONS, reason) ? PICTURE_REASONS[reason] : void 0;
@@ -48523,7 +48546,8 @@ var BookPipelineRuns = class {
   /** The live drive's numbers, or what the last drive left; undefined when this plugin session never ran the map. */
   getProgress(mapPath) {
     const drive = this.drives.get(mapPath);
-    return drive ? this.progressOf(drive, true) : this.last.get(mapPath);
+    if (drive) return drive.store ? this.progressOf(drive, true) : void 0;
+    return this.last.get(mapPath);
   }
   /** Starts a new run (writes `bookPipeline` to the map file) and drives it until it ends, pauses or reaches a gate. */
   async start(mapPath) {
@@ -48549,9 +48573,9 @@ var BookPipelineRuns = class {
           doc.bookPipeline = state;
         });
         initial = state;
+        this.attachStore(drive, state);
       });
       if (!initial || this.dead(drive)) return;
-      this.attachStore(drive, initial);
       this.log(drive, "start", "-", "plan", "ok");
     });
   }
@@ -48960,6 +48984,7 @@ var BookPipelineRuns = class {
     };
   }
   async execPlan(drive, token, nodeId) {
+    var _a2, _b2;
     const signal = drive.controller.signal;
     const info = drive.cards.get(nodeId);
     const rootInfo = drive.cards.get(drive.rootId);
@@ -49000,8 +49025,22 @@ var BookPipelineRuns = class {
     if (!path) return { kind: "failed", reason: "card_removed" };
     if (!await this.ensureBackup(drive, nodeId, path, card.raw))
       return { kind: "failed", reason: "backup_failed", forceReview: true };
-    if (result.droppedSubjective)
-      this.log(drive, "checklist_dropped", nodeId, "plan", `subjective:${result.droppedSubjective}`);
+    this.ports.log(
+      formatPipelineLog({
+        event: "checklist_dropped",
+        runId: token.runId,
+        card: nodeId,
+        step: "plan",
+        attempt: attemptsOf(drive.store.state, nodeId).plan,
+        result: "ok",
+        ms: 0,
+        counts: {
+          subjective: (_a2 = result.droppedSubjective) != null ? _a2 : 0,
+          picture: (_b2 = result.droppedPicture) != null ? _b2 : 0,
+          kept: result.checklist.length
+        }
+      })
+    );
     const prompt = composeCardPrompt(
       {
         role: info.role,
@@ -49034,12 +49073,12 @@ var BookPipelineRuns = class {
     const authorize = this.authorize(drive, token);
     let unsafe = false;
     const finalize = (content) => {
-      const urls = bodyImageUrls(content);
+      const urls2 = bodyImageUrls(content);
       const unsafeUrls = new Map(
-        urls.filter((url) => !isHttps(url)).map((url) => [url, noPicture(drive.config.language, "unsafe")])
+        urls2.filter((url) => !isHttps(url)).map((url) => [url, noPicture(drive.config.language, "unsafe")])
       );
       const cleaned = replaceBodyImages(content, unsafeUrls);
-      if (this.exitCheck(cleaned, new Set(urls.filter(isHttps)))) {
+      if (this.exitCheck(cleaned, new Set(urls2.filter(isHttps)))) {
         unsafe = true;
         return null;
       }
@@ -49084,6 +49123,34 @@ var BookPipelineRuns = class {
         authorize
       });
       if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
+    }
+    const urls = bodyImageUrls(written2.raw);
+    this.ports.log(
+      formatPipelineLog({
+        event: "pictures",
+        runId: token.runId,
+        card: nodeId,
+        step: "write",
+        attempt: attemptsOf(drive.store.state, nodeId).write,
+        result: "ok",
+        ms: 0,
+        counts: { pictures: urls.length }
+      })
+    );
+    if (!urls.length) {
+      const latest = await this.ports.readCard(path);
+      const line2 = noPicture(drive.config.language, "none_found");
+      if (!/無圖：|No picture:/.test(chapterBody(latest.detail)) && !latest.detail.includes(line2)) {
+        const added = appendResearchNote(latest.detail, line2);
+        if (added.appended) {
+          const outcome = await this.ports.updateNoteGuarded(
+            path,
+            { detail: added.text },
+            { expectedContent: latest.raw, authorize }
+          );
+          if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
+        }
+      }
     }
     return { kind: "ok", after: () => this.setStage(drive, nodeId, "written", null) };
   }
@@ -49142,13 +49209,14 @@ var BookPipelineRuns = class {
       }
     }
     const verdict = result;
+    const structureUnmet = verdict.items.filter((item) => item.type !== "fact" && item.status === "unmet").map((item) => code2(item.id));
     return {
       kind: "ok",
       after: () => this.setStage(
         drive,
         nodeId,
         verdict.aggregate,
-        verdict.aggregate === "needs-review" ? `proof unmet: ${verdict.items.filter((item) => item.status === "unmet").map((item) => code2(item.id)).join(" ")}` : null
+        verdict.aggregate === "needs-review" ? `proof unmet: ${verdict.items.filter((item) => item.type === "fact" && item.status === "unmet").map((item) => code2(item.id)).join(" ")}` : structureUnmet.length ? `structure unmet: ${structureUnmet.join(" ")}` : null
       )
     };
   }
@@ -49404,6 +49472,10 @@ function bookIssueText(issue2) {
   if (unmet) return t("ui.book_issue_unmet_0", unmet[1]);
   return t("ui.book_issue_unknown");
 }
+function structureNote(issue2) {
+  const found = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue2.trim());
+  return found ? { issueText: t("ui.book_structure_unmet_0", String(found[1].split(" ").length)) } : {};
+}
 function bookCardView(note) {
   var _a2;
   const stage = (_a2 = readPipelineStage(note.pipelineStage)) != null ? _a2 : "pending";
@@ -49414,6 +49486,7 @@ function bookCardView(note) {
     stageText: t(STAGE_KEY[stage]),
     ...role ? { roleText: t(ROLE_KEY[role]) } : {},
     ...stage === "needs-review" && issue2 ? { issueText: t("ui.book_issue_0", bookIssueText(issue2)) } : {},
+    ...stage === "checked" && issue2 ? structureNote(issue2) : {},
     ...stage === "pending" ? {} : { summaryPrefix: t(stage === "planned" ? "ui.book_summary_plan" : "ui.book_summary_done") }
   };
 }
@@ -85178,7 +85251,7 @@ For every checklist item return exactly one result:
 
 You must successfully open at least one source page during this check: search, then actually open a result page (not only read search snippets). A search result that you did not open is not a source, and reading search snippets alone does not count. For a fact item, list in sources the URLs of the pages you actually opened for it; never list a URL you did not open. A structure item is judged from the chapter text alone and needs no sources.
 
-The chapter text is the chapter body only; the system's notes, update log and source list are not part of it, so judge its ending as the last paragraph given. A chapter with no picture, or with a line saying no picture was found, meets a picture item unless the item explicitly requires a picture to be present.
+The chapter text is the chapter body only; the system's open-questions section, notes, update log and source list are not part of it, so judge its ending as the last paragraph given. A chapter with no picture, or with a line saying no picture was found, meets a picture item unless the item explicitly requires a picture to be present.
 
 Return each checklist id exactly once, copied exactly from the list. note is one short plain sentence. Return only JSON: {"results":[{"id":"","status":"met|unmet|unverified","note":"","sources":[""]}]}. Do not return the chapter text or any rewritten text, and do not add other fields.
 

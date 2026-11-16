@@ -257,7 +257,8 @@ const PICTURE_REASONS: Record<string, [string, string]> = {
   load_failed: ["無法載入", "could not load"],
   empty: ["空圖", "empty image"],
   timeout: ["逾時", "timed out"],
-  aborted: ["已中止", "aborted"]
+  aborted: ["已中止", "aborted"],
+  none_found: ["未找到可驗證的公開圖片", "no verifiable public image found"]
 };
 /** The "no picture" line for a probe reason code (a known code in the output language; anything else is escaped text). */
 function noPicture(language: string, reason: string): string {
@@ -471,7 +472,9 @@ export class BookPipelineRuns {
   /** The live drive's numbers, or what the last drive left; undefined when this plugin session never ran the map. */
   getProgress(mapPath: string): BookPipelineProgress | undefined {
     const drive = this.drives.get(mapPath);
-    return drive ? this.progressOf(drive, true) : this.last.get(mapPath);
+    // A drive whose first write is still in progress has no store yet (a repaint during that write asks): nothing to report yet.
+    if (drive) return drive.store ? this.progressOf(drive, true) : undefined;
+    return this.last.get(mapPath);
   }
 
   /** Starts a new run (writes `bookPipeline` to the map file) and drives it until it ends, pauses or reaches a gate. */
@@ -498,9 +501,10 @@ export class BookPipelineRuns {
           doc.bookPipeline = state;
         });
         initial = state;
+        // Attach right after the write: the repaint that follows it (main.mutate reads the views back) already asks for progress.
+        this.attachStore(drive, state);
       });
       if (!initial || this.dead(drive)) return;
-      this.attachStore(drive, initial);
       this.log(drive, "start", "-", "plan", "ok");
     });
   }
@@ -968,8 +972,23 @@ export class BookPipelineRuns {
     if (!path) return { kind: "failed", reason: "card_removed" };
     if (!(await this.ensureBackup(drive, nodeId, path, card.raw)))
       return { kind: "failed", reason: "backup_failed", forceReview: true };
-    if (result.droppedSubjective)
-      this.log(drive, "checklist_dropped", nodeId, "plan", `subjective:${result.droppedSubjective}`);
+    // Always one line per accepted plan (also when nothing was dropped), so a run's log shows the filters did run: counts only.
+    this.ports.log(
+      formatPipelineLog({
+        event: "checklist_dropped",
+        runId: token.runId,
+        card: nodeId,
+        step: "plan",
+        attempt: attemptsOf(drive.store.state, nodeId).plan,
+        result: "ok",
+        ms: 0,
+        counts: {
+          subjective: result.droppedSubjective ?? 0,
+          picture: result.droppedPicture ?? 0,
+          kept: result.checklist.length
+        }
+      })
+    );
     const prompt = composeCardPrompt(
       {
         role: info.role,
@@ -1058,6 +1077,35 @@ export class BookPipelineRuns {
       });
       if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
     }
+    // Q13: a chapter with no picture and no "no picture" line gets one line in the research notes saying so (the body is not touched).
+    const urls = bodyImageUrls(written.raw);
+    this.ports.log(
+      formatPipelineLog({
+        event: "pictures",
+        runId: token.runId,
+        card: nodeId,
+        step: "write",
+        attempt: attemptsOf(drive.store.state, nodeId).write,
+        result: "ok",
+        ms: 0,
+        counts: { pictures: urls.length }
+      })
+    );
+    if (!urls.length) {
+      const latest = await this.ports.readCard(path);
+      const line = noPicture(drive.config.language, "none_found");
+      if (!/無圖：|No picture:/.test(chapterBody(latest.detail)) && !latest.detail.includes(line)) {
+        const added = appendResearchNote(latest.detail, line);
+        if (added.appended) {
+          const outcome = await this.ports.updateNoteGuarded(
+            path,
+            { detail: added.text },
+            { expectedContent: latest.raw, authorize }
+          );
+          if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
+        }
+      }
+    }
     return { kind: "ok", after: () => this.setStage(drive, nodeId, "written", null) };
   }
 
@@ -1120,6 +1168,10 @@ export class BookPipelineRuns {
       }
     }
     const verdict = result;
+    // Unmet structure items do not stop the card: it stays checked, and the count is kept in its issue field for the card's small note.
+    const structureUnmet = verdict.items
+      .filter(item => item.type !== "fact" && item.status === "unmet")
+      .map(item => code(item.id));
     return {
       kind: "ok",
       after: () =>
@@ -1129,10 +1181,12 @@ export class BookPipelineRuns {
           verdict.aggregate,
           verdict.aggregate === "needs-review"
             ? `proof unmet: ${verdict.items
-                .filter(item => item.status === "unmet")
+                .filter(item => item.type === "fact" && item.status === "unmet")
                 .map(item => code(item.id))
                 .join(" ")}`
-            : null
+            : structureUnmet.length
+              ? `structure unmet: ${structureUnmet.join(" ")}`
+              : null
         )
     };
   }

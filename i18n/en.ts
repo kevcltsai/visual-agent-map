@@ -3317,6 +3317,7 @@ export const en = {
   "ui.book_issue_unknown": "Needs a manual look (the reason code is not recognized).",
   "ui.book_issue_step_0_1": "{0} failed: {1}",
   "ui.book_issue_unmet_0": "Proofreading found unmet items: {0}",
+  "ui.book_structure_unmet_0": "Structure: {0} item(s) unmet",
   "ui.book_step_plan": "Planning",
   "ui.book_step_write": "Writing",
   "ui.book_step_proof": "Proofreading",

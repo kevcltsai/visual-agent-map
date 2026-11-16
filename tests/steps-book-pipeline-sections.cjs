@@ -93,3 +93,10 @@ test('chapterBody: Research notes, Update log and Sources are not the chapter; a
   assert.equal(sections.chapterBody('### Sources\n\n- a\n\n### Update log\n\nx\n\n### Research notes\n\n> y'), '');
   assert.equal(sections.chapterBody('Plain text\n'), 'Plain text');
 });
+
+test('chapterBody: an open-questions section (待確認問題 / Open questions to check) is not the chapter either; the ending is the last body paragraph', () => {
+  const detail = ['### 核心結論', '', '正文。', '', '最後一段回應下一張的問題。', '', '### 待確認問題', '', '- 還有什麼？', '', '### 來源', '', '- a', '', '### 更新紀錄', '', 'x'].join('\n');
+  assert.equal(sections.chapterBody(detail), '### 核心結論\n\n正文。\n\n最後一段回應下一張的問題。');
+  assert.equal(sections.chapterBody('Body.\n\nEnd.\n\n### Open questions to check\n\n- q'), 'Body.\n\nEnd.');
+  assert.equal(sections.chapterBody('Body.\n\n### 待確認事項\n\n- q'), 'Body.');
+});

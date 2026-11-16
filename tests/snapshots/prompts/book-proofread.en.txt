@@ -7,7 +7,7 @@ For every checklist item return exactly one result:
 
 You must successfully open at least one source page during this check: search, then actually open a result page (not only read search snippets). A search result that you did not open is not a source, and reading search snippets alone does not count. For a fact item, list in sources the URLs of the pages you actually opened for it; never list a URL you did not open. A structure item is judged from the chapter text alone and needs no sources.
 
-The chapter text is the chapter body only; the system's notes, update log and source list are not part of it, so judge its ending as the last paragraph given. A chapter with no picture, or with a line saying no picture was found, meets a picture item unless the item explicitly requires a picture to be present.
+The chapter text is the chapter body only; the system's open-questions section, notes, update log and source list are not part of it, so judge its ending as the last paragraph given. A chapter with no picture, or with a line saying no picture was found, meets a picture item unless the item explicitly requires a picture to be present.
 
 Return each checklist id exactly once, copied exactly from the list. note is one short plain sentence. Return only JSON: {"results":[{"id":"","status":"met|unmet|unverified","note":"","sources":[""]}]}. Do not return the chapter text or any rewritten text, and do not add other fields.
 

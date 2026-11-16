@@ -590,3 +590,64 @@ test('a proofread call logs openedPages and searches as numbers only; the log ca
   assert.ok(!/Secret/.test(r.stat.logs.join('\n')));
   assert.match(r.raw(1), /開頁 2 次、搜尋 3 次/);
 });
+
+// Real wiring: main.mutate() reads every view back after each write, and the view's repaint asks getProgress while the first start is
+// still inside its own mutate (the drive exists, its store does not yet). That read used to throw "reading 'state'" of undefined.
+test('first start on a map with no bookPipeline: a repaint (getProgress) during the start write does not break the run', async () => {
+  let runs;
+  let mapPath;
+  let queue = Promise.resolve();
+  const seen = [];
+  const r = await rig({ ports: { mutate: work => { const next = queue.then(async () => { await work(); seen.push(runs.getProgress(mapPath)); }); queue = next.catch(() => undefined); return next; } } });
+  runs = r.runs; mapPath = r.mapPath;
+  assert.equal(readBookPipeline(await r.repo.readMap(r.mapPath)).kind, 'absent');
+  await r.runs.start(r.mapPath);
+  const s = await r.state();
+  assert.equal(s.phase, 'gate1'); assert.equal(s.failureCode, undefined);
+  assert.equal(r.stat.plan[0], 'global');
+  assert.ok(!r.stat.logs.some(line => /internal_/.test(line)));
+  assert.ok(seen.length > 0);
+});
+
+test('an unexpected error before the store exists still saves its code (stopped, failureCode) so the bar can show a reason and retry', async () => {
+  let queue = Promise.resolve();
+  let first = true;
+  const r = await rig({ ports: { mutate: work => { const next = queue.then(async () => { await work(); if (first) { first = false; throw new TypeError('late repaint failed'); } }); queue = next.catch(() => undefined); return next; } } });
+  await r.runs.start(r.mapPath);
+  const s = await r.state();
+  assert.equal(s.status, 'stopped'); assert.equal(s.pauseReason, 'failed'); assert.equal(s.failureCode, 'internal_TypeError');
+  assert.equal(r.runs.getProgress(r.mapPath).failureCode, 'internal_TypeError');
+  assert.equal(r.stat.plan.length, 0, 'no call was made');
+});
+
+test('a written chapter with no picture gets one "no picture" line in the research notes (body untouched, no duplicate on a rewrite); one with a picture gets none; the log has pictures=n', async () => {
+  const r = await rig();
+  await r.runs.start(r.mapPath);
+  await r.runs.confirmGate1(r.mapPath);
+  for (let i = 0; i < 3; i++) {
+    const detail = (await r.note(i)).detail;
+    assert.equal(detail.split('無圖：未找到可驗證的公開圖片').length - 1, 1, `card ${i}: one line`);
+    assert.equal(withoutResearchNotes(detail).replace(/\s+$/, ''), bodyOf(TITLES[i]) + '', 'the body text is as the author wrote it');
+  }
+  assert.ok(r.stat.logs.some(line => / pictures=0$/.test(line) && /book-pipeline pictures /.test(line)));
+  assert.ok(!r.stat.logs.some(line => /SecretBody|SecretTitle/.test(line)));
+});
+
+test('a chapter whose body already carries a picture is not given the no-picture line', async () => {
+  const body = title => `SecretBody ${title}\n\n![x](https://upload.wikimedia.org/a.jpg)`;
+  const r = await rig();
+  r.script.author = async input => { await input.admission.reserve(); const note = await r.repo.readNote(input.path); const w = await r.repo.updateNoteGuarded(input.path, { detail: body(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return w === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; };
+  await r.runs.start(r.mapPath);
+  await r.runs.confirmGate1(r.mapPath);
+  for (let i = 0; i < 3; i++) assert.ok(!(await r.note(i)).detail.includes('無圖：未找到'));
+  assert.ok(r.stat.logs.some(line => / pictures=1$/.test(line)));
+});
+
+test('every accepted card plan logs one checklist_dropped line with counts only (zero included)', async () => {
+  const r = await rig({ script: { card: request => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }], ...(request.card.position === 2 ? { droppedSubjective: 2, droppedPicture: 1 } : {}) }) } });
+  await r.runs.start(r.mapPath);
+  const lines = r.stat.logs.filter(line => /book-pipeline checklist_dropped /.test(line));
+  assert.equal(lines.length, 3);
+  assert.equal(lines.filter(line => / subjective=0 picture=0 kept=1$/.test(line)).length, 2);
+  assert.equal(lines.filter(line => / subjective=2 picture=1 kept=1$/.test(line)).length, 1);
+});

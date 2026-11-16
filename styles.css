@@ -2215,3 +2215,33 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-argument-badge { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 3px; font-size: var(--font-ui-smaller); font-weight: 700; line-height: 18px; vertical-align: 1px; }
 .vam-argument-badge.is-qtype { background: var(--interactive-accent); color: var(--text-on-accent); }
 .vam-argument-badge.is-core { border: 1px solid var(--interactive-accent); color: var(--text-accent); }
+/* Picture-book pipeline (03b): toolbar button, top progress bar, card labels. Theme variables only; every state also has a word. */
+.vam-toolbar-actions .vam-book-button { margin-right: 6px; white-space: nowrap; }
+.vam-book-button:focus-visible, .vam-book-bar button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.vam-book-bar { flex: 1 1 100%; order: 99; display: grid; gap: 6px; min-width: 0; padding: 8px 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); }
+.vam-book-bar-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; font-size: var(--font-ui-small); }
+.vam-book-bar-title { font-weight: 650; }
+.vam-book-bar-counts { flex: 1 1 160px; min-width: 0; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.vam-book-bar-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.vam-book-bar[data-mode="budget"] .vam-book-bar-counts { color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); font-weight: 600; }
+.vam-book-track { display: flex; height: 8px; overflow: hidden; border-radius: 4px; background: var(--background-modifier-border); }
+.vam-book-seg { display: block; height: 100%; }
+.vam-book-seg.is-checked, .vam-book-legend-item.is-checked::before { background: var(--color-green); }
+.vam-book-seg.is-written, .vam-book-legend-item.is-written::before { background: var(--color-cyan); }
+.vam-book-seg.is-planned, .vam-book-legend-item.is-planned::before { background: var(--color-blue); }
+.vam-book-seg.is-needs-review, .vam-book-legend-item.is-needs-review::before { background: var(--color-orange); }
+.vam-book-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.vam-book-legend-item::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; }
+.vam-book-state.is-planned { color: color-mix(in srgb, var(--color-blue) 70%, var(--text-normal)); }
+.vam-book-state.is-planned::before { background: var(--color-blue); }
+.vam-book-state.is-written { color: color-mix(in srgb, var(--color-cyan) 70%, var(--text-normal)); }
+.vam-book-state.is-written::before { background: var(--color-cyan); }
+.vam-book-state.is-checked { color: color-mix(in srgb, var(--color-green) 70%, var(--text-normal)); }
+.vam-book-state.is-checked::before { background: var(--color-green); }
+.vam-book-state.is-needs-review { font-weight: 600; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
+.vam-book-state.is-needs-review::before { background: var(--color-orange); }
+.vam-book-state.is-pending::before { border: 1.5px solid var(--text-muted); background: transparent; }
+.vam-book-elapsed { margin-left: 4px; font-variant-numeric: tabular-nums; }
+.vam-book-role { display: inline-block; padding: 0 6px; border: 1px solid var(--background-modifier-border); border-radius: 4px; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }
+.vam-book-summary-prefix { color: var(--text-faint); margin-right: 2px; }
+.vam-card-book-issue { margin: 6px 0 0; font-size: var(--font-ui-smaller); line-height: 1.45; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); overflow-wrap: anywhere; }

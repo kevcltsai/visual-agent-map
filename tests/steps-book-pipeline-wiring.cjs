@@ -96,7 +96,7 @@ test('probeBookImage: a loaded https image is ok with no referrer; error, empty 
 function authorView(behaviour) {
   const calls = [];
   const view = {
-    map: { nodes: [{ id: 'n1', path: 'N1.md' }] },
+    map: { nodes: [{ id: 'n1', path: 'N1.md' }] }, bookAuthoring: new Map(),
     researchChild: async (...args) => { calls.push(args); return behaviour(...args); }
   };
   const input = (over = {}) => ({

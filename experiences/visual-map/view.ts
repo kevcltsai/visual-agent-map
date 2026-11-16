@@ -335,6 +335,8 @@ import { backupNote } from "../../ai/note-writeback";
 import { stopLabelKey, type ResearchStart, type SelectionSynthesisTask, type WritebackHooks } from "./topic-run";
 import type { AuthorInput, AuthorOutcome } from "./book-pipeline-run";
 import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
+import { readBookPipeline, readPipelineStage } from "../../core/book-pipeline/model";
+import { bookBarState, bookCardView, renderBookBar, renderBookCardLabels, runBookEntry } from "./book-pipeline-ui";
 import {
   INTEGRATION_DEPTHS,
   bottomUpOrder,
@@ -1435,6 +1437,8 @@ export class VisualAgentMapView extends ItemView {
   private researchSigs = new Map<string, string>();
   private researchElapsed = new Map<HTMLElement, number>();
   private researchTick: number | null = null;
+  /** Cards the picture-book author step is writing right now (path to start time); in memory only, never written to a card. */
+  private bookAuthoring = new Map<string, number>();
   /** The status bar's "N of M received" text of the running grade; painted in place, never by a repaint. */
   private relevanceReceivedEl: HTMLElement | null = null;
   private researchRenderTimer: number | null = null;
@@ -3011,6 +3015,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.researchRenderTimer !== null) window.clearTimeout(this.researchRenderTimer);
     this.researchTick = this.researchRenderTimer = null;
     this.researchElapsed.clear();
+    this.bookAuthoring.clear();
     this.researchSigs.clear();
     this.taskPreviewEls.clear();
     this.hoverResearch = null;
@@ -11708,6 +11713,12 @@ export class VisualAgentMapView extends ItemView {
         event.stopPropagation();
         this.openNewMapMenu(event);
       });
+      const bookButton = headerActions.createEl("button", {
+        cls: "mod-cta vam-book-button",
+        text: t("ui.book_button")
+      });
+      bookButton.setAttr("title", t("ui.book_button_title"));
+      bookButton.addEventListener("click", () => void this.startBookPipelineFromUi());
       this.iconButton(headerActions, "list-tree", t("ui.open_topic_outline"), () => {
         void this.plugin.activateOutline(this).catch(error => new Notice(String(error)));
       });
@@ -11723,6 +11734,7 @@ export class VisualAgentMapView extends ItemView {
         this.openMapActions(event)
       ).addClass("vam-map-actions-button");
     }
+    this.renderBookPipelineBar(toolbar);
     // The one line an old AIM map shows: AIM was removed, the map is an ordinary map now (no button, nothing to resume).
     if (this.map?.aim)
       this.contentEl.createDiv({
@@ -12166,6 +12178,7 @@ export class VisualAgentMapView extends ItemView {
       this.plugin.topicRuns.isBusy(node.path) ||
       this.plugin.quickExpandPending?.has(node.path) ||
       this.startingTasks.has(node.path);
+    const bookCard = bookCardView(note ?? {});
     if (!loading) {
       const statusText = research
         ? this.researchStageText(research)
@@ -12201,6 +12214,22 @@ export class VisualAgentMapView extends ItemView {
           text: statusText
         });
         if (active) chip.setAttr("role", "status");
+      }
+      // Picture-book labels: only on a map that has a usable `bookPipeline`; any other map draws nothing new.
+      if (note && this.hasBookPipeline()) {
+        const startedAt = this.bookAuthoring.get(node.path);
+        renderBookCardLabels(
+          header,
+          bookCard,
+          startedAt === undefined
+            ? undefined
+            : {
+                track: element => {
+                  element.setText(this.researchElapsedText(startedAt));
+                  this.trackResearchElapsed(element, startedAt);
+                }
+              }
+        );
       }
       if (note) {
         if (showsToResearch(kind, note.status, this.progressDone(node.id)))
@@ -12479,7 +12508,15 @@ export class VisualAgentMapView extends ItemView {
         attr: { title: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
       if (textEditable) summaryText.addClass("is-inline-editable");
+      // Screen-only prefix ("this chapter will cover" / "what it covers"); the note's summary is not changed.
+      if (note && bookCard.summaryPrefix && this.hasBookPipeline())
+        summaryText.insertBefore(
+          summaryText.createSpan({ cls: "vam-book-summary-prefix", text: bookCard.summaryPrefix }),
+          summaryText.firstChild
+        );
     }
+    if (note && bookCard.issueText && this.hasBookPipeline())
+      card.createEl("p", { cls: "vam-card-book-issue", text: bookCard.issueText });
     // Shown (by the stylesheet) only while the card is selected.
     if (
       !argumentView &&
@@ -16897,6 +16934,41 @@ export class VisualAgentMapView extends ItemView {
     await handle.finished;
     if (failure && !batchSignal.aborted) throw new Error(failure);
   }
+  private bookPipelineSeen: { map: unknown; usable: boolean } | null = null;
+  /** True when this map carries a usable `bookPipeline` (memoized per map object: the cards ask once each). */
+  private hasBookPipeline(): boolean {
+    if (this.bookPipelineSeen?.map !== this.map)
+      this.bookPipelineSeen = { map: this.map, usable: !!this.map && readBookPipeline(this.map).kind === "usable" };
+    return this.bookPipelineSeen.usable;
+  }
+  /** The map's picture-book bar: only for a map that has `bookPipeline` (even an unreadable one is not drawn: the entries refuse it). */
+  private renderBookPipelineBar(toolbar: HTMLElement): void {
+    if (!this.map || !this.path) return;
+    const read = readBookPipeline(this.map);
+    if (read.kind !== "usable") return;
+    const path = this.path;
+    const state = bookBarState(read.data, this.plugin.getBookPipelineProgress(path), id =>
+      readPipelineStage(this.notes.get(id)?.pipelineStage)
+    );
+    renderBookBar(toolbar, state, {
+      stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path)),
+      resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
+      addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
+      confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path))
+    });
+  }
+  /** Runs a runner entry (these resolve when the drive ends); a refusal becomes a notice, and the map repaints either way. */
+  private bookEntry(entry: () => Promise<void>): Promise<void> {
+    return runBookEntry(entry, message => new Notice(message)).finally(() => {
+      if (!this.closed) this.render();
+    });
+  }
+  /** The toolbar button and the command: start a picture-book run on this map. */
+  startBookPipelineFromUi(): Promise<void> {
+    if (!this.path) return Promise.resolve();
+    const path = this.path;
+    return this.bookEntry(() => this.plugin.startBookPipeline(path));
+  }
   /** True while a conversation chain or a multi-select research holds this map: a picture-book run must not start or write then. */
   bookPipelineBlocked(): boolean {
     return (
@@ -16919,6 +16991,7 @@ export class VisualAgentMapView extends ItemView {
       requirements: bookAuthorRequirements(input.settings),
       outputLanguage: input.language
     };
+    this.bookAuthoring.set(node.path, Date.now());
     try {
       await this.researchChild(
         node,
@@ -16946,6 +17019,8 @@ export class VisualAgentMapView extends ItemView {
       );
     } catch {
       // The outcome comes from the flags above and the signal; the error text is never inspected.
+    } finally {
+      this.bookAuthoring.delete(node.path);
     }
     if (exhausted) return { outcome: "budget-exhausted" };
     if (written) return { outcome: "written" };

@@ -840,6 +840,11 @@ export default class VisualAgentMapPlugin extends Plugin {
       }),
       key: "ui.command_selection_ai"
     });
+    this.addLocalizedCommand("book-pipeline", "ui.command_book_pipeline", () => {
+      const view = this.app.workspace.getActiveViewOfType(VisualAgentMapView) ?? this.views()[0];
+      if (view) void view.startBookPipelineFromUi();
+      else new Notice(t("ui.book_no_map"));
+    });
     this.addLocalizedCommand("preview-full-prompt", "ui.command_preview_prompt", () => this.openPromptPreview());
     this.logs.appendLog("info", t("log.plugin_loaded_0", this.manifest.version || "unknown"));
     if (this.app.vault.adapter instanceof FileSystemAdapter && this.manifest.dir) {

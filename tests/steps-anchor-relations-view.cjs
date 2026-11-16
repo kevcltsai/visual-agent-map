@@ -518,7 +518,7 @@ test('counter-example (security P4b): hostile anchor and relation text stays pla
   assert.equal(findAll(host, i => i.tag === 'a').length, 0);
   assert.ok(!('innerHTML' in row) || row.innerHTML === undefined);
   const editor = element('div');
-  h.view.renderAnchorRelationEditor(editor, { imageId: 'img1', anchorId: 'p1', topicId: h.root }, () => {}, () => {});
+  h.view.relationEditor.renderAnchorRelationEditor(editor, { imageId: 'img1', anchorId: 'p1', topicId: h.root }, () => {}, () => {});
   assert.equal(findAll(editor, i => i.tag === 'img' || i.tag === 'a').length, 0);
   const select = findAll(host, i => i.hasClass('vam-relation-add-kind'))[0];
   assert.ok(select);
@@ -534,7 +534,7 @@ test('editor: kind, reverse, note and delete are one undo step each; delete keep
   const original = (await h.onDisk())[0];
   const host = element('div');
   let changed = 0;
-  h.view.renderAnchorRelationEditor(host, { imageId: 'img1', anchorId: 'p1', topicId: h.root }, () => {}, () => { changed++; });
+  h.view.relationEditor.renderAnchorRelationEditor(host, { imageId: 'img1', anchorId: 'p1', topicId: h.root }, () => {}, () => { changed++; });
   const entries = () => h.view.history.past.length;
   let n = entries();
   const kind = find(host, i => i.tag === 'select');
@@ -556,7 +556,7 @@ test('editor: kind, reverse, note and delete are one undo step each; delete keep
   n = entries();
   let closed = false;
   const host2 = element('div');
-  h.view.renderAnchorRelationEditor(host2, { imageId: 'img1', anchorId: 'p1', topicId: h.root }, () => { closed = true; }, () => {});
+  h.view.relationEditor.renderAnchorRelationEditor(host2, { imageId: 'img1', anchorId: 'p1', topicId: h.root }, () => { closed = true; }, () => {});
   dom.button(host2, 'Delete relation').click();
   await h.settle();
   const after = (await h.onDisk())[0];

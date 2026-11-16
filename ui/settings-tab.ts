@@ -574,8 +574,43 @@ export class ClaudeSetupModal extends Modal {
       );
   }
 }
+type BookModelKey = "bookPlanModel" | "bookWriteModel" | "bookProofModel";
+export const BOOK_MODEL_SETTINGS: { key: BookModelKey; name: TranslationKey; desc: TranslationKey }[] = [
+  { key: "bookPlanModel", name: "ui.settings_book_plan_name", desc: "ui.settings_book_plan_desc" },
+  { key: "bookWriteModel", name: "ui.settings_book_write_name", desc: "ui.settings_book_write_desc" },
+  { key: "bookProofModel", name: "ui.settings_book_proof_name", desc: "ui.settings_book_proof_desc" }
+];
+/** One picture-book model dropdown: same model list, order and labels as the AI model dropdown; an unavailable value stays shown. */
+export function renderBookModelSetting(
+  setting: Setting,
+  plugin: VisualAgentMapPlugin,
+  spec: (typeof BOOK_MODEL_SETTINGS)[number],
+  track: (select: HTMLSelectElement) => void
+): void {
+  setting.setName(t(spec.name)).setDesc(t(spec.desc));
+  setting.addDropdown(dropdown => {
+    const select = (dropdown as unknown as { selectEl: HTMLSelectElement }).selectEl;
+    track(select);
+    select.setAttribute("aria-label", t(spec.name));
+    const selected = plugin.settings[spec.key];
+    select.add(new Option(selected, selected));
+    select.value = selected;
+    syncModelSelect(
+      select,
+      plugin.availableModels(),
+      id => plugin.modelLabel(id),
+      t("ui.current_model_is_unavailable")
+    );
+    dropdown.onChange(value => {
+      if (!value) return;
+      plugin.settings[spec.key] = value;
+      void plugin.saveSettings();
+    });
+  });
+}
 export class VisualAgentMapSettingTab extends PluginSettingTab {
   private readonly modelSelects = new Set<HTMLSelectElement>();
+  private readonly bookModelSelects = new Set<HTMLSelectElement>();
   private readonly modelStatusEls = new Set<HTMLElement>();
   private unsubscribeCurrentModel: (() => void) | null = null;
   constructor(
@@ -584,6 +619,16 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
   ) {
     super(app, plugin);
     plugin.subscribeModelDiscovery(() => {
+      for (const select of [...this.bookModelSelects]) {
+        if (!select.isConnected) this.bookModelSelects.delete(select);
+        else
+          syncModelSelect(
+            select,
+            plugin.availableModels(),
+            id => plugin.modelLabel(id),
+            t("ui.current_model_is_unavailable")
+          );
+      }
       for (const select of [...this.modelSelects]) {
         if (!select.isConnected) {
           this.modelSelects.delete(select);
@@ -894,6 +939,19 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
                   })
                 );
             }
+          },
+          {
+            name: t("ui.settings_group_book"),
+            render: (setting: Setting) => setting.setName(t("ui.settings_group_book")).setHeading()
+          },
+          ...BOOK_MODEL_SETTINGS.map(spec => ({
+            name: t(spec.name),
+            render: (setting: Setting) =>
+              renderBookModelSetting(setting, this.plugin, spec, select => this.bookModelSelects.add(select))
+          })),
+          {
+            name: t("ui.settings_book_note"),
+            render: (setting: Setting) => setting.setName(t("ui.settings_book_note"))
           },
           aiConnectionPage
         ]

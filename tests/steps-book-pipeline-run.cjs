@@ -718,3 +718,28 @@ test('chat "continue" confirms gate 1: the reply shows and the chat is free agai
   await assert.rejects(() => conv.sendMapChat(), /went on to the AI path/);
   await r.runs.stop(r.mapPath); hold.resolve();
 });
+
+test('the config port is read on every start and resume, so a settings change applies to the next run and never to a drive in progress', async () => {
+  const cfg = { planModel: 'plan-A', authorModel: 'author-A', proofModel: 'proof-A', reasoning: 'low', language: 'zh-TW' };
+  const seen = [];
+  const hold = defer();
+  const r = await rig({
+    ports: { config: () => ({ ...cfg }) },
+    script: { author: async input => {
+      seen.push(input.model);
+      if (input.nodeId === r.nodes[0].id) await hold.promise;
+      await input.admission.reserve(); const note = await r.repo.readNote(input.path);
+      const out = await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize });
+      return out === 'written' ? { outcome: 'written' } : { outcome: 'dropped' };
+    } }
+  });
+  await r.runs.start(r.mapPath);
+  cfg.authorModel = 'author-B'; // changed after start, before the writing drive begins: that drive is a new entry and reads it
+  const running = r.runs.confirmGate1(r.mapPath);
+  await settle();
+  assert.deepEqual([...new Set(seen)], ['author-B']);
+  cfg.authorModel = 'author-C'; // changed while the drive is running: calls of this drive keep author-B
+  hold.resolve(); await running;
+  while (r.runs.isRunning(r.mapPath)) await tick();
+  assert.deepEqual([...new Set(seen)], ['author-B']);
+});

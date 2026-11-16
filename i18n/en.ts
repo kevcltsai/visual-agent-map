@@ -2752,6 +2752,16 @@ export const en = {
   "ui.clipboard_text_outline_line": "Line {0}: the pasted outline is not valid, so nothing was pasted.",
   "ui.clipboard_text_outline": "The pasted outline is not valid, so nothing was pasted.",
   "ui.settings_group_general": "General",
+  "ui.settings_group_book": "Picture book",
+  "ui.settings_book_plan_name": "Plan",
+  "ui.settings_book_plan_desc":
+    "Writes the global plan and each card's plan. Few calls, short output; a cheaper model is enough.",
+  "ui.settings_book_write_name": "Author",
+  "ui.settings_book_write_desc": "Writes the body text and finds sources. Decides the quality of the result.",
+  "ui.settings_book_proof_name": "Proofread",
+  "ui.settings_book_proof_desc":
+    "Checks facts independently by actually opening pages; a stronger model is recommended.",
+  "ui.settings_book_note": "Changes apply from the next pipeline run; a run in progress is not affected.",
   "ui.settings_group_ai": "AI",
   "ui.settings_group_notes": "Notes",
   "ui.settings_group_map": "Map",

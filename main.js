@@ -2574,6 +2574,14 @@ var en = {
   "ui.clipboard_text_outline_line": "Line {0}: the pasted outline is not valid, so nothing was pasted.",
   "ui.clipboard_text_outline": "The pasted outline is not valid, so nothing was pasted.",
   "ui.settings_group_general": "General",
+  "ui.settings_group_book": "Picture book",
+  "ui.settings_book_plan_name": "Plan",
+  "ui.settings_book_plan_desc": "Writes the global plan and each card's plan. Few calls, short output; a cheaper model is enough.",
+  "ui.settings_book_write_name": "Author",
+  "ui.settings_book_write_desc": "Writes the body text and finds sources. Decides the quality of the result.",
+  "ui.settings_book_proof_name": "Proofread",
+  "ui.settings_book_proof_desc": "Checks facts independently by actually opening pages; a stronger model is recommended.",
+  "ui.settings_book_note": "Changes apply from the next pipeline run; a run in progress is not affected.",
   "ui.settings_group_ai": "AI",
   "ui.settings_group_notes": "Notes",
   "ui.settings_group_map": "Map",
@@ -5667,6 +5675,14 @@ var zhCN = {
   "ui.clipboard_text_outline_line": "\u7B2C {0} \u884C\uFF1A\u7C98\u8D34\u7684\u5927\u7EB2\u4E0D\u5408\u6CD5\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
   "ui.clipboard_text_outline": "\u7C98\u8D34\u7684\u5927\u7EB2\u4E0D\u5408\u6CD5\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
   "ui.settings_group_general": "\u5E38\u89C4",
+  "ui.settings_group_book": "\u56FE\u6587\u4E66",
+  "ui.settings_book_plan_name": "\u4F01\u5212",
+  "ui.settings_book_plan_desc": "\u5168\u5C40\u4E0E\u9010\u5361\u4F01\u5212\u3002\u8C03\u7528\u5C11\u3001\u8F93\u51FA\u77ED\uFF0C\u7528\u4FBF\u5B9C\u6A21\u578B\u5373\u53EF\u3002",
+  "ui.settings_book_write_name": "\u4F5C\u8005",
+  "ui.settings_book_write_desc": "\u5199\u6B63\u6587\u4E0E\u627E\u8D44\u6599\uFF0C\u5F71\u54CD\u6210\u54C1\u8D28\u91CF\u3002",
+  "ui.settings_book_proof_name": "\u6821\u5BF9",
+  "ui.settings_book_proof_desc": "\u72EC\u7ACB\u67E5\u8BC1\uFF0C\u8981\u5B9E\u9645\u6253\u5F00\u9875\u9762\uFF0C\u5EFA\u8BAE\u7528\u8F83\u5F3A\u6A21\u578B\u3002",
+  "ui.settings_book_note": "\u53D8\u66F4\u4E0B\u4E00\u6B21\u6D41\u6C34\u7EBF\u624D\u751F\u6548\uFF0C\u8FDB\u884C\u4E2D\u7684\u4E0D\u53D7\u5F71\u54CD\u3002",
   "ui.settings_group_ai": "AI",
   "ui.settings_group_notes": "\u7B14\u8BB0",
   "ui.settings_group_map": "\u5FC3\u667A\u56FE",
@@ -8760,6 +8776,14 @@ var zhTW = {
   "ui.clipboard_text_outline_line": "\u7B2C {0} \u884C\uFF1A\u8CBC\u4E0A\u7684\u5927\u7DB1\u4E0D\u5408\u6CD5\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
   "ui.clipboard_text_outline": "\u8CBC\u4E0A\u7684\u5927\u7DB1\u4E0D\u5408\u6CD5\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
   "ui.settings_group_general": "\u4E00\u822C",
+  "ui.settings_group_book": "\u5716\u6587\u66F8",
+  "ui.settings_book_plan_name": "\u4F01\u5283",
+  "ui.settings_book_plan_desc": "\u5168\u57DF\u8207\u9010\u5361\u4F01\u5283\u3002\u547C\u53EB\u5C11\u3001\u8F38\u51FA\u77ED\uFF0C\u7528\u4FBF\u5B9C\u6A21\u578B\u5373\u53EF\u3002",
+  "ui.settings_book_write_name": "\u4F5C\u8005",
+  "ui.settings_book_write_desc": "\u5BEB\u6B63\u6587\u8207\u627E\u8CC7\u6599\uFF0C\u5F71\u97FF\u6210\u54C1\u54C1\u8CEA\u3002",
+  "ui.settings_book_proof_name": "\u6821\u5C0D",
+  "ui.settings_book_proof_desc": "\u7368\u7ACB\u67E5\u8B49\uFF0C\u8981\u5BE6\u969B\u958B\u9801\uFF0C\u5EFA\u8B70\u7528\u8F03\u5F37\u6A21\u578B\u3002",
+  "ui.settings_book_note": "\u8B8A\u66F4\u4E0B\u4E00\u6B21\u6D41\u6C34\u7DDA\u624D\u751F\u6548\uFF0C\u9032\u884C\u4E2D\u7684\u4E0D\u53D7\u5F71\u97FF\u3002",
   "ui.settings_group_ai": "AI",
   "ui.settings_group_notes": "\u7B46\u8A18",
   "ui.settings_group_map": "\u5FC3\u667A\u5716",
@@ -89199,16 +89223,54 @@ var ClaudeSetupModal = class extends import_obsidian41.Modal {
     );
   }
 };
+var BOOK_MODEL_SETTINGS = [
+  { key: "bookPlanModel", name: "ui.settings_book_plan_name", desc: "ui.settings_book_plan_desc" },
+  { key: "bookWriteModel", name: "ui.settings_book_write_name", desc: "ui.settings_book_write_desc" },
+  { key: "bookProofModel", name: "ui.settings_book_proof_name", desc: "ui.settings_book_proof_desc" }
+];
+function renderBookModelSetting(setting, plugin, spec, track) {
+  setting.setName(t(spec.name)).setDesc(t(spec.desc));
+  setting.addDropdown((dropdown) => {
+    const select = dropdown.selectEl;
+    track(select);
+    select.setAttribute("aria-label", t(spec.name));
+    const selected = plugin.settings[spec.key];
+    select.add(new Option(selected, selected));
+    select.value = selected;
+    syncModelSelect(
+      select,
+      plugin.availableModels(),
+      (id) => plugin.modelLabel(id),
+      t("ui.current_model_is_unavailable")
+    );
+    dropdown.onChange((value) => {
+      if (!value) return;
+      plugin.settings[spec.key] = value;
+      void plugin.saveSettings();
+    });
+  });
+}
 var VisualAgentMapSettingTab = class extends import_obsidian41.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
     __publicField(this, "modelSelects", /* @__PURE__ */ new Set());
+    __publicField(this, "bookModelSelects", /* @__PURE__ */ new Set());
     __publicField(this, "modelStatusEls", /* @__PURE__ */ new Set());
     __publicField(this, "unsubscribeCurrentModel", null);
     /** Set when the language select fired a change; the select is focused again once the switch is done and it is enabled. */
     __publicField(this, "refocusLanguage", false);
     plugin.subscribeModelDiscovery(() => {
+      for (const select of [...this.bookModelSelects]) {
+        if (!select.isConnected) this.bookModelSelects.delete(select);
+        else
+          syncModelSelect(
+            select,
+            plugin.availableModels(),
+            (id) => plugin.modelLabel(id),
+            t("ui.current_model_is_unavailable")
+          );
+      }
       for (const select of [...this.modelSelects]) {
         if (!select.isConnected) {
           this.modelSelects.delete(select);
@@ -89487,6 +89549,18 @@ var VisualAgentMapSettingTab = class extends import_obsidian41.PluginSettingTab 
                 })
               );
             }
+          },
+          {
+            name: t("ui.settings_group_book"),
+            render: (setting) => setting.setName(t("ui.settings_group_book")).setHeading()
+          },
+          ...BOOK_MODEL_SETTINGS.map((spec) => ({
+            name: t(spec.name),
+            render: (setting) => renderBookModelSetting(setting, this.plugin, spec, (select) => this.bookModelSelects.add(select))
+          })),
+          {
+            name: t("ui.settings_book_note"),
+            render: (setting) => setting.setName(t("ui.settings_book_note"))
           },
           aiConnectionPage
         ]

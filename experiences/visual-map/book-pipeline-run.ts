@@ -226,16 +226,14 @@ const reasonOf = (error: unknown): string =>
 const STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" } as const;
 
 const DEFINITION = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:<([^>\n]*)>|(\S+))[^\n]*(?:\n|$)/gm;
-const INLINE_CODE = /(?<!`)(`+)(?!`)(?:(?!\r?\n[ \t]*\r?\n)[\s\S])*?(?<!`)\1(?!`)/g;
-const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
-const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
+const WIKI_TARGET = /^[^[\]()!<>\r\n\\]+$/;
 const SCHEME = /^\s*(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
 const frontmatterLength = (content: string): number =>
   /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(content)?.[0].length ?? 0;
 const labelOf = (value: string): string => value.trim().replace(/\s+/g, " ").toLowerCase();
-/** Every tag or comment start becomes `&lt;`; only the note's own section markers (an exact comment with no payload) stay. */
+/** Every tag or comment start (also a `<` ending a chunk, which an image follows) becomes `&lt;`; only the note's own section markers (an exact comment with no payload) stay. */
 const neutralize = (text: string): string =>
-  text.replace(/<(?=[A-Za-z/!?])(?!!-- visual-agent-map:(?:detail|references):(?:start|end) -->)/g, "&lt;");
+  text.replace(/<(?=[A-Za-z/!?]|$)(?!!-- visual-agent-map:(?:detail|references):(?:start|end) -->)/g, "&lt;");
 const NO_PICTURE = "無圖：";
 const isHttps = (url: string): boolean => /^https:\/\//i.test(url);
 
@@ -256,36 +254,6 @@ function safeHref(raw: string): string | undefined {
     else if (c === ")" && --depth < 0) return undefined;
   }
   return depth === 0 ? href : undefined;
-}
-
-/** Splits a body into fenced code blocks (kept as they are) and the text between them. */
-function splitFences(body: string): Array<{ code: boolean; text: string }> {
-  const parts: Array<{ code: boolean; text: string }> = [];
-  let text = "";
-  let fence: { char: string; size: number; text: string } | undefined;
-  for (const line of body.match(/[^\n]*\n|[^\n]+$/g) ?? []) {
-    const bare = line.replace(/\r?\n$/, "");
-    if (fence) {
-      fence.text += line;
-      const close = FENCE_CLOSE.exec(bare);
-      if (close && close[1][0] === fence.char && close[1].length >= fence.size) {
-        parts.push({ code: true, text: fence.text });
-        fence = undefined;
-      }
-      continue;
-    }
-    const open = FENCE_OPEN.exec(bare);
-    if (open && !(open[1][0] === "`" && open[2].includes("`"))) {
-      if (text) parts.push({ code: false, text });
-      text = "";
-      fence = { char: open[1][0], size: open[1].length, text: line };
-      continue;
-    }
-    text += line;
-  }
-  if (fence) parts.push({ code: true, text: fence.text });
-  if (text) parts.push({ code: false, text });
-  return parts;
 }
 
 type Resolve = (href: string) => string | undefined;
@@ -339,12 +307,11 @@ function rebuildImages(text: string, defs: Map<string, string>, used: Set<string
     if (text[at + 2] === "[") {
       const end = text.indexOf("]]", at + 3);
       const target = end < 0 ? "" : text.slice(at + 3, end);
-      if (end < 0 || target.includes("\n")) {
+      if (end < 0 || !WIKI_TARGET.test(target) || SCHEME.test(target)) {
         unsupported(at);
         continue;
       }
-      out += neutralize(text.slice(plain, at));
-      out += SCHEME.test(target) ? `${NO_PICTURE}形式不支援` : `![[${neutralize(target)}]]`;
+      out += neutralize(text.slice(plain, at)) + `![[${target}]]`;
       i = end + 2;
       plain = i;
       continue;
@@ -394,42 +361,55 @@ function rebuildImages(text: string, defs: Map<string, string>, used: Set<string
 }
 
 /**
- * Allow-list rebuild of a note's body (the frontmatter stays as it is). Fenced code and inline code stay as written. In the rest:
+ * Allow-list rebuild of a note's body (the frontmatter stays as it is). Code is not exempt: in the whole body
  * every image (inline, reference or `![[...]]`) is parsed conservatively and written again in the standard form `![alt](href)`
  * (https only, address from `new URL()`, title dropped), or becomes a "no picture" line when `resolve(href)` gives a reason, the
  * address is not https or the form is not understood; the definition lines that reference images used are removed; every HTML tag
- * or comment start `<` becomes `&lt;`. Nothing of the original image text is kept, so no form can carry a remote load through.
+ * or comment start `<` becomes `&lt;` (only the app's own section markers stay). Nothing of the original image text is kept.
+ * {@link unsafeBody} then checks the result.
  */
 function rebuildBody(content: string, resolve: Resolve): string {
   const at = frontmatterLength(content);
-  const parts = splitFences(content.slice(at));
+  const body = content.slice(at);
   const defs = new Map<string, string>();
-  for (const part of parts) {
-    if (part.code) continue;
-    for (const m of part.text.matchAll(DEFINITION)) {
-      const label = labelOf(m[1]);
-      if (!defs.has(label)) defs.set(label, m[2] ?? m[3] ?? "");
-    }
+  for (const m of body.matchAll(DEFINITION)) {
+    const label = labelOf(m[1]);
+    if (!defs.has(label)) defs.set(label, m[2] ?? m[3] ?? "");
   }
   const used = new Set<string>();
-  const render = (removeUsed: boolean): string =>
-    parts
-      .map(part => {
-        if (part.code) return part.text;
-        const text = removeUsed
-          ? part.text.replace(DEFINITION, (line, label: string) => (used.has(labelOf(label)) ? "" : line))
-          : part.text;
-        let result = "";
-        let last = 0;
-        for (const m of text.matchAll(INLINE_CODE)) {
-          result += rebuildImages(text.slice(last, m.index), defs, used, resolve) + m[0];
-          last = m.index + m[0].length;
-        }
-        return result + rebuildImages(text.slice(last), defs, used, resolve);
-      })
-      .join("");
-  render(false);
-  return content.slice(0, at) + render(true);
+  rebuildImages(body, defs, used, resolve);
+  const text = body.replace(DEFINITION, (line, label: string) => (used.has(labelOf(label)) ? "" : line));
+  return content.slice(0, at) + rebuildImages(text, defs, used, resolve);
+}
+
+const MARKERS = /<!-- visual-agent-map:(?:detail|references):(?:start|end) -->/g;
+/**
+ * Exit check, independent of the rebuild: true when the body of `content` still has an HTML tag start (the app's markers aside),
+ * an `![alt](url)` whose url is not one of `allowed` (the https addresses that were probed), any other `![` form, or an `![[...]]`
+ * that is not plain safe text without a scheme.
+ */
+export function unsafeBody(content: string, allowed: ReadonlySet<string>): boolean {
+  const body = content.slice(frontmatterLength(content)).replace(MARKERS, " ");
+  if (/<[A-Za-z/!?]/.test(body)) return true;
+  for (let at = body.indexOf("!["); at >= 0; at = body.indexOf("![", at + 2)) {
+    if (body[at + 2] === "[") {
+      const end = body.indexOf("]]", at + 3);
+      const target = end < 0 ? "" : body.slice(at + 3, end);
+      if (end < 0 || !WIKI_TARGET.test(target) || SCHEME.test(target)) return true;
+      continue;
+    }
+    const head = /^!\[(?:\\.|[^\\[\]\n])*\]\(/.exec(body.slice(at, at + 4000));
+    if (!head) return true;
+    let p = at + head[0].length;
+    let depth = 0;
+    while (p < body.length && !/\s/.test(body[p]) && (body[p] !== ")" || depth > 0)) {
+      if (body[p] === "(") depth++;
+      else if (body[p] === ")") depth--;
+      p++;
+    }
+    if (body[p] !== ")" || !allowed.has(body.slice(at + head[0].length, p))) return true;
+  }
+  return false;
 }
 
 /** The distinct addresses (standard form) of a note's body that an image would load and that may be probed: https only; never the frontmatter. */
@@ -978,7 +958,8 @@ export class BookPipelineRuns {
     if (!path) return { kind: "failed", reason: "card_removed" };
     const written = await this.ports.readCard(path);
     const replacements = new Map<string, string>();
-    for (const url of bodyImageUrls(written.raw)) {
+    const urls = bodyImageUrls(written.raw);
+    for (const url of urls) {
       if (!isHttps(url)) {
         replacements.set(url, `${NO_PICTURE}網址不安全`);
         continue;
@@ -989,14 +970,22 @@ export class BookPipelineRuns {
       });
       if (!probed.ok) replacements.set(url, `${NO_PICTURE}${escapeMarkdownText(probed.reason, 60) || "載入失敗"}`);
     }
-    if (replaceBodyImages(written.raw, replacements) !== written.raw) {
-      const outcome = await this.ports.updateNoteRawGuarded(path, content => replaceBodyImages(content, replacements), {
+    const cleaned = replaceBodyImages(written.raw, replacements);
+    const allowed = new Set(urls.filter(url => !replacements.has(url)));
+    if (this.exitCheck(cleaned, allowed)) return { kind: "failed", reason: "unsafe_body", forceReview: true };
+    if (cleaned !== written.raw) {
+      const outcome = await this.ports.updateNoteRawGuarded(path, () => cleaned, {
         expectedContent: written.raw,
         authorize
       });
       if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
     }
     return { kind: "ok", after: () => this.setStage(drive, nodeId, "written", null) };
+  }
+
+  /** The independent exit check of an author result (a method so a test can force it to fail). */
+  private exitCheck(cleaned: string, allowed: ReadonlySet<string>): boolean {
+    return unsafeBody(cleaned, allowed);
   }
 
   private async execProof(drive: Drive, token: StepToken, nodeId: string): Promise<Outcome> {

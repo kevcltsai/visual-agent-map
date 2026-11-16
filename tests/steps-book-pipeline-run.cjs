@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
-const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages } = S.load('experiences/visual-map/book-pipeline-run.ts');
+const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages, unsafeBody } = S.load('experiences/visual-map/book-pipeline-run.ts');
 const { BudgetExhaustedError } = S.load('core/admission.ts');
 const { readBookPipeline } = S.load('core/book-pipeline/model.ts');
 const { cardRevision } = S.load('core/book-pipeline/machine.ts');
@@ -233,11 +233,27 @@ test('pictures: a non-https address is not probed; an https failure becomes "無
   assert.ok(detail.includes('![d](https://ok.example/d.png)'));
 });
 
+test('pictures: when the exit check finds an unsafe body nothing is written, the card needs review with a neutral code and the log has no body', async () => {
+  const r = await rig({ script: { author: async input => {
+    await input.admission.reserve(); const note = await r.repo.readNote(input.path);
+    await r.repo.updateNoteGuarded(input.path, { detail: `${bodyOf(note.title)}\n\n![d](https://ok.example/d.png)\n\n![e](http://e.example/e.png)` }, { authorize: input.authorize });
+    return { outcome: 'written' };
+  } } });
+  r.runs.exitCheck = () => true;
+  await r.runs.start(r.mapPath);
+  await r.runs.confirmGate1(r.mapPath);
+  assert.ok(!(await r.note(1)).detail.includes('無圖'), 'the cleaned result is not written');
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: unsafe_body');
+  const log = r.stat.logs.join('\n');
+  assert.ok(log.includes('unsafe_body') && !/Secret|ok\.example|e\.example/.test(log));
+});
+
 test('picture allow-list: every form that could load a remote resource is rewritten, whatever its shape', () => {
   const none = new Map();
   // scanner: after neutralizing there is no "<tag", and every "![...](url)" is an https address that was probed (here: all in `probed`)
-  const probed = new Set(['https://ok.example/a.png', 'https://ok.example/b.png', 'https://ok.example/a_(1).png']);
-  const nonCode = out => out.replace(/^(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:\n\1[`~]*[ \t]*(?:\n|$)|$)/gm, '').replace(/`[^`\n]*`/g, '');
+  const probed = new Set(['https://ok.example/a.png', 'https://ok.example/b.png', 'https://ok.example/a_(1).png', 'https://evil.example/p.png']);
+  const nonCode = out => out;
   const loads = out => {
     const text = nonCode(out.replace(/^---\n[\s\S]*?\n---\n/, ''));
     if (/<\/?[a-z!?]/i.test(text) || /!\[\[\s*(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(text)) return true;
@@ -304,11 +320,46 @@ test('picture allow-list: every form that could load a remote resource is rewrit
   // all the definitions a reference image used are removed (also with several candidates); a probed reference image becomes the inline form
   assert.equal(replaceBodyImages('![x][r]\n\n[r]: https://ok.example/a.png\n[R]: http://e.example/2.png\n\ntext', none), '![x](https://ok.example/a.png)\n\n\ntext');
   assert.equal(replaceBodyImages('![x][]\n![x]\n\n[x]: https://ok.example/a.png', none), '![x](https://ok.example/a.png)\n![x](https://ok.example/a.png)\n\n');
-  // code is kept as written: fence, tilde fence, inline code (an image or tag in them is text); a definition in a fence is not used
+  // code is not exempt: an image or tag in a fence or in inline code is rewritten like any other
   const code = '```\n![x](http://e.example/a.png)\n<img src=x>\n```\n\n~~~\n![y](http://e.example/b.png)\n~~~\n\n`![z](http://e.example/c.png)` and `<img src=x>`';
-  assert.equal(replaceBodyImages(code, none), code);
+  const codeOut = replaceBodyImages(code, none);
+  assert.ok(!loads(codeOut) && codeOut.includes('&lt;img') && !codeOut.includes('http://'));
+  const codeForms = {
+    'backslash-escaped backtick': '\\`\n![x](http://e.example/a.png)\n<img src=//e.example/x>\n\\`',
+    'fence inside a container': '> ```\n> ![x](http://e.example/a.png)\n> <img src=//e.example/x>\n> ```',
+    'indented fence': '    ```\n    ![x](http://e.example/a.png)\n    <img src=//e.example/x>\n    ```',
+    'list item fence': '- item\n\n      ```\n      ![x](http://e.example/a.png) <img src=//e.example/x>',
+    'unclosed fence': '```\n![x](http://e.example/a.png)\n<img src=//e.example/x>',
+    'inline code': '`![x](http://e.example/a.png)` `<img src=//e.example/x>`',
+    'nested wikilink': '![[x![y](https://evil.example/p.png)]]',
+    'wikilink https': '![[https://evil.example/p.png]]',
+    'wikilink paren': '![[a)b]] ![[a(b]]',
+    'wikilink newline': '![[a\nb]]![x](http://e.example/a.png)',
+    'wikilink angle': '![[a<img src=//e.example/x>]]',
+    'wikilink then image': '![[a\\]] ![x](http://e.example/a.png)',
+    'wikilink bang': '![[a!b]]',
+    'angle right before an image': '<![x](http://e.example/a.png) <![[a]]'
+  };
+  for (const [name, input] of Object.entries(codeForms)) {
+    const out = replaceBodyImages(input, none);
+    assert.ok(!loads(out), `${name}: ${JSON.stringify(out)}`);
+    assert.ok(!unsafeBody(out, probed), `${name}: the exit check agrees`);
+    assert.ok(unsafeBody(input, probed), `${name}: the exit check sees the original as unsafe`);
+  }
+  assert.equal(replaceBodyImages('![[x![y](https://ok.example/a.png)]]', none), '無圖：形式不支援[[x![y](https://ok.example/a.png)]]');
+  assert.equal(replaceBodyImages('![[a b#c|d.png]]', none), '![[a b#c|d.png]]');
+  // exit check: a tag, an unprobed address, a scheme embed, any other `![` form
+  const ok = new Set(['https://ok.example/a.png', 'https://ok.example/a_(1).png']);
+  assert.equal(unsafeBody('![x](https://ok.example/a.png) ![y](https://ok.example/a_(1).png) ![[l.png]]\n<!-- visual-agent-map:detail:start -->', ok), false);
+  assert.equal(unsafeBody('![a\\[b\\]](https://ok.example/a.png)', ok), false);
+  assert.equal(unsafeBody('<img src=x>', ok), true);
+  assert.equal(unsafeBody('<!-- visual-agent-map:detail:start --><b>', ok), true);
+  assert.equal(unsafeBody('![x](https://ok.example/other.png)', ok), true);
+  assert.equal(unsafeBody('![x][r]', ok), true);
+  assert.equal(unsafeBody('![[https://e.example/a.png]]', ok), true);
+  assert.equal(unsafeBody('---\nimg: "<img>"\n---\nbody', ok), false);
   const fenced = replaceBodyImages(cases['reference definition inside a fence is not a definition'], none);
-  assert.ok(fenced.includes('[r]: http://e.example/in-fence.png') && !fenced.includes('real.png') && !loads(fenced));
+  assert.ok(!loads(fenced));
   // an unpaired backtick does not hide a picture in another paragraph
   assert.ok(!loads(replaceBodyImages('a ` b\n\n![x](http://e.example/a.png)\n\nc ` d', none)));
   // what stays: a good https image (inline, reference), a local embed, a callout, plain text; frontmatter is never changed

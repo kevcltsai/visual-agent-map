@@ -48201,16 +48201,14 @@ var code2 = (value) => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60) || "
 var reasonOf = (error) => isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_reply" : "failed";
 var STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" };
 var DEFINITION = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:<([^>\n]*)>|(\S+))[^\n]*(?:\n|$)/gm;
-var INLINE_CODE = /(?<!`)(`+)(?!`)(?:(?!\r?\n[ \t]*\r?\n)[\s\S])*?(?<!`)\1(?!`)/g;
-var FENCE_OPEN2 = /^ {0,3}(`{3,}|~{3,})(.*)$/;
-var FENCE_CLOSE2 = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
+var WIKI_TARGET = /^[^[\]()!<>\r\n\\]+$/;
 var SCHEME3 = /^\s*(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
 var frontmatterLength = (content) => {
   var _a2, _b2;
   return (_b2 = (_a2 = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(content)) == null ? void 0 : _a2[0].length) != null ? _b2 : 0;
 };
 var labelOf = (value) => value.trim().replace(/\s+/g, " ").toLowerCase();
-var neutralize = (text10) => text10.replace(/<(?=[A-Za-z/!?])(?!!-- visual-agent-map:(?:detail|references):(?:start|end) -->)/g, "&lt;");
+var neutralize = (text10) => text10.replace(/<(?=[A-Za-z/!?]|$)(?!!-- visual-agent-map:(?:detail|references):(?:start|end) -->)/g, "&lt;");
 var NO_PICTURE = "\u7121\u5716\uFF1A";
 var isHttps = (url) => /^https:\/\//i.test(url);
 function safeHref2(raw) {
@@ -48229,35 +48227,6 @@ function safeHref2(raw) {
     else if (c === ")" && --depth < 0) return void 0;
   }
   return depth === 0 ? href : void 0;
-}
-function splitFences(body) {
-  var _a2;
-  const parts = [];
-  let text10 = "";
-  let fence;
-  for (const line2 of (_a2 = body.match(/[^\n]*\n|[^\n]+$/g)) != null ? _a2 : []) {
-    const bare = line2.replace(/\r?\n$/, "");
-    if (fence) {
-      fence.text += line2;
-      const close = FENCE_CLOSE2.exec(bare);
-      if (close && close[1][0] === fence.char && close[1].length >= fence.size) {
-        parts.push({ code: true, text: fence.text });
-        fence = void 0;
-      }
-      continue;
-    }
-    const open2 = FENCE_OPEN2.exec(bare);
-    if (open2 && !(open2[1][0] === "`" && open2[2].includes("`"))) {
-      if (text10) parts.push({ code: false, text: text10 });
-      text10 = "";
-      fence = { char: open2[1][0], size: open2[1].length, text: line2 };
-      continue;
-    }
-    text10 += line2;
-  }
-  if (fence) parts.push({ code: true, text: fence.text });
-  if (text10) parts.push({ code: false, text: text10 });
-  return parts;
 }
 function inlineTarget(text10, from) {
   let p = from;
@@ -48307,12 +48276,11 @@ function rebuildImages(text10, defs, used, resolve) {
     if (text10[at + 2] === "[") {
       const end2 = text10.indexOf("]]", at + 3);
       const target = end2 < 0 ? "" : text10.slice(at + 3, end2);
-      if (end2 < 0 || target.includes("\n")) {
+      if (end2 < 0 || !WIKI_TARGET.test(target) || SCHEME3.test(target)) {
         unsupported(at);
         continue;
       }
-      out += neutralize(text10.slice(plain, at));
-      out += SCHEME3.test(target) ? `${NO_PICTURE}\u5F62\u5F0F\u4E0D\u652F\u63F4` : `![[${neutralize(target)}]]`;
+      out += neutralize(text10.slice(plain, at)) + `![[${target}]]`;
       i = end2 + 2;
       plain = i;
       continue;
@@ -48363,29 +48331,40 @@ function rebuildImages(text10, defs, used, resolve) {
 function rebuildBody(content, resolve) {
   var _a2, _b2;
   const at = frontmatterLength(content);
-  const parts = splitFences(content.slice(at));
+  const body = content.slice(at);
   const defs = /* @__PURE__ */ new Map();
-  for (const part of parts) {
-    if (part.code) continue;
-    for (const m of part.text.matchAll(DEFINITION)) {
-      const label = labelOf(m[1]);
-      if (!defs.has(label)) defs.set(label, (_b2 = (_a2 = m[2]) != null ? _a2 : m[3]) != null ? _b2 : "");
-    }
+  for (const m of body.matchAll(DEFINITION)) {
+    const label = labelOf(m[1]);
+    if (!defs.has(label)) defs.set(label, (_b2 = (_a2 = m[2]) != null ? _a2 : m[3]) != null ? _b2 : "");
   }
   const used = /* @__PURE__ */ new Set();
-  const render = (removeUsed) => parts.map((part) => {
-    if (part.code) return part.text;
-    const text10 = removeUsed ? part.text.replace(DEFINITION, (line2, label) => used.has(labelOf(label)) ? "" : line2) : part.text;
-    let result = "";
-    let last = 0;
-    for (const m of text10.matchAll(INLINE_CODE)) {
-      result += rebuildImages(text10.slice(last, m.index), defs, used, resolve) + m[0];
-      last = m.index + m[0].length;
+  rebuildImages(body, defs, used, resolve);
+  const text10 = body.replace(DEFINITION, (line2, label) => used.has(labelOf(label)) ? "" : line2);
+  return content.slice(0, at) + rebuildImages(text10, defs, used, resolve);
+}
+var MARKERS = /<!-- visual-agent-map:(?:detail|references):(?:start|end) -->/g;
+function unsafeBody(content, allowed) {
+  const body = content.slice(frontmatterLength(content)).replace(MARKERS, " ");
+  if (/<[A-Za-z/!?]/.test(body)) return true;
+  for (let at = body.indexOf("!["); at >= 0; at = body.indexOf("![", at + 2)) {
+    if (body[at + 2] === "[") {
+      const end = body.indexOf("]]", at + 3);
+      const target = end < 0 ? "" : body.slice(at + 3, end);
+      if (end < 0 || !WIKI_TARGET.test(target) || SCHEME3.test(target)) return true;
+      continue;
     }
-    return result + rebuildImages(text10.slice(last), defs, used, resolve);
-  }).join("");
-  render(false);
-  return content.slice(0, at) + render(true);
+    const head2 = /^!\[(?:\\.|[^\\[\]\n])*\]\(/.exec(body.slice(at, at + 4e3));
+    if (!head2) return true;
+    let p = at + head2[0].length;
+    let depth = 0;
+    while (p < body.length && !/\s/.test(body[p]) && (body[p] !== ")" || depth > 0)) {
+      if (body[p] === "(") depth++;
+      else if (body[p] === ")") depth--;
+      p++;
+    }
+    if (body[p] !== ")" || !allowed.has(body.slice(at + head2[0].length, p))) return true;
+  }
+  return false;
 }
 function bodyImageUrls(content) {
   const urls = /* @__PURE__ */ new Set();
@@ -48906,7 +48885,8 @@ var BookPipelineRuns = class {
     if (!path) return { kind: "failed", reason: "card_removed" };
     const written2 = await this.ports.readCard(path);
     const replacements = /* @__PURE__ */ new Map();
-    for (const url of bodyImageUrls(written2.raw)) {
+    const urls = bodyImageUrls(written2.raw);
+    for (const url of urls) {
       if (!isHttps(url)) {
         replacements.set(url, `${NO_PICTURE}\u7DB2\u5740\u4E0D\u5B89\u5168`);
         continue;
@@ -48917,14 +48897,21 @@ var BookPipelineRuns = class {
       });
       if (!probed.ok) replacements.set(url, `${NO_PICTURE}${escapeMarkdownText(probed.reason, 60) || "\u8F09\u5165\u5931\u6557"}`);
     }
-    if (replaceBodyImages(written2.raw, replacements) !== written2.raw) {
-      const outcome = await this.ports.updateNoteRawGuarded(path, (content) => replaceBodyImages(content, replacements), {
+    const cleaned = replaceBodyImages(written2.raw, replacements);
+    const allowed = new Set(urls.filter((url) => !replacements.has(url)));
+    if (this.exitCheck(cleaned, allowed)) return { kind: "failed", reason: "unsafe_body", forceReview: true };
+    if (cleaned !== written2.raw) {
+      const outcome = await this.ports.updateNoteRawGuarded(path, () => cleaned, {
         expectedContent: written2.raw,
         authorize
       });
       if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
     }
     return { kind: "ok", after: () => this.setStage(drive, nodeId, "written", null) };
+  }
+  /** The independent exit check of an author result (a method so a test can force it to fail). */
+  exitCheck(cleaned, allowed) {
+    return unsafeBody(cleaned, allowed);
   }
   async execProof(drive, token, nodeId) {
     const signal = drive.controller.signal;
@@ -51702,8 +51689,8 @@ function parseInline(src, depth = 0, links = true, ends) {
   flush(src.length);
   return out;
 }
-var FENCE_OPEN3 = /^ {0,3}(`{3,}|~{3,})(.*)$/;
-var FENCE_CLOSE3 = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
+var FENCE_OPEN2 = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+var FENCE_CLOSE2 = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 var HEADING_OPEN = /^ {0,3}(#{1,6})(?:[ \t]+|$)/;
 function headingAt(line2) {
   const open2 = HEADING_OPEN.exec(line2);
@@ -51718,7 +51705,7 @@ var RULE = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
 var QUOTE = /^ {0,3}>/;
 var LIST = /^( *)([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
 var isFenceOpen = (line2) => {
-  const open2 = FENCE_OPEN3.exec(line2);
+  const open2 = FENCE_OPEN2.exec(line2);
   return open2 && !(open2[1][0] === "`" && open2[2].includes("`")) ? open2 : null;
 };
 var startsBlock = (line2) => !!isFenceOpen(line2) || !!headingAt(line2) || RULE.test(line2) || QUOTE.test(line2) || LIST.test(line2);
@@ -51747,7 +51734,7 @@ function parseBlocks(lines, depth = 0, starts, budget) {
       const length = open2[1].length;
       const body = [];
       for (at++; at < lines.length; at++) {
-        const close = FENCE_CLOSE3.exec(lines[at]);
+        const close = FENCE_CLOSE2.exec(lines[at]);
         if (close && close[1][0] === mark2 && close[1].length >= length) {
           at++;
           break;
@@ -88397,12 +88384,12 @@ function htmlBlockLines(lines) {
   }
   return blocks;
 }
-var FENCE_OPEN4 = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+var FENCE_OPEN3 = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 function fenceRanges(lines, offsets, html) {
   const ranges = [];
   const inHtml = (line2) => html.some(([first, last]) => line2 >= first && line2 <= last);
   for (let i = 0; i < lines.length; i++) {
-    const open2 = FENCE_OPEN4.exec(lines[i]);
+    const open2 = FENCE_OPEN3.exec(lines[i]);
     if (!open2 || inHtml(i)) continue;
     const mark2 = open2[1];
     if (mark2[0] === "`" && open2[2].includes("`")) continue;

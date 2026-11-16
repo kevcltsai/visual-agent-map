@@ -16909,7 +16909,7 @@ export class VisualAgentMapView extends ItemView {
     if (!node || node.path !== input.path) return { outcome: "failed", reason: "missing" };
     let written = false;
     let exhausted = false;
-    let failure: string | undefined;
+    let discarded = false;
     const choices: TaskOptions = {
       rewrite: true,
       runOnce: { model: input.model, reasoning: input.reasoning },
@@ -16936,18 +16936,21 @@ export class VisualAgentMapView extends ItemView {
             authorize: input.authorize,
             onBudgetExhausted: () => {
               exhausted = true;
+            },
+            onDiscarded: () => {
+              discarded = true;
             }
           },
           request: { admission: input.admission, noContentLog: true }
         }
       );
-    } catch (error) {
-      failure = error instanceof Error ? error.message : String(error);
+    } catch {
+      // The outcome comes from the flags above and the signal; the error text is never inspected.
     }
     if (exhausted) return { outcome: "budget-exhausted" };
     if (written) return { outcome: "written" };
     if (input.signal.aborted) return { outcome: "cancelled" };
-    if (failure === t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved")) return { outcome: "discarded" };
+    if (discarded) return { outcome: "discarded" };
     return { outcome: "failed", reason: "author_failed" };
   }
   /** Loads the picture the way the card will (a real image load with no referrer, not an HTTP status); 8 s limit. */

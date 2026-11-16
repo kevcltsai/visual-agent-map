@@ -134,6 +134,14 @@ test('runBookAuthor: aborted -> cancelled; stale message -> discarded; other err
   assert.equal((await proto.runBookAuthor.call(h.view, h.input({ nodeId: 'zz' }))).outcome, 'failed');
 });
 
+test('runBookAuthor: discarded comes from the onDiscarded callback, never from the message text', async () => {
+  let h = authorView(async (...args) => { args[8].pipeline.onDiscarded(); throw new Error('any wording at all'); });
+  same(await proto.runBookAuthor.call(h.view, h.input()), { outcome: 'discarded' });
+  const { t } = load('i18n.ts');
+  h = authorView(async () => { throw new Error(t('ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved')); });
+  same(await proto.runBookAuthor.call(h.view, h.input()), { outcome: 'failed', reason: 'author_failed' });
+});
+
 test('bookBackupNote: wraps writebackHooks().backupNote; a missing hook is not ok', async () => {
   const seen = [];
   const view = { writebackHooks: () => ({ backupNote: async (p, c) => { seen.push([p, c]); return { ok: true, path: 'Backups/N1.md' }; } }) };

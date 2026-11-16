@@ -235,49 +235,88 @@ test('pictures: a non-https address is not probed; an https failure becomes "無
 
 test('picture allow-list: every form that could load a remote resource is rewritten, whatever its shape', () => {
   const none = new Map();
-  const loads = out => /!\[[^\]\n]*\]\(|!\[[^\]\n]*\]\[|<\/?(?:img|picture|source|iframe|video|audio|object|embed)\b|!\[\[\s*(?:[a-z][a-z0-9+.-]*:|\/\/)|url\s*\(|^ {0,3}\[[^\]\n]+\]:\s*\S/im.test(out);
+  // scanner: after neutralizing there is no "<tag", and every "![...](url)" is an https address that was probed (here: all in `probed`)
+  const probed = new Set(['https://ok.example/a.png', 'https://ok.example/b.png', 'https://ok.example/a_(1).png']);
+  const nonCode = out => out.replace(/^(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:\n\1[`~]*[ \t]*(?:\n|$)|$)/gm, '').replace(/`[^`\n]*`/g, '');
+  const loads = out => {
+    const text = nonCode(out.replace(/^---\n[\s\S]*?\n---\n/, ''));
+    if (/<\/?[a-z!?]/i.test(text) || /!\[\[\s*(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(text)) return true;
+    for (const m of text.matchAll(/!\[[^\]\n]*\]\(([^)\n]*(?:\([^)\n]*\))?[^)\n]*)\)/g)) if (!probed.has(m[1])) return true;
+    return /!\[(?!\[)[^\]\n]*\](?!\()/.test(text) || /^ {0,3}\[[^\]\n]+\]:\s*\S/m.test(text);
+  };
   const cases = {
     'inline http': '![x](http://e.example/a.png)',
     'inline angle brackets': '![x](<http://e.example/a b.png>)',
-    'inline nested parens': '![x](http://e.example/a_(1).png)',
+    'inline angle brackets https with a space': '![x](<https://ok.example/a b.png>)',
+    'inline angle containing > and <': '![x](<https://ok.example/a>b<c>)',
+    'inline nested parens http': '![x](http://e.example/a_(1).png)',
+    'inline backslash': '![x](https://ok.example/a\\).png)',
     'inline javascript': '![x](javascript:alert(1))',
     'inline data': '![x](data:image/svg+xml;base64,AAAA)',
-    'inline with title': '![x](http://e.example/a.png "t")',
+    'inline file': '![x](file:///etc/passwd)',
+    'inline title carrying img onerror': '![x](https://ok.example/a.png "<img src=x onerror=alert(1)>")',
+    'inline title with an angle address': '![x](<http://e.example/a.png> \'<img src=//e.example/x>\')',
+    'alt holding html': '![<img src=//e.example/x>](http://e.example/a.png)',
+    'alt with a bracket (not understood)': '![a [b]](https://ok.example/a.png)',
     'reference': '![x][r]\n\n[r]: http://e.example/a.png',
     'reference angle': '![x][r]\n\n[r]: <http://e.example/a.png> "t"',
     'reference collapsed': '![r][]\n\n[r]: http://e.example/a.png',
     'reference shortcut': '![r]\n\n[r]: javascript:alert(1)',
+    'reference with several candidate definitions': '![x][r]\n\n[r]: http://e.example/1.png\n[r]: https://ok.example/a.png\n\n[R]: http://e.example/2.png',
+    'reference definition inside a fence is not a definition': '```\n[r]: http://e.example/in-fence.png\n```\n\n![x][r]\n\n[r]: http://e.example/real.png',
+    'reference definition then a paragraph continuation': '![x][r]\n\n[r]: http://e.example/a.png\ncontinued paragraph <img src=//e.example/x>',
+    'reference to a missing definition': '![x][missing]',
     'html img': '<img src="https://ok.example/a.png">',
     'html img split over lines': '<img\n  src="https://ok.example/a.png"\n>',
     'html IMG upper case': '<IMG SRC=https://ok.example/a.png>',
+    'html entity-encoded attribute': '<img &#x73;rc="https://ok.example/a.png">',
     'html picture': '<picture><source srcset="https://ok.example/a.webp"><img src="https://ok.example/a.png"></picture>',
     'html iframe': '<iframe src="https://ok.example/"></iframe>',
+    'html svg': '<svg><image href="https://ok.example/a.png"/></svg>',
     'html video': '<video src="https://ok.example/a.mp4" poster="https://ok.example/p.png"></video>',
     'html audio': '<audio src="https://ok.example/a.mp3"></audio>',
     'html object': '<object data="https://ok.example/a.swf"></object>',
     'html embed': '<embed src="https://ok.example/a.swf">',
-    'html style url': '<p style="background:url(https://ok.example/a.png)">text</p>',
+    'html style element': '<style>@import url(https://ok.example/a.css);</style>',
+    'html style attribute url()': '<p style="background:url(https://ok.example/a.png)">text</p>',
+    'html comment': '<!-- <img src="https://ok.example/a.png"> -->',
     'obsidian embed https': '![[https://ok.example/a.png]]',
     'obsidian embed http': '![[http://e.example/a.png]]',
     'obsidian embed data': '![[data:image/png;base64,AAAA]]',
-    'alt with a bracket (not understood)': '![a [b]](https://ok.example/a.png)',
-    'alt holding html': '![<img src=x>](https://ok.example/a.png)'
+    'obsidian embed javascript': '![[javascript:alert(1)]]'
   };
   for (const [name, input] of Object.entries(cases)) {
-    assert.ok(loads(input) || name.includes('not understood'), `${name}: the sample itself loads`);
+    assert.ok(/!\[|</.test(input), `${name}: the sample is a picture form`);
     const out = replaceBodyImages(`---\ntitle: t\n---\n${input}\n`, none);
-    assert.ok(!loads(out) || /^!\[a \[b\]\]/.test(out.split('---\n')[2] ?? ''), `${name}: ${JSON.stringify(out)}`);
-    assert.ok(out.includes('無圖：'), `${name}: says why`);
+    assert.ok(!loads(out), `${name}: ${JSON.stringify(out)}`);
     assert.ok(out.startsWith('---\ntitle: t\n---\n'), `${name}: frontmatter kept`);
   }
-  // not understood: the leading "![" is replaced, so nothing can render as an image
-  assert.ok(!replaceBodyImages('![a [b]](https://ok.example/a.png)', none).includes('!['));
-  // what stays: a good https image (inline and reference form), a local embed, code-free text; frontmatter is never changed
-  const good = '![x](https://ok.example/a.png)\n\n![y][r]\n\n[r]: https://ok.example/b.png\n\n![[local.png]]\n\nplain text';
+  for (const name of ['inline http', 'inline javascript', 'inline data', 'inline file', 'obsidian embed https', 'reference shortcut', 'reference to a missing definition']) {
+    assert.ok(replaceBodyImages(cases[name], none).includes('無圖：'), `${name}: says why`);
+  }
+  assert.ok(replaceBodyImages(cases['html img'], none).includes('&lt;img'));
+  assert.equal(replaceBodyImages(cases['inline title carrying img onerror'], none), '![x](https://ok.example/a.png)');
+  assert.equal(replaceBodyImages('<!-- visual-agent-map:detail:start -->\nbody\n<!-- visual-agent-map:detail:end -->', none), '<!-- visual-agent-map:detail:start -->\nbody\n<!-- visual-agent-map:detail:end -->');
+  assert.ok(!replaceBodyImages(cases['inline angle containing > and <'], none).includes('b<c'));
+  // an https address is rebuilt in the standard form: the title is dropped, the alt is escaped, the original text is not kept
+  assert.equal(replaceBodyImages('![x](<https://ok.example/a.png> "a title")', none), '![x](https://ok.example/a.png)');
+  assert.equal(replaceBodyImages('![a<b>c](https://ok.example/a.png)', none), '![a＜b＞c](https://ok.example/a.png)');
+  // all the definitions a reference image used are removed (also with several candidates); a probed reference image becomes the inline form
+  assert.equal(replaceBodyImages('![x][r]\n\n[r]: https://ok.example/a.png\n[R]: http://e.example/2.png\n\ntext', none), '![x](https://ok.example/a.png)\n\n\ntext');
+  assert.equal(replaceBodyImages('![x][]\n![x]\n\n[x]: https://ok.example/a.png', none), '![x](https://ok.example/a.png)\n![x](https://ok.example/a.png)\n\n');
+  // code is kept as written: fence, tilde fence, inline code (an image or tag in them is text); a definition in a fence is not used
+  const code = '```\n![x](http://e.example/a.png)\n<img src=x>\n```\n\n~~~\n![y](http://e.example/b.png)\n~~~\n\n`![z](http://e.example/c.png)` and `<img src=x>`';
+  assert.equal(replaceBodyImages(code, none), code);
+  const fenced = replaceBodyImages(cases['reference definition inside a fence is not a definition'], none);
+  assert.ok(fenced.includes('[r]: http://e.example/in-fence.png') && !fenced.includes('real.png') && !loads(fenced));
+  // an unpaired backtick does not hide a picture in another paragraph
+  assert.ok(!loads(replaceBodyImages('a ` b\n\n![x](http://e.example/a.png)\n\nc ` d', none)));
+  // what stays: a good https image (inline, reference), a local embed, a callout, plain text; frontmatter is never changed
+  const good = '![x](https://ok.example/a.png)\n\n![[local.png]]\n\n> [!note] title\n> text\n\nplain text';
   assert.equal(replaceBodyImages(good, none), good);
-  assert.deepEqual([...bodyImageUrls(good)].sort(), ['https://ok.example/a.png', 'https://ok.example/b.png']);
+  assert.deepEqual([...bodyImageUrls('![x](https://ok.example/a.png)\n\n![y][r]\n\n[r]: https://ok.example/b.png\n\n![z](http://e.example/c.png)')].sort(), ['https://ok.example/a.png', 'https://ok.example/b.png']);
   const failed = new Map([['https://ok.example/b.png', '無圖：404']]);
-  const out = replaceBodyImages(good, failed);
+  const out = replaceBodyImages('![x](https://ok.example/a.png)\n\n![y][r]\n\n[r]: https://ok.example/b.png', failed);
   assert.ok(out.includes('無圖：404') && !out.includes('b.png') && out.includes('![x](https://ok.example/a.png)'));
   assert.equal(replaceBodyImages('---\nimg: "![](http://e.example/a.png)"\n---\nbody', none), '---\nimg: "![](http://e.example/a.png)"\n---\nbody');
   // idempotent

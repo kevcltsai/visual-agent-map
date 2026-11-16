@@ -27421,12 +27421,12 @@ function outsideInlineCode(line2, edit) {
 function sourceDefinitions(detail) {
   const lines = detail.split("\n");
   const code3 = fencedLines(lines);
-  const definitions3 = /* @__PURE__ */ new Map();
+  const definitions2 = /* @__PURE__ */ new Map();
   lines.forEach((line2, index) => {
     const definition = code3[index] ? null : sourceFootnoteDefinition(line2);
-    if (definition) definitions3.set(definition.label, definition.target);
+    if (definition) definitions2.set(definition.label, definition.target);
   });
-  return definitions3;
+  return definitions2;
 }
 function footnoteDefinitionLabels(content) {
   const lines = content.split("\n");
@@ -41772,7 +41772,11 @@ var TopicRuns = class {
     if (signal.aborted) return stopped;
     try {
       if (await hooks.readRaw(path) !== raw.started)
-        return { ok: false, message: t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved") };
+        return {
+          ok: false,
+          message: t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"),
+          discarded: true
+        };
       const backup = await hooks.backupNote(path, raw.original);
       if (!backup.ok) return failed;
       const composed = compose({ ...base, now: /* @__PURE__ */ new Date(), backupPath: backup.path });
@@ -41957,7 +41961,7 @@ var TopicRuns = class {
       steerObserver(observer, options.steer)
     ).then(
       (result) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m;
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
         progress == null ? void 0 : progress.end(path, progressAttempt);
         const latest = await repo.readNote(path, options.map);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
@@ -41970,14 +41974,17 @@ var TopicRuns = class {
               t(stale && !locked ? "log.stale_result_not_written" : "log.stopped_result_not_written")
             );
           if (locked) fail4(t("ui.ai_locked_notice"));
-          else if (stale) fail4(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+          else if (stale) {
+            (_c2 = (_b3 = options.pipeline) == null ? void 0 : _b3.onDiscarded) == null ? void 0 : _c2.call(_b3);
+            fail4(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+          }
           return;
         }
-        const effective = (_b3 = result.decidedTemplate) != null ? _b3 : context.detailTemplate;
+        const effective = (_d2 = result.decidedTemplate) != null ? _d2 : context.detailTemplate;
         const writeContext = context.aiSections === "decide" ? { ...context, detailTemplate: effective, aiSections: void 0 } : context;
-        if (result.aiSectionsFallback) (_c2 = options.notify) == null ? void 0 : _c2.call(options, t("ui.note_style_ai_sections_invalid"));
-        const mode = (_d2 = writeContext.updateMode) != null ? _d2 : "merge";
-        const writeLanguage = noteLanguageOf((_e2 = context.outputLanguage) != null ? _e2 : settings().language);
+        if (result.aiSectionsFallback) (_e2 = options.notify) == null ? void 0 : _e2.call(options, t("ui.note_style_ai_sections_invalid"));
+        const mode = (_f2 = writeContext.updateMode) != null ? _f2 : "merge";
+        const writeLanguage = noteLanguageOf((_g2 = context.outputLanguage) != null ? _g2 : settings().language);
         const aiDetail = intakeAiMarkdown(result.detail, {
           kind: "task-detail",
           seenImages: mode === "top" ? imageKeysIn(latest.detail) : void 0,
@@ -42005,7 +42012,7 @@ var TopicRuns = class {
           oldDetail: latest.detail,
           aiDetail,
           summary: result.summary,
-          template: (_f2 = writeContext.detailTemplate) != null ? _f2 : standardTemplate(writeLanguage),
+          template: (_h2 = writeContext.detailTemplate) != null ? _h2 : standardTemplate(writeLanguage),
           language: writeLanguage,
           signal: controller.signal,
           hooks: options,
@@ -42013,7 +42020,8 @@ var TopicRuns = class {
         });
         if (!composed.ok) {
           await repo.updateNote(path, { status: note.status });
-          if (exchangeId) (_g2 = exchanges()) == null ? void 0 : _g2.failed(exchangeId, composed.message);
+          if (exchangeId) (_i = exchanges()) == null ? void 0 : _i.failed(exchangeId, composed.message);
+          if (composed.discarded) (_k = (_j = options.pipeline) == null ? void 0 : _j.onDiscarded) == null ? void 0 : _k.call(_j);
           fail4(composed.message);
           return;
         }
@@ -42037,27 +42045,28 @@ var TopicRuns = class {
           });
           if (outcome === "discarded") {
             await repo.updateNote(path, { status: note.status });
-            if (exchangeId) (_h2 = exchanges()) == null ? void 0 : _h2.failed(exchangeId, t("log.stale_result_not_written"));
+            if (exchangeId) (_l = exchanges()) == null ? void 0 : _l.failed(exchangeId, t("log.stale_result_not_written"));
+            (_n = (_m = options.pipeline) == null ? void 0 : _m.onDiscarded) == null ? void 0 : _n.call(_m);
             fail4(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
             return;
           }
         } else await repo.updateNote(path, patch, writeOptions);
         const saved = await repo.readNote(path, options.map);
-        (_i = options.onWritten) == null ? void 0 : _i.call(options, { before: { ...latest, status: note.status }, after: saved });
-        if (exchangeId) (_j = exchanges()) == null ? void 0 : _j.completed(exchangeId);
+        (_o = options.onWritten) == null ? void 0 : _o.call(options, { before: { ...latest, status: note.status }, after: saved });
+        if (exchangeId) (_p = exchanges()) == null ? void 0 : _p.completed(exchangeId);
         this.ports.clearOtherHistory(options.origin);
-        (_l = options.queueCharts) == null ? void 0 : _l.call(options, {
+        (_r = options.queueCharts) == null ? void 0 : _r.call(options, {
           path,
           saved,
           context: writeContext,
           detail: saved.detail,
           formatIssues: mode === "top" ? [] : result.formatIssues,
           model: used.model,
-          language: (_k = context.outputLanguage) != null ? _k : settings().language,
+          language: (_q = context.outputLanguage) != null ? _q : settings().language,
           template: writeContext.detailTemplate,
           ...mode === "top" ? this.chartGuard(mode, composed.record) : {}
         });
-        (_m = options.done) == null ? void 0 : _m.call(options, result);
+        (_s = options.done) == null ? void 0 : _s.call(options, result);
       })
     ).catch(
       (error) => this.ports.mutate()(async () => {
@@ -72709,15 +72718,15 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (!argumentEnabled(this.plugin) || this.rerunning || this.closed || !map || map.argumentMap === void 0) return;
     const read = readArgumentMap(map);
     if (read.kind !== "usable" || ((_a2 = read.data.situation.assumptions) == null ? void 0 : _a2.id) !== cardId) return;
-    const definitions3 = map.nodes.find((node) => node.id === cardId);
+    const definitions2 = map.nodes.find((node) => node.id === cardId);
     const root = map.nodes.find((node) => node.id === read.data.roles.proposition);
-    if (!definitions3 || !root) return;
+    if (!definitions2 || !root) return;
     const rootNote = this.notes.get(root.id);
     const proposition = (rootNote == null ? void 0 : rootNote.summary) && !isPlaceholder(rootNote.summary) ? rootNote.summary : (_b2 = rootNote == null ? void 0 : rootNote.title) != null ? _b2 : "";
     this.rerunning = true;
     try {
       const result = await rerunWithAssumptions({
-        readDefinitions: async () => (await this.plugin.repo.readNote(definitions3.path, map)).detail,
+        readDefinitions: async () => (await this.plugin.repo.readNote(definitions2.path, map)).detail,
         proposition: () => proposition,
         createMap: async () => {
           let created = "";
@@ -76309,7 +76318,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (!node || node.path !== input2.path) return { outcome: "failed", reason: "missing" };
     let written2 = false;
     let exhausted = false;
-    let failure;
+    let discarded = false;
     const choices = {
       rewrite: true,
       runOnce: { model: input2.model, reasoning: input2.reasoning },
@@ -76336,18 +76345,20 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
             authorize: input2.authorize,
             onBudgetExhausted: () => {
               exhausted = true;
+            },
+            onDiscarded: () => {
+              discarded = true;
             }
           },
           request: { admission: input2.admission, noContentLog: true }
         }
       );
-    } catch (error) {
-      failure = error instanceof Error ? error.message : String(error);
+    } catch (e) {
     }
     if (exhausted) return { outcome: "budget-exhausted" };
     if (written2) return { outcome: "written" };
     if (input2.signal.aborted) return { outcome: "cancelled" };
-    if (failure === t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved")) return { outcome: "discarded" };
+    if (discarded) return { outcome: "discarded" };
     return { outcome: "failed", reason: "author_failed" };
   }
   /** Loads the picture the way the card will (a real image load with no referrer, not an HTTP status); 8 s limit. */
@@ -83634,84 +83645,204 @@ var BookPipelineRunError = class extends Error {
 var code2 = (value) => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60) || "failed";
 var reasonOf = (error) => isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_reply" : "failed";
 var STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" };
-var IMAGE = /!\[([^\]\n]*)\]\(\s*<?((?:[^()\s>]|\([^()\s]*\))+)>?(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\s*\)/g;
-var REF_IMAGE = /!\[([^\]\n]*)\]\[([^\]\n]*)\]|!\[([^\]\n]+)\](?![[(])/g;
-var DEFINITION = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:<([^>\n]*)>|(\S+))[^\n]*$/gm;
-var EMBED2 = /!\[\[([^\]\n]*)\]\]/g;
-var LOADING_TAG = /<\/?(?:img|picture|source|iframe|video|audio|object|embed|link|script|svg|image|use|input|track|frame|frameset|base|meta|style|body|applet|portal)\b[^>]*>?/gi;
-var LOADING_ATTRIBUTE = /<\/?[a-z][^>]*(?:\burl\s*\(|\b(?:src|srcset|poster|background|data|xlink:href)\s*=|@import)[^>]*>?/gi;
+var DEFINITION = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:<([^>\n]*)>|(\S+))[^\n]*(?:\n|$)/gm;
+var INLINE_CODE = /(?<!`)(`+)(?!`)(?:(?!\r?\n[ \t]*\r?\n)[\s\S])*?(?<!`)\1(?!`)/g;
+var FENCE_OPEN3 = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+var FENCE_CLOSE3 = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
+var SCHEME4 = /^\s*(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
 var frontmatterLength = (content) => {
   var _a2, _b2;
   return (_b2 = (_a2 = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(content)) == null ? void 0 : _a2[0].length) != null ? _b2 : 0;
 };
 var labelOf = (value) => value.trim().replace(/\s+/g, " ").toLowerCase();
-function definitions2(body) {
-  var _a2, _b2;
-  const found = /* @__PURE__ */ new Map();
-  for (const m of body.matchAll(DEFINITION)) {
-    const label = labelOf(m[1]);
-    if (!found.has(label)) found.set(label, (_b2 = (_a2 = m[2]) != null ? _a2 : m[3]) != null ? _b2 : "");
+var neutralize = (text10) => text10.replace(/<(?=[A-Za-z/!?])(?!!-- visual-agent-map:(?:detail|references):(?:start|end) -->)/g, "&lt;");
+var NO_PICTURE = "\u7121\u5716\uFF1A";
+var isHttps = (url) => /^https:\/\//i.test(url);
+function safeHref2(raw) {
+  if (!raw || /[\s\\<>\p{Cc}]/u.test(raw)) return void 0;
+  let href;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:") return void 0;
+    href = url.href;
+  } catch (e) {
+    return void 0;
   }
-  return found;
+  let depth = 0;
+  for (const c of href) {
+    if (c === "(") depth++;
+    else if (c === ")" && --depth < 0) return void 0;
+  }
+  return depth === 0 ? href : void 0;
 }
-var refLabel = (m) => {
+function splitFences(body) {
   var _a2;
-  return labelOf(m[2] ? m[2] : (_a2 = m[3]) != null ? _a2 : m[1]);
-};
-function bodyImageUrls(content) {
-  const body = content.slice(frontmatterLength(content));
-  const urls = /* @__PURE__ */ new Set();
-  for (const m of body.matchAll(IMAGE)) urls.add(m[2]);
-  const defs = definitions2(body);
-  for (const m of body.matchAll(REF_IMAGE)) {
-    const url = defs.get(refLabel(m));
-    if (url !== void 0) urls.add(url);
+  const parts = [];
+  let text10 = "";
+  let fence;
+  for (const line2 of (_a2 = body.match(/[^\n]*\n|[^\n]+$/g)) != null ? _a2 : []) {
+    const bare = line2.replace(/\r?\n$/, "");
+    if (fence) {
+      fence.text += line2;
+      const close = FENCE_CLOSE3.exec(bare);
+      if (close && close[1][0] === fence.char && close[1].length >= fence.size) {
+        parts.push({ code: true, text: fence.text });
+        fence = void 0;
+      }
+      continue;
+    }
+    const open2 = FENCE_OPEN3.exec(bare);
+    if (open2 && !(open2[1][0] === "`" && open2[2].includes("`"))) {
+      if (text10) parts.push({ code: false, text: text10 });
+      text10 = "";
+      fence = { char: open2[1][0], size: open2[1].length, text: line2 };
+      continue;
+    }
+    text10 += line2;
   }
+  if (fence) parts.push({ code: true, text: fence.text });
+  if (text10) parts.push({ code: false, text: text10 });
+  return parts;
+}
+function inlineTarget(text10, from) {
+  let p = from;
+  while (text10[p] === " " || text10[p] === "	") p++;
+  let raw;
+  if (text10[p] === "<") {
+    const q = text10.indexOf(">", p + 1);
+    if (q < 0) return void 0;
+    raw = text10.slice(p + 1, q);
+    if (/[\n<]/.test(raw)) return void 0;
+    p = q + 1;
+  } else {
+    const start = p;
+    let depth = 0;
+    while (p < text10.length && !/\s/.test(text10[p])) {
+      if (text10[p] === "\\") p++;
+      else if (text10[p] === "(") depth++;
+      else if (text10[p] === ")" && depth-- === 0) {
+        depth = 0;
+        break;
+      }
+      p++;
+    }
+    raw = text10.slice(start, p);
+  }
+  while (text10[p] === " " || text10[p] === "	") p++;
+  const quote3 = text10[p] === '"' ? '"' : text10[p] === "'" ? "'" : text10[p] === "(" ? ")" : "";
+  if (quote3) {
+    const q = text10.indexOf(quote3, p + 1);
+    if (q < 0 || /\n/.test(text10.slice(p, q))) return void 0;
+    p = q + 1;
+    while (text10[p] === " " || text10[p] === "	") p++;
+  }
+  return text10[p] === ")" ? { raw, end: p + 1 } : void 0;
+}
+function rebuildImages(text10, defs, used, resolve) {
+  var _a2;
+  let out = "";
+  let plain = 0;
+  let i = 0;
+  const unsupported = (at) => {
+    out += neutralize(text10.slice(plain, at)) + `${NO_PICTURE}\u5F62\u5F0F\u4E0D\u652F\u63F4`;
+    i = at + 1;
+    plain = i;
+  };
+  for (let at = text10.indexOf("![", i); at >= 0; at = text10.indexOf("![", i)) {
+    if (text10[at + 2] === "[") {
+      const end2 = text10.indexOf("]]", at + 3);
+      const target = end2 < 0 ? "" : text10.slice(at + 3, end2);
+      if (end2 < 0 || target.includes("\n")) {
+        unsupported(at);
+        continue;
+      }
+      out += neutralize(text10.slice(plain, at));
+      out += SCHEME4.test(target) ? `${NO_PICTURE}\u5F62\u5F0F\u4E0D\u652F\u63F4` : `![[${neutralize(target)}]]`;
+      i = end2 + 2;
+      plain = i;
+      continue;
+    }
+    let j = at + 2;
+    while (j < text10.length && text10[j] !== "]" && text10[j] !== "[" && text10[j] !== "\n") j += text10[j] === "\\" ? 2 : 1;
+    if (text10[j] !== "]") {
+      unsupported(at);
+      continue;
+    }
+    const alt = text10.slice(at + 2, j);
+    let raw;
+    let end = j + 1;
+    if (text10[end] === "(") {
+      const target = inlineTarget(text10, end + 1);
+      raw = target == null ? void 0 : target.raw;
+      end = (_a2 = target == null ? void 0 : target.end) != null ? _a2 : -1;
+    } else {
+      let label = alt;
+      if (text10[end] === "[") {
+        const q = text10.indexOf("]", end + 1);
+        const inner = q < 0 ? "" : text10.slice(end + 1, q);
+        if (q < 0 || /[[\n]/.test(inner)) end = -1;
+        else {
+          if (inner.trim()) label = inner;
+          end = q + 1;
+        }
+      }
+      if (end >= 0) {
+        const key4 = labelOf(label);
+        raw = defs.get(key4);
+        if (raw !== void 0) used.add(key4);
+      }
+    }
+    if (end < 0 || raw === void 0) {
+      unsupported(at);
+      continue;
+    }
+    const href = safeHref2(raw);
+    const failure = href ? resolve(href) : `${NO_PICTURE}\u7DB2\u5740\u4E0D\u5B89\u5168`;
+    out += neutralize(text10.slice(plain, at));
+    out += failure != null ? failure : `![${escapeMarkdownText(unescapeMarkdownText(alt), 200)}](${href})`;
+    i = end;
+    plain = i;
+  }
+  return out + neutralize(text10.slice(plain));
+}
+function rebuildBody(content, resolve) {
+  var _a2, _b2;
+  const at = frontmatterLength(content);
+  const parts = splitFences(content.slice(at));
+  const defs = /* @__PURE__ */ new Map();
+  for (const part of parts) {
+    if (part.code) continue;
+    for (const m of part.text.matchAll(DEFINITION)) {
+      const label = labelOf(m[1]);
+      if (!defs.has(label)) defs.set(label, (_b2 = (_a2 = m[2]) != null ? _a2 : m[3]) != null ? _b2 : "");
+    }
+  }
+  const used = /* @__PURE__ */ new Set();
+  const render = (removeUsed) => parts.map((part) => {
+    if (part.code) return part.text;
+    const text10 = removeUsed ? part.text.replace(DEFINITION, (line2, label) => used.has(labelOf(label)) ? "" : line2) : part.text;
+    let result = "";
+    let last = 0;
+    for (const m of text10.matchAll(INLINE_CODE)) {
+      result += rebuildImages(text10.slice(last, m.index), defs, used, resolve) + m[0];
+      last = m.index + m[0].length;
+    }
+    return result + rebuildImages(text10.slice(last), defs, used, resolve);
+  }).join("");
+  render(false);
+  return content.slice(0, at) + render(true);
+}
+function bodyImageUrls(content) {
+  const urls = /* @__PURE__ */ new Set();
+  rebuildBody(content, (href) => {
+    urls.add(href);
+    return void 0;
+  });
   return [...urls];
 }
 function replaceBodyImages(content, replacements) {
-  const at = frontmatterLength(content);
-  const body = content.slice(at).replace(/\uE000/g, "");
-  const kept = [];
-  const keep = (text10) => `\uE000${kept.push(text10) - 1}\uE000`;
-  const verdict = (url) => {
-    var _a2;
-    return (_a2 = replacements.get(url)) != null ? _a2 : isHttps(url) ? void 0 : `${NO_PICTURE}\u7DB2\u5740\u4E0D\u5B89\u5168`;
-  };
-  const defs = definitions2(body);
-  const usedLabels = /* @__PURE__ */ new Set();
-  let out = body.replace(IMAGE, (whole, alt, url) => {
-    var _a2;
-    if (/[<>]/.test(alt)) return whole;
-    return (_a2 = verdict(url)) != null ? _a2 : keep(whole);
-  });
-  out = out.replace(REF_IMAGE, (...args) => {
-    var _a2, _b2;
-    const whole = args[0];
-    const m = args.slice(0, 4);
-    const label = refLabel(m);
-    const url = defs.get(label);
-    if (url === void 0 || /[<>]/.test((_b2 = (_a2 = m[1]) != null ? _a2 : m[3]) != null ? _b2 : "")) return whole;
-    const bad = verdict(url);
-    if (bad) usedLabels.add(label);
-    return bad != null ? bad : keep(whole);
-  });
-  out = out.replace(DEFINITION, (line2, label, angle, bare) => {
-    var _a2;
-    const bad = verdict((_a2 = angle != null ? angle : bare) != null ? _a2 : "");
-    return usedLabels.has(labelOf(label)) && bad ? bad : line2;
-  });
-  out = out.replace(
-    EMBED2,
-    (whole, target) => /^\s*(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(target) ? `${NO_PICTURE}\u5F62\u5F0F\u4E0D\u652F\u63F4` : keep(whole)
-  );
-  out = out.replace(LOADING_TAG, `${NO_PICTURE}\u5F62\u5F0F\u4E0D\u652F\u63F4`).replace(LOADING_ATTRIBUTE, `${NO_PICTURE}\u5F62\u5F0F\u4E0D\u652F\u63F4`);
-  out = out.replace(/!\[/g, `${NO_PICTURE}\u5F62\u5F0F\u4E0D\u652F\u63F4[`);
-  out = out.replace(/\uE000(\d+)\uE000/g, (_, i) => kept[Number(i)]);
-  return content.slice(0, at) + out;
+  return rebuildBody(content, (href) => replacements.get(href));
 }
-var NO_PICTURE = "\u7121\u5716\uFF1A";
-var isHttps = (url) => /^https:\/\//i.test(url);
 var BookPipelineRuns = class {
   constructor(ports) {
     this.ports = ports;
@@ -87811,12 +87942,12 @@ function htmlBlockLines(lines) {
   }
   return blocks;
 }
-var FENCE_OPEN3 = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+var FENCE_OPEN4 = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 function fenceRanges(lines, offsets, html) {
   const ranges = [];
   const inHtml = (line2) => html.some(([first, last]) => line2 >= first && line2 <= last);
   for (let i = 0; i < lines.length; i++) {
-    const open2 = FENCE_OPEN3.exec(lines[i]);
+    const open2 = FENCE_OPEN4.exec(lines[i]);
     if (!open2 || inHtml(i)) continue;
     const mark2 = open2[1];
     if (mark2[0] === "`" && open2[2].includes("`")) continue;

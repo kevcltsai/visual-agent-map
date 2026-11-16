@@ -60,7 +60,7 @@ import {
 } from "../../core/book-pipeline/plan-text";
 import { composeProofRecord, isProofFailure, proofKey, type ProofResult } from "../../core/book-pipeline/proof";
 import { effectiveSettings } from "../../core/book-pipeline/settings";
-import { escapeMarkdownText } from "../../core/book-pipeline/text";
+import { escapeMarkdownText, unescapeMarkdownText } from "../../core/book-pipeline/text";
 import type { ReasoningLevel } from "../../ai/types";
 import type { ContentLanguage } from "../../i18n";
 import type { MapDocument } from "../../map-model";
@@ -225,82 +225,226 @@ const reasonOf = (error: unknown): string =>
   isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_reply" : "failed";
 const STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" } as const;
 
-const IMAGE = /!\[([^\]\n]*)\]\(\s*<?((?:[^()\s>]|\([^()\s]*\))+)>?(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\s*\)/g;
-const REF_IMAGE = /!\[([^\]\n]*)\]\[([^\]\n]*)\]|!\[([^\]\n]+)\](?![[(])/g;
-const DEFINITION = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:<([^>\n]*)>|(\S+))[^\n]*$/gm;
-const EMBED = /!\[\[([^\]\n]*)\]\]/g;
-const LOADING_TAG =
-  /<\/?(?:img|picture|source|iframe|video|audio|object|embed|link|script|svg|image|use|input|track|frame|frameset|base|meta|style|body|applet|portal)\b[^>]*>?/gi;
-const LOADING_ATTRIBUTE =
-  /<\/?[a-z][^>]*(?:\burl\s*\(|\b(?:src|srcset|poster|background|data|xlink:href)\s*=|@import)[^>]*>?/gi;
+const DEFINITION = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:<([^>\n]*)>|(\S+))[^\n]*(?:\n|$)/gm;
+const INLINE_CODE = /(?<!`)(`+)(?!`)(?:(?!\r?\n[ \t]*\r?\n)[\s\S])*?(?<!`)\1(?!`)/g;
+const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
+const SCHEME = /^\s*(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
 const frontmatterLength = (content: string): number =>
   /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(content)?.[0].length ?? 0;
 const labelOf = (value: string): string => value.trim().replace(/\s+/g, " ").toLowerCase();
-function definitions(body: string): Map<string, string> {
-  const found = new Map<string, string>();
-  for (const m of body.matchAll(DEFINITION)) {
-    const label = labelOf(m[1]);
-    if (!found.has(label)) found.set(label, m[2] ?? m[3] ?? "");
-  }
-  return found;
-}
-/** For a reference image: its definition label (the explicit one, else the alt text). */
-const refLabel = (m: RegExpMatchArray): string => labelOf(m[2] ? m[2] : (m[3] ?? m[1]));
-/** The distinct addresses of a note's body that an image form would load (inline images and the definitions of reference images; never the frontmatter). */
-export function bodyImageUrls(content: string): string[] {
-  const body = content.slice(frontmatterLength(content));
-  const urls = new Set<string>();
-  for (const m of body.matchAll(IMAGE)) urls.add(m[2]);
-  const defs = definitions(body);
-  for (const m of body.matchAll(REF_IMAGE)) {
-    const url = defs.get(refLabel(m));
-    if (url !== undefined) urls.add(url);
-  }
-  return [...urls];
-}
-/**
- * Allow-list pass over a note's body (the frontmatter stays as it is): an inline or reference image stays only when its address
- * is https and is not in `replacements` (the failed probes); every other form that could load a remote resource (HTML
- * img/picture/source/iframe/video/audio/object/embed and the like, any tag with src/url(), `![[scheme:...]]`, a form this
- * does not understand) becomes a plain "no picture" line. Local `![[file]]` embeds stay.
- */
-export function replaceBodyImages(content: string, replacements: ReadonlyMap<string, string>): string {
-  const at = frontmatterLength(content);
-  const body = content.slice(at).replace(/\uE000/g, "");
-  const kept: string[] = [];
-  const keep = (text: string): string => `\uE000${kept.push(text) - 1}\uE000`;
-  const verdict = (url: string): string | undefined =>
-    replacements.get(url) ?? (isHttps(url) ? undefined : `${NO_PICTURE}網址不安全`);
-  const defs = definitions(body);
-  const usedLabels = new Set<string>();
-  let out = body.replace(IMAGE, (whole, alt: string, url: string) => {
-    if (/[<>]/.test(alt)) return whole;
-    return verdict(url) ?? keep(whole);
-  });
-  out = out.replace(REF_IMAGE, (...args) => {
-    const whole = args[0];
-    const m = args.slice(0, 4) as unknown as RegExpMatchArray;
-    const label = refLabel(m);
-    const url = defs.get(label);
-    if (url === undefined || /[<>]/.test(m[1] ?? m[3] ?? "")) return whole;
-    const bad = verdict(url);
-    if (bad) usedLabels.add(label);
-    return bad ?? keep(whole);
-  });
-  out = out.replace(DEFINITION, (line, label: string, angle: string | undefined, bare: string | undefined) => {
-    const bad = verdict(angle ?? bare ?? "");
-    return usedLabels.has(labelOf(label)) && bad ? bad : line;
-  });
-  out = out.replace(EMBED, (whole, target: string) =>
-    /^\s*(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(target) ? `${NO_PICTURE}形式不支援` : keep(whole)
-  );
-  out = out.replace(LOADING_TAG, `${NO_PICTURE}形式不支援`).replace(LOADING_ATTRIBUTE, `${NO_PICTURE}形式不支援`);
-  out = out.replace(/!\[/g, `${NO_PICTURE}形式不支援[`);
-  out = out.replace(/\uE000(\d+)\uE000/g, (_, i: string) => kept[Number(i)]);
-  return content.slice(0, at) + out;
-}
+/** Every tag or comment start becomes `&lt;`; only the note's own section markers (an exact comment with no payload) stay. */
+const neutralize = (text: string): string =>
+  text.replace(/<(?=[A-Za-z/!?])(?!!-- visual-agent-map:(?:detail|references):(?:start|end) -->)/g, "&lt;");
 const NO_PICTURE = "無圖：";
 const isHttps = (url: string): boolean => /^https:\/\//i.test(url);
+
+/** An address that may be probed and written back: no whitespace, backslash, `<` or `>`; `new URL()` parses it as https with balanced parentheses. */
+function safeHref(raw: string): string | undefined {
+  if (!raw || /[\s\\<>\p{Cc}]/u.test(raw)) return undefined;
+  let href: string;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:") return undefined;
+    href = url.href;
+  } catch {
+    return undefined;
+  }
+  let depth = 0;
+  for (const c of href) {
+    if (c === "(") depth++;
+    else if (c === ")" && --depth < 0) return undefined;
+  }
+  return depth === 0 ? href : undefined;
+}
+
+/** Splits a body into fenced code blocks (kept as they are) and the text between them. */
+function splitFences(body: string): Array<{ code: boolean; text: string }> {
+  const parts: Array<{ code: boolean; text: string }> = [];
+  let text = "";
+  let fence: { char: string; size: number; text: string } | undefined;
+  for (const line of body.match(/[^\n]*\n|[^\n]+$/g) ?? []) {
+    const bare = line.replace(/\r?\n$/, "");
+    if (fence) {
+      fence.text += line;
+      const close = FENCE_CLOSE.exec(bare);
+      if (close && close[1][0] === fence.char && close[1].length >= fence.size) {
+        parts.push({ code: true, text: fence.text });
+        fence = undefined;
+      }
+      continue;
+    }
+    const open = FENCE_OPEN.exec(bare);
+    if (open && !(open[1][0] === "`" && open[2].includes("`"))) {
+      if (text) parts.push({ code: false, text });
+      text = "";
+      fence = { char: open[1][0], size: open[1].length, text: line };
+      continue;
+    }
+    text += line;
+  }
+  if (fence) parts.push({ code: true, text: fence.text });
+  if (text) parts.push({ code: false, text });
+  return parts;
+}
+
+type Resolve = (href: string) => string | undefined;
+/** Parses an inline destination starting right after `(`; undefined when the form is not the plain `url "title"` shape. */
+function inlineTarget(text: string, from: number): { raw: string; end: number } | undefined {
+  let p = from;
+  while (text[p] === " " || text[p] === "\t") p++;
+  let raw: string;
+  if (text[p] === "<") {
+    const q = text.indexOf(">", p + 1);
+    if (q < 0) return undefined;
+    raw = text.slice(p + 1, q);
+    if (/[\n<]/.test(raw)) return undefined;
+    p = q + 1;
+  } else {
+    const start = p;
+    let depth = 0;
+    while (p < text.length && !/\s/.test(text[p])) {
+      if (text[p] === "\\") p++;
+      else if (text[p] === "(") depth++;
+      else if (text[p] === ")" && depth-- === 0) {
+        depth = 0;
+        break;
+      }
+      p++;
+    }
+    raw = text.slice(start, p);
+  }
+  while (text[p] === " " || text[p] === "\t") p++;
+  const quote = text[p] === '"' ? '"' : text[p] === "'" ? "'" : text[p] === "(" ? ")" : "";
+  if (quote) {
+    const q = text.indexOf(quote, p + 1);
+    if (q < 0 || /\n/.test(text.slice(p, q))) return undefined;
+    p = q + 1;
+    while (text[p] === " " || text[p] === "\t") p++;
+  }
+  return text[p] === ")" ? { raw, end: p + 1 } : undefined;
+}
+
+/** Rebuilds every image of one stretch of plain text: whatever is understood is rewritten to the standard form (or a "no picture" line), whatever is not loses its `!`. */
+function rebuildImages(text: string, defs: Map<string, string>, used: Set<string>, resolve: Resolve): string {
+  let out = "";
+  let plain = 0;
+  let i = 0;
+  const unsupported = (at: number): void => {
+    out += neutralize(text.slice(plain, at)) + `${NO_PICTURE}形式不支援`;
+    i = at + 1;
+    plain = i;
+  };
+  for (let at = text.indexOf("![", i); at >= 0; at = text.indexOf("![", i)) {
+    if (text[at + 2] === "[") {
+      const end = text.indexOf("]]", at + 3);
+      const target = end < 0 ? "" : text.slice(at + 3, end);
+      if (end < 0 || target.includes("\n")) {
+        unsupported(at);
+        continue;
+      }
+      out += neutralize(text.slice(plain, at));
+      out += SCHEME.test(target) ? `${NO_PICTURE}形式不支援` : `![[${neutralize(target)}]]`;
+      i = end + 2;
+      plain = i;
+      continue;
+    }
+    let j = at + 2;
+    while (j < text.length && text[j] !== "]" && text[j] !== "[" && text[j] !== "\n") j += text[j] === "\\" ? 2 : 1;
+    if (text[j] !== "]") {
+      unsupported(at);
+      continue;
+    }
+    const alt = text.slice(at + 2, j);
+    let raw: string | undefined;
+    let end = j + 1;
+    if (text[end] === "(") {
+      const target = inlineTarget(text, end + 1);
+      raw = target?.raw;
+      end = target?.end ?? -1;
+    } else {
+      let label = alt;
+      if (text[end] === "[") {
+        const q = text.indexOf("]", end + 1);
+        const inner = q < 0 ? "" : text.slice(end + 1, q);
+        if (q < 0 || /[[\n]/.test(inner)) end = -1;
+        else {
+          if (inner.trim()) label = inner;
+          end = q + 1;
+        }
+      }
+      if (end >= 0) {
+        const key = labelOf(label);
+        raw = defs.get(key);
+        if (raw !== undefined) used.add(key);
+      }
+    }
+    if (end < 0 || raw === undefined) {
+      unsupported(at);
+      continue;
+    }
+    const href = safeHref(raw);
+    const failure = href ? resolve(href) : `${NO_PICTURE}網址不安全`;
+    out += neutralize(text.slice(plain, at));
+    out += failure ?? `![${escapeMarkdownText(unescapeMarkdownText(alt), 200)}](${href})`;
+    i = end;
+    plain = i;
+  }
+  return out + neutralize(text.slice(plain));
+}
+
+/**
+ * Allow-list rebuild of a note's body (the frontmatter stays as it is). Fenced code and inline code stay as written. In the rest:
+ * every image (inline, reference or `![[...]]`) is parsed conservatively and written again in the standard form `![alt](href)`
+ * (https only, address from `new URL()`, title dropped), or becomes a "no picture" line when `resolve(href)` gives a reason, the
+ * address is not https or the form is not understood; the definition lines that reference images used are removed; every HTML tag
+ * or comment start `<` becomes `&lt;`. Nothing of the original image text is kept, so no form can carry a remote load through.
+ */
+function rebuildBody(content: string, resolve: Resolve): string {
+  const at = frontmatterLength(content);
+  const parts = splitFences(content.slice(at));
+  const defs = new Map<string, string>();
+  for (const part of parts) {
+    if (part.code) continue;
+    for (const m of part.text.matchAll(DEFINITION)) {
+      const label = labelOf(m[1]);
+      if (!defs.has(label)) defs.set(label, m[2] ?? m[3] ?? "");
+    }
+  }
+  const used = new Set<string>();
+  const render = (removeUsed: boolean): string =>
+    parts
+      .map(part => {
+        if (part.code) return part.text;
+        const text = removeUsed
+          ? part.text.replace(DEFINITION, (line, label: string) => (used.has(labelOf(label)) ? "" : line))
+          : part.text;
+        let result = "";
+        let last = 0;
+        for (const m of text.matchAll(INLINE_CODE)) {
+          result += rebuildImages(text.slice(last, m.index), defs, used, resolve) + m[0];
+          last = m.index + m[0].length;
+        }
+        return result + rebuildImages(text.slice(last), defs, used, resolve);
+      })
+      .join("");
+  render(false);
+  return content.slice(0, at) + render(true);
+}
+
+/** The distinct addresses (standard form) of a note's body that an image would load and that may be probed: https only; never the frontmatter. */
+export function bodyImageUrls(content: string): string[] {
+  const urls = new Set<string>();
+  rebuildBody(content, href => {
+    urls.add(href);
+    return undefined;
+  });
+  return [...urls];
+}
+/** The allow-list rebuild of a note's body: `replacements` maps an address (as {@link bodyImageUrls} gave it) to the "no picture" line that replaces its image. */
+export function replaceBodyImages(content: string, replacements: ReadonlyMap<string, string>): string {
+  return rebuildBody(content, href => replacements.get(href));
+}
 
 export class BookPipelineRuns {
   private readonly drives = new Map<string, Drive>();

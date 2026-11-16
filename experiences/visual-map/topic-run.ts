@@ -230,9 +230,10 @@ export interface ResearchStart extends WritebackHooks {
    * The picture-book pipeline's author step only; absent: the run is exactly as before. `authorize` is checked inside the
    * write itself (with the file text the run started from), so a stopped or replaced pipeline run, or a note the owner
    * changed after the last read, writes nothing. `onBudgetExhausted` hears the call budget's refusal as its own outcome:
-   * the topic gets its old status back and no error is recorded.
+   * the topic gets its old status back and no error is recorded. `onDiscarded` hears that the result was dropped because the
+   * topic changed or the guarded write was refused (the failure text still goes to `failed`; callers must not match it).
    */
-  pipeline?: { authorize: () => boolean; onBudgetExhausted: () => void };
+  pipeline?: { authorize: () => boolean; onBudgetExhausted: () => void; onDiscarded?: () => void };
 }
 
 /** What a child-topic proposal run needs from the entry that starts it (the view). */
@@ -1189,7 +1190,9 @@ export class TopicRuns {
     hooks: WritebackHooks;
     /** "fresh" only: the note file as the run found it, and as it was once the run had marked it running. */
     raw?: RawSnapshot | null;
-  }): Promise<{ ok: true; detail: string; record: WritebackRecord } | { ok: false; message: string }> {
+  }): Promise<
+    { ok: true; detail: string; record: WritebackRecord } | { ok: false; message: string; discarded?: true }
+  > {
     const { mode, path, signal, hooks, raw } = input;
     const base = {
       mode,
@@ -1211,7 +1214,11 @@ export class TopicRuns {
     try {
       // The file must still be as the run left it before a backup is made; otherwise the result is outdated.
       if ((await hooks.readRaw(path)) !== raw.started)
-        return { ok: false as const, message: t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved") };
+        return {
+          ok: false as const,
+          message: t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"),
+          discarded: true as const
+        };
       // The backup is the file from before the run touched anything (status, stamp), byte for byte.
       const backup = await hooks.backupNote(path, raw.original);
       if (!backup.ok) return failed;
@@ -1452,7 +1459,10 @@ export class TopicRuns {
                 t(stale && !locked ? "log.stale_result_not_written" : "log.stopped_result_not_written")
               );
             if (locked) fail(t("ui.ai_locked_notice"));
-            else if (stale) fail(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+            else if (stale) {
+              options.pipeline?.onDiscarded?.();
+              fail(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+            }
             return;
           }
           // "AI suggested" first research: the sections the AI wrote are the template of everything written below (the
@@ -1511,6 +1521,7 @@ export class TopicRuns {
           if (!composed.ok) {
             await repo.updateNote(path, { status: note.status });
             if (exchangeId) exchanges()?.failed(exchangeId, composed.message);
+            if (composed.discarded) options.pipeline?.onDiscarded?.();
             fail(composed.message);
             return;
           }
@@ -1536,6 +1547,7 @@ export class TopicRuns {
             if (outcome === "discarded") {
               await repo.updateNote(path, { status: note.status });
               if (exchangeId) exchanges()?.failed(exchangeId, t("log.stale_result_not_written"));
+              options.pipeline?.onDiscarded?.();
               fail(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
               return;
             }

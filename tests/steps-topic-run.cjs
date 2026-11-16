@@ -1188,7 +1188,7 @@ function guardedRuns({ onGuarded, ...rest } = {}) {
   };
   return { ...h, guardedCalls, owner };
 }
-const hooks = (over = {}) => { const seen = { budget: 0 }; return { seen, pipeline: { authorize: () => true, onBudgetExhausted: () => { seen.budget++; }, ...over } }; };
+const hooks = (over = {}) => { const seen = { budget: 0, discarded: 0 }; return { seen, pipeline: { authorize: () => true, onBudgetExhausted: () => { seen.budget++; }, onDiscarded: () => { seen.discarded++; }, ...over } }; };
 
 test('research pipeline: the budget refusal is its own outcome: status restored, no error, failed never called, onBudgetExhausted once', async () => {
   const h = guardedRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); throw new BudgetExhaustedError(); } });
@@ -1224,7 +1224,7 @@ test('research pipeline: a discarded guarded write (stopped run or owner edit) s
     const handle = await h.runs.start('A.md', 'research', h.options({ pipeline: g.pipeline }));
     await handle.finished;
     assert.equal(h.store.get('A.md').status, 'idea'); assert.equal(h.store.get('A.md').summary, '', 'the result is not saved');
-    assert.equal(h.log.failed.length, 1); assert.deepEqual(h.log.written, []); assert.equal(g.seen.budget, 0);
+    assert.equal(h.log.failed.length, 1); assert.deepEqual(h.log.written, []); assert.equal(g.seen.budget, 0); assert.equal(g.seen.discarded, 1, 'onDiscarded once');
     assert.equal(h.log.exchanges.some(e => e[0] === 'failed'), true);
   }
 });

@@ -61617,6 +61617,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
       ((_c = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((node) => node.id === id)) == null ? void 0 : _c.height) || // A text node is no card: its measured height (drawn, or measured in a hidden copy), else the default.
       (this.isTextId(id) ? ((_d = this.textBoxOf(id)) == null ? void 0 : _d.height) || TEXT_NODE_HEIGHT : medianHeight([...this.cardEls.values()].map((card) => card.offsetHeight)));
     });
+    /** Card heights as drawn by the last render; the relevance sort reads these so every `canvasNodes()` call of one render agrees. */
+    __publicField(this, "drawnHeights", /* @__PURE__ */ new Map());
+    __publicField(this, "sortHeightOf", (id) => {
+      var _a2, _b2;
+      return this.drawnHeights.get(id) || ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === id)) == null ? void 0 : _b2.height);
+    });
     /** A text block's width for the layout: its measured width, else a guess from its text when nothing can be measured. */
     __publicField(this, "textWidthOf", (id) => {
       var _a2, _b2, _c, _d;
@@ -71362,6 +71368,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     this.stageEl.setAttr("aria-label", this.map.title);
     this.stageEl.setAttr("aria-multiselectable", String(this.selection.state.multiSelectMode));
     this.releaseCovers();
+    this.drawnHeights = new Map([...this.cardEls].map(([id, card]) => [id, card.offsetHeight]));
     this.cardEls.clear();
     this.textEls.clear();
     this.summaryEls.clear();
@@ -72066,7 +72073,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       },
       kept,
       layoutOf(this.map),
-      this.cardHeightOf
+      this.sortHeightOf
     );
   }
   /** Arrow keys walk the tree: left to the parent, right to the first child, up/down among siblings. */

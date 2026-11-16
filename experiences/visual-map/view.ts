@@ -1515,6 +1515,10 @@ export class VisualAgentMapView extends ItemView {
     (this.isTextId(id)
       ? this.textBoxOf(id)?.height || TEXT_NODE_HEIGHT
       : medianHeight([...this.cardEls.values()].map(card => card.offsetHeight)));
+  /** Card heights as drawn by the last render; the relevance sort reads these so every `canvasNodes()` call of one render agrees. */
+  private drawnHeights = new Map<string, number>();
+  private sortHeightOf = (id: string): number | undefined =>
+    this.drawnHeights.get(id) || this.map?.nodes.find(node => node.id === id)?.height;
   /** A text block's width for the layout: its measured width, else a guess from its text when nothing can be measured. */
   private textWidthOf = (id: string): number | undefined => {
     const measured = this.textBoxOf(id)?.width;
@@ -11890,6 +11894,8 @@ export class VisualAgentMapView extends ItemView {
     this.stageEl.setAttr("aria-label", this.map.title);
     this.stageEl.setAttr("aria-multiselectable", String(this.selection.state.multiSelectMode));
     this.releaseCovers();
+    // The relevance sort lays out with the heights drawn last time: this render clears the cards before it asks for the sorted positions.
+    this.drawnHeights = new Map([...this.cardEls].map(([id, card]) => [id, card.offsetHeight]));
     this.cardEls.clear();
     this.textEls.clear();
     this.summaryEls.clear();
@@ -12705,7 +12711,7 @@ export class VisualAgentMapView extends ItemView {
       id => this.notes.get(id)?.relevance?.tier,
       kept,
       layoutOf(this.map),
-      this.cardHeightOf
+      this.sortHeightOf
     );
   }
   /** Arrow keys walk the tree: left to the parent, right to the first child, up/down among siblings. */

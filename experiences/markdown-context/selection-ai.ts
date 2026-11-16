@@ -13,12 +13,8 @@ import {
 import { noteTextAiLocked } from "../../note-values";
 import { getUiLanguage, t } from "../../i18n";
 import type { PreparedStep } from "../../core/step-runner";
-import {
-  demoteUnparsableMermaid,
-  mermaidSyntaxCheck,
-  neutralizeUnsafeMermaid,
-  unsafeMermaid
-} from "../../ai/mermaid-safety";
+import { mermaidSyntaxCheck, unsafeMermaid } from "../../ai/mermaid-safety";
+import { intakeAiMarkdownChecked } from "../../ai/markdown-intake";
 import { prepareStep } from "../../core/step-runner";
 import { imageMarkdown, type ImageCandidate } from "../../core/image-candidates";
 import { imageSearchStep } from "../../core/steps/image-search/step";
@@ -761,8 +757,8 @@ class SelectionAiPanel extends Component {
         result = await this.run(request, model, controller.signal, undefined, plan.action === "research");
         insertAfter = plan.action === "research" || plan.action === "diagram";
         // Text results (transform, research) may hold mermaid blocks too: same allow-list and parser check as a task result.
-        if (plan.action !== "diagram" && /mermaid/i.test(result))
-          result = await demoteUnparsableMermaid(neutralizeUnsafeMermaid(result), mermaidSyntax);
+        if (plan.action !== "diagram")
+          result = await intakeAiMarkdownChecked(result, { kind: "selection-insert" }, mermaidSyntax);
         if (plan.action === "diagram") {
           // CRLF and a lone CR are line breaks to the renderer too; normalize so no directive hides on a "line" the check never saw.
           result = result.replace(/\r\n?/g, "\n");

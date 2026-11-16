@@ -2276,4 +2276,17 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-panel-card-status { min-height: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .vam-book-panel-card-status.is-error, .vam-book-panel-status { color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); font-size: var(--font-ui-smaller); }
 .vam-book-panel-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.vam-book-bar-eta { color: var(--text-muted); font-size: var(--font-ui-smaller); font-variant-numeric: tabular-nums; }
+.vam-book-panel-state { display: inline-block; max-width: 100%; font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
+.vam-book-panel-state::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }
+.vam-book-state.is-seam { font-weight: 600; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
+.vam-book-state.is-seam::before { background: var(--color-orange); }
+.vam-book-panel-summary { margin: 0; font-size: var(--font-ui-small); color: var(--text-muted); overflow-wrap: anywhere; }
+.vam-book-panel-row { min-width: 0; overflow-wrap: anywhere; }
+.vam-book-panel-row button:focus-visible, .vam-book-panel-row:focus-visible, .vam-book-panel-finish:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-book-panel-proof { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; padding: 6px 8px; border-left: 2px solid var(--background-modifier-border); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; white-space: pre-wrap; }
+.vam-book-panel-proof-items { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.vam-book-panel-proof-item { overflow-wrap: anywhere; }
+.vam-book-panel-proof-item.is-unmet { color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
+@media (max-width: 700px) { .vam-book-panel-row .vam-book-panel-card-head { align-items: flex-start; } .vam-book-panel-row button { max-width: 100%; white-space: normal; } }
 @media (prefers-reduced-motion: reduce) { .vam-book-side { transition: none; } }

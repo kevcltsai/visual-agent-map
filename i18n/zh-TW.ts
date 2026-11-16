@@ -3183,6 +3183,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_panel_confirm_seam_0": "已確認「{0}」的接縫",
   "ui.book_seam_label": "接縫需看",
   "ui.book_seam_reason": "鄰卡企劃或正文已變更，尚未人工核對。",
+  "ui.book_card_menu_rerun": "重跑圖文書這一張",
+  "ui.book_card_menu_rerun_sub": "企劃 → 寫 → 校",
   "ui.book_panel_proof_show": "看查證記錄",
   "ui.book_panel_proof_hide": "收合查證記錄",
   "ui.book_panel_proof_0": "{0} 的查證記錄",

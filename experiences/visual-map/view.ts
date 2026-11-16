@@ -9749,6 +9749,7 @@ export class VisualAgentMapView extends ItemView {
     // "Edit card", the same dialog as the panel's button; only for an editable topic whose cover picture is showing.
     if (this.markersEditable(node) && this.coverPictureOf(node))
       add(t("ui.topic_cover_frame_title"), "square-pen", () => this.openCoverFrameEditor(node));
+    this.addBookRerunMenuItem(menu, node);
     menu.addSeparator();
     menu.addItem(item =>
       item
@@ -9763,6 +9764,35 @@ export class VisualAgentMapView extends ItemView {
         .onClick(() => this.openNoteInTab(node))
     );
     menu.addSeparator();
+  }
+  /** "Rerun this picture-book card" (plan, write, proof): only on a map with `bookPipeline` at gate 1, gate 2 or done. */
+  private addBookRerunMenuItem(menu: Menu, node: MapNode): void {
+    const path = this.path;
+    if (!this.map || !path || !this.hasBookPipeline()) return;
+    const read = readBookPipeline(this.map);
+    if (read.kind !== "usable") return;
+    const progress = this.plugin.getBookPipelineProgress(path);
+    const phase = progress?.phase ?? read.data.phase;
+    if (phase !== "gate1" && phase !== "gate2" && phase !== "done") return;
+    const disabled = !!progress?.active || (progress?.busyCards ?? []).includes(node.id);
+    menu.addSeparator();
+    menu.addItem(item =>
+      item
+        .setTitle(t("ui.book_card_menu_rerun"))
+        .setIcon("refresh-cw")
+        .setDisabled(disabled)
+        .onClick(
+          () =>
+            void this.bookEntry(async () => {
+              try {
+                await this.plugin.rerunBookCard(path, node.id);
+              } finally {
+                await this.rereadBookCard(node.id);
+              }
+            })
+        )
+    );
+    menu.addItem(item => item.setTitle(t("ui.book_card_menu_rerun_sub")).setDisabled(true));
   }
   /** Opens the topic note in a new main-area tab (the details sidebar is the other way to read it). */
   private openNoteInTab(node: MapNode): void {
@@ -16998,7 +17028,41 @@ export class VisualAgentMapView extends ItemView {
     this.bookPanel.pendingFocus = "title";
     this.render();
   }
+  /** Per run: the last phase seen, and the "runId:gate" pairs already handled (auto-opened, seen on arrival, or closed by hand). Dies with the view. */
+  private readonly bookPhaseSeen = new Map<string, string>();
+  private readonly bookGateHandled = new Set<string>();
+  /** Opens the panel by itself once per run and gate when a gate is reached by a live drive; never at first sight of a map. */
+  private maybeAutoOpenBookPanel(): void {
+    const path = this.path;
+    const read = this.map ? readBookPipeline(this.map) : null;
+    if (!path || !read || read.kind !== "usable") return;
+    const progress = this.plugin.getBookPipelineProgress(path);
+    const phase = progress?.phase ?? read.data.phase;
+    const runId = progress?.runId ?? read.data.runId;
+    const prev = this.bookPhaseSeen.get(runId);
+    this.bookPhaseSeen.set(runId, phase);
+    if (phase !== "gate1" && phase !== "gate2") return;
+    const key = `${runId}:${phase}`;
+    if (prev === undefined) {
+      this.bookGateHandled.add(key);
+      return;
+    }
+    if (progress?.active || this.bookGateHandled.has(key)) return;
+    this.bookGateHandled.add(key);
+    if (this.bookPanel.open) return;
+    const chat = this.chat;
+    this.bookChatWasOpen = !!chat && !chat.isHero && chat.isOpen;
+    if (this.bookChatWasOpen) this.withChatForced(() => chat?.setOpen(false));
+    this.bookPanel.open = true;
+    this.bookPanel.pendingFocus = null;
+  }
   private closeBookPanel(): void {
+    const path = this.path;
+    const read = this.map ? readBookPipeline(this.map) : null;
+    if (path && read?.kind === "usable") {
+      const progress = this.plugin.getBookPipelineProgress(path);
+      this.bookGateHandled.add(`${progress?.runId ?? read.data.runId}:${progress?.phase ?? read.data.phase}`);
+    }
     this.bookPanel.open = false;
     this.bookPanel.pendingFocus = "opener";
     if (this.bookChatWasOpen) this.withChatForced(() => this.chat?.setOpen(true));
@@ -17026,6 +17090,7 @@ export class VisualAgentMapView extends ItemView {
       this.bookChatWasOpen = false;
     }
     this.bookPanelPath = this.hasBookPipeline() ? this.path : "";
+    if (this.bookPanelPath) this.maybeAutoOpenBookPanel();
     if (!this.bookPanel.open || !this.bookPanelPath) {
       // The panel just closed (button, Escape): the keyboard goes back to the toolbar button that opened it.
       if (this.bookPanel.pendingFocus === "opener")

@@ -3182,6 +3182,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_panel_confirm_seam_0": "已确认“{0}”的接缝",
   "ui.book_seam_label": "接缝需看",
   "ui.book_seam_reason": "邻卡企划或正文已变更，尚未人工核对。",
+  "ui.book_card_menu_rerun": "重跑图文书这一张",
+  "ui.book_card_menu_rerun_sub": "企划 → 写 → 校",
   "ui.book_panel_proof_show": "看查证记录",
   "ui.book_panel_proof_hide": "收合查证记录",
   "ui.book_panel_proof_0": "{0} 的查证记录",

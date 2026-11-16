@@ -3398,6 +3398,8 @@ export const en = {
   "ui.book_panel_confirm_seam_0": "Mark the seam for {0} as checked",
   "ui.book_seam_label": "Check seam",
   "ui.book_seam_reason": "A neighboring card's plan or body changed and has not been checked by hand.",
+  "ui.book_card_menu_rerun": "Rerun this picture-book card",
+  "ui.book_card_menu_rerun_sub": "Plan → write → proofread",
   "ui.book_panel_proof_show": "Show proof record",
   "ui.book_panel_proof_hide": "Hide proof record",
   "ui.book_panel_proof_0": "Proof record for {0}",

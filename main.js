@@ -3178,6 +3178,8 @@ var en = {
   "ui.book_panel_confirm_seam_0": "Mark the seam for {0} as checked",
   "ui.book_seam_label": "Check seam",
   "ui.book_seam_reason": "A neighboring card's plan or body changed and has not been checked by hand.",
+  "ui.book_card_menu_rerun": "Rerun this picture-book card",
+  "ui.book_card_menu_rerun_sub": "Plan \u2192 write \u2192 proofread",
   "ui.book_panel_proof_show": "Show proof record",
   "ui.book_panel_proof_hide": "Hide proof record",
   "ui.book_panel_proof_0": "Proof record for {0}",
@@ -6268,6 +6270,8 @@ var zhCN = {
   "ui.book_panel_confirm_seam_0": "\u5DF2\u786E\u8BA4\u201C{0}\u201D\u7684\u63A5\u7F1D",
   "ui.book_seam_label": "\u63A5\u7F1D\u9700\u770B",
   "ui.book_seam_reason": "\u90BB\u5361\u4F01\u5212\u6216\u6B63\u6587\u5DF2\u53D8\u66F4\uFF0C\u5C1A\u672A\u4EBA\u5DE5\u6838\u5BF9\u3002",
+  "ui.book_card_menu_rerun": "\u91CD\u8DD1\u56FE\u6587\u4E66\u8FD9\u4E00\u5F20",
+  "ui.book_card_menu_rerun_sub": "\u4F01\u5212 \u2192 \u5199 \u2192 \u6821",
   "ui.book_panel_proof_show": "\u770B\u67E5\u8BC1\u8BB0\u5F55",
   "ui.book_panel_proof_hide": "\u6536\u5408\u67E5\u8BC1\u8BB0\u5F55",
   "ui.book_panel_proof_0": "{0} \u7684\u67E5\u8BC1\u8BB0\u5F55",
@@ -9358,6 +9362,8 @@ var zhTW = {
   "ui.book_panel_confirm_seam_0": "\u5DF2\u78BA\u8A8D\u300C{0}\u300D\u7684\u63A5\u7E2B",
   "ui.book_seam_label": "\u63A5\u7E2B\u9700\u770B",
   "ui.book_seam_reason": "\u9130\u5361\u4F01\u5283\u6216\u6B63\u6587\u5DF2\u8B8A\u66F4\uFF0C\u5C1A\u672A\u4EBA\u5DE5\u6838\u5C0D\u3002",
+  "ui.book_card_menu_rerun": "\u91CD\u8DD1\u5716\u6587\u66F8\u9019\u4E00\u5F35",
+  "ui.book_card_menu_rerun_sub": "\u4F01\u5283 \u2192 \u5BEB \u2192 \u6821",
   "ui.book_panel_proof_show": "\u770B\u67E5\u8B49\u8A18\u9304",
   "ui.book_panel_proof_hide": "\u6536\u5408\u67E5\u8B49\u8A18\u9304",
   "ui.book_panel_proof_0": "{0} \u7684\u67E5\u8B49\u8A18\u9304",
@@ -65705,6 +65711,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     __publicField(this, "bookPanelPath", "");
     /** Whether the chat window was open when the gate panel took the side column (it comes back when the panel closes). */
     __publicField(this, "bookChatWasOpen", false);
+    /** Per run: the last phase seen, and the "runId:gate" pairs already handled (auto-opened, seen on arrival, or closed by hand). Dies with the view. */
+    __publicField(this, "bookPhaseSeen", /* @__PURE__ */ new Map());
+    __publicField(this, "bookGateHandled", /* @__PURE__ */ new Set());
     /** The zoom the selected card's tool row was last fitted at. */
     __publicField(this, "toolsZoom", null);
     /** The map whose saved viewport was already lifted clear of the toolbar (see applyInitialViewport). */
@@ -73377,6 +73386,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       );
     if (this.markersEditable(node) && this.coverPictureOf(node))
       add(t("ui.topic_cover_frame_title"), "square-pen", () => this.openCoverFrameEditor(node));
+    this.addBookRerunMenuItem(menu, node);
     menu.addSeparator();
     menu.addItem(
       (item) => item.setTitle(t("ui.open_details_in_right_sidebar")).setIcon("panel-right").onClick(() => this.openDetails(node))
@@ -73385,6 +73395,31 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       (item) => item.setTitle(t("ui.card_menu_open_note_tab")).setIcon("file-text").onClick(() => this.openNoteInTab(node))
     );
     menu.addSeparator();
+  }
+  /** "Rerun this picture-book card" (plan, write, proof): only on a map with `bookPipeline` at gate 1, gate 2 or done. */
+  addBookRerunMenuItem(menu, node) {
+    var _a2, _b2;
+    const path = this.path;
+    if (!this.map || !path || !this.hasBookPipeline()) return;
+    const read = readBookPipeline(this.map);
+    if (read.kind !== "usable") return;
+    const progress = this.plugin.getBookPipelineProgress(path);
+    const phase = (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : read.data.phase;
+    if (phase !== "gate1" && phase !== "gate2" && phase !== "done") return;
+    const disabled = !!(progress == null ? void 0 : progress.active) || ((_b2 = progress == null ? void 0 : progress.busyCards) != null ? _b2 : []).includes(node.id);
+    menu.addSeparator();
+    menu.addItem(
+      (item) => item.setTitle(t("ui.book_card_menu_rerun")).setIcon("refresh-cw").setDisabled(disabled).onClick(
+        () => void this.bookEntry(async () => {
+          try {
+            await this.plugin.rerunBookCard(path, node.id);
+          } finally {
+            await this.rereadBookCard(node.id);
+          }
+        })
+      )
+    );
+    menu.addItem((item) => item.setTitle(t("ui.book_card_menu_rerun_sub")).setDisabled(true));
   }
   /** Opens the topic note in a new main-area tab (the details sidebar is the other way to read it). */
   openNoteInTab(node) {
@@ -80023,12 +80058,45 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     this.bookPanel.pendingFocus = "title";
     this.render();
   }
+  /** Opens the panel by itself once per run and gate when a gate is reached by a live drive; never at first sight of a map. */
+  maybeAutoOpenBookPanel() {
+    var _a2, _b2;
+    const path = this.path;
+    const read = this.map ? readBookPipeline(this.map) : null;
+    if (!path || !read || read.kind !== "usable") return;
+    const progress = this.plugin.getBookPipelineProgress(path);
+    const phase = (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : read.data.phase;
+    const runId = (_b2 = progress == null ? void 0 : progress.runId) != null ? _b2 : read.data.runId;
+    const prev = this.bookPhaseSeen.get(runId);
+    this.bookPhaseSeen.set(runId, phase);
+    if (phase !== "gate1" && phase !== "gate2") return;
+    const key4 = `${runId}:${phase}`;
+    if (prev === void 0) {
+      this.bookGateHandled.add(key4);
+      return;
+    }
+    if ((progress == null ? void 0 : progress.active) || this.bookGateHandled.has(key4)) return;
+    this.bookGateHandled.add(key4);
+    if (this.bookPanel.open) return;
+    const chat = this.chat;
+    this.bookChatWasOpen = !!chat && !chat.isHero && chat.isOpen;
+    if (this.bookChatWasOpen) this.withChatForced(() => chat == null ? void 0 : chat.setOpen(false));
+    this.bookPanel.open = true;
+    this.bookPanel.pendingFocus = null;
+  }
   closeBookPanel() {
+    var _a2, _b2;
+    const path = this.path;
+    const read = this.map ? readBookPipeline(this.map) : null;
+    if (path && (read == null ? void 0 : read.kind) === "usable") {
+      const progress = this.plugin.getBookPipelineProgress(path);
+      this.bookGateHandled.add(`${(_a2 = progress == null ? void 0 : progress.runId) != null ? _a2 : read.data.runId}:${(_b2 = progress == null ? void 0 : progress.phase) != null ? _b2 : read.data.phase}`);
+    }
     this.bookPanel.open = false;
     this.bookPanel.pendingFocus = "opener";
     if (this.bookChatWasOpen) this.withChatForced(() => {
-      var _a2;
-      return (_a2 = this.chat) == null ? void 0 : _a2.setOpen(true);
+      var _a3;
+      return (_a3 = this.chat) == null ? void 0 : _a3.setOpen(true);
     });
     this.bookChatWasOpen = false;
     this.render();
@@ -80051,6 +80119,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       this.bookChatWasOpen = false;
     }
     this.bookPanelPath = this.hasBookPipeline() ? this.path : "";
+    if (this.bookPanelPath) this.maybeAutoOpenBookPanel();
     if (!this.bookPanel.open || !this.bookPanelPath) {
       if (this.bookPanel.pendingFocus === "opener")
         (_a2 = this.contentEl.querySelector(".vam-book-panel-toggle")) == null ? void 0 : _a2.focus();

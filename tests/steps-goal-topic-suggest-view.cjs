@@ -1001,3 +1001,100 @@ test('goal recommend: when the keyboard was on the status bar the finished run m
     assert.equal(h.control.calls.length, 1, where);
   }
 });
+
+// ---- Goal suggest characterization (view.ts series F, P1): behaviour that must stay the same when the list moves into its own module ----
+
+test('goal suggest characterization: closing the view with the list open removes the listener, aborts the task and clears it', async () => {
+  const h = await harness();
+  await h.open();
+  assert.equal(h.listeners.pointerdown.length, 1);
+  const { controller } = h.view.goalSuggestTask;
+  await h.view.onClose();
+  assert.equal(h.listeners.pointerdown.length, 0, 'no outside listener is left');
+  assert.equal(controller.signal.aborted, true, 'the task controller is aborted');
+  assert.equal(h.view.goalSuggestTask, null);
+  assert.equal(h.control.calls.length, 1);
+});
+
+test('goal suggest characterization: switching maps with the list open aborts the task, draws no rows and leaves no listener after the next paint', async () => {
+  const h = await harness();
+  await h.open();
+  const { controller } = h.view.goalSuggestTask;
+  h.view.path = 'Agent Workspace/Topics/other/Map.md';
+  h.view.dropMapBackground();
+  assert.equal(controller.signal.aborted, true);
+  assert.equal(h.view.goalSuggestTask, null);
+  h.view.render();
+  assert.equal(h.rows().length, 0, 'no rows');
+  assert.equal(h.panel(), undefined);
+  assert.equal(h.listeners.pointerdown.length, 0, 'no listener after the repaint');
+  h.view.path = MAP;
+  assert.equal(h.control.calls.length, 1);
+});
+
+test('goal suggest characterization: repainting twice with the list open keeps ONE pointerdown listener and does not pull the focus back to the first box', async () => {
+  const h = await harness();
+  await h.open();
+  assert.equal(h.boxes()[0].focused, true);
+  h.view.render(); h.view.render();
+  assert.equal(h.listeners.pointerdown.length, 1, 'one outside listener after two repaints');
+  assert.equal(h.rows().length, 2);
+  assert.ok(!h.boxes()[0].focused, 'the second draw does not take the focus back to the first box');
+  assert.equal(h.control.calls.length, 1);
+});
+
+test('goal suggest characterization: a map switch before the write callback runs adds nothing, leaves the disk as it was and says the recommendations no longer fit', async () => {
+  const h = await harness();
+  await h.open();
+  const before = JSON.stringify(Array.from(h.contents.entries()));
+  let addNodeCalls = 0; const addNode = h.view.addNode.bind(h.view); h.view.addNode = (...args) => { addNodeCalls++; return addNode(...args); };
+  h.plugin.mutate = async work => { h.view.path = 'Agent Workspace/Topics/other/Map.md'; await work(); };
+  h.addBtn().click();
+  await until(() => h.notices.some(m => /no longer fit/.test(m)));
+  h.view.path = MAP;
+  assert.equal(addNodeCalls, 0, 'no card is written');
+  assert.equal(JSON.stringify(Array.from(h.contents.entries())), before, 'the files are unchanged');
+  assert.match(h.notices.find(m => /no longer fit/.test(m)), /^2 recommendations no longer fit the map and were skipped$/);
+  assert.equal(h.view.goalSuggestTask, null);
+  assert.equal(h.control.calls.length, 1);
+});
+
+test('goal suggest characterization: a duplicate title and a parent that is merging are skipped and counted, the rest is added', async () => {
+  const h = await harness();
+  h.control.reply = async request => ({ items: gradeAll(request), suggestions: [{ parentId: 'c2', title: 'Sleep stages', summary: 's', suggestedTier: 'core' }, { parentId: 'c4', title: 'Stress habits', summary: 's', suggestedTier: 'support' }, { parentId: 'c5', title: 'Dream recall', summary: 's', suggestedTier: 'support' }] });
+  await h.open();
+  h.view.isMerging = id => id === h.ids.b;
+  h.view.notes.set(h.ids.c, { ...h.view.notes.get(h.ids.c), title: 'Dream recall' }); // the title is taken meanwhile
+  h.addBtn().click();
+  await until(() => h.notices.some(m => /no longer fit/.test(m)));
+  assert.match(h.notices.find(m => /no longer fit/.test(m)), /^2 recommendations no longer fit the map and were skipped$/);
+  assert.deepEqual((await h.titlesOnDisk()).filter(x => !BASE.includes(x)), ['Sleep stages'], 'only the intact one is added');
+  assert.equal(h.control.calls.length, 1);
+});
+
+test('goal suggest characterization: while Add is writing, Esc does nothing, no outside listener is armed and the spark, boxes and Skip are disabled', async () => {
+  const h = await harness();
+  await h.open();
+  const task = h.view.goalSuggestTask;
+  task.state = 'applying'; task.focus = null; h.view.render();
+  assert.equal(h.listeners.pointerdown.length, 0, 'no outside listener while applying');
+  h.panel().fire('keydown', { key: 'Escape' });
+  assert.ok(h.panel(), 'Esc does not close the list while it is writing');
+  assert.equal(h.view.goalSuggestTask, task);
+  assert.equal(h.spark().disabled, true);
+  assert.ok(h.boxes().length === 2 && h.boxes().every(b => b.disabled));
+  assert.equal(h.skipBtn().disabled, true);
+  assert.equal(h.control.calls.length, 1);
+});
+
+test('goal suggest characterization: opening the goal flow with the list open closes it, removes the listener and returns the focus to the spark after the timer', async () => {
+  const h = await harness();
+  await h.open();
+  h.control.decline = true;
+  await h.view.submitRelevanceGoal('Sleep better', '');
+  assert.equal(h.panel(), undefined, 'the list is closed');
+  assert.equal(h.view.goalSuggestTask, null);
+  assert.equal(h.listeners.pointerdown.length, 0, 'listener removed');
+  await new Promise(r => setTimeout(r, 5));
+  assert.equal(h.spark().focused, true, 'the focus is back on the spark');
+});

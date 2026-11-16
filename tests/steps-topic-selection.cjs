@@ -336,6 +336,12 @@ test('isPureHighlight: true only while the multi set is exactly the AI pick and 
   t.click('z');
   assert.equal(t.isPureHighlight(), false);
 });
+test('isPureHighlight stays true when some AI-picked cards are pruned (collapsed or deleted)', () => {
+  const s = seeded({});
+  s.chatSelect(['a', 'b', 'c']);
+  s.prune(new Set(['b', 'c']));
+  assert.equal(s.isPureHighlight(), true);
+});
 test('exitMultiSelect backgroundRun keeps the AI highlight when no selection mode is on', () => {
   const s = seeded({ multi: ['b', 'c'] });
   assert.equal(s.exitMultiSelect('backgroundRun').touched.length, 0);

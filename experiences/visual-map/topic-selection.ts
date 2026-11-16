@@ -80,8 +80,9 @@ export class TopicSelection {
   }
   private pureHighlight(): string[] {
     const h = this.highlight;
-    if (this.mode || !h || h.size !== this.multi.size || [...h].some(id => !this.multi.has(id))) return [];
-    return [...h];
+    // Cards hidden or deleted since the pick leave multi (prune), so "pure" means every member is still one the AI picked.
+    if (this.mode || !h || !this.multi.size || [...this.multi].some(id => !h.has(id))) return [];
+    return [...this.multi];
   }
 
   /** A frozen copy: editing it, or its Set, never reaches the module. */

@@ -946,3 +946,53 @@ test('P2: creating suggested subtopics under a locked topic says how to proceed 
   assert.equal(dom.focusedNow(), create, 'the focus stays on the button');
   assert.equal(h.view.map.nodes.length, 1, 'no subtopic is created');
 });
+
+// ---- topic busy state: the chat expand and the other busy readers -----------------------------------------------------
+test('busy: a synthesis waiting on a chat-expanded child wakes when the expand ends', async () => {
+  const h = await harness(['P']);
+  const [p] = h.nodes;
+  let release; const gate = new Promise(resolve => { release = resolve; });
+  h.host.outlineGeneration = { generate: async () => { await gate; return { nodes: [], markdown: '' }; } };
+  const expanding = h.view.chatExpand(p, '');
+  await dom.tick();
+  assert.equal(h.host.running.has(p.path), true, 'the expand shows running');
+  const idle = h.host.topicRuns.whenIdle([p.path]);
+  release();
+  await expanding;
+  const outcome = await Promise.race([idle.then(() => 'woke'), new Promise(resolve => setTimeout(() => resolve('stuck'), 100))]);
+  assert.equal(outcome, 'woke', 'a whenIdle waiter is not left waiting after the expand ended');
+});
+
+test('busy: Stop on a chat expand reaches it through the topic runs and clears every busy mark', async () => {
+  const h = await harness(['P']);
+  const [p] = h.nodes;
+  let seen;
+  h.host.outlineGeneration = { generate: (_request, sig) => { seen = sig; return new Promise((_, reject) => sig.addEventListener('abort', () => reject(new Error('aborted')))); } };
+  const expanding = h.view.chatExpand(p, '');
+  await dom.tick();
+  assert.equal(h.host.topicRuns.hasTask(p.path), true);
+  h.host.topicRuns.stopTask(p.path);
+  assert.equal(seen.aborted, true);
+  assert.equal((await expanding).status, 'stopped');
+  assert.equal(h.host.running.has(p.path) || h.host.activeTasks.has(p.path) || h.host.quickExpandPending.has(p.path), false);
+});
+
+test('busy: a chat expand while the same parent is still reading its sources for a batch is refused before the AI', async () => {
+  const h = await harness(['P', 'K']);
+  const [p, k] = h.nodes;
+  let releaseSources; const gate = new Promise(resolve => { releaseSources = resolve; });
+  h.view.readMapSourceGroups = () => gate.then(() => []);
+  let outlineCalls = 0;
+  h.host.outlineGeneration = { generate: async () => { outlineCalls++; return { nodes: [], markdown: '' }; } };
+  const batch = h.view.startShallowResearch(p, [k], { ...synthesis, shallowResearch: true });
+  await dom.tick();
+  assert.equal(h.host.quickExpandPending.has(p.path), true, 'the batch has marked the parent');
+  const expand = h.view.chatExpand(p, '');
+  await Promise.race([expand, new Promise(resolve => setTimeout(resolve, 300))]);
+  releaseSources([]);
+  await Promise.race([expand, new Promise(resolve => setTimeout(resolve, 500))]);
+  assert.equal(outlineCalls, 0, 'no second AI call for the same parent');
+  assert.match(h.notices.join('\n'), /AI|執行中|running/i);
+  h.host.activeTasks.get(p.path)?.abort();
+  await batch.catch(() => {});
+});

@@ -80506,17 +80506,22 @@ ${addition}` : addition },
    */
   async chatExpand(parent, direction, signal, steer) {
     var _a2, _b2, _c;
-    if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.running.has(parent.path)) {
+    if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.quickExpandPending.has(parent.path)) {
       new import_obsidian36.Notice(t("ui.ai_running_ai"));
       return { status: "failed", reason: t("ui.ai_running_ai") };
     }
     if (signal == null ? void 0 : signal.aborted) return { status: "stopped" };
+    const run = this.plugin.topicRuns.begin(parent.path, "proposeChildren");
+    if (!run) {
+      new import_obsidian36.Notice(t("ui.ai_running_ai"));
+      return { status: "failed", reason: t("ui.ai_running_ai") };
+    }
     const controller = new AbortController();
     const stopWithOwner = () => controller.abort();
     signal == null ? void 0 : signal.addEventListener("abort", stopWithOwner, { once: true });
-    this.plugin.running.add(parent.path);
+    run.signal.addEventListener("abort", stopWithOwner, { once: true });
     this.plugin.quickExpandPending.add(parent.path);
-    this.plugin.activeTasks.set(parent.path, controller);
+    this.plugin.topicRuns.registerTask(parent.path, controller);
     this.render();
     try {
       const note = await this.plugin.repo.readNote(parent.path, (_a2 = this.map) != null ? _a2 : void 0);
@@ -80568,9 +80573,9 @@ ${addition}` : addition },
       return { status: "failed", reason: errorMessage6(error) };
     } finally {
       signal == null ? void 0 : signal.removeEventListener("abort", stopWithOwner);
-      if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
-      this.plugin.running.delete(parent.path);
+      this.plugin.topicRuns.releaseTask(parent.path, controller);
       this.plugin.quickExpandPending.delete(parent.path);
+      run.release();
       if (!this.closed) this.render();
     }
   }

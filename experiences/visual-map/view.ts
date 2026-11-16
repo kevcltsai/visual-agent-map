@@ -21858,18 +21858,25 @@ export class VisualAgentMapView extends ItemView {
     signal?: AbortSignal,
     steer?: ResearchSteer
   ): Promise<ChatExpandOutcome> {
-    if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.running.has(parent.path)) {
+    // A batch that is still reading its sources has marked the parent but not registered yet.
+    if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.quickExpandPending.has(parent.path)) {
       new Notice(t("ui.ai_running_ai"));
       return { status: "failed", reason: t("ui.ai_running_ai") };
     }
     if (signal?.aborted) return { status: "stopped" };
+    // The topic runs own the busy mark: refused when the topic has a run, and waiting integrations wake on release.
+    const run = this.plugin.topicRuns.begin(parent.path, "proposeChildren");
+    if (!run) {
+      new Notice(t("ui.ai_running_ai"));
+      return { status: "failed", reason: t("ui.ai_running_ai") };
+    }
     const controller = new AbortController();
     // Stop on a continuation reaches the expansion it started.
     const stopWithOwner = (): void => controller.abort();
     signal?.addEventListener("abort", stopWithOwner, { once: true });
-    this.plugin.running.add(parent.path);
+    run.signal.addEventListener("abort", stopWithOwner, { once: true });
     this.plugin.quickExpandPending.add(parent.path);
-    this.plugin.activeTasks.set(parent.path, controller);
+    this.plugin.topicRuns.registerTask(parent.path, controller);
     this.render();
     try {
       const note = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
@@ -21922,9 +21929,9 @@ export class VisualAgentMapView extends ItemView {
       return { status: "failed", reason: errorMessage(error) };
     } finally {
       signal?.removeEventListener("abort", stopWithOwner);
-      if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
-      this.plugin.running.delete(parent.path);
+      this.plugin.topicRuns.releaseTask(parent.path, controller);
       this.plugin.quickExpandPending.delete(parent.path);
+      run.release();
       if (!this.closed) this.render();
     }
   }

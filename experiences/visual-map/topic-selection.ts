@@ -72,6 +72,13 @@ export class TopicSelection {
   private mode = false;
   private relation: string | null = null;
   private tabStop: string | null = null;
+  /** What the AI's last pick was while no selection mode was on; it is still "pure" only while the multi set is exactly that. */
+  private highlight: Set<string> | null = null;
+  private pureHighlight(): string[] {
+    const h = this.highlight;
+    if (this.mode || !h || h.size !== this.multi.size || [...h].some(id => !this.multi.has(id))) return [];
+    return [...h];
+  }
 
   /** A frozen copy: editing it, or its Set, never reaches the module. */
   get state(): SelectionState {
@@ -108,8 +115,11 @@ export class TopicSelection {
   // ---- Cmd/Ctrl click ----
   /** enableDrag Cmd/Ctrl branch (17592-17604). */
   cmdClick(id: string, ctx: SelectionContext): SelectionChange {
+    // The AI's highlight (no mode) is not the user's pick: starting their own selection drops it.
+    const stale = this.pureHighlight();
+    for (const id of stale) this.multi.delete(id);
     const before = this.selected,
-      multi = [...this.multi];
+      multi = [...stale, ...this.multi];
     if (ctx.canMultiSelect && !this.multi.size && before && before !== id) this.multi.add(before);
     if (this.multi.has(id)) this.multi.delete(id);
     else this.multi.add(id);
@@ -149,6 +159,8 @@ export class TopicSelection {
     if (!ctx.canMultiSelect) return NO_CHANGE;
     const hits = new Set(ids);
     if (!hits.size) return NO_CHANGE;
+    const stale = mode !== "subtract" ? this.pureHighlight() : [];
+    for (const id of stale) this.multi.delete(id);
     if (mode === "subtract") {
       const removed = [...hits].filter(id => this.multi.has(id));
       if (!removed.length) return NO_CHANGE;
@@ -158,9 +170,9 @@ export class TopicSelection {
     for (const id of hits) this.multi.add(id);
     if (mode === "enter") {
       this.mode = true;
-      return change(hits, true);
+      return change([...hits, ...stale], true);
     }
-    return this.commit(hits, ctx);
+    return this.commit([...hits, ...stale], ctx);
   }
 
   // ---- clear ----
@@ -226,6 +238,7 @@ export class TopicSelection {
       next = [...ids];
     this.multi = new Set(next);
     this.selected = null;
+    this.highlight = this.mode ? null : new Set(next);
     return change([before, ...multi, ...next], this.mode);
   }
   /** A card's direct subtopics (17015-17017). */

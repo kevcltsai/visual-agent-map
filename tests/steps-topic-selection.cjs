@@ -313,6 +313,18 @@ test('chatSelect: the AI highlight replaces the set and drops selected but never
   assert.equal(inMode.chatSelect(['b']).multiSelectModeChanged, true);
   assert.equal(inMode.state.multiSelectMode, true);
 });
+test('a Cmd-click or marquee after the AI highlight drops the highlight instead of carrying it into selection mode', () => {
+  const s = seeded({ selected: 'p' });
+  s.chatSelect(['b', 'c']);
+  s.setSelected('p');
+  const out = s.cmdClick('y', MAP);
+  assert.ok(out.touched.includes('b') && out.touched.includes('c'), 'the dropped highlight is repainted');
+  assert.deepEqual(st(s).multi.sort(), ['p', 'y']);
+  const m = seeded({});
+  m.chatSelect(['b', 'c']);
+  m.marquee(['y'], 'enter', MAP);
+  assert.deepEqual(st(m).multi, ['y']);
+});
 test('exitMultiSelect backgroundRun keeps the AI highlight when no selection mode is on', () => {
   const s = seeded({ multi: ['b', 'c'] });
   assert.equal(s.exitMultiSelect('backgroundRun').touched.length, 0);

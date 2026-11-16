@@ -223,21 +223,79 @@ const reasonOf = (error: unknown): string =>
   isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_reply" : "failed";
 const STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" } as const;
 
-const IMAGE = /!\[[^\]\n]*\]\(\s*<?((?:[^()\s>]|\([^()\s]*\))+)>?(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\s*\)/g;
+const IMAGE = /!\[([^\]\n]*)\]\(\s*<?((?:[^()\s>]|\([^()\s]*\))+)>?(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\s*\)/g;
+const REF_IMAGE = /!\[([^\]\n]*)\]\[([^\]\n]*)\]|!\[([^\]\n]+)\](?![[(])/g;
+const DEFINITION = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:<([^>\n]*)>|(\S+))[^\n]*$/gm;
+const EMBED = /!\[\[([^\]\n]*)\]\]/g;
+const LOADING_TAG =
+  /<\/?(?:img|picture|source|iframe|video|audio|object|embed|link|script|svg|image|use|input|track|frame|frameset|base|meta|style|body|applet|portal)\b[^>]*>?/gi;
+const LOADING_ATTRIBUTE =
+  /<\/?[a-z][^>]*(?:\burl\s*\(|\b(?:src|srcset|poster|background|data|xlink:href)\s*=|@import)[^>]*>?/gi;
 const frontmatterLength = (content: string): number =>
   /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(content)?.[0].length ?? 0;
-/** The distinct `![](url)` addresses of a note's body (never its frontmatter). */
+const labelOf = (value: string): string => value.trim().replace(/\s+/g, " ").toLowerCase();
+function definitions(body: string): Map<string, string> {
+  const found = new Map<string, string>();
+  for (const m of body.matchAll(DEFINITION)) {
+    const label = labelOf(m[1]);
+    if (!found.has(label)) found.set(label, m[2] ?? m[3] ?? "");
+  }
+  return found;
+}
+/** For a reference image: its definition label (the explicit one, else the alt text). */
+const refLabel = (m: RegExpMatchArray): string => labelOf(m[2] ? m[2] : (m[3] ?? m[1]));
+/** The distinct addresses of a note's body that an image form would load (inline images and the definitions of reference images; never the frontmatter). */
 export function bodyImageUrls(content: string): string[] {
+  const body = content.slice(frontmatterLength(content));
   const urls = new Set<string>();
-  for (const m of content.slice(frontmatterLength(content)).matchAll(IMAGE)) urls.add(m[1]);
+  for (const m of body.matchAll(IMAGE)) urls.add(m[2]);
+  const defs = definitions(body);
+  for (const m of body.matchAll(REF_IMAGE)) {
+    const url = defs.get(refLabel(m));
+    if (url !== undefined) urls.add(url);
+  }
   return [...urls];
 }
-/** Replaces each listed image with its text; the frontmatter and every other image stay as they are. */
+/**
+ * Allow-list pass over a note's body (the frontmatter stays as it is): an inline or reference image stays only when its address
+ * is https and is not in `replacements` (the failed probes); every other form that could load a remote resource (HTML
+ * img/picture/source/iframe/video/audio/object/embed and the like, any tag with src/url(), `![[scheme:...]]`, a form this
+ * does not understand) becomes a plain "no picture" line. Local `![[file]]` embeds stay.
+ */
 export function replaceBodyImages(content: string, replacements: ReadonlyMap<string, string>): string {
   const at = frontmatterLength(content);
-  return (
-    content.slice(0, at) + content.slice(at).replace(IMAGE, (whole, url: string) => replacements.get(url) ?? whole)
+  const body = content.slice(at).replace(/\uE000/g, "");
+  const kept: string[] = [];
+  const keep = (text: string): string => `\uE000${kept.push(text) - 1}\uE000`;
+  const verdict = (url: string): string | undefined =>
+    replacements.get(url) ?? (isHttps(url) ? undefined : `${NO_PICTURE}網址不安全`);
+  const defs = definitions(body);
+  const usedLabels = new Set<string>();
+  let out = body.replace(IMAGE, (whole, alt: string, url: string) => {
+    if (/[<>]/.test(alt)) return whole;
+    return verdict(url) ?? keep(whole);
+  });
+  out = out.replace(REF_IMAGE, (...args) => {
+    const whole = args[0];
+    const m = args.slice(0, 4) as unknown as RegExpMatchArray;
+    const label = refLabel(m);
+    const url = defs.get(label);
+    if (url === undefined || /[<>]/.test(m[1] ?? m[3] ?? "")) return whole;
+    const bad = verdict(url);
+    if (bad) usedLabels.add(label);
+    return bad ?? keep(whole);
+  });
+  out = out.replace(DEFINITION, (line, label: string, angle: string | undefined, bare: string | undefined) => {
+    const bad = verdict(angle ?? bare ?? "");
+    return usedLabels.has(labelOf(label)) && bad ? bad : line;
+  });
+  out = out.replace(EMBED, (whole, target: string) =>
+    /^\s*(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(target) ? `${NO_PICTURE}形式不支援` : keep(whole)
   );
+  out = out.replace(LOADING_TAG, `${NO_PICTURE}形式不支援`).replace(LOADING_ATTRIBUTE, `${NO_PICTURE}形式不支援`);
+  out = out.replace(/!\[/g, `${NO_PICTURE}形式不支援[`);
+  out = out.replace(/\uE000(\d+)\uE000/g, (_, i: string) => kept[Number(i)]);
+  return content.slice(0, at) + out;
 }
 const NO_PICTURE = "無圖：";
 const isHttps = (url: string): boolean => /^https:\/\//i.test(url);
@@ -376,7 +434,17 @@ export class BookPipelineRuns {
       if (error instanceof BookPipelineRunError) refusal = error;
       else if (!this.dead(drive)) {
         drive.fatal = error;
-        this.ports.log(`book-pipeline error run=- card=- step=plan attempt=0 result=${code(reasonOf(error))} ms=0`);
+        this.ports.log(
+          formatPipelineLog({
+            event: "error",
+            runId: "-",
+            card: "-",
+            step: "plan",
+            attempt: 0,
+            result: reasonOf(error),
+            ms: 0
+          })
+        );
       }
     } finally {
       try {
@@ -774,7 +842,7 @@ export class BookPipelineRuns {
       });
       if (!probed.ok) replacements.set(url, `${NO_PICTURE}${escapeMarkdownText(probed.reason, 60) || "載入失敗"}`);
     }
-    if (replacements.size) {
+    if (replaceBodyImages(written.raw, replacements) !== written.raw) {
       const outcome = await this.ports.updateNoteRawGuarded(path, content => replaceBodyImages(content, replacements), {
         expectedContent: written.raw,
         authorize

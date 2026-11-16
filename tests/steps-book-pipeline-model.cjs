@@ -197,6 +197,27 @@ test('budget: another map\'s gate is independent', async () => {
   assert.equal(a.state.used, 300);
 });
 
+test('budget: the pipeline port saves through PipelineStore.commit; concurrent commits and reservations never move used back or drop a raised limit', async () => {
+  const machine = S.load('core/book-pipeline/machine.ts');
+  const saved = [];
+  const store = new machine.PipelineStore(machine.newBookPipeline({ runId: 'r', order: ['a'], now: 'n', budgetLimit: 10 }), async state => { await Promise.resolve(); saved.push([state.budget.used, state.budget.limit]); });
+  const gate = budget.createBudgetAdmission(budget.createStoreBudgetPort(store));
+  const owner = store.commit(data => ({ state: machine.addBudget(data, 5), accepted: true }));
+  const calls = Array.from({ length: 6 }, () => gate.reserve());
+  const attempts = [store.commit(data => machine.beginStep(data, 'global')), store.commit(data => ({ state: machine.addBudget(data, 1), accepted: true })), store.commit(data => machine.beginStep(data, 'global'))];
+  await Promise.all([owner, ...calls, ...attempts]);
+  assert.equal(store.state.budget.used, 6); assert.equal(store.state.budget.limit, 16, 'the raised limit survives the reservations');
+  const useds = saved.map(entry => entry[0]);
+  assert.deepEqual(useds, [...useds].sort((x, y) => x - y), 'saved used never goes down');
+  // a reservation computed from an old budget cannot overwrite a newer one: the port keeps the larger used and the latest limit
+  const port = budget.createStoreBudgetPort(store);
+  await port.persist({ used: 2, limit: 3 });
+  assert.deepEqual(plain(store.state.budget), { used: 6, limit: 16 });
+  store.dispose();
+  await assert.rejects(port.persist({ used: 7, limit: 16 }), /not saved/);
+  assert.equal(store.state.budget.used, 6);
+});
+
 test('reserveBudget is pure', () => {
   const before = { used: 2, limit: 3 };
   assert.deepEqual(plain(model.reserveBudget(before)), { used: 3, limit: 3 });

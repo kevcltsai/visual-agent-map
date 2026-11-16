@@ -22,7 +22,7 @@ function loadWithAiCalls(entry, overrides = {}, globals = {}) {
   ].join('\n');
   const code = buildSync({ stdin: { contents, resolveDir: root, loader: 'ts', sourcefile: 'support-ai-calls-entry.ts' }, external: ['obsidian', 'node:*'] }).outputFiles[0].text;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console: Object.assign(Object.create(console), { debug() {} }), TextDecoder, crypto: crypto.webcrypto, process, AbortController, DOMException, setTimeout, clearTimeout, ...globals });
+  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console: Object.assign(Object.create(console), { debug() {} }), TextDecoder, URL, crypto: crypto.webcrypto, process, AbortController, DOMException, setTimeout, clearTimeout, ...globals });
   return module.exports;
 }
 

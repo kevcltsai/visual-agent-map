@@ -136,6 +136,8 @@ export interface BookPipelineData {
   /** Cards whose stage is stale from an earlier run and must be cleared before anything else (idempotent). */
   pendingReset?: string[];
   budget: PipelineBudget;
+  /** Raised by every owner stop; a step result carries the one it started under (absent = 0). */
+  stopEpoch?: number;
   /** Raised on every committed transition of the whole state. */
   revision: number;
   startedAt: string;
@@ -172,6 +174,7 @@ function problem(raw: unknown): string | undefined {
     return "pendingReset";
   if (!isObject(raw.budget) || !isCount(raw.budget.used) || !isCount(raw.budget.limit) || raw.budget.limit < 1)
     return "budget";
+  if (raw.stopEpoch !== undefined && !isCount(raw.stopEpoch)) return "stopEpoch";
   if (!isCount(raw.revision)) return "revision";
   if (typeof raw.startedAt !== "string" || typeof raw.phaseStartedAt !== "string") return "timestamps";
   return undefined;

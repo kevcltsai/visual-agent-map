@@ -5,7 +5,7 @@
  */
 import { instructionLanguageOf, type ContentLanguage } from "../../i18n";
 import { BOOK_ROLES, BOOK_SETTING_FIELDS, type BookRole, type BookSettings } from "./model";
-import { demoteHeadings, singleLine } from "./text";
+import { demoteHeadings, escapeMarkdownText, singleLine, unescapeMarkdownText } from "./text";
 
 type Words = { zh: string; en: string };
 const pick = (words: Words, language: ContentLanguage): string =>
@@ -53,6 +53,9 @@ const L = {
   materials: { zh: "素材登記表", en: "Material register" }
 } satisfies Record<string, Words>;
 
+/** One safe line of model text for a note: one line, no heading, and no Markdown/Obsidian syntax that could take effect. */
+const safe = (value: unknown, max = 400): string => escapeMarkdownText(singleLine(value, max), max);
+
 const colon = (language: ContentLanguage): string => (instructionLanguageOf(language) === "zh" ? "：" : ": ");
 
 export interface CardPlanText {
@@ -71,17 +74,17 @@ export function composeCardPrompt(plan: CardPlanText, language: ContentLanguage)
   const c = colon(language);
   const neighbour = (label: Words, n: CardPlanText["previous"]): string =>
     n
-      ? `${pick(label, language)}${c}(${n.position}) ${singleLine(n.title, 120)} — ${singleLine(n.summary, 240)}`
+      ? `${pick(label, language)}${c}(${n.position}) ${safe(n.title, 120)} — ${safe(n.summary, 240)}`
       : `${pick(label, language)}${c}${pick(L.none, language)}`;
   const lines = [
     `${pick(L.role, language)}${c}${pick(ROLE_WORDS[plan.role], language)}`,
-    `${pick(L.covers, language)}${c}${singleLine(plan.covers)}`,
-    `${pick(L.entry, language)}${c}${singleLine(plan.entry)}`,
-    `${pick(L.handoff, language)}${c}${singleLine(plan.handoff)}`,
+    `${pick(L.covers, language)}${c}${safe(plan.covers)}`,
+    `${pick(L.entry, language)}${c}${safe(plan.entry)}`,
+    `${pick(L.handoff, language)}${c}${safe(plan.handoff)}`,
     neighbour(L.previous, plan.previous),
     neighbour(L.next, plan.next),
     `${pick(L.checklist, language)}${c.trim()}`,
-    ...plan.checklist.map(item => `- ${item.id} [${pick(TYPE_WORDS[item.type], language)}] ${singleLine(item.text)}`)
+    ...plan.checklist.map(item => `- ${item.id} [${pick(TYPE_WORDS[item.type], language)}] ${safe(item.text)}`)
   ];
   return demoteHeadings(lines.join("\n"));
 }
@@ -94,7 +97,7 @@ export function parseChecklist(prompt: string): ChecklistItem[] {
     const m = CHECK_LINE.exec(line);
     if (!m) continue;
     const type = (Object.keys(TYPE_WORDS) as ChecklistType[]).find(key => matches(TYPE_WORDS[key], m[2].trim()));
-    if (type) items.push({ id: m[1], type, text: m[3] });
+    if (type) items.push({ id: m[1], type, text: unescapeMarkdownText(m[3]) });
   }
   return items;
 }
@@ -109,7 +112,7 @@ export function parseCardPrompt(
     if (!m) continue;
     const label = m[1].trim();
     for (const key of ["role", "covers", "entry", "handoff", "previous", "next"] as const)
-      if (matches(L[key], label) && out[key] === undefined) out[key] = m[2].trim();
+      if (matches(L[key], label) && out[key] === undefined) out[key] = unescapeMarkdownText(m[2].trim());
   }
   return out;
 }
@@ -129,14 +132,14 @@ export interface BookPlanText {
 export function composeBookPlan(plan: BookPlanText, language: ContentLanguage): string {
   const c = colon(language);
   const decisions = BOOK_SETTING_FIELDS.filter(field => plan.decisions[field]?.trim()).map(
-    field => `- ${pick(SETTING_WORDS[field], language)}${c}${singleLine(plan.decisions[field])}`
+    field => `- ${pick(SETTING_WORDS[field], language)}${c}${safe(plan.decisions[field])}`
   );
-  const materials = plan.materials.map(m => `- ${singleLine(m.name, 120)}${c}${singleLine(m.use, 240)}`);
+  const materials = plan.materials.map(m => `- ${safe(m.name, 120)}${c}${safe(m.use, 240)}`);
   return [
     `## ${pick(L.plan, language)}`,
     "",
     `### ${pick(L.thread, language)}`,
-    singleLine(plan.thread, 1200),
+    safe(plan.thread, 1200),
     "",
     `### ${pick(L.decisions, language)}`,
     ...decisions,
@@ -168,7 +171,7 @@ export function parseBookPlanDecisions(markdown: string): BookSettings {
     const m = /^[-*]\s+([^:：]+)[:：]\s*(.+?)\s*$/.exec(line);
     if (!m) continue;
     const field = BOOK_SETTING_FIELDS.find(key => matches(SETTING_WORDS[key], m[1].trim()));
-    if (field && out[field] === undefined) out[field] = m[2];
+    if (field && out[field] === undefined) out[field] = unescapeMarkdownText(m[2]);
   }
   return out;
 }

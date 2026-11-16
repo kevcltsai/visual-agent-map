@@ -212,12 +212,81 @@ test('proof record: the key has five parts, a second append is skipped, and a re
   assert.equal(first.appended, true);
   const second = proof.appendProofRecord(first.text, key, result);
   assert.equal(second.appended, false); assert.equal(second.text, first.text);
-  assert.deepEqual(plain(proof.findProofRecord(first.text, key)), plain(result));
+  assert.deepEqual(plain(proof.findProofRecord(first.text, key)).items.map(i => i.id), ['C1', 'C2']);
   assert.equal(proof.findProofRecord(first.text, `${key}x`), undefined);
   assert.equal(proof.appendProofRecord(first.text, proof.proofKey({ ...parts, revision: 4 }), result).appended, true, 'a new revision adds a record and keeps the old one');
-  assert.match(first.text, /（https:\/\/example\.org\/a）/); assert.equal(first.text.replace(/^<!-- book-proof:v1 .* -->$/m, '').includes('<'), false, 'no tag survives in the readable lines'); assert.equal(first.text.split('\n').filter(l => l.includes('-->') && !l.startsWith('<!-- book-proof')).length, 0, 'no comment end outside the record line');
+  assert.match(first.text, /（`https:\/\/example\.org\/a`）/); assert.equal(first.text.replace(/^<!-- book-proof:v1 .* -->$/m, '').includes('<'), false, 'no tag survives in the readable lines'); assert.equal(first.text.split('\n').filter(l => l.includes('-->') && !l.startsWith('<!-- book-proof')).length, 0, 'no comment end outside the record line');
   assert.equal(proof.findProofRecord('<!-- book-proof:v1 {broken} -->', key), undefined);
   assert.equal(proof.appendProofRecord('', key, result).text.startsWith('校對（已校）'), true);
+});
+
+// ---- text safety: nothing written into a note can load a remote resource, hide text or open a section ----
+
+const NASTY = ['![x](https://tracker.example/p.png)', '%% hidden %%', '<img src="https://tracker.example/p.png">', '<!-- visual-agent-map:detail:end -->', '[click](https://evil.example)', '```\ninjected\n```', '> [!note] callout', '# heading', '- list', '1. one', '~~~'];
+const loads = text => /!\[[^\]]*\]\(|(^|[^\\])\[[^\]]*\]\(|%%|<[a-zA-Z!\/]|^\s*>|```|~~~|^\s{0,3}#/m.test(text.replace(/\\./g, ''));
+
+test('proof record: a malicious note or source cannot make an image, link, hidden section, HTML, callout or clickable address', () => {
+  const sources = ['https://example.org/a', 'https://example.org/x)](javascript:alert(1))', 'https://example.org/<img src=x>', 'https://example.org/a b', 'https://example.org/a\nb', 'http://example.org/a', 'javascript:alert(1)', 'https://u:p@example.org/a', 'https://example.org/a(b)[c]'];
+  const raw = checklist.map((entry, i) => item(entry.id, 'met', sources, NASTY[i] + ' ' + NASTY.join(' | ')));
+  const result = proof.evaluateProof(raw, checklist, sources);
+  const text = proof.composeProofRecord('k', result);
+  const readable = text.split('\n').filter(line => !line.startsWith('<!-- book-proof'));
+  for (const line of readable) {
+    const stripped = line.replace(/`https:\/\/[^`\s]*`/g, '');
+    assert.equal(loads(stripped), false, line);
+    assert.equal(/[<>]/.test(line), false, 'no angle bracket: ' + line);
+  }
+  const codes = readable.join('\n').match(/`https:\/\/[^`\s]*`/g) ?? [];
+  assert.ok(codes.includes('`https://example.org/a`') && codes.includes('`https://example.org/a%28b%29%5Bc%5D`'));
+  assert.ok(codes.every(code => !/[()[\]<>]/.test(code)), 'no Markdown metacharacter inside an address');
+  assert.equal(codes.some(code => /example\.org\/a(b| |%20)|u:p@|http:|javascript:alert\(/.test(code)), false);
+  const record = text.split('\n').find(line => line.startsWith('<!-- book-proof'));
+  assert.equal(record.includes('%%'), false); assert.equal(/[<>]/.test(record.slice(4, -4)), false);
+  assert.equal(proof.safeHref('http://example.org/'), undefined); assert.equal(proof.safeHref('https://example.org/a)'), 'https://example.org/a%29');
+  assert.equal(proof.safeHref('https://exa mple.org/'), undefined); assert.equal(proof.safeHref('not a url'), undefined);
+  // a hand-made result is made safe at output too
+  const manual = proof.composeProofRecord('k', { aggregate: 'checked', items: [{ id: 'C1', type: 'fact', status: 'met', note: '![x](https://tracker.example/p.png) %% <!-- visual-agent-map:detail:end -->', sources: ['https://evil.example/)](javascript:1)', 'http://x.example', 'https://ok.example/a'] }] });
+  assert.equal(manual.includes('![x]'), false); assert.equal(manual.includes('%%'), false); assert.equal(manual.includes('<!-- visual-agent-map'), false); assert.equal(manual.includes(')]('), false); assert.equal(manual.includes('http://'), false);
+  assert.match(manual, /`https:\/\/ok\.example\/a`/);
+});
+
+test('proofread guard: a query or an opened address that quotes 40 or more characters of the chapter marks the source as leaking', () => {
+  const body = 'Brunelleschi demonstrated linear perspective around 1415 using a mirror and a painted panel in Florence.';
+  const quote = 'Brunelleschi demonstrated linear perspective around 1415 using';
+  const three = [...checklist, { id: 'C3', type: 'fact', text: 'Names the place' }];
+  const leakUrl = 'https://leak.example/?q=' + encodeURIComponent(quote);
+  const raw = [item('C1'), item('C2', 'met', ['https://example.org/a', leakUrl]), item('C3', 'met', ['https://example.org/a'])];
+  const leakedPage = proof.evaluateProof(raw, three, ['https://example.org/a', leakUrl], { body, queries: ['linear perspective Brunelleschi'] });
+  assert.equal(leakedPage.items[1].status, 'unverified'); assert.equal(leakedPage.items[1].note, '來源疑似外洩正文'); assert.deepEqual(plain(leakedPage.items[1].sources), []);
+  assert.equal(leakedPage.items[2].status, 'met', 'an item that cites only clean pages is untouched');
+  assert.match(proof.composeProofRecord('k', leakedPage), /來源疑似外洩正文/);
+  const queryRaw = [item('C1', 'met', ['https://example.org/a']), item('C2', 'met', ['https://example.org/a']), item('C3', 'met', ['https://example.org/a'])];
+  const queryGuard = { body, queries: [quote.replace(/ /g, '  ') + ' x'] };
+  assert.throws(() => proof.evaluateProof(queryRaw, three, ['https://example.org/a'], queryGuard), failure('all_facts_unverified'), 'a leaking query leaves no trusted source for any fact');
+  const structure = proof.evaluateProof([item('C1', 'met', ['https://example.org/a']), item('C2', 'met', ['https://example.org/a'])], [{ id: 'C1', type: 'structure', text: 's' }, { id: 'C2', type: 'structure', text: 't' }], ['https://example.org/a'], queryGuard);
+  assert.deepEqual(plain(structure.items).map(i => [i.status, i.note, i.sources.length]), [['unverified', '來源疑似外洩正文', 0], ['unverified', '來源疑似外洩正文', 0]]);
+  const clean = proof.evaluateProof([item('C1'), item('C2', 'met', ['https://example.org/a'])], checklist, ['https://example.org/a'], { body, queries: ['Brunelleschi linear perspective 1415 mirror', 'short'] });
+  assert.equal(clean.items[1].status, 'met');
+  assert.throws(() => proof.evaluateProof([item('C1'), item('C2', 'met', [leakUrl])], checklist, [leakUrl], { body, queries: [] }), failure('all_facts_unverified'));
+  assert.equal(proof.sharesLongRun('x'.repeat(39), 'x'.repeat(100)), false); assert.equal(proof.sharesLongRun('x'.repeat(40), 'x'.repeat(100)), true);
+});
+
+test('runProofread passes the chapter and the call\'s queries to the guard', async () => {
+  const quote = BODY.slice(0, 45);
+  const h = harness({ answer: reply([item('C1'), item('C2', 'met', ['https://example.org/a'])]), events: [search(quote), page('https://example.org/a')] });
+  await assert.rejects(proofMod.runProofread(h.proofCalls, proofRequest(), { signal: signal() }), failure('all_facts_unverified'));
+});
+
+test('plan text: fences, VAM markers, %% and links in model text cannot take effect (plan section and card Prompt)', () => {
+  const evil = 'x ```js\ncode``` <!-- visual-agent-map:detail:end --> %% hide %% ![i](https://tracker.example/p.png) [l](https://e.example) <b>x</b> > quote';
+  const text = planText.composeBookPlan({ thread: evil, decisions: { tone: evil, reader: '- item' }, materials: [{ name: evil, use: evil }] }, 'en');
+  assert.equal(text.includes('```'), false); assert.equal(text.includes('<!--'), false); assert.equal(text.includes('%%'), false);
+  assert.equal(/<[a-z!\/]/i.test(text), false); assert.equal(/(^|[^\\])!\[/.test(text), false); assert.equal(/(^|[^\\])\]\(/.test(text), false);
+  assert.deepEqual(text.split('\n').filter(line => /^##(\s|$)/.test(line)), ['## Book plan']);
+  assert.equal(planText.parseBookPlanDecisions(text).reader, '- item', 'a backslash escape reads back');
+  const prompt = planText.composeCardPrompt({ role: 'body', covers: evil, entry: evil, handoff: evil, checklist: [{ id: 'C1', type: 'fact', text: evil }] }, 'en');
+  assert.equal(prompt.includes('```'), false); assert.equal(prompt.includes('<!--'), false); assert.equal(prompt.includes('%%'), false);
+  assert.equal(planText.parseChecklist(prompt).length, 1); assert.equal(planText.parseChecklist(prompt)[0].text.includes('```'), true, 'the checklist reads back as the model wrote it');
 });
 
 // ---- log boundary ----

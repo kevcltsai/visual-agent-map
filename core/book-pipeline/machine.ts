@@ -47,6 +47,8 @@ export interface StepToken {
   nodeId?: string;
   /** The card's revision when the step started (0 for the whole-book plan). */
   revision: number;
+  /** The run's stop generation when the step started; a stop raises it, so a result from before a stop can never commit after a resume. */
+  stopEpoch: number;
 }
 
 const clone = (data: BookPipelineData): BookPipelineData => JSON.parse(JSON.stringify(data)) as BookPipelineData;
@@ -172,6 +174,7 @@ export function finishRun(data: BookPipelineData, now: string): BookPipelineData
 /** True while a result under `token` may still be committed. */
 export function isCurrent(data: BookPipelineData, token: StepToken): boolean {
   if (data.runId !== token.runId || data.status !== "running") return false;
+  if ((data.stopEpoch ?? 0) !== token.stopEpoch) return false;
   if (token.kind === "global") return !data.globalPlanned;
   if (!token.nodeId || !data.order.includes(token.nodeId)) return false;
   return cardRevision(data, token.nodeId) === token.revision;
@@ -192,7 +195,7 @@ export function beginStep(data: BookPipelineData, kind: PipelineStepKind, nodeId
     if (next.globalPlanned || next.attempts.global >= MAX_STEP_ATTEMPTS) return null;
     next.attempts.global++;
     next.revision++;
-    return { state: next, token: { runId: next.runId, kind, revision: 0 } };
+    return { state: next, token: { runId: next.runId, kind, revision: 0, stopEpoch: next.stopEpoch ?? 0 } };
   }
   if (!nodeId || !next.order.includes(nodeId)) return null;
   const attempts = attemptsOf(next, nodeId);
@@ -200,7 +203,10 @@ export function beginStep(data: BookPipelineData, kind: PipelineStepKind, nodeId
   attempts[kind]++;
   next.attempts[nodeId] = attempts;
   next.revision++;
-  return { state: next, token: { runId: next.runId, kind, nodeId, revision: cardRevision(next, nodeId) } };
+  return {
+    state: next,
+    token: { runId: next.runId, kind, nodeId, revision: cardRevision(next, nodeId), stopEpoch: next.stopEpoch ?? 0 }
+  };
 }
 
 export interface Committed {
@@ -267,6 +273,7 @@ export function stopRun(data: BookPipelineData): BookPipelineData {
   const next = clone(data);
   next.status = "stopped";
   delete next.pauseReason;
+  next.stopEpoch = (next.stopEpoch ?? 0) + 1;
   next.revision++;
   return next;
 }

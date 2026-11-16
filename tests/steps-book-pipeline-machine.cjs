@@ -175,6 +175,27 @@ test('late results are dropped: stale run, stopped run, changed card revision, c
   dropped(machine.applySuccess(machine.applySuccess(machine.beginStep(w.state, 'write', 'b').state, { ...w.token, kind: 'write' }).state, w.token));
 });
 
+test('stop then resume: a result issued before the stop is dropped after the resume, even though the run is running again', () => {
+  const base = succeed(fresh(), 'global');
+  const old = machine.beginStep(base, 'plan', 'a');
+  const stopped = machine.stopRun(old.state);
+  assert.equal(stopped.stopEpoch, 1);
+  const resumed = machine.resumeRun(stopped);
+  assert.equal(resumed.status, 'running');
+  for (const late of [machine.applySuccess(resumed, old.token), machine.applyFailure(resumed, old.token)]) { assert.equal(late.accepted, false); assert.equal(late.state, resumed); }
+  const fresher = machine.beginStep(resumed, 'plan', 'a');
+  assert.equal(fresher.token.stopEpoch, 1);
+  assert.equal(machine.applySuccess(fresher.state, fresher.token).accepted, true, 'the step begun after the resume commits');
+  // stop, resume, stop again, resume: the first result stays dropped
+  const again = machine.resumeRun(machine.stopRun(fresher.state));
+  assert.equal(again.stopEpoch, 2);
+  assert.equal(machine.applySuccess(again, fresher.token).accepted, false);
+  assert.equal(machine.stopRun(machine.stopRun(old.state)).stopEpoch, 1, 'a stop on a stopped run does not count again');
+  assert.equal(model.readBookPipeline({ bookPipeline: plain(stopped) }).kind, 'usable');
+  assert.equal(model.readBookPipeline({ bookPipeline: { ...plain(stopped), stopEpoch: -1 } }).kind, 'unusable');
+  assert.equal(machine.applySuccess(base, { ...machine.beginStep(base, 'plan', 'a').token, stopEpoch: 0 }).accepted, true, 'a saved run without the field counts as 0');
+});
+
 test('reducers never touch their input', () => {
   const state = succeed(fresh(), 'global');
   const frozen = JSON.stringify(state);

@@ -176,12 +176,12 @@ each('N1 new map: opens in one new tab; the current view is not re-pointed and i
   const w = makeWorld({ focusNewTab });
   const { view, calls } = w.makeView('Maps/A/Map.md');
   const chat = new AbortController(), suggest = new AbortController();
-  view.chatController = chat; view.goalSuggestTask = { controller: suggest, state: 'running' };
+  view.chatController = chat; view.goalSuggest.task = { controller: suggest, state: 'running' };
   view.openNewMindMapModal(); await settle();
   assert.deepEqual(w.getLeafCalls, ['tab']);
   assert.deepEqual(calls.openInPlace, [], 'the current view did not open the new map');
   assert.equal(chat.signal.aborted, false); assert.equal(suggest.signal.aborted, false);
-  assert.equal(view.chatController, chat); assert.ok(view.goalSuggestTask);
+  assert.equal(view.chatController, chat); assert.ok(view.goalSuggest.task);
   assert.equal(w.viewStates[0].state.file, 'Maps/Untitled mind map/Map.md');
   assert.equal(w.viewStates[0].active, true);
   assert.equal(w.revealed.length, 1);
@@ -295,7 +295,7 @@ test('N5 hasRunningWork: false when idle, true for each kind of work', () => {
     startingTasks: v => { v.startingTasks.set('k', new AbortController()); },
     startingExpand: v => { v.startingExpand.add('k'); },
     mergeTasks: v => { v.mergeDrafts.tasks.set('k', { controller: new AbortController() }); },
-    goalSuggestTask: v => { v.goalSuggestTask = { controller: new AbortController(), state: 'running' }; },
+    goalSuggest: v => { v.goalSuggest.task = { controller: new AbortController(), state: 'running' }; },
     structureReviewTask: v => { v.structureReviewTask = { controller: new AbortController() }; },
     outlineDraftTask: v => { v.outlineDraftTask = { controller: new AbortController() }; },
     relevanceGrade: v => { v.relevanceRun.started = true; v.plugin.relevanceGrades.set(v.path, { owner: v, status: 'running', controller: new AbortController() }); },

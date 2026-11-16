@@ -11656,10 +11656,10 @@ export class VisualAgentMapView extends ItemView {
     if (this.inlineSummary && !this.map?.nodes.some(node => node.id === this.inlineSummary?.id))
       this.inlineSummary = null;
     this.inlineSummaryInput = null;
-    // The goal bar lives in the header row, outside contentEl: empty() would leave it behind.
-    this.removeGoalBar();
     // The relevance sort lays out with the heights drawn last time; read them before empty() detaches the cards (a detached card is 0 tall).
     for (const [id, card] of this.cardEls) if (card.offsetHeight > 0) this.drawnHeights.set(id, card.offsetHeight);
+    // The goal bar lives in the header row, outside contentEl: empty() would leave it behind.
+    this.removeGoalBar();
     this.contentEl.empty();
     this.contentEl.removeClass?.("is-notes-loading");
     const toolbar = this.contentEl.createDiv("vam-toolbar");

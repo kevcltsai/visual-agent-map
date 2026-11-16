@@ -71157,8 +71157,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     })))
       this.inlineSummary = null;
     this.inlineSummaryInput = null;
-    this.removeGoalBar();
     for (const [id, card] of this.cardEls) if (card.offsetHeight > 0) this.drawnHeights.set(id, card.offsetHeight);
+    this.removeGoalBar();
     this.contentEl.empty();
     (_q = (_p = this.contentEl).removeClass) == null ? void 0 : _q.call(_p, "is-notes-loading");
     const toolbar = this.contentEl.createDiv("vam-toolbar");

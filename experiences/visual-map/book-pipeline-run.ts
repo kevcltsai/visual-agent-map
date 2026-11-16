@@ -67,7 +67,11 @@ import type { MapDocument } from "../../map-model";
 import type { NotePatch } from "../../repository";
 import { isBookStepError, type BookStepBase } from "../../core/steps/book-pipeline/base";
 import { cardPlanStep, type CardPlanRequest, type CardPlanResult } from "../../core/steps/book-pipeline/card-plan";
-import { globalPlanStep, type GlobalPlanRequest, type GlobalPlanResult } from "../../core/steps/book-pipeline/global-plan";
+import {
+  globalPlanStep,
+  type GlobalPlanRequest,
+  type GlobalPlanResult
+} from "../../core/steps/book-pipeline/global-plan";
 import type { ProofreadRequest, ProofreadRun } from "../../core/steps/book-pipeline/proofread";
 import type { StepDefinition } from "../../core/step-runner";
 import { untilAborted } from "./argument-run";
@@ -77,7 +81,17 @@ import { readingOrder } from "./presentation-order";
 export const BOOK_POOL = 5;
 
 export type BookRunRefusal =
-  "busy" | "blocked" | "root" | "exists" | "unusable" | "missing" | "finished" | "budget" | "disposed" | "unreadable" | "not_gate1";
+  | "busy"
+  | "blocked"
+  | "root"
+  | "exists"
+  | "unusable"
+  | "missing"
+  | "finished"
+  | "budget"
+  | "disposed"
+  | "unreadable"
+  | "not_gate1";
 export class BookPipelineRunError extends Error {
   constructor(readonly code: BookRunRefusal) {
     super(`book pipeline refused: ${code}`);
@@ -221,7 +235,9 @@ export function bodyImageUrls(content: string): string[] {
 /** Replaces each listed image with its text; the frontmatter and every other image stay as they are. */
 export function replaceBodyImages(content: string, replacements: ReadonlyMap<string, string>): string {
   const at = frontmatterLength(content);
-  return content.slice(0, at) + content.slice(at).replace(IMAGE, (whole, url: string) => replacements.get(url) ?? whole);
+  return (
+    content.slice(0, at) + content.slice(at).replace(IMAGE, (whole, url: string) => replacements.get(url) ?? whole)
+  );
 }
 const NO_PICTURE = "無圖：";
 const isHttps = (url: string): boolean => /^https:\/\//i.test(url);
@@ -482,7 +498,10 @@ export class BookPipelineRuns {
   }
 
   // ---- one step ----------------------------------------------------------------------------------------------------------------
-  private async step(drive: Drive, action: Extract<PipelineAction, { type: "global_plan" | "card_plan" | "card_write" | "card_proof" }>): Promise<void> {
+  private async step(
+    drive: Drive,
+    action: Extract<PipelineAction, { type: "global_plan" | "card_plan" | "card_write" | "card_proof" }>
+  ): Promise<void> {
     const nodeId = action.type === "global_plan" ? undefined : action.nodeId;
     const kind = action.type === "global_plan" ? "global" : STEP_OF[action.type];
     const key = nodeId ?? "global";
@@ -491,7 +510,9 @@ export class BookPipelineRuns {
     try {
       const begun = await drive.store.commit(state => {
         const dispatched = beginStep(state, kind, nodeId);
-        return dispatched ? { state: dispatched.state, accepted: true, token: dispatched.token } : { state, accepted: false as const, token: undefined };
+        return dispatched
+          ? { state: dispatched.state, accepted: true, token: dispatched.token }
+          : { state, accepted: false as const, token: undefined };
       });
       if (!begun || !begun.accepted || !begun.token) return;
       const token = begun.token;
@@ -512,7 +533,9 @@ export class BookPipelineRuns {
       const ms = Math.max(0, Date.parse(this.ports.now()) - startedAt || 0);
       const report = async (result: string): Promise<void> => {
         const attempt = attemptsOf(drive.store.state, key)[logStep];
-        this.ports.log(formatPipelineLog({ event: "step", runId: token.runId, card: key, step: logStep, attempt, result, ms }));
+        this.ports.log(
+          formatPipelineLog({ event: "step", runId: token.runId, card: key, step: logStep, attempt, result, ms })
+        );
       };
       if (outcome.kind === "ok") {
         const done = await drive.store.commit(state => applySuccess(state, token));
@@ -551,7 +574,8 @@ export class BookPipelineRuns {
 
   private classify(drive: Drive, error: unknown): Outcome {
     if (isBudgetExhausted(error)) return { kind: "budget" };
-    if (drive.controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) return { kind: "cancelled" };
+    if (drive.controller.signal.aborted || (error instanceof Error && error.name === "AbortError"))
+      return { kind: "cancelled" };
     return { kind: "failed", reason: reasonOf(error) };
   }
   private authorize(drive: Drive, token: StepToken): () => boolean {
@@ -618,7 +642,8 @@ export class BookPipelineRuns {
     );
     const path = await this.stillOnMap(drive, drive.rootId);
     if (!path) return { kind: "failed", reason: "card_removed" };
-    if (!(await this.ensureBackup(drive, drive.rootId, path, before.raw))) return { kind: "failed", reason: "backup_failed" };
+    if (!(await this.ensureBackup(drive, drive.rootId, path, before.raw)))
+      return { kind: "failed", reason: "backup_failed" };
     // The section's own heading is added by replaceBookPlanSection; its body (the ### parts) is the composed text after it.
     const section = composeBookPlan(
       { thread: result.thread, decisions: result.decisions, materials: result.materials },
@@ -664,7 +689,14 @@ export class BookPipelineRuns {
       thread: book.thread,
       settings,
       materials: book.materials,
-      card: { id: nodeId, position: index + 1, total: order.length, role: info.role, title: card.title, summary: card.summary },
+      card: {
+        id: nodeId,
+        position: index + 1,
+        total: order.length,
+        role: info.role,
+        title: card.title,
+        summary: card.summary
+      },
       ...(previous ? { previous } : {}),
       ...(next ? { next } : {})
     };
@@ -761,7 +793,13 @@ export class BookPipelineRuns {
     const body = withoutResearchNotes(card.detail);
     if (!checklist.length) return { kind: "failed", reason: "empty_list" };
     if (!body.trim()) return { kind: "failed", reason: "no_body" };
-    const key = proofKey({ runId: token.runId, nodeId, revision: cardRevision(drive.store.state, nodeId), body, checklist });
+    const key = proofKey({
+      runId: token.runId,
+      nodeId,
+      revision: cardRevision(drive.store.state, nodeId),
+      body,
+      checklist
+    });
     let result: ProofResult | undefined = findStoredProof(card.detail, key);
     if (!result) {
       result = await untilAborted(
@@ -794,7 +832,10 @@ export class BookPipelineRuns {
           nodeId,
           verdict.aggregate,
           verdict.aggregate === "needs-review"
-            ? `proof unmet: ${verdict.items.filter(item => item.status === "unmet").map(item => code(item.id)).join(" ")}`
+            ? `proof unmet: ${verdict.items
+                .filter(item => item.status === "unmet")
+                .map(item => code(item.id))
+                .join(" ")}`
             : null
         )
     };
@@ -803,7 +844,13 @@ export class BookPipelineRuns {
   // ---- progress and log --------------------------------------------------------------------------------------------------------
   private progressOf(drive: Drive, active: boolean): BookPipelineProgress {
     const state = drive.store.state;
-    const counts: BookPipelineProgress["counts"] = { pending: 0, planned: 0, written: 0, checked: 0, "needs-review": 0 };
+    const counts: BookPipelineProgress["counts"] = {
+      pending: 0,
+      planned: 0,
+      written: 0,
+      checked: 0,
+      "needs-review": 0
+    };
     for (const id of state.order) counts[drive.stages.get(id) ?? "pending"]++;
     return {
       runId: state.runId,

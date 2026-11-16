@@ -3276,6 +3276,8 @@ export const en = {
   "ui.book_refused_disposed": "The plugin is shutting down.",
   "ui.book_refused_unreadable": "This map's data could not be read. Try again shortly.",
   "ui.book_refused_not_gate1": "The run is not waiting for your confirmation.",
+  "ui.book_refused_not_gate": "The run is not at a checkpoint, so one card cannot be redone now.",
+  "ui.book_refused_instruction": "Write what you want changed on this card first.",
   "ui.book_failed_0": "The picture-book pipeline could not run: {0}",
   "ui.book_bar_label": "Picture-book progress",
   "ui.book_bar_title_0": "Picture book: {0}",

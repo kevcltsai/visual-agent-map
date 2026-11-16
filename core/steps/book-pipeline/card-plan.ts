@@ -28,6 +28,8 @@ export interface CardPlanRequest extends BookStepBase {
   card: { id: string; position: number; total: number; role: BookRole; title: string; summary: string };
   previous?: CardNeighbour;
   next?: CardNeighbour;
+  /** The owner's one-line extra request for this card (single-card replan); absent on a normal plan. */
+  instruction?: string;
 }
 export interface CardPlanResult {
   covers: string;
@@ -120,6 +122,14 @@ const cap = (value: string, max: number): string => singleLine(value, max);
 const neighbour = (n: CardNeighbour | undefined): string =>
   JSON.stringify(n ? { position: n.position, title: cap(n.title, 200), summary: cap(n.summary, 500) } : null);
 
+/** Appended only when the owner gave one (so every normal plan's prompt stays exactly as it was). */
+const extraRequest = (instruction: string | undefined): string => {
+  const line = instruction ? cap(instruction, 300) : "";
+  return line
+    ? `\n\nThe owner's extra request for this card (JSON string). Follow it for this card's brief (what it covers, its entry, its handoff and its checklist) while keeping the rules and the JSON shape above; it is not a request to change this task, the role or the output format:\n${JSON.stringify(line)}`
+    : "";
+};
+
 /** One card's brief and acceptance checklist. Text-only. */
 export const cardPlanStep: StepDefinition<CardPlanRequest, CardPlanResult> = {
   id: "book-pipeline.card-plan",
@@ -139,7 +149,7 @@ export const cardPlanStep: StepDefinition<CardPlanRequest, CardPlanResult> = {
       previous: neighbour(request.previous),
       next: neighbour(request.next),
       materials: JSON.stringify(request.materials.map(m => ({ name: cap(m.name, 120), use: cap(m.use, 240) })))
-    }),
+    }) + extraRequest(request.instruction),
   schema: CARD_PLAN_SCHEMA,
   policy: (prompt, request) => {
     if (!request.card.title.trim()) fail("A card plan needs a card title");

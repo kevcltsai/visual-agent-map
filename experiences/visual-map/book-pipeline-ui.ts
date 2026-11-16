@@ -193,7 +193,9 @@ const REFUSAL_KEY: Record<BookRunRefusal, TranslationKey> = {
   budget: "ui.book_refused_budget",
   disposed: "ui.book_refused_disposed",
   unreadable: "ui.book_refused_unreadable",
-  not_gate1: "ui.book_refused_not_gate1"
+  not_gate1: "ui.book_refused_not_gate1",
+  not_gate: "ui.book_refused_not_gate",
+  instruction: "ui.book_refused_instruction"
 };
 
 /** The message for a rejected entry call: the refusal's own sentence, or the generic one with a short cause. Never throws. */

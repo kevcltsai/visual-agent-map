@@ -29,14 +29,17 @@ import {
   newBookPipeline,
   nextActions,
   recoverInterrupted,
+  resetCard,
   resumeRun,
   retryGlobalPlan,
   stopRun,
   failRun,
   type PipelineAction,
+  type PipelineStepKind,
   type StepToken
 } from "../../core/book-pipeline/machine";
 import {
+  MAX_STEP_ATTEMPTS,
   attemptsOf,
   readBookPipeline,
   type BookPipelineData,
@@ -44,12 +47,14 @@ import {
   type BookSettings,
   type PipelineFields,
   type PipelineFieldsPatch,
+  type PipelinePhase,
   type PipelineStage,
   type PipelineStep
 } from "../../core/book-pipeline/model";
 import {
   appendResearchNote,
   findStoredProof,
+  markOldProofRecords,
   replaceBookPlanSection,
   chapterBody
 } from "../../core/book-pipeline/note-sections";
@@ -100,7 +105,9 @@ export type BookRunRefusal =
   | "budget"
   | "disposed"
   | "unreadable"
-  | "not_gate1";
+  | "not_gate1"
+  | "not_gate"
+  | "instruction";
 export class BookPipelineRunError extends Error {
   constructor(readonly code: BookRunRefusal) {
     super(`book pipeline refused: ${code}`);
@@ -200,7 +207,16 @@ export interface BookPipelineProgress {
   budget: { used: number; limit: number };
   startedAt: string;
   phaseStartedAt: string;
+  /** Cards a step (or a single-card rerun) is working on right now. */
+  busyCards: string[];
+  /** About how many seconds the planning/writing phase has left; only while a drive runs and at least {@link ETA_MIN_CARDS} cards of this phase finished. */
+  etaSeconds?: number;
 }
+/** What a single-card replan returns for the panel (the brief just written). */
+export type CardPlanSummary = Pick<CardPlanResult, "covers" | "entry" | "handoff" | "previous" | "next" | "checklist">;
+/** At least this many finished cards before the estimate is shown. */
+export const ETA_MIN_CARDS = 5;
+type StepResult = "ok" | "failed" | "cancelled" | "budget" | "dropped" | "none";
 
 type Outcome =
   | { kind: "ok"; after?: () => Promise<void> }
@@ -228,6 +244,15 @@ interface Drive {
   busy: Set<string>;
   stopRequested: boolean;
   disposed: boolean;
+  /** Set by a single-card rerun: runs instead of the loop, and a stop or error does not pause the run's phase. */
+  job?: () => Promise<void>;
+  /** The owner's one-line extra request for a card's plan (single-card replan). */
+  extra: Map<string, string>;
+  /** The plan a card's plan step wrote in this drive. */
+  plans: Map<string, CardPlanResult>;
+  /** When each card's first step started in this drive, and the durations (ms) of the cards that finished their phase. */
+  started: Map<string, number>;
+  durations: { plan: number[]; write: number[] };
   fatal?: unknown;
   /** A neutral code of why the run ended by itself (see failRun). */
   failure?: string;
@@ -241,6 +266,9 @@ const reasonOf = (error: unknown): string =>
 const internalCode = (error: unknown): string =>
   `internal_${(typeof (error as { name?: unknown } | null)?.name === "string" ? (error as { name: string }).name : "unknown").replace(/[^A-Za-z0-9_]/g, "_").slice(0, 40)}`;
 const STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" } as const;
+const ACTION_OF = { plan: "card_plan", write: "card_write", proof: "card_proof" } as const;
+const MAX_INSTRUCTION = 300;
+const singleLineText = (value: string, max: number): string => Array.from(value.replace(/\s+/g, " ").trim()).slice(0, max).join("");
 
 const DEFINITION = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:<([^>\n]*)>|(\S+))[^\n]*(?:\n|$)/gm;
 const WIKI_TARGET = /^[^[\]()!<>\r\n\\]+$/;
@@ -543,6 +571,135 @@ export class BookPipelineRuns {
   }
 
   /**
+   * Gate 1 only: rewrites one card's plan from the owner's one-line request ("say more about his manuscript"), with the whole-book
+   * thread and the neighbours' summaries as for every plan. Only this card's brief (`## Prompt`) and summary change; the cards on
+   * both sides are marked as seams to check. Resolves with the new brief, or with the reason it was not replanned (the card keeps
+   * its old brief unless the plan step itself marked it needs-review after three failed attempts).
+   */
+  async replanCard(
+    mapPath: string,
+    nodeId: string,
+    instruction: string
+  ): Promise<{ plan?: CardPlanSummary; reason?: string }> {
+    const line = singleLineText(instruction, MAX_INSTRUCTION);
+    if (!line) throw new BookPipelineRunError("instruction");
+    let result: { plan?: CardPlanSummary; reason?: string } = {};
+    await this.cardJob(mapPath, nodeId, ["gate1"], "not_gate1", () => ["plan"], line, drive => {
+      const plan = drive.plans.get(nodeId);
+      result = plan
+        ? { plan: { covers: plan.covers, entry: plan.entry, handoff: plan.handoff, previous: plan.previous, next: plan.next, checklist: plan.checklist } }
+        : { reason: drive.reasons.get(nodeId) ?? (drive.store.state.pauseReason === "budget" ? "budget" : "cancelled") };
+    });
+    return result;
+  }
+
+  /**
+   * One card again. Gate 1: the plan only. Gate 2 or done: plan, author, proofread with the usual per-step retries, fence, backup and
+   * budget rules; the card gets a new revision (so a new proof record; older records stay, marked old). The cards on both sides are
+   * not touched except for the seam mark. The run's phase does not change, and it cannot run beside another drive of the map.
+   */
+  async rerunCard(mapPath: string, nodeId: string): Promise<void> {
+    return this.cardJob(mapPath, nodeId, ["gate1", "gate2", "done"], "not_gate", phase =>
+      phase === "gate1" ? ["plan"] : ["plan", "write", "proof"]
+    );
+  }
+
+  /** The owner's "seam checked": the only thing that clears `pipeline-seam` (a proofread or any automatic step never does). */
+  async confirmSeam(mapPath: string, nodeId: string): Promise<void> {
+    return this.enter(mapPath, async drive => {
+      const map = await this.ports.readMap(mapPath);
+      const read = readBookPipeline(map);
+      if (read.kind === "absent") throw new BookPipelineRunError("missing");
+      if (read.kind === "unusable") throw new BookPipelineRunError("unusable");
+      const node = map.nodes.find(item => item.id === nodeId);
+      if (!node || !read.data.order.includes(nodeId)) throw new BookPipelineRunError("missing");
+      if (this.dead(drive)) throw new BookPipelineRunError("disposed");
+      const card = await this.ports.readCard(node.path).catch(() => undefined);
+      if (!card) throw new BookPipelineRunError("unreadable");
+      if (card.fields.pipelineSeam === undefined) return;
+      await this.ports.writePipelineFields(node.path, { pipelineSeam: null });
+      this.ports.log(
+        formatPipelineLog({ event: "seam_confirmed", runId: read.data.runId, card: nodeId, step: "proof", attempt: 0, result: "ok", ms: 0 })
+      );
+    });
+  }
+
+  private cardJob(
+    mapPath: string,
+    nodeId: string,
+    phases: readonly PipelinePhase[],
+    refusal: BookRunRefusal,
+    steps: (phase: PipelinePhase) => PipelineStep[],
+    extra?: string,
+    finish?: (drive: Drive) => void
+  ): Promise<void> {
+    return this.enter(mapPath, async drive => {
+      const data = await this.openSaved(drive, mapPath, { allowDone: true });
+      if (!data.order.includes(nodeId)) throw new BookPipelineRunError("missing");
+      if (!phases.includes(data.phase)) throw new BookPipelineRunError(refusal);
+      let refused = false;
+      await drive.store.commit(state => {
+        const next = resumeRun(state);
+        refused = next === null;
+        return { state: next ?? state, accepted: true };
+      });
+      if (refused) throw new BookPipelineRunError("budget");
+      if (extra) drive.extra.set(nodeId, extra);
+      const kinds = steps(data.phase);
+      drive.job = async () => {
+        await this.runCardJob(drive, nodeId, kinds);
+        finish?.(drive);
+      };
+      this.log(drive, "rerun", nodeId, kinds[0], kinds.length === 1 ? "plan_only" : "full");
+    });
+  }
+
+  /** Runs the given steps of one card in order, each with its own attempts (the third failure marks the card needs-review). */
+  private async runCardJob(drive: Drive, nodeId: string, kinds: readonly PipelineStep[]): Promise<void> {
+    drive.busy.add(nodeId);
+    let base = 0;
+    try {
+      await drive.store.commit(state => ({ state: resetCard(state, nodeId), accepted: true }));
+      base = cardRevision(drive.store.state, nodeId);
+      for (const kind of kinds) {
+        for (;;) {
+          if (this.dead(drive) || drive.controller.signal.aborted || drive.fatal !== undefined) return;
+          if (drive.store.state.status !== "running") return;
+          if (attemptsOf(drive.store.state, nodeId)[kind] >= MAX_STEP_ATTEMPTS) {
+            await this.markReview(drive, nodeId, kind, drive.reasons.get(nodeId) ?? "failed");
+            return;
+          }
+          const action = { type: ACTION_OF[kind], nodeId } as const;
+          const done = await this.step(drive, action);
+          if (done === "ok") break;
+          if (done !== "failed") return;
+          // The third failure already marked the card (see step): nothing more to do for it.
+          if (drive.stages.get(nodeId) === "needs-review") return;
+        }
+      }
+    } finally {
+      drive.busy.delete(nodeId);
+      // Whatever changed this card's plan or text (even a rerun that stopped half way) makes its neighbours' joins worth a look.
+      const revision = cardRevision(drive.store.state, nodeId);
+      if (!this.dead(drive) && revision > base) await this.markSeams(drive, nodeId, revision);
+    }
+  }
+
+  private async markSeams(drive: Drive, nodeId: string, revision: number): Promise<void> {
+    const order = drive.store.state.order;
+    const at = order.indexOf(nodeId);
+    const zh = /^zh/i.test(drive.config.language);
+    for (const other of [order[at - 1], order[at + 1]]) {
+      if (!other || !drive.cards.has(other)) continue;
+      await this.writeFields(drive, other, {
+        pipelineSeam: zh
+          ? `鄰卡企劃或正文已變更，尚未人工核對（第 ${at + 1} 張，版本 ${revision}）`
+          : `Neighbouring card's plan or text changed; not yet checked by a person (card ${at + 1}, revision ${revision})`
+      });
+    }
+  }
+
+  /**
    * Aborts every call and pauses the run (resumable). Resolves when the drive is over. With no drive, `saved` (the owner's Stop
    * button) writes the stop into the saved state, so a budget pause or a state left "running" ends as a plain stop; refusals
    * (no run, finished, unreadable) leave the file as it is.
@@ -590,6 +747,10 @@ export class BookPipelineRuns {
       backedUp: new Set(),
       reasons: new Map(),
       busy: new Set(),
+      extra: new Map(),
+      plans: new Map(),
+      started: new Map(),
+      durations: { plan: [], write: [] },
       stopRequested: false,
       disposed: false,
       rootId: "",
@@ -603,7 +764,7 @@ export class BookPipelineRuns {
     let refusal: BookPipelineRunError | undefined;
     try {
       await setup(drive);
-      if (drive.store && !this.dead(drive) && !drive.stopRequested) await this.loop(drive);
+      if (drive.store && !this.dead(drive) && !drive.stopRequested) await (drive.job ? drive.job() : this.loop(drive));
     } catch (error) {
       if (error instanceof BookPipelineRunError) refusal = error;
       else if (!this.dead(drive)) {
@@ -624,7 +785,7 @@ export class BookPipelineRuns {
     } finally {
       try {
         // A stop (or an unexpected error) is the run's last write: status "stopped", resumable. Never after dispose.
-        if (drive.store && !this.dead(drive)) {
+        if (drive.store && !this.dead(drive) && !drive.job) {
           // The owner's stop stays a plain stop; a run that ended by itself (whole-book plan failed, unexpected error) keeps its code.
           const code = drive.failure ?? (drive.fatal !== undefined ? "failed" : undefined);
           if (drive.stopRequested)
@@ -662,13 +823,23 @@ export class BookPipelineRuns {
     });
   }
   /** Reads the saved state of a map for resume and gate confirmation, and loads the cards. */
-  private async openSaved(drive: Drive, mapPath: string): Promise<BookPipelineData> {
+  private async openSaved(
+    drive: Drive,
+    mapPath: string,
+    options: { allowDone?: boolean } = {}
+  ): Promise<BookPipelineData> {
     if (this.ports.blocked(mapPath)) throw new BookPipelineRunError("blocked");
     const map = await this.ports.readMap(mapPath);
     const read = readBookPipeline(map);
     if (read.kind === "absent") throw new BookPipelineRunError("missing");
     if (read.kind === "unusable") throw new BookPipelineRunError("unusable");
-    if (read.data.phase === "done") throw new BookPipelineRunError("finished");
+    // A finished run is closed, except for a single-card rerun and for the budget pause such a rerun can end in.
+    if (
+      read.data.phase === "done" &&
+      !options.allowDone &&
+      !(read.data.status === "stopped" && read.data.pauseReason === "budget")
+    )
+      throw new BookPipelineRunError("finished");
     await this.load(drive, map, read.data.order);
     if (this.dead(drive)) throw new BookPipelineRunError("disposed");
     this.attachStore(drive, read.data);
@@ -733,7 +904,7 @@ export class BookPipelineRuns {
           started++;
           inflight.set(
             key,
-            this.step(drive, action).finally(() => {
+            this.step(drive, action).then(() => undefined).finally(() => {
               drive.busy.delete(key);
               inflight.delete(key);
             })
@@ -751,12 +922,13 @@ export class BookPipelineRuns {
   private async step(
     drive: Drive,
     action: Extract<PipelineAction, { type: "global_plan" | "card_plan" | "card_write" | "card_proof" }>
-  ): Promise<void> {
+  ): Promise<StepResult> {
     const nodeId = action.type === "global_plan" ? undefined : action.nodeId;
     const kind = action.type === "global_plan" ? "global" : STEP_OF[action.type];
     const key = nodeId ?? "global";
     const logStep: PipelineStep = kind === "global" ? "plan" : kind;
     const startedAt = Date.parse(this.ports.now());
+    if (nodeId && !drive.started.has(nodeId)) drive.started.set(nodeId, startedAt);
     try {
       const begun = await drive.store.commit(state => {
         const dispatched = beginStep(state, kind, nodeId);
@@ -764,7 +936,7 @@ export class BookPipelineRuns {
           ? { state: dispatched.state, accepted: true, token: dispatched.token }
           : { state, accepted: false as const, token: undefined };
       });
-      if (!begun || !begun.accepted || !begun.token) return;
+      if (!begun || !begun.accepted || !begun.token) return "none";
       const token = begun.token;
       let outcome: Outcome;
       try {
@@ -779,7 +951,7 @@ export class BookPipelineRuns {
       } catch (error) {
         outcome = this.classify(drive, error);
       }
-      if (this.dead(drive)) return;
+      if (this.dead(drive)) return "none";
       const ms = Math.max(0, Date.parse(this.ports.now()) - startedAt || 0);
       const report = async (result: string): Promise<void> => {
         const attempt = attemptsOf(drive.store.state, key)[logStep];
@@ -789,33 +961,38 @@ export class BookPipelineRuns {
       };
       if (outcome.kind === "ok") {
         const done = await drive.store.commit(state => applySuccess(state, token));
-        if (!done) return;
+        if (!done) return "none";
         if (!done.accepted) {
           await drive.store.commit(state => applyCancelled(state, token));
           await report("dropped");
-          return;
+          return "dropped";
         }
         await outcome.after?.();
+        this.recordDuration(drive, kind, nodeId, Date.parse(this.ports.now()), drive.store.state.phase);
         await report("ok");
+        return "ok";
       } else if (outcome.kind === "cancelled") {
         await drive.store.commit(state => applyCancelled(state, token));
         await report("cancelled");
+        return "cancelled";
       } else if (outcome.kind === "budget") {
         await drive.store.commit(state => applyBudgetExhausted(state, token));
         drive.controller.abort();
         await report("budget");
+        return "budget";
       } else {
         const failed = await drive.store.commit(state => applyFailure(state, token));
-        if (!failed) return;
+        if (!failed) return "none";
         if (!failed.accepted) {
           await drive.store.commit(state => applyCancelled(state, token));
           await report("dropped");
-          return;
+          return "dropped";
         }
         drive.reasons.set(key, outcome.reason);
         if (nodeId && kind !== "global" && (failed.needsReview || outcome.forceReview))
           await this.markReview(drive, nodeId, kind, outcome.reason);
         await report(`failed:${code(outcome.reason)}`);
+        return "failed";
       }
     } catch (error) {
       if (!this.dead(drive)) {
@@ -834,6 +1011,23 @@ export class BookPipelineRuns {
         );
       }
     }
+    return "none";
+  }
+
+  /** A card that finished its phase's last step (planned in planning, proofread in writing) adds its wall time to the estimate. */
+  private recordDuration(
+    drive: Drive,
+    kind: PipelineStepKind,
+    nodeId: string | undefined,
+    now: number,
+    phase: BookPipelineData["phase"]
+  ): void {
+    const begun = nodeId ? drive.started.get(nodeId) : undefined;
+    if (begun === undefined || !nodeId) return;
+    const list = phase === "planning" && kind === "plan" ? drive.durations.plan : phase === "writing" && kind === "proof" ? drive.durations.write : undefined;
+    if (!list) return;
+    list.push(Math.max(0, now - begun));
+    drive.started.delete(nodeId);
   }
 
   private classify(drive: Drive, error: unknown): Outcome {
@@ -962,7 +1156,8 @@ export class BookPipelineRuns {
         summary: card.summary
       },
       ...(previous ? { previous } : {}),
-      ...(next ? { next } : {})
+      ...(next ? { next } : {}),
+      ...(drive.extra.has(nodeId) ? { instruction: drive.extra.get(nodeId) } : {})
     };
     const result: CardPlanResult = await untilAborted(
       signal,
@@ -1007,6 +1202,7 @@ export class BookPipelineRuns {
       { expectedContent: card.raw, authorize: this.authorize(drive, token) }
     );
     if (written === "discarded") return { kind: "failed", reason: "discarded" };
+    drive.plans.set(nodeId, result);
     return { kind: "ok", after: () => this.setStage(drive, nodeId, "planned", null) };
   }
 
@@ -1147,7 +1343,8 @@ export class BookPipelineRuns {
               token,
               nodeId,
               card,
-              composeProofRecord(failedProofKey(key), error.partial, error.code)
+              composeProofRecord(failedProofKey(key), error.partial, error.code),
+              key
             );
           throw error;
         });
@@ -1161,7 +1358,7 @@ export class BookPipelineRuns {
       if (added.appended) {
         const written = await this.ports.updateNoteGuarded(
           path,
-          { detail: added.text },
+          { detail: markOldProofRecords(added.text, key) },
           { expectedContent: card.raw, authorize: this.authorize(drive, token) }
         );
         if (written === "discarded") return { kind: "failed", reason: "discarded" };
@@ -1180,10 +1377,12 @@ export class BookPipelineRuns {
           nodeId,
           verdict.aggregate,
           verdict.aggregate === "needs-review"
-            ? `proof unmet: ${verdict.items
-                .filter(item => item.type === "fact" && item.status === "unmet")
-                .map(item => code(item.id))
-                .join(" ")}`
+            ? verdict.factsUnverified
+              ? "proof unmet: facts_unverified"
+              : `proof unmet: ${verdict.items
+                  .filter(item => item.type === "fact" && item.status === "unmet")
+                  .map(item => code(item.id))
+                  .join(" ")}`
             : structureUnmet.length
               ? `structure unmet: ${structureUnmet.join(" ")}`
               : null
@@ -1197,7 +1396,8 @@ export class BookPipelineRuns {
     token: StepToken,
     nodeId: string,
     card: { raw: string; detail: string },
-    record: string
+    record: string,
+    key: string
   ): Promise<void> {
     try {
       const path = await this.stillOnMap(drive, nodeId);
@@ -1206,7 +1406,7 @@ export class BookPipelineRuns {
       if (added.appended)
         await this.ports.updateNoteGuarded(
           path,
-          { detail: added.text },
+          { detail: markOldProofRecords(added.text, key) },
           { expectedContent: card.raw, authorize: this.authorize(drive, token) }
         );
     } catch {
@@ -1225,6 +1425,7 @@ export class BookPipelineRuns {
       "needs-review": 0
     };
     for (const id of state.order) counts[drive.stages.get(id) ?? "pending"]++;
+    const eta = this.etaOf(drive, active);
     return {
       runId: state.runId,
       phase: state.phase,
@@ -1236,8 +1437,25 @@ export class BookPipelineRuns {
       counts,
       budget: { ...state.budget },
       startedAt: state.startedAt,
-      phaseStartedAt: state.phaseStartedAt
+      phaseStartedAt: state.phaseStartedAt,
+      busyCards: [...drive.busy].filter(id => id !== "global"),
+      ...(eta === undefined ? {} : { etaSeconds: eta })
     };
+  }
+  /** Average wall time of the cards that finished this phase in this drive × cards left ÷ pool; undefined below {@link ETA_MIN_CARDS} finished cards. */
+  private etaOf(drive: Drive, active: boolean): number | undefined {
+    const state = drive.store.state;
+    if (!active || state.status !== "running") return undefined;
+    const planning = state.phase === "planning";
+    if (!planning && state.phase !== "writing") return undefined;
+    const list = planning ? drive.durations.plan : drive.durations.write;
+    if (list.length < ETA_MIN_CARDS) return undefined;
+    const left = state.order.filter(id => {
+      const stage = drive.stages.get(id);
+      return planning ? stage === undefined : stage !== "checked" && stage !== "needs-review";
+    }).length;
+    const average = list.reduce((sum, ms) => sum + ms, 0) / list.length;
+    return Math.max(0, Math.round((average * left) / BOOK_POOL / 1000));
   }
   /** One line per proofread call: the numbers only (the call has no content log, so this is the trace of what it did). */
   private logProofCounts(drive: Drive, runId: string, nodeId: string, counts: ProofCounts, result: string): void {

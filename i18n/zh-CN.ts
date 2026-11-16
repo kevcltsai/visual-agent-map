@@ -3060,6 +3060,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_refused_disposed": "插件正在关闭，无法执行。",
   "ui.book_refused_unreadable": "读不到这张地图的数据，请稍后再试。",
   "ui.book_refused_not_gate1": "当前不在“等你确认”阶段，不需要确认。",
+  "ui.book_refused_not_gate": "当前不在关卡上，现在不能单独重跑一张卡。",
+  "ui.book_refused_instruction": "请先写下这张卡要怎么改。",
   "ui.book_failed_0": "图文书流水线无法执行：{0}",
   "ui.book_bar_label": "图文书进度",
   "ui.book_bar_title_0": "图文书：{0}",

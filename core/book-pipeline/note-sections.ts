@@ -114,6 +114,40 @@ export function appendResearchNote(detail: string, record: string): { text: stri
   return { text: `${head}${glue}${addition}${rest}`, appended: true };
 }
 
+const OLD_MARK = "（舊版）";
+const PROOF_HEADER = /^(?:（舊版）)?校對(?:失敗)?（/;
+/**
+ * Marks every stored proof record whose key is not `currentKey` (or its `:failed` partial) as an old version: its readable first
+ * line gets a "（舊版）" prefix; the records themselves stay (nothing is deleted, the machine line is untouched). A text with
+ * nothing to mark is returned as it is, so a first run (every record current) changes no byte.
+ */
+export function markOldProofRecords(detail: string, currentKey: string): string {
+  const lines = detail.split("\n");
+  let changed = false;
+  for (let i = 0; i < lines.length; i++) {
+    const m = RECORD_KEY.exec(unquoted(lines[i]).trim());
+    if (!m) continue;
+    let key: unknown;
+    try {
+      key = (JSON.parse(m[1]) as { key?: unknown }).key;
+    } catch {
+      continue;
+    }
+    if (typeof key !== "string" || key === currentKey || key === `${currentKey}:failed`) continue;
+    for (let j = i - 1; j >= 0; j--) {
+      const plain = unquoted(lines[j]);
+      if (RECORD_KEY.test(plain.trim())) break;
+      if (!PROOF_HEADER.test(plain.trim())) continue;
+      if (!plain.trim().startsWith(OLD_MARK)) {
+        lines[j] = lines[j].replace(/^([ \t]{0,3}>[ \t]?)?/, prefix => `${prefix}${OLD_MARK}`);
+        changed = true;
+      }
+      break;
+    }
+  }
+  return changed ? lines.join("\n") : detail;
+}
+
 /** The stored proof result for `key` in a Detail's Research notes (read through the `> ` quote prefix), or undefined. */
 export function findStoredProof(detail: string, key: string): ReturnType<typeof findProofRecord> {
   return findProofRecord(unquoted(detail), key);

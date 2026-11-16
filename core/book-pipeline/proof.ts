@@ -29,6 +29,11 @@ export interface ProofResult {
   items: ProofItemResult[];
   /** `needs-review` when a fact item is unmet (a source contradicts the list); otherwise `checked`. Unmet structure items and unverified items are recorded, not blocking. */
   aggregate: "checked" | "needs-review";
+  /**
+   * True when pages were opened but every fact item stayed "unverified": retrying cannot help, so the judged items are kept,
+   * the card is `needs-review` and its note says "facts unverified" (a call that opened no page is still a failure, `no_open_page`).
+   */
+  factsUnverified?: boolean;
   /** What the call did, as numbers only (no query or address): successful page opens and completed searches. */
   counts?: ProofCounts;
 }
@@ -44,6 +49,7 @@ export type ProofFailureCode =
   | "duplicate_item"
   | "unknown_item"
   | "no_open_page"
+  /** No longer thrown (a result with `factsUnverified` is returned instead); kept so old log lines and the reason map stay readable. */
   | "all_facts_unverified";
 /** A whole-card failure (retry, three times, then needs-review). The message is the code only. */
 export class ProofFailure extends Error {
@@ -194,7 +200,7 @@ export function evaluateProof(
   const partial: ProofResult = { items, aggregate: "needs-review" };
   if (noPage) throw new ProofFailure("no_open_page", partial);
   if (facts.length && facts.every(item => item.status === "unverified"))
-    throw new ProofFailure("all_facts_unverified", partial);
+    return { items, aggregate: "needs-review", factsUnverified: true };
   return result;
 }
 
@@ -228,6 +234,7 @@ export function composeProofRecord(key: string, result: ProofResult, failure?: P
   // Re-checked here too: whatever the result holds, the note only ever gets escaped text and inline-code https addresses.
   const clean: ProofResult = {
     aggregate: result.aggregate,
+    ...(result.factsUnverified ? { factsUnverified: true } : {}),
     items: result.items.map(item => ({
       id: escapeMarkdownText(item.id, 20),
       type: item.type,
@@ -242,7 +249,7 @@ export function composeProofRecord(key: string, result: ProofResult, failure?: P
   const lines = [
     (failure
       ? `校對失敗（原因：${failure}；以下是已判斷的結果，仍需人看）`
-      : `校對（${clean.aggregate === "checked" ? "已校" : "需人看"}）`) +
+      : `校對（${clean.aggregate === "checked" ? "已校" : clean.factsUnverified ? "需人看；事實項目皆待查" : "需人看"}）`) +
       (clean.counts ? ` 開頁 ${clean.counts.openedPages} 次、搜尋 ${clean.counts.searches} 次` : "")
   ];
   for (const item of clean.items)

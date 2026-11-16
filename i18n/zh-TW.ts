@@ -3061,6 +3061,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_refused_disposed": "外掛正在關閉，無法執行。",
   "ui.book_refused_unreadable": "讀不到這張心智圖的資料，請稍後再試。",
   "ui.book_refused_not_gate1": "目前不在「等你確認」階段，不需要確認。",
+  "ui.book_refused_not_gate": "目前不在關卡上，現在不能單獨重跑一張卡。",
+  "ui.book_refused_instruction": "請先寫下這張卡要怎麼改。",
   "ui.book_failed_0": "圖文書流水線無法執行：{0}",
   "ui.book_bar_label": "圖文書進度",
   "ui.book_bar_title_0": "圖文書：{0}",

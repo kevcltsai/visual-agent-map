@@ -10,6 +10,7 @@
  */
 import {
   DEFAULT_BUDGET_LIMIT,
+  FAILURE_CODE,
   MAX_STEP_ATTEMPTS,
   attemptsOf,
   emptyAttempts,
@@ -263,6 +264,7 @@ export function applyBudgetExhausted(data: BookPipelineData, token: StepToken): 
   const next = clone(refunded.accepted ? refunded.state : data);
   next.status = "stopped";
   next.pauseReason = "budget";
+  delete next.failureCode;
   next.revision++;
   return { state: next, accepted: true };
 }
@@ -273,6 +275,18 @@ export function stopRun(data: BookPipelineData): BookPipelineData {
   const next = clone(data);
   next.status = "stopped";
   delete next.pauseReason;
+  delete next.failureCode;
+  next.stopEpoch = (next.stopEpoch ?? 0) + 1;
+  next.revision++;
+  return next;
+}
+
+/** The run stopped by itself (the whole-book plan failed three times, or an unexpected error): resumable, with a neutral code the bar shows. */
+export function failRun(data: BookPipelineData, code: string): BookPipelineData {
+  const next = clone(data);
+  next.status = "stopped";
+  next.pauseReason = "failed";
+  next.failureCode = FAILURE_CODE.test(code) ? code : "failed";
   next.stopEpoch = (next.stopEpoch ?? 0) + 1;
   next.revision++;
   return next;
@@ -288,6 +302,7 @@ export function resumeRun(data: BookPipelineData): BookPipelineData | null {
   const next = clone(data);
   next.status = "running";
   delete next.pauseReason;
+  delete next.failureCode;
   next.revision++;
   return next;
 }

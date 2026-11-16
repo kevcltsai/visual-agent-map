@@ -1,6 +1,6 @@
 import type { AdmissionContext } from "../../admission";
 import type { AiCalls } from "../../ai-calls";
-import { openedUrlsFromEvents } from "../../argument-map/source-proof";
+import { openedUrlsFromEvents, searchEventCount } from "../../argument-map/source-proof";
 import type { ChecklistItem } from "../../book-pipeline/plan-text";
 import {
   evaluateProof,
@@ -140,6 +140,17 @@ export async function runProofread(
         }
       }
     },
-    raw => evaluateProof(prepared.parse(raw), request.checklist, openedUrlsFromEvents(events), { body: request.body })
+    raw => {
+      const opened = openedUrlsFromEvents(events);
+      const counts = { openedPages: opened.length, searches: searchEventCount(events) };
+      try {
+        return { ...evaluateProof(prepared.parse(raw), request.checklist, opened, { body: request.body }), counts };
+      } catch (error) {
+        // The counts travel with a failure too: they are the only trace of what a no-content-log call did.
+        if (isProofFailure(error))
+          throw new ProofFailure(error.code, error.partial && { ...error.partial, counts }, counts);
+        throw error;
+      }
+    }
   );
 }

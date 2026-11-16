@@ -30,7 +30,9 @@ import {
   nextActions,
   recoverInterrupted,
   resumeRun,
+  retryGlobalPlan,
   stopRun,
+  failRun,
   type PipelineAction,
   type StepToken
 } from "../../core/book-pipeline/machine";
@@ -63,6 +65,7 @@ import {
   failedProofKey,
   isProofFailure,
   proofKey,
+  type ProofCounts,
   type ProofResult
 } from "../../core/book-pipeline/proof";
 import { effectiveSettings } from "../../core/book-pipeline/settings";
@@ -187,7 +190,8 @@ export interface BookPipelineProgress {
   runId: string;
   phase: BookPipelineData["phase"];
   status: BookPipelineData["status"];
-  pauseReason?: "budget";
+  pauseReason?: "budget" | "failed";
+  failureCode?: string;
   /** True while a drive is executing steps. */
   active: boolean;
   total: number;
@@ -225,12 +229,17 @@ interface Drive {
   stopRequested: boolean;
   disposed: boolean;
   fatal?: unknown;
+  /** A neutral code of why the run ended by itself (see failRun). */
+  failure?: string;
   done: Promise<void>;
 }
 
 const code = (value: string): string => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60) || "failed";
 const reasonOf = (error: unknown): string =>
   isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_reply" : "failed";
+/** An unexpected error's code: only its class name, never its message (which could carry a path or a title). */
+const internalCode = (error: unknown): string =>
+  `internal_${(typeof (error as { name?: unknown } | null)?.name === "string" ? (error as { name: string }).name : "unknown").replace(/[^A-Za-z0-9_]/g, "_").slice(0, 40)}`;
 const STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" } as const;
 
 const DEFINITION = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:<([^>\n]*)>|(\S+))[^\n]*(?:\n|$)/gm;
@@ -503,7 +512,7 @@ export class BookPipelineRuns {
       const extra = options.addBudget ?? 0;
       let refused = false;
       await drive.store.commit(state => {
-        let next = recoverInterrupted(state);
+        let next = retryGlobalPlan(recoverInterrupted(state));
         if (extra) next = addBudget(next, extra);
         const resumed = resumeRun(next);
         refused = resumed === null;
@@ -595,14 +604,15 @@ export class BookPipelineRuns {
       if (error instanceof BookPipelineRunError) refusal = error;
       else if (!this.dead(drive)) {
         drive.fatal = error;
+        drive.failure = internalCode(error);
         this.ports.log(
           formatPipelineLog({
             event: "error",
-            runId: "-",
+            runId: drive.store?.state.runId ?? "-",
             card: "-",
             step: "plan",
             attempt: 0,
-            result: reasonOf(error),
+            result: drive.failure,
             ms: 0
           })
         );
@@ -610,8 +620,14 @@ export class BookPipelineRuns {
     } finally {
       try {
         // A stop (or an unexpected error) is the run's last write: status "stopped", resumable. Never after dispose.
-        if (drive.store && !this.dead(drive) && (drive.stopRequested || drive.fatal !== undefined))
-          await drive.store.commit(state => ({ state: stopRun(state), accepted: true })).catch(() => undefined);
+        if (drive.store && !this.dead(drive)) {
+          // The owner's stop stays a plain stop; a run that ended by itself (whole-book plan failed, unexpected error) keeps its code.
+          const code = drive.failure ?? (drive.fatal !== undefined ? "failed" : undefined);
+          if (drive.stopRequested)
+            await drive.store.commit(state => ({ state: stopRun(state), accepted: true })).catch(() => undefined);
+          else if (code !== undefined)
+            await drive.store.commit(state => ({ state: failRun(state, code), accepted: true })).catch(() => undefined);
+        }
         if (drive.store) {
           this.last.set(drive.mapPath, this.progressOf(drive, false));
           drive.store.dispose();
@@ -687,6 +703,7 @@ export class BookPipelineRuns {
     const inflight = new Map<string, Promise<void>>();
     while (!this.dead(drive) && drive.fatal === undefined) {
       const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy);
+      if (plan.hold === "global_failed") drive.failure = drive.reasons.get("global") ?? "failed";
       if (plan.hold) break;
       let started = 0;
       let changed = false;
@@ -797,7 +814,21 @@ export class BookPipelineRuns {
         await report(`failed:${code(outcome.reason)}`);
       }
     } catch (error) {
-      if (!this.dead(drive)) drive.fatal = error;
+      if (!this.dead(drive)) {
+        drive.fatal = error;
+        drive.failure = internalCode(error);
+        this.ports.log(
+          formatPipelineLog({
+            event: "error",
+            runId: drive.store?.state.runId ?? "-",
+            card: key,
+            step: logStep,
+            attempt: 0,
+            result: drive.failure,
+            ms: 0
+          })
+        );
+      }
     }
   }
 
@@ -937,6 +968,8 @@ export class BookPipelineRuns {
     if (!path) return { kind: "failed", reason: "card_removed" };
     if (!(await this.ensureBackup(drive, nodeId, path, card.raw)))
       return { kind: "failed", reason: "backup_failed", forceReview: true };
+    if (result.droppedSubjective)
+      this.log(drive, "checklist_dropped", nodeId, "plan", `subjective:${result.droppedSubjective}`);
     const prompt = composeCardPrompt(
       {
         role: info.role,
@@ -1058,6 +1091,8 @@ export class BookPipelineRuns {
           { signal, admission: drive.admission }
         )
         .catch(async (error: unknown) => {
+          if (isProofFailure(error) && error.counts)
+            this.logProofCounts(drive, token.runId, nodeId, error.counts, "failed");
           if (isProofFailure(error) && error.partial && !signal.aborted)
             await this.keepPartialProof(
               drive,
@@ -1069,6 +1104,7 @@ export class BookPipelineRuns {
           throw error;
         });
       result = await untilAborted(signal, call);
+      if (result.counts) this.logProofCounts(drive, token.runId, nodeId, result.counts, "ok");
       const path = await this.stillOnMap(drive, nodeId);
       if (!path) return { kind: "failed", reason: "card_removed" };
       if (!(await this.ensureBackup(drive, nodeId, path, card.raw)))
@@ -1140,6 +1176,7 @@ export class BookPipelineRuns {
       phase: state.phase,
       status: state.status,
       ...(state.pauseReason ? { pauseReason: state.pauseReason } : {}),
+      ...(state.failureCode ? { failureCode: state.failureCode } : {}),
       active,
       total: state.order.length,
       counts,
@@ -1147,6 +1184,21 @@ export class BookPipelineRuns {
       startedAt: state.startedAt,
       phaseStartedAt: state.phaseStartedAt
     };
+  }
+  /** One line per proofread call: the numbers only (the call has no content log, so this is the trace of what it did). */
+  private logProofCounts(drive: Drive, runId: string, nodeId: string, counts: ProofCounts, result: string): void {
+    this.ports.log(
+      formatPipelineLog({
+        event: "proof_calls",
+        runId,
+        card: nodeId,
+        step: "proof",
+        attempt: attemptsOf(drive.store.state, nodeId).proof,
+        result,
+        ms: 0,
+        counts: { ...counts }
+      })
+    );
   }
   private log(drive: Drive, event: string, card: string, step: PipelineStep, result: string): void {
     this.ports.log(

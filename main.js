@@ -3070,6 +3070,13 @@ var en = {
   "ui.book_progress_text_0_1_2_3": "Proofread {0}, written {1}, planned {2}, needs a look {3}",
   "ui.book_stopped_at_0_1_2": "Stopped in the {0} phase, proofread {1}/{2}",
   "ui.book_stop": "Stop",
+  "ui.book_failed_at_0_1": "Stopped in the {0} phase: {1}",
+  "ui.book_retry": "Retry",
+  "ui.book_fail_invalid_reply": "The AI reply did not fit the format after several tries",
+  "ui.book_fail_backup": "Backing up the original note failed, so it stopped to protect your content",
+  "ui.book_fail_discarded": "The content changed during the run, so the result was dropped",
+  "ui.book_fail_card_removed": "A card is not on the map or cannot be read",
+  "ui.book_fail_other": "An unexpected error happened",
   "ui.book_resume": "Continue from where it stopped",
   "ui.book_add_budget": "Add 100 calls",
   "ui.book_budget_used_up_0_1": "Call budget used up: {0}/{1} used",
@@ -6073,6 +6080,13 @@ var zhCN = {
   "ui.book_progress_text_0_1_2_3": "\u5DF2\u6821 {0}\u3001\u5DF2\u5199 {1}\u3001\u5DF2\u4F01\u5212 {2}\u3001\u9700\u4EBA\u770B {3}",
   "ui.book_stopped_at_0_1_2": "\u505C\u5728\u201C{0}\u201D\u9636\u6BB5\uFF0C\u5DF2\u6821 {1}\uFF0F{2}",
   "ui.book_stop": "\u505C\u6B62",
+  "ui.book_failed_at_0_1": "\u505C\u5728\u201C{0}\u201D\u9636\u6BB5\uFF1A{1}",
+  "ui.book_retry": "\u91CD\u8BD5",
+  "ui.book_fail_invalid_reply": "AI \u56DE\u590D\u683C\u5F0F\u4E0D\u7B26\uFF0C\u91CD\u8BD5\u591A\u6B21\u4ECD\u5931\u8D25",
+  "ui.book_fail_backup": "\u5907\u4EFD\u539F\u7B14\u8BB0\u5931\u8D25\uFF0C\u4E3A\u4FDD\u62A4\u4F60\u7684\u5185\u5BB9\u800C\u505C\u6B62",
+  "ui.book_fail_discarded": "\u5185\u5BB9\u5728\u8FD0\u884C\u4E2D\u88AB\u4FEE\u6539\uFF0C\u7ED3\u679C\u5DF2\u4E22\u5F03",
+  "ui.book_fail_card_removed": "\u5361\u7247\u4E0D\u5728\u5FC3\u667A\u56FE\u4E0A\u6216\u8BFB\u4E0D\u5230",
+  "ui.book_fail_other": "\u53D1\u751F\u672A\u9884\u671F\u7684\u9519\u8BEF",
   "ui.book_resume": "\u4ECE\u505C\u5904\u7EE7\u7EED",
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u989D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
@@ -9076,6 +9090,13 @@ var zhTW = {
   "ui.book_progress_text_0_1_2_3": "\u5DF2\u6821 {0}\u3001\u5DF2\u5BEB {1}\u3001\u5DF2\u4F01\u5283 {2}\u3001\u9700\u4EBA\u770B {3}",
   "ui.book_stopped_at_0_1_2": "\u505C\u5728\u300C{0}\u300D\u968E\u6BB5\uFF0C\u5DF2\u6821 {1}\uFF0F{2}",
   "ui.book_stop": "\u505C\u6B62",
+  "ui.book_failed_at_0_1": "\u505C\u5728\u300C{0}\u300D\u968E\u6BB5\uFF1A{1}",
+  "ui.book_retry": "\u91CD\u8A66",
+  "ui.book_fail_invalid_reply": "AI \u56DE\u8986\u683C\u5F0F\u4E0D\u7B26\uFF0C\u91CD\u8A66\u591A\u6B21\u4ECD\u5931\u6557",
+  "ui.book_fail_backup": "\u5099\u4EFD\u539F\u7B46\u8A18\u5931\u6557\uFF0C\u70BA\u4FDD\u8B77\u4F60\u7684\u5167\u5BB9\u800C\u505C\u6B62",
+  "ui.book_fail_discarded": "\u5167\u5BB9\u5728\u57F7\u884C\u4E2D\u88AB\u4FEE\u6539\uFF0C\u7D50\u679C\u5DF2\u4E1F\u68C4",
+  "ui.book_fail_card_removed": "\u5361\u7247\u4E0D\u5728\u5FC3\u667A\u5716\u4E0A\u6216\u8B80\u4E0D\u5230",
+  "ui.book_fail_other": "\u767C\u751F\u672A\u9810\u671F\u7684\u932F\u8AA4",
   "ui.book_resume": "\u5F9E\u505C\u8655\u7E7C\u7E8C",
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u984D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
@@ -28654,6 +28675,7 @@ function bookSettingsFrontmatter(patch) {
   }
   return values;
 }
+var FAILURE_CODE = /^[A-Za-z0-9_.:-]{1,60}$/;
 var isObject = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isCount = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0;
 function problem2(raw) {
@@ -28662,7 +28684,10 @@ function problem2(raw) {
   if (typeof raw.runId !== "string" || !raw.runId) return "runId";
   if (!PIPELINE_PHASES.includes(raw.phase)) return "phase";
   if (!PIPELINE_STATUSES.includes(raw.status)) return "status";
-  if (raw.pauseReason !== void 0 && raw.pauseReason !== "budget") return "pauseReason";
+  if (raw.pauseReason !== void 0 && raw.pauseReason !== "budget" && raw.pauseReason !== "failed")
+    return "pauseReason";
+  if (raw.failureCode !== void 0 && (typeof raw.failureCode !== "string" || !FAILURE_CODE.test(raw.failureCode)))
+    return "failureCode";
   if (!Array.isArray(raw.order) || raw.order.some((id) => typeof id !== "string" || !id)) return "order";
   if (new Set(raw.order).size !== raw.order.length) return "order has duplicates";
   if (typeof raw.globalPlanned !== "boolean") return "globalPlanned";
@@ -42859,6 +42884,7 @@ var BOOK_AUTHOR_RULES = [
   "- Write the chapter as the role named in the brief says.",
   "- Open by picking up the brief's entry point (how this chapter continues from the previous card).",
   "- End with one sentence that leads into the next card, taking up the question the brief leaves for it. If the brief has no next card (the last card), do not lead into a next card; close the whole book as the brief says.",
+  "- If the chapter suits pictures, prefer a direct https image address from Wikimedia Commons or a museum's public collection (Markdown image syntax, with the source and the work's name). If you cannot find an image that loads, write a line saying no picture and why. Never invent an address.",
   '- Do not end the chapter with an update log, a change note or a "this version" remark; those are added by the system.'
 ].join("\n");
 function bookAuthorRequirements(settings) {
@@ -42904,7 +42930,10 @@ function createStoreBudgetPort(store) {
 // core/book-pipeline/log.ts
 var code = (value) => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60) || "-";
 function formatPipelineLog(e) {
-  return `book-pipeline ${code(e.event)} run=${code(e.runId)} card=${code(e.card)} step=${e.step} attempt=${Math.max(0, Math.trunc(e.attempt))} result=${code(e.result)} ms=${Math.max(0, Math.round(e.ms))}`;
+  var _a2;
+  return `book-pipeline ${code(e.event)} run=${code(e.runId)} card=${code(e.card)} step=${e.step} attempt=${Math.max(0, Math.trunc(e.attempt))} result=${code(e.result)} ms=${Math.max(0, Math.round(e.ms))}${Object.entries(
+    (_a2 = e.counts) != null ? _a2 : {}
+  ).map(([name2, n]) => ` ${code(name2)}=${Math.max(0, Math.trunc(Number(n) || 0))}`).join("")}`;
 }
 
 // core/book-pipeline/machine.ts
@@ -43055,6 +43084,7 @@ function applyBudgetExhausted(data, token) {
   const next = clone2(refunded.accepted ? refunded.state : data);
   next.status = "stopped";
   next.pauseReason = "budget";
+  delete next.failureCode;
   next.revision++;
   return { state: next, accepted: true };
 }
@@ -43064,6 +43094,17 @@ function stopRun(data) {
   const next = clone2(data);
   next.status = "stopped";
   delete next.pauseReason;
+  delete next.failureCode;
+  next.stopEpoch = ((_a2 = next.stopEpoch) != null ? _a2 : 0) + 1;
+  next.revision++;
+  return next;
+}
+function failRun(data, code3) {
+  var _a2;
+  const next = clone2(data);
+  next.status = "stopped";
+  next.pauseReason = "failed";
+  next.failureCode = FAILURE_CODE.test(code3) ? code3 : "failed";
   next.stopEpoch = ((_a2 = next.stopEpoch) != null ? _a2 : 0) + 1;
   next.revision++;
   return next;
@@ -43074,6 +43115,7 @@ function resumeRun(data) {
   const next = clone2(data);
   next.status = "running";
   delete next.pauseReason;
+  delete next.failureCode;
   next.revision++;
   return next;
 }
@@ -43085,6 +43127,13 @@ function addBudget(data, extra) {
     next.status = "running";
     delete next.pauseReason;
   }
+  next.revision++;
+  return next;
+}
+function retryGlobalPlan(data) {
+  if (data.globalPlanned || data.attempts.global === 0) return data;
+  const next = clone2(data);
+  next.attempts.global = 0;
   next.revision++;
   return next;
 }
@@ -43138,10 +43187,11 @@ var ProofFailure = class extends Error {
    * The judgments already made when the failure is "no page opened" or "all facts unverified": the structure items are real
    * results, so the caller keeps them in the research notes (the card still needs a human).
    */
-  constructor(code3, partial) {
+  constructor(code3, partial, counts) {
     super(code3);
     this.code = code3;
     this.partial = partial;
+    this.counts = counts;
     this.name = "ProofFailure";
   }
 };
@@ -43238,6 +43288,7 @@ function proofKey(parts) {
   const list2 = hashText(JSON.stringify(parts.checklist.map((item) => [item.id, item.type, item.text])));
   return `${parts.runId}:${parts.nodeId}:${parts.revision}:${hashText(parts.body)}:${list2}`;
 }
+var safeCount = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
 var RECORD = /^<!-- book-proof:v1 (\{.*\}) -->$/;
 var escapeJson = (text10) => text10.replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
 var STATUS_WORDS = { met: "\u9054\u6210", unmet: "\u672A\u9054\u6210", unverified: "\u5F85\u67E5" };
@@ -43250,14 +43301,15 @@ function composeProofRecord(key4, result, failure) {
       status: item.status,
       note: escapeMarkdownText(item.note, 300),
       sources: item.sources.map(safeHref).filter((href) => !!href)
-    }))
+    })),
+    ...result.counts ? { counts: { openedPages: safeCount(result.counts.openedPages), searches: safeCount(result.counts.searches) } } : {}
   };
   const lines = [
-    failure ? `\u6821\u5C0D\u5931\u6557\uFF08\u539F\u56E0\uFF1A${failure}\uFF1B\u4EE5\u4E0B\u662F\u5DF2\u5224\u65B7\u7684\u7D50\u679C\uFF0C\u4ECD\u9700\u4EBA\u770B\uFF09` : `\u6821\u5C0D\uFF08${clean3.aggregate === "checked" ? "\u5DF2\u6821" : "\u9700\u4EBA\u770B"}\uFF09`
+    (failure ? `\u6821\u5C0D\u5931\u6557\uFF08\u539F\u56E0\uFF1A${failure}\uFF1B\u4EE5\u4E0B\u662F\u5DF2\u5224\u65B7\u7684\u7D50\u679C\uFF0C\u4ECD\u9700\u4EBA\u770B\uFF09` : `\u6821\u5C0D\uFF08${clean3.aggregate === "checked" ? "\u5DF2\u6821" : "\u9700\u4EBA\u770B"}\uFF09`) + (clean3.counts ? ` \u958B\u9801 ${clean3.counts.openedPages} \u6B21\u3001\u641C\u5C0B ${clean3.counts.searches} \u6B21` : "")
   ];
   for (const item of clean3.items)
     lines.push(
-      `- ${item.id} ${STATUS_WORDS[item.status]}\uFF1A${item.note}${item.sources.length ? `\uFF08${item.sources.map((href) => `\`${href}\``).join(" ")}\uFF09` : ""}`
+      `- ${item.id} ${STATUS_WORDS[item.status]}\uFF1A${item.note}${item.sources.length ? `\uFF08\u958B\u9801\uFF1A${item.sources.map((href) => `\`${href}\``).join(" ")}\uFF09` : ""}`
     );
   lines.push(
     `<!-- book-proof:v1 ${escapeJson(JSON.stringify({ key: key4, result: clean3, ...failure ? { failed: failure } : {} }))} -->`
@@ -43679,8 +43731,8 @@ Write the brief the chapter's author will follow and the proofreader will check:
 - handoff: the open question this chapter leaves for the next card, one sentence (for the last card: how the book closes).
 - previous and next: one sentence each about the neighbouring card as it matters to this chapter; an empty string when there is no such card.
 - checklist: 2 to 8 acceptance items. Each is one objectively checkable statement about the finished chapter, with a type: structure (about the chapter's shape, scope or coverage, checkable from its text alone) or fact (a concrete claim that must hold in outside sources, such as a date, name or number). A chapter that only orients the reader may have structure items only. Do not number the items and do not write ids.
-  - Allowed: what the chapter covers, what it leaves out, the order of its parts, that it picks up the entry point at its opening and takes up the question left for the next card at its ending, and facts that outside sources can confirm.
-  - Not allowed: anything subjective or about style (tone, voice, readability, "plain" or "friendly" wording, a required opening or closing sentence pattern such as a question), and any requirement on exact wording.
+  - Allowed: what the chapter covers, what it leaves out, the order of its parts, and facts that outside sources can confirm. Write every structure item so it can be verified by quoting the chapter's text, for example: "the opening paragraph mentions the entry point 'X'", "the closing paragraph takes up the question 'Y' left for the next card", "the chapter names the work and its year".
+  - Not allowed: anything subjective, evaluative or about style: no adjective or value-judgement items (noteworthy, brilliant, vivid, important, engaging and the like), nothing about tone, voice, readability, "plain" or "friendly" wording, no required opening or closing sentence pattern such as a question, and no requirement on exact wording. An item that cannot be checked by quoting the text is dropped by the program.
   - Pictures: the author step has no image search, so never require pictures. If you mention one at all, write it only as a condition: "if a loadable https image is found, it sits next to the passage it supports; if none, a line 'No picture: reason' is acceptable and counts as met".
 
 The chapter's role is fixed by the plan: do not change it. Use plain single-line text in every field and no Markdown headings. Use only numbers and links that appear in the supplied text.
@@ -43740,6 +43792,7 @@ var PICTURE_NOUN = /圖片|图片|圖像|图像/;
 var PICTURE_VERB = /[附放配含]|嵌入|插入|每段|需有|要有|需要有|必須有|必须有/;
 var CONDITION = /無圖|无图|沒有圖|没有图|找不到|若找得到|若有|若無|若无|如果|如有|有找到|\b(?:if|unless|when (?:available|found|possible)|no (?:image|picture)|without)\b/i;
 var unconditionalPicture = (text10) => (PICTURE_ALONE.test(text10) || PICTURE_NOUN.test(text10) && PICTURE_VERB.test(text10)) && !CONDITION.test(text10);
+var SUBJECTIVE = /值得(?:注意|關注|关注|一提|留意)|精彩|精采|生動|生动|重要|引人入勝|引人入胜|有趣|吸引人|動人|动人|優美|优美|流暢|流畅|深刻|震撼|\b(?:noteworthy|worth noting|brilliant|vivid|engaging|compelling|interesting|important)\b/i;
 function parseCardPlan(raw, request) {
   const item = parseJson(raw);
   exactKeys(item, ["covers", "entry", "handoff", "previous", "next", "checklist"]);
@@ -43751,7 +43804,9 @@ function parseCardPlan(raw, request) {
     if (one.type !== "structure" && one.type !== "fact") return fail2("unknown checklist type");
     return { type: one.type, text: singleLine(textOf(one.text, "checklist text")) };
   });
-  const kept = parsed.filter((item2) => !unconditionalPicture(item2.text));
+  const objective = parsed.filter((item2) => !SUBJECTIVE.test(item2.text));
+  const dropped = parsed.length - objective.length;
+  const kept = objective.filter((item2) => !unconditionalPicture(item2.text));
   if (!kept.length) fail2("checklist has no usable item");
   const checklist = kept.map((item2, index) => ({ id: `C${index + 1}`, ...item2 }));
   const side = (value, present, what) => present ? singleLine(textOf(value, what), 240) : "";
@@ -43761,7 +43816,8 @@ function parseCardPlan(raw, request) {
     handoff: singleLine(textOf(item.handoff, "handoff")),
     previous: side(item.previous, !!request.previous, "previous"),
     next: side(item.next, !!request.next, "next"),
-    checklist
+    checklist,
+    ...dropped ? { droppedSubjective: dropped } : {}
   };
 }
 var cap = (value, max) => singleLine(value, max);
@@ -45301,6 +45357,17 @@ function openedUrlsFromEvents(events) {
     if (typeof item.action.url === "string" && item.action.url) urls.push(item.action.url);
   }
   return urls;
+}
+function searchEventCount(events) {
+  var _a2, _b2;
+  let count3 = 0;
+  for (const event of events) {
+    const e = event;
+    if (!e || typeof e !== "object" || e.method !== "item/completed") continue;
+    const item = (_a2 = e.params) == null ? void 0 : _a2.item;
+    if ((item == null ? void 0 : item.type) === "webSearch" && ((_b2 = item.action) == null ? void 0 : _b2.type) === "search") count3++;
+  }
+  return count3;
 }
 function searchQueriesFromEvents(events) {
   var _a2, _b2;
@@ -48251,6 +48318,7 @@ var BookPipelineRunError = class extends Error {
 };
 var code2 = (value) => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60) || "failed";
 var reasonOf = (error) => isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_reply" : "failed";
+var internalCode = (error) => `internal_${(typeof (error == null ? void 0 : error.name) === "string" ? error.name : "unknown").replace(/[^A-Za-z0-9_]/g, "_").slice(0, 40)}`;
 var STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" };
 var DEFINITION = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:<([^>\n]*)>|(\S+))[^\n]*(?:\n|$)/gm;
 var WIKI_TARGET = /^[^[\]()!<>\r\n\\]+$/;
@@ -48495,7 +48563,7 @@ var BookPipelineRuns = class {
       const extra = (_a2 = options.addBudget) != null ? _a2 : 0;
       let refused = false;
       await drive.store.commit((state) => {
-        let next = recoverInterrupted(state);
+        let next = retryGlobalPlan(recoverInterrupted(state));
         if (extra) next = addBudget(next, extra);
         const resumed = resumeRun(next);
         refused = resumed === null;
@@ -48577,6 +48645,7 @@ var BookPipelineRuns = class {
     return drive.done;
   }
   async go(drive, setup) {
+    var _a2, _b2, _c;
     let refusal;
     try {
       await setup(drive);
@@ -48585,22 +48654,28 @@ var BookPipelineRuns = class {
       if (error instanceof BookPipelineRunError) refusal = error;
       else if (!this.dead(drive)) {
         drive.fatal = error;
+        drive.failure = internalCode(error);
         this.ports.log(
           formatPipelineLog({
             event: "error",
-            runId: "-",
+            runId: (_b2 = (_a2 = drive.store) == null ? void 0 : _a2.state.runId) != null ? _b2 : "-",
             card: "-",
             step: "plan",
             attempt: 0,
-            result: reasonOf(error),
+            result: drive.failure,
             ms: 0
           })
         );
       }
     } finally {
       try {
-        if (drive.store && !this.dead(drive) && (drive.stopRequested || drive.fatal !== void 0))
-          await drive.store.commit((state) => ({ state: stopRun(state), accepted: true })).catch(() => void 0);
+        if (drive.store && !this.dead(drive)) {
+          const code3 = (_c = drive.failure) != null ? _c : drive.fatal !== void 0 ? "failed" : void 0;
+          if (drive.stopRequested)
+            await drive.store.commit((state) => ({ state: stopRun(state), accepted: true })).catch(() => void 0);
+          else if (code3 !== void 0)
+            await drive.store.commit((state) => ({ state: failRun(state, code3), accepted: true })).catch(() => void 0);
+        }
         if (drive.store) {
           this.last.set(drive.mapPath, this.progressOf(drive, false));
           drive.store.dispose();
@@ -48672,10 +48747,11 @@ var BookPipelineRuns = class {
     return Object.fromEntries(drive.stages);
   }
   async loop(drive) {
-    var _a2;
+    var _a2, _b2;
     const inflight = /* @__PURE__ */ new Map();
     while (!this.dead(drive) && drive.fatal === void 0) {
       const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy);
+      if (plan.hold === "global_failed") drive.failure = (_a2 = drive.reasons.get("global")) != null ? _a2 : "failed";
       if (plan.hold) break;
       let started = 0;
       let changed = false;
@@ -48685,7 +48761,7 @@ var BookPipelineRuns = class {
           await this.reset(drive, action.nodeId);
           changed = true;
         } else if (action.type === "mark_needs_review") {
-          await this.markReview(drive, action.nodeId, action.step, (_a2 = drive.reasons.get(action.nodeId)) != null ? _a2 : "failed");
+          await this.markReview(drive, action.nodeId, action.step, (_b2 = drive.reasons.get(action.nodeId)) != null ? _b2 : "failed");
           changed = true;
         } else if (action.type === "advance_phase") {
           const before = drive.store.state;
@@ -48716,7 +48792,7 @@ var BookPipelineRuns = class {
   }
   // ---- one step ----------------------------------------------------------------------------------------------------------------
   async step(drive, action) {
-    var _a2;
+    var _a2, _b2, _c;
     const nodeId = action.type === "global_plan" ? void 0 : action.nodeId;
     const kind = action.type === "global_plan" ? "global" : STEP_OF[action.type];
     const key4 = nodeId != null ? nodeId : "global";
@@ -48774,7 +48850,21 @@ var BookPipelineRuns = class {
         await report(`failed:${code2(outcome.reason)}`);
       }
     } catch (error) {
-      if (!this.dead(drive)) drive.fatal = error;
+      if (!this.dead(drive)) {
+        drive.fatal = error;
+        drive.failure = internalCode(error);
+        this.ports.log(
+          formatPipelineLog({
+            event: "error",
+            runId: (_c = (_b2 = drive.store) == null ? void 0 : _b2.state.runId) != null ? _c : "-",
+            card: key4,
+            step: logStep,
+            attempt: 0,
+            result: drive.failure,
+            ms: 0
+          })
+        );
+      }
     }
   }
   classify(drive, error) {
@@ -48910,6 +49000,8 @@ var BookPipelineRuns = class {
     if (!path) return { kind: "failed", reason: "card_removed" };
     if (!await this.ensureBackup(drive, nodeId, path, card.raw))
       return { kind: "failed", reason: "backup_failed", forceReview: true };
+    if (result.droppedSubjective)
+      this.log(drive, "checklist_dropped", nodeId, "plan", `subjective:${result.droppedSubjective}`);
     const prompt = composeCardPrompt(
       {
         role: info.role,
@@ -49021,6 +49113,8 @@ var BookPipelineRuns = class {
         { ...this.base(drive, drive.config.proofModel), body, checklist },
         { signal, admission: drive.admission }
       ).catch(async (error) => {
+        if (isProofFailure(error) && error.counts)
+          this.logProofCounts(drive, token.runId, nodeId, error.counts, "failed");
         if (isProofFailure(error) && error.partial && !signal.aborted)
           await this.keepPartialProof(
             drive,
@@ -49032,6 +49126,7 @@ var BookPipelineRuns = class {
         throw error;
       });
       result = await untilAborted(signal, call);
+      if (result.counts) this.logProofCounts(drive, token.runId, nodeId, result.counts, "ok");
       const path = await this.stillOnMap(drive, nodeId);
       if (!path) return { kind: "failed", reason: "card_removed" };
       if (!await this.ensureBackup(drive, nodeId, path, card.raw))
@@ -49089,6 +49184,7 @@ var BookPipelineRuns = class {
       phase: state.phase,
       status: state.status,
       ...state.pauseReason ? { pauseReason: state.pauseReason } : {},
+      ...state.failureCode ? { failureCode: state.failureCode } : {},
       active,
       total: state.order.length,
       counts,
@@ -49096,6 +49192,21 @@ var BookPipelineRuns = class {
       startedAt: state.startedAt,
       phaseStartedAt: state.phaseStartedAt
     };
+  }
+  /** One line per proofread call: the numbers only (the call has no content log, so this is the trace of what it did). */
+  logProofCounts(drive, runId, nodeId, counts, result) {
+    this.ports.log(
+      formatPipelineLog({
+        event: "proof_calls",
+        runId,
+        card: nodeId,
+        step: "proof",
+        attempt: attemptsOf(drive.store.state, nodeId).proof,
+        result,
+        ms: 0,
+        counts: { ...counts }
+      })
+    );
   }
   log(drive, event, card, step, result) {
     var _a2, _b2;
@@ -49106,6 +49217,17 @@ var BookPipelineRuns = class {
 };
 
 // experiences/visual-map/book-pipeline-ui.ts
+var FAILURE_KEY = {
+  invalid_reply: "ui.book_fail_invalid_reply",
+  backup_failed: "ui.book_fail_backup",
+  discarded: "ui.book_fail_discarded",
+  card_removed: "ui.book_fail_card_removed",
+  missing: "ui.book_fail_card_removed"
+};
+var bookFailureText = (code3) => {
+  var _a2;
+  return t((_a2 = FAILURE_KEY[code3]) != null ? _a2 : "ui.book_fail_other");
+};
 var PHASE_KEY = {
   planning: "ui.book_phase_planning",
   gate1: "ui.book_phase_gate1",
@@ -49122,9 +49244,17 @@ function bookBarState(data, progress, stageOf) {
   const counts = (_d = progress == null ? void 0 : progress.counts) != null ? _d : countStages(data.order.map(stageOf));
   const total2 = (_e = progress == null ? void 0 : progress.total) != null ? _e : data.order.length;
   const budget = (_f = progress == null ? void 0 : progress.budget) != null ? _f : data.budget;
+  const failure = progress ? progress.failureCode : data.failureCode;
   const interrupted = (phase === "planning" || phase === "writing") && !active;
   const mode = status === "stopped" && pauseReason === "budget" ? "budget" : status === "stopped" || interrupted ? "stopped" : phase;
-  return { mode, phase, total: total2, counts, budget };
+  return {
+    mode,
+    phase,
+    total: total2,
+    counts,
+    budget,
+    ...mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {}
+  };
 }
 function countStages(stages) {
   const counts = { pending: 0, planned: 0, written: 0, checked: 0, "needs-review": 0 };
@@ -49143,7 +49273,7 @@ function renderBookBar(parent, state, actions) {
   bar.setAttr("aria-label", t("ui.book_bar_label"));
   const top = bar.createDiv("vam-book-bar-top");
   top.createEl("b", { cls: "vam-book-bar-title", text: bookTitleText(state) });
-  const summary = state.mode === "budget" ? t("ui.book_budget_used_up_0_1", state.budget.used, state.budget.limit) : state.mode === "stopped" ? t("ui.book_stopped_at_0_1_2", t(PHASE_KEY[state.phase]), counts.checked, total2) : t("ui.book_counts_0_1_2_3_4", counts.checked, total2, counts.written, counts.planned, counts["needs-review"]);
+  const summary = state.mode === "budget" ? t("ui.book_budget_used_up_0_1", state.budget.used, state.budget.limit) : state.mode === "stopped" ? state.failure ? t("ui.book_failed_at_0_1", t(PHASE_KEY[state.phase]), bookFailureText(state.failure)) : t("ui.book_stopped_at_0_1_2", t(PHASE_KEY[state.phase]), counts.checked, total2) : t("ui.book_counts_0_1_2_3_4", counts.checked, total2, counts.written, counts.planned, counts["needs-review"]);
   top.createSpan({ cls: "vam-book-bar-counts", text: summary });
   const buttons = top.createDiv("vam-book-bar-actions");
   if (state.phase === "gate1" && state.mode !== "done")
@@ -49152,7 +49282,12 @@ function renderBookBar(parent, state, actions) {
     makeButton(buttons, t("ui.book_add_budget"), "mod-cta vam-book-add-budget", actions.addBudget);
     makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
   } else if (state.mode === "stopped")
-    makeButton(buttons, t("ui.book_resume"), "mod-cta vam-book-resume", actions.resume);
+    makeButton(
+      buttons,
+      t(state.failure ? "ui.book_retry" : "ui.book_resume"),
+      "mod-cta vam-book-resume",
+      actions.resume
+    );
   else if (state.mode === "planning" || state.mode === "writing")
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   const valueText = t(
@@ -85147,7 +85282,17 @@ async function runProofread(aiCalls, request, run) {
         }
       }
     },
-    (raw) => evaluateProof(prepared.parse(raw), request.checklist, openedUrlsFromEvents(events), { body: request.body })
+    (raw) => {
+      const opened = openedUrlsFromEvents(events);
+      const counts = { openedPages: opened.length, searches: searchEventCount(events) };
+      try {
+        return { ...evaluateProof(prepared.parse(raw), request.checklist, opened, { body: request.body }), counts };
+      } catch (error) {
+        if (isProofFailure(error))
+          throw new ProofFailure(error.code, error.partial && { ...error.partial, counts }, counts);
+        throw error;
+      }
+    }
   );
 }
 

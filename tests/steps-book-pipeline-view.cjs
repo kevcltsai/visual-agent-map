@@ -356,3 +356,29 @@ test('styles: the bar wraps full width inside the toolbar, buttons are focus-vis
 test('the model reads the saved key the bar relies on', () => {
   assert.equal(model.readBookPipeline({ bookPipeline: bookData() }).kind, 'usable');
 });
+
+test('bar: a run that stopped by itself shows the reason in words (three languages) and a retry button, never the raw code; an owner stop does not', () => {
+  const expected = { 'zh-TW': ['停在「企劃中」階段：AI 回覆格式不符，重試多次仍失敗', '重試'], en: ['Stopped in the Planning phase: The AI reply did not fit the format after several tries', 'Retry'], 'zh-CN': ['停在“企划中”阶段：AI 回复格式不符，重试多次仍失败', '重试'] };
+  for (const [language, [line, retry]] of Object.entries(expected)) {
+    lang(language);
+    const data = bookData({ phase: 'planning', status: 'stopped', pauseReason: 'failed', failureCode: 'invalid_reply', globalPlanned: false });
+    for (const prog of [undefined, progress({ phase: 'planning', status: 'stopped', active: false, pauseReason: 'failed', failureCode: 'invalid_reply' })]) {
+      const d = draw(data, prog);
+      assert.ok(texts(d.bar).includes(line), `${language} ${line}`);
+      assert.deepEqual(buttonsOf(d.bar).map(b => b.text), [retry]);
+      assert.equal(texts(d.bar).some(x => x.includes('invalid_reply')), false);
+      buttonsOf(d.bar)[0].click();
+      assert.deepEqual(d.log, ['resume']);
+    }
+  }
+  lang('zh-TW');
+  assert.match(ui.bookFailureText('internal_TypeError'), /未預期/);
+  const plainStop = draw(bookData({ phase: 'planning', status: 'stopped' }), undefined);
+  assert.deepEqual(buttonsOf(plainStop.bar).map(b => b.text), ['從停處繼續']);
+});
+
+test('model: failureCode must be a neutral code; a pauseReason of failed is readable', () => {
+  assert.equal(model.readBookPipeline({ bookPipeline: bookData({ status: 'stopped', pauseReason: 'failed', failureCode: 'backup_failed' }) }).kind, 'usable');
+  assert.equal(model.readBookPipeline({ bookPipeline: bookData({ status: 'stopped', pauseReason: 'failed', failureCode: 'has space' }) }).kind, 'unusable');
+  assert.equal(model.readBookPipeline({ bookPipeline: bookData({ pauseReason: 'other' }) }).kind, 'unusable');
+});

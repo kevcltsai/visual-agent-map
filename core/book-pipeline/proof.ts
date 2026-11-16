@@ -29,6 +29,12 @@ export interface ProofResult {
   items: ProofItemResult[];
   /** `needs-review` when any item is unmet; otherwise `checked` (unverified items are recorded, not blocking). */
   aggregate: "checked" | "needs-review";
+  /** What the call did, as numbers only (no query or address): successful page opens and completed searches. */
+  counts?: ProofCounts;
+}
+export interface ProofCounts {
+  openedPages: number;
+  searches: number;
 }
 
 export type ProofFailureCode =
@@ -47,7 +53,8 @@ export class ProofFailure extends Error {
    */
   constructor(
     readonly code: ProofFailureCode,
-    readonly partial?: ProofResult
+    readonly partial?: ProofResult,
+    readonly counts?: ProofCounts
   ) {
     super(code);
     this.name = "ProofFailure";
@@ -188,6 +195,8 @@ export function proofKey(parts: ProofKeyParts): string {
   return `${parts.runId}:${parts.nodeId}:${parts.revision}:${hashText(parts.body)}:${list}`;
 }
 
+const safeCount = (value: unknown): number =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
 const RECORD = /^<!-- book-proof:v1 (\{.*\}) -->$/;
 const escapeJson = (text: string): string => text.replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
 const STATUS_WORDS: Record<ProofStatus, string> = { met: "達成", unmet: "未達成", unverified: "待查" };
@@ -206,16 +215,20 @@ export function composeProofRecord(key: string, result: ProofResult, failure?: P
       status: item.status,
       note: escapeMarkdownText(item.note, 300),
       sources: item.sources.map(safeHref).filter((href): href is string => !!href)
-    }))
+    })),
+    ...(result.counts
+      ? { counts: { openedPages: safeCount(result.counts.openedPages), searches: safeCount(result.counts.searches) } }
+      : {})
   };
   const lines = [
-    failure
+    (failure
       ? `校對失敗（原因：${failure}；以下是已判斷的結果，仍需人看）`
-      : `校對（${clean.aggregate === "checked" ? "已校" : "需人看"}）`
+      : `校對（${clean.aggregate === "checked" ? "已校" : "需人看"}）`) +
+      (clean.counts ? ` 開頁 ${clean.counts.openedPages} 次、搜尋 ${clean.counts.searches} 次` : "")
   ];
   for (const item of clean.items)
     lines.push(
-      `- ${item.id} ${STATUS_WORDS[item.status]}：${item.note}${item.sources.length ? `（${item.sources.map(href => `\`${href}\``).join(" ")}）` : ""}`
+      `- ${item.id} ${STATUS_WORDS[item.status]}：${item.note}${item.sources.length ? `（開頁：${item.sources.map(href => `\`${href}\``).join(" ")}）` : ""}`
     );
   lines.push(
     `<!-- book-proof:v1 ${escapeJson(JSON.stringify({ key, result: clean, ...(failure ? { failed: failure } : {}) }))} -->`

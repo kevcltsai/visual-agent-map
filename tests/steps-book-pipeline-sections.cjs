@@ -15,7 +15,7 @@ const count = (haystack, needle) => haystack.split(needle).length - 1;
 test('appendResearchNote: no Research notes section: a new section with a folded callout at the end', () => {
   const out = sections.appendResearchNote('Lead text\n\n### Sources\n\n- a', recordOf(1));
   assert.equal(out.appended, true);
-  assert.match(out.text, /\n### 研究備註\n\n> \[!note\]- 研究備註\n> 校對（已校）\n> - C1 達成：ok（`https:\/\/example\.com\/a`）\n> <!-- book-proof:v1 /);
+  assert.match(out.text, /\n### 研究備註\n\n> \[!note\]- 研究備註\n> 校對（已校）\n> - C1 達成：ok（開頁：`https:\/\/example\.com\/a`）\n> <!-- book-proof:v1 /);
   assert.ok(out.text.startsWith('Lead text\n\n### Sources\n\n- a\n\n### 研究備註'));
   assert.equal(count(out.text, '### '), 2);
 });

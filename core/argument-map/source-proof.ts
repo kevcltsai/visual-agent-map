@@ -196,6 +196,21 @@ export function openedUrlsFromEvents(events: readonly unknown[]): string[] {
   return urls;
 }
 
+/** How many search events the provider completed during a call (each counts once, whatever its queries). */
+export function searchEventCount(events: readonly unknown[]): number {
+  let count = 0;
+  for (const event of events) {
+    const e = event as {
+      method?: unknown;
+      params?: { item?: { type?: unknown; action?: { type?: unknown } | null } };
+    } | null;
+    if (!e || typeof e !== "object" || e.method !== "item/completed") continue;
+    const item = e.params?.item;
+    if (item?.type === "webSearch" && item.action?.type === "search") count++;
+  }
+  return count;
+}
+
 /** Search queries the provider ran, from its completed search events (`action.query` or `action.queries`); blank and repeated ones dropped. */
 export function searchQueriesFromEvents(events: readonly unknown[]): string[] {
   const queries: string[] = [];

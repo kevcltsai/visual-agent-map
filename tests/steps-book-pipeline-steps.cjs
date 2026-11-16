@@ -215,7 +215,7 @@ test('proof record: the key has five parts, a second append is skipped, and a re
   assert.deepEqual(plain(proof.findProofRecord(first.text, key)).items.map(i => i.id), ['C1', 'C2']);
   assert.equal(proof.findProofRecord(first.text, `${key}x`), undefined);
   assert.equal(proof.appendProofRecord(first.text, proof.proofKey({ ...parts, revision: 4 }), result).appended, true, 'a new revision adds a record and keeps the old one');
-  assert.match(first.text, /（`https:\/\/example\.org\/a`）/); assert.equal(first.text.replace(/^<!-- book-proof:v1 .* -->$/m, '').includes('<'), false, 'no tag survives in the readable lines'); assert.equal(first.text.split('\n').filter(l => l.includes('-->') && !l.startsWith('<!-- book-proof')).length, 0, 'no comment end outside the record line');
+  assert.match(first.text, /（開頁：`https:\/\/example\.org\/a`）/); assert.equal(first.text.replace(/^<!-- book-proof:v1 .* -->$/m, '').includes('<'), false, 'no tag survives in the readable lines'); assert.equal(first.text.split('\n').filter(l => l.includes('-->') && !l.startsWith('<!-- book-proof')).length, 0, 'no comment end outside the record line');
   assert.equal(proof.findProofRecord('<!-- book-proof:v1 {broken} -->', key), undefined);
   assert.equal(proof.appendProofRecord('', key, result).text.startsWith('校對（已校）'), true);
 });
@@ -371,7 +371,7 @@ test('card plan: objective art-history items are kept, picture requirements (tra
 
 test('card plan and proofread prompts: only objective items, picture items conditional, no-picture is met, system sections are not the ending', () => {
   const text = fs.readFileSync(path.join(__dirname, '..', 'core/steps/book-pipeline/card-plan.md'), 'utf8');
-  assert.match(text, /Not allowed: anything subjective or about style/); assert.match(text, /never require pictures/);
+  assert.match(text, /Not allowed: anything subjective, evaluative or about style/); assert.match(text, /never require pictures/);
   const proofText = fs.readFileSync(path.join(__dirname, '..', 'core/steps/book-pipeline/proofread.md'), 'utf8');
   assert.match(proofText, /actually open a result page/); assert.doesNotMatch(proofText, /WebFetch/); assert.match(proofText, /meets a picture item unless the item explicitly requires/); assert.match(proofText, /update log and source list are not part of it/);
 });
@@ -397,4 +397,41 @@ test('author requirements: the fixed chapter rules always come first, the settin
   assert.match(none, /Open by picking up the brief's entry point/); assert.match(none, /End with one sentence that leads into the next card/); assert.match(none, /Do not end the chapter with an update log/); assert.match(none, /no next card \(the last card\).*close the whole book/);
   const some = settings.bookAuthorRequirements({ tone: 'warm' });
   assert.ok(some.startsWith(none)); assert.match(some, /- tone: warm/);
+});
+
+// ---- second device acceptance: subjective items, proofread counts, author picture rule ----
+
+test('card plan: subjective or evaluative items (Traditional and Simplified) are dropped and counted; structural quote-checkable items stay', () => {
+  const request = { ...base, thread: 't', settings: {}, materials: [], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
+  const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: texts.map(text => ({ type: 'structure', text })) }), request));
+  const result = run(['開頭說明為何值得注意', '開头段落提及接入点「透視法」', '本章内容精彩生动', '結尾段落回應「留給下一張的問題」', '這個發明很重要', '出現作品名與年份', '文字引人入勝', '开头说明为何值得关注']);
+  assert.deepEqual(result.checklist.map(c => c.text), ['開头段落提及接入点「透視法」', '結尾段落回應「留給下一張的問題」', '出現作品名與年份']);
+  assert.equal(result.droppedSubjective, 5);
+  const clean = run(['開頭段落提及接入點「X」']);
+  assert.equal(clean.droppedSubjective, undefined); assert.equal(clean.checklist.length, 1);
+  assert.throws(() => run(['開頭說明為何值得注意', '內容生動']), /no usable item/, 'nothing left is a failure (retried)');
+});
+
+test('author rules: pictures come from Wikimedia Commons or museum collections over https, none found is said so, no invented address', () => {
+  const { bookAuthorRequirements } = loadWithAiCalls('core/book-pipeline/settings.ts');
+  const text = bookAuthorRequirements({});
+  assert.match(text, /Wikimedia Commons/); assert.match(text, /https/); assert.match(text, /no picture/); assert.match(text, /Never invent an address/);
+});
+
+test('proofread counts: openedPages and searches ride with the result and with a failure, and the record names each source as an opened page', async () => {
+  const h = harness({ answer: reply([item('C1'), item('C2', 'met', ['https://example.org/a'])]), events: [search('q1'), search('q2'), page('https://example.org/a'), page('https://example.org/b')] });
+  const result = await proofMod.runProofread(h.proofCalls, proofRequest(), { signal: signal() });
+  assert.deepEqual(plain(result.counts), { openedPages: 2, searches: 2 });
+  const text = proof.composeProofRecord('k', result);
+  assert.match(text, /開頁 2 次、搜尋 2 次/); assert.match(text, /（開頁：`https:\/\/example\.org\/a`）/);
+  assert.deepEqual(plain(proof.findProofRecord(text, 'k').counts), { openedPages: 2, searches: 2 });
+  const bad = harness({ answer: reply([item('C1'), item('C2', 'met', ['https://never.example'])]), events: [search('q1')] });
+  await assert.rejects(proofMod.runProofread(bad.proofCalls, proofRequest(), { signal: signal() }), e => e.code === 'no_open_page' && e.counts.openedPages === 0 && e.counts.searches === 1 && e.partial.counts.searches === 1);
+  assert.match(proof.composeProofRecord('k:failed', { ...result, aggregate: 'needs-review' }, 'no_open_page'), /^校對失敗（原因：no_open_page[^\n]*開頁 2 次、搜尋 2 次/);
+});
+
+test('pipeline log line: counts are numbers appended as name=n, never text', () => {
+  const line = pipelineLog.formatPipelineLog({ event: 'proof_calls', runId: 'r', card: 'n2', step: 'proof', attempt: 1, result: 'ok', ms: 0, counts: { openedPages: 2, searches: 3 } });
+  assert.equal(line, 'book-pipeline proof_calls run=r card=n2 step=proof attempt=1 result=ok ms=0 openedPages=2 searches=3');
+  assert.match(pipelineLog.formatPipelineLog({ event: 'e', runId: 'r', card: 'c', step: 'proof', attempt: 1, result: 'ok', ms: 0, counts: { 'bad name!': Number.NaN } }), / bad_name_=0$/);
 });

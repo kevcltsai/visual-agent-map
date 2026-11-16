@@ -533,3 +533,60 @@ test('a whole-card proof failure keeps the judged structure items in the researc
   assert.match(raw, /C1 達成：judged C1/);
   assert.equal((raw.match(/book-proof:v1/g) ?? []).length, 1, 'the same failure is recorded once across retries');
 });
+
+test('a whole-book plan that fails three times stops the run with a neutral code the map file keeps; retry (resume) runs it again from zero attempts', async () => {
+  let broken = true;
+  const r = await rig({ script: { global: (request, n) => { if (broken) throw new Error('nope SecretBody'); return { thread: 'one thread', cards: [], materials: [], decisions: {} }; } } });
+  const original = r.script.global;
+  r.script.global = (request, n) => broken ? original(request, n) : { thread: 'one thread', cards: r.nodes.map((n2, i) => ({ id: n2.id, role: i ? 'body' : 'intro' })), materials: [{ name: 'm', use: 'u' }], decisions: {} };
+  await r.runs.start(r.mapPath);
+  let s = await r.state();
+  assert.equal(s.status, 'stopped'); assert.equal(s.pauseReason, 'failed'); assert.equal(s.failureCode, 'failed'); assert.equal(s.attempts.global, 3);
+  assert.equal(r.runs.getProgress(r.mapPath).failureCode, 'failed');
+  assert.ok(r.stat.logs.some(l => /step=plan attempt=\d result=failed:failed/.test(l)));
+  broken = false;
+  await r.runs.resume(r.mapPath);
+  s = await r.state();
+  assert.equal(s.phase, 'gate1'); assert.equal(s.pauseReason, undefined); assert.equal(s.failureCode, undefined); assert.equal(s.attempts.global, 1);
+});
+
+test('first-start failures each leave a code: backup failed, root card unreadable, an unexpected error in the map write', async () => {
+  // the backup port fails (the global plan writes the root card first)
+  let r = await rig({ ports: { backupNote: async () => ({ ok: false }) } });
+  await r.runs.start(r.mapPath);
+  let s = await r.state();
+  assert.equal(s.status, 'stopped'); assert.equal(s.failureCode, 'backup_failed'); assert.equal(s.attempts.global, 3);
+  assert.equal(r.stat.plan.length, 3, 'the plan is asked each attempt (the backup comes after the call)');
+  // the backup port throws
+  r = await rig({ ports: { backupNote: async () => { throw new Error('boom'); } } });
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.state()).failureCode, 'backup_failed');
+  // readCard of the root fails on the first read after start
+  let reads = 0;
+  r = await rig();
+  const inner = r.ports.readCard;
+  r.ports.readCard = async path => { if (path === r.nodes[0].path && ++reads > 1) throw new Error('gone'); return inner(path); };
+  await r.runs.start(r.mapPath);
+  s = await r.state();
+  assert.equal(s.status, 'stopped'); assert.equal(s.pauseReason, 'failed'); assert.ok(/^[A-Za-z0-9_.:-]+$/.test(s.failureCode));
+  // an unexpected error while the run state is saved: stopped with an internal code naming the class only
+  r = await rig();
+  let updates = 0;
+  const upd = r.ports.updateMap;
+  r.ports.updateMap = async (path, change) => { if (++updates === 2) throw new TypeError('secret path /Users/x SecretTitleA'); return upd(path, change); };
+  await r.runs.start(r.mapPath).catch(() => undefined);
+  s = await r.state().catch(() => undefined);
+  assert.ok(r.stat.logs.every(l => !/Secret|Users/.test(l)), 'no message text in the log');
+  assert.deepEqual([s.status, s.pauseReason, s.failureCode], ['stopped', 'failed', 'internal_TypeError']);
+  assert.ok(r.stat.logs.some(l => /^book-pipeline error .* result=internal_TypeError/.test(l)));
+});
+
+test('a proofread call logs openedPages and searches as numbers only; the log carries no title or body', async () => {
+  const r = await rig({ script: { proof: async request => ({ items: request.checklist.map(c => ({ id: c.id, type: c.type, status: 'met', note: 'fine', sources: [] })), aggregate: 'checked', counts: { openedPages: 2, searches: 3 } }) } });
+  await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath);
+  const lines = r.stat.logs.filter(l => l.includes('proof_calls'));
+  assert.equal(lines.length, 3);
+  for (const line of lines) assert.match(line, /^book-pipeline proof_calls run=run-1 card=\S+ step=proof attempt=1 result=ok ms=0 openedPages=2 searches=3$/);
+  assert.ok(!/Secret/.test(r.stat.logs.join('\n')));
+  assert.match(r.raw(1), /開頁 2 次、搜尋 3 次/);
+});

@@ -127,7 +127,9 @@ export interface BookPipelineData {
   phase: PipelinePhase;
   status: PipelineStatus;
   /** Why a stopped run stopped when it was not the owner: the call budget ran out (not a failure of any card). */
-  pauseReason?: "budget";
+  pauseReason?: "budget" | "failed";
+  /** With pauseReason "failed": a neutral code (letters, digits, `_.:-`) of what stopped the run. Never owner text. */
+  failureCode?: string;
   order: string[];
   globalPlanned: boolean;
   attempts: Record<"global", number> & Record<string, StepAttempts | number>;
@@ -147,6 +149,8 @@ export interface BookPipelineData {
 export type BookPipelineRead =
   { kind: "absent" } | { kind: "usable"; data: BookPipelineData } | { kind: "unusable"; reason: string; raw: unknown };
 
+/** A neutral failure code: short, no spaces, no owner text. */
+export const FAILURE_CODE = /^[A-Za-z0-9_.:-]{1,60}$/;
 const isObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
 const isCount = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 0;
@@ -157,7 +161,10 @@ function problem(raw: unknown): string | undefined {
   if (typeof raw.runId !== "string" || !raw.runId) return "runId";
   if (!PIPELINE_PHASES.includes(raw.phase as PipelinePhase)) return "phase";
   if (!PIPELINE_STATUSES.includes(raw.status as PipelineStatus)) return "status";
-  if (raw.pauseReason !== undefined && raw.pauseReason !== "budget") return "pauseReason";
+  if (raw.pauseReason !== undefined && raw.pauseReason !== "budget" && raw.pauseReason !== "failed")
+    return "pauseReason";
+  if (raw.failureCode !== undefined && (typeof raw.failureCode !== "string" || !FAILURE_CODE.test(raw.failureCode)))
+    return "failureCode";
   if (!Array.isArray(raw.order) || raw.order.some(id => typeof id !== "string" || !id)) return "order";
   if (new Set(raw.order).size !== raw.order.length) return "order has duplicates";
   if (typeof raw.globalPlanned !== "boolean") return "globalPlanned";

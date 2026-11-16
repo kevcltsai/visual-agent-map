@@ -24,7 +24,19 @@ export interface BookBarState {
   total: number;
   counts: Record<PipelineStage | "pending", number>;
   budget: { used: number; limit: number };
+  /** The neutral code of why the run stopped by itself; the bar shows it in words and offers "retry". */
+  failure?: string;
 }
+
+const FAILURE_KEY: Record<string, TranslationKey> = {
+  invalid_reply: "ui.book_fail_invalid_reply",
+  backup_failed: "ui.book_fail_backup",
+  discarded: "ui.book_fail_discarded",
+  card_removed: "ui.book_fail_card_removed",
+  missing: "ui.book_fail_card_removed"
+};
+/** A failure code in words (the code itself is never shown; an unknown one reads as an unexpected error). */
+export const bookFailureText = (code: string): string => t(FAILURE_KEY[code] ?? "ui.book_fail_other");
 
 const PHASE_KEY: Record<BookPipelineData["phase"], TranslationKey> = {
   planning: "ui.book_phase_planning",
@@ -50,6 +62,7 @@ export function bookBarState(
   const counts = progress?.counts ?? countStages(data.order.map(stageOf));
   const total = progress?.total ?? data.order.length;
   const budget = progress?.budget ?? data.budget;
+  const failure = progress ? progress.failureCode : data.failureCode;
   const interrupted = (phase === "planning" || phase === "writing") && !active;
   const mode: BookBarMode =
     status === "stopped" && pauseReason === "budget"
@@ -57,7 +70,14 @@ export function bookBarState(
       : status === "stopped" || interrupted
         ? "stopped"
         : phase;
-  return { mode, phase, total, counts, budget };
+  return {
+    mode,
+    phase,
+    total,
+    counts,
+    budget,
+    ...(mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {})
+  };
 }
 
 function countStages(stages: (PipelineStage | undefined)[]): Record<PipelineStage | "pending", number> {
@@ -96,7 +116,9 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     state.mode === "budget"
       ? t("ui.book_budget_used_up_0_1", state.budget.used, state.budget.limit)
       : state.mode === "stopped"
-        ? t("ui.book_stopped_at_0_1_2", t(PHASE_KEY[state.phase]), counts.checked, total)
+        ? state.failure
+          ? t("ui.book_failed_at_0_1", t(PHASE_KEY[state.phase]), bookFailureText(state.failure))
+          : t("ui.book_stopped_at_0_1_2", t(PHASE_KEY[state.phase]), counts.checked, total)
         : t("ui.book_counts_0_1_2_3_4", counts.checked, total, counts.written, counts.planned, counts["needs-review"]);
   top.createSpan({ cls: "vam-book-bar-counts", text: summary });
   // "About N minutes left" is stage 2 work (it needs at least 5 finished cards for a real number); nothing is shown until then.
@@ -107,7 +129,12 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     makeButton(buttons, t("ui.book_add_budget"), "mod-cta vam-book-add-budget", actions.addBudget);
     makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
   } else if (state.mode === "stopped")
-    makeButton(buttons, t("ui.book_resume"), "mod-cta vam-book-resume", actions.resume);
+    makeButton(
+      buttons,
+      t(state.failure ? "ui.book_retry" : "ui.book_resume"),
+      "mod-cta vam-book-resume",
+      actions.resume
+    );
   else if (state.mode === "planning" || state.mode === "writing")
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   const valueText = t(

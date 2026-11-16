@@ -37,6 +37,8 @@ export interface CardPlanResult {
   next: string;
   /** Ids `C1..Cn` assigned here, in order. */
   checklist: ChecklistItem[];
+  /** How many items the subjective-word filter dropped (absent when none); the runner logs the count. */
+  droppedSubjective?: number;
 }
 
 export const MAX_CHECKLIST = 8;
@@ -75,6 +77,10 @@ const CONDITION =
 const unconditionalPicture = (text: string): boolean =>
   (PICTURE_ALONE.test(text) || (PICTURE_NOUN.test(text) && PICTURE_VERB.test(text))) && !CONDITION.test(text);
 
+/** Adjective or value-judgement wording (Traditional and Simplified): an item with one cannot be checked from the text, so the program drops it. */
+const SUBJECTIVE =
+  /值得(?:注意|關注|关注|一提|留意)|精彩|精采|生動|生动|重要|引人入勝|引人入胜|有趣|吸引人|動人|动人|優美|优美|流暢|流畅|深刻|震撼|\b(?:noteworthy|worth noting|brilliant|vivid|engaging|compelling|interesting|important)\b/i;
+
 export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanResult {
   const item = parseJson(raw);
   exactKeys(item, ["covers", "entry", "handoff", "previous", "next", "checklist"]);
@@ -87,7 +93,10 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
     return { type: one.type, text: singleLine(textOf(one.text, "checklist text")) };
   });
   // Unconditional picture requirements are dropped by program (never rewritten); a plan with nothing left is a failure (retried).
-  const kept = parsed.filter(item => !unconditionalPicture(item.text));
+  // Subjective items are dropped the same way and counted; the plan fails (and is retried) only when none is left.
+  const objective = parsed.filter(item => !SUBJECTIVE.test(item.text));
+  const dropped = parsed.length - objective.length;
+  const kept = objective.filter(item => !unconditionalPicture(item.text));
   if (!kept.length) fail("checklist has no usable item");
   const checklist = kept.map((item, index): ChecklistItem => ({ id: `C${index + 1}`, ...item }));
   const side = (value: unknown, present: boolean, what: string): string =>
@@ -98,7 +107,8 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
     handoff: singleLine(textOf(item.handoff, "handoff")),
     previous: side(item.previous, !!request.previous, "previous"),
     next: side(item.next, !!request.next, "next"),
-    checklist
+    checklist,
+    ...(dropped ? { droppedSubjective: dropped } : {})
   };
 }
 

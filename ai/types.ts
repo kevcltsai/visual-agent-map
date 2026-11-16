@@ -155,6 +155,8 @@ export interface TaskContext {
   usageMapPath?: string;
   /** Trusted: reserves one call before each provider request of this task (including its repair and reference passes); never serialized. Absent: no admission. */
   admission?: AdmissionContext;
+  /** Trusted: the exchange log keeps this task's metadata but never its prompt or reply (the picture-book pipeline's owner text); never serialized. */
+  noContentLog?: boolean;
 }
 /** Provider-neutral web activity event; Claude events are translated into the Codex App Server shape. */
 export interface WebSearchEvent {

@@ -296,6 +296,7 @@ export class AiTaskService {
             localCodex: context.researchMode === "local",
             usage: { action: usageActionOf(context, role), mapPath: context.usageMapPath },
             ...(context.admission ? { admission: context.admission } : {}),
+            ...(context.noContentLog ? { noContentLog: true } : {}),
             requestLog: "request",
             // The service ends the entry: parsed, a stage failure, a re-ask, a re-send or a superseded first reply.
             entryEnd: "caller",
@@ -762,6 +763,7 @@ export class AiTaskService {
               intermediateDetail: true,
               ...(context.usageMapPath ? { usageMapPath: context.usageMapPath } : {}),
               ...(context.admission ? { admission: context.admission } : {}),
+              ...(context.noContentLog ? { noContentLog: true } : {}),
               // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
               ...(context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {})
             },

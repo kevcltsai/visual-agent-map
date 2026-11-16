@@ -3,6 +3,7 @@
  * It imports neither obsidian nor the view; everything it needs from the plugin comes through lazy ports, because the
  * plugin replaces some of those objects after construction.
  */
+import { isBudgetExhausted } from "../../core/admission";
 import { aiLockedError, isAiLockedError } from "../../core/ai-lock";
 import { noteLanguageOf, t, type ContentLanguage, type NoteLanguage, type UiLanguage } from "../../i18n";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
@@ -103,6 +104,17 @@ export interface RunRepository {
     patch: NotePatch,
     options?: { detailTemplate?: DetailTemplate; newVisualReferences?: boolean }
   ): Promise<void>;
+  /** The guarded write (`Repository.updateNoteGuarded`); only the picture-book author step asks for it. */
+  updateNoteGuarded?(
+    path: string,
+    patch: NotePatch,
+    options?: {
+      detailTemplate?: DetailTemplate;
+      newVisualReferences?: boolean;
+      expectedContent?: string;
+      authorize?: () => boolean;
+    }
+  ): Promise<"written" | "discarded">;
   resolveTopicModel(
     path: string,
     map?: MapDocument,
@@ -214,6 +226,13 @@ export interface ResearchStart extends WritebackHooks {
   queueCharts?: (job: QueuedCharts) => void;
   /** Takes user additions while the main call runs (the topic chat window). Absent: the run is exactly as before. */
   steer?: ResearchSteer;
+  /**
+   * The picture-book pipeline's author step only; absent: the run is exactly as before. `authorize` is checked inside the
+   * write itself (with the file text the run started from), so a stopped or replaced pipeline run, or a note the owner
+   * changed after the last read, writes nothing. `onBudgetExhausted` hears the call budget's refusal as its own outcome:
+   * the topic gets its old status back and no error is recorded.
+   */
+  pipeline?: { authorize: () => boolean; onBudgetExhausted: () => void };
 }
 
 /** What a child-topic proposal run needs from the entry that starts it (the view). */
@@ -1495,20 +1514,32 @@ export class TopicRuns {
             fail(composed.message);
             return;
           }
-          await repo.updateNote(
-            path,
-            {
-              summary: result.summary,
-              detail: composed.detail,
-              visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
-              newFindings: "",
-              status: "completed",
-              // The topic remembers the mode of its latest research (Quick is stored as local).
-              ...(context.researchMode ? { researchMode: context.researchMode } : {}),
-              ...(mode === "top" ? { detailFormatIssues: [] } : formatIssuesPatch(result.formatIssues, language))
-            },
-            { detailTemplate: writeContext.detailTemplate, newVisualReferences: true }
-          );
+          const patch: NotePatch = {
+            summary: result.summary,
+            detail: composed.detail,
+            visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
+            newFindings: "",
+            status: "completed",
+            // The topic remembers the mode of its latest research (Quick is stored as local).
+            ...(context.researchMode ? { researchMode: context.researchMode } : {}),
+            ...(mode === "top" ? { detailFormatIssues: [] } : formatIssuesPatch(result.formatIssues, language))
+          };
+          const writeOptions = { detailTemplate: writeContext.detailTemplate, newVisualReferences: true };
+          const guard = options.pipeline;
+          if (guard && repo.updateNoteGuarded) {
+            // The pipeline's write: the file must still be the text the run left, and the run must still be current.
+            const outcome = await repo.updateNoteGuarded(path, patch, {
+              ...writeOptions,
+              ...(raw ? { expectedContent: raw.started } : {}),
+              authorize: guard.authorize
+            });
+            if (outcome === "discarded") {
+              await repo.updateNote(path, { status: note.status });
+              if (exchangeId) exchanges()?.failed(exchangeId, t("log.stale_result_not_written"));
+              fail(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+              return;
+            }
+          } else await repo.updateNote(path, patch, writeOptions);
           const saved = await repo.readNote(path, options.map);
           options.onWritten?.({ before: { ...latest, status: note.status }, after: saved });
           if (exchangeId) exchanges()?.completed(exchangeId);
@@ -1530,6 +1561,12 @@ export class TopicRuns {
       .catch(error =>
         this.ports.mutate()(async () => {
           progress?.end(path, progressAttempt);
+          if (options.pipeline && isBudgetExhausted(error)) {
+            // Not a failure of the note: it keeps its old status and gets no error text.
+            await repo.updateNote(path, { status: note.status });
+            options.pipeline.onBudgetExhausted();
+            return;
+          }
           if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
             await repo.updateNote(path, { status: note.status });
             fail(t("ui.research_stopped_existing_content_was_preserved"));

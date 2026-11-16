@@ -90028,14 +90028,16 @@ var AiCalls = class {
           }
         },
         onRequest: (data) => {
-          var _a3, _b3;
+          var _a3, _b3, _c2;
           (_a3 = task.onRequest) == null ? void 0 : _a3.call(task, data);
           sentText += promptTextOf(data);
-          (_b3 = log()) == null ? void 0 : _b3.sent(
-            id,
-            JSON.stringify(requestLog === "request" ? data : { request: data, prompt: call.prompt }, null, 2),
-            call.prompt
-          );
+          if (options.noContentLog) (_b3 = log()) == null ? void 0 : _b3.sent(id, JSON.stringify({ content: "omitted" }));
+          else
+            (_c2 = log()) == null ? void 0 : _c2.sent(
+              id,
+              JSON.stringify(requestLog === "request" ? data : { request: data, prompt: call.prompt }, null, 2),
+              call.prompt
+            );
         }
       };
       if (options.admission) {
@@ -90054,7 +90056,7 @@ var AiCalls = class {
       if (controller.signal.aborted) throw stopped();
       (_f = options.afterReply) == null ? void 0 : _f.call(options);
       milestones.receivedAt = (/* @__PURE__ */ new Date()).toISOString();
-      (_g = log()) == null ? void 0 : _g.received(id, raw);
+      (_g = log()) == null ? void 0 : _g.received(id, options.noContentLog ? "[omitted]" : raw);
       writeMilestones();
       const value = await finish(raw, exchange);
       if (!finished) {
@@ -90066,7 +90068,7 @@ var AiCalls = class {
       writeMilestones();
       if (options.entryEnd !== "caller" && !finished)
         exchange.fail(
-          options.failMessage ? options.failMessage(error) : error instanceof Error ? error.message : String(error)
+          options.failMessage ? options.failMessage(error) : options.noContentLog ? "failed" : error instanceof Error ? error.message : String(error)
         );
       throw error;
     } finally {

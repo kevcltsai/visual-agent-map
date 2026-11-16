@@ -364,6 +364,17 @@ test('collect snapshots: chart step (chart.add@1)', () => {
     // P2-8: the corrective-retry variant of the facet plan (the reason line is the only difference)
     record(`argument-map-facet-plan-retry.${tag}`, 'core/steps/argument-map/runner.ts withRetryReason(facetPlanStep)', language, argumentSteps.withRetryReason(argumentSteps.facetPlanStep, 'The reply uses the number 9, which the request does not have').render(request), argumentSteps.facetPlanStep.schema);
   }
+  // Picture-book pipeline (02b): the whole-book plan, one card's brief and the proofread. Fixed inputs; no existing snapshot is touched.
+  const bookGlobal = support.load('core/steps/book-pipeline/global-plan.ts', { obsidian: support.obsidian });
+  const bookCard = support.load('core/steps/book-pipeline/card-plan.ts', { obsidian: support.obsidian });
+  const bookProof = support.load('core/steps/book-pipeline/proofread.ts', { obsidian: support.obsidian });
+  for (const [language, tag] of LANGUAGES) {
+    const base = { language, model: 'claude-haiku-4-5', reasoning: 'low' };
+    const cards = [{ id: 'n1', title: 'Introduction to Western art', summary: 'What the book covers' }, { id: 'n2', title: 'Renaissance', summary: 'Perspective and the workshop' }, { id: 'n3', title: 'Baroque', summary: 'Light and drama' }];
+    record(`book-global-plan.${tag}`, 'core/steps/book-pipeline/global-plan.ts globalPlanStep', language, bookGlobal.globalPlanStep.render({ ...base, bookTitle: 'Western art history', settings: { reader: 'Curious adults' }, cards }), bookGlobal.globalPlanStep.schema);
+    record(`book-card-plan.${tag}`, 'core/steps/book-pipeline/card-plan.ts cardPlanStep', language, bookCard.cardPlanStep.render({ ...base, thread: 'From workshop craft to theatrical light', settings: { reader: 'Curious adults', tone: 'warm' }, materials: [{ name: 'Mona Lisa', use: 'Opens the Renaissance chapter' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: 'Renaissance', summary: 'Perspective and the workshop' }, previous: { position: 1, title: 'Introduction to Western art', summary: 'What the book covers' }, next: { position: 3, title: 'Baroque', summary: 'Light and drama' } }), bookCard.cardPlanStep.schema);
+    record(`book-proofread.${tag}`, 'core/steps/book-pipeline/proofread.ts proofreadStep', language, bookProof.proofreadStep.render({ ...base, body: 'Brunelleschi demonstrated linear perspective around 1415.', checklist: [{ id: 'C1', type: 'structure', text: 'Names the technique' }, { id: 'C2', type: 'fact', text: 'States the date of the demonstration' }] }), bookProof.proofreadStep.schema);
+  }
   for (const [language, tag] of LANGUAGES) record(`chart.add-none.${tag}`, 'core/steps/chart/step.ts chartStep (no existing diagram)', language, chartStep.render({ title: 'Topic T', detail: language === 'en' ? 'Plain text.' : '純文字。', language, existingCount: 0, existingTypes: [], remaining: 3 }), chartStep.schema);
 });
 

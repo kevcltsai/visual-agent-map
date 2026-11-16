@@ -69,6 +69,11 @@ export interface AiCallOptions {
    * sent. Absent: the call is exactly as before.
    */
   admission?: AdmissionContext;
+  /**
+   * True: the exchange log entry keeps its metadata (step, model, timings, status) but never the prompt, the reply or the
+   * runtime request, and a failure is filed under `failMessage` only. For callers whose text is the owner's private writing.
+   */
+  noContentLog?: boolean;
   /** "caller": AiCalls writes neither `completed` nor `failed`; the caller ends the entry by id after later work. */
   entryEnd?: "calls" | "caller";
 }
@@ -259,11 +264,13 @@ export class AiCalls {
         onRequest: (data: unknown): void => {
           task.onRequest?.(data);
           sentText += promptTextOf(data);
-          log()?.sent(
-            id,
-            JSON.stringify(requestLog === "request" ? data : { request: data, prompt: call.prompt }, null, 2),
-            call.prompt
-          );
+          if (options.noContentLog) log()?.sent(id, JSON.stringify({ content: "omitted" }));
+          else
+            log()?.sent(
+              id,
+              JSON.stringify(requestLog === "request" ? data : { request: data, prompt: call.prompt }, null, 2),
+              call.prompt
+            );
         }
       };
       if (options.admission) {
@@ -282,7 +289,7 @@ export class AiCalls {
       if (controller.signal.aborted) throw stopped();
       options.afterReply?.();
       milestones.receivedAt = new Date().toISOString();
-      log()?.received(id, raw);
+      log()?.received(id, options.noContentLog ? "[omitted]" : raw);
       writeMilestones();
       const value = await finish(raw, exchange);
       if (!finished) {
@@ -294,7 +301,13 @@ export class AiCalls {
       writeMilestones();
       if (options.entryEnd !== "caller" && !finished)
         exchange.fail(
-          options.failMessage ? options.failMessage(error) : error instanceof Error ? error.message : String(error)
+          options.failMessage
+            ? options.failMessage(error)
+            : options.noContentLog
+              ? "failed"
+              : error instanceof Error
+                ? error.message
+                : String(error)
         );
       throw error;
     } finally {

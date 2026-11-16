@@ -226,6 +226,51 @@
       "language": "zh-CN",
       "schema": true
     },
+    "book-card-plan.en": {
+      "builder": "core/steps/book-pipeline/card-plan.ts cardPlanStep",
+      "language": "en",
+      "schema": true
+    },
+    "book-card-plan.zh": {
+      "builder": "core/steps/book-pipeline/card-plan.ts cardPlanStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "book-card-plan.zh-CN": {
+      "builder": "core/steps/book-pipeline/card-plan.ts cardPlanStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "book-global-plan.en": {
+      "builder": "core/steps/book-pipeline/global-plan.ts globalPlanStep",
+      "language": "en",
+      "schema": true
+    },
+    "book-global-plan.zh": {
+      "builder": "core/steps/book-pipeline/global-plan.ts globalPlanStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "book-global-plan.zh-CN": {
+      "builder": "core/steps/book-pipeline/global-plan.ts globalPlanStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "book-proofread.en": {
+      "builder": "core/steps/book-pipeline/proofread.ts proofreadStep",
+      "language": "en",
+      "schema": true
+    },
+    "book-proofread.zh": {
+      "builder": "core/steps/book-pipeline/proofread.ts proofreadStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "book-proofread.zh-CN": {
+      "builder": "core/steps/book-pipeline/proofread.ts proofreadStep",
+      "language": "zh-CN",
+      "schema": true
+    },
     "chart.add-none.en": {
       "builder": "core/steps/chart/step.ts chartStep (no existing diagram)",
       "language": "en",

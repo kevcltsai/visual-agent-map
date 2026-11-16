@@ -1,0 +1,97 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "thread": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cards": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "intro",
+              "body",
+              "gallery",
+              "closing"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "role"
+        ]
+      }
+    },
+    "materials": {
+      "type": "array",
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "use": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "name",
+          "use"
+        ]
+      }
+    },
+    "decisions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reader": {
+          "type": "string"
+        },
+        "goal": {
+          "type": "string"
+        },
+        "angle": {
+          "type": "string"
+        },
+        "tone": {
+          "type": "string"
+        },
+        "length": {
+          "type": "string"
+        },
+        "style": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reader",
+        "goal",
+        "angle",
+        "tone",
+        "length",
+        "style"
+      ]
+    }
+  },
+  "required": [
+    "thread",
+    "cards",
+    "materials",
+    "decisions"
+  ]
+}

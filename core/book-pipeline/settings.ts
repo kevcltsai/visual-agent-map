@@ -45,8 +45,12 @@ export const BOOK_SETTING_INPUT_MAX = 200;
 export function cleanBookSettingsInput(input: unknown): BookSettings {
   const out: BookSettings = {};
   if (!input || typeof input !== "object") return out;
+  const raw = input as Record<string, unknown>;
   for (const field of BOOK_SETTING_FIELDS) {
-    const line = singleLine((input as Record<string, unknown>)[field], BOOK_SETTING_INPUT_MAX);
+    const line = singleLine(
+      typeof raw[field] === "string" ? raw[field].replace(/\p{Cc}/gu, " ") : raw[field],
+      BOOK_SETTING_INPUT_MAX
+    );
     if (line) out[field] = line;
   }
   return out;

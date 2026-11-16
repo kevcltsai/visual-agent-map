@@ -104,6 +104,15 @@ test('a usable bookPipeline round-trips byte-identical and reads as usable', () 
   assert.equal(read.data.budget.used, 0);
 });
 
+test('autoRoles is optional: older data without it round-trips byte-identical and stays usable; with it, it round-trips too', () => {
+  const old = core.serializeMap(baseMap({ aiMode: 'quick', bookPipeline: usable() }));
+  assert.ok(!old.includes('autoRoles'));
+  assert.equal(roundTrip(old), old);
+  const withRoles = core.serializeMap(baseMap({ aiMode: 'quick', bookPipeline: { ...usable(), autoRoles: ['a'] } }));
+  assert.equal(roundTrip(withRoles), withRoles);
+  assert.deepEqual(plain(model.readBookPipeline(core.parseMap(withRoles)).data.autoRoles), ['a']);
+});
+
 const corrupt = {
   'v:2': s => { s.v = 2; },
   'v missing': s => { delete s.v; },
@@ -117,6 +126,8 @@ const corrupt = {
   'attempt entry short': s => { s.attempts.a = { plan: 1 }; },
   'negative revision': s => { s.revision = -1; },
   'revisions bad': s => { s.revisions.a = 'x'; },
+  'autoRoles not strings': s => { s.autoRoles = [1]; },
+  'autoRoles not array': s => { s.autoRoles = 'a'; },
   'budget limit 0': s => { s.budget.limit = 0; },
   'budget used fraction': s => { s.budget.used = 1.5; },
   'future field with v:2': s => { s.v = 2; s.futureThing = { deep: [1, { x: 'y' }] }; },

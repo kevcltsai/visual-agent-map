@@ -63,6 +63,8 @@ export function newBookPipeline(input: {
   budgetLimit?: number;
   /** Cards that carry a stage from before this run: it is stale (never trusted across runs) and gets cleared first. */
   staleStages?: readonly string[];
+  /** Cards whose role the pipeline wrote itself (see `BookPipelineData.autoRoles`). */
+  autoRoles?: readonly string[];
 }): BookPipelineData {
   if (!input.order.length) throw new Error("empty order");
   if (input.order.includes("global")) throw new Error("reserved node id");
@@ -76,6 +78,7 @@ export function newBookPipeline(input: {
     attempts: { global: 0 },
     revisions: {},
     ...(input.staleStages?.length ? { pendingReset: [...input.staleStages] } : {}),
+    ...(input.autoRoles?.length ? { autoRoles: [...input.autoRoles] } : {}),
     budget: { used: 0, limit: input.budgetLimit ?? DEFAULT_BUDGET_LIMIT },
     revision: 0,
     startedAt: input.now,

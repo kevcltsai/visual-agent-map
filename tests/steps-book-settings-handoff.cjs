@@ -66,6 +66,11 @@ test('cleanBookSettingsInput drops empty, non-string and over-long input', () =>
   assert.deepEqual(cleanBookSettingsInput({ style: '😀'.repeat(250) }).style, '😀'.repeat(200));
 });
 
+test('cleanBookSettingsInput removes control characters (NUL, escape, tab)', () => {
+  assert.deepEqual(plain(cleanBookSettingsInput({ reader: 'a\u0000b\u001bc\u007fd\te' })), { reader: 'a b c d e' });
+  assert.deepEqual(plain(cleanBookSettingsInput({ goal: '\u0000\u0001' })), {});
+});
+
 test('typing at the limit shows a notice', async () => {
   const fx = await reframingModalFixture();
   const input = find(fx.modal, 'Reader');

@@ -555,9 +555,17 @@ export class BookPipelineRuns {
         if (read.kind === "unusable") throw new BookPipelineRunError("unusable");
         if (read.kind === "usable" && read.data.phase !== "done") throw new BookPipelineRunError("exists");
         const order = this.orderOf(map);
-        await this.load(drive, map, order);
+        // Roles the previous run's pipeline wrote (defaults and plan choices) are not the owner's; only roles written outside the pipeline are.
+        const prior = read.kind === "usable" ? (read.data.autoRoles ?? []) : [];
+        await this.load(drive, map, order, new Set(prior));
         const stale = order.filter(id => drive.stages.get(id) !== undefined);
-        const state = newBookPipeline({ runId, order, now: this.ports.now(), staleStages: stale });
+        const state = newBookPipeline({
+          runId,
+          order,
+          now: this.ports.now(),
+          staleStages: stale,
+          autoRoles: [...new Set([...prior.filter(id => order.includes(id)), ...drive.missingRoles.keys()])]
+        });
         if (this.dead(drive)) return;
         await this.ports.updateMap(mapPath, doc => {
           const found = readBookPipeline(doc);
@@ -948,13 +956,18 @@ export class BookPipelineRuns {
       !(read.data.status === "stopped" && read.data.pauseReason === "budget")
     )
       throw new BookPipelineRunError("finished");
-    await this.load(drive, map, read.data.order);
+    await this.load(drive, map, read.data.order, new Set(read.data.autoRoles));
     if (this.dead(drive)) throw new BookPipelineRunError("disposed");
     this.attachStore(drive, read.data);
     return read.data;
   }
   /** Reads every card of the run: its path, title, summary, role and stage (kept in memory, updated after each write). */
-  private async load(drive: Drive, map: MapDocument, order: readonly string[]): Promise<void> {
+  private async load(
+    drive: Drive,
+    map: MapDocument,
+    order: readonly string[],
+    autoRoles: ReadonlySet<string>
+  ): Promise<void> {
     drive.rootId = map.nodes.find(node => !node.parentId)?.id ?? "";
     if (map.nodes.filter(node => !node.parentId).length !== 1) throw new BookPipelineRunError("root");
     drive.ownerRoles.clear();
@@ -967,8 +980,9 @@ export class BookPipelineRuns {
       }
       try {
         const card = await this.ports.readCard(node.path);
-        if (card.fields.bookRole) drive.ownerRoles.add(id);
-        else drive.missingRoles.set(id, !node.parentId || node.parentId === drive.rootId ? "intro" : "body");
+        if (card.fields.bookRole) {
+          if (!autoRoles.has(id)) drive.ownerRoles.add(id);
+        } else drive.missingRoles.set(id, !node.parentId || node.parentId === drive.rootId ? "intro" : "body");
         drive.cards.set(id, {
           path: node.path,
           title: card.title,

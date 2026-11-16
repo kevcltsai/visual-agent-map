@@ -121,6 +121,58 @@ test('a failed whole-book plan three times holds the run at planning; no card is
   for (let i = 0; i < 3; i++) assert.equal(stageOf(r.raw(i)), undefined);
 });
 
+const planRoles = (r, roles) => ({ thread: 't', cards: r.nodes.map((n, i) => ({ id: n.id, role: roles[i] })), materials: [{ name: 'm', use: 'u' }], decisions: { reader: 'kids' } });
+/** Card 2 becomes a child of card 1 (a second level), so its default role is body; card 1 (first level) defaults to intro. */
+const deepen = r => r.repo.updateMap(r.mapPath, d => { d.nodes.find(n => n.id === r.nodes[2].id).parentId = r.nodes[1].id; });
+
+test('book roles: a default written before an interrupted global plan stays overridable after resume', async () => {
+  let ok = false;
+  const holder = {};
+  const r = await rig({ script: { global: () => { if (!ok) throw new Error('nope'); return planRoles(holder.r, ['intro', 'intro', 'intro']); } } });
+  holder.r = r;
+  await deepen(r);
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.note(2)).bookRole, 'body');
+  assert.deepEqual([...(await r.state()).autoRoles].sort(), r.nodes.map(n => n.id).sort());
+  ok = true;
+  await r.runs.resume(r.mapPath); await settle();
+  assert.equal((await r.note(2)).bookRole, 'intro');
+});
+
+test('book roles: an owner-set role is never overwritten, on the first run, after resume or on a later run', async () => {
+  const holder = {};
+  let roles = ['intro', 'body', 'intro'];
+  const r = await rig({ script: { global: () => planRoles(holder.r, roles) } });
+  holder.r = r;
+  await deepen(r);
+  await r.repo.writePipelineFields(r.nodes[1].path, { bookRole: 'body' });
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.note(1)).bookRole, 'body');
+  assert.equal((await r.note(2)).bookRole, 'intro', 'the plan overrode the default');
+  assert.ok(!(await r.state()).autoRoles.includes(r.nodes[1].id));
+  await r.runs.stop(r.mapPath, { saved: true }); await r.runs.resume(r.mapPath); await settle();
+  assert.equal((await r.note(1)).bookRole, 'body');
+  // A later run: the plan's own choice from the first run is not frozen as the owner's; the owner's still is.
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'done'; });
+  roles = ['intro', 'intro', 'body'];
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.note(2)).bookRole, 'body', 'the earlier plan role is not frozen');
+  assert.equal((await r.note(1)).bookRole, 'body', 'the owner role is kept');
+});
+
+test('book roles: data without autoRoles behaves as before (every existing role is the owner\'s; nothing is added to the saved shape)', async () => {
+  const holder = {};
+  const r = await rig({ script: { global: () => planRoles(holder.r, ['body', 'body', 'body']) } });
+  holder.r = r;
+  for (const [i, role] of ['intro', 'intro', 'body'].entries()) await r.repo.writePipelineFields(r.nodes[i].path, { bookRole: role });
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.state()).autoRoles, undefined, 'no pipeline-written role: the key stays absent');
+  assert.equal((await r.note(0)).bookRole, 'intro');
+  await r.runs.stop(r.mapPath, { saved: true });
+  await r.runs.resume(r.mapPath); await settle();
+  assert.deepEqual(await Promise.all([0, 1, 2].map(async i => (await r.note(i)).bookRole)), ['intro', 'intro', 'body']);
+});
+
 test('the budget running out pauses without marking a card; addBudget resumes and finishes; another map is not touched', async () => {
   const r = await rig();
   const other = await rig();

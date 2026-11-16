@@ -137,6 +137,8 @@ export interface BookPipelineData {
   revisions: Record<string, number>;
   /** Cards whose stage is stale from an earlier run and must be cleared before anything else (idempotent). */
   pendingReset?: string[];
+  /** Cards whose `book-role` the pipeline itself wrote (its default or the global plan's choice), never the owner's; the plan may overwrite these. Absent = none (older data). */
+  autoRoles?: string[];
   budget: PipelineBudget;
   /** Raised by every owner stop; a step result carries the one it started under (absent = 0). */
   stopEpoch?: number;
@@ -179,6 +181,11 @@ function problem(raw: unknown): string | undefined {
     (!Array.isArray(raw.pendingReset) || raw.pendingReset.some(id => typeof id !== "string"))
   )
     return "pendingReset";
+  if (
+    raw.autoRoles !== undefined &&
+    (!Array.isArray(raw.autoRoles) || raw.autoRoles.some(id => typeof id !== "string"))
+  )
+    return "autoRoles";
   if (!isObject(raw.budget) || !isCount(raw.budget.used) || !isCount(raw.budget.limit) || raw.budget.limit < 1)
     return "budget";
   if (raw.stopEpoch !== undefined && !isCount(raw.stopEpoch)) return "stopEpoch";

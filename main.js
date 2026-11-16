@@ -12400,6 +12400,8 @@ function problem(raw) {
   if (!isObject(raw.revisions) || Object.values(raw.revisions).some((value) => !isCount(value))) return "revisions";
   if (raw.pendingReset !== void 0 && (!Array.isArray(raw.pendingReset) || raw.pendingReset.some((id) => typeof id !== "string")))
     return "pendingReset";
+  if (raw.autoRoles !== void 0 && (!Array.isArray(raw.autoRoles) || raw.autoRoles.some((id) => typeof id !== "string")))
+    return "autoRoles";
   if (!isObject(raw.budget) || !isCount(raw.budget.used) || !isCount(raw.budget.limit) || raw.budget.limit < 1)
     return "budget";
   if (raw.stopEpoch !== void 0 && !isCount(raw.stopEpoch)) return "stopEpoch";
@@ -12477,8 +12479,12 @@ var BOOK_SETTING_INPUT_MAX = 200;
 function cleanBookSettingsInput(input2) {
   const out = {};
   if (!input2 || typeof input2 !== "object") return out;
+  const raw = input2;
   for (const field of BOOK_SETTING_FIELDS) {
-    const line2 = singleLine(input2[field], BOOK_SETTING_INPUT_MAX);
+    const line2 = singleLine(
+      typeof raw[field] === "string" ? raw[field].replace(/\p{Cc}/gu, " ") : raw[field],
+      BOOK_SETTING_INPUT_MAX
+    );
     if (line2) out[field] = line2;
   }
   return out;
@@ -43310,7 +43316,7 @@ function formatPipelineLog(e) {
 var clone2 = (data) => JSON.parse(JSON.stringify(data));
 var ranked = (stage) => stage === void 0 ? 0 : stage === "planned" ? 1 : stage === "written" ? 2 : 3;
 function newBookPipeline(input2) {
-  var _a2, _b2;
+  var _a2, _b2, _c;
   if (!input2.order.length) throw new Error("empty order");
   if (input2.order.includes("global")) throw new Error("reserved node id");
   return {
@@ -43323,7 +43329,8 @@ function newBookPipeline(input2) {
     attempts: { global: 0 },
     revisions: {},
     ...((_a2 = input2.staleStages) == null ? void 0 : _a2.length) ? { pendingReset: [...input2.staleStages] } : {},
-    budget: { used: 0, limit: (_b2 = input2.budgetLimit) != null ? _b2 : DEFAULT_BUDGET_LIMIT },
+    ...((_b2 = input2.autoRoles) == null ? void 0 : _b2.length) ? { autoRoles: [...input2.autoRoles] } : {},
+    budget: { used: 0, limit: (_c = input2.budgetLimit) != null ? _c : DEFAULT_BUDGET_LIMIT },
     revision: 0,
     startedAt: input2.now,
     phaseStartedAt: input2.now
@@ -49045,15 +49052,23 @@ var BookPipelineRuns = class {
       const runId = this.ports.newId();
       let initial;
       await this.ports.mutate(async () => {
+        var _a2;
         if (this.dead(drive)) return;
         const map = await this.ports.readMap(mapPath);
         const read = readBookPipeline(map);
         if (read.kind === "unusable") throw new BookPipelineRunError("unusable");
         if (read.kind === "usable" && read.data.phase !== "done") throw new BookPipelineRunError("exists");
         const order = this.orderOf(map);
-        await this.load(drive, map, order);
+        const prior = read.kind === "usable" ? (_a2 = read.data.autoRoles) != null ? _a2 : [] : [];
+        await this.load(drive, map, order, new Set(prior));
         const stale = order.filter((id) => drive.stages.get(id) !== void 0);
-        const state = newBookPipeline({ runId, order, now: this.ports.now(), staleStages: stale });
+        const state = newBookPipeline({
+          runId,
+          order,
+          now: this.ports.now(),
+          staleStages: stale,
+          autoRoles: [.../* @__PURE__ */ new Set([...prior.filter((id) => order.includes(id)), ...drive.missingRoles.keys()])]
+        });
         if (this.dead(drive)) return;
         await this.ports.updateMap(mapPath, (doc) => {
           const found = readBookPipeline(doc);
@@ -49410,13 +49425,13 @@ var BookPipelineRuns = class {
     if (read.kind === "unusable") throw new BookPipelineRunError("unusable");
     if (read.data.phase === "done" && !options.allowDone && !(read.data.status === "stopped" && read.data.pauseReason === "budget"))
       throw new BookPipelineRunError("finished");
-    await this.load(drive, map, read.data.order);
+    await this.load(drive, map, read.data.order, new Set(read.data.autoRoles));
     if (this.dead(drive)) throw new BookPipelineRunError("disposed");
     this.attachStore(drive, read.data);
     return read.data;
   }
   /** Reads every card of the run: its path, title, summary, role and stage (kept in memory, updated after each write). */
-  async load(drive, map, order) {
+  async load(drive, map, order, autoRoles) {
     var _a2, _b2, _c, _d;
     drive.rootId = (_b2 = (_a2 = map.nodes.find((node) => !node.parentId)) == null ? void 0 : _a2.id) != null ? _b2 : "";
     if (map.nodes.filter((node) => !node.parentId).length !== 1) throw new BookPipelineRunError("root");
@@ -49430,8 +49445,9 @@ var BookPipelineRuns = class {
       }
       try {
         const card = await this.ports.readCard(node.path);
-        if (card.fields.bookRole) drive.ownerRoles.add(id);
-        else drive.missingRoles.set(id, !node.parentId || node.parentId === drive.rootId ? "intro" : "body");
+        if (card.fields.bookRole) {
+          if (!autoRoles.has(id)) drive.ownerRoles.add(id);
+        } else drive.missingRoles.set(id, !node.parentId || node.parentId === drive.rootId ? "intro" : "body");
         drive.cards.set(id, {
           path: node.path,
           title: card.title,

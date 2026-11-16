@@ -82070,6 +82070,104 @@ async function applyMathRepair(vault, plan) {
 // main.ts
 var import_obsidian48 = require("obsidian");
 
+// ai/note-style-references.ts
+async function renameStyleReferences(ports, category, ref, name2) {
+  var _a2;
+  const topics = category === "recipe" ? ports.topics.list().filter((item) => item.ref === ref) : [];
+  const oldName = ref.slice("file:".length);
+  const renamed = await ports.files.renameFile(category, ref, name2);
+  if (!renamed.ok) return renamed;
+  if (renamed.unchanged) return { ok: true, ref, unchanged: true, topics: 0, styles: 0, failed: [] };
+  const failed = [];
+  let settingsFailed = false;
+  const next = renamed.ref;
+  const settings = ports.settings();
+  const swap = (table2) => table2 && Object.values(table2).includes(ref) ? Object.fromEntries(Object.entries(table2).map(([key4, value]) => [key4, value === ref ? next : value])) : void 0;
+  let settingsChanged = false;
+  const byKind = category === "recipe" ? swap(settings.noteStyleByKind) : void 0;
+  if (byKind) {
+    settings.noteStyleByKind = byKind;
+    settingsChanged = true;
+  }
+  if (category !== "recipe") {
+    const legacy = (_a2 = settings.noteStyleRecipe) == null ? void 0 : _a2.legacy;
+    const table2 = category === "structure" ? "templates" : category === "voice" ? "tones" : void 0;
+    const swapped = table2 ? swap(legacy == null ? void 0 : legacy[table2]) : void 0;
+    if (legacy && table2 && swapped) {
+      settings.noteStyleRecipe = { ...settings.noteStyleRecipe, legacy: { ...legacy, [table2]: swapped } };
+      settingsChanged = true;
+    }
+    const defaults2 = settings.noteStyleDefaults;
+    if (category !== "structure" && (defaults2 == null ? void 0 : defaults2[category]) === ref) {
+      settings.noteStyleDefaults = { ...defaults2, [category]: next };
+      settingsChanged = true;
+    }
+  }
+  if (settingsChanged) {
+    try {
+      await ports.save();
+    } catch (e) {
+      settingsFailed = true;
+    }
+  }
+  let styles = 0;
+  if (category !== "recipe") {
+    const written2 = await ports.files.rewritePartRefs(category, oldName, next.slice("file:".length));
+    styles = written2.changed.length;
+    failed.push(...written2.failed);
+  }
+  let changedTopics = 0;
+  for (const topic of topics) {
+    try {
+      if (await ports.topics.rename(topic.path, ref, next)) changedTopics++;
+    } catch (e) {
+      failed.push(topic.path);
+    }
+  }
+  return { ok: true, ref: next, topics: changedTopics, styles, failed, settingsFailed };
+}
+async function clearKindStyles(ports, ref) {
+  const settings = ports.settings();
+  const stored = settings.noteStyleByKind;
+  const kinds = stored ? Object.keys(stored).filter((kind) => stored[kind] === ref) : [];
+  if (!kinds.length) return kinds;
+  const next = { ...stored };
+  for (const kind of kinds) delete next[kind];
+  if (Object.keys(next).length) settings.noteStyleByKind = next;
+  else delete settings.noteStyleByKind;
+  await ports.save();
+  return kinds;
+}
+async function setKindStyle(ports, kind, ref) {
+  const settings = ports.settings();
+  const next = { ...settings.noteStyleByKind };
+  if (ref === KIND_DEFAULT_RECIPE[kind]) delete next[kind];
+  else next[kind] = ref;
+  if (Object.keys(next).length) settings.noteStyleByKind = next;
+  else delete settings.noteStyleByKind;
+  await ports.save();
+}
+async function setGlobalPart(ports, category, ref) {
+  if (!parseRecipeRef(ref, category)) return;
+  const settings = ports.settings();
+  const next = withGlobalPart(settings.noteStyleDefaults, category, ref);
+  if (next) settings.noteStyleDefaults = next;
+  else delete settings.noteStyleDefaults;
+  await ports.save();
+}
+async function deleteStyleReferences(ports, category, ref) {
+  var _a2;
+  try {
+    await ports.files.trashFile(category, ref);
+  } catch (e) {
+    return false;
+  }
+  if (category === "recipe") await clearKindStyles(ports, ref);
+  else if (category !== "structure" && ((_a2 = ports.settings().noteStyleDefaults) == null ? void 0 : _a2[category]) === ref)
+    await setGlobalPart(ports, category, GLOBAL_PART_DEFAULT[category]);
+  return true;
+}
+
 // ui/modals/map-chat-records-off-modal.ts
 var import_obsidian36 = require("obsidian");
 var MapChatRecordsOffModal = class extends import_obsidian36.Modal {
@@ -94285,6 +94383,21 @@ function settingsFromSaved(saved, appLocale) {
     canvasHintSeen: (saved == null ? void 0 : saved.canvasHintSeen) === true
   };
 }
+function noteStylePorts(plugin) {
+  return {
+    settings: () => plugin.settings,
+    save: () => plugin.saveSettings(),
+    files: {
+      renameFile: (category, ref, name2) => plugin.noteStyles.renameFile(category, ref, name2),
+      rewritePartRefs: (category, oldName, newName) => plugin.noteStyles.rewritePartRefs(category, oldName, newName),
+      trashFile: (category, ref) => plugin.noteStyles.trashFile(category, ref)
+    },
+    topics: {
+      list: () => plugin.topicNoteStyleRefs(),
+      rename: (path, from, to) => plugin.repo.renameNoteStyleRef(path, from, to)
+    }
+  };
+}
 var VisualAgentMapPlugin = class extends import_obsidian48.Plugin {
   constructor() {
     super(...arguments);
@@ -95679,77 +95792,20 @@ ${t("ui.organize_link_wait_hint")}`;
    * Notice says what was updated and one lists what was not. There is no undo: renaming back follows the same way.
    */
   async renameNoteStyle(category, ref, name2) {
-    var _a2;
-    const topics = category === "recipe" ? this.topicNoteStyleRefs().filter((item) => item.ref === ref) : [];
-    const oldName = ref.slice("file:".length);
-    const renamed = await this.noteStyles.renameFile(category, ref, name2);
-    if (!renamed.ok) {
+    const result = await renameStyleReferences(noteStylePorts(this), category, ref, name2);
+    if (!result.ok) {
       new import_obsidian48.Notice(t("ui.manage_rename_refused"));
-      return renamed;
+      return result;
     }
-    if (renamed.unchanged) return { ok: true, ref, unchanged: true, topics: 0, styles: 0, failed: [] };
-    const failed = [];
-    const next = renamed.ref;
-    const swap = (table2) => table2 && Object.values(table2).includes(ref) ? Object.fromEntries(Object.entries(table2).map(([key4, value]) => [key4, value === ref ? next : value])) : void 0;
-    let settingsChanged = false;
-    const byKind = category === "recipe" ? swap(this.settings.noteStyleByKind) : void 0;
-    if (byKind) {
-      this.settings.noteStyleByKind = byKind;
-      settingsChanged = true;
-    }
-    if (category !== "recipe") {
-      const legacy = (_a2 = this.settings.noteStyleRecipe) == null ? void 0 : _a2.legacy;
-      const table2 = category === "structure" ? "templates" : category === "voice" ? "tones" : void 0;
-      const swapped = table2 ? swap(legacy == null ? void 0 : legacy[table2]) : void 0;
-      if (legacy && table2 && swapped) {
-        this.settings.noteStyleRecipe = {
-          ...this.settings.noteStyleRecipe,
-          legacy: { ...legacy, [table2]: swapped }
-        };
-        settingsChanged = true;
-      }
-      const defaults2 = this.settings.noteStyleDefaults;
-      if (category !== "structure" && (defaults2 == null ? void 0 : defaults2[category]) === ref) {
-        this.settings.noteStyleDefaults = { ...defaults2, [category]: next };
-        settingsChanged = true;
-      }
-    }
-    if (settingsChanged) {
-      try {
-        await this.saveSettings();
-      } catch (e) {
-        failed.push(t("ui.manage_rename_settings"));
-      }
-    }
-    let styles = 0;
-    if (category !== "recipe") {
-      const written2 = await this.noteStyles.rewritePartRefs(category, oldName, next.slice("file:".length));
-      styles = written2.changed.length;
-      failed.push(...written2.failed);
-    }
-    let changedTopics = 0;
-    for (const topic of topics) {
-      try {
-        if (await this.repo.renameNoteStyleRef(topic.path, ref, next)) changedTopics++;
-      } catch (e) {
-        failed.push(topic.path);
-      }
-    }
-    new import_obsidian48.Notice(t("ui.manage_rename_done_0_1_2", name2, changedTopics, styles));
+    if (result.unchanged) return result;
+    const failed = [...result.settingsFailed ? [t("ui.manage_rename_settings")] : [], ...result.failed];
+    new import_obsidian48.Notice(t("ui.manage_rename_done_0_1_2", name2, result.topics, result.styles));
     if (failed.length) new import_obsidian48.Notice(t("ui.manage_rename_failed_0", failed.join(t("ui.list_separator"))));
-    return { ok: true, ref: next, topics: changedTopics, styles, failed };
+    return { ok: true, ref: result.ref, topics: result.topics, styles: result.styles, failed };
   }
   /** Removes the entries of `noteStyleByKind` that name `ref` (those topic types go back to their built-in style); one save. Returns the kinds. */
-  async clearKindStyles(ref) {
-    const stored = this.settings.noteStyleByKind;
-    const kinds = stored ? Object.keys(stored).filter((kind) => stored[kind] === ref) : [];
-    if (!kinds.length) return kinds;
-    const next = { ...stored };
-    for (const kind of kinds) delete next[kind];
-    if (Object.keys(next).length) this.settings.noteStyleByKind = next;
-    else delete this.settings.noteStyleByKind;
-    await this.saveSettings();
-    return kinds;
+  clearKindStyles(ref) {
+    return clearKindStyles(noteStylePorts(this), ref);
   }
   /**
    * Moves a style or part file to the Obsidian trash (recoverable). A style: the topic types that used it go back to their
@@ -95758,37 +95814,20 @@ ${t("ui.organize_link_wait_hint")}`;
    * it goes back to the default. Returns false (with a Notice) when the file could not be moved; nothing else is changed then.
    */
   async deleteNoteStyle(category, ref) {
-    var _a2;
-    try {
-      await this.noteStyles.trashFile(category, ref);
-    } catch (e) {
-      new import_obsidian48.Notice(t("ui.manage_delete_failed"));
-      return false;
-    }
-    if (category === "recipe") await this.clearKindStyles(ref);
-    else if (category !== "structure" && ((_a2 = this.settings.noteStyleDefaults) == null ? void 0 : _a2[category]) === ref)
-      await this.setGlobalPart(category, GLOBAL_PART_DEFAULT[category]);
-    return true;
+    const deleted = await deleteStyleReferences(noteStylePorts(this), category, ref);
+    if (!deleted) new import_obsidian48.Notice(t("ui.manage_delete_failed"));
+    return deleted;
   }
   /** Sets the style a kind uses. Choosing the kind's own built-in style removes the entry (a kind with no entry uses it). */
-  async setKindStyle(kind, ref) {
-    const next = { ...this.settings.noteStyleByKind };
-    if (ref === KIND_DEFAULT_RECIPE[kind]) delete next[kind];
-    else next[kind] = ref;
-    if (Object.keys(next).length) this.settings.noteStyleByKind = next;
-    else delete this.settings.noteStyleByKind;
-    await this.saveSettings();
+  setKindStyle(kind, ref) {
+    return setKindStyle(noteStylePorts(this), kind, ref);
   }
   /**
    * Sets the global voice or format (a part ref). Choosing the built-in default (academic, standard) removes the key, and
    * the whole object when no key is left. Does nothing for a value that is not a part ref of that category.
    */
-  async setGlobalPart(category, ref) {
-    if (!parseRecipeRef(ref, category)) return;
-    const next = withGlobalPart(this.settings.noteStyleDefaults, category, ref);
-    if (next) this.settings.noteStyleDefaults = next;
-    else delete this.settings.noteStyleDefaults;
-    await this.saveSettings();
+  setGlobalPart(category, ref) {
+    return setGlobalPart(noteStylePorts(this), category, ref);
   }
   /** Saves a custom style from the editor and says what happened in a Notice; the result goes back to the editor. */
   async saveNoteRecipe(input2) {

@@ -48,15 +48,15 @@ import {
   type StyleCategory,
   type StyleFilePort
 } from "./ai/note-style-store";
+import { parseRecipeRef, STYLE_KINDS, type PartCategory, type StyleKind } from "./ai/note-style-recipe";
 import {
-  GLOBAL_PART_DEFAULT,
-  KIND_DEFAULT_RECIPE,
-  parseRecipeRef,
-  STYLE_KINDS,
-  withGlobalPart,
-  type PartCategory,
-  type StyleKind
-} from "./ai/note-style-recipe";
+  clearKindStyles,
+  deleteStyleReferences,
+  renameStyleReferences,
+  setGlobalPart,
+  setKindStyle,
+  type NoteStylePorts
+} from "./ai/note-style-references";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { turnMapChatRecordsOff, type MapChatRecordsSwitch } from "./ui/modals/map-chat-records-off-modal";
 import { PromptPreviewModal } from "./ui/modals/prompt-preview-modal";
@@ -299,6 +299,23 @@ export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: s
     addDiagramsAfterResearch: saved?.addDiagramsAfterResearch !== false,
     workspaceInitialized: saved ? saved.workspaceInitialized !== false : false,
     canvasHintSeen: saved?.canvasHintSeen === true
+  };
+}
+
+/** The ports of ai/note-style-references.ts; lazy closures, so the settings and the topics are read when a call runs. A function, not a method, so a stand-in plugin that borrows the facade methods needs no extra member. */
+function noteStylePorts(plugin: VisualAgentMapPlugin): NoteStylePorts {
+  return {
+    settings: () => plugin.settings,
+    save: () => plugin.saveSettings(),
+    files: {
+      renameFile: (category, ref, name) => plugin.noteStyles.renameFile(category, ref, name),
+      rewritePartRefs: (category, oldName, newName) => plugin.noteStyles.rewritePartRefs(category, oldName, newName),
+      trashFile: (category, ref) => plugin.noteStyles.trashFile(category, ref)
+    },
+    topics: {
+      list: () => plugin.topicNoteStyleRefs(),
+      rename: (path, from, to) => plugin.repo.renameNoteStyleRef(path, from, to)
+    }
   };
 }
 
@@ -1767,79 +1784,20 @@ export default class VisualAgentMapPlugin extends Plugin {
     | { ok: true; ref: string; unchanged?: true; topics: number; styles: number; failed: string[] }
     | { ok: false; reason: "missing" | "name" | "taken" | "failed" }
   > {
-    const topics = category === "recipe" ? this.topicNoteStyleRefs().filter(item => item.ref === ref) : [];
-    const oldName = ref.slice("file:".length);
-    const renamed = await this.noteStyles.renameFile(category, ref, name);
-    if (!renamed.ok) {
+    const result = await renameStyleReferences(noteStylePorts(this), category, ref, name);
+    if (!result.ok) {
       new Notice(t("ui.manage_rename_refused"));
-      return renamed;
+      return result;
     }
-    if (renamed.unchanged) return { ok: true, ref, unchanged: true, topics: 0, styles: 0, failed: [] };
-    const failed: string[] = [];
-    const next = renamed.ref;
-    const swap = <T extends Record<string, string>>(table: T | undefined): T | undefined =>
-      table && Object.values(table).includes(ref)
-        ? (Object.fromEntries(Object.entries(table).map(([key, value]) => [key, value === ref ? next : value])) as T)
-        : undefined;
-    let settingsChanged = false;
-    const byKind = category === "recipe" ? swap(this.settings.noteStyleByKind) : undefined;
-    if (byKind) {
-      this.settings.noteStyleByKind = byKind;
-      settingsChanged = true;
-    }
-    if (category !== "recipe") {
-      const legacy = this.settings.noteStyleRecipe?.legacy;
-      const table = category === "structure" ? "templates" : category === "voice" ? "tones" : undefined;
-      const swapped = table ? swap(legacy?.[table]) : undefined;
-      if (legacy && table && swapped) {
-        this.settings.noteStyleRecipe = {
-          ...this.settings.noteStyleRecipe!,
-          legacy: { ...legacy, [table]: swapped }
-        };
-        settingsChanged = true;
-      }
-      const defaults = this.settings.noteStyleDefaults;
-      if (category !== "structure" && defaults?.[category] === ref) {
-        this.settings.noteStyleDefaults = { ...defaults, [category]: next };
-        settingsChanged = true;
-      }
-    }
-    if (settingsChanged) {
-      try {
-        await this.saveSettings();
-      } catch {
-        failed.push(t("ui.manage_rename_settings"));
-      }
-    }
-    let styles = 0;
-    if (category !== "recipe") {
-      const written = await this.noteStyles.rewritePartRefs(category, oldName, next.slice("file:".length));
-      styles = written.changed.length;
-      failed.push(...written.failed);
-    }
-    let changedTopics = 0;
-    for (const topic of topics) {
-      try {
-        if (await this.repo.renameNoteStyleRef(topic.path, ref, next)) changedTopics++;
-      } catch {
-        failed.push(topic.path);
-      }
-    }
-    new Notice(t("ui.manage_rename_done_0_1_2", name, changedTopics, styles));
+    if (result.unchanged) return result;
+    const failed = [...(result.settingsFailed ? [t("ui.manage_rename_settings")] : []), ...result.failed];
+    new Notice(t("ui.manage_rename_done_0_1_2", name, result.topics, result.styles));
     if (failed.length) new Notice(t("ui.manage_rename_failed_0", failed.join(t("ui.list_separator"))));
-    return { ok: true, ref: next, topics: changedTopics, styles, failed };
+    return { ok: true, ref: result.ref, topics: result.topics, styles: result.styles, failed };
   }
   /** Removes the entries of `noteStyleByKind` that name `ref` (those topic types go back to their built-in style); one save. Returns the kinds. */
-  async clearKindStyles(ref: string): Promise<StyleKind[]> {
-    const stored = this.settings.noteStyleByKind;
-    const kinds = stored ? (Object.keys(stored) as StyleKind[]).filter(kind => stored[kind] === ref) : [];
-    if (!kinds.length) return kinds;
-    const next = { ...stored };
-    for (const kind of kinds) delete next[kind];
-    if (Object.keys(next).length) this.settings.noteStyleByKind = next;
-    else delete this.settings.noteStyleByKind;
-    await this.saveSettings();
-    return kinds;
+  clearKindStyles(ref: string): Promise<StyleKind[]> {
+    return clearKindStyles(noteStylePorts(this), ref);
   }
   /**
    * Moves a style or part file to the Obsidian trash (recoverable). A style: the topic types that used it go back to their
@@ -1848,36 +1806,20 @@ export default class VisualAgentMapPlugin extends Plugin {
    * it goes back to the default. Returns false (with a Notice) when the file could not be moved; nothing else is changed then.
    */
   async deleteNoteStyle(category: StyleCategory, ref: string): Promise<boolean> {
-    try {
-      await this.noteStyles.trashFile(category, ref);
-    } catch {
-      new Notice(t("ui.manage_delete_failed"));
-      return false;
-    }
-    if (category === "recipe") await this.clearKindStyles(ref);
-    else if (category !== "structure" && this.settings.noteStyleDefaults?.[category] === ref)
-      await this.setGlobalPart(category, GLOBAL_PART_DEFAULT[category]);
-    return true;
+    const deleted = await deleteStyleReferences(noteStylePorts(this), category, ref);
+    if (!deleted) new Notice(t("ui.manage_delete_failed"));
+    return deleted;
   }
   /** Sets the style a kind uses. Choosing the kind's own built-in style removes the entry (a kind with no entry uses it). */
-  async setKindStyle(kind: StyleKind, ref: string): Promise<void> {
-    const next = { ...this.settings.noteStyleByKind };
-    if (ref === KIND_DEFAULT_RECIPE[kind]) delete next[kind];
-    else next[kind] = ref;
-    if (Object.keys(next).length) this.settings.noteStyleByKind = next;
-    else delete this.settings.noteStyleByKind;
-    await this.saveSettings();
+  setKindStyle(kind: StyleKind, ref: string): Promise<void> {
+    return setKindStyle(noteStylePorts(this), kind, ref);
   }
   /**
    * Sets the global voice or format (a part ref). Choosing the built-in default (academic, standard) removes the key, and
    * the whole object when no key is left. Does nothing for a value that is not a part ref of that category.
    */
-  async setGlobalPart(category: "voice" | "format", ref: string): Promise<void> {
-    if (!parseRecipeRef(ref, category)) return;
-    const next = withGlobalPart(this.settings.noteStyleDefaults, category, ref);
-    if (next) this.settings.noteStyleDefaults = next;
-    else delete this.settings.noteStyleDefaults;
-    await this.saveSettings();
+  setGlobalPart(category: "voice" | "format", ref: string): Promise<void> {
+    return setGlobalPart(noteStylePorts(this), category, ref);
   }
   /** Saves a custom style from the editor and says what happened in a Notice; the result goes back to the editor. */
   async saveNoteRecipe(input: SaveRecipeInput): Promise<SaveRecipeResult> {

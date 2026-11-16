@@ -2585,7 +2585,7 @@ const heEditor = (relations, current, options = {}) => {
   fx.view.enqueue = work => work();
   fx.view.mapChange = async (change, rebuild) => { calls.push(rebuild); change(fx.view.map); };
   const host = dom.element('editor');
-  const saveNote = fx.view.renderRelationEditor(host, current, () => closed.push(1), () => changed.push(1));
+  const saveNote = fx.view.relationEditor.renderRelationEditor(host, current, () => closed.push(1), () => changed.push(1));
   const kindOptions = () => dom.findAll(host, c => c.tag === 'option').map(o => o.text);
   const openKinds = () => dom.findAll(host, c => c.tag === 'option' && !c.disabled).map(o => o.text);
   const select = () => dom.find(host, c => c.tag === 'select');
@@ -2825,8 +2825,12 @@ integrationTest('hypothesis-evidence: a note like <img src=x onerror=alert(1)> i
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
   assert.ok(dom.texts(panel).includes(evil), 'shown verbatim'); assert.equal(dom.findAll(panel, c => c.tag === 'img').length, 0);
   const src = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  const editor = src.slice(src.indexOf('private renderRelationEditor'), src.indexOf('/** `focus` false leaves the camera'));
-  assert.equal(/innerHTML|outerHTML|insertAdjacentHTML/.test(editor), false, 'the editor and the panel rows never parse markup');
+  const editorSrc = fs.readFileSync(path.join(root, 'experiences/visual-map/relation-editor.ts'), 'utf8');
+  const panelStart = src.indexOf('private renderHypothesisSection'), panelEnd = src.indexOf('`focus` false leaves the camera');
+  const panelSrc = src.slice(panelStart, panelEnd);
+  assert.ok(panelStart >= 0 && panelEnd >= 0 && panelSrc.length > 200, 'the panel slice is not empty');
+  assert.ok(editorSrc.indexOf('class RelationEditor') >= 0 && editorSrc.length > 200, 'the editor module is not empty');
+  for (const scanned of [editorSrc, panelSrc]) assert.equal(/innerHTML|outerHTML|insertAdjacentHTML/.test(scanned), false, 'the editor and the panel rows never parse markup');
 });
 integrationTest('hypothesis-evidence: the V1.5 evidence and prerequisite panel keys are gone and the six relation names exist in all three languages', () => {
   const read = lang => fs.readFileSync(path.join(root, 'i18n', `${lang}.ts`), 'utf8');

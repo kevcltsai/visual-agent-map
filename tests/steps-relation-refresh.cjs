@@ -94,7 +94,7 @@ test('S3: the relation editor: reverse swaps the wording at both ends at once; a
   const h = await harness();
   await h.view.addRelation(h.ids.a, h.ids.b, 'derives_from');
   const host = dom.element('editor');
-  h.view.renderRelationEditor(host, h.view.map.topicRelations[0], () => {}, () => {});
+  h.view.relationEditor.renderRelationEditor(host, h.view.map.topicRelations[0], () => {}, () => {});
   h.reset();
   dom.button(host, 'Reverse direction').click();
   await dom.tick(); await dom.tick();

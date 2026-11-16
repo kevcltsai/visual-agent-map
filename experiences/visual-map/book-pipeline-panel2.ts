@@ -57,7 +57,8 @@ export function buildGate2Panel(input: {
     const other = changedIndex(seamText);
     const partner = other !== undefined && Math.abs(other - 1 - at) === 1 ? input.order[other - 1] : undefined;
     const issue = typeof note?.pipelineIssue === "string" ? note.pipelineIssue : "";
-    const proof = view.stage === "checked" || view.stage === "needs-review" ? latestStoredProof(note?.detail ?? "") : undefined;
+    const proof =
+      view.stage === "checked" || view.stage === "needs-review" ? latestStoredProof(note?.detail ?? "") : undefined;
     return {
       id,
       index: at + 1,
@@ -66,7 +67,11 @@ export function buildGate2Panel(input: {
       ...(view.stage === "needs-review" && issue ? { reasonText: bookIssueText(issue) } : {}),
       ...(view.stage === "checked" && view.issueText ? { noteText: view.issueText } : {}),
       seam: view.seam,
-      seamTitle: partner ? (other! - 1 > at ? `${title} ↔ ${input.titleOf(partner)}` : `${input.titleOf(partner)} ↔ ${title}`) : title,
+      seamTitle: partner
+        ? other! - 1 > at
+          ? `${title} ↔ ${input.titleOf(partner)}`
+          : `${input.titleOf(partner)} ↔ ${title}`
+        : title,
       ...(proof ? { proof } : {})
     };
   });
@@ -77,7 +82,9 @@ export function buildGate2Panel(input: {
     checked: cards.filter(card => card.stage === "checked").length,
     needsReview: cards.filter(card => card.stage === "needs-review").length,
     seams: cards.filter(card => card.seam).length,
-    ...(Number.isFinite(from) && Number.isFinite(to) && to >= from ? { elapsedMinutes: Math.round((to - from) / 60000) } : {}),
+    ...(Number.isFinite(from) && Number.isFinite(to) && to >= from
+      ? { elapsedMinutes: Math.round((to - from) / 60000) }
+      : {}),
     cards
   };
 }
@@ -111,7 +118,10 @@ export function renderGate2Panel(
   else if (data.elapsedMinutes !== undefined) {
     const took = head.createSpan({
       cls: "vam-book-panel-tag",
-      text: data.elapsedMinutes < 1 ? t("ui.book_panel_elapsed_under_minute") : t("ui.book_panel_elapsed_0", data.elapsedMinutes)
+      text:
+        data.elapsedMinutes < 1
+          ? t("ui.book_panel_elapsed_under_minute")
+          : t("ui.book_panel_elapsed_0", data.elapsedMinutes)
     });
     took.setAttr("title", t("ui.book_panel_elapsed_hint"));
   }
@@ -122,7 +132,9 @@ export function renderGate2Panel(
 
   const anyBusy = externalBusy.size > 0 || state.busy.size > 0 || state.seaming.size > 0 || state.finishing;
   const busyNow = (id: string): boolean => externalBusy.has(id) || state.busy.has(id);
-  const attention = data.cards.filter(card => card.stage === "needs-review" || (busyNow(card.id) && card.stage !== "checked"));
+  const attention = data.cards.filter(
+    card => card.stage === "needs-review" || (busyNow(card.id) && card.stage !== "checked")
+  );
   const seams = data.cards.filter(card => card.seam);
   const checked = data.cards.filter(card => card.stage === "checked");
 
@@ -252,8 +264,15 @@ function renderAttention(
   const head = item.createDiv("vam-book-panel-card-head");
   stateTag(head, "needs-review", t("ui.book_stage_needs_review"));
   head.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
-  button(head, "vam-book-panel-open", t("ui.book_panel_open"), t("ui.book_panel_open_0", card.title), card, "open", false, () =>
-    actions.open(card.id)
+  button(
+    head,
+    "vam-book-panel-open",
+    t("ui.book_panel_open_card"),
+    t("ui.book_panel_open_0", card.title),
+    card,
+    "open",
+    false,
+    () => actions.open(card.id)
   );
   button(
     head,
@@ -270,15 +289,28 @@ function renderAttention(
   noteLine(item, state, card.id, false);
 }
 
-function renderSeam(list: HTMLElement, card: Gate2Card, state: GatePanelState, actions: Gate2Actions, anyBusy: boolean): void {
+function renderSeam(
+  list: HTMLElement,
+  card: Gate2Card,
+  state: GatePanelState,
+  actions: Gate2Actions,
+  anyBusy: boolean
+): void {
   const key = `seam:${card.id}`;
   const busy = state.seaming.has(card.id);
   const item = row(list, "seam", card, busy);
   const head = item.createDiv("vam-book-panel-card-head");
   stateTag(head, "seam", t("ui.book_seam_label"));
   head.createEl("b", { cls: "vam-book-panel-card-title", text: card.seamTitle });
-  button(head, "vam-book-panel-open", t("ui.book_panel_open"), t("ui.book_panel_open_0", card.title), card, "open-seam", false, () =>
-    actions.open(card.id)
+  button(
+    head,
+    "vam-book-panel-open",
+    t("ui.book_panel_open_card"),
+    t("ui.book_panel_open_0", card.title),
+    card,
+    "open-seam",
+    false,
+    () => actions.open(card.id)
   );
   item.createDiv({ cls: "vam-book-panel-field", text: t("ui.book_seam_reason") });
   button(
@@ -356,7 +388,11 @@ function proofSummary(proof: StoredProofView): string {
   return t("ui.book_panel_proof_summary_0_1_2", met, unverified, unmet);
 }
 
-const STATUS_KEY = { met: "ui.book_proof_met", unmet: "ui.book_proof_unmet", unverified: "ui.book_proof_unverified" } as const;
+const STATUS_KEY = {
+  met: "ui.book_proof_met",
+  unmet: "ui.book_proof_unmet",
+  unverified: "ui.book_proof_unverified"
+} as const;
 
 function renderProof(body: HTMLElement, proof: StoredProofView | undefined): void {
   if (!proof) {

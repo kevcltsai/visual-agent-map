@@ -333,11 +333,12 @@ import { CANONICAL_LANGUAGES } from "../../ai/note-style-file";
 import type { UpdateMode } from "../../ai/note-style-recipe";
 import { backupNote } from "../../ai/note-writeback";
 import { stopLabelKey, type ResearchStart, type SelectionSynthesisTask, type WritebackHooks } from "./topic-run";
-import type { AuthorInput, AuthorOutcome } from "./book-pipeline-run";
+import type { AuthorInput, AuthorOutcome, BookPipelineProgress } from "./book-pipeline-run";
 import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
-import { readBookPipeline, readPipelineStage } from "../../core/book-pipeline/model";
+import { readBookPipeline, readPipelineStage, type BookPipelineData } from "../../core/book-pipeline/model";
 import { bookBarState, bookCardView, renderBookBar, renderBookCardLabels, runBookEntry } from "./book-pipeline-ui";
 import { buildGatePanel, GatePanelState, renderGatePanel } from "./book-pipeline-panel";
+import { buildGate2Panel, renderGate2Panel } from "./book-pipeline-panel2";
 import {
   INTEGRATION_DEPTHS,
   bottomUpOrder,
@@ -17052,21 +17053,31 @@ export class VisualAgentMapView extends ItemView {
     const doc = this.contentEl.ownerDocument;
     const held = doc?.activeElement as HTMLElement | null;
     const heldCard = held && side.contains(held) ? (held.dataset?.card ?? null) : null;
+    const heldAct = heldCard ? (held?.dataset?.act ?? null) : null;
     const draftCaret = heldCard ? ((held as HTMLInputElement).selectionStart ?? null) : null;
     side.empty();
     const progress = this.plugin.getBookPipelineProgress(path);
+    const phase = progress?.phase ?? read.data.phase;
+    if (phase === "gate2" || phase === "done") {
+      this.paintBookGate2(side, read.data, progress, phase === "done", heldCard, heldAct);
+      return;
+    }
+    if (phase !== "gate1") {
+      side.createEl("p", { cls: "vam-book-panel-muted", text: t("ui.book_panel_not_gate2") });
+      this.bookPanel.pendingFocus = null;
+      return;
+    }
     const data = buildGatePanel({
       order: read.data.order,
       titleOf: id => this.notes.get(id)?.title ?? map.nodes.find(node => node.id === id)?.path ?? id,
       noteOf: id => this.notes.get(id),
       rootRaw: this.bookPanel.rootRaw
     });
-    const gate1 = (progress?.phase ?? read.data.phase) === "gate1";
     const state = this.bookPanel;
     renderGatePanel(
       side,
       data,
-      gate1,
+      true,
       state,
       {
         editPlan: id => void this.openBookPlan(id),
@@ -17102,6 +17113,85 @@ export class VisualAgentMapView extends ItemView {
     else if (state.pendingFocus === "opener")
       this.contentEl.querySelector<HTMLElement>(".vam-book-panel-toggle")?.focus();
     state.pendingFocus = null;
+  }
+  /** Gate 2 (and done): the review panel. Actions reread the card's note afterwards so the rows show the new stage. */
+  private paintBookGate2(
+    side: HTMLElement,
+    data: BookPipelineData,
+    progress: BookPipelineProgress | undefined,
+    done: boolean,
+    heldCard: string | null,
+    heldAct: string | null
+  ): void {
+    const map = this.map;
+    const path = this.path;
+    if (!map) return;
+    const state = this.bookPanel;
+    const view = buildGate2Panel({
+      order: data.order,
+      titleOf: id => this.notes.get(id)?.title ?? map.nodes.find(node => node.id === id)?.path ?? id,
+      noteOf: id => this.notes.get(id),
+      startedAt: progress?.startedAt ?? data.startedAt,
+      writingEndedAt: progress?.phaseStartedAt ?? data.phaseStartedAt
+    });
+    renderGate2Panel(
+      side,
+      view,
+      done,
+      state,
+      {
+        open: id => void this.openBookNote(id),
+        rerun: async id => {
+          try {
+            await this.plugin.rerunBookCard(path, id);
+          } finally {
+            await this.rereadBookCard(id);
+          }
+        },
+        confirmSeam: async id => {
+          try {
+            await this.plugin.confirmBookSeam(path, id);
+          } finally {
+            await this.rereadBookCard(id);
+          }
+        },
+        finish: () => this.plugin.finishBookRun(path),
+        showChat: () => this.showChatFromBookPanel(),
+        close: () => this.closeBookPanel(),
+        refresh: () => this.paintBookPanel()
+      },
+      new Set(progress?.busyCards ?? [])
+    );
+    const all = (selector: string): HTMLElement[] => Array.from(side.querySelectorAll<HTMLElement>(selector));
+    if (state.pendingFocus === "title") side.querySelector<HTMLElement>(".vam-book-panel-title")?.focus();
+    else if (state.pendingFocus === "opener")
+      this.contentEl.querySelector<HTMLElement>(".vam-book-panel-toggle")?.focus();
+    else if (heldCard) {
+      const same = all("[data-card]").find(item => item.dataset.card === heldCard && item.dataset.act === heldAct);
+      const target =
+        same ??
+        all("[data-row]").find(item => item.dataset.row === heldCard) ??
+        side.querySelector<HTMLElement>(".vam-book-panel-title");
+      target?.focus();
+    } else if (heldAct === "finish")
+      all("[data-act]")
+        .find(item => item.dataset.act === "finish")
+        ?.focus();
+    state.pendingFocus = null;
+  }
+  /** A card's note opens in a tab. */
+  private async openBookNote(id: string): Promise<void> {
+    const node = this.map?.nodes.find(item => item.id === id);
+    const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
+    if (!(file instanceof TFile)) {
+      new Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
+      return;
+    }
+    try {
+      await this.app.workspace.getLeaf("tab").openFile(file);
+    } catch (error) {
+      new Notice(error instanceof Error ? error.message : String(error));
+    }
   }
   /** The root note's file text (the thread and the editorial decisions live there); repaints the panel when it differs. */
   private async loadBookRoot(): Promise<void> {

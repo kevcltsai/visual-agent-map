@@ -138,17 +138,17 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
   if (state.etaSeconds !== undefined && (state.mode === "planning" || state.mode === "writing"))
     top.createSpan({ cls: "vam-book-bar-eta", text: bookEtaText(state.etaSeconds) });
   const buttons = top.createDiv("vam-book-bar-actions");
+  if (actions.panel && (state.phase === "gate1" || state.phase === "gate2" || state.phase === "done")) {
+    const open = actions.panel.open;
+    const opener = makeButton(
+      buttons,
+      t(open ? "ui.book_panel_close" : "ui.book_panel_open"),
+      "vam-book-panel-toggle",
+      actions.panel.toggle
+    );
+    opener.setAttr("aria-expanded", String(open));
+  }
   if (state.phase === "gate1" && state.mode !== "done") {
-    if (actions.panel) {
-      const open = actions.panel.open;
-      const opener = makeButton(
-        buttons,
-        t(open ? "ui.book_panel_close" : "ui.book_panel_open"),
-        "vam-book-panel-toggle",
-        actions.panel.toggle
-      );
-      opener.setAttr("aria-expanded", String(open));
-    }
     makeButton(buttons, t("ui.book_confirm_gate1"), "mod-cta vam-book-confirm", actions.confirmGate1);
   }
   if (state.mode === "budget") {

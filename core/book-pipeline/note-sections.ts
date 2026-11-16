@@ -161,8 +161,10 @@ export interface StoredProofView {
   counts?: { openedPages: number; searches: number };
   items: Pick<ProofItemResult, "id" | "type" | "status" | "note" | "sources">[];
 }
-const shortText = (value: unknown, max: number): string => (typeof value === "string" ? Array.from(value).slice(0, max).join("") : "");
-const count = (value: unknown): number => (typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0);
+const shortText = (value: unknown, max: number): string =>
+  typeof value === "string" ? Array.from(value).slice(0, max).join("") : "";
+const count = (value: unknown): number =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
 
 /**
  * The newest proof record inside the Research notes section (the last one stored is the latest; an older run's records stay above it).
@@ -191,7 +193,10 @@ export function latestStoredProof(detail: string): StoredProofView | undefined {
           status,
           note: shortText(raw.note, 300),
           sources: Array.isArray(raw.sources)
-            ? raw.sources.filter((src): src is string => typeof src === "string").slice(0, 10).map(src => shortText(src, 300))
+            ? raw.sources
+                .filter((src): src is string => typeof src === "string")
+                .slice(0, 10)
+                .map(src => shortText(src, 300))
             : []
         });
       }

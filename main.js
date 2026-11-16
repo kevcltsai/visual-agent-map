@@ -3156,6 +3156,44 @@ var en = {
   "ui.book_panel_replan_failed_0": "This plan was not rewritten: {0}",
   "ui.book_panel_cancelled": "cancelled",
   "ui.book_panel_confirming": "Confirming\u2026",
+  "ui.book_eta_0": "About {0} min left",
+  "ui.book_eta_under_minute": "Under 1 min left",
+  "ui.book_panel_gate2_title": "Gate 2: review",
+  "ui.book_panel_gate2_done_tag": "Review complete",
+  "ui.book_panel_gate2_summary_0_1_2_3": "{0} cards: {1} checked, {2} need a look, {3} seams to check",
+  "ui.book_panel_gate2_list_label": "Gate 2 card list",
+  "ui.book_panel_gate2_nothing": "No cards to review yet.",
+  "ui.book_panel_gate2_hint": "When you have checked the cards you wanted to, press Finish review.",
+  "ui.book_panel_finish": "Finish review",
+  "ui.book_panel_finishing": "Finishing review\u2026",
+  "ui.book_panel_elapsed_0": "Took {0} min",
+  "ui.book_panel_elapsed_under_minute": "Took under 1 min",
+  "ui.book_panel_elapsed_hint": "Time from planning start to the last card written",
+  "ui.book_panel_open_card": "Open",
+  "ui.book_panel_open_0": "Open the note for {0}",
+  "ui.book_panel_rerun_card": "Rerun this card",
+  "ui.book_panel_rerun_card_0": "Rerun this book card: {0} (plan \u2192 write \u2192 check)",
+  "ui.book_panel_reason_0": "Reason: {0}",
+  "ui.book_panel_confirm_seam": "Seam confirmed",
+  "ui.book_panel_confirm_seam_0": "Mark the seam for {0} as checked",
+  "ui.book_seam_label": "Check seam",
+  "ui.book_seam_reason": "A neighboring card's plan or body changed and has not been checked by hand.",
+  "ui.book_panel_proof_show": "Show proof record",
+  "ui.book_panel_proof_hide": "Hide proof record",
+  "ui.book_panel_proof_0": "Proof record for {0}",
+  "ui.book_panel_proof_summary_0_1_2": "{0} met, {1} unverified, {2} unmet",
+  "ui.book_panel_proof_none": "No proof record.",
+  "ui.book_panel_proof_failed": "The check for this card did not finish.",
+  "ui.book_panel_proof_facts_unverified": "None of the fact items could be verified against a source.",
+  "ui.book_panel_proof_opened_0_1": "Opened {0} pages, searched {1} times",
+  "ui.book_panel_proof_sources_0": "Sources: {0}",
+  "ui.book_panel_structure_unmet_0": "Structure items unmet: {0}",
+  "ui.book_proof_fact": "fact",
+  "ui.book_proof_structure": "structure",
+  "ui.book_proof_met": "met",
+  "ui.book_proof_unmet": "unmet",
+  "ui.book_proof_unverified": "unverified",
+  "ui.book_panel_not_gate2": "Not at gate 1 or gate 2 right now, so there is nothing to show.",
   "ui.book_panel_hint": "You can also click a card on the map and edit its Prompt section."
 };
 
@@ -6208,6 +6246,44 @@ var zhCN = {
   "ui.book_panel_replan_failed_0": "\u8FD9\u5F20\u6CA1\u6709\u91CD\u5199\uFF1A{0}",
   "ui.book_panel_cancelled": "\u5DF2\u53D6\u6D88",
   "ui.book_panel_confirming": "\u786E\u8BA4\u4E2D\u22EF",
+  "ui.book_eta_0": "\u7EA6\u5269 {0} \u5206\u949F",
+  "ui.book_eta_under_minute": "\u4E0D\u5230 1 \u5206\u949F",
+  "ui.book_panel_gate2_title": "\u5173\u5361 2\uFF1A\u9A8C\u6536",
+  "ui.book_panel_gate2_done_tag": "\u9A8C\u6536\u5B8C\u6210",
+  "ui.book_panel_gate2_summary_0_1_2_3": "{0} \u5F20\uFF1A\u5DF2\u6821 {1}\u3001\u9700\u4EBA\u770B {2}\u3001\u63A5\u7F1D\u9700\u770B {3}",
+  "ui.book_panel_gate2_list_label": "\u5173\u5361 2 \u5361\u7247\u6E05\u5355",
+  "ui.book_panel_gate2_nothing": "\u8FD8\u6CA1\u6709\u53EF\u9A8C\u6536\u7684\u5361\u3002",
+  "ui.book_panel_gate2_hint": "\u786E\u8BA4\u5B8C\u8981\u770B\u7684\u5361\u540E\uFF0C\u6309\u201C\u9A8C\u6536\u5B8C\u6210\u201D\u3002",
+  "ui.book_panel_finish": "\u9A8C\u6536\u5B8C\u6210",
+  "ui.book_panel_finishing": "\u9A8C\u6536\u4E2D\u2026",
+  "ui.book_panel_elapsed_0": "\u82B1\u4E86 {0} \u5206\u949F",
+  "ui.book_panel_elapsed_under_minute": "\u82B1\u4E86\u4E0D\u5230 1 \u5206\u949F",
+  "ui.book_panel_elapsed_hint": "\u4ECE\u5F00\u59CB\u4F01\u5212\u5230\u5199\u5B8C\u7684\u65F6\u95F4",
+  "ui.book_panel_open_card": "\u6253\u5F00",
+  "ui.book_panel_open_0": "\u6253\u5F00\u201C{0}\u201D\u7684\u7B14\u8BB0",
+  "ui.book_panel_rerun_card": "\u91CD\u8DD1\u8FD9\u5F20",
+  "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u56FE\u6587\u4E66\u8FD9\u4E00\u5F20\uFF1A{0}\uFF08\u4F01\u5212 \u2192 \u5199 \u2192 \u6821\uFF09",
+  "ui.book_panel_reason_0": "\u539F\u56E0\uFF1A{0}",
+  "ui.book_panel_confirm_seam": "\u5DF2\u786E\u8BA4\u63A5\u7F1D",
+  "ui.book_panel_confirm_seam_0": "\u5DF2\u786E\u8BA4\u201C{0}\u201D\u7684\u63A5\u7F1D",
+  "ui.book_seam_label": "\u63A5\u7F1D\u9700\u770B",
+  "ui.book_seam_reason": "\u90BB\u5361\u4F01\u5212\u6216\u6B63\u6587\u5DF2\u53D8\u66F4\uFF0C\u5C1A\u672A\u4EBA\u5DE5\u6838\u5BF9\u3002",
+  "ui.book_panel_proof_show": "\u770B\u67E5\u8BC1\u8BB0\u5F55",
+  "ui.book_panel_proof_hide": "\u6536\u5408\u67E5\u8BC1\u8BB0\u5F55",
+  "ui.book_panel_proof_0": "{0} \u7684\u67E5\u8BC1\u8BB0\u5F55",
+  "ui.book_panel_proof_summary_0_1_2": "{0} \u9879\u8FBE\u6210\u3001{1} \u9879\u5F85\u67E5\u3001{2} \u9879\u672A\u8FBE\u6210",
+  "ui.book_panel_proof_none": "\u6CA1\u6709\u67E5\u8BC1\u8BB0\u5F55\u3002",
+  "ui.book_panel_proof_failed": "\u8FD9\u5F20\u6821\u5BF9\u6CA1\u6709\u5B8C\u6210\u3002",
+  "ui.book_panel_proof_facts_unverified": "\u4E8B\u5B9E\u9879\u76EE\u90FD\u8FD8\u6CA1\u67E5\u8BC1\u5230\u6765\u6E90\u3002",
+  "ui.book_panel_proof_opened_0_1": "\u5F00\u9875 {0} \u6B21\u3001\u641C\u7D22 {1} \u6B21",
+  "ui.book_panel_proof_sources_0": "\u6765\u6E90\uFF1A{0}",
+  "ui.book_panel_structure_unmet_0": "\u7ED3\u6784 {0} \u9879\u672A\u8FBE\u6210",
+  "ui.book_proof_fact": "\u4E8B\u5B9E",
+  "ui.book_proof_structure": "\u7ED3\u6784",
+  "ui.book_proof_met": "\u8FBE\u6210",
+  "ui.book_proof_unmet": "\u672A\u8FBE\u6210",
+  "ui.book_proof_unverified": "\u5F85\u67E5",
+  "ui.book_panel_not_gate2": "\u76EE\u524D\u4E0D\u5728\u5173\u5361 1 \u6216\u5173\u5361 2\uFF0C\u6CA1\u6709\u53EF\u770B\u7684\u5185\u5BB9\u3002",
   "ui.book_panel_hint": "\u4E5F\u53EF\u4EE5\u76F4\u63A5\u5728\u5730\u56FE\u4E0A\u70B9\u5361\uFF0C\u6539\u5B83\u7684\u201CPrompt\u201D\u533A\u6BB5\u3002"
 };
 
@@ -9260,6 +9336,44 @@ var zhTW = {
   "ui.book_panel_replan_failed_0": "\u9019\u5F35\u6C92\u6709\u91CD\u5BEB\uFF1A{0}",
   "ui.book_panel_cancelled": "\u5DF2\u53D6\u6D88",
   "ui.book_panel_confirming": "\u78BA\u8A8D\u4E2D\u22EF",
+  "ui.book_eta_0": "\u7D04\u5269 {0} \u5206\u9418",
+  "ui.book_eta_under_minute": "\u4E0D\u5230 1 \u5206\u9418",
+  "ui.book_panel_gate2_title": "\u95DC\u5361 2\uFF1A\u9A57\u6536",
+  "ui.book_panel_gate2_done_tag": "\u9A57\u6536\u5B8C\u6210",
+  "ui.book_panel_gate2_summary_0_1_2_3": "{0} \u5F35\uFF1A\u5DF2\u6821 {1}\u3001\u9700\u4EBA\u770B {2}\u3001\u63A5\u7E2B\u9700\u770B {3}",
+  "ui.book_panel_gate2_list_label": "\u95DC\u5361 2 \u5361\u7247\u6E05\u55AE",
+  "ui.book_panel_gate2_nothing": "\u9084\u6C92\u6709\u53EF\u9A57\u6536\u7684\u5361\u3002",
+  "ui.book_panel_gate2_hint": "\u78BA\u8A8D\u5B8C\u8981\u770B\u7684\u5361\u5F8C\uFF0C\u6309\u300C\u9A57\u6536\u5B8C\u6210\u300D\u3002",
+  "ui.book_panel_finish": "\u9A57\u6536\u5B8C\u6210",
+  "ui.book_panel_finishing": "\u9A57\u6536\u4E2D\u22EF",
+  "ui.book_panel_elapsed_0": "\u82B1\u4E86 {0} \u5206\u9418",
+  "ui.book_panel_elapsed_under_minute": "\u82B1\u4E86\u4E0D\u5230 1 \u5206\u9418",
+  "ui.book_panel_elapsed_hint": "\u5F9E\u958B\u59CB\u4F01\u5283\u5230\u5BEB\u5B8C\u7684\u6642\u9593",
+  "ui.book_panel_open_card": "\u6253\u958B",
+  "ui.book_panel_open_0": "\u6253\u958B\u300C{0}\u300D\u7684\u7B46\u8A18",
+  "ui.book_panel_rerun_card": "\u91CD\u8DD1\u9019\u5F35",
+  "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u5716\u6587\u66F8\u9019\u4E00\u5F35\uFF1A{0}\uFF08\u4F01\u5283 \u2192 \u5BEB \u2192 \u6821\uFF09",
+  "ui.book_panel_reason_0": "\u539F\u56E0\uFF1A{0}",
+  "ui.book_panel_confirm_seam": "\u5DF2\u78BA\u8A8D\u63A5\u7E2B",
+  "ui.book_panel_confirm_seam_0": "\u5DF2\u78BA\u8A8D\u300C{0}\u300D\u7684\u63A5\u7E2B",
+  "ui.book_seam_label": "\u63A5\u7E2B\u9700\u770B",
+  "ui.book_seam_reason": "\u9130\u5361\u4F01\u5283\u6216\u6B63\u6587\u5DF2\u8B8A\u66F4\uFF0C\u5C1A\u672A\u4EBA\u5DE5\u6838\u5C0D\u3002",
+  "ui.book_panel_proof_show": "\u770B\u67E5\u8B49\u8A18\u9304",
+  "ui.book_panel_proof_hide": "\u6536\u5408\u67E5\u8B49\u8A18\u9304",
+  "ui.book_panel_proof_0": "{0} \u7684\u67E5\u8B49\u8A18\u9304",
+  "ui.book_panel_proof_summary_0_1_2": "{0} \u9805\u9054\u6210\u3001{1} \u9805\u5F85\u67E5\u3001{2} \u9805\u672A\u9054\u6210",
+  "ui.book_panel_proof_none": "\u6C92\u6709\u67E5\u8B49\u8A18\u9304\u3002",
+  "ui.book_panel_proof_failed": "\u9019\u5F35\u6821\u5C0D\u6C92\u6709\u5B8C\u6210\u3002",
+  "ui.book_panel_proof_facts_unverified": "\u4E8B\u5BE6\u9805\u76EE\u90FD\u9084\u6C92\u67E5\u8B49\u5230\u4F86\u6E90\u3002",
+  "ui.book_panel_proof_opened_0_1": "\u958B\u9801 {0} \u6B21\u3001\u641C\u5C0B {1} \u6B21",
+  "ui.book_panel_proof_sources_0": "\u4F86\u6E90\uFF1A{0}",
+  "ui.book_panel_structure_unmet_0": "\u7D50\u69CB {0} \u9805\u672A\u9054\u6210",
+  "ui.book_proof_fact": "\u4E8B\u5BE6",
+  "ui.book_proof_structure": "\u7D50\u69CB",
+  "ui.book_proof_met": "\u9054\u6210",
+  "ui.book_proof_unmet": "\u672A\u9054\u6210",
+  "ui.book_proof_unverified": "\u5F85\u67E5",
+  "ui.book_panel_not_gate2": "\u76EE\u524D\u4E0D\u5728\u95DC\u5361 1 \u6216\u95DC\u5361 2\uFF0C\u6C92\u6709\u53EF\u770B\u7684\u5167\u5BB9\u3002",
   "ui.book_panel_hint": "\u4E5F\u53EF\u4EE5\u76F4\u63A5\u5728\u5FC3\u667A\u5716\u4E0A\u9EDE\u5361\uFF0C\u6539\u5B83\u7684\u300CPrompt\u300D\u5340\u6BB5\u3002"
 };
 
@@ -9851,16 +9965,16 @@ var MermaidZoomModal = class extends import_obsidian2.Modal {
     const height = (viewport == null ? void 0 : viewport.clientHeight) || (viewport == null ? void 0 : viewport.getBoundingClientRect().height) || 0;
     return { width: width || 900, height: height || 600 };
   }
-  toolButton(parent, icon, label, run, text10) {
-    const button = parent.createEl("button", {
+  toolButton(parent, icon, label, run2, text10) {
+    const button2 = parent.createEl("button", {
       cls: "vam-mermaid-zoom-tool",
       attr: { type: "button", "aria-label": label }
     });
-    if (icon) (0, import_obsidian2.setIcon)(button, icon);
-    if (text10) button.createSpan({ text: text10 });
-    button.addEventListener("click", () => {
+    if (icon) (0, import_obsidian2.setIcon)(button2, icon);
+    if (text10) button2.createSpan({ text: text10 });
+    button2.addEventListener("click", () => {
       var _a2;
-      run();
+      run2();
       (_a2 = this.viewport) == null ? void 0 : _a2.focus();
     });
   }
@@ -9998,16 +10112,16 @@ function decorateDiagram(app, host) {
   if (!svg) return;
   host.addClass(SCOPE_CLASS, ZOOMABLE_CLASS);
   if (host.querySelector(`.${BUTTON_CLASS}`)) return;
-  const button = host.createEl("button", {
+  const button2 = host.createEl("button", {
     cls: `${BUTTON_CLASS} clickable-icon`,
     attr: { type: "button", "aria-label": t("ui.mermaid_zoom_open"), title: t("ui.mermaid_zoom_open") }
   });
-  (0, import_obsidian3.setIcon)(button, "maximize-2");
-  button.addEventListener("click", (event) => {
+  (0, import_obsidian3.setIcon)(button2, "maximize-2");
+  button2.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
     const current = host.querySelector("svg");
-    if (current) new MermaidZoomModal(app, current, button).open();
+    if (current) new MermaidZoomModal(app, current, button2).open();
   });
 }
 function inForeignEmbed(section3, host) {
@@ -11868,9 +11982,9 @@ function customizationFields(parent, initial, language2, changed = () => void 0)
     ["questions", "coffee.preserve_questions"],
     ["sources", "coffee.preserve_sources"]
   ]) {
-    const row = fieldset.createEl("label");
-    const input2 = row.createEl("input", { attr: { type: "checkbox" } });
-    row.createSpan({ text: t2(label) });
+    const row2 = fieldset.createEl("label");
+    const input2 = row2.createEl("input", { attr: { type: "checkbox" } });
+    row2.createSpan({ text: t2(label) });
     preserve.set(key4, input2);
   }
   const warning = converge.createEl("p", {
@@ -11975,9 +12089,9 @@ var CoffeeCustomizationModal = class extends import_obsidian5.Modal {
     const fields = customizationFields(content, (_d = engine.session.guests) == null ? void 0 : _d.customization, engine.session.language);
     const errors = content.createEl("p", { cls: "ct-error", attr: { "aria-live": "polite" } });
     const actions = content.createDiv("ct-customization-actions");
-    const run = (label2, action) => {
-      const button = actions.createEl("button", { text: label2 });
-      button.onclick = () => {
+    const run2 = (label2, action) => {
+      const button2 = actions.createEl("button", { text: label2 });
+      button2.onclick = () => {
         const value = fields.read(), issues = validateCustomization(value, engine.session.language);
         errors.setText(issues.join("\n"));
         if (issues.length) return;
@@ -11990,16 +12104,16 @@ var CoffeeCustomizationModal = class extends import_obsidian5.Modal {
         });
       };
     };
-    run(t2("coffee.apply_to_this_table"), async (value) => {
+    run2(t2("coffee.apply_to_this_table"), async (value) => {
       await engine.setCustomization(style.value, value);
       new import_obsidian5.Notice(t2("coffee.table_settings_saved"));
       this.close();
     });
-    run(t2("coffee.default_for_new_tables"), async (value) => {
+    run2(t2("coffee.default_for_new_tables"), async (value) => {
       await this.saveDefault(style.value, value);
       new import_obsidian5.Notice(t2("coffee.saved_for_new_tables"));
     });
-    run(t2("coffee.preview_convergence_once"), async (value) => {
+    run2(t2("coffee.preview_convergence_once"), async (value) => {
       const before = convergencePreviewMarks(engine);
       let started = false;
       await this.confirmRun(async () => {
@@ -12240,16 +12354,16 @@ ${item.answer}`);
   const unresolved = [], excerpts = [];
   for (const source of (_c = selected == null ? void 0 : selected.sources) != null ? _c : []) {
     const needle = normalize2(source);
-    let count3 = 0;
+    let count4 = 0;
     for (const text10 of committed) {
       const haystack = normalize2(text10);
       let at = 0;
       while (needle && (at = haystack.indexOf(needle, at)) >= 0) {
-        count3++;
+        count4++;
         at += needle.length;
       }
     }
-    if (count3 === 1) excerpts.push(source);
+    if (count4 === 1) excerpts.push(source);
     else unresolved.push(source);
   }
   const snapshotText = selected ? [
@@ -14852,7 +14966,7 @@ var CoffeeStorage = class {
   }
   encode(session) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x;
-    const zh = coffeeInstruction(session.language) === "zh", count3 = (_b2 = (_a2 = session.guests) == null ? void 0 : _a2.counts) != null ? _b2 : { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 };
+    const zh = coffeeInstruction(session.language) === "zh", count4 = (_b2 = (_a2 = session.guests) == null ? void 0 : _a2.counts) != null ? _b2 : { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 };
     const t2 = (zhText, enText) => zh ? zhText : enText;
     const lines = [
       `# ${session.topic}`,
@@ -14862,10 +14976,10 @@ var CoffeeStorage = class {
       `- ${t2("\u6A21\u578B", "Model")}: ${session.model}`,
       `- ${t2("\u63A8\u7406\u5F37\u5EA6", "Reasoning")}: ${session.reasoning}`,
       `- ${t2("\u4E3B\u6301\u4EBA", "Hosts")}: ${(_d = (_c = session.guests) == null ? void 0 : _c.hostCount) != null ? _d : 2}`,
-      `- ${t2("\u4E3B\u984C\u5C08\u5BB6", "Topic experts")}: ${count3.experts}`,
-      `- ${t2("\u8DE8\u9818\u57DF\u5C08\u5BB6", "Cross-domain experts")}: ${count3["cross-domain"]}`,
-      `- ${t2("\u597D\u5947\u7684\u901A\u624D", "Curious generalists")}: ${count3.generalist}`,
-      `- ${t2("\u53D7\u5F71\u97FF\u8005", "Affected perspectives")}: ${count3.affected}`
+      `- ${t2("\u4E3B\u984C\u5C08\u5BB6", "Topic experts")}: ${count4.experts}`,
+      `- ${t2("\u8DE8\u9818\u57DF\u5C08\u5BB6", "Cross-domain experts")}: ${count4["cross-domain"]}`,
+      `- ${t2("\u597D\u5947\u7684\u901A\u624D", "Curious generalists")}: ${count4.generalist}`,
+      `- ${t2("\u53D7\u5F71\u97FF\u8005", "Affected perspectives")}: ${count4.affected}`
     ];
     for (const guest of (_f = (_e = session.guests) == null ? void 0 : _e.guests) != null ? _f : [])
       lines.push(`- ${t2("\u6307\u5B9A\u4F86\u8CD3", "Guest")}: ${t2(...CATEGORY_LABELS[guest.category])} \u2014 ${guest.description}`);
@@ -15752,10 +15866,10 @@ function interleaveInterventions(markdown, interventions) {
   if (!interventions.length) return demoteRootHeadings(markdown);
   const chunks = markdown.split(/(?=^### .+$)/gm), output = [];
   let turns = 0, inserted = /* @__PURE__ */ new Set();
-  const insertThrough = (count3) => {
+  const insertThrough = (count4) => {
     var _a2;
     for (const item of interventions)
-      if (!inserted.has(item.id) && ((_a2 = item.afterTurn) != null ? _a2 : 0) <= count3) {
+      if (!inserted.has(item.id) && ((_a2 = item.afterTurn) != null ? _a2 : 0) <= count4) {
         const quoted = item.text.trim().split("\n").map((line2, index) => index === 0 ? `> **\u4F60\uFF08\u63D2\u8A71\uFF09**\uFF1A${line2}` : `> ${line2}`).join("\n");
         output.push("", quoted, "");
         inserted.add(item.id);
@@ -16443,7 +16557,7 @@ function defaults() {
   return { experts: 4, "cross-domain": 1, generalist: 1, affected: 1 };
 }
 function total(counts) {
-  return Object.values(counts).reduce((sum2, count3) => sum2 + count3, 0);
+  return Object.values(counts).reduce((sum2, count4) => sum2 + count4, 0);
 }
 var CoffeeTablesView = class extends import_obsidian8.ItemView {
   constructor(leaf, plugin) {
@@ -16646,12 +16760,12 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
     this.app.workspace.requestSaveLayout();
   }
   button(parent, label, action, disabled = false) {
-    const button = parent.createEl("button", { text: label });
-    button.disabled = disabled;
-    button.addEventListener("click", () => {
+    const button2 = parent.createEl("button", { text: label });
+    button2.disabled = disabled;
+    button2.addEventListener("click", () => {
       void Promise.resolve().then(action).catch((error) => new import_obsidian8.Notice(error instanceof Error ? error.message : String(error)));
     });
-    return button;
+    return button2;
   }
   async home(edit) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q;
@@ -16838,8 +16952,8 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
     const hostCount = hostRow.createEl("select", {
       attr: { "aria-label": this.t("coffee.number_of_hosts"), "data-ct-home-field": "hostCount" }
     });
-    for (let count3 = 1; count3 <= 4; count3++)
-      hostCount.createEl("option", { value: String(count3), text: String(count3) });
+    for (let count4 = 1; count4 <= 4; count4++)
+      hostCount.createEl("option", { value: String(count4), text: String(count4) });
     hostCount.value = String((_F = (_E = this.homeForm.hostCount) != null ? _E : old == null ? void 0 : old.hostCount) != null ? _F : 2);
     hostRow.createEl("p", {
       cls: "ct-muted",
@@ -16863,8 +16977,8 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
       );
     };
     for (const category of CATEGORIES4) {
-      const row = guestSection.createDiv("ct-count-row");
-      const label = row.createEl("label");
+      const row2 = guestSection.createDiv("ct-count-row");
+      const label = row2.createEl("label");
       label.createSpan({ text: this.t(category.label) });
       const input2 = label.createEl("input", {
         attr: {
@@ -16878,7 +16992,7 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
       });
       input2.value = (_G = this.homeForm[`count-${category.id}`]) != null ? _G : String(counts[category.id]);
       countInputs.set(category.id, input2);
-      row.createEl("p", { cls: "ct-muted", text: this.t(category.description) });
+      row2.createEl("p", { cls: "ct-muted", text: this.t(category.description) });
     }
     const warning = guestSection.createEl("p", { cls: "ct-risk-warning is-hidden", attr: { role: "status" } });
     const invites = advanced.createDiv("ct-invites");
@@ -16894,12 +17008,12 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
     })();
     const addInvite = (guest) => {
       var _a3;
-      const row = invites.createDiv("ct-invite-row"), id = (_a3 = guest == null ? void 0 : guest.id) != null ? _a3 : crypto.randomUUID();
-      const select = row.createEl("select", {
+      const row2 = invites.createDiv("ct-invite-row"), id = (_a3 = guest == null ? void 0 : guest.id) != null ? _a3 : crypto.randomUUID();
+      const select = row2.createEl("select", {
         attr: { "aria-label": this.t("coffee.guest_category"), "data-ct-home-field": `invite-category-${id}` }
       });
       CATEGORIES4.forEach((item) => select.createEl("option", { value: item.id, text: this.t(item.label) }));
-      const description = row.createEl("input", {
+      const description = row2.createEl("input", {
         attr: {
           type: "text",
           maxlength: "160",
@@ -16912,14 +17026,14 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
         select.value = guest.category;
         description.value = guest.description;
       }
-      const remove = this.button(row, this.t("ui.reference_remove"), () => {
-        row.remove();
-        const rowIndex = inviteRows.findIndex((item) => item.row === row);
+      const remove = this.button(row2, this.t("ui.reference_remove"), () => {
+        row2.remove();
+        const rowIndex = inviteRows.findIndex((item) => item.row === row2);
         if (rowIndex >= 0) inviteRows.splice(rowIndex, 1);
         updateWarning();
         snapshotForm();
       });
-      inviteRows.push({ id, category: select, description, row });
+      inviteRows.push({ id, category: select, description, row: row2 });
       select.addEventListener("change", () => {
         updateWarning();
         snapshotForm();
@@ -17082,11 +17196,11 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
     const renderReferences = () => {
       referenceList.empty();
       for (const [index, file] of referenceFiles.entries()) {
-        const row = referenceList.createDiv("ct-reference-row");
-        row.createSpan({
+        const row2 = referenceList.createDiv("ct-reference-row");
+        row2.createSpan({
           text: `${file.name} \xB7 ${file.content.length.toLocaleString()} ${this.t("coffee.characters")}`
         });
-        this.button(row, this.t("ui.reference_remove"), () => {
+        this.button(row2, this.t("ui.reference_remove"), () => {
           referenceFiles.splice(index, 1);
           renderReferences();
           snapshotForm();
@@ -17375,14 +17489,14 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       completed: "coffee.filter_completed"
     };
     for (const filter of ["all", "generating", "unfinished", "completed"]) {
-      const button = this.button(filterBar, this.t(filterLabels[filter]), () => {
+      const button2 = this.button(filterBar, this.t(filterLabels[filter]), () => {
         this.tableFilter = filter;
         this.focusedTopic = null;
         updateFilters();
         void renderList();
       });
-      button.setAttribute("aria-pressed", String(this.tableFilter === filter));
-      filterButtons.set(filter, button);
+      button2.setAttribute("aria-pressed", String(this.tableFilter === filter));
+      filterButtons.set(filter, button2);
     }
     const topicFocusRow = aside.createDiv("ct-topic-focus is-hidden");
     const topicFocusText = topicFocusRow.createSpan();
@@ -17392,9 +17506,9 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       void renderList();
     });
     const updateFilters = () => {
-      for (const [filter, button] of filterButtons) {
-        button.toggleClass("is-active", this.tableFilter === filter && !this.focusedTopic);
-        button.setAttribute("aria-pressed", String(this.tableFilter === filter && !this.focusedTopic));
+      for (const [filter, button2] of filterButtons) {
+        button2.toggleClass("is-active", this.tableFilter === filter && !this.focusedTopic);
+        button2.setAttribute("aria-pressed", String(this.tableFilter === filter && !this.focusedTopic));
       }
       topicFocusRow.toggleClass("is-hidden", !this.focusedTopic);
       if (this.focusedTopic) topicFocusText.setText(this.t("coffee.same_topic", this.focusedTopic));
@@ -17670,7 +17784,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       updateSelection();
       for (const item of visible) {
         const time = tableTime(item), timestamp = new Date(time.value), status = this.t(tableStatusKey(item));
-        const entry = list2.createDiv("ct-list-entry"), button = this.button(entry, "", () => {
+        const entry = list2.createDiv("ct-list-entry"), button2 = this.button(entry, "", () => {
           if (item.status === "generating") void this.loadSession(item.path);
           else void showPreview(item.path);
         });
@@ -17686,23 +17800,23 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
           else selectedTables.delete(item.path);
           updateSelection();
         });
-        button.empty();
-        button.addClass("ct-list-item");
-        button.createSpan({ cls: "ct-list-title", text: item.topic });
-        const meta = button.createDiv("ct-list-meta");
+        button2.empty();
+        button2.addClass("ct-list-item");
+        button2.createSpan({ cls: "ct-list-title", text: item.topic });
+        const meta = button2.createDiv("ct-list-meta");
         meta.createSpan({ text: formatTableTime(time.value, Date.now(), this.plugin.settings.language) });
         const badge = meta.createSpan({ cls: `ct-status-badge ct-status-${item.status}`, text: status });
         badge.setAttribute("aria-label", status);
         if (time.isFallback) meta.createSpan({ cls: "ct-list-fallback", text: this.t("coffee.last_updated") });
         if (item.unreadable) {
-          button.addClass("ct-list-unreadable");
-          button.disabled = true;
-          button.createDiv({ cls: "ct-list-reason", text: this.t("coffee.unreadable_reason") });
+          button2.addClass("ct-list-unreadable");
+          button2.disabled = true;
+          button2.createDiv({ cls: "ct-list-reason", text: this.t("coffee.unreadable_reason") });
         }
-        if (this.selectedPath === item.path) button.addClass("is-selected");
-        button.setAttribute("aria-current", this.selectedPath === item.path ? "true" : "false");
+        if (this.selectedPath === item.path) button2.addClass("is-selected");
+        button2.setAttribute("aria-current", this.selectedPath === item.path ? "true" : "false");
         if (Number.isFinite(timestamp.getTime()))
-          button.setAttribute(
+          button2.setAttribute(
             "title",
             `${item.topic}
 ${formatTableDateTime(timestamp.getTime(), this.plugin.settings.language)}${item.model ? ` \xB7 ${item.model}` : ""}`
@@ -18390,8 +18504,8 @@ ${formatTableDateTime(timestamp.getTime(), this.plugin.settings.language)}${item
     details.createEl("summary", { text: this.t("coffee.invite_temporary_guests") });
     const rows2 = details.createDiv("ct-follow-up-guest-list");
     this.followUpGuests.forEach((guest, index) => {
-      const row = rows2.createDiv("ct-follow-up-guest");
-      const name2 = row.createEl("input", {
+      const row2 = rows2.createDiv("ct-follow-up-guest");
+      const name2 = row2.createEl("input", {
         attr: {
           type: "text",
           maxlength: "60",
@@ -18404,14 +18518,14 @@ ${formatTableDateTime(timestamp.getTime(), this.plugin.settings.language)}${item
       name2.addEventListener("input", () => {
         guest.name = name2.value;
       });
-      const category = row.createEl("select", { attr: { "aria-label": this.t("coffee.guest_perspective") } });
+      const category = row2.createEl("select", { attr: { "aria-label": this.t("coffee.guest_perspective") } });
       category.disabled = engine.busy;
       for (const item of CATEGORIES4) category.createEl("option", { value: item.id, text: this.t(item.label) });
       category.value = guest.category;
       category.addEventListener("change", () => {
         guest.category = category.value;
       });
-      const description = row.createEl("input", {
+      const description = row2.createEl("input", {
         attr: {
           type: "text",
           maxlength: "160",
@@ -18425,7 +18539,7 @@ ${formatTableDateTime(timestamp.getTime(), this.plugin.settings.language)}${item
         guest.description = description.value;
       });
       this.button(
-        row,
+        row2,
         this.t("ui.reference_remove"),
         () => {
           this.followUpGuests.splice(index, 1);
@@ -19672,17 +19786,17 @@ function modalActions(modal) {
 function actionStatus(actions) {
   return actions.createSpan({ cls: "vam-next-actions-note vam-next-status", attr: { "aria-live": "polite" } });
 }
-function armDiscard(button, status, discard, blocked = () => false, labels = { confirm: t("ui.discard_confirm"), hint: t("ui.discard_confirm_hint") }) {
+function armDiscard(button2, status, discard, blocked = () => false, labels = { confirm: t("ui.discard_confirm"), hint: t("ui.discard_confirm_hint") }) {
   var _a2;
-  const label = (_a2 = button.textContent) != null ? _a2 : "";
+  const label = (_a2 = button2.textContent) != null ? _a2 : "";
   let timer = 0;
   const disarm = () => {
     window.clearTimeout(timer);
     timer = 0;
-    button.setText(label);
-    button.removeClass("mod-warning");
+    button2.setText(label);
+    button2.removeClass("mod-warning");
   };
-  button.addEventListener("click", () => {
+  button2.addEventListener("click", () => {
     if (blocked()) return;
     if (timer) {
       disarm();
@@ -19693,8 +19807,8 @@ function armDiscard(button, status, discard, blocked = () => false, labels = { c
       disarm();
       status.setText("");
     }, 5e3);
-    button.setText(labels.confirm);
-    button.addClass("mod-warning");
+    button2.setText(labels.confirm);
+    button2.addClass("mod-warning");
     status.setText(labels.hint);
   });
   return disarm;
@@ -19782,13 +19896,13 @@ var AnchorModal = class extends import_obsidian9.Modal {
         ["none", t("ui.anchor_target_none")]
       ];
       for (const [value, label] of choices) {
-        const row = group.createEl("label", { cls: "vam-anchor-choice" });
-        const radio = row.createEl("input", { type: "radio", attr: { name: "vam-anchor-target", value } });
+        const row2 = group.createEl("label", { cls: "vam-anchor-choice" });
+        const radio = row2.createEl("input", { type: "radio", attr: { name: "vam-anchor-target", value } });
         radio.checked = value === target;
         radio.addEventListener("change", () => {
           if (radio.checked) target = value;
         });
-        row.createSpan({ text: label });
+        row2.createSpan({ text: label });
       }
     }
     const actions = modalActions(this);
@@ -19832,14 +19946,14 @@ var AnchorPickModal = class extends import_obsidian9.Modal {
     this.titleEl.setText(t("ui.anchor_relation_pick_title"));
     const list2 = this.contentEl.createDiv("vam-anchor-pick-list");
     for (const entry of this.entries) {
-      const row = list2.createDiv("vam-anchor-pick-row");
-      const button = row.createEl("button", { text: entry.label, attr: { type: "button" } });
-      button.disabled = entry.taken;
+      const row2 = list2.createDiv("vam-anchor-pick-row");
+      const button2 = row2.createEl("button", { text: entry.label, attr: { type: "button" } });
+      button2.disabled = entry.taken;
       if (entry.taken) {
-        button.setAttr("aria-disabled", "true");
-        row.createSpan({ text: t("ui.anchor_relation_pick_taken"), cls: "vam-anchor-pick-taken" });
+        button2.setAttr("aria-disabled", "true");
+        row2.createSpan({ text: t("ui.anchor_relation_pick_taken"), cls: "vam-anchor-pick-taken" });
       }
-      button.addEventListener("click", () => {
+      button2.addEventListener("click", () => {
         if (entry.taken) return;
         this.close();
         this.choose(entry);
@@ -21085,7 +21199,7 @@ function buildMapSearchBar(parent, options) {
     attr: { "aria-label": options.label, placeholder: options.label, autocomplete: "off", spellcheck: "false" }
   });
   input2.value = options.query;
-  const count3 = root.createSpan({ cls: "vam-map-search-count", text: options.countText });
+  const count4 = root.createSpan({ cls: "vam-map-search-count", text: options.countText });
   const close = root.createEl("button", {
     cls: "vam-map-search-close",
     text: "\xD7",
@@ -21113,7 +21227,7 @@ function buildMapSearchBar(parent, options) {
     root,
     input: input2,
     setCount: (text10) => {
-      count3.setText(text10);
+      count4.setText(text10);
     }
   };
 }
@@ -21631,20 +21745,20 @@ function maskInlineCode(line2) {
       out += line2[i++];
       continue;
     }
-    let run = 0;
-    while (line2[i + run] === "`") run++;
-    const ticks = "`".repeat(run);
-    const close = line2.indexOf(ticks, i + run);
+    let run2 = 0;
+    while (line2[i + run2] === "`") run2++;
+    const ticks = "`".repeat(run2);
+    const close = line2.indexOf(ticks, i + run2);
     let end = close;
-    while (end !== -1 && (line2[end + run] === "`" || line2[end - 1] === "`")) {
+    while (end !== -1 && (line2[end + run2] === "`" || line2[end - 1] === "`")) {
       end = line2.indexOf(ticks, end + 1);
     }
     if (end === -1) {
-      out += line2.slice(i, i + run);
-      i += run;
+      out += line2.slice(i, i + run2);
+      i += run2;
     } else {
-      out += "\0".repeat(end + run - i);
-      i = end + run;
+      out += "\0".repeat(end + run2 - i);
+      i = end + run2;
     }
   }
   return out;
@@ -21835,9 +21949,9 @@ function sectionAliasRows() {
 function sectionAliasesFor(heading) {
   const key4 = lowered(heading);
   const result = [];
-  for (const row of sectionAliasRows())
-    if (row.names.some((entry) => lowered(entry) === key4)) {
-      for (const alias of row.aliases)
+  for (const row2 of sectionAliasRows())
+    if (row2.names.some((entry) => lowered(entry) === key4)) {
+      for (const alias of row2.aliases)
         if (lowered(alias) !== key4 && !result.some((existing) => lowered(existing) === lowered(alias)))
           result.push(alias);
     }
@@ -21976,13 +22090,13 @@ function section(value) {
   const item = value;
   if (typeof item.id !== "string" || typeof item.name !== "string") return null;
   const role = item.role === "sources" || item.role === "log" ? item.role : "none";
-  const count3 = item.count && (item.count.mode === "exact" || item.count.mode === "min") && typeof item.count.n === "number" ? { mode: item.count.mode, n: item.count.n } : void 0;
+  const count4 = item.count && (item.count.mode === "exact" || item.count.mode === "min") && typeof item.count.n === "number" ? { mode: item.count.mode, n: item.count.n } : void 0;
   return {
     id: item.id,
     name: item.name,
     description: typeof item.description === "string" ? item.description : "",
     role,
-    ...count3 ? { count: count3 } : {},
+    ...count4 ? { count: count4 } : {},
     aliases: Array.isArray(item.aliases) ? item.aliases.filter((alias) => typeof alias === "string") : []
   };
 }
@@ -22259,10 +22373,10 @@ async function demoteUnparsableMermaid(markdown, check) {
   if (!check || !/mermaid/i.test(markdown)) return markdown;
   const parts = markdown.split(/(\r\n?|\n)/);
   const at = (line2) => line2 * 2;
-  const count3 = Math.ceil(parts.length / 2);
+  const count4 = Math.ceil(parts.length / 2);
   const demote = [];
   let outer = null;
-  for (let index = 0; index < count3; index++) {
+  for (let index = 0; index < count4; index++) {
     const fence = fenceOf(parts[at(index)]);
     if (outer) {
       if (fence && fence[1][0] === outer[1][0] && fence[1].length >= outer[1].length && !fence[2].trim()) outer = null;
@@ -22281,7 +22395,7 @@ async function demoteUnparsableMermaid(markdown, check) {
     );
     const body = [];
     let next = index + 1;
-    for (; next < count3; next++) {
+    for (; next < count4; next++) {
       const raw = parts[at(next)];
       const content = core(raw);
       const close = FENCE.exec(content);
@@ -22764,7 +22878,7 @@ function withoutMermaid(text10) {
 }
 function inlineCode(text10) {
   var _a2;
-  const longest = Math.max(0, ...((_a2 = text10.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
+  const longest = Math.max(0, ...((_a2 = text10.match(/`+/g)) != null ? _a2 : []).map((run2) => run2.length));
   const fence = "`".repeat(longest + 1);
   return longest ? `${fence} ${text10} ${fence}` : `${fence}${text10}${fence}`;
 }
@@ -23179,10 +23293,10 @@ function fishbonePositions(input2) {
         cursor += sizes.get(detail.id) + gap;
       }
       const length = Math.max(column, cursor);
-      const run = length * BONE_RUN;
+      const run2 = length * BONE_RUN;
       const height = heightFor(topic);
       const lefts = [-width / 2, ...cards.map((card) => card.x)];
-      const rights = [width / 2, run, ...cards.map((card) => card.x + width)];
+      const rights = [width / 2, run2, ...cards.map((card) => card.x + width)];
       return {
         topic,
         side,
@@ -23256,13 +23370,13 @@ function radialPositions(input2) {
     const spots = [];
     const leaves = /* @__PURE__ */ new Map();
     const childrenOf = (node) => [...kidsOf(node), ...joinsOf(node)];
-    const count3 = (node) => {
+    const count4 = (node) => {
       const kids = childrenOf(node);
-      const total2 = kids.length ? kids.reduce((sum2, kid) => sum2 + count3(kid), 0) : 1;
+      const total2 = kids.length ? kids.reduce((sum2, kid) => sum2 + count4(kid), 0) : 1;
       leaves.set(node.id, total2);
       return total2;
     };
-    count3(root);
+    count4(root);
     const spread = (node, depth, start, end) => {
       spots.push({ id: node.id, depth, angle: (start + end) / 2, height: heightFor(node) });
       let next = start;
@@ -23352,7 +23466,7 @@ function verticalPositions(input2) {
     const kids = kidsOf(node);
     const extra = joinsOf(node);
     const width = widths.get(node.id);
-    const row = (list2, level) => {
+    const row2 = (list2, level) => {
       let next2 = start + (width - rowWidth(list2)) / 2;
       return list2.map((item) => {
         place(item, level, next2);
@@ -23361,8 +23475,8 @@ function verticalPositions(input2) {
         return x;
       });
     };
-    const kidXs = row(kids, depth + 1);
-    const joinXs = row(extra, depth + spans.get(node.id));
+    const kidXs = row2(kids, depth + 1);
+    const joinXs = row2(extra, depth + spans.get(node.id));
     const own2 = kidXs.length ? kidXs : joinXs;
     depths.set(node.id, depth);
     const centres = (list2, xsOf) => xsOf.map((x, i) => x + cardWidth(list2[i]) / 2);
@@ -24422,7 +24536,7 @@ var History = class {
       return;
     }
     this.past.push(...all.filter((entry) => this.solo.has(entry)));
-    const run = async (list2, redo) => {
+    const run2 = async (list2, redo) => {
       const done = [];
       try {
         for (const entry of list2) {
@@ -24438,8 +24552,8 @@ var History = class {
       }
     };
     const combined = {
-      undo: () => run([...entries].reverse(), false),
-      redo: () => run(entries, true),
+      undo: () => run2([...entries].reverse(), false),
+      redo: () => run2(entries, true),
       ...label ? { label } : {}
     };
     this.past.push(combined);
@@ -24550,10 +24664,10 @@ function mergeTitleFromResult(result, fallback) {
   return name2 && name2.length <= MERGE_TITLE_MAX ? name2 : sanitizeGeneratedTitle(fallback);
 }
 var MergeTopicsModal = class extends import_obsidian11.Modal {
-  constructor(app, count3, value, submit, cancelled2 = () => {
+  constructor(app, count4, value, submit, cancelled2 = () => {
   }, ai, parentName) {
     super(app);
-    this.count = count3;
+    this.count = count4;
     this.value = value;
     this.submit = submit;
     this.cancelled = cancelled2;
@@ -25000,7 +25114,7 @@ function begin(deps) {
   };
   let committed = false;
   const exists = (path) => !!repo.app.vault.getAbstractFileByPath(path);
-  async function run(files, maps, rebuild2, notes = { before: [], after: [] }, refresh = []) {
+  async function run2(files, maps, rebuild2, notes = { before: [], after: [] }, refresh = []) {
     const journal = { files: [], maps: [], notes: [] };
     const rewrite = async (step) => {
       journal.notes.push({ path: step.path, restore: step.restore, written: true });
@@ -25182,7 +25296,7 @@ function begin(deps) {
         if (undoing) notes.after.push({ path: at, restore, apply: () => writeText(repo, note.path, note.beforeText) });
         else notes.before.push({ path: note.path, restore, apply: () => note.write(note.path, attachment) });
       }
-      await run(files, maps, rebuild2, notes, refresh);
+      await run2(files, maps, rebuild2, notes, refresh);
     };
     return {
       undo: () => apply("undo"),
@@ -25445,7 +25559,7 @@ function ringSlotsAt(clearance, cell2) {
       out.push({ side, ax, ay: (T + B) / 2 - columnSpan / 2 + i * (cell2.h + RING_GAP) });
   return out;
 }
-function ringSlots(image, count3, cell2, margin = RING_MARGIN, fixedLines = []) {
+function ringSlots(image, count4, cell2, margin = RING_MARGIN, fixedLines = []) {
   for (let m = margin; ; m += RING_GROW) {
     const clearance = expand(image, m);
     let slots = ringSlotsAt(clearance, cell2);
@@ -25454,7 +25568,7 @@ function ringSlots(image, count3, cell2, margin = RING_MARGIN, fixedLines = []) 
         const rect2 = ringCardRect(slot, cell2.w, cell2.h);
         return !fixedLines.some((line2) => segmentHitsRect(line2, rect2));
       });
-    if (slots.length >= count3) return { slots, clearance };
+    if (slots.length >= count4) return { slots, clearance };
   }
 }
 function ringCardRect(slot, w, h) {
@@ -25620,17 +25734,17 @@ function countCrossings(points, slots, fixedLines, picked) {
 }
 function uncross(points, slots, fixedLines, picked) {
   const n = picked.length;
-  const count3 = slots.length;
+  const count4 = slots.length;
   const lines = points.map((p) => slots.map((s) => lineBetween(p, s)));
   const length = points.map((p, i) => slots.map((_, j) => Math.hypot(lines[i][j].x2 - p[0], lines[i][j].y2 - p[1])));
-  const hitsFixed = lines.map((row) => row.map((l) => fixedLines.filter((f) => segmentsCross(l, f)).length));
-  const cache = new Uint8Array(n * count3 * n * count3);
+  const hitsFixed = lines.map((row2) => row2.map((l) => fixedLines.filter((f) => segmentsCross(l, f)).length));
+  const cache = new Uint8Array(n * count4 * n * count4);
   const crossing = (a, sa, b, sb) => {
-    const key4 = ((a * count3 + sa) * n + b) * count3 + sb;
+    const key4 = ((a * count4 + sa) * n + b) * count4 + sb;
     if (!cache[key4]) {
       const value = segmentsCross(lines[a][sa], lines[b][sb]) ? 2 : 1;
       cache[key4] = value;
-      cache[((b * count3 + sb) * n + a) * count3 + sa] = value;
+      cache[((b * count4 + sb) * n + a) * count4 + sa] = value;
     }
     return cache[key4] === 2;
   };
@@ -25650,7 +25764,7 @@ function uncross(points, slots, fixedLines, picked) {
       let bestSlot = -1;
       for (let a = 0; a < n; a++) {
         const from2 = picked[a];
-        for (let to = 0; to < count3; to++) {
+        for (let to = 0; to < count4; to++) {
           if (to === from2) continue;
           const b2 = (_a2 = owner.get(to)) != null ? _a2 : -1;
           const before = cardCost(a, -1) + (b2 >= 0 ? cardCost(b2, a) : 0);
@@ -25709,7 +25823,7 @@ function uncross(points, slots, fixedLines, picked) {
     }
     return false;
   };
-  const domains = lines.map((row, i) => row.map((_, j) => j).filter((j) => hitsFixed[i][j] === 0));
+  const domains = lines.map((row2, i) => row2.map((_, j) => j).filter((j) => hitsFixed[i][j] === 0));
   if (domains.every((domain) => domain.length) && search(domains, n)) for (let i = 0; i < n; i++) picked[i] = found[i];
   descend();
 }
@@ -27544,9 +27658,9 @@ function truncateSummary(value, limit = 80) {
     if (SENTENCE_END.test(character) || character === "." && /\s/.test((_a2 = characters[index + 1]) != null ? _a2 : ""))
       return characters.slice(0, index + 1).join("");
   }
-  let count3 = 0;
-  while (count3 < characters.length && prefix[count3 + 1] <= limit - 1) count3++;
-  const window2 = characters.slice(0, count3);
+  let count4 = 0;
+  while (count4 < characters.length && prefix[count4 + 1] <= limit - 1) count4++;
+  const window2 = characters.slice(0, count4);
   let gap = -1;
   for (let index = window2.length - 1; index >= 0 && prefix[index] >= floor && gap < 0; index--)
     if (/\s/.test(window2[index])) gap = index;
@@ -27755,8 +27869,8 @@ function documentFootnoteLabel(document2) {
 }
 function resolveSummaryReferences(summary, groups) {
   const documents = dedupeReferenceGroups(groups).flatMap((group) => group.documents);
-  const run = String.raw`\[S\d+\](?:\s*[,，、;；]?\s*\[S\d+\])*`;
-  const stripped = summary.replace(new RegExp(String.raw`[ \t]*[（(]\s*${run}\s*[）)]`, "g"), "").replace(new RegExp(String.raw`[ \t]*${run}`, "g"), "").trim();
+  const run2 = String.raw`\[S\d+\](?:\s*[,，、;；]?\s*\[S\d+\])*`;
+  const stripped = summary.replace(new RegExp(String.raw`[ \t]*[（(]\s*${run2}\s*[）)]`, "g"), "").replace(new RegExp(String.raw`[ \t]*${run2}`, "g"), "").trim();
   return resolveWikilinks(stripped, documents);
 }
 var FOOTNOTE_REFERENCE = /\[\^([^\]\s]+)\](?!\()/g;
@@ -28208,13 +28322,13 @@ function enqueueCommit(app, mapId, task) {
   var _a2, _b2;
   const queues = (_a2 = commitQueues.get(app)) != null ? _a2 : /* @__PURE__ */ new Map();
   commitQueues.set(app, queues);
-  const run = ((_b2 = queues.get(mapId)) != null ? _b2 : Promise.resolve()).then(task, task);
-  const tail = run.catch(() => void 0);
+  const run2 = ((_b2 = queues.get(mapId)) != null ? _b2 : Promise.resolve()).then(task, task);
+  const tail = run2.catch(() => void 0);
   queues.set(mapId, tail);
   void tail.then(() => {
     if (queues.get(mapId) === tail) queues.delete(mapId);
   });
-  return run;
+  return run2;
 }
 async function addExternalSource(app, mapId, input2, scope) {
   const check = await checkExternalRoot(input2, scope);
@@ -28397,13 +28511,13 @@ function mapSourceStatus(app, source) {
   const item = app.vault.getAbstractFileByPath(source.path);
   if (source.kind === "folder") {
     if (!(item instanceof import_obsidian12.TFolder)) return { exists: false };
-    const count3 = markdownFiles(item).filter(
+    const count4 = markdownFiles(item).filter(
       (file) => {
         var _a2;
         return !isArchivedVamNote(file.path, (_a2 = app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter);
       }
     ).length;
-    return { exists: true, count: count3 };
+    return { exists: true, count: count4 };
   }
   return { exists: item instanceof import_obsidian12.TFile };
 }
@@ -28544,16 +28658,16 @@ function problem(raw, nodeIds) {
     if (!isStr(id)) return `role ${key4} malformed`;
     if (!nodeIds.has(id)) return `role ${key4} points to a missing node`;
   }
-  const run = raw.run;
-  if (!isRec(run)) return "run missing";
-  if (!isStr(run.runId) || !count(run.researchCalls)) return "run malformed";
-  if (run.presetAssumptions !== void 0) {
-    const preset = run.presetAssumptions;
+  const run2 = raw.run;
+  if (!isRec(run2)) return "run missing";
+  if (!isStr(run2.runId) || !count(run2.researchCalls)) return "run malformed";
+  if (run2.presetAssumptions !== void 0) {
+    const preset = run2.presetAssumptions;
     if (!Array.isArray(preset) || !preset.length || preset.some((item) => !isRec(item) || !isStr(item.label) || !isStr(item.value) || !isStr(item.reason)))
       return "run malformed";
   }
-  if (!optOneOf(QUESTION_TYPES, run.presetQuestionType)) return "unknown run enum";
-  if (!oneOf(RUN_PHASES, run.phase) || !oneOf(RUN_STATUSES, run.status) || !optOneOf(STOP_REASONS, run.stopReason))
+  if (!optOneOf(QUESTION_TYPES, run2.presetQuestionType)) return "unknown run enum";
+  if (!oneOf(RUN_PHASES, run2.phase) || !oneOf(RUN_STATUSES, run2.status) || !optOneOf(STOP_REASONS, run2.stopReason))
     return "unknown run enum";
   const situation = raw.situation;
   if (!isRec(situation) || !Array.isArray(situation.data) || !isRec(situation.gate)) return "situation malformed";
@@ -28694,9 +28808,9 @@ function evidenceClearlySupports(h) {
     var _a2;
     return (_a2 = n.stance) != null ? _a2 : "uncertain";
   });
-  const count3 = (stance) => stances.filter((s) => s === stance).length;
-  const supports = count3("supports");
-  return supports > 2 * count3("contradicts") && supports >= count3("uncertain") && supports > 0;
+  const count4 = (stance) => stances.filter((s) => s === stance).length;
+  const supports = count4("supports");
+  return supports > 2 * count4("contradicts") && supports >= count4("uncertain") && supports > 0;
 }
 var isLimitCut = (h) => {
   var _a2;
@@ -29054,17 +29168,17 @@ function rebaseMapNotePaths(map, rebase) {
     }
     if (JSON.stringify(branch.inputSnapshot) === snapshotBefore) continue;
     const hash = hashSnapshot({ branch: branch.inputSnapshot, answer: branch.answerSnapshot });
-    for (const run of aim.runs) {
-      if (run.branchId !== branch.id) continue;
-      for (const attempt of run.attempts) {
+    for (const run2 of aim.runs) {
+      if (run2.branchId !== branch.id) continue;
+      for (const attempt of run2.attempts) {
         attempt.inputSnapshotHash = hash;
         for (const draft of (_b2 = aim.resultDrafts) != null ? _b2 : [])
-          if (draft.runId === run.id && draft.attemptId === attempt.id) draft.inputSnapshotHash = hash;
+          if (draft.runId === run2.id && draft.attemptId === attempt.id) draft.inputSnapshotHash = hash;
       }
     }
   }
-  for (const run of aim.runs)
-    for (const attempt of run.attempts)
+  for (const run2 of aim.runs)
+    for (const attempt of run2.attempts)
       if (attempt.retainedReports) attempt.retainedReports.notePath = move(attempt.retainedReports.notePath);
   for (const draft of (_c = aim.resultDrafts) != null ? _c : []) {
     draft.notePath = move(draft.notePath);
@@ -29478,8 +29592,8 @@ function followedPreview(current, auto, hash, initialized) {
   if (hash === PREVIEW_MANUAL) return { preview: null, hash };
   const text10 = isPlaceholder(current) ? "" : normalizePreviewText(current);
   const paragraphs = text10 ? text10.split("\n\n") : [];
-  const replaceFirst = (count3) => ({
-    preview: [auto, ...paragraphs.slice(count3)].join("\n\n"),
+  const replaceFirst = (count4) => ({
+    preview: [auto, ...paragraphs.slice(count4)].join("\n\n"),
     hash: previewHash(auto)
   });
   if (hash) {
@@ -32423,7 +32537,7 @@ var ChatActionWriter = class {
   get app() {
     return this.ports.app();
   }
-  async write(action, baseline, same2, run) {
+  async write(action, baseline, same2, run2) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h;
     const hashes = baseline.mdHashes;
     if (!same2() || !this.map) return skipped("ui.map_chat_skip_map_changed");
@@ -32436,7 +32550,7 @@ var ChatActionWriter = class {
     const configDir = this.app.vault.configDir;
     const real = (id) => {
       var _a3;
-      return id.startsWith(MAP_CHAT_NEW_PREFIX) ? (_a3 = run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length))) != null ? _a3 : null : id;
+      return id.startsWith(MAP_CHAT_NEW_PREFIX) ? (_a3 = run2.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length))) != null ? _a3 : null : id;
     };
     const sourceFileRefusal = (node) => {
       const verdict = guardMapChatWrite({
@@ -32462,29 +32576,29 @@ var ChatActionWriter = class {
           if (this.ports.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
         }
         const before = new Set(this.map.nodes.map((item) => item.id));
-        if (run.deferRebuild) run.ownershipDirty = true;
-        await this.ports.addNode(parent, action.title, !run.deferRebuild, false, (_b2 = action.topicKind) != null ? _b2 : "topic", false, {
+        if (run2.deferRebuild) run2.ownershipDirty = true;
+        await this.ports.addNode(parent, action.title, !run2.deferRebuild, false, (_b2 = action.topicKind) != null ? _b2 : "topic", false, {
           leaning: action.leaning,
           strength: action.strength
         });
         const created = (_c = this.map) == null ? void 0 : _c.nodes.find((item) => !before.has(item.id));
         if (!created) return skipped("ui.map_chat_skip_unavailable");
-        run.created.push(created.id);
-        (_d = run.notes) == null ? void 0 : _d.add(created.id);
-        if (action.ref) run.refs.set(action.ref, created.id);
+        run2.created.push(created.id);
+        (_d = run2.notes) == null ? void 0 : _d.add(created.id);
+        if (action.ref) run2.refs.set(action.ref, created.id);
         if (action.summary) await this.ports.noteChange(created, { summary: action.summary });
         return done;
       }
       case "set_topic_kind":
-        return this.chatSetTopicKind(action, real, run);
+        return this.chatSetTopicKind(action, real, run2);
       case "add_relation":
       case "remove_relation":
         return this.chatChangeRelation(action, real);
       case "add_anchor":
       case "link_anchor":
-        return this.chatChangeAnchor(action, real, run);
+        return this.chatChangeAnchor(action, real, run2);
       case "set_appearance":
-        return this.chatSetAppearance(action, real, run);
+        return this.chatSetAppearance(action, real, run2);
       case "collapse_topic":
       case "expand_topic": {
         this.ports.flushChatRender();
@@ -32527,7 +32641,7 @@ var ChatActionWriter = class {
         if (this.ports.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
         if (changed) return changed;
-        (_e = run.notes) == null ? void 0 : _e.add(node.id);
+        (_e = run2.notes) == null ? void 0 : _e.add(node.id);
         await this.ports.noteChange(
           node,
           action.kind === "rename_topic" ? { title: action.title } : action.kind === "update_summary" ? { summary: action.summary } : { detail }
@@ -32586,7 +32700,7 @@ var ChatActionWriter = class {
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;
         const removed = await this.ports.removeToUnassignedEntry(node, action.branch);
-        for (const path of (_g = (_f = removed == null ? void 0 : removed.parkedPaths) == null ? void 0 : _f.call(removed)) != null ? _g : []) (_h = run.parked) == null ? void 0 : _h.add(path);
+        for (const path of (_g = (_f = removed == null ? void 0 : removed.parkedPaths) == null ? void 0 : _f.call(removed)) != null ? _g : []) (_h = run2.parked) == null ? void 0 : _h.add(path);
         return done;
       }
       case "edit_md_file": {
@@ -32661,7 +32775,7 @@ var ChatActionWriter = class {
             replace = next.slice(from, next.length - rest);
           }
           source.editor.replaceRange(replace, source.editor.offsetToPos(from), source.editor.offsetToPos(to));
-          this.recordChatFileEdit(source.file.path, source.text, next, run);
+          this.recordChatFileEdit(source.file.path, source.text, next, run2);
           if (editKey) hashes[editKey] = contentHash2(next);
           return done;
         }
@@ -32674,7 +32788,7 @@ var ChatActionWriter = class {
           return next;
         });
         if (raced) return skipped("ui.map_chat_skip_stale");
-        this.recordChatFileEdit(source.file.path, source.text, next, run);
+        this.recordChatFileEdit(source.file.path, source.text, next, run2);
         if (editKey) hashes[editKey] = contentHash2(next);
         return done;
       }
@@ -32706,7 +32820,7 @@ var ChatActionWriter = class {
           if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
         }
         await this.app.vault.create(key4, content);
-        this.recordChatFileCreate(key4, content, run);
+        this.recordChatFileCreate(key4, content, run2);
         hashes[key4] = contentHash2(content);
         return done;
       }
@@ -32717,7 +32831,7 @@ var ChatActionWriter = class {
    * value per single-choice marker group, one text size; unknown frontmatter values stay). Only the notes whose appearance
    * really changes are written; Map.md changes only its viewport. A card of an AIM map (or an AIM card) has none and is skipped.
    */
-  async chatSetAppearance(action, real, run) {
+  async chatSetAppearance(action, real, run2) {
     var _a2, _b2, _c, _d;
     if (!this.map || !this.ports.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
     const nodes = action.nodeIds.map((id) => real(id)).map((id) => {
@@ -32728,11 +32842,11 @@ var ChatActionWriter = class {
     const editableAll = nodes.filter((node) => this.notes.get(node.id));
     if (!editableAll.length) return skipped("ui.map_chat_skip_unavailable");
     if (editableAll.some((node) => this.ports.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
-    const heldIds = (run == null ? void 0 : run.mergeSourceIds) ? editableAll.filter((node) => {
+    const heldIds = (run2 == null ? void 0 : run2.mergeSourceIds) ? editableAll.filter((node) => {
       var _a3;
-      return (_a3 = run.mergeSourceIds) == null ? void 0 : _a3.has(node.id);
+      return (_a3 = run2.mergeSourceIds) == null ? void 0 : _a3.has(node.id);
     }) : [];
-    if (heldIds.length) (_a2 = run == null ? void 0 : run.held) == null ? void 0 : _a2.push({ action, ids: heldIds.map((node) => node.id) });
+    if (heldIds.length) (_a2 = run2 == null ? void 0 : run2.held) == null ? void 0 : _a2.push({ action, ids: heldIds.map((node) => node.id) });
     const editable = editableAll.filter((node) => !heldIds.includes(node));
     const skippedCards = new Set(action.nodeIds.map((id) => {
       var _a3;
@@ -32752,7 +32866,7 @@ var ChatActionWriter = class {
       };
       if (!Object.keys(topicAppearanceValues(shown, change2)).length) continue;
       changes++;
-      (_d = run == null ? void 0 : run.notes) == null ? void 0 : _d.add(node.id);
+      (_d = run2 == null ? void 0 : run2.notes) == null ? void 0 : _d.add(node.id);
       transaction.rewriteNote(node.path, (path) => this.plugin.repo.writeTopicAppearance(path, change2));
     }
     if (!changes) return done();
@@ -32811,7 +32925,7 @@ var ChatActionWriter = class {
    * a pair that already has a relation skips only that item. The anchor id is made here (never taken from the reply) and does not
    * collide with a card or an anchor of the picture. Never on an AIM map.
    */
-  async chatChangeAnchor(action, real, run) {
+  async chatChangeAnchor(action, real, run2) {
     var _a2, _b2, _c, _d, _e, _f;
     if (!this.map || !this.ports.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
     const items = (_a2 = this.map.canvasItems) != null ? _a2 : [];
@@ -32841,10 +32955,10 @@ var ChatActionWriter = class {
           });
       }, false);
       if (box2.refused) return skipped(box2.refused);
-      ((_b2 = run.anchors) != null ? _b2 : run.anchors = /* @__PURE__ */ new Map()).set(action.ref, anchorId2);
+      ((_b2 = run2.anchors) != null ? _b2 : run2.anchors = /* @__PURE__ */ new Map()).set(action.ref, anchorId2);
       return { status: "done" };
     }
-    const anchorId = action.anchorId.startsWith(MAP_CHAT_ANCHOR_PREFIX) ? (_c = run.anchors) == null ? void 0 : _c.get(action.anchorId.slice(MAP_CHAT_ANCHOR_PREFIX.length)) : action.anchorId;
+    const anchorId = action.anchorId.startsWith(MAP_CHAT_ANCHOR_PREFIX) ? (_c = run2.anchors) == null ? void 0 : _c.get(action.anchorId.slice(MAP_CHAT_ANCHOR_PREFIX.length)) : action.anchorId;
     if (!anchorId || !image.anchors.some((anchor) => anchor.id === anchorId))
       return skipped("ui.map_chat_skip_anchor_gone");
     const nodeId = real(action.nodeId);
@@ -32870,7 +32984,7 @@ var ChatActionWriter = class {
         return;
       }
       const topic = map.nodes.find((node) => node.id === nodeId);
-      const ring = !!topic && !topic.parentId && run.created.includes(nodeId) && !ringMemberIds(map.nodes, (_b3 = map.canvasItems) != null ? _b3 : []).has(nodeId);
+      const ring = !!topic && !topic.parentId && run2.created.includes(nodeId) && !ringMemberIds(map.nodes, (_b3 = map.canvasItems) != null ? _b3 : []).has(nodeId);
       const marked = ring ? { ...link, ring: true } : link;
       if (!anchorRelationAllowed(current, marked)) box.refused = "ui.map_chat_skip_relation_not_allowed";
       else {
@@ -32881,13 +32995,13 @@ var ChatActionWriter = class {
     }, false);
     if (box.refused) return skipped(box.refused);
     if (box.ring) {
-      ((_d = run.ringImages) != null ? _d : run.ringImages = /* @__PURE__ */ new Set()).add(action.imageId);
-      const added = (_f = ((_e = run.ringAdded) != null ? _e : run.ringAdded = /* @__PURE__ */ new Map()).get(action.imageId)) != null ? _f : {
+      ((_d = run2.ringImages) != null ? _d : run2.ringImages = /* @__PURE__ */ new Set()).add(action.imageId);
+      const added = (_f = ((_e = run2.ringAdded) != null ? _e : run2.ringAdded = /* @__PURE__ */ new Map()).get(action.imageId)) != null ? _f : {
         hadRing: box.hadRing,
         topicIds: []
       };
       added.topicIds.push(nodeId);
-      run.ringAdded.set(action.imageId, added);
+      run2.ringAdded.set(action.imageId, added);
     }
     return { status: "done" };
   }
@@ -32896,7 +33010,7 @@ var ChatActionWriter = class {
    * target in one step. Only the note's frontmatter changes: never the title, the body, the id, the parent or a relation. A card
    * of an AIM map (or an AIM card) has no type and is skipped; a card that already has the type and strength is left alone.
    */
-  async chatSetTopicKind(action, real, run) {
+  async chatSetTopicKind(action, real, run2) {
     var _a2, _b2, _c;
     if (!this.map || !this.ports.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
     const nodes = action.nodeIds.map((id) => real(id)).map((id) => {
@@ -32924,7 +33038,7 @@ var ChatActionWriter = class {
       const strengthWrite = hypothesis && !!action.strength && (kindChanges || leaningWrite || target.strength !== current.strength);
       if (!kindChanges && !leaningWrite && !strengthWrite) continue;
       changes++;
-      (_c = run == null ? void 0 : run.notes) == null ? void 0 : _c.add(node.id);
+      (_c = run2 == null ? void 0 : run2.notes) == null ? void 0 : _c.add(node.id);
       transaction.rewriteNote(node.path, async (path) => {
         if (kindChanges) await this.plugin.repo.writeTopicKind(path, kind);
         if (leaningWrite) await this.plugin.repo.writeHypothesisLeaning(path, target.leaning);
@@ -33047,9 +33161,9 @@ var ChatActionWriter = class {
     else await this.app.vault.process(source.file, () => text10);
   }
   /** edit_md_file as an undo entry: undo puts the old text back, redo the new one, each only over the text it expects. */
-  recordChatFileEdit(path, before, after, run) {
+  recordChatFileEdit(path, before, after, run2) {
     var _a2;
-    (_a2 = run.files) == null ? void 0 : _a2.add(path);
+    (_a2 = run2.files) == null ? void 0 : _a2.add(path);
     this.ports.noteChatOwnFile(path, after, false);
     const swap = async (expected, replacement) => {
       if (await this.ports.chatFileText(path) !== expected) throw this.ports.chatUndoRefusal();
@@ -33058,9 +33172,9 @@ var ChatActionWriter = class {
     this.history.push({ undo: () => swap(after, before), redo: () => swap(before, after) });
   }
   /** create_md_file as an undo entry: undo moves the file to the trash, redo creates it again, each only when nothing changed. */
-  recordChatFileCreate(path, content, run) {
+  recordChatFileCreate(path, content, run2) {
     var _a2;
-    (_a2 = run.files) == null ? void 0 : _a2.add(path);
+    (_a2 = run2.files) == null ? void 0 : _a2.add(path);
     this.ports.noteChatOwnFile(path, content, true);
     this.history.push({
       undo: async () => {
@@ -33605,10 +33719,10 @@ var RelationEditor = class {
     if (links.length || anchored.length) {
       const list2 = body.createEl("ul", { cls: "vam-relation-list" });
       for (const link of links) {
-        const row = list2.createEl("li", { cls: "vam-relation-row" }), text10 = this.relationRowText(link, node.id), described = link.description ? `${text10}. ${link.description}` : text10;
-        this.ports.bindRelationRow(row, link, described);
-        this.relationSwatch(row, link.kind);
-        const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
+        const row2 = list2.createEl("li", { cls: "vam-relation-row" }), text10 = this.relationRowText(link, node.id), described = link.description ? `${text10}. ${link.description}` : text10;
+        this.ports.bindRelationRow(row2, link, described);
+        this.relationSwatch(row2, link.kind);
+        const label = row2.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
         label.createSpan({
           text: this.relationSentence(link, node.id),
           cls: "vam-relation-sentence",
@@ -33616,7 +33730,7 @@ var RelationEditor = class {
         });
         if (link.description)
           label.createSpan({ text: link.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
-        const tools = row.createSpan({ cls: "vam-relation-tools" });
+        const tools = row2.createSpan({ cls: "vam-relation-tools" });
         const pair5 = relationPairKey(link.from, link.to);
         const edit = this.ports.iconButton(
           tools,
@@ -33657,15 +33771,15 @@ var RelationEditor = class {
    * the relation changes. Adding goes through `addRelation`, so Map.md is written exactly as before.
    */
   renderRelationAddRow(parent, node, onAdded, exposeFirst, close) {
-    const row = parent.createDiv("vam-relation-add");
-    row.setAttr("role", "group");
-    row.setAttr("aria-label", t("ui.relation_add_row"));
-    row.createSpan({ text: t("ui.relation_this_card"), cls: "vam-relation-add-self" });
-    const kindSelect = row.createEl("select", { cls: "dropdown vam-relation-add-kind" });
+    const row2 = parent.createDiv("vam-relation-add");
+    row2.setAttr("role", "group");
+    row2.setAttr("aria-label", t("ui.relation_add_row"));
+    row2.createSpan({ text: t("ui.relation_this_card"), cls: "vam-relation-add-self" });
+    const kindSelect = row2.createEl("select", { cls: "dropdown vam-relation-add-kind" });
     kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
     for (const kind of RELATION_KINDS) kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
     exposeFirst(kindSelect);
-    row.createSpan({ text: "\u2192", cls: "vam-relation-add-arrow", attr: { "aria-hidden": "true" } });
+    row2.createSpan({ text: "\u2192", cls: "vam-relation-add-arrow", attr: { "aria-hidden": "true" } });
     const currentKind = () => kindSelect.value || RELATION_KINDS[0];
     const legalSources = () => {
       const map = this.ports.map();
@@ -33674,7 +33788,7 @@ var RelationEditor = class {
     };
     const field = createCardSearchField({
       app: this.ports.app(),
-      parent: row,
+      parent: row2,
       placeholder: t("ui.relation_search_placeholder"),
       ariaLabel: t("ui.relation_target_label"),
       candidates: legalSources,
@@ -33781,20 +33895,20 @@ var RelationEditor = class {
    */
   renderAnchorRelationRow(list2, node, ref, repaint, editButtons) {
     const key4 = anchorLineKey(ref.imageId, ref.anchorId, node.id), text10 = this.anchorRelationRowText(ref), described = ref.relation.description ? `${text10}. ${ref.relation.description}` : text10, end = { imageId: ref.imageId, anchorId: ref.anchorId, topicId: node.id };
-    const row = list2.createEl("li", { cls: "vam-relation-row vam-anchor-relation-row" });
-    this.ports.bindRelationRow(row, ref.relation, described, key4);
-    this.relationSwatch(row, ref.relation.kind);
-    const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
+    const row2 = list2.createEl("li", { cls: "vam-relation-row vam-anchor-relation-row" });
+    this.ports.bindRelationRow(row2, ref.relation, described, key4);
+    this.relationSwatch(row2, ref.relation.kind);
+    const label = row2.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
     label.createSpan({ text: text10, cls: "vam-relation-sentence", attr: { dir: "auto" } });
     if (ref.relation.description)
       label.createSpan({ text: ref.relation.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
     if (!this.ports.anchorEditable()) return;
-    const tools = row.createSpan({ cls: "vam-relation-tools" });
+    const tools = row2.createSpan({ cls: "vam-relation-tools" });
     const reopen = () => {
       var _a2;
       return (_a2 = editButtons.get(key4)) == null ? void 0 : _a2.focus();
     };
-    row.addEventListener("click", (event) => {
+    row2.addEventListener("click", (event) => {
       var _a2;
       if ((_a2 = tools.contains) == null ? void 0 : _a2.call(tools, event.target)) return;
       this.ports.openAnchorRelationEditor(end, repaint, reopen);
@@ -33914,9 +34028,9 @@ var RelationEditor = class {
         attr: { dir: "auto" }
       });
       const field = (label, id) => {
-        const row = root.createDiv("vam-relation-field");
-        row.createEl("label", { text: label, attr: { for: id } });
-        return row;
+        const row2 = root.createDiv("vam-relation-field");
+        row2.createEl("label", { text: label, attr: { for: id } });
+        return row2;
       };
       const kindRow = field(t("ui.relation_kind_label"), "vam-relation-kind");
       const kindSelect = kindRow.createEl("select", { cls: "dropdown vam-relation-kind" });
@@ -34106,9 +34220,9 @@ var RelationEditor = class {
         attr: { dir: "auto" }
       });
       const field = (label, id) => {
-        const row = root.createDiv("vam-relation-field");
-        row.createEl("label", { text: label, attr: { for: id } });
-        return row;
+        const row2 = root.createDiv("vam-relation-field");
+        row2.createEl("label", { text: label, attr: { for: id } });
+        return row2;
       };
       const kindRow = field(t("ui.relation_kind_label"), "vam-relation-kind");
       const kindSelect = kindRow.createEl("select", { cls: "dropdown vam-relation-kind" });
@@ -34337,7 +34451,7 @@ function pointToBoxCurve(original, box, pointIsFrom) {
       y: original.y + (edge.y - original.y) / toEdge * inset
     };
   }
-  const length = gap > 0 ? controlLength(gap) : 0, run = Math.hypot(edge.x - point.x, edge.y - point.y) || 1, near = { x: point.x + (edge.x - point.x) / run * length, y: point.y + (edge.y - point.y) / run * length }, far = { x: edge.x + edge.nx * length, y: edge.y + edge.ny * length };
+  const length = gap > 0 ? controlLength(gap) : 0, run2 = Math.hypot(edge.x - point.x, edge.y - point.y) || 1, near = { x: point.x + (edge.x - point.x) / run2 * length, y: point.y + (edge.y - point.y) / run2 * length }, far = { x: edge.x + edge.nx * length, y: edge.y + edge.ny * length };
   return pointIsFrom ? { p1: { x: point.x, y: point.y }, c1: near, c2: far, p2: { x: edge.x, y: edge.y } } : { p1: { x: edge.x, y: edge.y }, c1: far, c2: near, p2: { x: point.x, y: point.y } };
 }
 function pointToBoxPathData(point, box, pointIsFrom) {
@@ -34350,9 +34464,9 @@ function pointToBoxLabelPoint(point, box, pointIsFrom) {
 }
 function pointToBoxStraight(original, box, side, pointIsFrom) {
   const end = side === "top" ? { x: box.x + box.width / 2, y: box.y + box.height } : side === "bottom" ? { x: box.x + box.width / 2, y: box.y } : side === "left" ? { x: box.x + box.width, y: box.y + box.height / 2 } : { x: box.x, y: box.y + box.height / 2 };
-  const run = Math.hypot(end.x - original.x, end.y - original.y) || 1, inset = Math.min(ANCHOR_LINE_INSET, run / 2), start = {
-    x: original.x + (end.x - original.x) / run * inset,
-    y: original.y + (end.y - original.y) / run * inset
+  const run2 = Math.hypot(end.x - original.x, end.y - original.y) || 1, inset = Math.min(ANCHOR_LINE_INSET, run2 / 2), start = {
+    x: original.x + (end.x - original.x) / run2 * inset,
+    y: original.y + (end.y - original.y) / run2 * inset
   };
   return pointIsFrom ? { p1: start, p2: end } : { p1: end, p2: start };
 }
@@ -34371,16 +34485,16 @@ function treeEdgePathData(parent, child, direction, depth = 1) {
   if (direction === "fishbone")
     return depth >= 3 ? treeEdgePathData(parent, child, "left") : fishboneEdgePathData(parent, child, depth);
   if (direction === "down" || direction === "up") {
-    const x12 = parent.x + parent.width / 2, x22 = child.x + child.width / 2, down = direction === "down", y12 = down ? parent.y + parent.height : parent.y, y22 = down ? child.y : child.y + child.height, run2 = down ? y22 - y12 : y12 - y22, bend2 = run2 >= 40 ? run2 / 2 : run2 >= 0 ? 60 - run2 : Math.max(60, -run2 / 2), sign = down ? 1 : -1;
+    const x12 = parent.x + parent.width / 2, x22 = child.x + child.width / 2, down = direction === "down", y12 = down ? parent.y + parent.height : parent.y, y22 = down ? child.y : child.y + child.height, run3 = down ? y22 - y12 : y12 - y22, bend2 = run3 >= 40 ? run3 / 2 : run3 >= 0 ? 60 - run3 : Math.max(60, -run3 / 2), sign = down ? 1 : -1;
     return `M ${x12} ${y12} C ${x12} ${y12 + sign * bend2}, ${x22} ${y22 - sign * bend2}, ${x22} ${y22}`;
   }
   const y1 = parent.y + parent.height / 2, y2 = child.y + child.height / 2;
   const leftward = direction === "balanced" ? child.x + child.width / 2 < parent.x + parent.width / 2 : direction === "left";
   if (leftward) {
-    const x12 = parent.x, x22 = child.x + child.width, run2 = x12 - x22, bend2 = run2 >= 40 ? run2 / 2 : run2 >= 0 ? 60 - run2 : Math.max(60, -run2 / 2);
+    const x12 = parent.x, x22 = child.x + child.width, run3 = x12 - x22, bend2 = run3 >= 40 ? run3 / 2 : run3 >= 0 ? 60 - run3 : Math.max(60, -run3 / 2);
     return `M ${x12} ${y1} C ${x12 - bend2} ${y1}, ${x22 + bend2} ${y2}, ${x22} ${y2}`;
   }
-  const x1 = parent.x + parent.width, x2 = child.x, run = x2 - x1, bend = run >= 40 ? run / 2 : run >= 0 ? 60 - run : Math.max(60, -run / 2);
+  const x1 = parent.x + parent.width, x2 = child.x, run2 = x2 - x1, bend = run2 >= 40 ? run2 / 2 : run2 >= 0 ? 60 - run2 : Math.max(60, -run2 / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
 var BONE_RUN2 = 1 / Math.tan(Math.PI / 3);
@@ -34655,14 +34769,14 @@ var childWith = (parent, cls) => {
 };
 function arrangeCover(card, frame, position) {
   var _a2, _b2, _c;
-  const row = childWith(card, "vam-card-side");
-  if (row) {
-    const text11 = childWith(row, "vam-card-side-text");
+  const row2 = childWith(card, "vam-card-side");
+  if (row2) {
+    const text11 = childWith(row2, "vam-card-side-text");
     for (const child of Array.from((_a2 = text11 == null ? void 0 : text11.children) != null ? _a2 : [])) {
       child.remove();
-      card.insertBefore(child, row);
+      card.insertBefore(child, row2);
     }
-    row.remove();
+    row2.remove();
   }
   for (const cls of POSITION_CLASSES) if (hasCls(card, cls)) card.classList.remove(cls);
   if (!frame) return;
@@ -34977,8 +35091,8 @@ var CoverFrameModal = class extends import_obsidian16.Modal {
     this.setDraft(this.draft);
   }
   /** The tool row above the card: the picture size slider (30-100% of the content width). */
-  buildTools(row) {
-    const label = row.createEl("label", { cls: "vam-card-frame-tool" });
+  buildTools(row2) {
+    const label = row2.createEl("label", { cls: "vam-card-frame-tool" });
     label.createSpan({ text: t("ui.card_edit_picture_size") });
     const slider = label.createEl("input", {
       cls: "vam-card-frame-size",
@@ -34997,7 +35111,7 @@ var CoverFrameModal = class extends import_obsidian16.Modal {
     slider.addEventListener("input", update);
     slider.addEventListener("change", update);
     this.sizeSlider = slider;
-    const place = row.createDiv({ cls: "vam-card-frame-tool" });
+    const place = row2.createDiv({ cls: "vam-card-frame-tool" });
     const placeLabel = place.createSpan({ text: t("ui.card_edit_picture_position") });
     const group = place.createDiv({ cls: "vam-card-frame-positions" });
     group.setAttr("role", "radiogroup");
@@ -35349,8 +35463,8 @@ function externalFailureText(reason) {
       return t("ui.map_sources_external_reject_missing");
   }
 }
-function mapSourcesButtonLabel(count3) {
-  return count3 ? t("ui.map_sources_button_count_0", count3) : t("ui.map_sources_button");
+function mapSourcesButtonLabel(count4) {
+  return count4 ? t("ui.map_sources_button_count_0", count4) : t("ui.map_sources_button");
 }
 var MapSourcePickerModal = class extends import_obsidian17.FuzzySuggestModal {
   constructor(app, items, text10, placeholder2, emptyText, choose, draw) {
@@ -35670,14 +35784,14 @@ function drawMapSourcesPanel(parent, host, focus) {
   for (const { source, index } of order) {
     const status = mapSourceStatus(host.app, source);
     const name2 = mapSourceName(host.app, source);
-    const row = list2.createDiv({ cls: "vam-map-sources-row", attr: { role: "listitem" } });
-    row.toggleClass("is-unreadable", !status.exists);
-    row.toggleClass("is-new", fresh(source) >= 0);
-    (0, import_obsidian17.setIcon)(row.createSpan({ cls: "vam-map-sources-icon", attr: { "aria-hidden": "true" } }), ICONS[source.kind]);
-    row.createSpan({ cls: "vam-map-sources-name", text: name2, attr: { title: source.path, dir: "auto" } });
+    const row2 = list2.createDiv({ cls: "vam-map-sources-row", attr: { role: "listitem" } });
+    row2.toggleClass("is-unreadable", !status.exists);
+    row2.toggleClass("is-new", fresh(source) >= 0);
+    (0, import_obsidian17.setIcon)(row2.createSpan({ cls: "vam-map-sources-icon", attr: { "aria-hidden": "true" } }), ICONS[source.kind]);
+    row2.createSpan({ cls: "vam-map-sources-name", text: name2, attr: { title: source.path, dir: "auto" } });
     const meta = !status.exists ? t("ui.map_sources_unreadable_row") : source.kind === "folder" ? t("ui.map_sources_folder_count_0", (_d = status.count) != null ? _d : 0) : t(KIND_LABELS[source.kind]);
-    row.createSpan({ cls: "vam-map-sources-meta", text: meta });
-    const remove = row.createEl("button", {
+    row2.createSpan({ cls: "vam-map-sources-meta", text: meta });
+    const remove = row2.createEl("button", {
       cls: "vam-map-sources-remove",
       text: t("ui.reference_remove"),
       attr: { "aria-label": t("ui.map_sources_remove_0", name2) }
@@ -35694,13 +35808,13 @@ function drawMapSourcesPanel(parent, host, focus) {
   for (const source of externals) {
     const status = (_e = host.externalStatus) == null ? void 0 : _e.call(host, source.label);
     const bad = !!status && "unreadable" in status;
-    const row = list2.createDiv({ cls: "vam-map-sources-row", attr: { role: "listitem" } });
-    row.toggleClass("is-unreadable", bad);
-    (0, import_obsidian17.setIcon)(row.createSpan({ cls: "vam-map-sources-icon", attr: { "aria-hidden": "true" } }), "folder-open");
-    row.createSpan({ cls: "vam-map-sources-name", text: source.label, attr: { dir: "auto" } });
+    const row2 = list2.createDiv({ cls: "vam-map-sources-row", attr: { role: "listitem" } });
+    row2.toggleClass("is-unreadable", bad);
+    (0, import_obsidian17.setIcon)(row2.createSpan({ cls: "vam-map-sources-icon", attr: { "aria-hidden": "true" } }), "folder-open");
+    row2.createSpan({ cls: "vam-map-sources-name", text: source.label, attr: { dir: "auto" } });
     const meta = !status ? t("ui.map_sources_external_meta_pending") : "count" in status ? t("ui.map_sources_external_meta_0", status.count) : status.unreadable === "too-large" ? t("ui.map_sources_external_too_large") : t("ui.map_sources_unreadable_row");
-    row.createSpan({ cls: "vam-map-sources-meta", text: meta });
-    const remove = row.createEl("button", {
+    row2.createSpan({ cls: "vam-map-sources-meta", text: meta });
+    const remove = row2.createEl("button", {
       cls: "vam-map-sources-remove",
       text: t("ui.reference_remove"),
       attr: { "aria-label": t("ui.map_sources_remove_0", source.label) }
@@ -35828,35 +35942,35 @@ var MapSourcesControl = class {
     if (this.mapSourcesOpen) this.drawMapSourcesPanelEl(null);
   }
   drawMapSourcesButton(parent) {
-    const button = this.ports.button(parent, () => {
+    const button2 = this.ports.button(parent, () => {
       if (this.mapSourcesOpen && this.mapSourcesPanelEl) this.closeMapSourcesPanel(true);
       else this.openMapSourcesPanel();
     });
-    button.addClass("vam-sources-button");
-    button.setAttr("aria-haspopup", "dialog");
-    button.setAttr("aria-controls", this.mapSourcesPanelId);
-    button.addEventListener("mousedown", (event) => event.preventDefault());
-    button.addEventListener("focusout", (event) => {
+    button2.addClass("vam-sources-button");
+    button2.setAttr("aria-haspopup", "dialog");
+    button2.setAttr("aria-controls", this.mapSourcesPanelId);
+    button2.addEventListener("mousedown", (event) => event.preventDefault());
+    button2.addEventListener("focusout", (event) => {
       var _a2;
-      if (!this.mapSourcesOpen || this.mapSourcesButtonEl !== button || this.mapSourcesPickerOpen) return;
+      if (!this.mapSourcesOpen || this.mapSourcesButtonEl !== button2 || this.mapSourcesPickerOpen) return;
       const next = event.relatedTarget;
-      if (next && (next === button || ((_a2 = this.mapSourcesPanelEl) == null ? void 0 : _a2.contains(next)) || isDragSourceTarget(next))) return;
+      if (next && (next === button2 || ((_a2 = this.mapSourcesPanelEl) == null ? void 0 : _a2.contains(next)) || isDragSourceTarget(next))) return;
       this.closeMapSourcesPanel(false);
     });
-    button.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape" || !this.mapSourcesOpen || this.mapSourcesButtonEl !== button) return;
+    button2.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || !this.mapSourcesOpen || this.mapSourcesButtonEl !== button2) return;
       event.preventDefault();
       event.stopPropagation();
       this.closeMapSourcesPanel(true);
     });
-    this.mapSourcesButtonEl = button;
+    this.mapSourcesButtonEl = button2;
     this.paintMapSourcesButton();
   }
   /** Icon, count/! badge and accessible text from the current sources; also run when a vault event changes what is readable. */
   paintMapSourcesButton() {
     var _a2;
-    const button = this.mapSourcesButtonEl;
-    if (!button) return;
+    const button2 = this.mapSourcesButtonEl;
+    if (!button2) return;
     const total2 = this.mapSources.length + this.externalSources.length;
     const label = mapSourcesButtonLabel(total2);
     const unreadable = unreadableMapSources(
@@ -35864,22 +35978,22 @@ var MapSourcesControl = class {
       this.mapSources,
       this.externalSources.map((source) => this.externalStatuses.get(source.label))
     );
-    button.empty();
-    const icon = button.createSpan({ cls: "vam-sources-button-icon" });
+    button2.empty();
+    const icon = button2.createSpan({ cls: "vam-sources-button-icon" });
     icon.setAttr("aria-hidden", "true");
     (0, import_obsidian18.setIcon)(icon, "files");
-    const count3 = total2;
-    if (unreadable || count3 > 0) {
-      const badge = button.createSpan({ cls: "vam-sources-button-badge", text: unreadable ? "!" : String(count3) });
+    const count4 = total2;
+    if (unreadable || count4 > 0) {
+      const badge = button2.createSpan({ cls: "vam-sources-button-badge", text: unreadable ? "!" : String(count4) });
       badge.setAttr("aria-hidden", "true");
       if (unreadable) badge.addClass("is-bad");
     }
-    button.setAttr("aria-label", label);
-    button.setAttr("aria-expanded", String(this.mapSourcesOpen));
-    if (unreadable) button.setAttr("aria-description", t("ui.map_sources_unreadable_description_0", unreadable));
-    else (_a2 = button.removeAttribute) == null ? void 0 : _a2.call(button, "aria-description");
-    button.toggleClass("has-unreadable", unreadable > 0);
-    button.toggleClass("is-empty", !total2);
+    button2.setAttr("aria-label", label);
+    button2.setAttr("aria-expanded", String(this.mapSourcesOpen));
+    if (unreadable) button2.setAttr("aria-description", t("ui.map_sources_unreadable_description_0", unreadable));
+    else (_a2 = button2.removeAttribute) == null ? void 0 : _a2.call(button2, "aria-description");
+    button2.toggleClass("has-unreadable", unreadable > 0);
+    button2.toggleClass("is-empty", !total2);
   }
   openMapSourcesPanel() {
     var _a2;
@@ -35965,13 +36079,13 @@ var MapSourcesControl = class {
   }
   /** Left-aligned under the button, shifted left when it would overflow; the width follows the CSS (max about 440px). */
   placeMapSourcesPanel(panel) {
-    const button = this.mapSourcesButtonEl;
+    const button2 = this.mapSourcesButtonEl;
     const tools = this.mapSourcesToolsEl;
     const overlay = tools == null ? void 0 : tools.parentElement;
-    if (!(button == null ? void 0 : button.getBoundingClientRect) || !(tools == null ? void 0 : tools.getBoundingClientRect) || !(overlay == null ? void 0 : overlay.getBoundingClientRect)) return;
+    if (!(button2 == null ? void 0 : button2.getBoundingClientRect) || !(tools == null ? void 0 : tools.getBoundingClientRect) || !(overlay == null ? void 0 : overlay.getBoundingClientRect)) return;
     const bounds = overlay.getBoundingClientRect();
     const width = Math.max(0, Math.min(440, bounds.width - 32));
-    const from = button.getBoundingClientRect().left;
+    const from = button2.getBoundingClientRect().left;
     const left = Math.min(Math.max(from, bounds.left + 16), bounds.left + bounds.width - 16 - width);
     panel.style.width = `${width}px`;
     panel.style.left = `${left - tools.getBoundingClientRect().left - 1}px`;
@@ -36601,14 +36715,14 @@ var AiUsageStore = class {
 
 // experiences/visual-map/usage-panel.ts
 var PANEL_GAP = 8;
-function formatTokens(count3) {
-  const n = Math.max(0, Math.round(Number.isFinite(count3) ? count3 : 0));
+function formatTokens(count4) {
+  const n = Math.max(0, Math.round(Number.isFinite(count4) ? count4 : 0));
   if (n < 1e3) return String(n);
   if (n < 1e5) return `${(Math.floor(n / 100) / 10).toFixed(1)}k`;
   return `${Math.round(n / 1e3)}k`;
 }
 var sum = (tokens2) => tokens2.inputTokens + tokens2.outputTokens;
-var mark = (count3, estimated) => estimated ? t("ui.usage_estimated_0", formatTokens(count3)) : formatTokens(count3);
+var mark = (count4, estimated) => estimated ? t("ui.usage_estimated_0", formatTokens(count4)) : formatTokens(count4);
 var FILTERS = ["total", "claude", "codex"];
 var FILTER_LABEL = { claude: "Claude", codex: "Codex" };
 var UsageControl = class {
@@ -36667,19 +36781,19 @@ var UsageControl = class {
     this.detachPanel();
     this.bar = zoomBar;
     this.overlay = overlay;
-    const button = zoomBar.createEl("button", { cls: "clickable-icon vam-icon-button vam-usage-button" });
-    button.setAttr("aria-haspopup", "dialog");
-    button.setAttr("aria-expanded", String(this.isOpen));
-    const icon = button.createSpan({ cls: "vam-usage-icon" });
+    const button2 = zoomBar.createEl("button", { cls: "clickable-icon vam-icon-button vam-usage-button" });
+    button2.setAttr("aria-haspopup", "dialog");
+    button2.setAttr("aria-expanded", String(this.isOpen));
+    const icon = button2.createSpan({ cls: "vam-usage-icon" });
     (0, import_obsidian19.setIcon)(icon, "gauge");
-    this.numberEl = button.createSpan({ cls: "vam-usage-number" });
+    this.numberEl = button2.createSpan({ cls: "vam-usage-number" });
     zoomBar.createSpan({ cls: "vam-usage-sep" }).setAttr("aria-hidden", "true");
-    button.addEventListener("click", (event) => {
+    button2.addEventListener("click", (event) => {
       event.stopPropagation();
       if (this.isOpen) this.close(true);
       else this.openPanel();
     });
-    this.button = button;
+    this.button = button2;
     if (this.isOpen) this.attachPanel();
     this.refresh();
   }
@@ -36705,16 +36819,16 @@ var UsageControl = class {
   }
   /** Rewrites the numbers in place (store change, new mount). Nothing is rebuilt. */
   refresh() {
-    const button = this.button;
-    if (!button || !this.numberEl) return;
+    const button2 = this.button;
+    if (!button2 || !this.numberEl) return;
     const today = this.store.totals({ since: localDayStart() });
     if (today.status === "unreadable") {
       this.numberEl.setText("\u2013");
-      button.setAttr("aria-label", t("ui.usage_button_unavailable"));
+      button2.setAttr("aria-label", t("ui.usage_button_unavailable"));
     } else {
       const label = formatTokens(sum(today.value));
       this.numberEl.setText(label);
-      button.setAttr("aria-label", t("ui.usage_button_today_0", label));
+      button2.setAttr("aria-label", t("ui.usage_button_today_0", label));
     }
     if (this.isOpen && this.parts) this.fillPanel(this.parts);
   }
@@ -36977,7 +37091,7 @@ function buildPreparedTaskContext(input2, model, budget = SOURCE_CONTEXT_TOKEN_B
     contextBreakdown.workingFindings,
     contextBreakdown.sourceContext,
     contextBreakdown.anchorContext
-  ].reduce((sum2, count3) => sum2 + count3, 0);
+  ].reduce((sum2, count4) => sum2 + count4, 0);
   return {
     context,
     metrics: {
@@ -37738,7 +37852,7 @@ var ChoiceModal = class extends import_obsidian21.Modal {
     this.contentEl.createEl("p", { text: this.description, cls: "vam-modal-intro" });
     for (const choice of this.choices) {
       const setting = new import_obsidian21.Setting(this.contentEl);
-      const run = () => {
+      const run2 = () => {
         this.chosen = true;
         this.close();
         choice.action();
@@ -37746,12 +37860,12 @@ var ChoiceModal = class extends import_obsidian21.Modal {
       if (choice.description || choice.named)
         setting.setName(choice.label).setDesc((_a2 = choice.description) != null ? _a2 : "").addButton((b) => {
           var _a3;
-          b.setButtonText((_a3 = choice.buttonLabel) != null ? _a3 : t("ui.select")).onClick(run);
+          b.setButtonText((_a3 = choice.buttonLabel) != null ? _a3 : t("ui.select")).onClick(run2);
           if (choice.warning) b.setDestructive();
         });
       else
         setting.addButton((b) => {
-          b.setButtonText(choice.label).onClick(run);
+          b.setButtonText(choice.label).onClick(run2);
           if (choice.warning) b.setDestructive();
         });
     }
@@ -37765,8 +37879,8 @@ var ChoiceModal = class extends import_obsidian21.Modal {
 // ui/modals/map-switcher-modal.ts
 var import_obsidian22 = require("obsidian");
 function mapSwitcherDetail(item, showFolder, now = Date.now()) {
-  const count3 = item.topicCount === 1 ? t("ui.map_switcher_one_topic") : t("ui.map_switcher_topics_0", item.topicCount);
-  const parts = [count3];
+  const count4 = item.topicCount === 1 ? t("ui.map_switcher_one_topic") : t("ui.map_switcher_topics_0", item.topicCount);
+  const parts = [count4];
   if (item.modified > 0) parts.push(t("ui.map_switcher_edited_0", editedText(item.modified, now)));
   if (showFolder && item.folder) parts.push(item.folder);
   return parts.join(" \xB7 ");
@@ -37850,13 +37964,13 @@ var KeyboardShortcutsModal = class extends import_obsidian23.Modal {
     const table2 = this.contentEl.createEl("table", { cls: "vam-shortcuts" });
     const body = table2.createEl("tbody");
     for (const entry of MAP_KEYBOARD_SHORTCUTS) {
-      const row = body.createEl("tr");
-      const keys = row.createEl("td", { cls: "vam-shortcuts-keys" });
+      const row2 = body.createEl("tr");
+      const keys = row2.createEl("td", { cls: "vam-shortcuts-keys" });
       entry.keys.forEach((key4, index) => {
         if (index) keys.appendText(" ");
         keys.createEl("kbd", { text: shortcutLabel(key4) });
       });
-      row.createEl("td", { text: t(entry.action) });
+      row2.createEl("td", { text: t(entry.action) });
     }
     this.contentEl.createEl("p", { cls: "vam-modal-intro", text: t("ui.keyboard_shortcuts_hotkeys_hint") });
   }
@@ -38167,13 +38281,13 @@ function parseNoteStyleFile(text10, options) {
     let content = bodyLines.slice(heading.index + 1, end);
     const sectionCode = code3.slice(heading.index + 1, end);
     const line2 = bodyStart + heading.index + 1;
-    let count3;
+    let count4;
     const first = content.findIndex((entry) => entry.trim());
     if (first >= 0 && !sectionCode[first]) {
       const parsed = parseCount(content[first]);
       if (parsed === "invalid")
         issues.push(issue(line2 + 1 + first, "count_invalid", `Line ${line2 + 1 + first}: the count is not a number.`));
-      else if (parsed) count3 = parsed;
+      else if (parsed) count4 = parsed;
       if (parsed) {
         content = content.filter((_, index) => index !== first);
         sectionCode.splice(first, 1);
@@ -38196,7 +38310,7 @@ function parseNoteStyleFile(text10, options) {
       name: heading.name,
       description: rest.join("\n").trim(),
       role,
-      ...count3 ? { count: count3 } : {},
+      ...count4 ? { count: count4 } : {},
       aliases,
       callouts,
       line: line2
@@ -40211,9 +40325,9 @@ var NoteStyleStore = class {
   }
   // ---- writing block files (only on a user action; a file is never overwritten) ----
   serial(task) {
-    const run = this.writeQueue.then(task, task);
-    this.writeQueue = run.catch(() => void 0);
-    return run;
+    const run2 = this.writeQueue.then(task, task);
+    this.writeQueue = run2.catch(() => void 0);
+    return run2;
   }
   takenNames(category) {
     return new Set([...this.blocks[category].keys()].map(lower3));
@@ -40882,12 +40996,12 @@ var NoteStyleStore = class {
    * style of their own: they are handed back once (`notify`) because that style is not read any more.
    */
   migrateLegacy(input2) {
-    const run = this.serial(() => this.runMigration(input2.mapsWithStyle));
-    const fence = run.catch(() => void 0).then(() => {
+    const run2 = this.serial(() => this.runMigration(input2.mapsWithStyle));
+    const fence = run2.catch(() => void 0).then(() => {
       if (this.migration === fence) this.migration = void 0;
     });
     this.migration = fence;
-    return run;
+    return run2;
   }
   async runMigration(mapsWithStyle) {
     var _a2;
@@ -42927,7 +43041,7 @@ var TopicRuns = class {
     this.ports.progress().begin(job.path, progressId, Date.now(), job.model);
     this.ports.progress().stage(job.path, progressId, "charts", Date.now());
     let exchangeId = "";
-    const run = async () => {
+    const run2 = async () => {
       try {
         const detail = await this.ports.aiTasks().chartDetail({
           input: job.context,
@@ -42966,7 +43080,7 @@ var TopicRuns = class {
     this.chartQueue.push({
       controller,
       start: () => {
-        void run();
+        void run2();
       }
     });
     this.pumpChartQueue();
@@ -43154,6 +43268,14 @@ function confirmGate1(data, now) {
   next.revision++;
   return next;
 }
+function finishRun(data, now) {
+  if (data.phase !== "gate2" || data.status !== "running") return data;
+  const next = clone2(data);
+  next.phase = "done";
+  next.phaseStartedAt = now;
+  next.revision++;
+  return next;
+}
 function isCurrent(data, token) {
   var _a2;
   if (data.runId !== token.runId || data.status !== "running") return false;
@@ -43308,7 +43430,7 @@ var PipelineStore = class {
   }
   /** Applies `change` to the latest state. Its result is saved first, then becomes current; returns whether it was kept. */
   commit(change2) {
-    const run = this.queue.then(async () => {
+    const run2 = this.queue.then(async () => {
       if (this.disposed) return null;
       const result = change2(this.current);
       if (result.accepted === false || result.state === this.current) return result;
@@ -43316,8 +43438,8 @@ var PipelineStore = class {
       this.current = result.state;
       return result;
     });
-    this.queue = run.catch(() => void 0);
-    return run;
+    this.queue = run2.catch(() => void 0);
+    return run2;
   }
 };
 
@@ -43596,6 +43718,46 @@ function markOldProofRecords(detail, currentKey) {
 }
 function findStoredProof(detail, key4) {
   return findProofRecord(unquoted(detail), key4);
+}
+var shortText = (value, max) => typeof value === "string" ? Array.from(value).slice(0, max).join("") : "";
+var count2 = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
+function latestStoredProof(detail) {
+  const lines = detail.split("\n");
+  const section3 = findSection(lines, fencedLines2(lines), (text10) => isResearchNotesHeading(text10));
+  if (!section3) return void 0;
+  let found;
+  for (const line2 of lines.slice(section3.at + 1, section3.end)) {
+    const m = RECORD_KEY.exec(unquoted(line2).trim());
+    if (!m) continue;
+    try {
+      const data = JSON.parse(m[1]);
+      const result = data.result;
+      if (!result || !Array.isArray(result.items)) continue;
+      const items = [];
+      for (const raw of result.items.slice(0, 100)) {
+        if (!raw || typeof raw !== "object") continue;
+        const status = PROOF_STATUSES.find((item) => item === raw.status);
+        if (!status || typeof raw.id !== "string") continue;
+        items.push({
+          id: shortText(raw.id, 20),
+          type: raw.type === "structure" ? "structure" : "fact",
+          status,
+          note: shortText(raw.note, 300),
+          sources: Array.isArray(raw.sources) ? raw.sources.filter((src) => typeof src === "string").slice(0, 10).map((src) => shortText(src, 300)) : []
+        });
+      }
+      const counts = result.counts;
+      found = {
+        aggregate: result.aggregate === "checked" ? "checked" : "needs-review",
+        factsUnverified: result.factsUnverified === true,
+        ...typeof data.failed === "string" ? { failed: shortText(data.failed, 40) } : {},
+        ...counts && typeof counts === "object" ? { counts: { openedPages: count2(counts.openedPages), searches: count2(counts.searches) } } : {},
+        items
+      };
+    } catch (e) {
+    }
+  }
+  return found;
 }
 function replaceBookPlanSection(content, markdown) {
   var _a2;
@@ -44174,7 +44336,7 @@ var globalPlanStep = {
 
 // experiences/visual-map/argument-notes.ts
 var wide = (c) => String.fromCharCode(c.charCodeAt(0) + 65248);
-var wideRun = (run) => [...run].map(wide).join("");
+var wideRun = (run2) => [...run2].map(wide).join("");
 var ACTIVE_SCHEME = /(?<![A-Za-z0-9+.-])(?!https?:)([A-Za-z][A-Za-z0-9+.-]*):(?=\S)/g;
 function plainLine2(text10) {
   return text10.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, (m) => [...m].join(" ")).replace(/</g, "\uFF1C").replace(/>/g, "\uFF1E").replace(/[[\]]/g, wide).replace(/\$/g, "\uFF04").replace(/%{2,}|={2,}|~{2,}/g, wideRun).replace(ACTIVE_SCHEME, (_m, scheme) => `${scheme}\uFF1A`).replace(
@@ -44231,9 +44393,9 @@ var chartLabel = (text10) => [
 ].slice(0, 20).join("").trim();
 function buildChart(title, rows2) {
   const points = [];
-  for (const row of rows2) {
-    const value = figureNumber(row.figure);
-    if (value !== null) points.push({ label: chartLabel(row.label) || "n", value, unit: unitOf(row.figure) });
+  for (const row2 of rows2) {
+    const value = figureNumber(row2.figure);
+    if (value !== null) points.push({ label: chartLabel(row2.label) || "n", value, unit: unitOf(row2.figure) });
   }
   if (points.length < 2 || points.length > 12 || new Set(points.map((p) => p.unit)).size !== 1) return "";
   const values = points.map((p) => p.value);
@@ -45094,9 +45256,9 @@ function addRetryNeeds(state, items) {
     if (!facet || facet.verdict !== "insufficient")
       throw new GateError("only an insufficient facet can be searched again");
     if (blank(item.need)) throw new GateError("empty retry need");
-    const count3 = ((_a2 = perFacet.get(facet.id)) != null ? _a2 : 0) + 1;
-    if (count3 > MAX_FACET_NEEDS) throw new GateError("too many retry needs for one facet");
-    perFacet.set(facet.id, count3);
+    const count4 = ((_a2 = perFacet.get(facet.id)) != null ? _a2 : 0) + 1;
+    if (count4 > MAX_FACET_NEEDS) throw new GateError("too many retry needs for one facet");
+    perFacet.set(facet.id, count4);
     next.situation.data.push({
       id: newId2(ids2, item.id),
       need: item.need,
@@ -45562,14 +45724,14 @@ function openedUrlsFromEvents(events) {
 }
 function searchEventCount(events) {
   var _a2, _b2;
-  let count3 = 0;
+  let count4 = 0;
   for (const event of events) {
     const e = event;
     if (!e || typeof e !== "object" || e.method !== "item/completed") continue;
     const item = (_a2 = e.params) == null ? void 0 : _a2.item;
-    if ((item == null ? void 0 : item.type) === "webSearch" && ((_b2 = item.action) == null ? void 0 : _b2.type) === "search") count3++;
+    if ((item == null ? void 0 : item.type) === "webSearch" && ((_b2 = item.action) == null ? void 0 : _b2.type) === "search") count4++;
   }
-  return count3;
+  return count4;
 }
 function searchQueriesFromEvents(events) {
   var _a2, _b2;
@@ -47313,7 +47475,7 @@ var ArgumentRuns = class {
   }
   /** Setup, then the loop, then the stop/pause write, then release. Setup refusals reject the returned promise. */
   go(drive, setup) {
-    const run = async () => {
+    const run2 = async () => {
       let refusal;
       try {
         await setup();
@@ -47330,7 +47492,7 @@ var ArgumentRuns = class {
       }
       if (refusal) throw refusal;
     };
-    return run();
+    return run2();
   }
   async usageAllowed(drive) {
     var _a2, _b2, _c;
@@ -47921,7 +48083,7 @@ var ArgumentRuns = class {
     const path = (_b2 = (_a2 = map.nodes.find((n) => n.id === id)) == null ? void 0 : _a2.path) != null ? _b2 : await this.notePath(drive, id);
     if (path) await this.writeNote(path, patch);
   }
-  async propose(drive, state, proposition, count3) {
+  async propose(drive, state, proposition, count4) {
     var _a2;
     const existing = [];
     for (const h of state.hypotheses) existing.push((await this.text(drive, h.id)).title);
@@ -47933,7 +48095,7 @@ var ArgumentRuns = class {
         ...this.base(drive),
         proposition,
         data: dataOrNone(state, stanced).map((d, i) => ({ ...d, propStance: stanced[i].propStance })),
-        count: count3,
+        count: count4,
         existing,
         causalQuestions: (_a2 = state.situation.causalQuestions) != null ? _a2 : [],
         ...isSituationUnconfirmed(state) ? { unconfirmed: true } : {}
@@ -47944,7 +48106,7 @@ var ArgumentRuns = class {
         ...this.base(drive),
         proposition,
         data: gateData(found),
-        count: count3,
+        count: count4,
         existing
       };
       result = await this.ask(drive, ARGUMENT_STEPS.propose_hypotheses, request);
@@ -48814,6 +48976,30 @@ var BookPipelineRuns = class {
       });
       if (!moved) throw new BookPipelineRunError("not_gate1");
       this.log(drive, "gate1", "-", "write", "confirmed");
+    });
+  }
+  /**
+   * The owner accepted gate 2: the run is done. Only at gate 2; a run that is already done answers as if nothing happened (a second
+   * press is harmless), any other phase is refused. Cards are not touched.
+   */
+  async finishRun(mapPath) {
+    return this.enter(mapPath, async (drive) => {
+      const data = await this.openSaved(drive, mapPath, { allowDone: true });
+      if (data.phase === "done") return;
+      if (data.phase !== "gate2") throw new BookPipelineRunError("not_gate");
+      let refusal;
+      await drive.store.commit((state) => {
+        const running2 = resumeRun(state);
+        if (!running2) {
+          refusal = "budget";
+          return { state, accepted: true };
+        }
+        const next = finishRun(running2, this.ports.now());
+        if (next.phase === state.phase) refusal = "not_gate";
+        return { state: refusal ? state : next, accepted: true };
+      });
+      if (refusal) throw new BookPipelineRunError(refusal);
+      this.log(drive, "gate2", "-", "proof", "finished");
     });
   }
   /**
@@ -49708,7 +49894,8 @@ function bookBarState(data, progress, stageOf) {
     total: total2,
     counts,
     budget,
-    ...mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {}
+    ...mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {},
+    ...(progress == null ? void 0 : progress.etaSeconds) !== void 0 && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0 ? { etaSeconds: progress.etaSeconds } : {}
   };
 }
 function countStages(stages) {
@@ -49720,6 +49907,10 @@ function bookTitleText(state) {
   const word = state.mode === "stopped" ? t("ui.book_phase_stopped") : state.mode === "budget" ? t("ui.book_phase_budget") : t(PHASE_KEY[state.mode]);
   return t("ui.book_bar_title_0", word);
 }
+function bookEtaText(seconds) {
+  const minutes = Math.round(seconds / 60);
+  return minutes < 1 ? t("ui.book_eta_under_minute") : t("ui.book_eta_0", minutes);
+}
 function renderBookBar(parent, state, actions) {
   const { counts, total: total2 } = state;
   const bar = parent.createDiv("vam-book-bar");
@@ -49730,18 +49921,20 @@ function renderBookBar(parent, state, actions) {
   top.createEl("b", { cls: "vam-book-bar-title", text: bookTitleText(state) });
   const summary = state.mode === "budget" ? t("ui.book_budget_used_up_0_1", state.budget.used, state.budget.limit) : state.mode === "stopped" ? state.failure ? t("ui.book_failed_at_0_1", t(PHASE_KEY[state.phase]), bookFailureText(state.failure)) : t("ui.book_stopped_at_0_1_2", t(PHASE_KEY[state.phase]), counts.checked, total2) : t("ui.book_counts_0_1_2_3_4", counts.checked, total2, counts.written, counts.planned, counts["needs-review"]);
   top.createSpan({ cls: "vam-book-bar-counts", text: summary });
+  if (state.etaSeconds !== void 0 && (state.mode === "planning" || state.mode === "writing"))
+    top.createSpan({ cls: "vam-book-bar-eta", text: bookEtaText(state.etaSeconds) });
   const buttons = top.createDiv("vam-book-bar-actions");
+  if (actions.panel && (state.phase === "gate1" || state.phase === "gate2" || state.phase === "done")) {
+    const open2 = actions.panel.open;
+    const opener = makeButton(
+      buttons,
+      t(open2 ? "ui.book_panel_close" : "ui.book_panel_open"),
+      "vam-book-panel-toggle",
+      actions.panel.toggle
+    );
+    opener.setAttr("aria-expanded", String(open2));
+  }
   if (state.phase === "gate1" && state.mode !== "done") {
-    if (actions.panel) {
-      const open2 = actions.panel.open;
-      const opener = makeButton(
-        buttons,
-        t(open2 ? "ui.book_panel_close" : "ui.book_panel_open"),
-        "vam-book-panel-toggle",
-        actions.panel.toggle
-      );
-      opener.setAttr("aria-expanded", String(open2));
-    }
     makeButton(buttons, t("ui.book_confirm_gate1"), "mod-cta vam-book-confirm", actions.confirmGate1);
   }
   if (state.mode === "budget") {
@@ -49776,9 +49969,9 @@ function renderBookBar(parent, state, actions) {
     ["planned", counts.planned],
     ["needs-review", counts["needs-review"]]
   ];
-  for (const [name2, count3] of segments) {
-    if (!count3 || !total2) continue;
-    track.createSpan({ cls: `vam-book-seg is-${name2}` }).style.width = `${count3 / total2 * 100}%`;
+  for (const [name2, count4] of segments) {
+    if (!count4 || !total2) continue;
+    track.createSpan({ cls: `vam-book-seg is-${name2}` }).style.width = `${count4 / total2 * 100}%`;
   }
   const legend = bar.createDiv("vam-book-legend");
   legend.setAttr("aria-hidden", "true");
@@ -49792,12 +49985,12 @@ function renderBookBar(parent, state, actions) {
   return bar;
 }
 function makeButton(parent, text10, cls, action) {
-  const button = parent.createEl("button", { cls, text: text10 });
-  button.addEventListener("click", (event) => {
+  const button2 = parent.createEl("button", { cls, text: text10 });
+  button2.addEventListener("click", (event) => {
     event.stopPropagation();
     action();
   });
-  return button;
+  return button2;
 }
 var REFUSAL_KEY = {
   busy: "ui.book_refused_busy",
@@ -49869,6 +50062,7 @@ function bookIssueText(issue2) {
     if (reason) return t("ui.book_issue_step_0_1", t(STEP_KEY[step]), t(reason));
   }
   const unmet = /^proof unmet: (\S+(?: \S+)*)$/.exec(issue2.trim());
+  if (unmet && unmet[1] === "facts_unverified") return t("ui.book_reason_all_facts_unverified");
   if (unmet) return t("ui.book_issue_unmet_0", unmet[1]);
   return t("ui.book_issue_unknown");
 }
@@ -49884,6 +50078,7 @@ function bookCardView(note) {
   return {
     stage,
     stageText: t(STAGE_KEY[stage]),
+    seam: typeof note.pipelineSeam === "string" && note.pipelineSeam.trim() !== "",
     ...role ? { roleText: t(ROLE_KEY[role]) } : {},
     ...stage === "needs-review" && issue2 ? { issueText: t("ui.book_issue_0", bookIssueText(issue2)) } : {},
     ...stage === "checked" && issue2 ? structureNote(issue2) : {},
@@ -49898,6 +50093,10 @@ function renderBookCardLabels(header2, view, writing) {
     elapsed.setAttr("aria-hidden", "true");
     writing.track(elapsed);
   } else header2.createSpan({ cls: `vam-status vam-book-state is-${view.stage}`, text: view.stageText });
+  if (view.seam) {
+    const seam = header2.createSpan({ cls: "vam-status vam-book-state is-seam", text: t("ui.book_seam_label") });
+    seam.setAttr("title", t("ui.book_seam_reason"));
+  }
   if (view.roleText) header2.createSpan({ cls: "vam-book-role", text: view.roleText });
 }
 
@@ -49962,6 +50161,11 @@ var GatePanelState = class {
     __publicField(this, "notes", /* @__PURE__ */ new Map());
     __publicField(this, "confirming", false);
     __publicField(this, "confirmError", "");
+    /** Gate 2: cards whose proof record is unfolded, cards whose seam confirmation is running, and the "review finished" button. */
+    __publicField(this, "proofOpen", /* @__PURE__ */ new Set());
+    __publicField(this, "seaming", /* @__PURE__ */ new Set());
+    __publicField(this, "finishing", false);
+    __publicField(this, "finishError", "");
     /** Where the keyboard goes after the next paint: the panel's title (it just opened) or the toolbar button (it just closed). */
     __publicField(this, "pendingFocus", null);
   }
@@ -49974,6 +50178,10 @@ var GatePanelState = class {
     this.notes.clear();
     this.confirming = false;
     this.confirmError = "";
+    this.proofOpen.clear();
+    this.seaming.clear();
+    this.finishing = false;
+    this.finishError = "";
     this.pendingFocus = null;
   }
 };
@@ -49983,10 +50191,7 @@ function reasonText2(reason) {
   if (reason === "cancelled") return t("ui.book_panel_cancelled");
   return REASON_CODES.has(reason) ? bookFailureText(reason) : t("ui.book_fail_other");
 }
-function renderGatePanel(parent, data, gate1, state, actions, externalBusy = /* @__PURE__ */ new Set()) {
-  const panel = parent.createDiv("vam-book-panel");
-  panel.setAttr("role", "region");
-  panel.setAttr("aria-label", t("ui.book_panel_label"));
+function renderPanelTabs(panel, actions) {
   const tabs = panel.createDiv("vam-book-panel-tabs");
   tabs.setAttr("role", "group");
   tabs.setAttr("aria-label", t("ui.book_panel_tabs_label"));
@@ -50009,6 +50214,12 @@ function renderGatePanel(parent, data, gate1, state, actions, externalBusy = /* 
     event.stopPropagation();
     actions.close();
   });
+}
+function renderGatePanel(parent, data, gate1, state, actions, externalBusy = /* @__PURE__ */ new Set()) {
+  const panel = parent.createDiv("vam-book-panel");
+  panel.setAttr("role", "region");
+  panel.setAttr("aria-label", t("ui.book_panel_label"));
+  renderPanelTabs(panel, actions);
   const head2 = panel.createDiv("vam-book-panel-head");
   const title = head2.createEl("h3", { cls: "vam-book-panel-title", text: t("ui.book_panel_gate1_title") });
   title.setAttr("tabindex", "-1");
@@ -50172,6 +50383,314 @@ function finish(id, state, actions, note, clearDraft = false) {
   actions.refresh();
 }
 
+// experiences/visual-map/book-pipeline-panel2.ts
+function changedIndex(seam) {
+  var _a2;
+  const found = /第 (\d+) 張|card (\d+)/.exec(seam);
+  const n = found ? Number((_a2 = found[1]) != null ? _a2 : found[2]) : NaN;
+  return Number.isInteger(n) && n >= 1 ? n : void 0;
+}
+function buildGate2Panel(input2) {
+  var _a2, _b2;
+  const cards = input2.order.map((id, at) => {
+    var _a3;
+    const note = input2.noteOf(id);
+    const view = bookCardView(note != null ? note : {});
+    const title = input2.titleOf(id);
+    const seamText = typeof (note == null ? void 0 : note.pipelineSeam) === "string" ? note.pipelineSeam : "";
+    const other = changedIndex(seamText);
+    const partner = other !== void 0 && Math.abs(other - 1 - at) === 1 ? input2.order[other - 1] : void 0;
+    const issue2 = typeof (note == null ? void 0 : note.pipelineIssue) === "string" ? note.pipelineIssue : "";
+    const proof = view.stage === "checked" || view.stage === "needs-review" ? latestStoredProof((_a3 = note == null ? void 0 : note.detail) != null ? _a3 : "") : void 0;
+    return {
+      id,
+      index: at + 1,
+      title,
+      stage: view.stage,
+      ...view.stage === "needs-review" && issue2 ? { reasonText: bookIssueText(issue2) } : {},
+      ...view.stage === "checked" && view.issueText ? { noteText: view.issueText } : {},
+      seam: view.seam,
+      seamTitle: partner ? other - 1 > at ? `${title} \u2194 ${input2.titleOf(partner)}` : `${input2.titleOf(partner)} \u2194 ${title}` : title,
+      ...proof ? { proof } : {}
+    };
+  });
+  const from = Date.parse((_a2 = input2.startedAt) != null ? _a2 : "");
+  const to = Date.parse((_b2 = input2.writingEndedAt) != null ? _b2 : "");
+  return {
+    total: cards.length,
+    checked: cards.filter((card) => card.stage === "checked").length,
+    needsReview: cards.filter((card) => card.stage === "needs-review").length,
+    seams: cards.filter((card) => card.seam).length,
+    ...Number.isFinite(from) && Number.isFinite(to) && to >= from ? { elapsedMinutes: Math.round((to - from) / 6e4) } : {},
+    cards
+  };
+}
+function renderGate2Panel(parent, data, done, state, actions, externalBusy = /* @__PURE__ */ new Set()) {
+  const panel = parent.createDiv("vam-book-panel vam-book-panel-gate2");
+  panel.setAttr("role", "region");
+  panel.setAttr("aria-label", t("ui.book_panel_label"));
+  renderPanelTabs(panel, actions);
+  const head2 = panel.createDiv("vam-book-panel-head");
+  const title = head2.createEl("h3", { cls: "vam-book-panel-title", text: t("ui.book_panel_gate2_title") });
+  title.setAttr("tabindex", "-1");
+  if (done) head2.createSpan({ cls: "vam-book-panel-tag", text: t("ui.book_panel_gate2_done_tag") });
+  else if (data.elapsedMinutes !== void 0) {
+    const took = head2.createSpan({
+      cls: "vam-book-panel-tag",
+      text: data.elapsedMinutes < 1 ? t("ui.book_panel_elapsed_under_minute") : t("ui.book_panel_elapsed_0", data.elapsedMinutes)
+    });
+    took.setAttr("title", t("ui.book_panel_elapsed_hint"));
+  }
+  panel.createEl("p", {
+    cls: "vam-book-panel-summary",
+    text: t("ui.book_panel_gate2_summary_0_1_2_3", data.total, data.checked, data.needsReview, data.seams)
+  });
+  const anyBusy = externalBusy.size > 0 || state.busy.size > 0 || state.seaming.size > 0 || state.finishing;
+  const busyNow = (id) => externalBusy.has(id) || state.busy.has(id);
+  const attention = data.cards.filter(
+    (card) => card.stage === "needs-review" || busyNow(card.id) && card.stage !== "checked"
+  );
+  const seams = data.cards.filter((card) => card.seam);
+  const checked2 = data.cards.filter((card) => card.stage === "checked");
+  const list2 = panel.createEl("ul", { cls: "vam-book-panel-cards vam-book-panel-gate2-list" });
+  list2.setAttr("aria-label", t("ui.book_panel_gate2_list_label"));
+  if (!attention.length && !seams.length && !checked2.length)
+    list2.createEl("li", { cls: "vam-book-panel-muted", text: t("ui.book_panel_gate2_nothing") });
+  for (const card of attention) renderAttention(list2, card, state, actions, busyNow(card.id), anyBusy);
+  for (const card of seams) renderSeam(list2, card, state, actions, anyBusy);
+  for (const card of checked2) renderChecked(list2, card, state, actions, busyNow(card.id), anyBusy);
+  const foot = panel.createDiv("vam-book-panel-foot");
+  foot.createSpan({ cls: "vam-book-panel-muted", text: t("ui.book_panel_gate2_hint") });
+  if (!done) {
+    const finish2 = foot.createEl("button", {
+      cls: "mod-cta vam-book-panel-finish",
+      text: state.finishing ? t("ui.book_panel_finishing") : t("ui.book_panel_finish")
+    });
+    finish2.dataset.act = "finish";
+    finish2.disabled = anyBusy;
+    if (state.finishing) finish2.setAttr("aria-busy", "true");
+    finish2.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (anyBusy) return;
+      state.finishing = true;
+      state.finishError = "";
+      actions.refresh();
+      void actions.finish().then(
+        () => {
+          state.finishing = false;
+          actions.refresh();
+        },
+        (error) => {
+          state.finishing = false;
+          state.finishError = bookRefusalText(error);
+          actions.refresh();
+        }
+      );
+    });
+  }
+  const status = panel.createDiv({ cls: "vam-book-panel-status", text: state.finishError });
+  status.setAttr("role", "status");
+  return panel;
+}
+function row(list2, kind, card, busy) {
+  const item = list2.createEl("li", { cls: "vam-book-panel-card vam-book-panel-row" });
+  item.dataset.kind = kind;
+  item.dataset.stage = card.stage;
+  item.dataset.row = card.id;
+  item.setAttr("tabindex", "-1");
+  if (busy) item.setAttr("aria-busy", "true");
+  return item;
+}
+function button(parent, cls, text10, label, card, act, disabled, onClick) {
+  const el = parent.createEl("button", { cls, text: text10 });
+  el.setAttr("aria-label", label);
+  el.dataset.card = card.id;
+  el.dataset.act = act;
+  el.disabled = disabled;
+  el.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (!el.disabled) onClick();
+  });
+  return el;
+}
+function stateTag(head2, stage, text10) {
+  head2.createSpan({ cls: `vam-book-panel-state vam-book-state is-${stage}`, text: text10 });
+}
+function noteLine(item, state, key4, busy) {
+  var _a2;
+  const note = state.notes.get(key4);
+  const line2 = item.createDiv({
+    cls: "vam-book-panel-card-status",
+    text: busy ? t("ui.book_panel_busy") : (_a2 = note == null ? void 0 : note.text) != null ? _a2 : ""
+  });
+  line2.setAttr("role", (note == null ? void 0 : note.error) ? "alert" : "status");
+  if (note == null ? void 0 : note.error) line2.addClass("is-error");
+}
+function run(noteKey, id, state, set, actions, work) {
+  if (set.has(id)) return;
+  set.add(id);
+  state.notes.delete(noteKey);
+  actions.refresh();
+  void work().then(
+    () => {
+      set.delete(id);
+      actions.refresh();
+    },
+    (error) => {
+      set.delete(id);
+      state.notes.set(noteKey, { text: bookRefusalText(error), error: true });
+      actions.refresh();
+    }
+  );
+}
+function renderAttention(list2, card, state, actions, busy, anyBusy) {
+  const item = row(list2, "attention", card, busy);
+  const head2 = item.createDiv("vam-book-panel-card-head");
+  stateTag(head2, "needs-review", t("ui.book_stage_needs_review"));
+  head2.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
+  button(
+    head2,
+    "vam-book-panel-open",
+    t("ui.book_panel_open_card"),
+    t("ui.book_panel_open_0", card.title),
+    card,
+    "open",
+    false,
+    () => actions.open(card.id)
+  );
+  button(
+    head2,
+    "vam-book-panel-rerun-card",
+    busy ? t("ui.book_panel_busy") : t("ui.book_panel_rerun_card"),
+    t("ui.book_panel_rerun_card_0", card.title),
+    card,
+    "rerun",
+    anyBusy,
+    () => run(card.id, card.id, state, state.busy, actions, () => actions.rerun(card.id))
+  );
+  if (card.reasonText)
+    item.createDiv({ cls: "vam-book-panel-field", text: t("ui.book_panel_reason_0", card.reasonText) });
+  noteLine(item, state, card.id, false);
+}
+function renderSeam(list2, card, state, actions, anyBusy) {
+  const key4 = `seam:${card.id}`;
+  const busy = state.seaming.has(card.id);
+  const item = row(list2, "seam", card, busy);
+  const head2 = item.createDiv("vam-book-panel-card-head");
+  stateTag(head2, "seam", t("ui.book_seam_label"));
+  head2.createEl("b", { cls: "vam-book-panel-card-title", text: card.seamTitle });
+  button(
+    head2,
+    "vam-book-panel-open",
+    t("ui.book_panel_open_card"),
+    t("ui.book_panel_open_0", card.title),
+    card,
+    "open-seam",
+    false,
+    () => actions.open(card.id)
+  );
+  item.createDiv({ cls: "vam-book-panel-field", text: t("ui.book_seam_reason") });
+  button(
+    item,
+    "vam-book-panel-confirm-seam",
+    t("ui.book_panel_confirm_seam"),
+    t("ui.book_panel_confirm_seam_0", card.seamTitle),
+    card,
+    "seam",
+    anyBusy,
+    () => run(key4, card.id, state, state.seaming, actions, () => actions.confirmSeam(card.id))
+  );
+  const note = state.notes.get(key4);
+  if (note) {
+    const line2 = item.createDiv({ cls: "vam-book-panel-card-status is-error", text: note.text });
+    line2.setAttr("role", "alert");
+  }
+}
+function renderChecked(list2, card, state, actions, busy, anyBusy) {
+  const item = row(list2, "checked", card, busy);
+  const head2 = item.createDiv("vam-book-panel-card-head");
+  stateTag(head2, "checked", t("ui.book_stage_checked"));
+  head2.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
+  const open2 = state.proofOpen.has(card.id);
+  const toggle = button(
+    head2,
+    "vam-book-panel-proof-toggle",
+    open2 ? t("ui.book_panel_proof_hide") : t("ui.book_panel_proof_show"),
+    t("ui.book_panel_proof_0", card.title),
+    card,
+    "proof",
+    false,
+    () => void 0
+  );
+  toggle.setAttr("aria-expanded", String(open2));
+  button(
+    head2,
+    "vam-book-panel-rerun-card",
+    busy ? t("ui.book_panel_busy") : t("ui.book_panel_rerun_card"),
+    t("ui.book_panel_rerun_card_0", card.title),
+    card,
+    "rerun",
+    anyBusy,
+    () => run(card.id, card.id, state, state.busy, actions, () => actions.rerun(card.id))
+  );
+  const proof = card.proof;
+  if (proof) item.createDiv({ cls: "vam-book-panel-field", text: proofSummary(proof) });
+  if (card.noteText) item.createDiv({ cls: "vam-book-panel-field", text: card.noteText });
+  const body = item.createDiv("vam-book-panel-proof");
+  body.hidden = !open2;
+  renderProof(body, proof);
+  toggle.addEventListener("click", () => {
+    const now = !state.proofOpen.has(card.id);
+    if (now) state.proofOpen.add(card.id);
+    else state.proofOpen.delete(card.id);
+    body.hidden = !now;
+    toggle.setAttr("aria-expanded", String(now));
+    toggle.setText(now ? t("ui.book_panel_proof_hide") : t("ui.book_panel_proof_show"));
+  });
+  noteLine(item, state, card.id, false);
+}
+function proofSummary(proof) {
+  const met = proof.items.filter((item) => item.status === "met").length;
+  const unverified = proof.items.filter((item) => item.status === "unverified").length;
+  const unmet = proof.items.filter((item) => item.status === "unmet").length;
+  return t("ui.book_panel_proof_summary_0_1_2", met, unverified, unmet);
+}
+var STATUS_KEY = {
+  met: "ui.book_proof_met",
+  unmet: "ui.book_proof_unmet",
+  unverified: "ui.book_proof_unverified"
+};
+function renderProof(body, proof) {
+  if (!proof) {
+    body.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_proof_none") });
+    return;
+  }
+  if (proof.failed) body.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_proof_failed") });
+  if (proof.factsUnverified)
+    body.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_proof_facts_unverified") });
+  if (proof.counts)
+    body.createDiv({
+      cls: "vam-book-panel-field",
+      text: t("ui.book_panel_proof_opened_0_1", proof.counts.openedPages, proof.counts.searches)
+    });
+  const structure2 = proof.items.filter((item) => item.type === "structure" && item.status === "unmet");
+  if (structure2.length)
+    body.createDiv({
+      cls: "vam-book-panel-field",
+      text: t("ui.book_panel_structure_unmet_0", structure2.map((item) => item.id).join(" "))
+    });
+  const items = body.createEl("ul", { cls: "vam-book-panel-proof-items" });
+  for (const item of proof.items) {
+    const li = items.createEl("li", { cls: `vam-book-panel-proof-item is-${item.status}` });
+    const kind = item.type === "structure" ? t("ui.book_proof_structure") : t("ui.book_proof_fact");
+    li.createSpan({
+      text: `${item.id} ${kind}\u30FB${t(STATUS_KEY[item.status])}${item.note ? `\uFF1A${unescapeMarkdownText(item.note)}` : ""}`
+    });
+    if (item.sources.length)
+      li.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_proof_sources_0", item.sources.join("  ")) });
+  }
+}
+
 // experiences/visual-map/subtree-plan.ts
 var INTEGRATION_DEPTHS = ["quick", "bottom-up", "research-first"];
 var OUTLINE_SUMMARY_CHARS = 60;
@@ -50278,17 +50797,17 @@ function buildSubtreeOutline(nodes, rootId, maxChars = OUTLINE_MAX_CHARS) {
   if (deepest < 2) return { text: "", topics: items.length, unresearched };
   const below = /* @__PURE__ */ new Map();
   const index = childrenIndex(nodes);
-  const count3 = (id, seen) => {
+  const count4 = (id, seen) => {
     var _a2;
     let sum2 = 0;
     for (const child of (_a2 = index.get(id)) != null ? _a2 : []) {
       if (seen.has(child.id)) continue;
       seen.add(child.id);
-      sum2 += 1 + count3(child.id, seen);
+      sum2 += 1 + count4(child.id, seen);
     }
     return sum2;
   };
-  for (const item of items) below.set(item.node.id, count3(item.node.id, /* @__PURE__ */ new Set([rootId, item.node.id])));
+  for (const item of items) below.set(item.node.id, count4(item.node.id, /* @__PURE__ */ new Set([rootId, item.node.id])));
   const render = (summaryDepths2, foldFrom2) => items.filter((item) => item.depth < foldFrom2).map((item) => {
     const { node, depth } = item;
     const folded2 = depth + 1 === foldFrom2 && below.get(node.id) > 0 ? ` (+${below.get(node.id)} subtopics)` : "";
@@ -50379,8 +50898,8 @@ var NoteStyleFileError = class extends Error {
     this.open = open2;
   }
 };
-function actionNotice(message, label, run, timeout = 12e3) {
-  return backgroundResultNotice(message, { label, open: run }, timeout);
+function actionNotice(message, label, run2, timeout = 12e3) {
+  return backgroundResultNotice(message, { label, open: run2 }, timeout);
 }
 function errorNotice(error) {
   const message = error == null ? void 0 : error.message;
@@ -50440,7 +50959,7 @@ var TopicStylePickerModal = class extends import_obsidian24.Modal {
     __publicField(this, "radios", []);
     __publicField(this, "expanded", false);
     __publicField(this, "applyButton");
-    this.selected = rows2.find((row) => row.current);
+    this.selected = rows2.find((row2) => row2.current);
   }
   onClose() {
     var _a2, _b2;
@@ -50451,15 +50970,15 @@ var TopicStylePickerModal = class extends import_obsidian24.Modal {
     var _a2;
     this.titleEl.setText(t("ui.note_style_topic_title"));
     this.contentEl.createEl("p", { text: t("ui.note_style_topic_desc"), cls: "vam-modal-intro" });
-    const choosable = this.rows.filter((row) => !row.issue);
-    const broken = this.rows.filter((row) => row.issue);
+    const choosable = this.rows.filter((row2) => !row2.issue);
+    const broken = this.rows.filter((row2) => row2.issue);
     const shown = choosable.slice(0, PICKER_SHOWN);
     const rest = [...choosable.slice(PICKER_SHOWN), ...broken];
     const group = this.contentEl.createDiv({
       cls: "vam-picker-group",
       attr: { role: "radiogroup", "aria-label": t("ui.note_style_topic_title") }
     });
-    for (const row of shown) this.addRow(group, row, false);
+    for (const row2 of shown) this.addRow(group, row2, false);
     let toggle;
     if (rest.length) {
       toggle = this.contentEl.createEl("button", {
@@ -50469,9 +50988,9 @@ var TopicStylePickerModal = class extends import_obsidian24.Modal {
       });
       const extra = this.contentEl.createDiv({ cls: "vam-picker-group vam-picker-rest", attr: { role: "group" } });
       extra.hidden = true;
-      for (const row of rest) {
-        if (row.issue) this.addBroken(extra, row);
-        else this.addRow(extra, row, true);
+      for (const row2 of rest) {
+        if (row2.issue) this.addBroken(extra, row2);
+        else this.addRow(extra, row2, true);
       }
       toggle.addEventListener("click", () => {
         var _a3;
@@ -50491,17 +51010,17 @@ var TopicStylePickerModal = class extends import_obsidian24.Modal {
     start == null ? void 0 : start.el.focus();
     if (typeof window !== "undefined") window.setTimeout(() => start == null ? void 0 : start.el.focus(), 0);
   }
-  addRow(parent, row, extra) {
+  addRow(parent, row2, extra) {
     const el = parent.createEl("button", {
-      cls: `vam-picker-row${row.current ? " is-current" : ""}`,
+      cls: `vam-picker-row${row2.current ? " is-current" : ""}`,
       attr: { type: "button", role: "radio", "aria-checked": "false", tabindex: "-1" }
     });
     el.createSpan({
-      text: row.current ? `${row.label} \xB7 ${t("ui.detail_template_current")}` : row.label,
+      text: row2.current ? `${row2.label} \xB7 ${t("ui.detail_template_current")}` : row2.label,
       cls: "vam-picker-name"
     });
-    el.createSpan({ text: row.tags, cls: "vam-picker-desc" });
-    const entry = { row, el, extra };
+    el.createSpan({ text: row2.tags, cls: "vam-picker-desc" });
+    const entry = { row: row2, el, extra };
     this.radios.push(entry);
     el.addEventListener("click", () => this.choose(entry));
     el.addEventListener("keydown", (event) => {
@@ -50518,12 +51037,12 @@ var TopicStylePickerModal = class extends import_obsidian24.Modal {
       this.choose(live2[(from + step + live2.length) % live2.length], true);
     });
   }
-  addBroken(parent, row) {
-    const issue2 = row.issue;
+  addBroken(parent, row2) {
+    const issue2 = row2.issue;
     const el = parent.createDiv({ cls: "vam-picker-row vam-picker-broken" });
     const text10 = el.createDiv({ cls: "vam-picker-text" });
-    text10.createSpan({ text: row.label, cls: "vam-picker-name" });
-    text10.createSpan({ text: row.tags, cls: "vam-picker-desc" });
+    text10.createSpan({ text: row2.label, cls: "vam-picker-name" });
+    text10.createSpan({ text: row2.tags, cls: "vam-picker-desc" });
     el.createEl("button", { text: t("ui.note_style_open_file") }).addEventListener(
       "click",
       () => this.handlers.openFile(issue2.ref)
@@ -50544,11 +51063,11 @@ var TopicStylePickerModal = class extends import_obsidian24.Modal {
     if (this.applyButton) this.applyButton.disabled = !changed;
   }
   apply() {
-    const row = this.selected;
-    if (!row || row.current || row.value === void 0) return;
+    const row2 = this.selected;
+    if (!row2 || row2.current || row2.value === void 0) return;
     this.applied = true;
     this.close();
-    void this.handlers.apply(row.value);
+    void this.handlers.apply(row2.value);
   }
 };
 async function openTopicStyleChooser(app, plugin, options) {
@@ -50595,7 +51114,7 @@ async function openTopicStyleChooser(app, plugin, options) {
     }
     rows2.push({ label: item.name, tags: recipeTags(item), current: note.noteStyle === item.ref, value: item.ref });
   }
-  const at = rows2.findIndex((row) => row.current);
+  const at = rows2.findIndex((row2) => row2.current);
   if (at > 0) rows2.unshift(...rows2.splice(at, 1));
   const modal = new TopicStylePickerModal(app, rows2, {
     apply: options.write,
@@ -50695,7 +51214,7 @@ function firstMarkdownTable(markdown) {
       );
       if (rows2.length >= 4) break;
     }
-    return rows2.filter((row) => row.length);
+    return rows2.filter((row2) => row2.length);
   }
   return [];
 }
@@ -50925,7 +51444,7 @@ function cardToolsSideGap(side, zoom) {
 }
 function chooseCardToolsSpot(input2) {
   var _a2, _b2, _c, _d, _e;
-  const { card, row, size, others, controls, visible } = input2;
+  const { card, row: row2, size, others, controls, visible } = input2;
   const edge = (_a2 = input2.edge) != null ? _a2 : 6, maxInset = (_b2 = input2.maxInset) != null ? _b2 : 14, margin = 8, rightGap = (_c = input2.rightGap) != null ? _c : 4;
   const candidates = [];
   const slides = [0];
@@ -50937,7 +51456,7 @@ function chooseCardToolsSpot(input2) {
         side: "top",
         inset,
         slide,
-        rect: { left: row.left + slide, right: row.right + slide, top: bottom - size.height, bottom }
+        rect: { left: row2.left + slide, right: row2.right + slide, top: bottom - size.height, bottom }
       });
     }
   }
@@ -50948,7 +51467,7 @@ function chooseCardToolsSpot(input2) {
         side: "bottom",
         inset,
         slide,
-        rect: { left: row.left + slide, right: row.right + slide, top, bottom: top + size.height }
+        rect: { left: row2.left + slide, right: row2.right + slide, top, bottom: top + size.height }
       });
     }
   }
@@ -50981,16 +51500,16 @@ function chooseCardToolsSpot(input2) {
   }));
   const chosen = (_e = (_d = scored.find((item) => item.overlap === 0 && !item.blocked)) != null ? _d : scored.find((item) => item.overlap === 0)) != null ? _e : scored.reduce((best, item) => item.overlap < best.overlap ? item : best);
   let dx = 0, dy = 0;
-  const row2 = chosen.rect;
-  if (row2.left < visible.left + margin) dx = visible.left + margin - row2.left;
-  else if (row2.right > visible.right - margin) dx = visible.right - margin - row2.right;
-  if (row2.top < visible.top + margin) dy = visible.top + margin - row2.top;
-  else if (row2.bottom > visible.bottom - margin) dy = visible.bottom - margin - row2.bottom;
+  const row22 = chosen.rect;
+  if (row22.left < visible.left + margin) dx = visible.left + margin - row22.left;
+  else if (row22.right > visible.right - margin) dx = visible.right - margin - row22.right;
+  if (row22.top < visible.top + margin) dy = visible.top + margin - row22.top;
+  else if (row22.bottom > visible.bottom - margin) dy = visible.bottom - margin - row22.bottom;
   const union = () => ({
-    left: Math.min(card.left, row2.left) + dx,
-    right: Math.max(card.right, row2.right) + dx,
-    top: Math.min(card.top, row2.top) + dy,
-    bottom: Math.max(card.bottom, row2.bottom) + dy
+    left: Math.min(card.left, row22.left) + dx,
+    right: Math.max(card.right, row22.right) + dx,
+    top: Math.min(card.top, row22.top) + dy,
+    bottom: Math.max(card.bottom, row22.bottom) + dy
   });
   for (let round3 = 0; round3 < controls.length + 1; round3++) {
     const box = union(), hit = controls.find((control) => rectsIntersect(box, control));
@@ -51010,10 +51529,10 @@ function chooseCardToolsSpot(input2) {
     slide: chosen.slide,
     overlap: chosen.overlap,
     rect: {
-      left: row2.left + dx,
-      right: row2.right + dx,
-      top: row2.top + dy,
-      bottom: row2.bottom + dy
+      left: row22.left + dx,
+      right: row22.right + dx,
+      top: row22.top + dy,
+      bottom: row22.bottom + dy
     },
     pan: { dx, dy }
   };
@@ -51029,17 +51548,17 @@ var RelevanceSummaryModal = class extends import_obsidian26.Modal {
   renderRows(label, rows2) {
     const list2 = this.contentEl.createEl("ul", { cls: "vam-relevance-changes" });
     list2.setAttr("aria-label", label);
-    for (const row of rows2) {
+    for (const row2 of rows2) {
       const item = list2.createEl("li", { cls: "vam-relevance-change" });
-      item.createDiv({ cls: "vam-relevance-change-title", text: row.title });
+      item.createDiv({ cls: "vam-relevance-change-title", text: row2.title });
       const tags = item.createDiv({ cls: "vam-relevance-change-tags" });
-      if (row.before) renderRelevanceTag(tags, row.before.tier, t(RELEVANCE_LABEL[row.before.tier]));
+      if (row2.before) renderRelevanceTag(tags, row2.before.tier, t(RELEVANCE_LABEL[row2.before.tier]));
       else tags.createSpan({ cls: "vam-relevance-ungraded", text: t("ui.relevance_ungraded") });
       const arrow = tags.createSpan({ cls: "vam-relevance-arrow" });
       arrow.setAttr("role", "img");
       arrow.setAttr("aria-label", t("ui.relevance_changed_to"));
       (0, import_obsidian26.setIcon)(arrow, "arrow-right");
-      renderRelevanceTag(tags, row.after.tier, t(RELEVANCE_LABEL[row.after.tier]));
+      renderRelevanceTag(tags, row2.after.tier, t(RELEVANCE_LABEL[row2.after.tier]));
     }
   }
   onOpen() {
@@ -51050,9 +51569,9 @@ var RelevanceSummaryModal = class extends import_obsidian26.Modal {
     const pinOf = new Map(((_b2 = this.host.pins) != null ? _b2 : []).map((pin) => [pin.id, pin]));
     const groups = /* @__PURE__ */ new Map();
     const others = [];
-    for (const row of this.host.rows) {
-      if (row.anchor && pinOf.has(row.anchor)) groups.set(row.anchor, [...(_c = groups.get(row.anchor)) != null ? _c : [], row]);
-      else others.push(row);
+    for (const row2 of this.host.rows) {
+      if (row2.anchor && pinOf.has(row2.anchor)) groups.set(row2.anchor, [...(_c = groups.get(row2.anchor)) != null ? _c : [], row2]);
+      else others.push(row2);
     }
     if (!this.host.rows.length && !conflicts.length)
       this.contentEl.createEl("p", { cls: "vam-hint", text: t("ui.relevance_changes_none") });
@@ -51088,7 +51607,7 @@ var RelevanceSummaryModal = class extends import_obsidian26.Modal {
     actionStatus(footer);
     const close = footer.createEl("button", { text: t("ui.close") });
     close.addEventListener("click", () => this.close());
-    this.host.highlight(this.host.rows.map((row) => row.id));
+    this.host.highlight(this.host.rows.map((row2) => row2.id));
     close.focus();
   }
   onClose() {
@@ -51348,8 +51867,8 @@ function providerStructureReviewRunner(aiCalls) {
   });
 }
 var StructureReviewService = class {
-  constructor(run) {
-    this.run = run;
+  constructor(run2) {
+    this.run = run2;
   }
   /**
    * Review a map or branch. Throws {@link StructureReviewError} (localized message, `code` for the reason) for an
@@ -51753,8 +52272,8 @@ function providerGoalRecommendRunner(aiCalls) {
   });
 }
 var GoalRecommendService = class {
-  constructor(run, now = Date.now) {
-    this.run = run;
+  constructor(run2, now = Date.now) {
+    this.run = run2;
     this.now = now;
   }
   /**
@@ -51845,30 +52364,30 @@ var RelevanceGradeRun = class {
   get paintCount() {
     return this.ports.paintCount();
   }
-  isCurrent(run, mapPath) {
-    return !this.closed && this.path === mapPath && this.plugin.relevanceGrades.get(mapPath) === run && run.status === "running" && !run.controller.signal.aborted;
+  isCurrent(run2, mapPath) {
+    return !this.closed && this.path === mapPath && this.plugin.relevanceGrades.get(mapPath) === run2 && run2.status === "running" && !run2.controller.signal.aborted;
   }
   /** Whether this view owns a grading run that is still running (what closing or switching the map would stop). */
   isRunning() {
     if (!this.started || !this.path) return false;
-    const run = this.plugin.relevanceGrades.get(this.path);
-    return (run == null ? void 0 : run.owner) === this.owner && run.status === "running";
+    const run2 = this.plugin.relevanceGrades.get(this.path);
+    return (run2 == null ? void 0 : run2.owner) === this.owner && run2.status === "running";
   }
   /** View closed or map switched: stop this view's run and forget it. A late result then fails every fence. */
   abort(mapPath = this.path) {
     if (!this.started) return;
-    const run = this.plugin.relevanceGrades.get(mapPath);
-    if (!run || run.owner !== this.owner) return;
+    const run2 = this.plugin.relevanceGrades.get(mapPath);
+    if (!run2 || run2.owner !== this.owner) return;
     this.plugin.relevanceGrades.delete(mapPath);
-    run.controller.abort();
+    run2.controller.abort();
   }
-  finish(run, mapPath, status, message) {
+  finish(run2, mapPath, status, message) {
     var _a2, _b2;
-    if (!this.isCurrent(run, mapPath)) return;
+    if (!this.isCurrent(run2, mapPath)) return;
     (_b2 = (_a2 = this.plugin).releaseWarmClaude) == null ? void 0 : _b2.call(_a2);
-    run.received = void 0;
-    run.status = status;
-    run.message = message;
+    run2.received = void 0;
+    run2.status = status;
+    run2.message = message;
     this.ports.refresh();
   }
   /**
@@ -51886,7 +52405,7 @@ var RelevanceGradeRun = class {
     if (!goal || !this.ports.gradeable() || this.ports.notesLoading()) return;
     if (((_a2 = this.plugin.relevanceGrades.get(mapPath)) == null ? void 0 : _a2.status) === "running") return;
     this.ports.dropGoalSuggest();
-    const run = {
+    const run2 = {
       token: ++relevanceRunToken,
       owner: this.owner,
       controller: new AbortController(),
@@ -51894,9 +52413,9 @@ var RelevanceGradeRun = class {
       status: "running",
       startedAt: Date.now()
     };
-    this.plugin.relevanceGrades.set(mapPath, run);
+    this.plugin.relevanceGrades.set(mapPath, run2);
     this.started = true;
-    run.controller.signal.addEventListener("abort", () => {
+    run2.controller.signal.addEventListener("abort", () => {
       var _a3, _b3;
       return (_b3 = (_a3 = this.plugin).releaseWarmClaude) == null ? void 0 : _b3.call(_a3);
     }, { once: true });
@@ -51922,14 +52441,14 @@ var RelevanceGradeRun = class {
       });
       const { model, reasoning } = this.plugin.currentModelChoice();
       if ((_c = (_b2 = this.plugin).usageNoticePending) == null ? void 0 : _c.call(_b2, model)) {
-        run.awaitingUsage = true;
+        run2.awaitingUsage = true;
         this.ports.refresh();
       }
       const started = await this.plugin.confirmAiUsage(model, async () => {
-        if (!this.isCurrent(run, mapPath) || !this.map) return;
-        if (run.awaitingUsage) {
-          run.awaitingUsage = false;
-          run.startedAt = Date.now();
+        if (!this.isCurrent(run2, mapPath) || !this.map) return;
+        if (run2.awaitingUsage) {
+          run2.awaitingUsage = false;
+          run2.startedAt = Date.now();
           this.ports.refresh();
         }
         basis = buildStructureReviewNodes(this.map.nodes, (id) => this.ports.describe(id));
@@ -51956,24 +52475,24 @@ var RelevanceGradeRun = class {
         const hooks = {
           // Text only: the count changes in place, the map is not repainted for it.
           onProgress: (progress) => {
-            if (!this.isCurrent(run, mapPath)) return;
-            run.received = progress != null ? progress : void 0;
-            this.ports.paintReceived(run);
+            if (!this.isCurrent(run2, mapPath)) return;
+            run2.received = progress != null ? progress : void 0;
+            this.ports.paintReceived(run2);
           }
         };
-        result = await this.plugin.goalRecommend.recommend(request, run.controller.signal, hooks);
+        result = await this.plugin.goalRecommend.recommend(request, run2.controller.signal, hooks);
       });
-      if (!this.isCurrent(run, mapPath)) return;
-      if (!started) return this.finish(run, mapPath, "declined", t("ui.relevance_not_started"));
+      if (!this.isCurrent(run2, mapPath)) return;
+      if (!started) return this.finish(run2, mapPath, "declined", t("ui.relevance_not_started"));
       const answered = result;
       if (!answered) return;
       const paintedBefore = this.paintCount;
-      await this.plugin.mutate(() => this.apply(run, mapPath, basis, answered, { scope, pins }));
+      await this.plugin.mutate(() => this.apply(run2, mapPath, basis, answered, { scope, pins }));
       if (this.paintCount === paintedBefore) this.ports.refresh();
-      this.ports.openRecommendations(run, mapPath, answered.suggestions);
+      this.ports.openRecommendations(run2, mapPath, answered.suggestions);
     } catch (error) {
       this.finish(
-        run,
+        run2,
         mapPath,
         "failed",
         t("ui.relevance_failed_0", goalRecommendFailureDetail(error, this.plugin.settings.language))
@@ -51987,12 +52506,12 @@ var RelevanceGradeRun = class {
    * write and the same undo step, unless the parent is hand-set, locked, outside what the AI saw, or changed meanwhile.
    * A note that cannot be written is counted; the undo step covers only the notes actually written.
    */
-  async apply(run, mapPath, basis, graded, meta) {
+  async apply(run2, mapPath, basis, graded, meta) {
     var _a2, _b2, _c, _d, _e;
-    if (!this.isCurrent(run, mapPath) || !this.map) return;
+    if (!this.isCurrent(run2, mapPath) || !this.map) return;
     const items = graded.items;
-    run.writing = true;
-    run.received = void 0;
+    run2.writing = true;
+    run2.received = void 0;
     const startedAt = Date.now();
     const repo = this.plugin.repo;
     const fresh = /* @__PURE__ */ new Map();
@@ -52113,11 +52632,11 @@ var RelevanceGradeRun = class {
           redo: () => this.restore(changes, "redo")
         };
         this.history.push(entry);
-        run.historyEntry = entry;
+        run2.historyEntry = entry;
         this.ports.updateHistoryButtons();
       }
-      run.outcome = outcome;
-      run.status = "done";
+      run2.outcome = outcome;
+      run2.status = "done";
     }
   }
   /**
@@ -52144,12 +52663,12 @@ var RelevanceGradeRun = class {
     if (skipped2) this.ports.notice(t("ui.relevance_undo_skipped_0", skipped2));
   }
   stop() {
-    const run = this.plugin.relevanceGrades.get(this.path);
-    if (!run || run.status !== "running" || run.writing) return;
-    run.status = "stopped";
-    run.received = void 0;
-    run.message = t("ui.relevance_stopped");
-    run.controller.abort();
+    const run2 = this.plugin.relevanceGrades.get(this.path);
+    if (!run2 || run2.status !== "running" || run2.writing) return;
+    run2.status = "stopped";
+    run2.received = void 0;
+    run2.message = t("ui.relevance_stopped");
+    run2.controller.abort();
     this.ports.refresh();
   }
 };
@@ -52195,7 +52714,7 @@ function expandBasisOf(cards) {
 var BASIS_TEXT_LIMIT = 200;
 var BASIS_LIST_LIMIT = 50;
 var text7 = (value) => typeof value === "string" ? [...value].slice(0, BASIS_TEXT_LIMIT).join("") : null;
-var count2 = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 ? { existingChildren: value } : {};
+var count3 = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 ? { existingChildren: value } : {};
 function parseChatBasis(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
   const raw = value;
@@ -52207,7 +52726,7 @@ function parseChatBasis(value) {
       const title = text7(entry.title);
       return id !== null && title !== null ? [{ id, title }] : [];
     });
-    return { kind: raw.kind, sources, ...count2(raw.existingChildren) };
+    return { kind: raw.kind, sources, ...count3(raw.existingChildren) };
   }
   if (raw.kind === "outline_only") {
     const alsoRead = (Array.isArray(raw.alsoRead) ? raw.alsoRead : []).slice(0, BASIS_LIST_LIMIT).flatMap((item) => {
@@ -52216,7 +52735,7 @@ function parseChatBasis(value) {
       const title = text7(entry.title);
       return path !== null && title !== null ? [{ path, title }] : [];
     });
-    return { kind: "outline_only", alsoRead, ...count2(raw.existingChildren) };
+    return { kind: "outline_only", alsoRead, ...count3(raw.existingChildren) };
   }
   return void 0;
 }
@@ -52588,26 +53107,26 @@ function parseInline(src, depth = 0, links = true, ends) {
     if (ch === "`") {
       let end = at;
       while (src[end] === "`") end++;
-      const run = src.slice(at, end);
+      const run2 = src.slice(at, end);
       let close = -1;
       for (let search = end; search < src.length; ) {
         const next = src.indexOf("`", search);
         if (next < 0) break;
         let stop = next;
         while (src[stop] === "`") stop++;
-        if (stop - next === run.length) {
+        if (stop - next === run2.length) {
           close = next;
           break;
         }
         search = stop;
       }
       if (close < 0) {
-        buf += run;
+        buf += run2;
         at = end;
         continue;
       }
       flush(at);
-      at = close + run.length;
+      at = close + run2.length;
       push({ t: "code", text: src.slice(end, close).replace(/\n/g, " ") }, at);
       continue;
     }
@@ -52758,8 +53277,8 @@ function parseBlocks(lines, depth = 0, starts, budget) {
     if (LIST.test(line2)) {
       const rows2 = [];
       while (at < lines.length) {
-        const row = lines[at];
-        if (!row.trim()) {
+        const row2 = lines[at];
+        if (!row2.trim()) {
           let next = at + 1;
           while (next < lines.length && !lines[next].trim()) next++;
           if (next < lines.length && LIST.test(lines[next])) {
@@ -52768,27 +53287,27 @@ function parseBlocks(lines, depth = 0, starts, budget) {
           }
           break;
         }
-        const item = LIST.exec(row);
+        const item = LIST.exec(row2);
         if (item) {
           const ordered = /\d/.test(item[2]);
           const level = item[1].length >= 2 ? 1 : 0;
           if (level === 0 && rows2.length && ordered !== rows2[0].ordered) break;
           rows2.push({ level, ordered, text: item[3], line: at });
-        } else if (/^\s{2,}\S/.test(row) && rows2.length) rows2[rows2.length - 1].text += `
-${row.trim()}`;
+        } else if (/^\s{2,}\S/.test(row2) && rows2.length) rows2[rows2.length - 1].text += `
+${row2.trim()}`;
         else break;
         at++;
       }
       const list2 = { t: "list", ordered: rows2[0].ordered, items: [] };
       const itemLines = [];
-      for (const row of rows2) {
+      for (const row2 of rows2) {
         const top = list2.items.at(-1);
-        if (row.level === 1 && top) {
-          (_a2 = top.sub) != null ? _a2 : top.sub = { t: "list", ordered: row.ordered, items: [] };
-          top.sub.items.push({ c: parseInline(row.text), sub: null });
+        if (row2.level === 1 && top) {
+          (_a2 = top.sub) != null ? _a2 : top.sub = { t: "list", ordered: row2.ordered, items: [] };
+          top.sub.items.push({ c: parseInline(row2.text), sub: null });
         } else {
-          list2.items.push({ c: parseInline(row.text), sub: null });
-          itemLines.push(row.line);
+          list2.items.push({ c: parseInline(row2.text), sub: null });
+          itemLines.push(row2.line);
         }
       }
       if (!emit(list2) && budget) budget.itemLines = itemLines;
@@ -52927,9 +53446,9 @@ function renderBlocks(parent, blocks) {
       case "list": {
         const list2 = parent.createEl(block.ordered ? "ol" : "ul");
         for (const item of block.items) {
-          const row = list2.createEl("li");
-          renderInline(row, item.c);
-          if (item.sub) renderBlocks(row, [item.sub]);
+          const row2 = list2.createEl("li");
+          renderInline(row2, item.c);
+          if (item.sub) renderBlocks(row2, [item.sub]);
         }
         break;
       }
@@ -52968,11 +53487,11 @@ function chatFirstSentence(message) {
   const end = text10.search(SENTENCE_END2);
   const sentence = end >= 0 ? text10.slice(0, end) : text10;
   let cut = "";
-  let count3 = 0;
+  let count4 = 0;
   for (const part of graphemesOf(sentence)) {
-    if (count3 === CHAT_NAME_LIMIT) break;
+    if (count4 === CHAT_NAME_LIMIT) break;
     cut += part;
-    count3++;
+    count4++;
   }
   return cut.replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\p{Cc}/gu, " ").replace(/\s+/g, " ").replace(/^[\s.]+/, "").replace(/[\s.]+$/, "");
 }
@@ -53018,7 +53537,7 @@ function pageLink(label, url) {
 function codeSpan(text10) {
   var _a2;
   const body = defuseCode(text10.replace(/\r?\n|\r/g, " "));
-  const longest = Math.max(0, ...((_a2 = body.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
+  const longest = Math.max(0, ...((_a2 = body.match(/`+/g)) != null ? _a2 : []).map((run2) => run2.length));
   const fence = "`".repeat(longest + 1);
   const guarded = /^\s*[=$]/.test(body) ? `${ZERO_WIDTH}${body}` : body;
   const padded = /^[`\s]|[`\s]$/.test(guarded) ? ` ${guarded} ` : guarded;
@@ -53080,7 +53599,7 @@ function blockMarkdown(block) {
       return "---";
     case "code": {
       const text10 = defuseCode(block.text);
-      const longest = Math.max(2, ...((_a2 = text10.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
+      const longest = Math.max(2, ...((_a2 = text10.match(/`+/g)) != null ? _a2 : []).map((run2) => run2.length));
       const fence = "`".repeat(longest + 1);
       return `${fence}
 ${text10}
@@ -53281,10 +53800,10 @@ var ARGUMENT_SUGGESTION_KEYS = [
   "ui.argument_suggestion_9",
   "ui.argument_suggestion_10"
 ];
-function pickArgumentSuggestions(pool, random, count3 = 3) {
+function pickArgumentSuggestions(pool, random, count4 = 3) {
   const rest = [...pool];
   const picked = [];
-  while (picked.length < count3 && rest.length) {
+  while (picked.length < count4 && rest.length) {
     const roll = random();
     const at = Number.isFinite(roll) ? Math.min(rest.length - 1, Math.max(0, Math.floor(roll * rest.length))) : 0;
     picked.push(rest.splice(at, 1)[0]);
@@ -54130,12 +54649,12 @@ ${typed}` : draft;
     }
     const notice = els.box.createDiv({ cls: "vam-map-chat-progress-slow" });
     notice.createSpan({ cls: "vam-map-chat-progress-slow-text", text: slow.text });
-    const button = notice.createEl("button", {
+    const button2 = notice.createEl("button", {
       cls: "vam-map-chat-progress-resend",
       text: t("ui.map_chat_resend"),
       attr: { type: "button" }
     });
-    button.addEventListener("click", () => {
+    button2.addEventListener("click", () => {
       var _a3;
       (_a3 = this.slow) == null ? void 0 : _a3.resend();
       if (this.built && this.stage) this.stopEl.focus();
@@ -54859,14 +55378,14 @@ ${typed}` : draft;
     }
     if (!this.newEl) {
       const label = t("ui.map_chat_new_conversation");
-      const button = this.newEl = this.headEl.createEl("button", {
+      const button2 = this.newEl = this.headEl.createEl("button", {
         cls: "vam-map-chat-new clickable-icon",
         attr: { type: "button", "aria-label": label, title: label }
       });
-      (0, import_obsidian27.setIcon)(button, "square-pen");
-      button.addEventListener("click", () => this.startNewConversation());
-      button.remove();
-      this.headEl.insertBefore(button, this.saveEl);
+      (0, import_obsidian27.setIcon)(button2, "square-pen");
+      button2.addEventListener("click", () => this.startNewConversation());
+      button2.remove();
+      this.headEl.insertBefore(button2, this.saveEl);
     }
     this.newEl.hidden = this.hero;
     this.newEl.toggleClass("is-hidden", this.hero);
@@ -54997,12 +55516,12 @@ ${typed}` : draft;
     this.suggestionsEl.empty();
     for (const key4 of this.suggestionKeys) {
       const text10 = t(key4);
-      const button = this.suggestionsEl.createEl("button", {
+      const button2 = this.suggestionsEl.createEl("button", {
         cls: "vam-map-chat-claim-pick",
         text: text10,
         attr: { type: "button" }
       });
-      button.addEventListener("click", () => {
+      button2.addEventListener("click", () => {
         this.inputEl.value = text10;
         this.renderSteerHint();
         this.inputEl.focus();
@@ -55364,18 +55883,18 @@ ${shown}` : t("ui.map_chat_model_label"));
         attr: { role: "group", "aria-label": t("ui.map_chat_auto_apply_label") }
       });
       const make = (wantOn) => {
-        const button = group.createEl("button", {
+        const button2 = group.createEl("button", {
           cls: "vam-map-chat-image-mode-button",
           text: t(wantOn ? "ui.map_chat_auto_apply_on" : "ui.map_chat_auto_apply_off"),
           attr: { type: "button", "aria-pressed": "false" }
         });
-        button.addEventListener("click", () => {
+        button2.addEventListener("click", () => {
           var _a3, _b3, _c, _d;
           if (!!((_b3 = (_a3 = this.host).autoApply) == null ? void 0 : _b3.call(_a3)) === wantOn) return;
           (_d = (_c = this.host).setAutoApply) == null ? void 0 : _d.call(_c, wantOn);
           this.renderAutoApply();
         });
-        return button;
+        return button2;
       };
       this.autoApplyButtons = { off: make(false), on: make(true) };
       this.autoNoteEl = this.autoApplyEl.createSpan({ cls: "vam-map-chat-auto-apply-note" });
@@ -55392,12 +55911,12 @@ ${shown}` : t("ui.map_chat_model_label"));
       this.autoWarnEl.setText(t("ui.map_chat_auto_apply_warning"));
     }
     const on = !!((_b2 = (_a2 = this.host).autoApply) == null ? void 0 : _b2.call(_a2));
-    for (const [button, pressed] of [
+    for (const [button2, pressed] of [
       [this.autoApplyButtons.off, !on],
       [this.autoApplyButtons.on, on]
     ]) {
-      button.setAttr("aria-pressed", String(pressed));
-      button.toggleClass("is-active", pressed);
+      button2.setAttr("aria-pressed", String(pressed));
+      button2.toggleClass("is-active", pressed);
     }
     if (!on) this.autoWarnOpen = false;
     if (this.autoNoteEl) this.autoNoteEl.hidden = !on;
@@ -55488,26 +56007,26 @@ ${shown}` : t("ui.map_chat_model_label"));
         attr: { role: "group", "aria-label": t("ui.map_chat_image_mode_label") }
       });
       const make = (mode) => {
-        const button = group.createEl("button", {
+        const button2 = group.createEl("button", {
           cls: "vam-map-chat-image-mode-button",
           text: t(`ui.map_chat_image_mode_${mode}`),
           attr: { type: "button", "aria-pressed": "false" }
         });
-        button.addEventListener("click", () => {
+        button2.addEventListener("click", () => {
           var _a3, _b3, _c2, _d2, _e2;
           if (((_c2 = (_b3 = (_a3 = this.host).imageMode) == null ? void 0 : _b3.call(_a3)) != null ? _c2 : "preview") === mode) return;
           (_e2 = (_d2 = this.host).setImageMode) == null ? void 0 : _e2.call(_d2, mode);
           this.renderImageMode();
         });
-        return button;
+        return button2;
       };
       this.imageModeButtons = { preview: make("preview"), direct: make("direct") };
     }
     const current = (_e = (_d = (_c = this.host).imageMode) == null ? void 0 : _d.call(_c)) != null ? _e : "preview";
     for (const mode of ["preview", "direct"]) {
-      const button = this.imageModeButtons[mode];
-      button.setAttr("aria-pressed", String(mode === current));
-      button.toggleClass("is-active", mode === current);
+      const button2 = this.imageModeButtons[mode];
+      button2.setAttr("aria-pressed", String(mode === current));
+      button2.toggleClass("is-active", mode === current);
     }
   }
   /** The turn that was just finished sent a picture and/or wrote an undo step: its row says so. */
@@ -55523,9 +56042,9 @@ ${shown}` : t("ui.map_chat_model_label"));
     var _a2, _b2, _c;
     if (!this.built) return;
     for (const message of this.messages) {
-      const button = message.replyUndo ? (_a2 = this.rows.get(message)) == null ? void 0 : _a2.row.querySelector(".vam-map-chat-undo-reply") : null;
-      if (button && message.replyUndo)
-        button.disabled = ((_c = (_b2 = this.host).replyUndoState) == null ? void 0 : _c.call(_b2, message.replyUndo.token)) === "undone";
+      const button2 = message.replyUndo ? (_a2 = this.rows.get(message)) == null ? void 0 : _a2.row.querySelector(".vam-map-chat-undo-reply") : null;
+      if (button2 && message.replyUndo)
+        button2.disabled = ((_c = (_b2 = this.host).replyUndoState) == null ? void 0 : _c.call(_b2, message.replyUndo.token)) === "undone";
     }
   }
   renderChips() {
@@ -55663,10 +56182,10 @@ ${shown}` : t("ui.map_chat_model_label"));
     return summary.notRun ? t("ui.map_chat_batch_stopped_failed_0_1_2_3", summary.done, summary.total, summary.failed, summary.notRun) : t("ui.map_chat_batch_finished_failed_0_1_2", summary.done, summary.total, summary.failed);
   }
   /** What a batch that stopped, failed in part or was cut by a reload says, and the one button that runs the rest again. Titles are untrusted text. */
-  buildBatch(row, message, batch) {
+  buildBatch(row2, message, batch) {
     const summary = summarizeChatBatch(batch, batch.restored === true);
     if (!summary || !(batch.ended || summary.interrupted || batch.running)) return;
-    const box = row.createDiv({ cls: "vam-map-chat-batch", attr: { role: "status", tabindex: "-1" } });
+    const box = row2.createDiv({ cls: "vam-map-chat-batch", attr: { role: "status", tabindex: "-1" } });
     box.createDiv({ cls: "vam-map-chat-batch-title", text: this.batchTitle(summary) });
     const shown = summary.pending.slice(0, 5);
     const left = box.createDiv("vam-map-chat-batch-left");
@@ -55676,14 +56195,14 @@ ${shown}` : t("ui.map_chat_model_label"));
         cls: "vam-map-chat-batch-more",
         text: t("ui.map_chat_batch_more_0", summary.pending.length - shown.length)
       });
-    const run = box.createEl("button", {
+    const run2 = box.createEl("button", {
       cls: "vam-map-chat-batch-rerun",
       text: batch.running ? t("ui.map_chat_batch_running_0", summary.pending.length) : t("ui.map_chat_batch_rerun_0", summary.pending.length),
       attr: { type: "button" }
     });
-    run.disabled = batch.running === true;
-    if (!this.host.rerunBatch) this.makeInert(run);
-    else run.addEventListener("click", () => {
+    run2.disabled = batch.running === true;
+    if (!this.host.rerunBatch) this.makeInert(run2);
+    else run2.addEventListener("click", () => {
       var _a2, _b2;
       return (_b2 = (_a2 = this.host).rerunBatch) == null ? void 0 : _b2.call(_a2, message);
     });
@@ -55695,8 +56214,8 @@ ${shown}` : t("ui.map_chat_model_label"));
     return !(batch && (batch.restored && !batch.ended || batch.running));
   }
   /** What an interrupted chain says and the one button that goes on with the next round. */
-  buildResume(row, message, point) {
-    const box = row.createDiv({
+  buildResume(row2, message, point) {
+    const box = row2.createDiv({
       cls: "vam-map-chat-batch vam-map-chat-resume",
       attr: { role: "status", tabindex: "-1" }
     });
@@ -55707,14 +56226,14 @@ ${shown}` : t("ui.map_chat_model_label"));
       });
     if (point.remaining.trim())
       box.createDiv({ cls: "vam-map-chat-batch-left", text: t("ui.map_chat_chain_left_0", point.remaining) });
-    const run = box.createEl("button", {
+    const run2 = box.createEl("button", {
       cls: "vam-map-chat-batch-rerun vam-map-chat-resume-run",
       text: t("ui.map_chat_chain_resume_0", point.round),
       attr: { type: "button" }
     });
-    run.disabled = this.working;
-    if (!this.host.resumeChain) this.makeInert(run);
-    else run.addEventListener("click", () => this.handOffFocus(() => {
+    run2.disabled = this.working;
+    if (!this.host.resumeChain) this.makeInert(run2);
+    else run2.addEventListener("click", () => this.handOffFocus(() => {
       var _a2, _b2;
       return (_b2 = (_a2 = this.host).resumeChain) == null ? void 0 : _b2.call(_a2, message);
     }));
@@ -55753,44 +56272,44 @@ ${shown}` : t("ui.map_chat_model_label"));
   }
   buildRow(message) {
     var _a2, _b2, _c;
-    const row = this.logEl.createDiv({
+    const row2 = this.logEl.createDiv({
       cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}${message.auto ? " is-auto" : ""}`
     });
     if (message.auto) {
       const info = message.autoInfo;
-      const body2 = row.createDiv({ cls: "vam-map-chat-auto-title" });
+      const body2 = row2.createDiv({ cls: "vam-map-chat-auto-title" });
       body2.setText((info == null ? void 0 : info.round) ? this.autoRoundLabel({ ...info, round: info.round }) : t("ui.map_chat_role_auto"));
       if (info == null ? void 0 : info.partial)
-        row.createDiv({
+        row2.createDiv({
           cls: "vam-map-chat-auto-note",
           text: t("ui.map_chat_chain_partial_0_1", info.partial.failed, info.partial.succeeded)
         });
       if ((_a2 = info == null ? void 0 : info.remaining) == null ? void 0 : _a2.trim())
-        row.createDiv({ cls: "vam-map-chat-auto-left", text: t("ui.map_chat_chain_left_0", info.remaining) });
+        row2.createDiv({ cls: "vam-map-chat-auto-left", text: t("ui.map_chat_chain_left_0", info.remaining) });
       if (info == null ? void 0 : info.applied)
-        row.createDiv({ cls: "vam-map-chat-auto-applied", text: t("ui.map_chat_auto_applied_0", info.applied) });
-      return { row, body: body2, more: null };
+        row2.createDiv({ cls: "vam-map-chat-auto-applied", text: t("ui.map_chat_auto_applied_0", info.applied) });
+      return { row: row2, body: body2, more: null };
     }
-    row.createSpan({
+    row2.createSpan({
       cls: "vam-map-chat-role",
       text: message.role === "user" ? t("ui.map_chat_role_you") : message.modelLabel || t("ui.map_chat_role_ai")
     });
     const markdown = message.role === "assistant" && !message.error;
-    const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
+    const body = row2.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
     if (markdown) renderChatMarkdown(body, message.text, t("ui.map_chat_overflow_note"));
     else body.setText(message.text);
-    for (const steer of (_b2 = message.steers) != null ? _b2 : []) this.buildSteer(row, steer);
-    if (message.error && message.technical) this.buildTechnical(row, message.technical);
-    if (this.stage && this.stageMessage() === message) this.buildStage(row, message);
+    for (const steer of (_b2 = message.steers) != null ? _b2 : []) this.buildSteer(row2, steer);
+    if (message.error && message.technical) this.buildTechnical(row2, message.technical);
+    if (this.stage && this.stageMessage() === message) this.buildStage(row2, message);
     const applied = message.plan && message.plan.state === "applied" && !message.plan.stale ? message.plan : null;
-    if (message.plan && !applied) this.buildPlan(row, message.plan, message);
-    if (message.choices) this.buildChoices(row, message.choices);
-    const undoPlaced = message.lines.length > 0 || applied ? this.buildOutcome(row, message, applied) : false;
-    this.buildBasis(row, message);
-    if ((_c = message.images) == null ? void 0 : _c.length) this.buildImages(row, message.images);
-    if (this.chainWaitingState && this.messages.at(-1) === message) this.buildChainWait(row);
+    if (message.plan && !applied) this.buildPlan(row2, message.plan, message);
+    if (message.choices) this.buildChoices(row2, message.choices);
+    const undoPlaced = message.lines.length > 0 || applied ? this.buildOutcome(row2, message, applied) : false;
+    this.buildBasis(row2, message);
+    if ((_c = message.images) == null ? void 0 : _c.length) this.buildImages(row2, message.images);
+    if (this.chainWaitingState && this.messages.at(-1) === message) this.buildChainWait(row2);
     if (message.seenImage) {
-      const line2 = row.createDiv("vam-map-chat-seen-row");
+      const line2 = row2.createDiv("vam-map-chat-seen-row");
       const eye = line2.createSpan("vam-map-chat-seen-icon");
       eye.setAttr("aria-hidden", "true");
       (0, import_obsidian27.setIcon)(eye, "eye");
@@ -55800,15 +56319,15 @@ ${shown}` : t("ui.map_chat_model_label"));
       });
     }
     if (message.chainNote)
-      row.createDiv({ cls: `vam-map-chat-chain-note is-${message.chainNote.reason}`, text: message.chainNote.text });
-    if (message.batch) this.buildBatch(row, message, message.batch);
-    if (this.resumeShown(message) && message.resume) this.buildResume(row, message, message.resume);
-    if (message.replyUndo && !undoPlaced) this.buildReplyUndo(row, message.replyUndo.token);
+      row2.createDiv({ cls: `vam-map-chat-chain-note is-${message.chainNote.reason}`, text: message.chainNote.text });
+    if (message.batch) this.buildBatch(row2, message, message.batch);
+    if (this.resumeShown(message) && message.resume) this.buildResume(row2, message, message.resume);
+    if (message.replyUndo && !undoPlaced) this.buildReplyUndo(row2, message.replyUndo.token);
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more = null;
     if (this.canRetry(message, asked) && (asked == null ? void 0 : asked.origin)) {
       const origin = asked.origin;
-      more = row.createEl("button", {
+      more = row2.createEl("button", {
         cls: "vam-map-chat-retry",
         text: t("ui.map_chat_retry"),
         attr: { type: "button" }
@@ -55823,19 +56342,19 @@ ${shown}` : t("ui.map_chat_model_label"));
           });
         });
     }
-    return { row, body, more };
+    return { row: row2, body, more };
   }
   /**
    * What the results were built from, gathered under them (so a folded list still shows it) and then the research notes the round
    * left unread. Plain text only (titles are untrusted); "read", never "checked". The program decides it, not the model.
    */
-  buildBasis(row, message) {
+  buildBasis(row2, message) {
     var _a2;
     const all = summarizeBasis(message.lines.flatMap((line2) => line2.basis ? [line2.basis] : []));
     const entries = message.linesOpen ? all : all.filter((entry) => entry.kind === "outline_only");
     const unread = (_a2 = message.unread) != null ? _a2 : [];
     if (!entries.length && !unread.length) return;
-    const box = row.createDiv({ cls: "vam-map-chat-basis" });
+    const box = row2.createDiv({ cls: "vam-map-chat-basis" });
     for (const entry of entries) this.buildBasisEntry(box.createDiv("vam-map-chat-basis-line"), entry);
     for (const item of unread)
       box.createDiv({
@@ -55873,8 +56392,8 @@ ${shown}` : t("ui.map_chat_model_label"));
       );
   }
   /** The waiting row of a continuation: how far the research and expansions are, the time (hidden from readers), and what is left. */
-  buildChainWait(row) {
-    const box = row.createDiv({ cls: "vam-map-chat-chain-wait", attr: { role: "status" } });
+  buildChainWait(row2) {
+    const box = row2.createDiv({ cls: "vam-map-chat-chain-wait", attr: { role: "status" } });
     const line2 = box.createDiv("vam-map-chat-chain-wait-line");
     const label = line2.createSpan({ cls: "vam-map-chat-chain-wait-label" });
     const elapsed = line2.createSpan({ cls: "vam-map-chat-chain-wait-elapsed" });
@@ -55894,14 +56413,14 @@ ${shown}` : t("ui.map_chat_model_label"));
   /** "Undo this reply" under an "apply directly" reply. Nothing of it is saved with the conversation. */
   buildReplyUndo(parent, token) {
     var _a2, _b2;
-    const button = parent.createEl("button", {
+    const button2 = parent.createEl("button", {
       cls: "vam-map-chat-undo-reply",
       text: t("ui.map_chat_undo_reply"),
       attr: { type: "button" }
     });
-    button.disabled = ((_b2 = (_a2 = this.host).replyUndoState) == null ? void 0 : _b2.call(_a2, token)) === "undone";
-    button.addEventListener("click", () => {
-      if (button.disabled || !this.host.undoReply) return;
+    button2.disabled = ((_b2 = (_a2 = this.host).replyUndoState) == null ? void 0 : _b2.call(_a2, token)) === "undone";
+    button2.addEventListener("click", () => {
+      if (button2.disabled || !this.host.undoReply) return;
       void this.host.undoReply(token).then(() => this.refreshReplyUndo());
     });
   }
@@ -55919,8 +56438,8 @@ ${shown}` : t("ui.map_chat_model_label"));
     });
   }
   /** A follow-up under the question: its own small bubble, tagged in words (the tag is text, never colour alone). */
-  buildSteer(row, steer) {
-    const bubble = row.createDiv({ cls: `vam-map-chat-steer is-${steer.state}` });
+  buildSteer(row2, steer) {
+    const bubble = row2.createDiv({ cls: `vam-map-chat-steer is-${steer.state}` });
     bubble.createEl("small", {
       cls: "vam-map-chat-steer-tag",
       text: t(steer.state === "live" ? "ui.map_chat_steer_tag_live" : "ui.map_chat_steer_tag_queued")
@@ -55928,8 +56447,8 @@ ${shown}` : t("ui.map_chat_model_label"));
     bubble.createSpan({ cls: "vam-map-chat-steer-text", text: steer.text });
   }
   /** The raw error of a failed turn: folded away, selectable and copyable. */
-  buildTechnical(row, raw) {
-    const more = row.createEl("details", { cls: "vam-map-chat-error-details" });
+  buildTechnical(row2, raw) {
+    const more = row2.createEl("details", { cls: "vam-map-chat-error-details" });
     more.createEl("summary", { text: t("ui.technical_details") });
     more.createEl("pre", { text: raw });
     const copy = more.createEl("button", { text: t("ui.copy_technical_details"), attr: { type: "button" } });
@@ -55939,8 +56458,8 @@ ${shown}` : t("ui.map_chat_model_label"));
     });
   }
   /** The stage line of the running turn: the stage name, then the seconds (hidden from screen readers; they tick). */
-  buildStage(row, message) {
-    const box = row.createDiv({ cls: `vam-map-chat-progress${message.text ? " is-compact" : ""}` });
+  buildStage(row2, message) {
+    const box = row2.createDiv({ cls: `vam-map-chat-progress${message.text ? " is-compact" : ""}` });
     const label = box.createSpan({ cls: "vam-map-chat-progress-stage" });
     const elapsed = box.createSpan({ cls: "vam-map-chat-progress-elapsed" });
     elapsed.setAttr("aria-hidden", "true");
@@ -55971,7 +56490,7 @@ ${shown}` : t("ui.map_chat_model_label"));
    * notes). Done lines fold into a count, and with the applied plan card and the basis they sit behind "View details". Each
    * line says what happened in words, so the colour is never the only sign. Returns whether Undo was put in the summary row.
    */
-  buildOutcome(row, message, applied) {
+  buildOutcome(row2, message, applied) {
     const shownLines = message.lines.filter((line2) => {
       var _a2;
       return !((_a2 = line2.imageGroup) == null ? void 0 : _a2.some((block) => block.state === "searching"));
@@ -55984,7 +56503,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     const open2 = hasDetail && message.linesOpen === true;
     const undo = message.replyUndo;
     if (!hasDetail && !loud.length && !notes.length && !undo) return false;
-    const list2 = row.createDiv({ cls: "vam-map-chat-lines" });
+    const list2 = row2.createDiv({ cls: "vam-map-chat-lines" });
     if (hasDetail || undo) {
       const summary = list2.createDiv("vam-map-chat-lines-summary");
       if (folded2.length)
@@ -56130,16 +56649,16 @@ ${shown}` : t("ui.map_chat_model_label"));
    * how many have ended, and offers Stop for the ones that have not. Nothing here is run or fetched except the thumbnails,
    * which are https images shown without a referrer. All text goes in as text.
    */
-  buildImages(row, blocks) {
+  buildImages(row2, blocks) {
     const live2 = blocks.filter((block) => !block.stale);
-    if (live2.length) this.buildImageResult(row, live2);
+    if (live2.length) this.buildImageResult(row2, live2);
     const old = blocks.filter((block) => block.stale);
-    if (old.length) this.buildStaleImages(row, old);
+    if (old.length) this.buildStaleImages(row2, old);
   }
-  buildImageResult(row, blocks) {
+  buildImageResult(row2, blocks) {
     var _a2, _b2, _c;
     const pending2 = blocks.filter((block) => block.state === "searching");
-    const box = row.createDiv({
+    const box = row2.createDiv({
       cls: `vam-map-chat-images ${pending2.length ? "is-searching" : "is-done"}`,
       attr: { role: "group", "aria-label": t("ui.map_chat_images_label") }
     });
@@ -56200,8 +56719,8 @@ ${shown}` : t("ui.map_chat_model_label"));
     }
   }
   /** Older saved records: what was listed, read-only (no link, no thumbnail, nothing to press). */
-  buildStaleImages(row, blocks) {
-    const box = row.createDiv({
+  buildStaleImages(row2, blocks) {
+    const box = row2.createDiv({
       cls: "vam-map-chat-images is-stale",
       attr: { role: "group", "aria-label": t("ui.map_chat_images_label") }
     });
@@ -56219,8 +56738,8 @@ ${shown}` : t("ui.map_chat_model_label"));
         else text10.createDiv({ cls: "vam-map-chat-images-title", text: clip4(item.candidate.title, 80) });
       }
   }
-  buildChoices(row, choices) {
-    const box = row.createDiv({ cls: "vam-map-chat-choices" });
+  buildChoices(row2, choices) {
+    const box = row2.createDiv({ cls: "vam-map-chat-choices" });
     box.setAttr("role", "group");
     box.setAttr("aria-label", choices.prompt);
     box.createDiv({ cls: "vam-map-chat-choices-prompt", text: choices.prompt });
@@ -56235,14 +56754,14 @@ ${shown}` : t("ui.map_chat_model_label"));
     }
     const buttons = [];
     for (const option of choices.options) {
-      const button = box.createEl("button", {
+      const button2 = box.createEl("button", {
         cls: "vam-map-chat-choice",
         text: option.label,
         attr: { type: "button" }
       });
-      button.disabled = choices.picked;
-      buttons.push(button);
-      button.addEventListener("click", () => {
+      button2.disabled = choices.picked;
+      buttons.push(button2);
+      button2.addEventListener("click", () => {
         if (choices.picked) return;
         choices.picked = true;
         for (const other of buttons) other.disabled = true;
@@ -56579,9 +57098,9 @@ var ChatImageFinder = class {
     const cover = await this.coverBytes(block, candidate, signal);
     if (!alive()) return { ok: false, reason: t("ui.map_chat_images_stale_map") };
     const work = () => this.ports.write(block, candidate, alive, cover);
-    const run = this.writes.then(work, work);
-    this.writes = run.catch(() => void 0);
-    return run;
+    const run2 = this.writes.then(work, work);
+    this.writes = run2.catch(() => void 0);
+    return run2;
   }
   /** A download that ends when the search is stopped or after {@link CHAT_IMAGE_DOWNLOAD_MS}, whichever comes first. */
   download(url, signal) {
@@ -56856,9 +57375,9 @@ var PAUSE_REASON_KEY = {
   limit: "ui.argument_paused_reason_limit"
 };
 function pausedParts(state, phase, t2) {
-  const run = state.run;
-  if (run.status !== "paused" || run.phase !== phase) return null;
-  const reason = run.stopReason === void 0 ? void 0 : PAUSE_REASON_KEY[run.stopReason];
+  const run2 = state.run;
+  if (run2.status !== "paused" || run2.phase !== phase) return null;
+  const reason = run2.stopReason === void 0 ? void 0 : PAUSE_REASON_KEY[run2.stopReason];
   const lines = reason ? [t2("ui.argument_reason_0", t2(reason))] : [];
   if (isLegacyFacetMap(state))
     return {
@@ -57162,7 +57681,7 @@ function facetSituationCard(state, t2) {
     const line2 = t2(
       "ui.argument_facets_summary_0_1",
       facets.length,
-      parts.filter(([, count3]) => count3 > 0).map(([key4, count3]) => t2(key4, count3)).join(t2("ui.argument_list_sep"))
+      parts.filter(([, count4]) => count4 > 0).map(([key4, count4]) => t2(key4, count4)).join(t2("ui.argument_list_sep"))
     );
     if (type === "fact") return { ...base, lines: [line2], label: [kind, typeText, line2].join(", ") };
     return finish2({ tone: "yes", text: t2("ui.argument_gate_premise_holds") }, [line2]);
@@ -57180,11 +57699,11 @@ function facetSituationCard(state, t2) {
     ]);
   if (gate.state === "pending") {
     const data = state.situation.data;
-    const count3 = t2("ui.argument_data_count_0_1", data.filter((d) => d.state === "found").length, data.length);
+    const count4 = t2("ui.argument_data_count_0_1", data.filter((d) => d.state === "found").length, data.length);
     const paused = pausedParts(state, "situation", t2);
     if (paused)
-      return { ...finish2(paused.chip, [count3, ...paused.lines]), ...paused.resume ? { resume: paused.resume } : {} };
-    return finish2({ tone: "open", text: t2("ui.argument_gate_pending") }, [count3]);
+      return { ...finish2(paused.chip, [count4, ...paused.lines]), ...paused.resume ? { resume: paused.resume } : {} };
+    return finish2({ tone: "open", text: t2("ui.argument_gate_pending") }, [count4]);
   }
   if (gate.kind === "data_insufficient")
     return finish2({ tone: "maybe", text: t2("ui.argument_gate_insufficient") }, [
@@ -57238,18 +57757,18 @@ function describeArgumentCard(state, id, t2) {
   if (id === roles.situation) {
     const data = state.situation.data;
     const found = data.filter((datum2) => datum2.state === "found").length;
-    const count3 = t2("ui.argument_data_count_0_1", found, data.length);
+    const count4 = t2("ui.argument_data_count_0_1", found, data.length);
     const gate = state.situation.gate.state;
     if (gate === "matched")
       return plain("situation", t2("ui.argument_situation"), [t2("ui.argument_gate_matched_0_1", found, data.length)]);
     const paused = gate === "pending" ? pausedParts(state, "situation", t2) : null;
     if (paused)
       return {
-        ...plain("situation", t2("ui.argument_situation"), [count3, ...paused.lines], [paused.chip]),
+        ...plain("situation", t2("ui.argument_situation"), [count4, ...paused.lines], [paused.chip]),
         ...paused.resume ? { resume: paused.resume } : {}
       };
     const chip = gate === "unmatched" ? { tone: "no", text: t2("ui.argument_gate_unmatched") } : { tone: "open", text: t2("ui.argument_gate_pending") };
-    return plain("situation", t2("ui.argument_situation"), [count3], [chip]);
+    return plain("situation", t2("ui.argument_situation"), [count4], [chip]);
   }
   if (((_a2 = state.situation.assumptions) == null ? void 0 : _a2.id) === id) return assumptionsCard(state, t2);
   const facet = (_b2 = state.situation.facets) == null ? void 0 : _b2.find((f) => f.id === id);
@@ -57270,9 +57789,9 @@ function describeArgumentCard(state, id, t2) {
     ]);
   if (id === roles.eliminated) {
     const cut = state.hypotheses.filter(isLimitCut).length;
-    const count3 = state.hypotheses.filter((h) => h.location === "eliminated").length - cut;
+    const count4 = state.hypotheses.filter((h) => h.location === "eliminated").length - cut;
     return plain("group", t2("ui.argument_group_label"), [
-      t2("ui.argument_group_eliminated_count_0", count3),
+      t2("ui.argument_group_eliminated_count_0", count4),
       ...cut && !roles.unconfirmed ? [t2("ui.argument_group_unverified_count_0", cut)] : []
     ]);
   }
@@ -57296,8 +57815,8 @@ function renderArgumentCardBody(card, view, onAction, onResume) {
   if (view.dashed) card.dataset.argumentMissing = "true";
   const body = card.createDiv({ cls: "vam-argument-body" });
   if (view.chips.length) {
-    const row = body.createDiv({ cls: "vam-argument-chips" });
-    for (const chip of view.chips) row.createSpan({ cls: `vam-argument-chip is-${chip.tone}`, text: chip.text });
+    const row2 = body.createDiv({ cls: "vam-argument-chips" });
+    for (const chip of view.chips) row2.createSpan({ cls: `vam-argument-chip is-${chip.tone}`, text: chip.text });
   }
   if ((_a2 = view.definitions) == null ? void 0 : _a2.length) {
     const list2 = body.createEl("dl", { cls: "vam-argument-definitions" });
@@ -57312,22 +57831,22 @@ function renderArgumentCardBody(card, view, onAction, onResume) {
   return body;
 }
 function renderArgumentAction(body, action, onAction) {
-  const button = body.createEl("button", { cls: "vam-argument-action", text: action.text });
-  button.setAttr("type", "button");
-  button.setAttr("aria-label", action.ariaLabel);
+  const button2 = body.createEl("button", { cls: "vam-argument-action", text: action.text });
+  button2.setAttr("type", "button");
+  button2.setAttr("aria-label", action.ariaLabel);
   for (const type of ["pointerdown", "mousedown", "dblclick", "keydown"])
-    button.addEventListener(type, (event) => event.stopPropagation());
-  button.addEventListener("click", (event) => {
+    button2.addEventListener(type, (event) => event.stopPropagation());
+  button2.addEventListener("click", (event) => {
     event.stopPropagation();
-    onAction == null ? void 0 : onAction(button);
+    onAction == null ? void 0 : onAction(button2);
   });
-  return button;
+  return button2;
 }
 
 // experiences/visual-map/argument-rerun.ts
 var ENTITY = { lt: "<", gt: ">", amp: "&" };
 var narrow = (c) => String.fromCharCode(c.charCodeAt(0) - 65248);
-var narrowRun = (run) => [...run].map(narrow).join("");
+var narrowRun = (run2) => [...run2].map(narrow).join("");
 var decode = (text10) => text10.replace(
   /&(?:#(\d{1,5})|(lt|gt|amp));/g,
   (_m, code3, name2) => code3 ? String.fromCodePoint(Number(code3)) : ENTITY[name2]
@@ -57335,8 +57854,8 @@ var decode = (text10) => text10.replace(
   /^(?:([＋－＞])|(\d+)([．）]))/,
   (_m, mark2, digits, ordered) => digits ? `${digits}${ordered === "\uFF0E" ? "." : ")"}` : narrow(mark2)
 ).replace(/[＼｀＊＿＾＃＄［］＜｜]/g, narrow).replace(/％{2,}|＝{2,}|～{2,}/g, narrowRun).replace(/＆(?=#|\w+;)/g, narrow).replace(/：+(?=\/)|：{2,}/g, narrowRun).replace(/\bwww．/gi, (m) => `${m.slice(0, 3)}.`);
-var cells = (row) => row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|");
-var isSeparator = (row) => cells(row).every((cell2) => /^\s*:?-{3,}:?\s*$/.test(cell2));
+var cells = (row2) => row2.trim().replace(/^\|/, "").replace(/\|$/, "").split("|");
+var isSeparator = (row2) => cells(row2).every((cell2) => /^\s*:?-{3,}:?\s*$/.test(cell2));
 function parseDefinitionsTable(detail) {
   const lines = detail.split(/\r?\n/);
   const start = lines.findIndex((line2) => line2.trim().startsWith("|"));
@@ -57348,8 +57867,8 @@ function parseDefinitionsTable(detail) {
   }
   if (block.length < 3 || cells(block[0]).length !== 3 || !isSeparator(block[1])) return null;
   const items = [];
-  for (const row of block.slice(2)) {
-    const parts = cells(row);
+  for (const row2 of block.slice(2)) {
+    const parts = cells(row2);
     if (parts.length !== 3) return null;
     const [label, value, reason] = parts.map((part) => decode(part.trim()));
     if (!label || !value || !reason || label === "-" || value === "-") return null;
@@ -57389,17 +57908,17 @@ async function rerunWithAssumptions(ports) {
 
 // experiences/visual-map/argument-progress.ts
 function describeArgumentProgress(state, owned, t2) {
-  const run = state.run;
-  const used = t2("ui.argument_bar_used_0_1", run.researchCalls, MAX_RESEARCH_CALLS);
-  if (run.status === "finished" || run.phase === "concluded" || run.phase === "stopped_mismatch" || run.phase === "stopped_limit")
+  const run2 = state.run;
+  const used = t2("ui.argument_bar_used_0_1", run2.researchCalls, MAX_RESEARCH_CALLS);
+  if (run2.status === "finished" || run2.phase === "concluded" || run2.phase === "stopped_mismatch" || run2.phase === "stopped_limit")
     return {
       tone: "done",
       title: t2("ui.argument_bar_finished"),
       detail: t2("ui.argument_bar_see_conclusion"),
-      count: t2("ui.argument_bar_total_0", run.researchCalls),
+      count: t2("ui.argument_bar_total_0", run2.researchCalls),
       action: null
     };
-  if (run.status === "running") {
+  if (run2.status === "running") {
     if (!owned)
       return {
         tone: "warn",
@@ -57407,7 +57926,7 @@ function describeArgumentProgress(state, owned, t2) {
         detail: t2("ui.argument_bar_no_auto_rerun"),
         action: null
       };
-    if (run.phase === "situation") {
+    if (run2.phase === "situation") {
       const searching2 = state.situation.data.filter((datum) => datum.state === "searching").length;
       return {
         tone: "run",
@@ -57438,14 +57957,14 @@ function describeArgumentProgress(state, owned, t2) {
       count: used,
       action: null
     };
-  if (run.stopReason === "interrupted")
+  if (run2.stopReason === "interrupted")
     return {
       tone: "warn",
       title: t2("ui.argument_bar_interrupted"),
       detail: t2("ui.argument_bar_no_auto_rerun"),
       action: "resume"
     };
-  if (run.stopReason === "error")
+  if (run2.stopReason === "error")
     return { tone: "warn", title: t2("ui.argument_bar_paused"), detail: t2("ui.argument_bar_error"), action: "resume" };
   return {
     tone: "paused",
@@ -58028,8 +58547,8 @@ var MapChatRecordWriter = class {
     return ((_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date()).toISOString();
   }
   enqueue(task, fallback) {
-    const run = this.chain.then(() => this.dead() ? fallback : task());
-    const safe2 = run.catch((error) => {
+    const run2 = this.chain.then(() => this.dead() ? fallback : task());
+    const safe2 = run2.catch((error) => {
       this.deps.log("error", `Map chat record: ${errorText2(error)}`);
       return fallback;
     });
@@ -58061,9 +58580,9 @@ var MapChatRecordWriter = class {
     const vault = this.deps.app.vault;
     if (!conv.file && conv.adapterPath) {
       if (this.dead()) return;
-      const count4 = conv.pending.length;
-      await vault.adapter.append(conv.adapterPath, conv.pending.slice(0, count4).join(""));
-      conv.pending.splice(0, count4);
+      const count5 = conv.pending.length;
+      await vault.adapter.append(conv.adapterPath, conv.pending.slice(0, count5).join(""));
+      conv.pending.splice(0, count5);
       conv.held = false;
       return;
     }
@@ -58098,9 +58617,9 @@ var MapChatRecordWriter = class {
       conv.root = root;
     }
     if (this.dead()) return;
-    const count3 = conv.pending.length;
-    await vault.append(conv.file, conv.pending.slice(0, count3).join(""));
-    conv.pending.splice(0, count3);
+    const count4 = conv.pending.length;
+    await vault.append(conv.file, conv.pending.slice(0, count4).join(""));
+    conv.pending.splice(0, count4);
     conv.held = false;
   }
   /** The conversation's file as the Vault knows it now: by the handle's own path, then by the path this writer made. */
@@ -58540,7 +59059,7 @@ var MapChatChainRunner = class {
       return live2;
     }
     if (live2) this.interruptChain(live2, "user_took_over");
-    const run = {
+    const run2 = {
       seq: ++this.seq,
       state: origin ? { ...origin.state, phase: "round" } : this.ports.autoApply() ? startAutoChain() : startChain(),
       anchor,
@@ -58564,20 +59083,20 @@ var MapChatChainRunner = class {
       retriedRound: null,
       appliedText: ""
     };
-    this.current = run;
-    return run;
+    this.current = run2;
+    return run2;
   }
   /**
    * A round of an auto-apply chain failed (provider timeout, transient or format failure): the same round is sent once more, at once,
    * counting as one more call of the chain. Only the live, un-stopped chain of this round is retried (a Stop or a new message has
    * already ended it); a second failure of the round ends the chain as `failed` as usual. Returns whether a retry was started.
    */
-  retryAutoRound(run, origin) {
-    if (!this.ports.autoApply() || run.retriedRound === run.state.round || this.current !== run || run.state.phase !== "round" || this.ports.closed() || this.ports.applying() || !this.ports.map() || this.ports.notesLoading() || !origin.text)
+  retryAutoRound(run2, origin) {
+    if (!this.ports.autoApply() || run2.retriedRound === run2.state.round || this.current !== run2 || run2.state.phase !== "round" || this.ports.closed() || this.ports.applying() || !this.ports.map() || this.ports.notesLoading() || !origin.text)
       return false;
-    run.retriedRound = run.state.round;
-    run.state = { ...run.state, calls: run.state.calls + 1 };
-    this.ports.send({ ...origin }, void 0, run);
+    run2.retriedRound = run2.state.round;
+    run2.state = { ...run2.state, calls: run2.state.calls + 1 };
+    this.ports.send({ ...origin }, void 0, run2);
     return true;
   }
   /** The cards of an earlier AI selection that are still on the map. */
@@ -58626,92 +59145,92 @@ var MapChatChainRunner = class {
     return segment * Math.ceil(round3 / segment);
   }
   /** The continuation is more than a single answer (a later round, or one that said something was left): its end is told and recorded. */
-  chainShows(run) {
-    return run.state.round >= 2 || !!run.replyRemaining || !!run.state.remaining;
+  chainShows(run2) {
+    return run2.state.round >= 2 || !!run2.replyRemaining || !!run2.state.remaining;
   }
   /** Ends the chain from the outside (Stop, a new message, a failure, a map change): the first ending wins, a later one changes nothing. */
-  interruptChain(run, reason) {
-    if (!run) return;
-    const step = interrupt(run.state, reason);
+  interruptChain(run2, reason) {
+    if (!run2) return;
+    const step = interrupt(run2.state, reason);
     if (step.decision.kind !== "end") return;
-    const applied = run.state.phase === "waiting";
-    run.state = step.state;
-    this.endChatChain(run, reason, run.replyRemaining || step.decision.remaining, applied);
+    const applied = run2.state.phase === "waiting";
+    run2.state = step.state;
+    this.endChatChain(run2, reason, run2.replyRemaining || step.decision.remaining, applied);
   }
   /** The chain is over: its timer and wait go, the end is recorded, and (unless it simply finished) the panel says why. */
-  endChatChain(run, reason, remaining, applied = true) {
+  endChatChain(run2, reason, remaining, applied = true) {
     var _a2;
-    if (this.current === run) this.current = null;
-    if (run.timer !== null) window.clearTimeout(run.timer);
-    run.timer = null;
-    run.state = { ...run.state, phase: "ended" };
+    if (this.current === run2) this.current = null;
+    if (run2.timer !== null) window.clearTimeout(run2.timer);
+    run2.timer = null;
+    run2.state = { ...run2.state, phase: "ended" };
     if (this.ports.closed()) return;
     const chat = this.ports.panel();
-    if (run.waitShown) chat == null ? void 0 : chat.setChainWaiting(null);
-    run.waitShown = false;
-    if (!this.chainShows(run)) return;
-    const calls = run.state.autoApply ? run.state.calls : void 0;
+    if (run2.waitShown) chat == null ? void 0 : chat.setChainWaiting(null);
+    run2.waitShown = false;
+    if (!this.chainShows(run2)) return;
+    const calls = run2.state.autoApply ? run2.state.calls : void 0;
     (_a2 = this.ports.lastRecord()) == null ? void 0 : _a2.event("chain_end", {
       reason,
-      round: run.state.round,
+      round: run2.state.round,
       remaining,
       ...calls === void 0 ? {} : { calls }
     });
-    if (chat && (chainEndNeedsNotice(reason) || reason === "done" && run.state.round >= 2)) {
+    if (chat && (chainEndNeedsNotice(reason) || reason === "done" && run2.state.round >= 2)) {
       const next = reason === "failed" ? null : resumeRound(
         {
           reason,
-          round: run.state.round,
+          round: run2.state.round,
           applied,
-          startRemaining: run.roundRemaining,
+          startRemaining: run2.roundRemaining,
           replyRemaining: remaining
         },
-        run.state.autoApply ? MAP_CHAT_AUTO_MAX_ROUNDS : MAP_CHAT_CHAIN_MAX_ROUNDS
+        run2.state.autoApply ? MAP_CHAT_AUTO_MAX_ROUNDS : MAP_CHAT_CHAIN_MAX_ROUNDS
       );
-      const details = run.details.length ? run.details : void 0;
+      const details = run2.details.length ? run2.details : void 0;
       if (calls === void 0) chat.endChain(reason, remaining, details);
       else chat.endChain(reason, remaining, details, calls);
       if (next)
         chat.offerResume({
           ...next,
-          ...run.state.progress ? { progress: run.state.progress } : {},
-          stoppedRound: run.state.round,
+          ...run2.state.progress ? { progress: run2.state.progress } : {},
+          stoppedRound: run2.state.round,
           reason,
-          message: run.message,
-          selectedIds: run.aiSelection ? [...run.aiSelection] : [],
-          lastResults: run.lastResults.map((line2) => ({ text: line2.text, status: line2.status }))
+          message: run2.message,
+          selectedIds: run2.aiSelection ? [...run2.aiSelection] : [],
+          lastResults: run2.lastResults.map((line2) => ({ text: line2.text, status: line2.status }))
         });
     }
   }
   /** Stop on a continuation: what the chain started and still runs (research, expansions) stops; what was written stays. */
-  stopChainWork(run) {
-    const work = run.work;
+  stopChainWork(run2) {
+    const work = run2.work;
     if (!work) return;
     work.controller.abort();
     for (const key4 of work.researchKeys) this.ports.stopResearch(key4);
   }
   /** A round ended with its reply applied (or its plan): the chain goes on, waits or ends, unless the user spoke meanwhile. */
-  finishChatRound(run, round3) {
+  finishChatRound(run2, round3) {
     var _a2;
-    if ((_a2 = this.ports.panel()) == null ? void 0 : _a2.hasQueuedSteers()) this.interruptChain(run, "user_took_over");
-    else this.advanceChain(run, round3);
+    if ((_a2 = this.ports.panel()) == null ? void 0 : _a2.hasQueuedSteers()) this.interruptChain(run2, "user_took_over");
+    else this.advanceChain(run2, round3);
     this.ports.flushSteers(true);
   }
-  advanceChain(run, round3) {
+  advanceChain(run2, round3) {
     var _a2, _b2;
-    if (this.current !== run || run.state.phase === "ended") return;
-    run.partial = null;
-    for (const id of round3.work.created) run.createdIds.add(id);
-    if (round3.work.selected) run.aiSelection = [...round3.work.selected];
-    run.lastResults = chatResultLines(round3.lines).map((line2) => ({ text: line2.text, status: line2.status }));
-    run.anchor = { path: round3.anchor.path, id: round3.anchor.id };
-    run.state = syncAutoApply(run.state, this.ports.autoApply());
+    if (this.current !== run2 || run2.state.phase === "ended") return;
+    run2.partial = null;
+    for (const id of round3.work.created) run2.createdIds.add(id);
+    if (round3.work.selected) run2.aiSelection = [...round3.work.selected];
+    run2.lastResults = chatResultLines(round3.lines).map((line2) => ({ text: line2.text, status: line2.status }));
+    run2.anchor = { path: round3.anchor.path, id: round3.anchor.id };
+    run2.state = syncAutoApply(run2.state, this.ports.autoApply());
     const appliedActions = round3.result.actions.filter((_, index) => {
       var _a3;
       return ((_a3 = round3.lines[index]) == null ? void 0 : _a3.status) === "done";
     });
-    run.appliedText = run.state.autoApply ? this.appliedDirectlyText(appliedActions, round3.context.selectedCount) : "";
-    const step = finishRound(run.state, {
+    run2.appliedText = run2.state.autoApply ? this.appliedDirectlyText(appliedActions, round3.context.selectedCount) : "";
+    const step = finishRound(run2.state, {
       // The round's own request plus the AI calls its applied actions started (counted for the auto-apply limit).
       calls: 1 + estimateChatCalls(appliedActions, round3.context, {
         diagrams: this.ports.diagrams(),
@@ -58735,25 +59254,25 @@ var MapChatChainRunner = class {
         otherBackground: round3.work.otherBackground
       }
     });
-    run.state = step.state;
+    run2.state = step.state;
     this.showChainFlow(
-      run,
+      run2,
       step.decision.kind === "end" && step.decision.reason === "done" && !step.decision.remaining.trim()
     );
-    this.followChainDecision(run, step.decision, round3.work);
+    this.followChainDecision(run2, step.decision, round3.work);
   }
   /**
    * The whole-flow block follows the chain: only an auto-apply chain shows it (the panel hides it for fewer than two steps). A chain
    * that ended done with nothing left shows every step done, even when the last reply did not move the statuses.
    */
-  showChainFlow(run, finished = false) {
+  showChainFlow(run2, finished = false) {
     var _a2;
-    const progress = run.state.progress;
-    if (!run.state.autoApply || !progress) return;
+    const progress = run2.state.progress;
+    if (!run2.state.autoApply || !progress) return;
     (_a2 = this.ports.panel()) == null ? void 0 : _a2.setFlowProgress({
       steps: progress.steps.map((step) => ({ ...step, ...finished ? { status: "done" } : {} })),
-      round: run.state.round,
-      calls: run.state.calls,
+      round: run2.state.round,
+      calls: run2.state.calls,
       maxCalls: MAP_CHAT_AUTO_MAX_CALLS
     });
   }
@@ -58771,33 +59290,33 @@ var MapChatChainRunner = class {
     ].filter(Boolean);
     return parts.join(t("ui.map_chat_chain_detail_separator"));
   }
-  followChainDecision(run, decision, work) {
-    if (decision.kind === "end") this.endChatChain(run, decision.reason, decision.remaining);
-    else if (decision.kind === "wait" && work) this.waitForChain(run, decision.waitFor, work);
-    else if (decision.kind === "next") this.startNextRound(run, decision.round, decision.remaining);
+  followChainDecision(run2, decision, work) {
+    if (decision.kind === "end") this.endChatChain(run2, decision.reason, decision.remaining);
+    else if (decision.kind === "wait" && work) this.waitForChain(run2, decision.waitFor, work);
+    else if (decision.kind === "next") this.startNextRound(run2, decision.round, decision.remaining);
   }
   /** Waits for the research and expansions the round started; the 30 minutes only end the chain, never the work (auto-apply: 30 minutes with none finishing). */
-  waitForChain(run, waitFor, work) {
+  waitForChain(run2, waitFor, work) {
     const chat = this.ports.panel();
     const research = waitFor.includes("research") ? work.research : [];
     const expand2 = waitFor.includes("expand") ? work.expand : [];
     const waiting = { kinds: waitFor, total: (research.length ? work.researchTargets : 0) + expand2.length, settled: 0 };
-    chat == null ? void 0 : chat.setChainWaiting(waiting, run.state.remaining);
-    run.waitShown = true;
+    chat == null ? void 0 : chat.setChainWaiting(waiting, run2.state.remaining);
+    run2.waitShown = true;
     const progress = (by) => {
       var _a2;
-      if (this.current !== run || run.state.phase !== "waiting") return;
+      if (this.current !== run2 || run2.state.phase !== "waiting") return;
       waiting.settled = Math.min(waiting.total, waiting.settled + by);
-      (_a2 = this.ports.panel()) == null ? void 0 : _a2.setChainWaiting(waiting, run.state.remaining);
+      (_a2 = this.ports.panel()) == null ? void 0 : _a2.setChainWaiting(waiting, run2.state.remaining);
       if (this.ports.autoApply()) {
-        if (run.timer !== null) window.clearTimeout(run.timer);
+        if (run2.timer !== null) window.clearTimeout(run2.timer);
         arm();
       }
     };
     const arm = () => {
-      run.timer = window.setTimeout(() => {
-        run.timer = null;
-        this.settleChainWait(run, { timedOut: true }, []);
+      run2.timer = window.setTimeout(() => {
+        run2.timer = null;
+        this.settleChainWait(run2, { timedOut: true }, []);
       }, MAP_CHAT_CHAIN_WAIT_MS);
     };
     arm();
@@ -58837,7 +59356,7 @@ var MapChatChainRunner = class {
       );
     void Promise.all(pending2).then(
       () => this.settleChainWait(
-        run,
+        run2,
         {
           ...researched ? { research: researched } : {},
           ...expand2.length ? { expand: { succeeded: expandSucceeded, failed: expandFailed } } : {}
@@ -58847,65 +59366,65 @@ var MapChatChainRunner = class {
     );
   }
   /** What the chain waited for is over (or the 30 minutes are). A late or repeated call, for a chain that has moved on, changes nothing. */
-  settleChainWait(run, end, waited) {
+  settleChainWait(run2, end, waited) {
     var _a2, _b2;
-    if (this.current !== run || run.state.phase !== "waiting") return;
-    if (run.timer !== null) window.clearTimeout(run.timer);
-    run.timer = null;
+    if (this.current !== run2 || run2.state.phase !== "waiting") return;
+    if (run2.timer !== null) window.clearTimeout(run2.timer);
+    run2.timer = null;
     const chat = this.ports.panel();
-    if (this.ports.closed() || !chat || this.ports.path() !== run.anchor.path || ((_a2 = this.ports.map()) == null ? void 0 : _a2.id) !== run.anchor.id || run.turn !== null && !chat.hasTurn(run.turn)) {
-      this.interruptChain(run, "map_changed");
+    if (this.ports.closed() || !chat || this.ports.path() !== run2.anchor.path || ((_a2 = this.ports.map()) == null ? void 0 : _a2.id) !== run2.anchor.id || run2.turn !== null && !chat.hasTurn(run2.turn)) {
+      this.interruptChain(run2, "map_changed");
       return;
     }
     chat.setChainWaiting(null);
-    run.waitShown = false;
-    run.waited = waited.map((item) => ({
+    run2.waitShown = false;
+    run2.waited = waited.map((item) => ({
       id: item.id,
       title: item.title,
       status: item.status,
       ...item.error ? { error: item.error } : {}
     }));
-    run.details = waited.filter((item) => item.status !== "succeeded").map(chainWorkDetail);
-    const step = finishWait(run.state, end);
-    run.state = step.state;
-    run.partial = step.decision.kind === "next" && ((_b2 = end.research) == null ? void 0 : _b2.kind) === "settled" && end.research.failed > 0 && end.research.succeeded > 0 ? { failed: end.research.failed, succeeded: end.research.succeeded } : null;
-    this.followChainDecision(run, step.decision, null);
+    run2.details = waited.filter((item) => item.status !== "succeeded").map(chainWorkDetail);
+    const step = finishWait(run2.state, end);
+    run2.state = step.state;
+    run2.partial = step.decision.kind === "next" && ((_b2 = end.research) == null ? void 0 : _b2.kind) === "settled" && end.research.failed > 0 && end.research.succeeded > 0 ? { failed: end.research.failed, succeeded: end.research.succeeded } : null;
+    this.followChainDecision(run2, step.decision, null);
   }
   /** Round `round` of the chain begins now, as a message of its own: the same preparation, request, plan rules and apply as any send. */
-  startNextRound(run, round3, remaining) {
+  startNextRound(run2, round3, remaining) {
     var _a2;
     const chat = this.ports.panel();
-    if (this.ports.closed() || !chat || this.ports.path() !== run.anchor.path || ((_a2 = this.ports.map()) == null ? void 0 : _a2.id) !== run.anchor.id || run.turn !== null && !chat.hasTurn(run.turn)) {
-      this.interruptChain(run, "map_changed");
+    if (this.ports.closed() || !chat || this.ports.path() !== run2.anchor.path || ((_a2 = this.ports.map()) == null ? void 0 : _a2.id) !== run2.anchor.id || run2.turn !== null && !chat.hasTurn(run2.turn)) {
+      this.interruptChain(run2, "map_changed");
       return;
     }
     if (chat.isBusy || this.ports.applying()) {
-      this.interruptChain(run, "user_took_over");
+      this.interruptChain(run2, "user_took_over");
       return;
     }
     const origin = {
-      text: run.message,
+      text: run2.message,
       // The chips of the user's message go with every round (the source of an attached file is what "each one" is checked against);
       // a picture is sent with the first round only and a follow-up adds no chip.
-      chips: [...run.chips],
-      selectedIds: run.aiSelection ? this.chainSelection(run.aiSelection) : this.ports.selectionIds(),
+      chips: [...run2.chips],
+      selectedIds: run2.aiSelection ? this.chainSelection(run2.aiSelection) : this.ports.selectionIds(),
       chain: {
-        seq: run.seq,
-        ...run.aiSelection ? { aiSelection: [...run.aiSelection] } : {},
-        state: run.state,
-        createdIds: [...run.createdIds],
+        seq: run2.seq,
+        ...run2.aiSelection ? { aiSelection: [...run2.aiSelection] } : {},
+        state: run2.state,
+        createdIds: [...run2.createdIds],
         continuation: {
           round: round3,
-          maxRounds: run.state.maxRounds,
+          maxRounds: run2.state.maxRounds,
           remaining,
-          lastResults: run.lastResults,
-          research: run.waited,
-          ...run.state.progress ? { progress: run.state.progress } : {},
-          ...run.state.checkingDone ? { checkDone: true } : {}
+          lastResults: run2.lastResults,
+          research: run2.waited,
+          ...run2.state.progress ? { progress: run2.state.progress } : {},
+          ...run2.state.checkingDone ? { checkDone: true } : {}
         }
       }
     };
-    run.work = null;
+    run2.work = null;
     this.ports.send(origin);
   }
 };
@@ -59092,7 +59611,7 @@ var MapChatConversation = class {
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */
-  offerChatPlan(result, plan, baseline, anchor, message, record = null, run = null) {
+  offerChatPlan(result, plan, baseline, anchor, message, record = null, run2 = null) {
     const chat = this.ports.panel();
     if (!chat) return;
     const token = ++this.planToken;
@@ -59120,7 +59639,7 @@ var MapChatConversation = class {
       reasons: plan.reasons.map(
         (reason) => {
           var _a2;
-          return this.planReasonText(reason, result, baseline.selectedCount, (_a2 = run == null ? void 0 : run.state.researchTargets) != null ? _a2 : 0);
+          return this.planReasonText(reason, result, baseline.selectedCount, (_a2 = run2 == null ? void 0 : run2.state.researchTargets) != null ? _a2 : 0);
         }
       ),
       items,
@@ -59129,7 +59648,7 @@ var MapChatConversation = class {
       // Undo takes the plan's changes back; only the AI work it starts is said to stay.
       aiWork: result.actions.some((action) => action.kind === "run_map_action"),
       state: "pending",
-      apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor, run),
+      apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor, run2),
       cancel: () => {
         var _a2, _b2;
         if (token !== this.planToken) return;
@@ -59137,13 +59656,13 @@ var MapChatConversation = class {
         this.ports.clearPreview();
         (_a2 = this.ports.panel()) == null ? void 0 : _a2.settlePlan(card, "cancelled");
         (_b2 = this.ports.plans().get(card)) == null ? void 0 : _b2.plan("cancelled");
-        this.ports.chain().interruptChain(run, "plan_cancelled");
+        this.ports.chain().interruptChain(run2, "plan_cancelled");
       }
     };
     if (record) this.ports.plans().set(card, record);
     chat.showPlan(card);
   }
-  async applyChatPlan(card, token, result, baseline, anchor, run = null) {
+  async applyChatPlan(card, token, result, baseline, anchor, run2 = null) {
     var _a2, _b2, _c, _d;
     const chat = this.ports.panel();
     if (!chat || this.ports.closed() || token !== this.planToken || chat.isBusy || this.applying) return;
@@ -59151,7 +59670,7 @@ var MapChatConversation = class {
     if (!map || this.ports.path() !== anchor.path || map.id !== anchor.id) {
       this.planToken++;
       this.ports.clearPreview();
-      this.ports.chain().interruptChain(run, "map_changed");
+      this.ports.chain().interruptChain(run2, "map_changed");
       const skip = [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }];
       chat.settlePlan(card, "cancelled", skip);
       (_a2 = this.ports.plans().get(card)) == null ? void 0 : _a2.plan("cancelled", skip);
@@ -59165,14 +59684,14 @@ var MapChatConversation = class {
     const stopped = () => token !== this.planToken;
     let lines;
     const work = newChatWork();
-    if (run) run.work = work;
+    if (run2) run2.work = work;
     const live2 = { path: anchor.path, id: anchor.id };
     try {
       lines = await this.ports.applyActions(result, baseline, () => token === this.planToken, live2, {
         context: baseline,
         work,
-        continuation: ((_b2 = run == null ? void 0 : run.state.round) != null ? _b2 : 1) > 1,
-        chain: run
+        continuation: ((_b2 = run2 == null ? void 0 : run2.state.round) != null ? _b2 : 1) > 1,
+        chain: run2
       });
     } catch (error) {
       lines = [{ status: "failed", text: errorMessage4(error) }];
@@ -59183,12 +59702,12 @@ var MapChatConversation = class {
     if (!this.ports.closed()) {
       lines = (_c = chat.settlePlan(card, "applied", lines)) != null ? _c : lines;
       (_d = this.ports.plans().get(card)) == null ? void 0 : _d.plan(this.planStopped ? "stopped" : "applied", lines);
-      if (run) {
+      if (run2) {
         if (stopped()) {
-          if (this.ports.chain().chainShows(run)) this.ports.chain().stopChainWork(run);
-          this.ports.chain().interruptChain(run, "stopped");
-        } else if (chat.hasQueuedSteers()) this.ports.chain().interruptChain(run, "user_took_over");
-        else this.ports.chain().advanceChain(run, { result, context: baseline, lines, work, anchor: live2 });
+          if (this.ports.chain().chainShows(run2)) this.ports.chain().stopChainWork(run2);
+          this.ports.chain().interruptChain(run2, "stopped");
+        } else if (chat.hasQueuedSteers()) this.ports.chain().interruptChain(run2, "user_took_over");
+        else this.ports.chain().advanceChain(run2, { result, context: baseline, lines, work, anchor: live2 });
       }
       this.flushSteers(!stopped());
     }
@@ -59223,24 +59742,24 @@ var MapChatConversation = class {
       ...imageId ? { imageId } : {}
     };
     const anchor = { path: this.ports.path(), id: (_a2 = this.ports.map()) == null ? void 0 : _a2.id };
-    const run = retryOf && !autoOrigin ? retryOf : this.ports.chain().chainForRound(autoOrigin, anchor, message);
-    if (run === retryOf) run.message = message;
-    run.chips = [...origin.chips];
+    const run2 = retryOf && !autoOrigin ? retryOf : this.ports.chain().chainForRound(autoOrigin, anchor, message);
+    if (run2 === retryOf) run2.message = message;
+    run2.chips = [...origin.chips];
     const draft = chat.draft;
     const turn = autoOrigin ? chat.beginAutoRound(
-      run.state.round,
-      run.state.maxRounds,
-      run.state.remaining,
+      run2.state.round,
+      run2.state.maxRounds,
+      run2.state.remaining,
       origin,
-      (_b2 = run.partial) != null ? _b2 : void 0,
-      ...run.state.autoApply ? [{ calls: run.state.calls, applied: run.appliedText }] : []
+      (_b2 = run2.partial) != null ? _b2 : void 0,
+      ...run2.state.autoApply ? [{ calls: run2.state.calls, applied: run2.appliedText }] : []
     ) : chat.begin(message, origin, Boolean(again), "preparing");
-    run.turn = turn;
+    run2.turn = turn;
     let sent = false;
     const abandon = (reason, ends = "map_changed") => {
       if (this.prepAbandon === stopPreparing) this.prepAbandon = null;
       const retracted = chat.retract(turn, again ? restore : draft);
-      this.ports.chain().interruptChain(run, ends);
+      this.ports.chain().interruptChain(run2, ends);
       if (!retracted) return;
       if (reason !== void 0 && (!autoOrigin || ends === "failed")) this.ports.notice(reason);
     };
@@ -59261,8 +59780,8 @@ var MapChatConversation = class {
         },
         onChange: (reason) => {
           var _a3;
-          for (const [entry, row] of steerRows)
-            if (entry.state === "queued") (_a3 = this.ports.panel()) == null ? void 0 : _a3.setSteerState(row, "queued");
+          for (const [entry, row2] of steerRows)
+            if (entry.state === "queued") (_a3 = this.ports.panel()) == null ? void 0 : _a3.setSteerState(row2, "queued");
           if (reason) origin.text = [message, ...steerState.steers.delivered()].join("\n\n");
         }
       })
@@ -59293,7 +59812,7 @@ var MapChatConversation = class {
           sent = true;
           if (this.prepAbandon === stopPreparing) this.prepAbandon = null;
           const record = this.ports.beginRecord(turn, request, origin);
-          run.record = record;
+          run2.record = record;
           if (record) record.steerTexts = () => steerState.steers.delivered();
           const turnController = new AbortController();
           const key4 = this.ports.taskKey();
@@ -59362,16 +59881,16 @@ var MapChatConversation = class {
             await steerState.steers.close();
             if (!alive()) return;
             const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
-            run.message = fullMessage;
-            run.replyRemaining = result.remaining;
-            run.state = syncAutoApply(run.state, this.ports.autoApply());
-            const plan = result.actions.length ? planFor(result.actions, request.context, this.ports.planOptions(run, request)) : null;
+            run2.message = fullMessage;
+            run2.replyRemaining = result.remaining;
+            run2.state = syncAutoApply(run2.state, this.ports.autoApply());
+            const plan = result.actions.length ? planFor(result.actions, request.context, this.ports.planOptions(run2, request)) : null;
             if (plan) {
               if (chat.isBusy) {
                 chat.finish(result.reply, []);
                 this.showUnreadResearch(chat, turn, request.context);
                 this.ports.markTurn(origin, request);
-                run.state = pauseForPlan(run.state);
+                run2.state = pauseForPlan(run2.state);
                 this.offerChatPlan(
                   result,
                   plan,
@@ -59379,7 +59898,7 @@ var MapChatConversation = class {
                   { path: anchor.path, id: anchor.id },
                   fullMessage,
                   record,
-                  run
+                  run2
                 );
                 if (record == null ? void 0 : record.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
                   this.ports.markLogged(turn.assistant);
@@ -59389,7 +59908,7 @@ var MapChatConversation = class {
             }
             if (result.actions.length) chat.setStage("applying");
             const work = newChatWork();
-            run.work = work;
+            run2.work = work;
             const lines = await this.ports.applyActions(
               { ...result, message: fullMessage },
               request.context,
@@ -59399,7 +59918,7 @@ var MapChatConversation = class {
                 context: request.context,
                 work,
                 continuation: Boolean(autoOrigin),
-                chain: run
+                chain: run2
               }
             );
             if (alive() && chat.isBusy) {
@@ -59409,7 +59928,7 @@ var MapChatConversation = class {
               this.ports.markTurn(origin, request, entry);
               if (record == null ? void 0 : record.end("done", { reply: result.reply, lines: shown, rejected: result.rejected }))
                 this.ports.markLogged(turn.assistant);
-              this.ports.chain().finishChatRound(run, { result, context: request.context, lines, work, anchor });
+              this.ports.chain().finishChatRound(run2, { result, context: request.context, lines, work, anchor });
             }
             return;
           } catch (error) {
@@ -59423,7 +59942,7 @@ var MapChatConversation = class {
                 error: { text: failure.text, technical: (_d = failure.technical) != null ? _d : "" }
               });
               this.returnSteers(steerState);
-              if (!this.ports.chain().retryAutoRound(run, origin)) this.ports.chain().interruptChain(run, "failed");
+              if (!this.ports.chain().retryAutoRound(run2, origin)) this.ports.chain().interruptChain(run2, "failed");
             }
             return;
           } finally {
@@ -59473,7 +59992,7 @@ var MapChatConversation = class {
   returnSteers(state) {
     const chat = this.ports.panel();
     if (chat) {
-      for (const [entry, row] of state.rows) if (entry.state !== "delivered") chat.setSteerState(row, "queued", false);
+      for (const [entry, row2] of state.rows) if (entry.state !== "delivered") chat.setSteerState(row2, "queued", false);
     }
     state.steers.abandon();
     chat == null ? void 0 : chat.restoreDraft(chat.takeQueued());
@@ -59507,17 +60026,17 @@ var MapChatConversation = class {
   /** Stop button: the request is aborted and whatever came back is dropped. */
   stopMapChat() {
     var _a2, _b2, _c, _d, _e, _f;
-    const run = this.ports.chain().current;
-    if ((run == null ? void 0 : run.state.phase) === "waiting") {
-      this.ports.chain().stopChainWork(run);
-      this.ports.chain().interruptChain(run, "stopped");
+    const run2 = this.ports.chain().current;
+    if ((run2 == null ? void 0 : run2.state.phase) === "waiting") {
+      this.ports.chain().stopChainWork(run2);
+      this.ports.chain().interruptChain(run2, "stopped");
       (_a2 = this.ports.panel()) == null ? void 0 : _a2.focusInput();
       return;
     }
     if (this.applying && !this.controller) {
       this.planToken++;
       this.planStopped = true;
-      if (run && this.ports.chain().chainShows(run)) this.ports.chain().stopChainWork(run);
+      if (run2 && this.ports.chain().chainShows(run2)) this.ports.chain().stopChainWork(run2);
       (_b2 = this.ports.panel()) == null ? void 0 : _b2.focusInput();
       return;
     }
@@ -59527,12 +60046,12 @@ var MapChatConversation = class {
       (_d = this.ports.panel()) == null ? void 0 : _d.focusInput();
       return;
     }
-    if (run && this.ports.chain().chainShows(run)) this.ports.chain().stopChainWork(run);
+    if (run2 && this.ports.chain().chainShows(run2)) this.ports.chain().stopChainWork(run2);
     this.releaseChatTask();
     controller.abort();
     this.ports.endRecord("stopped");
     (_e = this.ports.panel()) == null ? void 0 : _e.markStopped();
-    this.ports.chain().interruptChain(run, "stopped");
+    this.ports.chain().interruptChain(run2, "stopped");
     if (this.steer) this.returnSteers(this.steer);
     (_f = this.ports.panel()) == null ? void 0 : _f.focusInput();
   }
@@ -59977,8 +60496,8 @@ var TopicChatRecordWriter = class {
     return this.killed || this.deps.disposed();
   }
   enqueue(task) {
-    const run = this.chain.then(() => this.dead() ? void 0 : task());
-    const safe2 = run.catch((error) => this.fail(error));
+    const run2 = this.chain.then(() => this.dead() ? void 0 : task());
+    const safe2 = run2.catch((error) => this.fail(error));
     this.chain = safe2;
     return safe2;
   }
@@ -60264,19 +60783,19 @@ var GoalSuggest = class {
     const rows2 = panel.createDiv("vam-goal-suggest-rows");
     task.suggestions.forEach((item, index) => {
       var _a3, _b3;
-      const row = rows2.createEl("label", { cls: "vam-goal-suggest-row" });
-      const box = row.createEl("input", { type: "checkbox" });
+      const row2 = rows2.createEl("label", { cls: "vam-goal-suggest-row" });
+      const box = row2.createEl("input", { type: "checkbox" });
       box.checked = task.checked.has(index);
       box.disabled = applying;
       boxes.push(box);
-      const text10 = row.createSpan("vam-goal-suggest-text");
+      const text10 = row2.createSpan("vam-goal-suggest-text");
       text10.createSpan({ cls: "vam-goal-suggest-title", text: item.title });
       text10.createSpan({ cls: "vam-goal-suggest-summary", text: item.summary });
       text10.createSpan({
         cls: "vam-goal-suggest-why",
         text: t("ui.goal_suggest_under_0", (_b3 = (_a3 = task.basis.get(item.parentId)) == null ? void 0 : _a3.title) != null ? _b3 : "")
       });
-      row.createSpan({
+      row2.createSpan({
         cls: `vam-goal-suggest-tier is-${item.suggestedTier}`,
         text: t(RELEVANCE_LABEL[item.suggestedTier])
       });
@@ -60763,13 +61282,13 @@ function canPasteCut(nodes, rootIds, targetId) {
 function resolveCrossSource(payload, record, sourceMap) {
   try {
     if (sourceMap.id !== record.sourceMapId) return null;
-    const count3 = payload.nodes.length;
-    if (!count3 || record.nodeIds.length !== count3 || record.notePaths.length !== count3) return null;
+    const count4 = payload.nodes.length;
+    if (!count4 || record.nodeIds.length !== count4 || record.notePaths.length !== count4) return null;
     const byId = new Map(sourceMap.nodes.map((node) => [node.id, node]));
     const ids2 = new Set(record.nodeIds);
     const branch = [];
     const roots = [];
-    for (let i = 0; i < count3; i++) {
+    for (let i = 0; i < count4; i++) {
       const node = byId.get(record.nodeIds[i]);
       if (!node || node.path !== record.notePaths[i]) return null;
       const clip5 = payload.nodes[i];
@@ -61023,10 +61542,10 @@ function aiModeField(parent, options = {}) {
   let current = (_a2 = options.initial) != null ? _a2 : DEFAULT_MAP_AI_MODE;
   const paint = () => {
     hint.setText(t(current === "standard" ? "ui.ai_mode_hint_standard" : "ui.ai_mode_hint"));
-    for (const [mode, button] of buttons) {
-      button.setAttr("aria-checked", String(mode === current));
-      button.tabIndex = mode === current ? 0 : -1;
-      button.toggleClass("is-active", mode === current);
+    for (const [mode, button2] of buttons) {
+      button2.setAttr("aria-checked", String(mode === current));
+      button2.tabIndex = mode === current ? 0 : -1;
+      button2.toggleClass("is-active", mode === current);
     }
   };
   const set = (mode) => {
@@ -61040,10 +61559,10 @@ function aiModeField(parent, options = {}) {
     (_a3 = options.onChange) == null ? void 0 : _a3.call(options, mode);
   };
   for (const mode of AI_MODES) {
-    const button = group.createEl("button", { text: t(mode === "quick" ? "ui.quick" : "ui.standard") });
-    button.setAttr("role", "radio");
-    button.addEventListener("click", () => choose(mode));
-    button.addEventListener("keydown", (event) => {
+    const button2 = group.createEl("button", { text: t(mode === "quick" ? "ui.quick" : "ui.standard") });
+    button2.setAttr("role", "radio");
+    button2.addEventListener("click", () => choose(mode));
+    button2.addEventListener("keydown", (event) => {
       var _a3;
       const step = ["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : ["ArrowLeft", "ArrowUp"].includes(event.key) ? -1 : 0;
       if (!step) return;
@@ -61052,7 +61571,7 @@ function aiModeField(parent, options = {}) {
       choose(next);
       (_a3 = buttons.get(next)) == null ? void 0 : _a3.focus();
     });
-    buttons.set(mode, button);
+    buttons.set(mode, button2);
   }
   paint();
   return { element, value: () => current, set };
@@ -61063,12 +61582,12 @@ function linkedField(parent, label) {
   head2.createSpan({ text: label });
   return { field, head: head2 };
 }
-function fieldLink(head2, text10, run) {
+function fieldLink(head2, text10, run2) {
   const link = head2.createEl("button", { text: text10, cls: "vam-field-link" });
   link.type = "button";
   link.addEventListener("click", (event) => {
     event.preventDefault();
-    run();
+    run2();
   });
 }
 function modelField(parent, models, defaultLabel, repair) {
@@ -61176,12 +61695,12 @@ function styleChoiceField(parent, options) {
     for (const item of own2) {
       const first = item.issues[0];
       if (!first) continue;
-      const row = problems.createDiv({ cls: "vam-note-style-problem", attr: { role: "status" } });
-      row.createSpan({
+      const row2 = problems.createDiv({ cls: "vam-note-style-problem", attr: { role: "status" } });
+      row2.createSpan({
         text: t("ui.note_style_unusable_0_1_2", (_a2 = item.fileName) != null ? _a2 : item.name, first.line, styleIssueText(first))
       });
       if (picker) {
-        const open2 = row.createEl("button", { text: t("ui.note_style_open_file"), cls: "vam-field-link" });
+        const open2 = row2.createEl("button", { text: t("ui.note_style_open_file"), cls: "vam-field-link" });
         open2.type = "button";
         open2.addEventListener("click", () => void picker.openRecipe(item.ref));
       }
@@ -62423,9 +62942,9 @@ var DebugLogModal = class extends import_obsidian31.Modal {
       text: t("ui.logs_are_kept_in_memory_only_and_disappear_when_the_plugin_r")
     });
     const actions = new import_obsidian31.Setting(this.contentEl);
-    actions.addButton((button) => button.setButtonText(t("ui.refresh_logs")).onClick(() => this.renderLogs()));
+    actions.addButton((button2) => button2.setButtonText(t("ui.refresh_logs")).onClick(() => this.renderLogs()));
     actions.addButton(
-      (button) => button.setButtonText(t("ui.copy_logs")).setCta().onClick(async () => {
+      (button2) => button2.setButtonText(t("ui.copy_logs")).setCta().onClick(async () => {
         const text10 = formatDebugLogs(this.logs.getLogs());
         if (!text10) {
           new import_obsidian31.Notice(t("ui.there_are_no_debug_logs_yet"));
@@ -62440,20 +62959,20 @@ var DebugLogModal = class extends import_obsidian31.Modal {
       })
     );
     actions.addButton(
-      (button) => button.setButtonText(t("ui.clear_logs")).setDestructive().onClick(() => this.logs.clear())
+      (button2) => button2.setButtonText(t("ui.clear_logs")).setDestructive().onClick(() => this.logs.clear())
     );
     const list2 = this.contentEl.createDiv("vam-debug-log-list");
     const entries = this.logs.getLogs();
     if (!entries.length) list2.createEl("p", { cls: "vam-debug-log-empty", text: t("ui.there_are_no_debug_logs_yet") });
     for (const entry of entries) {
-      const row = list2.createDiv("vam-debug-log-entry");
-      const metadata = row.createDiv("vam-debug-log-meta");
+      const row2 = list2.createDiv("vam-debug-log-entry");
+      const metadata = row2.createDiv("vam-debug-log-meta");
       metadata.createEl("time", {
         text: new Date(entry.timestamp).toLocaleString(getUiLanguage()),
         attr: { datetime: entry.timestamp }
       });
       metadata.createSpan({ cls: `vam-debug-log-level is-${entry.level}`, text: entry.level.toUpperCase() });
-      row.createEl("pre", { text: entry.message });
+      row2.createEl("pre", { text: entry.message });
     }
     this.contentEl.createEl("h3", { text: t("ui.ai_exchanges") });
     this.contentEl.createEl("p", {
@@ -62470,7 +62989,7 @@ var DebugLogModal = class extends import_obsidian31.Modal {
         })
       );
     exchangeActions.addButton(
-      (button) => button.setButtonText(t("ui.prompt_monitor_copy_all")).onClick(async () => {
+      (button2) => button2.setButtonText(t("ui.prompt_monitor_copy_all")).onClick(async () => {
         var _a3, _b3;
         try {
           await navigator.clipboard.writeText(
@@ -62483,7 +63002,7 @@ var DebugLogModal = class extends import_obsidian31.Modal {
       })
     );
     exchangeActions.addButton(
-      (button) => button.setButtonText(t("ui.clear_ai_exchanges")).setDestructive().onClick(() => {
+      (button2) => button2.setButtonText(t("ui.clear_ai_exchanges")).setDestructive().onClick(() => {
         var _a3;
         return (_a3 = this.exchanges) == null ? void 0 : _a3.clear();
       })
@@ -62700,14 +63219,14 @@ var NextStepModal = class extends import_obsidian32.Modal {
       }
     }
   }
-  async run(panel, button, work, needsUsage = true) {
-    if (button.disabled || this.runPending || this.taskController && !this.taskController.signal.aborted) return;
+  async run(panel, button2, work, needsUsage = true) {
+    if (button2.disabled || this.runPending || this.taskController && !this.taskController.signal.aborted) return;
     this.runPending = true;
-    button.disabled = true;
+    button2.disabled = true;
     const start = async () => {
       var _a2, _b2, _c, _d, _e, _f;
       if (this.closed) return;
-      button.disabled = true;
+      button2.disabled = true;
       const failureHelp = panel.querySelector(".vam-ai-failure-help");
       if (failureHelp) failureHelp.hidden = true;
       const controller = new AbortController();
@@ -62727,7 +63246,7 @@ var NextStepModal = class extends import_obsidian32.Modal {
         if (this.closed && !controller.signal.aborted) errorNotice(error);
         this.failed(
           panel,
-          button,
+          button2,
           controller.signal.aborted ? t("ui.ai_task_cancelled") : error instanceof Error ? error.message : String(error)
         );
       } finally {
@@ -62754,9 +63273,9 @@ var NextStepModal = class extends import_obsidian32.Modal {
     try {
       const model = this.plugin.settings.cliModel;
       const started = needsUsage ? await this.plugin.confirmAiUsage(model, start) : await this.plugin.aiReadyForModel(model) && (await start(), true);
-      if (!started) button.disabled = false;
+      if (!started) button2.disabled = false;
     } catch (error) {
-      this.failed(panel, button, error instanceof Error ? error.message : String(error));
+      this.failed(panel, button2, error instanceof Error ? error.message : String(error));
     } finally {
       this.runPending = false;
     }
@@ -62765,8 +63284,8 @@ var NextStepModal = class extends import_obsidian32.Modal {
    * One synthesis step (directions or draft) from this dialog. The run is the view's: while this dialog is open the
    * next stage appears here, and if it is closed the run carries on in the background and falls back to the node badge.
    */
-  launchSynthesis(panel, button, direction, buildOptions, flow) {
-    void this.run(panel, button, async () => {
+  launchSynthesis(panel, button2, direction, buildOptions, flow) {
+    void this.run(panel, button2, async () => {
       const controller = this.taskController;
       if (!controller) return;
       const options = await buildOptions(controller.signal);
@@ -62813,8 +63332,8 @@ var NextStepModal = class extends import_obsidian32.Modal {
           }
           settle();
           failedShown = true;
-          if (userCancelled) this.failed(panel, button, message);
-          else this.failedAi(panel, button, message);
+          if (userCancelled) this.failed(panel, button2, message);
+          else this.failedAi(panel, button2, message);
         },
         () => {
         },
@@ -62822,18 +63341,18 @@ var NextStepModal = class extends import_obsidian32.Modal {
       );
       if (!this.closed && !outcome && !failedShown) {
         settle();
-        this.failed(panel, button, t("ui.ai_task_cancelled"));
+        this.failed(panel, button2, t("ui.ai_task_cancelled"));
       }
     });
   }
-  failed(panel, button, message) {
+  failed(panel, button2, message) {
     var _a2;
     if (this.closed) return;
     (_a2 = panel.querySelector(".vam-next-status")) == null ? void 0 : _a2.setText(message);
-    button.disabled = false;
+    button2.disabled = false;
   }
-  failedAi(panel, button, message) {
-    this.failed(panel, button, message);
+  failedAi(panel, button2, message) {
+    this.failed(panel, button2, message);
     if (this.closed) return;
     let help = panel.querySelector(".vam-ai-failure-help");
     if (!help) {
@@ -63062,21 +63581,21 @@ var NextStepModal = class extends import_obsidian32.Modal {
     });
   }
 };
-function renderProposalKind(head2, row, item) {
+function renderProposalKind(head2, row2, item) {
   if (item.kind)
     head2.createSpan({
       cls: `vam-proposal-kind vam-proposal-kind-${item.kind}`,
       text: t(`ui.proposal_kind_${item.kind}`)
     });
   if (item.destination)
-    row.createEl("p", {
+    row2.createEl("p", {
       cls: "vam-proposal-destination",
       text: t(
         item.kind === "merge" ? "ui.proposal_merge_into_0" : item.kind === "add" ? "ui.proposal_add_under_0" : "ui.proposal_destination_0",
         item.destination
       )
     });
-  if (item.reason) row.createEl("p", { cls: "vam-proposal-reason", text: item.reason });
+  if (item.reason) row2.createEl("p", { cls: "vam-proposal-reason", text: item.reason });
 }
 function renderProposalList(parent, suggestions, changed, options = {}) {
   var _a2;
@@ -63123,17 +63642,17 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
       up = parentOf2((_a3 = suggestions.find((other) => keyOf2(other) === up)) != null ? _a3 : { title: "", task: "", contribution: "" });
     return depth;
   };
-  const count3 = () => rows2.filter((row) => row.check.checked).length;
+  const count4 = () => rows2.filter((row2) => row2.check.checked).length;
   const update = () => {
-    const picked = count3();
+    const picked = count4();
     counter.setText(t("ui.selected_0_of_1", picked, rows2.length));
     all.setText(t(picked === rows2.length ? "ui.select_none" : "ui.select_all"));
     changed(picked);
   };
   for (const item of ordered) {
-    const row = list2.createDiv(parentOf2(item) ? "vam-proposal is-child" : "vam-proposal");
-    if (keyed) row.addClass(`vam-proposal-depth-${Math.min(depthOf2(item), 5)}`);
-    const head2 = row.createDiv("vam-proposal-head");
+    const row2 = list2.createDiv(parentOf2(item) ? "vam-proposal is-child" : "vam-proposal");
+    if (keyed) row2.addClass(`vam-proposal-depth-${Math.min(depthOf2(item), 5)}`);
+    const head2 = row2.createDiv("vam-proposal-head");
     const check = head2.createEl("input", { type: "checkbox" });
     check.checked = !review;
     check.hidden = review;
@@ -63141,12 +63660,12 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
     const title = head2.createEl("input", { type: "text", value: item.title, cls: "vam-proposal-title" });
     title.setAttr("aria-label", t("ui.proposal_name"));
     title.readOnly = !!item.kind && item.kind !== "add";
-    renderProposalKind(head2, row, item);
+    renderProposalKind(head2, row2, item);
     let task, contribution;
     if (!options.compact && (!item.kind || item.kind === "add")) {
       const more = head2.createEl("button", { text: t("ui.proposal_details"), cls: "vam-proposal-more" });
       more.setAttr("aria-expanded", "false");
-      const body = row.createDiv("vam-proposal-body");
+      const body = row2.createDiv("vam-proposal-body");
       body.hidden = true;
       more.addEventListener("click", () => {
         body.hidden = !body.hidden;
@@ -63165,7 +63684,7 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
       contribution.setAttr("aria-label", t("ui.contribution_to_the_parent_topic"));
     }
     rows2.push({ item, check, title, task, contribution });
-    (_a2 = options.apply) == null ? void 0 : _a2.call(options, item, { element: row, head: head2, title });
+    (_a2 = options.apply) == null ? void 0 : _a2.call(options, item, { element: row2, head: head2, title });
     check.addEventListener("change", () => {
       const uncheckChildren = (key4) => rows2.forEach((other) => {
         if (parentOf2(other.item) === key4 && other.check.checked) {
@@ -63187,29 +63706,29 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
     });
   }
   all.addEventListener("click", () => {
-    const value = count3() !== rows2.length;
-    rows2.forEach((row) => row.check.checked = value);
+    const value = count4() !== rows2.length;
+    rows2.forEach((row2) => row2.check.checked = value);
     update();
   });
   update();
   return {
-    count: count3,
+    count: count4,
     selected: () => {
-      const selected = rows2.filter((row) => row.check.checked && row.title.value.trim());
+      const selected = rows2.filter((row2) => row2.check.checked && row2.title.value.trim());
       if (!selected.length) return t("ui.select_at_least_one_subtopic");
-      const renamed = new Map(selected.map((row) => [keyOf2(row.item), row.title.value.trim()]));
-      const names3 = selected.filter((row) => !parentOf2(row.item)).map((row) => row.title.value.trim());
+      const renamed = new Map(selected.map((row2) => [keyOf2(row2.item), row2.title.value.trim()]));
+      const names3 = selected.filter((row2) => !parentOf2(row2.item)).map((row2) => row2.title.value.trim());
       if (new Set(names3).size !== names3.length) return t("ui.first_level_topic_names_must_be_unique");
-      if (selected.some((row) => parentOf2(row.item) && !renamed.has(parentOf2(row.item))))
+      if (selected.some((row2) => parentOf2(row2.item) && !renamed.has(parentOf2(row2.item))))
         return t("ui.select_the_parent_topic_before_its_child");
-      return selected.map((row) => {
+      return selected.map((row2) => {
         var _a3, _b2, _c, _d, _e;
         return {
-          title: row.title.value.trim(),
-          task: (_b2 = (_a3 = row.task) == null ? void 0 : _a3.value.trim()) != null ? _b2 : row.item.task,
-          contribution: (_d = (_c = row.contribution) == null ? void 0 : _c.value.trim()) != null ? _d : row.item.contribution,
-          parentTitle: parentOf2(row.item) ? renamed.get(parentOf2(row.item)) : "",
-          ...row.item.key !== void 0 ? { key: row.item.key, parentKey: (_e = row.item.parentKey) != null ? _e : "" } : {}
+          title: row2.title.value.trim(),
+          task: (_b2 = (_a3 = row2.task) == null ? void 0 : _a3.value.trim()) != null ? _b2 : row2.item.task,
+          contribution: (_d = (_c = row2.contribution) == null ? void 0 : _c.value.trim()) != null ? _d : row2.item.contribution,
+          parentTitle: parentOf2(row2.item) ? renamed.get(parentOf2(row2.item)) : "",
+          ...row2.item.key !== void 0 ? { key: row2.item.key, parentKey: (_e = row2.item.parentKey) != null ? _e : "" } : {}
         };
       });
     }
@@ -63373,9 +63892,9 @@ var ChildProposalModal = class extends import_obsidian32.Modal {
     });
     actions.createEl("button", { text: t("ui.cancel") }).addEventListener("click", () => this.close());
     const create = actions.createEl("button", { cls: "mod-cta" });
-    const list2 = renderProposalList(this.contentEl, this.suggestions, (count3) => {
-      create.setText(t("ui.create_0_subtopics", count3));
-      create.disabled = count3 === 0;
+    const list2 = renderProposalList(this.contentEl, this.suggestions, (count4) => {
+      create.setText(t("ui.create_0_subtopics", count4));
+      create.disabled = count4 === 0;
       status.setText("");
     });
     create.setText(t("ui.create_0_subtopics", list2.count()));
@@ -63408,11 +63927,11 @@ var MapConflictModal = class extends import_obsidian32.Modal {
     };
     const options = this.contentEl.createDiv("vam-conflict-options");
     const option = (label, description, map) => {
-      const row = options.createDiv("vam-conflict-option");
-      const text10 = row.createDiv("vam-conflict-option-text");
+      const row2 = options.createDiv("vam-conflict-option");
+      const text10 = row2.createDiv("vam-conflict-option-text");
       text10.createEl("strong", { text: label });
       text10.createSpan({ text: description, cls: "vam-hint" });
-      row.createEl("button", { text: label }).addEventListener("click", () => finish2(map()));
+      row2.createEl("button", { text: label }).addEventListener("click", () => finish2(map()));
     };
     option(t("ui.use_file_contents"), t("ui.conflict_use_file_desc"), () => clone(this.disk));
     option(t("ui.keep_editor_contents"), t("ui.conflict_keep_editor_desc"), () => clone(this.local));
@@ -63456,16 +63975,16 @@ var NoteCollectionModal = class extends import_obsidian32.Modal {
     this.titleEl.setText(this.titleText);
     if (!this.files.length) this.contentEl.createEl("p", { text: t("ui.no_notes_yet") });
     for (const file of this.files) {
-      const row = this.contentEl.createDiv("vam-collection-row");
-      row.createSpan({ text: file.basename });
-      const actions = row.createDiv("vam-collection-actions");
+      const row2 = this.contentEl.createDiv("vam-collection-row");
+      row2.createSpan({ text: file.basename });
+      const actions = row2.createDiv("vam-collection-actions");
       for (const action of this.actions)
         actions.createEl("button", { text: action.label }).addEventListener("click", () => {
           this.close();
           action.run(file);
         });
     }
-    new import_obsidian32.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.close")).onClick(() => this.close()));
+    new import_obsidian32.Setting(this.contentEl).addButton((button2) => button2.setButtonText(t("ui.close")).onClick(() => this.close()));
   }
 };
 var TopicPickerModal = class extends import_obsidian32.Modal {
@@ -63479,13 +63998,13 @@ var TopicPickerModal = class extends import_obsidian32.Modal {
     this.titleEl.setText(this.titleText);
     for (const topic of this.topics)
       new import_obsidian32.Setting(this.contentEl).setName(topic.title).setDesc(topic.root).addButton(
-        (button) => button.setButtonText(t("ui.select")).onClick(() => {
+        (button2) => button2.setButtonText(t("ui.select")).onClick(() => {
           this.close();
           this.choose(topic);
         })
       );
     if (!this.topics.length) this.contentEl.createEl("p", { text: t("ui.no_other_topics") });
-    new import_obsidian32.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close()));
+    new import_obsidian32.Setting(this.contentEl).addButton((button2) => button2.setButtonText(t("ui.cancel")).onClick(() => this.close()));
   }
 };
 
@@ -63523,7 +64042,7 @@ var StructureReviewModal = class extends import_obsidian33.Modal {
     if (this.host.initial) {
       this.showSuggestions(result, this.host.initial);
       ((_a2 = Array.from(result.querySelectorAll(".vam-structure-apply")).find(
-        (button) => !button.disabled
+        (button2) => !button2.disabled
       )) != null ? _a2 : close).focus();
       return;
     }
@@ -63559,7 +64078,7 @@ var StructureReviewModal = class extends import_obsidian33.Modal {
         this.showSuggestions(result, review);
         if (hadFocus)
           ((_b2 = Array.from(result.querySelectorAll(".vam-structure-apply")).find(
-            (button) => !button.disabled
+            (button2) => !button2.disabled
           )) != null ? _b2 : close).focus();
       }).catch((error) => {
         if (this.closed) return;
@@ -63616,43 +64135,43 @@ var StructureReviewModal = class extends import_obsidian33.Modal {
     renderProposalList(parent, items, () => {
     }, {
       compact: true,
-      apply: (item, row) => {
+      apply: (item, row2) => {
         const entry = this.entries[index++];
-        const button = row.head.createEl("button", {
+        const button2 = row2.head.createEl("button", {
           text: t("ui.structure_review_apply"),
           cls: "vam-structure-apply"
         });
-        const note = row.element.createEl("p", { cls: "vam-structure-note", attr: { "aria-live": "polite" } });
+        const note = row2.element.createEl("p", { cls: "vam-structure-note", attr: { "aria-live": "polite" } });
         let busy = false;
         let message = "";
-        const label = () => button.setAttr(
+        const label = () => button2.setAttr(
           "aria-label",
           t(
             entry.applied ? "ui.structure_review_applied_named" : "ui.structure_review_apply_named",
-            row.title.value.trim() || item.title
+            row2.title.value.trim() || item.title
           )
         );
-        row.title.addEventListener("input", label);
+        row2.title.addEventListener("input", label);
         const refresh = () => {
           const stale = entry.applied ? null : this.host.staleReason(entry.suggestion);
-          row.element.toggleClass("is-applied", entry.applied);
-          row.element.toggleClass("is-stale", !!stale);
-          button.disabled = busy || entry.applied || !!stale;
-          button.setText(t(entry.applied ? "ui.structure_review_applied" : "ui.structure_review_apply"));
+          row2.element.toggleClass("is-applied", entry.applied);
+          row2.element.toggleClass("is-stale", !!stale);
+          button2.disabled = busy || entry.applied || !!stale;
+          button2.setText(t(entry.applied ? "ui.structure_review_applied" : "ui.structure_review_apply"));
           label();
-          row.title.readOnly = entry.applied || entry.suggestion.kind !== "strengthen";
+          row2.title.readOnly = entry.applied || entry.suggestion.kind !== "strengthen";
           note.setText(stale != null ? stale : message);
         };
         refreshers.push(refresh);
         refresh();
-        button.addEventListener("click", () => {
+        button2.addEventListener("click", () => {
           if (busy || entry.applied) return;
           const stale = this.host.staleReason(entry.suggestion);
           if (stale) {
             refreshAll();
             return;
           }
-          const title = row.title.value.trim();
+          const title = row2.title.value.trim();
           if (entry.suggestion.kind === "strengthen" && !title) {
             message = t("ui.structure_review_title_required");
             refresh();
@@ -63690,32 +64209,32 @@ function renderTopicTree(parent, options) {
     children.set(key4, [...(_a2 = children.get(key4)) != null ? _a2 : [], node]);
   }
   const rows2 = [];
-  const row = (id, text10, depth, enabled) => {
-    const button = tree.createEl("button", { cls: "vam-topic-tree-row", text: text10, attr: { role: "option" } });
-    button.style.paddingLeft = `${8 + depth * 16}px`;
-    button.dataset.id = id;
-    button.title = text10;
-    button.setAttr("dir", "auto");
-    button.disabled = !enabled;
-    button.setAttr("aria-disabled", String(!enabled));
-    if (enabled) button.addEventListener("click", () => options.onChoose(id));
-    rows2.push(button);
+  const row2 = (id, text10, depth, enabled) => {
+    const button2 = tree.createEl("button", { cls: "vam-topic-tree-row", text: text10, attr: { role: "option" } });
+    button2.style.paddingLeft = `${8 + depth * 16}px`;
+    button2.dataset.id = id;
+    button2.title = text10;
+    button2.setAttr("dir", "auto");
+    button2.disabled = !enabled;
+    button2.setAttr("aria-disabled", String(!enabled));
+    if (enabled) button2.addEventListener("click", () => options.onChoose(id));
+    rows2.push(button2);
   };
-  if (options.rootChoice !== void 0) row("", options.rootChoice, 0, true);
+  if (options.rootChoice !== void 0) row2("", options.rootChoice, 0, true);
   const append = (node, depth, seen2) => {
     var _a3;
     if (seen2.has(node.id)) return;
     seen2.add(node.id);
-    row(node.id, options.title(node), depth, options.selectable(node));
+    row2(node.id, options.title(node), depth, options.selectable(node));
     for (const child of (_a3 = children.get(node.id)) != null ? _a3 : []) append(child, depth + 1, seen2);
   };
   const seen = /* @__PURE__ */ new Set();
   for (const root of (_b2 = children.get(null)) != null ? _b2 : []) append(root, 0, seen);
   const select = (id) => {
-    for (const button of rows2) {
-      const selected = button.dataset.id === id;
-      button.toggleClass("is-selected", selected);
-      button.setAttr("aria-selected", String(selected));
+    for (const button2 of rows2) {
+      const selected = button2.dataset.id === id;
+      button2.toggleClass("is-selected", selected);
+      button2.setAttr("aria-selected", String(selected));
     }
   };
   if (options.value !== void 0) select(options.value);
@@ -63825,13 +64344,13 @@ var TopicChatWindow = class {
     this.logEl = this.el.createDiv("vam-topic-chat-log");
     const actions = this.el.createDiv("vam-topic-chat-actions");
     for (const kind of KINDS3) {
-      const button = actions.createEl("button", {
+      const button2 = actions.createEl("button", {
         cls: "vam-topic-chat-action",
         text: kindLabel(kind),
         attr: { type: "button", "aria-pressed": "false" }
       });
-      this.kindEls.set(kind, button);
-      this.on(button, "click", () => this.pickKind(kind));
+      this.kindEls.set(kind, button2);
+      this.on(button2, "click", () => this.pickKind(kind));
     }
     const composer = this.el.createDiv("vam-topic-chat-composer");
     this.inputEl = composer.createEl("textarea", {
@@ -63854,15 +64373,15 @@ var TopicChatWindow = class {
     });
     this.modeMenuEl.hidden = true;
     for (const mode of MODES2) {
-      const button = this.modeMenuEl.createEl("button", {
+      const button2 = this.modeMenuEl.createEl("button", {
         cls: "vam-topic-chat-mode",
         attr: { type: "button", role: "menuitemradio", "aria-checked": "false" }
       });
-      (0, import_obsidian35.setIcon)(button.createSpan("vam-topic-chat-mode-icon"), modeIcon(mode));
-      button.createSpan({ cls: "vam-topic-chat-mode-label", text: modeName(mode) });
-      (0, import_obsidian35.setIcon)(button.createSpan("vam-topic-chat-mode-check"), "check");
-      this.modeEls.set(mode, button);
-      this.on(button, "click", () => this.pickMode(mode));
+      (0, import_obsidian35.setIcon)(button2.createSpan("vam-topic-chat-mode-icon"), modeIcon(mode));
+      button2.createSpan({ cls: "vam-topic-chat-mode-label", text: modeName(mode) });
+      (0, import_obsidian35.setIcon)(button2.createSpan("vam-topic-chat-mode-check"), "check");
+      this.modeEls.set(mode, button2);
+      this.on(button2, "click", () => this.pickMode(mode));
     }
     this.on(this.modeToggleEl, "click", (event) => {
       if (this.modeMenuEl.hidden) this.openModeMenu(event.detail === 0);
@@ -63877,7 +64396,7 @@ var TopicChatWindow = class {
       if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
       event.preventDefault();
       const buttons = MODES2.map((mode) => this.modeEls.get(mode));
-      const at = buttons.findIndex((button) => button === event.target);
+      const at = buttons.findIndex((button2) => button2 === event.target);
       const step = event.key === "ArrowDown" ? 1 : -1;
       buttons[(Math.max(at, 0) + step + buttons.length) % buttons.length].focus();
     });
@@ -64074,16 +64593,16 @@ var TopicChatWindow = class {
     const session = this.host.session();
     const busy = session.running || this.submitting;
     const empty = this.inputEl.value === "";
-    for (const [kind, button] of this.kindEls) {
-      button.setAttr("aria-pressed", String(session.draftKind === kind));
-      button.toggleClass("is-active", session.draftKind === kind);
-      button.disabled = busy;
+    for (const [kind, button2] of this.kindEls) {
+      button2.setAttr("aria-pressed", String(session.draftKind === kind));
+      button2.toggleClass("is-active", session.draftKind === kind);
+      button2.disabled = busy;
     }
     if (session.running) this.closeModeMenu(false);
-    for (const [mode, button] of this.modeEls) {
-      button.setAttr("aria-checked", String(session.mode === mode));
-      button.toggleClass("is-active", session.mode === mode);
-      button.disabled = session.running;
+    for (const [mode, button2] of this.modeEls) {
+      button2.setAttr("aria-checked", String(session.mode === mode));
+      button2.toggleClass("is-active", session.mode === mode);
+      button2.disabled = session.running;
     }
     this.modeToggleEl.disabled = session.running;
     this.modeToggleEl.setAttr("aria-label", t("ui.topic_chat_mode_button_0", modeName(session.mode)));
@@ -64113,12 +64632,12 @@ var TopicChatWindow = class {
     const heldPart = active && this.logEl.contains(active) ? (_b2 = active.getAttr("data-part")) != null ? _b2 : null : null;
     this.logEl.empty();
     for (const turn of session.turns) {
-      const row = this.logEl.createDiv({
+      const row2 = this.logEl.createDiv({
         cls: turn.role === "user" ? "vam-topic-chat-msg is-me" : "vam-topic-chat-msg"
       });
       const who = turn.role === "user" ? turn.kind && turn.kind !== "ask" ? t("ui.topic_chat_you_0", kindLabel(turn.kind)) : t("ui.map_chat_role_you") : t("ui.map_chat_role_ai");
-      row.createSpan({ cls: "vam-topic-chat-who", text: who });
-      const body = row.createSpan({ cls: "vam-topic-chat-text" });
+      row2.createSpan({ cls: "vam-topic-chat-who", text: who });
+      const body = row2.createSpan({ cls: "vam-topic-chat-text" });
       if (turn.markdown) renderChatMarkdown(body, turn.text, t("ui.map_chat_overflow_note"));
       else body.setText(turn.text);
       for (const steer of (_c = turn.steers) != null ? _c : []) {
@@ -64150,15 +64669,15 @@ var TopicChatWindow = class {
   }
   /** The depth card: an AI message with three radio options and Start / Cancel. Arrows switch, Enter starts, Escape cancels. */
   paintChoice(choice, heldPart, focusNow) {
-    const row = this.logEl.createDiv({ cls: "vam-topic-chat-msg is-choice" });
-    row.createSpan({ cls: "vam-topic-chat-who", text: t("ui.map_chat_role_ai") });
+    const row2 = this.logEl.createDiv({ cls: "vam-topic-chat-msg is-choice" });
+    row2.createSpan({ cls: "vam-topic-chat-who", text: t("ui.map_chat_role_ai") });
     const messageId = `vam-topic-chat-choice-${++labelSeq2}`;
-    row.createSpan({
+    row2.createSpan({
       cls: "vam-topic-chat-text",
       text: t("ui.topic_chat_choice_message_0_1_2", choice.levels, choice.topics, choice.researched),
       attr: { id: messageId }
     });
-    const group = row.createDiv({
+    const group = row2.createDiv({
       cls: "vam-topic-chat-choice",
       attr: { role: "radiogroup", "aria-labelledby": messageId }
     });
@@ -64208,7 +64727,7 @@ var TopicChatWindow = class {
         }
       });
     }
-    const actions = row.createDiv("vam-topic-chat-choice-actions");
+    const actions = row2.createDiv("vam-topic-chat-choice-actions");
     const start = actions.createEl("button", {
       cls: "vam-topic-chat-choice-start mod-cta",
       text: t("ui.topic_chat_choice_start"),
@@ -64551,8 +65070,8 @@ function fittedTextWidth(el) {
   return fitted;
 }
 function edgePathData(x1, y1, x2, y2) {
-  const run = x2 - x1;
-  const bend = run >= 40 ? run / 2 : run >= 0 ? 60 - run : Math.max(60, -run / 2);
+  const run2 = x2 - x1;
+  const bend = run2 >= 40 ? run2 / 2 : run2 >= 0 ? 60 - run2 : Math.max(60, -run2 / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
 function argumentTipPath(x, y) {
@@ -64600,9 +65119,9 @@ function chatSynthesisOptions(input2) {
     ...input2.synthesisTitle !== void 0 ? { synthesisTitle: input2.synthesisTitle } : {}
   };
 }
-function integrationUpdateMode(run) {
-  const unset = run.recipe.implicit === true || run.recipe.source === "kind" && run.recipe.ref.startsWith("builtin:");
-  return run.updateMode === "merge" && unset ? "fresh" : run.updateMode;
+function integrationUpdateMode(run2) {
+  const unset = run2.recipe.implicit === true || run2.recipe.source === "kind" && run2.recipe.ref.startsWith("builtin:");
+  return run2.updateMode === "merge" && unset ? "fresh" : run2.updateMode;
 }
 function researchWebLines(web) {
   if (!web.counted) return [];
@@ -64633,11 +65152,11 @@ function argumentEnabled(plugin) {
   var _a2;
   return ((_a2 = plugin.settings) == null ? void 0 : _a2.experimentalArgumentMap) === true;
 }
-function requestArgumentResume(plugin, path, button, onFailed) {
-  button.disabled = true;
+function requestArgumentResume(plugin, path, button2, onFailed) {
+  button2.disabled = true;
   plugin.argumentRuns.resume(path).catch((error) => {
     onFailed();
-    button.disabled = false;
+    button2.disabled = false;
     if (!(error instanceof ArgumentRunError) || error.code === "busy") return;
     new import_obsidian36.Notice(
       t(
@@ -64691,9 +65210,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
       },
       lockedParent: (parentId) => !!this.aiLockReason("addChild", [parentId]),
       refresh: (focusBar) => this.refreshRelevance(focusBar),
-      paintReceived: (run) => this.paintGoalRecommendReceived(run),
+      paintReceived: (run2) => this.paintGoalRecommendReceived(run2),
       updateHistoryButtons: () => this.updateHistoryButtons(),
-      openRecommendations: (run, mapPath, suggestions) => this.openRecommendations(run, mapPath, suggestions),
+      openRecommendations: (run2, mapPath, suggestions) => this.openRecommendations(run2, mapPath, suggestions),
       notice: (message) => new import_obsidian36.Notice(message)
     }));
     __publicField(this, "relevancePanelId", `vam-relevance-panel-${++relevancePanelSeq}`);
@@ -65253,8 +65772,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     var _a2, _b2;
     return (_b2 = (_a2 = this.chatChainRunner) == null ? void 0 : _a2.current) != null ? _b2 : null;
   }
-  set chatChain(run) {
-    this.chatChainRunner.current = run;
+  set chatChain(run2) {
+    this.chatChainRunner.current = run2;
   }
   /** Files changed while VAM was writing that this view has not read back yet (the plugin fills it; see synchronize). */
   get unsynced() {
@@ -65577,8 +66096,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     ].join(", ");
     const lock = (host) => {
       var _a3, _b3, _c2, _d2;
-      for (const button of Array.from((_b3 = (_a3 = host == null ? void 0 : host.querySelectorAll) == null ? void 0 : _a3.call(host, "button")) != null ? _b3 : []))
-        if (!((_c2 = button.closest) == null ? void 0 : _c2.call(button, keep)) || ((_d2 = button.classList) == null ? void 0 : _d2.contains("vam-layout-button"))) button.disabled = true;
+      for (const button2 of Array.from((_b3 = (_a3 = host == null ? void 0 : host.querySelectorAll) == null ? void 0 : _a3.call(host, "button")) != null ? _b3 : []))
+        if (!((_c2 = button2.closest) == null ? void 0 : _c2.call(button2, keep)) || ((_d2 = button2.classList) == null ? void 0 : _d2.contains("vam-layout-button"))) button2.disabled = true;
     };
     lock(this.contentEl);
     lock(this.relevanceBarEl);
@@ -65846,7 +66365,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
   installUndoScope() {
     const scope = new import_obsidian36.Scope(this.app.scope);
     const seen = /* @__PURE__ */ new WeakSet();
-    const run = (redo) => (event) => {
+    const run2 = (redo) => (event) => {
       if (!redo && !this.closed && !event.isComposing && this.undoNewCardNow(event.target)) return false;
       if (this.closed || event.isComposing || isEditableTarget(event.target)) return true;
       if (this.presentation) return false;
@@ -65855,9 +66374,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
       this.enqueue(() => this.travel(redo));
       return false;
     };
-    scope.register(["Mod"], "z", run(false));
-    scope.register(["Mod", "Shift"], "z", run(true));
-    scope.register(["Mod", "Shift"], "Z", run(true));
+    scope.register(["Mod"], "z", run2(false));
+    scope.register(["Mod", "Shift"], "z", run2(true));
+    scope.register(["Mod", "Shift"], "Z", run2(true));
     scope.register([], "F2", (event) => {
       var _a2, _b2;
       if (this.closed || event.isComposing || event.defaultPrevented) return true;
@@ -66754,9 +67273,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
   }
   /** After a dialog or menu closed: Obsidian puts focus back on the opener, which a repaint may have removed. Checked twice, as the host restores late. */
   restoreMapFocusSoon(fallbackNodeId) {
-    const run = () => this.restoreMapFocus(this.lastMapFocus, fallbackNodeId);
-    window.setTimeout(run, 0);
-    window.setTimeout(run, 120);
+    const run2 = () => this.restoreMapFocus(this.lastMapFocus, fallbackNodeId);
+    window.setTimeout(run2, 0);
+    window.setTimeout(run2, 120);
   }
   /** Opens a dialog from the map; when it closes, focus returns to the map if the repaint it caused removed its opener. */
   openMapModal(modal) {
@@ -67221,7 +67740,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
         const controller = new AbortController();
         const forward = () => controller.abort();
         signal.addEventListener("abort", forward, { once: true });
-        const run = {};
+        const run2 = {};
         const ran = await this.plugin.confirmAiUsage(model, async () => {
           if (signal.aborted) return;
           const inputs = started();
@@ -67232,7 +67751,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
             state: "running",
             inputs
           };
-          run.task = own2;
+          run2.task = own2;
           this.outlineDraftTask = own2;
           if (!this.closed) this.render();
           try {
@@ -67268,8 +67787,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
           if (!this.closed) this.render();
         });
         signal.removeEventListener("abort", forward);
-        if (!ran || !run.task) throw new Error(t("ui.outline_ai_not_started"));
-        return (_h = run.task.markdown) != null ? _h : "";
+        if (!ran || !run2.task) throw new Error(t("ui.outline_ai_not_started"));
+        return (_h = run2.task.markdown) != null ? _h : "";
       }
     };
   }
@@ -67369,15 +67888,15 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     const review = this.structureReviewTask;
     if (review && review.mapPath === this.path) {
       const running2 = review.state === "running";
-      const count3 = (_b2 = (_a2 = review.result) == null ? void 0 : _a2.suggestions.length) != null ? _b2 : 0;
+      const count4 = (_b2 = (_a2 = review.result) == null ? void 0 : _a2.suggestions.length) != null ? _b2 : 0;
       renderBackgroundStatus(parent, {
         title: t(review.scopeId ? "ui.structure_review_branch" : "ui.structure_review_map"),
-        value: running2 ? t("ui.structure_review_running") : review.state === "done" ? t("ui.structure_review_ready_0", count3) : (_c = review.message) != null ? _c : "",
+        value: running2 ? t("ui.structure_review_running") : review.state === "done" ? t("ui.structure_review_ready_0", count4) : (_c = review.message) != null ? _c : "",
         running: running2,
         ...running2 ? { onStop: () => this.stopStructureReview(review) } : {},
         ...review.state === "done" && review.result ? {
           review: {
-            label: t("ui.structure_review_view_0", count3),
+            label: t("ui.structure_review_view_0", count4),
             open: () => this.reopenStructureReview(review)
           }
         } : {},
@@ -67552,10 +68071,10 @@ ${request.requirements}` : preset.text,
         const controller = new AbortController();
         const forward = () => controller.abort();
         signal.addEventListener("abort", forward, { once: true });
-        const run = { began: false };
+        const run2 = { began: false };
         await this.plugin.confirmAiUsage(model, async () => {
           if (signal.aborted) return;
-          run.began = true;
+          run2.began = true;
           signal.removeEventListener("abort", forward);
           const own2 = {
             mapPath,
@@ -67598,7 +68117,7 @@ ${request.requirements}` : preset.text,
           if (!this.closed) this.render();
         });
         signal.removeEventListener("abort", forward);
-        if (!run.began) throw new Error(t("ui.structure_review_not_started"));
+        if (!run2.began) throw new Error(t("ui.structure_review_not_started"));
         return { suggestions: [], rejected: [] };
       }
     });
@@ -67705,17 +68224,17 @@ ${request.requirements}` : preset.text,
       }
     });
     const actions = bar.createDiv({ cls: "vam-goal-actions" });
-    const icon = (kind, name2, run, disabled) => {
-      const button = actions.createEl("button", { cls: "vam-goal-icon" });
-      appendGoalSvg(button, kind);
-      (0, import_obsidian36.setTooltip)(button, name2);
-      button.setAttr("aria-label", name2);
-      button.disabled = disabled;
-      button.addEventListener("click", (event) => {
+    const icon = (kind, name2, run2, disabled) => {
+      const button2 = actions.createEl("button", { cls: "vam-goal-icon" });
+      appendGoalSvg(button2, kind);
+      (0, import_obsidian36.setTooltip)(button2, name2);
+      button2.setAttr("aria-label", name2);
+      button2.disabled = disabled;
+      button2.addEventListener("click", (event) => {
         event.stopPropagation();
-        run();
+        run2();
       });
-      return button;
+      return button2;
     };
     const suggestTask = this.goalSuggest.task;
     const busy = !!suggestTask && suggestTask.state !== "ready";
@@ -68116,10 +68635,10 @@ ${request.requirements}` : preset.text,
    * on the same map, opens it; a stopped, failed or late run, a closed view or another map opens nothing. The keyboard
    * moves to the list only when it was on the status bar, the goal bar or the page itself.
    */
-  openRecommendations(run, mapPath, suggestions) {
+  openRecommendations(run2, mapPath, suggestions) {
     if (!suggestions.length) return;
-    if (this.closed || this.path !== mapPath || run.owner !== this || run.status !== "done") return;
-    if (this.plugin.relevanceGrades.get(mapPath) !== run || run.controller.signal.aborted) return;
+    if (this.closed || this.path !== mapPath || run2.owner !== this || run2.status !== "done") return;
+    if (this.plugin.relevanceGrades.get(mapPath) !== run2 || run2.controller.signal.aborted) return;
     if (this.goalSuggest.task || this.presentation) return;
     this.goalSuggest.open(mapPath, suggestions, this.focusIsFreeForList());
   }
@@ -68221,42 +68740,42 @@ ${request.requirements}` : preset.text,
   /** Status bar under the toolbar, same place and look as the AIM and multi-research bars. */
   renderRelevanceStatus(parent) {
     var _a2, _b2;
-    const run = this.plugin.relevanceGrades.get(this.path);
-    if (!run) return;
-    const running2 = run.status === "running";
+    const run2 = this.plugin.relevanceGrades.get(this.path);
+    if (!run2) return;
+    const running2 = run2.status === "running";
     const bar = parent.createDiv(`vam-aim-statusbar vam-relevance-statusbar${running2 ? " is-active" : ""}`);
     bar.setAttr("aria-live", "polite");
     bar.createSpan({ cls: "vam-aim-status-title", text: t("ui.relevance_history_label") });
-    const outcome = run.outcome;
-    const text10 = running2 ? t(run.awaitingUsage ? "ui.relevance_awaiting_usage" : "ui.relevance_running") : run.status === "done" && outcome ? [
+    const outcome = run2.outcome;
+    const text10 = running2 ? t(run2.awaitingUsage ? "ui.relevance_awaiting_usage" : "ui.relevance_running") : run2.status === "done" && outcome ? [
       this.relevanceDoneText(outcome),
       outcome.pinned && outcome.scope !== "current" ? t("ui.relevance_pinned_kept_0", outcome.pinned) : "",
       outcome.failed ? t("ui.relevance_write_failed_0", outcome.failed) : ""
-    ].filter(Boolean).join(" ") : (_a2 = run.message) != null ? _a2 : "";
-    const tone2 = running2 ? " vam-status-running" : run.status === "failed" || (outcome == null ? void 0 : outcome.failed) ? " vam-status-error" : "";
+    ].filter(Boolean).join(" ") : (_a2 = run2.message) != null ? _a2 : "";
+    const tone2 = running2 ? " vam-status-running" : run2.status === "failed" || (outcome == null ? void 0 : outcome.failed) ? " vam-status-error" : "";
     bar.createSpan({ cls: `vam-aim-status-value${tone2}`, text: text10 });
     this.relevanceReceivedEl = null;
-    if (running2 && !run.awaitingUsage && !run.writing) {
+    if (running2 && !run2.awaitingUsage && !run2.writing) {
       const received = bar.createSpan({ cls: "vam-relevance-received" });
       received.setAttr("aria-hidden", "true");
       this.relevanceReceivedEl = received;
-      this.paintGoalRecommendReceived(run);
-      if (run.startedAt !== void 0) {
+      this.paintGoalRecommendReceived(run2);
+      if (run2.startedAt !== void 0) {
         const elapsed = bar.createSpan({
           cls: "vam-research-elapsed vam-relevance-elapsed",
-          text: this.researchElapsedText(run.startedAt)
+          text: this.researchElapsedText(run2.startedAt)
         });
         elapsed.setAttr("aria-hidden", "true");
-        this.trackResearchElapsed(elapsed, run.startedAt);
+        this.trackResearchElapsed(elapsed, run2.startedAt);
       }
     }
     if (running2) {
-      if (!run.writing) this.button(bar, t("ui.relevance_stop"), () => this.relevanceRun.stop());
+      if (!run2.writing) this.button(bar, t("ui.relevance_stop"), () => this.relevanceRun.stop());
       return;
     }
     if ((outcome == null ? void 0 : outcome.changes.length) || ((_b2 = outcome == null ? void 0 : outcome.conflicts) == null ? void 0 : _b2.length)) {
-      this.button(bar, t("ui.relevance_view_changes"), () => this.openRelevanceSummary(run));
-      if (this.history.undoEntry && this.history.undoEntry === run.historyEntry)
+      this.button(bar, t("ui.relevance_view_changes"), () => this.openRelevanceSummary(run2));
+      if (this.history.undoEntry && this.history.undoEntry === run2.historyEntry)
         this.button(bar, t("ui.undo"), () => this.enqueue(() => this.travel(false)));
     }
     this.iconButton(bar, "x", t("ui.dismiss"), () => {
@@ -68267,10 +68786,10 @@ ${request.requirements}` : preset.text,
     });
   }
   /** Rewrites only the "N of M received" text; nothing is repainted. Empty (and hidden) until the first tier arrives. */
-  paintGoalRecommendReceived(run) {
+  paintGoalRecommendReceived(run2) {
     const element = this.relevanceReceivedEl;
     if (!element) return;
-    const progress = run.received;
+    const progress = run2.received;
     const text10 = progress ? progress.total === void 0 ? t("ui.relevance_received_changes_0", progress.received) : t("ui.relevance_received_0_1", progress.received, progress.total) : "";
     element.setText(text10 ? t("ui.aim_stage_with_elapsed_0_1", "", text10) : "");
   }
@@ -68281,9 +68800,9 @@ ${request.requirements}` : preset.text,
       outcome.recommended ? t("ui.relevance_recommended_0", outcome.recommended) : ""
     ].filter(Boolean).join(", ");
   }
-  openRelevanceSummary(run) {
+  openRelevanceSummary(run2) {
     var _a2, _b2, _c;
-    const outcome = run.outcome;
+    const outcome = run2.outcome;
     new RelevanceSummaryModal(this.app, {
       rows: ((_a2 = outcome == null ? void 0 : outcome.changes) != null ? _a2 : []).map((change2) => ({
         id: change2.id,
@@ -68339,12 +68858,12 @@ ${request.requirements}` : preset.text,
       );
     return new Promise((resolve, reject2) => {
       var _a2;
-      const run = (work) => {
+      const run2 = (work) => {
         write(work).then(() => resolve(true), reject2);
       };
       const node = nodeOf(suggestion2.targetId);
       if (suggestion2.kind === "reduce") {
-        this.confirmRemoveNode(node, { run, dismissed: () => resolve(false) });
+        this.confirmRemoveNode(node, { run: run2, dismissed: () => resolve(false) });
         return;
       }
       const into = nodeOf((_a2 = suggestion2.mergeIntoId) != null ? _a2 : "");
@@ -68360,7 +68879,7 @@ ${request.requirements}` : preset.text,
           {
             label: t("ui.structure_review_merge_confirm", name2(node)),
             warning: true,
-            action: () => run(() => this.removeToUnassigned(node, false, into.id))
+            action: () => run2(() => this.removeToUnassigned(node, false, into.id))
           }
         ],
         () => resolve(false)
@@ -69228,16 +69747,16 @@ ${request.requirements}` : preset.text,
     } else this.changed(file);
   }
   iconButton(parent, icon, label, action) {
-    const button = parent.createEl("button", { cls: "clickable-icon vam-icon-button" });
-    if (this.renderingCard) button.tabIndex = -1;
-    button.setAttr("aria-label", label);
-    button.dataset.icon = icon;
-    (0, import_obsidian36.setIcon)(button, icon);
-    button.addEventListener("click", (event) => {
+    const button2 = parent.createEl("button", { cls: "clickable-icon vam-icon-button" });
+    if (this.renderingCard) button2.tabIndex = -1;
+    button2.setAttr("aria-label", label);
+    button2.dataset.icon = icon;
+    (0, import_obsidian36.setIcon)(button2, icon);
+    button2.addEventListener("click", (event) => {
       event.stopPropagation();
       action(event);
     });
-    return button;
+    return button2;
   }
   /** "Switch mind map": a searchable list (type to filter) whose rows say how the maps differ. */
   openMapSwitcher() {
@@ -69565,14 +70084,14 @@ ${request.requirements}` : preset.text,
     action();
   }
   button(parent, text10, action, disabled = false) {
-    const button = parent.createEl("button", { text: text10 });
-    if (this.renderingCard) button.tabIndex = -1;
-    button.disabled = disabled;
-    button.addEventListener("click", (event) => {
+    const button2 = parent.createEl("button", { text: text10 });
+    if (this.renderingCard) button2.tabIndex = -1;
+    button2.disabled = disabled;
+    button2.addEventListener("click", (event) => {
       event.stopPropagation();
       action();
     });
-    return button;
+    return button2;
   }
   /** Returns the snapshots its history entry restores (taken after any conflict was resolved), or null when nothing ran. */
   async mapChange(change2, rebuildDerivedData = true) {
@@ -70316,7 +70835,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       (_a2 = hooks.dismissed) == null ? void 0 : _a2.call(hooks);
       return;
     }
-    const run = (_b2 = hooks.run) != null ? _b2 : (work) => this.enqueue(work);
+    const run2 = (_b2 = hooks.run) != null ? _b2 : (work) => this.enqueue(work);
     new ChoiceModal(
       this.app,
       t("ui.remove_from_map"),
@@ -70325,12 +70844,12 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         {
           label: t("ui.remove_only_this_node_children_become_roots"),
           warning: true,
-          action: () => run(() => this.removeToUnassigned(node, false))
+          action: () => run2(() => this.removeToUnassigned(node, false))
         },
         {
           label: t("ui.remove_entire_branch"),
           warning: true,
-          action: () => run(() => this.removeToUnassigned(node, true))
+          action: () => run2(() => this.removeToUnassigned(node, true))
         }
       ],
       hooks.dismissed
@@ -71531,9 +72050,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       event.stopPropagation();
       this.openUnlinkMenu(text10.id, unlink);
     });
-    for (const button of [connect, unlink]) {
-      button.addEventListener("keydown", (event) => event.stopPropagation());
-      button.addEventListener("dblclick", (event) => event.stopPropagation());
+    for (const button2 of [connect, unlink]) {
+      button2.addEventListener("keydown", (event) => event.stopPropagation());
+      button2.addEventListener("dblclick", (event) => event.stopPropagation());
     }
     this.enableTextDrag(el, text10);
   }
@@ -74041,9 +74560,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     var _a2, _b2, _c, _d, _e;
     (_a2 = this.chat) == null ? void 0 : _a2.refreshReplyUndo();
     const undo = (_b2 = this.contentEl) == null ? void 0 : _b2.querySelector("[data-history=undo]"), redo = (_c = this.contentEl) == null ? void 0 : _c.querySelector("[data-history=redo]");
-    const label = (button, text10) => {
-      if (button.dataset.icon) button.setAttr("aria-label", text10);
-      else button.setText(text10);
+    const label = (button2, text10) => {
+      if (button2.dataset.icon) button2.setAttr("aria-label", text10);
+      else button2.setText(text10);
     };
     if (undo) {
       undo.disabled = !this.history.canUndo;
@@ -74216,18 +74735,18 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const editable = !this.presentation && !this.selection.state.multiSelectMode;
     const selected = map.nodes.find((node) => node.id === this.selection.state.selected);
     const note = selected ? this.notes.get(selected.id) : void 0;
-    const run = (applies, work) => {
+    const run2 = (applies, work) => {
       if (!applies) return false;
       if (!checking) work();
       return true;
     };
     switch (action) {
       case "add-topic":
-        return run(editable, () => this.enqueue(() => this.addNode(null)));
+        return run2(editable, () => this.enqueue(() => this.addNode(null)));
       case "add-subtopic":
-        return run(editable && !!selected, () => this.enqueue(() => this.addNode(selected)));
+        return run2(editable && !!selected, () => this.enqueue(() => this.addNode(selected)));
       case "add-sibling":
-        return run(
+        return run2(
           editable && !!selected,
           () => this.enqueue(() => {
             var _a2;
@@ -74235,24 +74754,24 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           })
         );
       case "ai-explore":
-        return run(editable && !!selected, () => this.openTopicChat(selected));
+        return run2(editable && !!selected, () => this.openTopicChat(selected));
       case "rename":
-        return run(editable && !!note, () => this.startCardTitleEdit(selected, { select: true }));
+        return run2(editable && !!note, () => this.startCardTitleEdit(selected, { select: true }));
       case "open-details":
-        return run(!!selected, () => this.openDetails(selected));
+        return run2(!!selected, () => this.openDetails(selected));
       case "toggle-collapse":
-        return run(
+        return run2(
           editable && !!selected && map.nodes.some((item) => item.parentId === selected.id),
           () => this.collapseByKey(selected)
         );
       case "zoom-fit":
-        return run(!!this.viewportEl, () => this.fit());
+        return run2(!!this.viewportEl, () => this.fit());
       case "zoom-reset":
-        return run(!!this.viewportEl, () => this.zoomBy(1 / map.viewport.zoom));
+        return run2(!!this.viewportEl, () => this.zoomBy(1 / map.viewport.zoom));
       case "search":
-        return run(!this.presentation, () => this.openMapSearch());
+        return run2(!this.presentation, () => this.openMapSearch());
       case "shortcuts":
-        return run(true, () => this.openKeyboardShortcuts());
+        return run2(true, () => this.openKeyboardShortcuts());
     }
   }
   openKeyboardShortcuts() {
@@ -75104,7 +75623,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         relevance.tier,
         tierLabel,
         t("ui.relevance_tag_label_0", tierLabel),
-        (button) => this.openRelevanceMenu(node, relevance.tier, button),
+        (button2) => this.openRelevanceMenu(node, relevance.tier, button2),
         ((_n = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _n.status) === "running"
       );
       if (relevance.manual) {
@@ -75231,12 +75750,12 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       }
     }
     const tools = card.createDiv("vam-node-tools");
-    const count3 = this.paintChildIndex ? branchSize(this.paintChildIndex, node.id) : descendants(this.map.nodes, node.id).size;
-    if (count3) {
+    const count4 = this.paintChildIndex ? branchSize(this.paintChildIndex, node.id) : descendants(this.map.nodes, node.id).size;
+    if (count4) {
       if (node.collapsed) {
         const collapse = this.button(
           header2,
-          t("ui.expand_0", count3),
+          t("ui.expand_0", count4),
           () => this.whenEditing(() => this.toggleCollapsed(node))
         );
         collapse.addClass("vam-collapse-button", "is-collapsed");
@@ -75254,13 +75773,13 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     (0, import_obsidian36.setIcon)(details, "panel-right");
     details.setAttr("aria-label", t("ui.node_tool_details"));
     const iconTool = (title2, icon, cls, action) => {
-      const button = this.button(tools, "", action);
-      button.addClass("vam-node-tool", cls);
-      (0, import_obsidian36.setIcon)(button, icon);
-      button.setAttr("aria-label", title2);
-      return button;
+      const button2 = this.button(tools, "", action);
+      button2.addClass("vam-node-tool", cls);
+      (0, import_obsidian36.setIcon)(button2, icon);
+      button2.setAttr("aria-label", title2);
+      return button2;
     };
-    if (count3 && !node.collapsed)
+    if (count4 && !node.collapsed)
       iconTool(
         t("ui.collapse"),
         "chevrons-down-up",
@@ -75306,9 +75825,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         card,
         argumentEnabled(this.plugin) ? argumentView : { ...argumentView, action: void 0, resume: void 0 },
         () => void this.rerunFromDefinitions(node.id),
-        (button) => {
+        (button2) => {
           this.argumentBarPressed = { path: this.path, action: "resume" };
-          requestArgumentResume(this.plugin, this.path, button, () => this.argumentBarPressed = null);
+          requestArgumentResume(this.plugin, this.path, button2, () => this.argumentBarPressed = null);
         }
       );
     else if (textEditable && ((_A = this.inlineSummary) == null ? void 0 : _A.id) === node.id) this.paintCardSummaryEdit(card, node);
@@ -75439,7 +75958,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     card.addEventListener("focusin", (event) => {
       if (event.target === card) aimTopic(true);
       this.alignCardTools(card);
-      for (const button of toolButtons()) button.tabIndex = 0;
+      for (const button2 of toolButtons()) button2.tabIndex = 0;
       if (this.restoringFocus || event.target !== card || !note || this.selection.state.multiSelectMode || !card.matches(":focus-visible"))
         return;
       this.clearHoverTimer();
@@ -75450,7 +75969,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     card.addEventListener("focusout", (event) => {
       if (event.relatedTarget instanceof Node && card.contains(event.relatedTarget)) return;
       aimTopic(false);
-      for (const button of toolButtons()) button.tabIndex = -1;
+      for (const button2 of toolButtons()) button2.tabIndex = -1;
       this.hideHoverCardSoon();
     });
     this.arrangeCardCover(card);
@@ -76099,9 +76618,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const label = this.plugin.modelLabel(note.model), text10 = t("ui.card_model_override_0", label), tag = header2.createSpan({ cls: "vam-node-model-tag", text: label });
       tag.setAttr("aria-hidden", "true");
       tag.setAttr("title", text10);
-      const row = cardMarkerRows.get(card);
+      const row2 = cardMarkerRows.get(card);
       if (old) old.replaceWith(tag);
-      else if (row && row.parentElement === header2) row.after(tag);
+      else if (row2 && row2.parentElement === header2) row2.after(tag);
       cardModelTags.set(header2, tag);
       card.dataset.modelText = text10;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, text10));
@@ -76124,9 +76643,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     (_a2 = cardImageRelationMarks.get(card)) == null ? void 0 : _a2.remove();
     cardImageRelationMarks.delete(card);
     if (!this.map || !this.relationsEnabled()) return;
-    const count3 = anchorRelationsForTopic((_b2 = this.map.canvasItems) != null ? _b2 : [], id).length;
-    if (!count3) return;
-    const text10 = t("ui.card_image_relations_0", count3), mark2 = card.createDiv({ cls: "vam-image-relations-mark" });
+    const count4 = anchorRelationsForTopic((_b2 = this.map.canvasItems) != null ? _b2 : [], id).length;
+    if (!count4) return;
+    const text10 = t("ui.card_image_relations_0", count4), mark2 = card.createDiv({ cls: "vam-image-relations-mark" });
     cardImageRelationMarks.set(card, mark2);
     mark2.setAttr("aria-label", text10);
     const icon = mark2.createSpan({ cls: "vam-image-relations-mark-icon" });
@@ -76146,13 +76665,13 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }
     if (markers.length) {
       const kindTag = old ? null : header2.querySelector(".vam-hypothesis-tag");
-      const row = header2.createSpan("vam-card-markers vam-hypothesis-tag");
-      if (old) old.replaceWith(row);
-      else if (kindTag) kindTag.after(row);
-      row.setAttr("aria-hidden", "true");
-      cardMarkerRows.set(card, row);
+      const row2 = header2.createSpan("vam-card-markers vam-hypothesis-tag");
+      if (old) old.replaceWith(row2);
+      else if (kindTag) kindTag.after(row2);
+      row2.setAttr("aria-hidden", "true");
+      cardMarkerRows.set(card, row2);
       for (const marker3 of markers) {
-        const mark2 = row.createSpan({ cls: "vam-marker", text: markerSymbol(marker3) });
+        const mark2 = row2.createSpan({ cls: "vam-marker", text: markerSymbol(marker3) });
         mark2.dataset.marker = marker3;
       }
       card.dataset.markerText = text10;
@@ -76729,9 +77248,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
             ]);
           else backgroundResultNotice(t("ui.background_research_done_0", title), view);
         } else {
-          const count3 = (_d = (_c = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _c.length) != null ? _d : 0;
+          const count4 = (_d = (_c = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _c.length) != null ? _d : 0;
           backgroundResultNotice(t("ui.background_expand_ready_0", title), {
-            label: t("ui.view_0_expansion_suggestions", count3),
+            label: t("ui.view_0_expansion_suggestions", count4),
             open: () => this.openNodePanel(node, "proposals")
           });
         }
@@ -77590,9 +78109,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         continue;
       }
       if (action.action === "research_standard") {
-        const run = await this.runTopicChatResearch(target, note, mode, language2, action.direction, signal);
-        if (run.result) done++;
-        else if (run.failure) reason = run.failure;
+        const run2 = await this.runTopicChatResearch(target, note, mode, language2, action.direction, signal);
+        if (run2.result) done++;
+        else if (run2.failure) reason = run2.failure;
       } else if (action.action === "expand") {
         const outcome = await this.chatExpand(target, action.direction, signal);
         if (outcome.status === "succeeded") done++;
@@ -77867,7 +78386,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     section3.createEl("p", { text: t("ui.select_and_edit_suggestions_subtopics_are_created_only_after") });
     let showCount = (_count) => {
     };
-    const list2 = renderProposalList(section3, suggestions, (count3) => showCount(count3), { rootTitle: note.title });
+    const list2 = renderProposalList(section3, suggestions, (count4) => showCount(count4), { rootTitle: note.title });
     const researchLabel = section3.createEl("label", { cls: "vam-field vam-next-toggle" });
     const shallow = researchLabel.createEl("input", { type: "checkbox" });
     shallow.checked = !!((_a2 = this.plugin.pendingResearchOptions.get(node.path)) == null ? void 0 : _a2.shallowResearch);
@@ -77880,9 +78399,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     });
     actions.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close == null ? void 0 : close());
     const create = actions.createEl("button", { text: t("ui.create_0_subtopics", list2.count()), cls: "mod-cta" });
-    showCount = (count3) => {
-      create.setText(t("ui.create_0_subtopics", count3));
-      create.disabled = count3 === 0;
+    showCount = (count4) => {
+      create.setText(t("ui.create_0_subtopics", count4));
+      create.disabled = count4 === 0;
       status.setText("");
     };
     create.addEventListener("click", () => {
@@ -78275,29 +78794,29 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       return;
     }
     const hosts = links.map((href) => this.linkHost(href)).join(t("ui.list_separator"));
-    const button = header2.createEl("button", {
+    const button2 = header2.createEl("button", {
       cls: "vam-card-links",
       text: links.length > 1 ? `\u2197${links.length}` : "\u2197"
     });
-    button.type = "button";
-    button.tabIndex = card.matches(":focus-within") ? 0 : -1;
-    button.setAttr("aria-label", t("ui.topic_links_aria_0", hosts));
-    button.setAttr("title", hosts);
-    button.addEventListener("pointerdown", (event) => event.stopPropagation());
-    button.addEventListener("dblclick", (event) => event.stopPropagation());
-    button.addEventListener("click", (event) => {
+    button2.type = "button";
+    button2.tabIndex = card.matches(":focus-within") ? 0 : -1;
+    button2.setAttr("aria-label", t("ui.topic_links_aria_0", hosts));
+    button2.setAttr("title", hosts);
+    button2.addEventListener("pointerdown", (event) => event.stopPropagation());
+    button2.addEventListener("dblclick", (event) => event.stopPropagation());
+    button2.addEventListener("click", (event) => {
       event.stopPropagation();
       event.preventDefault();
       const current = this.linksOf(id);
       if (current.length === 1) this.openTopicLink(current[0]);
-      else if (current.length) this.showTopicLinkMenu(button, current);
+      else if (current.length) this.showTopicLinkMenu(button2, current);
     });
-    if (old) old.replaceWith(button);
+    if (old) old.replaceWith(button2);
     else {
-      const row = cardMarkerRows.get(card);
-      if (row && row.parentElement === header2) row.after(button);
+      const row2 = cardMarkerRows.get(card);
+      if (row2 && row2.parentElement === header2) row2.after(button2);
     }
-    cardLinkButtons.set(card, button);
+    cardLinkButtons.set(card, button2);
   }
   /** A small menu of the topic's links (one item per host); arrow keys move, Enter opens, Escape closes and returns focus. */
   showTopicLinkMenu(trigger, links) {
@@ -78372,14 +78891,14 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       var _a2;
       list2.empty();
       this.linksOf(node.id).forEach((href, index) => {
-        const row = list2.createEl("li", { cls: "vam-topic-link-row" });
-        const open2 = row.createEl("button", { text: href, cls: "vam-topic-link-open" });
+        const row2 = list2.createEl("li", { cls: "vam-topic-link-row" });
+        const open2 = row2.createEl("button", { text: href, cls: "vam-topic-link-open" });
         open2.type = "button";
         open2.setAttr("title", t("ui.topic_link_open"));
         open2.setAttr("aria-label", t("ui.topic_link_open_0", this.linkHost(href)));
         open2.addEventListener("click", () => this.openTopicLink(href));
         if (editable) {
-          const remove = row.createEl("button", { text: "\xD7", cls: "vam-topic-link-remove" });
+          const remove = row2.createEl("button", { text: "\xD7", cls: "vam-topic-link-remove" });
           remove.type = "button";
           remove.setAttr("aria-label", t("ui.topic_link_remove_0", this.linkHost(href)));
           remove.addEventListener(
@@ -78594,24 +79113,24 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const managed = this.isArgumentCard(node.id);
     if (!this.map || !managed && ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) !== true) return;
     card.dataset.aiLocked = "true";
-    const button = header2.createEl("button", { cls: "vam-card-ai-lock" });
-    cardAiLockButtons.set(card, button);
-    button.type = "button";
-    (0, import_obsidian36.setIcon)(button, "lock");
-    button.tabIndex = -1;
+    const button2 = header2.createEl("button", { cls: "vam-card-ai-lock" });
+    cardAiLockButtons.set(card, button2);
+    button2.type = "button";
+    (0, import_obsidian36.setIcon)(button2, "lock");
+    button2.tabIndex = -1;
     if (managed) {
-      button.disabled = true;
-      button.setAttr("aria-disabled", "true");
-      button.setAttr("aria-pressed", "true");
-      button.setAttr("aria-label", t("ui.ai_lock_state_managed"));
-      button.setAttr("title", t("ui.ai_lock_state_managed"));
+      button2.disabled = true;
+      button2.setAttr("aria-disabled", "true");
+      button2.setAttr("aria-pressed", "true");
+      button2.setAttr("aria-label", t("ui.ai_lock_state_managed"));
+      button2.setAttr("title", t("ui.ai_lock_state_managed"));
     } else {
-      button.setAttr("aria-label", t("ui.ai_unlock_card"));
-      button.setAttr("title", t("ui.ai_unlock_card"));
+      button2.setAttr("aria-label", t("ui.ai_unlock_card"));
+      button2.setAttr("title", t("ui.ai_unlock_card"));
     }
-    button.addEventListener("pointerdown", (event) => event.stopPropagation());
-    button.addEventListener("dblclick", (event) => event.stopPropagation());
-    button.addEventListener("click", (event) => {
+    button2.addEventListener("pointerdown", (event) => event.stopPropagation());
+    button2.addEventListener("dblclick", (event) => event.stopPropagation());
+    button2.addEventListener("click", (event) => {
       event.stopPropagation();
       event.preventDefault();
       this.enqueue(() => this.setAiLock([node], false));
@@ -79549,7 +80068,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     void this.loadBookRoot();
   }
   paintBookPanel() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
     const side = this.bookSideEl;
     const map = this.map;
     const path = this.path;
@@ -79559,9 +80078,20 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const doc = this.contentEl.ownerDocument;
     const held = doc == null ? void 0 : doc.activeElement;
     const heldCard = held && side.contains(held) ? (_b2 = (_a2 = held.dataset) == null ? void 0 : _a2.card) != null ? _b2 : null : null;
-    const draftCaret = heldCard ? (_c = held.selectionStart) != null ? _c : null : null;
+    const heldAct = heldCard ? (_d = (_c = held == null ? void 0 : held.dataset) == null ? void 0 : _c.act) != null ? _d : null : null;
+    const draftCaret = heldCard ? (_e = held.selectionStart) != null ? _e : null : null;
     side.empty();
     const progress = this.plugin.getBookPipelineProgress(path);
+    const phase = (_f = progress == null ? void 0 : progress.phase) != null ? _f : read.data.phase;
+    if (phase === "gate2" || phase === "done") {
+      this.paintBookGate2(side, read.data, progress, phase === "done", heldCard, heldAct);
+      return;
+    }
+    if (phase !== "gate1") {
+      side.createEl("p", { cls: "vam-book-panel-muted", text: t("ui.book_panel_not_gate2") });
+      this.bookPanel.pendingFocus = null;
+      return;
+    }
     const data = buildGatePanel({
       order: read.data.order,
       titleOf: (id) => {
@@ -79571,12 +80101,11 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       noteOf: (id) => this.notes.get(id),
       rootRaw: this.bookPanel.rootRaw
     });
-    const gate1 = ((_d = progress == null ? void 0 : progress.phase) != null ? _d : read.data.phase) === "gate1";
     const state = this.bookPanel;
     renderGatePanel(
       side,
       data,
-      gate1,
+      true,
       state,
       {
         editPlan: (id) => void this.openBookPlan(id),
@@ -79599,19 +80128,91 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         close: () => this.closeBookPanel(),
         refresh: () => this.paintBookPanel()
       },
-      new Set((_e = progress == null ? void 0 : progress.busyCards) != null ? _e : [])
+      new Set((_g = progress == null ? void 0 : progress.busyCards) != null ? _g : [])
     );
     if (heldCard) {
       const input2 = Array.from(side.querySelectorAll(".vam-book-panel-more-input")).find(
         (item) => item.dataset.card === heldCard
       );
       input2 == null ? void 0 : input2.focus();
-      if (input2 && draftCaret !== null) (_f = input2.setSelectionRange) == null ? void 0 : _f.call(input2, draftCaret, draftCaret);
+      if (input2 && draftCaret !== null) (_h = input2.setSelectionRange) == null ? void 0 : _h.call(input2, draftCaret, draftCaret);
     }
-    if (state.pendingFocus === "title") (_g = side.querySelector(".vam-book-panel-title")) == null ? void 0 : _g.focus();
+    if (state.pendingFocus === "title") (_i = side.querySelector(".vam-book-panel-title")) == null ? void 0 : _i.focus();
     else if (state.pendingFocus === "opener")
-      (_h = this.contentEl.querySelector(".vam-book-panel-toggle")) == null ? void 0 : _h.focus();
+      (_j = this.contentEl.querySelector(".vam-book-panel-toggle")) == null ? void 0 : _j.focus();
     state.pendingFocus = null;
+  }
+  /** Gate 2 (and done): the review panel. Actions reread the card's note afterwards so the rows show the new stage. */
+  paintBookGate2(side, data, progress, done, heldCard, heldAct) {
+    var _a2, _b2, _c, _d, _e, _f, _g;
+    const map = this.map;
+    const path = this.path;
+    if (!map) return;
+    const state = this.bookPanel;
+    const view = buildGate2Panel({
+      order: data.order,
+      titleOf: (id) => {
+        var _a3, _b3, _c2, _d2;
+        return (_d2 = (_c2 = (_a3 = this.notes.get(id)) == null ? void 0 : _a3.title) != null ? _c2 : (_b3 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _b3.path) != null ? _d2 : id;
+      },
+      noteOf: (id) => this.notes.get(id),
+      startedAt: (_a2 = progress == null ? void 0 : progress.startedAt) != null ? _a2 : data.startedAt,
+      writingEndedAt: (_b2 = progress == null ? void 0 : progress.phaseStartedAt) != null ? _b2 : data.phaseStartedAt
+    });
+    renderGate2Panel(
+      side,
+      view,
+      done,
+      state,
+      {
+        open: (id) => void this.openBookNote(id),
+        rerun: async (id) => {
+          try {
+            await this.plugin.rerunBookCard(path, id);
+          } finally {
+            await this.rereadBookCard(id);
+          }
+        },
+        confirmSeam: async (id) => {
+          try {
+            await this.plugin.confirmBookSeam(path, id);
+          } finally {
+            await this.rereadBookCard(id);
+          }
+        },
+        finish: () => this.plugin.finishBookRun(path),
+        showChat: () => this.showChatFromBookPanel(),
+        close: () => this.closeBookPanel(),
+        refresh: () => this.paintBookPanel()
+      },
+      new Set((_c = progress == null ? void 0 : progress.busyCards) != null ? _c : [])
+    );
+    const all = (selector) => Array.from(side.querySelectorAll(selector));
+    if (state.pendingFocus === "title") (_d = side.querySelector(".vam-book-panel-title")) == null ? void 0 : _d.focus();
+    else if (state.pendingFocus === "opener")
+      (_e = this.contentEl.querySelector(".vam-book-panel-toggle")) == null ? void 0 : _e.focus();
+    else if (heldCard) {
+      const same2 = all("[data-card]").find((item) => item.dataset.card === heldCard && item.dataset.act === heldAct);
+      const target = (_f = same2 != null ? same2 : all("[data-row]").find((item) => item.dataset.row === heldCard)) != null ? _f : side.querySelector(".vam-book-panel-title");
+      target == null ? void 0 : target.focus();
+    } else if (heldAct === "finish")
+      (_g = all("[data-act]").find((item) => item.dataset.act === "finish")) == null ? void 0 : _g.focus();
+    state.pendingFocus = null;
+  }
+  /** A card's note opens in a tab. */
+  async openBookNote(id) {
+    var _a2;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+    const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
+    if (!(file instanceof import_obsidian36.TFile)) {
+      new import_obsidian36.Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
+      return;
+    }
+    try {
+      await this.app.workspace.getLeaf("tab").openFile(file);
+    } catch (error) {
+      new import_obsidian36.Notice(error instanceof Error ? error.message : String(error));
+    }
   }
   /** The root note's file text (the thread and the editorial decisions live there); repaints the panel when it differs. */
   async loadBookRoot() {
@@ -79850,8 +80451,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const ownModel = new Set(resolved.filter((item) => item.origin === "override").map((item) => item.path));
       const models = request.model ? [request.model] : [...new Set(resolved.map((item) => item.origin === "override" ? item.model : current.model))];
       if (!models.length) models.push(this.plugin.settings.cliModel);
-      const confirmEach = async (index, run) => index >= models.length ? (await run(), true) : this.plugin.confirmAiUsage(models[index], async () => {
-        await confirmEach(index + 1, run);
+      const confirmEach = async (index, run2) => index >= models.length ? (await run2(), true) : this.plugin.confirmAiUsage(models[index], async () => {
+        await confirmEach(index + 1, run2);
       });
       await confirmEach(0, async () => {
         var _a3, _b3;
@@ -80114,9 +80715,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   renderSelectionBar(workspace) {
     var _a2, _b2;
     const selection = workspace.createDiv("vam-selection-bar");
-    const count3 = this.selection.state.multiSelected.size;
-    (_a2 = workspace.toggleClass) == null ? void 0 : _a2.call(workspace, "has-selection-bar", count3 > 0);
-    if (!count3) {
+    const count4 = this.selection.state.multiSelected.size;
+    (_a2 = workspace.toggleClass) == null ? void 0 : _a2.call(workspace, "has-selection-bar", count4 > 0);
+    if (!count4) {
       selection.addClass("is-empty");
       return selection;
     }
@@ -80126,26 +80727,26 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }).filter(Boolean);
     selection.createSpan({
       attr: { dir: "auto" },
-      text: t("ui.selected_0_1_2", count3, names3.slice(0, 2).join(t("ui.list_separator")), names3.length > 2 ? "\u2026" : "")
+      text: t("ui.selected_0_1_2", count4, names3.slice(0, 2).join(t("ui.list_separator")), names3.length > 2 ? "\u2026" : "")
     });
     const check = this.mergeCheck(), merge = this.button(selection, t("ui.merge"), () => this.openMerge());
-    if (count3 > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count3));
-    if (count3 > 1) merge.addClass("mod-cta");
+    if (count4 > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count4));
+    if (count4 > 1) merge.addClass("mod-cta");
     if (!check.ok) {
       merge.setAttr("aria-disabled", "true");
       merge.setAttr("title", t(check.reason));
     }
     const running2 = ((_b2 = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _b2.status) === "running";
     const research = this.button(selection, t("ui.multi_research"), () => this.openMultiResearch(), running2);
-    research.setAttr("aria-label", count3 > 1 ? t("ui.research_0_topics", count3) : t("ui.research_one_topic"));
-    if (count3 === 1) research.addClass("mod-cta");
+    research.setAttr("aria-label", count4 > 1 ? t("ui.research_0_topics", count4) : t("ui.research_one_topic"));
+    if (count4 === 1) research.addClass("mod-cta");
     this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false));
     const more = this.button(selection, t("ui.card_more"), () => {
     });
     more.setAttr("aria-label", t("ui.selection_more_hint"));
     more.setAttr("aria-haspopup", "menu");
     more.addClass("vam-selection-more");
-    more.addEventListener("click", (event) => this.openSelectionMoreMenu(event, count3));
+    more.addEventListener("click", (event) => this.openSelectionMoreMenu(event, count4));
     const help = this.button(
       selection,
       t("ui.selection_help"),
@@ -80162,16 +80763,16 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     return selection;
   }
   /** What the narrow selection bar has no room for: Synthesize, Copy to…, frame, summary bracket, AI lock, Clear, Remove. */
-  openSelectionMoreMenu(event, count3) {
+  openSelectionMoreMenu(event, count4) {
     const menu = this.newMenu();
     const add = (title, icon, action, disabled = false) => {
       menu.addItem((item) => item.setTitle(title).setIcon(icon).setDisabled(disabled).onClick(action));
     };
     add(
-      count3 > 1 ? t("ui.synthesize_0_topics", count3) : t("ui.synthesize"),
+      count4 > 1 ? t("ui.synthesize_0_topics", count4) : t("ui.synthesize"),
       "git-merge",
       () => this.integrateSelected(),
-      count3 < 2
+      count4 < 2
     );
     add(t("ui.copy_to"), "copy", () => this.chooseSelectedParent(true));
     add(t("ui.canvas_boundary_add"), "square-dashed", () => this.openAddBoundary());
@@ -80388,15 +80989,15 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           return t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
         const language2 = this.plugin.settings.language;
         task = direction || synthesisGoalTask(language2);
-        const run = await this.detailTemplateFor(
+        const run2 = await this.detailTemplateFor(
           node,
           options == null ? void 0 : options.noteStyle,
           void 0,
           (_a3 = options == null ? void 0 : options.outputLanguage) != null ? _a3 : language2
         );
-        const detailTemplate = run.template;
-        synthesisRun = run;
-        updateMode = (options == null ? void 0 : options.subtreeIntegration) ? integrationUpdateMode(run) : run.updateMode;
+        const detailTemplate = run2.template;
+        synthesisRun = run2;
+        updateMode = (options == null ? void 0 : options.subtreeIntegration) ? integrationUpdateMode(run2) : run2.updateMode;
         return {
           detailTemplate,
           updateMode,
@@ -80414,10 +81015,10 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       buildContext: async (note) => {
         var _a3, _b2, _c, _d, _e;
         const language2 = this.plugin.settings.language;
-        const run = synthesisRun;
+        const run2 = synthesisRun;
         const synthesisStyle = {
-          tone: run.toneText ? { toneText: run.toneText } : {},
-          style: run.contextFields
+          tone: run2.toneText ? { toneText: run2.toneText } : {},
+          style: run2.contextFields
         };
         const outlineText = (options == null ? void 0 : options.subtreeIntegration) ? subtreeOutlineText(buildSubtreeOutline(this.subtreePlanNodes(), node.id)) : "";
         return withThinkingOrigin(
@@ -80445,9 +81046,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
             researchMode: (_c = options == null ? void 0 : options.researchMode) != null ? _c : "local",
             researchDepth: (_d = options == null ? void 0 : options.researchDepth) != null ? _d : "normal",
             visualMode: (_e = options == null ? void 0 : options.visualMode) != null ? _e : note.visualMode,
-            detailTemplate: run.template,
+            detailTemplate: run2.template,
             ...synthesisStyle.style,
-            updateMode: updateMode != null ? updateMode : run.updateMode,
+            updateMode: updateMode != null ? updateMode : run2.updateMode,
             ...outlineText ? { subtreeOutline: outlineText } : {},
             addCharts: true
           },
@@ -82334,8 +82935,8 @@ ${note.detail.trim()}` : "",
   resumeChatChain(message) {
     return this.chatChainRunner.resumeChatChain(message);
   }
-  interruptChain(run, reason) {
-    this.chatChainRunner.interruptChain(run, reason);
+  interruptChain(run2, reason) {
+    this.chatChainRunner.interruptChain(run2, reason);
   }
   chatChainPorts() {
     return {
@@ -82406,7 +83007,7 @@ ${note.detail.trim()}` : "",
         ...await this.buildChatRequest(message, this.chat, origin, signal),
         ...this.usageMapField()
       }),
-      confirmAiUsage: (model, run, hooks) => this.plugin.confirmAiUsage(model, run, hooks),
+      confirmAiUsage: (model, run2, hooks) => this.plugin.confirmAiUsage(model, run2, hooks),
       beginRecord: (turn, request, origin) => this.beginChatRecord(this.chat, turn, request, origin),
       endRecord: (status, fields) => this.endChatRecord(status, fields),
       markLogged: (answer) => this.chatRecordSession.markLogged(answer),
@@ -82424,22 +83025,22 @@ ${note.detail.trim()}` : "",
       requestChat: (...args) => this.plugin.mapChat.chat(...args),
       researchSent: () => this.chatResearchSent,
       autoApply: () => this.chatAutoApply,
-      planOptions: (run, request) => {
+      planOptions: (run2, request) => {
         var _a2;
         return {
           diagrams: this.plugin.settings.addDiagramsAfterResearch,
           mapAiMode: (_a2 = this.map) == null ? void 0 : _a2.aiMode,
           imageMode: this.chatImageMode(),
           imageAttached: !!request.imageDataUrl,
-          chain: planChainOf(run.state),
+          chain: planChainOf(run2.state),
           autoApply: this.chatAutoApply,
           mapFolder: this.path.slice(0, Math.max(0, this.path.lastIndexOf("/"))),
           readablePaths: this.chatFiles.readablePaths(),
-          callsSoFar: run.state.calls,
+          callsSoFar: run2.state.calls,
           chatStartedResearch: this.chatStartedResearch,
           chatReadSources: this.chatReadsSources || request.context.mapSourcesSent === true,
           trusted: {
-            createdIds: run.createdIds,
+            createdIds: run2.createdIds,
             researchedIds: new Set(
               [...this.chatResearched].filter(([, info]) => info.status === "succeeded").map(([id]) => id)
             )
@@ -82482,7 +83083,7 @@ ${note.detail.trim()}` : "",
       syncRelationClasses: () => this.syncRelationClasses(),
       button: (parent, text10, action, disabled) => this.button(parent, text10, action, disabled),
       iconButton: (parent, icon, label, action) => this.iconButton(parent, icon, label, action),
-      bindRelationRow: (row, link, ariaLabel, key4) => this.bindRelationRow(row, link, ariaLabel, key4),
+      bindRelationRow: (row2, link, ariaLabel, key4) => this.bindRelationRow(row2, link, ariaLabel, key4),
       markerId: () => this.relationMarkerId,
       marker: (id, barred) => this.relationMarker(id, barred),
       cardSearchSources: (include, enabled) => this.cardSearchSources(include, enabled),
@@ -82931,9 +83532,9 @@ ${note.detail.trim()}` : "",
     }
   }
   /** Rebuilds the derived data once for the cards a reply added, then lets the held repaint and re-read happen. */
-  async settleChatBatch(run) {
-    if (run.ownershipDirty) {
-      run.ownershipDirty = false;
+  async settleChatBatch(run2) {
+    if (run2.ownershipDirty) {
+      run2.ownershipDirty = false;
       try {
         await this.plugin.mutate(async () => {
           await this.plugin.rebuildDerivedData();
@@ -82981,7 +83582,7 @@ ${note.detail.trim()}` : "",
     const hidden = /* @__PURE__ */ new Set();
     if (!scope) this.chatFiles.startRound();
     const autoChain = options.chain && (options.chain.state.autoApply || this.chatAutoApply) ? options.chain : null;
-    const run = {
+    const run2 = {
       refs: /* @__PURE__ */ new Map(),
       // Shared with the round's work, which hands the ids to its chain.
       created: (_d = (_c = options.work) == null ? void 0 : _c.created) != null ? _d : [],
@@ -83018,7 +83619,7 @@ ${note.detail.trim()}` : "",
     const batched = adds === 0 || adds >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW;
     try {
       if (batched) this.holdChatBatch();
-      run.deferRebuild = batched;
+      run2.deferRebuild = batched;
       for (const [index, action] of result.actions.entries()) {
         if (action.kind === "read_md_file") {
           hidden.add(index);
@@ -83059,7 +83660,7 @@ ${note.detail.trim()}` : "",
           continue;
         }
         if (action.kind === "create_map") {
-          await this.settleChatBatch(run);
+          await this.settleChatBatch(run2);
           const outcome = await this.chatCreateMap(action.title, anchor, same2);
           if (batched) this.holdChatBatch();
           if (outcome.status === "done") {
@@ -83078,11 +83679,11 @@ ${note.detail.trim()}` : "",
         const write = key4 && movedRoot && key4.startsWith(`${movedRoot.from}/`) ? { ...action, path: `${movedRoot.to}${key4.slice(movedRoot.from.length)}` } : action;
         const box = { outcome: { status: "done" } };
         try {
-          const unsaved = autoChain ? await this.backupBeforeAutoWrite(autoChain, write, run) : null;
+          const unsaved = autoChain ? await this.backupBeforeAutoWrite(autoChain, write, run2) : null;
           if (unsaved) box.outcome = unsaved;
           else
             await this.plugin.mutate(async () => {
-              box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own2, same2, run));
+              box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own2, same2, run2));
             });
         } catch (error) {
           box.outcome = { status: "failed", reason: errorMessage6(error) };
@@ -83095,14 +83696,14 @@ ${note.detail.trim()}` : "",
         if (box.outcome.status === "done" && (action.kind === "rename_topic" || action.kind === "update_summary" || action.kind === "edit_topic_note"))
           resized.add(action.nodeId);
         if (action.kind === "auto_layout" && box.outcome.status === "done") {
-          laidOutCount = run.created.length;
+          laidOutCount = run2.created.length;
           layoutDone = true;
         }
         lines[index] = this.chatLine(label, box.outcome);
       }
       let arranged = false;
-      if (!scope && run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW && !noNewMap && same2() && // A reply that made a ring places the ring and the other new cards below, never the whole map again.
-      !((_f = run.ringImages) == null ? void 0 : _f.size) && !result.actions.some((action) => action.kind === "auto_layout")) {
+      if (!scope && run2.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW && !noNewMap && same2() && // A reply that made a ring places the ring and the other new cards below, never the whole map again.
+      !((_f = run2.ringImages) == null ? void 0 : _f.size) && !result.actions.some((action) => action.kind === "auto_layout")) {
         try {
           await this.plugin.mutate(
             () => this.history.ownWrites(async () => {
@@ -83136,8 +83737,8 @@ ${note.detail.trim()}` : "",
       }
       if (arranged) lines.push({ status: "done", text: t("ui.map_chat_auto_layout_added") });
       if (!same2()) stopped = true;
-      const ringed = ((_g = run.ringImages) == null ? void 0 : _g.size) ? new Set(run.ringImages) : null;
-      const rough = batched && !arranged && (stopped || layoutDone || !!ringed || !!scope) ? run.created.slice(laidOutCount) : [];
+      const ringed = ((_g = run2.ringImages) == null ? void 0 : _g.size) ? new Set(run2.ringImages) : null;
+      const rough = batched && !arranged && (stopped || layoutDone || !!ringed || !!scope) ? run2.created.slice(laidOutCount) : [];
       if ((rough.length || ringed) && !this.closed && this.path === anchor.path && ((_h = this.map) == null ? void 0 : _h.id) === anchor.id) {
         try {
           await this.plugin.mutate(
@@ -83150,7 +83751,7 @@ ${note.detail.trim()}` : "",
                 if (ringed) {
                   const fresh = /* @__PURE__ */ new Set();
                   for (const imageId of ringed) {
-                    const added = (_a5 = run.ringAdded) == null ? void 0 : _a5.get(imageId);
+                    const added = (_a5 = run2.ringAdded) == null ? void 0 : _a5.get(imageId);
                     if (added == null ? void 0 : added.hadRing) {
                       const pending2 = new Set(added.topicIds);
                       for (const topicId of added.topicIds) {
@@ -83184,7 +83785,7 @@ ${note.detail.trim()}` : "",
         }
       }
     } finally {
-      await this.settleChatBatch(run);
+      await this.settleChatBatch(run2);
       const entries = this.history.closeGroup();
       if (!scope) this.chatReplyStep = void 0;
       if (wrote) {
@@ -83193,9 +83794,9 @@ ${note.detail.trim()}` : "",
             const step = await this.pushChatReplyEntry(
               entries,
               anchor.path,
-              (_i = run.notes) != null ? _i : /* @__PURE__ */ new Set(),
-              (_j = run.files) != null ? _j : /* @__PURE__ */ new Set(),
-              (_k = run.parked) != null ? _k : /* @__PURE__ */ new Set(),
+              (_i = run2.notes) != null ? _i : /* @__PURE__ */ new Set(),
+              (_j = run2.files) != null ? _j : /* @__PURE__ */ new Set(),
+              (_k = run2.parked) != null ? _k : /* @__PURE__ */ new Set(),
               record
             );
             if (!scope) this.chatReplyStep = step;
@@ -83206,9 +83807,9 @@ ${note.detail.trim()}` : "",
         this.updateHistoryButtons();
       }
     }
-    const branchRoot = ((_l = run.ringImages) == null ? void 0 : _l.size) || scope ? void 0 : this.chatBranchRoot(run);
+    const branchRoot = ((_l = run2.ringImages) == null ? void 0 : _l.size) || scope ? void 0 : this.chatBranchRoot(run2);
     if (scope) {
-    } else if ((_m = run.ringImages) == null ? void 0 : _m.size) {
+    } else if ((_m = run2.ringImages) == null ? void 0 : _m.size) {
       if (same2() && !this.closed) this.applySelectionChange(this.selection.clickEmpty());
     } else if (branchRoot && same2() && !this.closed)
       this.applySelectionChange(this.selection.setSelected(branchRoot.id));
@@ -83221,7 +83822,7 @@ ${note.detail.trim()}` : "",
       else {
         try {
           if (scope && action.kind === "run_map_action") {
-            const resolved = this.chatResolveTargets(action, run);
+            const resolved = this.chatResolveTargets(action, run2);
             const ids2 = (_n = resolved == null ? void 0 : resolved.action.nodeIds) != null ? _n : [];
             const targets = ids2.length ? ids2 : [scope.rootId];
             outcome = !resolved ? skipped("ui.map_chat_skip_parent_missing") : scope.run ? await scope.run(action, targets) : skipped("ui.map_chat_skip_unavailable");
@@ -83229,7 +83830,7 @@ ${note.detail.trim()}` : "",
             outcome = await this.chatOpenMap(action.title, anchor, same2);
             if (outcome.status === "done") touched.add(anchor.path);
           } else if (action.kind === "ask_topic_kind") {
-            const ids2 = action.nodeIds.map((id) => id.startsWith(MAP_CHAT_NEW_PREFIX) ? run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) : id).filter((id) => {
+            const ids2 = action.nodeIds.map((id) => id.startsWith(MAP_CHAT_NEW_PREFIX) ? run2.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) : id).filter((id) => {
               var _a4;
               return !!id && !!((_a4 = this.map) == null ? void 0 : _a4.nodes.some((node) => node.id === id));
             });
@@ -83242,10 +83843,10 @@ ${note.detail.trim()}` : "",
           } else {
             const resolved = this.chatResolveTargets(
               action,
-              run
+              run2
             );
             const mergeIds = (resolved == null ? void 0 : resolved.action.kind) === "run_map_action" && resolved.action.action === "merge" ? new Set(resolved.action.nodeIds) : void 0;
-            const mine = mergeIds ? ((_o = run.held) != null ? _o : []).filter((entry) => entry.ids.some((id) => mergeIds.has(id))) : [];
+            const mine = mergeIds ? ((_o = run2.held) != null ? _o : []).filter((entry) => entry.ids.some((id) => mergeIds.has(id))) : [];
             let asked;
             for (const entry of mine) {
               const change2 = chatAppearanceChange(entry.action);
@@ -83270,12 +83871,12 @@ ${note.detail.trim()}` : "",
               options.work.otherBackground = true;
             if (outcome.status !== "done" && mine.length && same2()) {
               const merged = new Set(mine.flatMap((entry) => entry.ids));
-              run.mergeSourceIds = new Set([...(_y = run.mergeSourceIds) != null ? _y : []].filter((id) => !merged.has(id)));
+              run2.mergeSourceIds = new Set([...(_y = run2.mergeSourceIds) != null ? _y : []].filter((id) => !merged.has(id)));
               for (const entry of mine) {
                 const keep = entry.ids;
                 await this.plugin.mutate(async () => {
                   await this.history.ownWrites(
-                    () => this.chatWriter.chatSetAppearance({ ...entry.action, nodeIds: keep }, (id) => id, run)
+                    () => this.chatWriter.chatSetAppearance({ ...entry.action, nodeIds: keep }, (id) => id, run2)
                   );
                 });
               }
@@ -83306,10 +83907,10 @@ ${note.detail.trim()}` : "",
     return all;
   }
   /** The root of the branch a reply made: its first card without a parent, else the first card it made. */
-  chatBranchRoot(run) {
+  chatBranchRoot(run2) {
     var _a2, _b2, _c;
     const nodes = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [];
-    const fresh = run.created.map((id) => nodes.find((node) => node.id === id)).filter((n) => !!n);
+    const fresh = run2.created.map((id) => nodes.find((node) => node.id === id)).filter((n) => !!n);
     return (_c = fresh.find((node) => !node.parentId)) != null ? _c : fresh[0];
   }
   /** Places the cards a reply made (and only those): each new branch beside its parent, a new tree below the others. */
@@ -83356,9 +83957,9 @@ ${note.detail.trim()}` : "",
   /**
    * Swaps `new:<ref>` target ids for the cards they became; null when every target was a card that was never created.
    */
-  chatResolveTargets(action, run) {
+  chatResolveTargets(action, run2) {
     if (action.kind === "select_topics" && action.all) return { action };
-    const ids2 = action.nodeIds.map((id) => id.startsWith(MAP_CHAT_NEW_PREFIX) ? run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) : id).filter((id) => !!id);
+    const ids2 = action.nodeIds.map((id) => id.startsWith(MAP_CHAT_NEW_PREFIX) ? run2.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) : id).filter((id) => !!id);
     if (action.nodeIds.length && !ids2.length) return null;
     return { action: { ...action, nodeIds: ids2 } };
   }
@@ -83487,7 +84088,7 @@ ${note.detail.trim()}` : "",
    * One write action. Runs inside `plugin.mutate`: it must not queue another one. The map's data sources are read-only for the
    * whole action: a write to one of them (through any card, any descendant of a branch) is refused as "a data source".
    */
-  async applyChatWrite(action, baseline, same2, run = { refs: /* @__PURE__ */ new Map(), created: [] }) {
+  async applyChatWrite(action, baseline, same2, run2 = { refs: /* @__PURE__ */ new Map(), created: [] }) {
     var _a2;
     const previous = this.chatReadOnlyPaths;
     this.chatReadOnlyPaths = new Set(
@@ -83497,7 +84098,7 @@ ${note.detail.trim()}` : "",
       })
     );
     try {
-      return await this.chatWriter.write(action, baseline, same2, run);
+      return await this.chatWriter.write(action, baseline, same2, run2);
     } catch (error) {
       if (error instanceof MapSourceWriteError) return guardSkipped("map_source");
       throw error;
@@ -83510,14 +84111,14 @@ ${note.detail.trim()}` : "",
    * the file is copied to the backups folder, once per file per chain. A failed backup leaves the action unwritten (skipped), and
    * the next write to the file tries the backup again. Research rewrites back up on their own and are not handled here.
    */
-  async backupBeforeAutoWrite(chain, action, run) {
+  async backupBeforeAutoWrite(chain, action, run2) {
     var _a2;
     const paths = [];
     const existing = (raw) => {
       var _a3, _b2, _c;
       if (!raw) return null;
-      const id = raw.startsWith(MAP_CHAT_NEW_PREFIX) ? (_a3 = run.refs.get(raw.slice(MAP_CHAT_NEW_PREFIX.length))) != null ? _a3 : null : raw;
-      if (!id || chain.createdIds.has(id) || run.created.includes(id)) return null;
+      const id = raw.startsWith(MAP_CHAT_NEW_PREFIX) ? (_a3 = run2.refs.get(raw.slice(MAP_CHAT_NEW_PREFIX.length))) != null ? _a3 : null : raw;
+      if (!id || chain.createdIds.has(id) || run2.created.includes(id)) return null;
       return (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === id)) != null ? _c : null;
     };
     const noteOf3 = (raw) => {
@@ -83613,7 +84214,7 @@ ${note.detail.trim()}` : "",
     if (!entries.length) return void 0;
     const fingerprint = () => this.chatReplyFingerprint(mapPath, noteIds, files, parked);
     let expected = await fingerprint();
-    const run = async (redo) => {
+    const run2 = async (redo) => {
       if (await fingerprint() !== expected) {
         record == null ? void 0 : record.event("undo_refused");
         throw this.chatUndoRefusal();
@@ -83636,8 +84237,8 @@ ${note.detail.trim()}` : "",
       record == null ? void 0 : record.event(redo ? "redo" : "undo");
     };
     const step = {
-      undo: () => run(false),
-      redo: () => run(true),
+      undo: () => run2(false),
+      redo: () => run2(true),
       label: t("ui.map_chat_undo_label")
     };
     this.history.pushSolo(step);
@@ -84329,15 +84930,15 @@ ${addition}` : addition },
       return { status: "failed", reason: t("ui.ai_running_ai") };
     }
     if (signal == null ? void 0 : signal.aborted) return { status: "stopped" };
-    const run = this.plugin.topicRuns.begin(parent.path, "proposeChildren");
-    if (!run) {
+    const run2 = this.plugin.topicRuns.begin(parent.path, "proposeChildren");
+    if (!run2) {
       new import_obsidian36.Notice(t("ui.ai_running_ai"));
       return { status: "failed", reason: t("ui.ai_running_ai") };
     }
     const controller = new AbortController();
     const stopWithOwner = () => controller.abort();
     signal == null ? void 0 : signal.addEventListener("abort", stopWithOwner, { once: true });
-    run.signal.addEventListener("abort", stopWithOwner, { once: true });
+    run2.signal.addEventListener("abort", stopWithOwner, { once: true });
     this.plugin.quickExpandPending.add(parent.path);
     this.plugin.topicRuns.registerTask(parent.path, controller);
     this.render();
@@ -84393,7 +84994,7 @@ ${addition}` : addition },
       signal == null ? void 0 : signal.removeEventListener("abort", stopWithOwner);
       this.plugin.topicRuns.releaseTask(parent.path, controller);
       this.plugin.quickExpandPending.delete(parent.path);
-      run.release();
+      run2.release();
       if (!this.closed) this.render();
     }
   }
@@ -85761,23 +86362,23 @@ ${addition}` : addition },
     this.relationEndIds = ends;
   }
   /** A panel row stands for its line: focusing it selects the line, hovering previews it with the same highlight and name. */
-  bindRelationRow(row, link, ariaLabel, key4 = relationIdentity(link)) {
-    row.tabIndex = 0;
-    row.setAttr("role", "group");
-    row.setAttr("aria-label", ariaLabel);
-    row.addEventListener("focus", () => {
+  bindRelationRow(row2, link, ariaLabel, key4 = relationIdentity(link)) {
+    row2.tabIndex = 0;
+    row2.setAttr("role", "group");
+    row2.setAttr("aria-label", ariaLabel);
+    row2.addEventListener("focus", () => {
       this.selection.selectRelation(key4);
       this.syncRelationClasses();
     });
-    row.addEventListener("blur", () => {
+    row2.addEventListener("blur", () => {
       this.selection.deselectRelation(key4);
       this.syncRelationClasses();
     });
-    row.addEventListener("mouseenter", () => {
+    row2.addEventListener("mouseenter", () => {
       this.previewRelation = key4;
       this.syncRelationClasses();
     });
-    row.addEventListener("mouseleave", () => {
+    row2.addEventListener("mouseleave", () => {
       if (this.previewRelation === key4) this.previewRelation = null;
       this.syncRelationClasses();
     });
@@ -86070,7 +86671,7 @@ async function applyMathRepair(vault, plan) {
 
 // core/steps/book-pipeline/run.ts
 var planFailMessage = (error) => isBookStepError(error) ? "invalid_reply" : "failed";
-async function runPlanStep(aiCalls, step, request, run) {
+async function runPlanStep(aiCalls, step, request, run2) {
   const prepared = prepareStep(step, request);
   return aiCalls.run(
     prepared,
@@ -86079,12 +86680,12 @@ async function runPlanStep(aiCalls, step, request, run) {
       effort: stepEffort(request.reasoning),
       topic: "Book pipeline plan",
       taskName: "book-pipeline-plan",
-      signal: run.signal,
+      signal: run2.signal,
       localCodex: true,
       noContentLog: true,
       failMessage: planFailMessage,
       usage: { action: "other", mapPath: request.usageMapPath },
-      ...run.admission ? { admission: run.admission } : {},
+      ...run2.admission ? { admission: run2.admission } : {},
       task: { textOnly: true, searchBudget: 0 }
     },
     (raw) => prepared.parse(raw)
@@ -86180,7 +86781,7 @@ var proofreadStep = {
   parse: (raw) => parseProofread(raw)
 };
 var proofFailMessage = (error) => isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_step" : "failed";
-async function runProofread(aiCalls, request, run) {
+async function runProofread(aiCalls, request, run2) {
   const events = [];
   const prepared = prepareStep(proofreadStep, request);
   return aiCalls.run(
@@ -86190,12 +86791,12 @@ async function runProofread(aiCalls, request, run) {
       effort: stepEffort(request.reasoning),
       topic: "Book pipeline proofread",
       taskName: "book-pipeline-proof",
-      signal: run.signal,
+      signal: run2.signal,
       localCodex: false,
       noContentLog: true,
       failMessage: proofFailMessage,
       usage: { action: "other", mapPath: request.usageMapPath },
-      ...run.admission ? { admission: run.admission } : {},
+      ...run2.admission ? { admission: run2.admission } : {},
       task: {
         webSearchOnly: true,
         searchBudget: PROOF_SEARCH_BUDGET,
@@ -86323,9 +86924,9 @@ async function deleteStyleReferences(ports, category, ref) {
 // ui/modals/map-chat-records-off-modal.ts
 var import_obsidian37 = require("obsidian");
 var MapChatRecordsOffModal = class extends import_obsidian37.Modal {
-  constructor(app, count3, decide) {
+  constructor(app, count4, decide) {
     super(app);
-    this.count = count3;
+    this.count = count4;
     this.decide = decide;
     __publicField(this, "decided", false);
   }
@@ -86364,10 +86965,10 @@ async function turnMapChatRecordsOff(deps) {
   for (const writer of writers) writer.setEnabled(false);
   await Promise.all(writers.map((writer) => writer.idle()));
   const scan3 = () => recordFilesIn(deps.app.vault.getFiles());
-  const count3 = scan3().length;
-  if (count3 === 0) return { deleted: 0, failed: 0 };
+  const count4 = scan3().length;
+  if (count4 === 0) return { deleted: 0, failed: 0 };
   const ask = (_a2 = deps.ask) != null ? _a2 : (n) => new Promise((resolve) => new MapChatRecordsOffModal(deps.app, n, resolve).open());
-  if (!await ask(count3) || ((_b2 = deps.stillOff) == null ? void 0 : _b2.call(deps)) === false) return { deleted: 0, failed: 0 };
+  if (!await ask(count4) || ((_b2 = deps.stillOff) == null ? void 0 : _b2.call(deps)) === false) return { deleted: 0, failed: 0 };
   await Promise.all(writers.map((writer) => writer.idle()));
   let deleted = 0;
   let failed = 0;
@@ -86632,7 +87233,7 @@ function rowsOf(chunks) {
   return chunks.sections.map((section3, origin) => ({ origin, name: section3.name }));
 }
 function sameRows(chunks, rows2) {
-  return rows2.length === chunks.sections.length && rows2.every((row, index) => row.origin === index && row.name === chunks.sections[index].name);
+  return rows2.length === chunks.sections.length && rows2.every((row2, index) => row2.origin === index && row2.name === chunks.sections[index].name);
 }
 var trimTrailingBlank = (lines) => {
   let end = lines.length;
@@ -86643,16 +87244,16 @@ function composeStructure(chunks, rows2) {
   const pieces = [];
   const head2 = trimTrailingBlank(chunks.head);
   if (head2.length) pieces.push(head2);
-  for (const row of rows2) {
-    const original = row.origin === null ? void 0 : chunks.sections[row.origin];
+  for (const row2 of rows2) {
+    const original = row2.origin === null ? void 0 : chunks.sections[row2.origin];
     if (!original) {
-      pieces.push([`## ${row.name}`]);
+      pieces.push([`## ${row2.name}`]);
       continue;
     }
     const lines = trimTrailingBlank(original.lines);
-    if (row.name !== original.name) {
+    if (row2.name !== original.name) {
       const comment = lines[0].indexOf("%%");
-      lines[0] = `## ${row.name}${comment >= 0 ? ` ${lines[0].slice(comment)}` : ""}`;
+      lines[0] = `## ${row2.name}${comment >= 0 ? ` ${lines[0].slice(comment)}` : ""}`;
     }
     pieces.push(lines);
   }
@@ -86901,12 +87502,12 @@ var NoteStyleEditorModal = class extends import_obsidian39.Modal {
     const a = this.draft;
     const b = this.initial;
     const rows2 = this.cleanRows();
-    return a.name !== b.name || a.voice !== b.voice || a.update !== b.update || a.applyAll || rows2.length !== b.rows.length || rows2.some((row, index) => row.origin !== b.rows[index].origin || row.name !== b.rows[index].name);
+    return a.name !== b.name || a.voice !== b.voice || a.update !== b.update || a.applyAll || rows2.length !== b.rows.length || rows2.some((row2, index) => row2.origin !== b.rows[index].origin || row2.name !== b.rows[index].name);
   }
   // ---- the sections ----
   /** The rows with their names trimmed, which is how the parser reads them back. */
   cleanRows() {
-    return this.draft.rows.map((row) => ({ origin: row.origin, name: row.name.trim() }));
+    return this.draft.rows.map((row2) => ({ origin: row2.origin, name: row2.name.trim() }));
   }
   /** Whether the sections are not what the text had (a new file or a change in place is needed). */
   sectionsEdited() {
@@ -86928,13 +87529,13 @@ var NoteStyleEditorModal = class extends import_obsidian39.Modal {
       return say(t(first.code, ...values));
     }
     const names3 = parsed.template.sections.map((section3) => section3.name);
-    const wrong = rows2.findIndex((row, index) => names3[index] !== row.name);
+    const wrong = rows2.findIndex((row2, index) => names3[index] !== row2.name);
     if (wrong >= 0 || names3.length !== rows2.length)
       return say(t("ui.detail_template_error_section_name_invalid", String(Math.max(wrong, 0) + 1)));
     return "";
   }
   freshSectionName() {
-    const taken = new Set(this.draft.rows.map((row) => lower4(row.name.trim())));
+    const taken = new Set(this.draft.rows.map((row2) => lower4(row2.name.trim())));
     for (let n = 1; ; n++) {
       const name2 = t("ui.editor_section_new_name_0", String(n));
       if (!taken.has(lower4(name2)) || n > 999) return name2;
@@ -86966,22 +87567,22 @@ var NoteStyleEditorModal = class extends import_obsidian39.Modal {
     list2.empty();
     const rows2 = this.draft.rows;
     const controls = [];
-    rows2.forEach((row2, index) => {
+    rows2.forEach((row3, index) => {
       const line2 = list2.createDiv({ cls: "vam-editor-section" });
       const input2 = line2.createEl("input", { type: "text", cls: "vam-editor-section-name" });
-      input2.value = row2.name;
-      const button = (text10, key4, cls, run) => {
+      input2.value = row3.name;
+      const button2 = (text10, key4, cls, run2) => {
         const el = line2.createEl("button", { text: text10, cls, attr: { type: "button" } });
-        el.addEventListener("click", run);
+        el.addEventListener("click", run2);
         return el;
       };
-      const up = button("\u2191", "up", "vam-editor-section-up", () => this.moveRow(index, -1));
-      const down = button("\u2193", "down", "vam-editor-section-down", () => this.moveRow(index, 1));
-      const remove = button("\u2212", "remove", "vam-editor-section-remove", () => this.removeRow(index));
+      const up = button2("\u2191", "up", "vam-editor-section-up", () => this.moveRow(index, -1));
+      const down = button2("\u2193", "down", "vam-editor-section-down", () => this.moveRow(index, 1));
+      const remove = button2("\u2212", "remove", "vam-editor-section-remove", () => this.removeRow(index));
       up.disabled = index === 0;
       down.disabled = index === rows2.length - 1;
       const label = () => {
-        const name2 = row2.name.trim() || String(index + 1);
+        const name2 = row3.name.trim() || String(index + 1);
         input2.setAttr("aria-label", t("ui.editor_section_name_aria_0", String(index + 1)));
         up.setAttr("aria-label", t("ui.editor_section_up_aria_0", name2));
         down.setAttr("aria-label", t("ui.editor_section_down_aria_0", name2));
@@ -86989,18 +87590,18 @@ var NoteStyleEditorModal = class extends import_obsidian39.Modal {
       };
       label();
       input2.addEventListener("input", () => {
-        row2.name = input2.value;
+        row3.name = input2.value;
         label();
         this.changed();
       });
       controls.push({ name: input2, up, down, remove });
     });
     if (!focus) return;
-    const row = controls[focus.index];
-    if (!row) return;
+    const row2 = controls[focus.index];
+    if (!row2) return;
     const usable = (el) => !el.disabled;
     const order = focus.control === "up" ? ["up", "down", "name"] : focus.control === "down" ? ["down", "up", "name"] : [focus.control, "name"];
-    const target = (_a2 = order.map((key4) => row[key4]).find(usable)) != null ? _a2 : row.name;
+    const target = (_a2 = order.map((key4) => row2[key4]).find(usable)) != null ? _a2 : row2.name;
     target.focus();
   }
   // ---- the voice ----
@@ -87183,10 +87784,10 @@ var NoteStyleEditorModal = class extends import_obsidian39.Modal {
     this.exampleChild = child;
   }
   // ---- preview and save ----
-  async previewPrompt(button) {
+  async previewPrompt(button2) {
     await this.plugin.noteStyles.refresh().catch(() => void 0);
     if (this.closed) return;
-    this.plugin.openPromptPreview(button, () => this.draftStyle());
+    this.plugin.openPromptPreview(button2, () => this.draftStyle());
   }
   /** The topic types (not AIM, not the ones that use `ref`) whose style sets its own voice: "also use it" does not change them. */
   kindsWithOwnVoice(ref) {
@@ -87316,13 +87917,13 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
       attr: { role: "tablist", "aria-label": t("ui.manage_title") }
     });
     for (const [index, tab] of MANAGE_TABS.entries()) {
-      const button = tablist.createEl("button", {
+      const button2 = tablist.createEl("button", {
         text: manageTabName(tab),
         cls: "vam-manage-tab",
         attr: { role: "tab", id: `vam-manage-tab-${tab}`, "aria-controls": `vam-manage-panel-${tab}` }
       });
-      button.addEventListener("click", () => this.selectTab(tab, false));
-      button.addEventListener("keydown", (event) => {
+      button2.addEventListener("click", () => this.selectTab(tab, false));
+      button2.addEventListener("keydown", (event) => {
         let next;
         if (event.key === "ArrowRight") next = (index + 1) % MANAGE_TABS.length;
         else if (event.key === "ArrowLeft") next = (index + MANAGE_TABS.length - 1) % MANAGE_TABS.length;
@@ -87332,7 +87933,7 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
         event.preventDefault();
         this.selectTab(MANAGE_TABS[next], true);
       });
-      this.tabEls.set(tab, button);
+      this.tabEls.set(tab, button2);
       this.panelEls.set(
         tab,
         this.contentEl.createDiv({
@@ -87437,21 +88038,21 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
         });
       if (entry.aimOnly || entry.noCopy) continue;
       if (entry.builtin) {
-        setting.addButton((button) => {
-          button.setButtonText(t("ui.manage_view")).onClick(() => this.view(entry, button.buttonEl));
-          button.buttonEl.setAttr("aria-label", t("ui.manage_view_aria_0", entry.name));
+        setting.addButton((button2) => {
+          button2.setButtonText(t("ui.manage_view")).onClick(() => this.view(entry, button2.buttonEl));
+          button2.buttonEl.setAttr("aria-label", t("ui.manage_view_aria_0", entry.name));
         });
-        setting.addButton((button) => {
-          button.setButtonText(t("ui.manage_copy_edit")).onClick(() => void this.edit(entry));
-          button.buttonEl.setAttr("aria-label", t("ui.manage_copy_edit_aria_0", entry.name));
-          this.editButtons.set(entry.ref, button.buttonEl);
+        setting.addButton((button2) => {
+          button2.setButtonText(t("ui.manage_copy_edit")).onClick(() => void this.edit(entry));
+          button2.buttonEl.setAttr("aria-label", t("ui.manage_copy_edit_aria_0", entry.name));
+          this.editButtons.set(entry.ref, button2.buttonEl);
         });
         continue;
       }
-      setting.addButton((button) => {
-        button.setButtonText(t("ui.manage_edit")).onClick(() => void this.edit(entry));
-        button.buttonEl.setAttr("aria-label", t("ui.manage_edit_aria_0", entry.name));
-        this.editButtons.set(entry.ref, button.buttonEl);
+      setting.addButton((button2) => {
+        button2.setButtonText(t("ui.manage_edit")).onClick(() => void this.edit(entry));
+        button2.buttonEl.setAttr("aria-label", t("ui.manage_edit_aria_0", entry.name));
+        this.editButtons.set(entry.ref, button2.buttonEl);
       });
       this.addMenu(setting, entry);
     }
@@ -87529,18 +88130,18 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
     (_a2 = this.menu) == null ? void 0 : _a2.close(false);
     const el = setting.settingEl.createDiv({ cls: "vam-manage-menu", attr: { role: "menu" } });
     const buttons = items.map((item) => {
-      const button = el.createEl("button", {
+      const button2 = el.createEl("button", {
         text: item.text,
         cls: item.danger ? "vam-manage-menu-item is-danger" : "vam-manage-menu-item",
         attr: { role: "menuitem", tabindex: "-1" }
       });
-      if (item.desc) button.createSpan({ text: item.desc, cls: "vam-manage-menu-desc" });
-      button.addEventListener("click", () => {
+      if (item.desc) button2.createSpan({ text: item.desc, cls: "vam-manage-menu-desc" });
+      button2.addEventListener("click", () => {
         var _a3;
         (_a3 = this.menu) == null ? void 0 : _a3.close(false);
         item.run();
       });
-      return button;
+      return button2;
     });
     const close = (focus) => {
       var _a3;
@@ -87550,7 +88151,7 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
       if (focus) more.focus();
     };
     el.addEventListener("keydown", (event) => {
-      const at = buttons.findIndex((button) => button === event.target);
+      const at = buttons.findIndex((button2) => button2 === event.target);
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
@@ -87842,9 +88443,9 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
       attr: { id: errorId, "aria-live": "polite" }
     });
     let createButton;
-    new import_obsidian40.Setting(form).addButton((button) => {
-      createButton = button;
-      button.setButtonText(t("ui.manage_add_create")).setCta().onClick(() => void create());
+    new import_obsidian40.Setting(form).addButton((button2) => {
+      createButton = button2;
+      button2.setButtonText(t("ui.manage_add_create")).setCta().onClick(() => void create());
     });
     const setName = (value) => {
       name2 = value;
@@ -87962,9 +88563,9 @@ var RenameDialog = class extends import_obsidian40.Modal {
       cls: "vam-block-status-error vam-manage-error",
       attr: { id: errorId, "aria-live": "polite" }
     });
-    const row = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
-    const rename = row.createEl("button", { text: t("ui.manage_rename_button"), cls: "mod-cta" });
-    const cancel = row.createEl("button", { text: t("ui.cancel") });
+    const row2 = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
+    const rename = row2.createEl("button", { text: t("ui.manage_rename_button"), cls: "mod-cta" });
+    const cancel = row2.createEl("button", { text: t("ui.cancel") });
     let busy = false;
     const check = () => {
       const problem3 = input2.value === opts.name ? "" : opts.problem(input2.value);
@@ -88022,9 +88623,9 @@ var ConfirmDialog = class extends import_obsidian40.Modal {
     const { opts } = this;
     this.titleEl.setText(opts.title);
     for (const line2 of opts.lines) this.contentEl.createEl("p", { text: line2 });
-    const row = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
-    const confirm = row.createEl("button", { text: opts.confirm, cls: "mod-warning" });
-    const cancel = row.createEl("button", { text: t("ui.cancel") });
+    const row2 = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
+    const confirm = row2.createEl("button", { text: opts.confirm, cls: "mod-warning" });
+    const cancel = row2.createEl("button", { text: t("ui.cancel") });
     confirm.addEventListener("click", () => {
       if (confirm.disabled) return;
       confirm.disabled = true;
@@ -88053,8 +88654,8 @@ var ViewDialog = class extends import_obsidian40.Modal {
     this.contentEl.createEl("p", { text: t("ui.manage_view_readonly"), cls: "vam-manage-dialog-note" });
     for (const line2 of (_a2 = opts.lines) != null ? _a2 : []) this.contentEl.createEl("p", { text: line2 });
     if (opts.text !== void 0) this.contentEl.createEl("pre", { text: opts.text, cls: "vam-manage-view-text" });
-    const row = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
-    const close = row.createEl("button", { text: t("ui.close") });
+    const row2 = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
+    const close = row2.createEl("button", { text: t("ui.close") });
     close.addEventListener("click", () => this.close());
     close.focus();
   }
@@ -88079,9 +88680,9 @@ var CARD_FORMATS = [
 function renderNoteStyleCard(setting, plugin) {
   setting.setName(t("ui.note_style_card_title")).setDesc(t("ui.note_style_card_desc"));
   setting.settingEl.addClass("vam-style-card");
-  setting.addButton((button) => {
-    button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl));
-    button.buttonEl.addClass("mod-muted");
+  setting.addButton((button2) => {
+    button2.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button2.buttonEl));
+    button2.buttonEl.addClass("mod-muted");
   });
   const body = setting.settingEl.createDiv({ cls: "vam-style-card-body" });
   const partName = (category, ref) => {
@@ -88162,7 +88763,7 @@ function renderNoteLocationSetting(setting, plugin, refresh) {
       });
     });
     setting.addButton(
-      (button) => button.setButtonText(t("ui.note_style_folder_choose")).onClick(async () => {
+      (button2) => button2.setButtonText(t("ui.note_style_folder_choose")).onClick(async () => {
         const value = (0, import_obsidian41.normalizePath)(input2.trim());
         if (!input2.trim() || value === ".") return;
         settings.noteStylesFolder = value;
@@ -88179,7 +88780,7 @@ function renderNoteLocationSetting(setting, plugin, refresh) {
     });
   }
   setting.addButton(
-    (button) => button.setButtonText(t("ui.note_style_open_folder")).onClick(async () => {
+    (button2) => button2.setButtonText(t("ui.note_style_open_folder")).onClick(async () => {
       await plugin.openNoteStylesFolder();
       refresh();
     })
@@ -88238,9 +88839,9 @@ var kindRows = /* @__PURE__ */ new WeakMap();
 function redrawKindRows(plugin) {
   const rows2 = kindRows.get(plugin);
   if (!rows2) return;
-  for (const row of [...rows2]) {
-    if (row.el.isConnected === false) rows2.delete(row);
-    else row.redraw();
+  for (const row2 of [...rows2]) {
+    if (row2.el.isConnected === false) rows2.delete(row2);
+    else row2.redraw();
   }
 }
 function renderNoteKindSetting(setting, plugin, kind) {
@@ -88347,17 +88948,17 @@ function renderMyStylesSetting(setting, plugin) {
     });
   };
   describe();
-  setting.addButton((button) => {
-    button.setButtonText(t("ui.my_styles_manage")).onClick(() => {
-      const modal = new NoteStyleManageModal(plugin.app, plugin, "recipe", button.buttonEl, () => {
+  setting.addButton((button2) => {
+    button2.setButtonText(t("ui.my_styles_manage")).onClick(() => {
+      const modal = new NoteStyleManageModal(plugin.app, plugin, "recipe", button2.buttonEl, () => {
         var _a2;
         describe();
         redrawKindRows(plugin);
         (_a2 = locationUpdates.get(plugin)) == null ? void 0 : _a2();
       });
-      openInWindowOf(modal, button.buttonEl);
+      openInWindowOf(modal, button2.buttonEl);
     });
-    button.buttonEl.setAttr("aria-label", t("ui.my_styles_manage_aria"));
+    button2.buttonEl.setAttr("aria-label", t("ui.my_styles_manage_aria"));
   });
   void store.refresh().then(describe, () => void 0);
 }
@@ -88417,8 +89018,8 @@ var CodexSetupModal = class extends import_obsidian41.Modal {
       cls: "vam-setup-note"
     });
     this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian41.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
-      (button) => button.setButtonText(t("ui.i_ve_finished_check_again")).setCta().onClick(() => {
+    new import_obsidian41.Setting(this.contentEl).addButton((button2) => button2.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
+      (button2) => button2.setButtonText(t("ui.i_ve_finished_check_again")).setCta().onClick(() => {
         this.close();
         this.recheck();
       })
@@ -88446,8 +89047,8 @@ var AiUsageModal = class extends import_obsidian41.Modal {
       this.close();
       this.resolve(confirmed);
     };
-    new import_obsidian41.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish2(false))).addButton(
-      (button) => button.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish2(true))
+    new import_obsidian41.Setting(this.contentEl).addButton((button2) => button2.setButtonText(t("ui.cancel")).onClick(() => finish2(false))).addButton(
+      (button2) => button2.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish2(true))
     );
   }
   onClose() {
@@ -88474,8 +89075,8 @@ var ClaudeSetupModal = class extends import_obsidian41.Modal {
     });
     steps.createEl("li", { text: t("ui.return_to_vam_and_check_the_cli_path_again") });
     this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian41.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
-      (button) => button.setButtonText(t("ui.check_again")).setCta().onClick(() => {
+    new import_obsidian41.Setting(this.contentEl).addButton((button2) => button2.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
+      (button2) => button2.setButtonText(t("ui.check_again")).setCta().onClick(() => {
         this.close();
         this.recheck();
       })
@@ -88733,7 +89334,7 @@ var VisualAgentMapSettingTab = class extends import_obsidian41.PluginSettingTab 
                   void this.setControlValue("cliModel", value);
                 });
               }).addButton(
-                (button) => button.setButtonText(t("ui.check_again")).onClick(() => {
+                (button2) => button2.setButtonText(t("ui.check_again")).onClick(() => {
                   void this.plugin.refreshModelDiscovery("codex");
                   void this.plugin.refreshModelDiscovery("claude");
                 })
@@ -88876,12 +89477,12 @@ var VisualAgentMapSettingTab = class extends import_obsidian41.PluginSettingTab 
             setting.setName(t("ui.settings_status")).setDesc(found.installed ? t("ui.settings_cli_found_0", found.executable) : t(notFoundDesc));
             if (!found.installed)
               setting.addButton(
-                (button) => button.setButtonText(t("ui.installation_guide")).onClick(
+                (button2) => button2.setButtonText(t("ui.installation_guide")).onClick(
                   () => provider === "codex" ? this.plugin.openCodexSetupGuide() : this.plugin.openClaudeSetupGuide()
                 )
               );
             setting.addButton(
-              (button) => button.setButtonText(t("ui.check_again")).onClick(() => {
+              (button2) => button2.setButtonText(t("ui.check_again")).onClick(() => {
                 void (provider === "codex" ? this.plugin.recheckCodex() : this.plugin.recheckClaude());
               })
             );
@@ -88897,11 +89498,11 @@ var VisualAgentMapSettingTab = class extends import_obsidian41.PluginSettingTab 
   }
   /** A button row of the "Advanced" page: name, one-line help and one button. */
   /** `run` gets the button, so what it opens or reports lands in the settings window. */
-  actionRow(name2, desc, label, run) {
+  actionRow(name2, desc, label, run2) {
     return {
       name: name2,
       render: (setting) => {
-        setting.setName(name2).setDesc(desc).addButton((button) => button.setButtonText(label).onClick(() => run(button.buttonEl)));
+        setting.setName(name2).setDesc(desc).addButton((button2) => button2.setButtonText(label).onClick(() => run2(button2.buttonEl)));
       }
     };
   }
@@ -89096,11 +89697,11 @@ var OutlineView = class extends import_obsidian42.ItemView {
     if (path === this.activePath) return;
     this.activePath = path;
     const rows2 = Array.from(this.contentEl.querySelectorAll(".vam-outline-note"));
-    for (const row of rows2) {
-      const active = !!path && row.getAttribute("data-path") === path;
-      row.toggleClass("is-active", active);
-      if (active) row.setAttr("aria-current", "true");
-      else row.removeAttribute("aria-current");
+    for (const row2 of rows2) {
+      const active = !!path && row2.getAttribute("data-path") === path;
+      row2.toggleClass("is-active", active);
+      if (active) row2.setAttr("aria-current", "true");
+      else row2.removeAttribute("aria-current");
     }
   }
   setCoffeeOutline(snapshot, active, locate, fill2 = null) {
@@ -89197,18 +89798,18 @@ var OutlineView = class extends import_obsidian42.ItemView {
     const tree = this.contentEl.createDiv("vam-outline-tree");
     snapshot.segments.forEach((item, index) => {
       var _a2;
-      const button = tree.createEl("button", { cls: "vam-coffee-segment" });
+      const button2 = tree.createEl("button", { cls: "vam-coffee-segment" });
       const kind = t(
         item.kind === "question" ? "ui.coffee_segment_question" : item.kind === "continuation" ? "ui.coffee_segment_continuation" : item.kind === "legacy" ? "ui.coffee_segment_legacy" : "ui.coffee_segment_initial"
       );
-      button.createEl("strong", {
+      button2.createEl("strong", {
         text: t("ui.coffee_outline_segment", index + 1, kind)
       });
-      button.createSpan({
+      button2.createSpan({
         text: item.status === "generating" ? t("ui.coffee_segment_generating") : (_a2 = item.summary) != null ? _a2 : t("ui.coffee_segment_no_summary")
       });
-      if (item.status === "error") button.createEl("small", { text: t("ui.coffee_segment_incomplete") });
-      button.addEventListener("click", () => {
+      if (item.status === "error") button2.createEl("small", { text: t("ui.coffee_segment_incomplete") });
+      button2.addEventListener("click", () => {
         var _a3;
         if (!((_a3 = this.locateCoffee) == null ? void 0 : _a3.call(this, item.id))) new import_obsidian42.Notice(t("ui.coffee_segment_no_content"));
       });
@@ -89233,10 +89834,10 @@ var OutlineView = class extends import_obsidian42.ItemView {
       var _a3, _b3, _c2, _d;
       if (!matches2(node)) return;
       const descendants2 = (_a3 = children.get(node.id)) != null ? _a3 : [];
-      const row = tree.createDiv("vam-outline-row");
-      row.style.paddingLeft = `${8 + depth * 16}px`;
+      const row2 = tree.createDiv("vam-outline-row");
+      row2.style.paddingLeft = `${8 + depth * 16}px`;
       if (descendants2.length) {
-        const toggle = row.createEl("button", {
+        const toggle = row2.createEl("button", {
           text: query || !this.collapsed.has(node.id) ? "\u25BE" : "\u25B8",
           cls: "vam-outline-toggle"
         });
@@ -89252,41 +89853,41 @@ var OutlineView = class extends import_obsidian42.ItemView {
           this.renderTree();
           if (hadFocus) (_b4 = this.toggleEls.get(node.id)) == null ? void 0 : _b4.focus();
         });
-      } else row.createSpan("vam-outline-spacer");
+      } else row2.createSpan("vam-outline-spacer");
       const title = (_c2 = (_b3 = this.titles.get(node.id)) != null ? _b3 : node.path.split("/").pop()) != null ? _c2 : node.path;
-      const button = row.createEl("button", { text: title, cls: "vam-outline-note" });
-      button.title = title;
-      button.setAttr("dir", "auto");
-      button.setAttr("data-path", node.path);
+      const button2 = row2.createEl("button", { text: title, cls: "vam-outline-note" });
+      button2.title = title;
+      button2.setAttr("dir", "auto");
+      button2.setAttr("data-path", node.path);
       const marks = readTopicMarkers({ "topic-markers": this.markers.get(node.id) });
       if (marks.length) {
         const listSeparator = t("ui.list_separator");
         const names3 = marks.map((id) => t(markerLabelKey(id))).join(listSeparator);
-        button.setAttr(
+        button2.setAttr(
           "aria-label",
           `${title}${listSeparator === "\u3001" ? "\uFF0C" : ", "}${t("share.viewer_markers_0", names3)}`
         );
-        const row2 = button.createSpan("vam-markers");
+        const row3 = button2.createSpan("vam-markers");
         for (const id of marks) {
-          const mark2 = row2.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
+          const mark2 = row3.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
           mark2.dataset.marker = id;
         }
       }
       const linkCount = readTopicLinks({ "topic-links": this.links.get(node.id) }).length;
       if (linkCount) {
         const listSeparator = t("ui.list_separator");
-        const base = (_d = button.getAttr("aria-label")) != null ? _d : title;
-        button.setAttr(
+        const base = (_d = button2.getAttr("aria-label")) != null ? _d : title;
+        button2.setAttr(
           "aria-label",
           `${base}${listSeparator === "\u3001" ? "\uFF0C" : ", "}${t("ui.outline_links_0", String(linkCount))}`
         );
-        button.createSpan({ cls: "vam-outline-links", text: "\u2197", attr: { "aria-hidden": "true" } });
+        button2.createSpan({ cls: "vam-outline-links", text: "\u2197", attr: { "aria-hidden": "true" } });
       }
       if (node.path === this.activePath) {
-        button.addClass("is-active");
-        button.setAttr("aria-current", "true");
+        button2.addClass("is-active");
+        button2.setAttr("aria-current", "true");
       }
-      button.addEventListener("click", () => {
+      button2.addEventListener("click", () => {
         this.setActive(node.path);
         void this.openNote(node.path);
       });
@@ -89598,8 +90199,8 @@ function fenceRanges(lines, offsets, html) {
     const mark2 = open2[1];
     if (mark2[0] === "`" && open2[2].includes("`")) continue;
     for (let j = i + 1; j < lines.length; j++) {
-      const run = FENCE_LINE.exec(lines[j]);
-      if (run && run[1][0] === mark2[0] && run[1].length >= mark2.length && lines[j].slice(run[0].length).trim() === "") {
+      const run2 = FENCE_LINE.exec(lines[j]);
+      if (run2 && run2[1][0] === mark2[0] && run2[1].length >= mark2.length && lines[j].slice(run2[0].length).trim() === "") {
         ranges.push({ start: offsets[i], end: offsets[j] + lines[j].length });
         i = j;
         break;
@@ -90011,7 +90612,7 @@ function scrubMermaidSvg(root) {
   return true;
 }
 function countLocalReferences(root) {
-  let count3 = 0;
+  let count4 = 0;
   const local = (value) => {
     const url = normalizeUrl2(value != null ? value : "");
     return !!url && !url.startsWith("#") && !/^https?:\/\//.test(url) && !url.startsWith("mailto:");
@@ -90023,16 +90624,16 @@ function countLocalReferences(root) {
         const internal = ((_a2 = child.getAttribute("class")) != null ? _a2 : "").split(/\s+/).includes("internal-link");
         const refs = [child.getAttribute("href"), child.getAttribute("xlink:href")];
         if (internal) refs.push(child.getAttribute("data-href"));
-        if (refs.some(local)) count3++;
+        if (refs.some(local)) count4++;
       }
       visit(child);
     }
   };
   visit(root);
-  return count3;
+  return count4;
 }
 function unwrapLocalLinks(root, createSpan2) {
-  let count3 = 0;
+  let count4 = 0;
   const visit = (parent) => {
     var _a2, _b2;
     for (const child of Array.from(parent.children)) {
@@ -90044,7 +90645,7 @@ function unwrapLocalLinks(root, createSpan2) {
           const span = createSpan2();
           span.append(...Array.from(child.childNodes));
           child.replaceWith(span);
-          count3++;
+          count4++;
           visit(span);
           continue;
         }
@@ -90053,7 +90654,7 @@ function unwrapLocalLinks(root, createSpan2) {
     }
   };
   visit(root);
-  return count3;
+  return count4;
 }
 function pickMermaidFallbackSource(candidates) {
   for (const text10 of candidates) if (text10 && text10.trim()) return text10.replace(/\n$/, "");
@@ -90326,40 +90927,40 @@ function extractSegments(root) {
       else collectAlt(child);
     }
   };
-  const flush = (run) => {
-    if (!run.length) return;
+  const flush = (run2) => {
+    if (!run2.length) return;
     const parts = [];
-    const raw = buildText(run, parts);
+    const raw = buildText(run2, parts);
     const text10 = raw.trim();
     if (!text10 || !hasTranslatableText(text10) || raw.includes("\u27E6\u27E6")) return;
     const stripped = raw.replace(TOKEN2, "");
     if (stripped.includes(PLACEHOLDER_OPEN) || stripped.includes(PLACEHOLDER_CLOSE)) return;
     const lead = raw.slice(0, raw.length - raw.trimStart().length);
     const trail = raw.slice(raw.trimEnd().length);
-    units.push({ index: units.length, kind: "run", text: text10, nodes: run, lead, trail, parts });
+    units.push({ index: units.length, kind: "run", text: text10, nodes: run2, lead, trail, parts });
   };
   const walk2 = (parent) => {
-    let run = [];
+    let run2 = [];
     for (const child of Array.from(parent.childNodes)) {
       if (child.nodeType === TEXT_NODE) {
-        run.push(child);
+        run2.push(child);
         continue;
       }
       if (child.nodeType !== ELEMENT_NODE) {
-        flush(run);
-        run = [];
+        flush(run2);
+        run2 = [];
         continue;
       }
       const element = child;
       const kind = classify2(element);
-      if (kind === "atom" || kind === "inline") run.push(element);
+      if (kind === "atom" || kind === "inline") run2.push(element);
       else {
-        flush(run);
-        run = [];
+        flush(run2);
+        run2 = [];
         if (kind === "block") walk2(element);
       }
     }
-    flush(run);
+    flush(run2);
   };
   collectAlt(root);
   walk2(root);
@@ -92600,9 +93201,9 @@ var ShareModal = class extends import_obsidian44.Modal {
     if (!languages.length) return;
     const model = this.resolvedModel();
     this.translateNote = "";
-    const run = () => this.runTranslation(host, languages, model);
-    if (host.confirmAiUsage) await host.confirmAiUsage(model, run);
-    else await run();
+    const run2 = () => this.runTranslation(host, languages, model);
+    if (host.confirmAiUsage) await host.confirmAiUsage(model, run2);
+    else await run2();
   }
   async runTranslation(host, languages, model) {
     var _a2, _b2, _c;
@@ -92764,17 +93365,17 @@ var ShareModal = class extends import_obsidian44.Modal {
   }
   renderLanguageResult(container, item, host, note) {
     const label = this.languageLabel(item.language);
-    const row = container.createDiv({ cls: "vam-share-translate-row" });
-    row.createDiv({ text: `${label}: ${this.statusText(item)}`, cls: "vam-share-note" });
-    row.createDiv({ text: t("share.translate_result_model_0", host.modelLabel(item.model)), cls: "vam-share-note" });
+    const row2 = container.createDiv({ cls: "vam-share-translate-row" });
+    row2.createDiv({ text: `${label}: ${this.statusText(item)}`, cls: "vam-share-note" });
+    row2.createDiv({ text: t("share.translate_result_model_0", host.modelLabel(item.model)), cls: "vam-share-note" });
     if (item.diagramsKept > 0)
-      row.createDiv({ text: t("share.translate_diagrams_kept_0", item.diagramsKept), cls: "vam-share-note" });
+      row2.createDiv({ text: t("share.translate_diagrams_kept_0", item.diagramsKept), cls: "vam-share-note" });
     if (item.status === "complete" || item.status === "incomplete") {
       if (UNVERIFIED_LANGUAGES.includes(item.language))
-        row.createDiv({ text: t("share.translate_unverified_0", label), cls: "vam-share-note" });
+        row2.createDiv({ text: t("share.translate_unverified_0", label), cls: "vam-share-note" });
     }
     if (item.status === "incomplete")
-      new import_obsidian44.Setting(row).setName(`${label}: ${t("share.translate_include_incomplete")}`).addToggle(
+      new import_obsidian44.Setting(row2).setName(`${label}: ${t("share.translate_include_incomplete")}`).addToggle(
         (toggle) => toggle.setValue(this.includeIncomplete.has(item.language)).onChange((value) => {
           if (value) this.includeIncomplete.add(item.language);
           else this.includeIncomplete.delete(item.language);
@@ -92882,8 +93483,8 @@ var ShareModal = class extends import_obsidian44.Modal {
     this.publishEl.empty();
     if (!this.savedText) return;
     this.publishEl.createDiv({ text: t("share.publish_note"), cls: "vam-share-note" });
-    const button = this.publishEl.createEl("button", { text: t("share.publish_copy") });
-    button.addEventListener("click", () => void this.copyPublish());
+    const button2 = this.publishEl.createEl("button", { text: t("share.publish_copy") });
+    button2.addEventListener("click", () => void this.copyPublish());
     if (this.publishFallback)
       this.publishEl.createEl("textarea", {
         text: publishInstructions(),
@@ -93337,8 +93938,8 @@ async function runPool(tasks, limit, signal) {
 }
 var flatten = (text10) => text10.replace(/\s*[\r\n]+\s*/g, " ").trim();
 var ShareTranslateService = class {
-  constructor(run) {
-    this.run = run;
+  constructor(run2) {
+    this.run = run2;
   }
   /** Calls and minutes the given languages need right now (cache taken into account). Translates nothing. */
   estimate(source, languages, options) {
@@ -96989,8 +97590,8 @@ function providerReframeRunner(aiCalls) {
   };
 }
 var ReframingService = class {
-  constructor(run) {
-    this.run = run;
+  constructor(run2) {
+    this.run = run2;
   }
   async reframe(request, signal) {
     const checkCancelled = () => {
@@ -97015,8 +97616,8 @@ function providerOutlineRunner(aiCalls) {
   });
 }
 var OutlineGenerationService = class {
-  constructor(run) {
-    this.run = run;
+  constructor(run2) {
+    this.run = run2;
   }
   /**
    * Generate a outline (each heading with a one-line summary) for `request.topic`. Throws {@link OutlineGenerateError} (localized message,
@@ -97094,8 +97695,8 @@ function providerMapChatRunner(aiCalls) {
   });
 }
 var MapChatService = class {
-  constructor(run) {
-    this.run = run;
+  constructor(run2) {
+    this.run = run2;
   }
   /**
    * One chat turn. `onReply` receives the whole reply text decoded so far (not a delta) each time it grows; it starts over
@@ -97904,7 +98505,7 @@ var MarkdownSelectionAi = class extends import_obsidian47.Component {
   }
 };
 var SelectionAiPanel = class extends import_obsidian47.Component {
-  constructor(app, snapshot, modelOf, modelLabel, language2, translateTarget, run, isManagedNote) {
+  constructor(app, snapshot, modelOf, modelLabel, language2, translateTarget, run2, isManagedNote) {
     super();
     this.app = app;
     this.snapshot = snapshot;
@@ -97912,7 +98513,7 @@ var SelectionAiPanel = class extends import_obsidian47.Component {
     this.modelLabel = modelLabel;
     this.language = language2;
     this.translateTarget = translateTarget;
-    this.run = run;
+    this.run = run2;
     this.isManagedNote = isManagedNote;
     __publicField(this, "modalEl");
     __publicField(this, "contentEl");
@@ -98032,13 +98633,13 @@ var SelectionAiPanel = class extends import_obsidian47.Component {
     this.presets.setAttribute("role", "group");
     this.presets.setAttribute("aria-label", t("ui.context_ai_quick_actions"));
     const preset = (id, icon, label, prompt) => {
-      const button = this.presets.createEl("button", { cls: "vam-context-ai-preset" });
-      button.dataset.preset = id;
-      (0, import_obsidian47.setIcon)(button.createSpan({ cls: "vam-context-ai-preset-icon" }), icon);
-      button.createSpan({ text: label });
-      button.addEventListener(
+      const button2 = this.presets.createEl("button", { cls: "vam-context-ai-preset" });
+      button2.dataset.preset = id;
+      (0, import_obsidian47.setIcon)(button2.createSpan({ cls: "vam-context-ai-preset-icon" }), icon);
+      button2.createSpan({ text: label });
+      button2.addEventListener(
         "click",
-        () => void this.generate(prompt(), label, id === "search_images" ? "image_search" : void 0, button)
+        () => void this.generate(prompt(), label, id === "search_images" ? "image_search" : void 0, button2)
       );
     };
     const language2 = getUiLanguage();
@@ -98149,13 +98750,13 @@ var SelectionAiPanel = class extends import_obsidian47.Component {
     const busy = active !== null;
     this.modalEl.toggleClass("is-running", busy);
     this.status.toggleClass("is-running", busy);
-    for (const button of Array.from(this.presets.querySelectorAll("button"))) {
-      button.disabled = busy;
-      button.toggleClass("is-active", busy && button === active);
+    for (const button2 of Array.from(this.presets.querySelectorAll("button"))) {
+      button2.disabled = busy;
+      button2.toggleClass("is-active", busy && button2 === active);
     }
     this.runButton.disabled = busy;
-    this.resultActions.querySelectorAll("button").forEach((button) => {
-      button.disabled = busy;
+    this.resultActions.querySelectorAll("button").forEach((button2) => {
+      button2.disabled = busy;
     });
     this.stopButton.setText(busy ? t("ui.context_ai_stop") : t("ui.cancel"));
     if (!busy) this.showResult(!this.resultActions.hidden);
@@ -98712,8 +99313,8 @@ var VisualAgentMapPlugin = class extends import_obsidian49.Plugin {
       writePipelineFields: (path, patch) => this.repo.writePipelineFields(path, patch),
       updateNoteGuarded: (path, patch, options) => this.repo.updateNoteGuarded(path, patch, options),
       updateNoteRawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
-      runPlan: (step, request, run) => runPlanStep(this.aiCalls, step, request, run),
-      runProofread: (request, run) => runProofread(this.aiCalls, request, run),
+      runPlan: (step, request, run2) => runPlanStep(this.aiCalls, step, request, run2),
+      runProofread: (request, run2) => runProofread(this.aiCalls, request, run2),
       author: async (input2) => {
         const view = this.views().find((item) => item.mapPath === input2.mapPath);
         if (view) return view.runBookAuthor(input2);
@@ -99017,7 +99618,7 @@ var VisualAgentMapPlugin = class extends import_obsidian49.Plugin {
         modelLabel: (model) => this.modelLabel(model),
         defaultModel: () => this.currentModelChoice().model,
         reasoning: () => this.currentModelChoice().reasoning,
-        confirmAiUsage: (model, run) => this.confirmAiUsage(model, run)
+        confirmAiUsage: (model, run2) => this.confirmAiUsage(model, run2)
       }
     }).open();
   }
@@ -99914,6 +100515,9 @@ ${t("ui.organize_link_wait_hint")}`;
   rerunBookCard(mapPath, nodeId) {
     return this.bookPipelineRuns.rerunCard(mapPath, nodeId);
   }
+  finishBookRun(mapPath) {
+    return this.bookPipelineRuns.finishRun(mapPath);
+  }
   confirmBookSeam(mapPath, nodeId) {
     return this.bookPipelineRuns.confirmSeam(mapPath, nodeId);
   }
@@ -100247,7 +100851,7 @@ ${t("ui.organize_link_wait_hint")}`;
     if (state.status !== "ready") this.logs.appendLog("warn", `Claude model discovery status: ${state.status}`);
   }
   /** `noticeOpening` is called just before the usage notice opens (only when it really does), so a caller can say it waits for it. */
-  async confirmAiUsage(model, run, hooks) {
+  async confirmAiUsage(model, run2, hooks) {
     var _a2;
     if (!await this.aiReadyForModel(model)) return false;
     if (!this.usageNoticeSeen(model)) {
@@ -100257,11 +100861,11 @@ ${t("ui.organize_link_wait_hint")}`;
       if (!confirmed) return false;
       await this.setUsageNoticeSeen(model);
     }
-    await run();
+    await run2();
     return true;
   }
-  async confirmCodexUsage(run) {
-    await this.confirmAiUsage(this.settings.cliModel, run);
+  async confirmCodexUsage(run2) {
+    await this.confirmAiUsage(this.settings.cliModel, run2);
   }
   /** Rebuilds derived note data; `paths` limits the rewrite to those notes (the ends of a changed relation). */
   async rebuildDerivedData(paths) {

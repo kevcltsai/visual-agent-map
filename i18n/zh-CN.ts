@@ -3185,7 +3185,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_card_menu_rerun": "重跑图文书这一张",
   "ui.book_card_menu_rerun_sub": "企划 → 写 → 校",
   "ui.book_panel_proof_show": "看查证记录",
-  "ui.book_panel_proof_hide": "收合查证记录",
+  "ui.book_panel_proof_hide": "折叠查证记录",
   "ui.book_panel_proof_0": "{0} 的查证记录",
   "ui.book_panel_proof_summary_0_1_2": "{0} 项达成、{1} 项待查、{2} 项未达成",
   "ui.book_panel_proof_none": "没有查证记录。",

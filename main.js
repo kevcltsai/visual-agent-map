@@ -6273,7 +6273,7 @@ var zhCN = {
   "ui.book_card_menu_rerun": "\u91CD\u8DD1\u56FE\u6587\u4E66\u8FD9\u4E00\u5F20",
   "ui.book_card_menu_rerun_sub": "\u4F01\u5212 \u2192 \u5199 \u2192 \u6821",
   "ui.book_panel_proof_show": "\u770B\u67E5\u8BC1\u8BB0\u5F55",
-  "ui.book_panel_proof_hide": "\u6536\u5408\u67E5\u8BC1\u8BB0\u5F55",
+  "ui.book_panel_proof_hide": "\u6298\u53E0\u67E5\u8BC1\u8BB0\u5F55",
   "ui.book_panel_proof_0": "{0} \u7684\u67E5\u8BC1\u8BB0\u5F55",
   "ui.book_panel_proof_summary_0_1_2": "{0} \u9879\u8FBE\u6210\u3001{1} \u9879\u5F85\u67E5\u3001{2} \u9879\u672A\u8FBE\u6210",
   "ui.book_panel_proof_none": "\u6CA1\u6709\u67E5\u8BC1\u8BB0\u5F55\u3002",

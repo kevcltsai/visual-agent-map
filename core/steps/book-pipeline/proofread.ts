@@ -140,7 +140,6 @@ export async function runProofread(
         }
       }
     },
-    raw =>
-      evaluateProof(prepared.parse(raw), request.checklist, openedUrlsFromEvents(events), { body: request.body })
+    raw => evaluateProof(prepared.parse(raw), request.checklist, openedUrlsFromEvents(events), { body: request.body })
   );
 }

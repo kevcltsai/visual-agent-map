@@ -3112,5 +3112,5 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_reason_no_open_page": "校對時沒有成功開啟任何來源頁",
   "ui.book_reason_all_facts_unverified": "所有事實項目都無法查證",
   "ui.book_reason_unsafe_body": "圖片內容不安全，卡片維持原樣",
-  "ui.book_reason_no_view": "地圖已不在畫面上，執行已停止"
+  "ui.book_reason_no_view": "心智圖已不在畫面上，執行已停止"
 };

@@ -9113,7 +9113,7 @@ var zhTW = {
   "ui.book_reason_no_open_page": "\u6821\u5C0D\u6642\u6C92\u6709\u6210\u529F\u958B\u555F\u4EFB\u4F55\u4F86\u6E90\u9801",
   "ui.book_reason_all_facts_unverified": "\u6240\u6709\u4E8B\u5BE6\u9805\u76EE\u90FD\u7121\u6CD5\u67E5\u8B49",
   "ui.book_reason_unsafe_body": "\u5716\u7247\u5167\u5BB9\u4E0D\u5B89\u5168\uFF0C\u5361\u7247\u7DAD\u6301\u539F\u6A23",
-  "ui.book_reason_no_view": "\u5730\u5716\u5DF2\u4E0D\u5728\u756B\u9762\u4E0A\uFF0C\u57F7\u884C\u5DF2\u505C\u6B62"
+  "ui.book_reason_no_view": "\u5FC3\u667A\u5716\u5DF2\u4E0D\u5728\u756B\u9762\u4E0A\uFF0C\u57F7\u884C\u5DF2\u505C\u6B62"
 };
 
 // i18n/languages.ts
@@ -48905,7 +48905,9 @@ var BookPipelineRuns = class {
     let unsafe = false;
     const finalize = (content) => {
       const urls = bodyImageUrls(content);
-      const unsafeUrls = new Map(urls.filter((url) => !isHttps(url)).map((url) => [url, noPicture(drive.config.language, "unsafe")]));
+      const unsafeUrls = new Map(
+        urls.filter((url) => !isHttps(url)).map((url) => [url, noPicture(drive.config.language, "unsafe")])
+      );
       const cleaned = replaceBodyImages(content, unsafeUrls);
       if (this.exitCheck(cleaned, new Set(urls.filter(isHttps)))) {
         unsafe = true;

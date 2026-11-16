@@ -967,7 +967,9 @@ export class BookPipelineRuns {
     let unsafe = false;
     const finalize = (content: string): string | null => {
       const urls = bodyImageUrls(content);
-      const unsafeUrls = new Map(urls.filter(url => !isHttps(url)).map(url => [url, noPicture(drive.config.language, "unsafe")]));
+      const unsafeUrls = new Map(
+        urls.filter(url => !isHttps(url)).map(url => [url, noPicture(drive.config.language, "unsafe")])
+      );
       const cleaned = replaceBodyImages(content, unsafeUrls);
       if (this.exitCheck(cleaned, new Set(urls.filter(isHttps)))) {
         unsafe = true;

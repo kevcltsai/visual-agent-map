@@ -249,6 +249,22 @@ export function assertSourceUnchanged(expected, directory = root) {
   if (sourceFingerprint(directory) !== expected) throw new Error("Source changed during verification; rerun the harness before E2E.");
 }
 
+/** Best effort: fetch the dependency table test:affected needs from the latest green full CI run on main. Any failure leaves it missing, which means the full suite. */
+export function fetchDepsTable(directory = root, exec = execFileSync) {
+  const table = join(directory, "test-deps.json");
+  if (existsSync(table)) return false;
+  let scratch;
+  try {
+    const rows = exec("gh", ["run", "list", "--workflow", "ci.yml", "--branch", "main", "--limit", "20", "--json", "databaseId,displayTitle,conclusion", "--jq", '.[] | select(.conclusion == "success") | select(.displayTitle | startswith("CI full")) | .databaseId'], { cwd: directory, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    const id = rows.split("\n").map(line => line.trim()).find(line => /^\d+$/.test(line));
+    if (!id) return false;
+    scratch = mkdtempSync(join(tmpdir(), "vam-deps-"));
+    exec("gh", ["run", "download", id, "-n", "test-deps", "-D", scratch], { cwd: directory, stdio: "ignore" });
+    copyFileSync(join(scratch, "test-deps.json"), table);
+    return true;
+  } catch { return false; } finally { if (scratch) rmSync(scratch, { recursive: true, force: true }); }
+}
+
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, stdio: "inherit" });
   if (result.error || result.status !== 0) throw new Error(`Failed: ${command} ${args.join(" ")}`, { cause: result.error });
@@ -286,13 +302,14 @@ export function main(args = process.argv.slice(2)) {
     // Checked before the build so a busy owner is not kept waiting, and again right before the files are replaced.
     if (ownerIdleConfirmed) process.stdout.write("--owner-idle-confirmed: skipping the owner-idle check (only after the owner said 「可以裝」).\n");
     else assertOwnerIdle(canonicalVault);
+    fetchDepsTable();
     run("npm", ["run", "build"]);
     const builtHashes = hashes(root);
     // The build regenerates ignored artifacts; anchor the non-destructive update
     // check after those expected outputs exist, then protect them through tests.
     const fingerprint = sourceFingerprint();
-    run("npm", ["run", "test:unit"]);
-    run("npm", ["run", "test:integration"]);
+    // Only the tests this change can reach; test:affected answers every doubt (missing/stale table, unknown file) with the full suite.
+    run("npm", ["run", "test:affected"]);
     assertSourceUnchanged(fingerprint);
     if (JSON.stringify(hashes(root)) !== JSON.stringify(builtHashes)) throw new Error("Build artifacts changed during tests.");
     const git = (...values) => execFileSync("git", values, { cwd: root, encoding: "utf8" });

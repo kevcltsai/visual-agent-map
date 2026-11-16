@@ -4,7 +4,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { canonicalVault, prepareTestVault, updateCurrentTestVault, verifyTestVault, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled } from '../scripts/test-harness.mjs';
+import { canonicalVault, prepareTestVault, updateCurrentTestVault, verifyTestVault, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, fetchDepsTable } from '../scripts/test-harness.mjs';
 import { ownerBusyReasons } from '../scripts/owner-idle.mjs';
 import { policyAction, applyPolicy, policyExpression } from '../scripts/keep-background.mjs';
 
@@ -459,4 +459,22 @@ test('--owner-idle-confirmed only goes with --update-current; --which-installed 
   assert.match(text, /branch at install: main/);
   writeFileSync(join(vault, '.obsidian/plugins/visual-agent-map/main.js'), 'hand edited');
   assert.match(whichInstalled(vault), /commit: unknown \(main\.js changed after the recorded install\)/);
+});
+
+test('fetchDepsTable fetches the latest green full main run once and fails soft', t => {
+  const { folder } = environment(t);
+  const calls = [];
+  const fake = (command, args) => {
+    calls.push([command, ...args]);
+    if (args[1] === 'list') return 'noise\n111\n222\n';
+    writeFileSync(join(args[args.indexOf('-D') + 1], 'test-deps.json'), '{"fetched":true}');
+  };
+  assert.equal(fetchDepsTable(folder, fake), true);
+  assert.equal(readFileSync(join(folder, 'test-deps.json'), 'utf8'), '{"fetched":true}');
+  assert.deepEqual(calls[1].slice(0, 5), ['gh', 'run', 'download', '111', '-n']);
+  assert.equal(fetchDepsTable(folder, () => { throw new Error('must not run'); }), false); // table already present
+  rmSync(join(folder, 'test-deps.json'));
+  assert.equal(fetchDepsTable(folder, () => { throw new Error('gh missing'); }), false);
+  assert.equal(existsSync(join(folder, 'test-deps.json')), false);
+  assert.equal(fetchDepsTable(folder, () => ''), false); // no green full run
 });

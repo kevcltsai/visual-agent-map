@@ -1465,7 +1465,7 @@ integrationTest('selection bar shows Research; starting leaves selection mode an
   items = bar(); assert.equal(research(), undefined, 'no topic picked: no bar yet');
   h.view.selection.replaceMulti([h.nodes[0].id]); items = bar(); assert.equal(research().disabled, false); assert.equal(research().text, 'Research'); assert.equal(research().attrs['aria-label'], 'Research 1 topic');
   assert.equal(toolbar().length, 1);
-  h.view.selection.chatSelect([h.nodes[0].id]);
+  h.view.selection.selectSubtopics([h.nodes[0].id]); // enters selection mode like the user's own pick
   await h.view.startMultiResearch(h.request); await until(() => h.runs.length === 1);
   assert.equal(h.view.selection.state.multiSelectMode, false); assert.equal(h.view.selection.state.multiSelected.size, 0);
   h.view.selection.replaceMulti([h.nodes[1].id]); items = bar(); assert.equal(research().disabled, true);
@@ -1526,7 +1526,7 @@ integrationTest('multi research without a chosen model runs a workspace topic on
 integrationTest('multi research keeps selection mode when nothing starts', async () => {
   const h = await multiResearchHarness(['A']);
   h.plugin.running.add(h.nodes[0].path);
-  h.view.selection.chatSelect([h.nodes[0].id]);
+  h.view.selection.selectSubtopics([h.nodes[0].id]); // enters selection mode like the user's own pick
   await h.view.startMultiResearch(h.request);
   assert.equal(h.view.selection.state.multiSelectMode, true); assert.equal(h.view.selection.state.multiSelected.size, 1);
 });

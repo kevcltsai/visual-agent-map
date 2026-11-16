@@ -2974,6 +2974,7 @@ export class VisualAgentMapView extends ItemView {
   async onClose(): Promise<void> {
     this.closeTopicLinkMenu();
     this.closed = true;
+    if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
     this.chatSourceCache = null;
     this.unsyncedPaths = null;
     this.closeTopicChatWindow();
@@ -19135,6 +19136,8 @@ export class VisualAgentMapView extends ItemView {
       },
       selectedIds: () => this.chatSelectionIds(),
       send: () => {
+        // A new message of the user starts a new piece of work: the AI's earlier picks no longer stand in for "the selection".
+        this.aiTargets = null;
         void this.sendMapChat();
       },
       stop: () => this.stopMapChat(),
@@ -21149,7 +21152,36 @@ export class VisualAgentMapView extends ItemView {
   }
   private chatSelect(ids: string[]): void {
     this.selection.chatSelect(ids);
+    this.aiTargets = ids;
     if (!this.closed) this.render();
+    this.armHighlightFade();
+  }
+  /** The cards the AI picked last: an action with no cards named works on these, not on what the user clicked meanwhile. */
+  private aiTargets: string[] | null = null;
+  private chatTargetIds(): string[] {
+    if (this.selection.state.multiSelectMode) return this.chatSelectionIds();
+    const ids = (this.aiTargets ?? []).filter(id => this.map?.nodes.some(node => node.id === id));
+    return ids.length ? ids : this.chatSelectionIds();
+  }
+  private highlightFadeTimer: number | null = null;
+  /** The AI's highlight (no selection mode) fades 5 s after its work ends; while a chat chain or batch runs it waits. */
+  private armHighlightFade(idleSince: number | null = null): void {
+    if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
+    this.highlightFadeTimer = window.setTimeout(() => {
+      this.highlightFadeTimer = null;
+      if (this.closed || this.selection.state.multiSelectMode || !this.selection.state.multiSelected.size) return;
+      // The user took over (a Cmd-click, a marquee): what is selected is theirs now and stays.
+      if (!this.selection.isPureHighlight()) {
+        this.aiTargets = null;
+        return;
+      }
+      if (this.chatChainRunner?.current || this.plugin.expansionCoordinator?.isRunning(this.multiResearchKey()))
+        return this.armHighlightFade(null);
+      const since = idleSince ?? Date.now();
+      if (Date.now() - since < 5000) return this.armHighlightFade(since);
+      this.aiTargets = null;
+      this.applySelectionChange(this.selection.clearMulti());
+    }, 1000);
   }
   /** The chat remembers what it researched; a card researched again moves to the end, and a later failure does not undo a success. */
   /** The user asked for images: the researched topics whose note still has no image, named in one line (failed ones are in the batch box). */
@@ -21333,12 +21365,13 @@ export class VisualAgentMapView extends ItemView {
     };
     const writesTargets =
       action.action === "research_standard" || action.action === "expand" || action.action === "find_images";
-    const lockIds = targets.length ? targets : this.chatSelectionIds();
+    const lockIds = targets.length ? targets : this.chatTargetIds();
     if ((writesTargets || (action.action === "synthesize" && lockIds.length === 1)) && (await lockedOnly(lockIds)))
       return skipped("ui.ai_locked_notice");
     switch (action.action) {
       case "research_standard": {
         if (targets.length) this.chatSelect(targets);
+        else if (!this.selection.state.multiSelectMode && this.aiTargets?.length) this.chatSelect(this.chatTargetIds());
         if (!this.selection.state.multiSelected.size) return skipped("ui.map_chat_skip_unavailable");
         // A batch already running is told in the result, not only by the Notice the research itself shows.
         if (this.plugin.expansionCoordinator.isRunning(this.multiResearchKey()))
@@ -21360,6 +21393,8 @@ export class VisualAgentMapView extends ItemView {
         // The map's own source files (as a single research gets them) plus what this turn attached; read before the batch starts.
         const mapSourceGroups = await this.readMapSourceGroups(work?.controller.signal ?? new AbortController().signal);
         const referenceGroups = [...mapSourceGroups, ...this.chatTurnReferences];
+        // The user may have clicked a card while the sources were read: the batch runs on the cards this action took.
+        if (!this.selection.state.multiSelectMode) this.selection.chatSelect(researchIds);
         // From here on any turn of this conversation may read web text (decision #17): set before the first card is written, and
         // kept in the record so a reopened conversation keeps it.
         this.chatStartedResearch = true;
@@ -21429,7 +21464,7 @@ export class VisualAgentMapView extends ItemView {
         return { status: "done" };
       }
       case "expand": {
-        const ids = targets.length ? targets : this.chatSelectionIds();
+        const ids = targets.length ? targets : this.chatTargetIds();
         const parents = known(ids)
           .map(id => this.map?.nodes.find(node => node.id === id))
           .filter((node): node is MapNode => !!node && !this.aiLockReason("addChild", [node.id]));
@@ -21507,7 +21542,7 @@ export class VisualAgentMapView extends ItemView {
         return { status: "done", ...(allBasis ? { basis: allBasis } : {}) };
       }
       case "synthesize":
-        return this.chatSynthesize(targets.length ? targets : this.chatSelectionIds(), message);
+        return this.chatSynthesize(targets.length ? targets : this.chatTargetIds(), message);
       case "rate_by_goal": {
         const goal = action.goal.trim();
         if (!goal || !this.relevanceGradeable()) return skipped("ui.map_chat_skip_unavailable");
@@ -21572,7 +21607,7 @@ export class VisualAgentMapView extends ItemView {
     const map = this.map;
     const chat = this.chat;
     if (!map || !chat) return skipped("ui.map_chat_skip_map_changed");
-    const wanted = targets.length ? targets : this.chatSelectionIds();
+    const wanted = targets.length ? targets : this.chatTargetIds();
     if (!wanted.length) return skipped("ui.map_chat_skip_images_one_card");
     const readsResearch = this.chatStartedResearch || this.chatReadsSources || continuation;
     const found = await this.chatImageFinder.find(map, chat, wanted, direction, readsResearch, batch);

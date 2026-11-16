@@ -901,6 +901,31 @@ integrationTest('map chat: a failing write is reported and the next action still
   assert.equal((await h.note('b')).title, 'Two');
 });
 
+integrationTest('map chat: a card the user clicks after the AI picked cards does not become the target of a later action that names none', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const started = [];
+  h.view.startMultiResearch = async request => { started.push({ request, selected: [...h.view.selection.state.multiSelected] }); };
+  const [a, b, c] = Object.values(h.ids);
+  h.view.chatSelect([a, b]);
+  h.view.selection.click(c);
+  assert.equal(h.view.selection.state.multiSelectMode, false);
+  const lines = await apply(h, [{ kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '' }]);
+  eq(lines.map(l => l.status), ['done']); await tick();
+  assert.equal(started.length, 1); eq(started[0].selected.sort(), [a, b].sort(), 'the AI picked a and b; the click on c did not replace them');
+});
+
+integrationTest('map chat: in a manual selection mode an action that names no card works on the user selection, not the AI earlier pick', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const started = [];
+  h.view.startMultiResearch = async request => { started.push({ request, selected: [...h.view.selection.state.multiSelected] }); };
+  const [a, b, c] = Object.values(h.ids);
+  h.view.chatSelect([a]);
+  h.view.selection.selectSubtopics([b, c]);
+  const lines = await apply(h, [{ kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '' }]);
+  eq(lines.map(l => l.status), ['done']); await tick();
+  eq(started[0].selected.sort(), [b, c].sort(), 'the user picked b and c in selection mode; the earlier AI pick a does not replace them');
+});
+
 integrationTest('map chat: select_topics(all) then research_standard starts the research once on every topic (Quick when nothing names a mode), outside any mutate', async () => {
   const h = await harness(); await h.view.hydrate();
   const started = [];
@@ -913,7 +938,7 @@ integrationTest('map chat: select_topics(all) then research_standard starts the 
   eq(lines.map(l => l.status), ['done', 'done']); await tick();
   assert.equal(started.length, 1); eq(started[0].request, quickRequest, 'no mode named and the map remembers none: Quick (D-2026-10-228)');
   eq(started[0].selected.sort(), Object.values(h.ids).sort()); assert.equal(started[0].mutating, 0, 'not inside a mutate');
-  assert.equal(h.view.selection.state.multiSelectMode, true); assert.equal(h.control.mutates, 0, 'selecting and starting research write nothing through the queue');
+  assert.equal(h.view.selection.state.multiSelectMode, false, 'the AI highlight never takes the selection mode'); assert.equal(h.control.mutates, 0, 'selecting and starting research write nothing through the queue');
 });
 
 integrationTest('map chat: the result rows name the mode the research really runs in, and the expand row says the subtopics are created directly', async () => {
@@ -1790,7 +1815,7 @@ test('map chat D1: the view refreshes the note chip when the active leaf changes
 
 integrationTest('map chat: in selection mode a card dragged onto the panel adds a topic chip, writes nothing and keeps the selection', async () => {
   const d = await dragHarness();
-  d.view.selection.chatSelect([d.ids.b, d.ids.c]);
+  d.view.selection.selectSubtopics([d.ids.b, d.ids.c]);
   d.down(); d.move(100, 400);
   assert.ok(hasClass(d.chat.el, 'is-drop'), 'the panel lights up in selection mode too');
   d.up();
@@ -1802,7 +1827,7 @@ integrationTest('map chat: in selection mode a card dragged onto the panel adds 
 
 integrationTest('map chat: in selection mode a drag onto the canvas moves nothing and does not toggle; a plain click is left to the click handler', async () => {
   const d = await dragHarness();
-  d.view.selection.chatSelect([d.ids.b]); d.view.selection.setSelected(d.ids.b);
+  d.view.selection.selectSubtopics([d.ids.b]); d.view.selection.setSelected(d.ids.b);
   d.down(); d.move(520, 150); d.move(560, 160); d.up();
   await new Promise(r => setTimeout(r, 0));
   assert.equal(d.changes.length, 0, 'mapChange not called'); eq([d.card.style.left, d.card.style.top], [`${d.node('a').x}px`, `${d.node('a').y}px`]);

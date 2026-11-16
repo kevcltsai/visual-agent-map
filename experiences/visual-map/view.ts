@@ -337,6 +337,7 @@ import type { AuthorInput, AuthorOutcome } from "./book-pipeline-run";
 import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
 import { readBookPipeline, readPipelineStage } from "../../core/book-pipeline/model";
 import { bookBarState, bookCardView, renderBookBar, renderBookCardLabels, runBookEntry } from "./book-pipeline-ui";
+import { buildGatePanel, GatePanelState, renderGatePanel } from "./book-pipeline-panel";
 import {
   INTEGRATION_DEPTHS,
   bottomUpOrder,
@@ -498,7 +499,14 @@ import {
   type ChatBatch,
   type ChatBatchRequest
 } from "../../core/map-chat-batch";
-import { chatDockedWidth, chatOverlayWidth, clampMapChatWidth, isChatNarrow } from "../../core/map-chat-layout";
+import {
+  chatDockedWidth,
+  chatOverlayWidth,
+  clampMapChatWidth,
+  isChatNarrow,
+  MAP_CHAT_MIN_CANVAS,
+  MAP_CHAT_WIDTH_DEFAULT
+} from "../../core/map-chat-layout";
 import { GoalSuggest } from "./goal-suggest";
 import type { RelevancePin } from "./relevance-pins";
 import {
@@ -3016,6 +3024,8 @@ export class VisualAgentMapView extends ItemView {
     this.researchTick = this.researchRenderTimer = null;
     this.researchElapsed.clear();
     this.bookAuthoring.clear();
+    this.bookPanel.reset();
+    this.bookSideEl = null;
     this.researchSigs.clear();
     this.taskPreviewEls.clear();
     this.hoverResearch = null;
@@ -11860,6 +11870,7 @@ export class VisualAgentMapView extends ItemView {
       this.dropGoalEdit();
     }
     this.mountMapChat(workspace, overlay);
+    this.mountBookPanel(workspace);
     this.placeGoalBar();
     // The gesture hint goes away once the user has panned or zoomed; select mode keeps its gesture hint inside the selection bar, never over the canvas.
     // In select mode the selection bar (bottom-left) owns that space, so no hint is drawn there.
@@ -16956,8 +16967,178 @@ export class VisualAgentMapView extends ItemView {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
-      confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path))
+      confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path)),
+      panel: { open: this.bookPanel.open, toggle: () => this.toggleBookPanel() }
     });
+  }
+  // ---- Picture-book gate panel (04b) ---------------------------------------------------------------------------
+  private readonly bookPanel = new GatePanelState();
+  private bookSideEl: HTMLElement | null = null;
+  private bookPanelPath = "";
+  /** Whether the chat window was open when the gate panel took the side column (it comes back when the panel closes). */
+  private bookChatWasOpen = false;
+  /** Runs `work` so the chat's open state is not saved as the user's choice (the panel folded it, not the user). */
+  private withChatForced(work: () => void): void {
+    const was = this.chatForcedOpen;
+    this.chatForcedOpen = true;
+    try {
+      work();
+    } finally {
+      this.chatForcedOpen = was;
+    }
+  }
+  /** The gate panel shares the side column with the chat: one at a time. Opening it folds the chat; closing gives the chat back. */
+  private toggleBookPanel(): void {
+    if (this.bookPanel.open) return this.closeBookPanel();
+    const chat = this.chat;
+    this.bookChatWasOpen = !!chat && !chat.isHero && chat.isOpen;
+    if (this.bookChatWasOpen) this.withChatForced(() => chat?.setOpen(false));
+    this.bookPanel.open = true;
+    this.bookPanel.pendingFocus = "title";
+    this.render();
+  }
+  private closeBookPanel(): void {
+    this.bookPanel.open = false;
+    this.bookPanel.pendingFocus = "opener";
+    if (this.bookChatWasOpen) this.withChatForced(() => this.chat?.setOpen(true));
+    this.bookChatWasOpen = false;
+    this.render();
+  }
+  /** The panel's "Chat" tab: the panel closes and the chat window opens with the keyboard in its message field. */
+  private showChatFromBookPanel(): void {
+    this.bookPanel.open = false;
+    this.bookPanel.pendingFocus = null;
+    this.bookChatWasOpen = false;
+    this.render();
+    this.chat?.setOpen(true, true);
+  }
+  /** Part of every repaint: the panel's column, only for a map that has a usable `bookPipeline` and only while it is open. */
+  private mountBookPanel(workspace: HTMLElement): void {
+    this.bookSideEl = null;
+    if (
+      !this.map ||
+      !this.path ||
+      !this.hasBookPipeline() ||
+      (this.bookPanelPath && this.bookPanelPath !== this.path)
+    ) {
+      this.bookPanel.reset();
+      this.bookChatWasOpen = false;
+    }
+    this.bookPanelPath = this.hasBookPipeline() ? this.path : "";
+    if (!this.bookPanel.open || !this.bookPanelPath) {
+      // The panel just closed (button, Escape): the keyboard goes back to the toolbar button that opened it.
+      if (this.bookPanel.pendingFocus === "opener")
+        this.contentEl.querySelector<HTMLElement>(".vam-book-panel-toggle")?.focus();
+      this.bookPanel.pendingFocus = null;
+      return;
+    }
+    const side = workspace.createDiv("vam-book-side");
+    const measured = this.chatPaneWidths();
+    side.toggleClass(
+      "is-overlay",
+      !!measured && measured.pane - measured.inspector < MAP_CHAT_WIDTH_DEFAULT + MAP_CHAT_MIN_CANVAS
+    );
+    this.bookSideEl = side;
+    this.paintBookPanel();
+    void this.loadBookRoot();
+  }
+  private paintBookPanel(): void {
+    const side = this.bookSideEl;
+    const map = this.map;
+    const path = this.path;
+    if (!side || !map || !path || this.closed) return;
+    const read = readBookPipeline(map);
+    if (read.kind !== "usable") return;
+    const doc = this.contentEl.ownerDocument;
+    const held = doc?.activeElement as HTMLElement | null;
+    const heldCard = held && side.contains(held) ? (held.dataset?.card ?? null) : null;
+    const draftCaret = heldCard ? ((held as HTMLInputElement).selectionStart ?? null) : null;
+    side.empty();
+    const progress = this.plugin.getBookPipelineProgress(path);
+    const data = buildGatePanel({
+      order: read.data.order,
+      titleOf: id => this.notes.get(id)?.title ?? map.nodes.find(node => node.id === id)?.path ?? id,
+      noteOf: id => this.notes.get(id),
+      rootRaw: this.bookPanel.rootRaw
+    });
+    const gate1 = (progress?.phase ?? read.data.phase) === "gate1";
+    const state = this.bookPanel;
+    renderGatePanel(
+      side,
+      data,
+      gate1,
+      state,
+      {
+        editPlan: id => void this.openBookPlan(id),
+        replan: async (id, instruction) => {
+          try {
+            return await this.plugin.replanBookCard(path, id, instruction);
+          } finally {
+            await this.rereadBookCard(id);
+          }
+        },
+        rerunPlan: async id => {
+          try {
+            await this.plugin.rerunBookCard(path, id);
+          } finally {
+            await this.rereadBookCard(id);
+          }
+        },
+        confirm: () => this.plugin.confirmBookGate1(path),
+        showChat: () => this.showChatFromBookPanel(),
+        close: () => this.closeBookPanel(),
+        refresh: () => this.paintBookPanel()
+      },
+      new Set(progress?.busyCards ?? [])
+    );
+    if (heldCard) {
+      const input = Array.from(side.querySelectorAll<HTMLInputElement>(".vam-book-panel-more-input")).find(
+        item => item.dataset.card === heldCard
+      );
+      input?.focus();
+      if (input && draftCaret !== null) input.setSelectionRange?.(draftCaret, draftCaret);
+    }
+    if (state.pendingFocus === "title") side.querySelector<HTMLElement>(".vam-book-panel-title")?.focus();
+    else if (state.pendingFocus === "opener")
+      this.contentEl.querySelector<HTMLElement>(".vam-book-panel-toggle")?.focus();
+    state.pendingFocus = null;
+  }
+  /** The root note's file text (the thread and the editorial decisions live there); repaints the panel when it differs. */
+  private async loadBookRoot(): Promise<void> {
+    const map = this.map;
+    if (!map) return;
+    const read = readBookPipeline(map);
+    if (read.kind !== "usable") return;
+    const root = map.nodes.find(node => !node.parentId) ?? map.nodes.find(node => node.id === read.data.order[0]);
+    const file = root ? this.app.vault.getAbstractFileByPath(root.path) : null;
+    if (!(file instanceof TFile)) return;
+    const raw = await this.app.vault.read(file).catch(() => "");
+    if (this.closed || !this.bookSideEl || raw === this.bookPanel.rootRaw) return;
+    this.bookPanel.rootRaw = raw;
+    this.paintBookPanel();
+  }
+  /** After a replan or rerun: this card's note is read again so the panel shows the new plan without waiting for the repaint. */
+  private async rereadBookCard(id: string): Promise<void> {
+    const node = this.map?.nodes.find(item => item.id === id);
+    if (!node || this.closed) return;
+    const note = await this.plugin.repo.readNote(node.path).catch(() => null);
+    if (note && !this.closed) this.notes.set(id, note);
+  }
+  /** "Edit plan": the card's note opens in a tab at its `## Prompt` section. */
+  private async openBookPlan(id: string): Promise<void> {
+    const node = this.map?.nodes.find(item => item.id === id);
+    const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
+    if (!(file instanceof TFile)) {
+      new Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
+      return;
+    }
+    const text = await this.app.vault.read(file).catch(() => "");
+    const line = text.split(/\r?\n/).findIndex(item => /^##[ \t]+Prompt[ \t]*$/.test(item));
+    try {
+      await this.app.workspace.getLeaf("tab").openFile(file, line >= 0 ? { eState: { line } } : undefined);
+    } catch (error) {
+      new Notice(error instanceof Error ? error.message : String(error));
+    }
   }
   /** Runs a runner entry (these resolve when the drive ends); a refusal becomes a notice, and the map repaints either way. */
   private bookEntry(entry: () => Promise<void>): Promise<void> {

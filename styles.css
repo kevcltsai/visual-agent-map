@@ -2245,3 +2245,35 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-role { display: inline-block; padding: 0 6px; border: 1px solid var(--background-modifier-border); border-radius: 4px; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }
 .vam-book-summary-prefix { color: var(--text-faint); margin-right: 2px; }
 .vam-card-book-issue { margin: 6px 0 0; font-size: var(--font-ui-smaller); line-height: 1.45; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); overflow-wrap: anywhere; }
+.vam-book-side { position: relative; display: flex; flex: 0 0 340px; flex-direction: column; box-sizing: border-box; width: 340px; min-width: 0; min-height: 0; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); color: var(--text-normal); }
+.vam-book-side.is-overlay { position: absolute; z-index: 12; top: 0; right: 0; bottom: 0; max-width: calc(100% - 44px); box-shadow: var(--shadow-l); }
+.vam-book-panel { display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; padding: 10px 12px 12px; min-width: 0; }
+.vam-book-panel button:focus-visible, .vam-book-panel input:focus-visible, .vam-book-panel-title:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-book-panel-tabs { display: flex; align-items: center; gap: 4px; }
+.vam-book-panel-tab { flex: 0 1 auto; padding: 2px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: transparent; box-shadow: none; color: var(--text-muted); font-size: var(--font-ui-small); }
+.vam-book-panel-tab.is-active { background: var(--background-modifier-hover); color: var(--text-normal); font-weight: 600; }
+.vam-book-panel-close { margin-left: auto; padding: 0 8px; background: transparent; box-shadow: none; color: var(--text-muted); }
+.vam-book-panel-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.vam-book-panel-title { flex: 1 1 auto; margin: 0; font-size: var(--font-ui-medium); }
+.vam-book-panel-tag { padding: 0 8px; border-radius: 10px; background: var(--background-secondary); color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-book-panel-note, .vam-book-panel-muted { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-book-panel-plan { border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); }
+.vam-book-panel-plan-toggle { display: block; width: 100%; padding: 6px 10px; border: 0; background: transparent; box-shadow: none; text-align: left; font-weight: 600; }
+.vam-book-panel-plan-toggle::before { content: "\25B8"; margin-right: 6px; }
+.vam-book-panel-plan-toggle[aria-expanded="true"]::before { content: "\25BE"; }
+.vam-book-panel-plan-body { display: flex; flex-direction: column; gap: 4px; padding: 0 10px 8px; font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
+.vam-book-panel-plan-body[hidden] { display: none; }
+.vam-book-panel-cards { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.vam-book-panel-card { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); }
+.vam-book-panel-card[data-stage="needs-review"] { border-color: var(--color-orange); }
+.vam-book-panel-card[aria-busy="true"] { opacity: 0.75; }
+.vam-book-panel-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.vam-book-panel-card-title { flex: 1 1 120px; min-width: 0; overflow-wrap: anywhere; }
+.vam-book-panel-field { font-size: var(--font-ui-smaller); color: var(--text-muted); overflow-wrap: anywhere; white-space: pre-wrap; }
+.vam-book-panel-issue { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--font-ui-smaller); color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
+.vam-book-panel-more { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.vam-book-panel-more-input { flex: 1 1 140px; min-width: 0; }
+.vam-book-panel-card-status { min-height: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.vam-book-panel-card-status.is-error, .vam-book-panel-status { color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); font-size: var(--font-ui-smaller); }
+.vam-book-panel-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { .vam-book-side { transition: none; } }

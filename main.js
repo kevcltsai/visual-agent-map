@@ -3117,7 +3117,46 @@ var en = {
   "ui.book_reason_no_open_page": "no source page was opened while proofreading",
   "ui.book_reason_all_facts_unverified": "none of the factual items could be verified",
   "ui.book_reason_unsafe_body": "the picture text was not safe, so the card was left as it was",
-  "ui.book_reason_no_view": "the map is no longer open, so the run stopped"
+  "ui.book_reason_no_view": "the map is no longer open, so the run stopped",
+  "ui.book_panel_label": "Picture-book gate panel",
+  "ui.book_panel_tabs_label": "Side panel",
+  "ui.book_panel_tab_book": "Picture-book panel",
+  "ui.book_panel_tab_chat": "Chat",
+  "ui.book_panel_open": "Open the gate panel",
+  "ui.book_panel_close": "Close the panel",
+  "ui.book_panel_gate1_title": "Gate 1: Confirm the plan",
+  "ui.book_panel_all_planned_0": "All {0} cards are planned",
+  "ui.book_panel_some_planned_0_1_2": "Planned {0}/{1} \xB7 Needs a look {2}",
+  "ui.book_panel_not_gate1": "The run is not at gate 1, so there is no plan to confirm here.",
+  "ui.book_panel_plan_heading": "Book thread and editorial decisions",
+  "ui.book_panel_plan_empty": "The book plan has no content yet.",
+  "ui.book_panel_thread_0": "Thread: {0}",
+  "ui.book_panel_decisions_0": "Decided by the editor (the ones you left empty): {0}",
+  "ui.book_panel_materials_0": "Material register: {0} items",
+  "ui.book_field_reader": "Reader",
+  "ui.book_field_goal": "Goal",
+  "ui.book_field_angle": "Angle",
+  "ui.book_field_tone": "Tone",
+  "ui.book_field_length": "Length",
+  "ui.book_field_style": "Style",
+  "ui.book_panel_cards_label": "Plan of each card",
+  "ui.book_panel_covers": "Covers",
+  "ui.book_panel_entry": "Entry point",
+  "ui.book_panel_handoff": "Left for the next card",
+  "ui.book_panel_no_plan": "This card has no plan yet.",
+  "ui.book_panel_edit_plan": "Edit plan",
+  "ui.book_panel_edit_plan_0": "Edit the plan of {0}",
+  "ui.book_panel_rerun_plan": "Re-plan",
+  "ui.book_panel_rerun_plan_0": "Re-plan {0}",
+  "ui.book_panel_more_label_0": "What to say more about in {0}",
+  "ui.book_panel_more_placeholder": "Say more about\u2026 e.g. his manuscripts",
+  "ui.book_panel_replan": "Rewrite this plan",
+  "ui.book_panel_busy": "Working\u2026",
+  "ui.book_panel_replanned": "This plan was rewritten; the seams with the cards before and after are marked.",
+  "ui.book_panel_replan_failed_0": "This plan was not rewritten: {0}",
+  "ui.book_panel_cancelled": "cancelled",
+  "ui.book_panel_confirming": "Confirming\u2026",
+  "ui.book_panel_hint": "You can also click a card on the map and edit its Prompt section."
 };
 
 // i18n/zh-CN.ts
@@ -6130,7 +6169,46 @@ var zhCN = {
   "ui.book_reason_no_open_page": "\u6821\u5BF9\u65F6\u6CA1\u6709\u6210\u529F\u6253\u5F00\u4EFB\u4F55\u6765\u6E90\u9875",
   "ui.book_reason_all_facts_unverified": "\u6240\u6709\u4E8B\u5B9E\u9879\u76EE\u90FD\u65E0\u6CD5\u67E5\u8BC1",
   "ui.book_reason_unsafe_body": "\u56FE\u7247\u5185\u5BB9\u4E0D\u5B89\u5168\uFF0C\u5361\u7247\u4FDD\u6301\u539F\u6837",
-  "ui.book_reason_no_view": "\u5730\u56FE\u5DF2\u4E0D\u5728\u754C\u9762\u4E0A\uFF0C\u8FD0\u884C\u5DF2\u505C\u6B62"
+  "ui.book_reason_no_view": "\u5730\u56FE\u5DF2\u4E0D\u5728\u754C\u9762\u4E0A\uFF0C\u8FD0\u884C\u5DF2\u505C\u6B62",
+  "ui.book_panel_label": "\u56FE\u6587\u4E66\u5173\u5361\u9762\u677F",
+  "ui.book_panel_tabs_label": "\u53F3\u4FA7\u680F",
+  "ui.book_panel_tab_book": "\u56FE\u6587\u4E66\u9762\u677F",
+  "ui.book_panel_tab_chat": "\u5BF9\u8BDD",
+  "ui.book_panel_open": "\u6253\u5F00\u5173\u5361\u9762\u677F",
+  "ui.book_panel_close": "\u5173\u95ED\u9762\u677F",
+  "ui.book_panel_gate1_title": "\u5173\u5361 1\uFF1A\u786E\u8BA4\u4F01\u5212",
+  "ui.book_panel_all_planned_0": "{0} \u5F20\u90FD\u5DF2\u4F01\u5212",
+  "ui.book_panel_some_planned_0_1_2": "\u5DF2\u4F01\u5212 {0}\uFF0F{1} \xB7 \u9700\u4EBA\u770B {2}",
+  "ui.book_panel_not_gate1": "\u76EE\u524D\u4E0D\u5728\u201C\u5173\u5361 1\u201D\uFF0C\u8FD9\u91CC\u6CA1\u6709\u8981\u786E\u8BA4\u7684\u4F01\u5212\u3002",
+  "ui.book_panel_plan_heading": "\u5168\u4E66\u4E3B\u7EBF\u4E0E\u7F16\u8F91\u51B3\u5B9A",
+  "ui.book_panel_plan_empty": "\u5168\u4E66\u4F01\u5212\u8FD8\u6CA1\u6709\u5185\u5BB9\u3002",
+  "ui.book_panel_thread_0": "\u4E3B\u7EBF\uFF1A{0}",
+  "ui.book_panel_decisions_0": "\u603B\u7F16\u8F91\u51B3\u5B9A\u7684\u680F\u4F4D\uFF08\u4F60\u7559\u7A7A\u7684\uFF09\uFF1A{0}",
+  "ui.book_panel_materials_0": "\u7D20\u6750\u767B\u8BB0\u8868 {0} \u4EF6",
+  "ui.book_field_reader": "\u8BFB\u8005",
+  "ui.book_field_goal": "\u76EE\u6807",
+  "ui.book_field_angle": "\u5207\u5165\u89D2\u5EA6",
+  "ui.book_field_tone": "\u8BED\u6C14",
+  "ui.book_field_length": "\u7BC7\u5E45",
+  "ui.book_field_style": "\u98CE\u683C",
+  "ui.book_panel_cards_label": "\u6BCF\u5F20\u5361\u7684\u4F01\u5212",
+  "ui.book_panel_covers": "\u4F1A\u8BB2\u4EC0\u4E48",
+  "ui.book_panel_entry": "\u63A5\u5165\u70B9",
+  "ui.book_panel_handoff": "\u7559\u7ED9\u4E0B\u4E00\u5F20\u7684\u95EE\u9898",
+  "ui.book_panel_no_plan": "\u8FD9\u5F20\u8FD8\u6CA1\u6709\u4F01\u5212\u3002",
+  "ui.book_panel_edit_plan": "\u6539\u4F01\u5212",
+  "ui.book_panel_edit_plan_0": "\u6539\u201C{0}\u201D\u7684\u4F01\u5212",
+  "ui.book_panel_rerun_plan": "\u91CD\u8DD1\u4F01\u5212",
+  "ui.book_panel_rerun_plan_0": "\u91CD\u8DD1\u201C{0}\u201D\u7684\u4F01\u5212",
+  "ui.book_panel_more_label_0": "\u201C{0}\u201D\u8FD9\u5F20\u8981\u591A\u8BB2\u4EC0\u4E48",
+  "ui.book_panel_more_placeholder": "\u8FD9\u5F20\u8981\u591A\u8BB2\u22EF\uFF0C\u4F8B\u5982\uFF1A\u4ED6\u7684\u624B\u7A3F",
+  "ui.book_panel_replan": "\u91CD\u5199\u8FD9\u5F20\u4F01\u5212",
+  "ui.book_panel_busy": "\u5904\u7406\u4E2D\u22EF",
+  "ui.book_panel_replanned": "\u5DF2\u91CD\u5199\u8FD9\u5F20\u4F01\u5212\uFF0C\u524D\u540E\u5361\u63A5\u7F1D\u5DF2\u6807\u8BB0\u3002",
+  "ui.book_panel_replan_failed_0": "\u8FD9\u5F20\u6CA1\u6709\u91CD\u5199\uFF1A{0}",
+  "ui.book_panel_cancelled": "\u5DF2\u53D6\u6D88",
+  "ui.book_panel_confirming": "\u786E\u8BA4\u4E2D\u22EF",
+  "ui.book_panel_hint": "\u4E5F\u53EF\u4EE5\u76F4\u63A5\u5728\u5730\u56FE\u4E0A\u70B9\u5361\uFF0C\u6539\u5B83\u7684\u201CPrompt\u201D\u533A\u6BB5\u3002"
 };
 
 // i18n/zh-TW.ts
@@ -9143,7 +9221,46 @@ var zhTW = {
   "ui.book_reason_no_open_page": "\u6821\u5C0D\u6642\u6C92\u6709\u6210\u529F\u958B\u555F\u4EFB\u4F55\u4F86\u6E90\u9801",
   "ui.book_reason_all_facts_unverified": "\u6240\u6709\u4E8B\u5BE6\u9805\u76EE\u90FD\u7121\u6CD5\u67E5\u8B49",
   "ui.book_reason_unsafe_body": "\u5716\u7247\u5167\u5BB9\u4E0D\u5B89\u5168\uFF0C\u5361\u7247\u7DAD\u6301\u539F\u6A23",
-  "ui.book_reason_no_view": "\u5FC3\u667A\u5716\u5DF2\u4E0D\u5728\u756B\u9762\u4E0A\uFF0C\u57F7\u884C\u5DF2\u505C\u6B62"
+  "ui.book_reason_no_view": "\u5FC3\u667A\u5716\u5DF2\u4E0D\u5728\u756B\u9762\u4E0A\uFF0C\u57F7\u884C\u5DF2\u505C\u6B62",
+  "ui.book_panel_label": "\u5716\u6587\u66F8\u95DC\u5361\u9762\u677F",
+  "ui.book_panel_tabs_label": "\u53F3\u5074\u6B04\u4F4D",
+  "ui.book_panel_tab_book": "\u5716\u6587\u66F8\u9762\u677F",
+  "ui.book_panel_tab_chat": "\u5C0D\u8A71",
+  "ui.book_panel_open": "\u958B\u555F\u95DC\u5361\u9762\u677F",
+  "ui.book_panel_close": "\u95DC\u9589\u9762\u677F",
+  "ui.book_panel_gate1_title": "\u95DC\u5361 1\uFF1A\u78BA\u8A8D\u4F01\u5283",
+  "ui.book_panel_all_planned_0": "{0} \u5F35\u90FD\u5DF2\u4F01\u5283",
+  "ui.book_panel_some_planned_0_1_2": "\u5DF2\u4F01\u5283 {0}\uFF0F{1} \xB7 \u9700\u4EBA\u770B {2}",
+  "ui.book_panel_not_gate1": "\u76EE\u524D\u4E0D\u5728\u300C\u95DC\u5361 1\u300D\uFF0C\u9019\u88E1\u6C92\u6709\u8981\u78BA\u8A8D\u7684\u4F01\u5283\u3002",
+  "ui.book_panel_plan_heading": "\u5168\u66F8\u4E3B\u7DDA\u8207\u7DE8\u8F2F\u6C7A\u5B9A",
+  "ui.book_panel_plan_empty": "\u5168\u66F8\u4F01\u5283\u9084\u6C92\u6709\u5167\u5BB9\u3002",
+  "ui.book_panel_thread_0": "\u4E3B\u7DDA\uFF1A{0}",
+  "ui.book_panel_decisions_0": "\u7E3D\u7DE8\u8F2F\u6C7A\u5B9A\u7684\u6B04\u4F4D\uFF08\u4F60\u7559\u7A7A\u7684\uFF09\uFF1A{0}",
+  "ui.book_panel_materials_0": "\u7D20\u6750\u767B\u8A18\u8868 {0} \u4EF6",
+  "ui.book_field_reader": "\u8B80\u8005",
+  "ui.book_field_goal": "\u76EE\u6A19",
+  "ui.book_field_angle": "\u5207\u5165\u89D2\u5EA6",
+  "ui.book_field_tone": "\u8A9E\u6C23",
+  "ui.book_field_length": "\u7BC7\u5E45",
+  "ui.book_field_style": "\u98A8\u683C",
+  "ui.book_panel_cards_label": "\u6BCF\u5F35\u5361\u7684\u4F01\u5283",
+  "ui.book_panel_covers": "\u6703\u8B1B\u4EC0\u9EBC",
+  "ui.book_panel_entry": "\u63A5\u5165\u9EDE",
+  "ui.book_panel_handoff": "\u7559\u7D66\u4E0B\u4E00\u5F35\u7684\u554F\u984C",
+  "ui.book_panel_no_plan": "\u9019\u5F35\u9084\u6C92\u6709\u4F01\u5283\u3002",
+  "ui.book_panel_edit_plan": "\u6539\u4F01\u5283",
+  "ui.book_panel_edit_plan_0": "\u6539\u300C{0}\u300D\u7684\u4F01\u5283",
+  "ui.book_panel_rerun_plan": "\u91CD\u8DD1\u4F01\u5283",
+  "ui.book_panel_rerun_plan_0": "\u91CD\u8DD1\u300C{0}\u300D\u7684\u4F01\u5283",
+  "ui.book_panel_more_label_0": "\u300C{0}\u300D\u9019\u5F35\u8981\u591A\u8B1B\u4EC0\u9EBC",
+  "ui.book_panel_more_placeholder": "\u9019\u5F35\u8981\u591A\u8B1B\u22EF\uFF0C\u4F8B\u5982\uFF1A\u4ED6\u7684\u624B\u7A3F",
+  "ui.book_panel_replan": "\u91CD\u5BEB\u9019\u5F35\u4F01\u5283",
+  "ui.book_panel_busy": "\u8655\u7406\u4E2D\u22EF",
+  "ui.book_panel_replanned": "\u5DF2\u91CD\u5BEB\u9019\u5F35\u4F01\u5283\uFF0C\u524D\u5F8C\u5361\u63A5\u7E2B\u5DF2\u6A19\u8A18\u3002",
+  "ui.book_panel_replan_failed_0": "\u9019\u5F35\u6C92\u6709\u91CD\u5BEB\uFF1A{0}",
+  "ui.book_panel_cancelled": "\u5DF2\u53D6\u6D88",
+  "ui.book_panel_confirming": "\u78BA\u8A8D\u4E2D\u22EF",
+  "ui.book_panel_hint": "\u4E5F\u53EF\u4EE5\u76F4\u63A5\u5728\u5FC3\u667A\u5716\u4E0A\u9EDE\u5361\uFF0C\u6539\u5B83\u7684\u300CPrompt\u300D\u5340\u6BB5\u3002"
 };
 
 // i18n/languages.ts
@@ -29517,12 +29634,12 @@ function relationReferences(map, nodeId, language2, hasNote) {
   const notes = new Map(map.nodes.filter((node) => hasNote(node.path)).map((node) => [node.id, node.path]));
   if (!notes.has(nodeId)) return [];
   const lines = [];
-  for (const [kind, start, finish] of ref.relations) {
+  for (const [kind, start, finish2] of ref.relations) {
     const ends = (side) => {
       var _a2;
       return ((_a2 = map.topicRelations) != null ? _a2 : []).filter((r) => r.kind === kind && r[side] === nodeId).map((r) => notes.get(side === "from" ? r.to : r.from)).filter((path) => path !== void 0);
     };
-    const groups = start === finish ? [[start, [...ends("from"), ...ends("to")]]] : [[start, ends("from")], [finish, ends("to")]];
+    const groups = start === finish2 ? [[start, [...ends("from"), ...ends("to")]]] : [[start, ends("from")], [finish2, ends("to")]];
     for (const [label, paths] of groups)
       if (paths.length)
         lines.push(
@@ -43584,6 +43701,17 @@ function parseChecklist(prompt) {
   }
   return items;
 }
+function parseCardPrompt(prompt) {
+  const out = {};
+  for (const line2 of prompt.split(/\r?\n/)) {
+    const m = /^([^:：]+)[:：]\s*(.*)$/.exec(line2);
+    if (!m) continue;
+    const label = m[1].trim();
+    for (const key4 of ["role", "covers", "entry", "handoff", "previous", "next"])
+      if (matches(L[key4], label) && out[key4] === void 0) out[key4] = unescapeMarkdownText(m[2].trim());
+  }
+  return out;
+}
 function composeBookPlan(plan, language2) {
   const c = colon(language2);
   const decisions = BOOK_SETTING_FIELDS.filter((field) => {
@@ -48765,7 +48893,7 @@ var BookPipelineRuns = class {
       );
     });
   }
-  cardJob(mapPath, nodeId, phases, refusal, steps, extra, finish) {
+  cardJob(mapPath, nodeId, phases, refusal, steps, extra, finish2) {
     return this.enter(mapPath, async (drive) => {
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       if (!data.order.includes(nodeId)) throw new BookPipelineRunError("missing");
@@ -48781,7 +48909,7 @@ var BookPipelineRuns = class {
       const kinds = steps(data.phase);
       drive.job = async () => {
         await this.runCardJob(drive, nodeId, kinds);
-        finish == null ? void 0 : finish(drive);
+        finish2 == null ? void 0 : finish2(drive);
       };
       this.log(drive, "rerun", nodeId, kinds[0], kinds.length === 1 ? "plan_only" : "full");
     });
@@ -49603,8 +49731,19 @@ function renderBookBar(parent, state, actions) {
   const summary = state.mode === "budget" ? t("ui.book_budget_used_up_0_1", state.budget.used, state.budget.limit) : state.mode === "stopped" ? state.failure ? t("ui.book_failed_at_0_1", t(PHASE_KEY[state.phase]), bookFailureText(state.failure)) : t("ui.book_stopped_at_0_1_2", t(PHASE_KEY[state.phase]), counts.checked, total2) : t("ui.book_counts_0_1_2_3_4", counts.checked, total2, counts.written, counts.planned, counts["needs-review"]);
   top.createSpan({ cls: "vam-book-bar-counts", text: summary });
   const buttons = top.createDiv("vam-book-bar-actions");
-  if (state.phase === "gate1" && state.mode !== "done")
+  if (state.phase === "gate1" && state.mode !== "done") {
+    if (actions.panel) {
+      const open2 = actions.panel.open;
+      const opener = makeButton(
+        buttons,
+        t(open2 ? "ui.book_panel_close" : "ui.book_panel_open"),
+        "vam-book-panel-toggle",
+        actions.panel.toggle
+      );
+      opener.setAttr("aria-expanded", String(open2));
+    }
     makeButton(buttons, t("ui.book_confirm_gate1"), "mod-cta vam-book-confirm", actions.confirmGate1);
+  }
   if (state.mode === "budget") {
     makeButton(buttons, t("ui.book_add_budget"), "mod-cta vam-book-add-budget", actions.addBudget);
     makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
@@ -49760,6 +49899,277 @@ function renderBookCardLabels(header2, view, writing) {
     writing.track(elapsed);
   } else header2.createSpan({ cls: `vam-status vam-book-state is-${view.stage}`, text: view.stageText });
   if (view.roleText) header2.createSpan({ cls: "vam-book-role", text: view.roleText });
+}
+
+// experiences/visual-map/book-pipeline-panel.ts
+var FIELD_KEY = {
+  reader: "ui.book_field_reader",
+  goal: "ui.book_field_goal",
+  angle: "ui.book_field_angle",
+  tone: "ui.book_field_tone",
+  length: "ui.book_field_length",
+  style: "ui.book_field_style"
+};
+function buildGatePanel(input2) {
+  const plan = parseBookPlanBody(input2.rootRaw);
+  const decided = parseBookPlanDecisions(input2.rootRaw);
+  const cards = input2.order.map((id, at) => {
+    var _a2;
+    const note = input2.noteOf(id);
+    const view = bookCardView(note != null ? note : {});
+    const prompt = (_a2 = note == null ? void 0 : note.prompt) != null ? _a2 : "";
+    const parsed = parseCardPrompt(prompt);
+    const fields = [];
+    if (parsed.covers) fields.push({ label: t("ui.book_panel_covers"), value: parsed.covers });
+    if (parsed.entry) fields.push({ label: t("ui.book_panel_entry"), value: parsed.entry });
+    if (parsed.handoff) fields.push({ label: t("ui.book_panel_handoff"), value: parsed.handoff });
+    const rawLines = fields.length ? [] : prompt.split(/\r?\n/).filter((line2) => line2.trim()).slice(0, 3);
+    return {
+      id,
+      index: at + 1,
+      title: input2.titleOf(id),
+      stage: view.stage,
+      ...view.roleText ? { roleText: view.roleText } : {},
+      ...view.issueText ? { issueText: view.issueText } : {},
+      fields,
+      rawLines
+    };
+  });
+  return {
+    total: cards.length,
+    planned: cards.filter((card) => card.stage !== "pending").length,
+    needsReview: cards.filter((card) => card.stage === "needs-review").length,
+    thread: plan.thread,
+    decisions: BOOK_SETTING_FIELDS.filter((field) => {
+      var _a2;
+      return (_a2 = decided[field]) == null ? void 0 : _a2.trim();
+    }).map((field) => ({
+      label: t(FIELD_KEY[field]),
+      value: decided[field]
+    })),
+    materialCount: plan.materials.length,
+    cards
+  };
+}
+var GatePanelState = class {
+  constructor() {
+    __publicField(this, "open", false);
+    __publicField(this, "expanded", false);
+    /** The map's root note text, read when the panel is drawn (for the thread and the decisions). */
+    __publicField(this, "rootRaw", "");
+    __publicField(this, "drafts", /* @__PURE__ */ new Map());
+    __publicField(this, "busy", /* @__PURE__ */ new Set());
+    __publicField(this, "notes", /* @__PURE__ */ new Map());
+    __publicField(this, "confirming", false);
+    __publicField(this, "confirmError", "");
+    /** Where the keyboard goes after the next paint: the panel's title (it just opened) or the toolbar button (it just closed). */
+    __publicField(this, "pendingFocus", null);
+  }
+  reset() {
+    this.open = false;
+    this.expanded = false;
+    this.rootRaw = "";
+    this.drafts.clear();
+    this.busy.clear();
+    this.notes.clear();
+    this.confirming = false;
+    this.confirmError = "";
+    this.pendingFocus = null;
+  }
+};
+var REASON_CODES = /* @__PURE__ */ new Set(["invalid_reply", "backup_failed", "discarded", "card_removed", "missing"]);
+function reasonText2(reason) {
+  if (reason === "budget") return t("ui.book_refused_budget");
+  if (reason === "cancelled") return t("ui.book_panel_cancelled");
+  return REASON_CODES.has(reason) ? bookFailureText(reason) : t("ui.book_fail_other");
+}
+function renderGatePanel(parent, data, gate1, state, actions, externalBusy = /* @__PURE__ */ new Set()) {
+  const panel = parent.createDiv("vam-book-panel");
+  panel.setAttr("role", "region");
+  panel.setAttr("aria-label", t("ui.book_panel_label"));
+  const tabs = panel.createDiv("vam-book-panel-tabs");
+  tabs.setAttr("role", "group");
+  tabs.setAttr("aria-label", t("ui.book_panel_tabs_label"));
+  const bookTab = tabs.createEl("button", { cls: "vam-book-panel-tab is-active", text: t("ui.book_panel_tab_book") });
+  bookTab.setAttr("aria-pressed", "true");
+  const chatTab = tabs.createEl("button", { cls: "vam-book-panel-tab", text: t("ui.book_panel_tab_chat") });
+  chatTab.setAttr("aria-pressed", "false");
+  chatTab.addEventListener("click", (event) => {
+    event.stopPropagation();
+    actions.showChat();
+  });
+  const closeButton = tabs.createEl("button", { cls: "vam-book-panel-close", text: "\xD7" });
+  closeButton.setAttr("aria-label", t("ui.book_panel_close"));
+  closeButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    actions.close();
+  });
+  panel.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.stopPropagation();
+    actions.close();
+  });
+  const head2 = panel.createDiv("vam-book-panel-head");
+  const title = head2.createEl("h3", { cls: "vam-book-panel-title", text: t("ui.book_panel_gate1_title") });
+  title.setAttr("tabindex", "-1");
+  if (!gate1) {
+    panel.createDiv({ cls: "vam-book-panel-note", text: t("ui.book_panel_not_gate1") });
+    return panel;
+  }
+  head2.createSpan({
+    cls: "vam-book-panel-tag",
+    text: data.needsReview || data.planned < data.total ? t("ui.book_panel_some_planned_0_1_2", data.planned, data.total, data.needsReview) : t("ui.book_panel_all_planned_0", data.total)
+  });
+  const plan = panel.createDiv("vam-book-panel-plan");
+  const toggle = plan.createEl("button", { cls: "vam-book-panel-plan-toggle", text: t("ui.book_panel_plan_heading") });
+  toggle.setAttr("aria-expanded", String(state.expanded));
+  const body = plan.createDiv("vam-book-panel-plan-body");
+  body.hidden = !state.expanded;
+  toggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    state.expanded = !state.expanded;
+    toggle.setAttr("aria-expanded", String(state.expanded));
+    body.hidden = !state.expanded;
+  });
+  if (!data.thread && !data.decisions.length && !data.materialCount)
+    body.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_plan_empty") });
+  if (data.thread) body.createDiv({ cls: "vam-book-panel-thread", text: t("ui.book_panel_thread_0", data.thread) });
+  if (data.decisions.length)
+    body.createDiv({
+      cls: "vam-book-panel-decisions",
+      text: t("ui.book_panel_decisions_0", data.decisions.map((item) => `${item.label}\uFF1A${item.value}`).join("\uFF1B"))
+    });
+  if (data.materialCount)
+    body.createDiv({ cls: "vam-book-panel-materials", text: t("ui.book_panel_materials_0", data.materialCount) });
+  const list2 = panel.createEl("ul", { cls: "vam-book-panel-cards" });
+  list2.setAttr("aria-label", t("ui.book_panel_cards_label"));
+  for (const card of data.cards) renderCard(list2, card, state, actions, externalBusy.has(card.id));
+  const foot = panel.createDiv("vam-book-panel-foot");
+  foot.createSpan({ cls: "vam-book-panel-muted", text: t("ui.book_panel_hint") });
+  const confirm = foot.createEl("button", {
+    cls: "mod-cta vam-book-panel-confirm",
+    text: state.confirming ? t("ui.book_panel_confirming") : t("ui.book_confirm_gate1")
+  });
+  confirm.disabled = state.confirming;
+  if (state.confirming) confirm.setAttr("aria-busy", "true");
+  confirm.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (state.confirming) return;
+    state.confirming = true;
+    state.confirmError = "";
+    actions.refresh();
+    void actions.confirm().then(
+      () => {
+        state.confirming = false;
+        actions.refresh();
+      },
+      (error) => {
+        state.confirming = false;
+        state.confirmError = bookRefusalText(error);
+        actions.refresh();
+      }
+    );
+  });
+  const status = panel.createDiv({ cls: "vam-book-panel-status", text: state.confirmError });
+  status.setAttr("role", "status");
+  return panel;
+}
+function renderCard(list2, card, state, actions, external) {
+  var _a2, _b2;
+  const busy = external || state.busy.has(card.id);
+  const item = list2.createEl("li", { cls: "vam-book-panel-card" });
+  item.dataset.stage = card.stage;
+  if (busy) item.setAttr("aria-busy", "true");
+  const head2 = item.createDiv("vam-book-panel-card-head");
+  if (card.roleText) head2.createSpan({ cls: "vam-book-role", text: card.roleText });
+  head2.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
+  const edit = head2.createEl("button", { cls: "vam-book-panel-edit", text: t("ui.book_panel_edit_plan") });
+  edit.setAttr("aria-label", t("ui.book_panel_edit_plan_0", card.title));
+  edit.addEventListener("click", (event) => {
+    event.stopPropagation();
+    actions.editPlan(card.id);
+  });
+  if (card.fields.length)
+    for (const field of card.fields)
+      item.createDiv({ cls: "vam-book-panel-field", text: `${field.label}\uFF1A${field.value}` });
+  else if (card.rawLines.length)
+    for (const line3 of card.rawLines) item.createDiv({ cls: "vam-book-panel-field is-raw", text: line3 });
+  else item.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_no_plan") });
+  if (card.issueText) {
+    const issue2 = item.createDiv("vam-book-panel-issue");
+    issue2.createSpan({ text: card.issueText });
+    const rerun = issue2.createEl("button", { cls: "vam-book-panel-rerun", text: t("ui.book_panel_rerun_plan") });
+    rerun.setAttr("aria-label", t("ui.book_panel_rerun_plan_0", card.title));
+    rerun.disabled = busy;
+    rerun.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (state.busy.has(card.id)) return;
+      state.busy.add(card.id);
+      state.notes.delete(card.id);
+      actions.refresh();
+      void actions.rerunPlan(card.id).then(
+        () => finish(card.id, state, actions, void 0),
+        (error) => finish(card.id, state, actions, { text: bookRefusalText(error), error: true })
+      );
+    });
+  }
+  const form = item.createDiv("vam-book-panel-more");
+  const input2 = form.createEl("input", { cls: "vam-book-panel-more-input", type: "text" });
+  input2.dataset.card = card.id;
+  input2.setAttr("aria-label", t("ui.book_panel_more_label_0", card.title));
+  input2.setAttr("placeholder", t("ui.book_panel_more_placeholder"));
+  input2.value = (_a2 = state.drafts.get(card.id)) != null ? _a2 : "";
+  input2.disabled = busy;
+  input2.addEventListener("input", () => state.drafts.set(card.id, input2.value));
+  const send = form.createEl("button", {
+    cls: "vam-book-panel-replan",
+    text: busy ? t("ui.book_panel_busy") : t("ui.book_panel_replan")
+  });
+  send.disabled = busy;
+  const submit = () => {
+    var _a3;
+    const instruction = ((_a3 = input2.value) != null ? _a3 : "").trim();
+    if (!instruction || state.busy.has(card.id)) return;
+    state.drafts.set(card.id, input2.value);
+    state.busy.add(card.id);
+    state.notes.delete(card.id);
+    actions.refresh();
+    void actions.replan(card.id, instruction).then(
+      (result) => {
+        var _a4;
+        return finish(
+          card.id,
+          state,
+          actions,
+          result.plan ? { text: t("ui.book_panel_replanned"), error: false } : { text: t("ui.book_panel_replan_failed_0", reasonText2((_a4 = result.reason) != null ? _a4 : "cancelled")), error: true },
+          !!result.plan
+        );
+      },
+      (error) => finish(card.id, state, actions, { text: bookRefusalText(error), error: true })
+    );
+  };
+  send.addEventListener("click", (event) => {
+    event.stopPropagation();
+    submit();
+  });
+  input2.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.isComposing) return;
+    event.preventDefault();
+    submit();
+  });
+  const note = state.notes.get(card.id);
+  const line2 = item.createDiv({
+    cls: "vam-book-panel-card-status",
+    text: busy ? t("ui.book_panel_busy") : (_b2 = note == null ? void 0 : note.text) != null ? _b2 : ""
+  });
+  line2.setAttr("role", (note == null ? void 0 : note.error) ? "alert" : "status");
+  if (note == null ? void 0 : note.error) line2.addClass("is-error");
+}
+function finish(id, state, actions, note, clearDraft = false) {
+  state.busy.delete(id);
+  if (note) state.notes.set(id, note);
+  if (clearDraft) state.drafts.delete(id);
+  actions.refresh();
 }
 
 // experiences/visual-map/subtree-plan.ts
@@ -56737,7 +57147,7 @@ function facetSituationCard(state, t2) {
     lines: [],
     label: kind
   };
-  const finish = (chip, lines) => ({
+  const finish2 = (chip, lines) => ({
     ...base,
     chips: [chip],
     lines,
@@ -56755,14 +57165,14 @@ function facetSituationCard(state, t2) {
       parts.filter(([, count3]) => count3 > 0).map(([key4, count3]) => t2(key4, count3)).join(t2("ui.argument_list_sep"))
     );
     if (type === "fact") return { ...base, lines: [line2], label: [kind, typeText, line2].join(", ") };
-    return finish({ tone: "yes", text: t2("ui.argument_gate_premise_holds") }, [line2]);
+    return finish2({ tone: "yes", text: t2("ui.argument_gate_premise_holds") }, [line2]);
   }
   if (gate.state === "matched")
-    return finish({ tone: "yes", text: t2("ui.argument_gate_facets_0_1") }, [
+    return finish2({ tone: "yes", text: t2("ui.argument_gate_facets_0_1") }, [
       t2("ui.argument_gate_facets_line_0_1", facets.filter((f) => f.verdict === "supports").length, facets.length)
     ]);
   if (gate.state === "unconfirmed")
-    return finish({ tone: "maybe", text: t2("ui.argument_gate_unconfirmed") }, [
+    return finish2({ tone: "maybe", text: t2("ui.argument_gate_unconfirmed") }, [
       t2(
         "ui.argument_reason_0",
         t2("ui.argument_reason_insufficient_0_1", facets.length - lacking(state).length, facets.length)
@@ -56773,18 +57183,18 @@ function facetSituationCard(state, t2) {
     const count3 = t2("ui.argument_data_count_0_1", data.filter((d) => d.state === "found").length, data.length);
     const paused = pausedParts(state, "situation", t2);
     if (paused)
-      return { ...finish(paused.chip, [count3, ...paused.lines]), ...paused.resume ? { resume: paused.resume } : {} };
-    return finish({ tone: "open", text: t2("ui.argument_gate_pending") }, [count3]);
+      return { ...finish2(paused.chip, [count3, ...paused.lines]), ...paused.resume ? { resume: paused.resume } : {} };
+    return finish2({ tone: "open", text: t2("ui.argument_gate_pending") }, [count3]);
   }
   if (gate.kind === "data_insufficient")
-    return finish({ tone: "maybe", text: t2("ui.argument_gate_insufficient") }, [
+    return finish2({ tone: "maybe", text: t2("ui.argument_gate_insufficient") }, [
       t2(
         "ui.argument_reason_0",
         t2("ui.argument_reason_insufficient_0_1", facets.length - lacking(state).length, facets.length)
       )
     ]);
   const refuted = facets.find((f) => f.verdict === "refutes");
-  return finish(
+  return finish2(
     { tone: "no", text: t2("ui.argument_gate_unmatched") },
     refuted ? [t2("ui.argument_reason_0", t2("ui.argument_reason_refuted_0_1", refuted.title, refuted.reason))] : []
   );
@@ -62991,7 +63401,7 @@ var MapConflictModal = class extends import_obsidian32.Modal {
   onOpen() {
     this.titleEl.setText(t("ui.mind_map_changed_externally"));
     this.contentEl.createEl("p", { text: t("ui.both_the_map_and_map_md_have_changed_choose_a_version_or_edi") });
-    const finish = (map) => {
+    const finish2 = (map) => {
       this.settled = true;
       this.close();
       this.resolve(map);
@@ -63002,7 +63412,7 @@ var MapConflictModal = class extends import_obsidian32.Modal {
       const text10 = row.createDiv("vam-conflict-option-text");
       text10.createEl("strong", { text: label });
       text10.createSpan({ text: description, cls: "vam-hint" });
-      row.createEl("button", { text: label }).addEventListener("click", () => finish(map()));
+      row.createEl("button", { text: label }).addEventListener("click", () => finish2(map()));
     };
     option(t("ui.use_file_contents"), t("ui.conflict_use_file_desc"), () => clone(this.disk));
     option(t("ui.keep_editor_contents"), t("ui.conflict_keep_editor_desc"), () => clone(this.local));
@@ -63025,7 +63435,7 @@ var MapConflictModal = class extends import_obsidian32.Modal {
     advanced.addEventListener("toggle", () => merged.hidden = !advanced.open);
     merged.addEventListener("click", () => {
       try {
-        finish(parseMap(serializeMap(JSON.parse(input2.value))));
+        finish2(parseMap(serializeMap(JSON.parse(input2.value))));
       } catch (error) {
         status.setText(invalidMergedContentsText(error));
       }
@@ -63961,7 +64371,7 @@ var TopicChatRun = class {
     const end = (_a2 = entry.steerEnd) != null ? _a2 : null;
     const done = !!end && end.status === "done" && !end.plan;
     const folded2 = (_b2 = entry.steerFolded) != null ? _b2 : [];
-    const finish = () => {
+    const finish2 = () => {
       entry.session.running = false;
       this.ports.notify(entry);
     };
@@ -63981,15 +64391,15 @@ var TopicChatRun = class {
           }
         }
         this.returnSteers(entry, steers.takeQueued(), true);
-        finish();
+        finish2();
         return;
       }
       this.returnSteers(entry, [...done ? [] : folded2, ...steers.takeQueued()], false);
-      finish();
+      finish2();
     } catch (e) {
       if (entry.runningTurnId) return;
       this.returnSteers(entry, steers.takeQueued(), true);
-      finish();
+      finish2();
     }
   }
 };
@@ -64770,6 +65180,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     __publicField(this, "heightsSeenMap", null);
     __publicField(this, "settling", false);
     __publicField(this, "bookPipelineSeen", null);
+    // ---- Picture-book gate panel (04b) ---------------------------------------------------------------------------
+    __publicField(this, "bookPanel", new GatePanelState());
+    __publicField(this, "bookSideEl", null);
+    __publicField(this, "bookPanelPath", "");
+    /** Whether the chat window was open when the gate panel took the side column (it comes back when the panel closes). */
+    __publicField(this, "bookChatWasOpen", false);
     /** The zoom the selected card's tool row was last fitted at. */
     __publicField(this, "toolsZoom", null);
     /** The map whose saved viewport was already lifted clear of the toolbar (see applyInitialViewport). */
@@ -65863,7 +66279,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
       state.draft = input2.value;
       release2();
     };
-    const finish = (save) => {
+    const finish2 = (save) => {
       if (!live2) return;
       const value = input2.value;
       release2();
@@ -65884,13 +66300,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
       if (event.isComposing) return;
       if (event.key === "Enter") {
         event.preventDefault();
-        finish(true);
+        finish2(true);
       } else if (event.key === "Escape") {
         event.preventDefault();
-        finish(false);
+        finish2(false);
       }
     });
-    input2.addEventListener("blur", () => finish(true));
+    input2.addEventListener("blur", () => finish2(true));
     this.inlineNameInput = input2;
     return input2;
   }
@@ -66064,7 +66480,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
       state.draft = area.value;
       release2();
     };
-    const finish = (save, keepFocus = false) => {
+    const finish2 = (save, keepFocus = false) => {
       if (!live2) return;
       const value = area.value.trim();
       release2();
@@ -66087,13 +66503,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
       if (event.isComposing) return;
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
-        finish(true, true);
+        finish2(true, true);
       } else if (event.key === "Escape") {
         event.preventDefault();
-        finish(false, true);
+        finish2(false, true);
       }
     });
-    area.addEventListener("blur", () => finish(true));
+    area.addEventListener("blur", () => finish2(true));
     this.inlineSummaryInput = area;
     return area;
   }
@@ -66169,6 +66585,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     this.researchTick = this.researchRenderTimer = null;
     this.researchElapsed.clear();
     this.bookAuthoring.clear();
+    this.bookPanel.reset();
+    this.bookSideEl = null;
     this.researchSigs.clear();
     this.taskPreviewEls.clear();
     this.hoverResearch = null;
@@ -74356,6 +74774,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       this.dropGoalEdit();
     }
     this.mountMapChat(workspace, overlay);
+    this.mountBookPanel(workspace);
     this.placeGoalBar();
     this.hintEl = this.map.nodes.length > 0 && !this.selection.state.multiSelectMode && !this.plugin.settings.canvasHintSeen ? overlay.createSpan({
       cls: "vam-hint vam-canvas-hint",
@@ -79061,8 +79480,178 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
-      confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path))
+      confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path)),
+      panel: { open: this.bookPanel.open, toggle: () => this.toggleBookPanel() }
     });
+  }
+  /** Runs `work` so the chat's open state is not saved as the user's choice (the panel folded it, not the user). */
+  withChatForced(work) {
+    const was = this.chatForcedOpen;
+    this.chatForcedOpen = true;
+    try {
+      work();
+    } finally {
+      this.chatForcedOpen = was;
+    }
+  }
+  /** The gate panel shares the side column with the chat: one at a time. Opening it folds the chat; closing gives the chat back. */
+  toggleBookPanel() {
+    if (this.bookPanel.open) return this.closeBookPanel();
+    const chat = this.chat;
+    this.bookChatWasOpen = !!chat && !chat.isHero && chat.isOpen;
+    if (this.bookChatWasOpen) this.withChatForced(() => chat == null ? void 0 : chat.setOpen(false));
+    this.bookPanel.open = true;
+    this.bookPanel.pendingFocus = "title";
+    this.render();
+  }
+  closeBookPanel() {
+    this.bookPanel.open = false;
+    this.bookPanel.pendingFocus = "opener";
+    if (this.bookChatWasOpen) this.withChatForced(() => {
+      var _a2;
+      return (_a2 = this.chat) == null ? void 0 : _a2.setOpen(true);
+    });
+    this.bookChatWasOpen = false;
+    this.render();
+  }
+  /** The panel's "Chat" tab: the panel closes and the chat window opens with the keyboard in its message field. */
+  showChatFromBookPanel() {
+    var _a2;
+    this.bookPanel.open = false;
+    this.bookPanel.pendingFocus = null;
+    this.bookChatWasOpen = false;
+    this.render();
+    (_a2 = this.chat) == null ? void 0 : _a2.setOpen(true, true);
+  }
+  /** Part of every repaint: the panel's column, only for a map that has a usable `bookPipeline` and only while it is open. */
+  mountBookPanel(workspace) {
+    var _a2;
+    this.bookSideEl = null;
+    if (!this.map || !this.path || !this.hasBookPipeline() || this.bookPanelPath && this.bookPanelPath !== this.path) {
+      this.bookPanel.reset();
+      this.bookChatWasOpen = false;
+    }
+    this.bookPanelPath = this.hasBookPipeline() ? this.path : "";
+    if (!this.bookPanel.open || !this.bookPanelPath) {
+      if (this.bookPanel.pendingFocus === "opener")
+        (_a2 = this.contentEl.querySelector(".vam-book-panel-toggle")) == null ? void 0 : _a2.focus();
+      this.bookPanel.pendingFocus = null;
+      return;
+    }
+    const side = workspace.createDiv("vam-book-side");
+    const measured = this.chatPaneWidths();
+    side.toggleClass(
+      "is-overlay",
+      !!measured && measured.pane - measured.inspector < MAP_CHAT_WIDTH_DEFAULT + MAP_CHAT_MIN_CANVAS
+    );
+    this.bookSideEl = side;
+    this.paintBookPanel();
+    void this.loadBookRoot();
+  }
+  paintBookPanel() {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    const side = this.bookSideEl;
+    const map = this.map;
+    const path = this.path;
+    if (!side || !map || !path || this.closed) return;
+    const read = readBookPipeline(map);
+    if (read.kind !== "usable") return;
+    const doc = this.contentEl.ownerDocument;
+    const held = doc == null ? void 0 : doc.activeElement;
+    const heldCard = held && side.contains(held) ? (_b2 = (_a2 = held.dataset) == null ? void 0 : _a2.card) != null ? _b2 : null : null;
+    const draftCaret = heldCard ? (_c = held.selectionStart) != null ? _c : null : null;
+    side.empty();
+    const progress = this.plugin.getBookPipelineProgress(path);
+    const data = buildGatePanel({
+      order: read.data.order,
+      titleOf: (id) => {
+        var _a3, _b3, _c2, _d2;
+        return (_d2 = (_c2 = (_a3 = this.notes.get(id)) == null ? void 0 : _a3.title) != null ? _c2 : (_b3 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _b3.path) != null ? _d2 : id;
+      },
+      noteOf: (id) => this.notes.get(id),
+      rootRaw: this.bookPanel.rootRaw
+    });
+    const gate1 = ((_d = progress == null ? void 0 : progress.phase) != null ? _d : read.data.phase) === "gate1";
+    const state = this.bookPanel;
+    renderGatePanel(
+      side,
+      data,
+      gate1,
+      state,
+      {
+        editPlan: (id) => void this.openBookPlan(id),
+        replan: async (id, instruction) => {
+          try {
+            return await this.plugin.replanBookCard(path, id, instruction);
+          } finally {
+            await this.rereadBookCard(id);
+          }
+        },
+        rerunPlan: async (id) => {
+          try {
+            await this.plugin.rerunBookCard(path, id);
+          } finally {
+            await this.rereadBookCard(id);
+          }
+        },
+        confirm: () => this.plugin.confirmBookGate1(path),
+        showChat: () => this.showChatFromBookPanel(),
+        close: () => this.closeBookPanel(),
+        refresh: () => this.paintBookPanel()
+      },
+      new Set((_e = progress == null ? void 0 : progress.busyCards) != null ? _e : [])
+    );
+    if (heldCard) {
+      const input2 = Array.from(side.querySelectorAll(".vam-book-panel-more-input")).find(
+        (item) => item.dataset.card === heldCard
+      );
+      input2 == null ? void 0 : input2.focus();
+      if (input2 && draftCaret !== null) (_f = input2.setSelectionRange) == null ? void 0 : _f.call(input2, draftCaret, draftCaret);
+    }
+    if (state.pendingFocus === "title") (_g = side.querySelector(".vam-book-panel-title")) == null ? void 0 : _g.focus();
+    else if (state.pendingFocus === "opener")
+      (_h = this.contentEl.querySelector(".vam-book-panel-toggle")) == null ? void 0 : _h.focus();
+    state.pendingFocus = null;
+  }
+  /** The root note's file text (the thread and the editorial decisions live there); repaints the panel when it differs. */
+  async loadBookRoot() {
+    var _a2;
+    const map = this.map;
+    if (!map) return;
+    const read = readBookPipeline(map);
+    if (read.kind !== "usable") return;
+    const root = (_a2 = map.nodes.find((node) => !node.parentId)) != null ? _a2 : map.nodes.find((node) => node.id === read.data.order[0]);
+    const file = root ? this.app.vault.getAbstractFileByPath(root.path) : null;
+    if (!(file instanceof import_obsidian36.TFile)) return;
+    const raw = await this.app.vault.read(file).catch(() => "");
+    if (this.closed || !this.bookSideEl || raw === this.bookPanel.rootRaw) return;
+    this.bookPanel.rootRaw = raw;
+    this.paintBookPanel();
+  }
+  /** After a replan or rerun: this card's note is read again so the panel shows the new plan without waiting for the repaint. */
+  async rereadBookCard(id) {
+    var _a2;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+    if (!node || this.closed) return;
+    const note = await this.plugin.repo.readNote(node.path).catch(() => null);
+    if (note && !this.closed) this.notes.set(id, note);
+  }
+  /** "Edit plan": the card's note opens in a tab at its `## Prompt` section. */
+  async openBookPlan(id) {
+    var _a2;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+    const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
+    if (!(file instanceof import_obsidian36.TFile)) {
+      new import_obsidian36.Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
+      return;
+    }
+    const text10 = await this.app.vault.read(file).catch(() => "");
+    const line2 = text10.split(/\r?\n/).findIndex((item) => /^##[ \t]+Prompt[ \t]*$/.test(item));
+    try {
+      await this.app.workspace.getLeaf("tab").openFile(file, line2 >= 0 ? { eState: { line: line2 } } : void 0);
+    } catch (error) {
+      new import_obsidian36.Notice(error instanceof Error ? error.message : String(error));
+    }
   }
   /** Runs a runner entry (these resolve when the drive ends); a refusal becomes a notice, and the map repaints either way. */
   bookEntry(entry) {
@@ -79140,17 +79729,17 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     return new Promise((resolve) => {
       const probe = createEl("img");
       probe.referrerPolicy = "no-referrer";
-      const finish = (result) => {
+      const finish2 = (result) => {
         window.clearTimeout(timer);
         signal.removeEventListener("abort", onAbort);
         probe.onload = probe.onerror = null;
         if (!result.ok) probe.src = "";
         resolve(result);
       };
-      const onAbort = () => finish({ ok: false, reason: "aborted" });
-      const timer = window.setTimeout(() => finish({ ok: false, reason: "timeout" }), 8e3);
-      probe.onload = () => finish(probe.naturalWidth > 0 ? { ok: true } : { ok: false, reason: "empty" });
-      probe.onerror = () => finish({ ok: false, reason: "load_failed" });
+      const onAbort = () => finish2({ ok: false, reason: "aborted" });
+      const timer = window.setTimeout(() => finish2({ ok: false, reason: "timeout" }), 8e3);
+      probe.onload = () => finish2(probe.naturalWidth > 0 ? { ok: true } : { ok: false, reason: "empty" });
+      probe.onerror = () => finish2({ ok: false, reason: "load_failed" });
       if (signal.aborted) return onAbort();
       signal.addEventListener("abort", onAbort, { once: true });
       probe.src = url;
@@ -84405,13 +84994,13 @@ ${addition}` : addition },
         if (this.dragFrame !== null) window.cancelAnimationFrame(this.dragFrame);
         this.dragFrame = null;
         card.removeEventListener("pointermove", move);
-        card.removeEventListener("pointerup", finish);
-        card.removeEventListener("pointercancel", finish);
-        card.removeEventListener("lostpointercapture", finish);
+        card.removeEventListener("pointerup", finish2);
+        card.removeEventListener("pointercancel", finish2);
+        card.removeEventListener("lostpointercapture", finish2);
         doc == null ? void 0 : doc.removeEventListener("keydown", esc, true);
         this.dragCleanup = null;
       };
-      const finish = (e) => {
+      const finish2 = (e) => {
         const stale = this.dragStale();
         const landed = hover;
         settle();
@@ -84491,9 +85080,9 @@ ${addition}` : addition },
       };
       this.dragCleanup = settle;
       card.addEventListener("pointermove", move);
-      card.addEventListener("pointerup", finish);
-      card.addEventListener("pointercancel", finish);
-      card.addEventListener("lostpointercapture", finish);
+      card.addEventListener("pointerup", finish2);
+      card.addEventListener("pointercancel", finish2);
+      card.addEventListener("lostpointercapture", finish2);
       doc == null ? void 0 : doc.addEventListener("keydown", esc, true);
     });
   }
@@ -87300,7 +87889,7 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
       if (!touched) setName(this.suggestName(mode === "from" ? source : null));
       check();
     };
-    const finish = (target) => {
+    const finish2 = (target) => {
       if (this.closed) return;
       form.hidden = true;
       toggle.setAttr("aria-expanded", "false");
@@ -87317,7 +87906,7 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
           from: mode === "from" ? source : null,
           name: name2,
           trigger: createButton == null ? void 0 : createButton.buttonEl,
-          onSaved: (ref) => finish(ref)
+          onSaved: (ref) => finish2(ref)
         }));
         return;
       }
@@ -87333,7 +87922,7 @@ var NoteStyleManageModal = class extends import_obsidian40.Modal {
         if (target) target = (_a2 = await this.plugin.editNotePart(tab, target)) != null ? _a2 : target;
         if (!target) return;
         await this.plugin.noteStyles.refresh();
-        finish(target);
+        finish2(target);
       } finally {
         this.busy = false;
       }
@@ -87852,13 +88441,13 @@ var AiUsageModal = class extends import_obsidian41.Modal {
       ),
       cls: "vam-modal-intro"
     });
-    const finish = (confirmed) => {
+    const finish2 = (confirmed) => {
       this.settled = true;
       this.close();
       this.resolve(confirmed);
     };
-    new import_obsidian41.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish(false))).addButton(
-      (button) => button.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish(true))
+    new import_obsidian41.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish2(false))).addButton(
+      (button) => button.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish2(true))
     );
   }
   onClose() {
@@ -93075,7 +93664,7 @@ var AiCalls = class {
    * Sends a prepared step. A value that is not a `PreparedStep` throws before anything is registered or logged.
    * `finish` gets the raw reply and ends the entry (parse, `exchange.parsed()`); returning writes `completed`.
    */
-  async run(prepared, options, finish) {
+  async run(prepared, options, finish2) {
     let result;
     const provider = {
       complete: async (call) => {
@@ -93087,7 +93676,7 @@ var AiCalls = class {
               step: stepLabel({ id: call.stepId, version: call.version })
             },
             options,
-            finish
+            finish2
           )
         };
         return "";
@@ -93098,7 +93687,7 @@ var AiCalls = class {
     return result.value;
   }
   /** A raw call without a PreparedStep (Coffee Tables). Same registration, runtime routing and logging as `run`. */
-  async runCall(call, options, finish) {
+  async runCall(call, options, finish2) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h;
     if ((_a2 = options.task) == null ? void 0 : _a2.generateImage) this.capabilitiesFor(options.model, { imageGeneration: true });
     const {
@@ -93212,7 +93801,7 @@ var AiCalls = class {
       milestones.receivedAt = (/* @__PURE__ */ new Date()).toISOString();
       (_g = log()) == null ? void 0 : _g.received(id, options.noContentLog ? "[omitted]" : raw);
       writeMilestones();
-      const value = await finish(raw, exchange);
+      const value = await finish2(raw, exchange);
       if (!finished) {
         finished = true;
         if (options.entryEnd !== "caller") (_h = log()) == null ? void 0 : _h.completed(id);
@@ -94642,7 +95231,7 @@ var ClaudeCodeCliRuntime = class {
         } catch (e) {
         }
       };
-      const finish = (error, result) => {
+      const finish2 = (error, result) => {
         if (settled2) return;
         settled2 = true;
         cleanup();
@@ -94672,13 +95261,13 @@ var ClaudeCodeCliRuntime = class {
       };
       const onAbort = () => {
         stop();
-        finish(abortError());
+        finish2(abortError());
       };
       const timeout = window.setTimeout(
         () => {
           var _a4;
           stop();
-          finish(
+          finish2(
             new Error(
               (_a4 = controls.timeoutMessage) != null ? _a4 : controls.timeoutMs ? t("ui.ai_task_exceeded_0_minutes", Math.ceil(controls.timeoutMs / 6e4)) : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")
             )
@@ -94695,7 +95284,7 @@ var ClaudeCodeCliRuntime = class {
           stdout += stdoutDecoder.write(chunk);
           if (stdout.length > CLAUDE_STDOUT_LIMIT) {
             stop();
-            finish(new Error(t("ui.claude_returned_an_invalid_response")));
+            finish2(new Error(t("ui.claude_returned_an_invalid_response")));
           }
           return;
         }
@@ -94709,7 +95298,7 @@ var ClaudeCodeCliRuntime = class {
           }
         } catch (error) {
           stop();
-          finish(error instanceof Error ? error : new Error(String(error)));
+          finish2(error instanceof Error ? error : new Error(String(error)));
         }
       });
       child.stderr.on("data", (chunk) => {
@@ -94717,7 +95306,7 @@ var ClaudeCodeCliRuntime = class {
       });
       child.on("error", (error) => {
         if (killTimer) window.clearTimeout(killTimer);
-        finish(new Error(t("ui.could_not_start_claude_code_0_1", this.options.executable, error.message)));
+        finish2(new Error(t("ui.could_not_start_claude_code_0_1", this.options.executable, error.message)));
       });
       child.on("close", (code3) => {
         var _a4, _b4;
@@ -94750,7 +95339,7 @@ var ClaudeCodeCliRuntime = class {
             }
           }
           message || (message = t("ui.claude_exited_with_code_0", code3 != null ? code3 : t("ui.unknown")));
-          finish(new Error(message.slice(-4e3)));
+          finish2(new Error(message.slice(-4e3)));
           return;
         }
         try {
@@ -94762,9 +95351,9 @@ var ClaudeCodeCliRuntime = class {
           const result = claudeStructuredOutput(streaming ? finalResult : stdout, !outputSchema);
           if (controls.webSearchOnly && !activity.retrievals) throw searchNotPerformedError();
           const streamed = [streamText, currentText].filter(Boolean).join("\n\n");
-          finish(void 0, !outputSchema && streaming && result.length < streamed.length ? streamed : result);
+          finish2(void 0, !outputSchema && streaming && result.length < streamed.length ? streamed : result);
         } catch (error) {
-          finish(error instanceof Error ? error : new Error(String(error)));
+          finish2(error instanceof Error ? error : new Error(String(error)));
         }
       });
       (_e2 = (_d2 = child.stdin).on) == null ? void 0 : _e2.call(_d2, "error", () => {
@@ -94779,7 +95368,7 @@ var ClaudeCodeCliRuntime = class {
               var _a4;
               if (error) {
                 stop();
-                finish(error);
+                finish2(error);
                 return;
               }
               if (!settled2 && !((_a4 = controls.signal) == null ? void 0 : _a4.aborted)) accepted2 == null ? void 0 : accepted2();
@@ -94794,13 +95383,13 @@ var ClaudeCodeCliRuntime = class {
           child.stdin.end(prompt, (error) => {
             if (error) {
               stop();
-              finish(error);
+              finish2(error);
             } else markAccepted();
           });
         } else child.stdin.end(prompt);
       } catch (error) {
         stop();
-        finish(error instanceof Error ? error : new Error(String(error)));
+        finish2(error instanceof Error ? error : new Error(String(error)));
       }
     });
   }
@@ -97744,7 +98333,7 @@ var SelectionAiPanel = class extends import_obsidian47.Component {
     const image = createEl("img");
     image.referrerPolicy = "no-referrer";
     await new Promise((resolve, reject2) => {
-      const finish = (error) => {
+      const finish2 = (error) => {
         window.clearTimeout(timeout);
         signal.removeEventListener("abort", abort);
         image.onload = null;
@@ -97754,11 +98343,11 @@ var SelectionAiPanel = class extends import_obsidian47.Component {
       };
       const abort = () => {
         image.src = "";
-        finish(new Error(t("ui.ai_task_cancelled")));
+        finish2(new Error(t("ui.ai_task_cancelled")));
       };
-      const timeout = window.setTimeout(() => finish(new Error(t("ui.context_ai_image_load_failed"))), 15e3);
-      image.onload = () => finish();
-      image.onerror = () => finish(new Error(t("ui.context_ai_image_load_failed")));
+      const timeout = window.setTimeout(() => finish2(new Error(t("ui.context_ai_image_load_failed"))), 15e3);
+      image.onload = () => finish2();
+      image.onerror = () => finish2(new Error(t("ui.context_ai_image_load_failed")));
       signal.addEventListener("abort", abort, { once: true });
       if (signal.aborted) abort();
       else image.src = candidate.url;

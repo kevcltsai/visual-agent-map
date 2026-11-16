@@ -91,6 +91,8 @@ export interface BookBarActions {
   resume: () => void;
   addBudget: () => void;
   confirmGate1: () => void;
+  /** The gate panel's opener (04b); a bar drawn without it (older callers) shows no such button. */
+  panel?: { open: boolean; toggle: () => void };
 }
 
 export function bookTitleText(state: BookBarState): string {
@@ -123,8 +125,19 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
   top.createSpan({ cls: "vam-book-bar-counts", text: summary });
   // "About N minutes left" is stage 2 work (it needs at least 5 finished cards for a real number); nothing is shown until then.
   const buttons = top.createDiv("vam-book-bar-actions");
-  if (state.phase === "gate1" && state.mode !== "done")
+  if (state.phase === "gate1" && state.mode !== "done") {
+    if (actions.panel) {
+      const open = actions.panel.open;
+      const opener = makeButton(
+        buttons,
+        t(open ? "ui.book_panel_close" : "ui.book_panel_open"),
+        "vam-book-panel-toggle",
+        actions.panel.toggle
+      );
+      opener.setAttr("aria-expanded", String(open));
+    }
     makeButton(buttons, t("ui.book_confirm_gate1"), "mod-cta vam-book-confirm", actions.confirmGate1);
+  }
   if (state.mode === "budget") {
     makeButton(buttons, t("ui.book_add_budget"), "mod-cta vam-book-add-budget", actions.addBudget);
     makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);

@@ -614,7 +614,7 @@ export function parseMapChat(
           actions.push({ kind: "rename_topic", nodeId: node("nodeId"), title: text("title") });
           break;
         case "update_summary":
-          actions.push({ kind: "update_summary", nodeId: node("nodeId"), summary: text("summary") });
+          actions.push({ kind: "update_summary", nodeId: node("nodeId"), summary: text("summary", true, true) });
           break;
         case "edit_topic_note":
           actions.push({ kind: "edit_topic_note", nodeId: node("nodeId"), detail: text("detail", true, true) });

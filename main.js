@@ -31542,7 +31542,7 @@ function parseMapChat(raw, context) {
           actions.push({ kind: "rename_topic", nodeId: node("nodeId"), title: text10("title") });
           break;
         case "update_summary":
-          actions.push({ kind: "update_summary", nodeId: node("nodeId"), summary: text10("summary") });
+          actions.push({ kind: "update_summary", nodeId: node("nodeId"), summary: text10("summary", true, true) });
           break;
         case "edit_topic_note":
           actions.push({ kind: "edit_topic_note", nodeId: node("nodeId"), detail: text10("detail", true, true) });

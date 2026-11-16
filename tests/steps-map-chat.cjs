@@ -74,7 +74,6 @@ test('parser drops an item that misses a field its kind needs (add_child without
   const result = parse(reply(
     item('add_child', { parentId: 'a' }),
     item('add_child', { parentId: 'a', title: '   ' }),
-    item('update_summary', { nodeId: 'a' }),
     item('edit_md_file', { path: 'x.md', replace: 'new' }),
     item('create_md_file', { path: 'y.md' }),
     item('select_topics'),
@@ -84,7 +83,7 @@ test('parser drops an item that misses a field its kind needs (add_child without
   ));
   assert.equal(result.actions.length, 0);
   assert.ok(result.rejected.every(entry => entry.code === 'missing_field' || entry.code === 'unknown_node'), JSON.stringify(result.rejected));
-  assert.equal(result.rejected.length, 9);
+  assert.equal(result.rejected.length, 8);
 });
 test('parser keeps edit_topic_note with an empty detail (clearing a note) but still drops a missing or non-string detail', () => {
   const ctx = context({ selected: [topic('a')] });
@@ -93,6 +92,13 @@ test('parser keeps edit_topic_note with an empty detail (clearing a note) but st
   assert.deepEqual(cleared.actions, [{ kind: 'edit_topic_note', nodeId: 'a', detail: '' }, { kind: 'edit_topic_note', nodeId: 'a', detail: '' }]);
   const raw = JSON.stringify({ reply: 'ok', actions: [{ kind: 'edit_topic_note', nodeId: 'a' }, { kind: 'edit_topic_note', nodeId: 'a', detail: 5 }] });
   assert.deepEqual(parse(raw, ctx).rejected.map(entry => entry.code), ['missing_field', 'bad_value']);
+});
+test('parser keeps update_summary with an empty summary (clearing a summary) but still drops a missing or non-string summary', () => {
+  const cleared = parse(reply(item('update_summary', { nodeId: 'a', summary: '' })));
+  assert.deepEqual(cleared.rejected, []);
+  assert.deepEqual(cleared.actions, [{ kind: 'update_summary', nodeId: 'a', summary: '' }]);
+  const raw = JSON.stringify({ reply: 'ok', actions: [{ kind: 'update_summary', nodeId: 'a' }, { kind: 'update_summary', nodeId: 'a', summary: 5 }] });
+  assert.deepEqual(parse(raw).rejected.map(entry => entry.code), ['missing_field', 'bad_value']);
 });
 test('parser drops a move under itself or its own descendant, a bad run_map_action and non-object items', () => {
   const result = parse(JSON.stringify({ reply: 'ok', actions: [

@@ -332,7 +332,9 @@ import { resolveBlockFolder } from "../../core/blocks/block-files";
 import { CANONICAL_LANGUAGES } from "../../ai/note-style-file";
 import type { UpdateMode } from "../../ai/note-style-recipe";
 import { backupNote } from "../../ai/note-writeback";
-import { stopLabelKey, type SelectionSynthesisTask, type WritebackHooks } from "./topic-run";
+import { stopLabelKey, type ResearchStart, type SelectionSynthesisTask, type WritebackHooks } from "./topic-run";
+import type { AuthorInput, AuthorOutcome } from "./book-pipeline-run";
+import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
 import {
   INTEGRATION_DEPTHS,
   bottomUpOrder,
@@ -3039,6 +3041,8 @@ export class VisualAgentMapView extends ItemView {
     this.hoverCard?.remove();
     this.dragCleanup?.();
     this.anchorDragCancel?.(false);
+    // Closing the map's view stops its picture-book run (resumable); the run's calls cannot outlive the view that drives them.
+    if (this.path) void this.plugin.bookPipelineRuns?.stop(this.path);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -16842,7 +16846,8 @@ export class VisualAgentMapView extends ItemView {
     charts = true,
     onResult?: (result: AiResult) => void,
     gate?: { shown: boolean },
-    languageSource?: Pick<MapDocument, "title" | "outputLanguage">
+    languageSource?: Pick<MapDocument, "title" | "outputLanguage">,
+    book?: { pipeline: NonNullable<ResearchStart["pipeline"]>; request: Partial<TaskContext> }
   ): Promise<void> {
     const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
     const outputLanguage =
@@ -16875,6 +16880,7 @@ export class VisualAgentMapView extends ItemView {
         addCharts: charts,
         // A whole rewrite the user asked for: this run replaces the note (backup first) instead of the style's update mode.
         ...(choices.rewrite ? { updateMode: "fresh" as const } : {}),
+        ...(book?.request ?? {}),
         task: [note.prompt || researchTopicTask(outputLanguage, note.title), choices.requirements]
           .filter(Boolean)
           .join("\n\n")
@@ -16883,11 +16889,91 @@ export class VisualAgentMapView extends ItemView {
         started = true;
         accepted();
       },
-      choices.runOnce
+      choices.runOnce,
+      undefined,
+      book?.pipeline
     );
     if (!started || !handle) throw new Error(failure ?? t("ui.shallow_research_did_not_start"));
     await handle.finished;
     if (failure && !batchSignal.aborted) throw new Error(failure);
+  }
+  /** True while a conversation chain or a multi-select research holds this map: a picture-book run must not start or write then. */
+  bookPipelineBlocked(): boolean {
+    return (
+      !!this.chatChainRunner?.current || this.plugin.expansionBatches.get(this.multiResearchKey())?.status === "running"
+    );
+  }
+  /** The picture-book author step: one card's single-card research (rewrite, no charts), mapped to the runner's outcomes. */
+  async runBookAuthor(input: AuthorInput): Promise<AuthorOutcome> {
+    const node = this.map?.nodes.find(item => item.id === input.nodeId);
+    if (!node || node.path !== input.path) return { outcome: "failed", reason: "missing" };
+    let written = false;
+    let exhausted = false;
+    let failure: string | undefined;
+    const choices: TaskOptions = {
+      rewrite: true,
+      runOnce: { model: input.model, reasoning: input.reasoning },
+      researchMode: "research",
+      researchDepth: "normal",
+      visualMode: "off",
+      requirements: bookAuthorRequirements(input.settings),
+      outputLanguage: input.language
+    };
+    try {
+      await this.researchChild(
+        node,
+        input.signal,
+        () => undefined,
+        choices,
+        false,
+        () => {
+          written = true;
+        },
+        undefined,
+        undefined,
+        {
+          pipeline: {
+            authorize: input.authorize,
+            onBudgetExhausted: () => {
+              exhausted = true;
+            }
+          },
+          request: { admission: input.admission, noContentLog: true }
+        }
+      );
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error);
+    }
+    if (exhausted) return { outcome: "budget-exhausted" };
+    if (written) return { outcome: "written" };
+    if (input.signal.aborted) return { outcome: "cancelled" };
+    if (failure === t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved")) return { outcome: "discarded" };
+    return { outcome: "failed", reason: "author_failed" };
+  }
+  /** Loads the picture the way the card will (a real image load with no referrer, not an HTTP status); 8 s limit. */
+  probeBookImage(url: string, signal: AbortSignal): Promise<{ ok: true } | { ok: false; reason: string }> {
+    return new Promise(resolve => {
+      const probe = createEl("img");
+      probe.referrerPolicy = "no-referrer";
+      const finish = (result: { ok: true } | { ok: false; reason: string }): void => {
+        window.clearTimeout(timer);
+        signal.removeEventListener("abort", onAbort);
+        probe.onload = probe.onerror = null;
+        if (!result.ok) probe.src = "";
+        resolve(result);
+      };
+      const onAbort = (): void => finish({ ok: false, reason: "aborted" });
+      const timer = window.setTimeout(() => finish({ ok: false, reason: "timeout" }), 8_000);
+      probe.onload = () => finish(probe.naturalWidth > 0 ? { ok: true } : { ok: false, reason: "empty" });
+      probe.onerror = () => finish({ ok: false, reason: "load_failed" });
+      if (signal.aborted) return onAbort();
+      signal.addEventListener("abort", onAbort, { once: true });
+      probe.src = url;
+    });
+  }
+  /** Byte-exact backup of a card's text before the pipeline rewrites it (never overwrites an earlier backup). */
+  async bookBackupNote(path: string, content: string): Promise<{ ok: true; path: string } | { ok: false }> {
+    return (await this.writebackHooks().backupNote?.(path, content)) ?? { ok: false };
   }
   private multiResearchKey(): string {
     return `multi-research:${this.path}`;
@@ -23761,11 +23847,13 @@ export class VisualAgentMapView extends ItemView {
     request?: Partial<TaskContext> & { runStyle?: RunStyle },
     onLaunchAccepted?: () => void,
     runOnce?: RunOnceModel,
-    steer?: ResearchSteer
+    steer?: ResearchSteer,
+    pipeline?: ResearchStart["pipeline"]
   ): Promise<AgentTaskHandle | null> {
     return this.plugin.topicRuns.start(node.path, "research", {
       ...this.writebackHooks(),
       ...(steer ? { steer } : {}),
+      ...(pipeline ? { pipeline } : {}),
       origin: this,
       map: this.map ?? undefined,
       usageMapPath: this.path || undefined,

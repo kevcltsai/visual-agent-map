@@ -119,6 +119,8 @@ export interface BookRunConfig {
   language: ContentLanguage;
 }
 export interface AuthorInput {
+  /** The map the run belongs to (the plugin finds the open view by it). */
+  mapPath: string;
   nodeId: string;
   path: string;
   /** The effective whole-book settings; the port turns them into the research requirements. */
@@ -811,6 +813,7 @@ export class BookPipelineRuns {
     const done = await untilAborted(
       signal,
       this.ports.author({
+        mapPath: drive.mapPath,
         nodeId,
         path: info.path,
         settings: effectiveSettings(root.settings, parseBookPlanDecisions(root.raw)),

@@ -12,6 +12,9 @@ import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-r
 import type { TaskOptions } from "./experiences/visual-map/modals";
 import { attachmentPath } from "./experiences/visual-map/attachment-store";
 import { selectionOutputLanguage } from "./core/content-language";
+import { BookPipelineRuns, type BookPipelineProgress } from "./experiences/visual-map/book-pipeline-run";
+import { runPlanStep } from "./core/steps/book-pipeline/run";
+import { runProofread } from "./core/steps/book-pipeline/proofread";
 import {
   t,
   setUiLanguage,
@@ -442,6 +445,63 @@ export default class VisualAgentMapPlugin extends Plugin {
     log: line => this.logs.appendLog("info", line),
     t: (key, ...values) => t(key, ...values),
     confirmUsage: () => this.confirmAiUsage(this.currentModelChoice().model, async () => {})
+  });
+  /**
+   * Picture-book pipeline runner, keyed by map path. Entries: {@link startBookPipeline} and friends (the screen and the
+   * commands call those). The map's open view supplies the author call and the image probe; without one they fail.
+   */
+  readonly bookPipelineRuns = new BookPipelineRuns({
+    mutate: work => this.mutate(work),
+    readMap: path => this.repo.readMap(path),
+    updateMap: (path, change) => this.repo.updateMap(path, change),
+    readCard: async path => {
+      const note = await this.repo.readNote(path);
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!(file instanceof TFile)) throw new Error("missing");
+      const raw = await this.app.vault.read(file);
+      return {
+        path,
+        title: note.title,
+        summary: note.summary,
+        prompt: note.prompt,
+        detail: note.detail,
+        raw,
+        settings: note.bookSettings ?? {},
+        fields: {
+          ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}),
+          ...(note.bookRole ? { bookRole: note.bookRole } : {}),
+          ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {})
+        }
+      };
+    },
+    writePipelineFields: (path, patch) => this.repo.writePipelineFields(path, patch),
+    updateNoteGuarded: (path, patch, options) => this.repo.updateNoteGuarded(path, patch, options),
+    updateNoteRawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
+    runPlan: (step, request, run) => runPlanStep(this.aiCalls, step, request, run),
+    runProofread: (request, run) => runProofread(this.aiCalls, request, run),
+    author: async input => {
+      const view = this.views().find(item => item.mapPath === input.mapPath);
+      return view ? view.runBookAuthor(input) : { outcome: "failed", reason: "no_view" };
+    },
+    probeImage: async (url, signal) => {
+      const view = this.views()[0];
+      return view ? view.probeBookImage(url, signal) : { ok: false, reason: "no_view" };
+    },
+    backupNote: async (path, raw) => {
+      const view = this.views()[0];
+      return view ? view.bookBackupNote(path, raw) : { ok: false };
+    },
+    blocked: path => this.views().some(view => view.mapPath === path && view.bookPipelineBlocked()),
+    config: () => ({
+      planModel: this.settings.bookPlanModel,
+      authorModel: this.settings.bookWriteModel,
+      proofModel: this.settings.bookProofModel,
+      reasoning: this.currentModelChoice().reasoning,
+      language: selectionOutputLanguage(this.settings.language, "")
+    }),
+    now: () => new Date().toISOString(),
+    newId: () => crypto.randomUUID(),
+    log: line => this.logs.appendLog("info", line)
   });
   /** Suggestions awaiting a decision; onload replaces it with the persisted store, {@link topicRuns} reads whichever is current. */
   pendingSuggestions: Map<string, Suggestion[]> = new Map();
@@ -1643,10 +1703,27 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (!(leaf?.view instanceof MarkdownView)) return;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
+  /** Picture-book pipeline entries (the screen and the commands call these; refusals are thrown as BookPipelineRunError). */
+  startBookPipeline(mapPath: string): Promise<void> {
+    return this.bookPipelineRuns.start(mapPath);
+  }
+  stopBookPipeline(mapPath: string): Promise<void> {
+    return this.bookPipelineRuns.stop(mapPath);
+  }
+  resumeBookPipeline(mapPath: string, options: { addBudget?: number } = {}): Promise<void> {
+    return this.bookPipelineRuns.resume(mapPath, options);
+  }
+  confirmBookGate1(mapPath: string): Promise<void> {
+    return this.bookPipelineRuns.confirmGate1(mapPath);
+  }
+  getBookPipelineProgress(mapPath: string): BookPipelineProgress | undefined {
+    return this.bookPipelineRuns.getProgress(mapPath);
+  }
   onunload(): void {
     // Background diagram jobs stop before the repository does, so none can apply a result after the vault is released.
     this.topicRuns.dispose();
     this.argumentRuns.dispose();
+    this.bookPipelineRuns.dispose();
     // In-flight work (a long Obsidian rename, a queued mutation) must not write into the vault after this point.
     this.repo?.dispose();
     void this.coffeeManager?.stop();

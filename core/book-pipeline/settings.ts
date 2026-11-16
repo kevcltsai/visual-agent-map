@@ -19,3 +19,9 @@ export function effectiveSettings(current: BookSettings, decided: BookSettings):
 export function settingsVersion(settings: BookSettings): string {
   return hashText(JSON.stringify(BOOK_SETTING_FIELDS.map(field => settings[field] ?? "")));
 }
+
+/** The effective whole-book settings as the author's extra requirements (empty when the owner set none). */
+export function bookAuthorRequirements(settings: BookSettings): string {
+  const lines = BOOK_SETTING_FIELDS.filter(field => settings[field]).map(field => `- ${field}: ${settings[field]}`);
+  return lines.length ? `Whole-book settings (follow them):\n${lines.join("\n")}` : "";
+}

@@ -363,11 +363,17 @@ test('card plan: an unconditional picture requirement is dropped by program, a c
   assert.throws(() => cardPlan.cardPlanStep.parse(good([{ type: 'structure', text: 'Uses an image per section' }]), request), /no usable item/);
 });
 
+test('card plan: objective art-history items are kept, picture requirements (traditional and simplified) are dropped, 若干 is not a condition', () => {
+  const request = { ...base, thread: 't', settings: {}, materials: [], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
+  const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: texts.map(text => ({ type: 'fact', text })) }), request)).checklist.map(c => c.text);
+  assert.deepEqual(run(['圖像學特徵說明正確', '聖像的圖像特徵描述正確', '每段附一張圖片', '每段配图', '每段附一张图片', '若干作品列出年代']), ['圖像學特徵說明正確', '聖像的圖像特徵描述正確', '若干作品列出年代']);
+});
+
 test('card plan and proofread prompts: only objective items, picture items conditional, no-picture is met, system sections are not the ending', () => {
   const text = fs.readFileSync(path.join(__dirname, '..', 'core/steps/book-pipeline/card-plan.md'), 'utf8');
   assert.match(text, /Not allowed: anything subjective or about style/); assert.match(text, /never require pictures/);
   const proofText = fs.readFileSync(path.join(__dirname, '..', 'core/steps/book-pipeline/proofread.md'), 'utf8');
-  assert.match(proofText, /WebFetch/); assert.match(proofText, /meets a picture item unless the item explicitly requires/); assert.match(proofText, /update log and source list are not part of it/);
+  assert.match(proofText, /actually open a result page/); assert.doesNotMatch(proofText, /WebFetch/); assert.match(proofText, /meets a picture item unless the item explicitly requires/); assert.match(proofText, /update log and source list are not part of it/);
 });
 
 test('proofread: a whole-card failure carries the judged items as a partial result that is never "checked"; its record has its own key and marks the failure', () => {
@@ -388,7 +394,7 @@ test('proofread: a whole-card failure carries the judged items as a partial resu
 
 test('author requirements: the fixed chapter rules always come first, the settings after', () => {
   const none = settings.bookAuthorRequirements({});
-  assert.match(none, /Open by picking up the brief's entry point/); assert.match(none, /End with one sentence that leads into the next card/); assert.match(none, /Do not end the chapter with an update log/);
+  assert.match(none, /Open by picking up the brief's entry point/); assert.match(none, /End with one sentence that leads into the next card/); assert.match(none, /Do not end the chapter with an update log/); assert.match(none, /no next card \(the last card\).*close the whole book/);
   const some = settings.bookAuthorRequirements({ tone: 'warm' });
   assert.ok(some.startsWith(none)); assert.match(some, /- tone: warm/);
 });

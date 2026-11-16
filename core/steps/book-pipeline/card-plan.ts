@@ -64,11 +64,16 @@ export const CARD_PLAN_SCHEMA = {
   required: ["covers", "entry", "handoff", "previous", "next", "checklist"]
 };
 
-const PICTURE =
-  /以圖為主|圖文並茂|圖片|圖像|插圖|配圖|附圖|有圖|\b(?:images?|pictures?|illustrations?|photos?|diagrams?)\b/i;
-const CONDITION = /無圖|沒有圖|没有图|找不到|若|如果|如有|有找到|\b(?:if|when|unless|no (?:image|picture)|without)\b/i;
+/** Picture words that are a requirement by themselves, and picture nouns that count only beside a requirement verb (so "圖像學" is not a picture item). */
+const PICTURE_ALONE =
+  /以圖為主|以图为主|圖文並茂|图文并茂|插圖|插图|配圖|配图|附圖|附图|有圖|有图|\b(?:images?|pictures?|illustrations?|photos?|diagrams?)\b/i;
+const PICTURE_NOUN = /圖片|图片|圖像|图像/;
+const PICTURE_VERB = /[附放配含]|嵌入|插入|每段|需有|要有|需要有|必須有|必须有/;
+const CONDITION =
+  /無圖|无图|沒有圖|没有图|找不到|若找得到|若有|若無|若无|如果|如有|有找到|\b(?:if|unless|when (?:available|found|possible)|no (?:image|picture)|without)\b/i;
 /** A picture item that is not conditional: the first author version has no image step, so it could never be met. */
-const unconditionalPicture = (text: string): boolean => PICTURE.test(text) && !CONDITION.test(text);
+const unconditionalPicture = (text: string): boolean =>
+  (PICTURE_ALONE.test(text) || (PICTURE_NOUN.test(text) && PICTURE_VERB.test(text))) && !CONDITION.test(text);
 
 export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanResult {
   const item = parseJson(raw);

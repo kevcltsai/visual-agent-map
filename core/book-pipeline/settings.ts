@@ -25,7 +25,7 @@ export const BOOK_AUTHOR_RULES = [
   "Chapter writing rules (follow them):",
   "- Write the chapter as the role named in the brief says.",
   "- Open by picking up the brief's entry point (how this chapter continues from the previous card).",
-  "- End with one sentence that leads into the next card, taking up the question the brief leaves for it.",
+  "- End with one sentence that leads into the next card, taking up the question the brief leaves for it. If the brief has no next card (the last card), do not lead into a next card; close the whole book as the brief says.",
   '- Do not end the chapter with an update log, a change note or a "this version" remark; those are added by the system.'
 ].join("\n");
 

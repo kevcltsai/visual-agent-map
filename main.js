@@ -42858,7 +42858,7 @@ var BOOK_AUTHOR_RULES = [
   "Chapter writing rules (follow them):",
   "- Write the chapter as the role named in the brief says.",
   "- Open by picking up the brief's entry point (how this chapter continues from the previous card).",
-  "- End with one sentence that leads into the next card, taking up the question the brief leaves for it.",
+  "- End with one sentence that leads into the next card, taking up the question the brief leaves for it. If the brief has no next card (the last card), do not lead into a next card; close the whole book as the brief says.",
   '- Do not end the chapter with an update log, a change note or a "this version" remark; those are added by the system.'
 ].join("\n");
 function bookAuthorRequirements(settings) {
@@ -43735,9 +43735,11 @@ var CARD_PLAN_SCHEMA = {
   },
   required: ["covers", "entry", "handoff", "previous", "next", "checklist"]
 };
-var PICTURE = /以圖為主|圖文並茂|圖片|圖像|插圖|配圖|附圖|有圖|\b(?:images?|pictures?|illustrations?|photos?|diagrams?)\b/i;
-var CONDITION = /無圖|沒有圖|没有图|找不到|若|如果|如有|有找到|\b(?:if|when|unless|no (?:image|picture)|without)\b/i;
-var unconditionalPicture = (text10) => PICTURE.test(text10) && !CONDITION.test(text10);
+var PICTURE_ALONE = /以圖為主|以图为主|圖文並茂|图文并茂|插圖|插图|配圖|配图|附圖|附图|有圖|有图|\b(?:images?|pictures?|illustrations?|photos?|diagrams?)\b/i;
+var PICTURE_NOUN = /圖片|图片|圖像|图像/;
+var PICTURE_VERB = /[附放配含]|嵌入|插入|每段|需有|要有|需要有|必須有|必须有/;
+var CONDITION = /無圖|无图|沒有圖|没有图|找不到|若找得到|若有|若無|若无|如果|如有|有找到|\b(?:if|unless|when (?:available|found|possible)|no (?:image|picture)|without)\b/i;
+var unconditionalPicture = (text10) => (PICTURE_ALONE.test(text10) || PICTURE_NOUN.test(text10) && PICTURE_VERB.test(text10)) && !CONDITION.test(text10);
 function parseCardPlan(raw, request) {
   const item = parseJson(raw);
   exactKeys(item, ["covers", "entry", "handoff", "previous", "next", "checklist"]);
@@ -85039,7 +85041,7 @@ For every checklist item return exactly one result:
 - unmet: the chapter fails the item.
 - unverified: you checked but cannot decide, or you could not open a source for it.
 
-You must successfully open at least one source page during this check: search, then open a result with your page-fetch tool (WebFetch). A search result that you did not open is not a source, and reading search snippets alone does not count. For a fact item, list in sources the URLs of the pages you actually opened for it; never list a URL you did not open. A structure item is judged from the chapter text alone and needs no sources.
+You must successfully open at least one source page during this check: search, then actually open a result page (not only read search snippets). A search result that you did not open is not a source, and reading search snippets alone does not count. For a fact item, list in sources the URLs of the pages you actually opened for it; never list a URL you did not open. A structure item is judged from the chapter text alone and needs no sources.
 
 The chapter text is the chapter body only; the system's notes, update log and source list are not part of it, so judge its ending as the last paragraph given. A chapter with no picture, or with a line saying no picture was found, meets a picture item unless the item explicitly requires a picture to be present.
 

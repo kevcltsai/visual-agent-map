@@ -29,6 +29,7 @@ const texts = el => dom.findAll(el, i => i.text).map(i => i.text);
 const EVIL = 'fine <img src=x onerror=alert(1)> ![pic](http://example.test/a.png)';
 
 // ---- part A: real runner at gate 2 ----
+const confirmDone = async (runs, mapPath) => { await runs.confirmGate1(mapPath); while (runs.isRunning(mapPath)) await new Promise(resolve => setImmediate(resolve)); };
 async function rig() {
   setUiLanguage('zh-TW');
   const data = S.fixture('zh-TW');
@@ -68,7 +69,7 @@ async function rig() {
   };
   const runs = new bundle.BookPipelineRuns(ports);
   await runs.start(mapPath);
-  await runs.confirmGate1(mapPath);
+  await confirmDone(runs, mapPath);
   const noteOf = new Map();
   const reload = async () => { for (const n of nodes) noteOf.set(n.id, await repo.readNote(n.path)); };
   const state = new bundle.GatePanelState();

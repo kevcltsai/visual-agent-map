@@ -3,6 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
+const { load: loadReplay } = require('./support-replay.cjs');
 const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages, unsafeBody } = S.load('experiences/visual-map/book-pipeline-run.ts');
 const { BudgetExhaustedError } = S.load('core/admission.ts');
 const { readBookPipeline } = S.load('core/book-pipeline/model.ts');
@@ -19,6 +20,7 @@ const bodyOf = title => `SecretBody ${title}`;
 const stageOf = raw => /^pipeline-stage: "?([a-z-]+)"?$/m.exec(raw)?.[1];
 
 /** A map of one root and two child cards (reading order: root, A, B), the fake ports and call counters. `over` replaces ports/script. */
+const confirmDone = async (runs, mapPath) => { await runs.confirmGate1(mapPath); while (runs.isRunning(mapPath)) await new Promise(resolve => setImmediate(resolve)); };
 async function rig(over = {}) {
   const data = S.fixture('zh-TW');
   const { repo, contents } = data;
@@ -84,7 +86,8 @@ test('three cards run to gate 1, wait there, then write and proof to gate 2 afte
   assert.match(r.raw(0), /## 全書企劃/);
   assert.equal(r.runs.isRunning(r.mapPath), false);
   assert.equal(r.runs.getProgress(r.mapPath).counts.planned, 3);
-  await assert.rejects(() => r.runs.confirmGate1(r.mapPath).then(() => r.runs.confirmGate1(r.mapPath)), e => e instanceof BookPipelineRunError && e.code === 'not_gate1');
+  await confirmDone(r.runs, r.mapPath);
+  await assert.rejects(() => r.runs.confirmGate1(r.mapPath), e => e instanceof BookPipelineRunError && e.code === 'not_gate1');
   s = await r.state();
   assert.equal(s.phase, 'gate2');
   assert.equal(r.stat.author.length, 3);
@@ -99,7 +102,7 @@ test('a step that fails three times marks the card needs-review with a neutral c
   const r = await rig({ script: { author: async (input, n) => { if (input.nodeId === bad.id) throw new Error('boom'); await input.admission.reserve(); const note = await r.repo.readNote(input.path); await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } } });
   bad.id = r.nodes[1].id;
   await r.runs.start(r.mapPath);
-  await r.runs.confirmGate1(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
   const s = await r.state();
   assert.equal(s.phase, 'gate2');
   assert.equal(r.stat.author.filter(id => id === bad.id).length, 3);
@@ -123,14 +126,14 @@ test('the budget running out pauses without marking a card; addBudget resumes an
   const other = await rig();
   await r.runs.start(r.mapPath);
   await setLimit(r, 6); // 4 used by planning: two more calls
-  await r.runs.confirmGate1(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
   let s = await r.state();
   assert.equal(s.status, 'stopped'); assert.equal(s.pauseReason, 'budget'); assert.equal(s.phase, 'writing');
   assert.equal(r.runs.getProgress(r.mapPath).pauseReason, 'budget');
   for (let i = 0; i < 3; i++) assert.notEqual(stageOf(r.raw(i)), 'needs-review');
   assert.ok(Object.values(s.attempts).every(a => typeof a === 'number' || (a.write <= 1 && a.plan <= 1)));
   // the other map (its own budget gate) and a call without a gate are unaffected
-  await other.runs.start(other.mapPath); await other.runs.confirmGate1(other.mapPath);
+  await other.runs.start(other.mapPath); await confirmDone(other.runs, other.mapPath);
   assert.equal((await other.state()).phase, 'gate2');
   assert.equal((await other.state()).budget.used, 10);
   await assert.rejects(() => r.runs.resume(r.mapPath), e => e instanceof BookPipelineRunError && e.code === 'budget');
@@ -209,7 +212,7 @@ test('while the author runs, its card frontmatter is not written; the owner edit
     return n === 1 ? { ok: false, reason: 'gone' } : { ok: true };
   } } });
   await r.runs.start(r.mapPath);
-  await r.runs.confirmGate1(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
   assert.ok(seen.length >= 3 && seen.every(([a, b]) => a === b && a === 'planned'));
   assert.equal((await r.note(0)).summary, 'owner summary', 'the owner text survived');
   assert.ok(r.stat.author.filter(id => id === r.nodes[0].id).length >= 2, 'the discarded step was tried again');
@@ -224,7 +227,7 @@ test('pictures: a non-https address is not probed; an https failure becomes "無
     return { outcome: 'written' };
   }, probe: async url => (url.includes('dead') ? { ok: false, reason: '404' } : { ok: true }) } });
   await r.runs.start(r.mapPath);
-  await r.runs.confirmGate1(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
   assert.ok(r.stat.probes.every(u => u.startsWith('https://')), 'only https is probed');
   assert.ok(!r.stat.probes.some(u => u.includes('plain') || u.startsWith('javascript')));
   const detail = (await r.note(1)).detail;
@@ -241,7 +244,7 @@ test('pictures: when the exit check finds an unsafe body nothing is written, the
   } } });
   r.runs.exitCheck = () => true;
   await r.runs.start(r.mapPath);
-  await r.runs.confirmGate1(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
   assert.ok(!(await r.note(1)).detail.includes('無圖'), 'the cleaned result is not written');
   assert.equal(stageOf(r.raw(1)), 'needs-review');
   assert.equal((await r.note(1)).pipelineIssue, 'write failed: unsafe_body');
@@ -277,20 +280,20 @@ test('exit safety: the probe-result write being discarded leaves the cleaned tex
   let armed = false;
   const r = await rig({ script: { author: async input => { const out = await evilAuthor(r, input); armed = true; return out; }, probe: async () => ({ ok: false, reason: 'load_failed' }) },
     ports: { updateNoteRawGuarded: async (path, transform, options) => (armed ? 'discarded' : r.repo.updateNoteRawGuarded(path, transform, options)) } });
-  await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath);
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
   assertSafeCard(r, 1);
 });
 
 test('exit safety: the card leaving the map, or readCard throwing, after the author write leaves the cleaned text', async () => {
   let removeAfter = false;
   const a = await rig({ script: { author: async input => { const out = await evilAuthor(a, input); await a.repo.updateMap(a.mapPath, d => { d.nodes = d.nodes.filter(n => n.path !== input.path); }); return out; } } });
-  await a.runs.start(a.mapPath); await a.runs.confirmGate1(a.mapPath);
+  await a.runs.start(a.mapPath); await confirmDone(a.runs, a.mapPath);
   assertSafeCard(a, 1);
   let reads = 0, armed = false;
   const b = await rig({ script: { author: async input => { const out = await evilAuthor(b, input); armed = true; return out; } },
     ports: { readCard: async path => { if (armed) throw new Error('read boom'); return b.__readCard(path); } } });
   b.__readCard = path => b.repo.readNote(path).then(note => ({ path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: b.contents.get(path), settings: note.bookSettings ?? {}, fields: {} }));
-  await b.runs.start(b.mapPath); await b.runs.confirmGate1(b.mapPath);
+  await b.runs.start(b.mapPath); await confirmDone(b.runs, b.mapPath);
   assertSafeCard(b, 1);
 });
 
@@ -300,7 +303,7 @@ test('exit safety: a body the exit check refuses is not written at all (the card
   const before = () => r.raw(1).replace(/^---\n[\s\S]*?\n---\n/, '');
   await r.runs.start(r.mapPath);
   const earlier = before();
-  await r.runs.confirmGate1(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
   assert.equal(before().includes('evil.example'), false); assert.equal(before(), earlier);
   assert.equal(stageOf(r.raw(1)), 'needs-review');
   assert.equal((await r.note(1)).pipelineIssue, 'write failed: unsafe_body');
@@ -314,7 +317,7 @@ test('probe failure reasons are words in the output language (zh: 無法載入 /
       await r.repo.updateNoteGuarded(input.path, { detail: reasons.map((_, i) => `![p${i}](https://x.example/${i}.png)`).join('\n\n') }, { authorize: input.authorize, finalize: input.finalize });
       return { outcome: 'written' };
     }, probe: async url => ({ ok: false, reason: reasons[Number(/(\d)\.png/.exec(url)[1])] }) }, ports: { config: () => ({ planModel: 'm1', authorModel: 'm2', proofModel: 'm3', reasoning: 'low', language }) } });
-    await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath);
+    await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
     const detail = (await r.note(0)).detail;
     for (const text of expected) assert.ok(detail.includes(text), `${language}: ${text}`);
   }
@@ -462,7 +465,7 @@ test('picture allow-list: every form that could load a remote resource is rewrit
 
 test('log lines carry ids, counts and codes only: no title and no body text', async () => {
   const r = await rig();
-  await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath);
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
   const log = r.stat.logs.join('\n');
   assert.ok(r.stat.logs.length > 5 && log.includes('run=run-1'));
   assert.ok(!/Secret/.test(log) && !log.includes('summary of') && !log.includes('one thread'));
@@ -470,7 +473,7 @@ test('log lines carry ids, counts and codes only: no title and no body text', as
 
 test('a proof already stored under the same key is reused: no second AI call', async () => {
   const r = await rig();
-  await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath);
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
   assert.equal(r.stat.proof.length, 3);
   // send card 1 back to "written" and the run back to the writing phase; its revision and text are unchanged, so the key is the same
   await r.repo.writePipelineFields(r.nodes[1].path, { pipelineStage: 'written' });
@@ -483,7 +486,7 @@ test('a proof already stored under the same key is reused: no second AI call', a
 
 test('the proof record callout survives the real repository: the key and the body hash are stable after a reopen and another write', async () => {
   const r = await rig();
-  await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath);
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
   const s = await r.state();
   const keyOf = async () => {
     const note = await r.note(1);
@@ -525,7 +528,7 @@ test('a proof that opened pages but verified no fact keeps the judged structure 
   const r = await rig({ script: {
     card: request => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: facts }),
     proof: async request => evaluateProof(request.checklist.map(c => ({ id: c.id, status: 'met', note: 'judged ' + c.id, sources: [] })), request.checklist, ['https://example.org/p']) } });
-  await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath);
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
   const raw = r.raw(1);
   assert.equal(stageOf(raw), 'needs-review');
   assert.equal(r.stat.proof.length, r.nodes.length, 'one proofread per card: pages were opened but no fact verified is not retried (Primary decision)');
@@ -584,7 +587,7 @@ test('first-start failures each leave a code: backup failed, root card unreadabl
 
 test('a proofread call logs openedPages and searches as numbers only; the log carries no title or body', async () => {
   const r = await rig({ script: { proof: async request => ({ items: request.checklist.map(c => ({ id: c.id, type: c.type, status: 'met', note: 'fine', sources: [] })), aggregate: 'checked', counts: { openedPages: 2, searches: 3 } }) } });
-  await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath);
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
   const lines = r.stat.logs.filter(l => l.includes('proof_calls'));
   assert.equal(lines.length, 3);
   for (const line of lines) assert.match(line, /^book-pipeline proof_calls run=run-1 card=\S+ step=proof attempt=1 result=ok ms=0 openedPages=2 searches=3$/);
@@ -624,7 +627,7 @@ test('an unexpected error before the store exists still saves its code (stopped,
 test('a written chapter with no picture gets one "no picture" line in the research notes (body untouched, no duplicate on a rewrite); one with a picture gets none; the log has pictures=n', async () => {
   const r = await rig();
   await r.runs.start(r.mapPath);
-  await r.runs.confirmGate1(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
   for (let i = 0; i < 3; i++) {
     const detail = (await r.note(i)).detail;
     assert.equal(detail.split('無圖：未找到可驗證的公開圖片').length - 1, 1, `card ${i}: one line`);
@@ -639,7 +642,7 @@ test('a chapter whose body already carries a picture is not given the no-picture
   const r = await rig();
   r.script.author = async input => { await input.admission.reserve(); const note = await r.repo.readNote(input.path); const w = await r.repo.updateNoteGuarded(input.path, { detail: body(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return w === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; };
   await r.runs.start(r.mapPath);
-  await r.runs.confirmGate1(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
   for (let i = 0; i < 3; i++) assert.ok(!(await r.note(i)).detail.includes('無圖：未找到'));
   assert.ok(r.stat.logs.some(line => / pictures=1$/.test(line)));
 });
@@ -651,4 +654,67 @@ test('every accepted card plan logs one checklist_dropped line with counts only 
   assert.equal(lines.length, 3);
   assert.equal(lines.filter(line => / subjective=0 picture=0 kept=1$/.test(line)).length, 2);
   assert.equal(lines.filter(line => / subjective=2 picture=1 kept=1$/.test(line)).length, 1);
+});
+
+// Gate 1 confirm answers once writing has begun; the drive goes on in the background (the chat is not left busy for the whole writing).
+test('confirmGate1 resolves when the phase is writing while the drive still runs; a second press (panel or chat) is refused and starts no second drive', async () => {
+  const hold = defer();
+  const r = await rig({ script: { author: async () => { await hold.promise; return { ok: false, reason: 'cancelled' }; } } });
+  await r.runs.start(r.mapPath);
+  await r.runs.confirmGate1(r.mapPath);
+  assert.equal((await r.state()).phase, 'writing');
+  assert.equal(r.runs.isRunning(r.mapPath), true);
+  await settle();
+  const authors = r.stat.author.length;
+  await assert.rejects(() => r.runs.confirmGate1(r.mapPath), e => e instanceof BookPipelineRunError && e.code === 'busy');
+  await assert.rejects(() => r.runs.confirmGate1(r.mapPath), e => e instanceof BookPipelineRunError && e.code === 'busy');
+  assert.equal(r.stat.author.length, authors, 'no second drive started');
+  await r.runs.stop(r.mapPath); hold.resolve();
+});
+
+test('a drive failing in the background after confirm: no unhandled rejection, the failure code is written', async () => {
+  const unhandled = []; const on = e => unhandled.push(e); process.on('unhandledRejection', on);
+  try {
+    const r = await rig();
+    await r.runs.start(r.mapPath);
+    let confirmed = false;
+    const upd = r.ports.updateMap;
+    r.ports.updateMap = async (path, change) => { if (confirmed) { confirmed = false; throw new TypeError('boom'); } return upd(path, change); };
+    const logged = r.ports.log; r.ports.log = line => { if (/gate1/.test(line)) confirmed = true; return logged(line); };
+    await r.runs.confirmGate1(r.mapPath);
+    while (r.runs.isRunning(r.mapPath)) await tick();
+    await settle();
+    const s = await r.state();
+    assert.equal(s.status, 'stopped'); assert.equal(s.pauseReason, 'failed'); assert.equal(s.failureCode, 'internal_TypeError');
+    assert.equal(r.runs.getProgress(r.mapPath).failureCode, s.failureCode);
+    assert.deepEqual(unhandled, []);
+  } finally { process.off('unhandledRejection', on); }
+});
+
+test('chat "continue" confirms gate 1: the reply shows and the chat is free again while a long writing still runs', async () => {
+  const { MapChatConversation } = loadReplay('experiences/visual-map/map-chat-conversation.ts', { obsidian: S.obsidian });
+  const hold = defer();
+  const r = await rig({ script: { author: async () => { await hold.promise; return { ok: false, reason: 'cancelled' }; } } });
+  await r.runs.start(r.mapPath);
+  const log = [];
+  const panel = {
+    isBusy: false, draft: '繼續', transcript: () => [], clearDraft: () => log.push('clearDraft'),
+    begin(text) { this.isBusy = true; log.push('begin'); return { text }; }, attachments: () => [], hasTurn: () => true,
+    finish(reply) { this.isBusy = false; log.push(['finish', reply]); }, pendingPlan: () => null, hasQueuedSteers: () => false
+  };
+  const ports = {
+    panel: () => panel, closed: () => false, path: () => 'Maps/A/Map.md', map: () => ({ id: 'm1' }), notesLoading: () => false,
+    selectionIds: () => [], imageId: () => null,
+    chain: () => ({ current: null, resumeChatChain: () => false, interruptChain: () => log.push('interrupt'), chainForRound: () => { throw new Error('went on to the AI path'); } }),
+    bookGate1Confirm: () => r.runs.confirmGate1(r.mapPath).then(() => 'confirmed')
+  };
+  const conv = new MapChatConversation(ports);
+  await conv.sendMapChat();
+  assert.deepEqual(log.at(-1), ['finish', 'confirmed']);
+  assert.equal(panel.isBusy, false);
+  assert.equal(r.runs.isRunning(r.mapPath), true, 'the writing is still going');
+  panel.draft = 'another message';
+  ports.bookGate1Confirm = () => null;
+  await assert.rejects(() => conv.sendMapChat(), /went on to the AI path/);
+  await r.runs.stop(r.mapPath); hold.resolve();
 });

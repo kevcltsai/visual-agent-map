@@ -591,17 +591,21 @@ export class BookPipelineRuns {
 
   /** The owner confirmed gate 1: writing starts (or a stopped run at gate 1 continues into it). */
   async confirmGate1(mapPath: string): Promise<void> {
-    return this.enter(mapPath, async drive => {
-      await this.openSaved(drive, mapPath);
-      let moved = false;
-      await drive.store.commit(state => {
-        const next = confirmGate1(resumeRun(state) ?? state, this.ports.now());
-        moved = next.phase !== state.phase;
-        return { state: moved ? next : state, accepted: true };
-      });
-      if (!moved) throw new BookPipelineRunError("not_gate1");
-      this.log(drive, "gate1", "-", "write", "confirmed");
-    });
+    return this.enter(
+      mapPath,
+      async drive => {
+        await this.openSaved(drive, mapPath);
+        let moved = false;
+        await drive.store.commit(state => {
+          const next = confirmGate1(resumeRun(state) ?? state, this.ports.now());
+          moved = next.phase !== state.phase;
+          return { state: moved ? next : state, accepted: true };
+        });
+        if (!moved) throw new BookPipelineRunError("not_gate1");
+        this.log(drive, "gate1", "-", "write", "confirmed");
+      },
+      true
+    );
   }
 
   /**
@@ -821,7 +825,11 @@ export class BookPipelineRuns {
   private dead(drive: Drive): boolean {
     return drive.disposed || this.disposed;
   }
-  private enter(mapPath: string, setup: (drive: Drive) => Promise<void>): Promise<void> {
+  /**
+   * `early`: the returned promise settles once `setup` succeeded (the run's new phase is written) or refused; the drive keeps running in
+   * the background and its unexpected errors are handled by {@link go} (failure code, log), never as a rejection.
+   */
+  private enter(mapPath: string, setup: (drive: Drive) => Promise<void>, early = false): Promise<void> {
     if (this.disposed) return Promise.reject(new BookPipelineRunError("disposed"));
     if (this.drives.has(mapPath)) return Promise.reject(new BookPipelineRunError("busy"));
     const drive = {
@@ -843,13 +851,19 @@ export class BookPipelineRuns {
       done: Promise.resolve()
     } as unknown as Drive;
     this.drives.set(mapPath, drive);
-    drive.done = this.go(drive, setup);
-    return drive.done;
+    let ready: () => void = () => undefined;
+    drive.done = this.go(drive, setup, () => ready());
+    if (!early) return drive.done;
+    return new Promise<void>((resolve, reject) => {
+      ready = resolve;
+      drive.done.then(resolve, reject);
+    });
   }
-  private async go(drive: Drive, setup: (drive: Drive) => Promise<void>): Promise<void> {
+  private async go(drive: Drive, setup: (drive: Drive) => Promise<void>, onSetup: () => void): Promise<void> {
     let refusal: BookPipelineRunError | undefined;
     try {
       await setup(drive);
+      onSetup();
       if (drive.store && !this.dead(drive) && !drive.stopRequested) await (drive.job ? drive.job() : this.loop(drive));
     } catch (error) {
       if (error instanceof BookPipelineRunError) refusal = error;

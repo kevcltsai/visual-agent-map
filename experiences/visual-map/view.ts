@@ -17303,7 +17303,7 @@ export class VisualAgentMapView extends ItemView {
       new Notice(error instanceof Error ? error.message : String(error));
     }
   }
-  /** Runs a runner entry (these resolve when the drive ends); a refusal becomes a notice, and the map repaints either way. */
+  /** Runs a runner entry (these resolve when the drive ends, except confirmGate1: once writing has begun); a refusal becomes a notice, and the map repaints either way. */
   private bookEntry(entry: () => Promise<void>): Promise<void> {
     return runBookEntry(entry, message => new Notice(message)).finally(() => {
       if (!this.closed) this.render();

@@ -19,6 +19,7 @@ const bodyOf = title => `SecretBody ${title}`;
 const stageOf = raw => /^pipeline-stage: "?([a-z-]+)"?$/m.exec(raw)?.[1];
 
 /** A map of one root and two child cards (reading order: root, A, B), the fake ports and call counters. `over` replaces ports/script. */
+const confirmDone = async (runs, mapPath) => { await runs.confirmGate1(mapPath); while (runs.isRunning(mapPath)) await new Promise(resolve => setImmediate(resolve)); };
 async function rig(over = {}) {
   const data = S.fixture('zh-TW');
   const { repo, contents } = data;
@@ -80,7 +81,7 @@ const authorFor = r => async (input, n) => {
   const out = await r.repo.updateNoteGuarded(input.path, { detail: text }, { authorize: input.authorize, finalize: input.finalize });
   return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
 };
-const toGate2 = async r => { await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath); };
+const toGate2 = async r => { await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath); };
 
 test('replanCard at gate 1: only that card plan is rerun with the owner sentence; only its Prompt changes; both neighbours get a seam with its revision; the rest is byte for byte', async () => {
   const r = await rig();
@@ -124,7 +125,7 @@ test('replanCard refusals: only gate 1, a real sentence, a card of the run, no s
   assert.equal(failed.plan, undefined); assert.equal(failed.reason, 'failed');
   assert.equal(r.raw(0), before[0]); assert.equal(r.raw(3), before[3]); assert.equal(seamOf(r.raw(2)), undefined, 'nothing changed, so no seam');
   r.script.card = () => ({ covers: 'ok', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }] });
-  await r.runs.confirmGate1(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
   await assert.rejects(() => r.runs.replanCard(r.mapPath, r.nodes[1].id, 'more'), e => e.code === 'not_gate1', 'gate 2');
   assert.equal((await r.state()).phase, 'gate2');
 });

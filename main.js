@@ -48974,18 +48974,22 @@ var BookPipelineRuns = class {
   }
   /** The owner confirmed gate 1: writing starts (or a stopped run at gate 1 continues into it). */
   async confirmGate1(mapPath) {
-    return this.enter(mapPath, async (drive) => {
-      await this.openSaved(drive, mapPath);
-      let moved = false;
-      await drive.store.commit((state) => {
-        var _a2;
-        const next = confirmGate1((_a2 = resumeRun(state)) != null ? _a2 : state, this.ports.now());
-        moved = next.phase !== state.phase;
-        return { state: moved ? next : state, accepted: true };
-      });
-      if (!moved) throw new BookPipelineRunError("not_gate1");
-      this.log(drive, "gate1", "-", "write", "confirmed");
-    });
+    return this.enter(
+      mapPath,
+      async (drive) => {
+        await this.openSaved(drive, mapPath);
+        let moved = false;
+        await drive.store.commit((state) => {
+          var _a2;
+          const next = confirmGate1((_a2 = resumeRun(state)) != null ? _a2 : state, this.ports.now());
+          moved = next.phase !== state.phase;
+          return { state: moved ? next : state, accepted: true };
+        });
+        if (!moved) throw new BookPipelineRunError("not_gate1");
+        this.log(drive, "gate1", "-", "write", "confirmed");
+      },
+      true
+    );
   }
   /**
    * The owner accepted gate 2: the run is done. Only at gate 2; a run that is already done answers as if nothing happened (a second
@@ -49184,7 +49188,11 @@ var BookPipelineRuns = class {
   dead(drive) {
     return drive.disposed || this.disposed;
   }
-  enter(mapPath, setup) {
+  /**
+   * `early`: the returned promise settles once `setup` succeeded (the run's new phase is written) or refused; the drive keeps running in
+   * the background and its unexpected errors are handled by {@link go} (failure code, log), never as a rejection.
+   */
+  enter(mapPath, setup, early = false) {
     if (this.disposed) return Promise.reject(new BookPipelineRunError("disposed"));
     if (this.drives.has(mapPath)) return Promise.reject(new BookPipelineRunError("busy"));
     const drive = {
@@ -49206,14 +49214,20 @@ var BookPipelineRuns = class {
       done: Promise.resolve()
     };
     this.drives.set(mapPath, drive);
-    drive.done = this.go(drive, setup);
-    return drive.done;
+    let ready = () => void 0;
+    drive.done = this.go(drive, setup, () => ready());
+    if (!early) return drive.done;
+    return new Promise((resolve, reject2) => {
+      ready = resolve;
+      drive.done.then(resolve, reject2);
+    });
   }
-  async go(drive, setup) {
+  async go(drive, setup, onSetup) {
     var _a2, _b2, _c;
     let refusal;
     try {
       await setup(drive);
+      onSetup();
       if (drive.store && !this.dead(drive) && !drive.stopRequested) await (drive.job ? drive.job() : this.loop(drive));
     } catch (error) {
       if (error instanceof BookPipelineRunError) refusal = error;
@@ -80338,7 +80352,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       new import_obsidian36.Notice(error instanceof Error ? error.message : String(error));
     }
   }
-  /** Runs a runner entry (these resolve when the drive ends); a refusal becomes a notice, and the map repaints either way. */
+  /** Runs a runner entry (these resolve when the drive ends, except confirmGate1: once writing has begun); a refusal becomes a notice, and the map repaints either way. */
   bookEntry(entry) {
     return runBookEntry(entry, (message) => new import_obsidian36.Notice(message)).finally(() => {
       if (!this.closed) this.render();

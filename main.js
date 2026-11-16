@@ -32553,6 +32553,17 @@ var TopicSelection = class {
     __publicField(this, "mode", false);
     __publicField(this, "relation", null);
     __publicField(this, "tabStop", null);
+    /** What the AI's last pick was while no selection mode was on; it is still "pure" only while the multi set is exactly that. */
+    __publicField(this, "highlight", null);
+  }
+  /** True while the multi set is still exactly what the AI picked, with no selection mode on. */
+  isPureHighlight() {
+    return this.pureHighlight().length > 0;
+  }
+  pureHighlight() {
+    const h = this.highlight;
+    if (this.mode || !h || !this.multi.size || [...this.multi].some((id) => !h.has(id))) return [];
+    return [...this.multi];
   }
   /** A frozen copy: editing it, or its Set, never reaches the module. */
   get state() {
@@ -32586,7 +32597,9 @@ var TopicSelection = class {
   // ---- Cmd/Ctrl click ----
   /** enableDrag Cmd/Ctrl branch (17592-17604). */
   cmdClick(id, ctx) {
-    const before = this.selected, multi = [...this.multi];
+    const stale = this.pureHighlight();
+    for (const id2 of stale) this.multi.delete(id2);
+    const before = this.selected, multi = [...stale, ...this.multi];
     if (ctx.canMultiSelect && !this.multi.size && before && before !== id) this.multi.add(before);
     if (this.multi.has(id)) this.multi.delete(id);
     else this.multi.add(id);
@@ -32623,6 +32636,8 @@ var TopicSelection = class {
     if (!ctx.canMultiSelect) return NO_CHANGE;
     const hits = new Set(ids2);
     if (!hits.size) return NO_CHANGE;
+    const stale = mode !== "subtract" ? this.pureHighlight() : [];
+    for (const id of stale) this.multi.delete(id);
     if (mode === "subtract") {
       const removed = [...hits].filter((id) => this.multi.has(id));
       if (!removed.length) return NO_CHANGE;
@@ -32632,9 +32647,9 @@ var TopicSelection = class {
     for (const id of hits) this.multi.add(id);
     if (mode === "enter") {
       this.mode = true;
-      return change(hits, true);
+      return change([...hits, ...stale], true);
     }
-    return this.commit(hits, ctx);
+    return this.commit([...hits, ...stale], ctx);
   }
   // ---- clear ----
   /** Selection bar Clear (13439-13441): multi emptied, selected and mode kept. */
@@ -32675,6 +32690,7 @@ var TopicSelection = class {
   /** Leave multi-select. openMap (2006-2008) also drops selected; emptyMap (9532-9533) and backgroundRun (13231-13232) keep it. */
   exitMultiSelect(variant) {
     const before = this.selected, multi = [...this.multi], wasMode = this.mode;
+    if (variant === "backgroundRun" && !wasMode) return NO_CHANGE;
     this.mode = false;
     this.multi.clear();
     if (variant === "openMap") this.selected = null;
@@ -32682,7 +32698,11 @@ var TopicSelection = class {
   }
   /** Map chat picked topics (16508-16510). */
   chatSelect(ids2) {
-    return this.enterWith(ids2);
+    const before = this.selected, multi = [...this.multi], next = [...ids2];
+    this.multi = new Set(next);
+    this.selected = null;
+    this.highlight = this.mode ? null : new Set(next);
+    return change([before, ...multi, ...next], this.mode);
   }
   /** A card's direct subtopics (17015-17017). */
   selectSubtopics(ids2) {
@@ -61764,6 +61784,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
      * changed (a card added, another map in this tab, the view closed, a run already going), so the press is checked again.
      */
     __publicField(this, "argumentFocusMapId", null);
+    /** The cards the AI picked last: an action with no cards named works on these, not on what the user clicked meanwhile. */
+    __publicField(this, "aiTargets", null);
+    __publicField(this, "highlightFadeTimer", null);
     __publicField(this, "noStyleFiles");
     this.installUndoScope();
   }
@@ -63104,6 +63127,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian36.Ite
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
     this.closeTopicLinkMenu();
     this.closed = true;
+    if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
     this.chatSourceCache = null;
     this.unsyncedPaths = null;
     this.closeTopicChatWindow();
@@ -78035,6 +78059,7 @@ ${note.detail.trim()}` : "",
       },
       selectedIds: () => this.chatSelectionIds(),
       send: () => {
+        this.aiTargets = null;
         void this.sendMapChat();
       },
       stop: () => this.stopMapChat(),
@@ -79865,7 +79890,37 @@ ${note.detail.trim()}` : "",
   }
   chatSelect(ids2) {
     this.selection.chatSelect(ids2);
+    this.aiTargets = ids2;
     if (!this.closed) this.render();
+    this.armHighlightFade();
+  }
+  chatTargetIds() {
+    var _a2;
+    if (this.selection.state.multiSelectMode) return this.chatSelectionIds();
+    const ids2 = ((_a2 = this.aiTargets) != null ? _a2 : []).filter((id) => {
+      var _a3;
+      return (_a3 = this.map) == null ? void 0 : _a3.nodes.some((node) => node.id === id);
+    });
+    return ids2.length ? ids2 : this.chatSelectionIds();
+  }
+  /** The AI's highlight (no selection mode) fades 5 s after its work ends; while a chat chain or batch runs it waits. */
+  armHighlightFade(idleSince = null) {
+    if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
+    this.highlightFadeTimer = window.setTimeout(() => {
+      var _a2, _b2;
+      this.highlightFadeTimer = null;
+      if (this.closed || this.selection.state.multiSelectMode || !this.selection.state.multiSelected.size) return;
+      if (!this.selection.isPureHighlight()) {
+        this.aiTargets = null;
+        return;
+      }
+      if (((_a2 = this.chatChainRunner) == null ? void 0 : _a2.current) || ((_b2 = this.plugin.expansionCoordinator) == null ? void 0 : _b2.isRunning(this.multiResearchKey())))
+        return this.armHighlightFade(null);
+      const since = idleSince != null ? idleSince : Date.now();
+      if (Date.now() - since < 5e3) return this.armHighlightFade(since);
+      this.aiTargets = null;
+      this.applySelectionChange(this.selection.clearMulti());
+    }, 1e3);
   }
   /** The chat remembers what it researched; a card researched again moves to the end, and a later failure does not undo a success. */
   /** The user asked for images: the researched topics whose note still has no image, named in one line (failed ones are in the batch box). */
@@ -79995,7 +80050,7 @@ ${note.detail.trim()}` : "",
   }
   /** Selecting cards, and the run actions that start the map's own tasks; both after every write, outside a mutate. */
   async runChatSelection(action, message = "", batch = newChatImageBatch(), held, work, continuation = false) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
     const launch = (work2) => {
@@ -80022,17 +80077,18 @@ ${note.detail.trim()}` : "",
       return ids2.every((id) => !!this.aiLockReason("write", [id], fresh));
     };
     const writesTargets = action.action === "research_standard" || action.action === "expand" || action.action === "find_images";
-    const lockIds = targets.length ? targets : this.chatSelectionIds();
+    const lockIds = targets.length ? targets : this.chatTargetIds();
     if ((writesTargets || action.action === "synthesize" && lockIds.length === 1) && await lockedOnly(lockIds))
       return skipped("ui.ai_locked_notice");
     switch (action.action) {
       case "research_standard": {
         if (targets.length) this.chatSelect(targets);
+        else if (!this.selection.state.multiSelectMode && ((_a2 = this.aiTargets) == null ? void 0 : _a2.length)) this.chatSelect(this.chatTargetIds());
         if (!this.selection.state.multiSelected.size) return skipped("ui.map_chat_skip_unavailable");
         if (this.plugin.expansionCoordinator.isRunning(this.multiResearchKey()))
           return skipped("ui.map_chat_skip_research_running");
         const chat = this.chat;
-        const turns = (_a2 = chat == null ? void 0 : chat.transcript().length) != null ? _a2 : 0;
+        const turns = (_b2 = chat == null ? void 0 : chat.transcript().length) != null ? _b2 : 0;
         const retryModel = action.otherProvider ? this.otherProviderTarget(
           [...this.selection.state.multiSelected].flatMap(
             (id) => {
@@ -80044,12 +80100,13 @@ ${note.detail.trim()}` : "",
         const researchIds = [...this.selection.state.multiSelected];
         const conversation = this.chatConversation;
         const key4 = this.multiResearchKey();
-        const mapSourceGroups = await this.readMapSourceGroups((_b2 = work == null ? void 0 : work.controller.signal) != null ? _b2 : new AbortController().signal);
+        const mapSourceGroups = await this.readMapSourceGroups((_c = work == null ? void 0 : work.controller.signal) != null ? _c : new AbortController().signal);
         const referenceGroups = [...mapSourceGroups, ...this.chatTurnReferences];
+        if (!this.selection.state.multiSelectMode) this.selection.chatSelect(researchIds);
         this.chatStartedResearch = true;
         this.markResearchRecorded(this.chatLastRecord);
         const request = {
-          ...chatResearchRequest(action, (_c = this.map) == null ? void 0 : _c.aiMode, (mode) => aiModeOptions(mode, "research")),
+          ...chatResearchRequest(action, (_d = this.map) == null ? void 0 : _d.aiMode, (mode) => aiModeOptions(mode, "research")),
           ...retryModel ? { model: retryModel } : {},
           batchModel: this.currentModelId()
         };
@@ -80111,7 +80168,7 @@ ${note.detail.trim()}` : "",
         return { status: "done" };
       }
       case "expand": {
-        const ids2 = targets.length ? targets : this.chatSelectionIds();
+        const ids2 = targets.length ? targets : this.chatTargetIds();
         const parents = known(ids2).map((id) => {
           var _a3;
           return (_a3 = this.map) == null ? void 0 : _a3.nodes.find((node) => node.id === id);
@@ -80127,7 +80184,7 @@ ${note.detail.trim()}` : "",
           })
         );
         const expandChat = this.chat;
-        const expandTurns = (_d = expandChat == null ? void 0 : expandChat.transcript().length) != null ? _d : 0;
+        const expandTurns = (_e = expandChat == null ? void 0 : expandChat.transcript().length) != null ? _e : 0;
         const expandRecord = this.chatLastRecord;
         const cards = infos.map(({ parent, note }) => ({
           id: parent.id,
@@ -80181,7 +80238,7 @@ ${note.detail.trim()}` : "",
         return { status: "done", ...allBasis ? { basis: allBasis } : {} };
       }
       case "synthesize":
-        return this.chatSynthesize(targets.length ? targets : this.chatSelectionIds(), message);
+        return this.chatSynthesize(targets.length ? targets : this.chatTargetIds(), message);
       case "rate_by_goal": {
         const goal = action.goal.trim();
         if (!goal || !this.relevanceGradeable()) return skipped("ui.map_chat_skip_unavailable");
@@ -80239,7 +80296,7 @@ ${note.detail.trim()}` : "",
     const map = this.map;
     const chat = this.chat;
     if (!map || !chat) return skipped("ui.map_chat_skip_map_changed");
-    const wanted = targets.length ? targets : this.chatSelectionIds();
+    const wanted = targets.length ? targets : this.chatTargetIds();
     if (!wanted.length) return skipped("ui.map_chat_skip_images_one_card");
     const readsResearch = this.chatStartedResearch || this.chatReadsSources || continuation;
     const found = await this.chatImageFinder.find(map, chat, wanted, direction, readsResearch, batch);

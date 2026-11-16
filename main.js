@@ -31447,7 +31447,7 @@ function parseMapChat(raw, context) {
       if (index >= MAP_CHAT_MAX_ACTIONS) throw new Dropped("too_many");
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new Dropped("bad_item");
       const item = entry;
-      const text10 = (key4, required = true) => {
+      const text10 = (key4, required = true, allowEmpty = false) => {
         const field = item[key4];
         if (field === void 0 || field === null) {
           if (required) throw new Dropped("missing_field");
@@ -31455,7 +31455,7 @@ function parseMapChat(raw, context) {
         }
         if (typeof field !== "string") throw new Dropped("bad_value");
         const trimmed2 = field.trim();
-        if (required && !trimmed2) throw new Dropped("missing_field");
+        if (required && !allowEmpty && !trimmed2) throw new Dropped("missing_field");
         return trimmed2;
       };
       const rawText = (key4) => {
@@ -31545,7 +31545,7 @@ function parseMapChat(raw, context) {
           actions.push({ kind: "update_summary", nodeId: node("nodeId"), summary: text10("summary") });
           break;
         case "edit_topic_note":
-          actions.push({ kind: "edit_topic_note", nodeId: node("nodeId"), detail: text10("detail") });
+          actions.push({ kind: "edit_topic_note", nodeId: node("nodeId"), detail: text10("detail", true, true) });
           break;
         case "move_topic": {
           const nodeId = node("nodeId"), newParentId = node("newParentId", true);

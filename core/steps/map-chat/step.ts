@@ -511,7 +511,8 @@ export function parseMapChat(
       if (index >= MAP_CHAT_MAX_ACTIONS) throw new Dropped("too_many");
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new Dropped("bad_item");
       const item = entry as Record<string, unknown>;
-      const text = (key: string, required = true): string => {
+      /** `allowEmpty`: the field must be present as a string, but an empty one is a value (clearing a note body), not a missing field. */
+      const text = (key: string, required = true, allowEmpty = false): string => {
         const field = item[key];
         if (field === undefined || field === null) {
           if (required) throw new Dropped("missing_field");
@@ -519,7 +520,7 @@ export function parseMapChat(
         }
         if (typeof field !== "string") throw new Dropped("bad_value");
         const trimmed = field.trim();
-        if (required && !trimmed) throw new Dropped("missing_field");
+        if (required && !allowEmpty && !trimmed) throw new Dropped("missing_field");
         return trimmed;
       };
       const rawText = (key: string): string => {
@@ -616,7 +617,7 @@ export function parseMapChat(
           actions.push({ kind: "update_summary", nodeId: node("nodeId"), summary: text("summary") });
           break;
         case "edit_topic_note":
-          actions.push({ kind: "edit_topic_note", nodeId: node("nodeId"), detail: text("detail") });
+          actions.push({ kind: "edit_topic_note", nodeId: node("nodeId"), detail: text("detail", true, true) });
           break;
         case "move_topic": {
           const nodeId = node("nodeId"),

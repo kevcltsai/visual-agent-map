@@ -16,8 +16,8 @@ import {
   type ResearchSteer
 } from "../../ai/research-observer";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
-import { guardInlineHtmlLinks } from "../../ai/markdown-blocks";
-import { dedupeImageEmbeds, imageKeysIn } from "../../core/image-keys";
+import { intakeAiMarkdown } from "../../ai/markdown-intake";
+import { imageKeysIn } from "../../core/image-keys";
 import { checkCounts, standardTemplate } from "../../ai/detail-templates";
 import { carryForwardSources } from "../../core/steps/task/carry-sources";
 import { keepDroppedContent } from "../../core/steps/task/merge-check";
@@ -907,8 +907,6 @@ export class TopicRuns {
       const raw = await this.snapshotRaw(original, path, options);
       const save = async (summary: string, draft: string): Promise<void> =>
         this.ports.mutate()(async () => {
-          // New AI text only: a line it starts with an inline tag would stop Obsidian's editor from parsing the note.
-          const detail = guardInlineHtmlLinks(draft);
           if (signal.aborted || prepared.viewChanged()) throw changed();
           if (await prepared.sourcesChanged()) throw changed();
           const latest = await repo.readNote(path, options.map());
@@ -929,7 +927,7 @@ export class TopicRuns {
               path,
               oldDetail: latest.detail,
               // Appended on top: the old Detail stays, so an image it has is not embedded again.
-              aiDetail: dedupeImageEmbeds(detail, { seen: imageKeysIn(latest.detail) }),
+              aiDetail: intakeAiMarkdown(draft, { kind: "task-detail", seenImages: imageKeysIn(latest.detail) }),
               summary,
               template: detailTemplate,
               language: noteLanguage,
@@ -941,34 +939,40 @@ export class TopicRuns {
             written = composed.detail;
             record = composed.record;
           } else {
-            const canonicalOnly = canonicalDetail(detail, noteLanguage, detailTemplate);
+            // "AI suggested" later research does not add a sources section to a note that has none (the section list stays).
+            const keepsSections =
+              (context.aiSections === "follow" || context.aiSections === "general") &&
+              !detailTemplate.sections.some(section => section.role === "sources");
+            let canonicalOnly = "";
+            // New AI text only (a line it starts with an inline tag would stop Obsidian's editor from parsing the note);
+            // a full rewrite: only a repeat inside the new Detail is dropped.
+            const aiDetail = intakeAiMarkdown(draft, {
+              kind: "task-detail",
+              compose: guarded => {
+                canonicalOnly = canonicalDetail(guarded, noteLanguage, detailTemplate);
+                // Links the parent's earlier research had and the rewrite dropped are kept (no AI call; part of the saved detail).
+                // "Only the new content" does not read the old Detail, so nothing is carried there.
+                return mode === "fresh" || keepsSections
+                  ? canonicalOnly
+                  : carryForwardSources(
+                      canonicalOnly,
+                      [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
+                      [summary, canonicalOnly, references],
+                      outputLanguage,
+                      detailTemplate
+                    );
+              }
+            });
             // An edited draft is checked again so the topic's format mark matches what is saved.
             issues =
               result.formatIssues && draft !== result.detail
                 ? checkCounts(canonicalOnly, detailTemplate)
                 : result.formatIssues;
-            // Links the parent's earlier research had and the rewrite dropped are kept (no AI call; part of the saved detail).
-            // "Only the new content" does not read the old Detail, so nothing is carried there.
-            // "AI suggested" later research does not add a sources section to a note that has none (the section list stays).
-            const keepsSections =
-              (context.aiSections === "follow" || context.aiSections === "general") &&
-              !detailTemplate.sections.some(section => section.role === "sources");
-            const carried =
-              mode === "fresh" || keepsSections
-                ? canonicalOnly
-                : carryForwardSources(
-                    canonicalOnly,
-                    [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
-                    [summary, canonicalOnly, references],
-                    outputLanguage,
-                    detailTemplate
-                  );
             const composed = await this.composeWrite({
               mode,
               path,
               oldDetail: latest.detail,
-              // A full rewrite: only a repeat inside the new Detail is dropped.
-              aiDetail: dedupeImageEmbeds(carried),
+              aiDetail,
               summary,
               template: detailTemplate,
               language: noteLanguage,
@@ -1444,29 +1448,35 @@ export class TopicRuns {
           const mode: WritebackMode = writeContext.updateMode ?? "merge";
           const writeLanguage = noteLanguageOf(context.outputLanguage ?? settings().language);
           // top gets the raw reply (new findings only); merge and fresh get the canonical Detail.
-          const fresh = guardInlineHtmlLinks(result.detail);
-          let aiDetail = mode === "top" ? fresh : canonicalDetail(fresh, writeLanguage, writeContext.detailTemplate);
-          // "AI suggested" later research (or a note whose sections cannot be followed): the numbers and links the rewrite
-          // dropped are put back from the Detail this run started from; the write is never refused for it.
-          if (
-            (context.aiSections === "follow" || context.aiSections === "general") &&
-            mode === "merge" &&
-            latest.detail.trim()
-          ) {
-            const kept = keepDroppedContent({
-              oldDetail: latest.detail,
-              newDetail: aiDetail,
-              summary: result.summary,
-              references: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
-              template: writeContext.detailTemplate ?? standardTemplate(writeLanguage),
-              language: writeLanguage
-            });
-            aiDetail = kept.detail;
-            if (kept.restored > 0) options.notify?.(t("ui.note_style_restored_0", kept.restored));
-          }
           // Images: "top" keeps the old Detail, so its images count as seen; a full rewrite replaces it, so only repeats
           // inside the new Detail are dropped.
-          aiDetail = dedupeImageEmbeds(aiDetail, { seen: mode === "top" ? imageKeysIn(latest.detail) : [] });
+          const aiDetail = intakeAiMarkdown(result.detail, {
+            kind: "task-detail",
+            seenImages: mode === "top" ? imageKeysIn(latest.detail) : undefined,
+            compose: fresh => {
+              let composed =
+                mode === "top" ? fresh : canonicalDetail(fresh, writeLanguage, writeContext.detailTemplate);
+              // "AI suggested" later research (or a note whose sections cannot be followed): the numbers and links the rewrite
+              // dropped are put back from the Detail this run started from; the write is never refused for it.
+              if (
+                (context.aiSections === "follow" || context.aiSections === "general") &&
+                mode === "merge" &&
+                latest.detail.trim()
+              ) {
+                const kept = keepDroppedContent({
+                  oldDetail: latest.detail,
+                  newDetail: composed,
+                  summary: result.summary,
+                  references: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
+                  template: writeContext.detailTemplate ?? standardTemplate(writeLanguage),
+                  language: writeLanguage
+                });
+                composed = kept.detail;
+                if (kept.restored > 0) options.notify?.(t("ui.note_style_restored_0", kept.restored));
+              }
+              return composed;
+            }
+          });
           const composed = await this.composeWrite({
             mode,
             path,

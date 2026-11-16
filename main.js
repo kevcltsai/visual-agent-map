@@ -40423,7 +40423,6 @@ var TopicRuns = class {
       const raw = await this.snapshotRaw(original, path, options);
       const save = async (summary, draft) => this.ports.mutate()(async () => {
         var _a3, _b3;
-        const detail = guardInlineHtmlLinks(draft);
         if (signal.aborted || prepared.viewChanged()) throw changed();
         if (await prepared.sourcesChanged()) throw changed();
         const latest = await repo.readNote(path, options.map());
@@ -40442,7 +40441,7 @@ var TopicRuns = class {
             path,
             oldDetail: latest.detail,
             // Appended on top: the old Detail stays, so an image it has is not embedded again.
-            aiDetail: dedupeImageEmbeds(detail, { seen: imageKeysIn(latest.detail) }),
+            aiDetail: intakeAiMarkdown(draft, { kind: "task-detail", seenImages: imageKeysIn(latest.detail) }),
             summary,
             template: detailTemplate,
             language: noteLanguage,
@@ -40454,22 +40453,27 @@ var TopicRuns = class {
           written2 = composed.detail;
           record = composed.record;
         } else {
-          const canonicalOnly = canonicalDetail(detail, noteLanguage, detailTemplate);
-          issues = result.formatIssues && draft !== result.detail ? checkCounts(canonicalOnly, detailTemplate) : result.formatIssues;
           const keepsSections = (context.aiSections === "follow" || context.aiSections === "general") && !detailTemplate.sections.some((section3) => section3.role === "sources");
-          const carried = mode === "fresh" || keepsSections ? canonicalOnly : carryForwardSources(
-            canonicalOnly,
-            [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
-            [summary, canonicalOnly, references2],
-            outputLanguage2,
-            detailTemplate
-          );
+          let canonicalOnly = "";
+          const aiDetail = intakeAiMarkdown(draft, {
+            kind: "task-detail",
+            compose: (guarded) => {
+              canonicalOnly = canonicalDetail(guarded, noteLanguage, detailTemplate);
+              return mode === "fresh" || keepsSections ? canonicalOnly : carryForwardSources(
+                canonicalOnly,
+                [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
+                [summary, canonicalOnly, references2],
+                outputLanguage2,
+                detailTemplate
+              );
+            }
+          });
+          issues = result.formatIssues && draft !== result.detail ? checkCounts(canonicalOnly, detailTemplate) : result.formatIssues;
           const composed = await this.composeWrite({
             mode,
             path,
             oldDetail: latest.detail,
-            // A full rewrite: only a repeat inside the new Detail is dropped.
-            aiDetail: dedupeImageEmbeds(carried),
+            aiDetail,
             summary,
             template: detailTemplate,
             language: noteLanguage,
@@ -40851,7 +40855,7 @@ var TopicRuns = class {
       steerObserver(observer, options.steer)
     ).then(
       (result) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m, _n;
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l;
         progress == null ? void 0 : progress.end(path, progressAttempt);
         const latest = await repo.readNote(path, options.map);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
@@ -40872,28 +40876,34 @@ var TopicRuns = class {
         if (result.aiSectionsFallback) (_c2 = options.notify) == null ? void 0 : _c2.call(options, t("ui.note_style_ai_sections_invalid"));
         const mode = (_d2 = writeContext.updateMode) != null ? _d2 : "merge";
         const writeLanguage = noteLanguageOf((_e2 = context.outputLanguage) != null ? _e2 : settings().language);
-        const fresh = guardInlineHtmlLinks(result.detail);
-        let aiDetail = mode === "top" ? fresh : canonicalDetail(fresh, writeLanguage, writeContext.detailTemplate);
-        if ((context.aiSections === "follow" || context.aiSections === "general") && mode === "merge" && latest.detail.trim()) {
-          const kept = keepDroppedContent({
-            oldDetail: latest.detail,
-            newDetail: aiDetail,
-            summary: result.summary,
-            references: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2)),
-            template: (_f2 = writeContext.detailTemplate) != null ? _f2 : standardTemplate(writeLanguage),
-            language: writeLanguage
-          });
-          aiDetail = kept.detail;
-          if (kept.restored > 0) (_g2 = options.notify) == null ? void 0 : _g2.call(options, t("ui.note_style_restored_0", kept.restored));
-        }
-        aiDetail = dedupeImageEmbeds(aiDetail, { seen: mode === "top" ? imageKeysIn(latest.detail) : [] });
+        const aiDetail = intakeAiMarkdown(result.detail, {
+          kind: "task-detail",
+          seenImages: mode === "top" ? imageKeysIn(latest.detail) : void 0,
+          compose: (fresh) => {
+            var _a4, _b4;
+            let composed2 = mode === "top" ? fresh : canonicalDetail(fresh, writeLanguage, writeContext.detailTemplate);
+            if ((context.aiSections === "follow" || context.aiSections === "general") && mode === "merge" && latest.detail.trim()) {
+              const kept = keepDroppedContent({
+                oldDetail: latest.detail,
+                newDetail: composed2,
+                summary: result.summary,
+                references: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2)),
+                template: (_a4 = writeContext.detailTemplate) != null ? _a4 : standardTemplate(writeLanguage),
+                language: writeLanguage
+              });
+              composed2 = kept.detail;
+              if (kept.restored > 0) (_b4 = options.notify) == null ? void 0 : _b4.call(options, t("ui.note_style_restored_0", kept.restored));
+            }
+            return composed2;
+          }
+        });
         const composed = await this.composeWrite({
           mode,
           path,
           oldDetail: latest.detail,
           aiDetail,
           summary: result.summary,
-          template: (_h2 = writeContext.detailTemplate) != null ? _h2 : standardTemplate(writeLanguage),
+          template: (_f2 = writeContext.detailTemplate) != null ? _f2 : standardTemplate(writeLanguage),
           language: writeLanguage,
           signal: controller.signal,
           hooks: options,
@@ -40901,7 +40911,7 @@ var TopicRuns = class {
         });
         if (!composed.ok) {
           await repo.updateNote(path, { status: note.status });
-          if (exchangeId) (_i = exchanges()) == null ? void 0 : _i.failed(exchangeId, composed.message);
+          if (exchangeId) (_g2 = exchanges()) == null ? void 0 : _g2.failed(exchangeId, composed.message);
           fail3(composed.message);
           return;
         }
@@ -40920,21 +40930,21 @@ var TopicRuns = class {
           { detailTemplate: writeContext.detailTemplate, newVisualReferences: true }
         );
         const saved = await repo.readNote(path, options.map);
-        (_j = options.onWritten) == null ? void 0 : _j.call(options, { before: { ...latest, status: note.status }, after: saved });
-        if (exchangeId) (_k = exchanges()) == null ? void 0 : _k.completed(exchangeId);
+        (_h2 = options.onWritten) == null ? void 0 : _h2.call(options, { before: { ...latest, status: note.status }, after: saved });
+        if (exchangeId) (_i = exchanges()) == null ? void 0 : _i.completed(exchangeId);
         this.ports.clearOtherHistory(options.origin);
-        (_m = options.queueCharts) == null ? void 0 : _m.call(options, {
+        (_k = options.queueCharts) == null ? void 0 : _k.call(options, {
           path,
           saved,
           context: writeContext,
           detail: saved.detail,
           formatIssues: mode === "top" ? [] : result.formatIssues,
           model: used.model,
-          language: (_l = context.outputLanguage) != null ? _l : settings().language,
+          language: (_j = context.outputLanguage) != null ? _j : settings().language,
           template: writeContext.detailTemplate,
           ...mode === "top" ? this.chartGuard(mode, composed.record) : {}
         });
-        (_n = options.done) == null ? void 0 : _n.call(options, result);
+        (_l = options.done) == null ? void 0 : _l.call(options, result);
       })
     ).catch(
       (error) => this.ports.mutate()(async () => {

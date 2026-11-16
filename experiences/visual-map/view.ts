@@ -19124,6 +19124,8 @@ export class VisualAgentMapView extends ItemView {
       },
       selectedIds: () => this.chatSelectionIds(),
       send: () => {
+        // A new message of the user starts a new piece of work: the AI's earlier picks no longer stand in for "the selection".
+        this.aiTargets = null;
         void this.sendMapChat();
       },
       stop: () => this.stopMapChat(),
@@ -21145,6 +21147,7 @@ export class VisualAgentMapView extends ItemView {
   /** The cards the AI picked last: an action with no cards named works on these, not on what the user clicked meanwhile. */
   private aiTargets: string[] | null = null;
   private chatTargetIds(): string[] {
+    if (this.selection.state.multiSelectMode) return this.chatSelectionIds();
     const ids = (this.aiTargets ?? []).filter(id => this.map?.nodes.some(node => node.id === id));
     return ids.length ? ids : this.chatSelectionIds();
   }
@@ -21155,6 +21158,11 @@ export class VisualAgentMapView extends ItemView {
     this.highlightFadeTimer = window.setTimeout(() => {
       this.highlightFadeTimer = null;
       if (this.closed || this.selection.state.multiSelectMode || !this.selection.state.multiSelected.size) return;
+      // The user took over (a Cmd-click, a marquee): what is selected is theirs now and stays.
+      if (!this.selection.isPureHighlight()) {
+        this.aiTargets = null;
+        return;
+      }
       if (this.chatChainRunner?.current || this.plugin.expansionCoordinator?.isRunning(this.multiResearchKey()))
         return this.armHighlightFade(null);
       const since = idleSince ?? Date.now();
@@ -21351,7 +21359,7 @@ export class VisualAgentMapView extends ItemView {
     switch (action.action) {
       case "research_standard": {
         if (targets.length) this.chatSelect(targets);
-        else if (this.aiTargets?.length) this.chatSelect(this.chatTargetIds());
+        else if (!this.selection.state.multiSelectMode && this.aiTargets?.length) this.chatSelect(this.chatTargetIds());
         if (!this.selection.state.multiSelected.size) return skipped("ui.map_chat_skip_unavailable");
         // A batch already running is told in the result, not only by the Notice the research itself shows.
         if (this.plugin.expansionCoordinator.isRunning(this.multiResearchKey()))

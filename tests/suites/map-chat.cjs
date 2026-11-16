@@ -914,6 +914,18 @@ integrationTest('map chat: a card the user clicks after the AI picked cards does
   assert.equal(started.length, 1); eq(started[0].selected.sort(), [a, b].sort(), 'the AI picked a and b; the click on c did not replace them');
 });
 
+integrationTest('map chat: in a manual selection mode an action that names no card works on the user selection, not the AI earlier pick', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const started = [];
+  h.view.startMultiResearch = async request => { started.push({ request, selected: [...h.view.selection.state.multiSelected] }); };
+  const [a, b, c] = Object.values(h.ids);
+  h.view.chatSelect([a]);
+  h.view.selection.selectSubtopics([b, c]);
+  const lines = await apply(h, [{ kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '' }]);
+  eq(lines.map(l => l.status), ['done']); await tick();
+  eq(started[0].selected.sort(), [b, c].sort(), 'the user picked b and c in selection mode; the earlier AI pick a does not replace them');
+});
+
 integrationTest('map chat: select_topics(all) then research_standard starts the research once on every topic (Quick when nothing names a mode), outside any mutate', async () => {
   const h = await harness(); await h.view.hydrate();
   const started = [];

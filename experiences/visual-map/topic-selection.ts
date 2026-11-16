@@ -74,6 +74,10 @@ export class TopicSelection {
   private tabStop: string | null = null;
   /** What the AI's last pick was while no selection mode was on; it is still "pure" only while the multi set is exactly that. */
   private highlight: Set<string> | null = null;
+  /** True while the multi set is still exactly what the AI picked, with no selection mode on. */
+  isPureHighlight(): boolean {
+    return this.pureHighlight().length > 0;
+  }
   private pureHighlight(): string[] {
     const h = this.highlight;
     if (this.mode || !h || h.size !== this.multi.size || [...h].some(id => !this.multi.has(id))) return [];

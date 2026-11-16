@@ -325,6 +325,17 @@ test('a Cmd-click or marquee after the AI highlight drops the highlight instead 
   m.marquee(['y'], 'enter', MAP);
   assert.deepEqual(st(m).multi, ['y']);
 });
+test('isPureHighlight: true only while the multi set is exactly the AI pick and no mode is on', () => {
+  const s = seeded({});
+  s.chatSelect(['b', 'c']);
+  assert.equal(s.isPureHighlight(), true);
+  s.cmdClick('y', MAP);
+  assert.equal(s.isPureHighlight(), false);
+  const t = seeded({});
+  t.chatSelect(['b']);
+  t.click('z');
+  assert.equal(t.isPureHighlight(), false);
+});
 test('exitMultiSelect backgroundRun keeps the AI highlight when no selection mode is on', () => {
   const s = seeded({ multi: ['b', 'c'] });
   assert.equal(s.exitMultiSelect('backgroundRun').touched.length, 0);

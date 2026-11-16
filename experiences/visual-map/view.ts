@@ -39,23 +39,19 @@ import {
   updateTextNode,
   addAnchor,
   addAnchorRelation,
-  anchorRelationAllowed,
   anchorRelationsForTopic,
   ANCHOR_LIMIT,
   convertToAnnotatedImage,
   convertToPlainImage,
   isImage2dAnchor,
   removeAnchor,
-  removeAnchorRelation,
   updateAnchor,
-  updateAnchorRelation,
   findAnnotatedImage,
   isAnnotatedImage,
   setImageNote,
   IMAGE_MIN_SIZE,
   LINK_LIMIT,
   TEXT_LIMIT,
-  type AnchorRelation,
   type AnnotatedImageItem,
   type BoundaryItem,
   type CanvasItem,
@@ -64,13 +60,7 @@ import {
   type SummaryRefusal,
   type TextItem
 } from "./canvas-items";
-import {
-  AnchorModal,
-  AnchorPickModal,
-  ImageNoteModal,
-  type AnchorPickEntry,
-  type AnchorTarget
-} from "./annotated-image-modals";
+import { AnchorModal, ImageNoteModal, type AnchorTarget } from "./annotated-image-modals";
 import {
   avoidBracketObstacles,
   bracketGeometry,
@@ -132,6 +122,15 @@ import {
   type ChatRun
 } from "./chat-action-writer";
 import { TopicSelection, type SelectionChange } from "./topic-selection";
+import {
+  anchorLineKey,
+  RELATION_NAME_KEY,
+  relationIdentity,
+  relationPairKey,
+  RelationEditor,
+  type RelationEditorPorts,
+  type RelationListFocus
+} from "./relation-editor";
 import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/background-run";
 import { withThinkingOrigin } from "./thinking-origin";
 import { formatIssuesPatch, originBaseline, summaryForPrompt } from "./note-write-helpers";
@@ -275,11 +274,8 @@ import {
   descendants,
   History,
   inheritModel,
-  legalRelationTargets,
   type MapDocument,
   type MapNode,
-  normalizeRelationDescription,
-  RELATION_DESCRIPTION_MAX_LENGTH,
   parentIdsForNode,
   removeNodes,
   removeRelationsForTopics,
@@ -856,7 +852,6 @@ function argumentTipPath(x: number, y: number): SVGPathElement {
 }
 /** Unique ids for the arrowhead `<marker>`s: two map tabs share one document, so an id must belong to one view. */
 let relationMarkerSequence = 0;
-let relationSwatchSequence = 0;
 /** The structure dialog lists the types in the order of spec section 2 (not TOPIC_KINDS order, which the menus keep). */
 const KIND_PICKER_ORDER: readonly TopicKind[] = ["topic", "atomic", "hypothesis", "evidence", "conclusion", "action"];
 type CardBox = RelationBox;
@@ -903,8 +898,6 @@ interface AnchorLine {
   /** The picture when the line belongs to a ring card (straight line, map units); absent for a curved line. */
   image?: RingRect;
 }
-const anchorLineKey = (imageId: string, anchorId: string, topicId: string): string =>
-  `anchor:${imageId}:${anchorId}:${topicId}`;
 const BOUNDARY_PAD = 16;
 /**
  * The lines of an exported text block. The block's real horizontal padding + border is 14, and the exporter's width guess runs wider than
@@ -931,34 +924,6 @@ const boxOf = (card: HTMLElement): CardBox => ({
   width: card.offsetWidth,
   height: card.offsetHeight
 });
-
-const RELATION_KINDS: readonly TopicRelationKind[] = [
-  "supports",
-  "contradicts",
-  "verifies",
-  "derives_from",
-  "related",
-  "prerequisite"
-];
-/** One sentence per kind, "A ... B" with A the source and B the target, worded for each language rather than by word order. */
-const RELATION_SENTENCE_KEY: Record<Exclude<TopicRelationKind, "related">, Parameters<typeof t>[0]> = {
-  supports: "ui.relation_sentence_supports_0_1",
-  contradicts: "ui.relation_sentence_contradicts_0_1",
-  verifies: "ui.relation_sentence_verifies_0_1",
-  derives_from: "ui.relation_sentence_derives_from_0_1",
-  prerequisite: "ui.relation_sentence_prerequisite_0_1"
-};
-const RELATION_NAME_KEY: Record<TopicRelationKind, Parameters<typeof t>[0]> = {
-  supports: "ui.relation_name_supports",
-  contradicts: "ui.relation_name_contradicts",
-  verifies: "ui.relation_name_verifies",
-  derives_from: "ui.relation_name_derives_from",
-  related: "ui.relation_name_related",
-  prerequisite: "ui.relation_name_prerequisite"
-};
-/** The key a relation line is known by (view state only): `from`, `to` and kind. */
-const relationIdentity = (r: Pick<TopicRelation, "kind" | "from" | "to">): string =>
-  `${r.from}\u0000${r.to}\u0000${r.kind}`;
 
 /**
  * The options a chat integration runs with: what the integration dialog hands over when its fields are left as they come up
@@ -1093,11 +1058,6 @@ class MapSourceWriteError extends Error {
   }
 }
 let mapChatTaskSequence = 0;
-
-/** The same key for both directions: a pair of topics holds one relation (spec V1.7). */
-function relationPairKey(a: string, b: string): string {
-  return a < b ? `${a}|${b}` : `${b}|${a}`;
-}
 
 /** The map actions the command palette offers (`VisualAgentMapView.mapCommand`). */
 export type MapCommandAction =
@@ -1331,6 +1291,8 @@ export class VisualAgentMapView extends ItemView {
   private readonly chatChainRunner = new MapChatChainRunner(this.chatChainPorts());
   /** The plan flow of the chat (plan card, Apply, Cancel) and its state; the module lives and dies with the view. */
   private readonly mapChatConversation = new MapChatConversation(this.mapChatConversationPorts());
+  /** The relation list, both relation editor dialogs and the anchor pick dialog; the module lives and dies with the view. */
+  private readonly relationEditor = new RelationEditor(this.relationEditorPorts());
   // The runner's chain under its old name (the `?.` is for fixtures that never ran the constructor).
   private get chatChain(): ChatChainRun | null {
     return this.chatChainRunner?.current ?? null;
@@ -16586,68 +16548,6 @@ export class VisualAgentMapView extends ItemView {
       );
     }, false);
   }
-  /**
-   * "This card [relation ▾] → [another card ▾] [Add]": one sentence adds a relation A -> B. The card list holds only
-   * legal targets (never this card itself, never a card already linked to it, never a cycle), so it is refilled when
-   * the relation changes. Adding goes through `addRelation`, so Map.md is written exactly as before.
-   */
-  private renderRelationAddRow(
-    parent: HTMLElement,
-    node: MapNode,
-    onAdded: () => void,
-    exposeFirst: (control: HTMLElement) => void,
-    close?: () => void
-  ): void {
-    const row = parent.createDiv("vam-relation-add");
-    row.setAttr("role", "group");
-    row.setAttr("aria-label", t("ui.relation_add_row"));
-    row.createSpan({ text: t("ui.relation_this_card"), cls: "vam-relation-add-self" });
-    const kindSelect = row.createEl("select", { cls: "dropdown vam-relation-add-kind" });
-    kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
-    for (const kind of RELATION_KINDS) kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
-    exposeFirst(kindSelect);
-    row.createSpan({ text: "→", cls: "vam-relation-add-arrow", attr: { "aria-hidden": "true" } });
-    const currentKind = (): TopicRelationKind => (kindSelect.value as TopicRelationKind) || RELATION_KINDS[0];
-    // The list holds only the cards this card may be linked to with the chosen relation; it is read when the list opens.
-    const legalSources = (): CardSearchSource[] => {
-      const legal = this.map ? new Set(legalRelationTargets(this.map, currentKind(), node.id)) : new Set<string>();
-      return this.cardSearchSources(item => item.id !== node.id && legal.has(item.id));
-    };
-    const field = createCardSearchField({
-      app: this.app,
-      parent: row,
-      placeholder: t("ui.relation_search_placeholder"),
-      ariaLabel: t("ui.relation_target_label"),
-      candidates: legalSources,
-      onSelect: item => {
-        const kind = currentKind();
-        field.setValue("");
-        this.enqueue(async () => {
-          await this.addRelation(node.id, item.id, kind);
-          onAdded();
-        });
-      }
-    });
-    const refresh = (): void => {
-      field.setValue("");
-      const none = !legalSources().length;
-      field.setDisabled(
-        none,
-        none ? t("ui.no_relation_target_0", t(RELATION_NAME_KEY[currentKind()])) : t("ui.relation_search_placeholder")
-      );
-    };
-    refresh();
-    kindSelect.addEventListener("change", refresh);
-    // A second way to add: a point on an annotated image, a quiet link under the row (after the search, so the keyboard reaches it in order).
-    if (this.anchorRelationsEditable()) {
-      const point = parent.createEl("button", {
-        text: t("ui.anchor_relation_add_button"),
-        cls: "vam-relation-add-anchor"
-      });
-      point.type = "button";
-      point.addEventListener("click", () => this.openAnchorPick(node, currentKind, onAdded, close));
-    }
-  }
   /** Rows for a card search: the cards `include` keeps, each with its title and the titles above it. */
   private cardSearchSources(
     include: (node: MapNode) => boolean,
@@ -16667,544 +16567,17 @@ export class VisualAgentMapView extends ItemView {
   private anchorRelationsEditable(): boolean {
     return this.relationsEnabled() && this.canEditCanvasItems();
   }
-  /** The dialog behind "Point on an image…": the existing anchors of every annotated image, and "Place a new point". */
-  private openAnchorPick(node: MapNode, kind: () => TopicRelationKind, onAdded: () => void, close?: () => void): void {
-    if (!this.anchorRelationsEditable()) return;
-    const items = this.map?.canvasItems ?? [],
-      entries: AnchorPickEntry[] = [];
-    for (const item of items) {
-      if (!isAnnotatedImage(item)) continue;
-      const name = item.note || (item.path.split("/").pop() ?? item.path);
-      for (const anchor of item.anchors) {
-        if (!isImage2dAnchor(anchor)) continue;
-        entries.push({
-          imageId: item.id,
-          anchorId: anchor.id,
-          label: t("ui.anchor_pick_entry_0_1", name, anchor.note || t("ui.anchor_label_empty")),
-          taken: (item.relations ?? []).some(
-            r => (r.from === anchor.id && r.to === node.id) || (r.to === anchor.id && r.from === node.id)
-          )
-        });
-      }
-    }
-    new AnchorPickModal(
-      this.app,
-      entries,
-      items.some(item => isAnnotatedImage(item)),
-      entry =>
-        this.enqueue(async () => {
-          const relation = { kind: kind(), from: entry.anchorId, to: node.id };
-          const image = findAnnotatedImage(this.map?.canvasItems ?? [], entry.imageId);
-          if (!image || !anchorRelationAllowed(image, relation)) {
-            new Notice(t("ui.anchor_relation_not_added"));
-            return;
-          }
-          await this.changeCanvasItems(entry.imageId, list => addAnchorRelation(list, entry.imageId, relation));
-          onAdded();
-        }),
-      () => {
-        close?.();
-        this.startPickingAnchorImage(node.id, kind());
-      }
-    ).open();
+  /** The relation editor dialog for `link` (the canvas line click and the panel pencil open it; see {@link RelationEditor}). */
+  private openRelationEditor(link: TopicRelation, onChanged?: () => void, onClosed?: () => void): void {
+    this.relationEditor.openRelationEditor(link, onChanged, onClosed);
   }
-  /** "Annotated image · <anchor note>" (or the empty form) for the anchor `anchorId` of image `imageId`. */
-  private anchorEndText(imageId: string, anchorId: string): string {
-    const note = findAnnotatedImage(this.map?.canvasItems ?? [], imageId)?.anchors.find(a => a.id === anchorId)?.note;
-    return note ? t("ui.anchor_relation_end_0", note) : t("ui.anchor_relation_end_empty");
-  }
-  /** A panel row of an anchor relation: "Kind ← Annotated image · note" (the anchor is the source), "→" (it is the target), "—" for related. */
-  private anchorRelationRowText(ref: { imageId: string; anchorId: string; relation: AnchorRelation }): string {
-    const name = t(RELATION_NAME_KEY[ref.relation.kind]),
-      end = this.anchorEndText(ref.imageId, ref.anchorId);
-    // The owner-approved design shows the stored direction for every kind, "related" included ("Related ← Annotated image · x").
-    return t(
-      ref.relation.from === ref.anchorId ? "ui.anchor_relation_row_in_0_1" : "ui.anchor_relation_row_out_0_1",
-      name,
-      end
-    );
-  }
-  /** The text of a panel row for `link` seen from `selfId`: "Name → B" going out, "A → Name" coming in, "Name — X" for related. */
-  private relationRowText(link: TopicRelation, selfId: string): string {
-    const name = t(RELATION_NAME_KEY[link.kind]),
-      titleOf = (id: string): string => this.notes.get(id)?.title ?? id;
-    if (link.kind === "related")
-      return t("ui.relation_row_related_0_1", name, titleOf(link.from === selfId ? link.to : link.from));
-    return link.from === selfId
-      ? t("ui.relation_row_out_0_1", name, titleOf(link.to))
-      : t("ui.relation_row_in_0_1", titleOf(link.from), name);
-  }
-  /**
-   * One anchor relation in a topic's panel (the topic is the other end). The row reads "Kind ← Annotated image · note"; a click
-   * on it (or its pencil) opens the anchor relation editor, the trash removes it (the anchor stays). A map that cannot be
-   * edited shows the row alone. Everything the user typed goes in as text.
-   */
-  private renderAnchorRelationRow(
-    list: HTMLElement,
-    node: MapNode,
-    ref: { imageId: string; anchorId: string; relation: AnchorRelation },
-    repaint: () => void,
-    editButtons: Map<string, HTMLElement>
-  ): void {
-    const key = anchorLineKey(ref.imageId, ref.anchorId, node.id),
-      text = this.anchorRelationRowText(ref),
-      described = ref.relation.description ? `${text}. ${ref.relation.description}` : text,
-      end = { imageId: ref.imageId, anchorId: ref.anchorId, topicId: node.id };
-    const row = list.createEl("li", { cls: "vam-relation-row vam-anchor-relation-row" });
-    this.bindRelationRow(row, ref.relation, described, key);
-    this.relationSwatch(row, ref.relation.kind);
-    const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
-    label.createSpan({ text, cls: "vam-relation-sentence", attr: { dir: "auto" } });
-    if (ref.relation.description)
-      label.createSpan({ text: ref.relation.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
-    if (!this.anchorRelationsEditable()) return;
-    const tools = row.createSpan({ cls: "vam-relation-tools" });
-    const reopen = (): void => editButtons.get(key)?.focus();
-    row.addEventListener("click", event => {
-      if (tools.contains?.(event.target as Node)) return;
-      this.openAnchorRelationEditor(end, repaint, reopen);
-    });
-    editButtons.set(
-      key,
-      this.iconButton(tools, "pencil", t("ui.edit_relation_0", text), () =>
-        this.openAnchorRelationEditor(end, repaint, reopen)
-      )
-    );
-    this.iconButton(tools, "trash-2", t("ui.remove_relation_0", text), () =>
-      this.enqueue(async () => {
-        await this.changeCanvasItems(ref.imageId, items =>
-          removeAnchorRelation(items, ref.imageId, ref.anchorId, node.id)
-        );
-        repaint();
-      })
-    );
-  }
-  /** The anchor relation editor in a dialog; the same host and close-time save as {@link openRelationEditor}. */
+  /** The anchor relation editor dialog (see {@link RelationEditor}). */
   private openAnchorRelationEditor(
     ref: { imageId: string; anchorId: string; topicId: string },
     onChanged?: () => void,
     onClosed?: () => void
   ): void {
-    if (!this.anchorRelationsEditable()) return;
-    let saveNote = (): Promise<void> => Promise.resolve();
-    const render = (content: HTMLElement, close: () => void): void => {
-      saveNote = this.renderAnchorRelationEditor(content, ref, close, onChanged);
-    };
-    new (class extends Modal {
-      onOpen(): void {
-        this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
-        render(this.contentEl, () => this.close());
-      }
-      onClose(): void {
-        void saveNote().then(() => {
-          if (onClosed) window.setTimeout(onClosed, 0);
-        });
-      }
-    })(this.app).open();
-  }
-  /** The relation of this (anchor, topic) pair as the map holds it now. */
-  private anchorRelationOf(ref: { imageId: string; anchorId: string; topicId: string }): AnchorRelation | undefined {
-    return findAnnotatedImage(this.map?.canvasItems ?? [], ref.imageId)?.relations?.find(
-      r => (r.from === ref.anchorId && r.to === ref.topicId) || (r.from === ref.topicId && r.to === ref.anchorId)
-    );
-  }
-  /**
-   * The editor of an anchor relation: type, reverse, a one-line note and delete (the anchor stays). Each change is one undo
-   * step written at once (the note on blur, Ctrl/Cmd+Enter or close). The pair holds one relation, so a type or direction
-   * change can never make a second one; anchor relations take no part in the derives/prerequisite cycle rule (decision 2).
-   * Returns the close-time save, settled when its write is done.
-   */
-  private renderAnchorRelationEditor(
-    parent: HTMLElement,
-    ref: { imageId: string; anchorId: string; topicId: string },
-    close?: () => void,
-    onChanged?: () => void
-  ): () => Promise<void> {
-    const root = parent.createDiv("vam-relation-editor"),
-      key = anchorLineKey(ref.imageId, ref.anchorId, ref.topicId);
-    const apply = (next: (rel: AnchorRelation) => AnchorRelation | null, repaint = true): Promise<void> =>
-      new Promise(done =>
-        this.enqueue(async () => {
-          try {
-            const old = this.anchorRelationOf(ref);
-            if (!old) return;
-            const result = next(old);
-            await this.changeCanvasItems(ref.imageId, items =>
-              result
-                ? updateAnchorRelation(items, ref.imageId, ref.anchorId, ref.topicId, result)
-                : removeAnchorRelation(items, ref.imageId, ref.anchorId, ref.topicId)
-            );
-            if (!result) {
-              this.selection.deselectRelation(key);
-              this.syncRelationClasses();
-              onChanged?.();
-              close?.();
-              return;
-            }
-            this.selection.selectRelation(key);
-            this.syncRelationClasses();
-            if (repaint) paint();
-            onChanged?.();
-          } finally {
-            done();
-          }
-        })
-      );
-    let savedNote: string | undefined;
-    let noteWrite: Promise<void> = Promise.resolve();
-    let saveNote = (): void => {};
-    let refocus: "kind" | "reverse" | null = null;
-    const paint = (): void => {
-      root.empty();
-      saveNote = () => {};
-      root.createEl("strong", { text: t("ui.relation_editor_title"), cls: "vam-topic-tree-heading" });
-      const current = this.anchorRelationOf(ref),
-        image = findAnnotatedImage(this.map?.canvasItems ?? [], ref.imageId);
-      if (!current || !image) {
-        root.createEl("p", { text: t("ui.relation_gone") });
-        return;
-      }
-      const titleOf = (id: string): string =>
-        id === ref.anchorId ? this.anchorEndText(ref.imageId, ref.anchorId) : (this.notes.get(id)?.title ?? id);
-      const summary = root.createDiv("vam-relation-editor-summary");
-      this.relationSwatch(summary, current.kind);
-      summary.createSpan({
-        text: t(
-          current.kind === "related" ? "ui.relation_label_full_related_0_1_2" : "ui.relation_label_full_0_1_2",
-          t(RELATION_NAME_KEY[current.kind]),
-          titleOf(current.from),
-          titleOf(current.to)
-        ),
-        cls: "vam-relation-sentence",
-        attr: { dir: "auto" }
-      });
-      const field = (label: string, id: string): HTMLElement => {
-        const row = root.createDiv("vam-relation-field");
-        row.createEl("label", { text: label, attr: { for: id } });
-        return row;
-      };
-      const kindRow = field(t("ui.relation_kind_label"), "vam-relation-kind");
-      const kindSelect = kindRow.createEl("select", { cls: "dropdown vam-relation-kind" });
-      kindSelect.setAttr("id", "vam-relation-kind");
-      kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
-      for (const kind of RELATION_KINDS) {
-        const option = kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
-        if (kind !== current.kind && !anchorRelationAllowed(image, { ...current, kind }, current))
-          option.disabled = true;
-      }
-      kindSelect.value = current.kind;
-      kindSelect.addEventListener("change", () => {
-        const kind = kindSelect.value as TopicRelationKind;
-        if (kind === current.kind) return;
-        refocus = "kind";
-        void apply(rel => ({ ...rel, kind }));
-      });
-      let reverseButton: HTMLElement | null = null;
-      if (current.kind !== "related") {
-        const directionRow = root.createDiv("vam-relation-field");
-        directionRow.createSpan({ text: t("ui.relation_direction_label"), cls: "vam-relation-field-label" });
-        reverseButton = this.button(
-          directionRow,
-          t("ui.relation_reverse"),
-          () => {
-            refocus = "reverse";
-            void apply(rel => ({ ...rel, from: rel.to, to: rel.from }));
-          },
-          !anchorRelationAllowed(image, { ...current, from: current.to, to: current.from }, current)
-        );
-        reverseButton.addClass("vam-relation-reverse");
-      }
-      const noteRow = field(t("ui.relation_description_label"), "vam-relation-description");
-      const description = noteRow.createEl("textarea", { cls: "vam-relation-description" });
-      description.setAttr("id", "vam-relation-description");
-      description.setAttr("rows", "4");
-      description.setAttr("maxlength", String(RELATION_DESCRIPTION_MAX_LENGTH));
-      savedNote = current.description;
-      description.value = savedNote ?? "";
-      description.setAttr("aria-label", t("ui.relation_description_label"));
-      description.setAttr("placeholder", t("ui.relation_description_placeholder"));
-      const remaining = noteRow.createDiv({ cls: "vam-relation-remaining" });
-      saveNote = (): void => {
-        const text = normalizeRelationDescription(description.value);
-        if (text === savedNote) return;
-        savedNote = text;
-        noteWrite = apply(rel => {
-          const next: AnchorRelation = { kind: rel.kind, from: rel.from, to: rel.to };
-          if (text !== undefined) next.description = text;
-          return next;
-        }, false);
-      };
-      const footer = root.createDiv("vam-next-actions vam-relation-footer");
-      const remove = footer.createEl("button", { text: t("ui.relation_delete"), cls: "vam-discard mod-warning" });
-      remove.addEventListener("click", () => void apply(() => null));
-      footer.createSpan({ cls: "vam-next-status" });
-      footer.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close?.());
-      const refresh = (): void =>
-        remaining.setText(
-          t(
-            "ui.relation_description_remaining_0",
-            Math.max(0, RELATION_DESCRIPTION_MAX_LENGTH - description.value.length)
-          )
-        );
-      description.addEventListener("input", refresh);
-      description.addEventListener("change", () => saveNote());
-      description.addEventListener("keydown", event => {
-        if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
-        event.preventDefault();
-        saveNote();
-      });
-      refresh();
-      if (refocus) ({ kind: kindSelect, reverse: reverseButton })[refocus]?.focus();
-      refocus = null;
-    };
-    paint();
-    return () => {
-      saveNote();
-      return noteWrite;
-    };
-  }
-  /** The row's visible sentence "A relation B" (T1), with this topic written "This topic"; "related" reads "This topic is related to B". With a null `selfId` (the editor) both ends are named by title. */
-  private relationSentence(link: TopicRelation, selfId: string | null): string {
-    const self = t("ui.relation_this_topic"),
-      // English needs the lower-case form after the verb ("OTHER is derived from this topic"); Chinese has one form.
-      titleOf = (id: string, object = false): string =>
-        id === selfId ? (object ? t("ui.relation_this_topic_object") : self) : (this.notes.get(id)?.title ?? id);
-    if (link.kind === "related")
-      return selfId === null
-        ? t("ui.relation_sentence_related_0_1", titleOf(link.from), titleOf(link.to))
-        : t("ui.relation_sentence_related_0_1", self, titleOf(link.from === selfId ? link.to : link.from));
-    return t(RELATION_SENTENCE_KEY[link.kind], titleOf(link.from), titleOf(link.to, true));
-  }
-  /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
-  private openRelationEditor(link: TopicRelation, onChanged?: () => void, onClosed?: () => void): void {
-    if (!this.map || !this.relationsEnabled()) return;
-    let saveNote = (): Promise<void> => Promise.resolve();
-    const render = (content: HTMLElement, close: () => void): void => {
-      saveNote = this.renderRelationEditor(content, link, close, onChanged);
-    };
-    new (class extends Modal {
-      onOpen(): void {
-        this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
-        render(this.contentEl, () => this.close());
-      }
-      onClose(): void {
-        // Closing saves a changed note. Obsidian puts focus back on the button that opened the dialog, but a change
-        // repainted the panel and that button is gone; once the save is done, the caller moves focus to the row's replacement.
-        void saveNote().then(() => {
-          if (onClosed) window.setTimeout(onClosed, 0);
-        });
-      }
-    })(this.app).open();
-  }
-
-  /**
-   * The relation editor: type (only the legal ones), reverse (not for "related"; disabled with the reason when it is
-   * illegal), a one-line note, and delete. Each change is one undoable Map.md step and is written at once; the note is
-   * written when the box loses focus, on Ctrl/Cmd+Enter, or when the dialog closes (decision 40). Everything the user
-   * typed (the note, topic titles) is shown as text only. Returns the close-time save, settled when its write is done.
-   */
-  private renderRelationEditor(
-    parent: HTMLElement,
-    initial: TopicRelation,
-    close?: () => void,
-    onChanged?: () => void
-  ): () => Promise<void> {
-    let current: TopicRelation = { ...initial };
-    const root = parent.createDiv("vam-relation-editor");
-    const indexOfCurrent = (): number =>
-      (this.map?.topicRelations ?? []).findIndex(r => relationIdentity(r) === relationIdentity(current));
-    // Runs one change on the relation held in the map being edited; `next` returns its new form, or null to delete it.
-    // A note save does not repaint the dialog, so a control the user is reaching for stays where it is.
-    const apply = (next: (rel: TopicRelation) => TopicRelation | null | undefined, repaint = true): Promise<void> =>
-      new Promise(done =>
-        this.enqueue(async () => {
-          try {
-            await change(next, repaint);
-          } finally {
-            done();
-          }
-        })
-      );
-    const change = async (
-      next: (rel: TopicRelation) => TopicRelation | null | undefined,
-      repaint: boolean
-    ): Promise<void> => {
-      const outcome: { value?: TopicRelation | null } = {};
-      if (!this.map) return;
-      // The line stays selected under its new identity; a deleted one is dropped by the next draw.
-      await this.mapChange(map => {
-        const list = map.topicRelations ?? [],
-          index = list.findIndex(r => relationIdentity(r) === relationIdentity(current));
-        if (index < 0) return;
-        outcome.value = next(list[index]);
-        // A type or direction change is checked again on the map being edited (the same rule as the choices offered).
-        const old = list[index];
-        if (
-          outcome.value &&
-          (outcome.value.kind !== old.kind || outcome.value.from !== old.from || outcome.value.to !== old.to) &&
-          !relationAllowed(list, outcome.value, index)
-        )
-          outcome.value = undefined;
-        if (outcome.value === undefined) return;
-        const updated = [...list];
-        if (outcome.value) updated[index] = outcome.value;
-        else updated.splice(index, 1);
-        setTopicRelations(map, updated);
-      }, false);
-      const result = outcome.value;
-      if (result === null) {
-        this.selection.deselectRelation(relationIdentity(current));
-        this.syncRelationClasses();
-        onChanged?.();
-        close?.();
-        return;
-      }
-      if (result) {
-        current = result;
-        this.selection.selectRelation(relationIdentity(current));
-        this.syncRelationClasses();
-      }
-      if (repaint) paint();
-      onChanged?.();
-    };
-    // The note as last written or requested; a save is asked for only when the box differs from it.
-    let savedNote = initial.description;
-    let noteWrite: Promise<void> = Promise.resolve();
-    let saveNote = (): void => {};
-    // Which control takes the keyboard focus after the next repaint (a change repaints the whole dialog).
-    let refocus: "kind" | "reverse" | null = null;
-    const paint = (): void => {
-      root.empty();
-      saveNote = () => {};
-      const index = indexOfCurrent();
-      root.createEl("strong", { text: t("ui.relation_editor_title"), cls: "vam-topic-tree-heading" });
-      if (index < 0) {
-        root.createEl("p", { text: t("ui.relation_gone") });
-        return;
-      }
-      const relations = this.map?.topicRelations ?? [];
-      // E1: the sentence "A relation B" and the line sample follow the kind and direction at once.
-      const summary = root.createDiv("vam-relation-editor-summary");
-      this.relationSwatch(summary, current.kind);
-      summary.createSpan({
-        text: this.relationSentence(current, null),
-        cls: "vam-relation-sentence",
-        attr: { dir: "auto" }
-      });
-      // E2: one field per row, label above the control.
-      const field = (label: string, id: string): HTMLElement => {
-        const row = root.createDiv("vam-relation-field");
-        row.createEl("label", { text: label, attr: { for: id } });
-        return row;
-      };
-      // Type: every kind is listed; one that would close a derives/prerequisite cycle is disabled, with the reason beside it (Q7).
-      const kindRow = field(t("ui.relation_kind_label"), "vam-relation-kind");
-      const kindSelect = kindRow.createEl("select", { cls: "dropdown vam-relation-kind" });
-      kindSelect.setAttr("id", "vam-relation-kind");
-      kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
-      const blocked: TopicRelationKind[] = [];
-      for (const kind of RELATION_KINDS) {
-        const open =
-          kind === current.kind || relationAllowed(relations, { kind, from: current.from, to: current.to }, index);
-        if (!open) blocked.push(kind);
-        const option = kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
-        if (!open) option.disabled = true;
-      }
-      kindSelect.value = current.kind;
-      if (blocked.length) {
-        const reason = kindRow.createEl("p", {
-          text: t("ui.relation_kind_blocked_cycle_0", blocked.map(kind => t(RELATION_NAME_KEY[kind])).join(", ")),
-          cls: "vam-relation-reason"
-        });
-        reason.setAttr("id", "vam-relation-kind-reason");
-        kindSelect.setAttr("aria-describedby", "vam-relation-kind-reason");
-      }
-      kindSelect.addEventListener("change", () => {
-        const kind = kindSelect.value as TopicRelationKind;
-        if (kind === current.kind) return;
-        refocus = "kind";
-        void apply(rel => ({ ...rel, kind }));
-      });
-      let reverseButton: HTMLElement | null = null;
-      // E3 direction: one Reverse button; "related" has no direction and no button. A reverse that would close a cycle stays visible, disabled, with the reason beside it.
-      if (current.kind !== "related") {
-        const directionRow = root.createDiv("vam-relation-field");
-        directionRow.createSpan({ text: t("ui.relation_direction_label"), cls: "vam-relation-field-label" });
-        const reversed = { kind: current.kind, from: current.to, to: current.from };
-        const allowed = relationAllowed(relations, reversed, index);
-        const reverse = this.button(
-          directionRow,
-          t("ui.relation_reverse"),
-          () => {
-            refocus = "reverse";
-            void apply(rel => ({ ...rel, from: reversed.from, to: reversed.to }));
-          },
-          !allowed
-        );
-        reverse.addClass("vam-relation-reverse");
-        reverseButton = reverse;
-        if (!allowed) {
-          const reason = directionRow.createEl("p", {
-            text: t("ui.relation_reverse_blocked_cycle"),
-            cls: "vam-relation-reason"
-          });
-          reason.setAttr("id", "vam-relation-reverse-reason");
-          reverse.setAttr("aria-describedby", "vam-relation-reverse-reason");
-        }
-      }
-      // Note: a multi-line box of up to 200 characters, saved as one line (line breaks become spaces); an empty one removes the key.
-      const noteRow = field(t("ui.relation_description_label"), "vam-relation-description");
-      const description = noteRow.createEl("textarea", { cls: "vam-relation-description" });
-      description.setAttr("id", "vam-relation-description");
-      description.setAttr("rows", "4");
-      description.setAttr("maxlength", String(RELATION_DESCRIPTION_MAX_LENGTH));
-      savedNote = relations[index].description;
-      description.value = savedNote ?? "";
-      description.setAttr("aria-label", t("ui.relation_description_label"));
-      description.setAttr("placeholder", t("ui.relation_description_placeholder"));
-      const remaining = noteRow.createDiv({ cls: "vam-relation-remaining" });
-      const draft = (): string | undefined => normalizeRelationDescription(description.value);
-      saveNote = (): void => {
-        const text = draft();
-        if (text === savedNote) return;
-        savedNote = text;
-        noteWrite = apply(rel => {
-          const next: TopicRelation = { kind: rel.kind, from: rel.from, to: rel.to };
-          if (text !== undefined) next.description = text;
-          return next;
-        }, false);
-      };
-      // E5 footer (decision 40): Delete on the left, Close on the right; nothing waits for an Apply.
-      const footer = root.createDiv("vam-next-actions vam-relation-footer");
-      const remove = footer.createEl("button", { text: t("ui.relation_delete"), cls: "vam-discard mod-warning" });
-      remove.addEventListener("click", () => void apply(() => null));
-      footer.createSpan({ cls: "vam-next-status" });
-      footer.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close?.());
-      const refresh = (): void => {
-        remaining.setText(
-          t(
-            "ui.relation_description_remaining_0",
-            Math.max(0, RELATION_DESCRIPTION_MAX_LENGTH - description.value.length)
-          )
-        );
-      };
-      description.addEventListener("input", refresh);
-      description.addEventListener("change", () => saveNote());
-      // Enter adds a line break; Ctrl/Cmd+Enter saves at once.
-      description.addEventListener("keydown", event => {
-        if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
-        event.preventDefault();
-        saveNote();
-      });
-      refresh();
-      if (refocus) ({ kind: kindSelect, reverse: reverseButton, description })[refocus]?.focus();
-      refocus = null;
-    };
-    paint();
-    return () => {
-      saveNote();
-      return noteWrite;
-    };
+    this.relationEditor.openAnchorRelationEditor(ref, onChanged, onClosed);
   }
   /** "Add subtopic…" (the structure dialog's footer, left of "Remove from map"): the six-type menu, then a new subtopic of that type. */
   private renderAddSubtopic(actions: HTMLElement, node: MapNode, close?: () => void): void {
@@ -17252,29 +16625,6 @@ export class VisualAgentMapView extends ItemView {
       svg.appendChild(frame);
     }
     swatch.insertBefore(svg, null);
-  }
-  /** A 32x10 sample of a relation's line (the canvas classes and arrowheads), so a row shows which line to look for. */
-  private relationSwatch(parent: HTMLElement, kind: TopicRelationKind): void {
-    const svg = createSvg("svg"),
-      defs = createSvg("defs"),
-      id = `${this.relationMarkerId}-row${++relationSwatchSequence}`;
-    svg.addClass("vam-relation-swatch");
-    svg.setAttribute("viewBox", "0 0 32 10");
-    svg.setAttribute("aria-hidden", "true");
-    const arrow = kind === "related" ? null : `url(#${id})`;
-    if (arrow) {
-      defs.appendChild(this.relationMarker(id, kind === "contradicts"));
-      svg.appendChild(defs);
-    }
-    for (const gap of kind === "derives_from" ? [false, true] : [false]) {
-      const line = createSvg("path");
-      line.setAttribute("d", "M 0 5 L 32 5");
-      if (arrow) line.setAttribute("marker-end", arrow);
-      line.addClass(gap ? "vam-relation-gap" : "vam-relation");
-      if (!gap) line.addClass(`vam-relation-${kind}`);
-      svg.appendChild(line);
-    }
-    parent.insertBefore(svg, null);
   }
   /** Markers can be edited only on an ordinary editable map: not an AIM map or the select mode. */
   private markersEditable(node: MapNode): boolean {
@@ -18021,9 +17371,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.relationsEnabled()) return;
     const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
     const body = section.createDiv("vam-hypothesis-body");
-    const editByPair = new Map<string, HTMLElement>();
-    const anchorEdit = new Map<string, HTMLElement>();
-    let addRelationControl: HTMLElement | null = null;
+    const relationFocus: RelationListFocus = { editByPair: new Map(), anchorEdit: new Map(), addControl: null };
     const paint = (
       focusStrength = false,
       focusKind = false,
@@ -18108,56 +17456,15 @@ export class VisualAgentMapView extends ItemView {
           }
         }
       }
-      // Relations: every link that starts or ends at this topic, whatever its kind.
-      editByPair.clear();
-      anchorEdit.clear();
-      const links = (this.map?.topicRelations ?? []).filter(r => r.from === node.id || r.to === node.id);
-      body.createEl("strong", { text: t("ui.relations_heading"), cls: "vam-topic-tree-heading vam-section-heading" });
-      const anchored = anchorRelationsForTopic(this.map?.canvasItems ?? [], node.id);
-      if (links.length || anchored.length) {
-        const list = body.createEl("ul", { cls: "vam-relation-list" });
-        for (const link of links) {
-          const row = list.createEl("li", { cls: "vam-relation-row" }),
-            text = this.relationRowText(link, node.id),
-            described = link.description ? `${text}. ${link.description}` : text;
-          this.bindRelationRow(row, link, described);
-          this.relationSwatch(row, link.kind);
-          const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
-          label.createSpan({
-            text: this.relationSentence(link, node.id),
-            cls: "vam-relation-sentence",
-            attr: { dir: "auto" }
-          });
-          if (link.description)
-            label.createSpan({ text: link.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
-          const tools = row.createSpan({ cls: "vam-relation-tools" });
-          const pair = relationPairKey(link.from, link.to);
-          // After the editor closes, focus goes to this pair's edit button as last painted (a pair has one relation),
-          // or to "Add relation…" when the relation was deleted.
-          const edit = this.iconButton(tools, "pencil", t("ui.edit_relation_0", text), () =>
-            this.openRelationEditor(link, paint, () => (editByPair.get(pair) ?? addRelationControl)?.focus())
-          );
-          editByPair.set(pair, edit);
-          this.iconButton(tools, "trash-2", t("ui.remove_relation_0", text), () =>
-            this.enqueue(async () => {
-              await this.removeRelation(link);
-              paint();
-            })
-          );
-        }
-        for (const ref of anchored) this.renderAnchorRelationRow(list, node, ref, paint, anchorEdit);
-      } else body.createEl("p", { cls: "vam-hint vam-relation-empty", text: t("ui.relations_none") });
-      this.renderRelationAddRow(
+      this.relationEditor.renderList(
         body,
         node,
+        relationFocus,
+        () => paint(),
         () => paint(false, false, true),
-        kindControl => {
-          addRelationControl = kindControl;
-        },
+        focusAdd,
         close
       );
-      // Repainting replaced the control that started the flow; a keyboard user lands back on its replacement.
-      if (focusAdd) addRelationControl?.focus();
     };
     paint();
   }
@@ -21608,6 +20915,32 @@ export class VisualAgentMapView extends ItemView {
       root: managed ? this.plugin.repo.topicRoot(this.path) : null,
       mapPath: this.path,
       mapId: this.map?.id ?? ""
+    };
+  }
+  /** What the relation editor reads from this view (all lazily: a test may replace a member after the view is built). */
+  private relationEditorPorts(): RelationEditorPorts {
+    return {
+      app: () => this.app,
+      map: () => this.map,
+      notes: () => this.notes,
+      selection: () => this.selection,
+      relationsEnabled: () => this.relationsEnabled(),
+      anchorEditable: () => this.anchorRelationsEditable(),
+      enqueue: work => this.enqueue(work),
+      mapChange: (change, rebuildDerivedData) => this.mapChange(change, rebuildDerivedData),
+      changeCanvasItems: (id, change) => this.changeCanvasItems(id, change),
+      addRelation: (from, to, kind) => this.addRelation(from, to, kind),
+      removeRelation: link => this.removeRelation(link),
+      syncRelationClasses: () => this.syncRelationClasses(),
+      button: (parent, text, action, disabled) => this.button(parent, text, action, disabled),
+      iconButton: (parent, icon, label, action) => this.iconButton(parent, icon, label, action),
+      bindRelationRow: (row, link, ariaLabel, key) => this.bindRelationRow(row, link, ariaLabel, key),
+      markerId: () => this.relationMarkerId,
+      marker: (id, barred) => this.relationMarker(id, barred),
+      cardSearchSources: (include, enabled) => this.cardSearchSources(include, enabled),
+      startPickingAnchorImage: (topicId, kind) => this.startPickingAnchorImage(topicId, kind),
+      openRelationEditor: (link, onChanged, onClosed) => this.openRelationEditor(link, onChanged, onClosed),
+      openAnchorRelationEditor: (ref, onChanged, onClosed) => this.openAnchorRelationEditor(ref, onChanged, onClosed)
     };
   }
   /** What the record session reads from this view and the plugin (all lazily: the view's app may not exist yet when it is built). */

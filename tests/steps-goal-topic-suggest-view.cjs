@@ -147,8 +147,7 @@ test('goal recommend: model text (title and summary) goes into the DOM as text o
   await h.open();
   assert.deepEqual(h.titles(), [evil]); assert.deepEqual(h.summaries(), [evil]);
   assert.equal(findAll(h.rootEl, i => i.tag === 'img').length, 0);
-  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  const section = source.slice(source.indexOf('Suggest new topics for the goal'), source.indexOf('Starts the Claude CLI for the grade'));
+  const section = fs.readFileSync(path.join(root, 'experiences/visual-map/goal-suggest.ts'), 'utf8');
   assert.ok(section.length > 3000, 'the scanned section is the goal-recommend list code');
   assert.doesNotMatch(section, hasHtmlApi);
   assert.equal(h.control.calls.length, 1);
@@ -160,7 +159,7 @@ test('goal recommend: Add writes only the checked cards, each with the list\'s t
   h.boxes()[1].checked = false; h.boxes()[1].fire('change');
   const past = h.view.history.past.length;
   h.addBtn().click();
-  await until(() => h.panel() === undefined && h.view.goalSuggestTask === null);
+  await until(() => h.panel() === undefined && h.view.goalSuggest.task === null);
   const created = (await h.repo.readMap(MAP)).nodes.filter(n => !Object.values(h.ids).includes(n.id));
   assert.equal(created.length, 1, 'only the checked card was added');
   assert.equal(created[0].parentId, h.ids.a, 'under Body');
@@ -181,7 +180,7 @@ test('goal recommend: nothing of the list summary reaches any note file; it live
   await h.open();
   assert.deepEqual(h.summaries(), ['ZZ-summary-only-in-the-list']);
   h.addBtn().click();
-  await until(() => h.view.goalSuggestTask === null);
+  await until(() => h.view.goalSuggest.task === null);
   const card = await h.noteOf('Sleep stages');
   assert.ok(card, 'the card was added');
   for (const n of (await h.repo.readMap(MAP)).nodes) {
@@ -203,7 +202,7 @@ test('goal recommend: Add raises an AI-set parent above a new card in the same u
   assert.equal(await h.tierOf('Mind'), 'support'); assert.equal(await h.tierOf('REM'), 'side');
   const past = h.view.history.past.length;
   h.addBtn().click();
-  await until(() => h.view.goalSuggestTask === null && h.view.history.past.length === past + 1);
+  await until(() => h.view.goalSuggest.task === null && h.view.history.past.length === past + 1);
   assert.equal(await h.tierOf('Mind'), 'core', 'the AI-set parent is raised to the new card');
   assert.equal(await h.tierOf('REM'), 'core', 'a side parent is raised too');
   const body = (await h.noteOf('Body')).note.relevance;
@@ -222,7 +221,7 @@ test('goal recommend: an AI-locked parent is not raised, but the height still re
   await h.open();
   await h.repo.writeAiLocked(h.view.map.nodes.find(n => n.id === h.ids.b).path, true);
   h.addBtn().click();
-  await until(() => h.view.goalSuggestTask === null);
+  await until(() => h.view.goalSuggest.task === null);
   assert.equal(await h.tierOf('Dream recall'), 'core');
   assert.equal(await h.tierOf('Dreams'), 'core', 'the direct parent is raised');
   assert.equal(await h.tierOf('Mind'), 'support', 'the locked grandparent keeps its tier');
@@ -251,7 +250,7 @@ test('goal recommend: with AI tiers already there, the button asks scope current
   h.control.reply = async () => ({ items: [], suggestions: TWO });
   h.spark().click(); await until(() => h.control.calls.length === 2 && h.panel());
   assert.equal(h.control.calls[1].request.scope, 'current'); assert.ok(h.control.calls[1].request.current.length > 0);
-  h.addBtn().click(); await until(() => h.view.goalSuggestTask === null);
+  h.addBtn().click(); await until(() => h.view.goalSuggest.task === null);
   for (let i = 0; i < 20; i++) await tick();
   assert.equal(h.control.calls.length, 2, 'Add asked no AI');
   assert.deepEqual(h.control.calls.map(c => c.step), ['goal-recommend', 'goal-recommend']);
@@ -264,7 +263,7 @@ test('goal recommend: Add twice quickly adds once', async () => {
   const add = h.addBtn();
   let addNodeCalls = 0; const addNode = h.view.addNode.bind(h.view); h.view.addNode = (...args) => { addNodeCalls++; return addNode(...args); };
   add.fire('click'); add.fire('click');
-  await until(() => h.view.goalSuggestTask === null);
+  await until(() => h.view.goalSuggest.task === null);
   for (let i = 0; i < 30; i++) await tick(); // a second, unguarded Add would still be writing
   assert.deepEqual((await h.titlesOnDisk()).filter(x => !BASE.includes(x)), ['Sleep stages', 'Stress habits']);
   assert.equal(addNodeCalls, 2, 'two cards were written once, not twice');
@@ -321,7 +320,7 @@ test('goal recommend: closing the view or switching maps drops the late reply (n
     if (how === 'close') { h.view.closed = true; h.view.abortRelevanceGrade?.(); h.view.dropMapBackground(); } else { h.view.abortRelevanceGrade?.(); h.view.dropMapBackground(); h.view.path = 'Agent Workspace/Topics/other/Map.md'; }
     assert.equal(signal.aborted, true, how);
     gate.resolve(); for (let i = 0; i < 10; i++) await tick();
-    assert.equal(h.view.goalSuggestTask, null, how);
+    assert.equal(h.view.goalSuggest.task, null, how);
     assert.equal(h.rows().length, 0, how);
     h.view.path = MAP;
     assert.deepEqual(await h.titlesOnDisk(), BASE, how);
@@ -401,7 +400,7 @@ test('goal recommend: pressing the button while the list is open only closes the
   const h = await harness();
   await h.open();
   h.spark().click();
-  assert.equal(h.panel(), undefined); assert.equal(h.view.goalSuggestTask, null);
+  assert.equal(h.panel(), undefined); assert.equal(h.view.goalSuggest.task, null);
   for (let i = 0; i < 10; i++) await tick();
   assert.equal(h.control.calls.length, 1); assert.equal(h.control.usageAsks, 1);
   assert.equal(h.spark().focused, true);
@@ -639,7 +638,7 @@ async function stackRig(width, chat, state, host = HOSTS[0]) {
     if (state.edit === 'empty') { const area = find(h.rootEl, i => i.tag === 'textarea'); area.value = ''; area.fire('input'); }
     if (state.edit === 'context') find(h.rootEl, i => hasCls(i, 'vam-goal-add-context')).click();
   }
-  if (state.applying) { const task = view.goalSuggestTask; task.state = 'applying'; task.focus = null; view.render(); }
+  if (state.applying) { const task = view.goalSuggest.task; task.state = 'applying'; task.focus = null; view.render(); }
   h.rootEl.appendChild(overlay);
   const bar = find(h.rootEl, i => hasCls(i, 'vam-goal-bar'));
   // Narrow: measured widths; wide: centred in the row, capped at 460.
@@ -837,7 +836,7 @@ test('goal stack: only one attachment is open at a time (the list and the editor
   assert.equal(textarea(), undefined, 'opening the list drops the editor'); assert.equal(h.view.goalEdit, null);
   assert.equal(findAll(h.rootEl, i => hasCls(i, 'vam-goal-attachment')).length, 1);
   find(h.rootEl, i => hasCls(i, 'vam-goal-text')).click();
-  assert.ok(textarea(), 'a press on the goal opens the editor'); assert.equal(h.panel(), undefined, 'and closes the list'); assert.equal(h.view.goalSuggestTask, null);
+  assert.ok(textarea(), 'a press on the goal opens the editor'); assert.equal(h.panel(), undefined, 'and closes the list'); assert.equal(h.view.goalSuggest.task, null);
   assert.equal(findAll(h.rootEl, i => hasCls(i, 'vam-goal-attachment')).length, 0, 'the editor has no attachment until its context row is asked for');
   assert.equal(h.control.calls.length, 1, 'the one run is the only AI call');
 });
@@ -894,7 +893,7 @@ test('goal stack: the strip is left out where a clickable lies in the gap betwee
 test('goal recommend: a recommended side card never reaches the list, so no card is written side under a non-side parent; Add keeps the list tier with ONE call in all (counter-example 1, replaces the old floor test)', async () => {
   const h = await harness();
   h.control.reply = async request => ({ items: gradeAll(request), suggestions: [{ ...TWO[0], suggestedTier: 'side' }, TWO[1], { parentId: 'c3', title: 'Light exposure', summary: 's', suggestedTier: 'support' }] });
-  await h.open(); h.addBtn().click(); await until(() => h.view.goalSuggestTask === null);
+  await h.open(); h.addBtn().click(); await until(() => h.view.goalSuggest.task === null);
   for (let i = 0; i < 10; i++) await tick();
   assert.equal(await h.tierOf('Sleep stages'), undefined, 'the side recommendation was dropped, not added');
   assert.equal(await h.tierOf('Stress habits'), 'support');
@@ -910,7 +909,7 @@ test('goal recommend: the same holds with scope current: the side recommendation
   h.spark().click(); await until(() => h.control.calls.length === 2 && h.panel());
   assert.equal(h.control.calls[1].request.scope, 'current');
   assert.deepEqual(h.titles(), ['Stress habits']);
-  h.addBtn().click(); await until(() => h.view.goalSuggestTask === null);
+  h.addBtn().click(); await until(() => h.view.goalSuggest.task === null);
   for (let i = 0; i < 10; i++) await tick();
   assert.equal(await h.tierOf('Stress habits'), 'support');
   assert.equal(h.control.calls.length, 2, 'only the two button presses asked');
@@ -918,7 +917,7 @@ test('goal recommend: the same holds with scope current: the side recommendation
 
 test('goal recommend: the list tier is not kept: the next run rates an added card freely, even as side (decision 3 of suggest-tier-floor still holds)', async () => {
   const h = await harness();
-  await h.open(); h.addBtn().click(); await until(() => h.view.goalSuggestTask === null);
+  await h.open(); h.addBtn().click(); await until(() => h.view.goalSuggest.task === null);
   for (let i = 0; i < 10; i++) await tick();
   assert.equal(await h.tierOf('Sleep stages'), 'core');
   await h.view.hydrate();
@@ -1008,22 +1007,22 @@ test('goal suggest characterization: closing the view with the list open removes
   const h = await harness();
   await h.open();
   assert.equal(h.listeners.pointerdown.length, 1);
-  const { controller } = h.view.goalSuggestTask;
+  const { controller } = h.view.goalSuggest.task;
   await h.view.onClose();
   assert.equal(h.listeners.pointerdown.length, 0, 'no outside listener is left');
   assert.equal(controller.signal.aborted, true, 'the task controller is aborted');
-  assert.equal(h.view.goalSuggestTask, null);
+  assert.equal(h.view.goalSuggest.task, null);
   assert.equal(h.control.calls.length, 1);
 });
 
 test('goal suggest characterization: switching maps with the list open aborts the task, draws no rows and leaves no listener after the next paint', async () => {
   const h = await harness();
   await h.open();
-  const { controller } = h.view.goalSuggestTask;
+  const { controller } = h.view.goalSuggest.task;
   h.view.path = 'Agent Workspace/Topics/other/Map.md';
   h.view.dropMapBackground();
   assert.equal(controller.signal.aborted, true);
-  assert.equal(h.view.goalSuggestTask, null);
+  assert.equal(h.view.goalSuggest.task, null);
   h.view.render();
   assert.equal(h.rows().length, 0, 'no rows');
   assert.equal(h.panel(), undefined);
@@ -1055,7 +1054,7 @@ test('goal suggest characterization: a map switch before the write callback runs
   assert.equal(addNodeCalls, 0, 'no card is written');
   assert.equal(JSON.stringify(Array.from(h.contents.entries())), before, 'the files are unchanged');
   assert.match(h.notices.find(m => /no longer fit/.test(m)), /^2 recommendations no longer fit the map and were skipped$/);
-  assert.equal(h.view.goalSuggestTask, null);
+  assert.equal(h.view.goalSuggest.task, null);
   assert.equal(h.control.calls.length, 1);
 });
 
@@ -1075,12 +1074,12 @@ test('goal suggest characterization: a duplicate title and a parent that is merg
 test('goal suggest characterization: while Add is writing, Esc does nothing, no outside listener is armed and the spark, boxes and Skip are disabled', async () => {
   const h = await harness();
   await h.open();
-  const task = h.view.goalSuggestTask;
+  const task = h.view.goalSuggest.task;
   task.state = 'applying'; task.focus = null; h.view.render();
   assert.equal(h.listeners.pointerdown.length, 0, 'no outside listener while applying');
   h.panel().fire('keydown', { key: 'Escape' });
   assert.ok(h.panel(), 'Esc does not close the list while it is writing');
-  assert.equal(h.view.goalSuggestTask, task);
+  assert.equal(h.view.goalSuggest.task, task);
   assert.equal(h.spark().disabled, true);
   assert.ok(h.boxes().length === 2 && h.boxes().every(b => b.disabled));
   assert.equal(h.skipBtn().disabled, true);
@@ -1093,7 +1092,7 @@ test('goal suggest characterization: opening the goal flow with the list open cl
   h.control.decline = true;
   await h.view.submitRelevanceGoal('Sleep better', '');
   assert.equal(h.panel(), undefined, 'the list is closed');
-  assert.equal(h.view.goalSuggestTask, null);
+  assert.equal(h.view.goalSuggest.task, null);
   assert.equal(h.listeners.pointerdown.length, 0, 'listener removed');
   await new Promise(r => setTimeout(r, 5));
   assert.equal(h.spark().focused, true, 'the focus is back on the spark');

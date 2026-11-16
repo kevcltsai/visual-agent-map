@@ -1463,13 +1463,13 @@ integrationTest('N12: two presses, a second view and a press while the list is o
   const gate = deferred(); h.control.reply = request => gate.promise.then(() => ({ ...gradeAll(request), suggestions: [suggestFor(request, h)] }));
   await h.enter('Goal');
   await h.view.submitRelevanceGoal('Goal'); await h.view.submitRelevanceGoal('Goal again');
-  const other = Object.create(h.view); other.goalSuggestTask = null;
+  const other = Object.create(h.view); other.goalSuggest.task = null;
   await other.submitRelevanceGoal('Goal from a second view');
-  await until(() => h.control.calls.length); assert.equal(h.control.calls.length, 1); assert.equal(h.view.goalSuggestTask, null, 'no list while the AI works');
+  await until(() => h.control.calls.length); assert.equal(h.control.calls.length, 1); assert.equal(h.view.goalSuggest.task, null, 'no list while the AI works');
   gate.resolve(); await h.settled();
   assert.equal(h.control.calls.length, 1);
   assert.equal(await h.relevanceOf('a'), 'core', 'the tiers are written before the list opens');
-  const task = h.view.goalSuggestTask;
+  const task = h.view.goalSuggest.task;
   assert.ok(task && task.state === 'ready', 'the list is open'); assert.equal(task.suggestions.length, 1); assert.equal(task.suggestions[0].title, 'New topic');
   assert.equal(h.run().outcome.recommended, 1); assert.equal(h.barText(), 'Updated 4 topics, 1 new topics recommended');
   // A press on the icon while the list is open closes the list without a call (the spark behaviour) and the refresh icon is off-limits only while running.
@@ -1481,18 +1481,18 @@ integrationTest('N15: Stop, a failure, a closed view and a map switch open no li
   const stopped = await harness(); let gate = deferred(); withSuggestions(stopped, gate);
   await stopped.enter('Goal'); await until(() => stopped.control.calls.length);
   button(stopped.bar(), 'Stop').click(); gate.resolve(); await tick(); await tick(); await tick();
-  assert.equal(stopped.view.goalSuggestTask, null); assert.deepEqual(await graded(stopped), []);
+  assert.equal(stopped.view.goalSuggest.task, null); assert.deepEqual(await graded(stopped), []);
   const failed = await harness(); failed.control.reply = async request => ({ ...gradeAll(request), suggestions: [{ parentId: 'ghost' }] });
   await failed.enter('Goal'); await failed.settled();
-  assert.equal(failed.run().status, 'failed'); assert.equal(failed.view.goalSuggestTask, null);
+  assert.equal(failed.run().status, 'failed'); assert.equal(failed.view.goalSuggest.task, null);
   const closed = await harness(); gate = deferred(); withSuggestions(closed, gate);
   await closed.enter('Goal'); await until(() => closed.control.calls.length);
   await closed.view.onClose(); gate.resolve(); await tick(); await tick(); await tick();
-  assert.equal(closed.view.goalSuggestTask, null); assert.deepEqual(await graded(closed), []);
+  assert.equal(closed.view.goalSuggest.task, null); assert.deepEqual(await graded(closed), []);
   const left = await harness(); gate = deferred(); withSuggestions(left, gate);
   await left.enter('Goal'); await until(() => left.control.calls.length);
   left.view.path = 'Agent Workspace/Topics/other/Map.md'; gate.resolve(); await tick(); await tick(); await tick();
-  assert.equal(left.view.goalSuggestTask, null); assert.deepEqual(await graded(left), []);
+  assert.equal(left.view.goalSuggest.task, null); assert.deepEqual(await graded(left), []);
 });
 
 // Goal editing in place on the bare view (no repository): the unset bar, a repaint under an open edit. Unit layer (`test`): the tests/support-dom.cjs stand-in.

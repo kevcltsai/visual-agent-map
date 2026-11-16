@@ -41034,6 +41034,18 @@ async function backupNote(port, input2) {
   }
 }
 
+// core/admission.ts
+var BudgetExhaustedError = class extends Error {
+  constructor() {
+    super("budget-exhausted");
+    __publicField(this, "outcome", "budget-exhausted");
+    this.name = "BudgetExhaustedError";
+  }
+};
+function isBudgetExhausted(error) {
+  return error instanceof BudgetExhaustedError || !!error && typeof error === "object" && error.name === "BudgetExhaustedError";
+}
+
 // ai/research-observer.ts
 function steerObserver(observer, steer) {
   if (!observer || !steer) return observer;
@@ -41880,7 +41892,7 @@ var TopicRuns = class {
       steerObserver(observer, options.steer)
     ).then(
       (result) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l;
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m;
         progress == null ? void 0 : progress.end(path, progressAttempt);
         const latest = await repo.readNote(path, options.map);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
@@ -41940,41 +41952,57 @@ var TopicRuns = class {
           fail3(composed.message);
           return;
         }
-        await repo.updateNote(
-          path,
-          {
-            summary: result.summary,
-            detail: composed.detail,
-            visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2)),
-            newFindings: "",
-            status: "completed",
-            // The topic remembers the mode of its latest research (Quick is stored as local).
-            ...context.researchMode ? { researchMode: context.researchMode } : {},
-            ...mode === "top" ? { detailFormatIssues: [] } : formatIssuesPatch(result.formatIssues, language2)
-          },
-          { detailTemplate: writeContext.detailTemplate, newVisualReferences: true }
-        );
+        const patch = {
+          summary: result.summary,
+          detail: composed.detail,
+          visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2)),
+          newFindings: "",
+          status: "completed",
+          // The topic remembers the mode of its latest research (Quick is stored as local).
+          ...context.researchMode ? { researchMode: context.researchMode } : {},
+          ...mode === "top" ? { detailFormatIssues: [] } : formatIssuesPatch(result.formatIssues, language2)
+        };
+        const writeOptions = { detailTemplate: writeContext.detailTemplate, newVisualReferences: true };
+        const guard = options.pipeline;
+        if (guard && repo.updateNoteGuarded) {
+          const outcome = await repo.updateNoteGuarded(path, patch, {
+            ...writeOptions,
+            ...raw ? { expectedContent: raw.started } : {},
+            authorize: guard.authorize
+          });
+          if (outcome === "discarded") {
+            await repo.updateNote(path, { status: note.status });
+            if (exchangeId) (_h2 = exchanges()) == null ? void 0 : _h2.failed(exchangeId, t("log.stale_result_not_written"));
+            fail3(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+            return;
+          }
+        } else await repo.updateNote(path, patch, writeOptions);
         const saved = await repo.readNote(path, options.map);
-        (_h2 = options.onWritten) == null ? void 0 : _h2.call(options, { before: { ...latest, status: note.status }, after: saved });
-        if (exchangeId) (_i = exchanges()) == null ? void 0 : _i.completed(exchangeId);
+        (_i = options.onWritten) == null ? void 0 : _i.call(options, { before: { ...latest, status: note.status }, after: saved });
+        if (exchangeId) (_j = exchanges()) == null ? void 0 : _j.completed(exchangeId);
         this.ports.clearOtherHistory(options.origin);
-        (_k = options.queueCharts) == null ? void 0 : _k.call(options, {
+        (_l = options.queueCharts) == null ? void 0 : _l.call(options, {
           path,
           saved,
           context: writeContext,
           detail: saved.detail,
           formatIssues: mode === "top" ? [] : result.formatIssues,
           model: used.model,
-          language: (_j = context.outputLanguage) != null ? _j : settings().language,
+          language: (_k = context.outputLanguage) != null ? _k : settings().language,
           template: writeContext.detailTemplate,
           ...mode === "top" ? this.chartGuard(mode, composed.record) : {}
         });
-        (_l = options.done) == null ? void 0 : _l.call(options, result);
+        (_m = options.done) == null ? void 0 : _m.call(options, result);
       })
     ).catch(
       (error) => this.ports.mutate()(async () => {
         var _a3, _b3, _c2;
         progress == null ? void 0 : progress.end(path, progressAttempt);
+        if (options.pipeline && isBudgetExhausted(error)) {
+          await repo.updateNote(path, { status: note.status });
+          options.pipeline.onBudgetExhausted();
+          return;
+        }
         if (controller.signal.aborted || error instanceof Error && error.name === "AbortError") {
           await repo.updateNote(path, { status: note.status });
           fail3(t("ui.research_stopped_existing_content_was_preserved"));
@@ -92120,18 +92148,6 @@ var ResearchProgressStore = class {
 // core/ai-task-service.ts
 var import_node_crypto10 = require("node:crypto");
 
-// core/admission.ts
-var BudgetExhaustedError = class extends Error {
-  constructor() {
-    super("budget-exhausted");
-    __publicField(this, "outcome", "budget-exhausted");
-    this.name = "BudgetExhaustedError";
-  }
-};
-function isBudgetExhausted(error) {
-  return error instanceof BudgetExhaustedError || !!error && typeof error === "object" && error.name === "BudgetExhaustedError";
-}
-
 // core/steps/reference/extract.zh.md
 var extract_zh_default = "\u5F9E\u6BCF\u500B\u63D0\u4F9B\u7684\u4F86\u6E90\u6BB5\u843D\u64F7\u53D6\u76F8\u95DC\u4E8B\u5BE6\u3001\u8B49\u64DA\u3001\u5206\u6B67\u8207\u9650\u5236\u3002\u4E0D\u53EF\u56E0\u4F86\u6E90\u770B\u4F3C\u4E0D\u76F8\u95DC\u5C31\u7565\u904E\u3002\u6BCF\u9805\u64F7\u53D6\u5167\u5BB9\u90FD\u8981\u5728\u4E3B\u5F35\u65C1\u4FDD\u7559\u539F\u59CB [S#]\uFF0C\u4E26\u9644\u4E0A\u672C\u6279\u6240\u6709 [S#] \u5C0D\u61C9\u539F\u59CB\u5B8C\u6574\u8DEF\u5F91\u7684\u4F86\u6E90\u5C0D\u7167\u8868\u3002\u4FDD\u7559\u6709\u52A9\u8FA8\u8B58\u7AE0\u7BC0\u7684\u6A19\u984C\uFF1B\u6700\u7D42\u7B54\u6848\u9700\u8981\u9019\u4EFD\u5C0D\u7167\u8868\u624D\u80FD\u5F15\u7528\u539F\u6A94\u3002\u4E0D\u53EF\u8D85\u51FA\u539F\u6587\u63A8\u8AD6\u3002\n";
 
@@ -92721,6 +92737,7 @@ var AiTaskService = class {
             localCodex: context.researchMode === "local",
             usage: { action: usageActionOf(context, role), mapPath: context.usageMapPath },
             ...context.admission ? { admission: context.admission } : {},
+            ...context.noContentLog ? { noContentLog: true } : {},
             requestLog: "request",
             // The service ends the entry: parsed, a stage failure, a re-ask, a re-send or a superseded first reply.
             entryEnd: "caller",
@@ -93141,6 +93158,7 @@ var AiTaskService = class {
               intermediateDetail: true,
               ...context.usageMapPath ? { usageMapPath: context.usageMapPath } : {},
               ...context.admission ? { admission: context.admission } : {},
+              ...context.noContentLog ? { noContentLog: true } : {},
               // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
               ...context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {}
             },

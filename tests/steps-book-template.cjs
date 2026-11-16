@@ -124,6 +124,8 @@ test('fresh write-back: exactly one Research notes section at the end, folded ca
     assert.equal(count(detail, `### ${name}`), 1, `${language}: one section`);
     assert.ok(detail.trimEnd().split('\n').slice(-6).join('\n').includes(`### ${name}`), 'it is the last section');
     assert.ok(/^> \[!note\]- \S/m.test(detail), `${language}: a folded callout`);
+    assert.ok(detail.includes(`> [!note]- ${name}`), `${language}: the callout title is the section name`);
+    assert.ok(!detail.includes('更新紀錄'), `${language}: no 更新紀錄 anywhere`);
     assert.ok(!detail.includes(`### ${M.translate(note, 'detail.update_log')}`), 'no second log section');
     assert.ok(detail.startsWith('導讀 LEAD-A'), 'the lead stays on top');
     assert.ok(detail.includes('### 自訂小標\n\n自由正文 FREE-A'), 'the AI sub-heading and the free body stay as written');
@@ -150,7 +152,11 @@ test('second fresh write-back keeps the old log lines and adds exactly one; the 
     const result = write(template, note, mode, legacy, replyFor(template, 'C'));
     assert.ok(result.includes('舊紀錄一') && result.includes('舊紀錄二'), `${mode}: old log lines kept`);
     if (mode !== 'top') assert.equal(count(result, '### 更新紀錄'), 0, `${mode}: one log section only`);
-    assert.equal(count(result, '研究備註') + count(result, '### 更新紀錄') >= 1, true);
+    // top keeps the old text byte for byte, so the legacy heading stays there; fresh and merge move the lines into Research notes.
+    if (mode !== 'top') {
+      assert.ok(count(result, '研究備註') >= 1, `${mode}: Research notes section`);
+      assert.ok(!result.includes('更新紀錄'), `${mode}: no 更新紀錄 anywhere`);
+    } else assert.ok(count(result, '研究備註') + count(result, '### 更新紀錄') >= 1);
   }
 });
 
@@ -164,6 +170,7 @@ test('top and merge on a note that already has a folded Research notes section: 
     assert.equal(lines.length, 4, `${mode}: 3 old + 1`);
     assert.equal(count(result, '### 研究備註'), 1, mode);
     assert.equal(count(result, '[!note]-'), 1, `${mode}: one callout`);
+    assert.ok(!result.includes('更新紀錄'), `${mode}: no 更新紀錄 anywhere`);
   }
   // top keeps the old text byte for byte apart from the inserts
   const top = M.composeWriteback({ mode: 'top', oldDetail: first, aiDetail: replyFor(template, 'B'), summary: 'S', template, language: note, now: NOW });

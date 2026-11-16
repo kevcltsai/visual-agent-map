@@ -40621,8 +40621,8 @@ function logIsCallout(view, key4) {
   const range = sectionRange(view, key4);
   return !!range && isResearchNotesHeading(range.heading.text) && view.lines.slice(range.from, range.to).some((line2, offset) => !view.code[range.from + offset] && CALLOUT_HEAD.test(line2));
 }
-function foldedLog(lines, language2) {
-  return [`> [!note]- ${translate(language2, "detail.update_log")}`, ...lines.map((line2) => `> ${line2}`)].join("\n");
+function foldedLog(lines, title) {
+  return [`> [!note]- ${title}`, ...lines.map((line2) => `> ${line2}`)].join("\n");
 }
 function logHeadingName(template2, language2) {
   var _a2, _b2;
@@ -40633,7 +40633,7 @@ function withLogLines(detail, view, key4, heading, language2, linesFor) {
   const existing = range ? logLines(view, key4) : [];
   const folded2 = isResearchNotesHeading(heading);
   const lines = linesFor(existing);
-  let body = folded2 ? foldedLog(lines, language2) : lines.join("\n");
+  let body = folded2 ? foldedLog(lines, heading) : lines.join("\n");
   if (!range) return `${detail.trimEnd()}
 
 ### ${heading}
@@ -40817,7 +40817,7 @@ ${body}${needsBlank(at2) ? "\n" : ""}`, order: 0 });
     const name2 = logHeadingName(template2, language2);
     endParts.push(`### ${name2}
 
-${isResearchNotesHeading(name2) ? foldedLog([logLine], language2) : logLine}`);
+${isResearchNotesHeading(name2) ? foldedLog([logLine], name2) : logLine}`);
   }
   if (newDefinitions.length) {
     const text10 = newDefinitions.map((item) => item.text.replace(/^\[\^([^\]\s]+)\]/, (_whole, label) => {

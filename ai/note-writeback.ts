@@ -234,8 +234,8 @@ function logIsCallout(view: Scan, key: string): boolean {
 }
 
 /** The record as the folded callout the Research notes section is written in. */
-function foldedLog(lines: string[], language: NoteLanguage): string {
-  return [`> [!note]- ${translate(language, "detail.update_log")}`, ...lines.map(line => `> ${line}`)].join("\n");
+function foldedLog(lines: string[], title: string): string {
+  return [`> [!note]- ${title}`, ...lines.map(line => `> ${line}`)].join("\n");
 }
 
 function logHeadingName(template: DetailTemplate, language: NoteLanguage): string {
@@ -256,7 +256,7 @@ function withLogLines(
   // A Research notes section keeps its record in a folded callout; every other log section is written as plain lines.
   const folded = isResearchNotesHeading(heading);
   const lines = linesFor(existing);
-  let body = folded ? foldedLog(lines, language) : lines.join("\n");
+  let body = folded ? foldedLog(lines, heading) : lines.join("\n");
   if (!range) return `${detail.trimEnd()}\n\n### ${heading}\n\n${body}`;
   // Footnote definitions that sit in the log section stay right after the rewritten log lines.
   const definition = definitionLines(view);
@@ -462,7 +462,7 @@ function composeTop(input: WritebackInput): WritebackResult {
     });
   } else {
     const name = logHeadingName(template, language);
-    endParts.push(`### ${name}\n\n${isResearchNotesHeading(name) ? foldedLog([logLine], language) : logLine}`);
+    endParts.push(`### ${name}\n\n${isResearchNotesHeading(name) ? foldedLog([logLine], name) : logLine}`);
   }
 
   if (newDefinitions.length) {

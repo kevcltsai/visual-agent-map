@@ -10,7 +10,7 @@ import {
   type DetailTemplate
 } from "./detail-templates";
 import { fencedLines } from "./markdown-blocks";
-import { isNewSourcesHeading, sectionAliasesFor } from "./section-aliases";
+import { isNewSourcesHeading, isResearchNotesHeading, sectionAliasesFor } from "./section-aliases";
 
 /**
  * The sections of a note's detail as a template ("AI suggested" style): the `###` headings the note already has, each
@@ -64,6 +64,8 @@ export function templateFromDetail(detail: string, language: NoteLanguage): Deta
   const headings = headingLines(detail);
   if (!headings.length) return { ok: false, reason: "no_sections" };
   const structures = builtinStructures(language).map(template => ({ template, lookup: sectionLookup(template) }));
+  // Research notes is the log only when no heading has the standard log name.
+  const hasStandardLog = headings.some(({ name }) => LOG_KEYS.has(key(name)));
   const taken = new Set<"sources" | "log">();
   const usedIds = new Set<string>();
   const sections: DetailSection[] = headings.map(({ name }, position) => {
@@ -87,9 +89,14 @@ export function templateFromDetail(detail: string, language: NoteLanguage): Deta
         ...(found.callouts ? { callouts: found.callouts.map(callout => ({ ...callout })) } : {})
       };
     } else {
-      role = isNewSourcesHeading(name) ? "sources" : LOG_KEYS.has(heading) ? "log" : "none";
+      role = isNewSourcesHeading(name)
+        ? "sources"
+        : LOG_KEYS.has(heading) || (!hasStandardLog && isResearchNotesHeading(name))
+          ? "log"
+          : "none";
       base = { description: "", aliases: sectionAliasesFor(name) };
     }
+    if (role === "log" && hasStandardLog && isResearchNotesHeading(name)) role = "none";
     // Only the first section of a role keeps it.
     if (role !== "none") {
       if (taken.has(role)) role = "none";

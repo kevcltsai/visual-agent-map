@@ -244,7 +244,8 @@ test('K1 alias table: every old name of every row maps to the new section, in zh
   assert.ok(rows.length >= 14);
   for (const row of rows) {
     for (const current of row.names) {
-      const style = ok(`## ${current}\n\n## 更新紀錄\n`);
+      // The filler section must not be the name Research notes already takes as an alias (a current name wins over an alias).
+      const style = ok(`## ${current}\n\n## ${row.aliases.includes('更新紀錄') ? '其他' : '更新紀錄'}\n`);
       const lookup = lookupOf(style);
       for (const alias of row.aliases) assert.equal(lookup.get(alias.toLocaleLowerCase()), 0, `${alias} -> ${current}`);
     }

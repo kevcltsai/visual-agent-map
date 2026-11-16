@@ -1813,6 +1813,7 @@ var en = {
   "ui.structure_name_action": "Goal to done",
   "ui.structure_name_conclusion": "Conclusion & basis",
   "ui.structure_name_guide": "How-to guide",
+  "ui.structure_name_book_chapter": "Picture-book chapter",
   "ui.format_name_standard": "Standard format",
   "ui.format_name_lean": "Lean format",
   "ui.format_name_rich": "Rich format",
@@ -4748,6 +4749,7 @@ var zhCN = {
   "ui.structure_name_action": "\u76EE\u6807\u5230\u5B8C\u6210",
   "ui.structure_name_conclusion": "\u7ED3\u8BBA\u4E0E\u4F9D\u636E",
   "ui.structure_name_guide": "\u64CD\u4F5C\u6307\u5357",
+  "ui.structure_name_book_chapter": "\u56FE\u6587\u4E66\u7AE0\u8282",
   "ui.format_name_standard": "\u6807\u51C6\u683C\u5F0F",
   "ui.format_name_lean": "\u7CBE\u7B80\u683C\u5F0F",
   "ui.format_name_rich": "\u4E30\u5BCC\u683C\u5F0F",
@@ -7683,6 +7685,7 @@ var zhTW = {
   "ui.structure_name_action": "\u76EE\u6A19\u5230\u5B8C\u6210",
   "ui.structure_name_conclusion": "\u7D50\u8AD6\u8207\u4F9D\u64DA",
   "ui.structure_name_guide": "\u64CD\u4F5C\u6307\u5357",
+  "ui.structure_name_book_chapter": "\u5716\u6587\u66F8\u7AE0\u7BC0",
   "ui.format_name_standard": "\u6A19\u6E96\u683C\u5F0F",
   "ui.format_name_lean": "\u7CBE\u7C21\u683C\u5F0F",
   "ui.format_name_rich": "\u8C50\u5BCC\u683C\u5F0F",
@@ -21411,6 +21414,8 @@ var SECTION_NAME = {
   references: name("\u53C3\u8003\u8CC7\u6599", "References"),
   // log role (unchanged name)
   log: name("\u66F4\u65B0\u7D00\u9304", "Update log"),
+  // log role for the picture-book chapter template: only when no section has the standard log name
+  researchNotes: name("\u7814\u7A76\u5099\u8A3B", "Research notes"),
   // atomic
   oneSentence: name("\u4E00\u53E5\u8A71", "In one sentence"),
   why: name("\u70BA\u4EC0\u9EBC", "Why"),
@@ -21439,6 +21444,7 @@ var SPELLINGS = ["zh-TW", "zh-CN", "en"];
 var spellings = (key4) => SPELLINGS.map((locale) => translate(locale, key4));
 var both = (value) => [value.zh, value.en];
 var rows;
+var researchNotesNames = () => [...both(SECTION_NAME.researchNotes), "\u7814\u7A76\u5907\u6CE8"];
 function sectionAliasRows() {
   if (rows) return rows;
   const sourcesNames = [
@@ -21453,6 +21459,8 @@ function sectionAliasRows() {
   rows = [
     // role sources: the old standard name, and the three new names for each other
     { names: sourcesNames, aliases: [...sourcesNames, ...legacySources] },
+    // Research notes: a note that only has the old log heading still lines up with it
+    { names: researchNotesNames(), aliases: spellings("detail.update_log") },
     // standard / textbook
     { names: spellings("detail.background_and_mechanism"), aliases: spellings("detail.key_knowledge") },
     { names: spellings("detail.disagreements_and_limits"), aliases: spellings("detail.tradeoffs_and_limitations") },
@@ -21490,6 +21498,10 @@ function sectionAliasesFor(heading) {
 function isNewSourcesHeading(heading) {
   const key4 = lowered(heading);
   return sectionAliasRows()[0].names.some((entry) => lowered(entry) === key4);
+}
+function isResearchNotesHeading(heading) {
+  const key4 = lowered(heading);
+  return researchNotesNames().some((entry) => lowered(entry) === key4);
 }
 
 // ai/detail-templates.ts
@@ -29570,7 +29582,26 @@ var Repository = class {
    * headings and the reference frame stay in the interface language. Notes created by AIM remember it in frontmatter.
    */
   async updateNote(path, patch, options = {}) {
-    await this.app.vault.process(this.file(path), (content) => this.patchedNote(path, content, patch, options));
+    await this.updateNoteGuarded(path, patch, options);
+  }
+  /**
+   * `updateNote` with a guarded commit. Both checks run inside the `vault.process` callback that writes, on the content that
+   * callback is given, so nothing the owner typed after the caller's last read is overwritten:
+   * - `expectedContent`: the file must still be exactly this text;
+   * - `authorize`: called after the content check; false (a stopped run, a removed card) means nothing is written.
+   * Either failing leaves the file untouched and returns "discarded". With neither, it is `updateNote`, byte for byte.
+   */
+  async updateNoteGuarded(path, patch, options = {}) {
+    const { expectedContent, authorize, ...writeOptions } = options;
+    let outcome = "written";
+    await this.app.vault.process(this.file(path), (content) => {
+      if (expectedContent !== void 0 && content !== expectedContent || authorize && !authorize()) {
+        outcome = "discarded";
+        return content;
+      }
+      return this.patchedNote(path, content, patch, writeOptions);
+    });
+    return outcome;
   }
   /**
    * Marks a note left at `status: running` by a reload as failed. The status and `stillIdle()` are checked inside the same
@@ -37656,6 +37687,10 @@ function parseNoteStyleFile(text10, options) {
     const firstNew = sections.find((section3) => isNewSourcesHeading(section3.name));
     if (firstNew) firstNew.role = "sources";
   }
+  if (!sections.some((section3) => section3.role === "log")) {
+    const firstNotes = sections.find((section3) => isResearchNotesHeading(section3.name));
+    if (firstNotes) firstNotes.role = "log";
+  }
   const currentNames = new Set(sections.map((section3) => lowered2(section3.name)));
   for (const section3 of sections) section3.aliases = section3.aliases.filter((alias) => !currentNames.has(lowered2(alias)));
   if (sections.length) {
@@ -37932,6 +37967,15 @@ var guide_zh_CN_default = "## \u9069\u7528\u60C5\u5883\n\u4EC0\u9EBC\u6642\u5019
 // core/blocks/template/guide.en.md
 var guide_en_default2 = '## When to use\nWhen to use this guide and what it achieves; do not put the method here.\n\n## How to do it\nOrdered steps, one per line, each starting with a verb.\n\n## Common mistakes\nWrite each as "mistake \u2192 right way".\n\n## Decision rules\nHow to choose when there is a choice, one rule per line.\n\n## Sources\nOnly the source list, which is added to the end of this section automatically; do not restate the body.\n\n## Update log\nAdd only one line saying what this update changed.\n';
 
+// core/blocks/template/book-chapter.zh-TW.md
+var book_chapter_zh_TW_default = "\u9019\u662F\u5716\u6587\u66F8\u7684\u4E00\u7AE0\uFF1A\u5148\u7528\u4E00\u5169\u53E5\u8A71\u5E36\u51FA\u672C\u7AE0\u4E3B\u984C\uFF0C\u518D\u5BEB\u81EA\u7531\u6B63\u6587\uFF1B\u6B63\u6587\u53EF\u4EE5\u7528\u81EA\u5DF1\u7684 ### \u5C0F\u6A19\u5206\u6BB5\uFF0C\u4E0D\u8981\u628A\u4F86\u6E90\u6E05\u55AE\u91CD\u8FF0\u4E00\u6B21\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u7814\u7A76\u5099\u8A3B\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/book-chapter.zh-CN.md
+var book_chapter_zh_CN_default = "\u9019\u662F\u5716\u6587\u66F8\u7684\u4E00\u7AE0\uFF1A\u5148\u7528\u4E00\u5169\u53E5\u8A71\u5E36\u51FA\u672C\u7AE0\u4E3B\u984C\uFF0C\u518D\u5BEB\u81EA\u7531\u6B63\u6587\uFF1B\u6B63\u6587\u53EF\u4EE5\u7528\u81EA\u5DF1\u7684 ### \u5C0F\u6A19\u5206\u6BB5\uFF0C\u4E0D\u8981\u628A\u4F86\u6E90\u6E05\u55AE\u91CD\u8FF0\u4E00\u6B21\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u7814\u7A76\u5099\u8A3B\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/book-chapter.en.md
+var book_chapter_en_default = "This is one chapter of a picture book: open with a sentence or two that introduces the chapter's topic, then write the free body; the body may use its own ### sub-headings, and must not repeat the source list.\n\n## Sources\nOnly the source list; the source list is placed at the end of this section automatically. Do not restate the body.\n\n## Research notes\nAdd only one line saying what this update changed.\n";
+
 // core/blocks/template/conclusion.zh-TW.md
 var conclusion_zh_TW_default = "## \u7D50\u8AD6\n\u4E00\u5230\u4E09\u53E5\uFF0C\u5148\u8B1B\u7D50\u8AD6\uFF0C\u4E0D\u653E\u7406\u7531\u3002\n\n## \u4FE1\u5FC3\n\u4F4E\uFF0F\u4E2D\uFF0F\u9AD8\u4E09\u9078\u4E00\uFF0C\u52A0\u4E0A\u6700\u5927\u7684\u4E0D\u78BA\u5B9A\u4F86\u81EA\u54EA\u88E1\u3002\u53EA\u7559\u4E00\u4EFD\uFF0C\u9019\u4E00\u689D\u512A\u5148\u65BC\u524D\u9762\u7684\u4E0D\u4E00\u81F4\u8655\u7406\u898F\u5247\uFF1A\u4E0D\u4E26\u5217\u65B0\u820A\u4FE1\u5FC3\uFF1B\u4FE1\u5FC3\u6539\u8B8A\u6642\u6539\u5BEB\u9019\u4E00\u4EFD\uFF0C\u4E26\u5728\u66F4\u65B0\u7D00\u9304\u5BEB\u300C\u5F9E X \u6539\u70BA Y\uFF1A\u7406\u7531\u300D\u3002\n\n## \u4F9D\u64DA\n2\u20134 \u500B\u7406\u7531\uFF0C\u6BCF\u500B\u9023\u5230\u5B83\u4F9D\u8CF4\u7684\u8B70\u984C\u6216\u8B49\u64DA\u3002\n\n## \u4EC0\u9EBC\u6703\u6539\u8B8A\u9019\u500B\u7D50\u8AD6\n\u770B\u5230\u4EC0\u9EBC\u8B49\u64DA\u6216\u689D\u4EF6\u8B8A\u5316\uFF0C\u9019\u500B\u7D50\u8AD6\u5C31\u8981\u6539\u3002\n\n## \u9069\u7528\u7BC4\u570D\n\u7D50\u8AD6\u5728\u54EA\u4E9B\u689D\u4EF6\u4E0B\u6210\u7ACB\u3001\u54EA\u4E9B\u60C5\u6CC1\u4E0D\u9069\u7528\u3002\n\n## \u5F71\u97FF\u8207\u4E0B\u4E00\u6B65\n\u7D50\u8AD6\u6210\u7ACB\u7684\u8A71\u5F71\u97FF\u4EC0\u9EBC\u3001\u8981\u505A\u4EC0\u9EBC\uFF1B\u8981\u958B\u6210\u884C\u52D5\u8B70\u984C\u7684\uFF0C\u5BEB\u6210\u52D5\u8A5E\u958B\u982D\u7684\u4E00\u884C\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
@@ -38009,6 +38053,7 @@ var BUILTIN_BLOCKS = [
   template("atomic", "ui.structure_name_atomic", [atomic_zh_TW_default, atomic_zh_CN_default, atomic_en_default], true),
   template("conclusion", "ui.structure_name_conclusion", [conclusion_zh_TW_default, conclusion_zh_CN_default, conclusion_en_default]),
   template("guide", "ui.structure_name_guide", [guide_zh_TW_default, guide_zh_CN_default, guide_en_default2]),
+  template("book-chapter", "ui.structure_name_book_chapter", [book_chapter_zh_TW_default, book_chapter_zh_CN_default, book_chapter_en_default], true),
   tone("academic", "ui.preset_name_academic", ["ui.preset_name_academic_old"]),
   tone("plain", "ui.preset_name_plain"),
   tone("magazine", "ui.preset_name_magazine", ["ui.preset_name_magazine_old"]),
@@ -38529,6 +38574,7 @@ function templateFromDetail(detail, language2) {
   const headings = headingLines(detail);
   if (!headings.length) return { ok: false, reason: "no_sections" };
   const structures = builtinStructures(language2).map((template3) => ({ template: template3, lookup: sectionLookup(template3) }));
+  const hasStandardLog = headings.some(({ name: name2 }) => LOG_KEYS.has(key3(name2)));
   const taken = /* @__PURE__ */ new Set();
   const usedIds = /* @__PURE__ */ new Set();
   const sections = headings.map(({ name: name2 }, position) => {
@@ -38553,9 +38599,10 @@ function templateFromDetail(detail, language2) {
         ...found.callouts ? { callouts: found.callouts.map((callout2) => ({ ...callout2 })) } : {}
       };
     } else {
-      role = isNewSourcesHeading(name2) ? "sources" : LOG_KEYS.has(heading) ? "log" : "none";
+      role = isNewSourcesHeading(name2) ? "sources" : LOG_KEYS.has(heading) || !hasStandardLog && isResearchNotesHeading(name2) ? "log" : "none";
       base = { description: "", aliases: sectionAliasesFor(name2) };
     }
+    if (role === "log" && hasStandardLog && isResearchNotesHeading(name2)) role = "none";
     if (role !== "none") {
       if (taken.has(role)) role = "none";
       else taken.add(role);
@@ -40555,20 +40602,38 @@ function definitionLines(view) {
   for (const item of definitions(view)) for (let line2 = item.first; line2 <= item.last; line2++) found.add(line2);
   return found;
 }
+var CALLOUT_HEAD = /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?(?:[ \t].*)?$/;
 function logLines(view, key4) {
   const range = sectionRange(view, key4);
   if (!range) return [];
   const definition = definitionLines(view);
-  return view.lines.slice(range.from, range.to).filter((line2, offset) => line2.trim() && !isPlaceholder2(line2) && !definition.has(range.from + offset));
+  const folded2 = isResearchNotesHeading(range.heading.text);
+  const found = [];
+  for (let at = range.from; at < range.to; at++) {
+    const raw = view.lines[at];
+    if (definition.has(at) || folded2 && !view.code[at] && CALLOUT_HEAD.test(raw)) continue;
+    const line2 = folded2 && !view.code[at] ? raw.replace(/^>[ \t]?/, "") : raw;
+    if (line2.trim() && !isPlaceholder2(line2)) found.push(line2);
+  }
+  return found;
+}
+function logIsCallout(view, key4) {
+  const range = sectionRange(view, key4);
+  return !!range && isResearchNotesHeading(range.heading.text) && view.lines.slice(range.from, range.to).some((line2, offset) => !view.code[range.from + offset] && CALLOUT_HEAD.test(line2));
+}
+function foldedLog(lines, language2) {
+  return [`> [!note]- ${translate(language2, "detail.update_log")}`, ...lines.map((line2) => `> ${line2}`)].join("\n");
 }
 function logHeadingName(template2, language2) {
   var _a2, _b2;
   return (_b2 = (_a2 = template2.sections.find((section3) => section3.role === "log")) == null ? void 0 : _a2.name) != null ? _b2 : translate(language2, "detail.update_log");
 }
-function withLogLines(detail, view, key4, heading, linesFor) {
+function withLogLines(detail, view, key4, heading, language2, linesFor) {
   const range = sectionRange(view, key4);
   const existing = range ? logLines(view, key4) : [];
-  let body = linesFor(existing).join("\n");
+  const folded2 = isResearchNotesHeading(heading);
+  const lines = linesFor(existing);
+  let body = folded2 ? foldedLog(lines, language2) : lines.join("\n");
   if (!range) return `${detail.trimEnd()}
 
 ### ${heading}
@@ -40742,14 +40807,18 @@ ${body}${needsBlank(at2) ? "\n" : ""}`, order: 0 });
   if (logRange) {
     const content = lastContentLine(oldView, logRange.from, logRange.to);
     const at = lineEnd(oldView, content >= 0 ? content : logRange.heading.line);
+    const written2 = content >= 0 && logIsCallout(oldView, classify3.logKey) ? `> ${logLine}` : logLine;
     plan.push({
       at,
-      text: `${content >= 0 ? "\n" : "\n\n"}${logLine}${content >= 0 || !needsBlank(at) ? "" : "\n"}`,
+      text: `${content >= 0 ? "\n" : "\n\n"}${written2}${content >= 0 || !needsBlank(at) ? "" : "\n"}`,
       order: 1
     });
-  } else endParts.push(`### ${logHeadingName(template2, language2)}
+  } else {
+    const name2 = logHeadingName(template2, language2);
+    endParts.push(`### ${name2}
 
-${logLine}`);
+${isResearchNotesHeading(name2) ? foldedLog([logLine], language2) : logLine}`);
+  }
   if (newDefinitions.length) {
     const text10 = newDefinitions.map((item) => item.text.replace(/^\[\^([^\]\s]+)\]/, (_whole, label) => {
       var _a2;
@@ -40836,12 +40905,13 @@ function composeWriteback(raw) {
       view,
       key4,
       heading,
+      input2.language,
       (existing) => mergeLogLines(existing, oldLines, input2.summary, input2.now)
     );
   } else {
     const oldLines = logLines(scan2(input2.oldDetail, classify3), key4);
     const line2 = `${logMarker(oldLines)}${formatDate(input2.now)}\u3000${translate(input2.language, "note.writeback_fresh_replaced_0", (_a2 = input2.backupPath) != null ? _a2 : "")}`;
-    detail = withLogLines(input2.aiDetail, view, key4, heading, () => [...oldLines, line2]);
+    detail = withLogLines(input2.aiDetail, view, key4, heading, input2.language, () => [...oldLines, line2]);
   }
   return { ok: true, detail, record: { inserts: [], kept: [detail] } };
 }

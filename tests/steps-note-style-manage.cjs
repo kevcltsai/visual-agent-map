@@ -108,7 +108,7 @@ test('counter 3: updateRecipeFileText changes only the values of the four known 
 });
 
 // ---- listParts (decision #22) ----
-test('listParts: built-ins first (8 structures, 7 voices, 4 formats), then the user\'s files; a file named like a built-in in any language or case is the user\'s file with a builtin_name issue and does not mark the built-in as changed (counter 6, decision #22)', async () => {
+test('listParts: built-ins first (9 structures, 7 voices, 4 formats), then the user\'s files; a file named like a built-in in any language or case is the user\'s file with a builtin_name issue and does not mark the built-in as changed (counter 6, decision #22)', async () => {
   const files = {
     [`${dirOf('en', 'template')}/Standard six.md`]: '## A\nx\n',
     [`${dirOf('en', 'template')}/標準六段.md`]: '## A\nx\n',
@@ -120,9 +120,9 @@ test('listParts: built-ins first (8 structures, 7 voices, 4 formats), then the u
   };
   const { store, v, saves } = await makeStore(files);
   const structures = store.listParts('structure');
-  assert.equal(structures.filter(item => item.kind === 'builtin').length, 8);
-  assert.equal(structures.filter(item => item.kind === 'builtin').map(item => item.ref).join(), 'builtin:standard,builtin:textbook,builtin:hypothesis,builtin:evidence,builtin:action,builtin:atomic,builtin:conclusion,builtin:guide');
-  assert.deepEqual(plain(structures.slice(0, 8).map(item => item.kind)), Array(8).fill('builtin'));
+  assert.equal(structures.filter(item => item.kind === 'builtin').length, 9);
+  assert.equal(structures.filter(item => item.kind === 'builtin').map(item => item.ref).join(), 'builtin:standard,builtin:textbook,builtin:hypothesis,builtin:evidence,builtin:action,builtin:atomic,builtin:conclusion,builtin:guide,builtin:book-chapter');
+  assert.deepEqual(plain(structures.slice(0, 9).map(item => item.kind)), Array(9).fill('builtin'));
   for (const item of structures.filter(entry => entry.kind === 'builtin')) {
     assert.equal(item.fileName, undefined, item.ref);
     assert.deepEqual(plain(item.issues), [], item.ref);

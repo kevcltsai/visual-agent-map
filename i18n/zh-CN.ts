@@ -1780,6 +1780,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.structure_name_action": "目标到完成",
   "ui.structure_name_conclusion": "结论与依据",
   "ui.structure_name_guide": "操作指南",
+  "ui.structure_name_book_chapter": "图文书章节",
   "ui.format_name_standard": "标准格式",
   "ui.format_name_lean": "精简格式",
   "ui.format_name_rich": "丰富格式",

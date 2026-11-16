@@ -12,6 +12,7 @@ import { bareCalloutLines, titleBareCallouts } from "./callout-titles";
 import { NOTE_LANGUAGES, translate, type NoteLanguage } from "../i18n";
 import { fencedLines } from "./markdown-blocks";
 import { sectionLookup, type DetailTemplate } from "./detail-templates";
+import { isResearchNotesHeading } from "./section-aliases";
 
 export type WritebackMode = "merge" | "top" | "fresh";
 
@@ -198,14 +199,43 @@ function definitionLines(view: Scan): Set<number> {
   return found;
 }
 
-/** The log section's body lines: non-empty, placeholders and footnote definitions left out. */
+const CALLOUT_HEAD = /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?(?:[ \t].*)?$/;
+
+/**
+ * The log section's body lines: non-empty, placeholders and footnote definitions left out. A line of a callout (the
+ * folded record of a Research notes section) is read without its "> " prefix, and the callout's own title line is no log line.
+ */
 function logLines(view: Scan, key: string): string[] {
   const range = sectionRange(view, key);
   if (!range) return [];
   const definition = definitionLines(view);
-  return view.lines
-    .slice(range.from, range.to)
-    .filter((line, offset) => line.trim() && !isPlaceholder(line) && !definition.has(range.from + offset));
+  // Only a Research notes section is read as a callout; any other log section is read exactly as before.
+  const folded = isResearchNotesHeading(range.heading.text);
+  const found: string[] = [];
+  for (let at = range.from; at < range.to; at++) {
+    const raw = view.lines[at];
+    if (definition.has(at) || (folded && !view.code[at] && CALLOUT_HEAD.test(raw))) continue;
+    const line = folded && !view.code[at] ? raw.replace(/^>[ \t]?/, "") : raw;
+    if (line.trim() && !isPlaceholder(line)) found.push(line);
+  }
+  return found;
+}
+
+/** True when the section's body already holds a callout (the folded form), so a new line goes inside it. */
+function logIsCallout(view: Scan, key: string): boolean {
+  const range = sectionRange(view, key);
+  return (
+    !!range &&
+    isResearchNotesHeading(range.heading.text) &&
+    view.lines
+      .slice(range.from, range.to)
+      .some((line, offset) => !view.code[range.from + offset] && CALLOUT_HEAD.test(line))
+  );
+}
+
+/** The record as the folded callout the Research notes section is written in. */
+function foldedLog(lines: string[], language: NoteLanguage): string {
+  return [`> [!note]- ${translate(language, "detail.update_log")}`, ...lines.map(line => `> ${line}`)].join("\n");
 }
 
 function logHeadingName(template: DetailTemplate, language: NoteLanguage): string {
@@ -218,11 +248,15 @@ function withLogLines(
   view: Scan,
   key: string,
   heading: string,
+  language: NoteLanguage,
   linesFor: (existing: string[]) => string[]
 ): string {
   const range = sectionRange(view, key);
   const existing = range ? logLines(view, key) : [];
-  let body = linesFor(existing).join("\n");
+  // A Research notes section keeps its record in a folded callout; every other log section is written as plain lines.
+  const folded = isResearchNotesHeading(heading);
+  const lines = linesFor(existing);
+  let body = folded ? foldedLog(lines, language) : lines.join("\n");
   if (!range) return `${detail.trimEnd()}\n\n### ${heading}\n\n${body}`;
   // Footnote definitions that sit in the log section stay right after the rewritten log lines.
   const definition = definitionLines(view);
@@ -419,12 +453,17 @@ function composeTop(input: WritebackInput): WritebackResult {
   if (logRange) {
     const content = lastContentLine(oldView, logRange.from, logRange.to);
     const at = lineEnd(oldView, content >= 0 ? content : logRange.heading.line);
+    // Inside an existing folded callout the new line is one more callout line.
+    const written = content >= 0 && logIsCallout(oldView, classify.logKey) ? `> ${logLine}` : logLine;
     plan.push({
       at,
-      text: `${content >= 0 ? "\n" : "\n\n"}${logLine}${content >= 0 || !needsBlank(at) ? "" : "\n"}`,
+      text: `${content >= 0 ? "\n" : "\n\n"}${written}${content >= 0 || !needsBlank(at) ? "" : "\n"}`,
       order: 1
     });
-  } else endParts.push(`### ${logHeadingName(template, language)}\n\n${logLine}`);
+  } else {
+    const name = logHeadingName(template, language);
+    endParts.push(`### ${name}\n\n${isResearchNotesHeading(name) ? foldedLog([logLine], language) : logLine}`);
+  }
 
   if (newDefinitions.length) {
     const text = newDefinitions
@@ -525,13 +564,13 @@ export function composeWriteback(raw: WritebackInput): WritebackResult {
   let detail: string;
   if (input.mode === "merge") {
     const oldLines = logLines(scan(input.oldDetail, classify), key);
-    detail = withLogLines(input.aiDetail, view, key, heading, existing =>
+    detail = withLogLines(input.aiDetail, view, key, heading, input.language, existing =>
       mergeLogLines(existing, oldLines, input.summary, input.now)
     );
   } else {
     const oldLines = logLines(scan(input.oldDetail, classify), key);
     const line = `${logMarker(oldLines)}${formatDate(input.now)}\u3000${translate(input.language, "note.writeback_fresh_replaced_0", input.backupPath ?? "")}`;
-    detail = withLogLines(input.aiDetail, view, key, heading, () => [...oldLines, line]);
+    detail = withLogLines(input.aiDetail, view, key, heading, input.language, () => [...oldLines, line]);
   }
   return { ok: true, detail, record: { inserts: [], kept: [detail] } };
 }

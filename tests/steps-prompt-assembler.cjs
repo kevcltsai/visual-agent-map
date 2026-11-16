@@ -33,7 +33,7 @@ test('academic rigor tone block is empty; the other tones equal the built-in ton
 
 test('template blocks are registered with names; every block has a name in all languages', () => {
   const templates = M.BUILTIN_BLOCKS.filter(block => block.category === 'template').map(block => block.id);
-  assert.equal(templates.join(), 'standard,textbook,hypothesis,evidence,action,atomic,conclusion,guide');
+  assert.equal(templates.join(), 'standard,textbook,hypothesis,evidence,action,atomic,conclusion,guide,book-chapter');
   for (const block of M.BUILTIN_BLOCKS) {
     for (const language of LANGUAGES) assert.ok(M.translate(language, block.nameKey).length > 0, `${block.id} ${language}`);
   }
@@ -717,7 +717,7 @@ test('AI suggested decide: the structures listed in the fragment match the built
     const order = ['standard', 'atomic', 'hypothesis', 'evidence', 'conclusion', 'action', 'guide'];
     assert.deepEqual(listed, order.map(id => real[structures.indexOf(id)]), `${language}: structures listed`);
   }
-  // Every built-in template block except the Standard look-alike (Textbook) is listed.
-  const blocks = m.BUILTIN_BLOCKS.filter(block => block.category === 'template').map(block => block.id).filter(id => id !== 'textbook');
+  // Every built-in template block except the Standard look-alike (Textbook) and the picture-book chapter (not a kind of note) is listed.
+  const blocks = m.BUILTIN_BLOCKS.filter(block => block.category === 'template').map(block => block.id).filter(id => id !== 'textbook' && id !== 'book-chapter');
   assert.deepEqual([...blocks].sort(), [...structures].sort());
 });

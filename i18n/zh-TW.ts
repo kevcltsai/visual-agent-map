@@ -1781,6 +1781,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.structure_name_action": "目標到完成",
   "ui.structure_name_conclusion": "結論與依據",
   "ui.structure_name_guide": "操作指南",
+  "ui.structure_name_book_chapter": "圖文書章節",
   "ui.format_name_standard": "標準格式",
   "ui.format_name_lean": "精簡格式",
   "ui.format_name_rich": "豐富格式",

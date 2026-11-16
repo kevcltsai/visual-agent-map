@@ -97,7 +97,7 @@ function promptOf(style, language) {
 
 test('kinds: the kind templates and the guide are registered after Textbook, with names in three languages', () => {
   const templates = M.BUILTIN_BLOCKS.filter(block => block.category === 'template');
-  assert.equal(templates.map(block => block.id).join(), 'standard,textbook,hypothesis,evidence,action,atomic,conclusion,guide');
+  assert.equal(templates.map(block => block.id).join(), 'standard,textbook,hypothesis,evidence,action,atomic,conclusion,guide,book-chapter');
   for (const id of IDS) for (const language of LANGUAGES) {
     const block = templates.find(item => item.id === id);
     assert.equal(M.translate(language, block.nameKey), NAMES[language][id], `${id} ${language}`);
@@ -276,7 +276,7 @@ test('kinds: the built-in names are not mistaken for the legacy ids, and Standar
   }
   const { store } = await world({});
   assert.equal(store.runStyle({ outputLanguage: 'en' }).template.id, 'standard');
-  assert.deepEqual(JSON.parse(JSON.stringify(store.listBlocks('template').filter(item => item.kind === 'builtin').map(item => item.ref))), ['builtin:standard', 'builtin:textbook', 'builtin:hypothesis', 'builtin:evidence', 'builtin:action', 'builtin:atomic', 'builtin:conclusion', 'builtin:guide']);
+  assert.deepEqual(JSON.parse(JSON.stringify(store.listBlocks('template').filter(item => item.kind === 'builtin').map(item => item.ref))), ['builtin:standard', 'builtin:textbook', 'builtin:hypothesis', 'builtin:evidence', 'builtin:action', 'builtin:atomic', 'builtin:conclusion', 'builtin:guide', 'builtin:book-chapter']);
 });
 
 test('kinds: a user file named Evidence / Action / Hypothesis / Atomic note stays a file ("mine"), is not claimed by a built-in, and a style naming it resolves to it', async () => {

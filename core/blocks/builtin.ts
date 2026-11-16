@@ -29,6 +29,9 @@ import AtomicEn from "./template/atomic.en.md";
 import GuideZhTW from "./template/guide.zh-TW.md";
 import GuideZhCN from "./template/guide.zh-CN.md";
 import GuideEn from "./template/guide.en.md";
+import BookChapterZhTW from "./template/book-chapter.zh-TW.md";
+import BookChapterZhCN from "./template/book-chapter.zh-CN.md";
+import BookChapterEn from "./template/book-chapter.en.md";
 import ConclusionZhTW from "./template/conclusion.zh-TW.md";
 import ConclusionZhCN from "./template/conclusion.zh-CN.md";
 import ConclusionEn from "./template/conclusion.en.md";
@@ -126,6 +129,7 @@ export const BUILTIN_BLOCKS: readonly BuiltinBlock[] = [
   template("atomic", "ui.structure_name_atomic", [AtomicZhTW, AtomicZhCN, AtomicEn], true),
   template("conclusion", "ui.structure_name_conclusion", [ConclusionZhTW, ConclusionZhCN, ConclusionEn]),
   template("guide", "ui.structure_name_guide", [GuideZhTW, GuideZhCN, GuideEn]),
+  template("book-chapter", "ui.structure_name_book_chapter", [BookChapterZhTW, BookChapterZhCN, BookChapterEn], true),
   tone("academic", "ui.preset_name_academic", ["ui.preset_name_academic_old"]),
   tone("plain", "ui.preset_name_plain"),
   tone("magazine", "ui.preset_name_magazine", ["ui.preset_name_magazine_old"]),

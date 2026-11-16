@@ -1882,6 +1882,7 @@ export const en = {
   "ui.structure_name_action": "Goal to done",
   "ui.structure_name_conclusion": "Conclusion & basis",
   "ui.structure_name_guide": "How-to guide",
+  "ui.structure_name_book_chapter": "Picture-book chapter",
   "ui.format_name_standard": "Standard format",
   "ui.format_name_lean": "Lean format",
   "ui.format_name_rich": "Rich format",

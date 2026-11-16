@@ -23,6 +23,8 @@ export const SECTION_NAME = {
   references: name("參考資料", "References"),
   // log role (unchanged name)
   log: name("更新紀錄", "Update log"),
+  // log role for the picture-book chapter template: only when no section has the standard log name
+  researchNotes: name("研究備註", "Research notes"),
   // atomic
   oneSentence: name("一句話", "In one sentence"),
   why: name("為什麼", "Why"),
@@ -63,6 +65,8 @@ const both = (value: SectionName): string[] => [value.zh, value.en];
 
 let rows: AliasRow[] | undefined;
 
+const researchNotesNames = (): string[] => [...both(SECTION_NAME.researchNotes), "研究备注"];
+
 /** The table. Built on first use, because the standard rows read the i18n dictionaries. */
 export function sectionAliasRows(): readonly AliasRow[] {
   if (rows) return rows;
@@ -78,6 +82,8 @@ export function sectionAliasRows(): readonly AliasRow[] {
   rows = [
     // role sources: the old standard name, and the three new names for each other
     { names: sourcesNames, aliases: [...sourcesNames, ...legacySources] },
+    // Research notes: a note that only has the old log heading still lines up with it
+    { names: researchNotesNames(), aliases: spellings("detail.update_log") },
     // standard / textbook
     { names: spellings("detail.background_and_mechanism"), aliases: spellings("detail.key_knowledge") },
     { names: spellings("detail.disagreements_and_limits"), aliases: spellings("detail.tradeoffs_and_limitations") },
@@ -118,4 +124,10 @@ export function sectionAliasesFor(heading: string): string[] {
 export function isNewSourcesHeading(heading: string): boolean {
   const key = lowered(heading);
   return sectionAliasRows()[0].names.some(entry => lowered(entry) === key);
+}
+
+/** True for a heading that is one of the Research notes names (研究備註, 研究备注, Research notes). */
+export function isResearchNotesHeading(heading: string): boolean {
+  const key = lowered(heading);
+  return researchNotesNames().some(entry => lowered(entry) === key);
 }

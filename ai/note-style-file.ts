@@ -1,6 +1,6 @@
 import { NOTE_LANGUAGES, translate, type UiLanguage } from "../i18n";
 import { fencedLines } from "./markdown-blocks";
-import { isNewSourcesHeading, sectionAliasesFor } from "./section-aliases";
+import { isNewSourcesHeading, isResearchNotesHeading, sectionAliasesFor } from "./section-aliases";
 import {
   LEGACY_STANDARD,
   STANDARD,
@@ -335,6 +335,11 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
   if (!sections.some(section => section.role === "sources")) {
     const firstNew = sections.find(section => isNewSourcesHeading(section.name));
     if (firstNew) firstNew.role = "sources";
+  }
+  // Research notes takes the log role by the same rule: only when no section has it by the standard name, and only the first one.
+  if (!sections.some(section => section.role === "log")) {
+    const firstNotes = sections.find(section => isResearchNotesHeading(section.name));
+    if (firstNotes) firstNotes.role = "log";
   }
   // A current name always wins over another section's alias.
   const currentNames = new Set(sections.map(section => lowered(section.name)));

@@ -2,6 +2,8 @@ import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { normalizeReasoningLevel, type Repository, originMarkdown } from "../../repository";
 import type { ThinkingArtifact } from "../../core/thinking-artifact";
 import type { ModelChoice } from "../../ai/model-resolution";
+import { BOOK_SETTING_FIELDS } from "../../core/book-pipeline/model";
+import { cleanBookSettingsInput } from "../../core/book-pipeline/settings";
 import { HandoffWriteError, type ExperienceHandoffResult } from "../../core/experience-router";
 
 export interface VisualMapHandoffOptions {
@@ -67,6 +69,11 @@ export async function receiveVisualMapHandoff(
       );
       map.nodes.push(node);
       await options.repo.saveMap(targetPath, map);
+      // Whole-book settings only when something was filled in; all six empty writes no `book-*` key.
+      const book = cleanBookSettingsInput(
+        Object.fromEntries(BOOK_SETTING_FIELDS.map(field => [field, artifact.metadata?.[`book-${field}`]]))
+      );
+      if (Object.keys(book).length) await options.repo.writeBookSettings(node.path, book);
       saved = true;
     });
   } catch (error) {

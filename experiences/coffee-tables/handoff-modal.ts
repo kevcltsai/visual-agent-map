@@ -13,6 +13,8 @@ import {
   type TranslationKey,
   type UiLanguage
 } from "../../i18n";
+import { BOOK_SETTING_FIELDS, type BookSettingField } from "../../core/book-pipeline/model";
+import { BOOK_SETTING_INPUT_MAX, cleanBookSettingsInput } from "../../core/book-pipeline/settings";
 import { createThinkingArtifact } from "../../core/thinking-artifact";
 import { isHandoffWriteError, type ExperienceHandoffResult } from "../../core/experience-router";
 import { normalizeReasoningLevel } from "../../ai/task-policy";
@@ -30,6 +32,8 @@ export interface CoffeeHandoffInputs {
   model: string;
   reasoning: string;
   language: NoteLanguage;
+  /** The six whole-book fields as typed (absent when none was filled). */
+  book?: Partial<Record<BookSettingField, string>>;
 }
 
 /** Fields the dialog is reopened with: the original inputs, plus the AI draft when one finished. */
@@ -215,6 +219,7 @@ export class CoffeeHandoffModal extends Modal {
   private model!: HTMLSelectElement;
   private reasoning!: HTMLSelectElement;
   private language!: HTMLSelectElement;
+  private book = {} as Record<BookSettingField, HTMLTextAreaElement>;
   private organize!: HTMLButtonElement;
   private stop!: HTMLButtonElement;
   private create!: HTMLButtonElement;
@@ -293,6 +298,36 @@ export class CoffeeHandoffModal extends Modal {
     this.reasoning.value = normalizeReasoningLevel(this.snapshot.session.reasoning);
     this.language = this.select(choices, this.t("coffee.output_language"), [...NOTE_LANGUAGES], supportedLanguageLabel);
     this.language.value = noteLanguageOf(this.plugin.settings.language);
+    const bookLabels: Record<BookSettingField, TranslationKey> = {
+      reader: "coffee.book_reader",
+      goal: "coffee.book_goal",
+      angle: "coffee.book_angle",
+      tone: "coffee.book_tone",
+      length: "coffee.book_length",
+      style: "coffee.book_style"
+    };
+    const bookBox = this.contentEl.createEl("section", { cls: "ct-handoff-book" });
+    const bookTitle = bookBox.createEl("h4", { text: this.t("coffee.book_settings") });
+    bookTitle.createEl("small", { text: ` ${this.t("coffee.book_settings_hint")}`, cls: "ct-handoff-book-hint" });
+    for (const field of BOOK_SETTING_FIELDS) {
+      const id = `ct-handoff-${randomUUID()}`;
+      const label = this.t(bookLabels[field]);
+      bookBox.createEl("label", { text: label, attr: { for: id } });
+      const input = bookBox.createEl("textarea", {
+        attr: {
+          id,
+          rows: "2",
+          maxlength: String(BOOK_SETTING_INPUT_MAX),
+          "aria-label": label,
+          placeholder: this.t("coffee.book_setting_empty")
+        }
+      });
+      input.addEventListener("input", () => {
+        if (input.value.length >= BOOK_SETTING_INPUT_MAX)
+          this.status.setText(this.t("coffee.book_setting_limit", label, BOOK_SETTING_INPUT_MAX));
+      });
+      this.book[field] = input;
+    }
     this.status = this.contentEl.createEl("p", {
       cls: "ct-handoff-status",
       attr: { role: "status", "aria-live": "polite" }
@@ -335,6 +370,7 @@ export class CoffeeHandoffModal extends Modal {
     if (prefill.model) this.model.value = prefill.model;
     this.reasoning.value = normalizeReasoningLevel(prefill.reasoning);
     this.language.value = prefill.language;
+    for (const field of BOOK_SETTING_FIELDS) this.book[field].value = prefill.book?.[field] ?? "";
     if (prefill.rationale !== undefined) this.rationale = prefill.rationale;
     if (prefill.method) this.method = prefill.method;
     if (prefill.message !== undefined) this.status.setText(prefill.message);
@@ -345,6 +381,13 @@ export class CoffeeHandoffModal extends Modal {
     const id = `ct-handoff-${randomUUID()}`;
     this.contentEl.createEl("label", { text: label, attr: { for: id } });
     return this.contentEl.createEl("textarea", { attr: { id, rows: String(rows), "aria-label": label } });
+  }
+  /** The six fields cleaned to single lines (empty ones left out); `{}` when nothing was filled. */
+  private bookInputs(): { book?: Partial<Record<BookSettingField, string>> } {
+    const book = cleanBookSettingsInput(
+      Object.fromEntries(BOOK_SETTING_FIELDS.map(field => [field, this.book[field].value]))
+    );
+    return Object.keys(book).length ? { book } : {};
   }
   private select(
     parent: HTMLElement,
@@ -361,7 +404,14 @@ export class CoffeeHandoffModal extends Modal {
   }
   private refresh(): void {
     const busy = this.controller !== null || this.creating;
-    for (const input of [this.question, this.context, this.model, this.reasoning, this.language])
+    for (const input of [
+      this.question,
+      this.context,
+      this.model,
+      this.reasoning,
+      this.language,
+      ...Object.values(this.book)
+    ])
       input.disabled = busy || this.blocked || !!this.result;
     this.organize.disabled = busy || this.blocked || !!this.result;
     this.stop.disabled = !this.controller;
@@ -420,7 +470,8 @@ export class CoffeeHandoffModal extends Modal {
           context: request.context,
           model: request.model,
           reasoning: request.reasoning,
-          language
+          language,
+          ...this.bookInputs()
         });
         this.detached = true;
         this.close();
@@ -539,7 +590,8 @@ export class CoffeeHandoffModal extends Modal {
           model: this.model.value,
           reasoning: this.reasoning.value,
           reframingMethod: this.method,
-          sourceIdentityKind: this.source.identityKind
+          sourceIdentityKind: this.source.identityKind,
+          ...Object.fromEntries(Object.entries(this.bookInputs().book ?? {}).map(([k, v]) => [`book-${k}`, v]))
         }
       });
       const result = await this.plugin.core.experiences.handoff({

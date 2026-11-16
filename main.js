@@ -2116,6 +2116,16 @@ var en = {
   "coffee.organize_with_ai": "Organize with AI",
   "coffee.stop_organizing": "Stop",
   "coffee.create_research_map": "Create research map",
+  "coffee.book_settings": "Whole-book settings",
+  "coffee.book_settings_hint": "Fill in only for a picture book; may stay empty",
+  "coffee.book_reader": "Reader",
+  "coffee.book_goal": "Learning goal",
+  "coffee.book_angle": "Angle to explore",
+  "coffee.book_tone": "Tone",
+  "coffee.book_length": "Words per chapter",
+  "coffee.book_style": "Writing style",
+  "coffee.book_setting_empty": "Empty \u2192 the chief editor decides",
+  "coffee.book_setting_limit": '"{0}" holds at most {1} characters; the rest is not accepted.',
   "coffee.stopped_your_previous_draft_is_preserved": "Stopped. Your previous draft is preserved.",
   "coffee.the_table_is_generating_reopen_it_after_it_finishes": "The table is generating. Reopen it after it finishes.",
   "coffee.organizing_a_research_question": "Organizing a research question\u2026",
@@ -5217,6 +5227,16 @@ var zhCN = {
   "coffee.organize_with_ai": "AI \u6574\u7406",
   "coffee.stop_organizing": "\u505C\u6B62",
   "coffee.create_research_map": "\u521B\u5EFA\u7814\u7A76\u5730\u56FE",
+  "coffee.book_settings": "\u5168\u4E66\u8BBE\u5B9A",
+  "coffee.book_settings_hint": "\u8981\u505A\u56FE\u6587\u4E66\u624D\u586B\uFF0C\u53EF\u7559\u7A7A",
+  "coffee.book_reader": "\u8BFB\u8005",
+  "coffee.book_goal": "\u5B66\u4E60\u76EE\u6807",
+  "coffee.book_angle": "\u60F3\u770B\u7684\u89D2\u5EA6",
+  "coffee.book_tone": "\u8BED\u6C14",
+  "coffee.book_length": "\u6BCF\u7AE0\u5B57\u6570",
+  "coffee.book_style": "\u5199\u4F5C\u98CE\u683C",
+  "coffee.book_setting_empty": "\u7559\u7A7A \u2192 \u7531\u603B\u7F16\u8F91\u51B3\u5B9A",
+  "coffee.book_setting_limit": "\u201C{0}\u201D\u6700\u591A {1} \u5B57\uFF0C\u8D85\u8FC7\u7684\u90E8\u5206\u4E0D\u4F1A\u8F93\u5165\u3002",
   "coffee.stopped_your_previous_draft_is_preserved": "\u5DF2\u505C\u6B62\uFF0C\u539F\u8349\u7A3F\u5DF2\u4FDD\u7559\u3002",
   "coffee.the_table_is_generating_reopen_it_after_it_finishes": "\u8FD9\u684C\u6B63\u5728\u751F\u6210\uFF0C\u8BF7\u5B8C\u6210\u540E\u91CD\u65B0\u6253\u5F00\u3002",
   "coffee.organizing_a_research_question": "\u6B63\u5728\u6574\u7406\u7814\u7A76\u95EE\u9898\u2026",
@@ -8318,6 +8338,16 @@ var zhTW = {
   "coffee.organize_with_ai": "AI \u6574\u7406",
   "coffee.stop_organizing": "\u505C\u6B62",
   "coffee.create_research_map": "\u5EFA\u7ACB\u5FC3\u667A\u5716",
+  "coffee.book_settings": "\u5168\u66F8\u8A2D\u5B9A",
+  "coffee.book_settings_hint": "\u8981\u505A\u5716\u6587\u66F8\u624D\u586B\uFF0C\u53EF\u7559\u7A7A",
+  "coffee.book_reader": "\u8B80\u8005",
+  "coffee.book_goal": "\u5B78\u7FD2\u76EE\u6A19",
+  "coffee.book_angle": "\u60F3\u770B\u7684\u89D2\u5EA6",
+  "coffee.book_tone": "\u8A9E\u6C23",
+  "coffee.book_length": "\u6BCF\u7AE0\u5B57\u6578",
+  "coffee.book_style": "\u5BEB\u4F5C\u98A8\u683C",
+  "coffee.book_setting_empty": "\u7559\u7A7A \u2192 \u7531\u7E3D\u7DE8\u8F2F\u6C7A\u5B9A",
+  "coffee.book_setting_limit": "\u300C{0}\u300D\u6700\u591A {1} \u5B57\uFF0C\u8D85\u904E\u7684\u90E8\u5206\u4E0D\u6703\u8F38\u5165\u3002",
   "coffee.stopped_your_previous_draft_is_preserved": "\u5DF2\u505C\u6B62\uFF0C\u539F\u8349\u7A3F\u5DF2\u4FDD\u7559\u3002",
   "coffee.the_table_is_generating_reopen_it_after_it_finishes": "\u9019\u684C\u6B63\u5728\u751F\u6210\uFF0C\u8ACB\u5B8C\u6210\u5F8C\u91CD\u65B0\u958B\u555F\u3002",
   "coffee.organizing_a_research_question": "\u6B63\u5728\u6574\u7406\u7814\u7A76\u554F\u984C\u2026",
@@ -12274,7 +12304,185 @@ var CoffeeConvergenceModal = class extends import_obsidian5.Modal {
 
 // experiences/coffee-tables/handoff-modal.ts
 var import_obsidian6 = require("obsidian");
-var import_node_crypto2 = require("node:crypto");
+var import_node_crypto3 = require("node:crypto");
+
+// core/book-pipeline/model.ts
+var PIPELINE_STAGES = ["planned", "written", "checked", "needs-review"];
+var BOOK_ROLES = ["intro", "body", "gallery", "closing"];
+var PIPELINE_ISSUE_MAX = 200;
+var PIPELINE_PHASES = ["planning", "gate1", "writing", "gate2", "done"];
+var PIPELINE_STATUSES = ["running", "stopped"];
+var DEFAULT_BUDGET_LIMIT = 300;
+var MAX_STEP_ATTEMPTS = 3;
+var STEPS = ["plan", "write", "proof"];
+function readPipelineStage(value) {
+  return PIPELINE_STAGES.find((stage) => stage === value);
+}
+function readBookRole(value) {
+  return BOOK_ROLES.find((role) => role === value);
+}
+function plainPipelineLine(value) {
+  if (typeof value !== "string") return void 0;
+  const line2 = value.replace(/\s+/g, " ").trim();
+  if (!line2) return void 0;
+  return Array.from(line2).slice(0, PIPELINE_ISSUE_MAX).join("");
+}
+function readPipelineFields(fm) {
+  const stage = readPipelineStage(fm["pipeline-stage"]);
+  const role = readBookRole(fm["book-role"]);
+  const issue2 = plainPipelineLine(fm["pipeline-issue"]);
+  const seam = plainPipelineLine(fm["pipeline-seam"]);
+  return {
+    ...stage ? { pipelineStage: stage } : {},
+    ...role ? { bookRole: role } : {},
+    ...issue2 ? { pipelineIssue: issue2 } : {},
+    ...seam ? { pipelineSeam: seam } : {}
+  };
+}
+var FIELD_KEYS = {
+  pipelineStage: "pipeline-stage",
+  bookRole: "book-role",
+  pipelineIssue: "pipeline-issue",
+  pipelineSeam: "pipeline-seam"
+};
+function pipelineFrontmatter(patch) {
+  var _a2, _b2, _c;
+  const values = {};
+  for (const field of Object.keys(FIELD_KEYS)) {
+    const value = patch[field];
+    if (value === void 0) continue;
+    const clean3 = value === null ? null : field === "pipelineStage" ? (_a2 = readPipelineStage(value)) != null ? _a2 : null : field === "bookRole" ? (_b2 = readBookRole(value)) != null ? _b2 : null : (_c = plainPipelineLine(value)) != null ? _c : null;
+    values[FIELD_KEYS[field]] = clean3;
+  }
+  return values;
+}
+var BOOK_SETTING_FIELDS = ["reader", "goal", "angle", "tone", "length", "style"];
+function readBookSettings(fm) {
+  const settings = {};
+  for (const field of BOOK_SETTING_FIELDS) {
+    const value = fm[`book-${field}`];
+    if (typeof value === "string" && value.trim()) settings[field] = value.replace(/\s+/g, " ").trim();
+    else if (typeof value === "number" && Number.isFinite(value)) settings[field] = String(value);
+  }
+  return settings;
+}
+function bookSettingsFrontmatter(patch) {
+  const values = {};
+  for (const field of BOOK_SETTING_FIELDS) {
+    const value = patch[field];
+    if (value === void 0) continue;
+    const line2 = value === null ? null : value.replace(/\s+/g, " ").trim() || null;
+    values[`book-${field}`] = line2;
+  }
+  return values;
+}
+var FAILURE_CODE = /^[A-Za-z0-9_.:-]{1,60}$/;
+var isObject = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isCount = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0;
+function problem(raw) {
+  if (!isObject(raw)) return "not an object";
+  if (raw.v !== 1) return "unsupported version";
+  if (typeof raw.runId !== "string" || !raw.runId) return "runId";
+  if (!PIPELINE_PHASES.includes(raw.phase)) return "phase";
+  if (!PIPELINE_STATUSES.includes(raw.status)) return "status";
+  if (raw.pauseReason !== void 0 && raw.pauseReason !== "budget" && raw.pauseReason !== "failed")
+    return "pauseReason";
+  if (raw.failureCode !== void 0 && (typeof raw.failureCode !== "string" || !FAILURE_CODE.test(raw.failureCode)))
+    return "failureCode";
+  if (!Array.isArray(raw.order) || raw.order.some((id) => typeof id !== "string" || !id)) return "order";
+  if (new Set(raw.order).size !== raw.order.length) return "order has duplicates";
+  if (typeof raw.globalPlanned !== "boolean") return "globalPlanned";
+  if (!isObject(raw.attempts) || !isCount(raw.attempts.global)) return "attempts";
+  for (const [key4, value] of Object.entries(raw.attempts)) {
+    if (key4 === "global") continue;
+    if (!isObject(value) || STEPS.some((step) => !isCount(value[step]))) return "attempts entry";
+  }
+  if (!isObject(raw.revisions) || Object.values(raw.revisions).some((value) => !isCount(value))) return "revisions";
+  if (raw.pendingReset !== void 0 && (!Array.isArray(raw.pendingReset) || raw.pendingReset.some((id) => typeof id !== "string")))
+    return "pendingReset";
+  if (!isObject(raw.budget) || !isCount(raw.budget.used) || !isCount(raw.budget.limit) || raw.budget.limit < 1)
+    return "budget";
+  if (raw.stopEpoch !== void 0 && !isCount(raw.stopEpoch)) return "stopEpoch";
+  if (!isCount(raw.revision)) return "revision";
+  if (typeof raw.startedAt !== "string" || typeof raw.phaseStartedAt !== "string") return "timestamps";
+  return void 0;
+}
+function readBookPipeline(map) {
+  if (map.bookPipeline === void 0) return { kind: "absent" };
+  const found = problem(map.bookPipeline);
+  if (found) return { kind: "unusable", reason: found, raw: map.bookPipeline };
+  return { kind: "usable", data: map.bookPipeline };
+}
+function emptyAttempts() {
+  return { plan: 0, write: 0, proof: 0 };
+}
+function attemptsOf(data, nodeId) {
+  const entry = nodeId === "global" ? void 0 : data.attempts[nodeId];
+  return isObject(entry) ? { ...emptyAttempts(), ...entry } : emptyAttempts();
+}
+function reserveBudget(budget) {
+  return budget.used >= budget.limit ? null : { used: budget.used + 1, limit: budget.limit };
+}
+
+// core/book-pipeline/text.ts
+var import_node_crypto = require("node:crypto");
+function demoteHeadings(text10) {
+  return text10.replace(/^[ \t]{0,3}#{1,2}(?=[ \t]|$)[ \t]*/gm, "### ");
+}
+function singleLine(value, max = 400) {
+  if (typeof value !== "string") return "";
+  const line2 = demoteHeadings(value.replace(/\s+/g, " ").trim());
+  return Array.from(line2).slice(0, max).join("");
+}
+function escapeMarkdownText(value, max = 400) {
+  if (typeof value !== "string") return "";
+  const kept = value.replace(/[^\p{L}\p{N}\p{M}\p{P}\p{S}]+/gu, " ").replace(/ +/g, " ").trim();
+  const text10 = Array.from(kept).slice(0, max).join("");
+  return text10.replace(/</g, "\uFF1C").replace(/>/g, "\uFF1E").replace(/%/g, "\uFF05").replace(/[\\`*_[\]()!|~#$]/g, "\\$&").replace(/^([-+])(?=[ ]|$)/, "\\$1").replace(/^(\d+)([.)])/, "$1\\$2");
+}
+function unescapeMarkdownText(text10) {
+  return text10.replace(/\\([\\`*_[\]()!|~#$.+-])/g, "$1");
+}
+function hashText(text10) {
+  return (0, import_node_crypto.createHash)("sha256").update(text10.replace(/\r\n?/g, "\n")).digest("hex").slice(0, 16);
+}
+
+// core/book-pipeline/settings.ts
+function effectiveSettings(current, decided) {
+  var _a2, _b2;
+  const out = {};
+  for (const field of BOOK_SETTING_FIELDS) {
+    const value = ((_a2 = current[field]) == null ? void 0 : _a2.trim()) ? current[field] : ((_b2 = decided[field]) == null ? void 0 : _b2.trim()) ? decided[field] : void 0;
+    if (value) out[field] = value;
+  }
+  return out;
+}
+var BOOK_AUTHOR_RULES = [
+  "Chapter writing rules (follow them):",
+  "- Write the chapter as the role named in the brief says.",
+  "- Open by picking up the brief's entry point (how this chapter continues from the previous card).",
+  "- End with one sentence that leads into the next card, taking up the question the brief leaves for it. If the brief has no next card (the last card), do not lead into a next card; close the whole book as the brief says.",
+  "- The closing sentence belongs to the last paragraph of the chapter's own text, before any open-questions, sources or notes sections the template adds; those sections are not the chapter's ending.",
+  "- If the chapter suits pictures, prefer a direct https image address from Wikimedia Commons or a museum's public collection (Markdown image syntax, with the source and the work's name). If you cannot find an image that loads, write a line saying no picture and why. Never invent an address.",
+  '- Do not end the chapter with an update log, a change note or a "this version" remark; those are added by the system.'
+].join("\n");
+function bookAuthorRequirements(settings) {
+  const lines = BOOK_SETTING_FIELDS.filter((field) => settings[field]).map((field) => `- ${field}: ${settings[field]}`);
+  return lines.length ? `${BOOK_AUTHOR_RULES}
+
+Whole-book settings (follow them):
+${lines.join("\n")}` : BOOK_AUTHOR_RULES;
+}
+var BOOK_SETTING_INPUT_MAX = 200;
+function cleanBookSettingsInput(input2) {
+  const out = {};
+  if (!input2 || typeof input2 !== "object") return out;
+  for (const field of BOOK_SETTING_FIELDS) {
+    const line2 = singleLine(input2[field], BOOK_SETTING_INPUT_MAX);
+    if (line2) out[field] = line2;
+  }
+  return out;
+}
 
 // core/thinking-artifact.ts
 function createThinkingArtifact(input2) {
@@ -12337,7 +12545,7 @@ function researchGuidance(context, language2 = "zh-TW") {
 }
 
 // experiences/coffee-tables/handoff-source.ts
-var import_node_crypto = require("node:crypto");
+var import_node_crypto2 = require("node:crypto");
 function references(session) {
   var _a2, _b2, _c;
   return [
@@ -12431,7 +12639,7 @@ ${item.content}`)
     content,
     sourceSnapshot,
     question: (selected == null ? void 0 : selected.question) || (selected == null ? void 0 : selected.summary) || session.topic,
-    artifactId: (selected == null ? void 0 : selected.persistedId) ? selected.id : (0, import_node_crypto.randomUUID)(),
+    artifactId: (selected == null ? void 0 : selected.persistedId) ? selected.id : (0, import_node_crypto2.randomUUID)(),
     identityKind: (selected == null ? void 0 : selected.persistedId) ? "persisted-insight" : "snapshot"
   };
 }
@@ -12676,7 +12884,7 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     this.path = path;
     this.insightId = insightId;
     this.prefill = prefill;
-    __publicField(this, "operationId", (0, import_node_crypto2.randomUUID)());
+    __publicField(this, "operationId", (0, import_node_crypto3.randomUUID)());
     __publicField(this, "controller", null);
     __publicField(this, "epoch", 0);
     __publicField(this, "closed", false);
@@ -12692,6 +12900,7 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     __publicField(this, "model");
     __publicField(this, "reasoning");
     __publicField(this, "language");
+    __publicField(this, "book", {});
     __publicField(this, "organize");
     __publicField(this, "stop");
     __publicField(this, "create");
@@ -12759,6 +12968,36 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     this.reasoning.value = normalizeReasoningLevel(this.snapshot.session.reasoning);
     this.language = this.select(choices, this.t("coffee.output_language"), [...NOTE_LANGUAGES], supportedLanguageLabel);
     this.language.value = noteLanguageOf(this.plugin.settings.language);
+    const bookLabels = {
+      reader: "coffee.book_reader",
+      goal: "coffee.book_goal",
+      angle: "coffee.book_angle",
+      tone: "coffee.book_tone",
+      length: "coffee.book_length",
+      style: "coffee.book_style"
+    };
+    const bookBox = this.contentEl.createEl("section", { cls: "ct-handoff-book" });
+    const bookTitle = bookBox.createEl("h4", { text: this.t("coffee.book_settings") });
+    bookTitle.createEl("small", { text: ` ${this.t("coffee.book_settings_hint")}`, cls: "ct-handoff-book-hint" });
+    for (const field of BOOK_SETTING_FIELDS) {
+      const id = `ct-handoff-${(0, import_node_crypto3.randomUUID)()}`;
+      const label = this.t(bookLabels[field]);
+      bookBox.createEl("label", { text: label, attr: { for: id } });
+      const input2 = bookBox.createEl("textarea", {
+        attr: {
+          id,
+          rows: "2",
+          maxlength: String(BOOK_SETTING_INPUT_MAX),
+          "aria-label": label,
+          placeholder: this.t("coffee.book_setting_empty")
+        }
+      });
+      input2.addEventListener("input", () => {
+        if (input2.value.length >= BOOK_SETTING_INPUT_MAX)
+          this.status.setText(this.t("coffee.book_setting_limit", label, BOOK_SETTING_INPUT_MAX));
+      });
+      this.book[field] = input2;
+    }
     this.status = this.contentEl.createEl("p", {
       cls: "ct-handoff-status",
       attr: { role: "status", "aria-live": "polite" }
@@ -12787,6 +13026,7 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
   }
   /** Restores the inputs (and the AI draft) the dialog was hidden with. */
   applyPrefill() {
+    var _a2, _b2;
     const prefill = this.prefill;
     if (!prefill) return;
     this.question.value = prefill.question;
@@ -12798,6 +13038,7 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     if (prefill.model) this.model.value = prefill.model;
     this.reasoning.value = normalizeReasoningLevel(prefill.reasoning);
     this.language.value = prefill.language;
+    for (const field of BOOK_SETTING_FIELDS) this.book[field].value = (_b2 = (_a2 = prefill.book) == null ? void 0 : _a2[field]) != null ? _b2 : "";
     if (prefill.rationale !== void 0) this.rationale = prefill.rationale;
     if (prefill.method) this.method = prefill.method;
     if (prefill.message !== void 0) this.status.setText(prefill.message);
@@ -12805,12 +13046,19 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
       this.status.setText(this.t("coffee.review_and_edit_this_draft_then_create_the_research_map"));
   }
   field(label, rows2) {
-    const id = `ct-handoff-${(0, import_node_crypto2.randomUUID)()}`;
+    const id = `ct-handoff-${(0, import_node_crypto3.randomUUID)()}`;
     this.contentEl.createEl("label", { text: label, attr: { for: id } });
     return this.contentEl.createEl("textarea", { attr: { id, rows: String(rows2), "aria-label": label } });
   }
+  /** The six fields cleaned to single lines (empty ones left out); `{}` when nothing was filled. */
+  bookInputs() {
+    const book = cleanBookSettingsInput(
+      Object.fromEntries(BOOK_SETTING_FIELDS.map((field) => [field, this.book[field].value]))
+    );
+    return Object.keys(book).length ? { book } : {};
+  }
   select(parent, label, values, display = (value) => value) {
-    const id = `ct-handoff-${(0, import_node_crypto2.randomUUID)()}`;
+    const id = `ct-handoff-${(0, import_node_crypto3.randomUUID)()}`;
     const group = parent.createDiv();
     group.createEl("label", { text: label, attr: { for: id } });
     const select = group.createEl("select", { attr: { id, "aria-label": label } });
@@ -12819,7 +13067,14 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
   }
   refresh() {
     const busy = this.controller !== null || this.creating;
-    for (const input2 of [this.question, this.context, this.model, this.reasoning, this.language])
+    for (const input2 of [
+      this.question,
+      this.context,
+      this.model,
+      this.reasoning,
+      this.language,
+      ...Object.values(this.book)
+    ])
       input2.disabled = busy || this.blocked || !!this.result;
     this.organize.disabled = busy || this.blocked || !!this.result;
     this.stop.disabled = !this.controller;
@@ -12878,7 +13133,8 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
           context: request.context,
           model: request.model,
           reasoning: request.reasoning,
-          language: language2
+          language: language2,
+          ...this.bookInputs()
         });
         this.detached = true;
         this.close();
@@ -12961,6 +13217,7 @@ var CoffeeHandoffModal = class extends import_obsidian6.Modal {
     if (busy()) throw new Error(this.t("coffee.the_table_is_generating_reopen_it_after_it_finishes"));
   }
   async submit() {
+    var _a2;
     if (this.controller || this.creating || this.blocked || this.closed) return;
     const title = this.question.value.trim();
     if (!title || /[\r\n]/.test(title)) {
@@ -12998,7 +13255,8 @@ ${this.rationale}` : ""].filter(Boolean).join("\n\n"),
           model: this.model.value,
           reasoning: this.reasoning.value,
           reframingMethod: this.method,
-          sourceIdentityKind: this.source.identityKind
+          sourceIdentityKind: this.source.identityKind,
+          ...Object.fromEntries(Object.entries((_a2 = this.bookInputs().book) != null ? _a2 : {}).map(([k, v]) => [`book-${k}`, v]))
         }
       });
       const result = await this.plugin.core.experiences.handoff({
@@ -20100,7 +20358,7 @@ function avoidBracketObstacles(side, label, size, obstacles, maxPush = BRACKET_T
 }
 
 // experiences/visual-map/attachment-store.ts
-var import_node_crypto3 = require("node:crypto");
+var import_node_crypto4 = require("node:crypto");
 var import_obsidian10 = require("obsidian");
 var MAP_FILE = "Map.md";
 var parentOf = (path) => path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
@@ -20133,7 +20391,7 @@ async function attachmentPath(app, name2, sourcePath) {
 }
 var fingerprintOf = (data) => ({
   size: data.byteLength,
-  sha256: (0, import_node_crypto3.createHash)("sha256").update(new Uint8Array(data)).digest("hex")
+  sha256: (0, import_node_crypto4.createHash)("sha256").update(new Uint8Array(data)).digest("hex")
 });
 var pending = [];
 function claim(path, owner) {
@@ -25530,7 +25788,7 @@ function begin(deps) {
 }
 
 // experiences/visual-map/chat-action-writer.ts
-var import_node_crypto5 = require("node:crypto");
+var import_node_crypto6 = require("node:crypto");
 
 // experiences/visual-map/image-ring.ts
 var RING_IMAGE_SIDE = 720;
@@ -26642,7 +26900,7 @@ function markedProgressPercent(lists) {
 }
 
 // repository.ts
-var import_node_crypto4 = require("node:crypto");
+var import_node_crypto5 = require("node:crypto");
 
 // ai/model-resolution.ts
 var FALLBACK_MODEL = "gpt-5.6-luna";
@@ -28676,7 +28934,7 @@ function readFacets(situation, ids2) {
   }
   return null;
 }
-function problem(raw, nodeIds) {
+function problem2(raw, nodeIds) {
   if (!isRec(raw)) return "not an object";
   if (raw.v !== ARGUMENT_MAP_VERSION) return "unsupported version";
   if (!isRec(raw.roles)) return "roles missing";
@@ -28764,7 +29022,7 @@ function problem(raw, nodeIds) {
 }
 function readArgumentMap(map) {
   if (map.argumentMap === void 0) return { kind: "absent" };
-  const found = problem(map.argumentMap, new Set(map.nodes.map((node) => node.id)));
+  const found = problem2(map.argumentMap, new Set(map.nodes.map((node) => node.id)));
   if (found) return { kind: "unusable", reason: found, raw: map.argumentMap };
   return { kind: "usable", data: map.argumentMap };
 }
@@ -28882,124 +29140,6 @@ function conclusionView(state) {
   if (phase === "concluded" && (verifiedCount(state) >= MIN_VERIFIED || state.conclusion.partial === true && verifiedCount(state) >= 1))
     return "concluded";
   return "in_progress";
-}
-
-// core/book-pipeline/model.ts
-var PIPELINE_STAGES = ["planned", "written", "checked", "needs-review"];
-var BOOK_ROLES = ["intro", "body", "gallery", "closing"];
-var PIPELINE_ISSUE_MAX = 200;
-var PIPELINE_PHASES = ["planning", "gate1", "writing", "gate2", "done"];
-var PIPELINE_STATUSES = ["running", "stopped"];
-var DEFAULT_BUDGET_LIMIT = 300;
-var MAX_STEP_ATTEMPTS = 3;
-var STEPS = ["plan", "write", "proof"];
-function readPipelineStage(value) {
-  return PIPELINE_STAGES.find((stage) => stage === value);
-}
-function readBookRole(value) {
-  return BOOK_ROLES.find((role) => role === value);
-}
-function plainPipelineLine(value) {
-  if (typeof value !== "string") return void 0;
-  const line2 = value.replace(/\s+/g, " ").trim();
-  if (!line2) return void 0;
-  return Array.from(line2).slice(0, PIPELINE_ISSUE_MAX).join("");
-}
-function readPipelineFields(fm) {
-  const stage = readPipelineStage(fm["pipeline-stage"]);
-  const role = readBookRole(fm["book-role"]);
-  const issue2 = plainPipelineLine(fm["pipeline-issue"]);
-  const seam = plainPipelineLine(fm["pipeline-seam"]);
-  return {
-    ...stage ? { pipelineStage: stage } : {},
-    ...role ? { bookRole: role } : {},
-    ...issue2 ? { pipelineIssue: issue2 } : {},
-    ...seam ? { pipelineSeam: seam } : {}
-  };
-}
-var FIELD_KEYS = {
-  pipelineStage: "pipeline-stage",
-  bookRole: "book-role",
-  pipelineIssue: "pipeline-issue",
-  pipelineSeam: "pipeline-seam"
-};
-function pipelineFrontmatter(patch) {
-  var _a2, _b2, _c;
-  const values = {};
-  for (const field of Object.keys(FIELD_KEYS)) {
-    const value = patch[field];
-    if (value === void 0) continue;
-    const clean3 = value === null ? null : field === "pipelineStage" ? (_a2 = readPipelineStage(value)) != null ? _a2 : null : field === "bookRole" ? (_b2 = readBookRole(value)) != null ? _b2 : null : (_c = plainPipelineLine(value)) != null ? _c : null;
-    values[FIELD_KEYS[field]] = clean3;
-  }
-  return values;
-}
-var BOOK_SETTING_FIELDS = ["reader", "goal", "angle", "tone", "length", "style"];
-function readBookSettings(fm) {
-  const settings = {};
-  for (const field of BOOK_SETTING_FIELDS) {
-    const value = fm[`book-${field}`];
-    if (typeof value === "string" && value.trim()) settings[field] = value.replace(/\s+/g, " ").trim();
-    else if (typeof value === "number" && Number.isFinite(value)) settings[field] = String(value);
-  }
-  return settings;
-}
-function bookSettingsFrontmatter(patch) {
-  const values = {};
-  for (const field of BOOK_SETTING_FIELDS) {
-    const value = patch[field];
-    if (value === void 0) continue;
-    const line2 = value === null ? null : value.replace(/\s+/g, " ").trim() || null;
-    values[`book-${field}`] = line2;
-  }
-  return values;
-}
-var FAILURE_CODE = /^[A-Za-z0-9_.:-]{1,60}$/;
-var isObject = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-var isCount = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0;
-function problem2(raw) {
-  if (!isObject(raw)) return "not an object";
-  if (raw.v !== 1) return "unsupported version";
-  if (typeof raw.runId !== "string" || !raw.runId) return "runId";
-  if (!PIPELINE_PHASES.includes(raw.phase)) return "phase";
-  if (!PIPELINE_STATUSES.includes(raw.status)) return "status";
-  if (raw.pauseReason !== void 0 && raw.pauseReason !== "budget" && raw.pauseReason !== "failed")
-    return "pauseReason";
-  if (raw.failureCode !== void 0 && (typeof raw.failureCode !== "string" || !FAILURE_CODE.test(raw.failureCode)))
-    return "failureCode";
-  if (!Array.isArray(raw.order) || raw.order.some((id) => typeof id !== "string" || !id)) return "order";
-  if (new Set(raw.order).size !== raw.order.length) return "order has duplicates";
-  if (typeof raw.globalPlanned !== "boolean") return "globalPlanned";
-  if (!isObject(raw.attempts) || !isCount(raw.attempts.global)) return "attempts";
-  for (const [key4, value] of Object.entries(raw.attempts)) {
-    if (key4 === "global") continue;
-    if (!isObject(value) || STEPS.some((step) => !isCount(value[step]))) return "attempts entry";
-  }
-  if (!isObject(raw.revisions) || Object.values(raw.revisions).some((value) => !isCount(value))) return "revisions";
-  if (raw.pendingReset !== void 0 && (!Array.isArray(raw.pendingReset) || raw.pendingReset.some((id) => typeof id !== "string")))
-    return "pendingReset";
-  if (!isObject(raw.budget) || !isCount(raw.budget.used) || !isCount(raw.budget.limit) || raw.budget.limit < 1)
-    return "budget";
-  if (raw.stopEpoch !== void 0 && !isCount(raw.stopEpoch)) return "stopEpoch";
-  if (!isCount(raw.revision)) return "revision";
-  if (typeof raw.startedAt !== "string" || typeof raw.phaseStartedAt !== "string") return "timestamps";
-  return void 0;
-}
-function readBookPipeline(map) {
-  if (map.bookPipeline === void 0) return { kind: "absent" };
-  const found = problem2(map.bookPipeline);
-  if (found) return { kind: "unusable", reason: found, raw: map.bookPipeline };
-  return { kind: "usable", data: map.bookPipeline };
-}
-function emptyAttempts() {
-  return { plan: 0, write: 0, proof: 0 };
-}
-function attemptsOf(data, nodeId) {
-  const entry = nodeId === "global" ? void 0 : data.attempts[nodeId];
-  return isObject(entry) ? { ...emptyAttempts(), ...entry } : emptyAttempts();
-}
-function reserveBudget(budget) {
-  return budget.used >= budget.limit ? null : { used: budget.used + 1, limit: budget.limit };
 }
 
 // core/image-keys.ts
@@ -29190,7 +29330,7 @@ function rebaseMapNotePaths(map, rebase) {
   for (const node of map.nodes) node.path = move(node.path);
   const aim = map.aim;
   if (!aim) return changed;
-  const hashSnapshot = (value) => (0, import_node_crypto4.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
+  const hashSnapshot = (value) => (0, import_node_crypto5.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
   for (const branch of aim.branches) {
     const snapshotBefore = JSON.stringify(branch.inputSnapshot);
     for (const result of branch.inputSnapshot.upstreamResults) result.notePath = move(result.notePath);
@@ -32972,7 +33112,7 @@ var ChatActionWriter = class {
       const taken = /* @__PURE__ */ new Set([...this.map.nodes.map((node) => node.id), ...image.anchors.map((anchor) => anchor.id)]);
       let anchorId2;
       do
-        anchorId2 = `anc-${(0, import_node_crypto5.randomUUID)().slice(0, 8)}`;
+        anchorId2 = `anc-${(0, import_node_crypto6.randomUUID)().slice(0, 8)}`;
       while (taken.has(anchorId2));
       const box2 = { refused: null };
       await this.ports.mapChange((map) => {
@@ -34394,14 +34534,14 @@ function withThinkingOrigin(context, note) {
 }
 
 // experiences/visual-map/note-write-helpers.ts
-var import_node_crypto6 = require("node:crypto");
+var import_node_crypto7 = require("node:crypto");
 function summaryForPrompt(summary, language2) {
   return isPlaceholder(summary) ? translateNote(noteLanguageOf(language2), "note.no_conclusion_yet") : summary;
 }
 function formatIssuesPatch(issues, language2) {
   return { detailFormatIssues: (issues != null ? issues : []).map((issue2) => countIssueText(issue2, noteLanguageOf(language2))) };
 }
-var originBaseline = (origin) => (0, import_node_crypto6.createHash)("sha256").update(origin != null ? origin : "").digest("hex");
+var originBaseline = (origin) => (0, import_node_crypto7.createHash)("sha256").update(origin != null ? origin : "").digest("hex");
 
 // experiences/visual-map/relation-geometry.ts
 var MIN_CONTROL = 16;
@@ -43125,56 +43265,6 @@ var TopicRuns = class {
   }
 };
 
-// core/book-pipeline/text.ts
-var import_node_crypto7 = require("node:crypto");
-function demoteHeadings(text10) {
-  return text10.replace(/^[ \t]{0,3}#{1,2}(?=[ \t]|$)[ \t]*/gm, "### ");
-}
-function singleLine(value, max = 400) {
-  if (typeof value !== "string") return "";
-  const line2 = demoteHeadings(value.replace(/\s+/g, " ").trim());
-  return Array.from(line2).slice(0, max).join("");
-}
-function escapeMarkdownText(value, max = 400) {
-  if (typeof value !== "string") return "";
-  const kept = value.replace(/[^\p{L}\p{N}\p{M}\p{P}\p{S}]+/gu, " ").replace(/ +/g, " ").trim();
-  const text10 = Array.from(kept).slice(0, max).join("");
-  return text10.replace(/</g, "\uFF1C").replace(/>/g, "\uFF1E").replace(/%/g, "\uFF05").replace(/[\\`*_[\]()!|~#$]/g, "\\$&").replace(/^([-+])(?=[ ]|$)/, "\\$1").replace(/^(\d+)([.)])/, "$1\\$2");
-}
-function unescapeMarkdownText(text10) {
-  return text10.replace(/\\([\\`*_[\]()!|~#$.+-])/g, "$1");
-}
-function hashText(text10) {
-  return (0, import_node_crypto7.createHash)("sha256").update(text10.replace(/\r\n?/g, "\n")).digest("hex").slice(0, 16);
-}
-
-// core/book-pipeline/settings.ts
-function effectiveSettings(current, decided) {
-  var _a2, _b2;
-  const out = {};
-  for (const field of BOOK_SETTING_FIELDS) {
-    const value = ((_a2 = current[field]) == null ? void 0 : _a2.trim()) ? current[field] : ((_b2 = decided[field]) == null ? void 0 : _b2.trim()) ? decided[field] : void 0;
-    if (value) out[field] = value;
-  }
-  return out;
-}
-var BOOK_AUTHOR_RULES = [
-  "Chapter writing rules (follow them):",
-  "- Write the chapter as the role named in the brief says.",
-  "- Open by picking up the brief's entry point (how this chapter continues from the previous card).",
-  "- End with one sentence that leads into the next card, taking up the question the brief leaves for it. If the brief has no next card (the last card), do not lead into a next card; close the whole book as the brief says.",
-  "- The closing sentence belongs to the last paragraph of the chapter's own text, before any open-questions, sources or notes sections the template adds; those sections are not the chapter's ending.",
-  "- If the chapter suits pictures, prefer a direct https image address from Wikimedia Commons or a museum's public collection (Markdown image syntax, with the source and the work's name). If you cannot find an image that loads, write a line saying no picture and why. Never invent an address.",
-  '- Do not end the chapter with an update log, a change note or a "this version" remark; those are added by the system.'
-].join("\n");
-function bookAuthorRequirements(settings) {
-  const lines = BOOK_SETTING_FIELDS.filter((field) => settings[field]).map((field) => `- ${field}: ${settings[field]}`);
-  return lines.length ? `${BOOK_AUTHOR_RULES}
-
-Whole-book settings (follow them):
-${lines.join("\n")}` : BOOK_AUTHOR_RULES;
-}
-
 // core/book-pipeline/budget.ts
 function createBudgetAdmission(port) {
   let queue = Promise.resolve();
@@ -48972,6 +49062,8 @@ var BookPipelineRuns = class {
           doc.bookPipeline = state;
         });
         initial = state;
+        for (const [id, role] of drive.missingRoles) await this.writeFields(drive, id, { bookRole: role });
+        drive.missingRoles.clear();
         this.attachStore(drive, state);
       });
       if (!initial || this.dead(drive)) return;
@@ -49224,6 +49316,8 @@ var BookPipelineRuns = class {
       controller: new AbortController(),
       config: this.ports.config(mapPath),
       cards: /* @__PURE__ */ new Map(),
+      ownerRoles: /* @__PURE__ */ new Set(),
+      missingRoles: /* @__PURE__ */ new Map(),
       stages: /* @__PURE__ */ new Map(),
       backedUp: /* @__PURE__ */ new Set(),
       reasons: /* @__PURE__ */ new Map(),
@@ -49323,9 +49417,11 @@ var BookPipelineRuns = class {
   }
   /** Reads every card of the run: its path, title, summary, role and stage (kept in memory, updated after each write). */
   async load(drive, map, order) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     drive.rootId = (_b2 = (_a2 = map.nodes.find((node) => !node.parentId)) == null ? void 0 : _a2.id) != null ? _b2 : "";
     if (map.nodes.filter((node) => !node.parentId).length !== 1) throw new BookPipelineRunError("root");
+    drive.ownerRoles.clear();
+    drive.missingRoles.clear();
     for (const id of order) {
       const node = map.nodes.find((item) => item.id === id);
       if (!node) {
@@ -49334,11 +49430,13 @@ var BookPipelineRuns = class {
       }
       try {
         const card = await this.ports.readCard(node.path);
+        if (card.fields.bookRole) drive.ownerRoles.add(id);
+        else drive.missingRoles.set(id, !node.parentId || node.parentId === drive.rootId ? "intro" : "body");
         drive.cards.set(id, {
           path: node.path,
           title: card.title,
           summary: card.summary,
-          role: (_c = card.fields.bookRole) != null ? _c : "body"
+          role: (_d = (_c = card.fields.bookRole) != null ? _c : drive.missingRoles.get(id)) != null ? _d : "body"
         });
         drive.stages.set(id, card.fields.pipelineStage);
       } catch (e) {
@@ -49572,7 +49670,7 @@ var BookPipelineRuns = class {
       after: async () => {
         for (const { id, role } of result.cards) {
           const info = drive.cards.get(id);
-          if (!info) continue;
+          if (!info || drive.ownerRoles.has(id)) continue;
           info.role = role;
           await this.writeFields(drive, id, { bookRole: role });
         }
@@ -98035,6 +98133,13 @@ ${artifact.sourceSnapshot || "No insight snapshot was supplied."}`
       );
       map.nodes.push(node);
       await options.repo.saveMap(targetPath, map);
+      const book = cleanBookSettingsInput(
+        Object.fromEntries(BOOK_SETTING_FIELDS.map((field) => {
+          var _a3;
+          return [field, (_a3 = artifact.metadata) == null ? void 0 : _a3[`book-${field}`]];
+        }))
+      );
+      if (Object.keys(book).length) await options.repo.writeBookSettings(node.path, book);
       saved = true;
     });
   } catch (error) {

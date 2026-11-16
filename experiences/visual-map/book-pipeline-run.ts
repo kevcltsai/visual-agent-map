@@ -239,6 +239,9 @@ interface Drive {
   config: BookRunConfig;
   rootId: string;
   cards: Map<string, CardInfo>;
+  /** Cards that already had a `book-role` when loaded (the owner's choice; the global plan does not overwrite it), and the missing ones with their default. */
+  ownerRoles: Set<string>;
+  missingRoles: Map<string, BookRole>;
   stages: Map<string, PipelineStage | undefined>;
   backedUp: Set<string>;
   reasons: Map<string, string>;
@@ -563,6 +566,9 @@ export class BookPipelineRuns {
           doc.bookPipeline = state;
         });
         initial = state;
+        // First start: a missing role gets its default (root and first-level topics intro, the rest body); an existing one is kept.
+        for (const [id, role] of drive.missingRoles) await this.writeFields(drive, id, { bookRole: role });
+        drive.missingRoles.clear();
         // Attach right after the write: the repaint that follows it (main.mutate reads the views back) already asks for progress.
         this.attachStore(drive, state);
       });
@@ -837,6 +843,8 @@ export class BookPipelineRuns {
       controller: new AbortController(),
       config: this.ports.config(mapPath),
       cards: new Map(),
+      ownerRoles: new Set(),
+      missingRoles: new Map(),
       stages: new Map(),
       backedUp: new Set(),
       reasons: new Map(),
@@ -949,6 +957,8 @@ export class BookPipelineRuns {
   private async load(drive: Drive, map: MapDocument, order: readonly string[]): Promise<void> {
     drive.rootId = map.nodes.find(node => !node.parentId)?.id ?? "";
     if (map.nodes.filter(node => !node.parentId).length !== 1) throw new BookPipelineRunError("root");
+    drive.ownerRoles.clear();
+    drive.missingRoles.clear();
     for (const id of order) {
       const node = map.nodes.find(item => item.id === id);
       if (!node) {
@@ -957,11 +967,13 @@ export class BookPipelineRuns {
       }
       try {
         const card = await this.ports.readCard(node.path);
+        if (card.fields.bookRole) drive.ownerRoles.add(id);
+        else drive.missingRoles.set(id, !node.parentId || node.parentId === drive.rootId ? "intro" : "body");
         drive.cards.set(id, {
           path: node.path,
           title: card.title,
           summary: card.summary,
-          role: card.fields.bookRole ?? "body"
+          role: card.fields.bookRole ?? drive.missingRoles.get(id) ?? "body"
         });
         drive.stages.set(id, card.fields.pipelineStage);
       } catch {
@@ -1224,7 +1236,7 @@ export class BookPipelineRuns {
       after: async () => {
         for (const { id, role } of result.cards) {
           const info = drive.cards.get(id);
-          if (!info) continue;
+          if (!info || drive.ownerRoles.has(id)) continue;
           info.role = role;
           await this.writeFields(drive, id, { bookRole: role });
         }

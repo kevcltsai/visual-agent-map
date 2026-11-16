@@ -1354,6 +1354,9 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .ct-handoff-modal { max-height: 80vh; overflow-y: auto; }
 .ct-handoff-modal textarea { display: block; width: 100%; margin-block: 0.4em 1em; resize: vertical; }
 .ct-handoff-modal label { display: block; }
+.ct-handoff-book { margin-block: 1em; border-top: 1px solid var(--background-modifier-border); padding-top: 0.5em; }
+.ct-handoff-book h4 { margin: 0 0 0.5em; }
+.ct-handoff-book-hint { color: var(--text-muted); font-weight: normal; }
 .ct-handoff-options { display: flex; flex-wrap: wrap; gap: 0.75em; }
 .ct-handoff-options select { max-width: 100%; }
 .ct-handoff-status { white-space: pre-wrap; overflow-wrap: anywhere; }

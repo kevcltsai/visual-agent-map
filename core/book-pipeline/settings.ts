@@ -4,7 +4,7 @@
  * Planning and writing both call this, never a private merge.
  */
 import { BOOK_SETTING_FIELDS, type BookSettings } from "./model";
-import { hashText } from "./text";
+import { hashText, singleLine } from "./text";
 
 export function effectiveSettings(current: BookSettings, decided: BookSettings): BookSettings {
   const out: BookSettings = {};
@@ -37,4 +37,17 @@ export function bookAuthorRequirements(settings: BookSettings): string {
   return lines.length
     ? `${BOOK_AUTHOR_RULES}\n\nWhole-book settings (follow them):\n${lines.join("\n")}`
     : BOOK_AUTHOR_RULES;
+}
+
+/** The longest a whole-book setting typed in the create dialog may be (characters). */
+export const BOOK_SETTING_INPUT_MAX = 200;
+/** What the create dialog's six fields become: single lines of at most {@link BOOK_SETTING_INPUT_MAX} characters; an empty field is left out. */
+export function cleanBookSettingsInput(input: unknown): BookSettings {
+  const out: BookSettings = {};
+  if (!input || typeof input !== "object") return out;
+  for (const field of BOOK_SETTING_FIELDS) {
+    const line = singleLine((input as Record<string, unknown>)[field], BOOK_SETTING_INPUT_MAX);
+    if (line) out[field] = line;
+  }
+  return out;
 }

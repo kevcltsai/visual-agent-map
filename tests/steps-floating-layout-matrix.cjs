@@ -127,7 +127,7 @@ const SCENARIOS = {
   'narrow, overlay chat + goal bar + sources': { ...NARROW, chat: 'overlay', goalBar: true, sources: true },
   'short pane, goal bar, suggestion list': { w: 360, h: 260, goalBar: true, attachment: 'suggest', statusBar: true }
 };
-const EXPECTED = process.env.GEN ? {} : require('./floating-layout-matrix.expected.json');
+const EXPECTED = process.env.GEN ? {} : require('./steps-floating-layout-matrix.expected.json');
 for (const [name, scenario] of Object.entries(SCENARIOS)) {
   test(`floating layout matrix: ${name}`, () => {
     assert.deepEqual(run(scenario), EXPECTED[name]);

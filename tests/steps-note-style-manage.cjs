@@ -1411,3 +1411,268 @@ test('P5a "Used in" for a part counts the global voice and format (a style that 
   const academic = rowFor(modal.contentEl, 'Academic rigor') ?? rowFor(modal.contentEl, 'Professional');
   assert.equal(rowTexts(academic)[0].includes('General research'), false, 'the built-in default no longer lists a style that follows another global voice');
 });
+
+// ---- note-style-integrity P1: characterization of rename / delete / clear / set (pins what main.ts does today; C1-C14) ----
+function trace(setup) {
+  const { plugin, v } = setup;
+  const log = [];
+  let saves = 0;
+  plugin.setGlobalPart = (...args) => Plugin.prototype.setGlobalPart.apply(plugin, args);
+  plugin.saveSettings = async () => { saves++; log.push(['save', notices.length]); if (setup.saveError) throw new Error('disk'); };
+  const wrap = (owner, name, label) => {
+    const real = owner[name].bind(owner);
+    owner[name] = async (...args) => { log.push([label, notices.length]); return real(...args); };
+  };
+  const listTopics = plugin.topicNoteStyleRefs;
+  plugin.topicNoteStyleRefs = (...args) => { log.push(['topics.list', notices.length]); return listTopics.apply(plugin, args); };
+  wrap(setup.store, 'renameFile', 'renameFile');
+  wrap(setup.store, 'rewritePartRefs', 'rewritePartRefs');
+  wrap(setup.store, 'trashFile', 'trashFile');
+  wrap(plugin.repo, 'renameNoteStyleRef', 'repoRename');
+  return { log, saves: () => saves, names: () => log.map(entry => entry[0]) };
+}
+const REN_DONE = (name, topics, styles) => M.translate('en', 'ui.manage_rename_done_0_1_2', name, topics, styles);
+
+test('note-style-integrity C1 rename: a failing settings save is swallowed; the topics are still written; failed starts with the settings label', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, { noteStyleByKind: { hypothesis: 'file:Weekly' } }, { topics: { 'Maps/a.md': topicText('file:Weekly') } });
+  setup.saveError = true;
+  const t = trace(setup);
+  const result = await setup.plugin.renameNoteStyle('recipe', 'file:Weekly', 'Monthly');
+  assert.equal(result.ok, true);
+  assert.deepEqual(plain(result.failed), [M.translate('en', 'ui.manage_rename_settings')]);
+  assert.equal(result.topics, 1);
+  assert.equal(t.saves(), 1);
+  assert.ok(setup.topics['Maps/a.md'].includes('"file:Monthly"'));
+  assert.deepEqual(plain(setup.settings.noteStyleByKind), { hypothesis: 'file:Monthly' }, 'memory changed although the save failed');
+  assert.equal(notices.length, 2);
+  assert.equal(notices[0], REN_DONE('Monthly', 1, 0));
+  assert.equal(notices[1], M.translate('en', 'ui.manage_rename_failed_0', M.translate('en', 'ui.manage_rename_settings')));
+});
+
+test('note-style-integrity C2 rename a part: failed order is [settings, ...style files, ...topics]; a rewritePartRefs that rejects goes out after the save and with no Notice', async () => {
+  const user = '---\nstructure: Mine\n---\nbody\n';
+  const files = { [`${STRUCTURES}/Mine.md`]: '## A\nx\n', [`${RECIPES}/User.md`]: user, [`${RECIPES}/User2.md`]: user };
+  const patch = { noteStyleRecipe: { migrated: 1, legacy: { templates: { t1: 'file:Mine' }, tones: {} } } };
+  const setup = await manageSetup(files, patch);
+  setup.saveError = true;
+  const t = trace(setup);
+  const realModify = setup.v.port.modify;
+  setup.v.port.modify = async (file, content) => { if (file.endsWith('User2.md')) throw new Error('locked'); return realModify(file, content); };
+  const result = await setup.plugin.renameNoteStyle('structure', 'file:Mine', 'Plan');
+  assert.equal(result.ok, true);
+  assert.equal(result.styles, 1);
+  assert.equal(result.failed.length, 2);
+  assert.equal(result.failed[0], M.translate('en', 'ui.manage_rename_settings'));
+  assert.match(result.failed[1], /User2/);
+  assert.equal(notices.length, 2);
+  assert.equal(notices[0], REN_DONE('Plan', 0, 1));
+  assert.equal(notices[1], M.translate('en', 'ui.manage_rename_failed_0', result.failed.join(M.translate('en', 'ui.list_separator'))));
+  assert.deepEqual(t.names(), ['renameFile', 'save', 'rewritePartRefs']);
+  // F6: a rewritePartRefs that rejects is not caught: no Notice, the save already happened
+  const other = await manageSetup({ [`${STRUCTURES}/Mine.md`]: '## A\nx\n' }, patch);
+  const o = trace(other);
+  other.store.rewritePartRefs = async () => { throw new Error('boom'); };
+  await assert.rejects(other.plugin.renameNoteStyle('structure', 'file:Mine', 'Plan'), /boom/);
+  assert.equal(o.saves(), 1);
+  assert.equal(notices.length, 0);
+});
+
+test('note-style-integrity C3 rename refused: one refused Notice, the store object is returned as it is, no save, no topic or style write', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY, [`${RECIPES}/Other.md`]: WEEKLY }, { noteStyleByKind: { hypothesis: 'file:Weekly' } }, { topics: { 'Maps/a.md': topicText('file:Weekly') } });
+  const t = trace(setup);
+  const result = await setup.plugin.renameNoteStyle('recipe', 'file:Weekly', 'Other');
+  assert.deepEqual(plain(result), { ok: false, reason: 'taken' });
+  assert.deepEqual(notices, [M.translate('en', 'ui.manage_rename_refused')]);
+  assert.equal(t.saves(), 0);
+  assert.equal(setup.topicWrites.length, 0);
+  assert.deepEqual(t.names(), ['topics.list', 'renameFile']);
+  const fixed = { ok: false, reason: 'failed' };
+  setup.store.renameFile = async () => fixed;
+  assert.equal(await setup.plugin.renameNoteStyle('recipe', 'file:Weekly', 'X'), fixed, 'the same object, not a copy');
+});
+
+test('note-style-integrity C4 rename unchanged: ok with unchanged, zero counts, no Notice, no save, no topic or style write', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, { noteStyleByKind: { hypothesis: 'file:Weekly' } }, { topics: { 'Maps/a.md': topicText('file:Weekly') } });
+  const t = trace(setup);
+  const result = await setup.plugin.renameNoteStyle('recipe', 'file:Weekly', 'Weekly');
+  assert.deepEqual(plain(result), { ok: true, ref: 'file:Weekly', unchanged: true, topics: 0, styles: 0, failed: [] });
+  assert.equal(notices.length, 0);
+  assert.equal(t.saves(), 0);
+  assert.equal(setup.topicWrites.length, 0);
+  assert.deepEqual(t.names(), ['topics.list', 'renameFile']);
+});
+
+test('note-style-integrity C5 call order: a style reads the topics before renameFile, saves before the topic writes, and the done Notice comes after every write; a part never reads the topics', async () => {
+  const topics = { 'Maps/a.md': topicText('file:Weekly'), 'Maps/b.md': topicText('file:Weekly') };
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, { noteStyleByKind: { hypothesis: 'file:Weekly' } }, { topics });
+  const t = trace(setup);
+  await setup.plugin.renameNoteStyle('recipe', 'file:Weekly', 'Monthly');
+  assert.deepEqual(t.names(), ['topics.list', 'renameFile', 'save', 'repoRename', 'repoRename']);
+  assert.ok(t.log.every(entry => entry[1] === 0), 'no Notice before the last write');
+  assert.equal(notices.length, 1);
+  const part = await manageSetup({ [`${STRUCTURES}/Mine.md`]: '## A\nx\n', [`${RECIPES}/User.md`]: '---\nstructure: Mine\n---\n' }, { noteStyleRecipe: { migrated: 1, legacy: { templates: { t: 'file:Mine' }, tones: {} } } }, { topics });
+  const p = trace(part);
+  await part.plugin.renameNoteStyle('structure', 'file:Mine', 'Plan');
+  assert.deepEqual(p.names(), ['renameFile', 'save', 'rewritePartRefs']);
+  assert.ok(p.log.every(entry => entry[1] === 0));
+  assert.equal(notices.length, 1);
+});
+
+test('note-style-integrity C6 rename a format: the global format follows, no legacy table is invented, one save; a structure with no legacy and no match saves nothing', async () => {
+  const setup = await manageSetup({ ['WS/S/' + M.translate('en', 'ui.style_folder_format') + '/Fmt.md']: '' }, { noteStyleDefaults: { format: 'file:Fmt', voice: 'file:Calm' } });
+  const t = trace(setup);
+  const result = await setup.plugin.renameNoteStyle('format', 'file:Fmt', 'Fmt2');
+  assert.equal(result.ok, true);
+  assert.deepEqual(plain(setup.settings.noteStyleDefaults), { format: 'file:Fmt2', voice: 'file:Calm' });
+  assert.equal('noteStyleRecipe' in setup.settings, false);
+  assert.equal(t.saves(), 1);
+  const bare = await manageSetup({ [`${STRUCTURES}/Mine.md`]: '## A\nx\n' }, {});
+  const b = trace(bare);
+  await bare.plugin.renameNoteStyle('structure', 'file:Mine', 'Plan');
+  assert.equal(b.saves(), 0);
+  assert.equal('noteStyleRecipe' in bare.settings, false);
+  assert.equal('noteStyleDefaults' in bare.settings, false);
+});
+
+test('note-style-integrity C7 rename a style nothing refers to: no save, done Notice with 0 and 0, no failed Notice', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, { noteStyleByKind: { atomic: 'file:Other' } }, { topics: { 'Maps/a.md': topicText('file:Other') } });
+  const t = trace(setup);
+  const result = await setup.plugin.renameNoteStyle('recipe', 'file:Weekly', 'Monthly');
+  assert.deepEqual(plain(result), { ok: true, ref: 'file:Monthly', topics: 0, styles: 0, failed: [] });
+  assert.equal(t.saves(), 0);
+  assert.deepEqual(notices, [REN_DONE('Monthly', 0, 0)]);
+  assert.deepEqual(plain(setup.settings.noteStyleByKind), { atomic: 'file:Other' });
+});
+
+test('note-style-integrity C8 delete when the trash fails: false, the delete-failed Notice, settings and file untouched, no save', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, { noteStyleByKind: { hypothesis: 'file:Weekly' }, noteStyleDefaults: { voice: 'file:Weekly' } });
+  const t = trace(setup);
+  setup.v.port.trash = async () => { throw new Error('nope'); };
+  const before = JSON.stringify(setup.settings);
+  assert.equal(await setup.plugin.deleteNoteStyle('recipe', 'file:Weekly'), false);
+  assert.deepEqual(notices, [M.translate('en', 'ui.manage_delete_failed')]);
+  assert.equal(JSON.stringify(setup.settings), before);
+  assert.equal(t.saves(), 0);
+  assert.ok(`${RECIPES}/Weekly.md` in setup.v.files);
+});
+
+test('note-style-integrity C9 delete: a save that throws after the trash rejects out of deleteNoteStyle; no Notice; memory changed, file trashed (F1, pinned not fixed)', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, { noteStyleByKind: { hypothesis: 'file:Weekly' } });
+  setup.saveError = true;
+  const t = trace(setup);
+  await assert.rejects(setup.plugin.deleteNoteStyle('recipe', 'file:Weekly'), /disk/);
+  assert.equal(notices.length, 0);
+  assert.equal('noteStyleByKind' in setup.settings, false);
+  assert.equal(setup.v.trashes, 1);
+  assert.equal(t.saves(), 1);
+});
+
+test('note-style-integrity C10 delete a part: the global voice or format that named it goes back to the default (key gone, object gone when empty, one save); anything else saves nothing', async () => {
+  const voiceDir = dirOf('en', 'tone');
+  const formatDir = dirOf('en', 'format');
+  const make = (defaults, extra = {}) => manageSetup({ [`${voiceDir}/Calm.md`]: 'soft', [`${formatDir}/Fmt.md`]: '', [`${STRUCTURES}/Mine.md`]: '## A\nx\n', ...extra }, defaults ? { noteStyleDefaults: defaults } : {});
+  const a = await make({ voice: 'file:Calm' });
+  const ta = trace(a);
+  assert.equal(await a.plugin.deleteNoteStyle('voice', 'file:Calm'), true);
+  assert.equal('noteStyleDefaults' in a.settings, false);
+  assert.equal(ta.saves(), 1);
+  assert.deepEqual(ta.names(), ['trashFile', 'save']);
+  assert.equal(notices.length, 0);
+  const b = await make({ voice: 'file:Calm', format: 'file:Fmt' });
+  const tb = trace(b);
+  await b.plugin.deleteNoteStyle('format', 'file:Fmt');
+  assert.deepEqual(plain(b.settings.noteStyleDefaults), { voice: 'file:Calm' });
+  assert.equal(tb.saves(), 1);
+  const c = await make({ voice: 'file:Other' });
+  const tc = trace(c);
+  await c.plugin.deleteNoteStyle('voice', 'file:Calm');
+  assert.deepEqual(plain(c.settings.noteStyleDefaults), { voice: 'file:Other' });
+  assert.equal(tc.saves(), 0);
+  const d = await make({ voice: 'file:Mine' });
+  const td = trace(d);
+  await d.plugin.deleteNoteStyle('structure', 'file:Mine');
+  assert.deepEqual(plain(d.settings.noteStyleDefaults), { voice: 'file:Mine' }, 'structure has no global default');
+  assert.equal(td.saves(), 0);
+  const e = await make(undefined);
+  const te = trace(e);
+  await e.plugin.deleteNoteStyle('voice', 'file:Calm');
+  assert.equal(te.saves(), 0);
+});
+
+test('note-style-integrity C11 settings object replaced: every method reads plugin.settings when it runs, not a copy taken earlier', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, { noteStyleByKind: { hypothesis: 'file:Weekly' } });
+  const t = trace(setup);
+  const fresh = { noteStyleByKind: { action: 'file:Weekly', atomic: 'file:Other' } };
+  const realRename = setup.store.renameFile;
+  setup.store.renameFile = async (...args) => { const out = await realRename(...args); setup.plugin.settings = fresh; return out; };
+  await setup.plugin.renameNoteStyle('recipe', 'file:Weekly', 'Monthly');
+  assert.deepEqual(plain(fresh.noteStyleByKind), { action: 'file:Monthly', atomic: 'file:Other' });
+  assert.deepEqual(plain(setup.settings.noteStyleByKind), { hypothesis: 'file:Weekly' }, 'the old object is not touched');
+  const next = { noteStyleByKind: { atomic: 'file:Z', action: 'file:Z' } };
+  setup.plugin.settings = next;
+  assert.deepEqual(plain(await setup.plugin.clearKindStyles('file:Z')), ['atomic', 'action']);
+  assert.equal('noteStyleByKind' in next, false);
+  const third = {};
+  setup.plugin.settings = third;
+  await setup.plugin.setKindStyle('action', 'file:Q');
+  assert.deepEqual(plain(third.noteStyleByKind), { action: 'file:Q' });
+  const fourth = {};
+  setup.plugin.settings = fourth;
+  await setup.plugin.setGlobalPart('voice', 'builtin:guide');
+  assert.deepEqual(plain(fourth.noteStyleDefaults), { voice: 'builtin:guide' });
+  assert.equal(t.saves(), 4);
+});
+
+test('note-style-integrity C12 clearKindStyles / setKindStyle / setGlobalPart: a throwing save rejects after the memory was changed; one save each', async () => {
+  const setup = await manageSetup({}, { noteStyleByKind: { hypothesis: 'file:Weekly' } });
+  setup.saveError = true;
+  const t = trace(setup);
+  await assert.rejects(setup.plugin.clearKindStyles('file:Weekly'), /disk/);
+  assert.equal('noteStyleByKind' in setup.settings, false);
+  await assert.rejects(setup.plugin.setKindStyle('action', 'file:Q'), /disk/);
+  assert.deepEqual(plain(setup.settings.noteStyleByKind), { action: 'file:Q' });
+  await assert.rejects(setup.plugin.setGlobalPart('voice', 'builtin:guide'), /disk/);
+  assert.deepEqual(plain(setup.settings.noteStyleDefaults), { voice: 'builtin:guide' });
+  assert.equal(t.saves(), 3);
+  // no match / not a part ref: no save, no change
+  setup.saveError = false;
+  assert.deepEqual(plain(await setup.plugin.clearKindStyles('file:None')), []);
+  await setup.plugin.setGlobalPart('voice', 'file:'); // not a usable part ref
+  await setup.plugin.setGlobalPart('format', 'plain'); // not a ref at all
+  assert.equal(t.saves(), 3);
+  // the kind's own built-in style removes the entry; the choice that leaves the table empty removes the key
+  await setup.plugin.setKindStyle('action', 'builtin:action');
+  assert.equal('noteStyleByKind' in setup.settings, false);
+  assert.equal(t.saves(), 4);
+  await setup.plugin.setGlobalPart('voice', 'builtin:academic');
+  assert.equal('noteStyleDefaults' in setup.settings, false);
+  assert.equal(t.saves(), 5);
+});
+
+test('note-style-integrity C13 a topic added while renameFile waits is not followed (F2, pinned not fixed)', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, { noteStyleByKind: { hypothesis: 'file:Weekly' } }, { topics: { 'Maps/a.md': topicText('file:Weekly') } });
+  const t = trace(setup);
+  const realRename = setup.store.renameFile;
+  setup.store.renameFile = async (...args) => { setup.topics['Maps/late.md'] = topicText('file:Weekly'); return realRename(...args); };
+  const result = await setup.plugin.renameNoteStyle('recipe', 'file:Weekly', 'Monthly');
+  assert.equal(result.topics, 1);
+  assert.equal(setup.topics['Maps/late.md'], topicText('file:Weekly'));
+  assert.deepEqual(setup.topicWrites, ['Maps/a.md']);
+  assert.equal(t.names().filter(name => name === 'topics.list').length, 1);
+});
+
+test('note-style-integrity C14 rename and delete started together on the same style: the actual outcome is pinned', async () => {
+  const setup = await manageSetup({ [`${RECIPES}/Weekly.md`]: WEEKLY }, { noteStyleByKind: { hypothesis: 'file:Weekly' } }, { topics: { 'Maps/a.md': topicText('file:Weekly') } });
+  const t = trace(setup);
+  const [renamed, deleted] = await Promise.allSettled([setup.plugin.renameNoteStyle('recipe', 'file:Weekly', 'Monthly'), setup.plugin.deleteNoteStyle('recipe', 'file:Weekly')]);
+  // the rename's renameFile is queued first, so the trash then finds no file: delete answers false with its Notice and changes nothing else
+  assert.equal(renamed.status, 'fulfilled');
+  assert.deepEqual(plain(renamed.value), { ok: true, ref: 'file:Monthly', topics: 1, styles: 0, failed: [] });
+  assert.deepEqual(plain(deleted), { status: 'fulfilled', value: false });
+  assert.deepEqual(t.names(), ['topics.list', 'renameFile', 'trashFile', 'save', 'repoRename']);
+  assert.deepEqual(Object.keys(setup.v.files), [`${RECIPES}/Monthly.md`]);
+  assert.equal(setup.v.trashes, 0);
+  assert.deepEqual(plain(setup.settings.noteStyleByKind), { hypothesis: 'file:Monthly' });
+  assert.deepEqual(notices, [REN_DONE('Monthly', 1, 0), M.translate('en', 'ui.manage_delete_failed')]);
+  assert.equal(t.saves(), 1);
+});

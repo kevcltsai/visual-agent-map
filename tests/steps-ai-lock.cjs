@@ -94,6 +94,7 @@ async function harness(titles = ['A', 'B'], plugin = {}) {
   const modals = [];
   const { VisualAgentMapView } = S.load('main.ts', { obsidian: { ...obsidian, Notice: class { constructor(message) { notices.push(message); } }, Modal: class { constructor(app) { this.app = app; } open() { modals.push(this); } close() {} } } });
   const view = new VisualAgentMapView({ app }, attachTopicRuns(host));
+  view.armHighlightFade = () => {}; // the 5 s fade is not under test here
   const hydrate = async () => { view.notes = new Map(await Promise.all(mapDoc.nodes.map(async n => [n.id, await repo.readNote(n.path, mapDoc)]))); };
   Object.assign(view, { path: MAP, map: mapDoc, contentEl: { querySelector: () => null }, render() {}, hydrate, ancestorContext: async () => '', queueCharts() {} });
   await hydrate();

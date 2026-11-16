@@ -228,6 +228,7 @@ function chatStub() {
 async function rig(options = {}) {
   const View = await view();
   const instance = Object.create(View.prototype);
+  instance.armHighlightFade = () => {}; // the 5 s fade is not under test here
   const notices = [];
   const starts = [];
   const chat = chatStub();

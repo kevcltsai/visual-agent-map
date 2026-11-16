@@ -72,6 +72,18 @@ export class TopicSelection {
   private mode = false;
   private relation: string | null = null;
   private tabStop: string | null = null;
+  /** What the AI's last pick was while no selection mode was on; it is still "pure" only while the multi set is exactly that. */
+  private highlight: Set<string> | null = null;
+  /** True while the multi set is still exactly what the AI picked, with no selection mode on. */
+  isPureHighlight(): boolean {
+    return this.pureHighlight().length > 0;
+  }
+  private pureHighlight(): string[] {
+    const h = this.highlight;
+    // Cards hidden or deleted since the pick leave multi (prune), so "pure" means every member is still one the AI picked.
+    if (this.mode || !h || !this.multi.size || [...this.multi].some(id => !h.has(id))) return [];
+    return [...this.multi];
+  }
 
   /** A frozen copy: editing it, or its Set, never reaches the module. */
   get state(): SelectionState {
@@ -108,8 +120,11 @@ export class TopicSelection {
   // ---- Cmd/Ctrl click ----
   /** enableDrag Cmd/Ctrl branch (17592-17604). */
   cmdClick(id: string, ctx: SelectionContext): SelectionChange {
+    // The AI's highlight (no mode) is not the user's pick: starting their own selection drops it.
+    const stale = this.pureHighlight();
+    for (const id of stale) this.multi.delete(id);
     const before = this.selected,
-      multi = [...this.multi];
+      multi = [...stale, ...this.multi];
     if (ctx.canMultiSelect && !this.multi.size && before && before !== id) this.multi.add(before);
     if (this.multi.has(id)) this.multi.delete(id);
     else this.multi.add(id);
@@ -149,6 +164,8 @@ export class TopicSelection {
     if (!ctx.canMultiSelect) return NO_CHANGE;
     const hits = new Set(ids);
     if (!hits.size) return NO_CHANGE;
+    const stale = mode !== "subtract" ? this.pureHighlight() : [];
+    for (const id of stale) this.multi.delete(id);
     if (mode === "subtract") {
       const removed = [...hits].filter(id => this.multi.has(id));
       if (!removed.length) return NO_CHANGE;
@@ -158,9 +175,9 @@ export class TopicSelection {
     for (const id of hits) this.multi.add(id);
     if (mode === "enter") {
       this.mode = true;
-      return change(hits, true);
+      return change([...hits, ...stale], true);
     }
-    return this.commit(hits, ctx);
+    return this.commit([...hits, ...stale], ctx);
   }
 
   // ---- clear ----
@@ -210,6 +227,8 @@ export class TopicSelection {
     const before = this.selected,
       multi = [...this.multi],
       wasMode = this.mode;
+    // A batch starting while only the AI's highlight is on (no mode): the highlight stays until the work ends.
+    if (variant === "backgroundRun" && !wasMode) return NO_CHANGE;
     this.mode = false;
     this.multi.clear();
     if (variant === "openMap") this.selected = null;
@@ -217,7 +236,15 @@ export class TopicSelection {
   }
   /** Map chat picked topics (16508-16510). */
   chatSelect(ids: Iterable<string>): SelectionChange {
-    return this.enterWith(ids);
+    // Highlight only: the AI's working set must not take the user's selection mode (they keep reading cards meanwhile).
+    // Inside a mode the user entered themselves, it behaves as before.
+    const before = this.selected,
+      multi = [...this.multi],
+      next = [...ids];
+    this.multi = new Set(next);
+    this.selected = null;
+    this.highlight = this.mode ? null : new Set(next);
+    return change([before, ...multi, ...next], this.mode);
   }
   /** A card's direct subtopics (17015-17017). */
   selectSubtopics(ids: Iterable<string>): SelectionChange {

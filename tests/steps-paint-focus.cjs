@@ -94,7 +94,7 @@ async function harness() {
       card.add('button', { cls: 'vam-card-resize' }); card.add('button', { cls: 'vam-card-resize-y' });
       view.cardEls.set(node.id, card);
     },
-    renderCanvasItems() {}, setupPan() {}, setupCanvasImageInput() {}, applyInitialViewport() {}, transform() {}, applyStageTransform() {},
+    renderCanvasItems() {}, setupPan() { log.push('setupPan'); }, setupCanvasImageInput() {}, applyInitialViewport() { log.push('applyInitialViewport'); }, transform() { log.push('transform'); }, applyStageTransform() {},
     syncStatusBarClearance() { log.push('syncStatusBarClearance'); }, releaseCovers() {}, fillEmptyMap() {}, mountMapChat() {}, removeGoalBar() {}, lockWhileLoading() {}, settleCardHeights() {}, drawEdges() { log.push('drawEdges'); }
   });
   for (const name of ['lockWhileLoading', 'settleCardHeights']) view[name] = () => { log.push(name); };
@@ -106,7 +106,7 @@ async function harness() {
   view.anchorDragCancel = arg => { log.push('anchorDragCancel(' + arg + ')'); };
   const emptyOnce = contentEl.empty.bind(contentEl); contentEl.empty = () => { log.push('contentEl.empty'); emptyOnce(); };
   const focused = [];
-  contentEl.addEventListener('focusin', event => focused.push({ el: event.target, restoring: view.restoringFocus }));
+  contentEl.addEventListener('focusin', event => { focused.push({ el: event.target, restoring: view.restoringFocus }); if (view.restoringFocus) log.push('cardFocus'); });
   return { focused, view, repo, doc, contentEl, ids, mapWin, log, plugin, active: () => doc.activeElement, VisualAgentMapView };
 }
 
@@ -122,12 +122,14 @@ const goMap = h => { globalWin.activeWindow = h.mapWin; globalWin.activeDocument
 
 test('P1 C1: paint runs its phases in this order (holds, empty, rebuild, restorers, tail), then render locks and settles', async () => {
   const h = await harness();
+  h.view.render();
+  leafCard(h).focus(); // a focused card, so paint's card handoff (cardFocus) is part of the sequence
   h.log.length = 0;
   h.view.render();
   // The second captureGoalEdit is mountGoalBar's own redraw, inside the rebuild (observed, not in paint's own list).
   assert.deepEqual(h.log, [
     'anchorDragCancel(false)', 'holdMapFocus', 'keepRelevanceBarFocus', 'keepArgumentBarFocus', 'detachMapChat', 'detachTopicChat', 'holdMapSearch', 'captureGoalEdit',
-    'contentEl.empty', 'captureGoalEdit', 'drawEdges',
+    'contentEl.empty', 'captureGoalEdit', 'cardFocus', 'setupPan', 'applyInitialViewport', 'transform', 'drawEdges',
     'restoreRelevance', 'restoreArgument', 'restoreChat', 'remountTopicChat', 'keepMapFocus', 'focusInlineName', 'focusInlineSummary', 'focusGoalEdit',
     'syncStatusBarClearance', 'applyPresentationMarks', 'restoreSearch', 'lockWhileLoading', 'settleCardHeights'
   ]);
@@ -244,10 +246,8 @@ test('P1 C8: refreshFromPlugin while another window is active moves no map focus
     goMap(h);
     h.view.onMapWindowFocus();
     assert.equal(h.view.focusRestorePending, false, name);
-    if (name === 'title button') {
-      assert.equal(ident(h.active()), id, 'same identity, new element');
-      assert.ok(h.active() !== el);
-    }
+    assert.equal(ident(h.active()), id, `${name}: same identity, new element`);
+    assert.ok(h.active() !== el, name);
     const after = h.active(); const count = h.focused.length;
     h.view.onMapWindowFocus();
     assert.ok(h.active() === after, `${name}: a second window focus is a no-op`);

@@ -2970,6 +2970,7 @@ export class VisualAgentMapView extends ItemView {
   async onClose(): Promise<void> {
     this.closeTopicLinkMenu();
     this.closed = true;
+    if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
     this.chatSourceCache = null;
     this.unsyncedPaths = null;
     this.closeTopicChatWindow();
@@ -21138,6 +21139,19 @@ export class VisualAgentMapView extends ItemView {
   private chatSelect(ids: string[]): void {
     this.selection.chatSelect(ids);
     if (!this.closed) this.render();
+    this.armHighlightFade();
+  }
+  private highlightFadeTimer: number | null = null;
+  /** The AI's highlight (no selection mode) fades about 5 s after its work ends; while a chat chain or batch runs it waits. */
+  private armHighlightFade(): void {
+    if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
+    this.highlightFadeTimer = window.setTimeout(() => {
+      this.highlightFadeTimer = null;
+      if (this.closed || this.selection.state.multiSelectMode || !this.selection.state.multiSelected.size) return;
+      if (this.chatChainRunner?.current || this.plugin.expansionCoordinator?.isRunning(this.multiResearchKey()))
+        return this.armHighlightFade();
+      this.applySelectionChange(this.selection.clearMulti());
+    }, 5000);
   }
   /** The chat remembers what it researched; a card researched again moves to the end, and a later failure does not undo a success. */
   /** The user asked for images: the researched topics whose note still has no image, named in one line (failed ones are in the batch box). */

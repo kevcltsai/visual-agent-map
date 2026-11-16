@@ -210,6 +210,8 @@ export class TopicSelection {
     const before = this.selected,
       multi = [...this.multi],
       wasMode = this.mode;
+    // A batch starting while only the AI's highlight is on (no mode): the highlight stays until the work ends.
+    if (variant === "backgroundRun" && !wasMode) return NO_CHANGE;
     this.mode = false;
     this.multi.clear();
     if (variant === "openMap") this.selected = null;
@@ -217,7 +219,14 @@ export class TopicSelection {
   }
   /** Map chat picked topics (16508-16510). */
   chatSelect(ids: Iterable<string>): SelectionChange {
-    return this.enterWith(ids);
+    // Highlight only: the AI's working set must not take the user's selection mode (they keep reading cards meanwhile).
+    // Inside a mode the user entered themselves, it behaves as before.
+    const before = this.selected,
+      multi = [...this.multi],
+      next = [...ids];
+    this.multi = new Set(next);
+    this.selected = null;
+    return change([before, ...multi, ...next], this.mode);
   }
   /** A card's direct subtopics (17015-17017). */
   selectSubtopics(ids: Iterable<string>): SelectionChange {

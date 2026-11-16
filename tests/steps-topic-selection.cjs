@@ -305,8 +305,21 @@ test('exit variants report no mode change when not in the mode', () => {
     assert.equal(seeded({ multi: ['b'] }).exitMultiSelect(variant).multiSelectModeChanged, false, variant);
   }
 });
-test('enter rows: chatSelect 16508-16510 and selectSubtopics 17015-17017 replace the set, drop selected, turn the mode on', () => {
-  for (const op of ['chatSelect', 'selectSubtopics']) {
+test('chatSelect: the AI highlight replaces the set and drops selected but never turns the mode on', () => {
+  const s = seeded({ selected: 'a', multi: ['x'] });
+  assert.deepEqual(ch(s.chatSelect(['b', 'c'])), { touched: ['a', 'x', 'b', 'c'], mode: false, relation: false });
+  assert.deepEqual(st(s), { selected: null, multi: ['b', 'c'], mode: false, relation: null, stop: null });
+  const inMode = seeded({ multi: ['x'], mode: true });
+  assert.equal(inMode.chatSelect(['b']).multiSelectModeChanged, true);
+  assert.equal(inMode.state.multiSelectMode, true);
+});
+test('exitMultiSelect backgroundRun keeps the AI highlight when no selection mode is on', () => {
+  const s = seeded({ multi: ['b', 'c'] });
+  assert.equal(s.exitMultiSelect('backgroundRun').touched.length, 0);
+  assert.deepEqual(st(s), { selected: null, multi: ['b', 'c'], mode: false, relation: null, stop: null });
+});
+test('enter rows: selectSubtopics 17015-17017 replaces the set, drops selected, turns the mode on', () => {
+  for (const op of ['selectSubtopics']) {
     const s = seeded({ selected: 'a', multi: ['x'] });
     assert.deepEqual(ch(s[op](['b', 'c'])), { touched: ['a', 'x', 'b', 'c'], mode: true, relation: false }, op);
     assert.deepEqual(st(s), { selected: null, multi: ['b', 'c'], mode: true, relation: null, stop: null }, op);

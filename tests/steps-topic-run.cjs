@@ -1172,3 +1172,73 @@ test('selection synthesis: state is per view, and a draft whose view closed writ
   await drafts.startSelectionSynthesis(c, d.input('direction', { closed: () => true }));
   assert.equal(d.writes.length, 0); assert.equal(d.failed.length, 1); assert.equal(drafts.syntheses(c).selection.state, 'failed');
 });
+
+// ---- research run with the picture-book pipeline guard (03a) ----
+const { BudgetExhaustedError } = load('core/admission.ts', { obsidian });
+function guardedRuns({ onGuarded, ...rest } = {}) {
+  const h = researchRuns(rest);
+  const guardedCalls = [];
+  const owner = { text: 'RAW-STARTED' };
+  const repo = h.runs.ports.repository();
+  repo.updateNoteGuarded = async (p, patch, opt) => {
+    guardedCalls.push({ p, patch, opt });
+    const verdict = onGuarded ? onGuarded(opt, owner) : 'written';
+    if (verdict === 'written') Object.assign(h.store.get(p), patch);
+    return verdict;
+  };
+  return { ...h, guardedCalls, owner };
+}
+const hooks = (over = {}) => { const seen = { budget: 0 }; return { seen, pipeline: { authorize: () => true, onBudgetExhausted: () => { seen.budget++; }, ...over } }; };
+
+test('research pipeline: the budget refusal is its own outcome: status restored, no error, failed never called, onBudgetExhausted once', async () => {
+  const h = guardedRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); throw new BudgetExhaustedError(); } });
+  const g = hooks();
+  const handle = await h.runs.start('A.md', 'research', h.options({ pipeline: g.pipeline }));
+  await handle.finished;
+  assert.equal(g.seen.budget, 1); assert.deepEqual(h.log.failed, []);
+  assert.equal(h.store.get('A.md').status, 'idea', 'old status back'); assert.equal(h.store.get('A.md').lastError, undefined);
+  assert.equal(h.running.has('A.md'), false); assert.equal(h.guardedCalls.length, 0);
+  assert.equal(h.log.writes.some(([, patch]) => 'lastError' in patch || patch.status === 'error'), false);
+});
+
+test('research pipeline: without the pipeline option a budget error is an ordinary failure, exactly as before', async () => {
+  const h = guardedRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); throw new BudgetExhaustedError(); } });
+  const handle = await h.runs.start('A.md', 'research', h.options());
+  await handle.finished;
+  assert.equal(h.store.get('A.md').status, 'error'); assert.equal(h.log.failed.length, 1);
+});
+
+test('research pipeline: the write is guarded (authorize + expectedContent) and written when both hold', async () => {
+  const authorize = () => true;
+  const h = guardedRuns();
+  const handle = await h.runs.start('A.md', 'research', h.options({ pipeline: hooks({ authorize }).pipeline }));
+  await handle.finished;
+  assert.equal(h.guardedCalls.length, 1); assert.equal(h.guardedCalls[0].opt.authorize, authorize);
+  assert.equal(h.store.get('A.md').status, 'completed'); assert.deepEqual(h.log.failed, []); assert.equal(h.log.written.length, 1);
+});
+
+test('research pipeline: a discarded guarded write (stopped run or owner edit) saves nothing of the result, restores the status and reports through failed', async () => {
+  for (const verdict of ['discarded']) {
+    const h = guardedRuns({ onGuarded: () => verdict });
+    const g = hooks({ authorize: () => false });
+    const handle = await h.runs.start('A.md', 'research', h.options({ pipeline: g.pipeline }));
+    await handle.finished;
+    assert.equal(h.store.get('A.md').status, 'idea'); assert.equal(h.store.get('A.md').summary, '', 'the result is not saved');
+    assert.equal(h.log.failed.length, 1); assert.deepEqual(h.log.written, []); assert.equal(g.seen.budget, 0);
+    assert.equal(h.log.exchanges.some(e => e[0] === 'failed'), true);
+  }
+});
+
+test('research pipeline: expectedContent is the file text the run started from (readRaw), and an owner change is the repository\'s discard', async () => {
+  let current = 'RAW-ORIGINAL';
+  const freshStyle = { runStyle: () => ({ template: undefined, recipe: { ref: 'builtin:general', source: 'topic' }, label: { fileName: 'std' }, contextFields: {}, issues: {}, updateMode: 'fresh' }) };
+  const h = guardedRuns({ extra: freshStyle, onGuarded: opt => (opt.expectedContent === current ? 'written' : 'discarded') });
+  const readRaw = async () => current;
+  const handle = await h.runs.start('A.md', 'research', h.options({ pipeline: hooks().pipeline, readRaw, backupNote: async () => ({ ok: true, path: 'B.md' }) }));
+  await handle.finished;
+  assert.equal(h.guardedCalls[0].opt.expectedContent, 'RAW-ORIGINAL'); assert.equal(h.store.get('A.md').status, 'completed');
+  const h2 = guardedRuns({ extra: freshStyle, onGuarded: opt => (opt.expectedContent === 'OWNER-CHANGED' ? 'written' : 'discarded') });
+  const handle2 = await h2.runs.start('A.md', 'research', h2.options({ pipeline: hooks().pipeline, readRaw, backupNote: async () => ({ ok: true, path: 'B.md' }) }));
+  await handle2.finished;
+  assert.equal(h2.store.get('A.md').summary, '', 'discarded: the owner text stays'); assert.equal(h2.log.failed.length, 1);
+});

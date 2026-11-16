@@ -29678,6 +29678,23 @@ var Repository = class {
     return outcome;
   }
   /**
+   * Rewrites a note's whole text through `transform`, with the same guarded commit as `updateNoteGuarded` (both checks run on
+   * the content `vault.process` hands over; `expectedContent` is the text the caller last read, `authorize` false means a
+   * stopped run). A transform that returns the text it got writes nothing new. Returns "discarded" when a check failed.
+   */
+  async updateNoteRawGuarded(path, transform, options = {}) {
+    const { expectedContent, authorize } = options;
+    let outcome = "written";
+    await this.app.vault.process(this.file(path), (content) => {
+      if (expectedContent !== void 0 && content !== expectedContent || authorize && !authorize()) {
+        outcome = "discarded";
+        return content;
+      }
+      return transform(content);
+    });
+    return outcome;
+  }
+  /**
    * Marks a note left at `status: running` by a reload as failed. The status and `stillIdle()` are checked inside the same
    * `vault.process` callback that writes, so a task that starts or finishes in between is never overwritten.
    * Returns whether it wrote. Does not take the mutation queue: callers are already inside it.

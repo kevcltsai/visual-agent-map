@@ -293,3 +293,22 @@ test('the restore after a cancel or an error is guarded the same way: a status r
   assert.equal(await repo.updateNoteGuarded(note.path, { status: 'error', lastError: 'x' }, { authorize: () => false }), 'discarded');
   assert.equal(contents.get(note.path), expected);
 });
+
+// ---- updateNoteRawGuarded (03a): a whole-text rewrite with the same guarded commit ----
+test('updateNoteRawGuarded: expectedContent and authorize are checked on the callback content; discarded leaves the file alone', async () => {
+  const { repo, app, note, contents, expected } = await guarded();
+  const calls = [];
+  assert.equal(await repo.updateNoteRawGuarded(note.path, c => (calls.push('t'), `${c}\nRAW-1`), { expectedContent: 'other' }), 'discarded');
+  assert.equal(contents.get(note.path), expected); assert.deepEqual(calls, [], 'transform not run');
+  assert.equal(await repo.updateNoteRawGuarded(note.path, c => c + '\nRAW-2', { authorize: () => false }), 'discarded');
+  assert.equal(contents.get(note.path), expected);
+  assert.equal(await repo.updateNoteRawGuarded(note.path, c => `${c}\nRAW-3`, { expectedContent: expected, authorize: () => true }), 'written');
+  assert.equal(contents.get(note.path), `${expected}\nRAW-3`);
+  assert.equal(await repo.updateNoteRawGuarded(note.path, c => `${c}\nRAW-4`), 'written', 'no options: always writes');
+  const before = contents.get(note.path);
+  const original = app.vault.process;
+  const OWNER = `${before}\nOWNER-EDIT-77`;
+  app.vault.process = async (file, change) => { contents.set(file.path, OWNER); return original(file, change); };
+  assert.equal(await repo.updateNoteRawGuarded(note.path, c => `${c}\nRAW-5`, { expectedContent: before }), 'discarded');
+  assert.equal(contents.get(note.path), OWNER, 'the owner edit made after the last read is untouched');
+});

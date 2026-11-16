@@ -706,3 +706,17 @@ test('AI suggested decide: [S1] footnotes go to the sources section of the decid
   assert.ok(/\[\^1\]:/.test(sources), 'the footnote definition sits in the sources section');
   assert.ok(text.indexOf('### Drills') < text.indexOf('### Sources'));
 });
+
+// ---- noContentLog (picture-book pipeline): the entry keeps its metadata, never the prompt or the reply ----
+test('noContentLog: the exchange log gets the omitted markers, not the prompt or the reply; without it the content is logged as before', async () => {
+  const SECRET = 'SECRET-OWNER-TEXT-9931';
+  const reply = JSON.stringify({ summary: SECRET, detail: 'D', suggestions: [], visualReferences: [] });
+  const quiet = rig({ handler: call => answer(call, reply) });
+  await quiet.service.askModel(context({ task: `Do ${SECRET}`, noContentLog: true }), 'gpt-6-luna', 'low', undefined, quiet.mark);
+  const logged = JSON.stringify(quiet.order.filter(e => e[0] === 'sent' || e[0] === 'received'));
+  assert.ok(logged.includes('omitted'), 'the markers are there');
+  assert.equal(logged.includes(SECRET), false, 'nothing of the prompt or the reply is logged');
+  const loud = rig({ handler: call => answer(call, reply) });
+  await loud.service.askModel(context({ task: `Do ${SECRET}` }), 'gpt-6-luna', 'low', undefined, loud.mark);
+  assert.ok(JSON.stringify(loud.order.filter(e => e[0] === 'sent' || e[0] === 'received')).includes(SECRET), 'default: unchanged');
+});

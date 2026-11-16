@@ -1,50 +1,14 @@
-// AI Markdown intake: the write-stage chain per destination, pinned with fixed literal outputs (6f2e1aee behavior).
+// AI Markdown intake: the write-stage chain per destination, pinned with fixed literal outputs (6f2e1aee behavior), called through ai/markdown-intake.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { loadSource } = require('./support-replay.cjs');
 
-const h = loadSource(
-  `export { guardInlineHtmlLinks } from './ai/markdown-blocks';
-   export { neutralizeUnsafeMermaid, demoteUnparsableMermaid } from './ai/mermaid-safety';
-   export { dedupeImageEmbeds } from './core/image-keys';`,
-  { obsidian: {} }
-);
-const { guardInlineHtmlLinks, neutralizeUnsafeMermaid, demoteUnparsableMermaid, dedupeImageEmbeds } = h;
-
-// The OLD call-site expressions, copied from 6f2e1aee. Expected values below are literals, never computed from these.
-const impl = {
-  // topic-run.ts:911 `guardInlineHtmlLinks(draft)`, :932 `dedupeImageEmbeds(detail, { seen: imageKeysIn(latest.detail) })`,
-  // :1447-1469 `dedupeImageEmbeds(aiDetail, { seen: mode === "top" ? imageKeysIn(latest.detail) : [] })`
-  'task-detail': async (text, o = {}) => {
-    const guarded = guardInlineHtmlLinks(text);
-    const composed = o.compose ? o.compose(guarded) : guarded;
-    return o.seenImages ? dedupeImageEmbeds(composed, { seen: o.seenImages }) : dedupeImageEmbeds(composed);
-  },
-  // chat-action-writer.ts:409-415
-  'chat-file-edit': async (raw, o) => {
-    const guarded = guardInlineHtmlLinks(raw, {
-      frontmatter: true,
-      range: { start: o.at, end: o.at + o.insertedLength }
-    });
-    return dedupeImageEmbeds(guarded, { file: true, range: { start: o.at, end: guarded.length - o.tail } });
-  },
-  // chat-action-writer.ts:307-311 (inside the edit_topic_note branch only)
-  'chat-topic-detail': async (text, o = {}) =>
-    demoteUnparsableMermaid(neutralizeUnsafeMermaid(dedupeImageEmbeds(guardInlineHtmlLinks(text))), o.check),
-  // chat-action-writer.ts:495-500
-  'chat-new-file': async (text, o = {}) =>
-    demoteUnparsableMermaid(
-      neutralizeUnsafeMermaid(dedupeImageEmbeds(guardInlineHtmlLinks(text, { frontmatter: true }), { file: true })),
-      o.check
-    ),
-  // selection-ai.ts:764-765 (plan.action !== "diagram")
-  'selection-insert': async (text, o = {}) =>
-    /mermaid/i.test(text) ? await demoteUnparsableMermaid(neutralizeUnsafeMermaid(text), o.check) : text,
-  // argument-run.ts:344 / :350
-  'argument-detail': async text => neutralizeUnsafeMermaid(text)
-};
-async function run(kind, text, opts) {
-  return impl[kind](text, opts);
+// Every destination goes through the intake module; the expected values below are fixed literals (the 6f2e1aee outputs).
+const intake = loadSource(`export * from './ai/markdown-intake';`, { obsidian: {} });
+const SYNC = new Set(['task-detail', 'chat-file-edit', 'argument-detail']);
+async function run(kind, text, opts = {}) {
+  if (SYNC.has(kind)) return intake.intakeAiMarkdown(text, { kind, ...opts });
+  return intake.intakeAiMarkdownChecked(text, { kind }, opts.check);
 }
 
 const invalid = async code => (/BAD/.test(code) ? 'invalid' : 'valid');

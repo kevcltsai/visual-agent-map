@@ -520,7 +520,7 @@ test('start is refused while a conversation holds the map, and a busy map refuse
   await q.runs.stop(q.mapPath); hold.resolve(); await running;
 });
 
-test('a whole-card proof failure keeps the judged structure items in the research notes and still needs a person', async () => {
+test('a proof that opened pages but verified no fact keeps the judged structure items in the research notes and still needs a person (not a failure)', async () => {
   const facts = [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'fact', text: 'a date' }];
   const r = await rig({ script: {
     card: request => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: facts }),
@@ -528,10 +528,11 @@ test('a whole-card proof failure keeps the judged structure items in the researc
   await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath);
   const raw = r.raw(1);
   assert.equal(stageOf(raw), 'needs-review');
-  assert.equal(r.stat.proof.length >= 3, true);
-  assert.match(raw, /校對失敗（原因：all_facts_unverified/);
+  assert.equal(r.stat.proof.length, r.nodes.length, 'one proofread per card: pages were opened but no fact verified is not retried (Primary decision)');
+  assert.equal((await r.note(1)).pipelineIssue, 'proof unmet: facts_unverified');
+  assert.ok(!/校對失敗/.test(raw));
   assert.match(raw, /C1 達成：judged C1/);
-  assert.equal((raw.match(/book-proof:v1/g) ?? []).length, 1, 'the same failure is recorded once across retries');
+  assert.equal((raw.match(/book-proof:v1/g) ?? []).length, 1, 'the result is recorded once');
 });
 
 test('a whole-book plan that fails three times stops the run with a neutral code the map file keeps; retry (resume) runs it again from zero attempts', async () => {

@@ -4,6 +4,11 @@
   ],
   "allow": [
     {
+      "file": "experiences/visual-map/book-pipeline-run.ts",
+      "text": "Neighbouring card's plan or text changed",
+      "reason": "owner-facing notice stored in the neighbour card's frontmatter field (data the owner reads and clears, English counterpart of the zh line next to it), never sent to a model"
+    },
+    {
       "file": "experiences/visual-map/handoff.ts",
       "text": "Simulated / unverified thinking source",
       "reason": "statement written into a handed-over note as stored data, not a prompt template; the model later sees it only as quoted note content"

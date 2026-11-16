@@ -46,6 +46,8 @@ function harness({ answer = '{}', fail, events = [], logging = true } = {}) {
 const signal = () => new AbortController().signal;
 const proofRequest = (extra = {}) => ({ ...base, body: BODY, checklist, ...extra });
 const failure = code => error => error.name === 'ProofFailure' && error.code === code;
+// Primary decision: pages were opened but no fact item could be verified -> not a failure, an aggregate needs-review result flagged factsUnverified (no retry).
+const factsUnverified = (result, message) => { assert.equal(result.factsUnverified, true, message); assert.equal(result.aggregate, 'needs-review', message); return result; };
 
 // ---- text written into notes ----
 
@@ -127,6 +129,10 @@ test('card plan: ids and types assigned, neighbours only when they exist, an emp
   assert.deepEqual(result.checklist.map(c => `${c.id}:${c.type}`), ['C1:structure', 'C2:fact']);
   assert.equal(result.covers, 'covers ## Detail'); assert.equal(result.previous, 'prev line'); assert.equal(result.next, '');
   assert.ok(cardPlan.cardPlanStep.render(request).includes(JSON.stringify(TITLE)));
+  const plain0 = cardPlan.cardPlanStep.render(request);
+  assert.ok(!plain0.includes('extra request'), 'no owner sentence: the prompt is unchanged');
+  const asked = cardPlan.cardPlanStep.render({ ...request, instruction: 'say "more"\nabout x' });
+  assert.ok(asked.startsWith(plain0) && asked.includes("The owner's extra request for this card") && asked.endsWith(JSON.stringify('say "more" about x')), 'the sentence is one JSON string appended after the unchanged prompt');
   assert.throws(() => cardPlan.cardPlanStep.parse(good({ checklist: [] }), request), /1 to 8/);
   assert.throws(() => cardPlan.cardPlanStep.parse(good({ checklist: [{ type: 'opinion', text: 'x' }] }), request), /unknown checklist type/);
   assert.throws(() => cardPlan.cardPlanStep.parse(good({ checklist: Array.from({ length: 9 }, () => ({ type: 'fact', text: 'x' })) }), request), /1 to 8/);
@@ -169,7 +175,7 @@ test('proofread: the same page written another way matches the event; another pa
     assert.equal(ok(same).status, 'met', same); assert.deepEqual(plain(ok(same).sources), ['https://example.org/a/b/?utm_source=x&id=7#top'], 'the saved source is the event address (https)');
   }
   for (const other of ['https://example.org/a/c?id=7', 'https://example.org/a/b?id=8', 'https://www.example.org/a/b?id=7', 'https://example.org/a/b', 'https://user:pw@example.org/a/b?id=7']) {
-    assert.throws(() => proof.evaluateProof([item('C1'), item('C2', 'met', [other])], checklist, opened), failure('all_facts_unverified'), other);
+    factsUnverified(proof.evaluateProof([item('C1'), item('C2', 'met', [other])], checklist, opened), other);
   }
   // an http event is never a source, even when the model cites the https spelling
   assert.throws(() => proof.evaluateProof([item('C1'), item('C2', 'met', ['https://example.org/a'])], checklist, ['http://example.org/a']), failure('no_open_page'));
@@ -184,8 +190,8 @@ test('proofread: whole-card failures (empty list, missing, duplicate, unknown, n
   assert.throws(() => proof.evaluateProof([item('C1'), item('C2'), item('C9')], checklist, opened), failure('unknown_item'));
   assert.throws(() => proof.evaluateProof([item('C1'), item('C2', 'met', ['https://example.org/a'])], checklist, []), failure('no_open_page'));
   assert.throws(() => proof.evaluateProof([item('C1'), item('C2', 'met', ['https://example.org/a'])], checklist, ['file:///etc/passwd', 'javascript:alert(1)', 'ftp://x/y']), failure('no_open_page'));
-  assert.throws(() => proof.evaluateProof([item('C1'), item('C2', 'met', ['https://spoofed.example/z'])], checklist, opened), failure('all_facts_unverified'), 'a spoofed source is no source');
-  assert.throws(() => proof.evaluateProof([item('C1'), item('C2', 'unverified')], checklist, opened), failure('all_facts_unverified'));
+  factsUnverified(proof.evaluateProof([item('C1'), item('C2', 'met', ['https://spoofed.example/z'])], checklist, opened), 'a spoofed source is no source');
+  factsUnverified(proof.evaluateProof([item('C1'), item('C2', 'unverified')], checklist, opened));
   for (const raw of ['not json', '{}', '{"results":"x"}', reply([{ id: 'C1', status: 'maybe' }]), reply([null])]) assert.throws(() => proofMod.parseProofread(raw), failure('unparsable'), raw);
 });
 
@@ -280,7 +286,7 @@ test('proofread guard: an opened address that quotes 40 or more characters of th
   assert.deepEqual(plain(manyPages.items).map(i => i.status), ['met', 'met', 'unverified'], 'an opened address quoting the chapter downgrades only the item that cites it');
   const clean = proof.evaluateProof([item('C1'), item('C2', 'met', ['https://example.org/a'])], checklist, ['https://example.org/a'], { body });
   assert.equal(clean.items[1].status, 'met');
-  assert.throws(() => proof.evaluateProof([item('C1'), item('C2', 'met', [leakUrl])], checklist, [leakUrl], { body }), failure('all_facts_unverified'));
+  factsUnverified(proof.evaluateProof([item('C1'), item('C2', 'met', [leakUrl])], checklist, [leakUrl], { body }));
   assert.equal(proof.sharesLongRun('x'.repeat(39), 'x'.repeat(100)), false); assert.equal(proof.sharesLongRun('x'.repeat(40), 'x'.repeat(100)), true);
 });
 
@@ -291,7 +297,7 @@ test('runProofread: a search query quoting a sentence of the chapter still passe
   assert.equal(result.items[1].status, 'met');
   const leakUrl = 'https://leak.example/?q=' + encodeURIComponent(quote);
   const h2 = harness({ answer: reply([item('C1'), item('C2', 'met', [leakUrl])]), events: [page('https://example.org/a'), page(leakUrl)] });
-  await assert.rejects(proofMod.runProofread(h2.proofCalls, proofRequest(), { signal: signal() }), failure('all_facts_unverified'));
+  factsUnverified(await proofMod.runProofread(h2.proofCalls, proofRequest(), { signal: signal() }));
 });
 
 test('plan text: fences, VAM markers, %% and links in model text cannot take effect (plan section and card Prompt)', () => {
@@ -395,10 +401,8 @@ test('card plan and proofread prompts: only objective items, picture items condi
 test('proofread: a whole-card failure carries the judged items as a partial result that is never "checked"; its record has its own key and marks the failure', () => {
   const opened = ['https://example.org/a'];
   let error;
-  try { proof.evaluateProof([item('C1', 'unmet'), item('C2', 'met', ['https://spoofed.example/z'])], checklist, opened); } catch (e) { error = e; }
-  assert.equal(error.code, 'all_facts_unverified');
-  assert.deepEqual(plain(error.partial.items).map(i => `${i.id}:${i.status}`), ['C1:unmet', 'C2:unverified']);
-  assert.equal(error.partial.aggregate, 'needs-review');
+  const unverified = factsUnverified(proof.evaluateProof([item('C1', 'unmet'), item('C2', 'met', ['https://spoofed.example/z'])], checklist, opened));
+  assert.deepEqual(plain(unverified.items).map(i => `${i.id}:${i.status}`), ['C1:unmet', 'C2:unverified']);
   try { proof.evaluateProof([item('C1'), item('C2', 'met', ['https://example.org/a'])], checklist, []); } catch (e) { error = e; }
   assert.equal(error.code, 'no_open_page'); assert.equal(error.partial.aggregate, 'needs-review');
   const key = proof.proofKey({ runId: 'r', nodeId: 'n', revision: 1, body: 'b', checklist });

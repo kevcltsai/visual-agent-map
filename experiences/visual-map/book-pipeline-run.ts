@@ -279,6 +279,31 @@ const labelOf = (value: string): string => value.trim().replace(/\s+/g, " ").toL
 /** Every tag or comment start (also a `<` ending a chunk, which an image follows) becomes `&lt;`; only the note's own section markers (an exact comment with no payload) stay. */
 const neutralize = (text: string): string =>
   text.replace(/<(?=[A-Za-z/!?]|$)(?!!-- visual-agent-map:(?:detail|references):(?:start|end) -->)/g, "&lt;");
+/**
+ * The machine line of a stored proof record (`<!-- book-proof:v1 {json} -->`, also as a `> ` quote line of the callout) must pass the
+ * body cleaning byte for byte: a rerun's author step keeps the old records, and neutralize would turn their `<` into `&lt;`.
+ * Only a line that is one comment with a JSON payload holding no `<` and no `-->` is held back; any other `<!--` is cleaned as before.
+ */
+const PROOF_LINE = /^(?:[ \t]{0,3}>[ \t]?)?<!-- book-proof:v1 (\{[^<]*\}) -->$/;
+function holdProofLines(content: string): { text: string; restore: (cleaned: string) => string } {
+  const held: string[] = [];
+  const token = `VAMPROOFLINE${Math.random().toString(36).slice(2)}X`;
+  const text = content
+    .split("\n")
+    .map(line => {
+      const m = PROOF_LINE.exec(line.replace(/\r$/, ""));
+      if (!m || m[1].includes("-->")) return line;
+      try {
+        JSON.parse(m[1]);
+      } catch {
+        return line;
+      }
+      held.push(line);
+      return `${token}${held.length - 1}X`;
+    })
+    .join("\n");
+  return { text, restore: cleaned => cleaned.replace(new RegExp(`${token}(\\d+)X`, "g"), (_, i: string) => held[Number(i)]) };
+}
 const NO_PICTURE = "無圖：";
 const PICTURE_REASONS: Record<string, [string, string]> = {
   unsafe: ["網址不安全", "unsafe address"],
@@ -1219,7 +1244,8 @@ export class BookPipelineRuns {
     // The body is cleaned inside the author's own write (same `vault.process`): only standard https pictures are ever saved, and
     // an unsafe body is refused whole, so the card keeps its text from before this step.
     let unsafe = false;
-    const finalize = (content: string): string | null => {
+    const finalize = (original: string): string | null => {
+      const { text: content, restore } = holdProofLines(original);
       const urls = bodyImageUrls(content);
       const unsafeUrls = new Map(
         urls.filter(url => !isHttps(url)).map(url => [url, noPicture(drive.config.language, "unsafe")])
@@ -1229,7 +1255,7 @@ export class BookPipelineRuns {
         unsafe = true;
         return null;
       }
-      return cleaned;
+      return restore(cleaned);
     };
     // Nothing of this card's frontmatter is written while the author runs: the research write compares the whole file.
     const done = await untilAborted(
@@ -1266,7 +1292,8 @@ export class BookPipelineRuns {
       if (!probed.ok) replacements.set(url, noPicture(drive.config.language, probed.reason));
     }
     if (replacements.size) {
-      const cleaned = replaceBodyImages(written.raw, replacements);
+      const held = holdProofLines(written.raw);
+      const cleaned = held.restore(replaceBodyImages(held.text, replacements));
       const outcome = await this.ports.updateNoteRawGuarded(path, () => cleaned, {
         expectedContent: written.raw,
         authorize

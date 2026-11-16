@@ -100,3 +100,26 @@ test('chapterBody: an open-questions section (待確認問題 / Open questions t
   assert.equal(sections.chapterBody('Body.\n\nEnd.\n\n### Open questions to check\n\n- q'), 'Body.\n\nEnd.');
   assert.equal(sections.chapterBody('Body.\n\n### 待確認事項\n\n- q'), 'Body.');
 });
+
+test('markOldProofRecords: the header of a record under an older key gets （舊版）, the record itself stays; the current key and its failed twin are not marked', () => {
+  const old = sections.appendResearchNote('Lead', recordOf(1)).text;
+  const both = sections.appendResearchNote(old, recordOf(2)).text;
+  const out = sections.markOldProofRecords(both, keyOf(2));
+  assert.equal(count(out, '（舊版）'), 1);
+  assert.equal(count(out, 'book-proof:v1'), 2, 'nothing is deleted');
+  assert.ok(out.includes(`> （舊版）校對（`), 'the mark sits after the quote prefix, before the header text');
+  assert.equal(sections.markOldProofRecords(out, keyOf(2)), out, 'idempotent: an old record is marked once');
+  const failed = sections.appendResearchNote(old, proof.composeProofRecord(proof.failedProofKey(keyOf(2)), { aggregate: 'needs-review', items: result().items }, 'no_open_page')).text;
+  assert.equal(count(sections.markOldProofRecords(failed, keyOf(2)), '（舊版）'), 1, 'only the revision-1 record; the failed twin of the current key stays');
+});
+
+test('markOldProofRecords: no old record (a first run, or only the current key) leaves the text byte for byte; text outside the records, such as a seam notice, is never touched', () => {
+  const plain = 'Lead\n\n鄰卡企劃或正文已變更，尚未人工核對（第 3 張，版本 2）\n\n### 研究備註\n\n> [!note]- 研究備註\n> 無圖：未找到可驗證的公開圖片\n';
+  assert.equal(sections.markOldProofRecords(plain, keyOf(2)), plain);
+  assert.equal(sections.markOldProofRecords('', keyOf(2)), '');
+  const current = sections.appendResearchNote(plain, recordOf(2)).text;
+  assert.equal(sections.markOldProofRecords(current, keyOf(2)), current);
+  const marked = sections.markOldProofRecords(sections.appendResearchNote(current, recordOf(3)).text, keyOf(3));
+  assert.ok(marked.includes('鄰卡企劃或正文已變更，尚未人工核對（第 3 張，版本 2）\n'), 'the line outside the records is unchanged');
+  assert.ok(marked.includes('> 無圖：未找到可驗證的公開圖片\n'));
+});

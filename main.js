@@ -3056,6 +3056,8 @@ var en = {
   "ui.book_refused_disposed": "The plugin is shutting down.",
   "ui.book_refused_unreadable": "This map's data could not be read. Try again shortly.",
   "ui.book_refused_not_gate1": "The run is not waiting for your confirmation.",
+  "ui.book_refused_not_gate": "The run is not at a checkpoint, so one card cannot be redone now.",
+  "ui.book_refused_instruction": "Write what you want changed on this card first.",
   "ui.book_failed_0": "The picture-book pipeline could not run: {0}",
   "ui.book_bar_label": "Picture-book progress",
   "ui.book_bar_title_0": "Picture book: {0}",
@@ -6067,6 +6069,8 @@ var zhCN = {
   "ui.book_refused_disposed": "\u63D2\u4EF6\u6B63\u5728\u5173\u95ED\uFF0C\u65E0\u6CD5\u6267\u884C\u3002",
   "ui.book_refused_unreadable": "\u8BFB\u4E0D\u5230\u8FD9\u5F20\u5730\u56FE\u7684\u6570\u636E\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5\u3002",
   "ui.book_refused_not_gate1": "\u5F53\u524D\u4E0D\u5728\u201C\u7B49\u4F60\u786E\u8BA4\u201D\u9636\u6BB5\uFF0C\u4E0D\u9700\u8981\u786E\u8BA4\u3002",
+  "ui.book_refused_not_gate": "\u5F53\u524D\u4E0D\u5728\u5173\u5361\u4E0A\uFF0C\u73B0\u5728\u4E0D\u80FD\u5355\u72EC\u91CD\u8DD1\u4E00\u5F20\u5361\u3002",
+  "ui.book_refused_instruction": "\u8BF7\u5148\u5199\u4E0B\u8FD9\u5F20\u5361\u8981\u600E\u4E48\u6539\u3002",
   "ui.book_failed_0": "\u56FE\u6587\u4E66\u6D41\u6C34\u7EBF\u65E0\u6CD5\u6267\u884C\uFF1A{0}",
   "ui.book_bar_label": "\u56FE\u6587\u4E66\u8FDB\u5EA6",
   "ui.book_bar_title_0": "\u56FE\u6587\u4E66\uFF1A{0}",
@@ -9078,6 +9082,8 @@ var zhTW = {
   "ui.book_refused_disposed": "\u5916\u639B\u6B63\u5728\u95DC\u9589\uFF0C\u7121\u6CD5\u57F7\u884C\u3002",
   "ui.book_refused_unreadable": "\u8B80\u4E0D\u5230\u9019\u5F35\u5FC3\u667A\u5716\u7684\u8CC7\u6599\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002",
   "ui.book_refused_not_gate1": "\u76EE\u524D\u4E0D\u5728\u300C\u7B49\u4F60\u78BA\u8A8D\u300D\u968E\u6BB5\uFF0C\u4E0D\u9700\u8981\u78BA\u8A8D\u3002",
+  "ui.book_refused_not_gate": "\u76EE\u524D\u4E0D\u5728\u95DC\u5361\u4E0A\uFF0C\u73FE\u5728\u4E0D\u80FD\u55AE\u7368\u91CD\u8DD1\u4E00\u5F35\u5361\u3002",
+  "ui.book_refused_instruction": "\u8ACB\u5148\u5BEB\u4E0B\u9019\u5F35\u5361\u8981\u600E\u9EBC\u6539\u3002",
   "ui.book_failed_0": "\u5716\u6587\u66F8\u6D41\u6C34\u7DDA\u7121\u6CD5\u57F7\u884C\uFF1A{0}",
   "ui.book_bar_label": "\u5716\u6587\u66F8\u9032\u5EA6",
   "ui.book_bar_title_0": "\u5716\u6587\u66F8\uFF1A{0}",
@@ -43147,6 +43153,14 @@ function retryGlobalPlan(data) {
   next.revision++;
   return next;
 }
+function resetCard(data, nodeId) {
+  if (!data.order.includes(nodeId)) return data;
+  const next = clone2(data);
+  next.attempts[nodeId] = emptyAttempts();
+  next.revisions[nodeId] = cardRevision(next, nodeId) + 1;
+  next.revision++;
+  return next;
+}
 function applyReset(data, nodeId) {
   var _a2, _b2, _c;
   if (!((_a2 = data.pendingReset) == null ? void 0 : _a2.includes(nodeId))) return data;
@@ -43300,7 +43314,7 @@ function evaluateProof(raw, checklist, openedUrls, guard) {
   const partial = { items, aggregate: "needs-review" };
   if (noPage) throw new ProofFailure("no_open_page", partial);
   if (facts.length && facts.every((item) => item.status === "unverified"))
-    throw new ProofFailure("all_facts_unverified", partial);
+    return { items, aggregate: "needs-review", factsUnverified: true };
   return result;
 }
 var failedProofKey = (key4) => `${key4}:failed`;
@@ -43315,6 +43329,7 @@ var STATUS_WORDS = { met: "\u9054\u6210", unmet: "\u672A\u9054\u6210", unverifie
 function composeProofRecord(key4, result, failure) {
   const clean3 = {
     aggregate: result.aggregate,
+    ...result.factsUnverified ? { factsUnverified: true } : {},
     items: result.items.map((item) => ({
       id: escapeMarkdownText(item.id, 20),
       type: item.type,
@@ -43325,7 +43340,7 @@ function composeProofRecord(key4, result, failure) {
     ...result.counts ? { counts: { openedPages: safeCount(result.counts.openedPages), searches: safeCount(result.counts.searches) } } : {}
   };
   const lines = [
-    (failure ? `\u6821\u5C0D\u5931\u6557\uFF08\u539F\u56E0\uFF1A${failure}\uFF1B\u4EE5\u4E0B\u662F\u5DF2\u5224\u65B7\u7684\u7D50\u679C\uFF0C\u4ECD\u9700\u4EBA\u770B\uFF09` : `\u6821\u5C0D\uFF08${clean3.aggregate === "checked" ? "\u5DF2\u6821" : "\u9700\u4EBA\u770B"}\uFF09`) + (clean3.counts ? ` \u958B\u9801 ${clean3.counts.openedPages} \u6B21\u3001\u641C\u5C0B ${clean3.counts.searches} \u6B21` : "")
+    (failure ? `\u6821\u5C0D\u5931\u6557\uFF08\u539F\u56E0\uFF1A${failure}\uFF1B\u4EE5\u4E0B\u662F\u5DF2\u5224\u65B7\u7684\u7D50\u679C\uFF0C\u4ECD\u9700\u4EBA\u770B\uFF09` : `\u6821\u5C0D\uFF08${clean3.aggregate === "checked" ? "\u5DF2\u6821" : clean3.factsUnverified ? "\u9700\u4EBA\u770B\uFF1B\u4E8B\u5BE6\u9805\u76EE\u7686\u5F85\u67E5" : "\u9700\u4EBA\u770B"}\uFF09`) + (clean3.counts ? ` \u958B\u9801 ${clean3.counts.openedPages} \u6B21\u3001\u641C\u5C0B ${clean3.counts.searches} \u6B21` : "")
   ];
   for (const item of clean3.items)
     lines.push(
@@ -43433,6 +43448,34 @@ ${quoted}`;
 ${tail.join("\n")}` : "\n";
   const glue = last >= 0 ? "\n" : "\n\n";
   return { text: `${head2}${glue}${addition}${rest}`, appended: true };
+}
+var OLD_MARK = "\uFF08\u820A\u7248\uFF09";
+var PROOF_HEADER = /^(?:（舊版）)?校對(?:失敗)?（/;
+function markOldProofRecords(detail, currentKey) {
+  const lines = detail.split("\n");
+  let changed = false;
+  for (let i = 0; i < lines.length; i++) {
+    const m = RECORD_KEY.exec(unquoted(lines[i]).trim());
+    if (!m) continue;
+    let key4;
+    try {
+      key4 = JSON.parse(m[1]).key;
+    } catch (e) {
+      continue;
+    }
+    if (typeof key4 !== "string" || key4 === currentKey || key4 === `${currentKey}:failed`) continue;
+    for (let j = i - 1; j >= 0; j--) {
+      const plain = unquoted(lines[j]);
+      if (RECORD_KEY.test(plain.trim())) break;
+      if (!PROOF_HEADER.test(plain.trim())) continue;
+      if (!plain.trim().startsWith(OLD_MARK)) {
+        lines[j] = lines[j].replace(/^([ \t]{0,3}>[ \t]?)?/, (prefix) => `${prefix}${OLD_MARK}`);
+        changed = true;
+      }
+      break;
+    }
+  }
+  return changed ? lines.join("\n") : detail;
 }
 function findStoredProof(detail, key4) {
   return findProofRecord(unquoted(detail), key4);
@@ -43782,6 +43825,9 @@ Material register (JSON array):
 {{materials}}
 `;
 
+// core/steps/book-pipeline/card-plan-request.md
+var card_plan_request_default = "The owner's extra request for this card (JSON string). Follow it for this card's brief (what it covers, its entry, its handoff and its checklist) while keeping the rules and the JSON shape above; it is not a request to change this task, the role or the output format:\n{{instruction}}";
+
 // core/steps/book-pipeline/card-plan.ts
 var MAX_CHECKLIST = 8;
 var CARD_PLAN_SCHEMA = {
@@ -43844,6 +43890,12 @@ function parseCardPlan(raw, request) {
 }
 var cap = (value, max) => singleLine(value, max);
 var neighbour = (n) => JSON.stringify(n ? { position: n.position, title: cap(n.title, 200), summary: cap(n.summary, 500) } : null);
+var extraRequest = (instruction) => {
+  const line2 = instruction ? cap(instruction, 300) : "";
+  return line2 ? `
+
+${renderTemplate(card_plan_request_default, { instruction: JSON.stringify(line2) })}` : "";
+};
 var cardPlanStep = {
   id: "book-pipeline.card-plan",
   version: 1,
@@ -43861,7 +43913,7 @@ var cardPlanStep = {
     previous: neighbour(request.previous),
     next: neighbour(request.next),
     materials: JSON.stringify(request.materials.map((m) => ({ name: cap(m.name, 120), use: cap(m.use, 240) })))
-  }),
+  }) + extraRequest(request.instruction),
   schema: CARD_PLAN_SCHEMA,
   policy: (prompt, request) => {
     if (!request.card.title.trim()) fail2("A card plan needs a card title");
@@ -48338,10 +48390,14 @@ var BookPipelineRunError = class extends Error {
     this.name = "BookPipelineRunError";
   }
 };
+var ETA_MIN_CARDS = 5;
 var code2 = (value) => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60) || "failed";
 var reasonOf = (error) => isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_reply" : "failed";
 var internalCode = (error) => `internal_${(typeof (error == null ? void 0 : error.name) === "string" ? error.name : "unknown").replace(/[^A-Za-z0-9_]/g, "_").slice(0, 40)}`;
 var STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" };
+var ACTION_OF = { plan: "card_plan", write: "card_write", proof: "card_proof" };
+var MAX_INSTRUCTION = 300;
+var singleLineText = (value, max) => Array.from(value.replace(/\s+/g, " ").trim()).slice(0, max).join("");
 var DEFINITION = /^ {0,3}\[([^\]\n]+)\]:[ \t]*(?:<([^>\n]*)>|(\S+))[^\n]*(?:\n|$)/gm;
 var WIKI_TARGET = /^[^[\]()!<>\r\n\\]+$/;
 var SCHEME3 = /^\s*(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
@@ -48351,6 +48407,23 @@ var frontmatterLength = (content) => {
 };
 var labelOf = (value) => value.trim().replace(/\s+/g, " ").toLowerCase();
 var neutralize = (text10) => text10.replace(/<(?=[A-Za-z/!?]|$)(?!!-- visual-agent-map:(?:detail|references):(?:start|end) -->)/g, "&lt;");
+var PROOF_LINE = /^(?:[ \t]{0,3}>[ \t]?)?<!-- book-proof:v1 (\{[^<]*\}) -->$/;
+function holdProofLines(content) {
+  const held = [];
+  const token = `VAMPROOFLINE${Math.random().toString(36).slice(2)}X`;
+  const text10 = content.split("\n").map((line2) => {
+    const m = PROOF_LINE.exec(line2.replace(/\r$/, ""));
+    if (!m || m[1].includes("-->")) return line2;
+    try {
+      JSON.parse(m[1]);
+    } catch (e) {
+      return line2;
+    }
+    held.push(line2);
+    return `${token}${held.length - 1}X`;
+  }).join("\n");
+  return { text: text10, restore: (cleaned) => cleaned.replace(new RegExp(`${token}(\\d+)X`, "g"), (_, i) => held[Number(i)]) };
+}
 var NO_PICTURE = "\u7121\u5716\uFF1A";
 var PICTURE_REASONS = {
   unsafe: ["\u7DB2\u5740\u4E0D\u5B89\u5168", "unsafe address"],
@@ -48613,6 +48686,117 @@ var BookPipelineRuns = class {
     });
   }
   /**
+   * Gate 1 only: rewrites one card's plan from the owner's one-line request ("say more about his manuscript"), with the whole-book
+   * thread and the neighbours' summaries as for every plan. Only this card's brief (`## Prompt`) and summary change; the cards on
+   * both sides are marked as seams to check. Resolves with the new brief, or with the reason it was not replanned (the card keeps
+   * its old brief unless the plan step itself marked it needs-review after three failed attempts).
+   */
+  async replanCard(mapPath, nodeId, instruction) {
+    const line2 = singleLineText(instruction, MAX_INSTRUCTION);
+    if (!line2) throw new BookPipelineRunError("instruction");
+    let result = {};
+    await this.cardJob(mapPath, nodeId, ["gate1"], "not_gate1", () => ["plan"], line2, (drive) => {
+      var _a2;
+      const plan = drive.plans.get(nodeId);
+      result = plan ? { plan: { covers: plan.covers, entry: plan.entry, handoff: plan.handoff, previous: plan.previous, next: plan.next, checklist: plan.checklist } } : { reason: (_a2 = drive.reasons.get(nodeId)) != null ? _a2 : drive.store.state.pauseReason === "budget" ? "budget" : "cancelled" };
+    });
+    return result;
+  }
+  /**
+   * One card again. Gate 1: the plan only. Gate 2 or done: plan, author, proofread with the usual per-step retries, fence, backup and
+   * budget rules; the card gets a new revision (so a new proof record; older records stay, marked old). The cards on both sides are
+   * not touched except for the seam mark. The run's phase does not change, and it cannot run beside another drive of the map.
+   */
+  async rerunCard(mapPath, nodeId) {
+    return this.cardJob(
+      mapPath,
+      nodeId,
+      ["gate1", "gate2", "done"],
+      "not_gate",
+      (phase) => phase === "gate1" ? ["plan"] : ["plan", "write", "proof"]
+    );
+  }
+  /** The owner's "seam checked": the only thing that clears `pipeline-seam` (a proofread or any automatic step never does). */
+  async confirmSeam(mapPath, nodeId) {
+    return this.enter(mapPath, async (drive) => {
+      const map = await this.ports.readMap(mapPath);
+      const read = readBookPipeline(map);
+      if (read.kind === "absent") throw new BookPipelineRunError("missing");
+      if (read.kind === "unusable") throw new BookPipelineRunError("unusable");
+      const node = map.nodes.find((item) => item.id === nodeId);
+      if (!node || !read.data.order.includes(nodeId)) throw new BookPipelineRunError("missing");
+      if (this.dead(drive)) throw new BookPipelineRunError("disposed");
+      const card = await this.ports.readCard(node.path).catch(() => void 0);
+      if (!card) throw new BookPipelineRunError("unreadable");
+      if (card.fields.pipelineSeam === void 0) return;
+      await this.ports.writePipelineFields(node.path, { pipelineSeam: null });
+      this.ports.log(
+        formatPipelineLog({ event: "seam_confirmed", runId: read.data.runId, card: nodeId, step: "proof", attempt: 0, result: "ok", ms: 0 })
+      );
+    });
+  }
+  cardJob(mapPath, nodeId, phases, refusal, steps, extra, finish) {
+    return this.enter(mapPath, async (drive) => {
+      const data = await this.openSaved(drive, mapPath, { allowDone: true });
+      if (!data.order.includes(nodeId)) throw new BookPipelineRunError("missing");
+      if (!phases.includes(data.phase)) throw new BookPipelineRunError(refusal);
+      let refused = false;
+      await drive.store.commit((state) => {
+        const next = resumeRun(state);
+        refused = next === null;
+        return { state: next != null ? next : state, accepted: true };
+      });
+      if (refused) throw new BookPipelineRunError("budget");
+      if (extra) drive.extra.set(nodeId, extra);
+      const kinds = steps(data.phase);
+      drive.job = async () => {
+        await this.runCardJob(drive, nodeId, kinds);
+        finish == null ? void 0 : finish(drive);
+      };
+      this.log(drive, "rerun", nodeId, kinds[0], kinds.length === 1 ? "plan_only" : "full");
+    });
+  }
+  /** Runs the given steps of one card in order, each with its own attempts (the third failure marks the card needs-review). */
+  async runCardJob(drive, nodeId, kinds) {
+    var _a2;
+    drive.busy.add(nodeId);
+    let base = 0;
+    try {
+      await drive.store.commit((state) => ({ state: resetCard(state, nodeId), accepted: true }));
+      base = cardRevision(drive.store.state, nodeId);
+      for (const kind of kinds) {
+        for (; ; ) {
+          if (this.dead(drive) || drive.controller.signal.aborted || drive.fatal !== void 0) return;
+          if (drive.store.state.status !== "running") return;
+          if (attemptsOf(drive.store.state, nodeId)[kind] >= MAX_STEP_ATTEMPTS) {
+            await this.markReview(drive, nodeId, kind, (_a2 = drive.reasons.get(nodeId)) != null ? _a2 : "failed");
+            return;
+          }
+          const action = { type: ACTION_OF[kind], nodeId };
+          const done = await this.step(drive, action);
+          if (done === "ok") break;
+          if (done !== "failed") return;
+          if (drive.stages.get(nodeId) === "needs-review") return;
+        }
+      }
+    } finally {
+      drive.busy.delete(nodeId);
+      const revision = cardRevision(drive.store.state, nodeId);
+      if (!this.dead(drive) && revision > base) await this.markSeams(drive, nodeId, revision);
+    }
+  }
+  async markSeams(drive, nodeId, revision) {
+    const order = drive.store.state.order;
+    const at = order.indexOf(nodeId);
+    const zh = /^zh/i.test(drive.config.language);
+    for (const other of [order[at - 1], order[at + 1]]) {
+      if (!other || !drive.cards.has(other)) continue;
+      await this.writeFields(drive, other, {
+        pipelineSeam: zh ? `\u9130\u5361\u4F01\u5283\u6216\u6B63\u6587\u5DF2\u8B8A\u66F4\uFF0C\u5C1A\u672A\u4EBA\u5DE5\u6838\u5C0D\uFF08\u7B2C ${at + 1} \u5F35\uFF0C\u7248\u672C ${revision}\uFF09` : `Neighbouring card's plan or text changed; not yet checked by a person (card ${at + 1}, revision ${revision})`
+      });
+    }
+  }
+  /**
    * Aborts every call and pauses the run (resumable). Resolves when the drive is over. With no drive, `saved` (the owner's Stop
    * button) writes the stop into the saved state, so a budget pause or a state left "running" ends as a plain stop; refusals
    * (no run, finished, unreadable) leave the file as it is.
@@ -48659,6 +48843,10 @@ var BookPipelineRuns = class {
       backedUp: /* @__PURE__ */ new Set(),
       reasons: /* @__PURE__ */ new Map(),
       busy: /* @__PURE__ */ new Set(),
+      extra: /* @__PURE__ */ new Map(),
+      plans: /* @__PURE__ */ new Map(),
+      started: /* @__PURE__ */ new Map(),
+      durations: { plan: [], write: [] },
       stopRequested: false,
       disposed: false,
       rootId: "",
@@ -48673,7 +48861,7 @@ var BookPipelineRuns = class {
     let refusal;
     try {
       await setup(drive);
-      if (drive.store && !this.dead(drive) && !drive.stopRequested) await this.loop(drive);
+      if (drive.store && !this.dead(drive) && !drive.stopRequested) await (drive.job ? drive.job() : this.loop(drive));
     } catch (error) {
       if (error instanceof BookPipelineRunError) refusal = error;
       else if (!this.dead(drive)) {
@@ -48693,7 +48881,7 @@ var BookPipelineRuns = class {
       }
     } finally {
       try {
-        if (drive.store && !this.dead(drive)) {
+        if (drive.store && !this.dead(drive) && !drive.job) {
           const code3 = (_c = drive.failure) != null ? _c : drive.fatal !== void 0 ? "failed" : void 0;
           if (drive.stopRequested)
             await drive.store.commit((state) => ({ state: stopRun(state), accepted: true })).catch(() => void 0);
@@ -48729,13 +48917,14 @@ var BookPipelineRuns = class {
     });
   }
   /** Reads the saved state of a map for resume and gate confirmation, and loads the cards. */
-  async openSaved(drive, mapPath) {
+  async openSaved(drive, mapPath, options = {}) {
     if (this.ports.blocked(mapPath)) throw new BookPipelineRunError("blocked");
     const map = await this.ports.readMap(mapPath);
     const read = readBookPipeline(map);
     if (read.kind === "absent") throw new BookPipelineRunError("missing");
     if (read.kind === "unusable") throw new BookPipelineRunError("unusable");
-    if (read.data.phase === "done") throw new BookPipelineRunError("finished");
+    if (read.data.phase === "done" && !options.allowDone && !(read.data.status === "stopped" && read.data.pauseReason === "budget"))
+      throw new BookPipelineRunError("finished");
     await this.load(drive, map, read.data.order);
     if (this.dead(drive)) throw new BookPipelineRunError("disposed");
     this.attachStore(drive, read.data);
@@ -48801,7 +48990,7 @@ var BookPipelineRuns = class {
           started++;
           inflight.set(
             key4,
-            this.step(drive, action).finally(() => {
+            this.step(drive, action).then(() => void 0).finally(() => {
               drive.busy.delete(key4);
               inflight.delete(key4);
             })
@@ -48822,12 +49011,13 @@ var BookPipelineRuns = class {
     const key4 = nodeId != null ? nodeId : "global";
     const logStep = kind === "global" ? "plan" : kind;
     const startedAt = Date.parse(this.ports.now());
+    if (nodeId && !drive.started.has(nodeId)) drive.started.set(nodeId, startedAt);
     try {
       const begun = await drive.store.commit((state) => {
         const dispatched = beginStep(state, kind, nodeId);
         return dispatched ? { state: dispatched.state, accepted: true, token: dispatched.token } : { state, accepted: false, token: void 0 };
       });
-      if (!begun || !begun.accepted || !begun.token) return;
+      if (!begun || !begun.accepted || !begun.token) return "none";
       const token = begun.token;
       let outcome;
       try {
@@ -48835,7 +49025,7 @@ var BookPipelineRuns = class {
       } catch (error) {
         outcome = this.classify(drive, error);
       }
-      if (this.dead(drive)) return;
+      if (this.dead(drive)) return "none";
       const ms = Math.max(0, Date.parse(this.ports.now()) - startedAt || 0);
       const report = async (result) => {
         const attempt = attemptsOf(drive.store.state, key4)[logStep];
@@ -48845,33 +49035,38 @@ var BookPipelineRuns = class {
       };
       if (outcome.kind === "ok") {
         const done = await drive.store.commit((state) => applySuccess(state, token));
-        if (!done) return;
+        if (!done) return "none";
         if (!done.accepted) {
           await drive.store.commit((state) => applyCancelled(state, token));
           await report("dropped");
-          return;
+          return "dropped";
         }
         await ((_a2 = outcome.after) == null ? void 0 : _a2.call(outcome));
+        this.recordDuration(drive, kind, nodeId, Date.parse(this.ports.now()), drive.store.state.phase);
         await report("ok");
+        return "ok";
       } else if (outcome.kind === "cancelled") {
         await drive.store.commit((state) => applyCancelled(state, token));
         await report("cancelled");
+        return "cancelled";
       } else if (outcome.kind === "budget") {
         await drive.store.commit((state) => applyBudgetExhausted(state, token));
         drive.controller.abort();
         await report("budget");
+        return "budget";
       } else {
         const failed = await drive.store.commit((state) => applyFailure(state, token));
-        if (!failed) return;
+        if (!failed) return "none";
         if (!failed.accepted) {
           await drive.store.commit((state) => applyCancelled(state, token));
           await report("dropped");
-          return;
+          return "dropped";
         }
         drive.reasons.set(key4, outcome.reason);
         if (nodeId && kind !== "global" && (failed.needsReview || outcome.forceReview))
           await this.markReview(drive, nodeId, kind, outcome.reason);
         await report(`failed:${code2(outcome.reason)}`);
+        return "failed";
       }
     } catch (error) {
       if (!this.dead(drive)) {
@@ -48890,6 +49085,16 @@ var BookPipelineRuns = class {
         );
       }
     }
+    return "none";
+  }
+  /** A card that finished its phase's last step (planned in planning, proofread in writing) adds its wall time to the estimate. */
+  recordDuration(drive, kind, nodeId, now, phase) {
+    const begun = nodeId ? drive.started.get(nodeId) : void 0;
+    if (begun === void 0 || !nodeId) return;
+    const list2 = phase === "planning" && kind === "plan" ? drive.durations.plan : phase === "writing" && kind === "proof" ? drive.durations.write : void 0;
+    if (!list2) return;
+    list2.push(Math.max(0, now - begun));
+    drive.started.delete(nodeId);
   }
   classify(drive, error) {
     if (isBudgetExhausted(error)) return { kind: "budget" };
@@ -49015,7 +49220,8 @@ var BookPipelineRuns = class {
         summary: card.summary
       },
       ...previous ? { previous } : {},
-      ...next ? { next } : {}
+      ...next ? { next } : {},
+      ...drive.extra.has(nodeId) ? { instruction: drive.extra.get(nodeId) } : {}
     };
     const result = await untilAborted(
       signal,
@@ -49059,6 +49265,7 @@ var BookPipelineRuns = class {
       { expectedContent: card.raw, authorize: this.authorize(drive, token) }
     );
     if (written2 === "discarded") return { kind: "failed", reason: "discarded" };
+    drive.plans.set(nodeId, result);
     return { kind: "ok", after: () => this.setStage(drive, nodeId, "planned", null) };
   }
   async execWrite(drive, token, nodeId) {
@@ -49072,7 +49279,8 @@ var BookPipelineRuns = class {
       return { kind: "failed", reason: "backup_failed", forceReview: true };
     const authorize = this.authorize(drive, token);
     let unsafe = false;
-    const finalize = (content) => {
+    const finalize = (original) => {
+      const { text: content, restore } = holdProofLines(original);
       const urls2 = bodyImageUrls(content);
       const unsafeUrls = new Map(
         urls2.filter((url) => !isHttps(url)).map((url) => [url, noPicture(drive.config.language, "unsafe")])
@@ -49082,7 +49290,7 @@ var BookPipelineRuns = class {
         unsafe = true;
         return null;
       }
-      return cleaned;
+      return restore(cleaned);
     };
     const done = await untilAborted(
       signal,
@@ -49117,7 +49325,8 @@ var BookPipelineRuns = class {
       if (!probed.ok) replacements.set(url, noPicture(drive.config.language, probed.reason));
     }
     if (replacements.size) {
-      const cleaned = replaceBodyImages(written2.raw, replacements);
+      const held = holdProofLines(written2.raw);
+      const cleaned = held.restore(replaceBodyImages(held.text, replacements));
       const outcome = await this.ports.updateNoteRawGuarded(path, () => cleaned, {
         expectedContent: written2.raw,
         authorize
@@ -49188,7 +49397,8 @@ var BookPipelineRuns = class {
             token,
             nodeId,
             card,
-            composeProofRecord(failedProofKey(key4), error.partial, error.code)
+            composeProofRecord(failedProofKey(key4), error.partial, error.code),
+            key4
           );
         throw error;
       });
@@ -49202,7 +49412,7 @@ var BookPipelineRuns = class {
       if (added.appended) {
         const written2 = await this.ports.updateNoteGuarded(
           path,
-          { detail: added.text },
+          { detail: markOldProofRecords(added.text, key4) },
           { expectedContent: card.raw, authorize: this.authorize(drive, token) }
         );
         if (written2 === "discarded") return { kind: "failed", reason: "discarded" };
@@ -49216,12 +49426,12 @@ var BookPipelineRuns = class {
         drive,
         nodeId,
         verdict.aggregate,
-        verdict.aggregate === "needs-review" ? `proof unmet: ${verdict.items.filter((item) => item.type === "fact" && item.status === "unmet").map((item) => code2(item.id)).join(" ")}` : structureUnmet.length ? `structure unmet: ${structureUnmet.join(" ")}` : null
+        verdict.aggregate === "needs-review" ? verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${verdict.items.filter((item) => item.type === "fact" && item.status === "unmet").map((item) => code2(item.id)).join(" ")}` : structureUnmet.length ? `structure unmet: ${structureUnmet.join(" ")}` : null
       )
     };
   }
   /** Best effort: appends the failed proof's partial record once (its own key), under the same guards as every card write. Never throws. */
-  async keepPartialProof(drive, token, nodeId, card, record) {
+  async keepPartialProof(drive, token, nodeId, card, record, key4) {
     try {
       const path = await this.stillOnMap(drive, nodeId);
       if (!path || !await this.ensureBackup(drive, nodeId, path, card.raw)) return;
@@ -49229,7 +49439,7 @@ var BookPipelineRuns = class {
       if (added.appended)
         await this.ports.updateNoteGuarded(
           path,
-          { detail: added.text },
+          { detail: markOldProofRecords(added.text, key4) },
           { expectedContent: card.raw, authorize: this.authorize(drive, token) }
         );
     } catch (e) {
@@ -49247,6 +49457,7 @@ var BookPipelineRuns = class {
       "needs-review": 0
     };
     for (const id of state.order) counts[(_a2 = drive.stages.get(id)) != null ? _a2 : "pending"]++;
+    const eta = this.etaOf(drive, active);
     return {
       runId: state.runId,
       phase: state.phase,
@@ -49258,8 +49469,25 @@ var BookPipelineRuns = class {
       counts,
       budget: { ...state.budget },
       startedAt: state.startedAt,
-      phaseStartedAt: state.phaseStartedAt
+      phaseStartedAt: state.phaseStartedAt,
+      busyCards: [...drive.busy].filter((id) => id !== "global"),
+      ...eta === void 0 ? {} : { etaSeconds: eta }
     };
+  }
+  /** Average wall time of the cards that finished this phase in this drive × cards left ÷ pool; undefined below {@link ETA_MIN_CARDS} finished cards. */
+  etaOf(drive, active) {
+    const state = drive.store.state;
+    if (!active || state.status !== "running") return void 0;
+    const planning = state.phase === "planning";
+    if (!planning && state.phase !== "writing") return void 0;
+    const list2 = planning ? drive.durations.plan : drive.durations.write;
+    if (list2.length < ETA_MIN_CARDS) return void 0;
+    const left = state.order.filter((id) => {
+      const stage = drive.stages.get(id);
+      return planning ? stage === void 0 : stage !== "checked" && stage !== "needs-review";
+    }).length;
+    const average = list2.reduce((sum2, ms) => sum2 + ms, 0) / list2.length;
+    return Math.max(0, Math.round(average * left / BOOK_POOL / 1e3));
   }
   /** One line per proofread call: the numbers only (the call has no content log, so this is the trace of what it did). */
   logProofCounts(drive, runId, nodeId, counts, result) {
@@ -49412,7 +49640,9 @@ var REFUSAL_KEY = {
   budget: "ui.book_refused_budget",
   disposed: "ui.book_refused_disposed",
   unreadable: "ui.book_refused_unreadable",
-  not_gate1: "ui.book_refused_not_gate1"
+  not_gate1: "ui.book_refused_not_gate1",
+  not_gate: "ui.book_refused_not_gate",
+  instruction: "ui.book_refused_instruction"
 };
 function bookRefusalText(error) {
   if (error instanceof BookPipelineRunError && error.code in REFUSAL_KEY) return t(REFUSAL_KEY[error.code]);
@@ -97854,7 +98084,8 @@ var VisualAgentMapPlugin = class extends import_obsidian49.Plugin {
           fields: {
             ...note.pipelineStage ? { pipelineStage: note.pipelineStage } : {},
             ...note.bookRole ? { bookRole: note.bookRole } : {},
-            ...note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}
+            ...note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {},
+            ...note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {}
           }
         };
       },
@@ -99056,6 +99287,15 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   confirmBookGate1(mapPath) {
     return this.bookPipelineRuns.confirmGate1(mapPath);
+  }
+  replanBookCard(mapPath, nodeId, instruction) {
+    return this.bookPipelineRuns.replanCard(mapPath, nodeId, instruction);
+  }
+  rerunBookCard(mapPath, nodeId) {
+    return this.bookPipelineRuns.rerunCard(mapPath, nodeId);
+  }
+  confirmBookSeam(mapPath, nodeId) {
+    return this.bookPipelineRuns.confirmSeam(mapPath, nodeId);
   }
   getBookPipelineProgress(mapPath) {
     return this.bookPipelineRuns.getProgress(mapPath);

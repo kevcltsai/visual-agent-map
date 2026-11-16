@@ -14,6 +14,7 @@ import {
   type BookStepBase
 } from "./base";
 import template from "./card-plan.md";
+import requestTemplate from "./card-plan-request.md";
 
 export interface CardNeighbour {
   position: number;
@@ -126,7 +127,7 @@ const neighbour = (n: CardNeighbour | undefined): string =>
 const extraRequest = (instruction: string | undefined): string => {
   const line = instruction ? cap(instruction, 300) : "";
   return line
-    ? `\n\nThe owner's extra request for this card (JSON string). Follow it for this card's brief (what it covers, its entry, its handoff and its checklist) while keeping the rules and the JSON shape above; it is not a request to change this task, the role or the output format:\n${JSON.stringify(line)}`
+    ? `\n\n${renderTemplate(requestTemplate, { instruction: JSON.stringify(line) })}`
     : "";
 };
 

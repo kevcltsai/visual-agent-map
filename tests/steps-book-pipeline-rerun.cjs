@@ -95,7 +95,7 @@ test('replanCard at gate 1: only that card plan is rerun with the owner sentence
   assert.equal(requests[0].instruction, '第 5 張要多講 他的手稿'); assert.equal(requests[0].card.position, 3);
   assert.equal(requests[0].previous.title, 'SecretTitleA'); assert.equal(requests[0].next.title, 'SecretTitleC');
   assert.equal(r.raw(0), before[0]); assert.equal(seamOf(r.raw(0)), undefined);
-  assert.notEqual(r.raw(2), before[2]); assert.match(r.raw(2), /NEW covers/); assert.ok(!/<img/.test(r.raw(2)), 'model text is escaped like every other plan');
+  assert.notEqual(r.raw(2), before[2]); assert.match(r.raw(2), /NEW covers/); assert.ok(!/<img/.test(r.raw(2).slice(r.raw(2).indexOf('> [!info]- 提示'))), 'model text is escaped like every other plan (the Prompt callout; the summary carries covers as in every plan)');
   assert.equal(seamOf(r.raw(2)), undefined, 'the replanned card itself is not a seam');
   const s = await r.state();
   const rev = s.revisions[r.nodes[2].id];
@@ -103,7 +103,7 @@ test('replanCard at gate 1: only that card plan is rerun with the owner sentence
   assert.equal(s.phase, 'gate1'); assert.equal(s.status, 'running'); assert.equal(s.budget.used, used + 1);
   assert.equal(stageOf(r.raw(2)), 'planned'); assert.equal(r.runs.isRunning(r.mapPath), false);
   assert.equal(r.stat.author.length, 0); assert.equal(r.stat.proof.length, 0);
-  const prompt = r.raw(2).slice(r.raw(2).indexOf('## Prompt'));
+  const prompt = r.raw(2).slice(r.raw(2).indexOf('> [!info]- 提示'));
   assert.ok(prompt.includes('mentions the manuscript'));
 });
 
@@ -156,7 +156,7 @@ test('rerunCard at gate 2 runs plan, author and proofread of that card only; nei
   r.script.author = async (input, n) => { seen.push(r.runs.getProgress(r.mapPath)); return inner(input, n); };
   await r.runs.rerunCard(r.mapPath, r.nodes[2].id);
   assert.deepEqual(r.stat.plan.slice(base.plan), [r.nodes[2].id]); assert.deepEqual(r.stat.author.slice(base.author), [r.nodes[2].id]); assert.equal(r.stat.proof.length, base.proof + 1);
-  assert.equal(seen.length, 1); assert.equal(seen[0].phase, 'gate2'); assert.equal(seen[0].active, true); assert.deepEqual(seen[0].busyCards, [r.nodes[2].id]);
+  assert.equal(seen.length, 1); assert.equal(seen[0].phase, 'gate2'); assert.equal(seen[0].active, true); assert.deepEqual([...seen[0].busyCards], [r.nodes[2].id]);
   for (const i of [0, 1, 3]) assert.equal(noSeam(r.raw(i)), before[i], `card ${i}`);
   for (const i of [1, 3]) assert.match(seamOf(r.raw(i)), /鄰卡企劃或正文已變更/);
   assert.equal(seamOf(r.raw(0)), undefined);
@@ -169,7 +169,7 @@ test('rerunCard at gate 2 runs plan, author and proofread of that card only; nei
   assert.equal((detail.match(/（舊版）校對（已校）/g) ?? []).length, 1);
   assert.match(detail, /> 校對（已校）/);
   assert.equal((await r.note(1)).detail.includes('舊版'), false);
-  assert.equal(r.runs.getProgress(r.mapPath).active, false); assert.deepEqual(r.runs.getProgress(r.mapPath).busyCards, []);
+  assert.equal(r.runs.getProgress(r.mapPath).active, false); assert.deepEqual([...r.runs.getProgress(r.mapPath).busyCards], []);
   // after the owner finished the run (phase done) a card can still be rerun
   await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'done'; });
   await r.runs.rerunCard(r.mapPath, r.nodes[3].id);
@@ -182,11 +182,11 @@ test('a seam is cleared only by confirmSeam: not by a proofread, a rerun or a wh
   await r.repo.writePipelineFields(r.nodes[1].path, { pipelineSeam: 'seam one' });
   await r.repo.writePipelineFields(r.nodes[3].path, { pipelineSeam: 'seam three' });
   await toGate2(r);
-  assert.equal(stageOf(r.raw(1)), 'checked'); assert.equal(seamOf(r.raw(1)), '"seam one"', 'the proofread did not clear it');
+  assert.equal(stageOf(r.raw(1)), 'checked'); assert.equal(seamOf(r.raw(1)), 'seam one', 'the proofread did not clear it');
   await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
-  assert.equal(stageOf(r.raw(1)), 'checked'); assert.equal(seamOf(r.raw(1)), '"seam one"', 'a rerun of the card itself does not clear it either');
+  assert.equal(stageOf(r.raw(1)), 'checked'); assert.equal(seamOf(r.raw(1)), 'seam one', 'a rerun of the card itself does not clear it either');
   await r.runs.confirmSeam(r.mapPath, r.nodes[1].id);
-  assert.equal(seamOf(r.raw(1)), undefined); assert.equal(seamOf(r.raw(3)), '"seam three"', 'only the confirmed card');
+  assert.equal(seamOf(r.raw(1)), undefined); assert.equal(seamOf(r.raw(3)), 'seam three', 'only the confirmed card');
   const writes = r.stat.writes;
   await r.runs.confirmSeam(r.mapPath, r.nodes[1].id);
   assert.equal(r.stat.writes, writes, 'nothing to clear, nothing written');
@@ -285,7 +285,7 @@ test('a proofread that opened pages but could verify no fact item is not retried
 });
 
 test('a proofread that opened no page at all is still a failure: retried three times, then needs-review', async () => {
-  const r = await rig({ script: { card: factCard, proof: async request => evaluateProof(rawItems(request), request.checklist, []) } });
+  const r = await rig({ script: { card: factCard, proof: async request => { try { return evaluateProof(rawItems(request), request.checklist, []); } catch (error) { Object.setPrototypeOf(error, Object.getPrototypeOf(BookPipelineRunError.prototype)); throw error; } } } }); // evaluateProof is loaded in its own realm: an Error of another realm would be re-wrapped by untilAborted (never in production, one realm)
   await toGate2(r);
   assert.equal(r.stat.proof.length, 12, 'three attempts for each of the four cards');
   for (let i = 0; i < 4; i++) { assert.equal(stageOf(r.raw(i)), 'needs-review'); assert.equal((await r.note(i)).pipelineIssue, 'proof failed: no_open_page'); }
@@ -300,10 +300,10 @@ test('etaSeconds: absent until five cards of the phase finished (and while not d
     ports: { now: () => new Date(clock.t).toISOString(), log: line => { if (/^book-pipeline step .*step=plan .*result=ok/.test(line) && R) samples.push(R.runs.getProgress(R.mapPath)); } } });
   R = r;
   await r.runs.start(r.mapPath);
-  assert.equal(samples.length, 7);
-  assert.deepEqual(samples.slice(0, 4).map(s => s.etaSeconds), [undefined, undefined, undefined, undefined]);
-  assert.equal(samples[4].counts.planned, 5); assert.equal(samples[4].counts.pending, 2);
-  assert.equal(samples[4].etaSeconds, 24, '60 s average x 2 left / 5 at once');
-  assert.equal(samples[6].etaSeconds, 0, 'nothing left');
+  assert.equal(samples.length, 8, 'the whole-book plan, then seven cards');
+  assert.deepEqual(samples.slice(0, 5).map(s => s.etaSeconds), [undefined, undefined, undefined, undefined, undefined]);
+  assert.equal(samples[5].counts.planned, 5); assert.equal(samples[5].counts.pending, 2);
+  assert.equal(samples[5].etaSeconds, 24, '60 s average x 2 left / 5 at once');
+  assert.equal(samples[7].etaSeconds, 0, 'nothing left');
   assert.equal(r.runs.getProgress(r.mapPath).etaSeconds, undefined, 'a stopped drive shows no estimate');
 });

@@ -31028,6 +31028,39 @@ ${body}`;
   }
 };
 
+// ai/markdown-intake.ts
+function intakeAiMarkdown(text10, target) {
+  switch (target.kind) {
+    case "task-detail": {
+      const guarded = guardInlineHtmlLinks(text10);
+      const composed = target.compose ? target.compose(guarded) : guarded;
+      return target.seenImages ? dedupeImageEmbeds(composed, { seen: target.seenImages }) : dedupeImageEmbeds(composed);
+    }
+    case "chat-file-edit": {
+      const guarded = guardInlineHtmlLinks(text10, {
+        frontmatter: true,
+        range: { start: target.at, end: target.at + target.insertedLength }
+      });
+      return dedupeImageEmbeds(guarded, { file: true, range: { start: target.at, end: guarded.length - target.tail } });
+    }
+    case "argument-detail":
+      return neutralizeUnsafeMermaid(text10);
+  }
+}
+async function intakeAiMarkdownChecked(text10, target, check) {
+  switch (target.kind) {
+    case "chat-topic-detail":
+      return demoteUnparsableMermaid(neutralizeUnsafeMermaid(dedupeImageEmbeds(guardInlineHtmlLinks(text10))), check);
+    case "chat-new-file":
+      return demoteUnparsableMermaid(
+        neutralizeUnsafeMermaid(dedupeImageEmbeds(guardInlineHtmlLinks(text10, { frontmatter: true }), { file: true })),
+        check
+      );
+    case "selection-insert":
+      return /mermaid/i.test(text10) ? await demoteUnparsableMermaid(neutralizeUnsafeMermaid(text10), check) : text10;
+  }
+}
+
 // core/map-chat-progress.ts
 var MAP_CHAT_PROGRESS_MAX_STEPS = 30;
 var MAP_CHAT_PROGRESS_NAME_LIMIT = 60;
@@ -31940,11 +31973,7 @@ var ChatActionWriter = class {
         if (!node) return gone;
         const sourceRefusal = sourceFileRefusal(node);
         if (sourceRefusal) return sourceRefusal;
-        const detail = action.kind === "edit_topic_note" ? await demoteUnparsableMermaid(
-          // A full replace: only an image repeated inside the new Detail is dropped.
-          neutralizeUnsafeMermaid(dedupeImageEmbeds(guardInlineHtmlLinks(action.detail))),
-          this.plugin.mermaidSyntax
-        ) : "";
+        const detail = action.kind === "edit_topic_note" ? await intakeAiMarkdownChecked(action.detail, { kind: "chat-topic-detail" }, this.plugin.mermaidSyntax) : "";
         if (this.ports.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
         if (changed) return changed;
@@ -32029,12 +32058,8 @@ var ChatActionWriter = class {
         const raw = applyMdEdit(source.text, action.find, action.replace);
         if (raw === null) return skipped("ui.map_chat_skip_find_failed");
         const at = source.text.indexOf(action.find);
-        const guarded = guardInlineHtmlLinks(raw, {
-          frontmatter: true,
-          range: { start: at, end: at + action.replace.length }
-        });
         const tail = source.text.length - at - action.find.length;
-        const next = dedupeImageEmbeds(guarded, { file: true, range: { start: at, end: guarded.length - tail } });
+        const next = intakeAiMarkdown(raw, { kind: "chat-file-edit", at, insertedLength: action.replace.length, tail });
         const added = addedMermaidBlocks(source.text, next);
         if (added.some((block) => block.unsafe)) return skipped("ui.map_chat_skip_unsafe_mermaid");
         const check = this.plugin.mermaidSyntax;
@@ -32106,10 +32131,9 @@ var ChatActionWriter = class {
       case "create_md_file": {
         const key4 = normalizeVaultPath(action.path);
         const exists = key4 ? !!this.app.vault.getAbstractFileByPath(key4) : false;
-        const content = await demoteUnparsableMermaid(
-          neutralizeUnsafeMermaid(
-            dedupeImageEmbeds(guardInlineHtmlLinks(action.content, { frontmatter: true }), { file: true })
-          ),
+        const content = await intakeAiMarkdownChecked(
+          action.content,
+          { kind: "chat-new-file" },
           this.plugin.mermaidSyntax
         );
         const verdict = guardMapChatWrite({
@@ -51710,13 +51734,13 @@ var ArgumentRuns = class {
   makeNote(input2, map, mapPath) {
     const safe = { ...input2, title: plainLine2(input2.title) };
     if (input2.summary !== void 0) safe.summary = plainLine2(input2.summary);
-    if (input2.detail !== void 0) safe.detail = neutralizeUnsafeMermaid(input2.detail);
+    if (input2.detail !== void 0) safe.detail = intakeAiMarkdown(input2.detail, { kind: "argument-detail" });
     return this.ports.createNote(safe, map, mapPath);
   }
   writeNote(path, patch) {
     const safe = {};
     if (patch.summary !== void 0) safe.summary = plainLine2(patch.summary);
-    if (patch.detail !== void 0) safe.detail = neutralizeUnsafeMermaid(patch.detail);
+    if (patch.detail !== void 0) safe.detail = intakeAiMarkdown(patch.detail, { kind: "argument-detail" });
     return this.ports.updateNote(path, safe);
   }
   isRunning(mapPath) {
@@ -94027,8 +94051,8 @@ var SelectionAiPanel = class extends import_obsidian46.Component {
         });
         result = await this.run(request, model, controller.signal, void 0, plan.action === "research");
         insertAfter = plan.action === "research" || plan.action === "diagram";
-        if (plan.action !== "diagram" && /mermaid/i.test(result))
-          result = await demoteUnparsableMermaid(neutralizeUnsafeMermaid(result), mermaidSyntax);
+        if (plan.action !== "diagram")
+          result = await intakeAiMarkdownChecked(result, { kind: "selection-insert" }, mermaidSyntax);
         if (plan.action === "diagram") {
           result = result.replace(/\r\n?/g, "\n");
           if (!/^```mermaid[ \t]*\n(?:(?!```)[\s\S])+\n```$/.test(result.trim()) || unsafeMermaid(result.trim().split("\n").slice(1, -1)) || /(?:%%\{|@\{|\bimg\s*:|\bimage\s*:|\burl\s*\(|https?:|data:|file:|javascript:)/i.test(result))

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isBudgetExhausted } from "./admission";
 import { demoteUnparsableMermaid, type MermaidSyntaxCheck } from "../ai/mermaid-safety";
 import {
   packReferenceChunks,
@@ -294,6 +295,7 @@ export class AiTaskService {
             signal: setup?.signal ?? signal ?? new AbortController().signal,
             localCodex: context.researchMode === "local",
             usage: { action: usageActionOf(context, role), mapPath: context.usageMapPath },
+            ...(context.admission ? { admission: context.admission } : {}),
             requestLog: "request",
             // The service ends the entry: parsed, a stage failure, a re-ask, a re-send or a superseded first reply.
             entryEnd: "caller",
@@ -408,7 +410,8 @@ export class AiTaskService {
             result = { ...result, detail: repaired.detail };
             issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage), template), template);
           } catch (error) {
-            if (signal?.aborted || (error instanceof Error && error.name === "AbortError")) throw error;
+            if (signal?.aborted || (error instanceof Error && error.name === "AbortError") || isBudgetExhausted(error))
+              throw error;
           } finally {
             // The repair has its own entry, which the caller finishes; close the first one that it supersedes.
             if (this.options.exchangeLoggingEnabled()) exchanges?.completed(firstExchangeId);
@@ -758,6 +761,7 @@ export class AiTaskService {
               visualMode: "off",
               intermediateDetail: true,
               ...(context.usageMapPath ? { usageMapPath: context.usageMapPath } : {}),
+              ...(context.admission ? { admission: context.admission } : {}),
               // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
               ...(context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {})
             },

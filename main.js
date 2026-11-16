@@ -28383,6 +28383,72 @@ function conclusionView(state) {
   return "in_progress";
 }
 
+// core/book-pipeline/model.ts
+var PIPELINE_STAGES = ["planned", "written", "checked", "needs-review"];
+var BOOK_ROLES = ["intro", "body", "gallery", "closing"];
+var PIPELINE_ISSUE_MAX = 200;
+function readPipelineStage(value) {
+  return PIPELINE_STAGES.find((stage) => stage === value);
+}
+function readBookRole(value) {
+  return BOOK_ROLES.find((role) => role === value);
+}
+function plainPipelineLine(value) {
+  if (typeof value !== "string") return void 0;
+  const line2 = value.replace(/\s+/g, " ").trim();
+  if (!line2) return void 0;
+  return Array.from(line2).slice(0, PIPELINE_ISSUE_MAX).join("");
+}
+function readPipelineFields(fm) {
+  const stage = readPipelineStage(fm["pipeline-stage"]);
+  const role = readBookRole(fm["book-role"]);
+  const issue2 = plainPipelineLine(fm["pipeline-issue"]);
+  const seam = plainPipelineLine(fm["pipeline-seam"]);
+  return {
+    ...stage ? { pipelineStage: stage } : {},
+    ...role ? { bookRole: role } : {},
+    ...issue2 ? { pipelineIssue: issue2 } : {},
+    ...seam ? { pipelineSeam: seam } : {}
+  };
+}
+var FIELD_KEYS = {
+  pipelineStage: "pipeline-stage",
+  bookRole: "book-role",
+  pipelineIssue: "pipeline-issue",
+  pipelineSeam: "pipeline-seam"
+};
+function pipelineFrontmatter(patch) {
+  var _a2, _b2, _c;
+  const values = {};
+  for (const field of Object.keys(FIELD_KEYS)) {
+    const value = patch[field];
+    if (value === void 0) continue;
+    const clean3 = value === null ? null : field === "pipelineStage" ? (_a2 = readPipelineStage(value)) != null ? _a2 : null : field === "bookRole" ? (_b2 = readBookRole(value)) != null ? _b2 : null : (_c = plainPipelineLine(value)) != null ? _c : null;
+    values[FIELD_KEYS[field]] = clean3;
+  }
+  return values;
+}
+var BOOK_SETTING_FIELDS = ["reader", "goal", "angle", "tone", "length", "style"];
+function readBookSettings(fm) {
+  const settings = {};
+  for (const field of BOOK_SETTING_FIELDS) {
+    const value = fm[`book-${field}`];
+    if (typeof value === "string" && value.trim()) settings[field] = value.replace(/\s+/g, " ").trim();
+    else if (typeof value === "number" && Number.isFinite(value)) settings[field] = String(value);
+  }
+  return settings;
+}
+function bookSettingsFrontmatter(patch) {
+  const values = {};
+  for (const field of BOOK_SETTING_FIELDS) {
+    const value = patch[field];
+    if (value === void 0) continue;
+    const line2 = value === null ? null : value.replace(/\s+/g, " ").trim() || null;
+    values[`book-${field}`] = line2;
+  }
+  return values;
+}
+
 // core/image-keys.ts
 function imageKey(url) {
   var _a2;
@@ -28504,6 +28570,9 @@ function managedMapContainer(settings, path) {
 function isManagedMapPath(settings, path) {
   return managedMapContainer(settings, path) !== void 0;
 }
+var BOOK_PLAN_MODEL = "claude:haiku";
+var BOOK_WRITE_MODEL = "claude:sonnet";
+var BOOK_PROOF_MODEL = "claude:sonnet";
 var DEFAULT_SETTINGS = {
   detailTemplates: [],
   coffeeStyles: [],
@@ -28524,6 +28593,9 @@ var DEFAULT_SETTINGS = {
   mapChatImageMode: "preview",
   mapChatRecords: false,
   experimentalArgumentMap: false,
+  bookPlanModel: BOOK_PLAN_MODEL,
+  bookWriteModel: BOOK_WRITE_MODEL,
+  bookProofModel: BOOK_PROOF_MODEL,
   cliReasoning: "low",
   previewScale: 120,
   models: "",
@@ -29561,6 +29633,8 @@ var Repository = class {
       ...noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {},
       ...readRelevance(fm) ? { relevance: readRelevance(fm) } : {},
       ...readAiLocked(fm) || managedNodeIds(map).has((_b2 = (_a2 = map == null ? void 0 : map.nodes.find((item) => item.path === path)) == null ? void 0 : _a2.id) != null ? _b2 : "") ? { aiLocked: true } : {},
+      ...readPipelineFields(fm),
+      ...Object.keys(readBookSettings(fm)).length ? { bookSettings: readBookSettings(fm) } : {},
       ...readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) } : {},
       ...readTopicKind(fm) === "hypothesis" ? { hypothesisLeaning: readHypothesisLeaning(fm), hypothesisStrength: readHypothesisStrength(fm) } : {},
       ...readTopicMarkers(fm).length ? { markers: readTopicMarkers(fm) } : {},
@@ -29856,6 +29930,21 @@ ${body}`);
   async readRelevanceSetup(path) {
     const fm = frontmatter(await this.app.vault.read(this.file(path)));
     return { goal: readRelevanceGoal(fm), context: readRelevanceContext(fm) };
+  }
+  /**
+   * Sets the picture-book pipeline fields of a note (`undefined` keeps a key, `null` removes it) with `setFrontmatterKeys`:
+   * every other line and the body keep their bytes, `updated` is not bumped and `status` is not touched.
+   */
+  async writePipelineFields(path, patch) {
+    const values = pipelineFrontmatter(patch);
+    if (!Object.keys(values).length) return;
+    await this.app.vault.process(this.file(path), (content) => setFrontmatterKeys(content, values));
+  }
+  /** Sets or removes the root topic's `book-*` settings only (same contract as {@link writePipelineFields}). */
+  async writeBookSettings(path, patch) {
+    const values = bookSettingsFrontmatter(patch);
+    if (!Object.keys(values).length) return;
+    await this.app.vault.process(this.file(path), (content) => setFrontmatterKeys(content, values));
   }
   /**
    * Sets a note's `topic-kind` only (an ordinary topic removes the key): `hypothesis-leaning` and `hypothesis-strength`
@@ -89949,6 +90038,10 @@ var AiCalls = class {
           );
         }
       };
+      if (options.admission) {
+        if (controller.signal.aborted) throw stopped();
+        await options.admission.reserve();
+      }
       const raw = await runtime.run({
         prompt: call.prompt,
         model: options.model,
@@ -92025,6 +92118,18 @@ var ResearchProgressStore = class {
 // core/ai-task-service.ts
 var import_node_crypto10 = require("node:crypto");
 
+// core/admission.ts
+var BudgetExhaustedError = class extends Error {
+  constructor() {
+    super("budget-exhausted");
+    __publicField(this, "outcome", "budget-exhausted");
+    this.name = "BudgetExhaustedError";
+  }
+};
+function isBudgetExhausted(error) {
+  return error instanceof BudgetExhaustedError || !!error && typeof error === "object" && error.name === "BudgetExhaustedError";
+}
+
 // core/steps/reference/extract.zh.md
 var extract_zh_default = "\u5F9E\u6BCF\u500B\u63D0\u4F9B\u7684\u4F86\u6E90\u6BB5\u843D\u64F7\u53D6\u76F8\u95DC\u4E8B\u5BE6\u3001\u8B49\u64DA\u3001\u5206\u6B67\u8207\u9650\u5236\u3002\u4E0D\u53EF\u56E0\u4F86\u6E90\u770B\u4F3C\u4E0D\u76F8\u95DC\u5C31\u7565\u904E\u3002\u6BCF\u9805\u64F7\u53D6\u5167\u5BB9\u90FD\u8981\u5728\u4E3B\u5F35\u65C1\u4FDD\u7559\u539F\u59CB [S#]\uFF0C\u4E26\u9644\u4E0A\u672C\u6279\u6240\u6709 [S#] \u5C0D\u61C9\u539F\u59CB\u5B8C\u6574\u8DEF\u5F91\u7684\u4F86\u6E90\u5C0D\u7167\u8868\u3002\u4FDD\u7559\u6709\u52A9\u8FA8\u8B58\u7AE0\u7BC0\u7684\u6A19\u984C\uFF1B\u6700\u7D42\u7B54\u6848\u9700\u8981\u9019\u4EFD\u5C0D\u7167\u8868\u624D\u80FD\u5F15\u7528\u539F\u6A94\u3002\u4E0D\u53EF\u8D85\u51FA\u539F\u6587\u63A8\u8AD6\u3002\n";
 
@@ -92613,6 +92718,7 @@ var AiTaskService = class {
             signal: (_c2 = (_b3 = setup == null ? void 0 : setup.signal) != null ? _b3 : signal) != null ? _c2 : new AbortController().signal,
             localCodex: context.researchMode === "local",
             usage: { action: usageActionOf(context, role), mapPath: context.usageMapPath },
+            ...context.admission ? { admission: context.admission } : {},
             requestLog: "request",
             // The service ends the entry: parsed, a stage failure, a re-ask, a re-send or a superseded first reply.
             entryEnd: "caller",
@@ -92708,7 +92814,8 @@ var AiTaskService = class {
             result = { ...result, detail: repaired.detail };
             issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage2), template2), template2);
           } catch (error) {
-            if ((signal == null ? void 0 : signal.aborted) || error instanceof Error && error.name === "AbortError") throw error;
+            if ((signal == null ? void 0 : signal.aborted) || error instanceof Error && error.name === "AbortError" || isBudgetExhausted(error))
+              throw error;
           } finally {
             if (this.options.exchangeLoggingEnabled()) exchanges == null ? void 0 : exchanges.completed(firstExchangeId);
             supersededClosed = true;
@@ -93031,6 +93138,7 @@ var AiTaskService = class {
               visualMode: "off",
               intermediateDetail: true,
               ...context.usageMapPath ? { usageMapPath: context.usageMapPath } : {},
+              ...context.admission ? { admission: context.admission } : {},
               // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
               ...context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {}
             },
@@ -94652,6 +94760,9 @@ function obsidianAppLanguage() {
     return "en";
   }
 }
+function savedModel(value, fallback) {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
 function settingsFromSaved(saved, appLocale) {
   var _a2;
   const legacy = saved;
@@ -94690,6 +94801,9 @@ function settingsFromSaved(saved, appLocale) {
     mapChatImageMode: normalizeMapChatImageMode(saved == null ? void 0 : saved.mapChatImageMode),
     mapChatRecords: (saved == null ? void 0 : saved.mapChatRecords) === true,
     experimentalArgumentMap: (saved == null ? void 0 : saved.experimentalArgumentMap) === true,
+    bookPlanModel: savedModel(saved == null ? void 0 : saved.bookPlanModel, DEFAULT_SETTINGS.bookPlanModel),
+    bookWriteModel: savedModel(saved == null ? void 0 : saved.bookWriteModel, DEFAULT_SETTINGS.bookWriteModel),
+    bookProofModel: savedModel(saved == null ? void 0 : saved.bookProofModel, DEFAULT_SETTINGS.bookProofModel),
     cliReasoning: normalizeReasoningLevel(saved == null ? void 0 : saved.cliReasoning),
     previewScale: (saved == null ? void 0 : saved.previewScale) !== void 0 ? clampPreviewScale(saved.previewScale) : legacyPreviewScale(saved == null ? void 0 : saved.previewSize),
     models: "",

@@ -222,6 +222,11 @@ export function obsidianAppLanguage(): string {
     return "en";
   }
 }
+/** A saved model id, or `fallback` when it is missing or not a non-empty string. */
+function savedModel(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
 /**
  * The settings in effect for what was saved: every field is checked, and a missing or invalid one takes its default. A new
  * install (no language saved) starts in `appLocale`, Obsidian's own language, when VAM has an interface in it.
@@ -283,6 +288,9 @@ export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: s
     mapChatImageMode: normalizeMapChatImageMode(saved?.mapChatImageMode),
     mapChatRecords: saved?.mapChatRecords === true,
     experimentalArgumentMap: saved?.experimentalArgumentMap === true,
+    bookPlanModel: savedModel(saved?.bookPlanModel, DEFAULT_SETTINGS.bookPlanModel),
+    bookWriteModel: savedModel(saved?.bookWriteModel, DEFAULT_SETTINGS.bookWriteModel),
+    bookProofModel: savedModel(saved?.bookProofModel, DEFAULT_SETTINGS.bookProofModel),
     cliReasoning: normalizeReasoningLevel(saved?.cliReasoning),
     previewScale:
       saved?.previewScale !== undefined

@@ -226,7 +226,7 @@ function sendOnceViolations(taskServiceSource) {
   if (runs !== 1) violations.push(`sendOnce has ${runs} calls.run(, expected 1`);
   return violations;
 }
-const CALL_OPTION_MEMBERS = 'model,effort,topic,taskName,signal,localCodex,mode,requestLog,stopped,validate,afterReply,exchangeId,extraMilestones,milestones,task,onBegin,failMessage,usage,entryEnd';
+const CALL_OPTION_MEMBERS = 'model,effort,topic,taskName,signal,localCodex,mode,requestLog,stopped,validate,afterReply,exchangeId,extraMilestones,milestones,task,onBegin,failMessage,usage,admission,entryEnd';
 /** Member names of `export interface AiCallOptions {` in core/ai-calls.ts, comma-joined. */
 function callOptionMembers(aiCallsSource) {
   const start = aiCallsSource.indexOf('export interface AiCallOptions {');

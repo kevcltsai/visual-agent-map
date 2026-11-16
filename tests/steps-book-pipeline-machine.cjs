@@ -1,0 +1,421 @@
+// Picture-book pipeline state machine (02a): every transition, the 3-attempt rule, the whole-book plan stopping at planning,
+// idempotent resume, the separate budget pause, dispose, stale results, and a close injected at every commit boundary.
+// Plus the admission gate on the shared call layer: reserved before every provider request, absent = unchanged.
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const S = require('./support.cjs');
+const { load } = require('./support-replay.cjs');
+const { loadWithAiCalls } = require('./support-ai-calls.cjs');
+const machine = S.load('core/book-pipeline/machine.ts');
+const model = S.load('core/book-pipeline/model.ts');
+const budgetMod = S.load('core/book-pipeline/budget.ts');
+const admission = S.load('core/admission.ts');
+
+const plain = value => JSON.parse(JSON.stringify(value));
+const NOW = '2026-11-16T00:00:00.000Z';
+const IDS = ['a', 'b', 'c'];
+const fresh = (extra = {}) => machine.newBookPipeline({ runId: 'run-1', order: IDS, now: NOW, ...extra });
+const none = () => Object.fromEntries(IDS.map(id => [id, undefined]));
+const actionsOf = (state, stages, busy) => plain(machine.nextActions(state, stages, busy));
+/** Runs `kind` for `nodeId` to success the way a runner would (dispatch, then commit). */
+const succeed = (state, kind, nodeId) => { const d = machine.beginStep(state, kind, nodeId); return machine.applySuccess(d.state, d.token).state; };
+
+test('a new run: planning, running, budget 300, no cards trusted; the whole-book plan comes first and alone', () => {
+  const state = fresh();
+  assert.deepEqual([state.phase, state.status, state.budget.used, state.budget.limit, state.globalPlanned], ['planning', 'running', 0, 300, false]);
+  assert.deepEqual(actionsOf(state, none()), { actions: [{ type: 'global_plan' }] });
+  assert.equal(model.readBookPipeline({ bookPipeline: plain(state) }).kind, 'usable');
+  assert.throws(() => machine.newBookPipeline({ runId: 'r', order: [], now: NOW }));
+  assert.throws(() => machine.newBookPipeline({ runId: 'r', order: ['global'], now: NOW }));
+});
+
+test('transitions: global plan, every card plan, gate 1, confirm, write, proof, gate 2, done', () => {
+  let state = fresh();
+  const stages = none();
+  state = succeed(state, 'global');
+  assert.equal(state.globalPlanned, true);
+  assert.deepEqual(actionsOf(state, stages).actions.map(a => `${a.type}:${a.nodeId}`), ['card_plan:a', 'card_plan:b', 'card_plan:c']);
+  for (const id of IDS) { state = succeed(state, 'plan', id); stages[id] = 'planned'; assert.equal(machine.cardRevision(state, id), 1); }
+  assert.deepEqual(actionsOf(state, stages).actions, [{ type: 'advance_phase' }]);
+  state = machine.advancePhase(state, stages, NOW);
+  assert.equal(state.phase, 'gate1');
+  assert.deepEqual(actionsOf(state, stages), { actions: [], hold: 'gate1' });
+  assert.equal(machine.confirmGate1(fresh(), NOW).phase, 'planning', 'confirm outside gate 1 is a no-op');
+  state = machine.confirmGate1(state, NOW);
+  assert.equal(state.phase, 'writing');
+  assert.deepEqual(actionsOf(state, stages).actions.map(a => `${a.type}:${a.nodeId}`), ['card_write:a', 'card_write:b', 'card_write:c']);
+  for (const id of IDS) { state = succeed(state, 'write', id); stages[id] = 'written'; assert.equal(machine.cardRevision(state, id), 2); }
+  assert.deepEqual(actionsOf(state, stages).actions.map(a => a.type), ['card_proof', 'card_proof', 'card_proof']);
+  for (const id of IDS) { state = succeed(state, 'proof', id); stages[id] = 'checked'; assert.equal(machine.cardRevision(state, id), 2, 'a proof does not raise the revision'); }
+  state = machine.advancePhase(state, stages, NOW);
+  assert.equal(state.phase, 'gate2');
+  assert.deepEqual(actionsOf(state, stages), { actions: [], hold: 'gate2' });
+  state = machine.finishRun(state, NOW);
+  assert.equal(state.phase, 'done');
+  assert.deepEqual(actionsOf(state, stages), { actions: [], hold: 'done' });
+});
+
+test('a step takes at most 3 attempts; the third failure marks needs-review and the other cards go on', () => {
+  let state = succeed(fresh(), 'global');
+  const stages = none();
+  for (let n = 1; n <= 3; n++) {
+    const d = machine.beginStep(state, 'plan', 'b');
+    assert.equal(machine.attemptsOf ? 0 : 0, 0);
+    state = d.state;
+    const failed = machine.applyFailure(state, d.token);
+    state = failed.state;
+    assert.equal(!!failed.needsReview, n === 3, `attempt ${n}`);
+    if (n === 3) assert.deepEqual(plain(failed.needsReview), { nodeId: 'b', step: 'plan' });
+  }
+  assert.equal(machine.beginStep(state, 'plan', 'b'), null, 'a fourth attempt is refused');
+  assert.equal(state.attempts.b.plan, 3);
+  // The marking is written to the note; if the app closes before that, the next plan says so again.
+  assert.deepEqual(actionsOf(state, stages).actions.map(a => `${a.type}:${a.nodeId}`), ['card_plan:a', 'mark_needs_review:b', 'card_plan:c']);
+  stages.b = 'needs-review';
+  assert.deepEqual(actionsOf(state, stages).actions.map(a => `${a.type}:${a.nodeId}`), ['card_plan:a', 'card_plan:c']);
+  for (const id of ['a', 'c']) { state = succeed(state, 'plan', id); stages[id] = 'planned'; }
+  assert.deepEqual(actionsOf(state, stages).actions, [{ type: 'advance_phase' }], 'a needs-review card does not hold the phase');
+  state = machine.advancePhase(state, stages, NOW);
+  assert.equal(state.phase, 'gate1');
+});
+
+test('each step has its own count: a write that failed twice does not use up the proof', () => {
+  let state = succeed(fresh(), 'global');
+  const stages = { a: 'planned', b: 'planned', c: 'planned' };
+  state = { ...plain(state), phase: 'writing' };
+  for (let n = 0; n < 2; n++) { const d = machine.beginStep(state, 'write', 'a'); state = machine.applyFailure(d.state, d.token).state; }
+  state = succeed(state, 'write', 'a');
+  assert.deepEqual(plain(model.attemptsOf(state, 'a')), { plan: 0, write: 3, proof: 0 });
+  assert.notEqual(machine.beginStep(state, 'proof', 'a'), null);
+});
+
+test('the whole-book plan failing 3 times stops at planning with no card plan; retry starts over', () => {
+  let state = fresh();
+  for (let n = 1; n <= 3; n++) { const d = machine.beginStep(state, 'global'); state = machine.applyFailure(d.state, d.token).state; }
+  assert.equal(state.attempts.global, 3);
+  assert.deepEqual(actionsOf(state, none()), { actions: [], hold: 'global_failed' });
+  assert.equal(state.phase, 'planning');
+  assert.equal(machine.beginStep(state, 'global'), null);
+  state = machine.retryGlobalPlan(state);
+  assert.deepEqual(actionsOf(state, none()), { actions: [{ type: 'global_plan' }] });
+});
+
+test('a stop is not a failure: the attempt is given back, and resume re-derives the next steps from the stages', () => {
+  let state = succeed(fresh(), 'global');
+  const d = machine.beginStep(state, 'plan', 'a');
+  assert.equal(d.state.attempts.a.plan, 1);
+  state = machine.stopRun(d.state);
+  assert.deepEqual(actionsOf(state, none()), { actions: [], hold: 'stopped' });
+  const cancelled = machine.applyCancelled(state, d.token);
+  assert.equal(cancelled.state.attempts.a.plan, 0);
+  const resumed = machine.resumeRun(cancelled.state);
+  assert.equal(resumed.status, 'running');
+  assert.equal(machine.resumeRun(resumed), resumed, 'resume is idempotent on a running run');
+  assert.deepEqual(actionsOf(resumed, none()).actions.map(a => a.nodeId), ['a', 'b', 'c']);
+});
+
+test('resume is idempotent: finished cards are not redone, pressing it twice changes nothing', () => {
+  let state = succeed(fresh(), 'global');
+  state = { ...plain(state), phase: 'writing' };
+  const stages = { a: 'checked', b: 'written', c: 'needs-review' };
+  state = machine.stopRun(state);
+  const once = machine.resumeRun(state);
+  const twice = machine.resumeRun(machine.resumeRun(state));
+  assert.deepEqual(plain(once), plain(twice));
+  assert.deepEqual(actionsOf(once, stages).actions, [{ type: 'card_proof', nodeId: 'b' }]);
+  assert.deepEqual(actionsOf(once, stages), actionsOf(once, stages));
+  assert.deepEqual(actionsOf(once, stages, new Set(['b'])).actions, [], 'a card in flight is skipped');
+});
+
+test('an interrupted run (running on disk, no drive) reads as stopped', () => {
+  const state = machine.recoverInterrupted(fresh());
+  assert.equal(state.status, 'stopped');
+  assert.equal(state.pauseReason, undefined);
+  assert.equal(machine.recoverInterrupted(state), state);
+});
+
+test('budget exhausted is its own pause: no failure count, no needs-review, attempt given back; add budget ends it', () => {
+  let state = succeed(fresh({ budgetLimit: 5 }), 'global');
+  const d = machine.beginStep(state, 'plan', 'a');
+  const e = machine.beginStep(d.state, 'plan', 'b');
+  const first = machine.applyBudgetExhausted(e.state, d.token);
+  const second = machine.applyBudgetExhausted(first.state, e.token);
+  state = second.state;
+  assert.deepEqual([state.status, state.pauseReason], ['stopped', 'budget']);
+  assert.deepEqual(plain(model.attemptsOf(state, 'a')), { plan: 0, write: 0, proof: 0 });
+  assert.deepEqual(plain(model.attemptsOf(state, 'b')), { plan: 0, write: 0, proof: 0 });
+  assert.deepEqual(actionsOf(state, none()), { actions: [], hold: 'budget' });
+  assert.equal(machine.applyBudgetExhausted(machine.stopRun(fresh()), { ...d.token, runId: 'other' }).accepted, false);
+  const full = { ...plain(state), budget: { used: 5, limit: 5 } };
+  assert.equal(machine.resumeRun(full), null, 'resume is refused while the budget is used up');
+  const raised = machine.addBudget(full, 100);
+  assert.deepEqual([raised.status, raised.pauseReason, raised.budget.limit], ['running', undefined, 105]);
+  assert.deepEqual(plain(machine.addBudget(raised, 0)), plain(raised));
+  const owner = machine.stopRun(state);
+  assert.equal(owner.pauseReason, undefined, 'an owner stop after a budget pause reads as a plain stop');
+});
+
+test('late results are dropped: stale run, stopped run, changed card revision, card gone from the map', () => {
+  const base = succeed(fresh(), 'global');
+  const d = machine.beginStep(base, 'plan', 'a');
+  const dropped = result => { assert.equal(result.accepted, false); };
+  dropped(machine.applySuccess(d.state, { ...d.token, runId: 'run-0' }));
+  dropped(machine.applyFailure(d.state, { ...d.token, runId: 'run-0' }));
+  dropped(machine.applySuccess(machine.stopRun(d.state), d.token));
+  dropped(machine.applySuccess(machine.resetCard(d.state, 'a'), d.token));
+  dropped(machine.applySuccess({ ...plain(d.state), order: ['b', 'c'] }, d.token));
+  const accepted = machine.applySuccess(d.state, d.token);
+  assert.equal(accepted.accepted, true);
+  dropped(machine.applySuccess(accepted.state, d.token), 'the same result twice');
+  assert.equal(machine.applySuccess(d.state, { ...d.token, revision: 0 }).state.revisions.a, 1);
+  const stale = machine.applySuccess(d.state, { ...d.token, revision: 9 });
+  assert.equal(stale.state, d.state, 'a dropped result returns the input untouched');
+  // A proof dispatched before a rewrite cannot commit after it.
+  const w = machine.beginStep({ ...plain(base), phase: 'writing' }, 'proof', 'b');
+  dropped(machine.applySuccess(machine.applySuccess(machine.beginStep(w.state, 'write', 'b').state, { ...w.token, kind: 'write' }).state, w.token));
+});
+
+test('reducers never touch their input', () => {
+  const state = succeed(fresh(), 'global');
+  const frozen = JSON.stringify(state);
+  const d = machine.beginStep(state, 'plan', 'a');
+  machine.applySuccess(d.state, d.token); machine.applyFailure(d.state, d.token); machine.applyCancelled(d.state, d.token);
+  machine.applyBudgetExhausted(d.state, d.token); machine.stopRun(state); machine.addBudget(state, 5); machine.advancePhase(state, none(), NOW);
+  assert.equal(JSON.stringify(state), frozen);
+});
+
+test('a new run clears stale stages first (never trusted across runs), idempotently', () => {
+  let state = machine.newBookPipeline({ runId: 'run-2', order: IDS, now: NOW, staleStages: ['a', 'c'] });
+  const stages = { a: 'checked', b: undefined, c: 'needs-review' };
+  assert.deepEqual(actionsOf(state, stages).actions, [{ type: 'reset_stage', nodeId: 'a' }, { type: 'reset_stage', nodeId: 'c' }]);
+  stages.a = undefined;
+  state = machine.applyReset(state, 'a');
+  assert.deepEqual(actionsOf(state, stages).actions, [{ type: 'reset_stage', nodeId: 'c' }]);
+  stages.c = undefined;
+  assert.deepEqual(actionsOf(state, stages).actions, [{ type: 'advance_phase' }], 'already clear: only bookkeeping left');
+  state = machine.advancePhase(state, stages, NOW);
+  assert.equal(state.pendingReset, undefined);
+  assert.deepEqual(actionsOf(state, stages).actions, [{ type: 'global_plan' }]);
+});
+
+test('dispose: nothing is written after it, a late commit reports dropped, and the saved state is untouched', async () => {
+  const saved = [];
+  const store = new machine.PipelineStore(fresh(), async state => { await Promise.resolve(); saved.push(plain(state)); });
+  const first = await store.commit(state => machine.beginStep(state, 'global'));
+  assert.equal(saved.length, 1);
+  const pending = store.commit(state => ({ state: machine.stopRun(state), accepted: true }));
+  store.dispose();
+  assert.equal(await pending, null, 'a commit queued before dispose is not written');
+  assert.equal(await store.commit(state => machine.applySuccess(state, first.token)), null);
+  assert.equal(saved.length, 1);
+  assert.equal(store.isDisposed, true);
+});
+
+test('store: commits run one at a time in order; a rejected save keeps the old state and the queue goes on', async () => {
+  let fail = true;
+  const saved = [];
+  const store = new machine.PipelineStore(fresh(), async state => { if (fail) { fail = false; throw new Error('disk'); } saved.push(state.revision); });
+  const a = store.commit(state => machine.beginStep(state, 'global'));
+  const b = store.commit(state => machine.beginStep(state, 'global'));
+  await assert.rejects(a, /disk/);
+  const second = await b;
+  assert.equal(second.state.attempts.global, 1, 'the failed save did not become current');
+  assert.deepEqual(saved, [1]);
+  const noop = await store.commit(state => ({ state, accepted: true }));
+  assert.equal(noop.accepted, true);
+  assert.equal(saved.length, 1, 'an unchanged state is not saved again');
+});
+
+// --- A close injected at every commit boundary ------------------------------------------------------------------------------
+class Crash extends Error {}
+/**
+ * A runner over fake notes: each step writes its note, then the stage, then commits the state, in that order (the real order of
+ * the plan). `tick` is called at every boundary; the Nth call throws Crash, which is the app closing there. The "map file" and the
+ * notes outlive the crash; the store does not.
+ */
+function world(order = IDS) {
+  const w = { stages: Object.fromEntries(order.map(id => [id, undefined])), bodies: {}, plans: {}, proofs: [], globalPlans: 0, file: null, ticks: 0, crashAt: Infinity, failProofOnce: new Set() };
+  w.file = JSON.stringify(machine.newBookPipeline({ runId: 'run-1', order, now: NOW }));
+  w.tick = () => { if (++w.ticks === w.crashAt) throw new Crash('closed'); };
+  return w;
+}
+async function drive(w, { opens = 'saved' } = {}) {
+  let initial = JSON.parse(w.file);
+  initial = machine.resumeRun(machine.recoverInterrupted(initial));
+  const store = new machine.PipelineStore(initial, async state => { w.tick(); w.file = JSON.stringify(state); w.tick(); });
+  for (let guard = 0; guard < 200; guard++) {
+    const { actions, hold } = machine.nextActions(store.state, w.stages);
+    if (hold === 'gate1') { await store.commit(state => ({ state: machine.confirmGate1(state, NOW), accepted: true })); continue; }
+    if (hold === 'gate2') { await store.commit(state => ({ state: machine.finishRun(state, NOW), accepted: true })); continue; }
+    if (hold) return hold;
+    for (const action of actions) {
+      if (action.type === 'advance_phase') { await store.commit(state => ({ state: machine.advancePhase(state, w.stages, NOW), accepted: true })); continue; }
+      if (action.type === 'reset_stage') { w.tick(); w.stages[action.nodeId] = undefined; w.tick(); await store.commit(state => ({ state: machine.applyReset(state, action.nodeId), accepted: true })); continue; }
+      if (action.type === 'mark_needs_review') { w.tick(); w.stages[action.nodeId] = 'needs-review'; w.tick(); continue; }
+      const kind = action.type === 'global_plan' ? 'global' : action.type.slice(5);
+      const dispatched = await store.commit(state => machine.beginStep(state, kind, action.nodeId) ?? { state, accepted: false });
+      const token = dispatched?.token;
+      if (!token) continue;
+      w.tick();
+      if (kind === 'global') { w.globalPlans++; w.tick(); }
+      else if (kind === 'plan') { w.plans[action.nodeId] = `plan ${action.nodeId}`; w.tick(); w.stages[action.nodeId] = 'planned'; w.tick(); }
+      else if (kind === 'write') { w.bodies[action.nodeId] = `body ${action.nodeId}`; w.tick(); w.stages[action.nodeId] = 'written'; w.tick(); }
+      else {
+        const key = `${token.runId}:${action.nodeId}:${token.revision}:${w.bodies[action.nodeId]}`;
+        if (!w.proofs.includes(key)) w.proofs.push(key);
+        w.tick();
+        w.stages[action.nodeId] = 'checked';
+        w.tick();
+      }
+      await store.commit(state => machine.applySuccess(state, token));
+    }
+  }
+  throw new Error('did not settle');
+}
+
+test('closing the app at every commit boundary: resumes, loses nothing, appends each proof once', async () => {
+  const clean = world();
+  assert.equal(await drive(clean), 'done');
+  const boundaries = clean.ticks;
+  assert.ok(boundaries > 30, `many boundaries (${boundaries})`);
+  assert.deepEqual(clean.proofs.length, 3);
+  for (let at = 1; at <= boundaries; at++) {
+    const w = world();
+    w.crashAt = at;
+    await assert.rejects(drive(w), Crash, `crash ${at}`);
+    w.crashAt = Infinity;
+    assert.equal(await drive(w), 'done', `resume after crash ${at}`);
+    for (const id of IDS) {
+      assert.equal(w.stages[id], 'checked', `crash ${at}: card ${id}`);
+      assert.equal(w.bodies[id], `body ${id}`, `crash ${at}: body ${id} kept`);
+      assert.equal(w.plans[id], `plan ${id}`, `crash ${at}: plan ${id} kept`);
+    }
+    assert.equal(new Set(w.proofs).size, w.proofs.length, `crash ${at}: no duplicate proof key`);
+    assert.equal(w.proofs.length, 3, `crash ${at}: one proof record per card`);
+    assert.ok(w.globalPlans >= 1, `crash ${at}: the whole-book plan was done`);
+    assert.equal(JSON.parse(w.file).phase, 'done');
+  }
+});
+
+test('a close mid-run then resume does not redo finished cards beyond the one step that was open', async () => {
+  const w = world();
+  w.crashAt = 40;
+  await assert.rejects(drive(w), Crash);
+  const stagesBefore = { ...w.stages };
+  const proofsBefore = [...w.proofs];
+  w.crashAt = Infinity;
+  await drive(w);
+  for (const id of IDS) if (stagesBefore[id] === 'checked') assert.ok(proofsBefore.some(k => k.includes(`:${id}:`)), 'a card already checked keeps its record');
+  assert.equal(w.proofs.filter(k => k.includes(':a:')).length, 1);
+});
+
+test('stages from an older run are not trusted: the next run clears them before planning, and a close in between loses nothing', async () => {
+  const w = world();
+  assert.equal(await drive(w), 'done');
+  const next = machine.newBookPipeline({ runId: 'run-2', order: IDS, now: NOW, staleStages: IDS });
+  const clean = JSON.stringify(next);
+  for (let at = 1; at < 60; at++) {
+    const x = { ...w, stages: { ...w.stages }, proofs: [], plans: {}, bodies: {}, file: clean, ticks: 0, crashAt: at };
+    x.tick = () => { if (++x.ticks === x.crashAt) throw new Crash('closed'); };
+    let crashed = false;
+    try { await drive(x); } catch (error) { if (!(error instanceof Crash)) throw error; crashed = true; }
+    x.crashAt = Infinity;
+    assert.equal(await drive(x), 'done', `at ${at}`);
+    assert.deepEqual(IDS.map(id => x.stages[id]), ['checked', 'checked', 'checked']);
+    assert.equal(x.proofs.length, 3, `at ${at}: proofs belong to run-2 only`);
+    assert.ok(x.proofs.every(k => k.startsWith('run-2:')));
+    if (!crashed) break;
+  }
+});
+
+// --- Admission on the shared call layer --------------------------------------------------------------------------------------
+const callsMod = loadWithAiCalls('core/step-runner.ts');
+const step = { id: 'test.step', version: 1, render: () => 'the prompt', parse: raw => raw };
+function callsRig(run) {
+  const calls = [];
+  const runtime = { capabilities: callsMod.CODEX_CAPABILITIES, run: async request => { calls.push(request); return run(request, calls.length); } };
+  const aiCalls = new callsMod.AiCalls({ runtimeFor: () => runtime, exchanges: () => null });
+  const send = (admissionContext, signal = new AbortController().signal) => aiCalls.run(callsMod.prepareStep(step, {}), { model: 'm', effort: 'low', topic: 't', taskName: 'x', signal, localCodex: true, ...(admissionContext ? { admission: admissionContext } : {}) }, raw => raw);
+  return { calls, send };
+}
+const ctx = (used, limit) => {
+  const port = { used, limit, persisted: [] };
+  return { port, gate: budgetMod.createBudgetAdmission({ get: () => ({ used: port.used, limit: port.limit }), persist: async next => { port.persisted.push(next.used); port.used = next.used; } }) };
+};
+
+test('AiCalls: no admission context means no reservation and the call is exactly as before', async () => {
+  const r = callsRig(() => 'ok');
+  assert.equal(await r.send(), 'ok');
+  assert.equal(r.calls.length, 1);
+});
+
+test('AiCalls: the call is reserved (and saved) before the provider is asked; an exhausted budget sends nothing', async () => {
+  const c = ctx(0, 1);
+  const r = callsRig(() => { assert.deepEqual(c.port.persisted, [1], 'saved before the provider call'); return 'ok'; });
+  assert.equal(await r.send(c.gate), 'ok');
+  await assert.rejects(r.send(c.gate), e => e.outcome === 'budget-exhausted' && admission.isBudgetExhausted(e));
+  assert.equal(r.calls.length, 1, 'the refused call never reached the provider');
+});
+
+test('AiCalls: five parallel calls with one reservation left reach the provider once', async () => {
+  const c = ctx(299, 300);
+  const r = callsRig(async () => 'ok');
+  const results = await Promise.allSettled([1, 2, 3, 4, 5].map(() => r.send(c.gate)));
+  assert.equal(results.filter(x => x.status === 'fulfilled').length, 1);
+  assert.equal(r.calls.length, 1);
+  assert.equal(c.port.used, 300);
+});
+
+test('AiCalls: a call already stopped does not take a reservation', async () => {
+  const c = ctx(0, 5);
+  const r = callsRig(() => 'ok');
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(r.send(c.gate, controller.signal));
+  assert.equal(c.port.used, 0);
+  assert.equal(r.calls.length, 0);
+});
+
+// The service: an inner re-ask is a second provider call and takes a second reservation; a repair call refused for budget is not swallowed.
+const { AiTaskService } = load('core/ai-task-service.ts');
+const { searchNotPerformedError } = load('ai/search-not-performed.ts');
+const templates = load('ai/detail-templates.ts');
+const GOOD = JSON.stringify({ summary: 'S', detail: 'D', suggestions: [], visualReferences: [] });
+const taskContext = (extra = {}) => ({ title: 'Topic', summary: 'Sum', rules: '', detail: '', task: 'Do the task', ancestors: '', sourceContext: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'off', ...extra });
+function serviceRig(handler) {
+  const calls = [];
+  const runtime = { runTask: async (prompt, model, effort, schema, controls) => { const call = { n: calls.length + 1, controls }; calls.push(call); call.controls.onRequest?.({}); return handler(call); } };
+  const service = new AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => runtime, claudeRuntime: () => runtime });
+  return { service, calls };
+}
+const webEvent = { method: 'item/completed', params: { item: { type: 'webSearch', action: { type: 'search' } } } };
+
+test('task service: the re-ask after no search takes its own reservation (inner retries count)', async () => {
+  const c = ctx(0, 10);
+  const r = serviceRig(call => { if (call.n === 1) throw searchNotPerformedError(); call.controls.onWebSearchEvent?.(webEvent); return GOOD; });
+  const result = await r.service.askModel(taskContext({ researchMode: 'research', researchDepth: 'normal', admission: c.gate }), 'gpt-6-luna', 'low');
+  assert.equal(result.summary, 'S');
+  assert.equal(r.calls.length, 2);
+  assert.equal(c.port.used, 2);
+});
+
+test('task service: budget exhausted passes through as its own outcome (not a note error) and the repair path does not swallow it', async () => {
+  const template = templates.copyTemplate(templates.standardTemplate('zh-TW'), '教學', 't1');
+  template.sections.splice(2, 0, { id: 'ex', name: '範例', description: '', role: 'none', count: { mode: 'exact', n: 3 }, aliases: [] });
+  const detail = '### 核心結論\n\n- a\n\n### 範例\n\n- 1\n- 2';
+  const c = ctx(0, 1);
+  const r = serviceRig(() => JSON.stringify({ summary: 'S', detail, suggestions: [], visualReferences: [] }));
+  await assert.rejects(r.service.askModel(taskContext({ language: 'zh-TW', outputLanguage: 'zh-TW', detailTemplate: template, admission: c.gate }), 'gpt-6-luna', 'low'), e => admission.isBudgetExhausted(e));
+  assert.equal(r.calls.length, 1, 'the repair was refused before it was sent');
+  assert.equal(c.port.used, 1);
+  const plainRun = serviceRig(() => GOOD);
+  assert.equal((await plainRun.service.askModel(taskContext(), 'gpt-6-luna', 'low')).summary, 'S', 'a task without a context is untouched');
+});
+
+test('another map\'s ordinary research is not affected when this map\'s budget is used up', async () => {
+  const used = ctx(300, 300);
+  const r = serviceRig(() => GOOD);
+  await assert.rejects(r.service.askModel(taskContext({ admission: used.gate }), 'gpt-6-luna', 'low'), e => admission.isBudgetExhausted(e));
+  assert.equal(r.calls.length, 0);
+  assert.equal((await r.service.askModel(taskContext({ usageMapPath: 'other/Map.md' }), 'gpt-6-luna', 'low')).summary, 'S');
+  assert.equal(r.calls.length, 1);
+});

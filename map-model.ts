@@ -57,6 +57,12 @@ export interface MapDocument {
    * is saved back exactly as it was; core/argument-map/model.ts `readArgumentMap` decides whether it is usable. Absent on every other map.
    */
   argumentMap?: unknown;
+  /**
+   * Picture-book pipeline state, written only by that flow. Carried through parse and serialize untouched, like `argumentMap`:
+   * a key this version cannot read is saved back exactly as it was; core/book-pipeline/model.ts `readBookPipeline` decides
+   * whether it is usable. Absent on every other map.
+   */
+  bookPipeline?: unknown;
 }
 /**
  * Semantic links between topics; none of them changes the parent/child tree. `from` is A and `to` is B for every kind

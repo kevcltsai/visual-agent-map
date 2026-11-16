@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { AiExchangeLog, AiMilestones } from "../ai-exchange-log";
 import { t } from "../i18n";
+import type { AdmissionContext } from "./admission";
 import { estimateUsageTokens, type AiUsageStore, type UsageAction } from "./ai-usage-store";
 import type { AiRuntime, AiRuntimeCapabilities, AiRuntimePrewarmOptions, RuntimeTaskControls } from "./ai-runtime";
 import { StepRunner, stepLabel, type PreparedStep, type StepProvider } from "./step-runner";
@@ -62,6 +63,12 @@ export interface AiCallOptions {
   failMessage?: (error: unknown) => string;
   /** What the usage store files this call under; `action` defaults to "other". Every call is recorded exactly once, here. */
   usage?: { action?: UsageAction; mapPath?: string };
+  /**
+   * Optional admission context: one call is reserved (and saved) right before every actual provider request, so an inner
+   * retry or repair re-send counts too. A refusal throws `BudgetExhaustedError` (outcome `budget-exhausted`) and nothing is
+   * sent. Absent: the call is exactly as before.
+   */
+  admission?: AdmissionContext;
   /** "caller": AiCalls writes neither `completed` nor `failed`; the caller ends the entry by id after later work. */
   entryEnd?: "calls" | "caller";
 }
@@ -259,6 +266,10 @@ export class AiCalls {
           );
         }
       };
+      if (options.admission) {
+        if (controller.signal.aborted) throw stopped();
+        await options.admission.reserve();
+      }
       const raw = await runtime.run({
         prompt: call.prompt,
         model: options.model,

@@ -3,6 +3,7 @@ import type { StyleSelection } from "../core/steps/task/assemble";
 import type { ContentLanguage } from "../i18n";
 import type { ReferenceGroup } from "./reference-materials";
 import type { UpdateMode } from "./note-style-recipe";
+import type { AdmissionContext } from "../core/admission";
 
 export type ReasoningLevel = "auto" | "low" | "medium" | "high";
 export type ResearchMode = "local" | "research";
@@ -152,6 +153,8 @@ export interface TaskContext {
   visualMode?: VisualMode;
   /** Trusted: the map file this request belongs to, for token-usage accounting only; never serialized into a prompt. */
   usageMapPath?: string;
+  /** Trusted: reserves one call before each provider request of this task (including its repair and reference passes); never serialized. Absent: no admission. */
+  admission?: AdmissionContext;
 }
 /** Provider-neutral web activity event; Claude events are translated into the Codex App Server shape. */
 export interface WebSearchEvent {

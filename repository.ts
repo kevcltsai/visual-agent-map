@@ -74,6 +74,17 @@ import {
 } from "./experiences/visual-map/map-sources";
 import { upgradeLegacyAimText } from "./core/legacy-names";
 import { managedNodeIds } from "./core/argument-map/model";
+import {
+  bookSettingsFrontmatter,
+  pipelineFrontmatter,
+  readBookSettings,
+  readPipelineFields,
+  type BookRole,
+  type BookSettings,
+  type BookSettingsPatch,
+  type PipelineFieldsPatch,
+  type PipelineStage
+} from "./core/book-pipeline/model";
 import { dedupeImageEmbeds, imageKey, imageKeysIn } from "./core/image-keys";
 export type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode, VisualReference } from "./ai/types";
 export { normalizeReasoningLevel } from "./ai/task-policy";
@@ -137,6 +148,13 @@ export interface Note {
   relevance?: NoteRelevance;
   /** From `ai-locked: true` (see readAiLocked): AI may not change this topic or its relations. Absent = unlocked. */
   aiLocked?: true;
+  /** Picture-book pipeline fields (frontmatter `pipeline-stage`, `book-role`, `pipeline-issue`, `pipeline-seam`); each absent when the note has none. */
+  pipelineStage?: PipelineStage;
+  bookRole?: BookRole;
+  pipelineIssue?: string;
+  pipelineSeam?: string;
+  /** The root topic's `book-*` settings; absent when none is set. */
+  bookSettings?: BookSettings;
   /** From `topic-kind` frontmatter; set only for a hypothesis (absent = ordinary topic). */
   topicKind?: Exclude<TopicKind, "topic">;
   /** From `hypothesis-leaning`; set only for a hypothesis (missing or invalid reads as undecided). */
@@ -156,6 +174,10 @@ export type NotePatch = Partial<Note>;
 export interface Settings {
   /** Hidden developer switch (edit data.json only, no settings UI): off hides every way to start or resume hypothesis research. Old argument maps still open. */
   experimentalArgumentMap: boolean;
+  /** Models of the picture-book pipeline's three roles (model ids as in `cliModel`). */
+  bookPlanModel: string;
+  bookWriteModel: string;
+  bookProofModel: string;
   /** Save every map AI conversation as a record file in the map folder (off by default). */
   mapChatRecords: boolean;
   detailTemplates: DetailTemplate[];
@@ -289,6 +311,9 @@ export interface OrganizePlan {
   skipped: { mapPath: string; error: string }[];
 }
 
+const BOOK_PLAN_MODEL = "claude:haiku";
+const BOOK_WRITE_MODEL = "claude:sonnet";
+const BOOK_PROOF_MODEL = "claude:sonnet";
 export const DEFAULT_SETTINGS: Settings = {
   detailTemplates: [],
   coffeeStyles: [],
@@ -309,6 +334,9 @@ export const DEFAULT_SETTINGS: Settings = {
   mapChatImageMode: "preview",
   mapChatRecords: false,
   experimentalArgumentMap: false,
+  bookPlanModel: BOOK_PLAN_MODEL,
+  bookWriteModel: BOOK_WRITE_MODEL,
+  bookProofModel: BOOK_PROOF_MODEL,
   cliReasoning: "low",
   previewScale: 120,
   models: "",
@@ -1658,6 +1686,8 @@ export class Repository {
       ...(readAiLocked(fm) || managedNodeIds(map).has(map?.nodes.find(item => item.path === path)?.id ?? "")
         ? { aiLocked: true as const }
         : {}),
+      ...readPipelineFields(fm),
+      ...(Object.keys(readBookSettings(fm)).length ? { bookSettings: readBookSettings(fm) } : {}),
       ...(readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) as Exclude<TopicKind, "topic"> } : {}),
       ...(readTopicKind(fm) === "hypothesis"
         ? { hypothesisLeaning: readHypothesisLeaning(fm), hypothesisStrength: readHypothesisStrength(fm) }
@@ -2039,6 +2069,23 @@ export class Repository {
   async readRelevanceSetup(path: string): Promise<RelevanceSetup> {
     const fm = frontmatter(await this.app.vault.read(this.file(path)));
     return { goal: readRelevanceGoal(fm), context: readRelevanceContext(fm) };
+  }
+
+  /**
+   * Sets the picture-book pipeline fields of a note (`undefined` keeps a key, `null` removes it) with `setFrontmatterKeys`:
+   * every other line and the body keep their bytes, `updated` is not bumped and `status` is not touched.
+   */
+  async writePipelineFields(path: string, patch: PipelineFieldsPatch): Promise<void> {
+    const values = pipelineFrontmatter(patch);
+    if (!Object.keys(values).length) return;
+    await this.app.vault.process(this.file(path), content => setFrontmatterKeys(content, values));
+  }
+
+  /** Sets or removes the root topic's `book-*` settings only (same contract as {@link writePipelineFields}). */
+  async writeBookSettings(path: string, patch: BookSettingsPatch): Promise<void> {
+    const values = bookSettingsFrontmatter(patch);
+    if (!Object.keys(values).length) return;
+    await this.app.vault.process(this.file(path), content => setFrontmatterKeys(content, values));
   }
 
   /**

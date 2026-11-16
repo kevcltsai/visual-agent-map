@@ -130,7 +130,7 @@ export interface BookPipelineData {
   pauseReason?: "budget";
   order: string[];
   globalPlanned: boolean;
-  attempts: { global: number } & Record<string, StepAttempts | number>;
+  attempts: Record<"global", number> & Record<string, StepAttempts | number>;
   /** Per card, raised by every successful plan or write; a result carries the one it started under. */
   revisions: Record<string, number>;
   /** Cards whose stage is stale from an earlier run and must be cleared before anything else (idempotent). */

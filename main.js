@@ -20099,6 +20099,354 @@ function mapOutline(nodes, titleOf, summaryOf = () => "", mapTitle = "") {
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").replace(/\n+$/, "");
 }
 
+// experiences/visual-map/map-export-run.ts
+function errorMessage(error) {
+  const message = error == null ? void 0 : error.message;
+  return typeof message === "string" ? message : String(error);
+}
+var boxOf = (card) => ({
+  x: card.offsetLeft,
+  y: card.offsetTop,
+  width: card.offsetWidth,
+  height: card.offsetHeight
+});
+function textBlockLines(text10, boxWidth, boxHeight, lineHeight) {
+  const shown = Math.max(
+    1,
+    Math.round((boxHeight - 8) / (Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 19))
+  );
+  let room = Math.max(1, boxWidth - 14);
+  let lines = wrapText(text10, room);
+  for (let tries = 0; lines.length > shown && tries < 40; tries++) {
+    room *= 1.1;
+    lines = wrapText(text10, room);
+  }
+  return lines;
+}
+async function collectExportScene(source, isCurrent) {
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+  const map = source.map();
+  if (!map) return null;
+  const win = window;
+  const computed = (el, pseudo) => win.getComputedStyle(el, pseudo);
+  const colorOf = (value) => normalizeCssColor(value) || void 0;
+  const transient = ["is-selected", "is-cut", "is-drop-target", "is-marquee-hit", "is-marquee-remove"];
+  const savedLook = (el) => {
+    const on = transient.filter((name2) => el.hasClass(name2));
+    if (on.length) {
+      el.addClass("vam-export-measure");
+      el.removeClass(...on);
+    }
+    try {
+      const look = computed(el);
+      return {
+        backgroundColor: look.backgroundColor,
+        borderTopColor: look.borderTopColor,
+        borderTopWidth: look.borderTopWidth
+      };
+    } finally {
+      if (on.length) {
+        el.addClass(...on);
+        el.removeClass("vam-export-measure");
+      }
+    }
+  };
+  let embedded = 0;
+  const loaded = /* @__PURE__ */ new Map();
+  const imageHref = async (path) => {
+    var _a3, _b3;
+    const read = source.imageReader(path);
+    if (!read) return null;
+    if (!loaded.has(path)) {
+      const data = await read();
+      const mime = sniffImage(data);
+      loaded.set(path, mime ? toDataUri(mime, data) : null);
+      sizes.set(path, mime ? data.byteLength : 0);
+    }
+    embedded += (_a3 = sizes.get(path)) != null ? _a3 : 0;
+    return embedded > EXPORT_MAX_EMBEDDED_BYTES ? false : (_b3 = loaded.get(path)) != null ? _b3 : null;
+  };
+  const sizes = /* @__PURE__ */ new Map();
+  const cards = [];
+  const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  const grow = (x, y, w, h) => {
+    bounds.minX = Math.min(bounds.minX, x);
+    bounds.minY = Math.min(bounds.minY, y);
+    bounds.maxX = Math.max(bounds.maxX, x + w);
+    bounds.maxY = Math.max(bounds.maxY, y + h);
+  };
+  for (const [id, card] of source.cards()) {
+    const node = map.nodes.find((item2) => item2.id === id);
+    if (!node) continue;
+    const box = boxOf(card);
+    grow(box.x, box.y, box.width, box.height);
+    const style = savedLook(card);
+    const titleEl = card.querySelector(".vam-card-title");
+    const title = ((_b2 = (_a2 = titleEl == null ? void 0 : titleEl.textContent) != null ? _a2 : source.noteTitle(id)) != null ? _b2 : "").trim();
+    const item = {
+      x: box.x,
+      y: box.y,
+      w: box.width,
+      h: box.height,
+      title: wrapText(title, box.width - 28),
+      fill: colorOf(style.backgroundColor),
+      stroke: colorOf(style.borderTopColor),
+      textColor: colorOf(titleEl ? computed(titleEl).color : void 0),
+      accent: card.dataset.topicColor ? colorOf(computed(card, "::before").backgroundColor) : void 0
+    };
+    if (node.height && card.classList.contains("is-clipped")) item.clipped = true;
+    const placedTitle = ["has-cover-bottom", "has-cover-left", "has-cover-right"].some(
+      (cls) => card.classList.contains(cls)
+    );
+    if (placedTitle && titleEl && titleEl.offsetWidth > 0) {
+      item.titleAt = { x: box.x + titleEl.offsetLeft, y: box.y + titleEl.offsetTop };
+      item.title = wrapText(title, titleEl.offsetWidth);
+    }
+    const summaryEl = card.querySelector(".vam-card-summary");
+    const summaryText2 = (_e = (_d = (_c = summaryEl == null ? void 0 : summaryEl.querySelector(".vam-card-preview-text")) != null ? _c : summaryEl) == null ? void 0 : _d.textContent) == null ? void 0 : _e.trim();
+    if (summaryEl && summaryText2 && summaryEl.offsetWidth > 0) {
+      const summaryStyle = computed(summaryEl);
+      const clamp2 = parseInt(summaryStyle.getPropertyValue("-webkit-line-clamp"), 10);
+      const size = parseFloat(summaryStyle.fontSize);
+      const lines = wrapText(summaryText2, summaryEl.offsetWidth);
+      item.summary = {
+        lines: Number.isFinite(clamp2) && clamp2 > 0 ? lines.slice(0, clamp2) : lines,
+        x: box.x + summaryEl.offsetLeft,
+        y: box.y + summaryEl.offsetTop,
+        size: Number.isFinite(size) && size > 0 ? Math.round(size * 13 / 15) : void 0,
+        textColor: colorOf(summaryStyle.color)
+      };
+      if (item.summary.lines.length < lines.length) item.summary.lines[item.summary.lines.length - 1] += "\u2026";
+    }
+    if (card.dataset.topicStyleSize) {
+      const size = parseFloat(titleEl ? computed(titleEl).fontSize : "");
+      if (Number.isFinite(size) && size > 0) item.titleSize = Math.round(size * 13 / 15);
+    }
+    if (card.dataset.topicStyleBold) item.titleWeight = 800;
+    if (card.dataset.topicStyleBorder) {
+      const width = parseFloat(style.borderTopWidth);
+      if (Number.isFinite(width) && width > 0) item.strokeWidth = width;
+    }
+    const frame = card.querySelector(".vam-card-cover");
+    const coverInfo = frame ? source.coverOf(node.path) : null;
+    if (frame && coverInfo) {
+      const href = await imageHref(coverInfo.path);
+      if (!isCurrent()) return null;
+      if (href === false) return { refuse: "embedded" };
+      const win2 = coverInfo.frame && frame.classList.contains("is-sized") ? frame.querySelector(".vam-card-cover-window") : null;
+      if (href && coverInfo.frame && win2 && win2.offsetWidth > 0 && win2.offsetHeight > 0) {
+        const mask = coverInfo.frame;
+        const winX = box.x + frame.offsetLeft + win2.offsetLeft;
+        const winY = box.y + frame.offsetTop + win2.offsetTop;
+        const w = win2.offsetWidth / mask.w;
+        const h = win2.offsetHeight / mask.h;
+        const shownHeight = Math.min(win2.offsetHeight, Math.max(0, frame.offsetHeight - win2.offsetTop));
+        item.cover = {
+          x: winX - mask.x * w,
+          y: winY - mask.y * h,
+          w,
+          h,
+          href,
+          fit: "fill",
+          window: { x: winX, y: winY, w: win2.offsetWidth, h: shownHeight || win2.offsetHeight }
+        };
+      } else if (href)
+        item.cover = {
+          x: box.x + frame.offsetLeft,
+          y: box.y + frame.offsetTop,
+          w: frame.offsetWidth,
+          h: frame.offsetHeight,
+          href,
+          fit: "contain"
+        };
+    }
+    cards.push(item);
+  }
+  for (const el of source.texts()) {
+    const box = boxOf(el);
+    grow(box.x, box.y, box.width, box.height);
+    const body = el.querySelector(".vam-text-node-body");
+    cards.push({
+      x: box.x,
+      y: box.y,
+      w: box.width,
+      h: box.height,
+      title: textBlockLines(
+        (_f = body == null ? void 0 : body.textContent) != null ? _f : "",
+        box.width,
+        box.height,
+        parseFloat(computed(body != null ? body : el).lineHeight)
+      ),
+      plain: true,
+      textColor: colorOf(computed(body != null ? body : el).color)
+    });
+  }
+  const images = [];
+  for (const item of (_g = map.canvasItems) != null ? _g : []) {
+    if (item.kind !== "image" && !isAnnotatedImage(item)) continue;
+    const image = item;
+    const href = await imageHref(image.path);
+    if (!isCurrent()) return null;
+    if (href === false) return { refuse: "embedded" };
+    if (!href) continue;
+    grow(image.x, image.y, image.w, image.h);
+    images.push({ x: image.x, y: image.y, w: image.w, h: image.h, href, fit: "fill" });
+  }
+  const boundaries = [];
+  for (const item of (_h = map.canvasItems) != null ? _h : []) {
+    if (item.kind !== "boundary") continue;
+    const frame = item;
+    const box = source.frameBox(frame.members);
+    if (!box) continue;
+    grow(box.x, box.y, box.w, box.h);
+    boundaries.push({
+      x: box.x,
+      y: box.y,
+      w: box.w,
+      h: box.h,
+      ...frame.label ? { label: frame.label } : {},
+      stroke: colorOf(computed(source.styleRoot()).getPropertyValue("--text-muted"))
+    });
+  }
+  const summaryScenes = [];
+  for (const item of (_i = map.canvasItems) != null ? _i : []) {
+    if (item.kind !== "summary") continue;
+    const summary = item;
+    const geometry = source.summaryGeometry(summary.parentId, effectiveSummaryRange(summary, map.nodes), summary.text);
+    if (!(geometry == null ? void 0 : geometry.ok)) continue;
+    const lines = wrapText(summary.text, 200 - 12);
+    grow(geometry.extent.x, geometry.extent.y, geometry.extent.w, geometry.extent.h);
+    const across = geometry.side === "right" || geometry.side === "left";
+    grow(
+      geometry.side === "left" ? geometry.label.x - 200 : geometry.side === "right" ? geometry.label.x : geometry.label.x - 100,
+      across ? geometry.label.y - lines.length * 9 : geometry.side === "up" ? geometry.label.y - lines.length * 17 : geometry.label.y,
+      200,
+      across ? lines.length * 18 : lines.length * 17
+    );
+    summaryScenes.push({
+      d: geometry.path,
+      x: geometry.label.x,
+      y: geometry.label.y,
+      side: geometry.side,
+      text: lines,
+      stroke: colorOf(computed(source.styleRoot()).getPropertyValue("--text-muted")),
+      textColor: colorOf(computed(source.styleRoot()).getPropertyValue("--text-normal"))
+    });
+  }
+  const edges = [];
+  for (const el of source.edges()) {
+    if (((_j = el.tagName) == null ? void 0 : _j.toLowerCase()) !== "path") continue;
+    if (el.getAttribute("data-anchor-relation") !== null) continue;
+    const d = el.getAttribute("d");
+    const style = computed(el);
+    const stroke = colorOf(style.stroke);
+    if (!d || !stroke || stroke === "none" || style.display === "none") continue;
+    edges.push({
+      d,
+      stroke,
+      ...((_k = el.getAttribute("class")) != null ? _k : "").split(/\s+/).includes("vam-text-link") ? { dashed: true } : {},
+      ...((_l = el.getAttribute("data-line-thick")) != null ? _l : null) !== null ? { width: parseFloat(style.strokeWidth) > 0 ? parseFloat(style.strokeWidth) : 4 } : {}
+    });
+    try {
+      const bbox = (_m = el.getBBox) == null ? void 0 : _m.call(el);
+      if (bbox) grow(bbox.x, bbox.y, bbox.width, bbox.height);
+    } catch (e) {
+    }
+  }
+  if (!cards.length && !images.length) return { refuse: "empty" };
+  const margin = 24;
+  const root = computed(source.styleRoot());
+  const variable = (name2) => colorOf(root.getPropertyValue(name2));
+  const scene = {
+    x: bounds.minX - margin,
+    y: bounds.minY - margin,
+    width: bounds.maxX - bounds.minX + margin * 2,
+    height: bounds.maxY - bounds.minY + margin * 2,
+    title: map.title,
+    theme: {
+      background: variable("--background-primary"),
+      text: variable("--text-normal"),
+      stroke: variable("--background-modifier-border"),
+      card: variable("--background-primary")
+    },
+    boundaries,
+    edges,
+    summaries: summaryScenes,
+    cards,
+    images
+  };
+  return { scene };
+}
+function downloadBlob(host, blob, name2) {
+  const url = window.URL.createObjectURL(blob);
+  const link = host.createEl("a", { cls: "vam-sr-only", attr: { href: url, download: name2 } });
+  link.click();
+  link.remove();
+  window.setTimeout(() => window.URL.revokeObjectURL(url), 1e3);
+}
+async function exportMap(source, format, target) {
+  const map = source.map();
+  if (!map) return;
+  const mapPath = source.path(), isCurrent = source.fence();
+  try {
+    let blob;
+    if (format === "md") {
+      const outline = mapOutline(
+        source.outlineNodes(map),
+        (id) => {
+          var _a2;
+          return (_a2 = source.noteTitle(id)) != null ? _a2 : "";
+        },
+        (id) => source.outlineSummary(id),
+        map.title
+      );
+      blob = new Blob([`${outline}
+`], { type: "text/markdown;charset=utf-8" });
+    } else {
+      const got = await collectExportScene(source, isCurrent);
+      if (!got || !isCurrent()) return;
+      if (got.refuse) {
+        source.notice(t(got.refuse === "empty" ? "ui.export_empty" : "ui.export_refused_embedded"));
+        return;
+      }
+      const limit = exportLimits(got.scene);
+      if (limit.action === "refuse") {
+        source.notice(
+          t(
+            limit.reason === "embedded" ? "ui.export_refused_embedded" : limit.reason === "pixels" ? "ui.export_refused_pixels" : "ui.export_empty"
+          )
+        );
+        return;
+      }
+      const svg = buildMapSvg(got.scene);
+      if (format === "svg") blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+      else {
+        const { width, height } = got.scene;
+        let scale = 1;
+        if (limit.action === "scaleDown") {
+          scale = limit.scale;
+          source.notice(t("ui.export_scaled", String(EXPORT_MAX_EDGE)));
+        } else if (Math.max(width, height) * 2 <= EXPORT_MAX_EDGE && width * height * 4 <= EXPORT_MAX_PIXELS) scale = 2;
+        blob = await source.png(svg, width, height, scale);
+        if (!isCurrent()) return;
+      }
+    }
+    const name2 = `${exportFileStem(map.title)}.${format}`;
+    if (target === "download") {
+      downloadBlob(source.host(), blob, name2);
+      source.notice(t("ui.export_downloaded", name2));
+      return;
+    }
+    const data = await blob.arrayBuffer();
+    const destination = await source.attachmentPath(name2, mapPath);
+    if (!isCurrent()) return;
+    await source.createBinary(destination, data);
+    source.notice(t("ui.export_saved", destination));
+  } catch (error) {
+    if (isCurrent()) source.notice(t("ui.export_failed", errorMessage(error)));
+  }
+}
+
 // experiences/visual-map/map-focus.ts
 var KEYED = ["button", "input", "textarea", "select", "[tabindex]"].join(",");
 var keyOf = (el) => {
@@ -43288,7 +43636,7 @@ var GoalRecommendService = class {
 };
 
 // experiences/visual-map/relevance-grade-run.ts
-function errorMessage(error) {
+function errorMessage2(error) {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 }
@@ -43572,7 +43920,7 @@ var RelevanceGradeRun = class {
           });
         } catch (error) {
           outcome.failed++;
-          this.plugin.logs.appendLog("error", t("log.operation_failed_0", errorMessage(error)));
+          this.plugin.logs.appendLog("error", t("log.operation_failed_0", errorMessage2(error)));
         }
       }
     } finally {
@@ -47845,7 +48193,7 @@ async function loadableImages(candidates, signal) {
 }
 
 // experiences/visual-map/chat-image-finder.ts
-function errorMessage2(error) {
+function errorMessage3(error) {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 }
@@ -47941,7 +48289,7 @@ var ChatImageFinder = class {
       try {
         ok = await ports.confirmUsage(model);
       } catch (error) {
-        return { failed: errorMessage2(error) };
+        return { failed: errorMessage3(error) };
       }
       if (!ok) {
         batch.declined = true;
@@ -48039,7 +48387,7 @@ var ChatImageFinder = class {
       else dropped();
     } catch (error) {
       if (!current()) return dropped();
-      ports.settle(chat, block, { state: "failed", reason: errorMessage2(error) });
+      ports.settle(chat, block, { state: "failed", reason: errorMessage3(error) });
     }
   }
   /**
@@ -54872,7 +55220,7 @@ var TopicChatSteers = class {
 };
 
 // experiences/visual-map/map-chat-conversation.ts
-function errorMessage3(error) {
+function errorMessage4(error) {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 }
@@ -55019,7 +55367,7 @@ var MapChatConversation = class {
         chain: run
       });
     } catch (error) {
-      lines = [{ status: "failed", text: errorMessage3(error) }];
+      lines = [{ status: "failed", text: errorMessage4(error) }];
     } finally {
       this.applying = false;
       chat.setApplying(false);
@@ -55117,7 +55465,7 @@ var MapChatConversation = class {
     try {
       request = await this.ports.buildRequest(message, origin, preparing.signal);
     } catch (error) {
-      abandon(this.ports.closed() ? void 0 : errorMessage3(error), "failed");
+      abandon(this.ports.closed() ? void 0 : errorMessage4(error), "failed");
       return;
     }
     if (this.ports.closed() || !chat.hasTurn(turn)) {
@@ -55261,7 +55609,7 @@ var MapChatConversation = class {
               const failure = this.ports.errorText(error);
               chat.fail(failure.text, failure.wrapped ? failure.text : void 0, failure.technical);
               record == null ? void 0 : record.end("failed", {
-                reason: /time(d)?[\s-]?out/i.test(errorMessage3(error)) ? "timeout" : "error",
+                reason: /time(d)?[\s-]?out/i.test(errorMessage4(error)) ? "timeout" : "error",
                 reply: failure.text,
                 lines: [],
                 error: { text: failure.text, technical: (_d = failure.technical) != null ? _d : "" }
@@ -55283,7 +55631,7 @@ var MapChatConversation = class {
       );
     } catch (error) {
       if (sent) throw error;
-      abandon(this.ports.closed() ? void 0 : errorMessage3(error), "failed");
+      abandon(this.ports.closed() ? void 0 : errorMessage4(error), "failed");
       return;
     }
     if (!went && !sent) abandon(this.ports.closed() ? void 0 : notSent(), "not_ready");
@@ -59777,7 +60125,7 @@ function isEditableTarget(target) {
   var _a2;
   return !!((_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, EDITABLE_SELECTOR));
 }
-function errorMessage4(error) {
+function errorMessage5(error) {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 }
@@ -59920,21 +60268,8 @@ function estimateTextWidth(text10) {
   return Math.min(TEXT_AUTO_WIDTH_MAX, Math.max(TEXT_WIDTH_MIN, Math.ceil(line2 + 16)));
 }
 var BOUNDARY_PAD = 16;
-function textBlockLines(text10, boxWidth, boxHeight, lineHeight) {
-  const shown = Math.max(
-    1,
-    Math.round((boxHeight - 8) / (Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 19))
-  );
-  let room = Math.max(1, boxWidth - 14);
-  let lines = wrapText(text10, room);
-  for (let tries = 0; lines.length > shown && tries < 40; tries++) {
-    room *= 1.1;
-    lines = wrapText(text10, room);
-  }
-  return lines;
-}
 var unitStep = (v) => Math.round(Math.min(1, Math.max(0, v)) * 1e3) / 1e3;
-var boxOf = (card) => ({
+var boxOf2 = (card) => ({
   x: card.offsetLeft,
   y: card.offsetTop,
   width: card.offsetWidth,
@@ -63620,7 +63955,7 @@ ${request.requirements}` : preset.text,
           raised: true
         });
       } catch (error) {
-        this.plugin.logs.appendLog("error", t("log.operation_failed_0", errorMessage4(error)));
+        this.plugin.logs.appendLog("error", t("log.operation_failed_0", errorMessage5(error)));
       }
     }
     if (!changes.length) return;
@@ -64970,7 +65305,7 @@ ${request.requirements}` : preset.text,
             return;
           }
           state.saveFailed = true;
-          new import_obsidian35.Notice(t("ui.outline_import_map_save_failed", `${errorMessage4(cause)} (${kept.join(", ")})`));
+          new import_obsidian35.Notice(t("ui.outline_import_map_save_failed", `${errorMessage5(cause)} (${kept.join(", ")})`));
         };
         if (result.failure) return rollBack(new Error(result.failure));
         const top2 = created[0];
@@ -66413,7 +66748,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
             this.placeAnchorLine(
               key4,
               { ...line2, point: { x: image.x + at.x * image.w, y: image.y + at.y * image.h } },
-              boxOf(end)
+              boxOf2(end)
             );
         }
       };
@@ -67919,7 +68254,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const rects = [];
     for (const [id, card] of this.cardEls) {
       if (own2.has(id)) continue;
-      const b = boxOf(card);
+      const b = boxOf2(card);
       rects.push({ x: b.x, y: b.y, w: b.width, h: b.height });
     }
     return rects;
@@ -67937,7 +68272,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const rectOf = (id) => {
       const card = this.cardEls.get(id);
       if (!card) return null;
-      const box = boxOf(card);
+      const box = boxOf2(card);
       return { x: box.x, y: box.y, w: box.width, h: box.height };
     };
     let layer = null;
@@ -68015,7 +68350,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const rectOf = (id) => {
       const card = this.cardEls.get(id);
       if (!card) return null;
-      const box = boxOf(card);
+      const box = boxOf2(card);
       return { x: box.x, y: box.y, w: box.width, h: box.height };
     };
     const rangeRects = [], all = [], members = /* @__PURE__ */ new Set();
@@ -70038,359 +70373,69 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     );
     return cover && "path" in cover ? cover : null;
   }
-  /**
-   * The map as the screen shows it (decision D9): card rectangles and edge paths (the fishbone spine included) are
-   * read from the drawn DOM, so every layout is followed without a second layout engine; colours come from computed
-   * styles; covers and free pictures are read with `readBinary` and embedded as data URIs. `isCurrent` is checked
-   * after every await. Returns null when the view moved on, `{ empty }` for nothing to draw, `{ refuse }` when the
-   * pictures alone are over the limit (read no further).
-   */
-  async collectExportScene(isCurrent) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
-    const map = this.map;
-    if (!map) return null;
-    const win = window;
-    const computed = (el, pseudo) => win.getComputedStyle(el, pseudo);
-    const colorOf = (value) => normalizeCssColor(value) || void 0;
-    const transient = ["is-selected", "is-cut", "is-drop-target", "is-marquee-hit", "is-marquee-remove"];
-    const savedLook = (el) => {
-      const on = transient.filter((name2) => el.hasClass(name2));
-      if (on.length) {
-        el.addClass("vam-export-measure");
-        el.removeClass(...on);
-      }
-      try {
-        const look = computed(el);
-        return {
-          backgroundColor: look.backgroundColor,
-          borderTopColor: look.borderTopColor,
-          borderTopWidth: look.borderTopWidth
-        };
-      } finally {
-        if (on.length) {
-          el.addClass(...on);
-          el.removeClass("vam-export-measure");
-        }
-      }
-    };
-    let embedded = 0;
-    const loaded = /* @__PURE__ */ new Map();
-    const imageHref = async (path) => {
-      var _a3, _b3;
-      const file = this.app.vault.getAbstractFileByPath(path);
-      if (!(file instanceof import_obsidian35.TFile)) return null;
-      if (!loaded.has(path)) {
-        const data = await this.app.vault.readBinary(file);
-        const mime = sniffImage(data);
-        loaded.set(path, mime ? toDataUri(mime, data) : null);
-        sizes.set(path, mime ? data.byteLength : 0);
-      }
-      embedded += (_a3 = sizes.get(path)) != null ? _a3 : 0;
-      return embedded > EXPORT_MAX_EMBEDDED_BYTES ? false : (_b3 = loaded.get(path)) != null ? _b3 : null;
-    };
-    const sizes = /* @__PURE__ */ new Map();
-    const cards = [];
-    const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-    const grow = (x, y, w, h) => {
-      bounds.minX = Math.min(bounds.minX, x);
-      bounds.minY = Math.min(bounds.minY, y);
-      bounds.maxX = Math.max(bounds.maxX, x + w);
-      bounds.maxY = Math.max(bounds.maxY, y + h);
-    };
-    for (const [id, card] of this.cardEls) {
-      const node = map.nodes.find((item2) => item2.id === id);
-      if (!node) continue;
-      const box = boxOf(card);
-      grow(box.x, box.y, box.width, box.height);
-      const style = savedLook(card);
-      const titleEl = card.querySelector(".vam-card-title");
-      const title = ((_c = (_b2 = titleEl == null ? void 0 : titleEl.textContent) != null ? _b2 : (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _c : "").trim();
-      const item = {
-        x: box.x,
-        y: box.y,
-        w: box.width,
-        h: box.height,
-        title: wrapText(title, box.width - 28),
-        fill: colorOf(style.backgroundColor),
-        stroke: colorOf(style.borderTopColor),
-        textColor: colorOf(titleEl ? computed(titleEl).color : void 0),
-        accent: card.dataset.topicColor ? colorOf(computed(card, "::before").backgroundColor) : void 0
-      };
-      if (node.height && card.classList.contains("is-clipped")) item.clipped = true;
-      const placedTitle = ["has-cover-bottom", "has-cover-left", "has-cover-right"].some(
-        (cls) => card.classList.contains(cls)
-      );
-      if (placedTitle && titleEl && titleEl.offsetWidth > 0) {
-        item.titleAt = { x: box.x + titleEl.offsetLeft, y: box.y + titleEl.offsetTop };
-        item.title = wrapText(title, titleEl.offsetWidth);
-      }
-      const summaryEl = card.querySelector(".vam-card-summary");
-      const summaryText2 = (_f = (_e = (_d = summaryEl == null ? void 0 : summaryEl.querySelector(".vam-card-preview-text")) != null ? _d : summaryEl) == null ? void 0 : _e.textContent) == null ? void 0 : _f.trim();
-      if (summaryEl && summaryText2 && summaryEl.offsetWidth > 0) {
-        const summaryStyle = computed(summaryEl);
-        const clamp2 = parseInt(summaryStyle.getPropertyValue("-webkit-line-clamp"), 10);
-        const size = parseFloat(summaryStyle.fontSize);
-        const lines = wrapText(summaryText2, summaryEl.offsetWidth);
-        item.summary = {
-          lines: Number.isFinite(clamp2) && clamp2 > 0 ? lines.slice(0, clamp2) : lines,
-          x: box.x + summaryEl.offsetLeft,
-          y: box.y + summaryEl.offsetTop,
-          size: Number.isFinite(size) && size > 0 ? Math.round(size * 13 / 15) : void 0,
-          textColor: colorOf(summaryStyle.color)
-        };
-        if (item.summary.lines.length < lines.length) item.summary.lines[item.summary.lines.length - 1] += "\u2026";
-      }
-      if (card.dataset.topicStyleSize) {
-        const size = parseFloat(titleEl ? computed(titleEl).fontSize : "");
-        if (Number.isFinite(size) && size > 0) item.titleSize = Math.round(size * 13 / 15);
-      }
-      if (card.dataset.topicStyleBold) item.titleWeight = 800;
-      if (card.dataset.topicStyleBorder) {
-        const width = parseFloat(style.borderTopWidth);
-        if (Number.isFinite(width) && width > 0) item.strokeWidth = width;
-      }
-      const frame = card.querySelector(".vam-card-cover");
-      const coverInfo = frame ? this.exportCoverPath(node.path) : null;
-      if (frame && coverInfo) {
-        const href = await imageHref(coverInfo.path);
-        if (!isCurrent()) return null;
-        if (href === false) return { refuse: "embedded" };
-        const win2 = coverInfo.frame && frame.classList.contains("is-sized") ? frame.querySelector(".vam-card-cover-window") : null;
-        if (href && coverInfo.frame && win2 && win2.offsetWidth > 0 && win2.offsetHeight > 0) {
-          const mask = coverInfo.frame;
-          const winX = box.x + frame.offsetLeft + win2.offsetLeft;
-          const winY = box.y + frame.offsetTop + win2.offsetTop;
-          const w = win2.offsetWidth / mask.w;
-          const h = win2.offsetHeight / mask.h;
-          const shownHeight = Math.min(win2.offsetHeight, Math.max(0, frame.offsetHeight - win2.offsetTop));
-          item.cover = {
-            x: winX - mask.x * w,
-            y: winY - mask.y * h,
-            w,
-            h,
-            href,
-            fit: "fill",
-            window: { x: winX, y: winY, w: win2.offsetWidth, h: shownHeight || win2.offsetHeight }
-          };
-        } else if (href)
-          item.cover = {
-            x: box.x + frame.offsetLeft,
-            y: box.y + frame.offsetTop,
-            w: frame.offsetWidth,
-            h: frame.offsetHeight,
-            href,
-            fit: "contain"
-          };
-      }
-      cards.push(item);
-    }
-    for (const el of this.textEls.values()) {
-      const box = boxOf(el);
-      grow(box.x, box.y, box.width, box.height);
-      const body = el.querySelector(".vam-text-node-body");
-      cards.push({
-        x: box.x,
-        y: box.y,
-        w: box.width,
-        h: box.height,
-        title: textBlockLines(
-          (_g = body == null ? void 0 : body.textContent) != null ? _g : "",
-          box.width,
-          box.height,
-          parseFloat(computed(body != null ? body : el).lineHeight)
-        ),
-        plain: true,
-        textColor: colorOf(computed(body != null ? body : el).color)
-      });
-    }
-    const images = [];
-    for (const item of (_h = map.canvasItems) != null ? _h : []) {
-      if (item.kind !== "image" && !isAnnotatedImage(item)) continue;
-      const image = item;
-      const href = await imageHref(image.path);
-      if (!isCurrent()) return null;
-      if (href === false) return { refuse: "embedded" };
-      if (!href) continue;
-      grow(image.x, image.y, image.w, image.h);
-      images.push({ x: image.x, y: image.y, w: image.w, h: image.h, href, fit: "fill" });
-    }
-    const boundaries = [];
-    for (const item of (_i = map.canvasItems) != null ? _i : []) {
-      if (item.kind !== "boundary") continue;
-      const frame = item;
-      const box = boundaryBounds(
-        frame.members,
-        (id) => {
-          const card = this.cardEls.get(id);
-          if (!card) return null;
-          const b = boxOf(card);
-          return { x: b.x, y: b.y, w: b.width, h: b.height };
-        },
-        BOUNDARY_PAD,
-        this.otherCardRects(frame.members)
-      );
-      if (!box) continue;
-      grow(box.x, box.y, box.w, box.h);
-      boundaries.push({
-        x: box.x,
-        y: box.y,
-        w: box.w,
-        h: box.h,
-        ...frame.label ? { label: frame.label } : {},
-        stroke: colorOf(computed((_j = this.viewportEl) != null ? _j : this.contentEl).getPropertyValue("--text-muted"))
-      });
-    }
-    const summaryScenes = [];
-    for (const item of (_k = map.canvasItems) != null ? _k : []) {
-      if (item.kind !== "summary") continue;
-      const summary = item;
-      const geometry = this.summaryGeometry(summary.parentId, effectiveSummaryRange(summary, map.nodes), summary.text);
-      if (!(geometry == null ? void 0 : geometry.ok)) continue;
-      const lines = wrapText(summary.text, 200 - 12);
-      grow(geometry.extent.x, geometry.extent.y, geometry.extent.w, geometry.extent.h);
-      const across = geometry.side === "right" || geometry.side === "left";
-      grow(
-        geometry.side === "left" ? geometry.label.x - 200 : geometry.side === "right" ? geometry.label.x : geometry.label.x - 100,
-        across ? geometry.label.y - lines.length * 9 : geometry.side === "up" ? geometry.label.y - lines.length * 17 : geometry.label.y,
-        200,
-        across ? lines.length * 18 : lines.length * 17
-      );
-      summaryScenes.push({
-        d: geometry.path,
-        x: geometry.label.x,
-        y: geometry.label.y,
-        side: geometry.side,
-        text: lines,
-        stroke: colorOf(computed((_l = this.viewportEl) != null ? _l : this.contentEl).getPropertyValue("--text-muted")),
-        textColor: colorOf(computed((_m = this.viewportEl) != null ? _m : this.contentEl).getPropertyValue("--text-normal"))
-      });
-    }
-    const edges = [];
-    for (const el of Array.from((_o = (_n = this.edgesEl) == null ? void 0 : _n.children) != null ? _o : [])) {
-      if (((_p = el.tagName) == null ? void 0 : _p.toLowerCase()) !== "path") continue;
-      if (el.getAttribute("data-anchor-relation") !== null) continue;
-      const d = el.getAttribute("d");
-      const style = computed(el);
-      const stroke = colorOf(style.stroke);
-      if (!d || !stroke || stroke === "none" || style.display === "none") continue;
-      edges.push({
-        d,
-        stroke,
-        ...((_q = el.getAttribute("class")) != null ? _q : "").split(/\s+/).includes("vam-text-link") ? { dashed: true } : {},
-        ...((_r = el.getAttribute("data-line-thick")) != null ? _r : null) !== null ? { width: parseFloat(style.strokeWidth) > 0 ? parseFloat(style.strokeWidth) : 4 } : {}
-      });
-      try {
-        const bbox = (_s = el.getBBox) == null ? void 0 : _s.call(el);
-        if (bbox) grow(bbox.x, bbox.y, bbox.width, bbox.height);
-      } catch (e) {
-      }
-    }
-    if (!cards.length && !images.length) return { refuse: "empty" };
-    const margin = 24;
-    const root = computed((_t = this.viewportEl) != null ? _t : this.contentEl);
-    const variable = (name2) => colorOf(root.getPropertyValue(name2));
-    const scene = {
-      x: bounds.minX - margin,
-      y: bounds.minY - margin,
-      width: bounds.maxX - bounds.minX + margin * 2,
-      height: bounds.maxY - bounds.minY + margin * 2,
-      title: map.title,
-      theme: {
-        background: variable("--background-primary"),
-        text: variable("--text-normal"),
-        stroke: variable("--background-modifier-border"),
-        card: variable("--background-primary")
-      },
-      boundaries,
-      edges,
-      summaries: summaryScenes,
-      cards,
-      images
-    };
-    return { scene };
+  /** Not private: only the tests call this wrapper, which the compiler would flag as unused. */
+  collectExportScene(isCurrent) {
+    return collectExportScene(this.mapExportSource(), isCurrent);
   }
   async pngBlob(svg, width, height, scale) {
     return svgToPngBlob(svg, width, height, scale, browserPngEnv(window.URL));
   }
-  /** A download through a blob URL; the URL is released shortly after the click. */
-  downloadBlob(blob, name2) {
-    const url = window.URL.createObjectURL(blob);
-    const link = this.contentEl.createEl("a", { cls: "vam-sr-only", attr: { href: url, download: name2 } });
-    link.click();
-    link.remove();
-    window.setTimeout(() => window.URL.revokeObjectURL(url), 1e3);
+  exportMap(format, target) {
+    return exportMap(this.mapExportSource(), format, target);
   }
-  /**
-   * Exports the map as PNG, SVG or a Markdown outline, saved next to the other attachments of Map.md or downloaded.
-   * An export is not a map edit: no transaction, no undo step. A result that is ready after the view closed or moved
-   * to another map is thrown away (nothing written, nothing said).
-   */
-  async exportMap(format, target) {
-    const map = this.map;
-    if (!map) return;
-    const mapPath = this.path, epoch = this.mapOpenEpoch, isCurrent = () => !this.closed && this.path === mapPath && this.mapOpenEpoch === epoch && !!this.map;
-    try {
-      let blob;
-      if (format === "md") {
-        const outline = mapOutline(
-          this.onScreenSiblingOrder(map),
-          (id) => {
-            var _a2, _b2;
-            return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : "";
-          },
-          (id) => {
-            var _a2, _b2;
-            const summary = (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.summary) != null ? _b2 : "";
-            return isPlaceholder(summary) ? "" : summary;
-          },
-          map.title
-        );
-        blob = new Blob([`${outline}
-`], { type: "text/markdown;charset=utf-8" });
-      } else {
-        const got = await this.collectExportScene(isCurrent);
-        if (!got || !isCurrent()) return;
-        if (got.refuse) {
-          new import_obsidian35.Notice(t(got.refuse === "empty" ? "ui.export_empty" : "ui.export_refused_embedded"));
-          return;
-        }
-        const limit = exportLimits(got.scene);
-        if (limit.action === "refuse") {
-          new import_obsidian35.Notice(
-            t(
-              limit.reason === "embedded" ? "ui.export_refused_embedded" : limit.reason === "pixels" ? "ui.export_refused_pixels" : "ui.export_empty"
-            )
-          );
-          return;
-        }
-        const svg = buildMapSvg(got.scene);
-        if (format === "svg") blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-        else {
-          const { width, height } = got.scene;
-          let scale = 1;
-          if (limit.action === "scaleDown") {
-            scale = limit.scale;
-            new import_obsidian35.Notice(t("ui.export_scaled", String(EXPORT_MAX_EDGE)));
-          } else if (Math.max(width, height) * 2 <= EXPORT_MAX_EDGE && width * height * 4 <= EXPORT_MAX_PIXELS)
-            scale = 2;
-          blob = await this.pngBlob(svg, width, height, scale);
-          if (!isCurrent()) return;
-        }
+  mapExportSource() {
+    return {
+      map: () => this.map,
+      noteTitle: (id) => {
+        var _a2;
+        return (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title;
+      },
+      cards: () => this.cardEls,
+      texts: () => this.textEls.values(),
+      edges: () => {
+        var _a2, _b2;
+        return Array.from((_b2 = (_a2 = this.edgesEl) == null ? void 0 : _a2.children) != null ? _b2 : []);
+      },
+      styleRoot: () => {
+        var _a2;
+        return (_a2 = this.viewportEl) != null ? _a2 : this.contentEl;
+      },
+      frameBox: (members) => boundaryBounds(
+        members,
+        (id) => {
+          const card = this.cardEls.get(id);
+          if (!card) return null;
+          const b = boxOf2(card);
+          return { x: b.x, y: b.y, w: b.width, h: b.height };
+        },
+        BOUNDARY_PAD,
+        this.otherCardRects(members)
+      ),
+      summaryGeometry: (parentId, range, text10) => this.summaryGeometry(parentId, range, text10),
+      coverOf: (notePath) => this.exportCoverPath(notePath),
+      imageReader: (path) => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        return file instanceof import_obsidian35.TFile ? () => this.app.vault.readBinary(file) : null;
+      },
+      path: () => this.path,
+      fence: () => {
+        const mapPath = this.path, epoch = this.mapOpenEpoch;
+        return () => !this.closed && this.path === mapPath && this.mapOpenEpoch === epoch && !!this.map;
+      },
+      outlineNodes: (map) => this.onScreenSiblingOrder(map),
+      outlineSummary: (id) => {
+        var _a2, _b2;
+        const summary = (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.summary) != null ? _b2 : "";
+        return isPlaceholder(summary) ? "" : summary;
+      },
+      png: (svg, width, height, scale) => this.pngBlob(svg, width, height, scale),
+      host: () => this.contentEl,
+      attachmentPath: (name2, mapPath) => attachmentPath(this.app, name2, mapPath),
+      createBinary: (path, data) => this.app.vault.createBinary(path, data),
+      notice: (text10) => {
+        new import_obsidian35.Notice(text10);
       }
-      const name2 = `${exportFileStem(map.title)}.${format}`;
-      if (target === "download") {
-        this.downloadBlob(blob, name2);
-        new import_obsidian35.Notice(t("ui.export_downloaded", name2));
-        return;
-      }
-      const data = await blob.arrayBuffer();
-      const destination = await attachmentPath(this.app, name2, mapPath);
-      if (!isCurrent()) return;
-      await this.app.vault.createBinary(destination, data);
-      new import_obsidian35.Notice(t("ui.export_saved", destination));
-    } catch (error) {
-      if (isCurrent()) new import_obsidian35.Notice(t("ui.export_failed", errorMessage4(error)));
-    }
+    };
   }
   /**
    * The map commands of the command palette (they can take a hotkey): `checking` answers whether the command applies to
@@ -73533,7 +73578,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const stopped = controller.signal.aborted;
       this.settleTopicChat(
         entry,
-        stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", errorMessage4(error)),
+        stopped ? t("ui.topic_chat_stopped") : t("ui.topic_chat_failed_0", errorMessage5(error)),
         live2,
         !stopped,
         stopped ? "stopped" : "failed"
@@ -75925,7 +75970,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
                   id: child.id,
                   title: note.title,
                   status: batchSignal.aborted ? "stopped" : "failed",
-                  error: errorMessage4(error)
+                  error: errorMessage5(error)
                 });
                 throw error;
               }
@@ -78291,7 +78336,7 @@ ${note.detail.trim()}` : "",
     return {
       text: plainFailure(t("error.plain_chat_context"), error),
       wrapped: true,
-      technical: rawErrorText(error) || errorMessage4(error)
+      technical: rawErrorText(error) || errorMessage5(error)
     };
   }
   /** Sends the draft (see MapChatConversation). */
@@ -78511,7 +78556,7 @@ ${note.detail.trim()}` : "",
       this.markOwnFilesRecorded(record);
       return record;
     } catch (error) {
-      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage4(error)}`);
+      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage5(error)}`);
       return null;
     }
   }
@@ -78593,7 +78638,7 @@ ${note.detail.trim()}` : "",
     try {
       latest = await this.chatRecordSession.readLatest(this.plugin.repo.topicRoot(mapPath));
     } catch (error) {
-      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage4(error)}`);
+      this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage5(error)}`);
       return;
     }
     if (!latest || latest.parsed.unrecoverable || this.closed || epoch !== this.chatRecordSession.epoch || chat !== this.chat || chat.hasMessages || chat.isBusy || this.chatApplying || this.path !== mapPath || ((_a2 = this.map) == null ? void 0 : _a2.id) !== map.id)
@@ -78812,7 +78857,7 @@ ${note.detail.trim()}` : "",
       );
       if (this.chat === chat) chat.appendLines(lines);
     } catch (error) {
-      if (this.chat === chat) chat.appendLines([{ status: "failed", text: errorMessage4(error) }]);
+      if (this.chat === chat) chat.appendLines([{ status: "failed", text: errorMessage5(error) }]);
     } finally {
       this.chatApplying = false;
     }
@@ -79038,7 +79083,7 @@ ${note.detail.trim()}` : "",
               box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own2, same2, run));
             });
         } catch (error) {
-          box.outcome = { status: "failed", reason: errorMessage4(error) };
+          box.outcome = { status: "failed", reason: errorMessage5(error) };
         }
         if (autoChain && box.outcome.status === "done" && action.kind === "create_md_file") {
           const key5 = normalizeVaultPath(action.path);
@@ -79235,7 +79280,7 @@ ${note.detail.trim()}` : "",
             }
           }
         } catch (error) {
-          outcome = { status: "failed", reason: errorMessage4(error) };
+          outcome = { status: "failed", reason: errorMessage5(error) };
         }
       }
       lines[index] = this.chatLine(label, outcome);
@@ -79329,7 +79374,7 @@ ${note.detail.trim()}` : "",
         opened = await this.chatSwitchTo(mapPath, anchor);
       });
     } catch (error) {
-      return { status: "failed", reason: errorMessage4(error), created: made.created };
+      return { status: "failed", reason: errorMessage5(error), created: made.created };
     }
     if (opened) return { status: "done" };
     return made.created ? { status: "skipped", reason: t("ui.map_chat_skip_map_not_opened"), created: true } : skipped("ui.map_chat_skip_map_changed");
@@ -79353,7 +79398,7 @@ ${note.detail.trim()}` : "",
         anchor.path = this.path;
       });
     } catch (error) {
-      return { status: "failed", reason: errorMessage4(error) };
+      return { status: "failed", reason: errorMessage5(error) };
     }
     return outcome;
   }
@@ -79400,7 +79445,7 @@ ${note.detail.trim()}` : "",
         opened ? { status: "done", text: t("ui.map_chat_choose_opened_0", topic.title) } : { status: "skipped", text: t("ui.map_chat_skip_map_changed") }
       ]);
     } catch (error) {
-      (_b2 = this.chat) == null ? void 0 : _b2.appendLines([{ status: "failed", text: errorMessage4(error) }]);
+      (_b2 = this.chat) == null ? void 0 : _b2.appendLines([{ status: "failed", text: errorMessage5(error) }]);
     } finally {
       this.chatApplying = false;
     }
@@ -79646,7 +79691,7 @@ ${note.detail.trim()}` : "",
       try {
         live2.write({ type: "event", turn: batch.turn, kind, ...extra });
       } catch (error) {
-        this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage4(error)}`);
+        this.plugin.logs.appendLog("error", `Map chat record: ${errorMessage5(error)}`);
       }
     };
     const current = () => conversation === this.chatConversation;
@@ -79898,7 +79943,7 @@ ${note.detail.trim()}` : "",
               },
               (error) => {
                 errorNotice(error);
-                resolve({ status: "failed", reason: errorMessage4(error) });
+                resolve({ status: "failed", reason: errorMessage5(error) });
               }
             );
           }).then((outcome) => {
@@ -80060,7 +80105,7 @@ ${addition}` : addition },
             );
             outcome.result = { ok: true };
           } catch (error) {
-            outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage4(error)) };
+            outcome.result = { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage5(error)) };
             return;
           }
           if (cover) {
@@ -80081,7 +80126,7 @@ ${addition}` : addition },
         }
       });
     } catch (error) {
-      return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage4(error)) };
+      return { ok: false, reason: t("ui.map_chat_images_insert_failed_0", errorMessage5(error)) };
     }
     if (outcome.coverWritten) await this.refreshAfterSavedChange();
     return outcome.result;
@@ -80230,7 +80275,7 @@ ${addition}` : addition },
       written2.error = error;
     }
     if (written2.error !== void 0) {
-      const reason = t("ui.map_chat_save_failed_0", errorMessage4(written2.error));
+      const reason = t("ui.map_chat_save_failed_0", errorMessage5(written2.error));
       new import_obsidian35.Notice(reason);
       return { ok: false, reason };
     }
@@ -80304,7 +80349,7 @@ ${addition}` : addition },
     } catch (error) {
       if (controller.signal.aborted) return { status: "stopped" };
       new import_obsidian35.Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
-      return { status: "failed", reason: errorMessage4(error) };
+      return { status: "failed", reason: errorMessage5(error) };
     } finally {
       signal == null ? void 0 : signal.removeEventListener("abort", stopWithOwner);
       if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
@@ -80392,7 +80437,7 @@ ${addition}` : addition },
         );
       }).then(
         () => settle(skipped("ui.map_chat_skip_not_started")),
-        (error) => settle({ status: "failed", reason: errorMessage4(error) })
+        (error) => settle({ status: "failed", reason: errorMessage5(error) })
       );
     });
   }
@@ -81048,12 +81093,12 @@ ${addition}` : addition },
       this.ringDirections(this.map)
     );
     const base = /* @__PURE__ */ new Map();
-    for (const [id, el] of group) base.set(id, boxOf(el));
+    for (const [id, el] of group) base.set(id, boxOf2(el));
     const boxFor = (id) => {
       const known = base.get(id);
       if (known) return known;
       const el = this.lineEndEl(id);
-      return el ? boxOf(el) : void 0;
+      return el ? boxOf2(el) : void 0;
     };
     const shifted = (id, dx, dy) => {
       const box = boxFor(id);
@@ -81197,7 +81242,7 @@ ${addition}` : addition },
       const [fromId, toId] = key4.split("\0");
       if (fromId !== id && toId !== id) continue;
       const other = this.cardEls.get(fromId === id ? toId : fromId);
-      if (other) linked2.push({ key: key4, dragIsFrom: fromId === id, far: boxOf(other) });
+      if (other) linked2.push({ key: key4, dragIsFrom: fromId === id, far: boxOf2(other) });
     }
     const anchored = [...this.anchorLinks].filter(([, line2]) => line2.topicId === id);
     const dragged = (_c = this.map) == null ? void 0 : _c.nodes.find((node) => node.id === id);
@@ -81249,9 +81294,9 @@ ${addition}` : addition },
     for (const node of this.canvasNodes()) {
       if (node.parentId !== headId || node.afterTextId) continue;
       const card = this.cardEls.get(node.id);
-      if (card) topics.push({ id: node.id, box: boxOf(card) });
+      if (card) topics.push({ id: node.id, box: boxOf2(card) });
     }
-    return { head: boxOf(head2), topics };
+    return { head: boxOf2(head2), topics };
   }
   /**
    * Sets one spine's path from the cards on screen; `moved` is a card being dragged, whose box is not yet in the DOM,
@@ -81311,7 +81356,7 @@ ${addition}` : addition },
             parent.offsetTop + parent.offsetHeight / 2,
             child.offsetLeft,
             child.offsetTop + child.offsetHeight / 2
-          ) : treeEdgePathData(boxOf(parent), boxOf(child), direction, depthOf(allNodes, node.id))
+          ) : treeEdgePathData(boxOf2(parent), boxOf2(child), direction, depthOf(allNodes, node.id))
         );
         path.addClass("vam-edge");
         if (!node.aimKind && this.styleOf(node.id).includes("line-thick")) path.setAttribute("data-line-thick", "");
@@ -81345,7 +81390,7 @@ ${addition}` : addition },
           parent.offsetTop + parent.offsetHeight / 2,
           textEl.offsetLeft,
           textEl.offsetTop + textEl.offsetHeight / 2
-        ) : treeEdgePathData(boxOf(parent), boxOf(textEl), direction, depthOf(allNodes, text10.parentId) + 1)
+        ) : treeEdgePathData(boxOf2(parent), boxOf2(textEl), direction, depthOf(allNodes, text10.parentId) + 1)
       );
       path.addClass("vam-edge", "vam-text-edge");
       if (!this.map.aim) path.setAttribute("data-parent-line", "");
@@ -81361,7 +81406,7 @@ ${addition}` : addition },
         const card = this.cardEls.get(cardId);
         if (!card) continue;
         const path = createSvg("path");
-        path.setAttribute("d", relationPathData(boxOf(textEl), boxOf(card)));
+        path.setAttribute("d", relationPathData(boxOf2(textEl), boxOf2(card)));
         path.addClass("vam-text-link");
         path.setAttribute("data-text-id", textId);
         path.setAttribute("data-card-id", cardId);
@@ -81486,7 +81531,7 @@ ${addition}` : addition },
       this.relationLabelEls.set(link.key, label);
       this.placeRelationLabel(
         link.key,
-        link.anchor ? this.anchorLabelPoint(link.anchor, boxOf(link.to)) : relationLabelPoint(boxOf(link.from), boxOf(link.to), axis)
+        link.anchor ? this.anchorLabelPoint(link.anchor, boxOf2(link.to)) : relationLabelPoint(boxOf2(link.from), boxOf2(link.to), axis)
       );
     }
     this.selection.pruneRelation(new Set(this.relationEls.keys()));
@@ -81523,7 +81568,7 @@ ${addition}` : addition },
     return side ? pointToBoxStraightLabelPoint(line2.point, box, side, line2.fromAnchor) : pointToBoxLabelPoint(line2.point, box, line2.fromAnchor);
   }
   relationLinkPath(link, axis) {
-    return link.anchor ? this.anchorPathData(link.anchor, boxOf(link.to)) : relationPathData(boxOf(link.from), boxOf(link.to), axis);
+    return link.anchor ? this.anchorPathData(link.anchor, boxOf2(link.to)) : relationPathData(boxOf2(link.from), boxOf2(link.to), axis);
   }
   /**
    * Every anchor relation that can be drawn: its anchor has a 2D position (map units from the image's data, so a missing
@@ -87980,7 +88025,7 @@ async function saveShareFile(html, suggestedName, shouldWrite, env = browserSave
 }
 
 // experiences/sharing/share-modal.ts
-var errorMessage5 = (error) => {
+var errorMessage6 = (error) => {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : "";
 };
@@ -88317,7 +88362,7 @@ var ShareModal = class extends import_obsidian43.Modal {
       this.phase = "idle";
       this.estimateMemo = null;
       const stopped = abort.signal.aborted || (error == null ? void 0 : error.code) === "stopped";
-      this.translateNote = stopped ? t("share.translate_stopped") : t("share.translate_failed_0", errorMessage5(error).slice(0, 200));
+      this.translateNote = stopped ? t("share.translate_stopped") : t("share.translate_failed_0", errorMessage6(error).slice(0, 200));
       this.render();
     } finally {
       if (this.translateAbort === abort) this.translateAbort = null;

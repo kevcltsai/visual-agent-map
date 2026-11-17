@@ -57,9 +57,13 @@ import {
 import {
   appendResearchNote,
   findStoredProof,
+  findStoredProofModels,
   extractProofRecords,
-  markOldProofRecords,
+  carryImageSection,
+  dropPlaceholderSections,
   replaceBookPlanSection,
+  replaceProofSection,
+  replaceResearchRecord,
   setImageSection,
   chapterBody
 } from "../../core/book-pipeline/note-sections";
@@ -72,9 +76,12 @@ import {
 } from "../../core/book-pipeline/plan-text";
 import {
   composeProofRecord,
+  composeProofSection,
   failedProofKey,
   isProofFailure,
   proofKey,
+  proofSectionHeading,
+  safeHref as safeLinkHref,
   type ProofCounts,
   type ProofResult
 } from "../../core/book-pipeline/proof";
@@ -163,7 +170,12 @@ export type AuthorOutcome =
   | { outcome: "failed"; reason: string }
   | { outcome: "cancelled" }
   | { outcome: "discarded" };
-export type GuardOptions = { expectedContent?: string; authorize?: () => boolean };
+export type GuardOptions = {
+  expectedContent?: string;
+  authorize?: () => boolean;
+  /** Runs inside the same write on the text the patch produced; null refuses the write. */
+  finalize?: (content: string) => string | null;
+};
 
 /** Everything the runner touches. `mutate` is the plugin's serialized write queue; the others are repository/model/network seams. */
 export interface BookPipelinePorts {
@@ -198,6 +210,8 @@ export interface BookPipelinePorts {
   /** True while a conversation chain, a multi-select research or an argument run holds this map. */
   blocked(mapPath: string): boolean;
   config(mapPath: string): BookRunConfig;
+  /** A stored model id as the owner reads it (the plugin's display name); absent: the id itself. */
+  modelLabel?(model: string): string;
   now(): string;
   newId(): string;
   log(line: string): void;
@@ -263,6 +277,8 @@ interface Drive {
   extra: Map<string, string>;
   /** The plan a card's plan step wrote in this drive. */
   plans: Map<string, CardPlanResult>;
+  /** The model id each card's author step was dispatched with in this drive (the proof result section shows it). */
+  authorModels: Map<string, string>;
   /** When each card's first step started in this drive, and the durations (ms) of the cards that finished their phase. */
   started: Map<string, number>;
   durations: { plan: number[]; write: number[] };
@@ -278,6 +294,8 @@ const reasonOf = (error: unknown): string =>
 /** An unexpected error's code: only its class name, never its message (which could carry a path or a title). */
 const internalCode = (error: unknown): string =>
   `internal_${(typeof (error as { name?: unknown } | null)?.name === "string" ? (error as { name: string }).name : "unknown").replace(/[^A-Za-z0-9_]/g, "_").slice(0, 40)}`;
+/** Failure reasons after which the card's proof-result section is not written (the write never reached the card, or the card is gone). */
+const NO_FAILURE_SECTION: ReadonlySet<string> = new Set(["discarded", "card_removed", "backup_failed", "missing"]);
 const STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" } as const;
 const ACTION_OF = { plan: "card_plan", write: "card_write", proof: "card_proof" } as const;
 const MAX_INSTRUCTION = 300;
@@ -324,6 +342,34 @@ function holdProofLines(
     text,
     restore: cleaned => cleaned.replace(new RegExp(`${token}(\\d+)X`, "g"), (_, i: string) => held[Number(i)])
   };
+}
+/**
+ * A strict source anchor `<a href="https://…">text</a>` (each `<`, `>` and `"` also as its entity, decoded one level only), with
+ * `href` as the only attribute, one line, no tag inside. Anything else (another attribute, a nested or unclosed tag, `javascript:`,
+ * `http:`, a doubled entity) does not match and stays plain text for the cleaning that follows.
+ */
+const ANCHOR =
+  /(?:<|&lt;)a[ \t]+href=(?:"|&quot;)([^"<>\n]*?)(?:"|&quot;)[ \t]*(?:>|&gt;)([^<>\n]*?)(?:<|&lt;)\/a[ \t]*(?:>|&gt;)/gi;
+/**
+ * R1-6: the body (after the frontmatter) with every strict https anchor written as the markdown link `[text](href)`: the address
+ * must pass {@link safeLinkHref}, the text is escaped plain text, and a space goes before the link when a `!` or `\` precedes it (so
+ * it can never become an image or an escape). The caller runs the picture scan and the tag cleaning on the result.
+ */
+export function convertSourceAnchors(content: string): string {
+  const at = frontmatterLength(content);
+  return (
+    content.slice(0, at) +
+    content
+      .slice(at)
+      .replace(ANCHOR, (whole: string, rawHref: string, rawText: string, offset: number, all: string) => {
+        if (/&(?:lt|gt|quot);/i.test(rawText) || /&(?:lt|gt|quot);/i.test(rawHref.replace(/&amp;/g, ""))) return whole;
+        const href = safeLinkHref(rawHref.replace(/&amp;/g, "&"));
+        const text = escapeMarkdownText(rawText.replace(/&amp;/g, "&"), 200);
+        if (!href || !text) return whole;
+        const before = all[offset - 1];
+        return `${before === "!" || before === "\\" ? " " : ""}[${text}](${href})`;
+      })
+  );
 }
 const NO_PICTURE = "無圖：";
 const PICTURE_REASONS: Record<string, [string, string]> = {
@@ -916,6 +962,7 @@ export class BookPipelineRuns {
       busy: new Set(),
       extra: new Map(),
       plans: new Map(),
+      authorModels: new Map(),
       started: new Map(),
       durations: { plan: [], write: [] },
       stopRequested: false,
@@ -1262,6 +1309,39 @@ export class BookPipelineRuns {
       pipelineStage: "needs-review",
       pipelineIssue: `${step} failed: ${code(reason)}`
     });
+    if (step !== "plan" && !NO_FAILURE_SECTION.has(reason)) await this.writeFailureSection(drive, nodeId, reason);
+  }
+  /** The proof-result section of a card as `finalize`/`transform` text: the result with the models, or the failure line (never a model). */
+  private proofSectionOf(
+    drive: Drive,
+    outcome: { result: ProofResult } | { failure: string },
+    models: { model?: string; authorModel?: string }
+  ): (content: string) => string {
+    const language = drive.config.language;
+    const label = this.ports.modelLabel ? (id: string) => this.ports.modelLabel?.(id) ?? id : undefined;
+    return content =>
+      replaceProofSection(
+        content,
+        proofSectionHeading(language),
+        composeProofSection(language, outcome, models, label)
+      );
+  }
+  /** Best effort: the card's proof-result section says "failed: reason" (no model). Never throws; skipped when nothing is known to be safe to write. */
+  private async writeFailureSection(drive: Drive, nodeId: string, reason: string): Promise<void> {
+    try {
+      if (this.dead(drive)) return;
+      const path = await this.stillOnMap(drive, nodeId);
+      if (!path) return;
+      const card = await this.ports.readCard(path);
+      const next = this.proofSectionOf(drive, { failure: code(reason) }, {})(card.raw);
+      if (next === card.raw || !(await this.ensureBackup(drive, nodeId, path, card.raw))) return;
+      await this.ports.updateNoteRawGuarded(path, () => next, {
+        expectedContent: card.raw,
+        authorize: () => !this.dead(drive)
+      });
+    } catch {
+      // the card still shows its issue field; the section is only a help for the reader
+    }
   }
   private async reset(drive: Drive, nodeId: string): Promise<void> {
     drive.stages.set(nodeId, undefined);
@@ -1411,7 +1491,10 @@ export class BookPipelineRuns {
     const knownLines: ReadonlySet<string> = new Set(card.raw.split("\n"));
     let unsafe = false;
     const finalize = (original: string): string | null => {
-      const { text: content, restore } = holdProofLines(original, knownLines);
+      const held = holdProofLines(original, knownLines);
+      const restore = held.restore;
+      // R1-6: anchors become markdown links first; the picture scan and the cleaning then run on the final text. Placeholder sections go.
+      const content = dropPlaceholderSections(convertSourceAnchors(held.text));
       const urls = bodyImageUrls(content);
       const unsafeUrls = new Map(
         urls.filter(url => !isHttps(url)).map(url => [url, noPicture(drive.config.language, "unsafe")])
@@ -1445,14 +1528,16 @@ export class BookPipelineRuns {
     if (done.outcome === "cancelled") return { kind: "cancelled" };
     if (done.outcome === "failed") return { kind: "failed", reason: done.reason };
     if (done.outcome === "discarded") return { kind: "failed", reason: "discarded" };
+    drive.authorModels.set(nodeId, drive.config.authorModel);
     // What is saved holds only standard https pictures. The program (not the model) probes them; a failed one becomes a plain "no picture" line.
     const path = await this.stillOnMap(drive, nodeId);
     if (!path) return { kind: "failed", reason: "card_removed" };
     let written = await this.ports.readCard(path);
-    // A rewrite that replaced the whole Detail drops the Research notes: the proof records the card had before this step
-    // (their lines are in `knownLines` by construction) come back, and the next proof marks them as an old version.
+    // A rewrite that replaced the whole Detail drops the Research notes and the picture section: the card's latest proof record
+    // (its lines are in `knownLines` by construction) and its `### 圖像` section come back; the next proof replaces the record.
     let carried = written.detail;
-    for (const record of extractProofRecords(card.detail)) carried = appendResearchNote(carried, record).text;
+    for (const record of extractProofRecords(card.detail).slice(-1)) carried = appendResearchNote(carried, record).text;
+    carried = carryImageSection(card.detail, carried);
     if (carried !== written.detail) {
       const outcome = await this.ports.updateNoteGuarded(
         path,
@@ -1615,8 +1700,7 @@ export class BookPipelineRuns {
               token,
               nodeId,
               card,
-              composeProofRecord(failedProofKey(key), error.partial, error.code),
-              key
+              composeProofRecord(failedProofKey(key), error.partial, error.code)
             );
           throw error;
         });
@@ -1626,13 +1710,33 @@ export class BookPipelineRuns {
       if (!path) return { kind: "failed", reason: "card_removed" };
       if (!(await this.ensureBackup(drive, nodeId, path, card.raw)))
         return { kind: "failed", reason: "backup_failed", forceReview: true };
-      const added = appendResearchNote(card.detail, composeProofRecord(key, result));
-      if (added.appended) {
-        const written = await this.ports.updateNoteGuarded(
-          path,
-          { detail: markOldProofRecords(added.text, key) },
-          { expectedContent: card.raw, authorize: this.authorize(drive, token) }
-        );
+      const models = { model: drive.config.proofModel, authorModel: drive.authorModels.get(nodeId) };
+      const written = await this.ports.updateNoteGuarded(
+        path,
+        { detail: replaceResearchRecord(card.detail, composeProofRecord(key, result, undefined, models)) },
+        {
+          expectedContent: card.raw,
+          authorize: this.authorize(drive, token),
+          finalize: this.proofSectionOf(drive, { result }, models)
+        }
+      );
+      if (written === "discarded") return { kind: "failed", reason: "discarded" };
+    } else {
+      // R1-5: a stored result is reused, and the section still follows it: the model shown is the one stored with the result (never
+      // today's setting); a record from before models were kept shows "not recorded".
+      const stored = findStoredProofModels(card.detail, key);
+      const models = {
+        ...(stored?.model ? { model: stored.model } : {}),
+        authorModel: drive.authorModels.get(nodeId) ?? stored?.authorModel
+      };
+      const next = this.proofSectionOf(drive, { result }, models)(card.raw);
+      if (next !== card.raw) {
+        if (!(await this.ensureBackup(drive, nodeId, info.path, card.raw)))
+          return { kind: "failed", reason: "backup_failed", forceReview: true };
+        const written = await this.ports.updateNoteRawGuarded(info.path, () => next, {
+          expectedContent: card.raw,
+          authorize: this.authorize(drive, token)
+        });
         if (written === "discarded") return { kind: "failed", reason: "discarded" };
       }
     }
@@ -1662,25 +1766,22 @@ export class BookPipelineRuns {
     };
   }
 
-  /** Best effort: appends the failed proof's partial record once (its own key), under the same guards as every card write. Never throws. */
+  /** Best effort: replaces the proof records in the research notes with the failed proof's partial record (its own key), under the same guards as every card write. Never throws. */
   private async keepPartialProof(
     drive: Drive,
     token: StepToken,
     nodeId: string,
     card: { raw: string; detail: string },
-    record: string,
-    key: string
+    record: string
   ): Promise<void> {
     try {
       const path = await this.stillOnMap(drive, nodeId);
       if (!path || !(await this.ensureBackup(drive, nodeId, path, card.raw))) return;
-      const added = appendResearchNote(card.detail, record);
-      if (added.appended)
-        await this.ports.updateNoteGuarded(
-          path,
-          { detail: markOldProofRecords(added.text, key) },
-          { expectedContent: card.raw, authorize: this.authorize(drive, token) }
-        );
+      await this.ports.updateNoteGuarded(
+        path,
+        { detail: replaceResearchRecord(card.detail, record) },
+        { expectedContent: card.raw, authorize: this.authorize(drive, token) }
+      );
     } catch {
       // The failure itself is still reported; the partial record is only a help for the reader.
     }

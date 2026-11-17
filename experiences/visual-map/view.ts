@@ -16936,13 +16936,13 @@ export class VisualAgentMapView extends ItemView {
     onResult?: (result: AiResult) => void,
     gate?: { shown: boolean },
     languageSource?: Pick<MapDocument, "title" | "outputLanguage">,
-    book?: { pipeline: NonNullable<ResearchStart["pipeline"]>; request: Partial<TaskContext> }
+    book?: { pipeline: NonNullable<ResearchStart["pipeline"]>; request: Partial<TaskContext>; template?: string }
   ): Promise<void> {
     const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
     const outputLanguage =
       choices.outputLanguage ??
       cardOutputLanguage(languageSource ?? this.map, this.plugin.settings.language, note.title);
-    const runStyle = await this.detailTemplateFor(child, choices.noteStyle, gate, outputLanguage);
+    const runStyle = await this.detailTemplateFor(child, choices.noteStyle, gate, outputLanguage, book?.template);
     let started = false;
     let failure: string | undefined;
     const handle = await this.runAgent(
@@ -17385,7 +17385,8 @@ export class VisualAgentMapView extends ItemView {
               discarded = true;
             }
           },
-          request: { admission: input.admission, noContentLog: true }
+          request: { admission: input.admission, noContentLog: true },
+          template: "book-chapter"
         }
       );
     } catch {
@@ -24073,11 +24074,12 @@ export class VisualAgentMapView extends ItemView {
     node: MapNode,
     chosenStyle?: string,
     gate?: { shown: boolean },
-    outputLanguage: ContentLanguage = this.plugin.settings.language
+    outputLanguage: ContentLanguage = this.plugin.settings.language,
+    forceTemplate?: string
   ): Promise<RunStyle> {
     const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
     await this.noteStyles.refresh();
-    const resolved = this.topicStyle(note, chosenStyle, outputLanguage);
+    const resolved = this.topicStyle(note, chosenStyle, outputLanguage, forceTemplate);
     const { missing } = resolved.issues;
     this.noticeBlockIssues(resolved.issues, gate);
     this.noticeKindMissing(resolved.issues, note.topicKind ?? "topic", note.detailTemplateId, gate);
@@ -24099,11 +24101,15 @@ export class VisualAgentMapView extends ItemView {
   private topicStyle(
     note: Note,
     chosenStyle?: string,
-    outputLanguage: ContentLanguage = this.plugin.settings.language
+    outputLanguage: ContentLanguage = this.plugin.settings.language,
+    forceTemplate?: string
   ): RunStyle {
     return this.noteStyles.runStyle({
       choice: { style: chosenStyle },
-      topic: { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
+      // A book chapter is always written on the book-chapter template (the card's own style and template are not used or changed).
+      topic: forceTemplate
+        ? { template: forceTemplate, tone: note.toneId }
+        : { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
       kind: note.topicKind ?? "topic",
       outputLanguage,
       detail: note.detail

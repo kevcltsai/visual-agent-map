@@ -10,7 +10,7 @@ import {
 } from "../../ai/section-aliases";
 import { NOTE_LANGUAGES, translate } from "../../i18n";
 import { demoteHeadings } from "./text";
-import { findProofRecord, PROOF_STATUSES, type ProofItemResult, type ProofResult } from "./proof";
+import { findProofModels, findProofRecord, PROOF_STATUSES, type ProofItemResult, type ProofResult } from "./proof";
 
 export const BOOK_PLAN_HEADING = "全書企劃";
 const DEFAULT_RESEARCH_HEADING = "研究備註";
@@ -223,6 +223,11 @@ export function extractProofRecords(detail: string): string[] {
 /** The stored proof result for `key` in a Detail's Research notes (read through the `> ` quote prefix), or undefined. */
 export function findStoredProof(detail: string, key: string): ReturnType<typeof findProofRecord> {
   return findProofRecord(unquoted(detail), key);
+}
+
+/** The model ids kept in the stored record for `key` (empty fields: a record from before they were kept), or undefined when there is no such record. */
+export function findStoredProofModels(detail: string, key: string): ReturnType<typeof findProofModels> {
+  return findProofModels(unquoted(detail), key);
 }
 
 /** What the panel shows of the newest proof record: every field is re-read and cut to plain values (the note may have been edited by hand). */

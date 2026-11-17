@@ -352,11 +352,14 @@ test('exit safety: the card leaving the map, or readCard throwing, after the aut
 test('exit safety: a body the exit check refuses is not written at all (the card keeps its earlier text) and needs review', async () => {
   const r = await rig({ script: { author: input => evilAuthor(r, input) } });
   r.runs.exitCheck = () => true;
+  // T1: the only addition is the proof-result section saying the step failed (no model); the card text itself is unchanged.
+  const FAIL_SECTION = '\n## 校對結果（最新一次）\n\n- 失敗：unsafe\\_body\n';
   const before = () => r.raw(1).replace(/^---\n[\s\S]*?\n---\n/, '');
   await r.runs.start(r.mapPath);
   const earlier = before();
   await confirmDone(r.runs, r.mapPath);
-  assert.equal(before().includes('evil.example'), false); assert.equal(before(), earlier);
+  assert.equal(before().includes('evil.example'), false);
+  assert.ok(before().endsWith(FAIL_SECTION)); assert.equal(before().slice(0, -FAIL_SECTION.length), earlier);
   assert.equal(stageOf(r.raw(1)), 'needs-review');
   assert.equal((await r.note(1)).pipelineIssue, 'write failed: unsafe_body');
 });

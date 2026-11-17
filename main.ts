@@ -509,6 +509,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       reasoning: this.currentModelChoice().reasoning,
       language: selectionOutputLanguage(this.settings.language, "")
     }),
+    modelLabel: model => this.modelLabel(model),
     now: () => new Date().toISOString(),
     newId: () => crypto.randomUUID(),
     log: line => this.logs.appendLog("info", line)

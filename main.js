@@ -43789,6 +43789,21 @@ function composeProofRecord(key4, result, failure, models) {
   );
   return lines.join("\n");
 }
+function findProofModels(notes, key4) {
+  for (const line2 of notes.split(/\r?\n/)) {
+    const m = RECORD.exec(line2.trim());
+    if (!m) continue;
+    try {
+      const data = JSON.parse(m[1]);
+      if (data.key !== key4) continue;
+      const model = safeModelId(data.model);
+      const authorModel = safeModelId(data.authorModel);
+      return { ...model ? { model } : {}, ...authorModel ? { authorModel } : {} };
+    } catch (e) {
+    }
+  }
+  return void 0;
+}
 function findProofRecord(notes, key4) {
   for (const line2 of notes.split(/\r?\n/)) {
     const m = RECORD.exec(line2.trim());
@@ -43800,6 +43815,24 @@ function findProofRecord(notes, key4) {
     }
   }
   return void 0;
+}
+var proofSectionHeading = (language2) => translate(language2, "detail.book_proof_heading");
+function composeProofSection(language2, outcome, models, modelLabel = (id) => id) {
+  if ("failure" in outcome)
+    return `- ${translate(language2, "detail.book_proof_failed_0", escapeMarkdownText(outcome.failure, 60) || "failed")}`;
+  const colon2 = /^zh/i.test(language2) ? "\uFF1A" : ": ";
+  const words2 = {
+    met: translate(language2, "detail.book_proof_met"),
+    unmet: translate(language2, "detail.book_proof_unmet"),
+    unverified: translate(language2, "detail.book_proof_unverified")
+  };
+  const lines = cleanResult(outcome.result).items.map(
+    (item) => `- ${item.id} ${words2[item.status]}${item.status !== "met" && item.note ? `${colon2}${item.note}` : ""}`
+  );
+  const shown = (id) => safeModelId(id) ? escapeMarkdownText(modelLabel(safeModelId(id)), 80) : translate(language2, "detail.book_model_unrecorded");
+  lines.push(`- ${translate(language2, "detail.book_proof_author_model_0", shown(models.authorModel))}`);
+  lines.push(`- ${translate(language2, "detail.book_proof_proof_model_0", shown(models.model))}`);
+  return lines.join("\n");
 }
 
 // core/book-pipeline/note-sections.ts
@@ -43887,34 +43920,41 @@ ${tail.join("\n")}` : "\n";
   const glue = last >= 0 ? "\n" : "\n\n";
   return { text: `${head2}${glue}${addition}${rest}`, appended: true };
 }
-var OLD_MARK = "\uFF08\u820A\u7248\uFF09";
-var PROOF_HEADER = /^(?:（舊版）)?校對(?:失敗)?（/;
-function markOldProofRecords(detail, currentKey) {
-  const lines = detail.split("\n");
-  let changed = false;
-  for (let i = 0; i < lines.length; i++) {
-    const m = RECORD_KEY.exec(unquoted(lines[i]).trim());
-    if (!m) continue;
-    let key4;
-    try {
-      key4 = JSON.parse(m[1]).key;
-    } catch (e) {
-      continue;
-    }
-    if (typeof key4 !== "string" || key4 === currentKey || key4 === `${currentKey}:failed`) continue;
-    for (let j = i - 1; j >= 0; j--) {
-      const plain = unquoted(lines[j]);
-      if (RECORD_KEY.test(plain.trim())) break;
-      if (!PROOF_HEADER.test(plain.trim())) continue;
-      if (!plain.trim().startsWith(OLD_MARK)) {
-        lines[j] = lines[j].replace(/^([ \t]{0,3}>[ \t]?)?/, (prefix) => `${prefix}${OLD_MARK}`);
-        changed = true;
-      }
-      break;
-    }
+var PIPELINE_RECORD = /^<!-- (book-(?:proof|slots)):v1 (\{.*\}) -->$/;
+var PROOF_ITEM_LINE = /^- .+ (?:達成|未達成|待查)：/;
+var QUOTE_BLANK = /^[ \t]{0,3}>[ \t]*\r?$/;
+var validJson = (text10) => {
+  try {
+    return typeof JSON.parse(text10) === "object";
+  } catch (e) {
+    return false;
   }
-  return changed ? lines.join("\n") : detail;
+};
+function replaceResearchRecord(detail, record) {
+  var _a2;
+  const tag = ((_a2 = record.split(/\r?\n/).map((line2) => PIPELINE_RECORD.exec(line2.trim())).find(Boolean)) != null ? _a2 : [])[1];
+  const lines = detail.split("\n");
+  const section3 = tag ? findSection(lines, fencedLines2(lines), (text10) => isResearchNotesHeading(text10)) : void 0;
+  if (!tag || !section3) return appendResearchNote(detail, record).text;
+  const start = section3.at + 1;
+  const plain = lines.slice(start, section3.end).map((line2) => unquoted(line2).replace(/\r$/, ""));
+  const fenced = fencedLines2(plain);
+  const drop = /* @__PURE__ */ new Set();
+  for (let k = 0; k < plain.length; k++) {
+    const m = fenced[k] ? null : PIPELINE_RECORD.exec(plain[k].trim());
+    if (!m || m[1] !== tag || !validJson(m[2])) continue;
+    drop.add(k);
+    let j = k - 1;
+    if (tag === "book-proof") {
+      while (j >= 0 && !fenced[j] && !drop.has(j) && PROOF_ITEM_LINE.test(plain[j])) drop.add(j--);
+      if (j >= 0 && !fenced[j] && !drop.has(j) && PROOF_HEADER.test(plain[j].trim())) drop.add(j--);
+    }
+    if (j >= 0 && !drop.has(j) && QUOTE_BLANK.test(lines[start + j])) drop.add(j);
+  }
+  const kept = lines.filter((_, i) => i < start || i >= section3.end || !drop.has(i - start));
+  return appendResearchNote(kept.join("\n"), record).text;
 }
+var PROOF_HEADER = /^(?:（舊版）)?校對(?:失敗)?（/;
 function extractProofRecords(detail) {
   const lines = detail.split("\n");
   const section3 = findSection(lines, fencedLines2(lines), (text10) => isResearchNotesHeading(text10));
@@ -43933,6 +43973,9 @@ function extractProofRecords(detail) {
 }
 function findStoredProof(detail, key4) {
   return findProofRecord(unquoted(detail), key4);
+}
+function findStoredProofModels(detail, key4) {
+  return findProofModels(unquoted(detail), key4);
 }
 var shortText = (value, max) => typeof value === "string" ? Array.from(value).slice(0, max).join("") : "";
 var count2 = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
@@ -44051,6 +44094,13 @@ function setImageSection(detail, section3, language2) {
 
 ${section3.trim()}`);
 }
+function carryImageSection(oldDetail, newDetail) {
+  const oldLines = oldDetail.split("\n");
+  const old = findImageSection(oldLines);
+  if (!old || findImageSection(newDetail.split("\n"))) return newDetail;
+  const block = oldLines.slice(old.at, old.end).join("\n").replace(/\s+$/, "");
+  return withImageBlock(newDetail.split("\n"), block);
+}
 function chapterBody(detail) {
   var _a2;
   let lines = detail.split("\n");
@@ -44060,6 +44110,88 @@ function chapterBody(detail) {
     lines = [...lines.slice(0, section3.at), ...lines.slice(section3.end)];
   }
   return lines.join("\n").replace(/\s+$/, "");
+}
+var REFERENCE_START2 = "<!-- visual-agent-map:references:start -->";
+var DETAIL_START2 = "<!-- visual-agent-map:detail:start -->";
+var DETAIL_END2 = "<!-- visual-agent-map:detail:end -->";
+function protectedLines(lines) {
+  var _a2;
+  const flags = fencedLines2(lines);
+  if (((_a2 = lines[0]) == null ? void 0 : _a2.trim()) === "---") {
+    for (let i = 1; i < lines.length; i++) {
+      for (let k = 0; k <= i; k++) flags[k] = true;
+      if (lines[i].trim() === "---") break;
+    }
+  }
+  let inDetail = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === DETAIL_START2) inDetail = true;
+    if (inDetail) flags[i] = true;
+    if (lines[i].trim() === DETAIL_END2) inDetail = false;
+  }
+  return flags;
+}
+function replaceProofSection(content, heading, body) {
+  const lines = content.split("\n");
+  const flags = protectedLines(lines);
+  const names3 = new Set(NOTE_LANGUAGES.map((locale) => translate(locale, "detail.book_proof_heading").trim()));
+  const found = findSection(lines, flags, (text10, level) => level === 2 && names3.has(text10.trim()));
+  const entry = `## ${heading}
+
+${body.trim()}`;
+  if (found) {
+    let end = found.end;
+    for (let i = found.at + 1; i < found.end; i++) {
+      if (lines[i].trim().startsWith("<!-- visual-agent-map:") || /^>[ \t]?\[!/.test(lines[i])) {
+        end = i;
+        break;
+      }
+    }
+    const before = lines.slice(0, found.at).join("\n");
+    const after = lines.slice(end).join("\n");
+    return `${before ? `${before}
+` : ""}${entry}${after ? `
+
+${after}` : "\n"}`;
+  }
+  const marker3 = lines.findIndex((line2, i) => !flags[i] && line2.trim() === REFERENCE_START2);
+  if (marker3 >= 0) {
+    const before = lines.slice(0, marker3).join("\n").replace(/\s+$/, "");
+    return `${before ? `${before}
+
+` : ""}${entry}
+
+${lines.slice(marker3).join("\n")}`;
+  }
+  const base = content.replace(/\s+$/, "");
+  return `${base ? `${base}
+
+` : ""}${entry}
+`;
+}
+var PLACEHOLDERS = () => /* @__PURE__ */ new Set([
+  ...NOTE_LANGUAGES.map((locale) => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
+  "No new content this time",
+  "\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9"
+]);
+function dropPlaceholderSections(content) {
+  var _a2, _b2;
+  const placeholders = PLACEHOLDERS();
+  let lines = content.split("\n");
+  for (let from = 0; ; ) {
+    const flags = protectedLines(lines);
+    const hit = findSection(lines, flags, (_, level) => level >= 3, from);
+    if (!hit) break;
+    const body = lines.slice(hit.at + 1, hit.end).join("\n").trim();
+    if (!placeholders.has(body.replace(/[.。]$/, ""))) {
+      from = hit.at + 1;
+      continue;
+    }
+    lines = [...lines.slice(0, hit.at), ...lines.slice(hit.end)];
+    if (hit.at > 0 && !((_a2 = lines[hit.at - 1]) == null ? void 0 : _a2.trim()) && !((_b2 = lines[hit.at]) == null ? void 0 : _b2.trim())) lines.splice(hit.at, 1);
+    from = Math.max(0, hit.at - 1);
+  }
+  return lines.join("\n");
 }
 
 // core/book-pipeline/plan-text.ts
@@ -48946,6 +49078,7 @@ var ETA_MIN_CARDS = 5;
 var code2 = (value) => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60) || "failed";
 var reasonOf = (error) => isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_reply" : "failed";
 var internalCode = (error) => `internal_${(typeof (error == null ? void 0 : error.name) === "string" ? error.name : "unknown").replace(/[^A-Za-z0-9_]/g, "_").slice(0, 40)}`;
+var NO_FAILURE_SECTION = /* @__PURE__ */ new Set(["discarded", "card_removed", "backup_failed", "missing"]);
 var STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" };
 var ACTION_OF = { plan: "card_plan", write: "card_write", proof: "card_proof" };
 var MAX_INSTRUCTION = 300;
@@ -48978,6 +49111,18 @@ function holdProofLines(content, known) {
     text: text10,
     restore: (cleaned) => cleaned.replace(new RegExp(`${token}(\\d+)X`, "g"), (_, i) => held[Number(i)])
   };
+}
+var ANCHOR = /(?:<|&lt;)a[ \t]+href=(?:"|&quot;)([^"<>\n]*?)(?:"|&quot;)[ \t]*(?:>|&gt;)([^<>\n]*?)(?:<|&lt;)\/a[ \t]*(?:>|&gt;)/gi;
+function convertSourceAnchors(content) {
+  const at = frontmatterLength(content);
+  return content.slice(0, at) + content.slice(at).replace(ANCHOR, (whole, rawHref, rawText, offset, all) => {
+    if (/&(?:lt|gt|quot);/i.test(rawText) || /&(?:lt|gt|quot);/i.test(rawHref.replace(/&amp;/g, ""))) return whole;
+    const href = safeHref(rawHref.replace(/&amp;/g, "&"));
+    const text10 = escapeMarkdownText(rawText.replace(/&amp;/g, "&"), 200);
+    if (!href || !text10) return whole;
+    const before = all[offset - 1];
+    return `${before === "!" || before === "\\" ? " " : ""}[${text10}](${href})`;
+  });
 }
 var NO_PICTURE = "\u7121\u5716\uFF1A";
 var PICTURE_REASONS = {
@@ -49505,6 +49650,7 @@ var BookPipelineRuns = class {
       busy: /* @__PURE__ */ new Set(),
       extra: /* @__PURE__ */ new Map(),
       plans: /* @__PURE__ */ new Map(),
+      authorModels: /* @__PURE__ */ new Map(),
       started: /* @__PURE__ */ new Map(),
       durations: { plan: [], write: [] },
       stopRequested: false,
@@ -49809,6 +49955,36 @@ var BookPipelineRuns = class {
       pipelineStage: "needs-review",
       pipelineIssue: `${step} failed: ${code2(reason)}`
     });
+    if (step !== "plan" && !NO_FAILURE_SECTION.has(reason)) await this.writeFailureSection(drive, nodeId, reason);
+  }
+  /** The proof-result section of a card as `finalize`/`transform` text: the result with the models, or the failure line (never a model). */
+  proofSectionOf(drive, outcome, models) {
+    const language2 = drive.config.language;
+    const label = this.ports.modelLabel ? (id) => {
+      var _a2, _b2, _c;
+      return (_c = (_b2 = (_a2 = this.ports).modelLabel) == null ? void 0 : _b2.call(_a2, id)) != null ? _c : id;
+    } : void 0;
+    return (content) => replaceProofSection(
+      content,
+      proofSectionHeading(language2),
+      composeProofSection(language2, outcome, models, label)
+    );
+  }
+  /** Best effort: the card's proof-result section says "failed: reason" (no model). Never throws; skipped when nothing is known to be safe to write. */
+  async writeFailureSection(drive, nodeId, reason) {
+    try {
+      if (this.dead(drive)) return;
+      const path = await this.stillOnMap(drive, nodeId);
+      if (!path) return;
+      const card = await this.ports.readCard(path);
+      const next = this.proofSectionOf(drive, { failure: code2(reason) }, {})(card.raw);
+      if (next === card.raw || !await this.ensureBackup(drive, nodeId, path, card.raw)) return;
+      await this.ports.updateNoteRawGuarded(path, () => next, {
+        expectedContent: card.raw,
+        authorize: () => !this.dead(drive)
+      });
+    } catch (e) {
+    }
   }
   async reset(drive, nodeId) {
     drive.stages.set(nodeId, void 0);
@@ -49952,7 +50128,9 @@ var BookPipelineRuns = class {
     const knownLines = new Set(card.raw.split("\n"));
     let unsafe = false;
     const finalize = (original) => {
-      const { text: content, restore } = holdProofLines(original, knownLines);
+      const held = holdProofLines(original, knownLines);
+      const restore = held.restore;
+      const content = dropPlaceholderSections(convertSourceAnchors(held.text));
       const urls2 = bodyImageUrls(content);
       const unsafeUrls = new Map(
         urls2.filter((url) => !isHttps(url)).map((url) => [url, noPicture(drive.config.language, "unsafe")])
@@ -49985,11 +50163,13 @@ var BookPipelineRuns = class {
     if (done.outcome === "cancelled") return { kind: "cancelled" };
     if (done.outcome === "failed") return { kind: "failed", reason: done.reason };
     if (done.outcome === "discarded") return { kind: "failed", reason: "discarded" };
+    drive.authorModels.set(nodeId, drive.config.authorModel);
     const path = await this.stillOnMap(drive, nodeId);
     if (!path) return { kind: "failed", reason: "card_removed" };
     let written2 = await this.ports.readCard(path);
     let carried = written2.detail;
-    for (const record of extractProofRecords(card.detail)) carried = appendResearchNote(carried, record).text;
+    for (const record of extractProofRecords(card.detail).slice(-1)) carried = appendResearchNote(carried, record).text;
+    carried = carryImageSection(card.detail, carried);
     if (carried !== written2.detail) {
       const outcome = await this.ports.updateNoteGuarded(
         path,
@@ -50108,6 +50288,7 @@ var BookPipelineRuns = class {
     return unsafeBody(cleaned, allowed);
   }
   async execProof(drive, token, nodeId) {
+    var _a2;
     const signal = drive.controller.signal;
     const info = drive.cards.get(nodeId);
     if (!info) return { kind: "failed", reason: "missing" };
@@ -50137,8 +50318,7 @@ var BookPipelineRuns = class {
             token,
             nodeId,
             card,
-            composeProofRecord(failedProofKey(key4), error.partial, error.code),
-            key4
+            composeProofRecord(failedProofKey(key4), error.partial, error.code)
           );
         throw error;
       });
@@ -50148,13 +50328,31 @@ var BookPipelineRuns = class {
       if (!path) return { kind: "failed", reason: "card_removed" };
       if (!await this.ensureBackup(drive, nodeId, path, card.raw))
         return { kind: "failed", reason: "backup_failed", forceReview: true };
-      const added = appendResearchNote(card.detail, composeProofRecord(key4, result));
-      if (added.appended) {
-        const written2 = await this.ports.updateNoteGuarded(
-          path,
-          { detail: markOldProofRecords(added.text, key4) },
-          { expectedContent: card.raw, authorize: this.authorize(drive, token) }
-        );
+      const models = { model: drive.config.proofModel, authorModel: drive.authorModels.get(nodeId) };
+      const written2 = await this.ports.updateNoteGuarded(
+        path,
+        { detail: replaceResearchRecord(card.detail, composeProofRecord(key4, result, void 0, models)) },
+        {
+          expectedContent: card.raw,
+          authorize: this.authorize(drive, token),
+          finalize: this.proofSectionOf(drive, { result }, models)
+        }
+      );
+      if (written2 === "discarded") return { kind: "failed", reason: "discarded" };
+    } else {
+      const stored = findStoredProofModels(card.detail, key4);
+      const models = {
+        ...(stored == null ? void 0 : stored.model) ? { model: stored.model } : {},
+        authorModel: (_a2 = drive.authorModels.get(nodeId)) != null ? _a2 : stored == null ? void 0 : stored.authorModel
+      };
+      const next = this.proofSectionOf(drive, { result }, models)(card.raw);
+      if (next !== card.raw) {
+        if (!await this.ensureBackup(drive, nodeId, info.path, card.raw))
+          return { kind: "failed", reason: "backup_failed", forceReview: true };
+        const written2 = await this.ports.updateNoteRawGuarded(info.path, () => next, {
+          expectedContent: card.raw,
+          authorize: this.authorize(drive, token)
+        });
         if (written2 === "discarded") return { kind: "failed", reason: "discarded" };
       }
     }
@@ -50170,18 +50368,16 @@ var BookPipelineRuns = class {
       )
     };
   }
-  /** Best effort: appends the failed proof's partial record once (its own key), under the same guards as every card write. Never throws. */
-  async keepPartialProof(drive, token, nodeId, card, record, key4) {
+  /** Best effort: replaces the proof records in the research notes with the failed proof's partial record (its own key), under the same guards as every card write. Never throws. */
+  async keepPartialProof(drive, token, nodeId, card, record) {
     try {
       const path = await this.stillOnMap(drive, nodeId);
       if (!path || !await this.ensureBackup(drive, nodeId, path, card.raw)) return;
-      const added = appendResearchNote(card.detail, record);
-      if (added.appended)
-        await this.ports.updateNoteGuarded(
-          path,
-          { detail: markOldProofRecords(added.text, key4) },
-          { expectedContent: card.raw, authorize: this.authorize(drive, token) }
-        );
+      await this.ports.updateNoteGuarded(
+        path,
+        { detail: replaceResearchRecord(card.detail, record) },
+        { expectedContent: card.raw, authorize: this.authorize(drive, token) }
+      );
     } catch (e) {
     }
   }
@@ -80382,7 +80578,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     var _a2, _b2, _c, _d;
     const note = await this.plugin.repo.readNote(child.path, (_a2 = this.map) != null ? _a2 : void 0);
     const outputLanguage2 = (_b2 = choices.outputLanguage) != null ? _b2 : cardOutputLanguage(languageSource != null ? languageSource : this.map, this.plugin.settings.language, note.title);
-    const runStyle = await this.detailTemplateFor(child, choices.noteStyle, gate, outputLanguage2);
+    const runStyle = await this.detailTemplateFor(child, choices.noteStyle, gate, outputLanguage2, book == null ? void 0 : book.template);
     let started = false;
     let failure;
     const handle = await this.runAgent(
@@ -80815,7 +81011,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
               discarded = true;
             }
           },
-          request: { admission: input2.admission, noContentLog: true }
+          request: { admission: input2.admission, noContentLog: true },
+          template: "book-chapter"
         }
       );
     } catch (e) {
@@ -86892,11 +87089,11 @@ ${addition}` : addition },
    * Nothing is written to the topic: a dialog choice holds for this run only, and a topic template that no longer exists
    * is only reported.
    */
-  async detailTemplateFor(node, chosenStyle, gate, outputLanguage2 = this.plugin.settings.language) {
+  async detailTemplateFor(node, chosenStyle, gate, outputLanguage2 = this.plugin.settings.language, forceTemplate) {
     var _a2, _b2;
     const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
     await this.noteStyles.refresh();
-    const resolved = this.topicStyle(note, chosenStyle, outputLanguage2);
+    const resolved = this.topicStyle(note, chosenStyle, outputLanguage2, forceTemplate);
     const { missing } = resolved.issues;
     this.noticeBlockIssues(resolved.issues, gate);
     this.noticeKindMissing(resolved.issues, (_b2 = note.topicKind) != null ? _b2 : "topic", note.detailTemplateId, gate);
@@ -86916,11 +87113,12 @@ ${addition}` : addition },
    * not parse stops the run with a message naming file and line; a template block that does not parse only shows a Notice
    * at the entry of a run and the built-in template stands in.
    */
-  topicStyle(note, chosenStyle, outputLanguage2 = this.plugin.settings.language) {
+  topicStyle(note, chosenStyle, outputLanguage2 = this.plugin.settings.language, forceTemplate) {
     var _a2;
     return this.noteStyles.runStyle({
       choice: { style: chosenStyle },
-      topic: { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
+      // A book chapter is always written on the book-chapter template (the card's own style and template are not used or changed).
+      topic: forceTemplate ? { template: forceTemplate, tone: note.toneId } : { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
       kind: (_a2 = note.topicKind) != null ? _a2 : "topic",
       outputLanguage: outputLanguage2,
       detail: note.detail
@@ -99936,6 +100134,7 @@ var VisualAgentMapPlugin = class extends import_obsidian49.Plugin {
         reasoning: this.currentModelChoice().reasoning,
         language: selectionOutputLanguage(this.settings.language, "")
       }),
+      modelLabel: (model) => this.modelLabel(model),
       now: () => (/* @__PURE__ */ new Date()).toISOString(),
       newId: () => crypto.randomUUID(),
       log: (line2) => this.logs.appendLog("info", line2)

@@ -198,7 +198,7 @@ test('images: the budget is gated; a refusal in the search pauses the run and le
   assert.ok(!(await r.note(0)).pipelineIssue);
 });
 
-test('images: the proofread sees the chapter text without the picture section; a rewrite replaces the section and searches again', async () => {
+test('images: the proofread sees the chapter text without the picture section; a rewrite carries the old section over verbatim (T1 R1-1; no new search)', async () => {
   const r = await picRig({ finder: (req, run, n) => [cand(n * 10)] });
   await run(r);
   assert.match((await r.note(0)).detail, /### 圖像/);
@@ -209,8 +209,9 @@ test('images: the proofread sees the chapter text without the picture section; a
   await settle();
   const detail = (await r.note(0)).detail;
   assert.equal((detail.match(/### 圖像/g) ?? []).length, 1);
-  assert.match(detail, /Work 20/); assert.ok(!/Work 10/.test(detail));
-  assert.equal(r.calls.length, 2);
+  // T1 (R1-1): the old `### 圖像` section is carried over verbatim, so the rerun keeps the pictures and the search is skipped (T2 reworks this).
+  assert.match(detail, /Work 10/); assert.ok(!/Work 20/.test(detail));
+  assert.equal(r.calls.length, 1);
 });
 
 test('sections: chapterBody drops the picture section; setImageSection puts it before Sources, replaces an old one and removes on null', () => {

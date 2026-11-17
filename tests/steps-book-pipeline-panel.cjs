@@ -126,11 +126,22 @@ test('gate 1 panel: title, count, plan area, and one block per card with role, c
   assert.ok(texts(plan).includes('準備引用的資料 1 件'));
   assert.ok(!texts(panel).some(x => x.includes('素材登記表')));
   assert.equal(dom.findAll(panel, i => i.tag === 'h3')[0].text, '關卡 1：這本書要這樣寫，可以嗎？');
-  // per card: one sentence, role, image line; entry / hand-off / "say more" are behind "看細節 ▸"
+  // per card: one sentence, role, image line; entry / hand-off / "say more" are behind "看細節"
   const toggle = one(second, 'vam-book-panel-details-toggle');
   const details = one(second, 'vam-book-panel-details');
   assert.equal(toggle.tag, 'button');
-  assert.equal(toggle.text, '看細節 ▸');
+  assert.equal(toggle.text, '看細節');
+  assert.ok(toggle.attrs['aria-label'].includes('看細節'));
+  for (const lang of ['zh-TW', 'zh-CN', 'en']) {
+    const line = fs.readFileSync(path.join(root, `i18n/${lang}.ts`), 'utf8').split('\n').find(l => l.includes('"ui.book_gate1_details_0"'));
+    const word = lang === 'en' ? 'Details' : lang === 'zh-CN' ? '看细节' : '看細節';
+    assert.ok(line.includes(`"${word}`), lang);
+  }
+  // symbol follows aria-expanded: folded ▸, open ▾ (CSS), and the one-sentence rule beats the small grey field rule
+  assert.match(css, /\.vam-book-panel-details-toggle::after \{ content: " ▸"/);
+  assert.match(css, /\.vam-book-panel-details-toggle\[aria-expanded="true"\]::after \{ content: " ▾"/);
+  assert.match(css, /\.vam-book-panel-field\.vam-book-panel-covers \{[^}]*var\(--font-ui-small\)[^}]*var\(--text-normal\)/);
+  assert.equal((css.match(/^\.vam-book-panel-plan \{/gm) || []).length, 1);
   assert.equal(toggle.attrs['aria-expanded'], 'false');
   assert.equal(toggle.attrs['aria-controls'], details.attrs.id);
   assert.equal(details.hidden, true);
@@ -258,16 +269,19 @@ test('prompt that cannot be parsed: the first three lines show as they are; an e
 
 test('T4 old data: no book plan, no image arrangement, a failed single card; thread and cards still draw, details stay folded, no throw', () => {
   setUiLanguage('zh-TW');
-  const noteOf = id => ({ a: { prompt: '本章會講：舊的一句話\n接入點：舊接入', pipelineStage: 'planned' }, b: { prompt: '', pipelineStage: 'needs-review', pipelineIssue: 'plan failed: invalid_reply' } })[id];
-  const data = bundle.buildGatePanel({ order: ['a', 'b'], titleOf: id => `T${id}`, noteOf, rootRaw: '# Root\n' });
+  const noteOf = id => ({ a: { prompt: '本章會講：舊的一句話\n接入點：舊接入', pipelineStage: 'planned' }, b: { prompt: '', pipelineStage: 'needs-review', pipelineIssue: 'plan failed: invalid_reply' }, c: { prompt: '接入點：只有接入', pipelineStage: 'planned' } })[id];
+  const data = bundle.buildGatePanel({ order: ['a', 'b', 'c'], titleOf: id => `T${id}`, noteOf, rootRaw: '# Root\n' });
   const state = new bundle.GatePanelState();
   const p = bundle.renderGatePanel(dom.element('div'), data, true, state, { editPlan() {}, replan: async () => ({}), rerunPlan: async () => {}, confirm: async () => {}, showChat() {}, close() {}, refresh() {} });
   assert.ok(texts(p).includes('全書企劃還沒有內容。'));
   assert.equal(all(p, 'vam-book-panel-thread').length, 0);
-  assert.equal(all(p, 'vam-book-panel-images').length, 2);
+  assert.equal(all(p, 'vam-book-panel-images').length, 3);
   assert.ok(texts(p).includes('未安排圖'));
-  const [a, b] = all(p, 'vam-book-panel-card');
+  const [a, b, c] = all(p, 'vam-book-panel-card');
   assert.ok(texts(a).includes('舊的一句話'));
+  // only an entry point: it shows once, inside the folded details, not also as a raw line outside
+  assert.equal(texts(c).filter(x => x.includes('只有接入')).length, 1);
+  assert.ok(texts(one(c, 'vam-book-panel-details')).includes('接入點：只有接入'));
   assert.equal(one(b, 'vam-book-panel-rerun').text, '重跑企劃');
   assert.match(texts(one(b, 'vam-book-panel-issue')).join(' '), /需人看/);
   assert.ok(all(b, 'vam-book-panel-details-toggle').length === 1);

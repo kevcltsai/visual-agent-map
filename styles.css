@@ -2260,12 +2260,13 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-panel-title { flex: 1 1 auto; margin: 0; font-size: var(--font-ui-medium); }
 .vam-book-panel-tag { padding: 0 8px; border-radius: 10px; background: var(--background-secondary); color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-book-panel-note, .vam-book-panel-muted { color: var(--text-muted); font-size: var(--font-ui-smaller); }
-.vam-book-panel-plan { border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); }
-.vam-book-panel-plan { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; }
+.vam-book-panel-plan { border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; }
 .vam-book-panel-thread-label { font-size: var(--font-ui-smaller); font-weight: 600; color: var(--text-muted); }
 .vam-book-panel-thread { font-size: var(--font-ui-medium); line-height: 1.5; color: var(--text-normal); overflow-wrap: anywhere; white-space: pre-wrap; }
-.vam-book-panel-covers { font-size: var(--font-ui-small); color: var(--text-normal); }
+.vam-book-panel-field.vam-book-panel-covers { font-size: var(--font-ui-small); color: var(--text-normal); }
 .vam-book-panel-details-toggle { align-self: flex-start; padding: 0 4px; border: 0; background: transparent; box-shadow: none; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-book-panel-details-toggle::after { content: " ▸"; }
+.vam-book-panel-details-toggle[aria-expanded="true"]::after { content: " ▾"; }
 .vam-book-panel-details-toggle:hover, .vam-book-panel-details-toggle[aria-expanded="true"] { color: var(--text-normal); }
 .vam-book-panel-details { display: flex; flex-direction: column; gap: 4px; }
 .vam-book-panel-details[hidden] { display: none; }

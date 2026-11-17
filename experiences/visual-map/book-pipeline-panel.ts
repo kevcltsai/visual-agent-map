@@ -75,7 +75,7 @@ export function buildGatePanel(input: {
     if (parsed.covers) fields.push({ key: "covers", label: t("ui.book_panel_covers"), value: parsed.covers });
     if (parsed.entry) fields.push({ key: "entry", label: t("ui.book_panel_entry"), value: parsed.entry });
     if (parsed.handoff) fields.push({ key: "handoff", label: t("ui.book_panel_handoff"), value: parsed.handoff });
-    const rawLines = parsed.covers
+    const rawLines = fields.length
       ? []
       : prompt
           .split(/\r?\n/)

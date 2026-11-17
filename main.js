@@ -3175,8 +3175,8 @@ var en = {
   "ui.book_panel_decisions_0": "Decided by the editor (the ones you left empty): {0}",
   "ui.book_panel_materials_0": "Material to cite: {0} item(s)",
   "ui.book_gate1_thread_label": "Book thread",
-  "ui.book_gate1_details": "Details \u25B8",
-  "ui.book_gate1_details_0": "Details of {0}",
+  "ui.book_gate1_details": "Details",
+  "ui.book_gate1_details_0": "Details: {0}",
   "ui.book_field_reader": "Reader",
   "ui.book_field_goal": "Goal",
   "ui.book_field_angle": "Angle",
@@ -6315,8 +6315,8 @@ var zhCN = {
   "ui.book_panel_decisions_0": "\u603B\u7F16\u8F91\u51B3\u5B9A\u7684\u680F\u4F4D\uFF08\u4F60\u7559\u7A7A\u7684\uFF09\uFF1A{0}",
   "ui.book_panel_materials_0": "\u51C6\u5907\u5F15\u7528\u7684\u8D44\u6599 {0} \u4EF6",
   "ui.book_gate1_thread_label": "\u5168\u4E66\u4E3B\u7EBF",
-  "ui.book_gate1_details": "\u770B\u7EC6\u8282 \u25B8",
-  "ui.book_gate1_details_0": "\u770B\u201C{0}\u201D\u7684\u7EC6\u8282",
+  "ui.book_gate1_details": "\u770B\u7EC6\u8282",
+  "ui.book_gate1_details_0": "\u770B\u7EC6\u8282\uFF1A{0}",
   "ui.book_field_reader": "\u8BFB\u8005",
   "ui.book_field_goal": "\u76EE\u6807",
   "ui.book_field_angle": "\u5207\u5165\u89D2\u5EA6",
@@ -9455,8 +9455,8 @@ var zhTW = {
   "ui.book_panel_decisions_0": "\u7E3D\u7DE8\u8F2F\u6C7A\u5B9A\u7684\u6B04\u4F4D\uFF08\u4F60\u7559\u7A7A\u7684\uFF09\uFF1A{0}",
   "ui.book_panel_materials_0": "\u6E96\u5099\u5F15\u7528\u7684\u8CC7\u6599 {0} \u4EF6",
   "ui.book_gate1_thread_label": "\u5168\u66F8\u4E3B\u7DDA",
-  "ui.book_gate1_details": "\u770B\u7D30\u7BC0 \u25B8",
-  "ui.book_gate1_details_0": "\u770B\u300C{0}\u300D\u7684\u7D30\u7BC0",
+  "ui.book_gate1_details": "\u770B\u7D30\u7BC0",
+  "ui.book_gate1_details_0": "\u770B\u7D30\u7BC0\uFF1A{0}",
   "ui.book_field_reader": "\u8B80\u8005",
   "ui.book_field_goal": "\u76EE\u6A19",
   "ui.book_field_angle": "\u5207\u5165\u89D2\u5EA6",
@@ -51422,7 +51422,7 @@ function buildGatePanel(input2) {
     if (parsed.covers) fields.push({ key: "covers", label: t("ui.book_panel_covers"), value: parsed.covers });
     if (parsed.entry) fields.push({ key: "entry", label: t("ui.book_panel_entry"), value: parsed.entry });
     if (parsed.handoff) fields.push({ key: "handoff", label: t("ui.book_panel_handoff"), value: parsed.handoff });
-    const rawLines = parsed.covers ? [] : prompt.split(/\r?\n/).filter((line2) => line2.trim()).slice(0, 3);
+    const rawLines = fields.length ? [] : prompt.split(/\r?\n/).filter((line2) => line2.trim()).slice(0, 3);
     const slots = parseImageSlots(prompt);
     const imagePlan = !slots ? t("ui.book_panel_images_unarranged") : slots.length ? t("ui.book_panel_images_0_1", slots.length, slots.map((slot) => `${slot.kind}\uFF0F${slot.explains}`).join("\uFF1B")) : t("ui.book_panel_images_none");
     return {

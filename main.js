@@ -3185,6 +3185,7 @@ var en = {
   "ui.book_panel_gate2_hint": "When you have checked the cards you wanted to, press Finish review.",
   "ui.book_panel_finish": "Finish review",
   "ui.book_panel_finishing": "Finishing review\u2026",
+  "ui.book_panel_finish_waiting": "Waiting for the card that is still running to finish; then you can finish the review.",
   "ui.book_panel_elapsed_0": "Took {0} min",
   "ui.book_panel_elapsed_under_minute": "Took under 1 min",
   "ui.book_panel_elapsed_hint": "Time from planning start to the last card written",
@@ -6296,6 +6297,7 @@ var zhCN = {
   "ui.book_panel_gate2_hint": "\u786E\u8BA4\u5B8C\u8981\u770B\u7684\u5361\u540E\uFF0C\u6309\u201C\u9A8C\u6536\u5B8C\u6210\u201D\u3002",
   "ui.book_panel_finish": "\u9A8C\u6536\u5B8C\u6210",
   "ui.book_panel_finishing": "\u9A8C\u6536\u4E2D\u2026",
+  "ui.book_panel_finish_waiting": "\u8FD8\u6709\u5361\u7247\u5728\u5904\u7406\u4E2D\uFF0C\u7B49\u5B83\u7ED3\u675F\u540E\u624D\u80FD\u70B9\u201C\u9A8C\u6536\u5B8C\u6210\u201D\u3002",
   "ui.book_panel_elapsed_0": "\u82B1\u4E86 {0} \u5206\u949F",
   "ui.book_panel_elapsed_under_minute": "\u82B1\u4E86\u4E0D\u5230 1 \u5206\u949F",
   "ui.book_panel_elapsed_hint": "\u4ECE\u5F00\u59CB\u4F01\u5212\u5230\u5199\u5B8C\u7684\u65F6\u95F4",
@@ -9407,6 +9409,7 @@ var zhTW = {
   "ui.book_panel_gate2_hint": "\u78BA\u8A8D\u5B8C\u8981\u770B\u7684\u5361\u5F8C\uFF0C\u6309\u300C\u9A57\u6536\u5B8C\u6210\u300D\u3002",
   "ui.book_panel_finish": "\u9A57\u6536\u5B8C\u6210",
   "ui.book_panel_finishing": "\u9A57\u6536\u4E2D\u22EF",
+  "ui.book_panel_finish_waiting": "\u9084\u6709\u5361\u7247\u5728\u8655\u7406\u4E2D\uFF0C\u7B49\u5B83\u7D50\u675F\u5F8C\u624D\u80FD\u6309\u300C\u9A57\u6536\u5B8C\u6210\u300D\u3002",
   "ui.book_panel_elapsed_0": "\u82B1\u4E86 {0} \u5206\u9418",
   "ui.book_panel_elapsed_under_minute": "\u82B1\u4E86\u4E0D\u5230 1 \u5206\u9418",
   "ui.book_panel_elapsed_hint": "\u5F9E\u958B\u59CB\u4F01\u5283\u5230\u5BEB\u5B8C\u7684\u6642\u9593",
@@ -50790,7 +50793,7 @@ function buildGate2Panel(input2) {
     cards
   };
 }
-function renderGate2Panel(parent, data, done, state, actions, externalBusy = /* @__PURE__ */ new Set()) {
+function renderGate2Panel(parent, data, done, state, actions, externalBusy = /* @__PURE__ */ new Set(), driveActive = false) {
   const panel = parent.createDiv("vam-book-panel vam-book-panel-gate2");
   panel.setAttr("role", "region");
   panel.setAttr("aria-label", t("ui.book_panel_label"));
@@ -50810,7 +50813,7 @@ function renderGate2Panel(parent, data, done, state, actions, externalBusy = /* 
     cls: "vam-book-panel-summary",
     text: t("ui.book_panel_gate2_summary_0_1_2_3", data.total, data.checked, data.needsReview, data.seams)
   });
-  const anyBusy = externalBusy.size > 0 || state.busy.size > 0 || state.seaming.size > 0 || state.finishing;
+  const anyBusy = externalBusy.size > 0 || state.busy.size > 0 || state.seaming.size > 0 || state.finishing || driveActive;
   const busyNow = (id) => externalBusy.has(id) || state.busy.has(id);
   const attention = data.cards.filter(
     (card) => card.stage === "needs-review" || busyNow(card.id) && card.stage !== "checked"
@@ -50853,8 +50856,10 @@ function renderGate2Panel(parent, data, done, state, actions, externalBusy = /* 
       );
     });
   }
-  const status = panel.createDiv({ cls: "vam-book-panel-status", text: state.finishError });
+  const waiting = !done && !state.finishing && anyBusy ? t("ui.book_panel_finish_waiting") : "";
+  const status = panel.createDiv({ cls: "vam-book-panel-status", text: state.finishError || waiting });
   status.setAttr("role", "status");
+  status.setAttr("aria-live", "polite");
   return panel;
 }
 function row(list2, kind, card, busy) {
@@ -80624,7 +80629,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         close: () => this.closeBookPanel(),
         refresh: () => this.paintBookPanel()
       },
-      new Set((_c = progress == null ? void 0 : progress.busyCards) != null ? _c : [])
+      new Set((_c = progress == null ? void 0 : progress.busyCards) != null ? _c : []),
+      !!(progress == null ? void 0 : progress.active)
     );
     const all = (selector) => Array.from(side.querySelectorAll(selector));
     if (state.pendingFocus === "title") (_d = side.querySelector(".vam-book-panel-title")) == null ? void 0 : _d.focus();

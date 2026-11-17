@@ -3189,6 +3189,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_panel_gate2_hint": "确认完要看的卡后，按“验收完成”。",
   "ui.book_panel_finish": "验收完成",
   "ui.book_panel_finishing": "验收中…",
+  "ui.book_panel_finish_waiting": "还有卡片在处理中，等它结束后才能点“验收完成”。",
   "ui.book_panel_elapsed_0": "花了 {0} 分钟",
   "ui.book_panel_elapsed_under_minute": "花了不到 1 分钟",
   "ui.book_panel_elapsed_hint": "从开始企划到写完的时间",

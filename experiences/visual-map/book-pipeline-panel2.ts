@@ -105,7 +105,9 @@ export function renderGate2Panel(
   state: GatePanelState,
   actions: Gate2Actions,
   /** Cards the runner is working on right now (from its progress). */
-  externalBusy: ReadonlySet<string> = new Set()
+  externalBusy: ReadonlySet<string> = new Set(),
+  /** The runner still has a drive on this map (a rerun winding down): finish would be refused as busy, so the button waits. */
+  driveActive = false
 ): HTMLElement {
   const panel = parent.createDiv("vam-book-panel vam-book-panel-gate2");
   panel.setAttr("role", "region");
@@ -130,7 +132,8 @@ export function renderGate2Panel(
     text: t("ui.book_panel_gate2_summary_0_1_2_3", data.total, data.checked, data.needsReview, data.seams)
   });
 
-  const anyBusy = externalBusy.size > 0 || state.busy.size > 0 || state.seaming.size > 0 || state.finishing;
+  const anyBusy =
+    externalBusy.size > 0 || state.busy.size > 0 || state.seaming.size > 0 || state.finishing || driveActive;
   const busyNow = (id: string): boolean => externalBusy.has(id) || state.busy.has(id);
   const attention = data.cards.filter(
     card => card.stage === "needs-review" || (busyNow(card.id) && card.stage !== "checked")
@@ -175,8 +178,11 @@ export function renderGate2Panel(
       );
     });
   }
-  const status = panel.createDiv({ cls: "vam-book-panel-status", text: state.finishError });
+  // A disabled finish button always says why (a silent disable looked like a dead button); a refusal stays here too.
+  const waiting = !done && !state.finishing && anyBusy ? t("ui.book_panel_finish_waiting") : "";
+  const status = panel.createDiv({ cls: "vam-book-panel-status", text: state.finishError || waiting });
   status.setAttr("role", "status");
+  status.setAttr("aria-live", "polite");
   return panel;
 }
 

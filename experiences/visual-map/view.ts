@@ -17237,7 +17237,8 @@ export class VisualAgentMapView extends ItemView {
         close: () => this.closeBookPanel(),
         refresh: () => this.paintBookPanel()
       },
-      new Set(progress?.busyCards ?? [])
+      new Set(progress?.busyCards ?? []),
+      !!progress?.active
     );
     const all = (selector: string): HTMLElement[] => Array.from(side.querySelectorAll<HTMLElement>(selector));
     if (state.pendingFocus === "title") side.querySelector<HTMLElement>(".vam-book-panel-title")?.focus();

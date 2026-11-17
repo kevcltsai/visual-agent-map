@@ -330,3 +330,40 @@ test('styles: the new gate 2 and seam classes exist, use theme variables only an
   assert.match(view_ts, /this\.addBookRerunMenuItem\(menu, node\);/);
   assert.match(view_ts, /if \(this\.bookPanelPath\) this\.maybeAutoOpenBookPanel\(\);/);
 });
+
+test('finish after a rerun that stays needs-review: the finish button is enabled and the run reaches done', async () => {
+  const r = await rig();
+  r.script.proof = unmetProof;
+  await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
+  await r.runs.rerunCard(r.mapPath, r.nodes[2].id);
+  assert.equal(r.runs.isRunning(r.mapPath), false, 'no drive left behind');
+  const saved = await r.stateOf();
+  assert.equal(saved.phase, 'gate2');
+  const d = await r.draw();
+  const finish = one(d.panel, 'vam-book-panel-finish');
+  assert.equal(finish.disabled, false, JSON.stringify({ status: saved.status, phase: saved.phase }));
+  finish.click();
+  await settle();
+  assert.equal((await r.stateOf()).phase, 'done', one(d.panel, 'vam-book-panel-status').children.map(c => c.text).join());
+});
+
+test('finish: a disabled button says why in the aria-live status line; a refusal text shows there too', async () => {
+  const r = await rig();
+  const parent = dom.element('div');
+  const noop = () => undefined;
+  const actions = { open: noop, rerun: async () => {}, confirmSeam: async () => {}, finish: async () => { throw new bundle.BookPipelineRunError('busy', 'x'); }, showChat: noop, close: noop, refresh: () => { panel.remove(); panel = build(); } };
+  const state = new bundle.GatePanelState();
+  const view = () => bundle.buildGate2Panel({ order: [], titleOf: id => id, noteOf: () => undefined, startedAt: undefined, writingEndedAt: undefined });
+  let active = true;
+  const build = () => bundle.renderGate2Panel(parent, view(), false, state, actions, new Set(), active);
+  let panel = build();
+  assert.equal(one(panel, 'vam-book-panel-finish').disabled, true, 'a live drive with no busy card still waits');
+  const status = one(panel, 'vam-book-panel-status');
+  assert.equal(status.attrs['aria-live'], 'polite');
+  assert.ok(texts(status).join('').length > 0, 'the wait is explained');
+  active = false; panel.remove(); panel = build();
+  assert.equal(one(panel, 'vam-book-panel-finish').disabled, false);
+  assert.equal(texts(one(panel, 'vam-book-panel-status')).join(''), '');
+  one(panel, 'vam-book-panel-finish').click(); await settle();
+  assert.ok(texts(one(panel, 'vam-book-panel-status')).join('').length > 0, 'a refusal is visible');
+});

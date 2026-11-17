@@ -3190,6 +3190,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_panel_gate2_hint": "確認完要看的卡後，按「驗收完成」。",
   "ui.book_panel_finish": "驗收完成",
   "ui.book_panel_finishing": "驗收中⋯",
+  "ui.book_panel_finish_waiting": "還有卡片在處理中，等它結束後才能按「驗收完成」。",
   "ui.book_panel_elapsed_0": "花了 {0} 分鐘",
   "ui.book_panel_elapsed_under_minute": "花了不到 1 分鐘",
   "ui.book_panel_elapsed_hint": "從開始企劃到寫完的時間",

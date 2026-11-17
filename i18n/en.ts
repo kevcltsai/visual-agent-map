@@ -3407,6 +3407,8 @@ export const en = {
   "ui.book_panel_gate2_hint": "When you have checked the cards you wanted to, press Finish review.",
   "ui.book_panel_finish": "Finish review",
   "ui.book_panel_finishing": "Finishing review…",
+  "ui.book_panel_finish_waiting":
+    "Waiting for the card that is still running to finish; then you can finish the review.",
   "ui.book_panel_elapsed_0": "Took {0} min",
   "ui.book_panel_elapsed_under_minute": "Took under 1 min",
   "ui.book_panel_elapsed_hint": "Time from planning start to the last card written",

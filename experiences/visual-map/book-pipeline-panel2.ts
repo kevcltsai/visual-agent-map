@@ -29,7 +29,6 @@ export interface Gate2Card {
   /** The reason of a needs-review card, in words. */
   reasonText?: string;
   /** A checked card's small note ("n structure items not met"). */
-  noteText?: string;
   seam: boolean;
   /** "A ↔ B" when the seam's other card is known, else the card's own title. */
   seamTitle: string;
@@ -115,7 +114,6 @@ export function buildGate2Panel(input: {
       title,
       stage: view.stage,
       ...(view.stage === "needs-review" && issue ? { reasonText: reasonOf(issue, proof) } : {}),
-      ...(view.stage === "checked" && view.issueText ? { noteText: view.issueText } : {}),
       seam: view.seam,
       seamTitle: partner
         ? other! - 1 > at
@@ -524,7 +522,6 @@ function renderChecked(
     () => startRerun(card, state, actions)
   );
   const proof = card.proof;
-  if (card.noteText) item.createDiv({ cls: "vam-book-panel-field", text: card.noteText });
   const body = item.createDiv("vam-book-panel-proof");
   body.hidden = !open;
   if (proof) body.createDiv({ cls: "vam-book-panel-field", text: proofSummary(proof) });

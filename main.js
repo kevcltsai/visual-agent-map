@@ -52278,7 +52278,6 @@ function buildGate2Panel(input2) {
       title,
       stage: view.stage,
       ...view.stage === "needs-review" && issue2 ? { reasonText: reasonOf2(issue2, proof) } : {},
-      ...view.stage === "checked" && view.issueText ? { noteText: view.issueText } : {},
       seam: view.seam,
       seamTitle: partner ? other - 1 > at ? `${title} \u2194 ${input2.titleOf(partner)}` : `${input2.titleOf(partner)} \u2194 ${title}` : title,
       ...proof ? { proof } : {},
@@ -52589,7 +52588,6 @@ function renderChecked(list2, card, state, actions, busy, anyBusy, rerun) {
     () => startRerun(card, state, actions)
   );
   const proof = card.proof;
-  if (card.noteText) item.createDiv({ cls: "vam-book-panel-field", text: card.noteText });
   const body = item.createDiv("vam-book-panel-proof");
   body.hidden = !open2;
   if (proof) body.createDiv({ cls: "vam-book-panel-field", text: proofSummary(proof) });

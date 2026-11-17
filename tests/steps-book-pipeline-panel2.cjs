@@ -566,3 +566,15 @@ test('T5 gate 2: a passed card reads "通過" or "通過，n 處可留意" (not 
   assert.match(tag('a'), /通過/);
   assert.ok(!texts(panel).some(x => /地圖/.test(x)));
 });
+
+test('F-a gate 2: a passed card with unmet structure keeps the structure line out of the card body (only in the proof record); a needs-review card still shows its reason', () => {
+  const proof = PROOF([{ id: 'S1', type: 'structure', status: 'unmet', note: 'x', sources: [] }, { id: 'C1', type: 'fact', status: 'met', note: '', sources: [] }]);
+  const r = synth({ p: { pipelineStage: 'checked', pipelineIssue: 'structure unmet: S1', prompt: '圖安排：無\n', detail: proof } });
+  const panel = bundle.renderGate2Panel(dom.element('div'), r.data(), false, new bundle.GatePanelState(), baseActions());
+  const row = all(panel, 'vam-book-panel-row').find(x => x.dataset.row === 'p');
+  const outside = (row.children ?? []).filter(c => !(c.cls ?? '').split(/\s+/).includes('vam-book-panel-proof'));
+  assert.ok(!outside.some(c => texts(c).some(x => /結構/.test(x))), 'no structure line outside the proof record');
+  const proofBody = all(row, 'vam-book-panel-proof')[0];
+  assert.ok(texts(proofBody).some(x => /結構/.test(x)), 'proof record has it');
+  assert.ok(!texts(panel).some(x => /地圖/.test(x)));
+});

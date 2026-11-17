@@ -392,14 +392,14 @@ test('T5 rerunCard result: unchanged only when it needed a person before and aft
   assert.equal(r.runs.getProgress(r.mapPath)?.rerun, undefined);
 });
 
-test('T5 rerunCard result: the same result before and after but the author step stopped half way says changed (unchanged=false) and clears progress.rerun', async () => {
+test('T5 rerunCard result: the same result before and after because the run was stopped at the plan step (nothing written) says changed (unchanged=false) and clears progress.rerun', async () => {
   const r = await rig();
   await toGate2(r);
   const id = r.nodes[2].id;
   r.script.proof = itemsProof('unmet', ['https://a.test/1']);
   await r.runs.rerunCard(r.mapPath, id);
   const hold = defer();
-  r.script.author = async () => { await hold.promise; return { outcome: 'cancelled' }; };
+  const inner = r.script.card; r.script.card = async (...a) => { await hold.promise; return inner(...a); };
   let result;
   const rerun = r.runs.rerunCard(r.mapPath, id).then(value => { result = value; });
   await settle();

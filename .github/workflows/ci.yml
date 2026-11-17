@@ -1,10 +1,12 @@
 name: CI
 
-# The run name tells find-green-ci-run.sh which runs are full. A full run is a push to main or a manual run with full=true;
-# every other push (feature branches) runs only the tests a change can reach (scripts/test-affected.mjs).
+# The run name tells find-green-ci-run.sh which runs are full. Every push (main and feature branches) and a manual run with
+# full=true is full: an affected run selected nearly the whole suite (most tests bundle main.ts) at the same cost, and land.py merge
+# needs a full run anyway, so a branch push now yields the run the merge waits for. A manual run with full=false runs only the tests
+# a change can reach (scripts/test-affected.mjs).
 # There is no pull_request trigger: a PR shows its branch's push run for the same commit, so one commit runs once.
 # The PR merge ref is not tested on its own; the full run on main after the merge covers it.
-run-name: "CI ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }}: ${{ github.event.head_commit.message || github.ref_name }}"
+run-name: "CI ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }}: ${{ github.event.head_commit.message || github.ref_name }}"
 
 on:
   push:
@@ -28,11 +30,11 @@ concurrency:
 
 jobs:
   verify:
-    name: verify (${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }})
+    name: verify (${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }})
     timeout-minutes: 30
     runs-on: ubuntu-24.04
     env:
-      MODE: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }}
+      MODE: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -65,6 +67,15 @@ jobs:
         with:
           path: test-deps.json
           key: test-deps-${{ github.sha }}
+      # Also re-publish it as this run's artifact: the latest green full run on main is usually a reuse run, and
+      # test-harness.mjs fetchDepsTable downloads the table from that run (no artifact there meant a local full suite).
+      - if: steps.reuse.outputs.run != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-deps
+          path: test-deps.json
+          retention-days: 30
       - uses: actions/setup-node@v5
         if: steps.reuse.outputs.run == ''
         with:

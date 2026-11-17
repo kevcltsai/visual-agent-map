@@ -13,7 +13,7 @@
     "test:vault:normal": "node scripts/test-harness.mjs --prepare --profile=normal",
     "test:vault:reinstall": "node scripts/test-harness.mjs --prepare --profile=reinstall",
     "verify:vault:reinstall": "node scripts/verify-reinstall-test-vault.mjs",
-    "lint": "eslint . --max-warnings=0 && node scripts/check-css.mjs && node scripts/check-test-timing.mjs && node scripts/check-test-wiring.mjs",
+    "lint": "eslint . --max-warnings=0 --cache --cache-strategy content --cache-location node_modules/.cache/eslint/ && node scripts/check-css.mjs && node scripts/check-test-timing.mjs && node scripts/check-test-wiring.mjs",
     "test": "node scripts/test-harness.mjs",
     "test:unit": "node scripts/test-unit.mjs",
     "test:affected": "node scripts/test-affected.mjs --run",
@@ -23,7 +23,7 @@
     "test:ui:prepare": "node scripts/test-harness.mjs --prepare",
     "test:ui:update": "node scripts/test-harness.mjs --update-current",
     "format": "prettier --write \"**/*.ts\"",
-    "format:check": "prettier --check \"**/*.ts\"",
+    "format:check": "prettier --check --cache --cache-strategy content \"**/*.ts\"",
     "verify": "npm run lint && npm run format:check && npm run check:i18n && npm test && git diff --exit-code -- main.js experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts",
     "verify:push": "npm run lint && node scripts/check-workflows.mjs && npm run format:check && npm run check:i18n && npm run build && git diff --exit-code -- main.js experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts",
     "verify:fast": "npm run lint && npm run format:check && npm run check:i18n && npm run test:unit && git diff --exit-code -- main.js experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts"

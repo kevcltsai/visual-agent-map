@@ -1,7 +1,7 @@
 #!/bin/sh
 # Print the id of a successful FULL ci.yml run for the given commit sha and exit 0; otherwise exit 1.
-# Only a full run counts: ci.yml names its runs "CI full ..." (push to main, or workflow_dispatch with full=true) or "CI affected ..."
-# (branch pushes that run only the tests a change can reach). An affected run never authorises skipping verify.
+# Only a full run counts: ci.yml names its runs "CI full ..." (every push, or workflow_dispatch with full=true) or "CI affected ..."
+# (workflow_dispatch with full=false: only the tests a change can reach). An affected run never authorises skipping verify.
 # No `--status` filter: that filter lagged over an hour behind finished workflow_dispatch runs, so conclusion is read from each run instead.
 # Fail-closed: a missing/unauthenticated `gh`, a query error, or no matching run all exit 1 (caller runs the full verify).
 # `GH_BIN` overrides the gh executable (used by tests with a fake gh).

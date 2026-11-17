@@ -19,6 +19,7 @@ import {
 } from "./experiences/visual-map/book-pipeline-run";
 import { runPlanStep } from "./core/steps/book-pipeline/run";
 import { runProofread } from "./core/steps/book-pipeline/proofread";
+import { runFindImages } from "./core/steps/book-pipeline/find-images";
 import {
   t,
   setUiLanguage,
@@ -484,6 +485,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     updateNoteRawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
     runPlan: (step, request, run) => runPlanStep(this.aiCalls, step, request, run),
     runProofread: (request, run) => runProofread(this.aiCalls, request, run),
+    findImages: (request, run) => runFindImages(this.aiCalls, request, run),
     author: async input => {
       const view = this.views().find(item => item.mapPath === input.mapPath);
       if (view) return view.runBookAuthor(input);

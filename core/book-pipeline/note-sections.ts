@@ -276,8 +276,43 @@ export function replaceBookPlanSection(content: string, markdown: string): strin
 
 const isUpdateLogHeading = (text: string): boolean =>
   [SECTION_NAME.log.zh, SECTION_NAME.log.en].some(name => name.toLowerCase() === text.trim().toLowerCase());
+/** The "### 圖像" section the system writes after the picture search (its captions are not chapter facts). */
+export const IMAGES_HEADING = { zh: "圖像", en: "Images" };
+const isImagesHeading = (text: string): boolean =>
+  [IMAGES_HEADING.zh, IMAGES_HEADING.en, "图像"].some(name => name.toLowerCase() === text.trim().toLowerCase());
 const isSystemSection = (text: string): boolean =>
-  isResearchNotesHeading(text) || isUpdateLogHeading(text) || isNewSourcesHeading(text) || isOpenQuestionsHeading(text);
+  isResearchNotesHeading(text) ||
+  isUpdateLogHeading(text) ||
+  isNewSourcesHeading(text) ||
+  isOpenQuestionsHeading(text) ||
+  isImagesHeading(text);
+
+/**
+ * A Detail with its picture section replaced by `section` (the lines after a `### 圖像` / `### Images` heading; null: removed).
+ * The section sits between the chapter text and its first Sources section (else the first Open questions, Research notes or
+ * Update log section, else the end). Every other line stays as it is.
+ */
+export function setImageSection(detail: string, section: string | null, language: string): string {
+  let lines = detail.split("\n");
+  for (;;) {
+    const old = findSection(lines, fencedLines(lines), text => isImagesHeading(text));
+    if (!old) break;
+    lines = [...lines.slice(0, old.at), ...lines.slice(old.end)];
+  }
+  if (section === null) return lines.join("\n");
+  const fenced = fencedLines(lines);
+  const sources = findSection(lines, fenced, text => isNewSourcesHeading(text));
+  const other = findSection(
+    lines,
+    fenced,
+    text => isOpenQuestionsHeading(text) || isResearchNotesHeading(text) || isUpdateLogHeading(text)
+  );
+  const at = Math.min(sources?.at ?? lines.length, other?.at ?? lines.length);
+  const head = lines.slice(0, at).join("\n").replace(/\s+$/, "");
+  const tail = lines.slice(at).join("\n");
+  const heading = /^zh/i.test(language) ? IMAGES_HEADING.zh : IMAGES_HEADING.en;
+  return `${head ? `${head}\n\n` : ""}### ${heading}\n\n${section.trim()}\n${tail ? `\n${tail}` : ""}`;
+}
 
 /**
  * The chapter text alone: the Detail without the sections the system adds or keeps (Research notes, Update log, Sources, Open questions).

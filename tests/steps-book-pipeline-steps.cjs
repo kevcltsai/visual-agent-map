@@ -433,10 +433,17 @@ test('card plan: subjective or evaluative items (Traditional and Simplified) are
   assert.throws(() => run(['開頭說明為何值得注意', '內容生動']), /no usable item/, 'nothing left is a failure (retried)');
 });
 
-test('author rules: pictures come from Wikimedia Commons or museum collections over https, none found is said so, no invented address', () => {
+test('author rules: the author puts no pictures in the text (the system searches and embeds them); the search step asks for Wikimedia Commons or museum collections over https and never an invented address', () => {
   const { bookAuthorRequirements } = loadWithAiCalls('core/book-pipeline/settings.ts');
   const text = bookAuthorRequirements({});
-  assert.match(text, /Wikimedia Commons/); assert.match(text, /https/); assert.match(text, /no picture/); assert.match(text, /Never invent an address/);
+  assert.match(text, /Do not put images or image links in the chapter text/);
+  assert.ok(!/Wikimedia/.test(text));
+  const { findImagesStep } = loadWithAiCalls('core/steps/book-pipeline/find-images.ts');
+  const prompt = findImagesStep.render({ query: 'Title / 《Work》', language: 'en', model: 'm', reasoning: 'low' });
+  assert.match(prompt, /Wikimedia Commons/); assert.match(prompt, /Met Open Access/); assert.match(prompt, /direct https link/); assert.match(prompt, /Never invent or guess URLs/);
+  assert.match(prompt, /"Title \/ 《Work》"/);
+  const parsed = findImagesStep.parse('x {"images":[{"title":"A","imageUrl":"https://upload.wikimedia.org/a.jpg","sourceUrl":"https://commons.wikimedia.org/x"},{"title":"B","imageUrl":"http://e.com/b.jpg","sourceUrl":"https://e.com"}]} y');
+  assert.equal(parsed.length, 1); assert.equal(parsed[0].title, 'A');
 });
 
 test('proofread counts: openedPages and searches ride with the result and with a failure, and the record names each source as an opened page', async () => {

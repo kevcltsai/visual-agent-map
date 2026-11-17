@@ -27,7 +27,7 @@ export const BOOK_AUTHOR_RULES = [
   "- Open by picking up the brief's entry point (how this chapter continues from the previous card).",
   "- End with one sentence that leads into the next card, taking up the question the brief leaves for it. If the brief has no next card (the last card), do not lead into a next card; close the whole book as the brief says.",
   "- The closing sentence belongs to the last paragraph of the chapter's own text, before any open-questions, sources or notes sections the template adds; those sections are not the chapter's ending.",
-  "- If the chapter suits pictures, prefer a direct https image address from Wikimedia Commons or a museum's public collection (Markdown image syntax, with the source and the work's name). If you cannot find an image that loads, write a line saying no picture and why. Never invent an address.",
+  "- Do not put images or image links in the chapter text; the system searches for pictures after the writing and embeds the verified ones itself.",
   '- Do not end the chapter with an update log, a change note or a "this version" remark; those are added by the system.'
 ].join("\n");
 

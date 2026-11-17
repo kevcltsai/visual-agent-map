@@ -10,6 +10,8 @@
  * the map file. Only ids, counts and codes are logged.
  */
 import type { AdmissionContext } from "../../core/admission";
+import type { ImageCandidate } from "../../core/image-candidates";
+import type { FindImagesRequest } from "../../core/steps/book-pipeline/find-images";
 import { isBudgetExhausted } from "../../core/admission";
 import { createBudgetAdmission, createStoreBudgetPort } from "../../core/book-pipeline/budget";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
@@ -58,6 +60,7 @@ import {
   extractProofRecords,
   markOldProofRecords,
   replaceBookPlanSection,
+  setImageSection,
   chapterBody
 } from "../../core/book-pipeline/note-sections";
 import {
@@ -186,6 +189,11 @@ export interface BookPipelinePorts {
   /** The author step: the card's single-card research (charts off, fresh write-back). Never writes the card's frontmatter. */
   author(input: AuthorInput): Promise<AuthorOutcome>;
   probeImage(url: string, signal: AbortSignal): Promise<{ ok: true } | { ok: false; reason: string }>;
+  /** Production: `runFindImages(aiCalls, request, run)`: one web search for a chapter's pictures. Absent: no picture search (the "no picture" note stays). */
+  findImages?(
+    request: FindImagesRequest,
+    run: { signal: AbortSignal; admission?: AdmissionContext }
+  ): Promise<ImageCandidate[]>;
   backupNote(path: string, raw: string): Promise<{ ok: true; path: string } | { ok: false }>;
   /** True while a conversation chain, a multi-select research or an argument run holds this map. */
   blocked(mapPath: string): boolean;
@@ -332,6 +340,41 @@ function noPicture(language: string, reason: string): string {
   const zh = /^zh/i.test(language);
   const text = known ? known[zh ? 0 : 1] : escapeMarkdownText(reason, 60) || (zh ? "載入失敗" : "load failed");
   return zh ? `${NO_PICTURE}${text}` : `No picture: ${text}`;
+}
+/** The most pictures one chapter gets (a gallery chapter gets more). */
+export const BOOK_IMAGES_MAX = 3;
+export const BOOK_IMAGES_MAX_GALLERY = 6;
+const SEARCH_TEXT_MAX = 400;
+/** The chapter's search text: its title, summary and (at most five) `《work》` names from the text, one line with no address in it. */
+function imageSearchText(card: PipelineCard): string {
+  const works = [...new Set([...chapterBody(card.detail).matchAll(/《([^《》\n]{1,40})》/g)].map(m => m[1]))].slice(
+    0,
+    5
+  );
+  return singleLineText(
+    [card.title, card.summary, ...works.map(work => `《${work}》`)]
+      .filter(Boolean)
+      .join(" / ")
+      .replace(/\S*:\/\/\S*/g, " "),
+    SEARCH_TEXT_MAX
+  );
+}
+/** The "### 圖像" section body: for each verified candidate a standard image and one plain caption line (escaped text, no link, no HTML). */
+function imageSectionBody(items: readonly { href: string; candidate: ImageCandidate }[], language: string): string {
+  const zh = /^zh/i.test(language);
+  return items
+    .map(({ href, candidate }) => {
+      const name = escapeMarkdownText(candidate.title, 80) || (zh ? "圖" : "image");
+      let host = "";
+      try {
+        host = new URL(candidate.source).hostname;
+      } catch {
+        // an unreadable source page: the caption has the name only
+      }
+      const source = host ? `／${zh ? "來源" : "Source"}：${escapeMarkdownText(host, 80)}` : "";
+      return `![${name}](${href})\n${name}${source}`;
+    })
+    .join("\n\n");
 }
 const isHttps = (url: string): boolean => /^https:\/\//i.test(url);
 
@@ -1423,8 +1466,15 @@ export class BookPipelineRuns {
       });
       if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
     }
-    // Q13: a chapter with no picture and no "no picture" line gets one line in the research notes saying so (the body is not touched).
-    const urls = bodyImageUrls(written.raw);
+    // Q13: the picture search (one call, optional): only pictures that load are embedded, by the program, in the standard form.
+    let search: { found: number; verified: number } | undefined;
+    if (this.ports.findImages) {
+      const searched = await this.findPictures(drive, path, written.fields.bookRole, authorize);
+      if (searched.outcome) return searched.outcome;
+      search = searched.counts;
+    }
+    // The Detail only: the note's preview callout repeats the first picture and may be one write behind.
+    const urls = bodyImageUrls((await this.ports.readCard(path)).detail);
     this.ports.log(
       formatPipelineLog({
         event: "pictures",
@@ -1434,7 +1484,7 @@ export class BookPipelineRuns {
         attempt: attemptsOf(drive.store.state, nodeId).write,
         result: "ok",
         ms: 0,
-        counts: { pictures: urls.length }
+        counts: { pictures: urls.length, ...search }
       })
     );
     if (!urls.length) {
@@ -1453,6 +1503,65 @@ export class BookPipelineRuns {
       }
     }
     return { kind: "ok", after: () => this.setStage(drive, nodeId, "written", null) };
+  }
+
+  /**
+   * The picture search of one written card: one call through the author's model (budget reserved before it), every candidate loaded by
+   * the program, at most {@link BOOK_IMAGES_MAX} (a gallery card {@link BOOK_IMAGES_MAX_GALLERY}) https pictures embedded. A failed or empty
+   * search is not a failure of the card (it keeps the "no picture" note); only a budget refusal, a Stop or a refused write end the step.
+   */
+  private async findPictures(
+    drive: Drive,
+    path: string,
+    role: BookRole | undefined,
+    authorize: () => boolean
+  ): Promise<{ outcome?: Outcome; counts?: { found: number; verified: number } }> {
+    const signal = drive.controller.signal;
+    const card = await this.ports.readCard(path);
+    const query = imageSearchText(card);
+    if (bodyImageUrls(card.detail).length || !query || !this.ports.findImages) return {};
+    let found: ImageCandidate[] = [];
+    try {
+      found = await untilAborted(
+        signal,
+        this.ports.findImages(
+          { ...this.base(drive, drive.config.authorModel), query },
+          { signal, admission: drive.admission }
+        )
+      );
+    } catch (error) {
+      if (isBudgetExhausted(error)) return { outcome: { kind: "budget" } };
+      if (signal.aborted) throw error;
+      // The search is an optional gain: a call error or a timeout leaves the card as it is.
+    }
+    const candidates = found.flatMap(candidate => {
+      const href = safeHref(candidate.url);
+      return href ? [{ href, candidate }] : [];
+    });
+    const probed = await Promise.all(
+      candidates.map(item =>
+        untilAborted(signal, this.ports.probeImage(item.href, signal)).catch((error: unknown) => {
+          if (signal.aborted) throw error;
+          return { ok: false as const, reason: "probe_failed" };
+        })
+      )
+    );
+    const cap = role === "gallery" ? BOOK_IMAGES_MAX_GALLERY : BOOK_IMAGES_MAX;
+    const verified = candidates.filter((_, i) => probed[i].ok);
+    const counts = { found: found.length, verified: verified.length };
+    const items = verified.slice(0, cap);
+    if (!items.length) return { counts };
+    const section = imageSectionBody(items, drive.config.language);
+    // The exit check: nothing but the verified addresses may be an image in what is added.
+    if (this.exitCheck(section, new Set(items.map(item => item.href)))) return { counts };
+    const latest = await this.ports.readCard(path);
+    const outcome = await this.ports.updateNoteGuarded(
+      path,
+      { detail: setImageSection(latest.detail, section, drive.config.language) },
+      { expectedContent: latest.raw, authorize }
+    );
+    if (outcome === "discarded") return { outcome: { kind: "failed", reason: "discarded" }, counts };
+    return { counts };
   }
 
   /** The independent exit check of an author result (a method so a test can force it to fail). */

@@ -18,16 +18,38 @@ const TRAILING = /[.,;:!?，。；：！？、]+$/;
 export function httpsAddresses(text: string): string[] {
   const found: string[] = [];
   for (const match of text.matchAll(ADDRESS)) {
-    const address = match[0].replace(TRAILING, "");
-    if (Array.from(address).length > MAX_SOURCE_CHARS) continue;
+    // The normal form (a non-ASCII path becomes %XX), so the length limit counts what the instruction really carries.
+    let address: string;
     try {
-      if (new URL(address).protocol !== "https:" || !new URL(address).hostname) continue;
+      const url = new URL(match[0].replace(TRAILING, ""));
+      if (url.protocol !== "https:" || !url.hostname) continue;
+      address = url.href;
     } catch {
       continue;
     }
+    if (Array.from(address).length > MAX_SOURCE_CHARS) continue;
     found.push(address);
   }
   return found;
+}
+
+/**
+ * Why a card's right-click "rerun this card" cannot be used now ("ok" when it can). Order matters: a rerun in progress is named
+ * first (this card or another), then the whole book running, then this card busy with something else, then a chat holding the map.
+ */
+export type BookRerunMenuReason = "ok" | "this" | "other" | "running" | "blocked";
+export function bookRerunMenuReason(input: {
+  nodeId: string;
+  rerunNodeId?: string;
+  active: boolean;
+  busyCards: readonly string[];
+  blocked: boolean;
+}): BookRerunMenuReason {
+  if (input.rerunNodeId !== undefined) return input.rerunNodeId === input.nodeId ? "this" : "other";
+  if (input.active) return "running";
+  if (input.busyCards.includes(input.nodeId)) return "this";
+  if (input.blocked) return "blocked";
+  return "ok";
 }
 
 /** Cleans a list of candidate addresses (untrusted): https only, no repeats, each within the limit, at most five. */
@@ -59,7 +81,8 @@ export function unverifiedSourceUrls(proof: StoredProofView | undefined): string
  */
 export function avoidSourcesInstruction(addresses: readonly string[]): string {
   const clean = cleanAvoidSources(addresses);
-  const head = "Do not rely on sources that could not be opened and checked; use other sources that can be opened and checked.";
+  const head =
+    "Do not rely on sources that could not be opened and checked; use other sources that can be opened and checked.";
   return clean.length ? head + " Not usable: " + clean.map(address => JSON.stringify(address)).join(" ") : head;
 }
 
@@ -82,7 +105,10 @@ export function cardResultSnapshot(
   };
 }
 /** A card that needs a person before and after, with the same issue code and the same items, ids, statuses and sources. */
-export function sameReviewResult(before: CardResultSnapshot | undefined, after: CardResultSnapshot | undefined): boolean {
+export function sameReviewResult(
+  before: CardResultSnapshot | undefined,
+  after: CardResultSnapshot | undefined
+): boolean {
   return (
     !!before &&
     !!after &&

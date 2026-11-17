@@ -3274,6 +3274,8 @@ var en = {
   "ui.book_rerun_now_0_1": "Rerunning: {0} {1}",
   "ui.book_rerun_now_untitled_0": "Rerunning card {0}",
   "ui.book_panel_lead_passed_0": "{0} passed",
+  "ui.book_panel_checked_tag": "Passed",
+  "ui.book_panel_checked_tag_notes_0": "Passed, {0} to note",
   "ui.book_panel_lead_review_0": "{0} need your look",
   "ui.book_panel_lead_seams_0": "{0} seams not confirmed",
   "ui.book_panel_lead_images_0": "{0} picture gaps",
@@ -6489,6 +6491,8 @@ var zhCN = {
   "ui.book_rerun_now_0_1": "\u6B63\u5728\u91CD\u8DD1\uFF1A{0} {1}",
   "ui.book_rerun_now_untitled_0": "\u6B63\u5728\u91CD\u8DD1\uFF1A\u7B2C {0} \u5F20",
   "ui.book_panel_lead_passed_0": "{0} \u5F20\u901A\u8FC7",
+  "ui.book_panel_checked_tag": "\u901A\u8FC7",
+  "ui.book_panel_checked_tag_notes_0": "\u901A\u8FC7\uFF0C{0} \u5904\u53EF\u7559\u610F",
   "ui.book_panel_lead_review_0": "{0} \u5F20\u8981\u4F60\u770B",
   "ui.book_panel_lead_seams_0": "{0} \u4E2A\u63A5\u7F1D\u8FD8\u6CA1\u786E\u8BA4",
   "ui.book_panel_lead_images_0": "\u56FE\u6709 {0} \u5904\u7F3A",
@@ -9704,6 +9708,8 @@ var zhTW = {
   "ui.book_rerun_now_0_1": "\u6B63\u5728\u91CD\u8DD1\uFF1A{0} {1}",
   "ui.book_rerun_now_untitled_0": "\u6B63\u5728\u91CD\u8DD1\uFF1A\u7B2C {0} \u5F35",
   "ui.book_panel_lead_passed_0": "{0} \u5F35\u901A\u904E",
+  "ui.book_panel_checked_tag": "\u901A\u904E",
+  "ui.book_panel_checked_tag_notes_0": "\u901A\u904E\uFF0C{0} \u8655\u53EF\u7559\u610F",
   "ui.book_panel_lead_review_0": "{0} \u5F35\u8981\u4F60\u770B",
   "ui.book_panel_lead_seams_0": "{0} \u500B\u63A5\u7E2B\u9084\u6C92\u78BA\u8A8D",
   "ui.book_panel_lead_images_0": "\u5716\u6709 {0} \u8655\u7F3A",
@@ -49894,16 +49900,25 @@ var TRAILING = /[.,;:!?，。；：！？、]+$/;
 function httpsAddresses(text10) {
   const found = [];
   for (const match of text10.matchAll(ADDRESS)) {
-    const address = match[0].replace(TRAILING, "");
-    if (Array.from(address).length > MAX_SOURCE_CHARS) continue;
+    let address;
     try {
-      if (new URL(address).protocol !== "https:" || !new URL(address).hostname) continue;
+      const url = new URL(match[0].replace(TRAILING, ""));
+      if (url.protocol !== "https:" || !url.hostname) continue;
+      address = url.href;
     } catch (e) {
       continue;
     }
+    if (Array.from(address).length > MAX_SOURCE_CHARS) continue;
     found.push(address);
   }
   return found;
+}
+function bookRerunMenuReason(input2) {
+  if (input2.rerunNodeId !== void 0) return input2.rerunNodeId === input2.nodeId ? "this" : "other";
+  if (input2.active) return "running";
+  if (input2.busyCards.includes(input2.nodeId)) return "this";
+  if (input2.blocked) return "blocked";
+  return "ok";
 }
 function cleanAvoidSources(values) {
   const out = [];
@@ -51996,6 +52011,11 @@ var GatePanelState = class {
     this.pendingFocus = null;
   }
 };
+async function runTrackedRerun(state, nodeId, rerun) {
+  state.unchanged.delete(nodeId);
+  const result = await rerun();
+  if (result && result.unchanged) state.unchanged.add(nodeId);
+}
 var REASON_CODES = /* @__PURE__ */ new Set(["invalid_reply", "backup_failed", "discarded", "card_removed", "missing"]);
 function reasonText2(reason) {
   if (reason === "budget") return t("ui.book_refused_budget");
@@ -52428,9 +52448,7 @@ function run(noteKey, id, state, set, actions, work) {
 }
 function startRerun(card, state, actions, avoidSources) {
   run(card.id, card.id, state, state.busy, actions, async () => {
-    state.unchanged.delete(card.id);
-    const result = await actions.rerun(card.id, avoidSources ? { avoidSources } : void 0);
-    if (result && result.unchanged) state.unchanged.add(card.id);
+    await runTrackedRerun(state, card.id, () => actions.rerun(card.id, avoidSources ? { avoidSources } : void 0));
   });
 }
 function rerunTag(head2, card, rerun, actions) {
@@ -52538,10 +52556,15 @@ function renderSeam(list2, card, state, actions, anyBusy) {
     line2.setAttr("role", "alert");
   }
 }
+function checkedTagText(card) {
+  var _a2, _b2;
+  const notes = ((_b2 = (_a2 = card.proof) == null ? void 0 : _a2.items) != null ? _b2 : []).filter((item) => item.status !== "met").length;
+  return notes > 0 ? t("ui.book_panel_checked_tag_notes_0", String(notes)) : t("ui.book_panel_checked_tag");
+}
 function renderChecked(list2, card, state, actions, busy, anyBusy, rerun) {
   const item = row(list2, "checked", card, busy);
   const head2 = item.createDiv("vam-book-panel-card-head");
-  if (!rerunTag(head2, card, rerun, actions)) stateTag(head2, "checked", t("ui.book_stage_checked"));
+  if (!rerunTag(head2, card, rerun, actions)) stateTag(head2, "checked", checkedTagText(card));
   head2.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
   const open2 = state.proofOpen.has(card.id);
   const toggle = button(
@@ -75562,7 +75585,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   }
   /** "Rerun this picture-book card" (plan, write, proof): only on a map with `bookPipeline` at gate 1, gate 2 or done. */
   addBookRerunMenuItem(menu, node) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     const path = this.path;
     if (!this.map || !path || !this.hasBookPipeline()) return;
     const read = readBookPipeline(this.map);
@@ -75570,24 +75593,33 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const progress = this.plugin.getBookPipelineProgress(path);
     const phase = (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : read.data.phase;
     if (phase !== "gate1" && phase !== "gate2" && phase !== "done") return;
-    const why2 = (progress == null ? void 0 : progress.rerun) ? progress.rerun.nodeId === node.id ? t("ui.book_card_menu_why_this") : t("ui.book_card_menu_why_other") : (progress == null ? void 0 : progress.active) ? t("ui.book_card_menu_why_running") : ((_b2 = progress == null ? void 0 : progress.busyCards) != null ? _b2 : []).includes(node.id) ? t("ui.book_card_menu_why_this") : this.bookPipelineBlocked() ? t("ui.book_card_menu_why_blocked") : "";
+    const reason = bookRerunMenuReason({
+      nodeId: node.id,
+      rerunNodeId: (_b2 = progress == null ? void 0 : progress.rerun) == null ? void 0 : _b2.nodeId,
+      active: !!(progress == null ? void 0 : progress.active),
+      busyCards: (_c = progress == null ? void 0 : progress.busyCards) != null ? _c : [],
+      blocked: this.bookPipelineBlocked()
+    });
+    const why2 = reason === "this" ? t("ui.book_card_menu_why_this") : reason === "other" ? t("ui.book_card_menu_why_other") : reason === "running" ? t("ui.book_card_menu_why_running") : reason === "blocked" ? t("ui.book_card_menu_why_blocked") : "";
     const disabled = why2 !== "";
     menu.addSeparator();
     menu.addItem(
       (item) => item.setTitle(t("ui.book_card_menu_rerun")).setIcon("refresh-cw").setDisabled(disabled).onClick(
         () => void this.bookEntry(async () => {
           try {
-            await this.plugin.rerunBookCard(path, node.id);
+            await runTrackedRerun(this.bookPanel, node.id, () => this.plugin.rerunBookCard(path, node.id));
           } finally {
             await this.rereadBookCard(node.id);
+            if (!this.closed) this.paintBookPanel();
           }
         })
       )
     );
     menu.addItem((item) => {
-      var _a3;
       item.setTitle(why2 || t("ui.book_card_menu_rerun_sub"));
-      (_a3 = item.dom) == null ? void 0 : _a3.addClass("vam-book-menu-note");
+      const dom = item.dom;
+      dom == null ? void 0 : dom.addClass("vam-book-menu-note");
+      dom == null ? void 0 : dom.setAttr("aria-disabled", "true");
     });
   }
   /** Opens the topic note in a new main-area tab (the details sidebar is the other way to read it). */

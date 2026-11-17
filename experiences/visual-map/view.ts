@@ -350,7 +350,7 @@ import {
   renderBookCardLabels,
   runBookEntry
 } from "./book-pipeline-ui";
-import { buildGatePanel, GatePanelState, renderGatePanel } from "./book-pipeline-panel";
+import { buildGatePanel, GatePanelState, renderGatePanel, runTrackedRerun } from "./book-pipeline-panel";
 import { buildGate2Panel, renderGate2Panel } from "./book-pipeline-panel2";
 import {
   INTEGRATION_DEPTHS,
@@ -560,6 +560,7 @@ import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal } from "./multi-research-modal";
 import { BookStartModal } from "./book-pipeline-start-modal";
 import { BookFinishModal } from "./book-pipeline-finish-modal";
+import { bookRerunMenuReason } from "./book-pipeline-rerun";
 import { chatResearchReferenceGroups, type ResearchRequestWithReferences } from "./chat-research-sources";
 import { StructureReviewModal } from "./structure-review-modal";
 import {
@@ -9808,17 +9809,23 @@ export class VisualAgentMapView extends ItemView {
     const phase = progress?.phase ?? read.data.phase;
     if (phase !== "gate1" && phase !== "gate2" && phase !== "done") return;
     // Why the item cannot be used right now, in words (it was a grey line with no reason).
-    const why = progress?.rerun
-      ? progress.rerun.nodeId === node.id
+    const reason = bookRerunMenuReason({
+      nodeId: node.id,
+      rerunNodeId: progress?.rerun?.nodeId,
+      active: !!progress?.active,
+      busyCards: progress?.busyCards ?? [],
+      blocked: this.bookPipelineBlocked()
+    });
+    const why =
+      reason === "this"
         ? t("ui.book_card_menu_why_this")
-        : t("ui.book_card_menu_why_other")
-      : progress?.active
-        ? t("ui.book_card_menu_why_running")
-        : (progress?.busyCards ?? []).includes(node.id)
-          ? t("ui.book_card_menu_why_this")
-          : this.bookPipelineBlocked()
-            ? t("ui.book_card_menu_why_blocked")
-            : "";
+        : reason === "other"
+          ? t("ui.book_card_menu_why_other")
+          : reason === "running"
+            ? t("ui.book_card_menu_why_running")
+            : reason === "blocked"
+              ? t("ui.book_card_menu_why_blocked")
+              : "";
     const disabled = why !== "";
     menu.addSeparator();
     menu.addItem(item =>
@@ -9830,9 +9837,11 @@ export class VisualAgentMapView extends ItemView {
           () =>
             void this.bookEntry(async () => {
               try {
-                await this.plugin.rerunBookCard(path, node.id);
+                // The same "same result" mark as the panel's button: the old one goes first, a new one only if nothing changed.
+                await runTrackedRerun(this.bookPanel, node.id, () => this.plugin.rerunBookCard(path, node.id));
               } finally {
                 await this.rereadBookCard(node.id);
+                if (!this.closed) this.paintBookPanel();
               }
             })
         )
@@ -9840,7 +9849,9 @@ export class VisualAgentMapView extends ItemView {
     // The second line is a note, not a command: the reason when the item is unavailable, else what the rerun does.
     menu.addItem(item => {
       item.setTitle(why || t("ui.book_card_menu_rerun_sub"));
-      (item as unknown as { dom?: HTMLElement }).dom?.addClass("vam-book-menu-note");
+      const dom = (item as unknown as { dom?: HTMLElement }).dom;
+      dom?.addClass("vam-book-menu-note");
+      dom?.setAttr("aria-disabled", "true");
     });
   }
   /** Opens the topic note in a new main-area tab (the details sidebar is the other way to read it). */

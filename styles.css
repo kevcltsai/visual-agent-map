@@ -2315,7 +2315,6 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-panel-images-list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .vam-book-panel-image-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
 .vam-book-finish-line { margin: 6px 0; color: var(--text-muted); overflow-wrap: anywhere; }
-.vam-book-finish-buttons { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 10px; }
 .vam-book-menu-note { color: var(--text-muted); font-size: var(--font-ui-smaller); pointer-events: none; }
 .vam-book-panel-row { min-width: 0; overflow-wrap: anywhere; }
 .vam-book-panel-row button:focus-visible, .vam-book-panel-row:focus-visible, .vam-book-panel-finish:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }

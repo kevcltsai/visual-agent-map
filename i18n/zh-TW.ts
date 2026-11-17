@@ -3279,6 +3279,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_rerun_now_0_1": "正在重跑：{0} {1}",
   "ui.book_rerun_now_untitled_0": "正在重跑：第 {0} 張",
   "ui.book_panel_lead_passed_0": "{0} 張通過",
+  "ui.book_panel_checked_tag": "通過",
+  "ui.book_panel_checked_tag_notes_0": "通過，{0} 處可留意",
   "ui.book_panel_lead_review_0": "{0} 張要你看",
   "ui.book_panel_lead_seams_0": "{0} 個接縫還沒確認",
   "ui.book_panel_lead_images_0": "圖有 {0} 處缺",

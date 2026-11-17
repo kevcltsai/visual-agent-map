@@ -392,6 +392,59 @@ test('T5 rerunCard result: unchanged only when it needed a person before and aft
   assert.equal(r.runs.getProgress(r.mapPath)?.rerun, undefined);
 });
 
+test('T5 rerunCard result: the same result before and after but the author step stopped half way says changed (unchanged=false) and clears progress.rerun', async () => {
+  const r = await rig();
+  await toGate2(r);
+  const id = r.nodes[2].id;
+  r.script.proof = itemsProof('unmet', ['https://a.test/1']);
+  await r.runs.rerunCard(r.mapPath, id);
+  const hold = defer();
+  r.script.author = async () => { await hold.promise; return { outcome: 'cancelled' }; };
+  let result;
+  const rerun = r.runs.rerunCard(r.mapPath, id).then(value => { result = value; });
+  await settle();
+  assert.equal(r.runs.getProgress(r.mapPath)?.rerun?.nodeId, id, 'running');
+  await r.runs.stop(r.mapPath); hold.resolve(); await rerun;
+  assert.equal(result.unchanged, false, 'a stopped rerun says nothing about the result');
+  assert.equal(r.runs.getProgress(r.mapPath)?.rerun, undefined);
+});
+
+test('T5 rerunCard on an old card (no picture plan, no proof section): does not throw and is not unchanged', async () => {
+  const r = await rig();
+  await toGate2(r);
+  const id = r.nodes[1].id;
+  await r.repo.updateNote(r.nodes[1].path, { prompt: 'Role: body', detail: '' });
+  const result = await r.runs.rerunCard(r.mapPath, id);
+  assert.equal(result.unchanged, false);
+  assert.equal(r.runs.getProgress(r.mapPath)?.rerun, undefined);
+});
+
+test('T5 cleanAvoidSources: an address with Chinese in its path is kept in its normal %XX form, and the 200 limit counts that form', () => {
+  assert.deepEqual(cleanAvoidSources(['https://example.test/睡眠/研究?q=夜']), ['https://example.test/%E7%9D%A1%E7%9C%A0/%E7%A0%94%E7%A9%B6?q=%E5%A4%9C']);
+  const longCjk = 'https://example.test/' + '睡'.repeat(40); // 40 characters in the text, 360+ in the normal form
+  assert.deepEqual(cleanAvoidSources([longCjk]), []);
+  assert.ok(avoidSourcesInstruction(['https://example.test/睡眠']).includes('%E7%9D%A1%E7%9C%A0'));
+  assert.ok(!/[^\x00-\x7f]/.test(avoidSourcesInstruction(['https://example.test/睡眠'])));
+});
+
+test('T5 bookRerunMenuReason: every branch and the order (a rerun first, then the whole book, then this card, then a chat)', () => {
+  const base = { nodeId: 'a', active: false, busyCards: [], blocked: false };
+  const cases = [
+    [{}, 'ok'],
+    [{ rerunNodeId: 'a' }, 'this'],
+    [{ rerunNodeId: 'b' }, 'other'],
+    [{ active: true }, 'running'],
+    [{ busyCards: ['a'] }, 'this'],
+    [{ busyCards: ['b'] }, 'ok'],
+    [{ blocked: true }, 'blocked'],
+    [{ rerunNodeId: 'b', active: true, busyCards: ['a'], blocked: true }, 'other'],
+    [{ rerunNodeId: 'a', active: true, blocked: true }, 'this'],
+    [{ active: true, busyCards: ['a'], blocked: true }, 'running'],
+    [{ busyCards: ['a'], blocked: true }, 'this']
+  ];
+  for (const [over, want] of cases) assert.equal(rerunMod.bookRerunMenuReason({ ...base, ...over }), want, JSON.stringify(over));
+});
+
 test('T5 rerunCard with avoidSources: only the plan and the author get the program line (never the proofread); a plain rerun gets none; nothing is saved to the map file or the note', async () => {
   const r = await rig();
   r.script.author = authorFor(r);

@@ -282,6 +282,25 @@ test('right-click: the rerun item and its disabled sub line show at gate 1, gate
   assert.equal(reread, 1);
 });
 
+test('right-click rerun through the view: "same result" lands on the panel state (block with both actions), a changed result clears the old mark', async () => {
+  const h = await viewRig();
+  const node = h.view.map.nodes[1];
+  h.progress(h.prog('gate2'));
+  h.view.rereadBookCard = async () => {};
+  h.view.paintBookPanel = () => {};
+  let next = { unchanged: true };
+  h.plugin.rerunBookCard = async () => next;
+  const click = async () => { h.menu(node).find(i => i.title === '重跑圖文書這一張').click(); await settle(); };
+  await click();
+  assert.ok(h.view.bookPanel.unchanged.has(node.id), 'the same result is remembered');
+  next = { unchanged: false };
+  await click();
+  assert.ok(!h.view.bookPanel.unchanged.has(node.id), 'a changed result clears it');
+  const view_ts = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(view_ts, /runTrackedRerun\(this\.bookPanel, node\.id,/);
+  assert.match(view_ts, /dom\?\.setAttr\("aria-disabled", "true"\)/);
+});
+
 test('right-click: a map without bookPipeline gets the same items as before (no rerun item, no extra separator)', async () => {
   const h = await viewRig({ book: false });
   const node = h.view.map.nodes[1];
@@ -512,4 +531,38 @@ test('T5 gate 2: the card being rerun shows "重跑中 m:ss" from the view clock
   assert.ok(texts(row).includes('重跑中 0:00'), JSON.stringify(texts(row)));
   assert.ok(!texts(row).includes('需人看'));
   assert.deepEqual(log.filter(x => x[0] === 'track'), [['track', 12345]]);
+});
+
+test('T5 right-click rerun path: the same result shows the block with both actions; the old mark goes when the result changes', async () => {
+  const r = synth();
+  const state = new bundle.GatePanelState();
+  const log = [];
+  const draw = () => bundle.renderGate2Panel(dom.element('div'), r.data(), false, state, baseActions(log));
+  const row = panel => all(panel, 'vam-book-panel-row').find(x => x.dataset.row === 'b');
+  // What the view's menu item runs: runTrackedRerun over the plugin's rerun result.
+  await bundle.runTrackedRerun(state, 'b', async () => ({ unchanged: true }));
+  const panel = draw();
+  assert.ok(texts(row(panel)).includes('這次重跑的結果相同，仍需人看。'));
+  assert.equal(all(row(panel), 'vam-book-panel-swap-source').length, 1);
+  assert.equal(all(row(panel), 'vam-book-panel-look-myself').length, 1);
+  await bundle.runTrackedRerun(state, 'b', async () => ({ unchanged: false }));
+  assert.ok(!state.unchanged.has('b'), 'a changed result clears the old mark');
+  assert.equal(all(row(draw()), 'vam-book-panel-unchanged').length, 0);
+  await bundle.runTrackedRerun(state, 'b', async () => ({ unchanged: true }));
+  let seen;
+  await bundle.runTrackedRerun(state, 'b', async () => { seen = state.unchanged.has('b'); return undefined; });
+  assert.equal(seen, false, 'cleared before the run starts');
+  assert.ok(!state.unchanged.has('b'), 'a rerun that returns nothing leaves no mark');
+  await assert.rejects(() => bundle.runTrackedRerun(state, 'b', async () => { throw new Error('x'); }));
+  assert.ok(!state.unchanged.has('b'));
+});
+
+test('T5 gate 2: a passed card reads "通過" or "通過，n 處可留意" (not 已校), no 地圖 in zh-TW', () => {
+  const r = synth({ p: { pipelineStage: 'checked', prompt: '圖安排：無\n', detail: PROOF([{ id: 'C1', type: 'fact', status: 'unverified', note: 'x', sources: [] }, { id: 'C2', type: 'fact', status: 'unverified', note: 'y', sources: [] }, { id: 'C3', type: 'fact', status: 'met', note: '', sources: [] }]) } });
+  const panel = bundle.renderGate2Panel(dom.element('div'), r.data(), false, new bundle.GatePanelState(), baseActions());
+  const tag = id => texts(all(panel, 'vam-book-panel-row').find(x => x.dataset.row === id)).join('|');
+  assert.match(tag('p'), /通過，2 處可留意/);
+  assert.ok(!/已校/.test(tag('p')) && !/已校/.test(tag('a')));
+  assert.match(tag('a'), /通過/);
+  assert.ok(!texts(panel).some(x => /地圖/.test(x)));
 });

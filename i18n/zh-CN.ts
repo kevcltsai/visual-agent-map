@@ -3278,6 +3278,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_rerun_now_0_1": "正在重跑：{0} {1}",
   "ui.book_rerun_now_untitled_0": "正在重跑：第 {0} 张",
   "ui.book_panel_lead_passed_0": "{0} 张通过",
+  "ui.book_panel_checked_tag": "通过",
+  "ui.book_panel_checked_tag_notes_0": "通过，{0} 处可留意",
   "ui.book_panel_lead_review_0": "{0} 张要你看",
   "ui.book_panel_lead_seams_0": "{0} 个接缝还没确认",
   "ui.book_panel_lead_images_0": "图有 {0} 处缺",

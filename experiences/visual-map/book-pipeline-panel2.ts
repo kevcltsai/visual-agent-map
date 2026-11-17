@@ -7,7 +7,13 @@ import { unescapeMarkdownText } from "../../core/book-pipeline/text";
 import { bookCardView, bookIssueText, bookRefusalText } from "./book-pipeline-ui";
 import { bodyImageUrls } from "./book-pipeline-run";
 import { unverifiedSourceUrls } from "./book-pipeline-rerun";
-import { renderPanelTabs, type GateCardInput, type GatePanelActions, type GatePanelState } from "./book-pipeline-panel";
+import {
+  renderPanelTabs,
+  runTrackedRerun,
+  type GateCardInput,
+  type GatePanelActions,
+  type GatePanelState
+} from "./book-pipeline-panel";
 
 /**
  * Gate 2 side panel (04c): what needs a person (cards marked needs-review, seams to check), the proof record of every proofread
@@ -350,9 +356,7 @@ type RerunNow = { nodeId: string; startedAt: number } | undefined;
 /** Starts the card's rerun; a result the same as before that still needs a person is remembered (memory only) to say so. */
 function startRerun(card: Gate2Card, state: GatePanelState, actions: Gate2Actions, avoidSources?: string[]): void {
   run(card.id, card.id, state, state.busy, actions, async () => {
-    state.unchanged.delete(card.id);
-    const result = await actions.rerun(card.id, avoidSources ? { avoidSources } : undefined);
-    if (result && result.unchanged) state.unchanged.add(card.id);
+    await runTrackedRerun(state, card.id, () => actions.rerun(card.id, avoidSources ? { avoidSources } : undefined));
   });
 }
 
@@ -478,6 +482,12 @@ function renderSeam(
   }
 }
 
+/** "Passed" or "Passed, n to note" (n = proof items that are not met), as the approved panel draws it; not the map chip's "checked". */
+function checkedTagText(card: Gate2Card): string {
+  const notes = (card.proof?.items ?? []).filter(item => item.status !== "met").length;
+  return notes > 0 ? t("ui.book_panel_checked_tag_notes_0", String(notes)) : t("ui.book_panel_checked_tag");
+}
+
 function renderChecked(
   list: HTMLElement,
   card: Gate2Card,
@@ -489,7 +499,7 @@ function renderChecked(
 ): void {
   const item = row(list, "checked", card, busy);
   const head = item.createDiv("vam-book-panel-card-head");
-  if (!rerunTag(head, card, rerun, actions)) stateTag(head, "checked", t("ui.book_stage_checked"));
+  if (!rerunTag(head, card, rerun, actions)) stateTag(head, "checked", checkedTagText(card));
   head.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
   const open = state.proofOpen.has(card.id);
   const toggle = button(

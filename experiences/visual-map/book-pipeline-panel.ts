@@ -155,6 +155,20 @@ export class GatePanelState {
   }
 }
 
+/**
+ * Runs one card's rerun and keeps the "same result, still needs a person" mark (memory only) honest: the old mark goes before the
+ * run starts and comes back only when this run left the result the same. Both the panel button and the card's right-click menu use it.
+ */
+export async function runTrackedRerun(
+  state: GatePanelState,
+  nodeId: string,
+  rerun: () => Promise<{ unchanged: boolean } | void>
+): Promise<void> {
+  state.unchanged.delete(nodeId);
+  const result = await rerun();
+  if (result && result.unchanged) state.unchanged.add(nodeId);
+}
+
 export interface GatePanelActions {
   /** Opens the card's note at its `## Prompt`. */
   editPlan: (nodeId: string) => void;

@@ -29,5 +29,7 @@ if [ "$full" = 1 ]; then
   echo "pre-push: npm run verify"
   exec npm run verify
 fi
+# lint and format:check use content caches (node_modules/.cache): a type change in one file can leave a cached lint result of another
+# file stale, so a local pass may miss a cross-file type-aware lint error. CI has no cache and lints every file; CI decides.
 echo "pre-push: npm run verify:push (feature branch; tests run in CI)"
 exec npm run verify:push

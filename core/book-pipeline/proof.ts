@@ -324,7 +324,8 @@ export function composeProofRecord(
       `- ${item.id} ${STATUS_WORDS[item.status]}：${item.note}${item.sources.length ? `（開頁：${item.sources.map(href => `\`${href}\``).join(" ")}）` : ""}`
     );
   lines.push(
-    `<!-- book-proof:v1 ${escapeJson(JSON.stringify({
+    `<!-- book-proof:v1 ${escapeJson(
+      JSON.stringify({
         key,
         result: clean,
         ...(failure ? { failed: failure } : {}),
@@ -382,7 +383,8 @@ export function appendProofRecord(
 }
 
 /** The heading of the card's proof-result section in `language`. */
-export const proofSectionHeading = (language: ContentLanguage): string => translate(language, "detail.book_proof_heading");
+export const proofSectionHeading = (language: ContentLanguage): string =>
+  translate(language, "detail.book_proof_heading");
 
 /**
  * The body of the card's "proofread result" section (one `- ` line per item, then the two model lines; or one failure line and no model).
@@ -406,7 +408,9 @@ export function composeProofSection(
     item => `- ${item.id} ${words[item.status]}${item.status !== "met" && item.note ? `${colon}${item.note}` : ""}`
   );
   const shown = (id: string | undefined): string =>
-    safeModelId(id) ? escapeMarkdownText(modelLabel(safeModelId(id)), 80) : translate(language, "detail.book_model_unrecorded");
+    safeModelId(id)
+      ? escapeMarkdownText(modelLabel(safeModelId(id)), 80)
+      : translate(language, "detail.book_model_unrecorded");
   lines.push(`- ${translate(language, "detail.book_proof_author_model_0", shown(models.authorModel))}`);
   lines.push(`- ${translate(language, "detail.book_proof_proof_model_0", shown(models.model))}`);
   return lines.join("\n");

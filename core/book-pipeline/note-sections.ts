@@ -138,7 +138,10 @@ const validJson = (text: string): boolean => {
  * {@link appendResearchNote} does.
  */
 export function replaceResearchRecord(detail: string, record: string): string {
-  const tag = (record.split(/\r?\n/).map(line => PIPELINE_RECORD.exec(line.trim())).find(Boolean) ?? [])[1];
+  const tag = (record
+    .split(/\r?\n/)
+    .map(line => PIPELINE_RECORD.exec(line.trim()))
+    .find(Boolean) ?? [])[1];
   const lines = detail.split("\n");
   const section = tag ? findSection(lines, fencedLines(lines), text => isResearchNotesHeading(text)) : undefined;
   if (!tag || !section) return appendResearchNote(detail, record).text;
@@ -395,10 +398,7 @@ export function carryImageSection(oldDetail: string, newDetail: string): string 
   const oldLines = oldDetail.split("\n");
   const old = findImageSection(oldLines);
   if (!old || findImageSection(newDetail.split("\n"))) return newDetail;
-  const block = oldLines
-    .slice(old.at, old.end)
-    .join("\n")
-    .replace(/\s+$/, "");
+  const block = oldLines.slice(old.at, old.end).join("\n").replace(/\s+$/, "");
   return withImageBlock(newDetail.split("\n"), block);
 }
 

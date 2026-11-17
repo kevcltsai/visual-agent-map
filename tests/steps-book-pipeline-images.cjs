@@ -76,116 +76,171 @@ async function rig(over = {}) {
 const setLimit = (r, limit) => r.repo.updateMap(r.mapPath, d => { d.bookPipeline.budget.limit = limit; });
 
 const BODY = '正文開頭《蒙娜麗莎》結尾。';
-const withSources = title => `${BODY} ${title}\n\n### 來源\n- https://example.com/a\n`;
 const writeAuthor = (r, text) => async input => { await input.admission.reserve(); const n = await r.repo.readNote(input.path); const out = await r.repo.updateNoteGuarded(input.path, { detail: typeof text === 'function' ? text(n.title) : text }, { authorize: input.authorize, finalize: input.finalize }); return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; };
-const cand = (n, over = {}) => ({ title: `Work ${n}`, url: `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/W${n}.jpg/1280px-W${n}.jpg`, source: `https://commons.wikimedia.org/wiki/File:W${n}.jpg`, ...over });
-/** A rig whose author writes a body with a Sources section; `finder` is the fake picture search. */
-async function picRig({ finder, probe, text = withSources, titles, proof } = {}) {
+const cand = (n, over = {}) => ({ title: `Work ${n}`, caption: `Caption ${n}`, url: `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/W${n}.jpg/1280px-W${n}.jpg`, source: `https://commons.wikimedia.org/wiki/File:W${n}.jpg`, ...over });
+/** The finder's answer: `{ 1: [cand...], 2: [...] }` by slot index. */
+const found = bySlotObj => { const bySlot = new Map(Object.entries(bySlotObj).map(([k, v]) => [Number(k), v])); return { bySlot, found: [...bySlot.values()].reduce((n, v) => n + v.length, 0), offTopic: 0 }; };
+const slotsOf = n => Array.from({ length: n }, (_, i) => ({ index: i + 1, kind: 'diagram', explains: `explains ${i + 1} perspective`, anchor: `after paragraph ${i + 1}` }));
+const mk = (n, text = `explains ${n} perspective`) => `〔圖位 ${n}：${text}〕`;
+/** Two paragraphs, each followed by its marker line, then a Sources section. */
+const twoMarkers = title => `正文一。${title}\n\n${mk(1)}\n\n正文二。\n\n${mk(2)}\n\n正文三。\n\n### 來源\n- https://example.com/a\n`;
+/** A rig whose card plan arranges `slots` pictures (null: an old Prompt without an image plan) and whose author writes `text`; `finder` is the fake picture search (request, run, callNumber) -> found(). */
+async function picRig({ finder, probe, text = twoMarkers, titles, proof, slots = 2, ports } = {}) {
   const calls = [];
   const holder = {};
   const r = await rig({
     titles: titles ?? ['SecretRootTitle'],
-    script: { author: (input, n) => writeAuthor(holder.r, text)(input), ...(probe ? { probe } : {}), ...(proof ? { proof } : {}) },
-    ports: { findImages: async (request, run) => { calls.push(request); await run.admission.reserve(); return finder(request, run, calls.length); } }
+    script: { card: request => ({ covers: `covers ${request.card.position}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }], ...(slots === null ? {} : { images: slotsOf(slots) }) }),
+      author: (input, n) => writeAuthor(holder.r, text)(input), ...(probe ? { probe } : {}), ...(proof ? { proof } : {}) },
+    ports: { findImages: async (request, run) => { calls.push(request); await run.admission.reserve(); return finder(request, run, calls.length); }, ...ports }
   });
   holder.r = r;
   r.calls = calls;
   return r;
 }
-const dropPictures = (r, i) => r.contents.set(r.nodes[i].path, r.raw(i).replace(/### 圖像\n[\s\S]*?(?=### 來源)/, ''));
+const plain = value => JSON.parse(JSON.stringify(value));
 const run = async r => { await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath); };
+const recordOf = detail => JSON.parse(/<!-- book-slots:v1 (\{.*\}) -->/.exec(detail)[1]);
+const figures = detail => detail.match(/!\[[^\]]*\]\([^)\s]+\)/g) ?? [];
 
-test('images: two verified pictures are embedded as standard images with plain captions between the text and the Sources section', async () => {
-  const r = await picRig({ finder: () => [cand(1), cand(2)] });
+test('slots: two markers become two standard images with one plain caption line each, in place; the card has one book-slots record and no marker', async () => {
+  const r = await picRig({ finder: () => found({ 1: [cand(1)], 2: [cand(2)] }) });
   await run(r);
   const detail = (await r.note(0)).detail;
-  const expected = /正文開頭《蒙娜麗莎》結尾。 SecretRootTitle\n\n### 圖像\n\n!\[Work 1\]\(https:\/\/upload\.wikimedia\.org[^)\s]+\)\nWork 1／來源：commons\.wikimedia\.org\n\n!\[Work 2\]\([^)\s]+\)\nWork 2／來源：commons\.wikimedia\.org\n\n### 來源\n/;
-  assert.match(detail, expected);
+  assert.match(detail, /正文一。SecretRootTitle\n\n!\[Work 1\]\(https:\/\/upload\.wikimedia\.org[^)\s]+\)\nCaption 1\n\n正文二。\n\n!\[Work 2\]\([^)\s]+\)\nCaption 2\n\n正文三。\n\n### 來源\n/);
+  assert.ok(!/〔圖位|無圖：|### 圖像/.test(detail));
   assert.equal(r.calls.length, 1, 'one search call per card');
   assert.equal(r.calls[0].model, 'm2', 'the author model');
-  assert.match(r.calls[0].query, /SecretRootTitle/); assert.match(r.calls[0].query, /蒙娜麗莎/);
+  assert.deepEqual(plain(r.calls[0].slots.map(s => s.index)), [1, 2]);
+  assert.match(r.calls[0].chapter, /SecretRootTitle/);
+  assert.equal(detail.split('book-slots:v1').length - 1, 1, 'one record');
+  assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state])), [[1, 'placed'], [2, 'placed']]);
   assert.equal(stageOf(r.raw(0)), 'checked');
-  assert.ok(!/無圖：/.test(detail));
-  const log = r.stat.logs.filter(l => l.includes('pictures ')).join('\n');
-  assert.match(log, /pictures=2 found=2 verified=2/);
-  assert.ok(!/SecretRootTitle|wikimedia|蒙娜麗莎/.test(r.stat.logs.join('\n')), 'the log has counts only');
+  const log = r.stat.logs.filter(l => l.includes(' slots ')).join('\n');
+  assert.match(log, /book-pipeline slots .* placed=2 missing=0$/);
+  assert.ok(!/SecretRootTitle|wikimedia|蒙娜麗莎/.test(r.stat.logs.join('\n')), 'the log has counts and codes only');
 });
 
-test('images: nothing verified keeps the no-picture note and no image section; a card with no found candidates likewise', async () => {
-  for (const finder of [() => [cand(1), cand(2)], () => []]) {
+test('slots: a slot with no loadable or no found picture loses its whole marker line (no "no picture" text, no double blank line) and records why', async () => {
+  for (const [finder, reason] of [[() => found({ 1: [cand(1)], 2: [cand(2)] }), 'load_failed'], [() => found({}), 'not_found']]) {
     const r = await picRig({ finder, probe: async () => ({ ok: false, reason: 'load_failed' }) });
     await run(r);
     const note = await r.note(0);
-    assert.ok(!/### 圖像/.test(note.detail));
-    assert.match(note.detail, /無圖：未找到可驗證的公開圖片/);
-    assert.match(r.stat.logs.join('\n'), /pictures=0 found=[02] verified=0/);
+    assert.match(note.detail, /正文一。SecretRootTitle\n\n正文二。\n\n正文三。\n\n### 來源/);
+    assert.ok(!/〔圖位|無圖：|### 圖像|!\[/.test(note.detail));
+    assert.deepEqual(recordOf(note.detail).slots.map(s => [s.state, s.reasonCode]), [['missing', reason], ['missing', reason]]);
+    assert.match(r.stat.logs.join('\n'), new RegExp(`slots .* placed=0 missing=2 reason=${reason}$`, 'm'));
     assert.equal(stageOf(r.raw(0)), 'checked');
   }
 });
 
-test('images: a candidate that is not https, has a bad address or fails to load is not embedded; the verified one is', async () => {
-  const r = await picRig({ finder: () => [cand(1, { url: 'http://example.com/a.jpg' }), cand(2, { url: 'https://example.com/b c.jpg' }), cand(3), cand(4)], probe: async url => (url.includes('W3') ? { ok: false, reason: 'timeout' } : { ok: true }) });
+test('slots: a candidate that is not https, has a bad address or fails to load is not placed and not probed (when unsafe); the verified one is', async () => {
+  const r = await picRig({ slots: 1, text: title => `${BODY}\n\n${mk(1)}\n\n尾。\n`, finder: () => found({ 1: [cand(1, { url: 'http://example.com/a.jpg' }), cand(2, { url: 'javascript:alert(1)' }), cand(3), cand(4)] }), probe: async url => (url.includes('W3') ? { ok: false, reason: 'timeout' } : { ok: true }) });
   await run(r);
   const detail = (await r.note(0)).detail;
-  assert.equal((detail.match(/!\[/g) ?? []).length, 1);
+  assert.equal(figures(detail).length, 1);
   assert.match(detail, /!\[Work 4\]/);
-  assert.ok(!/http:\/\/|W3/.test(detail));
-  assert.ok(!r.stat.probes.some(u => u.startsWith('http:')), 'only https addresses are probed');
+  assert.ok(!/http:\/\/|javascript:|W3/.test(detail));
+  assert.ok(!r.stat.probes.some(u => !u.startsWith('https:')), 'only https addresses are probed');
+  const none = await picRig({ slots: 1, text: () => `${BODY}\n\n${mk(1)}\n\n尾。\n`, finder: () => found({ 1: [cand(1, { url: 'http://example.com/a.jpg' }), cand(2, { url: 'javascript:alert(1)' })] }) });
+  await run(none);
+  assert.equal(none.stat.probes.length, 0);
+  assert.equal(recordOf((await none.note(0)).detail).slots[0].reasonCode, 'unsafe_url');
 });
 
-test('images: a caption with HTML, a markdown link or a line break becomes plain escaped single-line text', async () => {
-  const r = await picRig({ finder: () => [cand(1, { title: 'Evil <img src=x onerror=alert(1)> [click](https://evil.example/x)\nsecond line ![x](https://evil.example/y)' , source: 'https://commons.wikimedia.org/wiki/File:X.jpg' })] });
+test('slots: addresses to an inner network, with credentials or an odd port are not probed or placed', async () => {
+  const r = await picRig({ slots: 1, text: () => `${BODY}\n\n${mk(1)}\n\n尾。\n`, finder: () => found({ 1: [cand(1, { url: 'https://127.0.0.1/a.jpg' }), cand(2, { url: 'https://foo.local/b.jpg' }), cand(3, { url: 'https://example.com:8443/c.jpg' }), cand(4)] }) });
+  await run(r);
+  assert.equal(figures((await r.note(0)).detail).length, 1);
+  assert.deepEqual(r.stat.probes.filter(u => /127\.0|\.local|8443/.test(u)), []);
+});
+
+test('slots: a malicious title or caption (HTML, links, line breaks, a slot marker, an image) becomes plain escaped single-line text', async () => {
+  const evil = 'Evil <img src=x onerror=alert(1)> [click](https://evil.example/x)\nsecond line ![x](https://evil.example/y) 〔圖位 2：boom〕';
+  const r = await picRig({ slots: 1, text: () => `${BODY}\n\n${mk(1)}\n\n尾。\n`, finder: () => found({ 1: [cand(1, { title: evil, caption: evil })] }) });
   await run(r);
   const detail = (await r.note(0)).detail;
-  const section = detail.slice(detail.indexOf('### 圖像'), detail.indexOf('### 來源'));
-  assert.ok(!/<img|<[A-Za-z]/.test(section));
-  assert.equal((section.match(/!\[/g) ?? []).length, 1, 'the title cannot form another image');
-  assert.ok(!/\]\(https:\/\/evil/.test(section.replace(/\\\]\\\(/g, '')));
-  assert.ok(!/\[click\]\(/.test(section));
-  const caption = section.trim().split('\n').filter(Boolean).pop();
-  assert.ok(!caption.includes('\n') && !/(^|[^\\])\[/.test(caption));
-  assert.equal(unsafeBody(section, new Set(bodyImageUrls(section))), false);
+  assert.equal(detail.split('\n').filter(l => l.startsWith('![')).length, 1, 'the text cannot form another image');
+  assert.ok(!/(^|[^\\])!\[/m.test(detail.split('\n').filter(l => !l.startsWith('![')).join('\n')), 'no unescaped image start in the caption');
+  assert.ok(!/<img|<[A-Za-z]|〔圖位/.test(detail));
+  assert.ok(!/\]\(https:\/\/evil/.test(detail.replace(/\\\]\\\(/g, '')));
+  assert.ok(!/\[click\]\(/.test(detail));
+  const lines = detail.split('\n'); const at = lines.findIndex(l => l.startsWith('![')); assert.ok(lines[at + 1] && !lines[at + 1].includes('![') && lines[at + 2] === '');
+  const added = lines.slice(at, at + 2).join('\n');
+  assert.equal(unsafeBody(added, new Set(bodyImageUrls(added))), false);
+  assert.equal(stageOf(r.raw(0)), 'checked');
 });
 
-test('images: more candidates than the cap are cut to 3, a gallery card keeps up to 6', async () => {
-  const six = () => [1, 2, 3, 4, 5, 6].map(n => cand(n));
-  const a = await picRig({ finder: six });
-  await run(a);
-  assert.equal(((await a.note(0)).detail.match(/!\[Work/g) ?? []).length, 3);
-  const b = await picRig({ finder: six });
-  await b.repo.updateMap(b.mapPath, d => { d.nodes[0].bookRole = 'gallery'; });
-  await b.repo.writePipelineFields(b.nodes[0].path, { bookRole: 'gallery' });
-  await run(b);
-  assert.equal(((await b.note(0)).detail.match(/!\[Work/g) ?? []).length, 6);
+test('slots: a marker inside a quote or a code fence stays word for word and does not count; the body marker of the same number is filled', async () => {
+  const text = () => `${BODY}\n\n${mk(1)}\n\n> ${mk(1, '引用')}\n\n\`\`\`\n${mk(2, '程式')}\n\`\`\`\n\n尾。\n\n${mk(2)}\n`;
+  const r = await picRig({ text, finder: () => found({ 1: [cand(1)], 2: [cand(2)] }) });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.ok(detail.includes(`> ${mk(1, '引用')}\n`) && detail.includes(`\`\`\`\n${mk(2, '程式')}\n\`\`\``), 'quote and fence verbatim');
+  assert.equal(figures(detail).length, 2);
+  assert.equal(stageOf(r.raw(0)), 'checked');
+  assert.deepEqual(recordOf(detail).slots.map(s => s.state), ['placed', 'placed']);
 });
 
-test('images: a search that throws, never answers or is aborted does not make the card need review or count as a failure', async () => {
+test('slots: a repeated marker keeps the first, an out-of-range or reworded marker line is deleted (bad_marker), and nothing is left over', async () => {
+  const text = () => `${BODY}\n\n${mk(1)}\n\n中。\n\n${mk(1)}\n\n${mk(5)}\n\n〔圖位 2 ：改寫〕\n\n尾。\n`;
+  const r = await picRig({ text, finder: () => found({ 1: [cand(1)], 2: [cand(2)] }) });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.ok(!/〔圖位/.test(detail));
+  assert.equal(figures(detail).length, 1);
+  assert.match(detail, /中。\n\n尾。/);
+  const rec = recordOf(detail);
+  assert.deepEqual(rec.slots.map(s => [s.index, s.state, s.reasonCode]), [[1, 'placed', undefined], [2, 'missing', 'bad_marker']]);
+  assert.equal(rec.bad, 2);
+  assert.equal(r.calls[0].slots.length, 1, 'only the slot that has a valid marker is searched');
+  assert.equal(stageOf(r.raw(0)), 'checked');
+});
+
+test('slots: markers on the same line (adjacent or inside a sentence) are removed without leaving a blank line, the rest of the line stays; no search when no slot has a marker', async () => {
+  const text = () => `前文〔圖位 1：a〕〔圖位 2：b〕後文。\n\n${mk(1)}${mk(2)}\n\n尾。\n`;
+  const r = await picRig({ text, finder: () => found({ 1: [cand(1)] }) });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.ok(detail.startsWith('前文後文。\n\n尾。'), detail);
+  assert.ok(!/\n\n\n/.test(detail) && !/〔圖位/.test(detail));
+  assert.equal(r.calls.length, 0, 'no slot had a valid marker, so no search call');
+  assert.deepEqual(recordOf(detail).slots.map(s => s.reasonCode), ['author_omitted', 'author_omitted']);
+  const adjacent = await picRig({ text: () => `${BODY}\n\n${mk(1)}\n${mk(2)}\n尾。\n`, finder: () => found({ 1: [cand(1)], 2: [cand(2)] }) });
+  await run(adjacent);
+  const d2 = (await adjacent.note(0)).detail;
+  assert.equal(figures(d2).length, 2); assert.ok(!/\n\n\n/.test(d2));
+});
+
+test('slots: a search that throws, never answers or is aborted does not make the card need review or count as a failure', async () => {
   const r = await picRig({ finder: () => { throw new Error('search boom'); } });
   await run(r);
   const s = await r.state();
   assert.equal(stageOf(r.raw(0)), 'checked');
   assert.ok(!(await r.note(0)).pipelineIssue);
-  assert.match((await r.note(0)).detail, /無圖：未找到可驗證的公開圖片/);
+  assert.deepEqual(recordOf((await r.note(0)).detail).slots.map(x => x.reasonCode), ['not_found', 'not_found']);
   assert.equal(s.cards?.[r.nodes[0].id]?.attempts?.write ?? 1, 1);
   assert.equal(r.calls.length, 1, 'no retry');
 });
 
-test('images: a stop during the search leaves the card unmarked and the card is not written as pictures', async () => {
-  const hold = defer();
-  const r = await picRig({ finder: async () => { await hold.promise; return [cand(1)]; } });
-  await r.runs.start(r.mapPath);
-  await r.runs.confirmGate1(r.mapPath);
-  await settle();
-  assert.equal(r.calls.length, 1);
-  await r.runs.stop(r.mapPath);
-  hold.resolve();
-  await settle();
-  assert.ok(!/### 圖像/.test((await r.note(0)).detail));
-  assert.notEqual(stageOf(r.raw(0)), 'written');
+test('slots: a stop during the search or a probe leaves the card with its markers and not written', async () => {
+  for (const where of ['search', 'probe']) {
+    const hold = defer();
+    const r = await picRig({ finder: async () => { if (where === 'search') await hold.promise; return found({ 1: [cand(1)] }); }, probe: async () => { if (where === 'probe') await hold.promise; return { ok: true }; } });
+    await r.runs.start(r.mapPath);
+    await r.runs.confirmGate1(r.mapPath);
+    await settle();
+    assert.equal(r.calls.length, 1);
+    await r.runs.stop(r.mapPath);
+    hold.resolve();
+    await settle();
+    assert.ok(!/book-slots/.test((await r.note(0)).detail) && figures((await r.note(0)).detail).length === 0, where);
+    assert.notEqual(stageOf(r.raw(0)), 'written');
+  }
 });
 
-test('images: the budget is gated; a refusal in the search pauses the run and leaves no pictures or stage on the card', async () => {
-  const r = await picRig({ finder: () => [cand(1)] });
+test('slots: the budget is gated; a refusal in the search pauses the run and leaves the markers, no record and no stage on the card', async () => {
+  const r = await picRig({ finder: () => found({ 1: [cand(1)] }) });
   await r.runs.start(r.mapPath);
   // global plan 1 + card plan 1 are used; allow the author call but not the search
   const used = (await r.state()).budget.used;
@@ -194,27 +249,74 @@ test('images: the budget is gated; a refusal in the search pauses the run and le
   await settle();
   const s = await r.state();
   assert.equal(s.status, 'stopped'); assert.equal(s.pauseReason, 'budget');
-  assert.ok(!/### 圖像/.test((await r.note(0)).detail));
+  assert.ok(!/book-slots/.test((await r.note(0)).detail));
   assert.notEqual(stageOf(r.raw(0)), 'written');
   assert.notEqual(stageOf(r.raw(0)), 'checked');
   assert.ok(!(await r.note(0)).pipelineIssue);
 });
 
-test('images: the proofread sees the chapter text without the picture section; a rewrite carries the old section over verbatim (T1 R1-1; no new search)', async () => {
-  const r = await picRig({ finder: (req, run, n) => [cand(n * 10)] });
+/** The old card's Detail with a system picture section (what a T1 card looks like). */
+const OLD_DETAIL = '舊文。\n\n### 圖像\n\n![Old](https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Old.jpg/1280px-Old.jpg)\nOld／來源：commons.wikimedia.org\n\n### 來源\n- https://example.com/a\n';
+test('old Prompt (no image plan): no search, no record, a stray marker line is deleted, the existing picture section is carried over word for word (#12, #16)', async () => {
+  const r = await picRig({ slots: null, text: () => `新文。\n\n${mk(1)}\n\n尾。\n\n### 來源\n- https://example.com/a\n`, finder: () => found({ 1: [cand(1)] }) });
+  await r.repo.updateNote(r.nodes[0].path, { detail: OLD_DETAIL });
   await run(r);
-  assert.match((await r.note(0)).detail, /### 圖像/);
-  assert.ok(r.stat.proof.length >= 1);
-  for (const request of r.stat.proof) { assert.ok(!/圖像|Work|wikimedia/.test(request.body)); }
-  await r.runs.rerunCard(r.mapPath, r.nodes[0].id);
-  while (r.runs.isRunning(r.mapPath)) await tick();
-  await settle();
   const detail = (await r.note(0)).detail;
+  assert.equal(r.calls.length, 0, 'no search call');
+  assert.ok(!/book-slots|〔圖位/.test(detail));
+  assert.match(detail, /新文。\n\n尾。/);
+  assert.match(detail, /### 圖像\n\n!\[Old\]\(https:\/\/upload\.wikimedia\.org[^)\s]+Old\.jpg[^)\s]*\)\nOld／來源：commons\.wikimedia\.org\n/);
   assert.equal((detail.match(/### 圖像/g) ?? []).length, 1);
-  // T1 (R1-1): the old `### 圖像` section is carried over verbatim, so the rerun keeps the pictures and the search is skipped (T2 reworks this).
-  assert.match(detail, /Work 10/); assert.ok(!/Work 20/.test(detail));
-  assert.equal(r.calls.length, 1);
+  assert.equal(stageOf(r.raw(0)), 'checked');
+  assert.ok(!r.stat.logs.some(l => l.includes(' slots ')), 'no slots event without a plan');
 });
+
+test('image plan with 0 slots: no search, no record, the old picture section is not carried over (the card has a plan)', async () => {
+  const r = await picRig({ slots: 0, text: () => `新文。\n\n${mk(1)}\n\n尾。\n`, finder: () => found({}) });
+  await r.repo.updateNote(r.nodes[0].path, { detail: OLD_DETAIL });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.equal(r.calls.length, 0);
+  assert.ok(!/book-slots|〔圖位|### 圖像/.test(detail));
+  assert.match(detail, /新文。\n\n尾。/);
+  assert.equal(stageOf(r.raw(0)), 'checked');
+});
+
+test('slots: a write that is discarded (the owner edited the card meanwhile) does not advance the stage and releases the claimed picture for the next chapter', async () => {
+  const gate = defer();
+  let hit = 0;
+  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], slots: 1, text: title => `${BODY} ${title}\n\n${mk(1)}\n\n尾。\n`, finder: () => found({ 1: [cand(1)] }), ports: { updateNoteGuarded: async (path, patch, options) => { return r2.repo.updateNoteGuarded(path, patch, options); } } });
+  const r2 = r;
+  const finder = r.ports.findImages;
+  r.ports.findImages = async (request, runInfo) => { if (/SecretTitleA/.test(request.chapter)) await gate.promise; return finder(request, runInfo); };
+  r.ports.updateNoteGuarded = async (path, patch, options) => {
+    if (path === r.nodes[0].path && /book-slots/.test(patch.detail ?? '') && !hit++) {
+      r.contents.set(path, r.raw(0) + '\nowner edit');
+      const out = await r.repo.updateNoteGuarded(path, patch, options);
+      gate.resolve();
+      return out;
+    }
+    return r.repo.updateNoteGuarded(path, patch, options);
+  };
+  await run(r);
+  assert.equal(hit >= 1, true);
+  assert.match(await r.raw(0), /owner edit/, 'the owner text is not overwritten');
+  assert.ok((await r.note(1)).detail.includes('![Work 1]'), 'the picture released by the discarded write went to the next chapter');
+});
+
+test('slots: a picture claimed by a chapter whose write is blocked by the exit check is released for the next chapter', async () => {
+  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], slots: 1, text: title => `${BODY} ${title}\n\n${mk(1)}\n\n尾。\n`, finder: () => found({ 1: [cand(1)] }) });
+  const first = defer();
+  const finder = r.ports.findImages;
+  r.ports.findImages = async (request, runInfo) => { if (/SecretTitleA/.test(request.chapter)) await first.promise; return finder(request, runInfo); };
+  let blocked = 0;
+  r.runs.exitCheck = text => { if (!text.includes('![Work 1]') || blocked++) return false; first.resolve(); return true; };
+  await run(r);
+  assert.equal((await embedded(r, 2)).length, 1, 'the picture went to the other chapter');
+  assert.ok(figures((await r.note(1)).detail).length === 1);
+});
+
+const embedded = async (r, n) => { const out = []; for (let i = 0; i < n; i++) out.push(...figures((await r.note(i)).detail)); return out; };
 
 test('sections: chapterBody drops the picture section; setImageSection puts it before Sources, replaces an old one and removes on null', () => {
   const { chapterBody, setImageSection } = S.load('core/book-pipeline/note-sections.ts');
@@ -260,16 +362,6 @@ test('images: addresses to an inner network or with credentials / odd ports are 
   for (const url of ok) assert.match(replaceBodyImages(`![x](${url})`, new Map()), /^!\[x\]\(https:\/\//, url);
 });
 
-test('images: a refused address is not probed and not embedded', async () => {
-  const r = await picRig({ finder: () => [cand(1, { url: 'https://127.0.0.1/a.jpg' }), cand(2, { url: 'https://foo.local/b.jpg' }), cand(3, { url: 'https://example.com:8443/c.jpg' }), cand(4)], probe: async () => ({ ok: true }) });
-  await run(r);
-  const detail = (await r.note(0)).detail;
-  assert.equal((detail.match(/!\[/g) ?? []).length, 1);
-  assert.deepEqual(r.stat.probes.filter(u => /127\.0|\.local|8443/.test(u)), []);
-});
-
-const embedded = async (r, n) => { const out = []; for (let i = 0; i < n; i++) out.push(...((await r.note(i)).detail.match(/!\[[^\]]*\]\([^)\s]+\)/g) ?? [])); return out; };
-
 test('images: imageKey is the decoded lowercase Wikimedia file name for original and thumbnail forms on both hosts; other addresses lose query and hash', () => {
   const name = 'my_file%20%C3%A9.jpg';
   const keys = [`https://upload.wikimedia.org/wikipedia/commons/a/ab/${name}`, `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/${name}/1280px-${name}`,
@@ -281,78 +373,126 @@ test('images: imageKey is the decoded lowercase Wikimedia file name for original
   assert.equal(imageKey('https://example.com/a/b.jpg?x=2'), imageKey('https://example.com/a/b.jpg'));
 });
 
-test('images: two chapters searched at the same time that get the same picture embed it once, and the duplicate is counted', async () => {
-  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], finder: () => [cand(1)] });
+
+test('slots: two chapters searched at the same time that get the same picture place it once; the other slot ends not_found', async () => {
+  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], slots: 1, text: title => `${BODY} ${title}\n\n${mk(1)}\n\n尾。\n`, finder: () => found({ 1: [cand(1)] }) });
   await run(r);
   assert.equal((await embedded(r, 2)).length, 1, 'one picture in the whole book');
   assert.equal(r.calls.length, 2);
   assert.ok(r.calls.every(c => Array.isArray(c.exclude)));
-  assert.match(r.stat.logs.join('\n'), /duplicate=1/);
+  const states = [(await r.note(0)).detail, (await r.note(1)).detail].map(d => recordOf(d).slots[0]);
+  assert.deepEqual(states.map(s => s.state).sort(), ['missing', 'placed']);
+  assert.equal(states.find(s => s.state === 'missing').reasonCode, 'not_found');
 });
 
-test('images: a later chapter is told the pictures other chapters already use, but a single-card rerun does not exclude its own', async () => {
-  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], finder: req => [cand(/SecretTitleA/.test(req.query) ? 2 : 1)] });
+test('slots: a later chapter is told the pictures other chapters already use; a single-card rerun searches again and does not exclude its own', async () => {
+  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], slots: 1, text: title => `${BODY} ${title}\n\n${mk(1)}\n\n尾。\n`, finder: req => found({ 1: [cand(/SecretTitleA/.test(req.chapter) ? 2 : 1)] }) });
   await run(r);
   assert.equal((await embedded(r, 2)).length, 2, 'each chapter has its own picture');
   const key = n => imageKey(cand(n).url);
-  const search = n => r.calls.filter(c => (n === 2) === /SecretTitleA/.test(c.query));
   const before = r.calls.length;
-  dropPictures(r, 1); // T1: a rerun keeps an old picture section and skips the search, so start from a card without pictures
   await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
   while (r.runs.isRunning(r.mapPath)) await tick();
   await settle();
   const rerun = r.calls[before];
-  assert.ok(/SecretTitleA/.test(rerun.query));
+  assert.ok(rerun, 'a card with an image plan is searched again on a rerun');
+  assert.ok(/SecretTitleA/.test(rerun.chapter));
   assert.ok(rerun.exclude.includes(key(1)), 'the other chapter\'s picture is excluded');
   assert.ok(!rerun.exclude.includes(key(2)), 'its own old picture is not excluded');
-  assert.equal(search(2).length, 2);
+  assert.equal(figures((await r.note(1)).detail).length, 1);
+  assert.equal((await r.note(1)).detail.split('book-slots:v1').length - 1, 1, 'the record is replaced, not added');
 });
 
-test('images: the find-images step drops images the model marks not relevant or gives no description for, and counts them', () => {
+test('images: the find-images step keeps up to 3 candidates per slot with the caption of the image the parser kept, drops not-relevant or undescribed images, and counts them', () => {
   const { findImagesStep } = require('./support-ai-calls.cjs').loadWithAiCalls('core/steps/book-pipeline/find-images.ts');
-  const img = (n, extra) => ({ title: `T${n}`, imageUrl: `https://upload.wikimedia.org/a/ab/F${n}.jpg`, sourceUrl: 'https://commons.wikimedia.org/x', kind: 'diagram', shows: 'a thing', relevant: true, ...extra });
-  const parsed = findImagesStep.parse(JSON.stringify({ images: [img(1), img(2, { relevant: false }), img(3, { shows: '  ' }), img(4, { shows: undefined }), img(5)] }));
-  assert.deepEqual([...parsed.map(p => p.title)], ['T1', 'T5']);
-  assert.equal(parsed.offTopic, 3);
-  const prompt = findImagesStep.render({ query: 'q', exclude: Array.from({ length: 40 }, (_, i) => `k${i}${'x'.repeat(200)}`), language: 'en', model: 'm', reasoning: 'low' });
+  const img = (n, extra) => ({ title: `T${n}`, caption: `C${n}`, imageUrl: `https://upload.wikimedia.org/a/ab/F${n}.jpg`, sourceUrl: 'https://commons.wikimedia.org/x', kind: 'diagram', shows: 'a thing', relevant: true, ...extra });
+  const parsed = findImagesStep.parse(JSON.stringify({ slots: [{ slot: 1, images: [img(1), img(2, { relevant: false }), img(3, { imageUrl: 'http://bad.example/x.jpg' }), img(4, { shows: '  ' }), img(5, { caption: undefined }), img(6), img(7), img(8)] }, { slot: 2, images: [img(9)] }, { slot: 'x', images: [img(10)] }, null] }));
+  assert.deepEqual([...parsed.bySlot.get(1)].map(p => [p.title, p.caption]), [['T1', 'C1'], ['T5', 'a thing'], ['T6', 'C6']], 'the caption follows its own image though one before it was dropped');
+  assert.deepEqual([...parsed.bySlot.keys()], [1, 2]);
+  assert.equal(parsed.offTopic, 2);
+  assert.equal(parsed.found, 4);
+  assert.equal(findImagesStep.parse('not json').found, 0);
+  assert.equal(findImagesStep.version, 3);
+  const prompt = findImagesStep.render({ chapter: 'q', slots: [{ index: 1, kind: 'diagram', explains: 'perspective' }], exclude: Array.from({ length: 40 }, (_, i) => `k${i}${'x'.repeat(200)}`), language: 'en', model: 'm', reasoning: 'low' });
   assert.equal(JSON.parse(/exclude list[^\[]*(\[.*\])/.exec(prompt)[1]).length, 30);
   assert.ok(!/x{121}/.test(prompt));
+  assert.match(prompt, /"slot":1,"kind":"diagram","shows":"perspective"/);
 });
 
-test('images: a single-card rerun (fresh run state) still refuses a picture another chapter already shows, even if the search ignores the exclude list', async () => {
-  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], finder: req => [cand(/SecretTitleA/.test(req.query) ? 2 : 1)] });
+test('slots: a single-card rerun (fresh run state) still refuses a picture another chapter already shows, even if the search ignores the exclude list', async () => {
+  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], slots: 1, text: title => `${BODY} ${title}\n\n${mk(1)}\n\n尾。\n`, finder: req => found({ 1: [cand(/SecretTitleA/.test(req.chapter) ? 2 : 1)] }) });
   await run(r);
-  r.stat.logs.length = 0;
   const finder = r.ports.findImages;
-  r.ports.findImages = async (request, runInfo) => { await finder(request, runInfo); return [cand(1)]; };
-  dropPictures(r, 1);
+  r.ports.findImages = async (request, runInfo) => { await finder(request, runInfo); return found({ 1: [cand(1)] }); };
   await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
   while (r.runs.isRunning(r.mapPath)) await tick();
   await settle();
-  assert.ok(!/W1\.jpg/.test((await r.note(1)).detail), 'the other chapter\'s picture is not embedded again');
-  assert.match(r.stat.logs.join('\n'), /duplicate=1/);
+  assert.ok(!/W1\.jpg/.test((await r.note(1)).detail), 'the other chapter\'s picture is not placed again');
+  assert.equal(recordOf((await r.note(1)).detail).slots[0].reasonCode, 'not_found');
 });
 
-test('images: another chapter whose note cannot be read does not fail this chapter\'s picture search', async () => {
-  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], finder: () => [cand(1)] });
+test('slots: another chapter whose note cannot be read does not fail this chapter', async () => {
+  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], slots: 1, text: title => `${BODY} ${title}\n\n${mk(1)}\n\n尾。\n`, finder: () => found({ 1: [cand(1)] }) });
   const author = r.script.author;
   let gone = false;
   r.script.author = async (input, n) => { const out = await author(input, n); gone = true; return out; };
   const read = r.ports.readCard;
   r.ports.readCard = path => (gone && path === r.nodes[1].path ? Promise.reject(new Error('deleted')) : read(path));
   await run(r);
-  assert.match((await r.note(0)).detail, /### 圖像/);
+  assert.equal(figures((await r.note(0)).detail).length, 1);
   assert.equal(stageOf(r.raw(0)), 'checked');
 });
 
-test('images: a picture claimed by a chapter whose write is blocked by the exit check is released for the next chapter', async () => {
-  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], finder: () => [cand(1)] });
-  const first = defer();
-  const finder = r.ports.findImages;
-  r.ports.findImages = async (request, runInfo) => { if (/SecretTitleA/.test(request.query)) await first.promise; return finder(request, runInfo); };
-  let blocked = 0;
-  r.runs.exitCheck = text => { if (!text.includes('![Work 1]') || blocked++) return false; first.resolve(); return true; };
+test('slots load: 5 chapters x 8 slots whose candidates all fail probe at most 24 addresses a chapter and 4 at a time, one search call each, and every card still ends checked', async () => {
+  const titles = ['T0', 'T1', 'T2', 'T3', 'T4'];
+  let seq = 0;
+  let inflight = 0, peak = 0;
+  const text = title => `${BODY} ${title}\n\n${Array.from({ length: 8 }, (_, i) => `${mk(i + 1)}\n\n段${i + 1}。`).join('\n\n')}\n`;
+  const finder = req => found(Object.fromEntries(req.slots.map(s => [s.index, Array.from({ length: 4 }, () => cand(++seq))])));
+  const r = await picRig({ titles, slots: 8, text, finder, probe: async () => { inflight++; peak = Math.max(peak, inflight); await tick(); await tick(); inflight--; return { ok: false, reason: 'load_failed' }; } });
   await run(r);
-  assert.ok(!/### 圖像/.test((await r.note(0)).detail), 'the blocked chapter wrote nothing');
-  assert.equal((await embedded(r, 2)).length, 1, 'the picture went to the other chapter');
+  assert.equal(r.calls.length, 5, 'one search per chapter');
+  assert.ok(r.calls.every(c => c.slots.length === 8));
+  assert.ok(peak <= 4 && peak >= 2, `peak ${peak}`);
+  assert.equal(r.stat.probes.length, 5 * 24, 'each chapter probes its first 24 distinct addresses of 32');
+  for (let i = 0; i < 5; i++) { assert.equal(stageOf(r.raw(i)), 'checked'); assert.equal(recordOf((await r.note(i)).detail).slots.length, 8); }
+});
+
+test('slots: a failure after the write and before the stage change leaves pictures and one record; running again fills the new markers and replaces the record', async () => {
+  const r = await picRig({ finder: () => found({ 1: [cand(1)], 2: [cand(2)] }) });
+  let boom = 1;
+  const wf = r.ports.writePipelineFields;
+  r.ports.writePipelineFields = (path, patch) => { if (patch.pipelineStage === 'written' && boom-- > 0) return Promise.reject(new Error('stage write failed')); return wf(path, patch); };
+  await r.runs.start(r.mapPath).catch(() => undefined);
+  await confirmDone(r.runs, r.mapPath).catch(() => undefined);
+  await settle();
+  assert.notEqual(stageOf(r.raw(0)), 'written');
+  assert.equal(figures((await r.note(0)).detail).length, 2, 'the filled text was committed');
+  await r.runs.start(r.mapPath).catch(() => undefined);
+  await confirmDone(r.runs, r.mapPath).catch(() => undefined);
+  await settle();
+  const detail = (await r.note(0)).detail;
+  assert.equal(detail.split('book-slots:v1').length - 1, 1);
+  assert.ok(!/〔圖位/.test(detail));
+});
+
+test('T1 fallback: the old picture-less card shape is unchanged by a card with a plan: a card plan without images parses as an old Prompt', () => {
+  const { parseImageSlots, composeCardPrompt } = S.load('core/book-pipeline/plan-text.ts');
+  const plan = { role: 'body', covers: 'c', entry: 'e', handoff: 'h', checklist: [{ id: 'C1', type: 'structure', text: 't' }] };
+  assert.equal(parseImageSlots(composeCardPrompt(plan, 'zh-TW')), undefined);
+  assert.equal(parseImageSlots(composeCardPrompt({ ...plan, images: [] }, 'zh-TW')).length, 0);
+  assert.equal(parseImageSlots(composeCardPrompt({ ...plan, images: slotsOf(2) }, 'zh-TW')).length, 2);
+});
+
+test('slots: CRLF text is filled with CRLF lines and verifies; no marker is left', () => {
+  const m = S.load('core/book-pipeline/image-slots.ts');
+  const slots = [{ index: 1 }];
+  const text = `前。\r\n\r\n${mk(1)}\r\n\r\n後。\r\n`;
+  const fig = m.figureOf({ imageUrl: 'https://a.example/x.jpg', sourceUrl: 'https://b.example', title: 'T', caption: 'C' }, 'https://a.example/x.jpg', 'zh-TW');
+  const done = m.fillSlotMarkers(text, slots, new Map([[1, { figure: fig }]]));
+  assert.equal(done.text, '前。\r\n\r\n![T](https://a.example/x.jpg)\r\nC\r\n\r\n後。\r\n');
+  assert.equal(m.verifyFill(text, done, slots), undefined);
+  const none = m.fillSlotMarkers(text, slots, new Map());
+  assert.equal(m.verifyFill(text, none, slots), undefined);
+  assert.ok(!/〔圖位/.test(none.text));
 });

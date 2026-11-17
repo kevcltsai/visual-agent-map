@@ -241,6 +241,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "book-find-images.en": {
+      "builder": "core/steps/book-pipeline/find-images.ts findImagesStep",
+      "language": "en",
+      "schema": false
+    },
+    "book-find-images.zh": {
+      "builder": "core/steps/book-pipeline/find-images.ts findImagesStep",
+      "language": "zh-TW",
+      "schema": false
+    },
+    "book-find-images.zh-CN": {
+      "builder": "core/steps/book-pipeline/find-images.ts findImagesStep",
+      "language": "zh-CN",
+      "schema": false
+    },
     "book-global-plan.en": {
       "builder": "core/steps/book-pipeline/global-plan.ts globalPlanStep",
       "language": "en",

@@ -690,16 +690,16 @@ test('an unexpected error before the store exists still saves its code (stopped,
   assert.equal(r.stat.plan.length, 0, 'no call was made');
 });
 
-test('a written chapter with no picture gets one "no picture" line in the research notes (body untouched, no duplicate on a rewrite); one with a picture gets none; the log has pictures=n', async () => {
+test('a written chapter whose Prompt has no image plan gets no "no picture" line and no search (body untouched); the log has no pictures event', async () => {
   const r = await rig();
   await r.runs.start(r.mapPath);
   await confirmDone(r.runs, r.mapPath);
   for (let i = 0; i < 3; i++) {
     const detail = (await r.note(i)).detail;
-    assert.equal(detail.split('無圖：未找到可驗證的公開圖片').length - 1, 1, `card ${i}: one line`);
+    assert.ok(!/無圖：/.test(detail), `card ${i}: no picture line`);
     assert.equal(withoutResearchNotes(detail).replace(/\s+$/, ''), bodyOf(TITLES[i]) + '', 'the body text is as the author wrote it');
   }
-  assert.ok(r.stat.logs.some(line => / pictures=0$/.test(line) && /book-pipeline pictures /.test(line)));
+  assert.ok(!r.stat.logs.some(line => /book-pipeline (pictures|slots) /.test(line)));
   assert.ok(!r.stat.logs.some(line => /SecretBody|SecretTitle/.test(line)));
 });
 
@@ -709,8 +709,7 @@ test('a chapter whose body already carries a picture is not given the no-picture
   r.script.author = async input => { await input.admission.reserve(); const note = await r.repo.readNote(input.path); const w = await r.repo.updateNoteGuarded(input.path, { detail: body(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return w === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; };
   await r.runs.start(r.mapPath);
   await confirmDone(r.runs, r.mapPath);
-  for (let i = 0; i < 3; i++) assert.ok(!(await r.note(i)).detail.includes('無圖：未找到'));
-  assert.ok(r.stat.logs.some(line => / pictures=1$/.test(line)));
+  for (let i = 0; i < 3; i++) assert.ok(!(await r.note(i)).detail.includes('無圖：'));
 });
 
 test('every accepted card plan logs one checklist_dropped line with counts only (zero included)', async () => {

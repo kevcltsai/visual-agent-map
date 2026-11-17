@@ -7,61 +7,98 @@ import { parseImageCandidates } from "../image-search/step";
 import type { BookStepBase } from "./base";
 import template from "./find-images.md";
 
-/** What the picture search of one chapter sees: the search text built from its title, summary and named works. */
+/** One planned picture position as the search sees it (the planner's kind and what it must show; never the marker). */
+export interface FindImagesSlot {
+  index: number;
+  kind: string;
+  explains: string;
+}
+
+/** What the picture search of one chapter sees: the chapter text (title, summary and the works it names) and its picture positions. */
 export interface FindImagesRequest extends BookStepBase {
-  query: string;
+  chapter: string;
+  slots: FindImagesSlot[];
   /** Image keys (see imageKey) the book already uses: file names or addresses only, never model-written titles. */
   exclude?: string[];
 }
 
-const EXCLUDE_MAX = 30;
-const EXCLUDE_ITEM_MAX = 120;
-
-/** Drops the images the model itself marked as not relevant or described no content for, then the shared candidate parser. */
-function parseFound(raw: string): ImageCandidate[] {
-  const start = raw.indexOf("{"),
-    end = raw.lastIndexOf("}");
-  let kept = raw;
-  let dropped = 0;
-  if (start >= 0 && end > start) {
-    try {
-      const parsed = JSON.parse(raw.slice(start, end + 1)) as { images?: unknown };
-      if (Array.isArray(parsed.images)) {
-        const images = (parsed.images as Array<Record<string, unknown> | null>).filter(item => {
-          const ok = !!item && item.relevant !== false && typeof item.shows === "string" && item.shows.trim() !== "";
-          if (!ok) dropped++;
-          return ok;
-        });
-        kept = JSON.stringify({ images });
-      }
-    } catch {
-      /* the shared parser returns [] */
-    }
-  }
-  const found = parseImageCandidates(kept);
-  // For the pictures log only; not enumerable so the result still compares as a plain list.
-  Object.defineProperty(found, "offTopic", { value: dropped, enumerable: false });
-  return found;
+/** One offered picture: the shared candidate plus the one plain line the finder wrote about it. */
+export interface FoundImage extends ImageCandidate {
+  caption: string;
+}
+/** The answer: up to {@link PER_SLOT_MAX} candidates per slot index; `found` counts the kept images, `offTopic` those the model marked as not relevant or described no content for. */
+export interface FoundImages {
+  bySlot: Map<number, FoundImage[]>;
+  found: number;
+  offTopic: number;
 }
 
-/** The map chat's image candidates (same parser: https links with an https source page, at most six), asked for the book's sources. */
-export const findImagesStep: StepDefinition<FindImagesRequest, ImageCandidate[]> = {
+const EXCLUDE_MAX = 30;
+const EXCLUDE_ITEM_MAX = 120;
+const PER_SLOT_MAX = 3;
+const CAPTION_MAX = 200;
+const SLOT_TEXT_MAX = 160;
+
+/** Per slot, each image goes through the shared candidate parser on its own, so the caption stays with the image the parser kept. */
+function parseFound(raw: string): FoundImages {
+  const out: FoundImages = { bySlot: new Map(), found: 0, offTopic: 0 };
+  const start = raw.indexOf("{"),
+    end = raw.lastIndexOf("}");
+  if (start < 0 || end <= start) return out;
+  let parsed: { slots?: unknown };
+  try {
+    parsed = JSON.parse(raw.slice(start, end + 1)) as { slots?: unknown };
+  } catch {
+    return out;
+  }
+  if (!Array.isArray(parsed.slots)) return out;
+  for (const entry of parsed.slots as Array<Record<string, unknown> | null>) {
+    if (!entry || !Number.isInteger(entry.slot) || !Array.isArray(entry.images)) continue;
+    const index = entry.slot as number;
+    const list = out.bySlot.get(index) ?? [];
+    for (const item of entry.images as Array<Record<string, unknown> | null>) {
+      if (list.length >= PER_SLOT_MAX) break;
+      if (!item || typeof item !== "object") continue;
+      if (item.relevant === false || typeof item.shows !== "string" || !item.shows.trim()) {
+        out.offTopic++;
+        continue;
+      }
+      const [candidate] = parseImageCandidates(JSON.stringify({ images: [item] }));
+      if (!candidate || list.some(have => have.url === candidate.url)) continue;
+      const caption = typeof item.caption === "string" && item.caption.trim() ? item.caption : item.shows;
+      list.push({ ...candidate, caption: caption.replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX) });
+      out.found++;
+    }
+    out.bySlot.set(index, list);
+  }
+  return out;
+}
+
+/** The map chat's image candidates (same parser: https links with an https source page), asked per picture position for the book's sources. */
+export const findImagesStep: StepDefinition<FindImagesRequest, FoundImages> = {
   id: "book-pipeline.find-images",
-  version: 2,
-  render: ({ query, exclude }) =>
+  version: 3,
+  render: ({ chapter, slots, exclude }) =>
     renderTemplate(template, {
-      query: JSON.stringify(query),
+      chapter: JSON.stringify(chapter),
+      slots: JSON.stringify(
+        slots.map(slot => ({
+          slot: slot.index,
+          kind: slot.kind.slice(0, SLOT_TEXT_MAX),
+          shows: slot.explains.slice(0, SLOT_TEXT_MAX)
+        }))
+      ),
       exclude: JSON.stringify((exclude ?? []).slice(0, EXCLUDE_MAX).map(key => key.slice(0, EXCLUDE_ITEM_MAX)))
     }),
   parse: raw => parseFound(raw)
 };
 
-/** One web search call for a chapter's pictures: web search only, the budget reserved before the provider is asked, no content in the exchange log. */
+/** One web search call for a chapter's pictures (every slot at once): web search only, the budget reserved before the provider is asked, no content in the exchange log. */
 export function runFindImages(
   aiCalls: AiCalls,
   request: FindImagesRequest,
   run: { signal: AbortSignal; admission?: AdmissionContext }
-): Promise<ImageCandidate[]> {
+): Promise<FoundImages> {
   const prepared = prepareStep(findImagesStep, request);
   return aiCalls.run(
     prepared,

@@ -12,6 +12,8 @@ export interface PipelineLogEvent {
   ms: number;
   /** Optional numbers (counts only), written as `name=n`. */
   counts?: Readonly<Record<string, number>>;
+  /** Optional host names (at most 5, each reduced to code characters), written as `name=a,b`. */
+  hosts?: { name: string; list: readonly string[] };
 }
 
 const code = (value: string): string => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60) || "-";
@@ -21,5 +23,5 @@ export function formatPipelineLog(e: PipelineLogEvent): string {
     e.counts ?? {}
   )
     .map(([name, n]) => ` ${code(name)}=${Math.max(0, Math.trunc(Number(n) || 0))}`)
-    .join("")}`;
+    .join("")}${e.hosts?.list.length ? ` ${code(e.hosts.name)}=${e.hosts.list.slice(0, 5).map(code).join(",")}` : ""}`;
 }

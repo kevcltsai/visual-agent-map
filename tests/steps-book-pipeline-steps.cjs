@@ -171,10 +171,10 @@ test('proofread: an item the reply asserts without a source this call opened dro
 test('proofread: the same page written another way matches the event; another page, an unopened page and a self-declared page do not', () => {
   const opened = ['https://Example.org:443/a/b/?utm_source=x&id=7#top'];
   const ok = spelling => proof.evaluateProof([item('C1'), item('C2', 'met', [spelling])], checklist, opened).items[1];
-  for (const same of ['https://example.org/a/b?id=7', 'http://EXAMPLE.org/a/b/?id=7&utm_medium=m#z', 'https://example.org/a/b?fbclid=1&id=7']) {
+  for (const same of ['https://example.org/a/b?id=7', 'http://EXAMPLE.org/a/b/?id=7&utm_medium=m#z', 'https://example.org/a/b?fbclid=1&id=7', 'https://www.example.org/a/b?id=7']) {
     assert.equal(ok(same).status, 'met', same); assert.deepEqual(plain(ok(same).sources), ['https://example.org/a/b/?utm_source=x&id=7#top'], 'the saved source is the event address (https)');
   }
-  for (const other of ['https://example.org/a/c?id=7', 'https://example.org/a/b?id=8', 'https://www.example.org/a/b?id=7', 'https://example.org/a/b', 'https://user:pw@example.org/a/b?id=7']) {
+  for (const other of ['https://example.org/a/c?id=7', 'https://example.org/a/b?id=8', 'https://example.org/a/b', 'https://user:pw@example.org/a/b?id=7']) {
     factsUnverified(proof.evaluateProof([item('C1'), item('C2', 'met', [other])], checklist, opened), other);
   }
   // an http event is never a source, even when the model cites the https spelling
@@ -442,7 +442,7 @@ test('author rules: pictures come from Wikimedia Commons or museum collections o
 test('proofread counts: openedPages and searches ride with the result and with a failure, and the record names each source as an opened page', async () => {
   const h = harness({ answer: reply([item('C1'), item('C2', 'met', ['https://example.org/a'])]), events: [search('q1'), search('q2'), page('https://example.org/a'), page('https://example.org/b')] });
   const result = await proofMod.runProofread(h.proofCalls, proofRequest(), { signal: signal() });
-  assert.deepEqual(plain(result.counts), { openedPages: 2, searches: 2 });
+  assert.deepEqual(plain(result.counts), { openedPages: 2, searches: 2, sources: { sourcesCited: 1, sourcesMatched: 1, eventUrls: 2, unmatchedHosts: [] } });
   const text = proof.composeProofRecord('k', result);
   assert.match(text, /開頁 2 次、搜尋 2 次/); assert.match(text, /（開頁：`https:\/\/example\.org\/a`）/);
   assert.deepEqual(plain(proof.findProofRecord(text, 'k').counts), { openedPages: 2, searches: 2 });
@@ -455,4 +455,36 @@ test('pipeline log line: counts are numbers appended as name=n, never text', () 
   const line = pipelineLog.formatPipelineLog({ event: 'proof_calls', runId: 'r', card: 'n2', step: 'proof', attempt: 1, result: 'ok', ms: 0, counts: { openedPages: 2, searches: 3 } });
   assert.equal(line, 'book-pipeline proof_calls run=r card=n2 step=proof attempt=1 result=ok ms=0 openedPages=2 searches=3');
   assert.match(pipelineLog.formatPipelineLog({ event: 'e', runId: 'r', card: 'c', step: 'proof', attempt: 1, result: 'ok', ms: 0, counts: { 'bad name!': Number.NaN } }), / bad_name_=0$/);
+});
+
+test('proofread guard: a chapter that holds its own inline citation address does not make that opened address a leak; long chapter text inside an address still does', () => {
+  const url = 'https://example.org/wiki/Linear_perspective_in_Florentine_painting_of_the_early_fifteenth_century';
+  const prose = 'Brunelleschi demonstrated linear perspective in Florence around fourteen fifteen with a mirror panel.';
+  const body = `${prose}（來源：[Linear perspective](${url})）`;
+  const ok = proof.evaluateProof([item('C1'), item('C2', 'met', [url])], checklist, [url], { body });
+  assert.deepEqual(plain(ok.items[1].sources), [url]); assert.equal(ok.items[1].note, 'ok');
+  const leakUrl = `https://evil.example/?q=${encodeURIComponent(prose)}`;
+  const leaked = proof.evaluateProof([item('C1'), item('C2', 'met', [leakUrl]), item('C1')].slice(0, 2), checklist, [url, leakUrl], { body });
+  assert.equal(leaked.items[1].note, proof.LEAK_NOTE); assert.deepEqual(plain(leaked.items[1].sources), []);
+});
+
+test('source matching: percent-encoding case, %28/%29, a leading www. match; other paths, other languages and unopened pages never do', () => {
+  const open = (opened, source) => proof.evaluateProof([item('C1'), item('C2', 'met', [source])], checklist, [opened]).items[1].sources.length;
+  assert.equal(open('https://zh.wikipedia.org/wiki/%E6%B8%AC_(x)', 'https://zh.wikipedia.org/wiki/%e6%b8%ac_%28x%29'), 1);
+  assert.equal(open('https://www.example.org/a', 'https://example.org/a'), 1);
+  assert.equal(open('https://example.org/a', 'https://www.example.org/a'), 1);
+  assert.equal(open('https://example.org/a', 'https://example.org/b'), 0);
+  assert.equal(open('https://en.wikipedia.org/wiki/Cat', 'https://zh.wikipedia.org/wiki/Cat'), 0);
+  assert.equal(open('https://example.org/a%2Fb', 'https://example.org/a/b'), 0, 'an encoded slash is another page');
+  assert.equal(open('https://example.org/x', 'https://example.org/y%28'), 0);
+});
+
+test('source diagnostics: numbers and host names only (at most 5, no path or query); the proof_calls log line carries them, never a title', () => {
+  const sources = ['https://www.a.example/p?q=SECRET', 'https://b.example/x', 'https://c.example/x', 'https://d.example/x', 'https://e.example/x', 'https://f.example/x', 'https://g.example/x', 'https://ok.example/1'];
+  const d = proof.sourceDiagnostics([item('C1', 'met', sources.slice(0, 4)), item('C2', 'met', sources.slice(4))], ['https://ok.example/1', 'https://z.example/']);
+  assert.deepEqual([d.sourcesCited, d.sourcesMatched, d.eventUrls], [8, 1, 2]);
+  assert.deepEqual(plain(d.unmatchedHosts), ['a.example', 'b.example', 'c.example', 'd.example', 'e.example']);
+  const line = pipelineLog.formatPipelineLog({ event: 'proof_calls', runId: 'r', card: 'n2', step: 'proof', attempt: 1, result: 'ok', ms: 0, counts: { sourcesCited: 8 }, hosts: { name: 'unmatchedHosts', list: d.unmatchedHosts } });
+  assert.equal(line, 'book-pipeline proof_calls run=r card=n2 step=proof attempt=1 result=ok ms=0 sourcesCited=8 unmatchedHosts=a.example,b.example,c.example,d.example,e.example');
+  assert.ok(!/SECRET|\/p/.test(line));
 });

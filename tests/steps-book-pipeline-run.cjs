@@ -647,6 +647,17 @@ test('a proofread call logs openedPages and searches as numbers only; the log ca
   assert.match(r.raw(1), /開頁 2 次、搜尋 3 次/);
 });
 
+test('a proofread call with source diagnostics logs sourcesCited, sourcesMatched, eventUrls and the unmatched hosts only', async () => {
+  const sources = { sourcesCited: 3, sourcesMatched: 1, eventUrls: 2, unmatchedHosts: ['a.example', 'b.example'] };
+  const r = await rig({ script: { proof: async request => ({ items: request.checklist.map(c => ({ id: c.id, type: c.type, status: 'met', note: 'fine', sources: [] })), aggregate: 'checked', counts: { openedPages: 2, searches: 3, sources } }) } });
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const lines = r.stat.logs.filter(l => l.includes('proof_calls'));
+  assert.equal(lines.length, 3);
+  for (const line of lines) assert.match(line, /openedPages=2 searches=3 sourcesCited=3 sourcesMatched=1 eventUrls=2 unmatchedHosts=a\.example,b\.example$/);
+  assert.match(r.raw(1), /開頁 2 次、搜尋 3 次/);
+  assert.ok(!/sourcesCited/.test(r.raw(1)), 'the diagnostics are not stored in the note');
+});
+
 // Real wiring: main.mutate() reads every view back after each write, and the view's repaint asks getProgress while the first start is
 // still inside its own mutate (the drive exists, its store does not yet). That read used to throw "reading 'state'" of undefined.
 test('first start on a map with no bookPipeline: a repaint (getProgress) during the start write does not break the run', async () => {

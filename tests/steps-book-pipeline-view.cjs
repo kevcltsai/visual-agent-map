@@ -390,3 +390,9 @@ test('a checked card with unmet structure items shows only a small count; a chec
   assert.equal(ui.bookCardView({ pipelineStage: 'checked', pipelineIssue: 'whatever <b>' }).issueText, undefined);
   assert.equal(ui.bookCardView({ pipelineStage: 'written', pipelineIssue: 'structure unmet: C2' }).issueText, undefined);
 });
+
+test('bar: a saved done of the same run is final even when the runner record still says gate2', () => {
+  const state = ui.bookBarState(bookData({ phase: 'done', status: 'running' }), progress({ phase: 'gate2', active: false }), noStage);
+  assert.equal(state.phase, 'done'); assert.equal(state.mode, 'done');
+  assert.equal(ui.bookBarState(bookData({ phase: 'done' }), progress({ runId: 'r2', phase: 'planning' }), noStage).phase, 'planning', 'a newer run is not hidden');
+});

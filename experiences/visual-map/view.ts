@@ -17228,7 +17228,11 @@ export class VisualAgentMapView extends ItemView {
             await this.rereadBookCard(id);
           }
         },
-        finish: () => this.plugin.finishBookRun(path),
+        // The bar is part of the toolbar, not of this panel: it repaints once the acceptance is saved (or refused).
+        finish: () =>
+          this.plugin.finishBookRun(path).finally(() => {
+            if (!this.closed) this.render();
+          }),
         showChat: () => this.showChatFromBookPanel(),
         close: () => this.closeBookPanel(),
         refresh: () => this.paintBookPanel()

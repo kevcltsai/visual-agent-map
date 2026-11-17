@@ -180,6 +180,8 @@ test('finish: the review-finished button moves gate2 to done, a second press is 
   assert.equal(all(after.panel, 'vam-book-panel-finish').length, 0, 'done: no finish button');
   await r.runs.finishRun(r.mapPath);
   assert.equal((await r.stateOf()).phase, 'done');
+  assert.equal(r.runs.getProgress(r.mapPath).phase, 'done', 'the runner reports done right after the acceptance');
+  assert.equal(bundle.bookTitleText(bundle.bookBarState(await r.stateOf(), r.runs.getProgress(r.mapPath), () => undefined)).includes('驗收'), false, 'the bar title no longer says it waits for acceptance');
   const early = await rig();
   await early.runs.rerunCard(early.mapPath, early.nodes[1].id);
   const g1 = await rig();

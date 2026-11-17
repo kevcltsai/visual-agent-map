@@ -43306,10 +43306,10 @@ function createStoreBudgetPort(store) {
 // core/book-pipeline/log.ts
 var code = (value) => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60) || "-";
 function formatPipelineLog(e) {
-  var _a2;
+  var _a2, _b2;
   return `book-pipeline ${code(e.event)} run=${code(e.runId)} card=${code(e.card)} step=${e.step} attempt=${Math.max(0, Math.trunc(e.attempt))} result=${code(e.result)} ms=${Math.max(0, Math.round(e.ms))}${Object.entries(
     (_a2 = e.counts) != null ? _a2 : {}
-  ).map(([name2, n]) => ` ${code(name2)}=${Math.max(0, Math.trunc(Number(n) || 0))}`).join("")}`;
+  ).map(([name2, n]) => ` ${code(name2)}=${Math.max(0, Math.trunc(Number(n) || 0))}`).join("")}${((_b2 = e.hosts) == null ? void 0 : _b2.list.length) ? ` ${code(e.hosts.name)}=${e.hosts.list.slice(0, 5).map(code).join(",")}` : ""}`;
 }
 
 // core/book-pipeline/machine.ts
@@ -43602,10 +43602,36 @@ var normalizeUrl = (value) => {
   }
   if (url.protocol !== "https:" && url.protocol !== "http:" || url.username || url.password || !url.hostname)
     return void 0;
-  const kept = url.search.slice(1).split("&").filter((pair5) => pair5 && !TRACKING.test(pair5.split("=")[0]));
+  const kept = url.search.slice(1).split("&").filter((pair5) => pair5 && !TRACKING.test(pair5.split("=")[0])).map(samePercent);
   const query = kept.length ? `?${kept.join("&")}` : "";
-  return `${url.host.toLowerCase()}${url.pathname.replace(/\/+$/, "")}${query}`;
+  return `${url.host.toLowerCase().replace(/^www\./, "")}${samePercent(url.pathname).replace(/\/+$/, "")}${query}`;
 };
+var samePercent = (text10) => text10.replace(/%([0-9a-fA-F]{2})/g, (_, hex) => {
+  const ch = String.fromCharCode(parseInt(hex, 16));
+  return "!$'()*,;:@".includes(ch) ? ch : `%${hex.toUpperCase()}`;
+});
+function sourceDiagnostics(raw, openedUrls) {
+  var _a2;
+  const opened = new Set(openedUrls.map(normalizeUrl).filter((key4) => !!key4));
+  const cited = /* @__PURE__ */ new Map();
+  for (const item of raw) for (const source of item.sources) cited.set((_a2 = normalizeUrl(source)) != null ? _a2 : source, source);
+  const hosts = /* @__PURE__ */ new Set();
+  let matched = 0;
+  for (const [key4, source] of cited) {
+    if (opened.has(key4)) matched++;
+    else
+      try {
+        hosts.add(new URL(source).hostname.toLowerCase().replace(/^www\./, ""));
+      } catch (e) {
+      }
+  }
+  return {
+    sourcesCited: cited.size,
+    sourcesMatched: matched,
+    eventUrls: opened.size,
+    unmatchedHosts: [...hosts].slice(0, 5)
+  };
+}
 function safeHref(value) {
   if (typeof value !== "string") return void 0;
   const text10 = value.trim();
@@ -43629,6 +43655,7 @@ function sharesLongRun(text10, body) {
     if (hay.includes(chars.slice(i, i + LEAK_RUN).join(""))) return true;
   return false;
 }
+var withoutUrls = (text10) => text10.replace(/https?:\/\/[\x21-\x7e]+/gi, " ");
 var decoded2 = (text10) => {
   const forms = [text10];
   try {
@@ -43649,7 +43676,8 @@ function evaluateProof(raw, checklist, openedUrls, guard) {
     seen.add(item.id);
   }
   if (checklist.some((item) => !seen.has(item.id))) throw new ProofFailure("missing_item");
-  const leaks = (text10) => !!guard && decoded2(text10).some((form) => sharesLongRun(form, guard.body));
+  const guardBody = guard ? withoutUrls(guard.body) : "";
+  const leaks = (text10) => !!guard && decoded2(text10).some((form) => sharesLongRun(form, guardBody));
   const opened = /* @__PURE__ */ new Map();
   const leakedKeys = /* @__PURE__ */ new Set();
   for (const url of openedUrls) {
@@ -43845,6 +43873,22 @@ function markOldProofRecords(detail, currentKey) {
     }
   }
   return changed ? lines.join("\n") : detail;
+}
+function extractProofRecords(detail) {
+  const lines = detail.split("\n");
+  const section3 = findSection(lines, fencedLines2(lines), (text10) => isResearchNotesHeading(text10));
+  if (!section3) return [];
+  const records = [];
+  let current = [];
+  for (const line2 of lines.slice(section3.at + 1, section3.end)) {
+    if (CALLOUT_HEAD2.test(line2.replace(/\r$/, ""))) continue;
+    const plain = unquoted(line2).replace(/\r$/, "");
+    if (RECORD_KEY.test(plain.trim())) {
+      records.push([...current, plain.trim()].join("\n"));
+      current = [];
+    } else if (plain.trim() || current.length) current.push(plain);
+  }
+  return records;
 }
 function findStoredProof(detail, key4) {
   return findProofRecord(unquoted(detail), key4);
@@ -49821,7 +49865,18 @@ var BookPipelineRuns = class {
     if (done.outcome === "discarded") return { kind: "failed", reason: "discarded" };
     const path = await this.stillOnMap(drive, nodeId);
     if (!path) return { kind: "failed", reason: "card_removed" };
-    const written2 = await this.ports.readCard(path);
+    let written2 = await this.ports.readCard(path);
+    let carried = written2.detail;
+    for (const record of extractProofRecords(card.detail)) carried = appendResearchNote(carried, record).text;
+    if (carried !== written2.detail) {
+      const outcome = await this.ports.updateNoteGuarded(
+        path,
+        { detail: carried },
+        { expectedContent: written2.raw, authorize }
+      );
+      if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
+      written2 = await this.ports.readCard(path);
+    }
     const replacements = /* @__PURE__ */ new Map();
     for (const url of bodyImageUrls(written2.raw)) {
       const probed = await untilAborted(signal, this.ports.probeImage(url, signal)).catch((error) => {
@@ -50006,7 +50061,16 @@ var BookPipelineRuns = class {
         attempt: attemptsOf(drive.store.state, nodeId).proof,
         result,
         ms: 0,
-        counts: { ...counts }
+        counts: {
+          openedPages: counts.openedPages,
+          searches: counts.searches,
+          ...counts.sources ? {
+            sourcesCited: counts.sources.sourcesCited,
+            sourcesMatched: counts.sources.sourcesMatched,
+            eventUrls: counts.sources.eventUrls
+          } : {}
+        },
+        ...counts.sources ? { hosts: { name: "unmatchedHosts", list: counts.sources.unmatchedHosts } } : {}
       })
     );
   }
@@ -50039,8 +50103,9 @@ var PHASE_KEY = {
 };
 function bookBarState(data, progress, stageOf) {
   var _a2, _b2, _c, _d, _e, _f;
-  const phase = (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : data.phase;
-  const status = (_b2 = progress == null ? void 0 : progress.status) != null ? _b2 : data.status;
+  const savedDone = data.phase === "done" && (!progress || progress.runId === data.runId);
+  const phase = savedDone ? "done" : (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : data.phase;
+  const status = savedDone ? data.status : (_b2 = progress == null ? void 0 : progress.status) != null ? _b2 : data.status;
   const pauseReason = progress ? progress.pauseReason : data.pauseReason;
   const active = (_c = progress == null ? void 0 : progress.active) != null ? _c : false;
   const counts = (_d = progress == null ? void 0 : progress.counts) != null ? _d : countStages(data.order.map(stageOf));
@@ -80416,7 +80481,10 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
             await this.rereadBookCard(id);
           }
         },
-        finish: () => this.plugin.finishBookRun(path),
+        // The bar is part of the toolbar, not of this panel: it repaints once the acceptance is saved (or refused).
+        finish: () => this.plugin.finishBookRun(path).finally(() => {
+          if (!this.closed) this.render();
+        }),
         showChat: () => this.showChatFromBookPanel(),
         close: () => this.closeBookPanel(),
         refresh: () => this.paintBookPanel()
@@ -87062,9 +87130,11 @@ async function runProofread(aiCalls, request, run2) {
     },
     (raw) => {
       const opened = openedUrlsFromEvents(events);
-      const counts = { openedPages: opened.length, searches: searchEventCount(events) };
+      let counts = { openedPages: opened.length, searches: searchEventCount(events) };
       try {
-        return { ...evaluateProof(prepared.parse(raw), request.checklist, opened, { body: request.body }), counts };
+        const parsed = prepared.parse(raw);
+        counts = { ...counts, sources: sourceDiagnostics(parsed, opened) };
+        return { ...evaluateProof(parsed, request.checklist, opened, { body: request.body }), counts };
       } catch (error) {
         if (isProofFailure(error))
           throw new ProofFailure(error.code, error.partial && { ...error.partial, counts }, counts);

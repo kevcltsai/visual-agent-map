@@ -57,8 +57,10 @@ export function bookBarState(
   progress: BookPipelineProgress | undefined,
   stageOf: (nodeId: string) => PipelineStage | undefined
 ): BookBarState {
-  const phase = progress?.phase ?? data.phase;
-  const status = progress?.status ?? data.status;
+  // The saved "done" of the same run is final: a runner record that still says gate2 is older than the owner's acceptance.
+  const savedDone = data.phase === "done" && (!progress || progress.runId === data.runId);
+  const phase = savedDone ? "done" : (progress?.phase ?? data.phase);
+  const status = savedDone ? data.status : (progress?.status ?? data.status);
   const pauseReason = progress ? progress.pauseReason : data.pauseReason;
   const active = progress?.active ?? false;
   const counts = progress?.counts ?? countStages(data.order.map(stageOf));

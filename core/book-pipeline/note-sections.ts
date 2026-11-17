@@ -148,6 +148,28 @@ export function markOldProofRecords(detail: string, currentKey: string): string 
   return changed ? lines.join("\n") : detail;
 }
 
+/**
+ * The stored proof records of a Detail's Research notes, each as its plain record text (the `> ` prefix removed; the readable
+ * first line, the item lines and the `book-proof` machine line), oldest first. A rewrite that replaces the whole Detail uses
+ * this to carry the earlier records over (`appendResearchNote` takes each back in); other callout text is not returned.
+ */
+export function extractProofRecords(detail: string): string[] {
+  const lines = detail.split("\n");
+  const section = findSection(lines, fencedLines(lines), text => isResearchNotesHeading(text));
+  if (!section) return [];
+  const records: string[] = [];
+  let current: string[] = [];
+  for (const line of lines.slice(section.at + 1, section.end)) {
+    if (CALLOUT_HEAD.test(line.replace(/\r$/, ""))) continue;
+    const plain = unquoted(line).replace(/\r$/, "");
+    if (RECORD_KEY.test(plain.trim())) {
+      records.push([...current, plain.trim()].join("\n"));
+      current = [];
+    } else if (plain.trim() || current.length) current.push(plain);
+  }
+  return records;
+}
+
 /** The stored proof result for `key` in a Detail's Research notes (read through the `> ` quote prefix), or undefined. */
 export function findStoredProof(detail: string, key: string): ReturnType<typeof findProofRecord> {
   return findProofRecord(unquoted(detail), key);

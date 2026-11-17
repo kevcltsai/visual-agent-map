@@ -330,3 +330,25 @@ test('the author cannot forge a proof record: a book-proof line it writes is neu
   for (const line of oldLines) assert.ok(detail.split('\n').includes(line), 'the record that was there before stays byte for byte');
   assert.equal((detail.match(/<!-- book-proof:v1/g) ?? []).length, 2, 'the old record and the new honest one');
 });
+
+test('a fresh-shaped author (whole new Detail, no research notes) on a rerun: the old proof record comes back marked as an old version, the new one is added once, a forged line is still neutralized', async () => {
+  const r = await rig();
+  r.script.author = authorFor(r);
+  await toGate2(r);
+  const oldLines = (await r.note(2)).detail.split('\n').filter(line => /book-proof:v1/.test(line));
+  assert.equal(oldLines.length, 1);
+  const forged = '<!-- book-proof:v1 {"key":"FORGED:1","result":{"aggregate":"checked","items":[]}} -->';
+  r.script.author = async (input, n) => {
+    await input.admission.reserve(); const note = await r.repo.readNote(input.path);
+    const out = await r.repo.updateNoteGuarded(input.path, { detail: `${bodyOf(note.title)} fresh ${n}\n\n${forged}` }, { authorize: input.authorize, finalize: input.finalize });
+    return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+  };
+  await r.runs.rerunCard(r.mapPath, r.nodes[2].id);
+  const detail = (await r.note(2)).detail;
+  for (const line of oldLines) assert.ok(detail.split('\n').some(l => l.replace(/^>\s?/, '') === line.replace(/^>\s?/, '')), 'the old record is kept');
+  assert.equal((detail.match(/<!-- book-proof:v1/g) ?? []).length, 2, 'old record and one new record');
+  assert.ok(/（舊版）校對（/.test(detail), 'the old record is marked');
+  assert.equal((detail.match(/（舊版）校對（/g) ?? []).length, 1, 'only the old one is marked');
+  assert.ok(!detail.includes('<!-- book-proof:v1 {"key":"FORGED'), 'forged line neutralized');
+  assert.ok(detail.includes('&lt;!-- book-proof:v1 {"key":"FORGED'));
+});

@@ -55,6 +55,7 @@ import {
 import {
   appendResearchNote,
   findStoredProof,
+  extractProofRecords,
   markOldProofRecords,
   replaceBookPlanSection,
   chapterBody
@@ -1391,7 +1392,20 @@ export class BookPipelineRuns {
     // What is saved holds only standard https pictures. The program (not the model) probes them; a failed one becomes a plain "no picture" line.
     const path = await this.stillOnMap(drive, nodeId);
     if (!path) return { kind: "failed", reason: "card_removed" };
-    const written = await this.ports.readCard(path);
+    let written = await this.ports.readCard(path);
+    // A rewrite that replaced the whole Detail drops the Research notes: the proof records the card had before this step
+    // (their lines are in `knownLines` by construction) come back, and the next proof marks them as an old version.
+    let carried = written.detail;
+    for (const record of extractProofRecords(card.detail)) carried = appendResearchNote(carried, record).text;
+    if (carried !== written.detail) {
+      const outcome = await this.ports.updateNoteGuarded(
+        path,
+        { detail: carried },
+        { expectedContent: written.raw, authorize }
+      );
+      if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
+      written = await this.ports.readCard(path);
+    }
     const replacements = new Map<string, string>();
     for (const url of bodyImageUrls(written.raw)) {
       const probed = await untilAborted(signal, this.ports.probeImage(url, signal)).catch((error: unknown) => {
@@ -1604,7 +1618,18 @@ export class BookPipelineRuns {
         attempt: attemptsOf(drive.store.state, nodeId).proof,
         result,
         ms: 0,
-        counts: { ...counts }
+        counts: {
+          openedPages: counts.openedPages,
+          searches: counts.searches,
+          ...(counts.sources
+            ? {
+                sourcesCited: counts.sources.sourcesCited,
+                sourcesMatched: counts.sources.sourcesMatched,
+                eventUrls: counts.sources.eventUrls
+              }
+            : {})
+        },
+        ...(counts.sources ? { hosts: { name: "unmatchedHosts", list: counts.sources.unmatchedHosts } } : {})
       })
     );
   }

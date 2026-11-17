@@ -4,9 +4,11 @@ import { openedUrlsFromEvents, searchEventCount } from "../../argument-map/sourc
 import type { ChecklistItem } from "../../book-pipeline/plan-text";
 import {
   evaluateProof,
+  sourceDiagnostics,
   isProofFailure,
   ProofFailure,
   PROOF_STATUSES,
+  type ProofCounts,
   type ProofResult,
   type ProofStatus,
   type RawProofItem
@@ -142,9 +144,11 @@ export async function runProofread(
     },
     raw => {
       const opened = openedUrlsFromEvents(events);
-      const counts = { openedPages: opened.length, searches: searchEventCount(events) };
+      let counts: ProofCounts = { openedPages: opened.length, searches: searchEventCount(events) };
       try {
-        return { ...evaluateProof(prepared.parse(raw), request.checklist, opened, { body: request.body }), counts };
+        const parsed = prepared.parse(raw);
+        counts = { ...counts, sources: sourceDiagnostics(parsed, opened) };
+        return { ...evaluateProof(parsed, request.checklist, opened, { body: request.body }), counts };
       } catch (error) {
         // The counts travel with a failure too: they are the only trace of what a no-content-log call did.
         if (isProofFailure(error))

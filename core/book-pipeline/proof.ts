@@ -40,6 +40,8 @@ export interface ProofResult {
 export interface ProofCounts {
   openedPages: number;
   searches: number;
+  /** Where the sources of the reply landed (numbers and hosts only); set by the proofread call, not stored in the note. */
+  sources?: SourceDiagnostics;
 }
 
 export type ProofFailureCode =
@@ -93,10 +95,51 @@ const normalizeUrl = (value: unknown): string | undefined => {
   const kept = url.search
     .slice(1)
     .split("&")
-    .filter(pair => pair && !TRACKING.test(pair.split("=")[0]));
+    .filter(pair => pair && !TRACKING.test(pair.split("=")[0]))
+    .map(samePercent);
   const query = kept.length ? `?${kept.join("&")}` : "";
-  return `${url.host.toLowerCase()}${url.pathname.replace(/\/+$/, "")}${query}`;
+  return `${url.host.toLowerCase().replace(/^www\./, "")}${samePercent(url.pathname).replace(/\/+$/, "")}${query}`;
 };
+/**
+ * One spelling of the percent-encodings: hex digits in upper case (%e6 = %E6), and the sub-delimiters that never change what a
+ * path or query means ( ! $ ' ( ) * , ; : @ ) decoded (%28 = "("). Separators (/ ? # & = %) stay encoded, so no other page matches.
+ */
+const samePercent = (text: string): string =>
+  text.replace(/%([0-9a-fA-F]{2})/g, (_, hex: string) => {
+    const ch = String.fromCharCode(parseInt(hex, 16));
+    return "!$'()*,;:@".includes(ch) ? ch : `%${hex.toUpperCase()}`;
+  });
+
+/** What the sources of a reply matched, as numbers and host names only (never a path, a query or any text). */
+export interface SourceDiagnostics {
+  sourcesCited: number;
+  sourcesMatched: number;
+  eventUrls: number;
+  /** The hosts of cited sources that no opened page matched: at most 5, no path, no query. */
+  unmatchedHosts: string[];
+}
+export function sourceDiagnostics(raw: readonly RawProofItem[], openedUrls: readonly string[]): SourceDiagnostics {
+  const opened = new Set(openedUrls.map(normalizeUrl).filter((key): key is string => !!key));
+  const cited = new Map<string, string>();
+  for (const item of raw) for (const source of item.sources) cited.set(normalizeUrl(source) ?? source, source);
+  const hosts = new Set<string>();
+  let matched = 0;
+  for (const [key, source] of cited) {
+    if (opened.has(key)) matched++;
+    else
+      try {
+        hosts.add(new URL(source).hostname.toLowerCase().replace(/^www\./, ""));
+      } catch {
+        // not an address: no host to name
+      }
+  }
+  return {
+    sourcesCited: cited.size,
+    sourcesMatched: matched,
+    eventUrls: opened.size,
+    unmatchedHosts: [...hosts].slice(0, 5)
+  };
+}
 
 /**
  * The one URL form a note may carry: https only, parsed by `new URL`, no credentials, no whitespace/control/`<>"`/backtick/
@@ -130,6 +173,8 @@ export function sharesLongRun(text: string, body: string): boolean {
     if (hay.includes(chars.slice(i, i + LEAK_RUN).join(""))) return true;
   return false;
 }
+/** The chapter text without its addresses: an author's inline citation link is not a quote of the chapter. */
+const withoutUrls = (text: string): string => text.replace(/https?:\/\/[\x21-\x7e]+/gi, " ");
 const decoded = (text: string): string[] => {
   const forms = [text];
   try {
@@ -163,7 +208,8 @@ export function evaluateProof(
     seen.add(item.id);
   }
   if (checklist.some(item => !seen.has(item.id))) throw new ProofFailure("missing_item");
-  const leaks = (text: string): boolean => !!guard && decoded(text).some(form => sharesLongRun(form, guard.body));
+  const guardBody = guard ? withoutUrls(guard.body) : "";
+  const leaks = (text: string): boolean => !!guard && decoded(text).some(form => sharesLongRun(form, guardBody));
   const opened = new Map<string, string>();
   const leakedKeys = new Set<string>();
   for (const url of openedUrls) {

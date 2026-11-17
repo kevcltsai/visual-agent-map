@@ -5,6 +5,11 @@
  * `pickForSlot` seam (the picture-quality work replaces only that function). No I/O, no model text is trusted here.
  */
 
+import { noteLanguageOf, translate, type ContentLanguage } from "../../i18n";
+import { imageKey } from "./image-dedupe";
+import { fencedLines } from "./note-sections";
+import { escapeMarkdownText } from "./text";
+
 /** One planned picture position. `index` is assigned by the program in order (1..n); the model never writes it. */
 export interface ImageSlot {
   index: number;
@@ -150,8 +155,491 @@ const isHttps = (url: string): boolean => {
  */
 export function pickForSlot(ctx: PickContext, candidates: readonly SlotCandidate[]): SlotPick {
   const secure = candidates.filter(item => isHttps(item.imageUrl));
-  const hit = secure.find(item => !ctx.alreadyPicked.has(item.imageUrl));
+  // One picture is one file: a thumbnail and the original of the same file count as the same address.
+  const picked = new Set([...ctx.alreadyPicked].map(imageKey));
+  const hit = secure.find(item => !picked.has(imageKey(item.imageUrl)));
   if (hit) return { candidate: hit };
   if (candidates.length && !secure.length) return { none: true, reasonCode: "unsafe_url" };
   return { none: true, reasonCode: "not_found" };
+}
+
+// ---- finding and placing pictures (P2b) ----------------------------------------------------------------------------------------------
+
+/** One candidate after the program looked at it: `href` is the https address that passed the address check (undefined: refused), `loaded` the probe result. */
+export interface ProbedCandidate {
+  candidate: SlotCandidate;
+  href: string | undefined;
+  loaded: boolean;
+}
+/** What a slot got: a picture ready to be written (every text already escaped), or the reason it ends without one. */
+export interface SlotFigure {
+  href: string;
+  alt: string;
+  caption: string;
+}
+export type SlotOutcome = { figure: SlotFigure } | { reasonCode: SlotReasonCode; reasonText?: string };
+
+/** A finder caption is one plain line (what it is, where to look); an empty one falls back to the title. */
+export function figureOf(candidate: SlotCandidate, href: string, language: string): SlotFigure {
+  // The marker brackets are taken out first: a caption must never read as a slot marker.
+  const plain = (value: string): string => value.replace(/[〔〕]/g, " ");
+  const alt = escapeMarkdownText(plain(candidate.title), 80) || (/^zh/i.test(language) ? "圖" : "image");
+  return { href, alt, caption: escapeMarkdownText(plain(candidate.caption), 160) || alt };
+}
+
+/**
+ * Decides every slot in order: the candidates that loaded, passed the address check and are not `taken` (the key of a picture another
+ * chapter shows or claimed) go to {@link pickForSlot}; the first slot of the chapter takes first, and one picture is never placed twice.
+ * A slot without a pick gets the most telling reason. Pure and synchronous, so the caller can claim the picks in the same turn.
+ */
+export function choosePictures(
+  chapter: PickContext["chapter"],
+  slots: readonly ImageSlot[],
+  perSlot: ReadonlyMap<number, readonly ProbedCandidate[]>,
+  taken: (key: string) => boolean,
+  language: string
+): Map<number, SlotOutcome> {
+  const outcomes = new Map<number, SlotOutcome>();
+  const alreadyPicked = new Set<string>();
+  for (const slot of slots) {
+    const all = perSlot.get(slot.index) ?? [];
+    const usable = all.filter(item => item.href && item.loaded && !taken(imageKey(item.href)));
+    const pick = pickForSlot(
+      { chapter, slot, allSlots: slots, alreadyPicked },
+      usable.map(item => ({ ...item.candidate, imageUrl: item.href as string }))
+    );
+    if ("candidate" in pick) {
+      alreadyPicked.add(pick.candidate.imageUrl);
+      outcomes.set(slot.index, { figure: figureOf(pick.candidate, pick.candidate.imageUrl, language) });
+      continue;
+    }
+    let reasonCode = pick.reasonCode;
+    if (!usable.length) {
+      if (!all.length) reasonCode = "not_found";
+      else if (all.every(item => !item.href)) reasonCode = "unsafe_url";
+      else if (all.some(item => item.href && !item.loaded)) reasonCode = "load_failed";
+      else reasonCode = "not_found";
+    }
+    outcomes.set(slot.index, { reasonCode, ...(pick.reasonText ? { reasonText: pick.reasonText } : {}) });
+  }
+  return outcomes;
+}
+
+export interface FillResult {
+  text: string;
+  placed: { index: number; href: string }[];
+  missing: { index: number; reasonCode: SlotReasonCode }[];
+  /** Marker lines refused whole (reworded, or an index the plan does not have). */
+  bad: number;
+  /** The figure lines this call wrote, so the independent check can tell them from the author's text. */
+  added: string[];
+}
+
+const BAD_INDEX = /〔圖位\s*(\d+)/;
+const isBlank = (line: string | undefined): boolean => line === undefined || !line.trim();
+
+/**
+ * R1-2: swaps every valid marker line for its figure (an image line and one caption line, a blank line kept around), and deletes
+ * the others: a marker whose slot got no picture, a repeated marker, a refused marker (whole line), and the marker text alone of a
+ * marker inside other text (the rest of the line stays; a line that becomes empty goes). Blank lines the deletions would double are
+ * dropped. Markers in code fences and quotes are never touched. The slot of a refused marker with a planned index ends as
+ * `bad_marker`; a slot with no marker at all ends as `author_omitted`.
+ */
+export function fillSlotMarkers(
+  content: string,
+  slots: readonly Pick<ImageSlot, "index">[],
+  outcomes: ReadonlyMap<number, SlotOutcome>
+): FillResult {
+  const lines = content.split("\n");
+  const scan = scanSlotMarkers(content, slots);
+  const cr = content.includes("\r\n") ? "\r" : "";
+  const figureAt = new Map<number, SlotFigure>();
+  const missing: FillResult["missing"] = [];
+  const placed: FillResult["placed"] = [];
+  const planned = new Set(slots.map(slot => slot.index));
+  const badIndexes = new Set<number>();
+  for (const at of scan.badLines) {
+    const m = BAD_INDEX.exec(lines[at]);
+    if (m && planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
+  }
+  for (const slot of slots) {
+    const at = scan.found.get(slot.index);
+    const outcome = outcomes.get(slot.index);
+    if (at === undefined) {
+      missing.push({ index: slot.index, reasonCode: badIndexes.has(slot.index) ? "bad_marker" : "author_omitted" });
+    } else if (outcome && "figure" in outcome) {
+      figureAt.set(at, outcome.figure);
+      placed.push({ index: slot.index, href: outcome.figure.href });
+    } else {
+      missing.push({ index: slot.index, reasonCode: outcome?.reasonCode ?? "not_found" });
+    }
+  }
+  const dropped = new Set(
+    [...scan.badLines, ...scan.duplicateLines, ...scan.found.values()].filter(at => !figureAt.has(at))
+  );
+  const inline = new Set(scan.inlineLines);
+  const added: string[] = [];
+  const out: string[] = [];
+  let removed = false;
+  const push = (line: string): void => {
+    // A deletion must not leave two blank lines (or one at the very start) where the text had one.
+    if (removed && isBlank(line) && (!out.length || isBlank(out[out.length - 1]))) {
+      removed = false;
+      return;
+    }
+    removed = false;
+    out.push(line);
+  };
+  lines.forEach((line, at) => {
+    const figure = figureAt.get(at);
+    if (figure) {
+      if (out.length && !isBlank(out[out.length - 1])) out.push("");
+      const image = `![${figure.alt}](${figure.href})${cr}`;
+      const caption = `${figure.caption}${cr}`;
+      added.push(image, caption);
+      out.push(image, caption);
+      if (!isBlank(lines[at + 1])) out.push(cr ? "\r" : "");
+      return;
+    }
+    if (dropped.has(at)) {
+      removed = true;
+      return;
+    }
+    if (inline.has(at)) {
+      const rest = line.replace(INLINE_MARKER, "");
+      if (!rest.trim()) {
+        removed = true;
+        return;
+      }
+      push(rest);
+      return;
+    }
+    push(line);
+  });
+  return { text: out.join("\n"), placed, missing, bad: scan.badLines.length, added };
+}
+
+/** Lines as the independent check compares them: markers out, blank lines out. Lines in fences and quotes are compared as they are. */
+function withoutMarkers(text: string): string[] {
+  const lines = text.split("\n");
+  const guarded = protectedLines(lines);
+  return lines
+    .map((line, at) => (guarded[at] ? line : line.replace(INLINE_MARKER, "")))
+    .map(line => line.replace(/\s+$/, ""))
+    .filter(line => line.trim());
+}
+
+/**
+ * R1-2 / R2-1: the three checks before a fill is committed. Returns the first that fails, or undefined: (1) replaced plus missing
+ * is the planned count, each index once; (2) no `〔圖位` is left outside fences and quotes; (3) what was taken out of the text is marker
+ * text only (the text without markers, blank lines and the figure lines written is the same before and after).
+ */
+export function verifyFill(
+  original: string,
+  result: FillResult,
+  slots: readonly Pick<ImageSlot, "index">[]
+): "count" | "residual" | "deleted_text" | undefined {
+  const seen = [...result.placed, ...result.missing].map(item => item.index).sort((a, b) => a - b);
+  const want = slots.map(slot => slot.index).sort((a, b) => a - b);
+  if (seen.length !== want.length || seen.some((index, i) => index !== want[i])) return "count";
+  if (residualMarkerLines(result.text).length) return "residual";
+  const rest = withoutMarkers(result.text);
+  for (const line of result.added) {
+    const at = rest.indexOf(line.replace(/\s+$/, ""));
+    if (at < 0) return "deleted_text";
+    rest.splice(at, 1);
+  }
+  const before = withoutMarkers(original);
+  return before.length === rest.length && before.every((line, i) => line === rest[i]) ? undefined : "deleted_text";
+}
+
+// ---- the stored result (book-slots:v1) and what gate 2 and the proof read of it --------------------------------------------------------
+
+export interface SlotRecordItem {
+  index: number;
+  state: "placed" | "missing";
+  reasonCode?: SlotReasonCode;
+  /** A short hash of the placed picture's key: enough to see that the picture is still there, no address. */
+  hash?: string;
+}
+export interface SlotsRecord {
+  slots: SlotRecordItem[];
+  /** Refused marker lines of the last fill. */
+  bad: number;
+}
+const REASONS: readonly SlotReasonCode[] = ["author_omitted", "bad_marker", "not_found", "load_failed", "unsafe_url"];
+
+/** FNV-1a over the picture key: 8 hex characters. */
+export function shortHash(url: string): string {
+  let hash = 0x811c9dc5;
+  for (const char of imageKey(url)) {
+    hash ^= char.codePointAt(0) as number;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+/** The one machine line the guarded write puts into the research notes (`replaceResearchRecord` keeps only the latest). It holds numbers, codes and hashes only. */
+export function composeSlotsRecord(result: Pick<FillResult, "placed" | "missing" | "bad">): string {
+  const slots: SlotRecordItem[] = [
+    ...result.placed.map(item => ({ index: item.index, state: "placed" as const, hash: shortHash(item.href) })),
+    ...result.missing.map(item => ({ index: item.index, state: "missing" as const, reasonCode: item.reasonCode }))
+  ].sort((a, b) => a.index - b.index);
+  return `<!-- book-slots:v1 ${JSON.stringify({ slots, bad: result.bad })} -->`;
+}
+
+const RECORD_LINE = /^(?:[ \t]{0,3}>[ \t]?)*<!-- book-slots:v1 (\{.*\}) -->$/;
+/** The latest valid `book-slots:v1` record of a Detail (a hand-edited or damaged one is read as far as it is valid; none: undefined). */
+export function latestSlotsRecord(detail: string): SlotsRecord | undefined {
+  const lines = detail.split("\n");
+  const fenced = fencedLines(lines);
+  let found: SlotsRecord | undefined;
+  lines.forEach((line, at) => {
+    const m = fenced[at] ? null : RECORD_LINE.exec(line.replace(/\r$/, "").trim());
+    if (!m) return;
+    try {
+      const data = JSON.parse(m[1]) as { slots?: unknown; bad?: unknown };
+      if (!Array.isArray(data.slots)) return;
+      const items: SlotRecordItem[] = [];
+      for (const raw of data.slots.slice(0, MAX_IMAGE_SLOTS) as Array<Record<string, unknown> | null>) {
+        if (!raw || !Number.isInteger(raw.index) || (raw.index as number) < 1) continue;
+        const state = raw.state === "placed" ? "placed" : raw.state === "missing" ? "missing" : undefined;
+        if (!state) continue;
+        const reasonCode = REASONS.find(code => code === raw.reasonCode);
+        items.push({
+          index: raw.index as number,
+          state,
+          ...(reasonCode ? { reasonCode } : {}),
+          ...(typeof raw.hash === "string" && /^[0-9a-f]{8}$/.test(raw.hash) ? { hash: raw.hash } : {})
+        });
+      }
+      found = { slots: items, bad: Number.isInteger(data.bad) && (data.bad as number) > 0 ? (data.bad as number) : 0 };
+    } catch {
+      // a damaged record is read as no record
+    }
+  });
+  return found;
+}
+
+const IMAGE_IN_LINE = /!\[[^\]\n]*\]\((https:\/\/[^)\s]+)\)/g;
+const IMAGE_ONLY_LINE = /^[ \t]*!\[[^\]\n]*\]\(https:\/\/[^)\s]+\)[ \t]*\r?$/;
+
+/**
+ * The text the proofread reads: the image lines (and the one caption line right after an image line of its own) are taken out, so a
+ * picture or its caption is never a claim to check. Lines in fences and quotes stay.
+ */
+export function stripImageLines(text: string): string {
+  const lines = text.split("\n");
+  const guarded = protectedLines(lines);
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!guarded[i] && IMAGE_ONLY_LINE.test(lines[i])) {
+      if (
+        i + 1 < lines.length &&
+        !isBlank(lines[i + 1]) &&
+        !guarded[i + 1] &&
+        !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[i + 1])
+      )
+        i++;
+      continue;
+    }
+    out.push(lines[i]);
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
+/** What the slot looks like now, read from the record, the plan and the body: `edited` = the recorded picture is no longer in the text (replaced or deleted by hand). */
+export type SlotState = "placed" | "edited" | "missing" | "unrecorded";
+export interface SlotStatus {
+  index: number;
+  state: SlotState;
+  reasonCode?: SlotReasonCode;
+}
+/** Gate 2's picture state, rebuilt from the Detail's record and the picture addresses now in the text (no map field). No record: every slot is `unrecorded`. */
+export function describeSlots(
+  slots: readonly Pick<ImageSlot, "index">[],
+  record: SlotsRecord | undefined,
+  imageUrls: readonly string[]
+): SlotStatus[] {
+  const now = new Set(imageUrls.map(shortHash));
+  return slots.map(slot => {
+    const item = record?.slots.find(entry => entry.index === slot.index);
+    if (!item) return { index: slot.index, state: "unrecorded" as const };
+    if (item.state === "missing")
+      return {
+        index: slot.index,
+        state: "missing" as const,
+        ...(item.reasonCode ? { reasonCode: item.reasonCode } : {})
+      };
+    return { index: slot.index, state: item.hash && now.has(item.hash) ? ("placed" as const) : ("edited" as const) };
+  });
+}
+
+// ---- the picture-and-text check (program, no AI) ---------------------------------------------------------------------------------------
+
+const STOP_CJK = new Set([..."的了是在和與与及或對对把被為为以之於于並并中上下這这那一個个也都就而但"]);
+const STOP_WORDS = new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "that",
+  "this",
+  "from",
+  "into",
+  "over",
+  "about",
+  "how",
+  "what"
+]);
+/** Words of an explanation worth looking for in the text: Latin words of 3+ letters, and every two characters in a run of Han characters (cut at common function characters). */
+export function slotKeywords(explains: string): string[] {
+  const out = new Set<string>();
+  for (const word of explains.toLowerCase().match(/[a-z0-9][a-z0-9'-]{2,}/g) ?? [])
+    if (!STOP_WORDS.has(word)) out.add(word);
+  for (const run of explains.match(/\p{Script=Han}+/gu) ?? []) {
+    let part = "";
+    const flush = (): void => {
+      const chars = Array.from(part);
+      for (let i = 0; i + 1 < chars.length; i++) out.add(chars[i] + chars[i + 1]);
+      part = "";
+    };
+    for (const char of run) {
+      if (STOP_CJK.has(char)) flush();
+      else part += char;
+    }
+    flush();
+  }
+  return [...out];
+}
+/** At least this many of a slot's keywords (all of them when it has fewer) must be in the text around the picture. */
+const KEYWORD_HITS = 2;
+
+export interface ImageTextCheck {
+  /** `none`: the plan arranged no picture (or the Prompt has no image plan); `unrecorded`: slots planned but no record; else `checked`. */
+  kind: "none" | "unrecorded" | "checked";
+  planned: number;
+  placed: number;
+  /** Standard images in the chapter text (outside the old picture section). */
+  imageCount: number;
+  bad: number;
+  /** One entry per thing worth a look: a slot that ended without a picture, a picture its neighbours do not talk about, a picture count that is not the placed count. */
+  issues: { index?: number; code: SlotReasonCode | "mismatch" | "count" }[];
+}
+
+/**
+ * R1-3: every proof recomputes this (it is not in the proof's key): the number of pictures equals the placed slots, and for each
+ * placed slot the keywords of what it explains appear in the paragraph before or after its picture (the picture block itself,
+ * caption included, is not the text around it). `body` is the chapter text (see chapterBody).
+ */
+export function checkImageText(
+  body: string,
+  slots: readonly ImageSlot[] | undefined,
+  record: SlotsRecord | undefined
+): ImageTextCheck {
+  const empty = { planned: 0, placed: 0, imageCount: 0, bad: 0, issues: [] };
+  if (!slots?.length) return { kind: "none", ...empty };
+  if (!record) return { kind: "unrecorded", ...empty, planned: slots.length };
+  const lines = body.split("\n");
+  const guarded = protectedLines(lines);
+  // Paragraph blocks: runs of non-blank lines outside fences and quotes; a block with an image is a figure block.
+  const blocks: { text: string; hashes: string[] }[] = [];
+  let current: string[] = [];
+  let hashes: string[] = [];
+  const close = (): void => {
+    if (current.length) blocks.push({ text: current.join("\n"), hashes });
+    current = [];
+    hashes = [];
+  };
+  lines.forEach((line, at) => {
+    if (guarded[at] || isBlank(line)) {
+      close();
+      return;
+    }
+    current.push(line);
+    for (const m of line.matchAll(IMAGE_IN_LINE)) hashes.push(shortHash(m[1]));
+  });
+  close();
+  const imageCount = blocks.reduce((sum, block) => sum + block.hashes.length, 0);
+  const placedItems = record.slots.filter(item => item.state === "placed");
+  const issues: ImageTextCheck["issues"] = [];
+  for (const item of record.slots)
+    if (item.state === "missing") issues.push({ index: item.index, code: item.reasonCode ?? "not_found" });
+  if (imageCount !== placedItems.length) issues.push({ code: "count" });
+  for (const item of placedItems) {
+    const at = blocks.findIndex(block => item.hash !== undefined && block.hashes.includes(item.hash));
+    const slot = slots.find(entry => entry.index === item.index);
+    if (at < 0 || !slot) continue;
+    const around = [at - 1, at + 1]
+      .map(i => blocks[i])
+      .filter(block => block && !block.hashes.length)
+      .map(block => block.text.toLowerCase())
+      .join("\n");
+    const words = slotKeywords(slot.explains);
+    const hits = words.filter(word => around.includes(word)).length;
+    if (words.length && hits < Math.min(KEYWORD_HITS, words.length))
+      issues.push({ index: item.index, code: "mismatch" });
+  }
+  return { kind: "checked", planned: slots.length, placed: placedItems.length, imageCount, bad: record.bad, issues };
+}
+
+/** The one `圖文` line of the proof result section. */
+export function composeImageTextLine(language: ContentLanguage, check: ImageTextCheck): string {
+  const note = noteLanguageOf(language);
+  if (check.kind === "none") return translate(note, "detail.book_slots_none");
+  if (check.kind === "unrecorded") return translate(note, "detail.book_slots_unrecorded");
+  const joiner = /^zh/i.test(language) ? "；" : "; ";
+  const parts = check.issues.map(issue =>
+    issue.code === "count"
+      ? translate(note, "detail.book_slots_count_0_1", String(check.imageCount), String(check.placed))
+      : translate(
+          note,
+          "detail.book_slots_slot_0_1",
+          String(issue.index),
+          translate(note, `detail.book_slots_reason_${issue.code}`)
+        )
+  );
+  if (check.bad) parts.push(translate(note, "detail.book_slots_bad_0", String(check.bad)));
+  return parts.length
+    ? translate(note, "detail.book_slots_issues_0", parts.join(joiner))
+    : translate(note, "detail.book_slots_ok_0", String(check.placed));
+}
+
+/** The pipeline issue tokens of a check (they count as "worth a look", never as needs-review): one per issue. */
+export function imageIssueTokens(check: ImageTextCheck): string[] {
+  const tokens = check.issues.map(issue => (issue.code === "count" ? "image_count" : `image_${issue.index}`));
+  return check.bad ? [...tokens, "image_marker"] : tokens;
+}
+
+/**
+ * The Haiku merge gate of T2 from the stored records (what the tester computes after the live run): of the chapters whose plan has
+ * slots, the share with at least one picture placed (must be at least 60%), and the share of slots the author left a valid marker for
+ * (the Sonnet sample must be 100%).
+ */
+export function slotGate(chapters: readonly { planned: number; record?: SlotsRecord }[]): {
+  chapters: number;
+  withPicture: number;
+  pictureShare: number;
+  slots: number;
+  marked: number;
+  markerShare: number;
+} {
+  const withSlots = chapters.filter(chapter => chapter.planned > 0);
+  const withPicture = withSlots.filter(chapter => chapter.record?.slots.some(item => item.state === "placed")).length;
+  const slotCount = withSlots.reduce((sum, chapter) => sum + chapter.planned, 0);
+  const marked = withSlots.reduce(
+    (sum, chapter) =>
+      sum +
+      (chapter.record?.slots.filter(item => item.reasonCode !== "author_omitted" && item.reasonCode !== "bad_marker")
+        .length ?? 0),
+    0
+  );
+  return {
+    chapters: withSlots.length,
+    withPicture,
+    pictureShare: withSlots.length ? withPicture / withSlots.length : 1,
+    slots: slotCount,
+    marked,
+    markerShare: slotCount ? marked / slotCount : 1
+  };
 }

@@ -553,6 +553,7 @@ import {
 } from "./outline-import-modal";
 import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal } from "./multi-research-modal";
+import { BookStartModal } from "./book-pipeline-start-modal";
 import { chatResearchReferenceGroups, type ResearchRequestWithReferences } from "./chat-research-sources";
 import { StructureReviewModal } from "./structure-review-modal";
 import {
@@ -1456,6 +1457,8 @@ export class VisualAgentMapView extends ItemView {
   private researchTick: number | null = null;
   /** Cards the picture-book author step is writing right now (path to start time); in memory only, never written to a card. */
   private bookAuthoring = new Map<string, number>();
+  /** The picture-book start card while it is open (closed with the view). */
+  private bookStartModal: BookStartModal | null = null;
   /** The status bar's "N of M received" text of the running grade; painted in place, never by a repaint. */
   private relevanceReceivedEl: HTMLElement | null = null;
   private researchRenderTimer: number | null = null;
@@ -2997,6 +3000,8 @@ export class VisualAgentMapView extends ItemView {
   async onClose(): Promise<void> {
     this.closeTopicLinkMenu();
     this.closed = true;
+    this.bookStartModal?.close();
+    this.bookStartModal = null;
     if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
     this.chatSourceCache = null;
     this.unsyncedPaths = null;
@@ -12269,18 +12274,20 @@ export class VisualAgentMapView extends ItemView {
       }
       // Picture-book labels: only on a map that has a usable `bookPipeline`; any other map draws nothing new.
       if (note && this.hasBookPipeline()) {
-        const startedAt = this.bookAuthoring.get(node.path);
+        // The step this card is in right now (memory only): the label says it, the clock runs from when the step began.
+        const working = this.bookWorkingStep(node.id, node.path);
         renderBookCardLabels(
           header,
           bookCard,
-          startedAt === undefined
-            ? undefined
-            : {
+          working
+            ? {
+                step: working.step,
                 track: element => {
-                  element.setText(this.researchElapsedText(startedAt));
-                  this.trackResearchElapsed(element, startedAt);
+                  element.setText(this.researchElapsedText(working.startedAt));
+                  this.trackResearchElapsed(element, working.startedAt);
                 }
               }
+            : undefined
         );
       }
       if (note) {
@@ -16993,14 +17000,33 @@ export class VisualAgentMapView extends ItemView {
       this.bookPipelineSeen = { map: this.map, usable: !!this.map && readBookPipeline(this.map).kind === "usable" };
     return this.bookPipelineSeen.usable;
   }
+  /** What a card is doing now: the runner's sub-step (planning, writing, finding pictures, proofreading) or the author call this view runs. */
+  private bookWorkingStep(
+    nodeId: string,
+    path: string
+  ): { step: "plan" | "write" | "images" | "proof"; startedAt: number } | undefined {
+    const authoring = this.bookAuthoring.get(path);
+    const current = this.path
+      ? this.plugin.getBookPipelineProgress(this.path)?.current?.find(item => item.nodeId === nodeId)
+      : undefined;
+    if (authoring !== undefined) return { step: "write", startedAt: authoring };
+    return current ? { step: current.step, startedAt: current.startedAt } : undefined;
+  }
+  /** The runner says a card changed sub-step without a saved change (it now finds pictures): repaint the map. */
+  refreshBookProgress(): void {
+    if (!this.closed && this.hasBookPipeline()) this.render();
+  }
   /** The map's picture-book bar: only for a map that has `bookPipeline` (even an unreadable one is not drawn: the entries refuse it). */
   private renderBookPipelineBar(toolbar: HTMLElement): void {
     if (!this.map || !this.path) return;
     const read = readBookPipeline(this.map);
     if (read.kind !== "usable") return;
     const path = this.path;
-    const state = bookBarState(read.data, this.plugin.getBookPipelineProgress(path), id =>
-      readPipelineStage(this.notes.get(id)?.pipelineStage)
+    const state = bookBarState(
+      read.data,
+      this.plugin.getBookPipelineProgress(path),
+      id => readPipelineStage(this.notes.get(id)?.pipelineStage),
+      id => this.notes.get(id)?.title
     );
     renderBookBar(toolbar, state, {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
@@ -17099,6 +17125,11 @@ export class VisualAgentMapView extends ItemView {
     }
     this.bookPanelPath = this.hasBookPipeline() ? this.path : "";
     if (this.bookPanelPath) this.maybeAutoOpenBookPanel();
+    // Outside the gates there is nothing to show: a panel left open folds away (never a "nothing to see" line).
+    if (this.bookPanel.open && this.bookPanelPath && !this.bookPanelHasContent())
+      void Promise.resolve().then(() => {
+        if (!this.closed && this.bookPanel.open && !this.bookPanelHasContent()) this.closeBookPanel();
+      });
     if (!this.bookPanel.open || !this.bookPanelPath) {
       // The panel just closed (button, Escape): the keyboard goes back to the toolbar button that opened it.
       if (this.bookPanel.pendingFocus === "opener")
@@ -17115,6 +17146,13 @@ export class VisualAgentMapView extends ItemView {
     this.bookSideEl = side;
     this.paintBookPanel();
     void this.loadBookRoot();
+  }
+  /** The panel only has something to show at gate 1, gate 2 and when the run is done. */
+  private bookPanelHasContent(): boolean {
+    const read = this.map ? readBookPipeline(this.map) : null;
+    if (!this.path || !read || read.kind !== "usable") return false;
+    const phase = this.plugin.getBookPipelineProgress(this.path)?.phase ?? read.data.phase;
+    return phase === "gate1" || phase === "gate2" || phase === "done";
   }
   private paintBookPanel(): void {
     const side = this.bookSideEl;
@@ -17136,7 +17174,6 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     if (phase !== "gate1") {
-      side.createEl("p", { cls: "vam-book-panel-muted", text: t("ui.book_panel_not_gate2") });
       this.bookPanel.pendingFocus = null;
       return;
     }
@@ -17332,10 +17369,38 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   /** The toolbar button and the command: start a picture-book run on this map. */
-  startBookPipelineFromUi(): Promise<void> {
-    if (!this.path) return Promise.resolve();
+  async startBookPipelineFromUi(): Promise<void> {
+    const map = this.map;
+    if (!this.path || !map) return;
     const path = this.path;
-    return this.bookEntry(() => this.plugin.startBookPipeline(path));
+    // A map that already carries a run (or one that cannot be read) has nothing to confirm: the entry answers with its own sentence.
+    if (readBookPipeline(map).kind !== "absent") return this.bookEntry(() => this.plugin.startBookPipeline(path));
+    if (this.bookStartModal?.isOpen) return;
+    const roots = map.nodes.filter(node => !node.parentId);
+    const root = roots.length === 1 ? roots[0] : undefined;
+    const rootNote = root ? await this.plugin.repo.readNote(root.path).catch(() => null) : null;
+    if (this.closed || this.bookStartModal?.isOpen) return;
+    const settings = this.plugin.settings;
+    const modal = new BookStartModal(this.app, {
+      cards: readingOrder(map.nodes, { includeHidden: true }).length,
+      models: {
+        plan: this.plugin.modelLabel(settings.bookPlanModel),
+        write: this.plugin.modelLabel(settings.bookWriteModel),
+        // The picture search runs on the author's model.
+        images: this.plugin.modelLabel(settings.bookWriteModel),
+        proof: this.plugin.modelLabel(settings.bookProofModel)
+      },
+      settings: rootNote?.bookSettings ?? {},
+      onStart: patch => {
+        void this.bookEntry(async () => {
+          // Only the fields the owner changed are written, and only to the root topic.
+          if (root && Object.keys(patch).length) await this.plugin.repo.writeBookSettings(root.path, patch);
+          await this.plugin.startBookPipeline(path);
+        });
+      }
+    });
+    this.bookStartModal = modal;
+    this.openMapModal(modal);
   }
   /** True while a conversation chain or a multi-select research holds this map: a picture-book run must not start or write then. */
   bookPipelineBlocked(): boolean {

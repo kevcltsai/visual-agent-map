@@ -7,7 +7,14 @@ import {
   type BookRole,
   type PipelineStage
 } from "../../core/book-pipeline/model";
-import { BookPipelineRunError, type BookPipelineProgress, type BookRunRefusal } from "./book-pipeline-run";
+import {
+  BookPipelineRunError,
+  stepCounts,
+  type BookPipelineProgress,
+  type BookRunRefusal,
+  type BookStepCounts,
+  type BookSubStep
+} from "./book-pipeline-run";
 
 /**
  * Picture-book pipeline screen parts (03b): the map's top progress bar, the card badges and the refusal messages.
@@ -28,6 +35,23 @@ export interface BookBarState {
   failure?: string;
   /** Seconds left, as the runner estimated them (only after at least five cards of the phase finished); absent means no number is shown. */
   etaSeconds?: number;
+  /** Cards done per listed step (memory only; after a reload they are derived from the cards' stages). */
+  steps: BookStepCounts;
+  /** The whole-book plan is saved. */
+  globalDone: boolean;
+  /** What the run is doing right now (memory only; absent after a reload or while nothing runs). */
+  current?: BookCurrent;
+}
+export type BookCurrentStep = BookSubStep | "global";
+export interface BookCurrent {
+  step: BookCurrentStep;
+  /** 1-based position in the reading order; absent for the whole-book plan. */
+  chapter?: number;
+  title?: string;
+  /** How many other cards work at the same time. */
+  more: number;
+  /** Every step some card is in right now (the stage list marks them). */
+  steps: BookCurrentStep[];
 }
 
 const FAILURE_KEY: Record<string, TranslationKey> = {
@@ -55,7 +79,8 @@ const PHASE_KEY: Record<BookPipelineData["phase"], TranslationKey> = {
 export function bookBarState(
   data: BookPipelineData,
   progress: BookPipelineProgress | undefined,
-  stageOf: (nodeId: string) => PipelineStage | undefined
+  stageOf: (nodeId: string) => PipelineStage | undefined,
+  titleOf?: (nodeId: string) => string | undefined
 ): BookBarState {
   // The saved "done" of the same run is final: a runner record that still says gate2 is older than the owner's acceptance.
   const savedDone = data.phase === "done" && (!progress || progress.runId === data.runId);
@@ -74,16 +99,43 @@ export function bookBarState(
       : status === "stopped" || interrupted
         ? "stopped"
         : phase;
+  const steps = progress?.steps ?? stepCounts(counts);
+  const current = mode === "planning" || mode === "writing" ? currentOf(data, progress, titleOf) : undefined;
   return {
     mode,
     phase,
     total,
     counts,
     budget,
+    steps,
+    globalDone: data.globalPlanned === true,
+    ...(current ? { current } : {}),
     ...(mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {}),
     ...(progress?.etaSeconds !== undefined && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0
       ? { etaSeconds: progress.etaSeconds }
       : {})
+  };
+}
+
+/** The run's busiest-first card for the "now" line: the whole-book plan first, then the earliest chapter in the reading order. */
+function currentOf(
+  data: BookPipelineData,
+  progress: BookPipelineProgress | undefined,
+  titleOf?: (nodeId: string) => string | undefined
+): BookCurrent | undefined {
+  if (!progress?.active || !progress.current?.length) return undefined;
+  const position = (nodeId: string): number => (nodeId === "global" ? -1 : data.order.indexOf(nodeId));
+  const entries = progress.current.filter(item => item.nodeId === "global" || position(item.nodeId) >= 0);
+  if (!entries.length) return undefined;
+  entries.sort((a, b) => position(a.nodeId) - position(b.nodeId));
+  const first = entries[0];
+  const title = first.nodeId === "global" ? undefined : titleOf?.(first.nodeId);
+  return {
+    step: first.nodeId === "global" ? "global" : first.step,
+    ...(first.nodeId === "global" ? {} : { chapter: position(first.nodeId) + 1 }),
+    ...(title ? { title } : {}),
+    more: entries.length - 1,
+    steps: entries.map(item => (item.nodeId === "global" ? "global" : item.step))
   };
 }
 
@@ -127,18 +179,17 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
   bar.setAttr("aria-label", t("ui.book_bar_label"));
   const top = bar.createDiv("vam-book-bar-top");
   top.createEl("b", { cls: "vam-book-bar-title", text: bookTitleText(state) });
-  const summary =
-    state.mode === "budget"
-      ? t("ui.book_budget_used_up_0_1", state.budget.used, state.budget.limit)
-      : state.mode === "stopped"
-        ? state.failure
-          ? t("ui.book_failed_at_0_1", t(PHASE_KEY[state.phase]), bookFailureText(state.failure))
-          : t("ui.book_stopped_at_0_1_2", t(PHASE_KEY[state.phase]), counts.checked, total)
-        : t("ui.book_counts_0_1_2_3_4", counts.checked, total, counts.written, counts.planned, counts["needs-review"]);
-  top.createSpan({ cls: "vam-book-bar-counts", text: summary });
-  // "About N minutes left" only when the runner has a real estimate (at least five finished cards); no number is made up.
-  if (state.etaSeconds !== undefined && (state.mode === "planning" || state.mode === "writing"))
-    top.createSpan({ cls: "vam-book-bar-eta", text: bookEtaText(state.etaSeconds) });
+  // Stopped and budget runs keep their one sentence; every other state is told by the stage list below.
+  if (state.mode === "budget" || state.mode === "stopped")
+    top.createSpan({
+      cls: "vam-book-bar-counts",
+      text:
+        state.mode === "budget"
+          ? t("ui.book_budget_used_up_0_1", state.budget.used, state.budget.limit)
+          : state.failure
+            ? t("ui.book_failed_at_0_1", t(PHASE_KEY[state.phase]), bookFailureText(state.failure))
+            : t("ui.book_stopped_at_0_1_2", t(PHASE_KEY[state.phase]), counts.checked, total)
+    });
   const buttons = top.createDiv("vam-book-bar-actions");
   if (actions.panel && (state.phase === "gate1" || state.phase === "gate2" || state.phase === "done")) {
     const open = actions.panel.open;
@@ -165,13 +216,10 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     );
   else if (state.mode === "planning" || state.mode === "writing")
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
-  const valueText = t(
-    "ui.book_progress_text_0_1_2_3",
-    counts.checked,
-    counts.written,
-    counts.planned,
-    counts["needs-review"]
-  );
+  const items = bookStepItems(state);
+  renderStepList(bar, items);
+  renderNowLine(bar, state);
+  const valueText = items.map(item => item.text).join(t("ui.book_progress_sep"));
   const track = bar.createDiv("vam-book-track");
   track.setAttr("role", "progressbar");
   track.setAttr("aria-label", t("ui.book_bar_label"));
@@ -189,16 +237,73 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     if (!count || !total) continue;
     track.createSpan({ cls: `vam-book-seg is-${name}` }).style.width = `${(count / total) * 100}%`;
   }
-  const legend = bar.createDiv("vam-book-legend");
-  legend.setAttr("aria-hidden", "true");
-  for (const [name, key] of [
-    ["checked", "ui.book_stage_checked"],
-    ["written", "ui.book_stage_written"],
-    ["planned", "ui.book_stage_planned"],
-    ["needs-review", "ui.book_stage_needs_review"]
-  ] as const)
-    legend.createSpan({ cls: `vam-book-legend-item is-${name}`, text: t(key) });
   return bar;
+}
+
+export interface BookStepItem {
+  key: BookCurrentStep;
+  text: string;
+  done: boolean;
+  current: boolean;
+}
+const STEP_LABEL: Record<BookCurrentStep, TranslationKey> = {
+  global: "ui.book_progress_step_global",
+  plan: "ui.book_progress_step_plan",
+  write: "ui.book_progress_step_write",
+  images: "ui.book_progress_step_images",
+  proof: "ui.book_progress_step_proof"
+};
+/** The five stages the owner knows, in order, each with its own words ("Writing 3/5"); a finished one carries a check mark. */
+export function bookStepItems(state: BookBarState): BookStepItem[] {
+  const marked = new Set(state.current?.steps ?? []);
+  const items: BookStepItem[] = [];
+  for (const key of ["global", "plan", "write", "images", "proof"] as const) {
+    const done = key === "global" ? state.globalDone : state.total > 0 && state.steps[key] >= state.total;
+    const label = t(STEP_LABEL[key]);
+    items.push({
+      key,
+      done,
+      current: marked.has(key),
+      text: done
+        ? t("ui.book_progress_done_0", label)
+        : key === "global"
+          ? label
+          : t("ui.book_progress_count_0_1_2", label, state.steps[key], state.total)
+    });
+  }
+  return items;
+}
+function renderStepList(bar: HTMLElement, items: BookStepItem[]): void {
+  const list = bar.createEl("ol", { cls: "vam-book-steps" });
+  list.setAttr("aria-label", t("ui.book_progress_steps_label"));
+  for (const item of items) {
+    const li = list.createEl("li", { cls: "vam-book-step", text: item.text });
+    li.dataset.step = item.key;
+    li.toggleClass("is-done", item.done);
+    li.toggleClass("is-current", item.current);
+    if (item.current) li.setAttr("aria-current", "step");
+  }
+}
+const NOW_KEY: Record<Exclude<BookCurrentStep, "global">, TranslationKey> = {
+  plan: "ui.book_progress_now_plan_0_1",
+  write: "ui.book_progress_now_write_0_1",
+  images: "ui.book_progress_now_images_0_1",
+  proof: "ui.book_progress_now_proof_0_1"
+};
+/** "Now writing chapter 3 'Title'". Titles come from notes: the caller sets them as text only. */
+export function bookNowText(current: BookCurrent): string {
+  if (current.step === "global") return t("ui.book_progress_now_global");
+  const base = t(NOW_KEY[current.step], current.chapter ?? 0, current.title ?? "");
+  return current.more > 0 ? `${base}${t("ui.book_progress_more_0", current.more)}` : base;
+}
+function renderNowLine(bar: HTMLElement, state: BookBarState): void {
+  const showEta = state.etaSeconds !== undefined && (state.mode === "planning" || state.mode === "writing");
+  if (!state.current && !showEta) return;
+  const now = bar.createDiv("vam-book-now");
+  if (state.current) now.createSpan({ cls: "vam-book-now-text", text: bookNowText(state.current) });
+  // "About N minutes left" only when the runner has a real estimate (at least five finished cards); no number is made up.
+  if (showEta && state.etaSeconds !== undefined)
+    now.createSpan({ cls: "vam-book-bar-eta", text: bookEtaText(state.etaSeconds) });
 }
 
 function makeButton(parent: HTMLElement, text: string, cls: string, action: () => void): HTMLButtonElement {
@@ -341,18 +446,25 @@ export function bookCardView(note: BookCardInput): BookCardView {
   };
 }
 
+const WORKING_KEY: Record<BookSubStep, TranslationKey> = {
+  plan: "ui.book_stage_planning",
+  write: "ui.book_stage_writing",
+  images: "ui.book_stage_images",
+  proof: "ui.book_stage_proof"
+};
 /**
  * The two small labels beside the existing status chip: the pipeline state (dot plus word, like `.vam-status`) and the role.
- * While the author step is writing this card, `writingElapsed` replaces the state with "Writing" and the elapsed clock.
+ * While a step works on this card, `writing` replaces the state with what it does (planning, writing, finding pictures, proofreading) and the elapsed clock.
  */
 export function renderBookCardLabels(
   header: HTMLElement,
   view: BookCardView,
-  writing?: { track: (element: HTMLElement) => void }
+  writing?: { track: (element: HTMLElement) => void; step?: BookSubStep }
 ): void {
   if (writing) {
-    const chip = header.createSpan({ cls: "vam-status vam-status-running vam-book-state is-writing" });
-    chip.createSpan({ text: t("ui.book_stage_writing") });
+    const step = writing.step ?? "write";
+    const chip = header.createSpan({ cls: `vam-status vam-status-running vam-book-state is-writing is-${step}` });
+    chip.createSpan({ text: t(WORKING_KEY[step]) });
     const elapsed = chip.createSpan({ cls: "vam-book-elapsed" });
     elapsed.setAttr("aria-hidden", "true");
     writing.track(elapsed);

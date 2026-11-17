@@ -333,7 +333,12 @@ import { CANONICAL_LANGUAGES } from "../../ai/note-style-file";
 import type { UpdateMode } from "../../ai/note-style-recipe";
 import { backupNote } from "../../ai/note-writeback";
 import { stopLabelKey, type ResearchStart, type SelectionSynthesisTask, type WritebackHooks } from "./topic-run";
-import type { AuthorInput, AuthorOutcome, BookPipelineProgress } from "./book-pipeline-run";
+import {
+  BookPipelineRunError,
+  type AuthorInput,
+  type AuthorOutcome,
+  type BookPipelineProgress
+} from "./book-pipeline-run";
 import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
 import { readBookPipeline, readPipelineStage, type BookPipelineData } from "../../core/book-pipeline/model";
 import {
@@ -17373,10 +17378,13 @@ export class VisualAgentMapView extends ItemView {
     const map = this.map;
     if (!this.path || !map) return;
     const path = this.path;
-    // A map that already carries a run (or one that cannot be read) has nothing to confirm: the entry answers with its own sentence.
-    if (readBookPipeline(map).kind !== "absent") return this.bookEntry(() => this.plugin.startBookPipeline(path));
-    if (this.bookStartModal?.isOpen) return;
     const roots = map.nodes.filter(node => !node.parentId);
+    // A map with a run still going (or one that cannot be read) has nothing to confirm: the entry answers with its own sentence.
+    // So does a map without exactly one root topic: the card would only lead to the same refusal.
+    const existing = readBookPipeline(map);
+    const startable = existing.kind === "absent" || (existing.kind === "usable" && existing.data.phase === "done");
+    if (!startable || roots.length !== 1) return this.bookEntry(() => this.plugin.startBookPipeline(path));
+    if (this.bookStartModal?.isOpen) return;
     const root = roots.length === 1 ? roots[0] : undefined;
     const rootNote = root ? await this.plugin.repo.readNote(root.path).catch(() => null) : null;
     if (this.closed || this.bookStartModal?.isOpen) return;
@@ -17393,6 +17401,8 @@ export class VisualAgentMapView extends ItemView {
       settings: rootNote?.bookSettings ?? {},
       onStart: patch => {
         void this.bookEntry(async () => {
+          // A chat chain holding the map refuses before anything is written.
+          if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");
           // Only the fields the owner changed are written, and only to the root topic.
           if (root && Object.keys(patch).length) await this.plugin.repo.writeBookSettings(root.path, patch);
           await this.plugin.startBookPipeline(path);

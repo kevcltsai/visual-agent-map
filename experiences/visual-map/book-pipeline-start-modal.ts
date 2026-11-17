@@ -17,17 +17,19 @@ import { BOOK_POOL } from "./book-pipeline-run";
 
 /** The median wall time of one card in a live run (stage 7 measurement). The estimate says "about"; T2 live runs may recalibrate it. */
 export const BOOK_CARD_P50_SECONDS = 88.5;
+/** The whole-book plan before the first card: about 135 seconds (stage 7 measurement: the plan took 2m15s). */
+export const BOOK_PLAN_SECONDS = 135;
 
 export interface BookStartEstimate {
   cards: number;
   /** One whole-book plan, then plan, write, find pictures and proofread for each card. */
   calls: number;
-  /** Cards run {@link BOOK_POOL} at a time, each taking about the measured median. */
+  /** The plan, then cards run {@link BOOK_POOL} at a time, each taking about the measured median. */
   seconds: number;
 }
 export function bookStartEstimate(cards: number): BookStartEstimate {
   const n = Math.max(0, Math.floor(cards));
-  return { cards: n, calls: 1 + 4 * n, seconds: Math.ceil(n / BOOK_POOL) * BOOK_CARD_P50_SECONDS };
+  return { cards: n, calls: 1 + 4 * n, seconds: BOOK_PLAN_SECONDS + Math.ceil(n / BOOK_POOL) * BOOK_CARD_P50_SECONDS };
 }
 export function bookStartEstimateText(estimate: BookStartEstimate): string {
   const minutes = Math.round(estimate.seconds / 60);

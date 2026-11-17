@@ -99,7 +99,7 @@ export function bookBarState(
       : status === "stopped" || interrupted
         ? "stopped"
         : phase;
-  const steps = progress?.steps ?? stepCounts(counts);
+  const steps = progress?.steps ?? stepCounts(counts, 0, { settled: phase === "gate2" || phase === "done" });
   const current = mode === "planning" || mode === "writing" ? currentOf(data, progress, titleOf) : undefined;
   return {
     mode,
@@ -290,10 +290,19 @@ const NOW_KEY: Record<Exclude<BookCurrentStep, "global">, TranslationKey> = {
   images: "ui.book_progress_now_images_0_1",
   proof: "ui.book_progress_now_proof_0_1"
 };
+const NOW_KEY_UNTITLED: Record<Exclude<BookCurrentStep, "global">, TranslationKey> = {
+  plan: "ui.book_progress_now_plan_0",
+  write: "ui.book_progress_now_write_0",
+  images: "ui.book_progress_now_images_0",
+  proof: "ui.book_progress_now_proof_0"
+};
 /** "Now writing chapter 3 'Title'". Titles come from notes: the caller sets them as text only. */
 export function bookNowText(current: BookCurrent): string {
   if (current.step === "global") return t("ui.book_progress_now_global");
-  const base = t(NOW_KEY[current.step], current.chapter ?? 0, current.title ?? "");
+  // A title that has not loaded yet reads as a sentence without one (never an empty pair of quotes).
+  const base = current.title
+    ? t(NOW_KEY[current.step], current.chapter ?? 0, current.title)
+    : t(NOW_KEY_UNTITLED[current.step], current.chapter ?? 0);
   return current.more > 0 ? `${base}${t("ui.book_progress_more_0", current.more)}` : base;
 }
 function renderNowLine(bar: HTMLElement, state: BookBarState): void {

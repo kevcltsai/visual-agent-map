@@ -15,7 +15,7 @@ const notices = [];
 const bundle = loadSource(`
 export * from "./experiences/visual-map/book-pipeline-ui";
 export { bookStartEstimate, bookStartEstimateText, bookSettingsPatch } from "./experiences/visual-map/book-pipeline-start-modal";
-export { BookPipelineRunError } from "./experiences/visual-map/book-pipeline-run";
+export { BookPipelineRunError, stepCounts } from "./experiences/visual-map/book-pipeline-run";
 export { readBookPipeline } from "./core/book-pipeline/model";
 export { VisualAgentMapView } from "./experiences/visual-map/view";
 export { setUiLanguage, t } from "./i18n";
@@ -54,7 +54,7 @@ test('bar: running writing phase shows the phase, the five stages in plain words
   const d = draw(bookData(), progress());
   assert.equal(d.bar.attrs.role, 'group');
   assert.ok(texts(d.bar).includes('圖文書：寫作、找圖與校對中'));
-  // Derived from the stage counts (planned 1, written 1, checked 1, needs-review 1 of 4); the old "已校 · 已寫 · 已企劃" line is gone.
+  // Derived from the stage counts (planned 1, written 1, checked 1, needs-review 1 of 4). While writing, a needs-review card whose failing step is unknown only counts for its plan (write 2 = written + checked); the old "已校 · 已寫 · 已企劃" line is gone.
   assert.deepEqual(dom.findAll(d.bar, i => i.tag === 'li').map(i => i.text), ['✓ 全書企劃', '✓ 逐章企劃', '寫作 2／4', '找圖 2／4', '校對 1／4']);
   assert.equal(texts(d.bar).filter(x => /已寫|已企劃|需人看/.test(x)).length, 0);
   assert.equal(dom.find(d.bar, i => i.cls.includes('vam-book-legend')), undefined);
@@ -234,6 +234,7 @@ async function harness({ book, stages = {}, issue }) {
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: work => Promise.resolve().then(work),
     getBookPipelineProgress: () => undefined,
+    argumentRuns: { isRunning: () => false },
     modelLabel: model => `M:${model}`,
     startBookPipeline: async p => { entries.push(['start', p]); },
     stopBookPipeline: async p => { entries.push(['stop', p]); },
@@ -433,7 +434,7 @@ test('start card: pressing the button opens a card with the estimate (1+4N calls
   assert.ok(modal.isOpen);
   assert.equal(h.entries.length, 0, 'nothing starts before the owner presses Start');
   const all = texts(modal.modalEl);
-  assert.ok(all.includes('3 張卡 · 約 1 分鐘 · 約 13 次 AI 呼叫。'), all.join('|'));
+  assert.ok(all.includes('3 張卡 · 約 4 分鐘 · 約 13 次 AI 呼叫。'), all.join('|'));
   assert.ok(all.includes('中間只會停兩次，讓你確認。'));
   for (const line of ['企劃：M:' + h.plugin.settings.bookPlanModel, '寫作：M:' + h.plugin.settings.bookWriteModel, '找圖：M:' + h.plugin.settings.bookWriteModel, '校對：M:' + h.plugin.settings.bookProofModel]) assert.ok(all.includes(line), line);
   const details = dom.find(modal.modalEl, i => i.tag === 'details');
@@ -446,15 +447,15 @@ test('start card: pressing the button opens a card with the estimate (1+4N calls
   assert.equal(h.entries.length, 0, 'Cancel starts nothing');
 });
 
-test('start card: the estimate numbers (1+4N calls; cards run five at a time at the measured median) and the under-a-minute wording', () => {
+test('start card: the estimate numbers (1+4N calls; the 135 s whole-book plan, then cards five at a time at the measured median) and the minutes wording', () => {
   const start = bundleStart;
-  assert.equal(JSON.stringify(start.bookStartEstimate(15)), JSON.stringify({ cards: 15, calls: 61, seconds: 3 * 88.5 }));
-  assert.equal(JSON.stringify(start.bookStartEstimate(0)), JSON.stringify({ cards: 0, calls: 1, seconds: 0 }));
+  assert.equal(JSON.stringify(start.bookStartEstimate(15)), JSON.stringify({ cards: 15, calls: 61, seconds: 135 + 3 * 88.5 }));
+  assert.equal(JSON.stringify(start.bookStartEstimate(0)), JSON.stringify({ cards: 0, calls: 1, seconds: 135 }));
   lang('zh-TW');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15)), '15 張卡 · 約 4 分鐘 · 約 61 次 AI 呼叫。');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(0)), '0 張卡 · 約 不到 1 分鐘 · 約 1 次 AI 呼叫。');
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15)), '15 張卡 · 約 7 分鐘 · 約 61 次 AI 呼叫。');
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(0)), '0 張卡 · 約 2 分鐘 · 約 1 次 AI 呼叫。');
   lang('en');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15)), '15 cards · about 4 minutes · about 61 AI calls.');
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15)), '15 cards · about 7 minutes · about 61 AI calls.');
   lang('zh-TW');
 });
 
@@ -625,4 +626,74 @@ test('panel: outside the gates the side column draws no "nothing to see" line an
   h.view.mountBookPanel(dom.element('div'));
   await Promise.resolve();
   assert.equal(closed, 1);
+});
+
+test('bar: 31 cards with 5 needing a look at gate 2 or done: every step is ticked; while writing the failing step decides (S1)', () => {
+  lang('zh-TW');
+  const counts = { pending: 0, planned: 0, written: 0, checked: 26, 'needs-review': 5 };
+  for (const phase of ['gate2', 'done']) {
+    const order = Array.from({ length: 31 }, (_, i) => 'c' + i);
+    const state = ui.bookBarState(bookData({ phase, order }), undefined, id => (Number(id.slice(1)) < 26 ? 'checked' : 'needs-review'), () => 'T');
+    assert.equal(JSON.stringify(state.steps), JSON.stringify({ plan: 31, write: 31, images: 31, proof: 31 }), phase);
+    const parent = dom.element('div');
+    ui.renderBookBar(parent, state, calls().actions);
+    assert.deepEqual(dom.findAll(parent, i => i.tag === 'li').map(i => i.text), ['✓ 全書企劃', '✓ 逐章企劃', '✓ 寫作', '✓ 找圖', '✓ 校對'], phase);
+  }
+  // The runner's own counts: the same at gate 2; while writing only a proofread failure keeps the text and pictures.
+  assert.equal(JSON.stringify(runModule.stepCounts(counts, 0, { settled: true })), JSON.stringify({ plan: 31, write: 31, images: 31, proof: 31 }));
+  assert.equal(JSON.stringify(runModule.stepCounts(counts, 0, { proofFailed: 2 })), JSON.stringify({ plan: 31, write: 28, images: 28, proof: 26 }));
+  assert.equal(JSON.stringify(runModule.stepCounts(counts)), JSON.stringify({ plan: 31, write: 26, images: 26, proof: 26 }));
+});
+
+test('start card: a finished map opens the card again; a running, gate, stopped or unreadable map still answers with its own sentence (S2)', async () => {
+  const done = await harness({ book: false });
+  const map = done.view.map; map.bookPipeline = bookData({ phase: 'done', order: [done.ids.root, done.ids.a, done.ids.b] });
+  const card = await openCard(done);
+  assert.ok(card?.isOpen, 'a finished map confirms again');
+  assert.equal(done.entries.length, 0);
+  for (const phase of ['planning', 'gate1', 'writing', 'gate2']) {
+    const h = await harness({ book: true });
+    h.view.map.bookPipeline = bookData({ phase, order: [h.ids.root, h.ids.a, h.ids.b] });
+    await h.view.startBookPipelineFromUi();
+    assert.equal(h.view.bookStartModal, null, phase);
+    assert.equal(h.entries.length, 1, phase);
+  }
+  const stopped = await harness({ book: true });
+  stopped.view.map.bookPipeline = bookData({ status: 'stopped', order: [stopped.ids.root] });
+  await stopped.view.startBookPipelineFromUi();
+  assert.equal(stopped.view.bookStartModal, null);
+  assert.equal(stopped.entries.length, 1);
+  const unreadable = await harness({ book: true });
+  unreadable.view.map.bookPipeline = { v: 99 };
+  await unreadable.view.startBookPipelineFromUi();
+  assert.equal(unreadable.view.bookStartModal, null);
+  assert.equal(unreadable.entries.length, 1);
+});
+
+test('start card: several root topics are refused before the card opens (M2); a chat chain holding the map refuses before any setting is written (M3)', async () => {
+  const many = await harness({ book: false });
+  many.view.map.nodes.find(n => n.id === many.ids.a).parentId = null;
+  await many.view.startBookPipelineFromUi();
+  assert.equal(many.view.bookStartModal, null, 'no card for a map the entry would refuse');
+  assert.equal(many.entries.length, 1, 'the entry answers with its refusal');
+  const h = await harness({ book: false });
+  const writes = [];
+  h.plugin.repo.writeBookSettings = async (path, patch) => { writes.push([path, patch]); };
+  const modal = await openCard(h);
+  h.view.chatChainRunner = { current: {} };
+  dom.findAll(modal.modalEl, i => i.tag === 'textarea').find(f => f.attrs['aria-label'] === '讀者').value = 'kids';
+  cardButton(modal, '開始').click();
+  await dom.tick(); await dom.tick();
+  assert.equal(writes.length, 0, 'blocked: nothing written');
+  assert.equal(h.entries.length, 0, 'blocked: nothing started');
+  assert.ok(notices.length > 0, 'the owner is told');
+});
+
+test('bar: a title that has not loaded yet reads as a sentence without an empty pair of quotes (M4)', () => {
+  lang('zh-TW');
+  assert.equal(ui.bookNowText({ step: 'write', chapter: 3, more: 0 }), '目前：正在寫第 3 章');
+  assert.equal(ui.bookNowText({ step: 'proof', chapter: 3, title: '睡眠', more: 1 }), '目前：正在校對第 3 章「睡眠」，另有 1 章同時進行');
+  lang('en');
+  assert.equal(ui.bookNowText({ step: 'images', chapter: 2, more: 0 }), 'Now: finding pictures for chapter 2');
+  lang('zh-TW');
 });

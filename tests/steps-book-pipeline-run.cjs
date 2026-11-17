@@ -1057,6 +1057,29 @@ test('image plan: the plan result is written to the Prompt and the author receiv
   assert.deepEqual(plain(seen.get(r.nodes[0].id)), []); assert.deepEqual(plain(seen.get(r.nodes[1].id)), images); assert.deepEqual(plain(seen.get(r.nodes[2].id)), []);
 });
 
+test('progress: a card whose step ended is no longer in current (the in-memory sub-step is dropped with the step)', async () => {
+  const stale = [];
+  let samples = 0;
+  const holder = {};
+  const sample = () => {
+    const p = holder.r.runs.getProgress(holder.r.mapPath);
+    samples++;
+    for (const c of p?.current ?? []) if (c.nodeId !== 'global' && !p.busyCards.includes(c.nodeId)) stale.push(c.nodeId);
+  };
+  const r = await rig({
+    ports: { progressed: () => sample() },
+    script: {
+      author: async input => { await input.admission.reserve(); const note = await holder.r.repo.readNote(input.path); const out = await holder.r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; },
+      proof: async request => { sample(); return { items: request.checklist.map(c => ({ id: c.id, type: c.type, status: 'met', note: 'fine', sources: [] })), aggregate: 'checked' }; }
+    }
+  });
+  holder.r = r;
+  await r.runs.start(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
+  assert.ok(samples > 3, 'sampled while the run progressed');
+  assert.deepEqual(stale, [], 'a finished card is not left in current');
+});
+
 test('progress (memory only): current walks write, images, proof; steps end 3/3/3/3; no eta under 5 cards; the map file has neither key; nothing once the run is not active', async () => {
   const seen = [];
   const holder = {};

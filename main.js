@@ -3108,6 +3108,10 @@ var en = {
   "ui.book_progress_now_write_0_1": 'Now: writing chapter {0} "{1}"',
   "ui.book_progress_now_images_0_1": 'Now: finding pictures for chapter {0} "{1}"',
   "ui.book_progress_now_proof_0_1": 'Now: proofreading chapter {0} "{1}"',
+  "ui.book_progress_now_plan_0": "Now: planning chapter {0}",
+  "ui.book_progress_now_write_0": "Now: writing chapter {0}",
+  "ui.book_progress_now_images_0": "Now: finding pictures for chapter {0}",
+  "ui.book_progress_now_proof_0": "Now: proofreading chapter {0}",
   "ui.book_progress_more_0": ", and {0} more at the same time",
   "ui.book_stage_planning": "Planning",
   "ui.book_stage_images": "Finding pictures",
@@ -6276,6 +6280,10 @@ var zhCN = {
   "ui.book_progress_now_write_0_1": "\u76EE\u524D\uFF1A\u6B63\u5728\u5199\u7B2C {0} \u7AE0\u201C{1}\u201D",
   "ui.book_progress_now_images_0_1": "\u76EE\u524D\uFF1A\u6B63\u5728\u627E\u7B2C {0} \u7AE0\u201C{1}\u201D\u7684\u56FE",
   "ui.book_progress_now_proof_0_1": "\u76EE\u524D\uFF1A\u6B63\u5728\u6821\u5BF9\u7B2C {0} \u7AE0\u201C{1}\u201D",
+  "ui.book_progress_now_plan_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u4F01\u5212\u7B2C {0} \u7AE0",
+  "ui.book_progress_now_write_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u5199\u7B2C {0} \u7AE0",
+  "ui.book_progress_now_images_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u627E\u7B2C {0} \u7AE0\u7684\u56FE",
+  "ui.book_progress_now_proof_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u6821\u5BF9\u7B2C {0} \u7AE0",
   "ui.book_progress_more_0": "\uFF0C\u53E6\u6709 {0} \u7AE0\u540C\u65F6\u8FDB\u884C",
   "ui.book_stage_planning": "\u4F01\u5212\u4E2D",
   "ui.book_stage_images": "\u627E\u56FE\u4E2D",
@@ -9444,6 +9452,10 @@ var zhTW = {
   "ui.book_progress_now_write_0_1": "\u76EE\u524D\uFF1A\u6B63\u5728\u5BEB\u7B2C {0} \u7AE0\u300C{1}\u300D",
   "ui.book_progress_now_images_0_1": "\u76EE\u524D\uFF1A\u6B63\u5728\u627E\u7B2C {0} \u7AE0\u300C{1}\u300D\u7684\u5716",
   "ui.book_progress_now_proof_0_1": "\u76EE\u524D\uFF1A\u6B63\u5728\u6821\u5C0D\u7B2C {0} \u7AE0\u300C{1}\u300D",
+  "ui.book_progress_now_plan_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u4F01\u5283\u7B2C {0} \u7AE0",
+  "ui.book_progress_now_write_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u5BEB\u7B2C {0} \u7AE0",
+  "ui.book_progress_now_images_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u627E\u7B2C {0} \u7AE0\u7684\u5716",
+  "ui.book_progress_now_proof_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u6821\u5C0D\u7B2C {0} \u7AE0",
   "ui.book_progress_more_0": "\uFF0C\u53E6\u6709 {0} \u7AE0\u540C\u6642\u9032\u884C",
   "ui.book_stage_planning": "\u4F01\u5283\u4E2D",
   "ui.book_stage_images": "\u627E\u5716\u4E2D",
@@ -49739,13 +49751,16 @@ var BookPipelineRunError = class extends Error {
     this.name = "BookPipelineRunError";
   }
 };
-function stepCounts(counts, imagesDone = 0) {
+function stepCounts(counts, imagesDone = 0, review = {}) {
+  var _a2;
   const written2 = counts.written + counts.checked;
+  const reviewed = counts["needs-review"];
+  const textual = written2 + (review.settled ? reviewed : (_a2 = review.proofFailed) != null ? _a2 : 0);
   return {
-    plan: counts.planned + written2 + counts["needs-review"],
-    write: written2,
-    images: written2 + imagesDone,
-    proof: counts.checked
+    plan: counts.planned + written2 + reviewed,
+    write: textual,
+    images: textual + imagesDone,
+    proof: counts.checked + (review.settled ? reviewed : 0)
   };
 }
 var ETA_MIN_CARDS = 5;
@@ -50327,6 +50342,7 @@ var BookPipelineRuns = class {
       durations: { plan: [], write: [] },
       sub: /* @__PURE__ */ new Map(),
       imagesDone: /* @__PURE__ */ new Set(),
+      reviewStep: /* @__PURE__ */ new Map(),
       stopRequested: false,
       disposed: false,
       rootId: "",
@@ -50635,6 +50651,7 @@ var BookPipelineRuns = class {
   }
   async markReview(drive, nodeId, step, reason) {
     drive.stages.set(nodeId, "needs-review");
+    drive.reviewStep.set(nodeId, step);
     await this.writeFields(drive, nodeId, {
       pipelineStage: "needs-review",
       pipelineIssue: `${step} failed: ${code2(reason)}`
@@ -51210,7 +51227,12 @@ var BookPipelineRuns = class {
       busyCards: [...drive.busy].filter((id) => id !== "global"),
       ...eta === void 0 ? {} : { etaSeconds: eta },
       ...active && drive.sub.size ? { current: [...drive.sub].map(([nodeId, sub]) => ({ nodeId, step: sub.step, startedAt: sub.startedAt })) } : {},
-      steps: stepCounts(counts, imagesDone)
+      steps: stepCounts(counts, imagesDone, {
+        settled: state.phase === "gate2" || state.phase === "done",
+        proofFailed: state.order.filter(
+          (id) => drive.stages.get(id) === "needs-review" && drive.reviewStep.get(id) === "proof"
+        ).length
+      })
     };
   }
   /** Average wall time of the cards that finished this phase in this drive × cards left ÷ pool; undefined below {@link ETA_MIN_CARDS} finished cards. */
@@ -51292,7 +51314,7 @@ function bookBarState(data, progress, stageOf, titleOf) {
   const failure = progress ? progress.failureCode : data.failureCode;
   const interrupted = (phase === "planning" || phase === "writing") && !active;
   const mode = status === "stopped" && pauseReason === "budget" ? "budget" : status === "stopped" || interrupted ? "stopped" : phase;
-  const steps = (_g = progress == null ? void 0 : progress.steps) != null ? _g : stepCounts(counts);
+  const steps = (_g = progress == null ? void 0 : progress.steps) != null ? _g : stepCounts(counts, 0, { settled: phase === "gate2" || phase === "done" });
   const current = mode === "planning" || mode === "writing" ? currentOf2(data, progress, titleOf) : void 0;
   return {
     mode,
@@ -51439,10 +51461,16 @@ var NOW_KEY = {
   images: "ui.book_progress_now_images_0_1",
   proof: "ui.book_progress_now_proof_0_1"
 };
+var NOW_KEY_UNTITLED = {
+  plan: "ui.book_progress_now_plan_0",
+  write: "ui.book_progress_now_write_0",
+  images: "ui.book_progress_now_images_0",
+  proof: "ui.book_progress_now_proof_0"
+};
 function bookNowText(current) {
   var _a2, _b2;
   if (current.step === "global") return t("ui.book_progress_now_global");
-  const base = t(NOW_KEY[current.step], (_a2 = current.chapter) != null ? _a2 : 0, (_b2 = current.title) != null ? _b2 : "");
+  const base = current.title ? t(NOW_KEY[current.step], (_a2 = current.chapter) != null ? _a2 : 0, current.title) : t(NOW_KEY_UNTITLED[current.step], (_b2 = current.chapter) != null ? _b2 : 0);
   return current.more > 0 ? `${base}${t("ui.book_progress_more_0", current.more)}` : base;
 }
 function renderNowLine(bar, state) {
@@ -64404,9 +64432,10 @@ var MultiResearchModal = class extends import_obsidian30.Modal {
 // experiences/visual-map/book-pipeline-start-modal.ts
 var import_obsidian31 = require("obsidian");
 var BOOK_CARD_P50_SECONDS = 88.5;
+var BOOK_PLAN_SECONDS = 135;
 function bookStartEstimate(cards) {
   const n = Math.max(0, Math.floor(cards));
-  return { cards: n, calls: 1 + 4 * n, seconds: Math.ceil(n / BOOK_POOL) * BOOK_CARD_P50_SECONDS };
+  return { cards: n, calls: 1 + 4 * n, seconds: BOOK_PLAN_SECONDS + Math.ceil(n / BOOK_POOL) * BOOK_CARD_P50_SECONDS };
 }
 function bookStartEstimateText(estimate) {
   const minutes = Math.round(estimate.seconds / 60);
@@ -82015,9 +82044,11 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const map = this.map;
     if (!this.path || !map) return;
     const path = this.path;
-    if (readBookPipeline(map).kind !== "absent") return this.bookEntry(() => this.plugin.startBookPipeline(path));
-    if ((_a2 = this.bookStartModal) == null ? void 0 : _a2.isOpen) return;
     const roots = map.nodes.filter((node) => !node.parentId);
+    const existing = readBookPipeline(map);
+    const startable = existing.kind === "absent" || existing.kind === "usable" && existing.data.phase === "done";
+    if (!startable || roots.length !== 1) return this.bookEntry(() => this.plugin.startBookPipeline(path));
+    if ((_a2 = this.bookStartModal) == null ? void 0 : _a2.isOpen) return;
     const root = roots.length === 1 ? roots[0] : void 0;
     const rootNote = root ? await this.plugin.repo.readNote(root.path).catch(() => null) : null;
     if (this.closed || ((_b2 = this.bookStartModal) == null ? void 0 : _b2.isOpen)) return;
@@ -82034,6 +82065,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       settings: (_c = rootNote == null ? void 0 : rootNote.bookSettings) != null ? _c : {},
       onStart: (patch) => {
         void this.bookEntry(async () => {
+          if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");
           if (root && Object.keys(patch).length) await this.plugin.repo.writeBookSettings(root.path, patch);
           await this.plugin.startBookPipeline(path);
         });

@@ -70,13 +70,15 @@ function makeScope() {
 function makeModal({ focusFirst = false } = {}) {
   return class Modal {
     constructor(app) { this.app = app; this.titleEl = element('title'); this.contentEl = element('content'); this.modalEl = element('modal'); this.modalEl.children.push(this.contentEl); this.closeCount = 0; this.scope = makeScope();
+      // Like Obsidian: isOpen is a writable instance property, written by the base class (a subclass getter of the same name makes these writes throw).
+      this.isOpen = false;
       // Scope runs handlers in registration order. Like Obsidian's constructor: Escape is bound first, to onEscapeKey (which closes the window unless a subclass overrides it).
       this.scope.register([], 'Escape', () => { if (this.onEscapeKey) this.onEscapeKey(); else this.close(); return false; });
     }
     // Like Obsidian's Modal, opening stores the page's text selection on `this.selection`.
     // With `focusFirst`, after onOpen it moves the focus to the first focusable control in modalEl, as Obsidian does with a physical keyboard.
-    open() { this.selection = { rangeCount: 0 }; this.onOpen?.(); if (focusFirst) findAll(this.modalEl, i => ['button', 'input', 'textarea', 'select'].includes(i.tag) && i.attrs.tabindex !== '-1')[0]?.focus(); }
-    close() { this.closeCount++; this.onClose?.(); }
+    open() { this.isOpen = true; this.selection = { rangeCount: 0 }; this.onOpen?.(); if (focusFirst) findAll(this.modalEl, i => ['button', 'input', 'textarea', 'select'].includes(i.tag) && i.attrs.tabindex !== '-1')[0]?.focus(); }
+    close() { this.closeCount++; this.isOpen = false; this.onClose?.(); }
   };
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));

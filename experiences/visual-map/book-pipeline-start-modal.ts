@@ -95,8 +95,8 @@ export class BookStartModal extends Modal {
   ) {
     super(app);
   }
-  /** True from open to close (the screen opens one card at a time). */
-  get isOpen(): boolean {
+  /** True from open to close (the screen opens one card at a time). Not named isOpen: Obsidian's Modal writes that property itself. */
+  get isShown(): boolean {
     return this.opened;
   }
   onOpen(): void {

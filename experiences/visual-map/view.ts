@@ -17449,10 +17449,10 @@ export class VisualAgentMapView extends ItemView {
     const existing = readBookPipeline(map);
     const startable = existing.kind === "absent" || (existing.kind === "usable" && existing.data.phase === "done");
     if (!startable || roots.length !== 1) return this.bookEntry(() => this.plugin.startBookPipeline(path));
-    if (this.bookStartModal?.isOpen) return;
+    if (this.bookStartModal?.isShown) return;
     const root = roots.length === 1 ? roots[0] : undefined;
     const rootNote = root ? await this.plugin.repo.readNote(root.path).catch(() => null) : null;
-    if (this.closed || this.bookStartModal?.isOpen) return;
+    if (this.closed || this.bookStartModal?.isShown) return;
     const settings = this.plugin.settings;
     const modal = new BookStartModal(this.app, {
       cards: readingOrder(map.nodes, { includeHidden: true }).length,

@@ -763,3 +763,29 @@ test('T5 view wiring: the rerun clock shares the one tick and dies with the view
   assert.match(css, /\.vam-book-rerun-clock/);
   assert.match(css, /\.vam-book-menu-note \{[^}]*pointer-events: none/);
 });
+
+test('fix1: the start and finish cards work on a Modal whose isOpen is a writable base property (no subclass getter shadows it)', () => {
+  const { loadSource: load } = require('./support-replay.cjs');
+  const b = load(`
+export { BookStartModal } from "./experiences/visual-map/book-pipeline-start-modal";
+export { BookFinishModal } from "./experiences/visual-map/book-pipeline-finish-modal";
+`, { obsidian: { ...support.obsidian, Modal: dom.makeModal() } }, { createFragment: dom.createFragment, window: { setTimeout, clearTimeout } });
+  const settings = { reader: '', goal: '', angle: '', tone: '', length: '', style: '' };
+  const start = new b.BookStartModal({}, { cards: 3, models: { plan: 'a', write: 'b', images: 'c', proof: 'd' }, settings, onStart() {} });
+  start.open();
+  assert.equal(start.isShown, true);
+  assert.equal(start.isOpen, true, 'the base class owns isOpen');
+  start.close();
+  assert.equal(start.isShown, false);
+  assert.equal(start.isOpen, false);
+  const fin = new b.BookFinishModal({}, { review: 1, reviewTitles: [], seams: 0 }, () => {});
+  fin.open();
+  assert.equal(fin.isOpen, true);
+  fin.close();
+  assert.equal(fin.isOpen, false);
+  for (const name of ['BookStartModal', 'BookFinishModal']) {
+    for (const key of ['isOpen', 'app', 'scope', 'contentEl', 'titleEl', 'modalEl']) {
+      assert.equal(Object.getOwnPropertyDescriptor(b[name].prototype, key), undefined, `${name} must not define ${key} on its prototype`);
+    }
+  }
+});

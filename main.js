@@ -64939,8 +64939,8 @@ var BookStartModal = class extends import_obsidian31.Modal {
     __publicField(this, "focusTimer", null);
     __publicField(this, "fields", /* @__PURE__ */ new Map());
   }
-  /** True from open to close (the screen opens one card at a time). */
-  get isOpen() {
+  /** True from open to close (the screen opens one card at a time). Not named isOpen: Obsidian's Modal writes that property itself. */
+  get isShown() {
     return this.opened;
   }
   onOpen() {
@@ -82612,10 +82612,10 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const existing = readBookPipeline(map);
     const startable = existing.kind === "absent" || existing.kind === "usable" && existing.data.phase === "done";
     if (!startable || roots.length !== 1) return this.bookEntry(() => this.plugin.startBookPipeline(path));
-    if ((_a2 = this.bookStartModal) == null ? void 0 : _a2.isOpen) return;
+    if ((_a2 = this.bookStartModal) == null ? void 0 : _a2.isShown) return;
     const root = roots.length === 1 ? roots[0] : void 0;
     const rootNote = root ? await this.plugin.repo.readNote(root.path).catch(() => null) : null;
-    if (this.closed || ((_b2 = this.bookStartModal) == null ? void 0 : _b2.isOpen)) return;
+    if (this.closed || ((_b2 = this.bookStartModal) == null ? void 0 : _b2.isShown)) return;
     const settings = this.plugin.settings;
     const modal = new BookStartModal(this.app, {
       cards: readingOrder(map.nodes, { includeHidden: true }).length,

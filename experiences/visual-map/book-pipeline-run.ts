@@ -94,8 +94,13 @@ import type { MapDocument } from "../../map-model";
 import type { NotePatch } from "../../repository";
 import { isBookStepError, type BookStepBase } from "../../core/steps/book-pipeline/base";
 import {
+  checkImageText,
   choosePictures,
+  composeImageTextLine,
   composeSlotsRecord,
+  imageIssueTokens,
+  latestSlotsRecord,
+  stripImageLines,
   fillSlotMarkers,
   residualMarkerLines,
   scanSlotMarkers,
@@ -1332,7 +1337,8 @@ export class BookPipelineRuns {
   private proofSectionOf(
     drive: Drive,
     outcome: { result: ProofResult } | { failure: string },
-    models: { model?: string; authorModel?: string }
+    models: { model?: string; authorModel?: string },
+    imageLine?: string
   ): (content: string) => string {
     const language = drive.config.language;
     const label = this.ports.modelLabel ? (id: string) => this.ports.modelLabel?.(id) ?? id : undefined;
@@ -1340,7 +1346,7 @@ export class BookPipelineRuns {
       replaceProofSection(
         content,
         proofSectionHeading(language),
-        composeProofSection(language, outcome, models, label)
+        composeProofSection(language, outcome, models, label, imageLine)
       );
   }
   /** Best effort: the card's proof-result section says "failed: reason" (no model). Never throws; skipped when nothing is known to be safe to write. */
@@ -1799,7 +1805,10 @@ export class BookPipelineRuns {
     if (!info) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
     const checklist = parseChecklist(card.prompt);
-    const body = chapterBody(card.detail);
+    const chapter = chapterBody(card.detail);
+    const body = stripImageLines(chapter);
+    const imageCheck = checkImageText(chapter, parseImageSlots(card.prompt), latestSlotsRecord(card.detail));
+    const imageLine = composeImageTextLine(drive.config.language, imageCheck);
     if (!checklist.length) return { kind: "failed", reason: "empty_list" };
     if (!body.trim()) return { kind: "failed", reason: "no_body" };
     const key = proofKey({
@@ -1843,7 +1852,7 @@ export class BookPipelineRuns {
         {
           expectedContent: card.raw,
           authorize: this.authorize(drive, token),
-          finalize: this.proofSectionOf(drive, { result }, models)
+          finalize: this.proofSectionOf(drive, { result }, models, imageLine)
         }
       );
       if (written === "discarded") return { kind: "failed", reason: "discarded" };
@@ -1855,7 +1864,7 @@ export class BookPipelineRuns {
         ...(stored?.model ? { model: stored.model } : {}),
         authorModel: drive.authorModels.get(nodeId) ?? stored?.authorModel
       };
-      const next = this.proofSectionOf(drive, { result }, models)(card.raw);
+      const next = this.proofSectionOf(drive, { result }, models, imageLine)(card.raw);
       if (next !== card.raw) {
         const path = await this.stillOnMap(drive, nodeId);
         if (!path) return { kind: "failed", reason: "card_removed" };
@@ -1873,6 +1882,7 @@ export class BookPipelineRuns {
     const structureUnmet = verdict.items
       .filter(item => item.type !== "fact" && item.status === "unmet")
       .map(item => code(item.id));
+    const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
     return {
       kind: "ok",
       after: () =>
@@ -1887,8 +1897,8 @@ export class BookPipelineRuns {
                   .filter(item => item.type === "fact" && item.status === "unmet")
                   .map(item => code(item.id))
                   .join(" ")}`
-            : structureUnmet.length
-              ? `structure unmet: ${structureUnmet.join(" ")}`
+            : noticed.length
+              ? `structure unmet: ${noticed.join(" ")}`
               : null
         )
     };

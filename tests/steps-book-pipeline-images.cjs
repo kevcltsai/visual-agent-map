@@ -217,7 +217,7 @@ test('slots: a search that throws, never answers or is aborted does not make the
   await run(r);
   const s = await r.state();
   assert.equal(stageOf(r.raw(0)), 'checked');
-  assert.ok(!(await r.note(0)).pipelineIssue);
+  assert.match((await r.note(0)).pipelineIssue ?? '', /^structure unmet: image_1 image_2$/, 'only the notice tokens of the missing pictures, never a failure or needs-review');
   assert.deepEqual(recordOf((await r.note(0)).detail).slots.map(x => x.reasonCode), ['not_found', 'not_found']);
   assert.equal(s.cards?.[r.nodes[0].id]?.attempts?.write ?? 1, 1);
   assert.equal(r.calls.length, 1, 'no retry');
@@ -495,4 +495,104 @@ test('slots: CRLF text is filled with CRLF lines and verifies; no marker is left
   const none = m.fillSlotMarkers(text, slots, new Map());
   assert.equal(m.verifyFill(text, none, slots), undefined);
   assert.ok(!/〔圖位/.test(none.text));
+});
+
+// ---- the old run's stages (R1-1): a card planned/written/checked by the old version, standard and textbook template, closed and resumed ----
+const TEMPLATES = { standard: '## 核心結論\n舊內文。\n\n## 背景與機制\n說明。', textbook: '## 章節本文\n舊內文。\n\n## 本章小結\n說明。' };
+async function reopen(r, stage, detail) {
+  await r.repo.updateNote(r.nodes[0].path, { detail });
+  await r.repo.writePipelineFields(r.nodes[0].path, stage ? { pipelineStage: stage, pipelineIssue: null } : { pipelineStage: null });
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'writing'; d.bookPipeline.status = 'stopped'; delete d.bookPipeline.pauseReason; });
+  const again = new BookPipelineRuns(r.ports);
+  await again.resume(r.mapPath);
+  while (again.isRunning(r.mapPath)) await tick();
+  await settle();
+  return again;
+}
+for (const [kind, template] of Object.entries(TEMPLATES)) {
+  const old = `${template}\n\n### 圖像\n\n![Old](https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Old.jpg/1280px-Old.jpg)\nOld／來源：commons.wikimedia.org\n\n### 來源\n- https://example.com/a\n`;
+  test(`old run stages, ${kind} card with an old Prompt (no image plan): planned = the author writes again with no marker or search; written = no search, the old picture section is kept; checked = nothing is redone`, async () => {
+    const r = await picRig({ slots: null, text: () => `${template}\n\n### 來源\n- https://example.com/a\n`, finder: () => found({ 1: [cand(1)] }) });
+    await run(r);
+    const authorCalls = () => r.stat.author.length;
+    // planned: the author has not committed yet (the card keeps its old text); the author runs again, no search, no record
+    let before = authorCalls();
+    await reopen(r, 'planned', old);
+    assert.equal(authorCalls(), before + 1, 'planned: author runs');
+    assert.equal(r.calls.length, 0, 'planned: no search for an old Prompt');
+    assert.ok(!/book-slots|〔圖位/.test((await r.note(0)).detail));
+    assert.equal(stageOf(r.raw(0)), 'checked');
+    // written: the author committed; the old picture section stays word for word, no search, no record
+    await r.repo.updateNote(r.nodes[0].path, { detail: old });
+    before = authorCalls();
+    const proofs = r.stat.proof.length;
+    await reopen(r, 'written', old);
+    assert.equal(authorCalls(), before, 'written: no author');
+    assert.equal(r.calls.length, 0, 'written: no search');
+    assert.ok((await r.note(0)).detail.includes('### 圖像') && (await r.note(0)).detail.includes('Old.jpg'), 'written: old pictures kept');
+    assert.ok(!/book-slots/.test((await r.note(0)).detail));
+    assert.equal(stageOf(r.raw(0)), 'checked');
+    assert.equal(r.stat.proof.length, proofs + 1, 'written: proof runs');
+    // checked: nothing redone
+    before = authorCalls();
+    const calls = r.stat.proof.length;
+    await reopen(r, 'checked', (await r.note(0)).detail);
+    assert.equal(authorCalls(), before, 'checked: no author');
+    assert.equal(r.calls.length, 0);
+    assert.ok(r.stat.proof.length <= calls + 1);
+    assert.equal(stageOf(r.raw(0)), 'checked');
+  });
+}
+for (const [kind, template] of Object.entries(TEMPLATES)) {
+  test(`old run stages, ${kind} card with an image plan: markers left by an interrupted run are filled on the next author pass; a written card with its pictures and record is not searched again`, async () => {
+    const text = () => `${template}\n\n${mk(1)}\n\n${mk(2)}\n\n### 來源\n- https://example.com/a\n`;
+    const r = await picRig({ text, finder: () => found({ 1: [cand(1)], 2: [cand(2)] }) });
+    await run(r);
+    assert.equal(r.calls.length, 1);
+    const done = (await r.note(0)).detail;
+    assert.equal(figures(done).length, 2);
+    // planned with markers still in the text (closed before the fill): the author runs again and the pictures are placed once
+    await reopen(r, 'planned', text());
+    assert.equal(r.calls.length, 2, 'one more search');
+    const again = (await r.note(0)).detail;
+    assert.equal(figures(again).length, 2);
+    assert.equal(again.split('book-slots:v1').length - 1, 1);
+    assert.equal(stageOf(r.raw(0)), 'checked');
+    // written, pictures and record in the text: the search is not repeated and the record is kept
+    const authors = r.stat.author.length;
+    await reopen(r, 'written', again);
+    assert.equal(r.calls.length, 2, 'no search again');
+    assert.equal(r.stat.author.length, authors, 'no author again');
+    assert.equal((await r.note(0)).detail, again);
+    assert.equal(stageOf(r.raw(0)), 'checked');
+  });
+}
+
+test('proofread: the request body has no image line or caption; the result section has one 圖文 line before the model lines; a missing or off-topic picture is a notice (structure unmet), never needs-review', async () => {
+  const text = () => `開頭。\n\nexplains perspective 的說明。\n\n${mk(1)}\n\n另一段。\n\n${mk(2)}\n\n尾。\n\n### 來源\n- https://example.com/a\n`;
+  const r = await picRig({ text, finder: () => found({ 1: [cand(1)] }) });
+  await run(r);
+  const body = r.stat.proof[0].body;
+  assert.ok(!/!\[|Caption 1|Work 1|upload\.wikimedia/.test(body), body);
+  assert.match(body, /explains perspective 的說明。/);
+  const raw = r.raw(0);
+  const section = /## 校對結果[^\n]*\n([\s\S]*?)(?:\n## |\n### |$)/.exec(raw)?.[1] ?? '';
+  const lines = section.split('\n').filter(l => l.startsWith('- '));
+  const at = lines.findIndex(l => /^- 圖文：/.test(l));
+  assert.ok(at >= 0 && at === lines.length - 3, raw);
+  assert.match(lines[at], /圖 2 沒找到合適的圖/);
+  assert.equal(stageOf(raw), 'checked');
+  assert.match((await r.note(0)).pipelineIssue ?? '', /^structure unmet: image_2$/);
+});
+
+test('proofread: all pictures placed next to their text: the 圖文 line says ok and the card carries no issue; an old Prompt says no image plan', async () => {
+  const text = () => `開頭。\n\nexplains 1 perspective 的 explains perspective。\n\n${mk(1)}\n\n尾。\n\n### 來源\n- https://example.com/a\n`;
+  const r = await picRig({ text, slots: 1, finder: () => found({ 1: [cand(1)] }) });
+  await run(r);
+  assert.ok(!(await r.note(0)).pipelineIssue, (await r.note(0)).pipelineIssue);
+  assert.match(r.raw(0), /- 圖文：?.*1/);
+  const old = await picRig({ slots: null, text: () => '舊文。\n\n### 來源\n- https://example.com/a\n', finder: () => found({}) });
+  await run(old);
+  assert.ok(!(await old.note(0)).pipelineIssue);
+  assert.match(old.raw(0), /圖/);
 });

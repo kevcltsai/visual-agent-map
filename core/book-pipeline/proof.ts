@@ -394,7 +394,8 @@ export function composeProofSection(
   language: ContentLanguage,
   outcome: { result: ProofResult } | { failure: string },
   models: ProofModels,
-  modelLabel: (id: string) => string = id => id
+  modelLabel: (id: string) => string = id => id,
+  imageLine?: string
 ): string {
   const note = noteLanguageOf(language);
   if ("failure" in outcome)
@@ -412,6 +413,7 @@ export function composeProofSection(
     safeModelId(id)
       ? escapeMarkdownText(modelLabel(safeModelId(id)), 80)
       : translate(note, "detail.book_model_unrecorded");
+  if (imageLine) lines.push(`- ${imageLine}`);
   lines.push(`- ${translate(note, "detail.book_proof_author_model_0", shown(models.authorModel))}`);
   lines.push(`- ${translate(note, "detail.book_proof_proof_model_0", shown(models.model))}`);
   return lines.join("\n");

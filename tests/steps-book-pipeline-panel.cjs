@@ -386,3 +386,19 @@ test('styles: the side column, the narrow overlay and the panel use theme variab
   assert.match(rules, /var\(--text-normal\)/);
   assert.match(rules, /:focus-visible \{ outline: 2px solid var\(--interactive-accent\)/);
 });
+
+test('gate 1 card: one plain 圖安排 line from the Prompt (not arranged / none / n pictures with kind and what it explains), set with textContent in three languages', () => {
+  const planText = S.load('core/book-pipeline/plan-text.ts');
+  const base = { role: 'body', covers: 'c', entry: 'e', handoff: 'h', checklist: [{ id: 'C1', type: 'fact', text: 'x' }] };
+  const slots = [{ index: 1, kind: 'map', explains: 'trade <b>routes</b>', anchor: 'a' }, { index: 2, kind: '圖表', explains: '成長', anchor: 'b' }];
+  const prompts = { old: planText.composeCardPrompt(base, 'zh-TW'), none: planText.composeCardPrompt({ ...base, images: [] }, 'zh-TW'), some: planText.composeCardPrompt({ ...base, images: slots }, 'zh-TW') };
+  const noteOf = id => ({ prompt: prompts[id], summary: '', pipelineStage: 'planned' });
+  const lines = lang => { setUiLanguage(lang); const data = bundle.buildGatePanel({ order: ['old', 'none', 'some'], titleOf: id => id, noteOf, rootRaw: '' }); return data.cards.map(c => c.imagePlan); };
+  assert.deepEqual(lines('zh-TW'), ['未安排圖', '不放圖', '圖 2 張：map／trade ＜b＞routes＜/b＞；圖表／成長']);
+  assert.deepEqual(lines('zh-CN'), ['未安排图', '不放图', '图 2 张：map／trade ＜b＞routes＜/b＞；圖表／成長']);
+  assert.deepEqual(lines('en'), ['Pictures: not arranged', 'Pictures: none', '2 picture(s): map／trade ＜b＞routes＜/b＞；圖表／成長']);
+  setUiLanguage('zh-TW');
+  const data = bundle.buildGatePanel({ order: ['old', 'none', 'some'], titleOf: id => id, noteOf, rootRaw: '' });
+  const p = bundle.renderGatePanel(dom.element('div'), data, true, new bundle.GatePanelState(), { editPlan() {}, replan: async () => ({}), rerunPlan: async () => {}, confirm: async () => {}, showChat() {}, close() {}, refresh() {} });
+  assert.deepEqual(all(p, 'vam-book-panel-images').map(i => i.text), ['未安排圖', '不放圖', '圖 2 張：map／trade ＜b＞routes＜/b＞；圖表／成長']);
+});

@@ -1,7 +1,12 @@
 import type { TranslationKey } from "../../i18n";
 import { t } from "../../i18n";
 import { BOOK_SETTING_FIELDS, type BookSettingField, type PipelineStage } from "../../core/book-pipeline/model";
-import { parseBookPlanBody, parseBookPlanDecisions, parseCardPrompt } from "../../core/book-pipeline/plan-text";
+import {
+  parseBookPlanBody,
+  parseBookPlanDecisions,
+  parseCardPrompt,
+  parseImageSlots
+} from "../../core/book-pipeline/plan-text";
 import { bookCardView, bookFailureText, bookRefusalText, type BookCardInput } from "./book-pipeline-ui";
 import type { CardPlanSummary } from "./book-pipeline-run";
 
@@ -26,6 +31,8 @@ export interface GatePanelCard {
   stage: PipelineStage | "pending";
   roleText?: string;
   issueText?: string;
+  /** The one plain line of the image plan: not arranged, none, or `n pictures: kind / what it explains`. */
+  imagePlan: string;
   fields: { label: string; value: string }[];
   /** When no labelled line could be read: the first three lines of the Prompt as they are. */
   rawLines: string[];
@@ -74,6 +81,12 @@ export function buildGatePanel(input: {
           .split(/\r?\n/)
           .filter(line => line.trim())
           .slice(0, 3);
+    const slots = parseImageSlots(prompt);
+    const imagePlan = !slots
+      ? t("ui.book_panel_images_unarranged")
+      : slots.length
+        ? t("ui.book_panel_images_0_1", slots.length, slots.map(slot => `${slot.kind}／${slot.explains}`).join("；"))
+        : t("ui.book_panel_images_none");
     return {
       id,
       index: at + 1,
@@ -81,6 +94,7 @@ export function buildGatePanel(input: {
       stage: view.stage,
       ...(view.roleText ? { roleText: view.roleText } : {}),
       ...(view.issueText ? { issueText: view.issueText } : {}),
+      imagePlan,
       fields,
       rawLines
     };
@@ -293,6 +307,7 @@ function renderCard(
   else if (card.rawLines.length)
     for (const line of card.rawLines) item.createDiv({ cls: "vam-book-panel-field is-raw", text: line });
   else item.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_no_plan") });
+  item.createDiv({ cls: "vam-book-panel-muted vam-book-panel-images", text: card.imagePlan });
   if (card.issueText) {
     const issue = item.createDiv("vam-book-panel-issue");
     issue.createSpan({ text: card.issueText });

@@ -3184,6 +3184,9 @@ var en = {
   "ui.book_panel_entry": "Entry point",
   "ui.book_panel_handoff": "Left for the next card",
   "ui.book_panel_no_plan": "This card has no plan yet.",
+  "ui.book_panel_images_unarranged": "Pictures: not arranged",
+  "ui.book_panel_images_none": "Pictures: none",
+  "ui.book_panel_images_0_1": "{0} picture(s): {1}",
   "ui.book_panel_edit_plan": "Edit plan",
   "ui.book_panel_edit_plan_0": "Edit the plan of {0}",
   "ui.book_panel_rerun_plan": "Re-plan",
@@ -6317,6 +6320,9 @@ var zhCN = {
   "ui.book_panel_entry": "\u63A5\u5165\u70B9",
   "ui.book_panel_handoff": "\u7559\u7ED9\u4E0B\u4E00\u5F20\u7684\u95EE\u9898",
   "ui.book_panel_no_plan": "\u8FD9\u5F20\u8FD8\u6CA1\u6709\u4F01\u5212\u3002",
+  "ui.book_panel_images_unarranged": "\u672A\u5B89\u6392\u56FE",
+  "ui.book_panel_images_none": "\u4E0D\u653E\u56FE",
+  "ui.book_panel_images_0_1": "\u56FE {0} \u5F20\uFF1A{1}",
   "ui.book_panel_edit_plan": "\u6539\u4F01\u5212",
   "ui.book_panel_edit_plan_0": "\u6539\u201C{0}\u201D\u7684\u4F01\u5212",
   "ui.book_panel_rerun_plan": "\u91CD\u8DD1\u4F01\u5212",
@@ -9450,6 +9456,9 @@ var zhTW = {
   "ui.book_panel_entry": "\u63A5\u5165\u9EDE",
   "ui.book_panel_handoff": "\u7559\u7D66\u4E0B\u4E00\u5F35\u7684\u554F\u984C",
   "ui.book_panel_no_plan": "\u9019\u5F35\u9084\u6C92\u6709\u4F01\u5283\u3002",
+  "ui.book_panel_images_unarranged": "\u672A\u5B89\u6392\u5716",
+  "ui.book_panel_images_none": "\u4E0D\u653E\u5716",
+  "ui.book_panel_images_0_1": "\u5716 {0} \u5F35\uFF1A{1}",
   "ui.book_panel_edit_plan": "\u6539\u4F01\u5283",
   "ui.book_panel_edit_plan_0": "\u6539\u300C{0}\u300D\u7684\u4F01\u5283",
   "ui.book_panel_rerun_plan": "\u91CD\u8DD1\u4F01\u5283",
@@ -43889,7 +43898,7 @@ function findProofRecord(notes, key4) {
   return void 0;
 }
 var proofSectionHeading = (language2) => translate(noteLanguageOf(language2), "detail.book_proof_heading");
-function composeProofSection(language2, outcome, models, modelLabel = (id) => id) {
+function composeProofSection(language2, outcome, models, modelLabel = (id) => id, imageLine) {
   const note = noteLanguageOf(language2);
   if ("failure" in outcome)
     return `- ${translate(note, "detail.book_proof_failed_0", escapeMarkdownText(outcome.failure, 60) || "failed")}`;
@@ -43903,6 +43912,7 @@ function composeProofSection(language2, outcome, models, modelLabel = (id) => id
     (item) => `- ${item.id} ${words2[item.status]}${item.status !== "met" && item.note ? `${colon2}${item.note}` : ""}`
   );
   const shown = (id) => safeModelId(id) ? escapeMarkdownText(modelLabel(safeModelId(id)), 80) : translate(note, "detail.book_model_unrecorded");
+  if (imageLine) lines.push(`- ${imageLine}`);
   lines.push(`- ${translate(note, "detail.book_proof_author_model_0", shown(models.authorModel))}`);
   lines.push(`- ${translate(note, "detail.book_proof_proof_model_0", shown(models.model))}`);
   return lines.join("\n");
@@ -44460,6 +44470,7 @@ function verifyFill(original, result, slots) {
   const before = withoutMarkers(original);
   return before.length === rest.length && before.every((line2, i) => line2 === rest[i]) ? void 0 : "deleted_text";
 }
+var REASONS = ["author_omitted", "bad_marker", "not_found", "load_failed", "unsafe_url"];
 function shortHash2(url) {
   let hash = 2166136261;
   for (const char of imageKey2(url)) {
@@ -44475,7 +44486,150 @@ function composeSlotsRecord(result) {
   ].sort((a, b) => a.index - b.index);
   return `<!-- book-slots:v1 ${JSON.stringify({ slots, bad: result.bad })} -->`;
 }
+var RECORD_LINE = /^(?:[ \t]{0,3}>[ \t]?)*<!-- book-slots:v1 (\{.*\}) -->$/;
+function latestSlotsRecord(detail) {
+  const lines = detail.split("\n");
+  const fenced = fencedLines2(lines);
+  let found;
+  lines.forEach((line2, at) => {
+    const m = fenced[at] ? null : RECORD_LINE.exec(line2.replace(/\r$/, "").trim());
+    if (!m) return;
+    try {
+      const data = JSON.parse(m[1]);
+      if (!Array.isArray(data.slots)) return;
+      const items = [];
+      for (const raw of data.slots.slice(0, MAX_IMAGE_SLOTS)) {
+        if (!raw || !Number.isInteger(raw.index) || raw.index < 1) continue;
+        const state = raw.state === "placed" ? "placed" : raw.state === "missing" ? "missing" : void 0;
+        if (!state) continue;
+        const reasonCode = REASONS.find((code3) => code3 === raw.reasonCode);
+        items.push({
+          index: raw.index,
+          state,
+          ...reasonCode ? { reasonCode } : {},
+          ...typeof raw.hash === "string" && /^[0-9a-f]{8}$/.test(raw.hash) ? { hash: raw.hash } : {}
+        });
+      }
+      found = { slots: items, bad: Number.isInteger(data.bad) && data.bad > 0 ? data.bad : 0 };
+    } catch (e) {
+    }
+  });
+  return found;
+}
+var IMAGE_IN_LINE = /!\[[^\]\n]*\]\((https:\/\/[^)\s]+)\)/g;
+var IMAGE_ONLY_LINE = /^[ \t]*!\[[^\]\n]*\]\(https:\/\/[^)\s]+\)[ \t]*\r?$/;
+function stripImageLines(text10) {
+  const lines = text10.split("\n");
+  const guarded = protectedLines2(lines);
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!guarded[i] && IMAGE_ONLY_LINE.test(lines[i])) {
+      if (i + 1 < lines.length && !isBlank(lines[i + 1]) && !guarded[i + 1] && !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[i + 1]))
+        i++;
+      continue;
+    }
+    out.push(lines[i]);
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n");
+}
 var STOP_CJK = /* @__PURE__ */ new Set([..."\u7684\u4E86\u662F\u5728\u548C\u8207\u4E0E\u53CA\u6216\u5C0D\u5BF9\u628A\u88AB\u70BA\u4E3A\u4EE5\u4E4B\u65BC\u4E8E\u4E26\u5E76\u4E2D\u4E0A\u4E0B\u9019\u8FD9\u90A3\u4E00\u500B\u4E2A\u4E5F\u90FD\u5C31\u800C\u4F46"]);
+var STOP_WORDS = /* @__PURE__ */ new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "that",
+  "this",
+  "from",
+  "into",
+  "over",
+  "about",
+  "how",
+  "what"
+]);
+function slotKeywords(explains) {
+  var _a2, _b2;
+  const out = /* @__PURE__ */ new Set();
+  for (const word of (_a2 = explains.toLowerCase().match(/[a-z0-9][a-z0-9'-]{2,}/g)) != null ? _a2 : [])
+    if (!STOP_WORDS.has(word)) out.add(word);
+  for (const run2 of (_b2 = explains.match(/\p{Script=Han}+/gu)) != null ? _b2 : []) {
+    let part = "";
+    const flush = () => {
+      const chars = Array.from(part);
+      for (let i = 0; i + 1 < chars.length; i++) out.add(chars[i] + chars[i + 1]);
+      part = "";
+    };
+    for (const char of run2) {
+      if (STOP_CJK.has(char)) flush();
+      else part += char;
+    }
+    flush();
+  }
+  return [...out];
+}
+var KEYWORD_HITS = 2;
+function checkImageText(body, slots, record) {
+  var _a2;
+  const empty = { planned: 0, placed: 0, imageCount: 0, bad: 0, issues: [] };
+  if (!(slots == null ? void 0 : slots.length)) return { kind: "none", ...empty };
+  if (!record) return { kind: "unrecorded", ...empty, planned: slots.length };
+  const lines = body.split("\n");
+  const guarded = protectedLines2(lines);
+  const blocks = [];
+  let current = [];
+  let hashes = [];
+  const close = () => {
+    if (current.length) blocks.push({ text: current.join("\n"), hashes });
+    current = [];
+    hashes = [];
+  };
+  lines.forEach((line2, at) => {
+    if (guarded[at] || isBlank(line2)) {
+      close();
+      return;
+    }
+    current.push(line2);
+    for (const m of line2.matchAll(IMAGE_IN_LINE)) hashes.push(shortHash2(m[1]));
+  });
+  close();
+  const imageCount = blocks.reduce((sum2, block) => sum2 + block.hashes.length, 0);
+  const placedItems = record.slots.filter((item) => item.state === "placed");
+  const issues = [];
+  for (const item of record.slots)
+    if (item.state === "missing") issues.push({ index: item.index, code: (_a2 = item.reasonCode) != null ? _a2 : "not_found" });
+  if (imageCount !== placedItems.length) issues.push({ code: "count" });
+  for (const item of placedItems) {
+    const at = blocks.findIndex((block) => item.hash !== void 0 && block.hashes.includes(item.hash));
+    const slot = slots.find((entry) => entry.index === item.index);
+    if (at < 0 || !slot) continue;
+    const around = [at - 1, at + 1].map((i) => blocks[i]).filter((block) => block && !block.hashes.length).map((block) => block.text.toLowerCase()).join("\n");
+    const words2 = slotKeywords(slot.explains);
+    const hits = words2.filter((word) => around.includes(word)).length;
+    if (words2.length && hits < Math.min(KEYWORD_HITS, words2.length))
+      issues.push({ index: item.index, code: "mismatch" });
+  }
+  return { kind: "checked", planned: slots.length, placed: placedItems.length, imageCount, bad: record.bad, issues };
+}
+function composeImageTextLine(language2, check) {
+  const note = noteLanguageOf(language2);
+  if (check.kind === "none") return translate(note, "detail.book_slots_none");
+  if (check.kind === "unrecorded") return translate(note, "detail.book_slots_unrecorded");
+  const joiner = /^zh/i.test(language2) ? "\uFF1B" : "; ";
+  const parts = check.issues.map(
+    (issue2) => issue2.code === "count" ? translate(note, "detail.book_slots_count_0_1", String(check.imageCount), String(check.placed)) : translate(
+      note,
+      "detail.book_slots_slot_0_1",
+      String(issue2.index),
+      translate(note, `detail.book_slots_reason_${issue2.code}`)
+    )
+  );
+  if (check.bad) parts.push(translate(note, "detail.book_slots_bad_0", String(check.bad)));
+  return parts.length ? translate(note, "detail.book_slots_issues_0", parts.join(joiner)) : translate(note, "detail.book_slots_ok_0", String(check.placed));
+}
+function imageIssueTokens(check) {
+  const tokens2 = check.issues.map((issue2) => issue2.code === "count" ? "image_count" : `image_${issue2.index}`);
+  return check.bad ? [...tokens2, "image_marker"] : tokens2;
+}
 
 // core/book-pipeline/plan-text.ts
 var pick = (words2, language2) => instructionLanguageOf(language2) === "zh" ? words2.zh : words2.en;
@@ -50318,7 +50472,7 @@ var BookPipelineRuns = class {
     if (step !== "plan" && !NO_FAILURE_SECTION.has(reason)) await this.writeFailureSection(drive, nodeId, reason);
   }
   /** The proof-result section of a card as `finalize`/`transform` text: the result with the models, or the failure line (never a model). */
-  proofSectionOf(drive, outcome, models) {
+  proofSectionOf(drive, outcome, models, imageLine) {
     const language2 = drive.config.language;
     const label = this.ports.modelLabel ? (id) => {
       var _a2, _b2, _c;
@@ -50327,7 +50481,7 @@ var BookPipelineRuns = class {
     return (content) => replaceProofSection(
       content,
       proofSectionHeading(language2),
-      composeProofSection(language2, outcome, models, label)
+      composeProofSection(language2, outcome, models, label, imageLine)
     );
   }
   /** Best effort: the card's proof-result section says "failed: reason" (no model). Never throws; skipped when nothing is known to be safe to write. */
@@ -50754,7 +50908,10 @@ var BookPipelineRuns = class {
     if (!info) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
     const checklist = parseChecklist(card.prompt);
-    const body = chapterBody(card.detail);
+    const chapter = chapterBody(card.detail);
+    const body = stripImageLines(chapter);
+    const imageCheck = checkImageText(chapter, parseImageSlots(card.prompt), latestSlotsRecord(card.detail));
+    const imageLine = composeImageTextLine(drive.config.language, imageCheck);
     if (!checklist.length) return { kind: "failed", reason: "empty_list" };
     if (!body.trim()) return { kind: "failed", reason: "no_body" };
     const key4 = proofKey({
@@ -50795,7 +50952,7 @@ var BookPipelineRuns = class {
         {
           expectedContent: card.raw,
           authorize: this.authorize(drive, token),
-          finalize: this.proofSectionOf(drive, { result }, models)
+          finalize: this.proofSectionOf(drive, { result }, models, imageLine)
         }
       );
       if (written2 === "discarded") return { kind: "failed", reason: "discarded" };
@@ -50805,7 +50962,7 @@ var BookPipelineRuns = class {
         ...(stored == null ? void 0 : stored.model) ? { model: stored.model } : {},
         authorModel: (_a2 = drive.authorModels.get(nodeId)) != null ? _a2 : stored == null ? void 0 : stored.authorModel
       };
-      const next = this.proofSectionOf(drive, { result }, models)(card.raw);
+      const next = this.proofSectionOf(drive, { result }, models, imageLine)(card.raw);
       if (next !== card.raw) {
         const path = await this.stillOnMap(drive, nodeId);
         if (!path) return { kind: "failed", reason: "card_removed" };
@@ -50820,13 +50977,14 @@ var BookPipelineRuns = class {
     }
     const verdict = result;
     const structureUnmet = verdict.items.filter((item) => item.type !== "fact" && item.status === "unmet").map((item) => code2(item.id));
+    const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
     return {
       kind: "ok",
       after: () => this.setStage(
         drive,
         nodeId,
         verdict.aggregate,
-        verdict.aggregate === "needs-review" ? verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${verdict.items.filter((item) => item.type === "fact" && item.status === "unmet").map((item) => code2(item.id)).join(" ")}` : structureUnmet.length ? `structure unmet: ${structureUnmet.join(" ")}` : null
+        verdict.aggregate === "needs-review" ? verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${verdict.items.filter((item) => item.type === "fact" && item.status === "unmet").map((item) => code2(item.id)).join(" ")}` : noticed.length ? `structure unmet: ${noticed.join(" ")}` : null
       )
     };
   }
@@ -51190,6 +51348,8 @@ function buildGatePanel(input2) {
     if (parsed.entry) fields.push({ label: t("ui.book_panel_entry"), value: parsed.entry });
     if (parsed.handoff) fields.push({ label: t("ui.book_panel_handoff"), value: parsed.handoff });
     const rawLines = fields.length ? [] : prompt.split(/\r?\n/).filter((line2) => line2.trim()).slice(0, 3);
+    const slots = parseImageSlots(prompt);
+    const imagePlan = !slots ? t("ui.book_panel_images_unarranged") : slots.length ? t("ui.book_panel_images_0_1", slots.length, slots.map((slot) => `${slot.kind}\uFF0F${slot.explains}`).join("\uFF1B")) : t("ui.book_panel_images_none");
     return {
       id,
       index: at + 1,
@@ -51197,6 +51357,7 @@ function buildGatePanel(input2) {
       stage: view.stage,
       ...view.roleText ? { roleText: view.roleText } : {},
       ...view.issueText ? { issueText: view.issueText } : {},
+      imagePlan,
       fields,
       rawLines
     };
@@ -51373,6 +51534,7 @@ function renderCard(list2, card, state, actions, external) {
   else if (card.rawLines.length)
     for (const line3 of card.rawLines) item.createDiv({ cls: "vam-book-panel-field is-raw", text: line3 });
   else item.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_no_plan") });
+  item.createDiv({ cls: "vam-book-panel-muted vam-book-panel-images", text: card.imagePlan });
   if (card.issueText) {
     const issue2 = item.createDiv("vam-book-panel-issue");
     issue2.createSpan({ text: card.issueText });

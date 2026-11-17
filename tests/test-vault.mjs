@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { canonicalVault, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, fetchDepsTable } from '../scripts/test-harness.mjs';
-import { ownerBusyReasons } from '../scripts/owner-idle.mjs';
+import { ownerBusyReasons, waitOwnerIdle } from '../scripts/owner-idle.mjs';
 import { policyAction, applyPolicy, policyExpression } from '../scripts/keep-background.mjs';
 
 function environment(t) {
@@ -469,6 +469,18 @@ test('owner-idle guard: a turn or an AI call still running (no end, under 60 min
   assert.deepEqual(reasons(t, { exchanges: [{ startedAt: ago(61), sentAt: ago(61) }] }), []);
 });
 
+test('owner-idle --wait-idle: re-checks while busy, returns once idle, refuses after the timeout', t => {
+  // A turn that started 10 minutes before NOW stops counting 15 minutes after it started, i.e. 5 minutes later.
+  const vault = busyVault(t, one([start(1, 10), end(1, 'done', 9)]));
+  let clock = NOW; const slept = []; const out = [];
+  waitOwnerIdle(vault, { clock: () => clock, sleep: ms => { slept.push(ms); clock += ms; }, out: text => out.push(text) });
+  assert.equal(slept.length, 6);
+  assert.equal(out.length, 1, 'the same reasons are printed once');
+  clock = NOW; slept.length = 0;
+  assert.throws(() => waitOwnerIdle(busyVault(t, one([start(1, 60), end(1, 'plan', 59)])), { clock: () => clock, sleep: ms => { slept.push(ms); clock += ms; }, out: () => {}, timeoutMs: 3 * 60000 }), /Refusing to install[\s\S]*待套用的計畫/);
+  assert.equal(slept.length, 3);
+});
+
 test('owner-idle guard: anything it cannot read refuses', t => {
   assert.match(reasons(t, one(['{not json'])).join('\n'), /格式不對/);
   assert.match(reasons(t, one([{ v: 1, type: 'turn_start', turn: 1 }])).join('\n'), /沒有可讀的時間/);
@@ -507,6 +519,8 @@ test('owner-idle guard: updating the owner vault refuses while busy and leaves m
 
 test('--owner-idle-confirmed only goes with --update-current; --which-installed stands alone and names the installed commit', t => {
   assert.throws(() => main(['--owner-idle-confirmed']), /applies only to --update-current/);
+  assert.throws(() => main(['--wait-idle']), /--wait-idle applies only/);
+  assert.throws(() => main(['--update-current', '--owner-idle-confirmed', '--wait-idle']), /--wait-idle applies only/);
   assert.throws(() => main(['--prepare', '--owner-idle-confirmed']), /cannot be combined|applies only/);
   assert.throws(() => main(['--which-installed', '--ui']), /takes no other options/);
   const { vault } = environment(t);

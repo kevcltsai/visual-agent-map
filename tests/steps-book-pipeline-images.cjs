@@ -70,7 +70,7 @@ async function rig(over = {}) {
   const state = async () => readBookPipeline(await repo.readMap(mapPath)).data;
   const note = async i => repo.readNote(nodes[i].path);
   const raw = i => contents.get(nodes[i].path);
-  return { ...data, runs, ports, stat, script, mapPath, nodes, state, note, raw, mapRaw: () => contents.get(mapPath) };
+  return { ...data, runs, ports, stat, script, mapPath, nodes, state, note, raw, contents, mapRaw: () => contents.get(mapPath) };
 }
 /** Lowers the saved call limit (the pipeline has no port for it; the file is the owner's control). */
 const setLimit = (r, limit) => r.repo.updateMap(r.mapPath, d => { d.bookPipeline.budget.limit = limit; });
@@ -92,6 +92,7 @@ async function picRig({ finder, probe, text = withSources, titles, proof } = {})
   r.calls = calls;
   return r;
 }
+const dropPictures = (r, i) => r.contents.set(r.nodes[i].path, r.raw(i).replace(/### 圖像\n[\s\S]*?(?=### 來源)/, ''));
 const run = async r => { await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath); };
 
 test('images: two verified pictures are embedded as standard images with plain captions between the text and the Sources section', async () => {
@@ -296,6 +297,7 @@ test('images: a later chapter is told the pictures other chapters already use, b
   const key = n => imageKey(cand(n).url);
   const search = n => r.calls.filter(c => (n === 2) === /SecretTitleA/.test(c.query));
   const before = r.calls.length;
+  dropPictures(r, 1); // T1: a rerun keeps an old picture section and skips the search, so start from a card without pictures
   await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
   while (r.runs.isRunning(r.mapPath)) await tick();
   await settle();
@@ -323,6 +325,7 @@ test('images: a single-card rerun (fresh run state) still refuses a picture anot
   r.stat.logs.length = 0;
   const finder = r.ports.findImages;
   r.ports.findImages = async (request, runInfo) => { await finder(request, runInfo); return [cand(1)]; };
+  dropPictures(r, 1);
   await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
   while (r.runs.isRunning(r.mapPath)) await tick();
   await settle();

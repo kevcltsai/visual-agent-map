@@ -546,3 +546,11 @@ test('progress label (was: only for a style file or a topic-type structure; gril
   for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.equal(fs.readFileSync(path.join(__dirname, '..', 'i18n', `${lang}.ts`), 'utf8').includes('progress_note_style_0'), false);
   assert.equal(view.includes('progress_note_style_0'), false);
 });
+
+test('book pipeline (view): a forced book-chapter template wins over the card\'s own note-style, template and the kind default; no force changes nothing', async () => {
+  const { view } = await viewWorld({ noteStyleByKind: { topic: 'builtin:atomic' } }, {});
+  const note = { noteStyle: 'builtin:hypothesis', detailTemplateId: 'standard', toneId: undefined, topicKind: 'hypothesis' };
+  assert.equal(view.topicStyle(note, undefined, 'en', 'book-chapter').template.id, 'book-chapter');
+  assert.equal(view.topicStyle({}, undefined, 'en', 'book-chapter').template.id, 'book-chapter');
+  assert.equal(view.topicStyle({}, undefined, 'en').template.id, 'atomic', 'without a forced template the result is as before');
+});

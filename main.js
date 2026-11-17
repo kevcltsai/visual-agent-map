@@ -44114,7 +44114,7 @@ function chapterBody(detail) {
 var REFERENCE_START2 = "<!-- visual-agent-map:references:start -->";
 var DETAIL_START2 = "<!-- visual-agent-map:detail:start -->";
 var DETAIL_END2 = "<!-- visual-agent-map:detail:end -->";
-function protectedLines(lines) {
+function protectedLines(lines, withDetail = true) {
   var _a2;
   const flags = fencedLines2(lines);
   if (((_a2 = lines[0]) == null ? void 0 : _a2.trim()) === "---") {
@@ -44126,7 +44126,7 @@ function protectedLines(lines) {
   let inDetail = false;
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].trim() === DETAIL_START2) inDetail = true;
-    if (inDetail) flags[i] = true;
+    if (inDetail && withDetail) flags[i] = true;
     if (lines[i].trim() === DETAIL_END2) inDetail = false;
   }
   return flags;
@@ -44134,21 +44134,17 @@ function protectedLines(lines) {
 function replaceProofSection(content, heading, body) {
   const lines = content.split("\n");
   const flags = protectedLines(lines);
-  const names3 = new Set(NOTE_LANGUAGES.map((locale) => translate(locale, "detail.book_proof_heading").trim()));
+  const names3 = new Set(ALL_LOCALES().map((locale) => translate(locale, "detail.book_proof_heading").trim()));
   const found = findSection(lines, flags, (text10, level) => level === 2 && names3.has(text10.trim()));
   const entry = `## ${heading}
 
 ${body.trim()}`;
   if (found) {
-    let end = found.end;
-    for (let i = found.at + 1; i < found.end; i++) {
-      if (lines[i].trim().startsWith("<!-- visual-agent-map:") || /^>[ \t]?\[!/.test(lines[i])) {
-        end = i;
-        break;
-      }
-    }
+    let end = found.at + 1;
+    while (end < found.end && (!lines[end].trim() || /^- /.test(lines[end]))) end++;
+    while (end > found.at + 1 && !lines[end - 1].trim()) end--;
     const before = lines.slice(0, found.at).join("\n");
-    const after = lines.slice(end).join("\n");
+    const after = lines.slice(end).join("\n").replace(/^\s+/, "");
     return `${before ? `${before}
 ` : ""}${entry}${after ? `
 
@@ -44169,8 +44165,11 @@ ${lines.slice(marker3).join("\n")}`;
 ` : ""}${entry}
 `;
 }
+var ALL_LOCALES = () => [
+  .../* @__PURE__ */ new Set([...NOTE_LANGUAGES, ...SUPPORTED_LANGUAGES.map((item) => item.id)])
+];
 var PLACEHOLDERS = () => /* @__PURE__ */ new Set([
-  ...NOTE_LANGUAGES.map((locale) => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
+  ...ALL_LOCALES().map((locale) => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
   "No new content this time",
   "\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9"
 ]);
@@ -44179,15 +44178,21 @@ function dropPlaceholderSections(content) {
   const placeholders = PLACEHOLDERS();
   let lines = content.split("\n");
   for (let from = 0; ; ) {
-    const flags = protectedLines(lines);
+    const flags = protectedLines(lines, false);
     const hit = findSection(lines, flags, (_, level) => level >= 3, from);
     if (!hit) break;
-    const body = lines.slice(hit.at + 1, hit.end).join("\n").trim();
+    let end = hit.end;
+    for (let i = hit.at + 1; i < hit.end; i++)
+      if (lines[i].trim().startsWith("<!-- visual-agent-map:")) {
+        end = i;
+        break;
+      }
+    const body = lines.slice(hit.at + 1, end).join("\n").trim();
     if (!placeholders.has(body.replace(/[.。]$/, ""))) {
       from = hit.at + 1;
       continue;
     }
-    lines = [...lines.slice(0, hit.at), ...lines.slice(hit.end)];
+    lines = [...lines.slice(0, hit.at), ...lines.slice(end)];
     if (hit.at > 0 && !((_a2 = lines[hit.at - 1]) == null ? void 0 : _a2.trim()) && !((_b2 = lines[hit.at]) == null ? void 0 : _b2.trim())) lines.splice(hit.at, 1);
     from = Math.max(0, hit.at - 1);
   }
@@ -49116,10 +49121,14 @@ var ANCHOR = /(?:<|&lt;)a[ \t]+href=(?:"|&quot;)([^"<>\n]*?)(?:"|&quot;)[ \t]*(?
 function convertSourceAnchors(content) {
   const at = frontmatterLength(content);
   return content.slice(0, at) + content.slice(at).replace(ANCHOR, (whole, rawHref, rawText, offset, all) => {
+    var _a2, _b2, _c, _d;
     if (/&(?:lt|gt|quot);/i.test(rawText) || /&(?:lt|gt|quot);/i.test(rawHref.replace(/&amp;/g, ""))) return whole;
     const href = safeHref(rawHref.replace(/&amp;/g, "&"));
     const text10 = escapeMarkdownText(rawText.replace(/&amp;/g, "&"), 200);
     if (!href || !text10) return whole;
+    const prefix = all.slice(all.lastIndexOf("\n", offset - 1) + 1, offset);
+    if (((_b2 = (_a2 = prefix.match(/(?:<|&lt;)a[ \t]/gi)) == null ? void 0 : _a2.length) != null ? _b2 : 0) > ((_d = (_c = prefix.match(/(?:<|&lt;)\/a/gi)) == null ? void 0 : _c.length) != null ? _d : 0))
+      return whole;
     const before = all[offset - 1];
     return `${before === "!" || before === "\\" ? " " : ""}[${text10}](${href})`;
   });

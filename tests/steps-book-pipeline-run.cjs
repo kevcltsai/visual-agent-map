@@ -4,12 +4,12 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
 const { load: loadReplay } = require('./support-replay.cjs');
-const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages, unsafeBody } = S.load('experiences/visual-map/book-pipeline-run.ts');
+const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages, unsafeBody, convertSourceAnchors } = S.load('experiences/visual-map/book-pipeline-run.ts');
 const { BudgetExhaustedError } = S.load('core/admission.ts');
 const { readBookPipeline } = S.load('core/book-pipeline/model.ts');
 const { cardRevision } = S.load('core/book-pipeline/machine.ts');
-const { proofKey, evaluateProof } = S.load('core/book-pipeline/proof.ts');
-const { findStoredProof, withoutResearchNotes } = S.load('core/book-pipeline/note-sections.ts');
+const { proofKey, evaluateProof, composeProofRecord } = S.load('core/book-pipeline/proof.ts');
+const { findStoredProof, withoutResearchNotes, appendResearchNote, dropPlaceholderSections, markOldProofRecords } = S.load('core/book-pipeline/note-sections.ts');
 const { parseChecklist } = S.load('core/book-pipeline/plan-text.ts');
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -808,4 +808,183 @@ test('the config port is read on every start and resume, so a settings change ap
   hold.resolve(); await running;
   while (r.runs.isRunning(r.mapPath)) await tick();
   assert.deepEqual([...new Set(seen)], ['author-B']);
+});
+
+// ---- T1: card content fixes (proof-result section, latest-only records, anchors, placeholders, models) ----
+const SECTION = '## 校對結果（最新一次）';
+const count = (text, needle) => text.split(needle).length - 1;
+const finish = async r => { await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath); };
+const rerun = async (r, i) => { await r.runs.rerunCard(r.mapPath, r.nodes[i].id); while (r.runs.isRunning(r.mapPath)) await tick(); await settle(); };
+
+test('T1 proof section: one "校對結果（最新一次）" section after the Detail block, with the author and proof model lines; frontmatter model unchanged; the log has no section text or model id', async () => {
+  const r = await rig({ ports: { modelLabel: id => `Label<${id}>` } });
+  await finish(r);
+  for (let i = 0; i < 3; i++) {
+    const raw = r.raw(i);
+    assert.equal(count(raw, SECTION), 1);
+    assert.ok(raw.indexOf(SECTION) > raw.indexOf('visual-agent-map:detail:end'), 'outside the Detail block');
+    const section = raw.slice(raw.indexOf(SECTION));
+    assert.match(section, /- C1 達成\n- C2 達成/);
+    assert.ok(!section.includes('fine'), 'a met item shows no note');
+    assert.match(section, /- 作者模型：Label＜m2＞/); assert.match(section, /- 校對模型：Label＜m3＞/);
+    assert.match(raw, /^model: "?model-a"?$/m);
+  }
+  for (const line of r.stat.logs) { assert.ok(!/校對結果|Label|m2|m3|SecretBody/.test(line), line); }
+});
+
+test('T1 proof section: an unmet item shows its note; a rerun replaces the section and the record (not accumulated) and the proof never sees the section', async () => {
+  const r = await rig({ script: { proof: async request => ({ items: request.checklist.map(c => ({ id: c.id, type: c.type, status: c.id === 'C2' ? 'unmet' : 'met', note: 'needs an end', sources: [] })), aggregate: 'needs-review' }) } });
+  await finish(r);
+  assert.match(r.raw(0), /- C2 未達成：needs an end/);
+  await rerun(r, 0);
+  const raw = r.raw(0);
+  assert.equal(count(raw, SECTION), 1);
+  assert.equal(count(raw, 'book-proof:v1'), 1, 'the research notes keep the latest record only');
+  assert.ok(!raw.includes('（舊版）'));
+  for (const request of r.stat.proof) assert.ok(!request.body.includes('校對結果') && !request.body.includes('作者模型'));
+});
+
+test('T1 models: the author model is the id actually dispatched (not the frontmatter model); a Haiku author shows Haiku and frontmatter model stays', async () => {
+  const r = await rig({ ports: { config: () => ({ planModel: 'm1', authorModel: 'claude-haiku-4-5', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }) } });
+  const before = /^model: .*$/m.exec(r.raw(1))[0];
+  await finish(r);
+  assert.match(r.raw(1), /- 作者模型：claude-haiku-4-5/);
+  assert.equal(/^model: .*$/m.exec(r.raw(1))[0], before);
+  assert.ok(r.raw(1).includes(`"authorModel":"claude-haiku-4-5"`));
+});
+
+test('T1 failure: a failed proof writes "失敗：原因" in the section with no model line; the card needs review', async () => {
+  const r = await rig({ script: { proof: async () => { throw new Error('nope'); } } });
+  await finish(r);
+  const raw = r.raw(1);
+  assert.equal(count(raw, SECTION), 1);
+  assert.match(raw, /校對結果（最新一次）\n\n- 失敗：failed\n/);
+  assert.ok(!/作者模型|校對模型/.test(raw.slice(raw.indexOf(SECTION))));
+  assert.equal(stageOf(raw), 'needs-review');
+});
+
+test('T1 failure: a failed author step (write) shows its code in the section; discarded / removed reasons write no section', async () => {
+  const r = await rig({ script: { author: async () => { throw new Error('boom'); } } });
+  await finish(r);
+  assert.match(r.raw(1), /校對結果（最新一次）\n\n- 失敗：failed\n/);
+  const d = await rig({ script: { author: async input => { await input.admission.reserve(); return { outcome: 'discarded' }; } } });
+  await finish(d);
+  assert.equal(count(d.raw(1), SECTION), 0);
+});
+
+test('T1 dedupe (R1-5): a stored result under the same key refreshes the section; its stored model is shown, an old record with none shows 未記錄, never today\'s config', async () => {
+  const r = await rig();
+  await finish(r);
+  const s = await r.state();
+  const note = await r.note(1);
+  const key = proofKey({ runId: s.runId, nodeId: r.nodes[1].id, revision: cardRevision(s, r.nodes[1].id), body: withoutResearchNotes(note.detail), checklist: parseChecklist(note.prompt) });
+  const result = findStoredProof(note.detail, key);
+  assert.ok(result);
+  // an old record (no model ids) and no section at all, as a card from before T1 has it
+  const old = appendResearchNote(note.detail.split('\n').slice(0, -1).join('\n').replace(/\s*> \[!.*[\s\S]*$/, ''), composeProofRecord(key, result)).text;
+  await r.repo.updateNoteGuarded(r.nodes[1].path, { detail: old }, {});
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/\n## 校對結果（最新一次）[\s\S]*?(?=\n<!--|\n> \[!|$)/, ''), {});
+  assert.equal(count(r.raw(1), SECTION), 0);
+  await r.repo.writePipelineFields(r.nodes[1].path, { pipelineStage: 'written' });
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'writing'; d.bookPipeline.attempts[r.nodes[1].id].proof = 0; });
+  const calls = r.stat.proof.length;
+  await r.runs.resume(r.mapPath);
+  assert.equal(r.stat.proof.length, calls, 'the stored result was reused');
+  const section = r.raw(1).slice(r.raw(1).indexOf(SECTION));
+  assert.equal(count(r.raw(1), SECTION), 1);
+  assert.match(section, /- 作者模型：未記錄/); assert.match(section, /- 校對模型：未記錄/);
+  assert.ok(!section.includes('m2') && !section.includes('m3'));
+});
+
+test('T1 placeholders: no "no new information" sentence in any language survives in a written card; real sections stay', async () => {
+  const { translate } = S.load('i18n.ts');
+  const text = `正文。\n\n### 補充\n\n本次無新增內容。\n\n### 更多\n\n${translate('en', 'note.no_new_information')}\n\n### 保留\n\n真正的內容。\n\n### 空\n\n${translate('zh-CN', 'note.no_new_information')}\n`;
+  const r = await rig({ script: { author: async input => { await input.admission.reserve(); await r.repo.updateNoteGuarded(input.path, { detail: text }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } } });
+  await finish(r);
+  const detail = (await r.note(1)).detail;
+  assert.ok(detail.includes('### 保留') && detail.includes('真正的內容。'));
+  for (const heading of ['### 補充', '### 更多', '### 空']) assert.ok(!detail.includes(heading), heading);
+  for (const locale of ['en', 'zh-TW', 'zh-CN']) assert.ok(!r.raw(1).includes(translate(locale, 'note.no_new_information').replace(/[.。]$/, '')), locale);
+  assert.equal(dropPlaceholderSections('正文。\n\n### 保留\n\n文字\n'), '正文。\n\n### 保留\n\n文字\n');
+  assert.equal(dropPlaceholderSections('## 補\n\nNo new information.\n'), '## 補\n\nNo new information.\n', 'a ## heading is never dropped');
+  const fenced = '```\n### x\n\nNo new content this time\n```\n';
+  assert.equal(dropPlaceholderSections(fenced), fenced);
+});
+
+test('T1 carry-over: a rewrite keeps the card\'s latest proof record only and the old `### 圖像` section verbatim; a textbook card with old (舊版) records and no section reruns fine', async () => {
+  const r = await rig();
+  await finish(r);
+  const images = '### 圖像\n\n![A](https://e.com/a.jpg)\nA';
+  const k = ['k1', 'k2', 'k3'];
+  const result = { items: [{ id: 'C1', type: 'structure', status: 'met', note: 'ok', sources: [] }], aggregate: 'checked', factsUnverified: false };
+  let detail = `舊內文。\n\n${images}\n`;
+  for (const key of k) detail = appendResearchNote(detail, composeProofRecord(key, result)).text;
+  detail = markOldProofRecords(detail, 'k3');
+  assert.ok(detail.includes('（舊版）校對'));
+  await r.repo.updateNoteRawGuarded(r.nodes[0].path, c => c.replace(/\n## 校對結果（最新一次）[\s\S]*$/, '\n'), {});
+  await r.repo.updateNoteGuarded(r.nodes[0].path, { detail }, {});
+  await r.repo.updateNoteGuarded(r.nodes[0].path, {}, { detailTemplate: undefined });
+  await rerun(r, 0);
+  const out = (await r.note(0)).detail;
+  assert.ok(out.includes(images), 'the picture section is verbatim');
+  assert.equal(count(out, 'book-proof:v1'), 1);
+  assert.ok(!out.includes('"key":"k') && !out.includes('（舊版）'));
+  assert.equal(count(r.raw(0), SECTION), 1);
+});
+
+test('T1 anchors: a strict https anchor becomes a markdown link (entity forms too); every counterexample stays plain text', () => {
+  const ok = [
+    ['<a href="https://example.com/x">Example</a>', '[Example](https://example.com/x)'],
+    ['&lt;a href=&quot;https://example.com/?a=1&amp;b=2&quot;&gt;E&lt;/a&gt;', '[E](https://example.com/?a=1&b=2)'],
+    ['見 <a href="https://example.com/p(1)">p [1]</a> 。', '見 [p \\[1\\]](https://example.com/p%281%29) 。']
+  ];
+  for (const [input, expected] of ok) assert.equal(convertSourceAnchors(input), expected, input);
+  assert.equal(convertSourceAnchors('!<a href="https://e.com/p.png">x</a>'), '! [x](https://e.com/p.png)', 'a preceding ! never forms an image');
+  assert.equal(convertSourceAnchors('\\<a href="https://e.com/p">x</a>'), '\\ [x](https://e.com/p)', 'a preceding backslash never escapes the link');
+  assert.equal(bodyImageUrls(convertSourceAnchors('!<a href="https://e.com/p.png">x</a>')).length, 0);
+  const plain = [
+    '<a href="javascript:alert(1)">x</a>', '<a href="http://e.com/a">x</a>', '<a href="HTTP://e.com/a">x</a>', '<a href="//e.com/a">x</a>',
+    '<a href="https://e.com/a" onclick="x()">x</a>', '<a onclick="x()" href="https://e.com/a">x</a>', "<a href='https://e.com/a'>x</a>",
+    '<a href="https://e.com/a"><b>x</b></a>', '<a href="https://e.com/a">x <a href="https://e.com/b">y</a></a>',
+    '<a href="https://e.com/a">x', '<a href="https://e.com/a>x</a>', '<a href="https://u:p@e.com/a">x</a>',
+    '&amp;lt;a href=&amp;quot;https://e.com/a&amp;quot;&amp;gt;x&amp;lt;/a&amp;gt;', '<a href="https://e.com/a"></a>',
+    '<a href="https://e.com/a">x\ny</a>', '<a href="https://e.com/a">&lt;img src=x&gt;</a>'
+  ];
+  for (const input of plain) assert.ok(!convertSourceAnchors(input).includes(']('), input);
+  assert.equal(convertSourceAnchors('---\ntitle: <a href="https://e.com/a">x</a>\n---\n文'), '---\ntitle: <a href="https://e.com/a">x</a>\n---\n文', 'the frontmatter is never touched');
+  const evil = convertSourceAnchors('<a href="https://e.com/a">![x](https://evil.example/i.png)</a>');
+  assert.ok(evil.includes('\\!') && evil.startsWith('[') && evil.endsWith('](https://e.com/a)'), evil);
+  assert.equal(bodyImageUrls(evil).length, 0, 'text inside an anchor never becomes an image');
+});
+
+test('T1 anchors (integration): the author write turns anchors into links; a tag the author writes stays cleaned; unsafe forms stay plain text and pass the exit check', async () => {
+  const text = '來源 <a href="https://example.com/s">Site</a> 與 &lt;a href=&quot;https://example.org/t&quot;&gt;T&lt;/a&gt;，不轉 <a href="javascript:x">bad</a>、<a href="https://e.com/a" onclick="x">on</a>、!<a href="https://e.com/i.png">img</a>。';
+  const r = await rig({ script: { author: async input => { await input.admission.reserve(); await r.repo.updateNoteGuarded(input.path, { detail: text }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } } });
+  await finish(r);
+  const detail = (await r.note(1)).detail;
+  assert.ok(detail.includes('[Site](https://example.com/s)') && detail.includes('[T](https://example.org/t)'), detail);
+  assert.ok(detail.includes('! [img](https://e.com/i.png)'));
+  assert.ok(!detail.includes('](javascript') && !/<a /i.test(detail) && !detail.includes('](https://e.com/a)'));
+  assert.equal(bodyImageUrls(detail).length, 0);
+  assert.equal(stageOf(r.raw(1)), 'checked');
+});
+
+test('T1 data compatibility: text with no anchor and no placeholder passes the new cleaning byte for byte; a map with no bookPipeline and a plain note write are unchanged', async () => {
+  const sample = '# T\n\n正文 [a](https://e.com) <!-- visual-agent-map:detail:start -->\n\n### 來源\n- s\n';
+  assert.equal(convertSourceAnchors(sample), sample);
+  assert.equal(dropPlaceholderSections(sample), sample);
+  const r = await rig();
+  const mapBefore = r.mapRaw();
+  assert.ok(!mapBefore.includes('bookPipeline'));
+  const before = r.raw(1);
+  await r.repo.updateNoteGuarded(r.nodes[1].path, { detail: 'x' }, {});
+  const guarded = r.raw(1);
+  await r.repo.updateNote(r.nodes[1].path, { detail: 'x' });
+  const stamp = text => text.replace(/^updated: .*$/m, '');
+  assert.equal(stamp(r.raw(1)), stamp(guarded));
+  assert.notEqual(before, guarded);
+  assert.ok(!guarded.includes(SECTION));
+  assert.equal(r.mapRaw(), mapBefore);
+  assert.equal(r.runs.getProgress(r.mapPath), undefined);
+  assert.equal(r.mapRaw(), mapBefore);
 });

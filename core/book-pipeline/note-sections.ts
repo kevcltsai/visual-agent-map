@@ -8,7 +8,7 @@ import {
   isResearchNotesHeading,
   SECTION_NAME
 } from "../../ai/section-aliases";
-import { NOTE_LANGUAGES, translate } from "../../i18n";
+import { NOTE_LANGUAGES, SUPPORTED_LANGUAGES, translate, type ContentLanguage } from "../../i18n";
 import { demoteHeadings } from "./text";
 import { findProofModels, findProofRecord, PROOF_STATUSES, type ProofItemResult, type ProofResult } from "./proof";
 
@@ -425,8 +425,8 @@ const REFERENCE_START = "<!-- visual-agent-map:references:start -->";
 const DETAIL_START = "<!-- visual-agent-map:detail:start -->";
 const DETAIL_END = "<!-- visual-agent-map:detail:end -->";
 
-/** Per line: true where a heading must not be read: the frontmatter, the Detail block and code fences. */
-function protectedLines(lines: string[]): boolean[] {
+/** Per line: true where a heading must not be read: the frontmatter, the Detail block (unless `withDetail` is false) and code fences. */
+function protectedLines(lines: string[], withDetail = true): boolean[] {
   const flags = fencedLines(lines);
   if (lines[0]?.trim() === "---") {
     for (let i = 1; i < lines.length; i++) {
@@ -437,7 +437,7 @@ function protectedLines(lines: string[]): boolean[] {
   let inDetail = false;
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].trim() === DETAIL_START) inDetail = true;
-    if (inDetail) flags[i] = true;
+    if (inDetail && withDetail) flags[i] = true;
     if (lines[i].trim() === DETAIL_END) inDetail = false;
   }
   return flags;
@@ -445,25 +445,22 @@ function protectedLines(lines: string[]): boolean[] {
 
 /**
  * The note's `## <proof result heading>` section set to `body` (any language's heading of it is found; the new heading is `heading`);
- * the section is added before the reference-links block, else at the end. The section ends at the next `##` heading, the app's own
- * marker comment or a callout, so what follows it stays. The Detail block, the frontmatter and everything else stay byte for byte.
+ * the section is added before the reference-links block, else at the end. The section is the heading and the `- ` lines right after it,
+ * so any other text that follows it (the owner's, a heading, a marker, a callout) stays. The Detail block, the frontmatter and everything else stay byte for byte.
  */
 export function replaceProofSection(content: string, heading: string, body: string): string {
   const lines = content.split("\n");
   const flags = protectedLines(lines);
-  const names = new Set(NOTE_LANGUAGES.map(locale => translate(locale, "detail.book_proof_heading").trim()));
+  const names = new Set(ALL_LOCALES().map(locale => translate(locale, "detail.book_proof_heading").trim()));
   const found = findSection(lines, flags, (text, level) => level === 2 && names.has(text.trim()));
   const entry = `## ${heading}\n\n${body.trim()}`;
   if (found) {
-    let end = found.end;
-    for (let i = found.at + 1; i < found.end; i++) {
-      if (lines[i].trim().startsWith("<!-- visual-agent-map:") || /^>[ \t]?\[!/.test(lines[i])) {
-        end = i;
-        break;
-      }
-    }
+    // The section is what this function writes: its heading and the `- ` list lines right after it. Any other text (the owner's, another heading, a marker, a callout) ends it and stays.
+    let end = found.at + 1;
+    while (end < found.end && (!lines[end].trim() || /^- /.test(lines[end]))) end++;
+    while (end > found.at + 1 && !lines[end - 1].trim()) end--;
     const before = lines.slice(0, found.at).join("\n");
-    const after = lines.slice(end).join("\n");
+    const after = lines.slice(end).join("\n").replace(/^\s+/, "");
     return `${before ? `${before}\n` : ""}${entry}${after ? `\n\n${after}` : "\n"}`;
   }
   const marker = lines.findIndex((line, i) => !flags[i] && line.trim() === REFERENCE_START);
@@ -475,10 +472,15 @@ export function replaceProofSection(content: string, heading: string, body: stri
   return `${base ? `${base}\n\n` : ""}${entry}\n`;
 }
 
+/** Every language the app's fixed text is written in: the note languages and every interface language. */
+const ALL_LOCALES = (): ContentLanguage[] => [
+  ...new Set<ContentLanguage>([...NOTE_LANGUAGES, ...SUPPORTED_LANGUAGES.map(item => item.id)])
+];
+
 /** "Nothing new" sentences the app and its prompts write into an empty section, in every language (without the final full stop). */
 const PLACEHOLDERS = (): Set<string> =>
   new Set([
-    ...NOTE_LANGUAGES.map(locale => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
+    ...ALL_LOCALES().map(locale => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
     "No new content this time",
     "本次無新增內容"
   ]);
@@ -491,18 +493,26 @@ export function dropPlaceholderSections(content: string): string {
   const placeholders = PLACEHOLDERS();
   let lines = content.split("\n");
   for (let from = 0; ;) {
-    const flags = protectedLines(lines);
+    // The Detail block is where these sections live, so only the frontmatter and code are protected here.
+    const flags = protectedLines(lines, false);
     const hit = findSection(lines, flags, (_, level) => level >= 3, from);
     if (!hit) break;
+    // The section ends at the app's own marker comment (the Detail block's end), which is never part of it.
+    let end = hit.end;
+    for (let i = hit.at + 1; i < hit.end; i++)
+      if (lines[i].trim().startsWith("<!-- visual-agent-map:")) {
+        end = i;
+        break;
+      }
     const body = lines
-      .slice(hit.at + 1, hit.end)
+      .slice(hit.at + 1, end)
       .join("\n")
       .trim();
     if (!placeholders.has(body.replace(/[.。]$/, ""))) {
       from = hit.at + 1;
       continue;
     }
-    lines = [...lines.slice(0, hit.at), ...lines.slice(hit.end)];
+    lines = [...lines.slice(0, hit.at), ...lines.slice(end)];
     if (hit.at > 0 && !lines[hit.at - 1]?.trim() && !lines[hit.at]?.trim()) lines.splice(hit.at, 1);
     from = Math.max(0, hit.at - 1);
   }

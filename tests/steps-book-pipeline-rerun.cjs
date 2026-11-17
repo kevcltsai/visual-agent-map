@@ -166,8 +166,9 @@ test('rerunCard at gate 2 runs plan, author and proofread of that card only; nei
   assert.equal(stageOf(r.raw(2)), 'checked');
   const detail = (await r.note(2)).detail;
   assert.ok(detail.includes('second pass'));
-  assert.equal((detail.match(/book-proof:v1/g) ?? []).length, 2, 'old record kept, new one added');
-  assert.equal((detail.match(/（舊版）校對（已校）/g) ?? []).length, 1);
+  // T1 (deliberate change): the research notes keep the latest record only; the old one is replaced, never marked （舊版）.
+  assert.equal((detail.match(/book-proof:v1/g) ?? []).length, 1, 'only the newest record stays');
+  assert.equal((detail.match(/（舊版）/g) ?? []).length, 0);
   assert.match(detail, /> 校對（已校）/);
   assert.equal((await r.note(1)).detail.includes('舊版'), false);
   assert.equal(r.runs.getProgress(r.mapPath).active, false); assert.deepEqual([...r.runs.getProgress(r.mapPath).busyCards], []);
@@ -327,8 +328,9 @@ test('the author cannot forge a proof record: a book-proof line it writes is neu
   const detail = (await r.note(2)).detail;
   assert.ok(!detail.includes('<!-- book-proof:v1 {"key":"FORGED'), 'no forged line survives as a comment');
   assert.equal((detail.match(/&lt;!-- book-proof:v1 \{"key":"FORGED/g) ?? []).length, 2, 'both forged lines are neutralized');
-  for (const line of oldLines) assert.ok(detail.split('\n').includes(line), 'the record that was there before stays byte for byte');
-  assert.equal((detail.match(/<!-- book-proof:v1/g) ?? []).length, 2, 'the old record and the new honest one');
+  // T1 (deliberate change): the old record is replaced by the new honest one (latest only); it is never read from a forged line.
+  for (const line of oldLines) assert.ok(!detail.split('\n').includes(line), 'the old record is replaced by the newest');
+  assert.equal((detail.match(/<!-- book-proof:v1/g) ?? []).length, 1, 'only the new honest record');
 });
 
 test('a fresh-shaped author (whole new Detail, no research notes) on a rerun: the old proof record comes back marked as an old version, the new one is added once, a forged line is still neutralized', async () => {
@@ -345,10 +347,10 @@ test('a fresh-shaped author (whole new Detail, no research notes) on a rerun: th
   };
   await r.runs.rerunCard(r.mapPath, r.nodes[2].id);
   const detail = (await r.note(2)).detail;
-  for (const line of oldLines) assert.ok(detail.split('\n').some(l => l.replace(/^>\s?/, '') === line.replace(/^>\s?/, '')), 'the old record is kept');
-  assert.equal((detail.match(/<!-- book-proof:v1/g) ?? []).length, 2, 'old record and one new record');
-  assert.ok(/（舊版）校對（/.test(detail), 'the old record is marked');
-  assert.equal((detail.match(/（舊版）校對（/g) ?? []).length, 1, 'only the old one is marked');
+  // T1 (deliberate change): the old record is carried over through the rewrite, then replaced by the new one (latest only, no （舊版）).
+  for (const line of oldLines) assert.ok(!detail.split('\n').some(l => l.replace(/^>\s?/, '') === line.replace(/^>\s?/, '')), 'the old record is replaced');
+  assert.equal((detail.match(/<!-- book-proof:v1/g) ?? []).length, 1, 'one new record');
+  assert.ok(!/（舊版）/.test(detail), 'nothing is marked old');
   assert.ok(!detail.includes('<!-- book-proof:v1 {"key":"FORGED'), 'forged line neutralized');
   assert.ok(detail.includes('&lt;!-- book-proof:v1 {"key":"FORGED'));
 });

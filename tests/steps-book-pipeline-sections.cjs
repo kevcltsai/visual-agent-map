@@ -123,3 +123,74 @@ test('markOldProofRecords: no old record (a first run, or only the current key) 
   assert.ok(marked.includes('鄰卡企劃或正文已變更，尚未人工核對（第 3 張，版本 2）\n'), 'the line outside the records is unchanged');
   assert.ok(marked.includes('> 無圖：未找到可驗證的公開圖片\n'));
 });
+
+// ---- T1: latest-only records, proof-result section, picture-section carry-over ----
+test('replaceResearchRecord: only valid pipeline records of the same kind go; owner text, other callouts, damaged records and fenced fake markers stay verbatim', () => {
+  let detail = 'Text.\n\n### 研究備註\n\n> [!note]- 研究備註\n> 作者研究：A\n>\n> 我的備註（owner）';
+  detail = sections.appendResearchNote(detail, recordOf(1, 'one')).text;
+  detail = sections.appendResearchNote(detail, recordOf(2, 'two')).text;
+  const damaged = '> <!-- book-proof:v1 {not json} -->';
+  const slots = '> <!-- book-slots:v1 {"key":"s"} -->';
+  detail = detail.replace(/\n$/, '') + `\n>\n${damaged}\n>\n${slots}\n\n> [!tip] 其他\n> 其他 callout\n`;
+  const fake = '```\n> <!-- book-proof:v1 {"key":"fake","result":{"items":[]}} -->\n```';
+  detail += `\n${fake}\n`;
+  const next = sections.replaceResearchRecord(detail, recordOf(3, 'three'));
+  assert.equal(count(next, 'book-proof:v1 {"key"'), 2, 'the new record and the fenced fake only');
+  assert.ok(next.includes(fake) && next.includes(damaged) && next.includes(slots));
+  assert.ok(next.includes('作者研究：A') && next.includes('我的備註（owner）') && next.includes('> [!tip] 其他\n> 其他 callout'));
+  assert.ok(next.includes('three') && !next.includes('one') && !next.includes('two'));
+  assert.ok(!next.includes('（舊版）'));
+  // same input twice is stable; a slots record replaces only slots
+  assert.equal(sections.replaceResearchRecord(next, recordOf(3, 'three')), next);
+  const slots2 = proof.composeProofRecord(keyOf(9), result('s')).replace('book-proof', 'book-slots');
+  const swapped = sections.replaceResearchRecord(next, slots2);
+  assert.ok(!swapped.includes('"key":"s"') && swapped.includes('three'));
+});
+
+test('replaceResearchRecord: no section yet adds it; a plain text with no records changes nothing but the addition', () => {
+  const out = sections.replaceResearchRecord('正文', recordOf(1));
+  assert.equal(out, sections.appendResearchNote('正文', recordOf(1)).text);
+  const twice = sections.replaceResearchRecord(sections.replaceResearchRecord('正文', recordOf(1, 'a')), recordOf(2, 'b'));
+  assert.equal(count(twice, 'book-proof:v1'), 1); assert.ok(twice.includes('b') && !twice.includes('：a'));
+});
+
+test('carryImageSection: the old section comes back verbatim after a rewrite; a rewrite that kept one is unchanged; no old section changes nothing', () => {
+  const old = '舊文。\n\n### 圖像\n\n![A](https://e.com/a.jpg)\nA\n\n### 來源\n- s';
+  const carried = sections.carryImageSection(old, '新文。');
+  assert.ok(carried.includes('### 圖像\n\n![A](https://e.com/a.jpg)\nA') && carried.startsWith('新文。'));
+  assert.equal(sections.carryImageSection(old, '新文。\n\n### 圖像\n\n![B](https://e.com/b.jpg)\nB'), '新文。\n\n### 圖像\n\n![B](https://e.com/b.jpg)\nB');
+  assert.equal(sections.carryImageSection('舊文。', '新文。'), '新文。');
+  const en = sections.carryImageSection('x\n\n### Images\n\n![A](https://e.com/a.jpg)\nA', 'y');
+  assert.ok(en.includes('### Images'));
+});
+
+test('replaceProofSection: adds the section before the reference block / at the end, replaces it (any language heading), never touches the Detail block, code or frontmatter', () => {
+  const note = '---\ntitle: T\n---\n# T\n\n## 詳細內容\n\n<!-- visual-agent-map:detail:start -->\n\n## 校對結果（最新一次）\n\n- 在 Detail 內，不動\n\n<!-- visual-agent-map:detail:end -->\n\n> [!info]- 提示\n> x\n';
+  const added = sections.replaceProofSection(note, '校對結果（最新一次）', '- C1 達成');
+  assert.ok(added.includes('- 在 Detail 內，不動'));
+  assert.ok(added.endsWith('> [!info]- 提示\n> x\n\n## 校對結果（最新一次）\n\n- C1 達成\n'));
+  const replaced = sections.replaceProofSection(added, '校對結果（最新一次）', '- C1 未達成：y');
+  assert.equal(count(replaced, '- C1'), 1); assert.ok(replaced.includes('- C1 未達成：y') && replaced.includes('在 Detail 內'));
+  assert.equal(sections.replaceProofSection(replaced, '校對結果（最新一次）', '- C1 未達成：y'), replaced);
+  const en = sections.replaceProofSection(added, 'Proofread result (latest)', '- C1 met');
+  assert.equal(count(en, '- C1'), 1, 'a heading in another language is found and replaced');
+  const owner = sections.replaceProofSection(added + '\n我自己寫的一行\n\n## 我的標題\n\n內容\n', '校對結果（最新一次）', '- C1 達成');
+  assert.ok(owner.includes('我自己寫的一行') && owner.includes('## 我的標題\n\n內容'), 'text after the section is never taken');
+  assert.equal(count(owner, '- C1'), 1);
+  const refs = '# T\n\n正文\n\n<!-- visual-agent-map:references:start -->\n[1]: x\n<!-- visual-agent-map:references:end -->\n';
+  assert.ok(sections.replaceProofSection(refs, 'H', 'b').indexOf('## H') < sections.replaceProofSection(refs, 'H', 'b').indexOf('references:start'));
+  const fenced = '# T\n\n```\n## 校對結果（最新一次）\n\n- fake\n```\n';
+  assert.ok(sections.replaceProofSection(fenced, '校對結果（最新一次）', '- real').includes('- fake'));
+});
+
+test('composeProofSection: lines per item (note only when not met), the two model lines, 未記錄 without an id, a failure is one line with no model; ids and labels are escaped', () => {
+  const res = { aggregate: 'needs-review', items: [{ id: 'C1', type: 'fact', status: 'met', note: 'ok', sources: [] }, { id: 'C2', type: 'fact', status: 'unmet', note: 'bad *x*', sources: [] }, { id: 'C3', type: 'fact', status: 'unverified', note: '', sources: [] }] };
+  const out = proof.composeProofSection('zh-TW', { result: res }, { model: 'm3' }, id => `<${id}>`);
+  assert.match(out, /^- C1 達成\n- C2 未達成：bad /m); assert.ok(!out.includes('ok'));
+  assert.match(out, /- 作者模型：未記錄\n- 校對模型：＜m3＞$/);
+  const failed = proof.composeProofSection('zh-TW', { failure: 'invalid_reply' }, { model: 'm3', authorModel: 'm2' });
+  assert.equal(failed, '- 失敗：invalid\\_reply'); assert.ok(!/模型|m2|m3/.test(failed));
+  assert.equal(proof.findProofModels(proof.composeProofRecord('k', res, undefined, { model: 'm3', authorModel: 'm2' }), 'k').authorModel, 'm2');
+  assert.deepEqual({ ...proof.findProofModels(proof.composeProofRecord('k', res), 'k') }, {});
+  assert.equal(proof.findProofModels(proof.composeProofRecord('k', res), 'other'), undefined);
+});

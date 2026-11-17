@@ -134,6 +134,14 @@ test('runBookAuthor: calls researchChild as a rewrite without charts, with admis
   assert.equal(book.pipeline.authorize, input.authorize); assert.equal(book.pipeline.finalize, input.finalize);
 });
 
+test('runBookAuthor: forces the book-chapter template for the run (never the card\'s own template); researchChild hands it to detailTemplateFor', async () => {
+  const h = authorView(async (child, signal, accepted, choices, charts, onResult) => onResult({}));
+  await proto.runBookAuthor.call(h.view, h.input());
+  assert.equal(h.calls[0][8].template, 'book-chapter');
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /detailTemplateFor\(child, choices\.noteStyle, gate, outputLanguage, book\?\.template\)/);
+});
+
 test('runBookAuthor: budget exhaustion is its own outcome (not failed, no thrown error)', async () => {
   const h = authorView(async (...args) => args[8].pipeline.onBudgetExhausted());
   same(await proto.runBookAuthor.call(h.view, h.input()), { outcome: 'budget-exhausted' });

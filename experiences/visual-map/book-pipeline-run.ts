@@ -366,6 +366,10 @@ export function convertSourceAnchors(content: string): string {
         const href = safeLinkHref(rawHref.replace(/&amp;/g, "&"));
         const text = escapeMarkdownText(rawText.replace(/&amp;/g, "&"), 200);
         if (!href || !text) return whole;
+        // Nested: an earlier anchor on this line is still open, so this one sits inside it.
+        const prefix = all.slice(all.lastIndexOf("\n", offset - 1) + 1, offset);
+        if ((prefix.match(/(?:<|&lt;)a[ \t]/gi)?.length ?? 0) > (prefix.match(/(?:<|&lt;)\/a/gi)?.length ?? 0))
+          return whole;
         const before = all[offset - 1];
         return `${before === "!" || before === "\\" ? " " : ""}[${text}](${href})`;
       })

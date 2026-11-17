@@ -456,11 +456,29 @@ const REASON_KEY: Record<string, TranslationKey> = {
   no_view: "ui.book_reason_no_view"
 };
 
+/** A step failure with a plain sentence (cause and next step) instead of "step failed: reason"; keyed `step:code`. */
+const PLAIN_KEY: Record<string, TranslationKey> = {
+  "write:no_body": "ui.book_plain_write_no_body",
+  "proof:no_body": "ui.book_plain_proof_no_body",
+  "proof:empty_list": "ui.book_plain_proof_empty_list",
+  "proof:unparsable": "ui.book_plain_proof_unparsable",
+  "proof:missing_item": "ui.book_plain_proof_mismatch",
+  "proof:duplicate_item": "ui.book_plain_proof_mismatch",
+  "proof:unknown_item": "ui.book_plain_proof_mismatch",
+  "proof:no_open_page": "ui.book_plain_proof_no_open_page",
+  "proof:invalid_reply": "ui.book_plain_proof_invalid_reply",
+  "proof:failed": "ui.book_plain_proof_failed"
+};
+
 /** Turns the neutral issue code (`write failed: invalid_reply`, `proof unmet: C1 C3`) into the sentence shown on the card. */
 export function bookIssueText(issue: string): string {
   const failed = /^(plan|write|proof) failed: (\S+)$/.exec(issue.trim());
   if (failed) {
     const step = failed[1] as keyof typeof STEP_KEY;
+    const plain = Object.prototype.hasOwnProperty.call(PLAIN_KEY, `${step}:${failed[2]}`)
+      ? PLAIN_KEY[`${step}:${failed[2]}`]
+      : undefined;
+    if (plain) return t(plain);
     const reason = Object.prototype.hasOwnProperty.call(REASON_KEY, failed[2]) ? REASON_KEY[failed[2]] : undefined;
     if (reason) return t("ui.book_issue_step_0_1", t(STEP_KEY[step]), t(reason));
   }

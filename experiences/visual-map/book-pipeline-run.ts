@@ -65,7 +65,8 @@ import {
   fencedLines,
   replaceProofSection,
   replaceResearchRecord,
-  chapterBody
+  chapterBody,
+  detailBlockOf
 } from "../../core/book-pipeline/note-sections";
 import {
   composeBookPlan,
@@ -1630,6 +1631,7 @@ export class BookPipelineRuns {
     // an unsafe body is refused whole, so the card keeps its text from before this step.
     const knownLines: ReadonlySet<string> = new Set(card.raw.split("\n"));
     let unsafe = false;
+    let emptyBody = false;
     const finalize = (original: string): string | null => {
       const held = holdProofLines(original, knownLines);
       const restore = held.restore;
@@ -1642,6 +1644,12 @@ export class BookPipelineRuns {
       const cleaned = replaceBodyImages(content, unsafeUrls);
       if (this.exitCheck(cleaned, new Set(urls.filter(isHttps)))) {
         unsafe = true;
+        return null;
+      }
+      // An author result whose Detail holds no chapter text (only sources and notes) is refused: the card keeps its text.
+      const detail = detailBlockOf(cleaned);
+      if (detail !== undefined && !chapterBody(detail).trim()) {
+        emptyBody = true;
         return null;
       }
       return restore(cleaned);
@@ -1666,6 +1674,7 @@ export class BookPipelineRuns {
       })
     );
     if (unsafe) return { kind: "failed", reason: "unsafe_body", forceReview: true };
+    if (emptyBody) return { kind: "failed", reason: "no_body" };
     if (done.outcome === "budget-exhausted") return { kind: "budget" };
     if (done.outcome === "cancelled") return { kind: "cancelled" };
     if (done.outcome === "failed") return { kind: "failed", reason: done.reason };

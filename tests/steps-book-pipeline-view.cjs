@@ -159,7 +159,10 @@ test('issue text: neutral codes become Chinese reasons; unknown codes get the ge
   lang('zh-TW');
   assert.equal(ui.bookIssueText('write failed: invalid_reply'), '寫作失敗：AI 回覆格式不符');
   assert.equal(ui.bookIssueText('plan failed: failed'), '企劃失敗：執行失敗');
-  assert.equal(ui.bookIssueText('proof failed: no_open_page'), '校對失敗：校對時沒有成功開啟任何來源頁');
+  assert.equal(ui.bookIssueText('proof failed: no_open_page'), '校對時一個來源頁都打不開，無法核對。請按「重跑這張」，或打開卡片自己查證。');
+  assert.equal(ui.bookIssueText('proof failed: no_body'), '這張卡還沒有正文，沒東西可校對。請按「重跑這張」重寫，或打開卡片自己補上內文。');
+  assert.equal(ui.bookIssueText('write failed: no_body'), 'AI 這次沒寫出正文，卡片維持原樣。請按「重跑這張」再寫一次。');
+  for (const code of ['no_body', 'empty_list', 'unparsable', 'missing_item', 'duplicate_item', 'unknown_item', 'no_open_page', 'invalid_reply', 'failed']) { const text = ui.bookIssueText(`proof failed: ${code}`); assert.ok(!/校對失敗|地圖|[a-z]+_[a-z]+/.test(text), `${code}: ${text}`); assert.ok(text.includes('這張'), code); }
   assert.equal(ui.bookIssueText('proof unmet: C1 C3'), '校對未達成項目：C1 C3');
   const generic = '需要人工查看（原因代碼無法辨識）。';
   for (const unknown of ['write failed: brand_new_code', 'something else', '', 'write failed: __proto__', 'proof failed: constructor']) assert.equal(ui.bookIssueText(unknown), generic, unknown);

@@ -3193,6 +3193,14 @@ var en = {
   "ui.book_reason_all_facts_unverified": "none of the factual items could be verified",
   "ui.book_reason_unsafe_body": "the picture text was not safe, so the card was left as it was",
   "ui.book_reason_no_view": "the map is no longer open, so the run stopped",
+  "ui.book_plain_write_no_body": 'The AI wrote no chapter text this time, so the card is unchanged. Use "Rerun this card" to write it again.',
+  "ui.book_plain_proof_no_body": 'This card has no chapter text to check. Use "Rerun this card" to rewrite it, or open the card and add the text yourself.',
+  "ui.book_plain_proof_empty_list": "This card has no checklist, so it cannot be checked. Add the checklist in the plan, then rerun this card.",
+  "ui.book_plain_proof_unparsable": `The checking AI's reply could not be read, so this card is not checked yet. Use "Rerun this card" to try again.`,
+  "ui.book_plain_proof_mismatch": 'The checklist does not match the plan, so this card was not checked. Use "Rerun this card" to check it again.',
+  "ui.book_plain_proof_no_open_page": 'None of the source pages could be opened, so nothing could be checked. Use "Rerun this card", or open the card and check it yourself.',
+  "ui.book_plain_proof_invalid_reply": `The checking AI's reply had the wrong format after several tries. Use "Rerun this card" to try again.`,
+  "ui.book_plain_proof_failed": 'Checking stopped with an error, so this card is not checked yet. Use "Rerun this card" to try again.',
   "ui.book_panel_label": "Picture-book gate panel",
   "ui.book_panel_tabs_label": "Side panel",
   "ui.book_panel_tab_book": "Picture-book panel",
@@ -6410,6 +6418,14 @@ var zhCN = {
   "ui.book_reason_all_facts_unverified": "\u6240\u6709\u4E8B\u5B9E\u9879\u76EE\u90FD\u65E0\u6CD5\u67E5\u8BC1",
   "ui.book_reason_unsafe_body": "\u56FE\u7247\u5185\u5BB9\u4E0D\u5B89\u5168\uFF0C\u5361\u7247\u4FDD\u6301\u539F\u6837",
   "ui.book_reason_no_view": "\u5730\u56FE\u5DF2\u4E0D\u5728\u754C\u9762\u4E0A\uFF0C\u8FD0\u884C\u5DF2\u505C\u6B62",
+  "ui.book_plain_write_no_body": "AI \u8FD9\u6B21\u6CA1\u5199\u51FA\u6B63\u6587\uFF0C\u5361\u7247\u4FDD\u6301\u539F\u6837\u3002\u8BF7\u70B9\u201C\u91CD\u8DD1\u8FD9\u5F20\u201D\u518D\u5199\u4E00\u6B21\u3002",
+  "ui.book_plain_proof_no_body": "\u8FD9\u5F20\u5361\u8FD8\u6CA1\u6709\u6B63\u6587\uFF0C\u6CA1\u6709\u4E1C\u897F\u53EF\u6821\u5BF9\u3002\u8BF7\u70B9\u201C\u91CD\u8DD1\u8FD9\u5F20\u201D\u91CD\u5199\uFF0C\u6216\u6253\u5F00\u5361\u7247\u81EA\u5DF1\u8865\u4E0A\u5185\u6587\u3002",
+  "ui.book_plain_proof_empty_list": "\u8FD9\u5F20\u5361\u6CA1\u6709\u9A8C\u6536\u6E05\u5355\uFF0C\u65E0\u6CD5\u6821\u5BF9\u3002\u8BF7\u56DE\u5230\u4F01\u5212\u8865\u4E0A\u6E05\u5355\uFF0C\u518D\u91CD\u8DD1\u8FD9\u5F20\u3002",
+  "ui.book_plain_proof_unparsable": "\u6821\u5BF9\u7684 AI \u56DE\u590D\u8BFB\u4E0D\u61C2\uFF0C\u8FD9\u5F20\u8FD8\u6CA1\u6821\u6210\u3002\u8BF7\u70B9\u201C\u91CD\u8DD1\u8FD9\u5F20\u201D\u518D\u8BD5\u4E00\u6B21\u3002",
+  "ui.book_plain_proof_mismatch": "\u6821\u5BF9\u6E05\u5355\u548C\u4F01\u5212\u5BF9\u4E0D\u4E0A\uFF0C\u8FD9\u5F20\u6CA1\u6821\u6210\u3002\u8BF7\u70B9\u201C\u91CD\u8DD1\u8FD9\u5F20\u201D\u91CD\u65B0\u6821\u5BF9\u3002",
+  "ui.book_plain_proof_no_open_page": "\u6821\u5BF9\u65F6\u4E00\u4E2A\u6765\u6E90\u9875\u90FD\u6253\u4E0D\u5F00\uFF0C\u65E0\u6CD5\u6838\u5BF9\u3002\u8BF7\u70B9\u201C\u91CD\u8DD1\u8FD9\u5F20\u201D\uFF0C\u6216\u6253\u5F00\u5361\u7247\u81EA\u5DF1\u67E5\u8BC1\u3002",
+  "ui.book_plain_proof_invalid_reply": "\u6821\u5BF9\u7684 AI \u56DE\u590D\u683C\u5F0F\u4E0D\u7B26\uFF0C\u91CD\u8BD5\u591A\u6B21\u4ECD\u5931\u8D25\u3002\u8BF7\u70B9\u201C\u91CD\u8DD1\u8FD9\u5F20\u201D\u518D\u8BD5\u4E00\u6B21\u3002",
+  "ui.book_plain_proof_failed": "\u6821\u5BF9\u4E2D\u9014\u51FA\u9519\uFF0C\u8FD9\u5F20\u8FD8\u6CA1\u6821\u6210\u3002\u8BF7\u70B9\u201C\u91CD\u8DD1\u8FD9\u5F20\u201D\u518D\u8BD5\u4E00\u6B21\u3002",
   "ui.book_panel_label": "\u56FE\u6587\u4E66\u5173\u5361\u9762\u677F",
   "ui.book_panel_tabs_label": "\u53F3\u4FA7\u680F",
   "ui.book_panel_tab_book": "\u56FE\u6587\u4E66\u9762\u677F",
@@ -9627,6 +9643,14 @@ var zhTW = {
   "ui.book_reason_all_facts_unverified": "\u6240\u6709\u4E8B\u5BE6\u9805\u76EE\u90FD\u7121\u6CD5\u67E5\u8B49",
   "ui.book_reason_unsafe_body": "\u5716\u7247\u5167\u5BB9\u4E0D\u5B89\u5168\uFF0C\u5361\u7247\u7DAD\u6301\u539F\u6A23",
   "ui.book_reason_no_view": "\u5FC3\u667A\u5716\u5DF2\u4E0D\u5728\u756B\u9762\u4E0A\uFF0C\u57F7\u884C\u5DF2\u505C\u6B62",
+  "ui.book_plain_write_no_body": "AI \u9019\u6B21\u6C92\u5BEB\u51FA\u6B63\u6587\uFF0C\u5361\u7247\u7DAD\u6301\u539F\u6A23\u3002\u8ACB\u6309\u300C\u91CD\u8DD1\u9019\u5F35\u300D\u518D\u5BEB\u4E00\u6B21\u3002",
+  "ui.book_plain_proof_no_body": "\u9019\u5F35\u5361\u9084\u6C92\u6709\u6B63\u6587\uFF0C\u6C92\u6771\u897F\u53EF\u6821\u5C0D\u3002\u8ACB\u6309\u300C\u91CD\u8DD1\u9019\u5F35\u300D\u91CD\u5BEB\uFF0C\u6216\u6253\u958B\u5361\u7247\u81EA\u5DF1\u88DC\u4E0A\u5167\u6587\u3002",
+  "ui.book_plain_proof_empty_list": "\u9019\u5F35\u5361\u6C92\u6709\u9A57\u6536\u6E05\u55AE\uFF0C\u7121\u6CD5\u6821\u5C0D\u3002\u8ACB\u56DE\u5230\u4F01\u5283\u88DC\u4E0A\u6E05\u55AE\uFF0C\u518D\u91CD\u8DD1\u9019\u5F35\u3002",
+  "ui.book_plain_proof_unparsable": "\u6821\u5C0D\u7684 AI \u56DE\u8986\u8B80\u4E0D\u61C2\uFF0C\u9019\u5F35\u9084\u6C92\u6821\u6210\u3002\u8ACB\u6309\u300C\u91CD\u8DD1\u9019\u5F35\u300D\u518D\u8A66\u4E00\u6B21\u3002",
+  "ui.book_plain_proof_mismatch": "\u6821\u5C0D\u6E05\u55AE\u548C\u4F01\u5283\u5C0D\u4E0D\u4E0A\uFF0C\u9019\u5F35\u6C92\u6821\u6210\u3002\u8ACB\u6309\u300C\u91CD\u8DD1\u9019\u5F35\u300D\u91CD\u65B0\u6821\u5C0D\u3002",
+  "ui.book_plain_proof_no_open_page": "\u6821\u5C0D\u6642\u4E00\u500B\u4F86\u6E90\u9801\u90FD\u6253\u4E0D\u958B\uFF0C\u7121\u6CD5\u6838\u5C0D\u3002\u8ACB\u6309\u300C\u91CD\u8DD1\u9019\u5F35\u300D\uFF0C\u6216\u6253\u958B\u5361\u7247\u81EA\u5DF1\u67E5\u8B49\u3002",
+  "ui.book_plain_proof_invalid_reply": "\u6821\u5C0D\u7684 AI \u56DE\u8986\u683C\u5F0F\u4E0D\u7B26\uFF0C\u91CD\u8A66\u591A\u6B21\u4ECD\u5931\u6557\u3002\u8ACB\u6309\u300C\u91CD\u8DD1\u9019\u5F35\u300D\u518D\u8A66\u4E00\u6B21\u3002",
+  "ui.book_plain_proof_failed": "\u6821\u5C0D\u4E2D\u9014\u51FA\u932F\uFF0C\u9019\u5F35\u9084\u6C92\u6821\u6210\u3002\u8ACB\u6309\u300C\u91CD\u8DD1\u9019\u5F35\u300D\u518D\u8A66\u4E00\u6B21\u3002",
   "ui.book_panel_label": "\u5716\u6587\u66F8\u95DC\u5361\u9762\u677F",
   "ui.book_panel_tabs_label": "\u53F3\u5074\u6B04\u4F4D",
   "ui.book_panel_tab_book": "\u5716\u6587\u66F8\u9762\u677F",
@@ -44427,6 +44451,11 @@ function chapterBody(detail) {
 var REFERENCE_START2 = "<!-- visual-agent-map:references:start -->";
 var DETAIL_START2 = "<!-- visual-agent-map:detail:start -->";
 var DETAIL_END2 = "<!-- visual-agent-map:detail:end -->";
+function detailBlockOf(content) {
+  const start = content.indexOf(DETAIL_START2);
+  const end = content.indexOf(DETAIL_END2, start + 1);
+  return start < 0 || end < 0 ? void 0 : content.slice(start + DETAIL_START2.length, end);
+}
 function protectedLines(lines, withDetail = true) {
   var _a2;
   const flags = fencedLines2(lines);
@@ -51076,6 +51105,7 @@ var BookPipelineRuns = class {
     const slots = parseImageSlots(card.prompt);
     const knownLines = new Set(card.raw.split("\n"));
     let unsafe = false;
+    let emptyBody = false;
     const finalize = (original) => {
       const held = holdProofLines(original, knownLines);
       const restore = held.restore;
@@ -51087,6 +51117,11 @@ var BookPipelineRuns = class {
       const cleaned = replaceBodyImages(content, unsafeUrls);
       if (this.exitCheck(cleaned, new Set(urls.filter(isHttps2)))) {
         unsafe = true;
+        return null;
+      }
+      const detail = detailBlockOf(cleaned);
+      if (detail !== void 0 && !chapterBody(detail).trim()) {
+        emptyBody = true;
         return null;
       }
       return restore(cleaned);
@@ -51110,6 +51145,7 @@ var BookPipelineRuns = class {
       })
     );
     if (unsafe) return { kind: "failed", reason: "unsafe_body", forceReview: true };
+    if (emptyBody) return { kind: "failed", reason: "no_body" };
     if (done.outcome === "budget-exhausted") return { kind: "budget" };
     if (done.outcome === "cancelled") return { kind: "cancelled" };
     if (done.outcome === "failed") return { kind: "failed", reason: done.reason };
@@ -51847,10 +51883,24 @@ var REASON_KEY = {
   unsafe_body: "ui.book_reason_unsafe_body",
   no_view: "ui.book_reason_no_view"
 };
+var PLAIN_KEY = {
+  "write:no_body": "ui.book_plain_write_no_body",
+  "proof:no_body": "ui.book_plain_proof_no_body",
+  "proof:empty_list": "ui.book_plain_proof_empty_list",
+  "proof:unparsable": "ui.book_plain_proof_unparsable",
+  "proof:missing_item": "ui.book_plain_proof_mismatch",
+  "proof:duplicate_item": "ui.book_plain_proof_mismatch",
+  "proof:unknown_item": "ui.book_plain_proof_mismatch",
+  "proof:no_open_page": "ui.book_plain_proof_no_open_page",
+  "proof:invalid_reply": "ui.book_plain_proof_invalid_reply",
+  "proof:failed": "ui.book_plain_proof_failed"
+};
 function bookIssueText(issue2) {
   const failed = /^(plan|write|proof) failed: (\S+)$/.exec(issue2.trim());
   if (failed) {
     const step = failed[1];
+    const plain = Object.prototype.hasOwnProperty.call(PLAIN_KEY, `${step}:${failed[2]}`) ? PLAIN_KEY[`${step}:${failed[2]}`] : void 0;
+    if (plain) return t(plain);
     const reason = Object.prototype.hasOwnProperty.call(REASON_KEY, failed[2]) ? REASON_KEY[failed[2]] : void 0;
     if (reason) return t("ui.book_issue_step_0_1", t(STEP_KEY[step]), t(reason));
   }

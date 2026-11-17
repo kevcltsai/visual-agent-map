@@ -425,6 +425,13 @@ const REFERENCE_START = "<!-- visual-agent-map:references:start -->";
 const DETAIL_START = "<!-- visual-agent-map:detail:start -->";
 const DETAIL_END = "<!-- visual-agent-map:detail:end -->";
 
+/** The Detail block of a whole note (between the managed markers); undefined when the note has none. */
+export function detailBlockOf(content: string): string | undefined {
+  const start = content.indexOf(DETAIL_START);
+  const end = content.indexOf(DETAIL_END, start + 1);
+  return start < 0 || end < 0 ? undefined : content.slice(start + DETAIL_START.length, end);
+}
+
 /** Per line: true where a heading must not be read: the frontmatter, the Detail block (unless `withDetail` is false) and code fences. */
 function protectedLines(lines: string[], withDetail = true): boolean[] {
   const flags = fencedLines(lines);

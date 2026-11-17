@@ -3416,6 +3416,22 @@ export const en = {
   "ui.book_reason_all_facts_unverified": "none of the factual items could be verified",
   "ui.book_reason_unsafe_body": "the picture text was not safe, so the card was left as it was",
   "ui.book_reason_no_view": "the map is no longer open, so the run stopped",
+  "ui.book_plain_write_no_body":
+    'The AI wrote no chapter text this time, so the card is unchanged. Use "Rerun this card" to write it again.',
+  "ui.book_plain_proof_no_body":
+    'This card has no chapter text to check. Use "Rerun this card" to rewrite it, or open the card and add the text yourself.',
+  "ui.book_plain_proof_empty_list":
+    "This card has no checklist, so it cannot be checked. Add the checklist in the plan, then rerun this card.",
+  "ui.book_plain_proof_unparsable":
+    'The checking AI\'s reply could not be read, so this card is not checked yet. Use "Rerun this card" to try again.',
+  "ui.book_plain_proof_mismatch":
+    'The checklist does not match the plan, so this card was not checked. Use "Rerun this card" to check it again.',
+  "ui.book_plain_proof_no_open_page":
+    'None of the source pages could be opened, so nothing could be checked. Use "Rerun this card", or open the card and check it yourself.',
+  "ui.book_plain_proof_invalid_reply":
+    'The checking AI\'s reply had the wrong format after several tries. Use "Rerun this card" to try again.',
+  "ui.book_plain_proof_failed":
+    'Checking stopped with an error, so this card is not checked yet. Use "Rerun this card" to try again.',
   "ui.book_panel_label": "Picture-book gate panel",
   "ui.book_panel_tabs_label": "Side panel",
   "ui.book_panel_tab_book": "Picture-book panel",

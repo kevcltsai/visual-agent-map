@@ -288,6 +288,20 @@ test('pictures: a non-https address is not probed; an https failure becomes "無
   assert.ok(detail.includes('![d](https://ok.example/d.png)'));
 });
 
+test('write: an author result whose Detail has only sources and notes (no chapter text) is refused, the card keeps its body and says no_body in a write failure', async () => {
+  const r = await rig({ script: { author: async input => {
+    await input.admission.reserve();
+    await r.repo.updateNoteGuarded(input.path, { detail: '### 來源\n\n- [S](https://s.example/a)\n\n### 研究備註\n\n> [!note]- 研究備註\n> x' }, { authorize: input.authorize, finalize: input.finalize });
+    return { outcome: 'written' };
+  } } });
+  await r.runs.start(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
+  const note = await r.note(1);
+  assert.ok(!note.detail.includes('s.example'), 'the body-less result is not written');
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.equal(note.pipelineIssue, 'write failed: no_body');
+});
+
 test('pictures: when the exit check finds an unsafe body nothing is written, the card needs review with a neutral code and the log has no body', async () => {
   const r = await rig({ script: { author: async input => {
     await input.admission.reserve(); const note = await r.repo.readNote(input.path);

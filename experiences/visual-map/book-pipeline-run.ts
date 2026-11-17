@@ -1675,12 +1675,15 @@ export class BookPipelineRuns {
             caption: candidate.caption
           },
           href,
-          loaded: href ? (loadedHref.get(href) ?? false) : false
+          loaded: href ? (loadedHref.get(href) ?? false) : false,
+          ...(href && !loadedHref.has(href) ? { skipped: true } : {})
         }))
       ])
     );
     // Re-read the latest text: the search and the probes took time, and the owner may have edited the card.
     const latest = await this.ports.readCard(path);
+    // The card may have left the map while the search and the probes ran: nothing is claimed or written for it.
+    if (!(await this.stillOnMap(drive, nodeId))) return { kind: "failed", reason: "card_removed" };
     const outcomes = choosePictures(
       { id: nodeId, title: latest.title },
       slots,

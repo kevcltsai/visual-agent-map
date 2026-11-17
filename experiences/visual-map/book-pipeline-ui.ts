@@ -292,10 +292,19 @@ export function bookIssueText(issue: string): string {
   return t("ui.book_issue_unknown");
 }
 
-/** A checked card's `structure unmet: C2 C3` issue as a small note (the count only); anything else shows nothing. */
+/**
+ * A checked card's `structure unmet: C2 C3 image_1` issue as a small note (counts only). Picture tokens (`image_*`) are "worth a look",
+ * not unmet structure items: they are counted apart; anything else shows nothing.
+ */
 function structureNote(issue: string): { issueText?: string } {
   const found = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue.trim());
-  return found ? { issueText: t("ui.book_structure_unmet_0", String(found[1].split(" ").length)) } : {};
+  if (!found) return {};
+  const tokens = found[1].split(" ");
+  const notices = tokens.filter(token => token.startsWith("image_")).length;
+  const structure = tokens.length - notices;
+  if (!notices) return { issueText: t("ui.book_structure_unmet_0", String(structure)) };
+  if (!structure) return { issueText: t("ui.book_checked_notice_0", String(notices)) };
+  return { issueText: t("ui.book_structure_notice_0_1", String(structure), String(notices)) };
 }
 
 export interface BookCardInput {

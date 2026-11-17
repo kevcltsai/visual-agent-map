@@ -205,7 +205,7 @@ test('slots: markers on the same line (adjacent or inside a sentence) are remove
   assert.ok(detail.startsWith('前文後文。\n\n尾。'), detail);
   assert.ok(!/\n\n\n/.test(detail) && !/〔圖位/.test(detail));
   assert.equal(r.calls.length, 0, 'no slot had a valid marker, so no search call');
-  assert.deepEqual(recordOf(detail).slots.map(s => s.reasonCode), ['author_omitted', 'author_omitted']);
+  assert.deepEqual(recordOf(detail).slots.map(s => s.reasonCode), ['bad_marker', 'bad_marker'], 'the author did leave markers (inline), so not author_omitted');
   const adjacent = await picRig({ text: () => `${BODY}\n\n${mk(1)}\n${mk(2)}\n尾。\n`, finder: () => found({ 1: [cand(1)], 2: [cand(2)] }) });
   await run(adjacent);
   const d2 = (await adjacent.note(0)).detail;
@@ -595,4 +595,93 @@ test('proofread: all pictures placed next to their text: the 圖文 line says ok
   await run(old);
   assert.ok(!(await old.note(0)).pipelineIssue);
   assert.match(old.raw(0), /圖/);
+});
+
+// ---- T2 review fixes -----------------------------------------------------------------------------------------------------------------
+const IS = S.load('core/book-pipeline/image-slots.ts');
+const figureWith = caption => IS.figureOf({ imageUrl: 'https://a.example/x.jpg', sourceUrl: 'https://b.example', title: 'T', caption }, 'https://a.example/x.jpg', 'zh-TW');
+const fillOne = (text, outcomes = new Map()) => { const slots = [{ index: 1 }]; const done = IS.fillSlotMarkers(text, slots, outcomes); return { done, verdict: IS.verifyFill(text, done, slots) }; };
+
+test('figureOf: a caption of only symbols (---, ===, - - -, ***, ___) is written as plain text and cannot turn the image line into a heading, rule or list', () => {
+  for (const caption of ['---', '===', '- - -', '***', '___', '+++', '-']) {
+    const fig = figureWith(caption);
+    assert.ok(!/^[\s=*_+-]+$/.test(fig.caption), `${caption} -> ${fig.caption}`);
+    assert.ok(fig.caption.startsWith('\\'), fig.caption);
+    const { done, verdict } = fillOne(`前。\n\n${mk(1)}\n\n後。\n`, new Map([[1, { figure: fig }]]));
+    assert.equal(verdict, undefined);
+    const lines = done.text.split('\n');
+    const at = lines.findIndex(l => l.startsWith('!['));
+    assert.ok(!/^ {0,3}([-=*_+][ \t]*)+$/.test(lines[at + 1]), `caption line ${lines[at + 1]}`);
+  }
+  assert.equal(figureWith('Plain caption').caption, 'Plain caption');
+});
+
+test('fill: an unclosed marker line, a bold-wrapped marker and a list-item marker leave no residue, whether the slot got a picture or not; verifyFill sees residue', () => {
+  const cases = ['〔圖位 1：藍光', '**〔圖位 1：藍光〕**', '- 〔圖位 1：藍光〕', '1. 〔圖位 1：藍光〕', '_〔圖位 1：藍光〕_', '*〔圖位 1：藍光'];
+  for (const marker of cases) {
+    const text = `前。\n\n${marker}\n\n後。\n`;
+    const { done, verdict } = fillOne(text);
+    assert.equal(done.text, '前。\n\n後。\n', marker);
+    assert.equal(verdict, undefined, marker);
+    assert.ok(done.missing.length === 1 && (marker.includes('〕') ? true : done.missing[0].reasonCode === 'bad_marker'), marker);
+  }
+  const wrapped = fillOne('前。\n\n**〔圖位 1：藍光〕**\n\n後。\n', new Map([[1, { figure: figureWith('C') }]]));
+  assert.equal(wrapped.done.placed.length, 1); assert.equal(wrapped.verdict, undefined);
+  assert.ok(!/\*\*/.test(wrapped.done.text));
+  // residue is caught: a result that kept the shell fails the independent check
+  const original = '前。\n\n**〔圖位 1：藍光〕**\n\n後。\n';
+  const sloppy = { text: '前。\n\n****\n\n後。\n', placed: [], missing: [{ index: 1, reasonCode: 'not_found' }], bad: 0, added: [] };
+  assert.equal(IS.verifyFill(original, sloppy, [{ index: 1 }]), 'deleted_text');
+  const bare = { text: '前。\n\n 1：藍光\n\n後。\n', placed: [], missing: [{ index: 1, reasonCode: 'not_found' }], bad: 0, added: [] };
+  assert.equal(IS.verifyFill('前。\n\n〔圖位 1：藍光\n\n後。\n', bare, [{ index: 1 }]), 'deleted_text');
+  const adjacent = fillOne('前。\n\n- 〔圖位 1：a〕〔圖位 2：b〕\n\n後。\n');
+  assert.equal(adjacent.done.text, '前。\n\n後。\n'); assert.equal(adjacent.verdict, undefined);
+});
+
+test('protectedLines: indented code (4 spaces or tab), indented fences and the lazy continuation of a quote are never filled; a marker after a normal paragraph still is', () => {
+  const m = n => mk(n);
+  const text = ['前。', '', `    ${m(1)}`, '', `\t${m(2)}`, '', '- 項目', '    ```', `    ${m(3)}`, '    ```', '', '> 引用', m(4), '', m(5), '', '後。'].join('\n');
+  const slots = [1, 2, 3, 4, 5].map(index => ({ index }));
+  const scan = IS.scanSlotMarkers(text, slots);
+  assert.deepEqual([...scan.found.keys()], [5], 'only the marker line in plain text counts');
+  assert.deepEqual(plain(IS.residualMarkerLines(text)).length, 1);
+  const done = IS.fillSlotMarkers(text, slots, new Map([[5, { figure: figureWith('C') }]]));
+  assert.ok(done.text.includes(`    ${m(1)}`) && done.text.includes(`\t${m(2)}`) && done.text.includes(`    ${m(3)}`) && done.text.includes(`\n${m(4)}\n`));
+  assert.equal(IS.verifyFill(text, done, slots), undefined);
+  const lazyEnds = IS.protectedLines(['> 引用', '續行', '', '正文', '> 又一個', '# 標題', '- 項']);
+  assert.deepEqual(plain(lazyEnds), [true, true, false, false, true, false, false]);
+});
+
+test('stripImageLines: a sentence right after an image line is dropped as its caption only when a blank line or the end follows; a sentence that runs into the next lines stays', () => {
+  const img = '![x](https://a.org/x.jpg)';
+  assert.equal(IS.stripImageLines(`前。\n\n${img}\n圖說\n\n後。`), '前。\n\n後。');
+  assert.equal(IS.stripImageLines(`前。\n\n${img}\n圖說`), '前。\n');
+  assert.equal(IS.stripImageLines(`${img}\n1730 年是…\n接下來的正文。\n`), '1730 年是…\n接下來的正文。\n');
+});
+
+test('slots: a card removed from the map while the search ran is not written, and its claimed pictures are not held', async () => {
+  const r = await picRig({ slots: 1, text: () => `${BODY}\n\n${mk(1)}\n\n尾。\n`, finder: () => found({ 1: [cand(1)] }) });
+  const readMap = r.ports.readMap;
+  let removed = false;
+  const search = r.ports.findImages;
+  r.ports.findImages = async (request, runInfo) => { const out = await search(request, runInfo); removed = true; return out; };
+  r.ports.readMap = async path => { const map = await readMap(path); return removed ? { ...map, nodes: map.nodes.filter(node => node.id !== r.nodes[0].id) } : map; };
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.ok(detail.includes(mk(1)) && !/!\[|book-slots/.test(detail), 'nothing was written to the removed card: marker kept, no picture, no record');
+  assert.notEqual(stageOf(r.raw(0)), 'checked');
+});
+
+test('slots: candidates left unprobed by the per-chapter limit end probe_capped (not load_failed); an adjacent pair on one line is bad_marker (not author_omitted)', async () => {
+  const text = title => `${BODY}\n\n${Array.from({ length: 8 }, (_, i) => `${mk(i + 1)}\n\n段${i + 1}。`).join('\n\n')}\n`;
+  let seq = 0;
+  const finder = req => found(Object.fromEntries(req.slots.map(s => [s.index, Array.from({ length: 4 }, () => cand(++seq))])));
+  const r = await picRig({ slots: 8, text, finder, probe: async () => ({ ok: false, reason: 'load_failed' }) });
+  await run(r);
+  const reasons = recordOf((await r.note(0)).detail).slots.map(s => s.reasonCode);
+  assert.deepEqual(reasons, ['load_failed', 'load_failed', 'load_failed', 'load_failed', 'load_failed', 'load_failed', 'probe_capped', 'probe_capped']);
+  assert.match(r.stat.logs.join('\n'), /reason=load_failed,probe_capped|reason=probe_capped/);
+  const pair = await picRig({ slots: 2, text: () => `${BODY}\n\n${mk(1)}${mk(2)}\n\n尾。\n`, finder: () => found({}) });
+  await run(pair);
+  assert.deepEqual(recordOf((await pair.note(0)).detail).slots.map(s => s.reasonCode), ['bad_marker', 'bad_marker']);
 });

@@ -24,8 +24,9 @@ export interface ImageSlot {
 /** The planner may arrange at most this many slots for one card. */
 export const MAX_IMAGE_SLOTS = 8;
 
-/** Why a slot ended without a picture. Only `author_omitted` and `bad_marker` come from the marker scan. */
-export type SlotReasonCode = "author_omitted" | "bad_marker" | "not_found" | "load_failed" | "unsafe_url";
+/** Why a slot ended without a picture (`probe_capped`: its candidates were left unprobed by the per-chapter limit). Only `author_omitted` and `bad_marker` come from the marker scan. */
+export type SlotReasonCode =
+  "author_omitted" | "bad_marker" | "not_found" | "load_failed" | "unsafe_url" | "probe_capped";
 
 /** Text of a slot field: one line, with the marker brackets and the Prompt field separator taken out. */
 export function cleanSlotText(value: string, max: number): string {
@@ -43,13 +44,21 @@ export function composeSlotMarker(slot: Pick<ImageSlot, "index" | "explains">): 
 
 const STANDALONE_MARKER = /^\s*〔圖位 ([1-9]\d*)：([^〔〕]+?)〕\s*$/;
 const MARKER_OPEN = "〔圖位";
-const OPEN_FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+const OPEN_FENCE = /^[ \t]*(`{3,}|~{3,})(.*)$/;
 const QUOTE_LINE = /^ {0,3}>/;
+const INDENTED_CODE = /^(?: {4}|\t)/;
+/** A line that ends a quote's lazy continuation: a fence, heading, list item or rule. */
+const BLOCK_START = /^ {0,3}(?:#{1,6}(?:\s|$)|[-*+]\s|\d+[.)]\s|(?:[-*_][ \t]*){3,}$)/;
 
-/** Per line: true when the line is inside a code fence (fence lines included) or is a quote line. Markers there are kept as they are. */
+/**
+ * Per line: true when the line is inside a code fence (fence lines included, at any indent), is indented code (4 spaces or a tab after a
+ * blank line or other code), is a quote line or a lazy continuation of one. Markers there are kept as they are.
+ */
 export function protectedLines(lines: readonly string[]): boolean[] {
   const out: boolean[] = [];
   let fence: { char: string; size: number } | undefined;
+  let quote = false;
+  let code = false;
   for (const line of lines) {
     if (fence) {
       out.push(true);
@@ -61,9 +70,27 @@ export function protectedLines(lines: readonly string[]): boolean[] {
     if (open && !(open[1][0] === "`" && open[2].includes("`"))) {
       fence = { char: open[1][0], size: open[1].length };
       out.push(true);
+      quote = false;
+      code = false;
       continue;
     }
-    out.push(QUOTE_LINE.test(line));
+    const blank = !line.trim();
+    const prevBlank = out.length === 0 || !lines[out.length - 1].trim();
+    if (QUOTE_LINE.test(line)) {
+      quote = true;
+      code = false;
+      out.push(true);
+    } else if (quote && !blank && !BLOCK_START.test(line)) {
+      out.push(true);
+    } else if (INDENTED_CODE.test(line) && !blank && (prevBlank || code)) {
+      quote = false;
+      code = true;
+      out.push(true);
+    } else {
+      if (!blank) code = false;
+      quote = false;
+      out.push(false);
+    }
   }
   return out;
 }
@@ -85,6 +112,27 @@ export interface SlotScan {
  * Classifies every `〔圖位` marker of a chapter body against the planned slots. Markers in code fences and quotes are not counted
  * and not listed (they stay as written). Pure; line numbers are 0-based over `content.split(/\r?\n/)`.
  */
+/** A marker line's text without its list symbol and the emphasis symbols around it (`- **〔圖位 1：x〕**` -> `〔圖位 1：x〕`). */
+function markerCore(line: string): string {
+  return line
+    .trim()
+    .replace(/^(?:[-+*]|\d+[.)])\s+/, "")
+    .replace(/^[*_~]+/, "")
+    .replace(/[*_~]+$/, "")
+    .trim();
+}
+/** `own`: a whole line that is one well-formed marker; `bad`: a whole line that is one marker but reworded, or opened and never closed; else not a marker line. */
+function markerLineKind(line: string): "own" | "bad" | undefined {
+  const core = markerCore(line);
+  if (STANDALONE_MARKER.test(core)) return "own";
+  if (!core.startsWith(MARKER_OPEN) || (core.match(/〔/g) ?? []).length !== 1) return undefined;
+  return core.endsWith("〕") || !core.includes("〕") ? "bad" : undefined;
+}
+/** What is left of a line once the markers are taken out is only list or emphasis symbols and blanks (the line held nothing else). */
+function isShell(rest: string): boolean {
+  return /^(?:[-+]|\d+[.)])?$/.test(rest.replace(/[\s*_~]+/g, ""));
+}
+
 export function scanSlotMarkers(content: string, slots: readonly Pick<ImageSlot, "index">[]): SlotScan {
   const lines = content.split(/\r?\n/);
   const guarded = protectedLines(lines);
@@ -92,16 +140,15 @@ export function scanSlotMarkers(content: string, slots: readonly Pick<ImageSlot,
   const scan: SlotScan = { found: new Map(), duplicateLines: [], badLines: [], inlineLines: [], omitted: [] };
   lines.forEach((line, at) => {
     if (guarded[at] || !line.includes(MARKER_OPEN)) return;
-    const own = STANDALONE_MARKER.exec(line);
-    if (own) {
-      const index = Number(own[1]);
+    const kind = markerLineKind(line);
+    if (kind === "own") {
+      const index = Number(STANDALONE_MARKER.exec(markerCore(line))?.[1]);
       if (!planned.has(index)) scan.badLines.push(at);
       else if (scan.found.has(index)) scan.duplicateLines.push(at);
       else scan.found.set(index, at);
       return;
     }
-    const trimmed = line.trim();
-    if (trimmed.startsWith(MARKER_OPEN) && trimmed.endsWith("〕") && (trimmed.match(/〔/g) ?? []).length === 1) {
+    if (kind === "bad") {
       scan.badLines.push(at);
       return;
     }
@@ -170,6 +217,8 @@ export interface ProbedCandidate {
   candidate: SlotCandidate;
   href: string | undefined;
   loaded: boolean;
+  /** The address passed the check but was not probed (the per-chapter probe limit). */
+  skipped?: boolean;
 }
 /** What a slot got: a picture ready to be written (every text already escaped), or the reason it ends without one. */
 export interface SlotFigure {
@@ -179,12 +228,17 @@ export interface SlotFigure {
 }
 export type SlotOutcome = { figure: SlotFigure } | { reasonCode: SlotReasonCode; reasonText?: string };
 
+/** A line of only symbols and blanks (`---`, `===`, `- - -`) can turn the line above into a heading or a rule: a backslash keeps it text. */
+function plainLine(text: string): string {
+  return text && /^[\s\p{P}\p{S}]+$/u.test(text) && !text.startsWith("\\") ? `\\${text}` : text;
+}
+
 /** A finder caption is one plain line (what it is, where to look); an empty one falls back to the title. */
 export function figureOf(candidate: SlotCandidate, href: string, language: string): SlotFigure {
   // The marker brackets are taken out first: a caption must never read as a slot marker.
   const plain = (value: string): string => value.replace(/[〔〕]/g, " ");
   const alt = escapeMarkdownText(plain(candidate.title), 80) || (/^zh/i.test(language) ? "圖" : "image");
-  return { href, alt, caption: escapeMarkdownText(plain(candidate.caption), 160) || alt };
+  return { href, alt, caption: plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt };
 }
 
 /**
@@ -217,7 +271,8 @@ export function choosePictures(
     if (!usable.length) {
       if (!all.length) reasonCode = "not_found";
       else if (all.every(item => !item.href)) reasonCode = "unsafe_url";
-      else if (all.some(item => item.href && !item.loaded)) reasonCode = "load_failed";
+      else if (all.some(item => item.href && !item.loaded && !item.skipped)) reasonCode = "load_failed";
+      else if (all.some(item => item.skipped)) reasonCode = "probe_capped";
       else reasonCode = "not_found";
     }
     outcomes.set(slot.index, { reasonCode, ...(pick.reasonText ? { reasonText: pick.reasonText } : {}) });
@@ -262,6 +317,9 @@ export function fillSlotMarkers(
     const m = BAD_INDEX.exec(lines[at]);
     if (m && planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
   }
+  // A marker the author left inside other text (or next to another one) is a wrong marker, not an omitted one.
+  for (const at of scan.inlineLines)
+    for (const m of lines[at].matchAll(/〔圖位\s*(\d+)/g)) if (planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
   for (const slot of slots) {
     const at = scan.found.get(slot.index);
     const outcome = outcomes.get(slot.index);
@@ -307,7 +365,7 @@ export function fillSlotMarkers(
     }
     if (inline.has(at)) {
       const rest = line.replace(INLINE_MARKER, "");
-      if (!rest.trim()) {
+      if (isShell(rest)) {
         removed = true;
         return;
       }
@@ -323,10 +381,18 @@ export function fillSlotMarkers(
 function withoutMarkers(text: string): string[] {
   const lines = text.split("\n");
   const guarded = protectedLines(lines);
-  return lines
-    .map((line, at) => (guarded[at] ? line : line.replace(INLINE_MARKER, "")))
-    .map(line => line.replace(/\s+$/, ""))
-    .filter(line => line.trim());
+  const out: string[] = [];
+  lines.forEach((line, at) => {
+    if (guarded[at] || !line.includes(MARKER_OPEN)) {
+      out.push(line);
+      return;
+    }
+    // A marker line goes whole; a line that is only list or emphasis symbols once its markers are out goes too (what a fill must not leave).
+    if (markerLineKind(line)) return;
+    const rest = line.replace(INLINE_MARKER, "");
+    if (!isShell(rest)) out.push(rest);
+  });
+  return out.map(line => line.replace(/\s+$/, "")).filter(line => line.trim());
 }
 
 /**
@@ -367,7 +433,14 @@ export interface SlotsRecord {
   /** Refused marker lines of the last fill. */
   bad: number;
 }
-const REASONS: readonly SlotReasonCode[] = ["author_omitted", "bad_marker", "not_found", "load_failed", "unsafe_url"];
+const REASONS: readonly SlotReasonCode[] = [
+  "author_omitted",
+  "bad_marker",
+  "not_found",
+  "load_failed",
+  "unsafe_url",
+  "probe_capped"
+];
 
 /** FNV-1a over the picture key: 8 hex characters. */
 export function shortHash(url: string): string {
@@ -438,7 +511,8 @@ export function stripImageLines(text: string): string {
         i + 1 < lines.length &&
         !isBlank(lines[i + 1]) &&
         !guarded[i + 1] &&
-        !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[i + 1])
+        !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[i + 1]) &&
+        (isBlank(lines[i + 2]) || /^\s*#/.test(lines[i + 2]))
       )
         i++;
       continue;

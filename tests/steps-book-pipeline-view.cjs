@@ -391,6 +391,18 @@ test('a checked card with unmet structure items shows only a small count; a chec
   assert.equal(ui.bookCardView({ pipelineStage: 'written', pipelineIssue: 'structure unmet: C2' }).issueText, undefined);
 });
 
+test('slots: a card with only picture problems shows "n spots worth a look", not "structure n unmet"; real structure items stay counted apart', () => {
+  setUiLanguage('zh-TW');
+  assert.equal(ui.bookCardView({ pipelineStage: 'checked', pipelineIssue: 'structure unmet: image_1 image_count' }).issueText, '通過，2 處可留意');
+  assert.equal(ui.bookCardView({ pipelineStage: 'checked', pipelineIssue: 'structure unmet: C2 C3' }).issueText, '結構 2 項未達成');
+  assert.equal(ui.bookCardView({ pipelineStage: 'checked', pipelineIssue: 'structure unmet: C2 image_1 image_marker' }).issueText, '結構 1 項未達成；2 處可留意');
+  setUiLanguage('en');
+  assert.equal(ui.bookCardView({ pipelineStage: 'checked', pipelineIssue: 'structure unmet: image_1' }).issueText, 'Passed, 1 spot(s) worth a look');
+  setUiLanguage('zh-CN');
+  assert.equal(ui.bookCardView({ pipelineStage: 'checked', pipelineIssue: 'structure unmet: image_1' }).issueText, '通过，1 处可留意');
+  setUiLanguage('zh-TW');
+});
+
 test('bar: a saved done of the same run is final even when the runner record still says gate2', () => {
   const state = ui.bookBarState(bookData({ phase: 'done', status: 'running' }), progress({ phase: 'gate2', active: false }), noStage);
   assert.equal(state.phase, 'done'); assert.equal(state.mode, 'done');

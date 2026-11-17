@@ -1909,6 +1909,7 @@ var en = {
   "detail.book_slots_reason_not_found": "no suitable picture found",
   "detail.book_slots_reason_load_failed": "the picture did not load",
   "detail.book_slots_reason_unsafe_url": "the picture address is not safe",
+  "detail.book_slots_reason_probe_capped": "not checked: too many candidates to probe",
   "detail.book_slots_reason_mismatch": "does not match the text around it",
   "detail.book_slots_count_0_1": "picture count ({0}) is not the placed slots ({1})",
   "detail.book_slots_bad_0": "{0} slot markers were refused and removed",
@@ -3140,6 +3141,8 @@ var en = {
   "ui.book_issue_step_0_1": "{0} failed: {1}",
   "ui.book_issue_unmet_0": "Proofreading found unmet items: {0}",
   "ui.book_structure_unmet_0": "Structure: {0} item(s) unmet",
+  "ui.book_checked_notice_0": "Passed, {0} spot(s) worth a look",
+  "ui.book_structure_notice_0_1": "Structure: {0} item(s) unmet; {1} spot(s) worth a look",
   "ui.book_step_plan": "Planning",
   "ui.book_step_write": "Writing",
   "ui.book_step_proof": "Proofreading",
@@ -5045,6 +5048,7 @@ var zhCN = {
   "detail.book_slots_reason_not_found": "\u6CA1\u627E\u5230\u5408\u9002\u7684\u56FE",
   "detail.book_slots_reason_load_failed": "\u56FE\u52A0\u8F7D\u5931\u8D25",
   "detail.book_slots_reason_unsafe_url": "\u56FE\u7F51\u5740\u4E0D\u5B89\u5168",
+  "detail.book_slots_reason_probe_capped": "\u5019\u9009\u592A\u591A\uFF0C\u6CA1\u9010\u4E00\u68C0\u67E5",
   "detail.book_slots_reason_mismatch": "\u4E0E\u524D\u540E\u6587\u5BF9\u4E0D\u4E0A",
   "detail.book_slots_count_0_1": "\u56FE\u6570\u4E0E\u5DF2\u653E\u56FE\u4F4D\u4E0D\u7B26\uFF08{0}\uFF0F{1}\uFF09",
   "detail.book_slots_bad_0": "{0} \u4E2A\u56FE\u4F4D\u6807\u8BB0\u4E0D\u5408\u683C\uFF0C\u5DF2\u5220\u9664",
@@ -6276,6 +6280,8 @@ var zhCN = {
   "ui.book_issue_step_0_1": "{0}\u5931\u8D25\uFF1A{1}",
   "ui.book_issue_unmet_0": "\u6821\u5BF9\u672A\u8FBE\u6210\u9879\u76EE\uFF1A{0}",
   "ui.book_structure_unmet_0": "\u7ED3\u6784 {0} \u9879\u672A\u8FBE\u6210",
+  "ui.book_checked_notice_0": "\u901A\u8FC7\uFF0C{0} \u5904\u53EF\u7559\u610F",
+  "ui.book_structure_notice_0_1": "\u7ED3\u6784 {0} \u9879\u672A\u8FBE\u6210\uFF1B{1} \u5904\u53EF\u7559\u610F",
   "ui.book_step_plan": "\u4F01\u5212",
   "ui.book_step_write": "\u5199\u4F5C",
   "ui.book_step_proof": "\u6821\u5BF9",
@@ -8181,6 +8187,7 @@ var zhTW = {
   "detail.book_slots_reason_not_found": "\u6C92\u627E\u5230\u5408\u9069\u7684\u5716",
   "detail.book_slots_reason_load_failed": "\u5716\u8F09\u5165\u5931\u6557",
   "detail.book_slots_reason_unsafe_url": "\u5716\u7DB2\u5740\u4E0D\u5B89\u5168",
+  "detail.book_slots_reason_probe_capped": "\u5019\u9078\u592A\u591A\uFF0C\u6C92\u9010\u4E00\u6AA2\u67E5",
   "detail.book_slots_reason_mismatch": "\u8207\u524D\u5F8C\u6587\u5C0D\u4E0D\u4E0A",
   "detail.book_slots_count_0_1": "\u5716\u6578\u8207\u5DF2\u653E\u5716\u4F4D\u4E0D\u7B26\uFF08{0}\uFF0F{1}\uFF09",
   "detail.book_slots_bad_0": "{0} \u500B\u5716\u4F4D\u6A19\u8A18\u4E0D\u5408\u683C\uFF0C\u5DF2\u522A\u9664",
@@ -9412,6 +9419,8 @@ var zhTW = {
   "ui.book_issue_step_0_1": "{0}\u5931\u6557\uFF1A{1}",
   "ui.book_issue_unmet_0": "\u6821\u5C0D\u672A\u9054\u6210\u9805\u76EE\uFF1A{0}",
   "ui.book_structure_unmet_0": "\u7D50\u69CB {0} \u9805\u672A\u9054\u6210",
+  "ui.book_checked_notice_0": "\u901A\u904E\uFF0C{0} \u8655\u53EF\u7559\u610F",
+  "ui.book_structure_notice_0_1": "\u7D50\u69CB {0} \u9805\u672A\u9054\u6210\uFF1B{1} \u8655\u53EF\u7559\u610F",
   "ui.book_step_plan": "\u4F01\u5283",
   "ui.book_step_write": "\u5BEB\u4F5C",
   "ui.book_step_proof": "\u6821\u5C0D",
@@ -44275,11 +44284,15 @@ function cleanSlotText(value, max) {
 }
 var STANDALONE_MARKER = /^\s*〔圖位 ([1-9]\d*)：([^〔〕]+?)〕\s*$/;
 var MARKER_OPEN = "\u3014\u5716\u4F4D";
-var OPEN_FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+var OPEN_FENCE = /^[ \t]*(`{3,}|~{3,})(.*)$/;
 var QUOTE_LINE = /^ {0,3}>/;
+var INDENTED_CODE = /^(?: {4}|\t)/;
+var BLOCK_START = /^ {0,3}(?:#{1,6}(?:\s|$)|[-*+]\s|\d+[.)]\s|(?:[-*_][ \t]*){3,}$)/;
 function protectedLines2(lines) {
   const out = [];
   let fence;
+  let quote3 = false;
+  let code3 = false;
   for (const line2 of lines) {
     if (fence) {
       out.push(true);
@@ -44291,11 +44304,42 @@ function protectedLines2(lines) {
     if (open2 && !(open2[1][0] === "`" && open2[2].includes("`"))) {
       fence = { char: open2[1][0], size: open2[1].length };
       out.push(true);
+      quote3 = false;
+      code3 = false;
       continue;
     }
-    out.push(QUOTE_LINE.test(line2));
+    const blank2 = !line2.trim();
+    const prevBlank = out.length === 0 || !lines[out.length - 1].trim();
+    if (QUOTE_LINE.test(line2)) {
+      quote3 = true;
+      code3 = false;
+      out.push(true);
+    } else if (quote3 && !blank2 && !BLOCK_START.test(line2)) {
+      out.push(true);
+    } else if (INDENTED_CODE.test(line2) && !blank2 && (prevBlank || code3)) {
+      quote3 = false;
+      code3 = true;
+      out.push(true);
+    } else {
+      if (!blank2) code3 = false;
+      quote3 = false;
+      out.push(false);
+    }
   }
   return out;
+}
+function markerCore(line2) {
+  return line2.trim().replace(/^(?:[-+*]|\d+[.)])\s+/, "").replace(/^[*_~]+/, "").replace(/[*_~]+$/, "").trim();
+}
+function markerLineKind(line2) {
+  var _a2;
+  const core2 = markerCore(line2);
+  if (STANDALONE_MARKER.test(core2)) return "own";
+  if (!core2.startsWith(MARKER_OPEN) || ((_a2 = core2.match(/〔/g)) != null ? _a2 : []).length !== 1) return void 0;
+  return core2.endsWith("\u3015") || !core2.includes("\u3015") ? "bad" : void 0;
+}
+function isShell(rest) {
+  return /^(?:[-+]|\d+[.)])?$/.test(rest.replace(/[\s*_~]+/g, ""));
 }
 function scanSlotMarkers(content, slots) {
   const lines = content.split(/\r?\n/);
@@ -44305,16 +44349,15 @@ function scanSlotMarkers(content, slots) {
   lines.forEach((line2, at) => {
     var _a2;
     if (guarded[at] || !line2.includes(MARKER_OPEN)) return;
-    const own2 = STANDALONE_MARKER.exec(line2);
-    if (own2) {
-      const index = Number(own2[1]);
+    const kind = markerLineKind(line2);
+    if (kind === "own") {
+      const index = Number((_a2 = STANDALONE_MARKER.exec(markerCore(line2))) == null ? void 0 : _a2[1]);
       if (!planned.has(index)) scan3.badLines.push(at);
       else if (scan3.found.has(index)) scan3.duplicateLines.push(at);
       else scan3.found.set(index, at);
       return;
     }
-    const trimmed2 = line2.trim();
-    if (trimmed2.startsWith(MARKER_OPEN) && trimmed2.endsWith("\u3015") && ((_a2 = trimmed2.match(/〔/g)) != null ? _a2 : []).length === 1) {
+    if (kind === "bad") {
       scan3.badLines.push(at);
       return;
     }
@@ -44348,10 +44391,13 @@ function pickForSlot(ctx, candidates) {
   if (candidates.length && !secure.length) return { none: true, reasonCode: "unsafe_url" };
   return { none: true, reasonCode: "not_found" };
 }
+function plainLine2(text10) {
+  return text10 && /^[\s\p{P}\p{S}]+$/u.test(text10) && !text10.startsWith("\\") ? `\\${text10}` : text10;
+}
 function figureOf(candidate, href, language2) {
   const plain = (value) => value.replace(/[〔〕]/g, " ");
   const alt = escapeMarkdownText(plain(candidate.title), 80) || (/^zh/i.test(language2) ? "\u5716" : "image");
-  return { href, alt, caption: escapeMarkdownText(plain(candidate.caption), 160) || alt };
+  return { href, alt, caption: plainLine2(escapeMarkdownText(plain(candidate.caption), 160)) || alt };
 }
 function choosePictures(chapter, slots, perSlot, taken, language2) {
   var _a2;
@@ -44373,7 +44419,8 @@ function choosePictures(chapter, slots, perSlot, taken, language2) {
     if (!usable.length) {
       if (!all.length) reasonCode = "not_found";
       else if (all.every((item) => !item.href)) reasonCode = "unsafe_url";
-      else if (all.some((item) => item.href && !item.loaded)) reasonCode = "load_failed";
+      else if (all.some((item) => item.href && !item.loaded && !item.skipped)) reasonCode = "load_failed";
+      else if (all.some((item) => item.skipped)) reasonCode = "probe_capped";
       else reasonCode = "not_found";
     }
     outcomes.set(slot.index, { reasonCode, ...pick8.reasonText ? { reasonText: pick8.reasonText } : {} });
@@ -44396,6 +44443,8 @@ function fillSlotMarkers(content, slots, outcomes) {
     const m = BAD_INDEX.exec(lines[at]);
     if (m && planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
   }
+  for (const at of scan3.inlineLines)
+    for (const m of lines[at].matchAll(/〔圖位\s*(\d+)/g)) if (planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
   for (const slot of slots) {
     const at = scan3.found.get(slot.index);
     const outcome = outcomes.get(slot.index);
@@ -44440,7 +44489,7 @@ function fillSlotMarkers(content, slots, outcomes) {
     }
     if (inline.has(at)) {
       const rest = line2.replace(INLINE_MARKER, "");
-      if (!rest.trim()) {
+      if (isShell(rest)) {
         removed = true;
         return;
       }
@@ -44454,7 +44503,17 @@ function fillSlotMarkers(content, slots, outcomes) {
 function withoutMarkers(text10) {
   const lines = text10.split("\n");
   const guarded = protectedLines2(lines);
-  return lines.map((line2, at) => guarded[at] ? line2 : line2.replace(INLINE_MARKER, "")).map((line2) => line2.replace(/\s+$/, "")).filter((line2) => line2.trim());
+  const out = [];
+  lines.forEach((line2, at) => {
+    if (guarded[at] || !line2.includes(MARKER_OPEN)) {
+      out.push(line2);
+      return;
+    }
+    if (markerLineKind(line2)) return;
+    const rest = line2.replace(INLINE_MARKER, "");
+    if (!isShell(rest)) out.push(rest);
+  });
+  return out.map((line2) => line2.replace(/\s+$/, "")).filter((line2) => line2.trim());
 }
 function verifyFill(original, result, slots) {
   const seen = [...result.placed, ...result.missing].map((item) => item.index).sort((a, b) => a - b);
@@ -44470,7 +44529,14 @@ function verifyFill(original, result, slots) {
   const before = withoutMarkers(original);
   return before.length === rest.length && before.every((line2, i) => line2 === rest[i]) ? void 0 : "deleted_text";
 }
-var REASONS = ["author_omitted", "bad_marker", "not_found", "load_failed", "unsafe_url"];
+var REASONS = [
+  "author_omitted",
+  "bad_marker",
+  "not_found",
+  "load_failed",
+  "unsafe_url",
+  "probe_capped"
+];
 function shortHash2(url) {
   let hash = 2166136261;
   for (const char of imageKey2(url)) {
@@ -44524,7 +44590,7 @@ function stripImageLines(text10) {
   const out = [];
   for (let i = 0; i < lines.length; i++) {
     if (!guarded[i] && IMAGE_ONLY_LINE.test(lines[i])) {
-      if (i + 1 < lines.length && !isBlank(lines[i + 1]) && !guarded[i + 1] && !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[i + 1]))
+      if (i + 1 < lines.length && !isBlank(lines[i + 1]) && !guarded[i + 1] && !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[i + 1]) && (isBlank(lines[i + 2]) || /^\s*#/.test(lines[i + 2])))
         i++;
       continue;
     }
@@ -45246,7 +45312,7 @@ var globalPlanStep = {
 var wide = (c) => String.fromCharCode(c.charCodeAt(0) + 65248);
 var wideRun = (run2) => [...run2].map(wide).join("");
 var ACTIVE_SCHEME = /(?<![A-Za-z0-9+.-])(?!https?:)([A-Za-z][A-Za-z0-9+.-]*):(?=\S)/g;
-function plainLine2(text10) {
+function plainLine3(text10) {
   return text10.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, (m) => [...m].join(" ")).replace(/</g, "\uFF1C").replace(/>/g, "\uFF1E").replace(/[[\]]/g, wide).replace(/\$/g, "\uFF04").replace(/%{2,}|={2,}|~{2,}/g, wideRun).replace(ACTIVE_SCHEME, (_m, scheme) => `${scheme}\uFF1A`).replace(
     /^(\s*)(?:(#)|([+\-*])(?=\s)|(\d+)([.)])(?=\s))/,
     (_m, space, hash, bullet, digits, ordered) => hash ? `${space}\uFF03` : bullet ? `${space}${wide(bullet)}` : `${space}${digits}${ordered === "." ? "\uFF0E" : "\uFF09"}`
@@ -48267,17 +48333,17 @@ var ArgumentRuns = class {
   // ---- note writes: every model/web-derived string passes here before it reaches a Markdown note ----------------------------------
   /** Translation with every string argument treated as plain single-line text. */
   t(key4, ...values) {
-    return this.ports.t(key4, ...values.map((v) => typeof v === "string" ? plainLine2(v) : v));
+    return this.ports.t(key4, ...values.map((v) => typeof v === "string" ? plainLine3(v) : v));
   }
   makeNote(input2, map, mapPath) {
-    const safe2 = { ...input2, title: plainLine2(input2.title) };
-    if (input2.summary !== void 0) safe2.summary = plainLine2(input2.summary);
+    const safe2 = { ...input2, title: plainLine3(input2.title) };
+    if (input2.summary !== void 0) safe2.summary = plainLine3(input2.summary);
     if (input2.detail !== void 0) safe2.detail = intakeAiMarkdown(input2.detail, { kind: "argument-detail" });
     return this.ports.createNote(safe2, map, mapPath);
   }
   writeNote(path, patch) {
     const safe2 = {};
-    if (patch.summary !== void 0) safe2.summary = plainLine2(patch.summary);
+    if (patch.summary !== void 0) safe2.summary = plainLine3(patch.summary);
     if (patch.detail !== void 0) safe2.detail = intakeAiMarkdown(patch.detail, { kind: "argument-detail" });
     return this.ports.updateNote(path, safe2);
   }
@@ -48639,7 +48705,7 @@ var ArgumentRuns = class {
   async statementOf(drive, h) {
     const note = await this.text(drive, h.id);
     if (h.statement === void 0) return note.summary;
-    if (note.summary.trim() !== plainLine2(h.statement).trim())
+    if (note.summary.trim() !== plainLine3(h.statement).trim())
       this.ports.log(`argument-run hypothesis note edited id=${h.id}; the stored statement is used`);
     return h.statement;
   }
@@ -49128,7 +49194,7 @@ var ArgumentRuns = class {
             this.tr,
             next.hypotheses.find((h) => h.id === hypothesisId),
             result.reason
-          ) : `${this.t("ui.argument_reason")}: ${plainLine2(result.reason)}`
+          ) : `${this.t("ui.argument_reason")}: ${plainLine3(result.reason)}`
         )
       };
     });
@@ -49156,7 +49222,7 @@ var ArgumentRuns = class {
     await this.checkpoint(drive, async (s, map) => {
       var _a2;
       const next = applyConclusion(s, result);
-      const pointLines = result.points.map((p) => `- ${plainLine2(p.text)}`);
+      const pointLines = result.points.map((p) => `- ${plainLine3(p.text)}`);
       const detail = hasFacets(next) ? conclusionDetail(
         this.tr,
         next,
@@ -49256,7 +49322,7 @@ var ArgumentRuns = class {
     if (next.run.phase === "stopped_limit")
       summary = next.hypotheses.length ? t2("ui.argument_stopped_limit_0", this.limitLists(next, titles)) : t2(
         "ui.argument_stopped_limit_data_0",
-        next.situation.data.filter((d) => d.state !== "found").map((d) => plainLine2(d.need)).join(t2("ui.argument_list_sep"))
+        next.situation.data.filter((d) => d.state !== "found").map((d) => plainLine3(d.need)).join(t2("ui.argument_list_sep"))
       );
     else
       summary = gate.kind === "data_insufficient" ? t2("ui.argument_stopped_insufficient") : gate.kind === "data_missing" ? t2("ui.argument_stopped_missing") : t2("ui.argument_stopped_mismatch");
@@ -49267,7 +49333,7 @@ var ArgumentRuns = class {
       void 0,
       summary,
       next.run.phase === "stopped_limit" && isSituationUnconfirmed(next) ? this.t("ui.argument_premise_unconfirmed") : void 0
-    ) : next.run.phase === "stopped_mismatch" ? [`${t2("ui.argument_reason")}: ${plainLine2((_a2 = gate.reason) != null ? _a2 : "")}`, "", ...this.dataSection(next, [])].join("\n") : "";
+    ) : next.run.phase === "stopped_mismatch" ? [`${t2("ui.argument_reason")}: ${plainLine3((_a2 = gate.reason) != null ? _a2 : "")}`, "", ...this.dataSection(next, [])].join("\n") : "";
     const path = (_b2 = (await this.ports.readMap(drive.mapPath)).nodes.find((n) => n.id === next.roles.conclusion)) == null ? void 0 : _b2.path;
     this.ports.log(
       `argument-run stopped runId=${next.run.runId} phase=${next.run.phase} stopReason=${(_c = next.run.stopReason) != null ? _c : "-"} gateKind=${(_d = gate.kind) != null ? _d : "-"}`
@@ -49357,7 +49423,7 @@ var ArgumentRuns = class {
       const runSignal = busy ? linked(drive.controller.signal, busy.signal) : drive.controller.signal;
       const signal = linked(runSignal, windSignal);
       const proposition = await this.proposition(drive, state);
-      const context = hypothesis ? [assumptionScope(state), `hypothesis claim: ${plainLine2(await this.statementOf(drive, hypothesis))}`].filter(Boolean).join("; ") : scopeOf(false, state).context;
+      const context = hypothesis ? [assumptionScope(state), `hypothesis claim: ${plainLine3(await this.statementOf(drive, hypothesis))}`].filter(Boolean).join("; ") : scopeOf(false, state).context;
       let result;
       let openedUrls = [];
       let domain = "-";
@@ -50789,12 +50855,14 @@ var BookPipelineRuns = class {
               caption: candidate.caption
             },
             href,
-            loaded: href ? (_a2 = loadedHref.get(href)) != null ? _a2 : false : false
+            loaded: href ? (_a2 = loadedHref.get(href)) != null ? _a2 : false : false,
+            ...href && !loadedHref.has(href) ? { skipped: true } : {}
           };
         })
       ])
     );
     const latest = await this.ports.readCard(path);
+    if (!await this.stillOnMap(drive, nodeId)) return { kind: "failed", reason: "card_removed" };
     const outcomes = choosePictures(
       { id: nodeId, title: latest.title },
       slots,
@@ -51289,7 +51357,13 @@ function bookIssueText(issue2) {
 }
 function structureNote(issue2) {
   const found = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue2.trim());
-  return found ? { issueText: t("ui.book_structure_unmet_0", String(found[1].split(" ").length)) } : {};
+  if (!found) return {};
+  const tokens2 = found[1].split(" ");
+  const notices = tokens2.filter((token) => token.startsWith("image_")).length;
+  const structure2 = tokens2.length - notices;
+  if (!notices) return { issueText: t("ui.book_structure_unmet_0", String(structure2)) };
+  if (!structure2) return { issueText: t("ui.book_checked_notice_0", String(notices)) };
+  return { issueText: t("ui.book_structure_notice_0_1", String(structure2), String(notices)) };
 }
 function bookCardView(note) {
   var _a2;

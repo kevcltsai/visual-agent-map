@@ -4,7 +4,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { canonicalVault, prepareTestVault, updateCurrentTestVault, verifyTestVault, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, fetchDepsTable } from '../scripts/test-harness.mjs';
+import { canonicalVault, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, fetchDepsTable } from '../scripts/test-harness.mjs';
 import { ownerBusyReasons } from '../scripts/owner-idle.mjs';
 import { policyAction, applyPolicy, policyExpression } from '../scripts/keep-background.mjs';
 
@@ -115,6 +115,63 @@ test('in-place refresh refuses vaults owned by another checkout without changing
   writeFileSync(main, 'keep the existing build');
   assert.throws(() => updateCurrentTestVault({ vault }), /another checkout: \/another\/checkout \(branch unknown\)\. Run --update-current from that checkout/);
   assert.equal(readFileSync(main, 'utf8'), 'keep the existing build');
+});
+
+// Builds a real repo + worktree + origin so the same-repo rule runs against actual git state.
+function repoWithWorktree(folder, { behind = false, dirty = false, ahead = false, edit = null, untracked = false } = {}) {
+  const g = (cwd, ...a) => execFileSync('git', a, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const origin = join(folder, 'origin.git'), main = join(folder, 'main'), wt = join(folder, 'wt');
+  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', origin]);
+  mkdirSync(main); g(main, 'init', '-q', '-b', 'main'); g(main, 'config', 'user.email', 't@t'); g(main, 'config', 'user.name', 't');
+  writeFileSync(join(main, 'a.txt'), '1'); g(main, 'add', 'a.txt'); g(main, 'commit', '-qm', 'one');
+  g(main, 'remote', 'add', 'origin', origin); g(main, 'push', '-q', 'origin', 'main'); g(main, 'fetch', '-q', 'origin');
+  g(main, 'worktree', 'add', '-q', '--detach', wt, 'origin/main');
+  if (behind) { writeFileSync(join(main, 'a.txt'), '2'); g(main, 'commit', '-qam', 'two'); g(main, 'push', '-q', 'origin', 'main'); g(main, 'fetch', '-q', 'origin'); }
+  if (dirty) writeFileSync(join(wt, 'a.txt'), 'edited');
+  if (ahead) { writeFileSync(join(wt, 'a.txt'), 'exp'); g(wt, 'config', 'user.email', 't@t'); g(wt, 'config', 'user.name', 't'); g(wt, 'commit', '-qam', 'experiment'); }
+  if (edit) writeFileSync(join(wt, edit), 'edited');
+  if (untracked) writeFileSync(join(wt, 'new.tsx'), 'x');
+  return { main, wt };
+}
+const vaultWithOwner = (vault, owner) => {
+  prepareTestVault({ vault });
+  const record = join(vault, '.vam-test-environment.json');
+  writeFileSync(record, JSON.stringify({ ...JSON.parse(readFileSync(record, 'utf8')), owner }));
+  const main = join(vault, '.obsidian/plugins/visual-agent-map/main.js');
+  writeFileSync(main, 'keep the existing build');
+  return main;
+};
+
+const sub = (folder, name) => { const d = join(folder, name); mkdirSync(d); return d; };
+
+test('a same-repo worktree exactly at origin/main may update a vault owned by the main checkout', t => {
+  const { folder } = environment(t); const { main, wt } = repoWithWorktree(folder);
+  const vault = join(folder, 'v'); vaultWithOwner(vault, main);
+  assert.equal(sameRepoCleanMain(main, wt), true);
+});
+
+test('only the generated main.js may differ from HEAD; styles.css is source', t => {
+  const { folder } = environment(t);
+  const base = (name, file) => { const r = repoWithWorktree(sub(folder, name)); writeFileSync(join(r.main, 'main.js'), '1'); writeFileSync(join(r.main, 'styles.css'), '1'); execFileSync('git', ['add', 'main.js', 'styles.css'], { cwd: r.main }); execFileSync('git', ['commit', '-qm', 'assets'], { cwd: r.main }); execFileSync('git', ['push', '-q', 'origin', 'main'], { cwd: r.main }); execFileSync('git', ['fetch', '-q', 'origin'], { cwd: r.main }); execFileSync('git', ['checkout', '-q', '--detach', 'origin/main'], { cwd: r.wt }); writeFileSync(join(r.wt, file), 'edited'); return r; };
+  const js = base('g', 'main.js'), css = base('h', 'styles.css');
+  assert.equal(sameRepoCleanMain(js.main, js.wt), true);
+  assert.equal(sameRepoCleanMain(css.main, css.wt), false);
+});
+
+test('a same-repo worktree behind origin/main, edited, or a different repo is refused', t => {
+  const { folder } = environment(t);
+  const behind = repoWithWorktree(mkdirSync(join(folder, 'b'), { recursive: true }) ?? join(folder, 'b'), { behind: true });
+  assert.equal(sameRepoCleanMain(behind.main, behind.wt), false);
+  const dirty = repoWithWorktree(mkdirSync(join(folder, 'd'), { recursive: true }) ?? join(folder, 'd'), { dirty: true });
+  assert.equal(sameRepoCleanMain(dirty.main, dirty.wt), false);
+  const a = repoWithWorktree(mkdirSync(join(folder, 'x'), { recursive: true }) ?? join(folder, 'x'));
+  const other = repoWithWorktree(mkdirSync(join(folder, 'y'), { recursive: true }) ?? join(folder, 'y'));
+  assert.equal(sameRepoCleanMain(a.main, other.wt), false);
+  assert.equal(sameRepoCleanMain('/does/not/exist', a.wt), false);
+  const ahead = repoWithWorktree(sub(folder, 'e'), { ahead: true });
+  assert.equal(sameRepoCleanMain(ahead.main, ahead.wt), false);
+  const untracked = repoWithWorktree(sub(folder, 'f'), { untracked: true });
+  assert.equal(sameRepoCleanMain(untracked.main, untracked.wt), false);
 });
 
 test('the refusal names the branch the owning checkout is on', t => {

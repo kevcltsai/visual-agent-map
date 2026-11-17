@@ -35,6 +35,19 @@ function ownerCheckoutState(owner) {
   catch { return `${owner} (branch unknown)`; }
 }
 
+// A vault recorded for one checkout may also be updated from another checkout of the SAME git repo (e.g. a worktree), but only when that
+// checkout is exactly origin/main with no tracked source edits: it can neither be behind main nor carry unmerged experiments.
+// The generated main.js is tracked and rewritten by every build, so it alone is ignored here; styles.css is hand-written source.
+export function sameRepoCleanMain(owner, checkout) {
+  const git = (dir, ...args) => execFileSync("git", ["-C", dir, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  const common = dir => realpathSync(resolve(dir, git(dir, "rev-parse", "--git-common-dir")));
+  try {
+    if (common(owner) !== common(checkout)) return false;
+    if (git(checkout, "rev-parse", "HEAD") !== git(checkout, "rev-parse", "refs/remotes/origin/main")) return false;
+    return git(checkout, "status", "--porcelain", "--untracked-files=normal", "--", ".", ":(exclude)main.js") === "";
+  } catch { return false; }
+}
+
 // The owner's canonical vault holds their own maps; the regression fixture maps are neither seeded into nor required of it.
 // Session and --prepare vaults keep both. `owner` is a parameter only so tests can designate a temp vault.
 const isOwnerVault = (vault, owner = canonicalVault) => resolve(vault) === resolve(owner);
@@ -99,7 +112,7 @@ export function updateCurrentTestVault({ vault = canonicalVault, artifact = root
   if (!existsSync(vault) || lstatSync(vault).isSymbolicLink() || !lstatSync(vault).isDirectory() || !existsSync(join(vault, marker))) throw new Error("Refusing to update a missing or unowned test vault.");
   const recordPath = join(vault, marker), record = json(recordPath);
   if (record.kind !== "vam-disposable-test-vault") throw new Error("Refusing to update a missing or unowned test vault.");
-  if (record.owner !== realpathSync(root)) throw new Error(`Refusing to update a test vault owned by another checkout: ${ownerCheckoutState(record.owner)}. Run --update-current from that checkout once it is on main; if another session holds it, tell the session that opened you what you are waiting for.`);
+  if (record.owner !== realpathSync(root) && !sameRepoCleanMain(record.owner, root)) throw new Error(`Refusing to update a test vault owned by another checkout: ${ownerCheckoutState(record.owner)}. Run --update-current from that checkout once it is on main, or from a worktree of the same repo that is exactly origin/main (fetch first) with no source edits; if another session holds it, tell the session that opened you what you are waiting for.`);
   const manifest = json(join(artifact, "manifest.json"));
   const plugin = join(vault, ".obsidian/plugins/visual-agent-map");
   if (!existsSync(plugin) || lstatSync(plugin).isSymbolicLink() || !lstatSync(plugin).isDirectory()) throw new Error("Refusing an invalid installed plugin directory.");

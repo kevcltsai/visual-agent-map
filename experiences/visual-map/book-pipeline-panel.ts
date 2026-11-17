@@ -129,7 +129,11 @@ export class GatePanelState {
   readonly proofOpen = new Set<string>();
   readonly seaming = new Set<string>();
   finishing = false;
+  /** The "still have things to do" question is open: the button waits for its answer. */
+  finishAsking = false;
   finishError = "";
+  /** Cards whose latest rerun gave the same result and still need a person (memory only; dies with the view). */
+  readonly unchanged = new Set<string>();
   /** Where the keyboard goes after the next paint: the panel's title (it just opened) or the toolbar button (it just closed). */
   pendingFocus: "title" | "opener" | null = null;
   reset(): void {
@@ -144,7 +148,9 @@ export class GatePanelState {
     this.proofOpen.clear();
     this.seaming.clear();
     this.finishing = false;
+    this.finishAsking = false;
     this.finishError = "";
+    this.unchanged.clear();
     this.pendingFocus = null;
   }
 }

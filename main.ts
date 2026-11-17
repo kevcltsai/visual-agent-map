@@ -15,6 +15,7 @@ import { selectionOutputLanguage } from "./core/content-language";
 import {
   BookPipelineRuns,
   type BookPipelineProgress,
+  type BookRerunResult,
   type CardPlanSummary
 } from "./experiences/visual-map/book-pipeline-run";
 import { runPlanStep } from "./core/steps/book-pipeline/run";
@@ -1743,8 +1744,12 @@ export default class VisualAgentMapPlugin extends Plugin {
   ): Promise<{ plan?: CardPlanSummary; reason?: string }> {
     return this.bookPipelineRuns.replanCard(mapPath, nodeId, instruction);
   }
-  rerunBookCard(mapPath: string, nodeId: string): Promise<void> {
-    return this.bookPipelineRuns.rerunCard(mapPath, nodeId);
+  rerunBookCard(
+    mapPath: string,
+    nodeId: string,
+    options: { avoidSources?: readonly string[] } = {}
+  ): Promise<BookRerunResult> {
+    return this.bookPipelineRuns.rerunCard(mapPath, nodeId, options);
   }
   finishBookRun(mapPath: string): Promise<void> {
     return this.bookPipelineRuns.finishRun(mapPath);

@@ -158,9 +158,11 @@ const cap = (value: string, max: number): string => singleLine(value, max);
 const neighbour = (n: CardNeighbour | undefined): string =>
   JSON.stringify(n ? { position: n.position, title: cap(n.title, 200), summary: cap(n.summary, 500) } : null);
 
+/** The longest instruction line (the owner's own line is cut to 300 by the runner; the program's "use other sources" line may list five addresses). */
+const INSTRUCTION_MAX = 1300;
 /** Appended only when the owner gave one (so every normal plan's prompt stays exactly as it was). */
 const extraRequest = (instruction: string | undefined): string => {
-  const line = instruction ? cap(instruction, 300) : "";
+  const line = instruction ? cap(instruction, INSTRUCTION_MAX) : "";
   return line ? `\n\n${renderTemplate(requestTemplate, { instruction: JSON.stringify(line) })}` : "";
 };
 

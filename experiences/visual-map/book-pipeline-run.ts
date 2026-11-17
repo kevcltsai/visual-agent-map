@@ -119,6 +119,12 @@ import {
 import type { ProofreadRequest, ProofreadRun } from "../../core/steps/book-pipeline/proofread";
 import type { StepDefinition } from "../../core/step-runner";
 import { untilAborted } from "./argument-run";
+import {
+  avoidSourcesInstruction,
+  cardResultSnapshot,
+  sameReviewResult,
+  type CardResultSnapshot
+} from "./book-pipeline-rerun";
 import { readingOrder } from "./presentation-order";
 
 /** At most this many cards are in a step at once (the whole-book plan runs alone before them). */
@@ -179,6 +185,8 @@ export interface AuthorInput {
   signal: AbortSignal;
   /** The call budget gate: the author's own `AiCalls` must carry it. */
   admission: AdmissionContext;
+  /** The program's one-line request to use other sources (a source swap); absent for a normal write. Never carries untrusted text. */
+  instruction?: string;
   /** Checked synchronously inside the write: false (a stop, a replaced run, a removed card) means nothing is written. */
   authorize: () => boolean;
   /** Runs inside the author's write on the text about to be saved: the cleaned text, or null (nothing is written). Pass it to the guarded write. */
@@ -264,6 +272,12 @@ export interface BookPipelineProgress {
   current?: { nodeId: string; step: BookSubStep; startedAt: number }[];
   /** Memory only: how many cards finished each of the steps the bar lists. */
   steps?: BookStepCounts;
+  /** Memory only: the single-card rerun running now and when it began (ms); gone when it ends, whatever way it ended. */
+  rerun?: { nodeId: string; startedAt: number };
+}
+/** What a single-card rerun tells its caller: a card that needed a person before and still does with the same result. */
+export interface BookRerunResult {
+  unchanged: boolean;
 }
 export type BookSubStep = "plan" | "write" | "images" | "proof";
 export type BookStepCounts = Record<BookSubStep, number>;
@@ -325,8 +339,12 @@ interface Drive {
   disposed: boolean;
   /** Set by a single-card rerun: runs instead of the loop, and a stop or error does not pause the run's phase. */
   job?: () => Promise<void>;
-  /** The owner's one-line extra request for a card's plan (single-card replan). */
+  /** The owner's one-line extra request for a card's plan (single-card replan), or the program's source-swap line (plan and author). */
   extra: Map<string, string>;
+  /** Cards whose `extra` line is a source swap: the author gets it too (an owner's replan line is for the plan only). */
+  avoid: Set<string>;
+  /** In memory only: the single-card rerun in progress. */
+  rerun?: { nodeId: string; startedAt: number };
   /** The plan a card's plan step wrote in this drive. */
   plans: Map<string, CardPlanResult>;
   /** The model id each card's author step was dispatched with in this drive (the proof result section shows it). */
@@ -854,10 +872,29 @@ export class BookPipelineRuns {
    * budget rules; the card gets a new revision (so a new proof record; older records stay, marked old). The cards on both sides are
    * not touched except for the seam mark. The run's phase does not change, and it cannot run beside another drive of the map.
    */
-  async rerunCard(mapPath: string, nodeId: string): Promise<void> {
-    return this.cardJob(mapPath, nodeId, ["gate1", "gate2", "done"], "not_gate", phase =>
-      phase === "gate1" ? ["plan"] : ["plan", "write", "proof"]
+  async rerunCard(
+    mapPath: string,
+    nodeId: string,
+    options: { avoidSources?: readonly string[] } = {}
+  ): Promise<BookRerunResult> {
+    const swap = options.avoidSources !== undefined;
+    let result: BookRerunResult = { unchanged: false };
+    await this.cardJob(
+      mapPath,
+      nodeId,
+      ["gate1", "gate2", "done"],
+      "not_gate",
+      phase => (phase === "gate1" ? ["plan"] : ["plan", "write", "proof"]),
+      swap ? avoidSourcesInstruction(options.avoidSources ?? []) : undefined,
+      (drive, snapshots) => {
+        // A stopped, replaced or removed run says nothing about the result.
+        const settled = !drive.controller.signal.aborted && !this.dead(drive) && drive.fatal === undefined;
+        result = { unchanged: settled && sameReviewResult(snapshots?.before, snapshots?.after) };
+      },
+      true,
+      swap
     );
+    return result;
   }
 
   /** The owner's "seam checked": the only thing that clears `pipeline-seam` (a proofread or any automatic step never does). */
@@ -895,7 +932,11 @@ export class BookPipelineRuns {
     refusal: BookRunRefusal,
     steps: (phase: PipelinePhase) => PipelineStep[],
     extra?: string,
-    finish?: (drive: Drive) => void
+    finish?: (drive: Drive, snapshots?: { before?: CardResultSnapshot; after?: CardResultSnapshot }) => void,
+    /** A rerun (not a replan): its time is shown, and the card's result is compared before and after. */
+    track = false,
+    /** The extra line is the program's source swap: the author gets it too. */
+    swap = false
   ): Promise<void> {
     return this.enter(mapPath, async drive => {
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
@@ -909,13 +950,32 @@ export class BookPipelineRuns {
       });
       if (refused) throw new BookPipelineRunError("budget");
       if (extra) drive.extra.set(nodeId, extra);
+      if (extra && swap) drive.avoid.add(nodeId);
       const kinds = steps(data.phase);
       drive.job = async () => {
-        await this.runCardJob(drive, nodeId, kinds);
-        finish?.(drive);
+        const before = track ? await this.cardSnapshot(drive, nodeId) : undefined;
+        if (track) drive.rerun = { nodeId, startedAt: Date.parse(this.ports.now()) };
+        try {
+          await this.runCardJob(drive, nodeId, kinds);
+        } finally {
+          drive.rerun = undefined;
+        }
+        finish?.(drive, track ? { before, after: await this.cardSnapshot(drive, nodeId) } : undefined);
       };
       this.log(drive, "rerun", nodeId, kinds[0], kinds.length === 1 ? "plan_only" : "full");
     });
+  }
+
+  /** The card's result as the rerun compares it (memory only); undefined when the card cannot be read. */
+  private async cardSnapshot(drive: Drive, nodeId: string): Promise<CardResultSnapshot | undefined> {
+    const path = drive.cards.get(nodeId)?.path;
+    if (!path) return undefined;
+    try {
+      const card = await this.ports.readCard(path);
+      return cardResultSnapshot(card.fields.pipelineStage, card.fields.pipelineIssue, card.detail);
+    } catch {
+      return undefined;
+    }
   }
 
   /** Runs the given steps of one card in order, each with its own attempts (the third failure marks the card needs-review). */
@@ -1018,6 +1078,7 @@ export class BookPipelineRuns {
       reasons: new Map(),
       busy: new Set(),
       extra: new Map(),
+      avoid: new Set(),
       plans: new Map(),
       authorModels: new Map(),
       started: new Map(),
@@ -1597,6 +1658,7 @@ export class BookPipelineRuns {
         language: drive.config.language,
         model: drive.config.authorModel,
         reasoning: drive.config.reasoning,
+        ...(drive.avoid.has(nodeId) ? { instruction: drive.extra.get(nodeId) } : {}),
         signal,
         admission: drive.admission,
         authorize,
@@ -2015,6 +2077,7 @@ export class BookPipelineRuns {
       phaseStartedAt: state.phaseStartedAt,
       busyCards: [...drive.busy].filter(id => id !== "global"),
       ...(eta === undefined ? {} : { etaSeconds: eta }),
+      ...(active && drive.rerun ? { rerun: { ...drive.rerun } } : {}),
       ...(active && drive.sub.size
         ? { current: [...drive.sub].map(([nodeId, sub]) => ({ nodeId, step: sub.step, startedAt: sub.startedAt })) }
         : {}),

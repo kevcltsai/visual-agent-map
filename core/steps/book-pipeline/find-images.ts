@@ -28,8 +28,7 @@ function parseFound(raw: string): ImageCandidate[] {
       const parsed = JSON.parse(raw.slice(start, end + 1)) as { images?: unknown };
       if (Array.isArray(parsed.images)) {
         const images = (parsed.images as Array<Record<string, unknown> | null>).filter(item => {
-          const ok =
-            !!item && item.relevant !== false && typeof item.shows === "string" && item.shows.trim() !== "";
+          const ok = !!item && item.relevant !== false && typeof item.shows === "string" && item.shows.trim() !== "";
           if (!ok) dropped++;
           return ok;
         });

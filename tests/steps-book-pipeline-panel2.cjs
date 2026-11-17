@@ -17,6 +17,7 @@ export * from "./experiences/visual-map/book-pipeline-panel2";
 export { BookPipelineRuns, BookPipelineRunError } from "./experiences/visual-map/book-pipeline-run";
 export { VisualAgentMapView } from "./experiences/visual-map/view";
 export { setUiLanguage } from "./i18n";
+export { shortHash } from "./core/book-pipeline/image-slots";
 `, { obsidian: { ...S.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice([]), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
 const { setUiLanguage } = bundle;
 const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
@@ -83,13 +84,15 @@ async function rig() {
     const parent = dom.element('div');
     const actions = {
       open: id => entries.push(['open', id]),
-      rerun: id => { entries.push(['rerun', id]); return over.rerun ? over.rerun(id) : runs.rerunCard(mapPath, id).then(reload); },
+      rerun: (id, options) => { entries.push(['rerun', id, options]); return over.rerun ? over.rerun(id, options) : runs.rerunCard(mapPath, id, options).then(async result => { await reload(); return result; }); },
+      confirmFinish: async info => { entries.push(['confirm', info]); return over.confirm === undefined ? true : over.confirm; },
+      track: (el, startedAt) => entries.push(['track', startedAt]),
       confirmSeam: id => { entries.push(['seam', id]); return runs.confirmSeam(mapPath, id).then(reload); },
       finish: () => { entries.push(['finish']); return runs.finishRun(mapPath); },
       showChat: () => entries.push(['chat']), close: () => entries.push(['close']),
       refresh: () => { current.panel.remove(); Object.assign(current, { panel: build() }); }
     };
-    const build = () => bundle.renderGate2Panel(parent, bundle.buildGate2Panel({ order, titleOf: id => noteOf.get(id)?.title ?? id, noteOf: id => noteOf.get(id), startedAt: map.bookPipeline.startedAt, writingEndedAt: map.bookPipeline.phaseStartedAt }), done, state, actions, over.busy ?? new Set());
+    const build = () => bundle.renderGate2Panel(parent, bundle.buildGate2Panel({ order, titleOf: id => noteOf.get(id)?.title ?? id, noteOf: id => noteOf.get(id), startedAt: map.bookPipeline.startedAt, writingEndedAt: map.bookPipeline.phaseStartedAt }), done, state, actions, over.busy ?? new Set(), false, over.rerunNow);
     const current = { panel: build() };
     return { parent, get panel() { return current.panel; }, actions };
   };
@@ -104,9 +107,9 @@ test('gate 2 panel: summary, a list of checked cards, no needs-review rows when 
   const d = await r.draw();
   const panel = d.panel;
   assert.equal(panel.attrs.role, 'region');
-  assert.ok(texts(panel).includes('3 張：已校 3、需人看 0、接縫需看 0'), JSON.stringify(texts(panel)));
+  assert.ok(texts(panel).includes('3 張通過'), JSON.stringify(texts(panel)));
   assert.equal(all(panel, 'vam-book-panel-row').length, 3);
-  assert.equal(all(panel, 'vam-book-panel-state').length, 3);
+  assert.equal(all(one(panel, 'vam-book-panel-gate2-list'), 'vam-book-panel-state').length, 3);
   assert.equal(all(panel, 'vam-book-panel-finish').length, 1);
   assert.ok(one(panel, 'vam-book-panel-gate2-list').attrs['aria-label']);
 });
@@ -156,7 +159,7 @@ test('gate 2 panel: "rerun this card" calls rerunBookCard for that card and is d
   const d = await r.draw({ rerun: async () => { await hold.promise; } });
   const row = rowOf(d.panel, r.nodes[2].id);
   one(row, 'vam-book-panel-rerun-card').click();
-  assert.deepEqual(r.entries.at(-1), ['rerun', r.nodes[2].id]);
+  assert.deepEqual(r.entries.at(-1), ['rerun', r.nodes[2].id, undefined]);
   const again = rowOf(d.panel, r.nodes[2].id);
   assert.equal(one(again, 'vam-book-panel-rerun-card').disabled, true);
   assert.equal(all(d.panel, 'vam-book-panel-finish')[0].disabled, true);
@@ -232,7 +235,7 @@ async function viewRig({ book = true, phase = 'gate2' } = {}) {
   await app.vault.create(MAP, S.core.serializeMap(mapDoc));
   await repo.rebuildDerivedData();
   const calls = [];
-  const plugin = S.withExpansionCoordinator({ repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false, mutate: work => Promise.resolve().then(work), getBookPipelineProgress: () => undefined, rerunBookCard: async (p, id) => { calls.push(['rerun', p, id]); } });
+  const plugin = S.withExpansionCoordinator({ repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false, mutate: work => Promise.resolve().then(work), getBookPipelineProgress: () => undefined, argumentRuns: { isRunning: () => false }, rerunBookCard: async (p, id) => { calls.push(['rerun', p, id]); } });
   S.attachTopicRuns(plugin);
   const view = new bundle.VisualAgentMapView({ app }, plugin);
   view.path = MAP; view.map = await repo.readMap(MAP); view.stageEl = dom.element('div'); view.contentEl = dom.element('div');
@@ -255,13 +258,19 @@ test('right-click: the rerun item and its disabled sub line show at gate 1, gate
     const at = items.findIndex(i => i.title === '重跑圖文書這一張');
     assert.ok(at >= 0, phase);
     assert.equal(items[at].disabled, false);
-    assert.equal(items[at + 1].title, '企劃 → 寫 → 校');
-    assert.equal(items[at + 1].disabled, true);
+    // The second line is a note (never the permanent grey "disabled" line it was): it describes the rerun while it can be used.
+    assert.equal(items[at + 1].title, '企劃 → 寫 → 校，約 2 分鐘；前後章不動，只標「接縫需看」');
+    assert.notEqual(items[at + 1].disabled, true);
   }
-  h.progress(h.prog('gate2', { active: true }));
-  assert.equal(h.menu(node).find(i => i.title === '重跑圖文書這一張').disabled, true);
-  h.progress(h.prog('gate2', { busyCards: [node.id] }));
-  assert.equal(h.menu(node).find(i => i.title === '重跑圖文書這一張').disabled, true);
+  // When it cannot be used the second line says why.
+  const why = progressOver => { h.progress(h.prog('gate2', progressOver)); const items = h.menu(node); const at = items.findIndex(i => i.title === '重跑圖文書這一張'); return { disabled: items[at].disabled, line: items[at + 1].title }; };
+  assert.deepEqual(why({ active: true }), { disabled: true, line: '圖文書正在執行，等它結束後再重跑' });
+  assert.deepEqual(why({ busyCards: [node.id] }), { disabled: true, line: '這一張正在重跑' });
+  assert.deepEqual(why({ rerun: { nodeId: node.id, startedAt: 1 } }), { disabled: true, line: '這一張正在重跑' });
+  assert.deepEqual(why({ rerun: { nodeId: 'other', startedAt: 1 } }), { disabled: true, line: '另一張正在重跑' });
+  h.view.chatChainRunner = { current: {} };
+  assert.deepEqual(why({}), { disabled: true, line: '對話進行中，等它結束後再重跑' });
+  h.view.chatChainRunner = null;
   h.progress(h.prog('writing'));
   assert.equal(h.menu(node).some(i => i.title === '重跑圖文書這一張'), false, 'not while planning or writing');
   h.progress(h.prog('gate2'));
@@ -366,4 +375,141 @@ test('finish: a disabled button says why in the aria-live status line; a refusal
   assert.equal(texts(one(panel, 'vam-book-panel-status')).join(''), '');
   one(panel, 'vam-book-panel-finish').click(); await settle();
   assert.ok(texts(one(panel, 'vam-book-panel-status')).join('').length > 0, 'a refusal is visible');
+});
+
+
+// ---- T5: lead line, reasons, picture rows, unchanged block, finish question, rerun clock ----
+const PROOF = items => `### Research notes\n\n<!-- book-proof:v1 ${JSON.stringify({ key: 'k', result: { aggregate: 'needs-review', items } })} -->\n`;
+const SLOTS_PROMPT = '圖安排：\n- 圖位 1｜圖表｜睡眠週期｜位置：第二段\n- 圖位 2｜照片｜腦波｜位置：結尾\n';
+const IMG = 'https://example.test/p.png';
+function synth(extra = {}) {
+  setUiLanguage('zh-TW');
+  const notes = new Map();
+  const add = (id, fields) => notes.set(id, { title: `T${id}`, prompt: '', summary: '', ...fields });
+  add('a', { pipelineStage: 'checked', prompt: SLOTS_PROMPT, detail: `text\n\n![x](${IMG})\n\n<!-- book-slots:v1 ${JSON.stringify({ slots: [{ index: 1, state: 'placed', hash: bundle.shortHash(IMG) }, { index: 2, state: 'missing', reasonCode: 'not_found' }], bad: 0 })} -->\n` });
+  add('b', { pipelineStage: 'needs-review', pipelineIssue: 'proof unmet: C1', prompt: '圖安排：無\n', detail: PROOF([{ id: 'C1', type: 'fact', status: 'unverified', note: 'Xie 2013 沒能打開核對', sources: [`${IMG}/paper`, 'http://insecure.test/x'] }, { id: 'C2', type: 'fact', status: 'met', note: '', sources: [] }]) });
+  add('c', { pipelineStage: 'checked', pipelineSeam: '前後章變了（第 2 張，版本 2）', prompt: SLOTS_PROMPT, detail: 'plain' });
+  add('d', { pipelineStage: 'planned' });
+  add('old', { pipelineStage: 'needs-review', pipelineIssue: 'proof unmet: C1', prompt: 'Role: body', detail: '' });
+  for (const [k, v] of Object.entries(extra)) add(k, v);
+  const order = [...notes.keys()];
+  return { notes, order, data: () => bundle.buildGate2Panel({ order, titleOf: id => notes.get(id).title, noteOf: id => notes.get(id) }) };
+}
+const baseActions = (log = []) => ({
+  open: id => log.push(['open', id]), rerun: async (id, options) => { log.push(['rerun', id, options]); return { unchanged: true }; }, confirmSeam: async () => {},
+  finish: async () => { log.push(['finish']); }, confirmFinish: async info => { log.push(['confirm', info]); return true; },
+  track: (el, at) => log.push(['track', at]), showChat() {}, close() {}, refresh() {}
+});
+
+test('T5 gate 2: one lead line (passed, review, seams, picture gaps); the reason is the proof note in words; the unverified https sources are kept for "use other sources"', () => {
+  const r = synth();
+  const data = r.data();
+  assert.deepEqual([data.checked, data.needsReview, data.seams, data.imageGaps], [2, 2, 1, 1]);
+  const panel = bundle.renderGate2Panel(dom.element('div'), data, false, new bundle.GatePanelState(), baseActions());
+  assert.equal(one(panel, 'vam-book-panel-summary').text, '2 張通過，2 張要你看，1 個接縫還沒確認，圖有 1 處缺');
+  const b = data.cards.find(card => card.id === 'b');
+  assert.equal(b.reasonText, 'Xie 2013 沒能打開核對');
+  assert.deepEqual([...b.avoidSources], [`${IMG}/paper`], 'only https, from the unverified items');
+  assert.ok(!texts(panel).some(x => /^C\d/.test(x)), 'no item codes shown');
+  // An older card (no image plan, no proof section) still draws and reads as a plain reason.
+  const old = data.cards.find(card => card.id === 'old');
+  assert.equal(old.images.planned, 0);
+  assert.ok(old.reasonText && !/proof unmet/.test(old.reasonText));
+});
+
+test('T5 gate 2: picture rows say placed, no fitting picture, edited, unrecorded, or none planned; a gap has "add pictures myself" that opens the note; planned cards have no row', () => {
+  const r = synth();
+  const log = [];
+  const panel = bundle.renderGate2Panel(dom.element('div'), r.data(), false, new bundle.GatePanelState(), baseActions(log));
+  const rows = all(panel, 'vam-book-panel-image-row');
+  assert.deepEqual(rows.map(x => x.dataset.row), ['a', 'b', 'c', 'old'], 'the planned card d has no picture row');
+  const say = id => texts(rows.find(x => x.dataset.row === id)).join(' ');
+  assert.match(say('a'), /1 張圖，1 處缺/);
+  assert.match(say('a'), /圖 2：沒找到合適的圖/);
+  assert.match(say('b'), /企劃未安排圖/);
+  assert.match(say('c'), /尚未記錄圖的結果/);
+  one(rows[0], 'vam-book-panel-add-images').click();
+  assert.deepEqual(log.at(-1), ['open', 'a']);
+  assert.equal(all(rows[1], 'vam-book-panel-add-images').length, 0);
+  // The recorded picture is no longer in the text: it reads as edited; no record of a missing slot becomes a gap.
+  const edited = synth({ e: { pipelineStage: 'checked', prompt: SLOTS_PROMPT, detail: `text <!-- x -->\n<!-- book-slots:v1 ${JSON.stringify({ slots: [{ index: 1, state: 'placed', hash: '00000000' }, { index: 2, state: 'missing', reasonCode: 'load_failed' }], bad: 0 })} -->\n` } });
+  const eRows = all(bundle.renderGate2Panel(dom.element('div'), edited.data(), false, new bundle.GatePanelState(), baseActions()), 'vam-book-panel-image-row');
+  const e = texts(eRows.find(x => x.dataset.row === 'e')).join(' ');
+  assert.match(e, /1 張圖，1 處缺/);
+  assert.match(e, /1 張被手動改過/);
+  assert.match(e, /圖載入失敗/);
+});
+
+test('T5 gate 2: a rerun left unchanged shows the block with "use other sources" (only the unverified https addresses go with it) and "I will look myself"; a second rerun clears it', async () => {
+  const r = synth();
+  const log = [];
+  const state = new bundle.GatePanelState();
+  let panel;
+  const actions = { ...baseActions(log), refresh() { panel.remove(); panel = draw(); } };
+  const parent = dom.element('div');
+  const draw = () => bundle.renderGate2Panel(parent, r.data(), false, state, actions);
+  panel = draw();
+  const row = () => all(panel, 'vam-book-panel-row').find(x => x.dataset.row === 'b');
+  assert.equal(all(row(), 'vam-book-panel-unchanged').length, 0, 'not before a rerun');
+  one(row(), 'vam-book-panel-rerun-card').click();
+  await settle();
+  assert.deepEqual(log.at(-1), ['rerun', 'b', undefined]);
+  assert.ok(state.unchanged.has('b'));
+  assert.ok(texts(row()).includes('還是要你看'));
+  assert.ok(texts(row()).includes('這次重跑的結果相同，仍需人看。'));
+  assert.ok(!texts(row()).some(x => /仍無法打開|同一來源/.test(x)), 'does not claim the same source still fails');
+  one(row(), 'vam-book-panel-look-myself').click();
+  assert.deepEqual(log.at(-1), ['open', 'b']);
+  one(row(), 'vam-book-panel-swap-source').click();
+  await settle();
+  assert.equal(JSON.stringify(log.at(-1)), JSON.stringify(['rerun', 'b', { avoidSources: [`${IMG}/paper`] }]));
+  // The old row had no sources to swap: no such button.
+  state.unchanged.add('old');
+  panel.remove(); panel = draw();
+  assert.equal(all(all(panel, 'vam-book-panel-row').find(x => x.dataset.row === 'old'), 'vam-book-panel-swap-source').length, 0);
+});
+
+test('T5 gate 2: finish asks once when something is left (cards to look at, seams), not when nothing is; "go back" does not finish; a card still working beats the question', async () => {
+  const r = synth();
+  const log = [];
+  const state = new bundle.GatePanelState();
+  const press = (panel) => one(panel, 'vam-book-panel-finish').click();
+  // Left over: the question, with counts and titles; "go back" (false) finishes nothing.
+  const answer = { yes: false };
+  const actions = { ...baseActions(log), confirmFinish: async info => { log.push(['confirm', info]); return answer.yes; } };
+  const panel = bundle.renderGate2Panel(dom.element('div'), r.data(), false, state, actions);
+  press(panel);
+  await settle();
+  assert.deepEqual(log.filter(x => x[0] === 'confirm').map(x => [x[1].review, x[1].seams, x[1].reviewTitles]), [[2, 1, ['2 Tb', '5 Told']]]);
+  assert.equal(log.filter(x => x[0] === 'finish').length, 0);
+  assert.equal(state.finishAsking, false);
+  answer.yes = true;
+  press(panel);
+  await settle();
+  assert.equal(log.filter(x => x[0] === 'confirm').length, 2);
+  assert.equal(log.filter(x => x[0] === 'finish').length, 1);
+  // Nothing left: no question, finish at once.
+  const clean = new Map([['a', { title: 'A', prompt: '', summary: '', pipelineStage: 'checked' }]]);
+  const log2 = [];
+  const p2 = bundle.renderGate2Panel(dom.element('div'), bundle.buildGate2Panel({ order: ['a'], titleOf: () => 'A', noteOf: id => clean.get(id) }), false, new bundle.GatePanelState(), baseActions(log2));
+  press(p2);
+  await settle();
+  assert.deepEqual(log2.map(x => x[0]), ['finish']);
+  // A card still working: the button waits (no question, no finish).
+  const log3 = [];
+  const p3 = bundle.renderGate2Panel(dom.element('div'), r.data(), false, new bundle.GatePanelState(), baseActions(log3), new Set(['b']));
+  assert.equal(one(p3, 'vam-book-panel-finish').disabled, true);
+  press(p3);
+  await settle();
+  assert.deepEqual(log3, [], 'busy comes first');
+});
+
+test('T5 gate 2: the card being rerun shows "重跑中 m:ss" from the view clock instead of its stage', () => {
+  const r = synth();
+  const log = [];
+  const panel = bundle.renderGate2Panel(dom.element('div'), r.data(), false, new bundle.GatePanelState(), baseActions(log), new Set(['b']), true, { nodeId: 'b', startedAt: 12345 });
+  const row = all(panel, 'vam-book-panel-row').find(x => x.dataset.row === 'b');
+  assert.ok(texts(row).includes('重跑中 0:00'), JSON.stringify(texts(row)));
+  assert.ok(!texts(row).includes('需人看'));
+  assert.deepEqual(log.filter(x => x[0] === 'track'), [['track', 12345]]);
 });

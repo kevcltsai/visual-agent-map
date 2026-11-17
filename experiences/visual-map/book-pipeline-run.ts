@@ -235,6 +235,8 @@ export interface BookPipelinePorts {
   now(): string;
   newId(): string;
   log(line: string): void;
+  /** Called when the sub-step changes without a saved state change (the card is now finding pictures), so the screen can repaint. */
+  progressed?(mapPath: string): void;
 }
 
 export interface BookPipelineProgress {
@@ -255,6 +257,36 @@ export interface BookPipelineProgress {
   busyCards: string[];
   /** About how many seconds the planning/writing phase has left; only while a drive runs and at least {@link ETA_MIN_CARDS} cards of this phase finished. */
   etaSeconds?: number;
+  /**
+   * Memory only (never saved to the map file): the sub-step each busy card is in right now (`global` is the whole-book plan), with
+   * when it began (ms). Finding pictures is part of the write step, so it only shows here.
+   */
+  current?: { nodeId: string; step: BookSubStep; startedAt: number }[];
+  /** Memory only: how many cards finished each of the steps the bar lists. */
+  steps?: BookStepCounts;
+}
+export type BookSubStep = "plan" | "write" | "images" | "proof";
+export type BookStepCounts = Record<BookSubStep, number>;
+/**
+ * The cards done per step from the stage counts: planned or beyond has its plan, written or checked has its text (and pictures:
+ * they are found inside the write step), checked has its proofread. `imagesDone` adds cards whose pictures are in but whose write has not ended.
+ */
+export function stepCounts(
+  counts: BookPipelineProgress["counts"],
+  imagesDone = 0,
+  review: { settled?: boolean; proofFailed?: number } = {}
+): BookStepCounts {
+  const written = counts.written + counts.checked;
+  // From gate 2 on, a needs-review card is a finished card the owner must look at: every step counts. While writing, a card whose
+  // proofread was the failing step has its text and pictures; any other needs-review card only has what came before the failure.
+  const reviewed = counts["needs-review"];
+  const textual = written + (review.settled ? reviewed : (review.proofFailed ?? 0));
+  return {
+    plan: counts.planned + written + reviewed,
+    write: textual,
+    images: textual + imagesDone,
+    proof: counts.checked + (review.settled ? reviewed : 0)
+  };
 }
 /** What a single-card replan returns for the panel (the brief just written). */
 export type CardPlanSummary = Pick<CardPlanResult, "covers" | "entry" | "handoff" | "previous" | "next" | "checklist">;
@@ -302,6 +334,11 @@ interface Drive {
   /** When each card's first step started in this drive, and the durations (ms) of the cards that finished their phase. */
   started: Map<string, number>;
   durations: { plan: number[]; write: number[] };
+  /** In memory only: the sub-step each running card (or `global`) is in, and the cards whose pictures are in but whose write step has not ended. */
+  sub: Map<string, { step: BookSubStep; startedAt: number }>;
+  imagesDone: Set<string>;
+  /** In memory only: the step that marked each card needs-review in this drive. */
+  reviewStep: Map<string, PipelineStep>;
   fatal?: unknown;
   /** A neutral code of why the run ended by itself (see failRun). */
   failure?: string;
@@ -985,6 +1022,9 @@ export class BookPipelineRuns {
       authorModels: new Map(),
       started: new Map(),
       durations: { plan: [], write: [] },
+      sub: new Map(),
+      imagesDone: new Set(),
+      reviewStep: new Map(),
       stopRequested: false,
       disposed: false,
       rootId: "",
@@ -1177,12 +1217,24 @@ export class BookPipelineRuns {
     drive: Drive,
     action: Extract<PipelineAction, { type: "global_plan" | "card_plan" | "card_write" | "card_proof" }>
   ): Promise<StepResult> {
+    try {
+      return await this.stepOnce(drive, action);
+    } finally {
+      // The in-memory sub-step ends with the step, whatever way it ended.
+      drive.sub.delete(action.type === "global_plan" ? "global" : action.nodeId);
+    }
+  }
+  private async stepOnce(
+    drive: Drive,
+    action: Extract<PipelineAction, { type: "global_plan" | "card_plan" | "card_write" | "card_proof" }>
+  ): Promise<StepResult> {
     const nodeId = action.type === "global_plan" ? undefined : action.nodeId;
     const kind = action.type === "global_plan" ? "global" : STEP_OF[action.type];
     const key = nodeId ?? "global";
     const logStep: PipelineStep = kind === "global" ? "plan" : kind;
     const startedAt = Date.parse(this.ports.now());
     if (nodeId && !drive.started.has(nodeId)) drive.started.set(nodeId, startedAt);
+    drive.sub.set(key, { step: logStep, startedAt });
     try {
       const begun = await drive.store.commit(state => {
         const dispatched = beginStep(state, kind, nodeId);
@@ -1327,6 +1379,7 @@ export class BookPipelineRuns {
   }
   private async markReview(drive: Drive, nodeId: string, step: PipelineStep, reason: string): Promise<void> {
     drive.stages.set(nodeId, "needs-review");
+    drive.reviewStep.set(nodeId, step);
     await this.writeFields(drive, nodeId, {
       pipelineStage: "needs-review",
       pipelineIssue: `${step} failed: ${code(reason)}`
@@ -1505,6 +1558,7 @@ export class BookPipelineRuns {
     const info = drive.cards.get(nodeId);
     const rootInfo = drive.cards.get(drive.rootId);
     if (!info || !rootInfo) return { kind: "failed", reason: "missing" };
+    drive.imagesDone.delete(nodeId);
     const card = await this.ports.readCard(info.path);
     const root = await this.ports.readCard(rootInfo.path);
     if (!(await this.ensureBackup(drive, nodeId, info.path, card.raw)))
@@ -1592,8 +1646,11 @@ export class BookPipelineRuns {
       if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
     }
     // The picture slots (T2): the author's markers become verified pictures in one guarded write, or the stage does not advance.
+    drive.sub.set(nodeId, { step: "images", startedAt: Date.parse(this.ports.now()) });
+    this.ports.progressed?.(drive.mapPath);
     const filled = await this.fillSlots(drive, token, nodeId, path, slots, authorize);
     if (filled) return filled;
+    drive.imagesDone.add(nodeId);
     return { kind: "ok", after: () => this.setStage(drive, nodeId, "written", null) };
   }
 
@@ -1940,6 +1997,10 @@ export class BookPipelineRuns {
     };
     for (const id of state.order) counts[drive.stages.get(id) ?? "pending"]++;
     const eta = this.etaOf(drive, active);
+    const imagesDone = [...drive.imagesDone].filter(id => {
+      const stage = drive.stages.get(id);
+      return state.order.includes(id) && stage !== "written" && stage !== "checked";
+    }).length;
     return {
       runId: state.runId,
       phase: state.phase,
@@ -1953,7 +2014,16 @@ export class BookPipelineRuns {
       startedAt: state.startedAt,
       phaseStartedAt: state.phaseStartedAt,
       busyCards: [...drive.busy].filter(id => id !== "global"),
-      ...(eta === undefined ? {} : { etaSeconds: eta })
+      ...(eta === undefined ? {} : { etaSeconds: eta }),
+      ...(active && drive.sub.size
+        ? { current: [...drive.sub].map(([nodeId, sub]) => ({ nodeId, step: sub.step, startedAt: sub.startedAt })) }
+        : {}),
+      steps: stepCounts(counts, imagesDone, {
+        settled: state.phase === "gate2" || state.phase === "done",
+        proofFailed: state.order.filter(
+          id => drive.stages.get(id) === "needs-review" && drive.reviewStep.get(id) === "proof"
+        ).length
+      })
     };
   }
   /** Average wall time of the cards that finished this phase in this drive × cards left ÷ pool; undefined below {@link ETA_MIN_CARDS} finished cards. */

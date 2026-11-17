@@ -14,13 +14,14 @@ const notices = [];
 // One bundle, so the view, the screen parts and the language setting share one copy of the interface language.
 const bundle = loadSource(`
 export * from "./experiences/visual-map/book-pipeline-ui";
-export { BookPipelineRunError } from "./experiences/visual-map/book-pipeline-run";
+export { bookStartEstimate, bookStartEstimateText, bookSettingsPatch } from "./experiences/visual-map/book-pipeline-start-modal";
+export { BookPipelineRunError, stepCounts } from "./experiences/visual-map/book-pipeline-run";
 export { readBookPipeline } from "./core/book-pipeline/model";
 export { VisualAgentMapView } from "./experiences/visual-map/view";
 export { setUiLanguage, t } from "./i18n";
 `, { obsidian: { ...support.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice(notices), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
 const { setUiLanguage, t: tr } = bundle;
-const ui = bundle, runModule = bundle, model = bundle;
+const ui = bundle, runModule = bundle, model = bundle, bundleStart = bundle;
 const flat = text => text.replace(/\s+/g, ' ');
 const view_ts = flat(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'));
 const main_ts = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
@@ -48,15 +49,18 @@ const draw = (data, prog, stageOf = noStage) => {
 const buttonsOf = bar => dom.findAll(bar, i => i.tag === 'button');
 const track = bar => dom.find(bar, i => i.attrs.role === 'progressbar');
 
-test('bar: running writing phase shows the phase, the four counts, a stop button and a progressbar with aria values and a text alternative', () => {
+test('bar: running writing phase shows the phase, the five stages in plain words, a stop button and a progressbar with aria values and a text alternative', () => {
   lang('zh-TW');
   const d = draw(bookData(), progress());
   assert.equal(d.bar.attrs.role, 'group');
-  assert.ok(texts(d.bar).includes('圖文書：作者＋校對中'));
-  assert.ok(texts(d.bar).includes('已校 1／4 · 已寫 1 · 已企劃 1 · 需人看 1'));
+  assert.ok(texts(d.bar).includes('圖文書：寫作、找圖與校對中'));
+  // Derived from the stage counts (planned 1, written 1, checked 1, needs-review 1 of 4). While writing, a needs-review card whose failing step is unknown only counts for its plan (write 2 = written + checked); the old "已校 · 已寫 · 已企劃" line is gone.
+  assert.deepEqual(dom.findAll(d.bar, i => i.tag === 'li').map(i => i.text), ['✓ 全書企劃', '✓ 逐章企劃', '寫作 2／4', '找圖 2／4', '校對 1／4']);
+  assert.equal(texts(d.bar).filter(x => /已寫|已企劃|需人看/.test(x)).length, 0);
+  assert.equal(dom.find(d.bar, i => i.cls.includes('vam-book-legend')), undefined);
   const t = track(d.bar);
   assert.deepEqual([t.attrs['aria-valuemin'], t.attrs['aria-valuemax'], t.attrs['aria-valuenow']], ['0', '4', '1']);
-  assert.equal(t.attrs['aria-valuetext'], '已校 1、已寫 1、已企劃 1、需人看 1');
+  assert.equal(t.attrs['aria-valuetext'], '✓ 全書企劃、✓ 逐章企劃、寫作 2／4、找圖 2／4、校對 1／4');
   assert.deepEqual(buttonsOf(d.bar).map(b => b.text), ['停止']);
   assert.equal(dom.findAll(t, i => i.cls.includes('vam-book-seg')).length, 4);
   buttonsOf(d.bar)[0].click();
@@ -66,9 +70,9 @@ test('bar: running writing phase shows the phase, the four counts, a stop button
 
 test('bar: every phase and status has its own words (zh-TW, en, zh-CN)', () => {
   const words = {
-    'zh-TW': { planning: '圖文書：企劃中', gate1: '圖文書：等你確認', writing: '圖文書：作者＋校對中', gate2: '圖文書：完成待驗收', stopped: '圖文書：已停止', budget: '圖文書：額度用完' },
-    en: { planning: 'Picture book: Planning', gate1: 'Picture book: Waiting for your confirmation', writing: 'Picture book: Writing and proofreading', gate2: 'Picture book: Done, waiting for review', stopped: 'Picture book: Stopped', budget: 'Picture book: Call budget used up' },
-    'zh-CN': { planning: '图文书：企划中', gate1: '图文书：等你确认', writing: '图文书：作者＋校对中', gate2: '图文书：完成待验收', stopped: '图文书：已停止', budget: '图文书：额度用完' }
+    'zh-TW': { planning: '圖文書：企劃中', gate1: '圖文書：等你確認', writing: '圖文書：寫作、找圖與校對中', gate2: '圖文書：完成待驗收', stopped: '圖文書：已停止', budget: '圖文書：額度用完' },
+    en: { planning: 'Picture book: Planning', gate1: 'Picture book: Waiting for your confirmation', writing: 'Picture book: Writing, finding pictures and proofreading', gate2: 'Picture book: Done, waiting for review', stopped: 'Picture book: Stopped', budget: 'Picture book: Call budget used up' },
+    'zh-CN': { planning: '图文书：企划中', gate1: '图文书：等你确认', writing: '图文书：写作、找图与校对中', gate2: '图文书：完成待验收', stopped: '图文书：已停止', budget: '图文书：额度用完' }
   };
   for (const [language, expected] of Object.entries(words)) {
     lang(language);
@@ -84,7 +88,7 @@ test('bar: a stopped run says stopped, names the phase, and offers "continue fro
   lang('zh-TW');
   const d = draw(bookData({ status: 'stopped' }), progress({ status: 'stopped', active: false }));
   assert.ok(texts(d.bar).includes('圖文書：已停止'));
-  assert.ok(texts(d.bar).includes('停在「作者＋校對中」階段，已校 1／4'));
+  assert.ok(texts(d.bar).includes('停在「寫作、找圖與校對中」階段，已校 1／4'));
   assert.deepEqual(buttonsOf(d.bar).map(b => b.text), ['從停處繼續']);
   buttonsOf(d.bar)[0].click();
   assert.deepEqual(d.log, ['resume']);
@@ -230,6 +234,8 @@ async function harness({ book, stages = {}, issue }) {
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: work => Promise.resolve().then(work),
     getBookPipelineProgress: () => undefined,
+    argumentRuns: { isRunning: () => false },
+    modelLabel: model => `M:${model}`,
     startBookPipeline: async p => { entries.push(['start', p]); },
     stopBookPipeline: async p => { entries.push(['stop', p]); },
     resumeBookPipeline: async (p, o) => { entries.push(['resume', p, o]); },
@@ -246,6 +252,14 @@ async function harness({ book, stages = {}, issue }) {
   view.selection.moveTabStop(view.defaultTabStop(view.map.nodes));
   const paint = () => { view.stageEl = dom.element('div'); view.cardEls.clear(); for (const n of view.map.nodes) view.renderNode(n); return view.stageEl; };
   return { view, ids, paint, entries, notices, plugin };
+}
+/** The toolbar entry opens the start card; pressing its Start button runs the entry. */
+async function startFromCard(h) {
+  await h.view.startBookPipelineFromUi();
+  const modal = h.view.bookStartModal;
+  assert.ok(modal?.isOpen, 'the start card is open');
+  dom.findAll(modal.modalEl, i => i.tag === 'button').find(b => b.text === '開始').click();
+  await dom.tick();
 }
 const cardClasses = stage => new Set(dom.findAll(stage, () => true).flatMap(i => i.classes));
 
@@ -319,16 +333,16 @@ test('view: an unreadable bookPipeline key draws no bar and no labels (the entri
 
 test('toolbar button and command: start calls the plugin entry; a refusal is a message, never an unhandled rejection', async () => {
   const h = await harness({ book: false });
-  await h.view.startBookPipelineFromUi();
+  await startFromCard(h);
   assert.equal(JSON.stringify(h.entries), JSON.stringify([['start', MAP]]));
   for (const code of ['busy', 'blocked', 'root', 'exists', 'unusable']) {
     h.plugin.startBookPipeline = async () => { throw new runModule.BookPipelineRunError(code); };
-    await h.view.startBookPipelineFromUi();
+    await startFromCard(h);
   }
   assert.equal(h.notices.length, 5);
   assert.match(h.notices[2], /根議題/);
   h.plugin.startBookPipeline = async () => { throw new TypeError('network down'); };
-  await h.view.startBookPipelineFromUi();
+  await startFromCard(h);
   assert.match(h.notices[5], /圖文書流水線無法執行/);
 });
 
@@ -407,4 +421,279 @@ test('bar: a saved done of the same run is final even when the runner record sti
   const state = ui.bookBarState(bookData({ phase: 'done', status: 'running' }), progress({ phase: 'gate2', active: false }), noStage);
   assert.equal(state.phase, 'done'); assert.equal(state.mode, 'done');
   assert.equal(ui.bookBarState(bookData({ phase: 'done' }), progress({ runId: 'r2', phase: 'planning' }), noStage).phase, 'planning', 'a newer run is not hidden');
+});
+
+// ---- T3: the start card and the plain-words progress ----
+const openCard = async h => { await h.view.startBookPipelineFromUi(); return h.view.bookStartModal; };
+const cardButton = (modal, text) => dom.findAll(modal.modalEl, i => i.tag === 'button').find(b => b.text === text);
+const rootPath = h => h.view.map.nodes.find(n => n.id === h.ids.root).path;
+
+test('start card: pressing the button opens a card with the estimate (1+4N calls, about minutes), each step\'s model and collapsed settings; nothing starts yet', async () => {
+  const h = await harness({ book: false });
+  const modal = await openCard(h);
+  assert.ok(modal.isOpen);
+  assert.equal(h.entries.length, 0, 'nothing starts before the owner presses Start');
+  const all = texts(modal.modalEl);
+  assert.ok(all.includes('3 張卡 · 約 4 分鐘 · 約 13 次 AI 呼叫。'), all.join('|'));
+  assert.ok(all.includes('中間只會停兩次，讓你確認。'));
+  for (const line of ['企劃：M:' + h.plugin.settings.bookPlanModel, '寫作：M:' + h.plugin.settings.bookWriteModel, '找圖：M:' + h.plugin.settings.bookWriteModel, '校對：M:' + h.plugin.settings.bookProofModel]) assert.ok(all.includes(line), line);
+  const details = dom.find(modal.modalEl, i => i.tag === 'details');
+  assert.equal(details.open, false, 'the whole-book settings start collapsed');
+  assert.equal(dom.findAll(details, i => i.tag === 'textarea').length, 6);
+  assert.deepEqual(dom.findAll(modal.modalEl, i => i.tag === 'button').map(b => b.text), ['取消', '開始']);
+  assert.equal(dom.focusedNow().text, '取消', 'the keyboard starts on Cancel, so a stray Enter never starts the run');
+  cardButton(modal, '取消').click();
+  assert.equal(modal.isOpen, false);
+  assert.equal(h.entries.length, 0, 'Cancel starts nothing');
+});
+
+test('start card: the estimate numbers (1+4N calls; the 135 s whole-book plan, then cards five at a time at the measured median) and the minutes wording', () => {
+  const start = bundleStart;
+  assert.equal(JSON.stringify(start.bookStartEstimate(15)), JSON.stringify({ cards: 15, calls: 61, seconds: 135 + 3 * 88.5 }));
+  assert.equal(JSON.stringify(start.bookStartEstimate(0)), JSON.stringify({ cards: 0, calls: 1, seconds: 135 }));
+  lang('zh-TW');
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15)), '15 張卡 · 約 7 分鐘 · 約 61 次 AI 呼叫。');
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(0)), '0 張卡 · 約 2 分鐘 · 約 1 次 AI 呼叫。');
+  lang('en');
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15)), '15 cards · about 7 minutes · about 61 AI calls.');
+  lang('zh-TW');
+});
+
+test('start card: Start without touching the fields writes nothing to the root topic and starts once, even when pressed twice; the map file is not touched', async () => {
+  const h = await harness({ book: false });
+  await h.plugin.repo.writeBookSettings(rootPath(h), { reader: 'kids', tone: 'warm' });
+  const before = h.plugin.repo.app?.vault ? undefined : undefined;
+  void before;
+  const writes = [];
+  const original = h.plugin.repo.writeBookSettings.bind(h.plugin.repo);
+  h.plugin.repo.writeBookSettings = (path, patch) => { writes.push([path, patch]); return original(path, patch); };
+  const modal = await openCard(h);
+  const fields = dom.findAll(modal.modalEl, i => i.tag === 'textarea');
+  assert.equal(fields.find(f => f.attrs['aria-label'] === '讀者').value, 'kids', 'prefilled with the current value');
+  assert.equal(fields.find(f => f.attrs['aria-label'] === '語氣').value, 'warm');
+  const go = cardButton(modal, '開始');
+  go.click(); go.click();
+  await dom.tick();
+  assert.equal(writes.length, 0);
+  assert.equal(JSON.stringify(h.entries), JSON.stringify([['start', MAP]]));
+});
+
+test('start card: only the fields the owner changed are written, to the root topic only; clearing a prefilled field removes it; other fields keep their bytes', async () => {
+  const h = await harness({ book: false });
+  await h.plugin.repo.writeBookSettings(rootPath(h), { reader: 'kids', tone: 'warm' });
+  const modal = await openCard(h);
+  const field = label => dom.findAll(modal.modalEl, i => i.tag === 'textarea').find(f => f.attrs['aria-label'] === label);
+  field('讀者').value = '  kids   ';      // same after whitespace is squashed: not touched
+  field('語氣').value = '';               // cleared: removed
+  field('想看的角度').value = 'sleep science'; // new
+  cardButton(modal, '開始').click();
+  await dom.tick(); await dom.tick();
+  const root = await h.plugin.repo.readNote(rootPath(h));
+  assert.equal(JSON.stringify(root.bookSettings), JSON.stringify({ reader: 'kids', angle: 'sleep science' }));
+  const other = await h.plugin.repo.readNote(h.view.map.nodes.find(n => n.id === h.ids.a).path);
+  assert.equal(other.bookSettings, undefined, 'a non-root card is not written');
+  assert.equal(JSON.stringify(h.entries), JSON.stringify([['start', MAP]]));
+});
+
+test('start card: a map that already has a run opens no card (the entry answers with its own sentence); a second press while the card is open opens no second one', async () => {
+  const withRun = await harness({ book: true });
+  await withRun.view.startBookPipelineFromUi();
+  assert.equal(withRun.view.bookStartModal, null);
+  assert.equal(JSON.stringify(withRun.entries), JSON.stringify([['start', MAP]]));
+  const h = await harness({ book: false });
+  const first = await openCard(h);
+  await h.view.startBookPipelineFromUi();
+  assert.equal(h.view.bookStartModal, first);
+});
+
+test('start card: closing clears the focus timer, the view closes an open card with itself, and the entry is the same for the command', async () => {
+  const h = await harness({ book: false });
+  const modal = await openCard(h);
+  assert.notEqual(modal.focusTimer, null);
+  modal.close();
+  assert.equal(modal.focusTimer, null, 'the focus timer is cleared on close');
+  assert.equal(modal.isOpen, false);
+  assert.match(view_ts, /this\.closed = true; this\.bookStartModal\?\.close\(\); this\.bookStartModal = null;/);
+  assert.match(main_ts, /view\.startBookPipelineFromUi\(\)/);
+});
+
+test('start card: Escape closes it without starting', async () => {
+  const h = await harness({ book: false });
+  const modal = await openCard(h);
+  assert.equal(modal.scope.press('Escape'), false);
+  assert.equal(modal.isOpen, false);
+  assert.equal(h.entries.length, 0);
+});
+
+test('bar: the five stages carry check marks and counts, the stage in progress is marked, and "now" names the chapter and its title as plain text', () => {
+  lang('zh-TW');
+  const order = ['a', 'b', 'c', 'd', 'e'];
+  const titles = { c: '<b>睡眠週期</b>', d: '第四章' };
+  const prog = progress({ total: 5, steps: { plan: 5, write: 3, images: 2, proof: 1 }, counts: { pending: 0, planned: 0, written: 2, checked: 1, 'needs-review': 0 },
+    current: [{ nodeId: 'd', step: 'images', startedAt: 1 }, { nodeId: 'c', step: 'write', startedAt: 2 }] });
+  const parent = dom.element('div');
+  const state = ui.bookBarState(bookData({ order }), prog, noStage, id => titles[id]);
+  ui.renderBookBar(parent, state, calls().actions);
+  const items = dom.findAll(parent, i => i.tag === 'li');
+  assert.deepEqual(items.map(i => i.text), ['✓ 全書企劃', '✓ 逐章企劃', '寫作 3／5', '找圖 2／5', '校對 1／5']);
+  assert.deepEqual(items.map(i => i.attrs['aria-current'] ?? null), [null, null, 'step', 'step', null], 'the steps some card is in are marked, not by color alone');
+  const now = dom.find(parent, i => i.cls.includes('vam-book-now-text'));
+  assert.equal(now.text, '目前：正在寫第 3 章「<b>睡眠週期</b>」，另有 1 章同時進行', 'a title from a note is shown as text, never markup');
+  assert.equal(now.children.length, 0);
+});
+
+test('bar: the whole-book plan shows as the current step first; a card unknown to the order is ignored; with nothing running there is no "now" line', () => {
+  lang('zh-TW');
+  const withCurrent = current => ui.bookBarState(bookData({ phase: 'planning', globalPlanned: false }), progress({ phase: 'planning', current }), noStage, () => 'T');
+  const s = withCurrent([{ nodeId: 'a', step: 'plan', startedAt: 1 }, { nodeId: 'global', step: 'plan', startedAt: 1 }]);
+  assert.equal(ui.bookNowText(s.current), '目前：正在規劃全書');
+  assert.equal(JSON.stringify(ui.bookStepItems(s).map(i => [i.key, i.current, i.done])), JSON.stringify([['global', true, false], ['plan', true, true], ['write', false, false], ['images', false, false], ['proof', false, false]]));
+  assert.equal(withCurrent([{ nodeId: 'zzz', step: 'write', startedAt: 1 }]).current, undefined);
+  assert.equal(ui.bookBarState(bookData(), progress({ active: false, current: [{ nodeId: 'a', step: 'write', startedAt: 1 }] }), noStage).current, undefined);
+  const parent = dom.element('div');
+  ui.renderBookBar(parent, ui.bookBarState(bookData({ phase: 'gate1' }), progress({ phase: 'gate1', active: false }), noStage), calls().actions);
+  assert.equal(dom.find(parent, i => i.cls.includes('vam-book-now')), undefined);
+});
+
+test('bar: the remaining time sits on the "now" line and only when the runner gave one (it gives none below five finished cards)', () => {
+  lang('zh-TW');
+  const cur = [{ nodeId: 'a', step: 'write', startedAt: 1 }];
+  const draw2 = over => { const parent = dom.element('div'); ui.renderBookBar(parent, ui.bookBarState(bookData(), progress({ current: cur, ...over }), noStage, () => 'T'), calls().actions); return parent; };
+  assert.equal(dom.find(draw2({}), i => i.cls.includes('vam-book-bar-eta')), undefined);
+  assert.equal(dom.find(draw2({ etaSeconds: 130 }), i => i.cls.includes('vam-book-bar-eta')).text, '約剩 2 分鐘');
+  assert.equal(dom.find(draw2({}), i => i.cls.includes('vam-book-now')).children.length, 1);
+});
+
+test('bar: a saved v1 map is only read: the data is not changed, and after a reload the steps come from the cards\' stages', () => {
+  lang('zh-TW');
+  const data = bookData({ phase: 'writing', status: 'running' });
+  const frozen = JSON.stringify(data);
+  const stages = { a: 'checked', b: 'written', c: 'planned', d: undefined };
+  const state = ui.bookBarState(data, undefined, id => stages[id], () => 'T');
+  assert.equal(JSON.stringify(state.steps), JSON.stringify({ plan: 3, write: 2, images: 2, proof: 1 }));
+  assert.equal(state.current, undefined);
+  assert.equal(JSON.stringify(data), frozen);
+  assert.equal(Object.keys(data).includes('current') || Object.keys(data).includes('steps'), false);
+});
+
+test('card labels: the label says which step the card is in (planning, writing, finding pictures, proofreading) and keeps the clock', () => {
+  lang('zh-TW');
+  const words = { plan: '企劃中', write: '寫作中', images: '找圖中', proof: '校對中' };
+  for (const [step, word] of Object.entries(words)) {
+    const header = dom.element('div');
+    let ticked = false;
+    ui.renderBookCardLabels(header, ui.bookCardView({ pipelineStage: 'planned' }), { step, track: el => { ticked = true; el.setText('0:07'); } });
+    const chip = header.children[0];
+    assert.equal(chip.children[0].text, word);
+    assert.match(chip.cls, new RegExp(`is-${step}`));
+    assert.ok(ticked && chip.children[1].text === '0:07');
+  }
+  for (const language of ['en', 'zh-CN']) { lang(language); const header = dom.element('div'); ui.renderBookCardLabels(header, ui.bookCardView({}), { step: 'images', track() {} }); assert.ok(header.children[0].children[0].text.length > 0); }
+  lang('zh-TW');
+});
+
+test('view: a card the runner is finding pictures for shows "找圖中" from the runner\'s sub-step; the author call of this view still reads "寫作中"', async () => {
+  const h = await harness({ book: true, stages: { a: 'planned', b: 'written' } });
+  const noteA = h.view.map.nodes.find(n => n.id === h.ids.a);
+  const noteB = h.view.map.nodes.find(n => n.id === h.ids.b);
+  h.plugin.getBookPipelineProgress = () => progress({ current: [{ nodeId: h.ids.a, step: 'images', startedAt: Date.now() - 12_000 }, { nodeId: h.ids.b, step: 'proof', startedAt: Date.now() - 5_000 }] });
+  let stage = h.paint();
+  const chips = dom.findAll(stage, i => i.cls.includes('is-writing')).map(c => c.children[0].text);
+  assert.deepEqual(chips.sort(), ['找圖中', '校對中']);
+  h.view.bookAuthoring.set(noteA.path, Date.now() - 3_000);
+  stage = h.paint();
+  assert.deepEqual(dom.findAll(stage, i => i.cls.includes('is-writing')).map(c => c.children[0].text).sort(), ['寫作中', '校對中']);
+  void noteB;
+  assert.match(view_ts, /refreshBookProgress\(\): void \{ if \(!this\.closed && this\.hasBookPipeline\(\)\) this\.render\(\);/);
+  assert.match(main_ts, /progressed: mapPath =>[\s\S]*?refreshBookProgress\(\)/);
+});
+
+test('panel: outside the gates the side column draws no "nothing to see" line and a panel left open folds itself away', async () => {
+  const h = await harness({ book: true });
+  h.plugin.getBookPipelineProgress = () => progress({ phase: 'writing' });
+  assert.doesNotMatch(view_ts, /book_panel_not_gate2/);
+  h.view.bookSideEl = dom.element('div');
+  h.view.paintBookPanel();
+  assert.equal(h.view.bookSideEl.children.length, 0);
+  assert.equal(h.view.bookPanelHasContent(), false);
+  h.plugin.getBookPipelineProgress = () => progress({ phase: 'gate1', active: false });
+  assert.equal(h.view.bookPanelHasContent(), true);
+  h.plugin.getBookPipelineProgress = () => progress({ phase: 'writing' });
+  let closed = 0;
+  h.view.closeBookPanel = () => { closed++; h.view.bookPanel.open = false; };
+  h.view.bookPanel.open = true;
+  h.view.chatPaneWidths = () => null;
+  h.view.mountBookPanel(dom.element('div'));
+  await Promise.resolve();
+  assert.equal(closed, 1);
+});
+
+test('bar: 31 cards with 5 needing a look at gate 2 or done: every step is ticked; while writing the failing step decides (S1)', () => {
+  lang('zh-TW');
+  const counts = { pending: 0, planned: 0, written: 0, checked: 26, 'needs-review': 5 };
+  for (const phase of ['gate2', 'done']) {
+    const order = Array.from({ length: 31 }, (_, i) => 'c' + i);
+    const state = ui.bookBarState(bookData({ phase, order }), undefined, id => (Number(id.slice(1)) < 26 ? 'checked' : 'needs-review'), () => 'T');
+    assert.equal(JSON.stringify(state.steps), JSON.stringify({ plan: 31, write: 31, images: 31, proof: 31 }), phase);
+    const parent = dom.element('div');
+    ui.renderBookBar(parent, state, calls().actions);
+    assert.deepEqual(dom.findAll(parent, i => i.tag === 'li').map(i => i.text), ['✓ 全書企劃', '✓ 逐章企劃', '✓ 寫作', '✓ 找圖', '✓ 校對'], phase);
+  }
+  // The runner's own counts: the same at gate 2; while writing only a proofread failure keeps the text and pictures.
+  assert.equal(JSON.stringify(runModule.stepCounts(counts, 0, { settled: true })), JSON.stringify({ plan: 31, write: 31, images: 31, proof: 31 }));
+  assert.equal(JSON.stringify(runModule.stepCounts(counts, 0, { proofFailed: 2 })), JSON.stringify({ plan: 31, write: 28, images: 28, proof: 26 }));
+  assert.equal(JSON.stringify(runModule.stepCounts(counts)), JSON.stringify({ plan: 31, write: 26, images: 26, proof: 26 }));
+});
+
+test('start card: a finished map opens the card again; a running, gate, stopped or unreadable map still answers with its own sentence (S2)', async () => {
+  const done = await harness({ book: false });
+  const map = done.view.map; map.bookPipeline = bookData({ phase: 'done', order: [done.ids.root, done.ids.a, done.ids.b] });
+  const card = await openCard(done);
+  assert.ok(card?.isOpen, 'a finished map confirms again');
+  assert.equal(done.entries.length, 0);
+  for (const phase of ['planning', 'gate1', 'writing', 'gate2']) {
+    const h = await harness({ book: true });
+    h.view.map.bookPipeline = bookData({ phase, order: [h.ids.root, h.ids.a, h.ids.b] });
+    await h.view.startBookPipelineFromUi();
+    assert.equal(h.view.bookStartModal, null, phase);
+    assert.equal(h.entries.length, 1, phase);
+  }
+  const stopped = await harness({ book: true });
+  stopped.view.map.bookPipeline = bookData({ status: 'stopped', order: [stopped.ids.root] });
+  await stopped.view.startBookPipelineFromUi();
+  assert.equal(stopped.view.bookStartModal, null);
+  assert.equal(stopped.entries.length, 1);
+  const unreadable = await harness({ book: true });
+  unreadable.view.map.bookPipeline = { v: 99 };
+  await unreadable.view.startBookPipelineFromUi();
+  assert.equal(unreadable.view.bookStartModal, null);
+  assert.equal(unreadable.entries.length, 1);
+});
+
+test('start card: several root topics are refused before the card opens (M2); a chat chain holding the map refuses before any setting is written (M3)', async () => {
+  const many = await harness({ book: false });
+  many.view.map.nodes.find(n => n.id === many.ids.a).parentId = null;
+  await many.view.startBookPipelineFromUi();
+  assert.equal(many.view.bookStartModal, null, 'no card for a map the entry would refuse');
+  assert.equal(many.entries.length, 1, 'the entry answers with its refusal');
+  const h = await harness({ book: false });
+  const writes = [];
+  h.plugin.repo.writeBookSettings = async (path, patch) => { writes.push([path, patch]); };
+  const modal = await openCard(h);
+  h.view.chatChainRunner = { current: {} };
+  dom.findAll(modal.modalEl, i => i.tag === 'textarea').find(f => f.attrs['aria-label'] === '讀者').value = 'kids';
+  cardButton(modal, '開始').click();
+  await dom.tick(); await dom.tick();
+  assert.equal(writes.length, 0, 'blocked: nothing written');
+  assert.equal(h.entries.length, 0, 'blocked: nothing started');
+  assert.ok(notices.length > 0, 'the owner is told');
+});
+
+test('bar: a title that has not loaded yet reads as a sentence without an empty pair of quotes (M4)', () => {
+  lang('zh-TW');
+  assert.equal(ui.bookNowText({ step: 'write', chapter: 3, more: 0 }), '目前：正在寫第 3 章');
+  assert.equal(ui.bookNowText({ step: 'proof', chapter: 3, title: '睡眠', more: 1 }), '目前：正在校對第 3 章「睡眠」，另有 1 章同時進行');
+  lang('en');
+  assert.equal(ui.bookNowText({ step: 'images', chapter: 2, more: 0 }), 'Now: finding pictures for chapter 2');
+  lang('zh-TW');
 });

@@ -512,7 +512,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     modelLabel: model => this.modelLabel(model),
     now: () => new Date().toISOString(),
     newId: () => crypto.randomUUID(),
-    log: line => this.logs.appendLog("info", line)
+    log: line => this.logs.appendLog("info", line),
+    progressed: mapPath =>
+      this.views()
+        .find(view => view.mapPath === mapPath)
+        ?.refreshBookProgress()
   });
   /** Suggestions awaiting a decision; onload replaces it with the persisted store, {@link topicRuns} reads whichever is current. */
   pendingSuggestions: Map<string, Suggestion[]> = new Map();

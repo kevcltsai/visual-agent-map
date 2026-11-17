@@ -44332,11 +44332,9 @@ function markerCore(line2) {
   return line2.trim().replace(/^(?:[-+*]|\d+[.)])\s+/, "").replace(/^[*_~]+/, "").replace(/[*_~]+$/, "").trim();
 }
 function markerLineKind(line2) {
-  var _a2;
   const core2 = markerCore(line2);
   if (STANDALONE_MARKER.test(core2)) return "own";
-  if (!core2.startsWith(MARKER_OPEN) || ((_a2 = core2.match(/〔/g)) != null ? _a2 : []).length !== 1) return void 0;
-  return core2.endsWith("\u3015") || !core2.includes("\u3015") ? "bad" : void 0;
+  return /^〔圖位[^〔〕]*〕$/.test(core2) ? "bad" : void 0;
 }
 function isShell(rest) {
   return /^(?:[-+]|\d+[.)])?$/.test(rest.replace(/[\s*_~]+/g, ""));
@@ -44366,7 +44364,7 @@ function scanSlotMarkers(content, slots) {
   scan3.omitted = slots.map((slot) => slot.index).filter((index) => !scan3.found.has(index));
   return scan3;
 }
-var INLINE_MARKER = /〔圖位[^〔〕\n]*〕|〔圖位/g;
+var INLINE_MARKER = /〔圖位[^〔〕\n]*〕|〔圖位\s*\d+\s*[：:]|〔圖位/g;
 function residualMarkerLines(content) {
   const lines = content.split(/\r?\n/);
   const guarded = protectedLines2(lines);
@@ -44392,7 +44390,7 @@ function pickForSlot(ctx, candidates) {
   return { none: true, reasonCode: "not_found" };
 }
 function plainLine2(text10) {
-  return text10 && /^[\s\p{P}\p{S}]+$/u.test(text10) && !text10.startsWith("\\") ? `\\${text10}` : text10;
+  return text10 && /^[\s\p{P}\p{S}]+$/u.test(text10) && /^[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]/.test(text10) && !text10.startsWith("\\") ? `\\${text10}` : text10;
 }
 function figureOf(candidate, href, language2) {
   const plain = (value) => value.replace(/[〔〕]/g, " ");

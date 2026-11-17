@@ -616,14 +616,14 @@ test('figureOf: a caption of only symbols (---, ===, - - -, ***, ___) is written
   assert.equal(figureWith('Plain caption').caption, 'Plain caption');
 });
 
-test('fill: an unclosed marker line, a bold-wrapped marker and a list-item marker leave no residue, whether the slot got a picture or not; verifyFill sees residue', () => {
-  const cases = ['〔圖位 1：藍光', '**〔圖位 1：藍光〕**', '- 〔圖位 1：藍光〕', '1. 〔圖位 1：藍光〕', '_〔圖位 1：藍光〕_', '*〔圖位 1：藍光'];
+test('fill: a bold-wrapped marker and a list-item marker leave no residue, whether the slot got a picture or not; verifyFill sees residue', () => {
+  const cases = ['**〔圖位 1：藍光〕**', '- 〔圖位 1：藍光〕', '1. 〔圖位 1：藍光〕', '_〔圖位 1：藍光〕_'];
   for (const marker of cases) {
     const text = `前。\n\n${marker}\n\n後。\n`;
     const { done, verdict } = fillOne(text);
     assert.equal(done.text, '前。\n\n後。\n', marker);
     assert.equal(verdict, undefined, marker);
-    assert.ok(done.missing.length === 1 && (marker.includes('〕') ? true : done.missing[0].reasonCode === 'bad_marker'), marker);
+    assert.equal(done.missing.length, 1, marker);
   }
   const wrapped = fillOne('前。\n\n**〔圖位 1：藍光〕**\n\n後。\n', new Map([[1, { figure: figureWith('C') }]]));
   assert.equal(wrapped.done.placed.length, 1); assert.equal(wrapped.verdict, undefined);
@@ -636,6 +636,24 @@ test('fill: an unclosed marker line, a bold-wrapped marker and a list-item marke
   assert.equal(IS.verifyFill('前。\n\n〔圖位 1：藍光\n\n後。\n', bare, [{ index: 1 }]), 'deleted_text');
   const adjacent = fillOne('前。\n\n- 〔圖位 1：a〕〔圖位 2：b〕\n\n後。\n');
   assert.equal(adjacent.done.text, '前。\n\n後。\n'); assert.equal(adjacent.verdict, undefined);
+});
+
+test('fill: an unclosed marker (or a stray closing bracket) takes out only the marker text; the sentence after it stays, the slot is bad_marker, verifyFill catches a deleted sentence', () => {
+  const a = fillOne('p\n\n〔圖位 1：藍光 讓人睡不著，這是重點。\n\nq');
+  assert.equal(a.done.text, 'p\n\n藍光 讓人睡不著，這是重點。\n\nq'); assert.equal(a.verdict, undefined);
+  assert.deepEqual(plain(a.done.missing), [{ index: 1, reasonCode: 'bad_marker' }]);
+  const b = fillOne('p\n\n〔圖位 1：a〕重要句子。〕\n\nq');
+  assert.equal(b.done.text, 'p\n\n重要句子。〕\n\nq'); assert.equal(b.verdict, undefined);
+  const lone = fillOne('前。\n\n〔圖位 1：\n\n後。\n'); assert.equal(lone.done.text, '前。\n\n後。\n'); assert.equal(lone.verdict, undefined);
+  assert.equal(fillOne('前。\n\n〔圖位 1：藍光\n\n後。\n').done.missing[0].reasonCode, 'bad_marker');
+  const wiped = { text: 'p\n\nq', placed: [], missing: [{ index: 1, reasonCode: 'bad_marker' }], bad: 0, added: [] };
+  assert.equal(IS.verifyFill('p\n\n〔圖位 1：藍光 讓人睡不著，這是重點。\n\nq', wiped, [{ index: 1 }]), 'deleted_text');
+  assert.equal(IS.verifyFill('p\n\n〔圖位 1：a〕重要句子。〕\n\nq', wiped, [{ index: 1 }]), 'deleted_text');
+});
+
+test('figureOf: a symbol-only caption gets a backslash only when it starts with an ASCII punctuation character', () => {
+  for (const caption of ['…', '→', '—', '（）', '★★★']) assert.equal(figureWith(caption).caption, caption);
+  assert.equal(figureWith('---').caption, '\\---');
 });
 
 test('protectedLines: indented code (4 spaces or tab), indented fences and the lazy continuation of a quote are never filled; a marker after a normal paragraph still is', () => {

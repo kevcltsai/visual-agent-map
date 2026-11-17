@@ -121,12 +121,11 @@ function markerCore(line: string): string {
     .replace(/[*_~]+$/, "")
     .trim();
 }
-/** `own`: a whole line that is one well-formed marker; `bad`: a whole line that is one marker but reworded, or opened and never closed; else not a marker line. */
+/** `own`: a whole line that is one well-formed marker; `bad`: a whole line that is one closed marker but reworded; else not a marker line (an unclosed marker or one followed by text is inline: only the marker text goes). */
 function markerLineKind(line: string): "own" | "bad" | undefined {
   const core = markerCore(line);
   if (STANDALONE_MARKER.test(core)) return "own";
-  if (!core.startsWith(MARKER_OPEN) || (core.match(/〔/g) ?? []).length !== 1) return undefined;
-  return core.endsWith("〕") || !core.includes("〕") ? "bad" : undefined;
+  return /^〔圖位[^〔〕]*〕$/.test(core) ? "bad" : undefined;
 }
 /** What is left of a line once the markers are taken out is only list or emphasis symbols and blanks (the line held nothing else). */
 function isShell(rest: string): boolean {
@@ -158,8 +157,8 @@ export function scanSlotMarkers(content: string, slots: readonly Pick<ImageSlot,
   return scan;
 }
 
-/** Marker text inside a line that is not a marker line of its own (a closed marker, or a bare opener without its closing bracket). */
-export const INLINE_MARKER = /〔圖位[^〔〕\n]*〕|〔圖位/g;
+/** Marker text inside a line that is not a marker line of its own: a closed marker, or an unclosed opener (`〔圖位 n：`; only the prefix, the text after it stays). */
+export const INLINE_MARKER = /〔圖位[^〔〕\n]*〕|〔圖位\s*\d+\s*[：:]|〔圖位/g;
 
 /** Lines (0-based) outside fences and quotes that still hold `〔圖位`: the commit check "no residual marker" needs this to be empty. */
 export function residualMarkerLines(content: string): number[] {
@@ -228,9 +227,14 @@ export interface SlotFigure {
 }
 export type SlotOutcome = { figure: SlotFigure } | { reasonCode: SlotReasonCode; reasonText?: string };
 
-/** A line of only symbols and blanks (`---`, `===`, `- - -`) can turn the line above into a heading or a rule: a backslash keeps it text. */
+/** A line of only symbols and blanks (`---`, `===`, `- - -`) can turn the line above into a heading or a rule: a backslash keeps it text (only when it starts with an ASCII punctuation character; `…`, `→`, `★★★` cannot). */
 function plainLine(text: string): string {
-  return text && /^[\s\p{P}\p{S}]+$/u.test(text) && !text.startsWith("\\") ? `\\${text}` : text;
+  return text &&
+    /^[\s\p{P}\p{S}]+$/u.test(text) &&
+    /^[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]/.test(text) &&
+    !text.startsWith("\\")
+    ? `\\${text}`
+    : text;
 }
 
 /** A finder caption is one plain line (what it is, where to look); an empty one falls back to the title. */

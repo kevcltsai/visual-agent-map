@@ -10,8 +10,7 @@
  * the map file. Only ids, counts and codes are logged.
  */
 import type { AdmissionContext } from "../../core/admission";
-import type { ImageCandidate } from "../../core/image-candidates";
-import type { FindImagesRequest } from "../../core/steps/book-pipeline/find-images";
+import type { FindImagesRequest, FoundImages } from "../../core/steps/book-pipeline/find-images";
 import { isBudgetExhausted } from "../../core/admission";
 import { createBudgetAdmission, createStoreBudgetPort } from "../../core/book-pipeline/budget";
 import { imageKey } from "../../core/book-pipeline/image-dedupe";
@@ -66,7 +65,6 @@ import {
   fencedLines,
   replaceProofSection,
   replaceResearchRecord,
-  setImageSection,
   chapterBody
 } from "../../core/book-pipeline/note-sections";
 import {
@@ -74,7 +72,8 @@ import {
   composeCardPrompt,
   parseBookPlanBody,
   parseBookPlanDecisions,
-  parseChecklist
+  parseChecklist,
+  parseImageSlots
 } from "../../core/book-pipeline/plan-text";
 import {
   composeProofRecord,
@@ -94,6 +93,23 @@ import type { ContentLanguage } from "../../i18n";
 import type { MapDocument } from "../../map-model";
 import type { NotePatch } from "../../repository";
 import { isBookStepError, type BookStepBase } from "../../core/steps/book-pipeline/base";
+import {
+  checkImageText,
+  choosePictures,
+  composeImageTextLine,
+  composeSlotsRecord,
+  imageIssueTokens,
+  latestSlotsRecord,
+  stripImageLines,
+  fillSlotMarkers,
+  residualMarkerLines,
+  scanSlotMarkers,
+  verifyFill,
+  type FillResult,
+  type ImageSlot,
+  type ProbedCandidate,
+  type SlotOutcome
+} from "../../core/book-pipeline/image-slots";
 import { cardPlanStep, type CardPlanRequest, type CardPlanResult } from "../../core/steps/book-pipeline/card-plan";
 import {
   globalPlanStep,
@@ -155,6 +171,8 @@ export interface AuthorInput {
   path: string;
   /** The effective whole-book settings; the port turns them into the research requirements. */
   settings: BookSettings;
+  /** The card's planned picture slots (from its `## Prompt`); empty when the plan has none or the Prompt has no image plan: the author then leaves no marker. */
+  slots: readonly ImageSlot[];
   language: ContentLanguage;
   model: string;
   reasoning: ReasoningLevel;
@@ -203,11 +221,11 @@ export interface BookPipelinePorts {
   /** The author step: the card's single-card research (charts off, fresh write-back). Never writes the card's frontmatter. */
   author(input: AuthorInput): Promise<AuthorOutcome>;
   probeImage(url: string, signal: AbortSignal): Promise<{ ok: true } | { ok: false; reason: string }>;
-  /** Production: `runFindImages(aiCalls, request, run)`: one web search for a chapter's pictures. Absent: no picture search (the "no picture" note stays). */
+  /** Production: `runFindImages(aiCalls, request, run)`: one web search for the picture slots of a chapter. Absent: no picture search (every marked slot ends as not found). */
   findImages?(
     request: FindImagesRequest,
     run: { signal: AbortSignal; admission?: AdmissionContext }
-  ): Promise<ImageCandidate[]>;
+  ): Promise<FoundImages>;
   backupNote(path: string, raw: string): Promise<{ ok: true; path: string } | { ok: false }>;
   /** True while a conversation chain, a multi-select research or an argument run holds this map. */
   blocked(mapPath: string): boolean;
@@ -289,6 +307,8 @@ interface Drive {
   failure?: string;
   /** Keys (see imageKey) of the pictures this run already embedded: one picture is used once in a book. */
   usedImages: Set<string>;
+  /** The drive-wide gate of picture probes in flight (see {@link PROBE_PARALLEL}). */
+  probeGate: { active: number; waiters: Array<() => void> };
   done: Promise<void>;
 }
 
@@ -395,8 +415,7 @@ const PICTURE_REASONS: Record<string, [string, string]> = {
   load_failed: ["無法載入", "could not load"],
   empty: ["空圖", "empty image"],
   timeout: ["逾時", "timed out"],
-  aborted: ["已中止", "aborted"],
-  none_found: ["未找到可驗證的公開圖片", "no verifiable public image found"]
+  aborted: ["已中止", "aborted"]
 };
 /** The "no picture" line for a probe reason code (a known code in the output language; anything else is escaped text). */
 function noPicture(language: string, reason: string): string {
@@ -405,9 +424,9 @@ function noPicture(language: string, reason: string): string {
   const text = known ? known[zh ? 0 : 1] : escapeMarkdownText(reason, 60) || (zh ? "載入失敗" : "load failed");
   return zh ? `${NO_PICTURE}${text}` : `No picture: ${text}`;
 }
-/** The most pictures one chapter gets (a gallery chapter gets more). */
-export const BOOK_IMAGES_MAX = 3;
-export const BOOK_IMAGES_MAX_GALLERY = 6;
+/** Picture probes of one chapter (at most 24 distinct addresses: 8 slots of 3 candidates) and probes in flight in the whole run. */
+export const PROBE_PER_CHAPTER = 24;
+export const PROBE_PARALLEL = 4;
 const SEARCH_TEXT_MAX = 400;
 /** The chapter's search text: its title, summary and (at most five) `《work》` names from the text, one line with no address in it. */
 function imageSearchText(card: PipelineCard): string {
@@ -422,23 +441,6 @@ function imageSearchText(card: PipelineCard): string {
       .replace(/\S*:\/\/\S*/g, " "),
     SEARCH_TEXT_MAX
   );
-}
-/** The "### 圖像" section body: for each verified candidate a standard image and one plain caption line (escaped text, no link, no HTML). */
-function imageSectionBody(items: readonly { href: string; candidate: ImageCandidate }[], language: string): string {
-  const zh = /^zh/i.test(language);
-  return items
-    .map(({ href, candidate }) => {
-      const name = escapeMarkdownText(candidate.title, 80) || (zh ? "圖" : "image");
-      let host = "";
-      try {
-        host = new URL(candidate.source).hostname;
-      } catch {
-        // an unreadable source page: the caption has the name only
-      }
-      const source = host ? `／${zh ? "來源" : "Source"}：${escapeMarkdownText(host, 80)}` : "";
-      return `![${name}](${href})\n${name}${source}`;
-    })
-    .join("\n\n");
 }
 const isHttps = (url: string): boolean => /^https:\/\//i.test(url);
 
@@ -987,6 +989,7 @@ export class BookPipelineRuns {
       disposed: false,
       rootId: "",
       usedImages: new Set<string>(),
+      probeGate: { active: 0, waiters: [] },
       done: Promise.resolve()
     } as unknown as Drive;
     this.drives.set(mapPath, drive);
@@ -1334,7 +1337,8 @@ export class BookPipelineRuns {
   private proofSectionOf(
     drive: Drive,
     outcome: { result: ProofResult } | { failure: string },
-    models: { model?: string; authorModel?: string }
+    models: { model?: string; authorModel?: string },
+    imageLine?: string
   ): (content: string) => string {
     const language = drive.config.language;
     const label = this.ports.modelLabel ? (id: string) => this.ports.modelLabel?.(id) ?? id : undefined;
@@ -1342,7 +1346,7 @@ export class BookPipelineRuns {
       replaceProofSection(
         content,
         proofSectionHeading(language),
-        composeProofSection(language, outcome, models, label)
+        composeProofSection(language, outcome, models, label, imageLine)
       );
   }
   /** Best effort: the card's proof-result section says "failed: reason" (no model). Never throws; skipped when nothing is known to be safe to write. */
@@ -1481,7 +1485,8 @@ export class BookPipelineRuns {
         handoff: result.handoff,
         ...(previous ? { previous: { ...previous, summary: result.previous } } : {}),
         ...(next ? { next: { ...next, summary: result.next } } : {}),
-        checklist: result.checklist
+        checklist: result.checklist,
+        images: result.images
       },
       drive.config.language
     );
@@ -1505,6 +1510,7 @@ export class BookPipelineRuns {
     if (!(await this.ensureBackup(drive, nodeId, info.path, card.raw)))
       return { kind: "failed", reason: "backup_failed", forceReview: true };
     const authorize = this.authorize(drive, token);
+    const slots = parseImageSlots(card.prompt);
     // The body is cleaned inside the author's own write (same `vault.process`): only standard https pictures are ever saved, and
     // an unsafe body is refused whole, so the card keeps its text from before this step.
     const knownLines: ReadonlySet<string> = new Set(card.raw.split("\n"));
@@ -1533,6 +1539,7 @@ export class BookPipelineRuns {
         nodeId,
         path: info.path,
         settings: effectiveSettings(root.settings, parseBookPlanDecisions(root.raw)),
+        slots: slots ?? [],
         language: drive.config.language,
         model: drive.config.authorModel,
         reasoning: drive.config.reasoning,
@@ -1556,7 +1563,8 @@ export class BookPipelineRuns {
     // (its lines are in `knownLines` by construction) and its `### 圖像` section come back; the next proof replaces the record.
     let carried = written.detail;
     for (const record of extractProofRecords(card.detail).slice(-1)) carried = appendResearchNote(carried, record).text;
-    carried = carryImageSection(card.detail, carried);
+    // #12: an old Prompt (no picture plan) keeps the card's picture section; a card with a plan gets its pictures from the slots.
+    if (slots === undefined) carried = carryImageSection(card.detail, carried);
     if (carried !== written.detail) {
       const outcome = await this.ports.updateNoteGuarded(
         path,
@@ -1583,143 +1591,210 @@ export class BookPipelineRuns {
       });
       if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
     }
-    // Q13: the picture search (one call, optional): only pictures that load are embedded, by the program, in the standard form.
-    let search: { found: number; verified: number; duplicate: number; offTopic: number } | undefined;
-    if (this.ports.findImages) {
-      const searched = await this.findPictures(drive, path, written.fields.bookRole, authorize);
-      if (searched.outcome) return searched.outcome;
-      search = searched.counts;
-    }
-    // The Detail only: the note's preview callout repeats the first picture and may be one write behind.
-    const urls = bodyImageUrls((await this.ports.readCard(path)).detail);
-    this.ports.log(
-      formatPipelineLog({
-        event: "pictures",
-        runId: token.runId,
-        card: nodeId,
-        step: "write",
-        attempt: attemptsOf(drive.store.state, nodeId).write,
-        result: "ok",
-        ms: 0,
-        counts: { pictures: urls.length, ...search }
-      })
-    );
-    if (!urls.length) {
-      const latest = await this.ports.readCard(path);
-      const line = noPicture(drive.config.language, "none_found");
-      if (!/無圖：|No picture:/.test(chapterBody(latest.detail)) && !latest.detail.includes(line)) {
-        const added = appendResearchNote(latest.detail, line);
-        if (added.appended) {
-          const outcome = await this.ports.updateNoteGuarded(
-            path,
-            { detail: added.text },
-            { expectedContent: latest.raw, authorize }
-          );
-          if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
-        }
-      }
-    }
+    // The picture slots (T2): the author's markers become verified pictures in one guarded write, or the stage does not advance.
+    const filled = await this.fillSlots(drive, token, nodeId, path, slots, authorize);
+    if (filled) return filled;
     return { kind: "ok", after: () => this.setStage(drive, nodeId, "written", null) };
   }
 
   /**
-   * The picture search of one written card: one call through the author's model (budget reserved before it), every candidate loaded by
-   * the program, at most {@link BOOK_IMAGES_MAX} (a gallery card {@link BOOK_IMAGES_MAX_GALLERY}) https pictures embedded. A failed or empty
-   * search is not a failure of the card (it keeps the "no picture" note); only a budget refusal, a Stop or a refused write end the step.
+   * The picture slots of one written card. No picture plan in the Prompt (`slots` undefined, #12): no search, no record, only a stray
+   * marker line is deleted. With a plan: scan the markers, one search call for the slots that have a marker (an optional gain: a
+   * failed or empty search leaves those slots `not_found`), probe the candidates (at most {@link PROBE_PER_CHAPTER} a chapter, at most
+   * {@link PROBE_PARALLEL} in flight in the run), re-read the card, choose and claim the pictures in one synchronous turn, swap the
+   * markers, verify, and write the text and the `book-slots:v1` record in one guarded write. Returns an outcome only when the step
+   * ends (budget, a refused or discarded write); undefined means the markers are settled and the card may advance to written.
    */
-  private async findPictures(
+  private async fillSlots(
     drive: Drive,
+    token: StepToken,
+    nodeId: string,
     path: string,
-    role: BookRole | undefined,
+    slots: ImageSlot[] | undefined,
     authorize: () => boolean
-  ): Promise<{
-    outcome?: Outcome;
-    counts?: { found: number; verified: number; duplicate: number; offTopic: number };
-  }> {
+  ): Promise<Outcome | undefined> {
     const signal = drive.controller.signal;
-    const card = await this.ports.readCard(path);
-    const query = imageSearchText(card);
-    if (bodyImageUrls(card.detail).length || !query || !this.ports.findImages) return {};
-    // What the other chapters already use (not this card's own old pictures: a rerun may pick again), and what this run embedded.
-    const exclude = new Set(drive.usedImages);
-    for (const info of drive.cards.values())
-      if (info.path !== path) {
-        // A card deleted meanwhile is skipped: it must not fail this chapter.
-        const other = await this.ports.readCard(info.path).catch(() => undefined);
-        if (other) for (const url of bodyImageUrls(other.detail)) exclude.add(imageKey(url));
-      }
-    let found: ImageCandidate[] = [];
-    try {
-      found = await untilAborted(
-        signal,
-        this.ports.findImages(
-          { ...this.base(drive, drive.config.authorModel), query, exclude: [...exclude] },
-          { signal, admission: drive.admission }
-        )
-      );
-    } catch (error) {
-      if (isBudgetExhausted(error)) return { outcome: { kind: "budget" } };
-      if (signal.aborted) throw error;
-      // The search is an optional gain: a call error or a timeout leaves the card as it is.
+    const language = drive.config.language;
+    const attempt = attemptsOf(drive.store.state, nodeId).write;
+    if (!slots) return this.settleStrayMarkers(path, authorize);
+    const first = await this.ports.readCard(path);
+    const marked = slots.length ? scanSlotMarkers(first.detail, slots).found : new Map<number, number>();
+    let found: FoundImages | undefined;
+    const others = new Set<string>();
+    if (slots.length) {
+      // What the other chapters already show (not this card's own old pictures: a rerun may pick again).
+      for (const info of drive.cards.values())
+        if (info.path !== path) {
+          // A card deleted meanwhile is skipped: it must not fail this chapter.
+          const other = await this.ports.readCard(info.path).catch(() => undefined);
+          if (other) for (const url of bodyImageUrls(other.detail)) others.add(imageKey(url));
+        }
     }
-    const candidates = found.flatMap(candidate => {
-      const href = safeHref(candidate.url);
-      return href ? [{ href, candidate }] : [];
-    });
-    const probed = await Promise.all(
-      candidates.map(item =>
-        untilAborted(signal, this.ports.probeImage(item.href, signal)).catch((error: unknown) => {
-          if (signal.aborted) throw error;
-          return { ok: false as const, reason: "probe_failed" };
-        })
-      )
+    const wanted = slots.filter(slot => marked.has(slot.index));
+    if (wanted.length && this.ports.findImages) {
+      try {
+        found = await untilAborted(
+          signal,
+          this.ports.findImages(
+            {
+              ...this.base(drive, drive.config.authorModel),
+              chapter: imageSearchText(first),
+              slots: wanted.map(({ index, kind, explains }) => ({ index, kind, explains })),
+              exclude: [...new Set([...drive.usedImages, ...others])]
+            },
+            { signal, admission: drive.admission }
+          )
+        );
+      } catch (error) {
+        if (isBudgetExhausted(error)) return { kind: "budget" };
+        if (signal.aborted) throw error;
+        // The search is an optional gain: a call error or a timeout leaves the slots without a picture.
+      }
+    }
+    // Probe each distinct safe address once (the first PROBE_PER_CHAPTER in slot order); the gate limits how many run at once.
+    const probes = new Map<string, Promise<boolean>>();
+    const listed = wanted.map(slot => ({
+      index: slot.index,
+      items: (found?.bySlot.get(slot.index) ?? []).map(candidate => {
+        const href = safeHref(candidate.url);
+        if (href && !probes.has(href) && probes.size < PROBE_PER_CHAPTER)
+          probes.set(href, this.probeGated(drive, href));
+        return { candidate, href };
+      })
+    }));
+    const loadedHref = new Map<string, boolean>();
+    await Promise.all([...probes].map(async ([href, work]) => loadedHref.set(href, await work)));
+    const perSlot = new Map<number, ProbedCandidate[]>(
+      listed.map(({ index, items }) => [
+        index,
+        items.map(({ candidate, href }) => ({
+          candidate: {
+            imageUrl: candidate.url,
+            sourceUrl: candidate.source,
+            title: candidate.title,
+            caption: candidate.caption
+          },
+          href,
+          loaded: href ? (loadedHref.get(href) ?? false) : false,
+          ...(href && !loadedHref.has(href) ? { skipped: true } : {})
+        }))
+      ])
     );
-    const cap = role === "gallery" ? BOOK_IMAGES_MAX_GALLERY : BOOK_IMAGES_MAX;
-    const verified = candidates.filter((_, i) => probed[i].ok);
-    // Filter and claim in one synchronous block: chapters run side by side, so the prompt's exclude list alone cannot stop a repeat.
-    const items: typeof verified = [];
-    let duplicate = 0;
-    for (const item of verified) {
-      const key = imageKey(item.href);
-      if (exclude.has(key) || drive.usedImages.has(key)) duplicate++;
-      else if (items.length < cap) {
-        drive.usedImages.add(key);
-        items.push(item);
-      }
-    }
-    const counts = {
-      found: found.length,
-      verified: verified.length,
-      duplicate,
-      offTopic: (found as { offTopic?: number }).offTopic ?? 0
-    };
-    if (!items.length) return { counts };
-    const section = imageSectionBody(items, drive.config.language);
-    // The exit check: nothing but the verified addresses may be an image in what is added.
+    // Re-read the latest text: the search and the probes took time, and the owner may have edited the card.
+    const latest = await this.ports.readCard(path);
+    // The card may have left the map while the search and the probes ran: nothing is claimed or written for it.
+    if (!(await this.stillOnMap(drive, nodeId))) return { kind: "failed", reason: "card_removed" };
+    const outcomes = choosePictures(
+      { id: nodeId, title: latest.title },
+      slots,
+      perSlot,
+      key => drive.usedImages.has(key) || others.has(key),
+      language
+    );
+    // Claim in the same synchronous turn as the choice: chapters run side by side, so the exclude list alone cannot stop a repeat.
+    const claimed = [...outcomes.values()].flatMap(outcome =>
+      "figure" in outcome ? [imageKey(outcome.figure.href)] : []
+    );
+    for (const key of claimed) drive.usedImages.add(key);
     const release = (): void => {
-      for (const item of items) drive.usedImages.delete(imageKey(item.href));
+      for (const key of claimed) drive.usedImages.delete(key);
     };
-    if (this.exitCheck(section, new Set(items.map(item => item.href)))) {
-      release();
-      return { counts };
-    }
-    let outcome: Awaited<ReturnType<BookPipelinePorts["updateNoteGuarded"]>>;
     try {
-      const latest = await this.ports.readCard(path);
-      outcome = await this.ports.updateNoteGuarded(
-        path,
-        { detail: setImageSection(latest.detail, section, drive.config.language) },
-        { expectedContent: latest.raw, authorize }
+      const result = await this.writeFilled(latest, slots, outcomes, authorize);
+      if (typeof result === "string") {
+        release();
+        return { kind: "failed", reason: result };
+      }
+      this.ports.log(
+        formatPipelineLog({
+          event: "slots",
+          runId: token.runId,
+          card: nodeId,
+          step: "write",
+          attempt,
+          result: "ok",
+          ms: 0,
+          counts: { placed: result.placed.length, missing: result.missing.length },
+          hosts: { name: "reason", list: [...new Set(result.missing.map(item => item.reasonCode))] }
+        })
       );
+      return undefined;
     } catch (error) {
       release();
       throw error;
     }
-    if (outcome === "discarded") {
-      release();
-      return { outcome: { kind: "failed", reason: "discarded" }, counts };
+  }
+
+  /** One probe through the run-wide gate: true when the picture loads. A probe that throws (not a Stop) counts as not loaded. */
+  private async probeGated(drive: Drive, href: string): Promise<boolean> {
+    const signal = drive.controller.signal;
+    const gate = drive.probeGate;
+    if (signal.aborted) throw new Error("aborted");
+    if (gate.active < PROBE_PARALLEL) gate.active++;
+    else
+      await new Promise<void>((resolve, reject) => {
+        const grant = (): void => {
+          signal.removeEventListener("abort", onAbort);
+          resolve();
+        };
+        const onAbort = (): void => {
+          const at = gate.waiters.indexOf(grant);
+          if (at >= 0) gate.waiters.splice(at, 1);
+          reject(new Error("aborted"));
+        };
+        signal.addEventListener("abort", onAbort, { once: true });
+        gate.waiters.push(grant);
+      });
+    try {
+      const probed = await untilAborted(signal, this.ports.probeImage(href, signal)).catch((error: unknown) => {
+        if (signal.aborted) throw error;
+        return { ok: false as const };
+      });
+      return probed.ok;
+    } finally {
+      const next = gate.waiters.shift();
+      if (next) next();
+      else gate.active--;
     }
-    return { counts };
+  }
+
+  /**
+   * Swaps the markers of `latest` for the chosen pictures and writes text plus record in one guarded write (the write is refused when
+   * the card changed since `latest`, or a marker is left outside fences and quotes). Returns the fill result, or a failure reason
+   * (nothing was written): the three checks, the exit check, or a discarded write.
+   */
+  private async writeFilled(
+    latest: PipelineCard,
+    slots: readonly ImageSlot[],
+    outcomes: ReadonlyMap<number, SlotOutcome>,
+    authorize: () => boolean
+  ): Promise<FillResult | string> {
+    const result = fillSlotMarkers(latest.detail, slots, outcomes);
+    const bad = verifyFill(latest.detail, result, slots);
+    if (bad) return `slots_${bad}`;
+    // The exit check: nothing but the placed addresses may be an image in what this write adds.
+    if (this.exitCheck(result.added.join("\n"), new Set(result.placed.map(item => item.href)))) return "slots_unsafe";
+    const detail = slots.length ? replaceResearchRecord(result.text, composeSlotsRecord(result)) : result.text;
+    if (detail === latest.detail) return result;
+    const outside = residualMarkerLines(latest.raw).length - residualMarkerLines(latest.detail).length;
+    const outcome = await this.ports.updateNoteGuarded(
+      latest.path,
+      { detail },
+      {
+        expectedContent: latest.raw,
+        authorize,
+        finalize: content => (residualMarkerLines(content).length > Math.max(0, outside) ? null : content)
+      }
+    );
+    return outcome === "discarded" ? "discarded" : result;
+  }
+
+  /** An old Prompt has no picture plan: nothing is searched or recorded; a marker line the author left anyway is deleted (the card's own pictures stay). */
+  private async settleStrayMarkers(path: string, authorize: () => boolean): Promise<Outcome | undefined> {
+    const latest = await this.ports.readCard(path);
+    if (!residualMarkerLines(latest.detail).length) return undefined;
+    const result = await this.writeFilled(latest, [], new Map(), authorize);
+    return typeof result === "string" ? { kind: "failed", reason: result } : undefined;
   }
 
   /** The independent exit check of an author result (a method so a test can force it to fail). */
@@ -1733,7 +1808,10 @@ export class BookPipelineRuns {
     if (!info) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
     const checklist = parseChecklist(card.prompt);
-    const body = chapterBody(card.detail);
+    const chapter = chapterBody(card.detail);
+    const body = stripImageLines(chapter);
+    const imageCheck = checkImageText(chapter, parseImageSlots(card.prompt), latestSlotsRecord(card.detail));
+    const imageLine = composeImageTextLine(drive.config.language, imageCheck);
     if (!checklist.length) return { kind: "failed", reason: "empty_list" };
     if (!body.trim()) return { kind: "failed", reason: "no_body" };
     const key = proofKey({
@@ -1777,7 +1855,7 @@ export class BookPipelineRuns {
         {
           expectedContent: card.raw,
           authorize: this.authorize(drive, token),
-          finalize: this.proofSectionOf(drive, { result }, models)
+          finalize: this.proofSectionOf(drive, { result }, models, imageLine)
         }
       );
       if (written === "discarded") return { kind: "failed", reason: "discarded" };
@@ -1789,7 +1867,7 @@ export class BookPipelineRuns {
         ...(stored?.model ? { model: stored.model } : {}),
         authorModel: drive.authorModels.get(nodeId) ?? stored?.authorModel
       };
-      const next = this.proofSectionOf(drive, { result }, models)(card.raw);
+      const next = this.proofSectionOf(drive, { result }, models, imageLine)(card.raw);
       if (next !== card.raw) {
         const path = await this.stillOnMap(drive, nodeId);
         if (!path) return { kind: "failed", reason: "card_removed" };
@@ -1807,6 +1885,7 @@ export class BookPipelineRuns {
     const structureUnmet = verdict.items
       .filter(item => item.type !== "fact" && item.status === "unmet")
       .map(item => code(item.id));
+    const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
     return {
       kind: "ok",
       after: () =>
@@ -1821,8 +1900,8 @@ export class BookPipelineRuns {
                   .filter(item => item.type === "fact" && item.status === "unmet")
                   .map(item => code(item.id))
                   .join(" ")}`
-            : structureUnmet.length
-              ? `structure unmet: ${structureUnmet.join(" ")}`
+            : noticed.length
+              ? `structure unmet: ${noticed.join(" ")}`
               : null
         )
     };

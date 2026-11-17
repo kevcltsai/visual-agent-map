@@ -1,5 +1,6 @@
 import type { BookRole, BookSettings } from "../../book-pipeline/model";
 import type { ChecklistItem, ChecklistType } from "../../book-pipeline/plan-text";
+import { cleanSlotText, MAX_IMAGE_SLOTS, type ImageSlot } from "../../book-pipeline/image-slots";
 import { singleLine } from "../../book-pipeline/text";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import {
@@ -40,6 +41,8 @@ export interface CardPlanResult {
   next: string;
   /** Ids `C1..Cn` assigned here, in order. */
   checklist: ChecklistItem[];
+  /** The image plan: 0 to 8 slots, indexes `1..n` assigned here in order. */
+  images: ImageSlot[];
   /** How many items the subjective-word filter dropped (absent when none); the runner logs the count. */
   droppedSubjective?: number;
   /** How many items the unconditional-picture filter dropped (absent when none). */
@@ -66,9 +69,24 @@ export const CARD_PLAN_SCHEMA = {
         properties: { type: { type: "string", enum: ["structure", "fact"] }, text: { type: "string", minLength: 1 } },
         required: ["type", "text"]
       }
+    },
+    images: {
+      type: "array",
+      minItems: 0,
+      maxItems: MAX_IMAGE_SLOTS,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          kind: { type: "string", minLength: 1 },
+          explains: { type: "string", minLength: 1 },
+          anchor: { type: "string", minLength: 1 }
+        },
+        required: ["kind", "explains", "anchor"]
+      }
     }
   },
-  required: ["covers", "entry", "handoff", "previous", "next", "checklist"]
+  required: ["covers", "entry", "handoff", "previous", "next", "checklist", "images"]
 };
 
 /** Picture words that are a requirement by themselves, and picture nouns that count only beside a requirement verb (so "圖像學" is not a picture item). */
@@ -88,7 +106,7 @@ const SUBJECTIVE =
 
 export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanResult {
   const item = parseJson(raw);
-  exactKeys(item, ["covers", "entry", "handoff", "previous", "next", "checklist"]);
+  exactKeys(item, ["covers", "entry", "handoff", "previous", "next", "checklist", "images"]);
   const entries = arrayOf(item.checklist, "checklist");
   if (entries.length < 1 || entries.length > MAX_CHECKLIST) fail(`checklist must have 1 to ${MAX_CHECKLIST} items`);
   const parsed = entries.map((entry): { type: ChecklistType; text: string } => {
@@ -105,6 +123,22 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
   const droppedPicture = objective.length - kept.length;
   if (!kept.length) fail("checklist has no usable item");
   const checklist = kept.map((item, index): ChecklistItem => ({ id: `C${index + 1}`, ...item }));
+  const slots = arrayOf(item.images, "images");
+  if (slots.length > MAX_IMAGE_SLOTS) fail(`images must have 0 to ${MAX_IMAGE_SLOTS} items`);
+  const images = slots.map((entry, at): ImageSlot => {
+    const one = recordOf(entry, "image slot");
+    exactKeys(one, ["kind", "explains", "anchor"]);
+    const field = (value: unknown, what: string, max: number): string => {
+      const text = cleanSlotText(singleLine(textOf(value, what), 400), max);
+      return text || fail(`${what} must be a non-empty string`);
+    };
+    return {
+      index: at + 1,
+      kind: field(one.kind, "image kind", 40),
+      explains: field(one.explains, "image explains", 200),
+      anchor: field(one.anchor, "image anchor", 120)
+    };
+  });
   const side = (value: unknown, present: boolean, what: string): string =>
     present ? singleLine(textOf(value, what), 240) : "";
   return {
@@ -114,6 +148,7 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
     previous: side(item.previous, !!request.previous, "previous"),
     next: side(item.next, !!request.next, "next"),
     checklist,
+    images,
     ...(dropped ? { droppedSubjective: dropped } : {}),
     ...(droppedPicture ? { droppedPicture } : {})
   };

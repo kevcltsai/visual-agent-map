@@ -1,7 +1,12 @@
 import type { TranslationKey } from "../../i18n";
 import { t } from "../../i18n";
 import { BOOK_SETTING_FIELDS, type BookSettingField, type PipelineStage } from "../../core/book-pipeline/model";
-import { parseBookPlanBody, parseBookPlanDecisions, parseCardPrompt } from "../../core/book-pipeline/plan-text";
+import {
+  parseBookPlanBody,
+  parseBookPlanDecisions,
+  parseCardPrompt,
+  parseImageSlots
+} from "../../core/book-pipeline/plan-text";
 import { bookCardView, bookFailureText, bookRefusalText, type BookCardInput } from "./book-pipeline-ui";
 import type { CardPlanSummary } from "./book-pipeline-run";
 
@@ -26,7 +31,9 @@ export interface GatePanelCard {
   stage: PipelineStage | "pending";
   roleText?: string;
   issueText?: string;
-  fields: { label: string; value: string }[];
+  /** The one plain line of the image plan: not arranged, none, or `n pictures: kind / what it explains`. */
+  imagePlan: string;
+  fields: { key: "covers" | "entry" | "handoff"; label: string; value: string }[];
   /** When no labelled line could be read: the first three lines of the Prompt as they are. */
   rawLines: string[];
 }
@@ -65,15 +72,21 @@ export function buildGatePanel(input: {
     const prompt = note?.prompt ?? "";
     const parsed = parseCardPrompt(prompt);
     const fields: GatePanelCard["fields"] = [];
-    if (parsed.covers) fields.push({ label: t("ui.book_panel_covers"), value: parsed.covers });
-    if (parsed.entry) fields.push({ label: t("ui.book_panel_entry"), value: parsed.entry });
-    if (parsed.handoff) fields.push({ label: t("ui.book_panel_handoff"), value: parsed.handoff });
+    if (parsed.covers) fields.push({ key: "covers", label: t("ui.book_panel_covers"), value: parsed.covers });
+    if (parsed.entry) fields.push({ key: "entry", label: t("ui.book_panel_entry"), value: parsed.entry });
+    if (parsed.handoff) fields.push({ key: "handoff", label: t("ui.book_panel_handoff"), value: parsed.handoff });
     const rawLines = fields.length
       ? []
       : prompt
           .split(/\r?\n/)
           .filter(line => line.trim())
           .slice(0, 3);
+    const slots = parseImageSlots(prompt);
+    const imagePlan = !slots
+      ? t("ui.book_panel_images_unarranged")
+      : slots.length
+        ? t("ui.book_panel_images_0_1", slots.length, slots.map(slot => `${slot.kind}／${slot.explains}`).join("；"))
+        : t("ui.book_panel_images_none");
     return {
       id,
       index: at + 1,
@@ -81,6 +94,7 @@ export function buildGatePanel(input: {
       stage: view.stage,
       ...(view.roleText ? { roleText: view.roleText } : {}),
       ...(view.issueText ? { issueText: view.issueText } : {}),
+      imagePlan,
       fields,
       rawLines
     };
@@ -102,9 +116,10 @@ export function buildGatePanel(input: {
 /** What the panel remembers across the map's repaints (the repaint rebuilds the DOM; this is on the view). */
 export class GatePanelState {
   open = false;
-  expanded = false;
   /** The map's root note text, read when the panel is drawn (for the thread and the decisions). */
   rootRaw = "";
+  /** Cards whose details (entry point, hand-off, "say more" box) are unfolded. */
+  readonly detailOpen = new Set<string>();
   readonly drafts = new Map<string, string>();
   readonly busy = new Set<string>();
   readonly notes = new Map<string, { text: string; error: boolean }>();
@@ -119,8 +134,8 @@ export class GatePanelState {
   pendingFocus: "title" | "opener" | null = null;
   reset(): void {
     this.open = false;
-    this.expanded = false;
     this.rootRaw = "";
+    this.detailOpen.clear();
     this.drafts.clear();
     this.busy.clear();
     this.notes.clear();
@@ -211,26 +226,22 @@ export function renderGatePanel(
   });
 
   const plan = panel.createDiv("vam-book-panel-plan");
-  const toggle = plan.createEl("button", { cls: "vam-book-panel-plan-toggle", text: t("ui.book_panel_plan_heading") });
-  toggle.setAttr("aria-expanded", String(state.expanded));
-  const body = plan.createDiv("vam-book-panel-plan-body");
-  body.hidden = !state.expanded;
-  toggle.addEventListener("click", event => {
-    event.stopPropagation();
-    state.expanded = !state.expanded;
-    toggle.setAttr("aria-expanded", String(state.expanded));
-    body.hidden = !state.expanded;
-  });
   if (!data.thread && !data.decisions.length && !data.materialCount)
-    body.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_plan_empty") });
-  if (data.thread) body.createDiv({ cls: "vam-book-panel-thread", text: t("ui.book_panel_thread_0", data.thread) });
+    plan.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_plan_empty") });
+  if (data.thread) {
+    plan.createDiv({ cls: "vam-book-panel-thread-label", text: t("ui.book_gate1_thread_label") });
+    plan.createDiv({ cls: "vam-book-panel-thread", text: data.thread });
+  }
   if (data.decisions.length)
-    body.createDiv({
-      cls: "vam-book-panel-decisions",
+    plan.createDiv({
+      cls: "vam-book-panel-decisions vam-book-panel-muted",
       text: t("ui.book_panel_decisions_0", data.decisions.map(item => `${item.label}：${item.value}`).join("；"))
     });
   if (data.materialCount)
-    body.createDiv({ cls: "vam-book-panel-materials", text: t("ui.book_panel_materials_0", data.materialCount) });
+    plan.createDiv({
+      cls: "vam-book-panel-materials vam-book-panel-muted",
+      text: t("ui.book_panel_materials_0", data.materialCount)
+    });
 
   const list = panel.createEl("ul", { cls: "vam-book-panel-cards" });
   list.setAttr("aria-label", t("ui.book_panel_cards_label"));
@@ -287,12 +298,12 @@ function renderCard(
     event.stopPropagation();
     actions.editPlan(card.id);
   });
-  if (card.fields.length)
-    for (const field of card.fields)
-      item.createDiv({ cls: "vam-book-panel-field", text: `${field.label}：${field.value}` });
+  const covers = card.fields.find(field => field.key === "covers");
+  if (covers) item.createDiv({ cls: "vam-book-panel-field vam-book-panel-covers", text: covers.value });
   else if (card.rawLines.length)
     for (const line of card.rawLines) item.createDiv({ cls: "vam-book-panel-field is-raw", text: line });
   else item.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_no_plan") });
+  item.createDiv({ cls: "vam-book-panel-muted vam-book-panel-images", text: card.imagePlan });
   if (card.issueText) {
     const issue = item.createDiv("vam-book-panel-issue");
     issue.createSpan({ text: card.issueText });
@@ -311,7 +322,26 @@ function renderCard(
       );
     });
   }
-  const form = item.createDiv("vam-book-panel-more");
+  const open = state.detailOpen.has(card.id);
+  const toggle = item.createEl("button", { cls: "vam-book-panel-details-toggle", text: t("ui.book_gate1_details") });
+  toggle.setAttr("aria-expanded", String(open));
+  toggle.setAttr("aria-label", t("ui.book_gate1_details_0", card.title));
+  const details = item.createDiv("vam-book-panel-details");
+  details.setAttr("id", `vam-book-details-${card.id}`);
+  toggle.setAttr("aria-controls", `vam-book-details-${card.id}`);
+  details.hidden = !open;
+  toggle.addEventListener("click", event => {
+    event.stopPropagation();
+    const now = !state.detailOpen.has(card.id);
+    if (now) state.detailOpen.add(card.id);
+    else state.detailOpen.delete(card.id);
+    toggle.setAttr("aria-expanded", String(now));
+    details.hidden = !now;
+  });
+  for (const field of card.fields)
+    if (field.key !== "covers")
+      details.createDiv({ cls: "vam-book-panel-field", text: `${field.label}：${field.value}` });
+  const form = details.createDiv("vam-book-panel-more");
   const input = form.createEl("input", { cls: "vam-book-panel-more-input", type: "text" });
   input.dataset.card = card.id;
   input.setAttr("aria-label", t("ui.book_panel_more_label_0", card.title));

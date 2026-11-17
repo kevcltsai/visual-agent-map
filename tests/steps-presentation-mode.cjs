@@ -57,7 +57,7 @@ async function harness() {
   view.path = MAP; view.map = await repo.readMap(MAP); view.stageEl = stage; view.contentEl = element('div');
   view.contentEl.root = doc; view.contentEl.ownerDocument = doc; view.contentEl.focus = () => { doc.activeElement = view.contentEl; };
   const contains = view.contentEl.contains; view.contentEl.contains = other => contains.call(view.contentEl, other) || other?.nodeId !== undefined;
-  view.viewportEl = { clientWidth: 800, clientHeight: 600, getBoundingClientRect: () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 }) };
+  view.viewportEl = { toggleClass() {}, clientWidth: 800, clientHeight: 600, getBoundingClientRect: () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 }) };
   view.announcer = element('div');
   view.openDetails = () => {};
   const centred = [];

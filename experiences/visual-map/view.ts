@@ -687,6 +687,8 @@ const ARROW_OFFSETS = new Map<string, -1 | 1>([
   ["ArrowDown", 1],
   ["ArrowRight", 1]
 ]);
+/** Zoom below which a card's tool row is hidden (its counter-scaled size would cover the neighbouring cards). */
+const TOOLS_MIN_ZOOM = 0.6;
 const TASK_PROGRESS_PREFIX = "vam-task:";
 /** How long the "merged, can undo" Notice stays, so its Undo button can be used. */
 const MERGE_DONE_NOTICE_MS = 15000;
@@ -13063,8 +13065,15 @@ export class VisualAgentMapView extends ItemView {
       const check = this.cardChecks.get(id);
       if (check) check.checked = this.selection.state.multiSelected.has(id);
     }
+    this.syncToolsVisibility();
     this.chat?.refreshSelection();
     this.syncRelationClasses();
+  }
+  /** With several cards selected only the hovered or focused card shows its tool row (see styles.css). */
+  private syncToolsVisibility(): void {
+    const { selected, multiSelected } = this.selection.state;
+    const total = new Set([...multiSelected, ...(selected ? [selected] : [])]).size;
+    this.viewportEl?.toggleClass("is-multi-selected", total > 1);
   }
   /**
    * Moves the selection without rebuilding the map: only the previous and next cards, the changed multi-select
@@ -17358,7 +17367,7 @@ export class VisualAgentMapView extends ItemView {
       researchMode: "research",
       researchDepth: "normal",
       visualMode: "off",
-      requirements: bookAuthorRequirements(input.settings),
+      requirements: bookAuthorRequirements(input.settings, input.slots),
       outputLanguage: input.language
     };
     this.bookAuthoring.set(node.path, Date.now());
@@ -18711,6 +18720,8 @@ export class VisualAgentMapView extends ItemView {
     this.stageEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
     // The stylesheet counter-scales each card's tool row by this, so its buttons stay a tappable size when zoomed out.
     this.stageEl.style.setProperty("--vam-zoom", String(zoom));
+    // Below this zoom the tool rows are hidden (they would cover neighbouring cards), see styles.css.
+    this.viewportEl?.toggleClass("is-zoomed-out", zoom < TOOLS_MIN_ZOOM);
   }
   private transform(): void {
     if (!this.map || !this.stageEl) return;

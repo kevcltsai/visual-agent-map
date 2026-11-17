@@ -134,6 +134,15 @@ test('runBookAuthor: calls researchChild as a rewrite without charts, with admis
   assert.equal(book.pipeline.authorize, input.authorize); assert.equal(book.pipeline.finalize, input.finalize);
 });
 
+test('runBookAuthor: the card\'s image slots reach the author requirements; no slots (or an input without the field) gives the rules and no plan block', async () => {
+  const h = authorView(async (child, signal, accepted, choices, charts, onResult) => onResult({}));
+  await proto.runBookAuthor.call(h.view, h.input({ slots: [{ index: 1, kind: 'map', explains: 'the route', anchor: 'after paragraph 1' }] }));
+  assert.match(h.calls[0][3].requirements, /Image slots: when an image plan is given/); assert.match(h.calls[0][3].requirements, /- slot 1: kind "map", explains "the route"/);
+  await proto.runBookAuthor.call(h.view, h.input({ slots: [] }));
+  await proto.runBookAuthor.call(h.view, h.input());
+  assert.ok(!/Image plan for this chapter/.test(h.calls[1][3].requirements)); assert.equal(h.calls[2][3].requirements, h.calls[1][3].requirements);
+});
+
 test('runBookAuthor: forces the book-chapter template for the run (never the card\'s own template); researchChild hands it to detailTemplateFor', async () => {
   const h = authorView(async (child, signal, accepted, choices, charts, onResult) => onResult({}));
   await proto.runBookAuthor.call(h.view, h.input());

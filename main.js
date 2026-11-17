@@ -66636,6 +66636,7 @@ var ARROW_OFFSETS = /* @__PURE__ */ new Map([
   ["ArrowDown", 1],
   ["ArrowRight", 1]
 ]);
+var TOOLS_MIN_ZOOM = 0.6;
 var TASK_PROGRESS_PREFIX = "vam-task:";
 var MERGE_DONE_NOTICE_MS = 15e3;
 var cardLabelSequence = 0;
@@ -77987,8 +77988,16 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const check = this.cardChecks.get(id);
       if (check) check.checked = this.selection.state.multiSelected.has(id);
     }
+    this.syncToolsVisibility();
     (_a2 = this.chat) == null ? void 0 : _a2.refreshSelection();
     this.syncRelationClasses();
+  }
+  /** With several cards selected only the hovered or focused card shows its tool row (see styles.css). */
+  syncToolsVisibility() {
+    var _a2;
+    const { selected, multiSelected } = this.selection.state;
+    const total2 = (/* @__PURE__ */ new Set([...multiSelected, ...selected ? [selected] : []])).size;
+    (_a2 = this.viewportEl) == null ? void 0 : _a2.toggleClass("is-multi-selected", total2 > 1);
   }
   /**
    * Moves the selection without rebuilding the map: only the previous and next cards, the changed multi-select
@@ -83345,10 +83354,12 @@ ${note.detail.trim()}` : "",
   }
   /** Only puts the viewport on the stage; measures nothing, so it is safe while a repaint is still drawing cards. */
   applyStageTransform() {
+    var _a2;
     if (!this.map || !this.stageEl) return;
     const { x, y, zoom } = this.map.viewport;
     this.stageEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
     this.stageEl.style.setProperty("--vam-zoom", String(zoom));
+    (_a2 = this.viewportEl) == null ? void 0 : _a2.toggleClass("is-zoomed-out", zoom < TOOLS_MIN_ZOOM);
   }
   transform() {
     var _a2, _b2, _c, _d, _e;
@@ -93912,6 +93923,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node > .vam-node-tools.is-side-left::after { left: 100%; }
 .vam-node > .vam-node-tools.is-side-right::after { right: 100%; }
 .vam-node > .vam-node-tools.is-wrapped { flex-wrap: wrap; justify-content: flex-start; }
+.vam-viewport.is-zoomed-out .vam-node > .vam-node-tools { opacity: 0; visibility: hidden; pointer-events: none; }
 .vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }
 .vam-node-tools > .vam-collapse-button { order: -1; }
 .vam-node-tools > .vam-node-tool { width: 26px; padding-left: 0; padding-right: 0; display: inline-flex; align-items: center; justify-content: center; }

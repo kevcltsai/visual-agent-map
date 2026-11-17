@@ -278,7 +278,7 @@ const jam = h => {
   // The card sits where the viewport puts it: panning moves it, so a placement settles after a pan or two, as in the app. Each repaint also changes where the row fits.
   card.getBoundingClientRect = () => { const dy = view.map.viewport.y + 290 - 10 * h.renders(); return { left: 5, right: 990, top: 20 + dy, bottom: 790 + dy }; };
   for (const other of h.stage.children) if (other !== card) other.getBoundingClientRect = () => ({ left: 2000, right: 2010, top: 0, bottom: 10 });
-  view.viewportEl = { getBoundingClientRect: () => ({ left: 0, right: 1000, top: 0, bottom: 800 }) };
+  view.viewportEl = { toggleClass() {}, getBoundingClientRect: () => ({ left: 0, right: 1000, top: 0, bottom: 800 }) };
   view.floatingControlRects = () => [];
   view.map.viewport = { x: -197, y: -290, zoom: 0.62 };
   view.transform = () => {};

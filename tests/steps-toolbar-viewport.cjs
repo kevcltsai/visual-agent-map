@@ -868,7 +868,7 @@ function fitWithToolsFixture() {
   view.canvasNodes = () => nodes;
   delete view.transform; // the real transform: it re-aligns the open tool row, which can pan
   view.textEls = new Map(); view.summaryEls = new Map();
-  view.viewportEl = { clientWidth: 640, clientHeight: 674, getBoundingClientRect: () => canvas };
+  view.viewportEl = { toggleClass() {}, clientWidth: 640, clientHeight: 674, getBoundingClientRect: () => canvas };
   view.stageEl = { style: { setProperty() {} }, querySelector: () => null, setAttribute() {}, removeAttribute() {} };
   view.contentEl = { querySelector: () => null };
   view.canvasInsets = () => ({ top: 0, right: 0, bottom: 0, left: 0 });
@@ -925,4 +925,25 @@ test('F5: a tool row beside the card never covers the + button: the + sits above
   assert.ok(row, 'the row has a stacking order');
   assert.ok(plus, 'a row on the right lifts the + button');
   assert.ok(number(plus) > number(row), 'the + is above the row');
+});
+
+test('card tool rows: hidden below 60% zoom, and with several cards selected only hover/focus shows one', () => {
+  const view = bareView({});
+  const toggles = [];
+  view.viewportEl = { toggleClass: (name, on) => toggles.push([name, on]) };
+  view.stageEl = { style: { setProperty() {} } };
+  view.map = { viewport: { x: 0, y: 0, zoom: 0.59 } };
+  view.applyStageTransform();
+  view.map.viewport.zoom = 0.6;
+  view.applyStageTransform();
+  assert.deepEqual(toggles, [['is-zoomed-out', true], ['is-zoomed-out', false]]);
+  toggles.length = 0;
+  view.selection.setSelected('a');
+  view.selection.replaceMulti([]);
+  view.syncToolsVisibility();
+  view.selection.replaceMulti(['a', 'b']);
+  view.syncToolsVisibility();
+  assert.deepEqual(toggles, [['is-multi-selected', false], ['is-multi-selected', true]]);
+  assert.match(css, /\.vam-viewport\.is-zoomed-out \.vam-node > \.vam-node-tools \{[^}]*visibility: hidden/);
+  assert.match(css, /\.vam-viewport\.is-multi-selected:not\(\.is-selecting\) \.vam-node\.is-selected:not\(:hover\):not\(:focus-within\) > \.vam-node-tools \{[^}]*visibility: hidden/);
 });

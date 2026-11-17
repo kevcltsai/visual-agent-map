@@ -2,6 +2,7 @@
 // Any one of these refuses: the newest conversation of a map ends on a plan nobody applied or cancelled; an automatic
 // continuation is running (the newest turn is an automatic round, `auto`, with no `chain_end` after it); a `turn_start` in the last 15 minutes;
 // an AI call in ai-exchanges.json in the last 15 minutes. A file that cannot be read or parsed refuses too.
+// waitOwnerIdle (--wait-idle) re-checks every minute for up to an hour instead of refusing at once.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { harnessConfigDir } from "./create-onboarding-test-vault.mjs";
@@ -91,5 +92,23 @@ export function ownerBusyReasons(vault, { now = Date.now() } = {}) {
 // Throws with every reason when the owner may be using the vault.
 export function assertOwnerIdle(vault, options) {
   const reasons = ownerBusyReasons(vault, options);
-  if (reasons.length) throw new Error(`Refusing to install into the owner's vault ${vault}: the owner may be using it.\n${reasons.map(reason => `- ${reason}`).join("\n")}\nAsk the session that opened you to get the owner's 「可以裝」; only then rerun with --update-current --owner-idle-confirmed.`);
+  if (reasons.length) throw new Error(`Refusing to install into the owner's vault ${vault}: the owner may be using it.\n${reasons.map(reason => `- ${reason}`).join("\n")}\nRerun with --update-current --wait-idle (run in background) to install as soon as the owner is idle, or ask the session that opened you to get the owner's 「可以裝」 and rerun with --owner-idle-confirmed.`);
+}
+
+export const WAIT_IDLE_TIMEOUT_MS = 60 * 60 * 1000;
+export const WAIT_IDLE_INTERVAL_MS = 60 * 1000;
+
+// --wait-idle: re-checks until the owner is idle, then returns; after the timeout it refuses with the current reasons.
+export function waitOwnerIdle(vault, { timeoutMs = WAIT_IDLE_TIMEOUT_MS, intervalMs = WAIT_IDLE_INTERVAL_MS, clock = Date.now, sleep, out = text => process.stdout.write(text) } = {}) {
+  const startedAt = clock();
+  let shown = "";
+  for (;;) {
+    const reasons = ownerBusyReasons(vault, { now: clock() });
+    if (!reasons.length) return;
+    if (clock() - startedAt >= timeoutMs) return assertOwnerIdle(vault, { now: clock() });
+    const text = reasons.join("\n");
+    if (text !== shown) out(`--wait-idle: owner may be using the vault; re-checking every ${Math.round(intervalMs / 1000)}s for up to ${Math.round(timeoutMs / 60000)} minutes.\n${reasons.map(reason => `- ${reason}`).join("\n")}\n`);
+    shown = text;
+    sleep(intervalMs);
+  }
 }

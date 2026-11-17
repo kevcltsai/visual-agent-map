@@ -8,7 +8,7 @@ import { focusAction, frontApp, instancePattern } from "./keep-background.mjs";
 import { enterHeavy, keepProfile } from "./heavy-lock.mjs";
 export { focusAction };
 import { createTestVault, ensureSourceSelectionFixture } from "./create-onboarding-test-vault.mjs";
-import { assertOwnerIdle } from "./owner-idle.mjs";
+import { assertOwnerIdle, waitOwnerIdle } from "./owner-idle.mjs";
 
 export const root = fileURLToPath(new URL("..", import.meta.url));
 // The owner's vault must survive reboots (macOS clears /private/tmp), so it lives beside the main checkout, never under the temp session prefix.
@@ -302,18 +302,21 @@ export function main(args = process.argv.slice(2)) {
     if (args.length !== 1) throw new Error("--which-installed takes no other options.");
     return process.stdout.write(`${whichInstalled()}\n`);
   }
-  for (const arg of args) if (!["--ui", "--prepare", "--update-current", "--owner-idle-confirmed"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg)) throw new Error(`Unknown argument: ${arg}`);
+  for (const arg of args) if (!["--ui", "--prepare", "--update-current", "--owner-idle-confirmed", "--wait-idle"].includes(arg) && !/^--profile=(normal|onboarding|reinstall)$/.test(arg)) throw new Error(`Unknown argument: ${arg}`);
   const ui = args.includes("--ui"), prepare = ui || args.includes("--prepare");
   const update = args.includes("--update-current");
   if (update && prepare) throw new Error("--update-current cannot be combined with reset/prepare options.");
   const ownerIdleConfirmed = args.includes("--owner-idle-confirmed");
   if (ownerIdleConfirmed && !update) throw new Error("--owner-idle-confirmed applies only to --update-current.");
+  const waitIdle = args.includes("--wait-idle");
+  if (waitIdle && (!update || ownerIdleConfirmed)) throw new Error("--wait-idle applies only to --update-current without --owner-idle-confirmed.");
   if (args.some(arg => arg.startsWith("--profile=")) && !prepare) throw new Error("Profile requires --prepare or --ui.");
   for (const name of ["VAM_TEST_TARGET_VERSION", "VAM_TEST_VAULT_PARENT", "VAM_TEST_ARTIFACT_DIR", "VAM_TEST_WORKSPACE_ROOT"]) if (process.env[name]) throw new Error(`${name} is retired in the current-branch harness; unset it to avoid testing a stale target.`);
   if (prepare) assertObsidianClosed();
   if (update) {
     // Checked before the build so a busy owner is not kept waiting, and again right before the files are replaced.
     if (ownerIdleConfirmed) process.stdout.write("--owner-idle-confirmed: skipping the owner-idle check (only after the owner said 「可以裝」).\n");
+    else if (waitIdle) waitOwnerIdle(canonicalVault, { sleep: ms => spawnSync("sleep", [String(ms / 1000)]) });
     else assertOwnerIdle(canonicalVault);
     fetchDepsTable();
     run("npm", ["run", "build"]);

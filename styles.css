@@ -2303,6 +2303,20 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-state.is-seam { font-weight: 600; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
 .vam-book-state.is-seam::before { background: var(--color-orange); }
 .vam-book-panel-summary { margin: 0; font-size: var(--font-ui-small); color: var(--text-muted); overflow-wrap: anywhere; }
+.vam-book-rerun { align-items: center; }
+.vam-book-rerun-clock { font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.vam-book-rerun-steps { margin-top: 4px; }
+.vam-book-state.is-rerun { font-weight: 600; font-variant-numeric: tabular-nums; color: color-mix(in srgb, var(--color-blue) 70%, var(--text-normal)); }
+.vam-book-state.is-rerun::before { background: var(--color-blue); }
+.vam-book-panel-unchanged { font-size: var(--font-ui-smaller); color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); overflow-wrap: anywhere; }
+.vam-book-panel-unchanged-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.vam-book-panel-images { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.vam-book-panel-images-title { margin: 0; font-size: var(--font-ui-small); }
+.vam-book-panel-images-list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.vam-book-panel-image-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
+.vam-book-finish-line { margin: 6px 0; color: var(--text-muted); overflow-wrap: anywhere; }
+.vam-book-finish-buttons { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.vam-book-menu-note { color: var(--text-muted); font-size: var(--font-ui-smaller); pointer-events: none; }
 .vam-book-panel-row { min-width: 0; overflow-wrap: anywhere; }
 .vam-book-panel-row button:focus-visible, .vam-book-panel-row:focus-visible, .vam-book-panel-finish:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-book-panel-proof { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; padding: 6px 8px; border-left: 2px solid var(--background-modifier-border); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; white-space: pre-wrap; }

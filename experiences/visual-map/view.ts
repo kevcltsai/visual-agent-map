@@ -559,6 +559,7 @@ import {
 import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal } from "./multi-research-modal";
 import { BookStartModal } from "./book-pipeline-start-modal";
+import { BookFinishModal } from "./book-pipeline-finish-modal";
 import { chatResearchReferenceGroups, type ResearchRequestWithReferences } from "./chat-research-sources";
 import { StructureReviewModal } from "./structure-review-modal";
 import {
@@ -1461,6 +1462,8 @@ export class VisualAgentMapView extends ItemView {
   /** What each card last showed of its research progress; a different signature means the card must be redrawn. */
   private researchSigs = new Map<string, string>();
   private researchElapsed = new Map<HTMLElement, number>();
+  /** Elements whose clock has its own words (the rerun's "Rerunning m:ss"). */
+  private researchFormat = new WeakMap<HTMLElement, (startedAt: number) => string>();
   private researchTick: number | null = null;
   /** Cards the picture-book author step is writing right now (path to start time); in memory only, never written to a card. */
   private bookAuthoring = new Map<string, number>();
@@ -6007,7 +6010,17 @@ export class VisualAgentMapView extends ItemView {
     // The stage is a separate element (the screen-reader announcement), so only the separator and the clock are here.
     return t("ui.aim_stage_with_elapsed_0_1", "", clock);
   }
-  private trackResearchElapsed(element: HTMLElement, startedAt: number): void {
+  private clockText(startedAt: number): string {
+    const seconds = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  }
+  /** "Rerunning m:ss" for a single-card rerun; the interval is the one tick every clock shares (cleared on close). */
+  private trackRerunClock(element: HTMLElement, startedAt: number): void {
+    element.setText(t("ui.book_rerun_elapsed_0", this.clockText(startedAt)));
+    this.trackResearchElapsed(element, startedAt, at => t("ui.book_rerun_elapsed_0", this.clockText(at)));
+  }
+  private trackResearchElapsed(element: HTMLElement, startedAt: number, format?: (startedAt: number) => string): void {
+    if (format) this.researchFormat.set(element, format);
     this.researchElapsed.set(element, startedAt);
     if (this.researchTick === null) this.researchTick = window.setInterval(() => this.tickResearch(), 1000);
   }
@@ -6015,7 +6028,7 @@ export class VisualAgentMapView extends ItemView {
   private tickResearch(): void {
     for (const [element, startedAt] of [...this.researchElapsed]) {
       if (this.closed || !element.isConnected) this.researchElapsed.delete(element);
-      else element.setText(this.researchElapsedText(startedAt));
+      else element.setText((this.researchFormat.get(element) ?? (at => this.researchElapsedText(at)))(startedAt));
     }
     if (!this.researchElapsed.size && this.researchTick !== null) {
       window.clearInterval(this.researchTick);
@@ -9794,7 +9807,19 @@ export class VisualAgentMapView extends ItemView {
     const progress = this.plugin.getBookPipelineProgress(path);
     const phase = progress?.phase ?? read.data.phase;
     if (phase !== "gate1" && phase !== "gate2" && phase !== "done") return;
-    const disabled = !!progress?.active || (progress?.busyCards ?? []).includes(node.id);
+    // Why the item cannot be used right now, in words (it was a grey line with no reason).
+    const why = progress?.rerun
+      ? progress.rerun.nodeId === node.id
+        ? t("ui.book_card_menu_why_this")
+        : t("ui.book_card_menu_why_other")
+      : progress?.active
+        ? t("ui.book_card_menu_why_running")
+        : (progress?.busyCards ?? []).includes(node.id)
+          ? t("ui.book_card_menu_why_this")
+          : this.bookPipelineBlocked()
+            ? t("ui.book_card_menu_why_blocked")
+            : "";
+    const disabled = why !== "";
     menu.addSeparator();
     menu.addItem(item =>
       item
@@ -9812,7 +9837,11 @@ export class VisualAgentMapView extends ItemView {
             })
         )
     );
-    menu.addItem(item => item.setTitle(t("ui.book_card_menu_rerun_sub")).setDisabled(true));
+    // The second line is a note, not a command: the reason when the item is unavailable, else what the rerun does.
+    menu.addItem(item => {
+      item.setTitle(why || t("ui.book_card_menu_rerun_sub"));
+      (item as unknown as { dom?: HTMLElement }).dom?.addClass("vam-book-menu-note");
+    });
   }
   /** Opens the topic note in a new main-area tab (the details sidebar is the other way to read it). */
   private openNoteInTab(node: MapNode): void {
@@ -12289,6 +12318,7 @@ export class VisualAgentMapView extends ItemView {
           working
             ? {
                 step: working.step,
+                ...(working.rerun ? { rerun: true } : {}),
                 track: element => {
                   element.setText(this.researchElapsedText(working.startedAt));
                   this.trackResearchElapsed(element, working.startedAt);
@@ -17018,11 +17048,18 @@ export class VisualAgentMapView extends ItemView {
   private bookWorkingStep(
     nodeId: string,
     path: string
-  ): { step: "plan" | "write" | "images" | "proof"; startedAt: number } | undefined {
+  ): { step: "plan" | "write" | "images" | "proof"; startedAt: number; rerun?: boolean } | undefined {
     const authoring = this.bookAuthoring.get(path);
-    const current = this.path
-      ? this.plugin.getBookPipelineProgress(this.path)?.current?.find(item => item.nodeId === nodeId)
-      : undefined;
+    const progress = this.path ? this.plugin.getBookPipelineProgress(this.path) : undefined;
+    // The whole-book plan is recorded under the name "global": it is never a card.
+    const current = progress?.current?.find(item => item.nodeId === nodeId && item.nodeId !== "global");
+    // A single-card rerun: the label says so and the clock runs from the rerun's start, not from each step's.
+    if (progress?.rerun?.nodeId === nodeId)
+      return {
+        step: authoring !== undefined ? "write" : (current?.step ?? "plan"),
+        startedAt: progress.rerun.startedAt,
+        rerun: true
+      };
     if (authoring !== undefined) return { step: "write", startedAt: authoring };
     return current ? { step: current.step, startedAt: current.startedAt } : undefined;
   }
@@ -17047,7 +17084,8 @@ export class VisualAgentMapView extends ItemView {
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
       confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path)),
-      panel: { open: this.bookPanel.open, toggle: () => this.toggleBookPanel() }
+      panel: { open: this.bookPanel.open, toggle: () => this.toggleBookPanel() },
+      track: (element, startedAt) => this.trackRerunClock(element, startedAt)
     });
   }
   // ---- Picture-book gate panel (04b) ---------------------------------------------------------------------------
@@ -17265,13 +17303,19 @@ export class VisualAgentMapView extends ItemView {
       state,
       {
         open: id => void this.openBookNote(id),
-        rerun: async id => {
+        rerun: async (id, options) => {
           try {
-            await this.plugin.rerunBookCard(path, id);
+            return await this.plugin.rerunBookCard(path, id, options);
           } finally {
             await this.rereadBookCard(id);
           }
         },
+        confirmFinish: info =>
+          new Promise<boolean>(resolve => {
+            if (this.closed) return resolve(false);
+            this.openMapModal(new BookFinishModal(this.app, info, resolve));
+          }),
+        track: (element, startedAt) => this.trackRerunClock(element, startedAt),
         confirmSeam: async id => {
           try {
             await this.plugin.confirmBookSeam(path, id);
@@ -17289,7 +17333,8 @@ export class VisualAgentMapView extends ItemView {
         refresh: () => this.paintBookPanel()
       },
       new Set(progress?.busyCards ?? []),
-      !!progress?.active
+      !!progress?.active,
+      progress?.rerun
     );
     const all = (selector: string): HTMLElement[] => Array.from(side.querySelectorAll<HTMLElement>(selector));
     if (state.pendingFocus === "title") side.querySelector<HTMLElement>(".vam-book-panel-title")?.focus();

@@ -5,6 +5,7 @@
  * the stored record (appended to the research notes under a dedupe key, reused when a run resumes). Pure: it never sees
  * or changes the card's body.
  */
+import { translate, type ContentLanguage } from "../../i18n";
 import type { ChecklistItem } from "./plan-text";
 import { escapeMarkdownText, hashText, singleLine } from "./text";
 
@@ -272,13 +273,17 @@ const RECORD = /^<!-- book-proof:v1 (\{.*\}) -->$/;
 const escapeJson = (text: string): string => text.replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
 const STATUS_WORDS: Record<ProofStatus, string> = { met: "達成", unmet: "未達成", unverified: "待查" };
 
-/**
- * The lines appended to the research notes for one proof: readable plain lines and one machine record. The only place the
- * note and sources are made safe (escaped text; https addresses as inline code, so nothing is clickable or loadable).
- */
-export function composeProofRecord(key: string, result: ProofResult, failure?: ProofFailureCode): string {
-  // Re-checked here too: whatever the result holds, the note only ever gets escaped text and inline-code https addresses.
-  const clean: ProofResult = {
+/** The model ids a proof record keeps: the proofread model actually called and the author model of the card's last write (either may be unknown). */
+export interface ProofModels {
+  model?: string;
+  authorModel?: string;
+}
+const safeModelId = (value: unknown): string =>
+  typeof value === "string" ? value.replace(/[^A-Za-z0-9_.:/-]/g, "").slice(0, 60) : "";
+
+/** Re-checked whenever a result is written: whatever it holds, the note only ever gets escaped text and inline-code https addresses. */
+function cleanResult(result: ProofResult): ProofResult {
+  return {
     aggregate: result.aggregate,
     ...(result.factsUnverified ? { factsUnverified: true } : {}),
     items: result.items.map(item => ({
@@ -292,6 +297,22 @@ export function composeProofRecord(key: string, result: ProofResult, failure?: P
       ? { counts: { openedPages: safeCount(result.counts.openedPages), searches: safeCount(result.counts.searches) } }
       : {})
   };
+}
+
+/**
+ * The lines appended to the research notes for one proof: readable plain lines and one machine record. The only place the
+ * note and sources are made safe (escaped text; https addresses as inline code, so nothing is clickable or loadable).
+ * `models` (ids only) are kept in the machine line so a later reuse of the record can still say which model was called.
+ */
+export function composeProofRecord(
+  key: string,
+  result: ProofResult,
+  failure?: ProofFailureCode,
+  models?: ProofModels
+): string {
+  const clean = cleanResult(result);
+  const model = safeModelId(models?.model);
+  const authorModel = safeModelId(models?.authorModel);
   const lines = [
     (failure
       ? `校對失敗（原因：${failure}；以下是已判斷的結果，仍需人看）`
@@ -303,9 +324,34 @@ export function composeProofRecord(key: string, result: ProofResult, failure?: P
       `- ${item.id} ${STATUS_WORDS[item.status]}：${item.note}${item.sources.length ? `（開頁：${item.sources.map(href => `\`${href}\``).join(" ")}）` : ""}`
     );
   lines.push(
-    `<!-- book-proof:v1 ${escapeJson(JSON.stringify({ key, result: clean, ...(failure ? { failed: failure } : {}) }))} -->`
+    `<!-- book-proof:v1 ${escapeJson(JSON.stringify({
+        key,
+        result: clean,
+        ...(failure ? { failed: failure } : {}),
+        ...(model ? { model } : {}),
+        ...(authorModel ? { authorModel } : {})
+      })
+    )} -->`
   );
   return lines.join("\n");
+}
+
+/** The model ids stored in the record for `key` (empty fields when it holds none: a record from before they were kept), or undefined when there is no such record. */
+export function findProofModels(notes: string, key: string): ProofModels | undefined {
+  for (const line of notes.split(/\r?\n/)) {
+    const m = RECORD.exec(line.trim());
+    if (!m) continue;
+    try {
+      const data = JSON.parse(m[1]) as { key?: unknown; model?: unknown; authorModel?: unknown };
+      if (data.key !== key) continue;
+      const model = safeModelId(data.model);
+      const authorModel = safeModelId(data.authorModel);
+      return { ...(model ? { model } : {}), ...(authorModel ? { authorModel } : {}) };
+    } catch {
+      // a damaged record is just not found
+    }
+  }
+  return undefined;
 }
 
 /** The stored result for `key` in a notes text, or undefined. */
@@ -333,4 +379,35 @@ export function appendProofRecord(
   const entry = composeProofRecord(key, result);
   const base = notes.replace(/\s+$/, "");
   return { text: base ? `${base}\n\n${entry}\n` : `${entry}\n`, appended: true };
+}
+
+/** The heading of the card's proof-result section in `language`. */
+export const proofSectionHeading = (language: ContentLanguage): string => translate(language, "detail.book_proof_heading");
+
+/**
+ * The body of the card's "proofread result" section (one `- ` line per item, then the two model lines; or one failure line and no model).
+ * Item notes are shown only when the item is not met; `modelLabel` turns a stored model id into its display name (an id with none is shown as it is).
+ */
+export function composeProofSection(
+  language: ContentLanguage,
+  outcome: { result: ProofResult } | { failure: string },
+  models: ProofModels,
+  modelLabel: (id: string) => string = id => id
+): string {
+  if ("failure" in outcome)
+    return `- ${translate(language, "detail.book_proof_failed_0", escapeMarkdownText(outcome.failure, 60) || "failed")}`;
+  const colon = /^zh/i.test(language) ? "：" : ": ";
+  const words: Record<ProofStatus, string> = {
+    met: translate(language, "detail.book_proof_met"),
+    unmet: translate(language, "detail.book_proof_unmet"),
+    unverified: translate(language, "detail.book_proof_unverified")
+  };
+  const lines = cleanResult(outcome.result).items.map(
+    item => `- ${item.id} ${words[item.status]}${item.status !== "met" && item.note ? `${colon}${item.note}` : ""}`
+  );
+  const shown = (id: string | undefined): string =>
+    safeModelId(id) ? escapeMarkdownText(modelLabel(safeModelId(id)), 80) : translate(language, "detail.book_model_unrecorded");
+  lines.push(`- ${translate(language, "detail.book_proof_author_model_0", shown(models.authorModel))}`);
+  lines.push(`- ${translate(language, "detail.book_proof_proof_model_0", shown(models.model))}`);
+  return lines.join("\n");
 }

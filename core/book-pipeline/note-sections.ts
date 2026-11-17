@@ -8,6 +8,7 @@ import {
   isResearchNotesHeading,
   SECTION_NAME
 } from "../../ai/section-aliases";
+import { NOTE_LANGUAGES, translate } from "../../i18n";
 import { demoteHeadings } from "./text";
 import { findProofRecord, PROOF_STATUSES, type ProofItemResult, type ProofResult } from "./proof";
 
@@ -103,8 +104,12 @@ export function appendResearchNote(detail: string, record: string): { text: stri
   while (last >= 0 && !body[last].trim()) last--;
   const hasCallout = body.some(line => CALLOUT_HEAD.test(line.replace(/\r$/, "")));
   const quoteTail = last >= 0 && /^>/.test(body[last]);
+  // A callout that holds nothing but its own title line (every record was taken out of it): the record follows the title directly.
+  const titleOnly = last >= 0 && CALLOUT_HEAD.test(body[last].replace(/\r$/, ""));
   const addition =
-    hasCallout && quoteTail ? `>\n${quoted}` : `${last >= 0 ? "\n" : ""}> [!note]- ${section.text}\n${quoted}`;
+    hasCallout && quoteTail
+      ? `${titleOnly ? "" : ">\n"}${quoted}`
+      : `${last >= 0 ? "\n" : ""}> [!note]- ${section.text}\n${quoted}`;
   const head = lines.slice(0, section.at + 1 + last + 1).join("\n");
   const tail = lines.slice(section.at + 1 + last + 1);
   while (tail.length && !tail[0].trim()) tail.shift();
@@ -112,6 +117,48 @@ export function appendResearchNote(detail: string, record: string): { text: stri
   // A heading with an empty body: `last` is -1, so the callout opens right after one blank line.
   const glue = last >= 0 ? "\n" : "\n\n";
   return { text: `${head}${glue}${addition}${rest}`, appended: true };
+}
+
+const PIPELINE_RECORD = /^<!-- (book-(?:proof|slots)):v1 (\{.*\}) -->$/;
+const PROOF_ITEM_LINE = /^- .+ (?:達成|未達成|待查)：/;
+const QUOTE_BLANK = /^[ \t]{0,3}>[ \t]*\r?$/;
+const validJson = (text: string): boolean => {
+  try {
+    return typeof JSON.parse(text) === "object";
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Puts `record` (a composed `book-proof:v1` or `book-slots:v1` record) into the Research notes section as the only record of its
+ * kind: every earlier record of that kind (its readable lines, its machine line and the blank quote line before it) is taken out
+ * first. Only the pipeline's own valid records go; any other text of the section (the author's research, the owner's notes, other
+ * callouts), a damaged record and anything inside a code block stay as they are. No Research notes section: it is added, as
+ * {@link appendResearchNote} does.
+ */
+export function replaceResearchRecord(detail: string, record: string): string {
+  const tag = (record.split(/\r?\n/).map(line => PIPELINE_RECORD.exec(line.trim())).find(Boolean) ?? [])[1];
+  const lines = detail.split("\n");
+  const section = tag ? findSection(lines, fencedLines(lines), text => isResearchNotesHeading(text)) : undefined;
+  if (!tag || !section) return appendResearchNote(detail, record).text;
+  const start = section.at + 1;
+  const plain = lines.slice(start, section.end).map(line => unquoted(line).replace(/\r$/, ""));
+  const fenced = fencedLines(plain);
+  const drop = new Set<number>();
+  for (let k = 0; k < plain.length; k++) {
+    const m = fenced[k] ? null : PIPELINE_RECORD.exec(plain[k].trim());
+    if (!m || m[1] !== tag || !validJson(m[2])) continue;
+    drop.add(k);
+    let j = k - 1;
+    if (tag === "book-proof") {
+      while (j >= 0 && !fenced[j] && !drop.has(j) && PROOF_ITEM_LINE.test(plain[j])) drop.add(j--);
+      if (j >= 0 && !fenced[j] && !drop.has(j) && PROOF_HEADER.test(plain[j].trim())) drop.add(j--);
+    }
+    if (j >= 0 && !drop.has(j) && QUOTE_BLANK.test(lines[start + j])) drop.add(j);
+  }
+  const kept = lines.filter((_, i) => i < start || i >= section.end || !drop.has(i - start));
+  return appendResearchNote(kept.join("\n"), record).text;
 }
 
 const OLD_MARK = "（舊版）";
@@ -307,6 +354,21 @@ function findImageSection(lines: string[]): { at: number; end: number } | undefi
   }
 }
 
+/** Where a picture block goes in a Detail: between the chapter text and its first Sources section (else the first Open questions, Research notes or Update log section, else the end). */
+function withImageBlock(lines: string[], block: string): string {
+  const fenced = fencedLines(lines);
+  const sources = findSection(lines, fenced, text => isNewSourcesHeading(text));
+  const other = findSection(
+    lines,
+    fenced,
+    text => isOpenQuestionsHeading(text) || isResearchNotesHeading(text) || isUpdateLogHeading(text)
+  );
+  const at = Math.min(sources?.at ?? lines.length, other?.at ?? lines.length);
+  const head = lines.slice(0, at).join("\n").replace(/\s+$/, "");
+  const tail = lines.slice(at).join("\n");
+  return `${head ? `${head}\n\n` : ""}${block}\n${tail ? `\n${tail}` : ""}`;
+}
+
 /**
  * A Detail with its picture section replaced by `section` (the lines after a `### 圖像` / `### Images` heading; null: removed).
  * The section sits between the chapter text and its first Sources section (else the first Open questions, Research notes or
@@ -320,18 +382,24 @@ export function setImageSection(detail: string, section: string | null, language
     lines = [...lines.slice(0, old.at), ...lines.slice(old.end)];
   }
   if (section === null) return lines.join("\n");
-  const fenced = fencedLines(lines);
-  const sources = findSection(lines, fenced, text => isNewSourcesHeading(text));
-  const other = findSection(
-    lines,
-    fenced,
-    text => isOpenQuestionsHeading(text) || isResearchNotesHeading(text) || isUpdateLogHeading(text)
-  );
-  const at = Math.min(sources?.at ?? lines.length, other?.at ?? lines.length);
-  const head = lines.slice(0, at).join("\n").replace(/\s+$/, "");
-  const tail = lines.slice(at).join("\n");
   const heading = /^zh/i.test(language) ? IMAGES_HEADING.zh : IMAGES_HEADING.en;
-  return `${head ? `${head}\n\n` : ""}### ${heading}\n\n${section.trim()}\n${tail ? `\n${tail}` : ""}`;
+  return withImageBlock(lines, `### ${heading}\n\n${section.trim()}`);
+}
+
+/**
+ * A rewritten Detail that lost the picture section the card had: the old section (heading and lines exactly as they were) is put
+ * back where {@link setImageSection} would put it. A rewrite that has a picture section of its own, or an old Detail without one
+ * in the system's form, is returned as it is.
+ */
+export function carryImageSection(oldDetail: string, newDetail: string): string {
+  const oldLines = oldDetail.split("\n");
+  const old = findImageSection(oldLines);
+  if (!old || findImageSection(newDetail.split("\n"))) return newDetail;
+  const block = oldLines
+    .slice(old.at, old.end)
+    .join("\n")
+    .replace(/\s+$/, "");
+  return withImageBlock(newDetail.split("\n"), block);
 }
 
 /**
@@ -346,4 +414,92 @@ export function chapterBody(detail: string): string {
     lines = [...lines.slice(0, section.at), ...lines.slice(section.end)];
   }
   return lines.join("\n").replace(/\s+$/, "");
+}
+
+const REFERENCE_START = "<!-- visual-agent-map:references:start -->";
+const DETAIL_START = "<!-- visual-agent-map:detail:start -->";
+const DETAIL_END = "<!-- visual-agent-map:detail:end -->";
+
+/** Per line: true where a heading must not be read: the frontmatter, the Detail block and code fences. */
+function protectedLines(lines: string[]): boolean[] {
+  const flags = fencedLines(lines);
+  if (lines[0]?.trim() === "---") {
+    for (let i = 1; i < lines.length; i++) {
+      for (let k = 0; k <= i; k++) flags[k] = true;
+      if (lines[i].trim() === "---") break;
+    }
+  }
+  let inDetail = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === DETAIL_START) inDetail = true;
+    if (inDetail) flags[i] = true;
+    if (lines[i].trim() === DETAIL_END) inDetail = false;
+  }
+  return flags;
+}
+
+/**
+ * The note's `## <proof result heading>` section set to `body` (any language's heading of it is found; the new heading is `heading`);
+ * the section is added before the reference-links block, else at the end. The section ends at the next `##` heading, the app's own
+ * marker comment or a callout, so what follows it stays. The Detail block, the frontmatter and everything else stay byte for byte.
+ */
+export function replaceProofSection(content: string, heading: string, body: string): string {
+  const lines = content.split("\n");
+  const flags = protectedLines(lines);
+  const names = new Set(NOTE_LANGUAGES.map(locale => translate(locale, "detail.book_proof_heading").trim()));
+  const found = findSection(lines, flags, (text, level) => level === 2 && names.has(text.trim()));
+  const entry = `## ${heading}\n\n${body.trim()}`;
+  if (found) {
+    let end = found.end;
+    for (let i = found.at + 1; i < found.end; i++) {
+      if (lines[i].trim().startsWith("<!-- visual-agent-map:") || /^>[ \t]?\[!/.test(lines[i])) {
+        end = i;
+        break;
+      }
+    }
+    const before = lines.slice(0, found.at).join("\n");
+    const after = lines.slice(end).join("\n");
+    return `${before ? `${before}\n` : ""}${entry}${after ? `\n\n${after}` : "\n"}`;
+  }
+  const marker = lines.findIndex((line, i) => !flags[i] && line.trim() === REFERENCE_START);
+  if (marker >= 0) {
+    const before = lines.slice(0, marker).join("\n").replace(/\s+$/, "");
+    return `${before ? `${before}\n\n` : ""}${entry}\n\n${lines.slice(marker).join("\n")}`;
+  }
+  const base = content.replace(/\s+$/, "");
+  return `${base ? `${base}\n\n` : ""}${entry}\n`;
+}
+
+/** "Nothing new" sentences the app and its prompts write into an empty section, in every language (without the final full stop). */
+const PLACEHOLDERS = (): Set<string> =>
+  new Set([
+    ...NOTE_LANGUAGES.map(locale => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
+    "No new content this time",
+    "本次無新增內容"
+  ]);
+
+/**
+ * A text without its `###`-or-deeper sections that hold nothing but the "no new information" sentence (heading and sentence both
+ * go). A section with any other text or a sub-section, a title, the frontmatter and code are never touched.
+ */
+export function dropPlaceholderSections(content: string): string {
+  const placeholders = PLACEHOLDERS();
+  let lines = content.split("\n");
+  for (let from = 0; ;) {
+    const flags = protectedLines(lines);
+    const hit = findSection(lines, flags, (_, level) => level >= 3, from);
+    if (!hit) break;
+    const body = lines
+      .slice(hit.at + 1, hit.end)
+      .join("\n")
+      .trim();
+    if (!placeholders.has(body.replace(/[.。]$/, ""))) {
+      from = hit.at + 1;
+      continue;
+    }
+    lines = [...lines.slice(0, hit.at), ...lines.slice(hit.end)];
+    if (hit.at > 0 && !lines[hit.at - 1]?.trim() && !lines[hit.at]?.trim()) lines.splice(hit.at, 1);
+    from = Math.max(0, hit.at - 1);
+  }
+  return lines.join("\n");
 }

@@ -103,29 +103,45 @@ test('gate 1 panel: title, count, plan area, and one block per card with role, c
   const panel = d.panel;
   assert.equal(panel.attrs.role, 'region');
   assert.ok(panel.attrs['aria-label']);
-  assert.ok(texts(panel).includes('關卡 1：確認企劃'));
+  assert.ok(texts(panel).includes('關卡 1：這本書要這樣寫，可以嗎？'));
   assert.ok(texts(panel).includes('3 張都已企劃'));
   const cards = all(panel, 'vam-book-panel-card');
   assert.equal(cards.length, 3);
   const second = cards[1];
   assert.ok(texts(second).includes('2 Da Vinci'));
   assert.ok(texts(second).includes('本文'));
-  assert.ok(texts(second).includes('會講什麼：covers 2'));
+  assert.ok(texts(second).includes('covers 2'), 'one sentence, no label');
   assert.ok(texts(second).includes('接入點：entry'));
   assert.ok(texts(second).includes('留給下一張的問題：handoff'));
   assert.ok(all(second, 'vam-book-panel-edit')[0].attrs['aria-label'].includes('Da Vinci'));
   const input = one(second, 'vam-book-panel-more-input');
   assert.ok(input.attrs['aria-label'].includes('Da Vinci'), 'the box has a label');
   assert.equal(texts(panel).filter(x => x === '確認，開始寫作').length, 1);
-  // the plan area: thread, decisions the owner left to the editor, material count; folded until opened
-  const body = one(panel, 'vam-book-panel-plan-body');
-  assert.equal(body.hidden, true);
-  one(panel, 'vam-book-panel-plan-toggle').click();
-  assert.equal(body.hidden, false);
-  assert.equal(one(panel, 'vam-book-panel-plan-toggle').attrs['aria-expanded'], 'true');
-  assert.ok(texts(body).some(x => x.includes('one thread')));
-  assert.ok(texts(body).some(x => x.includes('讀者：kids')));
-  assert.ok(texts(body).some(x => x.includes('素材登記表 1 件')));
+  // the plan area is open at the top, thread in big text, material in plain words; no fold left
+  const plan = one(panel, 'vam-book-panel-plan');
+  assert.equal(all(panel, 'vam-book-panel-plan-toggle').length, 0);
+  assert.ok(texts(plan).includes('全書主線'));
+  assert.ok(texts(plan).includes('one thread'));
+  assert.ok(texts(plan).some(x => x.includes('讀者：kids')));
+  assert.ok(texts(plan).includes('準備引用的資料 1 件'));
+  assert.ok(!texts(panel).some(x => x.includes('素材登記表')));
+  assert.equal(dom.findAll(panel, i => i.tag === 'h3')[0].text, '關卡 1：這本書要這樣寫，可以嗎？');
+  // per card: one sentence, role, image line; entry / hand-off / "say more" are behind "看細節 ▸"
+  const toggle = one(second, 'vam-book-panel-details-toggle');
+  const details = one(second, 'vam-book-panel-details');
+  assert.equal(toggle.tag, 'button');
+  assert.equal(toggle.text, '看細節 ▸');
+  assert.equal(toggle.attrs['aria-expanded'], 'false');
+  assert.equal(toggle.attrs['aria-controls'], details.attrs.id);
+  assert.equal(details.hidden, true);
+  assert.ok(texts(details).includes('接入點：entry'));
+  assert.ok(texts(details).includes('留給下一張的問題：handoff'));
+  assert.ok(one(details, 'vam-book-panel-more-input') && one(details, 'vam-book-panel-replan'));
+  toggle.click();
+  assert.equal(details.hidden, false);
+  assert.equal(toggle.attrs['aria-expanded'], 'true');
+  toggle.click();
+  assert.equal(details.hidden, true);
   one(panel, 'vam-book-panel-card'); // unchanged
   all(cards[0], 'vam-book-panel-edit')[0].click();
   assert.equal(JSON.stringify(r.entries.at(-1)), JSON.stringify(['edit', r.nodes[0].id]));
@@ -152,7 +168,7 @@ test('say more: calls replanCard with the sentence, shows busy then the new plan
   assert.ok(texts(d.panel).includes('已重寫這張企劃，前後卡接縫已標記。'));
   await r.reload();
   const d2 = await r.draw();
-  assert.ok(texts(d2.panel).includes('會講什麼：NEW covers'), 'the card shows the new plan from the note');
+  assert.ok(texts(d2.panel).includes('NEW covers'), 'the card shows the new plan from the note');
 });
 
 test('say more refusal: the runner error becomes a plain Chinese sentence under that card, and the box keeps what was typed', async () => {
@@ -210,7 +226,6 @@ test('plain text only: plan text with <img onerror>, <script>, markdown images a
   const evil = '<img src=x onerror=alert(1)> <script>alert(2)</script> ![p](https://evil.test/a.png) [l](javascript:alert(3))';
   const r = await rig({ card: request => ({ covers: evil, entry: evil, handoff: evil, previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'x' }] }), global: (request, list) => ({ thread: evil, cards: list.map((n, i) => ({ id: n.id, role: i ? 'body' : 'intro' })), materials: [{ name: evil, use: evil }], decisions: { reader: evil } }) });
   const d = await r.draw();
-  one(d.panel, 'vam-book-panel-plan-toggle').click();
   const tags = dom.findAll(d.panel, () => true).map(i => i.tag);
   for (const bad of ['img', 'script', 'a', 'iframe', 'svg']) assert.ok(!tags.includes(bad), bad);
   const shown = texts(d.panel).join('\n');
@@ -239,6 +254,41 @@ test('prompt that cannot be parsed: the first three lines show as they are; an e
   assert.match(texts(issue).join(' '), /需人看：企劃失敗/);
   one(issue, 'vam-book-panel-rerun').click();
   assert.equal(JSON.stringify(calls), JSON.stringify(['x3']));
+});
+
+test('T4 old data: no book plan, no image arrangement, a failed single card; thread and cards still draw, details stay folded, no throw', () => {
+  setUiLanguage('zh-TW');
+  const noteOf = id => ({ a: { prompt: '本章會講：舊的一句話\n接入點：舊接入', pipelineStage: 'planned' }, b: { prompt: '', pipelineStage: 'needs-review', pipelineIssue: 'plan failed: invalid_reply' } })[id];
+  const data = bundle.buildGatePanel({ order: ['a', 'b'], titleOf: id => `T${id}`, noteOf, rootRaw: '# Root\n' });
+  const state = new bundle.GatePanelState();
+  const p = bundle.renderGatePanel(dom.element('div'), data, true, state, { editPlan() {}, replan: async () => ({}), rerunPlan: async () => {}, confirm: async () => {}, showChat() {}, close() {}, refresh() {} });
+  assert.ok(texts(p).includes('全書企劃還沒有內容。'));
+  assert.equal(all(p, 'vam-book-panel-thread').length, 0);
+  assert.equal(all(p, 'vam-book-panel-images').length, 2);
+  assert.ok(texts(p).includes('未安排圖'));
+  const [a, b] = all(p, 'vam-book-panel-card');
+  assert.ok(texts(a).includes('舊的一句話'));
+  assert.equal(one(b, 'vam-book-panel-rerun').text, '重跑企劃');
+  assert.match(texts(one(b, 'vam-book-panel-issue')).join(' '), /需人看/);
+  assert.ok(all(b, 'vam-book-panel-details-toggle').length === 1);
+  assert.equal(one(b, 'vam-book-panel-details').hidden, true);
+});
+
+test('T4 details: open state survives a repaint (kept on the panel state), and a card with the details open stays open while another is toggled', () => {
+  setUiLanguage('zh-TW');
+  const data = bundle.buildGatePanel({ order: ['a', 'b'], titleOf: id => id, noteOf: () => ({ prompt: '本章會講：x\n接入點：e', pipelineStage: 'planned' }), rootRaw: '## 全書企劃\n### 主線\nT\n' });
+  const state = new bundle.GatePanelState();
+  const actions = { editPlan() {}, replan: async () => ({}), rerunPlan: async () => {}, confirm: async () => {}, showChat() {}, close() {}, refresh() {} };
+  const p1 = bundle.renderGatePanel(dom.element('div'), data, true, state, actions);
+  one(all(p1, 'vam-book-panel-card')[1], 'vam-book-panel-details-toggle').click();
+  const p2 = bundle.renderGatePanel(dom.element('div'), data, true, state, actions);
+  const [c0, c1] = all(p2, 'vam-book-panel-card');
+  assert.equal(one(c0, 'vam-book-panel-details').hidden, true);
+  assert.equal(one(c1, 'vam-book-panel-details').hidden, false);
+  assert.equal(one(c1, 'vam-book-panel-details-toggle').attrs['aria-expanded'], 'true');
+  assert.equal(one(c0, 'vam-book-panel-details').attrs.id !== one(c1, 'vam-book-panel-details').attrs.id, true);
+  state.reset();
+  assert.equal(state.detailOpen.size, 0);
 });
 
 test('keyboard and labels: Escape closes, the Chat tab calls showChat, buttons are real buttons in a sensible Tab order', async () => {

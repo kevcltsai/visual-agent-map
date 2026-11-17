@@ -3167,15 +3167,16 @@ var en = {
   "ui.book_panel_tab_chat": "Chat",
   "ui.book_panel_open": "Open the gate panel",
   "ui.book_panel_close": "Close the panel",
-  "ui.book_panel_gate1_title": "Gate 1: Confirm the plan",
+  "ui.book_panel_gate1_title": "Gate 1: Is this how the book should be written?",
   "ui.book_panel_all_planned_0": "All {0} cards are planned",
   "ui.book_panel_some_planned_0_1_2": "Planned {0}/{1} \xB7 Needs a look {2}",
   "ui.book_panel_not_gate1": "The run is not at gate 1, so there is no plan to confirm here.",
-  "ui.book_panel_plan_heading": "Book thread and editorial decisions",
   "ui.book_panel_plan_empty": "The book plan has no content yet.",
-  "ui.book_panel_thread_0": "Thread: {0}",
   "ui.book_panel_decisions_0": "Decided by the editor (the ones you left empty): {0}",
-  "ui.book_panel_materials_0": "Material register: {0} items",
+  "ui.book_panel_materials_0": "Material to cite: {0} item(s)",
+  "ui.book_gate1_thread_label": "Book thread",
+  "ui.book_gate1_details": "Details \u25B8",
+  "ui.book_gate1_details_0": "Details of {0}",
   "ui.book_field_reader": "Reader",
   "ui.book_field_goal": "Goal",
   "ui.book_field_angle": "Angle",
@@ -6306,15 +6307,16 @@ var zhCN = {
   "ui.book_panel_tab_chat": "\u5BF9\u8BDD",
   "ui.book_panel_open": "\u6253\u5F00\u5173\u5361\u9762\u677F",
   "ui.book_panel_close": "\u5173\u95ED\u9762\u677F",
-  "ui.book_panel_gate1_title": "\u5173\u5361 1\uFF1A\u786E\u8BA4\u4F01\u5212",
+  "ui.book_panel_gate1_title": "\u5173\u5361 1\uFF1A\u8FD9\u672C\u4E66\u8981\u8FD9\u6837\u5199\uFF0C\u53EF\u4EE5\u5417\uFF1F",
   "ui.book_panel_all_planned_0": "{0} \u5F20\u90FD\u5DF2\u4F01\u5212",
   "ui.book_panel_some_planned_0_1_2": "\u5DF2\u4F01\u5212 {0}\uFF0F{1} \xB7 \u9700\u4EBA\u770B {2}",
   "ui.book_panel_not_gate1": "\u76EE\u524D\u4E0D\u5728\u201C\u5173\u5361 1\u201D\uFF0C\u8FD9\u91CC\u6CA1\u6709\u8981\u786E\u8BA4\u7684\u4F01\u5212\u3002",
-  "ui.book_panel_plan_heading": "\u5168\u4E66\u4E3B\u7EBF\u4E0E\u7F16\u8F91\u51B3\u5B9A",
   "ui.book_panel_plan_empty": "\u5168\u4E66\u4F01\u5212\u8FD8\u6CA1\u6709\u5185\u5BB9\u3002",
-  "ui.book_panel_thread_0": "\u4E3B\u7EBF\uFF1A{0}",
   "ui.book_panel_decisions_0": "\u603B\u7F16\u8F91\u51B3\u5B9A\u7684\u680F\u4F4D\uFF08\u4F60\u7559\u7A7A\u7684\uFF09\uFF1A{0}",
-  "ui.book_panel_materials_0": "\u7D20\u6750\u767B\u8BB0\u8868 {0} \u4EF6",
+  "ui.book_panel_materials_0": "\u51C6\u5907\u5F15\u7528\u7684\u8D44\u6599 {0} \u4EF6",
+  "ui.book_gate1_thread_label": "\u5168\u4E66\u4E3B\u7EBF",
+  "ui.book_gate1_details": "\u770B\u7EC6\u8282 \u25B8",
+  "ui.book_gate1_details_0": "\u770B\u201C{0}\u201D\u7684\u7EC6\u8282",
   "ui.book_field_reader": "\u8BFB\u8005",
   "ui.book_field_goal": "\u76EE\u6807",
   "ui.book_field_angle": "\u5207\u5165\u89D2\u5EA6",
@@ -9445,15 +9447,16 @@ var zhTW = {
   "ui.book_panel_tab_chat": "\u5C0D\u8A71",
   "ui.book_panel_open": "\u958B\u555F\u95DC\u5361\u9762\u677F",
   "ui.book_panel_close": "\u95DC\u9589\u9762\u677F",
-  "ui.book_panel_gate1_title": "\u95DC\u5361 1\uFF1A\u78BA\u8A8D\u4F01\u5283",
+  "ui.book_panel_gate1_title": "\u95DC\u5361 1\uFF1A\u9019\u672C\u66F8\u8981\u9019\u6A23\u5BEB\uFF0C\u53EF\u4EE5\u55CE\uFF1F",
   "ui.book_panel_all_planned_0": "{0} \u5F35\u90FD\u5DF2\u4F01\u5283",
   "ui.book_panel_some_planned_0_1_2": "\u5DF2\u4F01\u5283 {0}\uFF0F{1} \xB7 \u9700\u4EBA\u770B {2}",
   "ui.book_panel_not_gate1": "\u76EE\u524D\u4E0D\u5728\u300C\u95DC\u5361 1\u300D\uFF0C\u9019\u88E1\u6C92\u6709\u8981\u78BA\u8A8D\u7684\u4F01\u5283\u3002",
-  "ui.book_panel_plan_heading": "\u5168\u66F8\u4E3B\u7DDA\u8207\u7DE8\u8F2F\u6C7A\u5B9A",
   "ui.book_panel_plan_empty": "\u5168\u66F8\u4F01\u5283\u9084\u6C92\u6709\u5167\u5BB9\u3002",
-  "ui.book_panel_thread_0": "\u4E3B\u7DDA\uFF1A{0}",
   "ui.book_panel_decisions_0": "\u7E3D\u7DE8\u8F2F\u6C7A\u5B9A\u7684\u6B04\u4F4D\uFF08\u4F60\u7559\u7A7A\u7684\uFF09\uFF1A{0}",
-  "ui.book_panel_materials_0": "\u7D20\u6750\u767B\u8A18\u8868 {0} \u4EF6",
+  "ui.book_panel_materials_0": "\u6E96\u5099\u5F15\u7528\u7684\u8CC7\u6599 {0} \u4EF6",
+  "ui.book_gate1_thread_label": "\u5168\u66F8\u4E3B\u7DDA",
+  "ui.book_gate1_details": "\u770B\u7D30\u7BC0 \u25B8",
+  "ui.book_gate1_details_0": "\u770B\u300C{0}\u300D\u7684\u7D30\u7BC0",
   "ui.book_field_reader": "\u8B80\u8005",
   "ui.book_field_goal": "\u76EE\u6A19",
   "ui.book_field_angle": "\u5207\u5165\u89D2\u5EA6",
@@ -51416,10 +51419,10 @@ function buildGatePanel(input2) {
     const prompt = (_a2 = note == null ? void 0 : note.prompt) != null ? _a2 : "";
     const parsed = parseCardPrompt(prompt);
     const fields = [];
-    if (parsed.covers) fields.push({ label: t("ui.book_panel_covers"), value: parsed.covers });
-    if (parsed.entry) fields.push({ label: t("ui.book_panel_entry"), value: parsed.entry });
-    if (parsed.handoff) fields.push({ label: t("ui.book_panel_handoff"), value: parsed.handoff });
-    const rawLines = fields.length ? [] : prompt.split(/\r?\n/).filter((line2) => line2.trim()).slice(0, 3);
+    if (parsed.covers) fields.push({ key: "covers", label: t("ui.book_panel_covers"), value: parsed.covers });
+    if (parsed.entry) fields.push({ key: "entry", label: t("ui.book_panel_entry"), value: parsed.entry });
+    if (parsed.handoff) fields.push({ key: "handoff", label: t("ui.book_panel_handoff"), value: parsed.handoff });
+    const rawLines = parsed.covers ? [] : prompt.split(/\r?\n/).filter((line2) => line2.trim()).slice(0, 3);
     const slots = parseImageSlots(prompt);
     const imagePlan = !slots ? t("ui.book_panel_images_unarranged") : slots.length ? t("ui.book_panel_images_0_1", slots.length, slots.map((slot) => `${slot.kind}\uFF0F${slot.explains}`).join("\uFF1B")) : t("ui.book_panel_images_none");
     return {
@@ -51453,9 +51456,10 @@ function buildGatePanel(input2) {
 var GatePanelState = class {
   constructor() {
     __publicField(this, "open", false);
-    __publicField(this, "expanded", false);
     /** The map's root note text, read when the panel is drawn (for the thread and the decisions). */
     __publicField(this, "rootRaw", "");
+    /** Cards whose details (entry point, hand-off, "say more" box) are unfolded. */
+    __publicField(this, "detailOpen", /* @__PURE__ */ new Set());
     __publicField(this, "drafts", /* @__PURE__ */ new Map());
     __publicField(this, "busy", /* @__PURE__ */ new Set());
     __publicField(this, "notes", /* @__PURE__ */ new Map());
@@ -51471,8 +51475,8 @@ var GatePanelState = class {
   }
   reset() {
     this.open = false;
-    this.expanded = false;
     this.rootRaw = "";
+    this.detailOpen.clear();
     this.drafts.clear();
     this.busy.clear();
     this.notes.clear();
@@ -51532,26 +51536,22 @@ function renderGatePanel(parent, data, gate1, state, actions, externalBusy = /* 
     text: data.needsReview || data.planned < data.total ? t("ui.book_panel_some_planned_0_1_2", data.planned, data.total, data.needsReview) : t("ui.book_panel_all_planned_0", data.total)
   });
   const plan = panel.createDiv("vam-book-panel-plan");
-  const toggle = plan.createEl("button", { cls: "vam-book-panel-plan-toggle", text: t("ui.book_panel_plan_heading") });
-  toggle.setAttr("aria-expanded", String(state.expanded));
-  const body = plan.createDiv("vam-book-panel-plan-body");
-  body.hidden = !state.expanded;
-  toggle.addEventListener("click", (event) => {
-    event.stopPropagation();
-    state.expanded = !state.expanded;
-    toggle.setAttr("aria-expanded", String(state.expanded));
-    body.hidden = !state.expanded;
-  });
   if (!data.thread && !data.decisions.length && !data.materialCount)
-    body.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_plan_empty") });
-  if (data.thread) body.createDiv({ cls: "vam-book-panel-thread", text: t("ui.book_panel_thread_0", data.thread) });
+    plan.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_plan_empty") });
+  if (data.thread) {
+    plan.createDiv({ cls: "vam-book-panel-thread-label", text: t("ui.book_gate1_thread_label") });
+    plan.createDiv({ cls: "vam-book-panel-thread", text: data.thread });
+  }
   if (data.decisions.length)
-    body.createDiv({
-      cls: "vam-book-panel-decisions",
+    plan.createDiv({
+      cls: "vam-book-panel-decisions vam-book-panel-muted",
       text: t("ui.book_panel_decisions_0", data.decisions.map((item) => `${item.label}\uFF1A${item.value}`).join("\uFF1B"))
     });
   if (data.materialCount)
-    body.createDiv({ cls: "vam-book-panel-materials", text: t("ui.book_panel_materials_0", data.materialCount) });
+    plan.createDiv({
+      cls: "vam-book-panel-materials vam-book-panel-muted",
+      text: t("ui.book_panel_materials_0", data.materialCount)
+    });
   const list2 = panel.createEl("ul", { cls: "vam-book-panel-cards" });
   list2.setAttr("aria-label", t("ui.book_panel_cards_label"));
   for (const card of data.cards) renderCard(list2, card, state, actions, externalBusy.has(card.id));
@@ -51600,9 +51600,8 @@ function renderCard(list2, card, state, actions, external) {
     event.stopPropagation();
     actions.editPlan(card.id);
   });
-  if (card.fields.length)
-    for (const field of card.fields)
-      item.createDiv({ cls: "vam-book-panel-field", text: `${field.label}\uFF1A${field.value}` });
+  const covers = card.fields.find((field) => field.key === "covers");
+  if (covers) item.createDiv({ cls: "vam-book-panel-field vam-book-panel-covers", text: covers.value });
   else if (card.rawLines.length)
     for (const line3 of card.rawLines) item.createDiv({ cls: "vam-book-panel-field is-raw", text: line3 });
   else item.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_no_plan") });
@@ -51625,7 +51624,26 @@ function renderCard(list2, card, state, actions, external) {
       );
     });
   }
-  const form = item.createDiv("vam-book-panel-more");
+  const open2 = state.detailOpen.has(card.id);
+  const toggle = item.createEl("button", { cls: "vam-book-panel-details-toggle", text: t("ui.book_gate1_details") });
+  toggle.setAttr("aria-expanded", String(open2));
+  toggle.setAttr("aria-label", t("ui.book_gate1_details_0", card.title));
+  const details = item.createDiv("vam-book-panel-details");
+  details.setAttr("id", `vam-book-details-${card.id}`);
+  toggle.setAttr("aria-controls", `vam-book-details-${card.id}`);
+  details.hidden = !open2;
+  toggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const now = !state.detailOpen.has(card.id);
+    if (now) state.detailOpen.add(card.id);
+    else state.detailOpen.delete(card.id);
+    toggle.setAttr("aria-expanded", String(now));
+    details.hidden = !now;
+  });
+  for (const field of card.fields)
+    if (field.key !== "covers")
+      details.createDiv({ cls: "vam-book-panel-field", text: `${field.label}\uFF1A${field.value}` });
+  const form = details.createDiv("vam-book-panel-more");
   const input2 = form.createEl("input", { cls: "vam-book-panel-more-input", type: "text" });
   input2.dataset.card = card.id;
   input2.setAttr("aria-label", t("ui.book_panel_more_label_0", card.title));

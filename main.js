@@ -51567,7 +51567,8 @@ function renderBookCardLabels(header2, view, writing) {
   var _a2;
   if (writing) {
     const step = (_a2 = writing.step) != null ? _a2 : "write";
-    const chip = header2.createSpan({ cls: `vam-status vam-status-running vam-book-state is-writing is-${step}` });
+    const chip = header2.createSpan({ cls: "vam-status vam-status-running vam-book-state is-writing" });
+    chip.addClass(`is-${step}`);
     chip.createSpan({ text: t(WORKING_KEY[step]) });
     const elapsed = chip.createSpan({ cls: "vam-book-elapsed" });
     elapsed.setAttr("aria-hidden", "true");

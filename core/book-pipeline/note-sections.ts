@@ -8,7 +8,7 @@ import {
   isResearchNotesHeading,
   SECTION_NAME
 } from "../../ai/section-aliases";
-import { NOTE_LANGUAGES, SUPPORTED_LANGUAGES, translate, type ContentLanguage } from "../../i18n";
+import { NOTE_LANGUAGES, translate } from "../../i18n";
 import { demoteHeadings } from "./text";
 import { findProofModels, findProofRecord, PROOF_STATUSES, type ProofItemResult, type ProofResult } from "./proof";
 
@@ -20,7 +20,7 @@ const CALLOUT_HEAD = /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?(?:[ \t].*)?$/;
 const RECORD_KEY = /^<!-- book-proof:v1 (\{.*\}) -->$/;
 
 /** Per line: true inside a fenced code block (the fence lines included). */
-function fencedLines(lines: string[]): boolean[] {
+export function fencedLines(lines: string[]): boolean[] {
   const flags: boolean[] = [];
   let open: string | undefined;
   for (const line of lines) {
@@ -451,13 +451,15 @@ function protectedLines(lines: string[], withDetail = true): boolean[] {
 export function replaceProofSection(content: string, heading: string, body: string): string {
   const lines = content.split("\n");
   const flags = protectedLines(lines);
-  const names = new Set(ALL_LOCALES().map(locale => translate(locale, "detail.book_proof_heading").trim()));
+  const names = new Set(NOTE_LANGUAGES.map(locale => translate(locale, "detail.book_proof_heading").trim()));
   const found = findSection(lines, flags, (text, level) => level === 2 && names.has(text.trim()));
   const entry = `## ${heading}\n\n${body.trim()}`;
   if (found) {
     // The section is what this function writes: its heading and the `- ` list lines right after it. Any other text (the owner's, another heading, a marker, a callout) ends it and stays.
+    // At most one blank line after the heading, then the consecutive `- ` lines; anything after a later blank line (even a `- ` list) is the owner's and stays.
     let end = found.at + 1;
-    while (end < found.end && (!lines[end].trim() || /^- /.test(lines[end]))) end++;
+    if (end < found.end && !lines[end].trim()) end++;
+    while (end < found.end && /^- /.test(lines[end])) end++;
     while (end > found.at + 1 && !lines[end - 1].trim()) end--;
     const before = lines.slice(0, found.at).join("\n");
     const after = lines.slice(end).join("\n").replace(/^\s+/, "");
@@ -472,15 +474,10 @@ export function replaceProofSection(content: string, heading: string, body: stri
   return `${base ? `${base}\n\n` : ""}${entry}\n`;
 }
 
-/** Every language the app's fixed text is written in: the note languages and every interface language. */
-const ALL_LOCALES = (): ContentLanguage[] => [
-  ...new Set<ContentLanguage>([...NOTE_LANGUAGES, ...SUPPORTED_LANGUAGES.map(item => item.id)])
-];
-
 /** "Nothing new" sentences the app and its prompts write into an empty section, in every language (without the final full stop). */
 const PLACEHOLDERS = (): Set<string> =>
   new Set([
-    ...ALL_LOCALES().map(locale => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
+    ...NOTE_LANGUAGES.map(locale => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
     "No new content this time",
     "本次無新增內容"
   ]);

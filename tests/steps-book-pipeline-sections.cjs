@@ -164,6 +164,20 @@ test('carryImageSection: the old section comes back verbatim after a rewrite; a 
   assert.ok(en.includes('### Images'));
 });
 
+test('replaceProofSection: the owner\'s `- ` list after the section (one blank line away) stays verbatim, at the end and before the reference block', () => {
+  const mine = '- 我的待辦一\n- 我的待辦二';
+  const atEnd = '# T\n\n## 校對結果（最新一次）\n\n- C1 達成\n\n' + mine + '\n';
+  const outEnd = sections.replaceProofSection(atEnd, '校對結果（最新一次）', '- C1 未達成');
+  assert.equal(outEnd, '# T\n\n## 校對結果（最新一次）\n\n- C1 未達成\n\n' + mine + '\n');
+  const refs = '<!-- visual-agent-map:references:start -->\n[1]: x\n<!-- visual-agent-map:references:end -->\n';
+  const beforeRefs = '# T\n\n## 校對結果（最新一次）\n\n- C1 達成\n- C2 達成\n\n' + mine + '\n\n' + refs;
+  const outRefs = sections.replaceProofSection(beforeRefs, '校對結果（最新一次）', '- C1 未達成');
+  assert.equal(outRefs, '# T\n\n## 校對結果（最新一次）\n\n- C1 未達成\n\n' + mine + '\n\n' + refs);
+  assert.equal(sections.replaceProofSection(outRefs, '校對結果（最新一次）', '- C1 未達成'), outRefs, 'idempotent');
+  const tight = sections.replaceProofSection('## 校對結果（最新一次）\n- C1 達成\n\n' + mine + '\n', '校對結果（最新一次）', '- C1 未達成');
+  assert.ok(tight.includes('\n\n' + mine + '\n') && count(tight, '- C1') === 1, 'no blank after the heading');
+});
+
 test('replaceProofSection: adds the section before the reference block / at the end, replaces it (any language heading), never touches the Detail block, code or frontmatter', () => {
   const note = '---\ntitle: T\n---\n# T\n\n## 詳細內容\n\n<!-- visual-agent-map:detail:start -->\n\n## 校對結果（最新一次）\n\n- 在 Detail 內，不動\n\n<!-- visual-agent-map:detail:end -->\n\n> [!info]- 提示\n> x\n';
   const added = sections.replaceProofSection(note, '校對結果（最新一次）', '- C1 達成');

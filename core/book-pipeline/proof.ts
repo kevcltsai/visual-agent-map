@@ -5,7 +5,7 @@
  * the stored record (appended to the research notes under a dedupe key, reused when a run resumes). Pure: it never sees
  * or changes the card's body.
  */
-import { translate, type ContentLanguage } from "../../i18n";
+import { noteLanguageOf, translate, type ContentLanguage } from "../../i18n";
 import type { ChecklistItem } from "./plan-text";
 import { escapeMarkdownText, hashText, singleLine } from "./text";
 
@@ -384,7 +384,7 @@ export function appendProofRecord(
 
 /** The heading of the card's proof-result section in `language`. */
 export const proofSectionHeading = (language: ContentLanguage): string =>
-  translate(language, "detail.book_proof_heading");
+  translate(noteLanguageOf(language), "detail.book_proof_heading");
 
 /**
  * The body of the card's "proofread result" section (one `- ` line per item, then the two model lines; or one failure line and no model).
@@ -396,13 +396,14 @@ export function composeProofSection(
   models: ProofModels,
   modelLabel: (id: string) => string = id => id
 ): string {
+  const note = noteLanguageOf(language);
   if ("failure" in outcome)
-    return `- ${translate(language, "detail.book_proof_failed_0", escapeMarkdownText(outcome.failure, 60) || "failed")}`;
+    return `- ${translate(note, "detail.book_proof_failed_0", escapeMarkdownText(outcome.failure, 60) || "failed")}`;
   const colon = /^zh/i.test(language) ? "：" : ": ";
   const words: Record<ProofStatus, string> = {
-    met: translate(language, "detail.book_proof_met"),
-    unmet: translate(language, "detail.book_proof_unmet"),
-    unverified: translate(language, "detail.book_proof_unverified")
+    met: translate(note, "detail.book_proof_met"),
+    unmet: translate(note, "detail.book_proof_unmet"),
+    unverified: translate(note, "detail.book_proof_unverified")
   };
   const lines = cleanResult(outcome.result).items.map(
     item => `- ${item.id} ${words[item.status]}${item.status !== "met" && item.note ? `${colon}${item.note}` : ""}`
@@ -410,8 +411,8 @@ export function composeProofSection(
   const shown = (id: string | undefined): string =>
     safeModelId(id)
       ? escapeMarkdownText(modelLabel(safeModelId(id)), 80)
-      : translate(language, "detail.book_model_unrecorded");
-  lines.push(`- ${translate(language, "detail.book_proof_author_model_0", shown(models.authorModel))}`);
-  lines.push(`- ${translate(language, "detail.book_proof_proof_model_0", shown(models.model))}`);
+      : translate(note, "detail.book_model_unrecorded");
+  lines.push(`- ${translate(note, "detail.book_proof_author_model_0", shown(models.authorModel))}`);
+  lines.push(`- ${translate(note, "detail.book_proof_proof_model_0", shown(models.model))}`);
   return lines.join("\n");
 }

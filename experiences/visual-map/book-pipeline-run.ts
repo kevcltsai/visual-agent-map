@@ -62,6 +62,7 @@ import {
   carryImageSection,
   dropPlaceholderSections,
   replaceBookPlanSection,
+  fencedLines,
   replaceProofSection,
   replaceResearchRecord,
   setImageSection,
@@ -357,22 +358,32 @@ const ANCHOR =
  */
 export function convertSourceAnchors(content: string): string {
   const at = frontmatterLength(content);
+  const lines = content.slice(at).split("\n");
+  const fenced = fencedLines(lines);
   return (
     content.slice(0, at) +
-    content
-      .slice(at)
-      .replace(ANCHOR, (whole: string, rawHref: string, rawText: string, offset: number, all: string) => {
-        if (/&(?:lt|gt|quot);/i.test(rawText) || /&(?:lt|gt|quot);/i.test(rawHref.replace(/&amp;/g, ""))) return whole;
-        const href = safeLinkHref(rawHref.replace(/&amp;/g, "&"));
-        const text = escapeMarkdownText(rawText.replace(/&amp;/g, "&"), 200);
-        if (!href || !text) return whole;
-        // Nested: an earlier anchor on this line is still open, so this one sits inside it.
-        const prefix = all.slice(all.lastIndexOf("\n", offset - 1) + 1, offset);
-        if ((prefix.match(/(?:<|&lt;)a[ \t]/gi)?.length ?? 0) > (prefix.match(/(?:<|&lt;)\/a/gi)?.length ?? 0))
-          return whole;
-        const before = all[offset - 1];
-        return `${before === "!" || before === "\\" ? " " : ""}[${text}](${href})`;
+    lines
+      .map((line, index) => {
+        if (fenced[index]) return line;
+        // Inline code spans (a backtick run to the same run) are shown as written, so an anchor inside one stays.
+        const spans: Array<[number, number]> = [];
+        for (const m of line.matchAll(/(`+)(?!`).+?(?<!`)\1(?!`)/g)) spans.push([m.index, m.index + m[0].length]);
+        return line.replace(ANCHOR, (whole: string, rawHref: string, rawText: string, offset: number, all: string) => {
+          if (spans.some(([from, to]) => offset >= from && offset < to)) return whole;
+          if (/&(?:lt|gt|quot);/i.test(rawText) || /&(?:lt|gt|quot);/i.test(rawHref.replace(/&amp;/g, "")))
+            return whole;
+          const href = safeLinkHref(rawHref.replace(/&amp;/g, "&"));
+          const text = escapeMarkdownText(rawText.replace(/&amp;/g, "&"), 200);
+          if (!href || !text) return whole;
+          // Nested: an earlier anchor on this line is still open, so this one sits inside it.
+          const prefix = all.slice(0, offset);
+          if ((prefix.match(/(?:<|&lt;)a[ \t]/gi)?.length ?? 0) > (prefix.match(/(?:<|&lt;)\/a/gi)?.length ?? 0))
+            return whole;
+          const before = all[offset - 1];
+          return `${before === "!" || before === "\\" ? " " : ""}[${text}](${href})`;
+        });
       })
+      .join("\n")
   );
 }
 const NO_PICTURE = "無圖：";
@@ -1333,7 +1344,7 @@ export class BookPipelineRuns {
   /** Best effort: the card's proof-result section says "failed: reason" (no model). Never throws; skipped when nothing is known to be safe to write. */
   private async writeFailureSection(drive: Drive, nodeId: string, reason: string): Promise<void> {
     try {
-      if (this.dead(drive)) return;
+      if (this.dead(drive) || drive.controller.signal.aborted) return;
       const path = await this.stillOnMap(drive, nodeId);
       if (!path) return;
       const card = await this.ports.readCard(path);
@@ -1341,7 +1352,7 @@ export class BookPipelineRuns {
       if (next === card.raw || !(await this.ensureBackup(drive, nodeId, path, card.raw))) return;
       await this.ports.updateNoteRawGuarded(path, () => next, {
         expectedContent: card.raw,
-        authorize: () => !this.dead(drive)
+        authorize: () => !this.dead(drive) && !drive.controller.signal.aborted
       });
     } catch {
       // the card still shows its issue field; the section is only a help for the reader
@@ -1735,9 +1746,11 @@ export class BookPipelineRuns {
       };
       const next = this.proofSectionOf(drive, { result }, models)(card.raw);
       if (next !== card.raw) {
-        if (!(await this.ensureBackup(drive, nodeId, info.path, card.raw)))
+        const path = await this.stillOnMap(drive, nodeId);
+        if (!path) return { kind: "failed", reason: "card_removed" };
+        if (!(await this.ensureBackup(drive, nodeId, path, card.raw)))
           return { kind: "failed", reason: "backup_failed", forceReview: true };
-        const written = await this.ports.updateNoteRawGuarded(info.path, () => next, {
+        const written = await this.ports.updateNoteRawGuarded(path, () => next, {
           expectedContent: card.raw,
           authorize: this.authorize(drive, token)
         });

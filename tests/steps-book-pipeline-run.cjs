@@ -896,15 +896,64 @@ test('T1 dedupe (R1-5): a stored result under the same key refreshes the section
   assert.ok(!section.includes('m2') && !section.includes('m3'));
 });
 
+test('T1 anchors: an anchor inside a fenced code block or an inline code span stays verbatim; one outside is still converted', () => {
+  const a = '<a href="https://e.com/a">x</a>';
+  const link = '[x](https://e.com/a)';
+  assert.equal(convertSourceAnchors('```html\n' + a + '\n```\n' + a), '```html\n' + a + '\n```\n' + link, 'fenced block');
+  assert.equal(convertSourceAnchors('~~~\n' + a + '\n~~~'), '~~~\n' + a + '\n~~~', 'tilde fence');
+  assert.equal(convertSourceAnchors('用 `' + a + '` 與 ' + a), '用 `' + a + '` 與 ' + link, 'inline code span');
+  assert.equal(convertSourceAnchors('``' + a + '`` ' + a), '``' + a + '`` ' + link, 'double-backtick span');
+  assert.equal(convertSourceAnchors(a + ' `code`'), link + ' `code`', 'an anchor before a span is converted');
+});
+
+test('T1 failure section: its write is refused once the run is aborted (authorize checks the abort signal)', async () => {
+  let seen;
+  const r = await rig({ script: { proof: async () => { throw new Error('nope'); } } });
+  const orig = r.ports.updateNoteRawGuarded;
+  r.ports.updateNoteRawGuarded = (path, transform, options) => {
+    if (options?.authorize && seen === undefined && transform('x') !== undefined) {
+      r.runs.stop(r.mapPath).catch(() => undefined);
+      seen = options.authorize();
+      return Promise.resolve('discarded');
+    }
+    return orig(path, transform, options);
+  };
+  await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath).catch(() => undefined); await settle();
+  assert.equal(seen, false, 'the section write must not be authorized after an abort');
+});
+
+test('T1 dedupe: a stored result whose card left the map is not written to (card_removed, no backup, no section)', async () => {
+  const r = await rig();
+  await finish(r);
+  const s = await r.state();
+  const note = await r.note(1);
+  const key = proofKey({ runId: s.runId, nodeId: r.nodes[1].id, revision: cardRevision(s, r.nodes[1].id), body: withoutResearchNotes(note.detail), checklist: parseChecklist(note.prompt) });
+  assert.ok(findStoredProof(note.detail, key));
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/\n## 校對結果（最新一次）[\s\S]*?(?=\n<!--|\n> \[!|$)/, ''), {});
+  assert.equal(count(r.raw(1), SECTION), 0);
+  await r.repo.writePipelineFields(r.nodes[1].path, { pipelineStage: 'written' });
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'writing'; d.bookPipeline.attempts[r.nodes[1].id].proof = 0; });
+  const backups = r.stat.backups.length;
+  const orig = r.ports.readCard;
+  r.ports.readCard = async path => {
+    const card = await orig(path);
+    if (path === r.nodes[1].path) await r.repo.updateMap(r.mapPath, d => { d.nodes = d.nodes.filter(n => n.path !== path); });
+    return card;
+  };
+  await r.runs.resume(r.mapPath); await settle();
+  assert.equal(count(r.raw(1), SECTION), 0, 'no section written for a card that left the map');
+  assert.equal(r.stat.backups.length, backups);
+});
+
 test('T1 placeholders: no "no new information" sentence in any language survives in a written card; real sections stay', async () => {
   const { translate } = S.load('i18n.ts');
-  const text = `正文。\n\n### 補充\n\n本次無新增內容。\n\n### 更多\n\n${translate('en', 'note.no_new_information')}\n\n### 保留\n\n真正的內容。\n\n### 空\n\n${translate('zh-CN', 'note.no_new_information')}\n`;
+  const text = `正文。\n\n### 補充\n\n本次無新增內容。\n\n### 更多\n\n${translate('en', 'note.no_new_information')}\n\n### 保留\n\n真正的內容。\n\n### 空\n\n${translate('zh-TW', 'note.no_new_information')}\n`;
   const r = await rig({ script: { author: async input => { await input.admission.reserve(); await r.repo.updateNoteGuarded(input.path, { detail: text }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } } });
   await finish(r);
   const detail = (await r.note(1)).detail;
   assert.ok(detail.includes('### 保留') && detail.includes('真正的內容。'));
   for (const heading of ['### 補充', '### 更多', '### 空']) assert.ok(!detail.includes(heading), heading);
-  for (const locale of ['en', 'zh-TW', 'zh-CN']) assert.ok(!r.raw(1).includes(translate(locale, 'note.no_new_information').replace(/[.。]$/, '')), locale);
+  for (const locale of ['en', 'zh-TW']) assert.ok(!r.raw(1).includes(translate(locale, 'note.no_new_information').replace(/[.。]$/, '')), locale);
   assert.equal(dropPlaceholderSections('正文。\n\n### 保留\n\n文字\n'), '正文。\n\n### 保留\n\n文字\n');
   assert.equal(dropPlaceholderSections('## 補\n\nNo new information.\n'), '## 補\n\nNo new information.\n', 'a ## heading is never dropped');
   const fenced = '```\n### x\n\nNo new content this time\n```\n';

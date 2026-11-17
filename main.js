@@ -43816,22 +43816,23 @@ function findProofRecord(notes, key4) {
   }
   return void 0;
 }
-var proofSectionHeading = (language2) => translate(language2, "detail.book_proof_heading");
+var proofSectionHeading = (language2) => translate(noteLanguageOf(language2), "detail.book_proof_heading");
 function composeProofSection(language2, outcome, models, modelLabel = (id) => id) {
+  const note = noteLanguageOf(language2);
   if ("failure" in outcome)
-    return `- ${translate(language2, "detail.book_proof_failed_0", escapeMarkdownText(outcome.failure, 60) || "failed")}`;
+    return `- ${translate(note, "detail.book_proof_failed_0", escapeMarkdownText(outcome.failure, 60) || "failed")}`;
   const colon2 = /^zh/i.test(language2) ? "\uFF1A" : ": ";
   const words2 = {
-    met: translate(language2, "detail.book_proof_met"),
-    unmet: translate(language2, "detail.book_proof_unmet"),
-    unverified: translate(language2, "detail.book_proof_unverified")
+    met: translate(note, "detail.book_proof_met"),
+    unmet: translate(note, "detail.book_proof_unmet"),
+    unverified: translate(note, "detail.book_proof_unverified")
   };
   const lines = cleanResult(outcome.result).items.map(
     (item) => `- ${item.id} ${words2[item.status]}${item.status !== "met" && item.note ? `${colon2}${item.note}` : ""}`
   );
-  const shown = (id) => safeModelId(id) ? escapeMarkdownText(modelLabel(safeModelId(id)), 80) : translate(language2, "detail.book_model_unrecorded");
-  lines.push(`- ${translate(language2, "detail.book_proof_author_model_0", shown(models.authorModel))}`);
-  lines.push(`- ${translate(language2, "detail.book_proof_proof_model_0", shown(models.model))}`);
+  const shown = (id) => safeModelId(id) ? escapeMarkdownText(modelLabel(safeModelId(id)), 80) : translate(note, "detail.book_model_unrecorded");
+  lines.push(`- ${translate(note, "detail.book_proof_author_model_0", shown(models.authorModel))}`);
+  lines.push(`- ${translate(note, "detail.book_proof_proof_model_0", shown(models.model))}`);
   return lines.join("\n");
 }
 
@@ -44134,14 +44135,15 @@ function protectedLines(lines, withDetail = true) {
 function replaceProofSection(content, heading, body) {
   const lines = content.split("\n");
   const flags = protectedLines(lines);
-  const names3 = new Set(ALL_LOCALES().map((locale) => translate(locale, "detail.book_proof_heading").trim()));
+  const names3 = new Set(NOTE_LANGUAGES.map((locale) => translate(locale, "detail.book_proof_heading").trim()));
   const found = findSection(lines, flags, (text10, level) => level === 2 && names3.has(text10.trim()));
   const entry = `## ${heading}
 
 ${body.trim()}`;
   if (found) {
     let end = found.at + 1;
-    while (end < found.end && (!lines[end].trim() || /^- /.test(lines[end]))) end++;
+    if (end < found.end && !lines[end].trim()) end++;
+    while (end < found.end && /^- /.test(lines[end])) end++;
     while (end > found.at + 1 && !lines[end - 1].trim()) end--;
     const before = lines.slice(0, found.at).join("\n");
     const after = lines.slice(end).join("\n").replace(/^\s+/, "");
@@ -44165,11 +44167,8 @@ ${lines.slice(marker3).join("\n")}`;
 ` : ""}${entry}
 `;
 }
-var ALL_LOCALES = () => [
-  .../* @__PURE__ */ new Set([...NOTE_LANGUAGES, ...SUPPORTED_LANGUAGES.map((item) => item.id)])
-];
 var PLACEHOLDERS = () => /* @__PURE__ */ new Set([
-  ...ALL_LOCALES().map((locale) => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
+  ...NOTE_LANGUAGES.map((locale) => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
   "No new content this time",
   "\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9"
 ]);
@@ -49120,18 +49119,27 @@ function holdProofLines(content, known) {
 var ANCHOR = /(?:<|&lt;)a[ \t]+href=(?:"|&quot;)([^"<>\n]*?)(?:"|&quot;)[ \t]*(?:>|&gt;)([^<>\n]*?)(?:<|&lt;)\/a[ \t]*(?:>|&gt;)/gi;
 function convertSourceAnchors(content) {
   const at = frontmatterLength(content);
-  return content.slice(0, at) + content.slice(at).replace(ANCHOR, (whole, rawHref, rawText, offset, all) => {
-    var _a2, _b2, _c, _d;
-    if (/&(?:lt|gt|quot);/i.test(rawText) || /&(?:lt|gt|quot);/i.test(rawHref.replace(/&amp;/g, ""))) return whole;
-    const href = safeHref(rawHref.replace(/&amp;/g, "&"));
-    const text10 = escapeMarkdownText(rawText.replace(/&amp;/g, "&"), 200);
-    if (!href || !text10) return whole;
-    const prefix = all.slice(all.lastIndexOf("\n", offset - 1) + 1, offset);
-    if (((_b2 = (_a2 = prefix.match(/(?:<|&lt;)a[ \t]/gi)) == null ? void 0 : _a2.length) != null ? _b2 : 0) > ((_d = (_c = prefix.match(/(?:<|&lt;)\/a/gi)) == null ? void 0 : _c.length) != null ? _d : 0))
-      return whole;
-    const before = all[offset - 1];
-    return `${before === "!" || before === "\\" ? " " : ""}[${text10}](${href})`;
-  });
+  const lines = content.slice(at).split("\n");
+  const fenced = fencedLines2(lines);
+  return content.slice(0, at) + lines.map((line2, index) => {
+    if (fenced[index]) return line2;
+    const spans = [];
+    for (const m of line2.matchAll(/(`+)(?!`).+?(?<!`)\1(?!`)/g)) spans.push([m.index, m.index + m[0].length]);
+    return line2.replace(ANCHOR, (whole, rawHref, rawText, offset, all) => {
+      var _a2, _b2, _c, _d;
+      if (spans.some(([from, to]) => offset >= from && offset < to)) return whole;
+      if (/&(?:lt|gt|quot);/i.test(rawText) || /&(?:lt|gt|quot);/i.test(rawHref.replace(/&amp;/g, "")))
+        return whole;
+      const href = safeHref(rawHref.replace(/&amp;/g, "&"));
+      const text10 = escapeMarkdownText(rawText.replace(/&amp;/g, "&"), 200);
+      if (!href || !text10) return whole;
+      const prefix = all.slice(0, offset);
+      if (((_b2 = (_a2 = prefix.match(/(?:<|&lt;)a[ \t]/gi)) == null ? void 0 : _a2.length) != null ? _b2 : 0) > ((_d = (_c = prefix.match(/(?:<|&lt;)\/a/gi)) == null ? void 0 : _c.length) != null ? _d : 0))
+        return whole;
+      const before = all[offset - 1];
+      return `${before === "!" || before === "\\" ? " " : ""}[${text10}](${href})`;
+    });
+  }).join("\n");
 }
 var NO_PICTURE = "\u7121\u5716\uFF1A";
 var PICTURE_REASONS = {
@@ -49982,7 +49990,7 @@ var BookPipelineRuns = class {
   /** Best effort: the card's proof-result section says "failed: reason" (no model). Never throws; skipped when nothing is known to be safe to write. */
   async writeFailureSection(drive, nodeId, reason) {
     try {
-      if (this.dead(drive)) return;
+      if (this.dead(drive) || drive.controller.signal.aborted) return;
       const path = await this.stillOnMap(drive, nodeId);
       if (!path) return;
       const card = await this.ports.readCard(path);
@@ -49990,7 +49998,7 @@ var BookPipelineRuns = class {
       if (next === card.raw || !await this.ensureBackup(drive, nodeId, path, card.raw)) return;
       await this.ports.updateNoteRawGuarded(path, () => next, {
         expectedContent: card.raw,
-        authorize: () => !this.dead(drive)
+        authorize: () => !this.dead(drive) && !drive.controller.signal.aborted
       });
     } catch (e) {
     }
@@ -50356,9 +50364,11 @@ var BookPipelineRuns = class {
       };
       const next = this.proofSectionOf(drive, { result }, models)(card.raw);
       if (next !== card.raw) {
-        if (!await this.ensureBackup(drive, nodeId, info.path, card.raw))
+        const path = await this.stillOnMap(drive, nodeId);
+        if (!path) return { kind: "failed", reason: "card_removed" };
+        if (!await this.ensureBackup(drive, nodeId, path, card.raw))
           return { kind: "failed", reason: "backup_failed", forceReview: true };
-        const written2 = await this.ports.updateNoteRawGuarded(info.path, () => next, {
+        const written2 = await this.ports.updateNoteRawGuarded(path, () => next, {
           expectedContent: card.raw,
           authorize: this.authorize(drive, token)
         });

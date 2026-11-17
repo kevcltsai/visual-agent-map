@@ -124,7 +124,7 @@ test('global plan: every card once with a role, only empty settings decided, str
 
 test('card plan: ids and types assigned, neighbours only when they exist, an empty checklist is refused', () => {
   const request = { ...base, thread: 'thread', settings: {}, materials: [], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' }, previous: { position: 1, title: 'Intro', summary: 'sum' } };
-  const good = over => JSON.stringify({ covers: 'covers\n## Detail', entry: 'entry', handoff: 'next q', previous: 'prev line', next: 'should be dropped', checklist: [{ type: 'structure', text: 'Shape' }, { type: 'fact', text: 'Date 1415' }], ...over });
+  const good = over => JSON.stringify({ covers: 'covers\n## Detail', entry: 'entry', handoff: 'next q', previous: 'prev line', next: 'should be dropped', images: [], checklist: [{ type: 'structure', text: 'Shape' }, { type: 'fact', text: 'Date 1415' }], ...over });
   const result = plain(cardPlan.cardPlanStep.parse(good(), request));
   assert.deepEqual(result.checklist.map(c => `${c.id}:${c.type}`), ['C1:structure', 'C2:fact']);
   assert.equal(result.covers, 'covers ## Detail'); assert.equal(result.previous, 'prev line'); assert.equal(result.next, '');
@@ -330,7 +330,7 @@ test('exchange log: success, parse error and provider error keep titles, chapter
   const spy = consoleSpy();
   try {
     const request = { ...base, thread: 'thread', settings: {}, materials: [], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 'SECRET-BODY summary' } };
-    const goodPlan = JSON.stringify({ covers: 'SECRET-REPLY covers', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'fact', text: 'SECRET-REPLY' }] });
+    const goodPlan = JSON.stringify({ covers: 'SECRET-REPLY covers', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: [{ type: 'fact', text: 'SECRET-REPLY' }] });
     const ok = harness({ answer: goodPlan });
     const parsed = await runMod.runPlanStep(ok.planCalls, cardPlan.cardPlanStep, request, { signal: signal() });
     assert.equal(parsed.checklist.length, 1); noContent(ok.log, spy, 'plan success');
@@ -373,7 +373,7 @@ test('pipeline log line: only ids, counts, codes and milliseconds', () => {
 
 test('card plan: an unconditional picture requirement is dropped by program, a conditional one stays, none left is a failure', () => {
   const request = { ...base, thread: 't', settings: {}, materials: [], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
-  const good = list => JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: list });
+  const good = list => JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: list });
   const result = plain(cardPlan.cardPlanStep.parse(good([
     { type: 'structure', text: '本章以圖為主、文字為輔' },
     { type: 'structure', text: 'The chapter is illustrated with pictures' },
@@ -387,13 +387,13 @@ test('card plan: an unconditional picture requirement is dropped by program, a c
 
 test('card plan: objective art-history items are kept, picture requirements (traditional and simplified) are dropped, 若干 is not a condition', () => {
   const request = { ...base, thread: 't', settings: {}, materials: [], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
-  const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: texts.map(text => ({ type: 'fact', text })) }), request)).checklist.map(c => c.text);
+  const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: texts.map(text => ({ type: 'fact', text })) }), request)).checklist.map(c => c.text);
   assert.deepEqual(run(['圖像學特徵說明正確', '聖像的圖像特徵描述正確', '每段附一張圖片', '每段配图', '每段附一张图片', '若干作品列出年代']), ['圖像學特徵說明正確', '聖像的圖像特徵描述正確', '若干作品列出年代']);
 });
 
 test('card plan and proofread prompts: only objective items, picture items conditional, no-picture is met, system sections are not the ending', () => {
   const text = fs.readFileSync(path.join(__dirname, '..', 'core/steps/book-pipeline/card-plan.md'), 'utf8');
-  assert.match(text, /Not allowed: anything subjective, evaluative or about style/); assert.match(text, /never require pictures/);
+  assert.match(text, /Not allowed: anything subjective, evaluative or about style/); assert.match(text, /never put a picture requirement in the checklist/);
   const proofText = fs.readFileSync(path.join(__dirname, '..', 'core/steps/book-pipeline/proofread.md'), 'utf8');
   assert.match(proofText, /actually open a result page/); assert.doesNotMatch(proofText, /WebFetch/); assert.match(proofText, /meets a picture item unless the item explicitly requires/); assert.match(proofText, /update log and source list are not part of it/);
 });
@@ -423,7 +423,7 @@ test('author requirements: the fixed chapter rules always come first, the settin
 
 test('card plan: subjective or evaluative items (Traditional and Simplified) are dropped and counted; structural quote-checkable items stay', () => {
   const request = { ...base, thread: 't', settings: {}, materials: [], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
-  const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: texts.map(text => ({ type: 'structure', text })) }), request));
+  const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: texts.map(text => ({ type: 'structure', text })) }), request));
   const result = run(['開頭說明為何值得注意', '開头段落提及接入点「透視法」', '本章内容精彩生动', '結尾段落回應「留給下一張的問題」', '這個發明很重要', '出現作品名與年份', '文字引人入勝', '开头说明为何值得关注']);
   assert.deepEqual(result.checklist.map(c => c.text), ['開头段落提及接入点「透視法」', '結尾段落回應「留給下一張的問題」', '出現作品名與年份']);
   assert.equal(result.droppedSubjective, 5);
@@ -436,7 +436,7 @@ test('card plan: subjective or evaluative items (Traditional and Simplified) are
 test('author rules: the author puts no pictures in the text (the system searches and embeds them); the search step asks for Wikimedia Commons or museum collections over https and never an invented address', () => {
   const { bookAuthorRequirements } = loadWithAiCalls('core/book-pipeline/settings.ts');
   const text = bookAuthorRequirements({});
-  assert.match(text, /Do not put images or image links in the chapter text/);
+  assert.match(text, /Never write image links or Markdown images yourself/);
   assert.ok(!/Wikimedia/.test(text));
   const { findImagesStep } = loadWithAiCalls('core/steps/book-pipeline/find-images.ts');
   const prompt = findImagesStep.render({ query: 'Title / 《Work》', language: 'en', model: 'm', reasoning: 'low' });
@@ -494,4 +494,104 @@ test('source diagnostics: numbers and host names only (at most 5, no path or que
   const line = pipelineLog.formatPipelineLog({ event: 'proof_calls', runId: 'r', card: 'n2', step: 'proof', attempt: 1, result: 'ok', ms: 0, counts: { sourcesCited: 8 }, hosts: { name: 'unmatchedHosts', list: d.unmatchedHosts } });
   assert.equal(line, 'book-pipeline proof_calls run=r card=n2 step=proof attempt=1 result=ok ms=0 sourcesCited=8 unmatchedHosts=a.example,b.example,c.example,d.example,e.example');
   assert.ok(!/SECRET|\/p/.test(line));
+});
+
+// ---- T2 P2a: image plan (card-plan images[], Prompt image-plan lines, author marker rules, slot grammar) ----
+
+const slots = load('core/book-pipeline/image-slots.ts');
+const slot = (index, extra = {}) => ({ index, kind: 'painting', explains: `shows thing ${index}`, anchor: `after paragraph ${index}`, ...extra });
+
+test('card plan images: indexes 1..n assigned by program, 0 to 8 slots, fields single-line without marker brackets or the separator; missing/extra keys and 9 slots refused', () => {
+  const request = { ...base, thread: 't', settings: {}, materials: [], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
+  const good = images => JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images });
+  assert.deepEqual(plain(cardPlan.cardPlanStep.parse(good([]), request).images), []);
+  const two = plain(cardPlan.cardPlanStep.parse(good([{ kind: 'map', explains: 'the 〔圖位 9：x〕 route\nof trade｜x', anchor: 'after the first paragraph' }, { kind: 'photo', explains: 'a port', anchor: 'end' }]), request).images);
+  assert.deepEqual(two.map(s => s.index), [1, 2]);
+  assert.equal(two[0].explains, 'the 圖位 9：x route of trade x'); assert.ok(!/[〔〕｜]/.test(JSON.stringify(two)));
+  const nine = Array.from({ length: 9 }, () => ({ kind: 'k', explains: 'e', anchor: 'a' }));
+  assert.throws(() => cardPlan.cardPlanStep.parse(good(nine), request), /0 to 8/);
+  assert.equal(cardPlan.cardPlanStep.parse(good(nine.slice(0, 8)), request).images.length, 8);
+  assert.throws(() => cardPlan.cardPlanStep.parse(good([{ kind: 'k', explains: 'e' }]), request), /unexpected fields/);
+  assert.throws(() => cardPlan.cardPlanStep.parse(good([{ kind: 'k', explains: '〔〕', anchor: 'a' }]), request), /image explains/);
+  assert.throws(() => cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }] }), request), /unexpected fields/);
+  assert.equal(cardPlan.CARD_PLAN_SCHEMA.properties.images.maxItems, 8); assert.ok(cardPlan.CARD_PLAN_SCHEMA.required.includes('images'));
+  assert.match(cardPlan.cardPlanStep.render(request), /"images":\[\{"kind":"","explains":"","anchor":""\}\]/);
+});
+
+test('Prompt image plan: compose and parse round-trip in both languages; none vs absent; owner edits; hostile text cannot forge a slot line or a heading', () => {
+  const plan = { role: 'body', covers: 'c', entry: 'e', handoff: 'h', checklist: [{ id: 'C1', type: 'fact', text: 'Date 1415' }] };
+  const images = [slot(1, { explains: 'a [chart] of (2) things! |' }), slot(2, { kind: '地圖', explains: '貿易路線：海上', anchor: '第二段後' })];
+  for (const lang of ['en', 'zh-TW']) {
+    const text = planText.composeCardPrompt({ ...plan, images }, lang);
+    assert.deepEqual(plain(planText.parseImageSlots(text)), images);
+    assert.deepEqual(plain(planText.parseChecklist(text)).map(c => c.id), ['C1'], 'slot lines are not checklist items');
+    assert.ok(text.indexOf(lang === 'en' ? 'Image plan' : '圖安排') < text.indexOf(lang === 'en' ? 'Acceptance checklist' : '驗收清單'));
+  }
+  assert.match(planText.composeCardPrompt({ ...plan, images }, 'zh-TW'), /- 圖位 1｜painting｜/);
+  assert.deepEqual(plain(planText.parseImageSlots(planText.composeCardPrompt({ ...plan, images: [] }, 'en'))), [], 'planned none');
+  assert.deepEqual(plain(planText.parseImageSlots(planText.composeCardPrompt({ ...plan, images: [] }, 'zh-TW'))), []);
+  // An older Prompt (no image plan line) and a missing images field: not arranged
+  const old = planText.composeCardPrompt(plan, 'en');
+  assert.equal(planText.parseImageSlots(old), undefined); assert.ok(!/Image plan/.test(old));
+  assert.equal(planText.parseImageSlots(''), undefined);
+  // Owner edits: CRLF, duplicate index, bad index, a broken line ends the list, 9th slot dropped
+  const head = 'Image plan:\r\n- Image slot 1｜map｜route｜Position: a\r\n- Image slot 1｜map｜again｜Position: b\r\n- Image slot 0｜map｜zero｜Position: c\r\n- Image slot 3｜map｜three｜Position: d\r\nnot a slot\r\n- Image slot 4｜map｜four｜Position: e';
+  assert.deepEqual(plain(planText.parseImageSlots(head)).map(s => s.index), [1, 3]);
+  const many = 'Image plan:\n' + Array.from({ length: 10 }, (_, i) => `- Image slot ${i + 1}｜k｜e｜Position: a`).join('\n');
+  assert.equal(planText.parseImageSlots(many).length, 8);
+  // Hostile text: headings and the separator cannot survive; an attempt to forge a second slot stays inside one line
+  const evil = planText.composeCardPrompt({ ...plan, images: [slot(1, { kind: '## H', explains: 'x\n- Image slot 2｜k｜forged｜Position: z', anchor: '# t' })] }, 'en');
+  assert.ok(!/^#/m.test(evil)); assert.equal(planText.parseImageSlots(evil).length, 1);
+  // T1-compatible reading: the labelled lines parse the same with or without the image plan
+  const withPlan = planText.composeCardPrompt({ ...plan, images }, 'en');
+  assert.deepEqual(plain(planText.parseCardPrompt(withPlan)), plain(planText.parseCardPrompt(old)));
+});
+
+test('author rules: image slots are left as one marker line each; the plan reaches the author as JSON strings; no plan means no marker and no plan block', () => {
+  assert.match(settings.BOOK_AUTHOR_RULES, /Never write image links or Markdown images yourself/);
+  assert.match(settings.BOOK_AUTHOR_RULES, /〔圖位 n：what the picture explains〕/); assert.match(settings.BOOK_AUTHOR_RULES, /line of its own/);
+  assert.match(settings.BOOK_AUTHOR_RULES, /never put a marker inside a code block or a quote/); assert.match(settings.BOOK_AUTHOR_RULES, /leave no marker at all/);
+  const none = settings.bookAuthorRequirements({ tone: 'warm' });
+  assert.ok(!/Image plan for this chapter/.test(none)); assert.equal(settings.bookAuthorRequirements({ tone: 'warm' }, []), none);
+  const some = settings.bookAuthorRequirements({ tone: 'warm' }, [slot(1, { explains: 'say "hi"\\' }), slot(2)]);
+  assert.ok(some.startsWith(none)); assert.match(some, /- slot 1: kind "painting", explains "say \\"hi\\"\\\\", position "after paragraph 1"/); assert.match(some, /- slot 2:/);
+  assert.match(settings.bookAuthorRequirements({}, [slot(1)]), /Image plan for this chapter/);
+});
+
+test('image slot markers: grammar, one count per index, bad/duplicate/inline classification, fences and quotes untouched, residual check, omitted', () => {
+  const plan = [slot(1), slot(2), slot(3)];
+  assert.equal(slots.composeSlotMarker(slot(2, { explains: 'a map' })), '〔圖位 2：a map〕');
+  const body = ['Intro text.', '〔圖位 1：shows thing 1〕', '', 'More.', '〔圖位 1：again〕', '〔圖位 7：out of range〕', '〔圖位 x：reworded〕', '〔圖位 2〕', '  〔圖位 2：indented is still standalone〕', 'Sentence 〔圖位 3：inline〕 continues.'].join('\n');
+  const scan = slots.scanSlotMarkers(body, plan);
+  assert.deepEqual(plain([...scan.found]), [[1, 1], [2, 8]]);
+  assert.deepEqual(plain(scan.duplicateLines), [4]); assert.deepEqual(plain(scan.badLines), [5, 6, 7]); assert.deepEqual(plain(scan.inlineLines), [9]); assert.deepEqual(plain(scan.omitted), [3]);
+  // CRLF line endings
+  assert.deepEqual(plain([...slots.scanSlotMarkers('a\r\n〔圖位 1：x〕\r\nb', plan).found]), [[1, 1]]);
+  // fences and quotes: kept as written, not counted, never residual
+  const guarded = ['〔圖位 1：in body〕', '```', '〔圖位 2：in fence〕', '```', '> 〔圖位 1：in quote〕', '> 〔圖位 3：quote only〕', '~~~~', '〔圖位 3：tilde fence〕', '~~~~', 'tail'].join('\n');
+  const g = slots.scanSlotMarkers(guarded, plan);
+  assert.deepEqual(plain([...g.found]), [[1, 0]]); assert.deepEqual(plain(g.duplicateLines), []); assert.deepEqual(plain(g.omitted), [2, 3]);
+  assert.deepEqual(plain(slots.residualMarkerLines(guarded)), [0]);
+  assert.deepEqual(plain(slots.residualMarkerLines(guarded.split('\n').slice(1).join('\n'))), [], 'with the body marker gone only guarded ones remain: no residue');
+  // an unclosed fence keeps the rest of the document protected; a fence closed by a longer or shorter run follows CommonMark
+  assert.deepEqual(plain(slots.protectedLines(['```', 'x', '```', 'y', '````', 'z', '```', 'w', '````', 'v'])), [true, true, true, false, true, true, true, true, true, false]);
+  // inline marker pattern removes the marker only (closed, or a bare opener)
+  assert.equal('Sentence 〔圖位 3：inline〕 continues 〔圖位 end'.replace(slots.INLINE_MARKER, ''), 'Sentence  continues  end');
+  // a quote and a body marker with the same number: body counted, quote verbatim and not residual, so the commit check passes
+  const same = '〔圖位 1：body〕\n> 〔圖位 1：quoted〕';
+  assert.deepEqual(plain([...slots.scanSlotMarkers(same, plan).found]), [[1, 0]]); assert.deepEqual(plain(slots.residualMarkerLines(same.split('\n').slice(1).join('\n'))), []);
+  assert.deepEqual(plain(slots.scanSlotMarkers('', []).omitted), []);
+});
+
+test('pickForSlot seam: deterministic, https only, same-chapter address never placed twice; none carries a reason code', () => {
+  const cand = (url, extra = {}) => ({ imageUrl: url, sourceUrl: 'https://example.org/p', title: 't', caption: 'c', ...extra });
+  const ctx = (picked = []) => ({ chapter: { id: 'n1', title: 'T' }, slot: slot(1), allSlots: [slot(1), slot(2)], alreadyPicked: new Set(picked) });
+  const a = cand('https://x.example/a.jpg'), b = cand('https://x.example/b.jpg');
+  assert.deepEqual(plain(slots.pickForSlot(ctx(), [a, b])), { candidate: a });
+  assert.deepEqual(plain(slots.pickForSlot(ctx([a.imageUrl]), [a, b])), { candidate: b });
+  assert.deepEqual(plain(slots.pickForSlot(ctx([a.imageUrl, b.imageUrl]), [a, b])), { none: true, reasonCode: 'not_found' });
+  assert.deepEqual(plain(slots.pickForSlot(ctx(), [])), { none: true, reasonCode: 'not_found' });
+  assert.deepEqual(plain(slots.pickForSlot(ctx(), [cand('http://x.example/a.jpg'), cand('javascript:alert(1)'), cand('not a url')])), { none: true, reasonCode: 'unsafe_url' });
+  assert.deepEqual(plain(slots.pickForSlot(ctx(), [cand('http://x.example/a.jpg'), b])), { candidate: b });
+  assert.deepEqual(plain(slots.pickForSlot(ctx(), [a, b])), plain(slots.pickForSlot(ctx(), [a, b])), 'same input, same answer');
 });

@@ -74,7 +74,8 @@ import {
   composeCardPrompt,
   parseBookPlanBody,
   parseBookPlanDecisions,
-  parseChecklist
+  parseChecklist,
+  parseImageSlots
 } from "../../core/book-pipeline/plan-text";
 import {
   composeProofRecord,
@@ -94,6 +95,7 @@ import type { ContentLanguage } from "../../i18n";
 import type { MapDocument } from "../../map-model";
 import type { NotePatch } from "../../repository";
 import { isBookStepError, type BookStepBase } from "../../core/steps/book-pipeline/base";
+import type { ImageSlot } from "../../core/book-pipeline/image-slots";
 import { cardPlanStep, type CardPlanRequest, type CardPlanResult } from "../../core/steps/book-pipeline/card-plan";
 import {
   globalPlanStep,
@@ -155,6 +157,8 @@ export interface AuthorInput {
   path: string;
   /** The effective whole-book settings; the port turns them into the research requirements. */
   settings: BookSettings;
+  /** The card's planned picture slots (from its `## Prompt`); empty when the plan has none or the Prompt has no image plan: the author then leaves no marker. */
+  slots: readonly ImageSlot[];
   language: ContentLanguage;
   model: string;
   reasoning: ReasoningLevel;
@@ -1481,7 +1485,8 @@ export class BookPipelineRuns {
         handoff: result.handoff,
         ...(previous ? { previous: { ...previous, summary: result.previous } } : {}),
         ...(next ? { next: { ...next, summary: result.next } } : {}),
-        checklist: result.checklist
+        checklist: result.checklist,
+        images: result.images
       },
       drive.config.language
     );
@@ -1533,6 +1538,7 @@ export class BookPipelineRuns {
         nodeId,
         path: info.path,
         settings: effectiveSettings(root.settings, parseBookPlanDecisions(root.raw)),
+        slots: parseImageSlots(card.prompt) ?? [],
         language: drive.config.language,
         model: drive.config.authorModel,
         reasoning: drive.config.reasoning,

@@ -3,6 +3,7 @@
  * frontmatter wins; a field the owner left empty takes the editorial decision saved in the root's `## 全書企劃` section.
  * Planning and writing both call this, never a private merge.
  */
+import type { ImageSlot } from "./image-slots";
 import { BOOK_SETTING_FIELDS, type BookSettings } from "./model";
 import { hashText, singleLine } from "./text";
 
@@ -27,16 +28,25 @@ export const BOOK_AUTHOR_RULES = [
   "- Open by picking up the brief's entry point (how this chapter continues from the previous card).",
   "- End with one sentence that leads into the next card, taking up the question the brief leaves for it. If the brief has no next card (the last card), do not lead into a next card; close the whole book as the brief says.",
   "- The closing sentence belongs to the last paragraph of the chapter's own text, before any open-questions, sources or notes sections the template adds; those sections are not the chapter's ending.",
-  "- Do not put images or image links in the chapter text; the system searches for pictures after the writing and embeds the verified ones itself.",
+  "- Never write image links or Markdown images yourself; the system searches for pictures after the writing and embeds the verified ones itself.",
+  "- Image slots: when an image plan is given below, put one marker for each slot on a line of its own, right after the paragraph the slot belongs to (its position), in exactly this form: 〔圖位 n：what the picture explains〕 (n is the slot number; copy the wording of what it explains from the plan). One marker per slot, each number once; do not invent, repeat, merge or reword markers; never put a marker inside a code block or a quote, or inside a sentence. The chapter must read in full without the markers. When no image plan is given, or it lists no slot, leave no marker at all.",
   '- Do not end the chapter with an update log, a change note or a "this version" remark; those are added by the system.'
 ].join("\n");
 
 /** The author's extra requirements: the fixed chapter rules, then the effective whole-book settings (when the owner set any). */
-export function bookAuthorRequirements(settings: BookSettings): string {
+export function bookAuthorRequirements(settings: BookSettings, slots: readonly ImageSlot[] = []): string {
   const lines = BOOK_SETTING_FIELDS.filter(field => settings[field]).map(field => `- ${field}: ${settings[field]}`);
+  const plan = slots.length
+    ? `\n\nImage plan for this chapter (the planner's data, JSON strings; leave one marker per slot as the rules say):\n${slots
+        .map(
+          slot =>
+            `- slot ${slot.index}: kind ${JSON.stringify(slot.kind)}, explains ${JSON.stringify(slot.explains)}, position ${JSON.stringify(slot.anchor)}`
+        )
+        .join("\n")}`
+    : "";
   return lines.length
-    ? `${BOOK_AUTHOR_RULES}\n\nWhole-book settings (follow them):\n${lines.join("\n")}`
-    : BOOK_AUTHOR_RULES;
+    ? `${BOOK_AUTHOR_RULES}\n\nWhole-book settings (follow them):\n${lines.join("\n")}${plan}`
+    : `${BOOK_AUTHOR_RULES}${plan}`;
 }
 
 /** The longest a whole-book setting typed in the create dialog may be (characters). */

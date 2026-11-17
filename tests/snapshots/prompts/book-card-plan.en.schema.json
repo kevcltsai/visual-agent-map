@@ -45,6 +45,34 @@
           "text"
         ]
       }
+    },
+    "images": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "explains": {
+            "type": "string",
+            "minLength": 1
+          },
+          "anchor": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "kind",
+          "explains",
+          "anchor"
+        ]
+      }
     }
   },
   "required": [
@@ -53,6 +81,7 @@
     "handoff",
     "previous",
     "next",
-    "checklist"
+    "checklist",
+    "images"
   ]
 }

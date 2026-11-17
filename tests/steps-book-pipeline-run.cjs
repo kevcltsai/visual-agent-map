@@ -1037,3 +1037,23 @@ test('T1 data compatibility: text with no anchor and no placeholder passes the n
   assert.equal(r.runs.getProgress(r.mapPath), undefined);
   assert.equal(r.mapRaw(), mapBefore);
 });
+
+// T2 P2a: the planner's image plan lands in the card's Prompt and reaches the author; an older card (no image plan) gives the author none.
+test('image plan: the plan result is written to the Prompt and the author receives the card\'s slots; a plan result without images (older shape) writes no image plan and the author gets no slots', async () => {
+  const { parseImageSlots } = S.load('core/book-pipeline/plan-text.ts');
+  const plain = value => JSON.parse(JSON.stringify(value));
+  const seen = new Map();
+  const images = [{ index: 1, kind: 'map', explains: 'the route', anchor: 'after paragraph 1' }, { index: 2, kind: 'photo', explains: 'a port', anchor: 'end' }];
+  const r = await rig({ script: {
+    card: request => ({ covers: `covers ${request.card.position}`, entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }], ...(request.card.position === 2 ? { images } : request.card.position === 3 ? { images: [] } : {}) }),
+    author: async input => { seen.set(input.nodeId, plain(input.slots)); await input.admission.reserve(); return { outcome: 'discarded' }; }
+  } });
+  await r.runs.start(r.mapPath);
+  await r.runs.confirmGate1(r.mapPath);
+  await settle();
+  const prompts = [await r.note(0), await r.note(1), await r.note(2)].map(n => n.prompt);
+  assert.equal(parseImageSlots(prompts[0]), undefined, 'older shape: no image plan line');
+  assert.deepEqual(plain(parseImageSlots(prompts[1])), images);
+  assert.deepEqual(plain(parseImageSlots(prompts[2])), [], 'planned none');
+  assert.deepEqual(plain(seen.get(r.nodes[0].id)), []); assert.deepEqual(plain(seen.get(r.nodes[1].id)), images); assert.deepEqual(plain(seen.get(r.nodes[2].id)), []);
+});

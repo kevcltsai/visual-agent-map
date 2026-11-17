@@ -12492,15 +12492,22 @@ var BOOK_AUTHOR_RULES = [
   "- Open by picking up the brief's entry point (how this chapter continues from the previous card).",
   "- End with one sentence that leads into the next card, taking up the question the brief leaves for it. If the brief has no next card (the last card), do not lead into a next card; close the whole book as the brief says.",
   "- The closing sentence belongs to the last paragraph of the chapter's own text, before any open-questions, sources or notes sections the template adds; those sections are not the chapter's ending.",
-  "- Do not put images or image links in the chapter text; the system searches for pictures after the writing and embeds the verified ones itself.",
+  "- Never write image links or Markdown images yourself; the system searches for pictures after the writing and embeds the verified ones itself.",
+  "- Image slots: when an image plan is given below, put one marker for each slot on a line of its own, right after the paragraph the slot belongs to (its position), in exactly this form: \u3014\u5716\u4F4D n\uFF1Awhat the picture explains\u3015 (n is the slot number; copy the wording of what it explains from the plan). One marker per slot, each number once; do not invent, repeat, merge or reword markers; never put a marker inside a code block or a quote, or inside a sentence. The chapter must read in full without the markers. When no image plan is given, or it lists no slot, leave no marker at all.",
   '- Do not end the chapter with an update log, a change note or a "this version" remark; those are added by the system.'
 ].join("\n");
-function bookAuthorRequirements(settings) {
+function bookAuthorRequirements(settings, slots = []) {
   const lines = BOOK_SETTING_FIELDS.filter((field) => settings[field]).map((field) => `- ${field}: ${settings[field]}`);
+  const plan = slots.length ? `
+
+Image plan for this chapter (the planner's data, JSON strings; leave one marker per slot as the rules say):
+${slots.map(
+    (slot) => `- slot ${slot.index}: kind ${JSON.stringify(slot.kind)}, explains ${JSON.stringify(slot.explains)}, position ${JSON.stringify(slot.anchor)}`
+  ).join("\n")}` : "";
   return lines.length ? `${BOOK_AUTHOR_RULES}
 
 Whole-book settings (follow them):
-${lines.join("\n")}` : BOOK_AUTHOR_RULES;
+${lines.join("\n")}${plan}` : `${BOOK_AUTHOR_RULES}${plan}`;
 }
 var BOOK_SETTING_INPUT_MAX = 200;
 function cleanBookSettingsInput(input2) {
@@ -44224,6 +44231,13 @@ function dropPlaceholderSections(content) {
   return lines.join("\n");
 }
 
+// core/book-pipeline/image-slots.ts
+var MAX_IMAGE_SLOTS = 8;
+function cleanSlotText(value, max) {
+  const text10 = value.replace(/[〔〕｜]/g, " ").replace(/\s+/g, " ").trim();
+  return Array.from(text10).slice(0, max).join("").trim();
+}
+
 // core/book-pipeline/plan-text.ts
 var pick = (words2, language2) => instructionLanguageOf(language2) === "zh" ? words2.zh : words2.en;
 var matches = (words2, value) => value === words2.zh || value === words2.en;
@@ -44253,6 +44267,9 @@ var L = {
   previous: { zh: "\u524D\u4E00\u5F35", en: "Previous card" },
   next: { zh: "\u5F8C\u4E00\u5F35", en: "Next card" },
   checklist: { zh: "\u9A57\u6536\u6E05\u55AE", en: "Acceptance checklist" },
+  images: { zh: "\u5716\u5B89\u6392", en: "Image plan" },
+  imageSlot: { zh: "\u5716\u4F4D", en: "Image slot" },
+  position: { zh: "\u4F4D\u7F6E", en: "Position" },
   none: { zh: "\u7121", en: "none" },
   plan: { zh: "\u5168\u66F8\u4F01\u5283", en: "Book plan" },
   thread: { zh: "\u5168\u66F8\u4E3B\u7DDA", en: "Book thread" },
@@ -44261,6 +44278,18 @@ var L = {
 };
 var safe = (value, max = 400) => escapeMarkdownText(singleLine(value, max), max);
 var colon = (language2) => instructionLanguageOf(language2) === "zh" ? "\uFF1A" : ": ";
+var SLOT_SEPARATOR = "\uFF5C";
+function composeImageSlots(images, language2) {
+  const c = colon(language2);
+  const head2 = pick(L.images, language2);
+  if (!images.length) return [`${head2}${c}${pick(L.none, language2)}`];
+  return [
+    `${head2}${c.trim()}`,
+    ...images.slice(0, MAX_IMAGE_SLOTS).map(
+      (slot, at) => `- ${pick(L.imageSlot, language2)} ${at + 1}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.kind, 40), 40)}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.explains, 200), 200)}${SLOT_SEPARATOR}${pick(L.position, language2)}${c}${safe(cleanSlotText(slot.anchor, 120), 120)}`
+    )
+  ];
+}
 function composeCardPrompt(plan, language2) {
   const c = colon(language2);
   const neighbour2 = (label, n) => n ? `${pick(label, language2)}${c}(${n.position}) ${safe(n.title, 120)} \u2014 ${safe(n.summary, 240)}` : `${pick(label, language2)}${c}${pick(L.none, language2)}`;
@@ -44271,6 +44300,7 @@ function composeCardPrompt(plan, language2) {
     `${pick(L.handoff, language2)}${c}${safe(plan.handoff)}`,
     neighbour2(L.previous, plan.previous),
     neighbour2(L.next, plan.next),
+    ...plan.images ? composeImageSlots(plan.images, language2) : [],
     `${pick(L.checklist, language2)}${c.trim()}`,
     ...plan.checklist.map((item) => `- ${item.id} [${pick(TYPE_WORDS[item.type], language2)}] ${safe(item.text)}`)
   ];
@@ -44286,6 +44316,34 @@ function parseChecklist(prompt) {
     if (type) items.push({ id: m[1], type, text: unescapeMarkdownText(m[3]) });
   }
   return items;
+}
+var IMAGES_HEAD = /^(\S[^:：]*)[:：]\s*(.*)$/;
+var SLOT_LINE = /^[-*]\s+(?:圖位|Image slot)\s+(\d+)\s*｜(.*)$/;
+function parseImageSlots(prompt) {
+  const lines = prompt.split(/\r?\n/);
+  const at = lines.findIndex((line2) => {
+    const m = IMAGES_HEAD.exec(line2);
+    return !!m && matches(L.images, m[1].trim());
+  });
+  if (at < 0) return void 0;
+  const slots = [];
+  for (const line2 of lines.slice(at + 1)) {
+    const m = SLOT_LINE.exec(line2);
+    if (!m) break;
+    const index = Number(m[1]);
+    const parts = m[2].split(SLOT_SEPARATOR);
+    if (parts.length < 3 || index < 1 || slots.some((slot) => slot.index === index) || slots.length >= MAX_IMAGE_SLOTS)
+      continue;
+    const place = /^[^:：]*[:：]\s*(.*)$/.exec(parts[parts.length - 1]);
+    if (!place) continue;
+    slots.push({
+      index,
+      kind: unescapeMarkdownText(parts[0].trim()),
+      explains: unescapeMarkdownText(parts.slice(1, -1).join(SLOT_SEPARATOR).trim()),
+      anchor: unescapeMarkdownText(place[1].trim())
+    });
+  }
+  return slots;
 }
 function parseCardPrompt(prompt) {
   const out = {};
@@ -44510,11 +44568,12 @@ Write the brief the chapter's author will follow and the proofreader will check:
 - checklist: 2 to 8 acceptance items. Each is one objectively checkable statement about the finished chapter, with a type: structure (about the chapter's shape, scope or coverage, checkable from its text alone) or fact (a concrete claim that must hold in outside sources, such as a date, name or number). A chapter that only orients the reader may have structure items only. Do not number the items and do not write ids.
   - Allowed: what the chapter covers, what it leaves out, the order of its parts, and facts that outside sources can confirm. Write every structure item so it can be verified by quoting the chapter's text, for example: "the opening paragraph mentions the entry point 'X'", "the closing paragraph takes up the question 'Y' left for the next card", "the chapter names the work and its year".
   - Not allowed: anything subjective, evaluative or about style: no adjective or value-judgement items (noteworthy, brilliant, vivid, important, engaging and the like), nothing about tone, voice, readability, "plain" or "friendly" wording, no required opening or closing sentence pattern such as a question, and no requirement on exact wording. An item that cannot be checked by quoting the text is dropped by the program.
-  - Pictures: the author step has no image search, so never require pictures. If you mention one at all, write it only as a condition: "if a loadable https image is found, it sits next to the passage it supports; if none, a line 'No picture: reason' is acceptable and counts as met".
+  - Pictures: never put a picture requirement in the checklist (pictures are planned in images, below).
+- images: the picture plan for this chapter, 0 to 8 slots. You decide how many and where, from what this chapter says and its role: an introduction or a closing needs few (0 to 2), a body chapter as many as its content gives a picture to, a gallery chapter follows its materials. Give 0 when no picture would help; never add one only to fill space. Each slot has: kind (the kind of picture, for example painting, photograph, map, diagram, portrait; a few words), explains (what the picture shows or explains, one sentence that names something the chapter's text talks about) and anchor (where it sits: the paragraph or point in the chapter it goes beside). Do not number the slots. Do not write image links, addresses or search words; a picture is found later.
 
 The chapter's role is fixed by the plan: do not change it. Use plain single-line text in every field and no Markdown headings. Use only numbers and links that appear in the supplied text.
 
-Return only JSON: {"covers":"","entry":"","handoff":"","previous":"","next":"","checklist":[{"type":"structure|fact","text":""}]}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.
+Return only JSON: {"covers":"","entry":"","handoff":"","previous":"","next":"","checklist":[{"type":"structure|fact","text":""}],"images":[{"kind":"","explains":"","anchor":""}]}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.
 
 {{languageInstruction}}
 
@@ -44563,9 +44622,24 @@ var CARD_PLAN_SCHEMA = {
         properties: { type: { type: "string", enum: ["structure", "fact"] }, text: { type: "string", minLength: 1 } },
         required: ["type", "text"]
       }
+    },
+    images: {
+      type: "array",
+      minItems: 0,
+      maxItems: MAX_IMAGE_SLOTS,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          kind: { type: "string", minLength: 1 },
+          explains: { type: "string", minLength: 1 },
+          anchor: { type: "string", minLength: 1 }
+        },
+        required: ["kind", "explains", "anchor"]
+      }
     }
   },
-  required: ["covers", "entry", "handoff", "previous", "next", "checklist"]
+  required: ["covers", "entry", "handoff", "previous", "next", "checklist", "images"]
 };
 var PICTURE_ALONE = /以圖為主|以图为主|圖文並茂|图文并茂|插圖|插图|配圖|配图|附圖|附图|有圖|有图|\b(?:images?|pictures?|illustrations?|photos?|diagrams?)\b/i;
 var PICTURE_NOUN = /圖片|图片|圖像|图像/;
@@ -44575,7 +44649,7 @@ var unconditionalPicture = (text10) => (PICTURE_ALONE.test(text10) || PICTURE_NO
 var SUBJECTIVE = /值得(?:注意|關注|关注|一提|留意)|精彩|精采|生動|生动|重要|引人入勝|引人入胜|有趣|吸引人|動人|动人|優美|优美|流暢|流畅|深刻|震撼|\b(?:noteworthy|worth noting|brilliant|vivid|engaging|compelling|interesting|important)\b/i;
 function parseCardPlan(raw, request) {
   const item = parseJson(raw);
-  exactKeys(item, ["covers", "entry", "handoff", "previous", "next", "checklist"]);
+  exactKeys(item, ["covers", "entry", "handoff", "previous", "next", "checklist", "images"]);
   const entries = arrayOf(item.checklist, "checklist");
   if (entries.length < 1 || entries.length > MAX_CHECKLIST) fail2(`checklist must have 1 to ${MAX_CHECKLIST} items`);
   const parsed = entries.map((entry) => {
@@ -44590,6 +44664,22 @@ function parseCardPlan(raw, request) {
   const droppedPicture = objective.length - kept.length;
   if (!kept.length) fail2("checklist has no usable item");
   const checklist = kept.map((item2, index) => ({ id: `C${index + 1}`, ...item2 }));
+  const slots = arrayOf(item.images, "images");
+  if (slots.length > MAX_IMAGE_SLOTS) fail2(`images must have 0 to ${MAX_IMAGE_SLOTS} items`);
+  const images = slots.map((entry, at) => {
+    const one = recordOf2(entry, "image slot");
+    exactKeys(one, ["kind", "explains", "anchor"]);
+    const field = (value, what, max) => {
+      const text10 = cleanSlotText(singleLine(textOf(value, what), 400), max);
+      return text10 || fail2(`${what} must be a non-empty string`);
+    };
+    return {
+      index: at + 1,
+      kind: field(one.kind, "image kind", 40),
+      explains: field(one.explains, "image explains", 200),
+      anchor: field(one.anchor, "image anchor", 120)
+    };
+  });
   const side = (value, present, what) => present ? singleLine(textOf(value, what), 240) : "";
   return {
     covers: singleLine(textOf(item.covers, "covers")),
@@ -44598,6 +44688,7 @@ function parseCardPlan(raw, request) {
     previous: side(item.previous, !!request.previous, "previous"),
     next: side(item.next, !!request.next, "next"),
     checklist,
+    images,
     ...dropped ? { droppedSubjective: dropped } : {},
     ...droppedPicture ? { droppedPicture } : {}
   };
@@ -50146,7 +50237,8 @@ var BookPipelineRuns = class {
         handoff: result.handoff,
         ...previous ? { previous: { ...previous, summary: result.previous } } : {},
         ...next ? { next: { ...next, summary: result.next } } : {},
-        checklist: result.checklist
+        checklist: result.checklist,
+        images: result.images
       },
       drive.config.language
     );
@@ -50160,6 +50252,7 @@ var BookPipelineRuns = class {
     return { kind: "ok", after: () => this.setStage(drive, nodeId, "planned", null) };
   }
   async execWrite(drive, token, nodeId) {
+    var _a2;
     const signal = drive.controller.signal;
     const info = drive.cards.get(nodeId);
     const rootInfo = drive.cards.get(drive.rootId);
@@ -50193,6 +50286,7 @@ var BookPipelineRuns = class {
         nodeId,
         path: info.path,
         settings: effectiveSettings(root.settings, parseBookPlanDecisions(root.raw)),
+        slots: (_a2 = parseImageSlots(card.prompt)) != null ? _a2 : [],
         language: drive.config.language,
         model: drive.config.authorModel,
         reasoning: drive.config.reasoning,
@@ -81066,7 +81160,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       researchMode: "research",
       researchDepth: "normal",
       visualMode: "off",
-      requirements: bookAuthorRequirements(input2.settings),
+      requirements: bookAuthorRequirements(input2.settings, input2.slots),
       outputLanguage: input2.language
     };
     this.bookAuthoring.set(node.path, Date.now());

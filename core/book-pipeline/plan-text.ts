@@ -4,6 +4,7 @@
  * (labelled lines plus an acceptance checklist whose items carry a stable id and a type). Pure.
  */
 import { instructionLanguageOf, type ContentLanguage } from "../../i18n";
+import { cleanSlotText, MAX_IMAGE_SLOTS, type ImageSlot } from "./image-slots";
 import { BOOK_ROLES, BOOK_SETTING_FIELDS, type BookRole, type BookSettings } from "./model";
 import { demoteHeadings, escapeMarkdownText, singleLine, unescapeMarkdownText } from "./text";
 
@@ -46,6 +47,9 @@ const L = {
   previous: { zh: "前一張", en: "Previous card" },
   next: { zh: "後一張", en: "Next card" },
   checklist: { zh: "驗收清單", en: "Acceptance checklist" },
+  images: { zh: "圖安排", en: "Image plan" },
+  imageSlot: { zh: "圖位", en: "Image slot" },
+  position: { zh: "位置", en: "Position" },
   none: { zh: "無", en: "none" },
   plan: { zh: "全書企劃", en: "Book plan" },
   thread: { zh: "全書主線", en: "Book thread" },
@@ -67,6 +71,25 @@ export interface CardPlanText {
   previous?: { position: number; title: string; summary: string };
   next?: { position: number; title: string; summary: string };
   checklist: readonly ChecklistItem[];
+  /** The card's image plan (0 to 8 slots). Absent = no image plan line is written (a card planned before the image plan existed). */
+  images?: readonly ImageSlot[];
+}
+
+const SLOT_SEPARATOR = "｜";
+/** The image plan lines: `圖安排：` then one `- 圖位 n｜類型｜要說明的事｜位置：…` line per slot; `圖安排：無` when the planner arranged none. */
+export function composeImageSlots(images: readonly ImageSlot[], language: ContentLanguage): string[] {
+  const c = colon(language);
+  const head = pick(L.images, language);
+  if (!images.length) return [`${head}${c}${pick(L.none, language)}`];
+  return [
+    `${head}${c.trim()}`,
+    ...images
+      .slice(0, MAX_IMAGE_SLOTS)
+      .map(
+        (slot, at) =>
+          `- ${pick(L.imageSlot, language)} ${at + 1}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.kind, 40), 40)}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.explains, 200), 200)}${SLOT_SEPARATOR}${pick(L.position, language)}${c}${safe(cleanSlotText(slot.anchor, 120), 120)}`
+      )
+  ];
 }
 
 /** The card's `## Prompt` body. Every field is one line, so no model text can start a heading. */
@@ -83,6 +106,7 @@ export function composeCardPrompt(plan: CardPlanText, language: ContentLanguage)
     `${pick(L.handoff, language)}${c}${safe(plan.handoff)}`,
     neighbour(L.previous, plan.previous),
     neighbour(L.next, plan.next),
+    ...(plan.images ? composeImageSlots(plan.images, language) : []),
     `${pick(L.checklist, language)}${c.trim()}`,
     ...plan.checklist.map(item => `- ${item.id} [${pick(TYPE_WORDS[item.type], language)}] ${safe(item.text)}`)
   ];
@@ -100,6 +124,40 @@ export function parseChecklist(prompt: string): ChecklistItem[] {
     if (type) items.push({ id: m[1], type, text: unescapeMarkdownText(m[3]) });
   }
   return items;
+}
+
+const IMAGES_HEAD = /^(\S[^:：]*)[:：]\s*(.*)$/;
+const SLOT_LINE = /^[-*]\s+(?:圖位|Image slot)\s+(\d+)\s*｜(.*)$/;
+/**
+ * The image plan of a Prompt body (the owner may have edited it). `undefined` = the Prompt has no image plan line (an older card):
+ * the pipeline then searches for no picture, leaves no marker and keeps the card's pictures. `[]` = the planner arranged none.
+ * Lines that are not valid slot lines end the list; a repeated or non-positive index is skipped; at most 8 slots.
+ */
+export function parseImageSlots(prompt: string): ImageSlot[] | undefined {
+  const lines = prompt.split(/\r?\n/);
+  const at = lines.findIndex(line => {
+    const m = IMAGES_HEAD.exec(line);
+    return !!m && matches(L.images, m[1].trim());
+  });
+  if (at < 0) return undefined;
+  const slots: ImageSlot[] = [];
+  for (const line of lines.slice(at + 1)) {
+    const m = SLOT_LINE.exec(line);
+    if (!m) break;
+    const index = Number(m[1]);
+    const parts = m[2].split(SLOT_SEPARATOR);
+    if (parts.length < 3 || index < 1 || slots.some(slot => slot.index === index) || slots.length >= MAX_IMAGE_SLOTS)
+      continue;
+    const place = /^[^:：]*[:：]\s*(.*)$/.exec(parts[parts.length - 1]);
+    if (!place) continue;
+    slots.push({
+      index,
+      kind: unescapeMarkdownText(parts[0].trim()),
+      explains: unescapeMarkdownText(parts.slice(1, -1).join(SLOT_SEPARATOR).trim()),
+      anchor: unescapeMarkdownText(place[1].trim())
+    });
+  }
+  return slots;
 }
 
 /** The labelled lines of a Prompt body for the gate panel; a label it cannot find is absent (the panel shows the raw lines then). */

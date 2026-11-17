@@ -1891,6 +1891,14 @@ var en = {
   "error.duplicate_map_unsupported": "Maps made by AIM research cannot be duplicated yet.",
   "detail.no_conclusion_yet": "No conclusion yet",
   "detail.preview": "Preview",
+  "detail.book_proof_heading": "Proofread result (latest)",
+  "detail.book_proof_met": "met",
+  "detail.book_proof_unmet": "not met",
+  "detail.book_proof_unverified": "to check",
+  "detail.book_proof_failed_0": "Failed: {0}",
+  "detail.book_proof_author_model_0": "Author model: {0}",
+  "detail.book_proof_proof_model_0": "Proofread model: {0}",
+  "detail.book_model_unrecorded": "not recorded",
   "ui.map_file_description": "This file stores the mind map structure. Full content lives in the topic notes. Choose Open as mind map from the file menu.",
   "ui.preset_name_plain": "Plain explanation",
   "ui.preset_name_magazine": "Narrative",
@@ -5003,6 +5011,14 @@ var zhCN = {
   "error.duplicate_map_unsupported": "AIM \u7814\u7A76\u751F\u6210\u7684\u5730\u56FE\u76EE\u524D\u8FD8\u4E0D\u80FD\u590D\u5236\u3002",
   "detail.no_conclusion_yet": "\u5C1A\u672A\u5F62\u6210\u7ED3\u8BBA",
   "detail.preview": "\u9884\u89C8",
+  "detail.book_proof_heading": "\u6821\u5BF9\u7ED3\u679C\uFF08\u6700\u65B0\u4E00\u6B21\uFF09",
+  "detail.book_proof_met": "\u8FBE\u6210",
+  "detail.book_proof_unmet": "\u672A\u8FBE\u6210",
+  "detail.book_proof_unverified": "\u5F85\u67E5",
+  "detail.book_proof_failed_0": "\u5931\u8D25\uFF1A{0}",
+  "detail.book_proof_author_model_0": "\u4F5C\u8005\u6A21\u578B\uFF1A{0}",
+  "detail.book_proof_proof_model_0": "\u6821\u5BF9\u6A21\u578B\uFF1A{0}",
+  "detail.book_model_unrecorded": "\u672A\u8BB0\u5F55",
   "ui.map_file_description": "\u6B64\u6587\u4EF6\u4FDD\u5B58\u5FC3\u667A\u56FE\u7ED3\u6784\uFF1B\u5B8C\u6574\u5185\u5BB9\u4FDD\u5B58\u5728\u5404\u8BAE\u9898\u7B14\u8BB0\u3002\u4ECE\u6587\u4EF6\u83DC\u5355\u9009\u62E9\u201C\u4EE5\u5FC3\u667A\u56FE\u6253\u5F00\u201D\u3002",
   "ui.preset_name_plain": "\u767D\u8BDD\u8BF4\u660E",
   "ui.preset_name_magazine": "\u53D9\u4E8B",
@@ -8115,6 +8131,14 @@ var zhTW = {
   "error.duplicate_map_unsupported": "AIM \u7814\u7A76\u7522\u751F\u7684\u5730\u5716\u76EE\u524D\u9084\u4E0D\u80FD\u8907\u88FD\u3002",
   "detail.no_conclusion_yet": "\u5C1A\u672A\u5F62\u6210\u7D50\u8AD6",
   "detail.preview": "\u9810\u89BD",
+  "detail.book_proof_heading": "\u6821\u5C0D\u7D50\u679C\uFF08\u6700\u65B0\u4E00\u6B21\uFF09",
+  "detail.book_proof_met": "\u9054\u6210",
+  "detail.book_proof_unmet": "\u672A\u9054\u6210",
+  "detail.book_proof_unverified": "\u5F85\u67E5",
+  "detail.book_proof_failed_0": "\u5931\u6557\uFF1A{0}",
+  "detail.book_proof_author_model_0": "\u4F5C\u8005\u6A21\u578B\uFF1A{0}",
+  "detail.book_proof_proof_model_0": "\u6821\u5C0D\u6A21\u578B\uFF1A{0}",
+  "detail.book_model_unrecorded": "\u672A\u8A18\u9304",
   "ui.map_file_description": "\u6B64\u6A94\u6848\u4FDD\u5B58\u5FC3\u667A\u5716\u7D50\u69CB\uFF1B\u5B8C\u6574\u5167\u5BB9\u4FDD\u5B58\u5728\u5404\u8B70\u984C\u7B46\u8A18\u3002\u5F9E\u6A94\u6848\u9078\u55AE\u9078\u64C7\u300C\u4EE5\u5FC3\u667A\u5716\u958B\u555F\u300D\u3002",
   "ui.preset_name_plain": "\u767D\u8A71\u8AAA\u660E",
   "ui.preset_name_magazine": "\u6558\u4E8B",
@@ -43726,8 +43750,9 @@ var safeCount = (value) => typeof value === "number" && Number.isInteger(value) 
 var RECORD = /^<!-- book-proof:v1 (\{.*\}) -->$/;
 var escapeJson = (text10) => text10.replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
 var STATUS_WORDS = { met: "\u9054\u6210", unmet: "\u672A\u9054\u6210", unverified: "\u5F85\u67E5" };
-function composeProofRecord(key4, result, failure) {
-  const clean3 = {
+var safeModelId = (value) => typeof value === "string" ? value.replace(/[^A-Za-z0-9_.:/-]/g, "").slice(0, 60) : "";
+function cleanResult(result) {
+  return {
     aggregate: result.aggregate,
     ...result.factsUnverified ? { factsUnverified: true } : {},
     items: result.items.map((item) => ({
@@ -43739,6 +43764,11 @@ function composeProofRecord(key4, result, failure) {
     })),
     ...result.counts ? { counts: { openedPages: safeCount(result.counts.openedPages), searches: safeCount(result.counts.searches) } } : {}
   };
+}
+function composeProofRecord(key4, result, failure, models) {
+  const clean3 = cleanResult(result);
+  const model = safeModelId(models == null ? void 0 : models.model);
+  const authorModel = safeModelId(models == null ? void 0 : models.authorModel);
   const lines = [
     (failure ? `\u6821\u5C0D\u5931\u6557\uFF08\u539F\u56E0\uFF1A${failure}\uFF1B\u4EE5\u4E0B\u662F\u5DF2\u5224\u65B7\u7684\u7D50\u679C\uFF0C\u4ECD\u9700\u4EBA\u770B\uFF09` : `\u6821\u5C0D\uFF08${clean3.aggregate === "checked" ? "\u5DF2\u6821" : clean3.factsUnverified ? "\u9700\u4EBA\u770B\uFF1B\u4E8B\u5BE6\u9805\u76EE\u7686\u5F85\u67E5" : "\u9700\u4EBA\u770B"}\uFF09`) + (clean3.counts ? ` \u958B\u9801 ${clean3.counts.openedPages} \u6B21\u3001\u641C\u5C0B ${clean3.counts.searches} \u6B21` : "")
   ];
@@ -43747,7 +43777,15 @@ function composeProofRecord(key4, result, failure) {
       `- ${item.id} ${STATUS_WORDS[item.status]}\uFF1A${item.note}${item.sources.length ? `\uFF08\u958B\u9801\uFF1A${item.sources.map((href) => `\`${href}\``).join(" ")}\uFF09` : ""}`
     );
   lines.push(
-    `<!-- book-proof:v1 ${escapeJson(JSON.stringify({ key: key4, result: clean3, ...failure ? { failed: failure } : {} }))} -->`
+    `<!-- book-proof:v1 ${escapeJson(
+      JSON.stringify({
+        key: key4,
+        result: clean3,
+        ...failure ? { failed: failure } : {},
+        ...model ? { model } : {},
+        ...authorModel ? { authorModel } : {}
+      })
+    )} -->`
   );
   return lines.join("\n");
 }
@@ -43837,8 +43875,8 @@ ${callout2}
   while (last >= 0 && !body[last].trim()) last--;
   const hasCallout = body.some((line2) => CALLOUT_HEAD2.test(line2.replace(/\r$/, "")));
   const quoteTail = last >= 0 && /^>/.test(body[last]);
-  const addition = hasCallout && quoteTail ? `>
-${quoted}` : `${last >= 0 ? "\n" : ""}> [!note]- ${section3.text}
+  const titleOnly = last >= 0 && CALLOUT_HEAD2.test(body[last].replace(/\r$/, ""));
+  const addition = hasCallout && quoteTail ? `${titleOnly ? "" : ">\n"}${quoted}` : `${last >= 0 ? "\n" : ""}> [!note]- ${section3.text}
 ${quoted}`;
   const head2 = lines.slice(0, section3.at + 1 + last + 1).join("\n");
   const tail = lines.slice(section3.at + 1 + last + 1);
@@ -43982,15 +44020,8 @@ function findImageSection(lines) {
     from = s.at + 1;
   }
 }
-function setImageSection(detail, section3, language2) {
+function withImageBlock(lines, block) {
   var _a2, _b2;
-  let lines = detail.split("\n");
-  for (; ; ) {
-    const old = findImageSection(lines);
-    if (!old) break;
-    lines = [...lines.slice(0, old.at), ...lines.slice(old.end)];
-  }
-  if (section3 === null) return lines.join("\n");
   const fenced = fencedLines2(lines);
   const sources = findSection(lines, fenced, (text10) => isNewSourcesHeading(text10));
   const other = findSection(
@@ -44001,14 +44032,24 @@ function setImageSection(detail, section3, language2) {
   const at = Math.min((_a2 = sources == null ? void 0 : sources.at) != null ? _a2 : lines.length, (_b2 = other == null ? void 0 : other.at) != null ? _b2 : lines.length);
   const head2 = lines.slice(0, at).join("\n").replace(/\s+$/, "");
   const tail = lines.slice(at).join("\n");
-  const heading = /^zh/i.test(language2) ? IMAGES_HEADING.zh : IMAGES_HEADING.en;
   return `${head2 ? `${head2}
 
-` : ""}### ${heading}
-
-${section3.trim()}
+` : ""}${block}
 ${tail ? `
 ${tail}` : ""}`;
+}
+function setImageSection(detail, section3, language2) {
+  let lines = detail.split("\n");
+  for (; ; ) {
+    const old = findImageSection(lines);
+    if (!old) break;
+    lines = [...lines.slice(0, old.at), ...lines.slice(old.end)];
+  }
+  if (section3 === null) return lines.join("\n");
+  const heading = /^zh/i.test(language2) ? IMAGES_HEADING.zh : IMAGES_HEADING.en;
+  return withImageBlock(lines, `### ${heading}
+
+${section3.trim()}`);
 }
 function chapterBody(detail) {
   var _a2;

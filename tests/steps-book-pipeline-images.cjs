@@ -225,3 +225,42 @@ test('sections: chapterBody drops the picture section; setImageSection puts it b
   assert.equal(setImageSection('Text.', '![A](https://e.com/a.jpg)\nA', 'en'), 'Text.\n\n### Images\n\n![A](https://e.com/a.jpg)\nA\n');
   assert.equal(chapterBody('Text.\n\n### Images\n\n![A](https://e.com/a.jpg)\nA\n'), 'Text.');
 });
+
+test('sections: the author\'s own "## 圖像" / "### 圖像" text and its Sources are kept; only the system form is replaced or stripped', () => {
+  const { chapterBody, setImageSection } = S.load('core/book-pipeline/note-sections.ts');
+  for (const h of ['## 圖像', '### 圖像', '### Images']) {
+    const authored = `開頭。\n\n${h}\n\n宗教圖像在這一章很重要。\n\n### 來源\n- s`;
+    const out = setImageSection(authored, '![A](https://e.com/a.jpg)\nA', 'zh-TW');
+    assert.ok(out.includes('宗教圖像在這一章很重要。') && out.includes('### 來源\n- s'), h);
+    assert.equal(setImageSection(authored, null, 'zh-TW'), authored);
+    assert.ok(chapterBody(authored).includes('宗教圖像在這一章很重要。'), h);
+  }
+  const img = '開頭。\n\n## 圖像\n\n正文\n\n### 來源\n- s';
+  let n = img;
+  for (let i = 0; i < 3; i++) n = setImageSection(n, `![A${i}](https://e.com/a${i}.jpg)\nA${i}`, 'zh-TW');
+  assert.equal((n.match(/^### 圖像/gm) ?? []).length, 1);
+  assert.ok(n.includes('## 圖像\n\n正文') && n.includes('### 來源\n- s') && !n.includes('a0.jpg'));
+  assert.equal(chapterBody(n), '開頭。\n\n## 圖像\n\n正文');
+});
+
+test('images: addresses to an inner network or with credentials / odd ports are refused, public ones pass (body images too)', () => {
+  const bad = ['https://127.0.0.1/a.png', 'https://localhost:8443/a.png', 'https://192.168.1.1/a.png', 'https://169.254.169.254/a.png', 'https://[::1]/a.png',
+    'https://user:pw@example.com/a.png', 'https://2130706433/a.png', 'https://0x7f.0.0.1/a.png', 'https://017700000001/a.png', 'https://[::ffff:127.0.0.1]/a.png',
+    'https://LOCALHOST/a.png', 'https://a.localhost/a.png', 'https://foo.local/a.png', 'https://foo.internal/a.png', 'https://foo.lan/a.png', 'https://intranet/a.png',
+    'https://example.com:8443/a.png', 'https://example.com@127.0.0.1/a.png', 'https://example.com%40evil/a.png'.replace('%40', '@')];
+  const ok = ['https://upload.wikimedia.org/a/a.jpg', 'https://images.metmuseum.org/a.jpg', 'https://www.rijksmuseum.nl/a.jpg', 'https://example.com:443/a.jpg'];
+  for (const url of bad) {
+    const out = replaceBodyImages(`![x](${url})`, new Map());
+    assert.ok(!out.includes('!['), url);
+    assert.match(out, /網址不安全/, url);
+  }
+  for (const url of ok) assert.match(replaceBodyImages(`![x](${url})`, new Map()), /^!\[x\]\(https:\/\//, url);
+});
+
+test('images: a refused address is not probed and not embedded', async () => {
+  const r = await picRig({ finder: () => [cand(1, { url: 'https://127.0.0.1/a.jpg' }), cand(2, { url: 'https://foo.local/b.jpg' }), cand(3, { url: 'https://example.com:8443/c.jpg' }), cand(4)], probe: async () => ({ ok: true }) });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.equal((detail.match(/!\[/g) ?? []).length, 1);
+  assert.deepEqual(r.stat.probes.filter(u => /127\.0|\.local|8443/.test(u)), []);
+});

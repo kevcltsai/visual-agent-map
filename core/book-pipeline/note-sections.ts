@@ -281,11 +281,31 @@ export const IMAGES_HEADING = { zh: "圖像", en: "Images" };
 const isImagesHeading = (text: string): boolean =>
   [IMAGES_HEADING.zh, IMAGES_HEADING.en, "图像"].some(name => name.toLowerCase() === text.trim().toLowerCase());
 const isSystemSection = (text: string): boolean =>
-  isResearchNotesHeading(text) ||
-  isUpdateLogHeading(text) ||
-  isNewSourcesHeading(text) ||
-  isOpenQuestionsHeading(text) ||
-  isImagesHeading(text);
+  isResearchNotesHeading(text) || isUpdateLogHeading(text) || isNewSourcesHeading(text) || isOpenQuestionsHeading(text);
+
+/**
+ * The first "### 圖像" section in the exact form the system writes (level 3; its body is only pairs of an `![..](https://..)` line and one
+ * plain caption line, blank lines between). A same-named heading with anything else under it is the author's text and is not found.
+ */
+function findImageSection(lines: string[]): { at: number; end: number } | undefined {
+  const fenced = fencedLines(lines);
+  for (let from = 0; ;) {
+    const s = findSection(lines, fenced, (text, level) => level === 3 && isImagesHeading(text), from);
+    if (!s) return undefined;
+    const body = lines
+      .slice(s.at + 1, s.end)
+      .map(l => l.replace(/\r$/, ""))
+      .filter(l => l.trim());
+    const ok =
+      body.length > 0 &&
+      body.length % 2 === 0 &&
+      body.every((l, i) =>
+        i % 2 === 0 ? /^!\[[^\]]*\]\(https:\/\/\S+\)$/.test(l) : !/!\[|^\s*(#|[-*+>]|\d+[.)])|<!--/.test(l)
+      );
+    if (ok) return s;
+    from = s.at + 1;
+  }
+}
 
 /**
  * A Detail with its picture section replaced by `section` (the lines after a `### 圖像` / `### Images` heading; null: removed).
@@ -295,7 +315,7 @@ const isSystemSection = (text: string): boolean =>
 export function setImageSection(detail: string, section: string | null, language: string): string {
   let lines = detail.split("\n");
   for (;;) {
-    const old = findSection(lines, fencedLines(lines), text => isImagesHeading(text));
+    const old = findImageSection(lines);
     if (!old) break;
     lines = [...lines.slice(0, old.at), ...lines.slice(old.end)];
   }
@@ -321,7 +341,7 @@ export function setImageSection(detail: string, section: string | null, language
 export function chapterBody(detail: string): string {
   let lines = detail.split("\n");
   for (;;) {
-    const section = findSection(lines, fencedLines(lines), text => isSystemSection(text));
+    const section = findSection(lines, fencedLines(lines), text => isSystemSection(text)) ?? findImageSection(lines);
     if (!section) break;
     lines = [...lines.slice(0, section.at), ...lines.slice(section.end)];
   }

@@ -378,13 +378,26 @@ function imageSectionBody(items: readonly { href: string; candidate: ImageCandid
 }
 const isHttps = (url: string): boolean => /^https:\/\//i.test(url);
 
+/**
+ * A public web host only (a front guard: an `<img>` that follows a redirect to an inner address is not stopped here). Refuses IP literals
+ * (WHATWG parsing has already turned decimal / octal / hex forms into dotted IPv4), localhost, hosts ending in local, internal or lan, a one-label host,
+ * credentials and a port other than 443.
+ */
+function isPublicHost(url: URL): boolean {
+  if (url.username || url.password || (url.port && url.port !== "443")) return false;
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  if (!host || host.includes("@") || host.startsWith("[") || /^[\d.]+$/.test(host) || !host.includes(".")) return false;
+  if (/^(0x[0-9a-f]*|\d+)(\.(0x[0-9a-f]*|\d+))*$/.test(host)) return false;
+  return !/(^|[.])(localhost|local|internal|lan)$/.test(host);
+}
+
 /** An address that may be probed and written back: no whitespace, backslash, `<` or `>`; `new URL()` parses it as https with balanced parentheses. */
 function safeHref(raw: string): string | undefined {
   if (!raw || /[\s\\<>\p{Cc}]/u.test(raw)) return undefined;
   let href: string;
   try {
     const url = new URL(raw);
-    if (url.protocol !== "https:") return undefined;
+    if (url.protocol !== "https:" || !isPublicHost(url)) return undefined;
     href = url.href;
   } catch {
     return undefined;

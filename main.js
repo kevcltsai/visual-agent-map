@@ -43965,12 +43965,25 @@ ${after}` : "\n"}`;
 var isUpdateLogHeading = (text10) => [SECTION_NAME.log.zh, SECTION_NAME.log.en].some((name2) => name2.toLowerCase() === text10.trim().toLowerCase());
 var IMAGES_HEADING = { zh: "\u5716\u50CF", en: "Images" };
 var isImagesHeading = (text10) => [IMAGES_HEADING.zh, IMAGES_HEADING.en, "\u56FE\u50CF"].some((name2) => name2.toLowerCase() === text10.trim().toLowerCase());
-var isSystemSection = (text10) => isResearchNotesHeading(text10) || isUpdateLogHeading(text10) || isNewSourcesHeading(text10) || isOpenQuestionsHeading(text10) || isImagesHeading(text10);
+var isSystemSection = (text10) => isResearchNotesHeading(text10) || isUpdateLogHeading(text10) || isNewSourcesHeading(text10) || isOpenQuestionsHeading(text10);
+function findImageSection(lines) {
+  const fenced = fencedLines2(lines);
+  for (let from = 0; ; ) {
+    const s = findSection(lines, fenced, (text10, level) => level === 3 && isImagesHeading(text10), from);
+    if (!s) return void 0;
+    const body = lines.slice(s.at + 1, s.end).map((l) => l.replace(/\r$/, "")).filter((l) => l.trim());
+    const ok = body.length > 0 && body.length % 2 === 0 && body.every(
+      (l, i) => i % 2 === 0 ? /^!\[[^\]]*\]\(https:\/\/\S+\)$/.test(l) : !/!\[|^\s*(#|[-*+>]|\d+[.)])|<!--/.test(l)
+    );
+    if (ok) return s;
+    from = s.at + 1;
+  }
+}
 function setImageSection(detail, section3, language2) {
   var _a2, _b2;
   let lines = detail.split("\n");
   for (; ; ) {
-    const old = findSection(lines, fencedLines2(lines), (text10) => isImagesHeading(text10));
+    const old = findImageSection(lines);
     if (!old) break;
     lines = [...lines.slice(0, old.at), ...lines.slice(old.end)];
   }
@@ -43995,9 +44008,10 @@ ${tail ? `
 ${tail}` : ""}`;
 }
 function chapterBody(detail) {
+  var _a2;
   let lines = detail.split("\n");
   for (; ; ) {
-    const section3 = findSection(lines, fencedLines2(lines), (text10) => isSystemSection(text10));
+    const section3 = (_a2 = findSection(lines, fencedLines2(lines), (text10) => isSystemSection(text10))) != null ? _a2 : findImageSection(lines);
     if (!section3) break;
     lines = [...lines.slice(0, section3.at), ...lines.slice(section3.end)];
   }
@@ -48964,12 +48978,19 @@ ${name2}${source}`;
   }).join("\n\n");
 }
 var isHttps = (url) => /^https:\/\//i.test(url);
+function isPublicHost(url) {
+  if (url.username || url.password || url.port && url.port !== "443") return false;
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  if (!host || host.includes("@") || host.startsWith("[") || /^[\d.]+$/.test(host) || !host.includes(".")) return false;
+  if (/^(0x[0-9a-f]*|\d+)(\.(0x[0-9a-f]*|\d+))*$/.test(host)) return false;
+  return !/(^|[.])(localhost|local|internal|lan)$/.test(host);
+}
 function safeHref2(raw) {
   if (!raw || /[\s\\<>\p{Cc}]/u.test(raw)) return void 0;
   let href;
   try {
     const url = new URL(raw);
-    if (url.protocol !== "https:") return void 0;
+    if (url.protocol !== "https:" || !isPublicHost(url)) return void 0;
     href = url.href;
   } catch (e) {
     return void 0;

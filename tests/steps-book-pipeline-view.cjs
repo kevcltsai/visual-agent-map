@@ -17,6 +17,7 @@ export * from "./experiences/visual-map/book-pipeline-ui";
 export { bookStartEstimate, bookStartEstimateText, bookSettingsPatch } from "./experiences/visual-map/book-pipeline-start-modal";
 export { BookPipelineRunError, stepCounts } from "./experiences/visual-map/book-pipeline-run";
 export { readBookPipeline } from "./core/book-pipeline/model";
+export { BookFinishModal, finishAskLine } from "./experiences/visual-map/book-pipeline-finish-modal";
 export { VisualAgentMapView } from "./experiences/visual-map/view";
 export { setUiLanguage, t } from "./i18n";
 `, { obsidian: { ...support.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice(notices), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
@@ -696,4 +697,69 @@ test('bar: a title that has not loaded yet reads as a sentence without an empty 
   lang('en');
   assert.equal(ui.bookNowText({ step: 'images', chapter: 2, more: 0 }), 'Now: finding pictures for chapter 2');
   lang('zh-TW');
+});
+
+
+// ---- T5: the rerun line of the bar, the card chip, the finish question ----
+test('T5 bar: a single-card rerun shows "正在重跑：2 Title", the clock from the view, the card\'s three steps and a stop button; the five-stage list is not drawn', () => {
+  lang('zh-TW');
+  const order = ['a', 'b', 'c'];
+  const prog = progress({ phase: 'gate2', total: 3, current: [{ nodeId: 'b', step: 'write', startedAt: 5 }], rerun: { nodeId: 'b', startedAt: 777 } });
+  const parent = dom.element('div');
+  const clocks = [];
+  const c = calls();
+  const state = ui.bookBarState(bookData({ order, phase: 'gate2' }), prog, noStage, id => ({ b: '<i>睡眠</i>' })[id]);
+  ui.renderBookBar(parent, state, { ...c.actions, track: (el, startedAt) => { clocks.push(startedAt); el.setText('重跑中 0:41'); } });
+  const now = dom.find(parent, i => i.cls.includes('vam-book-now-text'));
+  assert.equal(now.text, '正在重跑：2 <i>睡眠</i>');
+  assert.equal(now.children.length, 0, 'a title is text, never markup');
+  assert.deepEqual(clocks, [777]);
+  assert.ok(texts(parent).includes('重跑中 0:41'));
+  assert.deepEqual(dom.findAll(parent, i => i.tag === 'li').map(i => i.text), ['✓ 企劃', '寫作', '校對']);
+  assert.ok(dom.findAll(parent, i => i.tag === 'li').some(i => i.attrs['aria-current'] === 'step' && i.text === '寫作'));
+  assert.deepEqual(buttonsOf(parent).map(b => b.text), ['停止']);
+  buttonsOf(parent)[0].click();
+  assert.deepEqual(c.log, ['stop']);
+});
+
+test('T5 card chip: a card being rerun says 重跑中 with its clock and keeps the step in the tooltip; a plain working card is unchanged', () => {
+  lang('zh-TW');
+  const header = dom.element('div');
+  ui.renderBookCardLabels(header, ui.bookCardView({ pipelineStage: 'needs-review' }), { step: 'proof', rerun: true, track: el => el.setText('0:41') });
+  const chip = header.children[0];
+  assert.match(chip.cls, /is-rerun/);
+  assert.equal(chip.children[0].text, '重跑中');
+  assert.equal(chip.attrs.title, '校對中');
+  assert.equal(chip.children[1].text, '0:41');
+});
+
+test('T5 finish question: counts and card names as text, "回去處理" has the keyboard, Escape and the X count as going back, "仍要完成" finishes, one answer only', () => {
+  lang('zh-TW');
+  assert.equal(bundle.finishAskLine({ review: 1, reviewTitles: ['2 為什麼需要睡覺'], seams: 2 }), '1 張需人看（2 為什麼需要睡覺）、2 個接縫還沒確認。');
+  assert.equal(bundle.finishAskLine({ review: 0, reviewTitles: [], seams: 3 }), '3 個接縫還沒確認。');
+  const answers = [];
+  const open = info => { const m = new bundle.BookFinishModal({}, info, v => answers.push(v)); m.open(); return m; };
+  const modal = open({ review: 1, reviewTitles: ['<b>x</b>'], seams: 2 });
+  assert.equal(modal.titleEl.text, '還有 3 件沒處理');
+  assert.deepEqual(buttonsOf(modal.modalEl).map(b => b.text), ['回去處理', '仍要完成']);
+  assert.equal(dom.find(modal.modalEl, i => i.cls.includes('vam-book-finish-line')).children.length, 0);
+  assert.equal(dom.focusedNow().text, '回去處理');
+  buttonsOf(modal.modalEl)[1].click();
+  assert.deepEqual(answers, [true]);
+  const back = open({ review: 1, reviewTitles: [], seams: 0 });
+  buttonsOf(back.modalEl)[0].click();
+  const esc = open({ review: 1, reviewTitles: [], seams: 0 });
+  esc.close();
+  esc.close();
+  assert.deepEqual(answers, [true, false, false], 'one answer per question');
+  assert.equal(esc.focusTimer, null, 'the focus timer is cleared on close');
+});
+
+test('T5 view wiring: the rerun clock shares the one tick and dies with the view; "global" is never a card; the menu note is not a disabled grey line', () => {
+  assert.match(view_ts, /private trackRerunClock\(element: HTMLElement, startedAt: number\)/);
+  assert.match(view_ts, /item\.nodeId === nodeId && item\.nodeId !== "global"/);
+  assert.match(view_ts, /new BookFinishModal\(this\.app, info, resolve\)/);
+  assert.ok(!/item\.setTitle\(t\("ui\.book_card_menu_rerun_sub"\)\)\.setDisabled\(true\)/.test(view_ts));
+  assert.match(css, /\.vam-book-rerun-clock/);
+  assert.match(css, /\.vam-book-menu-note \{[^}]*pointer-events: none/);
 });

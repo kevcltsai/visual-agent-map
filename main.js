@@ -50051,8 +50051,10 @@ var BookPipelineRuns = class {
     if (bodyImageUrls(card.detail).length || !query || !this.ports.findImages) return {};
     const exclude = new Set(drive.usedImages);
     for (const info of drive.cards.values())
-      if (info.path !== path)
-        for (const url of bodyImageUrls((await this.ports.readCard(info.path)).detail)) exclude.add(imageKey2(url));
+      if (info.path !== path) {
+        const other = await this.ports.readCard(info.path).catch(() => void 0);
+        if (other) for (const url of bodyImageUrls(other.detail)) exclude.add(imageKey2(url));
+      }
     let found = [];
     try {
       found = await untilAborted(
@@ -50084,7 +50086,7 @@ var BookPipelineRuns = class {
     let duplicate = 0;
     for (const item of verified) {
       const key4 = imageKey2(item.href);
-      if (drive.usedImages.has(key4)) duplicate++;
+      if (exclude.has(key4) || drive.usedImages.has(key4)) duplicate++;
       else if (items.length < cap3) {
         drive.usedImages.add(key4);
         items.push(item);
@@ -50098,14 +50100,29 @@ var BookPipelineRuns = class {
     };
     if (!items.length) return { counts };
     const section3 = imageSectionBody(items, drive.config.language);
-    if (this.exitCheck(section3, new Set(items.map((item) => item.href)))) return { counts };
-    const latest = await this.ports.readCard(path);
-    const outcome = await this.ports.updateNoteGuarded(
-      path,
-      { detail: setImageSection(latest.detail, section3, drive.config.language) },
-      { expectedContent: latest.raw, authorize }
-    );
-    if (outcome === "discarded") return { outcome: { kind: "failed", reason: "discarded" }, counts };
+    const release2 = () => {
+      for (const item of items) drive.usedImages.delete(imageKey2(item.href));
+    };
+    if (this.exitCheck(section3, new Set(items.map((item) => item.href)))) {
+      release2();
+      return { counts };
+    }
+    let outcome;
+    try {
+      const latest = await this.ports.readCard(path);
+      outcome = await this.ports.updateNoteGuarded(
+        path,
+        { detail: setImageSection(latest.detail, section3, drive.config.language) },
+        { expectedContent: latest.raw, authorize }
+      );
+    } catch (error) {
+      release2();
+      throw error;
+    }
+    if (outcome === "discarded") {
+      release2();
+      return { outcome: { kind: "failed", reason: "discarded" }, counts };
+    }
     return { counts };
   }
   /** The independent exit check of an author result (a method so a test can force it to fail). */

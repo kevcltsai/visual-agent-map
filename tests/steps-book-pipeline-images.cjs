@@ -279,12 +279,13 @@ test('images: imageKey is the decoded lowercase Wikimedia file name for original
   assert.equal(imageKey('https://example.com/a/b.jpg?x=2'), imageKey('https://example.com/a/b.jpg'));
 });
 
-test('images: two chapters searched at the same time that get the same picture embed it once; the later search carries the earlier key in its exclude list', async () => {
+test('images: two chapters searched at the same time that get the same picture embed it once, and the duplicate is counted', async () => {
   const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], finder: () => [cand(1)] });
   await run(r);
   assert.equal((await embedded(r, 2)).length, 1, 'one picture in the whole book');
   assert.equal(r.calls.length, 2);
   assert.ok(r.calls.every(c => Array.isArray(c.exclude)));
+  assert.match(r.stat.logs.join('\n'), /duplicate=1/);
 });
 
 test('images: a later chapter is told the pictures other chapters already use, but a single-card rerun does not exclude its own', async () => {
@@ -313,4 +314,41 @@ test('images: the find-images step drops images the model marks not relevant or 
   const prompt = findImagesStep.render({ query: 'q', exclude: Array.from({ length: 40 }, (_, i) => `k${i}${'x'.repeat(200)}`), language: 'en', model: 'm', reasoning: 'low' });
   assert.equal(JSON.parse(/exclude list[^\[]*(\[.*\])/.exec(prompt)[1]).length, 30);
   assert.ok(!/x{121}/.test(prompt));
+});
+
+test('images: a single-card rerun (fresh run state) still refuses a picture another chapter already shows, even if the search ignores the exclude list', async () => {
+  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], finder: req => [cand(/SecretTitleA/.test(req.query) ? 2 : 1)] });
+  await run(r);
+  r.stat.logs.length = 0;
+  const finder = r.ports.findImages;
+  r.ports.findImages = async (request, runInfo) => { await finder(request, runInfo); return [cand(1)]; };
+  await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
+  while (r.runs.isRunning(r.mapPath)) await tick();
+  await settle();
+  assert.ok(!/W1\.jpg/.test((await r.note(1)).detail), 'the other chapter\'s picture is not embedded again');
+  assert.match(r.stat.logs.join('\n'), /duplicate=1/);
+});
+
+test('images: another chapter whose note cannot be read does not fail this chapter\'s picture search', async () => {
+  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], finder: () => [cand(1)] });
+  const author = r.script.author;
+  let gone = false;
+  r.script.author = async (input, n) => { const out = await author(input, n); gone = true; return out; };
+  const read = r.ports.readCard;
+  r.ports.readCard = path => (gone && path === r.nodes[1].path ? Promise.reject(new Error('deleted')) : read(path));
+  await run(r);
+  assert.match((await r.note(0)).detail, /### 圖像/);
+  assert.equal(stageOf(r.raw(0)), 'checked');
+});
+
+test('images: a picture claimed by a chapter whose write is blocked by the exit check is released for the next chapter', async () => {
+  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], finder: () => [cand(1)] });
+  const first = defer();
+  const finder = r.ports.findImages;
+  r.ports.findImages = async (request, runInfo) => { if (/SecretTitleA/.test(request.query)) await first.promise; return finder(request, runInfo); };
+  let blocked = 0;
+  r.runs.exitCheck = text => { if (!text.includes('![Work 1]') || blocked++) return false; first.resolve(); return true; };
+  await run(r);
+  assert.ok(!/### 圖像/.test((await r.note(0)).detail), 'the blocked chapter wrote nothing');
+  assert.equal((await embedded(r, 2)).length, 1, 'the picture went to the other chapter');
 });

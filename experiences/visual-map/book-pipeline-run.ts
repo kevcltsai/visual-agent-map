@@ -1543,8 +1543,11 @@ export class BookPipelineRuns {
     // What the other chapters already use (not this card's own old pictures: a rerun may pick again), and what this run embedded.
     const exclude = new Set(drive.usedImages);
     for (const info of drive.cards.values())
-      if (info.path !== path)
-        for (const url of bodyImageUrls((await this.ports.readCard(info.path)).detail)) exclude.add(imageKey(url));
+      if (info.path !== path) {
+        // A card deleted meanwhile is skipped: it must not fail this chapter.
+        const other = await this.ports.readCard(info.path).catch(() => undefined);
+        if (other) for (const url of bodyImageUrls(other.detail)) exclude.add(imageKey(url));
+      }
     let found: ImageCandidate[] = [];
     try {
       found = await untilAborted(
@@ -1578,7 +1581,7 @@ export class BookPipelineRuns {
     let duplicate = 0;
     for (const item of verified) {
       const key = imageKey(item.href);
-      if (drive.usedImages.has(key)) duplicate++;
+      if (exclude.has(key) || drive.usedImages.has(key)) duplicate++;
       else if (items.length < cap) {
         drive.usedImages.add(key);
         items.push(item);
@@ -1593,14 +1596,29 @@ export class BookPipelineRuns {
     if (!items.length) return { counts };
     const section = imageSectionBody(items, drive.config.language);
     // The exit check: nothing but the verified addresses may be an image in what is added.
-    if (this.exitCheck(section, new Set(items.map(item => item.href)))) return { counts };
-    const latest = await this.ports.readCard(path);
-    const outcome = await this.ports.updateNoteGuarded(
-      path,
-      { detail: setImageSection(latest.detail, section, drive.config.language) },
-      { expectedContent: latest.raw, authorize }
-    );
-    if (outcome === "discarded") return { outcome: { kind: "failed", reason: "discarded" }, counts };
+    const release = (): void => {
+      for (const item of items) drive.usedImages.delete(imageKey(item.href));
+    };
+    if (this.exitCheck(section, new Set(items.map(item => item.href)))) {
+      release();
+      return { counts };
+    }
+    let outcome: Awaited<ReturnType<BookPipelinePorts["updateNoteGuarded"]>>;
+    try {
+      const latest = await this.ports.readCard(path);
+      outcome = await this.ports.updateNoteGuarded(
+        path,
+        { detail: setImageSection(latest.detail, section, drive.config.language) },
+        { expectedContent: latest.raw, authorize }
+      );
+    } catch (error) {
+      release();
+      throw error;
+    }
+    if (outcome === "discarded") {
+      release();
+      return { outcome: { kind: "failed", reason: "discarded" }, counts };
+    }
     return { counts };
   }
 

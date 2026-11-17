@@ -14,6 +14,7 @@ import type { ImageCandidate } from "../../core/image-candidates";
 import type { FindImagesRequest } from "../../core/steps/book-pipeline/find-images";
 import { isBudgetExhausted } from "../../core/admission";
 import { createBudgetAdmission, createStoreBudgetPort } from "../../core/book-pipeline/budget";
+import { imageKey } from "../../core/book-pipeline/image-dedupe";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
 import {
   PipelineStore,
@@ -269,6 +270,8 @@ interface Drive {
   fatal?: unknown;
   /** A neutral code of why the run ended by itself (see failRun). */
   failure?: string;
+  /** Keys (see imageKey) of the pictures this run already embedded: one picture is used once in a book. */
+  usedImages: Set<string>;
   done: Promise<void>;
 }
 
@@ -921,6 +924,7 @@ export class BookPipelineRuns {
       stopRequested: false,
       disposed: false,
       rootId: "",
+      usedImages: new Set<string>(),
       done: Promise.resolve()
     } as unknown as Drive;
     this.drives.set(mapPath, drive);
@@ -1480,7 +1484,7 @@ export class BookPipelineRuns {
       if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
     }
     // Q13: the picture search (one call, optional): only pictures that load are embedded, by the program, in the standard form.
-    let search: { found: number; verified: number } | undefined;
+    let search: { found: number; verified: number; duplicate: number; offTopic: number } | undefined;
     if (this.ports.findImages) {
       const searched = await this.findPictures(drive, path, written.fields.bookRole, authorize);
       if (searched.outcome) return searched.outcome;
@@ -1528,17 +1532,25 @@ export class BookPipelineRuns {
     path: string,
     role: BookRole | undefined,
     authorize: () => boolean
-  ): Promise<{ outcome?: Outcome; counts?: { found: number; verified: number } }> {
+  ): Promise<{
+    outcome?: Outcome;
+    counts?: { found: number; verified: number; duplicate: number; offTopic: number };
+  }> {
     const signal = drive.controller.signal;
     const card = await this.ports.readCard(path);
     const query = imageSearchText(card);
     if (bodyImageUrls(card.detail).length || !query || !this.ports.findImages) return {};
+    // What the other chapters already use (not this card's own old pictures: a rerun may pick again), and what this run embedded.
+    const exclude = new Set(drive.usedImages);
+    for (const info of drive.cards.values())
+      if (info.path !== path)
+        for (const url of bodyImageUrls((await this.ports.readCard(info.path)).detail)) exclude.add(imageKey(url));
     let found: ImageCandidate[] = [];
     try {
       found = await untilAborted(
         signal,
         this.ports.findImages(
-          { ...this.base(drive, drive.config.authorModel), query },
+          { ...this.base(drive, drive.config.authorModel), query, exclude: [...exclude] },
           { signal, admission: drive.admission }
         )
       );
@@ -1561,8 +1573,23 @@ export class BookPipelineRuns {
     );
     const cap = role === "gallery" ? BOOK_IMAGES_MAX_GALLERY : BOOK_IMAGES_MAX;
     const verified = candidates.filter((_, i) => probed[i].ok);
-    const counts = { found: found.length, verified: verified.length };
-    const items = verified.slice(0, cap);
+    // Filter and claim in one synchronous block: chapters run side by side, so the prompt's exclude list alone cannot stop a repeat.
+    const items: typeof verified = [];
+    let duplicate = 0;
+    for (const item of verified) {
+      const key = imageKey(item.href);
+      if (drive.usedImages.has(key)) duplicate++;
+      else if (items.length < cap) {
+        drive.usedImages.add(key);
+        items.push(item);
+      }
+    }
+    const counts = {
+      found: found.length,
+      verified: verified.length,
+      duplicate,
+      offTopic: (found as { offTopic?: number }).offTopic ?? 0
+    };
     if (!items.length) return { counts };
     const section = imageSectionBody(items, drive.config.language);
     // The exit check: nothing but the verified addresses may be an image in what is added.

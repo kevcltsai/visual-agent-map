@@ -440,9 +440,9 @@ test('author rules: the author puts no pictures in the text (the system searches
   assert.ok(!/Wikimedia/.test(text));
   const { findImagesStep } = loadWithAiCalls('core/steps/book-pipeline/find-images.ts');
   const prompt = findImagesStep.render({ query: 'Title / 《Work》', language: 'en', model: 'm', reasoning: 'low' });
-  assert.match(prompt, /Wikimedia Commons/); assert.match(prompt, /Met Open Access/); assert.match(prompt, /direct https link/); assert.match(prompt, /Never invent or guess URLs/);
+  assert.match(prompt, /Wikimedia Commons/); assert.ok(!/Met Open Access|Rijksmuseum|National Gallery/.test(prompt)); assert.match(prompt, /diagram, schematic, chart or photo/); assert.match(prompt, /artwork[^.]*only when the chapter itself is about art/); assert.match(prompt, /"relevant"/); assert.match(prompt, /"shows"/); assert.match(prompt, /exclude list/); assert.match(prompt, /direct https link/); assert.match(prompt, /Never invent or guess URLs/);
   assert.match(prompt, /"Title \/ 《Work》"/);
-  const parsed = findImagesStep.parse('x {"images":[{"title":"A","imageUrl":"https://upload.wikimedia.org/a.jpg","sourceUrl":"https://commons.wikimedia.org/x"},{"title":"B","imageUrl":"http://e.com/b.jpg","sourceUrl":"https://e.com"}]} y');
+  const parsed = findImagesStep.parse('x {"images":[{"title":"A","shows":"s","relevant":true,"imageUrl":"https://upload.wikimedia.org/a.jpg","sourceUrl":"https://commons.wikimedia.org/x"},{"title":"B","shows":"s","imageUrl":"http://e.com/b.jpg","sourceUrl":"https://e.com"}]} y');
   assert.equal(parsed.length, 1); assert.equal(parsed[0].title, 'A');
 });
 

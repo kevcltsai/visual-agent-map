@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const S = require('./support.cjs');
 const { load: loadReplay } = require('./support-replay.cjs');
 const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages, unsafeBody } = S.load('experiences/visual-map/book-pipeline-run.ts');
+const { imageKey } = S.load('core/book-pipeline/image-dedupe.ts');
 const { BudgetExhaustedError } = S.load('core/admission.ts');
 const { readBookPipeline } = S.load('core/book-pipeline/model.ts');
 const { cardRevision } = S.load('core/book-pipeline/machine.ts');
@@ -263,4 +264,53 @@ test('images: a refused address is not probed and not embedded', async () => {
   const detail = (await r.note(0)).detail;
   assert.equal((detail.match(/!\[/g) ?? []).length, 1);
   assert.deepEqual(r.stat.probes.filter(u => /127\.0|\.local|8443/.test(u)), []);
+});
+
+const embedded = async (r, n) => { const out = []; for (let i = 0; i < n; i++) out.push(...((await r.note(i)).detail.match(/!\[[^\]]*\]\([^)\s]+\)/g) ?? [])); return out; };
+
+test('images: imageKey is the decoded lowercase Wikimedia file name for original and thumbnail forms on both hosts; other addresses lose query and hash', () => {
+  const name = 'my_file%20%C3%A9.jpg';
+  const keys = [`https://upload.wikimedia.org/wikipedia/commons/a/ab/${name}`, `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/${name}/1280px-${name}`,
+    `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/${name}/320px-${name}`, `https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/${name}/800px-${name}`].map(imageKey);
+  assert.equal(new Set(keys).size, 1);
+  assert.equal(keys[0], 'my_file é.jpg');
+  assert.notEqual(imageKey('https://upload.wikimedia.org/a/ab/Other.jpg'), keys[0]);
+  assert.equal(imageKey('https://example.com/a/b.jpg?x=1#frag'), 'https://example.com/a/b.jpg');
+  assert.equal(imageKey('https://example.com/a/b.jpg?x=2'), imageKey('https://example.com/a/b.jpg'));
+});
+
+test('images: two chapters searched at the same time that get the same picture embed it once; the later search carries the earlier key in its exclude list', async () => {
+  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], finder: () => [cand(1)] });
+  await run(r);
+  assert.equal((await embedded(r, 2)).length, 1, 'one picture in the whole book');
+  assert.equal(r.calls.length, 2);
+  assert.ok(r.calls.every(c => Array.isArray(c.exclude)));
+});
+
+test('images: a later chapter is told the pictures other chapters already use, but a single-card rerun does not exclude its own', async () => {
+  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], finder: req => [cand(/SecretTitleA/.test(req.query) ? 2 : 1)] });
+  await run(r);
+  assert.equal((await embedded(r, 2)).length, 2, 'each chapter has its own picture');
+  const key = n => imageKey(cand(n).url);
+  const search = n => r.calls.filter(c => (n === 2) === /SecretTitleA/.test(c.query));
+  const before = r.calls.length;
+  await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
+  while (r.runs.isRunning(r.mapPath)) await tick();
+  await settle();
+  const rerun = r.calls[before];
+  assert.ok(/SecretTitleA/.test(rerun.query));
+  assert.ok(rerun.exclude.includes(key(1)), 'the other chapter\'s picture is excluded');
+  assert.ok(!rerun.exclude.includes(key(2)), 'its own old picture is not excluded');
+  assert.equal(search(2).length, 2);
+});
+
+test('images: the find-images step drops images the model marks not relevant or gives no description for, and counts them', () => {
+  const { findImagesStep } = require('./support-ai-calls.cjs').loadWithAiCalls('core/steps/book-pipeline/find-images.ts');
+  const img = (n, extra) => ({ title: `T${n}`, imageUrl: `https://upload.wikimedia.org/a/ab/F${n}.jpg`, sourceUrl: 'https://commons.wikimedia.org/x', kind: 'diagram', shows: 'a thing', relevant: true, ...extra });
+  const parsed = findImagesStep.parse(JSON.stringify({ images: [img(1), img(2, { relevant: false }), img(3, { shows: '  ' }), img(4, { shows: undefined }), img(5)] }));
+  assert.deepEqual([...parsed.map(p => p.title)], ['T1', 'T5']);
+  assert.equal(parsed.offTopic, 3);
+  const prompt = findImagesStep.render({ query: 'q', exclude: Array.from({ length: 40 }, (_, i) => `k${i}${'x'.repeat(200)}`), language: 'en', model: 'm', reasoning: 'low' });
+  assert.equal(JSON.parse(/exclude list[^\[]*(\[.*\])/.exec(prompt)[1]).length, 30);
+  assert.ok(!/x{121}/.test(prompt));
 });

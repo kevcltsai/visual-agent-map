@@ -232,7 +232,13 @@ test('a card of the book flow: the earlier hidden log line is kept and a second 
   assert.equal(known.size, 1);
   // The run's own order: the rewritten text (only its own log section), the earlier hidden lines carried back.
   const second = sections.carryWorkLog(first, sections.hidePipelineLog(`正文二\n\n${logSection(logName, [`2026-11-19　已重新寫入，舊版備份在 ${FOLDER}/c 2026-11-19 100000.md`])}`, known, `${FOLDER}/c 2026-11-19 095900.md`));
-  assert.equal(sections.workLogLines(second).length, 2);
+  assert.equal(sections.workLogLines(second).length, 1, 'only the latest rewrite line stays');
+  assert.ok(sections.workLogLines(second)[0].includes('2026-11-19 100000.md'));
+  // A third rewrite (write, auto-fix, rerun): still one line, the newest backup path; other hidden records are untouched.
+  const withRecord = `${second.trimEnd()}\n> - C1 達成\n`;
+  const third = sections.carryWorkLog(withRecord, sections.hidePipelineLog(`正文三\n\n${logSection(logName, [`2026-11-20　已重新寫入，舊版備份在 ${FOLDER}/c 2026-11-20 100000.md`])}`, new Set(sections.workLogLines(withRecord)), `${FOLDER}/c 2026-11-20 095900.md`));
+  assert.equal(sections.workLogLines(third).length, 1);
+  assert.ok(sections.workLogLines(third)[0].includes('2026-11-20 100000.md'));
   assert.equal(second.split('[!vam-book]').length - 1, 1, 'one hidden callout, nothing doubled');
   assert.ok(!/^### /m.test(second.split('\n').filter(row => /更新紀錄/.test(row)).join('\n')), 'no visible update log section is left');
 });

@@ -360,6 +360,19 @@ export function hidePipelineLog(detail: string, known: ReadonlySet<string>, back
   return hideUpdateLog(dropRecordCopies(detail), line => known.has(line) || ownLine.some(re => re.test(line)));
 }
 
+/** Whether a log line (plain text) is the write-back's "rewritten, old version backed up at <path>" line, in any note language. */
+function replacedLineTest(): (line: string) => boolean {
+  const marker = "\u0000";
+  const escape = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const shapes = NOTE_LANGUAGES.map(locale =>
+    translate(locale, "note.writeback_fresh_replaced_0", marker).split(marker)
+  ).filter(parts => parts.length === 2);
+  const res = shapes.map(
+    ([head, tail]) => new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escape(head)}.+${escape(tail)}$`)
+  );
+  return line => res.some(re => re.test(line));
+}
+
 /** The dated log lines the write-back keeps in the work records (plain text, the `> ` prefix removed). */
 export function workLogLines(detail: string): string[] {
   const lines = detail.split("\n");
@@ -370,8 +383,16 @@ export function workLogLines(detail: string): string[] {
 
 /** A rewritten Detail that lost the earlier log lines of the card (the write-back reads only a section it can see by heading): they are put back first in the hidden callout. */
 export function carryWorkLog(oldDetail: string, newDetail: string): string {
-  const have = new Set(workLogLines(newDetail));
-  const add = workLogLines(oldDetail).filter(line => !have.has(line));
+  const newLines = workLogLines(newDetail);
+  const have = new Set(newLines);
+  // "Rewritten, backup at <path>" lines do not pile up: only the latest one stays (this write's own, else the newest earlier one).
+  const isReplaced = replacedLineTest();
+  const oldLines = workLogLines(oldDetail);
+  const lastOldReplaced = oldLines.filter(isReplaced).pop();
+  const keepOldReplaced = newLines.some(isReplaced) ? undefined : lastOldReplaced;
+  const add = oldLines.filter(
+    line => !have.has(line) && (!isReplaced(line) || (line === keepOldReplaced && keepOldReplaced !== undefined))
+  );
   return add.length ? appendHidden(newDetail, add.map(line => `> ${line}`).join("\n"), true) : newDetail;
 }
 

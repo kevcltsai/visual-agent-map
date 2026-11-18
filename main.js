@@ -43204,6 +43204,17 @@ function hidePipelineLog(detail, known, backupPath) {
   ) : [];
   return hideUpdateLog(dropRecordCopies(detail), (line2) => known.has(line2) || ownLine.some((re) => re.test(line2)));
 }
+function replacedLineTest() {
+  const marker3 = "\0";
+  const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const shapes = NOTE_LANGUAGES.map(
+    (locale) => translate(locale, "note.writeback_fresh_replaced_0", marker3).split(marker3)
+  ).filter((parts) => parts.length === 2);
+  const res = shapes.map(
+    ([head2, tail]) => new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escape(head2)}.+${escape(tail)}$`)
+  );
+  return (line2) => res.some((re) => re.test(line2));
+}
 function workLogLines(detail) {
   const lines = detail.split("\n");
   const fenced = fencedLines2(lines);
@@ -43211,8 +43222,15 @@ function workLogLines(detail) {
   return lines.map((line2, i) => mask[i] ? unquoted(bare(line2)).trim() : "").filter((line2) => LOG_LINE.test(line2));
 }
 function carryWorkLog(oldDetail, newDetail) {
-  const have = new Set(workLogLines(newDetail));
-  const add = workLogLines(oldDetail).filter((line2) => !have.has(line2));
+  const newLines = workLogLines(newDetail);
+  const have = new Set(newLines);
+  const isReplaced = replacedLineTest();
+  const oldLines = workLogLines(oldDetail);
+  const lastOldReplaced = oldLines.filter(isReplaced).pop();
+  const keepOldReplaced = newLines.some(isReplaced) ? void 0 : lastOldReplaced;
+  const add = oldLines.filter(
+    (line2) => !have.has(line2) && (!isReplaced(line2) || line2 === keepOldReplaced && keepOldReplaced !== void 0)
+  );
   return add.length ? appendHidden(newDetail, add.map((line2) => `> ${line2}`).join("\n"), true) : newDetail;
 }
 function appendResearchNote(detail, record) {

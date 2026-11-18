@@ -2325,3 +2325,5 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-panel-proof-item.is-unmet { color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
 @media (max-width: 700px) { .vam-book-panel-row .vam-book-panel-card-head { align-items: flex-start; } .vam-book-panel-row button { max-width: 100%; white-space: normal; } }
 @media (prefers-reduced-motion: reduce) { .vam-book-side { transition: none; } }
+/* The picture-book pipeline's work records (Prompt, proofread result, research notes) are written as [!vam-book] callouts: hidden in reading and live preview, still there in source mode. */
+.callout[data-callout="vam-book"] { display: none; }

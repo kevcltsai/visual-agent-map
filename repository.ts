@@ -655,7 +655,7 @@ const isCanonical = (set: NoteHeadings): boolean => set.Detail === CANONICAL_HEA
 /**
  * The heading set a note is already written with, read from its managed Detail heading (the `## ` heading right
  * before the Detail start marker) alone; undefined when it has no marker, unless the user (or a tool) removed the
- * markers of a localized note: then a localized set whose Detail and Current Summary headings are both there (outside
+ * markers of a localized note: then a localized set whose Current Summary heading is there (outside
  * fenced code) and no English managed heading is adopted, so such a note keeps decoding and does not gain a second pair. Any other heading there reads as English, so
  * a user's own heading that happens to read like a localized one is never taken for a managed section in older notes.
  */
@@ -668,9 +668,9 @@ function markerlessHeadingSet(content: string): NoteHeadings | undefined {
     if (text !== undefined) headings.add(text);
   });
   if (headings.has("Current Summary") || headings.has("Detail")) return undefined;
-  return NOTE_HEADING_SETS.filter(set => !isCanonical(set)).find(
-    set => headings.has(set.Detail) && headings.has(set["Current Summary"])
-  );
+  // The localized summary heading alone names the set too (a note made with only that section): without it the write adds an English
+  // Current Summary beside the localized one and the note shows its summary twice.
+  return NOTE_HEADING_SETS.filter(set => !isCanonical(set)).find(set => headings.has(set["Current Summary"]));
 }
 function noteHeadingSet(content: string): NoteHeadings | undefined {
   const start = content.indexOf(DETAIL_START);
@@ -717,7 +717,7 @@ function writtenHeadingSet(content: string, fallback: NoteHeadings): NoteHeading
     ? CANONICAL_HEADINGS
     : fallback;
 }
-const CALLOUT_TITLE = /^(> \[!info\][+-]? )(.+?)([ \t]*\r?)$/;
+const CALLOUT_TITLE = /^(> \[!(?:info|vam-book)\][+-]? )(.+?)([ \t]*\r?)$/;
 /**
  * Walks a note body's lines outside fenced code, the Detail block and the quoted Thinking Origin text (the places
  * where a heading-like line is content), and lets `rename` replace a `## ` heading text or a callout title.
@@ -773,8 +773,12 @@ export function localizeHeadings(content: string, set: NoteHeadings): string {
  * Preview (right after the summary) and Prompt (after Detail) are written as collapsed callouts (`> [!info]- 預覽`,
  * `> [!info]- Prompt`) so the note opens on the answer. Every read and write first turns these callouts back into the `## ` sections the rest
  * of this module works with; `noteBody` writes them as callouts again. Older notes keep their `## ` sections.
+ * A picture-book card (see {@link isBookCardFrontmatter}) writes them as `> [!vam-book]-` callouts, which the stylesheet hides; both types are read.
  */
-const CALLOUT_SECTION = /^> \[!info\][+-]? (預覽|Preview|Prompt)[ \t]*\r?$/;
+const CALLOUT_SECTION = /^> \[!(?:info|vam-book)\][+-]? (預覽|Preview|Prompt)[ \t]*\r?$/;
+/** A picture-book card: its frontmatter has `pipeline-stage` or `book-role`. */
+const isBookCardFrontmatter = (fm: Record<string, unknown>): boolean =>
+  fm["pipeline-stage"] !== undefined || fm["book-role"] !== undefined;
 function decodeCalloutSections(content: string): string {
   const lines = canonicalHeadings(content, noteHeadingSet(content) ?? CANONICAL_HEADINGS).split("\n");
   const code = fencedOutsideDetail(lines);
@@ -808,9 +812,9 @@ function decodeCalloutSections(content: string): string {
   }
   return out.join("\n");
 }
-function calloutSection(title: string, value: string): string {
+function calloutSection(title: string, value: string, type = "info"): string {
   const lines = value.trim().split("\n");
-  return [`> [!info]- ${title}`, ...lines.map(line => (line ? `> ${line}` : ">"))].join("\n");
+  return [`> [!${type}]- ${title}`, ...lines.map(line => (line ? `> ${line}` : ">"))].join("\n");
 }
 const previewSection = (content: string): string =>
   [...new Set([section(content, "Preview"), section(content, "預覽")].filter(Boolean))].join("\n\n");
@@ -1022,7 +1026,8 @@ function noteBody(
   visualReferences = "",
   newFindings = "",
   leftover = "",
-  layout: "answer-first" | "legacy" = "answer-first"
+  layout: "answer-first" | "legacy" = "answer-first",
+  calloutType = "info"
 ): string {
   if (layout === "legacy") {
     const legacyBlock = `${DETAIL_START}\n${detailWithVisualReferences(detail, visualReferences, standardTemplate(language))}\n${DETAIL_END}`;
@@ -1049,9 +1054,11 @@ function noteBody(
     [
       `# ${title}`,
       `## Current Summary\n\n${summary.trim() || placeholder(language)}`,
-      preview.trim() && !isPlaceholder(preview.trim()) ? calloutSection(previewHeading(language), preview) : "",
+      preview.trim() && !isPlaceholder(preview.trim())
+        ? calloutSection(previewHeading(language), preview, calloutType)
+        : "",
       `## Detail\n\n${detailBlock}`,
-      prompt.trim() ? calloutSection("Prompt", prompt) : "",
+      prompt.trim() ? calloutSection("Prompt", prompt, calloutType) : "",
       rules.trim() ? `## Rules\n\n${rules.trim()}` : "",
       newFindings.trim() ? `## Working Findings\n\n${newFindings.trim()}` : "",
       leftover.trim()
@@ -1066,7 +1073,8 @@ function normalizeBodyOrder(
   title: string,
   summaryFallback: string,
   language: NoteLanguage,
-  textLanguage: NoteLanguage = language
+  textLanguage: NoteLanguage = language,
+  book = false
 ): string {
   const clean = ensurePreview(withoutReference(content), language, textLanguage);
   const currentSummary = section(clean, "Current Summary") || summaryFallback;
@@ -1112,7 +1120,8 @@ function normalizeBodyOrder(
     "",
     newFindings,
     leftover,
-    legacy ? "legacy" : "answer-first"
+    legacy && !book ? "legacy" : "answer-first",
+    book ? "vam-book" : "info"
   );
 }
 
@@ -1908,7 +1917,8 @@ export class Repository {
       text(fm.title, path.replace(/\.md$/, "")),
       text(fm.summary, placeholder(textLanguage)),
       language,
-      textLanguage
+      textLanguage,
+      isBookCardFrontmatter(fm)
     );
     // Headings stay in the language the note was written in: a language switch never relabels an existing note.
     return `---\n${stringifyYaml(fm)}---\n${localizeHeadings(withReferenceLinks(body, fm, language), writtenHeadingSet(content, this.headingsFor(textLanguage)))}`;
@@ -3023,7 +3033,14 @@ export class Repository {
       delete fm["agent-map-references"];
       body = withoutReference(body);
     }
-    body = normalizeBodyOrder(body, title, text(fm.summary, placeholder(textLanguage)), language, textLanguage);
+    body = normalizeBodyOrder(
+      body,
+      title,
+      text(fm.summary, placeholder(textLanguage)),
+      language,
+      textLanguage,
+      isBookCardFrontmatter(fm)
+    );
     return `---\n${stringifyYaml(fm)}---\n${localizeHeadings(withReferenceLinks(body, fm, language), writtenHeadingSet(content, this.headingsFor(textLanguage)))}`;
   }
 

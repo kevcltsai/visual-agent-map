@@ -56,6 +56,7 @@ import {
 } from "../../core/book-pipeline/model";
 import {
   appendResearchNote,
+  carryWorkLog,
   findStoredProof,
   findStoredProofModels,
   extractProofRecords,
@@ -63,6 +64,7 @@ import {
   dropPlaceholderSections,
   replaceBookPlanSection,
   fencedLines,
+  normalizeWorkRecords,
   replaceProofSection,
   replaceResearchRecord,
   chapterBody,
@@ -1684,9 +1686,10 @@ export class BookPipelineRuns {
     const path = await this.stillOnMap(drive, nodeId);
     if (!path) return { kind: "failed", reason: "card_removed" };
     let written = await this.ports.readCard(path);
-    // A rewrite that replaced the whole Detail drops the Research notes and the picture section: the card's latest proof record
+    // A rewrite that replaced the whole Detail drops the work records and the picture section: the card's earlier log lines, its latest proof record
     // (its lines are in `knownLines` by construction) and its `### 圖像` section come back; the next proof replaces the record.
-    let carried = written.detail;
+    // The write-back's own log section (or an older Research notes section) is turned into the hidden callout first, the card's first write in the new form.
+    let carried = carryWorkLog(card.detail, normalizeWorkRecords(written.detail));
     for (const record of extractProofRecords(card.detail).slice(-1)) carried = appendResearchNote(carried, record).text;
     // #12: an old Prompt (no picture plan) keeps the card's picture section; a card with a plan gets its pictures from the slots.
     if (slots === undefined) carried = carryImageSection(card.detail, carried);

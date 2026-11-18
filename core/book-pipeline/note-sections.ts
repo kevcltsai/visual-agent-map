@@ -1,6 +1,8 @@
 /**
- * Pure edits of the two note sections the picture-book pipeline owns: the Research notes section of a card's Detail (the
- * folded callout that holds the proof records) and the `## 全書企劃` section of the root note. Nothing else in the text is touched.
+ * Pure edits of the note parts the picture-book pipeline owns: the work records of a card's Detail (proof and picture-slot records, the
+ * write-back log lines) and the card's proofread result, both kept in hidden `> [!vam-book]-` callouts, and the `## 全書企劃` section of the root note.
+ * Older cards keep their `### 研究備註` section (a `[!note]-` callout) and `## 校對結果` section; they are read as before and turned into
+ * the hidden callouts the first time the pipeline writes them. Nothing else in the text is touched.
  */
 import {
   isNewSourcesHeading,
@@ -18,6 +20,13 @@ const HEADING = /^[ \t]{0,3}(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/;
 const FENCE = /^[ \t]{0,3}(`{3,}|~{3,})/;
 const CALLOUT_HEAD = /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?(?:[ \t].*)?$/;
 const RECORD_KEY = /^<!-- book-proof:v1 (\{.*\}) -->$/;
+/** The callout type the pipeline writes its work records in: the stylesheet hides it in reading and live preview, source mode still shows it. */
+export const HIDDEN_CALLOUT = "vam-book";
+const HIDDEN_HEAD = /^>[ \t]?\[!vam-book\][+-]?(?:[ \t].*)?$/i;
+const QUOTE_LINE = /^[ \t]{0,3}>/;
+const LOG_LINE = /^(?:[-*+][ \t]+)?\d{4}-\d{2}-\d{2}/;
+const ANY_RECORD = /<!-- book-(?:proof|slots):v1 \{.*\} -->/;
+const bare = (line: string): string => line.replace(/\r$/, "");
 
 /** Per line: true inside a fenced code block (the fence lines included). */
 export function fencedLines(lines: string[]): boolean[] {
@@ -77,10 +86,194 @@ function recordKey(record: string): string | undefined {
   return undefined;
 }
 
+/** The end (exclusive) of the run of `>` lines that starts at `from`. */
+function quoteRunEnd(lines: string[], fenced: boolean[], from: number): number {
+  let end = from;
+  while (end < lines.length && !fenced[end] && QUOTE_LINE.test(lines[end])) end++;
+  return end;
+}
+
+/** The hidden callouts of a text (outside code): each from its `> [!vam-book]` line through the `>` lines that follow. */
+function hiddenRanges(lines: string[], fenced: boolean[]): { start: number; end: number }[] {
+  const found: { start: number; end: number }[] = [];
+  for (let i = 0; i < lines.length; ) {
+    if (!fenced[i] && HIDDEN_HEAD.test(bare(lines[i]))) {
+      const end = quoteRunEnd(lines, fenced, i + 1);
+      found.push({ start: i, end });
+      i = end;
+    } else i++;
+  }
+  return found;
+}
+
+/** A text without its hidden callouts (the pipeline's work records are no chapter text). */
+function withoutHiddenCallouts(lines: string[]): string[] {
+  const ranges = hiddenRanges(lines, fencedLines(lines));
+  if (!ranges.length) return lines;
+  return lines.filter((_, i) => !ranges.some(range => i >= range.start && i < range.end));
+}
+
+/** Per line: true where the pipeline keeps its work records: the body of an older Research notes section and every hidden callout. */
+function recordLines(lines: string[], fenced: boolean[]): boolean[] {
+  const mask = lines.map(() => false);
+  const section = findSection(lines, fenced, text => isResearchNotesHeading(text));
+  if (section) for (let i = section.at + 1; i < section.end; i++) mask[i] = true;
+  for (const range of hiddenRanges(lines, fenced)) for (let i = range.start; i < range.end; i++) mask[i] = true;
+  return mask;
+}
+
+const quoteAll = (text: string): string =>
+  text
+    .split(/\r?\n/)
+    .map(line => (line.trim() ? `> ${line}` : ">"))
+    .join("\n");
+
 /**
- * Appends one composed proof record (`composeProofRecord`) to the Research notes section of a Detail, every line as a `> `
- * quote line of the folded callout (inside the existing callout when there is one, else a new `> [!note]- <name>` callout
- * after the section's text; no such section: a new `### 研究備註` section at the end). The callout title is the section's own name.
+ * `quoted` (lines that already carry the `> ` prefix) added to the last hidden callout of a text, at its end (or right after its title line
+ * when `atTop`); no hidden callout yet: a new one at the end of the text, a blank line before it.
+ */
+function appendHidden(text: string, quoted: string, atTop = false): string {
+  const lines = text.split("\n");
+  const last = hiddenRanges(lines, fencedLines(lines)).pop();
+  if (!last) {
+    const base = text.replace(/\s+$/, "");
+    return `${base ? `${base}\n\n` : ""}> [!${HIDDEN_CALLOUT}]- ${DEFAULT_RESEARCH_HEADING}\n${quoted}\n`;
+  }
+  const titleOnly = last.end === last.start + 1;
+  if (atTop) lines.splice(last.start + 1, 0, ...quoted.split("\n"));
+  else {
+    const blankTail = !titleOnly && /^>[ \t]*\r?$/.test(lines[last.end - 1]);
+    lines.splice(last.end, 0, ...`${titleOnly || blankTail ? "" : ">\n"}${quoted}`.split("\n"));
+  }
+  return lines.join("\n");
+}
+
+/** `lines` with [at, end) replaced by `middle`: one blank line between the parts that are not empty, the text's final newline kept. */
+function spliceBlock(lines: string[], at: number, end: number, middle: string[]): string[] {
+  const before = lines.slice(0, at);
+  while (before.length && !before[before.length - 1].trim()) before.pop();
+  const rest = lines.slice(end);
+  const newline = rest.length > 0 && rest[rest.length - 1] === "";
+  while (rest.length && !rest[0].trim()) rest.shift();
+  while (rest.length && !rest[rest.length - 1].trim()) rest.pop();
+  const parts = [before, middle, rest].filter(part => part.length);
+  const out = parts.flatMap((part, i) => (i ? ["", ...part] : part));
+  return newline || !rest.length ? [...out, ""] : out;
+}
+
+/** The callouts in lines [from, to) outside code: each starts at a callout title line and runs through the `>` lines after it. */
+function calloutBlocks(lines: string[], fenced: boolean[], from: number, to: number): { start: number; end: number }[] {
+  const found: { start: number; end: number }[] = [];
+  for (let i = from; i < to; ) {
+    if (!fenced[i] && CALLOUT_HEAD.test(bare(lines[i]))) {
+      const end = Math.min(quoteRunEnd(lines, fenced, i + 1), to);
+      found.push({ start: i, end });
+      i = end;
+    } else i++;
+  }
+  return found;
+}
+
+const asHidden = (head: string): string => head.replace(/^(>[ \t]?)\[![A-Za-z][\w-]*\]/, `$1[!${HIDDEN_CALLOUT}]`);
+
+/**
+ * An older Research notes section (a `### 研究備註` heading over a `[!note]-` callout) turned into the hidden callout: a callout of the
+ * pipeline (titled as the section, or holding one of its records) gets the hidden type; when nothing else is in the section its heading
+ * goes too, else the section's other text and heading stay. Text without such a section is returned as it is.
+ */
+function hideResearchSection(text: string): string {
+  let lines = text.split("\n");
+  for (let from = 0; ; ) {
+    const fenced = fencedLines(lines);
+    const section = findSection(lines, fenced, name => isResearchNotesHeading(name), from);
+    if (!section) return lines.join("\n");
+    const blocks = calloutBlocks(lines, fenced, section.at + 1, section.end);
+    const name = section.text.trim().toLowerCase();
+    const mine = blocks.filter(
+      block =>
+        /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[block.start]))?.[1].toLowerCase() === name ||
+        lines.slice(block.start, block.end).some(line => ANY_RECORD.test(line))
+    );
+    if (!mine.length) {
+      from = section.at + 1;
+      continue;
+    }
+    for (const block of mine) lines[block.start] = asHidden(lines[block.start]);
+    const covered = new Set(blocks.flatMap(block => lines.slice(block.start, block.end).map((_, k) => block.start + k)));
+    const others = lines.slice(section.at + 1, section.end).some((line, k) => line.trim() && !covered.has(section.at + 1 + k));
+    if (mine.length < blocks.length || others) {
+      from = section.at + 1;
+      continue;
+    }
+    const body = lines.slice(section.at + 1, section.end);
+    while (body.length && !body[0].trim()) body.shift();
+    while (body.length && !body[body.length - 1].trim()) body.pop();
+    lines = spliceBlock(lines, section.at, section.end, body);
+    from = section.at;
+  }
+}
+
+const updateLogNames = (): Set<string> =>
+  new Set(
+    [SECTION_NAME.log.zh, SECTION_NAME.log.en, ...NOTE_LANGUAGES.map(locale => translate(locale, "detail.update_log"))].map(
+      name => name.trim().toLowerCase()
+    )
+  );
+
+/**
+ * The write-back's own "update log" section (a `###` heading over nothing but dated log lines) moved into the hidden callout as its
+ * lines; a section with any other text is the author's and stays.
+ */
+function hideUpdateLog(text: string): string {
+  const names = updateLogNames();
+  let lines = text.split("\n");
+  const moved: string[] = [];
+  for (let from = 0; ; ) {
+    const section = findSection(
+      lines,
+      fencedLines(lines),
+      (name, level) => level >= 3 && names.has(name.trim().toLowerCase()),
+      from
+    );
+    if (!section) break;
+    const body = lines.slice(section.at + 1, section.end).map(bare).filter(line => line.trim());
+    if (!body.length || !body.every(line => LOG_LINE.test(line))) {
+      from = section.at + 1;
+      continue;
+    }
+    moved.push(...body);
+    lines = spliceBlock(lines, section.at, section.end, []);
+    from = section.at;
+  }
+  if (!moved.length) return text;
+  return appendHidden(lines.join("\n"), moved.map(line => `> ${line}`).join("\n"));
+}
+
+/** The pipeline's work records of a Detail in the hidden callout: an older Research notes section or write-back log section is turned into it; the same text again changes nothing. */
+export function normalizeWorkRecords(detail: string): string {
+  return hideUpdateLog(hideResearchSection(detail));
+}
+
+/** The dated log lines the write-back keeps in the work records (plain text, the `> ` prefix removed). */
+export function workLogLines(detail: string): string[] {
+  const lines = detail.split("\n");
+  const fenced = fencedLines(lines);
+  const mask = recordLines(lines, fenced);
+  return lines
+    .map((line, i) => (mask[i] ? unquoted(bare(line)).trim() : ""))
+    .filter(line => LOG_LINE.test(line));
+}
+
+/** A rewritten Detail that lost the earlier log lines of the card (the write-back reads only a section it can see by heading): they are put back first in the hidden callout. */
+export function carryWorkLog(oldDetail: string, newDetail: string): string {
+  const have = new Set(workLogLines(newDetail));
+  const add = workLogLines(oldDetail).filter(line => !have.has(line));
+  return add.length ? appendHidden(newDetail, add.map(line => `> ${line}`).join("\n"), true) : newDetail;
+}
+
+/**
+ * Appends one composed proof record (`composeProofRecord`) to the hidden callout of a Detail (every line a `> ` quote line; no callout yet:
+ * a new `> [!vam-book]- 研究備註` at the end, after a blank line). An older Research notes section is turned into the hidden callout first.
  * The same record key already stored (read with the `> ` prefix removed) leaves the text exactly as it is. A record carries
  * no raw model text (composeProofRecord escapes it), and every line gets the quote prefix, so no heading, image, link, `%%`,
  * HTML or fence can form.
@@ -88,35 +281,7 @@ function recordKey(record: string): string | undefined {
 export function appendResearchNote(detail: string, record: string): { text: string; appended: boolean } {
   const key = recordKey(record);
   if (key && findProofRecord(unquoted(detail), key)) return { text: detail, appended: false };
-  const quoted = record
-    .split(/\r?\n/)
-    .map(line => (line.trim() ? `> ${line}` : ">"))
-    .join("\n");
-  const lines = detail.split("\n");
-  const section = findSection(lines, fencedLines(lines), text => isResearchNotesHeading(text));
-  if (!section) {
-    const base = detail.replace(/\s+$/, "");
-    const callout = `> [!note]- ${DEFAULT_RESEARCH_HEADING}\n${quoted}`;
-    return { text: `${base ? `${base}\n\n` : ""}### ${DEFAULT_RESEARCH_HEADING}\n\n${callout}\n`, appended: true };
-  }
-  const body = lines.slice(section.at + 1, section.end);
-  let last = body.length - 1;
-  while (last >= 0 && !body[last].trim()) last--;
-  const hasCallout = body.some(line => CALLOUT_HEAD.test(line.replace(/\r$/, "")));
-  const quoteTail = last >= 0 && /^>/.test(body[last]);
-  // A callout that holds nothing but its own title line (every record was taken out of it): the record follows the title directly.
-  const titleOnly = last >= 0 && CALLOUT_HEAD.test(body[last].replace(/\r$/, ""));
-  const addition =
-    hasCallout && quoteTail
-      ? `${titleOnly ? "" : ">\n"}${quoted}`
-      : `${last >= 0 ? "\n" : ""}> [!note]- ${section.text}\n${quoted}`;
-  const head = lines.slice(0, section.at + 1 + last + 1).join("\n");
-  const tail = lines.slice(section.at + 1 + last + 1);
-  while (tail.length && !tail[0].trim()) tail.shift();
-  const rest = tail.length ? `\n\n${tail.join("\n")}` : "\n";
-  // A heading with an empty body: `last` is -1, so the callout opens right after one blank line.
-  const glue = last >= 0 ? "\n" : "\n\n";
-  return { text: `${head}${glue}${addition}${rest}`, appended: true };
+  return { text: appendHidden(normalizeWorkRecords(detail), quoteAll(record)), appended: true };
 }
 
 const PIPELINE_RECORD = /^<!-- (book-(?:proof|slots)):v1 (\{.*\}) -->$/;
@@ -131,10 +296,10 @@ const validJson = (text: string): boolean => {
 };
 
 /**
- * Puts `record` (a composed `book-proof:v1` or `book-slots:v1` record) into the Research notes section as the only record of its
+ * Puts `record` (a composed `book-proof:v1` or `book-slots:v1` record) into the hidden callout as the only record of its
  * kind: every earlier record of that kind (its readable lines, its machine line and the blank quote line before it) is taken out
- * first. Only the pipeline's own valid records go; any other text of the section (the author's research, the owner's notes, other
- * callouts), a damaged record and anything inside a code block stay as they are. No Research notes section: it is added, as
+ * first. Only the pipeline's own valid records go; any other text of the work records (the author's research, the owner's notes, other
+ * callouts), a damaged record and anything inside a code block stay as they are. No work records yet: they are added, as
  * {@link appendResearchNote} does.
  */
 export function replaceResearchRecord(detail: string, record: string): string {
@@ -142,26 +307,25 @@ export function replaceResearchRecord(detail: string, record: string): string {
     .split(/\r?\n/)
     .map(line => PIPELINE_RECORD.exec(line.trim()))
     .find(Boolean) ?? [])[1];
-  const lines = detail.split("\n");
-  const section = tag ? findSection(lines, fencedLines(lines), text => isResearchNotesHeading(text)) : undefined;
-  if (!tag || !section) return appendResearchNote(detail, record).text;
-  const start = section.at + 1;
-  const plain = lines.slice(start, section.end).map(line => unquoted(line).replace(/\r$/, ""));
+  const base = normalizeWorkRecords(detail);
+  const lines = base.split("\n");
+  const mask = recordLines(lines, fencedLines(lines));
+  if (!tag || !mask.some(Boolean)) return appendResearchNote(base, record).text;
+  const plain = lines.map((line, i) => (mask[i] ? unquoted(line).replace(/\r$/, "") : ""));
   const fenced = fencedLines(plain);
   const drop = new Set<number>();
   for (let k = 0; k < plain.length; k++) {
-    const m = fenced[k] ? null : PIPELINE_RECORD.exec(plain[k].trim());
+    const m = !mask[k] || fenced[k] ? null : PIPELINE_RECORD.exec(plain[k].trim());
     if (!m || m[1] !== tag || !validJson(m[2])) continue;
     drop.add(k);
     let j = k - 1;
     if (tag === "book-proof") {
-      while (j >= 0 && !fenced[j] && !drop.has(j) && PROOF_ITEM_LINE.test(plain[j])) drop.add(j--);
-      if (j >= 0 && !fenced[j] && !drop.has(j) && PROOF_HEADER.test(plain[j].trim())) drop.add(j--);
+      while (j >= 0 && mask[j] && !fenced[j] && !drop.has(j) && PROOF_ITEM_LINE.test(plain[j])) drop.add(j--);
+      if (j >= 0 && mask[j] && !fenced[j] && !drop.has(j) && PROOF_HEADER.test(plain[j].trim())) drop.add(j--);
     }
-    if (j >= 0 && !drop.has(j) && QUOTE_BLANK.test(lines[start + j])) drop.add(j);
+    if (j >= 0 && mask[j] && !drop.has(j) && QUOTE_BLANK.test(lines[j])) drop.add(j);
   }
-  const kept = lines.filter((_, i) => i < start || i >= section.end || !drop.has(i - start));
-  return appendResearchNote(kept.join("\n"), record).text;
+  return appendResearchNote(lines.filter((_, i) => !drop.has(i)).join("\n"), record).text;
 }
 
 const OLD_MARK = "（舊版）";
@@ -205,11 +369,14 @@ export function markOldProofRecords(detail: string, currentKey: string): string 
  */
 export function extractProofRecords(detail: string): string[] {
   const lines = detail.split("\n");
-  const section = findSection(lines, fencedLines(lines), text => isResearchNotesHeading(text));
-  if (!section) return [];
+  const mask = recordLines(lines, fencedLines(lines));
   const records: string[] = [];
   let current: string[] = [];
-  for (const line of lines.slice(section.at + 1, section.end)) {
+  for (const [at, line] of lines.entries()) {
+    if (!mask[at]) {
+      current = [];
+      continue;
+    }
     if (CALLOUT_HEAD.test(line.replace(/\r$/, ""))) continue;
     const plain = unquoted(line).replace(/\r$/, "");
     if (RECORD_KEY.test(plain.trim())) {
@@ -249,10 +416,10 @@ const count = (value: unknown): number =>
  */
 export function latestStoredProof(detail: string): StoredProofView | undefined {
   const lines = detail.split("\n");
-  const section = findSection(lines, fencedLines(lines), text => isResearchNotesHeading(text));
-  if (!section) return undefined;
+  const mask = recordLines(lines, fencedLines(lines));
   let found: StoredProofView | undefined;
-  for (const line of lines.slice(section.at + 1, section.end)) {
+  for (const [at, line] of lines.entries()) {
+    if (!mask[at]) continue;
     const m = RECORD_KEY.exec(unquoted(line).trim());
     if (!m) continue;
     try {
@@ -294,9 +461,9 @@ export function latestStoredProof(detail: string): StoredProofView | undefined {
   return found;
 }
 
-/** The Detail without its Research notes section: the chapter text a proof is judged and keyed on (the records it adds do not change it). */
+/** The Detail without its work records (the hidden callouts, an older Research notes section): the chapter text a proof is judged and keyed on (the records it adds do not change it). */
 export function withoutResearchNotes(detail: string): string {
-  const lines = detail.split("\n");
+  const lines = withoutHiddenCallouts(detail.split("\n"));
   const section = findSection(lines, fencedLines(lines), text => isResearchNotesHeading(text));
   if (!section) return detail.replace(/\s+$/, "");
   return [...lines.slice(0, section.at), ...lines.slice(section.end)].join("\n").replace(/\s+$/, "");
@@ -371,7 +538,8 @@ function withImageBlock(lines: string[], block: string): string {
     fenced,
     text => isOpenQuestionsHeading(text) || isResearchNotesHeading(text) || isUpdateLogHeading(text)
   );
-  const at = Math.min(sources?.at ?? lines.length, other?.at ?? lines.length);
+  const hidden = hiddenRanges(lines, fenced)[0];
+  const at = Math.min(sources?.at ?? lines.length, other?.at ?? lines.length, hidden?.start ?? lines.length);
   const head = lines.slice(0, at).join("\n").replace(/\s+$/, "");
   const tail = lines.slice(at).join("\n");
   return `${head ? `${head}\n\n` : ""}${block}\n${tail ? `\n${tail}` : ""}`;
@@ -408,11 +576,11 @@ export function carryImageSection(oldDetail: string, newDetail: string): string 
 }
 
 /**
- * The chapter text alone: the Detail without the sections the system adds or keeps (Research notes, Update log, Sources, Open questions).
+ * The chapter text alone: the Detail without the hidden callouts and the sections the system adds or keeps (Research notes, Update log, Sources, Open questions).
  * The proofread sees and keys on this, so a system line is never taken for the chapter's ending.
  */
 export function chapterBody(detail: string): string {
-  let lines = detail.split("\n");
+  let lines = withoutHiddenCallouts(detail.split("\n"));
   for (;;) {
     const section = findSection(lines, fencedLines(lines), text => isSystemSection(text)) ?? findImageSection(lines);
     if (!section) break;
@@ -451,26 +619,35 @@ function protectedLines(lines: string[], withDetail = true): boolean[] {
 }
 
 /**
- * The note's `## <proof result heading>` section set to `body` (any language's heading of it is found; the new heading is `heading`);
- * the section is added before the reference-links block, else at the end. The section is the heading and the `- ` lines right after it,
- * so any other text that follows it (the owner's, a heading, a marker, a callout) stays. The Detail block, the frontmatter and everything else stay byte for byte.
+ * The note's proofread result set to `body` as a hidden callout `> [!vam-book]- <heading>` (any language's heading of it is found; the new
+ * title is `heading`): an existing hidden proof callout is replaced in place; an older `## <heading>` section is replaced by the callout (it is the
+ * heading and the `- ` lines right after it, so any other text that follows it stays); else the callout is added before the reference-links block,
+ * else at the end. A blank line stands before and after it. The Detail block, the frontmatter and everything else stay byte for byte.
  */
 export function replaceProofSection(content: string, heading: string, body: string): string {
   const lines = content.split("\n");
   const flags = protectedLines(lines);
   const names = new Set(NOTE_LANGUAGES.map(locale => translate(locale, "detail.book_proof_heading").trim()));
+  const entry = `> [!${HIDDEN_CALLOUT}]- ${heading}\n${quoteAll(body.trim())}`;
+  const join = (before: string, after: string): string => {
+    const lead = before && !before.endsWith("\n") ? `${before}\n\n` : before ? `${before}\n` : "";
+    return `${lead}${entry}${after ? `\n\n${after}` : "\n"}`;
+  };
+  const callout = hiddenRanges(lines, flags).find(range => {
+    const title = /^>[ \t]?\[![^\]]+\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[range.start]))?.[1] ?? "";
+    return names.has(title);
+  });
+  if (callout)
+    return join(lines.slice(0, callout.start).join("\n"), lines.slice(callout.end).join("\n").replace(/^\s+/, ""));
   const found = findSection(lines, flags, (text, level) => level === 2 && names.has(text.trim()));
-  const entry = `## ${heading}\n\n${body.trim()}`;
   if (found) {
-    // The section is what this function writes: its heading and the `- ` list lines right after it. Any other text (the owner's, another heading, a marker, a callout) ends it and stays.
+    // The old section is what this function wrote: its heading and the `- ` list lines right after it. Any other text (the owner's, another heading, a marker, a callout) ends it and stays.
     // At most one blank line after the heading, then the consecutive `- ` lines; anything after a later blank line (even a `- ` list) is the owner's and stays.
     let end = found.at + 1;
     if (end < found.end && !lines[end].trim()) end++;
     while (end < found.end && /^- /.test(lines[end])) end++;
     while (end > found.at + 1 && !lines[end - 1].trim()) end--;
-    const before = lines.slice(0, found.at).join("\n");
-    const after = lines.slice(end).join("\n").replace(/^\s+/, "");
-    return `${before ? `${before}\n` : ""}${entry}${after ? `\n\n${after}` : "\n"}`;
+    return join(lines.slice(0, found.at).join("\n"), lines.slice(end).join("\n").replace(/^\s+/, ""));
   }
   const marker = lines.findIndex((line, i) => !flags[i] && line.trim() === REFERENCE_START);
   if (marker >= 0) {

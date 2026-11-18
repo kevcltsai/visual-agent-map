@@ -1015,9 +1015,9 @@ export class TopicRuns {
           await repo.updateNote(
             path,
             {
-              summary,
-              detail: written,
-              visualReferences: references,
+              summary: neutralizeText(summary),
+              detail: neutralizeText(written),
+              visualReferences: neutralizeText(references),
               // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
               ...(options.findingsSent() ? { newFindings: "" } : {}),
               status: "completed",
@@ -1533,12 +1533,13 @@ export class TopicRuns {
             fail(composed.message);
             return;
           }
-          // The pipeline's author text never makes a hidden callout, in any field it writes (the Detail is cleaned in `finalize`).
-          const authored = (text: string): string => (options.pipeline ? neutralizeText(text) : text);
+          // Model text never makes a hidden callout (the stylesheet hides that type vault-wide); the pipeline writes its own after this.
           const patch: NotePatch = {
-            summary: authored(result.summary),
-            detail: composed.detail,
-            visualReferences: authored(visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language))),
+            summary: neutralizeText(result.summary),
+            detail: neutralizeText(composed.detail),
+            visualReferences: neutralizeText(
+              visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language))
+            ),
             newFindings: "",
             status: "completed",
             // The topic remembers the mode of its latest research (Quick is stored as local).

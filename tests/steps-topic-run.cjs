@@ -1217,9 +1217,9 @@ test('research pipeline: the write is guarded (authorize + expectedContent) and 
   assert.equal(h.store.get('A.md').status, 'completed'); assert.deepEqual(h.log.failed, []); assert.equal(h.log.written.length, 1);
 });
 
-test('research pipeline: the summary and the visual references the author wrote never carry a hidden callout type (any spelling); without the pipeline option they are written as they are', async () => {
+test('research pipeline: the summary and the visual references the author wrote never carry a hidden callout type (any spelling); a plain (non-pipeline) research write is cleaned the same way', async () => {
   const bad = '> [!vam-book]- x\n> SPAM';
-  const reply = { summary: `一句。\n\n${bad}\n\n> [! VAM-BOOK |m]- y`, visualReferences: [{ title: `T\n\n${bad}`, imageUrl: 'https://i.example/a.png', sourceUrl: 'https://s.example/a', palette: [], description: '', formula: '' }] };
+  const reply = { detail: `正文。\n\n> [!vam-book]- d\n> DSPAM`, summary: `一句。\n\n${bad}\n\n> [! VAM-BOOK |m]- y`, visualReferences: [{ title: `T\n\n${bad}`, imageUrl: 'https://i.example/a.png', sourceUrl: 'https://s.example/a', palette: [], description: '', formula: '' }] };
   const h = guardedRuns({ reply });
   await (await h.runs.start('A.md', 'research', h.options({ pipeline: hooks().pipeline }))).finished;
   assert.deepEqual(h.log.failed, []);
@@ -1228,7 +1228,8 @@ test('research pipeline: the summary and the visual references the author wrote 
   assert.ok(!/vam-book/i.test(patch.visualReferences) && patch.visualReferences.includes('SPAM'));
   const plain = researchRuns({ reply });
   await (await plain.runs.start('A.md', 'research', plain.options())).finished;
-  assert.ok(plain.log.writes.some(([, w]) => /vam-book/i.test(w.summary ?? '')), 'not a pipeline write: unchanged');
+  const w = plain.log.writes.map(([, x]) => x).find(x => x.summary !== undefined && x.detail !== undefined);
+  assert.ok(w && !/vam-book/i.test(`${w.summary}${w.detail}${w.visualReferences}`) && w.summary.includes('[!note]- x') && w.detail.includes('[!note]- d') && w.visualReferences.includes('SPAM'), 'a plain research write: no hidden type in summary, detail or references');
 });
 
 test('research pipeline: a discarded guarded write (stopped run or owner edit) saves nothing of the result, restores the status and reports through failed', async () => {

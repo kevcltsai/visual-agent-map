@@ -88,7 +88,10 @@ export function avoidSourcesInstruction(addresses: readonly string[]): string {
 
 const FIX_INSTRUCTION_MAX = 1000;
 const FIX_ITEM_MAX = 140;
-const oneLine = (value: string, max: number): string => Array.from(value.replace(/\s+/g, " ").trim()).slice(0, max).join("");
+/** The "do not use these" list never takes more than this, so the unmet points always have room. */
+const FIX_AVOID_MAX = 450;
+const oneLine = (value: string, max: number): string =>
+  Array.from(value.replace(/\s+/g, " ").trim()).slice(0, max).join("");
 /**
  * The automatic redo's one line when the proofread did not pass: constant words plus, for each fact point that did not hold, its
  * checklist text and the verifier's note, each as a JSON string cut to a few hundred characters (so a model sentence is data in
@@ -100,22 +103,24 @@ export function proofFixInstruction(
   checklist: readonly { id: string; text: string }[]
 ): string {
   const failed = items.filter(item => item.type === "fact" && item.status === "unmet");
-  const unverifiedSources = cleanAvoidSources(
+  let sources = cleanAvoidSources(
     items.filter(item => item.type === "fact" && item.status !== "met").flatMap(item => item.sources)
   );
-  const parts: string[] = [];
-  if (failed.length) {
-    const points = failed.map(item => {
-      const text = checklist.find(entry => entry.id === item.id)?.text ?? "";
-      return JSON.stringify(oneLine(`${text} / ${item.note}`, FIX_ITEM_MAX * 2));
-    });
-    parts.push(
-      "The previous version of this chapter failed the fact check on these points (JSON strings; rewrite the chapter so they are correct and supported): " +
-        points.join(" ")
-    );
+  // Whole pieces only: a cut in the middle of a JSON string would leave an unclosed quote, so what does not fit is left out.
+  while (sources.length && avoidSourcesInstruction(sources).length > FIX_AVOID_MAX) sources = sources.slice(0, -1);
+  const avoid = avoidSourcesInstruction(sources);
+  const lead =
+    "The previous version of this chapter failed the fact check on these points (JSON strings; rewrite the chapter so they are correct and supported): ";
+  let room = FIX_INSTRUCTION_MAX - avoid.length - lead.length - 1;
+  const points: string[] = [];
+  for (const item of failed) {
+    const text = checklist.find(entry => entry.id === item.id)?.text ?? "";
+    const point = JSON.stringify(oneLine(`${text} / ${item.note}`, FIX_ITEM_MAX * 2));
+    if (point.length + 1 > room) break;
+    points.push(point);
+    room -= point.length + 1;
   }
-  parts.push(avoidSourcesInstruction(unverifiedSources));
-  return neutralizeText(oneLine(parts.join(" "), FIX_INSTRUCTION_MAX));
+  return neutralizeText((points.length ? lead + points.join(" ") + " " : "") + avoid);
 }
 /** The automatic redo's one line when a step used up its attempts: constant words and the neutral failure code only. */
 export function stepFixInstruction(step: string, reasonCode: string): string {

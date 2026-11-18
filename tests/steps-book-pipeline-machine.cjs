@@ -440,3 +440,40 @@ test('another map\'s ordinary research is not affected when this map\'s budget i
   assert.equal((await r.service.askModel(taskContext({ usageMapPath: 'other/Map.md' }), 'gpt-6-luna', 'low')).summary, 'S');
   assert.equal(r.calls.length, 1);
 });
+
+test('requestAutoFix: two rounds per card, a revision rise, attempts start over, autoFixes survive stop and resume', () => {
+  const writing = () => ({ ...plain(fresh()), phase: 'writing', globalPlanned: true });
+  let state = writing();
+  state.attempts.a = { ...state.attempts.a, write: 3 };
+  const rev = machine.cardRevision(state, 'a');
+  const first = machine.requestAutoFix(state, 'a', 0);
+  assert.equal(first.accepted, true);
+  assert.equal(first.state.autoFixes.a, 1);
+  assert.equal(machine.cardRevision(first.state, 'a'), rev + 1, 'a late result of the old round is stale');
+  assert.deepEqual(plain(first.state.attempts.a), plain(machine.resetCard(state, 'a').attempts.a));
+  assert.equal(state.autoFixes, undefined, 'the input is not changed');
+  const stopped = machine.stopRun(first.state);
+  assert.equal(machine.autoFixesOf(stopped, 'a'), 1, 'an owner stop does not reset the rounds');
+  assert.equal(machine.autoFixesOf(machine.resumeRun(stopped), 'a'), 1);
+  const second = machine.requestAutoFix(first.state, 'a', 0);
+  assert.equal(second.accepted, true);
+  assert.equal(second.state.autoFixes.a, 2);
+  assert.equal(second.state.autoFixes.b, undefined);
+  const third = machine.requestAutoFix(second.state, 'a', 0);
+  assert.equal(third.accepted, false);
+  assert.equal(third.state, second.state, 'refused: nothing changes');
+  assert.equal(machine.autoFixVerdict(second.state, 'a', 0), 'rounds');
+  assert.equal(model.readBookPipeline({ bookPipeline: plain(second.state) }).kind, 'usable');
+});
+
+test('requestAutoFix: the budget left must keep 4 calls for each other unfinished card plus 5', () => {
+  const at = used => ({ ...plain(fresh({ budgetLimit: 100 })), phase: 'writing', globalPlanned: true, budget: { used, limit: 100 } });
+  assert.equal(machine.autoFixVerdict(at(100 - 13), 'a', 2), 'ok');
+  assert.equal(machine.autoFixVerdict(at(100 - 12), 'a', 2), 'quota');
+  assert.equal(machine.autoFixVerdict(at(95), 'a', 0), 'ok');
+  assert.equal(machine.autoFixVerdict(at(96), 'a', 0), 'quota');
+  assert.equal(machine.requestAutoFix(at(96), 'a', 0).accepted, false);
+  const stopped = machine.stopRun(at(0));
+  assert.equal(machine.autoFixVerdict(stopped, 'a', 0), 'quota', 'a stopped run is not redone');
+  assert.equal(machine.requestAutoFix(at(0), 'zzz', 0).accepted, false, 'a card that is not in the run');
+});

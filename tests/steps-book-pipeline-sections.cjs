@@ -209,3 +209,35 @@ test('composeProofSection: lines per item (note only when not met), the two mode
   assert.deepEqual({ ...proof.findProofModels(proof.composeProofRecord('k', res), 'k') }, {});
   assert.equal(proof.findProofModels(proof.composeProofRecord('k', res), 'other'), undefined);
 });
+
+test('fix record: composeFixRecord keeps code characters and numbers only; appendFixRecord puts it in the hidden callout once', () => {
+  const rec = sections.composeFixRecord(2, 'proof', 'fact_unmet');
+  assert.equal(rec, '<!-- book-fix:v1 {"round":2,"step":"proof","code":"fact_unmet"} -->');
+  const forged = sections.composeFixRecord(-3.7, 'p r"o>', '<!-- x -->');
+  assert.match(forged, /^<!-- book-fix:v1 \{"round":-?\d+,"step":"p_r_o_","code":"[^"<>]*"\} -->$/);
+  const once = sections.appendFixRecord('Lead', rec);
+  assert.match(once, /\n\n> \[!vam-book\]- 研究備註\n> <!-- book-fix:v1 /);
+  assert.equal(sections.appendFixRecord(once, rec), once, 'the same record again changes nothing');
+  assert.equal(JSON.stringify(sections.extractFixRecords(once)), JSON.stringify([rec]));
+  const twice = sections.appendFixRecord(once, sections.composeFixRecord(1, 'write', 'x'));
+  assert.equal(sections.extractFixRecords(twice).length, 2);
+});
+
+test('fix record: author text outside a hidden callout, in code, or with bad JSON is never a record', () => {
+  const rec = sections.composeFixRecord(1, 'proof', 'fact_unmet');
+  assert.equal(JSON.stringify(sections.extractFixRecords(`${rec}\n\ntext`)), JSON.stringify([]), 'bare line in the body');
+  assert.equal(JSON.stringify(sections.extractFixRecords('> [!note]- 研究備註\n> ' + rec)), JSON.stringify([]), 'a callout that is not vam-book');
+  assert.equal(JSON.stringify(sections.extractFixRecords('```\n> [!vam-book]- x\n> ' + rec + '\n```')), JSON.stringify([]), 'inside a code fence');
+  assert.equal(JSON.stringify(sections.extractFixRecords('> [!vam-book]- x\n> <!-- book-fix:v1 {nope} -->')), JSON.stringify([]), 'invalid JSON');
+  assert.equal(sections.extractFixRecords('> [!vam-book]- x\n> ' + rec).length, 1);
+});
+
+test('fix record: carryFixRecords puts the earlier records back into a rewritten Detail once; an author-forged one is not carried', () => {
+  const rec = sections.composeFixRecord(1, 'proof', 'fact_unmet');
+  const old = sections.appendFixRecord('Old text', rec) + '\n\nforged <!-- book-fix:v1 {"round":9,"step":"a","code":"b"} -->';
+  const carried = sections.carryFixRecords(old, 'New text');
+  assert.equal(JSON.stringify(sections.extractFixRecords(carried)), JSON.stringify([rec]));
+  assert.ok(carried.startsWith('New text'));
+  assert.equal(sections.carryFixRecords(old, carried), carried, 'already there: unchanged');
+  assert.equal(sections.carryFixRecords('no records', 'New'), 'New');
+});

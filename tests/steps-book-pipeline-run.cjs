@@ -1214,3 +1214,168 @@ test('B2 run: an author who keeps the old `### 研究備註` section loses no te
   assert.equal(count(out, 'book-proof:v1') - hiddenProof, 0, 'no visible copy of a stored record (the author\'s kept copy is cut)');
   assert.ok(!hiddenLines(out).some(l => l.includes('KEEPME')));
 });
+
+// ---- T4 (P4a): the automatic redo of a card (autoFixes, requestAutoFix, book-fix:v1) ----
+const { extractFixRecords } = S.load('core/book-pipeline/note-sections.ts');
+const FACTS = [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'fact', text: 'a date' }];
+const factCard = { card: () => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: FACTS }) };
+const verdictOf = (request, factStatus, note = 'judged') => evaluateProof(request.checklist.map(c => ({ id: c.id, status: c.type === 'fact' ? factStatus : 'met', note: c.type === 'fact' ? note : 'ok', sources: c.type === 'fact' ? ['https://example.org/p'] : [] })), request.checklist, ['https://example.org/p']);
+const count1 = (r, list) => list.filter(x => x === r.nodes[1].id).length;
+const fixRecordsOf = raw => extractFixRecords(raw.replace(/^---[\s\S]*?\n---\n/, ''));
+
+test('T4 autofix: a fact the proofread finds unmet gets two more rounds, each with a plan, a rewrite and a proofread; the third verdict stays needs-review with auto_quota', async () => {
+  const r = await rig({ script: { ...factCard, proof: async request => verdictOf(request, 'unmet', 'WRONGDATE') } });
+  await finish(r);
+  const s = await r.state();
+  assert.equal(s.phase, 'gate2');
+  for (const n of r.nodes) assert.equal(s.autoFixes[n.id], 2, 'at most two rounds per card');
+  assert.equal(r.stat.proof.length, r.nodes.length * 3);
+  assert.equal(r.stat.author.length, r.nodes.length * 3);
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.equal((await r.note(1)).pipelineIssue, 'proof unmet: C2; auto_quota');
+  assert.equal(fixRecordsOf(r.raw(1)).length, 2, 'two records in the card file, one per round');
+  assert.match(r.raw(1), /> <!-- book-fix:v1 \{"round":1,"step":"proof","code":"fact_unmet"\} -->/);
+  assert.match(r.raw(1), /> <!-- book-fix:v1 \{"round":2,"step":"proof","code":"fact_unmet"\} -->/);
+  assert.equal(s.budget.used, 1 + 3 * 3 * 3, 'every round pays its own calls');
+});
+
+test('T4 autofix: the reason reaches the plan request and the author input, never the proofread request; the second round that passes ends checked', async () => {
+  const seen = { plan: [], author: [] };
+  let proofs = 0;
+  const r = await rig({ script: { ...factCard,
+    proof: async request => (request.body.includes(TITLES[1]) && ++proofs === 1 ? verdictOf(request, 'unmet', 'WRONGDATE') : verdictOf(request, 'met')),
+    author: async input => { if (input.nodeId === r.nodes[1].id) seen.author.push(input.instruction); await input.admission.reserve(); const note = await r.repo.readNote(input.path); await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } },
+    ports: { runPlan: async (step, request, run) => { await run.admission.reserve(); if (step.id === 'book-pipeline.global-plan') return { thread: 't', cards: r.nodes.map((n, i) => ({ id: n.id, role: i ? 'body' : 'intro' })), materials: [{ name: 'm', use: 'u' }], decisions: { reader: 'kids' } }; if (request.card.id === r.nodes[1].id) seen.plan.push(request.instruction); return factCard.card(); } } });
+  await finish(r);
+  const s = await r.state();
+  assert.equal(stageOf(r.raw(1)), 'checked');
+  assert.equal(s.autoFixes[r.nodes[1].id], 1);
+  assert.equal(s.autoFixes[r.nodes[0].id], undefined, 'a card that passed has no rounds');
+  assert.equal(seen.plan.length, 2);
+  assert.equal(seen.plan[0], undefined, 'the first plan has no fix line');
+  assert.match(seen.plan[1], /failed the fact check/);
+  assert.match(seen.plan[1], /"a date \/ WRONGDATE"/, 'the model note is a JSON string');
+  assert.equal(seen.author.length, 2);
+  assert.equal(seen.author[0], undefined);
+  assert.match(seen.author[1], /"a date \/ WRONGDATE"/);
+  assert.ok(r.stat.proof.every(request => !JSON.stringify(request).includes('WRONGDATE') && !JSON.stringify(request).includes('failed the fact check')), 'the proofread never gets the reason');
+  assert.equal(fixRecordsOf(r.raw(1)).length, 1, 'the record is hidden in the card file and survived the rewrite');
+  assert.match(r.raw(1), /\n> \[!vam-book\]- [^\n]*\n(?:>[^\n]*\n)*> <!-- book-fix:v1 /);
+  assert.equal(count(r.raw(0), 'book-fix:v1'), 0);
+});
+
+test('T4 autofix: a step that used up its attempts is redone with the neutral code only; the fix record says write', async () => {
+  const seen = [];
+  const r = await rig({ script: { author: async input => { if (input.nodeId === r.nodes[1].id) { seen.push(input.instruction); throw new Error('boom SECRETMODELTEXT'); } await input.admission.reserve(); const note = await r.repo.readNote(input.path); await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } } });
+  await finish(r);
+  assert.equal(seen.length, 9);
+  assert.equal(seen[0], undefined);
+  assert.match(seen[3], /write step of this chapter failed with the code "failed"/);
+  assert.ok(!seen.join('').includes('SECRETMODELTEXT'));
+  assert.equal(fixRecordsOf(r.raw(1)).map(x => /"step":"(\w+)"/.exec(x)[1]).join(), 'write,write');
+});
+
+test('T4 autofix: reasons that are not retried never loop: backup_failed, discarded, a card that left the map, a stopped run', async () => {
+  // backup failed: the write step reports it and the card needs review at once
+  let noBackup = false;
+  const b = await rig({ ports: { backupNote: async path => (noBackup ? { ok: false } : { ok: true, path: `${path}.bak` }) } });
+  await b.runs.start(b.mapPath); noBackup = true; await confirmDone(b.runs, b.mapPath);
+  assert.equal(b.stat.author.length, 0);
+  assert.equal(stageOf(b.raw(1)), 'needs-review');
+  assert.equal((await b.state()).autoFixes, undefined);
+  // discarded: the author's write is refused every time
+  const d = await rig({ script: { author: async input => { await input.admission.reserve(); return { outcome: 'discarded' }; } } });
+  await finish(d);
+  assert.equal(count1(d, d.stat.author), 3, 'three attempts and no automatic round');
+  assert.equal(stageOf(d.raw(1)), 'needs-review');
+  assert.doesNotMatch((await d.note(1)).pipelineIssue, /auto_quota/);
+  assert.equal((await d.state()).autoFixes, undefined);
+  // card removed from the map while it is written
+  const m = await rig();
+  const orig = m.ports.readCard;
+  m.ports.readCard = async path => { const card = await orig(path); if (path === m.nodes[1].path && m.stat.author.length) await m.repo.updateMap(m.mapPath, x => { x.nodes = x.nodes.filter(n => n.path !== path); }); return card; };
+  await finish(m);
+  assert.ok(count1(m, m.stat.author) <= 3, 'no automatic round for a card that is gone');
+  assert.equal((await m.state()).autoFixes?.[m.nodes[1].id], undefined);
+});
+
+test('T4 autofix: the budget keeps a reserve for the cards still to do: a low limit gives no extra round and says auto_quota', async () => {
+  const r = await rig({ script: { ...factCard, proof: async request => verdictOf(request, 'unmet') } });
+  await r.runs.start(r.mapPath);
+  await setLimit(r, 1 + 3 + 6 + 6);
+  await confirmDone(r.runs, r.mapPath);
+  const s = await r.state();
+  const rounds = Object.values(s.autoFixes ?? {}).reduce((a, b) => a + b, 0);
+  assert.ok(rounds < 6, 'not every card got its two rounds');
+  assert.ok(s.budget.used <= s.budget.limit);
+  const issues = await Promise.all(r.nodes.map(async (n, i) => (await r.note(i)).pipelineIssue));
+  assert.ok(issues.some(issue => /auto_quota$/.test(issue)), 'a card refused for the reserve says so');
+  for (let i = 0; i < 3; i++) assert.equal(stageOf(r.raw(i)), 'needs-review');
+});
+
+test('T4 autofix: stop and reopen keep the rounds used; the redo does not start over and does not run forever', async () => {
+  const hold = defer();
+  let held = false;
+  const r = await rig({ script: { ...factCard, proof: async request => verdictOf(request, 'unmet'),
+    author: async input => { if (input.nodeId === r.nodes[1].id && count1(r, r.stat.author) === 2 && !held) { held = true; await hold.promise; } await input.admission.reserve(); const note = await r.repo.readNote(input.path); const out = await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; } } });
+  await r.runs.start(r.mapPath);
+  const running = r.runs.confirmGate1(r.mapPath);
+  await settle();
+  assert.equal((await r.state()).autoFixes[r.nodes[1].id], 1);
+  await r.runs.stop(r.mapPath); await running;
+  assert.equal((await r.state()).autoFixes[r.nodes[1].id], 1, 'the stop keeps the round');
+  await r.runs.resume(r.mapPath);
+  hold.resolve(); await settle();
+  while (r.runs.isRunning(r.mapPath)) await tick();
+  const s = await r.state();
+  assert.equal(s.autoFixes[r.nodes[1].id], 2, 'never more than two rounds in all');
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.equal(r.stat.plan.filter(x => x === r.nodes[1].id).length, 3, 'one plan per round, none after the stop');
+  assert.equal(r.stat.proof.filter(p => p.body.includes(TITLES[1])).length, 3);
+});
+
+test('T4 autofix: a proofread that comes back after its round was replaced is dropped by the card revision', async () => {
+  const hold = defer();
+  let first = true;
+  const r = await rig({ script: { ...factCard, proof: async request => {
+    if (request.body.includes(TITLES[1]) && first) { first = false; await hold.promise; return verdictOf(request, 'met', 'LATEPROOF'); }
+    return verdictOf(request, 'unmet', 'bad'); } } });
+  await r.runs.start(r.mapPath);
+  const running = r.runs.confirmGate1(r.mapPath);
+  await settle();
+  await r.runs.stop(r.mapPath); await running;
+  await r.runs.resume(r.mapPath); await settle();
+  while (r.runs.isRunning(r.mapPath)) await tick();
+  hold.resolve(); await settle();
+  assert.doesNotMatch(r.raw(1), /LATEPROOF/, 'the old result wrote nothing');
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.equal((await r.state()).autoFixes[r.nodes[1].id], 2);
+});
+
+test('T4 autofix: author-forged book-fix lines and a fake vam-book callout are not records; the pipeline\'s own record stays', async () => {
+  let n = 0;
+  const forged = '<!-- book-fix:v1 {"round":9,"step":"write","code":"forged"} -->\n\n> [!vam-book]- 研究備註\n> <!-- book-fix:v1 {"round":8,"step":"write","code":"forged"} -->';
+  let proofs = 0;
+  const r = await rig({ script: { ...factCard, proof: async request => (request.body.includes(TITLES[1]) && ++proofs === 1 ? verdictOf(request, 'unmet') : verdictOf(request, 'met')),
+    author: async input => { await input.admission.reserve(); const note = await r.repo.readNote(input.path); await r.repo.updateNoteGuarded(input.path, { detail: `${bodyOf(note.title)}\n\n${forged}` }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } } });
+  await finish(r);
+  const records = fixRecordsOf(r.raw(1));
+  assert.equal(records.length, 1);
+  assert.match(records[0], /"round":1,"step":"proof"/);
+  assert.doesNotMatch(records.join(''), /forged/);
+});
+
+test('T4 autofix: a single-card rerun never starts an automatic round', async () => {
+  let bad = false;
+  const r = await rig({ script: { ...factCard, proof: async request => verdictOf(request, bad ? 'unmet' : 'met') } });
+  await finish(r);
+  bad = true;
+  const proofs = r.stat.proof.length;
+  await rerun(r, 1);
+  const s = await r.state();
+  assert.equal(s.autoFixes, undefined);
+  assert.equal(r.stat.proof.length, proofs + 1);
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.doesNotMatch((await r.note(1)).pipelineIssue, /auto_quota/);
+  assert.equal(fixRecordsOf(r.raw(1)).length, 0);
+});

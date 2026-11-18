@@ -113,6 +113,19 @@ test('autoRoles is optional: older data without it round-trips byte-identical an
   assert.deepEqual(plain(model.readBookPipeline(core.parseMap(withRoles)).data.autoRoles), ['a']);
 });
 
+test('autoFixes is optional: an old map reads without it, a valid one round-trips, a bad one is unusable', () => {
+  const old = core.serializeMap(baseMap({ aiMode: 'quick', bookPipeline: usable() }));
+  assert.ok(!old.includes('autoFixes'));
+  assert.equal(model.readBookPipeline(core.parseMap(old)).kind, 'usable');
+  const withFixes = core.serializeMap(baseMap({ aiMode: 'quick', bookPipeline: { ...usable(), autoFixes: { a: 2 } } }));
+  assert.equal(roundTrip(withFixes), withFixes);
+  assert.deepEqual(plain(model.readBookPipeline(core.parseMap(withFixes)).data.autoFixes), { a: 2 });
+  for (const bad of [[1], 'x', { a: -1 }, { a: 1.5 }, { a: '1' }]) {
+    const text = core.serializeMap(baseMap({ aiMode: 'quick', bookPipeline: { ...usable(), autoFixes: bad } }));
+    assert.equal(model.readBookPipeline(core.parseMap(text)).kind, 'unusable', JSON.stringify(bad));
+  }
+});
+
 const corrupt = {
   'v:2': s => { s.v = 2; },
   'v missing': s => { delete s.v; },

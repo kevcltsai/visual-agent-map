@@ -481,3 +481,23 @@ test('T5 progress.rerun: present (card, start) only while a single-card rerun ru
   assert.ok(!r.mapRaw().includes('startedAt":' + Date.now()), 'sanity');
   assert.ok(!/rerun/i.test(JSON.stringify((await r.state()))), 'no rerun field in the saved state');
 });
+
+// ---- T4: the automatic redo's instruction lines ----
+test('T4 proofFixInstruction: a long note or many points never leave an unclosed JSON string; the line stays within 1000 characters', () => {
+  const R = S.load('experiences/visual-map/book-pipeline-rerun.ts');
+  const quoted = line => line.match(/"(?:[^"\\]|\\.)*"/g) ?? [];
+  const stripped = line => line.replace(/"(?:[^"\\]|\\.)*"/g, '');
+  for (const note of ['x'.repeat(5000), '"quote" \\ back 漢字😀 '.repeat(200), 'a\nb\tc']) {
+    const items = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7'].map(id => ({ id, type: 'fact', status: 'unmet', note, sources: [`https://example.org/${'p'.repeat(80)}${id}`] }));
+    const checklist = items.map(item => ({ id: item.id, text: 'point ' + item.id }));
+    const line = R.proofFixInstruction(items, checklist);
+    assert.ok(Array.from(line).length <= 1000 && line.length <= 1000);
+    assert.ok(!line.includes('\n'));
+    for (const token of quoted(line)) JSON.parse(token);
+    assert.ok(!stripped(line).includes('"'), 'every quote belongs to a closed JSON string');
+    assert.match(line, /failed the fact check/);
+  }
+  const hidden = R.proofFixInstruction([{ id: 'C1', type: 'fact', status: 'unmet', note: '[!vam-book] x', sources: [] }], [{ id: 'C1', text: 't' }]);
+  assert.doesNotMatch(hidden, /\[!vam-book\]/i);
+  assert.equal(R.proofFixInstruction([], []).includes('failed the fact check'), false);
+});

@@ -32,6 +32,21 @@
       "file": "experiences/visual-map/book-pipeline-rerun.ts",
       "text": "Do not rely on sources that could not be opened and checked; use other sources that can be opened and checked.",
       "reason": "model-facing one-line instruction composed by the program from a constant sentence plus cleaned https addresses (JSON strings); the owner never types it and no note or model text becomes part of the sentence"
+    },
+    {
+      "file": "experiences/visual-map/book-pipeline-rerun.ts",
+      "text": "The previous version of this chapter failed the fact check on these points",
+      "reason": "model-facing one-line instruction composed by the program from a constant sentence plus data in JSON strings (the failed fact points, or the neutral failure code); the owner never types it, no model sentence is ever an instruction line, and the proofread never receives it"
+    },
+    {
+      "file": "experiences/visual-map/book-pipeline-rerun.ts",
+      "text": "step of this chapter failed with the code",
+      "reason": "model-facing one-line instruction composed by the program from a constant sentence plus data in JSON strings (the failed fact points, or the neutral failure code); the owner never types it, no model sentence is ever an instruction line, and the proofread never receives it"
+    },
+    {
+      "file": "experiences/visual-map/book-pipeline-rerun.ts",
+      "text": "; produce it again carefully, following the required structure",
+      "reason": "model-facing one-line instruction composed by the program from a constant sentence plus data in JSON strings (the failed fact points, or the neutral failure code); the owner never types it, no model sentence is ever an instruction line, and the proofread never receives it"
     }
   ]
 }

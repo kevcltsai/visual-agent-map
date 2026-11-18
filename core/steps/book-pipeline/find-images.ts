@@ -6,6 +6,7 @@ import { prepareStep, renderTemplate, type StepDefinition } from "../../step-run
 import { parseImageCandidates } from "../image-search/step";
 import { languageInstruction, type BookStepBase } from "./base";
 import template from "./find-images.md";
+import againTemplate from "./find-images-again.md";
 import retryTemplate from "./find-images-retry.md";
 
 /** One planned picture position as the search sees it (the planner's kind and what it must show; never the marker). */
@@ -23,6 +24,8 @@ export interface FindImagesRequest extends BookStepBase {
   exclude?: string[];
   /** Set on the one repeat ask after a caption came back in the wrong language. */
   languageRetry?: boolean;
+  /** Set on the one second search for the positions the first search found nothing usable for (another direction; `exclude` also holds what was already tried). */
+  again?: boolean;
 }
 
 /** One offered picture: the shared candidate plus the one plain line the finder wrote about it. */
@@ -34,6 +37,8 @@ export interface FoundImages {
   bySlot: Map<number, FoundImage[]>;
   found: number;
   offTopic: number;
+  /** Per slot index, the one plain sentence the finder offers in place of a picture when it found none (raw model text: the caller escapes it). Absent when none was offered. */
+  textBySlot?: Map<number, string>;
 }
 
 const EXCLUDE_MAX = 30;
@@ -41,6 +46,7 @@ const EXCLUDE_ITEM_MAX = 120;
 const PER_SLOT_MAX = 3;
 const CAPTION_MAX = 200;
 const SLOT_TEXT_MAX = 160;
+const TEXT_INSTEAD_MAX = 300;
 
 /** Per slot, each image goes through the shared candidate parser on its own, so the caption stays with the image the parser kept. */
 function parseFound(raw: string): FoundImages {
@@ -58,6 +64,10 @@ function parseFound(raw: string): FoundImages {
   for (const entry of parsed.slots as Array<Record<string, unknown> | null>) {
     if (!entry || !Number.isInteger(entry.slot) || !Array.isArray(entry.images)) continue;
     const index = entry.slot as number;
+    if (typeof entry.textInstead === "string") {
+      const text = entry.textInstead.replace(/\s+/g, " ").trim().slice(0, TEXT_INSTEAD_MAX);
+      if (text) (out.textBySlot ??= new Map()).set(index, text);
+    }
     const list = out.bySlot.get(index) ?? [];
     for (const item of entry.images as Array<Record<string, unknown> | null>) {
       if (list.length >= PER_SLOT_MAX) break;
@@ -80,8 +90,8 @@ function parseFound(raw: string): FoundImages {
 /** The map chat's image candidates (same parser: https links with an https source page), asked per picture position for the book's sources. */
 export const findImagesStep: StepDefinition<FindImagesRequest, FoundImages> = {
   id: "book-pipeline.find-images",
-  version: 4,
-  render: ({ chapter, slots, exclude, language, languageRetry }) =>
+  version: 5,
+  render: ({ chapter, slots, exclude, language, languageRetry, again }) =>
     renderTemplate(template, {
       chapter: JSON.stringify(chapter),
       slots: JSON.stringify(
@@ -93,6 +103,7 @@ export const findImagesStep: StepDefinition<FindImagesRequest, FoundImages> = {
       ),
       languageInstruction: languageInstruction(language, chapter),
       languageRetry: languageRetry ? retryTemplate : "",
+      again: again ? againTemplate : "",
       exclude: JSON.stringify((exclude ?? []).slice(0, EXCLUDE_MAX).map(key => key.slice(0, EXCLUDE_ITEM_MAX)))
     }),
   parse: raw => parseFound(raw)

@@ -344,7 +344,11 @@ export function autoFixesOf(data: BookPipelineData, nodeId: string): number {
  * Whether a card may be redone automatically now: fewer than {@link MAX_AUTO_FIXES} rounds used, and the budget left keeps
  * {@link AUTO_FIX_CARD_RESERVE} calls for each other card that is not finished plus {@link AUTO_FIX_BASE_RESERVE}; a redo never starves the rest of the book.
  */
-export function autoFixVerdict(data: BookPipelineData, nodeId: string, unfinishedOthers: number): "ok" | "rounds" | "quota" {
+export function autoFixVerdict(
+  data: BookPipelineData,
+  nodeId: string,
+  unfinishedOthers: number
+): "ok" | "rounds" | "quota" {
   if (!data.order.includes(nodeId) || data.status !== "running") return "quota";
   if (autoFixesOf(data, nodeId) >= MAX_AUTO_FIXES) return "rounds";
   const left = data.budget.limit - data.budget.used;

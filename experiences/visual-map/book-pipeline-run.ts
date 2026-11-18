@@ -115,6 +115,7 @@ import {
   latestSlotsRecord,
   stripImageLines,
   fillSlotMarkers,
+  withTextFallback,
   residualMarkerLines,
   scanSlotMarkers,
   verifyFill,
@@ -394,7 +395,14 @@ const internalCode = (error: unknown): string =>
 /** Failure reasons after which the card's proof-result section is not written (the write never reached the card, or the card is gone). */
 const NO_FAILURE_SECTION: ReadonlySet<string> = new Set(["discarded", "card_removed", "backup_failed", "missing"]);
 /** Reasons after which a card is never redone automatically: the run's own stop or limit, the owner editing the card, no backup, or the card gone. */
-const NO_AUTO_FIX: ReadonlySet<string> = new Set(["budget", "cancelled", "discarded", "backup_failed", "card_removed", "missing"]);
+const NO_AUTO_FIX: ReadonlySet<string> = new Set([
+  "budget",
+  "cancelled",
+  "discarded",
+  "backup_failed",
+  "card_removed",
+  "missing"
+]);
 const STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" } as const;
 const ACTION_OF = { plan: "card_plan", write: "card_write", proof: "card_proof" } as const;
 const MAX_INSTRUCTION = 300;
@@ -1878,7 +1886,6 @@ export class BookPipelineRuns {
     if (!slots) return this.settleStrayMarkers(path, authorize);
     const first = await this.ports.readCard(path);
     const marked = slots.length ? scanSlotMarkers(first.detail, slots).found : new Map<number, number>();
-    let found: FoundImages | undefined;
     const others = new Set<string>();
     if (slots.length) {
       // What the other chapters already show (not this card's own old pictures: a rerun may pick again).
@@ -1890,64 +1897,104 @@ export class BookPipelineRuns {
         }
     }
     const wanted = slots.filter(slot => marked.has(slot.index));
-    if (wanted.length && this.ports.findImages) {
+    const exclude = [...new Set([...drive.usedImages, ...others])];
+    // One search call for `list`; a failed or timed-out call is an optional gain lost (undefined), never a failure of the chapter.
+    const search = async (
+      list: ImageSlot[],
+      again: boolean,
+      avoid: readonly string[]
+    ): Promise<FoundImages | undefined> => {
+      if (!list.length || !this.ports.findImages) return undefined;
       try {
-        found = await untilAborted(
+        return await untilAborted(
           signal,
           this.ports.findImages(
             {
               ...this.base(drive, drive.config.imageModel),
               chapter: imageSearchText(first),
-              slots: wanted.map(({ index, kind, explains }) => ({ index, kind, explains })),
-              exclude: [...new Set([...drive.usedImages, ...others])]
+              slots: list.map(({ index, kind, explains }) => ({ index, kind, explains })),
+              exclude: [...avoid],
+              ...(again ? { again: true } : {})
             },
             { signal, admission: drive.admission }
           )
         );
       } catch (error) {
-        if (isBudgetExhausted(error)) return { kind: "budget" };
+        if (isBudgetExhausted(error)) throw error;
         if (signal.aborted) throw error;
-        // The search is an optional gain: a call error or a timeout leaves the slots without a picture.
+        return undefined;
       }
-    }
-    // Probe each distinct safe address once (the first PROBE_PER_CHAPTER in slot order); the gate limits how many run at once.
+    };
+    // Probe each distinct safe address once (the first PROBE_PER_CHAPTER in slot order, the limit covers both searches); the gate limits how many run at once.
     const probes = new Map<string, Promise<boolean>>();
-    const listed = wanted.map(slot => ({
-      index: slot.index,
-      items: (found?.bySlot.get(slot.index) ?? []).map(candidate => {
-        const href = safeHref(candidate.url);
-        if (href && !probes.has(href) && probes.size < PROBE_PER_CHAPTER)
-          probes.set(href, this.probeGated(drive, href));
-        return { candidate, href };
-      })
-    }));
     const loadedHref = new Map<string, boolean>();
-    await Promise.all([...probes].map(async ([href, work]) => loadedHref.set(href, await work)));
-    const perSlot = new Map<number, ProbedCandidate[]>(
-      listed.map(({ index, items }) => [
-        index,
-        items.map(({ candidate, href }) => ({
-          candidate: {
-            imageUrl: candidate.url,
-            sourceUrl: candidate.source,
-            title: candidate.title,
-            caption: candidate.caption
-          },
-          href,
-          loaded: href ? (loadedHref.get(href) ?? false) : false,
-          ...(href && !loadedHref.has(href) ? { skipped: true } : {})
-        }))
-      ])
-    );
+    const probeFound = async (
+      list: ImageSlot[],
+      from: FoundImages | undefined
+    ): Promise<Map<number, ProbedCandidate[]>> => {
+      const listed = list.map(slot => ({
+        index: slot.index,
+        items: (from?.bySlot.get(slot.index) ?? []).map(candidate => {
+          const href = safeHref(candidate.url);
+          if (href && !probes.has(href) && probes.size < PROBE_PER_CHAPTER)
+            probes.set(href, this.probeGated(drive, href));
+          return { candidate, href };
+        })
+      }));
+      await Promise.all(
+        [...probes]
+          .filter(([href]) => !loadedHref.has(href))
+          .map(async ([href, work]) => loadedHref.set(href, await work))
+      );
+      return new Map(
+        listed.map(({ index, items }) => [
+          index,
+          items.map(({ candidate, href }) => ({
+            candidate: {
+              imageUrl: candidate.url,
+              sourceUrl: candidate.source,
+              title: candidate.title,
+              caption: candidate.caption
+            },
+            href,
+            loaded: href ? (loadedHref.get(href) ?? false) : false,
+            ...(href && !loadedHref.has(href) ? { skipped: true } : {})
+          }))
+        ])
+      );
+    };
+    const perSlot = new Map<number, ProbedCandidate[]>();
+    const texts = new Map<number, string>();
+    const taken = (key: string): boolean => drive.usedImages.has(key) || others.has(key);
+    try {
+      const round1 = await search(wanted, false, exclude);
+      for (const [index, list] of await probeFound(wanted, round1)) perSlot.set(index, list);
+      for (const [index, text] of round1?.textBySlot ?? []) texts.set(index, text);
+      // A second search (once) for the slots the first one left without a usable picture: another direction, the tried addresses excluded.
+      if (round1) {
+        const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
+        const lacking = wanted.filter(slot => !("figure" in (provisional.get(slot.index) ?? {})));
+        const tried = [
+          ...new Set([...perSlot.values()].flatMap(list => list.map(item => imageKey(item.candidate.imageUrl))))
+        ];
+        const second = await search(lacking, true, [...tried, ...exclude]);
+        if (second) {
+          for (const [index, list] of await probeFound(lacking, second))
+            perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
+          for (const [index, text] of second.textBySlot ?? []) texts.set(index, text);
+        }
+      }
+    } catch (error) {
+      if (isBudgetExhausted(error)) return { kind: "budget" };
+      throw error;
+    }
     // Re-read the latest text: the search and the probes took time, and the owner may have edited the card.
     const latest = await this.ports.readCard(path);
     // The card may have left the map while the search and the probes ran: nothing is claimed or written for it.
     if (!(await this.stillOnMap(drive, nodeId))) return { kind: "failed", reason: "card_removed" };
-    const outcomes = choosePictures(
-      { id: nodeId, title: latest.title },
-      slots,
-      perSlot,
-      key => drive.usedImages.has(key) || others.has(key),
+    const outcomes = withTextFallback(
+      choosePictures({ id: nodeId, title: latest.title }, slots, perSlot, taken, language),
+      texts,
       language
     );
     // Claim in the same synchronous turn as the choice: chapters run side by side, so the exclude list alone cannot stop a repeat.

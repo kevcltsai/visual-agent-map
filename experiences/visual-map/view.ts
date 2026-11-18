@@ -12337,6 +12337,21 @@ export class VisualAgentMapView extends ItemView {
             : undefined
         );
       }
+      // A picture-book card at gate 2 or when done: "rerun this card" always shown in the card header (the right-click item stays).
+      const rerunWhy = this.selection.state.multiSelectMode ? undefined : this.bookRerunWhy(node, true);
+      if (rerunWhy !== undefined) {
+        const rerun = this.button(header, "", () => this.runBookCardRerun(node));
+        rerun.addClass("vam-node-rerun");
+        setIcon(rerun.createSpan({ cls: "vam-node-rerun-icon" }), "refresh-cw");
+        rerun.createSpan({ text: t("ui.book_panel_rerun_card") });
+        const rerunName = t("ui.book_panel_rerun_card_0", note?.title ?? node.path);
+        rerun.setAttr("aria-label", rerunName);
+        rerun.setAttr("title", rerunName);
+        if (rerunWhy) {
+          rerun.disabled = true;
+          rerun.setAttr("title", rerunWhy);
+        }
+      }
       if (note) {
         if (showsToResearch(kind, note.status, this.progressDone(node.id)))
           this.labelCard(card, t("ui.topic_card_label_0_1", note.title, statusText));
@@ -12525,17 +12540,6 @@ export class VisualAgentMapView extends ItemView {
         );
         collapse.addClass("vam-collapse-button", "is-collapsed");
         collapse.setAttr("aria-expanded", "false");
-      }
-    }
-    // A picture-book card at gate 2 or when done: "rerun this card" on the card itself (the right-click item stays).
-    const rerunWhy = this.selection.state.multiSelectMode ? undefined : this.bookRerunWhy(node, true);
-    if (rerunWhy !== undefined) {
-      const rerun = this.button(tools, t("ui.book_panel_rerun_card"), () => this.runBookCardRerun(node));
-      rerun.addClass("vam-node-rerun");
-      rerun.setAttr("aria-label", t("ui.book_panel_rerun_card_0", note?.title ?? node.path));
-      if (rerunWhy) {
-        rerun.disabled = true;
-        rerun.setAttr("title", rerunWhy);
       }
     }
     if (!this.selection.state.multiSelectMode) {

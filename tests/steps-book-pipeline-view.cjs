@@ -324,8 +324,9 @@ test('T3 card button: gate 2 and done book cards carry "重跑這張" in the too
   const stage = h.paint();
   const buttons = rerunButtons(stage);
   assert.equal(buttons.length, 3, 'every book card');
-  assert.ok(buttons.every(b => b.text === '重跑這張' && !b.disabled));
-  assert.ok(buttons.every(b => dom.findAll(stage, i => i.cls.includes('vam-node-tools')).some(t => t.children.includes(b))), 'inside the tool row');
+  assert.ok(buttons.every(b => /重跑這張/.test(texts(b).join('')) && !b.disabled));
+  assert.ok(buttons.every(b => dom.findAll(stage, i => i.cls.includes('vam-node-header')).some(t => t.children.includes(b))), 'in the card header, which always shows (not the hover-only tool row)');
+  assert.ok(buttons.every(b => !dom.findAll(stage, i => i.cls.includes('vam-node-tools')).some(t => t.children.includes(b))));
   buttons[1].click();
   await dom.tick();
   assert.deepEqual(calls2, [[MAP, h.ids.a]]);
@@ -348,7 +349,7 @@ test('T3 card button: gate 2 and done book cards carry "重跑這張" in the too
   for (const phase of ['gate1', 'writing', 'planning']) { withProgress({ phase }); assert.equal(rerunButtons(h.paint()).length, 0, phase); }
   const plain = await harness({ book: false, stages: { a: 'checked' } });
   assert.equal(rerunButtons(plain.paint()).length, 0);
-  assert.match(css, /\.vam-node-tools > \.vam-node-rerun \{ white-space: nowrap; \}/);
+  assert.match(css, /\.vam-node-header > \.vam-node-rerun \{ display: inline-flex;[^}]*white-space: nowrap; \}/);
   assert.doesNotMatch(css, /vam-node-rerun[^{]*\{[^}]*display: none/);
 });
 

@@ -77975,13 +77975,27 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           } : void 0
         );
       }
+      const rerunWhy = this.selection.state.multiSelectMode ? void 0 : this.bookRerunWhy(node, true);
+      if (rerunWhy !== void 0) {
+        const rerun = this.button(header2, "", () => this.runBookCardRerun(node));
+        rerun.addClass("vam-node-rerun");
+        (0, import_obsidian38.setIcon)(rerun.createSpan({ cls: "vam-node-rerun-icon" }), "refresh-cw");
+        rerun.createSpan({ text: t("ui.book_panel_rerun_card") });
+        const rerunName = t("ui.book_panel_rerun_card_0", (_m = note == null ? void 0 : note.title) != null ? _m : node.path);
+        rerun.setAttr("aria-label", rerunName);
+        rerun.setAttr("title", rerunName);
+        if (rerunWhy) {
+          rerun.disabled = true;
+          rerun.setAttr("title", rerunWhy);
+        }
+      }
       if (note) {
         if (showsToResearch(kind, note.status, this.progressDone(node.id)))
           this.labelCard(card, t("ui.topic_card_label_0_1", note.title, statusText));
         else this.labelCard(card, note.title);
       }
     }
-    const relevance = !node.aimKind && !((_m = this.map) == null ? void 0 : _m.aim) ? note == null ? void 0 : note.relevance : void 0;
+    const relevance = !node.aimKind && !((_n = this.map) == null ? void 0 : _n.aim) ? note == null ? void 0 : note.relevance : void 0;
     if (relevance) {
       const tierLabel = t(RELEVANCE_LABEL[relevance.tier]);
       card.dataset.relevance = relevance.tier;
@@ -77991,14 +78005,14 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         tierLabel,
         t("ui.relevance_tag_label_0", tierLabel),
         (button2) => this.openRelevanceMenu(node, relevance.tier, button2),
-        ((_n = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _n.status) === "running"
+        ((_o = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _o.status) === "running"
       );
       if (relevance.manual) {
         const manualText = t("ui.relevance_manual_reason");
         (0, import_obsidian38.setTooltip)(tagButton, manualText);
         card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, manualText));
       }
-      const named = (_o = cardLabels.get(card)) == null ? void 0 : _o.textContent;
+      const named = (_p = cardLabels.get(card)) == null ? void 0 : _p.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
     if (argumentView) {
@@ -78011,7 +78025,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const kindText = strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey);
       if (strength && leaning) renderHypothesisTag(header2, leaning, strength, kindText);
       else header2.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
-      const named = (_p = cardLabels.get(card)) == null ? void 0 : _p.textContent;
+      const named = (_q = cardLabels.get(card)) == null ? void 0 : _q.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     this.paintCardMarkers(card, header2, node.id);
@@ -78021,7 +78035,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     this.paintCardStyle(card, note);
     if (header2) this.paintAiLock(card, header2, node);
     const errorDetails = [];
-    if ((_q = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _q.length) {
+    if ((_r = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _r.length) {
       const issue2 = header2.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
       issue2.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
@@ -78033,8 +78047,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       if (failure.technical) technicalDetails.push(failure.technical);
     }
     if (batch) {
-      const currentNode = batch.currentPath ? (_r = this.map) == null ? void 0 : _r.nodes.find((item) => item.path === batch.currentPath) : void 0;
-      const currentTitle = currentNode ? (_s = this.notes.get(currentNode.id)) == null ? void 0 : _s.title : void 0;
+      const currentNode = batch.currentPath ? (_s = this.map) == null ? void 0 : _s.nodes.find((item) => item.path === batch.currentPath) : void 0;
+      const currentTitle = currentNode ? (_t = this.notes.get(currentNode.id)) == null ? void 0 : _t.title : void 0;
       const label = this.batchProgressLabel(
         t("ui.shallow_research_counts", batch.succeeded, batch.total),
         batch,
@@ -78062,15 +78076,15 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }
     const ownSynthesis = this.plugin.topicRuns.syntheses(this).topics.get(node.path);
     const parentNode = node.parentId ? this.mapNodeById(node.parentId) : void 0;
-    const batchChild = !!parentNode && !!((_t = this.plugin.expansionCoordinator) == null ? void 0 : _t.isRunning(parentNode.path));
-    const stoppable = this.startingTasks.has(node.path) || ((_u = this.plugin.quickExpandPending) == null ? void 0 : _u.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
+    const batchChild = !!parentNode && !!((_u = this.plugin.expansionCoordinator) == null ? void 0 : _u.isRunning(parentNode.path));
+    const stoppable = this.startingTasks.has(node.path) || ((_v = this.plugin.quickExpandPending) == null ? void 0 : _v.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
     if (stoppable && (batch == null ? void 0 : batch.status) !== "running" && !((ownSynthesis == null ? void 0 : ownSynthesis.state) === "running" && ownSynthesis.mapPath === this.path)) {
       this.button(
         header2,
         t(
           stopLabelKey(
             this.plugin.topicRuns.runKind(node.path),
-            !!((_v = this.plugin.quickExpandPending) == null ? void 0 : _v.has(node.path)),
+            !!((_w = this.plugin.quickExpandPending) == null ? void 0 : _w.has(node.path)),
             this.startingTasks.has(node.path) && this.startingExpand.has(node.path)
           )
         ),
@@ -78087,7 +78101,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       });
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header2, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
-    const pendingCount = (_x = (_w = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _w.length) != null ? _x : 0;
+    const pendingCount = (_y = (_x = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _x.length) != null ? _y : 0;
     if (pendingCount && !this.selection.state.multiSelectMode)
       this.button(
         header2,
@@ -78127,16 +78141,6 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         );
         collapse.addClass("vam-collapse-button", "is-collapsed");
         collapse.setAttr("aria-expanded", "false");
-      }
-    }
-    const rerunWhy = this.selection.state.multiSelectMode ? void 0 : this.bookRerunWhy(node, true);
-    if (rerunWhy !== void 0) {
-      const rerun = this.button(tools, t("ui.book_panel_rerun_card"), () => this.runBookCardRerun(node));
-      rerun.addClass("vam-node-rerun");
-      rerun.setAttr("aria-label", t("ui.book_panel_rerun_card_0", (_y = note == null ? void 0 : note.title) != null ? _y : node.path));
-      if (rerunWhy) {
-        rerun.disabled = true;
-        rerun.setAttr("title", rerunWhy);
       }
     }
     if (!this.selection.state.multiSelectMode) {
@@ -94924,8 +94928,9 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node[data-argument-role="assumptions"] .vam-argument-definitions dd { margin: 0; overflow-wrap: anywhere; }
 .vam-toolbar-actions .vam-book-button { margin-right: 6px; white-space: nowrap; }
 .vam-card-book-issue { margin: 6px 0 0; font-size: var(--font-ui-smaller); line-height: 1.45; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); overflow-wrap: anywhere; }
-.vam-node-tools > .vam-node-rerun { white-space: nowrap; }
-.vam-node-tools > .vam-node-rerun:disabled { opacity: 0.5; cursor: not-allowed; }
+.vam-node-header > .vam-node-rerun { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.vam-node-header > .vam-node-rerun .svg-icon { width: 12px; height: 12px; }
+.vam-node-header > .vam-node-rerun:disabled { opacity: 0.5; cursor: not-allowed; }
 @keyframes vam-pulse { 50% { opacity: 0.35; } }
 @keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }
 /* Viewer-only parts: the pieces Obsidian would otherwise provide. */

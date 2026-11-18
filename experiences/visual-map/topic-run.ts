@@ -1544,6 +1544,8 @@ export class TopicRuns {
           };
           const writeOptions = { detailTemplate: writeContext.detailTemplate, newVisualReferences: true };
           const guard = options.pipeline;
+          // A refusal by the pipeline's own `finalize` (no chapter text, unsafe body) is not a stale topic: it is logged as what it is.
+          let refused = false;
           if (guard) {
             // The pipeline's write: the file must still be the text the run left, the run must still be current, and the text
             // is cleaned inside the write. Without the guarded write nothing is saved (never the unguarded path).
@@ -1553,11 +1555,21 @@ export class TopicRuns {
                   ...(raw ? { expectedContent: raw.started } : {}),
                   authorize: guard.authorize,
                   finalize: guard.finalize
+                    ? (content: string) => {
+                        const final = guard.finalize!(content);
+                        if (final === null) refused = true;
+                        return final;
+                      }
+                    : guard.finalize
                 })
               : "discarded";
             if (outcome === "discarded") {
               await repo.updateNote(path, { status: note.status });
-              if (exchangeId) exchanges()?.failed(exchangeId, t("log.stale_result_not_written"));
+              if (exchangeId)
+                exchanges()?.failed(
+                  exchangeId,
+                  t(refused ? "log.result_refused_not_written" : "log.stale_result_not_written")
+                );
               options.pipeline?.onDiscarded?.();
               fail(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
               return;

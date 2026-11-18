@@ -81,3 +81,9 @@ test('every new string exists in en, zh-TW and zh-CN; Chinese uses mind map word
   assert.equal(M.translate('zh-TW', 'ui.settings_group_book'), '圖文書');
   assert.equal(M.translate('zh-CN', 'ui.settings_group_book'), '图文书');
 });
+
+test('the author rules say the chapter text is required and comes first; a sources-and-notes-only result is invalid', () => {
+  const { BOOK_AUTHOR_RULES, bookAuthorRequirements } = S.load('core/book-pipeline/settings.ts');
+  assert.match(BOOK_AUTHOR_RULES, /chapter text itself is required and comes first in the Detail[\s\S]*only sources and notes[\s\S]*invalid/);
+  assert.match(bookAuthorRequirements({}, []), /chapter text itself is required/);
+});

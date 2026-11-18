@@ -1229,6 +1229,17 @@ test('research pipeline: a discarded guarded write (stopped run or owner edit) s
   }
 });
 
+test('research pipeline: a refusal by the pipeline finalize is logged as a refused result, not as a stale topic; a plain discard stays stale', async () => {
+  const h = guardedRuns({ onGuarded: opt => { assert.equal(opt.finalize('TEXT'), null); return 'discarded'; } });
+  const handle = await h.runs.start('A.md', 'research', h.options({ pipeline: hooks({ finalize: () => null }).pipeline }));
+  await handle.finished;
+  assert.match(h.log.exchanges.find(e => e[0] === 'failed')[2], /no usable chapter text/);
+  const h2 = guardedRuns({ onGuarded: () => 'discarded' });
+  const handle2 = await h2.runs.start('A.md', 'research', h2.options({ pipeline: hooks({ finalize: c => c }).pipeline }));
+  await handle2.finished;
+  assert.match(h2.log.exchanges.find(e => e[0] === 'failed')[2], /stale/);
+});
+
 test('research pipeline: expectedContent is the file text the run started from (readRaw), and an owner change is the repository\'s discard', async () => {
   let current = 'RAW-ORIGINAL';
   const freshStyle = { runStyle: () => ({ template: undefined, recipe: { ref: 'builtin:general', source: 'topic' }, label: { fileName: 'std' }, contextFields: {}, issues: {}, updateMode: 'fresh' }) };

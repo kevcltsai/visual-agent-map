@@ -312,3 +312,12 @@ test('updateNoteRawGuarded: expectedContent and authorize are checked on the cal
   assert.equal(await repo.updateNoteRawGuarded(note.path, c => `${c}\nRAW-5`, { expectedContent: before }), 'discarded');
   assert.equal(contents.get(note.path), OWNER, 'the owner edit made after the last read is untouched');
 });
+
+// Sonnet read the old lead as "write only the declared sections" and returned sources and notes without any chapter text.
+test('the chapter template lead says the chapter text is required, comes first and a sources-only result is invalid (3 languages)', () => {
+  const expected = { 'zh-TW': /一定要寫[\s\S]*來源[\s\S]*無效/, 'zh-CN': /一定要写[\s\S]*来源[\s\S]*无效/, en: /required and goes first, before `## Sources`[\s\S]*invalid/ };
+  for (const language of LANGUAGES) {
+    const parsed = M.parseTemplateBlock(M.builtinTemplateText(BOOK_ID, language), { id: BOOK_ID, name: BOOK_ID });
+    assert.match(parsed.lead, expected[language], language);
+  }
+});

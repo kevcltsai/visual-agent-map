@@ -2384,6 +2384,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "log.child_integration_failed": "子议题整合失败",
   "log.ai_task_failed": "AI 任务失败",
   "log.stale_result_not_written": "议题内容已变更，过时的 AI 结果未写入。",
+  "log.result_refused_not_written": "AI 结果没有可用的章节正文或未通过检查，未写入。",
   "log.stopped_result_not_written": "研究已停止，结果未写入。",
   "log.topic_write_failed_0": "写入议题失败：{0}",
   "error.topic_state_change_rollback_failed": "议题状态转换失败，且无法完整恢复",

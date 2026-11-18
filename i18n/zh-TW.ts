@@ -2384,6 +2384,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "log.child_integration_failed": "子議題整合失敗",
   "log.ai_task_failed": "AI 任務失敗",
   "log.stale_result_not_written": "議題內容已變更，過時的 AI 結果未寫入。",
+  "log.result_refused_not_written": "AI 結果沒有可用的章節正文或未通過檢查，未寫入。",
   "log.stopped_result_not_written": "研究已停止，結果未寫入。",
   "log.topic_write_failed_0": "寫入議題失敗：{0}",
   "error.topic_state_change_rollback_failed": "議題狀態轉換失敗，且無法完整復原",

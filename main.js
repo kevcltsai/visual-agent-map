@@ -2395,6 +2395,7 @@ var en = {
   "log.child_integration_failed": "Subtopic integration failed",
   "log.ai_task_failed": "AI task failed",
   "log.stale_result_not_written": "The topic changed; the stale AI result was not written.",
+  "log.result_refused_not_written": "The AI result had no usable chapter text or failed the safety check; it was not written.",
   "log.stopped_result_not_written": "Research stopped; the result was not written.",
   "log.topic_write_failed_0": "Writing the topic failed: {0}",
   "error.topic_state_change_rollback_failed": "Changing the topic state failed and could not be fully undone",
@@ -5620,6 +5621,7 @@ var zhCN = {
   "log.child_integration_failed": "\u5B50\u8BAE\u9898\u6574\u5408\u5931\u8D25",
   "log.ai_task_failed": "AI \u4EFB\u52A1\u5931\u8D25",
   "log.stale_result_not_written": "\u8BAE\u9898\u5185\u5BB9\u5DF2\u53D8\u66F4\uFF0C\u8FC7\u65F6\u7684 AI \u7ED3\u679C\u672A\u5199\u5165\u3002",
+  "log.result_refused_not_written": "AI \u7ED3\u679C\u6CA1\u6709\u53EF\u7528\u7684\u7AE0\u8282\u6B63\u6587\u6216\u672A\u901A\u8FC7\u68C0\u67E5\uFF0C\u672A\u5199\u5165\u3002",
   "log.stopped_result_not_written": "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u7ED3\u679C\u672A\u5199\u5165\u3002",
   "log.topic_write_failed_0": "\u5199\u5165\u8BAE\u9898\u5931\u8D25\uFF1A{0}",
   "error.topic_state_change_rollback_failed": "\u8BAE\u9898\u72B6\u6001\u8F6C\u6362\u5931\u8D25\uFF0C\u4E14\u65E0\u6CD5\u5B8C\u6574\u6062\u590D",
@@ -8845,6 +8847,7 @@ var zhTW = {
   "log.child_integration_failed": "\u5B50\u8B70\u984C\u6574\u5408\u5931\u6557",
   "log.ai_task_failed": "AI \u4EFB\u52D9\u5931\u6557",
   "log.stale_result_not_written": "\u8B70\u984C\u5167\u5BB9\u5DF2\u8B8A\u66F4\uFF0C\u904E\u6642\u7684 AI \u7D50\u679C\u672A\u5BEB\u5165\u3002",
+  "log.result_refused_not_written": "AI \u7D50\u679C\u6C92\u6709\u53EF\u7528\u7684\u7AE0\u7BC0\u6B63\u6587\u6216\u672A\u901A\u904E\u6AA2\u67E5\uFF0C\u672A\u5BEB\u5165\u3002",
   "log.stopped_result_not_written": "\u7814\u7A76\u5DF2\u505C\u6B62\uFF0C\u7D50\u679C\u672A\u5BEB\u5165\u3002",
   "log.topic_write_failed_0": "\u5BEB\u5165\u8B70\u984C\u5931\u6557\uFF1A{0}",
   "error.topic_state_change_rollback_failed": "\u8B70\u984C\u72C0\u614B\u8F49\u63DB\u5931\u6557\uFF0C\u4E14\u7121\u6CD5\u5B8C\u6574\u5FA9\u539F",
@@ -12804,6 +12807,7 @@ function effectiveSettings(current, decided) {
 var BOOK_AUTHOR_RULES = [
   "Chapter writing rules (follow them):",
   "- Write the chapter as the role named in the brief says.",
+  "- The chapter text itself is required and comes first in the Detail, before any sources or notes sections: a result with only sources and notes, and no chapter text, is invalid. Do the research, then write the chapter in full.",
   "- Open by picking up the brief's entry point (how this chapter continues from the previous card).",
   "- End with one sentence that leads into the next card, taking up the question the brief leaves for it. If the brief has no next card (the last card), do not lead into a next card; close the whole book as the brief says.",
   "- The closing sentence belongs to the last paragraph of the chapter's own text, before any open-questions, sources or notes sections the template adds; those sections are not the chapter's ending.",
@@ -39129,13 +39133,13 @@ var guide_zh_CN_default = "## \u9069\u7528\u60C5\u5883\n\u4EC0\u9EBC\u6642\u5019
 var guide_en_default2 = '## When to use\nWhen to use this guide and what it achieves; do not put the method here.\n\n## How to do it\nOrdered steps, one per line, each starting with a verb.\n\n## Common mistakes\nWrite each as "mistake \u2192 right way".\n\n## Decision rules\nHow to choose when there is a choice, one rule per line.\n\n## Sources\nOnly the source list, which is added to the end of this section automatically; do not restate the body.\n\n## Update log\nAdd only one line saying what this update changed.\n';
 
 // core/blocks/template/book-chapter.zh-TW.md
-var book_chapter_zh_TW_default = "\u9019\u662F\u5716\u6587\u66F8\u7684\u4E00\u7AE0\uFF1A\u5148\u7528\u4E00\u5169\u53E5\u8A71\u5E36\u51FA\u672C\u7AE0\u4E3B\u984C\uFF0C\u518D\u5BEB\u81EA\u7531\u6B63\u6587\uFF1B\u6B63\u6587\u53EF\u4EE5\u7528\u81EA\u5DF1\u7684 ### \u5C0F\u6A19\u5206\u6BB5\uFF0C\u4E0D\u8981\u628A\u4F86\u6E90\u6E05\u55AE\u91CD\u8FF0\u4E00\u6B21\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u7814\u7A76\u5099\u8A3B\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var book_chapter_zh_TW_default = "\u9019\u662F\u5716\u6587\u66F8\u7684\u4E00\u7AE0\u3002\u7AE0\u7BC0\u6B63\u6587\u4E00\u5B9A\u8981\u5BEB\uFF0C\u653E\u5728\u6700\u524D\u9762\u3001`## \u4F86\u6E90` \u4E4B\u524D\uFF1A\u5148\u7528\u4E00\u5169\u53E5\u8A71\u5E36\u51FA\u672C\u7AE0\u4E3B\u984C\uFF0C\u518D\u5BEB\u81EA\u7531\u6B63\u6587\uFF1B\u6B63\u6587\u53EF\u4EE5\u7528\u81EA\u5DF1\u7684 ### \u5C0F\u6A19\u5206\u6BB5\uFF0C\u4E0D\u8981\u628A\u4F86\u6E90\u6E05\u55AE\u91CD\u8FF0\u4E00\u6B21\u3002\u53EA\u6709\u4F86\u6E90\u8207\u7814\u7A76\u5099\u8A3B\u3001\u6C92\u6709\u6B63\u6587\uFF0C\u662F\u7121\u6548\u7684\u7D50\u679C\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u7814\u7A76\u5099\u8A3B\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/book-chapter.zh-CN.md
-var book_chapter_zh_CN_default = "\u9019\u662F\u5716\u6587\u66F8\u7684\u4E00\u7AE0\uFF1A\u5148\u7528\u4E00\u5169\u53E5\u8A71\u5E36\u51FA\u672C\u7AE0\u4E3B\u984C\uFF0C\u518D\u5BEB\u81EA\u7531\u6B63\u6587\uFF1B\u6B63\u6587\u53EF\u4EE5\u7528\u81EA\u5DF1\u7684 ### \u5C0F\u6A19\u5206\u6BB5\uFF0C\u4E0D\u8981\u628A\u4F86\u6E90\u6E05\u55AE\u91CD\u8FF0\u4E00\u6B21\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u7814\u7A76\u5099\u8A3B\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var book_chapter_zh_CN_default = "\u8FD9\u662F\u56FE\u6587\u4E66\u7684\u4E00\u7AE0\u3002\u7AE0\u8282\u6B63\u6587\u4E00\u5B9A\u8981\u5199\uFF0C\u653E\u5728\u6700\u524D\u9762\u3001`## \u6765\u6E90` \u4E4B\u524D\uFF1A\u5148\u7528\u4E00\u4E24\u53E5\u8BDD\u5E26\u51FA\u672C\u7AE0\u4E3B\u9898\uFF0C\u518D\u5199\u81EA\u7531\u6B63\u6587\uFF1B\u6B63\u6587\u53EF\u4EE5\u7528\u81EA\u5DF1\u7684 ### \u5C0F\u6807\u5206\u6BB5\uFF0C\u4E0D\u8981\u628A\u6765\u6E90\u6E05\u5355\u91CD\u8FF0\u4E00\u6B21\u3002\u53EA\u6709\u6765\u6E90\u4E0E\u7814\u7A76\u5907\u6CE8\u3001\u6CA1\u6709\u6B63\u6587\uFF0C\u662F\u65E0\u6548\u7684\u7ED3\u679C\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u7814\u7A76\u5099\u8A3B\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/book-chapter.en.md
-var book_chapter_en_default = "This is one chapter of a picture book: open with a sentence or two that introduces the chapter's topic, then write the free body; the body may use its own ### sub-headings, and must not repeat the source list.\n\n## Sources\nOnly the source list; the source list is placed at the end of this section automatically. Do not restate the body.\n\n## Research notes\nAdd only one line saying what this update changed.\n";
+var book_chapter_en_default = "This is one chapter of a picture book. The chapter text is required and goes first, before `## Sources`: open with a sentence or two that introduces the chapter's topic, then write the free body; the body may use its own ### sub-headings, and must not repeat the source list. A result with only sources and research notes and no chapter text is invalid.\n\n## Sources\nOnly the source list; the source list is placed at the end of this section automatically. Do not restate the body.\n\n## Research notes\nAdd only one line saying what this update changed.\n";
 
 // core/blocks/template/conclusion.zh-TW.md
 var conclusion_zh_TW_default = "## \u7D50\u8AD6\n\u4E00\u5230\u4E09\u53E5\uFF0C\u5148\u8B1B\u7D50\u8AD6\uFF0C\u4E0D\u653E\u7406\u7531\u3002\n\n## \u4FE1\u5FC3\n\u4F4E\uFF0F\u4E2D\uFF0F\u9AD8\u4E09\u9078\u4E00\uFF0C\u52A0\u4E0A\u6700\u5927\u7684\u4E0D\u78BA\u5B9A\u4F86\u81EA\u54EA\u88E1\u3002\u53EA\u7559\u4E00\u4EFD\uFF0C\u9019\u4E00\u689D\u512A\u5148\u65BC\u524D\u9762\u7684\u4E0D\u4E00\u81F4\u8655\u7406\u898F\u5247\uFF1A\u4E0D\u4E26\u5217\u65B0\u820A\u4FE1\u5FC3\uFF1B\u4FE1\u5FC3\u6539\u8B8A\u6642\u6539\u5BEB\u9019\u4E00\u4EFD\uFF0C\u4E26\u5728\u66F4\u65B0\u7D00\u9304\u5BEB\u300C\u5F9E X \u6539\u70BA Y\uFF1A\u7406\u7531\u300D\u3002\n\n## \u4F9D\u64DA\n2\u20134 \u500B\u7406\u7531\uFF0C\u6BCF\u500B\u9023\u5230\u5B83\u4F9D\u8CF4\u7684\u8B70\u984C\u6216\u8B49\u64DA\u3002\n\n## \u4EC0\u9EBC\u6703\u6539\u8B8A\u9019\u500B\u7D50\u8AD6\n\u770B\u5230\u4EC0\u9EBC\u8B49\u64DA\u6216\u689D\u4EF6\u8B8A\u5316\uFF0C\u9019\u500B\u7D50\u8AD6\u5C31\u8981\u6539\u3002\n\n## \u9069\u7528\u7BC4\u570D\n\u7D50\u8AD6\u5728\u54EA\u4E9B\u689D\u4EF6\u4E0B\u6210\u7ACB\u3001\u54EA\u4E9B\u60C5\u6CC1\u4E0D\u9069\u7528\u3002\n\n## \u5F71\u97FF\u8207\u4E0B\u4E00\u6B65\n\u7D50\u8AD6\u6210\u7ACB\u7684\u8A71\u5F71\u97FF\u4EC0\u9EBC\u3001\u8981\u505A\u4EC0\u9EBC\uFF1B\u8981\u958B\u6210\u884C\u52D5\u8B70\u984C\u7684\uFF0C\u5BEB\u6210\u52D5\u8A5E\u958B\u982D\u7684\u4E00\u884C\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
@@ -43044,16 +43048,25 @@ var TopicRuns = class {
         };
         const writeOptions = { detailTemplate: writeContext.detailTemplate, newVisualReferences: true };
         const guard = options.pipeline;
+        let refused = false;
         if (guard) {
           const outcome = repo.updateNoteGuarded ? await repo.updateNoteGuarded(path, patch, {
             ...writeOptions,
             ...raw ? { expectedContent: raw.started } : {},
             authorize: guard.authorize,
-            finalize: guard.finalize
+            finalize: guard.finalize ? (content) => {
+              const final = guard.finalize(content);
+              if (final === null) refused = true;
+              return final;
+            } : guard.finalize
           }) : "discarded";
           if (outcome === "discarded") {
             await repo.updateNote(path, { status: note.status });
-            if (exchangeId) (_l = exchanges()) == null ? void 0 : _l.failed(exchangeId, t("log.stale_result_not_written"));
+            if (exchangeId)
+              (_l = exchanges()) == null ? void 0 : _l.failed(
+                exchangeId,
+                t(refused ? "log.result_refused_not_written" : "log.stale_result_not_written")
+              );
             (_n = (_m = options.pipeline) == null ? void 0 : _m.onDiscarded) == null ? void 0 : _n.call(_m);
             fail4(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
             return;

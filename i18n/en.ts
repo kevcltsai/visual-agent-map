@@ -2552,6 +2552,8 @@ export const en = {
   "log.child_integration_failed": "Subtopic integration failed",
   "log.ai_task_failed": "AI task failed",
   "log.stale_result_not_written": "The topic changed; the stale AI result was not written.",
+  "log.result_refused_not_written":
+    "The AI result had no usable chapter text or failed the safety check; it was not written.",
   "log.stopped_result_not_written": "Research stopped; the result was not written.",
   "log.topic_write_failed_0": "Writing the topic failed: {0}",
   "error.topic_state_change_rollback_failed": "Changing the topic state failed and could not be fully undone",

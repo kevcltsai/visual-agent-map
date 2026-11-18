@@ -186,7 +186,7 @@ export interface BookPlanText {
   materials: readonly { name: string; use: string }[];
 }
 
-/** The root's `## 全書企劃` section, ending with a newline. Sub-headings are `###`, so the section stays one section. */
+/** The root's `## 全書企劃` section as composed (the pipeline stores its body in a hidden callout, see `replaceBookPlanSection`), ending with a newline. Sub-headings are `###`, so the section stays one section. */
 export function composeBookPlan(plan: BookPlanText, language: ContentLanguage): string {
   const c = colon(language);
   const decisions = BOOK_SETTING_FIELDS.filter(field => plan.decisions[field]?.trim()).map(
@@ -208,17 +208,44 @@ export function composeBookPlan(plan: BookPlanText, language: ContentLanguage): 
   ].join("\n");
 }
 
-/** The saved editorial decisions of a `## 全書企劃` section found anywhere in the root's body ({} when there is none). */
-export function parseBookPlanDecisions(markdown: string): BookSettings {
+/** Whether a callout or heading title is the book plan's (either language). */
+export const isBookPlanTitle = (title: string): boolean => matches(L.plan, title.trim());
+
+const PLAN_CALLOUT = /^[ \t]{0,3}>[ \t]?\[!vam-book\][+-]?[ \t]+(.+?)[ \t]*$/i;
+const QUOTE_PREFIX = /^[ \t]{0,3}>[ \t]?/;
+
+/**
+ * The lines of the saved book plan: the body of the pipeline's hidden callout `> [!vam-book]- 全書企劃` (quote prefix removed), else the lines after an
+ * older root's `## 全書企劃` heading; undefined when there is neither. The callout wins when both exist.
+ */
+function planLines(markdown: string): string[] | undefined {
   const lines = markdown.split(/\r?\n/);
+  const callout = lines.findIndex(line => {
+    const m = PLAN_CALLOUT.exec(line);
+    return !!m && isBookPlanTitle(m[1]);
+  });
+  if (callout >= 0) {
+    const body: string[] = [];
+    for (const line of lines.slice(callout + 1)) {
+      if (!QUOTE_PREFIX.test(line)) break;
+      body.push(line.replace(QUOTE_PREFIX, ""));
+    }
+    return body;
+  }
   const start = lines.findIndex(line => {
     const m = /^##[ \t]+(.+?)\s*$/.exec(line);
     return !!m && matches(L.plan, m[1]);
   });
-  if (start < 0) return {};
+  return start < 0 ? undefined : lines.slice(start + 1);
+}
+
+/** The saved editorial decisions of a `## 全書企劃` section found anywhere in the root's body ({} when there is none). */
+export function parseBookPlanDecisions(markdown: string): BookSettings {
+  const plan = planLines(markdown);
+  if (!plan) return {};
   const out: BookSettings = {};
   let inDecisions = false;
-  for (const line of lines.slice(start + 1)) {
+  for (const line of plan) {
     if (/^##(?!#)/.test(line)) break;
     const sub = /^###[ \t]+(.+?)\s*$/.exec(line);
     if (sub) {
@@ -236,16 +263,12 @@ export function parseBookPlanDecisions(markdown: string): BookSettings {
 
 /** The saved thread and material register of a `## 全書企劃` section found anywhere in the root's body ('' and [] when there is none). */
 export function parseBookPlanBody(markdown: string): { thread: string; materials: { name: string; use: string }[] } {
-  const lines = markdown.split(/\r?\n/);
-  const start = lines.findIndex(line => {
-    const m = /^##[ \t]+(.+?)\s*$/.exec(line);
-    return !!m && matches(L.plan, m[1]);
-  });
+  const plan = planLines(markdown);
   const thread: string[] = [];
   const materials: { name: string; use: string }[] = [];
-  if (start < 0) return { thread: "", materials };
+  if (!plan) return { thread: "", materials };
   let part: "thread" | "materials" | undefined;
-  for (const line of lines.slice(start + 1)) {
+  for (const line of plan) {
     if (/^##(?!#)/.test(line)) break;
     const sub = /^###[ \t]+(.+?)\s*$/.exec(line);
     if (sub) {

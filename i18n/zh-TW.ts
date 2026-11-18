@@ -2373,7 +2373,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "note.external_source_0": "外部來源：{0}",
   "note.earlier_research_sources": "先前研究的來源",
   "note.no_new_information": "本次無新增內容。",
-  "note.writeback_fresh_replaced_0": "已用新研究取代，舊版備份在 {0}",
+  "note.writeback_fresh_replaced_0": "已重新寫入，舊版備份在 {0}",
   "note.callout_titles_1": "摘要:summary,abstract,tldr|筆記:note|資訊:info|待辦:todo|提示:tip,hint",
   "note.callout_titles_2": "重要:important|成功:success,check,done|問題:question,help,faq|範例:example",
   "note.callout_titles_3": "注意:warning,caution,attention|失敗:failure,fail,missing|危險:danger,error",

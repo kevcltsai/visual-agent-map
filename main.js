@@ -2384,7 +2384,7 @@ var en = {
   "note.external_source_0": "External source: {0}",
   "note.earlier_research_sources": "Sources from earlier research",
   "note.no_new_information": "No new information in this task.",
-  "note.writeback_fresh_replaced_0": "Replaced with new research; the earlier version is backed up at {0}",
+  "note.writeback_fresh_replaced_0": "Rewritten; the earlier version is backed up at {0}",
   "note.callout_titles_1": "none",
   "note.callout_titles_2": "none",
   "note.callout_titles_3": "none",
@@ -5612,7 +5612,7 @@ var zhCN = {
   "note.external_source_0": "\u5916\u90E8\u6765\u6E90\uFF1A{0}",
   "note.earlier_research_sources": "\u5148\u524D\u7814\u7A76\u7684\u6765\u6E90",
   "note.no_new_information": "\u672C\u6B21\u65E0\u6DFB\u52A0\u5185\u5BB9\u3002",
-  "note.writeback_fresh_replaced_0": "\u5DF2\u7528\u65B0\u7814\u7A76\u53D6\u4EE3\uFF0C\u65E7\u7248\u5907\u4EFD\u5728 {0}",
+  "note.writeback_fresh_replaced_0": "\u5DF2\u91CD\u65B0\u5199\u5165\uFF0C\u65E7\u7248\u5907\u4EFD\u5728 {0}",
   "note.callout_titles_1": "\u6458\u8981:summary,abstract,tldr|\u7B14\u8BB0:note|\u4FE1\u606F:info|\u5F85\u529E:todo|\u63D0\u793A:tip,hint",
   "note.callout_titles_2": "\u91CD\u8981:important|\u6210\u529F:success,check,done|\u95EE\u9898:question,help,faq|\u793A\u4F8B:example",
   "note.callout_titles_3": "\u6CE8\u610F:warning,caution,attention|\u5931\u8D25:failure,fail,missing|\u5371\u9669:danger,error",
@@ -8840,7 +8840,7 @@ var zhTW = {
   "note.external_source_0": "\u5916\u90E8\u4F86\u6E90\uFF1A{0}",
   "note.earlier_research_sources": "\u5148\u524D\u7814\u7A76\u7684\u4F86\u6E90",
   "note.no_new_information": "\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u3002",
-  "note.writeback_fresh_replaced_0": "\u5DF2\u7528\u65B0\u7814\u7A76\u53D6\u4EE3\uFF0C\u820A\u7248\u5099\u4EFD\u5728 {0}",
+  "note.writeback_fresh_replaced_0": "\u5DF2\u91CD\u65B0\u5BEB\u5165\uFF0C\u820A\u7248\u5099\u4EFD\u5728 {0}",
   "note.callout_titles_1": "\u6458\u8981:summary,abstract,tldr|\u7B46\u8A18:note|\u8CC7\u8A0A:info|\u5F85\u8FA6:todo|\u63D0\u793A:tip,hint",
   "note.callout_titles_2": "\u91CD\u8981:important|\u6210\u529F:success,check,done|\u554F\u984C:question,help,faq|\u7BC4\u4F8B:example",
   "note.callout_titles_3": "\u6CE8\u610F:warning,caution,attention|\u5931\u6557:failure,fail,missing|\u5371\u96AA:danger,error",
@@ -42186,6 +42186,671 @@ function runStyleLabelText(label, language2) {
   ) : translate(language2, "ui.note_style_label_0_1", label.templateName, label.toneName);
 }
 
+// core/book-pipeline/image-dedupe.ts
+function imageKey2(url) {
+  var _a2;
+  let parsed;
+  try {
+    parsed = new URL(url.trim());
+  } catch (e) {
+    return url.trim().toLowerCase();
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (/^(upload|thumb)\.wikimedia\.org$/.test(host)) {
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    let name2 = (_a2 = parts[parts.length - 1]) != null ? _a2 : "";
+    const thumbAt = parts.indexOf("thumb");
+    if (thumbAt >= 0 && parts.length >= thumbAt + 5) name2 = parts[parts.length - 2];
+    try {
+      name2 = decodeURIComponent(name2);
+    } catch (e) {
+    }
+    return name2.toLowerCase();
+  }
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.href;
+}
+
+// core/book-pipeline/image-slots.ts
+var MAX_IMAGE_SLOTS = 8;
+function cleanSlotText(value, max) {
+  const text10 = value.replace(/[〔〕｜]/g, " ").replace(/\s+/g, " ").trim();
+  return Array.from(text10).slice(0, max).join("").trim();
+}
+var STANDALONE_MARKER = /^\s*〔圖位 ([1-9]\d*)：([^〔〕]+?)〕\s*$/;
+var MARKER_OPEN = "\u3014\u5716\u4F4D";
+var OPEN_FENCE = /^[ \t]*(`{3,}|~{3,})(.*)$/;
+var QUOTE_LINE = /^ {0,3}>/;
+var INDENTED_CODE = /^(?: {4}|\t)/;
+var BLOCK_START = /^ {0,3}(?:#{1,6}(?:\s|$)|[-*+]\s|\d+[.)]\s|(?:[-*_][ \t]*){3,}$)/;
+function protectedLines(lines) {
+  const out = [];
+  let fence;
+  let quote3 = false;
+  let code3 = false;
+  for (const line2 of lines) {
+    if (fence) {
+      out.push(true);
+      const close = OPEN_FENCE.exec(line2);
+      if (close && close[1][0] === fence.char && close[1].length >= fence.size && !close[2].trim()) fence = void 0;
+      continue;
+    }
+    const open2 = OPEN_FENCE.exec(line2);
+    if (open2 && !(open2[1][0] === "`" && open2[2].includes("`"))) {
+      fence = { char: open2[1][0], size: open2[1].length };
+      out.push(true);
+      quote3 = false;
+      code3 = false;
+      continue;
+    }
+    const blank2 = !line2.trim();
+    const prevBlank = out.length === 0 || !lines[out.length - 1].trim();
+    if (QUOTE_LINE.test(line2)) {
+      quote3 = true;
+      code3 = false;
+      out.push(true);
+    } else if (quote3 && !blank2 && !BLOCK_START.test(line2)) {
+      out.push(true);
+    } else if (INDENTED_CODE.test(line2) && !blank2 && (prevBlank || code3)) {
+      quote3 = false;
+      code3 = true;
+      out.push(true);
+    } else {
+      if (!blank2) code3 = false;
+      quote3 = false;
+      out.push(false);
+    }
+  }
+  return out;
+}
+function markerCore(line2) {
+  return line2.trim().replace(/^(?:[-+*]|\d+[.)])\s+/, "").replace(/^[*_~]+/, "").replace(/[*_~]+$/, "").trim();
+}
+function markerLineKind(line2) {
+  const core2 = markerCore(line2);
+  if (STANDALONE_MARKER.test(core2)) return "own";
+  return /^〔圖位[^〔〕]*〕$/.test(core2) ? "bad" : void 0;
+}
+function isShell(rest) {
+  return /^(?:[-+]|\d+[.)])?$/.test(rest.replace(/[\s*_~]+/g, ""));
+}
+function scanSlotMarkers(content, slots) {
+  const lines = content.split(/\r?\n/);
+  const guarded = protectedLines(lines);
+  const planned = new Set(slots.map((slot) => slot.index));
+  const scan3 = { found: /* @__PURE__ */ new Map(), duplicateLines: [], badLines: [], inlineLines: [], omitted: [] };
+  lines.forEach((line2, at) => {
+    var _a2;
+    if (guarded[at] || !line2.includes(MARKER_OPEN)) return;
+    const kind = markerLineKind(line2);
+    if (kind === "own") {
+      const index = Number((_a2 = STANDALONE_MARKER.exec(markerCore(line2))) == null ? void 0 : _a2[1]);
+      if (!planned.has(index)) scan3.badLines.push(at);
+      else if (scan3.found.has(index)) scan3.duplicateLines.push(at);
+      else scan3.found.set(index, at);
+      return;
+    }
+    if (kind === "bad") {
+      scan3.badLines.push(at);
+      return;
+    }
+    scan3.inlineLines.push(at);
+  });
+  scan3.omitted = slots.map((slot) => slot.index).filter((index) => !scan3.found.has(index));
+  return scan3;
+}
+var INLINE_MARKER = /〔圖位[^〔〕\n]*〕|〔圖位\s*\d+\s*[：:]|〔圖位/g;
+function residualMarkerLines(content) {
+  const lines = content.split(/\r?\n/);
+  const guarded = protectedLines(lines);
+  const out = [];
+  lines.forEach((line2, at) => {
+    if (!guarded[at] && line2.includes(MARKER_OPEN)) out.push(at);
+  });
+  return out;
+}
+var isHttps = (url) => {
+  try {
+    return new URL(url).protocol === "https:";
+  } catch (e) {
+    return false;
+  }
+};
+function pickForSlot(ctx, candidates) {
+  const secure = candidates.filter((item) => isHttps(item.imageUrl));
+  const picked = new Set([...ctx.alreadyPicked].map(imageKey2));
+  const hit = secure.find((item) => !picked.has(imageKey2(item.imageUrl)));
+  if (hit) return { candidate: hit };
+  if (candidates.length && !secure.length) return { none: true, reasonCode: "unsafe_url" };
+  return { none: true, reasonCode: "not_found" };
+}
+function plainLine2(text10) {
+  return text10 && /^[\s\p{P}\p{S}]+$/u.test(text10) && /^[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]/.test(text10) && !text10.startsWith("\\") ? `\\${text10}` : text10;
+}
+function figureOf(candidate, href, language2) {
+  const plain = (value) => value.replace(/[〔〕]/g, " ");
+  const alt = escapeMarkdownText(plain(candidate.title), 80) || (/^zh/i.test(language2) ? "\u5716" : "image");
+  return { href, alt, caption: plainLine2(escapeMarkdownText(plain(candidate.caption), 160)) || alt };
+}
+function choosePictures(chapter, slots, perSlot, taken, language2) {
+  var _a2;
+  const outcomes = /* @__PURE__ */ new Map();
+  const alreadyPicked = /* @__PURE__ */ new Set();
+  for (const slot of slots) {
+    const all = (_a2 = perSlot.get(slot.index)) != null ? _a2 : [];
+    const usable = all.filter((item) => item.href && item.loaded && !taken(imageKey2(item.href)));
+    const pick8 = pickForSlot(
+      { chapter, slot, allSlots: slots, alreadyPicked },
+      usable.map((item) => ({ ...item.candidate, imageUrl: item.href }))
+    );
+    if ("candidate" in pick8) {
+      alreadyPicked.add(pick8.candidate.imageUrl);
+      outcomes.set(slot.index, { figure: figureOf(pick8.candidate, pick8.candidate.imageUrl, language2) });
+      continue;
+    }
+    let reasonCode = pick8.reasonCode;
+    if (!usable.length) {
+      if (!all.length) reasonCode = "not_found";
+      else if (all.every((item) => !item.href)) reasonCode = "unsafe_url";
+      else if (all.some((item) => item.href && !item.loaded && !item.skipped)) reasonCode = "load_failed";
+      else if (all.some((item) => item.skipped)) reasonCode = "probe_capped";
+      else reasonCode = "not_found";
+    }
+    outcomes.set(slot.index, { reasonCode, ...pick8.reasonText ? { reasonText: pick8.reasonText } : {} });
+  }
+  return outcomes;
+}
+var BAD_INDEX = /〔圖位\s*(\d+)/;
+var isBlank = (line2) => line2 === void 0 || !line2.trim();
+function fillSlotMarkers(content, slots, outcomes) {
+  var _a2;
+  const lines = content.split("\n");
+  const scan3 = scanSlotMarkers(content, slots);
+  const cr = content.includes("\r\n") ? "\r" : "";
+  const figureAt = /* @__PURE__ */ new Map();
+  const missing = [];
+  const placed = [];
+  const planned = new Set(slots.map((slot) => slot.index));
+  const badIndexes = /* @__PURE__ */ new Set();
+  for (const at of scan3.badLines) {
+    const m = BAD_INDEX.exec(lines[at]);
+    if (m && planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
+  }
+  for (const at of scan3.inlineLines)
+    for (const m of lines[at].matchAll(/〔圖位\s*(\d+)/g)) if (planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
+  for (const slot of slots) {
+    const at = scan3.found.get(slot.index);
+    const outcome = outcomes.get(slot.index);
+    if (at === void 0) {
+      missing.push({ index: slot.index, reasonCode: badIndexes.has(slot.index) ? "bad_marker" : "author_omitted" });
+    } else if (outcome && "figure" in outcome) {
+      figureAt.set(at, outcome.figure);
+      placed.push({ index: slot.index, href: outcome.figure.href });
+    } else {
+      missing.push({ index: slot.index, reasonCode: (_a2 = outcome == null ? void 0 : outcome.reasonCode) != null ? _a2 : "not_found" });
+    }
+  }
+  const dropped = new Set(
+    [...scan3.badLines, ...scan3.duplicateLines, ...scan3.found.values()].filter((at) => !figureAt.has(at))
+  );
+  const inline = new Set(scan3.inlineLines);
+  const added = [];
+  const out = [];
+  let removed = false;
+  const push = (line2) => {
+    if (removed && isBlank(line2) && (!out.length || isBlank(out[out.length - 1]))) {
+      removed = false;
+      return;
+    }
+    removed = false;
+    out.push(line2);
+  };
+  lines.forEach((line2, at) => {
+    const figure = figureAt.get(at);
+    if (figure) {
+      if (out.length && !isBlank(out[out.length - 1])) out.push("");
+      const image = `![${figure.alt}](${figure.href})${cr}`;
+      const caption = `${figure.caption}${cr}`;
+      added.push(image, caption);
+      out.push(image, caption);
+      if (!isBlank(lines[at + 1])) out.push(cr ? "\r" : "");
+      return;
+    }
+    if (dropped.has(at)) {
+      removed = true;
+      return;
+    }
+    if (inline.has(at)) {
+      const rest = line2.replace(INLINE_MARKER, "");
+      if (isShell(rest)) {
+        removed = true;
+        return;
+      }
+      push(rest);
+      return;
+    }
+    push(line2);
+  });
+  return { text: out.join("\n"), placed, missing, bad: scan3.badLines.length, added };
+}
+function withoutMarkers(text10) {
+  const lines = text10.split("\n");
+  const guarded = protectedLines(lines);
+  const out = [];
+  lines.forEach((line2, at) => {
+    if (guarded[at] || !line2.includes(MARKER_OPEN)) {
+      out.push(line2);
+      return;
+    }
+    if (markerLineKind(line2)) return;
+    const rest = line2.replace(INLINE_MARKER, "");
+    if (!isShell(rest)) out.push(rest);
+  });
+  return out.map((line2) => line2.replace(/\s+$/, "")).filter((line2) => line2.trim());
+}
+function verifyFill(original, result, slots) {
+  const seen = [...result.placed, ...result.missing].map((item) => item.index).sort((a, b) => a - b);
+  const want = slots.map((slot) => slot.index).sort((a, b) => a - b);
+  if (seen.length !== want.length || seen.some((index, i) => index !== want[i])) return "count";
+  if (residualMarkerLines(result.text).length) return "residual";
+  const rest = withoutMarkers(result.text);
+  for (const line2 of result.added) {
+    const at = rest.indexOf(line2.replace(/\s+$/, ""));
+    if (at < 0) return "deleted_text";
+    rest.splice(at, 1);
+  }
+  const before = withoutMarkers(original);
+  return before.length === rest.length && before.every((line2, i) => line2 === rest[i]) ? void 0 : "deleted_text";
+}
+var REASONS = [
+  "author_omitted",
+  "bad_marker",
+  "not_found",
+  "load_failed",
+  "unsafe_url",
+  "probe_capped"
+];
+function shortHash2(url) {
+  let hash = 2166136261;
+  for (const char of imageKey2(url)) {
+    hash ^= char.codePointAt(0);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+function composeSlotsRecord(result) {
+  const slots = [
+    ...result.placed.map((item) => ({ index: item.index, state: "placed", hash: shortHash2(item.href) })),
+    ...result.missing.map((item) => ({ index: item.index, state: "missing", reasonCode: item.reasonCode }))
+  ].sort((a, b) => a.index - b.index);
+  return `<!-- book-slots:v1 ${JSON.stringify({ slots, bad: result.bad })} -->`;
+}
+var RECORD_LINE = /^(?:[ \t]{0,3}>[ \t]?)*<!-- book-slots:v1 (\{.*\}) -->$/;
+function latestSlotsRecord(detail) {
+  const lines = detail.split("\n");
+  const fenced = fencedLines2(lines);
+  let found;
+  lines.forEach((line2, at) => {
+    const m = fenced[at] ? null : RECORD_LINE.exec(line2.replace(/\r$/, "").trim());
+    if (!m) return;
+    try {
+      const data = JSON.parse(m[1]);
+      if (!Array.isArray(data.slots)) return;
+      const items = [];
+      for (const raw of data.slots.slice(0, MAX_IMAGE_SLOTS)) {
+        if (!raw || !Number.isInteger(raw.index) || raw.index < 1) continue;
+        const state = raw.state === "placed" ? "placed" : raw.state === "missing" ? "missing" : void 0;
+        if (!state) continue;
+        const reasonCode = REASONS.find((code3) => code3 === raw.reasonCode);
+        items.push({
+          index: raw.index,
+          state,
+          ...reasonCode ? { reasonCode } : {},
+          ...typeof raw.hash === "string" && /^[0-9a-f]{8}$/.test(raw.hash) ? { hash: raw.hash } : {}
+        });
+      }
+      found = { slots: items, bad: Number.isInteger(data.bad) && data.bad > 0 ? data.bad : 0 };
+    } catch (e) {
+    }
+  });
+  return found;
+}
+var IMAGE_IN_LINE = /!\[[^\]\n]*\]\((https:\/\/[^)\s]+)\)/g;
+var IMAGE_ONLY_LINE = /^[ \t]*!\[[^\]\n]*\]\(https:\/\/[^)\s]+\)[ \t]*\r?$/;
+function stripImageLines(text10) {
+  const lines = text10.split("\n");
+  const guarded = protectedLines(lines);
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!guarded[i] && IMAGE_ONLY_LINE.test(lines[i])) {
+      if (i + 1 < lines.length && !isBlank(lines[i + 1]) && !guarded[i + 1] && !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[i + 1]) && (isBlank(lines[i + 2]) || /^\s*#/.test(lines[i + 2])))
+        i++;
+      continue;
+    }
+    out.push(lines[i]);
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+function describeSlots(slots, record, imageUrls) {
+  const now = new Set(imageUrls.map(shortHash2));
+  return slots.map((slot) => {
+    const item = record == null ? void 0 : record.slots.find((entry) => entry.index === slot.index);
+    if (!item) return { index: slot.index, state: "unrecorded" };
+    if (item.state === "missing")
+      return {
+        index: slot.index,
+        state: "missing",
+        ...item.reasonCode ? { reasonCode: item.reasonCode } : {}
+      };
+    return { index: slot.index, state: item.hash && now.has(item.hash) ? "placed" : "edited" };
+  });
+}
+var STOP_CJK = /* @__PURE__ */ new Set([..."\u7684\u4E86\u662F\u5728\u548C\u8207\u4E0E\u53CA\u6216\u5C0D\u5BF9\u628A\u88AB\u70BA\u4E3A\u4EE5\u4E4B\u65BC\u4E8E\u4E26\u5E76\u4E2D\u4E0A\u4E0B\u9019\u8FD9\u90A3\u4E00\u500B\u4E2A\u4E5F\u90FD\u5C31\u800C\u4F46"]);
+var STOP_WORDS = /* @__PURE__ */ new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "that",
+  "this",
+  "from",
+  "into",
+  "over",
+  "about",
+  "how",
+  "what"
+]);
+function slotKeywords(explains) {
+  var _a2, _b2;
+  const out = /* @__PURE__ */ new Set();
+  for (const word of (_a2 = explains.toLowerCase().match(/[a-z0-9][a-z0-9'-]{2,}/g)) != null ? _a2 : [])
+    if (!STOP_WORDS.has(word)) out.add(word);
+  for (const run2 of (_b2 = explains.match(/\p{Script=Han}+/gu)) != null ? _b2 : []) {
+    let part = "";
+    const flush = () => {
+      const chars = Array.from(part);
+      for (let i = 0; i + 1 < chars.length; i++) out.add(chars[i] + chars[i + 1]);
+      part = "";
+    };
+    for (const char of run2) {
+      if (STOP_CJK.has(char)) flush();
+      else part += char;
+    }
+    flush();
+  }
+  return [...out];
+}
+var KEYWORD_HITS = 2;
+function checkImageText(body, slots, record) {
+  var _a2;
+  const empty = { planned: 0, placed: 0, imageCount: 0, bad: 0, issues: [] };
+  if (!(slots == null ? void 0 : slots.length)) return { kind: "none", ...empty };
+  if (!record) return { kind: "unrecorded", ...empty, planned: slots.length };
+  const lines = body.split("\n");
+  const guarded = protectedLines(lines);
+  const blocks = [];
+  let current = [];
+  let hashes = [];
+  const close = () => {
+    if (current.length) blocks.push({ text: current.join("\n"), hashes });
+    current = [];
+    hashes = [];
+  };
+  lines.forEach((line2, at) => {
+    if (guarded[at] || isBlank(line2)) {
+      close();
+      return;
+    }
+    current.push(line2);
+    for (const m of line2.matchAll(IMAGE_IN_LINE)) hashes.push(shortHash2(m[1]));
+  });
+  close();
+  const imageCount = blocks.reduce((sum2, block) => sum2 + block.hashes.length, 0);
+  const placedItems = record.slots.filter((item) => item.state === "placed");
+  const issues = [];
+  for (const item of record.slots)
+    if (item.state === "missing") issues.push({ index: item.index, code: (_a2 = item.reasonCode) != null ? _a2 : "not_found" });
+  if (imageCount !== placedItems.length) issues.push({ code: "count" });
+  for (const item of placedItems) {
+    const at = blocks.findIndex((block) => item.hash !== void 0 && block.hashes.includes(item.hash));
+    const slot = slots.find((entry) => entry.index === item.index);
+    if (at < 0 || !slot) continue;
+    const around = [at - 1, at + 1].map((i) => blocks[i]).filter((block) => block && !block.hashes.length).map((block) => block.text.toLowerCase()).join("\n");
+    const words2 = slotKeywords(slot.explains);
+    const hits = words2.filter((word) => around.includes(word)).length;
+    if (words2.length && hits < Math.min(KEYWORD_HITS, words2.length))
+      issues.push({ index: item.index, code: "mismatch" });
+  }
+  return { kind: "checked", planned: slots.length, placed: placedItems.length, imageCount, bad: record.bad, issues };
+}
+function composeImageTextLine(language2, check) {
+  const note = noteLanguageOf(language2);
+  if (check.kind === "none") return translate(note, "detail.book_slots_none");
+  if (check.kind === "unrecorded") return translate(note, "detail.book_slots_unrecorded");
+  const joiner = /^zh/i.test(language2) ? "\uFF1B" : "; ";
+  const parts = check.issues.map(
+    (issue2) => issue2.code === "count" ? translate(note, "detail.book_slots_count_0_1", String(check.imageCount), String(check.placed)) : translate(
+      note,
+      "detail.book_slots_slot_0_1",
+      String(issue2.index),
+      translate(note, `detail.book_slots_reason_${issue2.code}`)
+    )
+  );
+  if (check.bad) parts.push(translate(note, "detail.book_slots_bad_0", String(check.bad)));
+  return parts.length ? translate(note, "detail.book_slots_issues_0", parts.join(joiner)) : translate(note, "detail.book_slots_ok_0", String(check.placed));
+}
+function imageIssueTokens(check) {
+  const tokens2 = check.issues.map((issue2) => issue2.code === "count" ? "image_count" : `image_${issue2.index}`);
+  return check.bad ? [...tokens2, "image_marker"] : tokens2;
+}
+
+// core/book-pipeline/plan-text.ts
+var pick = (words2, language2) => instructionLanguageOf(language2) === "zh" ? words2.zh : words2.en;
+var matches = (words2, value) => value === words2.zh || value === words2.en;
+var ROLE_WORDS = {
+  intro: { zh: "\u5C0E\u8B80", en: "Intro" },
+  body: { zh: "\u672C\u6587", en: "Body" },
+  gallery: { zh: "\u7D20\u6750\u5C0E\u89BD", en: "Gallery" },
+  closing: { zh: "\u6536\u5C3E", en: "Closing" }
+};
+var TYPE_WORDS = {
+  structure: { zh: "\u7D50\u69CB\u578B", en: "structure" },
+  fact: { zh: "\u4E8B\u5BE6\u578B", en: "fact" }
+};
+var SETTING_WORDS = {
+  reader: { zh: "\u8B80\u8005", en: "Reader" },
+  goal: { zh: "\u76EE\u6A19", en: "Goal" },
+  angle: { zh: "\u5207\u5165\u89D2\u5EA6", en: "Angle" },
+  tone: { zh: "\u8A9E\u6C23", en: "Tone" },
+  length: { zh: "\u7BC7\u5E45", en: "Length" },
+  style: { zh: "\u98A8\u683C", en: "Style" }
+};
+var L = {
+  role: { zh: "\u89D2\u8272", en: "Role" },
+  covers: { zh: "\u672C\u7AE0\u6703\u8B1B", en: "This chapter covers" },
+  entry: { zh: "\u63A5\u5165\u9EDE", en: "Entry point" },
+  handoff: { zh: "\u7559\u7D66\u4E0B\u4E00\u5F35\u7684\u554F\u984C", en: "Question left for the next card" },
+  previous: { zh: "\u524D\u4E00\u5F35", en: "Previous card" },
+  next: { zh: "\u5F8C\u4E00\u5F35", en: "Next card" },
+  checklist: { zh: "\u9A57\u6536\u6E05\u55AE", en: "Acceptance checklist" },
+  images: { zh: "\u5716\u5B89\u6392", en: "Image plan" },
+  imageSlot: { zh: "\u5716\u4F4D", en: "Image slot" },
+  position: { zh: "\u4F4D\u7F6E", en: "Position" },
+  none: { zh: "\u7121", en: "none" },
+  plan: { zh: "\u5168\u66F8\u4F01\u5283", en: "Book plan" },
+  thread: { zh: "\u5168\u66F8\u4E3B\u7DDA", en: "Book thread" },
+  decisions: { zh: "\u7DE8\u8F2F\u6C7A\u5B9A", en: "Editorial decisions" },
+  materials: { zh: "\u7D20\u6750\u767B\u8A18\u8868", en: "Material register" }
+};
+var safe = (value, max = 400) => escapeMarkdownText(singleLine(value, max), max);
+var colon = (language2) => instructionLanguageOf(language2) === "zh" ? "\uFF1A" : ": ";
+var SLOT_SEPARATOR = "\uFF5C";
+function composeImageSlots(images, language2) {
+  const c = colon(language2);
+  const head2 = pick(L.images, language2);
+  if (!images.length) return [`${head2}${c}${pick(L.none, language2)}`];
+  return [
+    `${head2}${c.trim()}`,
+    ...images.slice(0, MAX_IMAGE_SLOTS).map(
+      (slot, at) => `- ${pick(L.imageSlot, language2)} ${at + 1}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.kind, 40), 40)}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.explains, 200), 200)}${SLOT_SEPARATOR}${pick(L.position, language2)}${c}${safe(cleanSlotText(slot.anchor, 120), 120)}`
+    )
+  ];
+}
+function composeCardPrompt(plan, language2) {
+  const c = colon(language2);
+  const neighbour2 = (label, n) => n ? `${pick(label, language2)}${c}(${n.position}) ${safe(n.title, 120)} \u2014 ${safe(n.summary, 240)}` : `${pick(label, language2)}${c}${pick(L.none, language2)}`;
+  const lines = [
+    `${pick(L.role, language2)}${c}${pick(ROLE_WORDS[plan.role], language2)}`,
+    `${pick(L.covers, language2)}${c}${safe(plan.covers)}`,
+    `${pick(L.entry, language2)}${c}${safe(plan.entry)}`,
+    `${pick(L.handoff, language2)}${c}${safe(plan.handoff)}`,
+    neighbour2(L.previous, plan.previous),
+    neighbour2(L.next, plan.next),
+    ...plan.images ? composeImageSlots(plan.images, language2) : [],
+    `${pick(L.checklist, language2)}${c.trim()}`,
+    ...plan.checklist.map((item) => `- ${item.id} [${pick(TYPE_WORDS[item.type], language2)}] ${safe(item.text)}`)
+  ];
+  return demoteHeadings(lines.join("\n"));
+}
+var CHECK_LINE = /^[-*]\s+(C\d+)\s+\[([^\]]+)\]\s+(.+?)\s*$/;
+function parseChecklist(prompt) {
+  const items = [];
+  for (const line2 of prompt.split(/\r?\n/)) {
+    const m = CHECK_LINE.exec(line2);
+    if (!m) continue;
+    const type = Object.keys(TYPE_WORDS).find((key4) => matches(TYPE_WORDS[key4], m[2].trim()));
+    if (type) items.push({ id: m[1], type, text: unescapeMarkdownText(m[3]) });
+  }
+  return items;
+}
+var IMAGES_HEAD = /^(\S[^:：]*)[:：]\s*(.*)$/;
+var SLOT_LINE = /^[-*]\s+(?:圖位|Image slot)\s+(\d+)\s*｜(.*)$/;
+function parseImageSlots(prompt) {
+  const lines = prompt.split(/\r?\n/);
+  const at = lines.findIndex((line2) => {
+    const m = IMAGES_HEAD.exec(line2);
+    return !!m && matches(L.images, m[1].trim());
+  });
+  if (at < 0) return void 0;
+  const slots = [];
+  for (const line2 of lines.slice(at + 1)) {
+    const m = SLOT_LINE.exec(line2);
+    if (!m) break;
+    const index = Number(m[1]);
+    const parts = m[2].split(SLOT_SEPARATOR);
+    if (parts.length < 3 || index < 1 || slots.some((slot) => slot.index === index) || slots.length >= MAX_IMAGE_SLOTS)
+      continue;
+    const place = /^[^:：]*[:：]\s*(.*)$/.exec(parts[parts.length - 1]);
+    if (!place) continue;
+    slots.push({
+      index,
+      kind: unescapeMarkdownText(parts[0].trim()),
+      explains: unescapeMarkdownText(parts.slice(1, -1).join(SLOT_SEPARATOR).trim()),
+      anchor: unescapeMarkdownText(place[1].trim())
+    });
+  }
+  return slots;
+}
+function parseCardPrompt(prompt) {
+  const out = {};
+  for (const line2 of prompt.split(/\r?\n/)) {
+    const m = /^([^:：]+)[:：]\s*(.*)$/.exec(line2);
+    if (!m) continue;
+    const label = m[1].trim();
+    for (const key4 of ["role", "covers", "entry", "handoff", "previous", "next"])
+      if (matches(L[key4], label) && out[key4] === void 0) out[key4] = unescapeMarkdownText(m[2].trim());
+  }
+  return out;
+}
+function composeBookPlan(plan, language2) {
+  const c = colon(language2);
+  const decisions = BOOK_SETTING_FIELDS.filter((field) => {
+    var _a2;
+    return (_a2 = plan.decisions[field]) == null ? void 0 : _a2.trim();
+  }).map(
+    (field) => `- ${pick(SETTING_WORDS[field], language2)}${c}${safe(plan.decisions[field])}`
+  );
+  const materials = plan.materials.map((m) => `- ${safe(m.name, 120)}${c}${safe(m.use, 240)}`);
+  return [
+    `## ${pick(L.plan, language2)}`,
+    "",
+    `### ${pick(L.thread, language2)}`,
+    safe(plan.thread, 1200),
+    "",
+    `### ${pick(L.decisions, language2)}`,
+    ...decisions,
+    "",
+    `### ${pick(L.materials, language2)}`,
+    ...materials,
+    ""
+  ].join("\n");
+}
+var isBookPlanTitle = (title) => matches(L.plan, title.trim());
+var PLAN_CALLOUT = /^[ \t]{0,3}>[ \t]?\[!vam-book\][+-]?[ \t]+(.+?)[ \t]*$/i;
+var QUOTE_PREFIX = /^[ \t]{0,3}>[ \t]?/;
+function planLines(markdown) {
+  const lines = markdown.split(/\r?\n/);
+  const callout2 = lines.findIndex((line2) => {
+    const m = PLAN_CALLOUT.exec(line2);
+    return !!m && isBookPlanTitle(m[1]);
+  });
+  if (callout2 >= 0) {
+    const body = [];
+    for (const line2 of lines.slice(callout2 + 1)) {
+      if (!QUOTE_PREFIX.test(line2)) break;
+      body.push(line2.replace(QUOTE_PREFIX, ""));
+    }
+    return body;
+  }
+  const start = lines.findIndex((line2) => {
+    const m = /^##[ \t]+(.+?)\s*$/.exec(line2);
+    return !!m && matches(L.plan, m[1]);
+  });
+  return start < 0 ? void 0 : lines.slice(start + 1);
+}
+function parseBookPlanDecisions(markdown) {
+  const plan = planLines(markdown);
+  if (!plan) return {};
+  const out = {};
+  let inDecisions = false;
+  for (const line2 of plan) {
+    if (/^##(?!#)/.test(line2)) break;
+    const sub = /^###[ \t]+(.+?)\s*$/.exec(line2);
+    if (sub) {
+      inDecisions = matches(L.decisions, sub[1]);
+      continue;
+    }
+    if (!inDecisions) continue;
+    const m = /^[-*]\s+([^:：]+)[:：]\s*(.+?)\s*$/.exec(line2);
+    if (!m) continue;
+    const field = BOOK_SETTING_FIELDS.find((key4) => matches(SETTING_WORDS[key4], m[1].trim()));
+    if (field && out[field] === void 0) out[field] = unescapeMarkdownText(m[2]);
+  }
+  return out;
+}
+function parseBookPlanBody(markdown) {
+  const plan = planLines(markdown);
+  const thread = [];
+  const materials = [];
+  if (!plan) return { thread: "", materials };
+  let part;
+  for (const line2 of plan) {
+    if (/^##(?!#)/.test(line2)) break;
+    const sub = /^###[ \t]+(.+?)\s*$/.exec(line2);
+    if (sub) {
+      part = matches(L.thread, sub[1]) ? "thread" : matches(L.materials, sub[1]) ? "materials" : void 0;
+      continue;
+    }
+    if (part === "thread" && line2.trim()) thread.push(line2.trim());
+    if (part === "materials") {
+      const m = /^[-*]\s+(.+?)[:：]\s*(.+?)\s*$/.exec(line2);
+      if (m) materials.push({ name: unescapeMarkdownText(m[1]), use: unescapeMarkdownText(m[2]) });
+    }
+  }
+  return { thread: unescapeMarkdownText(thread.join(" ")), materials };
+}
+
 // core/book-pipeline/proof.ts
 var PROOF_STATUSES = ["met", "unmet", "unverified"];
 var ProofFailure = class extends Error {
@@ -42432,7 +43097,7 @@ var CALLOUT_HEAD2 = /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?(?:[ \t].*)?$/;
 var RECORD_KEY = /^<!-- book-proof:v1 (\{.*\}) -->$/;
 var HIDDEN_CALLOUT = "vam-book";
 var HIDDEN_HEAD = /^[ \t]{0,3}>[ \t]?\[!vam-book\][+-]?(?:[ \t].*)?$/i;
-var QUOTE_LINE = /^[ \t]{0,3}>/;
+var QUOTE_LINE2 = /^[ \t]{0,3}>/;
 var LOG_LINE = /^(?:[-*+][ \t]+)?\d{4}-\d{2}-\d{2}/;
 var ANY_RECORD = /<!-- book-(?:proof|slots):v1 \{.*\} -->/;
 var bare = (line2) => line2.replace(/\r$/, "");
@@ -42482,7 +43147,7 @@ function recordKey(record) {
 }
 function quoteRunEnd(lines, fenced, from) {
   let end = from;
-  while (end < lines.length && !fenced[end] && QUOTE_LINE.test(lines[end])) end++;
+  while (end < lines.length && !fenced[end] && QUOTE_LINE2.test(lines[end])) end++;
   return end;
 }
 function hiddenRanges(lines, fenced) {
@@ -42613,7 +43278,11 @@ function hideUpdateLog(text10, own2) {
       from
     );
     if (!section3) break;
-    const body = lines.slice(section3.at + 1, section3.end).map(bare).filter((line2) => line2.trim());
+    const ranges = hiddenRanges(lines, fencedLines2(lines)).filter((r) => r.start > section3.at && r.end <= section3.end);
+    const inHidden = (i) => ranges.some((r) => i >= r.start && i < r.end);
+    const isText3 = lines.map((line2, i) => i > section3.at && i < section3.end && !inHidden(i) && line2.trim() !== "");
+    const body = lines.filter((_, i) => isText3[i]).map(bare);
+    const hidden = ranges.flatMap((r, i) => i ? ["", ...lines.slice(r.start, r.end)] : lines.slice(r.start, r.end));
     if (!body.length || !own2 && !body.every((line2) => LOG_LINE.test(line2))) {
       from = section3.at + 1;
       continue;
@@ -42625,31 +43294,59 @@ function hideUpdateLog(text10, own2) {
         continue;
       }
       moved.push(...mine);
-      const rest = lines.slice(section3.at + 1, section3.end).filter((line2) => line2.trim() && !own2(bare(line2).trim()));
-      lines = spliceBlock(lines, section3.at, section3.end, rest.length ? [lines[section3.at], "", ...rest] : []);
+      const rest = lines.filter((line2, i) => isText3[i] && !own2(bare(line2).trim()));
+      lines = spliceBlock(lines, section3.at, section3.end, [
+        ...rest.length ? [lines[section3.at], "", ...rest] : [],
+        ...rest.length && hidden.length ? [""] : [],
+        ...hidden
+      ]);
       from = section3.at + 1;
       continue;
     }
     moved.push(...body);
-    lines = spliceBlock(lines, section3.at, section3.end, []);
+    lines = spliceBlock(lines, section3.at, section3.end, hidden);
     from = section3.at;
   }
   if (!moved.length) return text10;
   return appendHidden(lines.join("\n"), moved.map((line2) => `> ${line2}`).join("\n"));
 }
+var RECORD_COPY = /(?:<|&lt;)!-- book-(?:proof|slots):v1 /;
+function dropRecordCopies(text10) {
+  let lines = text10.split("\n");
+  const fenced = fencedLines2(lines);
+  const older = [];
+  for (let from = 0; ; ) {
+    const section3 = findSection(lines, fenced, (name2) => isResearchNotesHeading(name2), from);
+    if (!section3) break;
+    older.push(section3);
+    from = section3.at + 1;
+  }
+  const drop = calloutBlocks(lines, fenced, 0, lines.length).filter((block) => {
+    var _a2, _b2;
+    if (older.some((section3) => block.start > section3.at && block.start < section3.end)) return false;
+    if (HIDDEN_HEAD.test(bare(lines[block.start]))) return false;
+    const title = (_b2 = (_a2 = /^[ \t]{0,3}>[ \t]?\[![A-Za-z][\w-]*\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[block.start]))) == null ? void 0 : _a2[1]) != null ? _b2 : "";
+    return isResearchNotesHeading(title) && lines.slice(block.start, block.end).some((line2) => RECORD_COPY.test(line2));
+  });
+  for (const block of drop.reverse()) lines = spliceBlock(lines, block.start, block.end, []);
+  return lines.join("\n");
+}
 function normalizeWorkRecords(detail) {
-  return hideUpdateLog(hideResearchSection(detail));
+  return hideUpdateLog(hideResearchSection(dropRecordCopies(detail)));
 }
 function hidePipelineLog(detail, known, backupPath) {
+  var _a2;
   const marker3 = "\0";
   const shapes = NOTE_LANGUAGES.map(
     (locale) => translate(locale, "note.writeback_fresh_replaced_0", marker3).split(marker3)
   ).filter((parts) => parts.length === 2);
   const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const ownLine = backupPath ? shapes.map(
-    ([head2, tail]) => new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escape(head2)}${escape(backupPath)}${escape(tail)}$`)
+  const stamp = /^(.*\/)?(.+) \d{4}-\d{2}-\d{2} \d{6}(?: \(\d+\))?\.md$/.exec(backupPath != null ? backupPath : "");
+  const pathShape = stamp ? `${escape((_a2 = stamp[1]) != null ? _a2 : "")}${escape(stamp[2])} \\d{4}-\\d{2}-\\d{2} \\d{6}(?: \\(\\d+\\))?\\.md` : "";
+  const ownLine = stamp ? shapes.map(
+    ([head2, tail]) => new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escape(head2)}${pathShape}${escape(tail)}$`)
   ) : [];
-  return hideUpdateLog(detail, (line2) => known.has(line2) || ownLine.some((re) => re.test(line2)));
+  return hideUpdateLog(dropRecordCopies(detail), (line2) => known.has(line2) || ownLine.some((re) => re.test(line2)));
 }
 function workLogLines(detail) {
   const lines = detail.split("\n");
@@ -42765,7 +43462,9 @@ function latestStoredProof(detail) {
 function replaceBookPlanSection(content, markdown) {
   var _a2;
   const body = demoteHeadings(markdown.replace(/\r\n?/g, "\n")).trim();
-  const lines = content.split("\n");
+  const entry = `> [!${HIDDEN_CALLOUT}]- ${BOOK_PLAN_HEADING}
+${quoteAll(body)}`.split("\n");
+  let lines = content.split("\n");
   const fenced = fencedLines2(lines);
   if (((_a2 = lines[0]) == null ? void 0 : _a2.trim()) === "---") {
     for (let i = 1; i < lines.length; i++) {
@@ -42773,23 +43472,34 @@ function replaceBookPlanSection(content, markdown) {
       if (lines[i].trim() === "---") break;
     }
   }
+  const titleOf = (line2) => {
+    var _a3, _b2;
+    return (_b2 = (_a3 = /^[ \t]{0,3}>[ \t]?\[![^\]]+\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(line2))) == null ? void 0 : _a3[1]) != null ? _b2 : "";
+  };
+  const isPlan = (range) => isBookPlanTitle(titleOf(lines[range.start]));
+  const callout2 = hiddenRanges(lines, fenced).find(isPlan);
   const section3 = findSection(lines, fenced, (text10, level) => level === 2 && text10 === BOOK_PLAN_HEADING);
-  const entry = `## ${BOOK_PLAN_HEADING}
-
-${body}`;
-  if (!section3) {
+  const edits = [];
+  const apart = callout2 && !(section3 && callout2.start > section3.at && callout2.end <= section3.end);
+  if (section3) {
+    const kept = hiddenRanges(lines, fenced).filter((range) => range.start > section3.at && range.end <= section3.end && !isPlan(range)).map((range) => lines.slice(range.start, range.end));
+    const middle = kept.flatMap((block, i) => i ? ["", ...block] : block);
+    edits.push({
+      at: section3.at,
+      end: section3.end,
+      middle: apart ? middle : [...entry, ...middle.length ? ["", ...middle] : []]
+    });
+  }
+  if (callout2 && apart) edits.push({ at: callout2.start, end: callout2.end, middle: entry });
+  if (!edits.length) {
     const base = content.replace(/\s+$/, "");
     return `${base ? `${base}
 
-` : ""}${entry}
+` : ""}${entry.join("\n")}
 `;
   }
-  const before = lines.slice(0, section3.at).join("\n");
-  const after = lines.slice(section3.end).join("\n");
-  return `${before ? `${before}
-` : ""}${entry}${after ? `
-
-${after}` : "\n"}`;
+  for (const edit of edits.sort((x, y) => y.at - x.at)) lines = spliceBlock(lines, edit.at, edit.end, edit.middle);
+  return lines.join("\n");
 }
 var isUpdateLogHeading = (text10) => [SECTION_NAME.log.zh, SECTION_NAME.log.en].some((name2) => name2.toLowerCase() === text10.trim().toLowerCase());
 var IMAGES_HEADING = { zh: "\u5716\u50CF", en: "Images" };
@@ -42854,7 +43564,7 @@ function detailBlockOf(content) {
   const end = content.indexOf(DETAIL_END2, start + 1);
   return start < 0 || end < 0 ? void 0 : content.slice(start + DETAIL_START2.length, end);
 }
-function protectedLines(lines, withDetail = true) {
+function protectedLines2(lines, withDetail = true) {
   var _a2;
   const flags = fencedLines2(lines);
   if (((_a2 = lines[0]) == null ? void 0 : _a2.trim()) === "---") {
@@ -42873,7 +43583,7 @@ function protectedLines(lines, withDetail = true) {
 }
 function replaceProofSection(content, heading, body) {
   const lines = content.split("\n");
-  const flags = protectedLines(lines);
+  const flags = protectedLines2(lines);
   const names3 = new Set(NOTE_LANGUAGES.map((locale) => translate(locale, "detail.book_proof_heading").trim()));
   const entry = `> [!${HIDDEN_CALLOUT}]- ${heading}
 ${quoteAll(body.trim())}`;
@@ -42926,7 +43636,7 @@ function dropPlaceholderSections(content) {
   const placeholders = PLACEHOLDERS();
   let lines = content.split("\n");
   for (let from = 0; ; ) {
-    const flags = protectedLines(lines, false);
+    const flags = protectedLines2(lines, false);
     const hit = findSection(lines, flags, (_, level) => level >= 3, from);
     if (!hit) break;
     let end = hit.end;
@@ -44455,32 +45165,6 @@ function createStoreBudgetPort(store) {
   };
 }
 
-// core/book-pipeline/image-dedupe.ts
-function imageKey2(url) {
-  var _a2;
-  let parsed;
-  try {
-    parsed = new URL(url.trim());
-  } catch (e) {
-    return url.trim().toLowerCase();
-  }
-  const host = parsed.hostname.toLowerCase();
-  if (/^(upload|thumb)\.wikimedia\.org$/.test(host)) {
-    const parts = parsed.pathname.split("/").filter(Boolean);
-    let name2 = (_a2 = parts[parts.length - 1]) != null ? _a2 : "";
-    const thumbAt = parts.indexOf("thumb");
-    if (thumbAt >= 0 && parts.length >= thumbAt + 5) name2 = parts[parts.length - 2];
-    try {
-      name2 = decodeURIComponent(name2);
-    } catch (e) {
-    }
-    return name2.toLowerCase();
-  }
-  parsed.search = "";
-  parsed.hash = "";
-  return parsed.href;
-}
-
 // core/book-pipeline/log.ts
 var code = (value) => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60) || "-";
 function formatPipelineLog(e) {
@@ -44765,630 +45449,6 @@ var PipelineStore = class {
     return run2;
   }
 };
-
-// core/book-pipeline/image-slots.ts
-var MAX_IMAGE_SLOTS = 8;
-function cleanSlotText(value, max) {
-  const text10 = value.replace(/[〔〕｜]/g, " ").replace(/\s+/g, " ").trim();
-  return Array.from(text10).slice(0, max).join("").trim();
-}
-var STANDALONE_MARKER = /^\s*〔圖位 ([1-9]\d*)：([^〔〕]+?)〕\s*$/;
-var MARKER_OPEN = "\u3014\u5716\u4F4D";
-var OPEN_FENCE = /^[ \t]*(`{3,}|~{3,})(.*)$/;
-var QUOTE_LINE2 = /^ {0,3}>/;
-var INDENTED_CODE = /^(?: {4}|\t)/;
-var BLOCK_START = /^ {0,3}(?:#{1,6}(?:\s|$)|[-*+]\s|\d+[.)]\s|(?:[-*_][ \t]*){3,}$)/;
-function protectedLines2(lines) {
-  const out = [];
-  let fence;
-  let quote3 = false;
-  let code3 = false;
-  for (const line2 of lines) {
-    if (fence) {
-      out.push(true);
-      const close = OPEN_FENCE.exec(line2);
-      if (close && close[1][0] === fence.char && close[1].length >= fence.size && !close[2].trim()) fence = void 0;
-      continue;
-    }
-    const open2 = OPEN_FENCE.exec(line2);
-    if (open2 && !(open2[1][0] === "`" && open2[2].includes("`"))) {
-      fence = { char: open2[1][0], size: open2[1].length };
-      out.push(true);
-      quote3 = false;
-      code3 = false;
-      continue;
-    }
-    const blank2 = !line2.trim();
-    const prevBlank = out.length === 0 || !lines[out.length - 1].trim();
-    if (QUOTE_LINE2.test(line2)) {
-      quote3 = true;
-      code3 = false;
-      out.push(true);
-    } else if (quote3 && !blank2 && !BLOCK_START.test(line2)) {
-      out.push(true);
-    } else if (INDENTED_CODE.test(line2) && !blank2 && (prevBlank || code3)) {
-      quote3 = false;
-      code3 = true;
-      out.push(true);
-    } else {
-      if (!blank2) code3 = false;
-      quote3 = false;
-      out.push(false);
-    }
-  }
-  return out;
-}
-function markerCore(line2) {
-  return line2.trim().replace(/^(?:[-+*]|\d+[.)])\s+/, "").replace(/^[*_~]+/, "").replace(/[*_~]+$/, "").trim();
-}
-function markerLineKind(line2) {
-  const core2 = markerCore(line2);
-  if (STANDALONE_MARKER.test(core2)) return "own";
-  return /^〔圖位[^〔〕]*〕$/.test(core2) ? "bad" : void 0;
-}
-function isShell(rest) {
-  return /^(?:[-+]|\d+[.)])?$/.test(rest.replace(/[\s*_~]+/g, ""));
-}
-function scanSlotMarkers(content, slots) {
-  const lines = content.split(/\r?\n/);
-  const guarded = protectedLines2(lines);
-  const planned = new Set(slots.map((slot) => slot.index));
-  const scan3 = { found: /* @__PURE__ */ new Map(), duplicateLines: [], badLines: [], inlineLines: [], omitted: [] };
-  lines.forEach((line2, at) => {
-    var _a2;
-    if (guarded[at] || !line2.includes(MARKER_OPEN)) return;
-    const kind = markerLineKind(line2);
-    if (kind === "own") {
-      const index = Number((_a2 = STANDALONE_MARKER.exec(markerCore(line2))) == null ? void 0 : _a2[1]);
-      if (!planned.has(index)) scan3.badLines.push(at);
-      else if (scan3.found.has(index)) scan3.duplicateLines.push(at);
-      else scan3.found.set(index, at);
-      return;
-    }
-    if (kind === "bad") {
-      scan3.badLines.push(at);
-      return;
-    }
-    scan3.inlineLines.push(at);
-  });
-  scan3.omitted = slots.map((slot) => slot.index).filter((index) => !scan3.found.has(index));
-  return scan3;
-}
-var INLINE_MARKER = /〔圖位[^〔〕\n]*〕|〔圖位\s*\d+\s*[：:]|〔圖位/g;
-function residualMarkerLines(content) {
-  const lines = content.split(/\r?\n/);
-  const guarded = protectedLines2(lines);
-  const out = [];
-  lines.forEach((line2, at) => {
-    if (!guarded[at] && line2.includes(MARKER_OPEN)) out.push(at);
-  });
-  return out;
-}
-var isHttps = (url) => {
-  try {
-    return new URL(url).protocol === "https:";
-  } catch (e) {
-    return false;
-  }
-};
-function pickForSlot(ctx, candidates) {
-  const secure = candidates.filter((item) => isHttps(item.imageUrl));
-  const picked = new Set([...ctx.alreadyPicked].map(imageKey2));
-  const hit = secure.find((item) => !picked.has(imageKey2(item.imageUrl)));
-  if (hit) return { candidate: hit };
-  if (candidates.length && !secure.length) return { none: true, reasonCode: "unsafe_url" };
-  return { none: true, reasonCode: "not_found" };
-}
-function plainLine2(text10) {
-  return text10 && /^[\s\p{P}\p{S}]+$/u.test(text10) && /^[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]/.test(text10) && !text10.startsWith("\\") ? `\\${text10}` : text10;
-}
-function figureOf(candidate, href, language2) {
-  const plain = (value) => value.replace(/[〔〕]/g, " ");
-  const alt = escapeMarkdownText(plain(candidate.title), 80) || (/^zh/i.test(language2) ? "\u5716" : "image");
-  return { href, alt, caption: plainLine2(escapeMarkdownText(plain(candidate.caption), 160)) || alt };
-}
-function choosePictures(chapter, slots, perSlot, taken, language2) {
-  var _a2;
-  const outcomes = /* @__PURE__ */ new Map();
-  const alreadyPicked = /* @__PURE__ */ new Set();
-  for (const slot of slots) {
-    const all = (_a2 = perSlot.get(slot.index)) != null ? _a2 : [];
-    const usable = all.filter((item) => item.href && item.loaded && !taken(imageKey2(item.href)));
-    const pick8 = pickForSlot(
-      { chapter, slot, allSlots: slots, alreadyPicked },
-      usable.map((item) => ({ ...item.candidate, imageUrl: item.href }))
-    );
-    if ("candidate" in pick8) {
-      alreadyPicked.add(pick8.candidate.imageUrl);
-      outcomes.set(slot.index, { figure: figureOf(pick8.candidate, pick8.candidate.imageUrl, language2) });
-      continue;
-    }
-    let reasonCode = pick8.reasonCode;
-    if (!usable.length) {
-      if (!all.length) reasonCode = "not_found";
-      else if (all.every((item) => !item.href)) reasonCode = "unsafe_url";
-      else if (all.some((item) => item.href && !item.loaded && !item.skipped)) reasonCode = "load_failed";
-      else if (all.some((item) => item.skipped)) reasonCode = "probe_capped";
-      else reasonCode = "not_found";
-    }
-    outcomes.set(slot.index, { reasonCode, ...pick8.reasonText ? { reasonText: pick8.reasonText } : {} });
-  }
-  return outcomes;
-}
-var BAD_INDEX = /〔圖位\s*(\d+)/;
-var isBlank = (line2) => line2 === void 0 || !line2.trim();
-function fillSlotMarkers(content, slots, outcomes) {
-  var _a2;
-  const lines = content.split("\n");
-  const scan3 = scanSlotMarkers(content, slots);
-  const cr = content.includes("\r\n") ? "\r" : "";
-  const figureAt = /* @__PURE__ */ new Map();
-  const missing = [];
-  const placed = [];
-  const planned = new Set(slots.map((slot) => slot.index));
-  const badIndexes = /* @__PURE__ */ new Set();
-  for (const at of scan3.badLines) {
-    const m = BAD_INDEX.exec(lines[at]);
-    if (m && planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
-  }
-  for (const at of scan3.inlineLines)
-    for (const m of lines[at].matchAll(/〔圖位\s*(\d+)/g)) if (planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
-  for (const slot of slots) {
-    const at = scan3.found.get(slot.index);
-    const outcome = outcomes.get(slot.index);
-    if (at === void 0) {
-      missing.push({ index: slot.index, reasonCode: badIndexes.has(slot.index) ? "bad_marker" : "author_omitted" });
-    } else if (outcome && "figure" in outcome) {
-      figureAt.set(at, outcome.figure);
-      placed.push({ index: slot.index, href: outcome.figure.href });
-    } else {
-      missing.push({ index: slot.index, reasonCode: (_a2 = outcome == null ? void 0 : outcome.reasonCode) != null ? _a2 : "not_found" });
-    }
-  }
-  const dropped = new Set(
-    [...scan3.badLines, ...scan3.duplicateLines, ...scan3.found.values()].filter((at) => !figureAt.has(at))
-  );
-  const inline = new Set(scan3.inlineLines);
-  const added = [];
-  const out = [];
-  let removed = false;
-  const push = (line2) => {
-    if (removed && isBlank(line2) && (!out.length || isBlank(out[out.length - 1]))) {
-      removed = false;
-      return;
-    }
-    removed = false;
-    out.push(line2);
-  };
-  lines.forEach((line2, at) => {
-    const figure = figureAt.get(at);
-    if (figure) {
-      if (out.length && !isBlank(out[out.length - 1])) out.push("");
-      const image = `![${figure.alt}](${figure.href})${cr}`;
-      const caption = `${figure.caption}${cr}`;
-      added.push(image, caption);
-      out.push(image, caption);
-      if (!isBlank(lines[at + 1])) out.push(cr ? "\r" : "");
-      return;
-    }
-    if (dropped.has(at)) {
-      removed = true;
-      return;
-    }
-    if (inline.has(at)) {
-      const rest = line2.replace(INLINE_MARKER, "");
-      if (isShell(rest)) {
-        removed = true;
-        return;
-      }
-      push(rest);
-      return;
-    }
-    push(line2);
-  });
-  return { text: out.join("\n"), placed, missing, bad: scan3.badLines.length, added };
-}
-function withoutMarkers(text10) {
-  const lines = text10.split("\n");
-  const guarded = protectedLines2(lines);
-  const out = [];
-  lines.forEach((line2, at) => {
-    if (guarded[at] || !line2.includes(MARKER_OPEN)) {
-      out.push(line2);
-      return;
-    }
-    if (markerLineKind(line2)) return;
-    const rest = line2.replace(INLINE_MARKER, "");
-    if (!isShell(rest)) out.push(rest);
-  });
-  return out.map((line2) => line2.replace(/\s+$/, "")).filter((line2) => line2.trim());
-}
-function verifyFill(original, result, slots) {
-  const seen = [...result.placed, ...result.missing].map((item) => item.index).sort((a, b) => a - b);
-  const want = slots.map((slot) => slot.index).sort((a, b) => a - b);
-  if (seen.length !== want.length || seen.some((index, i) => index !== want[i])) return "count";
-  if (residualMarkerLines(result.text).length) return "residual";
-  const rest = withoutMarkers(result.text);
-  for (const line2 of result.added) {
-    const at = rest.indexOf(line2.replace(/\s+$/, ""));
-    if (at < 0) return "deleted_text";
-    rest.splice(at, 1);
-  }
-  const before = withoutMarkers(original);
-  return before.length === rest.length && before.every((line2, i) => line2 === rest[i]) ? void 0 : "deleted_text";
-}
-var REASONS = [
-  "author_omitted",
-  "bad_marker",
-  "not_found",
-  "load_failed",
-  "unsafe_url",
-  "probe_capped"
-];
-function shortHash2(url) {
-  let hash = 2166136261;
-  for (const char of imageKey2(url)) {
-    hash ^= char.codePointAt(0);
-    hash = Math.imul(hash, 16777619) >>> 0;
-  }
-  return hash.toString(16).padStart(8, "0");
-}
-function composeSlotsRecord(result) {
-  const slots = [
-    ...result.placed.map((item) => ({ index: item.index, state: "placed", hash: shortHash2(item.href) })),
-    ...result.missing.map((item) => ({ index: item.index, state: "missing", reasonCode: item.reasonCode }))
-  ].sort((a, b) => a.index - b.index);
-  return `<!-- book-slots:v1 ${JSON.stringify({ slots, bad: result.bad })} -->`;
-}
-var RECORD_LINE = /^(?:[ \t]{0,3}>[ \t]?)*<!-- book-slots:v1 (\{.*\}) -->$/;
-function latestSlotsRecord(detail) {
-  const lines = detail.split("\n");
-  const fenced = fencedLines2(lines);
-  let found;
-  lines.forEach((line2, at) => {
-    const m = fenced[at] ? null : RECORD_LINE.exec(line2.replace(/\r$/, "").trim());
-    if (!m) return;
-    try {
-      const data = JSON.parse(m[1]);
-      if (!Array.isArray(data.slots)) return;
-      const items = [];
-      for (const raw of data.slots.slice(0, MAX_IMAGE_SLOTS)) {
-        if (!raw || !Number.isInteger(raw.index) || raw.index < 1) continue;
-        const state = raw.state === "placed" ? "placed" : raw.state === "missing" ? "missing" : void 0;
-        if (!state) continue;
-        const reasonCode = REASONS.find((code3) => code3 === raw.reasonCode);
-        items.push({
-          index: raw.index,
-          state,
-          ...reasonCode ? { reasonCode } : {},
-          ...typeof raw.hash === "string" && /^[0-9a-f]{8}$/.test(raw.hash) ? { hash: raw.hash } : {}
-        });
-      }
-      found = { slots: items, bad: Number.isInteger(data.bad) && data.bad > 0 ? data.bad : 0 };
-    } catch (e) {
-    }
-  });
-  return found;
-}
-var IMAGE_IN_LINE = /!\[[^\]\n]*\]\((https:\/\/[^)\s]+)\)/g;
-var IMAGE_ONLY_LINE = /^[ \t]*!\[[^\]\n]*\]\(https:\/\/[^)\s]+\)[ \t]*\r?$/;
-function stripImageLines(text10) {
-  const lines = text10.split("\n");
-  const guarded = protectedLines2(lines);
-  const out = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (!guarded[i] && IMAGE_ONLY_LINE.test(lines[i])) {
-      if (i + 1 < lines.length && !isBlank(lines[i + 1]) && !guarded[i + 1] && !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[i + 1]) && (isBlank(lines[i + 2]) || /^\s*#/.test(lines[i + 2])))
-        i++;
-      continue;
-    }
-    out.push(lines[i]);
-  }
-  return out.join("\n").replace(/\n{3,}/g, "\n\n");
-}
-function describeSlots(slots, record, imageUrls) {
-  const now = new Set(imageUrls.map(shortHash2));
-  return slots.map((slot) => {
-    const item = record == null ? void 0 : record.slots.find((entry) => entry.index === slot.index);
-    if (!item) return { index: slot.index, state: "unrecorded" };
-    if (item.state === "missing")
-      return {
-        index: slot.index,
-        state: "missing",
-        ...item.reasonCode ? { reasonCode: item.reasonCode } : {}
-      };
-    return { index: slot.index, state: item.hash && now.has(item.hash) ? "placed" : "edited" };
-  });
-}
-var STOP_CJK = /* @__PURE__ */ new Set([..."\u7684\u4E86\u662F\u5728\u548C\u8207\u4E0E\u53CA\u6216\u5C0D\u5BF9\u628A\u88AB\u70BA\u4E3A\u4EE5\u4E4B\u65BC\u4E8E\u4E26\u5E76\u4E2D\u4E0A\u4E0B\u9019\u8FD9\u90A3\u4E00\u500B\u4E2A\u4E5F\u90FD\u5C31\u800C\u4F46"]);
-var STOP_WORDS = /* @__PURE__ */ new Set([
-  "the",
-  "and",
-  "for",
-  "with",
-  "that",
-  "this",
-  "from",
-  "into",
-  "over",
-  "about",
-  "how",
-  "what"
-]);
-function slotKeywords(explains) {
-  var _a2, _b2;
-  const out = /* @__PURE__ */ new Set();
-  for (const word of (_a2 = explains.toLowerCase().match(/[a-z0-9][a-z0-9'-]{2,}/g)) != null ? _a2 : [])
-    if (!STOP_WORDS.has(word)) out.add(word);
-  for (const run2 of (_b2 = explains.match(/\p{Script=Han}+/gu)) != null ? _b2 : []) {
-    let part = "";
-    const flush = () => {
-      const chars = Array.from(part);
-      for (let i = 0; i + 1 < chars.length; i++) out.add(chars[i] + chars[i + 1]);
-      part = "";
-    };
-    for (const char of run2) {
-      if (STOP_CJK.has(char)) flush();
-      else part += char;
-    }
-    flush();
-  }
-  return [...out];
-}
-var KEYWORD_HITS = 2;
-function checkImageText(body, slots, record) {
-  var _a2;
-  const empty = { planned: 0, placed: 0, imageCount: 0, bad: 0, issues: [] };
-  if (!(slots == null ? void 0 : slots.length)) return { kind: "none", ...empty };
-  if (!record) return { kind: "unrecorded", ...empty, planned: slots.length };
-  const lines = body.split("\n");
-  const guarded = protectedLines2(lines);
-  const blocks = [];
-  let current = [];
-  let hashes = [];
-  const close = () => {
-    if (current.length) blocks.push({ text: current.join("\n"), hashes });
-    current = [];
-    hashes = [];
-  };
-  lines.forEach((line2, at) => {
-    if (guarded[at] || isBlank(line2)) {
-      close();
-      return;
-    }
-    current.push(line2);
-    for (const m of line2.matchAll(IMAGE_IN_LINE)) hashes.push(shortHash2(m[1]));
-  });
-  close();
-  const imageCount = blocks.reduce((sum2, block) => sum2 + block.hashes.length, 0);
-  const placedItems = record.slots.filter((item) => item.state === "placed");
-  const issues = [];
-  for (const item of record.slots)
-    if (item.state === "missing") issues.push({ index: item.index, code: (_a2 = item.reasonCode) != null ? _a2 : "not_found" });
-  if (imageCount !== placedItems.length) issues.push({ code: "count" });
-  for (const item of placedItems) {
-    const at = blocks.findIndex((block) => item.hash !== void 0 && block.hashes.includes(item.hash));
-    const slot = slots.find((entry) => entry.index === item.index);
-    if (at < 0 || !slot) continue;
-    const around = [at - 1, at + 1].map((i) => blocks[i]).filter((block) => block && !block.hashes.length).map((block) => block.text.toLowerCase()).join("\n");
-    const words2 = slotKeywords(slot.explains);
-    const hits = words2.filter((word) => around.includes(word)).length;
-    if (words2.length && hits < Math.min(KEYWORD_HITS, words2.length))
-      issues.push({ index: item.index, code: "mismatch" });
-  }
-  return { kind: "checked", planned: slots.length, placed: placedItems.length, imageCount, bad: record.bad, issues };
-}
-function composeImageTextLine(language2, check) {
-  const note = noteLanguageOf(language2);
-  if (check.kind === "none") return translate(note, "detail.book_slots_none");
-  if (check.kind === "unrecorded") return translate(note, "detail.book_slots_unrecorded");
-  const joiner = /^zh/i.test(language2) ? "\uFF1B" : "; ";
-  const parts = check.issues.map(
-    (issue2) => issue2.code === "count" ? translate(note, "detail.book_slots_count_0_1", String(check.imageCount), String(check.placed)) : translate(
-      note,
-      "detail.book_slots_slot_0_1",
-      String(issue2.index),
-      translate(note, `detail.book_slots_reason_${issue2.code}`)
-    )
-  );
-  if (check.bad) parts.push(translate(note, "detail.book_slots_bad_0", String(check.bad)));
-  return parts.length ? translate(note, "detail.book_slots_issues_0", parts.join(joiner)) : translate(note, "detail.book_slots_ok_0", String(check.placed));
-}
-function imageIssueTokens(check) {
-  const tokens2 = check.issues.map((issue2) => issue2.code === "count" ? "image_count" : `image_${issue2.index}`);
-  return check.bad ? [...tokens2, "image_marker"] : tokens2;
-}
-
-// core/book-pipeline/plan-text.ts
-var pick = (words2, language2) => instructionLanguageOf(language2) === "zh" ? words2.zh : words2.en;
-var matches = (words2, value) => value === words2.zh || value === words2.en;
-var ROLE_WORDS = {
-  intro: { zh: "\u5C0E\u8B80", en: "Intro" },
-  body: { zh: "\u672C\u6587", en: "Body" },
-  gallery: { zh: "\u7D20\u6750\u5C0E\u89BD", en: "Gallery" },
-  closing: { zh: "\u6536\u5C3E", en: "Closing" }
-};
-var TYPE_WORDS = {
-  structure: { zh: "\u7D50\u69CB\u578B", en: "structure" },
-  fact: { zh: "\u4E8B\u5BE6\u578B", en: "fact" }
-};
-var SETTING_WORDS = {
-  reader: { zh: "\u8B80\u8005", en: "Reader" },
-  goal: { zh: "\u76EE\u6A19", en: "Goal" },
-  angle: { zh: "\u5207\u5165\u89D2\u5EA6", en: "Angle" },
-  tone: { zh: "\u8A9E\u6C23", en: "Tone" },
-  length: { zh: "\u7BC7\u5E45", en: "Length" },
-  style: { zh: "\u98A8\u683C", en: "Style" }
-};
-var L = {
-  role: { zh: "\u89D2\u8272", en: "Role" },
-  covers: { zh: "\u672C\u7AE0\u6703\u8B1B", en: "This chapter covers" },
-  entry: { zh: "\u63A5\u5165\u9EDE", en: "Entry point" },
-  handoff: { zh: "\u7559\u7D66\u4E0B\u4E00\u5F35\u7684\u554F\u984C", en: "Question left for the next card" },
-  previous: { zh: "\u524D\u4E00\u5F35", en: "Previous card" },
-  next: { zh: "\u5F8C\u4E00\u5F35", en: "Next card" },
-  checklist: { zh: "\u9A57\u6536\u6E05\u55AE", en: "Acceptance checklist" },
-  images: { zh: "\u5716\u5B89\u6392", en: "Image plan" },
-  imageSlot: { zh: "\u5716\u4F4D", en: "Image slot" },
-  position: { zh: "\u4F4D\u7F6E", en: "Position" },
-  none: { zh: "\u7121", en: "none" },
-  plan: { zh: "\u5168\u66F8\u4F01\u5283", en: "Book plan" },
-  thread: { zh: "\u5168\u66F8\u4E3B\u7DDA", en: "Book thread" },
-  decisions: { zh: "\u7DE8\u8F2F\u6C7A\u5B9A", en: "Editorial decisions" },
-  materials: { zh: "\u7D20\u6750\u767B\u8A18\u8868", en: "Material register" }
-};
-var safe = (value, max = 400) => escapeMarkdownText(singleLine(value, max), max);
-var colon = (language2) => instructionLanguageOf(language2) === "zh" ? "\uFF1A" : ": ";
-var SLOT_SEPARATOR = "\uFF5C";
-function composeImageSlots(images, language2) {
-  const c = colon(language2);
-  const head2 = pick(L.images, language2);
-  if (!images.length) return [`${head2}${c}${pick(L.none, language2)}`];
-  return [
-    `${head2}${c.trim()}`,
-    ...images.slice(0, MAX_IMAGE_SLOTS).map(
-      (slot, at) => `- ${pick(L.imageSlot, language2)} ${at + 1}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.kind, 40), 40)}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.explains, 200), 200)}${SLOT_SEPARATOR}${pick(L.position, language2)}${c}${safe(cleanSlotText(slot.anchor, 120), 120)}`
-    )
-  ];
-}
-function composeCardPrompt(plan, language2) {
-  const c = colon(language2);
-  const neighbour2 = (label, n) => n ? `${pick(label, language2)}${c}(${n.position}) ${safe(n.title, 120)} \u2014 ${safe(n.summary, 240)}` : `${pick(label, language2)}${c}${pick(L.none, language2)}`;
-  const lines = [
-    `${pick(L.role, language2)}${c}${pick(ROLE_WORDS[plan.role], language2)}`,
-    `${pick(L.covers, language2)}${c}${safe(plan.covers)}`,
-    `${pick(L.entry, language2)}${c}${safe(plan.entry)}`,
-    `${pick(L.handoff, language2)}${c}${safe(plan.handoff)}`,
-    neighbour2(L.previous, plan.previous),
-    neighbour2(L.next, plan.next),
-    ...plan.images ? composeImageSlots(plan.images, language2) : [],
-    `${pick(L.checklist, language2)}${c.trim()}`,
-    ...plan.checklist.map((item) => `- ${item.id} [${pick(TYPE_WORDS[item.type], language2)}] ${safe(item.text)}`)
-  ];
-  return demoteHeadings(lines.join("\n"));
-}
-var CHECK_LINE = /^[-*]\s+(C\d+)\s+\[([^\]]+)\]\s+(.+?)\s*$/;
-function parseChecklist(prompt) {
-  const items = [];
-  for (const line2 of prompt.split(/\r?\n/)) {
-    const m = CHECK_LINE.exec(line2);
-    if (!m) continue;
-    const type = Object.keys(TYPE_WORDS).find((key4) => matches(TYPE_WORDS[key4], m[2].trim()));
-    if (type) items.push({ id: m[1], type, text: unescapeMarkdownText(m[3]) });
-  }
-  return items;
-}
-var IMAGES_HEAD = /^(\S[^:：]*)[:：]\s*(.*)$/;
-var SLOT_LINE = /^[-*]\s+(?:圖位|Image slot)\s+(\d+)\s*｜(.*)$/;
-function parseImageSlots(prompt) {
-  const lines = prompt.split(/\r?\n/);
-  const at = lines.findIndex((line2) => {
-    const m = IMAGES_HEAD.exec(line2);
-    return !!m && matches(L.images, m[1].trim());
-  });
-  if (at < 0) return void 0;
-  const slots = [];
-  for (const line2 of lines.slice(at + 1)) {
-    const m = SLOT_LINE.exec(line2);
-    if (!m) break;
-    const index = Number(m[1]);
-    const parts = m[2].split(SLOT_SEPARATOR);
-    if (parts.length < 3 || index < 1 || slots.some((slot) => slot.index === index) || slots.length >= MAX_IMAGE_SLOTS)
-      continue;
-    const place = /^[^:：]*[:：]\s*(.*)$/.exec(parts[parts.length - 1]);
-    if (!place) continue;
-    slots.push({
-      index,
-      kind: unescapeMarkdownText(parts[0].trim()),
-      explains: unescapeMarkdownText(parts.slice(1, -1).join(SLOT_SEPARATOR).trim()),
-      anchor: unescapeMarkdownText(place[1].trim())
-    });
-  }
-  return slots;
-}
-function parseCardPrompt(prompt) {
-  const out = {};
-  for (const line2 of prompt.split(/\r?\n/)) {
-    const m = /^([^:：]+)[:：]\s*(.*)$/.exec(line2);
-    if (!m) continue;
-    const label = m[1].trim();
-    for (const key4 of ["role", "covers", "entry", "handoff", "previous", "next"])
-      if (matches(L[key4], label) && out[key4] === void 0) out[key4] = unescapeMarkdownText(m[2].trim());
-  }
-  return out;
-}
-function composeBookPlan(plan, language2) {
-  const c = colon(language2);
-  const decisions = BOOK_SETTING_FIELDS.filter((field) => {
-    var _a2;
-    return (_a2 = plan.decisions[field]) == null ? void 0 : _a2.trim();
-  }).map(
-    (field) => `- ${pick(SETTING_WORDS[field], language2)}${c}${safe(plan.decisions[field])}`
-  );
-  const materials = plan.materials.map((m) => `- ${safe(m.name, 120)}${c}${safe(m.use, 240)}`);
-  return [
-    `## ${pick(L.plan, language2)}`,
-    "",
-    `### ${pick(L.thread, language2)}`,
-    safe(plan.thread, 1200),
-    "",
-    `### ${pick(L.decisions, language2)}`,
-    ...decisions,
-    "",
-    `### ${pick(L.materials, language2)}`,
-    ...materials,
-    ""
-  ].join("\n");
-}
-function parseBookPlanDecisions(markdown) {
-  const lines = markdown.split(/\r?\n/);
-  const start = lines.findIndex((line2) => {
-    const m = /^##[ \t]+(.+?)\s*$/.exec(line2);
-    return !!m && matches(L.plan, m[1]);
-  });
-  if (start < 0) return {};
-  const out = {};
-  let inDecisions = false;
-  for (const line2 of lines.slice(start + 1)) {
-    if (/^##(?!#)/.test(line2)) break;
-    const sub = /^###[ \t]+(.+?)\s*$/.exec(line2);
-    if (sub) {
-      inDecisions = matches(L.decisions, sub[1]);
-      continue;
-    }
-    if (!inDecisions) continue;
-    const m = /^[-*]\s+([^:：]+)[:：]\s*(.+?)\s*$/.exec(line2);
-    if (!m) continue;
-    const field = BOOK_SETTING_FIELDS.find((key4) => matches(SETTING_WORDS[key4], m[1].trim()));
-    if (field && out[field] === void 0) out[field] = unescapeMarkdownText(m[2]);
-  }
-  return out;
-}
-function parseBookPlanBody(markdown) {
-  const lines = markdown.split(/\r?\n/);
-  const start = lines.findIndex((line2) => {
-    const m = /^##[ \t]+(.+?)\s*$/.exec(line2);
-    return !!m && matches(L.plan, m[1]);
-  });
-  const thread = [];
-  const materials = [];
-  if (start < 0) return { thread: "", materials };
-  let part;
-  for (const line2 of lines.slice(start + 1)) {
-    if (/^##(?!#)/.test(line2)) break;
-    const sub = /^###[ \t]+(.+?)\s*$/.exec(line2);
-    if (sub) {
-      part = matches(L.thread, sub[1]) ? "thread" : matches(L.materials, sub[1]) ? "materials" : void 0;
-      continue;
-    }
-    if (part === "thread" && line2.trim()) thread.push(line2.trim());
-    if (part === "materials") {
-      const m = /^[-*]\s+(.+?)[:：]\s*(.+?)\s*$/.exec(line2);
-      if (m) materials.push({ name: unescapeMarkdownText(m[1]), use: unescapeMarkdownText(m[2]) });
-    }
-  }
-  return { thread: unescapeMarkdownText(thread.join(" ")), materials };
-}
 
 // core/steps/argument-map/language.en.md
 var language_en_default3 = "Write in {{language}}.\n";

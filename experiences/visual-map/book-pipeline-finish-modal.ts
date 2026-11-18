@@ -3,26 +3,22 @@ import { t } from "../../i18n";
 import { modalActions } from "../../ui/modals/action-bar";
 
 /**
- * The one question before "review finished" when something is left (block 5): how many cards still need a person and how many seams are
- * unconfirmed. "Go back" is the default (keyboard focus starts there); "Finish anyway" is allowed, never forced.
+ * The one question before "review finished" when chapters still need attention: how many, and which. "Go back" is the default
+ * (keyboard focus starts there); "Finish anyway" is allowed, never forced.
  */
 export interface BookFinishAsk {
-  review: number;
+  count: number;
   /** Card labels ("2 Title"); text from notes, drawn with textContent only. */
-  reviewTitles: string[];
-  seams: number;
+  titles: string[];
 }
 
 export function finishAskLine(info: BookFinishAsk): string {
-  const parts: string[] = [];
-  if (info.review)
-    parts.push(
-      info.reviewTitles.length
-        ? t("ui.book_finish_ask_review_title_0_1", info.review, info.reviewTitles.join(" · "))
-        : t("ui.book_finish_ask_review_0", info.review)
-    );
-  if (info.seams) parts.push(t("ui.book_finish_ask_seams_0", info.seams));
-  return t("ui.book_finish_ask_line_0", parts.join(t("ui.book_finish_ask_sep")));
+  return t(
+    "ui.book_finish_ask_line_0",
+    info.titles.length
+      ? t("ui.book_finish_ask_review_title_0_1", info.count, info.titles.join(" · "))
+      : t("ui.book_finish_ask_review_0", info.count)
+  );
 }
 
 export class BookFinishModal extends Modal {
@@ -37,7 +33,7 @@ export class BookFinishModal extends Modal {
   }
   onOpen(): void {
     const { contentEl } = this;
-    this.titleEl.setText(t("ui.book_finish_ask_title_0", this.info.review + this.info.seams));
+    this.titleEl.setText(t("ui.book_finish_ask_title_0", this.info.count));
     contentEl.createEl("p", { cls: "vam-book-finish-line", text: finishAskLine(this.info) });
     const actions = modalActions(this);
     const back = actions.createEl("button", { cls: "vam-book-finish-back", text: t("ui.book_finish_ask_back") });

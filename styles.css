@@ -2238,9 +2238,6 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-seg.is-needs-review, .vam-book-legend-item.is-needs-review::before { background: var(--color-orange); }
 .vam-book-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .vam-book-legend-item::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; }
-.vam-book-steps { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: var(--font-ui-small); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.vam-book-step.is-done { color: color-mix(in srgb, var(--color-green) 70%, var(--text-normal)); }
-.vam-book-step.is-current { color: var(--text-normal); font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
 .vam-book-now { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: var(--font-ui-small); min-width: 0; overflow-wrap: anywhere; }
 .vam-book-start-estimate { font-weight: 600; margin-block: 8px 2px; }
 .vam-book-start-stops { margin-block: 0 8px; color: var(--text-muted); }
@@ -2308,6 +2305,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-state.is-seam { font-weight: 600; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
 .vam-book-state.is-seam::before { background: var(--color-orange); }
 .vam-book-panel-summary { margin: 0; font-size: var(--font-ui-small); color: var(--text-muted); overflow-wrap: anywhere; }
+.vam-book-panel-summary.vam-book-panel-g2-line { font-size: var(--font-ui-large); font-weight: 600; color: var(--text-normal); }
+.vam-book-panel-summary.vam-book-panel-g2-line[data-state="attention"] { color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
+.vam-book-panel-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .vam-book-rerun-hint { margin-top: 4px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .vam-node-header > .vam-node-rerun { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .vam-node-header > .vam-node-rerun .svg-icon { width: 12px; height: 12px; }
@@ -2316,21 +2316,10 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-viewport.is-zoomed-out .vam-node-header > .vam-node-rerun { position: absolute; right: 4px; bottom: 4px; font-size: 0; gap: 0; padding: 2px 6px; transform: scale(calc(0.6 / var(--vam-zoom, 1))); transform-origin: right bottom; z-index: 2; }
 .vam-book-state.is-rerun { font-weight: 600; color: color-mix(in srgb, var(--color-blue) 70%, var(--text-normal)); }
 .vam-book-state.is-rerun::before { background: var(--color-blue); }
-.vam-book-panel-unchanged { font-size: var(--font-ui-smaller); color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); overflow-wrap: anywhere; }
-.vam-book-panel-unchanged-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.vam-book-panel-images { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
-.vam-book-panel-images-title { margin: 0; font-size: var(--font-ui-small); }
-.vam-book-panel-images-list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.vam-book-panel-image-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
 .vam-book-finish-line { margin: 6px 0; color: var(--text-muted); overflow-wrap: anywhere; }
 .vam-book-menu-note { color: var(--text-muted); font-size: var(--font-ui-smaller); pointer-events: none; }
 .vam-book-panel-row { min-width: 0; overflow-wrap: anywhere; }
 .vam-book-panel-row button:focus-visible, .vam-book-panel-row:focus-visible, .vam-book-panel-finish:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
-.vam-book-panel-proof { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; padding: 6px 8px; border-left: 2px solid var(--background-modifier-border); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; white-space: pre-wrap; }
-.vam-book-panel-proof[hidden] { display: none; }
-.vam-book-panel-proof-items { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.vam-book-panel-proof-item { overflow-wrap: anywhere; }
-.vam-book-panel-proof-item.is-unmet { color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
 @media (max-width: 700px) { .vam-book-panel-row .vam-book-panel-card-head { align-items: flex-start; } .vam-book-panel-row button { max-width: 100%; white-space: normal; } }
 @media (prefers-reduced-motion: reduce) { .vam-book-side { transition: none; } }
 /* The picture-book pipeline's work records (Prompt, proofread result, research notes) are written as [!vam-book] callouts: hidden in reading and live preview, still there in source mode. */

@@ -1,4 +1,4 @@
-import { t, type TranslationKey } from "../../i18n";
+import { t } from "../../i18n";
 import type { PipelineStage } from "../../core/book-pipeline/model";
 import { describeSlots, latestSlotsRecord } from "../../core/book-pipeline/image-slots";
 import { chapterBody, latestStoredProof, type StoredProofView } from "../../core/book-pipeline/note-sections";
@@ -6,7 +6,6 @@ import { parseImageSlots } from "../../core/book-pipeline/plan-text";
 import { unescapeMarkdownText } from "../../core/book-pipeline/text";
 import { bookCardView, bookIssueText, bookRefusalText } from "./book-pipeline-ui";
 import { bodyImageUrls } from "./book-pipeline-run";
-import { unverifiedSourceUrls } from "./book-pipeline-rerun";
 import {
   renderPanelTabs,
   runTrackedRerun,
@@ -16,9 +15,10 @@ import {
 } from "./book-pipeline-panel";
 
 /**
- * Gate 2 side panel (04c): what needs a person (cards marked needs-review, seams to check), the proof record of every proofread
- * card, and the "review finished" button. Same rules as gate 1: every string from a note or the model goes on screen with
- * textContent only, and the panel is drawn only for a map that has a usable `bookPipeline`.
+ * Gate 2 side panel: two states. Nothing needs a person: "N chapters are done" and one finish button. Otherwise the same sentence
+ * with the count of chapters that still need attention, only those cards (name, one plain reason, "rerun this card" / "edit myself"),
+ * and the finish button, which asks once. Every string from a note or the model goes on screen with textContent only, and the panel
+ * is drawn only for a map that has a usable `bookPipeline`.
  */
 
 export interface Gate2Card {
@@ -26,113 +26,114 @@ export interface Gate2Card {
   index: number;
   title: string;
   stage: PipelineStage | "pending";
-  /** The reason of a needs-review card, in words. */
-  reasonText?: string;
-  /** A checked card's small note ("n structure items not met"). */
+  role?: string;
+  /** The plain sentence of a needs-review card (never a code). */
+  failureText?: string;
+  /** Checked cards: structure items the proofreader found unmet (picture tokens are not counted). */
+  structureUnmet: number;
+  /** Checked cards: fact items that were not confirmed against a source. */
+  factsOpen: number;
+  /** A gallery chapter whose every picture slot ended without a picture: its content is missing. */
+  galleryBare: boolean;
+  /** A neighbouring card changed and the owner has not confirmed the join. */
   seam: boolean;
-  /** "A ↔ B" when the seam's other card is known, else the card's own title. */
-  seamTitle: string;
-  proof?: StoredProofView;
-  /** Picture state of a written chapter (absent before it is written). */
-  images?: Gate2Images;
-  /** Unverified source addresses of the proof (for "use other sources"); at most five https addresses. */
-  avoidSources: string[];
-}
-/** What the Prompt's image plan, the stored record and the text now say about one chapter's pictures. */
-export interface Gate2Images {
-  planned: number;
-  placed: number;
-  edited: number;
-  unrecorded: number;
-  missing: { index: number; code: string }[];
 }
 export interface Gate2Data {
   total: number;
-  checked: number;
-  needsReview: number;
-  seams: number;
-  /** Slots that ended without a picture, over all chapters. */
-  imageGaps: number;
+  /** Cards for which `attentionReasons` is not empty. */
+  attention: number;
   /** Minutes from the start of the run to the end of writing; absent when the saved times cannot be read. */
   elapsedMinutes?: number;
   cards: Gate2Card[];
 }
 
-/** The index of the card that changed, read from the seam text the runner wrote ("… (card 5, revision 2)" / "（第 5 張，版本 2）"). */
-function changedIndex(seam: string): number | undefined {
-  const found = /第 (\d+) 張|card (\d+)/.exec(seam);
-  const n = found ? Number(found[1] ?? found[2]) : NaN;
-  return Number.isInteger(n) && n >= 1 ? n : undefined;
+/**
+ * The one place that decides whether a chapter is "fine": every reason below keeps the card in the attention list and keeps the
+ * panel from saying "all done". A needs-review or unfinished card, unmet structure items, facts not confirmed, a gallery chapter
+ * with no picture at all, and a join not yet confirmed all count. A slot that found no picture in an ordinary chapter does not: the
+ * chapter simply has fewer pictures (its text still stands).
+ */
+export function attentionReasons(card: Gate2Card): string[] {
+  const out: string[] = [];
+  if (card.stage === "needs-review") out.push(card.failureText || t("ui.book_issue_unknown"));
+  else if (card.stage !== "checked") out.push(t("ui.book_panel_g2_reason_unfinished"));
+  if (card.structureUnmet > 0) out.push(t("ui.book_panel_g2_reason_structure_0", card.structureUnmet));
+  if (card.factsOpen > 0) out.push(t("ui.book_panel_g2_reason_facts_0", card.factsOpen));
+  if (card.galleryBare) out.push(t("ui.book_panel_g2_reason_images"));
+  if (card.seam) out.push(t("ui.book_panel_g2_reason_seam"));
+  return out;
 }
+export const needsAttention = (card: Gate2Card): boolean => attentionReasons(card).length > 0;
 
-/** The reason of a needs-review card in words: the proof's own notes of the items not met, else the count, else the issue code's text. */
+/** Codes the proofreader may have copied into its notes (C1, N2) are not for the reader. */
+const plainNote = (text: string): string =>
+  text
+    .replace(/\b[CN]\d+\b\s*[:：]?/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** The reason of a needs-review card in words: the proof's own notes of the items not met, else the count, else a plain sentence; never a code. */
 function reasonOf(issue: string, proof: StoredProofView | undefined): string {
-  if (!/^proof unmet/.test(issue.trim()) || !proof) return bookIssueText(issue);
-  const open = proof.items.filter(item => item.status !== "met");
-  const notes = [...new Set(open.map(item => unescapeMarkdownText(item.note).trim()).filter(Boolean))].slice(0, 3);
+  if (!/^proof unmet/.test(issue.trim())) return bookIssueText(issue);
+  if (/facts_unverified/.test(issue)) return t("ui.book_reason_all_facts_unverified");
+  const open = (proof?.items ?? []).filter(item => item.status !== "met");
+  const notes = [...new Set(open.map(item => plainNote(unescapeMarkdownText(item.note))).filter(Boolean))].slice(0, 3);
   if (notes.length) return notes.join(t("ui.book_panel_lead_sep"));
-  return open.length ? t("ui.book_panel_reason_unchecked_0", open.length) : bookIssueText(issue);
+  return open.length ? t("ui.book_panel_reason_unchecked_0", open.length) : t("ui.book_panel_reason_unmet_plain");
 }
 
-function imagesOf(note: (GateCardInput & { pipelineSeam?: unknown }) | undefined): Gate2Images | undefined {
-  // An older card has no image plan: it reads as "no pictures planned" and nothing breaks.
+/** Whether the chapter's pictures are a hole in a gallery chapter (uses the stored slot record and the picture addresses now in the text). */
+function galleryBare(
+  role: string | undefined,
+  note: (GateCardInput & { pipelineSeam?: unknown }) | undefined
+): boolean {
+  if (role !== "gallery") return false;
   const slots = parseImageSlots(note?.prompt ?? "") ?? [];
+  if (!slots.length) return false;
   const detail = note?.detail ?? "";
   const states = describeSlots(slots, latestSlotsRecord(detail), bodyImageUrls(chapterBody(detail)));
-  return {
-    planned: slots.length,
-    placed: states.filter(slot => slot.state === "placed").length,
-    edited: states.filter(slot => slot.state === "edited").length,
-    unrecorded: states.filter(slot => slot.state === "unrecorded").length,
-    missing: states
-      .filter(slot => slot.state === "missing")
-      .map(slot => ({ index: slot.index, code: slot.reasonCode ?? "not_found" }))
-  };
+  return (
+    states.some(slot => slot.state === "missing") &&
+    !states.some(slot => slot.state === "placed" || slot.state === "edited")
+  );
 }
 
 export function buildGate2Panel(input: {
   order: readonly string[];
   titleOf: (id: string) => string;
-  noteOf: (id: string) => (GateCardInput & { pipelineSeam?: unknown }) | undefined;
+  noteOf: (id: string) => (GateCardInput & { pipelineSeam?: unknown; bookRole?: unknown }) | undefined;
   startedAt?: string;
   writingEndedAt?: string;
 }): Gate2Data {
   const cards = input.order.map((id, at): Gate2Card => {
     const note = input.noteOf(id);
     const view = bookCardView(note ?? {});
-    const title = input.titleOf(id);
-    const seamText = typeof note?.pipelineSeam === "string" ? note.pipelineSeam : "";
-    const other = changedIndex(seamText);
-    const partner = other !== undefined && Math.abs(other - 1 - at) === 1 ? input.order[other - 1] : undefined;
     const issue = typeof note?.pipelineIssue === "string" ? note.pipelineIssue : "";
-    const proof =
-      view.stage === "checked" || view.stage === "needs-review" ? latestStoredProof(note?.detail ?? "") : undefined;
-    const images = view.stage === "pending" || view.stage === "planned" ? undefined : imagesOf(note);
+    const checked = view.stage === "checked";
+    const proof = checked || view.stage === "needs-review" ? latestStoredProof(note?.detail ?? "") : undefined;
+    const structure = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue.trim());
+    const role = typeof note?.bookRole === "string" ? note.bookRole : undefined;
     return {
       id,
       index: at + 1,
-      title,
+      title: input.titleOf(id),
       stage: view.stage,
-      ...(view.stage === "needs-review" && issue ? { reasonText: reasonOf(issue, proof) } : {}),
-      seam: view.seam,
-      seamTitle: partner
-        ? other! - 1 > at
-          ? `${title} ↔ ${input.titleOf(partner)}`
-          : `${input.titleOf(partner)} ↔ ${title}`
-        : title,
-      ...(proof ? { proof } : {}),
-      ...(images ? { images } : {}),
-      avoidSources: unverifiedSourceUrls(proof)
+      ...(role ? { role } : {}),
+      ...(view.stage === "needs-review" && issue ? { failureText: reasonOf(issue, proof) } : {}),
+      structureUnmet:
+        checked && structure ? structure[1].split(" ").filter(token => !token.startsWith("image_")).length : 0,
+      factsOpen: checked
+        ? (proof?.items ?? []).filter(item => item.type === "fact" && item.status !== "met").length
+        : 0,
+      galleryBare: checked && galleryBare(role, note),
+      seam: view.seam
     };
   });
   const from = Date.parse(input.startedAt ?? "");
   const to = Date.parse(input.writingEndedAt ?? "");
   return {
     total: cards.length,
-    checked: cards.filter(card => card.stage === "checked").length,
-    needsReview: cards.filter(card => card.stage === "needs-review").length,
-    seams: cards.filter(card => card.seam).length,
-    imageGaps: cards.reduce((sum, card) => sum + (card.images?.missing.length ?? 0), 0),
+    attention: cards.filter(needsAttention).length,
     ...(Number.isFinite(from) && Number.isFinite(to) && to >= from
       ? { elapsedMinutes: Math.round((to - from) / 60000) }
       : {}),
@@ -141,17 +142,17 @@ export function buildGate2Panel(input: {
 }
 
 export interface Gate2Actions extends Pick<GatePanelActions, "showChat" | "close" | "refresh"> {
-  /** Opens the card's note in a tab. */
+  /** Opens the card's note in a tab ("edit myself"). */
   open: (nodeId: string) => void;
-  /** `avoidSources` = "use other sources"; the answer says whether the rerun left the same result that still needs a person. */
-  rerun: (nodeId: string, options?: { avoidSources?: string[] }) => Promise<{ unchanged: boolean } | void>;
+  /** The answer says whether the rerun left the same result that still needs a person. */
+  rerun: (nodeId: string) => Promise<{ unchanged: boolean } | void>;
   confirmSeam: (nodeId: string) => Promise<void>;
   finish: () => Promise<void>;
-  /** The one question before finishing with things left over; true = finish anyway. */
-  confirmFinish: (info: { review: number; reviewTitles: string[]; seams: number }) => Promise<boolean>;
+  /** The one question before finishing with chapters left over; true = finish anyway. */
+  confirmFinish: (info: { count: number; titles: string[] }) => Promise<boolean>;
 }
 
-/** Draws the gate 2 panel into `parent`. `done` is true once the owner finished the review (the rows stay; the finish button goes). */
+/** Draws the gate 2 panel into `parent`. `done` is true once the owner finished the review (the finish button goes). */
 export function renderGate2Panel(
   parent: HTMLElement,
   data: Gate2Data,
@@ -183,13 +184,15 @@ export function renderGate2Panel(
     });
     took.setAttr("title", t("ui.book_panel_elapsed_hint"));
   }
-  const lead = [
-    data.checked ? t("ui.book_panel_lead_passed_0", data.checked) : "",
-    data.needsReview ? t("ui.book_panel_lead_review_0", data.needsReview) : "",
-    data.seams ? t("ui.book_panel_lead_seams_0", data.seams) : "",
-    data.imageGaps ? t("ui.book_panel_lead_images_0", data.imageGaps) : ""
-  ].filter(Boolean);
-  if (lead.length) panel.createEl("p", { cls: "vam-book-panel-summary", text: lead.join(t("ui.book_panel_lead_sep")) });
+  const summary = panel.createEl("p", {
+    cls: "vam-book-panel-summary vam-book-panel-g2-line",
+    text: !data.total
+      ? t("ui.book_panel_gate2_nothing")
+      : data.attention
+        ? t("ui.book_panel_g2_some_0_1", data.total, data.attention)
+        : t("ui.book_panel_g2_all_done_0", data.total)
+  });
+  summary.dataset.state = data.attention ? "attention" : "clear";
 
   const anyBusy =
     externalBusy.size > 0 ||
@@ -199,23 +202,15 @@ export function renderGate2Panel(
     state.finishAsking ||
     driveActive;
   const busyNow = (id: string): boolean => externalBusy.has(id) || state.busy.has(id);
-  const attention = data.cards.filter(
-    card => card.stage === "needs-review" || (busyNow(card.id) && card.stage !== "checked")
-  );
-  const seams = data.cards.filter(card => card.seam);
-  const checked = data.cards.filter(card => card.stage === "checked");
-
-  const list = panel.createEl("ul", { cls: "vam-book-panel-cards vam-book-panel-gate2-list" });
-  list.setAttr("aria-label", t("ui.book_panel_gate2_list_label"));
-  if (!attention.length && !seams.length && !checked.length)
-    list.createEl("li", { cls: "vam-book-panel-muted", text: t("ui.book_panel_gate2_nothing") });
-  for (const card of attention) renderAttention(list, card, state, actions, busyNow(card.id), anyBusy, rerun);
-  for (const card of seams) renderSeam(list, card, state, actions, anyBusy);
-  for (const card of checked) renderChecked(list, card, state, actions, busyNow(card.id), anyBusy, rerun);
-  renderImages(panel, data, actions);
+  const attention = data.cards.filter(needsAttention);
+  if (attention.length) {
+    const list = panel.createEl("ul", { cls: "vam-book-panel-cards vam-book-panel-gate2-list" });
+    list.setAttr("aria-label", t("ui.book_panel_gate2_list_label"));
+    for (const card of attention) renderAttention(list, card, state, actions, busyNow(card.id), anyBusy, rerun);
+  }
 
   const foot = panel.createDiv("vam-book-panel-foot");
-  foot.createSpan({ cls: "vam-book-panel-muted", text: t("ui.book_panel_gate2_hint") });
+  if (attention.length && !done) foot.createSpan({ cls: "vam-book-panel-muted", text: t("ui.book_panel_gate2_hint") });
   if (!done) {
     const finish = foot.createEl("button", {
       cls: "mod-cta vam-book-panel-finish",
@@ -226,7 +221,7 @@ export function renderGate2Panel(
     if (state.finishing) finish.setAttr("aria-busy", "true");
     finish.addEventListener("click", event => {
       event.stopPropagation();
-      // A card still working comes first: wait for it (1ea4cfa3), then ask about what is left over.
+      // A card still working comes first: wait for it, then ask about what is left over.
       if (anyBusy) return;
       const go = (): void => {
         state.finishing = true;
@@ -244,16 +239,10 @@ export function renderGate2Panel(
           }
         );
       };
-      if (data.needsReview + data.seams === 0) return go();
+      if (!attention.length) return go();
       state.finishAsking = true;
       actions.refresh();
-      const info = {
-        review: data.needsReview,
-        reviewTitles: data.cards
-          .filter(card => card.stage === "needs-review")
-          .map(card => `${card.index} ${card.title}`),
-        seams: data.seams
-      };
+      const info = { count: attention.length, titles: attention.map(card => `${card.index} ${card.title}`) };
       void actions.confirmFinish(info).then(
         ok => {
           state.finishAsking = false;
@@ -273,16 +262,6 @@ export function renderGate2Panel(
   status.setAttr("role", "status");
   status.setAttr("aria-live", "polite");
   return panel;
-}
-
-function row(list: HTMLElement, kind: string, card: Gate2Card, busy: boolean): HTMLElement {
-  const item = list.createEl("li", { cls: "vam-book-panel-card vam-book-panel-row" });
-  item.dataset.kind = kind;
-  item.dataset.stage = card.stage;
-  item.dataset.row = card.id;
-  item.setAttr("tabindex", "-1");
-  if (busy) item.setAttr("aria-busy", "true");
-  return item;
 }
 
 function button(
@@ -305,20 +284,6 @@ function button(
     if (!el.disabled) onClick();
   });
   return el;
-}
-
-function stateTag(head: HTMLElement, stage: string, text: string): void {
-  head.createSpan({ cls: `vam-book-panel-state vam-book-state is-${stage}`, text });
-}
-
-function noteLine(item: HTMLElement, state: GatePanelState, key: string, busy: boolean): void {
-  const note = state.notes.get(key);
-  const line = item.createDiv({
-    cls: "vam-book-panel-card-status",
-    text: busy ? t("ui.book_panel_busy") : (note?.text ?? "")
-  });
-  line.setAttr("role", note?.error ? "alert" : "status");
-  if (note?.error) line.addClass("is-error");
 }
 
 /** Starts one row's action: its card is marked busy in `set` until the call ends; a refusal is kept as that row's error line. */
@@ -347,22 +312,7 @@ function run(
   );
 }
 
-type RerunNow = { nodeId: string; startedAt: number } | undefined;
-
-/** Starts the card's rerun; a result the same as before that still needs a person is remembered (memory only) to say so. */
-function startRerun(card: Gate2Card, state: GatePanelState, actions: Gate2Actions, avoidSources?: string[]): void {
-  run(card.id, card.id, state, state.busy, actions, async () => {
-    await runTrackedRerun(state, card.id, () => actions.rerun(card.id, avoidSources ? { avoidSources } : undefined));
-  });
-}
-
-/** "Working" while this card is the one being rerun (no clock). */
-function rerunTag(head: HTMLElement, card: Gate2Card, rerun: RerunNow): boolean {
-  if (!rerun || rerun.nodeId !== card.id) return false;
-  head.createSpan({ cls: "vam-book-panel-state vam-book-state is-rerun", text: t("ui.book_rerun_tag") });
-  return true;
-}
-
+/** One chapter that needs a person: its name, one plain sentence, and the ways forward. */
 function renderAttention(
   list: HTMLElement,
   card: Gate2Card,
@@ -370,264 +320,65 @@ function renderAttention(
   actions: Gate2Actions,
   busy: boolean,
   anyBusy: boolean,
-  rerun: RerunNow
+  rerun: { nodeId: string; startedAt: number } | undefined
 ): void {
-  const item = row(list, "attention", card, busy);
+  const item = list.createEl("li", { cls: "vam-book-panel-card vam-book-panel-row" });
+  item.dataset.kind = "attention";
+  item.dataset.row = card.id;
+  item.setAttr("tabindex", "-1");
+  if (busy) item.setAttr("aria-busy", "true");
   const head = item.createDiv("vam-book-panel-card-head");
-  const rerunning = rerunTag(head, card, rerun);
-  const unchanged = !busy && state.unchanged.has(card.id);
-  if (!rerunning)
-    stateTag(head, "needs-review", unchanged ? t("ui.book_panel_still_review") : t("ui.book_stage_needs_review"));
+  if (rerun?.nodeId === card.id)
+    head.createSpan({ cls: "vam-book-panel-state vam-book-state is-rerun", text: t("ui.book_rerun_tag") });
+  else
+    head.createSpan({
+      cls: "vam-book-panel-state vam-book-state is-needs-review",
+      text: state.unchanged.has(card.id) && !busy ? t("ui.book_panel_still_review") : t("ui.book_panel_g2_look")
+    });
   head.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
+  item.createDiv({ cls: "vam-book-panel-field", text: attentionReasons(card).join(t("ui.book_panel_lead_sep")) });
+  const row = item.createDiv("vam-book-panel-actions");
   button(
-    head,
+    row,
+    "vam-book-panel-rerun-card",
+    busy ? t("ui.book_panel_busy") : t("ui.book_panel_rerun_card"),
+    t("ui.book_panel_rerun_card_0", card.title),
+    card,
+    "rerun",
+    anyBusy,
+    () =>
+      run(card.id, card.id, state, state.busy, actions, async () => {
+        await runTrackedRerun(state, card.id, () => actions.rerun(card.id));
+      })
+  );
+  button(
+    row,
     "vam-book-panel-open",
-    t("ui.book_panel_open_card"),
+    t("ui.book_panel_g2_edit_myself"),
     t("ui.book_panel_open_0", card.title),
     card,
     "open",
     false,
     () => actions.open(card.id)
   );
-  button(
-    head,
-    "vam-book-panel-rerun-card",
-    busy ? t("ui.book_panel_busy") : t("ui.book_panel_rerun_card"),
-    t("ui.book_panel_rerun_card_0", card.title),
-    card,
-    "rerun",
-    anyBusy,
-    () => startRerun(card, state, actions)
-  );
-  if (unchanged) {
-    const block = item.createDiv({ cls: "vam-book-panel-unchanged", text: t("ui.book_panel_unchanged") });
-    block.setAttr("role", "status");
-    block.dataset.kind = "unchanged";
-  }
-  if (card.reasonText)
-    item.createDiv({ cls: "vam-book-panel-field", text: t("ui.book_panel_reason_0", card.reasonText) });
-  if (unchanged) {
-    const actionsRow = item.createDiv("vam-book-panel-unchanged-actions");
-    if (card.avoidSources.length)
-      button(
-        actionsRow,
-        "vam-book-panel-swap-source",
-        t("ui.book_panel_swap_source"),
-        t("ui.book_panel_swap_source_0", card.title),
-        card,
-        "swap-source",
-        anyBusy,
-        () => startRerun(card, state, actions, card.avoidSources)
-      );
+  if (card.seam) {
+    const key = `seam:${card.id}`;
     button(
-      actionsRow,
-      "vam-book-panel-look-myself",
-      t("ui.book_panel_look_myself"),
-      t("ui.book_panel_open_0", card.title),
+      row,
+      "vam-book-panel-confirm-seam",
+      t("ui.book_panel_g2_confirm_seam"),
+      t("ui.book_panel_confirm_seam_0", card.title),
       card,
-      "look-myself",
-      false,
-      () => actions.open(card.id)
+      "seam",
+      anyBusy,
+      () => run(key, card.id, state, state.seaming, actions, () => actions.confirmSeam(card.id))
     );
   }
-  noteLine(item, state, card.id, false);
-}
-
-function renderSeam(
-  list: HTMLElement,
-  card: Gate2Card,
-  state: GatePanelState,
-  actions: Gate2Actions,
-  anyBusy: boolean
-): void {
-  const key = `seam:${card.id}`;
-  const busy = state.seaming.has(card.id);
-  const item = row(list, "seam", card, busy);
-  const head = item.createDiv("vam-book-panel-card-head");
-  stateTag(head, "seam", t("ui.book_seam_label"));
-  head.createEl("b", { cls: "vam-book-panel-card-title", text: card.seamTitle });
-  button(
-    head,
-    "vam-book-panel-open",
-    t("ui.book_panel_open_card"),
-    t("ui.book_panel_open_0", card.title),
-    card,
-    "open-seam",
-    false,
-    () => actions.open(card.id)
-  );
-  item.createDiv({ cls: "vam-book-panel-field", text: t("ui.book_seam_reason") });
-  button(
-    item,
-    "vam-book-panel-confirm-seam",
-    t("ui.book_panel_confirm_seam"),
-    t("ui.book_panel_confirm_seam_0", card.seamTitle),
-    card,
-    "seam",
-    anyBusy,
-    () => run(key, card.id, state, state.seaming, actions, () => actions.confirmSeam(card.id))
-  );
-  const note = state.notes.get(key);
-  if (note) {
-    const line = item.createDiv({ cls: "vam-book-panel-card-status is-error", text: note.text });
-    line.setAttr("role", "alert");
-  }
-}
-
-/** "Passed" or "Passed, n to note" (n = proof items that are not met), as the approved panel draws it; not the map chip's "checked". */
-function checkedTagText(card: Gate2Card): string {
-  const notes = (card.proof?.items ?? []).filter(item => item.status !== "met").length;
-  return notes > 0 ? t("ui.book_panel_checked_tag_notes_0", String(notes)) : t("ui.book_panel_checked_tag");
-}
-
-function renderChecked(
-  list: HTMLElement,
-  card: Gate2Card,
-  state: GatePanelState,
-  actions: Gate2Actions,
-  busy: boolean,
-  anyBusy: boolean,
-  rerun: RerunNow
-): void {
-  const item = row(list, "checked", card, busy);
-  const head = item.createDiv("vam-book-panel-card-head");
-  if (!rerunTag(head, card, rerun)) stateTag(head, "checked", checkedTagText(card));
-  head.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
-  const open = state.proofOpen.has(card.id);
-  const toggle = button(
-    head,
-    "vam-book-panel-proof-toggle",
-    open ? t("ui.book_panel_proof_hide") : t("ui.book_panel_proof_show"),
-    t("ui.book_panel_proof_0", card.title),
-    card,
-    "proof",
-    false,
-    () => undefined
-  );
-  toggle.setAttr("aria-expanded", String(open));
-  button(
-    head,
-    "vam-book-panel-rerun-card",
-    busy ? t("ui.book_panel_busy") : t("ui.book_panel_rerun_card"),
-    t("ui.book_panel_rerun_card_0", card.title),
-    card,
-    "rerun",
-    anyBusy,
-    () => startRerun(card, state, actions)
-  );
-  const proof = card.proof;
-  const body = item.createDiv("vam-book-panel-proof");
-  body.hidden = !open;
-  if (proof) body.createDiv({ cls: "vam-book-panel-field", text: proofSummary(proof) });
-  renderProof(body, proof);
-  toggle.addEventListener("click", () => {
-    const now = !state.proofOpen.has(card.id);
-    if (now) state.proofOpen.add(card.id);
-    else state.proofOpen.delete(card.id);
-    body.hidden = !now;
-    toggle.setAttr("aria-expanded", String(now));
-    toggle.setText(now ? t("ui.book_panel_proof_hide") : t("ui.book_panel_proof_show"));
+  const note = state.notes.get(card.id) ?? state.notes.get(`seam:${card.id}`);
+  const line = item.createDiv({
+    cls: "vam-book-panel-card-status",
+    text: busy ? t("ui.book_panel_busy") : (note?.text ?? "")
   });
-  noteLine(item, state, card.id, false);
-}
-
-function proofSummary(proof: StoredProofView): string {
-  const met = proof.items.filter(item => item.status === "met").length;
-  const unverified = proof.items.filter(item => item.status === "unverified").length;
-  const unmet = proof.items.filter(item => item.status === "unmet").length;
-  return t("ui.book_panel_proof_summary_0_1_2", met, unverified, unmet);
-}
-
-const STATUS_KEY = {
-  met: "ui.book_proof_met",
-  unmet: "ui.book_proof_unmet",
-  unverified: "ui.book_proof_unverified"
-} as const;
-
-function renderProof(body: HTMLElement, proof: StoredProofView | undefined): void {
-  if (!proof) {
-    body.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_proof_none") });
-    return;
-  }
-  if (proof.failed) body.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_proof_failed") });
-  if (proof.factsUnverified)
-    body.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_proof_facts_unverified") });
-  if (proof.counts)
-    body.createDiv({
-      cls: "vam-book-panel-field",
-      text: t("ui.book_panel_proof_opened_0_1", proof.counts.openedPages, proof.counts.searches)
-    });
-  const structure = proof.items.filter(item => item.type === "structure" && item.status === "unmet");
-  if (structure.length)
-    body.createDiv({
-      cls: "vam-book-panel-field",
-      text: t("ui.book_panel_structure_unmet_0", structure.length)
-    });
-  const items = body.createEl("ul", { cls: "vam-book-panel-proof-items" });
-  for (const item of proof.items) {
-    const li = items.createEl("li", { cls: `vam-book-panel-proof-item is-${item.status}` });
-    const kind = item.type === "structure" ? t("ui.book_proof_structure") : t("ui.book_proof_fact");
-    li.createSpan({
-      text: `${kind}・${t(STATUS_KEY[item.status])}${item.note ? `：${unescapeMarkdownText(item.note)}` : ""}`
-    });
-    if (item.sources.length)
-      li.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_proof_sources_0", item.sources.join("  ")) });
-  }
-}
-
-const SLOT_REASON_KEY: Record<string, TranslationKey> = {
-  author_omitted: "ui.book_slot_reason_author_omitted",
-  bad_marker: "ui.book_slot_reason_bad_marker",
-  not_found: "ui.book_slot_reason_not_found",
-  load_failed: "ui.book_slot_reason_load_failed",
-  unsafe_url: "ui.book_slot_reason_unsafe_url",
-  probe_capped: "ui.book_slot_reason_probe_capped"
-};
-
-/** One line per written chapter: how many pictures, or why there is no fitting one (the reason words come from the stored codes). */
-function renderImages(panel: HTMLElement, data: Gate2Data, actions: Gate2Actions): void {
-  const cards = data.cards.filter(card => card.images);
-  if (!cards.length) return;
-  const box = panel.createDiv("vam-book-panel-images");
-  box.createEl("h4", { cls: "vam-book-panel-images-title", text: t("ui.book_panel_images_title") });
-  const list = box.createEl("ul", { cls: "vam-book-panel-images-list" });
-  list.setAttr("aria-label", t("ui.book_panel_images_label"));
-  for (const card of cards) {
-    const images = card.images!;
-    const gaps = images.missing.length;
-    const shown = images.placed + images.edited;
-    const allUnrecorded = images.planned > 0 && images.unrecorded === images.planned;
-    const text = !images.planned
-      ? t("ui.book_panel_g2_images_none")
-      : allUnrecorded
-        ? t("ui.book_panel_g2_images_unrecorded")
-        : shown === 0 && gaps > 0
-          ? t("ui.book_panel_g2_images_none_fit")
-          : gaps > 0
-            ? t("ui.book_panel_g2_images_n_gap_0_1", shown, gaps)
-            : t("ui.book_panel_g2_images_n_0", shown);
-    const li = list.createEl("li", { cls: "vam-book-panel-image-row" });
-    li.dataset.row = card.id;
-    li.dataset.kind = "images";
-    const warn = gaps > 0;
-    li.createSpan({ cls: `vam-book-panel-state vam-book-state ${warn ? "is-needs-review" : "is-checked"}`, text });
-    li.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
-    const why = images.missing
-      .map(slot =>
-        t("ui.book_panel_g2_slot_0_1", slot.index, t(SLOT_REASON_KEY[slot.code] ?? SLOT_REASON_KEY.not_found))
-      )
-      .concat(images.edited ? [t("ui.book_panel_g2_images_edited_0", images.edited)] : []);
-    if (why.length) li.createSpan({ cls: "vam-book-panel-muted", text: why.join(t("ui.book_panel_lead_sep")) });
-    if (warn)
-      button(
-        li,
-        "vam-book-panel-add-images",
-        t("ui.book_panel_add_images"),
-        t("ui.book_panel_add_images_0", card.title),
-        card,
-        "add-images",
-        false,
-        () => actions.open(card.id)
-      );
-  }
+  line.setAttr("role", note?.error ? "alert" : "status");
+  if (note?.error) line.addClass("is-error");
 }

@@ -3099,25 +3099,7 @@ var en = {
   "ui.book_start_suggesting": "Thinking up suggestions from this map's subject...",
   "ui.book_start_settings": "Whole-book settings (grey text is a suggestion; leave a field empty to use it)",
   "ui.book_start_go": "Start",
-  "ui.book_progress_step_global": "Whole-book plan",
-  "ui.book_progress_step_plan": "Chapter plans",
-  "ui.book_progress_step_write": "Writing",
   "ui.book_progress_step_images": "Pictures",
-  "ui.book_progress_step_proof": "Proofreading",
-  "ui.book_progress_done_0": "\u2713 {0}",
-  "ui.book_progress_count_0_1_2": "{0} {1}/{2}",
-  "ui.book_progress_sep": ", ",
-  "ui.book_progress_steps_label": "Picture-book stages",
-  "ui.book_progress_now_global": "Now: planning the whole book",
-  "ui.book_progress_now_plan_0_1": 'Now: planning chapter {0} "{1}"',
-  "ui.book_progress_now_write_0_1": 'Now: writing chapter {0} "{1}"',
-  "ui.book_progress_now_images_0_1": 'Now: finding pictures for chapter {0} "{1}"',
-  "ui.book_progress_now_proof_0_1": 'Now: proofreading chapter {0} "{1}"',
-  "ui.book_progress_now_plan_0": "Now: planning chapter {0}",
-  "ui.book_progress_now_write_0": "Now: writing chapter {0}",
-  "ui.book_progress_now_images_0": "Now: finding pictures for chapter {0}",
-  "ui.book_progress_now_proof_0": "Now: proofreading chapter {0}",
-  "ui.book_progress_more_0": ", and {0} more at the same time",
   "ui.book_stage_planning": "Planning",
   "ui.book_stage_images": "Finding pictures",
   "ui.book_stage_proof": "Proofreading",
@@ -3252,73 +3234,48 @@ var en = {
   "ui.book_eta_under_minute": "Under 1 min left",
   "ui.book_panel_gate2_title": "Gate 2: review",
   "ui.book_panel_gate2_done_tag": "Review complete",
+  "ui.book_panel_g2_all_done_0": "All {0} chapters are done",
+  "ui.book_panel_g2_some_0_1": "{0} chapters written, {1} still need attention",
+  "ui.book_panel_g2_look": "Needs a look",
+  "ui.book_panel_g2_reason_unfinished": "This chapter is not finished",
+  "ui.book_panel_g2_reason_structure_0": "{0} writing requirements are not met",
+  "ui.book_panel_g2_reason_facts_0": "{0} facts could not be confirmed against a source",
+  "ui.book_panel_g2_reason_images": "This is a picture chapter but no fitting picture was found",
+  "ui.book_panel_g2_reason_seam": "A neighbouring chapter changed; the join is not confirmed",
+  "ui.book_panel_g2_edit_myself": "Edit myself",
+  "ui.book_panel_g2_confirm_seam": "The join is fine",
+  "ui.book_panel_reason_unmet_plain": "Some items did not pass proofreading",
+  "ui.book_progress_line_global": "Planning the whole book",
+  "ui.book_progress_line_plan_0_1": "Planning chapter {0}/{1}",
+  "ui.book_progress_line_write_0_1": "Writing chapter {0}/{1}",
+  "ui.book_progress_line_sep": ", ",
+  "ui.book_progress_line_done_0_1": "{0}/{1} chapters done",
   "ui.book_panel_gate2_list_label": "Gate 2 card list",
   "ui.book_panel_gate2_nothing": "No cards to review yet.",
-  "ui.book_panel_gate2_hint": "When you have checked the cards you wanted to, press Finish review.",
+  "ui.book_panel_gate2_hint": "If chapters are still unresolved, \u201CReview finished\u201D asks once.",
   "ui.book_panel_finish": "Finish review",
   "ui.book_panel_finishing": "Finishing review\u2026",
   "ui.book_panel_finish_waiting": "Waiting for the card that is still running to finish; then you can finish the review.",
   "ui.book_panel_elapsed_0": "Took {0} min",
   "ui.book_panel_elapsed_under_minute": "Took under 1 min",
   "ui.book_panel_elapsed_hint": "Time from planning start to the last card written",
-  "ui.book_panel_open_card": "Open",
   "ui.book_panel_open_0": "Open the note for {0}",
   "ui.book_panel_rerun_card": "Rerun this card",
   "ui.book_panel_rerun_card_0": "Rerun this book card: {0} (plan \u2192 write \u2192 check)",
-  "ui.book_panel_reason_0": "Reason: {0}",
   "ui.book_panel_confirm_seam": "Seam confirmed",
   "ui.book_panel_confirm_seam_0": "Mark the seam for {0} as checked",
   "ui.book_seam_label": "Check seam",
   "ui.book_seam_reason": "A neighboring card's plan or body changed and has not been checked by hand.",
   "ui.book_card_menu_rerun": "Rerun this picture-book card",
   "ui.book_card_menu_rerun_sub": 'Plan \u2192 write \u2192 proofread, about 2 minutes; other chapters stay, only marked "seam needs a look"',
-  "ui.book_panel_proof_show": "Show proof record",
-  "ui.book_panel_proof_hide": "Hide proof record",
-  "ui.book_panel_proof_0": "Proof record for {0}",
-  "ui.book_panel_proof_summary_0_1_2": "{0} met, {1} unverified, {2} unmet",
-  "ui.book_panel_proof_none": "No proof record.",
-  "ui.book_panel_proof_failed": "The check for this card did not finish.",
-  "ui.book_panel_proof_facts_unverified": "None of the fact items could be verified against a source.",
-  "ui.book_panel_proof_opened_0_1": "Opened {0} pages, searched {1} times",
-  "ui.book_panel_proof_sources_0": "Sources: {0}",
-  "ui.book_panel_structure_unmet_0": "Structure items unmet: {0}",
   "ui.book_rerun_tag": "Working",
   "ui.book_progress_rerun_hint": "Not happy with one chapter? You can rerun just that chapter without redoing the whole book.",
-  "ui.book_panel_lead_passed_0": "{0} passed",
-  "ui.book_panel_checked_tag": "Passed",
-  "ui.book_panel_checked_tag_notes_0": "Passed, {0} to note",
-  "ui.book_panel_lead_review_0": "{0} need your look",
-  "ui.book_panel_lead_seams_0": "{0} seams not confirmed",
-  "ui.book_panel_lead_images_0": "{0} picture gaps",
   "ui.book_panel_lead_sep": ", ",
   "ui.book_panel_reason_unchecked_0": "{0} items could not be checked against a source.",
   "ui.book_panel_still_review": "Still needs a look",
-  "ui.book_panel_unchanged": "This rerun gave the same result; it still needs a person.",
-  "ui.book_panel_swap_source": "Use other sources",
-  "ui.book_panel_swap_source_0": 'Rerun "{0}" with other sources',
-  "ui.book_panel_look_myself": "I'll look myself",
-  "ui.book_panel_images_title": "Pictures",
-  "ui.book_panel_images_label": "Picture status of each chapter",
-  "ui.book_panel_g2_images_none": "No pictures planned",
-  "ui.book_panel_g2_images_unrecorded": "Picture result not recorded",
-  "ui.book_panel_g2_images_n_0": "{0} pictures",
-  "ui.book_panel_g2_images_n_gap_0_1": "{0} pictures, {1} missing",
-  "ui.book_panel_g2_images_none_fit": "No fitting picture",
-  "ui.book_panel_g2_images_edited_0": "{0} edited by hand",
-  "ui.book_panel_g2_slot_0_1": "Picture {0}: {1}",
-  "ui.book_panel_add_images": "Add pictures myself",
-  "ui.book_panel_add_images_0": 'Add pictures to "{0}" myself (opens the note)',
-  "ui.book_slot_reason_author_omitted": "The author left no picture spot",
-  "ui.book_slot_reason_bad_marker": "The picture marker was wrong",
-  "ui.book_slot_reason_not_found": "No fitting picture found",
-  "ui.book_slot_reason_load_failed": "The picture failed to load",
-  "ui.book_slot_reason_unsafe_url": "The picture address is unsafe",
-  "ui.book_slot_reason_probe_capped": "Too many candidates; not all were checked",
   "ui.book_finish_ask_title_0": "{0} things are not handled yet",
   "ui.book_finish_ask_review_0": "{0} cards need a look",
   "ui.book_finish_ask_review_title_0_1": "{0} cards need a look ({1})",
-  "ui.book_finish_ask_seams_0": "{0} seams not confirmed",
-  "ui.book_finish_ask_sep": ", ",
   "ui.book_finish_ask_line_0": "{0}.",
   "ui.book_finish_ask_back": "Go back",
   "ui.book_finish_ask_go": "Finish anyway",
@@ -3326,11 +3283,6 @@ var en = {
   "ui.book_card_menu_why_running": "The book is running; rerun after it ends",
   "ui.book_card_menu_why_this": "This card is being rerun",
   "ui.book_card_menu_why_blocked": "A chat is running; rerun after it ends",
-  "ui.book_proof_fact": "fact",
-  "ui.book_proof_structure": "structure",
-  "ui.book_proof_met": "met",
-  "ui.book_proof_unmet": "unmet",
-  "ui.book_proof_unverified": "unverified",
   "ui.book_panel_not_gate2": "Not at gate 1 or gate 2 right now, so there is nothing to show.",
   "ui.book_panel_hint": "You can also click a card on the map and edit its Prompt section."
 };
@@ -6327,25 +6279,7 @@ var zhCN = {
   "ui.book_start_suggesting": "\u6B63\u5728\u4F9D\u8FD9\u5F20\u601D\u7EF4\u5BFC\u56FE\u7684\u4E3B\u9898\u60F3\u5EFA\u8BAE\u2026\u2026",
   "ui.book_start_settings": "\u5168\u4E66\u8BBE\u5B9A\uFF08\u7070\u5B57\u662F\u5EFA\u8BAE\uFF0C\u4E0D\u586B\u5C31\u7528\u5B83\uFF09",
   "ui.book_start_go": "\u5F00\u59CB",
-  "ui.book_progress_step_global": "\u5168\u4E66\u4F01\u5212",
-  "ui.book_progress_step_plan": "\u9010\u7AE0\u4F01\u5212",
-  "ui.book_progress_step_write": "\u5199\u4F5C",
   "ui.book_progress_step_images": "\u627E\u56FE",
-  "ui.book_progress_step_proof": "\u6821\u5BF9",
-  "ui.book_progress_done_0": "\u2713 {0}",
-  "ui.book_progress_count_0_1_2": "{0} {1}\uFF0F{2}",
-  "ui.book_progress_sep": "\u3001",
-  "ui.book_progress_steps_label": "\u56FE\u6587\u4E66\u7684\u5404\u4E2A\u9636\u6BB5",
-  "ui.book_progress_now_global": "\u76EE\u524D\uFF1A\u6B63\u5728\u89C4\u5212\u5168\u4E66",
-  "ui.book_progress_now_plan_0_1": "\u76EE\u524D\uFF1A\u6B63\u5728\u4F01\u5212\u7B2C {0} \u7AE0\u201C{1}\u201D",
-  "ui.book_progress_now_write_0_1": "\u76EE\u524D\uFF1A\u6B63\u5728\u5199\u7B2C {0} \u7AE0\u201C{1}\u201D",
-  "ui.book_progress_now_images_0_1": "\u76EE\u524D\uFF1A\u6B63\u5728\u627E\u7B2C {0} \u7AE0\u201C{1}\u201D\u7684\u56FE",
-  "ui.book_progress_now_proof_0_1": "\u76EE\u524D\uFF1A\u6B63\u5728\u6821\u5BF9\u7B2C {0} \u7AE0\u201C{1}\u201D",
-  "ui.book_progress_now_plan_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u4F01\u5212\u7B2C {0} \u7AE0",
-  "ui.book_progress_now_write_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u5199\u7B2C {0} \u7AE0",
-  "ui.book_progress_now_images_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u627E\u7B2C {0} \u7AE0\u7684\u56FE",
-  "ui.book_progress_now_proof_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u6821\u5BF9\u7B2C {0} \u7AE0",
-  "ui.book_progress_more_0": "\uFF0C\u53E6\u6709 {0} \u7AE0\u540C\u65F6\u8FDB\u884C",
   "ui.book_stage_planning": "\u4F01\u5212\u4E2D",
   "ui.book_stage_images": "\u627E\u56FE\u4E2D",
   "ui.book_stage_proof": "\u6821\u5BF9\u4E2D",
@@ -6480,73 +6414,48 @@ var zhCN = {
   "ui.book_eta_under_minute": "\u4E0D\u5230 1 \u5206\u949F",
   "ui.book_panel_gate2_title": "\u5173\u5361 2\uFF1A\u9A8C\u6536",
   "ui.book_panel_gate2_done_tag": "\u9A8C\u6536\u5B8C\u6210",
+  "ui.book_panel_g2_all_done_0": "{0} \u7AE0\u90FD\u505A\u597D\u4E86",
+  "ui.book_panel_g2_some_0_1": "{0} \u7AE0\u5DF2\u4EA7\u51FA\uFF0C{1} \u7AE0\u4ECD\u9700\u6CE8\u610F",
+  "ui.book_panel_g2_look": "\u8981\u4F60\u770B",
+  "ui.book_panel_g2_reason_unfinished": "\u8FD9\u7AE0\u8FD8\u6CA1\u5B8C\u6210",
+  "ui.book_panel_g2_reason_structure_0": "\u6709 {0} \u9879\u5199\u4F5C\u8981\u6C42\u8FD8\u6CA1\u8FBE\u6210",
+  "ui.book_panel_g2_reason_facts_0": "\u6709 {0} \u9879\u4E8B\u5B9E\u8FD8\u6CA1\u67E5\u8BC1\u5230\u6765\u6E90",
+  "ui.book_panel_g2_reason_images": "\u8FD9\u7AE0\u662F\u56FE\u96C6\uFF0C\u5374\u6CA1\u6709\u627E\u5230\u5408\u9002\u7684\u56FE",
+  "ui.book_panel_g2_reason_seam": "\u524D\u540E\u7AE0\u6539\u8FC7\uFF0C\u8854\u63A5\u8FD8\u6CA1\u786E\u8BA4",
+  "ui.book_panel_g2_edit_myself": "\u6211\u81EA\u5DF1\u6539",
+  "ui.book_panel_g2_confirm_seam": "\u8854\u63A5\u6CA1\u95EE\u9898",
+  "ui.book_panel_reason_unmet_plain": "\u6709\u51E0\u9879\u5185\u5BB9\u6CA1\u901A\u8FC7\u6821\u5BF9",
+  "ui.book_progress_line_global": "\u6B63\u5728\u89C4\u5212\u5168\u4E66",
+  "ui.book_progress_line_plan_0_1": "\u6B63\u5728\u4F01\u5212\u7B2C {0}\uFF0F{1} \u7AE0",
+  "ui.book_progress_line_write_0_1": "\u6B63\u5728\u5199\u7B2C {0}\uFF0F{1} \u7AE0",
+  "ui.book_progress_line_sep": "\uFF0C",
+  "ui.book_progress_line_done_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
   "ui.book_panel_gate2_list_label": "\u5173\u5361 2 \u5361\u7247\u6E05\u5355",
   "ui.book_panel_gate2_nothing": "\u8FD8\u6CA1\u6709\u53EF\u9A8C\u6536\u7684\u5361\u3002",
-  "ui.book_panel_gate2_hint": "\u786E\u8BA4\u5B8C\u8981\u770B\u7684\u5361\u540E\uFF0C\u6309\u201C\u9A8C\u6536\u5B8C\u6210\u201D\u3002",
+  "ui.book_panel_gate2_hint": "\u8FD8\u6709\u7AE0\u8282\u6CA1\u5904\u7406\u65F6\uFF0C\u6309\u201C\u9A8C\u6536\u5B8C\u6210\u201D\u4F1A\u95EE\u4F60\u4E00\u6B21\u3002",
   "ui.book_panel_finish": "\u9A8C\u6536\u5B8C\u6210",
   "ui.book_panel_finishing": "\u9A8C\u6536\u4E2D\u2026",
   "ui.book_panel_finish_waiting": "\u8FD8\u6709\u5361\u7247\u5728\u5904\u7406\u4E2D\uFF0C\u7B49\u5B83\u7ED3\u675F\u540E\u624D\u80FD\u70B9\u201C\u9A8C\u6536\u5B8C\u6210\u201D\u3002",
   "ui.book_panel_elapsed_0": "\u82B1\u4E86 {0} \u5206\u949F",
   "ui.book_panel_elapsed_under_minute": "\u82B1\u4E86\u4E0D\u5230 1 \u5206\u949F",
   "ui.book_panel_elapsed_hint": "\u4ECE\u5F00\u59CB\u4F01\u5212\u5230\u5199\u5B8C\u7684\u65F6\u95F4",
-  "ui.book_panel_open_card": "\u6253\u5F00",
   "ui.book_panel_open_0": "\u6253\u5F00\u201C{0}\u201D\u7684\u7B14\u8BB0",
   "ui.book_panel_rerun_card": "\u91CD\u8DD1\u8FD9\u5F20",
   "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u56FE\u6587\u4E66\u8FD9\u4E00\u5F20\uFF1A{0}\uFF08\u4F01\u5212 \u2192 \u5199 \u2192 \u6821\uFF09",
-  "ui.book_panel_reason_0": "\u539F\u56E0\uFF1A{0}",
   "ui.book_panel_confirm_seam": "\u5DF2\u786E\u8BA4\u63A5\u7F1D",
   "ui.book_panel_confirm_seam_0": "\u5DF2\u786E\u8BA4\u201C{0}\u201D\u7684\u63A5\u7F1D",
   "ui.book_seam_label": "\u63A5\u7F1D\u9700\u770B",
   "ui.book_seam_reason": "\u90BB\u5361\u4F01\u5212\u6216\u6B63\u6587\u5DF2\u53D8\u66F4\uFF0C\u5C1A\u672A\u4EBA\u5DE5\u6838\u5BF9\u3002",
   "ui.book_card_menu_rerun": "\u91CD\u8DD1\u56FE\u6587\u4E66\u8FD9\u4E00\u5F20",
   "ui.book_card_menu_rerun_sub": "\u4F01\u5212 \u2192 \u5199 \u2192 \u6821\uFF0C\u7EA6 2 \u5206\u949F\uFF1B\u524D\u540E\u7AE0\u4E0D\u52A8\uFF0C\u53EA\u6807\u201C\u63A5\u7F1D\u9700\u770B\u201D",
-  "ui.book_panel_proof_show": "\u770B\u67E5\u8BC1\u8BB0\u5F55",
-  "ui.book_panel_proof_hide": "\u6298\u53E0\u67E5\u8BC1\u8BB0\u5F55",
-  "ui.book_panel_proof_0": "{0} \u7684\u67E5\u8BC1\u8BB0\u5F55",
-  "ui.book_panel_proof_summary_0_1_2": "{0} \u9879\u8FBE\u6210\u3001{1} \u9879\u5F85\u67E5\u3001{2} \u9879\u672A\u8FBE\u6210",
-  "ui.book_panel_proof_none": "\u6CA1\u6709\u67E5\u8BC1\u8BB0\u5F55\u3002",
-  "ui.book_panel_proof_failed": "\u8FD9\u5F20\u6821\u5BF9\u6CA1\u6709\u5B8C\u6210\u3002",
-  "ui.book_panel_proof_facts_unverified": "\u4E8B\u5B9E\u9879\u76EE\u90FD\u8FD8\u6CA1\u67E5\u8BC1\u5230\u6765\u6E90\u3002",
-  "ui.book_panel_proof_opened_0_1": "\u5F00\u9875 {0} \u6B21\u3001\u641C\u7D22 {1} \u6B21",
-  "ui.book_panel_proof_sources_0": "\u6765\u6E90\uFF1A{0}",
-  "ui.book_panel_structure_unmet_0": "\u7ED3\u6784 {0} \u9879\u672A\u8FBE\u6210",
   "ui.book_rerun_tag": "\u5904\u7406\u4E2D",
   "ui.book_progress_rerun_hint": "\u67D0\u4E00\u7AE0\u4E0D\u6EE1\u610F\uFF1F\u53EF\u4EE5\u53EA\u91CD\u8DD1\u90A3\u4E00\u7AE0\uFF0C\u4E0D\u7528\u6574\u672C\u91CD\u6765\u3002",
-  "ui.book_panel_lead_passed_0": "{0} \u5F20\u901A\u8FC7",
-  "ui.book_panel_checked_tag": "\u901A\u8FC7",
-  "ui.book_panel_checked_tag_notes_0": "\u901A\u8FC7\uFF0C{0} \u5904\u53EF\u7559\u610F",
-  "ui.book_panel_lead_review_0": "{0} \u5F20\u8981\u4F60\u770B",
-  "ui.book_panel_lead_seams_0": "{0} \u4E2A\u63A5\u7F1D\u8FD8\u6CA1\u786E\u8BA4",
-  "ui.book_panel_lead_images_0": "\u56FE\u6709 {0} \u5904\u7F3A",
   "ui.book_panel_lead_sep": "\uFF0C",
   "ui.book_panel_reason_unchecked_0": "\u6709 {0} \u9879\u6CA1\u80FD\u6838\u5BF9\u5230\u6765\u6E90\u3002",
   "ui.book_panel_still_review": "\u8FD8\u662F\u8981\u4F60\u770B",
-  "ui.book_panel_unchanged": "\u8FD9\u6B21\u91CD\u8DD1\u7684\u7ED3\u679C\u76F8\u540C\uFF0C\u4ECD\u9700\u4EBA\u770B\u3002",
-  "ui.book_panel_swap_source": "\u6539\u7528\u522B\u7684\u6765\u6E90",
-  "ui.book_panel_swap_source_0": "\u201C{0}\u201D\u6539\u7528\u522B\u7684\u6765\u6E90\u91CD\u8DD1",
-  "ui.book_panel_look_myself": "\u6211\u81EA\u5DF1\u770B",
-  "ui.book_panel_images_title": "\u56FE",
-  "ui.book_panel_images_label": "\u5404\u7AE0\u56FE\u72B6\u6001",
-  "ui.book_panel_g2_images_none": "\u4F01\u5212\u672A\u5B89\u6392\u56FE",
-  "ui.book_panel_g2_images_unrecorded": "\u5C1A\u672A\u8BB0\u5F55\u56FE\u7684\u7ED3\u679C",
-  "ui.book_panel_g2_images_n_0": "{0} \u5F20\u56FE",
-  "ui.book_panel_g2_images_n_gap_0_1": "{0} \u5F20\u56FE\uFF0C{1} \u5904\u7F3A",
-  "ui.book_panel_g2_images_none_fit": "\u6CA1\u6709\u5408\u9002\u7684\u56FE",
-  "ui.book_panel_g2_images_edited_0": "{0} \u5F20\u88AB\u624B\u52A8\u6539\u8FC7",
-  "ui.book_panel_g2_slot_0_1": "\u56FE {0}\uFF1A{1}",
-  "ui.book_panel_add_images": "\u81EA\u5DF1\u52A0\u56FE",
-  "ui.book_panel_add_images_0": "\u66FF\u201C{0}\u201D\u81EA\u5DF1\u52A0\u56FE\uFF08\u6253\u5F00\u7B14\u8BB0\uFF09",
-  "ui.book_slot_reason_author_omitted": "\u4F5C\u8005\u6CA1\u7559\u56FE\u4F4D",
-  "ui.book_slot_reason_bad_marker": "\u56FE\u4F4D\u6807\u8BB0\u6709\u8BEF",
-  "ui.book_slot_reason_not_found": "\u6CA1\u627E\u5230\u5408\u9002\u7684\u56FE",
-  "ui.book_slot_reason_load_failed": "\u56FE\u8F7D\u5165\u5931\u8D25",
-  "ui.book_slot_reason_unsafe_url": "\u56FE\u7F51\u5740\u4E0D\u5B89\u5168",
-  "ui.book_slot_reason_probe_capped": "\u5019\u9009\u592A\u591A\uFF0C\u6CA1\u9010\u4E00\u68C0\u67E5",
   "ui.book_finish_ask_title_0": "\u8FD8\u6709 {0} \u4EF6\u6CA1\u5904\u7406",
   "ui.book_finish_ask_review_0": "{0} \u5F20\u9700\u4EBA\u770B",
   "ui.book_finish_ask_review_title_0_1": "{0} \u5F20\u9700\u4EBA\u770B\uFF08{1}\uFF09",
-  "ui.book_finish_ask_seams_0": "{0} \u4E2A\u63A5\u7F1D\u8FD8\u6CA1\u786E\u8BA4",
-  "ui.book_finish_ask_sep": "\u3001",
   "ui.book_finish_ask_line_0": "{0}\u3002",
   "ui.book_finish_ask_back": "\u56DE\u53BB\u5904\u7406",
   "ui.book_finish_ask_go": "\u4ECD\u8981\u5B8C\u6210",
@@ -6554,11 +6463,6 @@ var zhCN = {
   "ui.book_card_menu_why_running": "\u56FE\u6587\u4E66\u6B63\u5728\u6267\u884C\uFF0C\u7B49\u5B83\u7ED3\u675F\u540E\u518D\u91CD\u8DD1",
   "ui.book_card_menu_why_this": "\u8FD9\u4E00\u5F20\u6B63\u5728\u91CD\u8DD1",
   "ui.book_card_menu_why_blocked": "\u5BF9\u8BDD\u8FDB\u884C\u4E2D\uFF0C\u7B49\u5B83\u7ED3\u675F\u540E\u518D\u91CD\u8DD1",
-  "ui.book_proof_fact": "\u4E8B\u5B9E",
-  "ui.book_proof_structure": "\u7ED3\u6784",
-  "ui.book_proof_met": "\u8FBE\u6210",
-  "ui.book_proof_unmet": "\u672A\u8FBE\u6210",
-  "ui.book_proof_unverified": "\u5F85\u67E5",
   "ui.book_panel_not_gate2": "\u76EE\u524D\u4E0D\u5728\u5173\u5361 1 \u6216\u5173\u5361 2\uFF0C\u6CA1\u6709\u53EF\u770B\u7684\u5185\u5BB9\u3002",
   "ui.book_panel_hint": "\u4E5F\u53EF\u4EE5\u76F4\u63A5\u5728\u5730\u56FE\u4E0A\u70B9\u5361\uFF0C\u6539\u5B83\u7684\u201CPrompt\u201D\u533A\u6BB5\u3002"
 };
@@ -9555,25 +9459,7 @@ var zhTW = {
   "ui.book_start_suggesting": "\u6B63\u5728\u4F9D\u9019\u5F35\u5FC3\u667A\u5716\u7684\u4E3B\u984C\u60F3\u5EFA\u8B70\u22EF\u22EF",
   "ui.book_start_settings": "\u5168\u66F8\u8A2D\u5B9A\uFF08\u7070\u5B57\u662F\u5EFA\u8B70\uFF0C\u4E0D\u586B\u5C31\u7528\u5B83\uFF09",
   "ui.book_start_go": "\u958B\u59CB",
-  "ui.book_progress_step_global": "\u5168\u66F8\u4F01\u5283",
-  "ui.book_progress_step_plan": "\u9010\u7AE0\u4F01\u5283",
-  "ui.book_progress_step_write": "\u5BEB\u4F5C",
   "ui.book_progress_step_images": "\u627E\u5716",
-  "ui.book_progress_step_proof": "\u6821\u5C0D",
-  "ui.book_progress_done_0": "\u2713 {0}",
-  "ui.book_progress_count_0_1_2": "{0} {1}\uFF0F{2}",
-  "ui.book_progress_sep": "\u3001",
-  "ui.book_progress_steps_label": "\u5716\u6587\u66F8\u7684\u5404\u500B\u968E\u6BB5",
-  "ui.book_progress_now_global": "\u76EE\u524D\uFF1A\u6B63\u5728\u898F\u5283\u5168\u66F8",
-  "ui.book_progress_now_plan_0_1": "\u76EE\u524D\uFF1A\u6B63\u5728\u4F01\u5283\u7B2C {0} \u7AE0\u300C{1}\u300D",
-  "ui.book_progress_now_write_0_1": "\u76EE\u524D\uFF1A\u6B63\u5728\u5BEB\u7B2C {0} \u7AE0\u300C{1}\u300D",
-  "ui.book_progress_now_images_0_1": "\u76EE\u524D\uFF1A\u6B63\u5728\u627E\u7B2C {0} \u7AE0\u300C{1}\u300D\u7684\u5716",
-  "ui.book_progress_now_proof_0_1": "\u76EE\u524D\uFF1A\u6B63\u5728\u6821\u5C0D\u7B2C {0} \u7AE0\u300C{1}\u300D",
-  "ui.book_progress_now_plan_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u4F01\u5283\u7B2C {0} \u7AE0",
-  "ui.book_progress_now_write_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u5BEB\u7B2C {0} \u7AE0",
-  "ui.book_progress_now_images_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u627E\u7B2C {0} \u7AE0\u7684\u5716",
-  "ui.book_progress_now_proof_0": "\u76EE\u524D\uFF1A\u6B63\u5728\u6821\u5C0D\u7B2C {0} \u7AE0",
-  "ui.book_progress_more_0": "\uFF0C\u53E6\u6709 {0} \u7AE0\u540C\u6642\u9032\u884C",
   "ui.book_stage_planning": "\u4F01\u5283\u4E2D",
   "ui.book_stage_images": "\u627E\u5716\u4E2D",
   "ui.book_stage_proof": "\u6821\u5C0D\u4E2D",
@@ -9708,73 +9594,48 @@ var zhTW = {
   "ui.book_eta_under_minute": "\u4E0D\u5230 1 \u5206\u9418",
   "ui.book_panel_gate2_title": "\u95DC\u5361 2\uFF1A\u9A57\u6536",
   "ui.book_panel_gate2_done_tag": "\u9A57\u6536\u5B8C\u6210",
+  "ui.book_panel_g2_all_done_0": "{0} \u7AE0\u90FD\u505A\u597D\u4E86",
+  "ui.book_panel_g2_some_0_1": "{0} \u7AE0\u5DF2\u7522\u51FA\uFF0C{1} \u7AE0\u4ECD\u9700\u6CE8\u610F",
+  "ui.book_panel_g2_look": "\u8981\u4F60\u770B",
+  "ui.book_panel_g2_reason_unfinished": "\u9019\u7AE0\u9084\u6C92\u5B8C\u6210",
+  "ui.book_panel_g2_reason_structure_0": "\u6709 {0} \u9805\u5BEB\u4F5C\u8981\u6C42\u9084\u6C92\u9054\u6210",
+  "ui.book_panel_g2_reason_facts_0": "\u6709 {0} \u9805\u4E8B\u5BE6\u9084\u6C92\u67E5\u8B49\u5230\u4F86\u6E90",
+  "ui.book_panel_g2_reason_images": "\u9019\u7AE0\u662F\u5716\u96C6\uFF0C\u537B\u6C92\u6709\u627E\u5230\u5408\u9069\u7684\u5716",
+  "ui.book_panel_g2_reason_seam": "\u524D\u5F8C\u7AE0\u6539\u904E\uFF0C\u929C\u63A5\u9084\u6C92\u78BA\u8A8D",
+  "ui.book_panel_g2_edit_myself": "\u6211\u81EA\u5DF1\u6539",
+  "ui.book_panel_g2_confirm_seam": "\u929C\u63A5\u6C92\u554F\u984C",
+  "ui.book_panel_reason_unmet_plain": "\u6709\u5E7E\u9805\u5167\u5BB9\u6C92\u901A\u904E\u6821\u5C0D",
+  "ui.book_progress_line_global": "\u6B63\u5728\u898F\u5283\u5168\u66F8",
+  "ui.book_progress_line_plan_0_1": "\u6B63\u5728\u4F01\u5283\u7B2C {0}\uFF0F{1} \u7AE0",
+  "ui.book_progress_line_write_0_1": "\u6B63\u5728\u5BEB\u7B2C {0}\uFF0F{1} \u7AE0",
+  "ui.book_progress_line_sep": "\uFF0C",
+  "ui.book_progress_line_done_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
   "ui.book_panel_gate2_list_label": "\u95DC\u5361 2 \u5361\u7247\u6E05\u55AE",
   "ui.book_panel_gate2_nothing": "\u9084\u6C92\u6709\u53EF\u9A57\u6536\u7684\u5361\u3002",
-  "ui.book_panel_gate2_hint": "\u78BA\u8A8D\u5B8C\u8981\u770B\u7684\u5361\u5F8C\uFF0C\u6309\u300C\u9A57\u6536\u5B8C\u6210\u300D\u3002",
+  "ui.book_panel_gate2_hint": "\u9084\u6709\u7AE0\u7BC0\u6C92\u8655\u7406\u6642\uFF0C\u6309\u300C\u9A57\u6536\u5B8C\u6210\u300D\u6703\u554F\u4F60\u4E00\u6B21\u3002",
   "ui.book_panel_finish": "\u9A57\u6536\u5B8C\u6210",
   "ui.book_panel_finishing": "\u9A57\u6536\u4E2D\u22EF",
   "ui.book_panel_finish_waiting": "\u9084\u6709\u5361\u7247\u5728\u8655\u7406\u4E2D\uFF0C\u7B49\u5B83\u7D50\u675F\u5F8C\u624D\u80FD\u6309\u300C\u9A57\u6536\u5B8C\u6210\u300D\u3002",
   "ui.book_panel_elapsed_0": "\u82B1\u4E86 {0} \u5206\u9418",
   "ui.book_panel_elapsed_under_minute": "\u82B1\u4E86\u4E0D\u5230 1 \u5206\u9418",
   "ui.book_panel_elapsed_hint": "\u5F9E\u958B\u59CB\u4F01\u5283\u5230\u5BEB\u5B8C\u7684\u6642\u9593",
-  "ui.book_panel_open_card": "\u6253\u958B",
   "ui.book_panel_open_0": "\u6253\u958B\u300C{0}\u300D\u7684\u7B46\u8A18",
   "ui.book_panel_rerun_card": "\u91CD\u8DD1\u9019\u5F35",
   "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u5716\u6587\u66F8\u9019\u4E00\u5F35\uFF1A{0}\uFF08\u4F01\u5283 \u2192 \u5BEB \u2192 \u6821\uFF09",
-  "ui.book_panel_reason_0": "\u539F\u56E0\uFF1A{0}",
   "ui.book_panel_confirm_seam": "\u5DF2\u78BA\u8A8D\u63A5\u7E2B",
   "ui.book_panel_confirm_seam_0": "\u5DF2\u78BA\u8A8D\u300C{0}\u300D\u7684\u63A5\u7E2B",
   "ui.book_seam_label": "\u63A5\u7E2B\u9700\u770B",
   "ui.book_seam_reason": "\u9130\u5361\u4F01\u5283\u6216\u6B63\u6587\u5DF2\u8B8A\u66F4\uFF0C\u5C1A\u672A\u4EBA\u5DE5\u6838\u5C0D\u3002",
   "ui.book_card_menu_rerun": "\u91CD\u8DD1\u5716\u6587\u66F8\u9019\u4E00\u5F35",
   "ui.book_card_menu_rerun_sub": "\u4F01\u5283 \u2192 \u5BEB \u2192 \u6821\uFF0C\u7D04 2 \u5206\u9418\uFF1B\u524D\u5F8C\u7AE0\u4E0D\u52D5\uFF0C\u53EA\u6A19\u300C\u63A5\u7E2B\u9700\u770B\u300D",
-  "ui.book_panel_proof_show": "\u770B\u67E5\u8B49\u8A18\u9304",
-  "ui.book_panel_proof_hide": "\u6536\u5408\u67E5\u8B49\u8A18\u9304",
-  "ui.book_panel_proof_0": "{0} \u7684\u67E5\u8B49\u8A18\u9304",
-  "ui.book_panel_proof_summary_0_1_2": "{0} \u9805\u9054\u6210\u3001{1} \u9805\u5F85\u67E5\u3001{2} \u9805\u672A\u9054\u6210",
-  "ui.book_panel_proof_none": "\u6C92\u6709\u67E5\u8B49\u8A18\u9304\u3002",
-  "ui.book_panel_proof_failed": "\u9019\u5F35\u6821\u5C0D\u6C92\u6709\u5B8C\u6210\u3002",
-  "ui.book_panel_proof_facts_unverified": "\u4E8B\u5BE6\u9805\u76EE\u90FD\u9084\u6C92\u67E5\u8B49\u5230\u4F86\u6E90\u3002",
-  "ui.book_panel_proof_opened_0_1": "\u958B\u9801 {0} \u6B21\u3001\u641C\u5C0B {1} \u6B21",
-  "ui.book_panel_proof_sources_0": "\u4F86\u6E90\uFF1A{0}",
-  "ui.book_panel_structure_unmet_0": "\u7D50\u69CB {0} \u9805\u672A\u9054\u6210",
   "ui.book_rerun_tag": "\u8655\u7406\u4E2D",
   "ui.book_progress_rerun_hint": "\u67D0\u4E00\u7AE0\u4E0D\u6EFF\u610F\uFF1F\u53EF\u4EE5\u53EA\u91CD\u8DD1\u90A3\u4E00\u7AE0\uFF0C\u4E0D\u7528\u6574\u672C\u91CD\u4F86\u3002",
-  "ui.book_panel_lead_passed_0": "{0} \u5F35\u901A\u904E",
-  "ui.book_panel_checked_tag": "\u901A\u904E",
-  "ui.book_panel_checked_tag_notes_0": "\u901A\u904E\uFF0C{0} \u8655\u53EF\u7559\u610F",
-  "ui.book_panel_lead_review_0": "{0} \u5F35\u8981\u4F60\u770B",
-  "ui.book_panel_lead_seams_0": "{0} \u500B\u63A5\u7E2B\u9084\u6C92\u78BA\u8A8D",
-  "ui.book_panel_lead_images_0": "\u5716\u6709 {0} \u8655\u7F3A",
   "ui.book_panel_lead_sep": "\uFF0C",
   "ui.book_panel_reason_unchecked_0": "\u6709 {0} \u9805\u6C92\u80FD\u6838\u5C0D\u5230\u4F86\u6E90\u3002",
   "ui.book_panel_still_review": "\u9084\u662F\u8981\u4F60\u770B",
-  "ui.book_panel_unchanged": "\u9019\u6B21\u91CD\u8DD1\u7684\u7D50\u679C\u76F8\u540C\uFF0C\u4ECD\u9700\u4EBA\u770B\u3002",
-  "ui.book_panel_swap_source": "\u6539\u7528\u5225\u7684\u4F86\u6E90",
-  "ui.book_panel_swap_source_0": "\u300C{0}\u300D\u6539\u7528\u5225\u7684\u4F86\u6E90\u91CD\u8DD1",
-  "ui.book_panel_look_myself": "\u6211\u81EA\u5DF1\u770B",
-  "ui.book_panel_images_title": "\u5716",
-  "ui.book_panel_images_label": "\u5404\u7AE0\u5716\u72C0\u614B",
-  "ui.book_panel_g2_images_none": "\u4F01\u5283\u672A\u5B89\u6392\u5716",
-  "ui.book_panel_g2_images_unrecorded": "\u5C1A\u672A\u8A18\u9304\u5716\u7684\u7D50\u679C",
-  "ui.book_panel_g2_images_n_0": "{0} \u5F35\u5716",
-  "ui.book_panel_g2_images_n_gap_0_1": "{0} \u5F35\u5716\uFF0C{1} \u8655\u7F3A",
-  "ui.book_panel_g2_images_none_fit": "\u6C92\u6709\u5408\u9069\u7684\u5716",
-  "ui.book_panel_g2_images_edited_0": "{0} \u5F35\u88AB\u624B\u52D5\u6539\u904E",
-  "ui.book_panel_g2_slot_0_1": "\u5716 {0}\uFF1A{1}",
-  "ui.book_panel_add_images": "\u81EA\u5DF1\u52A0\u5716",
-  "ui.book_panel_add_images_0": "\u66FF\u300C{0}\u300D\u81EA\u5DF1\u52A0\u5716\uFF08\u6253\u958B\u7B46\u8A18\uFF09",
-  "ui.book_slot_reason_author_omitted": "\u4F5C\u8005\u6C92\u7559\u5716\u4F4D",
-  "ui.book_slot_reason_bad_marker": "\u5716\u4F4D\u6A19\u8A18\u6709\u8AA4",
-  "ui.book_slot_reason_not_found": "\u6C92\u627E\u5230\u5408\u9069\u7684\u5716",
-  "ui.book_slot_reason_load_failed": "\u5716\u8F09\u5165\u5931\u6557",
-  "ui.book_slot_reason_unsafe_url": "\u5716\u7DB2\u5740\u4E0D\u5B89\u5168",
-  "ui.book_slot_reason_probe_capped": "\u5019\u9078\u592A\u591A\uFF0C\u6C92\u9010\u4E00\u6AA2\u67E5",
   "ui.book_finish_ask_title_0": "\u9084\u6709 {0} \u4EF6\u6C92\u8655\u7406",
   "ui.book_finish_ask_review_0": "{0} \u5F35\u9700\u4EBA\u770B",
   "ui.book_finish_ask_review_title_0_1": "{0} \u5F35\u9700\u4EBA\u770B\uFF08{1}\uFF09",
-  "ui.book_finish_ask_seams_0": "{0} \u500B\u63A5\u7E2B\u9084\u6C92\u78BA\u8A8D",
-  "ui.book_finish_ask_sep": "\u3001",
   "ui.book_finish_ask_line_0": "{0}\u3002",
   "ui.book_finish_ask_back": "\u56DE\u53BB\u8655\u7406",
   "ui.book_finish_ask_go": "\u4ECD\u8981\u5B8C\u6210",
@@ -9782,11 +9643,6 @@ var zhTW = {
   "ui.book_card_menu_why_running": "\u5716\u6587\u66F8\u6B63\u5728\u57F7\u884C\uFF0C\u7B49\u5B83\u7D50\u675F\u5F8C\u518D\u91CD\u8DD1",
   "ui.book_card_menu_why_this": "\u9019\u4E00\u5F35\u6B63\u5728\u91CD\u8DD1",
   "ui.book_card_menu_why_blocked": "\u5C0D\u8A71\u9032\u884C\u4E2D\uFF0C\u7B49\u5B83\u7D50\u675F\u5F8C\u518D\u91CD\u8DD1",
-  "ui.book_proof_fact": "\u4E8B\u5BE6",
-  "ui.book_proof_structure": "\u7D50\u69CB",
-  "ui.book_proof_met": "\u9054\u6210",
-  "ui.book_proof_unmet": "\u672A\u9054\u6210",
-  "ui.book_proof_unverified": "\u5F85\u67E5",
   "ui.book_panel_not_gate2": "\u76EE\u524D\u4E0D\u5728\u95DC\u5361 1 \u6216\u95DC\u5361 2\uFF0C\u6C92\u6709\u53EF\u770B\u7684\u5167\u5BB9\u3002",
   "ui.book_panel_hint": "\u4E5F\u53EF\u4EE5\u76F4\u63A5\u5728\u5FC3\u667A\u5716\u4E0A\u9EDE\u5361\uFF0C\u6539\u5B83\u7684\u300CPrompt\u300D\u5340\u6BB5\u3002"
 };
@@ -12396,9 +12252,9 @@ function customizationFields(parent, initial, language2, changed = () => void 0)
     ["questions", "coffee.preserve_questions"],
     ["sources", "coffee.preserve_sources"]
   ]) {
-    const row2 = fieldset.createEl("label");
-    const input2 = row2.createEl("input", { attr: { type: "checkbox" } });
-    row2.createSpan({ text: t2(label) });
+    const row = fieldset.createEl("label");
+    const input2 = row.createEl("input", { attr: { type: "checkbox" } });
+    row.createSpan({ text: t2(label) });
     preserve.set(key4, input2);
   }
   const warning = converge.createEl("p", {
@@ -17633,8 +17489,8 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
       );
     };
     for (const category of CATEGORIES4) {
-      const row2 = guestSection.createDiv("ct-count-row");
-      const label = row2.createEl("label");
+      const row = guestSection.createDiv("ct-count-row");
+      const label = row.createEl("label");
       label.createSpan({ text: this.t(category.label) });
       const input2 = label.createEl("input", {
         attr: {
@@ -17648,7 +17504,7 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
       });
       input2.value = (_G = this.homeForm[`count-${category.id}`]) != null ? _G : String(counts[category.id]);
       countInputs.set(category.id, input2);
-      row2.createEl("p", { cls: "ct-muted", text: this.t(category.description) });
+      row.createEl("p", { cls: "ct-muted", text: this.t(category.description) });
     }
     const warning = guestSection.createEl("p", { cls: "ct-risk-warning is-hidden", attr: { role: "status" } });
     const invites = advanced.createDiv("ct-invites");
@@ -17664,12 +17520,12 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
     })();
     const addInvite = (guest) => {
       var _a3;
-      const row2 = invites.createDiv("ct-invite-row"), id = (_a3 = guest == null ? void 0 : guest.id) != null ? _a3 : crypto.randomUUID();
-      const select = row2.createEl("select", {
+      const row = invites.createDiv("ct-invite-row"), id = (_a3 = guest == null ? void 0 : guest.id) != null ? _a3 : crypto.randomUUID();
+      const select = row.createEl("select", {
         attr: { "aria-label": this.t("coffee.guest_category"), "data-ct-home-field": `invite-category-${id}` }
       });
       CATEGORIES4.forEach((item) => select.createEl("option", { value: item.id, text: this.t(item.label) }));
-      const description = row2.createEl("input", {
+      const description = row.createEl("input", {
         attr: {
           type: "text",
           maxlength: "160",
@@ -17682,14 +17538,14 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
         select.value = guest.category;
         description.value = guest.description;
       }
-      const remove = this.button(row2, this.t("ui.reference_remove"), () => {
-        row2.remove();
-        const rowIndex = inviteRows.findIndex((item) => item.row === row2);
+      const remove = this.button(row, this.t("ui.reference_remove"), () => {
+        row.remove();
+        const rowIndex = inviteRows.findIndex((item) => item.row === row);
         if (rowIndex >= 0) inviteRows.splice(rowIndex, 1);
         updateWarning();
         snapshotForm();
       });
-      inviteRows.push({ id, category: select, description, row: row2 });
+      inviteRows.push({ id, category: select, description, row });
       select.addEventListener("change", () => {
         updateWarning();
         snapshotForm();
@@ -17852,11 +17708,11 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
     const renderReferences = () => {
       referenceList.empty();
       for (const [index, file] of referenceFiles.entries()) {
-        const row2 = referenceList.createDiv("ct-reference-row");
-        row2.createSpan({
+        const row = referenceList.createDiv("ct-reference-row");
+        row.createSpan({
           text: `${file.name} \xB7 ${file.content.length.toLocaleString()} ${this.t("coffee.characters")}`
         });
-        this.button(row2, this.t("ui.reference_remove"), () => {
+        this.button(row, this.t("ui.reference_remove"), () => {
           referenceFiles.splice(index, 1);
           renderReferences();
           snapshotForm();
@@ -19160,8 +19016,8 @@ ${formatTableDateTime(timestamp.getTime(), this.plugin.settings.language)}${item
     details.createEl("summary", { text: this.t("coffee.invite_temporary_guests") });
     const rows2 = details.createDiv("ct-follow-up-guest-list");
     this.followUpGuests.forEach((guest, index) => {
-      const row2 = rows2.createDiv("ct-follow-up-guest");
-      const name2 = row2.createEl("input", {
+      const row = rows2.createDiv("ct-follow-up-guest");
+      const name2 = row.createEl("input", {
         attr: {
           type: "text",
           maxlength: "60",
@@ -19174,14 +19030,14 @@ ${formatTableDateTime(timestamp.getTime(), this.plugin.settings.language)}${item
       name2.addEventListener("input", () => {
         guest.name = name2.value;
       });
-      const category = row2.createEl("select", { attr: { "aria-label": this.t("coffee.guest_perspective") } });
+      const category = row.createEl("select", { attr: { "aria-label": this.t("coffee.guest_perspective") } });
       category.disabled = engine.busy;
       for (const item of CATEGORIES4) category.createEl("option", { value: item.id, text: this.t(item.label) });
       category.value = guest.category;
       category.addEventListener("change", () => {
         guest.category = category.value;
       });
-      const description = row2.createEl("input", {
+      const description = row.createEl("input", {
         attr: {
           type: "text",
           maxlength: "160",
@@ -19195,7 +19051,7 @@ ${formatTableDateTime(timestamp.getTime(), this.plugin.settings.language)}${item
         guest.description = description.value;
       });
       this.button(
-        row2,
+        row,
         this.t("ui.reference_remove"),
         () => {
           this.followUpGuests.splice(index, 1);
@@ -20552,13 +20408,13 @@ var AnchorModal = class extends import_obsidian9.Modal {
         ["none", t("ui.anchor_target_none")]
       ];
       for (const [value, label] of choices) {
-        const row2 = group.createEl("label", { cls: "vam-anchor-choice" });
-        const radio = row2.createEl("input", { type: "radio", attr: { name: "vam-anchor-target", value } });
+        const row = group.createEl("label", { cls: "vam-anchor-choice" });
+        const radio = row.createEl("input", { type: "radio", attr: { name: "vam-anchor-target", value } });
         radio.checked = value === target;
         radio.addEventListener("change", () => {
           if (radio.checked) target = value;
         });
-        row2.createSpan({ text: label });
+        row.createSpan({ text: label });
       }
     }
     const actions = modalActions(this);
@@ -20602,12 +20458,12 @@ var AnchorPickModal = class extends import_obsidian9.Modal {
     this.titleEl.setText(t("ui.anchor_relation_pick_title"));
     const list2 = this.contentEl.createDiv("vam-anchor-pick-list");
     for (const entry of this.entries) {
-      const row2 = list2.createDiv("vam-anchor-pick-row");
-      const button2 = row2.createEl("button", { text: entry.label, attr: { type: "button" } });
+      const row = list2.createDiv("vam-anchor-pick-row");
+      const button2 = row.createEl("button", { text: entry.label, attr: { type: "button" } });
       button2.disabled = entry.taken;
       if (entry.taken) {
         button2.setAttr("aria-disabled", "true");
-        row2.createSpan({ text: t("ui.anchor_relation_pick_taken"), cls: "vam-anchor-pick-taken" });
+        row.createSpan({ text: t("ui.anchor_relation_pick_taken"), cls: "vam-anchor-pick-taken" });
       }
       button2.addEventListener("click", () => {
         if (entry.taken) return;
@@ -22605,9 +22461,9 @@ function sectionAliasRows() {
 function sectionAliasesFor(heading) {
   const key4 = lowered(heading);
   const result = [];
-  for (const row2 of sectionAliasRows())
-    if (row2.names.some((entry) => lowered(entry) === key4)) {
-      for (const alias of row2.aliases)
+  for (const row of sectionAliasRows())
+    if (row.names.some((entry) => lowered(entry) === key4)) {
+      for (const alias of row.aliases)
         if (lowered(alias) !== key4 && !result.some((existing) => lowered(existing) === lowered(alias)))
           result.push(alias);
     }
@@ -24122,7 +23978,7 @@ function verticalPositions(input2) {
     const kids = kidsOf(node);
     const extra = joinsOf(node);
     const width = widths.get(node.id);
-    const row2 = (list2, level) => {
+    const row = (list2, level) => {
       let next2 = start + (width - rowWidth(list2)) / 2;
       return list2.map((item) => {
         place(item, level, next2);
@@ -24131,8 +23987,8 @@ function verticalPositions(input2) {
         return x;
       });
     };
-    const kidXs = row2(kids, depth + 1);
-    const joinXs = row2(extra, depth + spans.get(node.id));
+    const kidXs = row(kids, depth + 1);
+    const joinXs = row(extra, depth + spans.get(node.id));
     const own2 = kidXs.length ? kidXs : joinXs;
     depths.set(node.id, depth);
     const centres = (list2, xsOf) => xsOf.map((x, i) => x + cardWidth(list2[i]) / 2);
@@ -26393,7 +26249,7 @@ function uncross(points, slots, fixedLines, picked) {
   const count4 = slots.length;
   const lines = points.map((p) => slots.map((s) => lineBetween(p, s)));
   const length = points.map((p, i) => slots.map((_, j) => Math.hypot(lines[i][j].x2 - p[0], lines[i][j].y2 - p[1])));
-  const hitsFixed = lines.map((row2) => row2.map((l) => fixedLines.filter((f) => segmentsCross(l, f)).length));
+  const hitsFixed = lines.map((row) => row.map((l) => fixedLines.filter((f) => segmentsCross(l, f)).length));
   const cache = new Uint8Array(n * count4 * n * count4);
   const crossing = (a, sa, b, sb) => {
     const key4 = ((a * count4 + sa) * n + b) * count4 + sb;
@@ -26479,7 +26335,7 @@ function uncross(points, slots, fixedLines, picked) {
     }
     return false;
   };
-  const domains = lines.map((row2, i) => row2.map((_, j) => j).filter((j) => hitsFixed[i][j] === 0));
+  const domains = lines.map((row, i) => row.map((_, j) => j).filter((j) => hitsFixed[i][j] === 0));
   if (domains.every((domain) => domain.length) && search(domains, n)) for (let i = 0; i < n; i++) picked[i] = found[i];
   descend();
 }
@@ -34275,10 +34131,10 @@ var RelationEditor = class {
     if (links.length || anchored.length) {
       const list2 = body.createEl("ul", { cls: "vam-relation-list" });
       for (const link of links) {
-        const row2 = list2.createEl("li", { cls: "vam-relation-row" }), text10 = this.relationRowText(link, node.id), described = link.description ? `${text10}. ${link.description}` : text10;
-        this.ports.bindRelationRow(row2, link, described);
-        this.relationSwatch(row2, link.kind);
-        const label = row2.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
+        const row = list2.createEl("li", { cls: "vam-relation-row" }), text10 = this.relationRowText(link, node.id), described = link.description ? `${text10}. ${link.description}` : text10;
+        this.ports.bindRelationRow(row, link, described);
+        this.relationSwatch(row, link.kind);
+        const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
         label.createSpan({
           text: this.relationSentence(link, node.id),
           cls: "vam-relation-sentence",
@@ -34286,7 +34142,7 @@ var RelationEditor = class {
         });
         if (link.description)
           label.createSpan({ text: link.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
-        const tools = row2.createSpan({ cls: "vam-relation-tools" });
+        const tools = row.createSpan({ cls: "vam-relation-tools" });
         const pair5 = relationPairKey(link.from, link.to);
         const edit = this.ports.iconButton(
           tools,
@@ -34327,15 +34183,15 @@ var RelationEditor = class {
    * the relation changes. Adding goes through `addRelation`, so Map.md is written exactly as before.
    */
   renderRelationAddRow(parent, node, onAdded, exposeFirst, close) {
-    const row2 = parent.createDiv("vam-relation-add");
-    row2.setAttr("role", "group");
-    row2.setAttr("aria-label", t("ui.relation_add_row"));
-    row2.createSpan({ text: t("ui.relation_this_card"), cls: "vam-relation-add-self" });
-    const kindSelect = row2.createEl("select", { cls: "dropdown vam-relation-add-kind" });
+    const row = parent.createDiv("vam-relation-add");
+    row.setAttr("role", "group");
+    row.setAttr("aria-label", t("ui.relation_add_row"));
+    row.createSpan({ text: t("ui.relation_this_card"), cls: "vam-relation-add-self" });
+    const kindSelect = row.createEl("select", { cls: "dropdown vam-relation-add-kind" });
     kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
     for (const kind of RELATION_KINDS) kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
     exposeFirst(kindSelect);
-    row2.createSpan({ text: "\u2192", cls: "vam-relation-add-arrow", attr: { "aria-hidden": "true" } });
+    row.createSpan({ text: "\u2192", cls: "vam-relation-add-arrow", attr: { "aria-hidden": "true" } });
     const currentKind = () => kindSelect.value || RELATION_KINDS[0];
     const legalSources = () => {
       const map = this.ports.map();
@@ -34344,7 +34200,7 @@ var RelationEditor = class {
     };
     const field = createCardSearchField({
       app: this.ports.app(),
-      parent: row2,
+      parent: row,
       placeholder: t("ui.relation_search_placeholder"),
       ariaLabel: t("ui.relation_target_label"),
       candidates: legalSources,
@@ -34451,20 +34307,20 @@ var RelationEditor = class {
    */
   renderAnchorRelationRow(list2, node, ref, repaint, editButtons) {
     const key4 = anchorLineKey(ref.imageId, ref.anchorId, node.id), text10 = this.anchorRelationRowText(ref), described = ref.relation.description ? `${text10}. ${ref.relation.description}` : text10, end = { imageId: ref.imageId, anchorId: ref.anchorId, topicId: node.id };
-    const row2 = list2.createEl("li", { cls: "vam-relation-row vam-anchor-relation-row" });
-    this.ports.bindRelationRow(row2, ref.relation, described, key4);
-    this.relationSwatch(row2, ref.relation.kind);
-    const label = row2.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
+    const row = list2.createEl("li", { cls: "vam-relation-row vam-anchor-relation-row" });
+    this.ports.bindRelationRow(row, ref.relation, described, key4);
+    this.relationSwatch(row, ref.relation.kind);
+    const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
     label.createSpan({ text: text10, cls: "vam-relation-sentence", attr: { dir: "auto" } });
     if (ref.relation.description)
       label.createSpan({ text: ref.relation.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
     if (!this.ports.anchorEditable()) return;
-    const tools = row2.createSpan({ cls: "vam-relation-tools" });
+    const tools = row.createSpan({ cls: "vam-relation-tools" });
     const reopen = () => {
       var _a2;
       return (_a2 = editButtons.get(key4)) == null ? void 0 : _a2.focus();
     };
-    row2.addEventListener("click", (event) => {
+    row.addEventListener("click", (event) => {
       var _a2;
       if ((_a2 = tools.contains) == null ? void 0 : _a2.call(tools, event.target)) return;
       this.ports.openAnchorRelationEditor(end, repaint, reopen);
@@ -34584,9 +34440,9 @@ var RelationEditor = class {
         attr: { dir: "auto" }
       });
       const field = (label, id) => {
-        const row2 = root.createDiv("vam-relation-field");
-        row2.createEl("label", { text: label, attr: { for: id } });
-        return row2;
+        const row = root.createDiv("vam-relation-field");
+        row.createEl("label", { text: label, attr: { for: id } });
+        return row;
       };
       const kindRow = field(t("ui.relation_kind_label"), "vam-relation-kind");
       const kindSelect = kindRow.createEl("select", { cls: "dropdown vam-relation-kind" });
@@ -34776,9 +34632,9 @@ var RelationEditor = class {
         attr: { dir: "auto" }
       });
       const field = (label, id) => {
-        const row2 = root.createDiv("vam-relation-field");
-        row2.createEl("label", { text: label, attr: { for: id } });
-        return row2;
+        const row = root.createDiv("vam-relation-field");
+        row.createEl("label", { text: label, attr: { for: id } });
+        return row;
       };
       const kindRow = field(t("ui.relation_kind_label"), "vam-relation-kind");
       const kindSelect = kindRow.createEl("select", { cls: "dropdown vam-relation-kind" });
@@ -35325,14 +35181,14 @@ var childWith = (parent, cls) => {
 };
 function arrangeCover(card, frame, position) {
   var _a2, _b2, _c;
-  const row2 = childWith(card, "vam-card-side");
-  if (row2) {
-    const text11 = childWith(row2, "vam-card-side-text");
+  const row = childWith(card, "vam-card-side");
+  if (row) {
+    const text11 = childWith(row, "vam-card-side-text");
     for (const child of Array.from((_a2 = text11 == null ? void 0 : text11.children) != null ? _a2 : [])) {
       child.remove();
-      card.insertBefore(child, row2);
+      card.insertBefore(child, row);
     }
-    row2.remove();
+    row.remove();
   }
   for (const cls of POSITION_CLASSES) if (hasCls(card, cls)) card.classList.remove(cls);
   if (!frame) return;
@@ -35647,8 +35503,8 @@ var CoverFrameModal = class extends import_obsidian16.Modal {
     this.setDraft(this.draft);
   }
   /** The tool row above the card: the picture size slider (30-100% of the content width). */
-  buildTools(row2) {
-    const label = row2.createEl("label", { cls: "vam-card-frame-tool" });
+  buildTools(row) {
+    const label = row.createEl("label", { cls: "vam-card-frame-tool" });
     label.createSpan({ text: t("ui.card_edit_picture_size") });
     const slider = label.createEl("input", {
       cls: "vam-card-frame-size",
@@ -35667,7 +35523,7 @@ var CoverFrameModal = class extends import_obsidian16.Modal {
     slider.addEventListener("input", update);
     slider.addEventListener("change", update);
     this.sizeSlider = slider;
-    const place = row2.createDiv({ cls: "vam-card-frame-tool" });
+    const place = row.createDiv({ cls: "vam-card-frame-tool" });
     const placeLabel = place.createSpan({ text: t("ui.card_edit_picture_position") });
     const group = place.createDiv({ cls: "vam-card-frame-positions" });
     group.setAttr("role", "radiogroup");
@@ -36340,14 +36196,14 @@ function drawMapSourcesPanel(parent, host, focus) {
   for (const { source, index } of order) {
     const status = mapSourceStatus(host.app, source);
     const name2 = mapSourceName(host.app, source);
-    const row2 = list2.createDiv({ cls: "vam-map-sources-row", attr: { role: "listitem" } });
-    row2.toggleClass("is-unreadable", !status.exists);
-    row2.toggleClass("is-new", fresh(source) >= 0);
-    (0, import_obsidian17.setIcon)(row2.createSpan({ cls: "vam-map-sources-icon", attr: { "aria-hidden": "true" } }), ICONS[source.kind]);
-    row2.createSpan({ cls: "vam-map-sources-name", text: name2, attr: { title: source.path, dir: "auto" } });
+    const row = list2.createDiv({ cls: "vam-map-sources-row", attr: { role: "listitem" } });
+    row.toggleClass("is-unreadable", !status.exists);
+    row.toggleClass("is-new", fresh(source) >= 0);
+    (0, import_obsidian17.setIcon)(row.createSpan({ cls: "vam-map-sources-icon", attr: { "aria-hidden": "true" } }), ICONS[source.kind]);
+    row.createSpan({ cls: "vam-map-sources-name", text: name2, attr: { title: source.path, dir: "auto" } });
     const meta = !status.exists ? t("ui.map_sources_unreadable_row") : source.kind === "folder" ? t("ui.map_sources_folder_count_0", (_d = status.count) != null ? _d : 0) : t(KIND_LABELS[source.kind]);
-    row2.createSpan({ cls: "vam-map-sources-meta", text: meta });
-    const remove = row2.createEl("button", {
+    row.createSpan({ cls: "vam-map-sources-meta", text: meta });
+    const remove = row.createEl("button", {
       cls: "vam-map-sources-remove",
       text: t("ui.reference_remove"),
       attr: { "aria-label": t("ui.map_sources_remove_0", name2) }
@@ -36364,13 +36220,13 @@ function drawMapSourcesPanel(parent, host, focus) {
   for (const source of externals) {
     const status = (_e = host.externalStatus) == null ? void 0 : _e.call(host, source.label);
     const bad = !!status && "unreadable" in status;
-    const row2 = list2.createDiv({ cls: "vam-map-sources-row", attr: { role: "listitem" } });
-    row2.toggleClass("is-unreadable", bad);
-    (0, import_obsidian17.setIcon)(row2.createSpan({ cls: "vam-map-sources-icon", attr: { "aria-hidden": "true" } }), "folder-open");
-    row2.createSpan({ cls: "vam-map-sources-name", text: source.label, attr: { dir: "auto" } });
+    const row = list2.createDiv({ cls: "vam-map-sources-row", attr: { role: "listitem" } });
+    row.toggleClass("is-unreadable", bad);
+    (0, import_obsidian17.setIcon)(row.createSpan({ cls: "vam-map-sources-icon", attr: { "aria-hidden": "true" } }), "folder-open");
+    row.createSpan({ cls: "vam-map-sources-name", text: source.label, attr: { dir: "auto" } });
     const meta = !status ? t("ui.map_sources_external_meta_pending") : "count" in status ? t("ui.map_sources_external_meta_0", status.count) : status.unreadable === "too-large" ? t("ui.map_sources_external_too_large") : t("ui.map_sources_unreadable_row");
-    row2.createSpan({ cls: "vam-map-sources-meta", text: meta });
-    const remove = row2.createEl("button", {
+    row.createSpan({ cls: "vam-map-sources-meta", text: meta });
+    const remove = row.createEl("button", {
       cls: "vam-map-sources-remove",
       text: t("ui.reference_remove"),
       attr: { "aria-label": t("ui.map_sources_remove_0", source.label) }
@@ -38520,13 +38376,13 @@ var KeyboardShortcutsModal = class extends import_obsidian23.Modal {
     const table2 = this.contentEl.createEl("table", { cls: "vam-shortcuts" });
     const body = table2.createEl("tbody");
     for (const entry of MAP_KEYBOARD_SHORTCUTS) {
-      const row2 = body.createEl("tr");
-      const keys = row2.createEl("td", { cls: "vam-shortcuts-keys" });
+      const row = body.createEl("tr");
+      const keys = row.createEl("td", { cls: "vam-shortcuts-keys" });
       entry.keys.forEach((key4, index) => {
         if (index) keys.appendText(" ");
         keys.createEl("kbd", { text: shortcutLabel(key4) });
       });
-      row2.createEl("td", { text: t(entry.action) });
+      row.createEl("td", { text: t(entry.action) });
     }
     this.contentEl.createEl("p", { cls: "vam-modal-intro", text: t("ui.keyboard_shortcuts_hotkeys_hint") });
   }
@@ -45852,9 +45708,9 @@ var chartLabel = (text10) => [
 ].slice(0, 20).join("").trim();
 function buildChart(title, rows2) {
   const points = [];
-  for (const row2 of rows2) {
-    const value = figureNumber(row2.figure);
-    if (value !== null) points.push({ label: chartLabel(row2.label) || "n", value, unit: unitOf(row2.figure) });
+  for (const row of rows2) {
+    const value = figureNumber(row.figure);
+    if (value !== null) points.push({ label: chartLabel(row.label) || "n", value, unit: unitOf(row.figure) });
   }
   if (points.length < 2 || points.length > 12 || new Set(points.map((p) => p.unit)).size !== 1) return "";
   const values = points.map((p) => p.value);
@@ -50169,12 +50025,6 @@ function cleanAvoidSources(values) {
   }
   return out;
 }
-function unverifiedSourceUrls(proof) {
-  if (!proof) return [];
-  return cleanAvoidSources(
-    proof.items.filter((item) => item.type === "fact" && (item.status === "unverified" || item.status === "unmet")).flatMap((item) => item.sources)
-  );
-}
 function avoidSourcesInstruction(addresses) {
   const clean3 = cleanAvoidSources(addresses);
   const head2 = "Do not rely on sources that could not be opened and checked; use other sources that can be opened and checked.";
@@ -51806,8 +51656,8 @@ var PHASE_KEY = {
   gate2: "ui.book_phase_gate2",
   done: "ui.book_phase_done"
 };
-function bookBarState(data, progress, stageOf, titleOf) {
-  var _a2, _b2, _c, _d, _e, _f, _g;
+function bookBarState(data, progress, stageOf) {
+  var _a2, _b2, _c, _d, _e, _f;
   const savedDone = data.phase === "done" && (!progress || progress.runId === data.runId);
   const phase = savedDone ? "done" : (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : data.phase;
   const status = savedDone ? data.status : (_b2 = progress == null ? void 0 : progress.status) != null ? _b2 : data.status;
@@ -51819,8 +51669,7 @@ function bookBarState(data, progress, stageOf, titleOf) {
   const failure = progress ? progress.failureCode : data.failureCode;
   const interrupted = (phase === "planning" || phase === "writing") && !active;
   const mode = status === "stopped" && pauseReason === "budget" ? "budget" : status === "stopped" || interrupted ? "stopped" : phase;
-  const steps = (_g = progress == null ? void 0 : progress.steps) != null ? _g : stepCounts(counts, 0, { settled: phase === "gate2" || phase === "done" });
-  const current = mode === "planning" || mode === "writing" ? currentOf2(data, progress, titleOf) : void 0;
+  const current = mode === "planning" || mode === "writing" ? currentOf2(data, progress) : void 0;
   const rerunning = !!(progress == null ? void 0 : progress.active) && !!progress.rerun && data.order.includes(progress.rerun.nodeId);
   return {
     mode,
@@ -51828,7 +51677,6 @@ function bookBarState(data, progress, stageOf, titleOf) {
     total: total2,
     counts,
     budget,
-    steps,
     globalDone: data.globalPlanned === true,
     ...current ? { current } : {},
     ...rerunning ? { rerun: true } : {},
@@ -51836,7 +51684,7 @@ function bookBarState(data, progress, stageOf, titleOf) {
     ...(progress == null ? void 0 : progress.etaSeconds) !== void 0 && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0 ? { etaSeconds: progress.etaSeconds } : {}
   };
 }
-function currentOf2(data, progress, titleOf) {
+function currentOf2(data, progress) {
   var _a2;
   if (!(progress == null ? void 0 : progress.active) || !((_a2 = progress.current) == null ? void 0 : _a2.length)) return void 0;
   const position = (nodeId) => nodeId === "global" ? -1 : data.order.indexOf(nodeId);
@@ -51844,14 +51692,7 @@ function currentOf2(data, progress, titleOf) {
   if (!entries.length) return void 0;
   entries.sort((a, b) => position(a.nodeId) - position(b.nodeId));
   const first = entries[0];
-  const title = first.nodeId === "global" ? void 0 : titleOf == null ? void 0 : titleOf(first.nodeId);
-  return {
-    step: first.nodeId === "global" ? "global" : first.step,
-    ...first.nodeId === "global" ? {} : { chapter: position(first.nodeId) + 1 },
-    ...title ? { title } : {},
-    more: entries.length - 1,
-    steps: entries.map((item) => item.nodeId === "global" ? "global" : item.step)
-  };
+  return first.nodeId === "global" ? { step: "global" } : { step: first.step, chapter: position(first.nodeId) + 1 };
 }
 function countStages(stages) {
   const counts = { pending: 0, planned: 0, written: 0, checked: 0, "needs-review": 0 };
@@ -51906,19 +51747,17 @@ function renderBookBar(parent, state, actions) {
   else if (state.mode === "planning" || state.mode === "writing")
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   if (state.rerun) makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
-  const items = bookStepItems(state);
-  renderStepList(bar, items);
-  renderNowLine(bar, state);
+  const progressText = bookProgressText(state);
+  renderProgressLine(bar, state, progressText);
   if (state.phase === "gate2" || state.phase === "done")
     bar.createDiv({ cls: "vam-book-rerun-hint", text: t("ui.book_progress_rerun_hint") });
-  const valueText = items.map((item) => item.text).join(t("ui.book_progress_sep"));
   const track = bar.createDiv("vam-book-track");
   track.setAttr("role", "progressbar");
   track.setAttr("aria-label", t("ui.book_bar_label"));
   track.setAttr("aria-valuemin", "0");
   track.setAttr("aria-valuemax", String(total2));
   track.setAttr("aria-valuenow", String(counts.checked));
-  track.setAttr("aria-valuetext", valueText);
+  track.setAttr("aria-valuetext", progressText);
   const segments = [
     ["checked", counts.checked],
     ["written", counts.written],
@@ -51931,65 +51770,20 @@ function renderBookBar(parent, state, actions) {
   }
   return bar;
 }
-var STEP_LABEL = {
-  global: "ui.book_progress_step_global",
-  plan: "ui.book_progress_step_plan",
-  write: "ui.book_progress_step_write",
-  images: "ui.book_progress_step_images",
-  proof: "ui.book_progress_step_proof"
-};
-function bookStepItems(state) {
-  var _a2, _b2;
-  const marked = new Set((_b2 = (_a2 = state.current) == null ? void 0 : _a2.steps) != null ? _b2 : []);
-  const items = [];
-  for (const key4 of ["global", "plan", "write", "images", "proof"]) {
-    const done = key4 === "global" ? state.globalDone : state.total > 0 && state.steps[key4] >= state.total;
-    const label = t(STEP_LABEL[key4]);
-    items.push({
-      key: key4,
-      done,
-      current: marked.has(key4),
-      text: done ? t("ui.book_progress_done_0", label) : key4 === "global" ? label : t("ui.book_progress_count_0_1_2", label, state.steps[key4], state.total)
-    });
-  }
-  return items;
+var settledCount = (state) => state.counts.checked + state.counts["needs-review"];
+function bookProgressText(state) {
+  var _a2, _b2, _c;
+  const { total: total2 } = state;
+  const at = Math.min((_b2 = (_a2 = state.current) == null ? void 0 : _a2.chapter) != null ? _b2 : settledCount(state) + 1, Math.max(total2, 1));
+  const sentence = state.mode === "planning" ? !state.globalDone || ((_c = state.current) == null ? void 0 : _c.step) === "global" ? t("ui.book_progress_line_global") : t("ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
+  return `${sentence}${t("ui.book_progress_line_sep")}${t("ui.book_progress_line_done_0_1", settledCount(state), total2)}`;
 }
-function renderStepList(bar, items) {
-  const list2 = bar.createEl("ol", { cls: "vam-book-steps" });
-  list2.setAttr("aria-label", t("ui.book_progress_steps_label"));
-  for (const item of items) {
-    const li = list2.createEl("li", { cls: "vam-book-step", text: item.text });
-    li.dataset.step = item.key;
-    li.toggleClass("is-done", item.done);
-    li.toggleClass("is-current", item.current);
-    if (item.current) li.setAttr("aria-current", "step");
-  }
-}
-var NOW_KEY = {
-  plan: "ui.book_progress_now_plan_0_1",
-  write: "ui.book_progress_now_write_0_1",
-  images: "ui.book_progress_now_images_0_1",
-  proof: "ui.book_progress_now_proof_0_1"
-};
-var NOW_KEY_UNTITLED = {
-  plan: "ui.book_progress_now_plan_0",
-  write: "ui.book_progress_now_write_0",
-  images: "ui.book_progress_now_images_0",
-  proof: "ui.book_progress_now_proof_0"
-};
-function bookNowText(current) {
-  var _a2, _b2;
-  if (current.step === "global") return t("ui.book_progress_now_global");
-  const base = current.title ? t(NOW_KEY[current.step], (_a2 = current.chapter) != null ? _a2 : 0, current.title) : t(NOW_KEY_UNTITLED[current.step], (_b2 = current.chapter) != null ? _b2 : 0);
-  return current.more > 0 ? `${base}${t("ui.book_progress_more_0", current.more)}` : base;
-}
-function renderNowLine(bar, state) {
-  const showEta = state.etaSeconds !== void 0 && (state.mode === "planning" || state.mode === "writing");
-  if (!state.current && !showEta) return;
+function renderProgressLine(bar, state, text10) {
+  const running2 = state.mode === "planning" || state.mode === "writing";
+  if (!running2) return;
   const now = bar.createDiv("vam-book-now");
-  if (state.current) now.createSpan({ cls: "vam-book-now-text", text: bookNowText(state.current) });
-  if (showEta && state.etaSeconds !== void 0)
-    now.createSpan({ cls: "vam-book-bar-eta", text: bookEtaText(state.etaSeconds) });
+  now.createSpan({ cls: "vam-book-now-text", text: text10 });
+  if (state.etaSeconds !== void 0) now.createSpan({ cls: "vam-book-bar-eta", text: bookEtaText(state.etaSeconds) });
 }
 function makeButton(parent, text10, cls, action) {
   const button2 = parent.createEl("button", { cls, text: text10 });
@@ -52460,72 +52254,65 @@ function finish(id, state, actions, note, clearDraft = false) {
 }
 
 // experiences/visual-map/book-pipeline-panel2.ts
-function changedIndex(seam) {
-  var _a2;
-  const found = /第 (\d+) 張|card (\d+)/.exec(seam);
-  const n = found ? Number((_a2 = found[1]) != null ? _a2 : found[2]) : NaN;
-  return Number.isInteger(n) && n >= 1 ? n : void 0;
+function attentionReasons(card) {
+  const out = [];
+  if (card.stage === "needs-review") out.push(card.failureText || t("ui.book_issue_unknown"));
+  else if (card.stage !== "checked") out.push(t("ui.book_panel_g2_reason_unfinished"));
+  if (card.structureUnmet > 0) out.push(t("ui.book_panel_g2_reason_structure_0", card.structureUnmet));
+  if (card.factsOpen > 0) out.push(t("ui.book_panel_g2_reason_facts_0", card.factsOpen));
+  if (card.galleryBare) out.push(t("ui.book_panel_g2_reason_images"));
+  if (card.seam) out.push(t("ui.book_panel_g2_reason_seam"));
+  return out;
 }
+var needsAttention = (card) => attentionReasons(card).length > 0;
+var plainNote = (text10) => text10.replace(/\b[CN]\d+\b\s*[:：]?/g, "").replace(/\s+/g, " ").trim();
 function reasonOf2(issue2, proof) {
-  if (!/^proof unmet/.test(issue2.trim()) || !proof) return bookIssueText(issue2);
-  const open2 = proof.items.filter((item) => item.status !== "met");
-  const notes = [...new Set(open2.map((item) => unescapeMarkdownText(item.note).trim()).filter(Boolean))].slice(0, 3);
+  var _a2;
+  if (!/^proof unmet/.test(issue2.trim())) return bookIssueText(issue2);
+  if (/facts_unverified/.test(issue2)) return t("ui.book_reason_all_facts_unverified");
+  const open2 = ((_a2 = proof == null ? void 0 : proof.items) != null ? _a2 : []).filter((item) => item.status !== "met");
+  const notes = [...new Set(open2.map((item) => plainNote(unescapeMarkdownText(item.note))).filter(Boolean))].slice(0, 3);
   if (notes.length) return notes.join(t("ui.book_panel_lead_sep"));
-  return open2.length ? t("ui.book_panel_reason_unchecked_0", open2.length) : bookIssueText(issue2);
+  return open2.length ? t("ui.book_panel_reason_unchecked_0", open2.length) : t("ui.book_panel_reason_unmet_plain");
 }
-function imagesOf(note) {
+function galleryBare(role, note) {
   var _a2, _b2, _c;
+  if (role !== "gallery") return false;
   const slots = (_b2 = parseImageSlots((_a2 = note == null ? void 0 : note.prompt) != null ? _a2 : "")) != null ? _b2 : [];
+  if (!slots.length) return false;
   const detail = (_c = note == null ? void 0 : note.detail) != null ? _c : "";
   const states = describeSlots(slots, latestSlotsRecord(detail), bodyImageUrls(chapterBody(detail)));
-  return {
-    planned: slots.length,
-    placed: states.filter((slot) => slot.state === "placed").length,
-    edited: states.filter((slot) => slot.state === "edited").length,
-    unrecorded: states.filter((slot) => slot.state === "unrecorded").length,
-    missing: states.filter((slot) => slot.state === "missing").map((slot) => {
-      var _a3;
-      return { index: slot.index, code: (_a3 = slot.reasonCode) != null ? _a3 : "not_found" };
-    })
-  };
+  return states.some((slot) => slot.state === "missing") && !states.some((slot) => slot.state === "placed" || slot.state === "edited");
 }
 function buildGate2Panel(input2) {
   var _a2, _b2;
   const cards = input2.order.map((id, at) => {
-    var _a3;
+    var _a3, _b3;
     const note = input2.noteOf(id);
     const view = bookCardView(note != null ? note : {});
-    const title = input2.titleOf(id);
-    const seamText = typeof (note == null ? void 0 : note.pipelineSeam) === "string" ? note.pipelineSeam : "";
-    const other = changedIndex(seamText);
-    const partner = other !== void 0 && Math.abs(other - 1 - at) === 1 ? input2.order[other - 1] : void 0;
     const issue2 = typeof (note == null ? void 0 : note.pipelineIssue) === "string" ? note.pipelineIssue : "";
-    const proof = view.stage === "checked" || view.stage === "needs-review" ? latestStoredProof((_a3 = note == null ? void 0 : note.detail) != null ? _a3 : "") : void 0;
-    const images = view.stage === "pending" || view.stage === "planned" ? void 0 : imagesOf(note);
+    const checked2 = view.stage === "checked";
+    const proof = checked2 || view.stage === "needs-review" ? latestStoredProof((_a3 = note == null ? void 0 : note.detail) != null ? _a3 : "") : void 0;
+    const structure2 = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue2.trim());
+    const role = typeof (note == null ? void 0 : note.bookRole) === "string" ? note.bookRole : void 0;
     return {
       id,
       index: at + 1,
-      title,
+      title: input2.titleOf(id),
       stage: view.stage,
-      ...view.stage === "needs-review" && issue2 ? { reasonText: reasonOf2(issue2, proof) } : {},
-      seam: view.seam,
-      seamTitle: partner ? other - 1 > at ? `${title} \u2194 ${input2.titleOf(partner)}` : `${input2.titleOf(partner)} \u2194 ${title}` : title,
-      ...proof ? { proof } : {},
-      ...images ? { images } : {},
-      avoidSources: unverifiedSourceUrls(proof)
+      ...role ? { role } : {},
+      ...view.stage === "needs-review" && issue2 ? { failureText: reasonOf2(issue2, proof) } : {},
+      structureUnmet: checked2 && structure2 ? structure2[1].split(" ").filter((token) => !token.startsWith("image_")).length : 0,
+      factsOpen: checked2 ? ((_b3 = proof == null ? void 0 : proof.items) != null ? _b3 : []).filter((item) => item.type === "fact" && item.status !== "met").length : 0,
+      galleryBare: checked2 && galleryBare(role, note),
+      seam: view.seam
     };
   });
   const from = Date.parse((_a2 = input2.startedAt) != null ? _a2 : "");
   const to = Date.parse((_b2 = input2.writingEndedAt) != null ? _b2 : "");
   return {
     total: cards.length,
-    checked: cards.filter((card) => card.stage === "checked").length,
-    needsReview: cards.filter((card) => card.stage === "needs-review").length,
-    seams: cards.filter((card) => card.seam).length,
-    imageGaps: cards.reduce((sum2, card) => {
-      var _a3, _b3;
-      return sum2 + ((_b3 = (_a3 = card.images) == null ? void 0 : _a3.missing.length) != null ? _b3 : 0);
-    }, 0),
+    attention: cards.filter(needsAttention).length,
     ...Number.isFinite(from) && Number.isFinite(to) && to >= from ? { elapsedMinutes: Math.round((to - from) / 6e4) } : {},
     cards
   };
@@ -52546,30 +52333,21 @@ function renderGate2Panel(parent, data, done, state, actions, externalBusy = /* 
     });
     took.setAttr("title", t("ui.book_panel_elapsed_hint"));
   }
-  const lead = [
-    data.checked ? t("ui.book_panel_lead_passed_0", data.checked) : "",
-    data.needsReview ? t("ui.book_panel_lead_review_0", data.needsReview) : "",
-    data.seams ? t("ui.book_panel_lead_seams_0", data.seams) : "",
-    data.imageGaps ? t("ui.book_panel_lead_images_0", data.imageGaps) : ""
-  ].filter(Boolean);
-  if (lead.length) panel.createEl("p", { cls: "vam-book-panel-summary", text: lead.join(t("ui.book_panel_lead_sep")) });
+  const summary = panel.createEl("p", {
+    cls: "vam-book-panel-summary vam-book-panel-g2-line",
+    text: !data.total ? t("ui.book_panel_gate2_nothing") : data.attention ? t("ui.book_panel_g2_some_0_1", data.total, data.attention) : t("ui.book_panel_g2_all_done_0", data.total)
+  });
+  summary.dataset.state = data.attention ? "attention" : "clear";
   const anyBusy = externalBusy.size > 0 || state.busy.size > 0 || state.seaming.size > 0 || state.finishing || state.finishAsking || driveActive;
   const busyNow = (id) => externalBusy.has(id) || state.busy.has(id);
-  const attention = data.cards.filter(
-    (card) => card.stage === "needs-review" || busyNow(card.id) && card.stage !== "checked"
-  );
-  const seams = data.cards.filter((card) => card.seam);
-  const checked2 = data.cards.filter((card) => card.stage === "checked");
-  const list2 = panel.createEl("ul", { cls: "vam-book-panel-cards vam-book-panel-gate2-list" });
-  list2.setAttr("aria-label", t("ui.book_panel_gate2_list_label"));
-  if (!attention.length && !seams.length && !checked2.length)
-    list2.createEl("li", { cls: "vam-book-panel-muted", text: t("ui.book_panel_gate2_nothing") });
-  for (const card of attention) renderAttention(list2, card, state, actions, busyNow(card.id), anyBusy, rerun);
-  for (const card of seams) renderSeam(list2, card, state, actions, anyBusy);
-  for (const card of checked2) renderChecked(list2, card, state, actions, busyNow(card.id), anyBusy, rerun);
-  renderImages(panel, data, actions);
+  const attention = data.cards.filter(needsAttention);
+  if (attention.length) {
+    const list2 = panel.createEl("ul", { cls: "vam-book-panel-cards vam-book-panel-gate2-list" });
+    list2.setAttr("aria-label", t("ui.book_panel_gate2_list_label"));
+    for (const card of attention) renderAttention(list2, card, state, actions, busyNow(card.id), anyBusy, rerun);
+  }
   const foot = panel.createDiv("vam-book-panel-foot");
-  foot.createSpan({ cls: "vam-book-panel-muted", text: t("ui.book_panel_gate2_hint") });
+  if (attention.length && !done) foot.createSpan({ cls: "vam-book-panel-muted", text: t("ui.book_panel_gate2_hint") });
   if (!done) {
     const finish2 = foot.createEl("button", {
       cls: "mod-cta vam-book-panel-finish",
@@ -52597,14 +52375,10 @@ function renderGate2Panel(parent, data, done, state, actions, externalBusy = /* 
           }
         );
       };
-      if (data.needsReview + data.seams === 0) return go();
+      if (!attention.length) return go();
       state.finishAsking = true;
       actions.refresh();
-      const info = {
-        review: data.needsReview,
-        reviewTitles: data.cards.filter((card) => card.stage === "needs-review").map((card) => `${card.index} ${card.title}`),
-        seams: data.seams
-      };
+      const info = { count: attention.length, titles: attention.map((card) => `${card.index} ${card.title}`) };
       void actions.confirmFinish(info).then(
         (ok) => {
           state.finishAsking = false;
@@ -52624,15 +52398,6 @@ function renderGate2Panel(parent, data, done, state, actions, externalBusy = /* 
   status.setAttr("aria-live", "polite");
   return panel;
 }
-function row(list2, kind, card, busy) {
-  const item = list2.createEl("li", { cls: "vam-book-panel-card vam-book-panel-row" });
-  item.dataset.kind = kind;
-  item.dataset.stage = card.stage;
-  item.dataset.row = card.id;
-  item.setAttr("tabindex", "-1");
-  if (busy) item.setAttr("aria-busy", "true");
-  return item;
-}
 function button(parent, cls, text10, label, card, act, disabled, onClick) {
   const el = parent.createEl("button", { cls, text: text10 });
   el.setAttr("aria-label", label);
@@ -52644,19 +52409,6 @@ function button(parent, cls, text10, label, card, act, disabled, onClick) {
     if (!el.disabled) onClick();
   });
   return el;
-}
-function stateTag(head2, stage, text10) {
-  head2.createSpan({ cls: `vam-book-panel-state vam-book-state is-${stage}`, text: text10 });
-}
-function noteLine(item, state, key4, busy) {
-  var _a2;
-  const note = state.notes.get(key4);
-  const line2 = item.createDiv({
-    cls: "vam-book-panel-card-status",
-    text: busy ? t("ui.book_panel_busy") : (_a2 = note == null ? void 0 : note.text) != null ? _a2 : ""
-  });
-  line2.setAttr("role", (note == null ? void 0 : note.error) ? "alert" : "status");
-  if (note == null ? void 0 : note.error) line2.addClass("is-error");
 }
 function run(noteKey, id, state, set, actions, work) {
   if (set.has(id)) return;
@@ -52675,245 +52427,66 @@ function run(noteKey, id, state, set, actions, work) {
     }
   );
 }
-function startRerun(card, state, actions, avoidSources) {
-  run(card.id, card.id, state, state.busy, actions, async () => {
-    await runTrackedRerun(state, card.id, () => actions.rerun(card.id, avoidSources ? { avoidSources } : void 0));
-  });
-}
-function rerunTag(head2, card, rerun) {
-  if (!rerun || rerun.nodeId !== card.id) return false;
-  head2.createSpan({ cls: "vam-book-panel-state vam-book-state is-rerun", text: t("ui.book_rerun_tag") });
-  return true;
-}
 function renderAttention(list2, card, state, actions, busy, anyBusy, rerun) {
-  const item = row(list2, "attention", card, busy);
+  var _a2, _b2;
+  const item = list2.createEl("li", { cls: "vam-book-panel-card vam-book-panel-row" });
+  item.dataset.kind = "attention";
+  item.dataset.row = card.id;
+  item.setAttr("tabindex", "-1");
+  if (busy) item.setAttr("aria-busy", "true");
   const head2 = item.createDiv("vam-book-panel-card-head");
-  const rerunning = rerunTag(head2, card, rerun);
-  const unchanged = !busy && state.unchanged.has(card.id);
-  if (!rerunning)
-    stateTag(head2, "needs-review", unchanged ? t("ui.book_panel_still_review") : t("ui.book_stage_needs_review"));
+  if ((rerun == null ? void 0 : rerun.nodeId) === card.id)
+    head2.createSpan({ cls: "vam-book-panel-state vam-book-state is-rerun", text: t("ui.book_rerun_tag") });
+  else
+    head2.createSpan({
+      cls: "vam-book-panel-state vam-book-state is-needs-review",
+      text: state.unchanged.has(card.id) && !busy ? t("ui.book_panel_still_review") : t("ui.book_panel_g2_look")
+    });
   head2.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
+  item.createDiv({ cls: "vam-book-panel-field", text: attentionReasons(card).join(t("ui.book_panel_lead_sep")) });
+  const row = item.createDiv("vam-book-panel-actions");
   button(
-    head2,
+    row,
+    "vam-book-panel-rerun-card",
+    busy ? t("ui.book_panel_busy") : t("ui.book_panel_rerun_card"),
+    t("ui.book_panel_rerun_card_0", card.title),
+    card,
+    "rerun",
+    anyBusy,
+    () => run(card.id, card.id, state, state.busy, actions, async () => {
+      await runTrackedRerun(state, card.id, () => actions.rerun(card.id));
+    })
+  );
+  button(
+    row,
     "vam-book-panel-open",
-    t("ui.book_panel_open_card"),
+    t("ui.book_panel_g2_edit_myself"),
     t("ui.book_panel_open_0", card.title),
     card,
     "open",
     false,
     () => actions.open(card.id)
   );
-  button(
-    head2,
-    "vam-book-panel-rerun-card",
-    busy ? t("ui.book_panel_busy") : t("ui.book_panel_rerun_card"),
-    t("ui.book_panel_rerun_card_0", card.title),
-    card,
-    "rerun",
-    anyBusy,
-    () => startRerun(card, state, actions)
-  );
-  if (unchanged) {
-    const block = item.createDiv({ cls: "vam-book-panel-unchanged", text: t("ui.book_panel_unchanged") });
-    block.setAttr("role", "status");
-    block.dataset.kind = "unchanged";
-  }
-  if (card.reasonText)
-    item.createDiv({ cls: "vam-book-panel-field", text: t("ui.book_panel_reason_0", card.reasonText) });
-  if (unchanged) {
-    const actionsRow = item.createDiv("vam-book-panel-unchanged-actions");
-    if (card.avoidSources.length)
-      button(
-        actionsRow,
-        "vam-book-panel-swap-source",
-        t("ui.book_panel_swap_source"),
-        t("ui.book_panel_swap_source_0", card.title),
-        card,
-        "swap-source",
-        anyBusy,
-        () => startRerun(card, state, actions, card.avoidSources)
-      );
+  if (card.seam) {
+    const key4 = `seam:${card.id}`;
     button(
-      actionsRow,
-      "vam-book-panel-look-myself",
-      t("ui.book_panel_look_myself"),
-      t("ui.book_panel_open_0", card.title),
+      row,
+      "vam-book-panel-confirm-seam",
+      t("ui.book_panel_g2_confirm_seam"),
+      t("ui.book_panel_confirm_seam_0", card.title),
       card,
-      "look-myself",
-      false,
-      () => actions.open(card.id)
+      "seam",
+      anyBusy,
+      () => run(key4, card.id, state, state.seaming, actions, () => actions.confirmSeam(card.id))
     );
   }
-  noteLine(item, state, card.id, false);
-}
-function renderSeam(list2, card, state, actions, anyBusy) {
-  const key4 = `seam:${card.id}`;
-  const busy = state.seaming.has(card.id);
-  const item = row(list2, "seam", card, busy);
-  const head2 = item.createDiv("vam-book-panel-card-head");
-  stateTag(head2, "seam", t("ui.book_seam_label"));
-  head2.createEl("b", { cls: "vam-book-panel-card-title", text: card.seamTitle });
-  button(
-    head2,
-    "vam-book-panel-open",
-    t("ui.book_panel_open_card"),
-    t("ui.book_panel_open_0", card.title),
-    card,
-    "open-seam",
-    false,
-    () => actions.open(card.id)
-  );
-  item.createDiv({ cls: "vam-book-panel-field", text: t("ui.book_seam_reason") });
-  button(
-    item,
-    "vam-book-panel-confirm-seam",
-    t("ui.book_panel_confirm_seam"),
-    t("ui.book_panel_confirm_seam_0", card.seamTitle),
-    card,
-    "seam",
-    anyBusy,
-    () => run(key4, card.id, state, state.seaming, actions, () => actions.confirmSeam(card.id))
-  );
-  const note = state.notes.get(key4);
-  if (note) {
-    const line2 = item.createDiv({ cls: "vam-book-panel-card-status is-error", text: note.text });
-    line2.setAttr("role", "alert");
-  }
-}
-function checkedTagText(card) {
-  var _a2, _b2;
-  const notes = ((_b2 = (_a2 = card.proof) == null ? void 0 : _a2.items) != null ? _b2 : []).filter((item) => item.status !== "met").length;
-  return notes > 0 ? t("ui.book_panel_checked_tag_notes_0", String(notes)) : t("ui.book_panel_checked_tag");
-}
-function renderChecked(list2, card, state, actions, busy, anyBusy, rerun) {
-  const item = row(list2, "checked", card, busy);
-  const head2 = item.createDiv("vam-book-panel-card-head");
-  if (!rerunTag(head2, card, rerun)) stateTag(head2, "checked", checkedTagText(card));
-  head2.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
-  const open2 = state.proofOpen.has(card.id);
-  const toggle = button(
-    head2,
-    "vam-book-panel-proof-toggle",
-    open2 ? t("ui.book_panel_proof_hide") : t("ui.book_panel_proof_show"),
-    t("ui.book_panel_proof_0", card.title),
-    card,
-    "proof",
-    false,
-    () => void 0
-  );
-  toggle.setAttr("aria-expanded", String(open2));
-  button(
-    head2,
-    "vam-book-panel-rerun-card",
-    busy ? t("ui.book_panel_busy") : t("ui.book_panel_rerun_card"),
-    t("ui.book_panel_rerun_card_0", card.title),
-    card,
-    "rerun",
-    anyBusy,
-    () => startRerun(card, state, actions)
-  );
-  const proof = card.proof;
-  const body = item.createDiv("vam-book-panel-proof");
-  body.hidden = !open2;
-  if (proof) body.createDiv({ cls: "vam-book-panel-field", text: proofSummary(proof) });
-  renderProof(body, proof);
-  toggle.addEventListener("click", () => {
-    const now = !state.proofOpen.has(card.id);
-    if (now) state.proofOpen.add(card.id);
-    else state.proofOpen.delete(card.id);
-    body.hidden = !now;
-    toggle.setAttr("aria-expanded", String(now));
-    toggle.setText(now ? t("ui.book_panel_proof_hide") : t("ui.book_panel_proof_show"));
+  const note = (_a2 = state.notes.get(card.id)) != null ? _a2 : state.notes.get(`seam:${card.id}`);
+  const line2 = item.createDiv({
+    cls: "vam-book-panel-card-status",
+    text: busy ? t("ui.book_panel_busy") : (_b2 = note == null ? void 0 : note.text) != null ? _b2 : ""
   });
-  noteLine(item, state, card.id, false);
-}
-function proofSummary(proof) {
-  const met = proof.items.filter((item) => item.status === "met").length;
-  const unverified = proof.items.filter((item) => item.status === "unverified").length;
-  const unmet = proof.items.filter((item) => item.status === "unmet").length;
-  return t("ui.book_panel_proof_summary_0_1_2", met, unverified, unmet);
-}
-var STATUS_KEY = {
-  met: "ui.book_proof_met",
-  unmet: "ui.book_proof_unmet",
-  unverified: "ui.book_proof_unverified"
-};
-function renderProof(body, proof) {
-  if (!proof) {
-    body.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_proof_none") });
-    return;
-  }
-  if (proof.failed) body.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_proof_failed") });
-  if (proof.factsUnverified)
-    body.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_proof_facts_unverified") });
-  if (proof.counts)
-    body.createDiv({
-      cls: "vam-book-panel-field",
-      text: t("ui.book_panel_proof_opened_0_1", proof.counts.openedPages, proof.counts.searches)
-    });
-  const structure2 = proof.items.filter((item) => item.type === "structure" && item.status === "unmet");
-  if (structure2.length)
-    body.createDiv({
-      cls: "vam-book-panel-field",
-      text: t("ui.book_panel_structure_unmet_0", structure2.length)
-    });
-  const items = body.createEl("ul", { cls: "vam-book-panel-proof-items" });
-  for (const item of proof.items) {
-    const li = items.createEl("li", { cls: `vam-book-panel-proof-item is-${item.status}` });
-    const kind = item.type === "structure" ? t("ui.book_proof_structure") : t("ui.book_proof_fact");
-    li.createSpan({
-      text: `${kind}\u30FB${t(STATUS_KEY[item.status])}${item.note ? `\uFF1A${unescapeMarkdownText(item.note)}` : ""}`
-    });
-    if (item.sources.length)
-      li.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_proof_sources_0", item.sources.join("  ")) });
-  }
-}
-var SLOT_REASON_KEY = {
-  author_omitted: "ui.book_slot_reason_author_omitted",
-  bad_marker: "ui.book_slot_reason_bad_marker",
-  not_found: "ui.book_slot_reason_not_found",
-  load_failed: "ui.book_slot_reason_load_failed",
-  unsafe_url: "ui.book_slot_reason_unsafe_url",
-  probe_capped: "ui.book_slot_reason_probe_capped"
-};
-function renderImages(panel, data, actions) {
-  const cards = data.cards.filter((card) => card.images);
-  if (!cards.length) return;
-  const box = panel.createDiv("vam-book-panel-images");
-  box.createEl("h4", { cls: "vam-book-panel-images-title", text: t("ui.book_panel_images_title") });
-  const list2 = box.createEl("ul", { cls: "vam-book-panel-images-list" });
-  list2.setAttr("aria-label", t("ui.book_panel_images_label"));
-  for (const card of cards) {
-    const images = card.images;
-    const gaps = images.missing.length;
-    const shown = images.placed + images.edited;
-    const allUnrecorded = images.planned > 0 && images.unrecorded === images.planned;
-    const text10 = !images.planned ? t("ui.book_panel_g2_images_none") : allUnrecorded ? t("ui.book_panel_g2_images_unrecorded") : shown === 0 && gaps > 0 ? t("ui.book_panel_g2_images_none_fit") : gaps > 0 ? t("ui.book_panel_g2_images_n_gap_0_1", shown, gaps) : t("ui.book_panel_g2_images_n_0", shown);
-    const li = list2.createEl("li", { cls: "vam-book-panel-image-row" });
-    li.dataset.row = card.id;
-    li.dataset.kind = "images";
-    const warn = gaps > 0;
-    li.createSpan({ cls: `vam-book-panel-state vam-book-state ${warn ? "is-needs-review" : "is-checked"}`, text: text10 });
-    li.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
-    const why2 = images.missing.map(
-      (slot) => {
-        var _a2;
-        return t("ui.book_panel_g2_slot_0_1", slot.index, t((_a2 = SLOT_REASON_KEY[slot.code]) != null ? _a2 : SLOT_REASON_KEY.not_found));
-      }
-    ).concat(images.edited ? [t("ui.book_panel_g2_images_edited_0", images.edited)] : []);
-    if (why2.length) li.createSpan({ cls: "vam-book-panel-muted", text: why2.join(t("ui.book_panel_lead_sep")) });
-    if (warn)
-      button(
-        li,
-        "vam-book-panel-add-images",
-        t("ui.book_panel_add_images"),
-        t("ui.book_panel_add_images_0", card.title),
-        card,
-        "add-images",
-        false,
-        () => actions.open(card.id)
-      );
-  }
+  line2.setAttr("role", (note == null ? void 0 : note.error) ? "alert" : "status");
+  if (note == null ? void 0 : note.error) line2.addClass("is-error");
 }
 
 // experiences/visual-map/subtree-plan.ts
@@ -53184,7 +52757,7 @@ var TopicStylePickerModal = class extends import_obsidian24.Modal {
     __publicField(this, "radios", []);
     __publicField(this, "expanded", false);
     __publicField(this, "applyButton");
-    this.selected = rows2.find((row2) => row2.current);
+    this.selected = rows2.find((row) => row.current);
   }
   onClose() {
     var _a2, _b2;
@@ -53195,15 +52768,15 @@ var TopicStylePickerModal = class extends import_obsidian24.Modal {
     var _a2;
     this.titleEl.setText(t("ui.note_style_topic_title"));
     this.contentEl.createEl("p", { text: t("ui.note_style_topic_desc"), cls: "vam-modal-intro" });
-    const choosable = this.rows.filter((row2) => !row2.issue);
-    const broken = this.rows.filter((row2) => row2.issue);
+    const choosable = this.rows.filter((row) => !row.issue);
+    const broken = this.rows.filter((row) => row.issue);
     const shown = choosable.slice(0, PICKER_SHOWN);
     const rest = [...choosable.slice(PICKER_SHOWN), ...broken];
     const group = this.contentEl.createDiv({
       cls: "vam-picker-group",
       attr: { role: "radiogroup", "aria-label": t("ui.note_style_topic_title") }
     });
-    for (const row2 of shown) this.addRow(group, row2, false);
+    for (const row of shown) this.addRow(group, row, false);
     let toggle;
     if (rest.length) {
       toggle = this.contentEl.createEl("button", {
@@ -53213,9 +52786,9 @@ var TopicStylePickerModal = class extends import_obsidian24.Modal {
       });
       const extra = this.contentEl.createDiv({ cls: "vam-picker-group vam-picker-rest", attr: { role: "group" } });
       extra.hidden = true;
-      for (const row2 of rest) {
-        if (row2.issue) this.addBroken(extra, row2);
-        else this.addRow(extra, row2, true);
+      for (const row of rest) {
+        if (row.issue) this.addBroken(extra, row);
+        else this.addRow(extra, row, true);
       }
       toggle.addEventListener("click", () => {
         var _a3;
@@ -53235,17 +52808,17 @@ var TopicStylePickerModal = class extends import_obsidian24.Modal {
     start == null ? void 0 : start.el.focus();
     if (typeof window !== "undefined") window.setTimeout(() => start == null ? void 0 : start.el.focus(), 0);
   }
-  addRow(parent, row2, extra) {
+  addRow(parent, row, extra) {
     const el = parent.createEl("button", {
-      cls: `vam-picker-row${row2.current ? " is-current" : ""}`,
+      cls: `vam-picker-row${row.current ? " is-current" : ""}`,
       attr: { type: "button", role: "radio", "aria-checked": "false", tabindex: "-1" }
     });
     el.createSpan({
-      text: row2.current ? `${row2.label} \xB7 ${t("ui.detail_template_current")}` : row2.label,
+      text: row.current ? `${row.label} \xB7 ${t("ui.detail_template_current")}` : row.label,
       cls: "vam-picker-name"
     });
-    el.createSpan({ text: row2.tags, cls: "vam-picker-desc" });
-    const entry = { row: row2, el, extra };
+    el.createSpan({ text: row.tags, cls: "vam-picker-desc" });
+    const entry = { row, el, extra };
     this.radios.push(entry);
     el.addEventListener("click", () => this.choose(entry));
     el.addEventListener("keydown", (event) => {
@@ -53262,12 +52835,12 @@ var TopicStylePickerModal = class extends import_obsidian24.Modal {
       this.choose(live2[(from + step + live2.length) % live2.length], true);
     });
   }
-  addBroken(parent, row2) {
-    const issue2 = row2.issue;
+  addBroken(parent, row) {
+    const issue2 = row.issue;
     const el = parent.createDiv({ cls: "vam-picker-row vam-picker-broken" });
     const text10 = el.createDiv({ cls: "vam-picker-text" });
-    text10.createSpan({ text: row2.label, cls: "vam-picker-name" });
-    text10.createSpan({ text: row2.tags, cls: "vam-picker-desc" });
+    text10.createSpan({ text: row.label, cls: "vam-picker-name" });
+    text10.createSpan({ text: row.tags, cls: "vam-picker-desc" });
     el.createEl("button", { text: t("ui.note_style_open_file") }).addEventListener(
       "click",
       () => this.handlers.openFile(issue2.ref)
@@ -53288,11 +52861,11 @@ var TopicStylePickerModal = class extends import_obsidian24.Modal {
     if (this.applyButton) this.applyButton.disabled = !changed;
   }
   apply() {
-    const row2 = this.selected;
-    if (!row2 || row2.current || row2.value === void 0) return;
+    const row = this.selected;
+    if (!row || row.current || row.value === void 0) return;
     this.applied = true;
     this.close();
-    void this.handlers.apply(row2.value);
+    void this.handlers.apply(row.value);
   }
 };
 async function openTopicStyleChooser(app, plugin, options) {
@@ -53339,7 +52912,7 @@ async function openTopicStyleChooser(app, plugin, options) {
     }
     rows2.push({ label: item.name, tags: recipeTags(item), current: note.noteStyle === item.ref, value: item.ref });
   }
-  const at = rows2.findIndex((row2) => row2.current);
+  const at = rows2.findIndex((row) => row.current);
   if (at > 0) rows2.unshift(...rows2.splice(at, 1));
   const modal = new TopicStylePickerModal(app, rows2, {
     apply: options.write,
@@ -53439,7 +53012,7 @@ function firstMarkdownTable(markdown) {
       );
       if (rows2.length >= 4) break;
     }
-    return rows2.filter((row2) => row2.length);
+    return rows2.filter((row) => row.length);
   }
   return [];
 }
@@ -53669,7 +53242,7 @@ function cardToolsSideGap(side, zoom) {
 }
 function chooseCardToolsSpot(input2) {
   var _a2, _b2, _c, _d, _e;
-  const { card, row: row2, size, others, controls, visible } = input2;
+  const { card, row, size, others, controls, visible } = input2;
   const edge = (_a2 = input2.edge) != null ? _a2 : 6, maxInset = (_b2 = input2.maxInset) != null ? _b2 : 14, margin = 8, rightGap = (_c = input2.rightGap) != null ? _c : 4;
   const candidates = [];
   const slides = [0];
@@ -53681,7 +53254,7 @@ function chooseCardToolsSpot(input2) {
         side: "top",
         inset,
         slide,
-        rect: { left: row2.left + slide, right: row2.right + slide, top: bottom - size.height, bottom }
+        rect: { left: row.left + slide, right: row.right + slide, top: bottom - size.height, bottom }
       });
     }
   }
@@ -53692,7 +53265,7 @@ function chooseCardToolsSpot(input2) {
         side: "bottom",
         inset,
         slide,
-        rect: { left: row2.left + slide, right: row2.right + slide, top, bottom: top + size.height }
+        rect: { left: row.left + slide, right: row.right + slide, top, bottom: top + size.height }
       });
     }
   }
@@ -53725,16 +53298,16 @@ function chooseCardToolsSpot(input2) {
   }));
   const chosen = (_e = (_d = scored.find((item) => item.overlap === 0 && !item.blocked)) != null ? _d : scored.find((item) => item.overlap === 0)) != null ? _e : scored.reduce((best, item) => item.overlap < best.overlap ? item : best);
   let dx = 0, dy = 0;
-  const row22 = chosen.rect;
-  if (row22.left < visible.left + margin) dx = visible.left + margin - row22.left;
-  else if (row22.right > visible.right - margin) dx = visible.right - margin - row22.right;
-  if (row22.top < visible.top + margin) dy = visible.top + margin - row22.top;
-  else if (row22.bottom > visible.bottom - margin) dy = visible.bottom - margin - row22.bottom;
+  const row2 = chosen.rect;
+  if (row2.left < visible.left + margin) dx = visible.left + margin - row2.left;
+  else if (row2.right > visible.right - margin) dx = visible.right - margin - row2.right;
+  if (row2.top < visible.top + margin) dy = visible.top + margin - row2.top;
+  else if (row2.bottom > visible.bottom - margin) dy = visible.bottom - margin - row2.bottom;
   const union = () => ({
-    left: Math.min(card.left, row22.left) + dx,
-    right: Math.max(card.right, row22.right) + dx,
-    top: Math.min(card.top, row22.top) + dy,
-    bottom: Math.max(card.bottom, row22.bottom) + dy
+    left: Math.min(card.left, row2.left) + dx,
+    right: Math.max(card.right, row2.right) + dx,
+    top: Math.min(card.top, row2.top) + dy,
+    bottom: Math.max(card.bottom, row2.bottom) + dy
   });
   for (let round3 = 0; round3 < controls.length + 1; round3++) {
     const box = union(), hit = controls.find((control) => rectsIntersect(box, control));
@@ -53754,10 +53327,10 @@ function chooseCardToolsSpot(input2) {
     slide: chosen.slide,
     overlap: chosen.overlap,
     rect: {
-      left: row22.left + dx,
-      right: row22.right + dx,
-      top: row22.top + dy,
-      bottom: row22.bottom + dy
+      left: row2.left + dx,
+      right: row2.right + dx,
+      top: row2.top + dy,
+      bottom: row2.bottom + dy
     },
     pan: { dx, dy }
   };
@@ -53773,17 +53346,17 @@ var RelevanceSummaryModal = class extends import_obsidian26.Modal {
   renderRows(label, rows2) {
     const list2 = this.contentEl.createEl("ul", { cls: "vam-relevance-changes" });
     list2.setAttr("aria-label", label);
-    for (const row2 of rows2) {
+    for (const row of rows2) {
       const item = list2.createEl("li", { cls: "vam-relevance-change" });
-      item.createDiv({ cls: "vam-relevance-change-title", text: row2.title });
+      item.createDiv({ cls: "vam-relevance-change-title", text: row.title });
       const tags = item.createDiv({ cls: "vam-relevance-change-tags" });
-      if (row2.before) renderRelevanceTag(tags, row2.before.tier, t(RELEVANCE_LABEL[row2.before.tier]));
+      if (row.before) renderRelevanceTag(tags, row.before.tier, t(RELEVANCE_LABEL[row.before.tier]));
       else tags.createSpan({ cls: "vam-relevance-ungraded", text: t("ui.relevance_ungraded") });
       const arrow = tags.createSpan({ cls: "vam-relevance-arrow" });
       arrow.setAttr("role", "img");
       arrow.setAttr("aria-label", t("ui.relevance_changed_to"));
       (0, import_obsidian26.setIcon)(arrow, "arrow-right");
-      renderRelevanceTag(tags, row2.after.tier, t(RELEVANCE_LABEL[row2.after.tier]));
+      renderRelevanceTag(tags, row.after.tier, t(RELEVANCE_LABEL[row.after.tier]));
     }
   }
   onOpen() {
@@ -53794,9 +53367,9 @@ var RelevanceSummaryModal = class extends import_obsidian26.Modal {
     const pinOf = new Map(((_b2 = this.host.pins) != null ? _b2 : []).map((pin) => [pin.id, pin]));
     const groups = /* @__PURE__ */ new Map();
     const others = [];
-    for (const row2 of this.host.rows) {
-      if (row2.anchor && pinOf.has(row2.anchor)) groups.set(row2.anchor, [...(_c = groups.get(row2.anchor)) != null ? _c : [], row2]);
-      else others.push(row2);
+    for (const row of this.host.rows) {
+      if (row.anchor && pinOf.has(row.anchor)) groups.set(row.anchor, [...(_c = groups.get(row.anchor)) != null ? _c : [], row]);
+      else others.push(row);
     }
     if (!this.host.rows.length && !conflicts.length)
       this.contentEl.createEl("p", { cls: "vam-hint", text: t("ui.relevance_changes_none") });
@@ -53832,7 +53405,7 @@ var RelevanceSummaryModal = class extends import_obsidian26.Modal {
     actionStatus(footer);
     const close = footer.createEl("button", { text: t("ui.close") });
     close.addEventListener("click", () => this.close());
-    this.host.highlight(this.host.rows.map((row2) => row2.id));
+    this.host.highlight(this.host.rows.map((row) => row.id));
     close.focus();
   }
   onClose() {
@@ -55502,8 +55075,8 @@ function parseBlocks(lines, depth = 0, starts, budget) {
     if (LIST.test(line2)) {
       const rows2 = [];
       while (at < lines.length) {
-        const row2 = lines[at];
-        if (!row2.trim()) {
+        const row = lines[at];
+        if (!row.trim()) {
           let next = at + 1;
           while (next < lines.length && !lines[next].trim()) next++;
           if (next < lines.length && LIST.test(lines[next])) {
@@ -55512,27 +55085,27 @@ function parseBlocks(lines, depth = 0, starts, budget) {
           }
           break;
         }
-        const item = LIST.exec(row2);
+        const item = LIST.exec(row);
         if (item) {
           const ordered = /\d/.test(item[2]);
           const level = item[1].length >= 2 ? 1 : 0;
           if (level === 0 && rows2.length && ordered !== rows2[0].ordered) break;
           rows2.push({ level, ordered, text: item[3], line: at });
-        } else if (/^\s{2,}\S/.test(row2) && rows2.length) rows2[rows2.length - 1].text += `
-${row2.trim()}`;
+        } else if (/^\s{2,}\S/.test(row) && rows2.length) rows2[rows2.length - 1].text += `
+${row.trim()}`;
         else break;
         at++;
       }
       const list2 = { t: "list", ordered: rows2[0].ordered, items: [] };
       const itemLines = [];
-      for (const row2 of rows2) {
+      for (const row of rows2) {
         const top = list2.items.at(-1);
-        if (row2.level === 1 && top) {
-          (_a2 = top.sub) != null ? _a2 : top.sub = { t: "list", ordered: row2.ordered, items: [] };
-          top.sub.items.push({ c: parseInline(row2.text), sub: null });
+        if (row.level === 1 && top) {
+          (_a2 = top.sub) != null ? _a2 : top.sub = { t: "list", ordered: row.ordered, items: [] };
+          top.sub.items.push({ c: parseInline(row.text), sub: null });
         } else {
-          list2.items.push({ c: parseInline(row2.text), sub: null });
-          itemLines.push(row2.line);
+          list2.items.push({ c: parseInline(row.text), sub: null });
+          itemLines.push(row.line);
         }
       }
       if (!emit(list2) && budget) budget.itemLines = itemLines;
@@ -55671,9 +55244,9 @@ function renderBlocks(parent, blocks) {
       case "list": {
         const list2 = parent.createEl(block.ordered ? "ol" : "ul");
         for (const item of block.items) {
-          const row2 = list2.createEl("li");
-          renderInline(row2, item.c);
-          if (item.sub) renderBlocks(row2, [item.sub]);
+          const row = list2.createEl("li");
+          renderInline(row, item.c);
+          if (item.sub) renderBlocks(row, [item.sub]);
         }
         break;
       }
@@ -58407,10 +57980,10 @@ ${shown}` : t("ui.map_chat_model_label"));
     return summary.notRun ? t("ui.map_chat_batch_stopped_failed_0_1_2_3", summary.done, summary.total, summary.failed, summary.notRun) : t("ui.map_chat_batch_finished_failed_0_1_2", summary.done, summary.total, summary.failed);
   }
   /** What a batch that stopped, failed in part or was cut by a reload says, and the one button that runs the rest again. Titles are untrusted text. */
-  buildBatch(row2, message, batch) {
+  buildBatch(row, message, batch) {
     const summary = summarizeChatBatch(batch, batch.restored === true);
     if (!summary || !(batch.ended || summary.interrupted || batch.running)) return;
-    const box = row2.createDiv({ cls: "vam-map-chat-batch", attr: { role: "status", tabindex: "-1" } });
+    const box = row.createDiv({ cls: "vam-map-chat-batch", attr: { role: "status", tabindex: "-1" } });
     box.createDiv({ cls: "vam-map-chat-batch-title", text: this.batchTitle(summary) });
     const shown = summary.pending.slice(0, 5);
     const left = box.createDiv("vam-map-chat-batch-left");
@@ -58439,8 +58012,8 @@ ${shown}` : t("ui.map_chat_model_label"));
     return !(batch && (batch.restored && !batch.ended || batch.running));
   }
   /** What an interrupted chain says and the one button that goes on with the next round. */
-  buildResume(row2, message, point) {
-    const box = row2.createDiv({
+  buildResume(row, message, point) {
+    const box = row.createDiv({
       cls: "vam-map-chat-batch vam-map-chat-resume",
       attr: { role: "status", tabindex: "-1" }
     });
@@ -58497,44 +58070,44 @@ ${shown}` : t("ui.map_chat_model_label"));
   }
   buildRow(message) {
     var _a2, _b2, _c;
-    const row2 = this.logEl.createDiv({
+    const row = this.logEl.createDiv({
       cls: `vam-map-chat-msg is-${message.role}${message.error ? " is-error" : ""}${message.auto ? " is-auto" : ""}`
     });
     if (message.auto) {
       const info = message.autoInfo;
-      const body2 = row2.createDiv({ cls: "vam-map-chat-auto-title" });
+      const body2 = row.createDiv({ cls: "vam-map-chat-auto-title" });
       body2.setText((info == null ? void 0 : info.round) ? this.autoRoundLabel({ ...info, round: info.round }) : t("ui.map_chat_role_auto"));
       if (info == null ? void 0 : info.partial)
-        row2.createDiv({
+        row.createDiv({
           cls: "vam-map-chat-auto-note",
           text: t("ui.map_chat_chain_partial_0_1", info.partial.failed, info.partial.succeeded)
         });
       if ((_a2 = info == null ? void 0 : info.remaining) == null ? void 0 : _a2.trim())
-        row2.createDiv({ cls: "vam-map-chat-auto-left", text: t("ui.map_chat_chain_left_0", info.remaining) });
+        row.createDiv({ cls: "vam-map-chat-auto-left", text: t("ui.map_chat_chain_left_0", info.remaining) });
       if (info == null ? void 0 : info.applied)
-        row2.createDiv({ cls: "vam-map-chat-auto-applied", text: t("ui.map_chat_auto_applied_0", info.applied) });
-      return { row: row2, body: body2, more: null };
+        row.createDiv({ cls: "vam-map-chat-auto-applied", text: t("ui.map_chat_auto_applied_0", info.applied) });
+      return { row, body: body2, more: null };
     }
-    row2.createSpan({
+    row.createSpan({
       cls: "vam-map-chat-role",
       text: message.role === "user" ? t("ui.map_chat_role_you") : message.modelLabel || t("ui.map_chat_role_ai")
     });
     const markdown = message.role === "assistant" && !message.error;
-    const body = row2.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
+    const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
     if (markdown) renderChatMarkdown(body, message.text, t("ui.map_chat_overflow_note"));
     else body.setText(message.text);
-    for (const steer of (_b2 = message.steers) != null ? _b2 : []) this.buildSteer(row2, steer);
-    if (message.error && message.technical) this.buildTechnical(row2, message.technical);
-    if (this.stage && this.stageMessage() === message) this.buildStage(row2, message);
+    for (const steer of (_b2 = message.steers) != null ? _b2 : []) this.buildSteer(row, steer);
+    if (message.error && message.technical) this.buildTechnical(row, message.technical);
+    if (this.stage && this.stageMessage() === message) this.buildStage(row, message);
     const applied = message.plan && message.plan.state === "applied" && !message.plan.stale ? message.plan : null;
-    if (message.plan && !applied) this.buildPlan(row2, message.plan, message);
-    if (message.choices) this.buildChoices(row2, message.choices);
-    const undoPlaced = message.lines.length > 0 || applied ? this.buildOutcome(row2, message, applied) : false;
-    this.buildBasis(row2, message);
-    if ((_c = message.images) == null ? void 0 : _c.length) this.buildImages(row2, message.images);
-    if (this.chainWaitingState && this.messages.at(-1) === message) this.buildChainWait(row2);
+    if (message.plan && !applied) this.buildPlan(row, message.plan, message);
+    if (message.choices) this.buildChoices(row, message.choices);
+    const undoPlaced = message.lines.length > 0 || applied ? this.buildOutcome(row, message, applied) : false;
+    this.buildBasis(row, message);
+    if ((_c = message.images) == null ? void 0 : _c.length) this.buildImages(row, message.images);
+    if (this.chainWaitingState && this.messages.at(-1) === message) this.buildChainWait(row);
     if (message.seenImage) {
-      const line2 = row2.createDiv("vam-map-chat-seen-row");
+      const line2 = row.createDiv("vam-map-chat-seen-row");
       const eye = line2.createSpan("vam-map-chat-seen-icon");
       eye.setAttr("aria-hidden", "true");
       (0, import_obsidian27.setIcon)(eye, "eye");
@@ -58544,15 +58117,15 @@ ${shown}` : t("ui.map_chat_model_label"));
       });
     }
     if (message.chainNote)
-      row2.createDiv({ cls: `vam-map-chat-chain-note is-${message.chainNote.reason}`, text: message.chainNote.text });
-    if (message.batch) this.buildBatch(row2, message, message.batch);
-    if (this.resumeShown(message) && message.resume) this.buildResume(row2, message, message.resume);
-    if (message.replyUndo && !undoPlaced) this.buildReplyUndo(row2, message.replyUndo.token);
+      row.createDiv({ cls: `vam-map-chat-chain-note is-${message.chainNote.reason}`, text: message.chainNote.text });
+    if (message.batch) this.buildBatch(row, message, message.batch);
+    if (this.resumeShown(message) && message.resume) this.buildResume(row, message, message.resume);
+    if (message.replyUndo && !undoPlaced) this.buildReplyUndo(row, message.replyUndo.token);
     const asked = this.messages[this.messages.indexOf(message) - 1];
     let more = null;
     if (this.canRetry(message, asked) && (asked == null ? void 0 : asked.origin)) {
       const origin = asked.origin;
-      more = row2.createEl("button", {
+      more = row.createEl("button", {
         cls: "vam-map-chat-retry",
         text: t("ui.map_chat_retry"),
         attr: { type: "button" }
@@ -58567,19 +58140,19 @@ ${shown}` : t("ui.map_chat_model_label"));
           });
         });
     }
-    return { row: row2, body, more };
+    return { row, body, more };
   }
   /**
    * What the results were built from, gathered under them (so a folded list still shows it) and then the research notes the round
    * left unread. Plain text only (titles are untrusted); "read", never "checked". The program decides it, not the model.
    */
-  buildBasis(row2, message) {
+  buildBasis(row, message) {
     var _a2;
     const all = summarizeBasis(message.lines.flatMap((line2) => line2.basis ? [line2.basis] : []));
     const entries = message.linesOpen ? all : all.filter((entry) => entry.kind === "outline_only");
     const unread = (_a2 = message.unread) != null ? _a2 : [];
     if (!entries.length && !unread.length) return;
-    const box = row2.createDiv({ cls: "vam-map-chat-basis" });
+    const box = row.createDiv({ cls: "vam-map-chat-basis" });
     for (const entry of entries) this.buildBasisEntry(box.createDiv("vam-map-chat-basis-line"), entry);
     for (const item of unread)
       box.createDiv({
@@ -58617,8 +58190,8 @@ ${shown}` : t("ui.map_chat_model_label"));
       );
   }
   /** The waiting row of a continuation: how far the research and expansions are, the time (hidden from readers), and what is left. */
-  buildChainWait(row2) {
-    const box = row2.createDiv({ cls: "vam-map-chat-chain-wait", attr: { role: "status" } });
+  buildChainWait(row) {
+    const box = row.createDiv({ cls: "vam-map-chat-chain-wait", attr: { role: "status" } });
     const line2 = box.createDiv("vam-map-chat-chain-wait-line");
     const label = line2.createSpan({ cls: "vam-map-chat-chain-wait-label" });
     const elapsed = line2.createSpan({ cls: "vam-map-chat-chain-wait-elapsed" });
@@ -58663,8 +58236,8 @@ ${shown}` : t("ui.map_chat_model_label"));
     });
   }
   /** A follow-up under the question: its own small bubble, tagged in words (the tag is text, never colour alone). */
-  buildSteer(row2, steer) {
-    const bubble = row2.createDiv({ cls: `vam-map-chat-steer is-${steer.state}` });
+  buildSteer(row, steer) {
+    const bubble = row.createDiv({ cls: `vam-map-chat-steer is-${steer.state}` });
     bubble.createEl("small", {
       cls: "vam-map-chat-steer-tag",
       text: t(steer.state === "live" ? "ui.map_chat_steer_tag_live" : "ui.map_chat_steer_tag_queued")
@@ -58672,8 +58245,8 @@ ${shown}` : t("ui.map_chat_model_label"));
     bubble.createSpan({ cls: "vam-map-chat-steer-text", text: steer.text });
   }
   /** The raw error of a failed turn: folded away, selectable and copyable. */
-  buildTechnical(row2, raw) {
-    const more = row2.createEl("details", { cls: "vam-map-chat-error-details" });
+  buildTechnical(row, raw) {
+    const more = row.createEl("details", { cls: "vam-map-chat-error-details" });
     more.createEl("summary", { text: t("ui.technical_details") });
     more.createEl("pre", { text: raw });
     const copy = more.createEl("button", { text: t("ui.copy_technical_details"), attr: { type: "button" } });
@@ -58683,8 +58256,8 @@ ${shown}` : t("ui.map_chat_model_label"));
     });
   }
   /** The stage line of the running turn: the stage name, then the seconds (hidden from screen readers; they tick). */
-  buildStage(row2, message) {
-    const box = row2.createDiv({ cls: `vam-map-chat-progress${message.text ? " is-compact" : ""}` });
+  buildStage(row, message) {
+    const box = row.createDiv({ cls: `vam-map-chat-progress${message.text ? " is-compact" : ""}` });
     const label = box.createSpan({ cls: "vam-map-chat-progress-stage" });
     const elapsed = box.createSpan({ cls: "vam-map-chat-progress-elapsed" });
     elapsed.setAttr("aria-hidden", "true");
@@ -58715,7 +58288,7 @@ ${shown}` : t("ui.map_chat_model_label"));
    * notes). Done lines fold into a count, and with the applied plan card and the basis they sit behind "View details". Each
    * line says what happened in words, so the colour is never the only sign. Returns whether Undo was put in the summary row.
    */
-  buildOutcome(row2, message, applied) {
+  buildOutcome(row, message, applied) {
     const shownLines = message.lines.filter((line2) => {
       var _a2;
       return !((_a2 = line2.imageGroup) == null ? void 0 : _a2.some((block) => block.state === "searching"));
@@ -58728,7 +58301,7 @@ ${shown}` : t("ui.map_chat_model_label"));
     const open2 = hasDetail && message.linesOpen === true;
     const undo = message.replyUndo;
     if (!hasDetail && !loud.length && !notes.length && !undo) return false;
-    const list2 = row2.createDiv({ cls: "vam-map-chat-lines" });
+    const list2 = row.createDiv({ cls: "vam-map-chat-lines" });
     if (hasDetail || undo) {
       const summary = list2.createDiv("vam-map-chat-lines-summary");
       if (folded2.length)
@@ -58874,16 +58447,16 @@ ${shown}` : t("ui.map_chat_model_label"));
    * how many have ended, and offers Stop for the ones that have not. Nothing here is run or fetched except the thumbnails,
    * which are https images shown without a referrer. All text goes in as text.
    */
-  buildImages(row2, blocks) {
+  buildImages(row, blocks) {
     const live2 = blocks.filter((block) => !block.stale);
-    if (live2.length) this.buildImageResult(row2, live2);
+    if (live2.length) this.buildImageResult(row, live2);
     const old = blocks.filter((block) => block.stale);
-    if (old.length) this.buildStaleImages(row2, old);
+    if (old.length) this.buildStaleImages(row, old);
   }
-  buildImageResult(row2, blocks) {
+  buildImageResult(row, blocks) {
     var _a2, _b2, _c;
     const pending2 = blocks.filter((block) => block.state === "searching");
-    const box = row2.createDiv({
+    const box = row.createDiv({
       cls: `vam-map-chat-images ${pending2.length ? "is-searching" : "is-done"}`,
       attr: { role: "group", "aria-label": t("ui.map_chat_images_label") }
     });
@@ -58944,8 +58517,8 @@ ${shown}` : t("ui.map_chat_model_label"));
     }
   }
   /** Older saved records: what was listed, read-only (no link, no thumbnail, nothing to press). */
-  buildStaleImages(row2, blocks) {
-    const box = row2.createDiv({
+  buildStaleImages(row, blocks) {
+    const box = row.createDiv({
       cls: "vam-map-chat-images is-stale",
       attr: { role: "group", "aria-label": t("ui.map_chat_images_label") }
     });
@@ -58963,8 +58536,8 @@ ${shown}` : t("ui.map_chat_model_label"));
         else text10.createDiv({ cls: "vam-map-chat-images-title", text: clip4(item.candidate.title, 80) });
       }
   }
-  buildChoices(row2, choices) {
-    const box = row2.createDiv({ cls: "vam-map-chat-choices" });
+  buildChoices(row, choices) {
+    const box = row.createDiv({ cls: "vam-map-chat-choices" });
     box.setAttr("role", "group");
     box.setAttr("aria-label", choices.prompt);
     box.createDiv({ cls: "vam-map-chat-choices-prompt", text: choices.prompt });
@@ -60040,8 +59613,8 @@ function renderArgumentCardBody(card, view, onAction, onResume) {
   if (view.dashed) card.dataset.argumentMissing = "true";
   const body = card.createDiv({ cls: "vam-argument-body" });
   if (view.chips.length) {
-    const row2 = body.createDiv({ cls: "vam-argument-chips" });
-    for (const chip of view.chips) row2.createSpan({ cls: `vam-argument-chip is-${chip.tone}`, text: chip.text });
+    const row = body.createDiv({ cls: "vam-argument-chips" });
+    for (const chip of view.chips) row.createSpan({ cls: `vam-argument-chip is-${chip.tone}`, text: chip.text });
   }
   if ((_a2 = view.definitions) == null ? void 0 : _a2.length) {
     const list2 = body.createEl("dl", { cls: "vam-argument-definitions" });
@@ -60079,8 +59652,8 @@ var decode = (text10) => text10.replace(
   /^(?:([＋－＞])|(\d+)([．）]))/,
   (_m, mark2, digits, ordered) => digits ? `${digits}${ordered === "\uFF0E" ? "." : ")"}` : narrow(mark2)
 ).replace(/[＼｀＊＿＾＃＄［］＜｜]/g, narrow).replace(/％{2,}|＝{2,}|～{2,}/g, narrowRun).replace(/＆(?=#|\w+;)/g, narrow).replace(/：+(?=\/)|：{2,}/g, narrowRun).replace(/\bwww．/gi, (m) => `${m.slice(0, 3)}.`);
-var cells = (row2) => row2.trim().replace(/^\|/, "").replace(/\|$/, "").split("|");
-var isSeparator = (row2) => cells(row2).every((cell2) => /^\s*:?-{3,}:?\s*$/.test(cell2));
+var cells = (row) => row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|");
+var isSeparator = (row) => cells(row).every((cell2) => /^\s*:?-{3,}:?\s*$/.test(cell2));
 function parseDefinitionsTable(detail) {
   const lines = detail.split(/\r?\n/);
   const start = lines.findIndex((line2) => line2.trim().startsWith("|"));
@@ -60092,8 +59665,8 @@ function parseDefinitionsTable(detail) {
   }
   if (block.length < 3 || cells(block[0]).length !== 3 || !isSeparator(block[1])) return null;
   const items = [];
-  for (const row2 of block.slice(2)) {
-    const parts = cells(row2);
+  for (const row of block.slice(2)) {
+    const parts = cells(row);
     if (parts.length !== 3) return null;
     const [label, value, reason] = parts.map((part) => decode(part.trim()));
     if (!label || !value || !reason || label === "-" || value === "-") return null;
@@ -62013,8 +61586,8 @@ var MapChatConversation = class {
         },
         onChange: (reason) => {
           var _a3;
-          for (const [entry, row2] of steerRows)
-            if (entry.state === "queued") (_a3 = this.ports.panel()) == null ? void 0 : _a3.setSteerState(row2, "queued");
+          for (const [entry, row] of steerRows)
+            if (entry.state === "queued") (_a3 = this.ports.panel()) == null ? void 0 : _a3.setSteerState(row, "queued");
           if (reason) origin.text = [message, ...steerState.steers.delivered()].join("\n\n");
         }
       })
@@ -62225,7 +61798,7 @@ var MapChatConversation = class {
   returnSteers(state) {
     const chat = this.ports.panel();
     if (chat) {
-      for (const [entry, row2] of state.rows) if (entry.state !== "delivered") chat.setSteerState(row2, "queued", false);
+      for (const [entry, row] of state.rows) if (entry.state !== "delivered") chat.setSteerState(row, "queued", false);
     }
     state.steers.abandon();
     chat == null ? void 0 : chat.restoreDraft(chat.takeQueued());
@@ -63016,19 +62589,19 @@ var GoalSuggest = class {
     const rows2 = panel.createDiv("vam-goal-suggest-rows");
     task.suggestions.forEach((item, index) => {
       var _a3, _b3;
-      const row2 = rows2.createEl("label", { cls: "vam-goal-suggest-row" });
-      const box = row2.createEl("input", { type: "checkbox" });
+      const row = rows2.createEl("label", { cls: "vam-goal-suggest-row" });
+      const box = row.createEl("input", { type: "checkbox" });
       box.checked = task.checked.has(index);
       box.disabled = applying;
       boxes.push(box);
-      const text10 = row2.createSpan("vam-goal-suggest-text");
+      const text10 = row.createSpan("vam-goal-suggest-text");
       text10.createSpan({ cls: "vam-goal-suggest-title", text: item.title });
       text10.createSpan({ cls: "vam-goal-suggest-summary", text: item.summary });
       text10.createSpan({
         cls: "vam-goal-suggest-why",
         text: t("ui.goal_suggest_under_0", (_b3 = (_a3 = task.basis.get(item.parentId)) == null ? void 0 : _a3.title) != null ? _b3 : "")
       });
-      row2.createSpan({
+      row.createSpan({
         cls: `vam-goal-suggest-tier is-${item.suggestedTier}`,
         text: t(RELEVANCE_LABEL[item.suggestedTier])
       });
@@ -63928,12 +63501,12 @@ function styleChoiceField(parent, options) {
     for (const item of own2) {
       const first = item.issues[0];
       if (!first) continue;
-      const row2 = problems.createDiv({ cls: "vam-note-style-problem", attr: { role: "status" } });
-      row2.createSpan({
+      const row = problems.createDiv({ cls: "vam-note-style-problem", attr: { role: "status" } });
+      row.createSpan({
         text: t("ui.note_style_unusable_0_1_2", (_a2 = item.fileName) != null ? _a2 : item.name, first.line, styleIssueText(first))
       });
       if (picker) {
-        const open2 = row2.createEl("button", { text: t("ui.note_style_open_file"), cls: "vam-field-link" });
+        const open2 = row.createEl("button", { text: t("ui.note_style_open_file"), cls: "vam-field-link" });
         open2.type = "button";
         open2.addEventListener("click", () => void picker.openRecipe(item.ref));
       }
@@ -65219,22 +64792,22 @@ function bookModelSummary(models, label) {
   );
 }
 function renderBookModelChoice(parent, input2) {
-  for (const row2 of MODEL_ROWS) {
-    const id = `vam-book-start-model-${row2.step}`;
-    const name2 = t(row2.label);
+  for (const row of MODEL_ROWS) {
+    const id = `vam-book-start-model-${row.step}`;
+    const name2 = t(row.label);
     parent.createEl("label", { text: name2, attr: { for: id } });
     const select = parent.createEl("select", {
       cls: "dropdown vam-book-start-model",
       attr: { id, "aria-label": name2 }
     });
-    const selected = input2.models[row2.step];
+    const selected = input2.models[row.step];
     select.add(new Option(selected, selected));
     select.value = selected;
     syncModelSelect(select, input2.options(), input2.label, t("ui.current_model_is_unavailable"));
     select.addEventListener("change", () => {
       if (!select.value) return;
-      input2.models[row2.step] = select.value;
-      input2.onChange(row2.key, select.value);
+      input2.models[row.step] = select.value;
+      input2.onChange(row.key, select.value);
     });
   }
 }
@@ -65350,13 +64923,10 @@ var BookStartModal = class extends import_obsidian31.Modal {
 // experiences/visual-map/book-pipeline-finish-modal.ts
 var import_obsidian32 = require("obsidian");
 function finishAskLine(info) {
-  const parts = [];
-  if (info.review)
-    parts.push(
-      info.reviewTitles.length ? t("ui.book_finish_ask_review_title_0_1", info.review, info.reviewTitles.join(" \xB7 ")) : t("ui.book_finish_ask_review_0", info.review)
-    );
-  if (info.seams) parts.push(t("ui.book_finish_ask_seams_0", info.seams));
-  return t("ui.book_finish_ask_line_0", parts.join(t("ui.book_finish_ask_sep")));
+  return t(
+    "ui.book_finish_ask_line_0",
+    info.titles.length ? t("ui.book_finish_ask_review_title_0_1", info.count, info.titles.join(" \xB7 ")) : t("ui.book_finish_ask_review_0", info.count)
+  );
 }
 var BookFinishModal = class extends import_obsidian32.Modal {
   constructor(app, info, answer) {
@@ -65368,7 +64938,7 @@ var BookFinishModal = class extends import_obsidian32.Modal {
   }
   onOpen() {
     const { contentEl } = this;
-    this.titleEl.setText(t("ui.book_finish_ask_title_0", this.info.review + this.info.seams));
+    this.titleEl.setText(t("ui.book_finish_ask_title_0", this.info.count));
     contentEl.createEl("p", { cls: "vam-book-finish-line", text: finishAskLine(this.info) });
     const actions = modalActions(this);
     const back = actions.createEl("button", { cls: "vam-book-finish-back", text: t("ui.book_finish_ask_back") });
@@ -65476,14 +65046,14 @@ var DebugLogModal = class extends import_obsidian33.Modal {
     const entries = this.logs.getLogs();
     if (!entries.length) list2.createEl("p", { cls: "vam-debug-log-empty", text: t("ui.there_are_no_debug_logs_yet") });
     for (const entry of entries) {
-      const row2 = list2.createDiv("vam-debug-log-entry");
-      const metadata = row2.createDiv("vam-debug-log-meta");
+      const row = list2.createDiv("vam-debug-log-entry");
+      const metadata = row.createDiv("vam-debug-log-meta");
       metadata.createEl("time", {
         text: new Date(entry.timestamp).toLocaleString(getUiLanguage()),
         attr: { datetime: entry.timestamp }
       });
       metadata.createSpan({ cls: `vam-debug-log-level is-${entry.level}`, text: entry.level.toUpperCase() });
-      row2.createEl("pre", { text: entry.message });
+      row.createEl("pre", { text: entry.message });
     }
     this.contentEl.createEl("h3", { text: t("ui.ai_exchanges") });
     this.contentEl.createEl("p", {
@@ -66092,21 +65662,21 @@ var NextStepModal = class extends import_obsidian34.Modal {
     });
   }
 };
-function renderProposalKind(head2, row2, item) {
+function renderProposalKind(head2, row, item) {
   if (item.kind)
     head2.createSpan({
       cls: `vam-proposal-kind vam-proposal-kind-${item.kind}`,
       text: t(`ui.proposal_kind_${item.kind}`)
     });
   if (item.destination)
-    row2.createEl("p", {
+    row.createEl("p", {
       cls: "vam-proposal-destination",
       text: t(
         item.kind === "merge" ? "ui.proposal_merge_into_0" : item.kind === "add" ? "ui.proposal_add_under_0" : "ui.proposal_destination_0",
         item.destination
       )
     });
-  if (item.reason) row2.createEl("p", { cls: "vam-proposal-reason", text: item.reason });
+  if (item.reason) row.createEl("p", { cls: "vam-proposal-reason", text: item.reason });
 }
 function renderProposalList(parent, suggestions, changed, options = {}) {
   var _a2;
@@ -66153,7 +65723,7 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
       up = parentOf2((_a3 = suggestions.find((other) => keyOf2(other) === up)) != null ? _a3 : { title: "", task: "", contribution: "" });
     return depth;
   };
-  const count4 = () => rows2.filter((row2) => row2.check.checked).length;
+  const count4 = () => rows2.filter((row) => row.check.checked).length;
   const update = () => {
     const picked = count4();
     counter.setText(t("ui.selected_0_of_1", picked, rows2.length));
@@ -66161,9 +65731,9 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
     changed(picked);
   };
   for (const item of ordered) {
-    const row2 = list2.createDiv(parentOf2(item) ? "vam-proposal is-child" : "vam-proposal");
-    if (keyed) row2.addClass(`vam-proposal-depth-${Math.min(depthOf2(item), 5)}`);
-    const head2 = row2.createDiv("vam-proposal-head");
+    const row = list2.createDiv(parentOf2(item) ? "vam-proposal is-child" : "vam-proposal");
+    if (keyed) row.addClass(`vam-proposal-depth-${Math.min(depthOf2(item), 5)}`);
+    const head2 = row.createDiv("vam-proposal-head");
     const check = head2.createEl("input", { type: "checkbox" });
     check.checked = !review;
     check.hidden = review;
@@ -66171,12 +65741,12 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
     const title = head2.createEl("input", { type: "text", value: item.title, cls: "vam-proposal-title" });
     title.setAttr("aria-label", t("ui.proposal_name"));
     title.readOnly = !!item.kind && item.kind !== "add";
-    renderProposalKind(head2, row2, item);
+    renderProposalKind(head2, row, item);
     let task, contribution;
     if (!options.compact && (!item.kind || item.kind === "add")) {
       const more = head2.createEl("button", { text: t("ui.proposal_details"), cls: "vam-proposal-more" });
       more.setAttr("aria-expanded", "false");
-      const body = row2.createDiv("vam-proposal-body");
+      const body = row.createDiv("vam-proposal-body");
       body.hidden = true;
       more.addEventListener("click", () => {
         body.hidden = !body.hidden;
@@ -66195,7 +65765,7 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
       contribution.setAttr("aria-label", t("ui.contribution_to_the_parent_topic"));
     }
     rows2.push({ item, check, title, task, contribution });
-    (_a2 = options.apply) == null ? void 0 : _a2.call(options, item, { element: row2, head: head2, title });
+    (_a2 = options.apply) == null ? void 0 : _a2.call(options, item, { element: row, head: head2, title });
     check.addEventListener("change", () => {
       const uncheckChildren = (key4) => rows2.forEach((other) => {
         if (parentOf2(other.item) === key4 && other.check.checked) {
@@ -66218,28 +65788,28 @@ function renderProposalList(parent, suggestions, changed, options = {}) {
   }
   all.addEventListener("click", () => {
     const value = count4() !== rows2.length;
-    rows2.forEach((row2) => row2.check.checked = value);
+    rows2.forEach((row) => row.check.checked = value);
     update();
   });
   update();
   return {
     count: count4,
     selected: () => {
-      const selected = rows2.filter((row2) => row2.check.checked && row2.title.value.trim());
+      const selected = rows2.filter((row) => row.check.checked && row.title.value.trim());
       if (!selected.length) return t("ui.select_at_least_one_subtopic");
-      const renamed = new Map(selected.map((row2) => [keyOf2(row2.item), row2.title.value.trim()]));
-      const names3 = selected.filter((row2) => !parentOf2(row2.item)).map((row2) => row2.title.value.trim());
+      const renamed = new Map(selected.map((row) => [keyOf2(row.item), row.title.value.trim()]));
+      const names3 = selected.filter((row) => !parentOf2(row.item)).map((row) => row.title.value.trim());
       if (new Set(names3).size !== names3.length) return t("ui.first_level_topic_names_must_be_unique");
-      if (selected.some((row2) => parentOf2(row2.item) && !renamed.has(parentOf2(row2.item))))
+      if (selected.some((row) => parentOf2(row.item) && !renamed.has(parentOf2(row.item))))
         return t("ui.select_the_parent_topic_before_its_child");
-      return selected.map((row2) => {
+      return selected.map((row) => {
         var _a3, _b2, _c, _d, _e;
         return {
-          title: row2.title.value.trim(),
-          task: (_b2 = (_a3 = row2.task) == null ? void 0 : _a3.value.trim()) != null ? _b2 : row2.item.task,
-          contribution: (_d = (_c = row2.contribution) == null ? void 0 : _c.value.trim()) != null ? _d : row2.item.contribution,
-          parentTitle: parentOf2(row2.item) ? renamed.get(parentOf2(row2.item)) : "",
-          ...row2.item.key !== void 0 ? { key: row2.item.key, parentKey: (_e = row2.item.parentKey) != null ? _e : "" } : {}
+          title: row.title.value.trim(),
+          task: (_b2 = (_a3 = row.task) == null ? void 0 : _a3.value.trim()) != null ? _b2 : row.item.task,
+          contribution: (_d = (_c = row.contribution) == null ? void 0 : _c.value.trim()) != null ? _d : row.item.contribution,
+          parentTitle: parentOf2(row.item) ? renamed.get(parentOf2(row.item)) : "",
+          ...row.item.key !== void 0 ? { key: row.item.key, parentKey: (_e = row.item.parentKey) != null ? _e : "" } : {}
         };
       });
     }
@@ -66438,11 +66008,11 @@ var MapConflictModal = class extends import_obsidian34.Modal {
     };
     const options = this.contentEl.createDiv("vam-conflict-options");
     const option = (label, description, map) => {
-      const row2 = options.createDiv("vam-conflict-option");
-      const text10 = row2.createDiv("vam-conflict-option-text");
+      const row = options.createDiv("vam-conflict-option");
+      const text10 = row.createDiv("vam-conflict-option-text");
       text10.createEl("strong", { text: label });
       text10.createSpan({ text: description, cls: "vam-hint" });
-      row2.createEl("button", { text: label }).addEventListener("click", () => finish2(map()));
+      row.createEl("button", { text: label }).addEventListener("click", () => finish2(map()));
     };
     option(t("ui.use_file_contents"), t("ui.conflict_use_file_desc"), () => clone(this.disk));
     option(t("ui.keep_editor_contents"), t("ui.conflict_keep_editor_desc"), () => clone(this.local));
@@ -66486,9 +66056,9 @@ var NoteCollectionModal = class extends import_obsidian34.Modal {
     this.titleEl.setText(this.titleText);
     if (!this.files.length) this.contentEl.createEl("p", { text: t("ui.no_notes_yet") });
     for (const file of this.files) {
-      const row2 = this.contentEl.createDiv("vam-collection-row");
-      row2.createSpan({ text: file.basename });
-      const actions = row2.createDiv("vam-collection-actions");
+      const row = this.contentEl.createDiv("vam-collection-row");
+      row.createSpan({ text: file.basename });
+      const actions = row.createDiv("vam-collection-actions");
       for (const action of this.actions)
         actions.createEl("button", { text: action.label }).addEventListener("click", () => {
           this.close();
@@ -66646,31 +66216,31 @@ var StructureReviewModal = class extends import_obsidian35.Modal {
     renderProposalList(parent, items, () => {
     }, {
       compact: true,
-      apply: (item, row2) => {
+      apply: (item, row) => {
         const entry = this.entries[index++];
-        const button2 = row2.head.createEl("button", {
+        const button2 = row.head.createEl("button", {
           text: t("ui.structure_review_apply"),
           cls: "vam-structure-apply"
         });
-        const note = row2.element.createEl("p", { cls: "vam-structure-note", attr: { "aria-live": "polite" } });
+        const note = row.element.createEl("p", { cls: "vam-structure-note", attr: { "aria-live": "polite" } });
         let busy = false;
         let message = "";
         const label = () => button2.setAttr(
           "aria-label",
           t(
             entry.applied ? "ui.structure_review_applied_named" : "ui.structure_review_apply_named",
-            row2.title.value.trim() || item.title
+            row.title.value.trim() || item.title
           )
         );
-        row2.title.addEventListener("input", label);
+        row.title.addEventListener("input", label);
         const refresh = () => {
           const stale = entry.applied ? null : this.host.staleReason(entry.suggestion);
-          row2.element.toggleClass("is-applied", entry.applied);
-          row2.element.toggleClass("is-stale", !!stale);
+          row.element.toggleClass("is-applied", entry.applied);
+          row.element.toggleClass("is-stale", !!stale);
           button2.disabled = busy || entry.applied || !!stale;
           button2.setText(t(entry.applied ? "ui.structure_review_applied" : "ui.structure_review_apply"));
           label();
-          row2.title.readOnly = entry.applied || entry.suggestion.kind !== "strengthen";
+          row.title.readOnly = entry.applied || entry.suggestion.kind !== "strengthen";
           note.setText(stale != null ? stale : message);
         };
         refreshers.push(refresh);
@@ -66682,7 +66252,7 @@ var StructureReviewModal = class extends import_obsidian35.Modal {
             refreshAll();
             return;
           }
-          const title = row2.title.value.trim();
+          const title = row.title.value.trim();
           if (entry.suggestion.kind === "strengthen" && !title) {
             message = t("ui.structure_review_title_required");
             refresh();
@@ -66720,7 +66290,7 @@ function renderTopicTree(parent, options) {
     children.set(key4, [...(_a2 = children.get(key4)) != null ? _a2 : [], node]);
   }
   const rows2 = [];
-  const row2 = (id, text10, depth, enabled) => {
+  const row = (id, text10, depth, enabled) => {
     const button2 = tree.createEl("button", { cls: "vam-topic-tree-row", text: text10, attr: { role: "option" } });
     button2.style.paddingLeft = `${8 + depth * 16}px`;
     button2.dataset.id = id;
@@ -66731,12 +66301,12 @@ function renderTopicTree(parent, options) {
     if (enabled) button2.addEventListener("click", () => options.onChoose(id));
     rows2.push(button2);
   };
-  if (options.rootChoice !== void 0) row2("", options.rootChoice, 0, true);
+  if (options.rootChoice !== void 0) row("", options.rootChoice, 0, true);
   const append = (node, depth, seen2) => {
     var _a3;
     if (seen2.has(node.id)) return;
     seen2.add(node.id);
-    row2(node.id, options.title(node), depth, options.selectable(node));
+    row(node.id, options.title(node), depth, options.selectable(node));
     for (const child of (_a3 = children.get(node.id)) != null ? _a3 : []) append(child, depth + 1, seen2);
   };
   const seen = /* @__PURE__ */ new Set();
@@ -67143,12 +66713,12 @@ var TopicChatWindow = class {
     const heldPart = active && this.logEl.contains(active) ? (_b2 = active.getAttr("data-part")) != null ? _b2 : null : null;
     this.logEl.empty();
     for (const turn of session.turns) {
-      const row2 = this.logEl.createDiv({
+      const row = this.logEl.createDiv({
         cls: turn.role === "user" ? "vam-topic-chat-msg is-me" : "vam-topic-chat-msg"
       });
       const who = turn.role === "user" ? turn.kind && turn.kind !== "ask" ? t("ui.topic_chat_you_0", kindLabel(turn.kind)) : t("ui.map_chat_role_you") : t("ui.map_chat_role_ai");
-      row2.createSpan({ cls: "vam-topic-chat-who", text: who });
-      const body = row2.createSpan({ cls: "vam-topic-chat-text" });
+      row.createSpan({ cls: "vam-topic-chat-who", text: who });
+      const body = row.createSpan({ cls: "vam-topic-chat-text" });
       if (turn.markdown) renderChatMarkdown(body, turn.text, t("ui.map_chat_overflow_note"));
       else body.setText(turn.text);
       for (const steer of (_c = turn.steers) != null ? _c : []) {
@@ -67180,15 +66750,15 @@ var TopicChatWindow = class {
   }
   /** The depth card: an AI message with three radio options and Start / Cancel. Arrows switch, Enter starts, Escape cancels. */
   paintChoice(choice, heldPart, focusNow) {
-    const row2 = this.logEl.createDiv({ cls: "vam-topic-chat-msg is-choice" });
-    row2.createSpan({ cls: "vam-topic-chat-who", text: t("ui.map_chat_role_ai") });
+    const row = this.logEl.createDiv({ cls: "vam-topic-chat-msg is-choice" });
+    row.createSpan({ cls: "vam-topic-chat-who", text: t("ui.map_chat_role_ai") });
     const messageId = `vam-topic-chat-choice-${++labelSeq2}`;
-    row2.createSpan({
+    row.createSpan({
       cls: "vam-topic-chat-text",
       text: t("ui.topic_chat_choice_message_0_1_2", choice.levels, choice.topics, choice.researched),
       attr: { id: messageId }
     });
-    const group = row2.createDiv({
+    const group = row.createDiv({
       cls: "vam-topic-chat-choice",
       attr: { role: "radiogroup", "aria-labelledby": messageId }
     });
@@ -67238,7 +66808,7 @@ var TopicChatWindow = class {
         }
       });
     }
-    const actions = row2.createDiv("vam-topic-chat-choice-actions");
+    const actions = row.createDiv("vam-topic-chat-choice-actions");
     const start = actions.createEl("button", {
       cls: "vam-topic-chat-choice-start mod-cta",
       text: t("ui.topic_chat_choice_start"),
@@ -79211,9 +78781,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const label = this.plugin.modelLabel(note.model), text10 = t("ui.card_model_override_0", label), tag = header2.createSpan({ cls: "vam-node-model-tag", text: label });
       tag.setAttr("aria-hidden", "true");
       tag.setAttr("title", text10);
-      const row2 = cardMarkerRows.get(card);
+      const row = cardMarkerRows.get(card);
       if (old) old.replaceWith(tag);
-      else if (row2 && row2.parentElement === header2) row2.after(tag);
+      else if (row && row.parentElement === header2) row.after(tag);
       cardModelTags.set(header2, tag);
       card.dataset.modelText = text10;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, text10));
@@ -79258,13 +78828,13 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }
     if (markers.length) {
       const kindTag = old ? null : header2.querySelector(".vam-hypothesis-tag");
-      const row2 = header2.createSpan("vam-card-markers vam-hypothesis-tag");
-      if (old) old.replaceWith(row2);
-      else if (kindTag) kindTag.after(row2);
-      row2.setAttr("aria-hidden", "true");
-      cardMarkerRows.set(card, row2);
+      const row = header2.createSpan("vam-card-markers vam-hypothesis-tag");
+      if (old) old.replaceWith(row);
+      else if (kindTag) kindTag.after(row);
+      row.setAttr("aria-hidden", "true");
+      cardMarkerRows.set(card, row);
       for (const marker3 of markers) {
-        const mark2 = row2.createSpan({ cls: "vam-marker", text: markerSymbol(marker3) });
+        const mark2 = row.createSpan({ cls: "vam-marker", text: markerSymbol(marker3) });
         mark2.dataset.marker = marker3;
       }
       card.dataset.markerText = text10;
@@ -81406,8 +80976,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     });
     if (old) old.replaceWith(button2);
     else {
-      const row2 = cardMarkerRows.get(card);
-      if (row2 && row2.parentElement === header2) row2.after(button2);
+      const row = cardMarkerRows.get(card);
+      if (row && row.parentElement === header2) row.after(button2);
     }
     cardLinkButtons.set(card, button2);
   }
@@ -81484,14 +81054,14 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       var _a2;
       list2.empty();
       this.linksOf(node.id).forEach((href, index) => {
-        const row2 = list2.createEl("li", { cls: "vam-topic-link-row" });
-        const open2 = row2.createEl("button", { text: href, cls: "vam-topic-link-open" });
+        const row = list2.createEl("li", { cls: "vam-topic-link-row" });
+        const open2 = row.createEl("button", { text: href, cls: "vam-topic-link-open" });
         open2.type = "button";
         open2.setAttr("title", t("ui.topic_link_open"));
         open2.setAttr("aria-label", t("ui.topic_link_open_0", this.linkHost(href)));
         open2.addEventListener("click", () => this.openTopicLink(href));
         if (editable) {
-          const remove = row2.createEl("button", { text: "\xD7", cls: "vam-topic-link-remove" });
+          const remove = row.createEl("button", { text: "\xD7", cls: "vam-topic-link-remove" });
           remove.type = "button";
           remove.setAttr("aria-label", t("ui.topic_link_remove_0", this.linkHost(href)));
           remove.addEventListener(
@@ -82605,10 +82175,6 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       (id) => {
         var _a2;
         return readPipelineStage((_a2 = this.notes.get(id)) == null ? void 0 : _a2.pipelineStage);
-      },
-      (id) => {
-        var _a2;
-        return (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title;
       }
     );
     renderBookBar(toolbar, state, {
@@ -82827,9 +82393,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       state,
       {
         open: (id) => void this.openBookNote(id),
-        rerun: async (id, options) => {
+        rerun: async (id) => {
           try {
-            return await this.plugin.rerunBookCard(path, id, options);
+            return await this.plugin.rerunBookCard(path, id);
           } finally {
             await this.rereadBookCard(id);
           }
@@ -85851,7 +85417,7 @@ ${note.detail.trim()}` : "",
       syncRelationClasses: () => this.syncRelationClasses(),
       button: (parent, text10, action, disabled) => this.button(parent, text10, action, disabled),
       iconButton: (parent, icon, label, action) => this.iconButton(parent, icon, label, action),
-      bindRelationRow: (row2, link, ariaLabel, key4) => this.bindRelationRow(row2, link, ariaLabel, key4),
+      bindRelationRow: (row, link, ariaLabel, key4) => this.bindRelationRow(row, link, ariaLabel, key4),
       markerId: () => this.relationMarkerId,
       marker: (id, barred) => this.relationMarker(id, barred),
       cardSearchSources: (include, enabled) => this.cardSearchSources(include, enabled),
@@ -89130,23 +88696,23 @@ ${addition}` : addition },
     this.relationEndIds = ends;
   }
   /** A panel row stands for its line: focusing it selects the line, hovering previews it with the same highlight and name. */
-  bindRelationRow(row2, link, ariaLabel, key4 = relationIdentity(link)) {
-    row2.tabIndex = 0;
-    row2.setAttr("role", "group");
-    row2.setAttr("aria-label", ariaLabel);
-    row2.addEventListener("focus", () => {
+  bindRelationRow(row, link, ariaLabel, key4 = relationIdentity(link)) {
+    row.tabIndex = 0;
+    row.setAttr("role", "group");
+    row.setAttr("aria-label", ariaLabel);
+    row.addEventListener("focus", () => {
       this.selection.selectRelation(key4);
       this.syncRelationClasses();
     });
-    row2.addEventListener("blur", () => {
+    row.addEventListener("blur", () => {
       this.selection.deselectRelation(key4);
       this.syncRelationClasses();
     });
-    row2.addEventListener("mouseenter", () => {
+    row.addEventListener("mouseenter", () => {
       this.previewRelation = key4;
       this.syncRelationClasses();
     });
-    row2.addEventListener("mouseleave", () => {
+    row.addEventListener("mouseleave", () => {
       if (this.previewRelation === key4) this.previewRelation = null;
       this.syncRelationClasses();
     });
@@ -90240,7 +89806,7 @@ function rowsOf(chunks) {
   return chunks.sections.map((section3, origin) => ({ origin, name: section3.name }));
 }
 function sameRows(chunks, rows2) {
-  return rows2.length === chunks.sections.length && rows2.every((row2, index) => row2.origin === index && row2.name === chunks.sections[index].name);
+  return rows2.length === chunks.sections.length && rows2.every((row, index) => row.origin === index && row.name === chunks.sections[index].name);
 }
 var trimTrailingBlank = (lines) => {
   let end = lines.length;
@@ -90251,16 +89817,16 @@ function composeStructure(chunks, rows2) {
   const pieces = [];
   const head2 = trimTrailingBlank(chunks.head);
   if (head2.length) pieces.push(head2);
-  for (const row2 of rows2) {
-    const original = row2.origin === null ? void 0 : chunks.sections[row2.origin];
+  for (const row of rows2) {
+    const original = row.origin === null ? void 0 : chunks.sections[row.origin];
     if (!original) {
-      pieces.push([`## ${row2.name}`]);
+      pieces.push([`## ${row.name}`]);
       continue;
     }
     const lines = trimTrailingBlank(original.lines);
-    if (row2.name !== original.name) {
+    if (row.name !== original.name) {
       const comment = lines[0].indexOf("%%");
-      lines[0] = `## ${row2.name}${comment >= 0 ? ` ${lines[0].slice(comment)}` : ""}`;
+      lines[0] = `## ${row.name}${comment >= 0 ? ` ${lines[0].slice(comment)}` : ""}`;
     }
     pieces.push(lines);
   }
@@ -90509,12 +90075,12 @@ var NoteStyleEditorModal = class extends import_obsidian41.Modal {
     const a = this.draft;
     const b = this.initial;
     const rows2 = this.cleanRows();
-    return a.name !== b.name || a.voice !== b.voice || a.update !== b.update || a.applyAll || rows2.length !== b.rows.length || rows2.some((row2, index) => row2.origin !== b.rows[index].origin || row2.name !== b.rows[index].name);
+    return a.name !== b.name || a.voice !== b.voice || a.update !== b.update || a.applyAll || rows2.length !== b.rows.length || rows2.some((row, index) => row.origin !== b.rows[index].origin || row.name !== b.rows[index].name);
   }
   // ---- the sections ----
   /** The rows with their names trimmed, which is how the parser reads them back. */
   cleanRows() {
-    return this.draft.rows.map((row2) => ({ origin: row2.origin, name: row2.name.trim() }));
+    return this.draft.rows.map((row) => ({ origin: row.origin, name: row.name.trim() }));
   }
   /** Whether the sections are not what the text had (a new file or a change in place is needed). */
   sectionsEdited() {
@@ -90536,13 +90102,13 @@ var NoteStyleEditorModal = class extends import_obsidian41.Modal {
       return say(t(first.code, ...values));
     }
     const names3 = parsed.template.sections.map((section3) => section3.name);
-    const wrong = rows2.findIndex((row2, index) => names3[index] !== row2.name);
+    const wrong = rows2.findIndex((row, index) => names3[index] !== row.name);
     if (wrong >= 0 || names3.length !== rows2.length)
       return say(t("ui.detail_template_error_section_name_invalid", String(Math.max(wrong, 0) + 1)));
     return "";
   }
   freshSectionName() {
-    const taken = new Set(this.draft.rows.map((row2) => lower4(row2.name.trim())));
+    const taken = new Set(this.draft.rows.map((row) => lower4(row.name.trim())));
     for (let n = 1; ; n++) {
       const name2 = t("ui.editor_section_new_name_0", String(n));
       if (!taken.has(lower4(name2)) || n > 999) return name2;
@@ -90574,10 +90140,10 @@ var NoteStyleEditorModal = class extends import_obsidian41.Modal {
     list2.empty();
     const rows2 = this.draft.rows;
     const controls = [];
-    rows2.forEach((row3, index) => {
+    rows2.forEach((row2, index) => {
       const line2 = list2.createDiv({ cls: "vam-editor-section" });
       const input2 = line2.createEl("input", { type: "text", cls: "vam-editor-section-name" });
-      input2.value = row3.name;
+      input2.value = row2.name;
       const button2 = (text10, key4, cls, run2) => {
         const el = line2.createEl("button", { text: text10, cls, attr: { type: "button" } });
         el.addEventListener("click", run2);
@@ -90589,7 +90155,7 @@ var NoteStyleEditorModal = class extends import_obsidian41.Modal {
       up.disabled = index === 0;
       down.disabled = index === rows2.length - 1;
       const label = () => {
-        const name2 = row3.name.trim() || String(index + 1);
+        const name2 = row2.name.trim() || String(index + 1);
         input2.setAttr("aria-label", t("ui.editor_section_name_aria_0", String(index + 1)));
         up.setAttr("aria-label", t("ui.editor_section_up_aria_0", name2));
         down.setAttr("aria-label", t("ui.editor_section_down_aria_0", name2));
@@ -90597,18 +90163,18 @@ var NoteStyleEditorModal = class extends import_obsidian41.Modal {
       };
       label();
       input2.addEventListener("input", () => {
-        row3.name = input2.value;
+        row2.name = input2.value;
         label();
         this.changed();
       });
       controls.push({ name: input2, up, down, remove });
     });
     if (!focus) return;
-    const row2 = controls[focus.index];
-    if (!row2) return;
+    const row = controls[focus.index];
+    if (!row) return;
     const usable = (el) => !el.disabled;
     const order = focus.control === "up" ? ["up", "down", "name"] : focus.control === "down" ? ["down", "up", "name"] : [focus.control, "name"];
-    const target = (_a2 = order.map((key4) => row2[key4]).find(usable)) != null ? _a2 : row2.name;
+    const target = (_a2 = order.map((key4) => row[key4]).find(usable)) != null ? _a2 : row.name;
     target.focus();
   }
   // ---- the voice ----
@@ -91570,9 +91136,9 @@ var RenameDialog = class extends import_obsidian42.Modal {
       cls: "vam-block-status-error vam-manage-error",
       attr: { id: errorId, "aria-live": "polite" }
     });
-    const row2 = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
-    const rename = row2.createEl("button", { text: t("ui.manage_rename_button"), cls: "mod-cta" });
-    const cancel = row2.createEl("button", { text: t("ui.cancel") });
+    const row = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
+    const rename = row.createEl("button", { text: t("ui.manage_rename_button"), cls: "mod-cta" });
+    const cancel = row.createEl("button", { text: t("ui.cancel") });
     let busy = false;
     const check = () => {
       const problem3 = input2.value === opts.name ? "" : opts.problem(input2.value);
@@ -91630,9 +91196,9 @@ var ConfirmDialog = class extends import_obsidian42.Modal {
     const { opts } = this;
     this.titleEl.setText(opts.title);
     for (const line2 of opts.lines) this.contentEl.createEl("p", { text: line2 });
-    const row2 = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
-    const confirm = row2.createEl("button", { text: opts.confirm, cls: "mod-warning" });
-    const cancel = row2.createEl("button", { text: t("ui.cancel") });
+    const row = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
+    const confirm = row.createEl("button", { text: opts.confirm, cls: "mod-warning" });
+    const cancel = row.createEl("button", { text: t("ui.cancel") });
     confirm.addEventListener("click", () => {
       if (confirm.disabled) return;
       confirm.disabled = true;
@@ -91661,8 +91227,8 @@ var ViewDialog = class extends import_obsidian42.Modal {
     this.contentEl.createEl("p", { text: t("ui.manage_view_readonly"), cls: "vam-manage-dialog-note" });
     for (const line2 of (_a2 = opts.lines) != null ? _a2 : []) this.contentEl.createEl("p", { text: line2 });
     if (opts.text !== void 0) this.contentEl.createEl("pre", { text: opts.text, cls: "vam-manage-view-text" });
-    const row2 = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
-    const close = row2.createEl("button", { text: t("ui.close") });
+    const row = this.contentEl.createDiv({ cls: "vam-manage-dialog-buttons" });
+    const close = row.createEl("button", { text: t("ui.close") });
     close.addEventListener("click", () => this.close());
     close.focus();
   }
@@ -91846,9 +91412,9 @@ var kindRows = /* @__PURE__ */ new WeakMap();
 function redrawKindRows(plugin) {
   const rows2 = kindRows.get(plugin);
   if (!rows2) return;
-  for (const row2 of [...rows2]) {
-    if (row2.el.isConnected === false) rows2.delete(row2);
-    else row2.redraw();
+  for (const row of [...rows2]) {
+    if (row.el.isConnected === false) rows2.delete(row);
+    else row.redraw();
   }
 }
 function renderNoteKindSetting(setting, plugin, kind) {
@@ -92755,11 +92321,11 @@ var OutlineView = class extends import_obsidian44.ItemView {
     if (path === this.activePath) return;
     this.activePath = path;
     const rows2 = Array.from(this.contentEl.querySelectorAll(".vam-outline-note"));
-    for (const row2 of rows2) {
-      const active = !!path && row2.getAttribute("data-path") === path;
-      row2.toggleClass("is-active", active);
-      if (active) row2.setAttr("aria-current", "true");
-      else row2.removeAttribute("aria-current");
+    for (const row of rows2) {
+      const active = !!path && row.getAttribute("data-path") === path;
+      row.toggleClass("is-active", active);
+      if (active) row.setAttr("aria-current", "true");
+      else row.removeAttribute("aria-current");
     }
   }
   setCoffeeOutline(snapshot, active, locate, fill2 = null) {
@@ -92892,10 +92458,10 @@ var OutlineView = class extends import_obsidian44.ItemView {
       var _a3, _b3, _c2, _d;
       if (!matches2(node)) return;
       const descendants2 = (_a3 = children.get(node.id)) != null ? _a3 : [];
-      const row2 = tree.createDiv("vam-outline-row");
-      row2.style.paddingLeft = `${8 + depth * 16}px`;
+      const row = tree.createDiv("vam-outline-row");
+      row.style.paddingLeft = `${8 + depth * 16}px`;
       if (descendants2.length) {
-        const toggle = row2.createEl("button", {
+        const toggle = row.createEl("button", {
           text: query || !this.collapsed.has(node.id) ? "\u25BE" : "\u25B8",
           cls: "vam-outline-toggle"
         });
@@ -92911,9 +92477,9 @@ var OutlineView = class extends import_obsidian44.ItemView {
           this.renderTree();
           if (hadFocus) (_b4 = this.toggleEls.get(node.id)) == null ? void 0 : _b4.focus();
         });
-      } else row2.createSpan("vam-outline-spacer");
+      } else row.createSpan("vam-outline-spacer");
       const title = (_c2 = (_b3 = this.titles.get(node.id)) != null ? _b3 : node.path.split("/").pop()) != null ? _c2 : node.path;
-      const button2 = row2.createEl("button", { text: title, cls: "vam-outline-note" });
+      const button2 = row.createEl("button", { text: title, cls: "vam-outline-note" });
       button2.title = title;
       button2.setAttr("dir", "auto");
       button2.setAttr("data-path", node.path);
@@ -92925,9 +92491,9 @@ var OutlineView = class extends import_obsidian44.ItemView {
           "aria-label",
           `${title}${listSeparator === "\u3001" ? "\uFF0C" : ", "}${t("share.viewer_markers_0", names3)}`
         );
-        const row3 = button2.createSpan("vam-markers");
+        const row2 = button2.createSpan("vam-markers");
         for (const id of marks) {
-          const mark2 = row3.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
+          const mark2 = row2.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
           mark2.dataset.marker = id;
         }
       }
@@ -96428,17 +95994,17 @@ var ShareModal = class extends import_obsidian46.Modal {
   }
   renderLanguageResult(container, item, host, note) {
     const label = this.languageLabel(item.language);
-    const row2 = container.createDiv({ cls: "vam-share-translate-row" });
-    row2.createDiv({ text: `${label}: ${this.statusText(item)}`, cls: "vam-share-note" });
-    row2.createDiv({ text: t("share.translate_result_model_0", host.modelLabel(item.model)), cls: "vam-share-note" });
+    const row = container.createDiv({ cls: "vam-share-translate-row" });
+    row.createDiv({ text: `${label}: ${this.statusText(item)}`, cls: "vam-share-note" });
+    row.createDiv({ text: t("share.translate_result_model_0", host.modelLabel(item.model)), cls: "vam-share-note" });
     if (item.diagramsKept > 0)
-      row2.createDiv({ text: t("share.translate_diagrams_kept_0", item.diagramsKept), cls: "vam-share-note" });
+      row.createDiv({ text: t("share.translate_diagrams_kept_0", item.diagramsKept), cls: "vam-share-note" });
     if (item.status === "complete" || item.status === "incomplete") {
       if (UNVERIFIED_LANGUAGES.includes(item.language))
-        row2.createDiv({ text: t("share.translate_unverified_0", label), cls: "vam-share-note" });
+        row.createDiv({ text: t("share.translate_unverified_0", label), cls: "vam-share-note" });
     }
     if (item.status === "incomplete")
-      new import_obsidian46.Setting(row2).setName(`${label}: ${t("share.translate_include_incomplete")}`).addToggle(
+      new import_obsidian46.Setting(row).setName(`${label}: ${t("share.translate_include_incomplete")}`).addToggle(
         (toggle) => toggle.setValue(this.includeIncomplete.has(item.language)).onChange((value) => {
           if (value) this.includeIncomplete.add(item.language);
           else this.includeIncomplete.delete(item.language);

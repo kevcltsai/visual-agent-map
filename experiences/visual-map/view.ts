@@ -17101,11 +17101,8 @@ export class VisualAgentMapView extends ItemView {
     const read = readBookPipeline(this.map);
     if (read.kind !== "usable") return;
     const path = this.path;
-    const state = bookBarState(
-      read.data,
-      this.plugin.getBookPipelineProgress(path),
-      id => readPipelineStage(this.notes.get(id)?.pipelineStage),
-      id => this.notes.get(id)?.title
+    const state = bookBarState(read.data, this.plugin.getBookPipelineProgress(path), id =>
+      readPipelineStage(this.notes.get(id)?.pipelineStage)
     );
     renderBookBar(toolbar, state, {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
@@ -17330,9 +17327,9 @@ export class VisualAgentMapView extends ItemView {
       state,
       {
         open: id => void this.openBookNote(id),
-        rerun: async (id, options) => {
+        rerun: async id => {
           try {
-            return await this.plugin.rerunBookCard(path, id, options);
+            return await this.plugin.rerunBookCard(path, id);
           } finally {
             await this.rereadBookCard(id);
           }

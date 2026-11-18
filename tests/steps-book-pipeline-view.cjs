@@ -53,23 +53,22 @@ const draw = (data, prog, stageOf = noStage) => {
 const buttonsOf = bar => dom.findAll(bar, i => i.tag === 'button');
 const track = bar => dom.find(bar, i => i.attrs.role === 'progressbar');
 
-test('bar: running writing phase shows the phase, the five stages in plain words, a stop button and a progressbar with aria values and a text alternative', () => {
+test('bar: running writing phase shows the phase, one plain sentence with the progress, a stop button and a progressbar with aria values and a text alternative; no stage list', () => {
   lang('zh-TW');
-  const d = draw(bookData(), progress());
+  const d = draw(bookData(), progress({ current: [{ nodeId: 'a', step: 'proof', startedAt: 1 }] }));
   assert.equal(d.bar.attrs.role, 'group');
   assert.ok(texts(d.bar).includes('圖文書：寫作、找圖與校對中'));
-  // Derived from the stage counts (planned 1, written 1, checked 1, needs-review 1 of 4). While writing, a needs-review card whose failing step is unknown only counts for its plan (write 2 = written + checked); the old "已校 · 已寫 · 已企劃" line is gone.
-  assert.deepEqual(dom.findAll(d.bar, i => i.tag === 'li').map(i => i.text), ['✓ 全書企劃', '✓ 逐章企劃', '寫作 2／4', '找圖 2／4', '校對 1／4']);
-  assert.equal(texts(d.bar).filter(x => /已寫|已企劃|需人看/.test(x)).length, 0);
-  assert.equal(dom.find(d.bar, i => i.cls.includes('vam-book-legend')), undefined);
+  assert.equal(dom.findAll(d.bar, i => i.tag === 'li').length, 0, 'no five-stage list');
+  assert.equal(dom.find(d.bar, i => i.cls.includes('vam-book-now-text')).text, '正在寫第 1／4 章，已完成 2／4 章');
   const t = track(d.bar);
   assert.deepEqual([t.attrs['aria-valuemin'], t.attrs['aria-valuemax'], t.attrs['aria-valuenow']], ['0', '4', '1']);
-  assert.equal(t.attrs['aria-valuetext'], '✓ 全書企劃、✓ 逐章企劃、寫作 2／4、找圖 2／4、校對 1／4');
+  assert.equal(t.attrs['aria-valuetext'], '正在寫第 1／4 章，已完成 2／4 章');
   assert.deepEqual(buttonsOf(d.bar).map(b => b.text), ['停止']);
   assert.equal(dom.findAll(t, i => i.cls.includes('vam-book-seg')).length, 4);
   buttonsOf(d.bar)[0].click();
   assert.deepEqual(d.log, ['stop']);
   assert.equal(dom.findAll(d.bar, i => /分鐘/.test(i.text ?? '')).length, 0, 'no remaining-time number in stage 1');
+  assert.ok(!texts(d.bar).some(x => /全書企劃|逐章企劃|找圖 |校對 \d/.test(x)), JSON.stringify(texts(d.bar)));
 });
 
 test('bar: every phase and status has its own words (zh-TW, en, zh-CN)', () => {
@@ -743,52 +742,48 @@ test('start card: Escape closes it without starting', async () => {
   assert.equal(h.entries.length, 0);
 });
 
-test('bar: the five stages carry check marks and counts, the stage in progress is marked, and "now" names the chapter and its title as plain text', () => {
+test('bar: the sentence names the chapter being written out of the total (never a title from a note), and the whole-book plan and chapter plans have their own words; unknown cards are ignored; nothing running means no line', () => {
   lang('zh-TW');
   const order = ['a', 'b', 'c', 'd', 'e'];
-  const titles = { c: '<b>睡眠週期</b>', d: '第四章' };
-  const prog = progress({ total: 5, steps: { plan: 5, write: 3, images: 2, proof: 1 }, counts: { pending: 0, planned: 0, written: 2, checked: 1, 'needs-review': 0 },
+  const prog = progress({ total: 5, counts: { pending: 0, planned: 0, written: 2, checked: 1, 'needs-review': 0 },
     current: [{ nodeId: 'd', step: 'images', startedAt: 1 }, { nodeId: 'c', step: 'write', startedAt: 2 }] });
   const parent = dom.element('div');
-  const state = ui.bookBarState(bookData({ order }), prog, noStage, id => titles[id]);
-  ui.renderBookBar(parent, state, calls().actions);
-  const items = dom.findAll(parent, i => i.tag === 'li');
-  assert.deepEqual(items.map(i => i.text), ['✓ 全書企劃', '✓ 逐章企劃', '寫作 3／5', '找圖 2／5', '校對 1／5']);
-  assert.deepEqual(items.map(i => i.attrs['aria-current'] ?? null), [null, null, 'step', 'step', null], 'the steps some card is in are marked, not by color alone');
+  ui.renderBookBar(parent, ui.bookBarState(bookData({ order }), prog, noStage), calls().actions);
   const now = dom.find(parent, i => i.cls.includes('vam-book-now-text'));
-  assert.equal(now.text, '目前：正在寫第 3 章「<b>睡眠週期</b>」，另有 1 章同時進行', 'a title from a note is shown as text, never markup');
-  assert.equal(now.children.length, 0);
-});
-
-test('bar: the whole-book plan shows as the current step first; a card unknown to the order is ignored; with nothing running there is no "now" line', () => {
-  lang('zh-TW');
-  const withCurrent = current => ui.bookBarState(bookData({ phase: 'planning', globalPlanned: false }), progress({ phase: 'planning', current }), noStage, () => 'T');
+  assert.equal(now.text, '正在寫第 3／5 章，已完成 1／5 章');
+  const withCurrent = (current, over = {}) => ui.bookBarState(bookData({ phase: 'planning', globalPlanned: false, ...over }), progress({ phase: 'planning', current }), noStage);
   const s = withCurrent([{ nodeId: 'a', step: 'plan', startedAt: 1 }, { nodeId: 'global', step: 'plan', startedAt: 1 }]);
-  assert.equal(ui.bookNowText(s.current), '目前：正在規劃全書');
-  assert.equal(JSON.stringify(ui.bookStepItems(s).map(i => [i.key, i.current, i.done])), JSON.stringify([['global', true, false], ['plan', true, true], ['write', false, false], ['images', false, false], ['proof', false, false]]));
+  assert.equal(s.current.step, 'global');
+  assert.equal(ui.bookProgressText(s), '正在規劃全書，已完成 2／4 章');
+  const chapters = withCurrent([{ nodeId: 'b', step: 'plan', startedAt: 1 }], { globalPlanned: true });
+  assert.equal(ui.bookProgressText(chapters), '正在企劃第 2／4 章，已完成 2／4 章');
   assert.equal(withCurrent([{ nodeId: 'zzz', step: 'write', startedAt: 1 }]).current, undefined);
   assert.equal(ui.bookBarState(bookData(), progress({ active: false, current: [{ nodeId: 'a', step: 'write', startedAt: 1 }] }), noStage).current, undefined);
-  const parent = dom.element('div');
-  ui.renderBookBar(parent, ui.bookBarState(bookData({ phase: 'gate1' }), progress({ phase: 'gate1', active: false }), noStage), calls().actions);
-  assert.equal(dom.find(parent, i => i.cls.includes('vam-book-now')), undefined);
+  const gate = dom.element('div');
+  ui.renderBookBar(gate, ui.bookBarState(bookData({ phase: 'gate1' }), progress({ phase: 'gate1', active: false }), noStage), calls().actions);
+  assert.equal(dom.find(gate, i => i.cls.includes('vam-book-now')), undefined);
+  // Without a current card (a reload) the number comes from the settled cards, never past the total.
+  lang('en');
+  assert.equal(ui.bookProgressText(ui.bookBarState(bookData(), progress({ counts: { pending: 0, planned: 0, written: 0, checked: 4, 'needs-review': 0 } }), noStage)), 'Writing chapter 4/4, 4/4 chapters done');
+  lang('zh-TW');
 });
 
 test('bar: the remaining time sits on the "now" line and only when the runner gave one (it gives none below five finished cards)', () => {
   lang('zh-TW');
   const cur = [{ nodeId: 'a', step: 'write', startedAt: 1 }];
-  const draw2 = over => { const parent = dom.element('div'); ui.renderBookBar(parent, ui.bookBarState(bookData(), progress({ current: cur, ...over }), noStage, () => 'T'), calls().actions); return parent; };
+  const draw2 = over => { const parent = dom.element('div'); ui.renderBookBar(parent, ui.bookBarState(bookData(), progress({ current: cur, ...over }), noStage), calls().actions); return parent; };
   assert.equal(dom.find(draw2({}), i => i.cls.includes('vam-book-bar-eta')), undefined);
   assert.equal(dom.find(draw2({ etaSeconds: 130 }), i => i.cls.includes('vam-book-bar-eta')).text, '約剩 2 分鐘');
   assert.equal(dom.find(draw2({}), i => i.cls.includes('vam-book-now')).children.length, 1);
 });
 
-test('bar: a saved v1 map is only read: the data is not changed, and after a reload the steps come from the cards\' stages', () => {
+test('bar: a saved v1 map is only read: the data is not changed, and after a reload the progress comes from the cards\' stages', () => {
   lang('zh-TW');
   const data = bookData({ phase: 'writing', status: 'running' });
   const frozen = JSON.stringify(data);
   const stages = { a: 'checked', b: 'written', c: 'planned', d: undefined };
-  const state = ui.bookBarState(data, undefined, id => stages[id], () => 'T');
-  assert.equal(JSON.stringify(state.steps), JSON.stringify({ plan: 3, write: 2, images: 2, proof: 1 }));
+  const state = ui.bookBarState(data, undefined, id => stages[id]);
+  assert.equal(JSON.stringify(state.counts), JSON.stringify({ pending: 1, planned: 1, written: 1, checked: 1, 'needs-review': 0 }));
   assert.equal(state.current, undefined);
   assert.equal(JSON.stringify(data), frozen);
   assert.equal(Object.keys(data).includes('current') || Object.keys(data).includes('steps'), false);
@@ -846,18 +841,17 @@ test('panel: outside the gates the side column draws no "nothing to see" line an
   assert.equal(closed, 1);
 });
 
-test('bar: 31 cards with 5 needing a look at gate 2 or done: every step is ticked; while writing the failing step decides (S1)', () => {
+test('bar: 31 cards with 5 needing a look at gate 2 or done: the bar draws no running sentence and no stage list; the runner step counts keep their rule (S1)', () => {
   lang('zh-TW');
   const counts = { pending: 0, planned: 0, written: 0, checked: 26, 'needs-review': 5 };
   for (const phase of ['gate2', 'done']) {
     const order = Array.from({ length: 31 }, (_, i) => 'c' + i);
-    const state = ui.bookBarState(bookData({ phase, order }), undefined, id => (Number(id.slice(1)) < 26 ? 'checked' : 'needs-review'), () => 'T');
-    assert.equal(JSON.stringify(state.steps), JSON.stringify({ plan: 31, write: 31, images: 31, proof: 31 }), phase);
+    const state = ui.bookBarState(bookData({ phase, order }), undefined, id => (Number(id.slice(1)) < 26 ? 'checked' : 'needs-review'));
     const parent = dom.element('div');
     ui.renderBookBar(parent, state, calls().actions);
-    assert.deepEqual(dom.findAll(parent, i => i.tag === 'li').map(i => i.text), ['✓ 全書企劃', '✓ 逐章企劃', '✓ 寫作', '✓ 找圖', '✓ 校對'], phase);
+    assert.equal(dom.findAll(parent, i => i.tag === 'li').length, 0, phase);
+    assert.equal(dom.find(parent, i => i.cls.includes('vam-book-now')), undefined, phase);
   }
-  // The runner's own counts: the same at gate 2; while writing only a proofread failure keeps the text and pictures.
   assert.equal(JSON.stringify(runModule.stepCounts(counts, 0, { settled: true })), JSON.stringify({ plan: 31, write: 31, images: 31, proof: 31 }));
   assert.equal(JSON.stringify(runModule.stepCounts(counts, 0, { proofFailed: 2 })), JSON.stringify({ plan: 31, write: 28, images: 28, proof: 26 }));
   assert.equal(JSON.stringify(runModule.stepCounts(counts)), JSON.stringify({ plan: 31, write: 26, images: 26, proof: 26 }));
@@ -907,29 +901,19 @@ test('start card: several root topics are refused before the card opens (M2); a 
   assert.ok(notices.length > 0, 'the owner is told');
 });
 
-test('bar: a title that has not loaded yet reads as a sentence without an empty pair of quotes (M4)', () => {
-  lang('zh-TW');
-  assert.equal(ui.bookNowText({ step: 'write', chapter: 3, more: 0 }), '目前：正在寫第 3 章');
-  assert.equal(ui.bookNowText({ step: 'proof', chapter: 3, title: '睡眠', more: 1 }), '目前：正在校對第 3 章「睡眠」，另有 1 章同時進行');
-  lang('en');
-  assert.equal(ui.bookNowText({ step: 'images', chapter: 2, more: 0 }), 'Now: finding pictures for chapter 2');
-  lang('zh-TW');
-});
-
-
 // ---- T5: the rerun line of the bar, the card chip, the finish question ----
-test('T3 bar: a single-card rerun draws no rerun line (no title, no clock, no three steps): the five-stage list stays, with the stop button and the one-line rerun hint', () => {
+test('T3 bar: a single-card rerun draws no rerun line (no title, no clock, no three steps): no stage list either, just the stop button and the one-line rerun hint', () => {
   lang('zh-TW');
   const order = ['a', 'b', 'c'];
   const prog = progress({ phase: 'gate2', total: 3, current: [{ nodeId: 'b', step: 'write', startedAt: 5 }], rerun: { nodeId: 'b', startedAt: 777 } });
   const parent = dom.element('div');
   const c = calls();
-  const state = ui.bookBarState(bookData({ order, phase: 'gate2' }), prog, noStage, id => ({ b: '<i>睡眠</i>' })[id]);
+  const state = ui.bookBarState(bookData({ order, phase: 'gate2' }), prog, noStage);
   assert.equal(state.rerun, true);
   ui.renderBookBar(parent, state, c.actions);
   assert.equal(dom.find(parent, i => i.classes.includes('vam-book-rerun')), undefined, 'no rerun row');
   assert.ok(!texts(parent).some(x => /正在重跑|重跑中|\d:\d\d/.test(x)), JSON.stringify(texts(parent)));
-  assert.equal(dom.findAll(parent, i => i.tag === 'li').length, 5, 'the normal stage list');
+  assert.equal(dom.findAll(parent, i => i.tag === 'li').length, 0, 'no stage list');
   assert.ok(texts(parent).includes('某一章不滿意？可以只重跑那一章，不用整本重來。'));
   assert.deepEqual(buttonsOf(parent).map(b => b.text), ['停止']);
   buttonsOf(parent)[0].click();
@@ -953,22 +937,22 @@ test('T3 card chip: a card being rerun says 處理中 with no clock and keeps th
   assert.equal(ticked, 0, 'no clock is started for a rerun');
 });
 
-test('T5 finish question: counts and card names as text, "回去處理" has the keyboard, Escape and the X count as going back, "仍要完成" finishes, one answer only', () => {
+test('T5 finish question: count and card names as text, "回去處理" has the keyboard, Escape and the X count as going back, "仍要完成" finishes, one answer only', () => {
   lang('zh-TW');
-  assert.equal(bundle.finishAskLine({ review: 1, reviewTitles: ['2 為什麼需要睡覺'], seams: 2 }), '1 張需人看（2 為什麼需要睡覺）、2 個接縫還沒確認。');
-  assert.equal(bundle.finishAskLine({ review: 0, reviewTitles: [], seams: 3 }), '3 個接縫還沒確認。');
+  assert.equal(bundle.finishAskLine({ count: 1, titles: ['2 為什麼需要睡覺'] }), '1 張需人看（2 為什麼需要睡覺）。');
+  assert.equal(bundle.finishAskLine({ count: 3, titles: [] }), '3 張需人看。');
   const answers = [];
   const open = info => { const m = new bundle.BookFinishModal({}, info, v => answers.push(v)); m.open(); return m; };
-  const modal = open({ review: 1, reviewTitles: ['<b>x</b>'], seams: 2 });
+  const modal = open({ count: 3, titles: ['<b>x</b>'] });
   assert.equal(modal.titleEl.text, '還有 3 件沒處理');
   assert.deepEqual(buttonsOf(modal.modalEl).map(b => b.text), ['回去處理', '仍要完成']);
   assert.equal(dom.find(modal.modalEl, i => i.cls.includes('vam-book-finish-line')).children.length, 0);
   assert.equal(dom.focusedNow().text, '回去處理');
   buttonsOf(modal.modalEl)[1].click();
   assert.deepEqual(answers, [true]);
-  const back = open({ review: 1, reviewTitles: [], seams: 0 });
+  const back = open({ count: 1, titles: [] });
   buttonsOf(back.modalEl)[0].click();
-  const esc = open({ review: 1, reviewTitles: [], seams: 0 });
+  const esc = open({ count: 1, titles: [] });
   esc.close();
   esc.close();
   assert.deepEqual(answers, [true, false, false], 'one answer per question');
@@ -998,7 +982,7 @@ export { BookFinishModal } from "./experiences/visual-map/book-pipeline-finish-m
   start.close();
   assert.equal(start.isShown, false);
   assert.equal(start.isOpen, false);
-  const fin = new b.BookFinishModal({}, { review: 1, reviewTitles: [], seams: 0 }, () => {});
+  const fin = new b.BookFinishModal({}, { count: 1, titles: [] }, () => {});
   fin.open();
   assert.equal(fin.isOpen, true);
   fin.close();

@@ -360,7 +360,6 @@ const rerunMod = S.load('experiences/visual-map/book-pipeline-rerun.ts');
 // Arrays from the loaded module are another realm's: copy before deepEqual.
 const cleanAvoidSources = (...a) => [...rerunMod.cleanAvoidSources(...a)];
 const httpsAddresses = (...a) => [...rerunMod.httpsAddresses(...a)];
-const unverifiedSourceUrls = (...a) => [...rerunMod.unverifiedSourceUrls(...a)];
 const { avoidSourcesInstruction } = rerunMod;
 const itemsProof = (status, sources = []) => async request => ({ items: request.checklist.map(c => ({ id: c.id, type: c.type, status, note: 'n', sources })), aggregate: status === 'met' ? 'checked' : 'needs-review' });
 
@@ -374,8 +373,6 @@ test('T5 cleanAvoidSources: https only, no scripts or plain http, at most 5, eac
   const line = avoidSourcesInstruction(['https://a.test/x?q=1', 'javascript:1']);
   assert.equal(line, 'Do not rely on sources that could not be opened and checked; use other sources that can be opened and checked. Not usable: "https://a.test/x?q=1"');
   assert.ok(!avoidSourcesInstruction([]).includes('Not usable'));
-  assert.deepEqual(unverifiedSourceUrls({ items: [{ id: 'C1', type: 'fact', status: 'unverified', note: '', sources: ['https://u.test/1'] }, { id: 'C2', type: 'fact', status: 'met', note: '', sources: ['https://m.test/2'] }, { id: 'C3', type: 'structure', status: 'unmet', note: '', sources: ['https://s.test/3'] }] }), ['https://u.test/1']);
-  assert.deepEqual(unverifiedSourceUrls(undefined), []);
 });
 
 test('T5 rerunCard result: unchanged only when it needed a person before and after with the same items, statuses, sources and issue; changed sources, a pass, or a stop say changed', async () => {

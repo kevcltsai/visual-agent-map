@@ -1,4 +1,4 @@
-import { latestStoredProof, type StoredProofView } from "../../core/book-pipeline/note-sections";
+import { latestStoredProof } from "../../core/book-pipeline/note-sections";
 import type { PipelineStage } from "../../core/book-pipeline/model";
 
 /**
@@ -63,16 +63,6 @@ export function cleanAvoidSources(values: readonly unknown[]): string[] {
     }
   }
   return out;
-}
-
-/** The addresses a card's proof could not check: sources of the fact items that are unverified or unmet. */
-export function unverifiedSourceUrls(proof: StoredProofView | undefined): string[] {
-  if (!proof) return [];
-  return cleanAvoidSources(
-    proof.items
-      .filter(item => item.type === "fact" && (item.status === "unverified" || item.status === "unmet"))
-      .flatMap(item => item.sources)
-  );
 }
 
 /**

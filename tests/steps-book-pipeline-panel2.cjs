@@ -84,7 +84,7 @@ async function rig() {
     const parent = dom.element('div');
     const actions = {
       open: id => entries.push(['open', id]),
-      rerun: (id, options) => { entries.push(['rerun', id, options]); return over.rerun ? over.rerun(id, options) : runs.rerunCard(mapPath, id, options).then(async result => { await reload(); return result; }); },
+      rerun: id => { entries.push(['rerun', id]); return over.rerun ? over.rerun(id) : runs.rerunCard(mapPath, id).then(async result => { await reload(); return result; }); },
       confirmFinish: async info => { entries.push(['confirm', info]); return over.confirm === undefined ? true : over.confirm; },
       confirmSeam: id => { entries.push(['seam', id]); return runs.confirmSeam(mapPath, id).then(reload); },
       finish: () => { entries.push(['finish']); return runs.finishRun(mapPath); },
@@ -100,76 +100,73 @@ async function rig() {
 const rowOf = (panel, id) => all(panel, 'vam-book-panel-row').find(r => r.dataset.row === id && r.dataset.kind !== 'seam');
 const unmetProof = async request => ({ items: request.checklist.map(c => ({ id: c.id, type: c.type, status: 'unmet', note: 'missing', sources: [] })), aggregate: 'needs-review' });
 
-test('gate 2 panel: summary, a list of checked cards, no needs-review rows when all pass, the finish button and the hint', async () => {
+test('gate 2 panel, nothing needs a person: one sentence "N 章都做好了" and the finish button; no card list, no proof record, no picture list', async () => {
   const r = await rig();
   assert.equal((await r.stateOf()).phase, 'gate2');
   const d = await r.draw();
   const panel = d.panel;
   assert.equal(panel.attrs.role, 'region');
-  assert.ok(texts(panel).includes('3 張通過'), JSON.stringify(texts(panel)));
-  assert.equal(all(panel, 'vam-book-panel-row').length, 3);
-  assert.equal(all(one(panel, 'vam-book-panel-gate2-list'), 'vam-book-panel-state').length, 3);
+  assert.equal(one(panel, 'vam-book-panel-g2-line').text, '3 章都做好了');
+  assert.equal(one(panel, 'vam-book-panel-g2-line').dataset.state, 'clear');
+  assert.equal(all(panel, 'vam-book-panel-row').length, 0, 'passed cards are not listed');
+  assert.equal(all(panel, 'vam-book-panel-gate2-list').length, 0);
+  assert.equal(dom.findAll(panel, i => ['vam-book-panel-proof', 'vam-book-panel-images', 'vam-book-panel-add-images'].some(c => (i.cls ?? '').split(/\s+/).includes(c))).length, 0);
   assert.equal(all(panel, 'vam-book-panel-finish').length, 1);
-  assert.ok(one(panel, 'vam-book-panel-gate2-list').attrs['aria-label']);
+  assert.ok(!texts(panel).some(x => /通過|查證|\bC\d|\bN\d|proof/i.test(x)), JSON.stringify(texts(panel)));
+  one(panel, 'vam-book-panel-finish').click();
+  await settle();
+  assert.equal(r.entries.filter(x => x[0] === 'confirm').length, 0, 'no question when nothing is left');
+  assert.equal((await r.stateOf()).phase, 'done');
 });
 
-test('gate 2 panel: a needs-review card shows its reason in Chinese, open and rerun buttons; neighbours get a seam row; confirming a seam calls confirmBookSeam and clears it', async () => {
+test('gate 2 panel, a card that needs a person: the sentence counts it, only that card is listed with a plain reason (no codes), rerun and "我自己改"; neighbours with an unconfirmed join are listed too and the join can be confirmed', async () => {
   const r = await rig();
   r.script.proof = unmetProof;
   await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
   const d = await r.draw();
-  const attention = rowOf(d.panel, r.nodes[1].id);
-  assert.equal(attention.dataset.kind, 'attention');
-  assert.ok(texts(attention).some(x => x.startsWith('需人看') || x.includes('原因')), JSON.stringify(texts(attention)));
-  assert.ok(!texts(attention).some(x => /^[a-z_]+$/.test(x)), 'no raw code shown');
-  const seams = all(d.panel, 'vam-book-panel-row').filter(x => x.dataset.kind === 'seam');
-  assert.equal(seams.length, 2, 'both neighbours');
-  assert.ok(texts(seams[0]).includes('接縫需看'));
-  const confirm = one(seams[0], 'vam-book-panel-confirm-seam');
-  assert.ok(confirm.attrs['aria-label']);
-  const target = seams[0].dataset.row;
-  confirm.click();
-  assert.deepEqual(r.entries.at(-1), ['seam', target]);
-  await settle();
-  assert.equal(r.noteOf.get(target).pipelineSeam, undefined, 'the seam is gone from the note');
-  assert.equal(all(d.panel, 'vam-book-panel-row').filter(x => x.dataset.kind === 'seam').length, 1);
-});
-
-test('gate 2 panel: the proof record opens as plain text; <img onerror> and markdown images make no element', async () => {
-  const r = await rig();
-  const d = await r.draw();
+  const line = one(d.panel, 'vam-book-panel-g2-line');
+  assert.equal(line.text, '3 章已產出，3 章仍需注意', 'the card and both neighbours (their join is not confirmed)');
+  assert.equal(line.dataset.state, 'attention');
   const row = rowOf(d.panel, r.nodes[1].id);
-  const body = one(row, 'vam-book-panel-proof');
-  assert.equal(body.hidden, true);
-  const toggle = one(row, 'vam-book-panel-proof-toggle');
-  assert.equal(toggle.attrs['aria-expanded'], 'false');
-  toggle.click();
-  assert.equal(body.hidden, false);
-  assert.equal(toggle.attrs['aria-expanded'], 'true');
-  const shown = texts(body).join('\n');
-  assert.ok(shown.includes('onerror=alert(1)') && shown.includes('http://example.test/a.png'), shown);
-  assert.equal(dom.findAll(d.panel, i => ['img', 'a', 'script'].includes(i.tag)).length, 0);
-  assert.equal(dom.findAll(d.panel, i => i.attrs && ('onerror' in i.attrs || 'src' in i.attrs)).length, 0);
+  assert.equal(row.dataset.kind, 'attention');
+  assert.ok(!texts(d.panel).some(x => /\b[CN]\d+\b|proof|unmet/i.test(x)), JSON.stringify(texts(d.panel)));
+  assert.ok(texts(row).some(x => x.includes('missing')), 'the proof note in words');
+  assert.equal(one(row, 'vam-book-panel-rerun-card').text, '重跑這張');
+  assert.equal(one(row, 'vam-book-panel-open').text, '我自己改');
+  one(row, 'vam-book-panel-open').click();
+  assert.deepEqual(r.entries.at(-1), ['open', r.nodes[1].id]);
+  const neighbour = rowOf(d.panel, r.nodes[0].id);
+  assert.ok(texts(neighbour).some(x => x.includes('銜接')), JSON.stringify(texts(neighbour)));
+  const confirm = one(neighbour, 'vam-book-panel-confirm-seam');
+  assert.ok(confirm.attrs['aria-label']);
+  confirm.click();
+  assert.deepEqual(r.entries.at(-1), ['seam', r.nodes[0].id]);
+  await settle();
+  assert.equal(r.noteOf.get(r.nodes[0].id).pipelineSeam, undefined, 'the seam is gone from the note');
+  assert.equal(rowOf(one(d.parent, 'vam-book-panel-gate2') ?? d.panel, r.nodes[0].id), undefined, 'the confirmed card leaves the list');
 });
 
 test('gate 2 panel: "rerun this card" calls rerunBookCard for that card and is disabled while anything runs; a refusal shows its reason on the row', async () => {
   const r = await rig();
+  r.script.proof = unmetProof;
+  await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
+  for (const n of [r.nodes[0], r.nodes[2]]) await r.runs.confirmSeam(r.mapPath, n.id);
   const hold = defer();
   const d = await r.draw({ rerun: async () => { await hold.promise; } });
-  const row = rowOf(d.panel, r.nodes[2].id);
+  const row = rowOf(d.panel, r.nodes[1].id);
   one(row, 'vam-book-panel-rerun-card').click();
-  assert.deepEqual(r.entries.at(-1), ['rerun', r.nodes[2].id, undefined]);
-  const again = rowOf(d.panel, r.nodes[2].id);
+  assert.deepEqual(r.entries.at(-1), ['rerun', r.nodes[1].id]);
+  const again = rowOf(d.panel, r.nodes[1].id);
   assert.equal(one(again, 'vam-book-panel-rerun-card').disabled, true);
   assert.equal(all(d.panel, 'vam-book-panel-finish')[0].disabled, true);
   hold.resolve(); await settle();
-  assert.equal(one(rowOf(d.panel, r.nodes[2].id), 'vam-book-panel-rerun-card').disabled, false);
-  const busy = await r.draw({ busy: new Set([r.nodes[1].id]) });
+  assert.equal(one(rowOf(d.panel, r.nodes[1].id), 'vam-book-panel-rerun-card').disabled, false);
+  const busy = await r.draw({ busy: new Set([r.nodes[2].id]) });
   assert.equal(all(busy.panel, 'vam-book-panel-rerun-card').every(b => b.disabled), true, 'a card the runner is working on locks the others');
   const refused = await r.draw({ rerun: async () => { throw new bundle.BookPipelineRunError('busy', 'x'); } });
   one(rowOf(refused.panel, r.nodes[1].id), 'vam-book-panel-rerun-card').click();
   await settle();
-  assert.ok(texts(rowOf(refused.panel, r.nodes[1].id)).some(x => /[一-鿿]/.test(x) && x !== ''), 'a Chinese reason line');
+  assert.ok(texts(rowOf(refused.panel, r.nodes[1].id)).some(x => /[一-鿿]/.test(x)), 'a Chinese reason line');
 });
 
 test('finish: the review-finished button moves gate2 to done, a second press is idempotent, and a non-gate2 run refuses', async () => {
@@ -346,12 +343,12 @@ test('auto-open: a map with no bookPipeline never opens a panel', async () => {
   assert.equal(h.log.length, 0);
 });
 
-test('styles: the new gate 2 and seam classes exist, use theme variables only and have focus rings; the view has the wiring', () => {
-  for (const cls of ['vam-book-panel-state', 'vam-book-state.is-seam', 'vam-book-bar-eta', 'vam-book-panel-summary', 'vam-book-panel-row', 'vam-book-panel-proof', 'vam-book-panel-proof-items']) assert.ok(css.includes(`.${cls}`), cls);
-  const rules = css.split('\n').filter(line => /^\.vam-book-(panel-(state|summary|row|proof)|state\.is-seam|bar-eta)/.test(line)).join('\n');
+test('styles: the gate 2 sentence, the row and the seam classes exist, use theme variables only and have focus rings; the folded-record and picture-list rules are gone; the view has the wiring', () => {
+  for (const cls of ['vam-book-panel-state', 'vam-book-state.is-seam', 'vam-book-bar-eta', 'vam-book-panel-summary', 'vam-book-panel-g2-line', 'vam-book-panel-actions', 'vam-book-panel-row']) assert.ok(css.includes(`.${cls}`), cls);
+  const rules = css.split('\n').filter(line => /^\.vam-book-(panel-(state|summary|row|actions)|state\.is-seam|bar-eta)/.test(line)).join('\n');
   assert.ok(rules.length > 300);
   assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(rules) && !/\brgba?\(/.test(rules), 'no hard-coded colour');
-  assert.match(css, /\.vam-book-panel-proof\[hidden\] \{ display: none; \}/, 'a folded proof record must stay folded: the class display:flex would otherwise beat the hidden attribute');
+  assert.ok(!/vam-book-panel-(proof|images|image-row|unchanged)|vam-book-steps/.test(css), 'no rule is left for removed parts');
   assert.match(css, /\.vam-book-panel-row button:focus-visible[^}]*outline: 2px solid var\(--interactive-accent\)/);
   assert.match(css, /@media \(max-width: 700px\) \{[^}]*vam-book-panel-row/);
   const view_ts = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
@@ -397,70 +394,81 @@ test('finish: a disabled button says why in the aria-live status line; a refusal
 });
 
 
-// ---- T5: lead line, reasons, picture rows, unchanged block, finish question, rerun clock ----
-const PROOF = items => `### Research notes\n\n<!-- book-proof:v1 ${JSON.stringify({ key: 'k', result: { aggregate: 'needs-review', items } })} -->\n`;
+
+// ---- the single "needs attention" decision, the sentence, the list, the finish question ----
+const PROOF = items => `### Research notes\n\n<!-- book-proof:v1 ${JSON.stringify({ key: 'k', result: { aggregate: 'checked', items } })} -->\n`;
 const SLOTS_PROMPT = '圖安排：\n- 圖位 1｜圖表｜睡眠週期｜位置：第二段\n- 圖位 2｜照片｜腦波｜位置：結尾\n';
 const IMG = 'https://example.test/p.png';
-function synth(extra = {}) {
+const SLOTS_REC = state => `<!-- book-slots:v1 ${JSON.stringify({ slots: [{ index: 1, state, ...(state === 'missing' ? { reasonCode: 'not_found' } : { hash: bundle.shortHash(IMG) }) }, { index: 2, state: 'missing', reasonCode: 'not_found' }], bad: 0 })} -->\n`;
+function synth(extra = {}, only) {
   setUiLanguage('zh-TW');
   const notes = new Map();
   const add = (id, fields) => notes.set(id, { title: `T${id}`, prompt: '', summary: '', ...fields });
-  add('a', { pipelineStage: 'checked', prompt: SLOTS_PROMPT, detail: `text\n\n![x](${IMG})\n\n<!-- book-slots:v1 ${JSON.stringify({ slots: [{ index: 1, state: 'placed', hash: bundle.shortHash(IMG) }, { index: 2, state: 'missing', reasonCode: 'not_found' }], bad: 0 })} -->\n` });
-  add('b', { pipelineStage: 'needs-review', pipelineIssue: 'proof unmet: C1', prompt: '圖安排：無\n', detail: PROOF([{ id: 'C1', type: 'fact', status: 'unverified', note: 'Xie 2013 沒能打開核對', sources: [`${IMG}/paper`, 'http://insecure.test/x'] }, { id: 'C2', type: 'fact', status: 'met', note: '', sources: [] }]) });
-  add('c', { pipelineStage: 'checked', pipelineSeam: '前後章變了（第 2 張，版本 2）', prompt: SLOTS_PROMPT, detail: 'plain' });
-  add('d', { pipelineStage: 'planned' });
+  // A fine card: checked, one of two optional pictures missing (not a reason by itself).
+  add('fine', { pipelineStage: 'checked', prompt: SLOTS_PROMPT, detail: `text\n\n![x](${IMG})\n\n${SLOTS_REC('placed')}` });
+  add('fail', { pipelineStage: 'needs-review', pipelineIssue: 'proof unmet: C1', prompt: '圖安排：無\n', detail: PROOF([{ id: 'C1', type: 'fact', status: 'unmet', note: 'C1: Xie 2013 沒能打開核對', sources: [] }]) });
+  add('unfinished', { pipelineStage: 'planned' });
   add('old', { pipelineStage: 'needs-review', pipelineIssue: 'proof unmet: C1', prompt: 'Role: body', detail: '' });
   for (const [k, v] of Object.entries(extra)) add(k, v);
+  for (const id of [...notes.keys()]) if (only && !only.includes(id)) notes.delete(id);
   const order = [...notes.keys()];
   return { notes, order, data: () => bundle.buildGate2Panel({ order, titleOf: id => notes.get(id).title, noteOf: id => notes.get(id) }) };
 }
 const baseActions = (log = []) => ({
-  open: id => log.push(['open', id]), rerun: async (id, options) => { log.push(['rerun', id, options]); return { unchanged: true }; }, confirmSeam: async () => {},
+  open: id => log.push(['open', id]), rerun: async id => { log.push(['rerun', id]); return { unchanged: true }; }, confirmSeam: async id => { log.push(['seam', id]); },
   finish: async () => { log.push(['finish']); }, confirmFinish: async info => { log.push(['confirm', info]); return true; },
   showChat() {}, close() {}, refresh() {}
 });
+const lineOf = r => one(bundle.renderGate2Panel(dom.element('div'), r.data(), false, new bundle.GatePanelState(), baseActions()), 'vam-book-panel-g2-line').text;
 
-test('T5 gate 2: one lead line (passed, review, seams, picture gaps); the reason is the proof note in words; the unverified https sources are kept for "use other sources"', () => {
-  const r = synth();
-  const data = r.data();
-  assert.deepEqual([data.checked, data.needsReview, data.seams, data.imageGaps], [2, 2, 1, 1]);
-  const panel = bundle.renderGate2Panel(dom.element('div'), data, false, new bundle.GatePanelState(), baseActions());
-  assert.equal(one(panel, 'vam-book-panel-summary').text, '2 張通過，2 張要你看，1 個接縫還沒確認，圖有 1 處缺');
-  const b = data.cards.find(card => card.id === 'b');
-  assert.equal(b.reasonText, 'Xie 2013 沒能打開核對');
-  assert.deepEqual([...b.avoidSources], [`${IMG}/paper`], 'only https, from the unverified items');
-  assert.ok(!texts(panel).some(x => /^C\d/.test(x)), 'no item codes shown');
-  // An older card (no image plan, no proof section) still draws and reads as a plain reason.
-  const old = data.cards.find(card => card.id === 'old');
-  assert.equal(old.images.planned, 0);
-  assert.ok(old.reasonText && !/proof unmet/.test(old.reasonText));
+test('the one decision: needs-review, unfinished, checked with unmet structure, checked with unconfirmed facts, a bare gallery chapter and an unconfirmed join all keep the panel from saying "都做好了"; a missing optional picture does not', () => {
+  const structure = JSON.stringify([{ id: 'S1', type: 'structure', status: 'unmet', note: '', sources: [] }]);
+  const cases = {
+    structure: { pipelineStage: 'checked', pipelineIssue: 'structure unmet: S1 S2', prompt: '圖安排：無\n', detail: PROOF(JSON.parse(structure)) },
+    facts: { pipelineStage: 'checked', prompt: '圖安排：無\n', detail: PROOF([{ id: 'C1', type: 'fact', status: 'unverified', note: 'x', sources: [] }, { id: 'C2', type: 'fact', status: 'met', note: '', sources: [] }]) },
+    gallery: { pipelineStage: 'checked', bookRole: 'gallery', prompt: SLOTS_PROMPT, detail: `text\n\n<!-- book-slots:v1 ${JSON.stringify({ slots: [{ index: 1, state: 'missing', reasonCode: 'not_found' }, { index: 2, state: 'missing', reasonCode: 'not_found' }], bad: 0 })} -->\n` },
+    seam: { pipelineStage: 'checked', pipelineSeam: '前後章變了（第 2 張，版本 2）', prompt: '圖安排：無\n', detail: 'plain' },
+    review: { pipelineStage: 'needs-review', pipelineIssue: 'write failed: invalid_reply' },
+    unfinished: { pipelineStage: 'written' }
+  };
+  const clean = synth({}, ['fine']);
+  assert.equal(lineOf(clean), '1 章都做好了', 'a checked card with one optional picture missing is fine');
+  for (const [name, fields] of Object.entries(cases)) {
+    const r = synth({ x: fields }, ['fine', 'x']);
+    assert.equal(lineOf(r), '2 章已產出，1 章仍需注意', name);
+    const card = r.data().cards.find(c => c.id === 'x');
+    assert.ok(bundle.needsAttention(card), name);
+    assert.ok(bundle.attentionReasons(card).every(x => x && !/\b[CN]\d+\b|unmet|proof/i.test(x)), `${name}: ${JSON.stringify(bundle.attentionReasons(card))}`);
+  }
+  // A picture-only gap in an ordinary chapter, or an unrecorded slot, stays quiet.
+  const gap = synth({ g: { pipelineStage: 'checked', prompt: SLOTS_PROMPT, detail: `text\n\n<!-- book-slots:v1 ${JSON.stringify({ slots: [{ index: 1, state: 'missing', reasonCode: 'not_found' }, { index: 2, state: 'missing', reasonCode: 'not_found' }], bad: 0 })} -->\n` }, u: { pipelineStage: 'checked', prompt: SLOTS_PROMPT, detail: 'plain' } }, ['g', 'u']);
+  assert.equal(lineOf(gap), '2 章都做好了');
+  const imageToken = synth({ i: { pipelineStage: 'checked', pipelineIssue: 'structure unmet: image_1', prompt: '圖安排：無\n', detail: 'plain' } }, ['i']);
+  assert.equal(lineOf(imageToken), '1 章都做好了', 'a picture token is not a structure item');
 });
 
-test('T5 gate 2: picture rows say placed, no fitting picture, edited, unrecorded, or none planned; a gap has "add pictures myself" that opens the note; planned cards have no row', () => {
+test('gate 2 list: only the cards that need a person, each with name, one plain reason and the two actions; no passed card, no proof record, no picture row, no code in any text', async () => {
   const r = synth();
   const log = [];
   const panel = bundle.renderGate2Panel(dom.element('div'), r.data(), false, new bundle.GatePanelState(), baseActions(log));
-  const rows = all(panel, 'vam-book-panel-image-row');
-  assert.deepEqual(rows.map(x => x.dataset.row), ['a', 'b', 'c', 'old'], 'the planned card d has no picture row');
-  const say = id => texts(rows.find(x => x.dataset.row === id)).join(' ');
-  assert.match(say('a'), /1 張圖，1 處缺/);
-  assert.match(say('a'), /圖 2：沒找到合適的圖/);
-  assert.match(say('b'), /企劃未安排圖/);
-  assert.match(say('c'), /尚未記錄圖的結果/);
-  one(rows[0], 'vam-book-panel-add-images').click();
-  assert.deepEqual(log.at(-1), ['open', 'a']);
-  assert.equal(all(rows[1], 'vam-book-panel-add-images').length, 0);
-  // The recorded picture is no longer in the text: it reads as edited; no record of a missing slot becomes a gap.
-  const edited = synth({ e: { pipelineStage: 'checked', prompt: SLOTS_PROMPT, detail: `text <!-- x -->\n<!-- book-slots:v1 ${JSON.stringify({ slots: [{ index: 1, state: 'placed', hash: '00000000' }, { index: 2, state: 'missing', reasonCode: 'load_failed' }], bad: 0 })} -->\n` } });
-  const eRows = all(bundle.renderGate2Panel(dom.element('div'), edited.data(), false, new bundle.GatePanelState(), baseActions()), 'vam-book-panel-image-row');
-  const e = texts(eRows.find(x => x.dataset.row === 'e')).join(' ');
-  assert.match(e, /1 張圖，1 處缺/);
-  assert.match(e, /1 張被手動改過/);
-  assert.match(e, /圖載入失敗/);
+  assert.equal(one(panel, 'vam-book-panel-g2-line').text, '4 章已產出，3 章仍需注意');
+  const rows = all(panel, 'vam-book-panel-row');
+  assert.deepEqual(rows.map(x => x.dataset.row), ['fail', 'unfinished', 'old']);
+  const failRow = rows[0];
+  assert.ok(texts(failRow).includes('2 Tfail'));
+  assert.ok(texts(failRow).some(x => x.includes('Xie 2013 沒能打開核對') && !/C1/.test(x)), 'the note without its code');
+  assert.ok(texts(rows[1]).includes('這章還沒完成'));
+  assert.ok(texts(rows[2]).every(x => !/proof unmet/.test(x)), 'an old card with no record still reads as a plain sentence');
+  one(failRow, 'vam-book-panel-open').click();
+  assert.deepEqual(log.at(-1), ['open', 'fail']);
+  assert.equal(all(panel, 'vam-book-panel-rerun-card').length, 3);
+  assert.equal(all(panel, 'vam-book-panel-confirm-seam').length, 0, 'the join button only where a join is open');
+  assert.ok(!texts(panel).some(x => /\b[CN]\d+\b|proof|^通過|查證|自己加圖|沒找到合適的圖/i.test(x)), JSON.stringify(texts(panel)));
+  assert.ok(!texts(panel).some(x => /地圖/.test(x)));
 });
 
-test('T5 gate 2: a rerun left unchanged shows the block with "use other sources" (only the unverified https addresses go with it) and "I will look myself"; a second rerun clears it', async () => {
-  const r = synth();
+test('gate 2: a rerun left unchanged marks the row "還是要你看"; a second rerun clears it; the right-click path lands on the same mark', async () => {
+  const r = synth({}, ['fail']);
   const log = [];
   const state = new bundle.GatePanelState();
   let panel;
@@ -468,38 +476,34 @@ test('T5 gate 2: a rerun left unchanged shows the block with "use other sources"
   const parent = dom.element('div');
   const draw = () => bundle.renderGate2Panel(parent, r.data(), false, state, actions);
   panel = draw();
-  const row = () => all(panel, 'vam-book-panel-row').find(x => x.dataset.row === 'b');
-  assert.equal(all(row(), 'vam-book-panel-unchanged').length, 0, 'not before a rerun');
+  const row = () => all(panel, 'vam-book-panel-row').find(x => x.dataset.row === 'fail');
+  assert.ok(!texts(row()).includes('還是要你看'), 'not before a rerun');
   one(row(), 'vam-book-panel-rerun-card').click();
   await settle();
-  assert.deepEqual(log.at(-1), ['rerun', 'b', undefined]);
-  assert.ok(state.unchanged.has('b'));
+  assert.deepEqual(log.at(-1), ['rerun', 'fail']);
+  assert.ok(state.unchanged.has('fail'));
   assert.ok(texts(row()).includes('還是要你看'));
-  assert.ok(texts(row()).includes('這次重跑的結果相同，仍需人看。'));
-  assert.ok(!texts(row()).some(x => /仍無法打開|同一來源/.test(x)), 'does not claim the same source still fails');
-  one(row(), 'vam-book-panel-look-myself').click();
-  assert.deepEqual(log.at(-1), ['open', 'b']);
-  one(row(), 'vam-book-panel-swap-source').click();
-  await settle();
-  assert.equal(JSON.stringify(log.at(-1)), JSON.stringify(['rerun', 'b', { avoidSources: [`${IMG}/paper`] }]));
-  // The old row had no sources to swap: no such button.
-  state.unchanged.add('old');
-  panel.remove(); panel = draw();
-  assert.equal(all(all(panel, 'vam-book-panel-row').find(x => x.dataset.row === 'old'), 'vam-book-panel-swap-source').length, 0);
+  await bundle.runTrackedRerun(state, 'fail', async () => ({ unchanged: false }));
+  assert.ok(!state.unchanged.has('fail'), 'a changed result clears the old mark');
+  await bundle.runTrackedRerun(state, 'fail', async () => ({ unchanged: true }));
+  let seen;
+  await bundle.runTrackedRerun(state, 'fail', async () => { seen = state.unchanged.has('fail'); return undefined; });
+  assert.equal(seen, false, 'cleared before the run starts');
+  await assert.rejects(() => bundle.runTrackedRerun(state, 'fail', async () => { throw new Error('x'); }));
+  assert.ok(!state.unchanged.has('fail'));
 });
 
-test('T5 gate 2: finish asks once when something is left (cards to look at, seams), not when nothing is; "go back" does not finish; a card still working beats the question', async () => {
+test('gate 2: finish asks once when something is left (count and names), not when nothing is; "go back" does not finish; a card still working beats the question', async () => {
   const r = synth();
   const log = [];
   const state = new bundle.GatePanelState();
-  const press = (panel) => one(panel, 'vam-book-panel-finish').click();
-  // Left over: the question, with counts and titles; "go back" (false) finishes nothing.
+  const press = panel => one(panel, 'vam-book-panel-finish').click();
   const answer = { yes: false };
   const actions = { ...baseActions(log), confirmFinish: async info => { log.push(['confirm', info]); return answer.yes; } };
   const panel = bundle.renderGate2Panel(dom.element('div'), r.data(), false, state, actions);
   press(panel);
   await settle();
-  assert.deepEqual(log.filter(x => x[0] === 'confirm').map(x => [x[1].review, x[1].seams, x[1].reviewTitles]), [[2, 1, ['2 Tb', '5 Told']]]);
+  assert.deepEqual(log.filter(x => x[0] === 'confirm').map(x => [x[1].count, x[1].titles]), [[3, ['2 Tfail', '3 Tunfinished', '4 Told']]]);
   assert.equal(log.filter(x => x[0] === 'finish').length, 0);
   assert.equal(state.finishAsking, false);
   answer.yes = true;
@@ -507,74 +511,36 @@ test('T5 gate 2: finish asks once when something is left (cards to look at, seam
   await settle();
   assert.equal(log.filter(x => x[0] === 'confirm').length, 2);
   assert.equal(log.filter(x => x[0] === 'finish').length, 1);
-  // Nothing left: no question, finish at once.
-  const clean = new Map([['a', { title: 'A', prompt: '', summary: '', pipelineStage: 'checked' }]]);
+  const clean = synth({}, ['fine']);
   const log2 = [];
-  const p2 = bundle.renderGate2Panel(dom.element('div'), bundle.buildGate2Panel({ order: ['a'], titleOf: () => 'A', noteOf: id => clean.get(id) }), false, new bundle.GatePanelState(), baseActions(log2));
+  const p2 = bundle.renderGate2Panel(dom.element('div'), clean.data(), false, new bundle.GatePanelState(), baseActions(log2));
   press(p2);
   await settle();
   assert.deepEqual(log2.map(x => x[0]), ['finish']);
-  // A card still working: the button waits (no question, no finish).
   const log3 = [];
-  const p3 = bundle.renderGate2Panel(dom.element('div'), r.data(), false, new bundle.GatePanelState(), baseActions(log3), new Set(['b']));
+  const p3 = bundle.renderGate2Panel(dom.element('div'), r.data(), false, new bundle.GatePanelState(), baseActions(log3), new Set(['fail']));
   assert.equal(one(p3, 'vam-book-panel-finish').disabled, true);
   press(p3);
   await settle();
   assert.deepEqual(log3, [], 'busy comes first');
 });
 
-test('T3 gate 2: the card being rerun shows "處理中" (no clock) instead of its stage', () => {
+test('gate 2: the card being rerun shows "處理中" (no clock) instead of its state', () => {
   const r = synth();
-  const log = [];
-  const panel = bundle.renderGate2Panel(dom.element('div'), r.data(), false, new bundle.GatePanelState(), baseActions(log), new Set(['b']), true, { nodeId: 'b', startedAt: 12345 });
-  const row = all(panel, 'vam-book-panel-row').find(x => x.dataset.row === 'b');
+  const panel = bundle.renderGate2Panel(dom.element('div'), r.data(), false, new bundle.GatePanelState(), baseActions(), new Set(['fail']), true, { nodeId: 'fail', startedAt: 12345 });
+  const row = all(panel, 'vam-book-panel-row').find(x => x.dataset.row === 'fail');
   assert.ok(texts(row).includes('處理中'), JSON.stringify(texts(row)));
-  assert.ok(!texts(row).includes('需人看'));
+  assert.ok(!texts(row).includes('要你看'));
   assert.ok(!texts(row).some(x => /\d:\d\d/.test(x)), 'no clock');
 });
 
-test('T5 right-click rerun path: the same result shows the block with both actions; the old mark goes when the result changes', async () => {
-  const r = synth();
-  const state = new bundle.GatePanelState();
-  const log = [];
-  const draw = () => bundle.renderGate2Panel(dom.element('div'), r.data(), false, state, baseActions(log));
-  const row = panel => all(panel, 'vam-book-panel-row').find(x => x.dataset.row === 'b');
-  // What the view's menu item runs: runTrackedRerun over the plugin's rerun result.
-  await bundle.runTrackedRerun(state, 'b', async () => ({ unchanged: true }));
-  const panel = draw();
-  assert.ok(texts(row(panel)).includes('這次重跑的結果相同，仍需人看。'));
-  assert.equal(all(row(panel), 'vam-book-panel-swap-source').length, 1);
-  assert.equal(all(row(panel), 'vam-book-panel-look-myself').length, 1);
-  await bundle.runTrackedRerun(state, 'b', async () => ({ unchanged: false }));
-  assert.ok(!state.unchanged.has('b'), 'a changed result clears the old mark');
-  assert.equal(all(row(draw()), 'vam-book-panel-unchanged').length, 0);
-  await bundle.runTrackedRerun(state, 'b', async () => ({ unchanged: true }));
-  let seen;
-  await bundle.runTrackedRerun(state, 'b', async () => { seen = state.unchanged.has('b'); return undefined; });
-  assert.equal(seen, false, 'cleared before the run starts');
-  assert.ok(!state.unchanged.has('b'), 'a rerun that returns nothing leaves no mark');
-  await assert.rejects(() => bundle.runTrackedRerun(state, 'b', async () => { throw new Error('x'); }));
-  assert.ok(!state.unchanged.has('b'));
-});
-
-test('T5 gate 2: a passed card reads "通過" or "通過，n 處可留意" (not 已校), no 地圖 in zh-TW', () => {
-  const r = synth({ p: { pipelineStage: 'checked', prompt: '圖安排：無\n', detail: PROOF([{ id: 'C1', type: 'fact', status: 'unverified', note: 'x', sources: [] }, { id: 'C2', type: 'fact', status: 'unverified', note: 'y', sources: [] }, { id: 'C3', type: 'fact', status: 'met', note: '', sources: [] }]) } });
-  const panel = bundle.renderGate2Panel(dom.element('div'), r.data(), false, new bundle.GatePanelState(), baseActions());
-  const tag = id => texts(all(panel, 'vam-book-panel-row').find(x => x.dataset.row === id)).join('|');
-  assert.match(tag('p'), /通過，2 處可留意/);
-  assert.ok(!/已校/.test(tag('p')) && !/已校/.test(tag('a')));
-  assert.match(tag('a'), /通過/);
-  assert.ok(!texts(panel).some(x => /地圖/.test(x)));
-});
-
-test('F-a gate 2: a passed card with unmet structure keeps the structure line out of the card body (only in the proof record); a needs-review card still shows its reason', () => {
-  const proof = PROOF([{ id: 'S1', type: 'structure', status: 'unmet', note: 'x', sources: [] }, { id: 'C1', type: 'fact', status: 'met', note: '', sources: [] }]);
-  const r = synth({ p: { pipelineStage: 'checked', pipelineIssue: 'structure unmet: S1', prompt: '圖安排：無\n', detail: proof } });
-  const panel = bundle.renderGate2Panel(dom.element('div'), r.data(), false, new bundle.GatePanelState(), baseActions());
-  const row = all(panel, 'vam-book-panel-row').find(x => x.dataset.row === 'p');
-  const outside = (row.children ?? []).filter(c => !(c.cls ?? '').split(/\s+/).includes('vam-book-panel-proof'));
-  assert.ok(!outside.some(c => texts(c).some(x => /結構/.test(x))), 'no structure line outside the proof record');
-  const proofBody = all(row, 'vam-book-panel-proof')[0];
-  assert.ok(texts(proofBody).some(x => /結構/.test(x)), 'proof record has it');
-  assert.ok(!texts(panel).some(x => /地圖/.test(x)));
+test('gate 2: the sentence and the actions read in English and Simplified Chinese (no 地圖 in zh-TW, no codes)', () => {
+  for (const [lang, line] of [['en', /still need attention/], ['zh-CN', /仍需注意/]]) {
+    const r = synth();
+    setUiLanguage(lang);
+    const panel = bundle.renderGate2Panel(dom.element('div'), r.data(), false, new bundle.GatePanelState(), baseActions());
+    assert.match(one(panel, 'vam-book-panel-g2-line').text, line, lang);
+    assert.ok(!texts(panel).some(x => /\b[CN]\d+\b/.test(x)), lang);
+  }
+  setUiLanguage('zh-TW');
 });

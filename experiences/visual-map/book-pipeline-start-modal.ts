@@ -233,7 +233,9 @@ export class BookStartModal extends Modal {
     if (!suggestions) return;
     for (const field of BOOK_SETTING_FIELDS) {
       const text = suggestions[field];
-      if (text && !this.input.settings[field]?.trim()) this.suggested[field] = text;
+      // Only a field that really shows the suggestion as its placeholder: a prefilled field or one typed in before the answer is not recorded.
+      const typedNow = this.fields?.areas.get(field)?.value.trim();
+      if (text && !this.input.settings[field]?.trim() && !typedNow) this.suggested[field] = text;
     }
     this.fields?.suggest(this.suggested);
   }

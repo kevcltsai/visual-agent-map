@@ -2788,8 +2788,7 @@ export const en = {
   "ui.settings_group_general": "General",
   "ui.settings_group_book": "Picture book",
   "ui.settings_book_plan_name": "Plan",
-  "ui.settings_book_plan_desc":
-    "Writes the global plan and each card's plan. Few calls, short output; a cheaper model is enough.",
+  "ui.settings_book_plan_desc": "Writes the global plan and each card's plan. Few calls, short output.",
   "ui.settings_book_write_name": "Author",
   "ui.settings_book_write_desc": "Writes the body text and finds sources. Decides the quality of the result.",
   "ui.settings_book_image_name": "Pictures",

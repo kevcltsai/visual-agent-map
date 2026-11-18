@@ -17495,7 +17495,8 @@ export class VisualAgentMapView extends ItemView {
         });
       }
     });
-    if (root && BOOK_SETTING_FIELDS.some(field => !rootNote?.bookSettings?.[field]?.trim())) {
+    const suggestCall = !!root && BOOK_SETTING_FIELDS.some(field => !rootNote?.bookSettings?.[field]?.trim());
+    if (root && suggestCall) {
       const children = map.nodes.filter(node => node.parentId === root.id).slice(0, 40);
       const request = (async (): Promise<BookSettings> => {
         const chapters = (
@@ -17525,6 +17526,8 @@ export class VisualAgentMapView extends ItemView {
     }
     this.bookStartModal = modal;
     this.openMapModal(modal);
+    // No call is made (every field filled, or no root): the "thinking up suggestions" line must not stay.
+    if (!suggestCall) modal.setSuggestions(null);
   }
   /** True while a conversation chain or a multi-select research holds this map: a picture-book run must not start or write then. */
   bookPipelineBlocked(): boolean {

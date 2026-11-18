@@ -2604,7 +2604,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.settings_group_general": "常规",
   "ui.settings_group_book": "图文书",
   "ui.settings_book_plan_name": "企划",
-  "ui.settings_book_plan_desc": "全局与逐卡企划。调用少、输出短，用便宜模型即可。",
+  "ui.settings_book_plan_desc": "全局与逐卡企划。调用少、输出短。",
   "ui.settings_book_write_name": "作者",
   "ui.settings_book_write_desc": "写正文与找资料，影响成品质量。",
   "ui.settings_book_image_name": "找图",

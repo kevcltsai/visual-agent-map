@@ -2604,7 +2604,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.settings_group_general": "一般",
   "ui.settings_group_book": "圖文書",
   "ui.settings_book_plan_name": "企劃",
-  "ui.settings_book_plan_desc": "全域與逐卡企劃。呼叫少、輸出短，用便宜模型即可。",
+  "ui.settings_book_plan_desc": "全域與逐卡企劃。呼叫少、輸出短。",
   "ui.settings_book_write_name": "作者",
   "ui.settings_book_write_desc": "寫正文與找資料，影響成品品質。",
   "ui.settings_book_image_name": "找圖",

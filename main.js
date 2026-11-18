@@ -2609,7 +2609,7 @@ var en = {
   "ui.settings_group_general": "General",
   "ui.settings_group_book": "Picture book",
   "ui.settings_book_plan_name": "Plan",
-  "ui.settings_book_plan_desc": "Writes the global plan and each card's plan. Few calls, short output; a cheaper model is enough.",
+  "ui.settings_book_plan_desc": "Writes the global plan and each card's plan. Few calls, short output.",
   "ui.settings_book_write_name": "Author",
   "ui.settings_book_write_desc": "Writes the body text and finds sources. Decides the quality of the result.",
   "ui.settings_book_image_name": "Pictures",
@@ -5839,7 +5839,7 @@ var zhCN = {
   "ui.settings_group_general": "\u5E38\u89C4",
   "ui.settings_group_book": "\u56FE\u6587\u4E66",
   "ui.settings_book_plan_name": "\u4F01\u5212",
-  "ui.settings_book_plan_desc": "\u5168\u5C40\u4E0E\u9010\u5361\u4F01\u5212\u3002\u8C03\u7528\u5C11\u3001\u8F93\u51FA\u77ED\uFF0C\u7528\u4FBF\u5B9C\u6A21\u578B\u5373\u53EF\u3002",
+  "ui.settings_book_plan_desc": "\u5168\u5C40\u4E0E\u9010\u5361\u4F01\u5212\u3002\u8C03\u7528\u5C11\u3001\u8F93\u51FA\u77ED\u3002",
   "ui.settings_book_write_name": "\u4F5C\u8005",
   "ui.settings_book_write_desc": "\u5199\u6B63\u6587\u4E0E\u627E\u8D44\u6599\uFF0C\u5F71\u54CD\u6210\u54C1\u8D28\u91CF\u3002",
   "ui.settings_book_image_name": "\u627E\u56FE",
@@ -9069,7 +9069,7 @@ var zhTW = {
   "ui.settings_group_general": "\u4E00\u822C",
   "ui.settings_group_book": "\u5716\u6587\u66F8",
   "ui.settings_book_plan_name": "\u4F01\u5283",
-  "ui.settings_book_plan_desc": "\u5168\u57DF\u8207\u9010\u5361\u4F01\u5283\u3002\u547C\u53EB\u5C11\u3001\u8F38\u51FA\u77ED\uFF0C\u7528\u4FBF\u5B9C\u6A21\u578B\u5373\u53EF\u3002",
+  "ui.settings_book_plan_desc": "\u5168\u57DF\u8207\u9010\u5361\u4F01\u5283\u3002\u547C\u53EB\u5C11\u3001\u8F38\u51FA\u77ED\u3002",
   "ui.settings_book_write_name": "\u4F5C\u8005",
   "ui.settings_book_write_desc": "\u5BEB\u6B63\u6587\u8207\u627E\u8CC7\u6599\uFF0C\u5F71\u97FF\u6210\u54C1\u54C1\u8CEA\u3002",
   "ui.settings_book_image_name": "\u627E\u5716",
@@ -65109,16 +65109,17 @@ var BookStartModal = class extends import_obsidian31.Modal {
   }
   /** The suggestion arrived (or did not): the fields show it in grey; a card already started or closed ignores it. */
   setSuggestions(suggestions) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d, _e;
     if (!this.opened || this.started) return;
     (_a2 = this.suggestingEl) == null ? void 0 : _a2.remove();
     this.suggestingEl = null;
     if (!suggestions) return;
     for (const field of BOOK_SETTING_FIELDS) {
       const text10 = suggestions[field];
-      if (text10 && !((_b2 = this.input.settings[field]) == null ? void 0 : _b2.trim())) this.suggested[field] = text10;
+      const typedNow = (_c = (_b2 = this.fields) == null ? void 0 : _b2.areas.get(field)) == null ? void 0 : _c.value.trim();
+      if (text10 && !((_d = this.input.settings[field]) == null ? void 0 : _d.trim()) && !typedNow) this.suggested[field] = text10;
     }
-    (_c = this.fields) == null ? void 0 : _c.suggest(this.suggested);
+    (_e = this.fields) == null ? void 0 : _e.suggest(this.suggested);
   }
   onOpen() {
     this.opened = true;
@@ -82836,10 +82837,11 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         });
       }
     });
-    if (root && BOOK_SETTING_FIELDS.some((field) => {
+    const suggestCall = !!root && BOOK_SETTING_FIELDS.some((field) => {
       var _a3, _b3;
       return !((_b3 = (_a3 = rootNote == null ? void 0 : rootNote.bookSettings) == null ? void 0 : _a3[field]) == null ? void 0 : _b3.trim());
-    })) {
+    });
+    if (root && suggestCall) {
       const children = map.nodes.filter((node) => node.parentId === root.id).slice(0, 40);
       const request = (async () => {
         var _a3, _b3;
@@ -82867,6 +82869,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }
     this.bookStartModal = modal;
     this.openMapModal(modal);
+    if (!suggestCall) modal.setSuggestions(null);
   }
   /** True while a conversation chain or a multi-select research holds this map: a picture-book run must not start or write then. */
   bookPipelineBlocked() {

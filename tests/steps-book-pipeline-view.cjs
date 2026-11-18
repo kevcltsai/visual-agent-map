@@ -575,7 +575,32 @@ test('suggestions: typed text is never replaced; Start writes a suggestion only 
   assert.equal(JSON.stringify(root.bookSettings), JSON.stringify({ reader: 'kids', goal: SUGGEST.goal, angle: SUGGEST.angle, tone: '嚴肅 的語氣', length: SUGGEST.length }), 'suggestions for empty fields, the typed tone, no style (no suggestion), reader kept');
 });
 
-test('suggestions: a root with all six fields filled makes no call; the patch helper keeps typed text over a suggestion and ignores suggestions for a cleared prefilled field', () => {
+test('suggestions: typed before the answer, then cleared, then Start writes nothing for that field (the owner never saw the suggestion)', async () => {
+  const h = await harness({ book: false });
+  const answer = pending(); h.ctl.impl = () => answer.promise;
+  const modal = await openCard(h);
+  await dom.tick(); await dom.tick();
+  field(modal, '語氣').value = 'my tone';
+  answer.resolve(SUGGEST);
+  await dom.tick(); await dom.tick(); await dom.tick();
+  assert.equal(field(modal, '讀者').attrs.placeholder, SUGGEST.reader, 'an untouched field shows the suggestion');
+  field(modal, '語氣').value = '';
+  cardButton(modal, '開始').click(); await dom.tick(); await dom.tick();
+  const root = await h.plugin.repo.readNote(rootPath(h));
+  assert.equal(root.bookSettings.tone, undefined, 'no tone written');
+  assert.equal(root.bookSettings.reader, SUGGEST.reader, 'a field that showed its suggestion still takes it');
+});
+
+test('suggestions: a root with all six fields filled opens the card with no call and no "thinking" line', async () => {
+  const h = await harness({ book: false });
+  await h.plugin.repo.writeBookSettings(rootPath(h), { reader: 'a', goal: 'b', angle: 'c', tone: 'd', length: 'e', style: 'f' });
+  const modal = await openCard(h);
+  await dom.tick(); await dom.tick();
+  assert.equal(h.ctl.calls.length, 0);
+  assert.equal(texts(modal.modalEl).includes('正在依這張心智圖的主題想建議⋯⋯'), false);
+});
+
+test('suggestions: the patch helper keeps typed text over a suggestion and ignores suggestions for a cleared prefilled field', () => {
   const s = bundleStart;
   assert.equal(JSON.stringify(s.bookSettingsPatch({}, { reader: '', tone: ' x ' }, { reader: 'R', tone: 'T', goal: 'G' })), JSON.stringify({ reader: 'R', tone: 'x' }));
   assert.equal(JSON.stringify(s.bookSettingsPatch({ tone: 'warm' }, { tone: '' }, { tone: 'T' })), JSON.stringify({ tone: null }));

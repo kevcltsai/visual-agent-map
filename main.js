@@ -44301,12 +44301,13 @@ function hiddenRanges(lines, fenced) {
   }
   return found;
 }
+var HIDDEN_TYPE = /\[!\s*vam-book\s*(?:\|[^\]]*)?\]/gi;
 function neutralizeDetail(content) {
   const start = content.indexOf(DETAIL_START2);
   const end = content.lastIndexOf(DETAIL_END2);
   if (start < 0 || end < start + DETAIL_START2.length) return null;
   const from = start + DETAIL_START2.length;
-  return `${content.slice(0, from)}${content.slice(from, end).replace(/\[!vam-book\]/gi, "[!note]")}${content.slice(end)}`;
+  return `${content.slice(0, from)}${content.slice(from, end).replace(HIDDEN_TYPE, "[!note]")}${content.slice(end)}`;
 }
 function withoutHiddenCallouts(lines) {
   const ranges = hiddenRanges(lines, fencedLines2(lines));

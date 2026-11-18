@@ -1150,6 +1150,9 @@ test('B2 run: hidden-looking text the author writes is saved visible; chapter te
     ['no space head', '>[!vam-book]\n>SPAM4', true],
     ['upper case head', '> [!VAM-BOOK]- y\n> SPAM5', true],
     ['nested head', '> > [!vam-book]- z\n> > SPAM6', true],
+    ['spaced type', '> [! vam-book]- s\n> SPAM9', true],
+    ['metadata type', '> [!VAM-BOOK|x]- m\n> SPAM10', true],
+    ['space before metadata', '> [!vam-book |meta]- n\n> SPAM11', true],
     ['lazy continuation', '> [!vam-book]- l\n> a\nSPAM7 lazy', true],
     ['inside a fence', '```\n> [!vam-book]- f\n> SPAM8\n```', true],
     ['research section', '### 研究備註\n\n> [!note]- 研究備註\n> SPAM1', false],
@@ -1163,7 +1166,7 @@ test('B2 run: hidden-looking text the author writes is saved visible; chapter te
     const spam = /SPAM\d/.exec(extra)[0];
     assert.ok(detail.includes(spam), `${name}: the text is kept`);
     assert.ok(!hiddenLines(detail).some(l => l.includes(spam)), `${name}: the author's text is not hidden`);
-    assert.ok(!/\[!vam-book\]- (?:x|y|z|l|f)\b/i.test(r.raw(1)) && !/>\s*\[!vam-book\]\s*\n>\s*SPAM/i.test(r.raw(1)), `${name}: no hidden block of the author's`);
+    assert.ok(!/\[!\s*vam-book\s*(?:\|[^\]]*)?\]- (?:x|y|z|l|f|s|m|n)\b/i.test(r.raw(1)) && !/>\s*\[!vam-book\]\s*\n>\s*SPAM/i.test(r.raw(1)), `${name}: no hidden block of the author's`);
     if (inBody) assert.ok(chapterBody(detail).includes(spam), `${name}: the proofreading input sees it`);
   }
 });

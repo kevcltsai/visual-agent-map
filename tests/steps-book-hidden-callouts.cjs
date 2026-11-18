@@ -166,9 +166,9 @@ test('extractProofRecords returns only the record lines (header, items, machine 
 
 test('neutralizeDetail: inside the Detail span every hidden-type title is a visible note by plain replace (any depth, case, indent, fence, forged marker); outside stays; no markers is refused', () => {
   const D = t => `> [!vam-book]- 預覽\n> p\n\n<!-- visual-agent-map:detail:start -->\n${t}\n<!-- visual-agent-map:detail:end -->\n\n> [!vam-book]- 提示\n> q`;
-  for (const head of [' > [!vam-book]- x', '>[!vam-book]', '> [!VAM-BOOK]- x', '> > [!vam-book]- x', '   >[!Vam-Book]+ x', '```\n> [!vam-book]- x\n```', '<!-- visual-agent-map:detail:end -->\n> [!vam-book]- x\n<!-- visual-agent-map:detail:start -->']) {
+  for (const head of [' > [!vam-book]- x', '>[!vam-book]', '> [!VAM-BOOK]- x', '> > [!vam-book]- x', '   >[!Vam-Book]+ x', '```\n> [!vam-book]- x\n```', '> [! vam-book]- x', '> [!VAM-BOOK|x]- x', '> [!vam-book |meta]- x', '<!-- visual-agent-map:detail:end -->\n> [!vam-book]- x\n<!-- visual-agent-map:detail:start -->']) {
     const out = sections.neutralizeDetail(D(`段一。\n\n${head}\n> SPAM\nlazy\n\n段二。`));
-    assert.equal((out.match(/\[!vam-book\]/gi) ?? []).length, 2, `${head}: only the Preview and Prompt titles stay`);
+    assert.equal((out.match(/\[!\s*vam-book\s*(?:\|[^\]]*)?\]/gi) ?? []).length, 2, `${head}: only the Preview and Prompt titles stay`);
     assert.ok(out.includes('> [!vam-book]- 預覽') && out.includes('> [!vam-book]- 提示'));
   }
   assert.equal(sections.neutralizeDetail('> [!vam-book]- x\n> y'), null);

@@ -106,6 +106,9 @@ function hiddenRanges(lines: string[], fenced: boolean[]): { start: number; end:
   return found;
 }
 
+/** The hidden callout type as Obsidian may read it: spaces inside the brackets, a `|metadata` tail. */
+const HIDDEN_TYPE = /\[!\s*vam-book\s*(?:\|[^\]]*)?\]/gi;
+
 /**
  * Everything the author wrote is model text: in the span from the first Detail start marker to the last Detail end marker (a marker the
  * author forges inside the text only widens the span) every `[!vam-book]` (any case, quote depth, indent, inside a fence too) becomes a
@@ -117,7 +120,7 @@ export function neutralizeDetail(content: string): string | null {
   const end = content.lastIndexOf(DETAIL_END);
   if (start < 0 || end < start + DETAIL_START.length) return null;
   const from = start + DETAIL_START.length;
-  return `${content.slice(0, from)}${content.slice(from, end).replace(/\[!vam-book\]/gi, "[!note]")}${content.slice(end)}`;
+  return `${content.slice(0, from)}${content.slice(from, end).replace(HIDDEN_TYPE, "[!note]")}${content.slice(end)}`;
 }
 
 /** A text without its hidden callouts (the pipeline's work records are no chapter text). */

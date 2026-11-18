@@ -1134,3 +1134,75 @@ test('write: a hidden callout the author wrote is saved as a visible note (its t
   assert.ok(chapterBody(detail).includes('SPAM'), 'the proofreading input sees the text');
   assert.ok(detail.includes('### 來源') && detail.includes('[S](https://s.example/a)'), 'the sources the author wrote are kept');
 });
+
+const holder = {};
+const authorWrites = extra => ({ author: async input => {
+  await input.admission.reserve(); const note = await holder.r.repo.readNote(input.path);
+  await holder.r.repo.updateNoteGuarded(input.path, { detail: `${bodyOf(note.title)}\n\n${extra}\n` }, { authorize: input.authorize, finalize: input.finalize });
+  return { outcome: 'written' };
+} });
+/** The lines of a Detail that sit inside a hidden callout (the `> ` quote lines after a `[!vam-book]` head). */
+const hiddenLines = detail => { const out = []; let on = false; for (const l of detail.split('\n')) { if (/^\s*>\s*\[!vam-book\]/i.test(l)) on = true; else if (!/^\s*>/.test(l)) on = false; if (on) out.push(l); } return out; };
+
+test('B2 run: hidden-looking text the author writes is saved visible; chapter text reaches the proofreading input, system sections stay readable', async () => {
+  const cases = [
+    ['indented head', ' > [!vam-book]- x\n >  SPAM3', true],
+    ['no space head', '>[!vam-book]\n>SPAM4', true],
+    ['upper case head', '> [!VAM-BOOK]- y\n> SPAM5', true],
+    ['nested head', '> > [!vam-book]- z\n> > SPAM6', true],
+    ['lazy continuation', '> [!vam-book]- l\n> a\nSPAM7 lazy', true],
+    ['inside a fence', '```\n> [!vam-book]- f\n> SPAM8\n```', true],
+    ['research section', '### 研究備註\n\n> [!note]- 研究備註\n> SPAM1', false],
+    ['update log section', '### 更新紀錄\n\n- 2026-01-01 SPAM2 任意文字', false]
+  ];
+  for (const [name, extra, inBody] of cases) {
+    const r = await rig({ script: authorWrites(extra) });
+    holder.r = r;
+    await finish(r);
+    const detail = (await r.note(1)).detail;
+    const spam = /SPAM\d/.exec(extra)[0];
+    assert.ok(detail.includes(spam), `${name}: the text is kept`);
+    assert.ok(!hiddenLines(detail).some(l => l.includes(spam)), `${name}: the author's text is not hidden`);
+    assert.ok(!/\[!vam-book\]- (?:x|y|z|l|f)\b/i.test(r.raw(1)) && !/>\s*\[!vam-book\]\s*\n>\s*SPAM/i.test(r.raw(1)), `${name}: no hidden block of the author's`);
+    if (inBody) assert.ok(chapterBody(detail).includes(spam), `${name}: the proofreading input sees it`);
+  }
+});
+
+test('B2 run: the card\'s own old log and records still become hidden; the log does not grow on later reruns', async () => {
+  const r = await rig();
+  holder.r = r;
+  await finish(r);
+  let detail = '舊內文。\n\n### 更新紀錄\n\n- 2026-01-01\u3000OLDLOG\n';
+  await r.repo.updateNoteRawGuarded(r.nodes[0].path, c => c.replace(/\n> \[!vam-book\]- 校對結果（最新一次）(\n>.*)*/, '\n'), {});
+  await r.repo.updateNoteGuarded(r.nodes[0].path, { detail }, {});
+  const sizes = [];
+  for (let i = 0; i < 3; i++) {
+    await rerun(r, 0);
+    const d = (await r.note(0)).detail;
+    assert.equal(count(d, 'OLDLOG'), 1, 'old log kept once');
+    assert.ok(hiddenLines(d).some(l => l.includes('OLDLOG')), 'old log is hidden');
+    assert.ok(!/^\s*(?:- )?2026-01-01\u3000OLDLOG/m.test(d), 'no visible copy');
+    assert.equal(count(d, 'book-proof:v1'), 1);
+    sizes.push(d.split('\n').filter(l => /\d{4}-\d\d-\d\d/.test(l)).length);
+  }
+  assert.ok(sizes[1] === sizes[0] && sizes[2] === sizes[0], `log lines: ${sizes}`);
+});
+
+test('B2 run: an author who keeps the old `### 研究備註` section loses no text; at most one visible and one hidden proof record', async () => {
+  const r = await rig();
+  holder.r = r;
+  await finish(r);
+  const old = (await r.note(0)).detail;
+  const keep = '### 研究備註\n\n> [!note]- 研究備註\n> KEEPME';
+  const keepOld = { author: async input => {
+    await input.admission.reserve(); const note = await holder.r.repo.readNote(input.path);
+    await holder.r.repo.updateNoteGuarded(input.path, { detail: `${note.detail}\n\n${keep}` }, { authorize: input.authorize, finalize: input.finalize });
+    return { outcome: 'written' };
+  } };
+  r.script.author = keepOld.author;
+  await rerun(r, 0);
+  const out = (await r.note(0)).detail;
+  assert.ok(old.includes('book-proof:v1') && out.includes('KEEPME'), 'no text lost');
+  assert.ok(count(out, 'book-proof:v1') <= 2, 'at most a visible and a hidden record');
+  assert.ok(!hiddenLines(out).some(l => l.includes('KEEPME')));
+});

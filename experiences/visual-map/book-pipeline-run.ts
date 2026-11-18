@@ -57,7 +57,8 @@ import {
 import {
   appendResearchNote,
   carryWorkLog,
-  demoteHiddenInDetail,
+  neutralizeDetail,
+  quoteAll,
   hidePipelineLog,
   findStoredProof,
   findStoredProofModels,
@@ -341,6 +342,7 @@ interface Drive {
   missingRoles: Map<string, BookRole>;
   stages: Map<string, PipelineStage | undefined>;
   backedUp: Set<string>;
+  backupPaths: Map<string, string>;
   reasons: Map<string, string>;
   busy: Set<string>;
   stopRequested: boolean;
@@ -1083,6 +1085,7 @@ export class BookPipelineRuns {
       missingRoles: new Map(),
       stages: new Map(),
       backedUp: new Set(),
+      backupPaths: new Map(),
       reasons: new Map(),
       busy: new Set(),
       extra: new Map(),
@@ -1430,7 +1433,10 @@ export class BookPipelineRuns {
   private async ensureBackup(drive: Drive, nodeId: string, path: string, raw: string): Promise<boolean> {
     if (drive.backedUp.has(nodeId)) return true;
     const saved = await this.ports.backupNote(path, raw).catch(() => ({ ok: false as const }));
-    if (saved.ok) drive.backedUp.add(nodeId);
+    if (saved.ok) {
+      drive.backedUp.add(nodeId);
+      drive.backupPaths.set(nodeId, saved.path);
+    }
     return saved.ok;
   }
   private async writeFields(drive: Drive, nodeId: string, patch: PipelineFieldsPatch): Promise<void> {
@@ -1637,13 +1643,20 @@ export class BookPipelineRuns {
     // The body is cleaned inside the author's own write (same `vault.process`): only standard https pictures are ever saved, and
     // an unsafe body is refused whole, so the card keeps its text from before this step.
     const knownLines: ReadonlySet<string> = new Set(card.raw.split("\n"));
+    const ownRecords = extractProofRecords(normalizeWorkRecords(card.detail)).map(quoteAll);
     let unsafe = false;
     let emptyBody = false;
     const finalize = (original: string): string | null => {
-      const held = holdProofLines(original, knownLines);
+      // The card's own stored records come back from the card (carried below), never from what the author kept of them: an exact copy is cut out first.
+      const cut = ownRecords.reduce((text, record) => text.split(record).join(""), original);
+      const held = holdProofLines(cut, knownLines);
       const restore = held.restore;
       // R1-6: anchors become markdown links first; the picture scan and the cleaning then run on the final text. Placeholder sections go.
-      const content = demoteHiddenInDetail(dropPlaceholderSections(convertSourceAnchors(held.text)), knownLines);
+      const content = neutralizeDetail(dropPlaceholderSections(convertSourceAnchors(held.text)));
+      if (content === null) {
+        emptyBody = true;
+        return null;
+      }
       const urls = bodyImageUrls(content);
       const unsafeUrls = new Map(
         urls.filter(url => !isHttps(url)).map(url => [url, noPicture(drive.config.language, "unsafe")])
@@ -1696,7 +1709,10 @@ export class BookPipelineRuns {
     // The write-back's own log section (or an older Research notes section) is turned into the hidden callout first, the card's first write in the new form.
     // Only the card's own earlier content (never what the author wrote this time) is turned into the hidden form.
     const earlier = normalizeWorkRecords(card.detail);
-    let carried = carryWorkLog(earlier, hidePipelineLog(written.detail, new Set(workLogLines(earlier))));
+    let carried = carryWorkLog(
+      earlier,
+      hidePipelineLog(written.detail, new Set(workLogLines(earlier)), drive.backupPaths.get(nodeId))
+    );
     for (const record of extractProofRecords(earlier).slice(-1)) carried = appendResearchNote(carried, record).text;
     // #12: an old Prompt (no picture plan) keeps the card's picture section; a card with a plan gets its pictures from the slots.
     if (slots === undefined) carried = carryImageSection(card.detail, carried);

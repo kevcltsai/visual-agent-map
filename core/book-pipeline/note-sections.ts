@@ -106,35 +106,18 @@ function hiddenRanges(lines: string[], fenced: boolean[]): { start: number; end:
   return found;
 }
 
-/** A callout title line of the hidden type at any quote depth, any case, with or without the space after `>`: `> [!VAM-BOOK]-`, `>[!vam-book]`, ` > > [!vam-book]`. */
-const ANY_HIDDEN_HEAD = /^([ \t]{0,3}>[ \t]?(?:>[ \t]?)*)\[!vam-book\]/i;
-
 /**
- * The Detail block of `content` with every hidden-type callout turned into a visible `[!note]`, except a block whose every line (title
- * included) is a line the card already held before the author ran (`known`): the author wrote nothing hidden, it only kept what was
- * there. What the author writes is model text, so it stays in the chapter text and the proofreading sees it; only the pipeline itself
- * writes a hidden callout. The title is found at any quote depth and case (`>[!vam-book]`, ` > [!VAM-BOOK]-`); code fences are left alone;
- * text outside the Detail block (the Prompt callout, the preview) is not touched.
+ * Everything the author wrote is model text: in the span from the first Detail start marker to the last Detail end marker (a marker the
+ * author forges inside the text only widens the span) every `[!vam-book]` (any case, quote depth, indent, inside a fence too) becomes a
+ * visible `[!note]` by plain string replace. Outside the span is the card's own text (Preview, Prompt, plan, proof result), kept as it is.
+ * A text without both markers returns null (refused: nothing is written). Only the pipeline itself writes a hidden callout, after this.
  */
-export function demoteHiddenInDetail(content: string, known: ReadonlySet<string>): string {
+export function neutralizeDetail(content: string): string | null {
   const start = content.indexOf(DETAIL_START);
-  const end = start < 0 ? -1 : content.indexOf(DETAIL_END, start + 1);
-  if (end < 0) return content;
+  const end = content.lastIndexOf(DETAIL_END);
+  if (start < 0 || end < start + DETAIL_START.length) return null;
   const from = start + DETAIL_START.length;
-  const lines = content.slice(from, end).split("\n");
-  const fenced = fencedLines(lines);
-  const have = new Set(Array.from(known, line => bare(line).trimEnd()));
-  let changed = false;
-  for (let i = 0; i < lines.length; i++) {
-    if (fenced[i] || !ANY_HIDDEN_HEAD.test(lines[i])) continue;
-    const stop = quoteRunEnd(lines, fenced, i + 1);
-    const own = lines.slice(i, stop).every(line => have.has(bare(line).trimEnd()));
-    if (!own) {
-      lines[i] = lines[i].replace(ANY_HIDDEN_HEAD, "$1[!note]");
-      changed = true;
-    }
-  }
-  return changed ? `${content.slice(0, from)}${lines.join("\n")}${content.slice(end)}` : content;
+  return `${content.slice(0, from)}${content.slice(from, end).replace(/\[!vam-book\]/gi, "[!note]")}${content.slice(end)}`;
 }
 
 /** A text without its hidden callouts (the pipeline's work records are no chapter text). */
@@ -153,7 +136,7 @@ function recordLines(lines: string[], fenced: boolean[]): boolean[] {
   return mask;
 }
 
-const quoteAll = (text: string): string =>
+export const quoteAll = (text: string): string =>
   text
     .split(/\r?\n/)
     .map(line => (line.trim() ? `> ${line}` : ">"))
@@ -312,16 +295,19 @@ export function normalizeWorkRecords(detail: string): string {
  * callout: a line is the pipeline's when it is one of `known` (the card's earlier log lines) or the write-back's "replaced with new
  * research, backup at <path>.md" line. A log line the author wrote, and every other section the author wrote, stays visible.
  */
-export function hidePipelineLog(detail: string, known: ReadonlySet<string>): string {
+export function hidePipelineLog(detail: string, known: ReadonlySet<string>, backupPath?: string): string {
   const marker = "\u0000";
   const shapes = NOTE_LANGUAGES.map(locale =>
     translate(locale, "note.writeback_fresh_replaced_0", marker).split(marker)
   ).filter(parts => parts.length === 2);
   const escape = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const ownLine = shapes.map(
-    ([head, tail]) =>
-      new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escape(head)}[^\\n]+\\.md${escape(tail)}$`)
-  );
+  // Only the exact line the write-back made for this write (this backup path); a log line the author wrote stays visible.
+  const ownLine = backupPath
+    ? shapes.map(
+        ([head, tail]) =>
+          new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escape(head)}${escape(backupPath)}${escape(tail)}$`)
+      )
+    : [];
   return hideUpdateLog(detail, line => known.has(line) || ownLine.some(re => re.test(line)));
 }
 

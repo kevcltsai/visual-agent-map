@@ -1,4 +1,4 @@
-import { latestStoredProof, neutralizeText, type StoredProofView } from "../../core/book-pipeline/note-sections";
+import { latestStoredProof, neutralizeText } from "../../core/book-pipeline/note-sections";
 import type { PipelineStage } from "../../core/book-pipeline/model";
 
 /**

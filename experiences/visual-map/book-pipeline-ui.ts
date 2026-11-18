@@ -41,17 +41,8 @@ export interface BookBarState {
   globalDone: boolean;
   /** What the run is doing right now (memory only; absent after a reload or while nothing runs). */
   current?: BookCurrent;
-  /** A single-card rerun in progress (memory only). */
-  rerun?: BookRerunNow;
-}
-export interface BookRerunNow {
-  /** 1-based position in the reading order. */
-  chapter: number;
-  title?: string;
-  /** When the rerun began (ms). */
-  startedAt: number;
-  /** The step the card is in now; absent between two steps. */
-  step?: BookSubStep;
+  /** A single-card rerun is in progress (memory only): the bar keeps its stop button; the card itself says "working". */
+  rerun?: true;
 }
 export type BookCurrentStep = BookSubStep | "global";
 export interface BookCurrent {
@@ -112,9 +103,7 @@ export function bookBarState(
         : phase;
   const steps = progress?.steps ?? stepCounts(counts, 0, { settled: phase === "gate2" || phase === "done" });
   const current = mode === "planning" || mode === "writing" ? currentOf(data, progress, titleOf) : undefined;
-  const at = progress?.active && progress.rerun ? data.order.indexOf(progress.rerun.nodeId) : -1;
-  const rerunTitle = at >= 0 && progress?.rerun ? titleOf?.(progress.rerun.nodeId) : undefined;
-  const rerunStep = at >= 0 ? progress?.current?.find(item => item.nodeId === progress.rerun?.nodeId)?.step : undefined;
+  const rerunning = !!progress?.active && !!progress.rerun && data.order.includes(progress.rerun.nodeId);
   return {
     mode,
     phase,
@@ -124,16 +113,7 @@ export function bookBarState(
     steps,
     globalDone: data.globalPlanned === true,
     ...(current ? { current } : {}),
-    ...(at >= 0 && progress?.rerun
-      ? {
-          rerun: {
-            chapter: at + 1,
-            ...(rerunTitle ? { title: rerunTitle } : {}),
-            startedAt: progress.rerun.startedAt,
-            ...(rerunStep ? { step: rerunStep } : {})
-          }
-        }
-      : {}),
+    ...(rerunning ? { rerun: true as const } : {}),
     ...(mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {}),
     ...(progress?.etaSeconds !== undefined && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0
       ? { etaSeconds: progress.etaSeconds }
@@ -176,8 +156,6 @@ export interface BookBarActions {
   confirmGate1: () => void;
   /** The gate panel's opener (04b); a bar drawn without it (older callers) shows no such button. */
   panel?: { open: boolean; toggle: () => void };
-  /** Puts a running clock ("Rerunning 0:41") on `element`; the screen keeps it ticking. A bar drawn without it shows the label only. */
-  track?: (element: HTMLElement, startedAt: number) => void;
 }
 
 export function bookTitleText(state: BookBarState): string {
@@ -244,11 +222,11 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   if (state.rerun) makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   const items = bookStepItems(state);
-  if (state.rerun) renderRerunLine(bar, state.rerun, actions);
-  else {
-    renderStepList(bar, items);
-    renderNowLine(bar, state);
-  }
+  renderStepList(bar, items);
+  renderNowLine(bar, state);
+  // The cards carry "rerun this card" at gate 2 and when done: say so once, under the steps.
+  if (state.phase === "gate2" || state.phase === "done")
+    bar.createDiv({ cls: "vam-book-rerun-hint", text: t("ui.book_progress_rerun_hint") });
   const valueText = items.map(item => item.text).join(t("ui.book_progress_sep"));
   const track = bar.createDiv("vam-book-track");
   track.setAttr("role", "progressbar");
@@ -313,40 +291,6 @@ function renderStepList(bar: HTMLElement, items: BookStepItem[]): void {
     li.toggleClass("is-current", item.current);
     if (item.current) li.setAttr("aria-current", "step");
   }
-}
-const RERUN_STEPS: { key: "plan" | "write" | "proof"; label: TranslationKey; covers: BookSubStep[] }[] = [
-  { key: "plan", label: "ui.book_step_plan", covers: ["plan"] },
-  { key: "write", label: "ui.book_step_write", covers: ["write", "images"] },
-  { key: "proof", label: "ui.book_step_proof", covers: ["proof"] }
-];
-/** "Rerunning: 2 Title" with the clock, and the three steps of this one card (done, now, waiting). The title comes from a note: text only. */
-function renderRerunLine(bar: HTMLElement, rerun: BookRerunNow, actions: BookBarActions): void {
-  const line = bar.createDiv("vam-book-now vam-book-rerun");
-  line.setAttr("role", "status");
-  line.createSpan({
-    cls: "vam-book-now-text",
-    text: rerun.title
-      ? t("ui.book_rerun_now_0_1", rerun.chapter, rerun.title)
-      : t("ui.book_rerun_now_untitled_0", rerun.chapter)
-  });
-  const clock = line.createSpan({ cls: "vam-book-rerun-clock", text: t("ui.book_rerun_elapsed_0", "0:00") });
-  clock.setAttr("aria-hidden", "true");
-  actions.track?.(clock, rerun.startedAt);
-  const list = bar.createEl("ol", { cls: "vam-book-steps vam-book-rerun-steps" });
-  list.setAttr("aria-label", t("ui.book_progress_steps_label"));
-  const nowAt = rerun.step ? RERUN_STEPS.findIndex(item => item.covers.includes(rerun.step as BookSubStep)) : -1;
-  RERUN_STEPS.forEach((item, at) => {
-    const done = nowAt >= 0 && at < nowAt;
-    const current = at === nowAt;
-    const li = list.createEl("li", {
-      cls: "vam-book-step",
-      text: done ? t("ui.book_progress_done_0", t(item.label)) : t(item.label)
-    });
-    li.dataset.step = item.key;
-    li.toggleClass("is-done", done);
-    li.toggleClass("is-current", current);
-    if (current) li.setAttr("aria-current", "step");
-  });
 }
 const NOW_KEY: Record<Exclude<BookCurrentStep, "global">, TranslationKey> = {
   plan: "ui.book_progress_now_plan_0_1",
@@ -556,15 +500,17 @@ export function renderBookCardLabels(
     const step = writing.step ?? "write";
     const chip = header.createSpan({ cls: "vam-status vam-status-running vam-book-state is-writing" });
     chip.addClass(`is-${step}`);
-    // A rerun says so (the clock is the rerun's, from its start); the step it is in stays in the tooltip.
+    // A rerun just says "working" (no clock); the step it is in stays in the tooltip.
     if (writing.rerun) {
       chip.addClass("is-rerun");
       chip.setAttr("title", t(WORKING_KEY[step]));
       chip.createSpan({ text: t("ui.book_rerun_tag") });
-    } else chip.createSpan({ text: t(WORKING_KEY[step]) });
-    const elapsed = chip.createSpan({ cls: "vam-book-elapsed" });
-    elapsed.setAttr("aria-hidden", "true");
-    writing.track(elapsed);
+    } else {
+      chip.createSpan({ text: t(WORKING_KEY[step]) });
+      const elapsed = chip.createSpan({ cls: "vam-book-elapsed" });
+      elapsed.setAttr("aria-hidden", "true");
+      writing.track(elapsed);
+    }
   } else header.createSpan({ cls: `vam-status vam-book-state is-${view.stage}`, text: view.stageText });
   if (view.seam) {
     const seam = header.createSpan({ cls: "vam-status vam-book-state is-seam", text: t("ui.book_seam_label") });

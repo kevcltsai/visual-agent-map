@@ -149,8 +149,6 @@ export interface Gate2Actions extends Pick<GatePanelActions, "showChat" | "close
   finish: () => Promise<void>;
   /** The one question before finishing with things left over; true = finish anyway. */
   confirmFinish: (info: { review: number; reviewTitles: string[]; seams: number }) => Promise<boolean>;
-  /** Keeps a "Rerunning m:ss" clock ticking in `el` (the view owns the timer). */
-  track?: (el: HTMLElement, startedAt: number) => void;
 }
 
 /** Draws the gate 2 panel into `parent`. `done` is true once the owner finished the review (the rows stay; the finish button goes). */
@@ -358,14 +356,10 @@ function startRerun(card: Gate2Card, state: GatePanelState, actions: Gate2Action
   });
 }
 
-/** "Rerunning m:ss" while this card is the one being rerun; the clock is the view's. */
-function rerunTag(head: HTMLElement, card: Gate2Card, rerun: RerunNow, actions: Gate2Actions): boolean {
+/** "Working" while this card is the one being rerun (no clock). */
+function rerunTag(head: HTMLElement, card: Gate2Card, rerun: RerunNow): boolean {
   if (!rerun || rerun.nodeId !== card.id) return false;
-  const tag = head.createSpan({
-    cls: "vam-book-panel-state vam-book-state is-rerun",
-    text: t("ui.book_rerun_elapsed_0", "0:00")
-  });
-  actions.track?.(tag, rerun.startedAt);
+  head.createSpan({ cls: "vam-book-panel-state vam-book-state is-rerun", text: t("ui.book_rerun_tag") });
   return true;
 }
 
@@ -380,7 +374,7 @@ function renderAttention(
 ): void {
   const item = row(list, "attention", card, busy);
   const head = item.createDiv("vam-book-panel-card-head");
-  const rerunning = rerunTag(head, card, rerun, actions);
+  const rerunning = rerunTag(head, card, rerun);
   const unchanged = !busy && state.unchanged.has(card.id);
   if (!rerunning)
     stateTag(head, "needs-review", unchanged ? t("ui.book_panel_still_review") : t("ui.book_stage_needs_review"));
@@ -497,7 +491,7 @@ function renderChecked(
 ): void {
   const item = row(list, "checked", card, busy);
   const head = item.createDiv("vam-book-panel-card-head");
-  if (!rerunTag(head, card, rerun, actions)) stateTag(head, "checked", checkedTagText(card));
+  if (!rerunTag(head, card, rerun)) stateTag(head, "checked", checkedTagText(card));
   head.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
   const open = state.proofOpen.has(card.id);
   const toggle = button(

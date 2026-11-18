@@ -2308,10 +2308,10 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-state.is-seam { font-weight: 600; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
 .vam-book-state.is-seam::before { background: var(--color-orange); }
 .vam-book-panel-summary { margin: 0; font-size: var(--font-ui-small); color: var(--text-muted); overflow-wrap: anywhere; }
-.vam-book-rerun { align-items: center; }
-.vam-book-rerun-clock { font-variant-numeric: tabular-nums; color: var(--text-muted); }
-.vam-book-rerun-steps { margin-top: 4px; }
-.vam-book-state.is-rerun { font-weight: 600; font-variant-numeric: tabular-nums; color: color-mix(in srgb, var(--color-blue) 70%, var(--text-normal)); }
+.vam-book-rerun-hint { margin-top: 4px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.vam-node-tools > .vam-node-rerun { white-space: nowrap; }
+.vam-node-tools > .vam-node-rerun:disabled { opacity: 0.5; cursor: not-allowed; }
+.vam-book-state.is-rerun { font-weight: 600; color: color-mix(in srgb, var(--color-blue) 70%, var(--text-normal)); }
 .vam-book-state.is-rerun::before { background: var(--color-blue); }
 .vam-book-panel-unchanged { font-size: var(--font-ui-smaller); color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); overflow-wrap: anywhere; }
 .vam-book-panel-unchanged-actions { display: flex; flex-wrap: wrap; gap: 6px; }

@@ -3516,10 +3516,9 @@ export const en = {
   "ui.book_panel_proof_opened_0_1": "Opened {0} pages, searched {1} times",
   "ui.book_panel_proof_sources_0": "Sources: {0}",
   "ui.book_panel_structure_unmet_0": "Structure items unmet: {0}",
-  "ui.book_rerun_tag": "Rerunning",
-  "ui.book_rerun_elapsed_0": "Rerunning {0}",
-  "ui.book_rerun_now_0_1": "Rerunning: {0} {1}",
-  "ui.book_rerun_now_untitled_0": "Rerunning card {0}",
+  "ui.book_rerun_tag": "Working",
+  "ui.book_progress_rerun_hint":
+    "Not happy with one chapter? You can rerun just that chapter without redoing the whole book.",
   "ui.book_panel_lead_passed_0": "{0} passed",
   "ui.book_panel_checked_tag": "Passed",
   "ui.book_panel_checked_tag_notes_0": "Passed, {0} to note",

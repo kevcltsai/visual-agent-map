@@ -120,12 +120,12 @@ test('bar: budget exhausted shows the used-up line with "add 100" and "stop"; ad
 test('bar: at gate 1 the confirm button shows (and calls confirmGate1); not in other phases', () => {
   lang('zh-TW');
   const gate = draw(bookData({ phase: 'gate1' }), progress({ phase: 'gate1', active: false }));
-  assert.ok(buttonsOf(gate.bar).some(b => b.text === '確認，開始寫作'));
+  assert.ok(buttonsOf(gate.bar).some(b => b.text === '這樣可以，跑完全書'));
   assert.ok(texts(gate.bar).includes('圖文書：等你確認'));
-  buttonsOf(gate.bar).find(b => b.text === '確認，開始寫作').click();
+  buttonsOf(gate.bar).find(b => b.text === '這樣可以，跑完全書').click();
   assert.deepEqual(gate.log, ['confirm']);
   for (const phase of ['planning', 'writing', 'gate2'])
-    assert.ok(!buttonsOf(draw(bookData({ phase }), progress({ phase })).bar).some(b => b.text === '確認，開始寫作'), phase);
+    assert.ok(!buttonsOf(draw(bookData({ phase }), progress({ phase })).bar).some(b => b.text === '這樣可以，跑完全書'), phase);
 });
 
 test('bar: a bar with nothing finished still has valid aria values (total 0 does not divide)', () => {
@@ -377,7 +377,7 @@ test('view: the bar draws for a book map from getBookPipelineProgress and its bu
   h.view.renderBookPipelineBar(toolbar);
   const bar = toolbar.children[0];
   assert.equal(bar.cls, 'vam-book-bar');
-  const confirm = buttonsOf(bar).find(b => b.text === '確認，開始寫作');
+  const confirm = buttonsOf(bar).find(b => b.text === '這樣可以，跑完全書');
   confirm.click();
   await dom.tick();
   assert.equal(JSON.stringify(h.entries), JSON.stringify([['confirm', MAP]]));
@@ -999,4 +999,18 @@ export { BookFinishModal } from "./experiences/visual-map/book-pipeline-finish-m
       assert.equal(Object.getOwnPropertyDescriptor(b[name].prototype, key), undefined, `${name} must not define ${key} on its prototype`);
     }
   }
+});
+
+test('T5 bar: while a run with a trial is planning, the sentence says which trial chapter is tried; the whole-book plan and a run without a trial keep their words', () => {
+  lang('zh-TW');
+  const trialState = (current, over = {}) => ui.bookBarState(bookData({ phase: 'planning', trial: ['a', 'b', 'c'], ...over }), progress({ phase: 'planning', current }), noStage);
+  assert.equal(ui.bookProgressText(trialState([{ nodeId: 'b', step: 'write', startedAt: 1 }])), '正在試跑第 2／3 章');
+  assert.equal(ui.bookProgressText(trialState([{ nodeId: 'global', step: 'plan', startedAt: 1 }])), '正在規劃全書，已完成 2／4 章', 'the whole-book plan comes first');
+  assert.equal(ui.bookProgressText(trialState(undefined)), '正在試跑第 3／3 章', 'no current card: the next unsettled trial chapter, never past the trial size');
+  assert.equal(ui.bookProgressText(trialState([{ nodeId: 'b', step: 'plan', startedAt: 1 }], { trial: undefined })), '正在企劃第 2／4 章，已完成 2／4 章', 'an older run');
+  lang('en');
+  assert.equal(ui.bookProgressText(trialState([{ nodeId: 'a', step: 'plan', startedAt: 1 }])), 'Trying chapter 1/3 first');
+  lang('zh-CN');
+  assert.equal(ui.bookProgressText(trialState([{ nodeId: 'a', step: 'plan', startedAt: 1 }])), '正在试跑第 1／3 章');
+  lang('zh-TW');
 });

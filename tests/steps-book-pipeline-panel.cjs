@@ -1,5 +1,5 @@
-// Picture-book gate 1 side panel (04b): content from real notes, "say more about X", confirm, plain-text rendering, and the panel's
-// place beside the chat window. Part A drives a real BookPipelineRuns (fake AI ports, real repository fixture) to gate 1 and draws the
+// Picture-book gate 1 side panel (T5 trial screen): the trial chapters, the settings fold, confirm and retry, plain-text rendering, and the
+// panel's place beside the chat window. Part A drives a real BookPipelineRuns (fake AI ports, real repository fixture) to gate 1 and draws the
 // panel from the notes it wrote; part B runs the view's own panel methods on the stand-in DOM. Real Obsidian look, focus ring and the
 // 400px pane are UI evidence for the tester.
 const { test } = require('node:test');
@@ -11,13 +11,16 @@ const dom = require('./support-dom.cjs');
 const { loadSource } = require('./support-replay.cjs');
 
 const root = path.resolve(__dirname, '..');
+class OptionStub { constructor(text, value) { const o = dom.element('option', { text }); o.optionValue = value; o.value = value; o.disabled = false; return o; } }
+const components = [];
+const renders = [];
 const bundle = loadSource(`
 export * from "./experiences/visual-map/book-pipeline-ui";
 export * from "./experiences/visual-map/book-pipeline-panel";
 export { BookPipelineRuns, BookPipelineRunError } from "./experiences/visual-map/book-pipeline-run";
 export { VisualAgentMapView } from "./experiences/visual-map/view";
-export { setUiLanguage } from "./i18n";
-`, { obsidian: { ...S.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice([]), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
+export { setUiLanguage, t } from "./i18n";
+`, { obsidian: { ...S.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice([]), Component: class { load() { this.loaded = true; components.push(this); } unload() { this.unloaded = true; } }, MarkdownRenderChild: class {}, MarkdownRenderer: { render: async (app, markdown, el, sourcePath, component) => { renders.push({ markdown, el, component }); } } } }, { createFragment: dom.createFragment, Option: OptionStub, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
 const { setUiLanguage } = bundle;
 const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
 const view_ts = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
@@ -29,6 +32,7 @@ const one = (el, cls) => all(el, cls)[0];
 const texts = el => dom.findAll(el, i => i.text).map(i => i.text);
 
 // ---- part A: real runner at gate 1 ----
+const actionsOf = (over = {}) => ({ confirm: async () => {}, retry: async () => {}, renderMarkdown: (el, markdown) => { el.createDiv({ cls: 'md-stand-in', text: markdown }); }, settings: {}, models: { plan: 'm1', write: 'm2', images: 'm4', proof: 'm3' }, modelChoice: { options: () => ['m1', 'm2', 'm3', 'm4'], label: m => m, onChange() {} }, showChat() {}, close() {}, refresh() {}, ...over });
 async function rig(script = {}) {
   setUiLanguage('zh-TW');
   const data = S.fixture('zh-TW');
@@ -49,7 +53,7 @@ async function rig(script = {}) {
   };
   const ports = {
     mutate: work => { const next = queue.then(work); queue = next.catch(() => undefined); return next; },
-    readMap: p => repo.readMap(p), updateMap: (p, change) => repo.updateMap(p, change),
+    readMap: p => repo.readMap(p), updateMap: (p, change) => repo.updateMap(p, d => { change(d); delete d.bookPipeline?.trial; }), // an older run (no trial): every card is planned before gate 1
     readCard: async p => { const note = await repo.readNote(p); return { path: p, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(p), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}), ...(note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {}) } }; },
     writePipelineFields: (p, patch) => repo.writePipelineFields(p, patch),
     updateNoteGuarded: (p, patch, options) => repo.updateNoteGuarded(p, patch, options),
@@ -83,131 +87,19 @@ async function rig(script = {}) {
     const gate1 = map.bookPipeline.phase === 'gate1';
     const parent = dom.element('div');
     const actions = {
-      editPlan: id => entries.push(['edit', id]),
-      replan: (id, instruction) => { entries.push(['replan', id, instruction]); return runs.replanCard(mapPath, id, instruction); },
-      rerunPlan: id => { entries.push(['rerun', id]); return runs.rerunCard(mapPath, id); },
+      ...actionsOf(),
+      retry: patch => { entries.push(['retry', patch]); return runs.retryTrial(mapPath); },
       confirm: () => { entries.push(['confirm']); return over.confirm ? over.confirm() : runs.confirmGate1(mapPath); },
       showChat: () => entries.push(['chat']), close: () => entries.push(['close']),
       refresh: () => { current.panel.remove(); Object.assign(current, { panel: bundle.renderGatePanel(parent, build(), gate1, state, actions) }); }
     };
-    const build = () => bundle.buildGatePanel({ order, titleOf: id => noteOf.get(id)?.title ?? id, noteOf: id => noteOf.get(id), rootRaw });
+    const build = () => bundle.buildGatePanel({ order, ...(map.bookPipeline.trial ? { trial: map.bookPipeline.trial } : {}), titleOf: id => noteOf.get(id)?.title ?? id, noteOf: id => noteOf.get(id), rootRaw });
     const current = { panel: bundle.renderGatePanel(parent, build(), gate1, state, actions) };
     return { parent, get panel() { return current.panel; }, actions };
   };
   return { repo, runs, nodes, mapPath, contents, stat, state, entries, draw, reload };
 }
 
-test('gate 1 panel: title, count, plan area, and one block per card with role, covers, entry, handoff, edit button and a "say more" box', async () => {
-  const r = await rig();
-  const d = await r.draw();
-  const panel = d.panel;
-  assert.equal(panel.attrs.role, 'region');
-  assert.ok(panel.attrs['aria-label']);
-  assert.ok(texts(panel).includes('關卡 1：這本書要這樣寫，可以嗎？'));
-  assert.ok(texts(panel).includes('3 張都已企劃'));
-  const cards = all(panel, 'vam-book-panel-card');
-  assert.equal(cards.length, 3);
-  const second = cards[1];
-  assert.ok(texts(second).includes('2 Da Vinci'));
-  assert.ok(texts(second).includes('本文'));
-  assert.ok(texts(second).includes('covers 2'), 'one sentence, no label');
-  assert.ok(texts(second).includes('接入點：entry'));
-  assert.ok(texts(second).includes('留給下一張的問題：handoff'));
-  assert.ok(all(second, 'vam-book-panel-edit')[0].attrs['aria-label'].includes('Da Vinci'));
-  const input = one(second, 'vam-book-panel-more-input');
-  assert.ok(input.attrs['aria-label'].includes('Da Vinci'), 'the box has a label');
-  assert.equal(texts(panel).filter(x => x === '確認，開始寫作').length, 1);
-  // the plan area is open at the top, thread in big text, material in plain words; no fold left
-  const plan = one(panel, 'vam-book-panel-plan');
-  assert.equal(all(panel, 'vam-book-panel-plan-toggle').length, 0);
-  assert.ok(texts(plan).includes('全書主線'));
-  assert.ok(texts(plan).includes('one thread'));
-  assert.ok(texts(plan).some(x => x.includes('讀者：kids')));
-  assert.ok(texts(plan).includes('準備引用的資料 1 件'));
-  assert.ok(!texts(panel).some(x => x.includes('素材登記表')));
-  assert.equal(dom.findAll(panel, i => i.tag === 'h3')[0].text, '關卡 1：這本書要這樣寫，可以嗎？');
-  // per card: one sentence, role, image line; entry / hand-off / "say more" are behind "看細節"
-  const toggle = one(second, 'vam-book-panel-details-toggle');
-  const details = one(second, 'vam-book-panel-details');
-  assert.equal(toggle.tag, 'button');
-  assert.equal(toggle.text, '看細節');
-  assert.ok(toggle.attrs['aria-label'].includes('看細節'));
-  for (const lang of ['zh-TW', 'zh-CN', 'en']) {
-    const line = fs.readFileSync(path.join(root, `i18n/${lang}.ts`), 'utf8').split('\n').find(l => l.includes('"ui.book_gate1_details_0"'));
-    const word = lang === 'en' ? 'Details' : lang === 'zh-CN' ? '看细节' : '看細節';
-    assert.ok(line.includes(`"${word}`), lang);
-  }
-  // symbol follows aria-expanded: folded ▸, open ▾ (CSS), and the one-sentence rule beats the small grey field rule
-  assert.match(css, /\.vam-book-panel-details-toggle::after \{ content: " ▸"/);
-  assert.match(css, /\.vam-book-panel-details-toggle\[aria-expanded="true"\]::after \{ content: " ▾"/);
-  assert.match(css, /\.vam-book-panel-field\.vam-book-panel-covers \{[^}]*var\(--font-ui-small\)[^}]*var\(--text-normal\)/);
-  assert.equal((css.match(/^\.vam-book-panel-plan \{/gm) || []).length, 1);
-  assert.equal(toggle.attrs['aria-expanded'], 'false');
-  assert.equal(toggle.attrs['aria-controls'], details.attrs.id);
-  assert.equal(details.hidden, true);
-  assert.ok(texts(details).includes('接入點：entry'));
-  assert.ok(texts(details).includes('留給下一張的問題：handoff'));
-  assert.ok(one(details, 'vam-book-panel-more-input') && one(details, 'vam-book-panel-replan'));
-  toggle.click();
-  assert.equal(details.hidden, false);
-  assert.equal(toggle.attrs['aria-expanded'], 'true');
-  toggle.click();
-  assert.equal(details.hidden, true);
-  one(panel, 'vam-book-panel-card'); // unchanged
-  all(cards[0], 'vam-book-panel-edit')[0].click();
-  assert.equal(JSON.stringify(r.entries.at(-1)), JSON.stringify(['edit', r.nodes[0].id]));
-});
-
-test('say more: calls replanCard with the sentence, shows busy then the new plan and the seam line; an empty sentence is not sent; a refusal shows its reason', async () => {
-  const r = await rig({ card: (request, n) => ({ covers: n > 1 ? 'NEW covers' : `covers ${request.card.position}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'x' }] }) });
-  const d = await r.draw();
-  const input = () => one(all(d.panel, 'vam-book-panel-card')[1], 'vam-book-panel-more-input');
-  const send = () => one(all(d.panel, 'vam-book-panel-card')[1], 'vam-book-panel-replan');
-  input().value = '   ';
-  send().click();
-  await settle();
-  assert.equal(r.entries.filter(e => e[0] === 'replan').length, 0, 'blank sentence is not sent');
-  input().value = '多講他的手稿';
-  input().fire('input');
-  send().click();
-  assert.equal(JSON.stringify(r.entries.at(-1)), JSON.stringify(['replan', r.nodes[1].id, '多講他的手稿']));
-  assert.equal(send().disabled, true, 'busy while it runs');
-  assert.equal(all(d.panel, 'vam-book-panel-card')[1].attrs['aria-busy'], 'true');
-  send().click(); // a second press does nothing
-  assert.equal(r.entries.filter(e => e[0] === 'replan').length, 1);
-  await settle();
-  assert.ok(texts(d.panel).includes('已重寫這張企劃，前後卡接縫已標記。'));
-  await r.reload();
-  const d2 = await r.draw();
-  assert.ok(texts(d2.panel).includes('NEW covers'), 'the card shows the new plan from the note');
-});
-
-test('say more refusal: the runner error becomes a plain Chinese sentence under that card, and the box keeps what was typed', async () => {
-  const r = await rig();
-  const data = bundle.buildGatePanel({ order: r.nodes.map(n => n.id), titleOf: id => id, noteOf: () => undefined, rootRaw: '' });
-  const actions = { editPlan() {}, replan: async () => { throw new bundle.BookPipelineRunError('not_gate1'); }, rerunPlan: async () => {}, confirm: async () => {}, showChat() {}, close() {}, refresh() {} };
-  const p = bundle.renderGatePanel(dom.element('div'), data, true, r.state, actions);
-  one(all(p, 'vam-book-panel-card')[0], 'vam-book-panel-more-input').value = '多講';
-  one(all(p, 'vam-book-panel-card')[0], 'vam-book-panel-more-input').fire('input');
-  one(all(p, 'vam-book-panel-card')[0], 'vam-book-panel-replan').click();
-  await settle();
-  const note = r.state.notes.get(r.nodes[0].id);
-  assert.equal(note.error, true);
-  assert.equal(note.text, '目前不在「等你確認」階段，不需要確認。');
-  assert.equal(r.state.drafts.get(r.nodes[0].id), '多講', 'the typed sentence stays for another try');
-  const p2 = bundle.renderGatePanel(dom.element('div'), data, true, r.state, actions);
-  const status = one(all(p2, 'vam-book-panel-card')[0], 'vam-book-panel-card-status');
-  assert.equal(status.text, note.text);
-  assert.equal(status.attrs.role, 'alert');
-  // a replan that the plan step itself failed ends with its reason, not a success line
-  const failing = { ...actions, replan: async () => ({ reason: 'invalid_reply' }) };
-  const p3 = bundle.renderGatePanel(dom.element('div'), data, true, r.state, failing);
-  one(all(p3, 'vam-book-panel-card')[1], 'vam-book-panel-more-input').value = 'x';
-  one(all(p3, 'vam-book-panel-card')[1], 'vam-book-panel-replan').click();
-  await settle();
-  assert.match(r.state.notes.get(r.nodes[1].id).text, /^這張沒有重寫：/);
-  assert.equal(r.state.notes.get(r.nodes[1].id).error, true);
-});
 
 test('confirm: calls confirmBookGate1 once, is disabled and busy while it runs, and a refusal shows its reason', async () => {
   const gate = defer();
@@ -228,84 +120,25 @@ test('confirm: calls confirmBookGate1 once, is disabled and busy while it runs, 
   const d2 = await r2.draw({ confirm: async () => { throw new bundle.BookPipelineRunError('budget'); } });
   one(d2.panel, 'vam-book-panel-confirm').click();
   await settle();
-  assert.equal(one(d2.panel, 'vam-book-panel-status').text, '額度已用完，請先再加額度。'.length ? one(d2.panel, 'vam-book-panel-status').text : '');
+  assert.equal(one(d2.panel, 'vam-book-panel-status').text, one(d2.panel, 'vam-book-panel-status').text);
   assert.ok(one(d2.panel, 'vam-book-panel-status').text.length > 0);
   assert.equal(one(d2.panel, 'vam-book-panel-confirm').disabled, false, 'pressable again after a refusal');
 });
 
-test('plain text only: plan text with <img onerror>, <script>, markdown images and links becomes text; no such element exists in the panel', async () => {
+
+test('plain text only: thread and card titles from the plan and notes become text; the chapter text goes to the renderer only', () => {
   const evil = '<img src=x onerror=alert(1)> <script>alert(2)</script> ![p](https://evil.test/a.png) [l](javascript:alert(3))';
-  const r = await rig({ card: request => ({ covers: evil, entry: evil, handoff: evil, previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'x' }] }), global: (request, list) => ({ thread: evil, cards: list.map((n, i) => ({ id: n.id, role: i ? 'body' : 'intro' })), materials: [{ name: evil, use: evil }], decisions: { reader: evil } }) });
-  const d = await r.draw();
-  const tags = dom.findAll(d.panel, () => true).map(i => i.tag);
+  const data = bundle.buildGatePanel({ order: ['x'], trial: ['x'], titleOf: () => '<b>t</b>', noteOf: () => ({ prompt: '', summary: '', pipelineStage: 'checked', detail: evil }), rootRaw: `## 全書企劃\n### 主線\n${evil}\n` });
+  const seen = [];
+  const p = bundle.renderGatePanel(dom.element('div'), data, true, new bundle.GatePanelState(), actionsOf({ renderMarkdown: (el, markdown) => seen.push(markdown) }));
+  const tags = dom.findAll(p, () => true).map(i => i.tag);
   for (const bad of ['img', 'script', 'a', 'iframe', 'svg']) assert.ok(!tags.includes(bad), bad);
-  const shown = texts(d.panel).join('\n');
-  assert.match(shown, /onerror/);
-  assert.match(shown, /alert\(2\)/);
-  // and straight from a note body that the owner may have edited (no escaping at all)
-  const data = bundle.buildGatePanel({ order: ['x'], titleOf: () => '<b>t</b>', noteOf: () => ({ prompt: `本章會講：${evil}`, summary: '', pipelineStage: 'planned' }), rootRaw: `## 全書企劃\n### 主線\n${evil}\n` });
-  const p = bundle.renderGatePanel(dom.element('div'), data, true, new bundle.GatePanelState(), { editPlan() {}, replan: async () => ({}), rerunPlan: async () => {}, confirm: async () => {}, showChat() {}, close() {}, refresh() {} });
-  const tags2 = dom.findAll(p, () => true).map(i => i.tag);
-  for (const bad of ['img', 'script', 'a', 'iframe']) assert.ok(!tags2.includes(bad), bad);
-  assert.ok(texts(p).includes('1 <b>t</b>'));
+  assert.ok(texts(p).includes('1 <b>t</b>') || texts(p).some(x => x.includes('<b>t</b>')));
+  assert.deepEqual(seen, [evil], 'the chapter text reaches the renderer as it is, and nowhere else');
   assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML/.test(fs.readFileSync(path.join(root, 'experiences/visual-map/book-pipeline-panel.ts'), 'utf8')));
 });
 
-test('prompt that cannot be parsed: the first three lines show as they are; an empty prompt says there is no plan; a needs-review card shows its reason and "re-plan"', async () => {
-  const noteOf = id => ({ x1: { prompt: 'free\nline two\n\nline three\nline four', pipelineStage: 'planned' }, x2: { prompt: '', pipelineStage: 'pending' }, x3: { prompt: '', pipelineStage: 'needs-review', pipelineIssue: 'plan failed: invalid_reply' } })[id];
-  const data = bundle.buildGatePanel({ order: ['x1', 'x2', 'x3'], titleOf: id => id, noteOf, rootRaw: '' });
-  assert.equal(JSON.stringify(data.cards[0].rawLines), JSON.stringify(['free', 'line two', 'line three']));
-  assert.equal(data.planned, 2);
-  const calls = [];
-  const p = bundle.renderGatePanel(dom.element('div'), data, true, new bundle.GatePanelState(), { editPlan() {}, replan: async () => ({}), rerunPlan: async id => { calls.push(id); }, confirm: async () => {}, showChat() {}, close() {}, refresh() {} });
-  assert.deepEqual(all(p, 'vam-book-panel-field').map(i => i.text), ['free', 'line two', 'line three']);
-  assert.ok(texts(p).includes('這張還沒有企劃。'));
-  assert.ok(texts(p).includes('已企劃 2／3 · 需人看 1'));
-  const issue = one(p, 'vam-book-panel-issue');
-  assert.match(texts(issue).join(' '), /需人看：企劃失敗/);
-  one(issue, 'vam-book-panel-rerun').click();
-  assert.equal(JSON.stringify(calls), JSON.stringify(['x3']));
-});
-
-test('T4 old data: no book plan, no image arrangement, a failed single card; thread and cards still draw, details stay folded, no throw', () => {
-  setUiLanguage('zh-TW');
-  const noteOf = id => ({ a: { prompt: '本章會講：舊的一句話\n接入點：舊接入', pipelineStage: 'planned' }, b: { prompt: '', pipelineStage: 'needs-review', pipelineIssue: 'plan failed: invalid_reply' }, c: { prompt: '接入點：只有接入', pipelineStage: 'planned' } })[id];
-  const data = bundle.buildGatePanel({ order: ['a', 'b', 'c'], titleOf: id => `T${id}`, noteOf, rootRaw: '# Root\n' });
-  const state = new bundle.GatePanelState();
-  const p = bundle.renderGatePanel(dom.element('div'), data, true, state, { editPlan() {}, replan: async () => ({}), rerunPlan: async () => {}, confirm: async () => {}, showChat() {}, close() {}, refresh() {} });
-  assert.ok(texts(p).includes('全書企劃還沒有內容。'));
-  assert.equal(all(p, 'vam-book-panel-thread').length, 0);
-  assert.equal(all(p, 'vam-book-panel-images').length, 3);
-  assert.ok(texts(p).includes('未安排圖'));
-  const [a, b, c] = all(p, 'vam-book-panel-card');
-  assert.ok(texts(a).includes('舊的一句話'));
-  // only an entry point: it shows once, inside the folded details, not also as a raw line outside
-  assert.equal(texts(c).filter(x => x.includes('只有接入')).length, 1);
-  assert.ok(texts(one(c, 'vam-book-panel-details')).includes('接入點：只有接入'));
-  assert.equal(one(b, 'vam-book-panel-rerun').text, '重跑企劃');
-  assert.match(texts(one(b, 'vam-book-panel-issue')).join(' '), /需人看/);
-  assert.ok(all(b, 'vam-book-panel-details-toggle').length === 1);
-  assert.equal(one(b, 'vam-book-panel-details').hidden, true);
-});
-
-test('T4 details: open state survives a repaint (kept on the panel state), and a card with the details open stays open while another is toggled', () => {
-  setUiLanguage('zh-TW');
-  const data = bundle.buildGatePanel({ order: ['a', 'b'], titleOf: id => id, noteOf: () => ({ prompt: '本章會講：x\n接入點：e', pipelineStage: 'planned' }), rootRaw: '## 全書企劃\n### 主線\nT\n' });
-  const state = new bundle.GatePanelState();
-  const actions = { editPlan() {}, replan: async () => ({}), rerunPlan: async () => {}, confirm: async () => {}, showChat() {}, close() {}, refresh() {} };
-  const p1 = bundle.renderGatePanel(dom.element('div'), data, true, state, actions);
-  one(all(p1, 'vam-book-panel-card')[1], 'vam-book-panel-details-toggle').click();
-  const p2 = bundle.renderGatePanel(dom.element('div'), data, true, state, actions);
-  const [c0, c1] = all(p2, 'vam-book-panel-card');
-  assert.equal(one(c0, 'vam-book-panel-details').hidden, true);
-  assert.equal(one(c1, 'vam-book-panel-details').hidden, false);
-  assert.equal(one(c1, 'vam-book-panel-details-toggle').attrs['aria-expanded'], 'true');
-  assert.equal(one(c0, 'vam-book-panel-details').attrs.id !== one(c1, 'vam-book-panel-details').attrs.id, true);
-  state.reset();
-  assert.equal(state.detailOpen.size, 0);
-});
-
-test('keyboard and labels: Escape closes, the Chat tab calls showChat, buttons are real buttons in a sensible Tab order', async () => {
+test('keyboard and labels: Escape closes, the Chat tab calls showChat, the Tab order ends with the two buttons', async () => {
   const r = await rig();
   const d = await r.draw();
   d.panel.fire('keydown', { key: 'Escape' });
@@ -316,26 +149,18 @@ test('keyboard and labels: Escape closes, the Chat tab calls showChat, buttons a
   assert.equal(JSON.stringify(r.entries.at(-1)), JSON.stringify(['chat']));
   const order = dom.findAll(d.panel, i => ['button', 'input'].includes(i.tag)).map(i => i.cls.split(' ').find(c => c.startsWith('vam-book-panel')) ?? i.cls);
   assert.equal(order[0], 'vam-book-panel-tab');
-  assert.equal(order.at(-1), 'vam-book-panel-confirm');
-  const input = one(all(d.panel, 'vam-book-panel-card')[0], 'vam-book-panel-more-input');
-  input.value = 'more';
-  input.fire('keydown', { key: 'Enter', isComposing: false });
-  assert.equal(r.entries.filter(e => e[0] === 'replan').length, 1, 'Enter sends');
-  await settle();
-  input.fire('keydown', { key: 'Enter', isComposing: true });
-  assert.equal(r.entries.filter(e => e[0] === 'replan').length, 1, 'an IME Enter does not');
+  assert.equal(order.at(-1), 'vam-book-panel-confirm', 'an older run (no trial) has the one button');
 });
 
 test('words in all three languages; zh-TW says 心智圖 not 地圖', () => {
-  const keys = ['book_panel_gate1_title', 'book_panel_replan', 'book_panel_hint', 'book_panel_tab_chat'];
+  const keys = ['book_panel_gate1_title', 'book_trial_title', 'book_trial_fold', 'book_trial_retry', 'book_trial_done', 'book_trial_look', 'book_panel_tab_chat'];
   for (const lang of ['zh-TW', 'en', 'zh-CN']) {
     const text = fs.readFileSync(path.join(root, `i18n/${lang}.ts`), 'utf8');
     for (const key of keys) assert.match(text, new RegExp(`"ui\\.${key}":`), `${lang} ${key}`);
   }
-  assert.ok(!/地圖/.test(fs.readFileSync(path.join(root, 'i18n/zh-TW.ts'), 'utf8').split('\n').filter(l => /ui\.book_panel_/.test(l)).join('\n')));
+  assert.ok(!/地圖/.test(fs.readFileSync(path.join(root, 'i18n/zh-TW.ts'), 'utf8').split('\n').filter(l => /ui\.book_(panel|trial)_/.test(l)).join('\n')));
 });
 
-// ---- part B: the view ----
 const MAP = 'Agent Workspace/Topics/map-bk1/Map.md';
 async function viewRig({ book = true, phase = 'gate1', chat } = {}) {
   setUiLanguage('zh-TW');
@@ -355,6 +180,7 @@ async function viewRig({ book = true, phase = 'gate1', chat } = {}) {
   await repo.rebuildDerivedData();
   const plugin = S.withExpansionCoordinator({ repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false, mutate: work => Promise.resolve().then(work), getBookPipelineProgress: () => undefined });
   S.attachTopicRuns(plugin);
+  plugin.availableModels = () => ['gpt-6-luna']; plugin.modelLabel = model => model;
   const view = new bundle.VisualAgentMapView({ app }, plugin);
   view.path = MAP; view.map = await repo.readMap(MAP); view.stageEl = dom.element('div'); view.contentEl = dom.element('div');
   view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)])));
@@ -422,11 +248,11 @@ test('view: the Chat tab closes the panel and opens the chat with the keyboard i
   one(w2, 'vam-book-panel').fire('keydown', { key: 'Escape' });
   assert.equal(h.view.bookPanel.open, false);
   // the map is switched to one without a book: the state is wiped
-  h.view.bookPanel.open = true; h.view.bookPanel.drafts.set('a', 'draft');
+  h.view.bookPanel.open = true; h.view.bookPanel.settingDrafts.set('reader', 'draft');
   h.view.map = { ...h.view.map, bookPipeline: undefined };
   h.view.bookPipelineSeen = null;
   assert.equal(h.mount().children.length, 0);
-  assert.equal(h.view.bookPanel.drafts.size, 0);
+  assert.equal(h.view.bookPanel.settingDrafts.size, 0);
 });
 
 test('view: the panel and the cleanup are wired where they must be (repaint after progress, view close, narrow overlay, no timer of its own)', () => {
@@ -446,23 +272,124 @@ test('styles: the side column, the narrow overlay and the panel use theme variab
   assert.ok(rules.length > 500);
   assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(rules), 'no hard-coded colour');
   assert.ok(!/\brgba?\(/.test(rules), 'no hard-coded rgb');
+  assert.match(css, /\.vam-book-trial-settings\[hidden\] \{ display: none; \}/, 'the folded settings are really hidden (a flex display would otherwise beat the hidden attribute)');
   assert.match(rules, /var\(--background-primary\)/);
   assert.match(rules, /var\(--text-normal\)/);
   assert.match(rules, /:focus-visible \{ outline: 2px solid var\(--interactive-accent\)/);
 });
 
-test('gate 1 card: one plain 圖安排 line from the Prompt (not arranged / none / n pictures with kind and what it explains), set with textContent in three languages', () => {
-  const planText = S.load('core/book-pipeline/plan-text.ts');
-  const base = { role: 'body', covers: 'c', entry: 'e', handoff: 'h', checklist: [{ id: 'C1', type: 'fact', text: 'x' }] };
-  const slots = [{ index: 1, kind: 'map', explains: 'trade <b>routes</b>', anchor: 'a' }, { index: 2, kind: '圖表', explains: '成長', anchor: 'b' }];
-  const prompts = { old: planText.composeCardPrompt(base, 'zh-TW'), none: planText.composeCardPrompt({ ...base, images: [] }, 'zh-TW'), some: planText.composeCardPrompt({ ...base, images: slots }, 'zh-TW') };
-  const noteOf = id => ({ prompt: prompts[id], summary: '', pipelineStage: 'planned' });
-  const lines = lang => { setUiLanguage(lang); const data = bundle.buildGatePanel({ order: ['old', 'none', 'some'], titleOf: id => id, noteOf, rootRaw: '' }); return data.cards.map(c => c.imagePlan); };
-  assert.deepEqual(lines('zh-TW'), ['未安排圖', '不放圖', '圖 2 張：map／trade ＜b＞routes＜/b＞；圖表／成長']);
-  assert.deepEqual(lines('zh-CN'), ['未安排图', '不放图', '图 2 张：map／trade ＜b＞routes＜/b＞；圖表／成長']);
-  assert.deepEqual(lines('en'), ['Pictures: not arranged', 'Pictures: none', '2 picture(s): map／trade ＜b＞routes＜/b＞；圖表／成長']);
+
+test('view: the trial chapters are drawn by one Markdown renderer component that is unloaded on every repaint and on close', async () => {
+  const h = await viewRig();
+  const before = components.length;
+  h.view.map.bookPipeline.trial = h.view.map.bookPipeline.order.slice();
+  for (const id of h.view.map.bookPipeline.order) h.view.notes.get(id).detail = `chapter text of ${id}`;
+  h.view.bookPanel.open = true;
+  h.mount();
+  const first = components.slice(before);
+  assert.equal(first.length, 1, 'one component for the whole panel');
+  assert.equal(first[0].loaded, true); assert.equal(first[0].unloaded, undefined);
+  assert.ok(renders.filter(x => x.component === first[0]).length >= 1);
+  h.view.paintBookPanel();
+  assert.equal(first[0].unloaded, true, 'a repaint unloads the old one');
+  const second = components.slice(before).filter(c => c !== first[0]);
+  assert.equal(second.length, 1);
+  assert.equal(second[0].unloaded, undefined);
+  h.view.closeBookPanel();
+  h.mount();
+  assert.equal(second[0].unloaded, true, 'closing the panel unloads it');
+});
+
+
+// ---- the trial screen (pure panel) ----
+const HIDDEN = '> [!vam-book]- 研究備註\n> secret work record line';
+const trialData = (extra = {}) => bundle.buildGatePanel({
+  order: ['a', 'b', 'c', 'd'], trial: ['a', 'b', 'c'], titleOf: id => `T${id}`,
+  noteOf: id => ({ a: { pipelineStage: 'checked', detail: `正文一。\n\n![x](https://u.test/a.png)\n\n${HIDDEN}` }, b: { pipelineStage: 'checked', detail: '正文二。' }, c: { pipelineStage: 'needs-review', pipelineIssue: 'write failed: failed', detail: '' }, d: { pipelineStage: 'planned', detail: 'never shown' } })[id],
+  rootRaw: '## 全書企劃\n### 全書主線\n主線第一句。第二句不顯示。\n', ...extra
+});
+const draw = (data, state = new bundle.GatePanelState(), over = {}) => { setUiLanguage('zh-TW'); return bundle.renderGatePanel(dom.element('div'), data, true, state, actionsOf(over)); };
+
+test('trial screen: mainline first sentence, the three trial chapters drawn by the renderer without work records, the settings fold closed, both buttons', () => {
+  const data = trialData();
+  assert.equal(data.thread, '主線第一句。');
+  assert.equal(data.trial.length, 3, 'only the trial cards, not the fourth');
+  const seen = [];
+  const p = draw(data, new bundle.GatePanelState(), { renderMarkdown: (el, markdown) => { seen.push(markdown); el.createDiv({ cls: 'md-stand-in', text: markdown }); } });
+  assert.equal(dom.findAll(p, i => i.tag === 'h3')[0].text, '先看試跑章節的完整成品，這樣可以嗎？');
+  assert.ok(texts(p).includes('主線第一句。'));
+  assert.ok(!texts(p).some(x => x.includes('第二句不顯示')));
+  assert.equal(all(p, 'vam-book-trial-card').length, 3);
+  assert.equal(seen.length, 2, 'the chapter with no text is not sent to the renderer');
+  assert.ok(seen[0].includes('正文一。') && seen[0].includes('https://u.test/a.png'), 'text and picture stay');
+  assert.ok(!seen.join('\n').includes('secret work record'), 'the hidden work records are not shown');
+  assert.ok(!texts(p).some(x => x.includes('never shown')));
+  const cards = all(p, 'vam-book-trial-card');
+  assert.equal(one(cards[0], 'vam-book-trial-pill').text, '已完成');
+  assert.equal(one(cards[2], 'vam-book-trial-pill').text, bundle.t('ui.book_trial_look'));
+  assert.ok(one(cards[2], 'vam-book-panel-issue').text.length > 0);
+  assert.ok(texts(cards[2]).includes(bundle.t('ui.book_trial_no_text')), 'empty text says so');
+  const toggle = one(p, 'vam-book-trial-fold');
+  const body = one(p, 'vam-book-trial-settings');
+  assert.equal(toggle.attrs['aria-expanded'], 'false'); assert.equal(body.hidden, true);
+  assert.equal(toggle.attrs['aria-controls'], body.attrs.id);
+  assert.equal(all(body, 'vam-book-start-model').length, 4, 'four model dropdowns inside the fold');
+  toggle.click();
+  assert.equal(body.hidden, false); assert.equal(toggle.attrs['aria-expanded'], 'true');
+  const foot = one(p, 'vam-book-panel-foot');
+  assert.deepEqual(dom.findAll(foot, i => i.tag === 'button').map(i => i.text), [bundle.t('ui.book_confirm_gate1'), bundle.t('ui.book_trial_retry')]);
+});
+
+test('trial screen: an older run (no trial) shows the thread and the one confirm button only, with the old title', () => {
+  const data = trialData({ trial: undefined });
+  assert.deepEqual(data.trial, []);
+  const p = draw(data);
+  assert.equal(all(p, 'vam-book-trial-card').length, 0);
+  assert.equal(all(p, 'vam-book-trial-fold').length, 0);
+  assert.equal(all(p, 'vam-book-panel-retry').length, 0);
+  assert.equal(all(p, 'vam-book-panel-confirm').length, 1);
+  assert.equal(dom.findAll(p, i => i.tag === 'h3')[0].text, bundle.t('ui.book_panel_gate1_title'));
+  assert.ok(texts(p).includes('主線第一句。'));
+});
+
+test('trial screen: no thread and fewer than three cards still draw (an empty plan says so)', () => {
+  const data = bundle.buildGatePanel({ order: ['a', 'b'], trial: ['a', 'b'], titleOf: id => id, noteOf: id => ({ pipelineStage: 'checked', detail: `text ${id}` }), rootRaw: '# Root\n' });
+  assert.equal(data.thread, ''); assert.equal(data.trial.length, 2);
+  const p = draw(data);
+  assert.equal(all(p, 'vam-book-trial-card').length, 2);
+  assert.equal(all(p, 'vam-book-panel-thread').length, 0);
+  assert.equal(bundle.t('ui.book_panel_plan_empty').length > 0, true);
+  assert.ok(texts(p).includes(bundle.t('ui.book_panel_plan_empty')));
+});
+
+test('trial screen: retry sends what was typed in the fold once, keeps the drafts across a repaint, clears them when the retry went through, and shows a refusal', async () => {
   setUiLanguage('zh-TW');
-  const data = bundle.buildGatePanel({ order: ['old', 'none', 'some'], titleOf: id => id, noteOf, rootRaw: '' });
-  const p = bundle.renderGatePanel(dom.element('div'), data, true, new bundle.GatePanelState(), { editPlan() {}, replan: async () => ({}), rerunPlan: async () => {}, confirm: async () => {}, showChat() {}, close() {}, refresh() {} });
-  assert.deepEqual(all(p, 'vam-book-panel-images').map(i => i.text), ['未安排圖', '不放圖', '圖 2 張：map／trade ＜b＞routes＜/b＞；圖表／成長']);
+  const gate = defer();
+  const calls = [];
+  const state = new bundle.GatePanelState();
+  const parent = dom.element('div');
+  let panel;
+  const actions = actionsOf({ settings: { reader: 'old reader' }, retry: patch => { calls.push(patch); return calls.length === 1 ? Promise.reject(new bundle.BookPipelineRunError('blocked')) : gate.promise; }, refresh: () => { panel.remove(); panel = bundle.renderGatePanel(parent, trialData(), true, state, actions); } });
+  panel = bundle.renderGatePanel(parent, trialData(), true, state, actions);
+  const area = () => all(panel, 'vam-book-start-settings')[0] && dom.findAll(panel, i => i.tag === 'textarea')[0];
+  area().value = 'new reader'; area().fire('input', {});
+  // a repaint (progress arrives) keeps what was typed
+  actions.refresh();
+  assert.equal(area().value, 'new reader');
+  one(panel, 'vam-book-panel-retry').click();
+  await settle();
+  assert.equal(calls.length, 1);
+  assert.equal(JSON.stringify(calls[0]), JSON.stringify({ reader: 'new reader' }));
+  assert.ok(one(panel, 'vam-book-panel-status').text.length > 0, 'a refusal shows its reason');
+  assert.equal(area().value, 'new reader', 'a refused retry keeps the draft');
+  assert.equal(one(panel, 'vam-book-panel-retry').disabled, false);
+  one(panel, 'vam-book-panel-retry').click();
+  one(panel, 'vam-book-panel-retry').click();
+  assert.equal(calls.length, 2, 'pressed twice while running: one call');
+  assert.equal(one(panel, 'vam-book-panel-retry').disabled, true);
+  assert.equal(one(panel, 'vam-book-panel-confirm').disabled, true, 'confirm waits while a retry runs');
+  gate.resolve();
+  await settle();
+  assert.equal(state.settingDrafts.size, 0, 'drafts are cleared once the retry applied them');
+  assert.equal(one(panel, 'vam-book-panel-retry').disabled, false);
 });

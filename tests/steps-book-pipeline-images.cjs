@@ -43,7 +43,8 @@ async function rig(over = {}) {
   const ports = {
     mutate: work => { const next = queue.then(work); queue = next.catch(() => undefined); return next; },
     readMap: path => repo.readMap(path),
-    updateMap: (path, change) => repo.updateMap(path, change),
+    // These tests pin the older run without a trial (every card planned before gate 1): the run's `trial` is dropped.
+    updateMap: (path, change) => repo.updateMap(path, d => { change(d); if (d.bookPipeline) delete d.bookPipeline.trial; }),
     readCard: async path => {
       const note = await repo.readNote(path);
       return { path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(path), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}) } };

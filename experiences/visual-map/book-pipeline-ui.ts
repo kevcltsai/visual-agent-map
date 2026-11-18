@@ -37,6 +37,8 @@ export interface BookBarState {
   globalDone: boolean;
   /** What the run is doing right now (memory only; absent after a reload or while nothing runs). */
   current?: BookCurrent;
+  /** The run has a trial (the first chapters before gate 1): while it is planning, the bar says which trial chapter is written. */
+  trialSize?: number;
   /** A single-card rerun is in progress (memory only): the bar keeps its stop button; the card itself says "working". */
   rerun?: true;
 }
@@ -101,6 +103,7 @@ export function bookBarState(
     budget,
     globalDone: data.globalPlanned === true,
     ...(current ? { current } : {}),
+    ...(data.trial?.length && mode === "planning" && data.globalPlanned ? { trialSize: data.trial.length } : {}),
     ...(rerunning ? { rerun: true as const } : {}),
     ...(mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {}),
     ...(progress?.etaSeconds !== undefined && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0
@@ -229,6 +232,15 @@ const settledCount = (state: BookBarState): number => state.counts.checked + sta
 /** The one sentence of the bar: "Writing chapter 3/31 · 2/31 done"; the whole-book plan and the chapter plans have their own words. */
 export function bookProgressText(state: BookBarState): string {
   const { total } = state;
+  if (state.mode === "planning" && state.trialSize && state.current?.step !== "global") {
+    // The trial chapters go all the way to the proofread before gate 1; the first chapters of the reading order are the trial's.
+    const settled = Math.min(state.counts.checked + state.counts["needs-review"], state.trialSize - 1);
+    return t(
+      "ui.book_progress_line_trial_0_1",
+      Math.min(state.current?.chapter ?? settled + 1, state.trialSize),
+      state.trialSize
+    );
+  }
   const at = Math.min(state.current?.chapter ?? settledCount(state) + 1, Math.max(total, 1));
   const sentence =
     state.mode === "planning"

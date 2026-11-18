@@ -26,7 +26,7 @@ const same = (actual, expected) => assert.equal(JSON.stringify(actual), JSON.str
 
 test('wiring: the plugin owns BookPipelineRuns with the public entries; dispose refuses further starts', async () => {
   const plugin = new Plugin({}, { id: 'vam', version: '0.0.0' });
-  for (const method of ['startBookPipeline', 'stopBookPipeline', 'resumeBookPipeline', 'confirmBookGate1', 'replanBookCard', 'rerunBookCard', 'confirmBookSeam', 'getBookPipelineProgress'])
+  for (const method of ['startBookPipeline', 'stopBookPipeline', 'resumeBookPipeline', 'confirmBookGate1', 'retryBookTrial', 'rerunBookCard', 'confirmBookSeam', 'getBookPipelineProgress'])
     assert.equal(typeof plugin[method], 'function', method);
   assert.equal(plugin.getBookPipelineProgress('Nothing.md'), undefined);
   await plugin.stopBookPipeline('Nothing.md');

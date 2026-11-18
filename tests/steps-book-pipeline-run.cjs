@@ -41,7 +41,8 @@ async function rig(over = {}) {
   const ports = {
     mutate: work => { const next = queue.then(work); queue = next.catch(() => undefined); return next; },
     readMap: path => repo.readMap(path),
-    updateMap: (path, change) => repo.updateMap(path, change),
+    // Most tests here pin the older run without a trial (every card planned before gate 1): the run's `trial` is dropped unless `over.trial`.
+    updateMap: (path, change) => repo.updateMap(path, d => { change(d); if (!over.trial && d.bookPipeline) delete d.bookPipeline.trial; }),
     readCard: async path => {
       const note = await repo.readNote(path);
       return { path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(path), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}) } };
@@ -1319,4 +1320,125 @@ test('T4 autofix: a single-card rerun never starts the automatic redo', async ()
   assert.equal((await r.state()).autoFixes, undefined);
   assert.equal(r.stat.proof.length, proofs + 1);
   assert.equal(stageOf(r.raw(1)), 'needs-review');
+});
+
+// ---- T5: the trial before gate 1 ----
+const idle = async r => { await settle(); while (r.runs.isRunning(r.mapPath)) await tick(); };
+const same = (actual, expected, message) => assert.equal(JSON.stringify(actual), JSON.stringify(expected), message);
+const T5_TITLES = ['T0', 'T1', 'T2', 'T3', 'T4'];
+const trialRig = (over = {}) => {
+  const models = { plan: 'm1', author: 'm2', proof: 'm3' };
+  return rig({ trial: true, titles: T5_TITLES, ...over, ports: { config: () => ({ planModel: models.plan, authorModel: models.author, imageModel: 'm4', proofModel: models.proof, reasoning: 'low', language: 'zh-TW' }), ...over.ports } }).then(r => ({ ...r, models }));
+};
+
+test('T5 trial: only the first three cards are planned, written and proofread before gate 1; after confirm the rest run and the trial cards get no more calls', async () => {
+  const r = await trialRig();
+  const trial = r.nodes.slice(0, 3).map(n => n.id);
+  await r.runs.start(r.mapPath);
+  let s = await r.state();
+  same(s.trial, trial);
+  assert.equal(s.phase, 'gate1'); assert.equal(s.status, 'running');
+  same(r.stat.plan, ['global', ...trial]);
+  same(r.stat.author, trial);
+  assert.equal(r.stat.proof.length, 3);
+  for (let i = 0; i < 3; i++) { assert.equal(stageOf(r.raw(i)), 'checked'); assert.ok((await r.note(i)).detail.includes(bodyOf(T5_TITLES[i]))); }
+  for (let i = 3; i < 5; i++) { assert.equal(stageOf(r.raw(i)), undefined, 'a card outside the trial is untouched'); assert.ok(!(await r.note(i)).detail.includes('SecretBody')); }
+  await confirmDone(r.runs, r.mapPath);
+  s = await r.state();
+  assert.equal(s.phase, 'gate2');
+  same(r.stat.plan, ['global', ...r.nodes.map(n => n.id)], 'each card planned once');
+  same(r.stat.author, r.nodes.map(n => n.id), 'each card written once: the trial cards are not written again');
+  assert.equal(r.stat.proof.length, 5);
+  for (let i = 0; i < 5; i++) assert.equal(stageOf(r.raw(i)), 'checked');
+});
+
+test('T5 trial: retryTrial reruns only the trial cards with the models read again; the others are untouched; a second retry works; it is refused outside gate 1', async () => {
+  const r = await trialRig();
+  r.stat.models = [];
+  const base = r.script.author;
+  r.script.author = async input => { r.stat.models.push(input.model); return base(input); };
+  const planModels = [];
+  const planPort = r.ports.runPlan;
+  r.runs.ports.runPlan = async (step, request, run) => { planModels.push(request.model); return planPort(step, request, run); };
+  await assert.rejects(() => r.runs.retryTrial(r.mapPath), e => e.code === 'missing', 'no run yet');
+  await r.runs.start(r.mapPath);
+  const trial = r.nodes.slice(0, 3).map(n => n.id);
+  const outside = [3, 4].map(i => r.raw(i));
+  same(r.stat.models, ['m2', 'm2', 'm2']);
+  const planned = r.stat.plan.length, authored = r.stat.author.length, proofs = r.stat.proof.length, used = (await r.state()).budget.used;
+  r.models.plan = 'n1'; r.models.author = 'n2'; r.models.proof = 'n3';
+  await r.runs.retryTrial(r.mapPath); await idle(r);
+  const s = await r.state();
+  assert.equal(s.phase, 'gate1'); assert.equal(s.status, 'running');
+  same(r.stat.plan.slice(planned), trial, 'the whole-book plan is not redone');
+  same(r.stat.author.slice(authored), trial);
+  assert.equal(r.stat.proof.length, proofs + 3);
+  same(r.stat.models.slice(3), ['n2', 'n2', 'n2'], 'the new author model');
+  same(planModels.slice(-3), ['n1', 'n1', 'n1'], 'the new plan model');
+  assert.ok(r.stat.proof.slice(proofs).every(request => request.model === 'n3'), 'the new proofread model');
+  assert.equal(s.budget.used, used + 9);
+  for (let i = 0; i < 3; i++) assert.equal(stageOf(r.raw(i)), 'checked');
+  same([3, 4].map(i => r.raw(i)), outside);
+  await r.runs.retryTrial(r.mapPath); await idle(r);
+  assert.equal(r.stat.author.length, authored + 6, 'a second retry runs the trial again');
+  await confirmDone(r.runs, r.mapPath);
+  await assert.rejects(() => r.runs.retryTrial(r.mapPath), e => e.code === 'not_gate1', 'gate 2');
+});
+
+test('T5 trial: a run without a trial (older data) refuses retryTrial and keeps planning every card before gate 1', async () => {
+  const r = await rig({ titles: T5_TITLES });
+  await r.runs.start(r.mapPath);
+  const s = await r.state();
+  assert.equal(s.trial, undefined);
+  assert.equal(s.phase, 'gate1');
+  same(r.stat.plan, ['global', ...r.nodes.map(n => n.id)]);
+  assert.equal(r.stat.author.length, 0);
+  await assert.rejects(() => r.runs.retryTrial(r.mapPath), e => e.code === 'not_gate1');
+});
+
+test('T5 trial: fewer than three cards: the trial is every card, and gate 1 shows them all finished', async () => {
+  const r = await trialRig({ titles: ['A', 'B'] });
+  await r.runs.start(r.mapPath);
+  const s = await r.state();
+  same(s.trial, r.nodes.map(n => n.id));
+  assert.equal(s.phase, 'gate1');
+  assert.equal(r.stat.author.length, 2);
+  await confirmDone(r.runs, r.mapPath);
+  assert.equal((await r.state()).phase, 'gate2');
+  assert.equal(r.stat.author.length, 2, 'nothing is written twice');
+});
+
+test('T5 trial: retry while a trial card is needs-review: its counters start over and it is tried again', async () => {
+  let fail = true;
+  const r = await trialRig({ script: { author: async (input) => { if (fail && input.nodeId === r0.id) throw new Error('boom'); await input.admission.reserve(); const note = await rr.repo.readNote(input.path); await rr.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } } });
+  const rr = r; const r0 = { id: r.nodes[1].id };
+  await r.runs.start(r.mapPath);
+  let s = await r.state();
+  assert.equal(s.phase, 'gate1', 'a trial card that needs a person still lets the run reach gate 1');
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.equal(s.attempts[r0.id].write, 3);
+  fail = false;
+  await r.runs.retryTrial(r.mapPath); await idle(r);
+  s = await r.state();
+  assert.equal(s.phase, 'gate1');
+  assert.equal(stageOf(r.raw(1)), 'checked', 'the retry gave it a fresh try');
+  assert.equal((await r.note(1)).pipelineIssue ?? '', '', 'the old issue is gone');
+});
+
+test('T5 trial: stop during the trial keeps the trial; resume finishes it without redoing the finished cards', async () => {
+  const hold = defer();
+  const r = await trialRig();
+  const base = r.script.author;
+  let first = true;
+  r.script.author = async (input, n) => { if (first && input.nodeId === r.nodes[1].id) { first = false; await hold.promise; return { outcome: 'cancelled' }; } return base(input, n); };
+  const starting = r.runs.start(r.mapPath); await settle();
+  await r.runs.stop(r.mapPath); hold.resolve(); await starting.catch(() => undefined); await settle();
+  let s = await r.state();
+  assert.equal(s.status, 'stopped'); assert.equal(s.phase, 'planning'); assert.equal(s.trial.length, 3);
+  await r.runs.resume(r.mapPath); await settle();
+  s = await r.state();
+  assert.equal(s.phase, 'gate1'); assert.equal(s.status, 'running');
+  for (let i = 0; i < 3; i++) assert.equal(stageOf(r.raw(i)), 'checked');
+  assert.equal(r.stat.author.filter(id => id === r.nodes[0].id).length, 1, 'a card finished before the stop is not written again');
+  assert.equal(stageOf(r.raw(3)), undefined);
 });

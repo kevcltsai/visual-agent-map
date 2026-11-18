@@ -3236,6 +3236,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_panel_reason_unmet_plain": "有几项内容没通过校对",
   "ui.book_progress_line_global": "正在规划全书",
   "ui.book_progress_line_plan_0_1": "正在企划第 {0}／{1} 章",
+  "ui.book_progress_line_trial_0_1": "正在试跑第 {0}／{1} 章",
   "ui.book_progress_line_write_0_1": "正在写第 {0}／{1} 章",
   "ui.book_progress_line_sep": "，",
   "ui.book_progress_line_done_0_1": "已完成 {0}／{1} 章",

@@ -40,7 +40,8 @@ async function rig(over = {}) {
   const ports = {
     mutate: work => { const next = queue.then(work); queue = next.catch(() => undefined); return next; },
     readMap: path => repo.readMap(path),
-    updateMap: (path, change) => repo.updateMap(path, change),
+    // These tests pin the older run without a trial (every card planned before gate 1): the run's `trial` is dropped.
+    updateMap: (path, change) => repo.updateMap(path, d => { change(d); if (d.bookPipeline) delete d.bookPipeline.trial; }),
     readCard: async path => {
       const note = await repo.readNote(path);
       return { path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(path), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}), ...(note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {}) } };
@@ -83,59 +84,12 @@ const authorFor = r => async (input, n) => {
 };
 const toGate2 = async r => { await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath); };
 
-test('replanCard at gate 1: only that card plan is rerun with the owner sentence; only its Prompt changes; both neighbours get a seam with its revision; the rest is byte for byte', async () => {
-  const r = await rig();
-  await r.runs.start(r.mapPath);
-  const before = [0, 1, 2, 3].map(i => r.raw(i));
-  const calls = r.stat.plan.length; const used = (await r.state()).budget.used;
-  const requests = [];
-  r.script.card = request => { requests.push(request); return { covers: 'NEW covers <img src=x>', entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'mentions the manuscript' }] }; };
-  const out = await r.runs.replanCard(r.mapPath, r.nodes[2].id, '  第 5 張要多講\n他的手稿  ');
-  assert.match(out.plan.covers, /NEW covers/); assert.equal(out.plan.checklist[0].id, 'C1'); assert.equal(out.reason, undefined);
-  assert.deepEqual(r.stat.plan.slice(calls), [r.nodes[2].id], 'no other card is replanned');
-  assert.equal(requests[0].instruction, '第 5 張要多講 他的手稿'); assert.equal(requests[0].card.position, 3);
-  assert.equal(requests[0].previous.title, 'SecretTitleA'); assert.equal(requests[0].next.title, 'SecretTitleC');
-  assert.equal(r.raw(0), before[0]); assert.equal(seamOf(r.raw(0)), undefined);
-  assert.notEqual(r.raw(2), before[2]); assert.match(r.raw(2), /NEW covers/); assert.ok(!/<img/.test(r.raw(2).slice(r.raw(2).indexOf('> [!vam-book]- 提示'))), 'model text is escaped like every other plan (the Prompt callout; the summary carries covers as in every plan)');
-  assert.equal(seamOf(r.raw(2)), undefined, 'the replanned card itself is not a seam');
-  const s = await r.state();
-  const rev = s.revisions[r.nodes[2].id];
-  for (const i of [1, 3]) { assert.match(seamOf(r.raw(i)), new RegExp(`鄰卡企劃或正文已變更，尚未人工核對.*第 3 張，版本 ${rev}`)); assert.equal(noSeam(r.raw(i)), before[i], 'only the seam line changed'); }
-  assert.equal(s.phase, 'gate1'); assert.equal(s.status, 'running'); assert.equal(s.budget.used, used + 1);
-  assert.equal(stageOf(r.raw(2)), 'planned'); assert.equal(r.runs.isRunning(r.mapPath), false);
-  assert.equal(r.stat.author.length, 0); assert.equal(r.stat.proof.length, 0);
-  const prompt = r.raw(2).slice(r.raw(2).indexOf('> [!vam-book]- 提示'));
-  assert.ok(prompt.includes('mentions the manuscript'));
-});
-
-test('replanCard refusals: only gate 1, a real sentence, a card of the run, no second drive; a failed replan reports its reason and marks nothing else', async () => {
-  const r = await rig();
-  await assert.rejects(() => r.runs.replanCard(r.mapPath, r.nodes[1].id, 'x'), e => e.code === 'missing', 'no run yet');
-  const hold = defer();
-  r.script.global = () => hold.promise.then(() => ({ thread: 't', cards: ids(r).map((id, i) => ({ id, role: i ? 'body' : 'intro' })), materials: [], decisions: {} }));
-  const starting = r.runs.start(r.mapPath); await settle();
-  await assert.rejects(() => r.runs.replanCard(r.mapPath, r.nodes[1].id, 'x'), e => e.code === 'busy');
-  await assert.rejects(() => r.runs.rerunCard(r.mapPath, r.nodes[1].id), e => e.code === 'busy');
-  hold.resolve(); await starting;
-  await assert.rejects(() => r.runs.replanCard(r.mapPath, r.nodes[1].id, '   '), e => e.code === 'instruction');
-  await assert.rejects(() => r.runs.replanCard(r.mapPath, 'nope', 'x'), e => e.code === 'missing');
-  const before = [0, 1, 2, 3].map(i => r.raw(i));
-  r.script.card = () => { throw new Error('boom'); };
-  const failed = await r.runs.replanCard(r.mapPath, r.nodes[1].id, 'more');
-  assert.equal(failed.plan, undefined); assert.equal(failed.reason, 'failed');
-  assert.equal(r.raw(0), before[0]); assert.equal(r.raw(3), before[3]); assert.equal(seamOf(r.raw(2)), undefined, 'nothing changed, so no seam');
-  r.script.card = () => ({ covers: 'ok', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }] });
-  await confirmDone(r.runs, r.mapPath);
-  await assert.rejects(() => r.runs.replanCard(r.mapPath, r.nodes[1].id, 'more'), e => e.code === 'not_gate1', 'gate 2');
-  assert.equal((await r.state()).phase, 'gate2');
-});
-
-test('rerunCard at gate 1 reruns the plan only (no author, no proofread); a writing-phase run refuses', async () => {
+test('rerunCard is refused at gate 1 (the trial screen has its own retry) and in the writing phase', async () => {
   const r = await rig();
   await r.runs.start(r.mapPath);
   const planned = r.stat.plan.length;
-  await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
-  assert.deepEqual(r.stat.plan.slice(planned), [r.nodes[1].id]); assert.equal(r.stat.author.length, 0); assert.equal(r.stat.proof.length, 0);
+  await assert.rejects(() => r.runs.rerunCard(r.mapPath, r.nodes[1].id), e => e.code === 'not_gate');
+  assert.equal(r.stat.plan.length, planned, 'nothing was rerun'); assert.equal(r.stat.author.length, 0); assert.equal(r.stat.proof.length, 0);
   assert.equal((await r.state()).phase, 'gate1');
   const hold = defer();
   r.script.author = async () => { await hold.promise; return { outcome: 'cancelled' }; };

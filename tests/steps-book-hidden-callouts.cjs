@@ -164,21 +164,18 @@ test('extractProofRecords returns only the record lines (header, items, machine 
   assert.equal(records[0], record.trim());
 });
 
-test('a hidden callout with a line the card did not hold before the author ran is shown as a plain note; one the card held is kept hidden', () => {
-  const own = ['> [!vam-book]- 校對結果', '> - 2026-01-01　舊紀錄', '>'].join('\n');
-  const known = new Set(`正文。\n\n${own}\n`.split('\n'));
-  const kept = sections.demoteForeignHidden(`新正文。\n\n${own}\n`, known);
-  assert.ok(kept.includes('> [!vam-book]- 校對結果'), 'the card\'s own block stays hidden');
-  assert.ok(sections.workLogLines(kept).length === 1, 'its log line is still read');
-  const forged = '段一。\n\n> [!vam-book]- 備註\n> 被藏起來的文字 SPAM\n\n段二。\n';
-  assert.ok(sections.chapterBody(forged).includes('SPAM') === false, 'before: hidden from the chapter text');
-  const shown = sections.demoteForeignHidden(forged, known);
-  assert.ok(!shown.includes('vam-book') && shown.includes('> [!note]- 備註'));
-  assert.ok(sections.chapterBody(shown).includes('SPAM'), 'the proofreading input sees it');
-  // a block that has one own line and one added line is foreign as a whole
-  const mixed = sections.demoteForeignHidden(`${own}\n> 附加的一行 SPAM\n`, known);
-  assert.ok(!mixed.includes('vam-book'));
-  // not an own block inside a code fence: untouched
-  const fence = '```\n> [!vam-book]- x\n> y\n```\n';
-  assert.equal(sections.demoteForeignHidden(fence, known), fence);
+test('demoteHiddenInDetail: any hidden-type title (indent, case, no space, nested) not made of the card\'s own lines becomes a visible note; a block of known lines stays hidden', () => {
+  const D = t => `<!-- visual-agent-map:detail:start -->\n${t}\n<!-- visual-agent-map:detail:end -->`;
+  const own = ['> [!vam-book]- 校對結果', '> - 2026-01-01　舊紀錄', '>'];
+  const known = new Set(['正文。', '', ...own]);
+  assert.equal(sections.demoteHiddenInDetail(D(`新正文。\n\n${own.join('\n')}`), known), D(`新正文。\n\n${own.join('\n')}`), 'own block stays hidden');
+  for (const head of [' > [!vam-book]- x', '>[!vam-book]', '> [!VAM-BOOK]- x', '> > [!vam-book]- x', '   >[!Vam-Book]+ x']) {
+    const out = sections.demoteHiddenInDetail(D(`段一。\n\n${head}\n> SPAM\n\n段二。`), known);
+    assert.ok(!/vam-book/i.test(out), head);
+    assert.ok(sections.chapterBody(out).includes('SPAM'), `${head}: the proofreading input sees it`);
+  }
+  const mixed = sections.demoteHiddenInDetail(D(`${own.join('\n')}\n> 附加 SPAM`), known);
+  assert.ok(!/vam-book/i.test(mixed));
+  const outside = `> [!vam-book]- 提示\n> p\n\n${D('x')}`;
+  assert.equal(sections.demoteHiddenInDetail(outside, new Set()), outside, 'outside the Detail block untouched');
 });

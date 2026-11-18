@@ -57,7 +57,8 @@ import {
 import {
   appendResearchNote,
   carryWorkLog,
-  demoteForeignHidden,
+  demoteHiddenInDetail,
+  hidePipelineLog,
   findStoredProof,
   findStoredProofModels,
   extractProofRecords,
@@ -66,6 +67,7 @@ import {
   replaceBookPlanSection,
   fencedLines,
   normalizeWorkRecords,
+  workLogLines,
   replaceProofSection,
   replaceResearchRecord,
   chapterBody,
@@ -1641,7 +1643,7 @@ export class BookPipelineRuns {
       const held = holdProofLines(original, knownLines);
       const restore = held.restore;
       // R1-6: anchors become markdown links first; the picture scan and the cleaning then run on the final text. Placeholder sections go.
-      const content = demoteForeignHidden(dropPlaceholderSections(convertSourceAnchors(held.text)), knownLines);
+      const content = demoteHiddenInDetail(dropPlaceholderSections(convertSourceAnchors(held.text)), knownLines);
       const urls = bodyImageUrls(content);
       const unsafeUrls = new Map(
         urls.filter(url => !isHttps(url)).map(url => [url, noPicture(drive.config.language, "unsafe")])
@@ -1692,8 +1694,10 @@ export class BookPipelineRuns {
     // A rewrite that replaced the whole Detail drops the work records and the picture section: the card's earlier log lines, its latest proof record
     // (its lines are in `knownLines` by construction) and its `### 圖像` section come back; the next proof replaces the record.
     // The write-back's own log section (or an older Research notes section) is turned into the hidden callout first, the card's first write in the new form.
-    let carried = carryWorkLog(card.detail, normalizeWorkRecords(written.detail));
-    for (const record of extractProofRecords(card.detail).slice(-1)) carried = appendResearchNote(carried, record).text;
+    // Only the card's own earlier content (never what the author wrote this time) is turned into the hidden form.
+    const earlier = normalizeWorkRecords(card.detail);
+    let carried = carryWorkLog(earlier, hidePipelineLog(written.detail, new Set(workLogLines(earlier))));
+    for (const record of extractProofRecords(earlier).slice(-1)) carried = appendResearchNote(carried, record).text;
     // #12: an old Prompt (no picture plan) keeps the card's picture section; a card with a plan gets its pictures from the slots.
     if (slots === undefined) carried = carryImageSection(card.detail, carried);
     if (carried !== written.detail) {

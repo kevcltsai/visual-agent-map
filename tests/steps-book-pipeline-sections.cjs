@@ -25,8 +25,8 @@ test('appendResearchNote: an empty Detail gets just the hidden callout', () => {
   assert.ok(out.text.startsWith('> [!vam-book]- 研究備註\n'));
 });
 
-test('appendResearchNote: an older Research notes section is turned into the hidden callout (heading gone, own title kept), the record goes inside it, what follows stays', () => {
-  const first = sections.appendResearchNote('Lead\n\n### Research notes\n\n> [!note]- Research notes\n> old line\n\n### After\n\ntail', recordOf(1));
+test('normalizeWorkRecords then appendResearchNote: an older Research notes section is turned into the hidden callout (heading gone, own title kept), the record goes inside it, what follows stays (append itself never converts text)', () => {
+  const first = sections.appendResearchNote(sections.normalizeWorkRecords('Lead\n\n### Research notes\n\n> [!note]- Research notes\n> old line\n\n### After\n\ntail'), recordOf(1));
   assert.equal(first.appended, true);
   assert.equal(count(first.text, '[!vam-book]-'), 1, 'still one callout'); assert.ok(!first.text.includes('[!note]') && !first.text.includes('### Research notes'));
   assert.ok(first.text.startsWith('Lead\n\n> [!vam-book]- Research notes\n> old line'));
@@ -60,7 +60,7 @@ test('appendResearchNote: a heading-like line inside a fence or a callout is not
 });
 
 test('appendResearchNote: a record without a key is appended as it is (no dedupe), CRLF text keeps working', () => {
-  const out = sections.appendResearchNote('Lead\r\n\r\n### 研究備註\r\n\r\n> [!note]- 研究備註\r\n> old\r\n', recordOf(1));
+  const out = sections.appendResearchNote(sections.normalizeWorkRecords('Lead\r\n\r\n### 研究備註\r\n\r\n> [!note]- 研究備註\r\n> old\r\n'), recordOf(1));
   assert.equal(out.appended, true);
   assert.equal(count(out.text, '[!vam-book]-'), 1); assert.ok(!out.text.includes('### 研究備註'));
   assert.equal(sections.appendResearchNote('x', 'just text').appended, true);

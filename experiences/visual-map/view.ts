@@ -9799,6 +9799,8 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || !path || !this.hasBookPipeline()) return undefined;
     const read = readBookPipeline(this.map);
     if (read.kind !== "usable") return undefined;
+    // A card the owner added later is not in the book's order; the rerun would only fail with "missing".
+    if (!read.data.order.includes(node.id)) return undefined;
     const progress = this.plugin.getBookPipelineProgress(path);
     const phase = progress?.phase ?? read.data.phase;
     if (phase !== "gate2" && phase !== "done" && (gate2Only || phase !== "gate1")) return undefined;
@@ -12350,6 +12352,7 @@ export class VisualAgentMapView extends ItemView {
         if (rerunWhy) {
           rerun.disabled = true;
           rerun.setAttr("title", rerunWhy);
+          rerun.setAttr("aria-description", rerunWhy);
         }
       }
       if (note) {

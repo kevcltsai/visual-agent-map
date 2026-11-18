@@ -351,6 +351,13 @@ test('T3 card button: gate 2 and done book cards carry "重跑這張" in the too
   assert.equal(rerunButtons(plain.paint()).length, 0);
   assert.match(css, /\.vam-node-header > \.vam-node-rerun \{ display: inline-flex;[^}]*white-space: nowrap; \}/);
   assert.doesNotMatch(css, /vam-node-rerun[^{]*\{[^}]*display: none/);
+  assert.match(css, /\.vam-viewport\.is-zoomed-out \.vam-node-header > \.vam-node-rerun \{[^}]*position: absolute;[^}]*font-size: 0;[^}]*transform: scale\(calc\(0\.6 \/ var\(--vam-zoom, 1\)\)\);[^}]*transform-origin: right bottom;/);
+  withProgress({});
+  h.view.map.bookPipeline.order = [h.ids.root, h.ids.a];
+  const partial = rerunButtons(h.paint());
+  assert.equal(partial.length, 2, 'a card that is not in the book order has no rerun button');
+  assert.ok(partial.every(b => b.disabled === false || !b.disabled));
+  assert.equal(h.view.bookRerunWhy(h.view.map.nodes.find(n => n.id === h.ids.b), true), undefined, 'nor a right-click item');
 });
 
 test('T3 view close: no rerun clock is left on a one-second timer (the card chip of a rerun starts none)', async () => {

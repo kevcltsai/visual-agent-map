@@ -75711,6 +75711,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (!this.map || !path || !this.hasBookPipeline()) return void 0;
     const read = readBookPipeline(this.map);
     if (read.kind !== "usable") return void 0;
+    if (!read.data.order.includes(node.id)) return void 0;
     const progress = this.plugin.getBookPipelineProgress(path);
     const phase = (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : read.data.phase;
     if (phase !== "gate2" && phase !== "done" && (gate2Only || phase !== "gate1")) return void 0;
@@ -77987,6 +77988,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         if (rerunWhy) {
           rerun.disabled = true;
           rerun.setAttr("title", rerunWhy);
+          rerun.setAttr("aria-description", rerunWhy);
         }
       }
       if (note) {
@@ -94931,7 +94933,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node-header > .vam-node-rerun { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .vam-node-header > .vam-node-rerun .svg-icon { width: 12px; height: 12px; }
 .vam-node-header > .vam-node-rerun:disabled { opacity: 0.5; cursor: not-allowed; }
-.vam-viewport.is-zoomed-out .vam-node-header > .vam-node-rerun { font-size: 0; gap: 0; padding: 2px 6px; transform: scale(calc(0.8 / var(--vam-zoom, 1))); transform-origin: right center; }
+.vam-viewport.is-zoomed-out .vam-node-header > .vam-node-rerun { position: absolute; right: 4px; bottom: 4px; font-size: 0; gap: 0; padding: 2px 6px; transform: scale(calc(0.6 / var(--vam-zoom, 1))); transform-origin: right bottom; z-index: 2; }
 @keyframes vam-pulse { 50% { opacity: 0.35; } }
 @keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }
 /* Viewer-only parts: the pieces Obsidian would otherwise provide. */

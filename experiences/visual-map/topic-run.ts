@@ -1556,7 +1556,7 @@ export class TopicRuns {
                   authorize: guard.authorize,
                   finalize: guard.finalize
                     ? (content: string) => {
-                        const final = guard.finalize!(content);
+                        const final = guard.finalize(content);
                         if (final === null) refused = true;
                         return final;
                       }

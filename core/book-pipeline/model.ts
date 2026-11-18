@@ -20,6 +20,8 @@ export const DEFAULT_BUDGET_LIMIT = 300;
 export const MAX_STEP_ATTEMPTS = 3;
 /** The automatic redo one card may get (the program's own retry of the author step after a proofread named unmet points). */
 export const MAX_AUTO_FIXES = 1;
+/** How many cards (the first in reading order) the trial run before gate 1 covers. */
+export const TRIAL_SIZE = 3;
 export const STEPS = ["plan", "write", "proof"] as const;
 export type PipelineStep = (typeof STEPS)[number];
 
@@ -143,6 +145,8 @@ export interface BookPipelineData {
   autoRoles?: string[];
   /** Per card, how many automatic redos it has used (at most {@link MAX_AUTO_FIXES}). Absent = none (older data); an owner stop or reopen never resets it. */
   autoFixes?: Record<string, number>;
+  /** The trial cards (the first in reading order): only they run before gate 1, which shows their finished result. Absent = an older run: every card is planned before gate 1 as before. */
+  trial?: string[];
   budget: PipelineBudget;
   /** Raised by every owner stop; a step result carries the one it started under (absent = 0). */
   stopEpoch?: number;
@@ -195,6 +199,11 @@ function problem(raw: unknown): string | undefined {
     (!isObject(raw.autoFixes) || Object.values(raw.autoFixes).some(value => !isCount(value)))
   )
     return "autoFixes";
+  if (
+    raw.trial !== undefined &&
+    (!Array.isArray(raw.trial) || raw.trial.some(id => typeof id !== "string" || !(raw.order as string[]).includes(id)))
+  )
+    return "trial";
   if (!isObject(raw.budget) || !isCount(raw.budget.used) || !isCount(raw.budget.limit) || raw.budget.limit < 1)
     return "budget";
   if (raw.stopEpoch !== undefined && !isCount(raw.stopEpoch)) return "stopEpoch";

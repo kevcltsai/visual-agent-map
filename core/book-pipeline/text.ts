@@ -48,3 +48,10 @@ export function unescapeMarkdownText(text: string): string {
 export function hashText(text: string): string {
   return createHash("sha256").update(text.replace(/\r\n?/g, "\n")).digest("hex").slice(0, 16);
 }
+
+/** The first sentence of a text (up to and including its first `。！？` or `.!?` before a space or the end); the whole text when it has none. */
+export function firstSentence(text: string): string {
+  const line = text.replace(/\s+/g, " ").trim();
+  const match = /^.*?(?:[。！？]|[.!?](?=\s|$))/u.exec(line);
+  return match ? match[0] : line;
+}

@@ -13,6 +13,7 @@ import {
   FAILURE_CODE,
   MAX_AUTO_FIXES,
   MAX_STEP_ATTEMPTS,
+  TRIAL_SIZE,
   attemptsOf,
   emptyAttempts,
   type BookPipelineData,
@@ -80,6 +81,7 @@ export function newBookPipeline(input: {
     revisions: {},
     ...(input.staleStages?.length ? { pendingReset: [...input.staleStages] } : {}),
     ...(input.autoRoles?.length ? { autoRoles: [...input.autoRoles] } : {}),
+    trial: input.order.slice(0, TRIAL_SIZE),
     budget: { used: 0, limit: input.budgetLimit ?? DEFAULT_BUDGET_LIMIT },
     revision: 0,
     startedAt: input.now,
@@ -124,9 +126,18 @@ export function nextActions(
     const stage = stages[nodeId];
     if (stage === "needs-review" || stage === "checked") continue;
     const attempts = attemptsOf(data, nodeId);
-    // The stage a card needs a step for: planning phase only plans; writing phase plans leftovers, writes, proofs.
+    // The stage a card needs a step for: planning phase only plans (a run with a trial: only its trial cards, all the way to the proofread);
+    // writing phase plans leftovers, writes, proofs.
+    const trialCard = !!data.trial?.includes(nodeId);
+    if (data.phase === "planning" && data.trial && !trialCard) continue;
     const step: PipelineStep | null =
-      stage === undefined ? "plan" : data.phase === "planning" ? null : stage === "planned" ? "write" : "proof";
+      stage === undefined
+        ? "plan"
+        : data.phase === "planning" && !trialCard
+          ? null
+          : stage === "planned"
+            ? "write"
+            : "proof";
     if (!step) continue;
     if (attempts[step] >= MAX_STEP_ATTEMPTS) actions.push({ type: "mark_needs_review", nodeId, step });
     else actions.push({ type: step === "plan" ? "card_plan" : step === "write" ? "card_write" : "card_proof", nodeId });
@@ -148,10 +159,31 @@ export function advancePhase(data: BookPipelineData, stages: CardStages, now: st
     return next;
   }
   const all = (min: number): boolean => next.order.every(id => ranked(stages[id]) >= min);
-  if (next.phase === "planning" && next.globalPlanned && all(1)) next.phase = "gate1";
+  const trialDone = next.trial ? next.trial.every(id => ranked(stages[id]) >= 3) : all(1);
+  if (next.phase === "planning" && next.globalPlanned && trialDone) next.phase = "gate1";
   else if (next.phase === "writing" && all(3)) next.phase = "gate2";
   else return data;
   next.phaseStartedAt = now;
+  next.revision++;
+  return next;
+}
+
+/**
+ * The owner wants the trial cards again with the settings and models as they are now (gate 1 of a run with a trial): the run goes back
+ * to planning, the trial cards' counters (attempts, automatic redo) start over and their stages are cleared first. The whole-book plan
+ * stays. A no-op (same state) outside gate 1 or for a run without a trial.
+ */
+export function retryTrial(data: BookPipelineData, now: string): BookPipelineData {
+  if (data.phase !== "gate1" || data.status !== "running" || !data.trial?.length) return data;
+  const next = clone(data);
+  next.phase = "planning";
+  next.phaseStartedAt = now;
+  next.pendingReset = [...new Set([...(next.pendingReset ?? []), ...data.trial])];
+  for (const id of data.trial) {
+    next.attempts[id] = emptyAttempts();
+    next.revisions[id] = cardRevision(next, id) + 1;
+    if (next.autoFixes) delete next.autoFixes[id];
+  }
   next.revision++;
   return next;
 }
@@ -338,12 +370,13 @@ export function autoFixesOf(data: BookPipelineData, nodeId: string): number {
   return data.autoFixes?.[nodeId] ?? 0;
 }
 /**
- * The one automatic redo of a card's text (author step only: the plan and the checklist stay): allowed while the run is writing and the
+ * The one automatic redo of a card's text (author step only: the plan and the checklist stay): allowed while the run is writing (or the card is in the trial before gate 1) and the
  * card has not used it. The use is counted and the card's revision rises, so a proofread still in flight can no longer commit.
  * Not allowed: `accepted` is false and nothing changes. Attempts are not reset.
  */
 export function requestAutoFix(data: BookPipelineData, nodeId: string): Committed {
-  if (!data.order.includes(nodeId) || data.status !== "running" || data.phase !== "writing")
+  const inTrial = data.phase === "planning" && !!data.trial?.includes(nodeId);
+  if (!data.order.includes(nodeId) || data.status !== "running" || (data.phase !== "writing" && !inTrial))
     return { state: data, accepted: false };
   if (autoFixesOf(data, nodeId) >= MAX_AUTO_FIXES) return { state: data, accepted: false };
   // A card whose write or proof already used every attempt would only be marked needs-review ("write failed") without running.

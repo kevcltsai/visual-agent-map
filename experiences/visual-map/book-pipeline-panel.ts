@@ -1,18 +1,24 @@
-import type { TranslationKey } from "../../i18n";
 import { t } from "../../i18n";
-import { BOOK_SETTING_FIELDS, type BookSettingField, type PipelineStage } from "../../core/book-pipeline/model";
+import { type BookSettings, type BookSettingsPatch, type PipelineStage } from "../../core/book-pipeline/model";
+import { parseBookPlanBody } from "../../core/book-pipeline/plan-text";
+import { visibleDetail } from "../../core/book-pipeline/note-sections";
+import { firstSentence } from "../../core/book-pipeline/text";
+import { bookCardView, bookRefusalText, type BookCardInput } from "./book-pipeline-ui";
 import {
-  parseBookPlanBody,
-  parseBookPlanDecisions,
-  parseCardPrompt,
-  parseImageSlots
-} from "../../core/book-pipeline/plan-text";
-import { bookCardView, bookFailureText, bookRefusalText, type BookCardInput } from "./book-pipeline-ui";
-import type { CardPlanSummary } from "./book-pipeline-run";
+  bookSettingsPatch,
+  renderBookModelChoice,
+  renderBookSettingsFields,
+  type BookModelChoiceInput,
+  type BookSettingsFields,
+  type BookStartModels
+} from "./book-pipeline-start-modal";
 
 /**
- * Gate 1 side panel (04b): the book's thread and editorial decisions, one block per card with its plan, "say more about X" and the
- * confirm button. Every string from a note or the model is put on screen with textContent (createEl `text`, setText), never as markup.
+ * Gate 1 side panel: the trial screen. The book's one-sentence thread, the finished chapters of the trial run (their text and pictures,
+ * drawn by the Markdown renderer the view hands in), the whole-book settings and models folded away, and two buttons: run the whole
+ * book, or run the trial chapters again with the changed settings. A run without a trial (older data) shows the thread and the first
+ * button only. Every string from a note or the model is put on screen with textContent (createEl `text`, setText), never as markup;
+ * the chapter text goes through the renderer only.
  * The panel is drawn only for a map that has a usable `bookPipeline`; the view decides that before it calls anything here.
  */
 
@@ -24,107 +30,65 @@ export interface GateCardInput extends BookCardInput {
   detail?: string;
 }
 
-export interface GatePanelCard {
+export interface GatePanelTrialCard {
   id: string;
   index: number;
   title: string;
   stage: PipelineStage | "pending";
-  roleText?: string;
   issueText?: string;
-  /** The one plain line of the image plan: not arranged, none, or `n pictures: kind / what it explains`. */
-  imagePlan: string;
-  fields: { key: "covers" | "entry" | "handoff"; label: string; value: string }[];
-  /** When no labelled line could be read: the first three lines of the Prompt as they are. */
-  rawLines: string[];
+  /** The chapter as the reader sees it (without the hidden work records): text, pictures, sources. */
+  text: string;
 }
 
 export interface GatePanelData {
-  total: number;
-  planned: number;
-  needsReview: number;
+  /** The first sentence of the book thread ('' when the plan has none). */
   thread: string;
-  decisions: { label: string; value: string }[];
-  materialCount: number;
-  cards: GatePanelCard[];
+  /** The trial chapters in reading order; empty for a run without a trial. */
+  trial: GatePanelTrialCard[];
 }
-
-const FIELD_KEY: Record<BookSettingField, TranslationKey> = {
-  reader: "ui.book_field_reader",
-  goal: "ui.book_field_goal",
-  angle: "ui.book_field_angle",
-  tone: "ui.book_field_tone",
-  length: "ui.book_field_length",
-  style: "ui.book_field_style"
-};
 
 /** What the panel shows, from the real notes: `rootRaw` is the root note's whole file text, `order` the run's reading order. */
 export function buildGatePanel(input: {
   order: readonly string[];
+  /** The run's trial cards (absent for an older run). */
+  trial?: readonly string[];
   titleOf: (id: string) => string;
   noteOf: (id: string) => GateCardInput | undefined;
   rootRaw: string;
 }): GatePanelData {
   const plan = parseBookPlanBody(input.rootRaw);
-  const decided = parseBookPlanDecisions(input.rootRaw);
-  const cards = input.order.map((id, at): GatePanelCard => {
-    const note = input.noteOf(id);
-    const view = bookCardView(note ?? {});
-    const prompt = note?.prompt ?? "";
-    const parsed = parseCardPrompt(prompt);
-    const fields: GatePanelCard["fields"] = [];
-    if (parsed.covers) fields.push({ key: "covers", label: t("ui.book_panel_covers"), value: parsed.covers });
-    if (parsed.entry) fields.push({ key: "entry", label: t("ui.book_panel_entry"), value: parsed.entry });
-    if (parsed.handoff) fields.push({ key: "handoff", label: t("ui.book_panel_handoff"), value: parsed.handoff });
-    const rawLines = fields.length
-      ? []
-      : prompt
-          .split(/\r?\n/)
-          .filter(line => line.trim())
-          .slice(0, 3);
-    const slots = parseImageSlots(prompt);
-    const imagePlan = !slots
-      ? t("ui.book_panel_images_unarranged")
-      : slots.length
-        ? t("ui.book_panel_images_0_1", slots.length, slots.map(slot => `${slot.kind}／${slot.explains}`).join("；"))
-        : t("ui.book_panel_images_none");
-    return {
-      id,
-      index: at + 1,
-      title: input.titleOf(id),
-      stage: view.stage,
-      ...(view.roleText ? { roleText: view.roleText } : {}),
-      ...(view.issueText ? { issueText: view.issueText } : {}),
-      imagePlan,
-      fields,
-      rawLines
-    };
-  });
-  return {
-    total: cards.length,
-    planned: cards.filter(card => card.stage !== "pending").length,
-    needsReview: cards.filter(card => card.stage === "needs-review").length,
-    thread: plan.thread,
-    decisions: BOOK_SETTING_FIELDS.filter(field => decided[field]?.trim()).map(field => ({
-      label: t(FIELD_KEY[field]),
-      value: decided[field] as string
-    })),
-    materialCount: plan.materials.length,
-    cards
-  };
+  const trial = input.order
+    .filter(id => input.trial?.includes(id))
+    .map((id): GatePanelTrialCard => {
+      const note = input.noteOf(id);
+      const view = bookCardView(note ?? {});
+      return {
+        id,
+        index: input.order.indexOf(id) + 1,
+        title: input.titleOf(id),
+        stage: view.stage,
+        ...(view.issueText ? { issueText: view.issueText } : {}),
+        text: visibleDetail(note?.detail ?? "")
+      };
+    });
+  return { thread: firstSentence(plan.thread), trial };
 }
 
 /** What the panel remembers across the map's repaints (the repaint rebuilds the DOM; this is on the view). */
 export class GatePanelState {
   open = false;
-  /** The map's root note text, read when the panel is drawn (for the thread and the decisions). */
+  /** The map's root note text, read when the panel is drawn (for the thread), and the root topic's whole-book settings. */
   rootRaw = "";
-  /** Cards whose details (entry point, hand-off, "say more" box) are unfolded. */
-  readonly detailOpen = new Set<string>();
-  readonly drafts = new Map<string, string>();
+  settings: BookSettings = {};
+  /** Gate 1: the settings and models fold is open; what the owner typed in the fields (kept across repaints until a retry applies it). */
+  settingsOpen = false;
+  readonly settingDrafts = new Map<string, string>();
+  confirming = false;
+  retrying = false;
+  confirmError = "";
+  /** Gate 2: which cards are working, and the line under each (see panel2). */
   readonly busy = new Set<string>();
   readonly notes = new Map<string, { text: string; error: boolean }>();
-  confirming = false;
-  confirmError = "";
   /** Gate 2: cards whose proof record is unfolded, cards whose seam confirmation is running, and the "review finished" button. */
   readonly proofOpen = new Set<string>();
   readonly seaming = new Set<string>();
@@ -139,11 +103,13 @@ export class GatePanelState {
   reset(): void {
     this.open = false;
     this.rootRaw = "";
-    this.detailOpen.clear();
-    this.drafts.clear();
+    this.settings = {};
+    this.settingsOpen = false;
+    this.settingDrafts.clear();
     this.busy.clear();
     this.notes.clear();
     this.confirming = false;
+    this.retrying = false;
     this.confirmError = "";
     this.proofOpen.clear();
     this.seaming.clear();
@@ -170,23 +136,20 @@ export async function runTrackedRerun(
 }
 
 export interface GatePanelActions {
-  /** Opens the card's note at its `## Prompt`. */
-  editPlan: (nodeId: string) => void;
-  replan: (nodeId: string, instruction: string) => Promise<{ plan?: CardPlanSummary; reason?: string }>;
-  rerunPlan: (nodeId: string) => Promise<void>;
   confirm: () => Promise<void>;
+  /** Writes what the owner changed in the settings (possibly nothing), then runs the trial chapters again. */
+  retry: (patch: BookSettingsPatch) => Promise<void>;
+  /** Draws `markdown` into `el` (the view's Markdown renderer, whose component is unloaded when the panel is drawn again or closed). */
+  renderMarkdown: (el: HTMLElement, markdown: string) => void;
+  /** The root topic's whole-book settings and the model of each step, with the lists and where a pick is saved. */
+  settings: BookSettings;
+  models: BookStartModels;
+  modelChoice: Omit<BookModelChoiceInput, "models">;
   /** The "Chat" tab: closes this panel and opens the chat window. */
   showChat: () => void;
   close: () => void;
   /** Repaint the panel (its own DOM) from the current state. */
   refresh: () => void;
-}
-
-const REASON_CODES = new Set(["invalid_reply", "backup_failed", "discarded", "card_removed", "missing"]);
-function reasonText(reason: string): string {
-  if (reason === "budget") return t("ui.book_refused_budget");
-  if (reason === "cancelled") return t("ui.book_panel_cancelled");
-  return REASON_CODES.has(reason) ? bookFailureText(reason) : t("ui.book_fail_other");
 }
 
 /** The tab row (book panel / chat / close) and the Escape key, shared by both gate panels. */
@@ -221,63 +184,49 @@ export function renderGatePanel(
   data: GatePanelData,
   gate1: boolean,
   state: GatePanelState,
-  actions: GatePanelActions,
-  /** Cards the runner is working on right now (from its progress), shown busy like the ones this panel started. */
-  externalBusy: ReadonlySet<string> = new Set()
+  actions: GatePanelActions
 ): HTMLElement {
   const panel = parent.createDiv("vam-book-panel");
   panel.setAttr("role", "region");
   panel.setAttr("aria-label", t("ui.book_panel_label"));
   renderPanelTabs(panel, actions);
 
+  const hasTrial = data.trial.length > 0;
   const head = panel.createDiv("vam-book-panel-head");
-  const title = head.createEl("h3", { cls: "vam-book-panel-title", text: t("ui.book_panel_gate1_title") });
+  const title = head.createEl("h3", {
+    cls: "vam-book-panel-title",
+    text: t(hasTrial ? "ui.book_trial_title" : "ui.book_panel_gate1_title")
+  });
   title.setAttr("tabindex", "-1");
   if (!gate1) {
     panel.createDiv({ cls: "vam-book-panel-note", text: t("ui.book_panel_not_gate1") });
     return panel;
   }
-  head.createSpan({
-    cls: "vam-book-panel-tag",
-    text:
-      data.needsReview || data.planned < data.total
-        ? t("ui.book_panel_some_planned_0_1_2", data.planned, data.total, data.needsReview)
-        : t("ui.book_panel_all_planned_0", data.total)
-  });
 
   const plan = panel.createDiv("vam-book-panel-plan");
-  if (!data.thread && !data.decisions.length && !data.materialCount)
-    plan.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_plan_empty") });
   if (data.thread) {
     plan.createDiv({ cls: "vam-book-panel-thread-label", text: t("ui.book_gate1_thread_label") });
     plan.createDiv({ cls: "vam-book-panel-thread", text: data.thread });
-  }
-  if (data.decisions.length)
-    plan.createDiv({
-      cls: "vam-book-panel-decisions vam-book-panel-muted",
-      text: t("ui.book_panel_decisions_0", data.decisions.map(item => `${item.label}：${item.value}`).join("；"))
-    });
-  if (data.materialCount)
-    plan.createDiv({
-      cls: "vam-book-panel-materials vam-book-panel-muted",
-      text: t("ui.book_panel_materials_0", data.materialCount)
-    });
+  } else plan.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_plan_empty") });
 
-  const list = panel.createEl("ul", { cls: "vam-book-panel-cards" });
-  list.setAttr("aria-label", t("ui.book_panel_cards_label"));
-  for (const card of data.cards) renderCard(list, card, state, actions, externalBusy.has(card.id));
+  if (hasTrial) {
+    const list = panel.createEl("ul", { cls: "vam-book-trial-cards" });
+    list.setAttr("aria-label", t("ui.book_trial_cards_label"));
+    for (const card of data.trial) renderTrialCard(list, card, actions);
+    renderSettingsFold(panel, state, actions);
+  }
 
   const foot = panel.createDiv("vam-book-panel-foot");
-  foot.createSpan({ cls: "vam-book-panel-muted", text: t("ui.book_panel_hint") });
+  const working = state.confirming || state.retrying;
   const confirm = foot.createEl("button", {
     cls: "mod-cta vam-book-panel-confirm",
     text: state.confirming ? t("ui.book_panel_confirming") : t("ui.book_confirm_gate1")
   });
-  confirm.disabled = state.confirming;
+  confirm.disabled = working;
   if (state.confirming) confirm.setAttr("aria-busy", "true");
   confirm.addEventListener("click", event => {
     event.stopPropagation();
-    if (state.confirming) return;
+    if (working) return;
     state.confirming = true;
     state.confirmError = "";
     actions.refresh();
@@ -293,135 +242,80 @@ export function renderGatePanel(
       }
     );
   });
+  if (hasTrial) {
+    const retry = foot.createEl("button", {
+      cls: "vam-book-panel-retry",
+      text: state.retrying ? t("ui.book_panel_confirming") : t("ui.book_trial_retry")
+    });
+    retry.disabled = working;
+    if (state.retrying) retry.setAttr("aria-busy", "true");
+    retry.addEventListener("click", event => {
+      event.stopPropagation();
+      if (working) return;
+      const typed: Record<string, string> = {};
+      for (const [field, value] of state.settingDrafts) typed[field] = value;
+      const patch = bookSettingsPatch(actions.settings, typed);
+      state.retrying = true;
+      state.confirmError = "";
+      actions.refresh();
+      void actions.retry(patch).then(
+        () => {
+          state.retrying = false;
+          state.settingDrafts.clear();
+          actions.refresh();
+        },
+        error => {
+          state.retrying = false;
+          state.confirmError = bookRefusalText(error);
+          actions.refresh();
+        }
+      );
+    });
+  }
   const status = panel.createDiv({ cls: "vam-book-panel-status", text: state.confirmError });
   status.setAttr("role", "status");
   return panel;
 }
 
-function renderCard(
-  list: HTMLElement,
-  card: GatePanelCard,
-  state: GatePanelState,
-  actions: GatePanelActions,
-  external: boolean
-): void {
-  const busy = external || state.busy.has(card.id);
-  const item = list.createEl("li", { cls: "vam-book-panel-card" });
+function renderTrialCard(list: HTMLElement, card: GatePanelTrialCard, actions: GatePanelActions): void {
+  const item = list.createEl("li", { cls: "vam-book-trial-card" });
   item.dataset.stage = card.stage;
-  if (busy) item.setAttr("aria-busy", "true");
-  const head = item.createDiv("vam-book-panel-card-head");
-  if (card.roleText) head.createSpan({ cls: "vam-book-role", text: card.roleText });
-  head.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
-  const edit = head.createEl("button", { cls: "vam-book-panel-edit", text: t("ui.book_panel_edit_plan") });
-  edit.setAttr("aria-label", t("ui.book_panel_edit_plan_0", card.title));
-  edit.addEventListener("click", event => {
-    event.stopPropagation();
-    actions.editPlan(card.id);
+  const head = item.createDiv("vam-book-trial-card-head");
+  head.createEl("b", { cls: "vam-book-trial-card-title", text: t("ui.book_trial_card_0_1", card.index, card.title) });
+  const done = card.stage === "checked" || card.stage === "written";
+  head.createSpan({
+    cls: `vam-book-trial-pill ${done ? "is-ok" : "is-look"}`,
+    text: done ? t("ui.book_trial_done") : t("ui.book_trial_look")
   });
-  const covers = card.fields.find(field => field.key === "covers");
-  if (covers) item.createDiv({ cls: "vam-book-panel-field vam-book-panel-covers", text: covers.value });
-  else if (card.rawLines.length)
-    for (const line of card.rawLines) item.createDiv({ cls: "vam-book-panel-field is-raw", text: line });
-  else item.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_no_plan") });
-  item.createDiv({ cls: "vam-book-panel-muted vam-book-panel-images", text: card.imagePlan });
-  if (card.issueText) {
-    const issue = item.createDiv("vam-book-panel-issue");
-    issue.createSpan({ text: card.issueText });
-    const rerun = issue.createEl("button", { cls: "vam-book-panel-rerun", text: t("ui.book_panel_rerun_plan") });
-    rerun.setAttr("aria-label", t("ui.book_panel_rerun_plan_0", card.title));
-    rerun.disabled = busy;
-    rerun.addEventListener("click", event => {
-      event.stopPropagation();
-      if (state.busy.has(card.id)) return;
-      state.busy.add(card.id);
-      state.notes.delete(card.id);
-      actions.refresh();
-      void actions.rerunPlan(card.id).then(
-        () => finish(card.id, state, actions, undefined),
-        error => finish(card.id, state, actions, { text: bookRefusalText(error), error: true })
-      );
-    });
-  }
-  const open = state.detailOpen.has(card.id);
-  const toggle = item.createEl("button", { cls: "vam-book-panel-details-toggle", text: t("ui.book_gate1_details") });
-  toggle.setAttr("aria-expanded", String(open));
-  toggle.setAttr("aria-label", t("ui.book_gate1_details_0", card.title));
-  const details = item.createDiv("vam-book-panel-details");
-  details.setAttr("id", `vam-book-details-${card.id}`);
-  toggle.setAttr("aria-controls", `vam-book-details-${card.id}`);
-  details.hidden = !open;
-  toggle.addEventListener("click", event => {
-    event.stopPropagation();
-    const now = !state.detailOpen.has(card.id);
-    if (now) state.detailOpen.add(card.id);
-    else state.detailOpen.delete(card.id);
-    toggle.setAttr("aria-expanded", String(now));
-    details.hidden = !now;
-  });
-  for (const field of card.fields)
-    if (field.key !== "covers")
-      details.createDiv({ cls: "vam-book-panel-field", text: `${field.label}：${field.value}` });
-  const form = details.createDiv("vam-book-panel-more");
-  const input = form.createEl("input", { cls: "vam-book-panel-more-input", type: "text" });
-  input.dataset.card = card.id;
-  input.setAttr("aria-label", t("ui.book_panel_more_label_0", card.title));
-  input.setAttr("placeholder", t("ui.book_panel_more_placeholder"));
-  input.value = state.drafts.get(card.id) ?? "";
-  input.disabled = busy;
-  input.addEventListener("input", () => state.drafts.set(card.id, input.value));
-  const send = form.createEl("button", {
-    cls: "vam-book-panel-replan",
-    text: busy ? t("ui.book_panel_busy") : t("ui.book_panel_replan")
-  });
-  send.disabled = busy;
-  const submit = (): void => {
-    const instruction = (input.value ?? "").trim();
-    if (!instruction || state.busy.has(card.id)) return;
-    state.drafts.set(card.id, input.value);
-    state.busy.add(card.id);
-    state.notes.delete(card.id);
-    actions.refresh();
-    void actions.replan(card.id, instruction).then(
-      result =>
-        finish(
-          card.id,
-          state,
-          actions,
-          result.plan
-            ? { text: t("ui.book_panel_replanned"), error: false }
-            : { text: t("ui.book_panel_replan_failed_0", reasonText(result.reason ?? "cancelled")), error: true },
-          !!result.plan
-        ),
-      error => finish(card.id, state, actions, { text: bookRefusalText(error), error: true })
-    );
-  };
-  send.addEventListener("click", event => {
-    event.stopPropagation();
-    submit();
-  });
-  input.addEventListener("keydown", event => {
-    if (event.key !== "Enter" || event.isComposing) return;
-    event.preventDefault();
-    submit();
-  });
-  const note = state.notes.get(card.id);
-  const line = item.createDiv({
-    cls: "vam-book-panel-card-status",
-    text: busy ? t("ui.book_panel_busy") : (note?.text ?? "")
-  });
-  line.setAttr("role", note?.error ? "alert" : "status");
-  if (note?.error) line.addClass("is-error");
+  if (card.issueText && !done) item.createDiv({ cls: "vam-book-panel-issue", text: card.issueText });
+  const body = item.createDiv("vam-book-trial-text");
+  body.tabIndex = 0;
+  body.setAttr("role", "region");
+  body.setAttr("aria-label", t("ui.book_trial_text_label_0", card.title));
+  if (card.text) actions.renderMarkdown(body, card.text);
+  else body.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_trial_no_text") });
 }
 
-function finish(
-  id: string,
-  state: GatePanelState,
-  actions: GatePanelActions,
-  note: { text: string; error: boolean } | undefined,
-  clearDraft = false
-): void {
-  state.busy.delete(id);
-  if (note) state.notes.set(id, note);
-  if (clearDraft) state.drafts.delete(id);
-  actions.refresh();
+/** "Want to change something?" opens the six settings and the four models; a retry applies what was changed. */
+function renderSettingsFold(panel: HTMLElement, state: GatePanelState, actions: GatePanelActions): void {
+  const toggle = panel.createEl("button", { cls: "vam-book-trial-fold", text: t("ui.book_trial_fold") });
+  toggle.setAttr("aria-expanded", String(state.settingsOpen));
+  const body = panel.createDiv("vam-book-trial-settings vam-book-start-settings");
+  body.setAttr("id", "vam-book-trial-settings");
+  toggle.setAttr("aria-controls", "vam-book-trial-settings");
+  body.hidden = !state.settingsOpen;
+  toggle.addEventListener("click", event => {
+    event.stopPropagation();
+    state.settingsOpen = !state.settingsOpen;
+    toggle.setAttr("aria-expanded", String(state.settingsOpen));
+    body.hidden = !state.settingsOpen;
+  });
+  const fields: BookSettingsFields = renderBookSettingsFields(body, actions.settings);
+  for (const [field, area] of fields.areas) {
+    const draft = state.settingDrafts.get(field);
+    if (draft !== undefined) area.value = draft;
+    area.addEventListener("input", () => state.settingDrafts.set(field, area.value));
+  }
+  const choice = body.createDiv("vam-book-start-model-choice");
+  renderBookModelChoice(choice, { ...actions.modelChoice, models: actions.models });
 }

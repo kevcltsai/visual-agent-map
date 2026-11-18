@@ -2279,13 +2279,6 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-panel-plan { border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; }
 .vam-book-panel-thread-label { font-size: var(--font-ui-smaller); font-weight: 600; color: var(--text-muted); }
 .vam-book-panel-thread { font-size: var(--font-ui-medium); line-height: 1.5; color: var(--text-normal); overflow-wrap: anywhere; white-space: pre-wrap; }
-.vam-book-panel-field.vam-book-panel-covers { font-size: var(--font-ui-small); color: var(--text-normal); }
-.vam-book-panel-details-toggle { align-self: flex-start; padding: 0 4px; border: 0; background: transparent; box-shadow: none; color: var(--text-muted); font-size: var(--font-ui-smaller); }
-.vam-book-panel-details-toggle::after { content: " ▸"; }
-.vam-book-panel-details-toggle[aria-expanded="true"]::after { content: " ▾"; }
-.vam-book-panel-details-toggle:hover, .vam-book-panel-details-toggle[aria-expanded="true"] { color: var(--text-normal); }
-.vam-book-panel-details { display: flex; flex-direction: column; gap: 4px; }
-.vam-book-panel-details[hidden] { display: none; }
 .vam-book-panel-cards { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .vam-book-panel-card { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); }
 .vam-book-panel-card[data-stage="needs-review"] { border-color: var(--color-orange); }
@@ -2294,11 +2287,26 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-panel-card-title { flex: 1 1 120px; min-width: 0; overflow-wrap: anywhere; }
 .vam-book-panel-field { font-size: var(--font-ui-smaller); color: var(--text-muted); overflow-wrap: anywhere; white-space: pre-wrap; }
 .vam-book-panel-issue { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--font-ui-smaller); color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
-.vam-book-panel-more { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.vam-book-panel-more-input { flex: 1 1 140px; min-width: 0; }
 .vam-book-panel-card-status { min-height: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .vam-book-panel-card-status.is-error, .vam-book-panel-status { color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); font-size: var(--font-ui-smaller); }
 .vam-book-panel-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.vam-book-trial-cards { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.vam-book-trial-card { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); }
+.vam-book-trial-card[data-stage="needs-review"] { border-color: var(--color-orange); }
+.vam-book-trial-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.vam-book-trial-card-title { flex: 1 1 120px; min-width: 0; overflow-wrap: anywhere; }
+.vam-book-trial-pill { padding: 0 8px; border-radius: 10px; background: var(--background-secondary); color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-book-trial-pill.is-ok { color: var(--text-success); }
+.vam-book-trial-pill.is-look { color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
+.vam-book-trial-text { max-height: 360px; overflow-y: auto; padding: 4px 8px; border-radius: var(--radius-s); background: var(--background-secondary); overflow-wrap: anywhere; }
+.vam-book-trial-text img { max-width: 100%; height: auto; }
+.vam-book-trial-text:focus-visible, .vam-book-trial-fold:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-book-trial-fold { align-self: flex-start; padding: 0 4px; border: 0; background: transparent; box-shadow: none; color: var(--text-muted); }
+.vam-book-trial-fold::after { content: " ▸"; }
+.vam-book-trial-fold[aria-expanded="true"]::after { content: " ▾"; }
+.vam-book-trial-fold:hover, .vam-book-trial-fold[aria-expanded="true"] { color: var(--text-normal); }
+.vam-book-trial-settings { display: flex; flex-direction: column; gap: 4px; }
+.vam-book-trial-settings[hidden] { display: none; }
 .vam-book-bar-eta { color: var(--text-muted); font-size: var(--font-ui-smaller); font-variant-numeric: tabular-nums; }
 .vam-book-panel-state { display: inline-block; max-width: 100%; font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }
 .vam-book-panel-state::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }

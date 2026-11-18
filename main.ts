@@ -15,8 +15,7 @@ import { selectionOutputLanguage } from "./core/content-language";
 import {
   BookPipelineRuns,
   type BookPipelineProgress,
-  type BookRerunResult,
-  type CardPlanSummary
+  type BookRerunResult
 } from "./experiences/visual-map/book-pipeline-run";
 import { runPlanStep } from "./core/steps/book-pipeline/run";
 import { runProofread } from "./core/steps/book-pipeline/proofread";
@@ -1760,12 +1759,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   confirmBookGate1(mapPath: string): Promise<void> {
     return this.bookPipelineRuns.confirmGate1(mapPath);
   }
-  replanBookCard(
-    mapPath: string,
-    nodeId: string,
-    instruction: string
-  ): Promise<{ plan?: CardPlanSummary; reason?: string }> {
-    return this.bookPipelineRuns.replanCard(mapPath, nodeId, instruction);
+  retryBookTrial(mapPath: string): Promise<void> {
+    return this.bookPipelineRuns.retryTrial(mapPath);
   }
   rerunBookCard(
     mapPath: string,

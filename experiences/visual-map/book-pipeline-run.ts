@@ -37,6 +37,7 @@ import {
   resetCard,
   resumeRun,
   retryGlobalPlan,
+  retryTrial,
   stopRun,
   failRun,
   type PipelineAction,
@@ -314,8 +315,6 @@ export function stepCounts(
     proof: counts.checked + (review.settled ? reviewed : 0)
   };
 }
-/** What a single-card replan returns for the panel (the brief just written). */
-export type CardPlanSummary = Pick<CardPlanResult, "covers" | "entry" | "handoff" | "previous" | "next" | "checklist">;
 /** At least this many finished cards before the estimate is shown. */
 export const ETA_MIN_CARDS = 5;
 type StepResult = "ok" | "failed" | "cancelled" | "budget" | "dropped" | "none";
@@ -352,9 +351,9 @@ interface Drive {
   disposed: boolean;
   /** Set by a single-card rerun: runs instead of the loop, and a stop or error does not pause the run's phase. */
   job?: () => Promise<void>;
-  /** The owner's one-line extra request for a card's plan (single-card replan), or the program's source-swap line (plan and author). */
+  /** The program's extra request line for a card (source swap or automatic redo). */
   extra: Map<string, string>;
-  /** Cards whose `extra` line is a source swap: the author gets it too (an owner's replan line is for the plan only). */
+  /** Cards whose `extra` line is a source swap: the author gets it too. */
   avoid: Set<string>;
   /** Cards whose proofread named unmet points, waiting for the one automatic redo once every card has had its first round: the program-built request line. */
   fixable: Map<string, string>;
@@ -392,7 +391,6 @@ const internalCode = (error: unknown): string =>
 const NO_FAILURE_SECTION: ReadonlySet<string> = new Set(["discarded", "card_removed", "backup_failed", "missing"]);
 const STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" } as const;
 const ACTION_OF = { plan: "card_plan", write: "card_write", proof: "card_proof" } as const;
-const MAX_INSTRUCTION = 300;
 const singleLineText = (value: string, max: number): string =>
   Array.from(value.replace(/\s+/g, " ").trim()).slice(0, max).join("");
 
@@ -850,49 +848,36 @@ export class BookPipelineRuns {
   }
 
   /**
-   * Gate 1 only: rewrites one card's plan from the owner's one-line request ("say more about his manuscript"), with the whole-book
-   * thread and the neighbours' summaries as for every plan. Only this card's brief (`## Prompt`) and summary change; the cards on
-   * both sides are marked as seams to check. Resolves with the new brief, or with the reason it was not replanned (the card keeps
-   * its old brief unless the plan step itself marked it needs-review after three failed attempts).
+   * Gate 1 of a run with a trial: the owner changed the settings or models and wants the trial cards again. The run goes back to
+   * planning, only the trial cards start over (stage, attempts, automatic redo, their own pictures are free to use again), and the
+   * drive runs them through plan, write, pictures and proofread to gate 1 again. Refused (not_gate1) at any other phase or for a run
+   * without a trial.
    */
-  async replanCard(
-    mapPath: string,
-    nodeId: string,
-    instruction: string
-  ): Promise<{ plan?: CardPlanSummary; reason?: string }> {
-    const line = singleLineText(instruction, MAX_INSTRUCTION);
-    if (!line) throw new BookPipelineRunError("instruction");
-    let result: { plan?: CardPlanSummary; reason?: string } = {};
-    await this.cardJob(
+  async retryTrial(mapPath: string): Promise<void> {
+    return this.enter(
       mapPath,
-      nodeId,
-      ["gate1"],
-      "not_gate1",
-      () => ["plan"],
-      line,
-      drive => {
-        const plan = drive.plans.get(nodeId);
-        result = plan
-          ? {
-              plan: {
-                covers: plan.covers,
-                entry: plan.entry,
-                handoff: plan.handoff,
-                previous: plan.previous,
-                next: plan.next,
-                checklist: plan.checklist
-              }
-            }
-          : {
-              reason: drive.reasons.get(nodeId) ?? (drive.store.state.pauseReason === "budget" ? "budget" : "cancelled")
-            };
-      }
+      async drive => {
+        await this.openSaved(drive, mapPath);
+        let moved = false;
+        await drive.store.commit(state => {
+          const next = retryTrial(resumeRun(state) ?? state, this.ports.now());
+          moved = next.phase !== state.phase;
+          return { state: moved ? next : state, accepted: true };
+        });
+        if (!moved) throw new BookPipelineRunError("not_gate1");
+        for (const id of drive.store.state.trial ?? []) {
+          const own = drive.cards.get(id);
+          const current = own ? await this.ports.readCard(own.path).catch(() => undefined) : undefined;
+          if (current) for (const url of bodyImageUrls(current.detail)) drive.usedImages.delete(imageKey(url));
+        }
+        this.log(drive, "gate1", "-", "plan", "trial_retry");
+      },
+      true
     );
-    return result;
   }
 
   /**
-   * One card again. Gate 1: the plan only. Gate 2 or done: plan, author, proofread with the usual per-step retries, fence, backup and
+   * One card again (gate 2 or done): plan, author, proofread with the usual per-step retries, fence, backup and
    * budget rules; the card gets a new revision (so a new proof record; older records stay, marked old). The cards on both sides are
    * not touched except for the seam mark. The run's phase does not change, and it cannot run beside another drive of the map.
    */
@@ -906,9 +891,9 @@ export class BookPipelineRuns {
     await this.cardJob(
       mapPath,
       nodeId,
-      ["gate1", "gate2", "done"],
+      ["gate2", "done"],
       "not_gate",
-      phase => (phase === "gate1" ? ["plan"] : ["plan", "write", "proof"]),
+      () => ["plan", "write", "proof"],
       swap ? avoidSourcesInstruction(options.avoidSources ?? []) : undefined,
       (drive, snapshots) => {
         // A stopped, replaced or removed run says nothing about the result.
@@ -957,7 +942,7 @@ export class BookPipelineRuns {
     steps: (phase: PipelinePhase) => PipelineStep[],
     extra?: string,
     finish?: (drive: Drive, snapshots?: { before?: CardResultSnapshot; after?: CardResultSnapshot }) => void,
-    /** A rerun (not a replan): its time is shown, and the card's result is compared before and after. */
+    /** A rerun: its time is shown, and the card's result is compared before and after. */
     track = false,
     /** The extra line is the program's source swap: the author gets it too. */
     swap = false

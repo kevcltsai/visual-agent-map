@@ -185,6 +185,7 @@ import {
   type ContentLanguage
 } from "../../i18n";
 import {
+  Component,
   FileSystemAdapter,
   MarkdownRenderer,
   ItemView,
@@ -564,7 +565,7 @@ import {
 } from "./outline-import-modal";
 import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal } from "./multi-research-modal";
-import { BOOK_SUGGEST_TIMEOUT_MS, BookStartModal } from "./book-pipeline-start-modal";
+import { BOOK_SUGGEST_TIMEOUT_MS, BookStartModal, type BookModelChoiceInput } from "./book-pipeline-start-modal";
 import { BookFinishModal } from "./book-pipeline-finish-modal";
 import { bookRerunMenuReason } from "./book-pipeline-rerun";
 import { chatResearchReferenceGroups, type ResearchRequestWithReferences } from "./chat-research-sources";
@@ -3054,6 +3055,7 @@ export class VisualAgentMapView extends ItemView {
     this.researchElapsed.clear();
     this.bookAuthoring.clear();
     this.bookPanel.reset();
+    this.unloadBookTrialMarkdown();
     this.bookSideEl = null;
     this.researchSigs.clear();
     this.taskPreviewEls.clear();
@@ -17174,6 +17176,7 @@ export class VisualAgentMapView extends ItemView {
       this.bookGateHandled.add(`${progress?.runId ?? read.data.runId}:${progress?.phase ?? read.data.phase}`);
     }
     this.bookPanel.open = false;
+    this.unloadBookTrialMarkdown();
     this.bookPanel.pendingFocus = "opener";
     if (this.bookChatWasOpen) this.withChatForced(() => this.chat?.setOpen(true));
     this.bookChatWasOpen = false;
@@ -17182,6 +17185,7 @@ export class VisualAgentMapView extends ItemView {
   /** The panel's "Chat" tab: the panel closes and the chat window opens with the keyboard in its message field. */
   private showChatFromBookPanel(): void {
     this.bookPanel.open = false;
+    this.unloadBookTrialMarkdown();
     this.bookPanel.pendingFocus = null;
     this.bookChatWasOpen = false;
     this.render();
@@ -17207,6 +17211,7 @@ export class VisualAgentMapView extends ItemView {
         if (!this.closed && this.bookPanel.open && !this.bookPanelHasContent()) this.closeBookPanel();
       });
     if (!this.bookPanel.open || !this.bookPanelPath) {
+      this.unloadBookTrialMarkdown();
       // The panel just closed (button, Escape): the keyboard goes back to the toolbar button that opened it.
       if (this.bookPanel.pendingFocus === "opener")
         this.contentEl.querySelector<HTMLElement>(".vam-book-panel-toggle")?.focus();
@@ -17241,7 +17246,7 @@ export class VisualAgentMapView extends ItemView {
     const held = doc?.activeElement as HTMLElement | null;
     const heldCard = held && side.contains(held) ? (held.dataset?.card ?? null) : null;
     const heldAct = heldCard ? (held?.dataset?.act ?? null) : null;
-    const draftCaret = heldCard ? ((held as HTMLInputElement).selectionStart ?? null) : null;
+    this.unloadBookTrialMarkdown();
     side.empty();
     const progress = this.plugin.getBookPipelineProgress(path);
     const phase = progress?.phase ?? read.data.phase;
@@ -17255,50 +17260,64 @@ export class VisualAgentMapView extends ItemView {
     }
     const data = buildGatePanel({
       order: read.data.order,
+      ...(read.data.trial ? { trial: read.data.trial } : {}),
       titleOf: id => this.notes.get(id)?.title ?? map.nodes.find(node => node.id === id)?.path ?? id,
       noteOf: id => this.notes.get(id),
       rootRaw: this.bookPanel.rootRaw
     });
     const state = this.bookPanel;
-    renderGatePanel(
-      side,
-      data,
-      true,
-      state,
-      {
-        editPlan: id => void this.openBookPlan(id),
-        replan: async (id, instruction) => {
-          try {
-            return await this.plugin.replanBookCard(path, id, instruction);
-          } finally {
-            await this.rereadBookCard(id);
-          }
-        },
-        rerunPlan: async id => {
-          try {
-            await this.plugin.rerunBookCard(path, id);
-          } finally {
-            await this.rereadBookCard(id);
-          }
-        },
-        confirm: () => this.plugin.confirmBookGate1(path),
-        showChat: () => this.showChatFromBookPanel(),
-        close: () => this.closeBookPanel(),
-        refresh: () => this.paintBookPanel()
+    const settings = this.plugin.settings;
+    const root = map.nodes.find(node => !node.parentId);
+    renderGatePanel(side, data, true, state, {
+      confirm: () => this.plugin.confirmBookGate1(path),
+      retry: async patch => {
+        // A chat chain holding the map refuses before anything is written; only the changed fields are written, to the root topic.
+        if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");
+        if (root && Object.keys(patch).length) await this.plugin.repo.writeBookSettings(root.path, patch);
+        await this.plugin.retryBookTrial(path);
       },
-      new Set(progress?.busyCards ?? [])
-    );
-    if (heldCard) {
-      const input = Array.from(side.querySelectorAll<HTMLInputElement>(".vam-book-panel-more-input")).find(
-        item => item.dataset.card === heldCard
-      );
-      input?.focus();
-      if (input && draftCaret !== null) input.setSelectionRange?.(draftCaret, draftCaret);
-    }
+      renderMarkdown: (el, markdown) => {
+        const component = this.bookTrialMarkdown ?? new Component();
+        if (!this.bookTrialMarkdown) {
+          component.load();
+          this.bookTrialMarkdown = component;
+        }
+        void MarkdownRenderer.render(this.app, markdown, el, root?.path ?? "", component);
+      },
+      settings: state.settings,
+      models: {
+        plan: settings.bookPlanModel,
+        write: settings.bookWriteModel,
+        images: settings.bookImageModel,
+        proof: settings.bookProofModel
+      },
+      modelChoice: this.bookModelChoice(),
+      showChat: () => this.showChatFromBookPanel(),
+      close: () => this.closeBookPanel(),
+      refresh: () => this.paintBookPanel()
+    });
     if (state.pendingFocus === "title") side.querySelector<HTMLElement>(".vam-book-panel-title")?.focus();
     else if (state.pendingFocus === "opener")
       this.contentEl.querySelector<HTMLElement>(".vam-book-panel-toggle")?.focus();
     state.pendingFocus = null;
+  }
+  /** The Markdown renderer's owner for the trial chapters: unloaded whenever the panel is drawn again or closes, so nothing it made stays alive. */
+  private bookTrialMarkdown: Component | null = null;
+  private unloadBookTrialMarkdown(): void {
+    this.bookTrialMarkdown?.unload();
+    this.bookTrialMarkdown = null;
+  }
+  /** The lists, labels and save of the four model dropdowns (the start card and the trial screen share them with the settings page). */
+  private bookModelChoice(): Omit<BookModelChoiceInput, "models"> {
+    return {
+      options: () => this.plugin.availableModels(),
+      label: model => this.plugin.modelLabel(model),
+      // The picks are the same settings as the settings page; they apply from this run on.
+      onChange: (key, model) => {
+        this.plugin.settings[key] = model;
+        void this.plugin.saveSettings();
+      }
+    };
   }
   /** Gate 2 (and done): the review panel. Actions reread the card's note afterwards so the rows show the new stage. */
   private paintBookGate2(
@@ -17400,8 +17419,11 @@ export class VisualAgentMapView extends ItemView {
     const file = root ? this.app.vault.getAbstractFileByPath(root.path) : null;
     if (!(file instanceof TFile)) return;
     const raw = await this.app.vault.read(file).catch(() => "");
-    if (this.closed || !this.bookSideEl || raw === this.bookPanel.rootRaw) return;
+    const settings = (await this.plugin.repo.readNote(file.path).catch(() => null))?.bookSettings ?? {};
+    if (this.closed || !this.bookSideEl) return;
+    if (raw === this.bookPanel.rootRaw && JSON.stringify(settings) === JSON.stringify(this.bookPanel.settings)) return;
     this.bookPanel.rootRaw = raw;
+    this.bookPanel.settings = settings;
     this.paintBookPanel();
   }
   /** After a replan or rerun: this card's note is read again so the panel shows the new plan without waiting for the repaint. */
@@ -17410,22 +17432,6 @@ export class VisualAgentMapView extends ItemView {
     if (!node || this.closed) return;
     const note = await this.plugin.repo.readNote(node.path).catch(() => null);
     if (note && !this.closed) this.notes.set(id, note);
-  }
-  /** "Edit plan": the card's note opens in a tab at its `## Prompt` section. */
-  private async openBookPlan(id: string): Promise<void> {
-    const node = this.map?.nodes.find(item => item.id === id);
-    const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
-    if (!(file instanceof TFile)) {
-      new Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
-      return;
-    }
-    const text = await this.app.vault.read(file).catch(() => "");
-    const line = text.split(/\r?\n/).findIndex(item => /^##[ \t]+Prompt[ \t]*$/.test(item));
-    try {
-      await this.app.workspace.getLeaf("tab").openFile(file, line >= 0 ? { eState: { line } } : undefined);
-    } catch (error) {
-      new Notice(error instanceof Error ? error.message : String(error));
-    }
   }
   /** Runs a runner entry (these resolve when the drive ends, except confirmGate1: once writing has begun); a refusal becomes a notice, and the map repaints either way. */
   private bookEntry(entry: () => Promise<void>): Promise<void> {
@@ -17477,15 +17483,7 @@ export class VisualAgentMapView extends ItemView {
         images: settings.bookImageModel,
         proof: settings.bookProofModel
       },
-      modelChoice: {
-        options: () => this.plugin.availableModels(),
-        label: model => this.plugin.modelLabel(model),
-        // The picks are the same settings as the settings page; they apply from this run on.
-        onChange: (key, model) => {
-          this.plugin.settings[key] = model;
-          void this.plugin.saveSettings();
-        }
-      },
+      modelChoice: this.bookModelChoice(),
       settings: rootNote?.bookSettings ?? {},
       onClose: () => {
         window.clearTimeout(suggestTimer);

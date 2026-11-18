@@ -134,6 +134,11 @@ function withoutHiddenCallouts(lines: string[]): string[] {
   return lines.filter((_, i) => !ranges.some(range => i >= range.start && i < range.end));
 }
 
+/** A Detail as the reader sees it: without the hidden work-record callouts (the chapter text, its pictures and sources stay). */
+export function visibleDetail(detail: string): string {
+  return withoutHiddenCallouts(detail.split("\n")).join("\n").trim();
+}
+
 /** Per line: true where the pipeline keeps its work records: the body of an older Research notes section and every hidden callout. */
 function recordLines(lines: string[], fenced: boolean[]): boolean[] {
   const mask = lines.map(() => false);

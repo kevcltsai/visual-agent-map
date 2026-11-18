@@ -819,6 +819,9 @@ function calloutSection(title: string, value: string, type = "info"): string {
 const previewSection = (content: string): string =>
   [...new Set([section(content, "Preview"), section(content, "預覽")].filter(Boolean))].join("\n\n");
 
+// Only the sections a book card writes as a callout (Prompt, Preview) end at its hidden callout, and only in the exact `vam-book` spelling: a note
+// that is no book card keeps every other section whole (the section text here has no frontmatter, so the card type is not known).
+const HIDDEN_AFTER: ReadonlySet<NoteSection> = new Set<NoteSection>(["Prompt", "Preview", "預覽"]);
 function sectionBounds(content: string, heading: NoteSection): { start: number; end: number } | null {
   if (heading === "Detail") {
     const managedStart = content.indexOf(DETAIL_START),
@@ -832,7 +835,7 @@ function sectionBounds(content: string, heading: NoteSection): { start: number; 
   const next = /^## .+$/m.exec(content.slice(start));
   const reference = content.indexOf(REFERENCE_START, start);
   // A hidden work-record callout (`> [!vam-book]- ...`, the proofread result) after a section is no part of it: Preview and Prompt callouts were turned into `## ` sections before.
-  const hidden = /^> \[!vam-book\]/im.exec(content.slice(start));
+  const hidden = HIDDEN_AFTER.has(heading) ? /^> \[!vam-book\]/m.exec(content.slice(start)) : null;
   const candidates = [
     next ? start + next.index : content.length,
     reference >= 0 ? reference : content.length,

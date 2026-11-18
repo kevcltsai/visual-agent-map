@@ -106,6 +106,24 @@ function hiddenRanges(lines: string[], fenced: boolean[]): { start: number; end:
   return found;
 }
 
+/**
+ * Every hidden callout of `text` with a line that is not in `known` (the lines the card held before the author ran) becomes a visible
+ * `[!note]` callout: a block the author wrote is model text, so it stays in the chapter text and the proofreading sees it.
+ */
+export function demoteForeignHidden(text: string, known: ReadonlySet<string>): string {
+  const lines = text.split("\n");
+  const trimmed = new Set(Array.from(known, line => bare(line).trimEnd()));
+  let changed = false;
+  for (const range of hiddenRanges(lines, fencedLines(lines))) {
+    let own = true;
+    for (let i = range.start; i < range.end; i++) if (!trimmed.has(bare(lines[i]).trimEnd())) own = false;
+    if (own) continue;
+    lines[range.start] = lines[range.start].replace(/\[!vam-book\]/i, "[!note]");
+    changed = true;
+  }
+  return changed ? lines.join("\n") : text;
+}
+
 /** A text without its hidden callouts (the pipeline's work records are no chapter text). */
 function withoutHiddenCallouts(lines: string[]): string[] {
   const ranges = hiddenRanges(lines, fencedLines(lines));
@@ -378,18 +396,16 @@ export function extractProofRecords(detail: string): string[] {
   const lines = detail.split("\n");
   const mask = recordLines(lines, fencedLines(lines));
   const records: string[] = [];
-  let current: string[] = [];
-  for (const [at, line] of lines.entries()) {
-    if (!mask[at]) {
-      current = [];
-      continue;
-    }
-    if (CALLOUT_HEAD.test(line.replace(/\r$/, ""))) continue;
-    const plain = unquoted(line).replace(/\r$/, "");
-    if (RECORD_KEY.test(plain.trim())) {
-      records.push([...current, plain.trim()].join("\n"));
-      current = [];
-    } else if (plain.trim() || current.length) current.push(plain);
+  const plain = lines.map((line, i) => (mask[i] ? unquoted(line).replace(/\r$/, "") : ""));
+  for (let k = 0; k < plain.length; k++) {
+    if (!mask[k] || !RECORD_KEY.test(plain[k].trim())) continue;
+    // Only the record's own lines (the machine line, its item lines and its readable first line: the range `replaceResearchRecord` deletes);
+    // the log lines and escaped lines before it are not part of the record.
+    const own = [plain[k].trim()];
+    let j = k - 1;
+    while (j >= 0 && mask[j] && PROOF_ITEM_LINE.test(plain[j])) own.unshift(plain[j--]);
+    if (j >= 0 && mask[j] && PROOF_HEADER.test(plain[j].trim())) own.unshift(plain[j].trim());
+    records.push(own.join("\n"));
   }
   return records;
 }

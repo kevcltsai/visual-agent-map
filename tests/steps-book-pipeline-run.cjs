@@ -9,7 +9,7 @@ const { BudgetExhaustedError } = S.load('core/admission.ts');
 const { readBookPipeline } = S.load('core/book-pipeline/model.ts');
 const { cardRevision } = S.load('core/book-pipeline/machine.ts');
 const { proofKey, evaluateProof, composeProofRecord } = S.load('core/book-pipeline/proof.ts');
-const { findStoredProof, withoutResearchNotes, appendResearchNote, dropPlaceholderSections, markOldProofRecords } = S.load('core/book-pipeline/note-sections.ts');
+const { findStoredProof, withoutResearchNotes, chapterBody, appendResearchNote, dropPlaceholderSections, markOldProofRecords } = S.load('core/book-pipeline/note-sections.ts');
 const { parseChecklist } = S.load('core/book-pipeline/plan-text.ts');
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -1118,4 +1118,19 @@ test('progress (memory only): current walks write, images, proof; steps end 3/3/
   assert.equal(/"current"|"steps"/.test(r.mapRaw()), false, 'the map file keeps its shape');
   const filed = (await r.repo.readMap(r.mapPath)).bookPipeline;
   assert.equal('current' in filed, false); assert.equal('steps' in filed, false);
+});
+
+test('write: a hidden callout the author wrote is saved as a visible note (its text stays in the chapter text); the sources the author wrote survive the write', async () => {
+  const r = await rig({ script: { author: async input => {
+    await input.admission.reserve(); const note = await r.repo.readNote(input.path);
+    const text = `${bodyOf(note.title)}\n\n> [!vam-book]- 備註\n> 被藏起來的文字 SPAM\n\n第二段。\n\n### 來源\n\n- [S](https://s.example/a)\n`;
+    await r.repo.updateNoteGuarded(input.path, { detail: text }, { authorize: input.authorize, finalize: input.finalize });
+    return { outcome: 'written' };
+  } } });
+  await r.runs.start(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
+  const detail = (await r.note(1)).detail;
+  assert.ok(!detail.includes('[!vam-book]- 備註') && detail.includes('[!note]- 備註'), 'the forged block is a visible note');
+  assert.ok(chapterBody(detail).includes('SPAM'), 'the proofreading input sees the text');
+  assert.ok(detail.includes('### 來源') && detail.includes('[S](https://s.example/a)'), 'the sources the author wrote are kept');
 });

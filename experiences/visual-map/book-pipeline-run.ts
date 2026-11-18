@@ -57,6 +57,7 @@ import {
 import {
   appendResearchNote,
   carryWorkLog,
+  demoteForeignHidden,
   findStoredProof,
   findStoredProofModels,
   extractProofRecords,
@@ -1638,7 +1639,7 @@ export class BookPipelineRuns {
       const held = holdProofLines(original, knownLines);
       const restore = held.restore;
       // R1-6: anchors become markdown links first; the picture scan and the cleaning then run on the final text. Placeholder sections go.
-      const content = dropPlaceholderSections(convertSourceAnchors(held.text));
+      const content = demoteForeignHidden(dropPlaceholderSections(convertSourceAnchors(held.text)), knownLines);
       const urls = bodyImageUrls(content);
       const unsafeUrls = new Map(
         urls.filter(url => !isHttps(url)).map(url => [url, noPicture(drive.config.language, "unsafe")])

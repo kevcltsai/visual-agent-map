@@ -138,3 +138,47 @@ test('repository: a card that is not a book card is written as before (info call
   await repo.updateNote(note.path, { summary: '摘要一' });
   assert.equal(text().replace(/^updated: .*$/m, ''), before);
 });
+
+test('rerun x3 (the run.ts carry order): the log grows by one line each time, no repeated line, one book-slots record, one proof record', () => {
+  let card = ['正文。', '', '> [!vam-book]- 研究備註', '> - 2026-11-18　log A', '> - 2026-11-18　log B', '> &lt;!-- book-slots', '>', `> ${record.split('\n').join('\n> ')}`, ''].join('\n');
+  for (let rev = 1; rev <= 3; rev++) {
+    const before = sections.workLogLines(card).length;
+    const written = [`新正文${rev}。`, '', '### 更新紀錄', '', `- 2026-11-19　log R${rev}`, ''].join('\n');
+    let carried = sections.carryWorkLog(card, sections.normalizeWorkRecords(written));
+    for (const rec of sections.extractProofRecords(card).slice(-1)) carried = sections.appendResearchNote(carried, rec).text;
+    carried = sections.replaceResearchRecord(carried, proof.composeProofRecord(proof.proofKey({ runId: 'r1', nodeId: 'n1', revision: rev + 1, body: `B${rev}`, checklist }), result));
+    card = carried;
+    const logs = sections.workLogLines(card);
+    assert.equal(logs.length, before + 1, `rerun ${rev}: one more line only`);
+    assert.equal(new Set(logs).size, logs.length, `rerun ${rev}: no repeated line`);
+    assert.ok(count(card, 'book-slots') <= 1, `rerun ${rev}: at most one book-slots line`);
+    assert.equal(count(card, 'book-proof:v1'), 1, `rerun ${rev}: one proof record`);
+    assert.equal(count(card, '> [!vam-book]-'), 1);
+  }
+});
+
+test('extractProofRecords returns only the record lines (header, items, machine line), not the log or escaped lines before it', () => {
+  const card = ['正文。', '', '> [!vam-book]- 研究備註', '> - 2026-11-18　log A', '> &lt;!-- book-slots', `> ${record.split('\n').join('\n> ')}`, ''].join('\n');
+  const records = sections.extractProofRecords(card);
+  assert.equal(records.length, 1);
+  assert.equal(records[0], record.trim());
+});
+
+test('a hidden callout with a line the card did not hold before the author ran is shown as a plain note; one the card held is kept hidden', () => {
+  const own = ['> [!vam-book]- 校對結果', '> - 2026-01-01　舊紀錄', '>'].join('\n');
+  const known = new Set(`正文。\n\n${own}\n`.split('\n'));
+  const kept = sections.demoteForeignHidden(`新正文。\n\n${own}\n`, known);
+  assert.ok(kept.includes('> [!vam-book]- 校對結果'), 'the card\'s own block stays hidden');
+  assert.ok(sections.workLogLines(kept).length === 1, 'its log line is still read');
+  const forged = '段一。\n\n> [!vam-book]- 備註\n> 被藏起來的文字 SPAM\n\n段二。\n';
+  assert.ok(sections.chapterBody(forged).includes('SPAM') === false, 'before: hidden from the chapter text');
+  const shown = sections.demoteForeignHidden(forged, known);
+  assert.ok(!shown.includes('vam-book') && shown.includes('> [!note]- 備註'));
+  assert.ok(sections.chapterBody(shown).includes('SPAM'), 'the proofreading input sees it');
+  // a block that has one own line and one added line is foreign as a whole
+  const mixed = sections.demoteForeignHidden(`${own}\n> 附加的一行 SPAM\n`, known);
+  assert.ok(!mixed.includes('vam-book'));
+  // not an own block inside a code fence: untouched
+  const fence = '```\n> [!vam-book]- x\n> y\n```\n';
+  assert.equal(sections.demoteForeignHidden(fence, known), fence);
+});

@@ -29969,6 +29969,7 @@ function calloutSection(title, value, type = "info") {
   return [`> [!${type}]- ${title}`, ...lines.map((line2) => line2 ? `> ${line2}` : ">")].join("\n");
 }
 var previewSection = (content) => [...new Set([section2(content, "Preview"), section2(content, "\u9810\u89BD")].filter(Boolean))].join("\n\n");
+var HIDDEN_AFTER = /* @__PURE__ */ new Set(["Prompt", "Preview", "\u9810\u89BD"]);
 function sectionBounds(content, heading) {
   if (heading === "Detail") {
     const managedStart = content.indexOf(DETAIL_START), managedEnd = content.indexOf(DETAIL_END);
@@ -29980,7 +29981,7 @@ function sectionBounds(content, heading) {
   const start = match.index + match[0].length;
   const next = /^## .+$/m.exec(content.slice(start));
   const reference = content.indexOf(REFERENCE_START, start);
-  const hidden = /^> \[!vam-book\]/im.exec(content.slice(start));
+  const hidden = HIDDEN_AFTER.has(heading) ? /^> \[!vam-book\]/m.exec(content.slice(start)) : null;
   const candidates = [
     next ? start + next.index : content.length,
     reference >= 0 ? reference : content.length,
@@ -44286,6 +44287,19 @@ function hiddenRanges(lines, fenced) {
   }
   return found;
 }
+function demoteForeignHidden(text10, known) {
+  const lines = text10.split("\n");
+  const trimmed2 = new Set(Array.from(known, (line2) => bare(line2).trimEnd()));
+  let changed = false;
+  for (const range of hiddenRanges(lines, fencedLines2(lines))) {
+    let own2 = true;
+    for (let i = range.start; i < range.end; i++) if (!trimmed2.has(bare(lines[i]).trimEnd())) own2 = false;
+    if (own2) continue;
+    lines[range.start] = lines[range.start].replace(/\[!vam-book\]/i, "[!note]");
+    changed = true;
+  }
+  return changed ? lines.join("\n") : text10;
+}
 function withoutHiddenCallouts(lines) {
   const ranges = hiddenRanges(lines, fencedLines2(lines));
   if (!ranges.length) return lines;
@@ -44463,18 +44477,14 @@ function extractProofRecords(detail) {
   const lines = detail.split("\n");
   const mask = recordLines(lines, fencedLines2(lines));
   const records = [];
-  let current = [];
-  for (const [at, line2] of lines.entries()) {
-    if (!mask[at]) {
-      current = [];
-      continue;
-    }
-    if (CALLOUT_HEAD2.test(line2.replace(/\r$/, ""))) continue;
-    const plain = unquoted(line2).replace(/\r$/, "");
-    if (RECORD_KEY.test(plain.trim())) {
-      records.push([...current, plain.trim()].join("\n"));
-      current = [];
-    } else if (plain.trim() || current.length) current.push(plain);
+  const plain = lines.map((line2, i) => mask[i] ? unquoted(line2).replace(/\r$/, "") : "");
+  for (let k = 0; k < plain.length; k++) {
+    if (!mask[k] || !RECORD_KEY.test(plain[k].trim())) continue;
+    const own2 = [plain[k].trim()];
+    let j = k - 1;
+    while (j >= 0 && mask[j] && PROOF_ITEM_LINE.test(plain[j])) own2.unshift(plain[j--]);
+    if (j >= 0 && mask[j] && PROOF_HEADER.test(plain[j].trim())) own2.unshift(plain[j].trim());
+    records.push(own2.join("\n"));
   }
   return records;
 }
@@ -51279,7 +51289,7 @@ var BookPipelineRuns = class {
     const finalize = (original) => {
       const held = holdProofLines(original, knownLines);
       const restore = held.restore;
-      const content = dropPlaceholderSections(convertSourceAnchors(held.text));
+      const content = demoteForeignHidden(dropPlaceholderSections(convertSourceAnchors(held.text)), knownLines);
       const urls = bodyImageUrls(content);
       const unsafeUrls = new Map(
         urls.filter((url) => !isHttps2(url)).map((url) => [url, noPicture(drive.config.language, "unsafe")])

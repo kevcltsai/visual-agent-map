@@ -147,6 +147,7 @@ test('second fresh write-back on the new format keeps the old log lines first, i
   const first = asCard(old, write(template, note, 'fresh', old, replyFor(template, 'A')));
   const second = asCard(first, write(template, note, 'fresh', first, replyFor(template, 'B')));
   assert.equal(hiddenCount(second), 1);
+  assert.equal(logLines(second).length, 4, 'one more line only');
   assert.deepEqual(logLines(second).slice(0, 3), logLines(first), 'the earlier lines come first, in order');
   assert.ok(second.includes('FREE-B') && !second.includes('FREE-A'));
   // An old card that only has "### 更新紀錄" (an old standard note): its lines come into the hidden callout in fresh, merge and top.

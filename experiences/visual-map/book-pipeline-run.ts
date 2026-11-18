@@ -44,7 +44,6 @@ import {
   type StepToken
 } from "../../core/book-pipeline/machine";
 import {
-  AUTO_QUOTA_SUFFIX,
   MAX_STEP_ATTEMPTS,
   attemptsOf,
   readBookPipeline,
@@ -58,11 +57,8 @@ import {
   type PipelineStep
 } from "../../core/book-pipeline/model";
 import {
-  appendFixRecord,
   appendResearchNote,
-  carryFixRecords,
   carryWorkLog,
-  composeFixRecord,
   neutralizeDetail,
   quoteAll,
   hidePipelineLog,
@@ -115,7 +111,6 @@ import {
   latestSlotsRecord,
   stripImageLines,
   fillSlotMarkers,
-  withTextFallback,
   residualMarkerLines,
   scanSlotMarkers,
   verifyFill,
@@ -138,7 +133,6 @@ import {
   cardResultSnapshot,
   proofFixInstruction,
   sameReviewResult,
-  stepFixInstruction,
   type CardResultSnapshot
 } from "./book-pipeline-rerun";
 import { readingOrder } from "./presentation-order";
@@ -362,6 +356,8 @@ interface Drive {
   extra: Map<string, string>;
   /** Cards whose `extra` line is a source swap: the author gets it too (an owner's replan line is for the plan only). */
   avoid: Set<string>;
+  /** Cards whose proofread named unmet points, waiting for the one automatic redo once every card has had its first round: the program-built request line. */
+  fixable: Map<string, string>;
   /** In memory only: the single-card rerun in progress. */
   rerun?: { nodeId: string; startedAt: number };
   /** The plan a card's plan step wrote in this drive. */
@@ -394,15 +390,6 @@ const internalCode = (error: unknown): string =>
   `internal_${(typeof (error as { name?: unknown } | null)?.name === "string" ? (error as { name: string }).name : "unknown").replace(/[^A-Za-z0-9_]/g, "_").slice(0, 40)}`;
 /** Failure reasons after which the card's proof-result section is not written (the write never reached the card, or the card is gone). */
 const NO_FAILURE_SECTION: ReadonlySet<string> = new Set(["discarded", "card_removed", "backup_failed", "missing"]);
-/** Reasons after which a card is never redone automatically: the run's own stop or limit, the owner editing the card, no backup, or the card gone. */
-const NO_AUTO_FIX: ReadonlySet<string> = new Set([
-  "budget",
-  "cancelled",
-  "discarded",
-  "backup_failed",
-  "card_removed",
-  "missing"
-]);
 const STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" } as const;
 const ACTION_OF = { plan: "card_plan", write: "card_write", proof: "card_proof" } as const;
 const MAX_INSTRUCTION = 300;
@@ -1108,6 +1095,7 @@ export class BookPipelineRuns {
       busy: new Set(),
       extra: new Map(),
       avoid: new Set(),
+      fixable: new Map(),
       plans: new Map(),
       authorModels: new Map(),
       started: new Map(),
@@ -1270,9 +1258,13 @@ export class BookPipelineRuns {
           await this.reset(drive, action.nodeId);
           changed = true;
         } else if (action.type === "mark_needs_review") {
-          await this.reviewOrFix(drive, action.nodeId, action.step, drive.reasons.get(action.nodeId) ?? "failed");
+          await this.markReview(drive, action.nodeId, action.step, drive.reasons.get(action.nodeId) ?? "failed");
           changed = true;
         } else if (action.type === "advance_phase") {
+          if (await this.startFixes(drive)) {
+            changed = true;
+            continue;
+          }
           const before = drive.store.state;
           await drive.store.commit(state => ({
             state: advancePhase(state, this.stagesOf(drive), this.ports.now()),
@@ -1386,7 +1378,7 @@ export class BookPipelineRuns {
         }
         drive.reasons.set(key, outcome.reason);
         if (nodeId && kind !== "global" && (failed.needsReview || outcome.forceReview))
-          await this.reviewOrFix(drive, nodeId, kind, outcome.reason);
+          await this.markReview(drive, nodeId, kind, outcome.reason);
         await report(`failed:${code(outcome.reason)}`);
         return "failed";
       }
@@ -1470,107 +1462,53 @@ export class BookPipelineRuns {
     drive.stages.set(nodeId, stage);
     await this.writeFields(drive, nodeId, { pipelineStage: stage, pipelineIssue: issue });
   }
-  private async markReview(
-    drive: Drive,
-    nodeId: string,
-    step: PipelineStep,
-    reason: string,
-    quotaUsed = false
-  ): Promise<void> {
+  private async markReview(drive: Drive, nodeId: string, step: PipelineStep, reason: string): Promise<void> {
     drive.stages.set(nodeId, "needs-review");
     drive.reviewStep.set(nodeId, step);
-    if (!drive.job) this.clearFix(drive, nodeId);
     await this.writeFields(drive, nodeId, {
       pipelineStage: "needs-review",
-      pipelineIssue: `${step} failed: ${code(reason)}${quotaUsed ? AUTO_QUOTA_SUFFIX : ""}`
+      pipelineIssue: `${step} failed: ${code(reason)}`
     });
     if (step !== "plan" && !NO_FAILURE_SECTION.has(reason)) await this.writeFailureSection(drive, nodeId, reason);
   }
-  /** The card ends its chain: the automatic redo's request line is of no use any more. */
-  private clearFix(drive: Drive, nodeId: string): void {
-    drive.extra.delete(nodeId);
-    drive.avoid.delete(nodeId);
-  }
-  private unfinishedOthers(drive: Drive, nodeId: string): number {
-    return drive.store.state.order.filter(id => {
-      const stage = drive.stages.get(id);
-      return id !== nodeId && stage !== "checked" && stage !== "needs-review";
-    }).length;
-  }
   /**
-   * The automatic redo (plan 2026 flow v3, E): a card that needs a person for a reason a rewrite can cure gets up to two more rounds
-   * while the budget keeps a reserve for the cards still to do. `started`: the round was counted and saved (its revision rises, so a late
-   * result of the old one is dropped), the card's stage is cleared so the chain runs again, and the real reason is handed to the plan
-   * and the author (never to the proofread). `denied`: it would have been redone but the rounds or the reserve are used up.
-   * `skip`: not a case for it (a single-card rerun, a run that is not writing, a reason that is not retried).
+   * The one automatic redo (plan 2026 flow v3, E), after every card has had its first round: a card whose proofread named unmet points
+   * gets its text written again by the author alone (the plan and the checklist stay, attempts are not reset), then proofread once more.
+   * The real points go to the author only (never to the proofread). A refused or no longer allowed request leaves the card needs-review.
+   * Returns how many cards were sent back; only cards queued by this drive's own proofreads are considered.
    */
-  private async autoFix(
-    drive: Drive,
-    nodeId: string,
-    step: PipelineStep,
-    reason: string,
-    instruction: string
-  ): Promise<"started" | "denied" | "skip"> {
-    if (drive.job || NO_AUTO_FIX.has(reason) || this.dead(drive) || drive.controller.signal.aborted) return "skip";
-    const before = drive.store.state;
-    if (before.phase !== "writing" || before.status !== "running" || !before.order.includes(nodeId)) return "skip";
-    const others = this.unfinishedOthers(drive, nodeId);
-    const done = await drive.store.commit(state => requestAutoFix(state, nodeId, others));
-    if (!done) return "skip";
-    if (!done.accepted) return "denied";
-    const round = autoFixesOf(drive.store.state, nodeId);
-    drive.extra.set(nodeId, instruction);
-    drive.avoid.add(nodeId);
-    drive.reasons.delete(nodeId);
-    drive.reviewStep.delete(nodeId);
-    drive.imagesDone.delete(nodeId);
-    drive.stages.set(nodeId, undefined);
-    await this.writeFields(drive, nodeId, { pipelineStage: null, pipelineIssue: null });
-    await this.writeFixRecord(drive, nodeId, round, step, reason);
-    this.ports.log(
-      formatPipelineLog({
-        event: "auto_fix",
-        runId: drive.store.state.runId,
-        card: nodeId,
-        step,
-        attempt: 0,
-        result: code(reason),
-        ms: 0,
-        counts: { round }
-      })
-    );
-    this.ports.progressed?.(drive.mapPath);
-    return "started";
-  }
-  /** A step used up its attempts (or failed for good): redo the card when the reason may be cured, else mark it needs-review. */
-  private async reviewOrFix(drive: Drive, nodeId: string, step: PipelineStep, reason: string): Promise<void> {
-    const fix = await this.autoFix(drive, nodeId, step, reason, stepFixInstruction(step, code(reason)));
-    if (fix === "started") return;
-    await this.markReview(drive, nodeId, step, reason, fix === "denied");
-  }
-  /** Best effort: the card's hidden work records get one `book-fix:v1` line (round, step, code). Written by the pipeline, in the hidden callout, under the card's usual write guards. */
-  private async writeFixRecord(
-    drive: Drive,
-    nodeId: string,
-    round: number,
-    step: PipelineStep,
-    reason: string
-  ): Promise<void> {
-    try {
-      if (this.dead(drive) || drive.controller.signal.aborted) return;
-      const path = await this.stillOnMap(drive, nodeId);
-      if (!path) return;
-      const card = await this.ports.readCard(path);
-      const detail = appendFixRecord(card.detail, composeFixRecord(round, step, code(reason)));
-      if (detail === card.detail || !(await this.ensureBackup(drive, nodeId, path, card.raw))) return;
-      await this.ports.updateNoteGuarded(
-        path,
-        { detail },
-        { expectedContent: card.raw, authorize: () => !this.dead(drive) && !drive.controller.signal.aborted }
+  private async startFixes(drive: Drive): Promise<number> {
+    let started = 0;
+    const queued = [...drive.fixable];
+    drive.fixable.clear();
+    for (const [nodeId, instruction] of queued) {
+      if (this.dead(drive) || drive.controller.signal.aborted) break;
+      if (drive.stages.get(nodeId) !== "needs-review") continue;
+      const done = await drive.store.commit(state => requestAutoFix(state, nodeId));
+      if (!done?.accepted) continue;
+      drive.extra.set(nodeId, instruction);
+      drive.avoid.add(nodeId);
+      drive.reasons.delete(nodeId);
+      drive.reviewStep.delete(nodeId);
+      drive.imagesDone.delete(nodeId);
+      drive.stages.set(nodeId, "planned");
+      await this.writeFields(drive, nodeId, { pipelineStage: "planned", pipelineIssue: null });
+      this.ports.log(
+        formatPipelineLog({
+          event: "auto_fix",
+          runId: drive.store.state.runId,
+          card: nodeId,
+          step: "proof",
+          attempt: 0,
+          result: "unmet",
+          ms: 0,
+          counts: { round: autoFixesOf(drive.store.state, nodeId) }
+        })
       );
-    } catch {
-      // the card is redone either way; the record is only a help for the reader
+      started++;
     }
+    if (started) this.ports.progressed?.(drive.mapPath);
+    return started;
   }
   /** The proof-result section of a card as `finalize`/`transform` text: the result with the models, or the failure line (never a model). */
   private proofSectionOf(
@@ -1825,8 +1763,6 @@ export class BookPipelineRuns {
       hidePipelineLog(written.detail, new Set(workLogLines(earlier)), drive.backupPaths.get(nodeId))
     );
     for (const record of extractProofRecords(earlier).slice(-1)) carried = appendResearchNote(carried, record).text;
-    // The card's own automatic-redo records are the pipeline's, kept through every rewrite (the author's text never makes one).
-    carried = carryFixRecords(earlier, carried);
     // #12: an old Prompt (no picture plan) keeps the card's picture section; a card with a plan gets its pictures from the slots.
     if (slots === undefined) carried = carryImageSection(card.detail, carried);
     if (carried !== written.detail) {
@@ -1964,12 +1900,10 @@ export class BookPipelineRuns {
       );
     };
     const perSlot = new Map<number, ProbedCandidate[]>();
-    const texts = new Map<number, string>();
     const taken = (key: string): boolean => drive.usedImages.has(key) || others.has(key);
     try {
       const round1 = await search(wanted, false, exclude);
       for (const [index, list] of await probeFound(wanted, round1)) perSlot.set(index, list);
-      for (const [index, text] of round1?.textBySlot ?? []) texts.set(index, text);
       // A second search (once) for the slots the first one left without a usable picture: another direction, the tried addresses excluded.
       if (round1) {
         const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
@@ -1981,7 +1915,6 @@ export class BookPipelineRuns {
         if (second) {
           for (const [index, list] of await probeFound(lacking, second))
             perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
-          for (const [index, text] of second.textBySlot ?? []) texts.set(index, text);
         }
       }
     } catch (error) {
@@ -1992,11 +1925,7 @@ export class BookPipelineRuns {
     const latest = await this.ports.readCard(path);
     // The card may have left the map while the search and the probes ran: nothing is claimed or written for it.
     if (!(await this.stillOnMap(drive, nodeId))) return { kind: "failed", reason: "card_removed" };
-    const outcomes = withTextFallback(
-      choosePictures({ id: nodeId, title: latest.title }, slots, perSlot, taken, language),
-      texts,
-      language
-    );
+    const outcomes = choosePictures({ id: nodeId, title: latest.title }, slots, perSlot, taken, language);
     // Claim in the same synchronous turn as the choice: chapters run side by side, so the exclude list alone cannot stop a repeat.
     const claimed = [...outcomes.values()].flatMap(outcome =>
       "figure" in outcome ? [imageKey(outcome.figure.href)] : []
@@ -2195,33 +2124,23 @@ export class BookPipelineRuns {
     return {
       kind: "ok",
       after: async () => {
-        let quotaUsed = false;
-        if (verdict.aggregate === "needs-review") {
-          // The verdict is a reason a rewrite may cure: the real unmet points go to the plan and the author (the proofread never sees them).
-          const fix = await this.autoFix(
-            drive,
-            nodeId,
-            "proof",
-            verdict.factsUnverified ? "facts_unverified" : "fact_unmet",
-            proofFixInstruction(verdict.items, checklist)
-          );
-          if (fix === "started") return;
-          quotaUsed = fix === "denied";
+        if (verdict.aggregate === "needs-review" && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0)
+          drive.fixable.set(nodeId, proofFixInstruction(verdict.items, checklist));
+        else if (!drive.job) {
+          drive.extra.delete(nodeId);
+          drive.avoid.delete(nodeId);
         }
-        if (!drive.job) this.clearFix(drive, nodeId);
         await this.setStage(
           drive,
           nodeId,
           verdict.aggregate,
           verdict.aggregate === "needs-review"
-            ? `${
-                verdict.factsUnverified
-                  ? "proof unmet: facts_unverified"
-                  : `proof unmet: ${verdict.items
-                      .filter(item => item.type === "fact" && item.status === "unmet")
-                      .map(item => code(item.id))
-                      .join(" ")}`
-              }${quotaUsed ? AUTO_QUOTA_SUFFIX : ""}`
+            ? verdict.factsUnverified
+              ? "proof unmet: facts_unverified"
+              : `proof unmet: ${verdict.items
+                  .filter(item => item.type === "fact" && item.status === "unmet")
+                  .map(item => code(item.id))
+                  .join(" ")}`
             : noticed.length
               ? `structure unmet: ${noticed.join(" ")}`
               : null

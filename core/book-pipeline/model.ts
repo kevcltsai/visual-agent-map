@@ -18,10 +18,8 @@ export const PIPELINE_STATUSES = ["running", "stopped"] as const;
 export type PipelineStatus = (typeof PIPELINE_STATUSES)[number];
 export const DEFAULT_BUDGET_LIMIT = 300;
 export const MAX_STEP_ATTEMPTS = 3;
-/** The automatic redo rounds one card may get (the program's own retry after a proofread or a step the card could not pass). */
-export const MAX_AUTO_FIXES = 2;
-/** Added to a needs-review card's issue code when the automatic redo was refused for lack of rounds or budget reserve. */
-export const AUTO_QUOTA_SUFFIX = "; auto_quota";
+/** The automatic redo one card may get (the program's own retry of the author step after a proofread named unmet points). */
+export const MAX_AUTO_FIXES = 1;
 export const STEPS = ["plan", "write", "proof"] as const;
 export type PipelineStep = (typeof STEPS)[number];
 
@@ -143,7 +141,7 @@ export interface BookPipelineData {
   pendingReset?: string[];
   /** Cards whose `book-role` the pipeline itself wrote (its default or the global plan's choice), never the owner's; the plan may overwrite these. Absent = none (older data). */
   autoRoles?: string[];
-  /** Per card, how many automatic redo rounds it has used (at most {@link MAX_AUTO_FIXES}). Absent = none (older data); an owner stop or reopen never resets it. */
+  /** Per card, how many automatic redos it has used (at most {@link MAX_AUTO_FIXES}). Absent = none (older data); an owner stop or reopen never resets it. */
   autoFixes?: Record<string, number>;
   budget: PipelineBudget;
   /** Raised by every owner stop; a step result carries the one it started under (absent = 0). */

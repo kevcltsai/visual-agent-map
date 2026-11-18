@@ -225,36 +225,7 @@ export interface SlotFigure {
   alt: string;
   caption: string;
 }
-/** `text`: no picture was found, so the finder's one plain sentence (already escaped by {@link textLineOf}) stands where the marker was. */
-export type SlotOutcome =
-  { figure: SlotFigure } | { text: string } | { reasonCode: SlotReasonCode; reasonText?: string };
-
-/**
- * The finder's text-instead sentence as one safe plain line for the card, or undefined when it cannot be used: empty, or (a Chinese
- * book) without a single Han character. The marker brackets are taken out and every Markdown syntax character is escaped.
- */
-export function textLineOf(raw: unknown, language: string): string | undefined {
-  if (typeof raw !== "string") return undefined;
-  const line = plainLine(escapeMarkdownText(raw.replace(/[〔〕]/g, " "), 240));
-  if (!line) return undefined;
-  if (/^zh/i.test(language) && !/[\u3400-\u9fff]/.test(line)) return undefined;
-  return line;
-}
-
-/** A slot that ended without a picture takes the finder's sentence when it has a usable one; a placed picture is never replaced. */
-export function withTextFallback(
-  outcomes: ReadonlyMap<number, SlotOutcome>,
-  texts: ReadonlyMap<number, string> | undefined,
-  language: string
-): Map<number, SlotOutcome> {
-  const out = new Map(outcomes);
-  for (const [index, outcome] of outcomes) {
-    if ("figure" in outcome || "text" in outcome) continue;
-    const line = textLineOf(texts?.get(index), language);
-    if (line) out.set(index, { text: line });
-  }
-  return out;
-}
+export type SlotOutcome = { figure: SlotFigure } | { reasonCode: SlotReasonCode; reasonText?: string };
 
 /** A line of only symbols and blanks (`---`, `===`, `- - -`) can turn the line above into a heading or a rule: a backslash keeps it text (only when it starts with an ASCII punctuation character; `…`, `→`, `★★★` cannot). */
 function plainLine(text: string): string {
@@ -317,8 +288,6 @@ export interface FillResult {
   text: string;
   placed: { index: number; href: string }[];
   missing: { index: number; reasonCode: SlotReasonCode }[];
-  /** Slots that show the finder's sentence in place of a picture. */
-  texted: { index: number }[];
   /** Marker lines refused whole (reworded, or an index the plan does not have). */
   bad: number;
   /** The figure lines this call wrote, so the independent check can tell them from the author's text. */
@@ -346,8 +315,6 @@ export function fillSlotMarkers(
   const figureAt = new Map<number, SlotFigure>();
   const missing: FillResult["missing"] = [];
   const placed: FillResult["placed"] = [];
-  const texted: FillResult["texted"] = [];
-  const textAt = new Map<number, string>();
   const planned = new Set(slots.map(slot => slot.index));
   const badIndexes = new Set<number>();
   for (const at of scan.badLines) {
@@ -365,17 +332,12 @@ export function fillSlotMarkers(
     } else if (outcome && "figure" in outcome) {
       figureAt.set(at, outcome.figure);
       placed.push({ index: slot.index, href: outcome.figure.href });
-    } else if (outcome && "text" in outcome) {
-      textAt.set(at, outcome.text);
-      texted.push({ index: slot.index });
     } else {
       missing.push({ index: slot.index, reasonCode: outcome?.reasonCode ?? "not_found" });
     }
   }
   const dropped = new Set(
-    [...scan.badLines, ...scan.duplicateLines, ...scan.found.values()].filter(
-      at => !figureAt.has(at) && !textAt.has(at)
-    )
+    [...scan.badLines, ...scan.duplicateLines, ...scan.found.values()].filter(at => !figureAt.has(at))
   );
   const inline = new Set(scan.inlineLines);
   const added: string[] = [];
@@ -401,15 +363,6 @@ export function fillSlotMarkers(
       if (!isBlank(lines[at + 1])) out.push(cr ? "\r" : "");
       return;
     }
-    const text = textAt.get(at);
-    if (text !== undefined) {
-      if (out.length && !isBlank(out[out.length - 1])) out.push("");
-      const line = `${text}${cr}`;
-      added.push(line);
-      out.push(line);
-      if (!isBlank(lines[at + 1])) out.push(cr ? "\r" : "");
-      return;
-    }
     if (dropped.has(at)) {
       removed = true;
       return;
@@ -425,7 +378,7 @@ export function fillSlotMarkers(
     }
     push(line);
   });
-  return { text: out.join("\n"), placed, missing, texted, bad: scan.badLines.length, added };
+  return { text: out.join("\n"), placed, missing, bad: scan.badLines.length, added };
 }
 
 /** Lines as the independent check compares them: markers out, blank lines out. Lines in fences and quotes are compared as they are. */
@@ -456,7 +409,7 @@ export function verifyFill(
   result: FillResult,
   slots: readonly Pick<ImageSlot, "index">[]
 ): "count" | "residual" | "deleted_text" | undefined {
-  const seen = [...result.placed, ...result.missing, ...result.texted].map(item => item.index).sort((a, b) => a - b);
+  const seen = [...result.placed, ...result.missing].map(item => item.index).sort((a, b) => a - b);
   const want = slots.map(slot => slot.index).sort((a, b) => a - b);
   if (seen.length !== want.length || seen.some((index, i) => index !== want[i])) return "count";
   if (residualMarkerLines(result.text).length) return "residual";
@@ -474,7 +427,7 @@ export function verifyFill(
 
 export interface SlotRecordItem {
   index: number;
-  state: "placed" | "missing" | "text";
+  state: "placed" | "missing";
   reasonCode?: SlotReasonCode;
   /** A short hash of the placed picture's key: enough to see that the picture is still there, no address. */
   hash?: string;
@@ -504,13 +457,10 @@ export function shortHash(url: string): string {
 }
 
 /** The one machine line the guarded write puts into the research notes (`replaceResearchRecord` keeps only the latest). It holds numbers, codes and hashes only. */
-export function composeSlotsRecord(
-  result: Pick<FillResult, "placed" | "missing" | "bad"> & Partial<Pick<FillResult, "texted">>
-): string {
+export function composeSlotsRecord(result: Pick<FillResult, "placed" | "missing" | "bad">): string {
   const slots: SlotRecordItem[] = [
     ...result.placed.map(item => ({ index: item.index, state: "placed" as const, hash: shortHash(item.href) })),
-    ...result.missing.map(item => ({ index: item.index, state: "missing" as const, reasonCode: item.reasonCode })),
-    ...(result.texted ?? []).map(item => ({ index: item.index, state: "text" as const }))
+    ...result.missing.map(item => ({ index: item.index, state: "missing" as const, reasonCode: item.reasonCode }))
   ].sort((a, b) => a.index - b.index);
   return `<!-- book-slots:v1 ${JSON.stringify({ slots, bad: result.bad })} -->`;
 }
@@ -530,7 +480,7 @@ export function latestSlotsRecord(detail: string): SlotsRecord | undefined {
       const items: SlotRecordItem[] = [];
       for (const raw of data.slots.slice(0, MAX_IMAGE_SLOTS) as Array<Record<string, unknown> | null>) {
         if (!raw || !Number.isInteger(raw.index) || (raw.index as number) < 1) continue;
-        const state = raw.state === "placed" || raw.state === "missing" || raw.state === "text" ? raw.state : undefined;
+        const state = raw.state === "placed" ? "placed" : raw.state === "missing" ? "missing" : undefined;
         if (!state) continue;
         const reasonCode = REASONS.find(code => code === raw.reasonCode);
         items.push({
@@ -577,7 +527,7 @@ export function stripImageLines(text: string): string {
 }
 
 /** What the slot looks like now, read from the record, the plan and the body: `edited` = the recorded picture is no longer in the text (replaced or deleted by hand). */
-export type SlotState = "placed" | "edited" | "missing" | "unrecorded" | "text";
+export type SlotState = "placed" | "edited" | "missing" | "unrecorded";
 export interface SlotStatus {
   index: number;
   state: SlotState;
@@ -593,7 +543,6 @@ export function describeSlots(
   return slots.map(slot => {
     const item = record?.slots.find(entry => entry.index === slot.index);
     if (!item) return { index: slot.index, state: "unrecorded" as const };
-    if (item.state === "text") return { index: slot.index, state: "text" as const };
     if (item.state === "missing")
       return {
         index: slot.index,

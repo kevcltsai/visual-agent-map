@@ -333,36 +333,23 @@ export function retryGlobalPlan(data: BookPipelineData): BookPipelineData {
   return next;
 }
 
-/** The calls a card's whole chain (plan, write, images, proof) needs at most, for the reserve of the cards still to do. */
-const AUTO_FIX_CARD_RESERVE = 4;
-const AUTO_FIX_BASE_RESERVE = 5;
-/** How many automatic redo rounds a card has used. */
+/** Whether the card has used its one automatic redo (kept in the saved run, so reopening never gives another). */
 export function autoFixesOf(data: BookPipelineData, nodeId: string): number {
   return data.autoFixes?.[nodeId] ?? 0;
 }
 /**
- * Whether a card may be redone automatically now: fewer than {@link MAX_AUTO_FIXES} rounds used, and the budget left keeps
- * {@link AUTO_FIX_CARD_RESERVE} calls for each other card that is not finished plus {@link AUTO_FIX_BASE_RESERVE}; a redo never starves the rest of the book.
+ * The one automatic redo of a card's text (author step only: the plan and the checklist stay): allowed while the run is writing and the
+ * card has not used it. The use is counted and the card's revision rises, so a proofread still in flight can no longer commit.
+ * Not allowed: `accepted` is false and nothing changes. Attempts are not reset.
  */
-export function autoFixVerdict(
-  data: BookPipelineData,
-  nodeId: string,
-  unfinishedOthers: number
-): "ok" | "rounds" | "quota" {
-  if (!data.order.includes(nodeId) || data.status !== "running") return "quota";
-  if (autoFixesOf(data, nodeId) >= MAX_AUTO_FIXES) return "rounds";
-  const left = data.budget.limit - data.budget.used;
-  return left >= AUTO_FIX_CARD_RESERVE * Math.max(0, unfinishedOthers) + AUTO_FIX_BASE_RESERVE ? "ok" : "quota";
-}
-/**
- * One automatic redo of a card: when allowed, the round count rises and the card is reset (attempts start over, its revision rises,
- * so a proofread still in flight can no longer commit). Not allowed: `accepted` is false and nothing changes.
- */
-export function requestAutoFix(data: BookPipelineData, nodeId: string, unfinishedOthers = 0): Committed {
-  if (autoFixVerdict(data, nodeId, unfinishedOthers) !== "ok") return { state: data, accepted: false };
-  const reset = resetCard(data, nodeId);
-  const next = clone(reset);
+export function requestAutoFix(data: BookPipelineData, nodeId: string): Committed {
+  if (!data.order.includes(nodeId) || data.status !== "running" || data.phase !== "writing")
+    return { state: data, accepted: false };
+  if (autoFixesOf(data, nodeId) >= MAX_AUTO_FIXES) return { state: data, accepted: false };
+  const next = clone(data);
   next.autoFixes = { ...(next.autoFixes ?? {}), [nodeId]: autoFixesOf(data, nodeId) + 1 };
+  next.revisions[nodeId] = cardRevision(next, nodeId) + 1;
+  next.revision++;
   return { state: next, accepted: true };
 }
 

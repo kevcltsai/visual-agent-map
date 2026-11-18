@@ -3180,7 +3180,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_summary_done": "實際講了：",
   "ui.book_issue_0": "需人看：{0}",
   "ui.book_issue_unknown": "需要人工查看（原因代碼無法辨識）。",
-  "ui.book_issue_auto_quota_0": "{0}（自動重試額度已用完。）",
   "ui.book_issue_step_0_1": "{0}失敗：{1}",
   "ui.book_issue_unmet_0": "校對未達成項目：{0}",
   "ui.book_structure_unmet_0": "結構 {0} 項未達成",

@@ -37,8 +37,6 @@ export interface FoundImages {
   bySlot: Map<number, FoundImage[]>;
   found: number;
   offTopic: number;
-  /** Per slot index, the one plain sentence the finder offers in place of a picture when it found none (raw model text: the caller escapes it). Absent when none was offered. */
-  textBySlot?: Map<number, string>;
 }
 
 const EXCLUDE_MAX = 30;
@@ -46,7 +44,6 @@ const EXCLUDE_ITEM_MAX = 120;
 const PER_SLOT_MAX = 3;
 const CAPTION_MAX = 200;
 const SLOT_TEXT_MAX = 160;
-const TEXT_INSTEAD_MAX = 300;
 
 /** Per slot, each image goes through the shared candidate parser on its own, so the caption stays with the image the parser kept. */
 function parseFound(raw: string): FoundImages {
@@ -64,10 +61,6 @@ function parseFound(raw: string): FoundImages {
   for (const entry of parsed.slots as Array<Record<string, unknown> | null>) {
     if (!entry || !Number.isInteger(entry.slot) || !Array.isArray(entry.images)) continue;
     const index = entry.slot as number;
-    if (typeof entry.textInstead === "string") {
-      const text = entry.textInstead.replace(/\s+/g, " ").trim().slice(0, TEXT_INSTEAD_MAX);
-      if (text) (out.textBySlot ??= new Map()).set(index, text);
-    }
     const list = out.bySlot.get(index) ?? [];
     for (const item of entry.images as Array<Record<string, unknown> | null>) {
       if (list.length >= PER_SLOT_MAX) break;

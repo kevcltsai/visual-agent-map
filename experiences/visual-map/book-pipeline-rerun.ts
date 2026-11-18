@@ -95,7 +95,7 @@ const oneLine = (value: string, max: number): string =>
 /**
  * The automatic redo's one line when the proofread did not pass: constant words plus, for each fact point that did not hold, its
  * checklist text and the verifier's note, each as a JSON string cut to a few hundred characters (so a model sentence is data in
- * quotes, never an instruction line), then the `[!vam-book]` callout type neutralized. Only the plan and the author get it; the proofread never does.
+ * quotes, never an instruction line), then the `[!vam-book]` callout type neutralized. Only the author gets it; the proofread never does.
  * Unverified sources become the "do not use these" list of {@link avoidSourcesInstruction}.
  */
 export function proofFixInstruction(
@@ -122,12 +122,6 @@ export function proofFixInstruction(
   }
   return neutralizeText((points.length ? lead + points.join(" ") + " " : "") + avoid);
 }
-/** The automatic redo's one line when a step used up its attempts: constant words and the neutral failure code only. */
-export function stepFixInstruction(step: string, reasonCode: string): string {
-  const clean = (value: string): string => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60);
-  return `The previous attempt at the ${clean(step)} step of this chapter failed with the code ${JSON.stringify(clean(reasonCode))}; produce it again carefully, following the required structure exactly.`;
-}
-
 /** What a rerun compares: the stage, the issue code and each proof item's id, status and sources. In memory only. */
 export interface CardResultSnapshot {
   stage: PipelineStage | undefined;

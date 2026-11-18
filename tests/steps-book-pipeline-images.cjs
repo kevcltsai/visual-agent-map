@@ -631,9 +631,9 @@ test('fill: a bold-wrapped marker and a list-item marker leave no residue, wheth
   assert.ok(!/\*\*/.test(wrapped.done.text));
   // residue is caught: a result that kept the shell fails the independent check
   const original = '前。\n\n**〔圖位 1：藍光〕**\n\n後。\n';
-  const sloppy = { text: '前。\n\n****\n\n後。\n', placed: [], missing: [{ index: 1, reasonCode: 'not_found' }], texted: [], bad: 0, added: [] };
+  const sloppy = { text: '前。\n\n****\n\n後。\n', placed: [], missing: [{ index: 1, reasonCode: 'not_found' }], bad: 0, added: [] };
   assert.equal(IS.verifyFill(original, sloppy, [{ index: 1 }]), 'deleted_text');
-  const bare = { text: '前。\n\n 1：藍光\n\n後。\n', placed: [], missing: [{ index: 1, reasonCode: 'not_found' }], texted: [], bad: 0, added: [] };
+  const bare = { text: '前。\n\n 1：藍光\n\n後。\n', placed: [], missing: [{ index: 1, reasonCode: 'not_found' }], bad: 0, added: [] };
   assert.equal(IS.verifyFill('前。\n\n〔圖位 1：藍光\n\n後。\n', bare, [{ index: 1 }]), 'deleted_text');
   const adjacent = fillOne('前。\n\n- 〔圖位 1：a〕〔圖位 2：b〕\n\n後。\n');
   assert.equal(adjacent.done.text, '前。\n\n後。\n'); assert.equal(adjacent.verdict, undefined);
@@ -647,7 +647,7 @@ test('fill: an unclosed marker (or a stray closing bracket) takes out only the m
   assert.equal(b.done.text, 'p\n\n重要句子。〕\n\nq'); assert.equal(b.verdict, undefined);
   const lone = fillOne('前。\n\n〔圖位 1：\n\n後。\n'); assert.equal(lone.done.text, '前。\n\n後。\n'); assert.equal(lone.verdict, undefined);
   assert.equal(fillOne('前。\n\n〔圖位 1：藍光\n\n後。\n').done.missing[0].reasonCode, 'bad_marker');
-  const wiped = { text: 'p\n\nq', placed: [], missing: [{ index: 1, reasonCode: 'bad_marker' }], texted: [], bad: 0, added: [] };
+  const wiped = { text: 'p\n\nq', placed: [], missing: [{ index: 1, reasonCode: 'bad_marker' }], bad: 0, added: [] };
   assert.equal(IS.verifyFill('p\n\n〔圖位 1：藍光 讓人睡不著，這是重點。\n\nq', wiped, [{ index: 1 }]), 'deleted_text');
   assert.equal(IS.verifyFill('p\n\n〔圖位 1：a〕重要句子。〕\n\nq', wiped, [{ index: 1 }]), 'deleted_text');
 });
@@ -709,7 +709,7 @@ test('images: the find-images prompt asks for captions in the book language; a C
   const { findImagesStep, runFindImages } = require('./support-ai-calls.cjs').loadWithAiCalls('core/steps/book-pipeline/find-images.ts');
   const base = { chapter: '巴夫洛夫與制約', slots: [{ index: 1, kind: 'diagram', explains: 'x' }], model: 'm', reasoning: 'low' };
   assert.match(findImagesStep.render({ ...base, language: 'zh-TW' }), /Traditional Chinese|繁體|zh/i);
-  assert.match(findImagesStep.render({ ...base, language: 'zh-TW' }), /caption" and "textInstead" in the language of the book/);
+  assert.match(findImagesStep.render({ ...base, language: 'zh-TW' }), /caption" in the language of the book/);
   assert.ok(!/not in the book's language/.test(findImagesStep.render({ ...base, language: 'zh-TW' })));
   assert.match(findImagesStep.render({ ...base, language: 'zh-TW', languageRetry: true }), /not in the book's language/);
   const reply = caption => JSON.stringify({ slots: [{ slot: 1, images: [{ title: 'T', caption, imageUrl: 'https://upload.wikimedia.org/a/ab/F.jpg', sourceUrl: 'https://commons.wikimedia.org/x', kind: 'diagram', shows: 'a thing', relevant: true }] }] });
@@ -730,8 +730,6 @@ test('images: the find-images prompt asks for captions in the book language; a C
 });
 
 // ---- T4 (P4b): a second search for the slots still without a picture, and the finder's sentence in place of a picture ----
-const withTexts = (base, texts) => ({ ...base, textBySlot: new Map(Object.entries(texts).map(([k, v]) => [Number(k), v])) });
-
 test('T4 images: a slot the first search left empty is searched once more (another direction, tried addresses excluded) and gets its picture', async () => {
   const r = await picRig({ finder: (req, run, n) => (n === 1 ? found({ 1: [cand(1)], 2: [] }) : found({ 2: [cand(2)] })) });
   await run(r);
@@ -755,26 +753,4 @@ test('T4 images: when every slot has its picture there is no second search; a se
   await run(b);
   assert.equal(b.calls.length, 1, 'an error is an optional gain lost, not a reason to ask twice');
   assert.equal(stageOf(b.raw(0)), 'checked');
-});
-
-test('T4 images: a slot with no picture after both searches shows the finder\'s sentence at the marker place; it is escaped, recorded as text, and not counted as a missing picture', async () => {
-  const sentence = '此處說明 **透視** 如何讓畫面有深度 ![x](https://evil.example/a.png) 〔圖位 9：x〕 <b>';
-  const r = await picRig({ finder: (req, run, n) => (n === 1 ? withTexts(found({ 1: [cand(1)] }), { 2: sentence }) : found({})) });
-  await run(r);
-  const detail = (await r.note(0)).detail;
-  assert.equal(r.calls.length, 2);
-  assert.match(detail, /正文二。\n\n此處說明 \\\*\\\*透視\\\*\\\* 如何讓畫面有深度 \\!\\\[x\\\]\\\(https:\/\/evil\.example\/a\.png\\\) 圖位 9：x ＜b＞\n\n正文三。/);
-  assert.equal(figures(detail).length, 1, 'no image formed from the sentence');
-  assert.ok(!/〔圖位|evil\.example\/a\.png\)/.test(detail.replace(/\\\]\\\(https:\/\/evil[^\n]*/, '')));
-  assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state])), [[1, 'placed'], [2, 'text']]);
-  assert.doesNotMatch((await r.note(0)).pipelineIssue ?? '', /image_2/, 'the text slot is not a missing picture');
-  assert.equal(stageOf(r.raw(0)), 'checked');
-});
-
-test('T4 images: a Chinese book never takes a sentence without a Han character; an empty or missing sentence leaves the slot missing as before; a picture beats a sentence', async () => {
-  const r = await picRig({ finder: (req, run, n) => (n === 1 ? withTexts(found({ 1: [cand(1)] }), { 1: '這句會輸給圖片', 2: 'English only sentence' }) : found({})) });
-  await run(r);
-  const detail = (await r.note(0)).detail;
-  assert.ok(!/English only|這句會輸給圖片/.test(detail));
-  assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state])), [[1, 'placed'], [2, 'missing']]);
 });

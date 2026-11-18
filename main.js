@@ -43386,9 +43386,9 @@ var TopicRuns = class {
         await repo.updateNote(
           path,
           {
-            summary,
-            detail: written2,
-            visualReferences: references2,
+            summary: neutralizeText(summary),
+            detail: neutralizeText(written2),
+            visualReferences: neutralizeText(references2),
             // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
             ...options.findingsSent() ? { newFindings: "" } : {},
             status: "completed",
@@ -43821,11 +43821,12 @@ var TopicRuns = class {
           fail4(composed.message);
           return;
         }
-        const authored = (text10) => options.pipeline ? neutralizeText(text10) : text10;
         const patch = {
-          summary: authored(result.summary),
-          detail: composed.detail,
-          visualReferences: authored(visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2))),
+          summary: neutralizeText(result.summary),
+          detail: neutralizeText(composed.detail),
+          visualReferences: neutralizeText(
+            visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2))
+          ),
           newFindings: "",
           status: "completed",
           // The topic remembers the mode of its latest research (Quick is stored as local).

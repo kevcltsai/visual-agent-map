@@ -412,7 +412,7 @@ test('images: the find-images step keeps up to 3 candidates per slot with the ca
   assert.equal(parsed.offTopic, 2);
   assert.equal(parsed.found, 4);
   assert.equal(findImagesStep.parse('not json').found, 0);
-  assert.equal(findImagesStep.version, 4);
+  assert.equal(findImagesStep.version, 5);
   const prompt = findImagesStep.render({ chapter: 'q', slots: [{ index: 1, kind: 'diagram', explains: 'perspective' }], exclude: Array.from({ length: 40 }, (_, i) => `k${i}${'x'.repeat(200)}`), language: 'en', model: 'm', reasoning: 'low' });
   assert.equal(JSON.parse(/exclude list[^\[]*(\[.*\])/.exec(prompt)[1]).length, 30);
   assert.ok(!/x{121}/.test(prompt));
@@ -451,10 +451,11 @@ test('slots load: 5 chapters x 8 slots whose candidates all fail probe at most 2
   const finder = req => found(Object.fromEntries(req.slots.map(s => [s.index, Array.from({ length: 4 }, () => cand(++seq))])));
   const r = await picRig({ titles, slots: 8, text, finder, probe: async () => { inflight++; peak = Math.max(peak, inflight); await tick(); await tick(); inflight--; return { ok: false, reason: 'load_failed' }; } });
   await run(r);
-  assert.equal(r.calls.length, 5, 'one search per chapter');
+  assert.equal(r.calls.length, 10, 'one search per chapter and one more for the slots still without a picture');
+  assert.equal(r.calls.filter(c => c.again).length, 5);
   assert.ok(r.calls.every(c => c.slots.length === 8));
   assert.ok(peak <= 4 && peak >= 2, `peak ${peak}`);
-  assert.equal(r.stat.probes.length, 5 * 24, 'each chapter probes its first 24 distinct addresses of 32');
+  assert.equal(r.stat.probes.length, 5 * 24, 'each chapter probes its first 24 distinct addresses; the limit covers both searches');
   for (let i = 0; i < 5; i++) { assert.equal(stageOf(r.raw(i)), 'checked'); assert.equal(recordOf((await r.note(i)).detail).slots.length, 8); }
 });
 
@@ -726,4 +727,30 @@ test('images: the find-images prompt asks for captions in the book language; a C
   r = rig([reply('圖說')]);
   await runFindImages(r.aiCalls, { ...base, language: 'zh-TW' }, run);
   assert.equal(r.prompts.length, 1);
+});
+
+// ---- T4 (P4b): a second search for the slots still without a picture, and the finder's sentence in place of a picture ----
+test('T4 images: a slot the first search left empty is searched once more (another direction, tried addresses excluded) and gets its picture', async () => {
+  const r = await picRig({ finder: (req, run, n) => (n === 1 ? found({ 1: [cand(1)], 2: [] }) : found({ 2: [cand(2)] })) });
+  await run(r);
+  assert.equal(r.calls.length, 2);
+  assert.equal(r.calls[0].again, undefined);
+  assert.equal(r.calls[1].again, true);
+  assert.deepEqual(plain(r.calls[1].slots.map(s => s.index)), [2], 'only the slot still without a picture');
+  assert.ok(r.calls[1].exclude.some(key => /w1/i.test(key)), 'what the first search offered is excluded');
+  const detail = (await r.note(0)).detail;
+  assert.equal(figures(detail).length, 2);
+  assert.match(detail, /!\[Work 2\]/);
+  assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state])), [[1, 'placed'], [2, 'placed']]);
+  assert.equal(stageOf(r.raw(0)), 'checked');
+});
+
+test('T4 images: when every slot has its picture there is no second search; a search that failed is not asked again', async () => {
+  const a = await picRig({ finder: () => found({ 1: [cand(1)], 2: [cand(2)] }) });
+  await run(a);
+  assert.equal(a.calls.length, 1);
+  const b = await picRig({ finder: () => { throw new Error('provider down'); } });
+  await run(b);
+  assert.equal(b.calls.length, 1, 'an error is an optional gain lost, not a reason to ask twice');
+  assert.equal(stageOf(b.raw(0)), 'checked');
 });

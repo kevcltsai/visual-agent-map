@@ -11,6 +11,7 @@
 import {
   DEFAULT_BUDGET_LIMIT,
   FAILURE_CODE,
+  MAX_AUTO_FIXES,
   MAX_STEP_ATTEMPTS,
   attemptsOf,
   emptyAttempts,
@@ -330,6 +331,26 @@ export function retryGlobalPlan(data: BookPipelineData): BookPipelineData {
   next.attempts.global = 0;
   next.revision++;
   return next;
+}
+
+/** Whether the card has used its one automatic redo (kept in the saved run, so reopening never gives another). */
+export function autoFixesOf(data: BookPipelineData, nodeId: string): number {
+  return data.autoFixes?.[nodeId] ?? 0;
+}
+/**
+ * The one automatic redo of a card's text (author step only: the plan and the checklist stay): allowed while the run is writing and the
+ * card has not used it. The use is counted and the card's revision rises, so a proofread still in flight can no longer commit.
+ * Not allowed: `accepted` is false and nothing changes. Attempts are not reset.
+ */
+export function requestAutoFix(data: BookPipelineData, nodeId: string): Committed {
+  if (!data.order.includes(nodeId) || data.status !== "running" || data.phase !== "writing")
+    return { state: data, accepted: false };
+  if (autoFixesOf(data, nodeId) >= MAX_AUTO_FIXES) return { state: data, accepted: false };
+  const next = clone(data);
+  next.autoFixes = { ...(next.autoFixes ?? {}), [nodeId]: autoFixesOf(data, nodeId) + 1 };
+  next.revisions[nodeId] = cardRevision(next, nodeId) + 1;
+  next.revision++;
+  return { state: next, accepted: true };
 }
 
 /** A card was reset by the owner or needs another pass (single-card rerun): its counters and its stage start over. */

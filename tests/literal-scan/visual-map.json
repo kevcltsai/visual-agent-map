@@ -32,6 +32,11 @@
       "file": "experiences/visual-map/book-pipeline-rerun.ts",
       "text": "Do not rely on sources that could not be opened and checked; use other sources that can be opened and checked.",
       "reason": "model-facing one-line instruction composed by the program from a constant sentence plus cleaned https addresses (JSON strings); the owner never types it and no note or model text becomes part of the sentence"
+    },
+    {
+      "file": "experiences/visual-map/book-pipeline-rerun.ts",
+      "text": "The previous version of this chapter failed the fact check on these points",
+      "reason": "model-facing one-line request to the author composed by the program from a constant sentence plus the failed fact points as JSON strings; the owner never types it, no model sentence is an instruction line, and the proofread never receives it"
     }
   ]
 }

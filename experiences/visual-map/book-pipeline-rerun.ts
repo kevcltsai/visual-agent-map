@@ -1,4 +1,4 @@
-import { latestStoredProof } from "../../core/book-pipeline/note-sections";
+import { latestStoredProof, neutralizeText, type StoredProofView } from "../../core/book-pipeline/note-sections";
 import type { PipelineStage } from "../../core/book-pipeline/model";
 
 /**
@@ -76,6 +76,42 @@ export function avoidSourcesInstruction(addresses: readonly string[]): string {
   return clean.length ? head + " Not usable: " + clean.map(address => JSON.stringify(address)).join(" ") : head;
 }
 
+const FIX_INSTRUCTION_MAX = 1000;
+const FIX_ITEM_MAX = 140;
+/** The "do not use these" list never takes more than this, so the unmet points always have room. */
+const FIX_AVOID_MAX = 450;
+const oneLine = (value: string, max: number): string =>
+  Array.from(value.replace(/\s+/g, " ").trim()).slice(0, max).join("");
+/**
+ * The automatic redo's one line when the proofread did not pass: constant words plus, for each fact point that did not hold, its
+ * checklist text and the verifier's note, each as a JSON string cut to a few hundred characters (so a model sentence is data in
+ * quotes, never an instruction line), then the `[!vam-book]` callout type neutralized. Only the author gets it; the proofread never does.
+ * Unverified sources become the "do not use these" list of {@link avoidSourcesInstruction}.
+ */
+export function proofFixInstruction(
+  items: readonly { id: string; type: string; status: string; note: string; sources: readonly string[] }[],
+  checklist: readonly { id: string; text: string }[]
+): string {
+  const failed = items.filter(item => item.type === "fact" && item.status === "unmet");
+  let sources = cleanAvoidSources(
+    items.filter(item => item.type === "fact" && item.status !== "met").flatMap(item => item.sources)
+  );
+  // Whole pieces only: a cut in the middle of a JSON string would leave an unclosed quote, so what does not fit is left out.
+  while (sources.length && avoidSourcesInstruction(sources).length > FIX_AVOID_MAX) sources = sources.slice(0, -1);
+  const avoid = avoidSourcesInstruction(sources);
+  const lead =
+    "The previous version of this chapter failed the fact check on these points (JSON strings; rewrite the chapter so they are correct and supported): ";
+  let room = FIX_INSTRUCTION_MAX - avoid.length - lead.length - 1;
+  const points: string[] = [];
+  for (const item of failed) {
+    const text = checklist.find(entry => entry.id === item.id)?.text ?? "";
+    const point = JSON.stringify(oneLine(`${text} / ${item.note}`, FIX_ITEM_MAX * 2));
+    if (point.length + 1 > room) break;
+    points.push(point);
+    room -= point.length + 1;
+  }
+  return neutralizeText((points.length ? lead + points.join(" ") + " " : "") + avoid);
+}
 /** What a rerun compares: the stage, the issue code and each proof item's id, status and sources. In memory only. */
 export interface CardResultSnapshot {
   stage: PipelineStage | undefined;

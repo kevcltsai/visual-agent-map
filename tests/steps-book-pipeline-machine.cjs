@@ -440,3 +440,26 @@ test('another map\'s ordinary research is not affected when this map\'s budget i
   assert.equal((await r.service.askModel(taskContext({ usageMapPath: 'other/Map.md' }), 'gpt-6-luna', 'low')).summary, 'S');
   assert.equal(r.calls.length, 1);
 });
+
+test('requestAutoFix: one redo per card, a revision rise, attempts kept, the use survives stop and resume; not outside writing or for an unknown card', () => {
+  const writing = () => ({ ...plain(fresh()), phase: 'writing', globalPlanned: true });
+  const state = writing();
+  state.attempts.a = { plan: 1, write: 1, proof: 1 };
+  const rev = machine.cardRevision(state, 'a');
+  const first = machine.requestAutoFix(state, 'a');
+  assert.equal(first.accepted, true);
+  assert.equal(first.state.autoFixes.a, 1);
+  assert.equal(machine.cardRevision(first.state, 'a'), rev + 1, 'a late result of the old round is stale');
+  assert.deepEqual(plain(first.state.attempts.a), plain(state.attempts.a), 'attempts are not reset');
+  assert.equal(state.autoFixes, undefined, 'the input is not changed');
+  const stopped = machine.stopRun(first.state);
+  assert.equal(machine.autoFixesOf(machine.resumeRun(stopped), 'a'), 1, 'stop and reopen never give another');
+  const second = machine.requestAutoFix(first.state, 'a');
+  assert.equal(second.accepted, false);
+  assert.equal(second.state, first.state);
+  assert.equal(machine.requestAutoFix(first.state, 'b').accepted, true, 'another card has its own');
+  assert.equal(machine.requestAutoFix(state, 'zzz').accepted, false);
+  assert.equal(machine.requestAutoFix(machine.stopRun(state), 'a').accepted, false);
+  assert.equal(machine.requestAutoFix(fresh(), 'a').accepted, false, 'planning phase');
+  assert.equal(model.readBookPipeline({ bookPipeline: plain(first.state) }).kind, 'usable');
+});

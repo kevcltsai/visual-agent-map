@@ -24,6 +24,7 @@ import {
   applyFailure,
   applyReset,
   applySuccess,
+  autoFixesOf,
   beginStep,
   cardRevision,
   confirmGate1,
@@ -32,6 +33,7 @@ import {
   newBookPipeline,
   nextActions,
   recoverInterrupted,
+  requestAutoFix,
   resetCard,
   resumeRun,
   retryGlobalPlan,
@@ -129,6 +131,7 @@ import { untilAborted } from "./argument-run";
 import {
   avoidSourcesInstruction,
   cardResultSnapshot,
+  proofFixInstruction,
   sameReviewResult,
   type CardResultSnapshot
 } from "./book-pipeline-rerun";
@@ -353,6 +356,8 @@ interface Drive {
   extra: Map<string, string>;
   /** Cards whose `extra` line is a source swap: the author gets it too (an owner's replan line is for the plan only). */
   avoid: Set<string>;
+  /** Cards whose proofread named unmet points, waiting for the one automatic redo once every card has had its first round: the program-built request line. */
+  fixable: Map<string, string>;
   /** In memory only: the single-card rerun in progress. */
   rerun?: { nodeId: string; startedAt: number };
   /** The plan a card's plan step wrote in this drive. */
@@ -1090,6 +1095,7 @@ export class BookPipelineRuns {
       busy: new Set(),
       extra: new Map(),
       avoid: new Set(),
+      fixable: new Map(),
       plans: new Map(),
       authorModels: new Map(),
       started: new Map(),
@@ -1255,6 +1261,10 @@ export class BookPipelineRuns {
           await this.markReview(drive, action.nodeId, action.step, drive.reasons.get(action.nodeId) ?? "failed");
           changed = true;
         } else if (action.type === "advance_phase") {
+          if (await this.startFixes(drive)) {
+            changed = true;
+            continue;
+          }
           const before = drive.store.state;
           await drive.store.commit(state => ({
             state: advancePhase(state, this.stagesOf(drive), this.ports.now()),
@@ -1460,6 +1470,45 @@ export class BookPipelineRuns {
       pipelineIssue: `${step} failed: ${code(reason)}`
     });
     if (step !== "plan" && !NO_FAILURE_SECTION.has(reason)) await this.writeFailureSection(drive, nodeId, reason);
+  }
+  /**
+   * The one automatic redo (plan 2026 flow v3, E), after every card has had its first round: a card whose proofread named unmet points
+   * gets its text written again by the author alone (the plan and the checklist stay, attempts are not reset), then proofread once more.
+   * The real points go to the author only (never to the proofread). A refused or no longer allowed request leaves the card needs-review.
+   * Returns how many cards were sent back; only cards queued by this drive's own proofreads are considered.
+   */
+  private async startFixes(drive: Drive): Promise<number> {
+    let started = 0;
+    const queued = [...drive.fixable];
+    drive.fixable.clear();
+    for (const [nodeId, instruction] of queued) {
+      if (this.dead(drive) || drive.controller.signal.aborted) break;
+      if (drive.stages.get(nodeId) !== "needs-review") continue;
+      const done = await drive.store.commit(state => requestAutoFix(state, nodeId));
+      if (!done?.accepted) continue;
+      drive.extra.set(nodeId, instruction);
+      drive.avoid.add(nodeId);
+      drive.reasons.delete(nodeId);
+      drive.reviewStep.delete(nodeId);
+      drive.imagesDone.delete(nodeId);
+      drive.stages.set(nodeId, "planned");
+      await this.writeFields(drive, nodeId, { pipelineStage: "planned", pipelineIssue: null });
+      this.ports.log(
+        formatPipelineLog({
+          event: "auto_fix",
+          runId: drive.store.state.runId,
+          card: nodeId,
+          step: "proof",
+          attempt: 0,
+          result: "unmet",
+          ms: 0,
+          counts: { round: autoFixesOf(drive.store.state, nodeId) }
+        })
+      );
+      started++;
+    }
+    if (started) this.ports.progressed?.(drive.mapPath);
+    return started;
   }
   /** The proof-result section of a card as `finalize`/`transform` text: the result with the models, or the failure line (never a model). */
   private proofSectionOf(
@@ -1773,7 +1822,6 @@ export class BookPipelineRuns {
     if (!slots) return this.settleStrayMarkers(path, authorize);
     const first = await this.ports.readCard(path);
     const marked = slots.length ? scanSlotMarkers(first.detail, slots).found : new Map<number, number>();
-    let found: FoundImages | undefined;
     const others = new Set<string>();
     if (slots.length) {
       // What the other chapters already show (not this card's own old pictures: a rerun may pick again).
@@ -1785,66 +1833,99 @@ export class BookPipelineRuns {
         }
     }
     const wanted = slots.filter(slot => marked.has(slot.index));
-    if (wanted.length && this.ports.findImages) {
+    const exclude = [...new Set([...drive.usedImages, ...others])];
+    // One search call for `list`; a failed or timed-out call is an optional gain lost (undefined), never a failure of the chapter.
+    const search = async (
+      list: ImageSlot[],
+      again: boolean,
+      avoid: readonly string[]
+    ): Promise<FoundImages | undefined> => {
+      if (!list.length || !this.ports.findImages) return undefined;
       try {
-        found = await untilAborted(
+        return await untilAborted(
           signal,
           this.ports.findImages(
             {
               ...this.base(drive, drive.config.imageModel),
               chapter: imageSearchText(first),
-              slots: wanted.map(({ index, kind, explains }) => ({ index, kind, explains })),
-              exclude: [...new Set([...drive.usedImages, ...others])]
+              slots: list.map(({ index, kind, explains }) => ({ index, kind, explains })),
+              exclude: [...avoid],
+              ...(again ? { again: true } : {})
             },
             { signal, admission: drive.admission }
           )
         );
       } catch (error) {
-        if (isBudgetExhausted(error)) return { kind: "budget" };
+        if (isBudgetExhausted(error)) throw error;
         if (signal.aborted) throw error;
-        // The search is an optional gain: a call error or a timeout leaves the slots without a picture.
+        return undefined;
       }
-    }
-    // Probe each distinct safe address once (the first PROBE_PER_CHAPTER in slot order); the gate limits how many run at once.
+    };
+    // Probe each distinct safe address once (the first PROBE_PER_CHAPTER in slot order, the limit covers both searches); the gate limits how many run at once.
     const probes = new Map<string, Promise<boolean>>();
-    const listed = wanted.map(slot => ({
-      index: slot.index,
-      items: (found?.bySlot.get(slot.index) ?? []).map(candidate => {
-        const href = safeHref(candidate.url);
-        if (href && !probes.has(href) && probes.size < PROBE_PER_CHAPTER)
-          probes.set(href, this.probeGated(drive, href));
-        return { candidate, href };
-      })
-    }));
     const loadedHref = new Map<string, boolean>();
-    await Promise.all([...probes].map(async ([href, work]) => loadedHref.set(href, await work)));
-    const perSlot = new Map<number, ProbedCandidate[]>(
-      listed.map(({ index, items }) => [
-        index,
-        items.map(({ candidate, href }) => ({
-          candidate: {
-            imageUrl: candidate.url,
-            sourceUrl: candidate.source,
-            title: candidate.title,
-            caption: candidate.caption
-          },
-          href,
-          loaded: href ? (loadedHref.get(href) ?? false) : false,
-          ...(href && !loadedHref.has(href) ? { skipped: true } : {})
-        }))
-      ])
-    );
+    const probeFound = async (
+      list: ImageSlot[],
+      from: FoundImages | undefined
+    ): Promise<Map<number, ProbedCandidate[]>> => {
+      const listed = list.map(slot => ({
+        index: slot.index,
+        items: (from?.bySlot.get(slot.index) ?? []).map(candidate => {
+          const href = safeHref(candidate.url);
+          if (href && !probes.has(href) && probes.size < PROBE_PER_CHAPTER)
+            probes.set(href, this.probeGated(drive, href));
+          return { candidate, href };
+        })
+      }));
+      await Promise.all(
+        [...probes]
+          .filter(([href]) => !loadedHref.has(href))
+          .map(async ([href, work]) => loadedHref.set(href, await work))
+      );
+      return new Map(
+        listed.map(({ index, items }) => [
+          index,
+          items.map(({ candidate, href }) => ({
+            candidate: {
+              imageUrl: candidate.url,
+              sourceUrl: candidate.source,
+              title: candidate.title,
+              caption: candidate.caption
+            },
+            href,
+            loaded: href ? (loadedHref.get(href) ?? false) : false,
+            ...(href && !loadedHref.has(href) ? { skipped: true } : {})
+          }))
+        ])
+      );
+    };
+    const perSlot = new Map<number, ProbedCandidate[]>();
+    const taken = (key: string): boolean => drive.usedImages.has(key) || others.has(key);
+    try {
+      const round1 = await search(wanted, false, exclude);
+      for (const [index, list] of await probeFound(wanted, round1)) perSlot.set(index, list);
+      // A second search (once) for the slots the first one left without a usable picture: another direction, the tried addresses excluded.
+      if (round1) {
+        const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
+        const lacking = wanted.filter(slot => !("figure" in (provisional.get(slot.index) ?? {})));
+        const tried = [
+          ...new Set([...perSlot.values()].flatMap(list => list.map(item => imageKey(item.candidate.imageUrl))))
+        ];
+        const second = await search(lacking, true, [...tried, ...exclude]);
+        if (second) {
+          for (const [index, list] of await probeFound(lacking, second))
+            perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
+        }
+      }
+    } catch (error) {
+      if (isBudgetExhausted(error)) return { kind: "budget" };
+      throw error;
+    }
     // Re-read the latest text: the search and the probes took time, and the owner may have edited the card.
     const latest = await this.ports.readCard(path);
     // The card may have left the map while the search and the probes ran: nothing is claimed or written for it.
     if (!(await this.stillOnMap(drive, nodeId))) return { kind: "failed", reason: "card_removed" };
-    const outcomes = choosePictures(
-      { id: nodeId, title: latest.title },
-      slots,
-      perSlot,
-      key => drive.usedImages.has(key) || others.has(key),
-      language
-    );
+    const outcomes = choosePictures({ id: nodeId, title: latest.title }, slots, perSlot, taken, language);
     // Claim in the same synchronous turn as the choice: chapters run side by side, so the exclude list alone cannot stop a repeat.
     const claimed = [...outcomes.values()].flatMap(outcome =>
       "figure" in outcome ? [imageKey(outcome.figure.href)] : []
@@ -2042,8 +2123,14 @@ export class BookPipelineRuns {
     const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
     return {
       kind: "ok",
-      after: () =>
-        this.setStage(
+      after: async () => {
+        if (verdict.aggregate === "needs-review" && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0)
+          drive.fixable.set(nodeId, proofFixInstruction(verdict.items, checklist));
+        else if (!drive.job) {
+          drive.extra.delete(nodeId);
+          drive.avoid.delete(nodeId);
+        }
+        await this.setStage(
           drive,
           nodeId,
           verdict.aggregate,
@@ -2057,7 +2144,8 @@ export class BookPipelineRuns {
             : noticed.length
               ? `structure unmet: ${noticed.join(" ")}`
               : null
-        )
+        );
+      }
     };
   }
 

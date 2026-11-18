@@ -1,6 +1,6 @@
 /**
  * Pure edits of the note parts the picture-book pipeline owns: the work records of a card's Detail (proof and picture-slot records, the
- * write-back log lines) and the card's proofread result, both kept in hidden `> [!vam-book]-` callouts, and the `## 全書企劃` section of the root note.
+ * write-back log lines) and the card's proofread result, both kept in hidden `> [!vam-book]-` callouts, and the book plan of the root note (a `> [!vam-book]- 全書企劃` callout; an older root keeps a `## 全書企劃` section until the pipeline writes it again).
  * Older cards keep their `### 研究備註` section (a `[!note]-` callout) and `## 校對結果` section; they are read as before and turned into
  * the hidden callouts the first time the pipeline writes them. Nothing else in the text is touched.
  */
@@ -11,6 +11,7 @@ import {
   SECTION_NAME
 } from "../../ai/section-aliases";
 import { NOTE_LANGUAGES, translate } from "../../i18n";
+import { isBookPlanTitle } from "./plan-text";
 import { demoteHeadings } from "./text";
 import { findProofModels, findProofRecord, PROOF_STATUSES, type ProofItemResult, type ProofResult } from "./proof";
 
@@ -262,10 +263,12 @@ function hideUpdateLog(text: string, own?: (line: string) => boolean): string {
       from
     );
     if (!section) break;
-    const body = lines
-      .slice(section.at + 1, section.end)
-      .map(bare)
-      .filter(line => line.trim());
+    // A hidden callout right under the heading is not the section's text: it stays (after the section) and never keeps the heading alive.
+    const ranges = hiddenRanges(lines, fencedLines(lines)).filter(r => r.start > section.at && r.end <= section.end);
+    const inHidden = (i: number): boolean => ranges.some(r => i >= r.start && i < r.end);
+    const isText = lines.map((line, i) => i > section.at && i < section.end && !inHidden(i) && line.trim() !== "");
+    const body = lines.filter((_, i) => isText[i]).map(bare);
+    const hidden = ranges.flatMap((r, i) => (i ? ["", ...lines.slice(r.start, r.end)] : lines.slice(r.start, r.end)));
     if (!body.length || (!own && !body.every(line => LOG_LINE.test(line)))) {
       from = section.at + 1;
       continue;
@@ -278,22 +281,56 @@ function hideUpdateLog(text: string, own?: (line: string) => boolean): string {
         continue;
       }
       moved.push(...mine);
-      const rest = lines.slice(section.at + 1, section.end).filter(line => line.trim() && !own(bare(line).trim()));
-      lines = spliceBlock(lines, section.at, section.end, rest.length ? [lines[section.at], "", ...rest] : []);
+      const rest = lines.filter((line, i) => isText[i] && !own(bare(line).trim()));
+      lines = spliceBlock(lines, section.at, section.end, [
+        ...(rest.length ? [lines[section.at], "", ...rest] : []),
+        ...(rest.length && hidden.length ? [""] : []),
+        ...hidden
+      ]);
       from = section.at + 1;
       continue;
     }
     moved.push(...body);
-    lines = spliceBlock(lines, section.at, section.end, []);
+    lines = spliceBlock(lines, section.at, section.end, hidden);
     from = section.at;
   }
   if (!moved.length) return text;
   return appendHidden(lines.join("\n"), moved.map(line => `> ${line}`).join("\n"));
 }
 
+const RECORD_COPY = /(?:<|&lt;)!-- book-(?:proof|slots):v1 /;
+
+/**
+ * A visible copy of the work-record callout: the author model saw the card's old Research notes callout and wrote it again in its text (the
+ * hidden form is neutralized to a `[!note]` callout, its record comments come out HTML-escaped). A callout of a type other than the pipeline's
+ * hidden one, titled "Research notes" in any language and holding a `book-proof`/`book-slots` record, is dropped: the real records are carried
+ * back in the hidden callout. Any other callout the author wrote stays.
+ */
+function dropRecordCopies(text: string): string {
+  let lines = text.split("\n");
+  const fenced = fencedLines(lines);
+  // The older card's own `### 研究備註` section is converted by hideResearchSection, not dropped.
+  const older: { at: number; end: number }[] = [];
+  for (let from = 0; ;) {
+    const section = findSection(lines, fenced, name => isResearchNotesHeading(name), from);
+    if (!section) break;
+    older.push(section);
+    from = section.at + 1;
+  }
+  const drop = calloutBlocks(lines, fenced, 0, lines.length).filter(block => {
+    if (older.some(section => block.start > section.at && block.start < section.end)) return false;
+    if (HIDDEN_HEAD.test(bare(lines[block.start]))) return false;
+    const title =
+      /^[ \t]{0,3}>[ \t]?\[![A-Za-z][\w-]*\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[block.start]))?.[1] ?? "";
+    return isResearchNotesHeading(title) && lines.slice(block.start, block.end).some(line => RECORD_COPY.test(line));
+  });
+  for (const block of drop.reverse()) lines = spliceBlock(lines, block.start, block.end, []);
+  return lines.join("\n");
+}
+
 /** The pipeline's work records of a Detail in the hidden callout: an older Research notes section or write-back log section is turned into it; the same text again changes nothing. */
 export function normalizeWorkRecords(detail: string): string {
-  return hideUpdateLog(hideResearchSection(detail));
+  return hideUpdateLog(hideResearchSection(dropRecordCopies(detail)));
 }
 
 /**
@@ -307,14 +344,20 @@ export function hidePipelineLog(detail: string, known: ReadonlySet<string>, back
     translate(locale, "note.writeback_fresh_replaced_0", marker).split(marker)
   ).filter(parts => parts.length === 2);
   const escape = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  // Only the exact line the write-back made for this write (this backup path); a log line the author wrote stays visible.
-  const ownLine = backupPath
+  // Only the exact line the write-back made for this write. The write-back takes its own backup of the card (same folder, same note name,
+  // a newer time stamp, so a different path from the pipeline's `backupPath`): the path must be that folder + `<note name> <date> <time>[ (n)].md`.
+  // A log line the author wrote (any other text or any other folder) stays visible.
+  const stamp = /^(.*\/)?(.+) \d{4}-\d{2}-\d{2} \d{6}(?: \(\d+\))?\.md$/.exec(backupPath ?? "");
+  const pathShape = stamp
+    ? `${escape(stamp[1] ?? "")}${escape(stamp[2])} \\d{4}-\\d{2}-\\d{2} \\d{6}(?: \\(\\d+\\))?\\.md`
+    : "";
+  const ownLine = stamp
     ? shapes.map(
         ([head, tail]) =>
-          new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escape(head)}${escape(backupPath)}${escape(tail)}$`)
+          new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escape(head)}${pathShape}${escape(tail)}$`)
       )
     : [];
-  return hideUpdateLog(detail, line => known.has(line) || ownLine.some(re => re.test(line)));
+  return hideUpdateLog(dropRecordCopies(detail), line => known.has(line) || ownLine.some(re => re.test(line)));
 }
 
 /** The dated log lines the write-back keeps in the work records (plain text, the `> ` prefix removed). */
@@ -529,13 +572,17 @@ export function withoutResearchNotes(detail: string): string {
 }
 
 /**
- * Replaces the body of the root note's `## 全書企劃` section with `markdown` (or adds the section at the end); every other
- * section, the frontmatter and the text around it stay byte for byte. `markdown` is the body only: its `#`/`##` heading lines
- * are demoted so it can never open or close a section.
+ * Sets the root note's book plan to `markdown` (the body only; its `#`/`##` heading lines are demoted so it can never open or close a section)
+ * as a hidden callout `> [!vam-book]- 全書企劃` (every line a `> ` quote line, so nothing in it can form a heading, link or callout). The plan is
+ * the pipeline's own record: reading and live preview do not show it, `parseBookPlanBody`/`parseBookPlanDecisions` read both forms.
+ * An existing plan callout is replaced in place; an older `## 全書企劃` section is replaced by the callout (a hidden callout of another kind
+ * inside it, such as the proofread result, stays right after); neither: the callout is added at the end. Every other section, the frontmatter and
+ * the text around it stay as they are.
  */
 export function replaceBookPlanSection(content: string, markdown: string): string {
   const body = demoteHeadings(markdown.replace(/\r\n?/g, "\n")).trim();
-  const lines = content.split("\n");
+  const entry = `> [!${HIDDEN_CALLOUT}]- ${BOOK_PLAN_HEADING}\n${quoteAll(body)}`.split("\n");
+  let lines = content.split("\n");
   const fenced = fencedLines(lines);
   // The frontmatter block is not a place for a section heading.
   if (lines[0]?.trim() === "---") {
@@ -544,15 +591,32 @@ export function replaceBookPlanSection(content: string, markdown: string): strin
       if (lines[i].trim() === "---") break;
     }
   }
+  const titleOf = (line: string): string =>
+    /^[ \t]{0,3}>[ \t]?\[![^\]]+\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(line))?.[1] ?? "";
+  const isPlan = (range: { start: number }): boolean => isBookPlanTitle(titleOf(lines[range.start]));
+  const callout = hiddenRanges(lines, fenced).find(isPlan);
   const section = findSection(lines, fenced, (text, level) => level === 2 && text === BOOK_PLAN_HEADING);
-  const entry = `## ${BOOK_PLAN_HEADING}\n\n${body}`;
-  if (!section) {
-    const base = content.replace(/\s+$/, "");
-    return `${base ? `${base}\n\n` : ""}${entry}\n`;
+  const edits: { at: number; end: number; middle: string[] }[] = [];
+  // A plan callout inside the old section is replaced with it; one outside the section is replaced in place and the section keeps only its other hidden callouts.
+  const apart = callout && !(section && callout.start > section.at && callout.end <= section.end);
+  if (section) {
+    const kept = hiddenRanges(lines, fenced)
+      .filter(range => range.start > section.at && range.end <= section.end && !isPlan(range))
+      .map(range => lines.slice(range.start, range.end));
+    const middle = kept.flatMap((block, i) => (i ? ["", ...block] : block));
+    edits.push({
+      at: section.at,
+      end: section.end,
+      middle: apart ? middle : [...entry, ...(middle.length ? ["", ...middle] : [])]
+    });
   }
-  const before = lines.slice(0, section.at).join("\n");
-  const after = lines.slice(section.end).join("\n");
-  return `${before ? `${before}\n` : ""}${entry}${after ? `\n\n${after}` : "\n"}`;
+  if (callout && apart) edits.push({ at: callout.start, end: callout.end, middle: entry });
+  if (!edits.length) {
+    const base = content.replace(/\s+$/, "");
+    return `${base ? `${base}\n\n` : ""}${entry.join("\n")}\n`;
+  }
+  for (const edit of edits.sort((x, y) => y.at - x.at)) lines = spliceBlock(lines, edit.at, edit.end, edit.middle);
+  return lines.join("\n");
 }
 
 const isUpdateLogHeading = (text: string): boolean =>

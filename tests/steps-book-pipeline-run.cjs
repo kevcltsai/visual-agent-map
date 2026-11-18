@@ -105,9 +105,9 @@ test('a step that fails three times marks the card needs-review with a neutral c
   await confirmDone(r.runs, r.mapPath);
   const s = await r.state();
   assert.equal(s.phase, 'gate2');
-  assert.equal(r.stat.author.filter(id => id === bad.id).length, 3);
+  assert.equal(r.stat.author.filter(id => id === bad.id).length, 9, 'three attempts, then two automatic rounds of three');
   assert.equal(stageOf(r.raw(1)), 'needs-review');
-  assert.equal((await r.note(1)).pipelineIssue, 'write failed: failed');
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: failed; auto_quota');
   assert.equal(stageOf(r.raw(0)), 'checked'); assert.equal(stageOf(r.raw(2)), 'checked');
 });
 
@@ -299,7 +299,7 @@ test('write: an author result whose Detail has only sources and notes (no chapte
   const note = await r.note(1);
   assert.ok(!note.detail.includes('s.example'), 'the body-less result is not written');
   assert.equal(stageOf(r.raw(1)), 'needs-review');
-  assert.equal(note.pipelineIssue, 'write failed: no_body');
+  assert.equal(note.pipelineIssue, 'write failed: no_body; auto_quota');
 });
 
 test('pictures: when the exit check finds an unsafe body nothing is written, the card needs review with a neutral code and the log has no body', async () => {
@@ -313,7 +313,7 @@ test('pictures: when the exit check finds an unsafe body nothing is written, the
   await confirmDone(r.runs, r.mapPath);
   assert.ok(!(await r.note(1)).detail.includes('無圖'), 'the cleaned result is not written');
   assert.equal(stageOf(r.raw(1)), 'needs-review');
-  assert.equal((await r.note(1)).pipelineIssue, 'write failed: unsafe_body');
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: unsafe_body; auto_quota');
   const log = r.stat.logs.join('\n');
   assert.ok(log.includes('unsafe_body') && !/Secret|ok\.example|e\.example/.test(log));
 });
@@ -373,9 +373,12 @@ test('exit safety: a body the exit check refuses is not written at all (the card
   const earlier = before();
   await confirmDone(r.runs, r.mapPath);
   assert.equal(before().includes('evil.example'), false);
-  assert.ok(before().endsWith(FAIL_SECTION)); assert.equal(before().slice(0, -FAIL_SECTION.length), earlier);
+  // Two automatic rounds each left one hidden `book-fix:v1` line (the pipeline's own record); nothing else is added to the card text.
+  const FIX = '> [!vam-book]- 研究備註\n> <!-- book-fix:v1 {"round":1,"step":"write","code":"unsafe_body"} -->\n>\n> <!-- book-fix:v1 {"round":2,"step":"write","code":"unsafe_body"} -->\n';
+  assert.ok(before().endsWith(FAIL_SECTION));
+  assert.equal(before().slice(0, -FAIL_SECTION.length), earlier.replace('<!-- visual-agent-map:detail:start -->\n\n', `<!-- visual-agent-map:detail:start -->\n${FIX}`));
   assert.equal(stageOf(r.raw(1)), 'needs-review');
-  assert.equal((await r.note(1)).pipelineIssue, 'write failed: unsafe_body');
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: unsafe_body; auto_quota');
 });
 
 test('probe failure reasons are words in the output language (zh: 無法載入 / 空圖 / 逾時 / 已中止; en: English)', async () => {
@@ -600,8 +603,8 @@ test('a proof that opened pages but verified no fact keeps the judged structure 
   await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
   const raw = r.raw(1);
   assert.equal(stageOf(raw), 'needs-review');
-  assert.equal(r.stat.proof.length, r.nodes.length, 'one proofread per card: pages were opened but no fact verified is not retried (Primary decision)');
-  assert.equal((await r.note(1)).pipelineIssue, 'proof unmet: facts_unverified');
+  assert.equal(r.stat.proof.length, r.nodes.length * 3, 'one proofread per card and per round: unverified facts get two automatic rounds (T4)');
+  assert.equal((await r.note(1)).pipelineIssue, 'proof unmet: facts_unverified; auto_quota');
   assert.ok(!/校對失敗/.test(raw));
   assert.match(raw, /C1 達成：judged C1/);
   assert.equal((raw.match(/book-proof:v1/g) ?? []).length, 1, 'the result is recorded once');

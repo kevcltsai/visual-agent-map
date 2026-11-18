@@ -273,10 +273,10 @@ const rawItems = request => request.checklist.map(c => ({ id: c.id, status: 'met
 test('a proofread that opened pages but could verify no fact item is not retried: judged items kept, needs-review, "facts unverified" in the notes and the issue', async () => {
   const r = await rig({ script: { card: factCard, proof: async request => evaluateProof(rawItems(request), request.checklist, ['https://example.org/p']) } });
   await toGate2(r);
-  assert.equal(r.stat.proof.length, 4, 'one proofread per card, no retry');
+  assert.equal(r.stat.proof.length, 12, 'one proofread per card and per round: two automatic rounds (T4)');
   for (let i = 0; i < 4; i++) {
     assert.equal(stageOf(r.raw(i)), 'needs-review');
-    assert.equal((await r.note(i)).pipelineIssue, 'proof unmet: facts_unverified');
+    assert.equal((await r.note(i)).pipelineIssue, 'proof unmet: facts_unverified; auto_quota');
     const detail = (await r.note(i)).detail;
     assert.match(detail, /校對（需人看；事實項目皆待查）/); assert.match(detail, /C1 達成：judged C1/); assert.match(detail, /C2 待查/);
     assert.ok(!/校對失敗/.test(detail)); assert.equal((detail.match(/book-proof:v1/g) ?? []).length, 1);
@@ -289,8 +289,8 @@ test('a proofread that opened pages but could verify no fact item is not retried
 test('a proofread that opened no page at all is still a failure: retried three times, then needs-review', async () => {
   const r = await rig({ script: { card: factCard, proof: async request => { try { return evaluateProof(rawItems(request), request.checklist, []); } catch (error) { Object.setPrototypeOf(error, Object.getPrototypeOf(BookPipelineRunError.prototype)); throw error; } } } }); // evaluateProof is loaded in its own realm: an Error of another realm would be re-wrapped by untilAborted (never in production, one realm)
   await toGate2(r);
-  assert.equal(r.stat.proof.length, 12, 'three attempts for each of the four cards');
-  for (let i = 0; i < 4; i++) { assert.equal(stageOf(r.raw(i)), 'needs-review'); assert.equal((await r.note(i)).pipelineIssue, 'proof failed: no_open_page'); }
+  assert.equal(r.stat.proof.length, 36, 'three attempts for each of the four cards, in three rounds (T4)');
+  for (let i = 0; i < 4; i++) { assert.equal(stageOf(r.raw(i)), 'needs-review'); assert.equal((await r.note(i)).pipelineIssue, 'proof failed: no_open_page; auto_quota'); }
   assert.match((await r.note(1)).detail, /校對失敗（原因：no_open_page/);
 });
 

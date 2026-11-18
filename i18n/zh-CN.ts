@@ -3179,6 +3179,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_summary_done": "实际讲了：",
   "ui.book_issue_0": "需人看：{0}",
   "ui.book_issue_unknown": "需要人工查看（原因代码无法识别）。",
+  "ui.book_issue_auto_quota_0": "{0}（自动重试额度已用完。）",
   "ui.book_issue_step_0_1": "{0}失败：{1}",
   "ui.book_issue_unmet_0": "校对未达成项目：{0}",
   "ui.book_structure_unmet_0": "结构 {0} 项未达成",

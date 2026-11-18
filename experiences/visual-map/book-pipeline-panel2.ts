@@ -1,5 +1,6 @@
 import { t, type TranslationKey } from "../../i18n";
 import type { PipelineStage } from "../../core/book-pipeline/model";
+import { AUTO_QUOTA_SUFFIX } from "../../core/book-pipeline/model";
 import { describeSlots, latestSlotsRecord } from "../../core/book-pipeline/image-slots";
 import { chapterBody, latestStoredProof, type StoredProofView } from "../../core/book-pipeline/note-sections";
 import { parseImageSlots } from "../../core/book-pipeline/plan-text";
@@ -67,6 +68,8 @@ function changedIndex(seam: string): number | undefined {
 
 /** The reason of a needs-review card in words: the proof's own notes of the items not met, else the count, else the issue code's text. */
 function reasonOf(issue: string, proof: StoredProofView | undefined): string {
+  if (issue.endsWith(AUTO_QUOTA_SUFFIX))
+    return t("ui.book_issue_auto_quota_0", reasonOf(issue.slice(0, -AUTO_QUOTA_SUFFIX.length), proof));
   if (!/^proof unmet/.test(issue.trim()) || !proof) return bookIssueText(issue);
   const open = proof.items.filter(item => item.status !== "met");
   const notes = [...new Set(open.map(item => unescapeMarkdownText(item.note).trim()).filter(Boolean))].slice(0, 3);

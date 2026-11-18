@@ -11,6 +11,7 @@
 import {
   DEFAULT_BUDGET_LIMIT,
   FAILURE_CODE,
+  MAX_AUTO_FIXES,
   MAX_STEP_ATTEMPTS,
   attemptsOf,
   emptyAttempts,
@@ -330,6 +331,35 @@ export function retryGlobalPlan(data: BookPipelineData): BookPipelineData {
   next.attempts.global = 0;
   next.revision++;
   return next;
+}
+
+/** The calls a card's whole chain (plan, write, images, proof) needs at most, for the reserve of the cards still to do. */
+const AUTO_FIX_CARD_RESERVE = 4;
+const AUTO_FIX_BASE_RESERVE = 5;
+/** How many automatic redo rounds a card has used. */
+export function autoFixesOf(data: BookPipelineData, nodeId: string): number {
+  return data.autoFixes?.[nodeId] ?? 0;
+}
+/**
+ * Whether a card may be redone automatically now: fewer than {@link MAX_AUTO_FIXES} rounds used, and the budget left keeps
+ * {@link AUTO_FIX_CARD_RESERVE} calls for each other card that is not finished plus {@link AUTO_FIX_BASE_RESERVE}; a redo never starves the rest of the book.
+ */
+export function autoFixVerdict(data: BookPipelineData, nodeId: string, unfinishedOthers: number): "ok" | "rounds" | "quota" {
+  if (!data.order.includes(nodeId) || data.status !== "running") return "quota";
+  if (autoFixesOf(data, nodeId) >= MAX_AUTO_FIXES) return "rounds";
+  const left = data.budget.limit - data.budget.used;
+  return left >= AUTO_FIX_CARD_RESERVE * Math.max(0, unfinishedOthers) + AUTO_FIX_BASE_RESERVE ? "ok" : "quota";
+}
+/**
+ * One automatic redo of a card: when allowed, the round count rises and the card is reset (attempts start over, its revision rises,
+ * so a proofread still in flight can no longer commit). Not allowed: `accepted` is false and nothing changes.
+ */
+export function requestAutoFix(data: BookPipelineData, nodeId: string, unfinishedOthers = 0): Committed {
+  if (autoFixVerdict(data, nodeId, unfinishedOthers) !== "ok") return { state: data, accepted: false };
+  const reset = resetCard(data, nodeId);
+  const next = clone(reset);
+  next.autoFixes = { ...(next.autoFixes ?? {}), [nodeId]: autoFixesOf(data, nodeId) + 1 };
+  return { state: next, accepted: true };
 }
 
 /** A card was reset by the owner or needs another pass (single-card rerun): its counters and its stage start over. */

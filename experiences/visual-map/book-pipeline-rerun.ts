@@ -1,4 +1,4 @@
-import { latestStoredProof, type StoredProofView } from "../../core/book-pipeline/note-sections";
+import { latestStoredProof, neutralizeText, type StoredProofView } from "../../core/book-pipeline/note-sections";
 import type { PipelineStage } from "../../core/book-pipeline/model";
 
 /**
@@ -84,6 +84,43 @@ export function avoidSourcesInstruction(addresses: readonly string[]): string {
   const head =
     "Do not rely on sources that could not be opened and checked; use other sources that can be opened and checked.";
   return clean.length ? head + " Not usable: " + clean.map(address => JSON.stringify(address)).join(" ") : head;
+}
+
+const FIX_INSTRUCTION_MAX = 1000;
+const FIX_ITEM_MAX = 140;
+const oneLine = (value: string, max: number): string => Array.from(value.replace(/\s+/g, " ").trim()).slice(0, max).join("");
+/**
+ * The automatic redo's one line when the proofread did not pass: constant words plus, for each fact point that did not hold, its
+ * checklist text and the verifier's note, each as a JSON string cut to a few hundred characters (so a model sentence is data in
+ * quotes, never an instruction line), then the `[!vam-book]` callout type neutralized. Only the plan and the author get it; the proofread never does.
+ * Unverified sources become the "do not use these" list of {@link avoidSourcesInstruction}.
+ */
+export function proofFixInstruction(
+  items: readonly { id: string; type: string; status: string; note: string; sources: readonly string[] }[],
+  checklist: readonly { id: string; text: string }[]
+): string {
+  const failed = items.filter(item => item.type === "fact" && item.status === "unmet");
+  const unverifiedSources = cleanAvoidSources(
+    items.filter(item => item.type === "fact" && item.status !== "met").flatMap(item => item.sources)
+  );
+  const parts: string[] = [];
+  if (failed.length) {
+    const points = failed.map(item => {
+      const text = checklist.find(entry => entry.id === item.id)?.text ?? "";
+      return JSON.stringify(oneLine(`${text} / ${item.note}`, FIX_ITEM_MAX * 2));
+    });
+    parts.push(
+      "The previous version of this chapter failed the fact check on these points (JSON strings; rewrite the chapter so they are correct and supported): " +
+        points.join(" ")
+    );
+  }
+  parts.push(avoidSourcesInstruction(unverifiedSources));
+  return neutralizeText(oneLine(parts.join(" "), FIX_INSTRUCTION_MAX));
+}
+/** The automatic redo's one line when a step used up its attempts: constant words and the neutral failure code only. */
+export function stepFixInstruction(step: string, reasonCode: string): string {
+  const clean = (value: string): string => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60);
+  return `The previous attempt at the ${clean(step)} step of this chapter failed with the code ${JSON.stringify(clean(reasonCode))}; produce it again carefully, following the required structure exactly.`;
 }
 
 /** What a rerun compares: the stage, the issue code and each proof item's id, status and sources. In memory only. */

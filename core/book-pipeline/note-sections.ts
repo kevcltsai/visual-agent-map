@@ -345,6 +345,44 @@ export function appendResearchNote(detail: string, record: string): { text: stri
   return { text: appendHidden(detail, quoteAll(record)), appended: true };
 }
 
+const FIX_RECORD = /^<!-- book-fix:v1 (\{[^<>]*\}) -->$/;
+/**
+ * The pipeline's own record of one automatic redo (`book-fix:v1`): the round, the step and a neutral code, numbers and code characters
+ * only (no title, no model text). Written by the pipeline into the hidden callout through {@link appendFixRecord}, never by the author.
+ */
+export function composeFixRecord(round: number, step: string, code: string): string {
+  const clean = (value: string): string => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60) || "-";
+  return `<!-- book-fix:v1 ${JSON.stringify({ round: Math.max(0, Math.trunc(round)), step: clean(step), code: clean(code) })} -->`;
+}
+/** Adds one fix record to the hidden callout (an older work-records section is turned into it first); the same record again changes nothing. */
+export function appendFixRecord(detail: string, record: string): string {
+  const base = normalizeWorkRecords(detail);
+  if (extractFixRecords(base).includes(record)) return base;
+  return appendHidden(base, quoteAll(record));
+}
+/** The fix records stored in the hidden callouts of a Detail (valid JSON, outside code), oldest first. Text outside a hidden callout is never a record. */
+export function extractFixRecords(detail: string): string[] {
+  const lines = detail.split("\n");
+  const fenced = fencedLines(lines);
+  const mask = recordLines(lines, fenced);
+  const out: string[] = [];
+  lines.forEach((line, at) => {
+    if (!mask[at] || fenced[at]) return;
+    const plain = unquoted(bare(line)).trim();
+    const m = FIX_RECORD.exec(plain);
+    if (m && validJson(m[1])) out.push(plain);
+  });
+  return out;
+}
+/** A rewritten Detail that lost the card's earlier fix records: they are put back at the end of the hidden callout. */
+export function carryFixRecords(oldDetail: string, newDetail: string): string {
+  let text = newDetail;
+  for (const record of extractFixRecords(oldDetail)) {
+    if (!extractFixRecords(text).includes(record)) text = appendHidden(text, quoteAll(record));
+  }
+  return text;
+}
+
 const PIPELINE_RECORD = /^<!-- (book-(?:proof|slots)):v1 (\{.*\}) -->$/;
 const PROOF_ITEM_LINE = /^- .+ (?:達成|未達成|待查)：/;
 const QUOTE_BLANK = /^[ \t]{0,3}>[ \t]*\r?$/;

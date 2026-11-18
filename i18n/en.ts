@@ -3399,6 +3399,7 @@ export const en = {
   "ui.book_summary_done": "What it covers: ",
   "ui.book_issue_0": "Needs a look: {0}",
   "ui.book_issue_unknown": "Needs a manual look (the reason code is not recognized).",
+  "ui.book_issue_auto_quota_0": "{0} (Automatic retries are used up.)",
   "ui.book_issue_step_0_1": "{0} failed: {1}",
   "ui.book_issue_unmet_0": "Proofreading found unmet items: {0}",
   "ui.book_structure_unmet_0": "Structure: {0} item(s) unmet",

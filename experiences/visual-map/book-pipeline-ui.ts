@@ -1,6 +1,7 @@
 import type { TranslationKey } from "../../i18n";
 import { t } from "../../i18n";
 import {
+  AUTO_QUOTA_SUFFIX,
   readBookRole,
   readPipelineStage,
   type BookPipelineData,
@@ -416,6 +417,9 @@ const PLAIN_KEY: Record<string, TranslationKey> = {
 
 /** Turns the neutral issue code (`write failed: invalid_reply`, `proof unmet: C1 C3`) into the sentence shown on the card. */
 export function bookIssueText(issue: string): string {
+  // A card the automatic redo could not retry (rounds or budget reserve used up) carries the plain note after its usual reason.
+  if (issue.endsWith(AUTO_QUOTA_SUFFIX))
+    return t("ui.book_issue_auto_quota_0", bookIssueText(issue.slice(0, -AUTO_QUOTA_SUFFIX.length)));
   const failed = /^(plan|write|proof) failed: (\S+)$/.exec(issue.trim());
   if (failed) {
     const step = failed[1] as keyof typeof STEP_KEY;

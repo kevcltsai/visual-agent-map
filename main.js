@@ -3282,10 +3282,8 @@ var en = {
   "ui.book_panel_proof_opened_0_1": "Opened {0} pages, searched {1} times",
   "ui.book_panel_proof_sources_0": "Sources: {0}",
   "ui.book_panel_structure_unmet_0": "Structure items unmet: {0}",
-  "ui.book_rerun_tag": "Rerunning",
-  "ui.book_rerun_elapsed_0": "Rerunning {0}",
-  "ui.book_rerun_now_0_1": "Rerunning: {0} {1}",
-  "ui.book_rerun_now_untitled_0": "Rerunning card {0}",
+  "ui.book_rerun_tag": "Working",
+  "ui.book_progress_rerun_hint": "Not happy with one chapter? You can rerun just that chapter without redoing the whole book.",
   "ui.book_panel_lead_passed_0": "{0} passed",
   "ui.book_panel_checked_tag": "Passed",
   "ui.book_panel_checked_tag_notes_0": "Passed, {0} to note",
@@ -6512,10 +6510,8 @@ var zhCN = {
   "ui.book_panel_proof_opened_0_1": "\u5F00\u9875 {0} \u6B21\u3001\u641C\u7D22 {1} \u6B21",
   "ui.book_panel_proof_sources_0": "\u6765\u6E90\uFF1A{0}",
   "ui.book_panel_structure_unmet_0": "\u7ED3\u6784 {0} \u9879\u672A\u8FBE\u6210",
-  "ui.book_rerun_tag": "\u91CD\u8DD1\u4E2D",
-  "ui.book_rerun_elapsed_0": "\u91CD\u8DD1\u4E2D {0}",
-  "ui.book_rerun_now_0_1": "\u6B63\u5728\u91CD\u8DD1\uFF1A{0} {1}",
-  "ui.book_rerun_now_untitled_0": "\u6B63\u5728\u91CD\u8DD1\uFF1A\u7B2C {0} \u5F20",
+  "ui.book_rerun_tag": "\u5904\u7406\u4E2D",
+  "ui.book_progress_rerun_hint": "\u67D0\u4E00\u7AE0\u4E0D\u6EE1\u610F\uFF1F\u53EF\u4EE5\u53EA\u91CD\u8DD1\u90A3\u4E00\u7AE0\uFF0C\u4E0D\u7528\u6574\u672C\u91CD\u6765\u3002",
   "ui.book_panel_lead_passed_0": "{0} \u5F20\u901A\u8FC7",
   "ui.book_panel_checked_tag": "\u901A\u8FC7",
   "ui.book_panel_checked_tag_notes_0": "\u901A\u8FC7\uFF0C{0} \u5904\u53EF\u7559\u610F",
@@ -9742,10 +9738,8 @@ var zhTW = {
   "ui.book_panel_proof_opened_0_1": "\u958B\u9801 {0} \u6B21\u3001\u641C\u5C0B {1} \u6B21",
   "ui.book_panel_proof_sources_0": "\u4F86\u6E90\uFF1A{0}",
   "ui.book_panel_structure_unmet_0": "\u7D50\u69CB {0} \u9805\u672A\u9054\u6210",
-  "ui.book_rerun_tag": "\u91CD\u8DD1\u4E2D",
-  "ui.book_rerun_elapsed_0": "\u91CD\u8DD1\u4E2D {0}",
-  "ui.book_rerun_now_0_1": "\u6B63\u5728\u91CD\u8DD1\uFF1A{0} {1}",
-  "ui.book_rerun_now_untitled_0": "\u6B63\u5728\u91CD\u8DD1\uFF1A\u7B2C {0} \u5F35",
+  "ui.book_rerun_tag": "\u8655\u7406\u4E2D",
+  "ui.book_progress_rerun_hint": "\u67D0\u4E00\u7AE0\u4E0D\u6EFF\u610F\uFF1F\u53EF\u4EE5\u53EA\u91CD\u8DD1\u90A3\u4E00\u7AE0\uFF0C\u4E0D\u7528\u6574\u672C\u91CD\u4F86\u3002",
   "ui.book_panel_lead_passed_0": "{0} \u5F35\u901A\u904E",
   "ui.book_panel_checked_tag": "\u901A\u904E",
   "ui.book_panel_checked_tag_notes_0": "\u901A\u904E\uFF0C{0} \u8655\u53EF\u7559\u610F",
@@ -51812,7 +51806,7 @@ var PHASE_KEY = {
   done: "ui.book_phase_done"
 };
 function bookBarState(data, progress, stageOf, titleOf) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+  var _a2, _b2, _c, _d, _e, _f, _g;
   const savedDone = data.phase === "done" && (!progress || progress.runId === data.runId);
   const phase = savedDone ? "done" : (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : data.phase;
   const status = savedDone ? data.status : (_b2 = progress == null ? void 0 : progress.status) != null ? _b2 : data.status;
@@ -51826,12 +51820,7 @@ function bookBarState(data, progress, stageOf, titleOf) {
   const mode = status === "stopped" && pauseReason === "budget" ? "budget" : status === "stopped" || interrupted ? "stopped" : phase;
   const steps = (_g = progress == null ? void 0 : progress.steps) != null ? _g : stepCounts(counts, 0, { settled: phase === "gate2" || phase === "done" });
   const current = mode === "planning" || mode === "writing" ? currentOf2(data, progress, titleOf) : void 0;
-  const at = (progress == null ? void 0 : progress.active) && progress.rerun ? data.order.indexOf(progress.rerun.nodeId) : -1;
-  const rerunTitle = at >= 0 && (progress == null ? void 0 : progress.rerun) ? titleOf == null ? void 0 : titleOf(progress.rerun.nodeId) : void 0;
-  const rerunStep = at >= 0 ? (_i = (_h = progress == null ? void 0 : progress.current) == null ? void 0 : _h.find((item) => {
-    var _a3;
-    return item.nodeId === ((_a3 = progress.rerun) == null ? void 0 : _a3.nodeId);
-  })) == null ? void 0 : _i.step : void 0;
+  const rerunning = !!(progress == null ? void 0 : progress.active) && !!progress.rerun && data.order.includes(progress.rerun.nodeId);
   return {
     mode,
     phase,
@@ -51841,14 +51830,7 @@ function bookBarState(data, progress, stageOf, titleOf) {
     steps,
     globalDone: data.globalPlanned === true,
     ...current ? { current } : {},
-    ...at >= 0 && (progress == null ? void 0 : progress.rerun) ? {
-      rerun: {
-        chapter: at + 1,
-        ...rerunTitle ? { title: rerunTitle } : {},
-        startedAt: progress.rerun.startedAt,
-        ...rerunStep ? { step: rerunStep } : {}
-      }
-    } : {},
+    ...rerunning ? { rerun: true } : {},
     ...mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {},
     ...(progress == null ? void 0 : progress.etaSeconds) !== void 0 && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0 ? { etaSeconds: progress.etaSeconds } : {}
   };
@@ -51924,11 +51906,10 @@ function renderBookBar(parent, state, actions) {
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   if (state.rerun) makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   const items = bookStepItems(state);
-  if (state.rerun) renderRerunLine(bar, state.rerun, actions);
-  else {
-    renderStepList(bar, items);
-    renderNowLine(bar, state);
-  }
+  renderStepList(bar, items);
+  renderNowLine(bar, state);
+  if (state.phase === "gate2" || state.phase === "done")
+    bar.createDiv({ cls: "vam-book-rerun-hint", text: t("ui.book_progress_rerun_hint") });
   const valueText = items.map((item) => item.text).join(t("ui.book_progress_sep"));
   const track = bar.createDiv("vam-book-track");
   track.setAttr("role", "progressbar");
@@ -51982,38 +51963,6 @@ function renderStepList(bar, items) {
     li.toggleClass("is-current", item.current);
     if (item.current) li.setAttr("aria-current", "step");
   }
-}
-var RERUN_STEPS = [
-  { key: "plan", label: "ui.book_step_plan", covers: ["plan"] },
-  { key: "write", label: "ui.book_step_write", covers: ["write", "images"] },
-  { key: "proof", label: "ui.book_step_proof", covers: ["proof"] }
-];
-function renderRerunLine(bar, rerun, actions) {
-  var _a2;
-  const line2 = bar.createDiv("vam-book-now vam-book-rerun");
-  line2.setAttr("role", "status");
-  line2.createSpan({
-    cls: "vam-book-now-text",
-    text: rerun.title ? t("ui.book_rerun_now_0_1", rerun.chapter, rerun.title) : t("ui.book_rerun_now_untitled_0", rerun.chapter)
-  });
-  const clock = line2.createSpan({ cls: "vam-book-rerun-clock", text: t("ui.book_rerun_elapsed_0", "0:00") });
-  clock.setAttr("aria-hidden", "true");
-  (_a2 = actions.track) == null ? void 0 : _a2.call(actions, clock, rerun.startedAt);
-  const list2 = bar.createEl("ol", { cls: "vam-book-steps vam-book-rerun-steps" });
-  list2.setAttr("aria-label", t("ui.book_progress_steps_label"));
-  const nowAt = rerun.step ? RERUN_STEPS.findIndex((item) => item.covers.includes(rerun.step)) : -1;
-  RERUN_STEPS.forEach((item, at) => {
-    const done = nowAt >= 0 && at < nowAt;
-    const current = at === nowAt;
-    const li = list2.createEl("li", {
-      cls: "vam-book-step",
-      text: done ? t("ui.book_progress_done_0", t(item.label)) : t(item.label)
-    });
-    li.dataset.step = item.key;
-    li.toggleClass("is-done", done);
-    li.toggleClass("is-current", current);
-    if (current) li.setAttr("aria-current", "step");
-  });
 }
 var NOW_KEY = {
   plan: "ui.book_progress_now_plan_0_1",
@@ -52178,10 +52127,12 @@ function renderBookCardLabels(header2, view, writing) {
       chip.addClass("is-rerun");
       chip.setAttr("title", t(WORKING_KEY[step]));
       chip.createSpan({ text: t("ui.book_rerun_tag") });
-    } else chip.createSpan({ text: t(WORKING_KEY[step]) });
-    const elapsed = chip.createSpan({ cls: "vam-book-elapsed" });
-    elapsed.setAttr("aria-hidden", "true");
-    writing.track(elapsed);
+    } else {
+      chip.createSpan({ text: t(WORKING_KEY[step]) });
+      const elapsed = chip.createSpan({ cls: "vam-book-elapsed" });
+      elapsed.setAttr("aria-hidden", "true");
+      writing.track(elapsed);
+    }
   } else header2.createSpan({ cls: `vam-status vam-book-state is-${view.stage}`, text: view.stageText });
   if (view.seam) {
     const seam = header2.createSpan({ cls: "vam-status vam-book-state is-seam", text: t("ui.book_seam_label") });
@@ -52728,20 +52679,15 @@ function startRerun(card, state, actions, avoidSources) {
     await runTrackedRerun(state, card.id, () => actions.rerun(card.id, avoidSources ? { avoidSources } : void 0));
   });
 }
-function rerunTag(head2, card, rerun, actions) {
-  var _a2;
+function rerunTag(head2, card, rerun) {
   if (!rerun || rerun.nodeId !== card.id) return false;
-  const tag = head2.createSpan({
-    cls: "vam-book-panel-state vam-book-state is-rerun",
-    text: t("ui.book_rerun_elapsed_0", "0:00")
-  });
-  (_a2 = actions.track) == null ? void 0 : _a2.call(actions, tag, rerun.startedAt);
+  head2.createSpan({ cls: "vam-book-panel-state vam-book-state is-rerun", text: t("ui.book_rerun_tag") });
   return true;
 }
 function renderAttention(list2, card, state, actions, busy, anyBusy, rerun) {
   const item = row(list2, "attention", card, busy);
   const head2 = item.createDiv("vam-book-panel-card-head");
-  const rerunning = rerunTag(head2, card, rerun, actions);
+  const rerunning = rerunTag(head2, card, rerun);
   const unchanged = !busy && state.unchanged.has(card.id);
   if (!rerunning)
     stateTag(head2, "needs-review", unchanged ? t("ui.book_panel_still_review") : t("ui.book_stage_needs_review"));
@@ -52841,7 +52787,7 @@ function checkedTagText(card) {
 function renderChecked(list2, card, state, actions, busy, anyBusy, rerun) {
   const item = row(list2, "checked", card, busy);
   const head2 = item.createDiv("vam-book-panel-card-head");
-  if (!rerunTag(head2, card, rerun, actions)) stateTag(head2, "checked", checkedTagText(card));
+  if (!rerunTag(head2, card, rerun)) stateTag(head2, "checked", checkedTagText(card));
   head2.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
   const open2 = state.proofOpen.has(card.id);
   const toggle = button(
@@ -68047,8 +67993,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     /** What each card last showed of its research progress; a different signature means the card must be redrawn. */
     __publicField(this, "researchSigs", /* @__PURE__ */ new Map());
     __publicField(this, "researchElapsed", /* @__PURE__ */ new Map());
-    /** Elements whose clock has its own words (the rerun's "Rerunning m:ss"). */
-    __publicField(this, "researchFormat", /* @__PURE__ */ new WeakMap());
     __publicField(this, "researchTick", null);
     /** Cards the picture-book author step is writing right now (path to start time); in memory only, never written to a card. */
     __publicField(this, "bookAuthoring", /* @__PURE__ */ new Map());
@@ -72412,26 +72356,15 @@ ${request.requirements}` : preset.text,
     const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
     return t("ui.aim_stage_with_elapsed_0_1", "", clock);
   }
-  clockText(startedAt) {
-    const seconds = Math.max(0, Math.round((Date.now() - startedAt) / 1e3));
-    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-  }
-  /** "Rerunning m:ss" for a single-card rerun; the interval is the one tick every clock shares (cleared on close). */
-  trackRerunClock(element, startedAt) {
-    element.setText(t("ui.book_rerun_elapsed_0", this.clockText(startedAt)));
-    this.trackResearchElapsed(element, startedAt, (at) => t("ui.book_rerun_elapsed_0", this.clockText(at)));
-  }
-  trackResearchElapsed(element, startedAt, format) {
-    if (format) this.researchFormat.set(element, format);
+  trackResearchElapsed(element, startedAt) {
     this.researchElapsed.set(element, startedAt);
     if (this.researchTick === null) this.researchTick = window.setInterval(() => this.tickResearch(), 1e3);
   }
   /** One-second tick: rewrite only the elapsed texts, never the cards; stops when none is left on screen. */
   tickResearch() {
-    var _a2;
     for (const [element, startedAt] of [...this.researchElapsed]) {
       if (this.closed || !element.isConnected) this.researchElapsed.delete(element);
-      else element.setText(((_a2 = this.researchFormat.get(element)) != null ? _a2 : (at) => this.researchElapsedText(at))(startedAt));
+      else element.setText(this.researchElapsedText(startedAt));
     }
     if (!this.researchElapsed.size && this.researchTick !== null) {
       window.clearInterval(this.researchTick);
@@ -75972,16 +75905,17 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     );
     menu.addSeparator();
   }
-  /** "Rerun this picture-book card" (plan, write, proof): only on a map with `bookPipeline` at gate 1, gate 2 or done. */
-  addBookRerunMenuItem(menu, node) {
+  /** Why this card's "rerun this card" (menu item and card button) cannot be used now: "" when it can; undefined when the map offers no rerun. */
+  bookRerunWhy(node, gate2Only = false) {
     var _a2, _b2, _c;
     const path = this.path;
-    if (!this.map || !path || !this.hasBookPipeline()) return;
+    if (!this.map || !path || !this.hasBookPipeline()) return void 0;
     const read = readBookPipeline(this.map);
-    if (read.kind !== "usable") return;
+    if (read.kind !== "usable") return void 0;
+    if (!read.data.order.includes(node.id)) return void 0;
     const progress = this.plugin.getBookPipelineProgress(path);
     const phase = (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : read.data.phase;
-    if (phase !== "gate1" && phase !== "gate2" && phase !== "done") return;
+    if (phase !== "gate2" && phase !== "done" && (gate2Only || phase !== "gate1")) return void 0;
     const reason = bookRerunMenuReason({
       nodeId: node.id,
       rerunNodeId: (_b2 = progress == null ? void 0 : progress.rerun) == null ? void 0 : _b2.nodeId,
@@ -75989,20 +75923,28 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       busyCards: (_c = progress == null ? void 0 : progress.busyCards) != null ? _c : [],
       blocked: this.bookPipelineBlocked()
     });
-    const why2 = reason === "this" ? t("ui.book_card_menu_why_this") : reason === "other" ? t("ui.book_card_menu_why_other") : reason === "running" ? t("ui.book_card_menu_why_running") : reason === "blocked" ? t("ui.book_card_menu_why_blocked") : "";
-    const disabled = why2 !== "";
+    return reason === "this" ? t("ui.book_card_menu_why_this") : reason === "other" ? t("ui.book_card_menu_why_other") : reason === "running" ? t("ui.book_card_menu_why_running") : reason === "blocked" ? t("ui.book_card_menu_why_blocked") : "";
+  }
+  /** The rerun both entries share. The same "same result" mark as the panel's button: the old one goes first, a new one only if nothing changed. */
+  runBookCardRerun(node) {
+    const path = this.path;
+    if (!path) return;
+    void this.bookEntry(async () => {
+      try {
+        await runTrackedRerun(this.bookPanel, node.id, () => this.plugin.rerunBookCard(path, node.id));
+      } finally {
+        await this.rereadBookCard(node.id);
+        if (!this.closed) this.render();
+      }
+    });
+  }
+  /** "Rerun this picture-book card" (plan, write, proof): only on a map with `bookPipeline` at gate 1, gate 2 or done. */
+  addBookRerunMenuItem(menu, node) {
+    const why2 = this.bookRerunWhy(node);
+    if (why2 === void 0) return;
     menu.addSeparator();
     menu.addItem(
-      (item) => item.setTitle(t("ui.book_card_menu_rerun")).setIcon("refresh-cw").setDisabled(disabled).onClick(
-        () => void this.bookEntry(async () => {
-          try {
-            await runTrackedRerun(this.bookPanel, node.id, () => this.plugin.rerunBookCard(path, node.id));
-          } finally {
-            await this.rereadBookCard(node.id);
-            if (!this.closed) this.paintBookPanel();
-          }
-        })
-      )
+      (item) => item.setTitle(t("ui.book_card_menu_rerun")).setIcon("refresh-cw").setDisabled(why2 !== "").onClick(() => this.runBookCardRerun(node))
     );
     menu.addItem((item) => {
       item.setTitle(why2 || t("ui.book_card_menu_rerun_sub"));
@@ -78128,7 +78070,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I;
     if (!this.stageEl) return;
     const index = (_c = this.paintCardIndex) != null ? _c : cardIndex((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []);
     const node = (_d = index.node(shownNode.id)) != null ? _d : shownNode;
@@ -78235,13 +78177,28 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           } : void 0
         );
       }
+      const rerunWhy = this.selection.state.multiSelectMode ? void 0 : this.bookRerunWhy(node, true);
+      if (rerunWhy !== void 0) {
+        const rerun = this.button(header2, "", () => this.runBookCardRerun(node));
+        rerun.addClass("vam-node-rerun");
+        (0, import_obsidian38.setIcon)(rerun.createSpan({ cls: "vam-node-rerun-icon" }), "refresh-cw");
+        rerun.createSpan({ text: t("ui.book_panel_rerun_card") });
+        const rerunName = t("ui.book_panel_rerun_card_0", (_m = note == null ? void 0 : note.title) != null ? _m : node.path);
+        rerun.setAttr("aria-label", rerunName);
+        rerun.setAttr("title", rerunName);
+        if (rerunWhy) {
+          rerun.disabled = true;
+          rerun.setAttr("title", rerunWhy);
+          rerun.setAttr("aria-description", rerunWhy);
+        }
+      }
       if (note) {
         if (showsToResearch(kind, note.status, this.progressDone(node.id)))
           this.labelCard(card, t("ui.topic_card_label_0_1", note.title, statusText));
         else this.labelCard(card, note.title);
       }
     }
-    const relevance = !node.aimKind && !((_m = this.map) == null ? void 0 : _m.aim) ? note == null ? void 0 : note.relevance : void 0;
+    const relevance = !node.aimKind && !((_n = this.map) == null ? void 0 : _n.aim) ? note == null ? void 0 : note.relevance : void 0;
     if (relevance) {
       const tierLabel = t(RELEVANCE_LABEL[relevance.tier]);
       card.dataset.relevance = relevance.tier;
@@ -78251,14 +78208,14 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         tierLabel,
         t("ui.relevance_tag_label_0", tierLabel),
         (button2) => this.openRelevanceMenu(node, relevance.tier, button2),
-        ((_n = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _n.status) === "running"
+        ((_o = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _o.status) === "running"
       );
       if (relevance.manual) {
         const manualText = t("ui.relevance_manual_reason");
         (0, import_obsidian38.setTooltip)(tagButton, manualText);
         card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, manualText));
       }
-      const named = (_o = cardLabels.get(card)) == null ? void 0 : _o.textContent;
+      const named = (_p = cardLabels.get(card)) == null ? void 0 : _p.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
     if (argumentView) {
@@ -78271,7 +78228,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const kindText = strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey);
       if (strength && leaning) renderHypothesisTag(header2, leaning, strength, kindText);
       else header2.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
-      const named = (_p = cardLabels.get(card)) == null ? void 0 : _p.textContent;
+      const named = (_q = cardLabels.get(card)) == null ? void 0 : _q.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     this.paintCardMarkers(card, header2, node.id);
@@ -78281,7 +78238,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     this.paintCardStyle(card, note);
     if (header2) this.paintAiLock(card, header2, node);
     const errorDetails = [];
-    if ((_q = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _q.length) {
+    if ((_r = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _r.length) {
       const issue2 = header2.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
       issue2.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
@@ -78293,8 +78250,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       if (failure.technical) technicalDetails.push(failure.technical);
     }
     if (batch) {
-      const currentNode = batch.currentPath ? (_r = this.map) == null ? void 0 : _r.nodes.find((item) => item.path === batch.currentPath) : void 0;
-      const currentTitle = currentNode ? (_s = this.notes.get(currentNode.id)) == null ? void 0 : _s.title : void 0;
+      const currentNode = batch.currentPath ? (_s = this.map) == null ? void 0 : _s.nodes.find((item) => item.path === batch.currentPath) : void 0;
+      const currentTitle = currentNode ? (_t = this.notes.get(currentNode.id)) == null ? void 0 : _t.title : void 0;
       const label = this.batchProgressLabel(
         t("ui.shallow_research_counts", batch.succeeded, batch.total),
         batch,
@@ -78322,15 +78279,15 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }
     const ownSynthesis = this.plugin.topicRuns.syntheses(this).topics.get(node.path);
     const parentNode = node.parentId ? this.mapNodeById(node.parentId) : void 0;
-    const batchChild = !!parentNode && !!((_t = this.plugin.expansionCoordinator) == null ? void 0 : _t.isRunning(parentNode.path));
-    const stoppable = this.startingTasks.has(node.path) || ((_u = this.plugin.quickExpandPending) == null ? void 0 : _u.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
+    const batchChild = !!parentNode && !!((_u = this.plugin.expansionCoordinator) == null ? void 0 : _u.isRunning(parentNode.path));
+    const stoppable = this.startingTasks.has(node.path) || ((_v = this.plugin.quickExpandPending) == null ? void 0 : _v.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
     if (stoppable && (batch == null ? void 0 : batch.status) !== "running" && !((ownSynthesis == null ? void 0 : ownSynthesis.state) === "running" && ownSynthesis.mapPath === this.path)) {
       this.button(
         header2,
         t(
           stopLabelKey(
             this.plugin.topicRuns.runKind(node.path),
-            !!((_v = this.plugin.quickExpandPending) == null ? void 0 : _v.has(node.path)),
+            !!((_w = this.plugin.quickExpandPending) == null ? void 0 : _w.has(node.path)),
             this.startingTasks.has(node.path) && this.startingExpand.has(node.path)
           )
         ),
@@ -78347,7 +78304,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       });
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header2, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
-    const pendingCount = (_x = (_w = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _w.length) != null ? _x : 0;
+    const pendingCount = (_y = (_x = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _x.length) != null ? _y : 0;
     if (pendingCount && !this.selection.state.multiSelectMode)
       this.button(
         header2,
@@ -78436,11 +78393,11 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
     if (note) this.paintCover(card, node.path);
-    const shownTitle = loading ? this.preReadTitle(node) : argumentView ? this.argumentTitleOf(argumentView, note) : (_y = note == null ? void 0 : note.title) != null ? _y : node.path;
+    const shownTitle = loading ? this.preReadTitle(node) : argumentView ? this.argumentTitleOf(argumentView, note) : (_z = note == null ? void 0 : note.title) != null ? _z : node.path;
     const title = card.createEl("h3", { text: shownTitle, cls: "vam-card-title" });
     title.setAttr("title", shownTitle);
     title.setAttr("dir", "auto");
-    if (note && ((_z = this.inlineName) == null ? void 0 : _z.target) === "card" && this.inlineName.id === node.id) {
+    if (note && ((_A = this.inlineName) == null ? void 0 : _A.target) === "card" && this.inlineName.id === node.id) {
       title.addClass("vam-sr-only");
       this.paintCardNameEdit(card, node, note);
     }
@@ -78457,8 +78414,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           requestArgumentResume(this.plugin, this.path, button2, () => this.argumentBarPressed = null);
         }
       );
-    else if (textEditable && ((_A = this.inlineSummary) == null ? void 0 : _A.id) === node.id) this.paintCardSummaryEdit(card, node);
-    else if ((_B = research == null ? void 0 : research.preview) == null ? void 0 : _B.summary)
+    else if (textEditable && ((_B = this.inlineSummary) == null ? void 0 : _B.id) === node.id) this.paintCardSummaryEdit(card, node);
+    else if ((_C = research == null ? void 0 : research.preview) == null ? void 0 : _C.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
     else if (loading) {
       const bars = card.createDiv({ cls: "vam-card-loading-bars" });
@@ -78468,8 +78425,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     } else if (!note || !isPlaceholder(note.summary)) {
       const summaryText2 = card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_C = note == null ? void 0 : note.summary) != null ? _C : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
-        attr: { title: (_D = note == null ? void 0 : note.summary) != null ? _D : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
+        text: (_D = note == null ? void 0 : note.summary) != null ? _D : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: (_E = note == null ? void 0 : note.summary) != null ? _E : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
       if (textEditable) summaryText2.addClass("is-inline-editable");
       if (note && bookCard.summaryPrefix && this.hasBookPipeline())
@@ -78480,9 +78437,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }
     if (note && bookCard.issueText && this.hasBookPipeline())
       card.createEl("p", { cls: "vam-card-book-issue", text: bookCard.issueText });
-    if (!argumentView && textEditable && !((_E = research == null ? void 0 : research.preview) == null ? void 0 : _E.summary) && ((_F = this.inlineSummary) == null ? void 0 : _F.id) !== node.id && isPlaceholder(note.summary))
+    if (!argumentView && textEditable && !((_F = research == null ? void 0 : research.preview) == null ? void 0 : _F.summary) && ((_G = this.inlineSummary) == null ? void 0 : _G.id) !== node.id && isPlaceholder(note.summary))
       card.createEl("p", { cls: "vam-card-summary-add", text: t("ui.card_summary_add_hint") });
-    else if (((_G = this.inlineSummary) == null ? void 0 : _G.id) === node.id && !textEditable) this.inlineSummary = null;
+    else if (((_H = this.inlineSummary) == null ? void 0 : _H.id) === node.id && !textEditable) this.inlineSummary = null;
     this.paintCardImageRelations(card, node.id);
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
@@ -78502,7 +78459,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       node,
       (point, wasSelected) => this.switchTopicChat(node, point.target) || this.openCardTextEditor(point, card, node, wasSelected)
     );
-    if (!this.selection.state.multiSelectMode && !((_H = this.map) == null ? void 0 : _H.aim) && !node.aimKind) {
+    if (!this.selection.state.multiSelectMode && !((_I = this.map) == null ? void 0 : _I.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
@@ -82658,8 +82615,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
       confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path)),
-      panel: { open: this.bookPanel.open, toggle: () => this.toggleBookPanel() },
-      track: (element, startedAt) => this.trackRerunClock(element, startedAt)
+      panel: { open: this.bookPanel.open, toggle: () => this.toggleBookPanel() }
     });
   }
   /** Runs `work` so the chat's open state is not saved as the user's choice (the panel folded it, not the user). */
@@ -82881,7 +82837,6 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           if (this.closed) return resolve(false);
           this.openMapModal(new BookFinishModal(this.app, info, resolve));
         }),
-        track: (element, startedAt) => this.trackRerunClock(element, startedAt),
         confirmSeam: async (id) => {
           try {
             await this.plugin.confirmBookSeam(path, id);
@@ -95176,6 +95131,10 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node[data-argument-role="assumptions"] .vam-argument-definitions dd { margin: 0; overflow-wrap: anywhere; }
 .vam-toolbar-actions .vam-book-button { margin-right: 6px; white-space: nowrap; }
 .vam-card-book-issue { margin: 6px 0 0; font-size: var(--font-ui-smaller); line-height: 1.45; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); overflow-wrap: anywhere; }
+.vam-node-header > .vam-node-rerun { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.vam-node-header > .vam-node-rerun .svg-icon { width: 12px; height: 12px; }
+.vam-node-header > .vam-node-rerun:disabled { opacity: 0.5; cursor: not-allowed; }
+.vam-viewport.is-zoomed-out .vam-node-header > .vam-node-rerun { position: absolute; right: 4px; bottom: 4px; font-size: 0; gap: 0; padding: 2px 6px; transform: scale(calc(0.6 / var(--vam-zoom, 1))); transform-origin: right bottom; z-index: 2; }
 @keyframes vam-pulse { 50% { opacity: 0.35; } }
 @keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }
 /* Viewer-only parts: the pieces Obsidian would otherwise provide. */

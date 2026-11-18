@@ -86,7 +86,6 @@ async function rig() {
       open: id => entries.push(['open', id]),
       rerun: (id, options) => { entries.push(['rerun', id, options]); return over.rerun ? over.rerun(id, options) : runs.rerunCard(mapPath, id, options).then(async result => { await reload(); return result; }); },
       confirmFinish: async info => { entries.push(['confirm', info]); return over.confirm === undefined ? true : over.confirm; },
-      track: (el, startedAt) => entries.push(['track', startedAt]),
       confirmSeam: id => { entries.push(['seam', id]); return runs.confirmSeam(mapPath, id).then(reload); },
       finish: () => { entries.push(['finish']); return runs.finishRun(mapPath); },
       showChat: () => entries.push(['chat']), close: () => entries.push(['close']),
@@ -418,7 +417,7 @@ function synth(extra = {}) {
 const baseActions = (log = []) => ({
   open: id => log.push(['open', id]), rerun: async (id, options) => { log.push(['rerun', id, options]); return { unchanged: true }; }, confirmSeam: async () => {},
   finish: async () => { log.push(['finish']); }, confirmFinish: async info => { log.push(['confirm', info]); return true; },
-  track: (el, at) => log.push(['track', at]), showChat() {}, close() {}, refresh() {}
+  showChat() {}, close() {}, refresh() {}
 });
 
 test('T5 gate 2: one lead line (passed, review, seams, picture gaps); the reason is the proof note in words; the unverified https sources are kept for "use other sources"', () => {
@@ -524,14 +523,14 @@ test('T5 gate 2: finish asks once when something is left (cards to look at, seam
   assert.deepEqual(log3, [], 'busy comes first');
 });
 
-test('T5 gate 2: the card being rerun shows "重跑中 m:ss" from the view clock instead of its stage', () => {
+test('T3 gate 2: the card being rerun shows "處理中" (no clock) instead of its stage', () => {
   const r = synth();
   const log = [];
   const panel = bundle.renderGate2Panel(dom.element('div'), r.data(), false, new bundle.GatePanelState(), baseActions(log), new Set(['b']), true, { nodeId: 'b', startedAt: 12345 });
   const row = all(panel, 'vam-book-panel-row').find(x => x.dataset.row === 'b');
-  assert.ok(texts(row).includes('重跑中 0:00'), JSON.stringify(texts(row)));
+  assert.ok(texts(row).includes('處理中'), JSON.stringify(texts(row)));
   assert.ok(!texts(row).includes('需人看'));
-  assert.deepEqual(log.filter(x => x[0] === 'track'), [['track', 12345]]);
+  assert.ok(!texts(row).some(x => /\d:\d\d/.test(x)), 'no clock');
 });
 
 test('T5 right-click rerun path: the same result shows the block with both actions; the old mark goes when the result changes', async () => {

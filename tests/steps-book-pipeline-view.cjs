@@ -313,6 +313,64 @@ test('view: a card the author step is writing shows "writing" and a ticking cloc
   assert.match(view_ts, /finally \{ this\.bookAuthoring\.delete\(node\.path\);/);
 });
 
+test('T3 card button: gate 2 and done book cards carry "重跑這張" in the tool row; it runs the rerun, is disabled with the reason while another card, the whole book or a chat is busy; none at gate 1, while writing, or on a plain map', async () => {
+  const h = await harness({ book: true, stages: { a: 'checked', b: 'needs-review' }, issue: 'write failed: invalid_reply' });
+  const calls2 = [];
+  h.plugin.rerunBookCard = async (p, id) => { calls2.push([p, id]); return {}; };
+  h.view.rereadBookCard = async () => {};
+  const rerunButtons = stage => dom.findAll(stage, i => i.tag === 'button' && i.cls.includes('vam-node-rerun'));
+  const withProgress = over => { h.plugin.getBookPipelineProgress = () => progress({ phase: 'gate2', active: false, ...over }); h.view.bookPipelineSeen = null; };
+  withProgress({});
+  const stage = h.paint();
+  const buttons = rerunButtons(stage);
+  assert.equal(buttons.length, 3, 'every book card');
+  assert.ok(buttons.every(b => /重跑這張/.test(texts(b).join('')) && !b.disabled));
+  assert.ok(buttons.every(b => dom.findAll(stage, i => i.cls.includes('vam-node-header')).some(t => t.children.includes(b))), 'in the card header, which always shows (not the hover-only tool row)');
+  assert.ok(buttons.every(b => !dom.findAll(stage, i => i.cls.includes('vam-node-tools')).some(t => t.children.includes(b))));
+  buttons[1].click();
+  await dom.tick();
+  assert.deepEqual(calls2, [[MAP, h.ids.a]]);
+  assert.ok(h.view.rendered >= 1, 'the map repaints afterwards');
+  withProgress({ phase: 'done' });
+  assert.equal(rerunButtons(h.paint()).length, 3, 'still there after the review is finished');
+  withProgress({ rerun: { nodeId: h.ids.a, startedAt: 1 }, active: true });
+  const busy = rerunButtons(h.paint());
+  assert.ok(busy.every(b => b.disabled), 'one rerun at a time');
+  assert.equal(busy[1].attrs.title, '這一張正在重跑');
+  assert.equal(busy[2].attrs.title, '這一張正在重跑'.replace('這一張', '另一張') );
+  withProgress({ active: true });
+  assert.equal(rerunButtons(h.paint())[0].attrs.title, '圖文書正在執行，等它結束後再重跑');
+  withProgress({ busyCards: [h.ids.b] });
+  assert.equal(rerunButtons(h.paint())[2].attrs.title, '這一張正在重跑');
+  withProgress({});
+  h.view.chatChainRunner = { current: {} };
+  assert.equal(rerunButtons(h.paint())[0].attrs.title, '對話進行中，等它結束後再重跑');
+  h.view.chatChainRunner = null;
+  for (const phase of ['gate1', 'writing', 'planning']) { withProgress({ phase }); assert.equal(rerunButtons(h.paint()).length, 0, phase); }
+  const plain = await harness({ book: false, stages: { a: 'checked' } });
+  assert.equal(rerunButtons(plain.paint()).length, 0);
+  assert.match(css, /\.vam-node-header > \.vam-node-rerun \{ display: inline-flex;[^}]*white-space: nowrap; \}/);
+  assert.doesNotMatch(css, /vam-node-rerun[^{]*\{[^}]*display: none/);
+  assert.match(css, /\.vam-viewport\.is-zoomed-out \.vam-node-header > \.vam-node-rerun \{[^}]*position: absolute;[^}]*font-size: 0;[^}]*transform: scale\(calc\(0\.6 \/ var\(--vam-zoom, 1\)\)\);[^}]*transform-origin: right bottom;/);
+  withProgress({});
+  h.view.map.bookPipeline.order = [h.ids.root, h.ids.a];
+  const partial = rerunButtons(h.paint());
+  assert.equal(partial.length, 2, 'a card that is not in the book order has no rerun button');
+  assert.ok(partial.every(b => b.disabled === false || !b.disabled));
+  assert.equal(h.view.bookRerunWhy(h.view.map.nodes.find(n => n.id === h.ids.b), true), undefined, 'nor a right-click item');
+});
+
+test('T3 view close: no rerun clock is left on a one-second timer (the card chip of a rerun starts none)', async () => {
+  const h = await harness({ book: true, stages: { a: 'checked' } });
+  h.plugin.getBookPipelineProgress = () => progress({ phase: 'gate2', active: true, current: [{ nodeId: h.ids.a, step: 'write', startedAt: 5 }], rerun: { nodeId: h.ids.a, startedAt: 5 } });
+  h.view.bookPipelineSeen = null;
+  const stage = h.paint();
+  const chip = dom.find(stage, i => i.cls.includes('is-rerun'));
+  assert.equal(chip.children[0].text, '處理中');
+  assert.equal(h.view.researchElapsed.size, 0);
+  assert.equal(h.view.researchTick, null, 'no interval was created');
+});
+
 test('view: the bar draws for a book map from getBookPipelineProgress and its buttons call the plugin entries with this map', async () => {
   const h = await harness({ book: true });
   h.plugin.getBookPipelineProgress = p => (p === MAP ? progress({ phase: 'gate1', active: false }) : undefined);
@@ -860,36 +918,39 @@ test('bar: a title that has not loaded yet reads as a sentence without an empty 
 
 
 // ---- T5: the rerun line of the bar, the card chip, the finish question ----
-test('T5 bar: a single-card rerun shows "正在重跑：2 Title", the clock from the view, the card\'s three steps and a stop button; the five-stage list is not drawn', () => {
+test('T3 bar: a single-card rerun draws no rerun line (no title, no clock, no three steps): the five-stage list stays, with the stop button and the one-line rerun hint', () => {
   lang('zh-TW');
   const order = ['a', 'b', 'c'];
   const prog = progress({ phase: 'gate2', total: 3, current: [{ nodeId: 'b', step: 'write', startedAt: 5 }], rerun: { nodeId: 'b', startedAt: 777 } });
   const parent = dom.element('div');
-  const clocks = [];
   const c = calls();
   const state = ui.bookBarState(bookData({ order, phase: 'gate2' }), prog, noStage, id => ({ b: '<i>睡眠</i>' })[id]);
-  ui.renderBookBar(parent, state, { ...c.actions, track: (el, startedAt) => { clocks.push(startedAt); el.setText('重跑中 0:41'); } });
-  const now = dom.find(parent, i => i.cls.includes('vam-book-now-text'));
-  assert.equal(now.text, '正在重跑：2 <i>睡眠</i>');
-  assert.equal(now.children.length, 0, 'a title is text, never markup');
-  assert.deepEqual(clocks, [777]);
-  assert.ok(texts(parent).includes('重跑中 0:41'));
-  assert.deepEqual(dom.findAll(parent, i => i.tag === 'li').map(i => i.text), ['✓ 企劃', '寫作', '校對']);
-  assert.ok(dom.findAll(parent, i => i.tag === 'li').some(i => i.attrs['aria-current'] === 'step' && i.text === '寫作'));
+  assert.equal(state.rerun, true);
+  ui.renderBookBar(parent, state, c.actions);
+  assert.equal(dom.find(parent, i => i.classes.includes('vam-book-rerun')), undefined, 'no rerun row');
+  assert.ok(!texts(parent).some(x => /正在重跑|重跑中|\d:\d\d/.test(x)), JSON.stringify(texts(parent)));
+  assert.equal(dom.findAll(parent, i => i.tag === 'li').length, 5, 'the normal stage list');
+  assert.ok(texts(parent).includes('某一章不滿意？可以只重跑那一章，不用整本重來。'));
   assert.deepEqual(buttonsOf(parent).map(b => b.text), ['停止']);
   buttonsOf(parent)[0].click();
   assert.deepEqual(c.log, ['stop']);
+  // The hint is for the two phases whose cards carry the button.
+  const writing = dom.element('div');
+  ui.renderBookBar(writing, ui.bookBarState(bookData({ order, phase: 'writing' }), progress({ phase: 'writing', total: 3, active: true }), noStage), c.actions);
+  assert.ok(!texts(writing).includes('某一章不滿意？可以只重跑那一章，不用整本重來。'));
 });
 
-test('T5 card chip: a card being rerun says 重跑中 with its clock and keeps the step in the tooltip; a plain working card is unchanged', () => {
+test('T3 card chip: a card being rerun says 處理中 with no clock and keeps the step in the tooltip; a plain working card still has its clock', () => {
   lang('zh-TW');
   const header = dom.element('div');
-  ui.renderBookCardLabels(header, ui.bookCardView({ pipelineStage: 'needs-review' }), { step: 'proof', rerun: true, track: el => el.setText('0:41') });
+  let ticked = 0;
+  ui.renderBookCardLabels(header, ui.bookCardView({ pipelineStage: 'needs-review' }), { step: 'proof', rerun: true, track: el => { ticked++; el.setText('0:41'); } });
   const chip = header.children[0];
   assert.match(chip.cls, /is-rerun/);
-  assert.equal(chip.children[0].text, '重跑中');
+  assert.equal(chip.children.length, 1);
+  assert.equal(chip.children[0].text, '處理中');
   assert.equal(chip.attrs.title, '校對中');
-  assert.equal(chip.children[1].text, '0:41');
+  assert.equal(ticked, 0, 'no clock is started for a rerun');
 });
 
 test('T5 finish question: counts and card names as text, "回去處理" has the keyboard, Escape and the X count as going back, "仍要完成" finishes, one answer only', () => {
@@ -914,12 +975,12 @@ test('T5 finish question: counts and card names as text, "回去處理" has the 
   assert.equal(esc.focusTimer, null, 'the focus timer is cleared on close');
 });
 
-test('T5 view wiring: the rerun clock shares the one tick and dies with the view; "global" is never a card; the menu note is not a disabled grey line', () => {
-  assert.match(view_ts, /private trackRerunClock\(element: HTMLElement, startedAt: number\)/);
+test('T5 view wiring: "global" is never a card; the menu note is not a disabled grey line', () => {
+  assert.doesNotMatch(view_ts, /trackRerunClock|book_rerun_elapsed/);
   assert.match(view_ts, /item\.nodeId === nodeId && item\.nodeId !== "global"/);
   assert.match(view_ts, /new BookFinishModal\(this\.app, info, resolve\)/);
   assert.ok(!/item\.setTitle\(t\("ui\.book_card_menu_rerun_sub"\)\)\.setDisabled\(true\)/.test(view_ts));
-  assert.match(css, /\.vam-book-rerun-clock/);
+  assert.doesNotMatch(css, /vam-book-rerun-clock/);
   assert.match(css, /\.vam-book-menu-note \{[^}]*pointer-events: none/);
 });
 

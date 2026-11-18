@@ -1469,8 +1469,6 @@ export class VisualAgentMapView extends ItemView {
   /** What each card last showed of its research progress; a different signature means the card must be redrawn. */
   private researchSigs = new Map<string, string>();
   private researchElapsed = new Map<HTMLElement, number>();
-  /** Elements whose clock has its own words (the rerun's "Rerunning m:ss"). */
-  private researchFormat = new WeakMap<HTMLElement, (startedAt: number) => string>();
   private researchTick: number | null = null;
   /** Cards the picture-book author step is writing right now (path to start time); in memory only, never written to a card. */
   private bookAuthoring = new Map<string, number>();
@@ -6017,17 +6015,7 @@ export class VisualAgentMapView extends ItemView {
     // The stage is a separate element (the screen-reader announcement), so only the separator and the clock are here.
     return t("ui.aim_stage_with_elapsed_0_1", "", clock);
   }
-  private clockText(startedAt: number): string {
-    const seconds = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
-    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-  }
-  /** "Rerunning m:ss" for a single-card rerun; the interval is the one tick every clock shares (cleared on close). */
-  private trackRerunClock(element: HTMLElement, startedAt: number): void {
-    element.setText(t("ui.book_rerun_elapsed_0", this.clockText(startedAt)));
-    this.trackResearchElapsed(element, startedAt, at => t("ui.book_rerun_elapsed_0", this.clockText(at)));
-  }
-  private trackResearchElapsed(element: HTMLElement, startedAt: number, format?: (startedAt: number) => string): void {
-    if (format) this.researchFormat.set(element, format);
+  private trackResearchElapsed(element: HTMLElement, startedAt: number): void {
     this.researchElapsed.set(element, startedAt);
     if (this.researchTick === null) this.researchTick = window.setInterval(() => this.tickResearch(), 1000);
   }
@@ -6035,7 +6023,7 @@ export class VisualAgentMapView extends ItemView {
   private tickResearch(): void {
     for (const [element, startedAt] of [...this.researchElapsed]) {
       if (this.closed || !element.isConnected) this.researchElapsed.delete(element);
-      else element.setText((this.researchFormat.get(element) ?? (at => this.researchElapsedText(at)))(startedAt));
+      else element.setText(this.researchElapsedText(startedAt));
     }
     if (!this.researchElapsed.size && this.researchTick !== null) {
       window.clearInterval(this.researchTick);
@@ -9805,16 +9793,18 @@ export class VisualAgentMapView extends ItemView {
     );
     menu.addSeparator();
   }
-  /** "Rerun this picture-book card" (plan, write, proof): only on a map with `bookPipeline` at gate 1, gate 2 or done. */
-  private addBookRerunMenuItem(menu: Menu, node: MapNode): void {
+  /** Why this card's "rerun this card" (menu item and card button) cannot be used now: "" when it can; undefined when the map offers no rerun. */
+  private bookRerunWhy(node: MapNode, gate2Only = false): string | undefined {
     const path = this.path;
-    if (!this.map || !path || !this.hasBookPipeline()) return;
+    if (!this.map || !path || !this.hasBookPipeline()) return undefined;
     const read = readBookPipeline(this.map);
-    if (read.kind !== "usable") return;
+    if (read.kind !== "usable") return undefined;
+    // A card the owner added later is not in the book's order; the rerun would only fail with "missing".
+    if (!read.data.order.includes(node.id)) return undefined;
     const progress = this.plugin.getBookPipelineProgress(path);
     const phase = progress?.phase ?? read.data.phase;
-    if (phase !== "gate1" && phase !== "gate2" && phase !== "done") return;
-    // Why the item cannot be used right now, in words (it was a grey line with no reason).
+    if (phase !== "gate2" && phase !== "done" && (gate2Only || phase !== "gate1")) return undefined;
+    // Why it cannot be used right now, in words (it was a grey line with no reason).
     const reason = bookRerunMenuReason({
       nodeId: node.id,
       rerunNodeId: progress?.rerun?.nodeId,
@@ -9822,35 +9812,40 @@ export class VisualAgentMapView extends ItemView {
       busyCards: progress?.busyCards ?? [],
       blocked: this.bookPipelineBlocked()
     });
-    const why =
-      reason === "this"
-        ? t("ui.book_card_menu_why_this")
-        : reason === "other"
-          ? t("ui.book_card_menu_why_other")
-          : reason === "running"
-            ? t("ui.book_card_menu_why_running")
-            : reason === "blocked"
-              ? t("ui.book_card_menu_why_blocked")
-              : "";
-    const disabled = why !== "";
+    return reason === "this"
+      ? t("ui.book_card_menu_why_this")
+      : reason === "other"
+        ? t("ui.book_card_menu_why_other")
+        : reason === "running"
+          ? t("ui.book_card_menu_why_running")
+          : reason === "blocked"
+            ? t("ui.book_card_menu_why_blocked")
+            : "";
+  }
+  /** The rerun both entries share. The same "same result" mark as the panel's button: the old one goes first, a new one only if nothing changed. */
+  private runBookCardRerun(node: MapNode): void {
+    const path = this.path;
+    if (!path) return;
+    void this.bookEntry(async () => {
+      try {
+        await runTrackedRerun(this.bookPanel, node.id, () => this.plugin.rerunBookCard(path, node.id));
+      } finally {
+        await this.rereadBookCard(node.id);
+        if (!this.closed) this.render();
+      }
+    });
+  }
+  /** "Rerun this picture-book card" (plan, write, proof): only on a map with `bookPipeline` at gate 1, gate 2 or done. */
+  private addBookRerunMenuItem(menu: Menu, node: MapNode): void {
+    const why = this.bookRerunWhy(node);
+    if (why === undefined) return;
     menu.addSeparator();
     menu.addItem(item =>
       item
         .setTitle(t("ui.book_card_menu_rerun"))
         .setIcon("refresh-cw")
-        .setDisabled(disabled)
-        .onClick(
-          () =>
-            void this.bookEntry(async () => {
-              try {
-                // The same "same result" mark as the panel's button: the old one goes first, a new one only if nothing changed.
-                await runTrackedRerun(this.bookPanel, node.id, () => this.plugin.rerunBookCard(path, node.id));
-              } finally {
-                await this.rereadBookCard(node.id);
-                if (!this.closed) this.paintBookPanel();
-              }
-            })
-        )
+        .setDisabled(why !== "")
+        .onClick(() => this.runBookCardRerun(node))
     );
     // The second line is a note, not a command: the reason when the item is unavailable, else what the rerun does.
     menu.addItem(item => {
@@ -12343,6 +12338,22 @@ export class VisualAgentMapView extends ItemView {
               }
             : undefined
         );
+      }
+      // A picture-book card at gate 2 or when done: "rerun this card" always shown in the card header (the right-click item stays).
+      const rerunWhy = this.selection.state.multiSelectMode ? undefined : this.bookRerunWhy(node, true);
+      if (rerunWhy !== undefined) {
+        const rerun = this.button(header, "", () => this.runBookCardRerun(node));
+        rerun.addClass("vam-node-rerun");
+        setIcon(rerun.createSpan({ cls: "vam-node-rerun-icon" }), "refresh-cw");
+        rerun.createSpan({ text: t("ui.book_panel_rerun_card") });
+        const rerunName = t("ui.book_panel_rerun_card_0", note?.title ?? node.path);
+        rerun.setAttr("aria-label", rerunName);
+        rerun.setAttr("title", rerunName);
+        if (rerunWhy) {
+          rerun.disabled = true;
+          rerun.setAttr("title", rerunWhy);
+          rerun.setAttr("aria-description", rerunWhy);
+        }
       }
       if (note) {
         if (showsToResearch(kind, note.status, this.progressDone(node.id)))
@@ -17070,7 +17081,7 @@ export class VisualAgentMapView extends ItemView {
     const progress = this.path ? this.plugin.getBookPipelineProgress(this.path) : undefined;
     // The whole-book plan is recorded under the name "global": it is never a card.
     const current = progress?.current?.find(item => item.nodeId === nodeId && item.nodeId !== "global");
-    // A single-card rerun: the label says so and the clock runs from the rerun's start, not from each step's.
+    // A single-card rerun: the label says so (no clock).
     if (progress?.rerun?.nodeId === nodeId)
       return {
         step: authoring !== undefined ? "write" : (current?.step ?? "plan"),
@@ -17101,8 +17112,7 @@ export class VisualAgentMapView extends ItemView {
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
       confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path)),
-      panel: { open: this.bookPanel.open, toggle: () => this.toggleBookPanel() },
-      track: (element, startedAt) => this.trackRerunClock(element, startedAt)
+      panel: { open: this.bookPanel.open, toggle: () => this.toggleBookPanel() }
     });
   }
   // ---- Picture-book gate panel (04b) ---------------------------------------------------------------------------
@@ -17332,7 +17342,6 @@ export class VisualAgentMapView extends ItemView {
             if (this.closed) return resolve(false);
             this.openMapModal(new BookFinishModal(this.app, info, resolve));
           }),
-        track: (element, startedAt) => this.trackRerunClock(element, startedAt),
         confirmSeam: async id => {
           try {
             await this.plugin.confirmBookSeam(path, id);

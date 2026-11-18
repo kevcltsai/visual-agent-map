@@ -15,8 +15,10 @@ export { parseTemplateBlock } from "./core/blocks/template-block";
 export { BUILTIN_BLOCKS, builtinTemplateText } from "./core/blocks/builtin";
 export { noteLanguageOf, translate } from "./i18n";
 export { templateFromDetail } from "./ai/detail-sections";
+export { normalizeWorkRecords, carryWorkLog, workLogLines, chapterBody, extractProofRecords } from "./core/book-pipeline/note-sections";
 `);
 
+const N = M;
 const NOW = new Date(2026, 10, 16, 9, 8, 7);
 const LANGUAGES = ['zh-TW', 'zh-CN', 'en'];
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -99,78 +101,76 @@ if (process.env.DUMP_BASELINE) {
 const BOOK_ID = 'book-chapter';
 const hasBook = () => M.BUILTIN_BLOCKS.some(block => block.category === 'template' && block.id === BOOK_ID);
 
-test('the chapter template is built in and parses in all three languages: lead kept, omit-empty, sources then Research notes', () => {
+test('the chapter template is built in and parses in all three languages: lead kept, omit-empty, only the sources section (no research notes)', () => {
   assert.ok(hasBook(), 'registered');
   for (const language of LANGUAGES) {
     const text = M.builtinTemplateText(BOOK_ID, language);
     const parsed = M.parseTemplateBlock(text, { id: BOOK_ID, name: BOOK_ID });
     assert.equal(parsed.ok, true, language);
     assert.ok(parsed.lead.length > 0, `${language}: the block keeps its lead`);
-    const names = parsed.template.sections.map(section => section.name);
-    assert.equal(parsed.template.sections.length, 2, language);
+    assert.equal(parsed.template.sections.length, 1, language);
     assert.equal(parsed.template.sections[0].role, 'sources', language);
-    assert.equal(parsed.template.sections[1].role, 'log', `${language}: Research notes takes the log role`);
-    assert.equal(names[1], language === 'en' ? 'Research notes' : '研究備註');
+    assert.ok(!/研究備註|研究备注|Research notes/.test(text), `${language}: the template no longer asks for research notes`);
     assert.equal(M.BUILTIN_BLOCKS.find(block => block.id === BOOK_ID).omitEmpty, true);
   }
 });
 
-test('fresh write-back: exactly one Research notes section at the end, folded callout, lead and free body and the AI sub-heading kept', () => {
+/** What the pipeline does with a write-back result: the log section it wrote becomes the hidden callout, the card's earlier log lines come back. */
+const asCard = (oldDetail, written) => N.carryWorkLog(oldDetail, N.normalizeWorkRecords(written));
+const logLines = detail => N.workLogLines(detail);
+const hiddenCount = detail => count(detail, '> [!vam-book]-');
+
+test('fresh write-back (old format card): the write-back log ends in one hidden callout at the end, no log heading; lead, free body, AI sub-heading and sources kept; same text again changes nothing', () => {
   for (const language of LANGUAGES) {
     const note = M.noteLanguageOf(language);
     const template = builtinTemplate(BOOK_ID, language);
-    const name = logName(template);
-    const detail = write(template, note, 'fresh', oldFor(template, note), replyFor(template, 'A'));
-    assert.equal(count(detail, `### ${name}`), 1, `${language}: one section`);
-    assert.ok(detail.trimEnd().split('\n').slice(-6).join('\n').includes(`### ${name}`), 'it is the last section');
-    assert.ok(/^> \[!note\]- \S/m.test(detail), `${language}: a folded callout`);
-    assert.ok(detail.includes(`> [!note]- ${name}`), `${language}: the callout title is the section name`);
-    assert.ok(!detail.includes('更新紀錄'), `${language}: no 更新紀錄 anywhere`);
-    assert.ok(!detail.includes(`### ${M.translate(note, 'detail.update_log')}`), 'no second log section');
+    const old = oldFor(template, note);
+    const detail = asCard(old, write(template, note, 'fresh', old, replyFor(template, 'A')));
+    assert.equal(hiddenCount(detail), 1, `${language}: one hidden callout`);
+    assert.ok(!detail.includes('[!note]'), `${language}: no visible callout type`);
+    assert.ok(!detail.includes(`### ${M.translate(note, 'detail.update_log')}`), `${language}: the log heading is gone`);
+    assert.ok(detail.trimEnd().split('\n').slice(-5).some(line => line.startsWith('> [!vam-book]-')), 'it is the last block');
+    assert.equal(logLines(detail).length, 3, `${language}: two old lines and one new`);
+    assert.ok(detail.includes('舊紀錄一') && detail.includes('舊紀錄二'));
     assert.ok(detail.startsWith('導讀 LEAD-A'), 'the lead stays on top');
     assert.ok(detail.includes('### 自訂小標\n\n自由正文 FREE-A'), 'the AI sub-heading and the free body stay as written');
     assert.ok(detail.includes('- [[來源A]]'), 'sources kept');
+    assert.equal(N.normalizeWorkRecords(detail), detail, `${language}: idempotent`);
+    assert.equal(N.chapterBody(detail).includes('舊紀錄'), false, 'the chapter text has no log line');
   }
 });
 
-test('second fresh write-back keeps the old log lines and adds exactly one; the old Update log lines are not lost', () => {
-  const language = 'zh-TW';
-  const note = 'zh-TW';
-  const template = builtinTemplate(BOOK_ID, language);
-  const noteOld = oldFor(template, note);
-  const first = write(template, note, 'fresh', noteOld, replyFor(template, 'A'));
-  const lines = detail => detail.split('\n').filter(line => /^> (?:- )?\d{4}-\d{2}-\d{2}/.test(line));
-  assert.equal(lines(first).length, 3, 'two old lines and one new');
-  assert.ok(first.includes('舊紀錄一') && first.includes('舊紀錄二'));
-  const second = write(template, note, 'fresh', first, replyFor(template, 'B'));
-  assert.equal(lines(second).length, 4, 'one more line only');
-  assert.deepEqual(lines(second).slice(0, 3), lines(first), 'the earlier lines come first, in order');
-  assert.equal(count(second, '### 研究備註'), 1);
-  // An old note that only has "### 更新紀錄" (an old standard note): its lines come into the new section in fresh, merge and top.
-  const legacy = ['### 核心結論', '', '舊結論', '', '### 更新紀錄', '', '- 2026-01-01　舊紀錄一', '- 2026-02-01　舊紀錄二'].join('\n');
-  for (const mode of ['fresh', 'merge', 'top']) {
-    const result = write(template, note, mode, legacy, replyFor(template, 'C'));
-    assert.ok(result.includes('舊紀錄一') && result.includes('舊紀錄二'), `${mode}: old log lines kept`);
-    if (mode !== 'top') assert.equal(count(result, '### 更新紀錄'), 0, `${mode}: one log section only`);
-    // top keeps the old text byte for byte, so the legacy heading stays there; fresh and merge move the lines into Research notes.
-    if (mode !== 'top') {
-      assert.ok(count(result, '研究備註') >= 1, `${mode}: Research notes section`);
-      assert.ok(!result.includes('更新紀錄'), `${mode}: no 更新紀錄 anywhere`);
-    } else assert.ok(count(result, '研究備註') + count(result, '### 更新紀錄') >= 1);
-  }
-});
-
-test('top and merge on a note that already has a folded Research notes section: old lines stay, one line is added inside the callout', () => {
+test('second fresh write-back on the new format keeps the old log lines first, in order, and still has exactly one hidden callout', () => {
   const note = 'zh-TW';
   const template = builtinTemplate(BOOK_ID, 'zh-TW');
-  const first = write(template, note, 'fresh', oldFor(template, note), replyFor(template, 'A'));
+  const old = oldFor(template, note);
+  const first = asCard(old, write(template, note, 'fresh', old, replyFor(template, 'A')));
+  const second = asCard(first, write(template, note, 'fresh', first, replyFor(template, 'B')));
+  assert.equal(hiddenCount(second), 1);
+  assert.deepEqual(logLines(second).slice(0, 3), logLines(first), 'the earlier lines come first, in order');
+  assert.ok(second.includes('FREE-B') && !second.includes('FREE-A'));
+  // An old card that only has "### 更新紀錄" (an old standard note): its lines come into the hidden callout in fresh, merge and top.
+  const legacy = ['### 核心結論', '', '舊結論', '', '### 更新紀錄', '', '- 2026-01-01　舊紀錄一', '- 2026-02-01　舊紀錄二'].join('\n');
+  for (const mode of ['fresh', 'merge', 'top']) {
+    const result = asCard(legacy, write(template, note, mode, legacy, replyFor(template, 'C')));
+    assert.ok(result.includes('舊紀錄一') && result.includes('舊紀錄二'), `${mode}: old log lines kept`);
+    assert.equal(hiddenCount(result), 1, `${mode}: one hidden callout`);
+    assert.equal(count(result, '### 更新紀錄'), 0, `${mode}: no log heading`);
+    assert.equal(logLines(result).length, 3, `${mode}: 2 old + 1 new`);
+  }
+});
+
+test('top and merge on a card that already has the hidden callout: old lines stay, one line is added inside it, no second callout and no log heading', () => {
+  const note = 'zh-TW';
+  const template = builtinTemplate(BOOK_ID, 'zh-TW');
+  const old = oldFor(template, note);
+  const first = asCard(old, write(template, note, 'fresh', old, replyFor(template, 'A')));
   for (const mode of ['top', 'merge']) {
-    const result = write(template, note, mode, first, replyFor(template, 'B'));
-    const lines = result.split('\n').filter(line => /^> (?:- )?\d{4}-\d{2}-\d{2}/.test(line));
-    assert.equal(lines.length, 4, `${mode}: 3 old + 1`);
-    assert.equal(count(result, '### 研究備註'), 1, mode);
-    assert.equal(count(result, '[!note]-'), 1, `${mode}: one callout`);
+    const result = asCard(first, write(template, note, mode, first, replyFor(template, 'B')));
+    assert.equal(logLines(result).length, 4, `${mode}: 3 old + 1`);
+    assert.equal(hiddenCount(result), 1, `${mode}: one callout`);
     assert.ok(!result.includes('更新紀錄'), `${mode}: no 更新紀錄 anywhere`);
+    assert.equal(N.normalizeWorkRecords(result), result, `${mode}: idempotent`);
   }
   // top keeps the old text byte for byte apart from the inserts
   const top = M.composeWriteback({ mode: 'top', oldDetail: first, aiDetail: replyFor(template, 'B'), summary: 'S', template, language: note, now: NOW });
@@ -185,14 +185,16 @@ test('top and merge on a note that already has a folded Research notes section: 
   assert.equal(pieces.join(''), first);
 });
 
-test('a "###" line inside the Research notes callout is not a new section; a note with both log names gives the role to Update log only', () => {
+test('an old Research notes section (heading + [!note]- callout, proof record inside) comes through a rewrite as one hidden callout with its log lines and its record; both log names still give the role to Update log only', () => {
   const note = 'zh-TW';
   const template = builtinTemplate(BOOK_ID, 'zh-TW');
-  const withHeading = ['導讀', '', '### 研究備註', '', '> [!note]- 更新紀錄', '> ### 不是區段', '> - 2026-01-01　舊紀錄一'].join('\n');
-  const result = write(template, note, 'fresh', withHeading, replyFor(template, 'D'));
-  assert.ok(result.includes('> ### 不是區段'), 'the callout line stays');
-  assert.ok(result.includes('舊紀錄一'));
-  assert.equal(count(result, '### 研究備註'), 1);
+  const record = '<!-- book-proof:v1 {"key":"k1","result":{"aggregate":"checked","items":[]}} -->';
+  const oldCard = ['導讀', '', '### 研究備註', '', '> [!note]- 研究備註', '> - 2026-01-01　舊紀錄一', `> ${record}`].join('\n');
+  const result = asCard(oldCard, write(template, note, 'fresh', oldCard, replyFor(template, 'D')));
+  assert.equal(hiddenCount(result), 1);
+  assert.ok(!result.includes('### 研究備註') && !result.includes('[!note]'));
+  assert.ok(result.includes('舊紀錄一') && !N.chapterBody(result).includes('舊紀錄一'));
+  assert.ok(N.extractProofRecords(N.normalizeWorkRecords(oldCard)).join('\n').includes('"key":"k1"'), 'the proof record is still read after the conversion');
   // custom template with both names
   const both = M.parseTemplateBlock('## 核心\n說明\n\n## 更新紀錄\n只新增一行\n\n## 研究備註\n別的\n', { id: 'both', name: 'both' });
   assert.equal(both.ok, true);

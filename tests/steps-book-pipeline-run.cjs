@@ -367,7 +367,7 @@ test('exit safety: a body the exit check refuses is not written at all (the card
   const r = await rig({ script: { author: input => evilAuthor(r, input) } });
   r.runs.exitCheck = () => true;
   // T1: the only addition is the proof-result section saying the step failed (no model); the card text itself is unchanged.
-  const FAIL_SECTION = '\n## 校對結果（最新一次）\n\n- 失敗：unsafe\\_body\n';
+  const FAIL_SECTION = '\n> [!vam-book]- 校對結果（最新一次）\n> - 失敗：unsafe\\_body\n';
   const before = () => r.raw(1).replace(/^---\n[\s\S]*?\n---\n/, '');
   await r.runs.start(r.mapPath);
   const earlier = before();
@@ -566,7 +566,7 @@ test('the proof record callout survives the real repository: the key and the bod
   const first = await keyOf();
   assert.equal(first.body, bodyOf(TITLES[1]), 'the proof record is not part of the body');
   assert.ok(findStoredProof(first.detail, first.key), 'the record is found again after the write');
-  assert.match(r.raw(1), /> \[!note\]-/);
+  assert.match(r.raw(1), />\s?\[!vam-book\]-/);
   // another real write through the repository (the owner changes the summary), then the file is read again
   await r.repo.updateNote(r.nodes[1].path, { summary: 'changed' });
   const second = await keyOf();
@@ -824,7 +824,7 @@ test('the config port is read on every start and resume, so a settings change ap
 });
 
 // ---- T1: card content fixes (proof-result section, latest-only records, anchors, placeholders, models) ----
-const SECTION = '## 校對結果（最新一次）';
+const SECTION = '> [!vam-book]- 校對結果（最新一次）';
 const count = (text, needle) => text.split(needle).length - 1;
 const finish = async r => { await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath); };
 const rerun = async (r, i) => { await r.runs.rerunCard(r.mapPath, r.nodes[i].id); while (r.runs.isRunning(r.mapPath)) await tick(); await settle(); };
@@ -837,9 +837,9 @@ test('T1 proof section: one "校對結果（最新一次）" section after the D
     assert.equal(count(raw, SECTION), 1);
     assert.ok(raw.indexOf(SECTION) > raw.indexOf('visual-agent-map:detail:end'), 'outside the Detail block');
     const section = raw.slice(raw.indexOf(SECTION));
-    assert.match(section, /- C1 達成\n- C2 達成/);
+    assert.match(section, /> - C1 達成\n> - C2 達成/);
     assert.ok(!section.includes('fine'), 'a met item shows no note');
-    assert.match(section, /- 作者模型：Label＜m2＞/); assert.match(section, /- 校對模型：Label＜m3＞/);
+    assert.match(section, /> - 作者模型：Label＜m2＞/); assert.match(section, /> - 校對模型：Label＜m3＞/);
     assert.match(raw, /^model: "?model-a"?$/m);
   }
   for (const line of r.stat.logs) { assert.ok(!/校對結果|Label|m2|m3|SecretBody/.test(line), line); }
@@ -848,7 +848,7 @@ test('T1 proof section: one "校對結果（最新一次）" section after the D
 test('T1 proof section: an unmet item shows its note; a rerun replaces the section and the record (not accumulated) and the proof never sees the section', async () => {
   const r = await rig({ script: { proof: async request => ({ items: request.checklist.map(c => ({ id: c.id, type: c.type, status: c.id === 'C2' ? 'unmet' : 'met', note: 'needs an end', sources: [] })), aggregate: 'needs-review' }) } });
   await finish(r);
-  assert.match(r.raw(0), /- C2 未達成：needs an end/);
+  assert.match(r.raw(0), /> - C2 未達成：needs an end/);
   await rerun(r, 0);
   const raw = r.raw(0);
   assert.equal(count(raw, SECTION), 1);
@@ -861,7 +861,7 @@ test('T1 models: the author model is the id actually dispatched (not the frontma
   const r = await rig({ ports: { config: () => ({ planModel: 'm1', authorModel: 'claude-haiku-4-5', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }) } });
   const before = /^model: .*$/m.exec(r.raw(1))[0];
   await finish(r);
-  assert.match(r.raw(1), /- 作者模型：claude-haiku-4-5/);
+  assert.match(r.raw(1), /> - 作者模型：claude-haiku-4-5/);
   assert.equal(/^model: .*$/m.exec(r.raw(1))[0], before);
   assert.ok(r.raw(1).includes(`"authorModel":"claude-haiku-4-5"`));
 });
@@ -871,7 +871,7 @@ test('T1 failure: a failed proof writes "失敗：原因" in the section with no
   await finish(r);
   const raw = r.raw(1);
   assert.equal(count(raw, SECTION), 1);
-  assert.match(raw, /校對結果（最新一次）\n\n- 失敗：failed\n/);
+  assert.match(raw, /校對結果（最新一次）\n> - 失敗：failed\n/);
   assert.ok(!/作者模型|校對模型/.test(raw.slice(raw.indexOf(SECTION))));
   assert.equal(stageOf(raw), 'needs-review');
 });
@@ -879,7 +879,7 @@ test('T1 failure: a failed proof writes "失敗：原因" in the section with no
 test('T1 failure: a failed author step (write) shows its code in the section; discarded / removed reasons write no section', async () => {
   const r = await rig({ script: { author: async () => { throw new Error('boom'); } } });
   await finish(r);
-  assert.match(r.raw(1), /校對結果（最新一次）\n\n- 失敗：failed\n/);
+  assert.match(r.raw(1), /校對結果（最新一次）\n> - 失敗：failed\n/);
   const d = await rig({ script: { author: async input => { await input.admission.reserve(); return { outcome: 'discarded' }; } } });
   await finish(d);
   assert.equal(count(d.raw(1), SECTION), 0);
@@ -896,7 +896,7 @@ test('T1 dedupe (R1-5): a stored result under the same key refreshes the section
   // an old record (no model ids) and no section at all, as a card from before T1 has it
   const old = appendResearchNote(note.detail.split('\n').slice(0, -1).join('\n').replace(/\s*> \[!.*[\s\S]*$/, ''), composeProofRecord(key, result)).text;
   await r.repo.updateNoteGuarded(r.nodes[1].path, { detail: old }, {});
-  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/\n## 校對結果（最新一次）[\s\S]*?(?=\n<!--|\n> \[!|$)/, ''), {});
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/\n> \[!vam-book\]- 校對結果（最新一次）(\n>.*)*/, ''), {});
   assert.equal(count(r.raw(1), SECTION), 0);
   await r.repo.writePipelineFields(r.nodes[1].path, { pipelineStage: 'written' });
   await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'writing'; d.bookPipeline.attempts[r.nodes[1].id].proof = 0; });
@@ -942,7 +942,7 @@ test('T1 dedupe: a stored result whose card left the map is not written to (card
   const note = await r.note(1);
   const key = proofKey({ runId: s.runId, nodeId: r.nodes[1].id, revision: cardRevision(s, r.nodes[1].id), body: withoutResearchNotes(note.detail), checklist: parseChecklist(note.prompt) });
   assert.ok(findStoredProof(note.detail, key));
-  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/\n## 校對結果（最新一次）[\s\S]*?(?=\n<!--|\n> \[!|$)/, ''), {});
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/\n> \[!vam-book\]- 校對結果（最新一次）(\n>.*)*/, ''), {});
   assert.equal(count(r.raw(1), SECTION), 0);
   await r.repo.writePipelineFields(r.nodes[1].path, { pipelineStage: 'written' });
   await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'writing'; d.bookPipeline.attempts[r.nodes[1].id].proof = 0; });
@@ -983,7 +983,7 @@ test('T1 carry-over: a rewrite keeps the card\'s latest proof record only and th
   for (const key of k) detail = appendResearchNote(detail, composeProofRecord(key, result)).text;
   detail = markOldProofRecords(detail, 'k3');
   assert.ok(detail.includes('（舊版）校對'));
-  await r.repo.updateNoteRawGuarded(r.nodes[0].path, c => c.replace(/\n## 校對結果（最新一次）[\s\S]*$/, '\n'), {});
+  await r.repo.updateNoteRawGuarded(r.nodes[0].path, c => c.replace(/\n> \[!vam-book\]- 校對結果（最新一次）(\n>.*)*/, '\n'), {});
   await r.repo.updateNoteGuarded(r.nodes[0].path, { detail }, {});
   await r.repo.updateNoteGuarded(r.nodes[0].path, {}, { detailTemplate: undefined });
   await rerun(r, 0);

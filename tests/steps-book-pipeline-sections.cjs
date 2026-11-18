@@ -12,33 +12,34 @@ const keyOf = revision => proof.proofKey({ runId: 'r1', nodeId: 'n1', revision, 
 const recordOf = (revision, note) => proof.composeProofRecord(keyOf(revision), result(note));
 const count = (haystack, needle) => haystack.split(needle).length - 1;
 
-test('appendResearchNote: no Research notes section: a new section with a folded callout at the end', () => {
+test('appendResearchNote: no work records yet: a new hidden vam-book callout at the end (no heading), a blank line before it', () => {
   const out = sections.appendResearchNote('Lead text\n\n### Sources\n\n- a', recordOf(1));
   assert.equal(out.appended, true);
-  assert.match(out.text, /\n### 研究備註\n\n> \[!note\]- 研究備註\n> 校對（已校）\n> - C1 達成：ok（開頁：`https:\/\/example\.com\/a`）\n> <!-- book-proof:v1 /);
-  assert.ok(out.text.startsWith('Lead text\n\n### Sources\n\n- a\n\n### 研究備註'));
-  assert.equal(count(out.text, '### '), 2);
+  assert.match(out.text, /\n\n> \[!vam-book\]- 研究備註\n> 校對（已校）\n> - C1 達成：ok（開頁：`https:\/\/example\.com\/a`）\n> <!-- book-proof:v1 /);
+  assert.ok(out.text.startsWith('Lead text\n\n### Sources\n\n- a\n\n> [!vam-book]- 研究備註'));
+  assert.equal(count(out.text, '### '), 1, 'no new heading');
 });
 
-test('appendResearchNote: an empty Detail gets just the section', () => {
+test('appendResearchNote: an empty Detail gets just the hidden callout', () => {
   const out = sections.appendResearchNote('', recordOf(1));
-  assert.ok(out.text.startsWith('### 研究備註\n\n> [!note]- 研究備註\n'));
+  assert.ok(out.text.startsWith('> [!vam-book]- 研究備註\n'));
 });
 
-test('appendResearchNote: appends inside the existing callout, uses the section\'s own name, keeps what follows', () => {
+test('appendResearchNote: an older Research notes section is turned into the hidden callout (heading gone, own title kept), the record goes inside it, what follows stays', () => {
   const first = sections.appendResearchNote('Lead\n\n### Research notes\n\n> [!note]- Research notes\n> old line\n\n### After\n\ntail', recordOf(1));
   assert.equal(first.appended, true);
-  assert.equal(count(first.text, '[!note]-'), 1, 'still one callout');
+  assert.equal(count(first.text, '[!vam-book]-'), 1, 'still one callout'); assert.ok(!first.text.includes('[!note]') && !first.text.includes('### Research notes'));
+  assert.ok(first.text.startsWith('Lead\n\n> [!vam-book]- Research notes\n> old line'));
   assert.match(first.text, /> old line\n>\n> 校對（已校）/);
   assert.match(first.text, /\n\n### After\n\ntail$/);
   const second = sections.appendResearchNote(first.text, recordOf(2));
-  assert.equal(count(second.text, '[!note]-'), 1);
+  assert.equal(count(second.text, '[!vam-book]-'), 1);
   assert.equal(count(second.text, 'book-proof:v1'), 2);
 });
 
-test('appendResearchNote: a section without a callout gets one named after the heading', () => {
+test('appendResearchNote: an older section without a callout keeps its text; the records go in a new hidden callout', () => {
   const out = sections.appendResearchNote('### 研究备注\n\nplain note\n', recordOf(1));
-  assert.match(out.text, /### 研究备注\n\nplain note\n\n> \[!note\]- 研究备注\n> 校對/);
+  assert.match(out.text, /### 研究备注\n\nplain note\n\n> \[!vam-book\]- 研究備註\n> 校對/);
 });
 
 test('appendResearchNote: the same key (read through the > prefix) is not appended twice, and the text is returned as it was', () => {
@@ -53,7 +54,7 @@ test('appendResearchNote: a heading-like line inside a fence or a callout is not
   const out = sections.appendResearchNote(detail, recordOf(1, '## evil ![x](http://a) %% <b> ```'));
   assert.ok(out.text.startsWith(detail), 'the fenced heading is not the section');
   const added = out.text.slice(detail.length).split('\n').filter(Boolean);
-  assert.ok(added.every(line => line.startsWith('> ') || line.startsWith('### 研究備註')), 'every line is quoted or the heading');
+  assert.ok(added.every(line => line.startsWith('> ')), 'every added line is quoted');
   assert.equal(/^\s{0,3}#{1,2} /m.test(out.text.replace(detail, '')), false);
   assert.ok(!/!\[x\]\(|%%|<b>/.test(out.text.slice(detail.length).replace(/<!-- book-proof[^\n]*/, '')));
 });
@@ -61,7 +62,7 @@ test('appendResearchNote: a heading-like line inside a fence or a callout is not
 test('appendResearchNote: a record without a key is appended as it is (no dedupe), CRLF text keeps working', () => {
   const out = sections.appendResearchNote('Lead\r\n\r\n### 研究備註\r\n\r\n> [!note]- 研究備註\r\n> old\r\n', recordOf(1));
   assert.equal(out.appended, true);
-  assert.equal(count(out.text, '[!note]-'), 1);
+  assert.equal(count(out.text, '[!vam-book]-'), 1); assert.ok(!out.text.includes('### 研究備註'));
   assert.equal(sections.appendResearchNote('x', 'just text').appended, true);
 });
 
@@ -168,11 +169,11 @@ test('replaceProofSection: the owner\'s `- ` list after the section (one blank l
   const mine = '- 我的待辦一\n- 我的待辦二';
   const atEnd = '# T\n\n## 校對結果（最新一次）\n\n- C1 達成\n\n' + mine + '\n';
   const outEnd = sections.replaceProofSection(atEnd, '校對結果（最新一次）', '- C1 未達成');
-  assert.equal(outEnd, '# T\n\n## 校對結果（最新一次）\n\n- C1 未達成\n\n' + mine + '\n');
+  assert.equal(outEnd, '# T\n\n> [!vam-book]- 校對結果（最新一次）\n> - C1 未達成\n\n' + mine + '\n');
   const refs = '<!-- visual-agent-map:references:start -->\n[1]: x\n<!-- visual-agent-map:references:end -->\n';
   const beforeRefs = '# T\n\n## 校對結果（最新一次）\n\n- C1 達成\n- C2 達成\n\n' + mine + '\n\n' + refs;
   const outRefs = sections.replaceProofSection(beforeRefs, '校對結果（最新一次）', '- C1 未達成');
-  assert.equal(outRefs, '# T\n\n## 校對結果（最新一次）\n\n- C1 未達成\n\n' + mine + '\n\n' + refs);
+  assert.equal(outRefs, '# T\n\n> [!vam-book]- 校對結果（最新一次）\n> - C1 未達成\n\n' + mine + '\n\n' + refs);
   assert.equal(sections.replaceProofSection(outRefs, '校對結果（最新一次）', '- C1 未達成'), outRefs, 'idempotent');
   const tight = sections.replaceProofSection('## 校對結果（最新一次）\n- C1 達成\n\n' + mine + '\n', '校對結果（最新一次）', '- C1 未達成');
   assert.ok(tight.includes('\n\n' + mine + '\n') && count(tight, '- C1') === 1, 'no blank after the heading');
@@ -182,7 +183,7 @@ test('replaceProofSection: adds the section before the reference block / at the 
   const note = '---\ntitle: T\n---\n# T\n\n## 詳細內容\n\n<!-- visual-agent-map:detail:start -->\n\n## 校對結果（最新一次）\n\n- 在 Detail 內，不動\n\n<!-- visual-agent-map:detail:end -->\n\n> [!info]- 提示\n> x\n';
   const added = sections.replaceProofSection(note, '校對結果（最新一次）', '- C1 達成');
   assert.ok(added.includes('- 在 Detail 內，不動'));
-  assert.ok(added.endsWith('> [!info]- 提示\n> x\n\n## 校對結果（最新一次）\n\n- C1 達成\n'));
+  assert.ok(added.endsWith('> [!info]- 提示\n> x\n\n> [!vam-book]- 校對結果（最新一次）\n> - C1 達成\n'));
   const replaced = sections.replaceProofSection(added, '校對結果（最新一次）', '- C1 未達成：y');
   assert.equal(count(replaced, '- C1'), 1); assert.ok(replaced.includes('- C1 未達成：y') && replaced.includes('在 Detail 內'));
   assert.equal(sections.replaceProofSection(replaced, '校對結果（最新一次）', '- C1 未達成：y'), replaced);
@@ -192,7 +193,7 @@ test('replaceProofSection: adds the section before the reference block / at the 
   assert.ok(owner.includes('我自己寫的一行') && owner.includes('## 我的標題\n\n內容'), 'text after the section is never taken');
   assert.equal(count(owner, '- C1'), 1);
   const refs = '# T\n\n正文\n\n<!-- visual-agent-map:references:start -->\n[1]: x\n<!-- visual-agent-map:references:end -->\n';
-  assert.ok(sections.replaceProofSection(refs, 'H', 'b').indexOf('## H') < sections.replaceProofSection(refs, 'H', 'b').indexOf('references:start'));
+  assert.ok(sections.replaceProofSection(refs, 'H', 'b').indexOf('[!vam-book]- H') < sections.replaceProofSection(refs, 'H', 'b').indexOf('references:start'));
   const fenced = '# T\n\n```\n## 校對結果（最新一次）\n\n- fake\n```\n';
   assert.ok(sections.replaceProofSection(fenced, '校對結果（最新一次）', '- real').includes('- fake'));
 });

@@ -96,7 +96,7 @@ function quoteRunEnd(lines: string[], fenced: boolean[], from: number): number {
 /** The hidden callouts of a text (outside code): each from its `> [!vam-book]` line through the `>` lines that follow. */
 function hiddenRanges(lines: string[], fenced: boolean[]): { start: number; end: number }[] {
   const found: { start: number; end: number }[] = [];
-  for (let i = 0; i < lines.length; ) {
+  for (let i = 0; i < lines.length;) {
     if (!fenced[i] && HIDDEN_HEAD.test(bare(lines[i]))) {
       const end = quoteRunEnd(lines, fenced, i + 1);
       found.push({ start: i, end });
@@ -164,7 +164,7 @@ function spliceBlock(lines: string[], at: number, end: number, middle: string[])
 /** The callouts in lines [from, to) outside code: each starts at a callout title line and runs through the `>` lines after it. */
 function calloutBlocks(lines: string[], fenced: boolean[], from: number, to: number): { start: number; end: number }[] {
   const found: { start: number; end: number }[] = [];
-  for (let i = from; i < to; ) {
+  for (let i = from; i < to;) {
     if (!fenced[i] && CALLOUT_HEAD.test(bare(lines[i]))) {
       const end = Math.min(quoteRunEnd(lines, fenced, i + 1), to);
       found.push({ start: i, end });
@@ -183,7 +183,7 @@ const asHidden = (head: string): string => head.replace(/^(>[ \t]?)\[![A-Za-z][\
  */
 function hideResearchSection(text: string): string {
   let lines = text.split("\n");
-  for (let from = 0; ; ) {
+  for (let from = 0; ;) {
     const fenced = fencedLines(lines);
     const section = findSection(lines, fenced, name => isResearchNotesHeading(name), from);
     if (!section) return lines.join("\n");
@@ -191,16 +191,20 @@ function hideResearchSection(text: string): string {
     const name = section.text.trim().toLowerCase();
     const mine = blocks.filter(
       block =>
-        /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[block.start]))?.[1].toLowerCase() === name ||
-        lines.slice(block.start, block.end).some(line => ANY_RECORD.test(line))
+        /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[block.start]))?.[1].toLowerCase() ===
+          name || lines.slice(block.start, block.end).some(line => ANY_RECORD.test(line))
     );
     if (!mine.length) {
       from = section.at + 1;
       continue;
     }
     for (const block of mine) lines[block.start] = asHidden(lines[block.start]);
-    const covered = new Set(blocks.flatMap(block => lines.slice(block.start, block.end).map((_, k) => block.start + k)));
-    const others = lines.slice(section.at + 1, section.end).some((line, k) => line.trim() && !covered.has(section.at + 1 + k));
+    const covered = new Set(
+      blocks.flatMap(block => lines.slice(block.start, block.end).map((_, k) => block.start + k))
+    );
+    const others = lines
+      .slice(section.at + 1, section.end)
+      .some((line, k) => line.trim() && !covered.has(section.at + 1 + k));
     if (mine.length < blocks.length || others) {
       from = section.at + 1;
       continue;
@@ -215,9 +219,11 @@ function hideResearchSection(text: string): string {
 
 const updateLogNames = (): Set<string> =>
   new Set(
-    [SECTION_NAME.log.zh, SECTION_NAME.log.en, ...NOTE_LANGUAGES.map(locale => translate(locale, "detail.update_log"))].map(
-      name => name.trim().toLowerCase()
-    )
+    [
+      SECTION_NAME.log.zh,
+      SECTION_NAME.log.en,
+      ...NOTE_LANGUAGES.map(locale => translate(locale, "detail.update_log"))
+    ].map(name => name.trim().toLowerCase())
   );
 
 /**
@@ -228,7 +234,7 @@ function hideUpdateLog(text: string): string {
   const names = updateLogNames();
   let lines = text.split("\n");
   const moved: string[] = [];
-  for (let from = 0; ; ) {
+  for (let from = 0; ;) {
     const section = findSection(
       lines,
       fencedLines(lines),
@@ -236,7 +242,10 @@ function hideUpdateLog(text: string): string {
       from
     );
     if (!section) break;
-    const body = lines.slice(section.at + 1, section.end).map(bare).filter(line => line.trim());
+    const body = lines
+      .slice(section.at + 1, section.end)
+      .map(bare)
+      .filter(line => line.trim());
     if (!body.length || !body.every(line => LOG_LINE.test(line))) {
       from = section.at + 1;
       continue;
@@ -259,9 +268,7 @@ export function workLogLines(detail: string): string[] {
   const lines = detail.split("\n");
   const fenced = fencedLines(lines);
   const mask = recordLines(lines, fenced);
-  return lines
-    .map((line, i) => (mask[i] ? unquoted(bare(line)).trim() : ""))
-    .filter(line => LOG_LINE.test(line));
+  return lines.map((line, i) => (mask[i] ? unquoted(bare(line)).trim() : "")).filter(line => LOG_LINE.test(line));
 }
 
 /** A rewritten Detail that lost the earlier log lines of the card (the write-back reads only a section it can see by heading): they are put back first in the hidden callout. */
@@ -465,7 +472,7 @@ export function latestStoredProof(detail: string): StoredProofView | undefined {
 export function withoutResearchNotes(detail: string): string {
   const lines = withoutHiddenCallouts(detail.split("\n"));
   const section = findSection(lines, fencedLines(lines), text => isResearchNotesHeading(text));
-  if (!section) return detail.replace(/\s+$/, "");
+  if (!section) return lines.join("\n").replace(/\s+$/, "");
   return [...lines.slice(0, section.at), ...lines.slice(section.end)].join("\n").replace(/\s+$/, "");
 }
 
@@ -514,6 +521,9 @@ function findImageSection(lines: string[]): { at: number; end: number } | undefi
   for (let from = 0; ;) {
     const s = findSection(lines, fenced, (text, level) => level === 3 && isImagesHeading(text), from);
     if (!s) return undefined;
+    // A hidden work-record callout after the pictures is no part of the section.
+    const hidden = hiddenRanges(lines, fenced).find(range => range.start > s.at && range.start < s.end);
+    if (hidden) s.end = hidden.start;
     const body = lines
       .slice(s.at + 1, s.end)
       .map(l => l.replace(/\r$/, ""))

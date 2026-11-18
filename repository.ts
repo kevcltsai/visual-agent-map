@@ -655,7 +655,7 @@ const isCanonical = (set: NoteHeadings): boolean => set.Detail === CANONICAL_HEA
 /**
  * The heading set a note is already written with, read from its managed Detail heading (the `## ` heading right
  * before the Detail start marker) alone; undefined when it has no marker, unless the user (or a tool) removed the
- * markers of a localized note: then a localized set whose Current Summary heading is there (outside
+ * markers of a localized note: then a localized set whose Detail and Current Summary headings are both there (outside
  * fenced code) and no English managed heading is adopted, so such a note keeps decoding and does not gain a second pair. Any other heading there reads as English, so
  * a user's own heading that happens to read like a localized one is never taken for a managed section in older notes.
  */
@@ -668,9 +668,9 @@ function markerlessHeadingSet(content: string): NoteHeadings | undefined {
     if (text !== undefined) headings.add(text);
   });
   if (headings.has("Current Summary") || headings.has("Detail")) return undefined;
-  // The localized summary heading alone names the set too (a note made with only that section): without it the write adds an English
-  // Current Summary beside the localized one and the note shows its summary twice.
-  return NOTE_HEADING_SETS.filter(set => !isCanonical(set)).find(set => headings.has(set["Current Summary"]));
+  return NOTE_HEADING_SETS.filter(set => !isCanonical(set)).find(
+    set => headings.has(set.Detail) && headings.has(set["Current Summary"])
+  );
 }
 function noteHeadingSet(content: string): NoteHeadings | undefined {
   const start = content.indexOf(DETAIL_START);
@@ -831,7 +831,13 @@ function sectionBounds(content: string, heading: NoteSection): { start: number; 
   const start = match.index + match[0].length;
   const next = /^## .+$/m.exec(content.slice(start));
   const reference = content.indexOf(REFERENCE_START, start);
-  const candidates = [next ? start + next.index : content.length, reference >= 0 ? reference : content.length];
+  // A hidden work-record callout (`> [!vam-book]- ...`, the proofread result) after a section is no part of it: Preview and Prompt callouts were turned into `## ` sections before.
+  const hidden = /^> \[!vam-book\]/im.exec(content.slice(start));
+  const candidates = [
+    next ? start + next.index : content.length,
+    reference >= 0 ? reference : content.length,
+    hidden ? start + hidden.index : content.length
+  ];
   return { start, end: Math.min(...candidates) };
 }
 

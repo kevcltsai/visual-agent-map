@@ -60,7 +60,7 @@ async function rig(over = {}) {
     probeImage: async (url, signal) => { stat.probes.push(url); return script.probe(url, signal, stat.probes.length); },
     backupNote: async path => { stat.backups.push(path); return { ok: true, path: `${path}.bak` }; },
     blocked: () => false,
-    config: () => ({ planModel: 'm1', authorModel: 'm2', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }),
+    config: () => ({ planModel: 'm1', authorModel: 'm2', imageModel: 'm4', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }),
     now: () => '2026-11-17T00:00:00.000Z',
     newId: () => `run-${++ids}`,
     log: line => stat.logs.push(line),
@@ -110,7 +110,7 @@ test('slots: two markers become two standard images with one plain caption line 
   assert.match(detail, /正文一。SecretRootTitle\n\n!\[Work 1\]\(https:\/\/upload\.wikimedia\.org[^)\s]+\)\nCaption 1\n\n正文二。\n\n!\[Work 2\]\([^)\s]+\)\nCaption 2\n\n正文三。\n\n### 來源\n/);
   assert.ok(!/〔圖位|無圖：|### 圖像/.test(detail));
   assert.equal(r.calls.length, 1, 'one search call per card');
-  assert.equal(r.calls[0].model, 'm2', 'the author model');
+  assert.equal(r.calls[0].model, 'm4', 'the picture model (not the author model m2)');
   assert.deepEqual(plain(r.calls[0].slots.map(s => s.index)), [1, 2]);
   assert.match(r.calls[0].chapter, /SecretRootTitle/);
   assert.equal(detail.split('book-slots:v1').length - 1, 1, 'one record');

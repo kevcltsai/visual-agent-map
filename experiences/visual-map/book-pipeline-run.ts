@@ -170,6 +170,8 @@ export interface PipelineCard {
 export interface BookRunConfig {
   planModel: string;
   authorModel: string;
+  /** The picture search (and the start card's suggestions) run on this model. */
+  imageModel: string;
   proofModel: string;
   reasoning: ReasoningLevel;
   language: ContentLanguage;
@@ -1769,7 +1771,7 @@ export class BookPipelineRuns {
           signal,
           this.ports.findImages(
             {
-              ...this.base(drive, drive.config.authorModel),
+              ...this.base(drive, drive.config.imageModel),
               chapter: imageSearchText(first),
               slots: wanted.map(({ index, kind, explains }) => ({ index, kind, explains })),
               exclude: [...new Set([...drive.usedImages, ...others])]

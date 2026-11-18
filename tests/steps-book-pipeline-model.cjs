@@ -148,11 +148,13 @@ for (const [name, change] of Object.entries(corrupt))
     assert.equal(roundTrip(text), text);
   });
 
-test('the three model defaults are haiku, sonnet, sonnet; saved ids are kept; blanks and non-strings fall back', () => {
+test('the four model defaults are sonnet, opus, haiku, haiku; saved ids are kept (old data.json gets the new field only); blanks fall back', () => {
   const fresh = Main.settingsFromSaved(null);
-  assert.deepEqual([fresh.bookPlanModel, fresh.bookWriteModel, fresh.bookProofModel], ['claude:haiku', 'claude:sonnet', 'claude:sonnet']);
+  assert.deepEqual([fresh.bookPlanModel, fresh.bookWriteModel, fresh.bookImageModel, fresh.bookProofModel], ['claude:sonnet', 'claude:opus', 'claude:haiku', 'claude:haiku']);
   const saved = Main.settingsFromSaved({ bookPlanModel: ' claude:opus ', bookWriteModel: '', bookProofModel: 5 });
-  assert.deepEqual([saved.bookPlanModel, saved.bookWriteModel, saved.bookProofModel], ['claude:opus', 'claude:sonnet', 'claude:sonnet']);
+  assert.deepEqual([saved.bookPlanModel, saved.bookWriteModel, saved.bookImageModel, saved.bookProofModel], ['claude:opus', 'claude:opus', 'claude:haiku', 'claude:haiku']);
+  const oldOwner = Main.settingsFromSaved({ bookPlanModel: 'claude:haiku', bookWriteModel: 'claude:sonnet', bookProofModel: 'claude:sonnet' });
+  assert.deepEqual([oldOwner.bookPlanModel, oldOwner.bookWriteModel, oldOwner.bookImageModel, oldOwner.bookProofModel], ['claude:haiku', 'claude:sonnet', 'claude:haiku', 'claude:sonnet']);
   const old = Main.settingsFromSaved({ cliModel: 'claude:sonnet' });
   assert.equal(old.cliModel, 'claude:sonnet');
 });

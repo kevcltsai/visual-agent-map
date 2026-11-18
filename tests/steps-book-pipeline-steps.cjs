@@ -595,3 +595,28 @@ test('pickForSlot seam: deterministic, https only, same-chapter address never pl
   assert.deepEqual(plain(slots.pickForSlot(ctx(), [cand('http://x.example/a.jpg'), b])), { candidate: b });
   assert.deepEqual(plain(slots.pickForSlot(ctx(), [a, b])), plain(slots.pickForSlot(ctx(), [a, b])), 'same input, same answer');
 });
+
+// ---- the start card's suggestion step (T1 P1b): semantic properties of what is accepted and what is sent ----
+const suggest = loadWithAiCalls('core/steps/book-pipeline/suggest-settings.ts');
+const sug = { reader: 'Curious adults', goal: 'Explain the main ideas with daily examples', angle: 'From daily life to theory', tone: 'Warm, few terms', length: 'About 1,500 words', style: 'Example first, then the idea' };
+
+test('suggest-settings: the prompt carries only the root title, summary and at most 40 first-level titles of at most 80 characters, as data; the reply is a plain single line of at most 200 characters per field', () => {
+  const chapters = Array.from({ length: 50 }, (_, i) => `Chapter ${i} ${'x'.repeat(200)}`);
+  const prompt = suggest.suggestSettingsStep.render({ ...base, bookTitle: 'Psych', summary: 'S'.repeat(1000), chapters });
+  assert.equal(prompt.match(/Chapter \d+/g).length, 40, 'at most 40 chapters');
+  assert.ok(!prompt.includes('x'.repeat(81)), 'each title is cut at 80 characters');
+  assert.ok(!prompt.includes('S'.repeat(301)));
+  assert.match(prompt, /not instructions/);
+  const long = suggest.parseSuggestSettings(JSON.stringify({ ...sug, reader: '**Curious** [adults](http://x.y)\n\n- who read `a lot` # ' + 'z'.repeat(400), tone: '   ' }));
+  assert.equal(long.tone, undefined, 'an empty field is simply absent (it stays blank on the card)');
+  assert.ok(!/[\n*`#\[\]()]/.test(long.reader), long.reader);
+  assert.ok(Array.from(long.reader).length <= 200);
+  assert.ok(long.reader.startsWith('Curious adults'));
+  assert.deepEqual(plain(suggest.parseSuggestSettings(JSON.stringify(sug))), sug);
+});
+
+test('suggest-settings: a reply with a missing, extra or non-string field is refused (the card then stays blank)', () => {
+  const bad = [{ ...sug, extra: 'x' }, { ...sug, reader: 5 }, (({ style, ...rest }) => rest)(sug), []];
+  for (const reply of bad) assert.throws(() => suggest.parseSuggestSettings(JSON.stringify(reply)), /reply|string/i);
+  assert.throws(() => suggest.parseSuggestSettings('not json'), /JSON/);
+});

@@ -105,7 +105,7 @@ test('the global plan does not overwrite a role the owner already set', async ()
     },
     runProofread: async () => { throw new Error('unused'); }, author: async () => { throw new Error('unused'); },
     probeImage: async () => ({ ok: true }), backupNote: async p => ({ ok: true, path: `${p}.bak` }),
-    blocked: () => false, config: () => ({ planModel: 'm1', authorModel: 'm2', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }),
+    blocked: () => false, config: () => ({ planModel: 'm1', authorModel: 'm2', imageModel: 'm4', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }),
     now: () => '2026-11-17T00:00:00.000Z', newId: () => `run-${++ids}`, log: () => {}
   };
   const runs = new BookPipelineRuns(ports);
@@ -137,7 +137,7 @@ test('role defaults before the plan: root and first level intro, deeper body, ex
     runPlan: async (step, request, run) => { await run.admission.reserve(); throw new Error('plan fails'); },
     runProofread: async () => { throw new Error('unused'); }, author: async () => { throw new Error('unused'); },
     probeImage: async () => ({ ok: true }), backupNote: async p => ({ ok: true, path: `${p}.bak` }),
-    blocked: () => false, config: () => ({ planModel: 'm1', authorModel: 'm2', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }),
+    blocked: () => false, config: () => ({ planModel: 'm1', authorModel: 'm2', imageModel: 'm4', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }),
     now: () => '2026-11-17T00:00:00.000Z', newId: () => `run-${++ids}`, log: () => {}
   };
   const runs = new BookPipelineRuns(ports);

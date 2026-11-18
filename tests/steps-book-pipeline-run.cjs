@@ -58,7 +58,7 @@ async function rig(over = {}) {
     probeImage: async (url, signal) => { stat.probes.push(url); return script.probe(url, signal, stat.probes.length); },
     backupNote: async path => { stat.backups.push(path); return { ok: true, path: `${path}.bak` }; },
     blocked: () => false,
-    config: () => ({ planModel: 'm1', authorModel: 'm2', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }),
+    config: () => ({ planModel: 'm1', authorModel: 'm2', imageModel: 'm4', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }),
     now: () => '2026-11-17T00:00:00.000Z',
     newId: () => `run-${++ids}`,
     log: line => stat.logs.push(line),
@@ -385,7 +385,7 @@ test('probe failure reasons are words in the output language (zh: 無法載入 /
       await input.admission.reserve();
       await r.repo.updateNoteGuarded(input.path, { detail: reasons.map((_, i) => `![p${i}](https://x.example/${i}.png)`).join('\n\n') }, { authorize: input.authorize, finalize: input.finalize });
       return { outcome: 'written' };
-    }, probe: async url => ({ ok: false, reason: reasons[Number(/(\d)\.png/.exec(url)[1])] }) }, ports: { config: () => ({ planModel: 'm1', authorModel: 'm2', proofModel: 'm3', reasoning: 'low', language }) } });
+    }, probe: async url => ({ ok: false, reason: reasons[Number(/(\d)\.png/.exec(url)[1])] }) }, ports: { config: () => ({ planModel: 'm1', authorModel: 'm2', imageModel: 'm4', proofModel: 'm3', reasoning: 'low', language }) } });
     await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
     const detail = (await r.note(0)).detail;
     for (const text of expected) assert.ok(detail.includes(text), `${language}: ${text}`);
@@ -799,7 +799,7 @@ test('chat "continue" confirms gate 1: the reply shows and the chat is free agai
 });
 
 test('the config port is read on every start and resume, so a settings change applies to the next run and never to a drive in progress', async () => {
-  const cfg = { planModel: 'plan-A', authorModel: 'author-A', proofModel: 'proof-A', reasoning: 'low', language: 'zh-TW' };
+  const cfg = { planModel: 'plan-A', authorModel: 'author-A', imageModel: 'image-A', proofModel: 'proof-A', reasoning: 'low', language: 'zh-TW' };
   const seen = [];
   const hold = defer();
   const r = await rig({
@@ -858,7 +858,7 @@ test('T1 proof section: an unmet item shows its note; a rerun replaces the secti
 });
 
 test('T1 models: the author model is the id actually dispatched (not the frontmatter model); a Haiku author shows Haiku and frontmatter model stays', async () => {
-  const r = await rig({ ports: { config: () => ({ planModel: 'm1', authorModel: 'claude-haiku-4-5', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }) } });
+  const r = await rig({ ports: { config: () => ({ planModel: 'm1', authorModel: 'claude-haiku-4-5', imageModel: 'claude-haiku-4-5', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }) } });
   const before = /^model: .*$/m.exec(r.raw(1))[0];
   await finish(r);
   assert.match(r.raw(1), /> - 作者模型：claude-haiku-4-5/);

@@ -386,12 +386,12 @@ const valueOf = page => typeof page.displayValue === 'function' ? page.displayVa
 const statusOf = page => typeof page.status === 'function' ? page.status() : page.status;
 const pageNamed = (tab, name) => allPages(tab.getSettingDefinitions()).find(p => p.name === name);
 
-test('settings page: five top-level groups in order, sixteen rows (the Picture book heading, three model rows and a note sit in the AI group; no AIM folder row since AIM was removed), three top-level pages and no nested page', () => {
+test('settings page: five top-level groups in order, seventeen rows (the Picture book heading, four model rows and a note sit in the AI group; no AIM folder row since AIM was removed), three top-level pages and no nested page', () => {
   const { tab } = groupedTab();
   const defs = tab.getSettingDefinitions();
   assert.ok(defs.every(d => d.type === 'group'), 'the top level holds only groups');
   assert.deepEqual(plain(defs.map(d => d.heading)), ['General', 'AI', 'Notes', 'Map', 'Advanced']);
-  assert.equal(defs.reduce((n, d) => n + d.items.length, 0), 16);
+  assert.equal(defs.reduce((n, d) => n + d.items.length, 0), 17);
   assert.deepEqual(plain(pagesOf(defs).map(p => p.name)), ['AI connection', 'Note style', 'Advanced and troubleshooting']);
   const note = pageNamed(tab, 'Note style');
   assert.deepEqual(plain(pagesOf(note.items).map(p => p.name)), [], 'the "By topic type" sub-page is gone (grilling Q11)');

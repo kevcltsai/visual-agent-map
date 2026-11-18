@@ -65,7 +65,7 @@ async function rig() {
     probeImage: async () => ({ ok: true }),
     backupNote: async p => ({ ok: true, path: `${p}.bak` }),
     blocked: () => false,
-    config: () => ({ planModel: 'm1', authorModel: 'm2', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }),
+    config: () => ({ planModel: 'm1', authorModel: 'm2', imageModel: 'm4', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }),
     now: () => '2026-11-17T00:00:00.000Z', newId: () => `run-${++ids}`, log() {}
   };
   const runs = new bundle.BookPipelineRuns(ports);

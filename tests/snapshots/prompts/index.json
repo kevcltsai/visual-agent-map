@@ -286,6 +286,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "book-suggest-settings.en": {
+      "builder": "core/steps/book-pipeline/suggest-settings.ts suggestSettingsStep",
+      "language": "en",
+      "schema": true
+    },
+    "book-suggest-settings.zh": {
+      "builder": "core/steps/book-pipeline/suggest-settings.ts suggestSettingsStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "book-suggest-settings.zh-CN": {
+      "builder": "core/steps/book-pipeline/suggest-settings.ts suggestSettingsStep",
+      "language": "zh-CN",
+      "schema": true
+    },
     "chart.add-none.en": {
       "builder": "core/steps/chart/step.ts chartStep (no existing diagram)",
       "language": "en",

@@ -11,16 +11,19 @@ const { loadSource } = require('./support-replay.cjs');
 const root = path.resolve(__dirname, '..');
 const MAP = 'Agent Workspace/Topics/map-bk1/Map.md';
 const notices = [];
+// The suggestion timeout is held so a test can fire it by hand; an <option> is a stand-in element like the real one (text, value).
+const timers = { hold: false, held: [] };
+class OptionStub { constructor(text, value) { const o = dom.element('option', { text }); o.optionValue = value; o.value = value; o.disabled = false; return o; } }
 // One bundle, so the view, the screen parts and the language setting share one copy of the interface language.
 const bundle = loadSource(`
 export * from "./experiences/visual-map/book-pipeline-ui";
-export { bookStartEstimate, bookStartEstimateText, bookSettingsPatch } from "./experiences/visual-map/book-pipeline-start-modal";
+export { bookStartEstimate, bookStartEstimateText, bookSettingsPatch, BookStartModal, BOOK_SUGGEST_TIMEOUT_MS } from "./experiences/visual-map/book-pipeline-start-modal";
 export { BookPipelineRunError, stepCounts } from "./experiences/visual-map/book-pipeline-run";
 export { readBookPipeline } from "./core/book-pipeline/model";
 export { BookFinishModal, finishAskLine } from "./experiences/visual-map/book-pipeline-finish-modal";
 export { VisualAgentMapView } from "./experiences/visual-map/view";
 export { setUiLanguage, t } from "./i18n";
-`, { obsidian: { ...support.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice(notices), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
+`, { obsidian: { ...support.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice(notices), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, Option: OptionStub, window: { setTimeout: (fn, ms) => (ms === 20000 && timers.hold ? (timers.held.push(fn), 99) : setTimeout(fn, ms)), clearTimeout, setInterval, clearInterval } });
 const { setUiLanguage, t: tr } = bundle;
 const ui = bundle, runModule = bundle, model = bundle, bundleStart = bundle;
 const flat = text => text.replace(/\s+/g, ' ');
@@ -234,12 +237,16 @@ async function harness({ book, stages = {}, issue }) {
   setUiLanguage('zh-TW');
   const { VisualAgentMapView } = bundle;
   const entries = [];
+  const ctl = { calls: [], saves: [], impl: async () => ({}) };
   const plugin = support.withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: work => Promise.resolve().then(work),
     getBookPipelineProgress: () => undefined,
     argumentRuns: { isRunning: () => false },
     modelLabel: model => `M:${model}`,
+    availableModels: () => ['claude:sonnet', 'claude:opus', 'claude:haiku'],
+    saveSettings: async () => { ctl.saves.push({ ...settings }); },
+    suggestBookSettings: (input, signal) => { ctl.calls.push({ input, signal }); return ctl.impl(input, signal); },
     startBookPipeline: async p => { entries.push(['start', p]); },
     stopBookPipeline: async p => { entries.push(['stop', p]); },
     resumeBookPipeline: async (p, o) => { entries.push(['resume', p, o]); },
@@ -255,7 +262,7 @@ async function harness({ book, stages = {}, issue }) {
   view.render = () => { view.rendered = (view.rendered ?? 0) + 1; };
   view.selection.moveTabStop(view.defaultTabStop(view.map.nodes));
   const paint = () => { view.stageEl = dom.element('div'); view.cardEls.clear(); for (const n of view.map.nodes) view.renderNode(n); return view.stageEl; };
-  return { view, ids, paint, entries, notices, plugin };
+  return { view, ids, paint, entries, notices, plugin, ctl };
 }
 /** The toolbar entry opens the start card; pressing its Start button runs the entry. */
 async function startFromCard(h) {
@@ -432,7 +439,11 @@ const openCard = async h => { await h.view.startBookPipelineFromUi(); return h.v
 const cardButton = (modal, text) => dom.findAll(modal.modalEl, i => i.tag === 'button').find(b => b.text === text);
 const rootPath = h => h.view.map.nodes.find(n => n.id === h.ids.root).path;
 
-test('start card: pressing the button opens a card with the estimate (1+4N calls, about minutes), each step\'s model and collapsed settings; nothing starts yet', async () => {
+/** Shown on screen as far as a stand-in DOM can tell: no ancestor is hidden or a closed <details>. The real computed style is checked live. */
+const shown = el => { for (let n = el; n; n = n.parent) if (n.hidden || (n.tag === 'details' && !n.open)) return false; return true; };
+const field = (modal, label) => dom.findAll(modal.modalEl, i => i.tag === 'textarea').find(f => f.attrs['aria-label'] === label);
+
+test('start card: opens with the estimate (1+4N calls, about minutes), the six settings open (no <details>), the models on one line behind "Change"; nothing starts yet', async () => {
   const h = await harness({ book: false });
   const modal = await openCard(h);
   assert.ok(modal.isOpen);
@@ -440,15 +451,160 @@ test('start card: pressing the button opens a card with the estimate (1+4N calls
   const all = texts(modal.modalEl);
   assert.ok(all.includes('3 張卡 · 約 4 分鐘 · 約 13 次 AI 呼叫。'), all.join('|'));
   assert.ok(all.includes('中間只會停兩次，讓你確認。'));
-  for (const line of ['企劃：M:' + h.plugin.settings.bookPlanModel, '寫作：M:' + h.plugin.settings.bookWriteModel, '找圖：M:' + h.plugin.settings.bookWriteModel, '校對：M:' + h.plugin.settings.bookProofModel]) assert.ok(all.includes(line), line);
-  const details = dom.find(modal.modalEl, i => i.tag === 'details');
-  assert.equal(details.open, false, 'the whole-book settings start collapsed');
-  assert.equal(dom.findAll(details, i => i.tag === 'textarea').length, 6);
-  assert.deepEqual(dom.findAll(modal.modalEl, i => i.tag === 'button').map(b => b.text), ['取消', '開始']);
+  assert.ok(all.includes('某一章不滿意，可以只重跑那一章。'));
+  assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined, 'no collapsed block: the settings are always open');
+  const areas = dom.findAll(modal.modalEl, i => i.tag === 'textarea');
+  assert.equal(areas.length, 6);
+  for (const area of areas) assert.ok(shown(area), 'each field is on screen');
+  const s = h.plugin.settings;
+  assert.ok(all.includes(`模型：企劃 M:${s.bookPlanModel}、寫作 M:${s.bookWriteModel}、找圖 M:${s.bookImageModel}、校對 M:${s.bookProofModel}`), all.join('|'));
+  const selects = dom.findAll(modal.modalEl, i => i.tag === 'select');
+  assert.equal(selects.length, 4);
+  for (const select of selects) assert.equal(shown(select), false, 'the four dropdowns are folded until "Change"');
+  assert.deepEqual(dom.findAll(modal.modalEl, i => i.tag === 'button').map(b => b.text), ['更改', '取消', '開始']);
   assert.equal(dom.focusedNow().text, '取消', 'the keyboard starts on Cancel, so a stray Enter never starts the run');
   cardButton(modal, '取消').click();
   assert.equal(modal.isOpen, false);
   assert.equal(h.entries.length, 0, 'Cancel starts nothing');
+});
+
+test('start card: "Change" unfolds four dropdowns (plan, author, pictures, proofread) with the AI model list; a pick is saved to the settings, the summary line and the time follow, the calls do not', async () => {
+  const h = await harness({ book: false });
+  const modal = await openCard(h);
+  const change = cardButton(modal, '更改');
+  change.click();
+  const selects = dom.findAll(modal.modalEl, i => i.tag === 'select');
+  for (const select of selects) assert.ok(shown(select));
+  assert.deepEqual(selects.map(x => x.attrs['aria-label']), ['企劃', '寫作', '找圖', '校對']);
+  assert.deepEqual(selects[1].children.map(o => o.optionValue), ['claude:sonnet', 'claude:opus', 'claude:haiku']);
+  assert.equal(selects[1].value, h.plugin.settings.bookWriteModel);
+  const before = texts(modal.modalEl).find(x => x.startsWith('3 張卡'));
+  selects[1].value = 'claude:sonnet'; selects[1].change();
+  assert.equal(h.plugin.settings.bookWriteModel, 'claude:sonnet');
+  assert.equal(h.ctl.saves.length, 1);
+  assert.ok(texts(modal.modalEl).includes('模型：企劃 M:claude:sonnet、寫作 M:claude:sonnet、找圖 M:claude:haiku、校對 M:claude:haiku'));
+  const after = texts(modal.modalEl).find(x => x.startsWith('3 張卡'));
+  assert.match(before, /約 13 次/); assert.match(after, /約 13 次/);
+  assert.notEqual(before, after, 'the time follows the model');
+  change.click();
+  for (const select of selects) assert.equal(shown(select), false, 'folds again');
+});
+
+// ---- the start card's grey suggestions (T1 P1b) ----
+const SUGGEST = { reader: '對心理學有興趣的一般大人', goal: '能用日常例子說出主要概念', angle: '從日常現象進到理論', tone: '親切、少用術語', length: '約 1,500 字', style: '先舉例，再說概念' };
+const pending = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
+
+test('suggestions: one call on the picture model\'s entry with only the root title, summary and first-level chapter titles; they show as grey italic placeholders, the fields stay empty', async () => {
+  const h = await harness({ book: false });
+  h.ctl.impl = async () => SUGGEST;
+  const modal = await openCard(h);
+  await dom.tick(); await dom.tick(); await dom.tick();
+  assert.equal(h.ctl.calls.length, 1);
+  const input = h.ctl.calls[0].input;
+  assert.deepEqual(Object.keys(input).sort(), ['chapters', 'mapPath', 'summary', 'title']);
+  assert.equal(input.mapPath, MAP);
+  assert.equal(JSON.stringify(input.chapters), JSON.stringify(['a', 'b']));
+  for (const [label, key] of [['讀者', 'reader'], ['學習目標', 'goal'], ['想看的角度', 'angle'], ['語氣', 'tone'], ['每章字數', 'length'], ['寫作風格', 'style']]) {
+    const area = field(modal, label);
+    assert.equal(area.attrs.placeholder, SUGGEST[key]);
+    assert.equal(area.value, '', 'the suggestion is a placeholder, not text the owner would have to delete');
+    assert.ok(area.hasClass('vam-book-start-suggested'));
+    assert.ok(shown(area));
+  }
+  assert.ok(!texts(modal.modalEl).includes('正在依這張心智圖的主題想建議⋯⋯'), 'the waiting line is gone');
+  // The grey italic look is real CSS on the placeholder (computed look: checked live).
+  assert.match(css, /\.vam-book-start-field\.vam-book-start-suggested::placeholder \{[^}]*font-style: italic[^}]*color: var\(--text-muted\)/);
+  assert.match(css, /\.vam-book-start-model-choice\[hidden\] \{ display: none; \}/);
+  modal.close();
+});
+
+test('suggestions: failure, a timeout (20 s) and a late answer leave the fields on the default hint and the card still starts', async () => {
+  // failure
+  let h = await harness({ book: false });
+  const failing = pending(); h.ctl.impl = () => failing.promise;
+  let modal = await openCard(h);
+  assert.ok(texts(modal.modalEl).includes('正在依這張心智圖的主題想建議⋯⋯'));
+  failing.reject(new Error('boom')); await dom.tick(); await dom.tick();
+  assert.equal(field(modal, '讀者').attrs.placeholder, '留空 → 由總編輯決定');
+  assert.ok(!texts(modal.modalEl).includes('正在依這張心智圖的主題想建議⋯⋯'));
+  cardButton(modal, '開始').click(); await dom.tick(); await dom.tick();
+  assert.equal(JSON.stringify(h.entries), JSON.stringify([['start', MAP]]));
+  assert.equal((await h.plugin.repo.readNote(rootPath(h))).bookSettings, undefined, 'nothing written');
+  // timeout: the held timer fires, the call is aborted and a later answer is dropped
+  timers.hold = true; timers.held.length = 0;
+  h = await harness({ book: false });
+  const slow = pending(); h.ctl.impl = () => slow.promise;
+  modal = await openCard(h);
+  await dom.tick();
+  assert.equal(timers.held.length, 1, 'one 20 s timer');
+  assert.equal(bundleStart.BOOK_SUGGEST_TIMEOUT_MS, 20000);
+  timers.held[0](); await dom.tick(); await dom.tick();
+  assert.equal(h.ctl.calls[0].signal.aborted, true);
+  assert.equal(field(modal, '讀者').attrs.placeholder, '留空 → 由總編輯決定');
+  slow.resolve(SUGGEST); await dom.tick(); await dom.tick();
+  assert.equal(field(modal, '讀者').attrs.placeholder, '留空 → 由總編輯決定', 'an answer after the timeout is dropped');
+  cardButton(modal, '開始').click(); await dom.tick(); await dom.tick();
+  assert.equal(h.entries.length, 1);
+  timers.hold = false; timers.held.length = 0;
+  // late: the card is closed by Start, then the answer arrives
+  h = await harness({ book: false });
+  const late = pending(); h.ctl.impl = () => late.promise;
+  modal = await openCard(h);
+  cardButton(modal, '開始').click(); await dom.tick(); await dom.tick();
+  assert.equal(h.ctl.calls[0].signal.aborted, true, 'closing aborts the call');
+  late.resolve(SUGGEST); await dom.tick(); await dom.tick();
+  assert.equal((await h.plugin.repo.readNote(rootPath(h))).bookSettings, undefined, 'a suggestion after Start writes nothing');
+  assert.equal(h.entries.length, 1);
+});
+
+test('suggestions: typed text is never replaced; Start writes a suggestion only into a field that is empty, with typed text as typed, nothing for a field without a suggestion', async () => {
+  const h = await harness({ book: false });
+  await h.plugin.repo.writeBookSettings(rootPath(h), { reader: 'kids' });
+  const answer = pending(); h.ctl.impl = () => answer.promise;
+  const modal = await openCard(h);
+  await dom.tick(); await dom.tick();
+  assert.equal(h.ctl.calls.length, 1);
+  field(modal, '語氣').value = '  嚴肅  的語氣 ';     // typed before the suggestion arrives
+  answer.resolve({ ...SUGGEST, style: '' });
+  await dom.tick(); await dom.tick(); await dom.tick();
+  assert.equal(field(modal, '語氣').value, '  嚴肅  的語氣 ', 'the owner\'s text is untouched');
+  assert.equal(field(modal, '讀者').value, 'kids', 'a prefilled field shows its value, not a suggestion');
+  assert.equal(field(modal, '讀者').attrs.placeholder, '留空 → 由總編輯決定');
+  cardButton(modal, '開始').click(); await dom.tick(); await dom.tick();
+  const root = await h.plugin.repo.readNote(rootPath(h));
+  assert.equal(JSON.stringify(root.bookSettings), JSON.stringify({ reader: 'kids', goal: SUGGEST.goal, angle: SUGGEST.angle, tone: '嚴肅 的語氣', length: SUGGEST.length }), 'suggestions for empty fields, the typed tone, no style (no suggestion), reader kept');
+});
+
+test('suggestions: typed before the answer, then cleared, then Start writes nothing for that field (the owner never saw the suggestion)', async () => {
+  const h = await harness({ book: false });
+  const answer = pending(); h.ctl.impl = () => answer.promise;
+  const modal = await openCard(h);
+  await dom.tick(); await dom.tick();
+  field(modal, '語氣').value = 'my tone';
+  answer.resolve(SUGGEST);
+  await dom.tick(); await dom.tick(); await dom.tick();
+  assert.equal(field(modal, '讀者').attrs.placeholder, SUGGEST.reader, 'an untouched field shows the suggestion');
+  field(modal, '語氣').value = '';
+  cardButton(modal, '開始').click(); await dom.tick(); await dom.tick();
+  const root = await h.plugin.repo.readNote(rootPath(h));
+  assert.equal(root.bookSettings.tone, undefined, 'no tone written');
+  assert.equal(root.bookSettings.reader, SUGGEST.reader, 'a field that showed its suggestion still takes it');
+});
+
+test('suggestions: a root with all six fields filled opens the card with no call and no "thinking" line', async () => {
+  const h = await harness({ book: false });
+  await h.plugin.repo.writeBookSettings(rootPath(h), { reader: 'a', goal: 'b', angle: 'c', tone: 'd', length: 'e', style: 'f' });
+  const modal = await openCard(h);
+  await dom.tick(); await dom.tick();
+  assert.equal(h.ctl.calls.length, 0);
+  assert.equal(texts(modal.modalEl).includes('正在依這張心智圖的主題想建議⋯⋯'), false);
+});
+
+test('suggestions: the patch helper keeps typed text over a suggestion and ignores suggestions for a cleared prefilled field', () => {
+  const s = bundleStart;
+  assert.equal(JSON.stringify(s.bookSettingsPatch({}, { reader: '', tone: ' x ' }, { reader: 'R', tone: 'T', goal: 'G' })), JSON.stringify({ reader: 'R', tone: 'x' }));
+  assert.equal(JSON.stringify(s.bookSettingsPatch({ tone: 'warm' }, { tone: '' }, { tone: 'T' })), JSON.stringify({ tone: null }));
+  assert.equal(JSON.stringify(s.bookSettingsPatch({}, { reader: '' }, { reader: 'a\nb' })), JSON.stringify({ reader: 'a b' }));
 });
 
 test('start card: the estimate numbers (1+4N calls; the 135 s whole-book plan, then cards five at a time at the measured median) and the minutes wording', () => {
@@ -772,9 +928,9 @@ test('fix1: the start and finish cards work on a Modal whose isOpen is a writabl
   const b = load(`
 export { BookStartModal } from "./experiences/visual-map/book-pipeline-start-modal";
 export { BookFinishModal } from "./experiences/visual-map/book-pipeline-finish-modal";
-`, { obsidian: { ...support.obsidian, Modal: dom.makeModal() } }, { createFragment: dom.createFragment, window: { setTimeout, clearTimeout } });
+`, { obsidian: { ...support.obsidian, Modal: dom.makeModal() } }, { createFragment: dom.createFragment, Option: OptionStub, window: { setTimeout, clearTimeout } });
   const settings = { reader: '', goal: '', angle: '', tone: '', length: '', style: '' };
-  const start = new b.BookStartModal({}, { cards: 3, models: { plan: 'a', write: 'b', images: 'c', proof: 'd' }, settings, onStart() {} });
+  const start = new b.BookStartModal({}, { cards: 3, models: { plan: 'a', write: 'b', images: 'c', proof: 'd' }, modelChoice: { options: () => ['a'], label: x => x, onChange() {} }, settings, onStart() {} });
   start.open();
   assert.equal(start.isShown, true);
   assert.equal(start.isOpen, true, 'the base class owns isOpen');
@@ -786,6 +942,13 @@ export { BookFinishModal } from "./experiences/visual-map/book-pipeline-finish-m
   assert.equal(fin.isOpen, true);
   fin.close();
   assert.equal(fin.isOpen, false);
+  // Every member the start card adds (prototype and instance) is checked against the real Obsidian Modal declaration: a same-name member would shadow or be written by the base class.
+  const dts = fs.readFileSync(path.join(root, 'node_modules/obsidian/obsidian.d.ts'), 'utf8');
+  const modalDecl = dts.slice(dts.indexOf('export class Modal '), dts.indexOf('export class Modal ') + 4000).split(/\n}\n/)[0];
+  const baseMembers = new Set([...modalDecl.matchAll(/^\s{4}(?:static\s+)?(?:readonly\s+)?(\w+)\s*[(:?]/gm)].map(m => m[1]));
+  for (const must of ['open', 'close', 'onOpen', 'onClose', 'titleEl', 'contentEl', 'modalEl', 'scope', 'app']) assert.ok(baseMembers.has(must), `parsed d.ts has Modal.${must}`);
+  const own = [...Object.getOwnPropertyNames(b.BookStartModal.prototype), ...Object.keys(start).filter(k => !(k in new (dom.makeModal())({})))].filter(k => !['constructor', 'onOpen', 'onClose'].includes(k));
+  assert.deepEqual(own.filter(k => baseMembers.has(k)), [], 'no start-card member shares a name with an Obsidian Modal member');
   for (const name of ['BookStartModal', 'BookFinishModal']) {
     for (const key of ['isOpen', 'app', 'scope', 'contentEl', 'titleEl', 'modalEl']) {
       assert.equal(Object.getOwnPropertyDescriptor(b[name].prototype, key), undefined, `${name} must not define ${key} on its prototype`);

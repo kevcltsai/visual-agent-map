@@ -21,6 +21,8 @@ import {
 import { runPlanStep } from "./core/steps/book-pipeline/run";
 import { runProofread } from "./core/steps/book-pipeline/proofread";
 import { runFindImages } from "./core/steps/book-pipeline/find-images";
+import { runSuggestSettings } from "./core/steps/book-pipeline/suggest-settings";
+import type { BookSettings } from "./core/book-pipeline/model";
 import {
   t,
   setUiLanguage,
@@ -299,6 +301,7 @@ export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: s
     experimentalArgumentMap: saved?.experimentalArgumentMap === true,
     bookPlanModel: savedModel(saved?.bookPlanModel, DEFAULT_SETTINGS.bookPlanModel),
     bookWriteModel: savedModel(saved?.bookWriteModel, DEFAULT_SETTINGS.bookWriteModel),
+    bookImageModel: savedModel(saved?.bookImageModel, DEFAULT_SETTINGS.bookImageModel),
     bookProofModel: savedModel(saved?.bookProofModel, DEFAULT_SETTINGS.bookProofModel),
     cliReasoning: normalizeReasoningLevel(saved?.cliReasoning),
     previewScale:
@@ -506,6 +509,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     config: () => ({
       planModel: this.settings.bookPlanModel,
       authorModel: this.settings.bookWriteModel,
+      imageModel: this.settings.bookImageModel,
       proofModel: this.settings.bookProofModel,
       reasoning: this.currentModelChoice().reasoning,
       language: selectionOutputLanguage(this.settings.language, "")
@@ -1727,6 +1731,25 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** Picture-book pipeline entries (the screen and the commands call these; refusals are thrown as BookPipelineRunError). */
   startBookPipeline(mapPath: string): Promise<void> {
     return this.bookPipelineRuns.start(mapPath);
+  }
+  /** The start card's grey suggestions: one text-only call on the picture model, in the book's language. The caller owns the timeout and the abort. */
+  suggestBookSettings(
+    input: { mapPath: string; title: string; summary: string; chapters: string[] },
+    signal: AbortSignal
+  ): Promise<BookSettings> {
+    return runSuggestSettings(
+      this.aiCalls,
+      {
+        usageMapPath: input.mapPath,
+        language: selectionOutputLanguage(this.settings.language, ""),
+        model: this.settings.bookImageModel,
+        reasoning: this.currentModelChoice().reasoning,
+        bookTitle: input.title,
+        summary: input.summary,
+        chapters: input.chapters
+      },
+      { signal }
+    );
   }
   stopBookPipeline(mapPath: string, options: { saved?: boolean } = {}): Promise<void> {
     return this.bookPipelineRuns.stop(mapPath, options);

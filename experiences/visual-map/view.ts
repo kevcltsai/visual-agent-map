@@ -340,7 +340,13 @@ import {
   type BookPipelineProgress
 } from "./book-pipeline-run";
 import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
-import { readBookPipeline, readPipelineStage, type BookPipelineData } from "../../core/book-pipeline/model";
+import {
+  BOOK_SETTING_FIELDS,
+  type BookSettings,
+  readBookPipeline,
+  readPipelineStage,
+  type BookPipelineData
+} from "../../core/book-pipeline/model";
 import {
   bookBarState,
   bookCardView,
@@ -558,7 +564,7 @@ import {
 } from "./outline-import-modal";
 import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal } from "./multi-research-modal";
-import { BookStartModal } from "./book-pipeline-start-modal";
+import { BOOK_SUGGEST_TIMEOUT_MS, BookStartModal } from "./book-pipeline-start-modal";
 import { BookFinishModal } from "./book-pipeline-finish-modal";
 import { bookRerunMenuReason } from "./book-pipeline-rerun";
 import { chatResearchReferenceGroups, type ResearchRequestWithReferences } from "./chat-research-sources";
@@ -17454,28 +17460,74 @@ export class VisualAgentMapView extends ItemView {
     const rootNote = root ? await this.plugin.repo.readNote(root.path).catch(() => null) : null;
     if (this.closed || this.bookStartModal?.isShown) return;
     const settings = this.plugin.settings;
+    // The grey suggestions: one call on the picture model, dropped when the card closes (Start, Cancel, view closed) or after 20 s.
+    const suggesting = new AbortController();
+    const suggestTimer = window.setTimeout(() => suggesting.abort(), BOOK_SUGGEST_TIMEOUT_MS);
     const modal = new BookStartModal(this.app, {
       cards: readingOrder(map.nodes, { includeHidden: true }).length,
       models: {
-        plan: this.plugin.modelLabel(settings.bookPlanModel),
-        write: this.plugin.modelLabel(settings.bookWriteModel),
-        // The picture search runs on the author's model.
-        images: this.plugin.modelLabel(settings.bookWriteModel),
-        proof: this.plugin.modelLabel(settings.bookProofModel)
+        plan: settings.bookPlanModel,
+        write: settings.bookWriteModel,
+        images: settings.bookImageModel,
+        proof: settings.bookProofModel
+      },
+      modelChoice: {
+        options: () => this.plugin.availableModels(),
+        label: model => this.plugin.modelLabel(model),
+        // The picks are the same settings as the settings page; they apply from this run on.
+        onChange: (key, model) => {
+          this.plugin.settings[key] = model;
+          void this.plugin.saveSettings();
+        }
       },
       settings: rootNote?.bookSettings ?? {},
+      onClose: () => {
+        window.clearTimeout(suggestTimer);
+        suggesting.abort();
+      },
       onStart: patch => {
         void this.bookEntry(async () => {
           // A chat chain holding the map refuses before anything is written.
           if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");
-          // Only the fields the owner changed are written, and only to the root topic.
+          // Only the fields the owner changed (or left empty with a suggestion) are written, and only to the root topic.
           if (root && Object.keys(patch).length) await this.plugin.repo.writeBookSettings(root.path, patch);
           await this.plugin.startBookPipeline(path);
         });
       }
     });
+    const suggestCall = !!root && BOOK_SETTING_FIELDS.some(field => !rootNote?.bookSettings?.[field]?.trim());
+    if (root && suggestCall) {
+      const children = map.nodes.filter(node => node.parentId === root.id).slice(0, 40);
+      const request = (async (): Promise<BookSettings> => {
+        const chapters = (
+          await Promise.all(
+            children.map(node =>
+              this.plugin.repo.readNote(node.path).then(
+                note => note.title,
+                () => ""
+              )
+            )
+          )
+        ).filter(Boolean);
+        return this.plugin.suggestBookSettings(
+          { mapPath: path, title: rootNote?.title ?? "", summary: rootNote?.summary ?? "", chapters },
+          suggesting.signal
+        );
+      })();
+      const dropped = new Promise<never>((_, reject) =>
+        suggesting.signal.addEventListener("abort", () => reject(new Error("suggestion dropped")), { once: true })
+      );
+      // Failed, timed out or late: the fields stay blank and the card starts as usual.
+      void Promise.race([request, dropped]).then(
+        found => modal.setSuggestions(found),
+        () => modal.setSuggestions(null)
+      );
+      request.catch(() => undefined);
+    }
     this.bookStartModal = modal;
     this.openMapModal(modal);
+    // No call is made (every field filled, or no root): the "thinking up suggestions" line must not stay.
+    if (!suggestCall) modal.setSuggestions(null);
   }
   /** True while a conversation chain or a multi-select research holds this map: a picture-book run must not start or write then. */
   bookPipelineBlocked(): boolean {

@@ -574,10 +574,11 @@ export class ClaudeSetupModal extends Modal {
       );
   }
 }
-type BookModelKey = "bookPlanModel" | "bookWriteModel" | "bookProofModel";
+type BookModelKey = "bookPlanModel" | "bookWriteModel" | "bookImageModel" | "bookProofModel";
 export const BOOK_MODEL_SETTINGS: { key: BookModelKey; name: TranslationKey; desc: TranslationKey }[] = [
   { key: "bookPlanModel", name: "ui.settings_book_plan_name", desc: "ui.settings_book_plan_desc" },
   { key: "bookWriteModel", name: "ui.settings_book_write_name", desc: "ui.settings_book_write_desc" },
+  { key: "bookImageModel", name: "ui.settings_book_image_name", desc: "ui.settings_book_image_desc" },
   { key: "bookProofModel", name: "ui.settings_book_proof_name", desc: "ui.settings_book_proof_desc" }
 ];
 /** One picture-book model dropdown: same model list, order and labels as the AI model dropdown; an unavailable value stays shown. */

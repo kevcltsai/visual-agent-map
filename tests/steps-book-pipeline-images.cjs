@@ -576,8 +576,8 @@ test('proofread: the request body has no image line or caption; the result secti
   assert.ok(!/!\[|Caption 1|Work 1|upload\.wikimedia/.test(body), body);
   assert.match(body, /explains perspective 的說明。/);
   const raw = r.raw(0);
-  const section = /## 校對結果[^\n]*\n([\s\S]*?)(?:\n## |\n### |$)/.exec(raw)?.[1] ?? '';
-  const lines = section.split('\n').filter(l => l.startsWith('- '));
+  const section = /> \[!vam-book\]- 校對結果[^\n]*\n((?:>[^\n]*(?:\n|$))*)/.exec(raw)?.[1] ?? '';
+  const lines = section.split('\n').filter(l => l.startsWith('> - ')).map(l => l.slice(2));
   const at = lines.findIndex(l => /^- 圖文：/.test(l));
   assert.ok(at >= 0 && at === lines.length - 3, raw);
   assert.match(lines[at], /圖 2 沒找到合適的圖/);

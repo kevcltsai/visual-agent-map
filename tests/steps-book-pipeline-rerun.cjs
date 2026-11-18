@@ -96,7 +96,7 @@ test('replanCard at gate 1: only that card plan is rerun with the owner sentence
   assert.equal(requests[0].instruction, '第 5 張要多講 他的手稿'); assert.equal(requests[0].card.position, 3);
   assert.equal(requests[0].previous.title, 'SecretTitleA'); assert.equal(requests[0].next.title, 'SecretTitleC');
   assert.equal(r.raw(0), before[0]); assert.equal(seamOf(r.raw(0)), undefined);
-  assert.notEqual(r.raw(2), before[2]); assert.match(r.raw(2), /NEW covers/); assert.ok(!/<img/.test(r.raw(2).slice(r.raw(2).indexOf('> [!info]- 提示'))), 'model text is escaped like every other plan (the Prompt callout; the summary carries covers as in every plan)');
+  assert.notEqual(r.raw(2), before[2]); assert.match(r.raw(2), /NEW covers/); assert.ok(!/<img/.test(r.raw(2).slice(r.raw(2).indexOf('> [!vam-book]- 提示'))), 'model text is escaped like every other plan (the Prompt callout; the summary carries covers as in every plan)');
   assert.equal(seamOf(r.raw(2)), undefined, 'the replanned card itself is not a seam');
   const s = await r.state();
   const rev = s.revisions[r.nodes[2].id];
@@ -104,7 +104,7 @@ test('replanCard at gate 1: only that card plan is rerun with the owner sentence
   assert.equal(s.phase, 'gate1'); assert.equal(s.status, 'running'); assert.equal(s.budget.used, used + 1);
   assert.equal(stageOf(r.raw(2)), 'planned'); assert.equal(r.runs.isRunning(r.mapPath), false);
   assert.equal(r.stat.author.length, 0); assert.equal(r.stat.proof.length, 0);
-  const prompt = r.raw(2).slice(r.raw(2).indexOf('> [!info]- 提示'));
+  const prompt = r.raw(2).slice(r.raw(2).indexOf('> [!vam-book]- 提示'));
   assert.ok(prompt.includes('mentions the manuscript'));
 });
 

@@ -4,8 +4,9 @@ import type { ImageCandidate } from "../../image-candidates";
 import { stepEffort } from "../../provider-step-runner";
 import { prepareStep, renderTemplate, type StepDefinition } from "../../step-runner";
 import { parseImageCandidates } from "../image-search/step";
-import type { BookStepBase } from "./base";
+import { languageInstruction, type BookStepBase } from "./base";
 import template from "./find-images.md";
+import retryTemplate from "./find-images-retry.md";
 
 /** One planned picture position as the search sees it (the planner's kind and what it must show; never the marker). */
 export interface FindImagesSlot {
@@ -20,6 +21,8 @@ export interface FindImagesRequest extends BookStepBase {
   slots: FindImagesSlot[];
   /** Image keys (see imageKey) the book already uses: file names or addresses only, never model-written titles. */
   exclude?: string[];
+  /** Set on the one repeat ask after a caption came back in the wrong language. */
+  languageRetry?: boolean;
 }
 
 /** One offered picture: the shared candidate plus the one plain line the finder wrote about it. */
@@ -77,8 +80,8 @@ function parseFound(raw: string): FoundImages {
 /** The map chat's image candidates (same parser: https links with an https source page), asked per picture position for the book's sources. */
 export const findImagesStep: StepDefinition<FindImagesRequest, FoundImages> = {
   id: "book-pipeline.find-images",
-  version: 3,
-  render: ({ chapter, slots, exclude }) =>
+  version: 4,
+  render: ({ chapter, slots, exclude, language, languageRetry }) =>
     renderTemplate(template, {
       chapter: JSON.stringify(chapter),
       slots: JSON.stringify(
@@ -88,33 +91,60 @@ export const findImagesStep: StepDefinition<FindImagesRequest, FoundImages> = {
           shows: slot.explains.slice(0, SLOT_TEXT_MAX)
         }))
       ),
+      languageInstruction: languageInstruction(language, chapter),
+      languageRetry: languageRetry ? retryTemplate : "",
       exclude: JSON.stringify((exclude ?? []).slice(0, EXCLUDE_MAX).map(key => key.slice(0, EXCLUDE_ITEM_MAX)))
     }),
   parse: raw => parseFound(raw)
 };
 
-/** One web search call for a chapter's pictures (every slot at once): web search only, the budget reserved before the provider is asked, no content in the exchange log. */
-export function runFindImages(
+/** A Chinese book needs a caption with Chinese characters; other languages are not checked (a Latin script cannot tell them apart reliably). */
+function captionFits(caption: string, language: string): boolean {
+  return !/^zh/i.test(language) || /[\u3400-\u9fff]/.test(caption);
+}
+function wrongCaptions(found: FoundImages, language: string): number {
+  let n = 0;
+  for (const list of found.bySlot.values()) for (const image of list) if (!captionFits(image.caption, language)) n++;
+  return n;
+}
+
+/** One web search call for a chapter's pictures (every slot at once): web search only, the budget reserved before the provider is asked, no content in the exchange log. A caption in the wrong language gets one repeat ask; one still wrong is emptied (the figure then reads its title). */
+export async function runFindImages(
   aiCalls: AiCalls,
   request: FindImagesRequest,
   run: { signal: AbortSignal; admission?: AdmissionContext }
 ): Promise<FoundImages> {
-  const prepared = prepareStep(findImagesStep, request);
-  return aiCalls.run(
-    prepared,
-    {
-      model: request.model,
-      effort: stepEffort(request.reasoning),
-      topic: "Book pipeline images",
-      taskName: "book-pipeline-images",
-      signal: run.signal,
-      localCodex: false,
-      noContentLog: true,
-      failMessage: () => "failed",
-      usage: { action: "other", mapPath: request.usageMapPath },
-      ...(run.admission ? { admission: run.admission } : {}),
-      task: { webSearchOnly: true, searchBudget: 4, timeoutMs: 2 * 60 * 1000 }
-    },
-    raw => prepared.parse(raw)
-  );
+  const ask = (asked: FindImagesRequest): Promise<FoundImages> => {
+    const prepared = prepareStep(findImagesStep, asked);
+    return aiCalls.run(
+      prepared,
+      {
+        model: request.model,
+        effort: stepEffort(request.reasoning),
+        topic: "Book pipeline images",
+        taskName: "book-pipeline-images",
+        signal: run.signal,
+        localCodex: false,
+        noContentLog: true,
+        failMessage: () => "failed",
+        usage: { action: "other", mapPath: request.usageMapPath },
+        ...(run.admission ? { admission: run.admission } : {}),
+        task: { webSearchOnly: true, searchBudget: 4, timeoutMs: 2 * 60 * 1000 }
+      },
+      raw => prepared.parse(raw)
+    );
+  };
+  let result = await ask(request);
+  const wrong = wrongCaptions(result, request.language);
+  if (wrong > 0) {
+    try {
+      const again = await ask({ ...request, languageRetry: true });
+      if (wrongCaptions(again, request.language) < wrong) result = again;
+    } catch (error) {
+      if (run.signal.aborted) throw error;
+    }
+    for (const list of result.bySlot.values())
+      for (const image of list) if (!captionFits(image.caption, request.language)) image.caption = "";
+  }
+  return result;
 }

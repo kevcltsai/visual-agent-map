@@ -412,7 +412,7 @@ test('images: the find-images step keeps up to 3 candidates per slot with the ca
   assert.equal(parsed.offTopic, 2);
   assert.equal(parsed.found, 4);
   assert.equal(findImagesStep.parse('not json').found, 0);
-  assert.equal(findImagesStep.version, 3);
+  assert.equal(findImagesStep.version, 4);
   const prompt = findImagesStep.render({ chapter: 'q', slots: [{ index: 1, kind: 'diagram', explains: 'perspective' }], exclude: Array.from({ length: 40 }, (_, i) => `k${i}${'x'.repeat(200)}`), language: 'en', model: 'm', reasoning: 'low' });
   assert.equal(JSON.parse(/exclude list[^\[]*(\[.*\])/.exec(prompt)[1]).length, 30);
   assert.ok(!/x{121}/.test(prompt));
@@ -702,4 +702,28 @@ test('slots: candidates left unprobed by the per-chapter limit end probe_capped 
   const pair = await picRig({ slots: 2, text: () => `${BODY}\n\n${mk(1)}${mk(2)}\n\n尾。\n`, finder: () => found({}) });
   await run(pair);
   assert.deepEqual(recordOf((await pair.note(0)).detail).slots.map(s => s.reasonCode), ['bad_marker', 'bad_marker']);
+});
+
+test('images: the find-images prompt asks for captions in the book language; a Chinese book repeats the ask once for an English caption and empties one still wrong', async () => {
+  const { findImagesStep, runFindImages } = require('./support-ai-calls.cjs').loadWithAiCalls('core/steps/book-pipeline/find-images.ts');
+  const base = { chapter: '巴夫洛夫與制約', slots: [{ index: 1, kind: 'diagram', explains: 'x' }], model: 'm', reasoning: 'low' };
+  assert.match(findImagesStep.render({ ...base, language: 'zh-TW' }), /Traditional Chinese|繁體|zh/i);
+  assert.match(findImagesStep.render({ ...base, language: 'zh-TW' }), /caption" in the language of the book/);
+  assert.ok(!/not in the book's language/.test(findImagesStep.render({ ...base, language: 'zh-TW' })));
+  assert.match(findImagesStep.render({ ...base, language: 'zh-TW', languageRetry: true }), /not in the book's language/);
+  const reply = caption => JSON.stringify({ slots: [{ slot: 1, images: [{ title: 'T', caption, imageUrl: 'https://upload.wikimedia.org/a/ab/F.jpg', sourceUrl: 'https://commons.wikimedia.org/x', kind: 'diagram', shows: 'a thing', relevant: true }] }] });
+  const rig = replies => { const prompts = []; return { prompts, aiCalls: { run: async (prepared, _o, parse) => { prompts.push(prepared.prompt); return parse(replies.shift()); } } }; };
+  const run = { signal: new AbortController().signal };
+  let r = rig([reply('This schematic lays out the procedure'), reply('示意圖：鈴聲與食物配對')]);
+  let out = await runFindImages(r.aiCalls, { ...base, language: 'zh-TW' }, run);
+  assert.equal(r.prompts.length, 2); assert.equal(out.bySlot.get(1)[0].caption, '示意圖：鈴聲與食物配對');
+  r = rig([reply('English only'), reply('Still English')]);
+  out = await runFindImages(r.aiCalls, { ...base, language: 'zh-TW' }, run);
+  assert.equal(r.prompts.length, 2); assert.equal(out.bySlot.get(1)[0].caption, '');
+  r = rig([reply('English only')]);
+  out = await runFindImages(r.aiCalls, { ...base, language: 'en' }, run);
+  assert.equal(r.prompts.length, 1); assert.equal(out.bySlot.get(1)[0].caption, 'English only');
+  r = rig([reply('圖說')]);
+  await runFindImages(r.aiCalls, { ...base, language: 'zh-TW' }, run);
+  assert.equal(r.prompts.length, 1);
 });

@@ -352,6 +352,7 @@ test('styles: the new gate 2 and seam classes exist, use theme variables only an
   const rules = css.split('\n').filter(line => /^\.vam-book-(panel-(state|summary|row|proof)|state\.is-seam|bar-eta)/.test(line)).join('\n');
   assert.ok(rules.length > 300);
   assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(rules) && !/\brgba?\(/.test(rules), 'no hard-coded colour');
+  assert.match(css, /\.vam-book-panel-proof\[hidden\] \{ display: none; \}/, 'a folded proof record must stay folded: the class display:flex would otherwise beat the hidden attribute');
   assert.match(css, /\.vam-book-panel-row button:focus-visible[^}]*outline: 2px solid var\(--interactive-accent\)/);
   assert.match(css, /@media \(max-width: 700px\) \{[^}]*vam-book-panel-row/);
   const view_ts = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');

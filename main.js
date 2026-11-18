@@ -29888,7 +29888,7 @@ function writtenHeadingSet(content, fallback) {
   if (set) return set;
   return /^## (?:Current Summary|Detail|Prompt|Rules|Working Findings|Thinking Origin)[ \t]*\r?$/m.test(content) ? CANONICAL_HEADINGS : fallback;
 }
-var CALLOUT_TITLE = /^(> \[!info\][+-]? )(.+?)([ \t]*\r?)$/;
+var CALLOUT_TITLE = /^(> \[!(?:info|vam-book)\][+-]? )(.+?)([ \t]*\r?)$/;
 function renameManagedHeadings(content, rename) {
   var _a2;
   const lines = content.split("\n");
@@ -29930,7 +29930,8 @@ function localizeHeadings(content, set) {
     (text10, kind) => Object.hasOwn(names3, text10) && kind === "callout" === (text10 === "Prompt") ? names3[text10] : void 0
   );
 }
-var CALLOUT_SECTION = /^> \[!info\][+-]? (預覽|Preview|Prompt)[ \t]*\r?$/;
+var CALLOUT_SECTION = /^> \[!(?:info|vam-book)\][+-]? (預覽|Preview|Prompt)[ \t]*\r?$/;
+var isBookCardFrontmatter = (fm) => fm["pipeline-stage"] !== void 0 || fm["book-role"] !== void 0;
 function decodeCalloutSections(content) {
   var _a2;
   const lines = canonicalHeadings(content, (_a2 = noteHeadingSet(content)) != null ? _a2 : CANONICAL_HEADINGS).split("\n");
@@ -29963,9 +29964,9 @@ function decodeCalloutSections(content) {
   }
   return out.join("\n");
 }
-function calloutSection(title, value) {
+function calloutSection(title, value, type = "info") {
   const lines = value.trim().split("\n");
-  return [`> [!info]- ${title}`, ...lines.map((line2) => line2 ? `> ${line2}` : ">")].join("\n");
+  return [`> [!${type}]- ${title}`, ...lines.map((line2) => line2 ? `> ${line2}` : ">")].join("\n");
 }
 var previewSection = (content) => [...new Set([section2(content, "Preview"), section2(content, "\u9810\u89BD")].filter(Boolean))].join("\n\n");
 function sectionBounds(content, heading) {
@@ -29979,7 +29980,12 @@ function sectionBounds(content, heading) {
   const start = match.index + match[0].length;
   const next = /^## .+$/m.exec(content.slice(start));
   const reference = content.indexOf(REFERENCE_START, start);
-  const candidates = [next ? start + next.index : content.length, reference >= 0 ? reference : content.length];
+  const hidden = /^> \[!vam-book\]/im.exec(content.slice(start));
+  const candidates = [
+    next ? start + next.index : content.length,
+    reference >= 0 ? reference : content.length,
+    hidden ? start + hidden.index : content.length
+  ];
   return { start, end: Math.min(...candidates) };
 }
 function detailWithOpenItems(content) {
@@ -30139,7 +30145,7 @@ function followedPreview(current, auto, hash, initialized) {
     return { preview: null, hash: PREVIEW_MANUAL };
   return replaceFirst(second !== void 0 && LEGACY_PREVIEW_IMAGE.test(second) ? 2 : 1);
 }
-function noteBody(title, summary, language2, prompt = "", rules = "", preview = "", detail = "", visualReferences = "", newFindings = "", leftover = "", layout = "answer-first") {
+function noteBody(title, summary, language2, prompt = "", rules = "", preview = "", detail = "", visualReferences = "", newFindings = "", leftover = "", layout = "answer-first", calloutType = "info") {
   if (layout === "legacy") {
     const legacyBlock = `${DETAIL_START}
 ${detailWithVisualReferences(detail, visualReferences, standardTemplate(language2))}
@@ -30178,11 +30184,11 @@ ${marker3}` : ""}`;
     `## Current Summary
 
 ${summary.trim() || placeholder(language2)}`,
-    preview.trim() && !isPlaceholder(preview.trim()) ? calloutSection(previewHeading(language2), preview) : "",
+    preview.trim() && !isPlaceholder(preview.trim()) ? calloutSection(previewHeading(language2), preview, calloutType) : "",
     `## Detail
 
 ${detailBlock}`,
-    prompt.trim() ? calloutSection("Prompt", prompt) : "",
+    prompt.trim() ? calloutSection("Prompt", prompt, calloutType) : "",
     rules.trim() ? `## Rules
 
 ${rules.trim()}` : "",
@@ -30192,7 +30198,7 @@ ${newFindings.trim()}` : "",
     leftover.trim()
   ].filter(Boolean).join("\n\n") + "\n";
 }
-function normalizeBodyOrder(content, title, summaryFallback, language2, textLanguage = language2) {
+function normalizeBodyOrder(content, title, summaryFallback, language2, textLanguage = language2, book = false) {
   const clean3 = ensurePreview(withoutReference(content), language2, textLanguage);
   const currentSummary = section2(clean3, "Current Summary") || summaryFallback;
   const summary = isPlaceholder(currentSummary) ? placeholder(textLanguage) : currentSummary;
@@ -30236,7 +30242,8 @@ ${openItems.marker}` : detail;
     "",
     newFindings,
     leftover,
-    legacy ? "legacy" : "answer-first"
+    legacy && !book ? "legacy" : "answer-first",
+    book ? "vam-book" : "info"
   );
 }
 var REFERENCE_LABELS = ["\u6240\u5C6C\u4E3B\u984C", "\u6240\u5C6C\u5FC3\u667A\u5716", "\u6BCD\u8B70\u984C", "\u5B50\u8B70\u984C", "\u4F86\u6E90\u8B70\u984C", "\u72C0\u614B"];
@@ -30858,7 +30865,8 @@ var Repository = class {
       text5(fm.title, path.replace(/\.md$/, "")),
       text5(fm.summary, placeholder(textLanguage)),
       language2,
-      textLanguage
+      textLanguage,
+      isBookCardFrontmatter(fm)
     );
     return `---
 ${(0, import_obsidian13.stringifyYaml)(fm)}---
@@ -31828,7 +31836,14 @@ ${body}`);
       delete fm["agent-map-references"];
       body = withoutReference(body);
     }
-    body = normalizeBodyOrder(body, title, text5(fm.summary, placeholder(textLanguage)), language2, textLanguage);
+    body = normalizeBodyOrder(
+      body,
+      title,
+      text5(fm.summary, placeholder(textLanguage)),
+      language2,
+      textLanguage,
+      isBookCardFrontmatter(fm)
+    );
     return `---
 ${(0, import_obsidian13.stringifyYaml)(fm)}---
 ${localizeHeadings(withReferenceLinks(body, fm, language2), writtenHeadingSet(content, this.headingsFor(textLanguage)))}`;
@@ -39133,13 +39148,13 @@ var guide_zh_CN_default = "## \u9069\u7528\u60C5\u5883\n\u4EC0\u9EBC\u6642\u5019
 var guide_en_default2 = '## When to use\nWhen to use this guide and what it achieves; do not put the method here.\n\n## How to do it\nOrdered steps, one per line, each starting with a verb.\n\n## Common mistakes\nWrite each as "mistake \u2192 right way".\n\n## Decision rules\nHow to choose when there is a choice, one rule per line.\n\n## Sources\nOnly the source list, which is added to the end of this section automatically; do not restate the body.\n\n## Update log\nAdd only one line saying what this update changed.\n';
 
 // core/blocks/template/book-chapter.zh-TW.md
-var book_chapter_zh_TW_default = "\u9019\u662F\u5716\u6587\u66F8\u7684\u4E00\u7AE0\u3002\u7AE0\u7BC0\u6B63\u6587\u4E00\u5B9A\u8981\u5BEB\uFF0C\u653E\u5728\u6700\u524D\u9762\u3001`## \u4F86\u6E90` \u4E4B\u524D\uFF1A\u5148\u7528\u4E00\u5169\u53E5\u8A71\u5E36\u51FA\u672C\u7AE0\u4E3B\u984C\uFF0C\u518D\u5BEB\u81EA\u7531\u6B63\u6587\uFF1B\u6B63\u6587\u53EF\u4EE5\u7528\u81EA\u5DF1\u7684 ### \u5C0F\u6A19\u5206\u6BB5\uFF0C\u4E0D\u8981\u628A\u4F86\u6E90\u6E05\u55AE\u91CD\u8FF0\u4E00\u6B21\u3002\u53EA\u6709\u4F86\u6E90\u8207\u7814\u7A76\u5099\u8A3B\u3001\u6C92\u6709\u6B63\u6587\uFF0C\u662F\u7121\u6548\u7684\u7D50\u679C\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u7814\u7A76\u5099\u8A3B\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var book_chapter_zh_TW_default = "\u9019\u662F\u5716\u6587\u66F8\u7684\u4E00\u7AE0\u3002\u7AE0\u7BC0\u6B63\u6587\u4E00\u5B9A\u8981\u5BEB\uFF0C\u653E\u5728\u6700\u524D\u9762\u3001`## \u4F86\u6E90` \u4E4B\u524D\uFF1A\u5148\u7528\u4E00\u5169\u53E5\u8A71\u5E36\u51FA\u672C\u7AE0\u4E3B\u984C\uFF0C\u518D\u5BEB\u81EA\u7531\u6B63\u6587\uFF1B\u6B63\u6587\u53EF\u4EE5\u7528\u81EA\u5DF1\u7684 ### \u5C0F\u6A19\u5206\u6BB5\uFF0C\u4E0D\u8981\u628A\u4F86\u6E90\u6E05\u55AE\u91CD\u8FF0\u4E00\u6B21\u3002\u53EA\u6709\u4F86\u6E90\u3001\u6C92\u6709\u6B63\u6587\uFF0C\u662F\u7121\u6548\u7684\u7D50\u679C\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n";
 
 // core/blocks/template/book-chapter.zh-CN.md
-var book_chapter_zh_CN_default = "\u8FD9\u662F\u56FE\u6587\u4E66\u7684\u4E00\u7AE0\u3002\u7AE0\u8282\u6B63\u6587\u4E00\u5B9A\u8981\u5199\uFF0C\u653E\u5728\u6700\u524D\u9762\u3001`## \u6765\u6E90` \u4E4B\u524D\uFF1A\u5148\u7528\u4E00\u4E24\u53E5\u8BDD\u5E26\u51FA\u672C\u7AE0\u4E3B\u9898\uFF0C\u518D\u5199\u81EA\u7531\u6B63\u6587\uFF1B\u6B63\u6587\u53EF\u4EE5\u7528\u81EA\u5DF1\u7684 ### \u5C0F\u6807\u5206\u6BB5\uFF0C\u4E0D\u8981\u628A\u6765\u6E90\u6E05\u5355\u91CD\u8FF0\u4E00\u6B21\u3002\u53EA\u6709\u6765\u6E90\u4E0E\u7814\u7A76\u5907\u6CE8\u3001\u6CA1\u6709\u6B63\u6587\uFF0C\u662F\u65E0\u6548\u7684\u7ED3\u679C\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u7814\u7A76\u5099\u8A3B\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var book_chapter_zh_CN_default = "\u8FD9\u662F\u56FE\u6587\u4E66\u7684\u4E00\u7AE0\u3002\u7AE0\u8282\u6B63\u6587\u4E00\u5B9A\u8981\u5199\uFF0C\u653E\u5728\u6700\u524D\u9762\u3001`## \u6765\u6E90` \u4E4B\u524D\uFF1A\u5148\u7528\u4E00\u4E24\u53E5\u8BDD\u5E26\u51FA\u672C\u7AE0\u4E3B\u9898\uFF0C\u518D\u5199\u81EA\u7531\u6B63\u6587\uFF1B\u6B63\u6587\u53EF\u4EE5\u7528\u81EA\u5DF1\u7684 ### \u5C0F\u6807\u5206\u6BB5\uFF0C\u4E0D\u8981\u628A\u6765\u6E90\u6E05\u5355\u91CD\u8FF0\u4E00\u6B21\u3002\u53EA\u6709\u6765\u6E90\u3001\u6CA1\u6709\u6B63\u6587\uFF0C\u662F\u65E0\u6548\u7684\u7ED3\u679C\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n";
 
 // core/blocks/template/book-chapter.en.md
-var book_chapter_en_default = "This is one chapter of a picture book. The chapter text is required and goes first, before `## Sources`: open with a sentence or two that introduces the chapter's topic, then write the free body; the body may use its own ### sub-headings, and must not repeat the source list. A result with only sources and research notes and no chapter text is invalid.\n\n## Sources\nOnly the source list; the source list is placed at the end of this section automatically. Do not restate the body.\n\n## Research notes\nAdd only one line saying what this update changed.\n";
+var book_chapter_en_default = "This is one chapter of a picture book. The chapter text is required and goes first, before `## Sources`: open with a sentence or two that introduces the chapter's topic, then write the free body; the body may use its own ### sub-headings, and must not repeat the source list. A result with only sources and no chapter text is invalid.\n\n## Sources\nOnly the source list; the source list is placed at the end of this section automatically. Do not restate the body.\n";
 
 // core/blocks/template/conclusion.zh-TW.md
 var conclusion_zh_TW_default = "## \u7D50\u8AD6\n\u4E00\u5230\u4E09\u53E5\uFF0C\u5148\u8B1B\u7D50\u8AD6\uFF0C\u4E0D\u653E\u7406\u7531\u3002\n\n## \u4FE1\u5FC3\n\u4F4E\uFF0F\u4E2D\uFF0F\u9AD8\u4E09\u9078\u4E00\uFF0C\u52A0\u4E0A\u6700\u5927\u7684\u4E0D\u78BA\u5B9A\u4F86\u81EA\u54EA\u88E1\u3002\u53EA\u7559\u4E00\u4EFD\uFF0C\u9019\u4E00\u689D\u512A\u5148\u65BC\u524D\u9762\u7684\u4E0D\u4E00\u81F4\u8655\u7406\u898F\u5247\uFF1A\u4E0D\u4E26\u5217\u65B0\u820A\u4FE1\u5FC3\uFF1B\u4FE1\u5FC3\u6539\u8B8A\u6642\u6539\u5BEB\u9019\u4E00\u4EFD\uFF0C\u4E26\u5728\u66F4\u65B0\u7D00\u9304\u5BEB\u300C\u5F9E X \u6539\u70BA Y\uFF1A\u7406\u7531\u300D\u3002\n\n## \u4F9D\u64DA\n2\u20134 \u500B\u7406\u7531\uFF0C\u6BCF\u500B\u9023\u5230\u5B83\u4F9D\u8CF4\u7684\u8B70\u984C\u6216\u8B49\u64DA\u3002\n\n## \u4EC0\u9EBC\u6703\u6539\u8B8A\u9019\u500B\u7D50\u8AD6\n\u770B\u5230\u4EC0\u9EBC\u8B49\u64DA\u6216\u689D\u4EF6\u8B8A\u5316\uFF0C\u9019\u500B\u7D50\u8AD6\u5C31\u8981\u6539\u3002\n\n## \u9069\u7528\u7BC4\u570D\n\u7D50\u8AD6\u5728\u54EA\u4E9B\u689D\u4EF6\u4E0B\u6210\u7ACB\u3001\u54EA\u4E9B\u60C5\u6CC1\u4E0D\u9069\u7528\u3002\n\n## \u5F71\u97FF\u8207\u4E0B\u4E00\u6B65\n\u7D50\u8AD6\u6210\u7ACB\u7684\u8A71\u5F71\u97FF\u4EC0\u9EBC\u3001\u8981\u505A\u4EC0\u9EBC\uFF1B\u8981\u958B\u6210\u884C\u52D5\u8B70\u984C\u7684\uFF0C\u5BEB\u6210\u52D5\u8A5E\u958B\u982D\u7684\u4E00\u884C\u3002\n\n## \u4F86\u6E90\n\u53EA\u653E\u4F86\u6E90\u6E05\u55AE\uFF0C\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\uFF0C\u4E0D\u91CD\u8FF0\u6B63\u6587\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
@@ -40113,8 +40128,8 @@ function updateRecipeFileText(oldText, parts, language2) {
   const text10 = bom ? oldText.slice(1) : oldText;
   const eol = text10.includes("\r\n") ? "\r\n" : "\n";
   const lines = text10.split("\n");
-  const bare = (line2) => line2.replace(/\r$/, "");
-  const closing = bare(lines[0]).trimEnd() === "---" ? lines.findIndex((line2, index) => index > 0 && bare(line2).trimEnd() === "---") : -1;
+  const bare2 = (line2) => line2.replace(/\r$/, "");
+  const closing = bare2(lines[0]).trimEnd() === "---" ? lines.findIndex((line2, index) => index > 0 && bare2(line2).trimEnd() === "---") : -1;
   const wanted = (slot) => slotValue(slot, parts, language2);
   if (closing < 0) {
     const head2 = [
@@ -40130,7 +40145,7 @@ function updateRecipeFileText(oldText, parts, language2) {
   const seen = /* @__PURE__ */ new Set();
   const removed = /* @__PURE__ */ new Set();
   for (let index = 1; index < closing; index++) {
-    const raw = bare(lines[index]);
+    const raw = bare2(lines[index]);
     if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
     const pair5 = /^(([^:：]+?)\s*[:：]\s*)(.*)$/.exec(raw);
     if (!pair5) continue;
@@ -40156,13 +40171,13 @@ function updateRecipeFileText(oldText, parts, language2) {
 }
 function renamePartInRecipeText(oldText, category, oldName, newName) {
   const lines = oldText.split("\n");
-  const bare = (line2) => line2.replace(/\r$/, "");
+  const bare2 = (line2) => line2.replace(/\r$/, "");
   const first = lines[0].replace(/^\uFEFF/, "");
-  if (bare(first).trimEnd() !== "---") return oldText;
-  const closing = lines.findIndex((line2, index) => index > 0 && bare(line2).trimEnd() === "---");
+  if (bare2(first).trimEnd() !== "---") return oldText;
+  const closing = lines.findIndex((line2, index) => index > 0 && bare2(line2).trimEnd() === "---");
   if (closing < 0) return oldText;
   for (let index = 1; index < closing; index++) {
-    const raw = bare(lines[index]);
+    const raw = bare2(lines[index]);
     if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
     const pair5 = /^(([^:：]+?)\s*[:：]\s*)(.*)$/.exec(raw);
     if (!pair5 || !KEYS[category].includes(pair5[2].trim().toLocaleLowerCase())) continue;
@@ -44205,6 +44220,12 @@ var HEADING4 = /^[ \t]{0,3}(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/;
 var FENCE2 = /^[ \t]{0,3}(`{3,}|~{3,})/;
 var CALLOUT_HEAD2 = /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?(?:[ \t].*)?$/;
 var RECORD_KEY = /^<!-- book-proof:v1 (\{.*\}) -->$/;
+var HIDDEN_CALLOUT = "vam-book";
+var HIDDEN_HEAD = /^>[ \t]?\[!vam-book\][+-]?(?:[ \t].*)?$/i;
+var QUOTE_LINE = /^[ \t]{0,3}>/;
+var LOG_LINE = /^(?:[-*+][ \t]+)?\d{4}-\d{2}-\d{2}/;
+var ANY_RECORD = /<!-- book-(?:proof|slots):v1 \{.*\} -->/;
+var bare = (line2) => line2.replace(/\r$/, "");
 function fencedLines2(lines) {
   const flags = [];
   let open2;
@@ -44249,39 +44270,160 @@ function recordKey(record) {
   }
   return void 0;
 }
+function quoteRunEnd(lines, fenced, from) {
+  let end = from;
+  while (end < lines.length && !fenced[end] && QUOTE_LINE.test(lines[end])) end++;
+  return end;
+}
+function hiddenRanges(lines, fenced) {
+  const found = [];
+  for (let i = 0; i < lines.length; ) {
+    if (!fenced[i] && HIDDEN_HEAD.test(bare(lines[i]))) {
+      const end = quoteRunEnd(lines, fenced, i + 1);
+      found.push({ start: i, end });
+      i = end;
+    } else i++;
+  }
+  return found;
+}
+function withoutHiddenCallouts(lines) {
+  const ranges = hiddenRanges(lines, fencedLines2(lines));
+  if (!ranges.length) return lines;
+  return lines.filter((_, i) => !ranges.some((range) => i >= range.start && i < range.end));
+}
+function recordLines(lines, fenced) {
+  const mask = lines.map(() => false);
+  const section3 = findSection(lines, fenced, (text10) => isResearchNotesHeading(text10));
+  if (section3) for (let i = section3.at + 1; i < section3.end; i++) mask[i] = true;
+  for (const range of hiddenRanges(lines, fenced)) for (let i = range.start; i < range.end; i++) mask[i] = true;
+  return mask;
+}
+var quoteAll = (text10) => text10.split(/\r?\n/).map((line2) => line2.trim() ? `> ${line2}` : ">").join("\n");
+function appendHidden(text10, quoted, atTop = false) {
+  const lines = text10.split("\n");
+  const last = hiddenRanges(lines, fencedLines2(lines)).pop();
+  if (!last) {
+    const base = text10.replace(/\s+$/, "");
+    return `${base ? `${base}
+
+` : ""}> [!${HIDDEN_CALLOUT}]- ${DEFAULT_RESEARCH_HEADING}
+${quoted}
+`;
+  }
+  const titleOnly = last.end === last.start + 1;
+  if (atTop) lines.splice(last.start + 1, 0, ...quoted.split("\n"));
+  else {
+    const blankTail = !titleOnly && /^>[ \t]*\r?$/.test(lines[last.end - 1]);
+    lines.splice(last.end, 0, ...`${titleOnly || blankTail ? "" : ">\n"}${quoted}`.split("\n"));
+  }
+  return lines.join("\n");
+}
+function spliceBlock(lines, at, end, middle) {
+  const before = lines.slice(0, at);
+  while (before.length && !before[before.length - 1].trim()) before.pop();
+  const rest = lines.slice(end);
+  const newline = rest.length > 0 && rest[rest.length - 1] === "";
+  while (rest.length && !rest[0].trim()) rest.shift();
+  while (rest.length && !rest[rest.length - 1].trim()) rest.pop();
+  const parts = [before, middle, rest].filter((part) => part.length);
+  const out = parts.flatMap((part, i) => i ? ["", ...part] : part);
+  return newline || !rest.length ? [...out, ""] : out;
+}
+function calloutBlocks(lines, fenced, from, to) {
+  const found = [];
+  for (let i = from; i < to; ) {
+    if (!fenced[i] && CALLOUT_HEAD2.test(bare(lines[i]))) {
+      const end = Math.min(quoteRunEnd(lines, fenced, i + 1), to);
+      found.push({ start: i, end });
+      i = end;
+    } else i++;
+  }
+  return found;
+}
+var asHidden = (head2) => head2.replace(/^(>[ \t]?)\[![A-Za-z][\w-]*\]/, `$1[!${HIDDEN_CALLOUT}]`);
+function hideResearchSection(text10) {
+  let lines = text10.split("\n");
+  for (let from = 0; ; ) {
+    const fenced = fencedLines2(lines);
+    const section3 = findSection(lines, fenced, (name3) => isResearchNotesHeading(name3), from);
+    if (!section3) return lines.join("\n");
+    const blocks = calloutBlocks(lines, fenced, section3.at + 1, section3.end);
+    const name2 = section3.text.trim().toLowerCase();
+    const mine = blocks.filter(
+      (block) => {
+        var _a2;
+        return ((_a2 = /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[block.start]))) == null ? void 0 : _a2[1].toLowerCase()) === name2 || lines.slice(block.start, block.end).some((line2) => ANY_RECORD.test(line2));
+      }
+    );
+    if (!mine.length) {
+      from = section3.at + 1;
+      continue;
+    }
+    for (const block of mine) lines[block.start] = asHidden(lines[block.start]);
+    const covered = new Set(
+      blocks.flatMap((block) => lines.slice(block.start, block.end).map((_, k) => block.start + k))
+    );
+    const others = lines.slice(section3.at + 1, section3.end).some((line2, k) => line2.trim() && !covered.has(section3.at + 1 + k));
+    if (mine.length < blocks.length || others) {
+      from = section3.at + 1;
+      continue;
+    }
+    const body = lines.slice(section3.at + 1, section3.end);
+    while (body.length && !body[0].trim()) body.shift();
+    while (body.length && !body[body.length - 1].trim()) body.pop();
+    lines = spliceBlock(lines, section3.at, section3.end, body);
+    from = section3.at;
+  }
+}
+var updateLogNames = () => new Set(
+  [
+    SECTION_NAME.log.zh,
+    SECTION_NAME.log.en,
+    ...NOTE_LANGUAGES.map((locale) => translate(locale, "detail.update_log"))
+  ].map((name2) => name2.trim().toLowerCase())
+);
+function hideUpdateLog(text10) {
+  const names3 = updateLogNames();
+  let lines = text10.split("\n");
+  const moved = [];
+  for (let from = 0; ; ) {
+    const section3 = findSection(
+      lines,
+      fencedLines2(lines),
+      (name2, level) => level >= 3 && names3.has(name2.trim().toLowerCase()),
+      from
+    );
+    if (!section3) break;
+    const body = lines.slice(section3.at + 1, section3.end).map(bare).filter((line2) => line2.trim());
+    if (!body.length || !body.every((line2) => LOG_LINE.test(line2))) {
+      from = section3.at + 1;
+      continue;
+    }
+    moved.push(...body);
+    lines = spliceBlock(lines, section3.at, section3.end, []);
+    from = section3.at;
+  }
+  if (!moved.length) return text10;
+  return appendHidden(lines.join("\n"), moved.map((line2) => `> ${line2}`).join("\n"));
+}
+function normalizeWorkRecords(detail) {
+  return hideUpdateLog(hideResearchSection(detail));
+}
+function workLogLines(detail) {
+  const lines = detail.split("\n");
+  const fenced = fencedLines2(lines);
+  const mask = recordLines(lines, fenced);
+  return lines.map((line2, i) => mask[i] ? unquoted(bare(line2)).trim() : "").filter((line2) => LOG_LINE.test(line2));
+}
+function carryWorkLog(oldDetail, newDetail) {
+  const have = new Set(workLogLines(newDetail));
+  const add = workLogLines(oldDetail).filter((line2) => !have.has(line2));
+  return add.length ? appendHidden(newDetail, add.map((line2) => `> ${line2}`).join("\n"), true) : newDetail;
+}
 function appendResearchNote(detail, record) {
   const key4 = recordKey(record);
   if (key4 && findProofRecord(unquoted(detail), key4)) return { text: detail, appended: false };
-  const quoted = record.split(/\r?\n/).map((line2) => line2.trim() ? `> ${line2}` : ">").join("\n");
-  const lines = detail.split("\n");
-  const section3 = findSection(lines, fencedLines2(lines), (text10) => isResearchNotesHeading(text10));
-  if (!section3) {
-    const base = detail.replace(/\s+$/, "");
-    const callout2 = `> [!note]- ${DEFAULT_RESEARCH_HEADING}
-${quoted}`;
-    return { text: `${base ? `${base}
-
-` : ""}### ${DEFAULT_RESEARCH_HEADING}
-
-${callout2}
-`, appended: true };
-  }
-  const body = lines.slice(section3.at + 1, section3.end);
-  let last = body.length - 1;
-  while (last >= 0 && !body[last].trim()) last--;
-  const hasCallout = body.some((line2) => CALLOUT_HEAD2.test(line2.replace(/\r$/, "")));
-  const quoteTail = last >= 0 && /^>/.test(body[last]);
-  const titleOnly = last >= 0 && CALLOUT_HEAD2.test(body[last].replace(/\r$/, ""));
-  const addition = hasCallout && quoteTail ? `${titleOnly ? "" : ">\n"}${quoted}` : `${last >= 0 ? "\n" : ""}> [!note]- ${section3.text}
-${quoted}`;
-  const head2 = lines.slice(0, section3.at + 1 + last + 1).join("\n");
-  const tail = lines.slice(section3.at + 1 + last + 1);
-  while (tail.length && !tail[0].trim()) tail.shift();
-  const rest = tail.length ? `
-
-${tail.join("\n")}` : "\n";
-  const glue = last >= 0 ? "\n" : "\n\n";
-  return { text: `${head2}${glue}${addition}${rest}`, appended: true };
+  return { text: appendHidden(normalizeWorkRecords(detail), quoteAll(record)), appended: true };
 }
 var PIPELINE_RECORD = /^<!-- (book-(?:proof|slots)):v1 (\{.*\}) -->$/;
 var PROOF_ITEM_LINE = /^- .+ (?:達成|未達成|待查)：/;
@@ -44296,35 +44438,37 @@ var validJson = (text10) => {
 function replaceResearchRecord(detail, record) {
   var _a2;
   const tag = ((_a2 = record.split(/\r?\n/).map((line2) => PIPELINE_RECORD.exec(line2.trim())).find(Boolean)) != null ? _a2 : [])[1];
-  const lines = detail.split("\n");
-  const section3 = tag ? findSection(lines, fencedLines2(lines), (text10) => isResearchNotesHeading(text10)) : void 0;
-  if (!tag || !section3) return appendResearchNote(detail, record).text;
-  const start = section3.at + 1;
-  const plain = lines.slice(start, section3.end).map((line2) => unquoted(line2).replace(/\r$/, ""));
+  const base = normalizeWorkRecords(detail);
+  const lines = base.split("\n");
+  const mask = recordLines(lines, fencedLines2(lines));
+  if (!tag || !mask.some(Boolean)) return appendResearchNote(base, record).text;
+  const plain = lines.map((line2, i) => mask[i] ? unquoted(line2).replace(/\r$/, "") : "");
   const fenced = fencedLines2(plain);
   const drop = /* @__PURE__ */ new Set();
   for (let k = 0; k < plain.length; k++) {
-    const m = fenced[k] ? null : PIPELINE_RECORD.exec(plain[k].trim());
+    const m = !mask[k] || fenced[k] ? null : PIPELINE_RECORD.exec(plain[k].trim());
     if (!m || m[1] !== tag || !validJson(m[2])) continue;
     drop.add(k);
     let j = k - 1;
     if (tag === "book-proof") {
-      while (j >= 0 && !fenced[j] && !drop.has(j) && PROOF_ITEM_LINE.test(plain[j])) drop.add(j--);
-      if (j >= 0 && !fenced[j] && !drop.has(j) && PROOF_HEADER.test(plain[j].trim())) drop.add(j--);
+      while (j >= 0 && mask[j] && !fenced[j] && !drop.has(j) && PROOF_ITEM_LINE.test(plain[j])) drop.add(j--);
+      if (j >= 0 && mask[j] && !fenced[j] && !drop.has(j) && PROOF_HEADER.test(plain[j].trim())) drop.add(j--);
     }
-    if (j >= 0 && !drop.has(j) && QUOTE_BLANK.test(lines[start + j])) drop.add(j);
+    if (j >= 0 && mask[j] && !drop.has(j) && QUOTE_BLANK.test(lines[j])) drop.add(j);
   }
-  const kept = lines.filter((_, i) => i < start || i >= section3.end || !drop.has(i - start));
-  return appendResearchNote(kept.join("\n"), record).text;
+  return appendResearchNote(lines.filter((_, i) => !drop.has(i)).join("\n"), record).text;
 }
 var PROOF_HEADER = /^(?:（舊版）)?校對(?:失敗)?（/;
 function extractProofRecords(detail) {
   const lines = detail.split("\n");
-  const section3 = findSection(lines, fencedLines2(lines), (text10) => isResearchNotesHeading(text10));
-  if (!section3) return [];
+  const mask = recordLines(lines, fencedLines2(lines));
   const records = [];
   let current = [];
-  for (const line2 of lines.slice(section3.at + 1, section3.end)) {
+  for (const [at, line2] of lines.entries()) {
+    if (!mask[at]) {
+      current = [];
+      continue;
+    }
     if (CALLOUT_HEAD2.test(line2.replace(/\r$/, ""))) continue;
     const plain = unquoted(line2).replace(/\r$/, "");
     if (RECORD_KEY.test(plain.trim())) {
@@ -44344,10 +44488,10 @@ var shortText = (value, max) => typeof value === "string" ? Array.from(value).sl
 var count2 = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
 function latestStoredProof(detail) {
   const lines = detail.split("\n");
-  const section3 = findSection(lines, fencedLines2(lines), (text10) => isResearchNotesHeading(text10));
-  if (!section3) return void 0;
+  const mask = recordLines(lines, fencedLines2(lines));
   let found;
-  for (const line2 of lines.slice(section3.at + 1, section3.end)) {
+  for (const [at, line2] of lines.entries()) {
+    if (!mask[at]) continue;
     const m = RECORD_KEY.exec(unquoted(line2).trim());
     if (!m) continue;
     try {
@@ -44418,6 +44562,8 @@ function findImageSection(lines) {
   for (let from = 0; ; ) {
     const s = findSection(lines, fenced, (text10, level) => level === 3 && isImagesHeading(text10), from);
     if (!s) return void 0;
+    const hidden = hiddenRanges(lines, fenced).find((range) => range.start > s.at && range.start < s.end);
+    if (hidden) s.end = hidden.start;
     const body = lines.slice(s.at + 1, s.end).map((l) => l.replace(/\r$/, "")).filter((l) => l.trim());
     const ok = body.length > 0 && body.length % 2 === 0 && body.every(
       (l, i) => i % 2 === 0 ? /^!\[[^\]]*\]\(https:\/\/\S+\)$/.test(l) : !/!\[|^\s*(#|[-*+>]|\d+[.)])|<!--/.test(l)
@@ -44427,7 +44573,7 @@ function findImageSection(lines) {
   }
 }
 function withImageBlock(lines, block) {
-  var _a2, _b2;
+  var _a2, _b2, _c;
   const fenced = fencedLines2(lines);
   const sources = findSection(lines, fenced, (text10) => isNewSourcesHeading(text10));
   const other = findSection(
@@ -44435,7 +44581,8 @@ function withImageBlock(lines, block) {
     fenced,
     (text10) => isOpenQuestionsHeading(text10) || isResearchNotesHeading(text10) || isUpdateLogHeading(text10)
   );
-  const at = Math.min((_a2 = sources == null ? void 0 : sources.at) != null ? _a2 : lines.length, (_b2 = other == null ? void 0 : other.at) != null ? _b2 : lines.length);
+  const hidden = hiddenRanges(lines, fenced)[0];
+  const at = Math.min((_a2 = sources == null ? void 0 : sources.at) != null ? _a2 : lines.length, (_b2 = other == null ? void 0 : other.at) != null ? _b2 : lines.length, (_c = hidden == null ? void 0 : hidden.start) != null ? _c : lines.length);
   const head2 = lines.slice(0, at).join("\n").replace(/\s+$/, "");
   const tail = lines.slice(at).join("\n");
   return `${head2 ? `${head2}
@@ -44453,7 +44600,7 @@ function carryImageSection(oldDetail, newDetail) {
 }
 function chapterBody(detail) {
   var _a2;
-  let lines = detail.split("\n");
+  let lines = withoutHiddenCallouts(detail.split("\n"));
   for (; ; ) {
     const section3 = (_a2 = findSection(lines, fencedLines2(lines), (text10) => isSystemSection(text10))) != null ? _a2 : findImageSection(lines);
     if (!section3) break;
@@ -44490,21 +44637,31 @@ function replaceProofSection(content, heading, body) {
   const lines = content.split("\n");
   const flags = protectedLines(lines);
   const names3 = new Set(NOTE_LANGUAGES.map((locale) => translate(locale, "detail.book_proof_heading").trim()));
-  const found = findSection(lines, flags, (text10, level) => level === 2 && names3.has(text10.trim()));
-  const entry = `## ${heading}
+  const entry = `> [!${HIDDEN_CALLOUT}]- ${heading}
+${quoteAll(body.trim())}`;
+  const join5 = (before, after) => {
+    const lead = before && !before.endsWith("\n") ? `${before}
 
-${body.trim()}`;
+` : before ? `${before}
+` : "";
+    return `${lead}${entry}${after ? `
+
+${after}` : "\n"}`;
+  };
+  const callout2 = hiddenRanges(lines, flags).find((range) => {
+    var _a2, _b2;
+    const title = (_b2 = (_a2 = /^>[ \t]?\[![^\]]+\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[range.start]))) == null ? void 0 : _a2[1]) != null ? _b2 : "";
+    return names3.has(title);
+  });
+  if (callout2)
+    return join5(lines.slice(0, callout2.start).join("\n"), lines.slice(callout2.end).join("\n").replace(/^\s+/, ""));
+  const found = findSection(lines, flags, (text10, level) => level === 2 && names3.has(text10.trim()));
   if (found) {
     let end = found.at + 1;
     if (end < found.end && !lines[end].trim()) end++;
     while (end < found.end && /^- /.test(lines[end])) end++;
     while (end > found.at + 1 && !lines[end - 1].trim()) end--;
-    const before = lines.slice(0, found.at).join("\n");
-    const after = lines.slice(end).join("\n").replace(/^\s+/, "");
-    return `${before ? `${before}
-` : ""}${entry}${after ? `
-
-${after}` : "\n"}`;
+    return join5(lines.slice(0, found.at).join("\n"), lines.slice(end).join("\n").replace(/^\s+/, ""));
   }
   const marker3 = lines.findIndex((line2, i) => !flags[i] && line2.trim() === REFERENCE_START2);
   if (marker3 >= 0) {
@@ -44561,7 +44718,7 @@ function cleanSlotText(value, max) {
 var STANDALONE_MARKER = /^\s*〔圖位 ([1-9]\d*)：([^〔〕]+?)〕\s*$/;
 var MARKER_OPEN = "\u3014\u5716\u4F4D";
 var OPEN_FENCE = /^[ \t]*(`{3,}|~{3,})(.*)$/;
-var QUOTE_LINE = /^ {0,3}>/;
+var QUOTE_LINE2 = /^ {0,3}>/;
 var INDENTED_CODE = /^(?: {4}|\t)/;
 var BLOCK_START = /^ {0,3}(?:#{1,6}(?:\s|$)|[-*+]\s|\d+[.)]\s|(?:[-*_][ \t]*){3,}$)/;
 function protectedLines2(lines) {
@@ -44586,7 +44743,7 @@ function protectedLines2(lines) {
     }
     const blank2 = !line2.trim();
     const prevBlank = out.length === 0 || !lines[out.length - 1].trim();
-    if (QUOTE_LINE.test(line2)) {
+    if (QUOTE_LINE2.test(line2)) {
       quote3 = true;
       code3 = false;
       out.push(true);
@@ -51167,7 +51324,7 @@ var BookPipelineRuns = class {
     const path = await this.stillOnMap(drive, nodeId);
     if (!path) return { kind: "failed", reason: "card_removed" };
     let written2 = await this.ports.readCard(path);
-    let carried = written2.detail;
+    let carried = carryWorkLog(card.detail, normalizeWorkRecords(written2.detail));
     for (const record of extractProofRecords(card.detail).slice(-1)) carried = appendResearchNote(carried, record).text;
     if (slots === void 0) carried = carryImageSection(card.detail, carried);
     if (carried !== written2.detail) {
@@ -56471,11 +56628,11 @@ var MapChatPanel = class {
     );
   }
   chainEndText(reason, remaining, details, last, round3 = this.chainRound, restored = false, calls) {
-    const bare = (value) => clip4(value, 200).replace(/[\s.。!！?？…]+$/u, "");
-    const left = remaining.trim() ? t("ui.map_chat_chain_left_end_0", bare(remaining)) : "";
+    const bare2 = (value) => clip4(value, 200).replace(/[\s.。!！?？…]+$/u, "");
+    const left = remaining.trim() ? t("ui.map_chat_chain_left_end_0", bare2(remaining)) : "";
     const why2 = (details != null ? details : []).length ? t(
       "ui.map_chat_chain_reason_0",
-      bare(
+      bare2(
         (details != null ? details : []).slice(0, 3).map((item) => clip4(item, 120)).join(t("ui.map_chat_chain_detail_separator"))
       )
     ) : "";
@@ -56494,7 +56651,7 @@ var MapChatPanel = class {
       case "call_limit":
         return this.joinSentences(
           say("ui.map_chat_chain_end_call_limit_0", calls != null ? calls : MAP_CHAT_AUTO_MAX_CALLS),
-          remaining.trim() ? say("ui.map_chat_chain_left_call_limit_0", bare(remaining)) : "",
+          remaining.trim() ? say("ui.map_chat_chain_left_call_limit_0", bare2(remaining)) : "",
           say("ui.map_chat_chain_end_max_rounds_more")
         );
       case "research_failed":
@@ -92983,10 +93140,10 @@ function removeLocalReferenceDefinitions(text10) {
   const ranges = markdownCodeRanges(text10);
   return text10.replace(
     definition,
-    (all, bracketed, bare, at) => {
+    (all, bracketed, bare2, at) => {
       var _a2;
       if (ranges.some((range) => at >= range.start && at < range.end)) return all;
-      const target = ((_a2 = bracketed != null ? bracketed : bare) != null ? _a2 : "").trim();
+      const target = ((_a2 = bracketed != null ? bracketed : bare2) != null ? _a2 : "").trim();
       return isWeb(target) || /^mailto:/i.test(target) ? all : "";
     }
   );
@@ -94024,14 +94181,14 @@ function rebuildTranslationsForPayload(nodes, pieces, dom) {
         entries[id] = entry;
         continue;
       }
-      const bare = { ...entry };
-      delete bare.detailSegments;
-      delete bare.detailCheck;
-      delete bare.detailDiagrams;
+      const bare2 = { ...entry };
+      delete bare2.detailSegments;
+      delete bare2.detailCheck;
+      delete bare2.detailDiagrams;
       try {
         const fits = !!(html == null ? void 0 : html.trim()) && (entry.detailSegments === void 0 || entry.detailCheck === detailCheckOf(prepareDetail(dom.parse(html), () => dom.createDiv()).extraction));
         if (!html || !fits) {
-          entries[id] = bare;
+          entries[id] = bare2;
           continue;
         }
         const root = dom.parse(html);
@@ -94043,7 +94200,7 @@ function rebuildTranslationsForPayload(nodes, pieces, dom) {
         ((_a2 = rebuilt[language2]) != null ? _a2 : rebuilt[language2] = {})[id] = dom.serialize(root);
         entries[id] = entry;
       } catch (e) {
-        entries[id] = bare;
+        entries[id] = bare2;
       }
     }
     return { language: language2, piece: { top: piece.top, nodes: entries } };

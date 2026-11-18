@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "reader": {
+      "type": "string"
+    },
+    "goal": {
+      "type": "string"
+    },
+    "angle": {
+      "type": "string"
+    },
+    "tone": {
+      "type": "string"
+    },
+    "length": {
+      "type": "string"
+    },
+    "style": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "reader",
+    "goal",
+    "angle",
+    "tone",
+    "length",
+    "style"
+  ]
+}

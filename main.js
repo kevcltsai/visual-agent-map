@@ -94931,6 +94931,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node-header > .vam-node-rerun { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .vam-node-header > .vam-node-rerun .svg-icon { width: 12px; height: 12px; }
 .vam-node-header > .vam-node-rerun:disabled { opacity: 0.5; cursor: not-allowed; }
+.vam-viewport.is-zoomed-out .vam-node-header > .vam-node-rerun { font-size: 0; gap: 0; padding: 2px 6px; transform: scale(calc(0.8 / var(--vam-zoom, 1))); transform-origin: right center; }
 @keyframes vam-pulse { 50% { opacity: 0.35; } }
 @keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }
 /* Viewer-only parts: the pieces Obsidian would otherwise provide. */

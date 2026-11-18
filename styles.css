@@ -2312,6 +2312,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-node-header > .vam-node-rerun { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .vam-node-header > .vam-node-rerun .svg-icon { width: 12px; height: 12px; }
 .vam-node-header > .vam-node-rerun:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Zoomed out, the label is dropped and the button is counter-scaled so a tappable refresh icon stays readable on the shrunken header. */
+.vam-viewport.is-zoomed-out .vam-node-header > .vam-node-rerun { font-size: 0; gap: 0; padding: 2px 6px; transform: scale(calc(0.8 / var(--vam-zoom, 1))); transform-origin: right center; }
 .vam-book-state.is-rerun { font-weight: 600; color: color-mix(in srgb, var(--color-blue) 70%, var(--text-normal)); }
 .vam-book-state.is-rerun::before { background: var(--color-blue); }
 .vam-book-panel-unchanged { font-size: var(--font-ui-smaller); color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); overflow-wrap: anywhere; }

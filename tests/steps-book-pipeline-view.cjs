@@ -440,7 +440,7 @@ test('start card: pressing the button opens a card with the estimate (1+4N calls
   const all = texts(modal.modalEl);
   assert.ok(all.includes('3 張卡 · 約 4 分鐘 · 約 13 次 AI 呼叫。'), all.join('|'));
   assert.ok(all.includes('中間只會停兩次，讓你確認。'));
-  for (const line of ['企劃：M:' + h.plugin.settings.bookPlanModel, '寫作：M:' + h.plugin.settings.bookWriteModel, '找圖：M:' + h.plugin.settings.bookWriteModel, '校對：M:' + h.plugin.settings.bookProofModel]) assert.ok(all.includes(line), line);
+  for (const line of ['企劃：M:' + h.plugin.settings.bookPlanModel, '寫作：M:' + h.plugin.settings.bookWriteModel, '找圖：M:' + h.plugin.settings.bookImageModel, '校對：M:' + h.plugin.settings.bookProofModel]) assert.ok(all.includes(line), line);
   const details = dom.find(modal.modalEl, i => i.tag === 'details');
   assert.equal(details.open, false, 'the whole-book settings start collapsed');
   assert.equal(dom.findAll(details, i => i.tag === 'textarea').length, 6);

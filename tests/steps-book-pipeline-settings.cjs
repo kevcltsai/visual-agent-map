@@ -23,24 +23,30 @@ function render(settings, models, spec) {
   tab.renderBookModelSetting(setting, plugin, spec, () => {});
   return { select, saved, change: v => onChange(v) };
 }
-const [PLAN, WRITE, PROOF] = tab.BOOK_MODEL_SETTINGS;
+const [PLAN, WRITE, IMAGE, PROOF] = tab.BOOK_MODEL_SETTINGS;
 
-test('three book model settings exist with the defaults planning haiku, author and proofread sonnet', () => {
-  assert.deepEqual(S.plain(tab.BOOK_MODEL_SETTINGS.map(s => s.key)), ['bookPlanModel', 'bookWriteModel', 'bookProofModel']);
-  assert.equal(DEFAULT_SETTINGS.bookPlanModel, 'claude:haiku');
-  assert.equal(DEFAULT_SETTINGS.bookWriteModel, 'claude:sonnet');
-  assert.equal(DEFAULT_SETTINGS.bookProofModel, 'claude:sonnet');
+test('four book model settings exist with the defaults plan sonnet, author opus, pictures and proofread haiku', () => {
+  assert.deepEqual(S.plain(tab.BOOK_MODEL_SETTINGS.map(s => s.key)), ['bookPlanModel', 'bookWriteModel', 'bookImageModel', 'bookProofModel']);
+  assert.equal(DEFAULT_SETTINGS.bookPlanModel, 'claude:sonnet');
+  assert.equal(DEFAULT_SETTINGS.bookWriteModel, 'claude:opus');
+  assert.equal(DEFAULT_SETTINGS.bookImageModel, 'claude:haiku');
+  assert.equal(DEFAULT_SETTINGS.bookProofModel, 'claude:haiku');
   const r = render({ ...DEFAULT_SETTINGS }, ['claude:haiku', 'claude:sonnet'], PLAN);
-  assert.equal(r.select.value, 'claude:haiku');
+  assert.equal(r.select.value, 'claude:sonnet');
+  const img = render({ ...DEFAULT_SETTINGS }, ['claude:haiku', 'claude:sonnet'], IMAGE);
+  assert.equal(img.select.value, 'claude:haiku');
+  img.change('claude:sonnet');
+  assert.equal(img.saved[0].bookImageModel, 'claude:sonnet');
+  assert.equal(img.saved[0].bookWriteModel, DEFAULT_SETTINGS.bookWriteModel);
 });
 
 test('options come from the same list, order and label as the AI model dropdown, and each dropdown has an accessible name', () => {
   const models = ['claude:sonnet', 'codex:gpt', 'claude:haiku'];
-  const book = render({ ...DEFAULT_SETTINGS }, models, WRITE);
+  const book = render({ ...DEFAULT_SETTINGS }, models, PROOF);
   const ref = fakeSelect(); ref.value = 'claude:sonnet';
   S.load('core/model-discovery.ts').syncModelSelect(ref, models, id => id.toUpperCase(), M.translate('en', 'ui.current_model_is_unavailable'));
   assert.deepEqual(book.select.options.map(o => [o.text, o.value]), ref.options.map(o => [o.text, o.value]));
-  assert.equal(book.select.attrs['aria-label'], M.translate('en', WRITE.name));
+  assert.equal(book.select.attrs['aria-label'], M.translate('en', PROOF.name));
 });
 
 test('a change writes the matching setting only and saves; cliModel is untouched', () => {

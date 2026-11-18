@@ -299,6 +299,7 @@ export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: s
     experimentalArgumentMap: saved?.experimentalArgumentMap === true,
     bookPlanModel: savedModel(saved?.bookPlanModel, DEFAULT_SETTINGS.bookPlanModel),
     bookWriteModel: savedModel(saved?.bookWriteModel, DEFAULT_SETTINGS.bookWriteModel),
+    bookImageModel: savedModel(saved?.bookImageModel, DEFAULT_SETTINGS.bookImageModel),
     bookProofModel: savedModel(saved?.bookProofModel, DEFAULT_SETTINGS.bookProofModel),
     cliReasoning: normalizeReasoningLevel(saved?.cliReasoning),
     previewScale:
@@ -506,6 +507,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     config: () => ({
       planModel: this.settings.bookPlanModel,
       authorModel: this.settings.bookWriteModel,
+      imageModel: this.settings.bookImageModel,
       proofModel: this.settings.bookProofModel,
       reasoning: this.currentModelChoice().reasoning,
       language: selectionOutputLanguage(this.settings.language, "")

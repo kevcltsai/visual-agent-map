@@ -17459,8 +17459,7 @@ export class VisualAgentMapView extends ItemView {
       models: {
         plan: this.plugin.modelLabel(settings.bookPlanModel),
         write: this.plugin.modelLabel(settings.bookWriteModel),
-        // The picture search runs on the author's model.
-        images: this.plugin.modelLabel(settings.bookWriteModel),
+        images: this.plugin.modelLabel(settings.bookImageModel),
         proof: this.plugin.modelLabel(settings.bookProofModel)
       },
       settings: rootNote?.bookSettings ?? {},

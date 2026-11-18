@@ -2792,9 +2792,12 @@ export const en = {
     "Writes the global plan and each card's plan. Few calls, short output; a cheaper model is enough.",
   "ui.settings_book_write_name": "Author",
   "ui.settings_book_write_desc": "Writes the body text and finds sources. Decides the quality of the result.",
+  "ui.settings_book_image_name": "Pictures",
+  "ui.settings_book_image_desc":
+    "Searches the web for each chapter's pictures and suggests the start card's whole-book settings. A cheaper model is enough.",
   "ui.settings_book_proof_name": "Proofread",
   "ui.settings_book_proof_desc":
-    "Checks facts independently by actually opening pages; a stronger model is recommended.",
+    "Checks facts independently by actually opening pages. A cheaper model is the default; pick a stronger one for stricter checks.",
   "ui.settings_book_note": "Changes apply from the next pipeline run; a run in progress is not affected.",
   "ui.settings_group_ai": "AI",
   "ui.settings_group_notes": "Notes",

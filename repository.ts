@@ -177,6 +177,7 @@ export interface Settings {
   /** Models of the picture-book pipeline's three roles (model ids as in `cliModel`). */
   bookPlanModel: string;
   bookWriteModel: string;
+  bookImageModel: string;
   bookProofModel: string;
   /** Save every map AI conversation as a record file in the map folder (off by default). */
   mapChatRecords: boolean;
@@ -311,9 +312,10 @@ export interface OrganizePlan {
   skipped: { mapPath: string; error: string }[];
 }
 
-const BOOK_PLAN_MODEL = "claude:haiku";
-const BOOK_WRITE_MODEL = "claude:sonnet";
-const BOOK_PROOF_MODEL = "claude:sonnet";
+const BOOK_PLAN_MODEL = "claude:sonnet";
+const BOOK_WRITE_MODEL = "claude:opus";
+const BOOK_IMAGE_MODEL = "claude:haiku";
+const BOOK_PROOF_MODEL = "claude:haiku";
 export const DEFAULT_SETTINGS: Settings = {
   detailTemplates: [],
   coffeeStyles: [],
@@ -336,6 +338,7 @@ export const DEFAULT_SETTINGS: Settings = {
   experimentalArgumentMap: false,
   bookPlanModel: BOOK_PLAN_MODEL,
   bookWriteModel: BOOK_WRITE_MODEL,
+  bookImageModel: BOOK_IMAGE_MODEL,
   bookProofModel: BOOK_PROOF_MODEL,
   cliReasoning: "low",
   previewScale: 120,

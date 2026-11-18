@@ -44236,7 +44236,7 @@ var FENCE2 = /^[ \t]{0,3}(`{3,}|~{3,})/;
 var CALLOUT_HEAD2 = /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?(?:[ \t].*)?$/;
 var RECORD_KEY = /^<!-- book-proof:v1 (\{.*\}) -->$/;
 var HIDDEN_CALLOUT = "vam-book";
-var HIDDEN_HEAD = /^>[ \t]?\[!vam-book\][+-]?(?:[ \t].*)?$/i;
+var HIDDEN_HEAD = /^[ \t]{0,3}>[ \t]?\[!vam-book\][+-]?(?:[ \t].*)?$/i;
 var QUOTE_LINE = /^[ \t]{0,3}>/;
 var LOG_LINE = /^(?:[-*+][ \t]+)?\d{4}-\d{2}-\d{2}/;
 var ANY_RECORD = /<!-- book-(?:proof|slots):v1 \{.*\} -->/;
@@ -44301,18 +44301,12 @@ function hiddenRanges(lines, fenced) {
   }
   return found;
 }
-function demoteForeignHidden(text10, known) {
-  const lines = text10.split("\n");
-  const trimmed2 = new Set(Array.from(known, (line2) => bare(line2).trimEnd()));
-  let changed = false;
-  for (const range of hiddenRanges(lines, fencedLines2(lines))) {
-    let own2 = true;
-    for (let i = range.start; i < range.end; i++) if (!trimmed2.has(bare(lines[i]).trimEnd())) own2 = false;
-    if (own2) continue;
-    lines[range.start] = lines[range.start].replace(/\[!vam-book\]/i, "[!note]");
-    changed = true;
-  }
-  return changed ? lines.join("\n") : text10;
+function neutralizeDetail(content) {
+  const start = content.indexOf(DETAIL_START2);
+  const end = content.lastIndexOf(DETAIL_END2);
+  if (start < 0 || end < start + DETAIL_START2.length) return null;
+  const from = start + DETAIL_START2.length;
+  return `${content.slice(0, from)}${content.slice(from, end).replace(/\[!vam-book\]/gi, "[!note]")}${content.slice(end)}`;
 }
 function withoutHiddenCallouts(lines) {
   const ranges = hiddenRanges(lines, fencedLines2(lines));
@@ -44410,7 +44404,7 @@ var updateLogNames = () => new Set(
     ...NOTE_LANGUAGES.map((locale) => translate(locale, "detail.update_log"))
   ].map((name2) => name2.trim().toLowerCase())
 );
-function hideUpdateLog(text10) {
+function hideUpdateLog(text10, own2) {
   const names3 = updateLogNames();
   let lines = text10.split("\n");
   const moved = [];
@@ -44423,7 +44417,19 @@ function hideUpdateLog(text10) {
     );
     if (!section3) break;
     const body = lines.slice(section3.at + 1, section3.end).map(bare).filter((line2) => line2.trim());
-    if (!body.length || !body.every((line2) => LOG_LINE.test(line2))) {
+    if (!body.length || !own2 && !body.every((line2) => LOG_LINE.test(line2))) {
+      from = section3.at + 1;
+      continue;
+    }
+    if (own2) {
+      const mine = body.filter((line2) => own2(line2.trim()));
+      if (!mine.length) {
+        from = section3.at + 1;
+        continue;
+      }
+      moved.push(...mine);
+      const rest = lines.slice(section3.at + 1, section3.end).filter((line2) => line2.trim() && !own2(bare(line2).trim()));
+      lines = spliceBlock(lines, section3.at, section3.end, rest.length ? [lines[section3.at], "", ...rest] : []);
       from = section3.at + 1;
       continue;
     }
@@ -44436,6 +44442,17 @@ function hideUpdateLog(text10) {
 }
 function normalizeWorkRecords(detail) {
   return hideUpdateLog(hideResearchSection(detail));
+}
+function hidePipelineLog(detail, known, backupPath) {
+  const marker3 = "\0";
+  const shapes = NOTE_LANGUAGES.map(
+    (locale) => translate(locale, "note.writeback_fresh_replaced_0", marker3).split(marker3)
+  ).filter((parts) => parts.length === 2);
+  const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const ownLine = backupPath ? shapes.map(
+    ([head2, tail]) => new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escape(head2)}${escape(backupPath)}${escape(tail)}$`)
+  ) : [];
+  return hideUpdateLog(detail, (line2) => known.has(line2) || ownLine.some((re) => re.test(line2)));
 }
 function workLogLines(detail) {
   const lines = detail.split("\n");
@@ -44451,7 +44468,7 @@ function carryWorkLog(oldDetail, newDetail) {
 function appendResearchNote(detail, record) {
   const key4 = recordKey(record);
   if (key4 && findProofRecord(unquoted(detail), key4)) return { text: detail, appended: false };
-  return { text: appendHidden(normalizeWorkRecords(detail), quoteAll(record)), appended: true };
+  return { text: appendHidden(detail, quoteAll(record)), appended: true };
 }
 var PIPELINE_RECORD = /^<!-- (book-(?:proof|slots)):v1 (\{.*\}) -->$/;
 var PROOF_ITEM_LINE = /^- .+ (?:達成|未達成|待查)：/;
@@ -44466,7 +44483,7 @@ var validJson = (text10) => {
 function replaceResearchRecord(detail, record) {
   var _a2;
   const tag = ((_a2 = record.split(/\r?\n/).map((line2) => PIPELINE_RECORD.exec(line2.trim())).find(Boolean)) != null ? _a2 : [])[1];
-  const base = normalizeWorkRecords(detail);
+  const base = detail;
   const lines = base.split("\n");
   const mask = recordLines(lines, fencedLines2(lines));
   if (!tag || !mask.some(Boolean)) return appendResearchNote(base, record).text;
@@ -50799,6 +50816,7 @@ var BookPipelineRuns = class {
       missingRoles: /* @__PURE__ */ new Map(),
       stages: /* @__PURE__ */ new Map(),
       backedUp: /* @__PURE__ */ new Set(),
+      backupPaths: /* @__PURE__ */ new Map(),
       reasons: /* @__PURE__ */ new Map(),
       busy: /* @__PURE__ */ new Set(),
       extra: /* @__PURE__ */ new Map(),
@@ -51101,7 +51119,10 @@ var BookPipelineRuns = class {
   async ensureBackup(drive, nodeId, path, raw) {
     if (drive.backedUp.has(nodeId)) return true;
     const saved = await this.ports.backupNote(path, raw).catch(() => ({ ok: false }));
-    if (saved.ok) drive.backedUp.add(nodeId);
+    if (saved.ok) {
+      drive.backedUp.add(nodeId);
+      drive.backupPaths.set(nodeId, saved.path);
+    }
     return saved.ok;
   }
   async writeFields(drive, nodeId, patch) {
@@ -51298,12 +51319,18 @@ var BookPipelineRuns = class {
     const authorize = this.authorize(drive, token);
     const slots = parseImageSlots(card.prompt);
     const knownLines = new Set(card.raw.split("\n"));
+    const ownRecords = extractProofRecords(normalizeWorkRecords(card.detail)).map(quoteAll);
     let unsafe = false;
     let emptyBody = false;
     const finalize = (original) => {
-      const held = holdProofLines(original, knownLines);
+      const cut = ownRecords.reduce((text10, record) => text10.split(record).join(""), original);
+      const held = holdProofLines(cut, knownLines);
       const restore = held.restore;
-      const content = demoteForeignHidden(dropPlaceholderSections(convertSourceAnchors(held.text)), knownLines);
+      const content = neutralizeDetail(dropPlaceholderSections(convertSourceAnchors(held.text)));
+      if (content === null) {
+        emptyBody = true;
+        return null;
+      }
       const urls = bodyImageUrls(content);
       const unsafeUrls = new Map(
         urls.filter((url) => !isHttps2(url)).map((url) => [url, noPicture(drive.config.language, "unsafe")])
@@ -51348,8 +51375,12 @@ var BookPipelineRuns = class {
     const path = await this.stillOnMap(drive, nodeId);
     if (!path) return { kind: "failed", reason: "card_removed" };
     let written2 = await this.ports.readCard(path);
-    let carried = carryWorkLog(card.detail, normalizeWorkRecords(written2.detail));
-    for (const record of extractProofRecords(card.detail).slice(-1)) carried = appendResearchNote(carried, record).text;
+    const earlier = normalizeWorkRecords(card.detail);
+    let carried = carryWorkLog(
+      earlier,
+      hidePipelineLog(written2.detail, new Set(workLogLines(earlier)), drive.backupPaths.get(nodeId))
+    );
+    for (const record of extractProofRecords(earlier).slice(-1)) carried = appendResearchNote(carried, record).text;
     if (slots === void 0) carried = carryImageSection(card.detail, carried);
     if (carried !== written2.detail) {
       const outcome = await this.ports.updateNoteGuarded(

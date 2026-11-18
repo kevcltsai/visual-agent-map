@@ -1293,7 +1293,20 @@ test('T4 autofix: stop and reopen during the redo keep the use: no second free r
   const s = await r.state();
   assert.equal(s.autoFixes[r.nodes[1].id], 1, 'never more than one redo');
   assert.equal(stageOf(r.raw(1)), 'needs-review');
-  assert.equal(r.stat.proof.filter(p => p.body.includes(TITLES[1])).length, 2, 'the first proofread and the one after the redo');
+  assert.equal((await r.note(1)).pipelineIssue, 'proof unmet: fix interrupted', 'the instruction was only in memory: the card is back at needs-review, not rewritten without it');
+  assert.equal(r.stat.proof.filter(p => p.body.includes(TITLES[1])).length, 1, 'only the first proofread');
+});
+
+test('T4 autofix: a card whose write needed its third attempt and whose proofread is unmet gets no redo: it stays needs-review with its proof result', async () => {
+  const seen = [];
+  const r = await rig({ script: { ...factCard, proof: async request => verdictOf(request, 'unmet', 'bad'),
+    author: (input, n) => (input.nodeId === r.nodes[1].id && n < 3 ? Promise.reject(new Error('network down')) : writeAs(r, seen)(input)) } });
+  await finish(r);
+  const s = await r.state();
+  assert.equal(r.stat.author.filter(id => id === r.nodes[1].id).length, 3, 'the write took all its attempts');
+  assert.equal(s.autoFixes?.[r.nodes[1].id], undefined, 'no redo was counted');
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.equal((await r.note(1)).pipelineIssue, 'proof unmet: C2', 'its proof result, not "write failed"');
 });
 
 test('T4 autofix: a single-card rerun never starts the automatic redo', async () => {

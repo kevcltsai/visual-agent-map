@@ -85,12 +85,12 @@ const mk = (n, text = `explains ${n} perspective`) => `〔圖位 ${n}：${text}�
 /** Two paragraphs, each followed by its marker line, then a Sources section. */
 const twoMarkers = title => `正文一。${title}\n\n${mk(1)}\n\n正文二。\n\n${mk(2)}\n\n正文三。\n\n### 來源\n- https://example.com/a\n`;
 /** A rig whose card plan arranges `slots` pictures (null: an old Prompt without an image plan) and whose author writes `text`; `finder` is the fake picture search (request, run, callNumber) -> found(). */
-async function picRig({ finder, probe, text = twoMarkers, titles, proof, slots = 2, ports } = {}) {
+async function picRig({ finder, probe, text = twoMarkers, titles, proof, slots = 2, ports, checklist } = {}) {
   const calls = [];
   const holder = {};
   const r = await rig({
     titles: titles ?? ['SecretRootTitle'],
-    script: { card: request => ({ covers: `covers ${request.card.position}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }], ...(slots === null ? {} : { images: slotsOf(slots) }) }),
+    script: { card: request => ({ covers: `covers ${request.card.position}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: checklist ?? [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }], ...(slots === null ? {} : { images: slotsOf(slots) }) }),
       author: (input, n) => writeAuthor(holder.r, text)(input), ...(probe ? { probe } : {}), ...(proof ? { proof } : {}) },
     ports: { findImages: async (request, run) => { calls.push(request); await run.admission.reserve(); return finder(request, run, calls.length); }, ...ports }
   });
@@ -753,4 +753,16 @@ test('T4 images: when every slot has its picture there is no second search; a se
   await run(b);
   assert.equal(b.calls.length, 1, 'an error is an optional gain lost, not a reason to ask twice');
   assert.equal(stageOf(b.raw(0)), 'checked');
+});
+
+test('T4 images: the automatic redo of a card may pick that card\'s own pictures again', async () => {
+  const checklist = [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'fact', text: 'a date' }];
+  let proofs = 0;
+  const r = await picRig({ checklist, slots: 1, text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。`,
+    finder: () => found({ 1: [cand(1)] }),
+    proof: async request => evaluateProof(request.checklist.map(c => ({ id: c.id, status: c.type === 'fact' && ++proofs === 1 ? 'unmet' : 'met', note: 'n', sources: c.type === 'fact' ? ['https://example.org/p'] : [] })), request.checklist, ['https://example.org/p']) });
+  await run(r);
+  assert.equal(r.calls.length, 2, 'first round and the redo each searched');
+  assert.ok(!r.calls[1].exclude.some(key => /w1/i.test(key)), 'its own old picture is not excluded');
+  assert.equal(figures((await r.note(0)).detail).length, 1, 'the redo shows the picture again');
 });

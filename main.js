@@ -3089,7 +3089,7 @@ var en = {
   "ui.book_button_title": "Start the picture-book pipeline: plan, confirm, write, proofread",
   "ui.book_start_title": "Turn this map into a book with pictures",
   "ui.book_start_intro": "From the topics and cards of this map, the AI plans, writes, finds pictures for and proofreads every chapter.",
-  "ui.book_start_estimate_0_1_2": "{0} cards \xB7 about {1} \xB7 about {2} AI calls.",
+  "ui.book_start_estimate_0_1_2": "{0} cards \xB7 about {1} \xB7 up to {2} AI calls.",
   "ui.book_start_under_minute": "under 1 minute",
   "ui.book_start_minutes_0": "{0} minutes",
   "ui.book_start_stops": "It stops only twice for you to confirm.",
@@ -6269,7 +6269,7 @@ var zhCN = {
   "ui.book_button_title": "\u5F00\u59CB\u56FE\u6587\u4E66\u6D41\u6C34\u7EBF\uFF1A\u4F01\u5212\u3001\u786E\u8BA4\u3001\u4F5C\u8005\u3001\u6821\u5BF9",
   "ui.book_start_title": "\u628A\u8FD9\u5F20\u601D\u7EF4\u5BFC\u56FE\u53D8\u6210\u4E00\u672C\u6709\u56FE\u7684\u4E66",
   "ui.book_start_intro": "\u4F1A\u4F9D\u8FD9\u5F20\u601D\u7EF4\u5BFC\u56FE\u7684\u4E3B\u9898\u4E0E\u5361\u7247\uFF0C\u7531 AI \u4F01\u5212\u3001\u5199\u4F5C\u3001\u627E\u56FE\u3001\u6821\u5BF9\u6BCF\u4E00\u7AE0\u3002",
-  "ui.book_start_estimate_0_1_2": "{0} \u5F20\u5361 \xB7 \u7EA6 {1} \xB7 \u7EA6 {2} \u6B21 AI \u8C03\u7528\u3002",
+  "ui.book_start_estimate_0_1_2": "{0} \u5F20\u5361 \xB7 \u7EA6 {1} \xB7 \u6700\u591A {2} \u6B21 AI \u8C03\u7528\u3002",
   "ui.book_start_under_minute": "\u4E0D\u5230 1 \u5206\u949F",
   "ui.book_start_minutes_0": "{0} \u5206\u949F",
   "ui.book_start_stops": "\u4E2D\u95F4\u53EA\u4F1A\u505C\u4E24\u6B21\uFF0C\u8BA9\u4F60\u786E\u8BA4\u3002",
@@ -9449,7 +9449,7 @@ var zhTW = {
   "ui.book_button_title": "\u958B\u59CB\u5716\u6587\u66F8\u6D41\u6C34\u7DDA\uFF1A\u4F01\u5283\u3001\u78BA\u8A8D\u3001\u4F5C\u8005\u3001\u6821\u5C0D",
   "ui.book_start_title": "\u628A\u9019\u5F35\u5FC3\u667A\u5716\u8B8A\u6210\u4E00\u672C\u6709\u5716\u7684\u66F8",
   "ui.book_start_intro": "\u6703\u4F9D\u9019\u5F35\u5FC3\u667A\u5716\u7684\u4E3B\u984C\u8207\u5361\u7247\uFF0C\u7531 AI \u4F01\u5283\u3001\u5BEB\u4F5C\u3001\u627E\u5716\u3001\u6821\u5C0D\u6BCF\u4E00\u7AE0\u3002",
-  "ui.book_start_estimate_0_1_2": "{0} \u5F35\u5361 \xB7 \u7D04 {1} \xB7 \u7D04 {2} \u6B21 AI \u547C\u53EB\u3002",
+  "ui.book_start_estimate_0_1_2": "{0} \u5F35\u5361 \xB7 \u7D04 {1} \xB7 \u6700\u591A {2} \u6B21 AI \u547C\u53EB\u3002",
   "ui.book_start_under_minute": "\u4E0D\u5230 1 \u5206\u9418",
   "ui.book_start_minutes_0": "{0} \u5206\u9418",
   "ui.book_start_stops": "\u4E2D\u9593\u53EA\u6703\u505C\u5169\u6B21\uFF0C\u8B93\u4F60\u78BA\u8A8D\u3002",
@@ -45249,6 +45249,8 @@ function requestAutoFix(data, nodeId) {
   if (!data.order.includes(nodeId) || data.status !== "running" || data.phase !== "writing")
     return { state: data, accepted: false };
   if (autoFixesOf(data, nodeId) >= MAX_AUTO_FIXES) return { state: data, accepted: false };
+  const used = attemptsOf(data, nodeId);
+  if (used.write >= MAX_STEP_ATTEMPTS || used.proof >= MAX_STEP_ATTEMPTS) return { state: data, accepted: false };
   const next = clone2(data);
   next.autoFixes = { ...(_a2 = next.autoFixes) != null ? _a2 : {}, [nodeId]: autoFixesOf(data, nodeId) + 1 };
   next.revisions[nodeId] = cardRevision(next, nodeId) + 1;
@@ -50501,6 +50503,14 @@ var BookPipelineRuns = class {
         return { state: resumed != null ? resumed : next, accepted: true };
       });
       if (refused) throw new BookPipelineRunError("budget");
+      for (const id of drive.store.state.order)
+        if (drive.stages.get(id) === "planned" && autoFixesOf(drive.store.state, id) > 0 && !drive.extra.has(id)) {
+          drive.stages.set(id, "needs-review");
+          await this.writeFields(drive, id, {
+            pipelineStage: "needs-review",
+            pipelineIssue: "proof unmet: fix interrupted"
+          });
+        }
       this.log(drive, "resume", "-", "plan", data.status === "running" ? "recovered" : "ok");
     });
   }
@@ -51117,6 +51127,9 @@ var BookPipelineRuns = class {
       if (drive.stages.get(nodeId) !== "needs-review") continue;
       const done = await drive.store.commit((state) => requestAutoFix(state, nodeId));
       if (!(done == null ? void 0 : done.accepted)) continue;
+      const own2 = drive.cards.get(nodeId);
+      const current = own2 ? await this.ports.readCard(own2.path).catch(() => void 0) : void 0;
+      if (current) for (const url of bodyImageUrls(current.detail)) drive.usedImages.delete(imageKey2(url));
       drive.extra.set(nodeId, instruction);
       drive.avoid.add(nodeId);
       drive.reasons.delete(nodeId);
@@ -64887,7 +64900,8 @@ function bookStartEstimate(cards, models) {
   const perCard = BOOK_CARD_P50_SECONDS * (CARD_TIME_SHARE.plan * speed("plan") + CARD_TIME_SHARE.write * speed("write") + CARD_TIME_SHARE.images * speed("images") + CARD_TIME_SHARE.proof * speed("proof"));
   return {
     cards: n,
-    calls: 1 + 4 * n,
+    // An upper bound: the plan, then per chapter write, proofread, and up to two image searches (the second only when the first finds too little).
+    calls: 1 + 5 * n,
     seconds: BOOK_PLAN_SECONDS * speed("plan") + Math.ceil(n / BOOK_POOL) * perCard
   };
 }

@@ -346,6 +346,9 @@ export function requestAutoFix(data: BookPipelineData, nodeId: string): Committe
   if (!data.order.includes(nodeId) || data.status !== "running" || data.phase !== "writing")
     return { state: data, accepted: false };
   if (autoFixesOf(data, nodeId) >= MAX_AUTO_FIXES) return { state: data, accepted: false };
+  // A card whose write or proof already used every attempt would only be marked needs-review ("write failed") without running.
+  const used = attemptsOf(data, nodeId);
+  if (used.write >= MAX_STEP_ATTEMPTS || used.proof >= MAX_STEP_ATTEMPTS) return { state: data, accepted: false };
   const next = clone(data);
   next.autoFixes = { ...(next.autoFixes ?? {}), [nodeId]: autoFixesOf(data, nodeId) + 1 };
   next.revisions[nodeId] = cardRevision(next, nodeId) + 1;

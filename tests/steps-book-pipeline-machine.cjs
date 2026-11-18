@@ -458,6 +458,11 @@ test('requestAutoFix: one redo per card, a revision rise, attempts kept, the use
   assert.equal(second.accepted, false);
   assert.equal(second.state, first.state);
   assert.equal(machine.requestAutoFix(first.state, 'b').accepted, true, 'another card has its own');
+  const spent = writing();
+  spent.attempts.a = { plan: 1, write: 3, proof: 1 };
+  assert.equal(machine.requestAutoFix(spent, 'a').accepted, false, 'a card with every write attempt used is refused');
+  spent.attempts.a = { plan: 1, write: 1, proof: 3 };
+  assert.equal(machine.requestAutoFix(spent, 'a').accepted, false, 'and one with every proof attempt used');
   assert.equal(machine.requestAutoFix(state, 'zzz').accepted, false);
   assert.equal(machine.requestAutoFix(machine.stopRun(state), 'a').accepted, false);
   assert.equal(machine.requestAutoFix(fresh(), 'a').accepted, false, 'planning phase');

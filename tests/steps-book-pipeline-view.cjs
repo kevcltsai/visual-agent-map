@@ -500,13 +500,13 @@ const rootPath = h => h.view.map.nodes.find(n => n.id === h.ids.root).path;
 const shown = el => { for (let n = el; n; n = n.parent) if (n.hidden || (n.tag === 'details' && !n.open)) return false; return true; };
 const field = (modal, label) => dom.findAll(modal.modalEl, i => i.tag === 'textarea').find(f => f.attrs['aria-label'] === label);
 
-test('start card: opens with the estimate (1+4N calls, about minutes), the six settings open (no <details>), the models on one line behind "Change"; nothing starts yet', async () => {
+test('start card: opens with the estimate (1+5N calls, about minutes), the six settings open (no <details>), the models on one line behind "Change"; nothing starts yet', async () => {
   const h = await harness({ book: false });
   const modal = await openCard(h);
   assert.ok(modal.isOpen);
   assert.equal(h.entries.length, 0, 'nothing starts before the owner presses Start');
   const all = texts(modal.modalEl);
-  assert.ok(all.includes('3 張卡 · 約 4 分鐘 · 約 13 次 AI 呼叫。'), all.join('|'));
+  assert.ok(all.includes('3 張卡 · 約 4 分鐘 · 最多 16 次 AI 呼叫。'), all.join('|'));
   assert.ok(all.includes('中間只會停兩次，讓你確認。'));
   assert.ok(all.includes('某一章不滿意，可以只重跑那一章。'));
   assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined, 'no collapsed block: the settings are always open');
@@ -541,7 +541,7 @@ test('start card: "Change" unfolds four dropdowns (plan, author, pictures, proof
   assert.equal(h.ctl.saves.length, 1);
   assert.ok(texts(modal.modalEl).includes('模型：企劃 M:claude:sonnet、寫作 M:claude:sonnet、找圖 M:claude:haiku、校對 M:claude:haiku'));
   const after = texts(modal.modalEl).find(x => x.startsWith('3 張卡'));
-  assert.match(before, /約 13 次/); assert.match(after, /約 13 次/);
+  assert.match(before, /最多 16 次/); assert.match(after, /最多 16 次/);
   assert.notEqual(before, after, 'the time follows the model');
   change.click();
   for (const select of selects) assert.equal(shown(select), false, 'folds again');
@@ -664,15 +664,15 @@ test('suggestions: the patch helper keeps typed text over a suggestion and ignor
   assert.equal(JSON.stringify(s.bookSettingsPatch({}, { reader: '' }, { reader: 'a\nb' })), JSON.stringify({ reader: 'a b' }));
 });
 
-test('start card: the estimate numbers (1+4N calls; the 135 s whole-book plan, then cards five at a time at the measured median) and the minutes wording', () => {
+test('start card: the estimate numbers (1+5N calls; the 135 s whole-book plan, then cards five at a time at the measured median) and the minutes wording', () => {
   const start = bundleStart;
-  assert.equal(JSON.stringify(start.bookStartEstimate(15)), JSON.stringify({ cards: 15, calls: 61, seconds: 135 + 3 * 88.5 }));
+  assert.equal(JSON.stringify(start.bookStartEstimate(15)), JSON.stringify({ cards: 15, calls: 76, seconds: 135 + 3 * 88.5 }));
   assert.equal(JSON.stringify(start.bookStartEstimate(0)), JSON.stringify({ cards: 0, calls: 1, seconds: 135 }));
   lang('zh-TW');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15)), '15 張卡 · 約 7 分鐘 · 約 61 次 AI 呼叫。');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(0)), '0 張卡 · 約 2 分鐘 · 約 1 次 AI 呼叫。');
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15)), '15 張卡 · 約 7 分鐘 · 最多 76 次 AI 呼叫。');
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(0)), '0 張卡 · 約 2 分鐘 · 最多 1 次 AI 呼叫。');
   lang('en');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15)), '15 cards · about 7 minutes · about 61 AI calls.');
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15)), '15 cards · about 7 minutes · up to 76 AI calls.');
   lang('zh-TW');
 });
 

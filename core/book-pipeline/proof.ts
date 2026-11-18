@@ -31,7 +31,7 @@ export interface ProofResult {
   /** `needs-review` when a fact item is unmet (a source contradicts the list); otherwise `checked`. Unmet structure items and unverified items are recorded, not blocking. */
   aggregate: "checked" | "needs-review";
   /**
-   * True when pages were opened but every fact item stayed "unverified": retrying cannot help, so the judged items are kept,
+   * True when pages were opened but every fact item stayed "unverified": retrying the proofread cannot help (the one automatic rewrite of the text still runs), so the judged items are kept,
    * the card is `needs-review` and its note says "facts unverified" (a call that opened no page is still a failure, `no_open_page`).
    */
   factsUnverified?: boolean;

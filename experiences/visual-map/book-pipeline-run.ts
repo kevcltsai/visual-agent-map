@@ -792,6 +792,15 @@ export class BookPipelineRuns {
         return { state: resumed ?? next, accepted: true };
       });
       if (refused) throw new BookPipelineRunError("budget");
+      // The fix instruction lived only in memory: a card still waiting for its one rewrite goes back to needs-review (its fix is spent).
+      for (const id of drive.store.state.order)
+        if (drive.stages.get(id) === "planned" && autoFixesOf(drive.store.state, id) > 0 && !drive.extra.has(id)) {
+          drive.stages.set(id, "needs-review");
+          await this.writeFields(drive, id, {
+            pipelineStage: "needs-review",
+            pipelineIssue: "proof unmet: fix interrupted"
+          });
+        }
       this.log(drive, "resume", "-", "plan", data.status === "running" ? "recovered" : "ok");
     });
   }
@@ -1486,6 +1495,10 @@ export class BookPipelineRuns {
       if (drive.stages.get(nodeId) !== "needs-review") continue;
       const done = await drive.store.commit(state => requestAutoFix(state, nodeId));
       if (!done?.accepted) continue;
+      // The rewrite may pick this card's own pictures again.
+      const own = drive.cards.get(nodeId);
+      const current = own ? await this.ports.readCard(own.path).catch(() => undefined) : undefined;
+      if (current) for (const url of bodyImageUrls(current.detail)) drive.usedImages.delete(imageKey(url));
       drive.extra.set(nodeId, instruction);
       drive.avoid.add(nodeId);
       drive.reasons.delete(nodeId);

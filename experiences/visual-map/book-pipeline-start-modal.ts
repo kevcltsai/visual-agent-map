@@ -49,7 +49,8 @@ export function bookStartEstimate(cards: number, models?: BookStartModels): Book
       CARD_TIME_SHARE.proof * speed("proof"));
   return {
     cards: n,
-    calls: 1 + 4 * n,
+    // An upper bound: the plan, then per chapter write, proofread, and up to two image searches (the second only when the first finds too little).
+    calls: 1 + 5 * n,
     seconds: BOOK_PLAN_SECONDS * speed("plan") + Math.ceil(n / BOOK_POOL) * perCard
   };
 }

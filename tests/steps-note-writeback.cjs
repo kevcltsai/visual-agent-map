@@ -396,12 +396,12 @@ test('fresh: the old log lines stay in front, the AI log lines go, one line name
     summary: 's', template: standard, language: 'zh-TW', now: NOW, backupPath: '筆記風格/備份/筆記/T 2026-11-03 090807.md'
   });
   assert.equal(fresh.ok, true);
-  assert.deepEqual(plain(logBody(fresh.detail)), ['2026-01-01　舊紀錄一', '2026-02-01　舊紀錄二', `${TODAY}　已用新研究取代，舊版備份在 筆記風格/備份/筆記/T 2026-11-03 090807.md`]);
+  assert.deepEqual(plain(logBody(fresh.detail)), ['2026-01-01　舊紀錄一', '2026-02-01　舊紀錄二', `${TODAY}　已重新寫入，舊版備份在 筆記風格/備份/筆記/T 2026-11-03 090807.md`]);
   assert.ok(!fresh.detail.includes('CANARY-舊判斷-4821'));
   assert.ok(!fresh.detail.includes('AI 自己寫的'));
   assert.deepEqual(plain(fresh.record.inserts), []);
   const en = W.composeWriteback({ mode: 'fresh', oldDetail: '### Update log\n\n2026-01-01　old', aiDetail: '### Core conclusions\n\nNew', summary: 's', template: W.standardTemplate('en'), language: 'en', now: NOW, backupPath: 'B/x.md' });
-  assert.deepEqual(plain(logBody(en.detail, 'Update log')), ['2026-01-01　old', `${TODAY}　Replaced with new research; the earlier version is backed up at B/x.md`]);
+  assert.deepEqual(plain(logBody(en.detail, 'Update log')), ['2026-01-01　old', `${TODAY}　Rewritten; the earlier version is backed up at B/x.md`]);
 });
 
 test('a structure with no log section gets an Update log section at the end in merge, top and fresh', () => {
@@ -415,7 +415,7 @@ test('a structure with no log section gets an Update log section at the end in m
   assert.equal(cutInserts(top), oldDetail);
   assert.ok(top.detail.endsWith(`${heading}\n\n${TODAY}　摘要 X`));
   const fresh = W.composeWriteback({ ...base, mode: 'fresh', aiDetail: section(names.core, '新') });
-  assert.ok(fresh.detail.endsWith(`${heading}\n\n${TODAY}　已用新研究取代，舊版備份在 B/x.md`));
+  assert.ok(fresh.detail.endsWith(`${heading}\n\n${TODAY}　已重新寫入，舊版備份在 B/x.md`));
   // The old note already has the log section: top and fresh add one line there, not a second section.
   const withLog = W.composeWriteback({ ...base, mode: 'top', oldDetail: `${oldDetail}\n\n${heading}\n\n2026-01-01　舊`, aiDetail: section(names.core, '新') });
   assert.equal(count(withLog.detail, heading), 1);
@@ -958,7 +958,7 @@ test('F1 log line marker: top, fresh and a merge supplement follow the old log l
   const dashed = `${section(names.core, '舊')}\n\n${section(names.log, '- 2026-01-01　舊一\n- 2026-02-01　舊二')}`;
   const base = { oldDetail: dashed, summary: '摘要', template: standard, language: 'zh-TW', now: NOW, backupPath: 'B/x.md' };
   assert.deepEqual(plain(logBody(W.composeWriteback({ ...base, mode: 'top', aiDetail: section(names.core, '新') }).detail)), ['- 2026-01-01　舊一', '- 2026-02-01　舊二', `- ${TODAY}　摘要`]);
-  assert.deepEqual(plain(logBody(W.composeWriteback({ ...base, mode: 'fresh', aiDetail: section(names.core, '新') }).detail)).slice(2), [`- ${TODAY}　已用新研究取代，舊版備份在 B/x.md`]);
+  assert.deepEqual(plain(logBody(W.composeWriteback({ ...base, mode: 'fresh', aiDetail: section(names.core, '新') }).detail)).slice(2), [`- ${TODAY}　已重新寫入，舊版備份在 B/x.md`]);
   assert.deepEqual(plain(logBody(W.composeWriteback({ ...base, mode: 'merge', aiDetail: `${section(names.core, '新')}\n\n${section(names.log, '- 2026-01-01　舊一\n- 2026-02-01　舊二')}` }).detail)), ['- 2026-01-01　舊一', '- 2026-02-01　舊二', `- ${TODAY}　摘要`]);
   // Plain old lines stay plain, and with no old line the line is written as the template does (no marker).
   const plainOld = `${section(names.core, '舊')}\n\n${section(names.log, '2026-01-01　舊一')}`;
@@ -1001,7 +1001,7 @@ test('T8 F1 merge: a footnote definition after the log is not a log line; the ne
 test('T8 F1 fresh: the old footnote definition is not copied into the new log; marker kept; the AI definition stays after the log', () => {
   const ai = `${section(names.core, '全新[^2]')}\n\n${section(names.log, '本次無新增內容。')}\n\n[^2]: 新來源`;
   const result = W.composeWriteback({ ...logDefBase, mode: 'fresh', aiDetail: ai });
-  assert.deepEqual(plain(logBody(result.detail).slice(0, 2)), ['- 2026-10-02　整理早期文獻回顧。', `- ${TODAY}　已用新研究取代，舊版備份在 B/x.md`]);
+  assert.deepEqual(plain(logBody(result.detail).slice(0, 2)), ['- 2026-10-02　整理早期文獻回顧。', `- ${TODAY}　已重新寫入，舊版備份在 B/x.md`]);
   assert.ok(!result.detail.includes('早期文獻回顧，2025'), 'old definition not copied');
   assert.ok(result.detail.trimEnd().endsWith('[^2]: 新來源'));
 });

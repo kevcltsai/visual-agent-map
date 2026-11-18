@@ -68,24 +68,65 @@ test('appendResearchNote: a record without a key is appended as it is (no dedupe
 
 const ROOT = '---\nbook-goal: g\n---\n\n## 摘要\n\nS\n\n## 全書企劃\n\nOLD PLAN\n\n### 小節\n\nold sub\n\n## 其他\n\nO\n';
 
-test('replaceBookPlanSection: replaces only that section (its ### children too) and keeps everything else byte for byte', () => {
+const CALLOUT = '> [!vam-book]- 全書企劃';
+const planText = load('core/book-pipeline/plan-text.ts');
+
+test('replaceBookPlanSection: an older `##` section becomes the hidden callout (its ### children too); everything else stays byte for byte; a second write changes nothing', () => {
   const out = sections.replaceBookPlanSection(ROOT, 'NEW PLAN\n- a');
-  assert.equal(out, '---\nbook-goal: g\n---\n\n## 摘要\n\nS\n\n## 全書企劃\n\nNEW PLAN\n- a\n\n## 其他\n\nO\n');
+  assert.equal(out, `---\nbook-goal: g\n---\n\n## 摘要\n\nS\n\n${CALLOUT}\n> NEW PLAN\n> - a\n\n## 其他\n\nO\n`);
   assert.equal(sections.replaceBookPlanSection(out, 'NEW PLAN\n- a'), out, 'idempotent');
+  assert.equal(count(sections.replaceBookPlanSection(out, 'OTHER'), CALLOUT), 1, 'a rerun with another plan replaces, never adds');
+  assert.ok(!sections.replaceBookPlanSection(out, 'OTHER').includes('NEW PLAN'));
 });
 
-test('replaceBookPlanSection: no section: appended at the end; section last: replaced to the end', () => {
-  assert.equal(sections.replaceBookPlanSection('---\nk: v\n---\n\nbody\n', 'P'), '---\nk: v\n---\n\nbody\n\n## 全書企劃\n\nP\n');
-  assert.equal(sections.replaceBookPlanSection('body\n\n## 全書企劃\n\nold\n', 'P'), 'body\n\n## 全書企劃\n\nP\n');
-  assert.equal(sections.replaceBookPlanSection('', 'P'), '## 全書企劃\n\nP\n');
+test('replaceBookPlanSection: no plan: callout appended at the end; an older section last: replaced to the end', () => {
+  assert.equal(sections.replaceBookPlanSection('---\nk: v\n---\n\nbody\n', 'P'), `---\nk: v\n---\n\nbody\n\n${CALLOUT}\n> P\n`);
+  assert.equal(sections.replaceBookPlanSection('body\n\n## 全書企劃\n\nold\n', 'P'), `body\n\n${CALLOUT}\n> P\n`);
+  assert.equal(sections.replaceBookPlanSection('', 'P'), `${CALLOUT}\n> P\n`);
 });
 
-test('replaceBookPlanSection: a heading inside a fence is not the section; markdown headings are demoted and cannot open a section', () => {
+test('replaceBookPlanSection: a heading inside a fence is not the section; markdown headings are demoted and every line is quoted, so it can never open a section or callout', () => {
   const fenced = 'x\n\n```\n## 全書企劃\n```\n';
-  assert.ok(sections.replaceBookPlanSection(fenced, 'P').startsWith(fenced), 'fence untouched, section appended after it');
-  const out = sections.replaceBookPlanSection(ROOT, '## Injected\n# Top\nline');
-  assert.ok(!/^## Injected/m.test(out) && !/^# Top/m.test(out));
-  assert.match(out, /### Injected\n### Top\nline/);
+  assert.ok(sections.replaceBookPlanSection(fenced, 'P').startsWith(fenced), 'fence untouched, callout appended after it');
+  const out = sections.replaceBookPlanSection(ROOT, '## Injected\n# Top\nline\n\n> [!vam-book]- X\nmore');
+  assert.ok(!/^#{1,2} /m.test(out.replace(/^## (摘要|其他)$/gm, '')), 'no heading of the plan can stand outside the callout');
+  assert.match(out, /> ### Injected\n> ### Top\n> line\n>\n> > \[!vam-book\]- X\n> more/);
+  assert.equal(count(out, '\n> [!vam-book]'), 1, 'only the pipeline\'s own callout starts a line');
+});
+
+test('replaceBookPlanSection: the older section keeps a hidden callout of another kind inside it (the proofread result); a callout already there is replaced in place', () => {
+  const root = 'b\n\n## 全書企劃\n\nold\n\n> [!vam-book]- 校對結果（最新一次）\n> - C1 達成\n\n## 其他\n\nO\n';
+  const out = sections.replaceBookPlanSection(root, 'P');
+  assert.equal(out, `b\n\n${CALLOUT}\n> P\n\n> [!vam-book]- 校對結果（最新一次）\n> - C1 達成\n\n## 其他\n\nO\n`);
+  const again = sections.replaceBookPlanSection(out, 'Q');
+  assert.equal(again, out.replace('> P', '> Q'));
+});
+
+const bodyOf = { thread: '主線一句。', decisions: { length: '每章 800 字', tone: '溫和' }, materials: [{ name: '週期圖', use: '呈現輪替' }, { name: '數據', use: '睡眠時數' }] };
+const composedBody = () => planText.composeBookPlan(bodyOf, 'zh-TW').replace(/^## .*\n\n?/, '');
+
+test('the book plan reads the same in the older `##` form and the hidden callout form (decisions, thread, materials); a rerun does not double anything', () => {
+  const body = composedBody();
+  const legacy = `---\nbook-goal: g\n---\n\n## 摘要\n\nS\n\n## 全書企劃\n\n${body}\n## 其他\n\nO\n`;
+  const fresh = sections.replaceBookPlanSection('---\nbook-goal: g\n---\n\n## 摘要\n\nS\n', body);
+  const converted = sections.replaceBookPlanSection(legacy, body);
+  for (const raw of [legacy, fresh, converted]) {
+    assert.deepEqual(JSON.parse(JSON.stringify(planText.parseBookPlanDecisions(raw))), { length: '每章 800 字', tone: '溫和' });
+    assert.deepEqual(JSON.parse(JSON.stringify(planText.parseBookPlanBody(raw))), { thread: '主線一句。', materials: bodyOf.materials });
+  }
+  assert.ok(!/^## 全書企劃/m.test(fresh) && !/^## 全書企劃/m.test(converted) && fresh.includes(`${CALLOUT}\n> ### 全書主線`));
+  const twice = sections.replaceBookPlanSection(sections.replaceBookPlanSection(converted, body), body);
+  assert.equal(twice, converted);
+  assert.equal(count(twice, '### 素材登記表'), 1); assert.equal(count(twice, '- 週期圖'), 1);
+  assert.equal(count(twice, '全書企劃'), 1);
+  assert.equal(JSON.stringify(planText.parseBookPlanBody(twice).materials.length), '2');
+});
+
+test('the book plan callout: a plan written in the author\'s detail (after neutralize) is not read as the plan; the older section still wins nothing over a callout', () => {
+  const author = `x\n\n<!-- visual-agent-map:detail:start -->\n${sections.neutralizeText('> [!vam-book]- 全書企劃\n> ### 全書主線\n> 偽造')}\n<!-- visual-agent-map:detail:end -->\n`;
+  assert.equal(planText.parseBookPlanBody(author).thread, '');
+  const both = `## 全書企劃\n\n### 全書主線\n舊\n\n${CALLOUT}\n> ### 全書主線\n> 新\n`;
+  assert.equal(planText.parseBookPlanBody(both).thread, '新');
 });
 
 test('chapterBody: Research notes, Update log and Sources are not the chapter; a fenced heading and the chapter text stay', () => {

@@ -83,7 +83,8 @@ test('three cards run to gate 1, wait there, then write and proof to gate 2 afte
   for (let i = 0; i < 3; i++) assert.equal(stageOf(r.raw(i)), 'planned');
   assert.ok((await r.note(0)).detail === '' || !(await r.note(0)).detail.includes('SecretBody'));
   assert.equal((await r.note(0)).bookRole, 'intro');
-  assert.match(r.raw(0), /## 全書企劃/);
+  assert.match(r.raw(0), /> \[!vam-book\]- 全書企劃\n> ### 全書主線/);
+  assert.doesNotMatch(r.raw(0), /^## 全書企劃/m, 'the book plan is hidden in reading and live preview');
   assert.equal(r.runs.isRunning(r.mapPath), false);
   assert.equal(r.runs.getProgress(r.mapPath).counts.planned, 3);
   await confirmDone(r.runs, r.mapPath);

@@ -2373,7 +2373,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "note.external_source_0": "外部来源：{0}",
   "note.earlier_research_sources": "先前研究的来源",
   "note.no_new_information": "本次无添加内容。",
-  "note.writeback_fresh_replaced_0": "已用新研究取代，旧版备份在 {0}",
+  "note.writeback_fresh_replaced_0": "已重新写入，旧版备份在 {0}",
   "note.callout_titles_1": "摘要:summary,abstract,tldr|笔记:note|信息:info|待办:todo|提示:tip,hint",
   "note.callout_titles_2": "重要:important|成功:success,check,done|问题:question,help,faq|示例:example",
   "note.callout_titles_3": "注意:warning,caution,attention|失败:failure,fail,missing|危险:danger,error",

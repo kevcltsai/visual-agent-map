@@ -173,3 +173,120 @@ test('neutralizeDetail: inside the Detail span every hidden-type title is a visi
   }
   assert.equal(sections.neutralizeDetail('> [!vam-book]- x\n> y'), null);
 });
+
+// T2b: the write-back's own "update log" line is hidden although it names the write-back's own backup (a different file from the pipeline's).
+const W = load('ai/note-writeback.ts');
+const T = load('ai/detail-templates.ts');
+const logSection = (heading, lines) => `### ${heading}\n\n${lines.join('\n')}`;
+const FOLDER = 'Agent Workspace/筆記風格/備份/筆記';
+const hiddenLog = detail => detail.split('\n').filter(line => /^> \d{4}-\d{2}-\d{2}/.test(line));
+const visibleLogLines = detail => detail.split('\n').filter(line => /^(?:> )?\d{4}-\d{2}-\d{2}/.test(line) && !line.startsWith('>'));
+
+// Notes are written in the note languages only (zh-TW, en); the language gate keeps it that way.
+for (const language of ['zh-TW', 'en']) {
+  test(`the pipeline's own write-back line is hidden for every card, whatever backup it names (${language}); a date line the author wrote stays visible`, () => {
+    const standard = T.standardTemplate(language);
+    const logName = standard.sections.find(item => item.role === 'log').name;
+    const pipelineBackup = `${FOLDER}/sleep-root 2026-11-18 172700.md`;
+    const writebackBackup = `${FOLDER}/sleep-root 2026-11-18 172754.md`;
+    const authorLine = '2026-05-01　作者自己寫的事件';
+    const composed = W.composeWriteback({ mode: 'fresh', oldDetail: '', aiDetail: `正文。\n\n${logSection(logName, [authorLine])}`, summary: 's', template: standard, language, now: new Date(2026, 10, 18, 17, 27, 54), backupPath: writebackBackup });
+    assert.equal(composed.ok, true);
+    // Fresh mode drops the author's own log lines; an author line next to the pipeline's one (another write, a hand edit) is added back here.
+    composed.detail = `${composed.detail}\n${authorLine}`;
+    const line = composed.detail.split('\n').find(row => row.includes(writebackBackup));
+    assert.ok(line, 'the write-back wrote one line naming its backup');
+    // The write-back's backup is not the pipeline's backup path: only folder + note name + time stamp match.
+    const out = sections.hidePipelineLog(composed.detail, new Set(), pipelineBackup);
+    assert.ok(!visibleLogLines(out).some(row => row.includes(writebackBackup)), 'the pipeline line is no longer visible');
+    assert.equal(hiddenLog(out).filter(row => row.includes(writebackBackup)).length, 1, 'it moved into the hidden callout once');
+    assert.ok(out.split('\n').some(row => row === `### ${logName}`), 'the author line keeps its own update log heading');
+    assert.ok(out.includes(authorLine) && !hiddenLog(out).some(row => row.includes(authorLine)), 'the date line the author wrote stays visible, not moved');
+    assert.equal(sections.hidePipelineLog(out, new Set(), pipelineBackup), out, 'the same text again changes nothing');
+    assert.equal(sections.workLogLines(out).filter(row => row.includes(writebackBackup)).length, 1);
+  });
+}
+
+test('hidePipelineLog: a lookalike line stays visible (another folder, another note name, extra text, no backup path); the wording no longer says "new research"', () => {
+  const standard = T.standardTemplate('zh-TW');
+  const logName = standard.sections.find(item => item.role === 'log').name;
+  const real = `${FOLDER}/sleep-root 2026-11-18 172754.md`;
+  const head = '2026-11-18　已重新寫入，舊版備份在 ';
+  const base = `${FOLDER}/sleep-root 2026-11-18 172700.md`;
+  for (const fake of [`${head}Other/folder/sleep-root 2026-11-18 172754.md`, `${head}${FOLDER}/another 2026-11-18 172754.md`, `${head}${real} 還有別的字`, `${head}${FOLDER}/sleep-root 2026-11-18 172754.txt`, '2026-11-18　作者寫的：已重新寫入，舊版備份在 x.md']) {
+    const out = sections.hidePipelineLog(`正文\n\n${logSection(logName, [fake])}`, new Set(), base);
+    assert.ok(out.includes(`\n${fake}`) && !out.includes('[!vam-book]'), fake);
+  }
+  assert.equal(sections.hidePipelineLog(`正文\n\n${logSection(logName, [`${head}${real}`])}`, new Set(), undefined).includes('[!vam-book]'), false, 'no backup path: nothing is hidden');
+  for (const language of ['zh-TW', 'zh-CN', 'en']) {
+    const text = W.composeWriteback({ mode: 'fresh', oldDetail: '', aiDetail: 'x', summary: 's', template: T.standardTemplate(language), language, now: new Date(2026, 10, 18), backupPath: 'B/x.md' }).detail;
+    assert.ok(!/新研究|new research|地圖/i.test(text), language);
+  }
+});
+
+test('a card of the book flow: the earlier hidden log line is kept and a second rewrite does not double it', () => {
+  const standard = T.standardTemplate('zh-TW');
+  const logName = standard.sections.find(item => item.role === 'log').name;
+  const first = sections.hidePipelineLog(`正文\n\n${logSection(logName, [`2026-11-18　已重新寫入，舊版備份在 ${FOLDER}/c 2026-11-18 100000.md`])}`, new Set(), `${FOLDER}/c 2026-11-18 095900.md`);
+  const known = new Set(sections.workLogLines(first));
+  assert.equal(known.size, 1);
+  // The run's own order: the rewritten text (only its own log section), the earlier hidden lines carried back.
+  const second = sections.carryWorkLog(first, sections.hidePipelineLog(`正文二\n\n${logSection(logName, [`2026-11-19　已重新寫入，舊版備份在 ${FOLDER}/c 2026-11-19 100000.md`])}`, known, `${FOLDER}/c 2026-11-19 095900.md`));
+  assert.equal(sections.workLogLines(second).length, 2);
+  assert.equal(second.split('[!vam-book]').length - 1, 1, 'one hidden callout, nothing doubled');
+  assert.ok(!/^### /m.test(second.split('\n').filter(row => /更新紀錄/.test(row)).join('\n')), 'no visible update log section is left');
+});
+
+test('the smoke-vault shape: the write-back log section is followed directly by the pipeline\'s hidden callout; the line moves in, the heading goes, the callout and its records stay once', () => {
+  const backup = `${FOLDER}/sleep-root 2026-11-18 172754.md`;
+  const detail = `正文。\n\n### 來源\n\n- a\n\n### 更新紀錄\n\n2026-11-18　已重新寫入，舊版備份在 ${backup}\n\n> [!vam-book]- 研究備註\n> - C1 達成\n`;
+  const out = sections.hidePipelineLog(detail, new Set(), `${FOLDER}/sleep-root 2026-11-18 172700.md`);
+  assert.ok(!out.includes('### 更新紀錄'), 'no visible heading');
+  assert.equal(out.split('\n').filter(line => line.includes('已重新寫入')).every(line => line.startsWith('> ')), true);
+  assert.equal(count(out, '> [!vam-book]-'), 1); assert.equal(count(out, '> - C1 達成'), 1);
+  assert.equal(JSON.stringify(sections.workLogLines(out)), JSON.stringify([`2026-11-18　已重新寫入，舊版備份在 ${backup}`]));
+  assert.equal(sections.hidePipelineLog(out, new Set(), `${FOLDER}/sleep-root 2026-11-18 172700.md`), out, 'again: nothing changes');
+  // The older card (the previous wording, nothing known): the first write turns the whole log section into the hidden form, callout kept.
+  const old = detail.replace('已重新寫入', '已用新研究取代');
+  const moved = sections.normalizeWorkRecords(old);
+  assert.ok(!moved.includes('### 更新紀錄') && count(moved, '> [!vam-book]-') === 1 && count(moved, '已用新研究取代') === 1);
+});
+
+// T2b UI fail: two "rerun this card" presses piled up log lines and left a visible `[!note]- 研究備註` copy of the records (escaped record comments).
+// The fixture is the card as the UI tester saw it after one rerun; the run's own steps are replayed offline for two more reruns.
+const fs = require('node:fs');
+const path = require('node:path');
+const AFTER1 = fs.readFileSync(path.join(__dirname, 'fixtures', 'book-sleep-cycle-after-rerun1.md'), 'utf8');
+const rerunOnce = (detail, stamp) => {
+  // What the author returns: the card's own text as the model saw it (hidden callouts turned into `[!note]` by neutralize), the write-back's log line added.
+  const earlier = sections.normalizeWorkRecords(detail);
+  const authored = earlier.replace(/\[!vam-book\]/g, '[!note]').replace(/<!-- (book-(?:slots|proof):v1)/g, '&lt;!-- $1');
+  const logLine = `2026-11-18　已重新寫入，舊版備份在 ${FOLDER}/sleep-cycle 2026-11-18 ${stamp}.md`;
+  const written = `${authored.replace(/\s+$/, '')}\n\n### 更新紀錄\n\n${sections.workLogLines(earlier).join('\n')}\n${logLine}\n`;
+  const hidden = sections.hidePipelineLog(written, new Set(sections.workLogLines(earlier)), `${FOLDER}/sleep-cycle 2026-11-18 ${stamp.replace(/\d$/, '0')}.md`);
+  let carried = sections.carryWorkLog(earlier, hidden);
+  for (const record of sections.extractProofRecords(earlier).slice(-1)) carried = sections.appendResearchNote(carried, record).text;
+  return carried;
+};
+
+test('rerun of the UI tester\'s card (fixture after one rerun): the log gains one line per rerun, no visible record callout or escaped record text is left, records are not doubled', () => {
+  const detail = sections.detailBlockOf(AFTER1);
+  assert.ok(detail.includes('> [!note]- 研究備註') && detail.includes('&lt;!-- book-slots'), 'the fixture holds the visible junk');
+  const first = rerunOnce(detail, '174001');
+  const second = rerunOnce(first, '174102');
+  for (const out of [first, second]) {
+    assert.ok(!out.includes('[!note]- 研究備註') && !out.includes('&lt;!--'), 'no visible copy of the records');
+    assert.ok(!/^### 更新紀錄/m.test(out), 'no visible update log section');
+    assert.equal(count(out, '> [!vam-book]- 研究備註'), 1);
+    assert.equal(count(out, '<!-- book-proof:v1'), 1);
+    assert.ok(count(out, '<!-- book-slots:v1') <= 1, 'the slots record is written again by the picture step, never doubled');
+  }
+  const lines = sections.workLogLines(first);
+  assert.equal(lines.length, 3, 'two lines of the card before (one real, one the junk section\'s) are kept once, plus one new line');
+  assert.equal(sections.workLogLines(second).length, lines.length + 1, 'one more line per rerun, no more');
+  assert.equal(new Set(sections.workLogLines(second)).size, sections.workLogLines(second).length, 'no line twice');
+  assert.equal(sections.chapterBody(second), sections.chapterBody(detail), 'the chapter text is untouched');
+  // An author callout that merely has a similar title stays.
+  const keep = sections.hidePipelineLog('正文\n\n> [!note]- 研究備註\n> 我自己的筆記\n', new Set(), undefined);
+  assert.ok(keep.includes('> [!note]- 研究備註\n> 我自己的筆記'));
+});

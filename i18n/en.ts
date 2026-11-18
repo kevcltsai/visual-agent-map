@@ -2541,7 +2541,7 @@ export const en = {
   "note.external_source_0": "External source: {0}",
   "note.earlier_research_sources": "Sources from earlier research",
   "note.no_new_information": "No new information in this task.",
-  "note.writeback_fresh_replaced_0": "Replaced with new research; the earlier version is backed up at {0}",
+  "note.writeback_fresh_replaced_0": "Rewritten; the earlier version is backed up at {0}",
   "note.callout_titles_1": "none",
   "note.callout_titles_2": "none",
   "note.callout_titles_3": "none",

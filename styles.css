@@ -2319,6 +2319,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-panel-row { min-width: 0; overflow-wrap: anywhere; }
 .vam-book-panel-row button:focus-visible, .vam-book-panel-row:focus-visible, .vam-book-panel-finish:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-book-panel-proof { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; padding: 6px 8px; border-left: 2px solid var(--background-modifier-border); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; white-space: pre-wrap; }
+.vam-book-panel-proof[hidden] { display: none; }
 .vam-book-panel-proof-items { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .vam-book-panel-proof-item { overflow-wrap: anywhere; }
 .vam-book-panel-proof-item.is-unmet { color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }

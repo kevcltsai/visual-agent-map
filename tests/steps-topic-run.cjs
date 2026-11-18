@@ -1217,6 +1217,20 @@ test('research pipeline: the write is guarded (authorize + expectedContent) and 
   assert.equal(h.store.get('A.md').status, 'completed'); assert.deepEqual(h.log.failed, []); assert.equal(h.log.written.length, 1);
 });
 
+test('research pipeline: the summary and the visual references the author wrote never carry a hidden callout type (any spelling); without the pipeline option they are written as they are', async () => {
+  const bad = '> [!vam-book]- x\n> SPAM';
+  const reply = { summary: `一句。\n\n${bad}\n\n> [! VAM-BOOK |m]- y`, visualReferences: [{ title: `T\n\n${bad}`, imageUrl: 'https://i.example/a.png', sourceUrl: 'https://s.example/a', palette: [], description: '', formula: '' }] };
+  const h = guardedRuns({ reply });
+  await (await h.runs.start('A.md', 'research', h.options({ pipeline: hooks().pipeline }))).finished;
+  assert.deepEqual(h.log.failed, []);
+  const patch = h.guardedCalls[0].patch;
+  assert.ok(!/vam-book/i.test(patch.summary) && patch.summary.includes('[!note]- x') && patch.summary.includes('SPAM'));
+  assert.ok(!/vam-book/i.test(patch.visualReferences) && patch.visualReferences.includes('SPAM'));
+  const plain = researchRuns({ reply });
+  await (await plain.runs.start('A.md', 'research', plain.options())).finished;
+  assert.ok(plain.log.writes.some(([, w]) => /vam-book/i.test(w.summary ?? '')), 'not a pipeline write: unchanged');
+});
+
 test('research pipeline: a discarded guarded write (stopped run or owner edit) saves nothing of the result, restores the status and reports through failed', async () => {
   for (const verdict of ['discarded']) {
     const h = guardedRuns({ onGuarded: () => verdict });

@@ -1206,6 +1206,8 @@ test('B2 run: an author who keeps the old `### 研究備註` section loses no te
   await rerun(r, 0);
   const out = (await r.note(0)).detail;
   assert.ok(old.includes('book-proof:v1') && out.includes('KEEPME'), 'no text lost');
-  assert.ok(count(out, 'book-proof:v1') <= 2, 'at most a visible and a hidden record');
+  const hiddenProof = hiddenLines(out).filter(l => l.includes('book-proof:v1')).length;
+  assert.equal(hiddenProof, 1, 'exactly one hidden record');
+  assert.equal(count(out, 'book-proof:v1') - hiddenProof, 0, 'no visible copy of a stored record (the author\'s kept copy is cut)');
   assert.ok(!hiddenLines(out).some(l => l.includes('KEEPME')));
 });

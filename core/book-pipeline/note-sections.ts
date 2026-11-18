@@ -109,6 +109,9 @@ function hiddenRanges(lines: string[], fenced: boolean[]): { start: number; end:
 /** The hidden callout type as Obsidian may read it: spaces inside the brackets, a `|metadata` tail. */
 const HIDDEN_TYPE = /\[!\s*vam-book\s*(?:\|[^\]]*)?\]/gi;
 
+/** Author-controlled text outside the Detail span (the summary, the visual references): the same plain replace over the whole text. */
+export const neutralizeText = (text: string): string => text.replace(HIDDEN_TYPE, "[!note]");
+
 /**
  * Everything the author wrote is model text: in the span from the first Detail start marker to the last Detail end marker (a marker the
  * author forges inside the text only widens the span) every `[!vam-book]` (any case, quote depth, indent, inside a fence too) becomes a

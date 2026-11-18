@@ -38,6 +38,7 @@ import type { MapDocument, MapNode } from "../../map-model";
 import type { ModelChoice } from "../../ai/model-resolution";
 import type { AgentTaskHandle, RunOnceModel, SynthesisObserver, TaskOptions } from "./modals";
 import { withThinkingOrigin } from "./thinking-origin";
+import { neutralizeText } from "../../core/book-pipeline/note-sections";
 import { formatIssuesPatch, originBaseline, summaryForPrompt } from "./note-write-helpers";
 
 /** Chart steps that may run at once; further jobs wait in a first-in-first-out queue. */
@@ -1532,10 +1533,12 @@ export class TopicRuns {
             fail(composed.message);
             return;
           }
+          // The pipeline's author text never makes a hidden callout, in any field it writes (the Detail is cleaned in `finalize`).
+          const authored = (text: string): string => (options.pipeline ? neutralizeText(text) : text);
           const patch: NotePatch = {
-            summary: result.summary,
+            summary: authored(result.summary),
             detail: composed.detail,
-            visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
+            visualReferences: authored(visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language))),
             newFindings: "",
             status: "completed",
             // The topic remembers the mode of its latest research (Quick is stored as local).

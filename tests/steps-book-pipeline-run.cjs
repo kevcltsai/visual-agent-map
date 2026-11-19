@@ -2391,6 +2391,23 @@ test('a card deleted before its author commits: the result is dropped, the attem
   assert.equal(s.attempts[victim].write, 0);
 });
 
+test('review-b S2: an author write already in flight to a card removed from the map does not land (the removed note keeps its text)', async () => {
+  const r = await rig({ titles: FOUR });
+  await r.runs.start(r.mapPath);
+  const victim = r.nodes[2].id;
+  const base = r.script.author;
+  let before;
+  r.script.author = async (input, n) => {
+    if (input.nodeId === victim) { before = r.raw(2); await dropCard(r, 2); await r.runs.mapModified(r.mapPath); }
+    return base(input, n);
+  };
+  await r.runs.confirmGate1(r.mapPath); await finished(r);
+  assert.ok(before !== undefined, 'the victim was in flight');
+  assert.equal(r.raw(2), before, 'the removed note is exactly as it was');
+  const s = await r.state();
+  assert.equal(s.pauseReason, 'map'); sameJson(s.changed.missing, [victim]);
+});
+
 test('neighbours: the previous and next chapter skip a removed one; its seam is never marked; its callouts and queued rewrite are cleaned', async () => {
   const cleared = [];
   const r = await rig({ titles: FOUR, ports: { callouts: { reconcile: async () => undefined, clear: async () => true, clearNotes: async (path, runId, cards) => { cleared.push(...cards.map(c => c.id)); return true; } } } });

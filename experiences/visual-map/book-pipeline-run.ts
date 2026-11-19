@@ -423,6 +423,8 @@ interface Drive {
   config: BookRunConfig;
   rootId: string;
   cards: Map<string, CardInfo>;
+  /** The map's card ids as the last map-modify event saw them; undefined until the first event (then the card is taken as present). A write checks it synchronously. */
+  members?: Set<string>;
   /** Each card's parent on the map (as loaded): a chapter's child cards are the cards of the order whose parent it is. */
   parents: Map<string, string | null>;
   /** Cards that already had a `book-role` when loaded (the owner's choice; the global plan does not overwrite it), and the missing ones with their default. */
@@ -1922,8 +1924,23 @@ export class BookPipelineRuns {
       return { kind: "cancelled" };
     return { kind: "failed", reason: reasonOf(error) };
   }
-  private authorize(drive: Drive, token: StepToken): () => boolean {
-    return () => !this.dead(drive) && !drive.controller.signal.aborted && isCurrent(drive.store.state, token);
+  private authorize(drive: Drive, token: StepToken, nodeId?: string): () => boolean {
+    return () =>
+      !this.dead(drive) &&
+      !drive.controller.signal.aborted &&
+      isCurrent(drive.store.state, token) &&
+      // A card the reader removed from the map is not written, even by a call already in flight (plan §14-3).
+      !(nodeId !== undefined && drive.members !== undefined && !drive.members.has(nodeId));
+  }
+  /**
+   * The map file changed (the plugin's modify event): the drive of that map learns the card ids now, so a write already in flight to a
+   * card that just left the map is refused synchronously at its commit. No drive: nothing to do.
+   */
+  async mapModified(mapPath: string): Promise<void> {
+    const drive = this.drives.get(mapPath);
+    if (!drive || this.dead(drive)) return;
+    const map = await this.ports.readMap(mapPath).catch(() => undefined);
+    if (map && !this.dead(drive)) drive.members = new Set(map.nodes.map(node => node.id));
   }
   private base(drive: Drive, model: string): BookStepBase {
     return { language: drive.config.language, model, reasoning: drive.config.reasoning, usageMapPath: drive.mapPath };
@@ -2217,7 +2234,7 @@ export class BookPipelineRuns {
     const written = await this.ports.updateNoteGuarded(
       path,
       { prompt, summary: result.covers },
-      { expectedContent: card.raw, authorize: this.authorize(drive, token) }
+      { expectedContent: card.raw, authorize: this.authorize(drive, token, nodeId) }
     );
     if (written === "discarded") return { kind: "failed", reason: "discarded" };
     drive.plans.set(nodeId, result);
@@ -2273,7 +2290,7 @@ export class BookPipelineRuns {
     }
     if (!(await this.ensureBackup(drive, nodeId, info.path, card.raw)))
       return { kind: "failed", reason: "backup_failed", forceReview: true };
-    const authorize = this.authorize(drive, token);
+    const authorize = this.authorize(drive, token, nodeId);
     let changedByHand = false;
     const authorizeWrite = (current?: string): boolean => {
       if (!authorize()) return false;

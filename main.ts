@@ -762,8 +762,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.registerEvent(this.app.workspace.on("editor-change", () => notes.paint()));
     this.registerEvent(
       this.app.vault.on("modify", file => {
-        if (file instanceof TFile && this.isMap(file)) this.refreshBookNotesSoon();
-        else notes.paint();
+        if (file instanceof TFile && this.isMap(file)) {
+          this.refreshBookNotesSoon();
+          void this.bookPipelineRuns.mapModified(file.path);
+        } else notes.paint();
       })
     );
     this.app.workspace.onLayoutReady(() => this.refreshBookNotesSoon());

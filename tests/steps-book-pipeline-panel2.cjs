@@ -245,10 +245,12 @@ async function viewRig({ book = true, phase = 'gate2' } = {}) {
   return { view, plugin, log, calls, progress, menu, prog, mount: () => { const workspace = dom.element('div'); view.mountBookPanel(workspace); return workspace; } };
 }
 
-test('right-click: the rerun item and its disabled sub line show at gate 1, gate 2 and done; busy or active disables; clicking calls rerunBookCard and rereads the card', async () => {
+test('right-click: the rerun item and its disabled sub line show at gate 2 and done (not at gate 1, where a trial retry replaces it); busy or active disables; clicking calls rerunBookCard and rereads the card', async () => {
   const h = await viewRig();
   const node = h.view.map.nodes[1];
-  for (const phase of ['gate1', 'gate2', 'done']) {
+  h.progress(h.prog('gate1'));
+  assert.ok(h.menu(node).every(i => i.title !== '重跑圖文書這一張'), 'no rerun item at gate 1');
+  for (const phase of ['gate2', 'done']) {
     h.progress(h.prog(phase));
     const items = h.menu(node);
     const at = items.findIndex(i => i.title === '重跑圖文書這一張');

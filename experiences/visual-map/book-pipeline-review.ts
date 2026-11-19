@@ -4,13 +4,14 @@ import { describeSlots, latestSlotsRecord } from "../../core/book-pipeline/image
 import {
   chapterBody,
   fencedLines,
+  latestStoredProof,
   programCalloutRanges,
   type ProgramCallout,
   type StoredProofView
 } from "../../core/book-pipeline/note-sections";
 import { parseImageSlots } from "../../core/book-pipeline/plan-text";
 import { escapeMarkdownText, hashText, unescapeMarkdownText } from "../../core/book-pipeline/text";
-import { bookIssueText } from "./book-pipeline-ui";
+import { bookCardView, bookIssueText } from "./book-pipeline-ui";
 import { bodyImageUrls } from "./book-pipeline-run";
 
 export { countNotes, projectProofBody, wrapNote } from "../../core/book-pipeline/book-notes";
@@ -92,6 +93,68 @@ export function galleryBare(role: string | undefined, note: GalleryNote | undefi
     states.some(slot => slot.state === "missing") &&
     !states.some(slot => slot.state === "placed" || slot.state === "edited")
   );
+}
+
+/** The note fields `gate2Cards` reads (a card note as the view holds it). */
+export interface Gate2NoteInput {
+  prompt?: string;
+  detail?: string;
+  pipelineStage?: unknown;
+  pipelineIssue?: unknown;
+  pipelineSeam?: unknown;
+  bookRole?: unknown;
+}
+
+/** The chapters of the run in reading order as `Gate2Card`s, from their notes (what the gate 2 panel used to build). */
+export function gate2Cards(input: {
+  order: readonly string[];
+  titleOf: (id: string) => string;
+  noteOf: (id: string) => Gate2NoteInput | undefined;
+}): Gate2Card[] {
+  return input.order.map((id, at): Gate2Card => {
+    const note = input.noteOf(id);
+    const view = bookCardView(note ?? {});
+    const issue = typeof note?.pipelineIssue === "string" ? note.pipelineIssue : "";
+    const checked = view.stage === "checked";
+    const proof = checked || view.stage === "needs-review" ? latestStoredProof(note?.detail ?? "") : undefined;
+    const structure = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue.trim());
+    const role = typeof note?.bookRole === "string" ? note.bookRole : undefined;
+    return {
+      id,
+      index: at + 1,
+      title: input.titleOf(id),
+      stage: view.stage,
+      ...(role ? { role } : {}),
+      ...(view.stage === "needs-review" && issue ? { failureText: reasonOf(issue, proof) } : {}),
+      structureUnmet:
+        checked && structure ? structure[1].split(" ").filter(token => !token.startsWith("image_")).length : 0,
+      factsOpen: checked
+        ? (proof?.items ?? []).filter(item => item.type === "fact" && item.status !== "met").length
+        : 0,
+      galleryBare: checked && galleryBare(role, note),
+      seam: view.seam
+    };
+  });
+}
+
+/** What the view remembers about card reruns (memory only; dies with the view). */
+export class BookReviewMemory {
+  /** Cards whose latest rerun gave the same result and still need a person. */
+  readonly unchanged = new Set<string>();
+}
+
+/**
+ * Runs one card's rerun and keeps the "same result, still needs a person" mark honest: the old mark goes before the run starts and
+ * comes back only when this run left the result the same. The card's rerun button and its right-click menu both use it.
+ */
+export async function runTrackedRerun(
+  memory: BookReviewMemory,
+  nodeId: string,
+  rerun: () => Promise<{ unchanged: boolean } | void>
+): Promise<void> {
+  memory.unchanged.delete(nodeId);
+  const result = await rerun();
+  if (result && result.unchanged) memory.unchanged.add(nodeId);
 }
 
 /** What makes a chapter's attention "the same one": a new stage, issue, proof or neighbour change is a new need, so an earlier tick no longer counts. */

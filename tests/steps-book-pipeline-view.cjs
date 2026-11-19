@@ -20,7 +20,6 @@ export * from "./experiences/visual-map/book-pipeline-ui";
 export { bookStartEstimate, bookStartEstimateText, bookSettingsPatch, BookStartModal, BOOK_SUGGEST_TIMEOUT_MS } from "./experiences/visual-map/book-pipeline-start-modal";
 export { BookPipelineRunError, stepCounts } from "./experiences/visual-map/book-pipeline-run";
 export { readBookPipeline } from "./core/book-pipeline/model";
-export { BookFinishModal, finishAskLine } from "./experiences/visual-map/book-pipeline-finish-modal";
 export { VisualAgentMapView } from "./experiences/visual-map/view";
 export { setUiLanguage, t } from "./i18n";
 `, { obsidian: { ...support.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice(notices), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, Option: OptionStub, window: { setTimeout: (fn, ms) => (ms === 20000 && timers.hold ? (timers.held.push(fn), 99) : setTimeout(fn, ms)), clearTimeout, setInterval, clearInterval } });
@@ -60,10 +59,10 @@ test('bar: running writing phase shows the phase, one plain sentence with the pr
   assert.equal(d.bar.attrs.role, 'group');
   assert.ok(texts(d.bar).includes('圖文書：寫作、找圖與校對中'));
   assert.equal(dom.findAll(d.bar, i => i.tag === 'li').length, 0, 'no five-stage list');
-  assert.equal(dom.find(d.bar, i => i.cls.includes('vam-book-now-text')).text, '正在寫第 1／4 章，已完成 2／4 章');
+  assert.equal(dom.find(d.bar, i => i.cls.includes('vam-book-now-text')).text, '正在寫第 1／4 章');
   const t = track(d.bar);
   assert.deepEqual([t.attrs['aria-valuemin'], t.attrs['aria-valuemax'], t.attrs['aria-valuenow']], ['0', '4', '1']);
-  assert.equal(t.attrs['aria-valuetext'], '正在寫第 1／4 章，已完成 2／4 章');
+  assert.equal(t.attrs['aria-valuetext'], '正在寫第 1／4 章');
   assert.deepEqual(buttonsOf(d.bar).map(b => b.text), ['停止']);
   assert.equal(dom.findAll(t, i => i.cls.includes('vam-book-seg')).length, 4);
   buttonsOf(d.bar)[0].click();
@@ -615,7 +614,6 @@ test('suggestions: one call on the picture model\'s entry with only the root tit
   assert.ok(!texts(modal.modalEl).includes('正在依這張心智圖的主題想建議⋯⋯'), 'the waiting line is gone');
   // The grey italic look is real CSS on the placeholder (computed look: checked live).
   assert.match(css, /\.vam-book-start-field\.vam-book-start-suggested::placeholder \{[^}]*font-style: italic[^}]*color: var\(--text-muted\)/);
-  assert.match(css, /\.vam-book-start-model-choice\[hidden\] \{ display: none; \}/);
   modal.close();
 });
 
@@ -794,7 +792,7 @@ test('bar: the sentence names the chapter being written out of the total (never 
   const parent = dom.element('div');
   ui.renderBookBar(parent, ui.bookBarState(bookData({ order }), prog, noStage), calls().actions);
   const now = dom.find(parent, i => i.cls.includes('vam-book-now-text'));
-  assert.equal(now.text, '正在寫第 3／5 章，已完成 1／5 章');
+  assert.equal(now.text, '正在寫第 3／5 章');
   const withCurrent = (current, over = {}) => ui.bookBarState(bookData({ phase: 'planning', globalPlanned: false, ...over }), progress({ phase: 'planning', current }), noStage);
   const s = withCurrent([{ nodeId: 'a', step: 'plan', startedAt: 1 }, { nodeId: 'global', step: 'plan', startedAt: 1 }]);
   assert.equal(s.current.step, 'global');
@@ -865,26 +863,6 @@ test('view: a card the runner is finding pictures for shows "找圖中" from the
   assert.match(main_ts, /progressed: mapPath =>[\s\S]*?refreshBookProgress\(\)/);
 });
 
-test('panel: outside the gates the side column draws no "nothing to see" line and a panel left open folds itself away', async () => {
-  const h = await harness({ book: true });
-  h.plugin.getBookPipelineProgress = () => progress({ phase: 'writing' });
-  assert.doesNotMatch(view_ts, /book_panel_not_gate2/);
-  h.view.bookSideEl = dom.element('div');
-  h.view.paintBookPanel();
-  assert.equal(h.view.bookSideEl.children.length, 0);
-  assert.equal(h.view.bookPanelHasContent(), false);
-  h.plugin.getBookPipelineProgress = () => progress({ phase: 'gate1', active: false });
-  assert.equal(h.view.bookPanelHasContent(), true);
-  h.plugin.getBookPipelineProgress = () => progress({ phase: 'writing' });
-  let closed = 0;
-  h.view.closeBookPanel = () => { closed++; h.view.bookPanel.open = false; };
-  h.view.bookPanel.open = true;
-  h.view.chatPaneWidths = () => null;
-  h.view.mountBookPanel(dom.element('div'));
-  await Promise.resolve();
-  assert.equal(closed, 1);
-});
-
 test('bar: 31 cards with 5 needing a look at gate 2 or done: the bar draws no running sentence and no stage list; the runner step counts keep their rule (S1)', () => {
   lang('zh-TW');
   const counts = { pending: 0, planned: 0, written: 0, checked: 26, 'needs-review': 5 };
@@ -946,7 +924,7 @@ test('start card: several root topics are refused before the card opens (M2); a 
 });
 
 // ---- T5: the rerun line of the bar, the card chip, the finish question ----
-test('T3 bar: a single-card rerun draws no rerun line (no title, no clock, no three steps): no stage list either, just the stop button and the one-line rerun hint', () => {
+test('T3 bar: a single-card rerun draws no rerun line (no title, no clock, no three steps): no stage list either, just the stop button (the one-line rerun hint went with the panel, owner OK 7-5)', () => {
   lang('zh-TW');
   const order = ['a', 'b', 'c'];
   const prog = progress({ phase: 'gate2', total: 3, current: [{ nodeId: 'b', step: 'write', startedAt: 5 }], rerun: { nodeId: 'b', startedAt: 777 } });
@@ -958,14 +936,10 @@ test('T3 bar: a single-card rerun draws no rerun line (no title, no clock, no th
   assert.equal(dom.find(parent, i => i.classes.includes('vam-book-rerun')), undefined, 'no rerun row');
   assert.ok(!texts(parent).some(x => /正在重跑|重跑中|\d:\d\d/.test(x)), JSON.stringify(texts(parent)));
   assert.equal(dom.findAll(parent, i => i.tag === 'li').length, 0, 'no stage list');
-  assert.ok(texts(parent).includes('某一章不滿意？可以只重跑那一章，不用整本重來。'));
+  assert.ok(!texts(parent).includes('某一章不滿意？可以只重跑那一章，不用整本重來。'), 'the rerun hint is gone');
   assert.deepEqual(buttonsOf(parent).map(b => b.text), ['停止']);
   buttonsOf(parent)[0].click();
   assert.deepEqual(c.log, ['stop']);
-  // The hint is for the two phases whose cards carry the button.
-  const writing = dom.element('div');
-  ui.renderBookBar(writing, ui.bookBarState(bookData({ order, phase: 'writing' }), progress({ phase: 'writing', total: 3, active: true }), noStage), c.actions);
-  assert.ok(!texts(writing).includes('某一章不滿意？可以只重跑那一章，不用整本重來。'));
 });
 
 test('T3 card chip: a card being rerun says 處理中 with no clock and keeps the step in the tooltip; a plain working card still has its clock', () => {
@@ -981,42 +955,18 @@ test('T3 card chip: a card being rerun says 處理中 with no clock and keeps th
   assert.equal(ticked, 0, 'no clock is started for a rerun');
 });
 
-test('T5 finish question: count and card names as text, "回去處理" has the keyboard, Escape and the X count as going back, "仍要完成" finishes, one answer only', () => {
-  lang('zh-TW');
-  assert.equal(bundle.finishAskLine({ count: 1, titles: ['2 為什麼需要睡覺'] }), '1 張需人看（2 為什麼需要睡覺）。');
-  assert.equal(bundle.finishAskLine({ count: 3, titles: [] }), '3 張需人看。');
-  const answers = [];
-  const open = info => { const m = new bundle.BookFinishModal({}, info, v => answers.push(v)); m.open(); return m; };
-  const modal = open({ count: 3, titles: ['<b>x</b>'] });
-  assert.equal(modal.titleEl.text, '還有 3 件沒處理');
-  assert.deepEqual(buttonsOf(modal.modalEl).map(b => b.text), ['回去處理', '仍要完成']);
-  assert.equal(dom.find(modal.modalEl, i => i.cls.includes('vam-book-finish-line')).children.length, 0);
-  assert.equal(dom.focusedNow().text, '回去處理');
-  buttonsOf(modal.modalEl)[1].click();
-  assert.deepEqual(answers, [true]);
-  const back = open({ count: 1, titles: [] });
-  buttonsOf(back.modalEl)[0].click();
-  const esc = open({ count: 1, titles: [] });
-  esc.close();
-  esc.close();
-  assert.deepEqual(answers, [true, false, false], 'one answer per question');
-  assert.equal(esc.focusTimer, null, 'the focus timer is cleared on close');
-});
-
 test('T5 view wiring: "global" is never a card; the menu note is not a disabled grey line', () => {
   assert.doesNotMatch(view_ts, /trackRerunClock|book_rerun_elapsed/);
   assert.match(view_ts, /item\.nodeId === nodeId && item\.nodeId !== "global"/);
-  assert.match(view_ts, /new BookFinishModal\(this\.app, info, resolve\)/);
   assert.ok(!/item\.setTitle\(t\("ui\.book_card_menu_rerun_sub"\)\)\.setDisabled\(true\)/.test(view_ts));
   assert.doesNotMatch(css, /vam-book-rerun-clock/);
   assert.match(css, /\.vam-book-menu-note \{[^}]*pointer-events: none/);
 });
 
-test('fix1: the start and finish cards work on a Modal whose isOpen is a writable base property (no subclass getter shadows it)', () => {
+test('fix1: the start card works on a Modal whose isOpen is a writable base property (no subclass getter shadows it)', () => {
   const { loadSource: load } = require('./support-replay.cjs');
   const b = load(`
 export { BookStartModal } from "./experiences/visual-map/book-pipeline-start-modal";
-export { BookFinishModal } from "./experiences/visual-map/book-pipeline-finish-modal";
 `, { obsidian: { ...support.obsidian, Modal: dom.makeModal() } }, { createFragment: dom.createFragment, Option: OptionStub, window: { setTimeout, clearTimeout } });
   const settings = { reader: '', goal: '', angle: '', tone: '', length: '', style: '' };
   const start = new b.BookStartModal({}, { cards: 3, models: { plan: 'a', write: 'b', images: 'c', proof: 'd' }, modelChoice: { options: () => ['a'], label: x => x, onChange() {} }, settings, onStart() {} });
@@ -1026,11 +976,6 @@ export { BookFinishModal } from "./experiences/visual-map/book-pipeline-finish-m
   start.close();
   assert.equal(start.isShown, false);
   assert.equal(start.isOpen, false);
-  const fin = new b.BookFinishModal({}, { count: 1, titles: [] }, () => {});
-  fin.open();
-  assert.equal(fin.isOpen, true);
-  fin.close();
-  assert.equal(fin.isOpen, false);
   // Every member the start card adds (prototype and instance) is checked against the real Obsidian Modal declaration: a same-name member would shadow or be written by the base class.
   const dts = fs.readFileSync(path.join(root, 'node_modules/obsidian/obsidian.d.ts'), 'utf8');
   const modalDecl = dts.slice(dts.indexOf('export class Modal '), dts.indexOf('export class Modal ') + 4000).split(/\n}\n/)[0];
@@ -1038,7 +983,7 @@ export { BookFinishModal } from "./experiences/visual-map/book-pipeline-finish-m
   for (const must of ['open', 'close', 'onOpen', 'onClose', 'titleEl', 'contentEl', 'modalEl', 'scope', 'app']) assert.ok(baseMembers.has(must), `parsed d.ts has Modal.${must}`);
   const own = [...Object.getOwnPropertyNames(b.BookStartModal.prototype), ...Object.keys(start).filter(k => !(k in new (dom.makeModal())({})))].filter(k => !['constructor', 'onOpen', 'onClose'].includes(k));
   assert.deepEqual(own.filter(k => baseMembers.has(k)), [], 'no start-card member shares a name with an Obsidian Modal member');
-  for (const name of ['BookStartModal', 'BookFinishModal']) {
+  for (const name of ['BookStartModal']) {
     for (const key of ['isOpen', 'app', 'scope', 'contentEl', 'titleEl', 'modalEl']) {
       assert.equal(Object.getOwnPropertyDescriptor(b[name].prototype, key), undefined, `${name} must not define ${key} on its prototype`);
     }

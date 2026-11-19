@@ -185,7 +185,6 @@ import {
   type ContentLanguage
 } from "../../i18n";
 import {
-  Component,
   FileSystemAdapter,
   MarkdownRenderer,
   ItemView,
@@ -334,12 +333,7 @@ import { CANONICAL_LANGUAGES } from "../../ai/note-style-file";
 import type { UpdateMode } from "../../ai/note-style-recipe";
 import { backupNote } from "../../ai/note-writeback";
 import { stopLabelKey, type ResearchStart, type SelectionSynthesisTask, type WritebackHooks } from "./topic-run";
-import {
-  BookPipelineRunError,
-  type AuthorInput,
-  type AuthorOutcome,
-  type BookPipelineProgress
-} from "./book-pipeline-run";
+import { BookPipelineRunError, type AuthorInput, type AuthorOutcome } from "./book-pipeline-run";
 import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
 import {
   BOOK_SETTING_FIELDS,
@@ -357,8 +351,14 @@ import {
   renderBookCardLabels,
   runBookEntry
 } from "./book-pipeline-ui";
-import { buildGatePanel, GatePanelState, renderGatePanel, runTrackedRerun } from "./book-pipeline-panel";
-import { buildGate2Panel, renderGate2Panel } from "./book-pipeline-panel2";
+import {
+  BookReviewMemory,
+  countNotes,
+  gate2Cards,
+  needsAttention,
+  runTrackedRerun,
+  type Gate2Card
+} from "./book-pipeline-review";
 import {
   INTEGRATION_DEPTHS,
   bottomUpOrder,
@@ -520,14 +520,7 @@ import {
   type ChatBatch,
   type ChatBatchRequest
 } from "../../core/map-chat-batch";
-import {
-  chatDockedWidth,
-  chatOverlayWidth,
-  clampMapChatWidth,
-  isChatNarrow,
-  MAP_CHAT_MIN_CANVAS,
-  MAP_CHAT_WIDTH_DEFAULT
-} from "../../core/map-chat-layout";
+import { chatDockedWidth, chatOverlayWidth, clampMapChatWidth, isChatNarrow } from "../../core/map-chat-layout";
 import { GoalSuggest } from "./goal-suggest";
 import type { RelevancePin } from "./relevance-pins";
 import {
@@ -566,7 +559,6 @@ import {
 import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal } from "./multi-research-modal";
 import { BOOK_SUGGEST_TIMEOUT_MS, BookStartModal, type BookModelChoiceInput } from "./book-pipeline-start-modal";
-import { BookFinishModal } from "./book-pipeline-finish-modal";
 import { bookRerunMenuReason } from "./book-pipeline-rerun";
 import { chatResearchReferenceGroups, type ResearchRequestWithReferences } from "./chat-research-sources";
 import { StructureReviewModal } from "./structure-review-modal";
@@ -3054,9 +3046,7 @@ export class VisualAgentMapView extends ItemView {
     this.researchTick = this.researchRenderTimer = null;
     this.researchElapsed.clear();
     this.bookAuthoring.clear();
-    this.bookPanel.reset();
-    this.unloadBookTrialMarkdown();
-    this.bookSideEl = null;
+    this.bookReview.unchanged.clear();
     this.researchSigs.clear();
     this.taskPreviewEls.clear();
     this.hoverResearch = null;
@@ -9831,7 +9821,7 @@ export class VisualAgentMapView extends ItemView {
     if (!path) return;
     void this.bookEntry(async () => {
       try {
-        await runTrackedRerun(this.bookPanel, node.id, () => this.plugin.rerunBookCard(path, node.id));
+        await runTrackedRerun(this.bookReview, node.id, () => this.plugin.rerunBookCard(path, node.id));
       } finally {
         await this.rereadBookCard(node.id);
         if (!this.closed) this.render();
@@ -11965,7 +11955,7 @@ export class VisualAgentMapView extends ItemView {
       this.dropGoalEdit();
     }
     this.mountMapChat(workspace, overlay);
-    this.mountBookPanel(workspace);
+    this.applyBookBarFocus();
     this.placeGoalBar();
     // The gesture hint goes away once the user has panned or zoomed; select mode keeps its gesture hint inside the selection bar, never over the canvas.
     // In select mode the selection bar (bottom-left) owns that space, so no hint is drawn there.
@@ -17116,6 +17106,12 @@ export class VisualAgentMapView extends ItemView {
     const state = bookBarState(read.data, this.plugin.getBookPipelineProgress(path), id =>
       readPipelineStage(this.notes.get(id)?.pipelineStage)
     );
+    // A question left over from another phase (the chat's "continue" moved the run on) is dropped.
+    if (state.mode !== "gate1") this.bookGate1Ask = null;
+    if (state.mode !== "gate2") this.bookFinishAsking = null;
+    const gate2Attention = state.mode === "gate2" ? this.bookReviewCards(read.data) : [];
+    if (state.mode === "gate2") state.review = { total: state.total, attention: gate2Attention.length };
+    const gate1Ask = this.bookGate1Ask?.path === path ? this.bookGate1Ask : null;
     renderBookBar(toolbar, state, {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
@@ -17133,215 +17129,123 @@ export class VisualAgentMapView extends ItemView {
         }
       },
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
-      confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path)),
-      panel: { open: this.bookPanel.open, toggle: () => this.toggleBookPanel() }
+      confirmGate1: () => void this.pressBookGate1(path, read.data.trial ?? []),
+      openTrial: () => {
+        const first = read.data.trial?.[0];
+        if (first) void this.openBookNote(first);
+      },
+      ...(gate1Ask
+        ? {
+            gate1Ask: {
+              count: gate1Ask.count,
+              cancel: () => {
+                this.bookGate1Ask = null;
+                this.bookBarFocus = "gate1-opener";
+                if (!this.closed) this.render();
+              },
+              confirm: () => {
+                this.bookGate1Ask = null;
+                void this.bookEntry(() => this.plugin.confirmBookGate1(path));
+              },
+              ...(this.bookBarFocus === "gate1-go" ? { focus: "go" as const } : {})
+            }
+          }
+        : {}),
+      nextReview: () => {
+        const next = this.nextBookReviewCard(gate2Attention);
+        if (next) void this.openBookNote(next.id);
+      },
+      finish: {
+        asking: this.bookFinishAsking === path,
+        ask: () => {
+          this.bookFinishAsking = path;
+          this.bookBarFocus = "finish-go";
+          if (!this.closed) this.render();
+        },
+        cancel: () => {
+          this.bookFinishAsking = null;
+          this.bookBarFocus = "finish-opener";
+          if (!this.closed) this.render();
+        },
+        confirm: () => {
+          this.bookFinishAsking = null;
+          void this.bookEntry(() => this.plugin.finishBookRun(path));
+        }
+      }
     });
+  }
+  /** What the bar and the card reruns remember in memory (the repaint rebuilds the DOM). */
+  private readonly bookReview = new BookReviewMemory();
+  /** The map whose bar is asking "run the whole book anyway?" (unapplied notes in the trial), with the count it found. */
+  private bookGate1Ask: { path: string; count: number } | null = null;
+  private bookGate1Checking = false;
+  /** The map whose bar is asking "finish anyway?" (chapters still need a look). */
+  private bookFinishAsking: string | null = null;
+  /** Where the keyboard goes after the next paint of the bar (the repaint rebuilds the buttons). */
+  private bookBarFocus: "gate1-go" | "gate1-opener" | "finish-go" | "finish-opener" | null = null;
+  /** The chapter the "next chapter to check" link opened last (the link cycles from there in reading order). */
+  private bookReviewLast: string | null = null;
+  private applyBookBarFocus(): void {
+    const focus = this.bookBarFocus;
+    this.bookBarFocus = null;
+    if (!focus || this.closed) return;
+    const selector = {
+      "gate1-go": ".vam-book-gate1-ask .vam-book-ask-go",
+      "gate1-opener": ".vam-book-confirm",
+      "finish-go": ".vam-book-finish-ask .vam-book-ask-go",
+      "finish-opener": ".vam-book-finish"
+    }[focus];
+    this.contentEl.querySelector<HTMLElement>(selector)?.focus();
+  }
+  /**
+   * The chapters that still need a look at gate 2, in reading order: the count in the bar and the cycle of "next chapter to check".
+   * The one place the bar decides this; today it is the proofreading rules over the loaded notes.
+   */
+  private bookReviewCards(data: BookPipelineData): Gate2Card[] {
+    const map = this.map;
+    if (!map) return [];
+    return gate2Cards({
+      order: data.order,
+      titleOf: id => this.notes.get(id)?.title ?? map.nodes.find(node => node.id === id)?.path ?? id,
+      noteOf: id => this.notes.get(id)
+    }).filter(needsAttention);
+  }
+  /** The attention chapter after the one opened last (wraps around); the first one when none was opened yet. */
+  private nextBookReviewCard(cards: readonly Gate2Card[]): Gate2Card | undefined {
+    if (!cards.length) return undefined;
+    const at = cards.findIndex(card => card.id === this.bookReviewLast);
+    const next = cards[(at + 1) % cards.length];
+    this.bookReviewLast = next.id;
+    return next;
+  }
+  /** "Run the whole book": with notes still unapplied in the trial chapters, the first press only asks (once, in the bar). */
+  private async pressBookGate1(path: string, trial: readonly string[]): Promise<void> {
+    if (this.bookGate1Checking) return;
+    this.bookGate1Checking = true;
+    let count = 0;
+    try {
+      for (const id of trial) {
+        const node = this.map?.nodes.find(item => item.id === id);
+        const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
+        if (file instanceof TFile) count += countNotes(await this.app.vault.read(file).catch(() => ""));
+      }
+    } finally {
+      this.bookGate1Checking = false;
+    }
+    if (this.closed || this.path !== path) return;
+    if (count > 0) {
+      this.bookGate1Ask = { path, count };
+      this.bookBarFocus = "gate1-go";
+      this.render();
+      return;
+    }
+    await this.bookEntry(() => this.plugin.confirmBookGate1(path));
   }
   /** The map whose bar shows the "give up this book" confirmation card (in-page; never window.confirm). */
   private bookAbandonAsking: string | null = null;
   private askBookAbandon(path: string, asking: boolean): void {
     this.bookAbandonAsking = asking ? path : null;
     if (!this.closed) this.render();
-  }
-  // ---- Picture-book gate panel (04b) ---------------------------------------------------------------------------
-  private readonly bookPanel = new GatePanelState();
-  private bookSideEl: HTMLElement | null = null;
-  private bookPanelPath = "";
-  /** Whether the chat window was open when the gate panel took the side column (it comes back when the panel closes). */
-  private bookChatWasOpen = false;
-  /** Runs `work` so the chat's open state is not saved as the user's choice (the panel folded it, not the user). */
-  private withChatForced(work: () => void): void {
-    const was = this.chatForcedOpen;
-    this.chatForcedOpen = true;
-    try {
-      work();
-    } finally {
-      this.chatForcedOpen = was;
-    }
-  }
-  /** The gate panel shares the side column with the chat: one at a time. Opening it folds the chat; closing gives the chat back. */
-  private toggleBookPanel(): void {
-    if (this.bookPanel.open) return this.closeBookPanel();
-    const chat = this.chat;
-    this.bookChatWasOpen = !!chat && !chat.isHero && chat.isOpen;
-    if (this.bookChatWasOpen) this.withChatForced(() => chat?.setOpen(false));
-    this.bookPanel.open = true;
-    this.bookPanel.pendingFocus = "title";
-    this.render();
-  }
-  /** Per run: the last phase seen, and the "runId:gate" pairs already handled (auto-opened, seen on arrival, or closed by hand). Dies with the view. */
-  private readonly bookPhaseSeen = new Map<string, string>();
-  private readonly bookGateHandled = new Set<string>();
-  /** Opens the panel by itself once per run and gate when a gate is reached by a live drive; never at first sight of a map. */
-  private maybeAutoOpenBookPanel(): void {
-    const path = this.path;
-    const read = this.map ? readBookPipeline(this.map) : null;
-    if (!path || !read || read.kind !== "usable") return;
-    const progress = this.plugin.getBookPipelineProgress(path);
-    const phase = progress?.phase ?? read.data.phase;
-    const runId = progress?.runId ?? read.data.runId;
-    const prev = this.bookPhaseSeen.get(runId);
-    this.bookPhaseSeen.set(runId, phase);
-    if (phase !== "gate1" && phase !== "gate2") return;
-    const key = `${runId}:${phase}`;
-    if (prev === undefined) {
-      this.bookGateHandled.add(key);
-      return;
-    }
-    if (progress?.active || this.bookGateHandled.has(key)) return;
-    this.bookGateHandled.add(key);
-    if (this.bookPanel.open) return;
-    const chat = this.chat;
-    this.bookChatWasOpen = !!chat && !chat.isHero && chat.isOpen;
-    if (this.bookChatWasOpen) this.withChatForced(() => chat?.setOpen(false));
-    this.bookPanel.open = true;
-    this.bookPanel.pendingFocus = null;
-  }
-  private closeBookPanel(): void {
-    const path = this.path;
-    const read = this.map ? readBookPipeline(this.map) : null;
-    if (path && read?.kind === "usable") {
-      const progress = this.plugin.getBookPipelineProgress(path);
-      this.bookGateHandled.add(`${progress?.runId ?? read.data.runId}:${progress?.phase ?? read.data.phase}`);
-    }
-    this.bookPanel.open = false;
-    this.unloadBookTrialMarkdown();
-    this.bookPanel.pendingFocus = "opener";
-    if (this.bookChatWasOpen) this.withChatForced(() => this.chat?.setOpen(true));
-    this.bookChatWasOpen = false;
-    this.render();
-  }
-  /** The panel's "Chat" tab: the panel closes and the chat window opens with the keyboard in its message field. */
-  private showChatFromBookPanel(): void {
-    this.bookPanel.open = false;
-    this.unloadBookTrialMarkdown();
-    this.bookPanel.pendingFocus = null;
-    this.bookChatWasOpen = false;
-    this.render();
-    this.chat?.setOpen(true, true);
-  }
-  /** Part of every repaint: the panel's column, only for a map that has a usable `bookPipeline` and only while it is open. */
-  private mountBookPanel(workspace: HTMLElement): void {
-    this.bookSideEl = null;
-    if (
-      !this.map ||
-      !this.path ||
-      !this.hasBookPipeline() ||
-      (this.bookPanelPath && this.bookPanelPath !== this.path)
-    ) {
-      this.bookPanel.reset();
-      this.bookChatWasOpen = false;
-    }
-    this.bookPanelPath = this.hasBookPipeline() ? this.path : "";
-    if (this.bookPanelPath) this.maybeAutoOpenBookPanel();
-    // Outside the gates there is nothing to show: a panel left open folds away (never a "nothing to see" line).
-    if (this.bookPanel.open && this.bookPanelPath && !this.bookPanelHasContent())
-      void Promise.resolve().then(() => {
-        if (!this.closed && this.bookPanel.open && !this.bookPanelHasContent()) this.closeBookPanel();
-      });
-    if (!this.bookPanel.open || !this.bookPanelPath) {
-      this.unloadBookTrialMarkdown();
-      // The panel just closed (button, Escape): the keyboard goes back to the toolbar button that opened it.
-      if (this.bookPanel.pendingFocus === "opener")
-        this.contentEl.querySelector<HTMLElement>(".vam-book-panel-toggle")?.focus();
-      this.bookPanel.pendingFocus = null;
-      return;
-    }
-    const side = workspace.createDiv("vam-book-side");
-    const measured = this.chatPaneWidths();
-    side.toggleClass(
-      "is-overlay",
-      !!measured && measured.pane - measured.inspector < MAP_CHAT_WIDTH_DEFAULT + MAP_CHAT_MIN_CANVAS
-    );
-    this.bookSideEl = side;
-    this.paintBookPanel();
-    void this.loadBookRoot();
-  }
-  /** The panel only has something to show at gate 1, gate 2 and when the run is done. */
-  private bookPanelHasContent(): boolean {
-    const read = this.map ? readBookPipeline(this.map) : null;
-    if (!this.path || !read || read.kind !== "usable") return false;
-    const phase = this.plugin.getBookPipelineProgress(this.path)?.phase ?? read.data.phase;
-    return phase === "gate1" || phase === "gate2" || phase === "done";
-  }
-  private paintBookPanel(): void {
-    const side = this.bookSideEl;
-    const map = this.map;
-    const path = this.path;
-    if (!side || !map || !path || this.closed) return;
-    const read = readBookPipeline(map);
-    if (read.kind !== "usable") return;
-    const doc = this.contentEl.ownerDocument;
-    const held = doc?.activeElement as HTMLElement | null;
-    const heldCard = held && side.contains(held) ? (held.dataset?.card ?? null) : null;
-    const heldAct = heldCard ? (held?.dataset?.act ?? null) : null;
-    this.unloadBookTrialMarkdown();
-    side.empty();
-    const progress = this.plugin.getBookPipelineProgress(path);
-    const phase = progress?.phase ?? read.data.phase;
-    if (phase === "gate2" || phase === "done") {
-      this.paintBookGate2(side, read.data, progress, phase === "done", heldCard, heldAct);
-      return;
-    }
-    if (phase !== "gate1") {
-      this.bookPanel.pendingFocus = null;
-      return;
-    }
-    const data = buildGatePanel({
-      order: read.data.order,
-      ...(read.data.trial ? { trial: read.data.trial } : {}),
-      titleOf: id => this.notes.get(id)?.title ?? map.nodes.find(node => node.id === id)?.path ?? id,
-      noteOf: id => this.notes.get(id),
-      rootRaw: this.bookPanel.rootRaw
-    });
-    const state = this.bookPanel;
-    const settings = this.plugin.settings;
-    const root = map.nodes.find(node => !node.parentId);
-    renderGatePanel(side, data, true, state, {
-      confirm: async patch => {
-        // Settings changed at gate 1 apply to the whole book: written to the root topic before writing begins.
-        if (root && Object.keys(patch).length) {
-          if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");
-          await this.plugin.repo.writeBookSettings(root.path, patch);
-        }
-        await this.plugin.confirmBookGate1(path);
-      },
-      retry: async patch => {
-        // A chat chain holding the map refuses before anything is written; only the changed fields are written, to the root topic.
-        if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");
-        if (root && Object.keys(patch).length) await this.plugin.repo.writeBookSettings(root.path, patch);
-        await this.plugin.retryBookTrial(path);
-      },
-      renderMarkdown: (el, markdown) => {
-        const component = this.bookTrialMarkdown ?? new Component();
-        if (!this.bookTrialMarkdown) {
-          component.load();
-          this.bookTrialMarkdown = component;
-        }
-        void MarkdownRenderer.render(this.app, markdown, el, root?.path ?? "", component);
-      },
-      settings: state.settings,
-      models: {
-        plan: settings.bookPlanModel,
-        write: settings.bookWriteModel,
-        images: settings.bookImageModel,
-        proof: settings.bookProofModel
-      },
-      modelChoice: this.bookModelChoice(),
-      showChat: () => this.showChatFromBookPanel(),
-      close: () => this.closeBookPanel(),
-      refresh: () => this.paintBookPanel()
-    });
-    if (state.pendingFocus === "title") side.querySelector<HTMLElement>(".vam-book-panel-title")?.focus();
-    else if (state.pendingFocus === "opener")
-      this.contentEl.querySelector<HTMLElement>(".vam-book-panel-toggle")?.focus();
-    state.pendingFocus = null;
-  }
-  /** The Markdown renderer's owner for the trial chapters: unloaded whenever the panel is drawn again or closes, so nothing it made stays alive. */
-  private bookTrialMarkdown: Component | null = null;
-  private unloadBookTrialMarkdown(): void {
-    this.bookTrialMarkdown?.unload();
-    this.bookTrialMarkdown = null;
   }
   /** The lists, labels and save of the four model dropdowns (the start card and the trial screen share them with the settings page). */
   private bookModelChoice(): Omit<BookModelChoiceInput, "models"> {
@@ -17354,82 +17258,6 @@ export class VisualAgentMapView extends ItemView {
         void this.plugin.saveSettings();
       }
     };
-  }
-  /** Gate 2 (and done): the review panel. Actions reread the card's note afterwards so the rows show the new stage. */
-  private paintBookGate2(
-    side: HTMLElement,
-    data: BookPipelineData,
-    progress: BookPipelineProgress | undefined,
-    done: boolean,
-    heldCard: string | null,
-    heldAct: string | null
-  ): void {
-    const map = this.map;
-    const path = this.path;
-    if (!map) return;
-    const state = this.bookPanel;
-    const view = buildGate2Panel({
-      order: data.order,
-      titleOf: id => this.notes.get(id)?.title ?? map.nodes.find(node => node.id === id)?.path ?? id,
-      noteOf: id => this.notes.get(id),
-      startedAt: progress?.startedAt ?? data.startedAt,
-      writingEndedAt: progress?.phaseStartedAt ?? data.phaseStartedAt
-    });
-    renderGate2Panel(
-      side,
-      view,
-      done,
-      state,
-      {
-        open: id => void this.openBookNote(id),
-        rerun: async id => {
-          try {
-            return await this.plugin.rerunBookCard(path, id);
-          } finally {
-            await this.rereadBookCard(id);
-          }
-        },
-        confirmFinish: info =>
-          new Promise<boolean>(resolve => {
-            if (this.closed) return resolve(false);
-            this.openMapModal(new BookFinishModal(this.app, info, resolve));
-          }),
-        confirmSeam: async id => {
-          try {
-            await this.plugin.confirmBookSeam(path, id);
-          } finally {
-            await this.rereadBookCard(id);
-          }
-        },
-        // The bar is part of the toolbar, not of this panel: it repaints once the acceptance is saved (or refused).
-        finish: () =>
-          this.plugin.finishBookRun(path).finally(() => {
-            if (!this.closed) this.render();
-          }),
-        showChat: () => this.showChatFromBookPanel(),
-        close: () => this.closeBookPanel(),
-        refresh: () => this.paintBookPanel()
-      },
-      new Set(progress?.busyCards ?? []),
-      !!progress?.active,
-      progress?.rerun
-    );
-    const all = (selector: string): HTMLElement[] => Array.from(side.querySelectorAll<HTMLElement>(selector));
-    if (state.pendingFocus === "title") side.querySelector<HTMLElement>(".vam-book-panel-title")?.focus();
-    else if (state.pendingFocus === "opener")
-      this.contentEl.querySelector<HTMLElement>(".vam-book-panel-toggle")?.focus();
-    else if (heldCard) {
-      const same = all("[data-card]").find(item => item.dataset.card === heldCard && item.dataset.act === heldAct);
-      const target =
-        same ??
-        all("[data-row]").find(item => item.dataset.row === heldCard) ??
-        side.querySelector<HTMLElement>(".vam-book-panel-title");
-      target?.focus();
-    } else if (heldAct === "finish")
-      all("[data-act]")
-        .find(item => item.dataset.act === "finish")
-        ?.focus();
-    state.pendingFocus = null;
   }
   /** A card's note opens in a tab. */
   private async openBookNote(id: string): Promise<void> {
@@ -17444,23 +17272,6 @@ export class VisualAgentMapView extends ItemView {
     } catch (error) {
       new Notice(error instanceof Error ? error.message : String(error));
     }
-  }
-  /** The root note's file text (the thread and the editorial decisions live there); repaints the panel when it differs. */
-  private async loadBookRoot(): Promise<void> {
-    const map = this.map;
-    if (!map) return;
-    const read = readBookPipeline(map);
-    if (read.kind !== "usable") return;
-    const root = map.nodes.find(node => !node.parentId) ?? map.nodes.find(node => node.id === read.data.order[0]);
-    const file = root ? this.app.vault.getAbstractFileByPath(root.path) : null;
-    if (!(file instanceof TFile)) return;
-    const raw = await this.app.vault.read(file).catch(() => "");
-    const settings = (await this.plugin.repo.readNote(file.path).catch(() => null))?.bookSettings ?? {};
-    if (this.closed || !this.bookSideEl) return;
-    if (raw === this.bookPanel.rootRaw && JSON.stringify(settings) === JSON.stringify(this.bookPanel.settings)) return;
-    this.bookPanel.rootRaw = raw;
-    this.bookPanel.settings = settings;
-    this.paintBookPanel();
   }
   /** After a replan or rerun: this card's note is read again so the panel shows the new plan without waiting for the repaint. */
   private async rereadBookCard(id: string): Promise<void> {

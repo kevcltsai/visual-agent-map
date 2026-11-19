@@ -3154,6 +3154,15 @@ var en = {
   "ui.book_abandoned": "This is a normal mind map again. Your notes were not changed.",
   "ui.book_add_budget": "Add 100 calls",
   "ui.book_budget_used_up_0_1": "Call budget used up: {0}/{1} used",
+  "ui.book_bar_trial_ready_0": "The {0} trial chapters are written",
+  "ui.book_bar_open_first": "Open chapter 1",
+  "ui.book_bar_notes_ask_0": "{0} notes are not applied yet. Run the whole book anyway?",
+  "ui.book_bar_go_anyway": "Run anyway",
+  "ui.book_bar_review_0_1": "{0} chapters written, {1} need a look",
+  "ui.book_bar_next_review": "Next chapter to check",
+  "ui.book_bar_finish": "Finish review",
+  "ui.book_bar_finish_ask_0": "{0} chapters are not handled yet. Finish anyway?",
+  "ui.book_bar_finish_go": "Finish anyway",
   "ui.book_confirm_gate1": "Looks good, run the whole book",
   "ui.book_stage_pending": "To plan",
   "ui.book_stage_planned": "Planned",
@@ -3200,40 +3209,14 @@ var en = {
   "ui.book_plain_proof_no_open_page": 'None of the source pages could be opened, so nothing could be checked. Use "Rerun this card", or open the card and check it yourself.',
   "ui.book_plain_proof_invalid_reply": `The checking AI's reply had the wrong format after several tries. Use "Rerun this card" to try again.`,
   "ui.book_plain_proof_failed": 'Checking stopped with an error, so this card is not checked yet. Use "Rerun this card" to try again.',
-  "ui.book_panel_label": "Picture-book gate panel",
-  "ui.book_panel_tabs_label": "Side panel",
-  "ui.book_panel_tab_book": "Picture-book panel",
-  "ui.book_panel_tab_chat": "Chat",
-  "ui.book_panel_open": "Open the gate panel",
-  "ui.book_panel_close": "Close the panel",
-  "ui.book_panel_gate1_title": "Gate 1: Is this how the book should be written?",
-  "ui.book_trial_title": "Look at the finished trial chapters first. Is this right?",
-  "ui.book_trial_cards_label": "Trial chapters",
-  "ui.book_trial_card_0_1": "Trial: chapter {0} {1}",
-  "ui.book_trial_done": "Done",
-  "ui.book_trial_look": "Needs your look",
-  "ui.book_trial_text_label_0": "Finished text of {0}",
-  "ui.book_trial_no_text": "This chapter has no text yet.",
-  "ui.book_trial_fold": "Want to change something? Whole-book settings and models",
-  "ui.book_trial_retry": "Retry the trial with the new settings",
-  "ui.book_panel_not_gate1": "The run is not at gate 1, so there is no plan to confirm here.",
-  "ui.book_panel_plan_empty": "The book plan has no content yet.",
-  "ui.book_gate1_thread_label": "Book thread",
   "ui.book_field_reader": "Reader",
   "ui.book_field_goal": "Goal",
   "ui.book_field_angle": "Angle",
   "ui.book_field_tone": "Tone",
   "ui.book_field_length": "Length",
   "ui.book_field_style": "Style",
-  "ui.book_panel_busy": "Working\u2026",
-  "ui.book_panel_confirming": "Confirming\u2026",
   "ui.book_eta_0": "About {0} min left",
   "ui.book_eta_under_minute": "Under 1 min left",
-  "ui.book_panel_gate2_title": "Gate 2: review",
-  "ui.book_panel_gate2_done_tag": "Review complete",
-  "ui.book_panel_g2_all_done_0": "All {0} chapters are done",
-  "ui.book_panel_g2_some_0_1": "{0} chapters written, {1} still need attention",
-  "ui.book_panel_g2_look": "Needs a look",
   "ui.book_panel_g2_reason_unfinished": "This chapter is not finished",
   "ui.book_panel_g2_reason_structure_0": "{0} writing requirements are not met",
   "ui.book_panel_g2_reason_facts_0": "{0} facts could not be confirmed against a source",
@@ -3248,8 +3231,6 @@ var en = {
   "ui.book_note_review_accept": "Accept it as it is, no change needed",
   "ui.book_note_review_fixed": "I fixed it",
   "ui.book_note_review_next_0": "Next chapter to check: {0}",
-  "ui.book_panel_g2_edit_myself": "Edit myself",
-  "ui.book_panel_g2_confirm_seam": "The join is fine",
   "ui.book_panel_reason_unmet_plain": "Some items did not pass proofreading",
   "ui.book_progress_line_global": "Planning the whole book",
   "ui.book_progress_line_plan_0_1": "Planning chapter {0}/{1}",
@@ -3257,40 +3238,19 @@ var en = {
   "ui.book_progress_line_write_0_1": "Writing chapter {0}/{1}",
   "ui.book_progress_line_sep": ", ",
   "ui.book_progress_line_done_0_1": "{0}/{1} chapters done",
-  "ui.book_panel_gate2_list_label": "Gate 2 card list",
-  "ui.book_panel_gate2_nothing": "No cards to review yet.",
-  "ui.book_panel_gate2_hint": "If chapters are still unresolved, \u201CReview finished\u201D asks once.",
-  "ui.book_panel_finish": "Finish review",
-  "ui.book_panel_finishing": "Finishing review\u2026",
-  "ui.book_panel_finish_waiting": "Waiting for the card that is still running to finish; then you can finish the review.",
-  "ui.book_panel_elapsed_0": "Took {0} min",
-  "ui.book_panel_elapsed_under_minute": "Took under 1 min",
-  "ui.book_panel_elapsed_hint": "Time from planning start to the last card written",
-  "ui.book_panel_open_0": "Open the note for {0}",
   "ui.book_panel_rerun_card": "Rerun this card",
   "ui.book_panel_rerun_card_0": "Rerun this book card: {0} (plan \u2192 write \u2192 check)",
-  "ui.book_panel_confirm_seam": "Seam confirmed",
-  "ui.book_panel_confirm_seam_0": "Mark the seam for {0} as checked",
   "ui.book_seam_label": "Check seam",
   "ui.book_seam_reason": "A neighboring card's plan or body changed and has not been checked by hand.",
   "ui.book_card_menu_rerun": "Rerun this picture-book card",
   "ui.book_card_menu_rerun_sub": 'Plan \u2192 write \u2192 proofread, about 2 minutes; other chapters stay, only marked "seam needs a look"',
   "ui.book_rerun_tag": "Working",
-  "ui.book_progress_rerun_hint": "Not happy with one chapter? You can rerun just that chapter without redoing the whole book.",
   "ui.book_panel_lead_sep": ", ",
   "ui.book_panel_reason_unchecked_0": "{0} items could not be checked against a source.",
-  "ui.book_panel_still_review": "Still needs a look",
-  "ui.book_finish_ask_title_0": "{0} things are not handled yet",
-  "ui.book_finish_ask_review_0": "{0} cards need a look",
-  "ui.book_finish_ask_review_title_0_1": "{0} cards need a look ({1})",
-  "ui.book_finish_ask_line_0": "{0}.",
-  "ui.book_finish_ask_back": "Go back",
-  "ui.book_finish_ask_go": "Finish anyway",
   "ui.book_card_menu_why_other": "Another card is being rerun",
   "ui.book_card_menu_why_running": "The book is running; rerun after it ends",
   "ui.book_card_menu_why_this": "This card is being rerun",
-  "ui.book_card_menu_why_blocked": "A chat is running; rerun after it ends",
-  "ui.book_panel_not_gate2": "Not at gate 1 or gate 2 right now, so there is nothing to show."
+  "ui.book_card_menu_why_blocked": "A chat is running; rerun after it ends"
 };
 
 // i18n/zh-CN.ts
@@ -6340,6 +6300,15 @@ var zhCN = {
   "ui.book_abandoned": "\u5DF2\u53D8\u56DE\u666E\u901A\u5FC3\u667A\u56FE\uFF0C\u4F60\u7684\u7B14\u8BB0\u6CA1\u6709\u88AB\u6539\u52A8\u3002",
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u989D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
+  "ui.book_bar_trial_ready_0": "\u8BD5\u8DD1\u7684 {0} \u7AE0\u5199\u597D\u4E86",
+  "ui.book_bar_open_first": "\u6253\u5F00\u7B2C 1 \u7AE0",
+  "ui.book_bar_notes_ask_0": "\u8FD8\u6709 {0} \u5219\u5907\u6CE8\u6CA1\u5957\u7528\uFF0C\u4ECD\u8981\u8DD1\u5B8C\u5168\u4E66\u5417\uFF1F",
+  "ui.book_bar_go_anyway": "\u4ECD\u8981",
+  "ui.book_bar_review_0_1": "{0} \u7AE0\u5199\u597D\u4E86\uFF0C{1} \u7AE0\u8981\u4F60\u770B",
+  "ui.book_bar_next_review": "\u4E0B\u4E00\u7AE0\u8981\u770B\u7684",
+  "ui.book_bar_finish": "\u9A8C\u6536\u5B8C\u6210",
+  "ui.book_bar_finish_ask_0": "\u8FD8\u6709 {0} \u7AE0\u6CA1\u5904\u7406\uFF0C\u4ECD\u8981\u5B8C\u6210\u5417\uFF1F",
+  "ui.book_bar_finish_go": "\u4ECD\u8981\u5B8C\u6210",
   "ui.book_confirm_gate1": "\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66",
   "ui.book_stage_pending": "\u5F85\u4F01\u5212",
   "ui.book_stage_planned": "\u5DF2\u4F01\u5212",
@@ -6386,40 +6355,14 @@ var zhCN = {
   "ui.book_plain_proof_no_open_page": "\u6821\u5BF9\u65F6\u4E00\u4E2A\u6765\u6E90\u9875\u90FD\u6253\u4E0D\u5F00\uFF0C\u65E0\u6CD5\u6838\u5BF9\u3002\u8BF7\u70B9\u201C\u91CD\u8DD1\u8FD9\u5F20\u201D\uFF0C\u6216\u6253\u5F00\u5361\u7247\u81EA\u5DF1\u67E5\u8BC1\u3002",
   "ui.book_plain_proof_invalid_reply": "\u6821\u5BF9\u7684 AI \u56DE\u590D\u683C\u5F0F\u4E0D\u7B26\uFF0C\u91CD\u8BD5\u591A\u6B21\u4ECD\u5931\u8D25\u3002\u8BF7\u70B9\u201C\u91CD\u8DD1\u8FD9\u5F20\u201D\u518D\u8BD5\u4E00\u6B21\u3002",
   "ui.book_plain_proof_failed": "\u6821\u5BF9\u4E2D\u9014\u51FA\u9519\uFF0C\u8FD9\u5F20\u8FD8\u6CA1\u6821\u6210\u3002\u8BF7\u70B9\u201C\u91CD\u8DD1\u8FD9\u5F20\u201D\u518D\u8BD5\u4E00\u6B21\u3002",
-  "ui.book_panel_label": "\u56FE\u6587\u4E66\u5173\u5361\u9762\u677F",
-  "ui.book_panel_tabs_label": "\u53F3\u4FA7\u680F",
-  "ui.book_panel_tab_book": "\u56FE\u6587\u4E66\u9762\u677F",
-  "ui.book_panel_tab_chat": "\u5BF9\u8BDD",
-  "ui.book_panel_open": "\u6253\u5F00\u5173\u5361\u9762\u677F",
-  "ui.book_panel_close": "\u5173\u95ED\u9762\u677F",
-  "ui.book_panel_gate1_title": "\u5173\u5361 1\uFF1A\u8FD9\u672C\u4E66\u8981\u8FD9\u6837\u5199\uFF0C\u53EF\u4EE5\u5417\uFF1F",
-  "ui.book_trial_title": "\u5148\u770B\u8BD5\u8DD1\u7AE0\u8282\u7684\u5B8C\u6574\u6210\u54C1\uFF0C\u8FD9\u6837\u53EF\u4EE5\u5417\uFF1F",
-  "ui.book_trial_cards_label": "\u8BD5\u8DD1\u7AE0\u8282",
-  "ui.book_trial_card_0_1": "\u8BD5\u8DD1\uFF1A\u7B2C {0} \u7AE0\u3000{1}",
-  "ui.book_trial_done": "\u5DF2\u5B8C\u6210",
-  "ui.book_trial_look": "\u8981\u4F60\u770B",
-  "ui.book_trial_text_label_0": "{0} \u7684\u5B8C\u6574\u5185\u5BB9",
-  "ui.book_trial_no_text": "\u8FD9\u4E00\u7AE0\u8FD8\u6CA1\u6709\u5185\u5BB9\u3002",
-  "ui.book_trial_fold": "\u60F3\u8C03\u6574\uFF1F\u5168\u4E66\u8BBE\u7F6E\u3001\u6A21\u578B",
-  "ui.book_trial_retry": "\u7528\u65B0\u8BBE\u7F6E\u91CD\u8BD5\u8BD5\u8DD1",
-  "ui.book_panel_not_gate1": "\u76EE\u524D\u4E0D\u5728\u201C\u5173\u5361 1\u201D\uFF0C\u8FD9\u91CC\u6CA1\u6709\u8981\u786E\u8BA4\u7684\u4F01\u5212\u3002",
-  "ui.book_panel_plan_empty": "\u5168\u4E66\u4F01\u5212\u8FD8\u6CA1\u6709\u5185\u5BB9\u3002",
-  "ui.book_gate1_thread_label": "\u5168\u4E66\u4E3B\u7EBF",
   "ui.book_field_reader": "\u8BFB\u8005",
   "ui.book_field_goal": "\u76EE\u6807",
   "ui.book_field_angle": "\u5207\u5165\u89D2\u5EA6",
   "ui.book_field_tone": "\u8BED\u6C14",
   "ui.book_field_length": "\u7BC7\u5E45",
   "ui.book_field_style": "\u98CE\u683C",
-  "ui.book_panel_busy": "\u5904\u7406\u4E2D\u22EF",
-  "ui.book_panel_confirming": "\u786E\u8BA4\u4E2D\u22EF",
   "ui.book_eta_0": "\u7EA6\u5269 {0} \u5206\u949F",
   "ui.book_eta_under_minute": "\u4E0D\u5230 1 \u5206\u949F",
-  "ui.book_panel_gate2_title": "\u5173\u5361 2\uFF1A\u9A8C\u6536",
-  "ui.book_panel_gate2_done_tag": "\u9A8C\u6536\u5B8C\u6210",
-  "ui.book_panel_g2_all_done_0": "{0} \u7AE0\u90FD\u505A\u597D\u4E86",
-  "ui.book_panel_g2_some_0_1": "{0} \u7AE0\u5DF2\u4EA7\u51FA\uFF0C{1} \u7AE0\u4ECD\u9700\u6CE8\u610F",
-  "ui.book_panel_g2_look": "\u8981\u4F60\u770B",
   "ui.book_panel_g2_reason_unfinished": "\u8FD9\u7AE0\u8FD8\u6CA1\u5B8C\u6210",
   "ui.book_panel_g2_reason_structure_0": "\u6709 {0} \u9879\u5199\u4F5C\u8981\u6C42\u8FD8\u6CA1\u8FBE\u6210",
   "ui.book_panel_g2_reason_facts_0": "\u6709 {0} \u9879\u4E8B\u5B9E\u8FD8\u6CA1\u67E5\u8BC1\u5230\u6765\u6E90",
@@ -6434,8 +6377,6 @@ var zhCN = {
   "ui.book_note_review_accept": "\u63A5\u53D7\u73B0\u5728\u8FD9\u6837\uFF0C\u4E0D\u7528\u6539",
   "ui.book_note_review_fixed": "\u6211\u6539\u597D\u4E86",
   "ui.book_note_review_next_0": "\u4E0B\u4E00\u7AE0\u8981\u770B\u7684\uFF1A{0}",
-  "ui.book_panel_g2_edit_myself": "\u6211\u81EA\u5DF1\u6539",
-  "ui.book_panel_g2_confirm_seam": "\u8854\u63A5\u6CA1\u95EE\u9898",
   "ui.book_panel_reason_unmet_plain": "\u6709\u51E0\u9879\u5185\u5BB9\u6CA1\u901A\u8FC7\u6821\u5BF9",
   "ui.book_progress_line_global": "\u6B63\u5728\u89C4\u5212\u5168\u4E66",
   "ui.book_progress_line_plan_0_1": "\u6B63\u5728\u4F01\u5212\u7B2C {0}\uFF0F{1} \u7AE0",
@@ -6443,40 +6384,19 @@ var zhCN = {
   "ui.book_progress_line_write_0_1": "\u6B63\u5728\u5199\u7B2C {0}\uFF0F{1} \u7AE0",
   "ui.book_progress_line_sep": "\uFF0C",
   "ui.book_progress_line_done_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
-  "ui.book_panel_gate2_list_label": "\u5173\u5361 2 \u5361\u7247\u6E05\u5355",
-  "ui.book_panel_gate2_nothing": "\u8FD8\u6CA1\u6709\u53EF\u9A8C\u6536\u7684\u5361\u3002",
-  "ui.book_panel_gate2_hint": "\u8FD8\u6709\u7AE0\u8282\u6CA1\u5904\u7406\u65F6\uFF0C\u6309\u201C\u9A8C\u6536\u5B8C\u6210\u201D\u4F1A\u95EE\u4F60\u4E00\u6B21\u3002",
-  "ui.book_panel_finish": "\u9A8C\u6536\u5B8C\u6210",
-  "ui.book_panel_finishing": "\u9A8C\u6536\u4E2D\u2026",
-  "ui.book_panel_finish_waiting": "\u8FD8\u6709\u5361\u7247\u5728\u5904\u7406\u4E2D\uFF0C\u7B49\u5B83\u7ED3\u675F\u540E\u624D\u80FD\u70B9\u201C\u9A8C\u6536\u5B8C\u6210\u201D\u3002",
-  "ui.book_panel_elapsed_0": "\u82B1\u4E86 {0} \u5206\u949F",
-  "ui.book_panel_elapsed_under_minute": "\u82B1\u4E86\u4E0D\u5230 1 \u5206\u949F",
-  "ui.book_panel_elapsed_hint": "\u4ECE\u5F00\u59CB\u4F01\u5212\u5230\u5199\u5B8C\u7684\u65F6\u95F4",
-  "ui.book_panel_open_0": "\u6253\u5F00\u201C{0}\u201D\u7684\u7B14\u8BB0",
   "ui.book_panel_rerun_card": "\u91CD\u8DD1\u8FD9\u5F20",
   "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u56FE\u6587\u4E66\u8FD9\u4E00\u5F20\uFF1A{0}\uFF08\u4F01\u5212 \u2192 \u5199 \u2192 \u6821\uFF09",
-  "ui.book_panel_confirm_seam": "\u5DF2\u786E\u8BA4\u63A5\u7F1D",
-  "ui.book_panel_confirm_seam_0": "\u5DF2\u786E\u8BA4\u201C{0}\u201D\u7684\u63A5\u7F1D",
   "ui.book_seam_label": "\u63A5\u7F1D\u9700\u770B",
   "ui.book_seam_reason": "\u90BB\u5361\u4F01\u5212\u6216\u6B63\u6587\u5DF2\u53D8\u66F4\uFF0C\u5C1A\u672A\u4EBA\u5DE5\u6838\u5BF9\u3002",
   "ui.book_card_menu_rerun": "\u91CD\u8DD1\u56FE\u6587\u4E66\u8FD9\u4E00\u5F20",
   "ui.book_card_menu_rerun_sub": "\u4F01\u5212 \u2192 \u5199 \u2192 \u6821\uFF0C\u7EA6 2 \u5206\u949F\uFF1B\u524D\u540E\u7AE0\u4E0D\u52A8\uFF0C\u53EA\u6807\u201C\u63A5\u7F1D\u9700\u770B\u201D",
   "ui.book_rerun_tag": "\u5904\u7406\u4E2D",
-  "ui.book_progress_rerun_hint": "\u67D0\u4E00\u7AE0\u4E0D\u6EE1\u610F\uFF1F\u53EF\u4EE5\u53EA\u91CD\u8DD1\u90A3\u4E00\u7AE0\uFF0C\u4E0D\u7528\u6574\u672C\u91CD\u6765\u3002",
   "ui.book_panel_lead_sep": "\uFF0C",
   "ui.book_panel_reason_unchecked_0": "\u6709 {0} \u9879\u6CA1\u80FD\u6838\u5BF9\u5230\u6765\u6E90\u3002",
-  "ui.book_panel_still_review": "\u8FD8\u662F\u8981\u4F60\u770B",
-  "ui.book_finish_ask_title_0": "\u8FD8\u6709 {0} \u4EF6\u6CA1\u5904\u7406",
-  "ui.book_finish_ask_review_0": "{0} \u5F20\u9700\u4EBA\u770B",
-  "ui.book_finish_ask_review_title_0_1": "{0} \u5F20\u9700\u4EBA\u770B\uFF08{1}\uFF09",
-  "ui.book_finish_ask_line_0": "{0}\u3002",
-  "ui.book_finish_ask_back": "\u56DE\u53BB\u5904\u7406",
-  "ui.book_finish_ask_go": "\u4ECD\u8981\u5B8C\u6210",
   "ui.book_card_menu_why_other": "\u53E6\u4E00\u5F20\u6B63\u5728\u91CD\u8DD1",
   "ui.book_card_menu_why_running": "\u56FE\u6587\u4E66\u6B63\u5728\u6267\u884C\uFF0C\u7B49\u5B83\u7ED3\u675F\u540E\u518D\u91CD\u8DD1",
   "ui.book_card_menu_why_this": "\u8FD9\u4E00\u5F20\u6B63\u5728\u91CD\u8DD1",
-  "ui.book_card_menu_why_blocked": "\u5BF9\u8BDD\u8FDB\u884C\u4E2D\uFF0C\u7B49\u5B83\u7ED3\u675F\u540E\u518D\u91CD\u8DD1",
-  "ui.book_panel_not_gate2": "\u76EE\u524D\u4E0D\u5728\u5173\u5361 1 \u6216\u5173\u5361 2\uFF0C\u6CA1\u6709\u53EF\u770B\u7684\u5185\u5BB9\u3002"
+  "ui.book_card_menu_why_blocked": "\u5BF9\u8BDD\u8FDB\u884C\u4E2D\uFF0C\u7B49\u5B83\u7ED3\u675F\u540E\u518D\u91CD\u8DD1"
 };
 
 // i18n/zh-TW.ts
@@ -9526,6 +9446,15 @@ var zhTW = {
   "ui.book_abandoned": "\u5DF2\u8B8A\u56DE\u4E00\u822C\u5FC3\u667A\u5716\uFF0C\u4F60\u7684\u7B46\u8A18\u6C92\u6709\u88AB\u66F4\u52D5\u3002",
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u984D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
+  "ui.book_bar_trial_ready_0": "\u8A66\u8DD1\u7684 {0} \u7AE0\u5BEB\u597D\u4E86",
+  "ui.book_bar_open_first": "\u6253\u958B\u7B2C 1 \u7AE0",
+  "ui.book_bar_notes_ask_0": "\u9084\u6709 {0} \u5247\u5099\u8A3B\u6C92\u5957\u7528\uFF0C\u4ECD\u8981\u8DD1\u5B8C\u5168\u66F8\u55CE\uFF1F",
+  "ui.book_bar_go_anyway": "\u4ECD\u8981",
+  "ui.book_bar_review_0_1": "{0} \u7AE0\u5BEB\u597D\u4E86\uFF0C{1} \u7AE0\u8981\u4F60\u770B",
+  "ui.book_bar_next_review": "\u4E0B\u4E00\u7AE0\u8981\u770B\u7684",
+  "ui.book_bar_finish": "\u9A57\u6536\u5B8C\u6210",
+  "ui.book_bar_finish_ask_0": "\u9084\u6709 {0} \u7AE0\u6C92\u8655\u7406\uFF0C\u4ECD\u8981\u5B8C\u6210\u55CE\uFF1F",
+  "ui.book_bar_finish_go": "\u4ECD\u8981\u5B8C\u6210",
   "ui.book_confirm_gate1": "\u9019\u6A23\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u66F8",
   "ui.book_stage_pending": "\u5F85\u4F01\u5283",
   "ui.book_stage_planned": "\u5DF2\u4F01\u5283",
@@ -9572,40 +9501,14 @@ var zhTW = {
   "ui.book_plain_proof_no_open_page": "\u6821\u5C0D\u6642\u4E00\u500B\u4F86\u6E90\u9801\u90FD\u6253\u4E0D\u958B\uFF0C\u7121\u6CD5\u6838\u5C0D\u3002\u8ACB\u6309\u300C\u91CD\u8DD1\u9019\u5F35\u300D\uFF0C\u6216\u6253\u958B\u5361\u7247\u81EA\u5DF1\u67E5\u8B49\u3002",
   "ui.book_plain_proof_invalid_reply": "\u6821\u5C0D\u7684 AI \u56DE\u8986\u683C\u5F0F\u4E0D\u7B26\uFF0C\u91CD\u8A66\u591A\u6B21\u4ECD\u5931\u6557\u3002\u8ACB\u6309\u300C\u91CD\u8DD1\u9019\u5F35\u300D\u518D\u8A66\u4E00\u6B21\u3002",
   "ui.book_plain_proof_failed": "\u6821\u5C0D\u4E2D\u9014\u51FA\u932F\uFF0C\u9019\u5F35\u9084\u6C92\u6821\u6210\u3002\u8ACB\u6309\u300C\u91CD\u8DD1\u9019\u5F35\u300D\u518D\u8A66\u4E00\u6B21\u3002",
-  "ui.book_panel_label": "\u5716\u6587\u66F8\u95DC\u5361\u9762\u677F",
-  "ui.book_panel_tabs_label": "\u53F3\u5074\u6B04\u4F4D",
-  "ui.book_panel_tab_book": "\u5716\u6587\u66F8\u9762\u677F",
-  "ui.book_panel_tab_chat": "\u5C0D\u8A71",
-  "ui.book_panel_open": "\u958B\u555F\u95DC\u5361\u9762\u677F",
-  "ui.book_panel_close": "\u95DC\u9589\u9762\u677F",
-  "ui.book_panel_gate1_title": "\u95DC\u5361 1\uFF1A\u9019\u672C\u66F8\u8981\u9019\u6A23\u5BEB\uFF0C\u53EF\u4EE5\u55CE\uFF1F",
-  "ui.book_trial_title": "\u5148\u770B\u8A66\u8DD1\u7AE0\u7BC0\u7684\u5B8C\u6574\u6210\u54C1\uFF0C\u9019\u6A23\u53EF\u4EE5\u55CE\uFF1F",
-  "ui.book_trial_cards_label": "\u8A66\u8DD1\u7AE0\u7BC0",
-  "ui.book_trial_card_0_1": "\u8A66\u8DD1\uFF1A\u7B2C {0} \u7AE0\u3000{1}",
-  "ui.book_trial_done": "\u5DF2\u5B8C\u6210",
-  "ui.book_trial_look": "\u8981\u4F60\u770B",
-  "ui.book_trial_text_label_0": "{0} \u7684\u5B8C\u6574\u5167\u6587",
-  "ui.book_trial_no_text": "\u9019\u4E00\u7AE0\u9084\u6C92\u6709\u5167\u6587\u3002",
-  "ui.book_trial_fold": "\u60F3\u8ABF\u6574\uFF1F\u5168\u66F8\u8A2D\u5B9A\u3001\u6A21\u578B",
-  "ui.book_trial_retry": "\u7528\u65B0\u8A2D\u5B9A\u91CD\u8A66\u8A66\u8DD1",
-  "ui.book_panel_not_gate1": "\u76EE\u524D\u4E0D\u5728\u300C\u95DC\u5361 1\u300D\uFF0C\u9019\u88E1\u6C92\u6709\u8981\u78BA\u8A8D\u7684\u4F01\u5283\u3002",
-  "ui.book_panel_plan_empty": "\u5168\u66F8\u4F01\u5283\u9084\u6C92\u6709\u5167\u5BB9\u3002",
-  "ui.book_gate1_thread_label": "\u5168\u66F8\u4E3B\u7DDA",
   "ui.book_field_reader": "\u8B80\u8005",
   "ui.book_field_goal": "\u76EE\u6A19",
   "ui.book_field_angle": "\u5207\u5165\u89D2\u5EA6",
   "ui.book_field_tone": "\u8A9E\u6C23",
   "ui.book_field_length": "\u7BC7\u5E45",
   "ui.book_field_style": "\u98A8\u683C",
-  "ui.book_panel_busy": "\u8655\u7406\u4E2D\u22EF",
-  "ui.book_panel_confirming": "\u78BA\u8A8D\u4E2D\u22EF",
   "ui.book_eta_0": "\u7D04\u5269 {0} \u5206\u9418",
   "ui.book_eta_under_minute": "\u4E0D\u5230 1 \u5206\u9418",
-  "ui.book_panel_gate2_title": "\u95DC\u5361 2\uFF1A\u9A57\u6536",
-  "ui.book_panel_gate2_done_tag": "\u9A57\u6536\u5B8C\u6210",
-  "ui.book_panel_g2_all_done_0": "{0} \u7AE0\u90FD\u505A\u597D\u4E86",
-  "ui.book_panel_g2_some_0_1": "{0} \u7AE0\u5DF2\u7522\u51FA\uFF0C{1} \u7AE0\u4ECD\u9700\u6CE8\u610F",
-  "ui.book_panel_g2_look": "\u8981\u4F60\u770B",
   "ui.book_panel_g2_reason_unfinished": "\u9019\u7AE0\u9084\u6C92\u5B8C\u6210",
   "ui.book_panel_g2_reason_structure_0": "\u6709 {0} \u9805\u5BEB\u4F5C\u8981\u6C42\u9084\u6C92\u9054\u6210",
   "ui.book_panel_g2_reason_facts_0": "\u6709 {0} \u9805\u4E8B\u5BE6\u9084\u6C92\u67E5\u8B49\u5230\u4F86\u6E90",
@@ -9620,8 +9523,6 @@ var zhTW = {
   "ui.book_note_review_accept": "\u63A5\u53D7\u73FE\u5728\u9019\u6A23\uFF0C\u4E0D\u7528\u6539",
   "ui.book_note_review_fixed": "\u6211\u6539\u597D\u4E86",
   "ui.book_note_review_next_0": "\u4E0B\u4E00\u7AE0\u8981\u770B\u7684\uFF1A{0}",
-  "ui.book_panel_g2_edit_myself": "\u6211\u81EA\u5DF1\u6539",
-  "ui.book_panel_g2_confirm_seam": "\u929C\u63A5\u6C92\u554F\u984C",
   "ui.book_panel_reason_unmet_plain": "\u6709\u5E7E\u9805\u5167\u5BB9\u6C92\u901A\u904E\u6821\u5C0D",
   "ui.book_progress_line_global": "\u6B63\u5728\u898F\u5283\u5168\u66F8",
   "ui.book_progress_line_plan_0_1": "\u6B63\u5728\u4F01\u5283\u7B2C {0}\uFF0F{1} \u7AE0",
@@ -9629,40 +9530,19 @@ var zhTW = {
   "ui.book_progress_line_write_0_1": "\u6B63\u5728\u5BEB\u7B2C {0}\uFF0F{1} \u7AE0",
   "ui.book_progress_line_sep": "\uFF0C",
   "ui.book_progress_line_done_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
-  "ui.book_panel_gate2_list_label": "\u95DC\u5361 2 \u5361\u7247\u6E05\u55AE",
-  "ui.book_panel_gate2_nothing": "\u9084\u6C92\u6709\u53EF\u9A57\u6536\u7684\u5361\u3002",
-  "ui.book_panel_gate2_hint": "\u9084\u6709\u7AE0\u7BC0\u6C92\u8655\u7406\u6642\uFF0C\u6309\u300C\u9A57\u6536\u5B8C\u6210\u300D\u6703\u554F\u4F60\u4E00\u6B21\u3002",
-  "ui.book_panel_finish": "\u9A57\u6536\u5B8C\u6210",
-  "ui.book_panel_finishing": "\u9A57\u6536\u4E2D\u22EF",
-  "ui.book_panel_finish_waiting": "\u9084\u6709\u5361\u7247\u5728\u8655\u7406\u4E2D\uFF0C\u7B49\u5B83\u7D50\u675F\u5F8C\u624D\u80FD\u6309\u300C\u9A57\u6536\u5B8C\u6210\u300D\u3002",
-  "ui.book_panel_elapsed_0": "\u82B1\u4E86 {0} \u5206\u9418",
-  "ui.book_panel_elapsed_under_minute": "\u82B1\u4E86\u4E0D\u5230 1 \u5206\u9418",
-  "ui.book_panel_elapsed_hint": "\u5F9E\u958B\u59CB\u4F01\u5283\u5230\u5BEB\u5B8C\u7684\u6642\u9593",
-  "ui.book_panel_open_0": "\u6253\u958B\u300C{0}\u300D\u7684\u7B46\u8A18",
   "ui.book_panel_rerun_card": "\u91CD\u8DD1\u9019\u5F35",
   "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u5716\u6587\u66F8\u9019\u4E00\u5F35\uFF1A{0}\uFF08\u4F01\u5283 \u2192 \u5BEB \u2192 \u6821\uFF09",
-  "ui.book_panel_confirm_seam": "\u5DF2\u78BA\u8A8D\u63A5\u7E2B",
-  "ui.book_panel_confirm_seam_0": "\u5DF2\u78BA\u8A8D\u300C{0}\u300D\u7684\u63A5\u7E2B",
   "ui.book_seam_label": "\u63A5\u7E2B\u9700\u770B",
   "ui.book_seam_reason": "\u9130\u5361\u4F01\u5283\u6216\u6B63\u6587\u5DF2\u8B8A\u66F4\uFF0C\u5C1A\u672A\u4EBA\u5DE5\u6838\u5C0D\u3002",
   "ui.book_card_menu_rerun": "\u91CD\u8DD1\u5716\u6587\u66F8\u9019\u4E00\u5F35",
   "ui.book_card_menu_rerun_sub": "\u4F01\u5283 \u2192 \u5BEB \u2192 \u6821\uFF0C\u7D04 2 \u5206\u9418\uFF1B\u524D\u5F8C\u7AE0\u4E0D\u52D5\uFF0C\u53EA\u6A19\u300C\u63A5\u7E2B\u9700\u770B\u300D",
   "ui.book_rerun_tag": "\u8655\u7406\u4E2D",
-  "ui.book_progress_rerun_hint": "\u67D0\u4E00\u7AE0\u4E0D\u6EFF\u610F\uFF1F\u53EF\u4EE5\u53EA\u91CD\u8DD1\u90A3\u4E00\u7AE0\uFF0C\u4E0D\u7528\u6574\u672C\u91CD\u4F86\u3002",
   "ui.book_panel_lead_sep": "\uFF0C",
   "ui.book_panel_reason_unchecked_0": "\u6709 {0} \u9805\u6C92\u80FD\u6838\u5C0D\u5230\u4F86\u6E90\u3002",
-  "ui.book_panel_still_review": "\u9084\u662F\u8981\u4F60\u770B",
-  "ui.book_finish_ask_title_0": "\u9084\u6709 {0} \u4EF6\u6C92\u8655\u7406",
-  "ui.book_finish_ask_review_0": "{0} \u5F35\u9700\u4EBA\u770B",
-  "ui.book_finish_ask_review_title_0_1": "{0} \u5F35\u9700\u4EBA\u770B\uFF08{1}\uFF09",
-  "ui.book_finish_ask_line_0": "{0}\u3002",
-  "ui.book_finish_ask_back": "\u56DE\u53BB\u8655\u7406",
-  "ui.book_finish_ask_go": "\u4ECD\u8981\u5B8C\u6210",
   "ui.book_card_menu_why_other": "\u53E6\u4E00\u5F35\u6B63\u5728\u91CD\u8DD1",
   "ui.book_card_menu_why_running": "\u5716\u6587\u66F8\u6B63\u5728\u57F7\u884C\uFF0C\u7B49\u5B83\u7D50\u675F\u5F8C\u518D\u91CD\u8DD1",
   "ui.book_card_menu_why_this": "\u9019\u4E00\u5F35\u6B63\u5728\u91CD\u8DD1",
-  "ui.book_card_menu_why_blocked": "\u5C0D\u8A71\u9032\u884C\u4E2D\uFF0C\u7B49\u5B83\u7D50\u675F\u5F8C\u518D\u91CD\u8DD1",
-  "ui.book_panel_not_gate2": "\u76EE\u524D\u4E0D\u5728\u95DC\u5361 1 \u6216\u95DC\u5361 2\uFF0C\u6C92\u6709\u53EF\u770B\u7684\u5167\u5BB9\u3002"
+  "ui.book_card_menu_why_blocked": "\u5C0D\u8A71\u9032\u884C\u4E2D\uFF0C\u7B49\u5B83\u7D50\u675F\u5F8C\u518D\u91CD\u8DD1"
 };
 
 // i18n/languages.ts
@@ -10253,16 +10133,16 @@ var MermaidZoomModal = class extends import_obsidian2.Modal {
     const height = (viewport == null ? void 0 : viewport.clientHeight) || (viewport == null ? void 0 : viewport.getBoundingClientRect().height) || 0;
     return { width: width || 900, height: height || 600 };
   }
-  toolButton(parent, icon, label, run2, text10) {
-    const button2 = parent.createEl("button", {
+  toolButton(parent, icon, label, run, text10) {
+    const button = parent.createEl("button", {
       cls: "vam-mermaid-zoom-tool",
       attr: { type: "button", "aria-label": label }
     });
-    if (icon) (0, import_obsidian2.setIcon)(button2, icon);
-    if (text10) button2.createSpan({ text: text10 });
-    button2.addEventListener("click", () => {
+    if (icon) (0, import_obsidian2.setIcon)(button, icon);
+    if (text10) button.createSpan({ text: text10 });
+    button.addEventListener("click", () => {
       var _a2;
-      run2();
+      run();
       (_a2 = this.viewport) == null ? void 0 : _a2.focus();
     });
   }
@@ -10400,16 +10280,16 @@ function decorateDiagram(app, host) {
   if (!svg) return;
   host.addClass(SCOPE_CLASS, ZOOMABLE_CLASS);
   if (host.querySelector(`.${BUTTON_CLASS}`)) return;
-  const button2 = host.createEl("button", {
+  const button = host.createEl("button", {
     cls: `${BUTTON_CLASS} clickable-icon`,
     attr: { type: "button", "aria-label": t("ui.mermaid_zoom_open"), title: t("ui.mermaid_zoom_open") }
   });
-  (0, import_obsidian3.setIcon)(button2, "maximize-2");
-  button2.addEventListener("click", (event) => {
+  (0, import_obsidian3.setIcon)(button, "maximize-2");
+  button.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
     const current = host.querySelector("svg");
-    if (current) new MermaidZoomModal(app, current, button2).open();
+    if (current) new MermaidZoomModal(app, current, button).open();
   });
 }
 function inForeignEmbed(section3, host) {
@@ -12377,9 +12257,9 @@ var CoffeeCustomizationModal = class extends import_obsidian5.Modal {
     const fields = customizationFields(content, (_d = engine.session.guests) == null ? void 0 : _d.customization, engine.session.language);
     const errors = content.createEl("p", { cls: "ct-error", attr: { "aria-live": "polite" } });
     const actions = content.createDiv("ct-customization-actions");
-    const run2 = (label2, action) => {
-      const button2 = actions.createEl("button", { text: label2 });
-      button2.onclick = () => {
+    const run = (label2, action) => {
+      const button = actions.createEl("button", { text: label2 });
+      button.onclick = () => {
         const value = fields.read(), issues = validateCustomization(value, engine.session.language);
         errors.setText(issues.join("\n"));
         if (issues.length) return;
@@ -12392,16 +12272,16 @@ var CoffeeCustomizationModal = class extends import_obsidian5.Modal {
         });
       };
     };
-    run2(t2("coffee.apply_to_this_table"), async (value) => {
+    run(t2("coffee.apply_to_this_table"), async (value) => {
       await engine.setCustomization(style.value, value);
       new import_obsidian5.Notice(t2("coffee.table_settings_saved"));
       this.close();
     });
-    run2(t2("coffee.default_for_new_tables"), async (value) => {
+    run(t2("coffee.default_for_new_tables"), async (value) => {
       await this.saveDefault(style.value, value);
       new import_obsidian5.Notice(t2("coffee.saved_for_new_tables"));
     });
-    run2(t2("coffee.preview_convergence_once"), async (value) => {
+    run(t2("coffee.preview_convergence_once"), async (value) => {
       const before = convergencePreviewMarks(engine);
       let started = false;
       await this.confirmRun(async () => {
@@ -12678,11 +12558,6 @@ function unescapeMarkdownText(text10) {
 }
 function hashText(text10) {
   return (0, import_node_crypto.createHash)("sha256").update(text10.replace(/\r\n?/g, "\n")).digest("hex").slice(0, 16);
-}
-function firstSentence(text10) {
-  const line2 = text10.replace(/\s+/g, " ").trim();
-  const match = /^.*?(?:[。！？]|[.!?](?=\s|$))/u.exec(line2);
-  return match ? match[0] : line2;
 }
 
 // core/book-pipeline/settings.ts
@@ -17301,12 +17176,12 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
     this.app.workspace.requestSaveLayout();
   }
   button(parent, label, action, disabled = false) {
-    const button2 = parent.createEl("button", { text: label });
-    button2.disabled = disabled;
-    button2.addEventListener("click", () => {
+    const button = parent.createEl("button", { text: label });
+    button.disabled = disabled;
+    button.addEventListener("click", () => {
       void Promise.resolve().then(action).catch((error) => new import_obsidian8.Notice(error instanceof Error ? error.message : String(error)));
     });
-    return button2;
+    return button;
   }
   async home(edit) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q;
@@ -18030,14 +17905,14 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       completed: "coffee.filter_completed"
     };
     for (const filter of ["all", "generating", "unfinished", "completed"]) {
-      const button2 = this.button(filterBar, this.t(filterLabels[filter]), () => {
+      const button = this.button(filterBar, this.t(filterLabels[filter]), () => {
         this.tableFilter = filter;
         this.focusedTopic = null;
         updateFilters();
         void renderList();
       });
-      button2.setAttribute("aria-pressed", String(this.tableFilter === filter));
-      filterButtons.set(filter, button2);
+      button.setAttribute("aria-pressed", String(this.tableFilter === filter));
+      filterButtons.set(filter, button);
     }
     const topicFocusRow = aside.createDiv("ct-topic-focus is-hidden");
     const topicFocusText = topicFocusRow.createSpan();
@@ -18047,9 +17922,9 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       void renderList();
     });
     const updateFilters = () => {
-      for (const [filter, button2] of filterButtons) {
-        button2.toggleClass("is-active", this.tableFilter === filter && !this.focusedTopic);
-        button2.setAttribute("aria-pressed", String(this.tableFilter === filter && !this.focusedTopic));
+      for (const [filter, button] of filterButtons) {
+        button.toggleClass("is-active", this.tableFilter === filter && !this.focusedTopic);
+        button.setAttribute("aria-pressed", String(this.tableFilter === filter && !this.focusedTopic));
       }
       topicFocusRow.toggleClass("is-hidden", !this.focusedTopic);
       if (this.focusedTopic) topicFocusText.setText(this.t("coffee.same_topic", this.focusedTopic));
@@ -18325,7 +18200,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       updateSelection();
       for (const item of visible) {
         const time = tableTime(item), timestamp = new Date(time.value), status = this.t(tableStatusKey(item));
-        const entry = list2.createDiv("ct-list-entry"), button2 = this.button(entry, "", () => {
+        const entry = list2.createDiv("ct-list-entry"), button = this.button(entry, "", () => {
           if (item.status === "generating") void this.loadSession(item.path);
           else void showPreview(item.path);
         });
@@ -18341,23 +18216,23 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
           else selectedTables.delete(item.path);
           updateSelection();
         });
-        button2.empty();
-        button2.addClass("ct-list-item");
-        button2.createSpan({ cls: "ct-list-title", text: item.topic });
-        const meta = button2.createDiv("ct-list-meta");
+        button.empty();
+        button.addClass("ct-list-item");
+        button.createSpan({ cls: "ct-list-title", text: item.topic });
+        const meta = button.createDiv("ct-list-meta");
         meta.createSpan({ text: formatTableTime(time.value, Date.now(), this.plugin.settings.language) });
         const badge = meta.createSpan({ cls: `ct-status-badge ct-status-${item.status}`, text: status });
         badge.setAttribute("aria-label", status);
         if (time.isFallback) meta.createSpan({ cls: "ct-list-fallback", text: this.t("coffee.last_updated") });
         if (item.unreadable) {
-          button2.addClass("ct-list-unreadable");
-          button2.disabled = true;
-          button2.createDiv({ cls: "ct-list-reason", text: this.t("coffee.unreadable_reason") });
+          button.addClass("ct-list-unreadable");
+          button.disabled = true;
+          button.createDiv({ cls: "ct-list-reason", text: this.t("coffee.unreadable_reason") });
         }
-        if (this.selectedPath === item.path) button2.addClass("is-selected");
-        button2.setAttribute("aria-current", this.selectedPath === item.path ? "true" : "false");
+        if (this.selectedPath === item.path) button.addClass("is-selected");
+        button.setAttribute("aria-current", this.selectedPath === item.path ? "true" : "false");
         if (Number.isFinite(timestamp.getTime()))
-          button2.setAttribute(
+          button.setAttribute(
             "title",
             `${item.topic}
 ${formatTableDateTime(timestamp.getTime(), this.plugin.settings.language)}${item.model ? ` \xB7 ${item.model}` : ""}`
@@ -20327,17 +20202,17 @@ function modalActions(modal) {
 function actionStatus(actions) {
   return actions.createSpan({ cls: "vam-next-actions-note vam-next-status", attr: { "aria-live": "polite" } });
 }
-function armDiscard(button2, status, discard, blocked = () => false, labels = { confirm: t("ui.discard_confirm"), hint: t("ui.discard_confirm_hint") }) {
+function armDiscard(button, status, discard, blocked = () => false, labels = { confirm: t("ui.discard_confirm"), hint: t("ui.discard_confirm_hint") }) {
   var _a2;
-  const label = (_a2 = button2.textContent) != null ? _a2 : "";
+  const label = (_a2 = button.textContent) != null ? _a2 : "";
   let timer = 0;
   const disarm = () => {
     window.clearTimeout(timer);
     timer = 0;
-    button2.setText(label);
-    button2.removeClass("mod-warning");
+    button.setText(label);
+    button.removeClass("mod-warning");
   };
-  button2.addEventListener("click", () => {
+  button.addEventListener("click", () => {
     if (blocked()) return;
     if (timer) {
       disarm();
@@ -20348,8 +20223,8 @@ function armDiscard(button2, status, discard, blocked = () => false, labels = { 
       disarm();
       status.setText("");
     }, 5e3);
-    button2.setText(labels.confirm);
-    button2.addClass("mod-warning");
+    button.setText(labels.confirm);
+    button.addClass("mod-warning");
     status.setText(labels.hint);
   });
   return disarm;
@@ -20488,13 +20363,13 @@ var AnchorPickModal = class extends import_obsidian9.Modal {
     const list2 = this.contentEl.createDiv("vam-anchor-pick-list");
     for (const entry of this.entries) {
       const row = list2.createDiv("vam-anchor-pick-row");
-      const button2 = row.createEl("button", { text: entry.label, attr: { type: "button" } });
-      button2.disabled = entry.taken;
+      const button = row.createEl("button", { text: entry.label, attr: { type: "button" } });
+      button.disabled = entry.taken;
       if (entry.taken) {
-        button2.setAttr("aria-disabled", "true");
+        button.setAttr("aria-disabled", "true");
         row.createSpan({ text: t("ui.anchor_relation_pick_taken"), cls: "vam-anchor-pick-taken" });
       }
-      button2.addEventListener("click", () => {
+      button.addEventListener("click", () => {
         if (entry.taken) return;
         this.close();
         this.choose(entry);
@@ -22286,20 +22161,20 @@ function maskInlineCode(line2) {
       out += line2[i++];
       continue;
     }
-    let run2 = 0;
-    while (line2[i + run2] === "`") run2++;
-    const ticks = "`".repeat(run2);
-    const close = line2.indexOf(ticks, i + run2);
+    let run = 0;
+    while (line2[i + run] === "`") run++;
+    const ticks = "`".repeat(run);
+    const close = line2.indexOf(ticks, i + run);
     let end = close;
-    while (end !== -1 && (line2[end + run2] === "`" || line2[end - 1] === "`")) {
+    while (end !== -1 && (line2[end + run] === "`" || line2[end - 1] === "`")) {
       end = line2.indexOf(ticks, end + 1);
     }
     if (end === -1) {
-      out += line2.slice(i, i + run2);
-      i += run2;
+      out += line2.slice(i, i + run);
+      i += run;
     } else {
-      out += "\0".repeat(end + run2 - i);
-      i = end + run2;
+      out += "\0".repeat(end + run - i);
+      i = end + run;
     }
   }
   return out;
@@ -23419,7 +23294,7 @@ function withoutMermaid(text10) {
 }
 function inlineCode(text10) {
   var _a2;
-  const longest = Math.max(0, ...((_a2 = text10.match(/`+/g)) != null ? _a2 : []).map((run2) => run2.length));
+  const longest = Math.max(0, ...((_a2 = text10.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
   const fence = "`".repeat(longest + 1);
   return longest ? `${fence} ${text10} ${fence}` : `${fence}${text10}${fence}`;
 }
@@ -23834,10 +23709,10 @@ function fishbonePositions(input2) {
         cursor += sizes.get(detail.id) + gap;
       }
       const length = Math.max(column, cursor);
-      const run2 = length * BONE_RUN;
+      const run = length * BONE_RUN;
       const height = heightFor(topic);
       const lefts = [-width / 2, ...cards.map((card) => card.x)];
-      const rights = [width / 2, run2, ...cards.map((card) => card.x + width)];
+      const rights = [width / 2, run, ...cards.map((card) => card.x + width)];
       return {
         topic,
         side,
@@ -25077,7 +24952,7 @@ var History = class {
       return;
     }
     this.past.push(...all.filter((entry) => this.solo.has(entry)));
-    const run2 = async (list2, redo) => {
+    const run = async (list2, redo) => {
       const done = [];
       try {
         for (const entry of list2) {
@@ -25093,8 +24968,8 @@ var History = class {
       }
     };
     const combined = {
-      undo: () => run2([...entries].reverse(), false),
-      redo: () => run2(entries, true),
+      undo: () => run([...entries].reverse(), false),
+      redo: () => run(entries, true),
       ...label ? { label } : {}
     };
     this.past.push(combined);
@@ -25655,7 +25530,7 @@ function begin(deps) {
   };
   let committed = false;
   const exists = (path) => !!repo.app.vault.getAbstractFileByPath(path);
-  async function run2(files, maps, rebuild2, notes = { before: [], after: [] }, refresh = []) {
+  async function run(files, maps, rebuild2, notes = { before: [], after: [] }, refresh = []) {
     const journal = { files: [], maps: [], notes: [] };
     const rewrite = async (step) => {
       journal.notes.push({ path: step.path, restore: step.restore, written: true });
@@ -25837,7 +25712,7 @@ function begin(deps) {
         if (undoing) notes.after.push({ path: at, restore, apply: () => writeText(repo, note.path, note.beforeText) });
         else notes.before.push({ path: note.path, restore, apply: () => note.write(note.path, attachment) });
       }
-      await run2(files, maps, rebuild2, notes, refresh);
+      await run(files, maps, rebuild2, notes, refresh);
     };
     return {
       undo: () => apply("undo"),
@@ -28410,8 +28285,8 @@ function documentFootnoteLabel(document2) {
 }
 function resolveSummaryReferences(summary, groups) {
   const documents = dedupeReferenceGroups(groups).flatMap((group) => group.documents);
-  const run2 = String.raw`\[S\d+\](?:\s*[,，、;；]?\s*\[S\d+\])*`;
-  const stripped = summary.replace(new RegExp(String.raw`[ \t]*[（(]\s*${run2}\s*[）)]`, "g"), "").replace(new RegExp(String.raw`[ \t]*${run2}`, "g"), "").trim();
+  const run = String.raw`\[S\d+\](?:\s*[,，、;；]?\s*\[S\d+\])*`;
+  const stripped = summary.replace(new RegExp(String.raw`[ \t]*[（(]\s*${run}\s*[）)]`, "g"), "").replace(new RegExp(String.raw`[ \t]*${run}`, "g"), "").trim();
   return resolveWikilinks(stripped, documents);
 }
 var FOOTNOTE_REFERENCE = /\[\^([^\]\s]+)\](?!\()/g;
@@ -28863,13 +28738,13 @@ function enqueueCommit(app, mapId, task) {
   var _a2, _b2;
   const queues = (_a2 = commitQueues.get(app)) != null ? _a2 : /* @__PURE__ */ new Map();
   commitQueues.set(app, queues);
-  const run2 = ((_b2 = queues.get(mapId)) != null ? _b2 : Promise.resolve()).then(task, task);
-  const tail = run2.catch(() => void 0);
+  const run = ((_b2 = queues.get(mapId)) != null ? _b2 : Promise.resolve()).then(task, task);
+  const tail = run.catch(() => void 0);
   queues.set(mapId, tail);
   void tail.then(() => {
     if (queues.get(mapId) === tail) queues.delete(mapId);
   });
-  return run2;
+  return run;
 }
 async function addExternalSource(app, mapId, input2, scope) {
   const check = await checkExternalRoot(input2, scope);
@@ -29199,16 +29074,16 @@ function problem2(raw, nodeIds) {
     if (!isStr(id)) return `role ${key4} malformed`;
     if (!nodeIds.has(id)) return `role ${key4} points to a missing node`;
   }
-  const run2 = raw.run;
-  if (!isRec(run2)) return "run missing";
-  if (!isStr(run2.runId) || !count(run2.researchCalls)) return "run malformed";
-  if (run2.presetAssumptions !== void 0) {
-    const preset = run2.presetAssumptions;
+  const run = raw.run;
+  if (!isRec(run)) return "run missing";
+  if (!isStr(run.runId) || !count(run.researchCalls)) return "run malformed";
+  if (run.presetAssumptions !== void 0) {
+    const preset = run.presetAssumptions;
     if (!Array.isArray(preset) || !preset.length || preset.some((item) => !isRec(item) || !isStr(item.label) || !isStr(item.value) || !isStr(item.reason)))
       return "run malformed";
   }
-  if (!optOneOf(QUESTION_TYPES, run2.presetQuestionType)) return "unknown run enum";
-  if (!oneOf(RUN_PHASES, run2.phase) || !oneOf(RUN_STATUSES, run2.status) || !optOneOf(STOP_REASONS, run2.stopReason))
+  if (!optOneOf(QUESTION_TYPES, run.presetQuestionType)) return "unknown run enum";
+  if (!oneOf(RUN_PHASES, run.phase) || !oneOf(RUN_STATUSES, run.status) || !optOneOf(STOP_REASONS, run.stopReason))
     return "unknown run enum";
   const situation = raw.situation;
   if (!isRec(situation) || !Array.isArray(situation.data) || !isRec(situation.gate)) return "situation malformed";
@@ -29593,17 +29468,17 @@ function rebaseMapNotePaths(map, rebase) {
     }
     if (JSON.stringify(branch.inputSnapshot) === snapshotBefore) continue;
     const hash = hashSnapshot({ branch: branch.inputSnapshot, answer: branch.answerSnapshot });
-    for (const run2 of aim.runs) {
-      if (run2.branchId !== branch.id) continue;
-      for (const attempt of run2.attempts) {
+    for (const run of aim.runs) {
+      if (run.branchId !== branch.id) continue;
+      for (const attempt of run.attempts) {
         attempt.inputSnapshotHash = hash;
         for (const draft of (_b2 = aim.resultDrafts) != null ? _b2 : [])
-          if (draft.runId === run2.id && draft.attemptId === attempt.id) draft.inputSnapshotHash = hash;
+          if (draft.runId === run.id && draft.attemptId === attempt.id) draft.inputSnapshotHash = hash;
       }
     }
   }
-  for (const run2 of aim.runs)
-    for (const attempt of run2.attempts)
+  for (const run of aim.runs)
+    for (const attempt of run.attempts)
       if (attempt.retainedReports) attempt.retainedReports.notePath = move(attempt.retainedReports.notePath);
   for (const draft of (_c = aim.resultDrafts) != null ? _c : []) {
     draft.notePath = move(draft.notePath);
@@ -32978,7 +32853,7 @@ var ChatActionWriter = class {
   get app() {
     return this.ports.app();
   }
-  async write(action, baseline, same2, run2) {
+  async write(action, baseline, same2, run) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h;
     const hashes = baseline.mdHashes;
     if (!same2() || !this.map) return skipped("ui.map_chat_skip_map_changed");
@@ -32991,7 +32866,7 @@ var ChatActionWriter = class {
     const configDir = this.app.vault.configDir;
     const real = (id) => {
       var _a3;
-      return id.startsWith(MAP_CHAT_NEW_PREFIX) ? (_a3 = run2.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length))) != null ? _a3 : null : id;
+      return id.startsWith(MAP_CHAT_NEW_PREFIX) ? (_a3 = run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length))) != null ? _a3 : null : id;
     };
     const sourceFileRefusal = (node) => {
       const verdict = guardMapChatWrite({
@@ -33017,29 +32892,29 @@ var ChatActionWriter = class {
           if (this.ports.isMerging(parent.id)) return skipped("ui.map_chat_skip_merge_locked");
         }
         const before = new Set(this.map.nodes.map((item) => item.id));
-        if (run2.deferRebuild) run2.ownershipDirty = true;
-        await this.ports.addNode(parent, action.title, !run2.deferRebuild, false, (_b2 = action.topicKind) != null ? _b2 : "topic", false, {
+        if (run.deferRebuild) run.ownershipDirty = true;
+        await this.ports.addNode(parent, action.title, !run.deferRebuild, false, (_b2 = action.topicKind) != null ? _b2 : "topic", false, {
           leaning: action.leaning,
           strength: action.strength
         });
         const created = (_c = this.map) == null ? void 0 : _c.nodes.find((item) => !before.has(item.id));
         if (!created) return skipped("ui.map_chat_skip_unavailable");
-        run2.created.push(created.id);
-        (_d = run2.notes) == null ? void 0 : _d.add(created.id);
-        if (action.ref) run2.refs.set(action.ref, created.id);
+        run.created.push(created.id);
+        (_d = run.notes) == null ? void 0 : _d.add(created.id);
+        if (action.ref) run.refs.set(action.ref, created.id);
         if (action.summary) await this.ports.noteChange(created, { summary: action.summary });
         return done;
       }
       case "set_topic_kind":
-        return this.chatSetTopicKind(action, real, run2);
+        return this.chatSetTopicKind(action, real, run);
       case "add_relation":
       case "remove_relation":
         return this.chatChangeRelation(action, real);
       case "add_anchor":
       case "link_anchor":
-        return this.chatChangeAnchor(action, real, run2);
+        return this.chatChangeAnchor(action, real, run);
       case "set_appearance":
-        return this.chatSetAppearance(action, real, run2);
+        return this.chatSetAppearance(action, real, run);
       case "collapse_topic":
       case "expand_topic": {
         this.ports.flushChatRender();
@@ -33082,7 +32957,7 @@ var ChatActionWriter = class {
         if (this.ports.isMerging(node.id)) return skipped("ui.map_chat_skip_merge_locked");
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes, action.kind === "edit_topic_note");
         if (changed) return changed;
-        (_e = run2.notes) == null ? void 0 : _e.add(node.id);
+        (_e = run.notes) == null ? void 0 : _e.add(node.id);
         await this.ports.noteChange(
           node,
           action.kind === "rename_topic" ? { title: action.title } : action.kind === "update_summary" ? { summary: action.summary } : { detail }
@@ -33141,7 +33016,7 @@ var ChatActionWriter = class {
         const changed = await this.chatTopicStale(node.id, baseline.topicHashes);
         if (changed) return changed;
         const removed = await this.ports.removeToUnassignedEntry(node, action.branch);
-        for (const path of (_g = (_f = removed == null ? void 0 : removed.parkedPaths) == null ? void 0 : _f.call(removed)) != null ? _g : []) (_h = run2.parked) == null ? void 0 : _h.add(path);
+        for (const path of (_g = (_f = removed == null ? void 0 : removed.parkedPaths) == null ? void 0 : _f.call(removed)) != null ? _g : []) (_h = run.parked) == null ? void 0 : _h.add(path);
         return done;
       }
       case "edit_md_file": {
@@ -33216,7 +33091,7 @@ var ChatActionWriter = class {
             replace = next.slice(from, next.length - rest);
           }
           source.editor.replaceRange(replace, source.editor.offsetToPos(from), source.editor.offsetToPos(to));
-          this.recordChatFileEdit(source.file.path, source.text, next, run2);
+          this.recordChatFileEdit(source.file.path, source.text, next, run);
           if (editKey) hashes[editKey] = contentHash2(next);
           return done;
         }
@@ -33229,7 +33104,7 @@ var ChatActionWriter = class {
           return next;
         });
         if (raced) return skipped("ui.map_chat_skip_stale");
-        this.recordChatFileEdit(source.file.path, source.text, next, run2);
+        this.recordChatFileEdit(source.file.path, source.text, next, run);
         if (editKey) hashes[editKey] = contentHash2(next);
         return done;
       }
@@ -33261,7 +33136,7 @@ var ChatActionWriter = class {
           if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
         }
         await this.app.vault.create(key4, content);
-        this.recordChatFileCreate(key4, content, run2);
+        this.recordChatFileCreate(key4, content, run);
         hashes[key4] = contentHash2(content);
         return done;
       }
@@ -33272,7 +33147,7 @@ var ChatActionWriter = class {
    * value per single-choice marker group, one text size; unknown frontmatter values stay). Only the notes whose appearance
    * really changes are written; Map.md changes only its viewport. A card of an AIM map (or an AIM card) has none and is skipped.
    */
-  async chatSetAppearance(action, real, run2) {
+  async chatSetAppearance(action, real, run) {
     var _a2, _b2, _c, _d;
     if (!this.map || !this.ports.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
     const nodes = action.nodeIds.map((id) => real(id)).map((id) => {
@@ -33283,11 +33158,11 @@ var ChatActionWriter = class {
     const editableAll = nodes.filter((node) => this.notes.get(node.id));
     if (!editableAll.length) return skipped("ui.map_chat_skip_unavailable");
     if (editableAll.some((node) => this.ports.isMerging(node.id))) return skipped("ui.map_chat_skip_merge_locked");
-    const heldIds = (run2 == null ? void 0 : run2.mergeSourceIds) ? editableAll.filter((node) => {
+    const heldIds = (run == null ? void 0 : run.mergeSourceIds) ? editableAll.filter((node) => {
       var _a3;
-      return (_a3 = run2.mergeSourceIds) == null ? void 0 : _a3.has(node.id);
+      return (_a3 = run.mergeSourceIds) == null ? void 0 : _a3.has(node.id);
     }) : [];
-    if (heldIds.length) (_a2 = run2 == null ? void 0 : run2.held) == null ? void 0 : _a2.push({ action, ids: heldIds.map((node) => node.id) });
+    if (heldIds.length) (_a2 = run == null ? void 0 : run.held) == null ? void 0 : _a2.push({ action, ids: heldIds.map((node) => node.id) });
     const editable = editableAll.filter((node) => !heldIds.includes(node));
     const skippedCards = new Set(action.nodeIds.map((id) => {
       var _a3;
@@ -33307,7 +33182,7 @@ var ChatActionWriter = class {
       };
       if (!Object.keys(topicAppearanceValues(shown, change2)).length) continue;
       changes++;
-      (_d = run2 == null ? void 0 : run2.notes) == null ? void 0 : _d.add(node.id);
+      (_d = run == null ? void 0 : run.notes) == null ? void 0 : _d.add(node.id);
       transaction.rewriteNote(node.path, (path) => this.plugin.repo.writeTopicAppearance(path, change2));
     }
     if (!changes) return done();
@@ -33366,7 +33241,7 @@ var ChatActionWriter = class {
    * a pair that already has a relation skips only that item. The anchor id is made here (never taken from the reply) and does not
    * collide with a card or an anchor of the picture. Never on an AIM map.
    */
-  async chatChangeAnchor(action, real, run2) {
+  async chatChangeAnchor(action, real, run) {
     var _a2, _b2, _c, _d, _e, _f;
     if (!this.map || !this.ports.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
     const items = (_a2 = this.map.canvasItems) != null ? _a2 : [];
@@ -33396,10 +33271,10 @@ var ChatActionWriter = class {
           });
       }, false);
       if (box2.refused) return skipped(box2.refused);
-      ((_b2 = run2.anchors) != null ? _b2 : run2.anchors = /* @__PURE__ */ new Map()).set(action.ref, anchorId2);
+      ((_b2 = run.anchors) != null ? _b2 : run.anchors = /* @__PURE__ */ new Map()).set(action.ref, anchorId2);
       return { status: "done" };
     }
-    const anchorId = action.anchorId.startsWith(MAP_CHAT_ANCHOR_PREFIX) ? (_c = run2.anchors) == null ? void 0 : _c.get(action.anchorId.slice(MAP_CHAT_ANCHOR_PREFIX.length)) : action.anchorId;
+    const anchorId = action.anchorId.startsWith(MAP_CHAT_ANCHOR_PREFIX) ? (_c = run.anchors) == null ? void 0 : _c.get(action.anchorId.slice(MAP_CHAT_ANCHOR_PREFIX.length)) : action.anchorId;
     if (!anchorId || !image.anchors.some((anchor) => anchor.id === anchorId))
       return skipped("ui.map_chat_skip_anchor_gone");
     const nodeId = real(action.nodeId);
@@ -33425,7 +33300,7 @@ var ChatActionWriter = class {
         return;
       }
       const topic = map.nodes.find((node) => node.id === nodeId);
-      const ring = !!topic && !topic.parentId && run2.created.includes(nodeId) && !ringMemberIds(map.nodes, (_b3 = map.canvasItems) != null ? _b3 : []).has(nodeId);
+      const ring = !!topic && !topic.parentId && run.created.includes(nodeId) && !ringMemberIds(map.nodes, (_b3 = map.canvasItems) != null ? _b3 : []).has(nodeId);
       const marked = ring ? { ...link, ring: true } : link;
       if (!anchorRelationAllowed(current, marked)) box.refused = "ui.map_chat_skip_relation_not_allowed";
       else {
@@ -33436,13 +33311,13 @@ var ChatActionWriter = class {
     }, false);
     if (box.refused) return skipped(box.refused);
     if (box.ring) {
-      ((_d = run2.ringImages) != null ? _d : run2.ringImages = /* @__PURE__ */ new Set()).add(action.imageId);
-      const added = (_f = ((_e = run2.ringAdded) != null ? _e : run2.ringAdded = /* @__PURE__ */ new Map()).get(action.imageId)) != null ? _f : {
+      ((_d = run.ringImages) != null ? _d : run.ringImages = /* @__PURE__ */ new Set()).add(action.imageId);
+      const added = (_f = ((_e = run.ringAdded) != null ? _e : run.ringAdded = /* @__PURE__ */ new Map()).get(action.imageId)) != null ? _f : {
         hadRing: box.hadRing,
         topicIds: []
       };
       added.topicIds.push(nodeId);
-      run2.ringAdded.set(action.imageId, added);
+      run.ringAdded.set(action.imageId, added);
     }
     return { status: "done" };
   }
@@ -33451,7 +33326,7 @@ var ChatActionWriter = class {
    * target in one step. Only the note's frontmatter changes: never the title, the body, the id, the parent or a relation. A card
    * of an AIM map (or an AIM card) has no type and is skipped; a card that already has the type and strength is left alone.
    */
-  async chatSetTopicKind(action, real, run2) {
+  async chatSetTopicKind(action, real, run) {
     var _a2, _b2, _c;
     if (!this.map || !this.ports.relationsEnabled()) return skipped("ui.map_chat_skip_unavailable");
     const nodes = action.nodeIds.map((id) => real(id)).map((id) => {
@@ -33479,7 +33354,7 @@ var ChatActionWriter = class {
       const strengthWrite = hypothesis && !!action.strength && (kindChanges || leaningWrite || target.strength !== current.strength);
       if (!kindChanges && !leaningWrite && !strengthWrite) continue;
       changes++;
-      (_c = run2 == null ? void 0 : run2.notes) == null ? void 0 : _c.add(node.id);
+      (_c = run == null ? void 0 : run.notes) == null ? void 0 : _c.add(node.id);
       transaction.rewriteNote(node.path, async (path) => {
         if (kindChanges) await this.plugin.repo.writeTopicKind(path, kind);
         if (leaningWrite) await this.plugin.repo.writeHypothesisLeaning(path, target.leaning);
@@ -33602,9 +33477,9 @@ var ChatActionWriter = class {
     else await this.app.vault.process(source.file, () => text10);
   }
   /** edit_md_file as an undo entry: undo puts the old text back, redo the new one, each only over the text it expects. */
-  recordChatFileEdit(path, before, after, run2) {
+  recordChatFileEdit(path, before, after, run) {
     var _a2;
-    (_a2 = run2.files) == null ? void 0 : _a2.add(path);
+    (_a2 = run.files) == null ? void 0 : _a2.add(path);
     this.ports.noteChatOwnFile(path, after, false);
     const swap = async (expected, replacement) => {
       if (await this.ports.chatFileText(path) !== expected) throw this.ports.chatUndoRefusal();
@@ -33613,9 +33488,9 @@ var ChatActionWriter = class {
     this.history.push({ undo: () => swap(after, before), redo: () => swap(before, after) });
   }
   /** create_md_file as an undo entry: undo moves the file to the trash, redo creates it again, each only when nothing changed. */
-  recordChatFileCreate(path, content, run2) {
+  recordChatFileCreate(path, content, run) {
     var _a2;
-    (_a2 = run2.files) == null ? void 0 : _a2.add(path);
+    (_a2 = run.files) == null ? void 0 : _a2.add(path);
     this.ports.noteChatOwnFile(path, content, true);
     this.history.push({
       undo: async () => {
@@ -34892,7 +34767,7 @@ function pointToBoxCurve(original, box, pointIsFrom) {
       y: original.y + (edge.y - original.y) / toEdge * inset
     };
   }
-  const length = gap > 0 ? controlLength(gap) : 0, run2 = Math.hypot(edge.x - point.x, edge.y - point.y) || 1, near = { x: point.x + (edge.x - point.x) / run2 * length, y: point.y + (edge.y - point.y) / run2 * length }, far = { x: edge.x + edge.nx * length, y: edge.y + edge.ny * length };
+  const length = gap > 0 ? controlLength(gap) : 0, run = Math.hypot(edge.x - point.x, edge.y - point.y) || 1, near = { x: point.x + (edge.x - point.x) / run * length, y: point.y + (edge.y - point.y) / run * length }, far = { x: edge.x + edge.nx * length, y: edge.y + edge.ny * length };
   return pointIsFrom ? { p1: { x: point.x, y: point.y }, c1: near, c2: far, p2: { x: edge.x, y: edge.y } } : { p1: { x: edge.x, y: edge.y }, c1: far, c2: near, p2: { x: point.x, y: point.y } };
 }
 function pointToBoxPathData(point, box, pointIsFrom) {
@@ -34905,9 +34780,9 @@ function pointToBoxLabelPoint(point, box, pointIsFrom) {
 }
 function pointToBoxStraight(original, box, side, pointIsFrom) {
   const end = side === "top" ? { x: box.x + box.width / 2, y: box.y + box.height } : side === "bottom" ? { x: box.x + box.width / 2, y: box.y } : side === "left" ? { x: box.x + box.width, y: box.y + box.height / 2 } : { x: box.x, y: box.y + box.height / 2 };
-  const run2 = Math.hypot(end.x - original.x, end.y - original.y) || 1, inset = Math.min(ANCHOR_LINE_INSET, run2 / 2), start = {
-    x: original.x + (end.x - original.x) / run2 * inset,
-    y: original.y + (end.y - original.y) / run2 * inset
+  const run = Math.hypot(end.x - original.x, end.y - original.y) || 1, inset = Math.min(ANCHOR_LINE_INSET, run / 2), start = {
+    x: original.x + (end.x - original.x) / run * inset,
+    y: original.y + (end.y - original.y) / run * inset
   };
   return pointIsFrom ? { p1: start, p2: end } : { p1: end, p2: start };
 }
@@ -34926,16 +34801,16 @@ function treeEdgePathData(parent, child, direction, depth = 1) {
   if (direction === "fishbone")
     return depth >= 3 ? treeEdgePathData(parent, child, "left") : fishboneEdgePathData(parent, child, depth);
   if (direction === "down" || direction === "up") {
-    const x12 = parent.x + parent.width / 2, x22 = child.x + child.width / 2, down = direction === "down", y12 = down ? parent.y + parent.height : parent.y, y22 = down ? child.y : child.y + child.height, run3 = down ? y22 - y12 : y12 - y22, bend2 = run3 >= 40 ? run3 / 2 : run3 >= 0 ? 60 - run3 : Math.max(60, -run3 / 2), sign = down ? 1 : -1;
+    const x12 = parent.x + parent.width / 2, x22 = child.x + child.width / 2, down = direction === "down", y12 = down ? parent.y + parent.height : parent.y, y22 = down ? child.y : child.y + child.height, run2 = down ? y22 - y12 : y12 - y22, bend2 = run2 >= 40 ? run2 / 2 : run2 >= 0 ? 60 - run2 : Math.max(60, -run2 / 2), sign = down ? 1 : -1;
     return `M ${x12} ${y12} C ${x12} ${y12 + sign * bend2}, ${x22} ${y22 - sign * bend2}, ${x22} ${y22}`;
   }
   const y1 = parent.y + parent.height / 2, y2 = child.y + child.height / 2;
   const leftward = direction === "balanced" ? child.x + child.width / 2 < parent.x + parent.width / 2 : direction === "left";
   if (leftward) {
-    const x12 = parent.x, x22 = child.x + child.width, run3 = x12 - x22, bend2 = run3 >= 40 ? run3 / 2 : run3 >= 0 ? 60 - run3 : Math.max(60, -run3 / 2);
+    const x12 = parent.x, x22 = child.x + child.width, run2 = x12 - x22, bend2 = run2 >= 40 ? run2 / 2 : run2 >= 0 ? 60 - run2 : Math.max(60, -run2 / 2);
     return `M ${x12} ${y1} C ${x12 - bend2} ${y1}, ${x22 + bend2} ${y2}, ${x22} ${y2}`;
   }
-  const x1 = parent.x + parent.width, x2 = child.x, run2 = x2 - x1, bend = run2 >= 40 ? run2 / 2 : run2 >= 0 ? 60 - run2 : Math.max(60, -run2 / 2);
+  const x1 = parent.x + parent.width, x2 = child.x, run = x2 - x1, bend = run >= 40 ? run / 2 : run >= 0 ? 60 - run : Math.max(60, -run / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
 var BONE_RUN2 = 1 / Math.tan(Math.PI / 3);
@@ -35846,7 +35721,7 @@ function showsToResearch(kind, status, progressDone = false) {
 
 // experiences/visual-map/view.ts
 var import_node_crypto9 = require("node:crypto");
-var import_obsidian38 = require("obsidian");
+var import_obsidian37 = require("obsidian");
 
 // experiences/visual-map/map-sources-control.ts
 var import_obsidian18 = require("obsidian");
@@ -36383,35 +36258,35 @@ var MapSourcesControl = class {
     if (this.mapSourcesOpen) this.drawMapSourcesPanelEl(null);
   }
   drawMapSourcesButton(parent) {
-    const button2 = this.ports.button(parent, () => {
+    const button = this.ports.button(parent, () => {
       if (this.mapSourcesOpen && this.mapSourcesPanelEl) this.closeMapSourcesPanel(true);
       else this.openMapSourcesPanel();
     });
-    button2.addClass("vam-sources-button");
-    button2.setAttr("aria-haspopup", "dialog");
-    button2.setAttr("aria-controls", this.mapSourcesPanelId);
-    button2.addEventListener("mousedown", (event) => event.preventDefault());
-    button2.addEventListener("focusout", (event) => {
+    button.addClass("vam-sources-button");
+    button.setAttr("aria-haspopup", "dialog");
+    button.setAttr("aria-controls", this.mapSourcesPanelId);
+    button.addEventListener("mousedown", (event) => event.preventDefault());
+    button.addEventListener("focusout", (event) => {
       var _a2;
-      if (!this.mapSourcesOpen || this.mapSourcesButtonEl !== button2 || this.mapSourcesPickerOpen) return;
+      if (!this.mapSourcesOpen || this.mapSourcesButtonEl !== button || this.mapSourcesPickerOpen) return;
       const next = event.relatedTarget;
-      if (next && (next === button2 || ((_a2 = this.mapSourcesPanelEl) == null ? void 0 : _a2.contains(next)) || isDragSourceTarget(next))) return;
+      if (next && (next === button || ((_a2 = this.mapSourcesPanelEl) == null ? void 0 : _a2.contains(next)) || isDragSourceTarget(next))) return;
       this.closeMapSourcesPanel(false);
     });
-    button2.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape" || !this.mapSourcesOpen || this.mapSourcesButtonEl !== button2) return;
+    button.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || !this.mapSourcesOpen || this.mapSourcesButtonEl !== button) return;
       event.preventDefault();
       event.stopPropagation();
       this.closeMapSourcesPanel(true);
     });
-    this.mapSourcesButtonEl = button2;
+    this.mapSourcesButtonEl = button;
     this.paintMapSourcesButton();
   }
   /** Icon, count/! badge and accessible text from the current sources; also run when a vault event changes what is readable. */
   paintMapSourcesButton() {
     var _a2;
-    const button2 = this.mapSourcesButtonEl;
-    if (!button2) return;
+    const button = this.mapSourcesButtonEl;
+    if (!button) return;
     const total2 = this.mapSources.length + this.externalSources.length;
     const label = mapSourcesButtonLabel(total2);
     const unreadable = unreadableMapSources(
@@ -36419,22 +36294,22 @@ var MapSourcesControl = class {
       this.mapSources,
       this.externalSources.map((source) => this.externalStatuses.get(source.label))
     );
-    button2.empty();
-    const icon = button2.createSpan({ cls: "vam-sources-button-icon" });
+    button.empty();
+    const icon = button.createSpan({ cls: "vam-sources-button-icon" });
     icon.setAttr("aria-hidden", "true");
     (0, import_obsidian18.setIcon)(icon, "files");
     const count4 = total2;
     if (unreadable || count4 > 0) {
-      const badge = button2.createSpan({ cls: "vam-sources-button-badge", text: unreadable ? "!" : String(count4) });
+      const badge = button.createSpan({ cls: "vam-sources-button-badge", text: unreadable ? "!" : String(count4) });
       badge.setAttr("aria-hidden", "true");
       if (unreadable) badge.addClass("is-bad");
     }
-    button2.setAttr("aria-label", label);
-    button2.setAttr("aria-expanded", String(this.mapSourcesOpen));
-    if (unreadable) button2.setAttr("aria-description", t("ui.map_sources_unreadable_description_0", unreadable));
-    else (_a2 = button2.removeAttribute) == null ? void 0 : _a2.call(button2, "aria-description");
-    button2.toggleClass("has-unreadable", unreadable > 0);
-    button2.toggleClass("is-empty", !total2);
+    button.setAttr("aria-label", label);
+    button.setAttr("aria-expanded", String(this.mapSourcesOpen));
+    if (unreadable) button.setAttr("aria-description", t("ui.map_sources_unreadable_description_0", unreadable));
+    else (_a2 = button.removeAttribute) == null ? void 0 : _a2.call(button, "aria-description");
+    button.toggleClass("has-unreadable", unreadable > 0);
+    button.toggleClass("is-empty", !total2);
   }
   openMapSourcesPanel() {
     var _a2;
@@ -36520,13 +36395,13 @@ var MapSourcesControl = class {
   }
   /** Left-aligned under the button, shifted left when it would overflow; the width follows the CSS (max about 440px). */
   placeMapSourcesPanel(panel) {
-    const button2 = this.mapSourcesButtonEl;
+    const button = this.mapSourcesButtonEl;
     const tools = this.mapSourcesToolsEl;
     const overlay = tools == null ? void 0 : tools.parentElement;
-    if (!(button2 == null ? void 0 : button2.getBoundingClientRect) || !(tools == null ? void 0 : tools.getBoundingClientRect) || !(overlay == null ? void 0 : overlay.getBoundingClientRect)) return;
+    if (!(button == null ? void 0 : button.getBoundingClientRect) || !(tools == null ? void 0 : tools.getBoundingClientRect) || !(overlay == null ? void 0 : overlay.getBoundingClientRect)) return;
     const bounds = overlay.getBoundingClientRect();
     const width = Math.max(0, Math.min(440, bounds.width - 32));
-    const from = button2.getBoundingClientRect().left;
+    const from = button.getBoundingClientRect().left;
     const left = Math.min(Math.max(from, bounds.left + 16), bounds.left + bounds.width - 16 - width);
     panel.style.width = `${width}px`;
     panel.style.left = `${left - tools.getBoundingClientRect().left - 1}px`;
@@ -37222,19 +37097,19 @@ var UsageControl = class {
     this.detachPanel();
     this.bar = zoomBar;
     this.overlay = overlay;
-    const button2 = zoomBar.createEl("button", { cls: "clickable-icon vam-icon-button vam-usage-button" });
-    button2.setAttr("aria-haspopup", "dialog");
-    button2.setAttr("aria-expanded", String(this.isOpen));
-    const icon = button2.createSpan({ cls: "vam-usage-icon" });
+    const button = zoomBar.createEl("button", { cls: "clickable-icon vam-icon-button vam-usage-button" });
+    button.setAttr("aria-haspopup", "dialog");
+    button.setAttr("aria-expanded", String(this.isOpen));
+    const icon = button.createSpan({ cls: "vam-usage-icon" });
     (0, import_obsidian19.setIcon)(icon, "gauge");
-    this.numberEl = button2.createSpan({ cls: "vam-usage-number" });
+    this.numberEl = button.createSpan({ cls: "vam-usage-number" });
     zoomBar.createSpan({ cls: "vam-usage-sep" }).setAttr("aria-hidden", "true");
-    button2.addEventListener("click", (event) => {
+    button.addEventListener("click", (event) => {
       event.stopPropagation();
       if (this.isOpen) this.close(true);
       else this.openPanel();
     });
-    this.button = button2;
+    this.button = button;
     if (this.isOpen) this.attachPanel();
     this.refresh();
   }
@@ -37260,16 +37135,16 @@ var UsageControl = class {
   }
   /** Rewrites the numbers in place (store change, new mount). Nothing is rebuilt. */
   refresh() {
-    const button2 = this.button;
-    if (!button2 || !this.numberEl) return;
+    const button = this.button;
+    if (!button || !this.numberEl) return;
     const today = this.store.totals({ since: localDayStart() });
     if (today.status === "unreadable") {
       this.numberEl.setText("\u2013");
-      button2.setAttr("aria-label", t("ui.usage_button_unavailable"));
+      button.setAttr("aria-label", t("ui.usage_button_unavailable"));
     } else {
       const label = formatTokens(sum(today.value));
       this.numberEl.setText(label);
-      button2.setAttr("aria-label", t("ui.usage_button_today_0", label));
+      button.setAttr("aria-label", t("ui.usage_button_today_0", label));
     }
     if (this.isOpen && this.parts) this.fillPanel(this.parts);
   }
@@ -38293,7 +38168,7 @@ var ChoiceModal = class extends import_obsidian21.Modal {
     this.contentEl.createEl("p", { text: this.description, cls: "vam-modal-intro" });
     for (const choice of this.choices) {
       const setting = new import_obsidian21.Setting(this.contentEl);
-      const run2 = () => {
+      const run = () => {
         this.chosen = true;
         this.close();
         choice.action();
@@ -38301,12 +38176,12 @@ var ChoiceModal = class extends import_obsidian21.Modal {
       if (choice.description || choice.named)
         setting.setName(choice.label).setDesc((_a2 = choice.description) != null ? _a2 : "").addButton((b) => {
           var _a3;
-          b.setButtonText((_a3 = choice.buttonLabel) != null ? _a3 : t("ui.select")).onClick(run2);
+          b.setButtonText((_a3 = choice.buttonLabel) != null ? _a3 : t("ui.select")).onClick(run);
           if (choice.warning) b.setDestructive();
         });
       else
         setting.addButton((b) => {
-          b.setButtonText(choice.label).onClick(run2);
+          b.setButtonText(choice.label).onClick(run);
           if (choice.warning) b.setDestructive();
         });
     }
@@ -40766,9 +40641,9 @@ var NoteStyleStore = class {
   }
   // ---- writing block files (only on a user action; a file is never overwritten) ----
   serial(task) {
-    const run2 = this.writeQueue.then(task, task);
-    this.writeQueue = run2.catch(() => void 0);
-    return run2;
+    const run = this.writeQueue.then(task, task);
+    this.writeQueue = run.catch(() => void 0);
+    return run;
   }
   takenNames(category) {
     return new Set([...this.blocks[category].keys()].map(lower3));
@@ -41437,12 +41312,12 @@ var NoteStyleStore = class {
    * style of their own: they are handed back once (`notify`) because that style is not read any more.
    */
   migrateLegacy(input2) {
-    const run2 = this.serial(() => this.runMigration(input2.mapsWithStyle));
-    const fence = run2.catch(() => void 0).then(() => {
+    const run = this.serial(() => this.runMigration(input2.mapsWithStyle));
+    const fence = run.catch(() => void 0).then(() => {
       if (this.migration === fence) this.migration = void 0;
     });
     this.migration = fence;
-    return run2;
+    return run;
   }
   async runMigration(mapsWithStyle) {
     var _a2;
@@ -42498,14 +42373,14 @@ function slotKeywords(explains) {
   const out = /* @__PURE__ */ new Set();
   for (const word of (_a2 = explains.toLowerCase().match(/[a-z0-9][a-z0-9'-]{2,}/g)) != null ? _a2 : [])
     if (!STOP_WORDS.has(word)) out.add(word);
-  for (const run2 of (_b2 = explains.match(/\p{Script=Han}+/gu)) != null ? _b2 : []) {
+  for (const run of (_b2 = explains.match(/\p{Script=Han}+/gu)) != null ? _b2 : []) {
     let part = "";
     const flush = () => {
       const chars = Array.from(part);
       for (let i = 0; i + 1 < chars.length; i++) out.add(chars[i] + chars[i + 1]);
       part = "";
     };
-    for (const char of run2) {
+    for (const char of run) {
       if (STOP_CJK.has(char)) flush();
       else part += char;
     }
@@ -43134,9 +43009,6 @@ function withoutHiddenCallouts(lines) {
   const ranges = [...hiddenRanges(lines, fenced), ...own2];
   if (!ranges.length) return lines;
   return lines.filter((_, i) => !ranges.some((range) => i >= range.start && i < range.end));
-}
-function visibleDetail(detail) {
-  return withoutHiddenCallouts(detail.split("\n")).join("\n").trim();
 }
 function recordLines(lines, fenced) {
   const mask = lines.map(() => false);
@@ -45094,7 +44966,7 @@ var TopicRuns = class {
     this.ports.progress().begin(job.path, progressId, Date.now(), job.model);
     this.ports.progress().stage(job.path, progressId, "charts", Date.now());
     let exchangeId = "";
-    const run2 = async () => {
+    const run = async () => {
       try {
         const detail = await this.ports.aiTasks().chartDetail({
           input: job.context,
@@ -45133,7 +45005,7 @@ var TopicRuns = class {
     this.chartQueue.push({
       controller,
       start: () => {
-        void run2();
+        void run();
       }
     });
     this.pumpChartQueue();
@@ -45471,7 +45343,7 @@ var PipelineStore = class {
   }
   /** Applies `change` to the latest state. Its result is saved first, then becomes current; returns whether it was kept. */
   commit(change2) {
-    const run2 = this.queue.then(async () => {
+    const run = this.queue.then(async () => {
       if (this.disposed) return null;
       const result = change2(this.current);
       if (result.accepted === false || result.state === this.current) return result;
@@ -45479,14 +45351,21 @@ var PipelineStore = class {
       this.current = result.state;
       return result;
     });
-    this.queue = run2.catch(() => void 0);
-    return run2;
+    this.queue = run.catch(() => void 0);
+    return run;
   }
 };
 
 // core/book-pipeline/book-notes.ts
 var NOTE_WRAPPER = /==((?:(?!==)[^\r\n])+?)==%%備註#\d+：(?:(?!%%)[^\r\n])*%%/g;
 var projectProofBody = (body) => body.replace(NOTE_WRAPPER, "$1");
+function countNotes(text10) {
+  var _a2;
+  const lines = text10.split("\n");
+  const fenced = fencedLines2(lines);
+  const kept = withoutHiddenCallouts(lines.filter((_, i) => !fenced[i]));
+  return ((_a2 = kept.join("\n").match(NOTE_WRAPPER)) != null ? _a2 : []).length;
+}
 
 // core/steps/argument-map/language.en.md
 var language_en_default3 = "Write in {{language}}.\n";
@@ -45911,7 +45790,7 @@ var globalPlanStep = {
 
 // experiences/visual-map/argument-notes.ts
 var wide = (c) => String.fromCharCode(c.charCodeAt(0) + 65248);
-var wideRun = (run2) => [...run2].map(wide).join("");
+var wideRun = (run) => [...run].map(wide).join("");
 var ACTIVE_SCHEME = /(?<![A-Za-z0-9+.-])(?!https?:)([A-Za-z][A-Za-z0-9+.-]*):(?=\S)/g;
 function plainLine3(text10) {
   return text10.replace(/[\r\n\u2028\u2029]+/g, " ").replace(/`{3,}|~{3,}/g, (m) => [...m].join(" ")).replace(/</g, "\uFF1C").replace(/>/g, "\uFF1E").replace(/[[\]]/g, wide).replace(/\$/g, "\uFF04").replace(/%{2,}|={2,}|~{2,}/g, wideRun).replace(ACTIVE_SCHEME, (_m, scheme) => `${scheme}\uFF1A`).replace(
@@ -49050,7 +48929,7 @@ var ArgumentRuns = class {
   }
   /** Setup, then the loop, then the stop/pause write, then release. Setup refusals reject the returned promise. */
   go(drive, setup) {
-    const run2 = async () => {
+    const run = async () => {
       let refusal;
       try {
         await setup();
@@ -49067,7 +48946,7 @@ var ArgumentRuns = class {
       }
       if (refusal) throw refusal;
     };
-    return run2();
+    return run();
   }
   async usageAllowed(drive) {
     var _a2, _b2, _c;
@@ -52055,7 +51934,7 @@ var PHASE_KEY = {
   done: "ui.book_phase_done"
 };
 function bookBarState(data, progress, stageOf) {
-  var _a2, _b2, _c, _d, _e, _f, _g;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h;
   const savedDone = data.phase === "done" && (!progress || progress.runId === data.runId);
   const phase = savedDone ? "done" : (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : data.phase;
   const status = savedDone ? data.status : (_b2 = progress == null ? void 0 : progress.status) != null ? _b2 : data.status;
@@ -52079,6 +51958,7 @@ function bookBarState(data, progress, stageOf) {
     ...current ? { current } : {},
     ...((_g = data.trial) == null ? void 0 : _g.length) && mode === "planning" && data.globalPlanned ? { trialSize: data.trial.length } : {},
     ...rerunning ? { rerun: true } : {},
+    ...mode === "gate1" && ((_h = data.trial) == null ? void 0 : _h.length) ? { trialCount: data.trial.length } : {},
     ...mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {},
     ...(progress == null ? void 0 : progress.etaSeconds) !== void 0 && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0 ? { etaSeconds: progress.etaSeconds } : {}
   };
@@ -52107,7 +51987,7 @@ function bookEtaText(seconds) {
   return minutes < 1 ? t("ui.book_eta_under_minute") : t("ui.book_eta_0", minutes);
 }
 function renderBookBar(parent, state, actions) {
-  var _a2;
+  var _a2, _b2, _c, _d;
   const { counts, total: total2 } = state;
   const bar = parent.createDiv("vam-book-bar");
   bar.dataset.mode = state.mode;
@@ -52121,18 +52001,32 @@ function renderBookBar(parent, state, actions) {
       text: state.mode === "budget" ? t("ui.book_budget_used_up_0_1", state.budget.used, state.budget.limit) : state.failure ? t("ui.book_failed_at_0_1", t(PHASE_KEY[state.phase]), bookFailureText(state.failure)) : t("ui.book_stopped_at_0_1_2", t(PHASE_KEY[state.phase]), counts.checked, total2)
     });
   const buttons = top.createDiv("vam-book-bar-actions");
-  if (actions.panel && (state.phase === "gate1" || state.phase === "gate2" || state.phase === "done")) {
-    const open2 = actions.panel.open;
-    const opener = makeButton(
-      buttons,
-      t(open2 ? "ui.book_panel_close" : "ui.book_panel_open"),
-      "vam-book-panel-toggle",
-      actions.panel.toggle
-    );
-    opener.setAttr("aria-expanded", String(open2));
+  if (state.mode === "gate1" && state.trialCount) {
+    top.createSpan({ cls: "vam-book-bar-counts", text: t("ui.book_bar_trial_ready_0", state.trialCount) });
+    if (actions.openTrial)
+      makeButton(buttons, t("ui.book_bar_open_first"), "vam-book-link vam-book-open-first", actions.openTrial);
+  }
+  if (state.mode === "gate2" && state.review) {
+    top.createSpan({
+      cls: "vam-book-bar-counts",
+      text: t("ui.book_bar_review_0_1", state.review.total, state.review.attention)
+    });
+    if (actions.nextReview && state.review.attention > 0)
+      makeButton(buttons, t("ui.book_bar_next_review"), "vam-book-link vam-book-next-review", actions.nextReview);
   }
   if (state.phase === "gate1" && state.mode !== "done" && state.mode !== "stopped") {
     makeButton(buttons, t("ui.book_confirm_gate1"), "mod-cta vam-book-confirm", actions.confirmGate1);
+  }
+  if (state.mode === "gate2" && actions.finish && state.review) {
+    const left = ((_b2 = (_a2 = state.review) == null ? void 0 : _a2.attention) != null ? _b2 : 0) > 0;
+    const finish = makeButton(
+      buttons,
+      t("ui.book_bar_finish"),
+      "mod-cta vam-book-finish",
+      left ? actions.finish.ask : actions.finish.confirm
+    );
+    finish.dataset.act = "finish";
+    finish.setAttr("aria-expanded", String(actions.finish.asking));
   }
   if (state.mode === "budget") {
     makeButton(buttons, t("ui.book_add_budget"), "mod-cta vam-book-add-budget", actions.addBudget);
@@ -52161,7 +52055,7 @@ function renderBookBar(parent, state, actions) {
     );
     ask.setAttr("aria-expanded", String(abandon.asking));
   }
-  if (((_a2 = actions.abandon) == null ? void 0 : _a2.asking) && (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")) {
+  if (((_c = actions.abandon) == null ? void 0 : _c.asking) && (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")) {
     const abandon = actions.abandon;
     const card = bar.createDiv("vam-book-abandon-card");
     card.setAttr("role", "group");
@@ -52172,10 +52066,24 @@ function renderBookBar(parent, state, actions) {
     makeButton(row, t("ui.cancel"), "vam-book-abandon-cancel", abandon.cancel);
     makeButton(row, t("ui.book_abandon_confirm"), "mod-warning vam-book-abandon-confirm", abandon.confirm);
   }
+  if (state.mode === "gate1" && actions.gate1Ask)
+    renderAsk(
+      bar,
+      "vam-book-gate1-ask",
+      t("ui.book_bar_notes_ask_0", actions.gate1Ask.count),
+      t("ui.book_bar_go_anyway"),
+      actions.gate1Ask
+    );
+  if (state.mode === "gate2" && ((_d = actions.finish) == null ? void 0 : _d.asking) && state.review && state.review.attention > 0)
+    renderAsk(
+      bar,
+      "vam-book-finish-ask",
+      t("ui.book_bar_finish_ask_0", state.review.attention),
+      t("ui.book_bar_finish_go"),
+      actions.finish
+    );
   const progressText = bookProgressText(state);
   renderProgressLine(bar, state, progressText);
-  if (state.phase === "gate2" || state.phase === "done")
-    bar.createDiv({ cls: "vam-book-rerun-hint", text: t("ui.book_progress_rerun_hint") });
   const track = bar.createDiv("vam-book-track");
   track.setAttr("role", "progressbar");
   track.setAttr("aria-label", t("ui.book_bar_label"));
@@ -52195,6 +52103,21 @@ function renderBookBar(parent, state, actions) {
   }
   return bar;
 }
+function renderAsk(bar, cls, question, goText, ask) {
+  const card = bar.createDiv(`vam-book-abandon-card ${cls}`);
+  card.setAttr("role", "group");
+  card.setAttr("aria-label", question);
+  card.createEl("p", { text: question });
+  const row = card.createDiv("vam-book-abandon-actions");
+  makeButton(row, t("ui.cancel"), "vam-book-ask-cancel", ask.cancel);
+  makeButton(row, goText, "mod-warning vam-book-ask-go", ask.confirm);
+  card.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.stopPropagation();
+    event.preventDefault();
+    ask.cancel();
+  });
+}
 var settledCount = (state) => state.counts.checked + state.counts["needs-review"];
 function bookProgressText(state) {
   var _a2, _b2, _c, _d, _e, _f;
@@ -52208,6 +52131,7 @@ function bookProgressText(state) {
     );
   }
   const at = Math.min((_e = (_d = state.current) == null ? void 0 : _d.chapter) != null ? _e : settledCount(state) + 1, Math.max(total2, 1));
+  if (state.mode === "writing") return t("ui.book_progress_line_write_0_1", at, total2);
   const sentence = state.mode === "planning" ? !state.globalDone || ((_f = state.current) == null ? void 0 : _f.step) === "global" ? t("ui.book_progress_line_global") : t("ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
   return `${sentence}${t("ui.book_progress_line_sep")}${t("ui.book_progress_line_done_0_1", settledCount(state), total2)}`;
 }
@@ -52219,12 +52143,12 @@ function renderProgressLine(bar, state, text10) {
   if (state.etaSeconds !== void 0) now.createSpan({ cls: "vam-book-bar-eta", text: bookEtaText(state.etaSeconds) });
 }
 function makeButton(parent, text10, cls, action) {
-  const button2 = parent.createEl("button", { cls, text: text10 });
-  button2.addEventListener("click", (event) => {
+  const button = parent.createEl("button", { cls, text: text10 });
+  button.addEventListener("click", (event) => {
     event.stopPropagation();
     action();
   });
-  return button2;
+  return button;
 }
 var REFUSAL_KEY = {
   busy: "ui.book_refused_busy",
@@ -52377,442 +52301,6 @@ function isBookGate1Waiting(progress, data) {
   return ((_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : data.phase) === "gate1" && !(progress == null ? void 0 : progress.active);
 }
 
-// experiences/visual-map/book-pipeline-start-modal.ts
-var import_obsidian24 = require("obsidian");
-var BOOK_CARD_P50_SECONDS = 88.5;
-var BOOK_SUGGEST_TIMEOUT_MS = 2e4;
-var BOOK_PLAN_SECONDS = 135;
-function bookModelSpeed(model) {
-  const id = model.toLowerCase();
-  return id.includes("haiku") ? 0.5 : id.includes("opus") ? 1.8 : 1;
-}
-var CARD_TIME_SHARE = { plan: 0.1, write: 0.5, images: 0.2, proof: 0.2 };
-function bookStartEstimate(cards, models) {
-  const n = Math.max(0, Math.floor(cards));
-  const speed = (step) => models ? bookModelSpeed(models[step]) : 1;
-  const perCard = BOOK_CARD_P50_SECONDS * (CARD_TIME_SHARE.plan * speed("plan") + CARD_TIME_SHARE.write * speed("write") + CARD_TIME_SHARE.images * speed("images") + CARD_TIME_SHARE.proof * speed("proof"));
-  return {
-    cards: n,
-    // An upper bound: the plan, then per chapter write, proofread, and up to two image searches (the second only when the first finds too little).
-    calls: 1 + 5 * n,
-    seconds: BOOK_PLAN_SECONDS * speed("plan") + Math.ceil(n / BOOK_POOL) * perCard
-  };
-}
-function bookStartEstimateText(estimate) {
-  const minutes = Math.round(estimate.seconds / 60);
-  return t(
-    "ui.book_start_estimate_0_1_2",
-    estimate.cards,
-    minutes < 1 ? t("ui.book_start_under_minute") : t("ui.book_start_minutes_0", minutes),
-    estimate.calls
-  );
-}
-function bookSettingsPatch(current, typed, suggestions = {}) {
-  var _a2, _b2;
-  const patch = {};
-  const squash2 = (value) => value.replace(/\s+/g, " ").trim();
-  for (const field of BOOK_SETTING_FIELDS) {
-    const raw = typed[field];
-    if (raw === void 0) continue;
-    if (!squash2(raw) && !current[field] && suggestions[field]) {
-      const suggested = cleanBookSettingsInput({ [field]: suggestions[field] })[field];
-      if (suggested) patch[field] = suggested;
-      continue;
-    }
-    if (squash2(raw) === ((_a2 = current[field]) != null ? _a2 : "")) continue;
-    patch[field] = (_b2 = cleanBookSettingsInput({ [field]: raw })[field]) != null ? _b2 : null;
-  }
-  return patch;
-}
-var MODEL_ROWS = [
-  { key: "bookPlanModel", step: "plan", label: "ui.book_step_plan" },
-  { key: "bookWriteModel", step: "write", label: "ui.book_step_write" },
-  { key: "bookImageModel", step: "images", label: "ui.book_progress_step_images" },
-  { key: "bookProofModel", step: "proof", label: "ui.book_step_proof" }
-];
-var FIELD_LABEL = {
-  reader: "coffee.book_reader",
-  goal: "coffee.book_goal",
-  angle: "coffee.book_angle",
-  tone: "coffee.book_tone",
-  length: "coffee.book_length",
-  style: "coffee.book_style"
-};
-function renderBookSettingsFields(parent, current) {
-  var _a2;
-  const areas = /* @__PURE__ */ new Map();
-  for (const field of BOOK_SETTING_FIELDS) {
-    const label = t(FIELD_LABEL[field]);
-    const id = `vam-book-start-${field}`;
-    parent.createEl("label", { text: label, attr: { for: id } });
-    const area = parent.createEl("textarea", {
-      cls: "vam-book-start-field",
-      attr: {
-        id,
-        rows: "2",
-        maxlength: String(BOOK_SETTING_INPUT_MAX),
-        "aria-label": label,
-        placeholder: t("coffee.book_setting_empty")
-      }
-    });
-    area.value = (_a2 = current[field]) != null ? _a2 : "";
-    areas.set(field, area);
-  }
-  return {
-    areas,
-    suggest: (suggestions) => {
-      for (const [field, area] of areas) {
-        const text10 = suggestions[field];
-        if (!text10 || area.value.trim()) continue;
-        area.setAttr("placeholder", text10);
-        area.addClass("vam-book-start-suggested");
-      }
-    }
-  };
-}
-function renderBookModelChoice(parent, input2) {
-  for (const row of MODEL_ROWS) {
-    const id = `vam-book-start-model-${row.step}`;
-    const name2 = t(row.label);
-    parent.createEl("label", { text: name2, attr: { for: id } });
-    const select = parent.createEl("select", {
-      cls: "dropdown vam-book-start-model",
-      attr: { id, "aria-label": name2 }
-    });
-    const selected = input2.models[row.step];
-    select.add(new Option(selected, selected));
-    select.value = selected;
-    syncModelSelect(select, input2.options(), input2.label, t("ui.current_model_is_unavailable"));
-    select.addEventListener("change", () => {
-      if (!select.value) return;
-      input2.models[row.step] = select.value;
-      input2.onChange(row.key, select.value);
-    });
-  }
-}
-var BookStartModal = class extends import_obsidian24.Modal {
-  constructor(app, input2) {
-    super(app);
-    this.input = input2;
-    __publicField(this, "started", false);
-    __publicField(this, "opened", false);
-    __publicField(this, "focusTimer", null);
-    __publicField(this, "fields", null);
-    __publicField(this, "suggested", {});
-    __publicField(this, "suggestingEl", null);
-    __publicField(this, "estimateEl", null);
-  }
-  /** True from open to close (the screen opens one card at a time). Not named isOpen: Obsidian's Modal writes that property itself. */
-  get isShown() {
-    return this.opened;
-  }
-  /** The suggestion arrived (or did not): the fields show it in grey; a card already started or closed ignores it. */
-  setSuggestions(suggestions) {
-    var _a2, _b2, _c, _d, _e;
-    if (!this.opened || this.started) return;
-    (_a2 = this.suggestingEl) == null ? void 0 : _a2.remove();
-    this.suggestingEl = null;
-    if (!suggestions) return;
-    for (const field of BOOK_SETTING_FIELDS) {
-      const text10 = suggestions[field];
-      const typedNow = (_c = (_b2 = this.fields) == null ? void 0 : _b2.areas.get(field)) == null ? void 0 : _c.value.trim();
-      if (text10 && !((_d = this.input.settings[field]) == null ? void 0 : _d.trim()) && !typedNow) this.suggested[field] = text10;
-    }
-    (_e = this.fields) == null ? void 0 : _e.suggest(this.suggested);
-  }
-  onOpen() {
-    this.opened = true;
-    const { contentEl } = this;
-    this.titleEl.setText(t("ui.book_start_title"));
-    contentEl.createEl("p", { cls: "vam-modal-intro", text: t("ui.book_start_intro") });
-    this.estimateEl = contentEl.createEl("p", { cls: "vam-book-start-estimate" });
-    this.estimateEl.setAttr("role", "status");
-    const choice = contentEl.createDiv({ cls: "vam-book-start-model-choice" });
-    renderBookModelChoice(choice, {
-      ...this.input.modelChoice,
-      models: this.input.models,
-      // A pick only changes this card's copy; it is saved when Start is pressed.
-      onChange: () => this.refreshEstimate()
-    });
-    contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_stops") });
-    contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_rerun_hint") });
-    const settings = contentEl.createDiv({ cls: "vam-book-start-settings" });
-    settings.setAttr("role", "group");
-    settings.setAttr("aria-label", t("ui.book_start_settings"));
-    settings.createEl("strong", { text: t("ui.book_start_settings") });
-    this.suggestingEl = settings.createEl("p", {
-      cls: "vam-book-start-suggesting",
-      text: t("ui.book_start_suggesting")
-    });
-    this.suggestingEl.setAttr("role", "status");
-    this.fields = renderBookSettingsFields(settings, this.input.settings);
-    this.refreshEstimate();
-    const actions = modalActions(this);
-    const cancel = actions.createEl("button", { text: t("ui.cancel") });
-    cancel.addEventListener("click", () => this.close());
-    const start = actions.createEl("button", { cls: "mod-cta vam-book-start-go", text: t("ui.book_start_go") });
-    start.addEventListener("click", () => this.start());
-    cancel.focus();
-    this.focusTimer = window.setTimeout(() => {
-      this.focusTimer = null;
-      cancel.focus();
-    }, 0);
-  }
-  /** The estimate follows the models in the dropdowns. */
-  refreshEstimate() {
-    var _a2;
-    (_a2 = this.estimateEl) == null ? void 0 : _a2.setText(bookStartEstimateText(bookStartEstimate(this.input.cards, this.input.models)));
-  }
-  onClose() {
-    var _a2, _b2;
-    this.opened = false;
-    if (this.focusTimer !== null) window.clearTimeout(this.focusTimer);
-    this.focusTimer = null;
-    this.contentEl.empty();
-    (_b2 = (_a2 = this.input).onClose) == null ? void 0 : _b2.call(_a2);
-  }
-  start() {
-    var _a2, _b2;
-    if (this.started) return;
-    this.started = true;
-    const typed = {};
-    for (const [field, area] of (_b2 = (_a2 = this.fields) == null ? void 0 : _a2.areas) != null ? _b2 : []) typed[field] = area.value;
-    const patch = bookSettingsPatch(this.input.settings, typed, this.suggested);
-    this.close();
-    this.input.onStart(patch, { ...this.input.models });
-  }
-};
-
-// experiences/visual-map/book-pipeline-panel.ts
-function buildGatePanel(input2) {
-  const plan = parseBookPlanBody(input2.rootRaw);
-  const trial = input2.order.filter((id) => {
-    var _a2;
-    return (_a2 = input2.trial) == null ? void 0 : _a2.includes(id);
-  }).map((id) => {
-    var _a2;
-    const note = input2.noteOf(id);
-    const view = bookCardView(note != null ? note : {});
-    return {
-      id,
-      index: input2.order.indexOf(id) + 1,
-      title: input2.titleOf(id),
-      stage: view.stage,
-      ...view.issueText ? { issueText: view.issueText } : {},
-      text: visibleDetail((_a2 = note == null ? void 0 : note.detail) != null ? _a2 : "")
-    };
-  });
-  return { thread: firstSentence(plan.thread), trial };
-}
-var GatePanelState = class {
-  constructor() {
-    __publicField(this, "open", false);
-    /** The map's root note text, read when the panel is drawn (for the thread), and the root topic's whole-book settings. */
-    __publicField(this, "rootRaw", "");
-    __publicField(this, "settings", {});
-    /** Gate 1: the settings and models fold is open; what the owner typed in the fields (kept across repaints until a retry applies it). */
-    __publicField(this, "settingsOpen", false);
-    __publicField(this, "settingDrafts", /* @__PURE__ */ new Map());
-    __publicField(this, "confirming", false);
-    __publicField(this, "retrying", false);
-    __publicField(this, "confirmError", "");
-    /** Gate 2: which cards are working, and the line under each (see panel2). */
-    __publicField(this, "busy", /* @__PURE__ */ new Set());
-    __publicField(this, "notes", /* @__PURE__ */ new Map());
-    /** Gate 2: cards whose proof record is unfolded, cards whose seam confirmation is running, and the "review finished" button. */
-    __publicField(this, "proofOpen", /* @__PURE__ */ new Set());
-    __publicField(this, "seaming", /* @__PURE__ */ new Set());
-    __publicField(this, "finishing", false);
-    /** The "still have things to do" question is open: the button waits for its answer. */
-    __publicField(this, "finishAsking", false);
-    __publicField(this, "finishError", "");
-    /** Cards whose latest rerun gave the same result and still need a person (memory only; dies with the view). */
-    __publicField(this, "unchanged", /* @__PURE__ */ new Set());
-    /** Where the keyboard goes after the next paint: the panel's title (it just opened) or the toolbar button (it just closed). */
-    __publicField(this, "pendingFocus", null);
-  }
-  reset() {
-    this.open = false;
-    this.rootRaw = "";
-    this.settings = {};
-    this.settingsOpen = false;
-    this.settingDrafts.clear();
-    this.busy.clear();
-    this.notes.clear();
-    this.confirming = false;
-    this.retrying = false;
-    this.confirmError = "";
-    this.proofOpen.clear();
-    this.seaming.clear();
-    this.finishing = false;
-    this.finishAsking = false;
-    this.finishError = "";
-    this.unchanged.clear();
-    this.pendingFocus = null;
-  }
-};
-async function runTrackedRerun(state, nodeId, rerun) {
-  state.unchanged.delete(nodeId);
-  const result = await rerun();
-  if (result && result.unchanged) state.unchanged.add(nodeId);
-}
-function renderPanelTabs(panel, actions) {
-  const tabs = panel.createDiv("vam-book-panel-tabs");
-  tabs.setAttr("role", "group");
-  tabs.setAttr("aria-label", t("ui.book_panel_tabs_label"));
-  const bookTab = tabs.createEl("button", { cls: "vam-book-panel-tab is-active", text: t("ui.book_panel_tab_book") });
-  bookTab.setAttr("aria-pressed", "true");
-  const chatTab = tabs.createEl("button", { cls: "vam-book-panel-tab", text: t("ui.book_panel_tab_chat") });
-  chatTab.setAttr("aria-pressed", "false");
-  chatTab.addEventListener("click", (event) => {
-    event.stopPropagation();
-    actions.showChat();
-  });
-  const closeButton = tabs.createEl("button", { cls: "vam-book-panel-close", text: "\xD7" });
-  closeButton.setAttr("aria-label", t("ui.book_panel_close"));
-  closeButton.addEventListener("click", (event) => {
-    event.stopPropagation();
-    actions.close();
-  });
-  panel.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    event.stopPropagation();
-    actions.close();
-  });
-}
-function typedPatch(state, actions) {
-  const typed = {};
-  for (const [field, value] of state.settingDrafts) typed[field] = value;
-  return bookSettingsPatch(actions.settings, typed);
-}
-function renderGatePanel(parent, data, gate1, state, actions) {
-  const panel = parent.createDiv("vam-book-panel");
-  panel.setAttr("role", "region");
-  panel.setAttr("aria-label", t("ui.book_panel_label"));
-  renderPanelTabs(panel, actions);
-  const hasTrial = data.trial.length > 0;
-  const head2 = panel.createDiv("vam-book-panel-head");
-  const title = head2.createEl("h3", {
-    cls: "vam-book-panel-title",
-    text: t(hasTrial ? "ui.book_trial_title" : "ui.book_panel_gate1_title")
-  });
-  title.setAttr("tabindex", "-1");
-  if (!gate1) {
-    panel.createDiv({ cls: "vam-book-panel-note", text: t("ui.book_panel_not_gate1") });
-    return panel;
-  }
-  const plan = panel.createDiv("vam-book-panel-plan");
-  if (data.thread) {
-    plan.createDiv({ cls: "vam-book-panel-thread-label", text: t("ui.book_gate1_thread_label") });
-    plan.createDiv({ cls: "vam-book-panel-thread", text: data.thread });
-  } else plan.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_panel_plan_empty") });
-  if (hasTrial) {
-    const list2 = panel.createEl("ul", { cls: "vam-book-trial-cards" });
-    list2.setAttr("aria-label", t("ui.book_trial_cards_label"));
-    for (const card of data.trial) renderTrialCard(list2, card, actions);
-    renderSettingsFold(panel, state, actions);
-  }
-  const foot = panel.createDiv("vam-book-panel-foot");
-  const working = state.confirming || state.retrying;
-  const confirm = foot.createEl("button", {
-    cls: "mod-cta vam-book-panel-confirm",
-    text: state.confirming ? t("ui.book_panel_confirming") : t("ui.book_confirm_gate1")
-  });
-  confirm.disabled = working;
-  if (state.confirming) confirm.setAttr("aria-busy", "true");
-  confirm.addEventListener("click", (event) => {
-    event.stopPropagation();
-    if (working) return;
-    const patch = typedPatch(state, actions);
-    state.confirming = true;
-    state.confirmError = "";
-    actions.refresh();
-    void actions.confirm(patch).then(
-      () => {
-        state.confirming = false;
-        state.settingDrafts.clear();
-        actions.refresh();
-      },
-      (error) => {
-        state.confirming = false;
-        state.confirmError = bookRefusalText(error);
-        actions.refresh();
-      }
-    );
-  });
-  if (hasTrial) {
-    const retry = foot.createEl("button", {
-      cls: "vam-book-panel-retry",
-      text: state.retrying ? t("ui.book_panel_confirming") : t("ui.book_trial_retry")
-    });
-    retry.disabled = working;
-    if (state.retrying) retry.setAttr("aria-busy", "true");
-    retry.addEventListener("click", (event) => {
-      event.stopPropagation();
-      if (working) return;
-      const patch = typedPatch(state, actions);
-      state.retrying = true;
-      state.confirmError = "";
-      actions.refresh();
-      void actions.retry(patch).then(
-        () => {
-          state.retrying = false;
-          state.settingDrafts.clear();
-          actions.refresh();
-        },
-        (error) => {
-          state.retrying = false;
-          state.confirmError = bookRefusalText(error);
-          actions.refresh();
-        }
-      );
-    });
-  }
-  const status = panel.createDiv({ cls: "vam-book-panel-status", text: state.confirmError });
-  status.setAttr("role", "status");
-  return panel;
-}
-function renderTrialCard(list2, card, actions) {
-  const item = list2.createEl("li", { cls: "vam-book-trial-card" });
-  item.dataset.stage = card.stage;
-  const head2 = item.createDiv("vam-book-trial-card-head");
-  head2.createEl("b", { cls: "vam-book-trial-card-title", text: t("ui.book_trial_card_0_1", card.index, card.title) });
-  const done = card.stage === "checked" || card.stage === "written";
-  head2.createSpan({
-    cls: `vam-book-trial-pill ${done ? "is-ok" : "is-look"}`,
-    text: done ? t("ui.book_trial_done") : t("ui.book_trial_look")
-  });
-  if (card.issueText && !done) item.createDiv({ cls: "vam-book-panel-issue", text: card.issueText });
-  const body = item.createDiv("vam-book-trial-text");
-  body.tabIndex = 0;
-  body.setAttr("role", "region");
-  body.setAttr("aria-label", t("ui.book_trial_text_label_0", card.title));
-  if (card.text) actions.renderMarkdown(body, card.text);
-  else body.createDiv({ cls: "vam-book-panel-muted", text: t("ui.book_trial_no_text") });
-}
-function renderSettingsFold(panel, state, actions) {
-  const toggle = panel.createEl("button", { cls: "vam-book-trial-fold", text: t("ui.book_trial_fold") });
-  toggle.setAttr("aria-expanded", String(state.settingsOpen));
-  const body = panel.createDiv("vam-book-trial-settings vam-book-start-settings");
-  body.setAttr("id", "vam-book-trial-settings");
-  toggle.setAttr("aria-controls", "vam-book-trial-settings");
-  body.hidden = !state.settingsOpen;
-  toggle.addEventListener("click", (event) => {
-    event.stopPropagation();
-    state.settingsOpen = !state.settingsOpen;
-    toggle.setAttr("aria-expanded", String(state.settingsOpen));
-    body.hidden = !state.settingsOpen;
-  });
-  const fields = renderBookSettingsFields(body, actions.settings);
-  for (const [field, area] of fields.areas) {
-    const draft = state.settingDrafts.get(field);
-    if (draft !== void 0) area.value = draft;
-    area.addEventListener("input", () => state.settingDrafts.set(field, area.value));
-  }
-  const choice = body.createDiv("vam-book-start-model-choice");
-  renderBookModelChoice(choice, { ...actions.modelChoice, models: actions.models });
-}
-
 // experiences/visual-map/book-pipeline-review.ts
 function attentionReasons(card) {
   const out = [];
@@ -52844,17 +52332,14 @@ function galleryBare(role, note) {
   const states = describeSlots(slots, latestSlotsRecord(detail), bodyImageUrls(chapterBody(detail)));
   return states.some((slot) => slot.state === "missing") && !states.some((slot) => slot.state === "placed" || slot.state === "edited");
 }
-
-// experiences/visual-map/book-pipeline-panel2.ts
-function buildGate2Panel(input2) {
-  var _a2, _b2;
-  const cards = input2.order.map((id, at) => {
-    var _a3, _b3;
+function gate2Cards(input2) {
+  return input2.order.map((id, at) => {
+    var _a2, _b2;
     const note = input2.noteOf(id);
     const view = bookCardView(note != null ? note : {});
     const issue2 = typeof (note == null ? void 0 : note.pipelineIssue) === "string" ? note.pipelineIssue : "";
     const checked2 = view.stage === "checked";
-    const proof = checked2 || view.stage === "needs-review" ? latestStoredProof((_a3 = note == null ? void 0 : note.detail) != null ? _a3 : "") : void 0;
+    const proof = checked2 || view.stage === "needs-review" ? latestStoredProof((_a2 = note == null ? void 0 : note.detail) != null ? _a2 : "") : void 0;
     const structure2 = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue2.trim());
     const role = typeof (note == null ? void 0 : note.bookRole) === "string" ? note.bookRole : void 0;
     return {
@@ -52865,190 +52350,22 @@ function buildGate2Panel(input2) {
       ...role ? { role } : {},
       ...view.stage === "needs-review" && issue2 ? { failureText: reasonOf2(issue2, proof) } : {},
       structureUnmet: checked2 && structure2 ? structure2[1].split(" ").filter((token) => !token.startsWith("image_")).length : 0,
-      factsOpen: checked2 ? ((_b3 = proof == null ? void 0 : proof.items) != null ? _b3 : []).filter((item) => item.type === "fact" && item.status !== "met").length : 0,
+      factsOpen: checked2 ? ((_b2 = proof == null ? void 0 : proof.items) != null ? _b2 : []).filter((item) => item.type === "fact" && item.status !== "met").length : 0,
       galleryBare: checked2 && galleryBare(role, note),
       seam: view.seam
     };
   });
-  const from = Date.parse((_a2 = input2.startedAt) != null ? _a2 : "");
-  const to = Date.parse((_b2 = input2.writingEndedAt) != null ? _b2 : "");
-  return {
-    total: cards.length,
-    attention: cards.filter(needsAttention).length,
-    ...Number.isFinite(from) && Number.isFinite(to) && to >= from ? { elapsedMinutes: Math.round((to - from) / 6e4) } : {},
-    cards
-  };
 }
-function renderGate2Panel(parent, data, done, state, actions, externalBusy = /* @__PURE__ */ new Set(), driveActive = false, rerun) {
-  const panel = parent.createDiv("vam-book-panel vam-book-panel-gate2");
-  panel.setAttr("role", "region");
-  panel.setAttr("aria-label", t("ui.book_panel_label"));
-  renderPanelTabs(panel, actions);
-  const head2 = panel.createDiv("vam-book-panel-head");
-  const title = head2.createEl("h3", { cls: "vam-book-panel-title", text: t("ui.book_panel_gate2_title") });
-  title.setAttr("tabindex", "-1");
-  if (done) head2.createSpan({ cls: "vam-book-panel-tag", text: t("ui.book_panel_gate2_done_tag") });
-  else if (data.elapsedMinutes !== void 0) {
-    const took = head2.createSpan({
-      cls: "vam-book-panel-tag",
-      text: data.elapsedMinutes < 1 ? t("ui.book_panel_elapsed_under_minute") : t("ui.book_panel_elapsed_0", data.elapsedMinutes)
-    });
-    took.setAttr("title", t("ui.book_panel_elapsed_hint"));
+var BookReviewMemory = class {
+  constructor() {
+    /** Cards whose latest rerun gave the same result and still need a person. */
+    __publicField(this, "unchanged", /* @__PURE__ */ new Set());
   }
-  const summary = panel.createEl("p", {
-    cls: "vam-book-panel-summary vam-book-panel-g2-line",
-    text: !data.total ? t("ui.book_panel_gate2_nothing") : data.attention ? t("ui.book_panel_g2_some_0_1", data.total, data.attention) : t("ui.book_panel_g2_all_done_0", data.total)
-  });
-  summary.dataset.state = data.attention ? "attention" : "clear";
-  const anyBusy = externalBusy.size > 0 || state.busy.size > 0 || state.seaming.size > 0 || state.finishing || state.finishAsking || driveActive;
-  const busyNow = (id) => externalBusy.has(id) || state.busy.has(id);
-  const attention = data.cards.filter(needsAttention);
-  if (attention.length) {
-    const list2 = panel.createEl("ul", { cls: "vam-book-panel-cards vam-book-panel-gate2-list" });
-    list2.setAttr("aria-label", t("ui.book_panel_gate2_list_label"));
-    for (const card of attention) renderAttention(list2, card, state, actions, busyNow(card.id), anyBusy, rerun);
-  }
-  const foot = panel.createDiv("vam-book-panel-foot");
-  if (attention.length && !done) foot.createSpan({ cls: "vam-book-panel-muted", text: t("ui.book_panel_gate2_hint") });
-  if (!done) {
-    const finish = foot.createEl("button", {
-      cls: "mod-cta vam-book-panel-finish",
-      text: state.finishing ? t("ui.book_panel_finishing") : t("ui.book_panel_finish")
-    });
-    finish.dataset.act = "finish";
-    finish.disabled = anyBusy;
-    if (state.finishing) finish.setAttr("aria-busy", "true");
-    finish.addEventListener("click", (event) => {
-      event.stopPropagation();
-      if (anyBusy) return;
-      const go = () => {
-        state.finishing = true;
-        state.finishError = "";
-        actions.refresh();
-        void actions.finish().then(
-          () => {
-            state.finishing = false;
-            actions.refresh();
-          },
-          (error) => {
-            state.finishing = false;
-            state.finishError = bookRefusalText(error);
-            actions.refresh();
-          }
-        );
-      };
-      if (!attention.length) return go();
-      state.finishAsking = true;
-      actions.refresh();
-      const info = { count: attention.length, titles: attention.map((card) => `${card.index} ${card.title}`) };
-      void actions.confirmFinish(info).then(
-        (ok) => {
-          state.finishAsking = false;
-          if (ok) go();
-          else actions.refresh();
-        },
-        () => {
-          state.finishAsking = false;
-          actions.refresh();
-        }
-      );
-    });
-  }
-  const waiting = !done && !state.finishing && !state.finishAsking && anyBusy ? t("ui.book_panel_finish_waiting") : "";
-  const status = panel.createDiv({ cls: "vam-book-panel-status", text: state.finishError || waiting });
-  status.setAttr("role", "status");
-  status.setAttr("aria-live", "polite");
-  return panel;
-}
-function button(parent, cls, text10, label, card, act, disabled, onClick) {
-  const el = parent.createEl("button", { cls, text: text10 });
-  el.setAttr("aria-label", label);
-  el.dataset.card = card.id;
-  el.dataset.act = act;
-  el.disabled = disabled;
-  el.addEventListener("click", (event) => {
-    event.stopPropagation();
-    if (!el.disabled) onClick();
-  });
-  return el;
-}
-function run(noteKey, id, state, set, actions, work) {
-  if (set.has(id)) return;
-  set.add(id);
-  state.notes.delete(noteKey);
-  actions.refresh();
-  void work().then(
-    () => {
-      set.delete(id);
-      actions.refresh();
-    },
-    (error) => {
-      set.delete(id);
-      state.notes.set(noteKey, { text: bookRefusalText(error), error: true });
-      actions.refresh();
-    }
-  );
-}
-function renderAttention(list2, card, state, actions, busy, anyBusy, rerun) {
-  var _a2, _b2;
-  const item = list2.createEl("li", { cls: "vam-book-panel-card vam-book-panel-row" });
-  item.dataset.kind = "attention";
-  item.dataset.row = card.id;
-  item.setAttr("tabindex", "-1");
-  if (busy) item.setAttr("aria-busy", "true");
-  const head2 = item.createDiv("vam-book-panel-card-head");
-  if ((rerun == null ? void 0 : rerun.nodeId) === card.id)
-    head2.createSpan({ cls: "vam-book-panel-state vam-book-state is-rerun", text: t("ui.book_rerun_tag") });
-  else
-    head2.createSpan({
-      cls: "vam-book-panel-state vam-book-state is-needs-review",
-      text: state.unchanged.has(card.id) && !busy ? t("ui.book_panel_still_review") : t("ui.book_panel_g2_look")
-    });
-  head2.createEl("b", { cls: "vam-book-panel-card-title", text: `${card.index} ${card.title}` });
-  item.createDiv({ cls: "vam-book-panel-field", text: attentionReasons(card).join(t("ui.book_panel_lead_sep")) });
-  const row = item.createDiv("vam-book-panel-actions");
-  button(
-    row,
-    "vam-book-panel-rerun-card",
-    busy ? t("ui.book_panel_busy") : t("ui.book_panel_rerun_card"),
-    t("ui.book_panel_rerun_card_0", card.title),
-    card,
-    "rerun",
-    anyBusy,
-    () => run(card.id, card.id, state, state.busy, actions, async () => {
-      await runTrackedRerun(state, card.id, () => actions.rerun(card.id));
-    })
-  );
-  button(
-    row,
-    "vam-book-panel-open",
-    t("ui.book_panel_g2_edit_myself"),
-    t("ui.book_panel_open_0", card.title),
-    card,
-    "open",
-    false,
-    () => actions.open(card.id)
-  );
-  if (card.seam) {
-    const key4 = `seam:${card.id}`;
-    button(
-      row,
-      "vam-book-panel-confirm-seam",
-      t("ui.book_panel_g2_confirm_seam"),
-      t("ui.book_panel_confirm_seam_0", card.title),
-      card,
-      "seam",
-      anyBusy,
-      () => run(key4, card.id, state, state.seaming, actions, () => actions.confirmSeam(card.id))
-    );
-  }
-  const note = (_a2 = state.notes.get(card.id)) != null ? _a2 : state.notes.get(`seam:${card.id}`);
-  const line2 = item.createDiv({
-    cls: "vam-book-panel-card-status",
-    text: busy ? t("ui.book_panel_busy") : (_b2 = note == null ? void 0 : note.text) != null ? _b2 : ""
-  });
-  line2.setAttr("role", (note == null ? void 0 : note.error) ? "alert" : "status");
-  if (note == null ? void 0 : note.error) line2.addClass("is-error");
+};
+async function runTrackedRerun(memory, nodeId, rerun) {
+  memory.unchanged.delete(nodeId);
+  const result = await rerun();
+  if (result && result.unchanged) memory.unchanged.add(nodeId);
 }
 
 // experiences/visual-map/subtree-plan.ts
@@ -53206,7 +52523,7 @@ function subtreeOutlineText(outline) {
 }
 
 // experiences/visual-map/note-style-picker.ts
-var import_obsidian25 = require("obsidian");
+var import_obsidian24 = require("obsidian");
 
 // ui/modals/open-in-window.ts
 function openInWindowOf(modal, anchor) {
@@ -53258,14 +52575,14 @@ var NoteStyleFileError = class extends Error {
     this.open = open2;
   }
 };
-function actionNotice(message, label, run2, timeout = 12e3) {
-  return backgroundResultNotice(message, { label, open: run2 }, timeout);
+function actionNotice(message, label, run, timeout = 12e3) {
+  return backgroundResultNotice(message, { label, open: run }, timeout);
 }
 function errorNotice(error) {
   const message = error == null ? void 0 : error.message;
   const text10 = typeof message === "string" ? message : String(error);
   if (error instanceof NoteStyleFileError) return actionNotice(text10, t("ui.note_style_open_file"), error.open);
-  return new import_obsidian25.Notice(text10);
+  return new import_obsidian24.Notice(text10);
 }
 function stylePickerFor(app, plugin) {
   const store = plugin.noteStyles;
@@ -53277,15 +52594,15 @@ function stylePickerFor(app, plugin) {
   };
 }
 async function openVaultFile(app, path) {
-  const file = app.vault.getAbstractFileByPath((0, import_obsidian25.normalizePath)(path));
-  if (!(file instanceof import_obsidian25.TFile)) return false;
+  const file = app.vault.getAbstractFileByPath((0, import_obsidian24.normalizePath)(path));
+  if (!(file instanceof import_obsidian24.TFile)) return false;
   await app.workspace.getLeaf("tab").openFile(file);
   return true;
 }
 async function openRecipeFile(app, store, ref) {
   const path = store.recipeFilePath(ref);
   if (path === void 0 || !await openVaultFile(app, path)) {
-    new import_obsidian25.Notice(t("ui.note_style_edit_missing_0", ref.startsWith("file:") ? `${ref.slice("file:".length)}.md` : ref));
+    new import_obsidian24.Notice(t("ui.note_style_edit_missing_0", ref.startsWith("file:") ? `${ref.slice("file:".length)}.md` : ref));
   }
 }
 var ISSUE_KEYS = /* @__PURE__ */ new Set([
@@ -53309,7 +52626,7 @@ function styleIssueText(issue2) {
   return t(issue2.code, ...issue2.values);
 }
 var PICKER_SHOWN = 4;
-var TopicStylePickerModal = class extends import_obsidian25.Modal {
+var TopicStylePickerModal = class extends import_obsidian24.Modal {
   constructor(app, rows2, handlers) {
     super(app);
     this.rows = rows2;
@@ -53612,7 +52929,7 @@ async function fitImageForInput(dataUrl, limits, signal) {
 }
 
 // experiences/visual-map/relevance-tag.ts
-var import_obsidian26 = require("obsidian");
+var import_obsidian25 = require("obsidian");
 var RELEVANCE_ICON = {
   core: "target",
   support: "library",
@@ -53626,7 +52943,7 @@ var RELEVANCE_LABEL = {
 function renderRelevanceTag(parent, tier, label) {
   const tag = parent.createSpan({ cls: "vam-relevance-tag" });
   tag.dataset.tier = tier;
-  (0, import_obsidian26.setIcon)(tag.createSpan({ cls: "vam-relevance-icon" }), RELEVANCE_ICON[tier]);
+  (0, import_obsidian25.setIcon)(tag.createSpan({ cls: "vam-relevance-icon" }), RELEVANCE_ICON[tier]);
   tag.createSpan({ text: label });
   return tag;
 }
@@ -53641,7 +52958,7 @@ function renderRelevanceTagButton(parent, tier, label, ariaLabel, open2, disable
   tag.setAttr("aria-label", ariaLabel);
   tag.setAttr("aria-labelledby", nameId);
   tag.setAttr("aria-haspopup", "menu");
-  (0, import_obsidian26.setIcon)(tag.createSpan({ cls: "vam-relevance-icon" }), RELEVANCE_ICON[tier]);
+  (0, import_obsidian25.setIcon)(tag.createSpan({ cls: "vam-relevance-icon" }), RELEVANCE_ICON[tier]);
   const visible = tag.createSpan({ text: label });
   visible.setAttr("aria-hidden", "true");
   tag.createSpan({ cls: "vam-relevance-tag-name", text: ariaLabel, attr: { id: nameId } });
@@ -53899,8 +53216,8 @@ function chooseCardToolsSpot(input2) {
 }
 
 // experiences/visual-map/relevance-summary-modal.ts
-var import_obsidian27 = require("obsidian");
-var RelevanceSummaryModal = class extends import_obsidian27.Modal {
+var import_obsidian26 = require("obsidian");
+var RelevanceSummaryModal = class extends import_obsidian26.Modal {
   constructor(app, host) {
     super(app);
     this.host = host;
@@ -53917,7 +53234,7 @@ var RelevanceSummaryModal = class extends import_obsidian27.Modal {
       const arrow = tags.createSpan({ cls: "vam-relevance-arrow" });
       arrow.setAttr("role", "img");
       arrow.setAttr("aria-label", t("ui.relevance_changed_to"));
-      (0, import_obsidian27.setIcon)(arrow, "arrow-right");
+      (0, import_obsidian26.setIcon)(arrow, "arrow-right");
       renderRelevanceTag(tags, row.after.tier, t(RELEVANCE_LABEL[row.after.tier]));
     }
   }
@@ -54227,8 +53544,8 @@ function providerStructureReviewRunner(aiCalls) {
   });
 }
 var StructureReviewService = class {
-  constructor(run2) {
-    this.run = run2;
+  constructor(run) {
+    this.run = run;
   }
   /**
    * Review a map or branch. Throws {@link StructureReviewError} (localized message, `code` for the reason) for an
@@ -54632,8 +53949,8 @@ function providerGoalRecommendRunner(aiCalls) {
   });
 }
 var GoalRecommendService = class {
-  constructor(run2, now = Date.now) {
-    this.run = run2;
+  constructor(run, now = Date.now) {
+    this.run = run;
     this.now = now;
   }
   /**
@@ -54724,30 +54041,30 @@ var RelevanceGradeRun = class {
   get paintCount() {
     return this.ports.paintCount();
   }
-  isCurrent(run2, mapPath) {
-    return !this.closed && this.path === mapPath && this.plugin.relevanceGrades.get(mapPath) === run2 && run2.status === "running" && !run2.controller.signal.aborted;
+  isCurrent(run, mapPath) {
+    return !this.closed && this.path === mapPath && this.plugin.relevanceGrades.get(mapPath) === run && run.status === "running" && !run.controller.signal.aborted;
   }
   /** Whether this view owns a grading run that is still running (what closing or switching the map would stop). */
   isRunning() {
     if (!this.started || !this.path) return false;
-    const run2 = this.plugin.relevanceGrades.get(this.path);
-    return (run2 == null ? void 0 : run2.owner) === this.owner && run2.status === "running";
+    const run = this.plugin.relevanceGrades.get(this.path);
+    return (run == null ? void 0 : run.owner) === this.owner && run.status === "running";
   }
   /** View closed or map switched: stop this view's run and forget it. A late result then fails every fence. */
   abort(mapPath = this.path) {
     if (!this.started) return;
-    const run2 = this.plugin.relevanceGrades.get(mapPath);
-    if (!run2 || run2.owner !== this.owner) return;
+    const run = this.plugin.relevanceGrades.get(mapPath);
+    if (!run || run.owner !== this.owner) return;
     this.plugin.relevanceGrades.delete(mapPath);
-    run2.controller.abort();
+    run.controller.abort();
   }
-  finish(run2, mapPath, status, message) {
+  finish(run, mapPath, status, message) {
     var _a2, _b2;
-    if (!this.isCurrent(run2, mapPath)) return;
+    if (!this.isCurrent(run, mapPath)) return;
     (_b2 = (_a2 = this.plugin).releaseWarmClaude) == null ? void 0 : _b2.call(_a2);
-    run2.received = void 0;
-    run2.status = status;
-    run2.message = message;
+    run.received = void 0;
+    run.status = status;
+    run.message = message;
     this.ports.refresh();
   }
   /**
@@ -54765,7 +54082,7 @@ var RelevanceGradeRun = class {
     if (!goal || !this.ports.gradeable() || this.ports.notesLoading()) return;
     if (((_a2 = this.plugin.relevanceGrades.get(mapPath)) == null ? void 0 : _a2.status) === "running") return;
     this.ports.dropGoalSuggest();
-    const run2 = {
+    const run = {
       token: ++relevanceRunToken,
       owner: this.owner,
       controller: new AbortController(),
@@ -54773,9 +54090,9 @@ var RelevanceGradeRun = class {
       status: "running",
       startedAt: Date.now()
     };
-    this.plugin.relevanceGrades.set(mapPath, run2);
+    this.plugin.relevanceGrades.set(mapPath, run);
     this.started = true;
-    run2.controller.signal.addEventListener("abort", () => {
+    run.controller.signal.addEventListener("abort", () => {
       var _a3, _b3;
       return (_b3 = (_a3 = this.plugin).releaseWarmClaude) == null ? void 0 : _b3.call(_a3);
     }, { once: true });
@@ -54801,14 +54118,14 @@ var RelevanceGradeRun = class {
       });
       const { model, reasoning } = this.plugin.currentModelChoice();
       if ((_c = (_b2 = this.plugin).usageNoticePending) == null ? void 0 : _c.call(_b2, model)) {
-        run2.awaitingUsage = true;
+        run.awaitingUsage = true;
         this.ports.refresh();
       }
       const started = await this.plugin.confirmAiUsage(model, async () => {
-        if (!this.isCurrent(run2, mapPath) || !this.map) return;
-        if (run2.awaitingUsage) {
-          run2.awaitingUsage = false;
-          run2.startedAt = Date.now();
+        if (!this.isCurrent(run, mapPath) || !this.map) return;
+        if (run.awaitingUsage) {
+          run.awaitingUsage = false;
+          run.startedAt = Date.now();
           this.ports.refresh();
         }
         basis = buildStructureReviewNodes(this.map.nodes, (id) => this.ports.describe(id));
@@ -54835,24 +54152,24 @@ var RelevanceGradeRun = class {
         const hooks = {
           // Text only: the count changes in place, the map is not repainted for it.
           onProgress: (progress) => {
-            if (!this.isCurrent(run2, mapPath)) return;
-            run2.received = progress != null ? progress : void 0;
-            this.ports.paintReceived(run2);
+            if (!this.isCurrent(run, mapPath)) return;
+            run.received = progress != null ? progress : void 0;
+            this.ports.paintReceived(run);
           }
         };
-        result = await this.plugin.goalRecommend.recommend(request, run2.controller.signal, hooks);
+        result = await this.plugin.goalRecommend.recommend(request, run.controller.signal, hooks);
       });
-      if (!this.isCurrent(run2, mapPath)) return;
-      if (!started) return this.finish(run2, mapPath, "declined", t("ui.relevance_not_started"));
+      if (!this.isCurrent(run, mapPath)) return;
+      if (!started) return this.finish(run, mapPath, "declined", t("ui.relevance_not_started"));
       const answered = result;
       if (!answered) return;
       const paintedBefore = this.paintCount;
-      await this.plugin.mutate(() => this.apply(run2, mapPath, basis, answered, { scope, pins }));
+      await this.plugin.mutate(() => this.apply(run, mapPath, basis, answered, { scope, pins }));
       if (this.paintCount === paintedBefore) this.ports.refresh();
-      this.ports.openRecommendations(run2, mapPath, answered.suggestions);
+      this.ports.openRecommendations(run, mapPath, answered.suggestions);
     } catch (error) {
       this.finish(
-        run2,
+        run,
         mapPath,
         "failed",
         t("ui.relevance_failed_0", goalRecommendFailureDetail(error, this.plugin.settings.language))
@@ -54866,12 +54183,12 @@ var RelevanceGradeRun = class {
    * write and the same undo step, unless the parent is hand-set, locked, outside what the AI saw, or changed meanwhile.
    * A note that cannot be written is counted; the undo step covers only the notes actually written.
    */
-  async apply(run2, mapPath, basis, graded, meta) {
+  async apply(run, mapPath, basis, graded, meta) {
     var _a2, _b2, _c, _d, _e;
-    if (!this.isCurrent(run2, mapPath) || !this.map) return;
+    if (!this.isCurrent(run, mapPath) || !this.map) return;
     const items = graded.items;
-    run2.writing = true;
-    run2.received = void 0;
+    run.writing = true;
+    run.received = void 0;
     const startedAt = Date.now();
     const repo = this.plugin.repo;
     const fresh = /* @__PURE__ */ new Map();
@@ -54992,11 +54309,11 @@ var RelevanceGradeRun = class {
           redo: () => this.restore(changes, "redo")
         };
         this.history.push(entry);
-        run2.historyEntry = entry;
+        run.historyEntry = entry;
         this.ports.updateHistoryButtons();
       }
-      run2.outcome = outcome;
-      run2.status = "done";
+      run.outcome = outcome;
+      run.status = "done";
     }
   }
   /**
@@ -55023,18 +54340,18 @@ var RelevanceGradeRun = class {
     if (skipped2) this.ports.notice(t("ui.relevance_undo_skipped_0", skipped2));
   }
   stop() {
-    const run2 = this.plugin.relevanceGrades.get(this.path);
-    if (!run2 || run2.status !== "running" || run2.writing) return;
-    run2.status = "stopped";
-    run2.received = void 0;
-    run2.message = t("ui.relevance_stopped");
-    run2.controller.abort();
+    const run = this.plugin.relevanceGrades.get(this.path);
+    if (!run || run.status !== "running" || run.writing) return;
+    run.status = "stopped";
+    run.received = void 0;
+    run.message = t("ui.relevance_stopped");
+    run.controller.abort();
     this.ports.refresh();
   }
 };
 
 // experiences/visual-map/map-chat.ts
-var import_obsidian28 = require("obsidian");
+var import_obsidian27 = require("obsidian");
 
 // core/map-chat-basis.ts
 function ancestors(parentId, parents, created) {
@@ -55467,26 +54784,26 @@ function parseInline(src, depth = 0, links = true, ends) {
     if (ch === "`") {
       let end = at;
       while (src[end] === "`") end++;
-      const run2 = src.slice(at, end);
+      const run = src.slice(at, end);
       let close = -1;
       for (let search = end; search < src.length; ) {
         const next = src.indexOf("`", search);
         if (next < 0) break;
         let stop = next;
         while (src[stop] === "`") stop++;
-        if (stop - next === run2.length) {
+        if (stop - next === run.length) {
           close = next;
           break;
         }
         search = stop;
       }
       if (close < 0) {
-        buf += run2;
+        buf += run;
         at = end;
         continue;
       }
       flush(at);
-      at = close + run2.length;
+      at = close + run.length;
       push({ t: "code", text: src.slice(end, close).replace(/\n/g, " ") }, at);
       continue;
     }
@@ -55897,7 +55214,7 @@ function pageLink(label, url) {
 function codeSpan(text10) {
   var _a2;
   const body = defuseCode(text10.replace(/\r?\n|\r/g, " "));
-  const longest = Math.max(0, ...((_a2 = body.match(/`+/g)) != null ? _a2 : []).map((run2) => run2.length));
+  const longest = Math.max(0, ...((_a2 = body.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
   const fence = "`".repeat(longest + 1);
   const guarded = /^\s*[=$]/.test(body) ? `${ZERO_WIDTH}${body}` : body;
   const padded = /^[`\s]|[`\s]$/.test(guarded) ? ` ${guarded} ` : guarded;
@@ -55959,7 +55276,7 @@ function blockMarkdown(block) {
       return "---";
     case "code": {
       const text10 = defuseCode(block.text);
-      const longest = Math.max(2, ...((_a2 = text10.match(/`+/g)) != null ? _a2 : []).map((run2) => run2.length));
+      const longest = Math.max(2, ...((_a2 = text10.match(/`+/g)) != null ? _a2 : []).map((run) => run.length));
       const fence = "`".repeat(longest + 1);
       return `${fence}
 ${text10}
@@ -57009,12 +56326,12 @@ ${typed}` : draft;
     }
     const notice = els.box.createDiv({ cls: "vam-map-chat-progress-slow" });
     notice.createSpan({ cls: "vam-map-chat-progress-slow-text", text: slow.text });
-    const button2 = notice.createEl("button", {
+    const button = notice.createEl("button", {
       cls: "vam-map-chat-progress-resend",
       text: t("ui.map_chat_resend"),
       attr: { type: "button" }
     });
-    button2.addEventListener("click", () => {
+    button.addEventListener("click", () => {
       var _a3;
       (_a3 = this.slow) == null ? void 0 : _a3.resend();
       if (this.built && this.stage) this.stopEl.focus();
@@ -57524,7 +56841,7 @@ ${typed}` : draft;
       cls: "vam-map-chat-toggle",
       attr: { "aria-label": t("ui.map_chat_open"), "aria-expanded": "false", "aria-controls": this.id }
     });
-    (0, import_obsidian28.setIcon)(this.toggleEl.createSpan("vam-map-chat-toggle-icon"), "message-square");
+    (0, import_obsidian27.setIcon)(this.toggleEl.createSpan("vam-map-chat-toggle-icon"), "message-square");
     this.badgeEl = this.toggleEl.createSpan({ cls: "vam-map-chat-unread", attr: { "aria-hidden": "true" } });
     this.badgeEl.hidden = true;
     this.toggleEl.addEventListener("click", () => this.setOpen(true, true));
@@ -57537,13 +56854,13 @@ ${typed}` : draft;
       cls: "vam-map-chat-save clickable-icon",
       attr: { type: "button", "aria-label": t("ui.map_chat_save"), title: t("ui.map_chat_save") }
     });
-    (0, import_obsidian28.setIcon)(this.saveEl, "file-down");
+    (0, import_obsidian27.setIcon)(this.saveEl, "file-down");
     this.saveEl.addEventListener("click", () => void this.saveNote());
     const close = this.closeEl = this.headEl.createEl("button", {
       cls: "vam-map-chat-close clickable-icon",
       attr: { "aria-label": t("ui.map_chat_close") }
     });
-    (0, import_obsidian28.setIcon)(close, "x");
+    (0, import_obsidian27.setIcon)(close, "x");
     close.addEventListener("click", () => this.setOpen(false, true));
     this.tabsEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-tabs",
@@ -57577,7 +56894,7 @@ ${typed}` : draft;
     this.researchDescEl.hidden = true;
     this.guideEl = this.bodyEl.createDiv("vam-map-chat-guide");
     this.guideIconEl = this.guideEl.createSpan({ cls: "vam-map-chat-guide-icon", attr: { "aria-hidden": "true" } });
-    (0, import_obsidian28.setIcon)(this.guideIconEl, "message-square");
+    (0, import_obsidian27.setIcon)(this.guideIconEl, "message-square");
     this.guideTextEl = this.guideEl.createSpan({ cls: "vam-sr-only", text: t("ui.map_chat_empty_log") });
     this.restoredEl = this.bodyEl.createDiv({ cls: "vam-map-chat-restored" });
     this.restoredEl.hidden = true;
@@ -57599,7 +56916,7 @@ ${typed}` : draft;
       const href = anchor.getAttribute("data-href");
       if (!href) return;
       event.preventDefault();
-      this.host.openLink(href, import_obsidian28.Keymap.isModEvent(event));
+      this.host.openLink(href, import_obsidian27.Keymap.isModEvent(event));
     };
     this.logEl.addEventListener("click", (event) => openInternal(event, event.target));
     this.logEl.addEventListener("keydown", (event) => {
@@ -57668,12 +56985,12 @@ ${typed}` : draft;
       cls: "vam-map-chat-send",
       attr: { type: "button", "aria-label": t("ui.map_chat_send") }
     });
-    (0, import_obsidian28.setIcon)(this.sendEl, "corner-down-left");
+    (0, import_obsidian27.setIcon)(this.sendEl, "corner-down-left");
     this.stopEl = box.createEl("button", {
       cls: "vam-map-chat-stop",
       attr: { type: "button", "aria-label": t("ui.map_chat_stop") }
     });
-    (0, import_obsidian28.setIcon)(this.stopEl, "square");
+    (0, import_obsidian27.setIcon)(this.stopEl, "square");
     box.addEventListener("click", (event) => {
       if (event.target === box) this.inputEl.focus();
     });
@@ -57738,14 +57055,14 @@ ${typed}` : draft;
     }
     if (!this.newEl) {
       const label = t("ui.map_chat_new_conversation");
-      const button2 = this.newEl = this.headEl.createEl("button", {
+      const button = this.newEl = this.headEl.createEl("button", {
         cls: "vam-map-chat-new clickable-icon",
         attr: { type: "button", "aria-label": label, title: label }
       });
-      (0, import_obsidian28.setIcon)(button2, "square-pen");
-      button2.addEventListener("click", () => this.startNewConversation());
-      button2.remove();
-      this.headEl.insertBefore(button2, this.saveEl);
+      (0, import_obsidian27.setIcon)(button, "square-pen");
+      button.addEventListener("click", () => this.startNewConversation());
+      button.remove();
+      this.headEl.insertBefore(button, this.saveEl);
     }
     this.newEl.hidden = this.hero;
     this.newEl.toggleClass("is-hidden", this.hero);
@@ -57876,12 +57193,12 @@ ${typed}` : draft;
     this.suggestionsEl.empty();
     for (const key4 of this.suggestionKeys) {
       const text10 = t(key4);
-      const button2 = this.suggestionsEl.createEl("button", {
+      const button = this.suggestionsEl.createEl("button", {
         cls: "vam-map-chat-claim-pick",
         text: text10,
         attr: { type: "button" }
       });
-      button2.addEventListener("click", () => {
+      button.addEventListener("click", () => {
         this.inputEl.value = text10;
         this.renderSteerHint();
         this.inputEl.focus();
@@ -58243,18 +57560,18 @@ ${shown}` : t("ui.map_chat_model_label"));
         attr: { role: "group", "aria-label": t("ui.map_chat_auto_apply_label") }
       });
       const make = (wantOn) => {
-        const button2 = group.createEl("button", {
+        const button = group.createEl("button", {
           cls: "vam-map-chat-image-mode-button",
           text: t(wantOn ? "ui.map_chat_auto_apply_on" : "ui.map_chat_auto_apply_off"),
           attr: { type: "button", "aria-pressed": "false" }
         });
-        button2.addEventListener("click", () => {
+        button.addEventListener("click", () => {
           var _a3, _b3, _c, _d;
           if (!!((_b3 = (_a3 = this.host).autoApply) == null ? void 0 : _b3.call(_a3)) === wantOn) return;
           (_d = (_c = this.host).setAutoApply) == null ? void 0 : _d.call(_c, wantOn);
           this.renderAutoApply();
         });
-        return button2;
+        return button;
       };
       this.autoApplyButtons = { off: make(false), on: make(true) };
       this.autoNoteEl = this.autoApplyEl.createSpan({ cls: "vam-map-chat-auto-apply-note" });
@@ -58271,12 +57588,12 @@ ${shown}` : t("ui.map_chat_model_label"));
       this.autoWarnEl.setText(t("ui.map_chat_auto_apply_warning"));
     }
     const on = !!((_b2 = (_a2 = this.host).autoApply) == null ? void 0 : _b2.call(_a2));
-    for (const [button2, pressed] of [
+    for (const [button, pressed] of [
       [this.autoApplyButtons.off, !on],
       [this.autoApplyButtons.on, on]
     ]) {
-      button2.setAttr("aria-pressed", String(pressed));
-      button2.toggleClass("is-active", pressed);
+      button.setAttr("aria-pressed", String(pressed));
+      button.toggleClass("is-active", pressed);
     }
     if (!on) this.autoWarnOpen = false;
     if (this.autoNoteEl) this.autoNoteEl.hidden = !on;
@@ -58367,26 +57684,26 @@ ${shown}` : t("ui.map_chat_model_label"));
         attr: { role: "group", "aria-label": t("ui.map_chat_image_mode_label") }
       });
       const make = (mode) => {
-        const button2 = group.createEl("button", {
+        const button = group.createEl("button", {
           cls: "vam-map-chat-image-mode-button",
           text: t(`ui.map_chat_image_mode_${mode}`),
           attr: { type: "button", "aria-pressed": "false" }
         });
-        button2.addEventListener("click", () => {
+        button.addEventListener("click", () => {
           var _a3, _b3, _c2, _d2, _e2;
           if (((_c2 = (_b3 = (_a3 = this.host).imageMode) == null ? void 0 : _b3.call(_a3)) != null ? _c2 : "preview") === mode) return;
           (_e2 = (_d2 = this.host).setImageMode) == null ? void 0 : _e2.call(_d2, mode);
           this.renderImageMode();
         });
-        return button2;
+        return button;
       };
       this.imageModeButtons = { preview: make("preview"), direct: make("direct") };
     }
     const current = (_e = (_d = (_c = this.host).imageMode) == null ? void 0 : _d.call(_c)) != null ? _e : "preview";
     for (const mode of ["preview", "direct"]) {
-      const button2 = this.imageModeButtons[mode];
-      button2.setAttr("aria-pressed", String(mode === current));
-      button2.toggleClass("is-active", mode === current);
+      const button = this.imageModeButtons[mode];
+      button.setAttr("aria-pressed", String(mode === current));
+      button.toggleClass("is-active", mode === current);
     }
   }
   /** The turn that was just finished sent a picture and/or wrote an undo step: its row says so. */
@@ -58402,9 +57719,9 @@ ${shown}` : t("ui.map_chat_model_label"));
     var _a2, _b2, _c;
     if (!this.built) return;
     for (const message of this.messages) {
-      const button2 = message.replyUndo ? (_a2 = this.rows.get(message)) == null ? void 0 : _a2.row.querySelector(".vam-map-chat-undo-reply") : null;
-      if (button2 && message.replyUndo)
-        button2.disabled = ((_c = (_b2 = this.host).replyUndoState) == null ? void 0 : _c.call(_b2, message.replyUndo.token)) === "undone";
+      const button = message.replyUndo ? (_a2 = this.rows.get(message)) == null ? void 0 : _a2.row.querySelector(".vam-map-chat-undo-reply") : null;
+      if (button && message.replyUndo)
+        button.disabled = ((_c = (_b2 = this.host).replyUndoState) == null ? void 0 : _c.call(_b2, message.replyUndo.token)) === "undone";
     }
   }
   renderChips() {
@@ -58419,7 +57736,7 @@ ${shown}` : t("ui.map_chat_model_label"));
       const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-auto is-image" });
       const pin = chip.createSpan("vam-map-chat-chip-icon");
       pin.setAttr("aria-hidden", "true");
-      (0, import_obsidian28.setIcon)(pin, "map-pin");
+      (0, import_obsidian27.setIcon)(pin, "map-pin");
       chip.createSpan({
         cls: "vam-map-chat-chip-label",
         text: t(
@@ -58555,14 +57872,14 @@ ${shown}` : t("ui.map_chat_model_label"));
         cls: "vam-map-chat-batch-more",
         text: t("ui.map_chat_batch_more_0", summary.pending.length - shown.length)
       });
-    const run2 = box.createEl("button", {
+    const run = box.createEl("button", {
       cls: "vam-map-chat-batch-rerun",
       text: batch.running ? t("ui.map_chat_batch_running_0", summary.pending.length) : t("ui.map_chat_batch_rerun_0", summary.pending.length),
       attr: { type: "button" }
     });
-    run2.disabled = batch.running === true;
-    if (!this.host.rerunBatch) this.makeInert(run2);
-    else run2.addEventListener("click", () => {
+    run.disabled = batch.running === true;
+    if (!this.host.rerunBatch) this.makeInert(run);
+    else run.addEventListener("click", () => {
       var _a2, _b2;
       return (_b2 = (_a2 = this.host).rerunBatch) == null ? void 0 : _b2.call(_a2, message);
     });
@@ -58586,14 +57903,14 @@ ${shown}` : t("ui.map_chat_model_label"));
       });
     if (point.remaining.trim())
       box.createDiv({ cls: "vam-map-chat-batch-left", text: t("ui.map_chat_chain_left_0", point.remaining) });
-    const run2 = box.createEl("button", {
+    const run = box.createEl("button", {
       cls: "vam-map-chat-batch-rerun vam-map-chat-resume-run",
       text: t("ui.map_chat_chain_resume_0", point.round),
       attr: { type: "button" }
     });
-    run2.disabled = this.working;
-    if (!this.host.resumeChain) this.makeInert(run2);
-    else run2.addEventListener("click", () => this.handOffFocus(() => {
+    run.disabled = this.working;
+    if (!this.host.resumeChain) this.makeInert(run);
+    else run.addEventListener("click", () => this.handOffFocus(() => {
       var _a2, _b2;
       return (_b2 = (_a2 = this.host).resumeChain) == null ? void 0 : _b2.call(_a2, message);
     }));
@@ -58672,7 +57989,7 @@ ${shown}` : t("ui.map_chat_model_label"));
       const line2 = row.createDiv("vam-map-chat-seen-row");
       const eye = line2.createSpan("vam-map-chat-seen-icon");
       eye.setAttr("aria-hidden", "true");
-      (0, import_obsidian28.setIcon)(eye, "eye");
+      (0, import_obsidian27.setIcon)(eye, "eye");
       line2.createDiv({
         cls: "vam-map-chat-seen",
         text: t("ui.map_chat_seen_image_0", clip4(message.seenImage.note, 80))
@@ -58773,14 +58090,14 @@ ${shown}` : t("ui.map_chat_model_label"));
   /** "Undo this reply" under an "apply directly" reply. Nothing of it is saved with the conversation. */
   buildReplyUndo(parent, token) {
     var _a2, _b2;
-    const button2 = parent.createEl("button", {
+    const button = parent.createEl("button", {
       cls: "vam-map-chat-undo-reply",
       text: t("ui.map_chat_undo_reply"),
       attr: { type: "button" }
     });
-    button2.disabled = ((_b2 = (_a2 = this.host).replyUndoState) == null ? void 0 : _b2.call(_a2, token)) === "undone";
-    button2.addEventListener("click", () => {
-      if (button2.disabled || !this.host.undoReply) return;
+    button.disabled = ((_b2 = (_a2 = this.host).replyUndoState) == null ? void 0 : _b2.call(_a2, token)) === "undone";
+    button.addEventListener("click", () => {
+      if (button.disabled || !this.host.undoReply) return;
       void this.host.undoReply(token).then(() => this.refreshReplyUndo());
     });
   }
@@ -59114,14 +58431,14 @@ ${shown}` : t("ui.map_chat_model_label"));
     }
     const buttons = [];
     for (const option of choices.options) {
-      const button2 = box.createEl("button", {
+      const button = box.createEl("button", {
         cls: "vam-map-chat-choice",
         text: option.label,
         attr: { type: "button" }
       });
-      button2.disabled = choices.picked;
-      buttons.push(button2);
-      button2.addEventListener("click", () => {
+      button.disabled = choices.picked;
+      buttons.push(button);
+      button.addEventListener("click", () => {
         if (choices.picked) return;
         choices.picked = true;
         for (const other of buttons) other.disabled = true;
@@ -59458,9 +58775,9 @@ var ChatImageFinder = class {
     const cover = await this.coverBytes(block, candidate, signal);
     if (!alive()) return { ok: false, reason: t("ui.map_chat_images_stale_map") };
     const work = () => this.ports.write(block, candidate, alive, cover);
-    const run2 = this.writes.then(work, work);
-    this.writes = run2.catch(() => void 0);
-    return run2;
+    const run = this.writes.then(work, work);
+    this.writes = run.catch(() => void 0);
+    return run;
   }
   /** A download that ends when the search is stopped or after {@link CHAT_IMAGE_DOWNLOAD_MS}, whichever comes first. */
   download(url, signal) {
@@ -59735,9 +59052,9 @@ var PAUSE_REASON_KEY = {
   limit: "ui.argument_paused_reason_limit"
 };
 function pausedParts(state, phase, t2) {
-  const run2 = state.run;
-  if (run2.status !== "paused" || run2.phase !== phase) return null;
-  const reason = run2.stopReason === void 0 ? void 0 : PAUSE_REASON_KEY[run2.stopReason];
+  const run = state.run;
+  if (run.status !== "paused" || run.phase !== phase) return null;
+  const reason = run.stopReason === void 0 ? void 0 : PAUSE_REASON_KEY[run.stopReason];
   const lines = reason ? [t2("ui.argument_reason_0", t2(reason))] : [];
   if (isLegacyFacetMap(state))
     return {
@@ -60191,22 +59508,22 @@ function renderArgumentCardBody(card, view, onAction, onResume) {
   return body;
 }
 function renderArgumentAction(body, action, onAction) {
-  const button2 = body.createEl("button", { cls: "vam-argument-action", text: action.text });
-  button2.setAttr("type", "button");
-  button2.setAttr("aria-label", action.ariaLabel);
+  const button = body.createEl("button", { cls: "vam-argument-action", text: action.text });
+  button.setAttr("type", "button");
+  button.setAttr("aria-label", action.ariaLabel);
   for (const type of ["pointerdown", "mousedown", "dblclick", "keydown"])
-    button2.addEventListener(type, (event) => event.stopPropagation());
-  button2.addEventListener("click", (event) => {
+    button.addEventListener(type, (event) => event.stopPropagation());
+  button.addEventListener("click", (event) => {
     event.stopPropagation();
-    onAction == null ? void 0 : onAction(button2);
+    onAction == null ? void 0 : onAction(button);
   });
-  return button2;
+  return button;
 }
 
 // experiences/visual-map/argument-rerun.ts
 var ENTITY = { lt: "<", gt: ">", amp: "&" };
 var narrow = (c) => String.fromCharCode(c.charCodeAt(0) - 65248);
-var narrowRun = (run2) => [...run2].map(narrow).join("");
+var narrowRun = (run) => [...run].map(narrow).join("");
 var decode = (text10) => text10.replace(
   /&(?:#(\d{1,5})|(lt|gt|amp));/g,
   (_m, code3, name2) => code3 ? String.fromCodePoint(Number(code3)) : ENTITY[name2]
@@ -60268,17 +59585,17 @@ async function rerunWithAssumptions(ports) {
 
 // experiences/visual-map/argument-progress.ts
 function describeArgumentProgress(state, owned, t2) {
-  const run2 = state.run;
-  const used = t2("ui.argument_bar_used_0_1", run2.researchCalls, MAX_RESEARCH_CALLS);
-  if (run2.status === "finished" || run2.phase === "concluded" || run2.phase === "stopped_mismatch" || run2.phase === "stopped_limit")
+  const run = state.run;
+  const used = t2("ui.argument_bar_used_0_1", run.researchCalls, MAX_RESEARCH_CALLS);
+  if (run.status === "finished" || run.phase === "concluded" || run.phase === "stopped_mismatch" || run.phase === "stopped_limit")
     return {
       tone: "done",
       title: t2("ui.argument_bar_finished"),
       detail: t2("ui.argument_bar_see_conclusion"),
-      count: t2("ui.argument_bar_total_0", run2.researchCalls),
+      count: t2("ui.argument_bar_total_0", run.researchCalls),
       action: null
     };
-  if (run2.status === "running") {
+  if (run.status === "running") {
     if (!owned)
       return {
         tone: "warn",
@@ -60286,7 +59603,7 @@ function describeArgumentProgress(state, owned, t2) {
         detail: t2("ui.argument_bar_no_auto_rerun"),
         action: null
       };
-    if (run2.phase === "situation") {
+    if (run.phase === "situation") {
       const searching2 = state.situation.data.filter((datum) => datum.state === "searching").length;
       return {
         tone: "run",
@@ -60317,14 +59634,14 @@ function describeArgumentProgress(state, owned, t2) {
       count: used,
       action: null
     };
-  if (run2.stopReason === "interrupted")
+  if (run.stopReason === "interrupted")
     return {
       tone: "warn",
       title: t2("ui.argument_bar_interrupted"),
       detail: t2("ui.argument_bar_no_auto_rerun"),
       action: "resume"
     };
-  if (run2.stopReason === "error")
+  if (run.stopReason === "error")
     return { tone: "warn", title: t2("ui.argument_bar_paused"), detail: t2("ui.argument_bar_error"), action: "resume" };
   return {
     tone: "paused",
@@ -60907,8 +60224,8 @@ var MapChatRecordWriter = class {
     return ((_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date()).toISOString();
   }
   enqueue(task, fallback) {
-    const run2 = this.chain.then(() => this.dead() ? fallback : task());
-    const safe2 = run2.catch((error) => {
+    const run = this.chain.then(() => this.dead() ? fallback : task());
+    const safe2 = run.catch((error) => {
       this.deps.log("error", `Map chat record: ${errorText2(error)}`);
       return fallback;
     });
@@ -61419,7 +60736,7 @@ var MapChatChainRunner = class {
       return live2;
     }
     if (live2) this.interruptChain(live2, "user_took_over");
-    const run2 = {
+    const run = {
       seq: ++this.seq,
       state: origin ? { ...origin.state, phase: "round" } : this.ports.autoApply() ? startAutoChain() : startChain(),
       anchor,
@@ -61443,20 +60760,20 @@ var MapChatChainRunner = class {
       retriedRound: null,
       appliedText: ""
     };
-    this.current = run2;
-    return run2;
+    this.current = run;
+    return run;
   }
   /**
    * A round of an auto-apply chain failed (provider timeout, transient or format failure): the same round is sent once more, at once,
    * counting as one more call of the chain. Only the live, un-stopped chain of this round is retried (a Stop or a new message has
    * already ended it); a second failure of the round ends the chain as `failed` as usual. Returns whether a retry was started.
    */
-  retryAutoRound(run2, origin) {
-    if (!this.ports.autoApply() || run2.retriedRound === run2.state.round || this.current !== run2 || run2.state.phase !== "round" || this.ports.closed() || this.ports.applying() || !this.ports.map() || this.ports.notesLoading() || !origin.text)
+  retryAutoRound(run, origin) {
+    if (!this.ports.autoApply() || run.retriedRound === run.state.round || this.current !== run || run.state.phase !== "round" || this.ports.closed() || this.ports.applying() || !this.ports.map() || this.ports.notesLoading() || !origin.text)
       return false;
-    run2.retriedRound = run2.state.round;
-    run2.state = { ...run2.state, calls: run2.state.calls + 1 };
-    this.ports.send({ ...origin }, void 0, run2);
+    run.retriedRound = run.state.round;
+    run.state = { ...run.state, calls: run.state.calls + 1 };
+    this.ports.send({ ...origin }, void 0, run);
     return true;
   }
   /** The cards of an earlier AI selection that are still on the map. */
@@ -61505,92 +60822,92 @@ var MapChatChainRunner = class {
     return segment * Math.ceil(round3 / segment);
   }
   /** The continuation is more than a single answer (a later round, or one that said something was left): its end is told and recorded. */
-  chainShows(run2) {
-    return run2.state.round >= 2 || !!run2.replyRemaining || !!run2.state.remaining;
+  chainShows(run) {
+    return run.state.round >= 2 || !!run.replyRemaining || !!run.state.remaining;
   }
   /** Ends the chain from the outside (Stop, a new message, a failure, a map change): the first ending wins, a later one changes nothing. */
-  interruptChain(run2, reason) {
-    if (!run2) return;
-    const step = interrupt(run2.state, reason);
+  interruptChain(run, reason) {
+    if (!run) return;
+    const step = interrupt(run.state, reason);
     if (step.decision.kind !== "end") return;
-    const applied = run2.state.phase === "waiting";
-    run2.state = step.state;
-    this.endChatChain(run2, reason, run2.replyRemaining || step.decision.remaining, applied);
+    const applied = run.state.phase === "waiting";
+    run.state = step.state;
+    this.endChatChain(run, reason, run.replyRemaining || step.decision.remaining, applied);
   }
   /** The chain is over: its timer and wait go, the end is recorded, and (unless it simply finished) the panel says why. */
-  endChatChain(run2, reason, remaining, applied = true) {
+  endChatChain(run, reason, remaining, applied = true) {
     var _a2;
-    if (this.current === run2) this.current = null;
-    if (run2.timer !== null) window.clearTimeout(run2.timer);
-    run2.timer = null;
-    run2.state = { ...run2.state, phase: "ended" };
+    if (this.current === run) this.current = null;
+    if (run.timer !== null) window.clearTimeout(run.timer);
+    run.timer = null;
+    run.state = { ...run.state, phase: "ended" };
     if (this.ports.closed()) return;
     const chat = this.ports.panel();
-    if (run2.waitShown) chat == null ? void 0 : chat.setChainWaiting(null);
-    run2.waitShown = false;
-    if (!this.chainShows(run2)) return;
-    const calls = run2.state.autoApply ? run2.state.calls : void 0;
+    if (run.waitShown) chat == null ? void 0 : chat.setChainWaiting(null);
+    run.waitShown = false;
+    if (!this.chainShows(run)) return;
+    const calls = run.state.autoApply ? run.state.calls : void 0;
     (_a2 = this.ports.lastRecord()) == null ? void 0 : _a2.event("chain_end", {
       reason,
-      round: run2.state.round,
+      round: run.state.round,
       remaining,
       ...calls === void 0 ? {} : { calls }
     });
-    if (chat && (chainEndNeedsNotice(reason) || reason === "done" && run2.state.round >= 2)) {
+    if (chat && (chainEndNeedsNotice(reason) || reason === "done" && run.state.round >= 2)) {
       const next = reason === "failed" ? null : resumeRound(
         {
           reason,
-          round: run2.state.round,
+          round: run.state.round,
           applied,
-          startRemaining: run2.roundRemaining,
+          startRemaining: run.roundRemaining,
           replyRemaining: remaining
         },
-        run2.state.autoApply ? MAP_CHAT_AUTO_MAX_ROUNDS : MAP_CHAT_CHAIN_MAX_ROUNDS
+        run.state.autoApply ? MAP_CHAT_AUTO_MAX_ROUNDS : MAP_CHAT_CHAIN_MAX_ROUNDS
       );
-      const details = run2.details.length ? run2.details : void 0;
+      const details = run.details.length ? run.details : void 0;
       if (calls === void 0) chat.endChain(reason, remaining, details);
       else chat.endChain(reason, remaining, details, calls);
       if (next)
         chat.offerResume({
           ...next,
-          ...run2.state.progress ? { progress: run2.state.progress } : {},
-          stoppedRound: run2.state.round,
+          ...run.state.progress ? { progress: run.state.progress } : {},
+          stoppedRound: run.state.round,
           reason,
-          message: run2.message,
-          selectedIds: run2.aiSelection ? [...run2.aiSelection] : [],
-          lastResults: run2.lastResults.map((line2) => ({ text: line2.text, status: line2.status }))
+          message: run.message,
+          selectedIds: run.aiSelection ? [...run.aiSelection] : [],
+          lastResults: run.lastResults.map((line2) => ({ text: line2.text, status: line2.status }))
         });
     }
   }
   /** Stop on a continuation: what the chain started and still runs (research, expansions) stops; what was written stays. */
-  stopChainWork(run2) {
-    const work = run2.work;
+  stopChainWork(run) {
+    const work = run.work;
     if (!work) return;
     work.controller.abort();
     for (const key4 of work.researchKeys) this.ports.stopResearch(key4);
   }
   /** A round ended with its reply applied (or its plan): the chain goes on, waits or ends, unless the user spoke meanwhile. */
-  finishChatRound(run2, round3) {
+  finishChatRound(run, round3) {
     var _a2;
-    if ((_a2 = this.ports.panel()) == null ? void 0 : _a2.hasQueuedSteers()) this.interruptChain(run2, "user_took_over");
-    else this.advanceChain(run2, round3);
+    if ((_a2 = this.ports.panel()) == null ? void 0 : _a2.hasQueuedSteers()) this.interruptChain(run, "user_took_over");
+    else this.advanceChain(run, round3);
     this.ports.flushSteers(true);
   }
-  advanceChain(run2, round3) {
+  advanceChain(run, round3) {
     var _a2, _b2;
-    if (this.current !== run2 || run2.state.phase === "ended") return;
-    run2.partial = null;
-    for (const id of round3.work.created) run2.createdIds.add(id);
-    if (round3.work.selected) run2.aiSelection = [...round3.work.selected];
-    run2.lastResults = chatResultLines(round3.lines).map((line2) => ({ text: line2.text, status: line2.status }));
-    run2.anchor = { path: round3.anchor.path, id: round3.anchor.id };
-    run2.state = syncAutoApply(run2.state, this.ports.autoApply());
+    if (this.current !== run || run.state.phase === "ended") return;
+    run.partial = null;
+    for (const id of round3.work.created) run.createdIds.add(id);
+    if (round3.work.selected) run.aiSelection = [...round3.work.selected];
+    run.lastResults = chatResultLines(round3.lines).map((line2) => ({ text: line2.text, status: line2.status }));
+    run.anchor = { path: round3.anchor.path, id: round3.anchor.id };
+    run.state = syncAutoApply(run.state, this.ports.autoApply());
     const appliedActions = round3.result.actions.filter((_, index) => {
       var _a3;
       return ((_a3 = round3.lines[index]) == null ? void 0 : _a3.status) === "done";
     });
-    run2.appliedText = run2.state.autoApply ? this.appliedDirectlyText(appliedActions, round3.context.selectedCount) : "";
-    const step = finishRound(run2.state, {
+    run.appliedText = run.state.autoApply ? this.appliedDirectlyText(appliedActions, round3.context.selectedCount) : "";
+    const step = finishRound(run.state, {
       // The round's own request plus the AI calls its applied actions started (counted for the auto-apply limit).
       calls: 1 + estimateChatCalls(appliedActions, round3.context, {
         diagrams: this.ports.diagrams(),
@@ -61614,25 +60931,25 @@ var MapChatChainRunner = class {
         otherBackground: round3.work.otherBackground
       }
     });
-    run2.state = step.state;
+    run.state = step.state;
     this.showChainFlow(
-      run2,
+      run,
       step.decision.kind === "end" && step.decision.reason === "done" && !step.decision.remaining.trim()
     );
-    this.followChainDecision(run2, step.decision, round3.work);
+    this.followChainDecision(run, step.decision, round3.work);
   }
   /**
    * The whole-flow block follows the chain: only an auto-apply chain shows it (the panel hides it for fewer than two steps). A chain
    * that ended done with nothing left shows every step done, even when the last reply did not move the statuses.
    */
-  showChainFlow(run2, finished = false) {
+  showChainFlow(run, finished = false) {
     var _a2;
-    const progress = run2.state.progress;
-    if (!run2.state.autoApply || !progress) return;
+    const progress = run.state.progress;
+    if (!run.state.autoApply || !progress) return;
     (_a2 = this.ports.panel()) == null ? void 0 : _a2.setFlowProgress({
       steps: progress.steps.map((step) => ({ ...step, ...finished ? { status: "done" } : {} })),
-      round: run2.state.round,
-      calls: run2.state.calls,
+      round: run.state.round,
+      calls: run.state.calls,
       maxCalls: MAP_CHAT_AUTO_MAX_CALLS
     });
   }
@@ -61650,33 +60967,33 @@ var MapChatChainRunner = class {
     ].filter(Boolean);
     return parts.join(t("ui.map_chat_chain_detail_separator"));
   }
-  followChainDecision(run2, decision, work) {
-    if (decision.kind === "end") this.endChatChain(run2, decision.reason, decision.remaining);
-    else if (decision.kind === "wait" && work) this.waitForChain(run2, decision.waitFor, work);
-    else if (decision.kind === "next") this.startNextRound(run2, decision.round, decision.remaining);
+  followChainDecision(run, decision, work) {
+    if (decision.kind === "end") this.endChatChain(run, decision.reason, decision.remaining);
+    else if (decision.kind === "wait" && work) this.waitForChain(run, decision.waitFor, work);
+    else if (decision.kind === "next") this.startNextRound(run, decision.round, decision.remaining);
   }
   /** Waits for the research and expansions the round started; the 30 minutes only end the chain, never the work (auto-apply: 30 minutes with none finishing). */
-  waitForChain(run2, waitFor, work) {
+  waitForChain(run, waitFor, work) {
     const chat = this.ports.panel();
     const research = waitFor.includes("research") ? work.research : [];
     const expand2 = waitFor.includes("expand") ? work.expand : [];
     const waiting = { kinds: waitFor, total: (research.length ? work.researchTargets : 0) + expand2.length, settled: 0 };
-    chat == null ? void 0 : chat.setChainWaiting(waiting, run2.state.remaining);
-    run2.waitShown = true;
+    chat == null ? void 0 : chat.setChainWaiting(waiting, run.state.remaining);
+    run.waitShown = true;
     const progress = (by) => {
       var _a2;
-      if (this.current !== run2 || run2.state.phase !== "waiting") return;
+      if (this.current !== run || run.state.phase !== "waiting") return;
       waiting.settled = Math.min(waiting.total, waiting.settled + by);
-      (_a2 = this.ports.panel()) == null ? void 0 : _a2.setChainWaiting(waiting, run2.state.remaining);
+      (_a2 = this.ports.panel()) == null ? void 0 : _a2.setChainWaiting(waiting, run.state.remaining);
       if (this.ports.autoApply()) {
-        if (run2.timer !== null) window.clearTimeout(run2.timer);
+        if (run.timer !== null) window.clearTimeout(run.timer);
         arm();
       }
     };
     const arm = () => {
-      run2.timer = window.setTimeout(() => {
-        run2.timer = null;
-        this.settleChainWait(run2, { timedOut: true }, []);
+      run.timer = window.setTimeout(() => {
+        run.timer = null;
+        this.settleChainWait(run, { timedOut: true }, []);
       }, MAP_CHAT_CHAIN_WAIT_MS);
     };
     arm();
@@ -61716,7 +61033,7 @@ var MapChatChainRunner = class {
       );
     void Promise.all(pending2).then(
       () => this.settleChainWait(
-        run2,
+        run,
         {
           ...researched ? { research: researched } : {},
           ...expand2.length ? { expand: { succeeded: expandSucceeded, failed: expandFailed } } : {}
@@ -61726,65 +61043,65 @@ var MapChatChainRunner = class {
     );
   }
   /** What the chain waited for is over (or the 30 minutes are). A late or repeated call, for a chain that has moved on, changes nothing. */
-  settleChainWait(run2, end, waited) {
+  settleChainWait(run, end, waited) {
     var _a2, _b2;
-    if (this.current !== run2 || run2.state.phase !== "waiting") return;
-    if (run2.timer !== null) window.clearTimeout(run2.timer);
-    run2.timer = null;
+    if (this.current !== run || run.state.phase !== "waiting") return;
+    if (run.timer !== null) window.clearTimeout(run.timer);
+    run.timer = null;
     const chat = this.ports.panel();
-    if (this.ports.closed() || !chat || this.ports.path() !== run2.anchor.path || ((_a2 = this.ports.map()) == null ? void 0 : _a2.id) !== run2.anchor.id || run2.turn !== null && !chat.hasTurn(run2.turn)) {
-      this.interruptChain(run2, "map_changed");
+    if (this.ports.closed() || !chat || this.ports.path() !== run.anchor.path || ((_a2 = this.ports.map()) == null ? void 0 : _a2.id) !== run.anchor.id || run.turn !== null && !chat.hasTurn(run.turn)) {
+      this.interruptChain(run, "map_changed");
       return;
     }
     chat.setChainWaiting(null);
-    run2.waitShown = false;
-    run2.waited = waited.map((item) => ({
+    run.waitShown = false;
+    run.waited = waited.map((item) => ({
       id: item.id,
       title: item.title,
       status: item.status,
       ...item.error ? { error: item.error } : {}
     }));
-    run2.details = waited.filter((item) => item.status !== "succeeded").map(chainWorkDetail);
-    const step = finishWait(run2.state, end);
-    run2.state = step.state;
-    run2.partial = step.decision.kind === "next" && ((_b2 = end.research) == null ? void 0 : _b2.kind) === "settled" && end.research.failed > 0 && end.research.succeeded > 0 ? { failed: end.research.failed, succeeded: end.research.succeeded } : null;
-    this.followChainDecision(run2, step.decision, null);
+    run.details = waited.filter((item) => item.status !== "succeeded").map(chainWorkDetail);
+    const step = finishWait(run.state, end);
+    run.state = step.state;
+    run.partial = step.decision.kind === "next" && ((_b2 = end.research) == null ? void 0 : _b2.kind) === "settled" && end.research.failed > 0 && end.research.succeeded > 0 ? { failed: end.research.failed, succeeded: end.research.succeeded } : null;
+    this.followChainDecision(run, step.decision, null);
   }
   /** Round `round` of the chain begins now, as a message of its own: the same preparation, request, plan rules and apply as any send. */
-  startNextRound(run2, round3, remaining) {
+  startNextRound(run, round3, remaining) {
     var _a2;
     const chat = this.ports.panel();
-    if (this.ports.closed() || !chat || this.ports.path() !== run2.anchor.path || ((_a2 = this.ports.map()) == null ? void 0 : _a2.id) !== run2.anchor.id || run2.turn !== null && !chat.hasTurn(run2.turn)) {
-      this.interruptChain(run2, "map_changed");
+    if (this.ports.closed() || !chat || this.ports.path() !== run.anchor.path || ((_a2 = this.ports.map()) == null ? void 0 : _a2.id) !== run.anchor.id || run.turn !== null && !chat.hasTurn(run.turn)) {
+      this.interruptChain(run, "map_changed");
       return;
     }
     if (chat.isBusy || this.ports.applying()) {
-      this.interruptChain(run2, "user_took_over");
+      this.interruptChain(run, "user_took_over");
       return;
     }
     const origin = {
-      text: run2.message,
+      text: run.message,
       // The chips of the user's message go with every round (the source of an attached file is what "each one" is checked against);
       // a picture is sent with the first round only and a follow-up adds no chip.
-      chips: [...run2.chips],
-      selectedIds: run2.aiSelection ? this.chainSelection(run2.aiSelection) : this.ports.selectionIds(),
+      chips: [...run.chips],
+      selectedIds: run.aiSelection ? this.chainSelection(run.aiSelection) : this.ports.selectionIds(),
       chain: {
-        seq: run2.seq,
-        ...run2.aiSelection ? { aiSelection: [...run2.aiSelection] } : {},
-        state: run2.state,
-        createdIds: [...run2.createdIds],
+        seq: run.seq,
+        ...run.aiSelection ? { aiSelection: [...run.aiSelection] } : {},
+        state: run.state,
+        createdIds: [...run.createdIds],
         continuation: {
           round: round3,
-          maxRounds: run2.state.maxRounds,
+          maxRounds: run.state.maxRounds,
           remaining,
-          lastResults: run2.lastResults,
-          research: run2.waited,
-          ...run2.state.progress ? { progress: run2.state.progress } : {},
-          ...run2.state.checkingDone ? { checkDone: true } : {}
+          lastResults: run.lastResults,
+          research: run.waited,
+          ...run.state.progress ? { progress: run.state.progress } : {},
+          ...run.state.checkingDone ? { checkDone: true } : {}
         }
       }
     };
-    run2.work = null;
+    run.work = null;
     this.ports.send(origin);
   }
 };
@@ -61971,7 +61288,7 @@ var MapChatConversation = class {
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */
-  offerChatPlan(result, plan, baseline, anchor, message, record = null, run2 = null) {
+  offerChatPlan(result, plan, baseline, anchor, message, record = null, run = null) {
     const chat = this.ports.panel();
     if (!chat) return;
     const token = ++this.planToken;
@@ -61999,7 +61316,7 @@ var MapChatConversation = class {
       reasons: plan.reasons.map(
         (reason) => {
           var _a2;
-          return this.planReasonText(reason, result, baseline.selectedCount, (_a2 = run2 == null ? void 0 : run2.state.researchTargets) != null ? _a2 : 0);
+          return this.planReasonText(reason, result, baseline.selectedCount, (_a2 = run == null ? void 0 : run.state.researchTargets) != null ? _a2 : 0);
         }
       ),
       items,
@@ -62008,7 +61325,7 @@ var MapChatConversation = class {
       // Undo takes the plan's changes back; only the AI work it starts is said to stay.
       aiWork: result.actions.some((action) => action.kind === "run_map_action"),
       state: "pending",
-      apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor, run2),
+      apply: () => void this.applyChatPlan(card, token, { ...result, message }, baseline, anchor, run),
       cancel: () => {
         var _a2, _b2;
         if (token !== this.planToken) return;
@@ -62016,13 +61333,13 @@ var MapChatConversation = class {
         this.ports.clearPreview();
         (_a2 = this.ports.panel()) == null ? void 0 : _a2.settlePlan(card, "cancelled");
         (_b2 = this.ports.plans().get(card)) == null ? void 0 : _b2.plan("cancelled");
-        this.ports.chain().interruptChain(run2, "plan_cancelled");
+        this.ports.chain().interruptChain(run, "plan_cancelled");
       }
     };
     if (record) this.ports.plans().set(card, record);
     chat.showPlan(card);
   }
-  async applyChatPlan(card, token, result, baseline, anchor, run2 = null) {
+  async applyChatPlan(card, token, result, baseline, anchor, run = null) {
     var _a2, _b2, _c, _d;
     const chat = this.ports.panel();
     if (!chat || this.ports.closed() || token !== this.planToken || chat.isBusy || this.applying) return;
@@ -62030,7 +61347,7 @@ var MapChatConversation = class {
     if (!map || this.ports.path() !== anchor.path || map.id !== anchor.id) {
       this.planToken++;
       this.ports.clearPreview();
-      this.ports.chain().interruptChain(run2, "map_changed");
+      this.ports.chain().interruptChain(run, "map_changed");
       const skip = [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }];
       chat.settlePlan(card, "cancelled", skip);
       (_a2 = this.ports.plans().get(card)) == null ? void 0 : _a2.plan("cancelled", skip);
@@ -62044,14 +61361,14 @@ var MapChatConversation = class {
     const stopped = () => token !== this.planToken;
     let lines;
     const work = newChatWork();
-    if (run2) run2.work = work;
+    if (run) run.work = work;
     const live2 = { path: anchor.path, id: anchor.id };
     try {
       lines = await this.ports.applyActions(result, baseline, () => token === this.planToken, live2, {
         context: baseline,
         work,
-        continuation: ((_b2 = run2 == null ? void 0 : run2.state.round) != null ? _b2 : 1) > 1,
-        chain: run2
+        continuation: ((_b2 = run == null ? void 0 : run.state.round) != null ? _b2 : 1) > 1,
+        chain: run
       });
     } catch (error) {
       lines = [{ status: "failed", text: errorMessage4(error) }];
@@ -62062,12 +61379,12 @@ var MapChatConversation = class {
     if (!this.ports.closed()) {
       lines = (_c = chat.settlePlan(card, "applied", lines)) != null ? _c : lines;
       (_d = this.ports.plans().get(card)) == null ? void 0 : _d.plan(this.planStopped ? "stopped" : "applied", lines);
-      if (run2) {
+      if (run) {
         if (stopped()) {
-          if (this.ports.chain().chainShows(run2)) this.ports.chain().stopChainWork(run2);
-          this.ports.chain().interruptChain(run2, "stopped");
-        } else if (chat.hasQueuedSteers()) this.ports.chain().interruptChain(run2, "user_took_over");
-        else this.ports.chain().advanceChain(run2, { result, context: baseline, lines, work, anchor: live2 });
+          if (this.ports.chain().chainShows(run)) this.ports.chain().stopChainWork(run);
+          this.ports.chain().interruptChain(run, "stopped");
+        } else if (chat.hasQueuedSteers()) this.ports.chain().interruptChain(run, "user_took_over");
+        else this.ports.chain().advanceChain(run, { result, context: baseline, lines, work, anchor: live2 });
       }
       this.flushSteers(!stopped());
     }
@@ -62110,24 +61427,24 @@ var MapChatConversation = class {
       ...imageId ? { imageId } : {}
     };
     const anchor = { path: this.ports.path(), id: (_c = this.ports.map()) == null ? void 0 : _c.id };
-    const run2 = retryOf && !autoOrigin ? retryOf : this.ports.chain().chainForRound(autoOrigin, anchor, message);
-    if (run2 === retryOf) run2.message = message;
-    run2.chips = [...origin.chips];
+    const run = retryOf && !autoOrigin ? retryOf : this.ports.chain().chainForRound(autoOrigin, anchor, message);
+    if (run === retryOf) run.message = message;
+    run.chips = [...origin.chips];
     const draft = chat.draft;
     const turn = autoOrigin ? chat.beginAutoRound(
-      run2.state.round,
-      run2.state.maxRounds,
-      run2.state.remaining,
+      run.state.round,
+      run.state.maxRounds,
+      run.state.remaining,
       origin,
-      (_d = run2.partial) != null ? _d : void 0,
-      ...run2.state.autoApply ? [{ calls: run2.state.calls, applied: run2.appliedText }] : []
+      (_d = run.partial) != null ? _d : void 0,
+      ...run.state.autoApply ? [{ calls: run.state.calls, applied: run.appliedText }] : []
     ) : chat.begin(message, origin, Boolean(again), "preparing");
-    run2.turn = turn;
+    run.turn = turn;
     let sent = false;
     const abandon = (reason, ends = "map_changed") => {
       if (this.prepAbandon === stopPreparing) this.prepAbandon = null;
       const retracted = chat.retract(turn, again ? restore : draft);
-      this.ports.chain().interruptChain(run2, ends);
+      this.ports.chain().interruptChain(run, ends);
       if (!retracted) return;
       if (reason !== void 0 && (!autoOrigin || ends === "failed")) this.ports.notice(reason);
     };
@@ -62180,7 +61497,7 @@ var MapChatConversation = class {
           sent = true;
           if (this.prepAbandon === stopPreparing) this.prepAbandon = null;
           const record = this.ports.beginRecord(turn, request, origin);
-          run2.record = record;
+          run.record = record;
           if (record) record.steerTexts = () => steerState.steers.delivered();
           const turnController = new AbortController();
           const key4 = this.ports.taskKey();
@@ -62249,16 +61566,16 @@ var MapChatConversation = class {
             await steerState.steers.close();
             if (!alive()) return;
             const fullMessage = [request.message, ...chat.takeSteerTexts()].join("\n\n");
-            run2.message = fullMessage;
-            run2.replyRemaining = result.remaining;
-            run2.state = syncAutoApply(run2.state, this.ports.autoApply());
-            const plan = result.actions.length ? planFor(result.actions, request.context, this.ports.planOptions(run2, request)) : null;
+            run.message = fullMessage;
+            run.replyRemaining = result.remaining;
+            run.state = syncAutoApply(run.state, this.ports.autoApply());
+            const plan = result.actions.length ? planFor(result.actions, request.context, this.ports.planOptions(run, request)) : null;
             if (plan) {
               if (chat.isBusy) {
                 chat.finish(result.reply, []);
                 this.showUnreadResearch(chat, turn, request.context);
                 this.ports.markTurn(origin, request);
-                run2.state = pauseForPlan(run2.state);
+                run.state = pauseForPlan(run.state);
                 this.offerChatPlan(
                   result,
                   plan,
@@ -62266,7 +61583,7 @@ var MapChatConversation = class {
                   { path: anchor.path, id: anchor.id },
                   fullMessage,
                   record,
-                  run2
+                  run
                 );
                 if (record == null ? void 0 : record.end("plan", { reply: result.reply, lines: [], rejected: result.rejected }))
                   this.ports.markLogged(turn.assistant);
@@ -62276,7 +61593,7 @@ var MapChatConversation = class {
             }
             if (result.actions.length) chat.setStage("applying");
             const work = newChatWork();
-            run2.work = work;
+            run.work = work;
             const lines = await this.ports.applyActions(
               { ...result, message: fullMessage },
               request.context,
@@ -62286,7 +61603,7 @@ var MapChatConversation = class {
                 context: request.context,
                 work,
                 continuation: Boolean(autoOrigin),
-                chain: run2
+                chain: run
               }
             );
             if (alive() && chat.isBusy) {
@@ -62296,7 +61613,7 @@ var MapChatConversation = class {
               this.ports.markTurn(origin, request, entry);
               if (record == null ? void 0 : record.end("done", { reply: result.reply, lines: shown, rejected: result.rejected }))
                 this.ports.markLogged(turn.assistant);
-              this.ports.chain().finishChatRound(run2, { result, context: request.context, lines, work, anchor });
+              this.ports.chain().finishChatRound(run, { result, context: request.context, lines, work, anchor });
             }
             return;
           } catch (error) {
@@ -62310,7 +61627,7 @@ var MapChatConversation = class {
                 error: { text: failure.text, technical: (_d2 = failure.technical) != null ? _d2 : "" }
               });
               this.returnSteers(steerState);
-              if (!this.ports.chain().retryAutoRound(run2, origin)) this.ports.chain().interruptChain(run2, "failed");
+              if (!this.ports.chain().retryAutoRound(run, origin)) this.ports.chain().interruptChain(run, "failed");
             }
             return;
           } finally {
@@ -62394,17 +61711,17 @@ var MapChatConversation = class {
   /** Stop button: the request is aborted and whatever came back is dropped. */
   stopMapChat() {
     var _a2, _b2, _c, _d, _e, _f;
-    const run2 = this.ports.chain().current;
-    if ((run2 == null ? void 0 : run2.state.phase) === "waiting") {
-      this.ports.chain().stopChainWork(run2);
-      this.ports.chain().interruptChain(run2, "stopped");
+    const run = this.ports.chain().current;
+    if ((run == null ? void 0 : run.state.phase) === "waiting") {
+      this.ports.chain().stopChainWork(run);
+      this.ports.chain().interruptChain(run, "stopped");
       (_a2 = this.ports.panel()) == null ? void 0 : _a2.focusInput();
       return;
     }
     if (this.applying && !this.controller) {
       this.planToken++;
       this.planStopped = true;
-      if (run2 && this.ports.chain().chainShows(run2)) this.ports.chain().stopChainWork(run2);
+      if (run && this.ports.chain().chainShows(run)) this.ports.chain().stopChainWork(run);
       (_b2 = this.ports.panel()) == null ? void 0 : _b2.focusInput();
       return;
     }
@@ -62414,12 +61731,12 @@ var MapChatConversation = class {
       (_d = this.ports.panel()) == null ? void 0 : _d.focusInput();
       return;
     }
-    if (run2 && this.ports.chain().chainShows(run2)) this.ports.chain().stopChainWork(run2);
+    if (run && this.ports.chain().chainShows(run)) this.ports.chain().stopChainWork(run);
     this.releaseChatTask();
     controller.abort();
     this.ports.endRecord("stopped");
     (_e = this.ports.panel()) == null ? void 0 : _e.markStopped();
-    this.ports.chain().interruptChain(run2, "stopped");
+    this.ports.chain().interruptChain(run, "stopped");
     if (this.steer) this.returnSteers(this.steer);
     (_f = this.ports.panel()) == null ? void 0 : _f.focusInput();
   }
@@ -62864,8 +62181,8 @@ var TopicChatRecordWriter = class {
     return this.killed || this.deps.disposed();
   }
   enqueue(task) {
-    const run2 = this.chain.then(() => this.dead() ? void 0 : task());
-    const safe2 = run2.catch((error) => this.fail(error));
+    const run = this.chain.then(() => this.dead() ? void 0 : task());
+    const safe2 = run.catch((error) => this.fail(error));
     this.chain = safe2;
     return safe2;
   }
@@ -63895,7 +63212,7 @@ function sameApartFromStamps(a, b) {
 }
 
 // experiences/visual-map/outline-import-modal.ts
-var import_obsidian29 = require("obsidian");
+var import_obsidian28 = require("obsidian");
 
 // experiences/visual-map/research-fields.ts
 var AI_MODES = ["quick", "standard"];
@@ -63910,10 +63227,10 @@ function aiModeField(parent, options = {}) {
   let current = (_a2 = options.initial) != null ? _a2 : DEFAULT_MAP_AI_MODE;
   const paint = () => {
     hint.setText(t(current === "standard" ? "ui.ai_mode_hint_standard" : "ui.ai_mode_hint"));
-    for (const [mode, button2] of buttons) {
-      button2.setAttr("aria-checked", String(mode === current));
-      button2.tabIndex = mode === current ? 0 : -1;
-      button2.toggleClass("is-active", mode === current);
+    for (const [mode, button] of buttons) {
+      button.setAttr("aria-checked", String(mode === current));
+      button.tabIndex = mode === current ? 0 : -1;
+      button.toggleClass("is-active", mode === current);
     }
   };
   const set = (mode) => {
@@ -63927,10 +63244,10 @@ function aiModeField(parent, options = {}) {
     (_a3 = options.onChange) == null ? void 0 : _a3.call(options, mode);
   };
   for (const mode of AI_MODES) {
-    const button2 = group.createEl("button", { text: t(mode === "quick" ? "ui.quick" : "ui.standard") });
-    button2.setAttr("role", "radio");
-    button2.addEventListener("click", () => choose(mode));
-    button2.addEventListener("keydown", (event) => {
+    const button = group.createEl("button", { text: t(mode === "quick" ? "ui.quick" : "ui.standard") });
+    button.setAttr("role", "radio");
+    button.addEventListener("click", () => choose(mode));
+    button.addEventListener("keydown", (event) => {
       var _a3;
       const step = ["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : ["ArrowLeft", "ArrowUp"].includes(event.key) ? -1 : 0;
       if (!step) return;
@@ -63939,7 +63256,7 @@ function aiModeField(parent, options = {}) {
       choose(next);
       (_a3 = buttons.get(next)) == null ? void 0 : _a3.focus();
     });
-    buttons.set(mode, button2);
+    buttons.set(mode, button);
   }
   paint();
   return { element, value: () => current, set };
@@ -63950,12 +63267,12 @@ function linkedField(parent, label) {
   head2.createSpan({ text: label });
   return { field, head: head2 };
 }
-function fieldLink(head2, text10, run2) {
+function fieldLink(head2, text10, run) {
   const link = head2.createEl("button", { text: text10, cls: "vam-field-link" });
   link.type = "button";
   link.addEventListener("click", (event) => {
     event.preventDefault();
-    run2();
+    run();
   });
 }
 function modelField(parent, models, defaultLabel, repair) {
@@ -64121,7 +63438,7 @@ var messageOf = (error) => {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 };
-var OutlineImportModal = class extends import_obsidian29.Modal {
+var OutlineImportModal = class extends import_obsidian28.Modal {
   constructor(app, create, models = { list: () => [], watch: () => () => {
   } }, target = { map: "none" }, initialPlacement = "tree", generator, links = {}, defaultModelLabel) {
     super(app);
@@ -64175,7 +63492,7 @@ var OutlineImportModal = class extends import_obsidian29.Modal {
     sourceHeader.createSpan({ text: t("ui.outline_import_text_label"), cls: "vam-outline-label" });
     const actions = sourceHeader.createDiv("vam-outline-actions");
     actions.createEl("button", { text: t("ui.outline_import_copy_format"), cls: "vam-outline-link" }).addEventListener("click", () => {
-      void navigator.clipboard.writeText(t("ui.outline_import_format")).then(() => new import_obsidian29.Notice(t("ui.outline_import_format_copied"))).catch(() => new import_obsidian29.Notice(t("ui.outline_import_copy_failed")));
+      void navigator.clipboard.writeText(t("ui.outline_import_format")).then(() => new import_obsidian28.Notice(t("ui.outline_import_format_copied"))).catch(() => new import_obsidian28.Notice(t("ui.outline_import_copy_failed")));
     });
     this.textarea = source.createEl("textarea", { cls: "vam-task-input vam-outline-text" });
     this.textarea.rows = 8;
@@ -64535,7 +63852,7 @@ var OutlineImportModal = class extends import_obsidian29.Modal {
 };
 
 // experiences/visual-map/outline-exchange-io.ts
-var import_obsidian30 = require("obsidian");
+var import_obsidian29 = require("obsidian");
 
 // experiences/visual-map/outline-exchange.ts
 var EXCHANGE_MAX_BYTES = 5 * 1024 * 1024;
@@ -64983,7 +64300,7 @@ function exchangeRefusal(reason, line2) {
 }
 async function importExchangeFile(host, file) {
   const refuse = (why2) => {
-    new import_obsidian30.Notice(t("ui.exchange_refused", file.name, why2));
+    new import_obsidian29.Notice(t("ui.exchange_refused", file.name, why2));
     return false;
   };
   if (file.size > EXCHANGE_MAX_BYTES) return refuse(exchangeRefusal("too-large"));
@@ -64998,7 +64315,7 @@ async function importExchangeFile(host, file) {
   try {
     await host.importOutline({ nodes: parsed.nodes, source: { file: file.name }, shallowResearch: false });
   } catch (error) {
-    new import_obsidian30.Notice(messageOf2(error));
+    new import_obsidian29.Notice(messageOf2(error));
     return false;
   }
   return true;
@@ -65008,7 +64325,7 @@ function chooseAndImportExchange(host) {
   input2.addEventListener("change", () => {
     var _a2;
     const file = (_a2 = input2.files) == null ? void 0 : _a2[0];
-    if (file) void importExchangeFile(host, file).catch((error) => new import_obsidian30.Notice(messageOf2(error)));
+    if (file) void importExchangeFile(host, file).catch((error) => new import_obsidian29.Notice(messageOf2(error)));
   });
   input2.click();
 }
@@ -65043,16 +64360,16 @@ async function exportMapExchange(vault, request) {
 async function exportMapWithNotice(vault, request) {
   try {
     const path = await exportMapExchange(vault, request);
-    new import_obsidian30.Notice(t("ui.exchange_exported", path));
+    new import_obsidian29.Notice(t("ui.exchange_exported", path));
     return path;
   } catch (error) {
-    new import_obsidian30.Notice(t("ui.exchange_export_failed", messageOf2(error)));
+    new import_obsidian29.Notice(t("ui.exchange_export_failed", messageOf2(error)));
     return null;
   }
 }
 
 // experiences/visual-map/multi-research-modal.ts
-var import_obsidian31 = require("obsidian");
+var import_obsidian30 = require("obsidian");
 
 // experiences/visual-map/expansion-batch.ts
 var MAX_BATCH_CONCURRENCY = 6;
@@ -65172,7 +64489,7 @@ var ShallowExpansionCoordinator = class {
 };
 
 // experiences/visual-map/multi-research-modal.ts
-var MultiResearchModal = class extends import_obsidian31.Modal {
+var MultiResearchModal = class extends import_obsidian30.Modal {
   constructor(app, names3, models, submit, links = {}, modes = [], initialMode = DEFAULT_MAP_AI_MODE) {
     super(app);
     this.names = names3;
@@ -65252,48 +64569,209 @@ var MultiResearchModal = class extends import_obsidian31.Modal {
   }
 };
 
-// experiences/visual-map/book-pipeline-finish-modal.ts
-var import_obsidian32 = require("obsidian");
-function finishAskLine(info) {
+// experiences/visual-map/book-pipeline-start-modal.ts
+var import_obsidian31 = require("obsidian");
+var BOOK_CARD_P50_SECONDS = 88.5;
+var BOOK_SUGGEST_TIMEOUT_MS = 2e4;
+var BOOK_PLAN_SECONDS = 135;
+function bookModelSpeed(model) {
+  const id = model.toLowerCase();
+  return id.includes("haiku") ? 0.5 : id.includes("opus") ? 1.8 : 1;
+}
+var CARD_TIME_SHARE = { plan: 0.1, write: 0.5, images: 0.2, proof: 0.2 };
+function bookStartEstimate(cards, models) {
+  const n = Math.max(0, Math.floor(cards));
+  const speed = (step) => models ? bookModelSpeed(models[step]) : 1;
+  const perCard = BOOK_CARD_P50_SECONDS * (CARD_TIME_SHARE.plan * speed("plan") + CARD_TIME_SHARE.write * speed("write") + CARD_TIME_SHARE.images * speed("images") + CARD_TIME_SHARE.proof * speed("proof"));
+  return {
+    cards: n,
+    // An upper bound: the plan, then per chapter write, proofread, and up to two image searches (the second only when the first finds too little).
+    calls: 1 + 5 * n,
+    seconds: BOOK_PLAN_SECONDS * speed("plan") + Math.ceil(n / BOOK_POOL) * perCard
+  };
+}
+function bookStartEstimateText(estimate) {
+  const minutes = Math.round(estimate.seconds / 60);
   return t(
-    "ui.book_finish_ask_line_0",
-    info.titles.length ? t("ui.book_finish_ask_review_title_0_1", info.count, info.titles.join(" \xB7 ")) : t("ui.book_finish_ask_review_0", info.count)
+    "ui.book_start_estimate_0_1_2",
+    estimate.cards,
+    minutes < 1 ? t("ui.book_start_under_minute") : t("ui.book_start_minutes_0", minutes),
+    estimate.calls
   );
 }
-var BookFinishModal = class extends import_obsidian32.Modal {
-  constructor(app, info, answer) {
+function bookSettingsPatch(current, typed, suggestions = {}) {
+  var _a2, _b2;
+  const patch = {};
+  const squash2 = (value) => value.replace(/\s+/g, " ").trim();
+  for (const field of BOOK_SETTING_FIELDS) {
+    const raw = typed[field];
+    if (raw === void 0) continue;
+    if (!squash2(raw) && !current[field] && suggestions[field]) {
+      const suggested = cleanBookSettingsInput({ [field]: suggestions[field] })[field];
+      if (suggested) patch[field] = suggested;
+      continue;
+    }
+    if (squash2(raw) === ((_a2 = current[field]) != null ? _a2 : "")) continue;
+    patch[field] = (_b2 = cleanBookSettingsInput({ [field]: raw })[field]) != null ? _b2 : null;
+  }
+  return patch;
+}
+var MODEL_ROWS = [
+  { key: "bookPlanModel", step: "plan", label: "ui.book_step_plan" },
+  { key: "bookWriteModel", step: "write", label: "ui.book_step_write" },
+  { key: "bookImageModel", step: "images", label: "ui.book_progress_step_images" },
+  { key: "bookProofModel", step: "proof", label: "ui.book_step_proof" }
+];
+var FIELD_LABEL = {
+  reader: "coffee.book_reader",
+  goal: "coffee.book_goal",
+  angle: "coffee.book_angle",
+  tone: "coffee.book_tone",
+  length: "coffee.book_length",
+  style: "coffee.book_style"
+};
+function renderBookSettingsFields(parent, current) {
+  var _a2;
+  const areas = /* @__PURE__ */ new Map();
+  for (const field of BOOK_SETTING_FIELDS) {
+    const label = t(FIELD_LABEL[field]);
+    const id = `vam-book-start-${field}`;
+    parent.createEl("label", { text: label, attr: { for: id } });
+    const area = parent.createEl("textarea", {
+      cls: "vam-book-start-field",
+      attr: {
+        id,
+        rows: "2",
+        maxlength: String(BOOK_SETTING_INPUT_MAX),
+        "aria-label": label,
+        placeholder: t("coffee.book_setting_empty")
+      }
+    });
+    area.value = (_a2 = current[field]) != null ? _a2 : "";
+    areas.set(field, area);
+  }
+  return {
+    areas,
+    suggest: (suggestions) => {
+      for (const [field, area] of areas) {
+        const text10 = suggestions[field];
+        if (!text10 || area.value.trim()) continue;
+        area.setAttr("placeholder", text10);
+        area.addClass("vam-book-start-suggested");
+      }
+    }
+  };
+}
+function renderBookModelChoice(parent, input2) {
+  for (const row of MODEL_ROWS) {
+    const id = `vam-book-start-model-${row.step}`;
+    const name2 = t(row.label);
+    parent.createEl("label", { text: name2, attr: { for: id } });
+    const select = parent.createEl("select", {
+      cls: "dropdown vam-book-start-model",
+      attr: { id, "aria-label": name2 }
+    });
+    const selected = input2.models[row.step];
+    select.add(new Option(selected, selected));
+    select.value = selected;
+    syncModelSelect(select, input2.options(), input2.label, t("ui.current_model_is_unavailable"));
+    select.addEventListener("change", () => {
+      if (!select.value) return;
+      input2.models[row.step] = select.value;
+      input2.onChange(row.key, select.value);
+    });
+  }
+}
+var BookStartModal = class extends import_obsidian31.Modal {
+  constructor(app, input2) {
     super(app);
-    this.info = info;
-    this.answer = answer;
-    __publicField(this, "settled", false);
+    this.input = input2;
+    __publicField(this, "started", false);
+    __publicField(this, "opened", false);
     __publicField(this, "focusTimer", null);
+    __publicField(this, "fields", null);
+    __publicField(this, "suggested", {});
+    __publicField(this, "suggestingEl", null);
+    __publicField(this, "estimateEl", null);
+  }
+  /** True from open to close (the screen opens one card at a time). Not named isOpen: Obsidian's Modal writes that property itself. */
+  get isShown() {
+    return this.opened;
+  }
+  /** The suggestion arrived (or did not): the fields show it in grey; a card already started or closed ignores it. */
+  setSuggestions(suggestions) {
+    var _a2, _b2, _c, _d, _e;
+    if (!this.opened || this.started) return;
+    (_a2 = this.suggestingEl) == null ? void 0 : _a2.remove();
+    this.suggestingEl = null;
+    if (!suggestions) return;
+    for (const field of BOOK_SETTING_FIELDS) {
+      const text10 = suggestions[field];
+      const typedNow = (_c = (_b2 = this.fields) == null ? void 0 : _b2.areas.get(field)) == null ? void 0 : _c.value.trim();
+      if (text10 && !((_d = this.input.settings[field]) == null ? void 0 : _d.trim()) && !typedNow) this.suggested[field] = text10;
+    }
+    (_e = this.fields) == null ? void 0 : _e.suggest(this.suggested);
   }
   onOpen() {
+    this.opened = true;
     const { contentEl } = this;
-    this.titleEl.setText(t("ui.book_finish_ask_title_0", this.info.count));
-    contentEl.createEl("p", { cls: "vam-book-finish-line", text: finishAskLine(this.info) });
+    this.titleEl.setText(t("ui.book_start_title"));
+    contentEl.createEl("p", { cls: "vam-modal-intro", text: t("ui.book_start_intro") });
+    this.estimateEl = contentEl.createEl("p", { cls: "vam-book-start-estimate" });
+    this.estimateEl.setAttr("role", "status");
+    const choice = contentEl.createDiv({ cls: "vam-book-start-model-choice" });
+    renderBookModelChoice(choice, {
+      ...this.input.modelChoice,
+      models: this.input.models,
+      // A pick only changes this card's copy; it is saved when Start is pressed.
+      onChange: () => this.refreshEstimate()
+    });
+    contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_stops") });
+    contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_rerun_hint") });
+    const settings = contentEl.createDiv({ cls: "vam-book-start-settings" });
+    settings.setAttr("role", "group");
+    settings.setAttr("aria-label", t("ui.book_start_settings"));
+    settings.createEl("strong", { text: t("ui.book_start_settings") });
+    this.suggestingEl = settings.createEl("p", {
+      cls: "vam-book-start-suggesting",
+      text: t("ui.book_start_suggesting")
+    });
+    this.suggestingEl.setAttr("role", "status");
+    this.fields = renderBookSettingsFields(settings, this.input.settings);
+    this.refreshEstimate();
     const actions = modalActions(this);
-    const back = actions.createEl("button", { cls: "vam-book-finish-back", text: t("ui.book_finish_ask_back") });
-    back.addEventListener("click", () => this.settle(false));
-    const go = actions.createEl("button", { cls: "mod-cta vam-book-finish-go", text: t("ui.book_finish_ask_go") });
-    go.addEventListener("click", () => this.settle(true));
-    back.focus();
+    const cancel = actions.createEl("button", { text: t("ui.cancel") });
+    cancel.addEventListener("click", () => this.close());
+    const start = actions.createEl("button", { cls: "mod-cta vam-book-start-go", text: t("ui.book_start_go") });
+    start.addEventListener("click", () => this.start());
+    cancel.focus();
     this.focusTimer = window.setTimeout(() => {
       this.focusTimer = null;
-      back.focus();
+      cancel.focus();
     }, 0);
   }
+  /** The estimate follows the models in the dropdowns. */
+  refreshEstimate() {
+    var _a2;
+    (_a2 = this.estimateEl) == null ? void 0 : _a2.setText(bookStartEstimateText(bookStartEstimate(this.input.cards, this.input.models)));
+  }
   onClose() {
+    var _a2, _b2;
+    this.opened = false;
     if (this.focusTimer !== null) window.clearTimeout(this.focusTimer);
     this.focusTimer = null;
     this.contentEl.empty();
-    this.settle(false);
+    (_b2 = (_a2 = this.input).onClose) == null ? void 0 : _b2.call(_a2);
   }
-  settle(finish) {
-    if (this.settled) return;
-    this.settled = true;
+  start() {
+    var _a2, _b2;
+    if (this.started) return;
+    this.started = true;
+    const typed = {};
+    for (const [field, area] of (_b2 = (_a2 = this.fields) == null ? void 0 : _a2.areas) != null ? _b2 : []) typed[field] = area.value;
+    const patch = bookSettingsPatch(this.input.settings, typed, this.suggested);
     this.close();
-    this.answer(finish);
+    this.input.onStart(patch, { ...this.input.models });
   }
 };
 
@@ -65315,13 +64793,13 @@ function chatResearchReferenceGroups(input2) {
 }
 
 // experiences/visual-map/structure-review-modal.ts
-var import_obsidian35 = require("obsidian");
-
-// experiences/visual-map/modals.ts
 var import_obsidian34 = require("obsidian");
 
-// ui/modals/debug-log-modal.ts
+// experiences/visual-map/modals.ts
 var import_obsidian33 = require("obsidian");
+
+// ui/modals/debug-log-modal.ts
+var import_obsidian32 = require("obsidian");
 var EXCHANGE_STATUS_KEYS = {
   preparing: "ui.ai_status_preparing",
   sent: "ui.ai_status_sent",
@@ -65330,7 +64808,7 @@ var EXCHANGE_STATUS_KEYS = {
   completed: "ui.ai_status_completed",
   failed: "ui.ai_status_failed"
 };
-var DebugLogModal = class extends import_obsidian33.Modal {
+var DebugLogModal = class extends import_obsidian32.Modal {
   constructor(app, logs, exchanges, exchangeEnabled, setExchangeEnabled) {
     super(app);
     this.logs = logs;
@@ -65354,25 +64832,25 @@ var DebugLogModal = class extends import_obsidian33.Modal {
       cls: "vam-modal-intro",
       text: t("ui.logs_are_kept_in_memory_only_and_disappear_when_the_plugin_r")
     });
-    const actions = new import_obsidian33.Setting(this.contentEl);
-    actions.addButton((button2) => button2.setButtonText(t("ui.refresh_logs")).onClick(() => this.renderLogs()));
+    const actions = new import_obsidian32.Setting(this.contentEl);
+    actions.addButton((button) => button.setButtonText(t("ui.refresh_logs")).onClick(() => this.renderLogs()));
     actions.addButton(
-      (button2) => button2.setButtonText(t("ui.copy_logs")).setCta().onClick(async () => {
+      (button) => button.setButtonText(t("ui.copy_logs")).setCta().onClick(async () => {
         const text10 = formatDebugLogs(this.logs.getLogs());
         if (!text10) {
-          new import_obsidian33.Notice(t("ui.there_are_no_debug_logs_yet"));
+          new import_obsidian32.Notice(t("ui.there_are_no_debug_logs_yet"));
           return;
         }
         try {
           await navigator.clipboard.writeText(text10);
-          new import_obsidian33.Notice(t("ui.debug_log_copied"));
+          new import_obsidian32.Notice(t("ui.debug_log_copied"));
         } catch (e) {
-          new import_obsidian33.Notice(t("ui.unable_to_copy_the_debug_log"));
+          new import_obsidian32.Notice(t("ui.unable_to_copy_the_debug_log"));
         }
       })
     );
     actions.addButton(
-      (button2) => button2.setButtonText(t("ui.clear_logs")).setDestructive().onClick(() => this.logs.clear())
+      (button) => button.setButtonText(t("ui.clear_logs")).setDestructive().onClick(() => this.logs.clear())
     );
     const list2 = this.contentEl.createDiv("vam-debug-log-list");
     const entries = this.logs.getLogs();
@@ -65392,7 +64870,7 @@ var DebugLogModal = class extends import_obsidian33.Modal {
       cls: "vam-modal-intro",
       text: this.exchangeEnabled() ? t("ui.up_to_20_exchanges_are_stored_in_this_vault_s_plugin_folder") : t("ui.ai_exchange_recording_is_off_enable_it_in_vam_settings")
     });
-    const exchangeActions = new import_obsidian33.Setting(this.contentEl);
+    const exchangeActions = new import_obsidian32.Setting(this.contentEl);
     if (this.setExchangeEnabled)
       exchangeActions.setName(t("ui.record_ai_exchanges")).addToggle(
         (toggle) => toggle.setValue(this.exchangeEnabled()).onChange(async (value) => {
@@ -65402,20 +64880,20 @@ var DebugLogModal = class extends import_obsidian33.Modal {
         })
       );
     exchangeActions.addButton(
-      (button2) => button2.setButtonText(t("ui.prompt_monitor_copy_all")).onClick(async () => {
+      (button) => button.setButtonText(t("ui.prompt_monitor_copy_all")).onClick(async () => {
         var _a3, _b3;
         try {
           await navigator.clipboard.writeText(
             ((_b3 = (_a3 = this.exchanges) == null ? void 0 : _a3.getEntries()) != null ? _b3 : []).map(formatAiExchange).join("\n\n---\n\n")
           );
-          new import_obsidian33.Notice(t("ui.ai_exchange_copied"));
+          new import_obsidian32.Notice(t("ui.ai_exchange_copied"));
         } catch (e) {
-          new import_obsidian33.Notice(t("ui.unable_to_copy_the_ai_exchange"));
+          new import_obsidian32.Notice(t("ui.unable_to_copy_the_ai_exchange"));
         }
       })
     );
     exchangeActions.addButton(
-      (button2) => button2.setButtonText(t("ui.clear_ai_exchanges")).setDestructive().onClick(() => {
+      (button) => button.setButtonText(t("ui.clear_ai_exchanges")).setDestructive().onClick(() => {
         var _a3;
         return (_a3 = this.exchanges) == null ? void 0 : _a3.clear();
       })
@@ -65457,7 +64935,7 @@ var DebugLogModal = class extends import_obsidian33.Modal {
       if (exchange.error) item.createEl("pre", { text: `${t("ui.error")}: ${exchange.error}` });
       const copy = item.createEl("button", { text: t("ui.copy_this_exchange") });
       copy.addEventListener("click", () => {
-        void navigator.clipboard.writeText(formatAiExchange(exchange)).then(() => new import_obsidian33.Notice(t("ui.ai_exchange_copied"))).catch(() => new import_obsidian33.Notice(t("ui.unable_to_copy_the_ai_exchange")));
+        void navigator.clipboard.writeText(formatAiExchange(exchange)).then(() => new import_obsidian32.Notice(t("ui.ai_exchange_copied"))).catch(() => new import_obsidian32.Notice(t("ui.unable_to_copy_the_ai_exchange")));
       });
     }
   }
@@ -65546,7 +65024,7 @@ function invalidMergedContentsText(error) {
 }
 var PartialChildBatchError = class extends Error {
 };
-var NextStepModal = class extends import_obsidian34.Modal {
+var NextStepModal = class extends import_obsidian33.Modal {
   constructor(app, plugin, synthesize, selectionFlow) {
     super(app);
     this.plugin = plugin;
@@ -65632,14 +65110,14 @@ var NextStepModal = class extends import_obsidian34.Modal {
       }
     }
   }
-  async run(panel, button2, work, needsUsage = true) {
-    if (button2.disabled || this.runPending || this.taskController && !this.taskController.signal.aborted) return;
+  async run(panel, button, work, needsUsage = true) {
+    if (button.disabled || this.runPending || this.taskController && !this.taskController.signal.aborted) return;
     this.runPending = true;
-    button2.disabled = true;
+    button.disabled = true;
     const start = async () => {
       var _a2, _b2, _c, _d, _e, _f;
       if (this.closed) return;
-      button2.disabled = true;
+      button.disabled = true;
       const failureHelp = panel.querySelector(".vam-ai-failure-help");
       if (failureHelp) failureHelp.hidden = true;
       const controller = new AbortController();
@@ -65659,7 +65137,7 @@ var NextStepModal = class extends import_obsidian34.Modal {
         if (this.closed && !controller.signal.aborted) errorNotice(error);
         this.failed(
           panel,
-          button2,
+          button,
           controller.signal.aborted ? t("ui.ai_task_cancelled") : error instanceof Error ? error.message : String(error)
         );
       } finally {
@@ -65686,9 +65164,9 @@ var NextStepModal = class extends import_obsidian34.Modal {
     try {
       const model = this.plugin.settings.cliModel;
       const started = needsUsage ? await this.plugin.confirmAiUsage(model, start) : await this.plugin.aiReadyForModel(model) && (await start(), true);
-      if (!started) button2.disabled = false;
+      if (!started) button.disabled = false;
     } catch (error) {
-      this.failed(panel, button2, error instanceof Error ? error.message : String(error));
+      this.failed(panel, button, error instanceof Error ? error.message : String(error));
     } finally {
       this.runPending = false;
     }
@@ -65697,8 +65175,8 @@ var NextStepModal = class extends import_obsidian34.Modal {
    * One synthesis step (directions or draft) from this dialog. The run is the view's: while this dialog is open the
    * next stage appears here, and if it is closed the run carries on in the background and falls back to the node badge.
    */
-  launchSynthesis(panel, button2, direction, buildOptions, flow) {
-    void this.run(panel, button2, async () => {
+  launchSynthesis(panel, button, direction, buildOptions, flow) {
+    void this.run(panel, button, async () => {
       const controller = this.taskController;
       if (!controller) return;
       const options = await buildOptions(controller.signal);
@@ -65740,13 +65218,13 @@ var NextStepModal = class extends import_obsidian34.Modal {
         direction,
         (message) => {
           if (this.closed) {
-            new import_obsidian34.Notice(message);
+            new import_obsidian33.Notice(message);
             return;
           }
           settle();
           failedShown = true;
-          if (userCancelled) this.failed(panel, button2, message);
-          else this.failedAi(panel, button2, message);
+          if (userCancelled) this.failed(panel, button, message);
+          else this.failedAi(panel, button, message);
         },
         () => {
         },
@@ -65754,18 +65232,18 @@ var NextStepModal = class extends import_obsidian34.Modal {
       );
       if (!this.closed && !outcome && !failedShown) {
         settle();
-        this.failed(panel, button2, t("ui.ai_task_cancelled"));
+        this.failed(panel, button, t("ui.ai_task_cancelled"));
       }
     });
   }
-  failed(panel, button2, message) {
+  failed(panel, button, message) {
     var _a2;
     if (this.closed) return;
     (_a2 = panel.querySelector(".vam-next-status")) == null ? void 0 : _a2.setText(message);
-    button2.disabled = false;
+    button.disabled = false;
   }
-  failedAi(panel, button2, message) {
-    this.failed(panel, button2, message);
+  failedAi(panel, button, message) {
+    this.failed(panel, button, message);
     if (this.closed) return;
     let help = panel.querySelector(".vam-ai-failure-help");
     if (!help) {
@@ -66159,7 +65637,7 @@ var DraftReviewView = class {
     this.confirm = confirm;
     this.discard = discard;
     this.close = close;
-    __publicField(this, "renderer", new import_obsidian34.Component());
+    __publicField(this, "renderer", new import_obsidian33.Component());
     __publicField(this, "disarm");
     __publicField(this, "intro");
   }
@@ -66200,7 +65678,7 @@ var DraftReviewView = class {
       const state = (_a3 = generations.get(target)) != null ? _a3 : { count: 0 };
       const generation = ++state.count;
       if (state.child) this.renderer.removeChild(state.child);
-      const child = this.renderer.addChild(new import_obsidian34.Component());
+      const child = this.renderer.addChild(new import_obsidian33.Component());
       state.child = child;
       generations.set(target, state);
       target.empty();
@@ -66210,7 +65688,7 @@ var DraftReviewView = class {
         target.setText(markdown);
       };
       try {
-        void import_obsidian34.MarkdownRenderer.render(this.app, markdown, target, (_b2 = this.review.sourcePath) != null ? _b2 : "", child).catch(fallback);
+        void import_obsidian33.MarkdownRenderer.render(this.app, markdown, target, (_b2 = this.review.sourcePath) != null ? _b2 : "", child).catch(fallback);
       } catch (e) {
         fallback();
       }
@@ -66270,7 +65748,7 @@ var DraftReviewView = class {
     this.renderer.unload();
   }
 };
-var DraftReviewModal = class extends import_obsidian34.Modal {
+var DraftReviewModal = class extends import_obsidian33.Modal {
   constructor(app, summary, detail, review, confirm, discard) {
     super(app);
     __publicField(this, "view");
@@ -66289,7 +65767,7 @@ var DraftReviewModal = class extends import_obsidian34.Modal {
     this.contentEl.empty();
   }
 };
-var ChildProposalModal = class extends import_obsidian34.Modal {
+var ChildProposalModal = class extends import_obsidian33.Modal {
   constructor(app, suggestions, submit) {
     super(app);
     this.suggestions = suggestions;
@@ -66322,7 +65800,7 @@ var ChildProposalModal = class extends import_obsidian34.Modal {
     });
   }
 };
-var MapConflictModal = class extends import_obsidian34.Modal {
+var MapConflictModal = class extends import_obsidian33.Modal {
   constructor(app, local, disk, resolve) {
     super(app);
     this.local = local;
@@ -66377,7 +65855,7 @@ var MapConflictModal = class extends import_obsidian34.Modal {
     if (!this.settled) this.resolve(clone(this.disk));
   }
 };
-var NoteCollectionModal = class extends import_obsidian34.Modal {
+var NoteCollectionModal = class extends import_obsidian33.Modal {
   constructor(app, titleText, files, actions) {
     super(app);
     this.titleText = titleText;
@@ -66397,10 +65875,10 @@ var NoteCollectionModal = class extends import_obsidian34.Modal {
           action.run(file);
         });
     }
-    new import_obsidian34.Setting(this.contentEl).addButton((button2) => button2.setButtonText(t("ui.close")).onClick(() => this.close()));
+    new import_obsidian33.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.close")).onClick(() => this.close()));
   }
 };
-var TopicPickerModal = class extends import_obsidian34.Modal {
+var TopicPickerModal = class extends import_obsidian33.Modal {
   constructor(app, titleText, topics, choose) {
     super(app);
     this.titleText = titleText;
@@ -66410,14 +65888,14 @@ var TopicPickerModal = class extends import_obsidian34.Modal {
   onOpen() {
     this.titleEl.setText(this.titleText);
     for (const topic of this.topics)
-      new import_obsidian34.Setting(this.contentEl).setName(topic.title).setDesc(topic.root).addButton(
-        (button2) => button2.setButtonText(t("ui.select")).onClick(() => {
+      new import_obsidian33.Setting(this.contentEl).setName(topic.title).setDesc(topic.root).addButton(
+        (button) => button.setButtonText(t("ui.select")).onClick(() => {
           this.close();
           this.choose(topic);
         })
       );
     if (!this.topics.length) this.contentEl.createEl("p", { text: t("ui.no_other_topics") });
-    new import_obsidian34.Setting(this.contentEl).addButton((button2) => button2.setButtonText(t("ui.cancel")).onClick(() => this.close()));
+    new import_obsidian33.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close()));
   }
 };
 
@@ -66432,7 +65910,7 @@ var KIND = {
   move: "move",
   merge: "merge"
 };
-var StructureReviewModal = class extends import_obsidian35.Modal {
+var StructureReviewModal = class extends import_obsidian34.Modal {
   constructor(app, host) {
     super(app);
     this.host = host;
@@ -66455,7 +65933,7 @@ var StructureReviewModal = class extends import_obsidian35.Modal {
     if (this.host.initial) {
       this.showSuggestions(result, this.host.initial);
       ((_a2 = Array.from(result.querySelectorAll(".vam-structure-apply")).find(
-        (button2) => !button2.disabled
+        (button) => !button.disabled
       )) != null ? _a2 : close).focus();
       return;
     }
@@ -66491,7 +65969,7 @@ var StructureReviewModal = class extends import_obsidian35.Modal {
         this.showSuggestions(result, review);
         if (hadFocus)
           ((_b2 = Array.from(result.querySelectorAll(".vam-structure-apply")).find(
-            (button2) => !button2.disabled
+            (button) => !button.disabled
           )) != null ? _b2 : close).focus();
       }).catch((error) => {
         if (this.closed) return;
@@ -66550,14 +66028,14 @@ var StructureReviewModal = class extends import_obsidian35.Modal {
       compact: true,
       apply: (item, row) => {
         const entry = this.entries[index++];
-        const button2 = row.head.createEl("button", {
+        const button = row.head.createEl("button", {
           text: t("ui.structure_review_apply"),
           cls: "vam-structure-apply"
         });
         const note = row.element.createEl("p", { cls: "vam-structure-note", attr: { "aria-live": "polite" } });
         let busy = false;
         let message = "";
-        const label = () => button2.setAttr(
+        const label = () => button.setAttr(
           "aria-label",
           t(
             entry.applied ? "ui.structure_review_applied_named" : "ui.structure_review_apply_named",
@@ -66569,15 +66047,15 @@ var StructureReviewModal = class extends import_obsidian35.Modal {
           const stale = entry.applied ? null : this.host.staleReason(entry.suggestion);
           row.element.toggleClass("is-applied", entry.applied);
           row.element.toggleClass("is-stale", !!stale);
-          button2.disabled = busy || entry.applied || !!stale;
-          button2.setText(t(entry.applied ? "ui.structure_review_applied" : "ui.structure_review_apply"));
+          button.disabled = busy || entry.applied || !!stale;
+          button.setText(t(entry.applied ? "ui.structure_review_applied" : "ui.structure_review_apply"));
           label();
           row.title.readOnly = entry.applied || entry.suggestion.kind !== "strengthen";
           note.setText(stale != null ? stale : message);
         };
         refreshers.push(refresh);
         refresh();
-        button2.addEventListener("click", () => {
+        button.addEventListener("click", () => {
           if (busy || entry.applied) return;
           const stale = this.host.staleReason(entry.suggestion);
           if (stale) {
@@ -66609,7 +66087,7 @@ var StructureReviewModal = class extends import_obsidian35.Modal {
 };
 
 // ui/modals/topic-tree-modal.ts
-var import_obsidian36 = require("obsidian");
+var import_obsidian35 = require("obsidian");
 
 // ui/topic-tree.ts
 function renderTopicTree(parent, options) {
@@ -66623,15 +66101,15 @@ function renderTopicTree(parent, options) {
   }
   const rows2 = [];
   const row = (id, text10, depth, enabled) => {
-    const button2 = tree.createEl("button", { cls: "vam-topic-tree-row", text: text10, attr: { role: "option" } });
-    button2.style.paddingLeft = `${8 + depth * 16}px`;
-    button2.dataset.id = id;
-    button2.title = text10;
-    button2.setAttr("dir", "auto");
-    button2.disabled = !enabled;
-    button2.setAttr("aria-disabled", String(!enabled));
-    if (enabled) button2.addEventListener("click", () => options.onChoose(id));
-    rows2.push(button2);
+    const button = tree.createEl("button", { cls: "vam-topic-tree-row", text: text10, attr: { role: "option" } });
+    button.style.paddingLeft = `${8 + depth * 16}px`;
+    button.dataset.id = id;
+    button.title = text10;
+    button.setAttr("dir", "auto");
+    button.disabled = !enabled;
+    button.setAttr("aria-disabled", String(!enabled));
+    if (enabled) button.addEventListener("click", () => options.onChoose(id));
+    rows2.push(button);
   };
   if (options.rootChoice !== void 0) row("", options.rootChoice, 0, true);
   const append = (node, depth, seen2) => {
@@ -66644,10 +66122,10 @@ function renderTopicTree(parent, options) {
   const seen = /* @__PURE__ */ new Set();
   for (const root of (_b2 = children.get(null)) != null ? _b2 : []) append(root, 0, seen);
   const select = (id) => {
-    for (const button2 of rows2) {
-      const selected = button2.dataset.id === id;
-      button2.toggleClass("is-selected", selected);
-      button2.setAttr("aria-selected", String(selected));
+    for (const button of rows2) {
+      const selected = button.dataset.id === id;
+      button.toggleClass("is-selected", selected);
+      button.setAttr("aria-selected", String(selected));
     }
   };
   if (options.value !== void 0) select(options.value);
@@ -66655,7 +66133,7 @@ function renderTopicTree(parent, options) {
 }
 
 // ui/modals/topic-tree-modal.ts
-var TopicTreeModal = class extends import_obsidian36.Modal {
+var TopicTreeModal = class extends import_obsidian35.Modal {
   constructor(app, titleText, description, nodes, title, selectable, choose) {
     super(app);
     this.titleText = titleText;
@@ -66695,7 +66173,7 @@ var TopicTreeModal = class extends import_obsidian36.Modal {
 };
 
 // experiences/visual-map/topic-chat.ts
-var import_obsidian37 = require("obsidian");
+var import_obsidian36 = require("obsidian");
 var MODES2 = ["quick", "standard"];
 var KINDS3 = ["research", "expand", "synthesize"];
 var WIDTH_FALLBACK = 340;
@@ -66757,13 +66235,13 @@ var TopicChatWindow = class {
     this.logEl = this.el.createDiv("vam-topic-chat-log");
     const actions = this.el.createDiv("vam-topic-chat-actions");
     for (const kind of KINDS3) {
-      const button2 = actions.createEl("button", {
+      const button = actions.createEl("button", {
         cls: "vam-topic-chat-action",
         text: kindLabel(kind),
         attr: { type: "button", "aria-pressed": "false" }
       });
-      this.kindEls.set(kind, button2);
-      this.on(button2, "click", () => this.pickKind(kind));
+      this.kindEls.set(kind, button);
+      this.on(button, "click", () => this.pickKind(kind));
     }
     const composer = this.el.createDiv("vam-topic-chat-composer");
     this.inputEl = composer.createEl("textarea", {
@@ -66786,15 +66264,15 @@ var TopicChatWindow = class {
     });
     this.modeMenuEl.hidden = true;
     for (const mode of MODES2) {
-      const button2 = this.modeMenuEl.createEl("button", {
+      const button = this.modeMenuEl.createEl("button", {
         cls: "vam-topic-chat-mode",
         attr: { type: "button", role: "menuitemradio", "aria-checked": "false" }
       });
-      (0, import_obsidian37.setIcon)(button2.createSpan("vam-topic-chat-mode-icon"), modeIcon(mode));
-      button2.createSpan({ cls: "vam-topic-chat-mode-label", text: modeName(mode) });
-      (0, import_obsidian37.setIcon)(button2.createSpan("vam-topic-chat-mode-check"), "check");
-      this.modeEls.set(mode, button2);
-      this.on(button2, "click", () => this.pickMode(mode));
+      (0, import_obsidian36.setIcon)(button.createSpan("vam-topic-chat-mode-icon"), modeIcon(mode));
+      button.createSpan({ cls: "vam-topic-chat-mode-label", text: modeName(mode) });
+      (0, import_obsidian36.setIcon)(button.createSpan("vam-topic-chat-mode-check"), "check");
+      this.modeEls.set(mode, button);
+      this.on(button, "click", () => this.pickMode(mode));
     }
     this.on(this.modeToggleEl, "click", (event) => {
       if (this.modeMenuEl.hidden) this.openModeMenu(event.detail === 0);
@@ -66809,7 +66287,7 @@ var TopicChatWindow = class {
       if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
       event.preventDefault();
       const buttons = MODES2.map((mode) => this.modeEls.get(mode));
-      const at = buttons.findIndex((button2) => button2 === event.target);
+      const at = buttons.findIndex((button) => button === event.target);
       const step = event.key === "ArrowDown" ? 1 : -1;
       buttons[(Math.max(at, 0) + step + buttons.length) % buttons.length].focus();
     });
@@ -66830,7 +66308,7 @@ var TopicChatWindow = class {
       cls: "vam-topic-chat-send",
       attr: { type: "button", "aria-label": t("ui.topic_chat_send") }
     });
-    (0, import_obsidian37.setIcon)(this.sendEl, "corner-down-left");
+    (0, import_obsidian36.setIcon)(this.sendEl, "corner-down-left");
     this.on(this.sendEl, "click", () => void this.send());
     this.modeHintEl = composer.createDiv({
       cls: "vam-topic-chat-mode-hint",
@@ -67006,22 +66484,22 @@ var TopicChatWindow = class {
     const session = this.host.session();
     const busy = session.running || this.submitting;
     const empty = this.inputEl.value === "";
-    for (const [kind, button2] of this.kindEls) {
-      button2.setAttr("aria-pressed", String(session.draftKind === kind));
-      button2.toggleClass("is-active", session.draftKind === kind);
-      button2.disabled = busy;
+    for (const [kind, button] of this.kindEls) {
+      button.setAttr("aria-pressed", String(session.draftKind === kind));
+      button.toggleClass("is-active", session.draftKind === kind);
+      button.disabled = busy;
     }
     if (session.running) this.closeModeMenu(false);
-    for (const [mode, button2] of this.modeEls) {
-      button2.setAttr("aria-checked", String(session.mode === mode));
-      button2.toggleClass("is-active", session.mode === mode);
-      button2.disabled = session.running;
+    for (const [mode, button] of this.modeEls) {
+      button.setAttr("aria-checked", String(session.mode === mode));
+      button.toggleClass("is-active", session.mode === mode);
+      button.disabled = session.running;
     }
     this.modeToggleEl.disabled = session.running;
     this.modeToggleEl.setAttr("aria-label", t("ui.topic_chat_mode_button_0", modeName(session.mode)));
     if (this.iconMode !== session.mode) {
       this.iconMode = session.mode;
-      (0, import_obsidian37.setIcon)(this.modeToggleEl, modeIcon(session.mode));
+      (0, import_obsidian36.setIcon)(this.modeToggleEl, modeIcon(session.mode));
     }
     this.modeHintEl.setText(
       session.running && !empty ? t("ui.map_chat_steer_hint") : session.mode === "quick" ? t("ui.topic_chat_mode_quick_hint") : t("ui.topic_chat_mode_standard_hint")
@@ -67484,8 +66962,8 @@ function fittedTextWidth(el) {
   return fitted;
 }
 function edgePathData(x1, y1, x2, y2) {
-  const run2 = x2 - x1;
-  const bend = run2 >= 40 ? run2 / 2 : run2 >= 0 ? 60 - run2 : Math.max(60, -run2 / 2);
+  const run = x2 - x1;
+  const bend = run >= 40 ? run / 2 : run >= 0 ? 60 - run : Math.max(60, -run / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
 function argumentTipPath(x, y) {
@@ -67533,9 +67011,9 @@ function chatSynthesisOptions(input2) {
     ...input2.synthesisTitle !== void 0 ? { synthesisTitle: input2.synthesisTitle } : {}
   };
 }
-function integrationUpdateMode(run2) {
-  const unset = run2.recipe.implicit === true || run2.recipe.source === "kind" && run2.recipe.ref.startsWith("builtin:");
-  return run2.updateMode === "merge" && unset ? "fresh" : run2.updateMode;
+function integrationUpdateMode(run) {
+  const unset = run.recipe.implicit === true || run.recipe.source === "kind" && run.recipe.ref.startsWith("builtin:");
+  return run.updateMode === "merge" && unset ? "fresh" : run.updateMode;
 }
 function researchWebLines(web) {
   if (!web.counted) return [];
@@ -67566,20 +67044,20 @@ function argumentEnabled(plugin) {
   var _a2;
   return ((_a2 = plugin.settings) == null ? void 0 : _a2.experimentalArgumentMap) === true;
 }
-function requestArgumentResume(plugin, path, button2, onFailed) {
-  button2.disabled = true;
+function requestArgumentResume(plugin, path, button, onFailed) {
+  button.disabled = true;
   plugin.argumentRuns.resume(path).catch((error) => {
     onFailed();
-    button2.disabled = false;
+    button.disabled = false;
     if (!(error instanceof ArgumentRunError) || error.code === "busy") return;
-    new import_obsidian38.Notice(
+    new import_obsidian37.Notice(
       t(
         error.code === "finished" ? "ui.argument_resume_refused_finished" : error.code === "legacy" ? "ui.argument_resume_refused_legacy" : "ui.argument_resume_refused"
       )
     );
   });
 }
-var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.ItemView {
+var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
@@ -67624,10 +67102,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
       },
       lockedParent: (parentId) => !!this.aiLockReason("addChild", [parentId]),
       refresh: (focusBar) => this.refreshRelevance(focusBar),
-      paintReceived: (run2) => this.paintGoalRecommendReceived(run2),
+      paintReceived: (run) => this.paintGoalRecommendReceived(run),
       updateHistoryButtons: () => this.updateHistoryButtons(),
-      openRecommendations: (run2, mapPath, suggestions) => this.openRecommendations(run2, mapPath, suggestions),
-      notice: (message) => new import_obsidian38.Notice(message)
+      openRecommendations: (run, mapPath, suggestions) => this.openRecommendations(run, mapPath, suggestions),
+      notice: (message) => new import_obsidian37.Notice(message)
     }));
     __publicField(this, "relevancePanelId", `vam-relevance-panel-${++relevancePanelSeq}`);
     /** The goal being edited in place (null when the goal is just shown). Changes only through startGoalEdit / closeGoalEdit. */
@@ -67669,7 +67147,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
         var _a2;
         return (_a2 = this.announcer) == null ? void 0 : _a2.setText(text10);
       },
-      notice: (message) => new import_obsidian38.Notice(message)
+      notice: (message) => new import_obsidian37.Notice(message)
     }));
     /** The attachments of the latest chat turn, as reference documents for a research the chat starts. */
     __publicField(this, "chatTurnReferences", []);
@@ -67773,7 +67251,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
       },
       fileOf: (path) => {
         const file = this.app.vault.getAbstractFileByPath(path);
-        return file instanceof import_obsidian38.TFile ? file : null;
+        return file instanceof import_obsidian37.TFile ? file : null;
       }
     }));
     /** Picture searches the chat started; the view owns them, so closing it or leaving the map stops them. */
@@ -67843,7 +67321,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
       ),
       check: (task, result) => this.checkMergeResult(task, result),
       recordFailure: (label, error) => this.plugin.recordFailure(label, error),
-      notice: (message) => new import_obsidian38.Notice(message),
+      notice: (message) => new import_obsidian37.Notice(message),
       write: (task, result, check) => this.writeMergeDraft(task, result, check)
     }));
     /** The step of the reply that is applying or just applied; the chat's merge hands it to its task. */
@@ -68115,19 +67593,19 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     __publicField(this, "heightsSeenMap", null);
     __publicField(this, "settling", false);
     __publicField(this, "bookPipelineSeen", null);
+    /** What the bar and the card reruns remember in memory (the repaint rebuilds the DOM). */
+    __publicField(this, "bookReview", new BookReviewMemory());
+    /** The map whose bar is asking "run the whole book anyway?" (unapplied notes in the trial), with the count it found. */
+    __publicField(this, "bookGate1Ask", null);
+    __publicField(this, "bookGate1Checking", false);
+    /** The map whose bar is asking "finish anyway?" (chapters still need a look). */
+    __publicField(this, "bookFinishAsking", null);
+    /** Where the keyboard goes after the next paint of the bar (the repaint rebuilds the buttons). */
+    __publicField(this, "bookBarFocus", null);
+    /** The chapter the "next chapter to check" link opened last (the link cycles from there in reading order). */
+    __publicField(this, "bookReviewLast", null);
     /** The map whose bar shows the "give up this book" confirmation card (in-page; never window.confirm). */
     __publicField(this, "bookAbandonAsking", null);
-    // ---- Picture-book gate panel (04b) ---------------------------------------------------------------------------
-    __publicField(this, "bookPanel", new GatePanelState());
-    __publicField(this, "bookSideEl", null);
-    __publicField(this, "bookPanelPath", "");
-    /** Whether the chat window was open when the gate panel took the side column (it comes back when the panel closes). */
-    __publicField(this, "bookChatWasOpen", false);
-    /** Per run: the last phase seen, and the "runId:gate" pairs already handled (auto-opened, seen on arrival, or closed by hand). Dies with the view. */
-    __publicField(this, "bookPhaseSeen", /* @__PURE__ */ new Map());
-    __publicField(this, "bookGateHandled", /* @__PURE__ */ new Set());
-    /** The Markdown renderer's owner for the trial chapters: unloaded whenever the panel is drawn again or closes, so nothing it made stays alive. */
-    __publicField(this, "bookTrialMarkdown", null);
     /** The zoom the selected card's tool row was last fitted at. */
     __publicField(this, "toolsZoom", null);
     /** The map whose saved viewport was already lifted clear of the toolbar (see applyInitialViewport). */
@@ -68195,8 +67673,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     var _a2, _b2;
     return (_b2 = (_a2 = this.chatChainRunner) == null ? void 0 : _a2.current) != null ? _b2 : null;
   }
-  set chatChain(run2) {
-    this.chatChainRunner.current = run2;
+  set chatChain(run) {
+    this.chatChainRunner.current = run;
   }
   /** Files changed while VAM was writing that this view has not read back yet (the plugin fills it; see synchronize). */
   get unsynced() {
@@ -68443,7 +67921,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     const base = ((_a2 = node.path.split("/").pop()) == null ? void 0 : _a2.replace(/\.md$/i, "")) || node.path;
     try {
       const file = this.app.vault.getAbstractFileByPath(node.path);
-      if (!(file instanceof import_obsidian38.TFile)) return base;
+      if (!(file instanceof import_obsidian37.TFile)) return base;
       const cache = this.app.metadataCache.getFileCache(file);
       const heading = (_d = (_c = (_b2 = cache == null ? void 0 : cache.headings) == null ? void 0 : _b2.find((item) => item.level === 1)) == null ? void 0 : _c.heading) == null ? void 0 : _d.trim();
       const fmTitle = (_e = cache == null ? void 0 : cache.frontmatter) == null ? void 0 : _e.title;
@@ -68519,8 +67997,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     ].join(", ");
     const lock = (host) => {
       var _a3, _b3, _c2, _d2;
-      for (const button2 of Array.from((_b3 = (_a3 = host == null ? void 0 : host.querySelectorAll) == null ? void 0 : _a3.call(host, "button")) != null ? _b3 : []))
-        if (!((_c2 = button2.closest) == null ? void 0 : _c2.call(button2, keep)) || ((_d2 = button2.classList) == null ? void 0 : _d2.contains("vam-layout-button"))) button2.disabled = true;
+      for (const button of Array.from((_b3 = (_a3 = host == null ? void 0 : host.querySelectorAll) == null ? void 0 : _a3.call(host, "button")) != null ? _b3 : []))
+        if (!((_c2 = button.closest) == null ? void 0 : _c2.call(button, keep)) || ((_d2 = button.classList) == null ? void 0 : _d2.contains("vam-layout-button"))) button.disabled = true;
     };
     lock(this.contentEl);
     lock(this.relevanceBarEl);
@@ -68629,7 +68107,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     this.registerEvent(
       workspace.on("active-leaf-change", (leaf) => {
         var _a2;
-        if ((leaf == null ? void 0 : leaf.view) instanceof import_obsidian38.MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
+        if ((leaf == null ? void 0 : leaf.view) instanceof import_obsidian37.MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
         this.drawWhenShown();
         (_a2 = this.chat) == null ? void 0 : _a2.refreshNote();
         this.syncStatusBarClearance();
@@ -68786,9 +68264,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     return true;
   }
   installUndoScope() {
-    const scope = new import_obsidian38.Scope(this.app.scope);
+    const scope = new import_obsidian37.Scope(this.app.scope);
     const seen = /* @__PURE__ */ new WeakSet();
-    const run2 = (redo) => (event) => {
+    const run = (redo) => (event) => {
       if (!redo && !this.closed && !event.isComposing && this.undoNewCardNow(event.target)) return false;
       if (this.closed || event.isComposing || isEditableTarget(event.target)) return true;
       if (this.presentation) return false;
@@ -68797,9 +68275,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
       this.enqueue(() => this.travel(redo));
       return false;
     };
-    scope.register(["Mod"], "z", run2(false));
-    scope.register(["Mod", "Shift"], "z", run2(true));
-    scope.register(["Mod", "Shift"], "Z", run2(true));
+    scope.register(["Mod"], "z", run(false));
+    scope.register(["Mod", "Shift"], "z", run(true));
+    scope.register(["Mod", "Shift"], "Z", run(true));
     scope.register([], "F2", (event) => {
       var _a2, _b2;
       if (this.closed || event.isComposing || event.defaultPrevented) return true;
@@ -69320,7 +68798,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
       this.history.dropRedo();
       for (const path of (_b2 = (_a2 = step.createdParkPaths) == null ? void 0 : _a2.call(step)) != null ? _b2 : []) {
         const file = this.app.vault.getAbstractFileByPath(path);
-        if (file instanceof import_obsidian38.TFile) await this.app.fileManager.trashFile(file);
+        if (file instanceof import_obsidian37.TFile) await this.app.fileManager.trashFile(file);
       }
       this.render();
     });
@@ -69345,7 +68823,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
           createdStep: edit == null ? void 0 : edit.createdStep,
           caret: null
         };
-        new import_obsidian38.Notice(problem3);
+        new import_obsidian37.Notice(problem3);
         this.render();
         return;
       }
@@ -69529,14 +69007,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     this.researchTick = this.researchRenderTimer = null;
     this.researchElapsed.clear();
     this.bookAuthoring.clear();
-    this.bookPanel.reset();
-    this.unloadBookTrialMarkdown();
-    this.bookSideEl = null;
+    this.bookReview.unchanged.clear();
     this.researchSigs.clear();
     this.taskPreviewEls.clear();
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
-    if (((_k = this.chat) == null ? void 0 : _k.hasUnsavedTurns) && !this.chatRecordSaved()) new import_obsidian38.Notice(t("ui.map_chat_unsaved_on_close"));
+    if (((_k = this.chat) == null ? void 0 : _k.hasUnsavedTurns) && !this.chatRecordSaved()) new import_obsidian37.Notice(t("ui.map_chat_unsaved_on_close"));
     this.endChatRecord("aborted", { reason: "view_closed" });
     this.closeChatRecords();
     this.abortMapChat();
@@ -69699,9 +69175,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
   }
   /** After a dialog or menu closed: Obsidian puts focus back on the opener, which a repaint may have removed. Checked twice, as the host restores late. */
   restoreMapFocusSoon(fallbackNodeId) {
-    const run2 = () => this.restoreMapFocus(this.lastMapFocus, fallbackNodeId);
-    window.setTimeout(run2, 0);
-    window.setTimeout(run2, 120);
+    const run = () => this.restoreMapFocus(this.lastMapFocus, fallbackNodeId);
+    window.setTimeout(run, 0);
+    window.setTimeout(run, 120);
   }
   /** Opens a dialog from the map; when it closes, focus returns to the map if the repaint it caused removed its opener. */
   openMapModal(modal) {
@@ -69715,7 +69191,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
   }
   /** Every menu this view opens: Esc that closes it must not also clear the selection, and focus returns to the map. */
   newMenu(nodeId) {
-    const menu = new import_obsidian38.Menu();
+    const menu = new import_obsidian37.Menu();
     this.restoreFocusOnMenuHide(menu, nodeId);
     return menu;
   }
@@ -69807,17 +69283,17 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
       var _a2;
       const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
       if (this.plugin.topicRuns.isBusy(node.path)) {
-        new import_obsidian38.Notice(t("ui.ai_running_ai"));
+        new import_obsidian37.Notice(t("ui.ai_running_ai"));
         return;
       }
       if (this.aiLockReason("write", [node.id], /* @__PURE__ */ new Map([[node.id, note]]))) {
-        new import_obsidian38.Notice(t("ui.ai_locked_notice"));
+        new import_obsidian37.Notice(t("ui.ai_locked_notice"));
         return;
       }
       await this.plugin.confirmAiUsage(note.model, async () => {
         const referenceGroups = await this.readMapSourceGroups(new AbortController().signal);
         const outputLanguage2 = cardOutputLanguage(this.map, this.plugin.settings.language, note.title);
-        await this.runAgent(node, void 0, (message) => new import_obsidian38.Notice(message), {
+        await this.runAgent(node, void 0, (message) => new import_obsidian37.Notice(message), {
           task: researchTopicTask(outputLanguage2, note.title),
           referenceGroups,
           // Within one request the map's sources go in as written; larger ones are still extracted first.
@@ -70088,7 +69564,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     var _a2;
     const target = prefill ? this.reopenedImportTarget(prefill.inputs) : this.outlineImportTarget();
     if (target.map !== "editable") {
-      new import_obsidian38.Notice(t("ui.outline_import_placement_no_map"));
+      new import_obsidian37.Notice(t("ui.outline_import_placement_no_map"));
       return;
     }
     const placement = prefill ? prefill.inputs.placement : target.selected ? "under" : "tree";
@@ -70146,7 +69622,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
         const parent = ((_b2 = request.placement) == null ? void 0 : _b2.kind) === "under" ? (_c = this.map) == null ? void 0 : _c.nodes.find((node) => node.id === request.placement.parentId) : void 0;
         const parentNote = parent ? await this.plugin.repo.readNote(parent.path, (_d = this.map) != null ? _d : void 0) : void 0;
         if (parent && parentNote && this.aiLockReason("addChild", [parent.id], /* @__PURE__ */ new Map([[parent.id, parentNote]]))) {
-          new import_obsidian38.Notice(t("ui.ai_locked_notice"));
+          new import_obsidian37.Notice(t("ui.ai_locked_notice"));
           throw new Error(t("ui.ai_locked_notice"));
         }
         const inherited = parent ? await this.plugin.repo.resolveTopicModel(parent.path, (_e = this.map) != null ? _e : void 0) : null;
@@ -70166,7 +69642,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
         const controller = new AbortController();
         const forward = () => controller.abort();
         signal.addEventListener("abort", forward, { once: true });
-        const run2 = {};
+        const run = {};
         const ran = await this.plugin.confirmAiUsage(model, async () => {
           if (signal.aborted) return;
           const inputs = started();
@@ -70177,7 +69653,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
             state: "running",
             inputs
           };
-          run2.task = own2;
+          run.task = own2;
           this.outlineDraftTask = own2;
           if (!this.closed) this.render();
           try {
@@ -70208,13 +69684,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
             if (controller.signal.aborted || this.outlineDraftTask !== own2 || this.closed) return;
             own2.state = "failed";
             own2.message = plainFailure(t("error.plain_outline_context"), error);
-            new import_obsidian38.Notice(own2.message);
+            new import_obsidian37.Notice(own2.message);
           }
           if (!this.closed) this.render();
         });
         signal.removeEventListener("abort", forward);
-        if (!ran || !run2.task) throw new Error(t("ui.outline_ai_not_started"));
-        return (_h = run2.task.markdown) != null ? _h : "";
+        if (!ran || !run.task) throw new Error(t("ui.outline_ai_not_started"));
+        return (_h = run.task.markdown) != null ? _h : "";
       }
     };
   }
@@ -70447,7 +69923,7 @@ ${request.requirements}` : preset.text,
     const existing = this.structureReviewTask;
     if (existing && existing.mapPath === this.path) {
       if (existing.state === "running") {
-        new import_obsidian38.Notice(t("ui.ai_running_ai"));
+        new import_obsidian37.Notice(t("ui.ai_running_ai"));
         return;
       }
       if (existing.state === "done" && existing.scopeId === scopeId) {
@@ -70497,10 +69973,10 @@ ${request.requirements}` : preset.text,
         const controller = new AbortController();
         const forward = () => controller.abort();
         signal.addEventListener("abort", forward, { once: true });
-        const run2 = { began: false };
+        const run = { began: false };
         await this.plugin.confirmAiUsage(model, async () => {
           if (signal.aborted) return;
-          run2.began = true;
+          run.began = true;
           signal.removeEventListener("abort", forward);
           const own2 = {
             mapPath,
@@ -70527,7 +70003,7 @@ ${request.requirements}` : preset.text,
             );
             if (controller.signal.aborted || this.structureReviewTask !== own2 || this.closed) return;
             const { kept, skipped: lockedCount } = this.dropAiLockedSuggestions(review);
-            if (lockedCount) new import_obsidian38.Notice(t("ui.ai_locked_suggestions_skipped_0", lockedCount));
+            if (lockedCount) new import_obsidian37.Notice(t("ui.ai_locked_suggestions_skipped_0", lockedCount));
             own2.state = "done";
             own2.result = kept;
             backgroundResultNotice(t("ui.structure_review_ready_0", kept.suggestions.length), {
@@ -70538,12 +70014,12 @@ ${request.requirements}` : preset.text,
             if (controller.signal.aborted || this.structureReviewTask !== own2 || this.closed) return;
             own2.state = "failed";
             own2.message = plainFailure(t("error.plain_review_context"), error);
-            new import_obsidian38.Notice(own2.message);
+            new import_obsidian37.Notice(own2.message);
           }
           if (!this.closed) this.render();
         });
         signal.removeEventListener("abort", forward);
-        if (!run2.began) throw new Error(t("ui.structure_review_not_started"));
+        if (!run.began) throw new Error(t("ui.structure_review_not_started"));
         return { suggestions: [], rejected: [] };
       }
     });
@@ -70650,17 +70126,17 @@ ${request.requirements}` : preset.text,
       }
     });
     const actions = bar.createDiv({ cls: "vam-goal-actions" });
-    const icon = (kind, name2, run2, disabled) => {
-      const button2 = actions.createEl("button", { cls: "vam-goal-icon" });
-      appendGoalSvg(button2, kind);
-      (0, import_obsidian38.setTooltip)(button2, name2);
-      button2.setAttr("aria-label", name2);
-      button2.disabled = disabled;
-      button2.addEventListener("click", (event) => {
+    const icon = (kind, name2, run, disabled) => {
+      const button = actions.createEl("button", { cls: "vam-goal-icon" });
+      appendGoalSvg(button, kind);
+      (0, import_obsidian37.setTooltip)(button, name2);
+      button.setAttr("aria-label", name2);
+      button.disabled = disabled;
+      button.addEventListener("click", (event) => {
         event.stopPropagation();
-        run2();
+        run();
       });
-      return button2;
+      return button;
     };
     const suggestTask = this.goalSuggest.task;
     const busy = !!suggestTask && suggestTask.state !== "ready";
@@ -70844,7 +70320,7 @@ ${request.requirements}` : preset.text,
     if (this.closed || this.notesLoading() || this.goalEdit || !this.relevanceGradeable() || !this.relevanceBarEl || !this.goalBarHost)
       return;
     if (((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") {
-      new import_obsidian38.Notice(t("ui.relevance_goal_unavailable_grading"));
+      new import_obsidian37.Notice(t("ui.relevance_goal_unavailable_grading"));
       return;
     }
     this.goalSuggest.dismiss();
@@ -71019,7 +70495,7 @@ ${request.requirements}` : preset.text,
   /** Where an outside folder is judged from: this vault's real location (absent on a vault the plugin cannot locate). */
   externalScope() {
     const adapter = this.app.vault.adapter;
-    return { vaultBase: adapter instanceof import_obsidian38.FileSystemAdapter ? adapter.getBasePath() : void 0 };
+    return { vaultBase: adapter instanceof import_obsidian37.FileSystemAdapter ? adapter.getBasePath() : void 0 };
   }
   submitRelevanceGoal(raw, contextRaw) {
     return this.relevanceRun.start(raw, contextRaw);
@@ -71061,10 +70537,10 @@ ${request.requirements}` : preset.text,
    * on the same map, opens it; a stopped, failed or late run, a closed view or another map opens nothing. The keyboard
    * moves to the list only when it was on the status bar, the goal bar or the page itself.
    */
-  openRecommendations(run2, mapPath, suggestions) {
+  openRecommendations(run, mapPath, suggestions) {
     if (!suggestions.length) return;
-    if (this.closed || this.path !== mapPath || run2.owner !== this || run2.status !== "done") return;
-    if (this.plugin.relevanceGrades.get(mapPath) !== run2 || run2.controller.signal.aborted) return;
+    if (this.closed || this.path !== mapPath || run.owner !== this || run.status !== "done") return;
+    if (this.plugin.relevanceGrades.get(mapPath) !== run || run.controller.signal.aborted) return;
     if (this.goalSuggest.task || this.presentation) return;
     this.goalSuggest.open(mapPath, suggestions, this.focusIsFreeForList());
   }
@@ -71166,42 +70642,42 @@ ${request.requirements}` : preset.text,
   /** Status bar under the toolbar, same place and look as the AIM and multi-research bars. */
   renderRelevanceStatus(parent) {
     var _a2, _b2;
-    const run2 = this.plugin.relevanceGrades.get(this.path);
-    if (!run2) return;
-    const running2 = run2.status === "running";
+    const run = this.plugin.relevanceGrades.get(this.path);
+    if (!run) return;
+    const running2 = run.status === "running";
     const bar = parent.createDiv(`vam-aim-statusbar vam-relevance-statusbar${running2 ? " is-active" : ""}`);
     bar.setAttr("aria-live", "polite");
     bar.createSpan({ cls: "vam-aim-status-title", text: t("ui.relevance_history_label") });
-    const outcome = run2.outcome;
-    const text10 = running2 ? t(run2.awaitingUsage ? "ui.relevance_awaiting_usage" : "ui.relevance_running") : run2.status === "done" && outcome ? [
+    const outcome = run.outcome;
+    const text10 = running2 ? t(run.awaitingUsage ? "ui.relevance_awaiting_usage" : "ui.relevance_running") : run.status === "done" && outcome ? [
       this.relevanceDoneText(outcome),
       outcome.pinned && outcome.scope !== "current" ? t("ui.relevance_pinned_kept_0", outcome.pinned) : "",
       outcome.failed ? t("ui.relevance_write_failed_0", outcome.failed) : ""
-    ].filter(Boolean).join(" ") : (_a2 = run2.message) != null ? _a2 : "";
-    const tone2 = running2 ? " vam-status-running" : run2.status === "failed" || (outcome == null ? void 0 : outcome.failed) ? " vam-status-error" : "";
+    ].filter(Boolean).join(" ") : (_a2 = run.message) != null ? _a2 : "";
+    const tone2 = running2 ? " vam-status-running" : run.status === "failed" || (outcome == null ? void 0 : outcome.failed) ? " vam-status-error" : "";
     bar.createSpan({ cls: `vam-aim-status-value${tone2}`, text: text10 });
     this.relevanceReceivedEl = null;
-    if (running2 && !run2.awaitingUsage && !run2.writing) {
+    if (running2 && !run.awaitingUsage && !run.writing) {
       const received = bar.createSpan({ cls: "vam-relevance-received" });
       received.setAttr("aria-hidden", "true");
       this.relevanceReceivedEl = received;
-      this.paintGoalRecommendReceived(run2);
-      if (run2.startedAt !== void 0) {
+      this.paintGoalRecommendReceived(run);
+      if (run.startedAt !== void 0) {
         const elapsed = bar.createSpan({
           cls: "vam-research-elapsed vam-relevance-elapsed",
-          text: this.researchElapsedText(run2.startedAt)
+          text: this.researchElapsedText(run.startedAt)
         });
         elapsed.setAttr("aria-hidden", "true");
-        this.trackResearchElapsed(elapsed, run2.startedAt);
+        this.trackResearchElapsed(elapsed, run.startedAt);
       }
     }
     if (running2) {
-      if (!run2.writing) this.button(bar, t("ui.relevance_stop"), () => this.relevanceRun.stop());
+      if (!run.writing) this.button(bar, t("ui.relevance_stop"), () => this.relevanceRun.stop());
       return;
     }
     if ((outcome == null ? void 0 : outcome.changes.length) || ((_b2 = outcome == null ? void 0 : outcome.conflicts) == null ? void 0 : _b2.length)) {
-      this.button(bar, t("ui.relevance_view_changes"), () => this.openRelevanceSummary(run2));
-      if (this.history.undoEntry && this.history.undoEntry === run2.historyEntry)
+      this.button(bar, t("ui.relevance_view_changes"), () => this.openRelevanceSummary(run));
+      if (this.history.undoEntry && this.history.undoEntry === run.historyEntry)
         this.button(bar, t("ui.undo"), () => this.enqueue(() => this.travel(false)));
     }
     this.iconButton(bar, "x", t("ui.dismiss"), () => {
@@ -71212,10 +70688,10 @@ ${request.requirements}` : preset.text,
     });
   }
   /** Rewrites only the "N of M received" text; nothing is repainted. Empty (and hidden) until the first tier arrives. */
-  paintGoalRecommendReceived(run2) {
+  paintGoalRecommendReceived(run) {
     const element = this.relevanceReceivedEl;
     if (!element) return;
-    const progress = run2.received;
+    const progress = run.received;
     const text10 = progress ? progress.total === void 0 ? t("ui.relevance_received_changes_0", progress.received) : t("ui.relevance_received_0_1", progress.received, progress.total) : "";
     element.setText(text10 ? t("ui.aim_stage_with_elapsed_0_1", "", text10) : "");
   }
@@ -71226,9 +70702,9 @@ ${request.requirements}` : preset.text,
       outcome.recommended ? t("ui.relevance_recommended_0", outcome.recommended) : ""
     ].filter(Boolean).join(", ");
   }
-  openRelevanceSummary(run2) {
+  openRelevanceSummary(run) {
     var _a2, _b2, _c;
-    const outcome = run2.outcome;
+    const outcome = run.outcome;
     new RelevanceSummaryModal(this.app, {
       rows: ((_a2 = outcome == null ? void 0 : outcome.changes) != null ? _a2 : []).map((change2) => ({
         id: change2.id,
@@ -71252,7 +70728,7 @@ ${request.requirements}` : preset.text,
       if (reason) throw new Error(reason);
       const touched = [suggestion2.targetId, suggestion2.newParentId, suggestion2.mergeIntoId];
       if (touched.some((id) => !!id && this.isMerging(id))) {
-        new import_obsidian38.Notice(t("ui.merge_locked"));
+        new import_obsidian37.Notice(t("ui.merge_locked"));
         throw new Error(t("ui.merge_locked"));
       }
       if (this.structureLockReason(suggestion2)) throw new Error(t("ui.ai_locked_notice"));
@@ -71284,12 +70760,12 @@ ${request.requirements}` : preset.text,
       );
     return new Promise((resolve, reject2) => {
       var _a2;
-      const run2 = (work) => {
+      const run = (work) => {
         write(work).then(() => resolve(true), reject2);
       };
       const node = nodeOf(suggestion2.targetId);
       if (suggestion2.kind === "reduce") {
-        this.confirmRemoveNode(node, { run: run2, dismissed: () => resolve(false) });
+        this.confirmRemoveNode(node, { run, dismissed: () => resolve(false) });
         return;
       }
       const into = nodeOf((_a2 = suggestion2.mergeIntoId) != null ? _a2 : "");
@@ -71305,7 +70781,7 @@ ${request.requirements}` : preset.text,
           {
             label: t("ui.structure_review_merge_confirm", name2(node)),
             warning: true,
-            action: () => run2(() => this.removeToUnassigned(node, false, into.id))
+            action: () => run(() => this.removeToUnassigned(node, false, into.id))
           }
         ],
         () => resolve(false)
@@ -71537,7 +71013,7 @@ ${request.requirements}` : preset.text,
   topicCoverOff(node) {
     var _a2, _b2;
     const file = this.app.vault.getAbstractFileByPath(node.path);
-    const value = file instanceof import_obsidian38.TFile ? (_b2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["topic-cover"] : null;
+    const value = file instanceof import_obsidian37.TFile ? (_b2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["topic-cover"] : null;
     return typeof value === "string" && value.trim().toLowerCase() === "none";
   }
   /**
@@ -71550,7 +71026,7 @@ ${request.requirements}` : preset.text,
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction().rewriteNote(node.path, async (path) => {
       const file = this.app.vault.getAbstractFileByPath(path);
-      if (!(file instanceof import_obsidian38.TFile)) throw new Error(path);
+      if (!(file instanceof import_obsidian37.TFile)) throw new Error(path);
       await this.app.vault.process(file, (content) => off ? withCoverOn(content) : withCoverOff(content));
     }).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
@@ -71570,7 +71046,7 @@ ${request.requirements}` : preset.text,
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction().rewriteNote(node.path, async (path) => {
       const file = this.app.vault.getAbstractFileByPath(path);
-      if (!(file instanceof import_obsidian38.TFile)) throw new Error(path);
+      if (!(file instanceof import_obsidian37.TFile)) throw new Error(path);
       await this.app.vault.process(file, (content) => withCoverLook(content, write));
     }).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
@@ -71589,14 +71065,14 @@ ${request.requirements}` : preset.text,
     var _a2, _b2;
     try {
       const file = this.app.vault.getAbstractFileByPath(node.path);
-      if (!(file instanceof import_obsidian38.TFile)) return null;
+      if (!(file instanceof import_obsidian37.TFile)) return null;
       const cover = resolveCoverWithFrame(
         this.app.metadataCache.getFileCache(file),
         (link) => this.app.metadataCache.getFirstLinkpathDest(link, node.path)
       );
       if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
-      const src = image instanceof import_obsidian38.TFile ? (_b2 = (_a2 = this.app.vault).getResourcePath) == null ? void 0 : _b2.call(_a2, image) : void 0;
+      const src = image instanceof import_obsidian37.TFile ? (_b2 = (_a2 = this.app.vault).getResourcePath) == null ? void 0 : _b2.call(_a2, image) : void 0;
       return src ? { src, path: cover.path, frame: cover.frame, size: cover.size, position: cover.position } : null;
     } catch (e) {
       return null;
@@ -71897,7 +71373,7 @@ ${request.requirements}` : preset.text,
     } catch (e) {
       opened = false;
     }
-    if (result.failure) new import_obsidian38.Notice(t("ui.outline_import_partial", result.created, result.total, result.failure));
+    if (result.failure) new import_obsidian37.Notice(t("ui.outline_import_partial", result.created, result.total, result.failure));
     if (result.failure || !opened || !request.shallowResearch || result.nodes.length < 2) return;
     const root = result.nodes.find((node) => node.parentId === null);
     if (!root) return;
@@ -71953,7 +71429,7 @@ ${request.requirements}` : preset.text,
         const { map, path, parent } = current;
         if (request.aiGenerated && parent && this.aiLockReason("addChild", [parent.id], /* @__PURE__ */ new Map([[parent.id, await repo.readNote(parent.path, map)]]))) {
           const skippedCount = request.nodes.length;
-          new import_obsidian38.Notice(t("ui.ai_locked_outline_skipped_0", skippedCount));
+          new import_obsidian37.Notice(t("ui.ai_locked_outline_skipped_0", skippedCount));
           state.rejection = new Error(t("ui.ai_locked_outline_skipped_0", skippedCount));
           return;
         }
@@ -72002,7 +71478,7 @@ ${request.requirements}` : preset.text,
               kept.unshift(node.path);
               continue;
             }
-            if (!(file instanceof import_obsidian38.TFile)) {
+            if (!(file instanceof import_obsidian37.TFile)) {
               this.notes.delete(node.id);
               continue;
             }
@@ -72019,7 +71495,7 @@ ${request.requirements}` : preset.text,
             return;
           }
           state.saveFailed = true;
-          new import_obsidian38.Notice(t("ui.outline_import_map_save_failed", `${errorMessage6(cause)} (${kept.join(", ")})`));
+          new import_obsidian37.Notice(t("ui.outline_import_map_save_failed", `${errorMessage6(cause)} (${kept.join(", ")})`));
         };
         if (result.failure) return rollBack(new Error(result.failure));
         const top2 = created[0];
@@ -72066,7 +71542,7 @@ ${request.requirements}` : preset.text,
     if (!outcome) return;
     if (!state.saveFailed && written2 && outcome.created.length) {
       const where = placement.kind === "tree" ? t("ui.outline_import_placement_tree") : ((_a2 = this.notes.get(placement.parentId)) == null ? void 0 : _a2.title) ? t("ui.outline_import_placement_under_named", (_c = (_b2 = this.notes.get(placement.parentId)) == null ? void 0 : _b2.title) != null ? _c : "") : t("ui.outline_import_placement_under");
-      new import_obsidian38.Notice(t("ui.outline_import_done_0_1", outcome.created.length, where));
+      new import_obsidian37.Notice(t("ui.outline_import_done_0_1", outcome.created.length, where));
     }
     if (state.saveFailed || !written2 || !request.shallowResearch || !outcome.created.length) return;
     const owner = placement.kind === "under" ? placement.parentId : null;
@@ -72173,16 +71649,16 @@ ${request.requirements}` : preset.text,
     } else this.changed(file);
   }
   iconButton(parent, icon, label, action) {
-    const button2 = parent.createEl("button", { cls: "clickable-icon vam-icon-button" });
-    if (this.renderingCard) button2.tabIndex = -1;
-    button2.setAttr("aria-label", label);
-    button2.dataset.icon = icon;
-    (0, import_obsidian38.setIcon)(button2, icon);
-    button2.addEventListener("click", (event) => {
+    const button = parent.createEl("button", { cls: "clickable-icon vam-icon-button" });
+    if (this.renderingCard) button.tabIndex = -1;
+    button.setAttr("aria-label", label);
+    button.dataset.icon = icon;
+    (0, import_obsidian37.setIcon)(button, icon);
+    button.addEventListener("click", (event) => {
       event.stopPropagation();
       action(event);
     });
-    return button2;
+    return button;
   }
   /** "Switch mind map": a searchable list (type to filter) whose rows say how the maps differ. */
   openMapSwitcher() {
@@ -72510,14 +71986,14 @@ ${request.requirements}` : preset.text,
     action();
   }
   button(parent, text10, action, disabled = false) {
-    const button2 = parent.createEl("button", { text: text10 });
-    if (this.renderingCard) button2.tabIndex = -1;
-    button2.disabled = disabled;
-    button2.addEventListener("click", (event) => {
+    const button = parent.createEl("button", { text: text10 });
+    if (this.renderingCard) button.tabIndex = -1;
+    button.disabled = disabled;
+    button.addEventListener("click", (event) => {
       event.stopPropagation();
       action();
     });
-    return button2;
+    return button;
   }
   /** Returns the snapshots its history entry restores (taken after any conflict was resolved), or null when nothing ran. */
   async mapChange(change2, rebuildDerivedData = true) {
@@ -72637,7 +72113,7 @@ ${request.requirements}` : preset.text,
   mergeUnlocked(ids2) {
     for (const id of ids2)
       if (this.isMerging(id)) {
-        new import_obsidian38.Notice(t("ui.merge_locked"));
+        new import_obsidian37.Notice(t("ui.merge_locked"));
         return false;
       }
     return true;
@@ -72656,12 +72132,12 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c, _d, _e;
     if (!this.map || this.mergeOpen || !this.selection.state.multiSelected.size) return;
     if (this.mergeDrafts.has(this.path)) {
-      new import_obsidian38.Notice(t("ui.merge_locked"));
+      new import_obsidian37.Notice(t("ui.merge_locked"));
       return;
     }
     const check = this.mergeCheck();
     if (!check.ok) {
-      new import_obsidian38.Notice(t(check.reason));
+      new import_obsidian37.Notice(t(check.reason));
       return;
     }
     const snapshot = {
@@ -72675,7 +72151,7 @@ ${request.requirements}` : preset.text,
       check.sources.map((source) => source.id),
       check.targetId
     );
-    if (locked) new import_obsidian38.Notice(t("ui.ai_locked_notice"));
+    if (locked) new import_obsidian37.Notice(t("ui.ai_locked_notice"));
     const withContent = !locked && hasMergeContent(
       check.sources.map((source) => this.notes.get(source.id)),
       isPlaceholder
@@ -72737,12 +72213,12 @@ ${request.requirements}` : preset.text,
       snapshot.targetId,
       await this.freshNotes()
     )) {
-      new import_obsidian38.Notice(t("ui.ai_locked_notice"));
+      new import_obsidian37.Notice(t("ui.ai_locked_notice"));
       return false;
     }
     await this.refreshNoteStyles();
     if (!stillValid()) {
-      new import_obsidian38.Notice(t("ui.merge_draft_stale"));
+      new import_obsidian37.Notice(t("ui.merge_draft_stale"));
       return false;
     }
     const { model, reasoning } = await this.mergeModel((_a2 = snapshot.targetId) != null ? _a2 : snapshot.parentId);
@@ -72774,7 +72250,7 @@ ${request.requirements}` : preset.text,
         this.render();
       });
     });
-    if (accepted && !began && !signal.aborted) new import_obsidian38.Notice(t("ui.merge_draft_stale"));
+    if (accepted && !began && !signal.aborted) new import_obsidian37.Notice(t("ui.merge_draft_stale"));
     return began;
   }
   /** The merged result is written (History, the chat reply's step, Undo Notice); the run itself lives in MergeDrafts. */
@@ -72809,7 +72285,7 @@ ${request.requirements}` : preset.text,
         },
         MERGE_DONE_NOTICE_MS
       );
-    else new import_obsidian38.Notice(done, MERGE_DONE_NOTICE_MS);
+    else new import_obsidian37.Notice(done, MERGE_DONE_NOTICE_MS);
   }
   /** A done Notice with Undo while the write is still the newest history step (the merge pattern). */
   undoNotice(message, previous) {
@@ -72825,7 +72301,7 @@ ${request.requirements}` : preset.text,
         },
         MERGE_DONE_NOTICE_MS
       );
-    else new import_obsidian38.Notice(message, MERGE_DONE_NOTICE_MS);
+    else new import_obsidian37.Notice(message, MERGE_DONE_NOTICE_MS);
   }
   /**
    * The Undo notice of a removal by key. While the last one still shows and nothing else entered the history since,
@@ -72931,7 +72407,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     );
     if (!check.ok) {
       if (content) stale();
-      new import_obsidian38.Notice(t(check.reason));
+      new import_obsidian37.Notice(t(check.reason));
       return;
     }
     if (((_a2 = snapshot.targetId) != null ? _a2 : null) !== check.targetId || check.sources.some((node) => {
@@ -72939,7 +72415,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       return ((_a3 = snapshot.sources.find((source) => source.id === node.id)) == null ? void 0 : _a3.path) !== node.path;
     })) {
       if (content) stale();
-      new import_obsidian38.Notice(t("ui.merge_missing_note"));
+      new import_obsidian37.Notice(t("ui.merge_missing_note"));
       return;
     }
     if (content && this.mergeLockReason(
@@ -73163,8 +72639,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   }
   /** Tells the user how many links the last merge removed: duplicates of a pair, and links that would have formed a cycle (both sentences when both happened). */
   noticeDroppedCycles() {
-    if (this.lastDroppedSamePair > 0) new import_obsidian38.Notice(t("ui.merge_dropped_same_pair_0", String(this.lastDroppedSamePair)));
-    if (this.lastDroppedCycles > 0) new import_obsidian38.Notice(t("ui.merge_dropped_cycles_0", String(this.lastDroppedCycles)));
+    if (this.lastDroppedSamePair > 0) new import_obsidian37.Notice(t("ui.merge_dropped_same_pair_0", String(this.lastDroppedSamePair)));
+    if (this.lastDroppedCycles > 0) new import_obsidian37.Notice(t("ui.merge_dropped_cycles_0", String(this.lastDroppedCycles)));
   }
   /** The merge is saved and in history; a failing reload must not look like the merge failed. */
   async finishMerge(id) {
@@ -73177,7 +72653,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       if (merged) this.focusNode(merged);
     } catch (e) {
       this.render();
-      new import_obsidian38.Notice(t("ui.merge_saved_refresh_failed"));
+      new import_obsidian37.Notice(t("ui.merge_saved_refresh_failed"));
     }
   }
   /** What the user is told when the transaction refuses or cannot restore; other errors pass through unchanged. */
@@ -73261,7 +72737,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       (_a2 = hooks.dismissed) == null ? void 0 : _a2.call(hooks);
       return;
     }
-    const run2 = (_b2 = hooks.run) != null ? _b2 : (work) => this.enqueue(work);
+    const run = (_b2 = hooks.run) != null ? _b2 : (work) => this.enqueue(work);
     new ChoiceModal(
       this.app,
       t("ui.remove_from_map"),
@@ -73270,12 +72746,12 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         {
           label: t("ui.remove_only_this_node_children_become_roots"),
           warning: true,
-          action: () => run2(() => this.removeToUnassigned(node, false))
+          action: () => run(() => this.removeToUnassigned(node, false))
         },
         {
           label: t("ui.remove_entire_branch"),
           warning: true,
-          action: () => run2(() => this.removeToUnassigned(node, true))
+          action: () => run(() => this.removeToUnassigned(node, true))
         }
       ],
       hooks.dismissed
@@ -73320,7 +72796,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       el.style.width = `${image.w}px`;
       el.style.height = `${image.h}px`;
       const file = this.app.vault.getAbstractFileByPath(image.path);
-      const source = file instanceof import_obsidian38.TFile ? (_f = (_e = this.app.vault).getResourcePath) == null ? void 0 : _f.call(_e, file) : void 0;
+      const source = file instanceof import_obsidian37.TFile ? (_f = (_e = this.app.vault).getResourcePath) == null ? void 0 : _f.call(_e, file) : void 0;
       if (annotated) this.renderAnnotatedBar(el, annotated, name2);
       let picture = null;
       const placeholder2 = () => {
@@ -73740,7 +73216,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const picked = this.picking;
       if (!picked) return;
       if (!findAnnotatedImage((_c = (_b2 = this.map) == null ? void 0 : _b2.canvasItems) != null ? _c : [], id)) {
-        new import_obsidian38.Notice(t("ui.anchor_pick_plain_image"));
+        new import_obsidian37.Notice(t("ui.anchor_pick_plain_image"));
         return;
       }
       this.cancelPicking(false);
@@ -73855,7 +73331,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const current = findAnnotatedImage((_a2 = this.map.canvasItems) != null ? _a2 : [], imageId);
     if (!current) return;
     if (current.anchors.length >= ANCHOR_LIMIT) {
-      new import_obsidian38.Notice(t("ui.anchor_limit", ANCHOR_LIMIT));
+      new import_obsidian37.Notice(t("ui.anchor_limit", ANCHOR_LIMIT));
       return;
     }
     if (target.kind === "existing" && !this.map.nodes.some((node2) => node2.id === target.topicId)) return;
@@ -73903,7 +73379,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }
     if (firstWithoutNote && !this.noteReminded.has(imageId)) {
       this.noteReminded.add(imageId);
-      new import_obsidian38.Notice(t("ui.anchor_no_note_notice"));
+      new import_obsidian37.Notice(t("ui.anchor_no_note_notice"));
     }
   }
   /**
@@ -73993,7 +73469,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     var _a2;
     if (!this.map) return null;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
-      new import_obsidian38.Notice(t("ui.legacy_map_view_only"));
+      new import_obsidian37.Notice(t("ui.legacy_map_view_only"));
       return null;
     }
     const map = this.map, parent = (_a2 = map.nodes.find((n) => !n.parentId)) != null ? _a2 : null;
@@ -74023,7 +73499,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   renderAnnotatedBar(el, image, name2) {
     const bar = el.createDiv("vam-annotated-bar");
     const pill = bar.createSpan("vam-annotated-pill");
-    (0, import_obsidian38.setIcon)(pill.createSpan("vam-annotated-pill-icon"), "map-pin");
+    (0, import_obsidian37.setIcon)(pill.createSpan("vam-annotated-pill-icon"), "map-pin");
     pill.createSpan({ text: t("ui.annotated_image_pill") });
     bar.createSpan({ text: image.note || name2, cls: "vam-annotated-note" });
     bar.createSpan({ text: this.annotatedCountText(image), cls: "vam-annotated-count" });
@@ -74127,11 +73603,11 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   }
   openImageOriginal(path) {
     const file = this.app.vault.getAbstractFileByPath(path);
-    if (!(file instanceof import_obsidian38.TFile)) {
-      new import_obsidian38.Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
+    if (!(file instanceof import_obsidian37.TFile)) {
+      new import_obsidian37.Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
       return;
     }
-    void this.app.workspace.getLeaf("tab").openFile(file).catch((error) => new import_obsidian38.Notice(error instanceof Error ? error.message : String(error)));
+    void this.app.workspace.getLeaf("tab").openFile(file).catch((error) => new import_obsidian37.Notice(error instanceof Error ? error.message : String(error)));
   }
   /** Text nodes change only on a map the user may edit, and never while presenting. */
   canEditText() {
@@ -74476,9 +73952,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       event.stopPropagation();
       this.openUnlinkMenu(text10.id, unlink);
     });
-    for (const button2 of [connect, unlink]) {
-      button2.addEventListener("keydown", (event) => event.stopPropagation());
-      button2.addEventListener("dblclick", (event) => event.stopPropagation());
+    for (const button of [connect, unlink]) {
+      button.addEventListener("keydown", (event) => event.stopPropagation());
+      button.addEventListener("dblclick", (event) => event.stopPropagation());
     }
     this.enableTextDrag(el, text10);
   }
@@ -74930,7 +74406,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       var _a2;
       if (!this.map) return;
       if (!this.canEditText()) {
-        if (this.selection.state.multiSelectMode) new import_obsidian38.Notice(t("ui.text_node_add_multiselect"));
+        if (this.selection.state.multiSelectMode) new import_obsidian37.Notice(t("ui.text_node_add_multiselect"));
         return;
       }
       const target = parent != null ? parent : this.map.nodes.find((node) => node.id === this.selection.state.selected);
@@ -75136,7 +74612,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const check = this.summaryEntryCheck(ids2);
     if (!check.ok) {
       (_a2 = this.announcer) == null ? void 0 : _a2.setText(t(check.reason));
-      new import_obsidian38.Notice(t(check.reason));
+      new import_obsidian37.Notice(t(check.reason));
       return;
     }
     if (this.suspendSummaryEdit) this.suspendSummaryEdit();
@@ -75349,7 +74825,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       } catch (error) {
         this.focusItemId = null;
         this.render();
-        new import_obsidian38.Notice(error instanceof Error ? error.message : String(error));
+        new import_obsidian37.Notice(error instanceof Error ? error.message : String(error));
       }
       return;
     }
@@ -75378,7 +74854,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const check = this.summaryEntryCheck(this.summaryTargets());
     if (!check.ok) {
       (_a2 = this.announcer) == null ? void 0 : _a2.setText(t(check.reason));
-      new import_obsidian38.Notice(t(check.reason));
+      new import_obsidian37.Notice(t(check.reason));
       return;
     }
     this.focusItemId = id;
@@ -75394,7 +74870,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       this.render();
       const message = error instanceof Error ? error.message : String(error);
       (_b2 = this.announcer) == null ? void 0 : _b2.setText(message);
-      new import_obsidian38.Notice(message);
+      new import_obsidian37.Notice(message);
       return;
     }
     (_c = this.announcer) == null ? void 0 : _c.setText(t("ui.summary_range_changed"));
@@ -75682,7 +75158,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const all = Array.from((_c = (_b2 = event.dataTransfer) == null ? void 0 : _b2.files) != null ? _c : []), images = imageFilesFrom({ files: all });
     const point = this.stagePoint({ x: event.clientX, y: event.clientY });
     for (const other of all.filter((item) => !images.includes(item)))
-      new import_obsidian38.Notice(t("ui.canvas_image_refused", other.name || "?"));
+      new import_obsidian37.Notice(t("ui.canvas_image_refused", other.name || "?"));
     if (images.length && point) this.queueCanvasImages(images, point);
   }
   // ---- Pictures on a card: drop and paste (ticket 32, decisions D5, D6) --------------------------------------------
@@ -75712,7 +75188,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     event.stopPropagation();
     const all = Array.from((_b2 = (_a2 = event.dataTransfer) == null ? void 0 : _a2.files) != null ? _b2 : []), images = imageFilesFrom({ files: all });
     for (const other of all.filter((item) => !images.includes(item)))
-      new import_obsidian38.Notice(t("ui.canvas_image_refused", other.name || "?"));
+      new import_obsidian37.Notice(t("ui.canvas_image_refused", other.name || "?"));
     if (images.length) this.enqueue(() => this.attachCardImages(node, images));
   }
   /**
@@ -75730,18 +75206,18 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       let data;
       try {
         if (file.size > IMAGE_MAX_BYTES) {
-          new import_obsidian38.Notice(t("ui.canvas_image_too_large", label));
+          new import_obsidian37.Notice(t("ui.canvas_image_too_large", label));
           continue;
         }
         data = await file.arrayBuffer();
       } catch (e) {
-        if (!stale()) new import_obsidian38.Notice(t("ui.canvas_image_unreadable", label));
+        if (!stale()) new import_obsidian37.Notice(t("ui.canvas_image_unreadable", label));
         continue;
       }
       if (stale()) return;
       const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
       if (!accepted.ok) {
-        new import_obsidian38.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
+        new import_obsidian37.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
         continue;
       }
       const name2 = safeImageName(file.name, accepted.mime);
@@ -75752,7 +75228,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         const viewport = clone(this.map.viewport);
         const entry = await this.beginMapTransaction().createAttachment("image", { name: name2, data, sourcePath: node.path }).rewriteNote(node.path, async (target, attachment) => {
           const note = this.app.vault.getAbstractFileByPath(target);
-          if (!(note instanceof import_obsidian38.TFile)) throw new Error(target);
+          if (!(note instanceof import_obsidian37.TFile)) throw new Error(target);
           const link = attachment("image");
           await this.app.vault.process(note, (content) => {
             const withEmbed = appendImageEmbed(content, link);
@@ -75839,7 +75315,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (!path) return;
     void this.bookEntry(async () => {
       try {
-        await runTrackedRerun(this.bookPanel, node.id, () => this.plugin.rerunBookCard(path, node.id));
+        await runTrackedRerun(this.bookReview, node.id, () => this.plugin.rerunBookCard(path, node.id));
       } finally {
         await this.rereadBookCard(node.id);
         if (!this.closed) this.render();
@@ -75864,11 +75340,11 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   /** Opens the topic note in a new main-area tab (the details sidebar is the other way to read it). */
   openNoteInTab(node) {
     const file = this.app.vault.getAbstractFileByPath(node.path);
-    if (!(file instanceof import_obsidian38.TFile)) {
-      new import_obsidian38.Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
+    if (!(file instanceof import_obsidian37.TFile)) {
+      new import_obsidian37.Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
       return;
     }
-    void this.app.workspace.getLeaf("tab").openFile(file).catch((error) => new import_obsidian38.Notice(error instanceof Error ? error.message : String(error)));
+    void this.app.workspace.getLeaf("tab").openFile(file).catch((error) => new import_obsidian37.Notice(error instanceof Error ? error.message : String(error)));
   }
   /** Folds or unfolds a card's branch: the card's fold tool and its menu entry. */
   toggleCollapsed(node) {
@@ -76026,18 +75502,18 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       let data;
       try {
         if (file.size > IMAGE_MAX_BYTES) {
-          new import_obsidian38.Notice(t("ui.canvas_image_too_large", label));
+          new import_obsidian37.Notice(t("ui.canvas_image_too_large", label));
           continue;
         }
         data = await file.arrayBuffer();
       } catch (e) {
-        if (!stale()) new import_obsidian38.Notice(t("ui.canvas_image_unreadable", label));
+        if (!stale()) new import_obsidian37.Notice(t("ui.canvas_image_unreadable", label));
         continue;
       }
       if (stale()) return;
       const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
       if (!accepted.ok) {
-        new import_obsidian38.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
+        new import_obsidian37.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
         continue;
       }
       const name2 = safeImageName(file.name, accepted.mime);
@@ -76321,7 +75797,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const ids2 = this.selection.state.multiSelected.size ? [...this.selection.state.multiSelected] : this.selection.state.selected ? [this.selection.state.selected] : [];
     if (!map || !ids2.length || !event.clipboardData) return;
     if (mode === "cut" && this.clipboardReadOnly()) {
-      new import_obsidian38.Notice(t("ui.clipboard_cut_readonly"));
+      new import_obsidian37.Notice(t("ui.clipboard_cut_readonly"));
       return;
     }
     const selection = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.getSelection) == null ? void 0 : _b2.call(_a2);
@@ -76349,7 +75825,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       clipId: crypto.randomUUID()
     });
     if (!built.ok || !visited.length) {
-      new import_obsidian38.Notice(t("ui.clipboard_copy_failed"));
+      new import_obsidian37.Notice(t("ui.clipboard_copy_failed"));
       return;
     }
     const serialized = serializeClipboard(built.payload);
@@ -76381,13 +75857,13 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }
     event.preventDefault();
     if (this.clipboardReadOnly()) {
-      new import_obsidian38.Notice(t("ui.clipboard_paste_readonly"));
+      new import_obsidian37.Notice(t("ui.clipboard_paste_readonly"));
       return;
     }
     const parsed = parseClipboard(vam);
     if (!parsed.ok) {
       if (text10.trim()) this.pasteText(event, text10);
-      else new import_obsidian38.Notice(t("ui.clipboard_paste_invalid"));
+      else new import_obsidian37.Notice(t("ui.clipboard_paste_invalid"));
       return;
     }
     this.enqueue(() => this.pasteBranches(parsed.payload, vam));
@@ -76398,12 +75874,12 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (!text10.trim()) return;
     event.preventDefault();
     if (this.clipboardReadOnly()) {
-      new import_obsidian38.Notice(t("ui.clipboard_paste_readonly"));
+      new import_obsidian37.Notice(t("ui.clipboard_paste_readonly"));
       return;
     }
     const parsed = parseIndentedText(text10);
     if (!parsed.ok) {
-      new import_obsidian38.Notice(this.pasteTextRefusal(parsed.reason, parsed.line));
+      new import_obsidian37.Notice(this.pasteTextRefusal(parsed.reason, parsed.line));
       return;
     }
     if (!parsed.nodes.length) return;
@@ -76441,7 +75917,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     var _a2, _b2, _c, _d, _e, _f;
     const map = this.map;
     if (!map || this.clipboardReadOnly()) {
-      new import_obsidian38.Notice(t("ui.clipboard_paste_readonly"));
+      new import_obsidian37.Notice(t("ui.clipboard_paste_readonly"));
       return;
     }
     const target = (_a2 = map.nodes.find((node) => node.id === this.selection.state.selected)) != null ? _a2 : null;
@@ -76494,7 +75970,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           (_d = target == null ? void 0 : target.id) != null ? _d : null
         );
         if (!check.ok) {
-          new import_obsidian38.Notice(t(check.reason === "into-own-branch" ? "ui.clipboard_cut_into_own" : "ui.clipboard_cut_missing"));
+          new import_obsidian37.Notice(t(check.reason === "into-own-branch" ? "ui.clipboard_cut_into_own" : "ui.clipboard_cut_missing"));
           sessionFor(this.plugin).cancelCut();
           this.refreshCutMarks();
           return;
@@ -76523,7 +75999,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     } else {
       const plan = planPaste(payload);
       if (!plan.ok) {
-        new import_obsidian38.Notice(t("ui.clipboard_paste_invalid"));
+        new import_obsidian37.Notice(t("ui.clipboard_paste_invalid"));
         return;
       }
       const repo = this.plugin.repo, settings = this.plugin.settings, before = clone(map), model = target ? inheritModel((await repo.readNote(target.path, map)).model, settings.cliModel) : settings.cliModel;
@@ -76626,7 +76102,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const session = sessionFor(this.plugin), from = record.sourceMapPath;
     const refuse = (key4, drop = false) => {
       if (drop && session.cancelCut()) this.refreshCutMarks();
-      new import_obsidian38.Notice(t(key4));
+      new import_obsidian37.Notice(t(key4));
       return null;
     };
     if (!this.app.vault.getAbstractFileByPath(from)) return refuse("ui.clipboard_cut_missing", true);
@@ -76683,7 +76159,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       },
       finish: async (entry) => {
         if (droppedImageRelations > 0)
-          new import_obsidian38.Notice(t("ui.cross_cut_dropped_image_relations_0", String(droppedImageRelations)));
+          new import_obsidian37.Notice(t("ui.cross_cut_dropped_image_relations_0", String(droppedImageRelations)));
         ledgerFor(plugin).push({
           id,
           paths: [from, into],
@@ -76823,7 +76299,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       this.render();
     } catch (e) {
       this.render();
-      new import_obsidian38.Notice(t("ui.change_saved_refresh_failed"));
+      new import_obsidian37.Notice(t("ui.change_saved_refresh_failed"));
     }
   }
   async claimToCurrent(file) {
@@ -77010,7 +76486,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     this.updateHistoryButtons();
   }
   openDetails(node) {
-    void this.plugin.openDetails(this.plugin.repo.file(node.path)).catch((error) => new import_obsidian38.Notice(error instanceof Error ? error.message : String(error)));
+    void this.plugin.openDetails(this.plugin.repo.file(node.path)).catch((error) => new import_obsidian37.Notice(error instanceof Error ? error.message : String(error)));
   }
   async travel(redo) {
     if (this.map && this.path && (redo ? this.history.canRedo : this.history.canUndo) && await this.resolveMapConflict()) {
@@ -77035,9 +76511,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     var _a2, _b2, _c, _d, _e;
     (_a2 = this.chat) == null ? void 0 : _a2.refreshReplyUndo();
     const undo = (_b2 = this.contentEl) == null ? void 0 : _b2.querySelector("[data-history=undo]"), redo = (_c = this.contentEl) == null ? void 0 : _c.querySelector("[data-history=redo]");
-    const label = (button2, text10) => {
-      if (button2.dataset.icon) button2.setAttr("aria-label", text10);
-      else button2.setText(text10);
+    const label = (button, text10) => {
+      if (button.dataset.icon) button.setAttr("aria-label", text10);
+      else button.setText(text10);
     };
     if (undo) {
       undo.disabled = !this.history.canUndo;
@@ -77073,7 +76549,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       this.unsynced.settle(snapshot, [], seq);
       return;
     }
-    if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof import_obsidian38.TFile)) {
+    if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof import_obsidian37.TFile)) {
       this.map = null;
       this.path = "";
       this.history.clear();
@@ -77129,7 +76605,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   /** The cover image file of a topic, resolved from the metadata cache exactly as the card resolves it. */
   exportCoverPath(notePath) {
     const file = this.app.vault.getAbstractFileByPath(notePath);
-    if (!(file instanceof import_obsidian38.TFile)) return null;
+    if (!(file instanceof import_obsidian37.TFile)) return null;
     const cover = resolveCoverWithFrame(
       this.app.metadataCache.getFileCache(file),
       (link) => this.app.metadataCache.getFirstLinkpathDest(link, notePath)
@@ -77178,7 +76654,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       coverOf: (notePath) => this.exportCoverPath(notePath),
       imageReader: (path) => {
         const file = this.app.vault.getAbstractFileByPath(path);
-        return file instanceof import_obsidian38.TFile ? () => this.app.vault.readBinary(file) : null;
+        return file instanceof import_obsidian37.TFile ? () => this.app.vault.readBinary(file) : null;
       },
       path: () => this.path,
       fence: () => {
@@ -77196,7 +76672,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       attachmentPath: (name2, mapPath) => attachmentPath(this.app, name2, mapPath),
       createBinary: (path, data) => this.app.vault.createBinary(path, data),
       notice: (text10) => {
-        new import_obsidian38.Notice(text10);
+        new import_obsidian37.Notice(text10);
       }
     };
   }
@@ -77210,18 +76686,18 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const editable = !this.presentation && !this.selection.state.multiSelectMode;
     const selected = map.nodes.find((node) => node.id === this.selection.state.selected);
     const note = selected ? this.notes.get(selected.id) : void 0;
-    const run2 = (applies, work) => {
+    const run = (applies, work) => {
       if (!applies) return false;
       if (!checking) work();
       return true;
     };
     switch (action) {
       case "add-topic":
-        return run2(editable, () => this.enqueue(() => this.addNode(null)));
+        return run(editable, () => this.enqueue(() => this.addNode(null)));
       case "add-subtopic":
-        return run2(editable && !!selected, () => this.enqueue(() => this.addNode(selected)));
+        return run(editable && !!selected, () => this.enqueue(() => this.addNode(selected)));
       case "add-sibling":
-        return run2(
+        return run(
           editable && !!selected,
           () => this.enqueue(() => {
             var _a2;
@@ -77229,24 +76705,24 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           })
         );
       case "ai-explore":
-        return run2(editable && !!selected, () => this.openTopicChat(selected));
+        return run(editable && !!selected, () => this.openTopicChat(selected));
       case "rename":
-        return run2(editable && !!note, () => this.startCardTitleEdit(selected, { select: true }));
+        return run(editable && !!note, () => this.startCardTitleEdit(selected, { select: true }));
       case "open-details":
-        return run2(!!selected, () => this.openDetails(selected));
+        return run(!!selected, () => this.openDetails(selected));
       case "toggle-collapse":
-        return run2(
+        return run(
           editable && !!selected && map.nodes.some((item) => item.parentId === selected.id),
           () => this.collapseByKey(selected)
         );
       case "zoom-fit":
-        return run2(!!this.viewportEl, () => this.fit());
+        return run(!!this.viewportEl, () => this.fit());
       case "zoom-reset":
-        return run2(!!this.viewportEl, () => this.zoomBy(1 / map.viewport.zoom));
+        return run(!!this.viewportEl, () => this.zoomBy(1 / map.viewport.zoom));
       case "search":
-        return run2(!this.presentation, () => this.openMapSearch());
+        return run(!this.presentation, () => this.openMapSearch());
       case "shortcuts":
-        return run2(true, () => this.openKeyboardShortcuts());
+        return run(true, () => this.openKeyboardShortcuts());
     }
   }
   openKeyboardShortcuts() {
@@ -77319,7 +76795,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   async renameMapTo(title) {
     if (!this.map) return;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
-      new import_obsidian38.Notice(t("ui.legacy_map_view_only"));
+      new import_obsidian37.Notice(t("ui.legacy_map_view_only"));
       return;
     }
     const before = clone(this.map), beforeRoot = this.plugin.repo.topicRoot(this.path);
@@ -77403,7 +76879,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const deleted = this.deletedMap;
     if (!deleted || deleted.deleted) return;
     const file = this.app.vault.getAbstractFileByPath(deleted.path);
-    if (!(file instanceof import_obsidian38.TFile) || await this.app.vault.read(file) !== deleted.content)
+    if (!(file instanceof import_obsidian37.TFile) || await this.app.vault.read(file) !== deleted.content)
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     await this.app.fileManager.trashFile(file);
     deleted.deleted = true;
@@ -77629,14 +77105,14 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const switchMap = switcher.createEl("button", { cls: "vam-map-switch-button" });
     switchMap.setAttr("aria-label", t("ui.switch_mind_map"));
     switchMap.setAttr("title", t("ui.switch_mind_map"));
-    (0, import_obsidian38.setIcon)(switchMap.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
+    (0, import_obsidian37.setIcon)(switchMap.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
     switchMap.addEventListener("click", () => this.openMapSwitcher());
     if (this.map && this.map.nodes.length && !this.notesLoading()) this.renderResearchProgress(toolbar);
     const headerActions = toolbar.createDiv("vam-toolbar-actions");
     if (this.map) {
       const newMap = headerActions.createEl("button", { cls: "vam-new-map" });
       newMap.createSpan({ text: t("ui.new_map") });
-      (0, import_obsidian38.setIcon)(newMap.createSpan("vam-new-map-icon"), "chevron-down");
+      (0, import_obsidian37.setIcon)(newMap.createSpan("vam-new-map-icon"), "chevron-down");
       newMap.addEventListener("click", (event) => {
         event.stopPropagation();
         this.openNewMapMenu(event);
@@ -77648,7 +77124,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       bookButton.setAttr("title", t("ui.book_button_title"));
       bookButton.addEventListener("click", () => void this.startBookPipelineFromUi());
       this.iconButton(headerActions, "list-tree", t("ui.open_topic_outline"), () => {
-        void this.plugin.activateOutline(this).catch((error) => new import_obsidian38.Notice(String(error)));
+        void this.plugin.activateOutline(this).catch((error) => new import_obsidian37.Notice(String(error)));
       });
       const undo = this.iconButton(headerActions, "undo-2", t("ui.undo"), () => this.enqueue(() => this.travel(false)));
       undo.disabled = !this.history.canUndo;
@@ -77768,7 +77244,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       this.dropGoalEdit();
     }
     this.mountMapChat(workspace, overlay);
-    this.mountBookPanel(workspace);
+    this.applyBookBarFocus();
     this.placeGoalBar();
     this.hintEl = this.map.nodes.length > 0 && !this.selection.state.multiSelectMode && !this.plugin.settings.canvasHintSeen ? overlay.createSpan({
       cls: "vam-hint vam-canvas-hint",
@@ -78095,7 +77571,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       if (rerunWhy !== void 0) {
         const rerun = this.button(header2, "", () => this.runBookCardRerun(node));
         rerun.addClass("vam-node-rerun");
-        (0, import_obsidian38.setIcon)(rerun.createSpan({ cls: "vam-node-rerun-icon" }), "refresh-cw");
+        (0, import_obsidian37.setIcon)(rerun.createSpan({ cls: "vam-node-rerun-icon" }), "refresh-cw");
         rerun.createSpan({ text: t("ui.book_panel_rerun_card") });
         const rerunName = t("ui.book_panel_rerun_card_0", (_m = note == null ? void 0 : note.title) != null ? _m : node.path);
         rerun.setAttr("aria-label", rerunName);
@@ -78121,12 +77597,12 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         relevance.tier,
         tierLabel,
         t("ui.relevance_tag_label_0", tierLabel),
-        (button2) => this.openRelevanceMenu(node, relevance.tier, button2),
+        (button) => this.openRelevanceMenu(node, relevance.tier, button),
         ((_o = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _o.status) === "running"
       );
       if (relevance.manual) {
         const manualText = t("ui.relevance_manual_reason");
-        (0, import_obsidian38.setTooltip)(tagButton, manualText);
+        (0, import_obsidian37.setTooltip)(tagButton, manualText);
         card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, manualText));
       }
       const named = (_p = cardLabels.get(card)) == null ? void 0 : _p.textContent;
@@ -78268,14 +77744,14 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     }
     const details = this.button(tools, "", () => this.openDetails(node));
     details.addClass("vam-node-tool", "vam-detail-button");
-    (0, import_obsidian38.setIcon)(details, "panel-right");
+    (0, import_obsidian37.setIcon)(details, "panel-right");
     details.setAttr("aria-label", t("ui.node_tool_details"));
     const iconTool = (title2, icon, cls, action) => {
-      const button2 = this.button(tools, "", action);
-      button2.addClass("vam-node-tool", cls);
-      (0, import_obsidian38.setIcon)(button2, icon);
-      button2.setAttr("aria-label", title2);
-      return button2;
+      const button = this.button(tools, "", action);
+      button.addClass("vam-node-tool", cls);
+      (0, import_obsidian37.setIcon)(button, icon);
+      button.setAttr("aria-label", title2);
+      return button;
     };
     if (count4 && !node.collapsed)
       iconTool(
@@ -78323,9 +77799,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         card,
         argumentEnabled(this.plugin) ? argumentView : { ...argumentView, action: void 0, resume: void 0 },
         () => void this.rerunFromDefinitions(node.id),
-        (button2) => {
+        (button) => {
           this.argumentBarPressed = { path: this.path, action: "resume" };
-          requestArgumentResume(this.plugin, this.path, button2, () => this.argumentBarPressed = null);
+          requestArgumentResume(this.plugin, this.path, button, () => this.argumentBarPressed = null);
         }
       );
     else if (textEditable && ((_B = this.inlineSummary) == null ? void 0 : _B.id) === node.id) this.paintCardSummaryEdit(card, node);
@@ -78456,7 +77932,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     card.addEventListener("focusin", (event) => {
       if (event.target === card) aimTopic(true);
       this.alignCardTools(card);
-      for (const button2 of toolButtons()) button2.tabIndex = 0;
+      for (const button of toolButtons()) button.tabIndex = 0;
       if (this.restoringFocus || event.target !== card || !note || this.selection.state.multiSelectMode || !card.matches(":focus-visible"))
         return;
       this.clearHoverTimer();
@@ -78467,7 +77943,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     card.addEventListener("focusout", (event) => {
       if (event.relatedTarget instanceof Node && card.contains(event.relatedTarget)) return;
       aimTopic(false);
-      for (const button2 of toolButtons()) button2.tabIndex = -1;
+      for (const button of toolButtons()) button.tabIndex = -1;
       this.hideHoverCardSoon();
     });
     this.arrangeCardCover(card);
@@ -78912,10 +78388,10 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           return created;
         },
         start: (mapPath, claim2, presetAssumptions, presetQuestionType) => this.plugin.argumentRuns.start(mapPath, claim2, { presetAssumptions, presetQuestionType }).catch((error) => {
-          if (error instanceof ArgumentRunError) new import_obsidian38.Notice(t("ui.argument_start_refused"));
+          if (error instanceof ArgumentRunError) new import_obsidian37.Notice(t("ui.argument_start_refused"));
         })
       });
-      if (result.kind === "unreadable") new import_obsidian38.Notice(t("ui.argument_rerun_unreadable"));
+      if (result.kind === "unreadable") new import_obsidian37.Notice(t("ui.argument_rerun_unreadable"));
       else await this.plugin.openMapInNewTab(result.mapPath);
     } catch (error) {
       errorNotice(error);
@@ -79042,14 +78518,14 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     let position = "top";
     try {
       const file = this.app.vault.getAbstractFileByPath(notePath);
-      if (!(file instanceof import_obsidian38.TFile)) return null;
+      if (!(file instanceof import_obsidian37.TFile)) return null;
       const cover = resolveCoverWithFrame(
         this.app.metadataCache.getFileCache(file),
         (link) => this.app.metadataCache.getFirstLinkpathDest(link, notePath)
       );
       if (!cover || !("path" in cover)) return null;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
-      source = image instanceof import_obsidian38.TFile ? (_b2 = (_a2 = this.app.vault).getResourcePath) == null ? void 0 : _b2.call(_a2, image) : void 0;
+      source = image instanceof import_obsidian37.TFile ? (_b2 = (_a2 = this.app.vault).getResourcePath) == null ? void 0 : _b2.call(_a2, image) : void 0;
       imagePath = cover.path;
       mask = cover.frame;
       size = cover.size;
@@ -79156,7 +78632,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     mark2.setAttr("aria-label", text10);
     const icon = mark2.createSpan({ cls: "vam-image-relations-mark-icon" });
     icon.setAttr("aria-hidden", "true");
-    (0, import_obsidian38.setIcon)(icon, "map-pin");
+    (0, import_obsidian37.setIcon)(icon, "map-pin");
     mark2.createSpan({ cls: "vam-image-relations-mark-text", text: text10 });
   }
   paintCardMarkers(card, header2, id) {
@@ -79466,7 +78942,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       this.paintHoverResearch();
     }
     const content = preview.createDiv("vam-hover-markdown");
-    void import_obsidian38.MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
+    void import_obsidian37.MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
     const host = workspace.getBoundingClientRect(), rect2 = card.getBoundingClientRect();
     const availableWidth = Math.max(180, host.width - 24);
     const width = Math.min(size.max, Math.max(Math.min(size.min, availableWidth), availableWidth));
@@ -79747,7 +79223,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
               {
                 label: t("ui.rerun_standard"),
                 open: () => {
-                  if (this.path !== mapPath) new import_obsidian38.Notice(t("ui.rerun_standard_other_map"));
+                  if (this.path !== mapPath) new import_obsidian37.Notice(t("ui.rerun_standard_other_map"));
                   else this.rerunStandard(node);
                 }
               }
@@ -79795,7 +79271,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         log: (level, message) => this.plugin.logs.appendLog(level, message),
         disposed: () => this.plugin.repo.isDisposed(),
         onFailure: () => {
-          new import_obsidian38.Notice(t("ui.topic_chat_record_failed"));
+          new import_obsidian37.Notice(t("ui.topic_chat_record_failed"));
         },
         configDir: this.app.vault.configDir
       });
@@ -79865,7 +79341,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     var _a2, _b2, _c;
     if (this.closed || !this.map || this.notesLoading() || this.presentation) return;
     if (this.aiLockReason("write", [node.id])) {
-      new import_obsidian38.Notice(t("ui.ai_locked_notice"));
+      new import_obsidian37.Notice(t("ui.ai_locked_notice"));
       return;
     }
     if (((_a2 = this.topicChatOpen) == null ? void 0 : _a2.entry.nodeId) === node.id && this.topicChatOpen.entry.mapId === this.map.id) return;
@@ -80016,12 +79492,12 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const map = this.map;
     if (this.closed || !map || map.id !== entry.mapId || this.presentation) return false;
     if (!followUp && entry.session.running || this.topicChatBusy(node)) {
-      new import_obsidian38.Notice(t("ui.ai_running_ai"));
+      new import_obsidian37.Notice(t("ui.ai_running_ai"));
       return false;
     }
     const note = await this.plugin.repo.readNote(node.path, map);
     if (this.aiLockReason("write", [node.id], /* @__PURE__ */ new Map([[node.id, note]]))) {
-      new import_obsidian38.Notice(t("ui.ai_locked_notice"));
+      new import_obsidian37.Notice(t("ui.ai_locked_notice"));
       return false;
     }
     const userTurn = { role: "user", kind, text: text10 };
@@ -80615,9 +80091,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         continue;
       }
       if (action.action === "research_standard") {
-        const run2 = await this.runTopicChatResearch(target, note, mode, language2, action.direction, signal);
-        if (run2.result) done++;
-        else if (run2.failure) reason = run2.failure;
+        const run = await this.runTopicChatResearch(target, note, mode, language2, action.direction, signal);
+        if (run.result) done++;
+        else if (run.failure) reason = run.failure;
       } else if (action.action === "expand") {
         const outcome = await this.chatExpand(target, action.direction, signal);
         if (outcome.status === "succeeded") done++;
@@ -80682,7 +80158,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       runAction: (...a) => this.runTopicChatAction(...a),
       errorText: (e) => this.chatErrorText(e),
       notice: (t2) => {
-        new import_obsidian38.Notice(t2);
+        new import_obsidian37.Notice(t2);
       },
       addDiagrams: () => this.plugin.settings.addDiagramsAfterResearch,
       window: (e) => {
@@ -80700,7 +80176,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   openNodePanel(node, mode) {
     const render = (content, close, host) => this.renderInspector(content, node, mode, close, host);
     this.openMapModal(
-      new class extends import_obsidian38.Modal {
+      new class extends import_obsidian37.Modal {
         onOpen() {
           this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
           render(this.contentEl, () => this.close(), this.modalEl);
@@ -80732,16 +80208,16 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
             const file = this.app.vault.getAbstractFileByPath(path);
             this.button(
               sources,
-              (_c = sourceNote2 == null ? void 0 : sourceNote2.title) != null ? _c : file instanceof import_obsidian38.TFile ? file.basename : t("ui.0_moved", (_b2 = path.split("/").at(-1)) == null ? void 0 : _b2.replace(/\.md$/, "")),
+              (_c = sourceNote2 == null ? void 0 : sourceNote2.title) != null ? _c : file instanceof import_obsidian37.TFile ? file.basename : t("ui.0_moved", (_b2 = path.split("/").at(-1)) == null ? void 0 : _b2.replace(/\.md$/, "")),
               () => {
                 close == null ? void 0 : close();
                 if (sourceNode) {
                   this.selection.setSelected(sourceNode.id);
                   this.render();
                   this.focusNode(sourceNode);
-                } else if (file instanceof import_obsidian38.TFile) void this.plugin.openDetails(file);
+                } else if (file instanceof import_obsidian37.TFile) void this.plugin.openDetails(file);
               },
-              !(sourceNode || file instanceof import_obsidian38.TFile)
+              !(sourceNode || file instanceof import_obsidian37.TFile)
             );
           }
         }
@@ -80990,7 +80466,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   async repairMissingTopic() {
     const broken = await this.plugin.repo.brokenTopics();
     if (!broken.length) {
-      new import_obsidian38.Notice(t("ui.no_topics_with_a_missing_map_md"));
+      new import_obsidian37.Notice(t("ui.no_topics_with_a_missing_map_md"));
       return;
     }
     new ChoiceModal(
@@ -81277,7 +80753,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   openTopicLink(href) {
     const clean3 = normalizeTopicLink(href);
     if (!clean3) {
-      new import_obsidian38.Notice(t("ui.topic_link_blocked"));
+      new import_obsidian37.Notice(t("ui.topic_link_blocked"));
       return false;
     }
     window.open(clean3, "_blank", "noopener,noreferrer");
@@ -81300,29 +80776,29 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       return;
     }
     const hosts = links.map((href) => this.linkHost(href)).join(t("ui.list_separator"));
-    const button2 = header2.createEl("button", {
+    const button = header2.createEl("button", {
       cls: "vam-card-links",
       text: links.length > 1 ? `\u2197${links.length}` : "\u2197"
     });
-    button2.type = "button";
-    button2.tabIndex = card.matches(":focus-within") ? 0 : -1;
-    button2.setAttr("aria-label", t("ui.topic_links_aria_0", hosts));
-    button2.setAttr("title", hosts);
-    button2.addEventListener("pointerdown", (event) => event.stopPropagation());
-    button2.addEventListener("dblclick", (event) => event.stopPropagation());
-    button2.addEventListener("click", (event) => {
+    button.type = "button";
+    button.tabIndex = card.matches(":focus-within") ? 0 : -1;
+    button.setAttr("aria-label", t("ui.topic_links_aria_0", hosts));
+    button.setAttr("title", hosts);
+    button.addEventListener("pointerdown", (event) => event.stopPropagation());
+    button.addEventListener("dblclick", (event) => event.stopPropagation());
+    button.addEventListener("click", (event) => {
       event.stopPropagation();
       event.preventDefault();
       const current = this.linksOf(id);
       if (current.length === 1) this.openTopicLink(current[0]);
-      else if (current.length) this.showTopicLinkMenu(button2, current);
+      else if (current.length) this.showTopicLinkMenu(button, current);
     });
-    if (old) old.replaceWith(button2);
+    if (old) old.replaceWith(button);
     else {
       const row = cardMarkerRows.get(card);
-      if (row && row.parentElement === header2) row.after(button2);
+      if (row && row.parentElement === header2) row.after(button);
     }
-    cardLinkButtons.set(card, button2);
+    cardLinkButtons.set(card, button);
   }
   /** A small menu of the topic's links (one item per host); arrow keys move, Enter opens, Escape closes and returns focus. */
   showTopicLinkMenu(trigger, links) {
@@ -81619,24 +81095,24 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const managed = this.isArgumentCard(node.id);
     if (!this.map || !managed && ((_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.aiLocked) !== true) return;
     card.dataset.aiLocked = "true";
-    const button2 = header2.createEl("button", { cls: "vam-card-ai-lock" });
-    cardAiLockButtons.set(card, button2);
-    button2.type = "button";
-    (0, import_obsidian38.setIcon)(button2, "lock");
-    button2.tabIndex = -1;
+    const button = header2.createEl("button", { cls: "vam-card-ai-lock" });
+    cardAiLockButtons.set(card, button);
+    button.type = "button";
+    (0, import_obsidian37.setIcon)(button, "lock");
+    button.tabIndex = -1;
     if (managed) {
-      button2.disabled = true;
-      button2.setAttr("aria-disabled", "true");
-      button2.setAttr("aria-pressed", "true");
-      button2.setAttr("aria-label", t("ui.ai_lock_state_managed"));
-      button2.setAttr("title", t("ui.ai_lock_state_managed"));
+      button.disabled = true;
+      button.setAttr("aria-disabled", "true");
+      button.setAttr("aria-pressed", "true");
+      button.setAttr("aria-label", t("ui.ai_lock_state_managed"));
+      button.setAttr("title", t("ui.ai_lock_state_managed"));
     } else {
-      button2.setAttr("aria-label", t("ui.ai_unlock_card"));
-      button2.setAttr("title", t("ui.ai_unlock_card"));
+      button.setAttr("aria-label", t("ui.ai_unlock_card"));
+      button.setAttr("title", t("ui.ai_unlock_card"));
     }
-    button2.addEventListener("pointerdown", (event) => event.stopPropagation());
-    button2.addEventListener("dblclick", (event) => event.stopPropagation());
-    button2.addEventListener("click", (event) => {
+    button.addEventListener("pointerdown", (event) => event.stopPropagation());
+    button.addEventListener("dblclick", (event) => event.stopPropagation());
+    button.addEventListener("click", (event) => {
       event.stopPropagation();
       event.preventDefault();
       this.enqueue(() => this.setAiLock([node], false));
@@ -81974,7 +81450,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const interactive = suggestedTitle === void 0;
     const model = parent ? (await this.plugin.repo.resolveTopicModel(parent.path, (_a2 = this.map) != null ? _a2 : void 0)).model : this.plugin.currentModelChoice().model;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
-      new import_obsidian38.Notice(t("ui.legacy_map_view_only"));
+      new import_obsidian37.Notice(t("ui.legacy_map_view_only"));
       return;
     }
     const defaultName = uniqueDefaultName(
@@ -82079,7 +81555,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         this.plugin.pendingResearchOptions.delete(parent.path);
         const message = t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa");
         if (failed) failed(message);
-        else new import_obsidian38.Notice(message);
+        else new import_obsidian37.Notice(message);
         return;
       }
       if (!found) {
@@ -82137,7 +81613,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         outputLanguage: options == null ? void 0 : options.outputLanguage,
         accepted: acceptedCallback,
         failed,
-        notify: (message) => new import_obsidian38.Notice(message),
+        notify: (message) => new import_obsidian37.Notice(message),
         onStarted: () => {
           this.plugin.quickExpandPending.add(parent.path);
           this.render();
@@ -82210,7 +81686,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (new Set(roots).size !== roots.length) {
       this.plugin.topicRuns.dropPending(parent.path);
       this.plugin.pendingResearchOptions.delete(parent.path);
-      new import_obsidian38.Notice(t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa"));
+      new import_obsidian37.Notice(t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa"));
       return;
     }
     new ChildProposalModal(this.app, suggestions.slice(0, 15), (items) => {
@@ -82236,7 +81712,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         if ((researchOptions == null ? void 0 : researchOptions.shallowResearch) && createdNodes.length)
           await this.startShallowResearch(parent, createdNodes, researchOptions);
       })().catch((error) => {
-        new import_obsidian38.Notice(error instanceof Error ? error.message : String(error));
+        new import_obsidian37.Notice(error instanceof Error ? error.message : String(error));
       });
     }).open();
   }
@@ -82508,6 +81984,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   }
   /** The map's picture-book bar: only for a map that has `bookPipeline` (even an unreadable one is not drawn: the entries refuse it). */
   renderBookPipelineBar(toolbar) {
+    var _a2;
     if (!this.map || !this.path) return;
     const read = readBookPipeline(this.map);
     if (read.kind !== "usable") return;
@@ -82516,10 +81993,15 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       read.data,
       this.plugin.getBookPipelineProgress(path),
       (id) => {
-        var _a2;
-        return readPipelineStage((_a2 = this.notes.get(id)) == null ? void 0 : _a2.pipelineStage);
+        var _a3;
+        return readPipelineStage((_a3 = this.notes.get(id)) == null ? void 0 : _a3.pipelineStage);
       }
     );
+    if (state.mode !== "gate1") this.bookGate1Ask = null;
+    if (state.mode !== "gate2") this.bookFinishAsking = null;
+    const gate2Attention = state.mode === "gate2" ? this.bookReviewCards(read.data) : [];
+    if (state.mode === "gate2") state.review = { total: state.total, attention: gate2Attention.length };
+    const gate1Ask = ((_a2 = this.bookGate1Ask) == null ? void 0 : _a2.path) === path ? this.bookGate1Ask : null;
     renderBookBar(toolbar, state, {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
@@ -82532,212 +82014,122 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           this.bookAbandonAsking = null;
           void this.bookEntry(async () => {
             await this.plugin.abandonBookPipeline(path);
-            new import_obsidian38.Notice(t("ui.book_abandoned"));
+            new import_obsidian37.Notice(t("ui.book_abandoned"));
           });
         }
       },
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
-      confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path)),
-      panel: { open: this.bookPanel.open, toggle: () => this.toggleBookPanel() }
+      confirmGate1: () => {
+        var _a3;
+        return void this.pressBookGate1(path, (_a3 = read.data.trial) != null ? _a3 : []);
+      },
+      openTrial: () => {
+        var _a3;
+        const first = (_a3 = read.data.trial) == null ? void 0 : _a3[0];
+        if (first) void this.openBookNote(first);
+      },
+      ...gate1Ask ? {
+        gate1Ask: {
+          count: gate1Ask.count,
+          cancel: () => {
+            this.bookGate1Ask = null;
+            this.bookBarFocus = "gate1-opener";
+            if (!this.closed) this.render();
+          },
+          confirm: () => {
+            this.bookGate1Ask = null;
+            void this.bookEntry(() => this.plugin.confirmBookGate1(path));
+          },
+          ...this.bookBarFocus === "gate1-go" ? { focus: "go" } : {}
+        }
+      } : {},
+      nextReview: () => {
+        const next = this.nextBookReviewCard(gate2Attention);
+        if (next) void this.openBookNote(next.id);
+      },
+      finish: {
+        asking: this.bookFinishAsking === path,
+        ask: () => {
+          this.bookFinishAsking = path;
+          this.bookBarFocus = "finish-go";
+          if (!this.closed) this.render();
+        },
+        cancel: () => {
+          this.bookFinishAsking = null;
+          this.bookBarFocus = "finish-opener";
+          if (!this.closed) this.render();
+        },
+        confirm: () => {
+          this.bookFinishAsking = null;
+          void this.bookEntry(() => this.plugin.finishBookRun(path));
+        }
+      }
     });
+  }
+  applyBookBarFocus() {
+    var _a2;
+    const focus = this.bookBarFocus;
+    this.bookBarFocus = null;
+    if (!focus || this.closed) return;
+    const selector = {
+      "gate1-go": ".vam-book-gate1-ask .vam-book-ask-go",
+      "gate1-opener": ".vam-book-confirm",
+      "finish-go": ".vam-book-finish-ask .vam-book-ask-go",
+      "finish-opener": ".vam-book-finish"
+    }[focus];
+    (_a2 = this.contentEl.querySelector(selector)) == null ? void 0 : _a2.focus();
+  }
+  /**
+   * The chapters that still need a look at gate 2, in reading order: the count in the bar and the cycle of "next chapter to check".
+   * The one place the bar decides this; today it is the proofreading rules over the loaded notes.
+   */
+  bookReviewCards(data) {
+    const map = this.map;
+    if (!map) return [];
+    return gate2Cards({
+      order: data.order,
+      titleOf: (id) => {
+        var _a2, _b2, _c, _d;
+        return (_d = (_c = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _c : (_b2 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _b2.path) != null ? _d : id;
+      },
+      noteOf: (id) => this.notes.get(id)
+    }).filter(needsAttention);
+  }
+  /** The attention chapter after the one opened last (wraps around); the first one when none was opened yet. */
+  nextBookReviewCard(cards) {
+    if (!cards.length) return void 0;
+    const at = cards.findIndex((card) => card.id === this.bookReviewLast);
+    const next = cards[(at + 1) % cards.length];
+    this.bookReviewLast = next.id;
+    return next;
+  }
+  /** "Run the whole book": with notes still unapplied in the trial chapters, the first press only asks (once, in the bar). */
+  async pressBookGate1(path, trial) {
+    var _a2;
+    if (this.bookGate1Checking) return;
+    this.bookGate1Checking = true;
+    let count4 = 0;
+    try {
+      for (const id of trial) {
+        const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+        const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
+        if (file instanceof import_obsidian37.TFile) count4 += countNotes(await this.app.vault.read(file).catch(() => ""));
+      }
+    } finally {
+      this.bookGate1Checking = false;
+    }
+    if (this.closed || this.path !== path) return;
+    if (count4 > 0) {
+      this.bookGate1Ask = { path, count: count4 };
+      this.bookBarFocus = "gate1-go";
+      this.render();
+      return;
+    }
+    await this.bookEntry(() => this.plugin.confirmBookGate1(path));
   }
   askBookAbandon(path, asking) {
     this.bookAbandonAsking = asking ? path : null;
     if (!this.closed) this.render();
-  }
-  /** Runs `work` so the chat's open state is not saved as the user's choice (the panel folded it, not the user). */
-  withChatForced(work) {
-    const was = this.chatForcedOpen;
-    this.chatForcedOpen = true;
-    try {
-      work();
-    } finally {
-      this.chatForcedOpen = was;
-    }
-  }
-  /** The gate panel shares the side column with the chat: one at a time. Opening it folds the chat; closing gives the chat back. */
-  toggleBookPanel() {
-    if (this.bookPanel.open) return this.closeBookPanel();
-    const chat = this.chat;
-    this.bookChatWasOpen = !!chat && !chat.isHero && chat.isOpen;
-    if (this.bookChatWasOpen) this.withChatForced(() => chat == null ? void 0 : chat.setOpen(false));
-    this.bookPanel.open = true;
-    this.bookPanel.pendingFocus = "title";
-    this.render();
-  }
-  /** Opens the panel by itself once per run and gate when a gate is reached by a live drive; never at first sight of a map. */
-  maybeAutoOpenBookPanel() {
-    var _a2, _b2;
-    const path = this.path;
-    const read = this.map ? readBookPipeline(this.map) : null;
-    if (!path || !read || read.kind !== "usable") return;
-    const progress = this.plugin.getBookPipelineProgress(path);
-    const phase = (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : read.data.phase;
-    const runId = (_b2 = progress == null ? void 0 : progress.runId) != null ? _b2 : read.data.runId;
-    const prev = this.bookPhaseSeen.get(runId);
-    this.bookPhaseSeen.set(runId, phase);
-    if (phase !== "gate1" && phase !== "gate2") return;
-    const key4 = `${runId}:${phase}`;
-    if (prev === void 0) {
-      this.bookGateHandled.add(key4);
-      return;
-    }
-    if ((progress == null ? void 0 : progress.active) || this.bookGateHandled.has(key4)) return;
-    this.bookGateHandled.add(key4);
-    if (this.bookPanel.open) return;
-    const chat = this.chat;
-    this.bookChatWasOpen = !!chat && !chat.isHero && chat.isOpen;
-    if (this.bookChatWasOpen) this.withChatForced(() => chat == null ? void 0 : chat.setOpen(false));
-    this.bookPanel.open = true;
-    this.bookPanel.pendingFocus = null;
-  }
-  closeBookPanel() {
-    var _a2, _b2;
-    const path = this.path;
-    const read = this.map ? readBookPipeline(this.map) : null;
-    if (path && (read == null ? void 0 : read.kind) === "usable") {
-      const progress = this.plugin.getBookPipelineProgress(path);
-      this.bookGateHandled.add(`${(_a2 = progress == null ? void 0 : progress.runId) != null ? _a2 : read.data.runId}:${(_b2 = progress == null ? void 0 : progress.phase) != null ? _b2 : read.data.phase}`);
-    }
-    this.bookPanel.open = false;
-    this.unloadBookTrialMarkdown();
-    this.bookPanel.pendingFocus = "opener";
-    if (this.bookChatWasOpen) this.withChatForced(() => {
-      var _a3;
-      return (_a3 = this.chat) == null ? void 0 : _a3.setOpen(true);
-    });
-    this.bookChatWasOpen = false;
-    this.render();
-  }
-  /** The panel's "Chat" tab: the panel closes and the chat window opens with the keyboard in its message field. */
-  showChatFromBookPanel() {
-    var _a2;
-    this.bookPanel.open = false;
-    this.unloadBookTrialMarkdown();
-    this.bookPanel.pendingFocus = null;
-    this.bookChatWasOpen = false;
-    this.render();
-    (_a2 = this.chat) == null ? void 0 : _a2.setOpen(true, true);
-  }
-  /** Part of every repaint: the panel's column, only for a map that has a usable `bookPipeline` and only while it is open. */
-  mountBookPanel(workspace) {
-    var _a2;
-    this.bookSideEl = null;
-    if (!this.map || !this.path || !this.hasBookPipeline() || this.bookPanelPath && this.bookPanelPath !== this.path) {
-      this.bookPanel.reset();
-      this.bookChatWasOpen = false;
-    }
-    this.bookPanelPath = this.hasBookPipeline() ? this.path : "";
-    if (this.bookPanelPath) this.maybeAutoOpenBookPanel();
-    if (this.bookPanel.open && this.bookPanelPath && !this.bookPanelHasContent())
-      void Promise.resolve().then(() => {
-        if (!this.closed && this.bookPanel.open && !this.bookPanelHasContent()) this.closeBookPanel();
-      });
-    if (!this.bookPanel.open || !this.bookPanelPath) {
-      this.unloadBookTrialMarkdown();
-      if (this.bookPanel.pendingFocus === "opener")
-        (_a2 = this.contentEl.querySelector(".vam-book-panel-toggle")) == null ? void 0 : _a2.focus();
-      this.bookPanel.pendingFocus = null;
-      return;
-    }
-    const side = workspace.createDiv("vam-book-side");
-    const measured = this.chatPaneWidths();
-    side.toggleClass(
-      "is-overlay",
-      !!measured && measured.pane - measured.inspector < MAP_CHAT_WIDTH_DEFAULT + MAP_CHAT_MIN_CANVAS
-    );
-    this.bookSideEl = side;
-    this.paintBookPanel();
-    void this.loadBookRoot();
-  }
-  /** The panel only has something to show at gate 1, gate 2 and when the run is done. */
-  bookPanelHasContent() {
-    var _a2, _b2;
-    const read = this.map ? readBookPipeline(this.map) : null;
-    if (!this.path || !read || read.kind !== "usable") return false;
-    const phase = (_b2 = (_a2 = this.plugin.getBookPipelineProgress(this.path)) == null ? void 0 : _a2.phase) != null ? _b2 : read.data.phase;
-    return phase === "gate1" || phase === "gate2" || phase === "done";
-  }
-  paintBookPanel() {
-    var _a2, _b2, _c, _d, _e, _f, _g;
-    const side = this.bookSideEl;
-    const map = this.map;
-    const path = this.path;
-    if (!side || !map || !path || this.closed) return;
-    const read = readBookPipeline(map);
-    if (read.kind !== "usable") return;
-    const doc = this.contentEl.ownerDocument;
-    const held = doc == null ? void 0 : doc.activeElement;
-    const heldCard = held && side.contains(held) ? (_b2 = (_a2 = held.dataset) == null ? void 0 : _a2.card) != null ? _b2 : null : null;
-    const heldAct = heldCard ? (_d = (_c = held == null ? void 0 : held.dataset) == null ? void 0 : _c.act) != null ? _d : null : null;
-    this.unloadBookTrialMarkdown();
-    side.empty();
-    const progress = this.plugin.getBookPipelineProgress(path);
-    const phase = (_e = progress == null ? void 0 : progress.phase) != null ? _e : read.data.phase;
-    if (phase === "gate2" || phase === "done") {
-      this.paintBookGate2(side, read.data, progress, phase === "done", heldCard, heldAct);
-      return;
-    }
-    if (phase !== "gate1") {
-      this.bookPanel.pendingFocus = null;
-      return;
-    }
-    const data = buildGatePanel({
-      order: read.data.order,
-      ...read.data.trial ? { trial: read.data.trial } : {},
-      titleOf: (id) => {
-        var _a3, _b3, _c2, _d2;
-        return (_d2 = (_c2 = (_a3 = this.notes.get(id)) == null ? void 0 : _a3.title) != null ? _c2 : (_b3 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _b3.path) != null ? _d2 : id;
-      },
-      noteOf: (id) => this.notes.get(id),
-      rootRaw: this.bookPanel.rootRaw
-    });
-    const state = this.bookPanel;
-    const settings = this.plugin.settings;
-    const root = map.nodes.find((node) => !node.parentId);
-    renderGatePanel(side, data, true, state, {
-      confirm: async (patch) => {
-        if (root && Object.keys(patch).length) {
-          if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");
-          await this.plugin.repo.writeBookSettings(root.path, patch);
-        }
-        await this.plugin.confirmBookGate1(path);
-      },
-      retry: async (patch) => {
-        if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");
-        if (root && Object.keys(patch).length) await this.plugin.repo.writeBookSettings(root.path, patch);
-        await this.plugin.retryBookTrial(path);
-      },
-      renderMarkdown: (el, markdown) => {
-        var _a3, _b3;
-        const component = (_a3 = this.bookTrialMarkdown) != null ? _a3 : new import_obsidian38.Component();
-        if (!this.bookTrialMarkdown) {
-          component.load();
-          this.bookTrialMarkdown = component;
-        }
-        void import_obsidian38.MarkdownRenderer.render(this.app, markdown, el, (_b3 = root == null ? void 0 : root.path) != null ? _b3 : "", component);
-      },
-      settings: state.settings,
-      models: {
-        plan: settings.bookPlanModel,
-        write: settings.bookWriteModel,
-        images: settings.bookImageModel,
-        proof: settings.bookProofModel
-      },
-      modelChoice: this.bookModelChoice(),
-      showChat: () => this.showChatFromBookPanel(),
-      close: () => this.closeBookPanel(),
-      refresh: () => this.paintBookPanel()
-    });
-    if (state.pendingFocus === "title") (_f = side.querySelector(".vam-book-panel-title")) == null ? void 0 : _f.focus();
-    else if (state.pendingFocus === "opener")
-      (_g = this.contentEl.querySelector(".vam-book-panel-toggle")) == null ? void 0 : _g.focus();
-    state.pendingFocus = null;
-  }
-  unloadBookTrialMarkdown() {
-    var _a2;
-    (_a2 = this.bookTrialMarkdown) == null ? void 0 : _a2.unload();
-    this.bookTrialMarkdown = null;
   }
   /** The lists, labels and save of the four model dropdowns (the start card and the trial screen share them with the settings page). */
   bookModelChoice() {
@@ -82751,104 +82143,20 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       }
     };
   }
-  /** Gate 2 (and done): the review panel. Actions reread the card's note afterwards so the rows show the new stage. */
-  paintBookGate2(side, data, progress, done, heldCard, heldAct) {
-    var _a2, _b2, _c, _d, _e, _f, _g;
-    const map = this.map;
-    const path = this.path;
-    if (!map) return;
-    const state = this.bookPanel;
-    const view = buildGate2Panel({
-      order: data.order,
-      titleOf: (id) => {
-        var _a3, _b3, _c2, _d2;
-        return (_d2 = (_c2 = (_a3 = this.notes.get(id)) == null ? void 0 : _a3.title) != null ? _c2 : (_b3 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _b3.path) != null ? _d2 : id;
-      },
-      noteOf: (id) => this.notes.get(id),
-      startedAt: (_a2 = progress == null ? void 0 : progress.startedAt) != null ? _a2 : data.startedAt,
-      writingEndedAt: (_b2 = progress == null ? void 0 : progress.phaseStartedAt) != null ? _b2 : data.phaseStartedAt
-    });
-    renderGate2Panel(
-      side,
-      view,
-      done,
-      state,
-      {
-        open: (id) => void this.openBookNote(id),
-        rerun: async (id) => {
-          try {
-            return await this.plugin.rerunBookCard(path, id);
-          } finally {
-            await this.rereadBookCard(id);
-          }
-        },
-        confirmFinish: (info) => new Promise((resolve) => {
-          if (this.closed) return resolve(false);
-          this.openMapModal(new BookFinishModal(this.app, info, resolve));
-        }),
-        confirmSeam: async (id) => {
-          try {
-            await this.plugin.confirmBookSeam(path, id);
-          } finally {
-            await this.rereadBookCard(id);
-          }
-        },
-        // The bar is part of the toolbar, not of this panel: it repaints once the acceptance is saved (or refused).
-        finish: () => this.plugin.finishBookRun(path).finally(() => {
-          if (!this.closed) this.render();
-        }),
-        showChat: () => this.showChatFromBookPanel(),
-        close: () => this.closeBookPanel(),
-        refresh: () => this.paintBookPanel()
-      },
-      new Set((_c = progress == null ? void 0 : progress.busyCards) != null ? _c : []),
-      !!(progress == null ? void 0 : progress.active),
-      progress == null ? void 0 : progress.rerun
-    );
-    const all = (selector) => Array.from(side.querySelectorAll(selector));
-    if (state.pendingFocus === "title") (_d = side.querySelector(".vam-book-panel-title")) == null ? void 0 : _d.focus();
-    else if (state.pendingFocus === "opener")
-      (_e = this.contentEl.querySelector(".vam-book-panel-toggle")) == null ? void 0 : _e.focus();
-    else if (heldCard) {
-      const same2 = all("[data-card]").find((item) => item.dataset.card === heldCard && item.dataset.act === heldAct);
-      const target = (_f = same2 != null ? same2 : all("[data-row]").find((item) => item.dataset.row === heldCard)) != null ? _f : side.querySelector(".vam-book-panel-title");
-      target == null ? void 0 : target.focus();
-    } else if (heldAct === "finish")
-      (_g = all("[data-act]").find((item) => item.dataset.act === "finish")) == null ? void 0 : _g.focus();
-    state.pendingFocus = null;
-  }
   /** A card's note opens in a tab. */
   async openBookNote(id) {
     var _a2;
     const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
     const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
-    if (!(file instanceof import_obsidian38.TFile)) {
-      new import_obsidian38.Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
+    if (!(file instanceof import_obsidian37.TFile)) {
+      new import_obsidian37.Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
       return;
     }
     try {
       await this.app.workspace.getLeaf("tab").openFile(file);
     } catch (error) {
-      new import_obsidian38.Notice(error instanceof Error ? error.message : String(error));
+      new import_obsidian37.Notice(error instanceof Error ? error.message : String(error));
     }
-  }
-  /** The root note's file text (the thread and the editorial decisions live there); repaints the panel when it differs. */
-  async loadBookRoot() {
-    var _a2, _b2, _c;
-    const map = this.map;
-    if (!map) return;
-    const read = readBookPipeline(map);
-    if (read.kind !== "usable") return;
-    const root = (_a2 = map.nodes.find((node) => !node.parentId)) != null ? _a2 : map.nodes.find((node) => node.id === read.data.order[0]);
-    const file = root ? this.app.vault.getAbstractFileByPath(root.path) : null;
-    if (!(file instanceof import_obsidian38.TFile)) return;
-    const raw = await this.app.vault.read(file).catch(() => "");
-    const settings = (_c = (_b2 = await this.plugin.repo.readNote(file.path).catch(() => null)) == null ? void 0 : _b2.bookSettings) != null ? _c : {};
-    if (this.closed || !this.bookSideEl) return;
-    if (raw === this.bookPanel.rootRaw && JSON.stringify(settings) === JSON.stringify(this.bookPanel.settings)) return;
-    this.bookPanel.rootRaw = raw;
-    this.bookPanel.settings = settings;
-    this.paintBookPanel();
   }
   /** After a replan or rerun: this card's note is read again so the panel shows the new plan without waiting for the repaint. */
   async rereadBookCard(id) {
@@ -82860,7 +82168,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   }
   /** Runs a runner entry (these resolve when the drive ends, except confirmGate1: once writing has begun); a refusal becomes a notice, and the map repaints either way. */
   bookEntry(entry) {
-    return runBookEntry(entry, (message) => new import_obsidian38.Notice(message)).finally(() => {
+    return runBookEntry(entry, (message) => new import_obsidian37.Notice(message)).finally(() => {
       if (!this.closed) this.render();
     });
   }
@@ -83081,7 +82389,7 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
           try {
             await ((_b2 = (_a3 = this.aiModeMemory()).rememberAiMode) == null ? void 0 : _b2.call(_a3, noteAiMode(request.researchMode)));
           } catch (e) {
-            new import_obsidian38.Notice(t("ui.multi_research_not_started"));
+            new import_obsidian37.Notice(t("ui.multi_research_not_started"));
             return;
           }
         }
@@ -83140,7 +82448,7 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
     const languageSource = this.batchLanguageSource();
     const key4 = this.multiResearchKey();
     if (this.plugin.expansionCoordinator.isRunning(key4)) {
-      new import_obsidian38.Notice(t("ui.multi_research_already_running"));
+      new import_obsidian37.Notice(t("ui.multi_research_already_running"));
       return;
     }
     const selected = [...this.selection.state.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
@@ -83158,26 +82466,26 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
       const ownModel = new Set(resolved.filter((item) => item.origin === "override").map((item) => item.path));
       const models = request.model ? [request.model] : [...new Set(resolved.map((item) => item.origin === "override" ? item.model : current.model))];
       if (!models.length) models.push(this.plugin.settings.cliModel);
-      const confirmEach = async (index, run2) => index >= models.length ? (await run2(), true) : this.plugin.confirmAiUsage(models[index], async () => {
-        await confirmEach(index + 1, run2);
+      const confirmEach = async (index, run) => index >= models.length ? (await run(), true) : this.plugin.confirmAiUsage(models[index], async () => {
+        await confirmEach(index + 1, run);
       });
       await confirmEach(0, async () => {
         var _a3, _b3;
         if (this.plugin.expansionCoordinator.isRunning(key4)) {
-          new import_obsidian38.Notice(t("ui.multi_research_already_running"));
+          new import_obsidian37.Notice(t("ui.multi_research_already_running"));
           return;
         }
         if (signal == null ? void 0 : signal.aborted) return;
         const busy = (node) => this.plugin.topicRuns.isBusy(node.path) || this.plugin.quickExpandPending.has(node.path) || this.plugin.topicRuns.hasTask(node.path);
         const unlocked = selected.filter((node) => !this.aiLockReason("write", [node.id]));
         if (unlocked.length < selected.length)
-          new import_obsidian38.Notice(t("ui.ai_locked_skipped_0", selected.length - unlocked.length));
+          new import_obsidian37.Notice(t("ui.ai_locked_skipped_0", selected.length - unlocked.length));
         const nodes = unlocked.filter((node) => !busy(node));
         if (!nodes.length) {
-          if (unlocked.length) new import_obsidian38.Notice(t("ui.multi_research_all_skipped"));
+          if (unlocked.length) new import_obsidian37.Notice(t("ui.multi_research_all_skipped"));
           return;
         }
-        if (nodes.length < unlocked.length) new import_obsidian38.Notice(t("ui.multi_research_skipped", unlocked.length - nodes.length));
+        if (nodes.length < unlocked.length) new import_obsidian37.Notice(t("ui.multi_research_skipped", unlocked.length - nodes.length));
         this.selection.exitMultiSelect("backgroundRun");
         if (!this.closed) this.render();
         const sources = await this.batchSources((_a3 = request.referenceGroups) != null ? _a3 : [], nodes.length, current.model, signal);
@@ -83270,7 +82578,7 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
               const state = this.plugin.expansionBatches.get(key4);
               if (state && state.status !== "running" && !reported) {
                 reported = true;
-                new import_obsidian38.Notice(
+                new import_obsidian37.Notice(
                   [
                     t(
                       state.status === "stopped" ? "ui.multi_research_stopped" : "ui.multi_research_finished",
@@ -83457,7 +82765,7 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
     const help = this.button(
       selection,
       t("ui.selection_help"),
-      () => new import_obsidian38.Notice(t("ui.drag_to_select_topics_hint"), 12e3)
+      () => new import_obsidian37.Notice(t("ui.drag_to_select_topics_hint"), 12e3)
     );
     help.setAttr("aria-label", t("ui.selection_help_hint"));
     help.setAttr("title", t("ui.selection_help_hint"));
@@ -83565,7 +82873,7 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
     const paths = [...section3.matchAll(/\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g)].map((match) => {
       var _a2, _b2;
       const link = match[1], direct = link.endsWith(".md") ? link : `${link}.md`;
-      if (this.app.vault.getAbstractFileByPath(direct) instanceof import_obsidian38.TFile) return direct;
+      if (this.app.vault.getAbstractFileByPath(direct) instanceof import_obsidian37.TFile) return direct;
       return (_b2 = (_a2 = this.app.metadataCache.getFirstLinkpathDest(link, ownerPath)) == null ? void 0 : _a2.path) != null ? _b2 : direct;
     });
     return [...new Set(paths)];
@@ -83696,15 +83004,15 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
           return t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
         const language2 = this.plugin.settings.language;
         task = direction || synthesisGoalTask(language2);
-        const run2 = await this.detailTemplateFor(
+        const run = await this.detailTemplateFor(
           node,
           options == null ? void 0 : options.noteStyle,
           void 0,
           (_a3 = options == null ? void 0 : options.outputLanguage) != null ? _a3 : language2
         );
-        const detailTemplate = run2.template;
-        synthesisRun = run2;
-        updateMode = (options == null ? void 0 : options.subtreeIntegration) ? integrationUpdateMode(run2) : run2.updateMode;
+        const detailTemplate = run.template;
+        synthesisRun = run;
+        updateMode = (options == null ? void 0 : options.subtreeIntegration) ? integrationUpdateMode(run) : run.updateMode;
         return {
           detailTemplate,
           updateMode,
@@ -83722,10 +83030,10 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
       buildContext: async (note) => {
         var _a3, _b2, _c, _d, _e;
         const language2 = this.plugin.settings.language;
-        const run2 = synthesisRun;
+        const run = synthesisRun;
         const synthesisStyle = {
-          tone: run2.toneText ? { toneText: run2.toneText } : {},
-          style: run2.contextFields
+          tone: run.toneText ? { toneText: run.toneText } : {},
+          style: run.contextFields
         };
         const outlineText = (options == null ? void 0 : options.subtreeIntegration) ? subtreeOutlineText(buildSubtreeOutline(this.subtreePlanNodes(), node.id)) : "";
         return withThinkingOrigin(
@@ -83753,9 +83061,9 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
             researchMode: (_c = options == null ? void 0 : options.researchMode) != null ? _c : "local",
             researchDepth: (_d = options == null ? void 0 : options.researchDepth) != null ? _d : "normal",
             visualMode: (_e = options == null ? void 0 : options.visualMode) != null ? _e : note.visualMode,
-            detailTemplate: run2.template,
+            detailTemplate: run.template,
             ...synthesisStyle.style,
-            updateMode: updateMode != null ? updateMode : run2.updateMode,
+            updateMode: updateMode != null ? updateMode : run.updateMode,
             ...outlineText ? { subtreeOutline: outlineText } : {},
             addCharts: true
           },
@@ -83793,7 +83101,7 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
       },
       ...(options == null ? void 0 : options.skipCharts) ? {} : { queueCharts: (job) => this.queueCharts(job) },
       failed,
-      notify: (message) => new import_obsidian38.Notice(message),
+      notify: (message) => new import_obsidian37.Notice(message),
       onSettled: async () => {
         await this.hydrate();
         this.render();
@@ -83844,7 +83152,7 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
             node,
             { ...task.options, continuesDirections: task.step === "draft" },
             task.step === "directions" ? null : task.direction,
-            (message) => new import_obsidian38.Notice(message),
+            (message) => new import_obsidian37.Notice(message),
             () => {
             }
           );
@@ -83855,13 +83163,13 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
   /** Multi-select synthesis: the same dialog and flow as a single topic's, over the selected topics. */
   integrateSelected() {
     if (!this.map || this.selection.state.multiSelected.size < 2) {
-      new import_obsidian38.Notice(t("ui.select_at_least_two_topics"));
+      new import_obsidian37.Notice(t("ui.select_at_least_two_topics"));
       return;
     }
     const selection = this.plugin.topicRuns.syntheses(this).selection;
     const task = selection && selection.mapPath === this.path ? selection : null;
     if ((task == null ? void 0 : task.state) === "running") {
-      new import_obsidian38.Notice(t("ui.ai_running_ai"));
+      new import_obsidian37.Notice(t("ui.ai_running_ai"));
       return;
     }
     this.openSelectionSynthesis((task == null ? void 0 : task.state) === "directions" ? task : null);
@@ -84067,7 +83375,7 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
           task.sources,
           { ...retained, synthesisTitle: task.title, continuesDirections: task.directions.length > 0 },
           task.step === "directions" ? null : task.goal,
-          (message) => new import_obsidian38.Notice(message),
+          (message) => new import_obsidian37.Notice(message),
           () => {
           }
         );
@@ -84234,7 +83542,7 @@ ${note.detail.trim()}` : "",
           this.focusNode(integrated);
         } catch (e) {
           this.render();
-          new import_obsidian38.Notice(t("ui.synthesis_saved_refresh_failed"));
+          new import_obsidian37.Notice(t("ui.synthesis_saved_refresh_failed"));
         }
         return;
       }
@@ -84574,7 +83882,7 @@ ${note.detail.trim()}` : "",
       const hint = t("ui.fit_clamped");
       (_d = this.announcer) == null ? void 0 : _d.setText(hint);
       (_e = this.fitNotice) == null ? void 0 : _e.hide();
-      this.fitNotice = new import_obsidian38.Notice(hint);
+      this.fitNotice = new import_obsidian37.Notice(hint);
     }
   }
   setupPan() {
@@ -85115,7 +84423,7 @@ ${note.detail.trim()}` : "",
     this.argumentFocusMapId = map.id;
     void this.plugin.argumentRuns.start(path, text10).catch((error) => {
       this.argumentFocusMapId = null;
-      if (error instanceof ArgumentRunError) new import_obsidian38.Notice(t("ui.argument_start_refused"));
+      if (error instanceof ArgumentRunError) new import_obsidian37.Notice(t("ui.argument_start_refused"));
     });
   }
   chatHost() {
@@ -85242,7 +84550,7 @@ ${note.detail.trim()}` : "",
     const doc = this.contentEl.ownerDocument;
     for (const leaf of (_c = (_b2 = (_a2 = this.app.workspace).getLeavesOfType) == null ? void 0 : _b2.call(_a2, "markdown")) != null ? _c : []) {
       const view = leaf.view;
-      if (!(view instanceof import_obsidian38.MarkdownView) || !view.file) continue;
+      if (!(view instanceof import_obsidian37.MarkdownView) || !view.file) continue;
       const el = view.containerEl;
       if (!el || doc && el.ownerDocument !== doc || !el.isShown()) continue;
       if (!shown.includes(view.file.path)) shown.push(view.file.path);
@@ -85255,7 +84563,7 @@ ${note.detail.trim()}` : "",
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
-      if (file instanceof import_obsidian38.TFile && file.extension === "md") return file;
+      if (file instanceof import_obsidian37.TFile && file.extension === "md") return file;
     }
     return null;
   }
@@ -85268,8 +84576,8 @@ ${note.detail.trim()}` : "",
     const workspace = this.app.workspace;
     const open2 = /* @__PURE__ */ new Set();
     for (const leaf of (_b2 = (_a2 = workspace.getLeavesOfType) == null ? void 0 : _a2.call(workspace, "markdown")) != null ? _b2 : [])
-      if (leaf.view instanceof import_obsidian38.MarkdownView && leaf.view.file) open2.add(leaf.view.file.path);
-    const live2 = (_e = (_d = (_c = workspace.getActiveViewOfType) == null ? void 0 : _c.call(workspace, import_obsidian38.MarkdownView)) == null ? void 0 : _d.file) == null ? void 0 : _e.path;
+      if (leaf.view instanceof import_obsidian37.MarkdownView && leaf.view.file) open2.add(leaf.view.file.path);
+    const live2 = (_e = (_d = (_c = workspace.getActiveViewOfType) == null ? void 0 : _c.call(workspace, import_obsidian37.MarkdownView)) == null ? void 0 : _d.file) == null ? void 0 : _e.path;
     const candidates = [
       live2,
       this.lastMarkdownPath && open2.has(this.lastMarkdownPath) ? this.lastMarkdownPath : null,
@@ -85277,21 +84585,21 @@ ${note.detail.trim()}` : "",
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
-      if (file instanceof import_obsidian38.TFile && file.extension === "md") return file;
+      if (file instanceof import_obsidian37.TFile && file.extension === "md") return file;
     }
     return null;
   }
   openMarkdownEditor(path) {
     var _a2, _b2, _c, _d;
     for (const leaf of (_c = (_b2 = (_a2 = this.app.workspace).getLeavesOfType) == null ? void 0 : _b2.call(_a2, "markdown")) != null ? _c : [])
-      if (leaf.view instanceof import_obsidian38.MarkdownView && ((_d = leaf.view.file) == null ? void 0 : _d.path) === path) return leaf.view.editor;
+      if (leaf.view instanceof import_obsidian37.MarkdownView && ((_d = leaf.view.file) == null ? void 0 : _d.path) === path) return leaf.view.editor;
     return null;
   }
   /** A vault note's text as it is right now (an open note is read from its editor, which may hold unsaved typing). */
   async readChatFile(path) {
     const key4 = normalizeVaultPath(path);
     const file = key4 ? this.app.vault.getAbstractFileByPath(key4) : null;
-    if (!(file instanceof import_obsidian38.TFile)) return null;
+    if (!(file instanceof import_obsidian37.TFile)) return null;
     const editor = this.openMarkdownEditor(file.path);
     return { file, editor, text: editor ? editor.getValue() : await this.app.vault.read(file) };
   }
@@ -85368,7 +84676,7 @@ ${note.detail.trim()}` : "",
   /** Undoes exactly the reply when it is the newest undo step; otherwise nothing changes and the Notice says how to undo in order. */
   async undoChatReply(entry) {
     const later = () => {
-      if (this.chatReplyUndoState(entry) !== "undone") new import_obsidian38.Notice(t("ui.map_chat_undo_reply_later"));
+      if (this.chatReplyUndoState(entry) !== "undone") new import_obsidian37.Notice(t("ui.map_chat_undo_reply_later"));
       return "later";
     };
     if (this.chatApplying || !this.isNewestUndoStep(entry)) return later();
@@ -85428,7 +84736,7 @@ ${note.detail.trim()}` : "",
     const limits = this.plugin.aiCalls.capabilitiesFor(model).imageInput;
     if (!limits) throw new Error(t("ui.map_chat_image_unsupported"));
     const file = this.app.vault.getAbstractFileByPath(path);
-    if (!(file instanceof import_obsidian38.TFile)) throw new Error(t("ui.map_chat_image_unreadable"));
+    if (!(file instanceof import_obsidian37.TFile)) throw new Error(t("ui.map_chat_image_unreadable"));
     let loaded;
     try {
       const data = await this.app.vault.readBinary(file);
@@ -85644,8 +84952,8 @@ ${note.detail.trim()}` : "",
   resumeChatChain(message) {
     return this.chatChainRunner.resumeChatChain(message);
   }
-  interruptChain(run2, reason) {
-    this.chatChainRunner.interruptChain(run2, reason);
+  interruptChain(run, reason) {
+    this.chatChainRunner.interruptChain(run, reason);
   }
   chatChainPorts() {
     return {
@@ -85716,7 +85024,7 @@ ${note.detail.trim()}` : "",
         ...await this.buildChatRequest(message, this.chat, origin, signal),
         ...this.usageMapField()
       }),
-      confirmAiUsage: (model, run2, hooks) => this.plugin.confirmAiUsage(model, run2, hooks),
+      confirmAiUsage: (model, run, hooks) => this.plugin.confirmAiUsage(model, run, hooks),
       beginRecord: (turn, request, origin) => this.beginChatRecord(this.chat, turn, request, origin),
       endRecord: (status, fields) => this.endChatRecord(status, fields),
       markLogged: (answer) => this.chatRecordSession.markLogged(answer),
@@ -85734,22 +85042,22 @@ ${note.detail.trim()}` : "",
       requestChat: (...args) => this.plugin.mapChat.chat(...args),
       researchSent: () => this.chatResearchSent,
       autoApply: () => this.chatAutoApply,
-      planOptions: (run2, request) => {
+      planOptions: (run, request) => {
         var _a2;
         return {
           diagrams: this.plugin.settings.addDiagramsAfterResearch,
           mapAiMode: (_a2 = this.map) == null ? void 0 : _a2.aiMode,
           imageMode: this.chatImageMode(),
           imageAttached: !!request.imageDataUrl,
-          chain: planChainOf(run2.state),
+          chain: planChainOf(run.state),
           autoApply: this.chatAutoApply,
           mapFolder: this.path.slice(0, Math.max(0, this.path.lastIndexOf("/"))),
           readablePaths: this.chatFiles.readablePaths(),
-          callsSoFar: run2.state.calls,
+          callsSoFar: run.state.calls,
           chatStartedResearch: this.chatStartedResearch,
           chatReadSources: this.chatReadsSources || request.context.mapSourcesSent === true,
           trusted: {
-            createdIds: run2.createdIds,
+            createdIds: run.createdIds,
             researchedIds: new Set(
               [...this.chatResearched].filter(([, info]) => info.status === "succeeded").map(([id]) => id)
             )
@@ -85760,7 +85068,7 @@ ${note.detail.trim()}` : "",
       markTurn: (origin, request, entry) => this.markChatTurn(origin, request, entry),
       errorText: (error) => this.chatErrorText(error),
       notice: (text10) => {
-        new import_obsidian38.Notice(text10);
+        new import_obsidian37.Notice(text10);
       },
       bookGate1Confirm: () => this.bookGate1FromChat(),
       send: (...args) => this.sendMapChat(...args)
@@ -85817,7 +85125,7 @@ ${note.detail.trim()}` : "",
           disposed: () => this.plugin.repo.isDisposed(),
           // The writer calls this once per conversation; the chat itself goes on.
           onFailure: () => {
-            new import_obsidian38.Notice(t("ui.map_chat_record_failed"));
+            new import_obsidian37.Notice(t("ui.map_chat_record_failed"));
           },
           pluginVersion: (_b2 = (_a2 = this.plugin.manifest) == null ? void 0 : _a2.version) != null ? _b2 : "0.0.0",
           configDir: this.app.vault.configDir
@@ -85968,7 +85276,7 @@ ${note.detail.trim()}` : "",
       this.chatSourcesMarkedIn = restored.id;
     }
     const handle = this.plugin.repo.app.vault.getAbstractFileByPath((_b2 = latest.path) != null ? _b2 : "");
-    this.chatRecordSession.resume(latest, restored, handle instanceof import_obsidian38.TFile ? handle : (_c = latest.path) != null ? _c : "");
+    this.chatRecordSession.resume(latest, restored, handle instanceof import_obsidian37.TFile ? handle : (_c = latest.path) != null ? _c : "");
     this.chatFiles.restore(restored.id, restored.ownFiles, restored.attachedFiles);
     for (const item of chat.completedTurns()) this.chatRecordSession.markLogged(item.answer);
     this.relocateMapChat();
@@ -86242,9 +85550,9 @@ ${note.detail.trim()}` : "",
     }
   }
   /** Rebuilds the derived data once for the cards a reply added, then lets the held repaint and re-read happen. */
-  async settleChatBatch(run2) {
-    if (run2.ownershipDirty) {
-      run2.ownershipDirty = false;
+  async settleChatBatch(run) {
+    if (run.ownershipDirty) {
+      run.ownershipDirty = false;
       try {
         await this.plugin.mutate(async () => {
           await this.plugin.rebuildDerivedData();
@@ -86292,7 +85600,7 @@ ${note.detail.trim()}` : "",
     const hidden = /* @__PURE__ */ new Set();
     if (!scope) this.chatFiles.startRound();
     const autoChain = options.chain && (options.chain.state.autoApply || this.chatAutoApply) ? options.chain : null;
-    const run2 = {
+    const run = {
       refs: /* @__PURE__ */ new Map(),
       // Shared with the round's work, which hands the ids to its chain.
       created: (_d = (_c = options.work) == null ? void 0 : _c.created) != null ? _d : [],
@@ -86329,7 +85637,7 @@ ${note.detail.trim()}` : "",
     const batched = adds === 0 || adds >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW;
     try {
       if (batched) this.holdChatBatch();
-      run2.deferRebuild = batched;
+      run.deferRebuild = batched;
       for (const [index, action] of result.actions.entries()) {
         if (action.kind === "read_md_file") {
           hidden.add(index);
@@ -86370,7 +85678,7 @@ ${note.detail.trim()}` : "",
           continue;
         }
         if (action.kind === "create_map") {
-          await this.settleChatBatch(run2);
+          await this.settleChatBatch(run);
           const outcome = await this.chatCreateMap(action.title, anchor, same2);
           if (batched) this.holdChatBatch();
           if (outcome.status === "done") {
@@ -86389,11 +85697,11 @@ ${note.detail.trim()}` : "",
         const write = key4 && movedRoot && key4.startsWith(`${movedRoot.from}/`) ? { ...action, path: `${movedRoot.to}${key4.slice(movedRoot.from.length)}` } : action;
         const box = { outcome: { status: "done" } };
         try {
-          const unsaved = autoChain ? await this.backupBeforeAutoWrite(autoChain, write, run2) : null;
+          const unsaved = autoChain ? await this.backupBeforeAutoWrite(autoChain, write, run) : null;
           if (unsaved) box.outcome = unsaved;
           else
             await this.plugin.mutate(async () => {
-              box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own2, same2, run2));
+              box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own2, same2, run));
             });
         } catch (error) {
           box.outcome = { status: "failed", reason: errorMessage6(error) };
@@ -86406,14 +85714,14 @@ ${note.detail.trim()}` : "",
         if (box.outcome.status === "done" && (action.kind === "rename_topic" || action.kind === "update_summary" || action.kind === "edit_topic_note"))
           resized.add(action.nodeId);
         if (action.kind === "auto_layout" && box.outcome.status === "done") {
-          laidOutCount = run2.created.length;
+          laidOutCount = run.created.length;
           layoutDone = true;
         }
         lines[index] = this.chatLine(label, box.outcome);
       }
       let arranged = false;
-      if (!scope && run2.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW && !noNewMap && same2() && // A reply that made a ring places the ring and the other new cards below, never the whole map again.
-      !((_f = run2.ringImages) == null ? void 0 : _f.size) && !result.actions.some((action) => action.kind === "auto_layout")) {
+      if (!scope && run.created.length >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW && !noNewMap && same2() && // A reply that made a ring places the ring and the other new cards below, never the whole map again.
+      !((_f = run.ringImages) == null ? void 0 : _f.size) && !result.actions.some((action) => action.kind === "auto_layout")) {
         try {
           await this.plugin.mutate(
             () => this.history.ownWrites(async () => {
@@ -86447,8 +85755,8 @@ ${note.detail.trim()}` : "",
       }
       if (arranged) lines.push({ status: "done", text: t("ui.map_chat_auto_layout_added") });
       if (!same2()) stopped = true;
-      const ringed = ((_g = run2.ringImages) == null ? void 0 : _g.size) ? new Set(run2.ringImages) : null;
-      const rough = batched && !arranged && (stopped || layoutDone || !!ringed || !!scope) ? run2.created.slice(laidOutCount) : [];
+      const ringed = ((_g = run.ringImages) == null ? void 0 : _g.size) ? new Set(run.ringImages) : null;
+      const rough = batched && !arranged && (stopped || layoutDone || !!ringed || !!scope) ? run.created.slice(laidOutCount) : [];
       if ((rough.length || ringed) && !this.closed && this.path === anchor.path && ((_h = this.map) == null ? void 0 : _h.id) === anchor.id) {
         try {
           await this.plugin.mutate(
@@ -86461,7 +85769,7 @@ ${note.detail.trim()}` : "",
                 if (ringed) {
                   const fresh = /* @__PURE__ */ new Set();
                   for (const imageId of ringed) {
-                    const added = (_a5 = run2.ringAdded) == null ? void 0 : _a5.get(imageId);
+                    const added = (_a5 = run.ringAdded) == null ? void 0 : _a5.get(imageId);
                     if (added == null ? void 0 : added.hadRing) {
                       const pending2 = new Set(added.topicIds);
                       for (const topicId of added.topicIds) {
@@ -86495,7 +85803,7 @@ ${note.detail.trim()}` : "",
         }
       }
     } finally {
-      await this.settleChatBatch(run2);
+      await this.settleChatBatch(run);
       const entries = this.history.closeGroup();
       if (!scope) this.chatReplyStep = void 0;
       if (wrote) {
@@ -86504,9 +85812,9 @@ ${note.detail.trim()}` : "",
             const step = await this.pushChatReplyEntry(
               entries,
               anchor.path,
-              (_i = run2.notes) != null ? _i : /* @__PURE__ */ new Set(),
-              (_j = run2.files) != null ? _j : /* @__PURE__ */ new Set(),
-              (_k = run2.parked) != null ? _k : /* @__PURE__ */ new Set(),
+              (_i = run.notes) != null ? _i : /* @__PURE__ */ new Set(),
+              (_j = run.files) != null ? _j : /* @__PURE__ */ new Set(),
+              (_k = run.parked) != null ? _k : /* @__PURE__ */ new Set(),
               record
             );
             if (!scope) this.chatReplyStep = step;
@@ -86517,9 +85825,9 @@ ${note.detail.trim()}` : "",
         this.updateHistoryButtons();
       }
     }
-    const branchRoot = ((_l = run2.ringImages) == null ? void 0 : _l.size) || scope ? void 0 : this.chatBranchRoot(run2);
+    const branchRoot = ((_l = run.ringImages) == null ? void 0 : _l.size) || scope ? void 0 : this.chatBranchRoot(run);
     if (scope) {
-    } else if ((_m = run2.ringImages) == null ? void 0 : _m.size) {
+    } else if ((_m = run.ringImages) == null ? void 0 : _m.size) {
       if (same2() && !this.closed) this.applySelectionChange(this.selection.clickEmpty());
     } else if (branchRoot && same2() && !this.closed)
       this.applySelectionChange(this.selection.setSelected(branchRoot.id));
@@ -86532,7 +85840,7 @@ ${note.detail.trim()}` : "",
       else {
         try {
           if (scope && action.kind === "run_map_action") {
-            const resolved = this.chatResolveTargets(action, run2);
+            const resolved = this.chatResolveTargets(action, run);
             const ids2 = (_n = resolved == null ? void 0 : resolved.action.nodeIds) != null ? _n : [];
             const targets = ids2.length ? ids2 : [scope.rootId];
             outcome = !resolved ? skipped("ui.map_chat_skip_parent_missing") : scope.run ? await scope.run(action, targets) : skipped("ui.map_chat_skip_unavailable");
@@ -86540,7 +85848,7 @@ ${note.detail.trim()}` : "",
             outcome = await this.chatOpenMap(action.title, anchor, same2);
             if (outcome.status === "done") touched.add(anchor.path);
           } else if (action.kind === "ask_topic_kind") {
-            const ids2 = action.nodeIds.map((id) => id.startsWith(MAP_CHAT_NEW_PREFIX) ? run2.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) : id).filter((id) => {
+            const ids2 = action.nodeIds.map((id) => id.startsWith(MAP_CHAT_NEW_PREFIX) ? run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) : id).filter((id) => {
               var _a4;
               return !!id && !!((_a4 = this.map) == null ? void 0 : _a4.nodes.some((node) => node.id === id));
             });
@@ -86553,10 +85861,10 @@ ${note.detail.trim()}` : "",
           } else {
             const resolved = this.chatResolveTargets(
               action,
-              run2
+              run
             );
             const mergeIds = (resolved == null ? void 0 : resolved.action.kind) === "run_map_action" && resolved.action.action === "merge" ? new Set(resolved.action.nodeIds) : void 0;
-            const mine = mergeIds ? ((_o = run2.held) != null ? _o : []).filter((entry) => entry.ids.some((id) => mergeIds.has(id))) : [];
+            const mine = mergeIds ? ((_o = run.held) != null ? _o : []).filter((entry) => entry.ids.some((id) => mergeIds.has(id))) : [];
             let asked;
             for (const entry of mine) {
               const change2 = chatAppearanceChange(entry.action);
@@ -86581,12 +85889,12 @@ ${note.detail.trim()}` : "",
               options.work.otherBackground = true;
             if (outcome.status !== "done" && mine.length && same2()) {
               const merged = new Set(mine.flatMap((entry) => entry.ids));
-              run2.mergeSourceIds = new Set([...(_y = run2.mergeSourceIds) != null ? _y : []].filter((id) => !merged.has(id)));
+              run.mergeSourceIds = new Set([...(_y = run.mergeSourceIds) != null ? _y : []].filter((id) => !merged.has(id)));
               for (const entry of mine) {
                 const keep = entry.ids;
                 await this.plugin.mutate(async () => {
                   await this.history.ownWrites(
-                    () => this.chatWriter.chatSetAppearance({ ...entry.action, nodeIds: keep }, (id) => id, run2)
+                    () => this.chatWriter.chatSetAppearance({ ...entry.action, nodeIds: keep }, (id) => id, run)
                   );
                 });
               }
@@ -86617,10 +85925,10 @@ ${note.detail.trim()}` : "",
     return all;
   }
   /** The root of the branch a reply made: its first card without a parent, else the first card it made. */
-  chatBranchRoot(run2) {
+  chatBranchRoot(run) {
     var _a2, _b2, _c;
     const nodes = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [];
-    const fresh = run2.created.map((id) => nodes.find((node) => node.id === id)).filter((n) => !!n);
+    const fresh = run.created.map((id) => nodes.find((node) => node.id === id)).filter((n) => !!n);
     return (_c = fresh.find((node) => !node.parentId)) != null ? _c : fresh[0];
   }
   /** Places the cards a reply made (and only those): each new branch beside its parent, a new tree below the others. */
@@ -86667,9 +85975,9 @@ ${note.detail.trim()}` : "",
   /**
    * Swaps `new:<ref>` target ids for the cards they became; null when every target was a card that was never created.
    */
-  chatResolveTargets(action, run2) {
+  chatResolveTargets(action, run) {
     if (action.kind === "select_topics" && action.all) return { action };
-    const ids2 = action.nodeIds.map((id) => id.startsWith(MAP_CHAT_NEW_PREFIX) ? run2.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) : id).filter((id) => !!id);
+    const ids2 = action.nodeIds.map((id) => id.startsWith(MAP_CHAT_NEW_PREFIX) ? run.refs.get(id.slice(MAP_CHAT_NEW_PREFIX.length)) : id).filter((id) => !!id);
     if (action.nodeIds.length && !ids2.length) return null;
     return { action: { ...action, nodeIds: ids2 } };
   }
@@ -86798,7 +86106,7 @@ ${note.detail.trim()}` : "",
    * One write action. Runs inside `plugin.mutate`: it must not queue another one. The map's data sources are read-only for the
    * whole action: a write to one of them (through any card, any descendant of a branch) is refused as "a data source".
    */
-  async applyChatWrite(action, baseline, same2, run2 = { refs: /* @__PURE__ */ new Map(), created: [] }) {
+  async applyChatWrite(action, baseline, same2, run = { refs: /* @__PURE__ */ new Map(), created: [] }) {
     var _a2;
     const previous = this.chatReadOnlyPaths;
     this.chatReadOnlyPaths = new Set(
@@ -86808,7 +86116,7 @@ ${note.detail.trim()}` : "",
       })
     );
     try {
-      return await this.chatWriter.write(action, baseline, same2, run2);
+      return await this.chatWriter.write(action, baseline, same2, run);
     } catch (error) {
       if (error instanceof MapSourceWriteError) return guardSkipped("map_source");
       throw error;
@@ -86821,14 +86129,14 @@ ${note.detail.trim()}` : "",
    * the file is copied to the backups folder, once per file per chain. A failed backup leaves the action unwritten (skipped), and
    * the next write to the file tries the backup again. Research rewrites back up on their own and are not handled here.
    */
-  async backupBeforeAutoWrite(chain, action, run2) {
+  async backupBeforeAutoWrite(chain, action, run) {
     var _a2;
     const paths = [];
     const existing = (raw) => {
       var _a3, _b2, _c;
       if (!raw) return null;
-      const id = raw.startsWith(MAP_CHAT_NEW_PREFIX) ? (_a3 = run2.refs.get(raw.slice(MAP_CHAT_NEW_PREFIX.length))) != null ? _a3 : null : raw;
-      if (!id || chain.createdIds.has(id) || run2.created.includes(id)) return null;
+      const id = raw.startsWith(MAP_CHAT_NEW_PREFIX) ? (_a3 = run.refs.get(raw.slice(MAP_CHAT_NEW_PREFIX.length))) != null ? _a3 : null : raw;
+      if (!id || chain.createdIds.has(id) || run.created.includes(id)) return null;
       return (_c = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === id)) != null ? _c : null;
     };
     const noteOf3 = (raw) => {
@@ -86878,7 +86186,7 @@ ${note.detail.trim()}` : "",
     for (const path of paths) {
       if (chain.backedUp.has(path) || chain.createdFiles.has(path)) continue;
       const file = this.app.vault.getAbstractFileByPath(path);
-      if (!(file instanceof import_obsidian38.TFile)) continue;
+      if (!(file instanceof import_obsidian37.TFile)) continue;
       const backup = this.writebackHooks().backupNote;
       const result = backup ? await backup(path, await this.app.vault.read(file)) : { ok: false };
       if (!result.ok) return skipped("ui.writeback_backup_failed");
@@ -86904,7 +86212,7 @@ ${note.detail.trim()}` : "",
     for (const node of map.nodes)
       if (noteIds.has(node.id)) {
         const file = this.app.vault.getAbstractFileByPath(node.path);
-        notes.push([node.id, file instanceof import_obsidian38.TFile ? await this.app.vault.read(file) : null]);
+        notes.push([node.id, file instanceof import_obsidian37.TFile ? await this.app.vault.read(file) : null]);
       }
     const texts = [];
     for (const path of files) texts.push([path, await this.chatFileText(path)]);
@@ -86924,7 +86232,7 @@ ${note.detail.trim()}` : "",
     if (!entries.length) return void 0;
     const fingerprint = () => this.chatReplyFingerprint(mapPath, noteIds, files, parked);
     let expected = await fingerprint();
-    const run2 = async (redo) => {
+    const run = async (redo) => {
       if (await fingerprint() !== expected) {
         record == null ? void 0 : record.event("undo_refused");
         throw this.chatUndoRefusal();
@@ -86947,8 +86255,8 @@ ${note.detail.trim()}` : "",
       record == null ? void 0 : record.event(redo ? "redo" : "undo");
     };
     const step = {
-      undo: () => run2(false),
-      redo: () => run2(true),
+      undo: () => run(false),
+      redo: () => run(true),
       label: t("ui.map_chat_undo_label")
     };
     this.history.pushSolo(step);
@@ -87077,7 +86385,7 @@ ${note.detail.trim()}` : "",
     if (!batch || !chat || !this.map || batch.running) return;
     const key4 = this.multiResearchKey();
     if (this.plugin.expansionCoordinator.isRunning(key4)) {
-      new import_obsidian38.Notice(t("ui.multi_research_already_running"));
+      new import_obsidian37.Notice(t("ui.multi_research_already_running"));
       return;
     }
     const summary = summarizeChatBatch(batch, batch.restored === true);
@@ -87478,7 +86786,7 @@ ${addition}` : addition },
   }
   /** The bytes of a picked picture (a seam: it needs the network). */
   async chatFetchImage(url) {
-    return (await (0, import_obsidian38.requestUrl)({ url, method: "GET", throw: true })).arrayBuffer;
+    return (await (0, import_obsidian37.requestUrl)({ url, method: "GET", throw: true })).arrayBuffer;
   }
   /** The card of `block` when it may take a cover picture now (same map, not locked by AIM, not merging), else null. */
   chatCoverTarget(block) {
@@ -87490,7 +86798,7 @@ ${addition}` : addition },
   chatHasNoCover(node) {
     var _a2;
     const file = this.app.vault.getAbstractFileByPath(node.path);
-    if (!(file instanceof import_obsidian38.TFile)) return false;
+    if (!(file instanceof import_obsidian37.TFile)) return false;
     const cache = this.app.metadataCache.getFileCache(file);
     const declared = (_a2 = cache == null ? void 0 : cache.frontmatter) == null ? void 0 : _a2["topic-cover"];
     if (declared !== void 0 && declared !== null) return false;
@@ -87507,7 +86815,7 @@ ${addition}` : addition },
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction().createAttachment("image", { name: cover.name, data: cover.data, sourcePath: node.path }).rewriteNote(node.path, async (path, attachment) => {
       const note = this.app.vault.getAbstractFileByPath(path);
-      if (!(note instanceof import_obsidian38.TFile)) throw new Error(path);
+      if (!(note instanceof import_obsidian37.TFile)) throw new Error(path);
       const link = attachment("image");
       await this.app.vault.process(note, (content) => withCover(appendImageEmbed(content, link), link));
     }).editMap(this.path, (map) => {
@@ -87621,10 +86929,10 @@ ${addition}` : addition },
     }
     if (written2.error !== void 0) {
       const reason = t("ui.map_chat_save_failed_0", errorMessage6(written2.error));
-      new import_obsidian38.Notice(reason);
+      new import_obsidian37.Notice(reason);
       return { ok: false, reason };
     }
-    new import_obsidian38.Notice(t("ui.map_chat_saved_0", written2.path));
+    new import_obsidian37.Notice(t("ui.map_chat_saved_0", written2.path));
     return { ok: true, path: written2.path };
   }
   /**
@@ -87636,26 +86944,26 @@ ${addition}` : addition },
   async chatExpand(parent, direction, signal, steer) {
     var _a2, _b2, _c;
     if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.quickExpandPending.has(parent.path)) {
-      new import_obsidian38.Notice(t("ui.ai_running_ai"));
+      new import_obsidian37.Notice(t("ui.ai_running_ai"));
       return { status: "failed", reason: t("ui.ai_running_ai") };
     }
     if (signal == null ? void 0 : signal.aborted) return { status: "stopped" };
-    const run2 = this.plugin.topicRuns.begin(parent.path, "proposeChildren");
-    if (!run2) {
-      new import_obsidian38.Notice(t("ui.ai_running_ai"));
+    const run = this.plugin.topicRuns.begin(parent.path, "proposeChildren");
+    if (!run) {
+      new import_obsidian37.Notice(t("ui.ai_running_ai"));
       return { status: "failed", reason: t("ui.ai_running_ai") };
     }
     const controller = new AbortController();
     const stopWithOwner = () => controller.abort();
     signal == null ? void 0 : signal.addEventListener("abort", stopWithOwner, { once: true });
-    run2.signal.addEventListener("abort", stopWithOwner, { once: true });
+    run.signal.addEventListener("abort", stopWithOwner, { once: true });
     this.plugin.quickExpandPending.add(parent.path);
     this.plugin.topicRuns.registerTask(parent.path, controller);
     this.render();
     try {
       const note = await this.plugin.repo.readNote(parent.path, (_a2 = this.map) != null ? _a2 : void 0);
       if (note.aiLocked) {
-        new import_obsidian38.Notice(t("ui.ai_locked_notice"));
+        new import_obsidian37.Notice(t("ui.ai_locked_notice"));
         return { status: "failed", reason: t("ui.ai_locked_notice") };
       }
       const outline = this.quickOutline(parent);
@@ -87680,7 +86988,7 @@ ${addition}` : addition },
       const { nodes } = limitOutline(generated, limits);
       const items = outlineProposals(nodes);
       if (!items.length) {
-        new import_obsidian38.Notice(t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"));
+        new import_obsidian37.Notice(t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"));
         return { status: "failed", reason: t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to") };
       }
       await outline.create(proposalOutline(items), {
@@ -87698,13 +87006,13 @@ ${addition}` : addition },
       return { status: "succeeded", titles: items.map((item) => item.title) };
     } catch (error) {
       if (controller.signal.aborted) return { status: "stopped" };
-      new import_obsidian38.Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
+      new import_obsidian37.Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
       return { status: "failed", reason: errorMessage6(error) };
     } finally {
       signal == null ? void 0 : signal.removeEventListener("abort", stopWithOwner);
       this.plugin.topicRuns.releaseTask(parent.path, controller);
       this.plugin.quickExpandPending.delete(parent.path);
-      run2.release();
+      run.release();
       if (!this.closed) this.render();
     }
   }
@@ -87780,7 +87088,7 @@ ${addition}` : addition },
       void this.plugin.confirmAiUsage(model, async () => {
         await start(
           (message) => {
-            if (settled2) new import_obsidian38.Notice(message);
+            if (settled2) new import_obsidian37.Notice(message);
             else settle({ status: "failed", reason: message });
           },
           () => settle({ status: "done" })
@@ -88257,7 +87565,7 @@ ${addition}` : addition },
           if (!group || !travelled || this.relevanceSortOn()) return;
           setHover(locked || overChat ? null : targetAt(e));
           if (locked || timelineBlocked && !hover) {
-            if (!warned) new import_obsidian38.Notice(t(locked ? "ui.merge_locked" : "ui.group_drag_timeline_top_level"));
+            if (!warned) new import_obsidian37.Notice(t(locked ? "ui.merge_locked" : "ui.group_drag_timeline_top_level"));
             warned = true;
             return;
           }
@@ -88270,7 +87578,7 @@ ${addition}` : addition },
         if (this.relevanceSortOn()) return;
         moved || (moved = Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3);
         if (moved && locked) {
-          if (!warned) new import_obsidian38.Notice(t("ui.merge_locked"));
+          if (!warned) new import_obsidian37.Notice(t("ui.merge_locked"));
           warned = true;
         }
         if (!moved || locked) return;
@@ -88355,7 +87663,7 @@ ${addition}` : addition },
           }
           if (landed) {
             putBack();
-            if (landed.invalid) new import_obsidian38.Notice(t("ui.circular_links_are_not_allowed"));
+            if (landed.invalid) new import_obsidian37.Notice(t("ui.circular_links_are_not_allowed"));
             else if (!this.notesLoading()) this.enqueue(() => this.moveBranches(this.selectedRoots(), landed.node));
             return;
           }
@@ -88373,7 +87681,7 @@ ${addition}` : addition },
         } else if (moved && landed) {
           putBack();
           const dragged = (_c2 = this.map) == null ? void 0 : _c2.nodes.find((item) => item.id === node.id);
-          if (landed.invalid) new import_obsidian38.Notice(t("ui.circular_links_are_not_allowed"));
+          if (landed.invalid) new import_obsidian37.Notice(t("ui.circular_links_are_not_allowed"));
           else if (dragged && !this.notesLoading())
             this.enqueue(() => this.moveBranches([dragged], landed.node, false));
         } else if (moved) {
@@ -89115,7 +88423,7 @@ ${addition}` : addition },
     var _a2;
     if (((_a2 = style.aiSections) == null ? void 0 : _a2.mode) !== "note-unusable" || (gate == null ? void 0 : gate.shown)) return;
     if (gate) gate.shown = true;
-    new import_obsidian38.Notice(t("ui.note_style_note_sections_unusable"));
+    new import_obsidian37.Notice(t("ui.note_style_note_sections_unusable"));
   }
   /**
    * The note style of a topic run without notifying or writing anything (see detailTemplateFor). A style file that does
@@ -89143,7 +88451,7 @@ ${addition}` : addition },
     const issue2 = issues.blockIssues[0];
     if (!issue2 || (gate == null ? void 0 : gate.shown)) return;
     if (gate) gate.shown = true;
-    new import_obsidian38.Notice(t("ui.preview_issue_0_1_2", (_a2 = issue2.fileName) != null ? _a2 : issue2.id, issue2.line, styleIssueText(issue2)));
+    new import_obsidian37.Notice(t("ui.preview_issue_0_1_2", (_a2 = issue2.fileName) != null ? _a2 : issue2.id, issue2.line, styleIssueText(issue2)));
   }
   /**
    * The structure set for a topic type was not found: say so, once per `gate`. The topic's own missing structure is told by
@@ -89154,7 +88462,7 @@ ${addition}` : addition },
     const ref = (_a2 = this.plugin.settings.noteStyleByKind) == null ? void 0 : _a2[kind];
     if (!ref || ref === topicTemplateId || !issues.missing.includes(ref) || (gate == null ? void 0 : gate.shown)) return;
     if (gate) gate.shown = true;
-    new import_obsidian38.Notice(t("ui.note_style_kind_missing_0_1", t(`ui.topic_kind_${kind}`), ref.replace(/^(?:builtin|file):/, "")));
+    new import_obsidian37.Notice(t("ui.note_style_kind_missing_0_1", t(`ui.topic_kind_${kind}`), ref.replace(/^(?:builtin|file):/, "")));
   }
   /** The plugin's note style store. A plugin without one (a test double) has no style folder: nothing changes then. */
   get noteStyles() {
@@ -89253,12 +88561,12 @@ ${addition}` : addition },
     const vault = this.app.vault;
     const folderAt = (path) => {
       const found = vault.getAbstractFileByPath(path);
-      return found instanceof import_obsidian38.TFolder ? found : null;
+      return found instanceof import_obsidian37.TFolder ? found : null;
     };
     return {
       readRaw: async (path) => {
         const file = vault.getAbstractFileByPath(path);
-        if (!(file instanceof import_obsidian38.TFile)) throw new Error(path);
+        if (!(file instanceof import_obsidian37.TFile)) throw new Error(path);
         return vault.read(file);
       },
       backupNote: (path, content) => {
@@ -89273,7 +88581,7 @@ ${addition}` : addition },
             folderExists: async (candidate) => exists(candidate),
             list: async (folder) => {
               var _a3, _b2;
-              return ((_b2 = (_a3 = folderAt(folder)) == null ? void 0 : _a3.children) != null ? _b2 : []).filter((child) => child instanceof import_obsidian38.TFile).map((child) => child.name);
+              return ((_b2 = (_a3 = folderAt(folder)) == null ? void 0 : _a3.children) != null ? _b2 : []).filter((child) => child instanceof import_obsidian37.TFile).map((child) => child.name);
             },
             createFolder: async (folder) => {
               await vault.createFolder(folder);
@@ -89283,7 +88591,7 @@ ${addition}` : addition },
             },
             read: async (file) => {
               const found = vault.getAbstractFileByPath(file);
-              if (!(found instanceof import_obsidian38.TFile)) throw new Error(file);
+              if (!(found instanceof import_obsidian37.TFile)) throw new Error(file);
               return vault.read(found);
             }
           },
@@ -89310,7 +88618,7 @@ ${addition}` : addition },
       runOnce,
       done,
       failed,
-      notify: (message) => new import_obsidian38.Notice(message),
+      notify: (message) => new import_obsidian37.Notice(message),
       accepted: onLaunchAccepted,
       resolveStyle: (language2) => this.detailTemplateFor(node, void 0, void 0, language2),
       ancestors: (language2) => this.ancestorContext(node, language2),
@@ -89382,7 +88690,7 @@ async function applyMathRepair(vault, plan) {
 
 // core/steps/book-pipeline/run.ts
 var planFailMessage = (error) => isBookStepError(error) ? "invalid_reply" : "failed";
-async function runPlanStep(aiCalls, step, request, run2) {
+async function runPlanStep(aiCalls, step, request, run) {
   const prepared = prepareStep(step, request);
   return aiCalls.run(
     prepared,
@@ -89391,12 +88699,12 @@ async function runPlanStep(aiCalls, step, request, run2) {
       effort: stepEffort(request.reasoning),
       topic: "Book pipeline plan",
       taskName: "book-pipeline-plan",
-      signal: run2.signal,
+      signal: run.signal,
       localCodex: true,
       noContentLog: true,
       failMessage: planFailMessage,
       usage: { action: "other", mapPath: request.usageMapPath },
-      ...run2.admission ? { admission: run2.admission } : {},
+      ...run.admission ? { admission: run.admission } : {},
       task: { textOnly: true, searchBudget: 0 }
     },
     (raw) => prepared.parse(raw)
@@ -89492,7 +88800,7 @@ var proofreadStep = {
   parse: (raw) => parseProofread(raw)
 };
 var proofFailMessage = (error) => isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_step" : "failed";
-async function runProofread(aiCalls, request, run2) {
+async function runProofread(aiCalls, request, run) {
   const events = [];
   const prepared = prepareStep(proofreadStep, request);
   return aiCalls.run(
@@ -89502,12 +88810,12 @@ async function runProofread(aiCalls, request, run2) {
       effort: stepEffort(request.reasoning),
       topic: "Book pipeline proofread",
       taskName: "book-pipeline-proof",
-      signal: run2.signal,
+      signal: run.signal,
       localCodex: false,
       noContentLog: true,
       failMessage: proofFailMessage,
       usage: { action: "other", mapPath: request.usageMapPath },
-      ...run2.admission ? { admission: run2.admission } : {},
+      ...run.admission ? { admission: run.admission } : {},
       task: {
         webSearchOnly: true,
         searchBudget: PROOF_SEARCH_BUDGET,
@@ -89671,7 +88979,7 @@ function wrongCaptions(found, language2) {
   for (const list2 of found.bySlot.values()) for (const image of list2) if (!captionFits(image.caption, language2)) n++;
   return n;
 }
-async function runFindImages(aiCalls, request, run2) {
+async function runFindImages(aiCalls, request, run) {
   const ask = (asked) => {
     const prepared = prepareStep(findImagesStep, asked);
     return aiCalls.run(
@@ -89681,12 +88989,12 @@ async function runFindImages(aiCalls, request, run2) {
         effort: stepEffort(request.reasoning),
         topic: "Book pipeline images",
         taskName: "book-pipeline-images",
-        signal: run2.signal,
+        signal: run.signal,
         localCodex: false,
         noContentLog: true,
         failMessage: () => "failed",
         usage: { action: "other", mapPath: request.usageMapPath },
-        ...run2.admission ? { admission: run2.admission } : {},
+        ...run.admission ? { admission: run.admission } : {},
         task: { webSearchOnly: true, searchBudget: 4, timeoutMs: 2 * 60 * 1e3 }
       },
       (raw) => prepared.parse(raw)
@@ -89699,7 +89007,7 @@ async function runFindImages(aiCalls, request, run2) {
       const again = await ask({ ...request, languageRetry: true });
       if (wrongCaptions(again, request.language) < wrong) result = again;
     } catch (error) {
-      if (run2.signal.aborted) throw error;
+      if (run.signal.aborted) throw error;
     }
     for (const list2 of result.bySlot.values())
       for (const image of list2) if (!captionFits(image.caption, request.language)) image.caption = "";
@@ -89782,12 +89090,12 @@ var suggestSettingsStep = {
   policy: (prompt) => overBudget2(prompt, SUGGEST_SETTINGS_SCHEMA),
   parse: parseSuggestSettings
 };
-function runSuggestSettings(aiCalls, request, run2) {
-  return runPlanStep(aiCalls, suggestSettingsStep, request, run2);
+function runSuggestSettings(aiCalls, request, run) {
+  return runPlanStep(aiCalls, suggestSettingsStep, request, run);
 }
 
 // main.ts
-var import_obsidian51 = require("obsidian");
+var import_obsidian50 = require("obsidian");
 
 // ai/note-style-references.ts
 async function renameStyleReferences(ports, category, ref, name2) {
@@ -89888,8 +89196,8 @@ async function deleteStyleReferences(ports, category, ref) {
 }
 
 // ui/modals/map-chat-records-off-modal.ts
-var import_obsidian39 = require("obsidian");
-var MapChatRecordsOffModal = class extends import_obsidian39.Modal {
+var import_obsidian38 = require("obsidian");
+var MapChatRecordsOffModal = class extends import_obsidian38.Modal {
   constructor(app, count4, decide) {
     super(app);
     this.count = count4;
@@ -89946,12 +89254,12 @@ async function turnMapChatRecordsOff(deps) {
       failed++;
     }
   }
-  if (failed) new import_obsidian39.Notice(t("ui.map_chat_records_delete_failed_0", failed));
+  if (failed) new import_obsidian38.Notice(t("ui.map_chat_records_delete_failed_0", failed));
   return { deleted, failed };
 }
 
 // ui/modals/prompt-preview-modal.ts
-var import_obsidian40 = require("obsidian");
+var import_obsidian39 = require("obsidian");
 
 // core/blocks/prompt-preview.ts
 var PREVIEW_STEPS = [
@@ -90022,7 +89330,7 @@ var GROUP_KEYS = {
   fixed: "ui.preview_group_fixed",
   input: "ui.preview_group_input"
 };
-var PromptPreviewModal = class extends import_obsidian40.Modal {
+var PromptPreviewModal = class extends import_obsidian39.Modal {
   constructor(app, store, language2, provider, trigger, styleOf) {
     super(app);
     this.store = store;
@@ -90122,7 +89430,7 @@ var PromptPreviewModal = class extends import_obsidian40.Modal {
 };
 
 // ui/settings-tab.ts
-var import_obsidian43 = require("obsidian");
+var import_obsidian42 = require("obsidian");
 
 // ai/note-style-card-voices.ts
 var CARD_VOICES = [
@@ -90165,10 +89473,10 @@ function renderRadioGroup(parent, label, choices, current, pick8, idPrefix = "va
 }
 
 // ui/modals/note-style-manage-modal.ts
-var import_obsidian42 = require("obsidian");
+var import_obsidian41 = require("obsidian");
 
 // ui/modals/note-style-editor-modal.ts
-var import_obsidian41 = require("obsidian");
+var import_obsidian40 = require("obsidian");
 
 // ai/note-style-structure-edit.ts
 function splitStructure(text10) {
@@ -90271,7 +89579,7 @@ var UPDATE_DESC_KEYS = {
 };
 var plainMd = (value) => value.replace(/\s+/g, " ").trim().replace(/[!-/:-@[-`{-~]/g, "\\$&");
 var EXAMPLE_DELAY_MS = 200;
-var NoteStyleEditorModal = class extends import_obsidian41.Modal {
+var NoteStyleEditorModal = class extends import_obsidian40.Modal {
   constructor(app, plugin, options) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h;
     super(app);
@@ -90289,7 +89597,7 @@ var NoteStyleEditorModal = class extends import_obsidian41.Modal {
     /** The voice the style had when the window opened, and whether the source wrote its own voice and format keys. */
     __publicField(this, "voiceKey");
     __publicField(this, "formatRef");
-    __publicField(this, "component", new import_obsidian41.Component());
+    __publicField(this, "component", new import_obsidian40.Component());
     /** The child that owns the sample on screen now; the next picture replaces it, so the children do not pile up. */
     __publicField(this, "exampleChild");
     __publicField(this, "closed", false);
@@ -90337,7 +89645,7 @@ var NoteStyleEditorModal = class extends import_obsidian41.Modal {
     const { contentEl } = this;
     this.modalEl.addClass("vam-editor-modal");
     this.titleEl.setText(t(this.options.source ? "ui.editor_title_edit" : "ui.editor_title_new"));
-    const nameRow = new import_obsidian41.Setting(contentEl).setName(t("ui.editor_name"));
+    const nameRow = new import_obsidian40.Setting(contentEl).setName(t("ui.editor_name"));
     nameRow.settingEl.addClass("vam-editor-row");
     nameRow.addText((text10) => {
       const input2 = text10.inputEl;
@@ -90537,14 +89845,14 @@ var NoteStyleEditorModal = class extends import_obsidian41.Modal {
       const line2 = list2.createDiv({ cls: "vam-editor-section" });
       const input2 = line2.createEl("input", { type: "text", cls: "vam-editor-section-name" });
       input2.value = row2.name;
-      const button2 = (text10, key4, cls, run2) => {
+      const button = (text10, key4, cls, run) => {
         const el = line2.createEl("button", { text: text10, cls, attr: { type: "button" } });
-        el.addEventListener("click", run2);
+        el.addEventListener("click", run);
         return el;
       };
-      const up = button2("\u2191", "up", "vam-editor-section-up", () => this.moveRow(index, -1));
-      const down = button2("\u2193", "down", "vam-editor-section-down", () => this.moveRow(index, 1));
-      const remove = button2("\u2212", "remove", "vam-editor-section-remove", () => this.removeRow(index));
+      const up = button("\u2191", "up", "vam-editor-section-up", () => this.moveRow(index, -1));
+      const down = button("\u2193", "down", "vam-editor-section-down", () => this.moveRow(index, 1));
+      const remove = button("\u2212", "remove", "vam-editor-section-remove", () => this.removeRow(index));
       up.disabled = index === 0;
       down.disabled = index === rows2.length - 1;
       const label = () => {
@@ -90731,10 +90039,10 @@ var NoteStyleEditorModal = class extends import_obsidian41.Modal {
     }
     const markdown = this.exampleMarkdown();
     const next = host.createDiv({ cls: "vam-editor-example-body" });
-    const child = new import_obsidian41.Component();
+    const child = new import_obsidian40.Component();
     this.component.addChild(child);
     try {
-      await import_obsidian41.MarkdownRenderer.render(this.app, markdown, next, "", child);
+      await import_obsidian40.MarkdownRenderer.render(this.app, markdown, next, "", child);
     } catch (e) {
       next.remove();
       this.component.removeChild(child);
@@ -90750,10 +90058,10 @@ var NoteStyleEditorModal = class extends import_obsidian41.Modal {
     this.exampleChild = child;
   }
   // ---- preview and save ----
-  async previewPrompt(button2) {
+  async previewPrompt(button) {
     await this.plugin.noteStyles.refresh().catch(() => void 0);
     if (this.closed) return;
-    this.plugin.openPromptPreview(button2, () => this.draftStyle());
+    this.plugin.openPromptPreview(button, () => this.draftStyle());
   }
   /** The topic types (not AIM, not the ones that use `ref`) whose style sets its own voice: "also use it" does not change them. */
   kindsWithOwnVoice(ref) {
@@ -90793,7 +90101,7 @@ var NoteStyleEditorModal = class extends import_obsidian41.Modal {
       const kindName = (kind) => t(kind === "aim" ? "ui.note_style_kind_aim" : `ui.topic_kind_${kind}`);
       if (switched.length) {
         for (const kind of switched) await this.plugin.setKindStyle(kind, result.ref);
-        new import_obsidian41.Notice(
+        new import_obsidian40.Notice(
           t(
             "ui.recipe_notice_switched_0_1",
             result.ref.slice("file:".length),
@@ -90804,9 +90112,9 @@ var NoteStyleEditorModal = class extends import_obsidian41.Modal {
       if (this.draft.applyAll) {
         const kept = this.kindsWithOwnVoice(result.ref);
         await this.plugin.setGlobalPart("voice", this.draft.voice);
-        new import_obsidian41.Notice(t("ui.editor_apply_notice_0", this.voiceName()));
+        new import_obsidian40.Notice(t("ui.editor_apply_notice_0", this.voiceName()));
         if (kept.length)
-          new import_obsidian41.Notice(t("ui.editor_apply_kept_0", kept.map(kindName).join(t("ui.manage_list_separator"))));
+          new import_obsidian40.Notice(t("ui.editor_apply_kept_0", kept.map(kindName).join(t("ui.manage_list_separator"))));
       }
       this.forceClose = true;
       super.close();
@@ -90846,7 +90154,7 @@ function styleKindName(kind) {
   return kind === "aim" ? t("ui.note_style_kind_aim") : t(`ui.topic_kind_${kind}`);
 }
 var lower5 = (value) => value.toLocaleLowerCase();
-var NoteStyleManageModal = class extends import_obsidian42.Modal {
+var NoteStyleManageModal = class extends import_obsidian41.Modal {
   constructor(app, plugin, initialTab = "recipe", trigger, onClosed) {
     super(app);
     this.plugin = plugin;
@@ -90883,13 +90191,13 @@ var NoteStyleManageModal = class extends import_obsidian42.Modal {
       attr: { role: "tablist", "aria-label": t("ui.manage_title") }
     });
     for (const [index, tab] of MANAGE_TABS.entries()) {
-      const button2 = tablist.createEl("button", {
+      const button = tablist.createEl("button", {
         text: manageTabName(tab),
         cls: "vam-manage-tab",
         attr: { role: "tab", id: `vam-manage-tab-${tab}`, "aria-controls": `vam-manage-panel-${tab}` }
       });
-      button2.addEventListener("click", () => this.selectTab(tab, false));
-      button2.addEventListener("keydown", (event) => {
+      button.addEventListener("click", () => this.selectTab(tab, false));
+      button.addEventListener("keydown", (event) => {
         let next;
         if (event.key === "ArrowRight") next = (index + 1) % MANAGE_TABS.length;
         else if (event.key === "ArrowLeft") next = (index + MANAGE_TABS.length - 1) % MANAGE_TABS.length;
@@ -90899,7 +90207,7 @@ var NoteStyleManageModal = class extends import_obsidian42.Modal {
         event.preventDefault();
         this.selectTab(MANAGE_TABS[next], true);
       });
-      this.tabEls.set(tab, button2);
+      this.tabEls.set(tab, button);
       this.panelEls.set(
         tab,
         this.contentEl.createDiv({
@@ -90990,7 +90298,7 @@ var NoteStyleManageModal = class extends import_obsidian42.Modal {
     list2.empty();
     this.editButtons.clear();
     for (const entry of this.entries()) {
-      const setting = new import_obsidian42.Setting(list2);
+      const setting = new import_obsidian41.Setting(list2);
       setting.settingEl.addClass("vam-manage-row");
       setting.setName(entry.name);
       if (entry.builtin) setting.nameEl.createSpan({ text: t("ui.block_group_builtin"), cls: "vam-manage-badge" });
@@ -91004,21 +90312,21 @@ var NoteStyleManageModal = class extends import_obsidian42.Modal {
         });
       if (entry.aimOnly || entry.noCopy) continue;
       if (entry.builtin) {
-        setting.addButton((button2) => {
-          button2.setButtonText(t("ui.manage_view")).onClick(() => this.view(entry, button2.buttonEl));
-          button2.buttonEl.setAttr("aria-label", t("ui.manage_view_aria_0", entry.name));
+        setting.addButton((button) => {
+          button.setButtonText(t("ui.manage_view")).onClick(() => this.view(entry, button.buttonEl));
+          button.buttonEl.setAttr("aria-label", t("ui.manage_view_aria_0", entry.name));
         });
-        setting.addButton((button2) => {
-          button2.setButtonText(t("ui.manage_copy_edit")).onClick(() => void this.edit(entry));
-          button2.buttonEl.setAttr("aria-label", t("ui.manage_copy_edit_aria_0", entry.name));
-          this.editButtons.set(entry.ref, button2.buttonEl);
+        setting.addButton((button) => {
+          button.setButtonText(t("ui.manage_copy_edit")).onClick(() => void this.edit(entry));
+          button.buttonEl.setAttr("aria-label", t("ui.manage_copy_edit_aria_0", entry.name));
+          this.editButtons.set(entry.ref, button.buttonEl);
         });
         continue;
       }
-      setting.addButton((button2) => {
-        button2.setButtonText(t("ui.manage_edit")).onClick(() => void this.edit(entry));
-        button2.buttonEl.setAttr("aria-label", t("ui.manage_edit_aria_0", entry.name));
-        this.editButtons.set(entry.ref, button2.buttonEl);
+      setting.addButton((button) => {
+        button.setButtonText(t("ui.manage_edit")).onClick(() => void this.edit(entry));
+        button.buttonEl.setAttr("aria-label", t("ui.manage_edit_aria_0", entry.name));
+        this.editButtons.set(entry.ref, button.buttonEl);
       });
       this.addMenu(setting, entry);
     }
@@ -91096,18 +90404,18 @@ var NoteStyleManageModal = class extends import_obsidian42.Modal {
     (_a2 = this.menu) == null ? void 0 : _a2.close(false);
     const el = setting.settingEl.createDiv({ cls: "vam-manage-menu", attr: { role: "menu" } });
     const buttons = items.map((item) => {
-      const button2 = el.createEl("button", {
+      const button = el.createEl("button", {
         text: item.text,
         cls: item.danger ? "vam-manage-menu-item is-danger" : "vam-manage-menu-item",
         attr: { role: "menuitem", tabindex: "-1" }
       });
-      if (item.desc) button2.createSpan({ text: item.desc, cls: "vam-manage-menu-desc" });
-      button2.addEventListener("click", () => {
+      if (item.desc) button.createSpan({ text: item.desc, cls: "vam-manage-menu-desc" });
+      button.addEventListener("click", () => {
         var _a3;
         (_a3 = this.menu) == null ? void 0 : _a3.close(false);
         item.run();
       });
-      return button2;
+      return button;
     });
     const close = (focus) => {
       var _a3;
@@ -91117,7 +90425,7 @@ var NoteStyleManageModal = class extends import_obsidian42.Modal {
       if (focus) more.focus();
     };
     el.addEventListener("keydown", (event) => {
-      const at = buttons.findIndex((button2) => button2 === event.target);
+      const at = buttons.findIndex((button) => button === event.target);
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
@@ -91181,7 +90489,7 @@ var NoteStyleManageModal = class extends import_obsidian42.Modal {
       try {
         ref = await this.plugin.noteStyles.duplicateFile(this.category, entry.ref);
       } catch (e) {
-        new import_obsidian42.Notice(t("ui.manage_create_failed"));
+        new import_obsidian41.Notice(t("ui.manage_create_failed"));
       }
       await this.redraw(ref != null ? ref : entry.ref);
     } finally {
@@ -91280,7 +90588,7 @@ var NoteStyleManageModal = class extends import_obsidian42.Modal {
     try {
       const result = await this.plugin.noteStyles.trashFiles(this.unusedCopies());
       if (result.failed.length)
-        new import_obsidian42.Notice(t("ui.manage_trash_failed_0", result.failed.join(t("ui.manage_list_separator"))));
+        new import_obsidian41.Notice(t("ui.manage_trash_failed_0", result.failed.join(t("ui.manage_list_separator"))));
       this.trashed = result.trashed.length ? result.trashed : void 0;
       await this.redraw(null);
     } finally {
@@ -91293,7 +90601,7 @@ var NoteStyleManageModal = class extends import_obsidian42.Modal {
     try {
       const result = await this.plugin.noteStyles.restoreTrashed(this.trashed);
       if (result.failed.length)
-        new import_obsidian42.Notice(t("ui.manage_undo_failed_0", result.failed.join(t("ui.manage_list_separator"))));
+        new import_obsidian41.Notice(t("ui.manage_undo_failed_0", result.failed.join(t("ui.manage_list_separator"))));
       this.trashed = void 0;
       await this.redraw(null);
     } finally {
@@ -91377,7 +90685,7 @@ var NoteStyleManageModal = class extends import_obsidian42.Modal {
     const fromRadio = radio("from", t("ui.manage_add_from"));
     const blankRadio = radio("blank", t("ui.manage_add_blank"));
     let sourceSelect;
-    new import_obsidian42.Setting(form).setName(t("ui.manage_add_source")).addDropdown((dropdown) => {
+    new import_obsidian41.Setting(form).setName(t("ui.manage_add_source")).addDropdown((dropdown) => {
       sourceSelect = dropdown.selectEl;
       dropdown.selectEl.setAttr("aria-label", t("ui.manage_add_source"));
       dropdown.onChange((value) => {
@@ -91388,7 +90696,7 @@ var NoteStyleManageModal = class extends import_obsidian42.Modal {
     });
     let nameInput;
     const errorId = `vam-manage-error-${tab}`;
-    new import_obsidian42.Setting(form).setName(t("ui.manage_add_name")).addText((text10) => {
+    new import_obsidian41.Setting(form).setName(t("ui.manage_add_name")).addText((text10) => {
       nameInput = text10.inputEl;
       text10.inputEl.setAttr("aria-label", t("ui.manage_add_name"));
       text10.inputEl.setAttr("aria-describedby", errorId);
@@ -91409,9 +90717,9 @@ var NoteStyleManageModal = class extends import_obsidian42.Modal {
       attr: { id: errorId, "aria-live": "polite" }
     });
     let createButton;
-    new import_obsidian42.Setting(form).addButton((button2) => {
-      createButton = button2;
-      button2.setButtonText(t("ui.manage_add_create")).setCta().onClick(() => void create());
+    new import_obsidian41.Setting(form).addButton((button) => {
+      createButton = button;
+      button.setButtonText(t("ui.manage_add_create")).setCta().onClick(() => void create());
     });
     const setName = (value) => {
       name2 = value;
@@ -91484,7 +90792,7 @@ var NoteStyleManageModal = class extends import_obsidian42.Modal {
         try {
           target = await this.plugin.noteStyles.createPart(tab, from, name2);
         } catch (e) {
-          new import_obsidian42.Notice(t("ui.manage_create_failed"));
+          new import_obsidian41.Notice(t("ui.manage_create_failed"));
         }
         if (target) target = (_a2 = await this.plugin.editNotePart(tab, target)) != null ? _a2 : target;
         if (!target) return;
@@ -91508,7 +90816,7 @@ var NoteStyleManageModal = class extends import_obsidian42.Modal {
     check();
   }
 };
-var RenameDialog = class extends import_obsidian42.Modal {
+var RenameDialog = class extends import_obsidian41.Modal {
   constructor(app, opts) {
     super(app);
     this.opts = opts;
@@ -91572,7 +90880,7 @@ var RenameDialog = class extends import_obsidian42.Modal {
     if (!this.done) this.opts.trigger.focus();
   }
 };
-var ConfirmDialog = class extends import_obsidian42.Modal {
+var ConfirmDialog = class extends import_obsidian41.Modal {
   constructor(app, opts) {
     super(app);
     this.opts = opts;
@@ -91608,7 +90916,7 @@ var ConfirmDialog = class extends import_obsidian42.Modal {
     if (!this.done) this.opts.trigger.focus();
   }
 };
-var ViewDialog = class extends import_obsidian42.Modal {
+var ViewDialog = class extends import_obsidian41.Modal {
   constructor(app, opts) {
     super(app);
     this.opts = opts;
@@ -91646,9 +90954,9 @@ var CARD_FORMATS = [
 function renderNoteStyleCard(setting, plugin) {
   setting.setName(t("ui.note_style_card_title")).setDesc(t("ui.note_style_card_desc"));
   setting.settingEl.addClass("vam-style-card");
-  setting.addButton((button2) => {
-    button2.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button2.buttonEl));
-    button2.buttonEl.addClass("mod-muted");
+  setting.addButton((button) => {
+    button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl));
+    button.buttonEl.addClass("mod-muted");
   });
   const body = setting.settingEl.createDiv({ cls: "vam-style-card-body" });
   const partName = (category, ref) => {
@@ -91729,8 +91037,8 @@ function renderNoteLocationSetting(setting, plugin, refresh) {
       });
     });
     setting.addButton(
-      (button2) => button2.setButtonText(t("ui.note_style_folder_choose")).onClick(async () => {
-        const value = (0, import_obsidian43.normalizePath)(input2.trim());
+      (button) => button.setButtonText(t("ui.note_style_folder_choose")).onClick(async () => {
+        const value = (0, import_obsidian42.normalizePath)(input2.trim());
         if (!input2.trim() || value === ".") return;
         settings.noteStylesFolder = value;
         await plugin.saveSettings();
@@ -91746,7 +91054,7 @@ function renderNoteLocationSetting(setting, plugin, refresh) {
     });
   }
   setting.addButton(
-    (button2) => button2.setButtonText(t("ui.note_style_open_folder")).onClick(async () => {
+    (button) => button.setButtonText(t("ui.note_style_open_folder")).onClick(async () => {
       await plugin.openNoteStylesFolder();
       refresh();
     })
@@ -91914,17 +91222,17 @@ function renderMyStylesSetting(setting, plugin) {
     });
   };
   describe();
-  setting.addButton((button2) => {
-    button2.setButtonText(t("ui.my_styles_manage")).onClick(() => {
-      const modal = new NoteStyleManageModal(plugin.app, plugin, "recipe", button2.buttonEl, () => {
+  setting.addButton((button) => {
+    button.setButtonText(t("ui.my_styles_manage")).onClick(() => {
+      const modal = new NoteStyleManageModal(plugin.app, plugin, "recipe", button.buttonEl, () => {
         var _a2;
         describe();
         redrawKindRows(plugin);
         (_a2 = locationUpdates.get(plugin)) == null ? void 0 : _a2();
       });
-      openInWindowOf(modal, button2.buttonEl);
+      openInWindowOf(modal, button.buttonEl);
     });
-    button2.buttonEl.setAttr("aria-label", t("ui.my_styles_manage_aria"));
+    button.buttonEl.setAttr("aria-label", t("ui.my_styles_manage_aria"));
   });
   void store.refresh().then(describe, () => void 0);
 }
@@ -91960,7 +91268,7 @@ function bindMapFolderInput(plugin, key4, input2) {
   });
 }
 var offersEveryLanguage = (values) => SUPPORTED_LANGUAGES.every((item) => values.includes(item.id));
-var CodexSetupModal = class extends import_obsidian43.Modal {
+var CodexSetupModal = class extends import_obsidian42.Modal {
   constructor(app, executable, recheck) {
     super(app);
     this.executable = executable;
@@ -91984,15 +91292,15 @@ var CodexSetupModal = class extends import_obsidian43.Modal {
       cls: "vam-setup-note"
     });
     this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian43.Setting(this.contentEl).addButton((button2) => button2.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
-      (button2) => button2.setButtonText(t("ui.i_ve_finished_check_again")).setCta().onClick(() => {
+    new import_obsidian42.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
+      (button) => button.setButtonText(t("ui.i_ve_finished_check_again")).setCta().onClick(() => {
         this.close();
         this.recheck();
       })
     );
   }
 };
-var AiUsageModal = class extends import_obsidian43.Modal {
+var AiUsageModal = class extends import_obsidian42.Modal {
   constructor(app, provider, resolve) {
     super(app);
     this.provider = provider;
@@ -92013,15 +91321,15 @@ var AiUsageModal = class extends import_obsidian43.Modal {
       this.close();
       this.resolve(confirmed);
     };
-    new import_obsidian43.Setting(this.contentEl).addButton((button2) => button2.setButtonText(t("ui.cancel")).onClick(() => finish(false))).addButton(
-      (button2) => button2.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish(true))
+    new import_obsidian42.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish(false))).addButton(
+      (button) => button.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish(true))
     );
   }
   onClose() {
     if (!this.settled) this.resolve(false);
   }
 };
-var ClaudeSetupModal = class extends import_obsidian43.Modal {
+var ClaudeSetupModal = class extends import_obsidian42.Modal {
   constructor(app, executable, url, recheck) {
     super(app);
     this.executable = executable;
@@ -92041,8 +91349,8 @@ var ClaudeSetupModal = class extends import_obsidian43.Modal {
     });
     steps.createEl("li", { text: t("ui.return_to_vam_and_check_the_cli_path_again") });
     this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian43.Setting(this.contentEl).addButton((button2) => button2.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
-      (button2) => button2.setButtonText(t("ui.check_again")).setCta().onClick(() => {
+    new import_obsidian42.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
+      (button) => button.setButtonText(t("ui.check_again")).setCta().onClick(() => {
         this.close();
         this.recheck();
       })
@@ -92077,7 +91385,7 @@ function renderBookModelSetting(setting, plugin, spec, track) {
     });
   });
 }
-var VisualAgentMapSettingTab = class extends import_obsidian43.PluginSettingTab {
+var VisualAgentMapSettingTab = class extends import_obsidian42.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -92339,7 +91647,7 @@ var VisualAgentMapSettingTab = class extends import_obsidian43.PluginSettingTab 
                   void this.setControlValue("cliModel", value);
                 });
               }).addButton(
-                (button2) => button2.setButtonText(t("ui.check_again")).onClick(() => {
+                (button) => button.setButtonText(t("ui.check_again")).onClick(() => {
                   void this.plugin.refreshModelDiscovery("codex");
                   void this.plugin.refreshModelDiscovery("claude");
                 })
@@ -92494,12 +91802,12 @@ var VisualAgentMapSettingTab = class extends import_obsidian43.PluginSettingTab 
             setting.setName(t("ui.settings_status")).setDesc(found.installed ? t("ui.settings_cli_found_0", found.executable) : t(notFoundDesc));
             if (!found.installed)
               setting.addButton(
-                (button2) => button2.setButtonText(t("ui.installation_guide")).onClick(
+                (button) => button.setButtonText(t("ui.installation_guide")).onClick(
                   () => provider === "codex" ? this.plugin.openCodexSetupGuide() : this.plugin.openClaudeSetupGuide()
                 )
               );
             setting.addButton(
-              (button2) => button2.setButtonText(t("ui.check_again")).onClick(() => {
+              (button) => button.setButtonText(t("ui.check_again")).onClick(() => {
                 void (provider === "codex" ? this.plugin.recheckCodex() : this.plugin.recheckClaude());
               })
             );
@@ -92515,11 +91823,11 @@ var VisualAgentMapSettingTab = class extends import_obsidian43.PluginSettingTab 
   }
   /** A button row of the "Advanced" page: name, one-line help and one button. */
   /** `run` gets the button, so what it opens or reports lands in the settings window. */
-  actionRow(name2, desc, label, run2) {
+  actionRow(name2, desc, label, run) {
     return {
       name: name2,
       render: (setting) => {
-        setting.setName(name2).setDesc(desc).addButton((button2) => button2.setButtonText(label).onClick(() => run2(button2.buttonEl)));
+        setting.setName(name2).setDesc(desc).addButton((button) => button.setButtonText(label).onClick(() => run(button.buttonEl)));
       }
     };
   }
@@ -92659,10 +91967,10 @@ var PendingSuggestions = class extends Map {
 };
 
 // ui/outline-view.ts
-var import_obsidian44 = require("obsidian");
+var import_obsidian43 = require("obsidian");
 var OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
 var foldOutlineSearch = (text10) => toSimplifiedFold(text10.toLocaleLowerCase().replace(/\u0307/g, ""));
-var OutlineView = class extends import_obsidian44.ItemView {
+var OutlineView = class extends import_obsidian43.ItemView {
   constructor(leaf, openNote) {
     super(leaf);
     this.openNote = openNote;
@@ -92815,20 +92123,20 @@ var OutlineView = class extends import_obsidian44.ItemView {
     const tree = this.contentEl.createDiv("vam-outline-tree");
     snapshot.segments.forEach((item, index) => {
       var _a2;
-      const button2 = tree.createEl("button", { cls: "vam-coffee-segment" });
+      const button = tree.createEl("button", { cls: "vam-coffee-segment" });
       const kind = t(
         item.kind === "question" ? "ui.coffee_segment_question" : item.kind === "continuation" ? "ui.coffee_segment_continuation" : item.kind === "legacy" ? "ui.coffee_segment_legacy" : "ui.coffee_segment_initial"
       );
-      button2.createEl("strong", {
+      button.createEl("strong", {
         text: t("ui.coffee_outline_segment", index + 1, kind)
       });
-      button2.createSpan({
+      button.createSpan({
         text: item.status === "generating" ? t("ui.coffee_segment_generating") : (_a2 = item.summary) != null ? _a2 : t("ui.coffee_segment_no_summary")
       });
-      if (item.status === "error") button2.createEl("small", { text: t("ui.coffee_segment_incomplete") });
-      button2.addEventListener("click", () => {
+      if (item.status === "error") button.createEl("small", { text: t("ui.coffee_segment_incomplete") });
+      button.addEventListener("click", () => {
         var _a3;
-        if (!((_a3 = this.locateCoffee) == null ? void 0 : _a3.call(this, item.id))) new import_obsidian44.Notice(t("ui.coffee_segment_no_content"));
+        if (!((_a3 = this.locateCoffee) == null ? void 0 : _a3.call(this, item.id))) new import_obsidian43.Notice(t("ui.coffee_segment_no_content"));
       });
     });
   }
@@ -92872,19 +92180,19 @@ var OutlineView = class extends import_obsidian44.ItemView {
         });
       } else row.createSpan("vam-outline-spacer");
       const title = (_c2 = (_b3 = this.titles.get(node.id)) != null ? _b3 : node.path.split("/").pop()) != null ? _c2 : node.path;
-      const button2 = row.createEl("button", { text: title, cls: "vam-outline-note" });
-      button2.title = title;
-      button2.setAttr("dir", "auto");
-      button2.setAttr("data-path", node.path);
+      const button = row.createEl("button", { text: title, cls: "vam-outline-note" });
+      button.title = title;
+      button.setAttr("dir", "auto");
+      button.setAttr("data-path", node.path);
       const marks = readTopicMarkers({ "topic-markers": this.markers.get(node.id) });
       if (marks.length) {
         const listSeparator = t("ui.list_separator");
         const names3 = marks.map((id) => t(markerLabelKey(id))).join(listSeparator);
-        button2.setAttr(
+        button.setAttr(
           "aria-label",
           `${title}${listSeparator === "\u3001" ? "\uFF0C" : ", "}${t("share.viewer_markers_0", names3)}`
         );
-        const row2 = button2.createSpan("vam-markers");
+        const row2 = button.createSpan("vam-markers");
         for (const id of marks) {
           const mark2 = row2.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
           mark2.dataset.marker = id;
@@ -92893,18 +92201,18 @@ var OutlineView = class extends import_obsidian44.ItemView {
       const linkCount = readTopicLinks({ "topic-links": this.links.get(node.id) }).length;
       if (linkCount) {
         const listSeparator = t("ui.list_separator");
-        const base = (_d = button2.getAttr("aria-label")) != null ? _d : title;
-        button2.setAttr(
+        const base = (_d = button.getAttr("aria-label")) != null ? _d : title;
+        button.setAttr(
           "aria-label",
           `${base}${listSeparator === "\u3001" ? "\uFF0C" : ", "}${t("ui.outline_links_0", String(linkCount))}`
         );
-        button2.createSpan({ cls: "vam-outline-links", text: "\u2197", attr: { "aria-hidden": "true" } });
+        button.createSpan({ cls: "vam-outline-links", text: "\u2197", attr: { "aria-hidden": "true" } });
       }
       if (node.path === this.activePath) {
-        button2.addClass("is-active");
-        button2.setAttr("aria-current", "true");
+        button.addClass("is-active");
+        button.setAttr("aria-current", "true");
       }
-      button2.addEventListener("click", () => {
+      button.addEventListener("click", () => {
         this.setActive(node.path);
         void this.openNote(node.path);
       });
@@ -92923,7 +92231,7 @@ var OutlineView = class extends import_obsidian44.ItemView {
 };
 
 // experiences/sharing/share-modal.ts
-var import_obsidian46 = require("obsidian");
+var import_obsidian45 = require("obsidian");
 
 // experiences/sharing/share-format.ts
 var SHARE_FORMAT = "vam-share";
@@ -93216,8 +92524,8 @@ function fenceRanges(lines, offsets, html) {
     const mark2 = open2[1];
     if (mark2[0] === "`" && open2[2].includes("`")) continue;
     for (let j = i + 1; j < lines.length; j++) {
-      const run2 = FENCE_LINE.exec(lines[j]);
-      if (run2 && run2[1][0] === mark2[0] && run2[1].length >= mark2.length && lines[j].slice(run2[0].length).trim() === "") {
+      const run = FENCE_LINE.exec(lines[j]);
+      if (run && run[1][0] === mark2[0] && run[1].length >= mark2.length && lines[j].slice(run[0].length).trim() === "") {
         ranges.push({ start: offsets[i], end: offsets[j] + lines[j].length });
         i = j;
         break;
@@ -93944,40 +93252,40 @@ function extractSegments(root) {
       else collectAlt(child);
     }
   };
-  const flush = (run2) => {
-    if (!run2.length) return;
+  const flush = (run) => {
+    if (!run.length) return;
     const parts = [];
-    const raw = buildText(run2, parts);
+    const raw = buildText(run, parts);
     const text10 = raw.trim();
     if (!text10 || !hasTranslatableText(text10) || raw.includes("\u27E6\u27E6")) return;
     const stripped = raw.replace(TOKEN2, "");
     if (stripped.includes(PLACEHOLDER_OPEN) || stripped.includes(PLACEHOLDER_CLOSE)) return;
     const lead = raw.slice(0, raw.length - raw.trimStart().length);
     const trail = raw.slice(raw.trimEnd().length);
-    units.push({ index: units.length, kind: "run", text: text10, nodes: run2, lead, trail, parts });
+    units.push({ index: units.length, kind: "run", text: text10, nodes: run, lead, trail, parts });
   };
   const walk2 = (parent) => {
-    let run2 = [];
+    let run = [];
     for (const child of Array.from(parent.childNodes)) {
       if (child.nodeType === TEXT_NODE) {
-        run2.push(child);
+        run.push(child);
         continue;
       }
       if (child.nodeType !== ELEMENT_NODE) {
-        flush(run2);
-        run2 = [];
+        flush(run);
+        run = [];
         continue;
       }
       const element = child;
       const kind = classify2(element);
-      if (kind === "atom" || kind === "inline") run2.push(element);
+      if (kind === "atom" || kind === "inline") run.push(element);
       else {
-        flush(run2);
-        run2 = [];
+        flush(run);
+        run = [];
         if (kind === "block") walk2(element);
       }
     }
-    flush(run2);
+    flush(run);
   };
   collectAlt(root);
   walk2(root);
@@ -94443,7 +93751,7 @@ function attachTranslations(payload, options) {
 }
 
 // experiences/sharing/share-exporter.ts
-var import_obsidian45 = require("obsidian");
+var import_obsidian44 = require("obsidian");
 
 // experiences/sharing/share-viewer-dictionaries.ts
 var SHARE_VIEWER_UI_EXTRA = {
@@ -95401,7 +94709,7 @@ async function installWrapper() {
   if (installedWrapper) return;
   installing != null ? installing : installing = (async () => {
     try {
-      const mermaid = await (0, import_obsidian45.loadMermaid)();
+      const mermaid = await (0, import_obsidian44.loadMermaid)();
       const original = mermaid.render;
       if (typeof original === "function" && !installedWrapper) {
         const wrapped = function(id, text10, ...rest) {
@@ -95452,7 +94760,7 @@ var ShareExporter = class {
     /** topic id -> asset name of its cover picture; annotated image id -> asset name of its picture (set by ensureImages). */
     __publicField(this, "coverNames", /* @__PURE__ */ new Map());
     __publicField(this, "imageNames", /* @__PURE__ */ new Map());
-    __publicField(this, "component", new import_obsidian45.Component());
+    __publicField(this, "component", new import_obsidian44.Component());
     __publicField(this, "container", null);
     __publicField(this, "disposed", false);
     __publicField(this, "forbidden", null);
@@ -95526,13 +94834,13 @@ ${detail}`;
   async renderOne(detail, titles, ticket) {
     const cleaned = cleanShareMarkdown(detail, { titleOf: (target) => titles.get(target), assets: this.registry });
     const host = this.host().createDiv();
-    const child = new import_obsidian45.Component();
+    const child = new import_obsidian44.Component();
     this.component.addChild(child);
     const hasDiagram = /(`{3,}|~{3,})[ \t]*mermaid\b/i.test(cleaned.markdown);
     const capture = hasDiagram ? await captureMermaidSources() : { sources: /* @__PURE__ */ new Map(), restore() {
     } };
     try {
-      await import_obsidian45.MarkdownRenderer.render(this.app, cleaned.markdown, host, "", child);
+      await import_obsidian44.MarkdownRenderer.render(this.app, cleaned.markdown, host, "", child);
       assertCurrent(ticket);
       await this.settleMermaid(host, ticket);
       const finished = this.finish(host, capture.sources);
@@ -95561,11 +94869,11 @@ ${detail}`;
     if (this.disposed || signal.aborted) return null;
     const ticket = { generation: 0, signal, isCurrent: () => !signal.aborted && !this.disposed };
     const host = this.host().createDiv();
-    const child = new import_obsidian45.Component();
+    const child = new import_obsidian44.Component();
     this.component.addChild(child);
     try {
       const fence = source.includes("```") ? "~~~~" : "```";
-      await import_obsidian45.MarkdownRenderer.render(this.app, `${fence}mermaid
+      await import_obsidian44.MarkdownRenderer.render(this.app, `${fence}mermaid
 ${source}
 ${fence}`, host, "", child);
       await this.settleMermaid(host, ticket);
@@ -95640,7 +94948,7 @@ ${fence}`, host, "", child);
         pre.after(caption);
       }
     const clean3 = createDiv();
-    clean3.append((0, import_obsidian45.sanitizeHTMLToDom)(host.innerHTML));
+    clean3.append((0, import_obsidian44.sanitizeHTMLToDom)(host.innerHTML));
     unwrapLocalLinks(clean3, () => createSpan());
     scrubShareTree(clean3);
     const slots = Array.from(clean3.querySelectorAll(".vam-mermaid-slot"));
@@ -95667,8 +94975,8 @@ ${fence}`, host, "", child);
     const relative = resolveRelative(folder, entry.ref);
     const candidates = [
       (_c = this.app.metadataCache.getFirstLinkpathDest(entry.ref, fromPath)) == null ? void 0 : _c.path,
-      relative ? (0, import_obsidian45.normalizePath)(relative) : void 0,
-      (0, import_obsidian45.normalizePath)(entry.ref)
+      relative ? (0, import_obsidian44.normalizePath)(relative) : void 0,
+      (0, import_obsidian44.normalizePath)(entry.ref)
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getFileByPath(path) : null;
@@ -95687,7 +94995,7 @@ ${fence}`, host, "", child);
    */
   assetNameFor(path, owner) {
     var _a2;
-    const target = (0, import_obsidian45.normalizePath)(path);
+    const target = (0, import_obsidian44.normalizePath)(path);
     for (const entry of this.registry.entries()) {
       if (this.ownerPath.has(entry.name) && ((_a2 = this.resolveImageFile(entry.name)) == null ? void 0 : _a2.path) === target) return entry.name;
     }
@@ -95745,7 +95053,7 @@ ${fence}`, host, "", child);
       const folder = this.source.mapPath.split("/").slice(0, -1).join("/");
       this.forbidden = forbiddenStringsFor(
         {
-          vaultPath: adapter instanceof import_obsidian45.FileSystemAdapter ? adapter.getBasePath() : void 0,
+          vaultPath: adapter instanceof import_obsidian44.FileSystemAdapter ? adapter.getBasePath() : void 0,
           vaultName: this.app.vault.getName(),
           mapFolder: folder,
           externalPaths: externalForbiddenPaths(loadExternalSources(this.app, this.source.map.id))
@@ -95960,7 +95268,7 @@ function originalLanguage(source, uiLanguage) {
 }
 var UNVERIFIED_LANGUAGES = ["ja", "ko", "es"];
 var AUTO_LANGUAGE = "auto";
-var ShareModal = class extends import_obsidian46.Modal {
+var ShareModal = class extends import_obsidian45.Modal {
   constructor(app, options) {
     var _a2, _b2;
     super(app);
@@ -96016,7 +95324,7 @@ var ShareModal = class extends import_obsidian46.Modal {
   onOpen() {
     this.titleEl.setText(t("share.title"));
     this.contentEl.createEl("p", { text: t("share.intro"), cls: "vam-modal-intro" });
-    this.fullSetting = new import_obsidian46.Setting(this.contentEl).setName(t("share.option_full_name")).setDesc(t(this.includeDetail ? "share.option_full_desc_on" : "share.option_full_desc")).addToggle((toggle) => {
+    this.fullSetting = new import_obsidian45.Setting(this.contentEl).setName(t("share.option_full_name")).setDesc(t(this.includeDetail ? "share.option_full_desc_on" : "share.option_full_desc")).addToggle((toggle) => {
       this.fullToggle = toggle;
       toggle.setValue(this.includeDetail).onChange((value) => {
         this.includeDetail = value;
@@ -96024,7 +95332,7 @@ var ShareModal = class extends import_obsidian46.Modal {
         this.restart();
       });
     });
-    this.imagesSetting = new import_obsidian46.Setting(this.contentEl).setName(t("share.option_images_name")).setDesc(t(this.includeImages ? "share.option_images_desc_on" : "share.option_images_desc")).addToggle((toggle) => {
+    this.imagesSetting = new import_obsidian45.Setting(this.contentEl).setName(t("share.option_images_name")).setDesc(t(this.includeImages ? "share.option_images_desc_on" : "share.option_images_desc")).addToggle((toggle) => {
       this.imagesToggle = toggle;
       toggle.setValue(this.includeImages).onChange((value) => {
         this.includeImages = value;
@@ -96093,11 +95401,11 @@ var ShareModal = class extends import_obsidian46.Modal {
   openTranslationSection() {
     const host = this.options.translation;
     if (!host) return;
-    new import_obsidian46.Setting(this.contentEl).setName(t("share.translate_section")).setHeading();
+    new import_obsidian45.Setting(this.contentEl).setName(t("share.translate_section")).setHeading();
     this.contentEl.createEl("p", { text: t("share.translate_intro"), cls: "vam-modal-intro" });
     for (const language2 of SHARE_TRANSLATION_LANGUAGES) {
       const original = language2 === this.sourceLanguage;
-      const setting = new import_obsidian46.Setting(this.contentEl).setName(
+      const setting = new import_obsidian45.Setting(this.contentEl).setName(
         original ? t("share.translate_original_0", this.languageLabel(language2)) : this.languageLabel(language2)
       );
       if (!original && UNVERIFIED_LANGUAGES.includes(language2))
@@ -96110,7 +95418,7 @@ var ShareModal = class extends import_obsidian46.Modal {
             else this.picked.delete(language2);
             if (!value && this.defaultChoice === language2) {
               this.defaultChoice = AUTO_LANGUAGE;
-              new import_obsidian46.Notice(t("share.translate_open_reset_0", this.languageLabel(language2)));
+              new import_obsidian45.Notice(t("share.translate_open_reset_0", this.languageLabel(language2)));
             }
             this.renderOpenLanguage();
             this.selectionChanged();
@@ -96120,7 +95428,7 @@ var ShareModal = class extends import_obsidian46.Modal {
     }
     this.openLangEl = this.contentEl.createDiv();
     this.renderOpenLanguage();
-    this.modelSetting = new import_obsidian46.Setting(this.contentEl).setName(t("share.translate_model_name")).setDesc(t("share.translate_model_desc")).addDropdown((dropdown) => {
+    this.modelSetting = new import_obsidian45.Setting(this.contentEl).setName(t("share.translate_model_name")).setDesc(t("share.translate_model_desc")).addDropdown((dropdown) => {
       this.modelDropdown = dropdown;
       dropdown.addOption(FOLLOW_DEFAULT_MODEL, t("ui.follow_default_model", host.modelLabel(host.defaultModel())));
       for (const id of host.models()) dropdown.addOption(id, host.modelLabel(id));
@@ -96141,7 +95449,7 @@ var ShareModal = class extends import_obsidian46.Modal {
     if (!container) return;
     container.empty();
     const ids2 = [String(this.sourceLanguage), ...this.selected()];
-    this.openLangSetting = new import_obsidian46.Setting(container).setName(t("share.translate_open_language")).setDesc(t("share.translate_default_desc")).addDropdown((dropdown) => {
+    this.openLangSetting = new import_obsidian45.Setting(container).setName(t("share.translate_open_language")).setDesc(t("share.translate_default_desc")).addDropdown((dropdown) => {
       this.openLangDropdown = dropdown;
       dropdown.addOption(AUTO_LANGUAGE, t("share.translate_default_auto"));
       for (const id of ids2) dropdown.addOption(id, this.languageLabel(id));
@@ -96223,9 +95531,9 @@ var ShareModal = class extends import_obsidian46.Modal {
     if (!languages.length) return;
     const model = this.resolvedModel();
     this.translateNote = "";
-    const run2 = () => this.runTranslation(host, languages, model);
-    if (host.confirmAiUsage) await host.confirmAiUsage(model, run2);
-    else await run2();
+    const run = () => this.runTranslation(host, languages, model);
+    if (host.confirmAiUsage) await host.confirmAiUsage(model, run);
+    else await run();
   }
   async runTranslation(host, languages, model) {
     var _a2, _b2, _c;
@@ -96268,7 +95576,7 @@ var ShareModal = class extends import_obsidian46.Modal {
       this.phase = "done";
       this.estimateMemo = null;
       this.applyTranslation();
-      new import_obsidian46.Notice(t("share.translate_done"));
+      new import_obsidian45.Notice(t("share.translate_done"));
       this.render();
       this.saveButton.focus();
     } catch (error) {
@@ -96311,7 +95619,7 @@ var ShareModal = class extends import_obsidian46.Modal {
     if (choice === AUTO_LANGUAGE || choice === String(this.sourceLanguage)) return;
     const carried = ((_b2 = (_a2 = this.translationArg()) == null ? void 0 : _a2.pieces) != null ? _b2 : []).map((item) => item.language);
     if (carried.includes(choice)) return;
-    new import_obsidian46.Notice(
+    new import_obsidian45.Notice(
       t("share.translate_open_dropped_0_1", this.languageLabel(choice), this.languageLabel(String(this.sourceLanguage)))
     );
   }
@@ -96397,7 +95705,7 @@ var ShareModal = class extends import_obsidian46.Modal {
         row.createDiv({ text: t("share.translate_unverified_0", label), cls: "vam-share-note" });
     }
     if (item.status === "incomplete")
-      new import_obsidian46.Setting(row).setName(`${label}: ${t("share.translate_include_incomplete")}`).addToggle(
+      new import_obsidian45.Setting(row).setName(`${label}: ${t("share.translate_include_incomplete")}`).addToggle(
         (toggle) => toggle.setValue(this.includeIncomplete.has(item.language)).onChange((value) => {
           if (value) this.includeIncomplete.add(item.language);
           else this.includeIncomplete.delete(item.language);
@@ -96505,8 +95813,8 @@ var ShareModal = class extends import_obsidian46.Modal {
     this.publishEl.empty();
     if (!this.savedText) return;
     this.publishEl.createDiv({ text: t("share.publish_note"), cls: "vam-share-note" });
-    const button2 = this.publishEl.createEl("button", { text: t("share.publish_copy") });
-    button2.addEventListener("click", () => void this.copyPublish());
+    const button = this.publishEl.createEl("button", { text: t("share.publish_copy") });
+    button.addEventListener("click", () => void this.copyPublish());
     if (this.publishFallback)
       this.publishEl.createEl("textarea", {
         text: publishInstructions(),
@@ -96519,9 +95827,9 @@ var ShareModal = class extends import_obsidian46.Modal {
     try {
       const write = (_a2 = this.options.writeClipboard) != null ? _a2 : (text10) => navigator.clipboard.writeText(text10);
       await write(publishInstructions());
-      new import_obsidian46.Notice(t("share.publish_done"));
+      new import_obsidian45.Notice(t("share.publish_done"));
     } catch (e) {
-      new import_obsidian46.Notice(t("share.publish_fail"));
+      new import_obsidian45.Notice(t("share.publish_fail"));
       this.publishFallback = true;
       if (!this.closed) this.render();
     }
@@ -96572,12 +95880,12 @@ var ShareModal = class extends import_obsidian46.Modal {
       else {
         const size = formatBytes(result.bytes);
         this.savedText = t(outcome === "saved" ? "share.saved_0_1" : "share.downloaded_0_1", name2, size);
-        new import_obsidian46.Notice(this.savedText);
+        new import_obsidian45.Notice(this.savedText);
       }
     } catch (e) {
       if (!this.closed) {
         this.savedText = "";
-        new import_obsidian46.Notice(t("share.save_failed"));
+        new import_obsidian45.Notice(t("share.save_failed"));
       }
     }
     this.saving = false;
@@ -96586,13 +95894,13 @@ var ShareModal = class extends import_obsidian46.Modal {
 };
 
 // experiences/sharing/share-translate-dom.ts
-var import_obsidian47 = require("obsidian");
+var import_obsidian46 = require("obsidian");
 function obsidianTranslateDom() {
   return {
     parse: (html) => new DOMParser().parseFromString(html, "text/html").body,
     serialize: (root) => root.innerHTML,
     sanitize: (root) => {
-      const clean3 = (0, import_obsidian47.sanitizeHTMLToDom)(root.innerHTML);
+      const clean3 = (0, import_obsidian46.sanitizeHTMLToDom)(root.innerHTML);
       root.replaceChildren(clean3);
     },
     createSpan: () => createSpan(),
@@ -96960,8 +96268,8 @@ async function runPool(tasks, limit, signal) {
 }
 var flatten = (text10) => text10.replace(/\s*[\r\n]+\s*/g, " ").trim();
 var ShareTranslateService = class {
-  constructor(run2) {
-    this.run = run2;
+  constructor(run) {
+    this.run = run;
   }
   /** Calls and minutes the given languages need right now (cache taken into account). Translates nothing. */
   estimate(source, languages, options) {
@@ -100573,8 +99881,8 @@ function providerReframeRunner(aiCalls) {
   };
 }
 var ReframingService = class {
-  constructor(run2) {
-    this.run = run2;
+  constructor(run) {
+    this.run = run;
   }
   async reframe(request, signal) {
     const checkCancelled = () => {
@@ -100599,8 +99907,8 @@ function providerOutlineRunner(aiCalls) {
   });
 }
 var OutlineGenerationService = class {
-  constructor(run2) {
-    this.run = run2;
+  constructor(run) {
+    this.run = run;
   }
   /**
    * Generate a outline (each heading with a one-line summary) for `request.topic`. Throws {@link OutlineGenerateError} (localized message,
@@ -100678,8 +99986,8 @@ function providerMapChatRunner(aiCalls) {
   });
 }
 var MapChatService = class {
-  constructor(run2) {
-    this.run = run2;
+  constructor(run) {
+    this.run = run;
   }
   /**
    * One chat turn. `onReply` receives the whole reply text decoded so far (not a delta) each time it grows; it starts over
@@ -100851,10 +100159,10 @@ ${artifact.sourceSnapshot || "No insight snapshot was supplied."}`
 }
 
 // experiences/markdown-context/selection-ai.ts
-var import_obsidian49 = require("obsidian");
+var import_obsidian48 = require("obsidian");
 
 // experiences/markdown-context/image-translate-action.ts
-var import_obsidian48 = require("obsidian");
+var import_obsidian47 = require("obsidian");
 
 // experiences/markdown-context/steps/image-translate/prompt.md
 var prompt_default7 = "Edit the attached image: create the same image with every piece of visible text translated into {{target}}.\nKeep the layout, illustrations, colors, arrows, icons and style the same; only replace the text, in a matching size and weight that fits each original text area. Do not add, remove or redraw other content. Leave proper names, numbers and units as they are unless they are normally translated.\nGenerate the image with the image generation tool, then reply with one short sentence describing the result in {{target}}.\n";
@@ -100880,7 +100188,7 @@ var languageIdsPattern = () => [...SUPPORTED_LANGUAGES, ...OUTPUT_LANGUAGE_CHOIC
 function imageFileBase(alt) {
   return (alt || "image").replace(/\.(?:png|jpe?g|gif|webp)$/i, "").replace(new RegExp(`-(?:${languageIdsPattern()})(?:[ -]\\d+)?$`), "").replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 }
-var ImageTranslateAction = class extends import_obsidian48.Component {
+var ImageTranslateAction = class extends import_obsidian47.Component {
   constructor(app, options) {
     super();
     this.app = app;
@@ -100961,7 +100269,7 @@ var ImageTranslateAction = class extends import_obsidian48.Component {
     this.target = { view, path: view.file.path, image, token };
     const rect2 = image.getBoundingClientRect();
     const pill = this.app.workspace.containerEl.createEl("button", { cls: "vam-image-action vam-image-action-pill" });
-    (0, import_obsidian48.setIcon)(pill.createSpan({ cls: "vam-image-action-icon" }), "wand-sparkles");
+    (0, import_obsidian47.setIcon)(pill.createSpan({ cls: "vam-image-action-icon" }), "wand-sparkles");
     pill.createSpan({ text: t("ui.image_translate_action") });
     pill.addEventListener("click", () => this.openPopover());
     this.pill = pill;
@@ -100999,7 +100307,7 @@ var ImageTranslateAction = class extends import_obsidian48.Component {
     header2.createEl("strong", { text: t("ui.image_translate_action"), attr: { id: titleId } });
     const close = header2.createEl("button", { cls: "clickable-icon" });
     close.setAttribute("aria-label", t("ui.close"));
-    (0, import_obsidian48.setIcon)(close, "x");
+    (0, import_obsidian47.setIcon)(close, "x");
     close.addEventListener("click", () => this.hide());
     const field = popover.createEl("label", { cls: "vam-image-action-field" });
     field.createSpan({ text: t("ui.image_translate_language") });
@@ -101056,8 +100364,8 @@ var ImageTranslateAction = class extends import_obsidian48.Component {
       text10 = target.view.editor.getValue();
     } catch (e) {
     }
-    if (noteTextAiLocked(text10, import_obsidian48.parseYaml)) {
-      new import_obsidian48.Notice(t("ui.ai_locked_notice"));
+    if (noteTextAiLocked(text10, import_obsidian47.parseYaml)) {
+      new import_obsidian47.Notice(t("ui.ai_locked_notice"));
       return;
     }
     const controller = new AbortController();
@@ -101088,10 +100396,10 @@ var ImageTranslateAction = class extends import_obsidian48.Component {
       const link = this.app.fileManager.generateMarkdownLink(saved, target.path);
       const embed = link.startsWith("!") ? link : `!${link}`;
       const outcome = await this.write(target, note, embed, placement);
-      new import_obsidian48.Notice(t(outcome, saved.path));
+      new import_obsidian47.Notice(t(outcome, saved.path));
       saved = null;
     } catch (error) {
-      if (!controller.signal.aborted) new import_obsidian48.Notice(error instanceof Error ? error.message : String(error));
+      if (!controller.signal.aborted) new import_obsidian47.Notice(error instanceof Error ? error.message : String(error));
       if (saved) await this.app.fileManager.trashFile(saved);
     } finally {
       if (this.running === controller) {
@@ -101109,7 +100417,7 @@ var ImageTranslateAction = class extends import_obsidian48.Component {
     let outcome = "ui.image_translate_appended";
     const edit = (text10) => {
       var _a2, _b2, _c, _d;
-      if (noteTextAiLocked(text10, import_obsidian48.parseYaml)) throw new Error(t("ui.ai_locked_notice"));
+      if (noteTextAiLocked(text10, import_obsidian47.parseYaml)) throw new Error(t("ui.ai_locked_notice"));
       const copies = target.token ? occurrences2(text10, target.token.text) : [];
       const at = target.token && copies.length === target.token.count ? copies[target.token.occurrence] : copies.length === 1 ? copies[0] : -1;
       const token = (_b2 = (_a2 = target.token) == null ? void 0 : _a2.text) != null ? _b2 : "";
@@ -101143,7 +100451,7 @@ ${embed}
     };
     const open2 = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view) => {
       var _a2;
-      return view instanceof import_obsidian48.MarkdownView && ((_a2 = view.file) == null ? void 0 : _a2.path) === note.path;
+      return view instanceof import_obsidian47.MarkdownView && ((_a2 = view.file) == null ? void 0 : _a2.path) === note.path;
     });
     if (open2) {
       const editor = open2.editor;
@@ -101314,8 +100622,8 @@ function locateImageToken(view, image, markdown, matches2) {
   return rendered.length === matches2.length ? toToken(matches2[rendered.indexOf(image)]) : null;
 }
 var panelSequence2 = 0;
-var mermaidSyntax = mermaidSyntaxCheck(import_obsidian49.loadMermaid);
-var MarkdownSelectionAi = class extends import_obsidian49.Component {
+var mermaidSyntax = mermaidSyntaxCheck(import_obsidian48.loadMermaid);
+var MarkdownSelectionAi = class extends import_obsidian48.Component {
   constructor(app, options) {
     super();
     this.app = app;
@@ -101356,8 +100664,8 @@ var MarkdownSelectionAi = class extends import_obsidian49.Component {
       const image = event.target;
       if (!(image instanceof HTMLImageElement) || !this.options.autoOpen()) return;
       if (image.closest(".vam-context-ai-panel, .vam-image-action")) return;
-      const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((candidate) => candidate instanceof import_obsidian49.MarkdownView && candidate.containerEl.contains(image));
-      if (!(view instanceof import_obsidian49.MarkdownView) || !view.file) return;
+      const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((candidate) => candidate instanceof import_obsidian48.MarkdownView && candidate.containerEl.contains(image));
+      if (!(view instanceof import_obsidian48.MarkdownView) || !view.file) return;
       const markdown = view.editor.getValue();
       const embeddedPath = (_a2 = image.closest(".internal-embed")) == null ? void 0 : _a2.getAttribute("src");
       const tokens2 = [...markdown.matchAll(/!\[\[[^\]\n]+\]\]|!\[[^\]\n]*\]\([^\n]+?\)/g)].filter((match) => {
@@ -101411,9 +100719,9 @@ var MarkdownSelectionAi = class extends import_obsidian49.Component {
     const selection = window.getSelection();
     const range = selection && !selection.isCollapsed && selection.rangeCount ? selection.getRangeAt(0) : null;
     const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find(
-      (candidate) => candidate instanceof import_obsidian49.MarkdownView && candidate.file && (range ? candidate.containerEl.contains(range.commonAncestorContainer) : candidate.getMode() === "source" && candidate.containerEl.contains(document.activeElement))
+      (candidate) => candidate instanceof import_obsidian48.MarkdownView && candidate.file && (range ? candidate.containerEl.contains(range.commonAncestorContainer) : candidate.getMode() === "source" && candidate.containerEl.contains(document.activeElement))
     );
-    if (!(view instanceof import_obsidian49.MarkdownView) || !view.file) {
+    if (!(view instanceof import_obsidian48.MarkdownView) || !view.file) {
       this.hideLauncher();
       return;
     }
@@ -101455,7 +100763,7 @@ var MarkdownSelectionAi = class extends import_obsidian49.Component {
     }
     this.updateLauncher(this.options.autoOpen());
     if (!this.snapshot) {
-      const view = this.app.workspace.getActiveViewOfType(import_obsidian49.MarkdownView);
+      const view = this.app.workspace.getActiveViewOfType(import_obsidian48.MarkdownView);
       if (!(view == null ? void 0 : view.file) || view.getMode() !== "source") return false;
       const markdown = view.editor.getValue();
       const selected = view.editor.getSelection();
@@ -101494,8 +100802,8 @@ var MarkdownSelectionAi = class extends import_obsidian49.Component {
     this.panel.open();
   }
 };
-var SelectionAiPanel = class extends import_obsidian49.Component {
-  constructor(app, snapshot, modelOf, modelLabel, language2, translateTarget, run2, isManagedNote) {
+var SelectionAiPanel = class extends import_obsidian48.Component {
+  constructor(app, snapshot, modelOf, modelLabel, language2, translateTarget, run, isManagedNote) {
     super();
     this.app = app;
     this.snapshot = snapshot;
@@ -101503,7 +100811,7 @@ var SelectionAiPanel = class extends import_obsidian49.Component {
     this.modelLabel = modelLabel;
     this.language = language2;
     this.translateTarget = translateTarget;
-    this.run = run2;
+    this.run = run;
     this.isManagedNote = isManagedNote;
     __publicField(this, "modalEl");
     __publicField(this, "contentEl");
@@ -101551,7 +100859,7 @@ var SelectionAiPanel = class extends import_obsidian49.Component {
     this.titleEl.id = titleId;
     const close = header2.createEl("button", { cls: "clickable-icon vam-context-ai-close" });
     close.setAttribute("aria-label", t("ui.close"));
-    (0, import_obsidian49.setIcon)(close, "x");
+    (0, import_obsidian48.setIcon)(close, "x");
     close.addEventListener("click", () => this.close());
     this.contentEl = this.modalEl.createDiv({ cls: "vam-context-ai-body" });
     this.load();
@@ -101623,13 +100931,13 @@ var SelectionAiPanel = class extends import_obsidian49.Component {
     this.presets.setAttribute("role", "group");
     this.presets.setAttribute("aria-label", t("ui.context_ai_quick_actions"));
     const preset = (id, icon, label, prompt) => {
-      const button2 = this.presets.createEl("button", { cls: "vam-context-ai-preset" });
-      button2.dataset.preset = id;
-      (0, import_obsidian49.setIcon)(button2.createSpan({ cls: "vam-context-ai-preset-icon" }), icon);
-      button2.createSpan({ text: label });
-      button2.addEventListener(
+      const button = this.presets.createEl("button", { cls: "vam-context-ai-preset" });
+      button.dataset.preset = id;
+      (0, import_obsidian48.setIcon)(button.createSpan({ cls: "vam-context-ai-preset-icon" }), icon);
+      button.createSpan({ text: label });
+      button.addEventListener(
         "click",
-        () => void this.generate(prompt(), label, id === "search_images" ? "image_search" : void 0, button2)
+        () => void this.generate(prompt(), label, id === "search_images" ? "image_search" : void 0, button)
       );
     };
     const language2 = getUiLanguage();
@@ -101698,7 +101006,7 @@ var SelectionAiPanel = class extends import_obsidian49.Component {
     const bar = footer.createDiv({ cls: "vam-context-ai-bar" });
     bar.createSpan({
       cls: "vam-context-ai-shortcut",
-      text: t("ui.context_ai_shortcut", import_obsidian49.Platform.isMacOS ? "\u2318" : "Ctrl")
+      text: t("ui.context_ai_shortcut", import_obsidian48.Platform.isMacOS ? "\u2318" : "Ctrl")
     });
     this.stopButton = bar.createEl("button", { text: t("ui.cancel") });
     this.stopButton.addEventListener("click", () => {
@@ -101740,13 +101048,13 @@ var SelectionAiPanel = class extends import_obsidian49.Component {
     const busy = active !== null;
     this.modalEl.toggleClass("is-running", busy);
     this.status.toggleClass("is-running", busy);
-    for (const button2 of Array.from(this.presets.querySelectorAll("button"))) {
-      button2.disabled = busy;
-      button2.toggleClass("is-active", busy && button2 === active);
+    for (const button of Array.from(this.presets.querySelectorAll("button"))) {
+      button.disabled = busy;
+      button.toggleClass("is-active", busy && button === active);
     }
     this.runButton.disabled = busy;
-    this.resultActions.querySelectorAll("button").forEach((button2) => {
-      button2.disabled = busy;
+    this.resultActions.querySelectorAll("button").forEach((button) => {
+      button.disabled = busy;
     });
     this.stopButton.setText(busy ? t("ui.context_ai_stop") : t("ui.cancel"));
     if (!busy) this.showResult(!this.resultActions.hidden);
@@ -101775,7 +101083,7 @@ var SelectionAiPanel = class extends import_obsidian49.Component {
     if (this.controller) return;
     if (this.noteLocked()) {
       this.status.setText(t("ui.ai_locked_notice"));
-      new import_obsidian49.Notice(t("ui.ai_locked_notice"));
+      new import_obsidian48.Notice(t("ui.ai_locked_notice"));
       return;
     }
     const controller = new AbortController();
@@ -101892,9 +101200,9 @@ var SelectionAiPanel = class extends import_obsidian49.Component {
           if (controller.signal.aborted || !this.isOpen) return;
           if (verdict === "invalid") throw new Error(t("ui.context_ai_invalid_diagram"));
           if (verdict === "unavailable") console.warn("Visual Agent Map diagram check skipped");
-          this.previewChild = new import_obsidian49.Component();
+          this.previewChild = new import_obsidian48.Component();
           this.previewChild.load();
-          await import_obsidian49.MarkdownRenderer.render(this.app, result, this.preview, this.snapshot.path, this.previewChild);
+          await import_obsidian48.MarkdownRenderer.render(this.app, result, this.preview, this.snapshot.path, this.previewChild);
         }
       }
       if (controller.signal.aborted || !this.modalEl.isConnected) return;
@@ -101965,13 +101273,13 @@ ${caption.trim()}`;
       current = view.editor.getValue();
     } catch (e) {
     }
-    return noteTextAiLocked(current, import_obsidian49.parseYaml);
+    return noteTextAiLocked(current, import_obsidian48.parseYaml);
   }
   applyResult(result, action, status) {
     var _a2;
     if (this.noteLocked()) {
       status.setText(t("ui.ai_locked_notice"));
-      new import_obsidian49.Notice(t("ui.ai_locked_notice"));
+      new import_obsidian48.Notice(t("ui.ai_locked_notice"));
       return;
     }
     const { view, path, markdown, text: text10, matchAt } = this.snapshot;
@@ -102012,15 +101320,15 @@ ${value}
     }
     this.close();
     const message = action === "replace" ? t("ui.context_ai_replaced") : action === "after" ? t("ui.context_ai_inserted_after") : t("ui.context_ai_appended");
-    if (view.getMode() === "source") new import_obsidian49.Notice(message);
-    else void view.save().then(() => new import_obsidian49.Notice(message));
+    if (view.getMode() === "source") new import_obsidian48.Notice(message);
+    else void view.save().then(() => new import_obsidian48.Notice(message));
   }
 };
 
 // ui/modals/notice-in-window.ts
-var import_obsidian50 = require("obsidian");
+var import_obsidian49 = require("obsidian");
 function noticeInWindowOf(message, anchor, duration) {
-  const notice = new import_obsidian50.Notice(message, duration);
+  const notice = new import_obsidian49.Notice(message, duration);
   const doc = anchor == null ? void 0 : anchor.ownerDocument;
   const el = notice.containerEl;
   if (!(doc == null ? void 0 : doc.body) || !el || el.ownerDocument === doc) return notice;
@@ -102081,7 +101389,7 @@ function normalizeNoteStyleRecipeMarker(value) {
 }
 function obsidianAppLanguage() {
   try {
-    return typeof import_obsidian51.getLanguage === "function" ? (0, import_obsidian51.getLanguage)() : "en";
+    return typeof import_obsidian50.getLanguage === "function" ? (0, import_obsidian50.getLanguage)() : "en";
   } catch (e) {
     return "en";
   }
@@ -102161,7 +101469,7 @@ function noteStylePorts(plugin) {
     }
   };
 }
-var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
+var VisualAgentMapPlugin = class extends import_obsidian50.Plugin {
   constructor() {
     super(...arguments);
     /** Diagnostics for the mermaid zoom viewer (observer count); read by UI checks only. */
@@ -102247,7 +101555,7 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
       runStep: (step, request, signal) => askArgumentStep(step, request, providerArgumentRunner(this.aiCalls), signal),
       // requestUrl has no abort: verifySource races its own 15 s timeout and the runner's fence drops a late result.
       fetch: async (request) => {
-        const response = await (0, import_obsidian51.requestUrl)(request);
+        const response = await (0, import_obsidian50.requestUrl)(request);
         return {
           status: response.status,
           headers: response.headers,
@@ -102283,7 +101591,7 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
         var _a2;
         const note = await this.repo.readNote(path);
         const file = this.app.vault.getAbstractFileByPath(path);
-        if (!(file instanceof import_obsidian51.TFile)) throw new Error("missing");
+        if (!(file instanceof import_obsidian50.TFile)) throw new Error("missing");
         const raw = await this.app.vault.read(file);
         return {
           path,
@@ -102304,9 +101612,9 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
       writePipelineFields: (path, patch) => this.repo.writePipelineFields(path, patch),
       updateNoteGuarded: (path, patch, options) => this.repo.updateNoteGuarded(path, patch, options),
       updateNoteRawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
-      runPlan: (step, request, run2) => runPlanStep(this.aiCalls, step, request, run2),
-      runProofread: (request, run2) => runProofread(this.aiCalls, request, run2),
-      findImages: (request, run2) => runFindImages(this.aiCalls, request, run2),
+      runPlan: (step, request, run) => runPlanStep(this.aiCalls, step, request, run),
+      runProofread: (request, run) => runProofread(this.aiCalls, request, run),
+      findImages: (request, run) => runFindImages(this.aiCalls, request, run),
       author: async (input2) => {
         const view = this.views().find((item) => item.mapPath === input2.mapPath);
         if (view) return view.runBookAuthor(input2);
@@ -102348,7 +101656,7 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
       claudePath: () => this.settings.claudePath,
       clientVersion: () => this.manifest.version || "0.0.0",
       pluginDirectory: () => this.pluginDirectory(),
-      readLocalFile: (path) => import_obsidian51.FileSystemAdapter.readLocalFile(path),
+      readLocalFile: (path) => import_obsidian50.FileSystemAdapter.readLocalFile(path),
       onLog: (level, message) => this.logs.appendLog(level, message),
       checks: {
         refresh: (id) => this.refreshModelDiscovery(id),
@@ -102356,7 +101664,7 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
       }
     }));
     /** Syntax check against the runtime parser of Obsidian's `loadMermaid`; shared by AI task results and map chat note edits. */
-    __publicField(this, "mermaidSyntax", mermaidSyntaxCheck(import_obsidian51.loadMermaid));
+    __publicField(this, "mermaidSyntax", mermaidSyntaxCheck(import_obsidian50.loadMermaid));
     __publicField(this, "aiTaskOptions", {
       pluginDirectory: () => this.pluginDirectory(),
       language: () => this.settings.language,
@@ -102370,7 +101678,7 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
       mermaidSyntax: this.mermaidSyntax,
       mermaidParses: async (code3) => {
         try {
-          const mermaid = await (0, import_obsidian51.loadMermaid)();
+          const mermaid = await (0, import_obsidian50.loadMermaid)();
           await mermaid.parse(code3);
           return true;
         } catch (e) {
@@ -102602,8 +101910,8 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
       this.sharePreparing = false;
     }
     const snapshot = view == null ? void 0 : view.shareSnapshot();
-    if (!snapshot || snapshot === "none") return void new import_obsidian51.Notice(t("share.unavailable_no_map"));
-    if (snapshot === "empty") return void new import_obsidian51.Notice(t("share.unavailable_empty"));
+    if (!snapshot || snapshot === "none") return void new import_obsidian50.Notice(t("share.unavailable_no_map"));
+    if (snapshot === "empty") return void new import_obsidian50.Notice(t("share.unavailable_empty"));
     new ShareModal(this.app, {
       source: snapshot,
       vamVersion: this.manifest.version || "0.0.0",
@@ -102616,7 +101924,7 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
         modelLabel: (model) => this.modelLabel(model),
         defaultModel: () => this.currentModelChoice().model,
         reasoning: () => this.currentModelChoice().reasoning,
-        confirmAiUsage: (model, run2) => this.confirmAiUsage(model, run2)
+        confirmAiUsage: (model, run) => this.confirmAiUsage(model, run)
       }
     }).open();
   }
@@ -102645,9 +101953,9 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
       this.useOutlineSource(leaf.view);
       return;
     }
-    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian51.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
+    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian50.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
     const path = leaf.view.file.path;
-    void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian51.Notice(error instanceof Error ? error.message : String(error)));
+    void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian50.Notice(error instanceof Error ? error.message : String(error)));
   }
   async onload() {
     const saved = await this.loadData();
@@ -102655,7 +101963,7 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
     if (hasLegacyChatModel(saved)) await this.saveSettings();
     setUiLanguage(this.settings.language);
     registerInternalMarkerPresentation(this);
-    for (const kind of TOPIC_KINDS) (0, import_obsidian51.addIcon)(kindIconId(kind), kindIconSvg(kind));
+    for (const kind of TOPIC_KINDS) (0, import_obsidian50.addIcon)(kindIconId(kind), kindIconSvg(kind));
     this.mermaidZoom = registerMermaidZoom(this);
     const markdownSelectionAi = this.markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.currentModelChoice().model,
@@ -102690,15 +101998,15 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
       var _a2;
       const view = (_a2 = this.app.workspace.getActiveViewOfType(VisualAgentMapView)) != null ? _a2 : this.views()[0];
       if (view) void view.startBookPipelineFromUi();
-      else new import_obsidian51.Notice(t("ui.book_no_map"));
+      else new import_obsidian50.Notice(t("ui.book_no_map"));
     });
     this.addLocalizedCommand("preview-full-prompt", "ui.command_preview_prompt", () => this.openPromptPreview());
     this.logs.appendLog("info", t("log.plugin_loaded_0", this.manifest.version || "unknown"));
-    if (this.app.vault.adapter instanceof import_obsidian51.FileSystemAdapter && this.manifest.dir) {
+    if (this.app.vault.adapter instanceof import_obsidian50.FileSystemAdapter && this.manifest.dir) {
       const adapter = this.app.vault.adapter;
       this.exchanges = new AiExchangeLog(
         adapter,
-        (0, import_obsidian51.normalizePath)(`${this.manifest.dir}/ai-exchanges.json`),
+        (0, import_obsidian50.normalizePath)(`${this.manifest.dir}/ai-exchanges.json`),
         (error) => this.logs.appendLog(
           "error",
           t("log.exchange_log_save_failed_0", error instanceof Error ? error.message : String(error))
@@ -102707,13 +102015,13 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
       await this.exchanges.load();
       this.usage = new AiUsageStore(
         adapter,
-        (0, import_obsidian51.normalizePath)(`${this.manifest.dir}/ai-usage.json`),
+        (0, import_obsidian50.normalizePath)(`${this.manifest.dir}/ai-usage.json`),
         (error) => this.logs.appendLog("error", `ai-usage.json: ${error instanceof Error ? error.message : String(error)}`)
       );
       await this.usage.load();
       this.pendingSuggestions = new PendingSuggestions(
         adapter,
-        (0, import_obsidian51.normalizePath)(`${this.manifest.dir}/pending-suggestions.json`),
+        (0, import_obsidian50.normalizePath)(`${this.manifest.dir}/pending-suggestions.json`),
         (error) => this.logs.appendLog(
           "error",
           t("log.pending_suggestions_save_failed_0", error instanceof Error ? error.message : String(error))
@@ -102735,12 +102043,12 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
             this.settings.structureVersion = 2;
             await this.saveSettings();
           } else this.logs.appendLog("warn", `${t("ui.subtopic_filename_sync_failed_will_retry")} ${failed}`);
-          if (renamed) new import_obsidian51.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", renamed));
-          if (failed) new import_obsidian51.Notice(t("ui.subtopic_filename_sync_failed_will_retry"));
+          if (renamed) new import_obsidian50.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", renamed));
+          if (failed) new import_obsidian50.Notice(t("ui.subtopic_filename_sync_failed_will_retry"));
         } catch (error) {
           const detail = error instanceof Error ? error.message : String(error);
           this.logs.appendLog("warn", `${t("ui.subtopic_filename_sync_failed_will_retry")} ${detail}`);
-          new import_obsidian51.Notice(t("ui.subtopic_filename_sync_failed_will_retry"));
+          new import_obsidian50.Notice(t("ui.subtopic_filename_sync_failed_will_retry"));
         }
       }
     });
@@ -102762,7 +102070,7 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
     this.registerView(COFFEE_TABLES_VIEW_TYPE, (leaf) => new CoffeeTablesView(leaf, this));
     this.buildCoffee();
     const openCoffee = () => {
-      void this.activateCoffeeTables().catch((error) => new import_obsidian51.Notice(String(error)));
+      void this.activateCoffeeTables().catch((error) => new import_obsidian50.Notice(String(error)));
     };
     const coffeeRibbonIcon = this.addRibbonIcon("coffee", t("ui.open_coffee_tables"), openCoffee);
     this.coffeeRibbonIcon = coffeeRibbonIcon;
@@ -102779,12 +102087,12 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
           }
           await this.openDetails(this.repo.file(path));
         } catch (error) {
-          new import_obsidian51.Notice(error instanceof Error ? error.message : String(error));
+          new import_obsidian50.Notice(error instanceof Error ? error.message : String(error));
         }
       })
     );
     this.ribbonIcon = this.addRibbonIcon("brain-circuit", t("ui.open_map"), () => {
-      void this.activateView().catch((error) => new import_obsidian51.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian50.Notice(String(error)));
     });
     const mapRibbonIcon = this.ribbonIcon;
     this.app.workspace.onLayoutReady(() => this.register(groupRibbonIcons(mapRibbonIcon, coffeeRibbonIcon)));
@@ -102802,19 +102110,19 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
       key: "ui.map_chat_toggle_command"
     });
     this.addLocalizedCommand("open-map", "ui.command_open_map", () => {
-      void this.activateView().catch((error) => new import_obsidian51.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian50.Notice(String(error)));
     });
     this.addLocalizedCommand("import-outline", "ui.command_import_outline", () => {
       void this.activateView().then(() => {
         var _a2;
         return (_a2 = this.views()[0]) == null ? void 0 : _a2.openOutlineImport();
-      }).catch((error) => new import_obsidian51.Notice(String(error)));
+      }).catch((error) => new import_obsidian50.Notice(String(error)));
     });
     this.addLocalizedCommand("import-outline-exchange", "ui.command_import_exchange", () => {
       void this.activateView().then(() => {
         const view = this.views()[0];
         if (view) chooseAndImportExchange(view);
-      }).catch((error) => new import_obsidian51.Notice(String(error)));
+      }).catch((error) => new import_obsidian50.Notice(String(error)));
     });
     this.localizedCommands.push({
       command: this.addCommand({
@@ -102869,7 +102177,7 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
       });
     this.addLocalizedCommand("share-map", "ui.command_share_map", () => void this.openShare());
     this.addLocalizedCommand("open-topic-outline", "ui.command_open_topic_outline", () => {
-      void this.activateOutline().catch((error) => new import_obsidian51.Notice(String(error)));
+      void this.activateOutline().catch((error) => new import_obsidian50.Notice(String(error)));
     });
     this.addLocalizedCommand("rebuild-references", "ui.command_refresh_data", () => {
       this.runMutation(() => this.fullRebuild());
@@ -102877,7 +102185,7 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
     this.addLocalizedCommand("normalize-note-filenames", "ui.command_sync_filenames", () => {
       this.runMutation(async () => {
         const { renamed, failed } = await this.repo.normalizeGeneratedNoteFilenames();
-        new import_obsidian51.Notice(
+        new import_obsidian50.Notice(
           failed ? t("ui.synced_0_topic_filenames_failed_1", renamed, failed) : renamed ? t("ui.synced_0_topic_filenames", renamed) : t("ui.topic_filenames_are_up_to_date")
         );
       });
@@ -102885,17 +102193,17 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
     this.addLocalizedCommand("repair-note-presentation", "ui.command_repair_note_display", () => {
       this.runMutation(async () => {
         await this.repo.ensureNodePresentation();
-        new import_obsidian51.Notice(t("ui.topic_note_display_repaired"));
+        new import_obsidian50.Notice(t("ui.topic_note_display_repaired"));
       });
     });
     this.addLocalizedCommand("fix-math-formulas", "ui.command_fix_math", () => {
       void this.offerFixMathFormulas().catch(
-        (error) => new import_obsidian51.Notice(error instanceof Error ? error.message : String(error))
+        (error) => new import_obsidian50.Notice(error instanceof Error ? error.message : String(error))
       );
     });
     this.addLocalizedCommand("organize-workspace-folders", "ui.command_organize_folders", () => {
       void this.offerOrganizeWorkspaceFolders().catch(
-        (error) => new import_obsidian51.Notice(error instanceof Error ? error.message : String(error))
+        (error) => new import_obsidian50.Notice(error instanceof Error ? error.message : String(error))
       );
     });
     this.addLocalizedCommand("repair-workspace", "ui.command_repair_workspace", () => {
@@ -102928,7 +102236,7 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
     this.registerNoteStyleEntrypoints();
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
-        if (file instanceof import_obsidian51.TFile && this.isMap(file))
+        if (file instanceof import_obsidian50.TFile && this.isMap(file))
           menu.addItem(
             (item) => item.setTitle(t("ui.open_as_mind_map")).setIcon("brain-circuit").onClick(() => {
               void this.activateView(file.path);
@@ -103030,14 +102338,14 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
         this.logs.appendLog("warn", `Note style maps record was not saved: ${result.error}`);
       } else if (result.status === "failed") {
         this.logs.appendLog("warn", `Note style conversion failed: ${(_a2 = result.error) != null ? _a2 : "unknown error"}`);
-        new import_obsidian51.Notice(t("ui.note_style_migrate_failed"));
+        new import_obsidian50.Notice(t("ui.note_style_migrate_failed"));
       } else if (result.notify) {
         const maps = result.notify.maps.join(t("ui.list_separator"));
         const text10 = [
           t("ui.note_style_maps_notice_0", maps),
           result.notify.defaultName ? t("ui.note_style_maps_notice_default_0", result.notify.defaultName) : ""
         ].filter(Boolean).join(" ");
-        new import_obsidian51.Notice(text10, 0);
+        new import_obsidian50.Notice(text10, 0);
       }
     } catch (error) {
       this.logs.appendLog(
@@ -103049,20 +102357,20 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
   registerVaultEvents() {
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
-        if (file instanceof import_obsidian51.TFile) this.collectUnsynced(file.path);
-        if (!this.writing && file instanceof import_obsidian51.TFile) for (const view of this.views()) view.changed(file);
+        if (file instanceof import_obsidian50.TFile) this.collectUnsynced(file.path);
+        if (!this.writing && file instanceof import_obsidian50.TFile) for (const view of this.views()) view.changed(file);
       })
     );
     this.registerEvent(
       this.app.vault.on("create", (file) => {
-        if (file instanceof import_obsidian51.TFile) this.collectUnsynced(file.path);
+        if (file instanceof import_obsidian50.TFile) this.collectUnsynced(file.path);
       })
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
-        if (file instanceof import_obsidian51.TFile) this.collectUnsynced(file.path);
-        if (file instanceof import_obsidian51.TFile) this.scheduleExternalReconciliation(file.path);
-        if (!this.writing && file instanceof import_obsidian51.TFile) {
+        if (file instanceof import_obsidian50.TFile) this.collectUnsynced(file.path);
+        if (file instanceof import_obsidian50.TFile) this.scheduleExternalReconciliation(file.path);
+        if (!this.writing && file instanceof import_obsidian50.TFile) {
           for (const view of this.views()) view.deleted(file);
           if (file.path.startsWith(`${this.settings.mapsFolder}/`) || isManagedMapPath(this.settings, file.path) && file.name === "Map.md")
             this.runMutation(() => this.repo.rebuildDerivedData());
@@ -103071,8 +102379,8 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
     );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        if (file instanceof import_obsidian51.TFile) this.collectUnsynced(oldPath, file.path);
-        if (!(file instanceof import_obsidian51.TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
+        if (file instanceof import_obsidian50.TFile) this.collectUnsynced(oldPath, file.path);
+        if (!(file instanceof import_obsidian50.TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
         if (file.path === oldPath) return;
         const external = !this.writing;
         if (external) for (const view of this.views()) view.relocate(/* @__PURE__ */ new Map([[oldPath, file.path]]));
@@ -103171,7 +102479,7 @@ ${error}`;
       this.unreadableReported.set(key4, now);
       const message = t("ui.map_unreadable_skipped_0_1", path, error);
       this.logs.appendLog("warn", message);
-      new import_obsidian51.Notice(message);
+      new import_obsidian50.Notice(message);
     }
   }
   /**
@@ -103184,7 +102492,7 @@ ${error}`;
       report: (done, total2, title) => {
         const message = t("ui.organize_progress_0_1_2", done, total2, title);
         if (notice) notice.setMessage(message);
-        else notice = new import_obsidian51.Notice(message, 0);
+        else notice = new import_obsidian50.Notice(message, 0);
       },
       done: () => notice == null ? void 0 : notice.hide()
     };
@@ -103214,7 +102522,7 @@ ${error}`;
         cleaned = await this.repo.removeEmptyLegacyFolders();
       });
       const base = plan.skipped.length ? t("ui.organize_only_skipped_0", plan.skipped.length) : t("ui.organize_nothing_to_do");
-      new import_obsidian51.Notice(cleaned.length ? `${base} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : base);
+      new import_obsidian50.Notice(cleaned.length ? `${base} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : base);
       return;
     }
     const mind = plan.moves.filter((move) => move.kind === "mind").length;
@@ -103241,7 +102549,7 @@ ${t("ui.organize_link_wait_hint")}`;
           for (const view of this.views()) view.relocate(mapping);
           this.app.workspace.requestSaveLayout();
           const cleaned = await this.repo.removeEmptyLegacyFolders();
-          new import_obsidian51.Notice(
+          new import_obsidian50.Notice(
             cleaned.length ? `${t("ui.organize_done_0", mapping.size)} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : t("ui.organize_done_0", mapping.size)
           );
         })
@@ -103254,7 +102562,7 @@ ${t("ui.organize_link_wait_hint")}`;
     const files = (await this.repo.markedFiles("agent-map-node")).filter((file) => file.path.startsWith(prefix));
     const plan = await planMathRepair(this.app.vault, files);
     if (!plan.items.length) {
-      new import_obsidian51.Notice(t("ui.fix_math_none"));
+      new import_obsidian50.Notice(t("ui.fix_math_none"));
       return;
     }
     new ChoiceModal(
@@ -103265,10 +102573,10 @@ ${t("ui.organize_link_wait_hint")}`;
         {
           label: t("ui.fix_math_start"),
           action: () => void applyMathRepair(this.app.vault, plan).then(
-            (result) => new import_obsidian51.Notice(
+            (result) => new import_obsidian50.Notice(
               result.skipped ? t("ui.fix_math_done_0_1", result.changed, result.skipped) : t("ui.fix_math_done_0", result.changed)
             )
-          ).catch((error) => new import_obsidian51.Notice(error instanceof Error ? error.message : String(error)))
+          ).catch((error) => new import_obsidian50.Notice(error instanceof Error ? error.message : String(error)))
         }
       ]
     ).open();
@@ -103466,19 +102774,19 @@ ${t("ui.organize_link_wait_hint")}`;
     const diagnostic = this.codexDiagnostic();
     if (!diagnostic.installed) {
       if (showGuide) this.openCodexSetupGuide();
-      else new import_obsidian51.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
+      else new import_obsidian50.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
       return;
     }
     const state = await this.refreshModelDiscovery("codex");
-    if (state.status === "ready") new import_obsidian51.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
+    if (state.status === "ready") new import_obsidian50.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
     else if (state.status === "error")
-      new import_obsidian51.Notice(
+      new import_obsidian50.Notice(
         t(
           "ui.codex_app_server_check_failed_0",
           this.recordFailure(t("log.codex_recheck_failed"), (_a2 = state.error) != null ? _a2 : "unknown error")
         )
       );
-    else new import_obsidian51.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
+    else new import_obsidian50.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
   }
   isMap(file) {
     var _a2, _b2;
@@ -103491,7 +102799,7 @@ ${t("ui.organize_link_wait_hint")}`;
     return marker3 === true || marker3 === "true" || file.extension === "md" && (file.path.startsWith(`${this.settings.notesFolder}/`) || isManagedMapPath(this.settings, file.path));
   }
   styleNodeLeaf(leaf) {
-    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian51.MarkdownView)) return;
+    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian50.MarkdownView)) return;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   /** Picture-book pipeline entries (the screen and the commands call these; refusals are thrown as BookPipelineRunError). */
@@ -103526,9 +102834,6 @@ ${t("ui.organize_link_wait_hint")}`;
   confirmBookGate1(mapPath) {
     return this.bookPipelineRuns.confirmGate1(mapPath);
   }
-  retryBookTrial(mapPath) {
-    return this.bookPipelineRuns.retryTrial(mapPath);
-  }
   rerunBookCard(mapPath, nodeId, options = {}) {
     return this.bookPipelineRuns.rerunCard(mapPath, nodeId, options);
   }
@@ -103562,44 +102867,44 @@ ${t("ui.organize_link_wait_hint")}`;
   /** The vault operations of the note style store (Vault and FileManager APIs only). */
   noteStylePort() {
     const folderAt = (path) => {
-      const found = this.app.vault.getAbstractFileByPath((0, import_obsidian51.normalizePath)(path));
-      return found instanceof import_obsidian51.TFolder ? found : null;
+      const found = this.app.vault.getAbstractFileByPath((0, import_obsidian50.normalizePath)(path));
+      return found instanceof import_obsidian50.TFolder ? found : null;
     };
     return {
       list: async (folder) => {
         var _a2, _b2;
-        return ((_b2 = (_a2 = folderAt(folder)) == null ? void 0 : _a2.children) != null ? _b2 : []).filter((child) => child instanceof import_obsidian51.TFile && child.extension === "md").map((child) => child.name);
+        return ((_b2 = (_a2 = folderAt(folder)) == null ? void 0 : _a2.children) != null ? _b2 : []).filter((child) => child instanceof import_obsidian50.TFile && child.extension === "md").map((child) => child.name);
       },
       read: (path) => {
-        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian51.normalizePath)(path));
-        if (!(file instanceof import_obsidian51.TFile)) return Promise.reject(new Error(path));
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian50.normalizePath)(path));
+        if (!(file instanceof import_obsidian50.TFile)) return Promise.reject(new Error(path));
         return this.app.vault.read(file);
       },
       folderExists: (path) => folderAt(path) !== null,
       createFolder: async (path) => {
         let current = "";
-        for (const part of (0, import_obsidian51.normalizePath)(path).split("/")) {
+        for (const part of (0, import_obsidian50.normalizePath)(path).split("/")) {
           current = current ? `${current}/${part}` : part;
           if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
         }
       },
       create: async (path, content) => {
-        await this.app.vault.create((0, import_obsidian51.normalizePath)(path), content);
+        await this.app.vault.create((0, import_obsidian50.normalizePath)(path), content);
       },
       modify: async (path, content) => {
-        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian51.normalizePath)(path));
-        if (!(file instanceof import_obsidian51.TFile)) throw new Error(path);
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian50.normalizePath)(path));
+        if (!(file instanceof import_obsidian50.TFile)) throw new Error(path);
         await this.app.vault.modify(file, content);
       },
       trash: async (path) => {
-        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian51.normalizePath)(path));
-        if (file instanceof import_obsidian51.TFile) await this.app.fileManager.trashFile(file);
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian50.normalizePath)(path));
+        if (file instanceof import_obsidian50.TFile) await this.app.fileManager.trashFile(file);
       },
       // FileManager.renameFile (not Vault.rename): it also updates links to the file; it rejects when the target exists.
       rename: async (from, to) => {
-        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian51.normalizePath)(from));
-        if (!(file instanceof import_obsidian51.TFile)) throw new Error(from);
-        await this.app.fileManager.renameFile(file, (0, import_obsidian51.normalizePath)(to));
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian50.normalizePath)(from));
+        if (!(file instanceof import_obsidian50.TFile)) throw new Error(from);
+        await this.app.fileManager.renameFile(file, (0, import_obsidian50.normalizePath)(to));
       }
     };
   }
@@ -103607,8 +102912,8 @@ ${t("ui.organize_link_wait_hint")}`;
   registerNoteStyleEntrypoints() {
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        if (file instanceof import_obsidian51.TFolder)
-          void this.noteStyles.followFolderRename((0, import_obsidian51.normalizePath)(oldPath), file.path).catch(() => void 0);
+        if (file instanceof import_obsidian50.TFolder)
+          void this.noteStyles.followFolderRename((0, import_obsidian50.normalizePath)(oldPath), file.path).catch(() => void 0);
       })
     );
     this.addLocalizedCommand("open-note-styles-folder", "ui.command_open_note_styles_folder", () => {
@@ -103620,8 +102925,8 @@ ${t("ui.organize_link_wait_hint")}`;
     var _a2, _b2, _c, _d, _e;
     try {
       const folder = await this.noteStyles.ensureBlockFolder();
-      new import_obsidian51.Notice(t("ui.note_style_folder_opened_0", folder));
-      const target = this.app.vault.getAbstractFileByPath((0, import_obsidian51.normalizePath)(folder));
+      new import_obsidian50.Notice(t("ui.note_style_folder_opened_0", folder));
+      const target = this.app.vault.getAbstractFileByPath((0, import_obsidian50.normalizePath)(folder));
       if (target) {
         const explorer = (_d = (_c = (_b2 = (_a2 = this.app.workspace).getLeavesOfType) == null ? void 0 : _b2.call(_a2, "file-explorer")) == null ? void 0 : _c[0]) == null ? void 0 : _d.view;
         (_e = explorer == null ? void 0 : explorer.revealInFolder) == null ? void 0 : _e.call(explorer, target);
@@ -103632,7 +102937,7 @@ ${t("ui.organize_link_wait_hint")}`;
         "warn",
         `${t("ui.note_style_folder_open_failed")} ${error instanceof Error ? error.message : String(error)}`
       );
-      new import_obsidian51.Notice(t("ui.note_style_folder_open_failed"));
+      new import_obsidian50.Notice(t("ui.note_style_folder_open_failed"));
       return null;
     }
   }
@@ -103644,15 +102949,15 @@ ${t("ui.organize_link_wait_hint")}`;
   async editNotePart(category, ref) {
     try {
       const { ref: target, created } = await this.noteStyles.copyPartOnce(category, ref);
-      if (created) new import_obsidian51.Notice(t("ui.part_notice_saved_as_0", target.slice("file:".length)));
+      if (created) new import_obsidian50.Notice(t("ui.part_notice_saved_as_0", target.slice("file:".length)));
       await this.noteStyles.refresh();
       const path = this.noteStyles.partFilePath(category, target);
-      const file = path ? this.app.vault.getAbstractFileByPath((0, import_obsidian51.normalizePath)(path)) : null;
-      if (!(file instanceof import_obsidian51.TFile)) throw new Error("not a file");
+      const file = path ? this.app.vault.getAbstractFileByPath((0, import_obsidian50.normalizePath)(path)) : null;
+      if (!(file instanceof import_obsidian50.TFile)) throw new Error("not a file");
       await this.app.workspace.getLeaf("tab").openFile(file);
       return target;
     } catch (e) {
-      new import_obsidian51.Notice(t("ui.block_notice_open_failed"));
+      new import_obsidian50.Notice(t("ui.block_notice_open_failed"));
       return null;
     }
   }
@@ -103679,13 +102984,13 @@ ${t("ui.organize_link_wait_hint")}`;
   async renameNoteStyle(category, ref, name2) {
     const result = await renameStyleReferences(noteStylePorts(this), category, ref, name2);
     if (!result.ok) {
-      new import_obsidian51.Notice(t("ui.manage_rename_refused"));
+      new import_obsidian50.Notice(t("ui.manage_rename_refused"));
       return result;
     }
     if (result.unchanged) return result;
     const failed = [...result.settingsFailed ? [t("ui.manage_rename_settings")] : [], ...result.failed];
-    new import_obsidian51.Notice(t("ui.manage_rename_done_0_1_2", name2, result.topics, result.styles));
-    if (failed.length) new import_obsidian51.Notice(t("ui.manage_rename_failed_0", failed.join(t("ui.list_separator"))));
+    new import_obsidian50.Notice(t("ui.manage_rename_done_0_1_2", name2, result.topics, result.styles));
+    if (failed.length) new import_obsidian50.Notice(t("ui.manage_rename_failed_0", failed.join(t("ui.list_separator"))));
     return { ok: true, ref: result.ref, topics: result.topics, styles: result.styles, failed };
   }
   /** Removes the entries of `noteStyleByKind` that name `ref` (those topic types go back to their built-in style); one save. Returns the kinds. */
@@ -103700,7 +103005,7 @@ ${t("ui.organize_link_wait_hint")}`;
    */
   async deleteNoteStyle(category, ref) {
     const deleted = await deleteStyleReferences(noteStylePorts(this), category, ref);
-    if (!deleted) new import_obsidian51.Notice(t("ui.manage_delete_failed"));
+    if (!deleted) new import_obsidian50.Notice(t("ui.manage_delete_failed"));
     return deleted;
   }
   /** Sets the style a kind uses. Choosing the kind's own built-in style removes the entry (a kind with no entry uses it). */
@@ -103717,9 +103022,9 @@ ${t("ui.organize_link_wait_hint")}`;
   /** Saves a custom style from the editor and says what happened in a Notice; the result goes back to the editor. */
   async saveNoteRecipe(input2) {
     const result = await this.noteStyles.saveRecipe(input2);
-    if (result.ok) new import_obsidian51.Notice(t("ui.recipe_notice_saved_0", result.ref.slice("file:".length)));
+    if (result.ok) new import_obsidian50.Notice(t("ui.recipe_notice_saved_0", result.ref.slice("file:".length)));
     else
-      new import_obsidian51.Notice(
+      new import_obsidian50.Notice(
         t(
           result.reason === "name" ? "ui.recipe_notice_name_unavailable" : result.reason === "changed" ? "ui.recipe_notice_changed" : "ui.recipe_notice_failed"
         )
@@ -103769,7 +103074,7 @@ ${t("ui.organize_link_wait_hint")}`;
         await this.saveData(nextSettings);
       } catch (error) {
         this.recordFailure(translate(previous, "ui.language_change_save_failed"), error);
-        new import_obsidian51.Notice(translate(previous, "ui.language_change_save_failed"));
+        new import_obsidian50.Notice(translate(previous, "ui.language_change_save_failed"));
         return false;
       }
       Object.assign(this.settings, nextSettings);
@@ -103796,7 +103101,7 @@ ${t("ui.organize_link_wait_hint")}`;
         failures.push(error);
       }
       for (const error of failures) this.recordFailure(t("ui.language_view_refresh_failed"), error);
-      new import_obsidian51.Notice(
+      new import_obsidian50.Notice(
         failures.length ? t("ui.language_change_partial_failure") : t("ui.language_changed_content_preserved")
       );
       return true;
@@ -103861,14 +103166,14 @@ ${t("ui.organize_link_wait_hint")}`;
     const diagnostic = this.claudeDiagnostic();
     const state = await this.refreshModelDiscovery("claude");
     if (!diagnostic.installed) {
-      new import_obsidian51.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
+      new import_obsidian50.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
       return;
     }
-    new import_obsidian51.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
+    new import_obsidian50.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
     if (state.status !== "ready") this.logs.appendLog("warn", `Claude model discovery status: ${state.status}`);
   }
   /** `noticeOpening` is called just before the usage notice opens (only when it really does), so a caller can say it waits for it. */
-  async confirmAiUsage(model, run2, hooks) {
+  async confirmAiUsage(model, run, hooks) {
     var _a2;
     if (!await this.aiReadyForModel(model)) return false;
     if (!this.usageNoticeSeen(model)) {
@@ -103878,11 +103183,11 @@ ${t("ui.organize_link_wait_hint")}`;
       if (!confirmed) return false;
       await this.setUsageNoticeSeen(model);
     }
-    await run2();
+    await run();
     return true;
   }
-  async confirmCodexUsage(run2) {
-    await this.confirmAiUsage(this.settings.cliModel, run2);
+  async confirmCodexUsage(run) {
+    await this.confirmAiUsage(this.settings.cliModel, run);
   }
   /** Rebuilds derived note data; `paths` limits the rewrite to those notes (the ends of a changed relation). */
   async rebuildDerivedData(paths) {
@@ -103890,7 +103195,7 @@ ${t("ui.organize_link_wait_hint")}`;
       await this.repo.rebuildDerivedData(paths ? { roots: [], paths } : void 0);
     } catch (error) {
       console.error("Visual Agent Map reference rebuild", error);
-      new import_obsidian51.Notice(
+      new import_obsidian50.Notice(
         t("ui.map_saved_but_reference_update_failed_0", error instanceof Error ? error.message : String(error))
       );
     }
@@ -103916,7 +103221,7 @@ ${t("ui.organize_link_wait_hint")}`;
     return this.app.workspace.getLeavesOfType("markdown").some(
       (leaf) => {
         var _a2, _b2;
-        return leaf.getRoot() === split && leaf.view instanceof import_obsidian51.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true && leaf.view.containerEl.isShown();
+        return leaf.getRoot() === split && leaf.view instanceof import_obsidian50.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true && leaf.view.containerEl.isShown();
       }
     );
   }
@@ -103929,7 +103234,7 @@ ${t("ui.organize_link_wait_hint")}`;
       this.detailsLeaf = (_b2 = (_a2 = markdownLeaves.filter(
         (leaf) => {
           var _a3, _b3;
-          return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian51.MarkdownView && !!leaf.view.file && ((_b3 = (_a3 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a3.frontmatter) == null ? void 0 : _b3["agent-map-node"]) === true;
+          return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian50.MarkdownView && !!leaf.view.file && ((_b3 = (_a3 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a3.frontmatter) == null ? void 0 : _b3["agent-map-node"]) === true;
         }
       ).sort(
         (a, b) => a.view.containerEl.getBoundingClientRect().top - b.view.containerEl.getBoundingClientRect().top
@@ -103951,11 +103256,11 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   closeStaleDetails() {
     var _a2, _b2, _c, _d;
-    const closed = ((_a2 = this.detailsLeaf) == null ? void 0 : _a2.view) instanceof import_obsidian51.MarkdownView && ((_b2 = this.detailsLeaf.view.file) == null ? void 0 : _b2.path) === this.detailsPath;
+    const closed = ((_a2 = this.detailsLeaf) == null ? void 0 : _a2.view) instanceof import_obsidian50.MarkdownView && ((_b2 = this.detailsLeaf.view.file) == null ? void 0 : _b2.path) === this.detailsPath;
     if (closed) {
       this.detailsLeaf.detach();
       this.app.workspace.trigger("file-open", null);
-      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian51.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
+      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian50.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
     }
     this.detailsLeaf = null;
     this.detailsPath = null;
@@ -103971,7 +103276,7 @@ ${t("ui.organize_link_wait_hint")}`;
     if (leaf.view instanceof CoffeeTablesView) this.syncCoffeeOutline(leaf.view);
   }
   async runCoffeeRequest(request) {
-    if (!(this.app.vault.adapter instanceof import_obsidian51.FileSystemAdapter) || !this.manifest.dir)
+    if (!(this.app.vault.adapter instanceof import_obsidian50.FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Coffee Tables requires the desktop runtime");
     const { session, signal, prompt } = request;
     const effort = effectiveReasoningLevel(
@@ -104024,16 +103329,16 @@ ${t("ui.organize_link_wait_hint")}`;
     }
     let bytes;
     const embeddedPath = (_b2 = (_a2 = image.closest(".internal-embed")) == null ? void 0 : _a2.getAttribute("src")) == null ? void 0 : _b2.split("#")[0];
-    const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view2) => view2 instanceof import_obsidian51.MarkdownView && view2.containerEl.contains(image));
+    const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view2) => view2 instanceof import_obsidian50.MarkdownView && view2.containerEl.contains(image));
     const file = embeddedPath ? this.app.metadataCache.getFirstLinkpathDest(
       embeddedPath,
-      view instanceof import_obsidian51.MarkdownView ? (_d = (_c = view.file) == null ? void 0 : _c.path) != null ? _d : "" : ""
+      view instanceof import_obsidian50.MarkdownView ? (_d = (_c = view.file) == null ? void 0 : _c.path) != null ? _d : "" : ""
     ) : null;
     const remote = image.currentSrc || image.src;
-    if (file instanceof import_obsidian51.TFile) bytes = await this.app.vault.readBinary(file);
+    if (file instanceof import_obsidian50.TFile) bytes = await this.app.vault.readBinary(file);
     else if (/^https?:\/\//i.test(remote)) {
       try {
-        bytes = (await (0, import_obsidian51.requestUrl)({ url: remote, method: "GET", throw: true })).arrayBuffer;
+        bytes = (await (0, import_obsidian50.requestUrl)({ url: remote, method: "GET", throw: true })).arrayBuffer;
       } catch (e) {
         throw new Error(t("ui.context_ai_image_download_failed"));
       }
@@ -104113,7 +103418,7 @@ ${t("ui.organize_link_wait_hint")}`;
       if (!this.coffeeStorage) throw new Error("Coffee storage is not ready");
       await openCoffeeResearchHandoff(this, this.coffeeStorage, session, sourcePath, insightId);
     } catch (error) {
-      new import_obsidian51.Notice(error instanceof Error ? error.message : String(error));
+      new import_obsidian50.Notice(error instanceof Error ? error.message : String(error));
     }
   }
   async openResearchMap(path) {
@@ -104190,7 +103495,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   async loadCodexModels() {
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian51.FileSystemAdapter) || !this.manifest.dir)
+    if (!(adapter instanceof import_obsidian50.FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Codex model discovery requires desktop Obsidian");
     const pluginDirectory = (0, import_node_path3.join)(adapter.getBasePath(), this.manifest.dir);
     const models = await this.runtime(pluginDirectory).listModels();
@@ -104258,7 +103563,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   pluginDirectory() {
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian51.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
+    if (!(adapter instanceof import_obsidian50.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
     if (!this.manifest.dir) throw new Error(t("ui.plugin_folder_not_found"));
     return (0, import_node_path3.join)(adapter.getBasePath(), this.manifest.dir);
   }

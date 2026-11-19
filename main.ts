@@ -1764,9 +1764,6 @@ export default class VisualAgentMapPlugin extends Plugin {
   confirmBookGate1(mapPath: string): Promise<void> {
     return this.bookPipelineRuns.confirmGate1(mapPath);
   }
-  retryBookTrial(mapPath: string): Promise<void> {
-    return this.bookPipelineRuns.retryTrial(mapPath);
-  }
   rerunBookCard(
     mapPath: string,
     nodeId: string,

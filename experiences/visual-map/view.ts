@@ -333,6 +333,7 @@ import { BookPipelineRunError, type AuthorInput, type AuthorOutcome } from "./bo
 import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
 import {
   BOOK_SETTING_FIELDS,
+  effectiveOrder,
   type BookSettings,
   readBookPipeline,
   readPipelineStage,
@@ -9809,7 +9810,7 @@ export class VisualAgentMapView extends ItemView {
     const read = readBookPipeline(this.map);
     if (read.kind !== "usable") return undefined;
     // A card the owner added later is not in the book's order; the rerun would only fail with "missing".
-    if (!read.data.order.includes(node.id)) return undefined;
+    if (!effectiveOrder(read.data).includes(node.id)) return undefined;
     const progress = this.plugin.getBookPipelineProgress(path);
     const phase = progress?.phase ?? read.data.phase;
     // The card button is only for gate 2: once the owner accepted the book it goes away (the right-click item stays).
@@ -17190,6 +17191,12 @@ export class VisualAgentMapView extends ItemView {
     const state = bookBarState(read.data, this.plugin.getBookPipelineProgress(path), id =>
       readPipelineStage(this.notes.get(id)?.pipelineStage)
     );
+    // The map-changed choice takes the keyboard once when it appears (the same way the inline asks do).
+    if (state.mode !== "changed") this.bookMapFocusedRun = null;
+    else if (this.bookMapFocusedRun !== read.data.runId) {
+      this.bookMapFocusedRun = read.data.runId;
+      this.bookBarFocus = "map-go";
+    }
     // A question left over from another phase (the chat's "continue" moved the run on) is dropped.
     if (state.mode !== "gate1") this.bookGate1Ask = null;
     if (state.mode !== "gate2") this.bookFinishAsking = null;
@@ -17201,6 +17208,10 @@ export class VisualAgentMapView extends ItemView {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
       restart: () => void this.startBookPipelineFromUi({ restart: true }),
+      mapChanged: {
+        replan: () => void this.startBookPipelineFromUi({ restart: true }),
+        keep: () => void this.bookEntry(() => this.plugin.keepBookMap(path))
+      },
       abandon: {
         asking: this.bookAbandonAsking === path,
         ask: () => this.askBookAbandon(path, true),
@@ -17214,9 +17225,9 @@ export class VisualAgentMapView extends ItemView {
         }
       },
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
-      confirmGate1: () => void this.pressBookGate1(path, read.data.trial ?? []),
+      confirmGate1: () => void this.pressBookGate1(path, this.effectiveTrial(read.data)),
       openTrial: () => {
-        const first = read.data.trial?.[0];
+        const first = this.effectiveTrial(read.data)[0];
         if (first) void this.openBookNote(first);
       },
       ...(gate1Ask
@@ -17262,6 +17273,11 @@ export class VisualAgentMapView extends ItemView {
   }
   /** What the bar and the card reruns remember in memory (the repaint rebuilds the DOM). */
   private readonly bookReview = new BookReviewMemory();
+  /** The trial chapters that are still on the run (a removed chapter is not shown or counted). */
+  private effectiveTrial(data: BookPipelineData): string[] {
+    const order = effectiveOrder(data);
+    return (data.trial ?? []).filter(id => order.includes(id));
+  }
   /** The map whose bar is asking "run the whole book anyway?" (unapplied notes in the trial), with the count it found. */
   private bookGate1Ask: { path: string; count: number } | null = null;
   private bookGate1Checking = false;
@@ -17269,7 +17285,9 @@ export class VisualAgentMapView extends ItemView {
   private bookFinishAsking: string | null = null;
   /** Where the keyboard goes after the next paint of the bar (the repaint rebuilds the buttons). */
   private bookBarFocus:
-    "gate1-go" | "gate1-opener" | "finish-go" | "finish-opener" | "rerun-go" | "rerun-opener" | null = null;
+    "gate1-go" | "gate1-opener" | "finish-go" | "finish-opener" | "rerun-go" | "rerun-opener" | "map-go" | null = null;
+  /** The run whose map-changed choice already took the keyboard. */
+  private bookMapFocusedRun: string | null = null;
   /** The chapter the "next chapter to check" link opened last (the link cycles from there in reading order). */
   private bookReviewLast: string | null = null;
   private applyBookBarFocus(): void {
@@ -17282,7 +17300,8 @@ export class VisualAgentMapView extends ItemView {
       "finish-go": ".vam-book-finish-ask .vam-book-ask-go",
       "finish-opener": ".vam-book-finish",
       "rerun-go": ".vam-book-rerun-ask .vam-book-ask-go",
-      "rerun-opener": ".vam-node-rerun"
+      "rerun-opener": ".vam-node-rerun",
+      "map-go": ".vam-book-map-replan"
     }[focus];
     this.contentEl.querySelector<HTMLElement>(selector)?.focus();
   }
@@ -17295,7 +17314,7 @@ export class VisualAgentMapView extends ItemView {
     if (!map) return [];
     return reviewEntries({
       proofContext: { runId: data.runId, revisionOf: id => cardRevision(data, id) },
-      order: data.order,
+      order: effectiveOrder(data),
       titleOf: id => this.notes.get(id)?.title ?? map.nodes.find(node => node.id === id)?.path ?? id,
       noteOf: id => this.notes.get(id)
     })
@@ -17319,7 +17338,7 @@ export class VisualAgentMapView extends ItemView {
     const mapPath = this.path;
     if (this.closed || !map || !mapPath) return;
     const read = readBookPipeline(map);
-    if (read.kind !== "usable" || read.data.phase !== "gate2" || !read.data.order.includes(id)) return;
+    if (read.kind !== "usable" || read.data.phase !== "gate2" || !effectiveOrder(read.data).includes(id)) return;
     const node = map.nodes.find(item => item.id === id);
     const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
     if (!node || !(file instanceof TFile)) return;
@@ -17360,7 +17379,7 @@ export class VisualAgentMapView extends ItemView {
     const read = this.map ? readBookPipeline(this.map) : null;
     if (!read || read.kind !== "usable" || read.data.phase !== "gate2") return;
     const id = this.map?.nodes.find(node => node.path === path)?.id;
-    if (id && read.data.order.includes(id)) void this.queueBookResolve(id);
+    if (id && effectiveOrder(read.data).includes(id)) void this.queueBookResolve(id);
   }
   /**
    * Whether a note of this map may carry a program callout, from the note text this view already holds (the callouts sit in the

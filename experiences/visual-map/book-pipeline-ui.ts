@@ -2,6 +2,7 @@ import type { TranslationKey } from "../../i18n";
 import { t } from "../../i18n";
 import { splitLengthIssue, type LengthReason } from "../../core/book-pipeline/settings";
 import {
+  effectiveOrder,
   readBookRole,
   readPipelineStage,
   type BookPipelineData,
@@ -21,7 +22,7 @@ import {
  * gets no new element. Text never relies on color alone (every state and role has a word).
  */
 
-export type BookBarMode = "planning" | "gate1" | "writing" | "gate2" | "done" | "stopped" | "budget";
+export type BookBarMode = "planning" | "gate1" | "writing" | "gate2" | "done" | "stopped" | "budget" | "changed";
 
 export interface BookBarState {
   mode: BookBarMode;
@@ -30,6 +31,8 @@ export interface BookBarState {
   total: number;
   counts: Record<PipelineStage | "pending", number>;
   budget: { used: number; limit: number };
+  /** The run paused because the map's cards changed: how many chapters were added and removed (counts only, never ids). */
+  mapChange?: { added: number; missing: number };
   /** The neutral code of why the run stopped by itself; the bar shows it in words and offers "retry". */
   failure?: string;
   /** Seconds left, as the runner estimated them (only after at least five cards of the phase finished); absent means no number is shown. */
@@ -87,19 +90,28 @@ export function bookBarState(
   const status = savedDone ? data.status : (progress?.status ?? data.status);
   const pauseReason = progress ? progress.pauseReason : data.pauseReason;
   const active = progress?.active ?? false;
-  const counts = progress?.counts ?? countStages(data.order.map(stageOf));
-  const total = progress?.total ?? data.order.length;
+  const order = effectiveOrder(data);
+  const counts = progress?.counts ?? countStages(order.map(stageOf));
+  const total = progress?.total ?? order.length;
   const budget = progress?.budget ?? data.budget;
   const failure = progress ? progress.failureCode : data.failureCode;
   const interrupted = (phase === "planning" || phase === "writing") && !active;
-  const mode: BookBarMode =
-    status === "stopped" && pauseReason === "budget"
+  const mapChange =
+    status === "stopped" && pauseReason === "map" && !active
+      ? (progress?.mapChange ?? {
+          added: data.changed?.added.length ?? 0,
+          missing: data.changed?.missing.length ?? 0
+        })
+      : undefined;
+  const mode: BookBarMode = mapChange
+    ? "changed"
+    : status === "stopped" && pauseReason === "budget"
       ? "budget"
       : status === "stopped" || interrupted
         ? "stopped"
         : phase;
   const current = mode === "planning" || mode === "writing" ? currentOf(data, progress) : undefined;
-  const rerunning = !!progress?.active && !!progress.rerun && data.order.includes(progress.rerun.nodeId);
+  const rerunning = !!progress?.active && !!progress.rerun && order.includes(progress.rerun.nodeId);
   return {
     mode,
     phase,
@@ -110,6 +122,7 @@ export function bookBarState(
     ...(current ? { current } : {}),
     ...(data.trial?.length && mode === "planning" && data.globalPlanned ? { trialSize: data.trial.length } : {}),
     ...(rerunning ? { rerun: true as const } : {}),
+    ...(mapChange ? { mapChange } : {}),
     ...(mode === "gate1" && data.trial?.length ? { trialCount: data.trial.length } : {}),
     ...(mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {}),
     ...(progress?.etaSeconds !== undefined && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0
@@ -121,7 +134,7 @@ export function bookBarState(
 /** The run's busiest-first card for the progress sentence: the whole-book plan first, then the earliest chapter in the reading order. */
 function currentOf(data: BookPipelineData, progress: BookPipelineProgress | undefined): BookCurrent | undefined {
   if (!progress?.active || !progress.current?.length) return undefined;
-  const position = (nodeId: string): number => (nodeId === "global" ? -1 : data.order.indexOf(nodeId));
+  const position = (nodeId: string): number => (nodeId === "global" ? -1 : effectiveOrder(data).indexOf(nodeId));
   const entries = progress.current.filter(item => item.nodeId === "global" || position(item.nodeId) >= 0);
   if (!entries.length) return undefined;
   entries.sort((a, b) => position(a.nodeId) - position(b.nodeId));
@@ -140,6 +153,8 @@ export interface BookBarActions {
   resume: () => void;
   /** "Reconfigure and start over" (a run stopped in any phase before done); a bar drawn without it shows no such button. */
   restart?: () => void;
+  /** The map changed: "plan again" (the restart path) and "carry on as before"; the bar shows both only in that state. */
+  mapChanged?: { replan: () => void; keep: () => void };
   /** "Give up this book" (stopped) and "remove the picture book" (done): the in-bar confirmation card; a bar drawn without it shows no such button. */
   abandon?: { asking: boolean; ask: () => void; cancel: () => void; confirm: () => void };
   addBudget: () => void;
@@ -165,7 +180,7 @@ export interface BookBarActions {
 
 export function bookTitleText(state: BookBarState): string {
   const word =
-    state.mode === "stopped"
+    state.mode === "stopped" || state.mode === "changed"
       ? t("ui.book_phase_stopped")
       : state.mode === "budget"
         ? t("ui.book_phase_budget")
@@ -200,6 +215,19 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
             : t("ui.book_stopped_at_0_1_2", t(PHASE_KEY[state.phase]), counts.checked, total)
     });
   const buttons = top.createDiv("vam-book-bar-actions");
+  if (state.mode === "changed" && state.mapChange) {
+    top.createSpan({
+      cls: "vam-book-bar-counts vam-book-map-changed",
+      text: t("ui.book_map_changed_0_1", state.mapChange.added, state.mapChange.missing)
+    });
+    buttons.setAttr("role", "group");
+    buttons.setAttr("aria-label", t("ui.book_map_changed_0_1", state.mapChange.added, state.mapChange.missing));
+    if (actions.mapChanged) {
+      makeButton(buttons, t("ui.book_map_replan"), "mod-cta vam-book-map-replan", actions.mapChanged.replan);
+      makeButton(buttons, t("ui.book_map_keep"), "vam-book-map-keep", actions.mapChanged.keep);
+    }
+    makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+  }
   if (state.mode === "gate1" && state.trialCount) {
     top.createSpan({ cls: "vam-book-bar-counts", text: t("ui.book_bar_trial_ready_0", state.trialCount) });
     if (actions.openTrial)

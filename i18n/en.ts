@@ -3368,6 +3368,9 @@ export const en = {
   "ui.book_fail_other": "An unexpected error happened",
   "ui.book_resume": "Continue from where it stopped",
   "ui.book_restart": "Change settings and start over",
+  "ui.book_map_changed_0_1": "The map changed: {0} chapters added, {1} removed",
+  "ui.book_map_replan": "Plan again",
+  "ui.book_map_keep": "Carry on as before (without the new cards)",
   "ui.book_refused_empty":
     "This mind map has only a root topic and no chapter cards, so there is nothing to write. Add chapter cards first.",
   "ui.book_refused_not_stopped": "The picture book is waiting at a check point. Stop it first, then give it up.",

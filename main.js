@@ -3144,6 +3144,9 @@ var en = {
   "ui.book_fail_other": "An unexpected error happened",
   "ui.book_resume": "Continue from where it stopped",
   "ui.book_restart": "Change settings and start over",
+  "ui.book_map_changed_0_1": "The map changed: {0} chapters added, {1} removed",
+  "ui.book_map_replan": "Plan again",
+  "ui.book_map_keep": "Carry on as before (without the new cards)",
   "ui.book_refused_empty": "This mind map has only a root topic and no chapter cards, so there is nothing to write. Add chapter cards first.",
   "ui.book_refused_not_stopped": "The picture book is waiting at a check point. Stop it first, then give it up.",
   "ui.book_refused_notes_busy": "The notes of a chapter are already being applied.",
@@ -6347,6 +6350,9 @@ var zhCN = {
   "ui.book_fail_other": "\u53D1\u751F\u672A\u9884\u671F\u7684\u9519\u8BEF",
   "ui.book_resume": "\u4ECE\u505C\u5904\u7EE7\u7EED",
   "ui.book_restart": "\u91CD\u65B0\u8BBE\u7F6E\u518D\u5F00\u59CB",
+  "ui.book_map_changed_0_1": "\u5730\u56FE\u53D8\u4E86\uFF1A\u591A {0} \u7AE0\u3001\u5C11 {1} \u7AE0",
+  "ui.book_map_replan": "\u91CD\u65B0\u89C4\u5212",
+  "ui.book_map_keep": "\u7167\u65E7\u8DD1\u5B8C\uFF08\u4E0D\u542B\u65B0\u5361\uFF09",
   "ui.book_refused_empty": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u53EA\u6709\u6839\u8BAE\u9898\u3001\u6CA1\u6709\u7AE0\u8282\u5361\u7247\uFF0C\u6CA1\u6709\u4E1C\u897F\u53EF\u4EE5\u5199\u3002\u8BF7\u5148\u52A0\u4E0A\u7AE0\u8282\u5361\u7247\u3002",
   "ui.book_refused_not_stopped": "\u56FE\u6587\u4E66\u6B63\u505C\u5728\u68C0\u67E5\u70B9\u3002\u8BF7\u5148\u505C\u6B62\uFF0C\u518D\u653E\u5F03\u3002",
   "ui.book_refused_notes_busy": "\u8FD9\u4E00\u7AE0\u7684\u5907\u6CE8\u6B63\u5728\u5957\u7528\u4E2D\u3002",
@@ -9550,6 +9556,9 @@ var zhTW = {
   "ui.book_fail_other": "\u767C\u751F\u672A\u9810\u671F\u7684\u932F\u8AA4",
   "ui.book_resume": "\u5F9E\u505C\u8655\u7E7C\u7E8C",
   "ui.book_restart": "\u91CD\u65B0\u8A2D\u5B9A\u518D\u958B\u59CB",
+  "ui.book_map_changed_0_1": "\u5FC3\u667A\u5716\u8B8A\u4E86\uFF1A\u591A {0} \u7AE0\u3001\u5C11 {1} \u7AE0",
+  "ui.book_map_replan": "\u91CD\u65B0\u898F\u5283",
+  "ui.book_map_keep": "\u7167\u820A\u8DD1\u5B8C\uFF08\u4E0D\u542B\u65B0\u5361\uFF09",
   "ui.book_refused_empty": "\u9019\u5F35\u5FC3\u667A\u5716\u53EA\u6709\u6839\u8B70\u984C\u3001\u6C92\u6709\u7AE0\u7BC0\u5361\u7247\uFF0C\u6C92\u6709\u6771\u897F\u53EF\u4EE5\u5BEB\u3002\u8ACB\u5148\u52A0\u4E0A\u7AE0\u7BC0\u5361\u7247\u3002",
   "ui.book_refused_not_stopped": "\u5716\u6587\u66F8\u6B63\u505C\u5728\u6AA2\u67E5\u9EDE\u3002\u8ACB\u5148\u505C\u6B62\uFF0C\u518D\u653E\u68C4\u3002",
   "ui.book_refused_notes_busy": "\u9019\u4E00\u7AE0\u7684\u5099\u8A3B\u6B63\u5728\u5957\u7528\u4E2D\u3002",
@@ -12666,8 +12675,17 @@ function problem(raw) {
   if (typeof raw.runId !== "string" || !raw.runId) return "runId";
   if (!PIPELINE_PHASES.includes(raw.phase)) return "phase";
   if (!PIPELINE_STATUSES.includes(raw.status)) return "status";
-  if (raw.pauseReason !== void 0 && raw.pauseReason !== "budget" && raw.pauseReason !== "failed")
+  if (raw.pauseReason !== void 0 && raw.pauseReason !== "budget" && raw.pauseReason !== "failed" && raw.pauseReason !== "map")
     return "pauseReason";
+  for (const key4 of ["accepted", "ignored", "removed"]) {
+    const list2 = raw[key4];
+    if (list2 !== void 0 && (!Array.isArray(list2) || list2.some((id) => typeof id !== "string" || !id))) return key4;
+  }
+  if (raw.changed !== void 0) {
+    const changed = raw.changed;
+    if (!isObject(changed) || !Array.isArray(changed.added) || !Array.isArray(changed.missing) || changed.added.concat(changed.missing).some((id) => typeof id !== "string"))
+      return "changed";
+  }
   if (raw.failureCode !== void 0 && (typeof raw.failureCode !== "string" || !FAILURE_CODE.test(raw.failureCode)))
     return "failureCode";
   if (!Array.isArray(raw.order) || raw.order.some((id) => typeof id !== "string" || !id)) return "order";
@@ -12699,6 +12717,19 @@ function readBookPipeline(map) {
   const found = problem(map.bookPipeline);
   if (found) return { kind: "unusable", reason: found, raw: map.bookPipeline };
   return { kind: "usable", data: map.bookPipeline };
+}
+function effectiveOrder(data) {
+  const gone = data.removed;
+  return (gone == null ? void 0 : gone.length) ? data.order.filter((id) => !gone.includes(id)) : data.order;
+}
+function mapDifference(data, mapIds) {
+  var _a2;
+  const accepted = new Set((_a2 = data.accepted) != null ? _a2 : data.order);
+  const onMap = new Set(mapIds);
+  return {
+    added: mapIds.filter((id) => !accepted.has(id)),
+    missing: effectiveOrder(data).filter((id) => !onMap.has(id))
+  };
 }
 function emptyAttempts() {
   return { plan: 0, write: 0, proof: 0 };
@@ -45425,6 +45456,7 @@ function newBookPipeline(input2) {
     phase: "planning",
     status: "running",
     order: [...input2.order],
+    accepted: [...input2.order],
     globalPlanned: false,
     attempts: { global: 0 },
     revisions: {},
@@ -45445,8 +45477,9 @@ function nextActions(data, stages, busy = /* @__PURE__ */ new Set()) {
   var _a2, _b2, _c;
   if (data.status === "stopped") return { actions: [], hold: data.pauseReason === "budget" ? "budget" : "stopped" };
   if (data.phase === "done") return { actions: [], hold: "done" };
-  if (!data.order.length) return { actions: [], hold: "empty" };
-  const resets = ((_a2 = data.pendingReset) != null ? _a2 : []).filter((id) => data.order.includes(id) && stages[id] !== void 0);
+  const order = effectiveOrder(data);
+  if (!order.length) return { actions: [], hold: "empty" };
+  const resets = ((_a2 = data.pendingReset) != null ? _a2 : []).filter((id) => order.includes(id) && stages[id] !== void 0);
   if ((_b2 = data.pendingReset) == null ? void 0 : _b2.length) {
     return resets.length ? { actions: resets.map((nodeId) => ({ type: "reset_stage", nodeId })) } : { actions: [{ type: "advance_phase" }] };
   }
@@ -45459,7 +45492,7 @@ function nextActions(data, stages, busy = /* @__PURE__ */ new Set()) {
       return { actions: busy.has("global") ? [] : [{ type: "global_plan" }] };
     }
   }
-  for (const nodeId of data.order) {
+  for (const nodeId of order) {
     if (busy.has(nodeId)) continue;
     const stage = stages[nodeId];
     if (stage === "needs-review" || stage === "checked") continue;
@@ -45485,8 +45518,9 @@ function advancePhase(data, stages, now) {
     next.revision++;
     return next;
   }
-  const all = (min) => next.order.every((id) => ranked(stages[id]) >= min);
-  const trialDone = next.trial ? next.trial.every((id) => ranked(stages[id]) >= 3) : all(1);
+  const order = effectiveOrder(next);
+  const all = (min) => order.every((id) => ranked(stages[id]) >= min);
+  const trialDone = next.trial ? next.trial.every((id) => !order.includes(id) || ranked(stages[id]) >= 3) : all(1);
   if (next.phase === "planning" && next.globalPlanned && trialDone) next.phase = "gate1";
   else if (next.phase === "writing" && all(3)) next.phase = "gate2";
   else return data;
@@ -45498,10 +45532,12 @@ function retryTrial(data, now) {
   var _a2, _b2;
   if (data.phase !== "gate1" || data.status !== "running" || !((_a2 = data.trial) == null ? void 0 : _a2.length)) return data;
   const next = clone2(data);
+  const live2 = effectiveOrder(data);
+  const trial = data.trial.filter((id) => live2.includes(id));
   next.phase = "planning";
   next.phaseStartedAt = now;
-  next.pendingReset = [.../* @__PURE__ */ new Set([...(_b2 = next.pendingReset) != null ? _b2 : [], ...data.trial])];
-  for (const id of data.trial) {
+  next.pendingReset = [.../* @__PURE__ */ new Set([...(_b2 = next.pendingReset) != null ? _b2 : [], ...trial])];
+  for (const id of trial) {
     next.attempts[id] = emptyAttempts();
     next.revisions[id] = cardRevision(next, id) + 1;
     if (next.autoFixes) delete next.autoFixes[id];
@@ -45530,7 +45566,7 @@ function isCurrent(data, token) {
   if (data.runId !== token.runId || data.status !== "running") return false;
   if (((_a2 = data.stopEpoch) != null ? _a2 : 0) !== token.stopEpoch) return false;
   if (token.kind === "global") return !data.globalPlanned;
-  if (!token.nodeId || !data.order.includes(token.nodeId)) return false;
+  if (!token.nodeId || !effectiveOrder(data).includes(token.nodeId)) return false;
   return cardRevision(data, token.nodeId) === token.revision;
 }
 function beginStep(data, kind, nodeId) {
@@ -45543,7 +45579,7 @@ function beginStep(data, kind, nodeId) {
     next.revision++;
     return { state: next, token: { runId: next.runId, kind, revision: 0, stopEpoch: (_a2 = next.stopEpoch) != null ? _a2 : 0 } };
   }
-  if (!nodeId || !next.order.includes(nodeId)) return null;
+  if (!nodeId || !effectiveOrder(next).includes(nodeId)) return null;
   const attempts = attemptsOf(next, nodeId);
   if (attempts[kind] >= MAX_STEP_ATTEMPTS) return null;
   attempts[kind]++;
@@ -45574,7 +45610,7 @@ function applyCancelled(data, token) {
   if (data.runId !== token.runId) return { state: data, accepted: false };
   const next = clone2(data);
   if (token.kind === "global") next.attempts.global = Math.max(0, next.attempts.global - 1);
-  else if (token.nodeId && next.order.includes(token.nodeId)) {
+  else if (token.nodeId && effectiveOrder(next).includes(token.nodeId)) {
     const attempts = attemptsOf(next, token.nodeId);
     attempts[token.kind] = Math.max(0, attempts[token.kind] - 1);
     next.attempts[token.nodeId] = attempts;
@@ -45599,7 +45635,49 @@ function stopRun(data) {
   next.status = "stopped";
   delete next.pauseReason;
   delete next.failureCode;
+  delete next.changed;
   next.stopEpoch = ((_a2 = next.stopEpoch) != null ? _a2 : 0) + 1;
+  next.revision++;
+  return next;
+}
+function pauseForMap(data, change2) {
+  var _a2;
+  const next = clone2(data);
+  next.status = "stopped";
+  next.pauseReason = "map";
+  next.changed = { added: [...change2.added], missing: [...change2.missing] };
+  delete next.failureCode;
+  next.stopEpoch = ((_a2 = next.stopEpoch) != null ? _a2 : 0) + 1;
+  next.revision++;
+  return next;
+}
+function acceptMapChange(data, mapIds, now) {
+  var _a2, _b2;
+  const { added, missing } = mapDifference(data, mapIds);
+  const next = clone2(data);
+  next.accepted = [...mapIds];
+  if (added.length) next.ignored = [.../* @__PURE__ */ new Set([...(_a2 = next.ignored) != null ? _a2 : [], ...added])];
+  if (missing.length) next.removed = [.../* @__PURE__ */ new Set([...(_b2 = next.removed) != null ? _b2 : [], ...missing])];
+  const order = effectiveOrder(next);
+  if (next.pendingReset) {
+    next.pendingReset = next.pendingReset.filter((id) => order.includes(id));
+    if (!next.pendingReset.length) delete next.pendingReset;
+  }
+  if (next.trial && !next.trial.some((id) => order.includes(id))) {
+    next.trial = order.slice(0, TRIAL_SIZE);
+    if (next.phase === "gate1") {
+      next.phase = "planning";
+      next.phaseStartedAt = now;
+    }
+  }
+  next.status = "running";
+  delete next.pauseReason;
+  delete next.changed;
+  delete next.failureCode;
+  if (next.budget.used >= next.budget.limit) {
+    next.status = "stopped";
+    next.pauseReason = "budget";
+  }
   next.revision++;
   return next;
 }
@@ -45619,6 +45697,7 @@ function resumeRun(data) {
   const next = clone2(data);
   next.status = "running";
   delete next.pauseReason;
+  delete next.changed;
   delete next.failureCode;
   next.revision++;
   return next;
@@ -45648,7 +45727,7 @@ function autoFixesOf(data, nodeId) {
 function requestAutoFix(data, nodeId) {
   var _a2, _b2;
   const inTrial = data.phase === "planning" && !!((_a2 = data.trial) == null ? void 0 : _a2.includes(nodeId));
-  if (!data.order.includes(nodeId) || data.status !== "running" || data.phase !== "writing" && !inTrial)
+  if (!effectiveOrder(data).includes(nodeId) || data.status !== "running" || data.phase !== "writing" && !inTrial)
     return { state: data, accepted: false };
   if (autoFixesOf(data, nodeId) >= MAX_AUTO_FIXES) return { state: data, accepted: false };
   const used = attemptsOf(data, nodeId);
@@ -45660,7 +45739,7 @@ function requestAutoFix(data, nodeId) {
   return { state: next, accepted: true };
 }
 function resetCard(data, nodeId) {
-  if (!data.order.includes(nodeId)) return data;
+  if (!effectiveOrder(data).includes(nodeId)) return data;
   const next = clone2(data);
   next.attempts[nodeId] = emptyAttempts();
   next.revisions[nodeId] = cardRevision(next, nodeId) + 1;
@@ -51441,7 +51520,7 @@ var BookPipelineRuns = class {
         return { state: resumed != null ? resumed : next, accepted: true };
       });
       if (refused) throw new BookPipelineRunError("budget");
-      for (const id of drive.store.state.order)
+      for (const id of effectiveOrder(drive.store.state))
         if (drive.stages.get(id) === "planned" && autoFixesOf(drive.store.state, id) > 0 && !drive.extra.has(id)) {
           drive.stages.set(id, "needs-review");
           await this.writeFields(drive, id, {
@@ -51559,7 +51638,7 @@ var BookPipelineRuns = class {
       if (read.kind === "absent") throw new BookPipelineRunError("missing");
       if (read.kind === "unusable") throw new BookPipelineRunError("unusable");
       const node = map.nodes.find((item) => item.id === nodeId);
-      if (!node || !read.data.order.includes(nodeId)) throw new BookPipelineRunError("missing");
+      if (!node || !effectiveOrder(read.data).includes(nodeId)) throw new BookPipelineRunError("missing");
       if (this.dead(drive)) throw new BookPipelineRunError("disposed");
       const card = await this.ports.readCard(node.path).catch(() => void 0);
       if (!card) throw new BookPipelineRunError("unreadable");
@@ -51582,7 +51661,7 @@ var BookPipelineRuns = class {
     return this.enter(mapPath, async (drive) => {
       var _a2;
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
-      if (!data.order.includes(nodeId)) throw new BookPipelineRunError("missing");
+      if (!effectiveOrder(data).includes(nodeId)) throw new BookPipelineRunError("missing");
       if (!phases.includes(data.phase)) throw new BookPipelineRunError(refusal);
       if (overwrite) {
         const path = (_a2 = drive.cards.get(nodeId)) == null ? void 0 : _a2.path;
@@ -51657,7 +51736,7 @@ var BookPipelineRuns = class {
     }
   }
   async markSeams(drive, nodeId, revision) {
-    const order = drive.store.state.order;
+    const order = effectiveOrder(drive.store.state);
     const at = order.indexOf(nodeId);
     for (const other of [order[at - 1], order[at + 1]]) {
       if (!other || !drive.cards.has(other)) continue;
@@ -51746,7 +51825,7 @@ var BookPipelineRuns = class {
     const state = read.data;
     runIdOut.value = state.runId;
     const node = map.nodes.find((item) => item.id === nodeId);
-    if (!node || !state.order.includes(nodeId)) throw new BookPipelineRunError("missing");
+    if (!node || !effectiveOrder(state).includes(nodeId)) throw new BookPipelineRunError("missing");
     if (!reserveBudget(state.budget)) throw new BookPipelineRunError("budget");
     refuseIfGone();
     const path = node.path;
@@ -51810,7 +51889,7 @@ var BookPipelineRuns = class {
     const fresh = await this.ports.readMap(mapPath);
     const again = readBookPipeline(fresh);
     refuseIfGone();
-    if (again.kind !== "usable" || again.data.runId !== state.runId || !again.data.order.includes(nodeId))
+    if (again.kind !== "usable" || again.data.runId !== state.runId || !effectiveOrder(again.data).includes(nodeId))
       throw new BookPipelineRunError("stale");
     if (((_b2 = fresh.nodes.find((item) => item.id === nodeId)) == null ? void 0 : _b2.path) !== path) throw new BookPipelineRunError("stale");
     let outcome;
@@ -51832,9 +51911,10 @@ var BookPipelineRuns = class {
   /** The body changed: both neighbours' joins are worth a look, as after a rerun. */
   async markNeighbourSeams(mapPath, state, nodeId, language2, map) {
     var _a2;
-    const at = state.order.indexOf(nodeId);
+    const stateOrder = effectiveOrder(state);
+    const at = stateOrder.indexOf(nodeId);
     const revision = cardRevision(state, nodeId);
-    for (const other of [state.order[at - 1], state.order[at + 1]]) {
+    for (const other of [stateOrder[at - 1], stateOrder[at + 1]]) {
       const path = other ? (_a2 = map.nodes.find((item) => item.id === other)) == null ? void 0 : _a2.path : void 0;
       if (!path || this.disposed) continue;
       await this.ports.writePipelineFields(path, { pipelineSeam: seamText(language2, at, revision) }).catch(() => void 0);
@@ -52004,7 +52084,7 @@ var BookPipelineRuns = class {
     if (read.kind === "unusable") throw new BookPipelineRunError("unusable");
     if (read.data.phase === "done" && !options.allowDone && !(read.data.status === "stopped" && read.data.pauseReason === "budget"))
       throw new BookPipelineRunError("finished");
-    await this.load(drive, map, read.data.order, new Set(read.data.autoRoles));
+    await this.load(drive, map, effectiveOrder(read.data), new Set(read.data.autoRoles));
     if (this.dead(drive)) throw new BookPipelineRunError("disposed");
     this.attachStore(drive, read.data);
     return read.data;
@@ -52049,6 +52129,7 @@ var BookPipelineRuns = class {
     var _a2, _b2;
     const inflight = /* @__PURE__ */ new Map();
     while (!this.dead(drive) && drive.fatal === void 0) {
+      if (await this.pauseOnMapChange(drive)) break;
       const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy);
       if (plan.hold === "global_failed") drive.failure = (_a2 = drive.reasons.get("global")) != null ? _a2 : "failed";
       if (plan.hold) break;
@@ -52092,6 +52173,53 @@ var BookPipelineRuns = class {
       else if (!started && !changed) break;
     }
     await Promise.all(inflight.values());
+  }
+  /** The map's cards in reading order (every card, hidden ones too). */
+  mapIds(map) {
+    return readingOrder(map.nodes, { includeHidden: true });
+  }
+  /**
+   * The map's cards differ from the accepted set: the run is saved as paused first (so nothing new is admitted and every result still
+   * in flight is dropped at its commit), the calls in flight are aborted (the caller waits for them to settle; the busy slot is freed
+   * when the drive ends), and the program callouts of the missing chapters are taken off. Returns whether it paused.
+   */
+  async pauseOnMapChange(drive) {
+    var _a2;
+    if (drive.job || this.dead(drive) || drive.store.state.status !== "running") return false;
+    const map = await this.ports.readMap(drive.mapPath);
+    if (this.dead(drive)) return false;
+    const change2 = mapDifference(drive.store.state, this.mapIds(map));
+    if (!change2.added.length && !change2.missing.length) return false;
+    await drive.store.commit((state2) => ({ state: pauseForMap(state2, change2), accepted: true }));
+    drive.controller.abort();
+    const state = drive.store.state;
+    const gone = change2.missing.flatMap((id) => {
+      const info = drive.cards.get(id);
+      return info ? [{ id, path: info.path }] : [];
+    });
+    if (gone.length && ((_a2 = this.ports.callouts) == null ? void 0 : _a2.clearNotes))
+      await this.ports.callouts.clearNotes(drive.mapPath, state.runId, gone).catch(() => false);
+    this.log(drive, "map_changed", "-", "plan", `added:${change2.added.length},missing:${change2.missing.length}`);
+    return true;
+  }
+  /** True when the map's cards differ from the accepted set (a step that found its card gone asks this before it counts as a failure). */
+  async mapDiffers(drive) {
+    const map = await this.ports.readMap(drive.mapPath);
+    const change2 = mapDifference(drive.store.state, this.mapIds(map));
+    return change2.added.length > 0 || change2.missing.length > 0;
+  }
+  /**
+   * "Carry on as before": the new cards are left out, the missing chapters are marked removed (terminal), the map's card set becomes the
+   * accepted one and the run goes on. Only for a run paused because the map changed.
+   */
+  async keepBookMap(mapPath) {
+    return this.enter(mapPath, async (drive) => {
+      const data = await this.openSaved(drive, mapPath);
+      if (data.status !== "stopped" || data.pauseReason !== "map") throw new BookPipelineRunError("not_stopped");
+      const ids2 = this.mapIds(await this.ports.readMap(mapPath));
+      await drive.store.commit((state) => ({ state: acceptMapChange(state, ids2, this.ports.now()), accepted: true }));
+      this.log(drive, "map_keep", "-", "plan", "ok");
+    });
   }
   // ---- one step ----------------------------------------------------------------------------------------------------------------
   async step(drive, action) {
@@ -52153,6 +52281,11 @@ var BookPipelineRuns = class {
         await report("budget");
         return "budget";
       } else {
+        if ((outcome.reason === "card_removed" || outcome.reason === "missing") && await this.mapDiffers(drive)) {
+          await drive.store.commit((state) => applyCancelled(state, token));
+          await report("map_changed");
+          return "cancelled";
+        }
         const failed = await drive.store.commit((state) => applyFailure(state, token));
         if (!failed) return "none";
         if (!failed.accepted) {
@@ -52338,7 +52471,7 @@ var BookPipelineRuns = class {
   async execGlobal(drive, token) {
     const signal = drive.controller.signal;
     const root = drive.cards.get(drive.rootId);
-    const order = drive.store.state.order;
+    const order = effectiveOrder(drive.store.state);
     if (!root || order.some((id) => !drive.cards.has(id))) return { kind: "failed", reason: "missing" };
     const before = await this.ports.readCard(root.path);
     const request = {
@@ -52390,7 +52523,7 @@ var BookPipelineRuns = class {
   }
   /** A chapter's child cards: the cards of the run whose parent on the map it is, in reading order. */
   childCardsOf(drive, nodeId) {
-    return drive.store.state.order.flatMap((id) => {
+    return effectiveOrder(drive.store.state).flatMap((id) => {
       const info = drive.parents.get(id) === nodeId ? drive.cards.get(id) : void 0;
       return info ? [{ title: info.title, summary: info.summary }] : [];
     });
@@ -52405,7 +52538,7 @@ var BookPipelineRuns = class {
     const root = await this.ports.readCard(rootInfo.path);
     const book = parseBookPlanBody(root.raw);
     const settings = effectiveSettings(root.settings, parseBookPlanDecisions(root.raw));
-    const order = drive.store.state.order;
+    const order = effectiveOrder(drive.store.state);
     const index = order.indexOf(nodeId);
     const side = (at) => {
       const other = order[at] === void 0 ? void 0 : drive.cards.get(order[at]);
@@ -52991,20 +53124,21 @@ var BookPipelineRuns = class {
       checked: 0,
       "needs-review": 0
     };
-    for (const id of state.order) counts[(_a2 = drive.stages.get(id)) != null ? _a2 : "pending"]++;
+    for (const id of effectiveOrder(state)) counts[(_a2 = drive.stages.get(id)) != null ? _a2 : "pending"]++;
     const eta = this.etaOf(drive, active);
     const imagesDone = [...drive.imagesDone].filter((id) => {
       const stage = drive.stages.get(id);
-      return state.order.includes(id) && stage !== "written" && stage !== "checked";
+      return effectiveOrder(state).includes(id) && stage !== "written" && stage !== "checked";
     }).length;
     return {
       runId: state.runId,
       phase: state.phase,
       status: state.status,
       ...state.pauseReason ? { pauseReason: state.pauseReason } : {},
+      ...state.pauseReason === "map" && state.changed ? { mapChange: { added: state.changed.added.length, missing: state.changed.missing.length } } : {},
       ...state.failureCode ? { failureCode: state.failureCode } : {},
       active,
-      total: state.order.length,
+      total: effectiveOrder(state).length,
       counts,
       budget: { ...state.budget },
       startedAt: state.startedAt,
@@ -53015,7 +53149,7 @@ var BookPipelineRuns = class {
       ...active && drive.sub.size ? { current: [...drive.sub].map(([nodeId, sub]) => ({ nodeId, step: sub.step, startedAt: sub.startedAt })) } : {},
       steps: stepCounts(counts, imagesDone, {
         settled: state.phase === "gate2" || state.phase === "done",
-        proofFailed: state.order.filter(
+        proofFailed: effectiveOrder(state).filter(
           (id) => drive.stages.get(id) === "needs-review" && drive.reviewStep.get(id) === "proof"
         ).length
       })
@@ -53029,7 +53163,7 @@ var BookPipelineRuns = class {
     if (!planning && state.phase !== "writing") return void 0;
     const list2 = planning ? drive.durations.plan : drive.durations.write;
     if (list2.length < ETA_MIN_CARDS) return void 0;
-    const left = state.order.filter((id) => {
+    const left = effectiveOrder(state).filter((id) => {
       const stage = drive.stages.get(id);
       return planning ? stage === void 0 : stage !== "checked" && stage !== "needs-review";
     }).length;
@@ -53088,20 +53222,25 @@ var PHASE_KEY = {
   done: "ui.book_phase_done"
 };
 function bookBarState(data, progress, stageOf) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
   const savedDone = data.phase === "done" && (!progress || progress.runId === data.runId);
   const phase = savedDone ? "done" : (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : data.phase;
   const status = savedDone ? data.status : (_b2 = progress == null ? void 0 : progress.status) != null ? _b2 : data.status;
   const pauseReason = progress ? progress.pauseReason : data.pauseReason;
   const active = (_c = progress == null ? void 0 : progress.active) != null ? _c : false;
-  const counts = (_d = progress == null ? void 0 : progress.counts) != null ? _d : countStages(data.order.map(stageOf));
-  const total2 = (_e = progress == null ? void 0 : progress.total) != null ? _e : data.order.length;
+  const order = effectiveOrder(data);
+  const counts = (_d = progress == null ? void 0 : progress.counts) != null ? _d : countStages(order.map(stageOf));
+  const total2 = (_e = progress == null ? void 0 : progress.total) != null ? _e : order.length;
   const budget = (_f = progress == null ? void 0 : progress.budget) != null ? _f : data.budget;
   const failure = progress ? progress.failureCode : data.failureCode;
   const interrupted = (phase === "planning" || phase === "writing") && !active;
-  const mode = status === "stopped" && pauseReason === "budget" ? "budget" : status === "stopped" || interrupted ? "stopped" : phase;
+  const mapChange = status === "stopped" && pauseReason === "map" && !active ? (_k = progress == null ? void 0 : progress.mapChange) != null ? _k : {
+    added: (_h = (_g = data.changed) == null ? void 0 : _g.added.length) != null ? _h : 0,
+    missing: (_j = (_i = data.changed) == null ? void 0 : _i.missing.length) != null ? _j : 0
+  } : void 0;
+  const mode = mapChange ? "changed" : status === "stopped" && pauseReason === "budget" ? "budget" : status === "stopped" || interrupted ? "stopped" : phase;
   const current = mode === "planning" || mode === "writing" ? currentOf2(data, progress) : void 0;
-  const rerunning = !!(progress == null ? void 0 : progress.active) && !!progress.rerun && data.order.includes(progress.rerun.nodeId);
+  const rerunning = !!(progress == null ? void 0 : progress.active) && !!progress.rerun && order.includes(progress.rerun.nodeId);
   return {
     mode,
     phase,
@@ -53110,9 +53249,10 @@ function bookBarState(data, progress, stageOf) {
     budget,
     globalDone: data.globalPlanned === true,
     ...current ? { current } : {},
-    ...((_g = data.trial) == null ? void 0 : _g.length) && mode === "planning" && data.globalPlanned ? { trialSize: data.trial.length } : {},
+    ...((_l = data.trial) == null ? void 0 : _l.length) && mode === "planning" && data.globalPlanned ? { trialSize: data.trial.length } : {},
     ...rerunning ? { rerun: true } : {},
-    ...mode === "gate1" && ((_h = data.trial) == null ? void 0 : _h.length) ? { trialCount: data.trial.length } : {},
+    ...mapChange ? { mapChange } : {},
+    ...mode === "gate1" && ((_m = data.trial) == null ? void 0 : _m.length) ? { trialCount: data.trial.length } : {},
     ...mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {},
     ...(progress == null ? void 0 : progress.etaSeconds) !== void 0 && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0 ? { etaSeconds: progress.etaSeconds } : {}
   };
@@ -53120,7 +53260,7 @@ function bookBarState(data, progress, stageOf) {
 function currentOf2(data, progress) {
   var _a2;
   if (!(progress == null ? void 0 : progress.active) || !((_a2 = progress.current) == null ? void 0 : _a2.length)) return void 0;
-  const position = (nodeId) => nodeId === "global" ? -1 : data.order.indexOf(nodeId);
+  const position = (nodeId) => nodeId === "global" ? -1 : effectiveOrder(data).indexOf(nodeId);
   const entries = progress.current.filter((item) => item.nodeId === "global" || position(item.nodeId) >= 0);
   if (!entries.length) return void 0;
   entries.sort((a, b) => position(a.nodeId) - position(b.nodeId));
@@ -53133,7 +53273,7 @@ function countStages(stages) {
   return counts;
 }
 function bookTitleText(state) {
-  const word = state.mode === "stopped" ? t("ui.book_phase_stopped") : state.mode === "budget" ? t("ui.book_phase_budget") : t(PHASE_KEY[state.mode]);
+  const word = state.mode === "stopped" || state.mode === "changed" ? t("ui.book_phase_stopped") : state.mode === "budget" ? t("ui.book_phase_budget") : t(PHASE_KEY[state.mode]);
   return t("ui.book_bar_title_0", word);
 }
 function bookEtaText(seconds) {
@@ -53155,6 +53295,19 @@ function renderBookBar(parent, state, actions) {
       text: state.mode === "budget" ? t("ui.book_budget_used_up_0_1", state.budget.used, state.budget.limit) : state.failure ? t("ui.book_failed_at_0_1", t(PHASE_KEY[state.phase]), bookFailureText(state.failure)) : t("ui.book_stopped_at_0_1_2", t(PHASE_KEY[state.phase]), counts.checked, total2)
     });
   const buttons = top.createDiv("vam-book-bar-actions");
+  if (state.mode === "changed" && state.mapChange) {
+    top.createSpan({
+      cls: "vam-book-bar-counts vam-book-map-changed",
+      text: t("ui.book_map_changed_0_1", state.mapChange.added, state.mapChange.missing)
+    });
+    buttons.setAttr("role", "group");
+    buttons.setAttr("aria-label", t("ui.book_map_changed_0_1", state.mapChange.added, state.mapChange.missing));
+    if (actions.mapChanged) {
+      makeButton(buttons, t("ui.book_map_replan"), "mod-cta vam-book-map-replan", actions.mapChanged.replan);
+      makeButton(buttons, t("ui.book_map_keep"), "vam-book-map-keep", actions.mapChanged.keep);
+    }
+    makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+  }
   if (state.mode === "gate1" && state.trialCount) {
     top.createSpan({ cls: "vam-book-bar-counts", text: t("ui.book_bar_trial_ready_0", state.trialCount) });
     if (actions.openTrial)
@@ -53888,6 +54041,24 @@ var BookCallouts = class {
   clear(mapPath) {
     return this.enqueue(mapPath, () => this.sweep(mapPath)).catch(() => false);
   }
+  /** Takes every program callout (and with it a queued rewrite) off notes that left the run's map (a removed chapter): the map no longer names them, so the caller passes the paths. */
+  clearNotes(mapPath, runId, cards) {
+    return this.enqueue(mapPath, async () => {
+      let clean3 = true;
+      for (const { id, path } of cards) {
+        if (this.disposed) return false;
+        let raw;
+        try {
+          raw = await this.ports.readText(path);
+        } catch (e) {
+          continue;
+        }
+        if (!hasProgramCallouts(raw)) continue;
+        if (!await this.put(runId, id, path, (text10) => alignCallouts(text10, void 0))) clean3 = false;
+      }
+      return clean3;
+    }).catch(() => false);
+  }
   /** Folds a ticked review box (the box at once; the ticks and marker stay). */
   collapse(path) {
     return this.disposed ? Promise.resolve("refused") : this.ports.write(path, collapseReviewCallouts);
@@ -53940,7 +54111,7 @@ var BookCallouts = class {
   /** The cards of the run in reading order with their note paths; a card whose note cannot be read is left out (and logged). */
   async cardsOf(map, data, skip) {
     const out = [];
-    for (const id of data.order) {
+    for (const id of effectiveOrder(data)) {
       if (skip == null ? void 0 : skip(id)) continue;
       const node = map.nodes.find((item) => item.id === id);
       if (!node) continue;
@@ -54058,7 +54229,7 @@ var BookCallouts = class {
       if (alignCallouts(card.raw, want) === card.raw) continue;
       await this.put(data.runId, id, card.path, (text10) => alignCallouts(text10, want));
     }
-    await this.dropStale(map, data.runId, new Set(data.order), clean3);
+    await this.dropStale(map, data.runId, new Set(effectiveOrder(data)), clean3);
   }
   /**
    * The notes of the map that are not chapters of the current run (or of any run, when there is none): every program callout whose
@@ -69322,6 +69493,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     __publicField(this, "bookFinishAsking", null);
     /** Where the keyboard goes after the next paint of the bar (the repaint rebuilds the buttons). */
     __publicField(this, "bookBarFocus", null);
+    /** The run whose map-changed choice already took the keyboard. */
+    __publicField(this, "bookMapFocusedRun", null);
     /** The chapter the "next chapter to check" link opened last (the link cycles from there in reading order). */
     __publicField(this, "bookReviewLast", null);
     /** Chapters whose review box is ticked for the attention they have now (fingerprint they were ticked for); the bar does not count them. */
@@ -77038,7 +77211,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (!this.map || !path || !this.hasBookPipeline()) return void 0;
     const read = readBookPipeline(this.map);
     if (read.kind !== "usable") return void 0;
-    if (!read.data.order.includes(node.id)) return void 0;
+    if (!effectiveOrder(read.data).includes(node.id)) return void 0;
     const progress = this.plugin.getBookPipelineProgress(path);
     const phase = (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : read.data.phase;
     if (gate2Only ? phase !== "gate2" : phase !== "gate2" && phase !== "done") return void 0;
@@ -83801,6 +83974,11 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         return readPipelineStage((_a3 = this.notes.get(id)) == null ? void 0 : _a3.pipelineStage);
       }
     );
+    if (state.mode !== "changed") this.bookMapFocusedRun = null;
+    else if (this.bookMapFocusedRun !== read.data.runId) {
+      this.bookMapFocusedRun = read.data.runId;
+      this.bookBarFocus = "map-go";
+    }
     if (state.mode !== "gate1") this.bookGate1Ask = null;
     if (state.mode !== "gate2") this.bookFinishAsking = null;
     const gate2Attention = state.mode === "gate2" ? this.bookReviewCards(read.data) : [];
@@ -83811,6 +83989,10 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
       restart: () => void this.startBookPipelineFromUi({ restart: true }),
+      mapChanged: {
+        replan: () => void this.startBookPipelineFromUi({ restart: true }),
+        keep: () => void this.bookEntry(() => this.plugin.keepBookMap(path))
+      },
       abandon: {
         asking: this.bookAbandonAsking === path,
         ask: () => this.askBookAbandon(path, true),
@@ -83824,13 +84006,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         }
       },
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
-      confirmGate1: () => {
-        var _a3;
-        return void this.pressBookGate1(path, (_a3 = read.data.trial) != null ? _a3 : []);
-      },
+      confirmGate1: () => void this.pressBookGate1(path, this.effectiveTrial(read.data)),
       openTrial: () => {
-        var _a3;
-        const first = (_a3 = read.data.trial) == null ? void 0 : _a3[0];
+        const first = this.effectiveTrial(read.data)[0];
         if (first) void this.openBookNote(first);
       },
       ...gate1Ask ? {
@@ -83872,6 +84050,12 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       }
     });
   }
+  /** The trial chapters that are still on the run (a removed chapter is not shown or counted). */
+  effectiveTrial(data) {
+    var _a2;
+    const order = effectiveOrder(data);
+    return ((_a2 = data.trial) != null ? _a2 : []).filter((id) => order.includes(id));
+  }
   applyBookBarFocus() {
     var _a2;
     const focus = this.bookBarFocus;
@@ -83883,7 +84067,8 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       "finish-go": ".vam-book-finish-ask .vam-book-ask-go",
       "finish-opener": ".vam-book-finish",
       "rerun-go": ".vam-book-rerun-ask .vam-book-ask-go",
-      "rerun-opener": ".vam-node-rerun"
+      "rerun-opener": ".vam-node-rerun",
+      "map-go": ".vam-book-map-replan"
     }[focus];
     (_a2 = this.contentEl.querySelector(selector)) == null ? void 0 : _a2.focus();
   }
@@ -83896,7 +84081,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (!map) return [];
     return reviewEntries({
       proofContext: { runId: data.runId, revisionOf: (id) => cardRevision(data, id) },
-      order: data.order,
+      order: effectiveOrder(data),
       titleOf: (id) => {
         var _a2, _b2, _c, _d;
         return (_d = (_c = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _c : (_b2 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _b2.path) != null ? _d : id;
@@ -83917,7 +84102,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const mapPath = this.path;
     if (this.closed || !map || !mapPath) return;
     const read = readBookPipeline(map);
-    if (read.kind !== "usable" || read.data.phase !== "gate2" || !read.data.order.includes(id)) return;
+    if (read.kind !== "usable" || read.data.phase !== "gate2" || !effectiveOrder(read.data).includes(id)) return;
     const node = map.nodes.find((item) => item.id === id);
     const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
     if (!node || !(file instanceof import_obsidian38.TFile)) return;
@@ -83957,7 +84142,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const read = this.map ? readBookPipeline(this.map) : null;
     if (!read || read.kind !== "usable" || read.data.phase !== "gate2") return;
     const id = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.path === path)) == null ? void 0 : _b2.id;
-    if (id && read.data.order.includes(id)) void this.queueBookResolve(id);
+    if (id && effectiveOrder(read.data).includes(id)) void this.queueBookResolve(id);
   }
   /** After a map opens: its notes are aligned with its run (stale boxes of an earlier run removed, old runs drawn), then ticked boxes are read. */
   async reconcileBookNotes(path, isCurrent2) {
@@ -90562,7 +90747,7 @@ var BookHandEdits = class {
       const map = await this.ports.readMap(mapPath);
       const read = readBookPipeline(map);
       const node = map.nodes.find((item) => item.id === nodeId);
-      if (read.kind !== "usable" || !node || !read.data.order.includes(nodeId)) return;
+      if (read.kind !== "usable" || !node || !effectiveOrder(read.data).includes(nodeId)) return;
       const card = await this.ports.readCard(node.path);
       const state = readReviewState(card.raw);
       if (!isRewriteAsked(state) || !(state == null ? void 0 : state.op)) return;
@@ -90594,7 +90779,7 @@ var BookHandEdits = class {
       const map = await this.ports.readMap(mapPath);
       const read = readBookPipeline(map);
       if (read.kind !== "usable" || read.data.phase !== "gate2" || this.ports.isRunning(mapPath)) return;
-      for (const id of read.data.order) {
+      for (const id of effectiveOrder(read.data)) {
         if (this.disposed || this.ports.isRunning(mapPath)) return;
         const node = map.nodes.find((item) => item.id === id);
         if (!node) continue;
@@ -104105,7 +104290,11 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
         (_a2 = this.views().find((view) => view.mapPath === mapPath)) == null ? void 0 : _a2.refreshBookProgress();
         this.bookNotes.paint();
       },
-      callouts: { reconcile: (path) => this.bookCallouts.reconcile(path), clear: (path) => this.bookCallouts.clear(path) },
+      callouts: {
+        reconcile: (path) => this.bookCallouts.reconcile(path),
+        clear: (path) => this.bookCallouts.clear(path),
+        clearNotes: (path, runId, cards) => this.bookCallouts.clearNotes(path, runId, cards)
+      },
       // A drive is over: a rewrite the reader queued behind it may run now.
       settled: (mapPath) => void this.bookHandEdits.drain(mapPath)
     }));
@@ -104308,7 +104497,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       const read = readBookPipeline(map);
       if (read.kind !== "usable") continue;
       for (const node of map.nodes)
-        if (candidates.has(node.path) && read.data.order.includes(node.id)) {
+        if (candidates.has(node.path) && effectiveOrder(read.data).includes(node.id)) {
           found.add(node.path);
           this.bookChapterMaps.set(node.path, file.path);
         }
@@ -105530,6 +105719,9 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   resumeBookPipeline(mapPath, options = {}) {
     return this.bookPipelineRuns.resume(mapPath, options);
+  }
+  keepBookMap(mapPath) {
+    return this.bookPipelineRuns.keepBookMap(mapPath);
   }
   confirmBookGate1(mapPath) {
     return this.bookPipelineRuns.confirmGate1(mapPath);

@@ -44,7 +44,7 @@ import {
 } from "./experiences/visual-map/book-applied-highlight";
 import type { EditorView } from "@codemirror/view";
 import { countNotes } from "./core/book-pipeline/book-notes";
-import { readBookPipeline } from "./core/book-pipeline/model";
+import { effectiveOrder, readBookPipeline } from "./core/book-pipeline/model";
 import { runPlanStep } from "./core/steps/book-pipeline/run";
 import { runProofread } from "./core/steps/book-pipeline/proofread";
 import { runFindImages } from "./core/steps/book-pipeline/find-images";
@@ -665,7 +665,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       const read = readBookPipeline(map);
       if (read.kind !== "usable") continue;
       for (const node of map.nodes)
-        if (candidates.has(node.path) && read.data.order.includes(node.id)) {
+        if (candidates.has(node.path) && effectiveOrder(read.data).includes(node.id)) {
           found.add(node.path);
           this.bookChapterMaps.set(node.path, file.path);
         }
@@ -821,7 +821,11 @@ export default class VisualAgentMapPlugin extends Plugin {
         ?.refreshBookProgress();
       this.bookNotes.paint();
     },
-    callouts: { reconcile: path => this.bookCallouts.reconcile(path), clear: path => this.bookCallouts.clear(path) },
+    callouts: {
+      reconcile: path => this.bookCallouts.reconcile(path),
+      clear: path => this.bookCallouts.clear(path),
+      clearNotes: (path, runId, cards) => this.bookCallouts.clearNotes(path, runId, cards)
+    },
     // A drive is over: a rewrite the reader queued behind it may run now.
     settled: mapPath => void this.bookHandEdits.drain(mapPath)
   });
@@ -2107,6 +2111,9 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   resumeBookPipeline(mapPath: string, options: { addBudget?: number } = {}): Promise<void> {
     return this.bookPipelineRuns.resume(mapPath, options);
+  }
+  keepBookMap(mapPath: string): Promise<void> {
+    return this.bookPipelineRuns.keepBookMap(mapPath);
   }
   confirmBookGate1(mapPath: string): Promise<void> {
     return this.bookPipelineRuns.confirmGate1(mapPath);

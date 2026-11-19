@@ -3318,5 +3318,12 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_card_menu_why_other": "另一張正在重跑",
   "ui.book_card_menu_why_running": "圖文書正在執行，等它結束後再重跑",
   "ui.book_card_menu_why_this": "這一張正在重跑",
-  "ui.book_card_menu_why_blocked": "對話進行中，等它結束後再重跑"
+  "ui.book_card_menu_why_blocked": "對話進行中，等它結束後再重跑",
+  "ui.book_role_menu": "圖文書：章節角色",
+  "ui.book_role_ai": "交給 AI 決定",
+  "ui.book_role_set_0": "章節角色已設為「{0}」，重跑不會改回。",
+  "ui.book_role_ai_set": "章節角色已交給 AI，下次規劃可能會調整。",
+  "ui.book_role_running_suffix": "圖文書正在執行，要等下次載入才生效。",
+  "ui.book_role_failed": "無法更改章節角色。",
+  "ui.book_deleted_chapter_hint_0": "這裡提到已不在心智圖上的章：{0}"
 };

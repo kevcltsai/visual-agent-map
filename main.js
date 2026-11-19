@@ -3310,7 +3310,14 @@ var en = {
   "ui.book_card_menu_why_other": "Another card is being rerun",
   "ui.book_card_menu_why_running": "The book is running; rerun after it ends",
   "ui.book_card_menu_why_this": "This card is being rerun",
-  "ui.book_card_menu_why_blocked": "A chat is running; rerun after it ends"
+  "ui.book_card_menu_why_blocked": "A chat is running; rerun after it ends",
+  "ui.book_role_menu": "Picture book: chapter role",
+  "ui.book_role_ai": "Let AI decide",
+  "ui.book_role_set_0": 'Chapter role set to "{0}"; it stays across reruns.',
+  "ui.book_role_ai_set": "Chapter role handed back to AI; the next plan may change it.",
+  "ui.book_role_running_suffix": "The book is running; this takes effect from the next load.",
+  "ui.book_role_failed": "Could not change the chapter role.",
+  "ui.book_deleted_chapter_hint_0": "This mentions a chapter that is no longer on the map: {0}"
 };
 
 // i18n/zh-CN.ts
@@ -6516,7 +6523,14 @@ var zhCN = {
   "ui.book_card_menu_why_other": "\u53E6\u4E00\u5F20\u6B63\u5728\u91CD\u8DD1",
   "ui.book_card_menu_why_running": "\u56FE\u6587\u4E66\u6B63\u5728\u6267\u884C\uFF0C\u7B49\u5B83\u7ED3\u675F\u540E\u518D\u91CD\u8DD1",
   "ui.book_card_menu_why_this": "\u8FD9\u4E00\u5F20\u6B63\u5728\u91CD\u8DD1",
-  "ui.book_card_menu_why_blocked": "\u5BF9\u8BDD\u8FDB\u884C\u4E2D\uFF0C\u7B49\u5B83\u7ED3\u675F\u540E\u518D\u91CD\u8DD1"
+  "ui.book_card_menu_why_blocked": "\u5BF9\u8BDD\u8FDB\u884C\u4E2D\uFF0C\u7B49\u5B83\u7ED3\u675F\u540E\u518D\u91CD\u8DD1",
+  "ui.book_role_menu": "\u56FE\u6587\u4E66\uFF1A\u7AE0\u8282\u89D2\u8272",
+  "ui.book_role_ai": "\u4EA4\u7ED9 AI \u51B3\u5B9A",
+  "ui.book_role_set_0": "\u7AE0\u8282\u89D2\u8272\u5DF2\u8BBE\u4E3A\u201C{0}\u201D\uFF0C\u91CD\u8DD1\u4E0D\u4F1A\u6539\u56DE\u3002",
+  "ui.book_role_ai_set": "\u7AE0\u8282\u89D2\u8272\u5DF2\u4EA4\u7ED9 AI\uFF0C\u4E0B\u6B21\u89C4\u5212\u53EF\u80FD\u4F1A\u8C03\u6574\u3002",
+  "ui.book_role_running_suffix": "\u56FE\u6587\u4E66\u6B63\u5728\u6267\u884C\uFF0C\u8981\u7B49\u4E0B\u6B21\u8F7D\u5165\u624D\u751F\u6548\u3002",
+  "ui.book_role_failed": "\u65E0\u6CD5\u66F4\u6539\u7AE0\u8282\u89D2\u8272\u3002",
+  "ui.book_deleted_chapter_hint_0": "\u8FD9\u91CC\u63D0\u5230\u5DF2\u4E0D\u5728\u5FC3\u667A\u56FE\u4E0A\u7684\u7AE0\uFF1A{0}"
 };
 
 // i18n/zh-TW.ts
@@ -9722,7 +9736,14 @@ var zhTW = {
   "ui.book_card_menu_why_other": "\u53E6\u4E00\u5F35\u6B63\u5728\u91CD\u8DD1",
   "ui.book_card_menu_why_running": "\u5716\u6587\u66F8\u6B63\u5728\u57F7\u884C\uFF0C\u7B49\u5B83\u7D50\u675F\u5F8C\u518D\u91CD\u8DD1",
   "ui.book_card_menu_why_this": "\u9019\u4E00\u5F35\u6B63\u5728\u91CD\u8DD1",
-  "ui.book_card_menu_why_blocked": "\u5C0D\u8A71\u9032\u884C\u4E2D\uFF0C\u7B49\u5B83\u7D50\u675F\u5F8C\u518D\u91CD\u8DD1"
+  "ui.book_card_menu_why_blocked": "\u5C0D\u8A71\u9032\u884C\u4E2D\uFF0C\u7B49\u5B83\u7D50\u675F\u5F8C\u518D\u91CD\u8DD1",
+  "ui.book_role_menu": "\u5716\u6587\u66F8\uFF1A\u7AE0\u7BC0\u89D2\u8272",
+  "ui.book_role_ai": "\u4EA4\u7D66 AI \u6C7A\u5B9A",
+  "ui.book_role_set_0": "\u7AE0\u7BC0\u89D2\u8272\u5DF2\u8A2D\u70BA\u300C{0}\u300D\uFF0C\u91CD\u8DD1\u4E0D\u6703\u6539\u56DE\u3002",
+  "ui.book_role_ai_set": "\u7AE0\u7BC0\u89D2\u8272\u5DF2\u4EA4\u7D66 AI\uFF0C\u4E0B\u6B21\u898F\u5283\u53EF\u80FD\u6703\u8ABF\u6574\u3002",
+  "ui.book_role_running_suffix": "\u5716\u6587\u66F8\u6B63\u5728\u57F7\u884C\uFF0C\u8981\u7B49\u4E0B\u6B21\u8F09\u5165\u624D\u751F\u6548\u3002",
+  "ui.book_role_failed": "\u7121\u6CD5\u66F4\u6539\u7AE0\u7BC0\u89D2\u8272\u3002",
+  "ui.book_deleted_chapter_hint_0": "\u9019\u88E1\u63D0\u5230\u5DF2\u4E0D\u5728\u5FC3\u667A\u5716\u4E0A\u7684\u7AE0\uFF1A{0}"
 };
 
 // i18n/languages.ts
@@ -12614,16 +12635,21 @@ function plainPipelineLine(value) {
   if (!line2) return void 0;
   return Array.from(line2).slice(0, PIPELINE_ISSUE_MAX).join("");
 }
+function readBookRoleBy(value) {
+  return value === "owner" || value === "ai" ? value : void 0;
+}
 function readPipelineFields(fm) {
   const stage = readPipelineStage(fm["pipeline-stage"]);
   const role = readBookRole(fm["book-role"]);
   const pipelineRole = readBookRole(fm["pipeline-role"]);
+  const roleBy = readBookRoleBy(fm["book-role-by"]);
   const issue2 = plainPipelineLine(fm["pipeline-issue"]);
   const seam = plainPipelineLine(fm["pipeline-seam"]);
   return {
     ...stage ? { pipelineStage: stage } : {},
     ...role ? { bookRole: role } : {},
     ...pipelineRole ? { pipelineRole } : {},
+    ...roleBy ? { bookRoleBy: roleBy } : {},
     ...issue2 ? { pipelineIssue: issue2 } : {},
     ...seam ? { pipelineSeam: seam } : {}
   };
@@ -12632,16 +12658,17 @@ var FIELD_KEYS = {
   pipelineStage: "pipeline-stage",
   bookRole: "book-role",
   pipelineRole: "pipeline-role",
+  bookRoleBy: "book-role-by",
   pipelineIssue: "pipeline-issue",
   pipelineSeam: "pipeline-seam"
 };
 function pipelineFrontmatter(patch) {
-  var _a2, _b2, _c;
+  var _a2, _b2, _c, _d;
   const values = {};
   for (const field of Object.keys(FIELD_KEYS)) {
     const value = patch[field];
     if (value === void 0) continue;
-    const clean3 = value === null ? null : field === "pipelineStage" ? (_a2 = readPipelineStage(value)) != null ? _a2 : null : field === "bookRole" || field === "pipelineRole" ? (_b2 = readBookRole(value)) != null ? _b2 : null : (_c = plainPipelineLine(value)) != null ? _c : null;
+    const clean3 = value === null ? null : field === "pipelineStage" ? (_a2 = readPipelineStage(value)) != null ? _a2 : null : field === "bookRole" || field === "pipelineRole" ? (_b2 = readBookRole(value)) != null ? _b2 : null : field === "bookRoleBy" ? (_c = readBookRoleBy(value)) != null ? _c : null : (_d = plainPipelineLine(value)) != null ? _d : null;
     values[FIELD_KEYS[field]] = clean3;
   }
   return values;
@@ -31095,11 +31122,34 @@ ${body}`);
     let wrote = false;
     await this.app.vault.process(this.file(path), (content) => {
       const fm = readPipelineFields(frontmatter(content));
-      if (fm.pipelineRole && fm.bookRole && fm.bookRole !== fm.pipelineRole) return content;
+      const byHand = !!fm.pipelineRole && !!fm.bookRole && fm.bookRole !== fm.pipelineRole;
+      if (fm.bookRoleBy === "owner" || byHand) {
+        return byHand && fm.bookRoleBy !== "owner" ? setFrontmatterKeys(content, pipelineFrontmatter({ bookRoleBy: "owner" })) : content;
+      }
       wrote = true;
       return setFrontmatterKeys(content, pipelineFrontmatter({ bookRole: role, pipelineRole: role }));
     });
     return wrote;
+  }
+  /**
+   * The owner's chapter-role choice from the card menu, in one guarded file transaction: a role writes `book-role` and
+   * `book-role-by: owner` (also when the value is unchanged); "ai" writes `book-role-by: ai` and sets `pipeline-role` to the
+   * current `book-role`, so the next plan may change it and a hand-edit check does not read it as the owner's.
+   */
+  async writeBookRoleChoice(path, choice, options = {}) {
+    return this.updateNoteRawGuarded(
+      path,
+      (content) => {
+        if (choice !== "ai")
+          return setFrontmatterKeys(content, pipelineFrontmatter({ bookRole: choice, bookRoleBy: "owner" }));
+        const role = readPipelineFields(frontmatter(content)).bookRole;
+        return setFrontmatterKeys(
+          content,
+          pipelineFrontmatter({ bookRoleBy: "ai", ...role ? { pipelineRole: role } : {} })
+        );
+      },
+      options
+    );
   }
   /** Sets or removes the root topic's `book-*` settings only (same contract as {@link writePipelineFields}). */
   async writeBookSettings(path, patch) {
@@ -52201,8 +52251,14 @@ var BookPipelineRuns = class {
       try {
         const card = await this.ports.readCard(node.path);
         if (card.fields.bookRole) {
-          const owner = card.fields.pipelineRole ? card.fields.bookRole !== card.fields.pipelineRole : !autoRoles.has(id);
-          if (owner) drive.ownerRoles.add(id);
+          const f = card.fields;
+          const byHand = !!f.pipelineRole && f.bookRole !== f.pipelineRole;
+          const owner = f.bookRoleBy === "owner" || byHand ? true : f.bookRoleBy === "ai" ? false : f.pipelineRole ? false : !autoRoles.has(id);
+          if (owner) {
+            drive.ownerRoles.add(id);
+            if (f.bookRoleBy !== "owner" && byHand)
+              await this.ports.writePipelineFields(node.path, { bookRoleBy: "owner" }).catch(() => void 0);
+          }
         } else drive.missingRoles.set(id, !node.parentId || node.parentId === drive.rootId ? "intro" : "body");
         drive.cards.set(id, {
           path: node.path,
@@ -52466,7 +52522,12 @@ var BookPipelineRuns = class {
       if (this.ports.writePipelineRole) return await this.ports.writePipelineRole(info.path, role);
       const now = await this.ports.readCard(info.path);
       const f = now.fields;
-      if (f.pipelineRole && f.bookRole && f.bookRole !== f.pipelineRole) return false;
+      const byHand = !!f.pipelineRole && !!f.bookRole && f.bookRole !== f.pipelineRole;
+      if (f.bookRoleBy === "owner" || byHand) {
+        if (byHand && f.bookRoleBy !== "owner")
+          await this.ports.writePipelineFields(info.path, { bookRoleBy: "owner" });
+        return false;
+      }
       await this.ports.writePipelineFields(info.path, { bookRole: role, pipelineRole: role });
       return true;
     } catch (e) {
@@ -52600,6 +52661,7 @@ var BookPipelineRuns = class {
     return {
       kind: "ok",
       after: async () => {
+        var _a2;
         for (const { id, role } of result.cards) {
           const info = drive.cards.get(id);
           if (!info || drive.ownerRoles.has(id)) continue;
@@ -52609,9 +52671,9 @@ var BookPipelineRuns = class {
           }
           const now = await this.ports.readCard(info.path).catch(() => void 0);
           const f = now == null ? void 0 : now.fields;
-          if ((f == null ? void 0 : f.bookRole) && f.pipelineRole && f.bookRole !== f.pipelineRole) {
+          if ((f == null ? void 0 : f.bookRoleBy) === "owner" || (f == null ? void 0 : f.bookRole) && f.pipelineRole && f.bookRole !== f.pipelineRole) {
             drive.ownerRoles.add(id);
-            info.role = f.bookRole;
+            info.role = (_a2 = f == null ? void 0 : f.bookRole) != null ? _a2 : role;
           } else info.role = role;
         }
       }
@@ -66615,7 +66677,22 @@ var FIELD_LABEL = {
   length: "coffee.book_length",
   style: "coffee.book_style"
 };
-function renderBookSettingsFields(parent, current) {
+function mentionedDeletedChapters(text10, deletedTitles) {
+  const lower6 = text10.toLowerCase();
+  return deletedTitles.filter((title) => title.trim().length >= 2 && lower6.includes(title.trim().toLowerCase()));
+}
+function deletedChapterTitles(snapshot, currentTitles) {
+  if (!snapshot) return [];
+  const present = new Set([...currentTitles.values()].map((title) => title.trim().toLowerCase()));
+  const out = [];
+  for (const [id, { title }] of Object.entries(snapshot)) {
+    const clean3 = title.trim();
+    if (currentTitles.has(id) || !clean3 || present.has(clean3.toLowerCase()) || out.includes(clean3)) continue;
+    out.push(clean3);
+  }
+  return out;
+}
+function renderBookSettingsFields(parent, current, deletedTitles = []) {
   var _a2;
   const areas = /* @__PURE__ */ new Map();
   for (const field of BOOK_SETTING_FIELDS) {
@@ -66634,6 +66711,17 @@ function renderBookSettingsFields(parent, current) {
     });
     area.value = (_a2 = current[field]) != null ? _a2 : "";
     areas.set(field, area);
+    const hint = parent.createEl("p", { cls: "vam-book-start-hint", attr: { id: `${id}-hint`, role: "status" } });
+    const refresh = () => {
+      const found = mentionedDeletedChapters(area.value, deletedTitles);
+      hint.setText(found.length ? t("ui.book_deleted_chapter_hint_0", found.join("\u3001")) : "");
+      hint.toggleClass("is-empty", !found.length);
+    };
+    if (deletedTitles.length) {
+      area.setAttr("aria-describedby", `${id}-hint`);
+      area.addEventListener("input", refresh);
+    }
+    refresh();
   }
   return {
     areas,
@@ -66722,7 +66810,7 @@ var BookStartModal = class extends import_obsidian32.Modal {
       text: t("ui.book_start_suggesting")
     });
     this.suggestingEl.setAttr("role", "status");
-    this.fields = renderBookSettingsFields(settings, this.input.settings);
+    this.fields = renderBookSettingsFields(settings, this.input.settings, this.input.deletedChapterTitles);
     this.refreshEstimate();
     const actions = modalActions(this);
     const cancel = actions.createEl("button", { text: t("ui.cancel") });
@@ -77291,6 +77379,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (this.markersEditable(node) && this.coverPictureOf(node))
       add(t("ui.topic_cover_frame_title"), "square-pen", () => this.openCoverFrameEditor(node));
     this.addBookRerunMenuItem(menu, node);
+    this.addBookRoleMenuItem(menu, node);
     menu.addSeparator();
     menu.addItem(
       (item) => item.setTitle(t("ui.open_details_in_right_sidebar")).setIcon("panel-right").onClick(() => this.openDetails(node))
@@ -77393,6 +77482,67 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       dom == null ? void 0 : dom.addClass("vam-book-menu-note");
       dom == null ? void 0 : dom.setAttr("aria-disabled", "true");
     });
+  }
+  /** The role choices of a chapter card's menu, or undefined when the card is not a chapter of a usable book. */
+  bookRoleChoices(node) {
+    const map = this.map;
+    if (!map || !this.hasBookPipeline()) return void 0;
+    const read = readBookPipeline(map);
+    if (read.kind !== "usable" || !effectiveOrder(read.data).includes(node.id)) return void 0;
+    const note = this.notes.get(node.id);
+    const owner = (note == null ? void 0 : note.bookRoleBy) === "owner" || !!(note == null ? void 0 : note.pipelineRole) && !!note.bookRole && note.bookRole !== note.pipelineRole;
+    const labels = {
+      body: t("ui.book_role_body"),
+      intro: t("ui.book_role_intro"),
+      gallery: t("ui.book_role_gallery"),
+      closing: t("ui.book_role_closing")
+    };
+    return [
+      ...["body", "intro", "gallery", "closing"].map((role) => ({
+        choice: role,
+        label: labels[role],
+        checked: owner && (note == null ? void 0 : note.bookRole) === role
+      })),
+      { choice: "ai", label: t("ui.book_role_ai"), checked: !owner }
+    ];
+  }
+  /** "Picture book: chapter role": a submenu where the menu has one, else a heading and the same items (all reachable by keyboard). */
+  addBookRoleMenuItem(menu, node) {
+    const choices = this.bookRoleChoices(node);
+    if (!choices) return;
+    const fill2 = (target) => {
+      for (const { choice, label, checked: checked2 } of choices)
+        target.addItem((item) => {
+          var _a2;
+          item.setTitle(label).onClick(() => void this.chooseBookRole(node, choice));
+          (_a2 = item.setChecked) == null ? void 0 : _a2.call(item, checked2);
+        });
+    };
+    let sub;
+    menu.addItem((item) => {
+      var _a2;
+      item.setTitle(t("ui.book_role_menu")).setIcon("book-open");
+      sub = (_a2 = item.setSubmenu) == null ? void 0 : _a2.call(item);
+    });
+    if (sub) fill2(sub);
+    else fill2(menu);
+  }
+  /** Writes the choice (works with no run; a running book takes it from its next load, which the notice says). */
+  async chooseBookRole(node, choice) {
+    var _a2;
+    const path = this.path;
+    try {
+      const outcome = await this.plugin.repo.writeBookRoleChoice(node.path, choice);
+      if (outcome === "discarded") throw new Error("discarded");
+      const running2 = !!path && !!((_a2 = this.plugin.getBookPipelineProgress(path)) == null ? void 0 : _a2.active);
+      const first = choice === "ai" ? t("ui.book_role_ai_set") : t("ui.book_role_set_0", t(`ui.book_role_${choice}`));
+      new import_obsidian38.Notice(running2 ? `${first}
+${t("ui.book_role_running_suffix")}` : first);
+    } catch (e) {
+      new import_obsidian38.Notice(t("ui.book_role_failed"));
+    }
+    await this.rereadBookCard(node.id);
+    if (!this.closed) this.render();
   }
   /** Opens the topic note in a new main-area tab (the details sidebar is the other way to read it). */
   openNoteInTab(node) {
@@ -84376,6 +84526,13 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       // Nothing is saved while the card is open: Start saves the picks (see onStart).
       modelChoice: { ...this.bookModelChoice(), onChange: () => void 0 },
       settings: (_c = rootNote == null ? void 0 : rootNote.bookSettings) != null ? _c : {},
+      deletedChapterTitles: deletedChapterTitles(
+        existing.kind === "usable" ? existing.data.chapters : void 0,
+        new Map(map.nodes.map((node) => {
+          var _a3, _b3;
+          return [node.id, (_b3 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b3 : ""];
+        }))
+      ),
       onClose: () => {
         window.clearTimeout(suggestTimer);
         suggesting.abort();
@@ -104713,6 +104870,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
         ...note.pipelineStage ? { pipelineStage: note.pipelineStage } : {},
         ...note.bookRole ? { bookRole: note.bookRole } : {},
         ...note.pipelineRole ? { pipelineRole: note.pipelineRole } : {},
+        ...note.bookRoleBy ? { bookRoleBy: note.bookRoleBy } : {},
         ...note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {},
         ...note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {}
       }

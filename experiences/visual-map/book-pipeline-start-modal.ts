@@ -122,6 +122,8 @@ export interface BookStartInput {
   modelChoice: Omit<BookModelChoiceInput, "models">;
   /** The root topic's current whole-book settings, shown in the fields. */
   settings: BookSettings;
+  /** Titles of chapters that were in the book and are no longer on the map: a field that names one gets a warning line (never blocks). */
+  deletedChapterTitles?: readonly string[];
   /** Called once, after the card closed, with what the owner changed and the suggestions to take (possibly nothing), and the four models picked in the card (saved only now, never by a Cancel). */
   onStart: (patch: BookSettingsPatch, models: BookStartModels) => void;
   /** Called when the card closes for any reason: a suggestion still being made is dropped. */
@@ -142,8 +144,32 @@ export interface BookSettingsFields {
   /** Show these as grey italic suggestions in the fields that are empty; typed text is never touched. */
   suggest: (suggestions: BookSettings) => void;
 }
+/** The deleted chapters' titles a field's text mentions (a title of one letter is too common to mean a chapter). */
+export function mentionedDeletedChapters(text: string, deletedTitles: readonly string[]): string[] {
+  const lower = text.toLowerCase();
+  return deletedTitles.filter(title => title.trim().length >= 2 && lower.includes(title.trim().toLowerCase()));
+}
+/** The deleted chapters' titles: in the book's snapshot, whose card is no longer on the map and whose title no chapter on the map has now. */
+export function deletedChapterTitles(
+  snapshot: Record<string, { title: string }> | undefined,
+  currentTitles: ReadonlyMap<string, string>
+): string[] {
+  if (!snapshot) return [];
+  const present = new Set([...currentTitles.values()].map(title => title.trim().toLowerCase()));
+  const out: string[] = [];
+  for (const [id, { title }] of Object.entries(snapshot)) {
+    const clean = title.trim();
+    if (currentTitles.has(id) || !clean || present.has(clean.toLowerCase()) || out.includes(clean)) continue;
+    out.push(clean);
+  }
+  return out;
+}
 /** The six whole-book fields, always open, prefilled with `current`. Shared with the trial-confirmation screen. */
-export function renderBookSettingsFields(parent: HTMLElement, current: BookSettings): BookSettingsFields {
+export function renderBookSettingsFields(
+  parent: HTMLElement,
+  current: BookSettings,
+  deletedTitles: readonly string[] = []
+): BookSettingsFields {
   const areas = new Map<BookSettingField, HTMLTextAreaElement>();
   for (const field of BOOK_SETTING_FIELDS) {
     const label = t(FIELD_LABEL[field]);
@@ -161,6 +187,18 @@ export function renderBookSettingsFields(parent: HTMLElement, current: BookSetti
     });
     area.value = current[field] ?? "";
     areas.set(field, area);
+    // The warning line follows the text as it is edited; it only informs.
+    const hint = parent.createEl("p", { cls: "vam-book-start-hint", attr: { id: `${id}-hint`, role: "status" } });
+    const refresh = (): void => {
+      const found = mentionedDeletedChapters(area.value, deletedTitles);
+      hint.setText(found.length ? t("ui.book_deleted_chapter_hint_0", found.join("、")) : "");
+      hint.toggleClass("is-empty", !found.length);
+    };
+    if (deletedTitles.length) {
+      area.setAttr("aria-describedby", `${id}-hint`);
+      area.addEventListener("input", refresh);
+    }
+    refresh();
   }
   return {
     areas,
@@ -254,7 +292,7 @@ export class BookStartModal extends Modal {
       text: t("ui.book_start_suggesting")
     });
     this.suggestingEl.setAttr("role", "status");
-    this.fields = renderBookSettingsFields(settings, this.input.settings);
+    this.fields = renderBookSettingsFields(settings, this.input.settings, this.input.deletedChapterTitles);
     this.refreshEstimate();
     const actions = modalActions(this);
     const cancel = actions.createEl("button", { text: t("ui.cancel") });

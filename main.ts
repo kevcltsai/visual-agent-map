@@ -847,6 +847,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}),
         ...(note.bookRole ? { bookRole: note.bookRole } : {}),
         ...(note.pipelineRole ? { pipelineRole: note.pipelineRole } : {}),
+        ...(note.bookRoleBy ? { bookRoleBy: note.bookRoleBy } : {}),
         ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}),
         ...(note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {})
       }

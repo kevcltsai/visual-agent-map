@@ -18,6 +18,7 @@ class OptionStub { constructor(text, value) { const o = dom.element('option', { 
 const bundle = loadSource(`
 export * from "./experiences/visual-map/book-pipeline-ui";
 export { bookStartEstimate, bookStartEstimateText, bookSettingsPatch, BookStartModal, BOOK_SUGGEST_TIMEOUT_MS } from "./experiences/visual-map/book-pipeline-start-modal";
+export { deletedChapterTitles, mentionedDeletedChapters, renderBookSettingsFields } from "./experiences/visual-map/book-pipeline-start-modal";
 export { BookPipelineRunError, stepCounts } from "./experiences/visual-map/book-pipeline-run";
 export { readBookPipeline } from "./core/book-pipeline/model";
 export { reviewEntries, reviewCallout, putProgramCallout } from "./experiences/visual-map/book-pipeline-review";
@@ -1526,4 +1527,57 @@ test('review box: the chapter callouts have their own look in the stylesheet (va
   assert.match(css, /\.callout\[data-callout="vam-trial"\] \{[^}]*--callout-color: var\(--color-blue-rgb\)/);
   assert.match(css, /\.callout\[data-callout="vam-review"\] \{[^}]*--callout-color: var\(--color-orange-rgb\)/);
   assert.match(css, /\.callout\[data-callout="vam-book"\] \{ display: none; \}/);
+});
+
+const sameJ = (a, b, m) => assert.equal(JSON.stringify(a), JSON.stringify(b), m);
+// ---- T14: the deleted-chapter hint of the start card ----
+test('T14 hint: a chapter in the snapshot whose id left the map is named; a rename, a same-name chapter still present, a general word and old data without a snapshot are not', () => {
+  const snap = { c1: { title: '研磨', path: 'a.md' }, c2: { title: '沖煮', path: 'b.md' }, c3: { title: '烘焙', path: 'c.md' } };
+  const cur = (...pairs) => new Map(pairs);
+  // c1 deleted; c2 renamed (id still there); c3 deleted but another chapter has the same name now
+  sameJ(bundle.deletedChapterTitles(snap, cur(['c2', '沖泡新名'], ['x9', '烘焙'])), ['研磨']);
+  sameJ(bundle.deletedChapterTitles(snap, cur(['c1', '研磨'], ['c2', '沖煮'], ['c3', '烘焙'])), [], 'nothing deleted');
+  sameJ(bundle.deletedChapterTitles(undefined, cur()), [], 'older data: no hint');
+  sameJ(bundle.mentionedDeletedChapters('想看研磨的細節與咖啡', ['研磨']), ['研磨']);
+  sameJ(bundle.mentionedDeletedChapters('想看咖啡的細節', ['研磨']), [], 'a general topic word that never was a chapter');
+  sameJ(bundle.mentionedDeletedChapters('Grind it fine', ['grind']), ['grind'], 'case-insensitive');
+});
+
+test('T14 hint: the warning line sits under the field that names a deleted chapter, follows the edit, never blocks, and speaks three languages', () => {
+  const field = (lang, titles, current) => { lang_(lang); const parent = dom.element('div'); const f = bundle.renderBookSettingsFields(parent, current, titles); return { parent, f }; };
+  const lang_ = l => setUiLanguage(l);
+  const hints = parent => dom.findAll(parent, i => i.cls.includes('vam-book-start-hint'));
+  const { parent, f } = field('zh-TW', ['研磨'], { angle: '從研磨切入', tone: '輕鬆' });
+  const shown = hints(parent).filter(h => !h.cls.includes('is-empty'));
+  assert.equal(shown.length, 1, 'only the field that names it');
+  assert.equal(shown[0].text, '這裡提到已不在心智圖上的章：研磨');
+  assert.equal(shown[0].attrs.role, 'status');
+  assert.equal(f.areas.get('angle').attrs['aria-describedby'], 'vam-book-start-angle-hint');
+  assert.equal(shown[0].attrs.id, 'vam-book-start-angle-hint');
+  // the owner edits the field: the line goes, and comes back when typed again
+  const area = f.areas.get('angle');
+  area.value = '從沖煮切入'; area.listeners.input.forEach(fn => fn());
+  assert.equal(hints(parent).filter(h => !h.cls.includes('is-empty')).length, 0, 'gone once the name is removed');
+  area.value = '研磨與沖煮'; area.listeners.input.forEach(fn => fn());
+  assert.equal(hints(parent).filter(h => !h.cls.includes('is-empty')).length, 1);
+  assert.ok(!f.areas.get('angle').disabled, 'the field stays editable');
+  assert.equal(field('en', ['Grind'], { goal: 'about grind' }).parent && hints(field('en', ['Grind'], { goal: 'about grind' }).parent).find(h => !h.cls.includes('is-empty')).text, 'This mentions a chapter that is no longer on the map: Grind');
+  assert.equal(hints(field('zh-CN', ['研磨'], { goal: '研磨' }).parent).find(h => !h.cls.includes('is-empty')).text, '这里提到已不在心智图上的章：研磨');
+  setUiLanguage('zh-TW');
+  assert.equal(hints(field('zh-TW', [], { goal: '研磨' }).parent).filter(h => !h.cls.includes('is-empty')).length, 0, 'no deleted chapter: no hint');
+});
+
+test('T14 hint: the start card of a finished book with a snapshot shows the line for a deleted chapter and still starts', async () => {
+  const h = await harness({ book: true, phase: 'done' });
+  const root = h.view.map.nodes.find(n => !n.parentId);
+  await h.plugin.repo.writeBookSettings(root.path, { angle: '想看研磨的角度' });
+  h.view.map.bookPipeline.chapters = { [h.ids.a]: { title: 'a', path: 'x' }, gone: { title: '研磨', path: 'y' } };
+  h.view.bookPipelineSeen = null;
+  await h.view.startBookPipelineFromUi();
+  const modal = h.view.bookStartModal;
+  const shown = dom.findAll(modal.modalEl, i => i.cls.includes('vam-book-start-hint') && !i.cls.includes('is-empty'));
+  assert.deepEqual(shown.map(i => i.text), ['這裡提到已不在心智圖上的章：研磨']);
+  dom.findAll(modal.modalEl, i => i.tag === 'button').find(b => b.text === '開始').click();
+  await dom.tick();
+  assert.ok(h.entries.some(e => e[0] === 'start'), 'only a hint: the run starts');
 });

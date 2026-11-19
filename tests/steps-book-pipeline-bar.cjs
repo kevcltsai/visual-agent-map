@@ -10,6 +10,7 @@ const dom = require('./support-dom.cjs');
 const { loadSource } = require('./support-replay.cjs');
 
 const root = path.resolve(__dirname, '..');
+const notices = [];
 const bundle = loadSource(`
 export * from "./experiences/visual-map/book-pipeline-ui";
 export { BookReviewMemory, runTrackedRerun } from "./experiences/visual-map/book-pipeline-review";
@@ -17,7 +18,7 @@ export { BookPipelineRuns, BookPipelineRunError } from "./experiences/visual-map
 export { VisualAgentMapView } from "./experiences/visual-map/view";
 export { setUiLanguage } from "./i18n";
 export { shortHash } from "./core/book-pipeline/image-slots";
-`, { obsidian: { ...S.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice([]), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
+`, { obsidian: { ...S.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice(notices), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
 const { setUiLanguage } = bundle;
 const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -262,4 +263,89 @@ test('runTrackedRerun: the same result is remembered, a changed result or a new 
   await bundle.runTrackedRerun(memory, 'fail', async () => ({ unchanged: true }));
   await assert.rejects(() => bundle.runTrackedRerun(memory, 'fail', async () => { throw new Error('x'); }));
   assert.ok(!memory.unchanged.has('fail'));
+});
+
+// ---- T14: the chapter-role item of the card right-click menu ----
+const roleMenu = (h, node, mode = 'sub') => {
+  const items = [];
+  const entry = () => { const it = {}; const chain = { setTitle(v) { it.title = v; return chain; }, setIcon(v) { it.icon = v; return chain; }, setDisabled(v) { it.disabled = !!v; return chain; }, setChecked(v) { it.checked = v; return chain; }, onClick(fn) { it.click = fn; return chain; } }; return { it, chain }; };
+  const sub = { items: [], addItem(build) { const e = entry(); build(e.chain); this.items.push(e.it); return this; } };
+  const m = { addItem(build) { const e = entry(); if (mode === 'sub') e.chain.setSubmenu = () => sub; build(e.chain); items.push(e.it); return m; }, addSeparator() { return m; } };
+  h.view.addCardMenuActions(m, node);
+  const at = items.findIndex(i => i.title === '圖文書：章節角色');
+  return { items, at, choices: mode === 'sub' ? sub.items : items.slice(at + 1, at + 6) };
+};
+const noteOf = (h, node) => h.view.plugin.repo.readNote(node.path);
+
+test('T14 menu: a chapter card of a usable book has the role item with five choices, a submenu where there is one and flat items otherwise (keyboard reachable through the same menu); the current value is marked; i18n in three languages', async () => {
+  const h = await viewRig();
+  const node = h.view.map.nodes[1];
+  await h.view.plugin.repo.writePipelineFields(node.path, { bookRole: 'body', pipelineRole: 'body' });
+  await h.view.rereadBookCard(node.id);
+  for (const mode of ['sub', 'flat']) {
+    const m = roleMenu(h, node, mode);
+    assert.ok(m.at >= 0, mode);
+    assert.deepEqual(m.choices.map(c => c.title), ['本文', '導讀', '素材導覽', '收尾', '交給 AI 決定'], mode);
+    assert.deepEqual(m.choices.map(c => !!c.checked), [false, false, false, false, true], 'a pipeline role: the AI option is marked');
+  }
+  for (const [lang, expect] of [['en', ['Picture book: chapter role', 'Let AI decide']], ['zh-CN', ['图文书：章节角色', '交给 AI 决定']], ['zh-TW', ['圖文書：章節角色', '交給 AI 決定']]]) {
+    setUiLanguage(lang);
+    const items = []; h.view.addCardMenuActions({ addItem(b) { const it = {}; const c = { setTitle(v) { it.title = v; return c; }, setIcon() { return c; }, setDisabled() { return c; }, onClick() { return c; } }; b(c); items.push(it); return this; }, addSeparator() { return this; } }, node);
+    assert.ok(items.some(i => i.title === expect[0]), lang);
+    assert.ok(items.some(i => i.title === expect[1]), lang);
+  }
+  setUiLanguage('zh-TW');
+});
+
+test('T14 menu: absent on a non-chapter card (not in the book order) and on a map without a usable book', async () => {
+  const h = await viewRig();
+  const node = h.view.map.nodes[1];
+  h.view.map.bookPipeline.order = [h.view.map.nodes[0].id];
+  h.view.bookPipelineSeen = null;
+  assert.equal(roleMenu(h, node).at, -1);
+  const plain = await viewRig({ book: false });
+  assert.equal(roleMenu(plain, plain.view.map.nodes[1]).at, -1);
+});
+
+test('T14 menu: a choice with no run writes book-role and book-role-by owner at once, the mark follows, and it survives a reopen; the same value is written too', async () => {
+  const h = await viewRig();
+  const node = h.view.map.nodes[1];
+  h.progress(undefined);
+  notices.length = 0;
+  let m = roleMenu(h, node);
+  m.choices[1].click();
+  await settle();
+  let note = await noteOf(h, node);
+  assert.equal(note.bookRole, 'intro');
+  assert.equal(note.bookRoleBy, 'owner');
+  assert.ok(notices.some(n => n.includes('導讀') && !n.includes('正在執行')), 'no run: no deferral sentence');
+  assert.deepEqual(roleMenu(h, node).choices.map(c => !!c.checked), [false, true, false, false, false]);
+  // a reopen: a fresh view reads the same file
+  h.view.notes.delete(node.id); await h.view.rereadBookCard(node.id);
+  assert.deepEqual(roleMenu(h, node).choices.map(c => !!c.checked), [false, true, false, false, false]);
+  // the same value again still records the owner (a pipeline-written role chosen as is)
+  await h.view.plugin.repo.writePipelineFields(node.path, { bookRole: 'body', pipelineRole: 'body', bookRoleBy: null });
+  await h.view.rereadBookCard(node.id);
+  roleMenu(h, node).choices[0].click();
+  await settle();
+  note = await noteOf(h, node);
+  assert.equal(note.bookRole, 'body');
+  assert.equal(note.bookRoleBy, 'owner', 'same value is still the owner\'s');
+});
+
+test('T14 menu: handing the card to AI writes book-role-by ai and pipeline-role = book-role; a running book is told the change waits for the next load', async () => {
+  const h = await viewRig({ phase: 'writing' });
+  const node = h.view.map.nodes[1];
+  await h.view.plugin.repo.writeBookRoleChoice(node.path, 'gallery');
+  await h.view.rereadBookCard(node.id);
+  h.progress({ runId: 'r1', phase: 'writing', status: 'running', active: true, total: 2, counts: { pending: 0, planned: 0, written: 0, checked: 2, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x' });
+  h.view.bookPipelineSeen = null;
+  notices.length = 0;
+  roleMenu(h, node).choices[4].click();
+  await settle();
+  const note = await noteOf(h, node);
+  assert.equal(note.bookRoleBy, 'ai');
+  assert.equal(note.bookRole, 'gallery');
+  assert.equal(note.pipelineRole, 'gallery');
+  assert.ok(notices.some(n => n.includes('交給 AI') && n.includes('下次載入才生效')), 'says it takes effect from the next load');
 });

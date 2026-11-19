@@ -1646,11 +1646,22 @@ export class BookPipelineRuns {
       try {
         const card = await this.ports.readCard(node.path);
         if (card.fields.bookRole) {
-          // A recorded pipeline-role is the proof: a different book-role was changed by hand. Without one (older data) the id list decides.
-          const owner = card.fields.pipelineRole
-            ? card.fields.bookRole !== card.fields.pipelineRole
-            : !autoRoles.has(id);
-          if (owner) drive.ownerRoles.add(id);
+          // Order: the recorded `book-role-by`, then a pipeline-role difference (a hand edit, recorded as the owner's), then the older id list.
+          const f = card.fields;
+          const byHand = !!f.pipelineRole && f.bookRole !== f.pipelineRole;
+          const owner =
+            f.bookRoleBy === "owner" || byHand
+              ? true
+              : f.bookRoleBy === "ai"
+                ? false
+                : f.pipelineRole
+                  ? false
+                  : !autoRoles.has(id);
+          if (owner) {
+            drive.ownerRoles.add(id);
+            if (f.bookRoleBy !== "owner" && byHand)
+              await this.ports.writePipelineFields(node.path, { bookRoleBy: "owner" }).catch(() => undefined);
+          }
         } else drive.missingRoles.set(id, !node.parentId || node.parentId === drive.rootId ? "intro" : "body");
         drive.cards.set(id, {
           path: node.path,
@@ -1947,7 +1958,12 @@ export class BookPipelineRuns {
       if (this.ports.writePipelineRole) return await this.ports.writePipelineRole(info.path, role);
       const now = await this.ports.readCard(info.path);
       const f = now.fields;
-      if (f.pipelineRole && f.bookRole && f.bookRole !== f.pipelineRole) return false;
+      const byHand = !!f.pipelineRole && !!f.bookRole && f.bookRole !== f.pipelineRole;
+      if (f.bookRoleBy === "owner" || byHand) {
+        if (byHand && f.bookRoleBy !== "owner")
+          await this.ports.writePipelineFields(info.path, { bookRoleBy: "owner" });
+        return false;
+      }
       await this.ports.writePipelineFields(info.path, { bookRole: role, pipelineRole: role });
       return true;
     } catch {
@@ -2097,9 +2113,9 @@ export class BookPipelineRuns {
           }
           const now = await this.ports.readCard(info.path).catch(() => undefined);
           const f = now?.fields;
-          if (f?.bookRole && f.pipelineRole && f.bookRole !== f.pipelineRole) {
+          if (f?.bookRoleBy === "owner" || (f?.bookRole && f.pipelineRole && f.bookRole !== f.pipelineRole)) {
             drive.ownerRoles.add(id);
-            info.role = f.bookRole;
+            info.role = f?.bookRole ?? role;
           } else info.role = role; // a failed write: the in-memory role still leads the run
         }
       }

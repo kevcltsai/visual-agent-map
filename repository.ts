@@ -80,6 +80,7 @@ import {
   readBookSettings,
   readPipelineFields,
   type BookRole,
+  type BookRoleBy,
   type BookSettings,
   type BookSettingsPatch,
   type PipelineFieldsPatch,
@@ -153,6 +154,8 @@ export interface Note {
   bookRole?: BookRole;
   /** Frontmatter `pipeline-role`: the role the pipeline wrote (a different `book-role` is the owner's). */
   pipelineRole?: BookRole;
+  /** Frontmatter `book-role-by`: `owner` keeps `book-role` across runs, `ai` lets the plan change it. */
+  bookRoleBy?: BookRoleBy;
   pipelineIssue?: string;
   pipelineSeam?: string;
   /** The root topic's `book-*` settings; absent when none is set. */
@@ -2145,11 +2148,42 @@ export class Repository {
     let wrote = false;
     await this.app.vault.process(this.file(path), content => {
       const fm = readPipelineFields(frontmatter(content));
-      if (fm.pipelineRole && fm.bookRole && fm.bookRole !== fm.pipelineRole) return content;
+      const byHand = !!fm.pipelineRole && !!fm.bookRole && fm.bookRole !== fm.pipelineRole;
+      // An owner choice (even the same value as the pipeline's) and a hand edit both keep the role; a hand edit is recorded as the owner's.
+      if (fm.bookRoleBy === "owner" || byHand) {
+        return byHand && fm.bookRoleBy !== "owner"
+          ? setFrontmatterKeys(content, pipelineFrontmatter({ bookRoleBy: "owner" }))
+          : content;
+      }
       wrote = true;
       return setFrontmatterKeys(content, pipelineFrontmatter({ bookRole: role, pipelineRole: role }));
     });
     return wrote;
+  }
+
+  /**
+   * The owner's chapter-role choice from the card menu, in one guarded file transaction: a role writes `book-role` and
+   * `book-role-by: owner` (also when the value is unchanged); "ai" writes `book-role-by: ai` and sets `pipeline-role` to the
+   * current `book-role`, so the next plan may change it and a hand-edit check does not read it as the owner's.
+   */
+  async writeBookRoleChoice(
+    path: string,
+    choice: BookRole | "ai",
+    options: { authorize?: () => boolean } = {}
+  ): Promise<"written" | "discarded"> {
+    return this.updateNoteRawGuarded(
+      path,
+      content => {
+        if (choice !== "ai")
+          return setFrontmatterKeys(content, pipelineFrontmatter({ bookRole: choice, bookRoleBy: "owner" }));
+        const role = readPipelineFields(frontmatter(content)).bookRole;
+        return setFrontmatterKeys(
+          content,
+          pipelineFrontmatter({ bookRoleBy: "ai", ...(role ? { pipelineRole: role } : {}) })
+        );
+      },
+      options
+    );
   }
 
   /** Sets or removes the root topic's `book-*` settings only (same contract as {@link writePipelineFields}). */

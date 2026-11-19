@@ -334,6 +334,7 @@ import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
 import {
   BOOK_SETTING_FIELDS,
   effectiveOrder,
+  type BookRole,
   type BookSettings,
   readBookPipeline,
   readPipelineStage,
@@ -562,7 +563,12 @@ import {
 } from "./outline-import-modal";
 import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal } from "./multi-research-modal";
-import { BOOK_SUGGEST_TIMEOUT_MS, BookStartModal, type BookModelChoiceInput } from "./book-pipeline-start-modal";
+import {
+  BOOK_SUGGEST_TIMEOUT_MS,
+  BookStartModal,
+  deletedChapterTitles,
+  type BookModelChoiceInput
+} from "./book-pipeline-start-modal";
 import { bookRerunMenuReason } from "./book-pipeline-rerun";
 import { chatResearchReferenceGroups, type ResearchRequestWithReferences } from "./chat-research-sources";
 import { StructureReviewModal } from "./structure-review-modal";
@@ -9788,6 +9794,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.markersEditable(node) && this.coverPictureOf(node))
       add(t("ui.topic_cover_frame_title"), "square-pen", () => this.openCoverFrameEditor(node));
     this.addBookRerunMenuItem(menu, node);
+    this.addBookRoleMenuItem(menu, node);
     menu.addSeparator();
     menu.addItem(item =>
       item
@@ -9916,6 +9923,66 @@ export class VisualAgentMapView extends ItemView {
       dom?.addClass("vam-book-menu-note");
       dom?.setAttr("aria-disabled", "true");
     });
+  }
+  /** The role choices of a chapter card's menu, or undefined when the card is not a chapter of a usable book. */
+  bookRoleChoices(node: MapNode): { choice: BookRole | "ai"; label: string; checked: boolean }[] | undefined {
+    const map = this.map;
+    if (!map || !this.hasBookPipeline()) return undefined;
+    const read = readBookPipeline(map);
+    if (read.kind !== "usable" || !effectiveOrder(read.data).includes(node.id)) return undefined;
+    const note = this.notes.get(node.id);
+    // The owner's when recorded, or a hand edit of older data (book-role differs from the pipeline's record).
+    const owner =
+      note?.bookRoleBy === "owner" || (!!note?.pipelineRole && !!note.bookRole && note.bookRole !== note.pipelineRole);
+    const labels: Record<BookRole, string> = {
+      body: t("ui.book_role_body"),
+      intro: t("ui.book_role_intro"),
+      gallery: t("ui.book_role_gallery"),
+      closing: t("ui.book_role_closing")
+    };
+    return [
+      ...(["body", "intro", "gallery", "closing"] as const satisfies readonly BookRole[]).map(role => ({
+        choice: role,
+        label: labels[role],
+        checked: owner && note?.bookRole === role
+      })),
+      { choice: "ai" as const, label: t("ui.book_role_ai"), checked: !owner }
+    ];
+  }
+  /** "Picture book: chapter role": a submenu where the menu has one, else a heading and the same items (all reachable by keyboard). */
+  private addBookRoleMenuItem(menu: Menu, node: MapNode): void {
+    const choices = this.bookRoleChoices(node);
+    if (!choices) return;
+    const fill = (target: Menu): void => {
+      for (const { choice, label, checked } of choices)
+        target.addItem(item => {
+          item.setTitle(label).onClick(() => void this.chooseBookRole(node, choice));
+          (item as unknown as { setChecked?: (value: boolean) => void }).setChecked?.(checked);
+        });
+    };
+    let sub: Menu | undefined;
+    menu.addItem(item => {
+      item.setTitle(t("ui.book_role_menu")).setIcon("book-open");
+      sub = (item as unknown as { setSubmenu?: () => Menu }).setSubmenu?.();
+    });
+    if (sub) fill(sub);
+    else fill(menu);
+  }
+  /** Writes the choice (works with no run; a running book takes it from its next load, which the notice says). */
+  private async chooseBookRole(node: MapNode, choice: BookRole | "ai"): Promise<void> {
+    const path = this.path;
+    try {
+      const outcome = await this.plugin.repo.writeBookRoleChoice(node.path, choice);
+      if (outcome === "discarded") throw new Error("discarded");
+      const running = !!path && !!this.plugin.getBookPipelineProgress(path)?.active;
+      const first =
+        choice === "ai" ? t("ui.book_role_ai_set") : t("ui.book_role_set_0", t(`ui.book_role_${choice}` as const));
+      new Notice(running ? `${first}\n${t("ui.book_role_running_suffix")}` : first);
+    } catch {
+      new Notice(t("ui.book_role_failed"));
+    }
+    await this.rereadBookCard(node.id);
+    if (!this.closed) this.render();
   }
   /** Opens the topic note in a new main-area tab (the details sidebar is the other way to read it). */
   private openNoteInTab(node: MapNode): void {
@@ -17531,6 +17598,10 @@ export class VisualAgentMapView extends ItemView {
       // Nothing is saved while the card is open: Start saves the picks (see onStart).
       modelChoice: { ...this.bookModelChoice(), onChange: () => undefined },
       settings: rootNote?.bookSettings ?? {},
+      deletedChapterTitles: deletedChapterTitles(
+        existing.kind === "usable" ? existing.data.chapters : undefined,
+        new Map(map.nodes.map(node => [node.id, this.notes.get(node.id)?.title ?? ""]))
+      ),
       onClose: () => {
         window.clearTimeout(suggestTimer);
         suggesting.abort();

@@ -46,7 +46,7 @@ async function rig(over = {}) {
     updateMap: (path, change) => repo.updateMap(path, d => { change(d); if (!over.trial && d.bookPipeline) delete d.bookPipeline.trial; }),
     readCard: async path => {
       const note = await repo.readNote(path);
-      return { path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(path), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineRole ? { pipelineRole: note.pipelineRole } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}) } };
+      return { path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(path), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineRole ? { pipelineRole: note.pipelineRole } : {}), ...(note.bookRoleBy ? { bookRoleBy: note.bookRoleBy } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}) } };
     },
     writePipelineFields: (path, patch) => { stat.writes++; return repo.writePipelineFields(path, patch); },
     ...(over.noRolePort ? {} : { writePipelineRole: (path, role) => repo.writePipelineRole(path, role) }),
@@ -181,6 +181,63 @@ test('book roles: a role changed by hand after the first run survives a rerun (p
   assert.equal((await r.note(1)).pipelineRole, 'body', 'the record is not touched');
   assert.equal((await r.note(2)).bookRole, 'closing', 'a pipeline-owned role is still reassigned');
   assert.equal((await r.note(2)).pipelineRole, 'closing');
+});
+
+test('T14 owner roles: a menu choice (also the same value as the pipeline\'s) survives later drives and a new runner; handing back to AI lets the next plan reassign; the hand-edit difference is recorded as the owner\'s', async () => {
+  const holder = {};
+  let roles = ['intro', 'body', 'body'];
+  const r = await rig({ script: { global: () => planRoles(holder.r, roles) } });
+  holder.r = r;
+  await r.runs.start(r.mapPath);
+  const done = () => r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'done'; });
+  // same value as the pipeline wrote (body): still the owner's
+  assert.equal((await r.note(1)).bookRoleBy, undefined);
+  assert.equal(await r.repo.writeBookRoleChoice(r.nodes[1].path, 'body'), 'written');
+  assert.equal((await r.note(1)).bookRoleBy, 'owner');
+  roles = ['intro', 'closing', 'closing'];
+  await done();
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.note(1)).bookRole, 'body', 'same-value choice is protected');
+  assert.equal((await r.note(2)).bookRole, 'closing');
+  // a reopen: a new runner on the same files
+  const again = new r.runs.constructor(r.ports);
+  roles = ['intro', 'gallery', 'gallery'];
+  await done();
+  await again.start(r.mapPath);
+  assert.equal((await r.note(1)).bookRole, 'body', 'kept across a new runner');
+  // handed back to AI: the next global plan may reassign it
+  await r.repo.writeBookRoleChoice(r.nodes[1].path, 'ai');
+  assert.equal((await r.note(1)).bookRoleBy, 'ai');
+  assert.equal((await r.note(1)).pipelineRole, 'body');
+  await done();
+  await again.start(r.mapPath);
+  assert.equal((await r.note(1)).bookRole, 'gallery', 'reassigned by the plan');
+  assert.equal((await r.note(1)).bookRoleBy, 'ai');
+  // a hand edit of book-role is recorded as the owner's (card 2 keeps its role afterwards)
+  await r.repo.writePipelineFields(r.nodes[2].path, { bookRole: 'intro' });
+  roles = ['intro', 'gallery', 'closing'];
+  await done();
+  await again.start(r.mapPath);
+  assert.equal((await r.note(2)).bookRole, 'intro');
+  assert.equal((await r.note(2)).bookRoleBy, 'owner', 'the hand edit is now written down');
+});
+
+test('T14 owner roles: a choice made before any run (no drive) is kept by the first plan; the owner mark is read from book-role-by first, even when pipeline-role equals book-role', async () => {
+  const holder = {};
+  const r = await rig({ script: { global: () => planRoles(holder.r, ['intro', 'closing', 'closing']) } });
+  holder.r = r;
+  await r.repo.writeBookRoleChoice(r.nodes[2].path, 'gallery');
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.note(2)).bookRole, 'gallery');
+  assert.equal((await r.note(1)).bookRole, 'closing');
+  // the no-role-port fallback path respects it too
+  const holder2 = {};
+  const q = await rig({ noRolePort: true, script: { global: () => planRoles(holder2.r, ['intro', 'closing', 'closing']) } });
+  holder2.r = q;
+  await q.repo.writeBookRoleChoice(q.nodes[1].path, 'body');
+  await q.runs.start(q.mapPath);
+  assert.equal((await q.note(1)).bookRole, 'body');
+  assert.equal((await q.note(2)).bookRole, 'closing');
 });
 
 test('book roles: the role changed while the global plan is awaited is not overwritten (decided at the write)', async () => {

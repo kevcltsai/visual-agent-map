@@ -3552,7 +3552,14 @@ export const en = {
   "ui.book_card_menu_why_other": "Another card is being rerun",
   "ui.book_card_menu_why_running": "The book is running; rerun after it ends",
   "ui.book_card_menu_why_this": "This card is being rerun",
-  "ui.book_card_menu_why_blocked": "A chat is running; rerun after it ends"
+  "ui.book_card_menu_why_blocked": "A chat is running; rerun after it ends",
+  "ui.book_role_menu": "Picture book: chapter role",
+  "ui.book_role_ai": "Let AI decide",
+  "ui.book_role_set_0": 'Chapter role set to "{0}"; it stays across reruns.',
+  "ui.book_role_ai_set": "Chapter role handed back to AI; the next plan may change it.",
+  "ui.book_role_running_suffix": "The book is running; this takes effect from the next load.",
+  "ui.book_role_failed": "Could not change the chapter role.",
+  "ui.book_deleted_chapter_hint_0": "This mentions a chapter that is no longer on the map: {0}"
 } as const;
 
 export type TranslationKey = keyof typeof en;

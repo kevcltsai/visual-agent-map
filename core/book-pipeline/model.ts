@@ -44,20 +44,28 @@ export interface PipelineFields {
   bookRole?: BookRole;
   /** The role the pipeline itself wrote; a `book-role` that differs from it was changed by hand. Absent = older data. */
   pipelineRole?: BookRole;
+  /** Frontmatter `book-role-by`: who decided `book-role` (`owner` is kept across runs; `ai` the plan may change). Absent = unrecorded. */
+  bookRoleBy?: BookRoleBy;
   pipelineIssue?: string;
   pipelineSeam?: string;
+}
+export type BookRoleBy = "owner" | "ai";
+export function readBookRoleBy(value: unknown): BookRoleBy | undefined {
+  return value === "owner" || value === "ai" ? value : undefined;
 }
 /** Only the keys the note has: a note without any of them gets `{}`. */
 export function readPipelineFields(fm: Record<string, unknown>): PipelineFields {
   const stage = readPipelineStage(fm["pipeline-stage"]);
   const role = readBookRole(fm["book-role"]);
   const pipelineRole = readBookRole(fm["pipeline-role"]);
+  const roleBy = readBookRoleBy(fm["book-role-by"]);
   const issue = plainPipelineLine(fm["pipeline-issue"]);
   const seam = plainPipelineLine(fm["pipeline-seam"]);
   return {
     ...(stage ? { pipelineStage: stage } : {}),
     ...(role ? { bookRole: role } : {}),
     ...(pipelineRole ? { pipelineRole } : {}),
+    ...(roleBy ? { bookRoleBy: roleBy } : {}),
     ...(issue ? { pipelineIssue: issue } : {}),
     ...(seam ? { pipelineSeam: seam } : {})
   };
@@ -67,6 +75,7 @@ export interface PipelineFieldsPatch {
   pipelineStage?: PipelineStage | null;
   bookRole?: BookRole | null;
   pipelineRole?: BookRole | null;
+  bookRoleBy?: BookRoleBy | null;
   pipelineIssue?: string | null;
   pipelineSeam?: string | null;
 }
@@ -74,6 +83,7 @@ const FIELD_KEYS = {
   pipelineStage: "pipeline-stage",
   bookRole: "book-role",
   pipelineRole: "pipeline-role",
+  bookRoleBy: "book-role-by",
   pipelineIssue: "pipeline-issue",
   pipelineSeam: "pipeline-seam"
 } as const;
@@ -90,7 +100,9 @@ export function pipelineFrontmatter(patch: PipelineFieldsPatch): Record<string, 
           ? (readPipelineStage(value) ?? null)
           : field === "bookRole" || field === "pipelineRole"
             ? (readBookRole(value) ?? null)
-            : (plainPipelineLine(value) ?? null);
+            : field === "bookRoleBy"
+              ? (readBookRoleBy(value) ?? null)
+              : (plainPipelineLine(value) ?? null);
     values[FIELD_KEYS[field]] = clean;
   }
   return values;

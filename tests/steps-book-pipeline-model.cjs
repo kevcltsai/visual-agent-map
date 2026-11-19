@@ -271,7 +271,10 @@ test('writePipelineRole writes book-role and pipeline-role together only while t
   assert.equal(await repo.writePipelineRole(note.path, 'closing'), false, 'changed by hand');
   read = await repo.readNote(note.path);
   assert.deepEqual([read.bookRole, read.pipelineRole], ['gallery', 'body']);
+  assert.equal(read.bookRoleBy, 'owner', 'the hand edit is recorded as the owner\'s');
   await repo.writePipelineFields(note.path, { pipelineRole: null });
+  assert.equal(await repo.writePipelineRole(note.path, 'closing'), false, 'a recorded owner choice stays without pipeline-role');
+  await repo.writePipelineFields(note.path, { bookRoleBy: null });
   assert.equal(await repo.writePipelineRole(note.path, 'closing'), true, 'older data (no pipeline-role) writes as before');
 });
 

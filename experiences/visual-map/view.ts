@@ -17600,6 +17600,13 @@ export class VisualAgentMapView extends ItemView {
     // The grey suggestions: one call on the picture model, dropped when the card closes (Start, Cancel, view closed) or after 20 s.
     const suggesting = new AbortController();
     const suggestTimer = window.setTimeout(() => suggesting.abort(), BOOK_SUGGEST_TIMEOUT_MS);
+    // A chapter not loaded into the view is named by its file name, so a deleted chapter of the same name is not reported as gone.
+    const chapterTitles = new Map(
+      map.nodes.map(node => [
+        node.id,
+        this.notes.get(node.id)?.title ?? (node.path.split("/").pop() ?? "").replace(/\.md$/, "")
+      ])
+    );
     const modal = new BookStartModal(this.app, {
       cards: readingOrder(map.nodes, { includeHidden: true }).length,
       models: {
@@ -17613,8 +17620,9 @@ export class VisualAgentMapView extends ItemView {
       settings: rootNote?.bookSettings ?? {},
       deletedChapterTitles: deletedChapterTitles(
         existing.kind === "usable" ? existing.data.chapters : undefined,
-        new Map(map.nodes.map(node => [node.id, this.notes.get(node.id)?.title ?? ""]))
+        chapterTitles
       ),
+      chapterTitles: [...chapterTitles.values()],
       onClose: () => {
         window.clearTimeout(suggestTimer);
         suggesting.abort();

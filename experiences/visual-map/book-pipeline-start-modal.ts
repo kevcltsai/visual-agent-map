@@ -124,6 +124,8 @@ export interface BookStartInput {
   settings: BookSettings;
   /** Titles of chapters that were in the book and are no longer on the map: a field that names one gets a warning line (never blocks). */
   deletedChapterTitles?: readonly string[];
+  /** Titles of the chapters still on the map (a mention of one is not a mention of a deleted chapter inside it). */
+  chapterTitles?: readonly string[];
   /** Called once, after the card closed, with what the owner changed and the suggestions to take (possibly nothing), and the four models picked in the card (saved only now, never by a Cancel). */
   onStart: (patch: BookSettingsPatch, models: BookStartModels) => void;
   /** Called when the card closes for any reason: a suggestion still being made is dropped. */
@@ -144,9 +146,18 @@ export interface BookSettingsFields {
   /** Show these as grey italic suggestions in the fields that are empty; typed text is never touched. */
   suggest: (suggestions: BookSettings) => void;
 }
-/** The deleted chapters' titles a field's text mentions (a title of one letter is too common to mean a chapter). */
-export function mentionedDeletedChapters(text: string, deletedTitles: readonly string[]): string[] {
-  const lower = text.toLowerCase();
+/**
+ * The deleted chapters' titles a field's text mentions (a title of one letter is too common to mean a chapter). The titles of the
+ * chapters still on the map are taken out of the text first, longest first, so "研磨與萃取" does not count as a mention of a deleted "研磨".
+ */
+export function mentionedDeletedChapters(
+  text: string,
+  deletedTitles: readonly string[],
+  existingTitles: readonly string[] = []
+): string[] {
+  let lower = text.toLowerCase();
+  const present = existingTitles.map(title => title.trim().toLowerCase()).filter(Boolean);
+  for (const title of present.sort((a, b) => b.length - a.length)) lower = lower.split(title).join(" ");
   return deletedTitles.filter(title => title.trim().length >= 2 && lower.includes(title.trim().toLowerCase()));
 }
 /** The deleted chapters' titles: in the book's snapshot, whose card is no longer on the map and whose title no chapter on the map has now. */
@@ -168,7 +179,8 @@ export function deletedChapterTitles(
 export function renderBookSettingsFields(
   parent: HTMLElement,
   current: BookSettings,
-  deletedTitles: readonly string[] = []
+  deletedTitles: readonly string[] = [],
+  chapterTitles: readonly string[] = []
 ): BookSettingsFields {
   const areas = new Map<BookSettingField, HTMLTextAreaElement>();
   for (const field of BOOK_SETTING_FIELDS) {
@@ -190,7 +202,7 @@ export function renderBookSettingsFields(
     // The warning line follows the text as it is edited; it only informs.
     const hint = parent.createEl("p", { cls: "vam-book-start-hint", attr: { id: `${id}-hint`, role: "status" } });
     const refresh = (): void => {
-      const found = mentionedDeletedChapters(area.value, deletedTitles);
+      const found = mentionedDeletedChapters(area.value, deletedTitles, chapterTitles);
       hint.setText(found.length ? t("ui.book_deleted_chapter_hint_0", found.join("、")) : "");
       hint.toggleClass("is-empty", !found.length);
     };
@@ -292,7 +304,12 @@ export class BookStartModal extends Modal {
       text: t("ui.book_start_suggesting")
     });
     this.suggestingEl.setAttr("role", "status");
-    this.fields = renderBookSettingsFields(settings, this.input.settings, this.input.deletedChapterTitles);
+    this.fields = renderBookSettingsFields(
+      settings,
+      this.input.settings,
+      this.input.deletedChapterTitles,
+      this.input.chapterTitles
+    );
     this.refreshEstimate();
     const actions = modalActions(this);
     const cancel = actions.createEl("button", { text: t("ui.cancel") });

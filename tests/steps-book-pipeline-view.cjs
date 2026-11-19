@@ -1541,6 +1541,10 @@ test('T14 hint: a chapter in the snapshot whose id left the map is named; a rena
   sameJ(bundle.mentionedDeletedChapters('想看研磨的細節與咖啡', ['研磨']), ['研磨']);
   sameJ(bundle.mentionedDeletedChapters('想看咖啡的細節', ['研磨']), [], 'a general topic word that never was a chapter');
   sameJ(bundle.mentionedDeletedChapters('Grind it fine', ['grind']), ['grind'], 'case-insensitive');
+  // review-c 3: "研磨" was deleted while "研磨與萃取" still exists
+  sameJ(bundle.mentionedDeletedChapters('寫到研磨與萃取的關係', ['研磨'], ['研磨與萃取']), [], 'a deleted name inside a present chapter name is not a mention');
+  sameJ(bundle.mentionedDeletedChapters('研磨與萃取，還有研磨本身', ['研磨'], ['研磨與萃取']), ['研磨'], 'a separate mention still warns');
+  sameJ(bundle.mentionedDeletedChapters('研磨與萃取', ['研磨'], ['研磨', '研磨與萃取']), [], 'longest present title is removed first');
 });
 
 test('T14 hint: the warning line sits under the field that names a deleted chapter, follows the edit, never blocks, and speaks three languages', () => {

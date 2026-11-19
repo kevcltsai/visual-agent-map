@@ -10,7 +10,7 @@ const { loadSource } = require('./support-replay.cjs');
 const b = loadSource(`
 export * from "./experiences/visual-map/book-pipeline-review";
 export { projectProofBody as projectDirect } from "./core/book-pipeline/book-notes";
-export { neutralizeDetail, neutralizeText, chapterBody, visibleDetail } from "./core/book-pipeline/note-sections";
+export { neutralizeDetail, neutralizeText, chapterBody } from "./core/book-pipeline/note-sections";
 export { proofKey } from "./core/book-pipeline/proof";
 export { setUiLanguage } from "./i18n";
 export { shortHash } from "./core/book-pipeline/image-slots";
@@ -234,12 +234,11 @@ test('neutralizeDetail: an author cannot forge the program callouts or markers (
   assert.equal(b.neutralizeDetail(note('> [!vam-book]- 研究備註\n> x')).includes('[!note]-'), true, 'vam-book still neutralized');
   assert.equal(b.neutralizeDetail(note('plain 50%% off and a %%real comment%%')), note('plain 50%% off and a %%real comment%%'), 'ordinary %% is left alone');
 });
-test('the program callouts are no chapter text: chapterBody and visibleDetail drop them, so a proof key does not move when one is added', () => {
+test('the program callouts are no chapter text: chapterBody drops them, so a proof key does not move when one is added', () => {
   const detail = 'Chapter text.\n\nMore.';
   const withBoth = b.putProgramCallout(b.putProgramCallout(note(detail), trial(false)), review());
   const inner = withBoth.slice(withBoth.indexOf(START) + START.length + 1, withBoth.indexOf(END));
   assert.equal(b.chapterBody(inner), detail);
-  assert.equal(b.visibleDetail(inner), detail);
   assert.equal(b.chapterBody(inner), b.chapterBody(b.collapseReviewCallouts(inner)));
   const parts = { runId: 'r', nodeId: 'n', revision: 1, checklist: [] };
   assert.equal(b.proofKey({ ...parts, body: b.chapterBody(inner) }), b.proofKey({ ...parts, body: detail }));

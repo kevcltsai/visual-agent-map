@@ -1681,14 +1681,19 @@ export default class VisualAgentMapPlugin extends Plugin {
       // Only the owner's own renames (not VAM's collision numbering) are followed, and a batch is first collapsed to origin -> final
       // so a chain (A -> B -> C) or a swap through a temporary name reads each file against the name it started with.
       const origins = new Map<string, string>();
-      for (const { pair: [from, to], external } of renames) {
+      for (const {
+        pair: [from, to],
+        external
+      } of renames) {
         const origin = origins.get(from) ?? from;
         origins.delete(from);
         if (external) origins.set(to, origin);
       }
       for (const [to, from] of origins)
         await this.repo
-          .followRenamedTitle(from, to, nodePaths, reason => this.logs.appendLog("info", `title_follow_refused reason=${reason}`))
+          .followRenamedTitle(from, to, nodePaths, reason =>
+            this.logs.appendLog("info", `title_follow_refused reason=${reason}`)
+          )
           .catch(() => {
             this.logs.appendLog("info", "title_follow_refused reason=error");
             return false;

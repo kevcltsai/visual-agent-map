@@ -121,10 +121,15 @@ const TOKEN = /⟦L\d+⟧/g;
 function whitelistBreach(original: string, before: string[], lines: string[]): string | null {
   const allowed = new Set([...original.replace(TOKEN, "")].filter(c => !/[\p{L}\p{N}\p{M}\s]/u.test(c)));
   for (const c of BASE_PUNCT) allowed.add(c);
-  for (const mark of ["```", "~~~", "$$"]) if (lines.join("\n").includes(mark) && !original.includes(mark)) return "block syntax";
+  for (const mark of ["```", "~~~", "$$"])
+    if (lines.join("\n").includes(mark) && !original.includes(mark)) return "block syntax";
   for (const [i, line] of lines.entries()) {
     const body = line.slice(LEAD.exec(line)?.[0].length ?? 0);
-    if (/^\s{0,3}(?:`{3,}|~{3,}|\$\$|\[\^|#)/.test(body) || /^\s{0,3}([-*_=])\1{2,}/.test(body) || /^\s{0,3}(?:[-*_]\s*){3,}$/.test(body))
+    if (
+      /^\s{0,3}(?:`{3,}|~{3,}|\$\$|\[\^|#)/.test(body) ||
+      /^\s{0,3}([-*_=])\1{2,}/.test(body) ||
+      /^\s{0,3}(?:[-*_]\s*){3,}$/.test(body)
+    )
       return "block syntax";
     if (/^\s*(?:[-*+]|\d+[.)])(\s|$)/.test(body)) return "list mark";
     const indent = (t: string): boolean => /^(?: {4,}|\t)/.test(t);

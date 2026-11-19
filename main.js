@@ -3217,7 +3217,7 @@ var en = {
   "ui.book_trial_text_label_0": "Finished text of {0}",
   "ui.book_trial_no_text": "This chapter has no text yet.",
   "ui.book_trial_fold": "Want to change something? Whole-book settings and models",
-  "ui.book_trial_retry": "Retry this chapter with the new settings",
+  "ui.book_trial_retry": "Retry the trial with the new settings",
   "ui.book_panel_not_gate1": "The run is not at gate 1, so there is no plan to confirm here.",
   "ui.book_panel_plan_empty": "The book plan has no content yet.",
   "ui.book_gate1_thread_label": "Book thread",
@@ -6396,7 +6396,7 @@ var zhCN = {
   "ui.book_trial_text_label_0": "{0} \u7684\u5B8C\u6574\u5185\u5BB9",
   "ui.book_trial_no_text": "\u8FD9\u4E00\u7AE0\u8FD8\u6CA1\u6709\u5185\u5BB9\u3002",
   "ui.book_trial_fold": "\u60F3\u8C03\u6574\uFF1F\u5168\u4E66\u8BBE\u7F6E\u3001\u6A21\u578B",
-  "ui.book_trial_retry": "\u7528\u65B0\u8BBE\u7F6E\u91CD\u8BD5\u8FD9\u4E00\u7AE0",
+  "ui.book_trial_retry": "\u7528\u65B0\u8BBE\u7F6E\u91CD\u8BD5\u8BD5\u8DD1",
   "ui.book_panel_not_gate1": "\u76EE\u524D\u4E0D\u5728\u201C\u5173\u5361 1\u201D\uFF0C\u8FD9\u91CC\u6CA1\u6709\u8981\u786E\u8BA4\u7684\u4F01\u5212\u3002",
   "ui.book_panel_plan_empty": "\u5168\u4E66\u4F01\u5212\u8FD8\u6CA1\u6709\u5185\u5BB9\u3002",
   "ui.book_gate1_thread_label": "\u5168\u4E66\u4E3B\u7EBF",
@@ -9575,7 +9575,7 @@ var zhTW = {
   "ui.book_trial_text_label_0": "{0} \u7684\u5B8C\u6574\u5167\u6587",
   "ui.book_trial_no_text": "\u9019\u4E00\u7AE0\u9084\u6C92\u6709\u5167\u6587\u3002",
   "ui.book_trial_fold": "\u60F3\u8ABF\u6574\uFF1F\u5168\u66F8\u8A2D\u5B9A\u3001\u6A21\u578B",
-  "ui.book_trial_retry": "\u7528\u65B0\u8A2D\u5B9A\u91CD\u8A66\u9019\u4E00\u7AE0",
+  "ui.book_trial_retry": "\u7528\u65B0\u8A2D\u5B9A\u91CD\u8A66\u8A66\u8DD1",
   "ui.book_panel_not_gate1": "\u76EE\u524D\u4E0D\u5728\u300C\u95DC\u5361 1\u300D\uFF0C\u9019\u88E1\u6C92\u6709\u8981\u78BA\u8A8D\u7684\u4F01\u5283\u3002",
   "ui.book_panel_plan_empty": "\u5168\u66F8\u4F01\u5283\u9084\u6C92\u6709\u5167\u5BB9\u3002",
   "ui.book_gate1_thread_label": "\u5168\u66F8\u4E3B\u7DDA",
@@ -52639,6 +52639,11 @@ function renderPanelTabs(panel, actions) {
     actions.close();
   });
 }
+function typedPatch(state, actions) {
+  const typed = {};
+  for (const [field, value] of state.settingDrafts) typed[field] = value;
+  return bookSettingsPatch(actions.settings, typed);
+}
 function renderGatePanel(parent, data, gate1, state, actions) {
   const panel = parent.createDiv("vam-book-panel");
   panel.setAttr("role", "region");
@@ -52677,12 +52682,14 @@ function renderGatePanel(parent, data, gate1, state, actions) {
   confirm.addEventListener("click", (event) => {
     event.stopPropagation();
     if (working) return;
+    const patch = typedPatch(state, actions);
     state.confirming = true;
     state.confirmError = "";
     actions.refresh();
-    void actions.confirm().then(
+    void actions.confirm(patch).then(
       () => {
         state.confirming = false;
+        state.settingDrafts.clear();
         actions.refresh();
       },
       (error) => {
@@ -52702,9 +52709,7 @@ function renderGatePanel(parent, data, gate1, state, actions) {
     retry.addEventListener("click", (event) => {
       event.stopPropagation();
       if (working) return;
-      const typed = {};
-      for (const [field, value] of state.settingDrafts) typed[field] = value;
-      const patch = bookSettingsPatch(actions.settings, typed);
+      const patch = typedPatch(state, actions);
       state.retrying = true;
       state.confirmError = "";
       actions.refresh();
@@ -82648,7 +82653,13 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const settings = this.plugin.settings;
     const root = map.nodes.find((node) => !node.parentId);
     renderGatePanel(side, data, true, state, {
-      confirm: () => this.plugin.confirmBookGate1(path),
+      confirm: async (patch) => {
+        if (root && Object.keys(patch).length) {
+          if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");
+          await this.plugin.repo.writeBookSettings(root.path, patch);
+        }
+        await this.plugin.confirmBookGate1(path);
+      },
       retry: async (patch) => {
         if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");
         if (root && Object.keys(patch).length) await this.plugin.repo.writeBookSettings(root.path, patch);

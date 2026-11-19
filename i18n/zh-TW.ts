@@ -3223,7 +3223,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_trial_text_label_0": "{0} 的完整內文",
   "ui.book_trial_no_text": "這一章還沒有內文。",
   "ui.book_trial_fold": "想調整？全書設定、模型",
-  "ui.book_trial_retry": "用新設定重試這一章",
+  "ui.book_trial_retry": "用新設定重試試跑",
   "ui.book_panel_not_gate1": "目前不在「關卡 1」，這裡沒有要確認的企劃。",
   "ui.book_panel_plan_empty": "全書企劃還沒有內容。",
   "ui.book_gate1_thread_label": "全書主線",

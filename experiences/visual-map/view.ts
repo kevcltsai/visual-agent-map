@@ -17298,7 +17298,14 @@ export class VisualAgentMapView extends ItemView {
     const settings = this.plugin.settings;
     const root = map.nodes.find(node => !node.parentId);
     renderGatePanel(side, data, true, state, {
-      confirm: () => this.plugin.confirmBookGate1(path),
+      confirm: async patch => {
+        // Settings changed at gate 1 apply to the whole book: written to the root topic before writing begins.
+        if (root && Object.keys(patch).length) {
+          if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");
+          await this.plugin.repo.writeBookSettings(root.path, patch);
+        }
+        await this.plugin.confirmBookGate1(path);
+      },
       retry: async patch => {
         // A chat chain holding the map refuses before anything is written; only the changed fields are written, to the root topic.
         if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");

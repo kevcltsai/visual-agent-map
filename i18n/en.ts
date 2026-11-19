@@ -3451,7 +3451,7 @@ export const en = {
   "ui.book_trial_text_label_0": "Finished text of {0}",
   "ui.book_trial_no_text": "This chapter has no text yet.",
   "ui.book_trial_fold": "Want to change something? Whole-book settings and models",
-  "ui.book_trial_retry": "Retry this chapter with the new settings",
+  "ui.book_trial_retry": "Retry the trial with the new settings",
   "ui.book_panel_not_gate1": "The run is not at gate 1, so there is no plan to confirm here.",
   "ui.book_panel_plan_empty": "The book plan has no content yet.",
   "ui.book_gate1_thread_label": "Book thread",

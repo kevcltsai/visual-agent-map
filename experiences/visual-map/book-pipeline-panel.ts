@@ -136,7 +136,8 @@ export async function runTrackedRerun(
 }
 
 export interface GatePanelActions {
-  confirm: () => Promise<void>;
+  /** Writes what the owner changed in the settings (possibly nothing), then confirms the plan: the whole book runs with them. */
+  confirm: (patch: BookSettingsPatch) => Promise<void>;
   /** Writes what the owner changed in the settings (possibly nothing), then runs the trial chapters again. */
   retry: (patch: BookSettingsPatch) => Promise<void>;
   /** Draws `markdown` into `el` (the view's Markdown renderer, whose component is unloaded when the panel is drawn again or closed). */
@@ -176,6 +177,13 @@ export function renderPanelTabs(panel: HTMLElement, actions: Pick<GatePanelActio
     event.stopPropagation();
     actions.close();
   });
+}
+
+/** What the owner typed in the settings fold, as the patch both buttons write (only the changed fields). */
+function typedPatch(state: GatePanelState, actions: GatePanelActions): BookSettingsPatch {
+  const typed: Record<string, string> = {};
+  for (const [field, value] of state.settingDrafts) typed[field] = value;
+  return bookSettingsPatch(actions.settings, typed);
 }
 
 /** Draws the panel into `parent` (the view's right-hand column). `gate1` is false once the run has left gate 1. */
@@ -227,12 +235,14 @@ export function renderGatePanel(
   confirm.addEventListener("click", event => {
     event.stopPropagation();
     if (working) return;
+    const patch = typedPatch(state, actions);
     state.confirming = true;
     state.confirmError = "";
     actions.refresh();
-    void actions.confirm().then(
+    void actions.confirm(patch).then(
       () => {
         state.confirming = false;
+        state.settingDrafts.clear();
         actions.refresh();
       },
       error => {
@@ -252,9 +262,7 @@ export function renderGatePanel(
     retry.addEventListener("click", event => {
       event.stopPropagation();
       if (working) return;
-      const typed: Record<string, string> = {};
-      for (const [field, value] of state.settingDrafts) typed[field] = value;
-      const patch = bookSettingsPatch(actions.settings, typed);
+      const patch = typedPatch(state, actions);
       state.retrying = true;
       state.confirmError = "";
       actions.refresh();

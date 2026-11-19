@@ -3222,7 +3222,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_trial_text_label_0": "{0} 的完整内容",
   "ui.book_trial_no_text": "这一章还没有内容。",
   "ui.book_trial_fold": "想调整？全书设置、模型",
-  "ui.book_trial_retry": "用新设置重试这一章",
+  "ui.book_trial_retry": "用新设置重试试跑",
   "ui.book_panel_not_gate1": "目前不在“关卡 1”，这里没有要确认的企划。",
   "ui.book_panel_plan_empty": "全书企划还没有内容。",
   "ui.book_gate1_thread_label": "全书主线",

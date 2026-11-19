@@ -393,3 +393,20 @@ test('trial screen: retry sends what was typed in the fold once, keeps the draft
   assert.equal(state.settingDrafts.size, 0, 'drafts are cleared once the retry applied them');
   assert.equal(one(panel, 'vam-book-panel-retry').disabled, false);
 });
+
+test('trial screen: "run the whole book" sends what was typed in the fold, so the whole book uses it; drafts clear once it went through', async () => {
+  setUiLanguage('zh-TW');
+  const calls = [];
+  const state = new bundle.GatePanelState();
+  const parent = dom.element('div');
+  let panel;
+  const actions = actionsOf({ settings: { reader: 'old reader' }, confirm: async patch => { calls.push(patch); }, refresh: () => { panel.remove(); panel = bundle.renderGatePanel(parent, trialData(), true, state, actions); } });
+  panel = bundle.renderGatePanel(parent, trialData(), true, state, actions);
+  assert.equal(one(panel, 'vam-book-panel-retry').text, '用新設定重試試跑', 'the retry names the trial, not one chapter');
+  const area = dom.findAll(panel, i => i.tag === 'textarea')[0];
+  area.value = 'new reader'; area.fire('input', {});
+  one(panel, 'vam-book-panel-confirm').click();
+  await settle();
+  assert.equal(JSON.stringify(calls), JSON.stringify([{ reader: 'new reader' }]));
+  assert.equal(state.settingDrafts.size, 0);
+});

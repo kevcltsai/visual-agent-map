@@ -318,7 +318,7 @@ function renderAsk(
   makeButton(row, t("ui.cancel"), "vam-book-ask-cancel", ask.cancel);
   makeButton(row, goText, "mod-warning vam-book-ask-go", ask.confirm);
   card.addEventListener("keydown", event => {
-    if ((event as KeyboardEvent).key !== "Escape") return;
+    if (event.key !== "Escape") return;
     event.stopPropagation();
     event.preventDefault();
     ask.cancel();

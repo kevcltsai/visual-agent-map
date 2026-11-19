@@ -15,7 +15,9 @@ import {
   MAX_STEP_ATTEMPTS,
   TRIAL_SIZE,
   attemptsOf,
+  effectiveOrder,
   emptyAttempts,
+  mapDifference,
   type BookPipelineData,
   type PipelineStage,
   type PipelineStep
@@ -76,6 +78,7 @@ export function newBookPipeline(input: {
     phase: "planning",
     status: "running",
     order: [...input.order],
+    accepted: [...input.order],
     globalPlanned: false,
     attempts: { global: 0 },
     revisions: {},
@@ -104,8 +107,9 @@ export function nextActions(
 ): PipelinePlan {
   if (data.status === "stopped") return { actions: [], hold: data.pauseReason === "budget" ? "budget" : "stopped" };
   if (data.phase === "done") return { actions: [], hold: "done" };
-  if (!data.order.length) return { actions: [], hold: "empty" };
-  const resets = (data.pendingReset ?? []).filter(id => data.order.includes(id) && stages[id] !== undefined);
+  const order = effectiveOrder(data);
+  if (!order.length) return { actions: [], hold: "empty" };
+  const resets = (data.pendingReset ?? []).filter(id => order.includes(id) && stages[id] !== undefined);
   if (data.pendingReset?.length) {
     // Stale stages go first; a stage that is already clear needs no action, only the (idempotent) bookkeeping.
     return resets.length
@@ -121,7 +125,7 @@ export function nextActions(
       return { actions: busy.has("global") ? [] : [{ type: "global_plan" }] };
     }
   }
-  for (const nodeId of data.order) {
+  for (const nodeId of order) {
     if (busy.has(nodeId)) continue;
     const stage = stages[nodeId];
     if (stage === "needs-review" || stage === "checked") continue;
@@ -158,8 +162,9 @@ export function advancePhase(data: BookPipelineData, stages: CardStages, now: st
     next.revision++;
     return next;
   }
-  const all = (min: number): boolean => next.order.every(id => ranked(stages[id]) >= min);
-  const trialDone = next.trial ? next.trial.every(id => ranked(stages[id]) >= 3) : all(1);
+  const order = effectiveOrder(next);
+  const all = (min: number): boolean => order.every(id => ranked(stages[id]) >= min);
+  const trialDone = next.trial ? next.trial.every(id => !order.includes(id) || ranked(stages[id]) >= 3) : all(1);
   if (next.phase === "planning" && next.globalPlanned && trialDone) next.phase = "gate1";
   else if (next.phase === "writing" && all(3)) next.phase = "gate2";
   else return data;
@@ -176,10 +181,12 @@ export function advancePhase(data: BookPipelineData, stages: CardStages, now: st
 export function retryTrial(data: BookPipelineData, now: string): BookPipelineData {
   if (data.phase !== "gate1" || data.status !== "running" || !data.trial?.length) return data;
   const next = clone(data);
+  const live = effectiveOrder(data);
+  const trial = data.trial.filter(id => live.includes(id));
   next.phase = "planning";
   next.phaseStartedAt = now;
-  next.pendingReset = [...new Set([...(next.pendingReset ?? []), ...data.trial])];
-  for (const id of data.trial) {
+  next.pendingReset = [...new Set([...(next.pendingReset ?? []), ...trial])];
+  for (const id of trial) {
     next.attempts[id] = emptyAttempts();
     next.revisions[id] = cardRevision(next, id) + 1;
     if (next.autoFixes) delete next.autoFixes[id];
@@ -213,7 +220,7 @@ export function isCurrent(data: BookPipelineData, token: StepToken): boolean {
   if (data.runId !== token.runId || data.status !== "running") return false;
   if ((data.stopEpoch ?? 0) !== token.stopEpoch) return false;
   if (token.kind === "global") return !data.globalPlanned;
-  if (!token.nodeId || !data.order.includes(token.nodeId)) return false;
+  if (!token.nodeId || !effectiveOrder(data).includes(token.nodeId)) return false;
   return cardRevision(data, token.nodeId) === token.revision;
 }
 
@@ -234,7 +241,7 @@ export function beginStep(data: BookPipelineData, kind: PipelineStepKind, nodeId
     next.revision++;
     return { state: next, token: { runId: next.runId, kind, revision: 0, stopEpoch: next.stopEpoch ?? 0 } };
   }
-  if (!nodeId || !next.order.includes(nodeId)) return null;
+  if (!nodeId || !effectiveOrder(next).includes(nodeId)) return null;
   const attempts = attemptsOf(next, nodeId);
   if (attempts[kind] >= MAX_STEP_ATTEMPTS) return null;
   attempts[kind]++;
@@ -281,7 +288,7 @@ export function applyCancelled(data: BookPipelineData, token: StepToken): Commit
   if (data.runId !== token.runId) return { state: data, accepted: false };
   const next = clone(data);
   if (token.kind === "global") next.attempts.global = Math.max(0, next.attempts.global - 1);
-  else if (token.nodeId && next.order.includes(token.nodeId)) {
+  else if (token.nodeId && effectiveOrder(next).includes(token.nodeId)) {
     const attempts = attemptsOf(next, token.nodeId);
     attempts[token.kind] = Math.max(0, attempts[token.kind] - 1);
     next.attempts[token.nodeId] = attempts;
@@ -312,7 +319,58 @@ export function stopRun(data: BookPipelineData): BookPipelineData {
   next.status = "stopped";
   delete next.pauseReason;
   delete next.failureCode;
+  delete next.changed;
   next.stopEpoch = (next.stopEpoch ?? 0) + 1;
+  next.revision++;
+  return next;
+}
+
+/**
+ * The map's cards differ from what the run accepted (a card added or removed meanwhile): the run pauses with its own reason and
+ * remembers what differed. The stop generation rises, so every result still in flight is dropped and its attempt given back.
+ * Idempotent while paused for the same reason.
+ */
+export function pauseForMap(data: BookPipelineData, change: { added: string[]; missing: string[] }): BookPipelineData {
+  const next = clone(data);
+  next.status = "stopped";
+  next.pauseReason = "map";
+  next.changed = { added: [...change.added], missing: [...change.missing] };
+  delete next.failureCode;
+  next.stopEpoch = (next.stopEpoch ?? 0) + 1;
+  next.revision++;
+  return next;
+}
+
+/**
+ * "Carry on as before": the new cards are recorded as ignored, the missing ones become removed (terminal), the map's card set becomes
+ * the accepted one and the run goes on (or waits for budget). A trial left with no card gets the first chapters that remain.
+ */
+export function acceptMapChange(data: BookPipelineData, mapIds: readonly string[], now: string): BookPipelineData {
+  const { added, missing } = mapDifference(data, mapIds);
+  const next = clone(data);
+  next.accepted = [...mapIds];
+  if (added.length) next.ignored = [...new Set([...(next.ignored ?? []), ...added])];
+  if (missing.length) next.removed = [...new Set([...(next.removed ?? []), ...missing])];
+  const order = effectiveOrder(next);
+  if (next.pendingReset) {
+    next.pendingReset = next.pendingReset.filter(id => order.includes(id));
+    if (!next.pendingReset.length) delete next.pendingReset;
+  }
+  if (next.trial && !next.trial.some(id => order.includes(id))) {
+    next.trial = order.slice(0, TRIAL_SIZE);
+    if (next.phase === "gate1") {
+      next.phase = "planning";
+      next.phaseStartedAt = now;
+    }
+  }
+  next.status = "running";
+  delete next.pauseReason;
+  delete next.changed;
+  delete next.failureCode;
+  if (next.budget.used >= next.budget.limit) {
+    next.status = "stopped";
+    next.pauseReason = "budget";
+  }
   next.revision++;
   return next;
 }
@@ -338,6 +396,7 @@ export function resumeRun(data: BookPipelineData): BookPipelineData | null {
   const next = clone(data);
   next.status = "running";
   delete next.pauseReason;
+  delete next.changed;
   delete next.failureCode;
   next.revision++;
   return next;
@@ -376,7 +435,7 @@ export function autoFixesOf(data: BookPipelineData, nodeId: string): number {
  */
 export function requestAutoFix(data: BookPipelineData, nodeId: string): Committed {
   const inTrial = data.phase === "planning" && !!data.trial?.includes(nodeId);
-  if (!data.order.includes(nodeId) || data.status !== "running" || (data.phase !== "writing" && !inTrial))
+  if (!effectiveOrder(data).includes(nodeId) || data.status !== "running" || (data.phase !== "writing" && !inTrial))
     return { state: data, accepted: false };
   if (autoFixesOf(data, nodeId) >= MAX_AUTO_FIXES) return { state: data, accepted: false };
   // A card whose write or proof already used every attempt would only be marked needs-review ("write failed") without running.
@@ -391,7 +450,7 @@ export function requestAutoFix(data: BookPipelineData, nodeId: string): Committe
 
 /** A card was reset by the owner or needs another pass (single-card rerun): its counters and its stage start over. */
 export function resetCard(data: BookPipelineData, nodeId: string): BookPipelineData {
-  if (!data.order.includes(nodeId)) return data;
+  if (!effectiveOrder(data).includes(nodeId)) return data;
   const next = clone(data);
   next.attempts[nodeId] = emptyAttempts();
   next.revisions[nodeId] = cardRevision(next, nodeId) + 1;

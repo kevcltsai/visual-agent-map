@@ -18,6 +18,7 @@ import { formatPipelineLog } from "../../core/book-pipeline/log";
 import {
   PipelineStore,
   addBudget,
+  acceptMapChange,
   advancePhase,
   applyBudgetExhausted,
   applyCancelled,
@@ -32,6 +33,7 @@ import {
   isCurrent,
   newBookPipeline,
   nextActions,
+  pauseForMap,
   recoverInterrupted,
   requestAutoFix,
   resetCard,
@@ -47,6 +49,8 @@ import {
 import {
   MAX_STEP_ATTEMPTS,
   attemptsOf,
+  effectiveOrder,
+  mapDifference,
   readBookPipeline,
   reserveBudget,
   type BookPipelineData,
@@ -328,13 +332,17 @@ export interface BookCalloutPort {
   reconcile(mapPath: string): void | Promise<void>;
   /** True when every chapter note is clean; a false is logged by the port and does not stop the caller. */
   clear(mapPath: string): Promise<boolean>;
+  /** Takes the program callouts off notes that are no longer on the map (a removed chapter), by path. */
+  clearNotes?(mapPath: string, runId: string, cards: readonly { id: string; path: string }[]): Promise<boolean>;
 }
 
 export interface BookPipelineProgress {
   runId: string;
   phase: BookPipelineData["phase"];
   status: BookPipelineData["status"];
-  pauseReason?: "budget" | "failed";
+  pauseReason?: "budget" | "failed" | "map";
+  /** With pauseReason "map": how many chapters the map gained and lost (counts only). */
+  mapChange?: { added: number; missing: number };
   failureCode?: string;
   /** True while a drive is executing steps. */
   active: boolean;
@@ -934,7 +942,7 @@ export class BookPipelineRuns {
       });
       if (refused) throw new BookPipelineRunError("budget");
       // The fix instruction lived only in memory: a card still waiting for its one rewrite goes back to needs-review (its fix is spent).
-      for (const id of drive.store.state.order)
+      for (const id of effectiveOrder(drive.store.state))
         if (drive.stages.get(id) === "planned" && autoFixesOf(drive.store.state, id) > 0 && !drive.extra.has(id)) {
           drive.stages.set(id, "needs-review");
           await this.writeFields(drive, id, {
@@ -1062,7 +1070,7 @@ export class BookPipelineRuns {
       if (read.kind === "absent") throw new BookPipelineRunError("missing");
       if (read.kind === "unusable") throw new BookPipelineRunError("unusable");
       const node = map.nodes.find(item => item.id === nodeId);
-      if (!node || !read.data.order.includes(nodeId)) throw new BookPipelineRunError("missing");
+      if (!node || !effectiveOrder(read.data).includes(nodeId)) throw new BookPipelineRunError("missing");
       if (this.dead(drive)) throw new BookPipelineRunError("disposed");
       const card = await this.ports.readCard(node.path).catch(() => undefined);
       if (!card) throw new BookPipelineRunError("unreadable");
@@ -1099,7 +1107,7 @@ export class BookPipelineRuns {
   ): Promise<void> {
     return this.enter(mapPath, async drive => {
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
-      if (!data.order.includes(nodeId)) throw new BookPipelineRunError("missing");
+      if (!effectiveOrder(data).includes(nodeId)) throw new BookPipelineRunError("missing");
       if (!phases.includes(data.phase)) throw new BookPipelineRunError(refusal);
       if (overwrite) {
         // Bound to the text it was given for: if the chapter changed since, nothing is rewritten (the write checks again inside itself).
@@ -1178,7 +1186,7 @@ export class BookPipelineRuns {
   }
 
   private async markSeams(drive: Drive, nodeId: string, revision: number): Promise<void> {
-    const order = drive.store.state.order;
+    const order = effectiveOrder(drive.store.state);
     const at = order.indexOf(nodeId);
     for (const other of [order[at - 1], order[at + 1]]) {
       if (!other || !drive.cards.has(other)) continue;
@@ -1274,7 +1282,7 @@ export class BookPipelineRuns {
     const state = read.data;
     runIdOut.value = state.runId;
     const node = map.nodes.find(item => item.id === nodeId);
-    if (!node || !state.order.includes(nodeId)) throw new BookPipelineRunError("missing");
+    if (!node || !effectiveOrder(state).includes(nodeId)) throw new BookPipelineRunError("missing");
     if (!reserveBudget(state.budget)) throw new BookPipelineRunError("budget");
     refuseIfGone();
     const path = node.path;
@@ -1340,7 +1348,7 @@ export class BookPipelineRuns {
     const fresh = await this.ports.readMap(mapPath);
     const again = readBookPipeline(fresh);
     refuseIfGone();
-    if (again.kind !== "usable" || again.data.runId !== state.runId || !again.data.order.includes(nodeId))
+    if (again.kind !== "usable" || again.data.runId !== state.runId || !effectiveOrder(again.data).includes(nodeId))
       throw new BookPipelineRunError("stale");
     if (fresh.nodes.find(item => item.id === nodeId)?.path !== path) throw new BookPipelineRunError("stale");
     let outcome: ApplyOutcome | undefined;
@@ -1369,9 +1377,10 @@ export class BookPipelineRuns {
     language: string,
     map: MapDocument
   ): Promise<void> {
-    const at = state.order.indexOf(nodeId);
+    const stateOrder = effectiveOrder(state);
+    const at = stateOrder.indexOf(nodeId);
     const revision = cardRevision(state, nodeId);
-    for (const other of [state.order[at - 1], state.order[at + 1]]) {
+    for (const other of [stateOrder[at - 1], stateOrder[at + 1]]) {
       const path = other ? map.nodes.find(item => item.id === other)?.path : undefined;
       if (!path || this.disposed) continue;
       await this.ports
@@ -1561,7 +1570,7 @@ export class BookPipelineRuns {
       !(read.data.status === "stopped" && read.data.pauseReason === "budget")
     )
       throw new BookPipelineRunError("finished");
-    await this.load(drive, map, read.data.order, new Set(read.data.autoRoles));
+    await this.load(drive, map, effectiveOrder(read.data), new Set(read.data.autoRoles));
     if (this.dead(drive)) throw new BookPipelineRunError("disposed");
     this.attachStore(drive, read.data);
     return read.data;
@@ -1613,6 +1622,8 @@ export class BookPipelineRuns {
   private async loop(drive: Drive): Promise<void> {
     const inflight = new Map<string, Promise<void>>();
     while (!this.dead(drive) && drive.fatal === undefined) {
+      // Before each step: the map's cards against the accepted set. A difference pauses the run (nothing new is admitted).
+      if (await this.pauseOnMapChange(drive)) break;
       const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy);
       if (plan.hold === "global_failed") drive.failure = drive.reasons.get("global") ?? "failed";
       if (plan.hold) break;
@@ -1658,6 +1669,53 @@ export class BookPipelineRuns {
       else if (!started && !changed) break;
     }
     await Promise.all(inflight.values());
+  }
+
+  /** The map's cards in reading order (every card, hidden ones too). */
+  private mapIds(map: MapDocument): string[] {
+    return readingOrder(map.nodes, { includeHidden: true });
+  }
+  /**
+   * The map's cards differ from the accepted set: the run is saved as paused first (so nothing new is admitted and every result still
+   * in flight is dropped at its commit), the calls in flight are aborted (the caller waits for them to settle; the busy slot is freed
+   * when the drive ends), and the program callouts of the missing chapters are taken off. Returns whether it paused.
+   */
+  private async pauseOnMapChange(drive: Drive): Promise<boolean> {
+    if (drive.job || this.dead(drive) || drive.store.state.status !== "running") return false;
+    const map = await this.ports.readMap(drive.mapPath);
+    if (this.dead(drive)) return false;
+    const change = mapDifference(drive.store.state, this.mapIds(map));
+    if (!change.added.length && !change.missing.length) return false;
+    await drive.store.commit(state => ({ state: pauseForMap(state, change), accepted: true }));
+    drive.controller.abort();
+    const state = drive.store.state;
+    const gone = change.missing.flatMap(id => {
+      const info = drive.cards.get(id);
+      return info ? [{ id, path: info.path }] : [];
+    });
+    if (gone.length && this.ports.callouts?.clearNotes)
+      await this.ports.callouts.clearNotes(drive.mapPath, state.runId, gone).catch(() => false);
+    this.log(drive, "map_changed", "-", "plan", `added:${change.added.length},missing:${change.missing.length}`);
+    return true;
+  }
+  /** True when the map's cards differ from the accepted set (a step that found its card gone asks this before it counts as a failure). */
+  private async mapDiffers(drive: Drive): Promise<boolean> {
+    const map = await this.ports.readMap(drive.mapPath);
+    const change = mapDifference(drive.store.state, this.mapIds(map));
+    return change.added.length > 0 || change.missing.length > 0;
+  }
+  /**
+   * "Carry on as before": the new cards are left out, the missing chapters are marked removed (terminal), the map's card set becomes the
+   * accepted one and the run goes on. Only for a run paused because the map changed.
+   */
+  async keepBookMap(mapPath: string): Promise<void> {
+    return this.enter(mapPath, async drive => {
+      const data = await this.openSaved(drive, mapPath);
+      if (data.status !== "stopped" || data.pauseReason !== "map") throw new BookPipelineRunError("not_stopped");
+      const ids = this.mapIds(await this.ports.readMap(mapPath));
+      await drive.store.commit(state => ({ state: acceptMapChange(state, ids, this.ports.now()), accepted: true }));
+      this.log(drive, "map_keep", "-", "plan", "ok");
+    });
   }
 
   // ---- one step ----------------------------------------------------------------------------------------------------------------
@@ -1735,6 +1793,12 @@ export class BookPipelineRuns {
         await report("budget");
         return "budget";
       } else {
+        // A card that left the map is not a failure: it is never retried and costs no attempt; the loop pauses on the map change.
+        if ((outcome.reason === "card_removed" || outcome.reason === "missing") && (await this.mapDiffers(drive))) {
+          await drive.store.commit(state => applyCancelled(state, token));
+          await report("map_changed");
+          return "cancelled";
+        }
         const failed = await drive.store.commit(state => applyFailure(state, token));
         if (!failed) return "none";
         if (!failed.accepted) {
@@ -1938,7 +2002,7 @@ export class BookPipelineRuns {
   private async execGlobal(drive: Drive, token: StepToken): Promise<Outcome> {
     const signal = drive.controller.signal;
     const root = drive.cards.get(drive.rootId);
-    const order = drive.store.state.order;
+    const order = effectiveOrder(drive.store.state);
     if (!root || order.some(id => !drive.cards.has(id))) return { kind: "failed", reason: "missing" };
     const before = await this.ports.readCard(root.path);
     const request: GlobalPlanRequest = {
@@ -1993,7 +2057,7 @@ export class BookPipelineRuns {
 
   /** A chapter's child cards: the cards of the run whose parent on the map it is, in reading order. */
   private childCardsOf(drive: Drive, nodeId: string): { title: string; summary: string }[] {
-    return drive.store.state.order.flatMap(id => {
+    return effectiveOrder(drive.store.state).flatMap(id => {
       const info = drive.parents.get(id) === nodeId ? drive.cards.get(id) : undefined;
       return info ? [{ title: info.title, summary: info.summary }] : [];
     });
@@ -2008,7 +2072,7 @@ export class BookPipelineRuns {
     const root = await this.ports.readCard(rootInfo.path);
     const book = parseBookPlanBody(root.raw);
     const settings = effectiveSettings(root.settings, parseBookPlanDecisions(root.raw));
-    const order = drive.store.state.order;
+    const order = effectiveOrder(drive.store.state);
     const index = order.indexOf(nodeId);
     const side = (at: number): { position: number; title: string; summary: string } | undefined => {
       const other = order[at] === undefined ? undefined : drive.cards.get(order[at]);
@@ -2666,20 +2730,23 @@ export class BookPipelineRuns {
       checked: 0,
       "needs-review": 0
     };
-    for (const id of state.order) counts[drive.stages.get(id) ?? "pending"]++;
+    for (const id of effectiveOrder(state)) counts[drive.stages.get(id) ?? "pending"]++;
     const eta = this.etaOf(drive, active);
     const imagesDone = [...drive.imagesDone].filter(id => {
       const stage = drive.stages.get(id);
-      return state.order.includes(id) && stage !== "written" && stage !== "checked";
+      return effectiveOrder(state).includes(id) && stage !== "written" && stage !== "checked";
     }).length;
     return {
       runId: state.runId,
       phase: state.phase,
       status: state.status,
       ...(state.pauseReason ? { pauseReason: state.pauseReason } : {}),
+      ...(state.pauseReason === "map" && state.changed
+        ? { mapChange: { added: state.changed.added.length, missing: state.changed.missing.length } }
+        : {}),
       ...(state.failureCode ? { failureCode: state.failureCode } : {}),
       active,
-      total: state.order.length,
+      total: effectiveOrder(state).length,
       counts,
       budget: { ...state.budget },
       startedAt: state.startedAt,
@@ -2692,7 +2759,7 @@ export class BookPipelineRuns {
         : {}),
       steps: stepCounts(counts, imagesDone, {
         settled: state.phase === "gate2" || state.phase === "done",
-        proofFailed: state.order.filter(
+        proofFailed: effectiveOrder(state).filter(
           id => drive.stages.get(id) === "needs-review" && drive.reviewStep.get(id) === "proof"
         ).length
       })
@@ -2706,7 +2773,7 @@ export class BookPipelineRuns {
     if (!planning && state.phase !== "writing") return undefined;
     const list = planning ? drive.durations.plan : drive.durations.write;
     if (list.length < ETA_MIN_CARDS) return undefined;
-    const left = state.order.filter(id => {
+    const left = effectiveOrder(state).filter(id => {
       const stage = drive.stages.get(id);
       return planning ? stage === undefined : stage !== "checked" && stage !== "needs-review";
     }).length;

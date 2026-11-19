@@ -1,6 +1,6 @@
 import { bodyStateRaw, integrityFpRaw, keepRaw } from "../../core/book-pipeline/body-integrity";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
-import { readBookPipeline } from "../../core/book-pipeline/model";
+import { effectiveOrder, readBookPipeline } from "../../core/book-pipeline/model";
 import { t } from "../../i18n";
 import type { MapDocument } from "../../map-model";
 import type { NoteWriteResult } from "./book-pipeline-callouts";
@@ -55,7 +55,7 @@ export class BookHandEdits {
       const map = await this.ports.readMap(mapPath);
       const read = readBookPipeline(map);
       const node = map.nodes.find(item => item.id === nodeId);
-      if (read.kind !== "usable" || !node || !read.data.order.includes(nodeId)) return;
+      if (read.kind !== "usable" || !node || !effectiveOrder(read.data).includes(nodeId)) return;
       const card = await this.ports.readCard(node.path);
       const state = readReviewState(card.raw);
       if (!isRewriteAsked(state) || !state?.op) return;
@@ -90,7 +90,7 @@ export class BookHandEdits {
       const map = await this.ports.readMap(mapPath);
       const read = readBookPipeline(map);
       if (read.kind !== "usable" || read.data.phase !== "gate2" || this.ports.isRunning(mapPath)) return;
-      for (const id of read.data.order) {
+      for (const id of effectiveOrder(read.data)) {
         if (this.disposed || this.ports.isRunning(mapPath)) return;
         const node = map.nodes.find(item => item.id === id);
         if (!node) continue;

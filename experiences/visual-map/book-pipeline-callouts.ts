@@ -2,7 +2,7 @@ import { t } from "../../i18n";
 import { cardRevision } from "../../core/book-pipeline/machine";
 import type { MapDocument } from "../../map-model";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
-import { readBookPipeline, type BookPipelineData } from "../../core/book-pipeline/model";
+import { effectiveOrder, readBookPipeline, type BookPipelineData } from "../../core/book-pipeline/model";
 import { hashText } from "../../core/book-pipeline/text";
 import type { PipelineCard } from "./book-pipeline-run";
 import {
@@ -192,6 +192,25 @@ export class BookCallouts {
     return this.enqueue(mapPath, () => this.sweep(mapPath)).catch(() => false);
   }
 
+  /** Takes every program callout (and with it a queued rewrite) off notes that left the run's map (a removed chapter): the map no longer names them, so the caller passes the paths. */
+  clearNotes(mapPath: string, runId: string, cards: readonly { id: string; path: string }[]): Promise<boolean> {
+    return this.enqueue(mapPath, async () => {
+      let clean = true;
+      for (const { id, path } of cards) {
+        if (this.disposed) return false;
+        let raw: string;
+        try {
+          raw = await this.ports.readText(path);
+        } catch {
+          continue;
+        }
+        if (!hasProgramCallouts(raw)) continue;
+        if (!(await this.put(runId, id, path, text => alignCallouts(text, undefined)))) clean = false;
+      }
+      return clean;
+    }).catch(() => false);
+  }
+
   /** Folds a ticked review box (the box at once; the ticks and marker stay). */
   collapse(path: string): Promise<NoteWriteResult> {
     return this.disposed ? Promise.resolve("refused") : this.ports.write(path, collapseReviewCallouts);
@@ -252,7 +271,7 @@ export class BookCallouts {
     skip?: (id: string) => boolean
   ): Promise<{ id: string; card: PipelineCard }[]> {
     const out: { id: string; card: PipelineCard }[] = [];
-    for (const id of data.order) {
+    for (const id of effectiveOrder(data)) {
       if (skip?.(id)) continue;
       const node = map.nodes.find(item => item.id === id);
       if (!node) continue;
@@ -374,7 +393,7 @@ export class BookCallouts {
       if (alignCallouts(card.raw, want) === card.raw) continue;
       await this.put(data.runId, id, card.path, text => alignCallouts(text, want));
     }
-    await this.dropStale(map, data.runId, new Set(data.order), clean);
+    await this.dropStale(map, data.runId, new Set(effectiveOrder(data)), clean);
   }
 
   /**

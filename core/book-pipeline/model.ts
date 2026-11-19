@@ -137,7 +137,9 @@ export interface BookPipelineData {
   phase: PipelinePhase;
   status: PipelineStatus;
   /** Why a stopped run stopped when it was not the owner: the call budget ran out (not a failure of any card). */
-  pauseReason?: "budget" | "failed";
+  pauseReason?: "budget" | "failed" | "map";
+  /** With pauseReason "map": what differed when the run paused (card ids; the bar shows counts, never ids). */
+  changed?: { added: string[]; missing: string[] };
   /** With pauseReason "failed": a neutral code (letters, digits, `_.:-`) of what stopped the run. Never owner text. */
   failureCode?: string;
   order: string[];
@@ -153,6 +155,12 @@ export interface BookPipelineData {
   autoFixes?: Record<string, number>;
   /** The trial cards (the first in reading order): only they run before gate 1, which shows their finished result. Absent = an older run: every card is planned before gate 1 as before. */
   trial?: string[];
+  /** The map's card set (ids) the run accepted: the cards of the map when it started, or when the owner chose "carry on as before". Absent = older data: `order`. */
+  accepted?: string[];
+  /** New cards (not in `order`) the owner chose to leave out with "carry on as before". Absent = none. */
+  ignored?: string[];
+  /** Cards of `order` that are no longer on the map: a terminal state (never retried, no budget, left out of every count and neighbour). Absent = none. */
+  removed?: string[];
   budget: PipelineBudget;
   /** Raised by every owner stop; a step result carries the one it started under (absent = 0). */
   stopEpoch?: number;
@@ -177,8 +185,27 @@ function problem(raw: unknown): string | undefined {
   if (typeof raw.runId !== "string" || !raw.runId) return "runId";
   if (!PIPELINE_PHASES.includes(raw.phase as PipelinePhase)) return "phase";
   if (!PIPELINE_STATUSES.includes(raw.status as PipelineStatus)) return "status";
-  if (raw.pauseReason !== undefined && raw.pauseReason !== "budget" && raw.pauseReason !== "failed")
+  if (
+    raw.pauseReason !== undefined &&
+    raw.pauseReason !== "budget" &&
+    raw.pauseReason !== "failed" &&
+    raw.pauseReason !== "map"
+  )
     return "pauseReason";
+  for (const key of ["accepted", "ignored", "removed"] as const) {
+    const list = raw[key];
+    if (list !== undefined && (!Array.isArray(list) || list.some(id => typeof id !== "string" || !id))) return key;
+  }
+  if (raw.changed !== undefined) {
+    const changed = raw.changed;
+    if (
+      !isObject(changed) ||
+      !Array.isArray(changed.added) ||
+      !Array.isArray(changed.missing) ||
+      (changed.added as unknown[]).concat(changed.missing as unknown[]).some(id => typeof id !== "string")
+    )
+      return "changed";
+  }
   if (raw.failureCode !== undefined && (typeof raw.failureCode !== "string" || !FAILURE_CODE.test(raw.failureCode)))
     return "failureCode";
   if (!Array.isArray(raw.order) || raw.order.some(id => typeof id !== "string" || !id)) return "order";
@@ -224,6 +251,24 @@ export function readBookPipeline(map: { bookPipeline?: unknown }): BookPipelineR
   const found = problem(map.bookPipeline);
   if (found) return { kind: "unusable", reason: found, raw: map.bookPipeline };
   return { kind: "usable", data: map.bookPipeline as BookPipelineData };
+}
+
+/** The cards the run works on: `order` without the cards the map lost. The one list scheduling, completion, counts, neighbours and the chapter list share. */
+export function effectiveOrder(data: Pick<BookPipelineData, "order" | "removed">): string[] {
+  const gone = data.removed;
+  return gone?.length ? data.order.filter(id => !gone.includes(id)) : data.order;
+}
+/** How the map's cards (`mapIds`) differ from what the run accepted: new cards, and cards of the run that are gone. */
+export function mapDifference(
+  data: BookPipelineData,
+  mapIds: readonly string[]
+): { added: string[]; missing: string[] } {
+  const accepted = new Set(data.accepted ?? data.order);
+  const onMap = new Set(mapIds);
+  return {
+    added: mapIds.filter(id => !accepted.has(id)),
+    missing: effectiveOrder(data).filter(id => !onMap.has(id))
+  };
 }
 
 export function emptyAttempts(): StepAttempts {

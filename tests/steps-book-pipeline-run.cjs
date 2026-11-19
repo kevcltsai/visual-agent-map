@@ -2214,3 +2214,141 @@ test('T10c length: a pure length failure keeps the notice tokens of the card (a 
   const issue = (await r.note(1)).pipelineIssue;
   assert.match(issue, /^length unmet: length:over:\d+:100-200:字:v\d+ C1$/, 'the length token and the structure token both stay');
 });
+
+// ---- T11: cards added or removed while a run is in progress ----
+const sameJson = (a, b, m) => assert.equal(JSON.stringify(a), JSON.stringify(b), m);
+const FOUR = ['SecretRootTitle', 'SecretTitleA', 'SecretTitleB', 'SecretTitleC'];
+const addCard = async (r, title) => {
+  const doc = await r.repo.readMap(r.mapPath);
+  const n = await r.repo.createNote(title, 'model-a', doc, r.mapPath, 'workspace', { summary: `summary of ${title}` });
+  n.x = 900; n.y = 0; n.parentId = r.nodes[0].id;
+  await r.repo.updateMap(r.mapPath, d => { d.nodes.push(n); });
+  return n;
+};
+const dropCard = (r, i) => r.repo.updateMap(r.mapPath, d => { d.nodes = d.nodes.filter(n => n.id !== r.nodes[i].id); });
+const finished = async (r, runs = r.runs) => { while (runs.isRunning(r.mapPath)) await tick(); await settle(); };
+
+test('map change before admission: the run pauses with a count and nothing is written; "carry on" runs on without pausing again', async () => {
+  const r = await rig({ titles: FOUR });
+  await r.runs.start(r.mapPath);
+  const before = (await r.state()).budget.used;
+  await dropCard(r, 2);
+  const fresh = await addCard(r, 'SecretTitleNew');
+  await r.runs.confirmGate1(r.mapPath); await finished(r);
+  let s = await r.state();
+  assert.equal(s.status, 'stopped'); assert.equal(s.pauseReason, 'map');
+  sameJson([s.changed.added.length, s.changed.missing.length], [1, 1]);
+  assert.equal(r.stat.author.length, 0, 'nothing was admitted');
+  assert.equal(s.budget.used, before, 'no call was spent');
+  assert.equal(r.runs.getProgress(r.mapPath).mapChange.added, 1);
+  await r.runs.keepBookMap(r.mapPath); await finished(r);
+  s = await r.state();
+  assert.equal(s.phase, 'gate2'); assert.equal(s.status, 'running');
+  sameJson(s.removed, [r.nodes[2].id]); sameJson(s.ignored, [fresh.id]);
+  assert.ok(s.accepted.includes(fresh.id) && !s.accepted.includes(r.nodes[2].id));
+  sameJson([...new Set(r.stat.author)].sort(), [r.nodes[0].id, r.nodes[1].id, r.nodes[3].id].sort(), 'only the kept cards were written, the new one and the removed one were not');
+  assert.equal(r.stat.author.length, 3);
+  assert.equal(s.budget.used, before + 3 + 3, 'three authors and three proofs, nothing for the removed card');
+  assert.equal(stageOf(r.raw(2)), 'planned', 'the removed card keeps what it had');
+  assert.equal(r.runs.getProgress(r.mapPath).total, 3);
+  assert.equal(r.runs.getProgress(r.mapPath).counts.checked, 3);
+});
+
+test('map change: it survives a reopen (a new runner reads the saved pause) and the old data without the new fields reads as before', async () => {
+  const r = await rig({ titles: FOUR });
+  await r.runs.start(r.mapPath);
+  await dropCard(r, 3);
+  await r.runs.confirmGate1(r.mapPath); await finished(r);
+  assert.equal((await r.state()).pauseReason, 'map');
+  const again = new BookPipelineRuns(r.ports);
+  assert.equal(again.getProgress(r.mapPath), undefined);
+  await again.keepBookMap(r.mapPath); await finished(r, again);
+  const s = await r.state();
+  assert.equal(s.phase, 'gate2'); sameJson(s.removed, [r.nodes[3].id]);
+  // A paused-for-map run is only resumed by keepBookMap; the plain resume pauses again at its first step.
+  const old = await rig({ titles: FOUR });
+  await old.runs.start(old.mapPath);
+  await old.repo.updateMap(old.mapPath, d => { delete d.bookPipeline.accepted; delete d.bookPipeline.ignored; delete d.bookPipeline.removed; });
+  await old.runs.confirmGate1(old.mapPath); await finished(old);
+  assert.equal((await old.state()).phase, 'gate2', 'an old map without the fields and with no change runs through');
+  const old2 = await rig({ titles: FOUR });
+  await old2.runs.start(old2.mapPath);
+  await old2.repo.updateMap(old2.mapPath, d => { delete d.bookPipeline.accepted; });
+  await dropCard(old2, 1);
+  await old2.runs.confirmGate1(old2.mapPath); await finished(old2);
+  assert.equal((await old2.state()).pauseReason, 'map', 'an old map without `accepted` compares with its order');
+  await old2.runs.resume(old2.mapPath); await finished(old2);
+  assert.equal((await old2.state()).pauseReason, 'map', 'a plain resume pauses again while the map still differs');
+});
+
+test('a second add or remove after "carry on" pauses again and only counts what is new', async () => {
+  const r = await rig({ titles: FOUR });
+  await r.runs.start(r.mapPath);
+  await dropCard(r, 1);
+  await r.runs.confirmGate1(r.mapPath); await finished(r);
+  const base = r.script.author; let armed = true; let second;
+  r.script.author = async (input, n) => { if (armed) { armed = false; second = await addCard(r, 'SecretTitleLate'); await dropCard(r, 3); } return base(input, n); };
+  await r.runs.keepBookMap(r.mapPath); await finished(r);
+  const s = await r.state();
+  assert.equal(s.status, 'stopped'); assert.equal(s.pauseReason, 'map');
+  sameJson(s.changed.added, [second.id]); sameJson(s.changed.missing, [r.nodes[3].id], 'the first removal is already settled');
+  await r.runs.keepBookMap(r.mapPath); await finished(r);
+  const done = await r.state();
+  assert.equal(done.phase, 'gate2'); sameJson(done.removed.sort(), [r.nodes[1].id, r.nodes[3].id].sort()); sameJson(done.ignored, [second.id]);
+  for (const id of done.removed) assert.ok(!r.stat.author.filter(x => x === id).length || id === r.nodes[3].id, 'a removed card is never retried');
+});
+
+test('a card deleted before its author commits: the result is dropped, the attempt is given back, the sent call is counted, the card is never retried', async () => {
+  const r = await rig({ titles: FOUR });
+  await r.runs.start(r.mapPath);
+  const before = (await r.state()).budget.used;
+  const victim = r.nodes[2].id; let hit = 0;
+  const base = r.script.author;
+  r.script.author = async (input, n) => { if (input.nodeId === victim) { hit++; await dropCard(r, 2); } return base(input, n); };
+  await r.runs.confirmGate1(r.mapPath); await finished(r);
+  let s = await r.state();
+  assert.equal(s.pauseReason, 'map'); sameJson(s.changed.missing, [victim]);
+  assert.equal(s.attempts[victim].write, 0, 'the attempt is given back');
+  assert.ok(s.budget.used > before, 'the call that was sent counts');
+  for (let i = 0; i < 4; i++) assert.notEqual(stageOf(r.raw(i)), 'needs-review');
+  await r.runs.keepBookMap(r.mapPath); await finished(r);
+  s = await r.state();
+  assert.equal(s.phase, 'gate2'); assert.equal(hit, 1, 'the removed card is never written again');
+  assert.equal(r.stat.author.filter(id => id === victim).length, 1);
+  assert.equal(s.attempts[victim].write, 0);
+});
+
+test('neighbours: the previous and next chapter skip a removed one; its seam is never marked; its callouts and queued rewrite are cleaned', async () => {
+  const cleared = [];
+  const r = await rig({ titles: FOUR, ports: { callouts: { reconcile: async () => undefined, clear: async () => true, clearNotes: async (path, runId, cards) => { cleared.push(...cards.map(c => c.id)); return true; } } } });
+  await r.runs.start(r.mapPath);
+  const base = r.script.author; let hit = false;
+  r.script.author = async (input, n) => { if (!hit) { hit = true; await dropCard(r, 2); } return base(input, n); };
+  await r.runs.confirmGate1(r.mapPath); await finished(r);
+  sameJson(cleared, [r.nodes[2].id], 'the removed chapter gets its program callouts taken off');
+  await r.runs.keepBookMap(r.mapPath); await finished(r);
+  const seen = [];
+  const card = r.script.card;
+  r.script.card = (request, n) => { seen.push(request); return card(request, n); };
+  await r.runs.rerunCard(r.mapPath, r.nodes[3].id); while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+  const request = seen.find(item => item.card.id === r.nodes[3].id);
+  assert.equal(request.previous.title, 'SecretTitleA', 'the previous chapter is the one before the removed card');
+  assert.ok((await r.note(1)).pipelineSeam, 'the previous chapter is marked');
+  assert.ok(!(await r.note(2)).pipelineSeam, 'the removed card is not');
+});
+
+test('no id reaches the owner: the log, progress and failure text of a map change carry counts only', async () => {
+  const r = await rig({ titles: FOUR });
+  await r.runs.start(r.mapPath);
+  await dropCard(r, 2);
+  await r.runs.confirmGate1(r.mapPath); await finished(r);
+  const text = JSON.stringify(r.runs.getProgress(r.mapPath));
+  for (const node of r.nodes) assert.ok(!text.includes(node.id));
+  assert.ok(r.stat.logs.some(line => /map_changed/.test(line)));
+});
+
+test('keepBookMap refuses a run that did not pause for the map', async () => {
+  const r = await rig();
+  await r.runs.start(r.mapPath);
+  await assert.rejects(r.runs.keepBookMap(r.mapPath), refusal('not_stopped'));
+});

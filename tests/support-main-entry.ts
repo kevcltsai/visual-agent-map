@@ -2,3 +2,4 @@
 export { default } from "../main";
 export { NoteStyleFileError } from "../experiences/visual-map/note-style-picker";
 export { NextStepModal } from "../main";
+export { BookPipelineRunError } from "../experiences/visual-map/book-pipeline-run";

@@ -13,6 +13,7 @@ import type { TaskOptions } from "./experiences/visual-map/modals";
 import { attachmentPath } from "./experiences/visual-map/attachment-store";
 import { selectionOutputLanguage } from "./core/content-language";
 import {
+  BookPipelineRunError,
   BookPipelineRuns,
   type BookPipelineProgress,
   type BookRerunResult
@@ -642,7 +643,8 @@ export default class VisualAgentMapPlugin extends Plugin {
       const message = error instanceof Error ? error.message : String(error);
       this.logs.appendLog("error", t("log.operation_failed_0", message));
       console.error("Visual Agent Map", error);
-      errorNotice(error);
+      // A picture-book refusal is shown by its caller in the owner's words; a second, raw notice would only repeat it.
+      if (!(error instanceof BookPipelineRunError)) errorNotice(error);
     });
     return result;
   }

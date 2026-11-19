@@ -102419,7 +102419,7 @@ var VisualAgentMapPlugin = class extends import_obsidian51.Plugin {
       const message = error instanceof Error ? error.message : String(error);
       this.logs.appendLog("error", t("log.operation_failed_0", message));
       console.error("Visual Agent Map", error);
-      errorNotice(error);
+      if (!(error instanceof BookPipelineRunError)) errorNotice(error);
     });
     return result;
   }

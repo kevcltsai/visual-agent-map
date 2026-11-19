@@ -46,6 +46,11 @@ test('plugin.mutate: a style file error from a queued write shows Open this file
     await mutate(async () => { throw new Error('boom'); }).catch(() => {});
     await host.queue;
     assert.equal(Notice.all[Notice.all.length - 1].message, 'boom');
+    // A picture-book refusal gets no raw notice here: its caller already shows the translated sentence.
+    const before = Notice.all.length;
+    await mutate(async () => { throw new loaded.BookPipelineRunError('empty'); }).catch(() => {});
+    await host.queue;
+    assert.equal(Notice.all.length, before);
   } finally { console.error = origError; }
 });
 

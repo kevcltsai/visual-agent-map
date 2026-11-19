@@ -1660,6 +1660,8 @@ export default class VisualAgentMapPlugin extends Plugin {
         sourceError = replaceError instanceof Error ? replaceError : new Error(String(replaceError));
       }
       const { changed, error } = await this.rebaseMaps(pairs);
+      // A map node whose title was its old file name follows the new one (a custom title, a folder move and other notes are left alone).
+      for (const [from, to] of pairs) await this.repo.followRenamedTitle(from, to).catch(() => false);
       // Derived references depend only on maps and VAM notes; renaming an unrelated note leaves them unchanged.
       const vamFile = renames.some(({ file }) => {
         const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;

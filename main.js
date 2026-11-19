@@ -31453,6 +31453,22 @@ ${body}`);
     }
     return false;
   }
+  /**
+   * A map node's note was renamed: when its title was the old file name (the default), the title becomes the new file name; a title the
+   * owner chose is kept. A pure folder move (same name), a note that is not a map node and a note edited while this runs are left alone
+   * (the write is guarded against the text read here). Returns whether the title was changed.
+   */
+  async followRenamedTitle(oldPath, newPath) {
+    const file = this.app.vault.getAbstractFileByPath(newPath);
+    if (!(file instanceof import_obsidian13.TFile) || file.extension !== "md") return false;
+    const oldName = baseName2(oldPath).replace(/\.md$/, "");
+    if (oldName === file.basename) return false;
+    if (!await this.isMapNodePath(newPath)) return false;
+    const raw = await this.app.vault.read(file);
+    const content = decodeCalloutSections(upgradeLegacyAimText(raw));
+    if (noteTitle(content, frontmatter(content), file.basename) !== oldName) return false;
+    return await this.updateNoteGuarded(newPath, { title: file.basename }, { expectedContent: raw }) === "written";
+  }
   /** Whether any map lists `path` as a node; only map files are read. */
   async isMapNodePath(path) {
     return this.anyMapNodePath([path]);
@@ -105383,6 +105399,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
         sourceError = replaceError instanceof Error ? replaceError : new Error(String(replaceError));
       }
       const { changed, error } = await this.rebaseMaps(pairs);
+      for (const [from, to] of pairs) await this.repo.followRenamedTitle(from, to).catch(() => false);
       const vamFile = renames.some(({ file }) => {
         var _a2;
         const frontmatter2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter;

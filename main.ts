@@ -34,6 +34,14 @@ import {
   type NotesEditor,
   type NotesLeaf
 } from "./experiences/visual-map/book-pipeline-notes-ui";
+import { BookNotesApply } from "./experiences/visual-map/book-pipeline-notes-apply";
+import {
+  AppliedHighlights,
+  appliedExtension,
+  setApplied,
+  type HighlightTarget
+} from "./experiences/visual-map/book-applied-highlight";
+import type { EditorView } from "@codemirror/view";
 import { countNotes } from "./core/book-pipeline/book-notes";
 import { readBookPipeline } from "./core/book-pipeline/model";
 import { runPlanStep } from "./core/steps/book-pipeline/run";
@@ -502,32 +510,93 @@ export default class VisualAgentMapPlugin extends Plugin {
     write: (path, transform) => this.bookNoteWriter(path, transform),
     askNote: (selected, submit) => new BookNoteModal(this.app, selected, submit).open(),
     notice: message => void new Notice(message),
-    applyNotes: path => this.applyBookNotes(path)
+    applyNotes: path => this.applyBookNotes(path),
+    applyStatus: path => {
+      const running = this.bookNotesApply.isRunning(path);
+      const disabled = this.bookNotesApply.disabledReason(path);
+      return {
+        running,
+        ...(running ? { elapsed: this.bookNotesApply.elapsed(path) ?? "0:00" } : {}),
+        ...(disabled ? { disabled } : {})
+      };
+    }
   });
   private bookNotesTimer: number | null = null;
-  /**
-   * The header action, the editor-menu item and the command end here. T6c SEAM: the running state on the header action, cancel
-   * (`bookPipelineRuns.cancelNotes`), the applied decoration, the undo notice and command (from `edits`) and the stale display
-   * belong to the controller that replaces this glue; today it runs the job and shows one notice.
-   */
-  private applyBookNotes(path: string): void {
-    void this.runBookNotes(path).then(result => {
-      if (result) new Notice(t("ui.book_note_applied_0_1", String(result.applied), String(result.skipped)));
-    });
-  }
-  /** Finds the chapter's map and card, then runs the runner's notes job; a refusal or failure is shown and answers undefined. */
-  private async runBookNotes(path: string): Promise<NotesApplyResult | undefined> {
-    try {
-      for (const { file, map } of await this.repo.readableMaps()) {
-        const node = map.nodes.find(item => item.path === path);
-        if (node && readBookPipeline(map).kind === "usable")
-          return await this.bookPipelineRuns.applyNotes(file.path, node.id);
-      }
-      throw new BookPipelineRunError("missing");
-    } catch (error) {
-      new Notice(bookRefusalText(error));
-      return undefined;
+  /** Chapter note path to its map path, filled when the chapters are looked up (the header action needs the map synchronously). */
+  private readonly bookChapterMaps = new Map<string, string>();
+  /** The apply job of a chapter (clock, cancel, messages) and the undo of the last apply. */
+  private readonly bookNotesApply = new BookNotesApply({
+    run: (path, signal) => this.runBookNotes(path, signal),
+    cancel: path => {
+      const map = this.bookChapterMaps.get(path);
+      if (map) this.bookPipelineRuns.cancelNotes(map);
+    },
+    mapBusy: path => {
+      const map = this.bookChapterMaps.get(path);
+      if (!map) return null;
+      if (this.bookPipelineRuns.isRunning(map)) return "drive";
+      return this.bookPipelineRuns.isApplyingNotes(map) ? "notes" : null;
+    },
+    codeOf: error => (error instanceof BookPipelineRunError ? error.code : undefined),
+    refusalText: error => bookRefusalText(error),
+    write: (path, transform) => this.bookNoteWriter(path, transform),
+    notice: message => void new Notice(message),
+    noticeAction: (message, label, onClick, ms) => {
+      const notice = new Notice(
+        createFragment(fragment => {
+          fragment.createSpan({ text: message });
+          const link = fragment.createEl("a", { text: label, cls: "vam-book-undo-link", href: "#" });
+          link.addEventListener("click", event => {
+            event.preventDefault();
+            onClick();
+          });
+        }),
+        ms
+      );
+      return { hide: () => notice.hide() };
+    },
+    highlight: (path, ranges) => this.bookHighlights.show(path, ranges),
+    releaseHighlight: () => this.bookHighlights.release(),
+    changed: () => this.bookNotes.paint(),
+    now: () => Date.now(),
+    setTimer: (run, ms) => window.setTimeout(run, ms),
+    clearTimer: handle => window.clearTimeout(handle as number),
+    setTick: (run, ms) => window.setInterval(run, ms),
+    clearTick: handle => window.clearInterval(handle as number)
+  });
+  /** The light-green mark on the paragraphs just rewritten, in every open editor of the note (10 s). */
+  private readonly bookHighlights = new AppliedHighlights({
+    targets: () => this.bookHighlightTargets(),
+    setTimer: (run, ms) => window.setTimeout(run, ms),
+    clearTimer: handle => window.clearTimeout(handle as number)
+  });
+  private bookHighlightTargets(): HighlightTarget[] {
+    const out: HighlightTarget[] = [];
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view;
+      if (!(view instanceof MarkdownView)) continue;
+      const cm = (view.editor as unknown as { cm?: EditorView }).cm;
+      if (!cm) continue;
+      out.push({
+        key: view,
+        path: () => view.file?.path,
+        set: ranges => cm.dispatch({ effects: setApplied.of(ranges) })
+      });
     }
+    return out;
+  }
+  /** The header action, the menu item and the command end here. */
+  private applyBookNotes(path: string): void {
+    this.bookNotesApply.press(path);
+  }
+  /** Finds the chapter's map and card, then runs the runner's notes job (a refusal or failure is thrown to the controller). */
+  private async runBookNotes(path: string, signal: AbortSignal): Promise<NotesApplyResult> {
+    for (const { file, map } of await this.repo.readableMaps()) {
+      const node = map.nodes.find(item => item.path === path);
+      if (node && readBookPipeline(map).kind === "usable")
+        return await this.bookPipelineRuns.applyNotes(file.path, node.id, { signal });
+    }
+    throw new BookPipelineRunError("missing");
   }
   /** The note backup service: works with no map tab open (the runner, the notes apply and the map view all use it). */
   backupBookNote(path: string, content: string): Promise<{ ok: true; path: string } | { ok: false }> {
@@ -557,6 +626,12 @@ export default class VisualAgentMapPlugin extends Plugin {
               el.setAttr("aria-label", next);
               span.setText(next);
             },
+            setDisabled: reason => {
+              el.toggleClass("is-disabled", !!reason);
+              if (reason) el.setAttr("aria-disabled", "true");
+              else el.removeAttribute("aria-disabled");
+              el.setAttr("title", reason ?? "");
+            },
             remove: () => el.remove()
           };
         }
@@ -574,11 +649,14 @@ export default class VisualAgentMapPlugin extends Plugin {
       })
     );
     if (!candidates.size) return found;
-    for (const { map } of await this.repo.readableMaps()) {
+    for (const { file, map } of await this.repo.readableMaps()) {
       const read = readBookPipeline(map);
       if (read.kind !== "usable") continue;
       for (const node of map.nodes)
-        if (candidates.has(node.path) && read.data.order.includes(node.id)) found.add(node.path);
+        if (candidates.has(node.path) && read.data.order.includes(node.id)) {
+          found.add(node.path);
+          this.bookChapterMaps.set(node.path, file.path);
+        }
     }
     return found;
   }
@@ -642,13 +720,30 @@ export default class VisualAgentMapPlugin extends Plugin {
         checkCallback: checking => {
           const view = this.app.workspace.getActiveViewOfType(MarkdownView);
           const path = view?.file?.path;
-          if (!view || !notes.isChapter(path) || !countNotes(view.editor.getValue())) return false;
+          const running = !!path && this.bookNotesApply.isRunning(path);
+          if (!view || !notes.isChapter(path) || (!running && !countNotes(view.editor.getValue()))) return false;
           if (!checking) notes.apply(path);
           return true;
         }
       }),
       key: "ui.command_book_note_apply"
     });
+    this.localizedCommands.push({
+      command: this.addCommand({
+        id: "book-note-undo",
+        name: t("ui.command_book_note_undo"),
+        checkCallback: checking => {
+          if (!this.bookNotesApply.canUndo()) return false;
+          if (!checking) void this.bookNotesApply.undo();
+          return true;
+        }
+      }),
+      key: "ui.command_book_note_undo"
+    });
+    this.registerEditorExtension(appliedExtension);
+    this.registerEvent(this.app.workspace.on("file-open", () => this.bookHighlights.sync()));
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.bookHighlights.sync()));
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.bookHighlights.sync()));
     this.registerEvent(this.app.workspace.on("file-open", () => this.refreshBookNotesSoon()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshBookNotesSoon()));
     this.registerEvent(this.app.workspace.on("layout-change", () => this.refreshBookNotesSoon()));
@@ -707,10 +802,12 @@ export default class VisualAgentMapPlugin extends Plugin {
     now: () => new Date().toISOString(),
     newId: () => crypto.randomUUID(),
     log: line => this.logs.appendLog("info", line),
-    progressed: mapPath =>
+    progressed: mapPath => {
       this.views()
         .find(view => view.mapPath === mapPath)
-        ?.refreshBookProgress(),
+        ?.refreshBookProgress();
+      this.bookNotes.paint();
+    },
     callouts: { reconcile: path => this.bookCallouts.reconcile(path), clear: path => this.bookCallouts.clear(path) }
   });
   /** A card note as the picture-book runner reads it (fields, text and the raw file). */
@@ -2022,6 +2119,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.bookCallouts.dispose();
     if (this.bookNotesTimer !== null) window.clearTimeout(this.bookNotesTimer);
     this.bookNotesTimer = null;
+    this.bookNotesApply.dispose();
+    this.bookHighlights.dispose();
     this.bookNotes.dispose();
     // In-flight work (a long Obsidian rename, a queued mutation) must not write into the vault after this point.
     this.repo?.dispose();

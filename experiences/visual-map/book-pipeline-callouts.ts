@@ -1,3 +1,4 @@
+import { cardRevision } from "../../core/book-pipeline/machine";
 import type { MapDocument } from "../../map-model";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
 import { readBookPipeline, type BookPipelineData } from "../../core/book-pipeline/model";
@@ -306,6 +307,7 @@ export class BookCallouts {
       });
     } else if (data.phase === "gate2") {
       const entries = reviewEntries({
+        proofContext: { runId: data.runId, revisionOf: id => cardRevision(data, id) },
         order: cards.map(item => item.id),
         titleOf: id => byId.get(id)?.title ?? id,
         noteOf: id => {

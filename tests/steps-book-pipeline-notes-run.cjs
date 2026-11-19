@@ -1,0 +1,245 @@
+// Picture-book notes, apply controller (T6c): the running clock, cancel, timeout, messages, the undo (success, partial, refused) and the
+// applied highlight lifecycle (10 s, switch, close, unload) with a hand-driven clock. Fake ports; no AI. How a real editor draws the mark
+// and the Notice looks is UI evidence for the tester.
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { loadSource } = require('./support-replay.cjs');
+const S = require('./support.cjs');
+
+const b = loadSource(`
+export { BookNotesApply, NOTES_TIMEOUT_MS, UNDO_NOTICE_MS } from "./experiences/visual-map/book-pipeline-notes-apply";
+export { AppliedHighlights, HIGHLIGHT_MS, appliedField, setApplied } from "./experiences/visual-map/book-applied-highlight";
+export { EditorState } from "@codemirror/state";
+export { setUiLanguage } from "./i18n";
+`, { obsidian: { ...S.obsidian } }, {});
+b.setUiLanguage('zh-TW');
+
+const W = (text, n, note) => `==${text}==%%備註#${n}：${note}%%`;
+const detail = body => `<!-- visual-agent-map:detail:start -->\n${body}\n<!-- visual-agent-map:detail:end -->`;
+
+function clock() {
+  const c = { t: 0, timers: [], next: 1 };
+  c.set = (run, ms) => { const h = c.next++; c.timers.push({ h, at: c.t + ms, run, every: 0 }); return h; };
+  c.tick = (run, ms) => { const h = c.next++; c.timers.push({ h, at: c.t + ms, run, every: ms }); return h; };
+  c.clear = h => { c.timers = c.timers.filter(x => x.h !== h); };
+  c.advance = ms => {
+    const end = c.t + ms;
+    for (;;) {
+      const due = c.timers.filter(x => x.at <= end).sort((x, y) => x.at - y.at)[0];
+      if (!due) break;
+      c.t = due.at;
+      if (due.every) due.at += due.every; else c.timers = c.timers.filter(x => x !== due);
+      due.run();
+    }
+    c.t = end;
+  };
+  return c;
+}
+
+function rig({ run, text = '', busy = null } = {}) {
+  const c = clock();
+  const r = { c, notices: [], actions: [], writes: [], highlights: [], releases: 0, changed: 0, cancels: [], text, busy };
+  r.deferred = null;
+  r.ports = {
+    run: (path, signal) => run ? run(path, signal, r) : new Promise((resolve, reject) => { r.deferred = { resolve, reject }; signal.addEventListener('abort', () => reject(Object.assign(new Error('cancelled'), { code: 'cancelled' }))); }),
+    cancel: path => { r.cancels.push(path); r.deferred?.reject(Object.assign(new Error('cancelled'), { code: 'cancelled' })); },
+    mapBusy: () => r.busy,
+    codeOf: e => e && e.code,
+    refusalText: e => `refused:${e.code}`,
+    write: async (path, transform) => { const next = transform(r.text); r.writes.push(path); if (r.refuse) return 'refused'; if (next === r.text) return 'unchanged'; r.text = next; return 'written'; },
+    notice: m => r.notices.push(m),
+    noticeAction: (message, label, onClick, ms) => { const a = { message, label, onClick, ms, hidden: false }; r.actions.push(a); return { hide: () => { a.hidden = true; } }; },
+    highlight: (path, ranges) => r.highlights.push({ path, ranges }),
+    releaseHighlight: () => { r.releases++; },
+    changed: () => { r.changed++; },
+    now: () => c.t, setTimer: c.set, clearTimer: c.clear, setTick: c.tick, clearTick: c.clear
+  };
+  r.ctl = new b.BookNotesApply(r.ports);
+  return r;
+}
+const flush = () => new Promise(resolve => setImmediate(resolve));
+const result = (over = {}) => ({ applied: 1, skipped: 0, marked: 0, edits: [{ id: 'p1', before: 'B', after: 'A', from: 3, to: 4 }], ...over });
+
+test('running: the clock reads m:ss from the start, the tick repaints, press while running cancels and nothing changes', async () => {
+  const r = rig();
+  r.ctl.press('N/c.md');
+  await flush();
+  assert.equal(r.ctl.isRunning('N/c.md'), true);
+  assert.equal(r.ctl.elapsed('N/c.md'), '0:00');
+  const before = r.changed;
+  r.c.advance(65_000);
+  assert.equal(r.ctl.elapsed('N/c.md'), '1:05');
+  assert.ok(r.changed >= before + 65, 'one repaint per second');
+  r.ctl.press('N/c.md');
+  await flush();
+  assert.deepEqual(r.cancels, ['N/c.md']);
+  assert.equal(r.ctl.isRunning('N/c.md'), false);
+  assert.deepEqual(r.notices, ['refused:cancelled']);
+  assert.deepEqual(r.writes, []);
+  assert.equal(r.highlights.length, 0);
+  assert.equal(r.c.timers.length, 0, 'the timeout and the tick are released');
+});
+test('disabled: a running drive or another notes job gives the reason, a press shows it and starts nothing', async () => {
+  const r = rig({ busy: 'drive' });
+  assert.match(r.ctl.disabledReason('N/c.md'), /圖文書正在執行中/);
+  r.ctl.press('N/c.md');
+  assert.equal(r.notices.length, 1);
+  assert.equal(r.ctl.isRunning('N/c.md'), false);
+  r.busy = 'notes';
+  assert.match(r.ctl.disabledReason('N/c.md'), /備註正在套用中/);
+  r.busy = null;
+  assert.equal(r.ctl.disabledReason('N/c.md'), null);
+});
+test('timeout: after 3 minutes the job is aborted and the notice says the notes are kept; nothing written', async () => {
+  const r = rig();
+  r.ctl.press('N/c.md');
+  await flush();
+  r.c.advance(b.NOTES_TIMEOUT_MS);
+  await flush();
+  assert.equal(r.notices.length, 1);
+  assert.match(r.notices[0], /太久.*備註都還在/);
+  assert.equal(r.ctl.isRunning('N/c.md'), false);
+});
+test('AI failure: the notice names the cause and says the notes are kept', async () => {
+  const r = rig({ run: async () => { throw new Error('provider down'); } });
+  r.ctl.press('N/c.md');
+  await flush();
+  assert.match(r.notices[0], /失敗（provider down）.*備註都還在/);
+});
+test('messages: nothing sendable, and every note skipped, say why (different texts)', async () => {
+  const r = rig({ run: async () => ({ applied: 0, skipped: 0, marked: 0, edits: [] }) });
+  r.ctl.press('N/c.md'); await flush();
+  assert.match(r.notices[0], /沒有改寫任何段落.*都沒有可送出/);
+  const q = rig({ run: async () => ({ applied: 0, skipped: 2, marked: 2, edits: [] }) });
+  q.ctl.press('N/c.md'); await flush();
+  assert.match(q.notices[0], /2 段都被略過/);
+  assert.equal(q.actions.length, 0, 'no undo for nothing');
+});
+test('applied: the notice shows the count and the skipped count with 還原, lasts 10 s, and the paragraphs are highlighted', async () => {
+  const r = rig({ run: async () => result({ skipped: 2 }) });
+  r.ctl.press('N/c.md'); await flush();
+  assert.equal(r.actions.length, 1);
+  assert.equal(r.actions[0].message, '已改 1 段（2 段略過） · ');
+  assert.equal(r.actions[0].label, '還原');
+  assert.equal(r.actions[0].ms, b.UNDO_NOTICE_MS);
+  assert.deepEqual(JSON.parse(JSON.stringify(r.highlights)), [{ path: 'N/c.md', ranges: [{ from: 3, to: 4 }] }]);
+  assert.equal(r.ctl.canUndo(), true);
+  const plain = rig({ run: async () => result() });
+  plain.ctl.press('N/c.md'); await flush();
+  assert.equal(plain.actions[0].message, '已改 1 段 · ');
+});
+
+const P_OLD = `舊的一段 ${W('小熊', 1, '改成小兔')}。`;
+const P_NEW = '新的一段，小兔。';
+const applied = (text) => ({ applied: 1, skipped: 0, marked: 0, edits: [{ id: 'p1', before: P_OLD, after: P_NEW, from: 0, to: P_NEW.length }] });
+
+test('undo success: the paragraph comes back with its note; the notice is released and the command is gone', async () => {
+  const r = rig({ text: detail(`${P_NEW}\n\n別的段`), run: async () => applied() });
+  r.ctl.press('N/c.md'); await flush();
+  r.actions[0].onClick();
+  await flush();
+  assert.equal(r.text, detail(`${P_OLD}\n\n別的段`));
+  assert.equal(r.actions[0].hidden, true);
+  assert.equal(r.releases, 1);
+  assert.match(r.notices.at(-1), /已還原 1 段，備註都放回去了/);
+  assert.equal(r.ctl.canUndo(), false);
+  await r.ctl.undo();
+  assert.match(r.notices.at(-1), /沒有可還原/);
+});
+test('undo partial and none: a paragraph edited since is left alone and reported', async () => {
+  const two = { applied: 2, skipped: 0, marked: 0, edits: [
+    { id: 'p1', before: P_OLD, after: P_NEW, from: 0, to: 1 },
+    { id: 'p2', before: '舊二', after: '新二', from: 2, to: 3 }] };
+  const r = rig({ text: detail(`${P_NEW}\n\n新二 又被改`), run: async () => two });
+  r.ctl.press('N/c.md'); await flush();
+  await r.ctl.undo();
+  assert.equal(r.text, detail(`${P_OLD}\n\n新二 又被改`));
+  assert.match(r.notices.at(-1), /已還原 1 段.*另有 1 段/);
+  const q = rig({ text: detail('全都改過了'), run: async () => applied() });
+  q.ctl.press('N/c.md'); await flush();
+  await q.ctl.undo();
+  assert.equal(q.text, detail('全都改過了'));
+  assert.match(q.notices.at(-1), /沒有還原任何段落/);
+  assert.equal(q.ctl.canUndo(), false);
+});
+test('undo refused: the writer refuses, the chapter is untouched and the undo stays available', async () => {
+  const r = rig({ text: detail(P_NEW), run: async () => applied() });
+  r.ctl.press('N/c.md'); await flush();
+  r.refuse = true;
+  await r.ctl.undo();
+  assert.equal(r.text, detail(P_NEW));
+  assert.match(r.notices.at(-1), /還原沒有成功/);
+  assert.equal(r.ctl.canUndo(), true);
+  r.refuse = false;
+  await r.ctl.undo();
+  assert.equal(r.text, detail(P_OLD));
+});
+test('dispose: a running job is aborted, a late result shows nothing, and the undo is gone', async () => {
+  const r = rig();
+  r.ctl.press('N/c.md'); await flush();
+  r.ctl.dispose();
+  r.deferred.resolve(result());
+  await flush();
+  assert.deepEqual(r.notices, []);
+  assert.equal(r.actions.length, 0);
+  assert.equal(r.highlights.length, 0);
+  assert.equal(r.ctl.canUndo(), false);
+});
+
+// ---- the highlight lifecycle ----
+function targets(...paths) {
+  const list = paths.map(path => ({ key: {}, shown: path, calls: [], path() { return this.shown; }, set(ranges) { this.calls.push(ranges); } }));
+  return list;
+}
+function lights(list) {
+  const c = clock();
+  const h = new b.AppliedHighlights({ targets: () => list.filter(t => !t.closed), setTimer: c.set, clearTimer: c.clear });
+  return { c, h };
+}
+const R = [{ from: 1, to: 5 }];
+test('highlight: shown in every open editor of the note, released after 10 s', () => {
+  const [a, other, a2] = targets('N/c.md', 'N/o.md', 'N/c.md');
+  const { c, h } = lights([a, other, a2]);
+  h.show('N/c.md', R);
+  assert.deepEqual(a.calls, [R]); assert.deepEqual(a2.calls, [R]); assert.deepEqual(other.calls, []);
+  c.advance(b.HIGHLIGHT_MS - 1);
+  assert.equal(a.calls.length, 1);
+  c.advance(1);
+  assert.deepEqual(a.calls, [R, null]); assert.deepEqual(a2.calls, [R, null]);
+  assert.equal(c.timers.length, 0);
+});
+test('highlight: a file switch releases that editor only; a closed view is forgotten; the last one going releases the timer', () => {
+  const [a, a2] = targets('N/c.md', 'N/c.md');
+  const { c, h } = lights([a, a2]);
+  h.show('N/c.md', R);
+  a.shown = 'N/o.md'; h.sync();
+  assert.deepEqual(a.calls, [R, null]); assert.deepEqual(a2.calls, [R]);
+  a2.closed = true; h.sync();
+  assert.equal(c.timers.length, 0, 'no editor left: the timer is released');
+  c.advance(20_000);
+  assert.deepEqual(a2.calls, [R], 'a closed editor is never touched again');
+});
+test('highlight: a newer apply replaces the older one; unload releases; nothing is drawn for an empty list or a note that is not open', () => {
+  const [a] = targets('N/c.md');
+  const { c, h } = lights([a]);
+  h.show('N/c.md', R);
+  h.show('N/c.md', [{ from: 7, to: 9 }]);
+  assert.deepEqual(a.calls, [R, null, [{ from: 7, to: 9 }]]);
+  h.dispose();
+  assert.deepEqual(a.calls.at(-1), null);
+  assert.equal(c.timers.length, 0);
+  h.show('N/c.md', []); h.show('N/x.md', R);
+  assert.equal(a.calls.length, 4);
+});
+test('highlight field: the marks map through edits, out-of-range ranges are dropped, null clears', () => {
+  const { EditorState } = b;
+  const count = state => { let n = 0; state.field(b.appliedField).between(0, state.doc.length, () => { n++; }); return n; };
+  let state = EditorState.create({ doc: 'abcdefghij', extensions: [b.appliedField] });
+  state = state.update({ effects: b.setApplied.of([{ from: 2, to: 5 }, { from: 8, to: 99 }, { from: 4, to: 4 }]) }).state;
+  assert.equal(count(state), 1);
+  state = state.update({ changes: { from: 0, insert: 'XX' } }).state;
+  let at = -1; state.field(b.appliedField).between(0, 20, from => { at = from; });
+  assert.equal(at, 4, 'mapped through the insert');
+  state = state.update({ effects: b.setApplied.of(null) }).state;
+  assert.equal(count(state), 0);
+});

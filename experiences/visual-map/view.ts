@@ -352,6 +352,7 @@ import {
   BookReviewMemory,
   countNotes,
   isReviewResolved,
+  proofIsStale,
   readReviewState,
   reviewEntries,
   runTrackedRerun,
@@ -463,6 +464,7 @@ import { mapChatSourceMaterial, type MapChatSourceCache } from "../../core/map-c
 import { normalizeVaultPath } from "../../core/map-chat-guard";
 import { MapChatFiles } from "../../core/map-chat-files";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
+import { cardRevision } from "../../core/book-pipeline/machine";
 import { GateError, applyPause } from "../../core/argument-map/machine";
 import { effectiveVerdict, managedNodeIds, readArgumentMap } from "../../core/argument-map/model";
 import {
@@ -12287,7 +12289,18 @@ export class VisualAgentMapView extends ItemView {
         if (read?.kind !== "usable") return false;
         return (this.plugin.getBookPipelineProgress(this.path ?? "")?.phase ?? read.data.phase) === "done";
       })();
-    const bookCard = bookCardView(note ?? {}, bookDone);
+    const bookStale = (() => {
+      const read = note && this.map && this.hasBookPipeline() ? readBookPipeline(this.map) : undefined;
+      if (read?.kind !== "usable") return false;
+      return proofIsStale(
+        note ?? { prompt: "", detail: "" },
+        readPipelineStage(note?.pipelineStage) ?? "pending",
+        node.id,
+        read.data.runId,
+        cardRevision(read.data, node.id)
+      );
+    })();
+    const bookCard = bookCardView(note ?? {}, bookDone, bookStale);
     if (!loading) {
       const statusText = research
         ? this.researchStageText(research)
@@ -17207,6 +17220,7 @@ export class VisualAgentMapView extends ItemView {
     const map = this.map;
     if (!map) return [];
     return reviewEntries({
+      proofContext: { runId: data.runId, revisionOf: id => cardRevision(data, id) },
       order: data.order,
       titleOf: id => this.notes.get(id)?.title ?? map.nodes.find(node => node.id === id)?.path ?? id,
       noteOf: id => this.notes.get(id)
@@ -17238,7 +17252,12 @@ export class VisualAgentMapView extends ItemView {
     const text = await this.app.vault.read(file).catch(() => null);
     const note = await this.plugin.repo.readNote(node.path).catch(() => null);
     if (this.closed || this.map !== map || text === null || !note) return;
-    const entry = reviewEntries({ order: [id], titleOf: () => note.title, noteOf: () => note })[0];
+    const entry = reviewEntries({
+      proofContext: { runId: read.data.runId, revisionOf: other => cardRevision(read.data, other) },
+      order: [id],
+      titleOf: () => note.title,
+      noteOf: () => note
+    })[0];
     const state = readReviewState(text);
     this.notes.set(id, note);
     if (!entry || !isReviewResolved(state, entry.fp)) {

@@ -3254,9 +3254,25 @@ var en = {
   "ui.book_note_not_chapter": "Open a chapter of a picture book first.",
   "ui.book_note_apply_0": "Apply {0} notes",
   "ui.book_note_apply_menu_0": "Picture book: apply {0} notes",
-  "ui.book_note_applied_0_1": "Rewrote {0} paragraph(s); {1} left as they were. Your notes are in place.",
   "ui.command_book_note_add": "Picture book: add a note to the selection",
   "ui.command_book_note_apply": "Picture book: apply the notes of this chapter",
+  "ui.book_note_applying_0": "Rewriting {0}\u2026",
+  "ui.book_note_cancel_hint_0": "{0} (press to cancel)",
+  "ui.book_note_cancel_menu": "Picture book: cancel the rewrite",
+  "ui.book_note_applied_n_0": "Rewrote {0} paragraph(s)",
+  "ui.book_note_applied_skipped_0": " ({0} skipped)",
+  "ui.book_note_undo_label": "Undo",
+  "ui.book_note_none_sendable": "Nothing was rewritten: none of the notes could be sent (paragraphs with links, tables or special marks are not sent). The chapter is unchanged and your notes are still there.",
+  "ui.book_note_none_skipped_0": "Nothing was rewritten: all {0} paragraph(s) were skipped because the text changed while waiting. A mark was added beside those notes; your notes are still there.",
+  "ui.book_note_timeout": "The AI took too long. The chapter was not changed and your notes are still there.",
+  "ui.book_note_ai_failed_0": "The AI rewrite failed ({0}). The chapter was not changed and your notes are still there.",
+  "ui.command_book_note_undo": "Picture book: undo the last applied notes",
+  "ui.book_note_undo_unavailable": "There is nothing to undo.",
+  "ui.book_note_undo_refused": "The undo did not go through, so the chapter was not changed.",
+  "ui.book_note_undo_none": "Nothing was restored: those paragraphs were edited after the rewrite.",
+  "ui.book_note_undo_done_0": "Restored {0} paragraph(s); the notes are back.",
+  "ui.book_note_undo_partial_0_1": "Restored {0} paragraph(s); {1} were edited after the rewrite and were not restored.",
+  "ui.book_stale_proof": "Edited, not re-checked",
   "ui.book_panel_reason_unmet_plain": "Some items did not pass proofreading",
   "ui.book_progress_line_global": "Planning the whole book",
   "ui.book_progress_line_plan_0_1": "Planning chapter {0}/{1}",
@@ -6426,9 +6442,25 @@ var zhCN = {
   "ui.book_note_not_chapter": "\u8BF7\u5148\u6253\u5F00\u56FE\u6587\u4E66\u7684\u7AE0\u8282\u7B14\u8BB0\u3002",
   "ui.book_note_apply_0": "\u5957\u7528 {0} \u5219\u5907\u6CE8",
   "ui.book_note_apply_menu_0": "\u56FE\u6587\u4E66\uFF1A\u5957\u7528 {0} \u5219\u5907\u6CE8",
-  "ui.book_note_applied_0_1": "\u5DF2\u6539\u5199 {0} \u6BB5\uFF0C{1} \u6BB5\u4FDD\u6301\u539F\u6837\u3002",
   "ui.command_book_note_add": "\u56FE\u6587\u4E66\uFF1A\u66FF\u9009\u53D6\u6587\u5B57\u52A0\u5907\u6CE8",
   "ui.command_book_note_apply": "\u56FE\u6587\u4E66\uFF1A\u5957\u7528\u8FD9\u7AE0\u7684\u5907\u6CE8",
+  "ui.book_note_applying_0": "\u6539\u5199\u4E2D {0}\u2026",
+  "ui.book_note_cancel_hint_0": "{0}\uFF08\u70B9\u4E00\u4E0B\u53D6\u6D88\uFF09",
+  "ui.book_note_cancel_menu": "\u56FE\u6587\u4E66\uFF1A\u53D6\u6D88\u6539\u5199",
+  "ui.book_note_applied_n_0": "\u5DF2\u6539 {0} \u6BB5",
+  "ui.book_note_applied_skipped_0": "\uFF08{0} \u6BB5\u7565\u8FC7\uFF09",
+  "ui.book_note_undo_label": "\u8FD8\u539F",
+  "ui.book_note_none_sendable": "\u6CA1\u6709\u6539\u5199\u4EFB\u4F55\u6BB5\u843D\uFF1A\u8FD9\u7AE0\u7684\u5907\u6CE8\u90FD\u6CA1\u6709\u53EF\u53D1\u9001\u7684\u6BB5\u843D\uFF08\u542B\u94FE\u63A5\u3001\u8868\u683C\u6216\u7279\u6B8A\u6807\u8BB0\u7684\u6BB5\u843D\u4E0D\u4F1A\u53D1\u9001\uFF09\u3002\u7AE0\u8282\u6CA1\u6709\u6539\u52A8\uFF0C\u5907\u6CE8\u90FD\u8FD8\u5728\u3002",
+  "ui.book_note_none_skipped_0": "\u6CA1\u6709\u6539\u5199\u4EFB\u4F55\u6BB5\u843D\uFF1A{0} \u6BB5\u90FD\u88AB\u7565\u8FC7\uFF0C\u56E0\u4E3A\u7B49\u5F85\u671F\u95F4\u539F\u6587\u88AB\u6539\u8FC7\u3002\u90A3\u4E9B\u5907\u6CE8\u65C1\u5DF2\u52A0\u6807\u8BB0\uFF0C\u5907\u6CE8\u90FD\u8FD8\u5728\u3002",
+  "ui.book_note_timeout": "AI \u7528\u65F6\u592A\u4E45\u3002\u7AE0\u8282\u6CA1\u6709\u6539\u52A8\uFF0C\u5907\u6CE8\u90FD\u8FD8\u5728\u3002",
+  "ui.book_note_ai_failed_0": "AI \u6539\u5199\u5931\u8D25\uFF08{0}\uFF09\u3002\u7AE0\u8282\u6CA1\u6709\u6539\u52A8\uFF0C\u5907\u6CE8\u90FD\u8FD8\u5728\u3002",
+  "ui.command_book_note_undo": "\u56FE\u6587\u4E66\uFF1A\u8FD8\u539F\u4E0A\u6B21\u5957\u7528",
+  "ui.book_note_undo_unavailable": "\u6CA1\u6709\u53EF\u8FD8\u539F\u7684\u5185\u5BB9\u3002",
+  "ui.book_note_undo_refused": "\u8FD8\u539F\u6CA1\u6709\u6210\u529F\uFF0C\u7AE0\u8282\u6CA1\u6709\u6539\u52A8\u3002",
+  "ui.book_note_undo_none": "\u6CA1\u6709\u8FD8\u539F\u4EFB\u4F55\u6BB5\u843D\uFF1A\u90A3\u4E9B\u6BB5\u843D\u5728\u6539\u5199\u540E\u53C8\u88AB\u6539\u8FC7\u3002",
+  "ui.book_note_undo_done_0": "\u5DF2\u8FD8\u539F {0} \u6BB5\uFF0C\u5907\u6CE8\u90FD\u653E\u56DE\u53BB\u4E86\u3002",
+  "ui.book_note_undo_partial_0_1": "\u5DF2\u8FD8\u539F {0} \u6BB5\uFF1B\u53E6\u6709 {1} \u6BB5\u5728\u6539\u5199\u540E\u53C8\u88AB\u6539\u8FC7\uFF0C\u6CA1\u6709\u8FD8\u539F\u3002",
+  "ui.book_stale_proof": "\u5DF2\u4FEE\u6539\uFF0C\u672A\u91CD\u65B0\u6821\u5BF9",
   "ui.book_panel_reason_unmet_plain": "\u6709\u51E0\u9879\u5185\u5BB9\u6CA1\u901A\u8FC7\u6821\u5BF9",
   "ui.book_progress_line_global": "\u6B63\u5728\u89C4\u5212\u5168\u4E66",
   "ui.book_progress_line_plan_0_1": "\u6B63\u5728\u4F01\u5212\u7B2C {0}\uFF0F{1} \u7AE0",
@@ -9598,9 +9630,25 @@ var zhTW = {
   "ui.book_note_not_chapter": "\u8ACB\u5148\u6253\u958B\u5716\u6587\u66F8\u7684\u7AE0\u7BC0\u7B46\u8A18\u3002",
   "ui.book_note_apply_0": "\u5957\u7528 {0} \u5247\u5099\u8A3B",
   "ui.book_note_apply_menu_0": "\u5716\u6587\u66F8\uFF1A\u5957\u7528 {0} \u5247\u5099\u8A3B",
-  "ui.book_note_applied_0_1": "\u5DF2\u6539\u5BEB {0} \u6BB5\uFF0C{1} \u6BB5\u7DAD\u6301\u539F\u6A23\u3002",
   "ui.command_book_note_add": "\u5716\u6587\u66F8\uFF1A\u66FF\u9078\u53D6\u6587\u5B57\u52A0\u5099\u8A3B",
   "ui.command_book_note_apply": "\u5716\u6587\u66F8\uFF1A\u5957\u7528\u9019\u7AE0\u7684\u5099\u8A3B",
+  "ui.book_note_applying_0": "\u6539\u5BEB\u4E2D {0}\u2026",
+  "ui.book_note_cancel_hint_0": "{0}\uFF08\u6309\u4E00\u4E0B\u53D6\u6D88\uFF09",
+  "ui.book_note_cancel_menu": "\u5716\u6587\u66F8\uFF1A\u53D6\u6D88\u6539\u5BEB",
+  "ui.book_note_applied_n_0": "\u5DF2\u6539 {0} \u6BB5",
+  "ui.book_note_applied_skipped_0": "\uFF08{0} \u6BB5\u7565\u904E\uFF09",
+  "ui.book_note_undo_label": "\u9084\u539F",
+  "ui.book_note_none_sendable": "\u6C92\u6709\u6539\u5BEB\u4EFB\u4F55\u6BB5\u843D\uFF1A\u9019\u7AE0\u7684\u5099\u8A3B\u90FD\u6C92\u6709\u53EF\u9001\u51FA\u7684\u6BB5\u843D\uFF08\u542B\u9023\u7D50\u3001\u8868\u683C\u6216\u7279\u6B8A\u6A19\u8A18\u7684\u6BB5\u843D\u4E0D\u6703\u9001\u51FA\uFF09\u3002\u7AE0\u7BC0\u6C92\u6709\u6539\u52D5\uFF0C\u5099\u8A3B\u90FD\u9084\u5728\u3002",
+  "ui.book_note_none_skipped_0": "\u6C92\u6709\u6539\u5BEB\u4EFB\u4F55\u6BB5\u843D\uFF1A{0} \u6BB5\u90FD\u88AB\u7565\u904E\uFF0C\u56E0\u70BA\u7B49\u5F85\u671F\u9593\u539F\u6587\u88AB\u6539\u904E\u3002\u90A3\u4E9B\u5099\u8A3B\u65C1\u5DF2\u52A0\u8A3B\u8A18\uFF0C\u5099\u8A3B\u90FD\u9084\u5728\u3002",
+  "ui.book_note_timeout": "AI \u82B1\u592A\u4E45\u4E86\u3002\u7AE0\u7BC0\u6C92\u6709\u6539\u52D5\uFF0C\u5099\u8A3B\u90FD\u9084\u5728\u3002",
+  "ui.book_note_ai_failed_0": "AI \u6539\u5BEB\u5931\u6557\uFF08{0}\uFF09\u3002\u7AE0\u7BC0\u6C92\u6709\u6539\u52D5\uFF0C\u5099\u8A3B\u90FD\u9084\u5728\u3002",
+  "ui.command_book_note_undo": "\u5716\u6587\u66F8\uFF1A\u9084\u539F\u4E0A\u6B21\u5957\u7528",
+  "ui.book_note_undo_unavailable": "\u6C92\u6709\u53EF\u9084\u539F\u7684\u6771\u897F\u3002",
+  "ui.book_note_undo_refused": "\u9084\u539F\u6C92\u6709\u6210\u529F\uFF0C\u7AE0\u7BC0\u6C92\u6709\u6539\u52D5\u3002",
+  "ui.book_note_undo_none": "\u6C92\u6709\u9084\u539F\u4EFB\u4F55\u6BB5\u843D\uFF1A\u90A3\u4E9B\u6BB5\u843D\u5728\u6539\u5BEB\u5F8C\u53C8\u88AB\u6539\u904E\u3002",
+  "ui.book_note_undo_done_0": "\u5DF2\u9084\u539F {0} \u6BB5\uFF0C\u5099\u8A3B\u90FD\u653E\u56DE\u53BB\u4E86\u3002",
+  "ui.book_note_undo_partial_0_1": "\u5DF2\u9084\u539F {0} \u6BB5\uFF1B\u53E6\u6709 {1} \u6BB5\u5728\u6539\u5BEB\u5F8C\u53C8\u88AB\u6539\u904E\uFF0C\u6C92\u6709\u9084\u539F\u3002",
+  "ui.book_stale_proof": "\u5DF2\u4FEE\u6539\uFF0C\u672A\u91CD\u65B0\u6821\u5C0D",
   "ui.book_panel_reason_unmet_plain": "\u6709\u5E7E\u9805\u5167\u5BB9\u6C92\u901A\u904E\u6821\u5C0D",
   "ui.book_progress_line_global": "\u6B63\u5728\u898F\u5283\u5168\u66F8",
   "ui.book_progress_line_plan_0_1": "\u6B63\u5728\u4F01\u5283\u7B2C {0}\uFF0F{1} \u7AE0",
@@ -45675,6 +45723,20 @@ function applyReplies(raw, items, replies) {
   });
   return { text: text10, applied: applied.sort((a, b) => a.from - b.from), skipped: skipped2, marked: free.length };
 }
+function undoApplied(raw, edits) {
+  const paragraphs = chapterParagraphs(raw);
+  const run = [];
+  let skipped2 = 0;
+  for (const e of edits) {
+    const same2 = paragraphs.filter((p) => p.text === e.after);
+    if (same2.length !== 1) {
+      skipped2++;
+      continue;
+    }
+    run.push({ from: same2[0].from, to: same2[0].to, insert: eol(e.before, same2[0].crlf) });
+  }
+  return { text: runEdits(raw, run).text, restored: run.length, skipped: skipped2 };
+}
 
 // core/steps/argument-map/language.en.md
 var language_en_default3 = "Write in {{language}}.\n";
@@ -52853,7 +52915,7 @@ function structureNote(issue2) {
   if (!structure2) return { issueText: t("ui.book_checked_notice_0", String(notices)) };
   return { issueText: t("ui.book_structure_notice_0_1", String(structure2), String(notices)) };
 }
-function bookCardView(note, accepted = false) {
+function bookCardView(note, accepted = false, stale = false) {
   var _a2;
   const stage = (_a2 = readPipelineStage(note.pipelineStage)) != null ? _a2 : "pending";
   const role = readBookRole(note.bookRole);
@@ -52861,6 +52923,7 @@ function bookCardView(note, accepted = false) {
   return {
     stage,
     stageText: t(STAGE_KEY[stage]),
+    ...!accepted && stale && stage === "checked" ? { edited: true } : {},
     seam: !accepted && typeof note.pipelineSeam === "string" && note.pipelineSeam.trim() !== "",
     ...accepted && stage === "needs-review" ? { hideStage: true } : {},
     ...role ? { roleText: t(ROLE_KEY[role]) } : {},
@@ -52893,6 +52956,7 @@ function renderBookCardLabels(header2, view, writing) {
     }
   } else if (!view.hideStage)
     header2.createSpan({ cls: `vam-status vam-book-state is-${view.stage}`, text: view.stageText });
+  if (view.edited) header2.createSpan({ cls: "vam-status vam-book-state is-edited", text: t("ui.book_stale_proof") });
   if (view.seam) {
     const seam = header2.createSpan({ cls: "vam-status vam-book-state is-seam", text: t("ui.book_seam_label") });
     seam.setAttr("title", t("ui.book_seam_reason"));
@@ -52923,7 +52987,8 @@ var PROBLEM_RULES = [
     of: (card) => card.factsOpen > 0 ? t("ui.book_panel_g2_reason_facts_0", card.factsOpen) : void 0
   },
   { kind: "images", of: (card) => card.galleryBare ? t("ui.book_panel_g2_reason_images") : void 0 },
-  { kind: "seam", of: (card) => card.seam ? t("ui.book_panel_g2_reason_seam") : void 0 }
+  { kind: "seam", of: (card) => card.seam ? t("ui.book_panel_g2_reason_seam") : void 0 },
+  { kind: "edited", of: (card) => card.proofStale ? t("ui.book_stale_proof") : void 0 }
 ];
 function reviewProblems(card) {
   const out = [];
@@ -52954,7 +53019,7 @@ function galleryBare(role, note) {
 }
 function gate2Cards(input2) {
   return input2.order.map((id, at) => {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d;
     const note = input2.noteOf(id);
     const view = bookCardView(note != null ? note : {});
     const issue2 = typeof (note == null ? void 0 : note.pipelineIssue) === "string" ? note.pipelineIssue : "";
@@ -52962,6 +53027,13 @@ function gate2Cards(input2) {
     const proof = checked2 || view.stage === "needs-review" ? latestStoredProof((_a2 = note == null ? void 0 : note.detail) != null ? _a2 : "") : void 0;
     const structure2 = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue2.trim());
     const role = typeof (note == null ? void 0 : note.bookRole) === "string" ? note.bookRole : void 0;
+    const stale = !!input2.proofContext && proofIsStale(
+      { prompt: (_b2 = note == null ? void 0 : note.prompt) != null ? _b2 : "", detail: (_c = note == null ? void 0 : note.detail) != null ? _c : "" },
+      view.stage,
+      id,
+      input2.proofContext.runId,
+      input2.proofContext.revisionOf(id)
+    );
     return {
       id,
       index: at + 1,
@@ -52970,9 +53042,10 @@ function gate2Cards(input2) {
       ...role ? { role } : {},
       ...view.stage === "needs-review" && issue2 ? { failureText: reasonOf2(issue2, proof) } : {},
       structureUnmet: checked2 && structure2 ? structure2[1].split(" ").filter((token) => !token.startsWith("image_")).length : 0,
-      factsOpen: checked2 ? ((_b2 = proof == null ? void 0 : proof.items) != null ? _b2 : []).filter((item) => item.type === "fact" && item.status !== "met").length : 0,
+      factsOpen: checked2 ? ((_d = proof == null ? void 0 : proof.items) != null ? _d : []).filter((item) => item.type === "fact" && item.status !== "met").length : 0,
       galleryBare: checked2 && galleryBare(role, note),
-      seam: view.seam
+      seam: view.seam,
+      ...stale ? { proofStale: true } : {}
     };
   });
 }
@@ -52989,7 +53062,15 @@ async function runTrackedRerun(memory, nodeId, rerun) {
 }
 var attentionFingerprint = (input2) => {
   var _a2, _b2, _c;
-  return hashText(JSON.stringify([input2.stage, (_a2 = input2.issue) != null ? _a2 : "", (_b2 = input2.proofKey) != null ? _b2 : "", (_c = input2.seam) != null ? _c : ""]));
+  return hashText(
+    JSON.stringify([
+      input2.stage,
+      (_a2 = input2.issue) != null ? _a2 : "",
+      (_b2 = input2.proofKey) != null ? _b2 : "",
+      (_c = input2.seam) != null ? _c : "",
+      ...input2.stale ? ["edited"] : []
+    ])
+  );
 };
 var proofFingerprint = (detail) => {
   const proof = latestStoredProof(detail);
@@ -53009,7 +53090,8 @@ function reviewEntries(input2) {
         stage: card.stage,
         issue: typeof (note == null ? void 0 : note.pipelineIssue) === "string" ? note.pipelineIssue : "",
         proofKey: proofFingerprint((_a2 = note == null ? void 0 : note.detail) != null ? _a2 : ""),
-        seam: typeof (note == null ? void 0 : note.pipelineSeam) === "string" ? note.pipelineSeam : ""
+        seam: typeof (note == null ? void 0 : note.pipelineSeam) === "string" ? note.pipelineSeam : "",
+        stale: card.proofStale === true
       })
     });
   }
@@ -53134,6 +53216,18 @@ function readReviewState(text10) {
   };
 }
 var isReviewResolved = (state, fp) => !!state && (state.accept || state.fixed) && state.fp === fp;
+function proofIsStale(card, stage, nodeId, runId, revision) {
+  if (stage !== "checked" && stage !== "needs-review") return false;
+  if (!latestStoredProof(card.detail)) return false;
+  const key4 = proofKey({
+    runId,
+    nodeId,
+    revision,
+    body: projectProofBody(stripImageLines(chapterBody(card.detail))),
+    checklist: parseChecklist(card.prompt)
+  });
+  return !findStoredProof(card.detail, key4) && !findStoredProof(card.detail, failedProofKey(key4));
+}
 
 // experiences/visual-map/book-pipeline-callouts.ts
 function minimalChange(before, after) {
@@ -53335,6 +53429,7 @@ var BookCallouts = class {
       });
     } else if (data.phase === "gate2") {
       const entries = reviewEntries({
+        proofContext: { runId: data.runId, revisionOf: (id) => cardRevision(data, id) },
         order: cards.map((item) => item.id),
         titleOf: (id) => {
           var _a3, _b3;
@@ -78581,7 +78676,19 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       if ((read == null ? void 0 : read.kind) !== "usable") return false;
       return ((_c2 = (_b3 = this.plugin.getBookPipelineProgress((_a3 = this.path) != null ? _a3 : "")) == null ? void 0 : _b3.phase) != null ? _c2 : read.data.phase) === "done";
     })();
-    const bookCard = bookCardView(note != null ? note : {}, bookDone);
+    const bookStale = (() => {
+      var _a3;
+      const read = note && this.map && this.hasBookPipeline() ? readBookPipeline(this.map) : void 0;
+      if ((read == null ? void 0 : read.kind) !== "usable") return false;
+      return proofIsStale(
+        note != null ? note : { prompt: "", detail: "" },
+        (_a3 = readPipelineStage(note == null ? void 0 : note.pipelineStage)) != null ? _a3 : "pending",
+        node.id,
+        read.data.runId,
+        cardRevision(read.data, node.id)
+      );
+    })();
+    const bookCard = bookCardView(note != null ? note : {}, bookDone, bookStale);
     if (!loading) {
       const statusText = research ? this.researchStageText(research) : merging ? t("ui.merging") : active ? t("ui.ai_running") : queued ? t("ui.research_queued") : (note == null ? void 0 : note.status) === "completed" ? t("ui.researched") : note ? topicStatusLabel(note.status, this.plugin.settings.language) : t("ui.note_missing");
       if (research) {
@@ -83138,6 +83245,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const map = this.map;
     if (!map) return [];
     return reviewEntries({
+      proofContext: { runId: data.runId, revisionOf: (id) => cardRevision(data, id) },
       order: data.order,
       titleOf: (id) => {
         var _a2, _b2, _c, _d;
@@ -83166,7 +83274,12 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const text10 = await this.app.vault.read(file).catch(() => null);
     const note = await this.plugin.repo.readNote(node.path).catch(() => null);
     if (this.closed || this.map !== map || text10 === null || !note) return;
-    const entry = reviewEntries({ order: [id], titleOf: () => note.title, noteOf: () => note })[0];
+    const entry = reviewEntries({
+      proofContext: { runId: read.data.runId, revisionOf: (other) => cardRevision(read.data, other) },
+      order: [id],
+      titleOf: () => note.title,
+      noteOf: () => note
+    })[0];
     const state = readReviewState(text10);
     this.notes.set(id, note);
     if (!entry || !isReviewResolved(state, entry.fp)) {
@@ -89842,6 +89955,7 @@ var BookNotes = class {
   }
   /** From what is known now (no reads): one header action on each view that shows a chapter with notes, none on any other. */
   paint() {
+    var _a2, _b2;
     if (this.disposed) return;
     const leaves = this.ports.leaves();
     const live2 = new Set(leaves.map((leaf) => leaf.key));
@@ -89853,19 +89967,26 @@ var BookNotes = class {
     for (const leaf of leaves) {
       const path = leaf.path();
       const count4 = this.isChapter(path) ? countNotes(leaf.text()) : 0;
+      const status = path ? this.ports.applyStatus(path) : { running: false };
       const shown = this.actions.get(leaf.key);
-      if (!count4) {
+      if (!count4 && !status.running) {
         shown == null ? void 0 : shown.handle.remove();
         this.actions.delete(leaf.key);
         continue;
       }
-      const label = t("ui.book_note_apply_0", count4);
+      const label = status.running ? t("ui.book_note_applying_0", (_a2 = status.elapsed) != null ? _a2 : "0:00") : t("ui.book_note_apply_0", count4);
+      const disabled = (_b2 = status.disabled) != null ? _b2 : null;
       if (shown) {
-        if (shown.count !== count4) shown.handle.setLabel(label);
-        shown.count = count4;
+        if (shown.label !== label)
+          shown.handle.setLabel(status.running ? t("ui.book_note_cancel_hint_0", label) : label);
+        if (shown.disabled !== disabled) shown.handle.setDisabled(disabled);
+        shown.label = label;
+        shown.disabled = disabled;
       } else {
         const handle = leaf.addAction(label, () => this.press(leaf));
-        this.actions.set(leaf.key, { handle, count: count4 });
+        if (status.running) handle.setLabel(t("ui.book_note_cancel_hint_0", label));
+        if (disabled) handle.setDisabled(disabled);
+        this.actions.set(leaf.key, { handle, label, disabled });
       }
     }
   }
@@ -89882,6 +90003,7 @@ var BookNotes = class {
   }
   /** The menu items for the active editor; null when the note is not a chapter (no item at all). */
   menu(editor) {
+    var _a2;
     if (!this.isChapter(editor.path)) return null;
     const { from, to } = editor.selection();
     const text10 = editor.text();
@@ -89889,7 +90011,7 @@ var BookNotes = class {
     const count4 = countNotes(text10);
     return {
       add: check.ok ? { title: t("ui.book_note_add"), disabled: false } : { title: t("ui.book_note_add_disabled_0", t(WHY[check.reason])), disabled: true },
-      ...count4 ? { apply: { title: t("ui.book_note_apply_menu_0", count4) } } : {}
+      ...this.ports.applyStatus((_a2 = editor.path) != null ? _a2 : "").running ? { apply: { title: t("ui.book_note_cancel_menu") } } : count4 ? { apply: { title: t("ui.book_note_apply_menu_0", count4) } } : {}
     };
   }
   /** The command: asks for the note and writes it. */
@@ -89962,6 +90084,215 @@ var BookNoteModal = class extends import_obsidian39.Modal {
   }
   onClose() {
     this.contentEl.empty();
+  }
+};
+
+// experiences/visual-map/book-pipeline-notes-apply.ts
+var NOTES_TIMEOUT_MS = 3 * 6e4;
+var UNDO_NOTICE_MS = 1e4;
+var BookNotesApply = class {
+  constructor(ports) {
+    this.ports = ports;
+    __publicField(this, "jobs", /* @__PURE__ */ new Map());
+    __publicField(this, "lastUndo", null);
+    __publicField(this, "undoNotice", null);
+    __publicField(this, "tick", null);
+    __publicField(this, "disposed", false);
+  }
+  isRunning(path) {
+    return this.jobs.has(path);
+  }
+  /** m:ss since the job began, undefined when none runs. */
+  elapsed(path) {
+    const job = this.jobs.get(path);
+    if (!job) return void 0;
+    const seconds = Math.max(0, Math.floor((this.ports.now() - job.startedAt) / 1e3));
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  }
+  /** Why the action is disabled (a drive runs, or another chapter's job holds the map); null when it can be pressed or is the running one. */
+  disabledReason(path) {
+    if (this.jobs.has(path)) return null;
+    const busy = this.ports.mapBusy(path);
+    if (busy === "drive") return t("ui.book_refused_drive_running");
+    if (busy === "notes") return t("ui.book_refused_notes_busy");
+    return null;
+  }
+  canUndo() {
+    return !!this.lastUndo;
+  }
+  /** The header action, the menu item and the command: start, or cancel when this chapter's job is running. */
+  press(path) {
+    if (this.disposed) return;
+    const job = this.jobs.get(path);
+    if (job) {
+      job.cancelled = true;
+      this.ports.cancel(path);
+      return;
+    }
+    const why2 = this.disabledReason(path);
+    if (why2) return this.ports.notice(why2);
+    void this.start(path);
+  }
+  async start(path) {
+    var _a2;
+    const abort = new AbortController();
+    const job = {
+      startedAt: this.ports.now(),
+      abort,
+      cancelled: false,
+      timedOut: false,
+      timer: this.ports.setTimer(() => {
+        job.timedOut = true;
+        abort.abort();
+      }, NOTES_TIMEOUT_MS)
+    };
+    this.jobs.set(path, job);
+    (_a2 = this.tick) != null ? _a2 : this.tick = this.ports.setTick(() => this.ports.changed(), 1e3);
+    this.ports.changed();
+    try {
+      const result = await this.ports.run(path, abort.signal);
+      if (!this.disposed) this.done(path, result);
+    } catch (error) {
+      if (!this.disposed) this.failed(job, error);
+    } finally {
+      this.ports.clearTimer(job.timer);
+      this.jobs.delete(path);
+      if (!this.jobs.size && this.tick !== null) {
+        this.ports.clearTick(this.tick);
+        this.tick = null;
+      }
+      if (!this.disposed) this.ports.changed();
+    }
+  }
+  failed(job, error) {
+    const code3 = this.ports.codeOf(error);
+    if (code3 === "cancelled" && job.timedOut && !job.cancelled) return this.ports.notice(t("ui.book_note_timeout"));
+    if (code3) return this.ports.notice(this.ports.refusalText(error));
+    const message = error == null ? void 0 : error.message;
+    const cause = (typeof message === "string" ? message : String(error)).slice(0, 120);
+    this.ports.notice(t("ui.book_note_ai_failed_0", cause));
+  }
+  done(path, result) {
+    var _a2;
+    if (!result.applied) {
+      this.ports.notice(
+        t(result.skipped ? "ui.book_note_none_skipped_0" : "ui.book_note_none_sendable", result.skipped)
+      );
+      return;
+    }
+    this.lastUndo = { path, edits: result.edits.map((edit) => ({ before: edit.before, after: edit.after })) };
+    this.ports.highlight(
+      path,
+      result.edits.map((edit) => ({ from: edit.from, to: edit.to }))
+    );
+    (_a2 = this.undoNotice) == null ? void 0 : _a2.hide();
+    const text10 = t("ui.book_note_applied_n_0", result.applied) + (result.skipped ? t("ui.book_note_applied_skipped_0", result.skipped) : "") + " \xB7 ";
+    this.undoNotice = this.ports.noticeAction(
+      text10,
+      t("ui.book_note_undo_label"),
+      () => void this.undo(),
+      UNDO_NOTICE_MS
+    );
+  }
+  /** Puts back the paragraphs of the last apply that are still as it left them (their notes come back with them); the rest are reported. */
+  async undo() {
+    var _a2;
+    const last = this.lastUndo;
+    if (!last) return this.ports.notice(t("ui.book_note_undo_unavailable"));
+    (_a2 = this.undoNotice) == null ? void 0 : _a2.hide();
+    this.undoNotice = null;
+    let outcome;
+    try {
+      const written2 = await this.ports.write(last.path, (text10) => {
+        const result = undoApplied(text10, last.edits);
+        outcome = { restored: result.restored, skipped: result.skipped };
+        return result.text;
+      });
+      if (written2 === "refused" || !outcome) return this.ports.notice(t("ui.book_note_undo_refused"));
+    } catch (e) {
+      return this.ports.notice(t("ui.book_note_undo_refused"));
+    }
+    this.ports.releaseHighlight();
+    this.lastUndo = null;
+    if (!outcome.restored) return this.ports.notice(t("ui.book_note_undo_none"));
+    this.ports.notice(
+      outcome.skipped ? t("ui.book_note_undo_partial_0_1", outcome.restored, outcome.skipped) : t("ui.book_note_undo_done_0", outcome.restored)
+    );
+  }
+  /** Plugin unload: every job is cancelled, nothing is shown afterwards. */
+  dispose() {
+    var _a2;
+    this.disposed = true;
+    for (const job of this.jobs.values()) job.abort.abort();
+    (_a2 = this.undoNotice) == null ? void 0 : _a2.hide();
+    this.undoNotice = null;
+    this.lastUndo = null;
+    if (this.tick !== null) this.ports.clearTick(this.tick);
+    this.tick = null;
+  }
+};
+
+// experiences/visual-map/book-applied-highlight.ts
+var import_state2 = require("@codemirror/state");
+var import_view3 = require("@codemirror/view");
+var setApplied = import_state2.StateEffect.define();
+var MARK = import_view3.Decoration.mark({ class: "vam-book-applied" });
+var appliedField = import_state2.StateField.define({
+  create: () => import_view3.Decoration.none,
+  update(set, tr) {
+    var _a2;
+    let next = set.map(tr.changes);
+    for (const effect of tr.effects) {
+      if (!effect.is(setApplied)) continue;
+      const size = tr.newDoc.length;
+      const ranges = [];
+      for (const range of (_a2 = effect.value) != null ? _a2 : [])
+        if (range.from < range.to && range.from >= 0 && range.to <= size) ranges.push(MARK.range(range.from, range.to));
+      next = import_view3.Decoration.set(ranges, true);
+    }
+    return next;
+  },
+  provide: (field) => import_view3.EditorView.decorations.from(field)
+});
+var appliedExtension = appliedField;
+var HIGHLIGHT_MS = 1e4;
+var AppliedHighlights = class {
+  constructor(ports) {
+    this.ports = ports;
+    __publicField(this, "shown", null);
+  }
+  show(path, ranges) {
+    this.release();
+    if (!ranges.length) return;
+    const targets = new Set(this.ports.targets().filter((target) => target.path() === path));
+    if (!targets.size) return;
+    for (const target of targets) target.set(ranges);
+    this.shown = { path, targets, timer: this.ports.setTimer(() => this.release(), HIGHLIGHT_MS) };
+  }
+  /** The workspace changed (a file switch, a view closed): an editor that no longer shows the note drops its marks. */
+  sync() {
+    const shown = this.shown;
+    if (!shown) return;
+    const live2 = new Map(this.ports.targets().map((target) => [target.key, target]));
+    for (const target of [...shown.targets]) {
+      const now = live2.get(target.key);
+      if (!now) shown.targets.delete(target);
+      else if (now.path() !== shown.path) {
+        now.set(null);
+        shown.targets.delete(target);
+      }
+    }
+    if (!shown.targets.size) this.release();
+  }
+  release() {
+    const shown = this.shown;
+    this.shown = null;
+    if (!shown) return;
+    this.ports.clearTimer(shown.timer);
+    for (const target of shown.targets) target.set(null);
+  }
+  dispose() {
+    this.release();
   }
 };
 
@@ -102884,9 +103215,67 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       write: (path, transform) => this.bookNoteWriter(path, transform),
       askNote: (selected, submit) => new BookNoteModal(this.app, selected, submit).open(),
       notice: (message) => void new import_obsidian52.Notice(message),
-      applyNotes: (path) => this.applyBookNotes(path)
+      applyNotes: (path) => this.applyBookNotes(path),
+      applyStatus: (path) => {
+        var _a2;
+        const running2 = this.bookNotesApply.isRunning(path);
+        const disabled = this.bookNotesApply.disabledReason(path);
+        return {
+          running: running2,
+          ...running2 ? { elapsed: (_a2 = this.bookNotesApply.elapsed(path)) != null ? _a2 : "0:00" } : {},
+          ...disabled ? { disabled } : {}
+        };
+      }
     }));
     __publicField(this, "bookNotesTimer", null);
+    /** Chapter note path to its map path, filled when the chapters are looked up (the header action needs the map synchronously). */
+    __publicField(this, "bookChapterMaps", /* @__PURE__ */ new Map());
+    /** The apply job of a chapter (clock, cancel, messages) and the undo of the last apply. */
+    __publicField(this, "bookNotesApply", new BookNotesApply({
+      run: (path, signal) => this.runBookNotes(path, signal),
+      cancel: (path) => {
+        const map = this.bookChapterMaps.get(path);
+        if (map) this.bookPipelineRuns.cancelNotes(map);
+      },
+      mapBusy: (path) => {
+        const map = this.bookChapterMaps.get(path);
+        if (!map) return null;
+        if (this.bookPipelineRuns.isRunning(map)) return "drive";
+        return this.bookPipelineRuns.isApplyingNotes(map) ? "notes" : null;
+      },
+      codeOf: (error) => error instanceof BookPipelineRunError ? error.code : void 0,
+      refusalText: (error) => bookRefusalText(error),
+      write: (path, transform) => this.bookNoteWriter(path, transform),
+      notice: (message) => void new import_obsidian52.Notice(message),
+      noticeAction: (message, label, onClick, ms) => {
+        const notice = new import_obsidian52.Notice(
+          createFragment((fragment) => {
+            fragment.createSpan({ text: message });
+            const link = fragment.createEl("a", { text: label, cls: "vam-book-undo-link", href: "#" });
+            link.addEventListener("click", (event) => {
+              event.preventDefault();
+              onClick();
+            });
+          }),
+          ms
+        );
+        return { hide: () => notice.hide() };
+      },
+      highlight: (path, ranges) => this.bookHighlights.show(path, ranges),
+      releaseHighlight: () => this.bookHighlights.release(),
+      changed: () => this.bookNotes.paint(),
+      now: () => Date.now(),
+      setTimer: (run, ms) => window.setTimeout(run, ms),
+      clearTimer: (handle) => window.clearTimeout(handle),
+      setTick: (run, ms) => window.setInterval(run, ms),
+      clearTick: (handle) => window.clearInterval(handle)
+    }));
+    /** The light-green mark on the paragraphs just rewritten, in every open editor of the note (10 s). */
+    __publicField(this, "bookHighlights", new AppliedHighlights({
+      targets: () => this.bookHighlightTargets(),
+      setTimer: (run, ms) => window.setTimeout(run, ms),
+      clearTimer: (handle) => window.clearTimeout(handle)
+    }));
     __publicField(this, "bookPipelineRuns", new BookPipelineRuns({
       mutate: (work) => this.mutate(work),
       readMap: (path) => this.repo.readMap(path),
@@ -102934,7 +103323,8 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       log: (line2) => this.logs.appendLog("info", line2),
       progressed: (mapPath) => {
         var _a2;
-        return (_a2 = this.views().find((view) => view.mapPath === mapPath)) == null ? void 0 : _a2.refreshBookProgress();
+        (_a2 = this.views().find((view) => view.mapPath === mapPath)) == null ? void 0 : _a2.refreshBookProgress();
+        this.bookNotes.paint();
       },
       callouts: { reconcile: (path) => this.bookCallouts.reconcile(path), clear: (path) => this.bookCallouts.clear(path) }
     }));
@@ -103047,29 +103437,36 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
   get chartJobs() {
     return this.topicRuns.chartJobs;
   }
-  /**
-   * The header action, the editor-menu item and the command end here. T6c SEAM: the running state on the header action, cancel
-   * (`bookPipelineRuns.cancelNotes`), the applied decoration, the undo notice and command (from `edits`) and the stale display
-   * belong to the controller that replaces this glue; today it runs the job and shows one notice.
-   */
-  applyBookNotes(path) {
-    void this.runBookNotes(path).then((result) => {
-      if (result) new import_obsidian52.Notice(t("ui.book_note_applied_0_1", String(result.applied), String(result.skipped)));
-    });
-  }
-  /** Finds the chapter's map and card, then runs the runner's notes job; a refusal or failure is shown and answers undefined. */
-  async runBookNotes(path) {
-    try {
-      for (const { file, map } of await this.repo.readableMaps()) {
-        const node = map.nodes.find((item) => item.path === path);
-        if (node && readBookPipeline(map).kind === "usable")
-          return await this.bookPipelineRuns.applyNotes(file.path, node.id);
-      }
-      throw new BookPipelineRunError("missing");
-    } catch (error) {
-      new import_obsidian52.Notice(bookRefusalText(error));
-      return void 0;
+  bookHighlightTargets() {
+    const out = [];
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view;
+      if (!(view instanceof import_obsidian52.MarkdownView)) continue;
+      const cm = view.editor.cm;
+      if (!cm) continue;
+      out.push({
+        key: view,
+        path: () => {
+          var _a2;
+          return (_a2 = view.file) == null ? void 0 : _a2.path;
+        },
+        set: (ranges) => cm.dispatch({ effects: setApplied.of(ranges) })
+      });
     }
+    return out;
+  }
+  /** The header action, the menu item and the command end here. */
+  applyBookNotes(path) {
+    this.bookNotesApply.press(path);
+  }
+  /** Finds the chapter's map and card, then runs the runner's notes job (a refusal or failure is thrown to the controller). */
+  async runBookNotes(path, signal) {
+    for (const { file, map } of await this.repo.readableMaps()) {
+      const node = map.nodes.find((item) => item.path === path);
+      if (node && readBookPipeline(map).kind === "usable")
+        return await this.bookPipelineRuns.applyNotes(file.path, node.id, { signal });
+    }
+    throw new BookPipelineRunError("missing");
   }
   /** The note backup service: works with no map tab open (the runner, the notes apply and the map view all use it). */
   backupBookNote(path, content) {
@@ -103102,6 +103499,12 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
               el.setAttr("aria-label", next);
               span.setText(next);
             },
+            setDisabled: (reason) => {
+              el.toggleClass("is-disabled", !!reason);
+              if (reason) el.setAttr("aria-disabled", "true");
+              else el.removeAttribute("aria-disabled");
+              el.setAttr("title", reason != null ? reason : "");
+            },
             remove: () => el.remove()
           };
         }
@@ -103120,11 +103523,14 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       })
     );
     if (!candidates.size) return found;
-    for (const { map } of await this.repo.readableMaps()) {
+    for (const { file, map } of await this.repo.readableMaps()) {
       const read = readBookPipeline(map);
       if (read.kind !== "usable") continue;
       for (const node of map.nodes)
-        if (candidates.has(node.path) && read.data.order.includes(node.id)) found.add(node.path);
+        if (candidates.has(node.path) && read.data.order.includes(node.id)) {
+          found.add(node.path);
+          this.bookChapterMaps.set(node.path, file.path);
+        }
     }
     return found;
   }
@@ -103186,13 +103592,30 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
           var _a2;
           const view = this.app.workspace.getActiveViewOfType(import_obsidian52.MarkdownView);
           const path = (_a2 = view == null ? void 0 : view.file) == null ? void 0 : _a2.path;
-          if (!view || !notes.isChapter(path) || !countNotes(view.editor.getValue())) return false;
+          const running2 = !!path && this.bookNotesApply.isRunning(path);
+          if (!view || !notes.isChapter(path) || !running2 && !countNotes(view.editor.getValue())) return false;
           if (!checking) notes.apply(path);
           return true;
         }
       }),
       key: "ui.command_book_note_apply"
     });
+    this.localizedCommands.push({
+      command: this.addCommand({
+        id: "book-note-undo",
+        name: t("ui.command_book_note_undo"),
+        checkCallback: (checking) => {
+          if (!this.bookNotesApply.canUndo()) return false;
+          if (!checking) void this.bookNotesApply.undo();
+          return true;
+        }
+      }),
+      key: "ui.command_book_note_undo"
+    });
+    this.registerEditorExtension(appliedExtension);
+    this.registerEvent(this.app.workspace.on("file-open", () => this.bookHighlights.sync()));
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.bookHighlights.sync()));
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.bookHighlights.sync()));
     this.registerEvent(this.app.workspace.on("file-open", () => this.refreshBookNotesSoon()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshBookNotesSoon()));
     this.registerEvent(this.app.workspace.on("layout-change", () => this.refreshBookNotesSoon()));
@@ -104349,6 +104772,8 @@ ${t("ui.organize_link_wait_hint")}`;
     this.bookCallouts.dispose();
     if (this.bookNotesTimer !== null) window.clearTimeout(this.bookNotesTimer);
     this.bookNotesTimer = null;
+    this.bookNotesApply.dispose();
+    this.bookHighlights.dispose();
     this.bookNotes.dispose();
     (_a2 = this.repo) == null ? void 0 : _a2.dispose();
     void ((_b2 = this.coffeeManager) == null ? void 0 : _b2.stop());

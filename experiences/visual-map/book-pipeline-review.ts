@@ -43,6 +43,8 @@ export interface Gate2Card {
   galleryBare: boolean;
   /** A neighbouring card changed and the owner has not confirmed the join. */
   seam: boolean;
+  /** The chapter text changed after its stored proof (the proof no longer fits): shown as "edited, not re-checked". */
+  proofStale?: boolean;
 }
 
 /** The input shape `galleryBare` reads from a card note. */
@@ -52,7 +54,7 @@ interface GalleryNote {
 }
 
 /** The kinds of problem a chapter can have. A new kind (a hand-edited chapter, say) is one more entry in {@link PROBLEM_RULES}. */
-export type ReviewProblemKind = "failed" | "unfinished" | "structure" | "facts" | "images" | "seam";
+export type ReviewProblemKind = "failed" | "unfinished" | "structure" | "facts" | "images" | "seam" | "edited";
 export interface ReviewProblem {
   kind: ReviewProblemKind;
   /** The plain sentence the reader sees. */
@@ -78,7 +80,8 @@ const PROBLEM_RULES: readonly { kind: ReviewProblemKind; of: (card: Gate2Card) =
     of: card => (card.factsOpen > 0 ? t("ui.book_panel_g2_reason_facts_0", card.factsOpen) : undefined)
   },
   { kind: "images", of: card => (card.galleryBare ? t("ui.book_panel_g2_reason_images") : undefined) },
-  { kind: "seam", of: card => (card.seam ? t("ui.book_panel_g2_reason_seam") : undefined) }
+  { kind: "seam", of: card => (card.seam ? t("ui.book_panel_g2_reason_seam") : undefined) },
+  { kind: "edited", of: card => (card.proofStale ? t("ui.book_stale_proof") : undefined) }
 ];
 
 /**
@@ -143,6 +146,8 @@ export function gate2Cards(input: {
   order: readonly string[];
   titleOf: (id: string) => string;
   noteOf: (id: string) => Gate2NoteInput | undefined;
+  /** The run and each card's revision: with it a chapter whose stored proof no longer fits its text is flagged `proofStale`. */
+  proofContext?: { runId: string; revisionOf: (id: string) => number };
 }): Gate2Card[] {
   return input.order.map((id, at): Gate2Card => {
     const note = input.noteOf(id);
@@ -152,6 +157,15 @@ export function gate2Cards(input: {
     const proof = checked || view.stage === "needs-review" ? latestStoredProof(note?.detail ?? "") : undefined;
     const structure = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue.trim());
     const role = typeof note?.bookRole === "string" ? note.bookRole : undefined;
+    const stale =
+      !!input.proofContext &&
+      proofIsStale(
+        { prompt: note?.prompt ?? "", detail: note?.detail ?? "" },
+        view.stage,
+        id,
+        input.proofContext.runId,
+        input.proofContext.revisionOf(id)
+      );
     return {
       id,
       index: at + 1,
@@ -165,7 +179,8 @@ export function gate2Cards(input: {
         ? (proof?.items ?? []).filter(item => item.type === "fact" && item.status !== "met").length
         : 0,
       galleryBare: checked && galleryBare(role, note),
-      seam: view.seam
+      seam: view.seam,
+      ...(stale ? { proofStale: true } : {})
     };
   });
 }
@@ -199,9 +214,19 @@ export interface AttentionFpInput {
   proofKey?: string;
   /** The full `pipelineSeam` value (source chapter and revision), not only whether there is one. */
   seam?: string;
+  /** The stored proof no longer fits the text. Part of the hash only when true, so every earlier fingerprint stays the same. */
+  stale?: boolean;
 }
 export const attentionFingerprint = (input: AttentionFpInput): string =>
-  hashText(JSON.stringify([input.stage, input.issue ?? "", input.proofKey ?? "", input.seam ?? ""]));
+  hashText(
+    JSON.stringify([
+      input.stage,
+      input.issue ?? "",
+      input.proofKey ?? "",
+      input.seam ?? "",
+      ...(input.stale ? ["edited"] : [])
+    ])
+  );
 
 /** A stable fingerprint of the newest stored proof of a Detail (what the proofreader found), or "" when there is none. */
 export const proofFingerprint = (detail: string): string => {
@@ -220,6 +245,7 @@ export function reviewEntries(input: {
   order: readonly string[];
   titleOf: (id: string) => string;
   noteOf: (id: string) => Gate2NoteInput | undefined;
+  proofContext?: { runId: string; revisionOf: (id: string) => number };
 }): ReviewEntry[] {
   const out: ReviewEntry[] = [];
   for (const card of gate2Cards(input)) {
@@ -233,7 +259,8 @@ export function reviewEntries(input: {
         stage: card.stage,
         issue: typeof note?.pipelineIssue === "string" ? note.pipelineIssue : "",
         proofKey: proofFingerprint(note?.detail ?? ""),
-        seam: typeof note?.pipelineSeam === "string" ? note.pipelineSeam : ""
+        seam: typeof note?.pipelineSeam === "string" ? note.pipelineSeam : "",
+        stale: card.proofStale === true
       })
     });
   }

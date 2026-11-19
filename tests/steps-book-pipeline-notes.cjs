@@ -143,7 +143,7 @@ test('scope: a word that appears in chapter text and in an excluded place is jud
 
 // ---- entry points and the header action: a fake window of tabs ----
 function world({ chapters = ['N/c.md'], files = {} } = {}) {
-  const w = { chapters: new Set(chapters), files: { 'N/c.md': note('小熊在森林。\n\n第二段。'), ...files }, tabs: [], notices: [], asked: [], applied: [], writes: [], asks: 0 };
+  const w = { chapters: new Set(chapters), files: { 'N/c.md': note('小熊在森林。\n\n第二段。'), ...files }, tabs: [], status: {}, notices: [], asked: [], applied: [], writes: [], asks: 0 };
   const mk = (path, text) => {
     const tab = { key: {}, path, text, actions: [] };
     tab.leaf = {
@@ -151,7 +151,7 @@ function world({ chapters = ['N/c.md'], files = {} } = {}) {
       addAction: (label, run) => {
         const action = { label, run, removed: false };
         tab.actions.push(action);
-        return { setLabel: next => { action.label = next; }, remove: () => { action.removed = true; } };
+        return { setLabel: next => { action.label = next; }, setDisabled: reason => { action.disabled = reason; }, remove: () => { action.removed = true; } };
       }
     };
     return tab;
@@ -173,7 +173,8 @@ function world({ chapters = ['N/c.md'], files = {} } = {}) {
     },
     askNote: (selected, submit) => { w.asks++; w.asked.push(selected); w.submit = submit; },
     notice: m => w.notices.push(m),
-    applyNotes: p => w.applied.push(p)
+    applyNotes: p => w.applied.push(p),
+    applyStatus: p => w.status[p] ?? { running: false }
   });
   w.editor = (tab, word) => ({ path: tab.path, text: () => tab.text, selection: () => { const [from, to] = word ? sel(tab.text, word) : [0, 0]; return { from, to }; } });
   return w;
@@ -377,6 +378,35 @@ test('apply seam (T6): the header button, the menu item twin and the command twi
   w.live(tab)[0].run();
   assert.equal(w.applied.length, 2);
   void other;
+});
+
+test('header action (T6c): running shows 改寫中 m:ss with a cancel hint, the clock repaints, disabled carries the reason, back to normal after', async () => {
+  const w = world({ files: { 'N/c.md': note('==甲==%%備註#1：a%%') } });
+  const tab = w.open('N/c.md'); await w.notes.refresh();
+  const action = w.live(tab)[0];
+  assert.match(action.label, /^套用 1 則備註$/);
+  w.status['N/c.md'] = { running: true, elapsed: '0:07' }; w.notes.paint();
+  assert.match(action.label, /改寫中 0:07….*取消/);
+  w.status['N/c.md'] = { running: true, elapsed: '1:05' }; w.notes.paint();
+  assert.match(action.label, /改寫中 1:05…/);
+  const menu = w.notes.menu(w.editor(tab));
+  assert.match(menu.apply.title, /取消改寫/, 'the menu twin offers the cancel');
+  action.run();
+  assert.deepEqual(w.applied, ['N/c.md'], 'pressing while running goes to the controller (which cancels)');
+  w.status['N/c.md'] = { running: false, disabled: '圖文書正在執行中' }; w.notes.paint();
+  assert.equal(action.disabled, '圖文書正在執行中');
+  assert.match(action.label, /^套用 1 則備註$/);
+  w.status['N/c.md'] = { running: false }; w.notes.paint();
+  assert.equal(action.disabled, null);
+});
+test('header action (T6c): a running job keeps the action even when the last note text is gone from the editor', async () => {
+  const w = world({ files: { 'N/c.md': note('==甲==%%備註#1：a%%') } });
+  const tab = w.open('N/c.md'); await w.notes.refresh();
+  w.status['N/c.md'] = { running: true, elapsed: '0:01' };
+  tab.text = note('沒有備註'); w.notes.paint();
+  assert.equal(w.live(tab).length, 1);
+  w.status['N/c.md'] = { running: false }; w.notes.paint();
+  assert.equal(w.live(tab).length, 0);
 });
 
 // ---- the input dialog ----

@@ -2287,3 +2287,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-note-selected { margin-block: 0 8px; padding: 4px 8px; border-left: 3px solid var(--interactive-accent); color: var(--text-muted); }
 .vam-book-note-problem:empty { display: none; }
 .vam-book-note-problem { color: var(--text-error); margin-block: 4px 0; }
+
+.vam-book-applied { background-color: color-mix(in srgb, var(--color-green) 28%, transparent); border-radius: 2px; }
+.vam-book-state.is-edited { font-weight: 600; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
+.vam-book-state.is-edited::before { background: var(--color-orange); }
+.view-action.vam-book-apply-notes.is-disabled { opacity: 0.5; }

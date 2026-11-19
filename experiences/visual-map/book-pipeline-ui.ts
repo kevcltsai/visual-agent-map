@@ -505,6 +505,8 @@ export interface BookCardView {
   issueText?: string;
   /** True when a neighbouring card changed and the owner has not confirmed the join yet. */
   seam: boolean;
+  /** The chapter text changed after its stored proof: the pill says so instead of a passed wording. */
+  edited?: boolean;
   /** Book accepted (done): the stage pill of a needs-review card is not drawn. */
   hideStage?: boolean;
   /** Screen prefix of the summary (never written to the note); none while the card has no plan yet. */
@@ -512,13 +514,14 @@ export interface BookCardView {
 }
 
 /** `accepted`: the book's phase is done; the proof marks (needs-review pill, issue line, seam pill) are hidden, the data is untouched. */
-export function bookCardView(note: BookCardInput, accepted = false): BookCardView {
+export function bookCardView(note: BookCardInput, accepted = false, stale = false): BookCardView {
   const stage = readPipelineStage(note.pipelineStage) ?? "pending";
   const role = readBookRole(note.bookRole);
   const issue = typeof note.pipelineIssue === "string" && note.pipelineIssue ? note.pipelineIssue : undefined;
   return {
     stage,
     stageText: t(STAGE_KEY[stage]),
+    ...(!accepted && stale && stage === "checked" ? { edited: true } : {}),
     seam: !accepted && typeof note.pipelineSeam === "string" && note.pipelineSeam.trim() !== "",
     ...(accepted && stage === "needs-review" ? { hideStage: true } : {}),
     ...(role ? { roleText: t(ROLE_KEY[role]) } : {}),
@@ -564,6 +567,7 @@ export function renderBookCardLabels(
     }
   } else if (!view.hideStage)
     header.createSpan({ cls: `vam-status vam-book-state is-${view.stage}`, text: view.stageText });
+  if (view.edited) header.createSpan({ cls: "vam-status vam-book-state is-edited", text: t("ui.book_stale_proof") });
   if (view.seam) {
     const seam = header.createSpan({ cls: "vam-status vam-book-state is-seam", text: t("ui.book_seam_label") });
     seam.setAttr("title", t("ui.book_seam_reason"));

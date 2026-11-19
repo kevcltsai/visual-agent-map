@@ -77,6 +77,18 @@ test('fingerprint: stage, issue codes, proof key and the full seam value each ch
   assert.equal(b.attentionFingerprint({ stage: 'checked' }), b.attentionFingerprint({ stage: 'checked', issue: '', proofKey: '', seam: '' }), 'missing = empty');
 });
 
+test('stale proof (T6c): the edited problem feeds the list and the fingerprint; non-stale fingerprints are unchanged', () => {
+  const card = { id: 'n1', index: 1, title: 'T', stage: 'checked', structureUnmet: 0, factsOpen: 0, galleryBare: false, seam: false };
+  assert.equal(b.reviewProblems(card).length, 0);
+  const stale = b.reviewProblems({ ...card, proofStale: true });
+  assert.deepEqual([...stale.map(p => p.kind)], ['edited']);
+  assert.equal(stale[0].text, '已修改，未重新校對');
+  assert.equal(b.needsAttention({ ...card, proofStale: true }), true);
+  const base = { stage: 'checked', issue: '', proofKey: 'k', seam: '' };
+  assert.equal(b.attentionFingerprint({ ...base, stale: false }), b.attentionFingerprint(base), 'old hashes stay equal');
+  assert.notEqual(b.attentionFingerprint({ ...base, stale: true }), b.attentionFingerprint(base));
+});
+
 // ---- builders ----
 test('trial callout: title, next step, links, owner marker and version; stopped says press Continue first', () => {
   const t1 = trial(false);

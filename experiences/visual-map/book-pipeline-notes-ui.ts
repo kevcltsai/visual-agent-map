@@ -7,8 +7,8 @@ import { addNote, checkNoteText, checkSelection, type NoteRefusal } from "./book
 
 /**
  * The entry points of the reader's notes in a picture-book chapter: the editor-menu item and command that add a note, the input dialog,
- * and the header action "✎ Apply N notes". Only a chapter note of a usable book has any of them. Applying the notes (the AI rewrite) is
- * not here: {@link BookNotesPorts.applyNotes} is the seam the next ticket (T6) fills.
+ * and the header action "✎ Apply N notes". Only a chapter note of a usable book has any of them. Applying the notes (the AI rewrite, its clock, cancel
+ * and undo) is the controller behind {@link BookNotesPorts.applyNotes}.
  */
 
 const WHY: Record<NoteRefusal, TranslationKey> = {
@@ -22,6 +22,8 @@ const WHY: Record<NoteRefusal, TranslationKey> = {
 /** The handle of one header action: its label can change and it can be taken off. */
 export interface ActionHandle {
   setLabel(label: string): void;
+  /** A reason makes the action look and read as disabled (a press still answers with the reason); null makes it normal. */
+  setDisabled(reason: string | null): void;
   remove(): void;
 }
 /** One markdown view (a tab): the note it shows, the text it holds now (typed, maybe not saved) and its header. */
@@ -48,11 +50,10 @@ export interface BookNotesPorts {
   /** The input dialog: `submit` gets the note text and answers a problem to show (the dialog stays open) or null (done). */
   askNote(selected: string, submit: (note: string) => string | null): void;
   notice(message: string): void;
-  /**
-   * T6 SEAM: applies the notes of this chapter (the AI rewrite). T5 only calls it from the header action, the menu item and the
-   * command; the plugin's stub shows a notice that it is not available yet.
-   */
+  /** The header action, the menu item and the command: apply the notes of this chapter, or cancel the job that is running (T6c). */
   applyNotes(path: string): void;
+  /** What the header action shows for this chapter: the running clock, or the reason it is disabled. */
+  applyStatus(path: string): { running: boolean; elapsed?: string; disabled?: string };
 }
 
 /** What the editor menu should show for the active editor: nothing for a note that is not a chapter. */
@@ -64,7 +65,7 @@ export interface MenuPlan {
 
 export class BookNotes {
   private chapters = new Map<string, boolean>();
-  private readonly actions = new Map<object, { handle: ActionHandle; count: number }>();
+  private readonly actions = new Map<object, { handle: ActionHandle; label: string; disabled: string | null }>();
   private pass = 0;
   private disposed = false;
 
@@ -98,19 +99,28 @@ export class BookNotes {
     for (const leaf of leaves) {
       const path = leaf.path();
       const count = this.isChapter(path) ? countNotes(leaf.text()) : 0;
+      const status = path ? this.ports.applyStatus(path) : { running: false };
       const shown = this.actions.get(leaf.key);
-      if (!count) {
+      if (!count && !status.running) {
         shown?.handle.remove();
         this.actions.delete(leaf.key);
         continue;
       }
-      const label = t("ui.book_note_apply_0", count);
+      const label = status.running
+        ? t("ui.book_note_applying_0", status.elapsed ?? "0:00")
+        : t("ui.book_note_apply_0", count);
+      const disabled = status.disabled ?? null;
       if (shown) {
-        if (shown.count !== count) shown.handle.setLabel(label);
-        shown.count = count;
+        if (shown.label !== label)
+          shown.handle.setLabel(status.running ? t("ui.book_note_cancel_hint_0", label) : label);
+        if (shown.disabled !== disabled) shown.handle.setDisabled(disabled);
+        shown.label = label;
+        shown.disabled = disabled;
       } else {
         const handle = leaf.addAction(label, () => this.press(leaf));
-        this.actions.set(leaf.key, { handle, count });
+        if (status.running) handle.setLabel(t("ui.book_note_cancel_hint_0", label));
+        if (disabled) handle.setDisabled(disabled);
+        this.actions.set(leaf.key, { handle, label, disabled });
       }
     }
   }
@@ -139,7 +149,11 @@ export class BookNotes {
       add: check.ok
         ? { title: t("ui.book_note_add"), disabled: false }
         : { title: t("ui.book_note_add_disabled_0", t(WHY[check.reason])), disabled: true },
-      ...(count ? { apply: { title: t("ui.book_note_apply_menu_0", count) } } : {})
+      ...(this.ports.applyStatus(editor.path ?? "").running
+        ? { apply: { title: t("ui.book_note_cancel_menu") } }
+        : count
+          ? { apply: { title: t("ui.book_note_apply_menu_0", count) } }
+          : {})
     };
   }
 

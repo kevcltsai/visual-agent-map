@@ -153,3 +153,31 @@ test('proofIsStale: true only after the chapter text changed since a stored proo
   assert.equal(stale(noted), false, 'adding a note keeps the proof key');
   assert.equal(review.proofIsStale(card(detail), 'checked', 'n1', 'r2', 2), true, 'another run');
 });
+
+test('stale proof (T6c): reviewEntries flags the chapter with the edited problem and a new fingerprint; the card pill says edited', () => {
+  const checklist = [{ id: 'C1', type: 'structure', text: 'Names the technique' }];
+  const prompt = '## Checklist\n- [ ] C1 structure: Names the technique\n';
+  const parse = require('./support-replay.cjs').load('core/book-pipeline/plan-text.ts').parseChecklist;
+  const key = text => proof.proofKey({ runId: 'r1', nodeId: 'n1', revision: 2, body: bookNotes.projectProofBody(imageSlots.stripImageLines(sections.chapterBody(text))), checklist: parse(prompt) });
+  const result = proof.evaluateProof([{ id: 'C1', status: 'met', note: 'ok', sources: [] }], checklist, ['https://example.org/a/']);
+  const body = detailOf(P2);
+  const detail = `${body}\n\n> [!vam-book]- Research notes\n${sections.quoteAll(proof.appendProofRecord('', key(body), result).text.trim())}\n`;
+  const entries = text => review.reviewEntries({
+    order: ['n1'], titleOf: () => 'T',
+    noteOf: () => ({ prompt, detail: text, pipelineStage: 'checked' }),
+    proofContext: { runId: 'r1', revisionOf: () => 2 }
+  });
+  assert.equal(entries(detail).length, 0, 'a fitting proof: nothing to look at');
+  const edited = entries(detail.replace(P2, `${P2} edited`));
+  assert.equal(edited.length, 1);
+  assert.deepEqual([...edited[0].problems.map(p => p.kind)], ['edited']);
+  const noted = entries(detail.replace('A plain', W('A plain', 5, 'a note')));
+  assert.equal(noted.length, 0, 'a note does not make it stale');
+  const withoutContext = review.reviewEntries({ order: ['n1'], titleOf: () => 'T', noteOf: () => ({ prompt, detail: detail.replace(P2, `${P2} edited`), pipelineStage: 'checked' }) });
+  assert.equal(withoutContext.length, 0, 'without the run context nothing is flagged');
+  const ui = require('./support-replay.cjs').load('experiences/visual-map/book-pipeline-ui.ts');
+  assert.equal(ui.bookCardView({ pipelineStage: 'checked' }, false, true).edited, true);
+  assert.equal(ui.bookCardView({ pipelineStage: 'checked' }, false, false).edited, undefined);
+  assert.equal(ui.bookCardView({ pipelineStage: 'checked' }, true, true).edited, undefined, 'an accepted book shows no proof marks');
+  assert.equal(ui.bookCardView({ pipelineStage: 'writing' }, false, true).edited, undefined);
+});

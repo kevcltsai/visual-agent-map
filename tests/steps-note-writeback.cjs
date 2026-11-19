@@ -794,12 +794,12 @@ test('integrate children: a failed top invariant or a failed backup writes nothi
   assert.equal(anyBackupFolder(fr.files), false);
 });
 
-test('not touched by the write-back: merge-topics and AIM never import it, and the module is used by the run module and the view only (counterexample 12)', () => {
+test('not touched by the write-back: merge-topics and AIM never import it, and the module is used by the run module and the note-backup service only (the view reaches it through note-backup; counterexample 12)', () => {
   const fs = require('node:fs');
   const path = require('node:path');
   const walk = dir => fs.readdirSync(path.join(S.root, dir), { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? (entry.name === 'node_modules' || entry.name === 'tests' ? [] : walk(path.join(dir, entry.name))) : /\.ts$/.test(entry.name) ? [path.join(dir, entry.name)] : []);
   const users = ['experiences', 'core', 'ai'].flatMap(walk).filter(file => /note-writeback/.test(fs.readFileSync(path.join(S.root, file), 'utf8')));
-  assert.deepEqual(users.sort(), ['experiences/visual-map/topic-run.ts', 'experiences/visual-map/view.ts']);
+  assert.deepEqual(users.sort(), ['experiences/visual-map/note-backup.ts', 'experiences/visual-map/topic-run.ts']);
   const run = fs.readFileSync(path.join(S.root, 'experiences/visual-map/topic-run.ts'), 'utf8');
   assert.equal(run.match(/composeWriteback\b/g).length >= 1, true);
   const selection = run.slice(run.indexOf('private async runSelection'), run.indexOf('private chartGuard'));

@@ -331,7 +331,7 @@ test('T3 card button: gate 2 and done book cards carry "重跑這張" in the too
   assert.deepEqual(calls2, [[MAP, h.ids.a]]);
   assert.ok(h.view.rendered >= 1, 'the map repaints afterwards');
   withProgress({ phase: 'done' });
-  assert.equal(rerunButtons(h.paint()).length, 3, 'still there after the review is finished');
+  assert.equal(rerunButtons(h.paint()).length, 0, 'gone once the review is finished (the right-click item stays)');
   withProgress({ rerun: { nodeId: h.ids.a, startedAt: 1 }, active: true });
   const busy = rerunButtons(h.paint());
   assert.ok(busy.every(b => b.disabled), 'one rerun at a time');

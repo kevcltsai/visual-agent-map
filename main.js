@@ -75591,7 +75591,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (!read.data.order.includes(node.id)) return void 0;
     const progress = this.plugin.getBookPipelineProgress(path);
     const phase = (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : read.data.phase;
-    if (phase !== "gate2" && phase !== "done" && (gate2Only || phase !== "gate1")) return void 0;
+    if (gate2Only ? phase !== "gate2" : phase !== "gate2" && phase !== "done") return void 0;
     const reason = bookRerunMenuReason({
       nodeId: node.id,
       rerunNodeId: (_b2 = progress == null ? void 0 : progress.rerun) == null ? void 0 : _b2.nodeId,

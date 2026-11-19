@@ -9805,7 +9805,8 @@ export class VisualAgentMapView extends ItemView {
     if (!read.data.order.includes(node.id)) return undefined;
     const progress = this.plugin.getBookPipelineProgress(path);
     const phase = progress?.phase ?? read.data.phase;
-    if (phase !== "gate2" && phase !== "done" && (gate2Only || phase !== "gate1")) return undefined;
+    // The card button is only for gate 2: once the owner accepted the book it goes away (the right-click item stays).
+    if (gate2Only ? phase !== "gate2" : phase !== "gate2" && phase !== "done") return undefined;
     // Why it cannot be used right now, in words (it was a grey line with no reason).
     const reason = bookRerunMenuReason({
       nodeId: node.id,

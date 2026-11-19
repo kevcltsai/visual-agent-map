@@ -1,18 +1,22 @@
 import { t } from "../../i18n";
 import type { PipelineStage } from "../../core/book-pipeline/model";
-import { describeSlots, latestSlotsRecord } from "../../core/book-pipeline/image-slots";
+import { describeSlots, latestSlotsRecord, stripImageLines } from "../../core/book-pipeline/image-slots";
 import {
   chapterBody,
   fencedLines,
+  findStoredProof,
   latestStoredProof,
   programCalloutRanges,
   type ProgramCallout,
   type StoredProofView
 } from "../../core/book-pipeline/note-sections";
-import { parseImageSlots } from "../../core/book-pipeline/plan-text";
+import { failedProofKey, proofKey } from "../../core/book-pipeline/proof";
+import { parseChecklist, parseImageSlots } from "../../core/book-pipeline/plan-text";
 import { escapeMarkdownText, hashText, unescapeMarkdownText } from "../../core/book-pipeline/text";
 import { bookCardView, bookIssueText } from "./book-pipeline-ui";
 import { bodyImageUrls } from "./book-pipeline-run";
+
+import { projectProofBody } from "../../core/book-pipeline/book-notes";
 
 export { countNotes, projectProofBody, wrapNote } from "../../core/book-pipeline/book-notes";
 
@@ -427,3 +431,26 @@ export function readReviewState(text: string): ReviewState | undefined {
 /** Handled: one of the two boxes is ticked and the box was written for the chapter's attention as it is now (a changed fingerprint voids the tick). */
 export const isReviewResolved = (state: ReviewState | undefined, fp: string): boolean =>
   !!state && (state.accept || state.fixed) && state.fp === fp;
+
+/**
+ * A checked or needs-review card whose chapter text changed after its proofread: a proof was stored, but none (finished or failed) fits
+ * the key of the text as it is now. Notes never change the key (the proof body drops their wrappers); applying them does.
+ */
+export function proofIsStale(
+  card: { prompt: string; detail: string },
+  stage: PipelineStage | "pending",
+  nodeId: string,
+  runId: string,
+  revision: number
+): boolean {
+  if (stage !== "checked" && stage !== "needs-review") return false;
+  if (!latestStoredProof(card.detail)) return false;
+  const key = proofKey({
+    runId,
+    nodeId,
+    revision,
+    body: projectProofBody(stripImageLines(chapterBody(card.detail))),
+    checklist: parseChecklist(card.prompt)
+  });
+  return !findStoredProof(card.detail, key) && !findStoredProof(card.detail, failedProofKey(key));
+}

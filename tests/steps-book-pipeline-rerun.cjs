@@ -112,7 +112,10 @@ test('rerunCard at gate 2 runs plan, author and proofread of that card only; nei
   await r.runs.rerunCard(r.mapPath, r.nodes[2].id);
   assert.deepEqual(r.stat.plan.slice(base.plan), [r.nodes[2].id]); assert.deepEqual(r.stat.author.slice(base.author), [r.nodes[2].id]); assert.equal(r.stat.proof.length, base.proof + 1);
   assert.equal(seen.length, 1); assert.equal(seen[0].phase, 'gate2'); assert.equal(seen[0].active, true); assert.deepEqual([...seen[0].busyCards], [r.nodes[2].id]);
-  for (const i of [0, 1, 3]) assert.equal(noSeam(r.raw(i)), before[i], `card ${i}`);
+  // The neighbours' text (Detail) is untouched; only their previous/next plan line (T12) and the write's own `updated`/quoting differ.
+  const keepText = raw => noSeam(raw).replace(/^updated: .*\n/m, '').replace(/^pipeline-stage: "?(\S+?)"?$/m, 'pipeline-stage: $1').replace(/^> (前一張|後一張)：.*$/gm, '> $1');
+  assert.equal(noSeam(r.raw(0)), before[0], 'card 0 (not a neighbour)');
+  for (const i of [1, 3]) assert.equal(keepText(r.raw(i)), keepText(before[i]), `card ${i}`);
   for (const i of [1, 3]) assert.match(seamOf(r.raw(i)), /鄰卡企劃或正文已變更/);
   assert.equal(seamOf(r.raw(0)), undefined);
   const s = await r.state();

@@ -31458,12 +31458,12 @@ ${body}`);
    * owner chose is kept. A pure folder move (same name), a note that is not a map node and a note edited while this runs are left alone
    * (the write is guarded against the text read here). Returns whether the title was changed.
    */
-  async followRenamedTitle(oldPath, newPath) {
+  async followRenamedTitle(oldPath, newPath, mapNodePaths) {
     const file = this.app.vault.getAbstractFileByPath(newPath);
     if (!(file instanceof import_obsidian13.TFile) || file.extension !== "md") return false;
     const oldName = baseName2(oldPath).replace(/\.md$/, "");
     if (oldName === file.basename) return false;
-    if (!await this.isMapNodePath(newPath)) return false;
+    if (!(mapNodePaths ? mapNodePaths.has(newPath) : await this.isMapNodePath(newPath))) return false;
     const raw = await this.app.vault.read(file);
     const content = decodeCalloutSections(upgradeLegacyAimText(raw));
     if (noteTitle(content, frontmatter(content), file.basename) !== oldName) return false;
@@ -105398,8 +105398,8 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       } catch (replaceError) {
         sourceError = replaceError instanceof Error ? replaceError : new Error(String(replaceError));
       }
-      const { changed, error } = await this.rebaseMaps(pairs);
-      for (const [from, to] of pairs) await this.repo.followRenamedTitle(from, to).catch(() => false);
+      const { changed, error, nodePaths } = await this.rebaseMaps(pairs);
+      for (const [from, to] of pairs) await this.repo.followRenamedTitle(from, to, nodePaths).catch(() => false);
       const vamFile = renames.some(({ file }) => {
         var _a2;
         const frontmatter2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter;
@@ -105432,8 +105432,11 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
   async rebaseMaps(pairs) {
     let changed = false;
     const failed = [];
+    const nodePaths = /* @__PURE__ */ new Set();
     for (const { file, map } of await this.repo.readableMaps()) {
-      if (!rebaseMapNotePaths(map, chainRebase(pairs))) continue;
+      const rebased = rebaseMapNotePaths(map, chainRebase(pairs));
+      for (const node of map.nodes) nodePaths.add(node.path);
+      if (!rebased) continue;
       try {
         await this.repo.saveMap(file.path, map);
         changed = true;
@@ -105452,7 +105455,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
         error != null ? error : error = retryError instanceof Error ? retryError : new Error(String(retryError));
       }
     }
-    return { changed, error };
+    return { changed, error, nodePaths };
   }
   /** One Notice and log line per scan; the same map and error is not repeated within a few seconds (one rename = two scans). */
   reportUnreadableMaps(failures) {

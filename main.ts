@@ -1659,9 +1659,9 @@ export default class VisualAgentMapPlugin extends Plugin {
       } catch (replaceError) {
         sourceError = replaceError instanceof Error ? replaceError : new Error(String(replaceError));
       }
-      const { changed, error } = await this.rebaseMaps(pairs);
+      const { changed, error, nodePaths } = await this.rebaseMaps(pairs);
       // A map node whose title was its old file name follows the new one (a custom title, a folder move and other notes are left alone).
-      for (const [from, to] of pairs) await this.repo.followRenamedTitle(from, to).catch(() => false);
+      for (const [from, to] of pairs) await this.repo.followRenamedTitle(from, to, nodePaths).catch(() => false);
       // Derived references depend only on maps and VAM notes; renaming an unrelated note leaves them unchanged.
       const vamFile = renames.some(({ file }) => {
         const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
@@ -1694,11 +1694,16 @@ export default class VisualAgentMapPlugin extends Plugin {
    * Rebases every readable map through the moves. A map whose save failed is read and rebased once more after the others
    * (its file was not written, so the moves still apply to it); a second failure is returned, after the other maps.
    */
-  private async rebaseMaps(pairs: readonly RenamePair[]): Promise<{ changed: boolean; error?: Error }> {
+  private async rebaseMaps(
+    pairs: readonly RenamePair[]
+  ): Promise<{ changed: boolean; error?: Error; nodePaths: Set<string> }> {
     let changed = false;
     const failed: string[] = [];
+    const nodePaths = new Set<string>();
     for (const { file, map } of await this.repo.readableMaps()) {
-      if (!rebaseMapNotePaths(map, chainRebase(pairs))) continue;
+      const rebased = rebaseMapNotePaths(map, chainRebase(pairs));
+      for (const node of map.nodes) nodePaths.add(node.path);
+      if (!rebased) continue;
       try {
         await this.repo.saveMap(file.path, map);
         changed = true;
@@ -1717,7 +1722,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         error ??= retryError instanceof Error ? retryError : new Error(String(retryError));
       }
     }
-    return { changed, error };
+    return { changed, error, nodePaths };
   }
   private readonly unreadableReported = new Map<string, number>();
   /** One Notice and log line per scan; the same map and error is not repeated within a few seconds (one rename = two scans). */

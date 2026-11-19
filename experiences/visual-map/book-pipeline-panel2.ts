@@ -1,11 +1,7 @@
 import { t } from "../../i18n";
-import type { PipelineStage } from "../../core/book-pipeline/model";
-import { describeSlots, latestSlotsRecord } from "../../core/book-pipeline/image-slots";
-import { chapterBody, latestStoredProof, type StoredProofView } from "../../core/book-pipeline/note-sections";
-import { parseImageSlots } from "../../core/book-pipeline/plan-text";
-import { unescapeMarkdownText } from "../../core/book-pipeline/text";
-import { bookCardView, bookIssueText, bookRefusalText } from "./book-pipeline-ui";
-import { bodyImageUrls } from "./book-pipeline-run";
+import { latestStoredProof } from "../../core/book-pipeline/note-sections";
+import { bookCardView, bookRefusalText } from "./book-pipeline-ui";
+import { attentionReasons, galleryBare, needsAttention, reasonOf, type Gate2Card } from "./book-pipeline-review";
 import {
   renderPanelTabs,
   runTrackedRerun,
@@ -21,23 +17,8 @@ import {
  * is drawn only for a map that has a usable `bookPipeline`.
  */
 
-export interface Gate2Card {
-  id: string;
-  index: number;
-  title: string;
-  stage: PipelineStage | "pending";
-  role?: string;
-  /** The plain sentence of a needs-review card (never a code). */
-  failureText?: string;
-  /** Checked cards: structure items the proofreader found unmet (picture tokens are not counted). */
-  structureUnmet: number;
-  /** Checked cards: fact items that were not confirmed against a source. */
-  factsOpen: number;
-  /** A gallery chapter whose every picture slot ended without a picture: its content is missing. */
-  galleryBare: boolean;
-  /** A neighbouring card changed and the owner has not confirmed the join. */
-  seam: boolean;
-}
+export { attentionReasons, needsAttention };
+export type { Gate2Card };
 export interface Gate2Data {
   total: number;
   /** Cards for which `attentionReasons` is not empty. */
@@ -45,57 +26,6 @@ export interface Gate2Data {
   /** Minutes from the start of the run to the end of writing; absent when the saved times cannot be read. */
   elapsedMinutes?: number;
   cards: Gate2Card[];
-}
-
-/**
- * The one place that decides whether a chapter is "fine": every reason below keeps the card in the attention list and keeps the
- * panel from saying "all done". A needs-review or unfinished card, unmet structure items, facts not confirmed, a gallery chapter
- * with no picture at all, and a join not yet confirmed all count. A slot that found no picture in an ordinary chapter does not: the
- * chapter simply has fewer pictures (its text still stands).
- */
-export function attentionReasons(card: Gate2Card): string[] {
-  const out: string[] = [];
-  if (card.stage === "needs-review") out.push(card.failureText || t("ui.book_issue_unknown"));
-  else if (card.stage !== "checked") out.push(t("ui.book_panel_g2_reason_unfinished"));
-  if (card.structureUnmet > 0) out.push(t("ui.book_panel_g2_reason_structure_0", card.structureUnmet));
-  if (card.factsOpen > 0) out.push(t("ui.book_panel_g2_reason_facts_0", card.factsOpen));
-  if (card.galleryBare) out.push(t("ui.book_panel_g2_reason_images"));
-  if (card.seam) out.push(t("ui.book_panel_g2_reason_seam"));
-  return out;
-}
-export const needsAttention = (card: Gate2Card): boolean => attentionReasons(card).length > 0;
-
-/** Codes the proofreader may have copied into its notes (C1, N2) are not for the reader. */
-const plainNote = (text: string): string =>
-  text
-    .replace(/\b[CN]\d+\b\s*[:：]?/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-/** The reason of a needs-review card in words: the proof's own notes of the items not met, else the count, else a plain sentence; never a code. */
-function reasonOf(issue: string, proof: StoredProofView | undefined): string {
-  if (!/^proof unmet/.test(issue.trim())) return bookIssueText(issue);
-  if (/facts_unverified/.test(issue)) return t("ui.book_reason_all_facts_unverified");
-  const open = (proof?.items ?? []).filter(item => item.status !== "met");
-  const notes = [...new Set(open.map(item => plainNote(unescapeMarkdownText(item.note))).filter(Boolean))].slice(0, 3);
-  if (notes.length) return notes.join(t("ui.book_panel_lead_sep"));
-  return open.length ? t("ui.book_panel_reason_unchecked_0", open.length) : t("ui.book_panel_reason_unmet_plain");
-}
-
-/** Whether the chapter's pictures are a hole in a gallery chapter (uses the stored slot record and the picture addresses now in the text). */
-function galleryBare(
-  role: string | undefined,
-  note: (GateCardInput & { pipelineSeam?: unknown }) | undefined
-): boolean {
-  if (role !== "gallery") return false;
-  const slots = parseImageSlots(note?.prompt ?? "") ?? [];
-  if (!slots.length) return false;
-  const detail = note?.detail ?? "";
-  const states = describeSlots(slots, latestSlotsRecord(detail), bodyImageUrls(chapterBody(detail)));
-  return (
-    states.some(slot => slot.state === "missing") &&
-    !states.some(slot => slot.state === "placed" || slot.state === "edited")
-  );
 }
 
 export function buildGate2Panel(input: {

@@ -108,10 +108,13 @@ function hiddenRanges(lines: string[], fenced: boolean[]): { start: number; end:
 }
 
 /** The hidden callout type as Obsidian may read it: spaces inside the brackets, a `|metadata` tail. */
-const HIDDEN_TYPE = /\[!\s*vam-book\s*(?:\|[^\]]*)?\]/gi;
+const HIDDEN_TYPE = /\[!\s*vam-(?:book|trial|review)\s*(?:\|[^\]]*)?\]/gi;
+/** The program's owner markers (`%%vam-trial:…%%`, `%%vam-review:…%%`, the version line): an author's copy is turned into full-width percent signs. */
+const OWNER_MARKER = /%%(?=[ \t]*vam-(?:trial|review|callout-version)\b)/gi;
+const neutralize = (text: string): string => text.replace(HIDDEN_TYPE, "[!note]").replace(OWNER_MARKER, "％％");
 
 /** Author-controlled text outside the Detail span (the summary, the visual references): the same plain replace over the whole text. */
-export const neutralizeText = (text: string): string => text.replace(HIDDEN_TYPE, "[!note]");
+export const neutralizeText = (text: string): string => neutralize(text);
 
 /**
  * Everything the author wrote is model text: in the span from the first Detail start marker to the last Detail end marker (a marker the
@@ -124,12 +127,66 @@ export function neutralizeDetail(content: string): string | null {
   const end = content.lastIndexOf(DETAIL_END);
   if (start < 0 || end < start + DETAIL_START.length) return null;
   const from = start + DETAIL_START.length;
-  return `${content.slice(0, from)}${content.slice(from, end).replace(HIDDEN_TYPE, "[!note]")}${content.slice(end)}`;
+  return `${content.slice(0, from)}${neutralize(content.slice(from, end))}${content.slice(end)}`;
 }
 
-/** A text without its hidden callouts (the pipeline's work records are no chapter text). */
-function withoutHiddenCallouts(lines: string[]): string[] {
-  const ranges = hiddenRanges(lines, fencedLines(lines));
+const PROGRAM_HEAD = /^[ \t]{0,3}>[ \t]?\[!(vam-trial|vam-review)\]([+-])?(?:[ \t].*)?$/i;
+const OWNER_LINE = /^[ \t]{0,3}>[ \t]?%%vam-(trial|review):([\w.-]+):([\w.-]+)(?::([\w.-]+))?%%[ \t]*$/;
+export interface ProgramCallout {
+  kind: "trial" | "review";
+  /** Line range: `start` is the head line, `end` is exclusive. */
+  start: number;
+  end: number;
+  sign: "" | "+" | "-";
+  runId: string;
+  nodeId: string;
+  /** The attention fingerprint of a review callout. */
+  fp?: string;
+}
+
+/**
+ * The callouts the program wrote for the reader (a trial hint, a review box) in a text's lines: a `[!vam-trial]` / `[!vam-review]` callout
+ * that carries its own owner marker of the same kind. One without the marker is the author's and is not listed. Code fences are skipped.
+ */
+export function programCalloutRanges(lines: string[], fenced = fencedLines(lines)): ProgramCallout[] {
+  const found: ProgramCallout[] = [];
+  for (let i = 0; i < lines.length;) {
+    const head = fenced[i] ? null : PROGRAM_HEAD.exec(bare(lines[i]));
+    if (!head) {
+      i++;
+      continue;
+    }
+    const end = quoteRunEnd(lines, fenced, i + 1);
+    const kind = head[1].toLowerCase() === "vam-trial" ? "trial" : "review";
+    for (let j = i + 1; j < end; j++) {
+      const owner = OWNER_LINE.exec(bare(lines[j]));
+      if (owner && owner[1] === kind) {
+        found.push({
+          kind,
+          start: i,
+          end,
+          sign: (head[2] ?? "") as "" | "+" | "-",
+          runId: owner[2],
+          nodeId: owner[3],
+          ...(owner[4] ? { fp: owner[4] } : {})
+        });
+        break;
+      }
+    }
+    i = end;
+  }
+  return found;
+}
+
+/** A text without its hidden callouts (the pipeline's work records) and the callouts the program wrote for the reader: no chapter text. */
+export function withoutHiddenCallouts(lines: string[]): string[] {
+  const fenced = fencedLines(lines);
+  // A program callout is followed by one blank line it brought with it; that goes too, so adding or removing a callout never changes the chapter text.
+  const own = programCalloutRanges(lines, fenced).map(({ start, end }) => ({
+    start,
+    end: end < lines.length && !lines[end].trim() ? end + 1 : end
+  }));
+  const ranges = [...hiddenRanges(lines, fenced), ...own];
   if (!ranges.length) return lines;
   return lines.filter((_, i) => !ranges.some(range => i >= range.start && i < range.end));
 }

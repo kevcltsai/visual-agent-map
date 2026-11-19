@@ -1,0 +1,266 @@
+// Picture-book review core (T2 of "book without a panel"): the attention rules moved out of the gate 2 panel, the fingerprint, the two
+// callouts the program writes at the top of a chapter's Detail, their reading and editing in raw text, plain-text escaping of untrusted
+// text, the notes parser and the shared proof body. Pure text in and out; the real Obsidian look is UI evidence for the tester.
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const S = require('./support.cjs');
+const dom = require('./support-dom.cjs');
+const { loadSource } = require('./support-replay.cjs');
+
+const b = loadSource(`
+export * from "./experiences/visual-map/book-pipeline-review";
+export { projectProofBody as projectDirect } from "./core/book-pipeline/book-notes";
+export { neutralizeDetail, neutralizeText, chapterBody, visibleDetail } from "./core/book-pipeline/note-sections";
+export { proofKey } from "./core/book-pipeline/proof";
+export { setUiLanguage } from "./i18n";
+export { shortHash } from "./core/book-pipeline/image-slots";
+`, { obsidian: { ...S.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice([]), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
+b.setUiLanguage('zh-TW');
+
+const START = '<!-- visual-agent-map:detail:start -->';
+const END = '<!-- visual-agent-map:detail:end -->';
+const note = (detail, head = '# T\n\n## Current Summary\n\nS\n\n## Detail\n\n') => `${head}${START}\n${detail}\n${END}\n\n## Prompt\n\nP\n`;
+const card = (over = {}) => ({ id: 'n1', index: 1, title: 'T', stage: 'checked', structureUnmet: 0, factsOpen: 0, galleryBare: false, seam: false, ...over });
+const link = { path: 'Notes/Next', title: '第二章' };
+const review = (over = {}, reasons = ['有 2 項寫作要求還沒達成']) => b.reviewCallout(card(over), reasons, link, 'abc123', 'run-1');
+const trial = (stopped) => b.trialCallout(1, 3, undefined, link, stopped, { runId: 'run-1', nodeId: 'n1' });
+const tick = (text, at) => { let n = 0; return text.replace(/\[ \]/g, m => (n++ === at ? '[x]' : m)); };
+
+// ---- attention rules (moved from the gate 2 panel, unchanged behaviour; the panel's own test keeps its copy until the panel goes) ----
+test('attention: every reason keeps a card in the list, reads plain, and a clean checked card is not listed', () => {
+  assert.equal(b.needsAttention(card()), false);
+  const cases = {
+    review: card({ stage: 'needs-review', failureText: '結尾沒有接到下一章' }),
+    reviewNoText: card({ stage: 'needs-review' }),
+    unfinished: card({ stage: 'written' }),
+    pending: card({ stage: 'pending' }),
+    structure: card({ structureUnmet: 2 }),
+    facts: card({ factsOpen: 1 }),
+    gallery: card({ galleryBare: true }),
+    seam: card({ seam: true })
+  };
+  for (const [name, c] of Object.entries(cases)) {
+    assert.ok(b.needsAttention(c), name);
+    assert.ok(b.attentionReasons(c).every(x => x && !/\b[CN]\d+\b|unmet|proof/i.test(x)), `${name}: ${JSON.stringify(b.attentionReasons(c))}`);
+  }
+  assert.equal(b.attentionReasons(card({ structureUnmet: 2, factsOpen: 1, seam: true })).length, 3, 'reasons add up');
+  assert.equal(b.attentionReasons(card({ stage: 'needs-review', failureText: 'X' }))[0], 'X');
+});
+test('plainNote and reasonOf: codes never reach the reader, at most 3 distinct proof notes', () => {
+  assert.equal(b.plainNote('C1: Xie 2013 沒能打開核對'), 'Xie 2013 沒能打開核對');
+  assert.equal(b.plainNote('N2：  a   b'), 'a b');
+  const items = ['C1: a', 'C2: b', 'C3: c', 'C4: d', 'C5: a'].map((n, i) => ({ id: `C${i}`, type: 'fact', status: 'unmet', note: n, sources: [] }));
+  const reason = b.reasonOf('proof unmet: C1', { items });
+  assert.equal(reason, ['a', 'b', 'c'].join('，'));
+  assert.ok(!/\bC\d/.test(b.reasonOf('proof unmet: C1', { items: [{ id: 'C1', type: 'fact', status: 'unmet', note: 'C1', sources: [] }] })));
+  assert.match(b.reasonOf('proof unmet: facts_unverified', undefined), /./);
+});
+test('galleryBare: only a gallery chapter whose every slot is missing', () => {
+  const prompt = '圖安排：\n- 圖位 1｜圖表｜睡眠週期｜位置：第二段\n- 圖位 2｜照片｜腦波｜位置：結尾\n';
+  const rec = slots => `<!-- book-slots:v1 ${JSON.stringify({ slots, bad: 0 })} -->\n`;
+  const missing = rec([{ index: 1, state: 'missing', reasonCode: 'not_found' }, { index: 2, state: 'missing', reasonCode: 'not_found' }]);
+  assert.equal(b.galleryBare('gallery', { prompt, detail: `text\n\n${missing}` }), true);
+  assert.equal(b.galleryBare('body', { prompt, detail: `text\n\n${missing}` }), false);
+  assert.equal(b.galleryBare('gallery', { prompt, detail: 'plain' }), false, 'no record: not bare');
+  assert.equal(b.galleryBare('gallery', { prompt: '圖安排：無\n', detail: missing }), false);
+  assert.equal(b.galleryBare('gallery', undefined), false);
+});
+
+// ---- fingerprint ----
+test('fingerprint: stage, issue codes, proof key and the full seam value each change it; the same input is stable', () => {
+  const base = { stage: 'checked', issue: 'structure unmet: S1', proofKey: 'r:n:1:h:l', seam: '前後章變了（第 2 張，版本 2）' };
+  const fp = b.attentionFingerprint(base);
+  assert.equal(fp, b.attentionFingerprint({ ...base }));
+  assert.match(fp, /^[0-9a-f]+$/, 'safe inside a marker');
+  for (const change of [{ stage: 'needs-review' }, { issue: 'structure unmet: S2' }, { proofKey: 'r:n:2:h:l' }, { seam: '前後章變了（第 2 張，版本 3）' }, { seam: '前後章變了（第 3 張，版本 2）' }, { seam: undefined }])
+    assert.notEqual(b.attentionFingerprint({ ...base, ...change }), fp, JSON.stringify(change));
+  assert.equal(b.attentionFingerprint({ stage: 'checked' }), b.attentionFingerprint({ stage: 'checked', issue: '', proofKey: '', seam: '' }), 'missing = empty');
+});
+
+// ---- builders ----
+test('trial callout: title, next step, links, owner marker and version; stopped says press Continue first', () => {
+  const t1 = trial(false);
+  assert.match(t1, /^> \[!vam-trial\] 試跑第 1／3 章\n/);
+  assert.match(t1, /這樣可以，跑完全書/);
+  assert.match(t1, /下一章：\[\[Notes\/Next\|第二章\]\]/);
+  assert.ok(!/上一章/.test(t1), 'no previous link when there is none');
+  assert.match(t1, /\n> %%vam-trial:run-1:n1%%\n/);
+  assert.match(t1, /vam-callout-version:1/);
+  const stopped = trial(true);
+  assert.match(stopped, /先在心智圖工具列按「繼續」/);
+  assert.ok(!/回心智圖，按「這樣可以/.test(stopped), 'the stopped text does not point to a button that is not there');
+  assert.ok(t1.split('\n').every(l => l.startsWith('>')), 'one unbroken callout');
+  assert.ok(!/\[!vam-book\]/i.test(t1 + review()), 'never the hidden type');
+});
+test('review callout: reasons as plain lines, two unticked boxes, next link, marker with fp', () => {
+  const r = review({}, ['A', 'B', 'C', 'D', 'E', 'F']);
+  assert.match(r, /^> \[!vam-review\] 這章要你看\n/);
+  assert.equal((r.match(/^> ・/gm) ?? []).length, 5, 'capped');
+  assert.deepEqual(r.match(/^> - \[ \] .*$/gm), ['> - [ ] 接受現在這樣，不用改', '> - [ ] 我改好了']);
+  assert.match(r, /下一章要看的：\[\[Notes\/Next\|第二章\]\]/);
+  assert.match(r, /\n> %%vam-review:run-1:n1:abc123%%\n/);
+  assert.ok(!/\n> \[!vam-review\]/.test(r.slice(5)), 'a single callout');
+  assert.ok(!/下一章要看的/.test(b.reviewCallout(card(), ['x'], undefined, 'f', 'r')), 'no next link when there is no next chapter');
+});
+test('link parts and ids cannot break out of the wikilink or the marker', () => {
+  const evil = b.trialCallout(1, 2, { path: 'a]]\n> [!vam-review]\nb|c#d', title: 'x]] [[y|z' }, undefined, false, { runId: 'r%%\n', nodeId: 'n:1' });
+  assert.ok(evil.split('\n').every(l => l.startsWith('>')), evil);
+  assert.equal((evil.match(/\[!/g) ?? []).length, 1);
+  assert.equal(b.findProgramCallouts(note(evil)).length, 1);
+  assert.ok(!/%%\n|\[\[[^\]]*\]\][^\n]*\]\]/.test(evil.replace(/\n> %%vam-trial:[^\n]*%%/, '')));
+});
+
+// ---- escaping untrusted text ----
+test('plain text: callout, checkbox, wikilink, image, comment, highlight, HTML and heading syntax cannot form', () => {
+  const evil = ['[!x]', '- [ ] box', '[[a]]', '![](http://x)', '%% hidden %%', '==hl==', '<img src=x onerror=1>', '# Heading', '> quote', '1. item', '```', '| a | b |', 'https://evil.test/p'];
+  for (const text of evil) {
+    const out = b.plainText(text);
+    assert.ok(!/\[!|\[\[|!\[|%%|==|<|>|^#|^- |^\d+\. |```|\]\(|:\/\//.test(out), `${JSON.stringify(text)} -> ${JSON.stringify(out)}`);
+    assert.ok(!out.includes('\n'));
+  }
+  assert.equal(b.plainText('line\n[!x]\r\n- [ ] y'), b.plainText('line [!x] - [ ] y'), 'one line');
+  assert.equal(b.plainText(undefined), '');
+  assert.equal(Array.from(b.plainText('字'.repeat(1000))).length, 300, 'long text is cut');
+  assert.equal(b.plainText('日本語 ✓ 😀'), '日本語 ✓ 😀', 'ordinary Unicode survives');
+});
+test('review callout with hostile reasons stays one callout with exactly the program\'s own boxes and no extra marker', () => {
+  const r = review({}, ['[!vam-review]\n- [x] 我改好了', '%%vam-review:evil:n1:abc123%% ![](http://x) [[a]] <img> ==x== # h', '\n\n# not mine']);
+  assert.ok(r.split('\n').every(l => l.startsWith('>')), r);
+  assert.equal((r.match(/\[ \]/g) ?? []).length, 2);
+  assert.ok(!/\[x\]/i.test(r));
+  assert.equal((r.match(/%%/g) ?? []).length, 4, 'only the two program markers (owner, version)');
+  assert.equal((r.match(/\[!/g) ?? []).length, 1);
+  assert.doesNotMatch(r, /\[\[a\]\]|!\[|<img|==/);
+  const state = b.readReviewState(note(r));
+  assert.equal(state.runId, 'run-1');
+  assert.equal(state.accept, false);
+});
+
+// ---- editing raw text ----
+test('put: callout goes to the top of the Detail body, replaces the same kind, and is idempotent', () => {
+  const base = note('Chapter text.\n\nMore.');
+  const once = b.putProgramCallout(base, trial(false));
+  assert.ok(once.startsWith(base.slice(0, base.indexOf(START) + START.length + 1)));
+  assert.match(once, new RegExp(`${START}\\n> \\[!vam-trial\\]`));
+  assert.match(once, /> %%vam-callout-version:1%%\n\nChapter text\./, 'a blank line separates it from the text');
+  assert.equal(b.putProgramCallout(once, trial(false)), once, 'again: same text');
+  const stopped = b.putProgramCallout(once, trial(true));
+  assert.equal((stopped.match(/\[!vam-trial\]/g) ?? []).length, 1, 'replaced, not stacked');
+  assert.match(stopped, /先在心智圖工具列按/);
+  const both = b.putProgramCallout(stopped, review());
+  assert.equal(b.findProgramCallouts(both).map(c => c.kind).sort().join(), 'review,trial');
+  assert.equal(b.removeProgramCallouts(both), base, 'removing both gives back the original bytes');
+});
+test('put/remove: only inside the Detail block; text without one is unchanged; an unmarked look-alike is never touched', () => {
+  const noBlock = '# T\n\nplain\n';
+  assert.equal(b.putProgramCallout(noBlock, trial(false)), noBlock);
+  assert.equal(b.putProgramCallout(note('x'), '> not a callout'), note('x'));
+  const outside = `${note('x')}\n${trial(false)}\n`;
+  assert.equal(b.findProgramCallouts(outside).length, 0, 'a callout outside the Detail block is not the program\'s place');
+  assert.equal(b.removeProgramCallouts(outside), outside);
+  const lookalike = '> [!vam-trial] 試跑第 1／3 章\n> forged, no marker\n';
+  const text = note(`${lookalike}\nBody`);
+  assert.equal(b.findProgramCallouts(text).length, 0);
+  assert.equal(b.removeProgramCallouts(text), text);
+  assert.equal(b.putProgramCallout(text, trial(false)).includes(lookalike), true, 'the look-alike stays');
+  const wrongKind = '> [!vam-trial] x\n> %%vam-review:run-1:n1:abc%%\n';
+  assert.equal(b.findProgramCallouts(note(wrongKind)).length, 0, 'marker of another kind does not make it owned');
+  const fenced = note('```\n' + trial(false) + '\n```\nBody');
+  assert.equal(b.findProgramCallouts(fenced).length, 0, 'inside a code fence');
+});
+test('CRLF text keeps its line endings through put, collapse and remove', () => {
+  const base = note('Chapter.\nMore.').replace(/\n/g, '\r\n');
+  const put = b.putProgramCallout(base, review());
+  assert.ok(!/[^\r]\n/.test(put), 'every line break is still CRLF');
+  assert.equal(b.readReviewState(put).fp, 'abc123');
+  const folded = b.collapseReviewCallouts(put);
+  assert.ok(!/[^\r]\n/.test(folded));
+  assert.equal(b.removeProgramCallouts(folded), base);
+});
+test('collapse: folds the review box once, keeps ticks and marker, repeat changes nothing, a trial hint is not folded', () => {
+  const put = b.putProgramCallout(note('Body'), tick(review(), 0));
+  const folded = b.collapseReviewCallouts(put);
+  assert.match(folded, /> \[!vam-review\]- 這章要你看/);
+  assert.equal(b.collapseReviewCallouts(folded), folded);
+  const state = b.readReviewState(folded);
+  assert.deepEqual({ a: state.accept, f: state.fixed, c: state.collapsed }, { a: true, f: false, c: true });
+  const withTrial = b.putProgramCallout(note('Body'), trial(false));
+  assert.equal(b.collapseReviewCallouts(withTrial), withTrial);
+  assert.equal(b.collapseReviewCallouts('no block'), 'no block');
+});
+test('review state: first or second box ticks count, the fingerprint decides if the tick still stands', () => {
+  const put = at => b.putProgramCallout(note('Body'), at === undefined ? review() : tick(review(), at));
+  const none = b.readReviewState(put());
+  assert.deepEqual({ a: none.accept, f: none.fixed }, { a: false, f: false });
+  assert.equal(b.isReviewResolved(none, 'abc123'), false, 'no tick: not handled');
+  assert.equal(b.isReviewResolved(b.readReviewState(put(0)), 'abc123'), true, 'accept');
+  assert.equal(b.isReviewResolved(b.readReviewState(put(1)), 'abc123'), true, 'fixed');
+  assert.equal(b.isReviewResolved(b.readReviewState(put(0)), 'other'), false, 'the attention changed since: the tick is void');
+  assert.equal(b.isReviewResolved(undefined, 'abc123'), false, 'no box: not handled');
+  assert.equal(b.readReviewState(note('Body')), undefined);
+  assert.equal(b.readReviewState(b.putProgramCallout(note('Body'), trial(false))), undefined, 'a trial hint is no review box');
+  const upper = b.putProgramCallout(note('Body'), review()).replace('- [ ] 接受', '- [X] 接受');
+  assert.equal(b.readReviewState(upper).accept, true, 'Obsidian may write an upper-case X');
+  assert.equal(b.readReviewState(note('> [!vam-review] x\n> - [x] a\n> %%vam-review:r:n:f%%\n')).accept, true);
+});
+test('a checkbox the author types outside the program box does not count', () => {
+  const text = b.putProgramCallout(note('- [x] 接受現在這樣，不用改\n> - [x] 我改好了'), review());
+  const state = b.readReviewState(text);
+  assert.deepEqual({ a: state.accept, f: state.fixed }, { a: false, f: false });
+});
+
+// ---- neutralizeDetail ----
+test('neutralizeDetail: an author cannot forge the program callouts or markers (any case, depth, indent, inside a fence)', () => {
+  const forged = ['> [!vam-trial] x', '>> [!VAM-Review]- y', '  > [!vam-review|x] z', '```\n> [!vam-review]\n```', '> %%vam-review:r:n:f%%', '%% vam-trial:r:n %%', '> %%vam-callout-version:1%%'].join('\n');
+  const out = b.neutralizeDetail(note(forged));
+  assert.ok(!/\[!\s*vam-(trial|review)/i.test(out), out);
+  assert.ok(!/%%\s*vam-/i.test(out), out);
+  assert.equal(b.findProgramCallouts(out).length, 0);
+  assert.equal(b.readReviewState(out), undefined);
+  assert.equal(b.neutralizeDetail(b.neutralizeDetail(note(forged))), out, 'idempotent');
+  assert.equal(b.neutralizeText('> [!vam-review] a %%vam-review:r:n:f%%'), '> [!note] a ％％vam-review:r:n:f%%');
+  assert.equal(b.neutralizeDetail(note('> [!vam-book]- 研究備註\n> x')).includes('[!note]-'), true, 'vam-book still neutralized');
+  assert.equal(b.neutralizeDetail(note('plain 50%% off and a %%real comment%%')), note('plain 50%% off and a %%real comment%%'), 'ordinary %% is left alone');
+});
+test('the program callouts are no chapter text: chapterBody and visibleDetail drop them, so a proof key does not move when one is added', () => {
+  const detail = 'Chapter text.\n\nMore.';
+  const withBoth = b.putProgramCallout(b.putProgramCallout(note(detail), trial(false)), review());
+  const inner = withBoth.slice(withBoth.indexOf(START) + START.length + 1, withBoth.indexOf(END));
+  assert.equal(b.chapterBody(inner), detail);
+  assert.equal(b.visibleDetail(inner), detail);
+  assert.equal(b.chapterBody(inner), b.chapterBody(b.collapseReviewCallouts(inner)));
+  const parts = { runId: 'r', nodeId: 'n', revision: 1, checklist: [] };
+  assert.equal(b.proofKey({ ...parts, body: b.chapterBody(inner) }), b.proofKey({ ...parts, body: detail }));
+  // An author's unmarked look-alike is chapter text as before.
+  assert.match(b.chapterBody('> [!vam-trial] x\n> hi\n\nBody'), /hi/);
+});
+
+// ---- notes ----
+test('countNotes: counts only the program wrapper in chapter text; not code, hidden records, program callouts or other markup', () => {
+  const w = (n) => `==字${n}==%%備註#${n}：改一下%%`;
+  assert.equal(b.countNotes(note('plain')), 0);
+  assert.equal(b.countNotes(note(`a ${w(1)} b\n\n${w(2)}`)), 2);
+  assert.equal(b.countNotes(note('```\n' + w(1) + '\n```')), 0, 'in code');
+  assert.equal(b.countNotes(note(`> [!vam-book]- 研究備註\n> ${w(1)}\n\nBody`)), 0, 'in a hidden record');
+  assert.equal(b.countNotes(note('==x== %%c%% ==y==%%not a note%%')), 0, 'plain highlight and comment');
+  assert.equal(b.countNotes(note(w(1)).replace(/\n/g, '\r\n')), 1, 'CRLF');
+  assert.equal(b.countNotes(''), 0);
+  assert.equal(b.wrapNote('字', 1, '改一下'), '==字==%%備註#1：改一下%%');
+  for (const bad of [['a==b', 1, 'n'], ['a', 1, 'n%%m'], ['a', 1, 'n\nm'], ['', 1, 'n'], ['a', 1, ''], ['a', 0, 'n']]) assert.equal(b.wrapNote(...bad), null, JSON.stringify(bad));
+});
+test('proof body: the note wrapper goes, the annotated text stays; text without notes is byte-identical; the proof key round-trips', () => {
+  const original = '第一段。\n\n第二段有重點文字，還有 a=b 與 50% 和 %%真註解%% 與 ==亮==。\n\n結尾。';
+  assert.equal(b.projectDirect(original), original, 'no wrapper: same bytes');
+  for (const text of ['', 'x', '==a==%%備註：舊格式%%', '==a==%%備註#x：no number%%', '==a== %%備註#1：space%%']) assert.equal(b.projectDirect(text), text, JSON.stringify(text));
+  const noted = original.replace('重點文字', '==重點文字==%%備註#1：寫清楚一點%%');
+  assert.notEqual(noted, original);
+  assert.equal(b.projectDirect(noted), original, 'wrapper removed, annotated text kept');
+  const twice = noted.replace('結尾', '==結尾==%%備註#2：太短%%');
+  assert.equal(b.projectDirect(twice), original);
+  assert.equal(b.projectDirect(b.projectDirect(twice)), original, 'idempotent');
+  const parts = { runId: 'r', nodeId: 'n', revision: 2, checklist: [{ id: 'C1', type: 'fact', text: 'x' }] };
+  const key = body => b.proofKey({ ...parts, body });
+  assert.equal(key(b.projectDirect(noted)), key(original), 'original -> note added -> same key');
+  assert.notEqual(key(noted), key(original), 'the unprojected body would have moved the key');
+  assert.equal(b.projectProofBody(noted), original, 're-exported from the review module');
+});

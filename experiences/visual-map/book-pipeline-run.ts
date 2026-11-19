@@ -57,6 +57,7 @@ import {
   type PipelineStage,
   type PipelineStep
 } from "../../core/book-pipeline/model";
+import { projectProofBody } from "../../core/book-pipeline/book-notes";
 import {
   appendResearchNote,
   carryWorkLog,
@@ -2082,7 +2083,7 @@ export class BookPipelineRuns {
     const card = await this.ports.readCard(info.path);
     const checklist = parseChecklist(card.prompt);
     const chapter = chapterBody(card.detail);
-    const body = stripImageLines(chapter);
+    const body = projectProofBody(stripImageLines(chapter));
     const imageCheck = checkImageText(chapter, parseImageSlots(card.prompt), latestSlotsRecord(card.detail));
     const imageLine = composeImageTextLine(drive.config.language, imageCheck);
     if (!checklist.length) return { kind: "failed", reason: "empty_list" };

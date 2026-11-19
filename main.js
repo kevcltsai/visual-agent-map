@@ -3239,6 +3239,15 @@ var en = {
   "ui.book_panel_g2_reason_facts_0": "{0} facts could not be confirmed against a source",
   "ui.book_panel_g2_reason_images": "This is a picture chapter but no fitting picture was found",
   "ui.book_panel_g2_reason_seam": "A neighbouring chapter changed; the join is not confirmed",
+  "ui.book_note_trial_title_0": "Trial chapter {0} of {1}",
+  "ui.book_note_trial_next": "Once you have read it, go back to the mind map and press \u201CRun the whole book\u201D.",
+  "ui.book_note_trial_stopped": "The book is stopped. Press \u201CContinue\u201D on the mind map toolbar first, then \u201CRun the whole book\u201D.",
+  "ui.book_note_prev_0": "Previous chapter: {0}",
+  "ui.book_note_next_0": "Next chapter: {0}",
+  "ui.book_note_review_title": "This chapter needs a look",
+  "ui.book_note_review_accept": "Accept it as it is, no change needed",
+  "ui.book_note_review_fixed": "I fixed it",
+  "ui.book_note_review_next_0": "Next chapter to check: {0}",
   "ui.book_panel_g2_edit_myself": "Edit myself",
   "ui.book_panel_g2_confirm_seam": "The join is fine",
   "ui.book_panel_reason_unmet_plain": "Some items did not pass proofreading",
@@ -6416,6 +6425,15 @@ var zhCN = {
   "ui.book_panel_g2_reason_facts_0": "\u6709 {0} \u9879\u4E8B\u5B9E\u8FD8\u6CA1\u67E5\u8BC1\u5230\u6765\u6E90",
   "ui.book_panel_g2_reason_images": "\u8FD9\u7AE0\u662F\u56FE\u96C6\uFF0C\u5374\u6CA1\u6709\u627E\u5230\u5408\u9002\u7684\u56FE",
   "ui.book_panel_g2_reason_seam": "\u524D\u540E\u7AE0\u6539\u8FC7\uFF0C\u8854\u63A5\u8FD8\u6CA1\u786E\u8BA4",
+  "ui.book_note_trial_title_0": "\u8BD5\u8DD1\u7B2C {0}\uFF0F{1} \u7AE0",
+  "ui.book_note_trial_next": "\u770B\u5B8C\u540E\u56DE\u5FC3\u667A\u56FE\uFF0C\u6309\u201C\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66\u201D\u3002",
+  "ui.book_note_trial_stopped": "\u8FD9\u672C\u4E66\u5DF2\u505C\u6B62\u3002\u5148\u5728\u5FC3\u667A\u56FE\u5DE5\u5177\u680F\u6309\u201C\u7EE7\u7EED\u201D\uFF0C\u518D\u6309\u201C\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66\u201D\u3002",
+  "ui.book_note_prev_0": "\u4E0A\u4E00\u7AE0\uFF1A{0}",
+  "ui.book_note_next_0": "\u4E0B\u4E00\u7AE0\uFF1A{0}",
+  "ui.book_note_review_title": "\u8FD9\u7AE0\u8981\u4F60\u770B",
+  "ui.book_note_review_accept": "\u63A5\u53D7\u73B0\u5728\u8FD9\u6837\uFF0C\u4E0D\u7528\u6539",
+  "ui.book_note_review_fixed": "\u6211\u6539\u597D\u4E86",
+  "ui.book_note_review_next_0": "\u4E0B\u4E00\u7AE0\u8981\u770B\u7684\uFF1A{0}",
   "ui.book_panel_g2_edit_myself": "\u6211\u81EA\u5DF1\u6539",
   "ui.book_panel_g2_confirm_seam": "\u8854\u63A5\u6CA1\u95EE\u9898",
   "ui.book_panel_reason_unmet_plain": "\u6709\u51E0\u9879\u5185\u5BB9\u6CA1\u901A\u8FC7\u6821\u5BF9",
@@ -9593,6 +9611,15 @@ var zhTW = {
   "ui.book_panel_g2_reason_facts_0": "\u6709 {0} \u9805\u4E8B\u5BE6\u9084\u6C92\u67E5\u8B49\u5230\u4F86\u6E90",
   "ui.book_panel_g2_reason_images": "\u9019\u7AE0\u662F\u5716\u96C6\uFF0C\u537B\u6C92\u6709\u627E\u5230\u5408\u9069\u7684\u5716",
   "ui.book_panel_g2_reason_seam": "\u524D\u5F8C\u7AE0\u6539\u904E\uFF0C\u929C\u63A5\u9084\u6C92\u78BA\u8A8D",
+  "ui.book_note_trial_title_0": "\u8A66\u8DD1\u7B2C {0}\uFF0F{1} \u7AE0",
+  "ui.book_note_trial_next": "\u770B\u5B8C\u5F8C\u56DE\u5FC3\u667A\u5716\uFF0C\u6309\u300C\u9019\u6A23\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u66F8\u300D\u3002",
+  "ui.book_note_trial_stopped": "\u9019\u672C\u66F8\u5DF2\u505C\u6B62\u3002\u5148\u5728\u5FC3\u667A\u5716\u5DE5\u5177\u5217\u6309\u300C\u7E7C\u7E8C\u300D\uFF0C\u518D\u6309\u300C\u9019\u6A23\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u66F8\u300D\u3002",
+  "ui.book_note_prev_0": "\u4E0A\u4E00\u7AE0\uFF1A{0}",
+  "ui.book_note_next_0": "\u4E0B\u4E00\u7AE0\uFF1A{0}",
+  "ui.book_note_review_title": "\u9019\u7AE0\u8981\u4F60\u770B",
+  "ui.book_note_review_accept": "\u63A5\u53D7\u73FE\u5728\u9019\u6A23\uFF0C\u4E0D\u7528\u6539",
+  "ui.book_note_review_fixed": "\u6211\u6539\u597D\u4E86",
+  "ui.book_note_review_next_0": "\u4E0B\u4E00\u7AE0\u8981\u770B\u7684\uFF1A{0}",
   "ui.book_panel_g2_edit_myself": "\u6211\u81EA\u5DF1\u6539",
   "ui.book_panel_g2_confirm_seam": "\u929C\u63A5\u6C92\u554F\u984C",
   "ui.book_panel_reason_unmet_plain": "\u6709\u5E7E\u9805\u5167\u5BB9\u6C92\u901A\u904E\u6821\u5C0D",
@@ -43055,17 +43082,56 @@ function hiddenRanges(lines, fenced) {
   }
   return found;
 }
-var HIDDEN_TYPE = /\[!\s*vam-book\s*(?:\|[^\]]*)?\]/gi;
-var neutralizeText = (text10) => text10.replace(HIDDEN_TYPE, "[!note]");
+var HIDDEN_TYPE = /\[!\s*vam-(?:book|trial|review)\s*(?:\|[^\]]*)?\]/gi;
+var OWNER_MARKER = /%%(?=[ \t]*vam-(?:trial|review|callout-version)\b)/gi;
+var neutralize = (text10) => text10.replace(HIDDEN_TYPE, "[!note]").replace(OWNER_MARKER, "\uFF05\uFF05");
+var neutralizeText = (text10) => neutralize(text10);
 function neutralizeDetail(content) {
   const start = content.indexOf(DETAIL_START2);
   const end = content.lastIndexOf(DETAIL_END2);
   if (start < 0 || end < start + DETAIL_START2.length) return null;
   const from = start + DETAIL_START2.length;
-  return `${content.slice(0, from)}${content.slice(from, end).replace(HIDDEN_TYPE, "[!note]")}${content.slice(end)}`;
+  return `${content.slice(0, from)}${neutralize(content.slice(from, end))}${content.slice(end)}`;
+}
+var PROGRAM_HEAD = /^[ \t]{0,3}>[ \t]?\[!(vam-trial|vam-review)\]([+-])?(?:[ \t].*)?$/i;
+var OWNER_LINE = /^[ \t]{0,3}>[ \t]?%%vam-(trial|review):([\w.-]+):([\w.-]+)(?::([\w.-]+))?%%[ \t]*$/;
+function programCalloutRanges(lines, fenced = fencedLines2(lines)) {
+  var _a2;
+  const found = [];
+  for (let i = 0; i < lines.length; ) {
+    const head2 = fenced[i] ? null : PROGRAM_HEAD.exec(bare(lines[i]));
+    if (!head2) {
+      i++;
+      continue;
+    }
+    const end = quoteRunEnd(lines, fenced, i + 1);
+    const kind = head2[1].toLowerCase() === "vam-trial" ? "trial" : "review";
+    for (let j = i + 1; j < end; j++) {
+      const owner = OWNER_LINE.exec(bare(lines[j]));
+      if (owner && owner[1] === kind) {
+        found.push({
+          kind,
+          start: i,
+          end,
+          sign: (_a2 = head2[2]) != null ? _a2 : "",
+          runId: owner[2],
+          nodeId: owner[3],
+          ...owner[4] ? { fp: owner[4] } : {}
+        });
+        break;
+      }
+    }
+    i = end;
+  }
+  return found;
 }
 function withoutHiddenCallouts(lines) {
-  const ranges = hiddenRanges(lines, fencedLines2(lines));
+  const fenced = fencedLines2(lines);
+  const own2 = programCalloutRanges(lines, fenced).map(({ start, end }) => ({
+    start,
+    end: end < lines.length && !lines[end].trim() ? end + 1 : end
+  }));
+  const ranges = [...hiddenRanges(lines, fenced), ...own2];
   if (!ranges.length) return lines;
   return lines.filter((_, i) => !ranges.some((range) => i >= range.start && i < range.end));
 }
@@ -45417,6 +45483,10 @@ var PipelineStore = class {
     return run2;
   }
 };
+
+// core/book-pipeline/book-notes.ts
+var NOTE_WRAPPER = /==((?:(?!==)[^\r\n])+?)==%%備註#\d+：(?:(?!%%)[^\r\n])*%%/g;
+var projectProofBody = (body) => body.replace(NOTE_WRAPPER, "$1");
 
 // core/steps/argument-map/language.en.md
 var language_en_default3 = "Write in {{language}}.\n";
@@ -50294,7 +50364,7 @@ var frontmatterLength = (content) => {
   return (_b2 = (_a2 = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(content)) == null ? void 0 : _a2[0].length) != null ? _b2 : 0;
 };
 var labelOf = (value) => value.trim().replace(/\s+/g, " ").toLowerCase();
-var neutralize = (text10) => text10.replace(/<(?=[A-Za-z/!?]|$)(?!!-- visual-agent-map:(?:detail|references):(?:start|end) -->)/g, "&lt;");
+var neutralize2 = (text10) => text10.replace(/<(?=[A-Za-z/!?]|$)(?!!-- visual-agent-map:(?:detail|references):(?:start|end) -->)/g, "&lt;");
 var PROOF_LINE = /^(?:[ \t]{0,3}>[ \t]?)?<!-- book-proof:v1 (\{[^<]*\}) -->$/;
 function holdProofLines(content, known) {
   const held = [];
@@ -50432,7 +50502,7 @@ function rebuildImages(text10, defs, used, resolve) {
   let plain = 0;
   let i = 0;
   const unsupported = (at) => {
-    out += neutralize(text10.slice(plain, at)) + `${NO_PICTURE}\u5F62\u5F0F\u4E0D\u652F\u63F4`;
+    out += neutralize2(text10.slice(plain, at)) + `${NO_PICTURE}\u5F62\u5F0F\u4E0D\u652F\u63F4`;
     i = at + 1;
     plain = i;
   };
@@ -50444,7 +50514,7 @@ function rebuildImages(text10, defs, used, resolve) {
         unsupported(at);
         continue;
       }
-      out += neutralize(text10.slice(plain, at)) + `![[${target}]]`;
+      out += neutralize2(text10.slice(plain, at)) + `![[${target}]]`;
       i = end2 + 2;
       plain = i;
       continue;
@@ -50485,12 +50555,12 @@ function rebuildImages(text10, defs, used, resolve) {
     }
     const href = safeHref2(raw);
     const failure = href ? resolve(href) : `${NO_PICTURE}\u7DB2\u5740\u4E0D\u5B89\u5168`;
-    out += neutralize(text10.slice(plain, at));
+    out += neutralize2(text10.slice(plain, at));
     out += failure != null ? failure : `![${escapeMarkdownText(unescapeMarkdownText(alt), 200)}](${href})`;
     i = end;
     plain = i;
   }
-  return out + neutralize(text10.slice(plain));
+  return out + neutralize2(text10.slice(plain));
 }
 function rebuildBody(content, resolve) {
   var _a2, _b2;
@@ -51777,7 +51847,7 @@ var BookPipelineRuns = class {
     const card = await this.ports.readCard(info.path);
     const checklist = parseChecklist(card.prompt);
     const chapter = chapterBody(card.detail);
-    const body = stripImageLines(chapter);
+    const body = projectProofBody(stripImageLines(chapter));
     const imageCheck = checkImageText(chapter, parseImageSlots(card.prompt), latestSlotsRecord(card.detail));
     const imageLine = composeImageTextLine(drive.config.language, imageCheck);
     if (!checklist.length) return { kind: "failed", reason: "empty_list" };
@@ -52743,7 +52813,7 @@ function renderSettingsFold(panel, state, actions) {
   renderBookModelChoice(choice, { ...actions.modelChoice, models: actions.models });
 }
 
-// experiences/visual-map/book-pipeline-panel2.ts
+// experiences/visual-map/book-pipeline-review.ts
 function attentionReasons(card) {
   const out = [];
   if (card.stage === "needs-review") out.push(card.failureText || t("ui.book_issue_unknown"));
@@ -52774,6 +52844,8 @@ function galleryBare(role, note) {
   const states = describeSlots(slots, latestSlotsRecord(detail), bodyImageUrls(chapterBody(detail)));
   return states.some((slot) => slot.state === "missing") && !states.some((slot) => slot.state === "placed" || slot.state === "edited");
 }
+
+// experiences/visual-map/book-pipeline-panel2.ts
 function buildGate2Panel(input2) {
   var _a2, _b2;
   const cards = input2.order.map((id, at) => {

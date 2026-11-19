@@ -12286,7 +12286,16 @@ export class VisualAgentMapView extends ItemView {
       this.plugin.topicRuns.isBusy(node.path) ||
       this.plugin.quickExpandPending?.has(node.path) ||
       this.startingTasks.has(node.path);
-    const bookCard = bookCardView(note ?? {});
+    // Once the owner accepted the book (phase done) the proof marks go away; same phase source as bookRerunWhy.
+    const bookDone =
+      !!note &&
+      this.hasBookPipeline() &&
+      (() => {
+        const read = this.map ? readBookPipeline(this.map) : undefined;
+        if (read?.kind !== "usable") return false;
+        return (this.plugin.getBookPipelineProgress(this.path ?? "")?.phase ?? read.data.phase) === "done";
+      })();
+    const bookCard = bookCardView(note ?? {}, bookDone);
     if (!loading) {
       const statusText = research
         ? this.researchStageText(research)

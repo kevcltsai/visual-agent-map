@@ -199,6 +199,22 @@ test('card view: summary prefix follows the stage; the reason shows only on need
   assert.equal(ui.bookCardView({ pipelineStage: 'needs-review' }).issueText, undefined, 'no issue text, no line');
 });
 
+test('view: proof marks (needs-review pill, issue line, seam pill) show at gate 2 and are hidden once the book is done; other pills stay', async () => {
+  const marks = async phase => {
+    const h = await harness({ book: true, phase, stages: { root: 'planned', a: 'checked', b: 'needs-review' }, issue: 'write failed: invalid_reply' });
+    Object.assign(h.view.notes.get(h.ids.a), { pipelineIssue: 'structure unmet: C1', pipelineSeam: 'x' });
+    const stage = h.paint();
+    return { states: dom.findAll(stage, i => i.cls.includes('vam-book-state')).map(i => i.text), issues: dom.findAll(stage, i => i.cls.includes('vam-card-book-issue')).length, roles: dom.findAll(stage, i => i.cls === 'vam-book-role').length };
+  };
+  const gate2 = await marks('gate2');
+  assert.deepEqual(gate2.states, ['已企劃', '已校', '接縫需看', '需人看']);
+  assert.equal(gate2.issues, 2);
+  const done = await marks('done');
+  assert.deepEqual(done.states, ['已企劃', '已校'], 'no needs-review pill, no seam pill; planned and checked stay');
+  assert.equal(done.issues, 0);
+  assert.equal(done.roles, 3, 'role tags stay');
+});
+
 test('card labels: dot-and-word state beside a role tag; the writing state shows "writing" with a clock and no stage chip', () => {
   lang('zh-TW');
   const header = dom.element('div');
@@ -217,7 +233,7 @@ test('card labels: dot-and-word state beside a role tag; the writing state shows
 });
 
 // ---- the view: a real renderNode on a fake vault, with and without bookPipeline ----
-async function harness({ book, stages = {}, issue }) {
+async function harness({ book, stages = {}, issue, phase }) {
   const { repo, app } = support.fixture('zh-TW', { linkIndex: true });
   const settings = { ...support.DEFAULT_SETTINGS, language: 'zh-TW', cliModel: 'gpt-6-luna' };
   repo.settings = settings;
@@ -229,7 +245,7 @@ async function harness({ book, stages = {}, issue }) {
     Object.assign(created, { parentId: parent ? ids[parent] : null, x: 0, y: mapDoc.nodes.length * 100 });
     mapDoc.nodes.push(created); ids[key] = created.id;
   }
-  if (book) mapDoc.bookPipeline = bookData({ order: [ids.root, ids.a, ids.b] });
+  if (book) mapDoc.bookPipeline = bookData({ order: [ids.root, ids.a, ids.b], ...(phase ? { phase } : {}) });
   await app.vault.create(MAP, support.core.serializeMap(mapDoc));
   await repo.rebuildDerivedData();
   notices.length = 0;

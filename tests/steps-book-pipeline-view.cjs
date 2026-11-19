@@ -806,7 +806,7 @@ test('bar: the sentence names the chapter being written out of the total (never 
   assert.equal(dom.find(gate, i => i.cls.includes('vam-book-now')), undefined);
   // Without a current card (a reload) the number comes from the settled cards, never past the total.
   lang('en');
-  assert.equal(ui.bookProgressText(ui.bookBarState(bookData(), progress({ counts: { pending: 0, planned: 0, written: 0, checked: 4, 'needs-review': 0 } }), noStage)), 'Writing chapter 4/4, 4/4 chapters done');
+  assert.equal(ui.bookProgressText(ui.bookBarState(bookData(), progress({ counts: { pending: 0, planned: 0, written: 0, checked: 4, 'needs-review': 0 } }), noStage)), 'Writing chapter 4/4');
   lang('zh-TW');
 });
 
@@ -1123,4 +1123,200 @@ test('restart: the card opens with the current settings; Start replaces the stop
   running.view.map.bookPipeline = bookData({ phase: 'planning', order: [running.ids.root, running.ids.a, running.ids.b] });
   await running.view.startBookPipelineFromUi({ restart: true });
   assert.equal(running.view.bookStartModal, null);
+});
+
+// ---- T3: the toolbar replaces the panel (no side column, no toggle, no finish modal) ----
+const WRAPPED = '==x==%%備註#1：y%%';
+async function gateRig({ phase, stages = {}, trialNotes = [] }) {
+  const h = await harness({ book: true, phase, stages });
+  h.view.map.bookPipeline = bookData({ phase, status: 'running', order: [h.ids.root, h.ids.a, h.ids.b], trial: [h.ids.root, h.ids.a, h.ids.b] });
+  h.plugin.getBookPipelineProgress = () => progress({ phase, active: false, total: 3, counts: { pending: 0, planned: 0, written: 0, checked: 3, 'needs-review': 0 } });
+  h.plugin.finishBookRun = async p => { h.entries.push(['finish', p]); };
+  const opened = [];
+  h.view.openBookNote = async id => { opened.push(id); };
+  const vault = h.view.app.vault;
+  for (const [key, text] of trialNotes) {
+    const file = vault.getAbstractFileByPath(h.view.map.nodes.find(n => n.id === h.ids[key]).path);
+    await vault.process(file, () => text);
+  }
+  const drawBar = () => { const t = dom.element('div'); h.view.renderBookPipelineBar(t); return t.children[0]; };
+  const click = (bar, text) => buttonsOf(bar).find(b => b.text === text).click();
+  const labels = bar => buttonsOf(bar).map(b => b.text);
+  return { ...h, opened, drawBar, click, labels };
+}
+
+test('toolbar gate 1: the trial sentence, "open chapter 1" opens the first trial chapter, confirm and stop go to the plugin', async () => {
+  lang('zh-TW');
+  const g = await gateRig({ phase: 'gate1' });
+  const bar = g.drawBar();
+  assert.ok(texts(bar).includes('試跑的 3 章寫好了'));
+  assert.deepEqual(g.labels(bar), ['打開第 1 章', '這樣可以，跑完全書', '停止']);
+  g.click(bar, '打開第 1 章');
+  assert.deepEqual(g.opened, [g.ids.root]);
+  g.click(bar, '停止'); await dom.tick();
+  g.click(g.drawBar(), '這樣可以，跑完全書'); await dom.tick();
+  assert.equal(JSON.stringify(g.entries), JSON.stringify([['stop', MAP], ['confirm', MAP]]), 'no notes: the first press confirms at once');
+  assert.equal(dom.find(g.drawBar(), i => i.cls.includes('vam-book-gate1-ask')), undefined);
+  assert.equal(dom.find(g.drawBar(), i => i.cls.includes('vam-book-panel') || i.cls.includes('vam-book-side')), undefined, 'no panel and no toggle');
+});
+
+test('toolbar gate 1 with notes not applied: the first press asks, only 仍要 confirms, Cancel gives the keyboard back to the opener; Escape cancels', async () => {
+  lang('zh-TW');
+  const g = await gateRig({ phase: 'gate1', trialNotes: [['root', `a ${WRAPPED}`], ['a', `b ${WRAPPED} ${WRAPPED.replace('#1', '#2')}`]] });
+  g.click(g.drawBar(), '這樣可以，跑完全書'); await dom.tick();
+  assert.equal(g.entries.length, 0, 'the first press does not confirm');
+  assert.equal(g.view.rendered, 1);
+  let bar = g.drawBar();
+  const ask = dom.find(bar, i => i.cls.includes('vam-book-gate1-ask'));
+  assert.ok(ask);
+  assert.ok(texts(ask).includes('還有 3 則備註沒套用，仍要跑完全書嗎？'));
+  g.view.contentEl.appendChild(bar);
+  g.view.applyBookBarFocus();
+  assert.ok(dom.focusedNow().cls.includes('vam-book-ask-go'), 'the keyboard lands on 仍要');
+  g.click(ask, '取消');
+  assert.equal(g.view.rendered, 2);
+  assert.equal(g.entries.length, 0);
+  bar = g.drawBar();
+  g.view.contentEl = dom.element('div'); g.view.contentEl.appendChild(bar);
+  g.view.applyBookBarFocus();
+  assert.ok(dom.focusedNow().cls.includes('vam-book-confirm'), 'Cancel returns the keyboard to the opener');
+  assert.equal(dom.find(bar, i => i.cls.includes('vam-book-gate1-ask')), undefined);
+  g.click(g.drawBar(), '這樣可以，跑完全書'); await dom.tick();
+  const again = dom.find(g.drawBar(), i => i.cls.includes('vam-book-gate1-ask'));
+  again.fire ? again.fire('keydown', { key: 'Escape', stopPropagation() {}, preventDefault() {} }) : again.listeners.keydown.forEach(fn => fn({ key: 'Escape', stopPropagation() {}, preventDefault() {} }));
+  assert.equal(g.entries.length, 0, 'Escape cancels, it does not confirm');
+  assert.equal(dom.find(g.drawBar(), i => i.cls.includes('vam-book-gate1-ask')), undefined);
+  g.click(g.drawBar(), '這樣可以，跑完全書'); await dom.tick();
+  dom.find(g.drawBar(), i => i.cls.includes('vam-book-ask-go')).click(); await dom.tick();
+  assert.equal(JSON.stringify(g.entries), JSON.stringify([['confirm', MAP]]), 'only 仍要 confirms');
+});
+
+test('toolbar gate 1 counterexamples: double press while counting, unreadable trial note, ask left over after the run moved on, old run without trial, result after the view closed or the map switched', async () => {
+  lang('zh-TW');
+  // Double press: the second press is ignored while the first counts the notes; with no notes the run is confirmed once.
+  const g = await gateRig({ phase: 'gate1' });
+  const bar = g.drawBar();
+  g.click(bar, '這樣可以，跑完全書'); g.click(bar, '這樣可以，跑完全書'); await dom.tick();
+  assert.equal(g.entries.filter(e => e[0] === 'confirm').length, 1);
+  // An unreadable (deleted) trial note counts as no notes: the press confirms and does not throw.
+  const gone = await gateRig({ phase: 'gate1' });
+  const first = gone.view.map.nodes.find(n => n.id === gone.ids.root);
+  const file = gone.view.app.vault.getAbstractFileByPath(first.path);
+  gone.view.app.vault.read = async () => { throw new Error('gone'); };
+  assert.ok(file);
+  gone.click(gone.drawBar(), '這樣可以，跑完全書'); await dom.tick();
+  assert.equal(gone.entries.filter(e => e[0] === 'confirm').length, 1);
+  // The chat's "continue" moved the run on while the ask was open: the next draw drops the ask.
+  const left = await gateRig({ phase: 'gate1', trialNotes: [['root', WRAPPED]] });
+  left.click(left.drawBar(), '這樣可以，跑完全書'); await dom.tick();
+  assert.ok(dom.find(left.drawBar(), i => i.cls.includes('vam-book-gate1-ask')));
+  left.view.map.bookPipeline = bookData({ phase: 'writing', order: [left.ids.root, left.ids.a, left.ids.b] });
+  left.plugin.getBookPipelineProgress = () => progress({ phase: 'writing' });
+  assert.equal(dom.find(left.drawBar(), i => i.cls.includes('vam-book-gate1-ask')), undefined);
+  left.view.map.bookPipeline = bookData({ phase: 'gate1', status: 'running', order: [left.ids.root, left.ids.a, left.ids.b], trial: [left.ids.root] });
+  left.plugin.getBookPipelineProgress = () => progress({ phase: 'gate1', active: false });
+  assert.equal(dom.find(left.drawBar(), i => i.cls.includes('vam-book-gate1-ask')), undefined, 'it does not come back when the run returns to gate 1');
+  // An old run has no trial: no sentence, no link, the confirm button still draws.
+  const old = await gateRig({ phase: 'gate1' });
+  delete old.view.map.bookPipeline.trial;
+  const oldBar = old.drawBar();
+  assert.deepEqual(old.labels(oldBar), ['這樣可以，跑完全書', '停止']);
+  assert.ok(!texts(oldBar).some(x => x.includes('試跑的')));
+  old.click(oldBar, '這樣可以，跑完全書'); await dom.tick();
+  assert.equal(old.entries.filter(e => e[0] === 'confirm').length, 1);
+  // The view closed, or another map opened, before the notes were counted: nothing is asked, nothing is confirmed.
+  for (const change of [v => { v.closed = true; }, v => { v.path = 'Other/Map.md'; }]) {
+    const late = await gateRig({ phase: 'gate1', trialNotes: [['root', WRAPPED]] });
+    const before = late.view.rendered ?? 0;
+    late.click(late.drawBar(), '這樣可以，跑完全書');
+    change(late.view);
+    await dom.tick();
+    assert.equal(late.entries.length, 0);
+    assert.equal(late.view.rendered ?? 0, before);
+  }
+});
+
+test('toolbar writing and planning: one chapter sentence, the stop button, and no ETA without an estimate', () => {
+  lang('zh-TW');
+  const d = draw(bookData(), progress({ current: [{ nodeId: 'a', step: 'write', startedAt: 1 }] }));
+  assert.equal(ui.bookProgressText(d.state), '正在寫第 1／4 章');
+  assert.ok(texts(d.bar).some(x => x.includes('正在寫第 1／4 章')), JSON.stringify(texts(d.bar)));
+  assert.equal(dom.findAll(d.bar, i => i.cls.includes('vam-book-bar-eta')).length, 0);
+  assert.deepEqual(buttonsOf(d.bar).map(b => b.text), ['停止']);
+  d.bar.children.length && buttonsOf(d.bar)[0].click();
+  assert.deepEqual(d.log, ['stop']);
+});
+
+test('toolbar gate 2 with chapters to check: the sentence, 下一章要看的 cycles in reading order, 驗收完成 asks in place, focus, Cancel and Escape', async () => {
+  lang('zh-TW');
+  const g = await gateRig({ phase: 'gate2', stages: { root: 'checked', a: 'needs-review', b: 'needs-review' } });
+  for (const key of ['a', 'b']) g.view.notes.get(g.ids[key]).pipelineIssue = 'proof unmet: C1';
+  let bar = g.drawBar();
+  assert.ok(texts(bar).includes('3 章寫好了，2 章要你看'));
+  assert.deepEqual(g.labels(bar), ['下一章要看的', '驗收完成', '停止']);
+  g.click(bar, '下一章要看的'); g.click(bar, '下一章要看的'); g.click(bar, '下一章要看的');
+  assert.deepEqual(g.opened, [g.ids.a, g.ids.b, g.ids.a], 'reading order, then around again');
+  g.click(bar, '驗收完成');
+  assert.equal(g.entries.length, 0, 'the first press does not finish');
+  bar = g.drawBar();
+  const ask = dom.find(bar, i => i.cls.includes('vam-book-finish-ask'));
+  assert.ok(texts(ask).includes('還有 2 章沒處理，仍要完成嗎？'));
+  g.view.contentEl.appendChild(bar);
+  g.view.applyBookBarFocus();
+  assert.ok(dom.focusedNow().cls.includes('vam-book-ask-go'), 'focus on 仍要完成');
+  g.click(ask, '取消');
+  g.view.contentEl = dom.element('div'); bar = g.drawBar(); g.view.contentEl.appendChild(bar);
+  g.view.applyBookBarFocus();
+  assert.ok(dom.focusedNow().cls.includes('vam-book-finish'), 'Cancel returns the keyboard to 驗收完成');
+  g.click(bar, '驗收完成');
+  const again = dom.find(g.drawBar(), i => i.cls.includes('vam-book-finish-ask'));
+  again.listeners.keydown.forEach(fn => fn({ key: 'Escape', stopPropagation() {}, preventDefault() {} }));
+  assert.equal(dom.find(g.drawBar(), i => i.cls.includes('vam-book-finish-ask')), undefined, 'Escape cancels');
+  assert.equal(g.entries.length, 0);
+  g.click(g.drawBar(), '驗收完成');
+  dom.find(g.drawBar(), i => i.cls.includes('vam-book-ask-go')).click(); await dom.tick();
+  assert.equal(JSON.stringify(g.entries), JSON.stringify([['finish', MAP]]));
+});
+
+test('toolbar gate 2 with nothing to check: no link, and 驗收完成 finishes at once', async () => {
+  lang('zh-TW');
+  const g = await gateRig({ phase: 'gate2', stages: { root: 'checked', a: 'checked', b: 'checked' } });
+  const bar = g.drawBar();
+  assert.ok(texts(bar).includes('3 章寫好了，0 章要你看'));
+  assert.deepEqual(g.labels(bar), ['驗收完成', '停止']);
+  g.click(bar, '驗收完成'); await dom.tick();
+  assert.equal(JSON.stringify(g.entries), JSON.stringify([['finish', MAP]]));
+  assert.equal(dom.find(g.drawBar(), i => i.cls.includes('vam-book-finish-ask')), undefined);
+});
+
+test('toolbar done and a map without a picture book: no toggle, no panel, no new elements', async () => {
+  lang('zh-TW');
+  const done = await gateRig({ phase: 'done' });
+  const bar = done.drawBar();
+  assert.deepEqual(done.labels(bar), ['移除圖文書']);
+  for (const cls of ['vam-book-link', 'vam-book-panel', 'vam-book-finish', 'vam-book-confirm']) assert.equal(dom.find(bar, i => i.cls.includes(cls)), undefined, cls);
+  const plain = await harness({ book: false });
+  const t = dom.element('div');
+  plain.view.renderBookPipelineBar(t);
+  assert.equal(t.children.length, 0);
+  assert.equal(dom.find(plain.paint(), i => i.cls.includes('vam-book-bar')), undefined);
+});
+
+test('toolbar words: the new sentences and buttons read in English and Simplified Chinese; zh-TW never says 地圖', () => {
+  for (const [language, want] of [['en', ['The 3 trial chapters are written', 'Open chapter 1', 'Run anyway']], ['zh-CN', ['试跑的 3 章写好了', '打开第 1 章', '仍要']]]) {
+    lang(language);
+    assert.ok(tr('ui.book_bar_trial_ready_0', 3) === want[0]);
+    assert.equal(tr('ui.book_bar_open_first'), want[1]);
+    assert.equal(tr('ui.book_bar_go_anyway'), want[2]);
+  }
+  lang('zh-TW');
+  for (const key of ['ui.book_bar_trial_ready_0', 'ui.book_bar_open_first', 'ui.book_bar_notes_ask_0', 'ui.book_bar_go_anyway', 'ui.book_bar_review_0_1', 'ui.book_bar_next_review', 'ui.book_bar_finish', 'ui.book_bar_finish_ask_0', 'ui.book_bar_finish_go']) assert.ok(!/地圖/.test(tr(key, 1, 2)), key);
+});
+
+test('toolbar source: the panel, its toggle and the finish modal are gone from the view, the plugin and the styles', () => {
+  const view = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  for (const name of ['bookPanel', 'mountBookPanel', 'bookSideEl', 'paintBookPanel', 'BookFinishModal']) assert.ok(!view.includes(name), name);
+  assert.ok(!main_ts.includes('retryBookTrial'));
+  assert.ok(!/\.vam-book-panel|\.vam-book-side|\.vam-book-trial|\.vam-book-finish-line/.test(css));
+  for (const file of ['book-pipeline-panel.ts', 'book-pipeline-panel2.ts', 'book-pipeline-finish-modal.ts']) assert.equal(fs.existsSync(path.join(root, 'experiences/visual-map', file)), false, file);
 });

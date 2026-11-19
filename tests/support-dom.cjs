@@ -44,6 +44,8 @@ function element(tag, options = {}) {
 const hasCls = (item, name) => (item.cls ?? '').split(/\s+/).includes(name);
 function matcher(selector) {
   if (selector.includes(',')) { const parts = selector.split(',').map(part => matcher(part.trim())); return item => parts.some(match => match(item)); }
+  // A descendant selector (`.a .b`): the last class on the item, the earlier ones on its ancestors, in that order.
+  if (/^\.\S+(\s+\.\S+)+$/.test(selector)) { const names = selector.split(/\s+/).map(part => part.slice(1)); return item => { if (!hasCls(item, names.at(-1))) return false; let up = item.parent; for (const name of names.slice(0, -1).reverse()) { while (up && !hasCls(up, name)) up = up.parent; if (!up) return false; up = up.parent; } return true; }; }
   if (selector.startsWith('.')) { const name = selector.slice(1); return item => hasCls(item, name); }
   return item => item.tag === selector;
 }

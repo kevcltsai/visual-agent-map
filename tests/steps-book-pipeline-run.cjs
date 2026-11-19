@@ -1442,3 +1442,41 @@ test('T5 trial: stop during the trial keeps the trial; resume finishes it withou
   assert.equal(r.stat.author.filter(id => id === r.nodes[0].id).length, 1, 'a card finished before the stop is not written again');
   assert.equal(stageOf(r.raw(3)), undefined);
 });
+
+test('restart: a run stopped in planning is replaced by a fresh run with the models read again; the old drive\'s late plan is dropped; a running run and a plain start are refused', async () => {
+  const hold = defer();
+  let held = false;
+  const models = { author: 'm2' };
+  const authorModels = [];
+  const r = await rig({ script: {
+    global: (request) => { if (!held) { held = true; return hold.promise.then(() => ({ thread: 'LATE thread', cards: r.nodes.map((n, i) => ({ id: n.id, role: i ? 'body' : 'intro' })), materials: [], decisions: {} })); } return { thread: 'new thread', cards: r.nodes.map((n, i) => ({ id: n.id, role: i ? 'body' : 'intro' })), materials: [{ name: 'm', use: 'u' }], decisions: {} }; },
+    author: async (input) => { authorModels.push(input.model); await input.admission.reserve(); const note = await r.repo.readNote(input.path); await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; }
+  }, ports: { config: () => ({ planModel: 'm1', authorModel: models.author, imageModel: 'm4', proofModel: 'm3', reasoning: 'low', language: 'zh-TW' }) } });
+  const started = r.runs.start(r.mapPath);
+  await settle();
+  await assert.rejects(() => r.runs.start(r.mapPath, { restart: true }), e => e.code === 'busy');
+  await r.runs.stop(r.mapPath); await started.catch(() => undefined);
+  let s = await r.state();
+  assert.equal(s.status, 'stopped'); assert.equal(s.phase, 'planning');
+  const oldId = s.runId;
+  await assert.rejects(() => r.runs.start(r.mapPath), e => e.code === 'exists', 'a plain start still refuses a stopped run');
+  models.author = 'm9';
+  await r.runs.start(r.mapPath, { restart: true });
+  hold.resolve(); await settle();
+  s = await r.state();
+  assert.notEqual(s.runId, oldId, 'a new run replaced the stopped one');
+  assert.equal(s.phase, 'gate1');
+  assert.equal(JSON.stringify(s).includes('LATE thread'), false, 'the old drive\'s late plan was dropped');
+  await r.runs.confirmGate1(r.mapPath); await settle();
+  assert.ok(authorModels.length > 0 && authorModels.every(m => m === 'm9'), `the new run uses the models read again: ${authorModels}`);
+});
+
+test('restart: a done or gate run is not replaced by a restart', async () => {
+  const r = await rig();
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.state()).phase, 'gate1');
+  await assert.rejects(() => r.runs.start(r.mapPath, { restart: true }), e => e.code === 'exists');
+  await r.runs.stop(r.mapPath, { saved: true });
+  assert.equal((await r.state()).status, 'stopped');
+  await assert.rejects(() => r.runs.start(r.mapPath, { restart: true }), e => e.code === 'exists', 'stopped at a gate keeps its own flow');
+});

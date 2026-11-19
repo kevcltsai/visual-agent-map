@@ -3149,6 +3149,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_fail_card_removed": "卡片不在心智图上或读不到",
   "ui.book_fail_other": "发生未预期的错误",
   "ui.book_resume": "从停处继续",
+  "ui.book_restart": "重新设置再开始",
   "ui.book_add_budget": "再加 100 次",
   "ui.book_budget_used_up_0_1": "额度用完：已用 {0}／{1} 次",
   "ui.book_confirm_gate1": "这样可以，跑完全书",

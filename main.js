@@ -3145,6 +3145,7 @@ var en = {
   "ui.book_fail_card_removed": "A card is not on the map or cannot be read",
   "ui.book_fail_other": "An unexpected error happened",
   "ui.book_resume": "Continue from where it stopped",
+  "ui.book_restart": "Change settings and start over",
   "ui.book_add_budget": "Add 100 calls",
   "ui.book_budget_used_up_0_1": "Call budget used up: {0}/{1} used",
   "ui.book_confirm_gate1": "Looks good, run the whole book",
@@ -6315,6 +6316,7 @@ var zhCN = {
   "ui.book_fail_card_removed": "\u5361\u7247\u4E0D\u5728\u5FC3\u667A\u56FE\u4E0A\u6216\u8BFB\u4E0D\u5230",
   "ui.book_fail_other": "\u53D1\u751F\u672A\u9884\u671F\u7684\u9519\u8BEF",
   "ui.book_resume": "\u4ECE\u505C\u5904\u7EE7\u7EED",
+  "ui.book_restart": "\u91CD\u65B0\u8BBE\u7F6E\u518D\u5F00\u59CB",
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u989D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
   "ui.book_confirm_gate1": "\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66",
@@ -9485,6 +9487,7 @@ var zhTW = {
   "ui.book_fail_card_removed": "\u5361\u7247\u4E0D\u5728\u5FC3\u667A\u5716\u4E0A\u6216\u8B80\u4E0D\u5230",
   "ui.book_fail_other": "\u767C\u751F\u672A\u9810\u671F\u7684\u932F\u8AA4",
   "ui.book_resume": "\u5F9E\u505C\u8655\u7E7C\u7E8C",
+  "ui.book_restart": "\u91CD\u65B0\u8A2D\u5B9A\u518D\u958B\u59CB",
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u984D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
   "ui.book_confirm_gate1": "\u9019\u6A23\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u66F8",
@@ -50537,7 +50540,8 @@ var BookPipelineRuns = class {
     return this.last.get(mapPath);
   }
   /** Starts a new run (writes `bookPipeline` to the map file) and drives it until it ends, pauses or reaches a gate. */
-  async start(mapPath) {
+  async start(mapPath, options = {}) {
+    const replaceable = (data) => data.phase === "done" || options.restart === true && data.status === "stopped" && (data.phase === "planning" || data.phase === "writing");
     return this.enter(mapPath, async (drive) => {
       if (this.ports.blocked(mapPath)) throw new BookPipelineRunError("blocked");
       const runId = this.ports.newId();
@@ -50548,7 +50552,7 @@ var BookPipelineRuns = class {
         const map = await this.ports.readMap(mapPath);
         const read = readBookPipeline(map);
         if (read.kind === "unusable") throw new BookPipelineRunError("unusable");
-        if (read.kind === "usable" && read.data.phase !== "done") throw new BookPipelineRunError("exists");
+        if (read.kind === "usable" && !replaceable(read.data)) throw new BookPipelineRunError("exists");
         const order = this.orderOf(map);
         const prior = read.kind === "usable" ? (_a2 = read.data.autoRoles) != null ? _a2 : [] : [];
         await this.load(drive, map, order, new Set(prior));
@@ -50563,7 +50567,7 @@ var BookPipelineRuns = class {
         if (this.dead(drive)) return;
         await this.ports.updateMap(mapPath, (doc) => {
           const found = readBookPipeline(doc);
-          if (found.kind === "unusable" || found.kind === "usable" && found.data.phase !== "done")
+          if (found.kind === "unusable" || found.kind === "usable" && !replaceable(found.data))
             throw new BookPipelineRunError("exists");
           doc.bookPipeline = state;
         });
@@ -52017,14 +52021,16 @@ function renderBookBar(parent, state, actions) {
   if (state.mode === "budget") {
     makeButton(buttons, t("ui.book_add_budget"), "mod-cta vam-book-add-budget", actions.addBudget);
     makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
-  } else if (state.mode === "stopped")
+  } else if (state.mode === "stopped") {
     makeButton(
       buttons,
       t(state.failure ? "ui.book_retry" : "ui.book_resume"),
       "mod-cta vam-book-resume",
       actions.resume
     );
-  else if (state.mode === "planning" || state.mode === "writing")
+    if (actions.restart && (state.phase === "planning" || state.phase === "writing"))
+      makeButton(buttons, t("ui.book_restart"), "vam-book-restart", actions.restart);
+  } else if (state.mode === "planning" || state.mode === "writing")
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   if (state.rerun) makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   const progressText = bookProgressText(state);
@@ -82392,6 +82398,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     renderBookBar(toolbar, state, {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
+      restart: () => void this.startBookPipelineFromUi({ restart: true }),
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
       confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path)),
       panel: { open: this.bookPanel.open, toggle: () => this.toggleBookPanel() }
@@ -82728,14 +82735,15 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     );
   }
   /** The toolbar button and the command: start a picture-book run on this map. */
-  async startBookPipelineFromUi() {
+  async startBookPipelineFromUi(options = {}) {
     var _a2, _b2, _c;
     const map = this.map;
     if (!this.path || !map) return;
     const path = this.path;
     const roots = map.nodes.filter((node) => !node.parentId);
     const existing = readBookPipeline(map);
-    const startable = existing.kind === "absent" || existing.kind === "usable" && existing.data.phase === "done";
+    const restart = options.restart === true && existing.kind === "usable" && existing.data.status === "stopped" && (existing.data.phase === "planning" || existing.data.phase === "writing");
+    const startable = existing.kind === "absent" || existing.kind === "usable" && existing.data.phase === "done" || restart;
     if (!startable || roots.length !== 1) return this.bookEntry(() => this.plugin.startBookPipeline(path));
     if ((_a2 = this.bookStartModal) == null ? void 0 : _a2.isShown) return;
     const root = roots.length === 1 ? roots[0] : void 0;
@@ -82762,7 +82770,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         void this.bookEntry(async () => {
           if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");
           if (root && Object.keys(patch).length) await this.plugin.repo.writeBookSettings(root.path, patch);
-          await this.plugin.startBookPipeline(path);
+          await this.plugin.startBookPipeline(path, restart ? { restart: true } : void 0);
         });
       }
     });
@@ -103325,8 +103333,8 @@ ${t("ui.organize_link_wait_hint")}`;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   /** Picture-book pipeline entries (the screen and the commands call these; refusals are thrown as BookPipelineRunError). */
-  startBookPipeline(mapPath) {
-    return this.bookPipelineRuns.start(mapPath);
+  startBookPipeline(mapPath, options = {}) {
+    return this.bookPipelineRuns.start(mapPath, options);
   }
   /** The start card's grey suggestions: one text-only call on the picture model, in the book's language. The caller owns the timeout and the abort. */
   suggestBookSettings(input2, signal) {

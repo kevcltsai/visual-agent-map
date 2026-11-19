@@ -132,6 +132,8 @@ function countStages(stages: (PipelineStage | undefined)[]): Record<PipelineStag
 export interface BookBarActions {
   stop: () => void;
   resume: () => void;
+  /** "Reconfigure and start over" (a run stopped before its first gate); a bar drawn without it shows no such button. */
+  restart?: () => void;
   addBudget: () => void;
   confirmGate1: () => void;
   /** The gate panel's opener (04b); a bar drawn without it (older callers) shows no such button. */
@@ -191,14 +193,16 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
   if (state.mode === "budget") {
     makeButton(buttons, t("ui.book_add_budget"), "mod-cta vam-book-add-budget", actions.addBudget);
     makeButton(buttons, t("ui.book_stop"), "vam-book-stop", actions.stop);
-  } else if (state.mode === "stopped")
+  } else if (state.mode === "stopped") {
     makeButton(
       buttons,
       t(state.failure ? "ui.book_retry" : "ui.book_resume"),
       "mod-cta vam-book-resume",
       actions.resume
     );
-  else if (state.mode === "planning" || state.mode === "writing")
+    if (actions.restart && (state.phase === "planning" || state.phase === "writing"))
+      makeButton(buttons, t("ui.book_restart"), "vam-book-restart", actions.restart);
+  } else if (state.mode === "planning" || state.mode === "writing")
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   if (state.rerun) makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   const progressText = bookProgressText(state);

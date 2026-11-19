@@ -48,6 +48,7 @@ import {
   MAX_STEP_ATTEMPTS,
   attemptsOf,
   readBookPipeline,
+  reserveBudget,
   type BookPipelineData,
   type BookRole,
   type BookSettings,
@@ -57,6 +58,12 @@ import {
   type PipelineStage,
   type PipelineStep
 } from "../../core/book-pipeline/model";
+import {
+  applyNotesStep,
+  MAX_NOTE_PARAGRAPHS,
+  type ApplyNotesRequest
+} from "../../core/steps/book-pipeline/apply-notes";
+import { applyReplies, snapshotNotes, type AppliedEdit, type ApplyOutcome } from "../../core/book-pipeline/notes-apply";
 import { projectProofBody } from "../../core/book-pipeline/book-notes";
 import {
   appendResearchNote,
@@ -158,7 +165,14 @@ export type BookRunRefusal =
   | "not_gate"
   | "empty"
   | "not_stopped"
-  | "instruction";
+  | "instruction"
+  /** Applying notes: a notes job already holds this map; a drive does; the job was cancelled; the map or card changed meanwhile; the backup failed; no note to apply. */
+  | "notes_busy"
+  | "drive_running"
+  | "cancelled"
+  | "stale"
+  | "backup_failed"
+  | "nothing";
 export class BookPipelineRunError extends Error {
   constructor(readonly code: BookRunRefusal) {
     super(`book pipeline refused: ${code}`);
@@ -252,6 +266,14 @@ export interface BookPipelinePorts {
     run: { signal: AbortSignal; admission?: AdmissionContext }
   ): Promise<FoundImages>;
   backupNote(path: string, raw: string): Promise<{ ok: true; path: string } | { ok: false }>;
+  /**
+   * Applying the reader's notes (absent: refused as unreadable). `readText` is the note as the writer will see it (an open editor's text
+   * first, else the file); `write` is the notes writer (`createNoteWriter`): the transform may run twice and must be pure.
+   */
+  notes?: {
+    readText(path: string): Promise<string>;
+    write(path: string, transform: (text: string) => string): Promise<"written" | "unchanged" | "refused">;
+  };
   /** True while a conversation chain, a multi-select research or an argument run holds this map. */
   blocked(mapPath: string): boolean;
   config(mapPath: string): BookRunConfig;
@@ -728,15 +750,40 @@ export function replaceBodyImages(content: string, replacements: ReadonlyMap<str
   return rebuildBody(content, href => replacements.get(href));
 }
 
+/** The neighbour's "join not yet checked" line (a rerun and an applied note both write it). */
+function seamText(language: string, at: number, revision: number): string {
+  return /^zh/i.test(language)
+    ? `鄰卡企劃或正文已變更，尚未人工核對（第 ${at + 1} 張，版本 ${revision}）`
+    : `Neighbouring card's plan or text changed; not yet checked by a person (card ${at + 1}, revision ${revision})`;
+}
+
+/** What one apply-notes job did. `edits` carry the before/after of each replaced paragraph (the undo's input). */
+export interface NotesApplyResult {
+  applied: number;
+  skipped: number;
+  marked: number;
+  edits: AppliedEdit[];
+}
+
 export class BookPipelineRuns {
   private readonly drives = new Map<string, Drive>();
   private readonly last = new Map<string, BookPipelineProgress>();
+  /** The notes slot: one apply-notes job per map, exclusive with a drive (both directions are checked synchronously). */
+  private readonly notesJobs = new Map<string, AbortController>();
   private disposed = false;
 
   constructor(private readonly ports: BookPipelinePorts) {}
 
   isRunning(mapPath: string): boolean {
     return this.drives.has(mapPath);
+  }
+  /** True while an apply-notes job holds this map. */
+  isApplyingNotes(mapPath: string): boolean {
+    return this.notesJobs.has(mapPath);
+  }
+  /** Cancels the map's apply-notes job: nothing is written after this, a late answer is dropped. */
+  cancelNotes(mapPath: string): void {
+    this.notesJobs.get(mapPath)?.abort();
   }
 
   /** The live drive's numbers, or what the last drive left; undefined when this plugin session never ran the map. */
@@ -1072,14 +1119,9 @@ export class BookPipelineRuns {
   private async markSeams(drive: Drive, nodeId: string, revision: number): Promise<void> {
     const order = drive.store.state.order;
     const at = order.indexOf(nodeId);
-    const zh = /^zh/i.test(drive.config.language);
     for (const other of [order[at - 1], order[at + 1]]) {
       if (!other || !drive.cards.has(other)) continue;
-      await this.writeFields(drive, other, {
-        pipelineSeam: zh
-          ? `鄰卡企劃或正文已變更，尚未人工核對（第 ${at + 1} 張，版本 ${revision}）`
-          : `Neighbouring card's plan or text changed; not yet checked by a person (card ${at + 1}, revision ${revision})`
-      });
+      await this.writeFields(drive, other, { pipelineSeam: seamText(drive.config.language, at, revision) });
     }
     this.syncReviewNotes(drive);
   }
@@ -1106,9 +1148,188 @@ export class BookPipelineRuns {
     await drive.done.catch(() => undefined);
   }
 
+  /**
+   * Applies the reader's notes of one chapter (one model call, one budget unit). A separate slot: it refuses while a drive holds the
+   * map ("drive_running") or another notes job does ("notes_busy"), and a drive entry refuses ("busy") while it runs. It never changes
+   * the book's phase or status (a stopped book stays stopped). Order: reservation check, backup (a failed one writes nothing and spends
+   * nothing), the call, a re-check (same run, card still in order, not cancelled), then one writer transform. A late answer after a
+   * cancel, a dispose or a replaced run is never written.
+   */
+  async applyNotes(mapPath: string, nodeId: string, options: { signal?: AbortSignal } = {}): Promise<NotesApplyResult> {
+    if (this.disposed) throw new BookPipelineRunError("disposed");
+    if (this.drives.has(mapPath)) throw new BookPipelineRunError("drive_running");
+    if (this.notesJobs.has(mapPath)) throw new BookPipelineRunError("notes_busy");
+    const job = new AbortController();
+    this.notesJobs.set(mapPath, job);
+    const onAbort = (): void => job.abort();
+    if (options.signal?.aborted) job.abort();
+    else options.signal?.addEventListener("abort", onAbort, { once: true });
+    const started = Date.now();
+    const runId = { value: "-" };
+    const line = (event: string, result: string, counts?: Record<string, number>): void =>
+      this.ports.log(
+        formatPipelineLog({
+          event,
+          runId: runId.value,
+          card: nodeId,
+          step: "write",
+          attempt: 0,
+          result,
+          ms: Date.now() - started,
+          ...(counts ? { counts } : {})
+        })
+      );
+    try {
+      const result = await this.runNotes(mapPath, nodeId, job, runId);
+      line("notes_applied", "ok", { applied: result.applied, skipped: result.skipped });
+      return result;
+    } catch (error) {
+      line("notes_failed", error instanceof BookPipelineRunError ? error.code : internalCode(error));
+      throw error;
+    } finally {
+      options.signal?.removeEventListener("abort", onAbort);
+      this.notesJobs.delete(mapPath);
+    }
+  }
+
+  private async runNotes(
+    mapPath: string,
+    nodeId: string,
+    job: AbortController,
+    runIdOut: { value: string }
+  ): Promise<NotesApplyResult> {
+    const signal = job.signal;
+    const gone = (): boolean => signal.aborted || this.disposed;
+    const refuseIfGone = (): void => {
+      if (gone()) throw new BookPipelineRunError(this.disposed ? "disposed" : "cancelled");
+    };
+    const notes = this.ports.notes;
+    if (!notes) throw new BookPipelineRunError("unreadable");
+    if (this.ports.blocked(mapPath)) throw new BookPipelineRunError("blocked");
+    const map = await this.ports.readMap(mapPath);
+    const read = readBookPipeline(map);
+    if (read.kind === "absent") throw new BookPipelineRunError("missing");
+    if (read.kind === "unusable") throw new BookPipelineRunError("unusable");
+    const state = read.data;
+    runIdOut.value = state.runId;
+    const node = map.nodes.find(item => item.id === nodeId);
+    if (!node || !state.order.includes(nodeId)) throw new BookPipelineRunError("missing");
+    if (!reserveBudget(state.budget)) throw new BookPipelineRunError("budget");
+    refuseIfGone();
+    const path = node.path;
+    let raw: string;
+    try {
+      raw = await notes.readText(path);
+    } catch {
+      throw new BookPipelineRunError("unreadable");
+    }
+    const items = snapshotNotes(raw);
+    if (!items.length) throw new BookPipelineRunError("nothing");
+    const sent = items.flatMap(item => (item.encoded ? [item.encoded] : [])).slice(0, MAX_NOTE_PARAGRAPHS);
+    if (!sent.length) return { applied: 0, skipped: 0, marked: 0, edits: [] };
+    // The copy comes first: when it fails nothing is spent and nothing is replaced.
+    const saved = await this.ports.backupNote(path, raw).catch(() => ({ ok: false as const }));
+    if (!saved.ok) throw new BookPipelineRunError("backup_failed");
+    refuseIfGone();
+    const rootNode = map.nodes.find(item => !item.parentId);
+    const [card, root] = await Promise.all([
+      this.ports.readCard(path),
+      rootNode ? this.ports.readCard(rootNode.path) : undefined
+    ]);
+    const config = this.ports.config(mapPath);
+    const request: ApplyNotesRequest = {
+      language: config.language,
+      model: config.authorModel,
+      reasoning: config.reasoning,
+      usageMapPath: mapPath,
+      settings: effectiveSettings(root?.settings ?? {}, root ? parseBookPlanDecisions(root.raw) : {}),
+      plan: card.prompt,
+      items: sent
+    };
+    // One call is one unit, saved through the map guard before the provider is asked; nothing else of the saved state changes.
+    const store = new PipelineStore(state, next =>
+      this.ports.mutate(async () => {
+        if (gone()) throw new BookPipelineRunError("cancelled");
+        await this.ports.updateMap(mapPath, doc => {
+          const found = readBookPipeline(doc);
+          if (found.kind !== "usable" || found.data.runId !== state.runId) throw new BookPipelineRunError("stale");
+          doc.bookPipeline = {
+            ...found.data,
+            budget: { used: Math.max(found.data.budget.used, next.budget.used), limit: found.data.budget.limit },
+            revision: found.data.revision + 1
+          };
+        });
+      })
+    );
+    const admission = createBudgetAdmission(createStoreBudgetPort(store));
+    let replies: { id: string; text: string }[];
+    try {
+      const result = await untilAborted(signal, this.ports.runPlan(applyNotesStep, request, { signal, admission }));
+      replies = result.paragraphs;
+    } catch (error) {
+      if (error instanceof BookPipelineRunError) throw error;
+      if (isBudgetExhausted(error)) throw new BookPipelineRunError("budget");
+      refuseIfGone();
+      throw error;
+    } finally {
+      store.dispose();
+    }
+    // Re-check before the commit: same run, the card still in order and on the map, no cancel.
+    refuseIfGone();
+    const fresh = await this.ports.readMap(mapPath);
+    const again = readBookPipeline(fresh);
+    refuseIfGone();
+    if (again.kind !== "usable" || again.data.runId !== state.runId || !again.data.order.includes(nodeId))
+      throw new BookPipelineRunError("stale");
+    if (fresh.nodes.find(item => item.id === nodeId)?.path !== path) throw new BookPipelineRunError("stale");
+    let outcome: ApplyOutcome | undefined;
+    const written = await notes.write(path, text => {
+      // The last gate, inside the write: a cancel that came while the writer waited changes nothing.
+      if (gone()) {
+        outcome = undefined;
+        return text;
+      }
+      outcome = applyReplies(text, items, replies);
+      return outcome.text;
+    });
+    refuseIfGone();
+    if (written === "refused") throw new BookPipelineRunError("stale");
+    const done = written === "written" && outcome ? outcome : undefined;
+    if (!done) return { applied: 0, skipped: 0, marked: 0, edits: [] };
+    if (done.applied.length) await this.markNeighbourSeams(mapPath, again.data, nodeId, config.language, fresh);
+    return { applied: done.applied.length, skipped: done.skipped, marked: done.marked, edits: done.applied };
+  }
+
+  /** The body changed: both neighbours' joins are worth a look, as after a rerun. */
+  private async markNeighbourSeams(
+    mapPath: string,
+    state: BookPipelineData,
+    nodeId: string,
+    language: string,
+    map: MapDocument
+  ): Promise<void> {
+    const at = state.order.indexOf(nodeId);
+    const revision = cardRevision(state, nodeId);
+    for (const other of [state.order[at - 1], state.order[at + 1]]) {
+      const path = other ? map.nodes.find(item => item.id === other)?.path : undefined;
+      if (!path || this.disposed) continue;
+      await this.ports
+        .writePipelineFields(path, { pipelineSeam: seamText(language, at, revision) })
+        .catch(() => undefined);
+    }
+    if (state.phase === "gate2" && this.ports.callouts && !this.disposed) {
+      try {
+        void Promise.resolve(this.ports.callouts.reconcile(mapPath)).catch(() => undefined);
+      } catch {
+        // a port that throws must not undo a written chapter
+      }
+    }
+  }
+
   /** Plugin unload: abort everything; nothing is written afterwards. */
   dispose(): void {
     this.disposed = true;
+    for (const job of this.notesJobs.values()) job.abort();
     for (const drive of this.drives.values()) {
       drive.disposed = true;
       drive.controller.abort();
@@ -1126,7 +1347,8 @@ export class BookPipelineRuns {
    */
   private enter(mapPath: string, setup: (drive: Drive) => Promise<void>, early = false): Promise<void> {
     if (this.disposed) return Promise.reject(new BookPipelineRunError("disposed"));
-    if (this.drives.has(mapPath)) return Promise.reject(new BookPipelineRunError("busy"));
+    if (this.drives.has(mapPath) || this.notesJobs.has(mapPath))
+      return Promise.reject(new BookPipelineRunError("busy"));
     const drive = {
       mapPath,
       controller: new AbortController(),

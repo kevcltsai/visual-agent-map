@@ -179,7 +179,6 @@ import {
   noteLanguageOf,
   t,
   topicStatusLabel,
-  translate,
   translateNote,
   type TranslationKey,
   type ContentLanguage
@@ -195,7 +194,6 @@ import {
   Notice,
   Scope,
   TFile,
-  TFolder,
   WorkspaceLeaf,
   requestUrl,
   setIcon,
@@ -328,10 +326,8 @@ import { dedupeImageEmbeds, imageKeysIn } from "../../core/image-keys";
 import type { DetailTemplate } from "../../ai/detail-templates";
 import { emptyNoteStyleStore, type NoteStyleStore, type RunStyle } from "../../ai/note-style-store";
 import { DEFAULT_OUTLINE_PRESET_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
-import { resolveBlockFolder } from "../../core/blocks/block-files";
-import { CANONICAL_LANGUAGES } from "../../ai/note-style-file";
 import type { UpdateMode } from "../../ai/note-style-recipe";
-import { backupNote } from "../../ai/note-writeback";
+import { backupNoteFile } from "./note-backup";
 import { stopLabelKey, type ResearchStart, type SelectionSynthesisTask, type WritebackHooks } from "./topic-run";
 import { BookPipelineRunError, type AuthorInput, type AuthorOutcome } from "./book-pipeline-run";
 import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
@@ -24394,43 +24390,19 @@ export class VisualAgentMapView extends ItemView {
    */
   private writebackHooks(): WritebackHooks {
     const vault = this.app.vault;
-    const folderAt = (path: string): TFolder | null => {
-      const found = vault.getAbstractFileByPath(path);
-      return found instanceof TFolder ? found : null;
-    };
     return {
       readRaw: async path => {
         const file = vault.getAbstractFileByPath(path);
         if (!(file instanceof TFile)) throw new Error(path);
         return vault.read(file);
       },
-      backupNote: (path, content) => {
-        const language = this.plugin.settings.language;
-        const exists = (candidate: string): boolean => folderAt(candidate) !== null;
-        const backups = resolveBlockFolder(this.noteStyles.folder(), "backup", exists, language);
-        const names = [...new Set(CANONICAL_LANGUAGES.map(code => translate(code, "ui.style_folder_backup_notes")))];
-        const notes =
-          names.find(name => exists(`${backups}/${name}`)) ?? translate(language, "ui.style_folder_backup_notes");
-        return backupNote(
-          {
-            folderExists: async candidate => exists(candidate),
-            list: async folder =>
-              (folderAt(folder)?.children ?? []).filter(child => child instanceof TFile).map(child => child.name),
-            createFolder: async folder => {
-              await vault.createFolder(folder);
-            },
-            create: async (file, text) => {
-              await vault.create(file, text);
-            },
-            read: async file => {
-              const found = vault.getAbstractFileByPath(file);
-              if (!(found instanceof TFile)) throw new Error(file);
-              return vault.read(found);
-            }
-          },
-          { notePath: path, content, folder: `${backups}/${notes}`, now: new Date() }
-        );
-      }
+      backupNote: (path, content) =>
+        backupNoteFile(vault, {
+          styleFolder: this.noteStyles.folder(),
+          language: this.plugin.settings.language,
+          path,
+          content
+        })
     };
   }
   /**

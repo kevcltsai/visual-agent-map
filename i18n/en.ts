@@ -3371,6 +3371,13 @@ export const en = {
   "ui.book_refused_empty":
     "This mind map has only a root topic and no chapter cards, so there is nothing to write. Add chapter cards first.",
   "ui.book_refused_not_stopped": "The picture book is waiting at a check point. Stop it first, then give it up.",
+  "ui.book_refused_notes_busy": "The notes of a chapter are already being applied.",
+  "ui.book_refused_drive_running": "The picture book is running. Apply the notes when it stops or finishes.",
+  "ui.book_refused_cancelled": "Cancelled. The chapter was not changed and your notes are still there.",
+  "ui.book_refused_stale":
+    "The chapter or the run changed meanwhile, so nothing was changed. Your notes are still there.",
+  "ui.book_refused_backup_failed": "The backup could not be saved, so the chapter was not changed.",
+  "ui.book_refused_nothing": "This chapter has no note to apply.",
   "ui.book_abandon": "Give up this book",
   "ui.book_remove": "Remove picture book",
   "ui.book_abandon_title": "Give up this picture book?",
@@ -3484,7 +3491,7 @@ export const en = {
   "ui.book_note_not_chapter": "Open a chapter of a picture book first.",
   "ui.book_note_apply_0": "Apply {0} notes",
   "ui.book_note_apply_menu_0": "Picture book: apply {0} notes",
-  "ui.book_note_apply_not_yet": "Applying notes is not available yet.",
+  "ui.book_note_applied_0_1": "Rewrote {0} paragraph(s); {1} left as they were. Your notes are in place.",
   "ui.command_book_note_add": "Picture book: add a note to the selection",
   "ui.command_book_note_apply": "Picture book: apply the notes of this chapter",
   "ui.book_panel_reason_unmet_plain": "Some items did not pass proofreading",

@@ -1585,3 +1585,173 @@ test('callouts: abandon and a restart clear the notes while bookPipeline still e
   await runs.start(r.mapPath, { restart: true });
   assert.ok(spy.log.some(x => x[0] === 'clear' && x[2] === true), 'a restart clears the old run first');
 });
+
+// ---- T6b: applying the reader's notes (the notes slot of BookPipelineRuns) ------------------------------------------------------------
+const { createNoteWriter } = S.load('experiences/visual-map/book-pipeline-callouts.ts');
+const { SKIP_MARK } = S.load('core/book-pipeline/notes-apply.ts');
+const NW = (text, n, note) => `==${text}==%%備註#${n}：${note}%%`;
+const P1 = `Alpha ${NW('beta', 1, 'shorter')} gamma.`;
+const reply = request => ({ paragraphs: request.items.map(item => ({ id: item.id, text: 'Alpha BETA2 gamma.' })) });
+
+/** A run waiting at gate 1 whose card A (nodes[1]) has one annotated paragraph; the notes ports write through the real writer with no editor open. */
+async function notesRig(over = {}) {
+  const r = await rig(over);
+  await r.runs.start(r.mapPath);
+  await r.repo.updateNoteGuarded(r.nodes[1].path, { detail: `${P1}\n\nA plain paragraph.` }, { authorize: () => true, finalize: c => c });
+  const calls = [];
+  const writer = createNoteWriter({ openViews: () => [], rawGuarded: (p, t, o) => r.repo.updateNoteRawGuarded(p, t, o) });
+  r.ports.notes = { readText: async path => r.contents.get(path), write: writer };
+  const planned = r.ports.runPlan;
+  r.ports.runPlan = async (step, request, run) => {
+    if (step.id !== 'book-pipeline.apply-notes') return planned(step, request, run);
+    calls.push(request);
+    await run.admission.reserve();
+    return (over.notes ?? reply)(request, run);
+  };
+  r.calls = calls;
+  r.cardRaw = () => r.contents.get(r.nodes[1].path);
+  return r;
+}
+const refusal = code => error => error instanceof BookPipelineRunError && error.code === code;
+
+test('apply notes: rewrites the paragraph once, spends one unit, keeps phase and status, marks both neighbour seams, logs no content (no map tab open)', async () => {
+  const r = await notesRig();
+  const before = await r.state();
+  const result = await r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  const after = await r.state();
+  assert.equal(result.applied, 1); assert.equal(result.skipped, 0);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.edits.map(e => [e.before, e.after]))), [[P1, 'Alpha BETA2 gamma.']]);
+  assert.ok(r.cardRaw().includes('Alpha BETA2 gamma.') && !r.cardRaw().includes('%%備註#1'));
+  assert.equal(after.budget.used, before.budget.used + 1);
+  assert.equal(after.phase, before.phase); assert.equal(after.status, before.status);
+  assert.equal(r.calls.length, 1);
+  assert.equal(r.stat.backups.at(-1), r.nodes[1].path);
+  assert.ok((await r.note(0)).pipelineSeam, 'the previous card is marked');
+  assert.ok((await r.note(2)).pipelineSeam, 'the next card is marked');
+  const line = r.stat.logs.find(x => x.includes('notes_applied'));
+  assert.ok(line && /applied=1/.test(line) && !line.includes('Alpha') && !line.includes('Secret'));
+});
+
+test('apply notes: a stopped book stays stopped (phase and status untouched, one unit spent)', async () => {
+  const r = await notesRig();
+  await r.runs.stop(r.mapPath, { saved: true }); await settle();
+  const before = await r.state();
+  assert.equal(before.status, 'stopped');
+  await r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  const after = await r.state();
+  assert.equal(after.status, 'stopped'); assert.equal(after.phase, before.phase);
+  assert.equal(after.budget.used, before.budget.used + 1);
+});
+
+test('apply notes: a drive refuses it, and while it runs every drive entry and a second job are refused', async () => {
+  const gate = defer();
+  const r = await notesRig({ notes: async request => { await gate.promise; return reply(request); } });
+  const job = r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  await settle();
+  assert.equal(r.runs.isApplyingNotes(r.mapPath), true);
+  await assert.rejects(r.runs.confirmGate1(r.mapPath), refusal('busy'));
+  await assert.rejects(r.runs.start(r.mapPath, { restart: true }), refusal('busy'));
+  await assert.rejects(r.runs.resume(r.mapPath), refusal('busy'));
+  await assert.rejects(r.runs.rerunCard(r.mapPath, r.nodes[1].id, 'again'), refusal('busy'));
+  await assert.rejects(r.runs.applyNotes(r.mapPath, r.nodes[1].id), refusal('notes_busy'));
+  gate.resolve();
+  assert.equal((await job).applied, 1);
+  assert.equal(r.runs.isApplyingNotes(r.mapPath), false);
+  // A drive holds the map: refused with its own code, nothing spent.
+  const hold = defer();
+  const q = await notesRig({ script: { author: async () => { await hold.promise; return { outcome: 'cancelled' }; } } });
+  const used = (await q.state()).budget.used;
+  const running = q.runs.confirmGate1(q.mapPath);
+  await settle();
+  assert.equal(q.runs.isRunning(q.mapPath), true);
+  await assert.rejects(q.runs.applyNotes(q.mapPath, q.nodes[1].id), refusal('drive_running'));
+  assert.equal(q.calls.length, 0);
+  hold.resolve(); await running.catch(() => undefined); await q.runs.stop(q.mapPath); await settle();
+  assert.ok((await q.state()).budget.used >= used);
+});
+
+test('apply notes: the last budget unit goes to one of two concurrent jobs, then the next is refused as budget', async () => {
+  const gate = defer();
+  const r = await notesRig({ notes: async request => { await gate.promise; return reply(request); } });
+  await setLimit(r, (await r.state()).budget.used + 1);
+  const first = r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  const second = r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  await assert.rejects(second, refusal('notes_busy'));
+  gate.resolve();
+  assert.equal((await first).applied, 1);
+  const s = await r.state();
+  assert.equal(s.budget.used, s.budget.limit);
+  await r.repo.updateNoteGuarded(r.nodes[1].path, { detail: `${P1}\n\nA plain paragraph.` }, { authorize: () => true, finalize: c => c });
+  await assert.rejects(r.runs.applyNotes(r.mapPath, r.nodes[1].id), refusal('budget'));
+  assert.equal(r.calls.length, 1);
+});
+
+test('apply notes: a failed backup replaces nothing, spends nothing and never asks the model', async () => {
+  const r = await notesRig({ ports: { backupNote: async () => ({ ok: false }) } });
+  const raw = r.cardRaw(); const used = (await r.state()).budget.used;
+  await assert.rejects(r.runs.applyNotes(r.mapPath, r.nodes[1].id), refusal('backup_failed'));
+  assert.equal(r.cardRaw(), raw); assert.equal(r.calls.length, 0);
+  assert.equal((await r.state()).budget.used, used);
+  assert.equal(r.runs.isApplyingNotes(r.mapPath), false, 'the slot is released');
+});
+
+test('apply notes: a replaced run or a card taken out of the order before the commit writes nothing', async () => {
+  for (const change of [
+    d => { d.bookPipeline.runId = 'another-run'; },
+    d => { d.bookPipeline.order = d.bookPipeline.order.filter(id => id !== d.nodes[1].id); },
+    d => { d.nodes = d.nodes.filter(n => n.id !== d.nodes[1].id); }
+  ]) {
+    const gate = defer();
+    let r;
+    r = await notesRig({ notes: async request => { await gate.promise; return reply(request); } });
+    const raw = r.cardRaw();
+    const job = r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+    await settle();
+    await r.repo.updateMap(r.mapPath, change);
+    gate.resolve();
+    await assert.rejects(job, error => error instanceof BookPipelineRunError && (error.code === 'stale' || error.code === 'missing'));
+    assert.equal(r.cardRaw(), raw);
+    assert.ok(!(await r.note(0)).pipelineSeam, 'no seam is marked either');
+  }
+});
+
+test('apply notes: cancel, a late answer after dispose, and the caller signal write nothing', async () => {
+  for (const stop of [
+    (r, controller) => r.runs.cancelNotes(r.mapPath),
+    (r, controller) => r.runs.dispose(),
+    (r, controller) => controller.abort()
+  ]) {
+    const gate = defer();
+    const r = await notesRig({ notes: async request => { await gate.promise; return reply(request); } });
+    const raw = r.cardRaw();
+    const controller = new AbortController();
+    const job = r.runs.applyNotes(r.mapPath, r.nodes[1].id, { signal: controller.signal });
+    await settle();
+    stop(r, controller);
+    gate.resolve();
+    await assert.rejects(job, error => error instanceof BookPipelineRunError && (error.code === 'cancelled' || error.code === 'disposed'));
+    assert.equal(r.cardRaw(), raw);
+    assert.equal(r.runs.isApplyingNotes(r.mapPath), false);
+  }
+});
+
+test('apply notes: a paragraph edited during the call is skipped (marked in its note), no body change means no seam', async () => {
+  const gate = defer();
+  const r = await notesRig({ notes: async request => { await gate.promise; return reply(request); } });
+  const job = r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  await settle();
+  await r.repo.updateNoteGuarded(r.nodes[1].path, { detail: `${P1} edited.\n\nA plain paragraph.` }, { authorize: () => true, finalize: c => c });
+  gate.resolve();
+  const result = await job;
+  assert.equal(result.applied, 0); assert.equal(result.skipped, 1);
+  assert.ok(r.cardRaw().includes(SKIP_MARK) && r.cardRaw().includes('edited.'));
+  assert.ok(!(await r.note(0)).pipelineSeam && !(await r.note(2)).pipelineSeam);
+});
+
+test('apply notes: no note, no run and a missing card are refused without a call', async () => {
+  const r = await notesRig();
+  await r.repo.updateNoteGuarded(r.nodes[2].path, { detail: 'No notes here.' }, { authorize: () => true, finalize: c => c });
+  await assert.rejects(r.runs.applyNotes(r.mapPath, r.nodes[2].id), refusal('nothing'));
+  await assert.rejects(r.runs.applyNotes(r.mapPath, 'no-such-card'), refusal('missing'));
+  assert.equal(r.calls.length, 0);
+});

@@ -17,8 +17,11 @@ import {
   BookPipelineRuns,
   type BookPipelineProgress,
   type PipelineCard,
-  type BookRerunResult
+  type BookRerunResult,
+  type NotesApplyResult
 } from "./experiences/visual-map/book-pipeline-run";
+import { bookRefusalText } from "./experiences/visual-map/book-pipeline-ui";
+import { backupNoteFile } from "./experiences/visual-map/note-backup";
 import {
   BookCallouts,
   createNoteWriter,
@@ -503,11 +506,37 @@ export default class VisualAgentMapPlugin extends Plugin {
   });
   private bookNotesTimer: number | null = null;
   /**
-   * T6 SEAM: applying the notes of a chapter (the AI rewrite) is the next ticket's work. The header action, the editor-menu item and the
-   * command all end here; until T6 replaces the body, it only says so.
+   * The header action, the editor-menu item and the command end here. T6c SEAM: the running state on the header action, cancel
+   * (`bookPipelineRuns.cancelNotes`), the applied decoration, the undo notice and command (from `edits`) and the stale display
+   * belong to the controller that replaces this glue; today it runs the job and shows one notice.
    */
-  private applyBookNotes(_path: string): void {
-    new Notice(t("ui.book_note_apply_not_yet"));
+  private applyBookNotes(path: string): void {
+    void this.runBookNotes(path).then(result => {
+      if (result) new Notice(t("ui.book_note_applied_0_1", String(result.applied), String(result.skipped)));
+    });
+  }
+  /** Finds the chapter's map and card, then runs the runner's notes job; a refusal or failure is shown and answers undefined. */
+  private async runBookNotes(path: string): Promise<NotesApplyResult | undefined> {
+    try {
+      for (const { file, map } of await this.repo.readableMaps()) {
+        const node = map.nodes.find(item => item.path === path);
+        if (node && readBookPipeline(map).kind === "usable")
+          return await this.bookPipelineRuns.applyNotes(file.path, node.id);
+      }
+      throw new BookPipelineRunError("missing");
+    } catch (error) {
+      new Notice(bookRefusalText(error));
+      return undefined;
+    }
+  }
+  /** The note backup service: works with no map tab open (the runner, the notes apply and the map view all use it). */
+  backupBookNote(path: string, content: string): Promise<{ ok: true; path: string } | { ok: false }> {
+    return backupNoteFile(this.app.vault, {
+      styleFolder: this.noteStyles.folder(),
+      language: this.settings.language,
+      path,
+      content
+    });
   }
   /** Every markdown tab as the notes controller sees it. */
   private bookNoteLeaves(): NotesLeaf[] {
@@ -654,9 +683,16 @@ export default class VisualAgentMapPlugin extends Plugin {
       const view = this.views()[0];
       return view ? view.probeBookImage(url, signal) : { ok: false, reason: "no_view" };
     },
-    backupNote: async (path, raw) => {
-      const view = this.views()[0];
-      return view ? view.bookBackupNote(path, raw) : { ok: false };
+    backupNote: (path, raw) => this.backupBookNote(path, raw),
+    notes: {
+      readText: async path => {
+        const open = this.openMarkdownViews(path)[0];
+        if (open) return open.text();
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile)) throw new Error("missing");
+        return this.app.vault.read(file);
+      },
+      write: (path, transform) => this.bookNoteWriter(path, transform)
     },
     blocked: path => this.views().some(view => view.mapPath === path && view.bookPipelineBlocked()),
     config: () => ({

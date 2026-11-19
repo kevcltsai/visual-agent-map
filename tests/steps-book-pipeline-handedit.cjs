@@ -294,3 +294,44 @@ test('H persistence: a queued box stays when the run is between checkpoints (no 
   await callouts.reconcile(MAP);
   assert.equal(kinds()?.queued, true, 'kept while the book writes');
 });
+
+test('review-b S5: a "busy" refusal leaves the rewrite queued (not failed); two settled events at once run each queued chapter once', async () => {
+  const r = rig({ running: true, rerun: () => { const e = new Error('book pipeline refused: busy'); e.code = 'busy'; throw e; } });
+  r.tickRewrite();
+  await r.ctl.tick(MAP, 'n1');
+  r.state.running = false;
+  await r.ctl.drain(MAP);
+  assert.equal(r.state.reruns.length, 1, 'tried');
+  assert.equal(b.isRewriteAsked(r.box()), true, 'still asked');
+  assert.equal(r.box().queued, true, 'still queued');
+  assert.doesNotMatch(r.state.raw, /沒有重寫/);
+  // two chapters, two settled events at once: one drain at a time, each chapter runs once, none is refused
+  const texts = {};
+  const make = id => {
+    const edited = b.stampDetail(BODY).replace('第二段', '第三段');
+    let raw = b.putProgramCallout(note(edited), b.reviewCallout({ ...CARD, id }, ['x'], undefined, 'fp1', 'r1', { op: `op-${id}`, ifp: b.integrityFp(edited) }));
+    raw = b.patchHandBox(tickAt(raw, 1), { queued: true });
+    texts[id] = raw;
+  };
+  make('a'); make('b');
+  const map = { id: 'm', nodes: [{ id: 'a', path: 'A' }, { id: 'b', path: 'B' }], bookPipeline: { ...b.newBookPipeline({ runId: 'r1', order: ['a', 'b'], now: 'a' }), phase: 'gate2' } };
+  let active = 0; let busy = 0; const ran = [];
+  const ctl = new b.BookHandEdits({
+    readMap: async () => map,
+    readCard: async p => { const raw = texts[p === 'A' ? 'a' : 'b']; return { path: p, title: 'T', raw, detail: raw.split(START + '\n')[1].split('\n' + END)[0] }; },
+    write: async (p, tr) => { const id = p === 'A' ? 'a' : 'b'; const next = tr(texts[id]); if (next === texts[id]) return 'unchanged'; texts[id] = next; return 'written'; },
+    rerunCard: async (_m, id) => {
+      if (active) { busy++; const e = new Error('busy'); e.code = 'busy'; throw e; }
+      active++; ran.push(id); await new Promise(res => setTimeout(res, 5));
+      texts[id] = texts[id].replace(/(<!-- visual-agent-map:detail:start -->\n)[\s\S]*?(\n<!-- visual-agent-map:detail:end -->)/, (_x, a, c) => `${a}${b.stampDetail(BODY)}${c}`);
+      active--; return { unchanged: false };
+    },
+    isRunning: () => false,
+    newId: () => 'new',
+    log: () => undefined
+  });
+  await Promise.all([ctl.drain(MAP), ctl.drain(MAP)]);
+  assert.equal(busy, 0, 'never two rewrites at once');
+  assert.deepEqual(ran.sort(), ['a', 'b'], 'each queued chapter ran once');
+  for (const id of ['a', 'b']) assert.doesNotMatch(texts[id], /沒有重寫/);
+});

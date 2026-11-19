@@ -35,6 +35,8 @@ export class BookHandEdits {
   private readonly inflight = new Set<string>();
   private readonly done = new Set<string>();
   private disposed = false;
+  /** Maps being drained: one drain per map at a time. The value is whether another settle came meanwhile (the drain looks once more). */
+  private readonly draining = new Map<string, boolean>();
 
   constructor(private readonly ports: HandEditPorts) {}
 
@@ -86,6 +88,21 @@ export class BookHandEdits {
   /** The book is at the checkpoint with nothing running: every queued rewrite of the map runs now, one after another. */
   async drain(mapPath: string): Promise<void> {
     if (this.disposed) return;
+    if (this.draining.has(mapPath)) {
+      this.draining.set(mapPath, true);
+      return;
+    }
+    try {
+      do {
+        this.draining.set(mapPath, false);
+        await this.drainOnce(mapPath);
+      } while (this.draining.get(mapPath) && !this.disposed);
+    } finally {
+      this.draining.delete(mapPath);
+    }
+  }
+
+  private async drainOnce(mapPath: string): Promise<void> {
     try {
       const map = await this.ports.readMap(mapPath);
       const read = readBookPipeline(map);
@@ -131,6 +148,11 @@ export class BookHandEdits {
         status: t("ui.book_review_hand_failed_0", t("ui.book_plain_write_hand_edited"))
       });
     } catch (error) {
+      // Another drive holds the map right now: the command stays queued in its box and runs at the next settle (decision H).
+      if ((error as { code?: unknown } | null)?.code === "busy") {
+        await this.patch(path, { queued: true, status: t("ui.book_review_hand_queued") });
+        return;
+      }
       await this.patch(path, {
         clearRewrite: true,
         queued: false,

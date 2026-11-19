@@ -2016,21 +2016,37 @@ test('T9 detection through the notes: a reader\'s note on the chapter is not a h
 });
 
 // ---- T10a: chapter prose under the first sources heading (new author result only); one verdict reducer for every proof ----
-test('T10a write: an author result with the prose under the first sources heading and the real list after it is repaired in the same write (prose first, fingerprint stamped); the card is not no_body', async () => {
-  // What an author writes: the evidence Detail without the program's own work-record callout (a copy of it would be neutralized anyway).
-  const fixtureDetail = require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures', 'book-sources-lead-r5.md'), 'utf8').split('> [!vam-book]')[0].trimEnd() + '\n';
+test('T10a write (decision #24): the two evidence shapes are NOT lifted; the card keeps its text, says no_body and ends needs-review without a fingerprint stamp', async () => {
+  for (const name of ['book-sources-lead-r5.md', 'book-sources-lead-r3.md']) {
+    const fixtureDetail = require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures', name), 'utf8').split('> [!vam-book]')[0].trimEnd() + '\n';
+    const r = await rig({ script: { author: async input => {
+      await input.admission.reserve();
+      await r.repo.updateNoteGuarded(input.path, { detail: fixtureDetail }, { authorize: input.authorize, finalize: input.finalize });
+      return { outcome: 'written' };
+    } } });
+    await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+    const note = await r.note(1);
+    assert.equal(note.pipelineIssue, 'write failed: no_body', name);
+    assert.equal(stageOf(r.raw(1)), 'needs-review', name);
+    assert.ok(!note.detail.includes('wayfair.com'), `${name}: the refused text was not written`);
+  }
+});
+
+test('T10a write (decision #24): a double heading with long sources commentary is not lifted and gets no fingerprint stamp', async () => {
+  const commentary = '這些來源的可靠度評析：第一個來源由專業機構發布，方法透明，數據可以重現，因此可信度高。'.repeat(3) + '\n\n' + '第二個來源是個人整理，缺乏原始出處，只能當作參考，引用時需要另外查證，可信度中等。'.repeat(3);
+  assert.ok(commentary.length > 200);
+  const detail = `### 來源\n\n${commentary}\n\n### 參考資料\n\n- [A](https://a.example/x)\n- [B](https://b.example/y)\n`;
   const r = await rig({ script: { author: async input => {
     await input.admission.reserve();
-    await r.repo.updateNoteGuarded(input.path, { detail: fixtureDetail }, { authorize: input.authorize, finalize: input.finalize });
+    await r.repo.updateNoteGuarded(input.path, { detail }, { authorize: input.authorize, finalize: input.finalize });
     return { outcome: 'written' };
   } } });
   await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
   const note = await r.note(1);
-  assert.ok(note.detail.trimStart().startsWith('在第五章我們看到'));
-  assert.ok(chapterBody(note.detail).length > 200);
-  assert.ok(note.detail.includes('### 來源：') && note.detail.includes('wayfair.com'));
-  assert.notEqual(note.pipelineIssue, 'write failed: no_body');
-  assert.equal(S.load('core/book-pipeline/body-integrity.ts').bodyState(note.detail), 'clean', 'the fingerprint was committed with the repaired text');
+  assert.equal(note.pipelineIssue, 'write failed: no_body');
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.ok(!note.detail.includes('可靠度評析'), 'the commentary was not committed as the chapter');
+  assert.ok(!r.raw(1).includes('book-body:v1'), 'no fingerprint stamp');
 });
 
 test('T10a write: an ambiguous result (list only, or commentary with a list under one heading) stays no_body; the text is not rewritten', async () => {
@@ -2074,4 +2090,127 @@ test('T10a proof: a mixed fact and structure failure puts both in the one auto-f
   const p = await rig({ script: { card: () => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: three }), proof: async request => unjudged(request, { C1: 'unmet' }) } });
   await p.runs.start(p.mapPath); await confirmDone(p.runs, p.mapPath);
   assert.equal(stageOf(p.raw(1)), 'checked');
+});
+
+// ---- T10c: the length rule (Bug3) and the card-plan request (Bug4) ----
+const LEN_SETTING = '每章 100–200 字';
+const lenRig = async (over = {}, setting = LEN_SETTING) => {
+  const r = await rig(over);
+  if (setting !== null) await r.repo.writeBookSettings(r.nodes[0].path, { length: setting });
+  return r;
+};
+const longBody = (title, n) => `${bodyOf(title)} ${'好'.repeat(n)}`;
+/** An author that writes `first` characters, then `later` once it was given an instruction (the one automatic redo). */
+const lengthAuthor = (r, seen, first, later) => async input => {
+  seen.push([input.nodeId, input.instruction]);
+  await input.admission.reserve();
+  const note = await r.repo.readNote(input.path);
+  const n = input.instruction !== undefined ? later : first;
+  const out = await r.repo.updateNoteGuarded(input.path, { detail: longBody(note.title, n) }, { authorize: input.authorize, finalize: input.finalize });
+  return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+};
+
+test('T10c length: a chapter over the range gets the one auto-fix whose author instruction says to shorten; when the redo fits it ends checked with no length issue', async () => {
+  const seen = [];
+  const r = await lenRig();
+  // chapter 1 first too long, then right; the others are right
+  r.script.author = async input => lengthAuthor(r, seen, input.nodeId === r.nodes[1].id ? 400 : 150, 150)(input);
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const redo = seen.filter(([id, instruction]) => id === r.nodes[1].id && instruction !== undefined);
+  assert.equal(redo.length, 1);
+  assert.match(redo[0][1], /shorten/); assert.match(redo[0][1], /100 to 200/);
+  assert.equal((await r.state()).autoFixes[r.nodes[1].id], 1);
+  assert.equal(stageOf(r.raw(1)), 'checked');
+  assert.equal((await r.note(1)).pipelineIssue ?? '', '');
+});
+
+test('T10c length: with the one auto-fix spent and the chapter still outside the range the card stays needs-review with the `length unmet:` token (not checked)', async () => {
+  const seen = [];
+  const r = await lenRig();
+  r.script.author = lengthAuthor(r, seen, 500, 500);
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.match((await r.note(1)).pipelineIssue, /^length unmet: length:over:\d+:100-200:字:v\d+$/);
+  assert.equal((await r.state()).autoFixes[r.nodes[1].id], 1, 'only one automatic redo');
+  assert.equal(seen.filter(([id, instruction]) => id === r.nodes[1].id && instruction !== undefined).length, 1);
+});
+
+test('T10c length: a lengthened chapter that is too short says "lengthen"; a failed fact and the length together keep both in the issue and in the one instruction', async () => {
+  const under = [];
+  const a = await lenRig();
+  a.script.author = lengthAuthor(a, under, 10, 10);
+  await a.runs.start(a.mapPath); await confirmDone(a.runs, a.mapPath);
+  assert.match(under.find(([id, instruction]) => id === a.nodes[1].id && instruction !== undefined)[1], /lengthen/);
+  assert.match((await a.note(1)).pipelineIssue, /length:under:\d+:100-200/);
+  const seen = [];
+  const r = await lenRig({ script: { ...factCard, proof: async request => verdictOf(request, 'unmet', 'WRONGDATE') } });
+  r.script.author = lengthAuthor(r, seen, 500, 500);
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const redo = seen.filter(([id, instruction]) => id === r.nodes[1].id && instruction !== undefined);
+  assert.equal(redo.length, 1);
+  assert.match(redo[0][1], /fact check/); assert.match(redo[0][1], /shorten/);
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.match((await r.note(1)).pipelineIssue, /^proof unmet: C2 length:over:\d+:100-200:字:v\d+$/, 'length does not lower the fact failure, and sits beside it');
+});
+
+test('T10c length: a single-card rerun (job) has no automatic redo; an over-length chapter stays needs-review with the length issue', async () => {
+  const r = await lenRig();
+  await finish(r);
+  assert.equal(stageOf(r.raw(1)), 'needs-review', 'the first run wrote a 25 character chapter, below the range');
+  const seen = [];
+  r.script.author = lengthAuthor(r, seen, 500, 500);
+  const fixes = (await r.state()).autoFixes[r.nodes[1].id];
+  await rerun(r, 1);
+  assert.equal(seen.filter(([id]) => id === r.nodes[1].id).length, 1, 'one write, no redo');
+  assert.ok(seen.every(([, instruction]) => instruction === undefined || typeof instruction === 'string'));
+  assert.equal((await r.state()).autoFixes[r.nodes[1].id], fixes, 'the job did not spend an automatic redo');
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.match((await r.note(1)).pipelineIssue, /length:over:/);
+});
+
+test('T10c length: an ambiguous (two ranges), inverted or zero-valued setting is not checked and the log says length_rule_ignored; no unit-less rule becomes a hard rule', async () => {
+  for (const setting of ['每章 100–200 字，或 300–400 words', '每章 300–100 字', '0–50 字']) {
+    const seen = [];
+    const r = await lenRig({}, setting);
+    r.script.author = lengthAuthor(r, seen, 900, 900);
+    await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+    assert.equal(stageOf(r.raw(1)), 'checked', setting);
+    assert.ok(!/length:/.test((await r.note(1)).pipelineIssue ?? ''), setting);
+    assert.ok(r.stat.logs.some(line => line.includes('length_rule_ignored')), `${setting}: logged`);
+    assert.ok(seen.every(([, instruction]) => instruction === undefined), 'no redo');
+  }
+});
+
+test('T10c plan request: the chapter list is the whole book on the map and the root carries its direct child cards; a card with no children has none', async () => {
+  const requests = [];
+  const r = await rig({ script: { card: request => { requests.push(request); return { covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }] }; } } });
+  await r.runs.start(r.mapPath);
+  const root = requests.find(x => x.card.id === r.nodes[0].id);
+  assert.deepEqual([...root.chapters.map(c => c.title)], TITLES);
+  assert.deepEqual([...root.chapters.map(c => c.position)], [1, 2, 3]);
+  assert.deepEqual([...root.children.map(c => c.title)], [TITLES[1], TITLES[2]]);
+  assert.match(root.children[0].summary, /summary of/);
+  const leaf = requests.find(x => x.card.id === r.nodes[1].id);
+  assert.equal(leaf.children, undefined);
+  assert.equal(leaf.chapters.length, 3);
+});
+
+test('T10c plan request: a chapter list too long for the step is refused before any call, logged plan_refused chapters_too_long, and the card needs a person', async () => {
+  const titles = ['R'.repeat(60000), 'A'.repeat(60000), 'B'.repeat(60000)];
+  const r = await rig({ titles });
+  await r.runs.start(r.mapPath);
+  assert.ok(r.stat.logs.some(line => line.includes('plan_refused') && line.includes('chapters_too_long')), 'logged');
+  assert.ok(!r.stat.plan.some(id => id !== 'global'), 'no card plan call was made');
+  assert.ok(r.stat.logs.every(line => !line.includes('R'.repeat(50))), 'no title in the log');
+  assert.equal(stageOf(r.raw(0)), 'needs-review');
+});
+
+test('T10c length: a pure length failure keeps the notice tokens of the card (a partly unmet structure point) and adds the length token; no token is dropped', async () => {
+  const three = [{ id: 'C1', type: 'structure', text: 'a' }, { id: 'C2', type: 'structure', text: 'b' }, { id: 'C3', type: 'fact', text: 'd' }];
+  const r = await lenRig({ script: { card: () => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: three }), proof: async request => unjudged(request, { C1: 'unmet' }) } });
+  r.script.author = lengthAuthor(r, [], 500, 500);
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  const issue = (await r.note(1)).pipelineIssue;
+  assert.match(issue, /^length unmet: length:over:\d+:100-200:字:v\d+ C1$/, 'the length token and the structure token both stay');
 });

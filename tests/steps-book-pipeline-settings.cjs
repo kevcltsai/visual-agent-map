@@ -149,3 +149,10 @@ test('bookAuthorRequirements: a hard length rule line appears only when the leng
   assert.doesNotMatch(L.bookAuthorRequirements({ length: '300–500 字，200–300 words' }), /Length rule/);
   assert.doesNotMatch(L.bookAuthorRequirements({ tone: 'warm' }), /Length rule/);
 });
+
+test('T10c splitLengthIssue: notice tokens beside a pure length issue are part of the issue but leave no text of their own', () => {
+  const s = L.splitLengthIssue('length unmet: length:over:241:100-200:字:v1 image_1 C1');
+  assert.equal(s.rest, '');
+  assert.equal(s.length.measured, 241);
+  assert.equal(L.splitLengthIssue('proof unmet: C2 length:over:241:100-200:字:v1').rest, 'proof unmet: C2');
+});

@@ -182,14 +182,14 @@ export function lengthReason(
 export const lengthToken = (r: LengthReason): string =>
   `length:${r.kind}:${r.measured}:${r.min}-${r.max}:${r.unit}:v${r.version}`;
 const TOKEN = /(?:^|\s)length:(over|under):(\d+):(\d+)-(\d+):(字|words):v(\d+)(?=\s|$)/u;
-/** An issue field split into its length reason (when it carries one) and the rest (`length unmet:` alone leaves nothing). */
+/** An issue field split into its length reason (when it carries one) and the rest (`length unmet:` with only notice tokens left leaves nothing). */
 export function splitLengthIssue(issue: string): { rest: string; length?: LengthReason } {
   const m = TOKEN.exec(issue);
   if (!m) return { rest: issue };
   const rest = issue
     .replace(TOKEN, "")
     .trim()
-    .replace(/^length unmet:?$/, "");
+    .replace(/^length unmet:(?:\s+\S+)*$|^length unmet$/, "");
   return {
     rest,
     length: {

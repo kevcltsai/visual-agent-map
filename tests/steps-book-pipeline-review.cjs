@@ -276,3 +276,25 @@ test('proof body: the note wrapper goes, the annotated text stays; text without 
   assert.notEqual(key(noted), key(original), 'the unprojected body would have moved the key');
   assert.equal(b.projectProofBody(noted), original, 're-exported from the review module');
 });
+
+// ---- T10c: the length reason in the review text and the fingerprint ----
+test('T10c length: failureText shows the length sentence (measured, range, unit), alone or after the proof reason, never the token', () => {
+  const lone = b.reasonOf('length unmet: length:over:241:100-200:字:v1', undefined);
+  assert.match(lone, /241/); assert.match(lone, /100/); assert.match(lone, /200/);
+  assert.ok(!lone.includes('length:') && !lone.includes('unmet'));
+  assert.equal(b.reasonOf('length unmet: length:over:241:100-200:字:v1 image_1', undefined), lone, 'notice tokens add no text');
+  const mixed = b.reasonOf('proof unmet: C2 length:under:79:100-200:字:v1', { items: [{ id: 'C2', status: 'unmet', note: '日期不對' }] });
+  assert.match(mixed, /日期不對/); assert.match(mixed, /79/);
+});
+
+test('T10c length: a different range, measured count, unit or rule version changes the fingerprint, so a ticked box no longer stands', () => {
+  const fp = issue => b.attentionFingerprint({ stage: 'needs-review', issue, proofKey: 'k', seam: '' });
+  const base = fp('length unmet: length:over:241:100-200:字:v1');
+  for (const other of ['length:over:260:100-200:字:v1', 'length:over:241:100-300:字:v1', 'length:over:241:100-200:words:v1', 'length:over:241:100-200:字:v2', 'length:under:241:100-200:字:v1'])
+    assert.notEqual(fp(`length unmet: ${other}`), base, other);
+  assert.equal(fp('length unmet: length:over:241:100-200:字:v1'), base, 'stable');
+  const ticked = b.readReviewState(b.putProgramCallout(note('Body'), tick(b.reviewCallout(card({ stage: 'needs-review' }), ['x'], link, base, 'run-1'), 0)));
+  assert.equal(b.isReviewResolved(ticked, base), true);
+  assert.equal(b.isReviewResolved(ticked, fp('length unmet: length:over:260:100-200:字:v1')), false, 'the measured number moved: the tick is void');
+  assert.equal(b.isReviewResolved(ticked, fp('length unmet: length:over:241:100-300:字:v1')), false, 'the asked range changed: the tick is void');
+});

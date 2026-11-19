@@ -696,3 +696,96 @@ test('T10a verdict reducer: all structure points unmet or an empty chapter is ne
   const all = proof.evaluateProof([item('C1', 'unmet'), item('C2', 'met', ['https://example.org/a'])], checklist, ['https://example.org/a']);
   assert.equal(all.aggregate, 'needs-review', 'a new proof goes through the same reducer');
 });
+
+// ---- T10c: child cards in the card plan, chapter titles in the global plan (Bug4) ----
+const { estimateTokens } = load('ai/context-builder.ts');
+const planBase = (over = {}) => ({ ...base, thread: 'thread', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Two' }], card: { id: 'n2', position: 2, total: 2, role: 'body', title: 'Two', summary: 's' }, ...over });
+const kids = (n, make = i => ({ title: `Kid ${i + 1}`, summary: `Kid summary ${i + 1}` })) => Array.from({ length: n }, (_, i) => make(i));
+const childBlock = prompt => { const at = prompt.indexOf('Child cards of this chapter (JSON array):\n'); return at < 0 ? null : JSON.parse(prompt.slice(at + 'Child cards of this chapter (JSON array):\n'.length).split('\n\n')[0]); };
+
+test('T10c card plan: 9 child cards give 9 entries in order and say all are listed; no child cards give no child block', () => {
+  const fitted = cardPlan.fitCardPlan(planBase({ children: kids(9) }));
+  assert.equal(fitted.shown, 9); assert.equal(fitted.total, 9);
+  const block = childBlock(fitted.prompt);
+  assert.deepEqual(block.map(c => c.title), kids(9).map(c => c.title));
+  assert.match(fitted.prompt, /All of this chapter's child cards are listed/);
+  for (const request of [planBase(), planBase({ children: [] })]) {
+    const prompt = cardPlan.cardPlanStep.render(request);
+    assert.ok(!prompt.includes('Child cards of this chapter') && !prompt.includes('not listed here'));
+    assert.equal(cardPlan.fitCardPlan(request).shown, 0);
+  }
+});
+
+test('T10c card plan: 40 and 41 child cards; many long cards are trimmed to the token cap with the "more child cards are not listed" note', () => {
+  const small = { title: 'K', summary: 'k' };
+  assert.equal(cardPlan.fitCardPlan(planBase({ children: kids(40, () => small) })).shown, 40);
+  assert.equal(cardPlan.fitCardPlan(planBase({ children: kids(41, () => small) })).shown, 41, 'a short list is not cut by count');
+  const long = i => ({ title: `T${i}`.padEnd(80, '題'), summary: '摘'.repeat(200) });
+  const fitted = cardPlan.fitCardPlan(planBase({ children: kids(120, long) }));
+  assert.ok(fitted.shown > 0 && fitted.shown < 120, `shown ${fitted.shown}`);
+  assert.equal(fitted.total, 120);
+  assert.match(fitted.prompt, new RegExp(`${120 - fitted.shown} more child cards are not listed here`));
+  assert.equal(childBlock(fitted.prompt).length, fitted.shown);
+  assert.deepEqual(childBlock(fitted.prompt).map(c => c.title), kids(fitted.shown, long).map(c => c.title).map(t => t.slice(0, 80)), 'the first ones, in order');
+  const childTokens = estimateTokens(fitted.prompt) - estimateTokens(cardPlan.cardPlanStep.render(planBase()));
+  assert.ok(childTokens <= cardPlan.CHILD_CARDS_TOKENS + 200, `child block ${childTokens} tokens`);
+});
+
+test('T10c card plan: long child titles are cut at 80 and summaries at 200 characters (Chinese counted by character)', () => {
+  const fitted = cardPlan.fitCardPlan(planBase({ children: [{ title: '題'.repeat(300), summary: '摘'.repeat(500) }] }));
+  const [entry] = childBlock(fitted.prompt);
+  assert.equal(Array.from(entry.title).length, cardPlan.CHILD_TITLE_MAX); assert.equal(cardPlan.CHILD_TITLE_MAX, 80);
+  assert.equal(Array.from(entry.summary).length, cardPlan.CHILD_SUMMARY_MAX); assert.equal(cardPlan.CHILD_SUMMARY_MAX, 200);
+});
+
+test('T10c card plan: near the 32,000-token budget the child cards go first; a chapter list that does not fit refuses the step and is never cut', () => {
+  const chaptersOf = (n, len) => Array.from({ length: n }, (_, i) => ({ position: i + 1, title: `${i}`.padEnd(len, '章') }));
+  const roomy = planBase({ chapters: chaptersOf(100, 20), children: kids(60, i => ({ title: `T${i}`.padEnd(80, '題'), summary: '摘'.repeat(200) })) });
+  const alone = cardPlan.fitCardPlan({ ...roomy, children: [] });
+  const withKids = cardPlan.fitCardPlan(roomy);
+  assert.ok(alone && withKids);
+  // a chapter list that leaves only a little room: the children are trimmed to it and the whole request stays inside the budget
+  let n = 100; let tight;
+  while (n < 5000) { const request = planBase({ chapters: chaptersOf(n, 40), children: roomy.children }); const f = cardPlan.fitCardPlan(request); if (f && f.shown < 60) { tight = { request, f }; break; } n += 25; }
+  assert.ok(tight, 'a list size exists where children are trimmed but the step still fits');
+  assert.ok(estimateTokens(tight.f.prompt + JSON.stringify(cardPlan.CARD_PLAN_SCHEMA)) <= 32000);
+  assert.equal(JSON.parse(tight.f.prompt.match(/\[\{"position":1,"title".*?\}\]/s)[0].replace(/\n.*/s, '')).length, n, 'every chapter is still listed');
+  // too many chapters: refused, not shortened
+  const huge = planBase({ chapters: chaptersOf(3000, 200), children: kids(3) });
+  assert.equal(cardPlan.cardPlanFits(huge), false);
+  assert.equal(cardPlan.fitCardPlan(huge), undefined);
+  assert.throws(() => cardPlan.cardPlanStep.policy(cardPlan.cardPlanStep.render(huge), huge), /chapter list is too long/);
+  assert.ok(cardPlan.cardPlanStep.render(huge).includes(`"position":3000`), 'render never drops a chapter');
+});
+
+test('T10c card plan: a legal chapter past the cut point is still in the chapter list', () => {
+  const chapters = Array.from({ length: 400 }, (_, i) => ({ position: i + 1, title: `Chapter ${i + 1}` }));
+  const request = planBase({ chapters, card: { id: 'n9', position: 400, total: 400, role: 'body', title: 'Last', summary: 's' }, children: kids(120, i => ({ title: `T${i}`.padEnd(80, '題'), summary: '摘'.repeat(200) })) });
+  const fitted = cardPlan.fitCardPlan(request);
+  assert.ok(fitted.shown < 120, 'the children were cut');
+  assert.ok(fitted.prompt.includes('"position":400,"title":"Chapter 400"'));
+  assert.ok(fitted.prompt.includes('"position":1,"title":"Chapter 1"'));
+  const parsed = cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: [{ type: 'structure', text: 'Shape' }] }), request);
+  assert.ok(parsed);
+});
+
+test('T10c global plan: child titles ride per card with moreChildren, only with children is the rule line added, and the 3,000-token cap cuts in reading order', () => {
+  const plainPrompt = globalPlan.globalPlanStep.render(globalRequest());
+  assert.ok(!plainPrompt.includes('moreChildren') && !plainPrompt.includes('"children"'), 'no children: unchanged prompt');
+  const withKids = globalRequest({ cards: cards.map((c, i) => (i === 1 ? { ...c, children: ['Kid A', 'Kid B'] } : c)) });
+  const prompt = globalPlan.globalPlanStep.render(withKids);
+  assert.match(prompt, /"children":\["Kid A","Kid B"\]/);
+  assert.ok(!/"moreChildren":/.test(prompt), 'all titles listed: no count of unlisted ones');
+  assert.match(prompt, /"moreChildren" counts titles that are not listed/);
+  const many = globalRequest({ cards: cards.map((c, i) => (i < 2 ? { ...c, children: Array.from({ length: 400 }, (_, k) => `${i}-${k}`.padEnd(80, '題')) } : c)) });
+  const big = globalPlan.globalPlanStep.render(many);
+  const entries = JSON.parse(big.match(/\[\{"id":"n1".*\}\]/s)[0].split('\n')[0]);
+  assert.ok(estimateTokens(big) - estimateTokens(plainPrompt) <= globalPlan.GLOBAL_CHILD_TOKENS + 500);
+  assert.ok(entries[0].children.length > 0 && entries[0].moreChildren > 0, 'the first card is cut, the count of the rest is kept');
+  assert.equal(entries[0].children.length + entries[0].moreChildren, 400);
+  assert.equal(entries[1].children, undefined, 'once the cap is hit later cards list none');
+  assert.equal(entries[1].moreChildren, 400);
+  assert.equal(entries[0].children[0], '0-0'.padEnd(80, '題'));
+  const longTitle = globalPlan.globalPlanStep.render(globalRequest({ cards: [{ ...cards[0], children: ['題'.repeat(300)] }] }));
+  assert.ok(longTitle.includes(`"${'題'.repeat(80)}"`) && !longTitle.includes('題'.repeat(81)));
+});

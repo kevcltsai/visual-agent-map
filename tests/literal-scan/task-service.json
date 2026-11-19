@@ -4,5 +4,21 @@
     "core/ai-task-service.ts",
     "ai/visual-guidance.ts"
   ],
-  "allow": []
+  "allow": [
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "more child cards are not listed here",
+      "reason": "model-facing note composed by the program: a constant sentence plus a count, part of the child-card block of the card plan; no owner or model text becomes part of the sentence"
+    },
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "All of this chapter's child cards are listed.",
+      "reason": "model-facing constant sentence of the child-card block of the card plan; no owner or model text becomes part of it"
+    },
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "The chapter list is too long for one request",
+      "reason": "internal refusal message of the step policy (logged by code, never sent to a model or shown as owner text)"
+    }
+  ]
 }

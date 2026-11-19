@@ -84,7 +84,6 @@ import {
   replaceProofSection,
   replaceResearchRecord,
   chapterBody,
-  liftChapterFromSources,
   detailBlockOf
 } from "../../core/book-pipeline/note-sections";
 import {
@@ -2177,21 +2176,14 @@ export class BookPipelineRuns {
         return null;
       }
       // An author result whose Detail holds no chapter text (only sources and notes) is refused: the card keeps its text.
-      let text = cleaned;
       const detail = detailBlockOf(cleaned);
       if (detail !== undefined && !chapterBody(detail).trim()) {
-        // The one clearly recognisable wrong shape (chapter prose written under the first sources heading, the real list after it)
-        // is repaired here, in this new result only; anything else stays "no chapter text".
-        const lifted = liftChapterFromSources(detail);
-        if (lifted === null || !chapterBody(lifted).trim()) {
-          emptyBody = true;
-          return null;
-        }
-        const at = cleaned.indexOf(detail);
-        text = `${cleaned.slice(0, at)}${lifted}${cleaned.slice(at + detail.length)}`;
+        // Chapter text written inside a sources section is not moved back (shape cannot prove ownership): no_body, needs-review.
+        emptyBody = true;
+        return null;
       }
       // The text and its new fingerprint are one write: from here on the chapter counts as "as the program left it".
-      return stampRaw(restore(text));
+      return stampRaw(restore(cleaned));
     };
     // Nothing of this card's frontmatter is written while the author runs: the research write compares the whole file.
     const done = await untilAborted(
@@ -2624,7 +2616,7 @@ export class BookPipelineRuns {
           verdict.aggregate === "needs-review"
             ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}`
             : lengthIssue
-              ? `length unmet: ${lengthIssue}`
+              ? `length unmet: ${[lengthIssue, ...noticed].join(" ")}`
               : noticed.length
                 ? `structure unmet: ${noticed.join(" ")}`
                 : null

@@ -12853,7 +12853,7 @@ var TOKEN = /(?:^|\s)length:(over|under):(\d+):(\d+)-(\d+):(字|words):v(\d+)(?=
 function splitLengthIssue(issue2) {
   const m = TOKEN.exec(issue2);
   if (!m) return { rest: issue2 };
-  const rest = issue2.replace(TOKEN, "").trim().replace(/^length unmet:?$/, "");
+  const rest = issue2.replace(TOKEN, "").trim().replace(/^length unmet:(?:\s+\S+)*$|^length unmet$/, "");
   return {
     rest,
     length: {
@@ -43761,50 +43761,6 @@ function chapterBody(detail) {
   }
   return lines.join("\n").replace(/\s+$/, "");
 }
-var LIST_ITEM = /^[ \t]{0,3}(?:[-*+]|\d+[.)])[ \t]+\S/;
-var LIFT_MIN_CHARS = 200;
-var LIFT_MIN_PARAGRAPHS = 2;
-function liftChapterFromSources(detail) {
-  var _a2, _b2;
-  const lines = detail.split("\n");
-  const fenced = fencedLines2(lines);
-  if (fenced.some(Boolean)) return null;
-  const first = lines.findIndex((line2) => line2.trim());
-  if (first < 0) return null;
-  const head2 = HEADING4.exec(bare(lines[first]));
-  if (!head2 || !isSourcesHeading(head2[2])) return null;
-  const section3 = findSection(
-    lines,
-    fenced,
-    (text11, level) => isSourcesHeading(text11) && level === head2[1].length,
-    first
-  );
-  if (!section3 || section3.at !== first || section3.end >= lines.length) return null;
-  const next = HEADING4.exec(bare(lines[section3.end]));
-  if (!next || next[1].length !== head2[1].length || !isSourcesHeading(next[2])) return null;
-  const hidden = hiddenRanges(lines, fenced);
-  if (hidden.some((range) => range.start < section3.end)) return null;
-  const prose = lines.slice(section3.at + 1, section3.end).map(bare);
-  if (prose.some((line2) => LIST_ITEM.test(line2) || QUOTE_LINE2.test(line2) || HEADING4.test(line2) || /<!--/.test(line2)))
-    return null;
-  const text10 = prose.filter((line2) => line2.trim() && !IMAGE_ONLY_LINE2.test(line2));
-  const paragraphs = prose.join("\n").split(/\n[ \t]*\n/).filter((part) => part.trim()).length;
-  if (text10.join("").replace(/\s/g, "").length < LIFT_MIN_CHARS || paragraphs < LIFT_MIN_PARAGRAPHS) return null;
-  const list2 = findSection(lines, fenced, () => true, section3.end);
-  if (!list2 || list2.at !== section3.end) return null;
-  const stop = (_b2 = (_a2 = hidden.find((range) => range.start > list2.at && range.start < list2.end)) == null ? void 0 : _a2.start) != null ? _b2 : list2.end;
-  const rest = lines.slice(list2.at + 1, stop).map(bare).filter((line2) => line2.trim());
-  const itemCount = rest.findIndex((line2) => !LIST_ITEM.test(line2));
-  const items = itemCount < 0 ? rest : rest.slice(0, itemCount);
-  const after = itemCount < 0 ? [] : rest.slice(itemCount);
-  if (!items.length || !items.every((line2) => /https:\/\/\S/.test(line2))) return null;
-  if (after.some((line2) => LIST_ITEM.test(line2) || QUOTE_LINE2.test(line2) || /<!--/.test(line2))) return null;
-  if (lines.slice(stop, list2.end).some((line2, i) => line2.trim() && !hidden.some((r) => stop + i >= r.start && stop + i < r.end)))
-    return null;
-  const cr = detail.includes("\r\n") ? "\r" : "";
-  const body = lines.slice(section3.at + 1, section3.end).join("\n").replace(/^\s+|\s+$/g, "");
-  return [...lines.slice(0, section3.at), ...body.split("\n"), cr, ...lines.slice(section3.end)].join("\n");
-}
 var IMAGE_ONLY_LINE2 = /^\s*(?:(?:!\[[^\]]*\]\([^)]*\)|!\[\[[^\]]*\]\])\s*)+$/;
 function chapterTextMask(lines) {
   var _a2;
@@ -52591,7 +52547,7 @@ var BookPipelineRuns = class {
     let unsafe = false;
     let emptyBody = false;
     const finalize = (original) => {
-      const cut = ownRecords.reduce((text11, record) => text11.split(record).join(""), original);
+      const cut = ownRecords.reduce((text10, record) => text10.split(record).join(""), original);
       const held = holdProofLines(cut, knownLines);
       const restore = held.restore;
       const content = neutralizeDetail(dropPlaceholderSections(convertSourceAnchors(held.text)));
@@ -52608,18 +52564,12 @@ var BookPipelineRuns = class {
         unsafe = true;
         return null;
       }
-      let text10 = cleaned;
       const detail = detailBlockOf(cleaned);
       if (detail !== void 0 && !chapterBody(detail).trim()) {
-        const lifted = liftChapterFromSources(detail);
-        if (lifted === null || !chapterBody(lifted).trim()) {
-          emptyBody = true;
-          return null;
-        }
-        const at = cleaned.indexOf(detail);
-        text10 = `${cleaned.slice(0, at)}${lifted}${cleaned.slice(at + detail.length)}`;
+        emptyBody = true;
+        return null;
       }
-      return stampRaw(restore(text10));
+      return stampRaw(restore(cleaned));
     };
     const done = await untilAborted(
       signal,
@@ -53003,7 +52953,7 @@ var BookPipelineRuns = class {
           drive,
           nodeId,
           stage,
-          verdict.aggregate === "needs-review" ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}` : lengthIssue ? `length unmet: ${lengthIssue}` : noticed.length ? `structure unmet: ${noticed.join(" ")}` : null
+          verdict.aggregate === "needs-review" ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}` : lengthIssue ? `length unmet: ${[lengthIssue, ...noticed].join(" ")}` : noticed.length ? `structure unmet: ${noticed.join(" ")}` : null
         );
       }
     };

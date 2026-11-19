@@ -17110,6 +17110,7 @@ export class VisualAgentMapView extends ItemView {
     renderBookBar(toolbar, state, {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
+      restart: () => void this.startBookPipelineFromUi({ restart: true }),
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
       confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path)),
       panel: { open: this.bookPanel.open, toggle: () => this.toggleBookPanel() }
@@ -17458,7 +17459,7 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   /** The toolbar button and the command: start a picture-book run on this map. */
-  async startBookPipelineFromUi(): Promise<void> {
+  async startBookPipelineFromUi(options: { restart?: boolean } = {}): Promise<void> {
     const map = this.map;
     if (!this.path || !map) return;
     const path = this.path;
@@ -17466,7 +17467,14 @@ export class VisualAgentMapView extends ItemView {
     // A map with a run still going (or one that cannot be read) has nothing to confirm: the entry answers with its own sentence.
     // So does a map without exactly one root topic: the card would only lead to the same refusal.
     const existing = readBookPipeline(map);
-    const startable = existing.kind === "absent" || (existing.kind === "usable" && existing.data.phase === "done");
+    // A restart is only for a run stopped before its first gate: the card opens, and confirming replaces that run.
+    const restart =
+      options.restart === true &&
+      existing.kind === "usable" &&
+      existing.data.status === "stopped" &&
+      (existing.data.phase === "planning" || existing.data.phase === "writing");
+    const startable =
+      existing.kind === "absent" || (existing.kind === "usable" && existing.data.phase === "done") || restart;
     if (!startable || roots.length !== 1) return this.bookEntry(() => this.plugin.startBookPipeline(path));
     if (this.bookStartModal?.isShown) return;
     const root = roots.length === 1 ? roots[0] : undefined;
@@ -17496,7 +17504,7 @@ export class VisualAgentMapView extends ItemView {
           if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");
           // Only the fields the owner changed (or left empty with a suggestion) are written, and only to the root topic.
           if (root && Object.keys(patch).length) await this.plugin.repo.writeBookSettings(root.path, patch);
-          await this.plugin.startBookPipeline(path);
+          await this.plugin.startBookPipeline(path, restart ? { restart: true } : undefined);
         });
       }
     });

@@ -3364,6 +3364,7 @@ export const en = {
   "ui.book_fail_card_removed": "A card is not on the map or cannot be read",
   "ui.book_fail_other": "An unexpected error happened",
   "ui.book_resume": "Continue from where it stopped",
+  "ui.book_restart": "Change settings and start over",
   "ui.book_add_budget": "Add 100 calls",
   "ui.book_budget_used_up_0_1": "Call budget used up: {0}/{1} used",
   "ui.book_confirm_gate1": "Looks good, run the whole book",

@@ -734,7 +734,13 @@ export class BookPipelineRuns {
   }
 
   /** Starts a new run (writes `bookPipeline` to the map file) and drives it until it ends, pauses or reaches a gate. */
-  async start(mapPath: string): Promise<void> {
+  async start(mapPath: string, options: { restart?: boolean } = {}): Promise<void> {
+    // A restart (the stopped bar's "reconfigure and start over") may replace a run that is stopped before its first gate; nothing else.
+    const replaceable = (data: BookPipelineData): boolean =>
+      data.phase === "done" ||
+      (options.restart === true &&
+        data.status === "stopped" &&
+        (data.phase === "planning" || data.phase === "writing"));
     return this.enter(mapPath, async drive => {
       if (this.ports.blocked(mapPath)) throw new BookPipelineRunError("blocked");
       const runId = this.ports.newId();
@@ -744,7 +750,7 @@ export class BookPipelineRuns {
         const map = await this.ports.readMap(mapPath);
         const read = readBookPipeline(map);
         if (read.kind === "unusable") throw new BookPipelineRunError("unusable");
-        if (read.kind === "usable" && read.data.phase !== "done") throw new BookPipelineRunError("exists");
+        if (read.kind === "usable" && !replaceable(read.data)) throw new BookPipelineRunError("exists");
         const order = this.orderOf(map);
         // Roles the previous run's pipeline wrote (defaults and plan choices) are not the owner's; only roles written outside the pipeline are.
         const prior = read.kind === "usable" ? (read.data.autoRoles ?? []) : [];
@@ -760,7 +766,7 @@ export class BookPipelineRuns {
         if (this.dead(drive)) return;
         await this.ports.updateMap(mapPath, doc => {
           const found = readBookPipeline(doc);
-          if (found.kind === "unusable" || (found.kind === "usable" && found.data.phase !== "done"))
+          if (found.kind === "unusable" || (found.kind === "usable" && !replaceable(found.data)))
             throw new BookPipelineRunError("exists");
           doc.bookPipeline = state;
         });

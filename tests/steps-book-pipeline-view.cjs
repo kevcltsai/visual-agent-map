@@ -43,9 +43,10 @@ const progress = (over = {}) => ({
 });
 const noStage = () => undefined;
 const calls = () => { const log = []; return { log, actions: { stop: () => log.push('stop'), resume: () => log.push('resume'), addBudget: () => log.push('add'), confirmGate1: () => log.push('confirm') } }; };
-const draw = (data, prog, stageOf = noStage) => {
+const draw = (data, prog, stageOf = noStage, withRestart = false) => {
   const parent = dom.element('div');
   const c = calls();
+  if (withRestart) c.actions.restart = () => c.log.push('restart');
   const state = ui.bookBarState(data, prog, stageOf);
   const bar = ui.renderBookBar(parent, state, c.actions);
   return { parent, bar, state, ...c };
@@ -246,7 +247,7 @@ async function harness({ book, stages = {}, issue }) {
     availableModels: () => ['claude:sonnet', 'claude:opus', 'claude:haiku'],
     saveSettings: async () => { ctl.saves.push({ ...settings }); },
     suggestBookSettings: (input, signal) => { ctl.calls.push({ input, signal }); return ctl.impl(input, signal); },
-    startBookPipeline: async p => { entries.push(['start', p]); },
+    startBookPipeline: async (p, o) => { entries.push(o ? ['start', p, o] : ['start', p]); },
     stopBookPipeline: async p => { entries.push(['stop', p]); },
     resumeBookPipeline: async (p, o) => { entries.push(['resume', p, o]); },
     confirmBookGate1: async p => { entries.push(['confirm', p]); }
@@ -1013,4 +1014,54 @@ test('T5 bar: while a run with a trial is planning, the sentence says which tria
   lang('zh-CN');
   assert.equal(ui.bookProgressText(trialState([{ nodeId: 'a', step: 'plan', startedAt: 1 }])), '正在试跑第 1／3 章');
   lang('zh-TW');
+});
+
+test('restart: the stopped bar shows both buttons before gate 1 only; planning and writing show it, gate1, gate2, done, budget pause and running do not', () => {
+  lang('zh-TW');
+  for (const phase of ['planning', 'writing']) {
+    const d = draw(bookData({ status: 'stopped', phase }), progress({ status: 'stopped', active: false, phase }), noStage, true);
+    assert.deepEqual(buttonsOf(d.bar).map(b => b.text), ['從停處繼續', '重新設定再開始'], phase);
+    buttonsOf(d.bar)[1].click();
+    assert.deepEqual(d.log, ['restart']);
+  }
+  for (const phase of ['gate1', 'gate2', 'done']) {
+    const d = draw(bookData({ status: 'stopped', phase }), progress({ status: 'stopped', active: false, phase }), noStage, true);
+    assert.ok(!buttonsOf(d.bar).some(b => b.text === '重新設定再開始'), phase);
+  }
+  const running = draw(bookData(), progress(), noStage, true);
+  assert.ok(!buttonsOf(running.bar).some(b => b.text === '重新設定再開始'));
+  const budget = draw(bookData({ status: 'stopped', pauseReason: 'budget' }), progress({ status: 'stopped', active: false, pauseReason: 'budget' }), noStage, true);
+  assert.ok(!buttonsOf(budget.bar).some(b => b.text === '重新設定再開始'));
+});
+
+test('restart: the card opens with the current settings; Start replaces the stopped run (restart flag, settings written first); Cancel leaves everything; gate and running runs refuse a restart', async () => {
+  const h = await harness({ book: false });
+  await h.plugin.repo.writeBookSettings(rootPath(h), { reader: 'kids', tone: 'warm' });
+  h.view.map.bookPipeline = bookData({ status: 'stopped', phase: 'planning', order: [h.ids.root, h.ids.a, h.ids.b] });
+  await h.view.startBookPipelineFromUi({ restart: true });
+  let modal = h.view.bookStartModal;
+  assert.ok(modal?.isOpen, 'the card opens for a stopped run');
+  assert.equal(field(modal, dom.findAll(modal.modalEl, i => i.tag === 'textarea')[0].attrs['aria-label']).value.length > 0, true, 'prefilled');
+  assert.ok(dom.findAll(modal.modalEl, i => i.tag === 'textarea').some(f => f.value === 'warm'), 'the saved tone is shown');
+  assert.equal(h.entries.length, 0);
+  cardButton(modal, '取消').click(); await dom.tick();
+  assert.equal(h.entries.length, 0, 'Cancel starts nothing');
+  assert.equal(h.view.map.bookPipeline.status, 'stopped', 'the stopped run is untouched');
+  h.view.bookStartModal = null;
+  await h.view.startBookPipelineFromUi({ restart: true });
+  modal = h.view.bookStartModal;
+  dom.findAll(modal.modalEl, i => i.tag === 'textarea').find(f => f.value === 'warm').value = 'cold';
+  cardButton(modal, '開始').click(); await dom.tick();
+  assert.equal(JSON.stringify(h.entries), JSON.stringify([['start', MAP, { restart: true }]]));
+  for (const phase of ['gate1', 'gate2', 'done']) {
+    const g = await harness({ book: true });
+    g.view.map.bookPipeline = bookData({ status: phase === 'done' ? 'running' : 'stopped', phase, order: [g.ids.root, g.ids.a, g.ids.b] });
+    await g.view.startBookPipelineFromUi({ restart: true });
+    if (phase === 'done') { assert.ok(g.view.bookStartModal?.isOpen, 'done opens its normal card'); assert.equal(g.entries.length, 0); }
+    else { assert.equal(g.view.bookStartModal, null, phase); assert.equal(g.entries.length, 1, phase); assert.equal(g.entries[0].length, 2, 'no restart flag is forwarded for ' + phase); }
+  }
+  const running = await harness({ book: true });
+  running.view.map.bookPipeline = bookData({ phase: 'planning', order: [running.ids.root, running.ids.a, running.ids.b] });
+  await running.view.startBookPipelineFromUi({ restart: true });
+  assert.equal(running.view.bookStartModal, null);
 });

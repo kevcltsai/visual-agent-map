@@ -1728,8 +1728,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   /** Picture-book pipeline entries (the screen and the commands call these; refusals are thrown as BookPipelineRunError). */
-  startBookPipeline(mapPath: string): Promise<void> {
-    return this.bookPipelineRuns.start(mapPath);
+  startBookPipeline(mapPath: string, options: { restart?: boolean } = {}): Promise<void> {
+    return this.bookPipelineRuns.start(mapPath, options);
   }
   /** The start card's grey suggestions: one text-only call on the picture model, in the book's language. The caller owns the timeout and the abort. */
   suggestBookSettings(

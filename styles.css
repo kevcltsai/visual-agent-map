@@ -312,8 +312,7 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 /* In select mode every picked card is selected, so only hover and focus show a card's tools there. */
 .vam-node:hover > .vam-node-tools, .vam-node:focus-within > .vam-node-tools, .vam-viewport:not(.is-selecting) .vam-node.is-selected > .vam-node-tools { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 /* The row hides a moment after the pointer leaves its card (it stays clickable meanwhile), so a pointer crossing bare canvas to reach a row beside or above the card still gets there. */
-/* Zoomed out, the counter-scaled rows would cover the neighbouring cards: none shows (zoom in to use them). With several cards selected only the hovered or focused one shows its row. */
-.vam-viewport.is-zoomed-out .vam-node > .vam-node-tools { opacity: 0; visibility: hidden; pointer-events: none; }
+/* With several cards selected only the hovered or focused one shows its row. Zoomed out the rows stay shown and clickable (a row that shows must always be clickable). */
 .vam-viewport.is-multi-selected:not(.is-selecting) .vam-node.is-selected:not(:hover):not(:focus-within) > .vam-node-tools { opacity: 0; visibility: hidden; transform: translateY(4px); }
 .vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }
 .vam-node-tools > .vam-collapse-button { order: -1; }

@@ -94897,7 +94897,6 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node > .vam-node-tools.is-side-left::after { left: 100%; }
 .vam-node > .vam-node-tools.is-side-right::after { right: 100%; }
 .vam-node > .vam-node-tools.is-wrapped { flex-wrap: wrap; justify-content: flex-start; }
-.vam-viewport.is-zoomed-out .vam-node > .vam-node-tools { opacity: 0; visibility: hidden; pointer-events: none; }
 .vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }
 .vam-node-tools > .vam-collapse-button { order: -1; }
 .vam-node-tools > .vam-node-tool { width: 26px; padding-left: 0; padding-right: 0; display: inline-flex; align-items: center; justify-content: center; }

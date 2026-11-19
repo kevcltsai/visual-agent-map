@@ -927,7 +927,7 @@ test('F5: a tool row beside the card never covers the + button: the + sits above
   assert.ok(number(plus) > number(row), 'the + is above the row');
 });
 
-test('card tool rows: hidden below 60% zoom, and with several cards selected only hover/focus shows one', () => {
+test('card tool rows: stay clickable below 60% zoom, and with several cards selected only hover/focus shows one', () => {
   const view = bareView({});
   const toggles = [];
   view.viewportEl = { toggleClass: (name, on) => toggles.push([name, on]) };
@@ -944,6 +944,6 @@ test('card tool rows: hidden below 60% zoom, and with several cards selected onl
   view.selection.replaceMulti(['a', 'b']);
   view.syncToolsVisibility();
   assert.deepEqual(toggles, [['is-multi-selected', false], ['is-multi-selected', true]]);
-  assert.match(css, /\.vam-viewport\.is-zoomed-out \.vam-node > \.vam-node-tools \{[^}]*visibility: hidden/);
+  assert.doesNotMatch(css, /is-zoomed-out \.vam-node > \.vam-node-tools/, 'a zoomed-out row is never shown-but-dead: no rule hides or disables it');
   assert.match(css, /\.vam-viewport\.is-multi-selected:not\(\.is-selecting\) \.vam-node\.is-selected:not\(:hover\):not\(:focus-within\) > \.vam-node-tools \{[^}]*visibility: hidden/);
 });

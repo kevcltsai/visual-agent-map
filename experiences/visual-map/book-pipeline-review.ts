@@ -355,7 +355,8 @@ export function reviewCallout(
     ...reasons.slice(0, 5).map(reason => `> ・${plainText(reason)}`),
     // A hand-edited chapter has two separate answers: keep it (a resolution) or rewrite it (a one-time command bound to the text and to `op`).
     `> - [ ] ${t(hand ? "ui.book_note_review_keep" : "ui.book_note_review_accept")}`,
-    `> - [ ] ${t(hand ? "ui.book_note_review_rewrite" : "ui.book_note_review_fixed")}`,
+    // A queued rewrite keeps its tick when the box is written again (the queue lives in the box: the tick is what a later drain reads).
+    `> - [${hand?.queued ? "x" : " "}] ${t(hand ? "ui.book_note_review_rewrite" : "ui.book_note_review_fixed")}`,
     ...(hand?.status ? [`> ${plainText(hand.status)}`] : []),
     ...(next ? [next] : []),
     `> %%vam-review:${idPart(runId)}:${idPart(card.id)}:${idPart(fp)}${handSuffix(hand)}%%`,

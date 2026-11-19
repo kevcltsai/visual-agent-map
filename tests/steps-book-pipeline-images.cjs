@@ -13,7 +13,7 @@ const { cardRevision } = S.load('core/book-pipeline/machine.ts');
 const { proofKey, evaluateProof } = S.load('core/book-pipeline/proof.ts');
 const { findStoredProof, withoutResearchNotes } = S.load('core/book-pipeline/note-sections.ts');
 const { parseChecklist } = S.load('core/book-pipeline/plan-text.ts');
-const { stampDetail } = S.load('core/book-pipeline/body-integrity.ts');
+const { stampDetail, bodyStateRaw, bodyState, readBodyRecord, integrityFp } = S.load('core/book-pipeline/body-integrity.ts');
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const defer = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
@@ -501,6 +501,32 @@ test('slots: CRLF text is filled with CRLF lines and verifies; no marker is left
 });
 
 // ---- the old run's stages (R1-1): a card planned/written/checked by the old version, standard and textbook template, closed and resumed ----
+// ---- T9: a program change of the text keeps the chapter "untouched" (the fingerprint follows) unless the reader's hand is on it ----
+test('T9 fingerprint: filling the slots (pictures placed, or missing and their marker lines deleted) and swapping a failed body picture for the plain no-picture line all leave the chapter clean', async () => {
+  for (const [name, over] of [
+    ['placed', { finder: () => found({ 1: [cand(1)], 2: [cand(2)] }) }],
+    ['missing', { finder: () => found({}) }],
+    ['load failed', { finder: () => found({ 1: [cand(1)], 2: [cand(2)] }), probe: async () => ({ ok: false, reason: 'load_failed' }) }],
+    ['a body picture that fails its probe', { slots: 1, text: () => `正文。\n\n![Body](https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Body.jpg/1280px-Body.jpg)\n\n${mk(1)}\n\n尾。\n`, finder: () => found({ 1: [cand(1)] }), probe: async url => (url.includes('Body') ? { ok: false, reason: 'load_failed' } : { ok: true }) }]
+  ]) {
+    const r = await picRig(over);
+    await run(r);
+    assert.equal(stageOf(r.raw(0)), 'checked', name);
+    assert.equal(bodyStateRaw(r.raw(0)), 'clean', name);
+  }
+});
+test('T9 fingerprint: the reader typing during the picture search is not stamped as program text (the pictures still go in, the chapter stays hand-edited)', async () => {
+  let rr;
+  const r = await picRig({ finder: async () => { const n = await rr.note(0); await rr.repo.updateNote(rr.nodes[0].path, { detail: n.detail.replace('正文二。', '正文二（我手改的）。') }); return found({ 1: [cand(1)], 2: [cand(2)] }); } });
+  rr = r;
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.ok(detail.includes('我手改的'), 'the reader\'s words are kept');
+  assert.equal(figures(detail).length, 2, 'the pictures were placed');
+  assert.equal(bodyState(detail), 'edited', 'the stored fingerprint was not moved to the typed text');
+  assert.notEqual(readBodyRecord(detail).fp, integrityFp(detail));
+});
+
 const TEMPLATES = { standard: '## 核心結論\n舊內文。\n\n## 背景與機制\n說明。', textbook: '## 章節本文\n舊內文。\n\n## 本章小結\n說明。' };
 async function reopen(r, stage, detail) {
   // a card the program left in that state carries its fingerprint (an old card without one would count as possibly hand-edited)

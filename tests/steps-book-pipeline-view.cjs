@@ -1363,6 +1363,103 @@ test('review box: a tick for the attention it has now resolves the chapter (the 
   assert.equal(r.view.bookResolved.has(r.ids.a), false);
   assert.deepEqual(r.attention(), [r.ids.a]);
 });
+// ---- T9: a hand-edited chapter's box (keep / rewrite) and the rerun question (G) ----
+const { stampDetail, integrityFpRaw } = support.load('core/book-pipeline/body-integrity.ts');
+async function handRig() {
+  const r = await boxRig();
+  await r.plugin.repo.writePipelineFields(r.node.path, { pipelineIssue: 'write failed: hand_edited' });
+  await r.plugin.repo.updateNote(r.node.path, { detail: stampDetail('第一段。\n\n第二段。').replace('第二段', '第三段') });
+  const e = await r.fresh();
+  assert.equal(e.card.handEdited, true);
+  const file = r.view.app.vault.getAbstractFileByPath(r.node.path);
+  await r.view.app.vault.process(file, raw => bundle.putProgramCallout(raw, bundle.reviewCallout(e.card, ['x'], undefined, e.fp, 'r1', { op: 'op1', ifp: e.card.bodyFp })));
+  const tickAt = at => r.view.app.vault.process(file, raw => { let n = 0; return raw.replace(/\[ \]/g, m => (n++ === at ? '[x]' : m)); });
+  return { ...r, e, tickAt };
+}
+test('T9 box: ticking "rewrite" calls the hand-edit controller (not a resolution, nothing collapses); ticking "keep" records the keep and resolves; a plain box never calls keep', async () => {
+  const r = await handRig();
+  await r.tickAt(1);
+  await r.modified(); await dom.tick();
+  assert.deepEqual(r.calls.tick, [[MAP, r.ids.a]], 'the rewrite goes to tick');
+  assert.deepEqual(r.calls.keep, []);
+  assert.equal(r.view.bookResolved.has(r.ids.a), false, 'a rewrite command is not a resolution');
+  assert.deepEqual(r.calls.collapse, []);
+  const k = await handRig();
+  await k.tickAt(0);
+  await k.modified(); await dom.tick();
+  assert.deepEqual(k.calls.keep, [k.node.path], 'keep is written into the chapter');
+  assert.deepEqual(k.calls.tick, []);
+  assert.equal(k.view.bookResolved.get(k.ids.a), k.e.fp, 'keep resolves the chapter');
+  const plain = await boxRig();
+  await plain.writeBox({ ticked: true });
+  await plain.modified();
+  assert.deepEqual(plain.calls.keep, [], 'a box without an operation id is no hand-edit box');
+  assert.deepEqual(plain.calls.tick, []);
+});
+
+async function askRig({ edited = true } = {}) {
+  const g = await gateRig({ phase: 'gate2' });
+  const calls = [];
+  g.plugin.rerunBookCard = async (p, id, options) => { calls.push([p, id, options]); return {}; };
+  g.view.rereadBookCard = async () => {};
+  const node = g.view.map.nodes.find(n => n.id === g.ids.a);
+  const text = (word = '第二段') => stampDetail('第一段。\n\n第二段。').replace('第二段', word);
+  const type = async detail => { await g.plugin.repo.updateNote(node.path, { detail }); g.view.notes.set(g.ids.a, await g.plugin.repo.readNote(node.path)); };
+  await type(edited ? text('第三段') : stampDetail('第一段。\n\n第二段。'));
+  const file = () => g.view.app.vault.getAbstractFileByPath(node.path);
+  const fpNow = async () => integrityFpRaw(await g.view.app.vault.read(file()));
+  const asked = () => dom.find(g.drawBar(), i => i.cls.includes('vam-book-rerun-ask'));
+  return { ...g, calls, node, type, text, fpNow, asked };
+}
+test('T9 G: rerunning a hand-edited chapter asks first (nothing runs); confirming runs it once with the permission bound to the asked text; a clean chapter reruns at once', async () => {
+  lang('zh-TW');
+  const r = await askRig();
+  r.view.runBookCardRerun(r.node); await dom.tick(); await dom.tick();
+  assert.deepEqual(r.calls, [], 'nothing runs before the answer');
+  const ask = r.asked();
+  assert.ok(ask);
+  assert.ok(texts(ask).includes('重跑會蓋掉你的修改（改前先備份），仍要重跑嗎？'));
+  const fp = await r.fpNow();
+  r.click(r.drawBar(), '仍要'); await dom.tick(); await dom.tick();
+  assert.equal(r.calls.length, 1);
+  assert.equal(r.calls[0][1], r.ids.a);
+  assert.equal(r.calls[0][2].overwrite.fingerprint, fp);
+  assert.ok(r.calls[0][2].overwrite.operation, 'an operation id');
+  assert.equal(r.asked(), undefined, 'the question is gone');
+  const clean = await askRig({ edited: false });
+  clean.view.runBookCardRerun(clean.node); await dom.tick(); await dom.tick();
+  assert.equal(clean.calls.length, 1);
+  assert.equal(JSON.stringify(clean.calls[0][2]), '{}', 'no permission asked for or given');
+  assert.equal(clean.asked(), undefined);
+});
+test('T9 G: cancel drops the question and runs nothing', async () => {
+  lang('zh-TW');
+  const r = await askRig();
+  r.view.runBookCardRerun(r.node); await dom.tick(); await dom.tick();
+  assert.ok(r.asked());
+  r.click(r.drawBar(), '取消'); await dom.tick();
+  assert.equal(r.asked(), undefined);
+  assert.equal(r.view.bookRerunAsk, null);
+  assert.deepEqual(r.calls, []);
+});
+test('T9 G: the question expires when the text changes (before it is drawn again, or between the question and the "yes"); nothing is rewritten', async () => {
+  lang('zh-TW');
+  const r = await askRig();
+  r.view.runBookCardRerun(r.node); await dom.tick(); await dom.tick();
+  assert.ok(r.asked());
+  await r.type(r.text('第四段'));
+  assert.equal(r.asked(), undefined, 'drawn again after a text change: gone');
+  assert.equal(r.view.bookRerunAsk, null);
+  // the text changes on disk while the view has not seen it yet: the confirm re-reads and expires
+  const s = await askRig();
+  s.view.runBookCardRerun(s.node); await dom.tick(); await dom.tick();
+  const bar = s.drawBar();
+  await s.plugin.repo.updateNote(s.node.path, { detail: s.text('第五段') });
+  s.click(bar, '仍要'); await dom.tick(); await dom.tick();
+  assert.deepEqual(s.calls, [], 'no rerun on text the reader did not ask about');
+  assert.equal(s.asked(), undefined);
+});
+
 test('review box: a tick written for an older fingerprint does not resolve; a ticked box that is already folded is not folded again', async () => {
   const r = await boxRig();
   await r.writeBox({ ticked: true, fp: 'stale' });

@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { load } = require('./support-replay.cjs');
 
-const { readingOrder, stepOrder } = load('experiences/visual-map/presentation-order.ts');
+const { readingOrder, bookReadingOrder, stepOrder } = load('experiences/visual-map/presentation-order.ts');
 const node = (id, parentId, x, y, extra = {}) => ({ id, path: `${id}.md`, parentId, x, y, collapsed: false, ...extra });
 const ids = list => [...list];
 
@@ -108,4 +108,13 @@ test('regression fixture map (12 nodes, 2 roots) lists every node once', () => {
   const order = readingOrder(doc.nodes);
   assert.equal(order.length, doc.nodes.length);
   assert.equal(new Set(order).size, doc.nodes.length);
+});
+
+test('review-b S1: a balanced map reads the right half top to bottom, then the left half; other maps keep one y order', () => {
+  const n = (id, parentId, x, y) => ({ id, path: id, parentId, x, y, collapsed: false });
+  const nodes = [n('r', null, 440, 180), n('R1', 'r', 800, 80), n('L1', 'r', 80, 80), n('R2', 'r', 800, 280), n('L2', 'r', 80, 280), n('g', 'R1', 1160, 80)];
+  const ids = list => [...list];
+  assert.deepEqual(ids(bookReadingOrder({ nodes, layout: { direction: 'balanced' } })), ['r', 'R1', 'g', 'R2', 'L1', 'L2']);
+  assert.deepEqual(ids(bookReadingOrder({ nodes, layout: { direction: 'right' } })), ['r', 'L1', 'R1', 'g', 'L2', 'R2'], 'not balanced: by y');
+  assert.deepEqual(ids(bookReadingOrder({ nodes })), ids(bookReadingOrder({ nodes, layout: { direction: 'right' } })));
 });

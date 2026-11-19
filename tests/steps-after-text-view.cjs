@@ -273,10 +273,10 @@ test('move: dragging a follower elsewhere, Move to..., or onto its own topic cle
 // Bug5: the book order is the reading order (siblings by position); every arrangement lays siblings out in array order. A moved
 // topic therefore takes its place among its new siblings in the array BEFORE the branch is laid out, so Auto layout keeps it.
 const bookOrder = (h, titles = true) => {
-  const ids = readingOrder(h.view.map.nodes, { includeHidden: true });
+  const ids = bookReadingOrder(h.view.map);
   return titles ? ids.map(id => h.view.notes.get(id)?.title) : ids;
 };
-const { readingOrder } = load('experiences/visual-map/presentation-order.ts');
+const { bookReadingOrder } = load('experiences/visual-map/presentation-order.ts');
 const arrangedHarness = async (direction, build = () => []) => {
   const h = await harness(build, { direction, other: true });
   // X is created first, under Child: its array place is before A and B, which the new siblings' arrangement must not follow.
@@ -287,7 +287,7 @@ const arrangedHarness = async (direction, build = () => []) => {
   await h.view.hydrate();
   return h;
 };
-for (const direction of ['right', 'radial', 'timeline', 'fishbone']) {
+for (const direction of ['right', 'balanced', 'radial', 'timeline', 'fishbone']) {
   test(`Bug5: moving a topic to a new parent puts it last among the new siblings, and Auto layout keeps that book order (${direction})`, async () => {
     const h = await arrangedHarness(direction);
     const root = h.view.map.nodes[0];
@@ -348,9 +348,9 @@ test('Bug5: dragging or "Move to..." (moveBranches) places the topic last among 
   await h.view.hydrate();
   const kids = h.view.map.nodes.filter(n => n.parentId === root.id && !n.afterTextId).map(n => h.view.notes.get(n.id)?.title);
   assert.equal(kids.at(-1), 'X');
-  const moved = readingOrder(h.view.map.nodes, { includeHidden: true });
+  const moved = bookReadingOrder(h.view.map);
   await h.view.mapChange(m => h.view.arrangeAll(m), false);
-  assert.deepEqual(plain(readingOrder(h.view.map.nodes, { includeHidden: true })), plain(moved), 'Auto layout keeps the book order');
+  assert.deepEqual(plain(bookReadingOrder(h.view.map)), plain(moved), 'Auto layout keeps the book order');
 });
 
 test('R2: coordinate-only writes (updateMap) keep the text block and the field; the saved map reopens', async () => {

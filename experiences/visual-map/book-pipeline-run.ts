@@ -163,7 +163,7 @@ import {
   sameReviewResult,
   type CardResultSnapshot
 } from "./book-pipeline-rerun";
-import { readingOrder } from "./presentation-order";
+import { bookReadingOrder } from "./presentation-order";
 import {
   bodyStateRaw,
   integrityFpRaw,
@@ -1573,7 +1573,7 @@ export class BookPipelineRuns {
   private orderOf(map: MapDocument): string[] {
     const roots = map.nodes.filter(node => !node.parentId);
     if (roots.length !== 1) throw new BookPipelineRunError("root");
-    const order = readingOrder(map.nodes, { includeHidden: true });
+    const order = bookReadingOrder(map);
     // A root alone has no chapter to write.
     if (order.length < 2) throw new BookPipelineRunError("empty");
     return order;
@@ -1741,7 +1741,7 @@ export class BookPipelineRuns {
 
   /** The map's cards in reading order (every card, hidden ones too). */
   private mapIds(map: MapDocument): string[] {
-    return readingOrder(map.nodes, { includeHidden: true });
+    return bookReadingOrder(map);
   }
   /**
    * The map's cards differ from the accepted set: the run is saved as paused first (so nothing new is admitted and every result still

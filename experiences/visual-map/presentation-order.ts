@@ -2,6 +2,8 @@
  * Presentation reading order of a map: a pre-order walk of the parentId tree, siblings sorted by position.
  * Pure functions, no DOM. Collapsed branches are skipped by default so a presentation follows what is on screen.
  */
+import { sideFromOffset } from "../../layouts/balanced";
+import { layoutOf } from "../../map-layout";
 import { withTextParents, type MapNode } from "../../map-graph";
 
 export interface ReadingOrderOptions {
@@ -9,6 +11,11 @@ export interface ReadingOrderOptions {
   siblingAxis?: "y" | "x";
   /** List the descendants of collapsed nodes too (default false). */
   includeHidden?: boolean;
+  /**
+   * A balanced root deals its topics out to a right and a left half, so one y order cannot be what the screen shows: the right half
+   * reads first (top to bottom), then the left half (top to bottom). Only the root's own children are split this way.
+   */
+  balanced?: boolean;
   /** Text nodes hung on topics (`treeTextNodes(...).attached`); each reads as a leaf among its parent's children. */
   textNodes?: readonly { id: string; parentId: string; x: number; y: number }[];
 }
@@ -58,7 +65,20 @@ export function readingOrder(topics: readonly MapNode[], opts: ReadingOrderOptio
   }
   const sortedRoots = [...roots].sort(byPosition);
   const sortedKids = new Map<string, MapNode[]>();
-  for (const [id, list] of children) sortedKids.set(id, [...list].sort(byPosition));
+  const rootIds = new Set(roots.map(root => root.id));
+  const byId = new Map(nodes.map(node => [node.id, node]));
+  // The half of a root's child: the layout's own rule (`sideFromOffset`), a topic too close to tell reads as the right half.
+  const half = (node: MapNode): number => {
+    const root = node.parentId ? byId.get(node.parentId) : undefined;
+    return root && (sideFromOffset(node.x - root.x) ?? (node.x < root.x ? "left" : "right")) === "left" ? 1 : 0;
+  };
+  for (const [id, list] of children)
+    sortedKids.set(
+      id,
+      [...list].sort(
+        opts.balanced && rootIds.has(id) ? (a, b) => half(a) - half(b) || byPosition(a, b) : byPosition
+      )
+    );
   const walk = (withHidden: boolean): string[] => {
     const seen = new Set<string>();
     const out: string[] = [];
@@ -80,6 +100,11 @@ export function readingOrder(topics: readonly MapNode[], opts: ReadingOrderOptio
   const cut = nodes.filter((node, index) => position.get(node.id) === index && !reachable.has(node.id));
   for (const node of cut.sort(byPosition)) order.push(node.id);
   return order;
+}
+
+/** The picture book's chapter order of a map: the reading order of every card (hidden ones too), the way the map's layout shows it. */
+export function bookReadingOrder(map: Parameters<typeof layoutOf>[0] & { nodes: readonly MapNode[] }): string[] {
+  return readingOrder(map.nodes, { includeHidden: true, balanced: layoutOf(map).direction === "balanced" });
 }
 
 /** One step through `order` without wrapping. Unknown or null current: first (delta 1) or last (delta -1). */

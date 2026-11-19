@@ -68,6 +68,49 @@ test('whitelist counterexamples: callout, checkbox, new link, %%, ==, heading, h
   assert.equal(na.checkRewrite({ text: 'a ⟦L1⟧', links: ['$&'] }, 'x ⟦L1⟧').text, 'x $&', 'a link with replacement patterns is restored literally');
 });
 
+test('whitelist (review-a B1): a reply line that opens a block construct, or uses a mark the original never had, is refused', () => {
+  const one = { text: 'line one\nline two', links: [] };
+  const bad = {
+    fence: 'line one\n```', tilde: 'line one\n~~~', fenceStart: '```js\nline two', math: 'line one\n$$', thematic: 'line one\n---', setext: 'line one\n===',
+    spaced: 'line one\n- - -', stars: 'line one\n***', underscore: 'line one\n___', footnote: '[^1]: x\nline two', tag: '#tag one\nline two',
+    indent: 'line one\n    code', tab: 'line one\n\tcode', list: '- line one\nline two', nested: 'line one\n- x', ordered: 'line one\n1. x',
+    quote: '> line one\nline two', pipe: 'line | one\nline two', backtick: 'line `one`\nline two', angle: 'line <one\nline two', brace: 'line {one}\nline two', dollar: 'line $one\nline two',
+    tokenOnly: 'line one\nline ⟦L9⟧'
+  };
+  for (const [name, text] of Object.entries(bad)) assert.equal(na.checkRewrite(one, text).ok, false, name);
+  assert.equal(na.checkRewrite(one, 'line 一, 二。 (three)\nline “two” — ok…').ok, true, 'letters, numbers, spaces and prose marks pass');
+  const marks = { text: 'a *b* and `c`', links: [] };
+  assert.equal(na.checkRewrite(marks, 'a *bb* and `cc`').ok, true, 'a mark the original used is allowed');
+  assert.equal(na.checkRewrite(marks, '```\n').ok, false);
+  const list = { text: '- one\n- two', links: [] };
+  assert.equal(na.checkRewrite(list, '- uno\n- dos').ok, true, 'a list the original had keeps its marks');
+  assert.equal(na.checkRewrite({ text: 'a\n    b', links: [] }, 'x\n    y').ok, true, 'an indent the original had is allowed');
+});
+
+test('whitelist (review-a B1): a refused reply changes nothing, so the hidden record stays and an earlier undo still restores', () => {
+  const steps = load('core/steps/book-pipeline/apply-notes.ts');
+  const record = '> [!vam-book]- 校對紀錄\n> proof-record';
+  const raw = `Title\n${detailOf(`${P1}\n\nsecond line\n\n${P3}`)}\n\n${record}\n`;
+  const items = na.snapshotNotes(raw);
+  const request = { items: items.map(i => i.encoded) };
+  const good = na.applyReplies(raw, items, replies(items));
+  const fenced = JSON.stringify({ paragraphs: [{ id: 'p1', text: 'Brunelleschi showed linear perspective ⟦L1⟧\n```' }, { id: 'p2', text: 'x ⟦L1⟧' }] });
+  assert.throws(() => steps.parseApplyNotes(fenced, { ...request, items: request.items }), /refused|line count/);
+  const fixed = JSON.stringify({ paragraphs: [{ id: 'p1', text: 'Brunelleschi showed linear perspective ⟦L1⟧\n```' }] });
+  assert.throws(() => steps.parseApplyNotes(fixed, { items: [request.items[0]] }), /refused/);
+  assert.ok(good.text.includes(record), 'the hidden record is in the written text');
+  assert.equal(sections.chapterBody(good.text).includes('proof-record'), false, 'the record stays out of the chapter text');
+  assert.equal(na.undoApplied(good.text, good.applied).text, raw, 'the undo of the accepted apply is whole');
+});
+
+test('applyReplies (review-a Low): two identical annotated paragraphs get the skip mark once per note', () => {
+  const raw = `T\n${detailOf(`${P1}\n\n${P1}`)}\n`;
+  const items = na.snapshotNotes(raw);
+  const out = na.applyReplies(raw, items, replies(items));
+  assert.equal(out.skipped, 2);
+  for (const n of bookNotes.findNotes(out.text)) assert.equal(n.note.split(na.SKIP_MARK).length - 1, 1, 'one mark per note');
+});
+
 const replies = items => items.map(i => ({ id: i.id, text: i.text.replace(/==([^=]+)==%%[^%]*%%/g, '$1 (rewritten)') }));
 
 test('applyReplies: one pass, notes gone from replaced paragraphs, other text untouched, new ranges reported', () => {

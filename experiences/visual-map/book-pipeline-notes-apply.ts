@@ -27,6 +27,8 @@ export interface NotesApplyPorts {
   noticeAction(message: string, label: string, onClick: () => void, ms: number): { hide(): void };
   highlight(path: string, ranges: readonly { from: number; to: number }[]): void;
   releaseHighlight(): void;
+  /** A chapter's text went back to an earlier state (undo): the map's boxes must be aligned again. */
+  undone(path: string): void;
   /** The header action and menu must repaint (state changed). */
   changed(): void;
   now(): number;
@@ -86,6 +88,7 @@ export class BookNotesApply {
     if (job) {
       job.cancelled = true;
       this.ports.cancel(path);
+      job.abort.abort();
       return;
     }
     const why = this.disabledReason(path);
@@ -177,6 +180,7 @@ export class BookNotesApply {
     }
     this.ports.releaseHighlight();
     this.lastUndo = null;
+    if (outcome.restored) this.ports.undone(last.path);
     if (!outcome.restored) return this.ports.notice(t("ui.book_note_undo_none"));
     this.ports.notice(
       outcome.skipped

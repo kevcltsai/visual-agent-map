@@ -573,6 +573,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     },
     highlight: (path, ranges) => this.bookHighlights.show(path, ranges),
     releaseHighlight: () => this.bookHighlights.release(),
+    undone: path => {
+      const map = this.bookChapterMaps.get(path);
+      if (map) void this.bookCallouts.reconcile(map);
+    },
     changed: () => this.bookNotes.paint(),
     now: () => Date.now(),
     setTimer: (run, ms) => window.setTimeout(run, ms),
@@ -609,7 +613,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   private async runBookNotes(path: string, signal: AbortSignal): Promise<NotesApplyResult> {
     for (const { file, map } of await this.repo.readableMaps()) {
       const node = map.nodes.find(item => item.path === path);
-      if (node && readBookPipeline(map).kind === "usable")
+      const read = readBookPipeline(map);
+      if (node && read.kind === "usable" && effectiveOrder(read.data).includes(node.id))
         return await this.bookPipelineRuns.applyNotes(file.path, node.id, { signal });
     }
     throw new BookPipelineRunError("missing");

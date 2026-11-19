@@ -38,7 +38,7 @@ function clock() {
 
 function rig({ run, text = '', busy = null } = {}) {
   const c = clock();
-  const r = { c, notices: [], actions: [], writes: [], highlights: [], releases: 0, changed: 0, cancels: [], text, busy };
+  const r = { c, notices: [], actions: [], writes: [], highlights: [], undones: [], releases: 0, changed: 0, cancels: [], text, busy };
   r.deferred = null;
   r.ports = {
     run: (path, signal) => run ? run(path, signal, r) : new Promise((resolve, reject) => { r.deferred = { resolve, reject }; signal.addEventListener('abort', () => reject(Object.assign(new Error('cancelled'), { code: 'cancelled' }))); }),
@@ -51,6 +51,7 @@ function rig({ run, text = '', busy = null } = {}) {
     noticeAction: (message, label, onClick, ms) => { const a = { message, label, onClick, ms, hidden: false }; r.actions.push(a); return { hide: () => { a.hidden = true; } }; },
     highlight: (path, ranges) => r.highlights.push({ path, ranges }),
     releaseHighlight: () => { r.releases++; },
+    undone: path => { r.undones.push(path); },
     changed: () => { r.changed++; },
     now: () => c.t, setTimer: c.set, clearTimer: c.clear, setTick: c.tick, clearTick: c.clear
   };
@@ -145,6 +146,32 @@ test('undo success: the paragraph comes back with its note; the notice is releas
   assert.equal(r.ctl.canUndo(), false);
   await r.ctl.undo();
   assert.match(r.notices.at(-1), /沒有可還原/);
+});
+test('undo (review-a M3): a successful undo asks for the map boxes to be aligned again; a refused or empty one does not', async () => {
+  const r = rig({ text: detail(`${P_NEW}\n\n別的段`), run: async () => applied() });
+  r.ctl.press('N/c.md'); await flush();
+  assert.deepEqual(r.undones, []);
+  await r.ctl.undo();
+  assert.deepEqual(r.undones, ['N/c.md']);
+  const q = rig({ text: detail(`${P_NEW}\n\n別的段`), run: async () => applied() });
+  q.ctl.press('N/c.md'); await flush();
+  q.refuse = true;
+  await q.ctl.undo();
+  assert.deepEqual(q.undones, [], 'refused: nothing changed');
+  q.refuse = false; q.text = detail('something else entirely');
+  await q.ctl.undo();
+  assert.deepEqual(q.undones, [], 'restored 0: nothing changed');
+});
+test('cancel (review-a M2): pressing again aborts the job\'s own signal even when the map lookup finds nothing to cancel', async () => {
+  let signal;
+  const r = rig({ run: (path, s) => { signal = s; return new Promise((_, reject) => s.addEventListener('abort', () => reject(Object.assign(new Error('cancelled'), { code: 'cancelled' })))); } });
+  r.ports.cancel = () => {};
+  r.ctl.press('N/c.md'); await flush();
+  assert.equal(signal.aborted, false);
+  r.ctl.press('N/c.md'); await flush();
+  assert.equal(signal.aborted, true);
+  assert.equal(r.ctl.isRunning('N/c.md'), false);
+  assert.equal(r.notices.at(-1), 'refused:cancelled');
 });
 test('undo partial and none: a paragraph edited since is left alone and reported', async () => {
   const two = { applied: 2, skipped: 0, marked: 0, edits: [

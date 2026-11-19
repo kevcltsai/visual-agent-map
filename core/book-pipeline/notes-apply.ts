@@ -109,6 +109,31 @@ export function snapshotNotes(raw: string): NoteItem[] {
 
 const LEAD = /^\s*(?:>\s*)*(?:[-*+]\s+|\d+[.)]\s+)?/;
 
+/** Prose punctuation any rewrite may use; every other mark must already be in the original paragraph. */
+const BASE_PUNCT = new Set([..." ,.;:!?'\"()，。、；：！？（）「」『』‘’“”…—"]);
+const TOKEN = /⟦L\d+⟧/g;
+
+/**
+ * Whitelist half of the reply check: no line may start a block construct (fence, math block, thematic or setext line, footnote, deep
+ * indent, a list mark the original line lacked), and every character is a letter, number, mark, space, a prose mark, or a mark the
+ * original paragraph already used. Returns the first breach or null.
+ */
+function whitelistBreach(original: string, before: string[], lines: string[]): string | null {
+  const allowed = new Set([...original.replace(TOKEN, "")].filter(c => !/[\p{L}\p{N}\p{M}\s]/u.test(c)));
+  for (const c of BASE_PUNCT) allowed.add(c);
+  for (const mark of ["```", "~~~", "$$"]) if (lines.join("\n").includes(mark) && !original.includes(mark)) return "block syntax";
+  for (const [i, line] of lines.entries()) {
+    const body = line.slice(LEAD.exec(line)?.[0].length ?? 0);
+    if (/^\s{0,3}(?:`{3,}|~{3,}|\$\$|\[\^|#)/.test(body) || /^\s{0,3}([-*_=])\1{2,}/.test(body) || /^\s{0,3}(?:[-*_]\s*){3,}$/.test(body))
+      return "block syntax";
+    if (/^\s*(?:[-*+]|\d+[.)])(\s|$)/.test(body)) return "list mark";
+    const indent = (t: string): boolean => /^(?: {4,}|\t)/.test(t);
+    if (indent(line) && !indent(before[i])) return "indent";
+    for (const c of body.replace(TOKEN, "")) if (!/[\p{L}\p{N}\p{M}\s]/u.test(c) && !allowed.has(c)) return "character";
+  }
+  return null;
+}
+
 export type RewriteCheck = { ok: true; text: string } | { ok: false; reason: string };
 /** One rewritten paragraph: same lines and list marks, no blank line, every link token once, no note marker, nothing the program owns. */
 export function checkRewrite(item: Pick<EncodedItem, "text" | "links">, reply: string): RewriteCheck {
@@ -121,7 +146,7 @@ export function checkRewrite(item: Pick<EncodedItem, "text" | "links">, reply: s
   if (lines.some(line => !line.trim())) return no("blank line");
   if (lines.some((line, i) => LEAD.exec(line)?.[0].trim() !== LEAD.exec(before[i])?.[0].trim()))
     return no("list or quote mark changed");
-  const bad = forbiddenSyntax(text);
+  const bad = forbiddenSyntax(text) ?? whitelistBreach(item.text, before, lines);
   if (bad) return no(`new ${bad}`);
   if (/⟦\/?N/.test(text)) return no("note marker left");
   const seen = new Set<number>();
@@ -207,7 +232,7 @@ export function applyReplies(
     }
     skipped++;
     for (const n of notes.filter(f => item.numbers.includes(f.n) && !f.note.endsWith(SKIP_MARK)))
-      marks.push({ from: n.to - 2, to: n.to - 2, insert: SKIP_MARK });
+      if (!marks.some(m => m.from === n.to - 2)) marks.push({ from: n.to - 2, to: n.to - 2, insert: SKIP_MARK });
   }
   const free = marks.filter(m => !edits.some(e => m.from >= e.from && m.from <= e.to));
   const { text, ranges } = runEdits(raw, [...edits, ...free]);

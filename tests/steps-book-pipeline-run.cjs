@@ -2371,3 +2371,85 @@ test('a card already missing when a drive opens: the start snapshot gives its no
     assert.equal((await r.state()).phase, 'gate2');
   }
 });
+
+// ---- T12: after a single-chapter rerun, the neighbours' previous/next plan line follows the new covers (no AI call) ----
+const promptLine = async (r, i, label) => new RegExp(`^${label}[:：] ?(.*)$`, 'm').exec((await r.note(i)).prompt)?.[1];
+async function neighbourRig(titles = FOUR) {
+  const r = await rig({ titles });
+  await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath); await finished(r);
+  assert.equal((await r.state()).phase, 'gate2');
+  const base = r.script.card; r.script.card = (request, n) => ({ ...base(request, n), covers: `NEWCOVERS ${request.card.position}` });
+  return r;
+}
+const NEXT = /後一張|Next card/;
+
+test('T12 neighbours: both neighbours get the rerun chapter\'s new covers on their line; no AI call; the seam is still marked; the chapter text and its fingerprint are untouched', async () => {
+  const r = await neighbourRig();
+  const fps = [1, 2, 3].map(i => integrityFpRaw(r.raw(i)));
+  const before = { proof: r.stat.proof.length };
+  const planBefore = r.stat.plan.length;
+  await rerun(r, 2);
+  assert.equal(r.stat.plan.length, planBefore + 1, 'only the rerun chapter was planned again');
+  assert.equal(r.stat.proof.length, before.proof + 1, 'only the rerun chapter was proofread again');
+  assert.equal((await promptLine(r, 1, '後一張')), `(3) SecretTitleB — NEWCOVERS 3`, 'left neighbour: next line');
+  assert.equal((await promptLine(r, 3, '前一張')), `(3) SecretTitleB — NEWCOVERS 3`, 'right neighbour: previous line');
+  assert.ok((await promptLine(r, 1, '前一張')).includes('(1)'), 'its other line is not touched');
+  assert.ok((await r.note(1)).pipelineSeam && (await r.note(3)).pipelineSeam, 'seams marked as before');
+  assert.equal(integrityFpRaw(r.raw(1)), fps[0]); assert.equal(integrityFpRaw(r.raw(3)), fps[2]);
+  for (const i of [1, 3]) assert.equal(bodyStateRaw(r.raw(i)), 'clean');
+});
+
+test('T12 neighbours: the first and the last chapter have one neighbour; a removed neighbour is skipped for the next one over', async () => {
+  const r = await neighbourRig();
+  await rerun(r, 0);
+  assert.equal((await promptLine(r, 1, '前一張')), '(1) SecretRootTitle — NEWCOVERS 1');
+  assert.ok(!/NEWCOVERS/.test((await promptLine(r, 2, '前一張'))));
+  const last = await neighbourRig();
+  await rerun(last, 3);
+  assert.equal((await promptLine(last, 2, '後一張')), '(4) SecretTitleC — NEWCOVERS 4');
+  // A removed neighbour: chapter 2 is removed; rerunning chapter 3 changes chapter 1's next line (now the one before) and not the removed card.
+  const gone = await neighbourRig();
+  const removedBefore = gone.raw(2);
+  await dropCard(gone, 2);
+  await gone.repo.updateMap(gone.mapPath, d => { d.bookPipeline.removed = [gone.nodes[2].id]; d.bookPipeline.accepted = d.bookPipeline.order.filter(id => id !== gone.nodes[2].id); d.bookPipeline.phase = 'gate2'; d.bookPipeline.status = 'stopped'; delete d.bookPipeline.pauseReason; });
+  await rerun(gone, 3);
+  assert.equal(gone.raw(2), removedBefore, 'the removed card is never written');
+  assert.equal((await promptLine(gone, 1, '後一張')), '(3) SecretTitleC — NEWCOVERS 3', 'the surviving neighbour on the left follows');
+});
+
+test('T12 neighbours: a neighbour whose text the reader edited by hand is not touched; its seam is still marked; running the rewrite again changes nothing', async () => {
+  const r = await neighbourRig();
+  await r.repo.updateNoteGuarded(r.nodes[1].path, { detail: `${(await r.note(1)).detail}\nreader added this line` }, {});
+  assert.equal(bodyStateRaw(r.raw(1)), 'edited');
+  const editedLine = await promptLine(r, 1, '後一張');
+  await rerun(r, 2);
+  assert.equal(await promptLine(r, 1, '後一張'), editedLine, 'the edited neighbour keeps its line');
+  assert.equal((await promptLine(r, 3, '前一張')), '(3) SecretTitleB — NEWCOVERS 3', 'the clean neighbour still follows');
+  assert.ok((await r.note(1)).pipelineSeam, 'seam is marked');
+  // Idempotent: the second rerun with the same covers writes no neighbour again.
+  const writes = []; const base = r.ports.updateNoteGuarded;
+  r.ports.updateNoteGuarded = async (path, patch, options) => { if (patch.prompt !== undefined && path !== r.nodes[2].path) writes.push(path); return base(path, patch, options); };
+  const snap = (await r.note(3)).prompt;
+  await rerun(r, 2);
+  assert.equal(writes.length, 0, 'identical line: no write');
+  assert.equal((await r.note(3)).prompt, snap);
+});
+
+test('T12 neighbours: a rerun that fails its plan, or one that is stopped, leaves the neighbours\' lines as they were', async () => {
+  const r = await neighbourRig();
+  const keep = [1, 3].map(i => r.raw(i));
+  const base = r.script.card; r.script.card = () => { throw new Error('plan boom'); };
+  await rerun(r, 2);
+  assert.deepEqual([1, 3].map(i => r.raw(i).replace(/^pipeline-seam:.*\n/m, '')), keep.map(x => x.replace(/^pipeline-seam:.*\n/m, '')));
+  r.script.card = base;
+});
+
+test('T12 rewriteNeighbourLine: keeps the label and colon (English, CRLF), writes one safe line, returns undefined for a missing or identical line', () => {
+  const { rewriteNeighbourLine } = S.load('core/book-pipeline/plan-text.ts');
+  const n = { position: 2, title: 'T\n# x', summary: 'new [[link]]' };
+  const out = rewriteNeighbourLine('Role: Body\r\nNext card: (3) old — old\r\nChecklist:', 'next', n);
+  assert.ok(/^Role: Body\r\nNext card: \(2\) T[^\n]* — [^\n]*\r\nChecklist:$/.test(out), out);
+  assert.equal(out.split('\n').length, 3, 'one line, no injected heading');
+  assert.equal(rewriteNeighbourLine('Role: Body', 'next', n), undefined, 'no such line');
+  assert.equal(rewriteNeighbourLine(out, 'next', n), undefined, 'already says it');
+});

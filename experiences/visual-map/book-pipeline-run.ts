@@ -95,8 +95,10 @@ import {
   composeCardPrompt,
   parseBookPlanBody,
   parseBookPlanDecisions,
+  parseCardPrompt,
   parseChecklist,
-  parseImageSlots
+  parseImageSlots,
+  rewriteNeighbourLine
 } from "../../core/book-pipeline/plan-text";
 import {
   composeProofRecord,
@@ -166,6 +168,7 @@ import {
   bodyStateRaw,
   integrityFpRaw,
   isKept,
+  isUntouched,
   programStamp,
   programStampRaw,
   stampRaw
@@ -1135,12 +1138,15 @@ export class BookPipelineRuns {
       const kinds = steps(data.phase);
       drive.job = async () => {
         const before = track ? await this.cardSnapshot(drive, nodeId) : undefined;
+        const planBefore = drive.plans.get(nodeId);
         if (track) drive.rerun = { nodeId, startedAt: Date.parse(this.ports.now()) };
         try {
           await this.runCardJob(drive, nodeId, kinds);
         } finally {
           drive.rerun = undefined;
         }
+        // A rerun that made a new plan: the neighbours' plans still describe the old one (no AI call, only their previous/next line).
+        if (track && drive.plans.get(nodeId) !== planBefore) await this.refreshNeighbourPlans(drive, nodeId);
         finish?.(drive, track ? { before, after: await this.cardSnapshot(drive, nodeId) } : undefined);
         this.syncReviewNotes(drive);
       };
@@ -1188,6 +1194,44 @@ export class BookPipelineRuns {
       // Whatever changed this card's plan or text (even a rerun that stopped half way) makes its neighbours' joins worth a look.
       const revision = cardRevision(drive.store.state, nodeId);
       if (!this.dead(drive) && revision > base) await this.markSeams(drive, nodeId, revision);
+    }
+  }
+
+  /**
+   * After a single-chapter rerun: the left neighbour's `後一張` line and the right neighbour's `前一張` line are rewritten to the rerun
+   * chapter's new "this chapter covers" sentence. Only that line of the Prompt changes (the chapter text, so its integrity fingerprint, is
+   * not touched). A neighbour that is not on the map, whose text the reader edited by hand, or whose line already says it is left alone.
+   */
+  private async refreshNeighbourPlans(drive: Drive, nodeId: string): Promise<void> {
+    const signal = drive.controller.signal;
+    if (this.dead(drive) || signal.aborted || drive.fatal !== undefined) return;
+    const order = effectiveOrder(drive.store.state);
+    const at = order.indexOf(nodeId);
+    const own = drive.cards.get(nodeId);
+    if (at < 0 || !own) return;
+    try {
+      const card = await this.ports.readCard(own.path);
+      const covers = (parseCardPrompt(card.prompt).covers ?? card.summary ?? "").trim();
+      if (!covers) return;
+      const sides = [
+        { id: order[at - 1], key: "next" as const },
+        { id: order[at + 1], key: "previous" as const }
+      ];
+      for (const { id, key } of sides) {
+        const info = id === undefined ? undefined : drive.cards.get(id);
+        if (!info || this.dead(drive) || signal.aborted) continue;
+        const raw = await this.ports.readCard(info.path);
+        if (!isUntouched(raw.detail)) continue;
+        const prompt = rewriteNeighbourLine(raw.prompt, key, { position: at + 1, title: card.title, summary: covers });
+        if (prompt === undefined) continue;
+        await this.ports.updateNoteGuarded(
+          info.path,
+          { prompt },
+          { expectedContent: raw.raw, authorize: () => !this.dead(drive) && !signal.aborted }
+        );
+      }
+    } catch {
+      // a neighbour that cannot be read or written keeps its old line; the seam mark already tells the reader to look
     }
   }
 

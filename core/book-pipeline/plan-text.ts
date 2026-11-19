@@ -175,6 +175,28 @@ export function parseCardPrompt(
   return out;
 }
 
+/**
+ * A card plan's `前一張` or `後一張` line rewritten to describe `neighbour` (position, title and a sentence), keeping the line's own label
+ * and colon. `undefined` when the Prompt has no such line (the reader took it out) or the line already says exactly this.
+ */
+export function rewriteNeighbourLine(
+  prompt: string,
+  key: "previous" | "next",
+  neighbour: { position: number; title: string; summary: string }
+): string | undefined {
+  const lines = prompt.split("\n");
+  const at = lines.findIndex(line => {
+    const m = /^([^:：]+)[:：]/.exec(line);
+    return !!m && matches(L[key], m[1].trim());
+  });
+  if (at < 0) return undefined;
+  const head = /^([^:：]+[:：]\s*)/.exec(lines[at].replace(/\r$/, ""))?.[1] ?? "";
+  const line = `${head}(${neighbour.position}) ${safe(neighbour.title, 120)} — ${safe(neighbour.summary, 240)}`;
+  if (lines[at].replace(/\r$/, "") === line) return undefined;
+  lines[at] = lines[at].endsWith("\r") ? `${line}\r` : line;
+  return lines.join("\n");
+}
+
 export function parseRoleWord(word: string): BookRole | undefined {
   return BOOK_ROLES.find(role => matches(ROLE_WORDS[role], word.trim()) || word.trim().toLowerCase() === role);
 }

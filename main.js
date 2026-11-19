@@ -42904,6 +42904,31 @@ function parseImageSlots(prompt) {
   }
   return slots;
 }
+function parseCardPrompt(prompt) {
+  const out = {};
+  for (const line2 of prompt.split(/\r?\n/)) {
+    const m = /^([^:：]+)[:：]\s*(.*)$/.exec(line2);
+    if (!m) continue;
+    const label = m[1].trim();
+    for (const key4 of ["role", "covers", "entry", "handoff", "previous", "next"])
+      if (matches(L[key4], label) && out[key4] === void 0) out[key4] = unescapeMarkdownText(m[2].trim());
+  }
+  return out;
+}
+function rewriteNeighbourLine(prompt, key4, neighbour2) {
+  var _a2, _b2;
+  const lines = prompt.split("\n");
+  const at = lines.findIndex((line3) => {
+    const m = /^([^:：]+)[:：]/.exec(line3);
+    return !!m && matches(L[key4], m[1].trim());
+  });
+  if (at < 0) return void 0;
+  const head2 = (_b2 = (_a2 = /^([^:：]+[:：]\s*)/.exec(lines[at].replace(/\r$/, ""))) == null ? void 0 : _a2[1]) != null ? _b2 : "";
+  const line2 = `${head2}(${neighbour2.position}) ${safe(neighbour2.title, 120)} \u2014 ${safe(neighbour2.summary, 240)}`;
+  if (lines[at].replace(/\r$/, "") === line2) return void 0;
+  lines[at] = lines[at].endsWith("\r") ? `${line2}\r` : line2;
+  return lines.join("\n");
+}
 function composeBookPlan(plan, language2) {
   const c = colon(language2);
   const decisions = BOOK_SETTING_FIELDS.filter((field) => {
@@ -51071,6 +51096,10 @@ function bodyState(detail) {
   if (!record) return !integrityText(detail) ? "empty" : oldNoteLooksUntouched(detail) ? "clean" : "unknown";
   return record.fp === integrityFp(detail) ? "clean" : "edited";
 }
+var isUntouched = (detail) => {
+  const state = bodyState(detail);
+  return state === "clean" || state === "empty";
+};
 var isKept = (detail) => {
   const record = readBodyRecord(detail);
   return !!(record == null ? void 0 : record.kept) && record.kept === integrityFp(detail);
@@ -51693,12 +51722,14 @@ var BookPipelineRuns = class {
       const kinds = steps(data.phase);
       drive.job = async () => {
         const before = track ? await this.cardSnapshot(drive, nodeId) : void 0;
+        const planBefore = drive.plans.get(nodeId);
         if (track) drive.rerun = { nodeId, startedAt: Date.parse(this.ports.now()) };
         try {
           await this.runCardJob(drive, nodeId, kinds);
         } finally {
           drive.rerun = void 0;
         }
+        if (track && drive.plans.get(nodeId) !== planBefore) await this.refreshNeighbourPlans(drive, nodeId);
         finish == null ? void 0 : finish(drive, track ? { before, after: await this.cardSnapshot(drive, nodeId) } : void 0);
         this.syncReviewNotes(drive);
       };
@@ -51744,6 +51775,43 @@ var BookPipelineRuns = class {
       drive.busy.delete(nodeId);
       const revision = cardRevision(drive.store.state, nodeId);
       if (!this.dead(drive) && revision > base) await this.markSeams(drive, nodeId, revision);
+    }
+  }
+  /**
+   * After a single-chapter rerun: the left neighbour's `後一張` line and the right neighbour's `前一張` line are rewritten to the rerun
+   * chapter's new "this chapter covers" sentence. Only that line of the Prompt changes (the chapter text, so its integrity fingerprint, is
+   * not touched). A neighbour that is not on the map, whose text the reader edited by hand, or whose line already says it is left alone.
+   */
+  async refreshNeighbourPlans(drive, nodeId) {
+    var _a2, _b2;
+    const signal = drive.controller.signal;
+    if (this.dead(drive) || signal.aborted || drive.fatal !== void 0) return;
+    const order = effectiveOrder(drive.store.state);
+    const at = order.indexOf(nodeId);
+    const own2 = drive.cards.get(nodeId);
+    if (at < 0 || !own2) return;
+    try {
+      const card = await this.ports.readCard(own2.path);
+      const covers = ((_b2 = (_a2 = parseCardPrompt(card.prompt).covers) != null ? _a2 : card.summary) != null ? _b2 : "").trim();
+      if (!covers) return;
+      const sides = [
+        { id: order[at - 1], key: "next" },
+        { id: order[at + 1], key: "previous" }
+      ];
+      for (const { id, key: key4 } of sides) {
+        const info = id === void 0 ? void 0 : drive.cards.get(id);
+        if (!info || this.dead(drive) || signal.aborted) continue;
+        const raw = await this.ports.readCard(info.path);
+        if (!isUntouched(raw.detail)) continue;
+        const prompt = rewriteNeighbourLine(raw.prompt, key4, { position: at + 1, title: card.title, summary: covers });
+        if (prompt === void 0) continue;
+        await this.ports.updateNoteGuarded(
+          info.path,
+          { prompt },
+          { expectedContent: raw.raw, authorize: () => !this.dead(drive) && !signal.aborted }
+        );
+      }
+    } catch (e) {
     }
   }
   async markSeams(drive, nodeId, revision) {

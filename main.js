@@ -42973,13 +42973,22 @@ function evaluateProof(raw, checklist, openedUrls, guard) {
   const facts = items.filter((item) => item.type === "fact");
   const result = {
     items,
-    aggregate: items.some((item) => item.type === "fact" && item.status === "unmet") ? "needs-review" : "checked"
+    aggregate: proofVerdict({ items })
   };
   const partial = { items, aggregate: "needs-review" };
   if (noPage) throw new ProofFailure("no_open_page", partial);
   if (facts.length && facts.every((item) => item.status === "unverified"))
     return { items, aggregate: "needs-review", factsUnverified: true };
   return result;
+}
+function proofVerdict(result, bodyEmpty = false) {
+  const structure2 = result.items.filter((item) => item.type !== "fact");
+  const facts = result.items.filter((item) => item.type === "fact");
+  if (bodyEmpty || result.aggregate === "needs-review" || result.factsUnverified) return "needs-review";
+  if (facts.some((item) => item.status === "unmet")) return "needs-review";
+  if (facts.length && facts.every((item) => item.status === "unverified")) return "needs-review";
+  if (structure2.length && structure2.every((item) => item.status === "unmet")) return "needs-review";
+  return "checked";
 }
 var failedProofKey = (key4) => `${key4}:failed`;
 function proofKey(parts) {
@@ -43551,7 +43560,8 @@ ${quoteAll(body)}`.split("\n");
 var isUpdateLogHeading = (text10) => [SECTION_NAME.log.zh, SECTION_NAME.log.en].some((name2) => name2.toLowerCase() === text10.trim().toLowerCase());
 var IMAGES_HEADING = { zh: "\u5716\u50CF", en: "Images" };
 var isImagesHeading = (text10) => [IMAGES_HEADING.zh, IMAGES_HEADING.en, "\u56FE\u50CF"].some((name2) => name2.toLowerCase() === text10.trim().toLowerCase());
-var isSystemSection = (text10) => isResearchNotesHeading(text10) || isUpdateLogHeading(text10) || isNewSourcesHeading(text10) || isOpenQuestionsHeading(text10);
+var isSourcesHeading = (text10) => isNewSourcesHeading(text10.replace(/[：:][ \t]*$/, ""));
+var isSystemSection = (text10) => isResearchNotesHeading(text10) || isUpdateLogHeading(text10) || isSourcesHeading(text10) || isOpenQuestionsHeading(text10);
 function findImageSection(lines) {
   const fenced = fencedLines2(lines);
   for (let from = 0; ; ) {
@@ -43570,7 +43580,7 @@ function findImageSection(lines) {
 function withImageBlock(lines, block) {
   var _a2, _b2, _c;
   const fenced = fencedLines2(lines);
-  const sources = findSection(lines, fenced, (text10) => isNewSourcesHeading(text10));
+  const sources = findSection(lines, fenced, (text10) => isSourcesHeading(text10));
   const other = findSection(
     lines,
     fenced,
@@ -43591,7 +43601,7 @@ function addPictureSources(detail, sources, language2) {
   const lines = detail.split("\n");
   const fenced = fencedLines2(lines);
   const cr = detail.includes("\r\n") ? "\r" : "";
-  const section3 = findSection(lines, fenced, (text10) => isNewSourcesHeading(text10));
+  const section3 = findSection(lines, fenced, (text10) => isSourcesHeading(text10));
   const have = section3 ? lines.slice(section3.at, section3.end).join("\n") : "";
   const seen = /* @__PURE__ */ new Set();
   const fresh = sources.filter(({ href }) => {
@@ -43633,6 +43643,50 @@ function chapterBody(detail) {
     lines = [...lines.slice(0, section3.at), ...lines.slice(section3.end)];
   }
   return lines.join("\n").replace(/\s+$/, "");
+}
+var LIST_ITEM = /^[ \t]{0,3}(?:[-*+]|\d+[.)])[ \t]+\S/;
+var LIFT_MIN_CHARS = 200;
+var LIFT_MIN_PARAGRAPHS = 2;
+function liftChapterFromSources(detail) {
+  var _a2, _b2;
+  const lines = detail.split("\n");
+  const fenced = fencedLines2(lines);
+  if (fenced.some(Boolean)) return null;
+  const first = lines.findIndex((line2) => line2.trim());
+  if (first < 0) return null;
+  const head2 = HEADING4.exec(bare(lines[first]));
+  if (!head2 || !isSourcesHeading(head2[2])) return null;
+  const section3 = findSection(
+    lines,
+    fenced,
+    (text11, level) => isSourcesHeading(text11) && level === head2[1].length,
+    first
+  );
+  if (!section3 || section3.at !== first || section3.end >= lines.length) return null;
+  const next = HEADING4.exec(bare(lines[section3.end]));
+  if (!next || next[1].length !== head2[1].length || !isSourcesHeading(next[2])) return null;
+  const hidden = hiddenRanges(lines, fenced);
+  if (hidden.some((range) => range.start < section3.end)) return null;
+  const prose = lines.slice(section3.at + 1, section3.end).map(bare);
+  if (prose.some((line2) => LIST_ITEM.test(line2) || QUOTE_LINE2.test(line2) || HEADING4.test(line2) || /<!--/.test(line2)))
+    return null;
+  const text10 = prose.filter((line2) => line2.trim() && !IMAGE_ONLY_LINE2.test(line2));
+  const paragraphs = prose.join("\n").split(/\n[ \t]*\n/).filter((part) => part.trim()).length;
+  if (text10.join("").replace(/\s/g, "").length < LIFT_MIN_CHARS || paragraphs < LIFT_MIN_PARAGRAPHS) return null;
+  const list2 = findSection(lines, fenced, () => true, section3.end);
+  if (!list2 || list2.at !== section3.end) return null;
+  const stop = (_b2 = (_a2 = hidden.find((range) => range.start > list2.at && range.start < list2.end)) == null ? void 0 : _a2.start) != null ? _b2 : list2.end;
+  const rest = lines.slice(list2.at + 1, stop).map(bare).filter((line2) => line2.trim());
+  const itemCount = rest.findIndex((line2) => !LIST_ITEM.test(line2));
+  const items = itemCount < 0 ? rest : rest.slice(0, itemCount);
+  const after = itemCount < 0 ? [] : rest.slice(itemCount);
+  if (!items.length || !items.every((line2) => /https:\/\/\S/.test(line2))) return null;
+  if (after.some((line2) => LIST_ITEM.test(line2) || QUOTE_LINE2.test(line2) || /<!--/.test(line2))) return null;
+  if (lines.slice(stop, list2.end).some((line2, i) => line2.trim() && !hidden.some((r) => stop + i >= r.start && stop + i < r.end)))
+    return null;
+  const cr = detail.includes("\r\n") ? "\r" : "";
+  const body = lines.slice(section3.at + 1, section3.end).join("\n").replace(/^\s+|\s+$/g, "");
+  return [...lines.slice(0, section3.at), ...body.split("\n"), cr, ...lines.slice(section3.end)].join("\n");
 }
 var IMAGE_ONLY_LINE2 = /^\s*(?:(?:!\[[^\]]*\]\([^)]*\)|!\[\[[^\]]*\]\])\s*)+$/;
 function chapterTextMask(lines) {
@@ -50666,24 +50720,33 @@ var FIX_ITEM_MAX = 140;
 var FIX_AVOID_MAX = 450;
 var oneLine2 = (value, max) => Array.from(value.replace(/\s+/g, " ").trim()).slice(0, max).join("");
 function proofFixInstruction(items, checklist) {
-  var _a2, _b2;
   const failed = items.filter((item) => item.type === "fact" && item.status === "unmet");
+  const structure2 = items.filter((item) => item.type !== "fact" && item.status === "unmet");
   let sources = cleanAvoidSources(
     items.filter((item) => item.type === "fact" && item.status !== "met").flatMap((item) => item.sources)
   );
   while (sources.length && avoidSourcesInstruction(sources).length > FIX_AVOID_MAX) sources = sources.slice(0, -1);
   const avoid = avoidSourcesInstruction(sources);
   const lead = "The previous version of this chapter failed the fact check on these points (JSON strings; rewrite the chapter so they are correct and supported): ";
-  let room = FIX_INSTRUCTION_MAX - avoid.length - lead.length - 1;
-  const points = [];
-  for (const item of failed) {
-    const text10 = (_b2 = (_a2 = checklist.find((entry) => entry.id === item.id)) == null ? void 0 : _a2.text) != null ? _b2 : "";
-    const point = JSON.stringify(oneLine2(`${text10} / ${item.note}`, FIX_ITEM_MAX * 2));
-    if (point.length + 1 > room) break;
-    points.push(point);
-    room -= point.length + 1;
-  }
-  return neutralizeText((points.length ? lead + points.join(" ") + " " : "") + avoid);
+  const leadStructure2 = "The previous version of this chapter did not meet these structure points of its checklist (JSON strings; the chapter text itself, not the sources list, must cover them): ";
+  let room = FIX_INSTRUCTION_MAX - avoid.length - 1;
+  const piece = (list2, intro) => {
+    var _a2, _b2;
+    const before = room;
+    room -= intro.length;
+    const points = [];
+    for (const item of list2) {
+      const text11 = (_b2 = (_a2 = checklist.find((entry) => entry.id === item.id)) == null ? void 0 : _a2.text) != null ? _b2 : "";
+      const point = JSON.stringify(oneLine2(`${text11} / ${item.note}`, FIX_ITEM_MAX * 2));
+      if (point.length + 1 > room) break;
+      points.push(point);
+      room -= point.length + 1;
+    }
+    if (!points.length) room = before;
+    return points.length ? intro + points.join(" ") + " " : "";
+  };
+  const text10 = piece(failed, lead) + piece(structure2, leadStructure2);
+  return neutralizeText(text10 + avoid);
 }
 function cardResultSnapshot(stage, issue2, detail) {
   var _a2;
@@ -50800,6 +50863,11 @@ var integrityFpRaw = (raw) => {
 
 // experiences/visual-map/book-pipeline-run.ts
 var BOOK_POOL = 5;
+function unmetIds(items) {
+  const unmet = items.filter((item) => item.status === "unmet");
+  const pick8 = unmet.filter((item) => item.type === "fact");
+  return (pick8.length ? pick8 : unmet).map((item) => code2(item.id)).join(" ") || "no_body";
+}
 var BookPipelineRunError = class extends Error {
   constructor(code3) {
     super(`book pipeline refused: ${code3}`);
@@ -52260,7 +52328,7 @@ var BookPipelineRuns = class {
     let unsafe = false;
     let emptyBody = false;
     const finalize = (original) => {
-      const cut = ownRecords.reduce((text10, record) => text10.split(record).join(""), original);
+      const cut = ownRecords.reduce((text11, record) => text11.split(record).join(""), original);
       const held = holdProofLines(cut, knownLines);
       const restore = held.restore;
       const content = neutralizeDetail(dropPlaceholderSections(convertSourceAnchors(held.text)));
@@ -52277,12 +52345,18 @@ var BookPipelineRuns = class {
         unsafe = true;
         return null;
       }
+      let text10 = cleaned;
       const detail = detailBlockOf(cleaned);
       if (detail !== void 0 && !chapterBody(detail).trim()) {
-        emptyBody = true;
-        return null;
+        const lifted = liftChapterFromSources(detail);
+        if (lifted === null || !chapterBody(lifted).trim()) {
+          emptyBody = true;
+          return null;
+        }
+        const at = cleaned.indexOf(detail);
+        text10 = `${cleaned.slice(0, at)}${lifted}${cleaned.slice(at + detail.length)}`;
       }
-      return stampRaw(restore(cleaned));
+      return stampRaw(restore(text10));
     };
     const done = await untilAborted(
       signal,
@@ -52630,7 +52704,11 @@ var BookPipelineRuns = class {
         ...(stored == null ? void 0 : stored.model) ? { model: stored.model } : {},
         authorModel: (_a2 = drive.authorModels.get(nodeId)) != null ? _a2 : stored == null ? void 0 : stored.authorModel
       };
-      const next = programStampRaw(card.raw, this.proofSectionOf(drive, { result }, models, imageLine)(card.raw));
+      const judged = { ...result, aggregate: proofVerdict(result, false) };
+      const next = programStampRaw(
+        card.raw,
+        this.proofSectionOf(drive, { result: judged }, models, imageLine)(card.raw)
+      );
       if (next !== card.raw) {
         const path = await this.stillOnMap(drive, nodeId);
         if (!path) return { kind: "failed", reason: "card_removed" };
@@ -52643,7 +52721,7 @@ var BookPipelineRuns = class {
         if (written2 === "discarded") return { kind: "failed", reason: "discarded" };
       }
     }
-    const verdict = result;
+    const verdict = { ...result, aggregate: proofVerdict(result, !body.trim()) };
     const structureUnmet = verdict.items.filter((item) => item.type !== "fact" && item.status === "unmet").map((item) => code2(item.id));
     const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
     return {
@@ -52659,7 +52737,7 @@ var BookPipelineRuns = class {
           drive,
           nodeId,
           verdict.aggregate,
-          verdict.aggregate === "needs-review" ? verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${verdict.items.filter((item) => item.type === "fact" && item.status === "unmet").map((item) => code2(item.id)).join(" ")}` : noticed.length ? `structure unmet: ${noticed.join(" ")}` : null
+          verdict.aggregate === "needs-review" ? verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}` : noticed.length ? `structure unmet: ${noticed.join(" ")}` : null
         );
       }
     };

@@ -241,7 +241,7 @@ export function evaluateProof(
   const facts = items.filter(item => item.type === "fact");
   const result: ProofResult = {
     items,
-    aggregate: items.some(item => item.type === "fact" && item.status === "unmet") ? "needs-review" : "checked"
+    aggregate: proofVerdict({ items })
   };
   // The partial result of a whole-card failure never reads as checked: the card needs a human.
   const partial: ProofResult = { items, aggregate: "needs-review" };
@@ -249,6 +249,24 @@ export function evaluateProof(
   if (facts.length && facts.every(item => item.status === "unverified"))
     return { items, aggregate: "needs-review", factsUnverified: true };
   return result;
+}
+
+/**
+ * The one verdict reducer, for a new proof and a stored one alike (a cache hit is judged again): needs-review when a fact point is
+ * unmet, when the facts are all unverified, when the proof already said needs-review for a whole-card reason, when every structure
+ * point is unmet (the chapter did not do what its list asked at all) or when the chapter text is empty; else checked.
+ */
+export function proofVerdict(
+  result: { items: readonly { type: string; status: string }[]; aggregate?: string; factsUnverified?: boolean },
+  bodyEmpty = false
+): "checked" | "needs-review" {
+  const structure = result.items.filter(item => item.type !== "fact");
+  const facts = result.items.filter(item => item.type === "fact");
+  if (bodyEmpty || result.aggregate === "needs-review" || result.factsUnverified) return "needs-review";
+  if (facts.some(item => item.status === "unmet")) return "needs-review";
+  if (facts.length && facts.every(item => item.status === "unverified")) return "needs-review";
+  if (structure.length && structure.every(item => item.status === "unmet")) return "needs-review";
+  return "checked";
 }
 
 export interface ProofKeyParts {

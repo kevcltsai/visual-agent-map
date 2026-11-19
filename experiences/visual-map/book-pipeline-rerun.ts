@@ -93,6 +93,7 @@ export function proofFixInstruction(
   checklist: readonly { id: string; text: string }[]
 ): string {
   const failed = items.filter(item => item.type === "fact" && item.status === "unmet");
+  const structure = items.filter(item => item.type !== "fact" && item.status === "unmet");
   let sources = cleanAvoidSources(
     items.filter(item => item.type === "fact" && item.status !== "met").flatMap(item => item.sources)
   );
@@ -101,16 +102,25 @@ export function proofFixInstruction(
   const avoid = avoidSourcesInstruction(sources);
   const lead =
     "The previous version of this chapter failed the fact check on these points (JSON strings; rewrite the chapter so they are correct and supported): ";
-  let room = FIX_INSTRUCTION_MAX - avoid.length - lead.length - 1;
-  const points: string[] = [];
-  for (const item of failed) {
-    const text = checklist.find(entry => entry.id === item.id)?.text ?? "";
-    const point = JSON.stringify(oneLine(`${text} / ${item.note}`, FIX_ITEM_MAX * 2));
-    if (point.length + 1 > room) break;
-    points.push(point);
-    room -= point.length + 1;
-  }
-  return neutralizeText((points.length ? lead + points.join(" ") + " " : "") + avoid);
+  const leadStructure =
+    "The previous version of this chapter did not meet these structure points of its checklist (JSON strings; the chapter text itself, not the sources list, must cover them): ";
+  let room = FIX_INSTRUCTION_MAX - avoid.length - 1;
+  const piece = (list: typeof items, intro: string): string => {
+    const before = room;
+    room -= intro.length;
+    const points: string[] = [];
+    for (const item of list) {
+      const text = checklist.find(entry => entry.id === item.id)?.text ?? "";
+      const point = JSON.stringify(oneLine(`${text} / ${item.note}`, FIX_ITEM_MAX * 2));
+      if (point.length + 1 > room) break;
+      points.push(point);
+      room -= point.length + 1;
+    }
+    if (!points.length) room = before;
+    return points.length ? intro + points.join(" ") + " " : "";
+  };
+  const text = piece(failed, lead) + piece(structure, leadStructure);
+  return neutralizeText(text + avoid);
 }
 /** What a rerun compares: the stage, the issue code and each proof item's id, status and sources. In memory only. */
 export interface CardResultSnapshot {

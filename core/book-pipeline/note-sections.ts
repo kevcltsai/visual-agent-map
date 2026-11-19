@@ -714,8 +714,10 @@ const isUpdateLogHeading = (text: string): boolean =>
 export const IMAGES_HEADING = { zh: "圖像", en: "Images" };
 const isImagesHeading = (text: string): boolean =>
   [IMAGES_HEADING.zh, IMAGES_HEADING.en, "图像"].some(name => name.toLowerCase() === text.trim().toLowerCase());
+/** A sources heading, also with a trailing full-width or ASCII colon ("來源：", which a model writes); the shared alias list stays exact. */
+const isSourcesHeading = (text: string): boolean => isNewSourcesHeading(text.replace(/[：:][ \t]*$/, ""));
 const isSystemSection = (text: string): boolean =>
-  isResearchNotesHeading(text) || isUpdateLogHeading(text) || isNewSourcesHeading(text) || isOpenQuestionsHeading(text);
+  isResearchNotesHeading(text) || isUpdateLogHeading(text) || isSourcesHeading(text) || isOpenQuestionsHeading(text);
 
 /**
  * The first "### 圖像" section in the exact form the system writes (level 3; its body is only pairs of an `![..](https://..)` line and one
@@ -747,7 +749,7 @@ function findImageSection(lines: string[]): { at: number; end: number } | undefi
 /** Where a picture block goes in a Detail: between the chapter text and its first Sources section (else the first Open questions, Research notes or Update log section, else the end). */
 function withImageBlock(lines: string[], block: string): string {
   const fenced = fencedLines(lines);
-  const sources = findSection(lines, fenced, text => isNewSourcesHeading(text));
+  const sources = findSection(lines, fenced, text => isSourcesHeading(text));
   const other = findSection(
     lines,
     fenced,
@@ -790,7 +792,7 @@ export function addPictureSources(
   const lines = detail.split("\n");
   const fenced = fencedLines(lines);
   const cr = detail.includes("\r\n") ? "\r" : "";
-  const section = findSection(lines, fenced, text => isNewSourcesHeading(text));
+  const section = findSection(lines, fenced, text => isSourcesHeading(text));
   const have = section ? lines.slice(section.at, section.end).join("\n") : "";
   const seen = new Set<string>();
   const fresh = sources.filter(({ href }) => {
@@ -840,6 +842,74 @@ export function chapterBody(detail: string): string {
     lines = [...lines.slice(0, section.at), ...lines.slice(section.end)];
   }
   return lines.join("\n").replace(/\s+$/, "");
+}
+
+const LIST_ITEM = /^[ \t]{0,3}(?:[-*+]|\d+[.)])[ \t]+\S/;
+/** The prose a lifted chapter must have (non-blank characters outside picture lines, and paragraphs): shorter text may be real source commentary. */
+const LIFT_MIN_CHARS = 200;
+const LIFT_MIN_PARAGRAPHS = 2;
+
+/**
+ * Repairs the one clearly wrong shape of a NEW author result: the Detail opens with a sources heading, the chapter prose follows it
+ * (plain paragraphs and picture lines only), and a second sources heading right after holds a real list (every line a list item with
+ * an https address). The prose is moved in front of the first heading and that heading is dropped; the list section stays as it is.
+ * Returns the repaired Detail, or null when the Detail is not exactly this shape (anything ambiguous: no change, the caller treats it
+ * as "no chapter text"). A repaired Detail has no such shape any more, so a second run changes nothing. Only the author-write
+ * step calls this; reading, proofreading and old notes never do.
+ */
+export function liftChapterFromSources(detail: string): string | null {
+  const lines = detail.split("\n");
+  const fenced = fencedLines(lines);
+  if (fenced.some(Boolean)) return null;
+  const first = lines.findIndex(line => line.trim());
+  if (first < 0) return null;
+  const head = HEADING.exec(bare(lines[first]));
+  if (!head || !isSourcesHeading(head[2])) return null;
+  const section = findSection(
+    lines,
+    fenced,
+    (text, level) => isSourcesHeading(text) && level === head[1].length,
+    first
+  );
+  if (!section || section.at !== first || section.end >= lines.length) return null;
+  const next = HEADING.exec(bare(lines[section.end]));
+  if (!next || next[1].length !== head[1].length || !isSourcesHeading(next[2])) return null;
+  const hidden = hiddenRanges(lines, fenced);
+  if (hidden.some(range => range.start < section.end)) return null;
+  const prose = lines.slice(section.at + 1, section.end).map(bare);
+  if (prose.some(line => LIST_ITEM.test(line) || QUOTE_LINE.test(line) || HEADING.test(line) || /<!--/.test(line)))
+    return null;
+  const text = prose.filter(line => line.trim() && !IMAGE_ONLY_LINE.test(line));
+  const paragraphs = prose
+    .join("\n")
+    .split(/\n[ \t]*\n/)
+    .filter(part => part.trim()).length;
+  if (text.join("").replace(/\s/g, "").length < LIFT_MIN_CHARS || paragraphs < LIFT_MIN_PARAGRAPHS) return null;
+  const list = findSection(lines, fenced, () => true, section.end);
+  if (!list || list.at !== section.end) return null;
+  const stop = hidden.find(range => range.start > list.at && range.start < list.end)?.start ?? list.end;
+  // The list section: https list items first, then at most plain note lines (a data-gap remark); anything else is ambiguous.
+  const rest = lines
+    .slice(list.at + 1, stop)
+    .map(bare)
+    .filter(line => line.trim());
+  const itemCount = rest.findIndex(line => !LIST_ITEM.test(line));
+  const items = itemCount < 0 ? rest : rest.slice(0, itemCount);
+  const after = itemCount < 0 ? [] : rest.slice(itemCount);
+  if (!items.length || !items.every(line => /https:\/\/\S/.test(line))) return null;
+  if (after.some(line => LIST_ITEM.test(line) || QUOTE_LINE.test(line) || /<!--/.test(line))) return null;
+  if (
+    lines
+      .slice(stop, list.end)
+      .some((line, i) => line.trim() && !hidden.some(r => stop + i >= r.start && stop + i < r.end))
+  )
+    return null;
+  const cr = detail.includes("\r\n") ? "\r" : "";
+  const body = lines
+    .slice(section.at + 1, section.end)
+    .join("\n")
+    .replace(/^\s+|\s+$/g, "");
+  return [...lines.slice(0, section.at), ...body.split("\n"), cr, ...lines.slice(section.end)].join("\n");
 }
 
 const IMAGE_ONLY_LINE = /^\s*(?:(?:!\[[^\]]*\]\([^)]*\)|!\[\[[^\]]*\]\])\s*)+$/;

@@ -1951,3 +1951,64 @@ test('T9 detection through the notes: a reader\'s note on the chapter is not a h
   await handEdit(r, 1, ' WORD');
   assert.equal(bodyStateRaw(r.raw(1)), 'edited');
 });
+
+// ---- T10a: chapter prose under the first sources heading (new author result only); one verdict reducer for every proof ----
+test('T10a write: an author result with the prose under the first sources heading and the real list after it is repaired in the same write (prose first, fingerprint stamped); the card is not no_body', async () => {
+  // What an author writes: the evidence Detail without the program's own work-record callout (a copy of it would be neutralized anyway).
+  const fixtureDetail = require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures', 'book-sources-lead-r5.md'), 'utf8').split('> [!vam-book]')[0].trimEnd() + '\n';
+  const r = await rig({ script: { author: async input => {
+    await input.admission.reserve();
+    await r.repo.updateNoteGuarded(input.path, { detail: fixtureDetail }, { authorize: input.authorize, finalize: input.finalize });
+    return { outcome: 'written' };
+  } } });
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const note = await r.note(1);
+  assert.ok(note.detail.trimStart().startsWith('在第五章我們看到'));
+  assert.ok(chapterBody(note.detail).length > 200);
+  assert.ok(note.detail.includes('### 來源：') && note.detail.includes('wayfair.com'));
+  assert.notEqual(note.pipelineIssue, 'write failed: no_body');
+  assert.equal(S.load('core/book-pipeline/body-integrity.ts').bodyState(note.detail), 'clean', 'the fingerprint was committed with the repaired text');
+});
+
+test('T10a write: an ambiguous result (list only, or commentary with a list under one heading) stays no_body; the text is not rewritten', async () => {
+  for (const detail of ['### 來源：\n\n- [S](https://s.example/a)', '### 來源\n\n這些資料是本章的依據。\n\n- [S](https://s.example/a)']) {
+    const r = await rig({ script: { author: async input => {
+      await input.admission.reserve();
+      await r.repo.updateNoteGuarded(input.path, { detail }, { authorize: input.authorize, finalize: input.finalize });
+      return { outcome: 'written' };
+    } } });
+    await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+    assert.equal((await r.note(1)).pipelineIssue, 'write failed: no_body');
+    assert.ok(!(await r.note(1)).detail.includes('s.example'));
+  }
+});
+
+const unjudged = (request, statuses) => ({ aggregate: 'checked', items: request.checklist.map(c => ({ id: c.id, type: c.type, status: statuses[c.id] ?? 'met', note: `note ${c.id}`, sources: c.type === 'fact' ? ['https://example.org/p'] : [] })) });
+test('T10a proof: a proof that says checked while every structure point is unmet is re-judged to needs-review and gets the one auto-fix, whose author request names the structure point', async () => {
+  const seen = [];
+  const r = await rig({ script: { ...factCard, proof: async request => unjudged(request, { C1: 'unmet' }), author: input => writeAs(r, seen)(input) } });
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  const s = await r.state();
+  assert.equal(s.autoFixes[r.nodes[1].id], 1);
+  const redo = seen.filter(([, instruction]) => instruction !== undefined);
+  assert.ok(redo.length >= 1);
+  assert.match(redo[0][1], /structure points/);
+  assert.match(redo[0][1], /has a beginning/);
+  assert.equal((await r.note(1)).pipelineIssue, 'proof unmet: C1');
+});
+
+test('T10a proof: a mixed fact and structure failure puts both in the one auto-fix request; a partly unmet structure with met facts stays checked', async () => {
+  const seen = [];
+  let first = true;
+  const r = await rig({ script: { ...factCard, proof: async request => { const out = first && request.body.includes(TITLES[1]) ? unjudged(request, { C1: 'unmet', C2: 'unmet' }) : unjudged(request, {}); if (request.body.includes(TITLES[1])) first = false; return out; }, author: input => writeAs(r, seen)(input) } });
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const redo = seen.filter(([, instruction]) => instruction !== undefined);
+  assert.equal(redo.length, 1);
+  assert.match(redo[0][1], /fact check/); assert.match(redo[0][1], /a date/);
+  assert.match(redo[0][1], /structure points/); assert.match(redo[0][1], /has a beginning/);
+  const three = [{ id: 'C1', type: 'structure', text: 'a' }, { id: 'C2', type: 'structure', text: 'b' }, { id: 'C3', type: 'fact', text: 'd' }];
+  const p = await rig({ script: { card: () => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: three }), proof: async request => unjudged(request, { C1: 'unmet' }) } });
+  await p.runs.start(p.mapPath); await confirmDone(p.runs, p.mapPath);
+  assert.equal(stageOf(p.raw(1)), 'checked');
+});

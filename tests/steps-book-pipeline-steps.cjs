@@ -165,7 +165,9 @@ test('proofread: an item the reply asserts without a source this call opened dro
   assert.deepEqual(mixed.items.map(i => i.status), ['met', 'unverified', 'met']); assert.equal(mixed.aggregate, 'checked'); assert.deepEqual(plain(mixed.items[1].sources), []);
   // Q-fix3: an unmet structure item no longer needs a person (it stays recorded); an unmet fact item does.
   const unmet = proof.evaluateProof([item('C1', 'unmet'), item('C2', 'met', ['https://example.org/a'])], checklist, ['https://example.org/a']);
-  assert.equal(unmet.aggregate, 'checked'); assert.equal(unmet.items[0].status, 'unmet');
+  assert.equal(unmet.aggregate, 'needs-review', 'T10a: the only structure point unmet = all unmet'); assert.equal(unmet.items[0].status, 'unmet');
+  const partly = proof.evaluateProof([item('C1', 'unmet'), item('C2', 'met', ['https://example.org/a']), item('C3', 'met')], [{ id: 'C1', type: 'structure', text: 'a' }, { id: 'C3', type: 'structure', text: 'b' }, checklist[1]].map((c, i) => ({ ...c, id: ['C1', 'C3', 'C2'][i] })), ['https://example.org/a']);
+  assert.equal(partly.aggregate, 'checked', 'some structure points met stays checked');
   const factUnmet = proof.evaluateProof([item('C1'), item('C2', 'unmet', ['https://example.org/a'])], checklist, ['https://example.org/a']);
   assert.equal(factUnmet.aggregate, 'needs-review');
 });
@@ -682,4 +684,15 @@ test('apply-notes: lines, list marks and blank lines are kept', () => {
   assert.throws(run('- first A\nsecond'), /list or quote mark/);
   assert.throws(run('- first A\n\n'), /line count|blank/);
   assert.throws(run('   '), /empty|non-empty/);
+});
+
+test('T10a verdict reducer: all structure points unmet or an empty chapter is needs-review (also for a stored checked result); some unmet structure with met facts stays checked', () => {
+  const r = (...statuses) => ({ aggregate: 'checked', items: statuses.map(([type, status], i) => ({ type, status, id: `C${i + 1}` })) });
+  assert.equal(proof.proofVerdict(r(['structure', 'unmet'], ['structure', 'unmet'], ['fact', 'met'])), 'needs-review');
+  assert.equal(proof.proofVerdict(r(['structure', 'unmet'], ['structure', 'met'], ['fact', 'met'])), 'checked');
+  assert.equal(proof.proofVerdict(r(['structure', 'met'], ['fact', 'met']), true), 'needs-review');
+  assert.equal(proof.proofVerdict(r(['structure', 'met'], ['fact', 'unmet'])), 'needs-review');
+  assert.equal(proof.proofVerdict({ ...r(['structure', 'met']), aggregate: 'needs-review' }), 'needs-review');
+  const all = proof.evaluateProof([item('C1', 'unmet'), item('C2', 'met', ['https://example.org/a'])], checklist, ['https://example.org/a']);
+  assert.equal(all.aggregate, 'needs-review', 'a new proof goes through the same reducer');
 });

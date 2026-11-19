@@ -269,3 +269,50 @@ test('addPictureSources: entries go to the end of the Sources section (before a 
   const afterHeading = sections.addPictureSources('正文。\n\n## 來源\n\n## 其他\nx\n', [e(4)], 'zh-TW');
   assert.equal(afterHeading, `正文。\n\n## 來源\n- ${e(4).entry}\n\n## 其他\nx\n`);
 });
+
+// ---- T10a: a sources heading with a trailing colon; the narrow lift of chapter prose written under the first sources heading ----
+const fs = require('node:fs');
+const path = require('node:path');
+const fixture = name => fs.readFileSync(path.join(__dirname, 'fixtures', name), 'utf8');
+const PROSE = '第一段正文，先把這一章要講的事說清楚。'.repeat(8) + '\n\n' + '第二段正文接著講做法與步驟，讓讀者能照著做。'.repeat(8);
+const LIST = '- [A](https://a.example/x)\n- [B](https://b.example/y)';
+
+test('T10a sources heading: "來源：" (full-width or ASCII colon) is a system section like "來源"; chapterBody drops it', () => {
+  for (const heading of ['### 來源：', '### 來源:', '### Sources:']) assert.equal(sections.chapterBody(`正文。\n\n${heading}\n\n- a`), '正文。');
+  assert.equal(sections.chapterBody('### 來源\n\n正文\n\n### 來源：\n\n- a'), '');
+});
+
+test('T10a lift: both evidence shapes (r5 closing chapter, r3 with a data-gap remark after the list) move the prose in front; the list section stays; chapterBody is the prose', () => {
+  for (const name of ['book-sources-lead-r5.md', 'book-sources-lead-r3.md']) {
+    const detail = fixture(name);
+    assert.equal(sections.chapterBody(detail), '', `${name}: before the repair the chapter reads as empty`);
+    const lifted = sections.liftChapterFromSources(detail);
+    assert.ok(lifted, name);
+    assert.ok(!lifted.trimStart().startsWith('###'), 'the prose now comes first');
+    assert.ok(sections.chapterBody(lifted).length > 200);
+    assert.ok(lifted.includes('### 來源：') && lifted.includes('https://'), 'the sources list stays');
+    assert.equal(lifted.split('book-proof:v1').length, detail.split('book-proof:v1').length, 'work records stay');
+    assert.equal(sections.liftChapterFromSources(lifted), null, 'a second run finds nothing to repair');
+  }
+});
+
+test('T10a lift: real source commentary, an annotated bibliography, fences, quotes, headings in the prose and short text are NOT lifted', () => {
+  const lift = text => sections.liftChapterFromSources(text);
+  assert.equal(lift(`### 來源\n\n這些資料是本章的依據。\n\n${LIST}`), null, 'one sources section with commentary and a list');
+  assert.equal(lift(`### 來源\n\n這些資料是本章的依據。\n\n### 來源：\n\n${LIST}`), null, 'commentary too short to be a chapter');
+  assert.equal(lift(`### 來源\n\n- [A](https://a.example/x) 說明很長的註解。\n- [B](https://b.example/y) 另一則註解。\n\n${PROSE}`), null, 'annotated bibliography (list first)');
+  assert.equal(lift(`### 來源\n\n${PROSE}\n\n- 一個清單項目\n\n### 來源：\n\n${LIST}`), null, 'a list item inside the prose');
+  assert.equal(lift(`### 來源\n\n${PROSE}\n\n\`\`\`\ncode\n\`\`\`\n\n### 來源：\n\n${LIST}`), null, 'a fence');
+  assert.equal(lift(`### 來源\n\n${PROSE}\n\n> 引用的一句話\n\n### 來源：\n\n${LIST}`), null, 'a blockquote');
+  assert.equal(lift(`### 來源\n\n${PROSE}\n\n#### 小節\n\n### 來源：\n\n${LIST}`), null, 'a sub-heading in the prose');
+  assert.equal(lift(`### 來源\n\n${PROSE}\n\n### 其他\n\n文字\n\n### 來源：\n\n${LIST}`), null, 'another section between');
+  assert.equal(lift(`### 來源\n\n${PROSE}\n\n### 來源：\n\n沒有清單，只有一句話。`), null, 'the second section is no list');
+  assert.equal(lift(`### 來源\n\n${PROSE}`), null, 'no list after');
+  assert.equal(lift(`正文開頭。\n\n### 來源\n\n${PROSE}\n\n### 來源：\n\n${LIST}`), null, 'the Detail does not start with the sources heading');
+  assert.equal(lift(''), null);
+});
+
+test('T10a lift: CRLF text is repaired the same way', () => {
+  const lifted = sections.liftChapterFromSources(`### 來源\r\n\r\n${PROSE.replace(/\n/g, '\r\n')}\r\n\r\n### 來源：\r\n\r\n${LIST.replace(/\n/g, '\r\n')}\r\n`);
+  assert.ok(lifted && sections.chapterBody(lifted).length > 200);
+});

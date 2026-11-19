@@ -84,6 +84,7 @@ import {
   replaceProofSection,
   replaceResearchRecord,
   chapterBody,
+  liftChapterFromSources,
   detailBlockOf
 } from "../../core/book-pipeline/note-sections";
 import {
@@ -103,6 +104,7 @@ import {
   proofSectionHeading,
   safeHref as safeLinkHref,
   type ProofCounts,
+  proofVerdict,
   type ProofResult
 } from "../../core/book-pipeline/proof";
 import { effectiveSettings } from "../../core/book-pipeline/settings";
@@ -183,6 +185,13 @@ export type BookRunRefusal =
   | "nothing"
   /** A rewrite the reader allowed was for a text that has changed since: nothing is rewritten. */
   | "text_changed";
+/** The ids a needs-review proof names: its unmet fact points, else its unmet structure points, else the empty text. */
+function unmetIds(items: readonly { id: string; type: string; status: string }[]): string {
+  const unmet = items.filter(item => item.status === "unmet");
+  const pick = unmet.filter(item => item.type === "fact");
+  return (pick.length ? pick : unmet).map(item => code(item.id)).join(" ") || "no_body";
+}
+
 export class BookPipelineRunError extends Error {
   constructor(readonly code: BookRunRefusal) {
     super(`book pipeline refused: ${code}`);
@@ -2093,13 +2102,21 @@ export class BookPipelineRuns {
         return null;
       }
       // An author result whose Detail holds no chapter text (only sources and notes) is refused: the card keeps its text.
+      let text = cleaned;
       const detail = detailBlockOf(cleaned);
       if (detail !== undefined && !chapterBody(detail).trim()) {
-        emptyBody = true;
-        return null;
+        // The one clearly recognisable wrong shape (chapter prose written under the first sources heading, the real list after it)
+        // is repaired here, in this new result only; anything else stays "no chapter text".
+        const lifted = liftChapterFromSources(detail);
+        if (lifted === null || !chapterBody(lifted).trim()) {
+          emptyBody = true;
+          return null;
+        }
+        const at = cleaned.indexOf(detail);
+        text = `${cleaned.slice(0, at)}${lifted}${cleaned.slice(at + detail.length)}`;
       }
       // The text and its new fingerprint are one write: from here on the chapter counts as "as the program left it".
-      return stampRaw(restore(cleaned));
+      return stampRaw(restore(text));
     };
     // Nothing of this card's frontmatter is written while the author runs: the research write compares the whole file.
     const done = await untilAborted(
@@ -2487,7 +2504,11 @@ export class BookPipelineRuns {
         ...(stored?.model ? { model: stored.model } : {}),
         authorModel: drive.authorModels.get(nodeId) ?? stored?.authorModel
       };
-      const next = programStampRaw(card.raw, this.proofSectionOf(drive, { result }, models, imageLine)(card.raw));
+      const judged: ProofResult = { ...result, aggregate: proofVerdict(result, false) };
+      const next = programStampRaw(
+        card.raw,
+        this.proofSectionOf(drive, { result: judged }, models, imageLine)(card.raw)
+      );
       if (next !== card.raw) {
         const path = await this.stillOnMap(drive, nodeId);
         if (!path) return { kind: "failed", reason: "card_removed" };
@@ -2500,8 +2521,9 @@ export class BookPipelineRuns {
         if (written === "discarded") return { kind: "failed", reason: "discarded" };
       }
     }
-    const verdict = result;
-    // Unmet structure items do not stop the card: it stays checked, and the count is kept in its issue field for the card's small note.
+    // The same reducer judges a fresh and a stored proof; a stored "checked" with every structure point unmet is needs-review.
+    const verdict: ProofResult = { ...result, aggregate: proofVerdict(result, !body.trim()) };
+    // Some unmet structure items do not stop the card: it stays checked, and the count is kept in its issue field for the card's small note.
     const structureUnmet = verdict.items
       .filter(item => item.type !== "fact" && item.status === "unmet")
       .map(item => code(item.id));
@@ -2522,10 +2544,7 @@ export class BookPipelineRuns {
           verdict.aggregate === "needs-review"
             ? verdict.factsUnverified
               ? "proof unmet: facts_unverified"
-              : `proof unmet: ${verdict.items
-                  .filter(item => item.type === "fact" && item.status === "unmet")
-                  .map(item => code(item.id))
-                  .join(" ")}`
+              : `proof unmet: ${unmetIds(verdict.items)}`
             : noticed.length
               ? `structure unmet: ${noticed.join(" ")}`
               : null

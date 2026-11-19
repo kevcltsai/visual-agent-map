@@ -3320,8 +3320,6 @@ export const en = {
   "ui.book_start_minutes_0": "{0} minutes",
   "ui.book_start_stops": "It stops only twice for you to confirm.",
   "ui.book_start_rerun_hint": "If one chapter is not good enough, you can rerun just that chapter.",
-  "ui.book_start_models_summary_0_1_2_3": "Models: plan {0}, author {1}, pictures {2}, proofread {3}",
-  "ui.book_start_models_change": "Change",
   "ui.book_start_suggesting": "Thinking up suggestions from this map's subject...",
   "ui.book_start_settings": "Whole-book settings (grey text is a suggestion; leave a field empty to use it)",
   "ui.book_start_go": "Start",

@@ -518,7 +518,7 @@ const rootPath = h => h.view.map.nodes.find(n => n.id === h.ids.root).path;
 const shown = el => { for (let n = el; n; n = n.parent) if (n.hidden || (n.tag === 'details' && !n.open)) return false; return true; };
 const field = (modal, label) => dom.findAll(modal.modalEl, i => i.tag === 'textarea').find(f => f.attrs['aria-label'] === label);
 
-test('start card: opens with the estimate (1+5N calls, about minutes), the six settings open (no <details>), the models on one line behind "Change"; nothing starts yet', async () => {
+test('start card: opens with the estimate (1+5N calls, about minutes), the six settings open (no <details>), the four model dropdowns always shown below the estimate (no summary, no change link); nothing starts yet', async () => {
   const h = await harness({ book: false });
   const modal = await openCard(h);
   assert.ok(modal.isOpen);
@@ -532,22 +532,28 @@ test('start card: opens with the estimate (1+5N calls, about minutes), the six s
   assert.equal(areas.length, 6);
   for (const area of areas) assert.ok(shown(area), 'each field is on screen');
   const s = h.plugin.settings;
-  assert.ok(all.includes(`模型：企劃 M:${s.bookPlanModel}、寫作 M:${s.bookWriteModel}、找圖 M:${s.bookImageModel}、校對 M:${s.bookProofModel}`), all.join('|'));
+  assert.ok(!all.some(x => x.startsWith('模型：')), 'no summary line');
   const selects = dom.findAll(modal.modalEl, i => i.tag === 'select');
   assert.equal(selects.length, 4);
-  for (const select of selects) assert.equal(shown(select), false, 'the four dropdowns are folded until "Change"');
-  assert.deepEqual(dom.findAll(modal.modalEl, i => i.tag === 'button').map(b => b.text), ['更改', '取消', '開始']);
+  for (const select of selects) assert.ok(shown(select), 'the four dropdowns are always shown');
+  assert.equal(dom.find(modal.modalEl, i => i.cls.includes('vam-book-start-models-change')), undefined, 'no change link');
+  assert.deepEqual(dom.findAll(modal.modalEl, i => i.tag === 'button').map(b => b.text), ['取消', '開始']);
+  // DOM order: intro, estimate, models, settings.
+  const order = dom.findAll(modal.modalEl, () => true);
+  const at = pred => order.findIndex(pred);
+  const iIntro = at(i => i.cls.includes('vam-modal-intro')), iEst = at(i => i.cls.includes('vam-book-start-estimate'));
+  const iModels = at(i => i.cls.includes('vam-book-start-model-choice')), iSettings = at(i => i.cls.includes('vam-book-start-settings'));
+  assert.ok(iIntro >= 0 && iIntro < iEst && iEst < iModels && iModels < iSettings, [iIntro, iEst, iModels, iSettings].join(','));
+  void s;
   assert.equal(dom.focusedNow().text, '取消', 'the keyboard starts on Cancel, so a stray Enter never starts the run');
   cardButton(modal, '取消').click();
   assert.equal(modal.isOpen, false);
   assert.equal(h.entries.length, 0, 'Cancel starts nothing');
 });
 
-test('start card: "Change" unfolds four dropdowns (plan, author, pictures, proofread) with the AI model list; a pick is saved to the settings, the summary line and the time follow, the calls do not', async () => {
+test('start card: the four dropdowns (plan, author, pictures, proofread) carry the AI model list; a pick is saved on Start only, the time follows, the calls do not', async () => {
   const h = await harness({ book: false });
   const modal = await openCard(h);
-  const change = cardButton(modal, '更改');
-  change.click();
   const selects = dom.findAll(modal.modalEl, i => i.tag === 'select');
   for (const select of selects) assert.ok(shown(select));
   assert.deepEqual(selects.map(x => x.attrs['aria-label']), ['企劃', '寫作', '找圖', '校對']);
@@ -557,12 +563,9 @@ test('start card: "Change" unfolds four dropdowns (plan, author, pictures, proof
   selects[1].value = 'claude:sonnet'; selects[1].change();
   assert.notEqual(h.plugin.settings.bookWriteModel, 'claude:sonnet', 'a pick is not saved while the card is open');
   assert.equal(h.ctl.saves.length, 0);
-  assert.ok(texts(modal.modalEl).includes('模型：企劃 M:claude:sonnet、寫作 M:claude:sonnet、找圖 M:claude:haiku、校對 M:claude:haiku'));
   const after = texts(modal.modalEl).find(x => x.startsWith('3 張卡'));
   assert.match(before, /最多 16 次/); assert.match(after, /最多 16 次/);
   assert.notEqual(before, after, 'the time follows the model');
-  change.click();
-  for (const select of selects) assert.equal(shown(select), false, 'folds again');
   cardButton(modal, '開始').click(); await dom.tick();
   assert.equal(h.plugin.settings.bookWriteModel, 'claude:sonnet', 'Start saves the pick');
   assert.equal(h.ctl.saves.length, 1);
@@ -572,7 +575,6 @@ test('start card: Cancel after changing the models leaves the saved models exact
   const h = await harness({ book: false });
   const was = { plan: h.plugin.settings.bookPlanModel, write: h.plugin.settings.bookWriteModel, images: h.plugin.settings.bookImageModel, proof: h.plugin.settings.bookProofModel };
   const modal = await openCard(h);
-  cardButton(modal, '更改').click();
   const selects = dom.findAll(modal.modalEl, i => i.tag === 'select');
   selects[0].value = 'claude:opus'; selects[0].change();
   selects[1].value = 'claude:haiku'; selects[1].change();

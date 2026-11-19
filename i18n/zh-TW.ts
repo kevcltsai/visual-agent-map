@@ -3104,8 +3104,6 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_start_minutes_0": "{0} 分鐘",
   "ui.book_start_stops": "中間只會停兩次，讓你確認。",
   "ui.book_start_rerun_hint": "某一章不滿意，可以只重跑那一章。",
-  "ui.book_start_models_summary_0_1_2_3": "模型：企劃 {0}、寫作 {1}、找圖 {2}、校對 {3}",
-  "ui.book_start_models_change": "更改",
   "ui.book_start_suggesting": "正在依這張心智圖的主題想建議⋯⋯",
   "ui.book_start_settings": "全書設定（灰字是建議，不填就用它）",
   "ui.book_start_go": "開始",

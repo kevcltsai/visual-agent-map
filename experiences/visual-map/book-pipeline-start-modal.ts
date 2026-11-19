@@ -12,9 +12,9 @@ import { syncModelSelect } from "../../core/model-discovery";
 import { BOOK_POOL } from "./book-pipeline-run";
 
 /**
- * The card shown when "Picture book" is pressed: what will happen, about how long and how many AI calls, the six whole-book
- * settings (always open; a grey italic suggestion shows in an empty field and is used when the field stays empty), and the model
- * of each step on one line with "Change" opening four dropdowns. The only decisions are Start and Cancel.
+ * The card shown when "Picture book" is pressed: what will happen, about how long and how many AI calls, the model of each
+ * step (four dropdowns, always shown, below the estimate), and the six whole-book settings (always open; a grey italic suggestion
+ * shows in an empty field and is used when the field stays empty). The only decisions are Start and Cancel.
  */
 
 /** The median wall time of one card in a live run (stage 7 measurement). The estimate says "about"; T2 live runs may recalibrate it. */
@@ -175,16 +175,6 @@ export function renderBookSettingsFields(parent: HTMLElement, current: BookSetti
   };
 }
 
-/** "Model: Plan X, Author Y, ..." in one line. */
-export function bookModelSummary(models: BookStartModels, label: (model: string) => string): string {
-  return t(
-    "ui.book_start_models_summary_0_1_2_3",
-    label(models.plan),
-    label(models.write),
-    label(models.images),
-    label(models.proof)
-  );
-}
 /** The four model dropdowns (plan, author, pictures, proofread). Shared with the trial-confirmation screen. */
 export function renderBookModelChoice(parent: HTMLElement, input: BookModelChoiceInput): void {
   for (const row of MODEL_ROWS) {
@@ -215,7 +205,6 @@ export class BookStartModal extends Modal {
   private suggested: BookSettings = {};
   private suggestingEl: HTMLElement | null = null;
   private estimateEl: HTMLElement | null = null;
-  private modelSummaryEl: HTMLElement | null = null;
   constructor(
     app: App,
     private input: BookStartInput
@@ -249,6 +238,13 @@ export class BookStartModal extends Modal {
     this.estimateEl.setAttr("role", "status");
     contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_stops") });
     contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_rerun_hint") });
+    const choice = contentEl.createDiv({ cls: "vam-book-start-model-choice" });
+    renderBookModelChoice(choice, {
+      ...this.input.modelChoice,
+      models: this.input.models,
+      // A pick only changes this card's copy; it is saved when Start is pressed.
+      onChange: () => this.refreshEstimate()
+    });
     const settings = contentEl.createDiv({ cls: "vam-book-start-settings" });
     settings.setAttr("role", "group");
     settings.setAttr("aria-label", t("ui.book_start_settings"));
@@ -259,26 +255,7 @@ export class BookStartModal extends Modal {
     });
     this.suggestingEl.setAttr("role", "status");
     this.fields = renderBookSettingsFields(settings, this.input.settings);
-    const models = contentEl.createDiv({ cls: "vam-book-start-models" });
-    this.modelSummaryEl = models.createSpan({ cls: "vam-book-start-models-summary" });
-    const change = models.createEl("button", {
-      cls: "vam-book-start-models-change",
-      text: t("ui.book_start_models_change")
-    });
-    change.setAttr("aria-expanded", "false");
-    const choice = contentEl.createDiv({ cls: "vam-book-start-model-choice" });
-    choice.hidden = true;
-    renderBookModelChoice(choice, {
-      ...this.input.modelChoice,
-      models: this.input.models,
-      // A pick only changes this card's copy; it is saved when Start is pressed.
-      onChange: () => this.refreshModels()
-    });
-    change.addEventListener("click", () => {
-      choice.hidden = !choice.hidden;
-      change.setAttr("aria-expanded", String(!choice.hidden));
-    });
-    this.refreshModels();
+    this.refreshEstimate();
     const actions = modalActions(this);
     const cancel = actions.createEl("button", { text: t("ui.cancel") });
     cancel.addEventListener("click", () => this.close());
@@ -291,10 +268,9 @@ export class BookStartModal extends Modal {
       cancel.focus();
     }, 0);
   }
-  /** The summary line and the estimate follow the models in the dropdowns. */
-  private refreshModels(): void {
+  /** The estimate follows the models in the dropdowns. */
+  private refreshEstimate(): void {
     this.estimateEl?.setText(bookStartEstimateText(bookStartEstimate(this.input.cards, this.input.models)));
-    this.modelSummaryEl?.setText(bookModelSummary(this.input.models, this.input.modelChoice.label));
   }
   onClose(): void {
     this.opened = false;

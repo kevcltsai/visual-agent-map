@@ -3103,8 +3103,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_start_minutes_0": "{0} 分钟",
   "ui.book_start_stops": "中间只会停两次，让你确认。",
   "ui.book_start_rerun_hint": "某一章不满意，可以只重跑那一章。",
-  "ui.book_start_models_summary_0_1_2_3": "模型：企划 {0}、写作 {1}、找图 {2}、校对 {3}",
-  "ui.book_start_models_change": "更改",
   "ui.book_start_suggesting": "正在依这张思维导图的主题想建议……",
   "ui.book_start_settings": "全书设定（灰字是建议，不填就用它）",
   "ui.book_start_go": "开始",

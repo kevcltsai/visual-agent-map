@@ -3099,8 +3099,6 @@ var en = {
   "ui.book_start_minutes_0": "{0} minutes",
   "ui.book_start_stops": "It stops only twice for you to confirm.",
   "ui.book_start_rerun_hint": "If one chapter is not good enough, you can rerun just that chapter.",
-  "ui.book_start_models_summary_0_1_2_3": "Models: plan {0}, author {1}, pictures {2}, proofread {3}",
-  "ui.book_start_models_change": "Change",
   "ui.book_start_suggesting": "Thinking up suggestions from this map's subject...",
   "ui.book_start_settings": "Whole-book settings (grey text is a suggestion; leave a field empty to use it)",
   "ui.book_start_go": "Start",
@@ -6278,8 +6276,6 @@ var zhCN = {
   "ui.book_start_minutes_0": "{0} \u5206\u949F",
   "ui.book_start_stops": "\u4E2D\u95F4\u53EA\u4F1A\u505C\u4E24\u6B21\uFF0C\u8BA9\u4F60\u786E\u8BA4\u3002",
   "ui.book_start_rerun_hint": "\u67D0\u4E00\u7AE0\u4E0D\u6EE1\u610F\uFF0C\u53EF\u4EE5\u53EA\u91CD\u8DD1\u90A3\u4E00\u7AE0\u3002",
-  "ui.book_start_models_summary_0_1_2_3": "\u6A21\u578B\uFF1A\u4F01\u5212 {0}\u3001\u5199\u4F5C {1}\u3001\u627E\u56FE {2}\u3001\u6821\u5BF9 {3}",
-  "ui.book_start_models_change": "\u66F4\u6539",
   "ui.book_start_suggesting": "\u6B63\u5728\u4F9D\u8FD9\u5F20\u601D\u7EF4\u5BFC\u56FE\u7684\u4E3B\u9898\u60F3\u5EFA\u8BAE\u2026\u2026",
   "ui.book_start_settings": "\u5168\u4E66\u8BBE\u5B9A\uFF08\u7070\u5B57\u662F\u5EFA\u8BAE\uFF0C\u4E0D\u586B\u5C31\u7528\u5B83\uFF09",
   "ui.book_start_go": "\u5F00\u59CB",
@@ -9457,8 +9453,6 @@ var zhTW = {
   "ui.book_start_minutes_0": "{0} \u5206\u9418",
   "ui.book_start_stops": "\u4E2D\u9593\u53EA\u6703\u505C\u5169\u6B21\uFF0C\u8B93\u4F60\u78BA\u8A8D\u3002",
   "ui.book_start_rerun_hint": "\u67D0\u4E00\u7AE0\u4E0D\u6EFF\u610F\uFF0C\u53EF\u4EE5\u53EA\u91CD\u8DD1\u90A3\u4E00\u7AE0\u3002",
-  "ui.book_start_models_summary_0_1_2_3": "\u6A21\u578B\uFF1A\u4F01\u5283 {0}\u3001\u5BEB\u4F5C {1}\u3001\u627E\u5716 {2}\u3001\u6821\u5C0D {3}",
-  "ui.book_start_models_change": "\u66F4\u6539",
   "ui.book_start_suggesting": "\u6B63\u5728\u4F9D\u9019\u5F35\u5FC3\u667A\u5716\u7684\u4E3B\u984C\u60F3\u5EFA\u8B70\u22EF\u22EF",
   "ui.book_start_settings": "\u5168\u66F8\u8A2D\u5B9A\uFF08\u7070\u5B57\u662F\u5EFA\u8B70\uFF0C\u4E0D\u586B\u5C31\u7528\u5B83\uFF09",
   "ui.book_start_go": "\u958B\u59CB",
@@ -52406,15 +52400,6 @@ function renderBookSettingsFields(parent, current) {
     }
   };
 }
-function bookModelSummary(models, label) {
-  return t(
-    "ui.book_start_models_summary_0_1_2_3",
-    label(models.plan),
-    label(models.write),
-    label(models.images),
-    label(models.proof)
-  );
-}
 function renderBookModelChoice(parent, input2) {
   for (const row of MODEL_ROWS) {
     const id = `vam-book-start-model-${row.step}`;
@@ -52446,7 +52431,6 @@ var BookStartModal = class extends import_obsidian24.Modal {
     __publicField(this, "suggested", {});
     __publicField(this, "suggestingEl", null);
     __publicField(this, "estimateEl", null);
-    __publicField(this, "modelSummaryEl", null);
   }
   /** True from open to close (the screen opens one card at a time). Not named isOpen: Obsidian's Modal writes that property itself. */
   get isShown() {
@@ -52475,6 +52459,13 @@ var BookStartModal = class extends import_obsidian24.Modal {
     this.estimateEl.setAttr("role", "status");
     contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_stops") });
     contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_rerun_hint") });
+    const choice = contentEl.createDiv({ cls: "vam-book-start-model-choice" });
+    renderBookModelChoice(choice, {
+      ...this.input.modelChoice,
+      models: this.input.models,
+      // A pick only changes this card's copy; it is saved when Start is pressed.
+      onChange: () => this.refreshEstimate()
+    });
     const settings = contentEl.createDiv({ cls: "vam-book-start-settings" });
     settings.setAttr("role", "group");
     settings.setAttr("aria-label", t("ui.book_start_settings"));
@@ -52485,26 +52476,7 @@ var BookStartModal = class extends import_obsidian24.Modal {
     });
     this.suggestingEl.setAttr("role", "status");
     this.fields = renderBookSettingsFields(settings, this.input.settings);
-    const models = contentEl.createDiv({ cls: "vam-book-start-models" });
-    this.modelSummaryEl = models.createSpan({ cls: "vam-book-start-models-summary" });
-    const change2 = models.createEl("button", {
-      cls: "vam-book-start-models-change",
-      text: t("ui.book_start_models_change")
-    });
-    change2.setAttr("aria-expanded", "false");
-    const choice = contentEl.createDiv({ cls: "vam-book-start-model-choice" });
-    choice.hidden = true;
-    renderBookModelChoice(choice, {
-      ...this.input.modelChoice,
-      models: this.input.models,
-      // A pick only changes this card's copy; it is saved when Start is pressed.
-      onChange: () => this.refreshModels()
-    });
-    change2.addEventListener("click", () => {
-      choice.hidden = !choice.hidden;
-      change2.setAttr("aria-expanded", String(!choice.hidden));
-    });
-    this.refreshModels();
+    this.refreshEstimate();
     const actions = modalActions(this);
     const cancel = actions.createEl("button", { text: t("ui.cancel") });
     cancel.addEventListener("click", () => this.close());
@@ -52516,11 +52488,10 @@ var BookStartModal = class extends import_obsidian24.Modal {
       cancel.focus();
     }, 0);
   }
-  /** The summary line and the estimate follow the models in the dropdowns. */
-  refreshModels() {
-    var _a2, _b2;
+  /** The estimate follows the models in the dropdowns. */
+  refreshEstimate() {
+    var _a2;
     (_a2 = this.estimateEl) == null ? void 0 : _a2.setText(bookStartEstimateText(bookStartEstimate(this.input.cards, this.input.models)));
-    (_b2 = this.modelSummaryEl) == null ? void 0 : _b2.setText(bookModelSummary(this.input.models, this.input.modelChoice.label));
   }
   onClose() {
     var _a2, _b2;

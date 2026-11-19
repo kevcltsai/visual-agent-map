@@ -1942,6 +1942,22 @@ test('T9 unknown: an older chapter with text and no fingerprint (and no stored p
   assert.equal((await r.note(1)).pipelineIssue, 'write failed: hand_edited');
 });
 
+test('T9 keep (review-b B1): keeping a note that has no record stays kept: a whole-book redo does not write it and the record holds no program fingerprint', async () => {
+  const r = await rig();
+  await finish(r);
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/\n> <!-- book-body:v1 .*-->/, '').replace(/\n> \[!vam-book\]- 校對結果（最新一次）(\n>.*)*/, '\n'), {});
+  assert.equal(bodyStateRaw(r.raw(1)), 'unknown');
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, keepRaw, {});
+  assert.equal(readBodyRecord(detailBlockOf(r.raw(1))).fp, undefined, 'no program fingerprint is stored');
+  assert.equal(bodyStateRaw(r.raw(1)), 'unknown');
+  const authors = r.stat.author.length;
+  await redo(r, [1]);
+  assert.equal(r.stat.author.length, authors, 'author not called');
+  assert.ok(r.stat.logs.some(l => l.includes('hand_edit_kept')));
+  const { isKeptRaw } = S.load('core/book-pipeline/body-integrity.ts');
+  assert.equal(isKeptRaw(r.raw(1)), true, 'the view still asks (G) for a manual rerun');
+});
+
 test('T9 keep: "keep my version" makes a whole-book redo leave the chapter alone and send it on to its proofread', async () => {
   const r = await rig();
   await finish(r);

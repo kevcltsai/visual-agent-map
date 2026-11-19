@@ -168,6 +168,7 @@ import {
   bodyStateRaw,
   integrityFpRaw,
   isKept,
+  isKeptRaw,
   isUntouched,
   programStamp,
   programStampRaw,
@@ -2236,7 +2237,8 @@ export class BookPipelineRuns {
     const permit = drive.overwrite.get(nodeId);
     const mayOverwrite = (raw: string): boolean => {
       const state = bodyStateRaw(raw);
-      if (state === "clean" || state === "empty") return true;
+      // A kept choice wins over clean/empty: an older note the reader kept has no program fingerprint and must stay as it is.
+      if ((state === "clean" || state === "empty") && !isKeptRaw(raw)) return true;
       return !!permit && permit.runId === drive.store.state.runId && permit.fingerprint === integrityFpRaw(raw);
     };
     if (!mayOverwrite(card.raw)) {

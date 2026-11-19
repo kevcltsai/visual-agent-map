@@ -340,7 +340,7 @@ import {
   readPipelineStage,
   type BookPipelineData
 } from "../../core/book-pipeline/model";
-import { bodyStateRaw, integrityFp, integrityFpRaw } from "../../core/book-pipeline/body-integrity";
+import { bodyStateRaw, integrityFp, integrityFpRaw, isKeptRaw } from "../../core/book-pipeline/body-integrity";
 import {
   type BookBarActions,
   bookBarState,
@@ -9850,7 +9850,7 @@ export class VisualAgentMapView extends ItemView {
       const raw = file instanceof TFile ? await this.app.vault.read(file).catch(() => null) : null;
       if (raw !== null) {
         const state = bodyStateRaw(raw);
-        if (state !== "clean" && state !== "empty") {
+        if ((state !== "clean" && state !== "empty") || isKeptRaw(raw)) {
           this.bookRerunAsk = { path, nodeId: node.id, fp: integrityFpRaw(raw) };
           this.bookBarFocus = "rerun-go";
           return;

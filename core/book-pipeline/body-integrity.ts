@@ -24,7 +24,8 @@ const BODY_LINE = /^(?:[ \t]{0,3}>[ \t]?)*<!-- book-body:v1 (\{.*\}) -->$/;
 
 /** What the hidden record holds: the fingerprint of the chapter as the program wrote it, and the one the reader chose to keep. */
 export interface BodyRecord {
-  fp: string;
+  /** Absent when the reader kept an older note that never had a program fingerprint: the state then stays "unknown", never "clean". */
+  fp?: string;
   /** The fingerprint of the text the reader chose "keep my version" for. */
   kept?: string;
 }
@@ -46,9 +47,11 @@ export function readBodyRecord(detail: string): BodyRecord | undefined {
     if (!m) return;
     try {
       const data = JSON.parse(m[1]) as { fp?: unknown; kept?: unknown };
-      if (typeof data.fp !== "string" || !/^[0-9a-f]{16}$/.test(data.fp)) return;
+      const fp = typeof data.fp === "string" && /^[0-9a-f]{16}$/.test(data.fp) ? data.fp : undefined;
+      const kept = typeof data.kept === "string" && /^[0-9a-f]{16}$/.test(data.kept) ? data.kept : undefined;
+      if (!fp && !kept) return;
       found = {
-        fp: data.fp,
+        ...(fp ? { fp } : {}),
         ...(typeof data.kept === "string" && /^[0-9a-f]{16}$/.test(data.kept) ? { kept: data.kept } : {})
       };
     } catch {
@@ -99,7 +102,7 @@ export function oldNoteLooksUntouched(detail: string): boolean {
 export type BodyState = "empty" | "clean" | "edited" | "unknown";
 export function bodyState(detail: string): BodyState {
   const record = readBodyRecord(detail);
-  if (!record) return !integrityText(detail) ? "empty" : oldNoteLooksUntouched(detail) ? "clean" : "unknown";
+  if (!record?.fp) return !integrityText(detail) ? "empty" : oldNoteLooksUntouched(detail) ? "clean" : "unknown";
   return record.fp === integrityFp(detail) ? "clean" : "edited";
 }
 /** Whether the program may rewrite the text without asking: it is as the program left it, or there is none. */
@@ -128,7 +131,7 @@ export function keepDetail(detail: string): string {
   const old = readBodyRecord(detail);
   const kept = integrityFp(detail);
   if (old?.kept === kept) return detail;
-  return replaceResearchRecord(detail, compose({ fp: old?.fp ?? kept, kept }));
+  return replaceResearchRecord(detail, compose({ ...(old?.fp ? { fp: old.fp } : {}), kept }));
 }
 
 /**
@@ -154,5 +157,6 @@ export function programStampRaw(baseRaw: string, nextRaw: string): string {
   const base = detailBlockOf(baseRaw);
   return base !== undefined && bodyState(base) === "clean" ? stampRaw(nextRaw) : nextRaw;
 }
+export const isKeptRaw = (raw: string): boolean => isKept(detailBlockOf(raw) ?? "");
 export const bodyStateRaw = (raw: string): BodyState => bodyState(detailBlockOf(raw) ?? "");
 export const integrityFpRaw = (raw: string): string => integrityFp(detailBlockOf(raw) ?? "");

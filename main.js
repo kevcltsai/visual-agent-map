@@ -9827,9 +9827,9 @@ function verbatimHeadingLanguage(output) {
 function languagePromptName(locale, instruction, form, anchor) {
   const entry = entryOf(locale);
   const anchored = "anchored" in entry ? entry.anchored : void 0;
-  const quoted = anchor && anchored ? quoteAnchor(anchor.text) : "";
-  if (!anchor || !anchored || !quoted) return entry.prompt[instruction][form];
-  return anchored[instruction].replace("{kind}", () => FOLLOW_ANCHOR_KINDS[anchor.kind][instruction]).replace("{anchor}", () => instruction === "zh" ? quoted.replace(/「/g, "\u300E").replace(/」/g, "\u300F") : quoted);
+  const quoted2 = anchor && anchored ? quoteAnchor(anchor.text) : "";
+  if (!anchor || !anchored || !quoted2) return entry.prompt[instruction][form];
+  return anchored[instruction].replace("{kind}", () => FOLLOW_ANCHOR_KINDS[anchor.kind][instruction]).replace("{anchor}", () => instruction === "zh" ? quoted2.replace(/「/g, "\u300E").replace(/」/g, "\u300F") : quoted2);
 }
 function quoteAnchor(text10) {
   const flat = text10.replace(/\s+/g, " ").trim();
@@ -16286,8 +16286,8 @@ function interleaveInterventions(markdown, interventions) {
     var _a2;
     for (const item of interventions)
       if (!inserted.has(item.id) && ((_a2 = item.afterTurn) != null ? _a2 : 0) <= count4) {
-        const quoted = item.text.trim().split("\n").map((line2, index) => index === 0 ? `> **\u4F60\uFF08\u63D2\u8A71\uFF09**\uFF1A${line2}` : `> ${line2}`).join("\n");
-        output.push("", quoted, "");
+        const quoted2 = item.text.trim().split("\n").map((line2, index) => index === 0 ? `> **\u4F60\uFF08\u63D2\u8A71\uFF09**\uFF1A${line2}` : `> ${line2}`).join("\n");
+        output.push("", quoted2, "");
         inserted.add(item.id);
       }
   };
@@ -37937,10 +37937,10 @@ var PLACEHOLDER_PATTERN = new RegExp(
   "gi"
 );
 function applyTopicToPreset(presetText, topic, language2) {
-  const quoted = JSON.stringify(topic.trim());
+  const quoted2 = JSON.stringify(topic.trim());
   PLACEHOLDER_PATTERN.lastIndex = 0;
-  if (PLACEHOLDER_PATTERN.test(presetText)) return presetText.replace(PLACEHOLDER_PATTERN, () => quoted);
-  const line2 = renderTemplate(inLanguage({ zh: topic_line_zh_default, en: topic_line_en_default }, language2), { topic: quoted });
+  if (PLACEHOLDER_PATTERN.test(presetText)) return presetText.replace(PLACEHOLDER_PATTERN, () => quoted2);
+  const line2 = renderTemplate(inLanguage({ zh: topic_line_zh_default, en: topic_line_en_default }, language2), { topic: quoted2 });
   return `${presetText.trimEnd()}
 
 ${line2}`;
@@ -39897,8 +39897,8 @@ function updateRecipeFileText(oldText, parts, language2) {
   const text10 = bom ? oldText.slice(1) : oldText;
   const eol = text10.includes("\r\n") ? "\r\n" : "\n";
   const lines = text10.split("\n");
-  const bare2 = (line2) => line2.replace(/\r$/, "");
-  const closing = bare2(lines[0]).trimEnd() === "---" ? lines.findIndex((line2, index) => index > 0 && bare2(line2).trimEnd() === "---") : -1;
+  const bare3 = (line2) => line2.replace(/\r$/, "");
+  const closing = bare3(lines[0]).trimEnd() === "---" ? lines.findIndex((line2, index) => index > 0 && bare3(line2).trimEnd() === "---") : -1;
   const wanted = (slot) => slotValue(slot, parts, language2);
   if (closing < 0) {
     const head2 = [
@@ -39914,7 +39914,7 @@ function updateRecipeFileText(oldText, parts, language2) {
   const seen = /* @__PURE__ */ new Set();
   const removed = /* @__PURE__ */ new Set();
   for (let index = 1; index < closing; index++) {
-    const raw = bare2(lines[index]);
+    const raw = bare3(lines[index]);
     if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
     const pair5 = /^(([^:：]+?)\s*[:：]\s*)(.*)$/.exec(raw);
     if (!pair5) continue;
@@ -39940,13 +39940,13 @@ function updateRecipeFileText(oldText, parts, language2) {
 }
 function renamePartInRecipeText(oldText, category, oldName, newName) {
   const lines = oldText.split("\n");
-  const bare2 = (line2) => line2.replace(/\r$/, "");
+  const bare3 = (line2) => line2.replace(/\r$/, "");
   const first = lines[0].replace(/^\uFEFF/, "");
-  if (bare2(first).trimEnd() !== "---") return oldText;
-  const closing = lines.findIndex((line2, index) => index > 0 && bare2(line2).trimEnd() === "---");
+  if (bare3(first).trimEnd() !== "---") return oldText;
+  const closing = lines.findIndex((line2, index) => index > 0 && bare3(line2).trimEnd() === "---");
   if (closing < 0) return oldText;
   for (let index = 1; index < closing; index++) {
-    const raw = bare2(lines[index]);
+    const raw = bare3(lines[index]);
     if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
     const pair5 = /^(([^:：]+?)\s*[:：]\s*)(.*)$/.exec(raw);
     if (!pair5 || !KEYS[category].includes(pair5[2].trim().toLocaleLowerCase())) continue;
@@ -43018,7 +43018,7 @@ function recordLines(lines, fenced) {
   return mask;
 }
 var quoteAll = (text10) => text10.split(/\r?\n/).map((line2) => line2.trim() ? `> ${line2}` : ">").join("\n");
-function appendHidden(text10, quoted, atTop = false) {
+function appendHidden(text10, quoted2, atTop = false) {
   const lines = text10.split("\n");
   const last = hiddenRanges(lines, fencedLines2(lines)).pop();
   if (!last) {
@@ -43026,14 +43026,14 @@ function appendHidden(text10, quoted, atTop = false) {
     return `${base ? `${base}
 
 ` : ""}> [!${HIDDEN_CALLOUT}]- ${DEFAULT_RESEARCH_HEADING}
-${quoted}
+${quoted2}
 `;
   }
   const titleOnly = last.end === last.start + 1;
-  if (atTop) lines.splice(last.start + 1, 0, ...quoted.split("\n"));
+  if (atTop) lines.splice(last.start + 1, 0, ...quoted2.split("\n"));
   else {
     const blankTail = !titleOnly && /^>[ \t]*\r?$/.test(lines[last.end - 1]);
-    lines.splice(last.end, 0, ...`${titleOnly || blankTail ? "" : ">\n"}${quoted}`.split("\n"));
+    lines.splice(last.end, 0, ...`${titleOnly || blankTail ? "" : ">\n"}${quoted2}`.split("\n"));
   }
   return lines.join("\n");
 }
@@ -50514,7 +50514,7 @@ var BookPipelineRuns = class {
       const runId = this.ports.newId();
       let initial;
       await this.ports.mutate(async () => {
-        var _a2;
+        var _a2, _b2;
         if (this.dead(drive)) return;
         const map = await this.ports.readMap(mapPath);
         const read = readBookPipeline(map);
@@ -50531,6 +50531,8 @@ var BookPipelineRuns = class {
           staleStages: stale,
           autoRoles: [.../* @__PURE__ */ new Set([...prior.filter((id) => order.includes(id)), ...drive.missingRoles.keys()])]
         });
+        if (this.dead(drive)) return;
+        if (read.kind === "usable") await ((_b2 = this.ports.callouts) == null ? void 0 : _b2.clear(mapPath));
         if (this.dead(drive)) return;
         await this.ports.updateMap(mapPath, (doc) => {
           const found = readBookPipeline(doc);
@@ -50556,12 +50558,15 @@ var BookPipelineRuns = class {
     return this.enter(mapPath, async (drive) => {
       if (this.ports.blocked(mapPath)) throw new BookPipelineRunError("blocked");
       await this.ports.mutate(async () => {
+        var _a2;
         if (this.dead(drive)) return;
         const found = readBookPipeline(await this.ports.readMap(mapPath));
         if (found.kind === "absent") throw new BookPipelineRunError("missing");
         if (found.kind === "unusable") throw new BookPipelineRunError("unusable");
         const waiting = (found.data.phase === "gate1" || found.data.phase === "gate2") && found.data.status === "running";
         if (waiting) throw new BookPipelineRunError("not_stopped");
+        await ((_a2 = this.ports.callouts) == null ? void 0 : _a2.clear(mapPath));
+        if (this.dead(drive)) return;
         await this.ports.updateMap(mapPath, (doc) => {
           const again = readBookPipeline(doc);
           if (again.kind !== "usable" || again.data.runId !== found.data.runId)
@@ -50747,6 +50752,7 @@ var BookPipelineRuns = class {
           drive.rerun = void 0;
         }
         finish == null ? void 0 : finish(drive, track ? { before, after: await this.cardSnapshot(drive, nodeId) } : void 0);
+        this.syncReviewNotes(drive);
       };
       this.log(drive, "rerun", nodeId, kinds[0], kinds.length === 1 ? "plan_only" : "full");
     });
@@ -50802,6 +50808,7 @@ var BookPipelineRuns = class {
         pipelineSeam: zh ? `\u9130\u5361\u4F01\u5283\u6216\u6B63\u6587\u5DF2\u8B8A\u66F4\uFF0C\u5C1A\u672A\u4EBA\u5DE5\u6838\u5C0D\uFF08\u7B2C ${at + 1} \u5F35\uFF0C\u7248\u672C ${revision}\uFF09` : `Neighbouring card's plan or text changed; not yet checked by a person (card ${at + 1}, revision ${revision})`
       });
     }
+    this.syncReviewNotes(drive);
   }
   /**
    * Aborts every call and pauses the run (resumable). Resolves when the drive is over. With no drive, `saved` (the owner's Stop
@@ -50934,6 +50941,7 @@ var BookPipelineRuns = class {
     return order;
   }
   attachStore(drive, state) {
+    drive.syncKey = `${state.phase}:${state.status}`;
     drive.store = new PipelineStore(state, (next) => this.persist(drive, next));
     drive.admission = createBudgetAdmission(createStoreBudgetPort(drive.store));
   }
@@ -50944,7 +50952,23 @@ var BookPipelineRuns = class {
       await this.ports.updateMap(drive.mapPath, (doc) => {
         doc.bookPipeline = state;
       });
+      const key4 = `${state.phase}:${state.status}`;
+      if (drive.syncKey !== void 0 && drive.syncKey !== key4) this.syncNotes(drive);
+      drive.syncKey = key4;
     });
+  }
+  /** Asks the notes to follow the run (fire and forget: the port logs its own failures; nothing here waits for a note write). */
+  syncNotes(drive) {
+    if (this.dead(drive) || !this.ports.callouts) return;
+    try {
+      void Promise.resolve(this.ports.callouts.reconcile(drive.mapPath)).catch(() => void 0);
+    } catch (e) {
+    }
+  }
+  /** A card's result changed at gate 2 (a failure, a join to check, a rerun): its review box is written, rewritten or taken off. */
+  syncReviewNotes(drive) {
+    var _a2;
+    if (((_a2 = drive.store) == null ? void 0 : _a2.state.phase) === "gate2") this.syncNotes(drive);
   }
   /** Reads the saved state of a map for resume and gate confirmation, and loads the cards. */
   async openSaved(drive, mapPath, options = {}) {
@@ -51190,6 +51214,7 @@ var BookPipelineRuns = class {
       pipelineIssue: `${step} failed: ${code2(reason)}`
     });
     if (step !== "plan" && !NO_FAILURE_SECTION.has(reason)) await this.writeFailureSection(drive, nodeId, reason);
+    this.syncReviewNotes(drive);
   }
   /**
    * The one automatic redo (plan 2026 flow v3, E), after every card has had its first round: a card whose proofread named unmet points
@@ -52302,17 +52327,34 @@ function isBookGate1Waiting(progress, data) {
 }
 
 // experiences/visual-map/book-pipeline-review.ts
-function attentionReasons(card) {
+var PROBLEM_RULES = [
+  {
+    kind: "failed",
+    of: (card) => card.stage === "needs-review" ? card.failureText || t("ui.book_issue_unknown") : void 0
+  },
+  {
+    kind: "unfinished",
+    of: (card) => card.stage !== "needs-review" && card.stage !== "checked" ? t("ui.book_panel_g2_reason_unfinished") : void 0
+  },
+  {
+    kind: "structure",
+    of: (card) => card.structureUnmet > 0 ? t("ui.book_panel_g2_reason_structure_0", card.structureUnmet) : void 0
+  },
+  {
+    kind: "facts",
+    of: (card) => card.factsOpen > 0 ? t("ui.book_panel_g2_reason_facts_0", card.factsOpen) : void 0
+  },
+  { kind: "images", of: (card) => card.galleryBare ? t("ui.book_panel_g2_reason_images") : void 0 },
+  { kind: "seam", of: (card) => card.seam ? t("ui.book_panel_g2_reason_seam") : void 0 }
+];
+function reviewProblems(card) {
   const out = [];
-  if (card.stage === "needs-review") out.push(card.failureText || t("ui.book_issue_unknown"));
-  else if (card.stage !== "checked") out.push(t("ui.book_panel_g2_reason_unfinished"));
-  if (card.structureUnmet > 0) out.push(t("ui.book_panel_g2_reason_structure_0", card.structureUnmet));
-  if (card.factsOpen > 0) out.push(t("ui.book_panel_g2_reason_facts_0", card.factsOpen));
-  if (card.galleryBare) out.push(t("ui.book_panel_g2_reason_images"));
-  if (card.seam) out.push(t("ui.book_panel_g2_reason_seam"));
+  for (const rule of PROBLEM_RULES) {
+    const text10 = rule.of(card);
+    if (text10 !== void 0) out.push({ kind: rule.kind, text: text10 });
+  }
   return out;
 }
-var needsAttention = (card) => attentionReasons(card).length > 0;
 var plainNote = (text10) => text10.replace(/\b[CN]\d+\b\s*[:：]?/g, "").replace(/\s+/g, " ").trim();
 function reasonOf2(issue2, proof) {
   var _a2;
@@ -52367,6 +52409,153 @@ async function runTrackedRerun(memory, nodeId, rerun) {
   const result = await rerun();
   if (result && result.unchanged) memory.unchanged.add(nodeId);
 }
+var attentionFingerprint = (input2) => {
+  var _a2, _b2, _c;
+  return hashText(JSON.stringify([input2.stage, (_a2 = input2.issue) != null ? _a2 : "", (_b2 = input2.proofKey) != null ? _b2 : "", (_c = input2.seam) != null ? _c : ""]));
+};
+var proofFingerprint = (detail) => {
+  const proof = latestStoredProof(detail);
+  return proof ? hashText(JSON.stringify(proof)) : "";
+};
+function reviewEntries(input2) {
+  var _a2;
+  const out = [];
+  for (const card of gate2Cards(input2)) {
+    const problems = reviewProblems(card);
+    if (!problems.length) continue;
+    const note = input2.noteOf(card.id);
+    out.push({
+      card,
+      problems,
+      fp: attentionFingerprint({
+        stage: card.stage,
+        issue: typeof (note == null ? void 0 : note.pipelineIssue) === "string" ? note.pipelineIssue : "",
+        proofKey: proofFingerprint((_a2 = note == null ? void 0 : note.detail) != null ? _a2 : ""),
+        seam: typeof (note == null ? void 0 : note.pipelineSeam) === "string" ? note.pipelineSeam : ""
+      })
+    });
+  }
+  return out;
+}
+var plainText = (value, max = 300) => escapeMarkdownText(value, max).replace(/=/g, "\uFF1D").replace(/:\/\//g, ":\uFF0F\uFF0F");
+var linkPart = (value, max) => Array.from(
+  value.replace(/[\p{Cc}[\]|#^\\<>%=]/gu, " ").replace(/\s+/g, " ").trim()
+).slice(0, max).join("");
+var noteLink2 = (link) => {
+  const path = link ? linkPart(link.path.replace(/\.md$/i, ""), 200) : "";
+  if (!link || !path) return "";
+  const title = linkPart(link.title, 60);
+  return title ? `[[${path}|${title}]]` : `[[${path}]]`;
+};
+var idPart = (value) => value.replace(/[^\w.-]/g, "");
+var VERSION_LINE = "> %%vam-callout-version:1%%";
+var quoted = (lines) => lines.join("\n");
+var linksLine = (pairs) => {
+  const parts = pairs.map(([key4, link]) => ({ key: key4, link: noteLink2(link) })).filter((part) => part.link);
+  return parts.length ? `> ${parts.map((part) => t(part.key, part.link)).join("\u3000")}` : void 0;
+};
+function trialCallout(i, n, prevLink, nextLink, stopped, owner) {
+  const links = linksLine([
+    ["ui.book_note_prev_0", prevLink],
+    ["ui.book_note_next_0", nextLink]
+  ]);
+  return quoted([
+    `> [!vam-trial] ${t("ui.book_note_trial_title_0", i, n)}`,
+    `> ${stopped ? t("ui.book_note_trial_stopped") : t("ui.book_note_trial_next")}`,
+    ...links ? [links] : [],
+    `> %%vam-trial:${idPart(owner.runId)}:${idPart(owner.nodeId)}%%`,
+    VERSION_LINE
+  ]);
+}
+function reviewCallout(card, reasons, nextLink, fp, runId) {
+  const next = linksLine([["ui.book_note_review_next_0", nextLink]]);
+  return quoted([
+    `> [!vam-review] ${t("ui.book_note_review_title")}`,
+    ...reasons.slice(0, 5).map((reason) => `> \u30FB${plainText(reason)}`),
+    `> - [ ] ${t("ui.book_note_review_accept")}`,
+    `> - [ ] ${t("ui.book_note_review_fixed")}`,
+    ...next ? [next] : [],
+    `> %%vam-review:${idPart(runId)}:${idPart(card.id)}:${idPart(fp)}%%`,
+    VERSION_LINE
+  ]);
+}
+var DETAIL_START3 = "<!-- visual-agent-map:detail:start -->";
+var DETAIL_END3 = "<!-- visual-agent-map:detail:end -->";
+var CHECKBOX = /^[ \t]{0,3}>[ \t]?[-*+][ \t]+\[([ xX])\]/;
+var REVIEW_SIGN = /\[!vam-review\][+-]?/i;
+var bare2 = (line2) => line2.replace(/\r$/, "");
+function detailSpan(lines) {
+  const from = lines.findIndex((line2) => bare2(line2).trim() === DETAIL_START3);
+  if (from < 0) return void 0;
+  let to = -1;
+  for (let i = lines.length - 1; i > from; i--) {
+    if (bare2(lines[i]).trim() === DETAIL_END3) {
+      to = i;
+      break;
+    }
+  }
+  return to < 0 ? void 0 : { from, to };
+}
+function ownedIn(lines) {
+  const span = detailSpan(lines);
+  if (!span) return [];
+  return programCalloutRanges(lines, fencedLines2(lines)).filter((c) => c.start > span.from && c.end <= span.to);
+}
+var findProgramCallouts = (text10) => ownedIn(text10.split("\n"));
+function removeProgramCalloutsWhere(text10, drop) {
+  const lines = text10.split("\n");
+  const gone = /* @__PURE__ */ new Set();
+  const picked = ownedIn(lines).filter(drop);
+  if (!picked.length) return text10;
+  for (const c of picked) {
+    for (let i = c.start; i < c.end; i++) gone.add(i);
+    if (c.end < lines.length && !bare2(lines[c.end]).trim()) gone.add(c.end);
+  }
+  return lines.filter((_, i) => !gone.has(i)).join("\n");
+}
+var removeProgramCallouts = (text10, kind) => removeProgramCalloutsWhere(text10, (c) => !kind || c.kind === kind);
+function putProgramCallout(text10, callout2) {
+  const head2 = /^>[ \t]?\[!vam-(trial|review)\]/i.exec(callout2);
+  const kind = head2 ? head2[1].toLowerCase() === "trial" ? "trial" : "review" : void 0;
+  if (!kind || !detailSpan(text10.split("\n"))) return text10;
+  const cleared = removeProgramCallouts(text10, kind);
+  const lines = cleared.split("\n");
+  const span = detailSpan(lines);
+  if (!span) return text10;
+  const cr = text10.includes("\r\n") ? "\r" : "";
+  const block = [...callout2.split("\n").map((line2) => line2 + cr), cr];
+  return [...lines.slice(0, span.from + 1), ...block, ...lines.slice(span.from + 1)].join("\n");
+}
+function collapseReviewCallouts(text10) {
+  const lines = text10.split("\n");
+  let changed = false;
+  for (const c of ownedIn(lines)) {
+    if (c.kind !== "review" || c.sign === "-") continue;
+    lines[c.start] = lines[c.start].replace(REVIEW_SIGN, "[!vam-review]-");
+    changed = true;
+  }
+  return changed ? lines.join("\n") : text10;
+}
+function readReviewState(text10) {
+  var _a2;
+  const lines = text10.split("\n");
+  const box = ownedIn(lines).find((c) => c.kind === "review" && c.fp);
+  if (!box) return void 0;
+  const ticks = [];
+  for (let i = box.start + 1; i < box.end; i++) {
+    const m = CHECKBOX.exec(bare2(lines[i]));
+    if (m) ticks.push(m[1] !== " ");
+  }
+  return {
+    runId: box.runId,
+    nodeId: box.nodeId,
+    fp: (_a2 = box.fp) != null ? _a2 : "",
+    accept: ticks[0] === true,
+    fixed: ticks[1] === true,
+    collapsed: box.sign === "-"
+  };
+}
+var isReviewResolved = (state, fp) => !!state && (state.accept || state.fixed) && state.fp === fp;
 
 // experiences/visual-map/subtree-plan.ts
 var INTEGRATION_DEPTHS = ["quick", "bottom-up", "research-first"];
@@ -56085,11 +56274,11 @@ var MapChatPanel = class {
     );
   }
   chainEndText(reason, remaining, details, last, round3 = this.chainRound, restored = false, calls) {
-    const bare2 = (value) => clip4(value, 200).replace(/[\s.。!！?？…]+$/u, "");
-    const left = remaining.trim() ? t("ui.map_chat_chain_left_end_0", bare2(remaining)) : "";
+    const bare3 = (value) => clip4(value, 200).replace(/[\s.。!！?？…]+$/u, "");
+    const left = remaining.trim() ? t("ui.map_chat_chain_left_end_0", bare3(remaining)) : "";
     const why2 = (details != null ? details : []).length ? t(
       "ui.map_chat_chain_reason_0",
-      bare2(
+      bare3(
         (details != null ? details : []).slice(0, 3).map((item) => clip4(item, 120)).join(t("ui.map_chat_chain_detail_separator"))
       )
     ) : "";
@@ -56108,7 +56297,7 @@ var MapChatPanel = class {
       case "call_limit":
         return this.joinSentences(
           say("ui.map_chat_chain_end_call_limit_0", calls != null ? calls : MAP_CHAT_AUTO_MAX_CALLS),
-          remaining.trim() ? say("ui.map_chat_chain_left_call_limit_0", bare2(remaining)) : "",
+          remaining.trim() ? say("ui.map_chat_chain_left_call_limit_0", bare3(remaining)) : "",
           say("ui.map_chat_chain_end_max_rounds_more")
         );
       case "research_failed":
@@ -58043,7 +58232,7 @@ ${shown}` : t("ui.map_chat_model_label"));
       });
   }
   buildBasisEntry(line2, entry) {
-    const quoted = (titles) => titles.map((title) => t("ui.map_chat_basis_quote_0", title)).join(t("ui.map_chat_basis_title_separator"));
+    const quoted2 = (titles) => titles.map((title) => t("ui.map_chat_basis_quote_0", title)).join(t("ui.map_chat_basis_title_separator"));
     if (entry.kind === "outline_only") {
       if (entry.type === "cards") {
         line2.createEl("strong", { text: t("ui.map_chat_basis_title_only_0", entry.count) });
@@ -58059,13 +58248,13 @@ ${shown}` : t("ui.map_chat_model_label"));
       line2.setText(
         t(
           entry.kind === "research" ? "ui.map_chat_basis_research_0_1" : "ui.map_chat_basis_note_0_1",
-          quoted(entry.titles),
+          quoted2(entry.titles),
           entry.count
         )
       );
     else
       line2.setText(
-        entry.existingChildren > 0 ? t("ui.map_chat_basis_expand_0_1", quoted(entry.titles), entry.existingChildren) : t("ui.map_chat_basis_expand_0", quoted(entry.titles))
+        entry.existingChildren > 0 ? t("ui.map_chat_basis_expand_0_1", quoted2(entry.titles), entry.existingChildren) : t("ui.map_chat_basis_expand_0", quoted2(entry.titles))
       );
   }
   /** The waiting row of a continuation: how far the research and expansions are, the time (hidden from readers), and what is left. */
@@ -62997,7 +63186,7 @@ var PASTE_TEXT_MAX_CHARS = 1e5;
 var TAB_COLUMNS = 4;
 var MARKDOWN_HEADING = /^ {0,3}#{1,6}[ \t]+\S/m;
 var LIST_MARKER = /^(?:[-*+]|\d{1,9}[.)])(?:[ \t]+|$)/;
-var CHECKBOX = /^\[[ xX]\](?:[ \t]+|$)/;
+var CHECKBOX2 = /^\[[ xX]\](?:[ \t]+|$)/;
 var TITLE_FORBIDDEN2 = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
 var reject = (reason, line2) => line2 === void 0 ? { ok: false, reason } : { ok: false, reason, line: line2 };
 function splitIndent(line2) {
@@ -63035,7 +63224,7 @@ function parseIndentedText(text10) {
       if (!rest.trim()) continue;
       const marker3 = LIST_MARKER.exec(rest);
       let body = marker3 ? rest.slice(marker3[0].length) : rest;
-      const box = marker3 ? CHECKBOX.exec(body) : null;
+      const box = marker3 ? CHECKBOX2.exec(body) : null;
       if (box) body = body.slice(box[0].length);
       const title = outlineTitle(body);
       if (!title) return reject("empty-title", lineNumber);
@@ -67604,6 +67793,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     __publicField(this, "bookBarFocus", null);
     /** The chapter the "next chapter to check" link opened last (the link cycles from there in reading order). */
     __publicField(this, "bookReviewLast", null);
+    /** Chapters whose review box is ticked for the attention they have now (fingerprint they were ticked for); the bar does not count them. */
+    __publicField(this, "bookResolved", /* @__PURE__ */ new Map());
+    /** Resolutions run one after another (each reads the note and may write it). */
+    __publicField(this, "bookNoteChain", Promise.resolve());
     /** The map whose bar shows the "give up this book" confirmation card (in-page; never window.confirm). */
     __publicField(this, "bookAbandonAsking", null);
     /** The zoom the selected card's tool row was last fitted at. */
@@ -68135,6 +68328,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
         var _a2;
         return (_a2 = this.mapSourcesControl) == null ? void 0 : _a2.refreshMapSourcesUi();
       }));
+      this.registerEvent(vault.on("modify", (file) => this.onBookNoteModified(file.path)));
     }
     const cache = this.app.metadataCache;
     if (typeof (cache == null ? void 0 : cache.on) === "function")
@@ -68971,6 +69165,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
     this.closed = true;
     (_a2 = this.bookStartModal) == null ? void 0 : _a2.close();
     this.bookStartModal = null;
+    this.bookResolved.clear();
     if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
     this.chatSourceCache = null;
     this.unsyncedPaths = null;
@@ -69455,6 +69650,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian37.Ite
       if (!isCurrent2()) return;
       this.endNoteLoad(load);
       this.render();
+      void this.reconcileBookNotes(path, isCurrent2);
       this.app.workspace.requestSaveLayout();
     } catch (error) {
       if (load && this.noteLoad === load && isCurrent2()) {
@@ -82086,14 +82282,69 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
   bookReviewCards(data) {
     const map = this.map;
     if (!map) return [];
-    return gate2Cards({
+    return reviewEntries({
       order: data.order,
       titleOf: (id) => {
         var _a2, _b2, _c, _d;
         return (_d = (_c = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _c : (_b2 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _b2.path) != null ? _d : id;
       },
       noteOf: (id) => this.notes.get(id)
-    }).filter(needsAttention);
+    }).filter((entry) => this.bookResolved.get(entry.card.id) !== entry.fp).map((entry) => entry.card);
+  }
+  queueBookResolve(id) {
+    this.bookNoteChain = this.bookNoteChain.then(() => this.resolveBookNote(id)).catch(() => void 0);
+    return this.bookNoteChain;
+  }
+  /**
+   * Reads one chapter's note and its box: a ticked box for the attention it has now resolves the chapter (the box folds at once; a
+   * chapter whose only problem was the join with a neighbour confirms that join); otherwise the resolution is dropped.
+   */
+  async resolveBookNote(id) {
+    const map = this.map;
+    const mapPath = this.path;
+    if (this.closed || !map || !mapPath) return;
+    const read = readBookPipeline(map);
+    if (read.kind !== "usable" || read.data.phase !== "gate2" || !read.data.order.includes(id)) return;
+    const node = map.nodes.find((item) => item.id === id);
+    const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
+    if (!node || !(file instanceof import_obsidian37.TFile)) return;
+    const text10 = await this.app.vault.read(file).catch(() => null);
+    const note = await this.plugin.repo.readNote(node.path).catch(() => null);
+    if (this.closed || this.map !== map || text10 === null || !note) return;
+    const entry = reviewEntries({ order: [id], titleOf: () => note.title, noteOf: () => note })[0];
+    const state = readReviewState(text10);
+    this.notes.set(id, note);
+    if (!entry || !isReviewResolved(state, entry.fp)) {
+      this.bookResolved.delete(id);
+    } else {
+      this.bookResolved.set(id, entry.fp);
+      if (state && !state.collapsed) await this.plugin.bookCallouts.collapse(node.path);
+      if (entry.problems.every((problem3) => problem3.kind === "seam")) {
+        await this.plugin.confirmBookSeam(mapPath, id).catch(() => void 0);
+        await this.plugin.bookCallouts.reconcile(mapPath);
+        await this.rereadBookCard(id);
+      }
+    }
+    if (!this.closed && this.map === map) this.render();
+  }
+  /** A save of a chapter note of the open book: its box may have been ticked or unticked. */
+  onBookNoteModified(path) {
+    var _a2, _b2;
+    const read = this.map ? readBookPipeline(this.map) : null;
+    if (!read || read.kind !== "usable" || read.data.phase !== "gate2") return;
+    const id = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.path === path)) == null ? void 0 : _b2.id;
+    if (id && read.data.order.includes(id)) void this.queueBookResolve(id);
+  }
+  /** After a map opens: its notes are aligned with its run (stale boxes of an earlier run removed, old runs drawn), then ticked boxes are read. */
+  async reconcileBookNotes(path, isCurrent2) {
+    try {
+      await this.plugin.bookCallouts.reconcile(path);
+      if (this.closed || !isCurrent2() || !this.map) return;
+      const read = readBookPipeline(this.map);
+      if (read.kind !== "usable" || read.data.phase !== "gate2") return;
+      for (const card of this.bookReviewCards(read.data)) await this.queueBookResolve(card.id);
+    } catch (e) {
+    }
   }
   /** The attention chapter after the one opened last (wraps around); the first one when none was opened yet. */
   nextBookReviewCard(cards) {
@@ -88688,6 +88939,271 @@ async function applyMathRepair(vault, plan) {
   return { changed, skipped: skipped2 };
 }
 
+// experiences/visual-map/book-pipeline-callouts.ts
+function minimalChange(before, after) {
+  if (before === after) return null;
+  let head2 = 0;
+  const max = Math.min(before.length, after.length);
+  while (head2 < max && before.charCodeAt(head2) === after.charCodeAt(head2)) head2++;
+  let tail = 0;
+  while (tail < max - head2 && before.charCodeAt(before.length - 1 - tail) === after.charCodeAt(after.length - 1 - tail))
+    tail++;
+  return { from: head2, to: before.length - tail, insert: after.slice(head2, after.length - tail) };
+}
+function createNoteWriter(ports) {
+  const viaEditor = (views, transform) => {
+    const texts = views.map((view) => view.text());
+    if (texts.some((text10) => text10 !== texts[0])) return "refused";
+    const next = transform(texts[0]);
+    if (next === texts[0]) return "unchanged";
+    return views[0].replace(next) ? "written" : "refused";
+  };
+  return async (path, transform) => {
+    const views = ports.openViews(path);
+    if (views.length) return viaEditor(views, transform);
+    let opened = false;
+    let same2 = false;
+    const outcome = await ports.rawGuarded(
+      path,
+      (content) => {
+        const next = transform(content);
+        same2 = next === content;
+        return next;
+      },
+      {
+        authorize: () => {
+          opened = ports.openViews(path).length > 0;
+          return !opened;
+        }
+      }
+    );
+    if (outcome === "written") return same2 ? "unchanged" : "written";
+    if (!opened) return "refused";
+    const now = ports.openViews(path);
+    return now.length ? viaEditor(now, transform) : "refused";
+  };
+}
+function alignCallouts(text10, want) {
+  if (!want) return removeProgramCallouts(text10);
+  let out = removeProgramCalloutsWhere(text10, (c) => c.runId !== idPart(want.runId) || c.nodeId !== idPart(want.nodeId));
+  out = want.trial ? putProgramCallout(out, want.trial) : removeProgramCallouts(out, "trial");
+  if (want.review) {
+    const state = readReviewState(out);
+    if (state && state.fp === idPart(want.review.fp)) {
+      if (isReviewResolved(state, state.fp)) out = collapseReviewCallouts(out);
+    } else out = putProgramCallout(out, want.review.build());
+  } else out = removeProgramCallouts(out, "review");
+  return out;
+}
+var hasProgramCallouts = (text10) => findProgramCallouts(text10).length > 0;
+var BookCallouts = class {
+  constructor(ports) {
+    this.ports = ports;
+    __publicField(this, "tails", /* @__PURE__ */ new Map());
+    __publicField(this, "waiting", /* @__PURE__ */ new Map());
+    __publicField(this, "disposed", false);
+  }
+  /** Aligns the chapter notes of this map's current run; asks that arrive while one waits to start share it. Failures are logged, never thrown. */
+  reconcile(mapPath) {
+    const queued = this.waiting.get(mapPath);
+    if (queued) return queued;
+    const job = this.enqueue(mapPath, async () => {
+      this.waiting.delete(mapPath);
+      await this.align(mapPath);
+    }).then(
+      () => void 0,
+      () => void 0
+    );
+    this.waiting.set(mapPath, job);
+    return job;
+  }
+  /** Takes every program callout (any run) off the chapters of the map's run; true when every note is clean. Called before the run is abandoned or replaced. */
+  clear(mapPath) {
+    return this.enqueue(mapPath, () => this.sweep(mapPath)).catch(() => false);
+  }
+  /** Folds a ticked review box (the box at once; the ticks and marker stay). */
+  collapse(path) {
+    return this.disposed ? Promise.resolve("refused") : this.ports.write(path, collapseReviewCallouts);
+  }
+  /** Resolves when every queued job has ended (tests, and a clean shutdown). */
+  async idle() {
+    for (let again = true; again; ) {
+      const before = [...this.tails.values()];
+      await Promise.all(before.map((tail) => tail.catch(() => void 0)));
+      again = [...this.tails.values()].some((tail) => !before.includes(tail));
+    }
+  }
+  /** Plugin unload: nothing is written afterwards. */
+  dispose() {
+    this.disposed = true;
+    this.waiting.clear();
+  }
+  enqueue(mapPath, job) {
+    var _a2;
+    const tail = (_a2 = this.tails.get(mapPath)) != null ? _a2 : Promise.resolve();
+    const next = tail.then(
+      () => this.disposed ? void 0 : job(),
+      () => this.disposed ? void 0 : job()
+    );
+    this.tails.set(mapPath, next);
+    void next.then(
+      () => this.release(mapPath, next),
+      () => this.release(mapPath, next)
+    );
+    return next;
+  }
+  release(mapPath, tail) {
+    if (this.tails.get(mapPath) === tail) this.tails.delete(mapPath);
+  }
+  fail(runId, nodeId, result) {
+    this.ports.log(
+      formatPipelineLog({ event: "callout_failed", runId, card: nodeId, step: "proof", attempt: 0, result, ms: 0 })
+    );
+  }
+  /** The cards of the run in reading order with their note paths; a card whose note cannot be read is left out (and logged). */
+  async cardsOf(map, data) {
+    const out = [];
+    for (const id of data.order) {
+      const node = map.nodes.find((item) => item.id === id);
+      if (!node) continue;
+      try {
+        out.push({ id, card: await this.ports.readCard(node.path) });
+      } catch (e) {
+        this.fail(data.runId, id, "unreadable");
+      }
+    }
+    return out;
+  }
+  async sweep(mapPath) {
+    const map = await this.ports.readMap(mapPath);
+    const read = readBookPipeline(map);
+    if (read.kind !== "usable") return true;
+    let clean3 = true;
+    for (const { id, card } of await this.cardsOf(map, read.data)) {
+      if (this.disposed) return false;
+      if (!hasProgramCallouts(card.raw)) continue;
+      if (!await this.put(read.data.runId, id, card.path, (text10) => alignCallouts(text10, void 0))) clean3 = false;
+    }
+    return clean3;
+  }
+  async put(runId, id, path, transform) {
+    try {
+      const result = await this.ports.write(path, transform);
+      if (result === "refused") this.fail(runId, id, "refused");
+      return result !== "refused";
+    } catch (e) {
+      this.fail(runId, id, "error");
+      return false;
+    }
+  }
+  async align(mapPath) {
+    var _a2, _b2;
+    const map = await this.ports.readMap(mapPath);
+    const read = readBookPipeline(map);
+    if (read.kind === "absent") {
+      await this.dropStale(map, void 0, /* @__PURE__ */ new Set());
+      return;
+    }
+    if (read.kind !== "usable") return;
+    const data = read.data;
+    const cards = await this.cardsOf(map, data);
+    const byId = new Map(cards.map((item) => [item.id, item.card]));
+    const link = (id) => {
+      const card = id ? byId.get(id) : void 0;
+      return card ? { path: card.path, title: card.title } : void 0;
+    };
+    const wanted = /* @__PURE__ */ new Map();
+    if (data.phase === "gate1") {
+      const trial = (_a2 = data.trial) != null ? _a2 : [];
+      trial.forEach((id, at) => {
+        if (!byId.has(id)) return;
+        wanted.set(id, {
+          runId: data.runId,
+          nodeId: id,
+          trial: trialCallout(
+            at + 1,
+            trial.length,
+            link(trial[at - 1]),
+            link(trial[at + 1]),
+            data.status === "stopped",
+            {
+              runId: data.runId,
+              nodeId: id
+            }
+          )
+        });
+      });
+    } else if (data.phase === "gate2") {
+      const entries = reviewEntries({
+        order: cards.map((item) => item.id),
+        titleOf: (id) => {
+          var _a3, _b3;
+          return (_b3 = (_a3 = byId.get(id)) == null ? void 0 : _a3.title) != null ? _b3 : id;
+        },
+        noteOf: (id) => {
+          const card = byId.get(id);
+          return card ? {
+            prompt: card.prompt,
+            detail: card.detail,
+            pipelineStage: card.fields.pipelineStage,
+            pipelineIssue: card.fields.pipelineIssue,
+            pipelineSeam: card.fields.pipelineSeam,
+            bookRole: card.fields.bookRole
+          } : void 0;
+        }
+      });
+      entries.forEach((entry, at) => {
+        const next = entries.length > 1 ? entries[(at + 1) % entries.length].card.id : void 0;
+        wanted.set(entry.card.id, {
+          runId: data.runId,
+          nodeId: entry.card.id,
+          review: {
+            fp: entry.fp,
+            build: () => reviewCallout(
+              entry.card,
+              entry.problems.map((problem3) => problem3.text),
+              link(next),
+              entry.fp,
+              data.runId
+            )
+          }
+        });
+      });
+    }
+    for (const { id, card } of cards) {
+      if (this.disposed) return;
+      const want = (_b2 = wanted.get(id)) != null ? _b2 : { runId: data.runId, nodeId: id };
+      if (alignCallouts(card.raw, want) === card.raw) continue;
+      await this.put(data.runId, id, card.path, (text10) => alignCallouts(text10, want));
+    }
+    await this.dropStale(map, data.runId, new Set(data.order));
+  }
+  /**
+   * The notes of the map that are not chapters of the current run (or of any run, when there is none): every program callout whose
+   * run is not the current one goes. This is what cleans up after an abandon or a restart whose clear failed.
+   */
+  async dropStale(map, runId, chapters) {
+    const current = runId === void 0 ? void 0 : idPart(runId);
+    for (const node of map.nodes) {
+      if (this.disposed) return;
+      if (chapters.has(node.id)) continue;
+      let raw;
+      try {
+        raw = await this.ports.readText(node.path);
+      } catch (e) {
+        continue;
+      }
+      if (!hasProgramCallouts(raw)) continue;
+      await this.put(
+        runId != null ? runId : "none",
+        node.id,
+        node.path,
+        (text10) => removeProgramCalloutsWhere(text10, (callout2) => callout2.runId !== current)
+      );
+    }
+  }
+};
+
 // core/steps/book-pipeline/run.ts
 var planFailMessage = (error) => isBookStepError(error) ? "invalid_reply" : "failed";
 async function runPlanStep(aiCalls, step, request, run) {
@@ -92659,10 +93175,10 @@ function removeLocalReferenceDefinitions(text10) {
   const ranges = markdownCodeRanges(text10);
   return text10.replace(
     definition,
-    (all, bracketed, bare2, at) => {
+    (all, bracketed, bare3, at) => {
       var _a2;
       if (ranges.some((range) => at >= range.start && at < range.end)) return all;
-      const target = ((_a2 = bracketed != null ? bracketed : bare2) != null ? _a2 : "").trim();
+      const target = ((_a2 = bracketed != null ? bracketed : bare3) != null ? _a2 : "").trim();
       return isWeb(target) || /^mailto:/i.test(target) ? all : "";
     }
   );
@@ -93700,14 +94216,14 @@ function rebuildTranslationsForPayload(nodes, pieces, dom) {
         entries[id] = entry;
         continue;
       }
-      const bare2 = { ...entry };
-      delete bare2.detailSegments;
-      delete bare2.detailCheck;
-      delete bare2.detailDiagrams;
+      const bare3 = { ...entry };
+      delete bare3.detailSegments;
+      delete bare3.detailCheck;
+      delete bare3.detailDiagrams;
       try {
         const fits = !!(html == null ? void 0 : html.trim()) && (entry.detailSegments === void 0 || entry.detailCheck === detailCheckOf(prepareDetail(dom.parse(html), () => dom.createDiv()).extraction));
         if (!html || !fits) {
-          entries[id] = bare2;
+          entries[id] = bare3;
           continue;
         }
         const root = dom.parse(html);
@@ -93719,7 +94235,7 @@ function rebuildTranslationsForPayload(nodes, pieces, dom) {
         ((_a2 = rebuilt[language2]) != null ? _a2 : rebuilt[language2] = {})[id] = dom.serialize(root);
         entries[id] = entry;
       } catch (e) {
-        entries[id] = bare2;
+        entries[id] = bare3;
       }
     }
     return { language: language2, piece: { top: piece.top, nodes: entries } };
@@ -96157,12 +96673,12 @@ function mermaidLabelSpans(source) {
   return spans.sort((a, b) => a.start - b.start);
 }
 var BR_TAG2 = /<br\s*\/?>/gi;
-function isSafeMermaidLabel(translated, quoted) {
+function isSafeMermaidLabel(translated, quoted2) {
   const text10 = translated.replace(BR_TAG2, " ");
   if (!text10.trim() || /[\r\n]/.test(text10)) return false;
   if (text10.includes("%%") || UNSAFE_TEXT.test(text10)) return false;
   if (/#\w+;/.test(text10) || /&/.test(text10)) return false;
-  return quoted ? !/["<>`]/.test(text10) : !/[[\]{}()|"`;<>#%]/.test(text10);
+  return quoted2 ? !/["<>`]/.test(text10) : !/[[\]{}()|"`;<>#%]/.test(text10);
 }
 function prepareMermaidTranslation(source) {
   const cleaned = stripMermaidComments(source);
@@ -97872,7 +98388,7 @@ function claudeWarmArgs(model, effort, schema, webSearch) {
   args.push("--include-partial-messages", "--input-format", "stream-json");
   return args;
 }
-function claudeStructuredOutput(stdout, plainText = false) {
+function claudeStructuredOutput(stdout, plainText2 = false) {
   const value = JSON.parse(stdout);
   const events = Array.isArray(value) ? value : [];
   const final = events.length ? events.reverse().find((item) => item && typeof item === "object" && "type" in item && item.type === "result") : value;
@@ -97882,7 +98398,7 @@ function claudeStructuredOutput(stdout, plainText = false) {
     const details = Array.isArray(record.errors) ? record.errors.filter((item) => typeof item === "string").join("\n") : "";
     throw new Error(details || (typeof record.result === "string" ? record.result : t("ui.claude_task_failed")));
   }
-  if (plainText && typeof record.result === "string") return record.result;
+  if (plainText2 && typeof record.result === "string") return record.result;
   if (record.structured_output === void 0 || record.structured_output === null)
     throw new Error(t("ui.claude_did_not_return_structured_output"));
   return JSON.stringify(record.structured_output);
@@ -98926,25 +99442,25 @@ function taskResponseShape(context, language2) {
 // core/steps/task/parse.ts
 function extractJsonObject(raw) {
   const candidates = [];
-  let start = -1, depth = 0, quoted = false, escaped = false;
+  let start = -1, depth = 0, quoted2 = false, escaped = false;
   for (let index = 0; index < raw.length; index++) {
     const character = raw[index];
     if (start < 0) {
       if (character === "{") {
         start = index;
         depth = 1;
-        quoted = false;
+        quoted2 = false;
         escaped = false;
       }
       continue;
     }
-    if (quoted) {
+    if (quoted2) {
       if (escaped) escaped = false;
       else if (character === "\\") escaped = true;
-      else if (character === '"') quoted = false;
+      else if (character === '"') quoted2 = false;
       continue;
     }
-    if (character === '"') quoted = true;
+    if (character === '"') quoted2 = true;
     else if (character === "{") depth++;
     else if (character === "}" && --depth === 0) {
       candidates.push(raw.slice(start, index + 1));
@@ -101583,32 +102099,26 @@ var VisualAgentMapPlugin = class extends import_obsidian50.Plugin {
      * Picture-book pipeline runner, keyed by map path. Entries: {@link startBookPipeline} and friends (the screen and the
      * commands call those). The map's open view supplies the author call and the image probe; without one they fail.
      */
+    /** The picture-book chapter notes' callouts (trial hint, review box); every program write to a chapter note goes through its writer. */
+    __publicField(this, "bookCallouts", new BookCallouts({
+      readMap: (path) => this.repo.readMap(path),
+      readCard: (path) => this.readBookCard(path),
+      readText: async (path) => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof import_obsidian50.TFile)) throw new Error("missing");
+        return this.app.vault.read(file);
+      },
+      write: createNoteWriter({
+        openViews: (path) => this.openMarkdownViews(path),
+        rawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options)
+      }),
+      log: (line2) => this.logs.appendLog("info", line2)
+    }));
     __publicField(this, "bookPipelineRuns", new BookPipelineRuns({
       mutate: (work) => this.mutate(work),
       readMap: (path) => this.repo.readMap(path),
       updateMap: (path, change2) => this.repo.updateMap(path, change2),
-      readCard: async (path) => {
-        var _a2;
-        const note = await this.repo.readNote(path);
-        const file = this.app.vault.getAbstractFileByPath(path);
-        if (!(file instanceof import_obsidian50.TFile)) throw new Error("missing");
-        const raw = await this.app.vault.read(file);
-        return {
-          path,
-          title: note.title,
-          summary: note.summary,
-          prompt: note.prompt,
-          detail: note.detail,
-          raw,
-          settings: (_a2 = note.bookSettings) != null ? _a2 : {},
-          fields: {
-            ...note.pipelineStage ? { pipelineStage: note.pipelineStage } : {},
-            ...note.bookRole ? { bookRole: note.bookRole } : {},
-            ...note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {},
-            ...note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {}
-          }
-        };
-      },
+      readCard: (path) => this.readBookCard(path),
       writePipelineFields: (path, patch) => this.repo.writePipelineFields(path, patch),
       updateNoteGuarded: (path, patch, options) => this.repo.updateNoteGuarded(path, patch, options),
       updateNoteRawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
@@ -101645,7 +102155,8 @@ var VisualAgentMapPlugin = class extends import_obsidian50.Plugin {
       progressed: (mapPath) => {
         var _a2;
         return (_a2 = this.views().find((view) => view.mapPath === mapPath)) == null ? void 0 : _a2.refreshBookProgress();
-      }
+      },
+      callouts: { reconcile: (path) => this.bookCallouts.reconcile(path), clear: (path) => this.bookCallouts.clear(path) }
     }));
     /** Suggestions awaiting a decision; onload replaces it with the persisted store, {@link topicRuns} reads whichever is current. */
     __publicField(this, "pendingSuggestions", /* @__PURE__ */ new Map());
@@ -101755,6 +102266,51 @@ var VisualAgentMapPlugin = class extends import_obsidian50.Plugin {
   /** Background chart steps (running and queued), keyed by note path; owned by {@link topicRuns}. */
   get chartJobs() {
     return this.topicRuns.chartJobs;
+  }
+  /** A card note as the picture-book runner reads it (fields, text and the raw file). */
+  async readBookCard(path) {
+    var _a2;
+    const note = await this.repo.readNote(path);
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof import_obsidian50.TFile)) throw new Error("missing");
+    const raw = await this.app.vault.read(file);
+    return {
+      path,
+      title: note.title,
+      summary: note.summary,
+      prompt: note.prompt,
+      detail: note.detail,
+      raw,
+      settings: (_a2 = note.bookSettings) != null ? _a2 : {},
+      fields: {
+        ...note.pipelineStage ? { pipelineStage: note.pipelineStage } : {},
+        ...note.bookRole ? { bookRole: note.bookRole } : {},
+        ...note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {},
+        ...note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {}
+      }
+    };
+  }
+  /** Every markdown view that has this note open (any mode), as the write coordinator edits it. */
+  openMarkdownViews(path) {
+    var _a2;
+    const out = [];
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view;
+      if (!(view instanceof import_obsidian50.MarkdownView) || ((_a2 = view.file) == null ? void 0 : _a2.path) !== path) continue;
+      out.push({
+        text: () => view.editor.getValue(),
+        replace: (next) => {
+          const editor = view.editor;
+          const change2 = minimalChange(editor.getValue(), next);
+          if (!change2) return true;
+          editor.transaction({
+            changes: [{ from: editor.offsetToPos(change2.from), to: editor.offsetToPos(change2.to), text: change2.insert }]
+          });
+          return true;
+        }
+      });
+    }
+    return out;
   }
   recordFailure(context, error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -102851,6 +103407,7 @@ ${t("ui.organize_link_wait_hint")}`;
     this.topicRuns.dispose();
     this.argumentRuns.dispose();
     this.bookPipelineRuns.dispose();
+    this.bookCallouts.dispose();
     (_a2 = this.repo) == null ? void 0 : _a2.dispose();
     void ((_b2 = this.coffeeManager) == null ? void 0 : _b2.stop());
     this.coffeeManager = null;

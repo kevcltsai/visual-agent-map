@@ -135,6 +135,8 @@ export const hasProgramCallouts = (text: string): boolean => findProgramCallouts
 export interface BookCalloutPorts {
   readMap(path: string): Promise<MapDocument>;
   readCard(path: string): Promise<PipelineCard>;
+  /** The raw text of a note (the cheap read for the scan of notes that are not chapters of the run). */
+  readText(path: string): Promise<string>;
   /** {@link createNoteWriter}. */
   write(path: string, transform: (text: string) => string): Promise<NoteWriteResult>;
   log(line: string): void;
@@ -252,6 +254,10 @@ export class BookCallouts {
   private async align(mapPath: string): Promise<void> {
     const map = await this.ports.readMap(mapPath);
     const read = readBookPipeline(map);
+    if (read.kind === "absent") {
+      await this.dropStale(map, undefined, new Set());
+      return;
+    }
     if (read.kind !== "usable") return;
     const data = read.data;
     const cards = await this.cardsOf(map, data);
@@ -324,6 +330,29 @@ export class BookCallouts {
       const want = wanted.get(id) ?? { runId: data.runId, nodeId: id };
       if (alignCallouts(card.raw, want) === card.raw) continue;
       await this.put(data.runId, id, card.path, text => alignCallouts(text, want));
+    }
+    await this.dropStale(map, data.runId, new Set(data.order));
+  }
+
+  /**
+   * The notes of the map that are not chapters of the current run (or of any run, when there is none): every program callout whose
+   * run is not the current one goes. This is what cleans up after an abandon or a restart whose clear failed.
+   */
+  private async dropStale(map: MapDocument, runId: string | undefined, chapters: Set<string>): Promise<void> {
+    const current = runId === undefined ? undefined : idPart(runId);
+    for (const node of map.nodes) {
+      if (this.disposed) return;
+      if (chapters.has(node.id)) continue;
+      let raw: string;
+      try {
+        raw = await this.ports.readText(node.path);
+      } catch {
+        continue;
+      }
+      if (!hasProgramCallouts(raw)) continue;
+      await this.put(runId ?? "none", node.id, node.path, text =>
+        removeProgramCalloutsWhere(text, callout => callout.runId !== current)
+      );
     }
   }
 }

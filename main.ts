@@ -470,6 +470,11 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly bookCallouts = new BookCallouts({
     readMap: path => this.repo.readMap(path),
     readCard: path => this.readBookCard(path),
+    readText: async path => {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!(file instanceof TFile)) throw new Error("missing");
+      return this.app.vault.read(file);
+    },
     write: createNoteWriter({
       openViews: path => this.openMarkdownViews(path),
       rawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options)

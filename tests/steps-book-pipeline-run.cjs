@@ -1550,3 +1550,38 @@ test('start: a map with only a root topic and no chapter cards is refused with "
   await assert.rejects(() => r.runs.start(r.mapPath), e => e.code === 'empty');
   assert.equal((await r.repo.readMap(r.mapPath)).bookPipeline, undefined);
 });
+
+// ---- the callout port (T4): the runner asks the notes to follow the run and clears them before a run is replaced ----
+const calloutPort = r => { const log = []; return { log, port: { reconcile: async path => { log.push(['reconcile', path, (await r.state())?.phase]); }, clear: async path => { log.push(['clear', path, !!(await r.repo.readMap(path)).bookPipeline]); return true; } } }; };
+test('callouts: entering gate 1, entering gate 2 and a rerun at gate 2 each ask for a reconcile; a plain phase of writing does not', async () => {
+  const spy = { log: [], port: null };
+  const r = await rig({ ports: { callouts: { reconcile: async path => { spy.log.push(['reconcile', path]); }, clear: async () => true } } });
+  await r.runs.start(r.mapPath); await settle();
+  const atGate1 = spy.log.length;
+  assert.ok(atGate1 >= 1, 'gate 1 asked');
+  await confirmDone(r.runs, r.mapPath); await settle();
+  assert.equal((await r.state()).phase, 'gate2');
+  const atGate2 = spy.log.length;
+  assert.ok(atGate2 > atGate1, 'writing then gate 2 asked again');
+  assert.ok(spy.log.every(([, path]) => path === r.mapPath));
+  await r.runs.rerunCard(r.mapPath, r.nodes[1].id); await settle();
+  assert.ok(spy.log.length > atGate2, 'a rerun at gate 2 redrew the box');
+});
+test('callouts: a throwing or rejecting port never stops the run', async () => {
+  const r = await rig({ ports: { callouts: { reconcile: () => { throw new Error('x'); }, clear: async () => true } } });
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  assert.equal((await r.state()).phase, 'gate2');
+});
+test('callouts: abandon and a restart clear the notes while bookPipeline still exists (nothing is left to find them by afterwards)', async () => {
+  const r = await rig(); const spy = calloutPort(r);
+  const runs = new BookPipelineRuns({ ...r.ports, callouts: spy.port });
+  await runs.start(r.mapPath); await runs.stop(r.mapPath, { saved: true }); await settle();
+  spy.log.length = 0;
+  await runs.abandon(r.mapPath);
+  assert.deepEqual(spy.log.filter(x => x[0] === 'clear').map(x => x[2]), [true], 'cleared first, then the run was removed');
+  assert.equal(readBookPipeline(await r.repo.readMap(r.mapPath)).kind, 'absent');
+  await runs.start(r.mapPath); await runs.stop(r.mapPath, { saved: true }); await settle();
+  spy.log.length = 0;
+  await runs.start(r.mapPath, { restart: true });
+  assert.ok(spy.log.some(x => x[0] === 'clear' && x[2] === true), 'a restart clears the old run first');
+});

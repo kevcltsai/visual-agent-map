@@ -2279,3 +2279,6 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-menu-note { color: var(--text-muted); font-size: var(--font-ui-smaller); pointer-events: none; }
 /* The picture-book pipeline's work records (Prompt, proofread result, research notes) are written as [!vam-book] callouts: hidden in reading and live preview, still there in source mode. */
 .callout[data-callout="vam-book"] { display: none; }
+/* The program's hints in a picture-book chapter: the trial note at gate 1 (info look) and the review box at gate 2 (warning look). */
+.callout[data-callout="vam-trial"] { --callout-color: var(--color-blue-rgb); --callout-icon: lucide-info; }
+.callout[data-callout="vam-review"] { --callout-color: var(--color-orange-rgb); --callout-icon: lucide-alert-triangle; }

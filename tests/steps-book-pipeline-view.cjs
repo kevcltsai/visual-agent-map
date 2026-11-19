@@ -20,6 +20,7 @@ export * from "./experiences/visual-map/book-pipeline-ui";
 export { bookStartEstimate, bookStartEstimateText, bookSettingsPatch, BookStartModal, BOOK_SUGGEST_TIMEOUT_MS } from "./experiences/visual-map/book-pipeline-start-modal";
 export { BookPipelineRunError, stepCounts } from "./experiences/visual-map/book-pipeline-run";
 export { readBookPipeline } from "./core/book-pipeline/model";
+export { reviewEntries, reviewCallout, putProgramCallout } from "./experiences/visual-map/book-pipeline-review";
 export { VisualAgentMapView } from "./experiences/visual-map/view";
 export { setUiLanguage, t } from "./i18n";
 `, { obsidian: { ...support.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice(notices), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, Option: OptionStub, window: { setTimeout: (fn, ms) => (ms === 20000 && timers.hold ? (timers.held.push(fn), 99) : setTimeout(fn, ms)), clearTimeout, setInterval, clearInterval } });
@@ -1319,4 +1320,112 @@ test('toolbar source: the panel, its toggle and the finish modal are gone from t
   assert.ok(!main_ts.includes('retryBookTrial'));
   assert.ok(!/\.vam-book-panel|\.vam-book-side|\.vam-book-trial|\.vam-book-finish-line/.test(css));
   for (const file of ['book-pipeline-panel.ts', 'book-pipeline-panel2.ts', 'book-pipeline-finish-modal.ts']) assert.equal(fs.existsSync(path.join(root, 'experiences/visual-map', file)), false, file);
+});
+
+// ---- the review boxes in the notes (T4): a tick in a chapter note resolves it in the bar; opening the map reconciles ----
+async function boxRig({ stage = 'needs-review', seam } = {}) {
+  const g = await gateRig({ phase: 'gate2' });
+  const calls = { collapse: [], reconcile: [], seam: [], renders: 0 };
+  g.plugin.bookCallouts = { collapse: async path => { calls.collapse.push(path); return 'written'; }, reconcile: async path => { calls.reconcile.push(path); } };
+  g.plugin.confirmBookSeam = async (path, id) => { calls.seam.push([path, id]); };
+  g.view.rereadBookCard = async () => {};
+  const node = g.view.map.nodes.find(n => n.id === g.ids.a);
+  await g.plugin.repo.writePipelineFields(node.path, { pipelineStage: stage, bookRole: 'body', ...(stage === 'needs-review' ? { pipelineIssue: 'x' } : {}), ...(seam ? { pipelineSeam: seam } : {}) });
+  const fresh = async () => { const n = await g.plugin.repo.readNote(node.path); return bundle.reviewEntries({ order: [g.ids.a], titleOf: () => n.title, noteOf: () => n })[0]; };
+  const file = g.view.app.vault.getAbstractFileByPath(node.path);
+  const writeBox = async ({ ticked, fp }) => {
+    const e = await fresh();
+    await g.view.app.vault.process(file, raw => {
+      const text = bundle.putProgramCallout(raw, bundle.reviewCallout(e.card, ['x'], undefined, fp ?? e.fp, 'r1'));
+      return ticked ? text.replace('[ ]', '[x]') : text;
+    });
+    return e;
+  };
+  g.view.render = () => { calls.renders++; };
+  const modified = async () => { g.view.onBookNoteModified(node.path); await g.view.bookNoteChain; };
+  const attention = () => Array.from(g.view.bookReviewCards(g.view.map.bookPipeline), c => c.id).filter(id => id === g.ids.a);
+  return { ...g, calls, node, fresh, writeBox, modified, attention };
+}
+test('review box: a tick for the attention it has now resolves the chapter (the bar stops counting it, the box folds at once); unticking brings it back', async () => {
+  const r = await boxRig();
+  assert.deepEqual(r.attention(), [r.ids.a]);
+  const e = await r.writeBox({ ticked: true });
+  await r.modified();
+  assert.equal(r.view.bookResolved.get(r.ids.a), e.fp);
+  assert.deepEqual(r.calls.collapse, [r.node.path]);
+  assert.deepEqual(r.attention(), []);
+  assert.deepEqual(r.calls.seam, [], 'a chapter with a real problem does not confirm a join');
+  assert.ok(r.calls.renders >= 1);
+  const file = r.view.app.vault.getAbstractFileByPath(r.node.path);
+  await r.view.app.vault.process(file, raw => raw.replace('[x]', '[ ]'));
+  await r.modified();
+  assert.equal(r.view.bookResolved.has(r.ids.a), false);
+  assert.deepEqual(r.attention(), [r.ids.a]);
+});
+test('review box: a tick written for an older fingerprint does not resolve; a ticked box that is already folded is not folded again', async () => {
+  const r = await boxRig();
+  await r.writeBox({ ticked: true, fp: 'stale' });
+  await r.modified();
+  assert.deepEqual(r.attention(), [r.ids.a]);
+  assert.deepEqual(r.calls.collapse, []);
+});
+test('review box: a chapter whose only problem was the join confirms the join when ticked, then the boxes are reconciled', async () => {
+  const r = await boxRig({ stage: 'checked', seam: 'n:1' });
+  await r.view.hydrate();
+  assert.deepEqual(r.attention(), [r.ids.a]);
+  await r.writeBox({ ticked: true });
+  await r.modified();
+  assert.deepEqual(r.calls.seam, [[MAP, r.ids.a]]);
+  assert.deepEqual(r.calls.reconcile, [MAP]);
+});
+test('review box: only a chapter of the open book at gate 2 is looked at; after the view closes nothing runs', async () => {
+  const r = await boxRig();
+  await r.writeBox({ ticked: true });
+  r.view.onBookNoteModified('Some/Other.md');
+  await r.view.bookNoteChain;
+  assert.equal(r.view.bookResolved.size, 0, 'a note outside the order is ignored');
+  r.view.map.bookPipeline = bookData({ phase: 'writing', order: [r.ids.root, r.ids.a, r.ids.b] });
+  await r.modified();
+  assert.equal(r.view.bookResolved.size, 0, 'only at gate 2');
+  r.view.map.bookPipeline = bookData({ phase: 'gate2', order: [r.ids.root, r.ids.a, r.ids.b] });
+  r.view.closed = true;
+  await r.modified();
+  assert.equal(r.view.bookResolved.size, 0, 'a closed view does nothing');
+  assert.deepEqual(r.calls.collapse, []);
+});
+test('review box: opening a map reconciles the notes first, then reads ticks already there (seeding the resolved chapters)', async () => {
+  const r = await boxRig();
+  const e = await r.writeBox({ ticked: true });
+  await r.view.reconcileBookNotes(MAP, () => true);
+  assert.deepEqual(r.calls.reconcile, [MAP]);
+  assert.equal(r.view.bookResolved.get(r.ids.a), e.fp);
+  assert.deepEqual(r.attention(), []);
+  // a map that is not current any more is not read
+  r.view.bookResolved.clear();
+  await r.view.reconcileBookNotes(MAP, () => false);
+  assert.equal(r.view.bookResolved.size, 0);
+});
+test('review box: the modify listener goes through registerEvent (released with the view), ignores other notes, and onClose forgets the resolutions', async () => {
+  const r = await boxRig();
+  const refs = [];
+  r.view.registerEvent = ref => refs.push(ref);
+  r.view.app.workspace = { on: (name, cb) => ({ name, cb }) };
+  r.view.app.vault.on = (name, cb) => ({ name, cb });
+  r.view.registerWorkspaceEvents();
+  const modify = refs.filter(x => x.name === 'modify');
+  assert.equal(modify.length, 1, 'registered once, through registerEvent');
+  await r.writeBox({ ticked: true });
+  modify[0].cb({ path: 'Some/Other.md' });
+  await r.view.bookNoteChain;
+  assert.equal(r.view.bookResolved.size, 0);
+  modify[0].cb({ path: r.node.path });
+  await r.view.bookNoteChain;
+  assert.equal(r.view.bookResolved.size, 1);
+  r.view.bookResolved.set('x', 'y');
+  assert.match(view_ts, /async onClose\(\): Promise<void> \{[^}]*this\.bookResolved\.clear\(\);/);
+});
+test('review box: the chapter callouts have their own look in the stylesheet (vam-trial info, vam-review warning) and vam-book stays hidden', () => {
+  assert.match(css, /\.callout\[data-callout="vam-trial"\] \{[^}]*--callout-color: var\(--color-blue-rgb\)/);
+  assert.match(css, /\.callout\[data-callout="vam-review"\] \{[^}]*--callout-color: var\(--color-orange-rgb\)/);
+  assert.match(css, /\.callout\[data-callout="vam-book"\] \{ display: none; \}/);
 });

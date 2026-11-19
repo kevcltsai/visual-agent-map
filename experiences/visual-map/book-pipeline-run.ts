@@ -1224,17 +1224,17 @@ export class BookPipelineRuns {
     drive.admission = createBudgetAdmission(createStoreBudgetPort(drive.store));
   }
   /** The state goes to the map file through the plugin's write queue (never from inside a `mutate` callback). */
-  private async persist(drive: Drive, state: BookPipelineData): Promise<void> {
-    await this.ports.mutate(async () => {
+  private persist(drive: Drive, state: BookPipelineData): Promise<void> {
+    return this.ports.mutate(async () => {
       if (this.dead(drive) || drive.store.isDisposed) return;
       await this.ports.updateMap(drive.mapPath, doc => {
         doc.bookPipeline = state;
       });
+      // A new phase or a stop/resume changes what the chapter notes should say (the trial hint, the review box).
+      const key = `${state.phase}:${state.status}`;
+      if (drive.syncKey !== undefined && drive.syncKey !== key) this.syncNotes(drive);
+      drive.syncKey = key;
     });
-    // A new phase or a stop/resume changes what the chapter notes should say (the trial hint, the review box).
-    const key = `${state.phase}:${state.status}`;
-    if (drive.syncKey !== undefined && drive.syncKey !== key) this.syncNotes(drive);
-    drive.syncKey = key;
   }
   /** Asks the notes to follow the run (fire and forget: the port logs its own failures; nothing here waits for a note write). */
   private syncNotes(drive: Drive): void {

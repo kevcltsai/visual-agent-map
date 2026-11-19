@@ -354,8 +354,9 @@ import {
 import {
   BookReviewMemory,
   countNotes,
-  gate2Cards,
-  needsAttention,
+  isReviewResolved,
+  readReviewState,
+  reviewEntries,
   runTrackedRerun,
   type Gate2Card
 } from "./book-pipeline-review";
@@ -2125,6 +2126,8 @@ export class VisualAgentMapView extends ItemView {
     if (typeof vault?.on === "function") {
       this.registerEvent(vault.on("delete", () => this.mapSourcesControl?.refreshMapSourcesUi()));
       this.registerEvent(vault.on("rename", () => this.mapSourcesControl?.refreshMapSourcesUi()));
+      // A chapter note of the open picture book was saved: a review box in it may have been ticked.
+      this.registerEvent(vault.on("modify", file => this.onBookNoteModified(file.path)));
     }
     // A note whose image or `topic-cover` just changed redraws only its own cover.
     const cache = this.app.metadataCache;
@@ -3010,6 +3013,7 @@ export class VisualAgentMapView extends ItemView {
     this.closed = true;
     this.bookStartModal?.close();
     this.bookStartModal = null;
+    this.bookResolved.clear();
     if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
     this.chatSourceCache = null;
     this.unsyncedPaths = null;
@@ -3533,6 +3537,7 @@ export class VisualAgentMapView extends ItemView {
       if (!isCurrent()) return;
       this.endNoteLoad(load);
       this.render();
+      void this.reconcileBookNotes(path, isCurrent);
       this.app.workspace.requestSaveLayout();
     } catch (error) {
       // A read that fails half way must not leave the map looking half read.
@@ -17204,11 +17209,72 @@ export class VisualAgentMapView extends ItemView {
   private bookReviewCards(data: BookPipelineData): Gate2Card[] {
     const map = this.map;
     if (!map) return [];
-    return gate2Cards({
+    return reviewEntries({
       order: data.order,
       titleOf: id => this.notes.get(id)?.title ?? map.nodes.find(node => node.id === id)?.path ?? id,
       noteOf: id => this.notes.get(id)
-    }).filter(needsAttention);
+    })
+      .filter(entry => this.bookResolved.get(entry.card.id) !== entry.fp)
+      .map(entry => entry.card);
+  }
+  /** Chapters whose review box is ticked for the attention they have now (fingerprint they were ticked for); the bar does not count them. */
+  private readonly bookResolved = new Map<string, string>();
+  /** Resolutions run one after another (each reads the note and may write it). */
+  private bookNoteChain: Promise<void> = Promise.resolve();
+  private queueBookResolve(id: string): Promise<void> {
+    this.bookNoteChain = this.bookNoteChain.then(() => this.resolveBookNote(id)).catch(() => undefined);
+    return this.bookNoteChain;
+  }
+  /**
+   * Reads one chapter's note and its box: a ticked box for the attention it has now resolves the chapter (the box folds at once; a
+   * chapter whose only problem was the join with a neighbour confirms that join); otherwise the resolution is dropped.
+   */
+  private async resolveBookNote(id: string): Promise<void> {
+    const map = this.map;
+    const mapPath = this.path;
+    if (this.closed || !map || !mapPath) return;
+    const read = readBookPipeline(map);
+    if (read.kind !== "usable" || read.data.phase !== "gate2" || !read.data.order.includes(id)) return;
+    const node = map.nodes.find(item => item.id === id);
+    const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
+    if (!node || !(file instanceof TFile)) return;
+    const text = await this.app.vault.read(file).catch(() => null);
+    const note = await this.plugin.repo.readNote(node.path).catch(() => null);
+    if (this.closed || this.map !== map || text === null || !note) return;
+    const entry = reviewEntries({ order: [id], titleOf: () => note.title, noteOf: () => note })[0];
+    const state = readReviewState(text);
+    this.notes.set(id, note);
+    if (!entry || !isReviewResolved(state, entry.fp)) {
+      this.bookResolved.delete(id);
+    } else {
+      this.bookResolved.set(id, entry.fp);
+      if (state && !state.collapsed) await this.plugin.bookCallouts.collapse(node.path);
+      if (entry.problems.every(problem => problem.kind === "seam")) {
+        await this.plugin.confirmBookSeam(mapPath, id).catch(() => undefined);
+        await this.plugin.bookCallouts.reconcile(mapPath);
+        await this.rereadBookCard(id);
+      }
+    }
+    if (!this.closed && this.map === map) this.render();
+  }
+  /** A save of a chapter note of the open book: its box may have been ticked or unticked. */
+  private onBookNoteModified(path: string): void {
+    const read = this.map ? readBookPipeline(this.map) : null;
+    if (!read || read.kind !== "usable" || read.data.phase !== "gate2") return;
+    const id = this.map?.nodes.find(node => node.path === path)?.id;
+    if (id && read.data.order.includes(id)) void this.queueBookResolve(id);
+  }
+  /** After a map opens: its notes are aligned with its run (stale boxes of an earlier run removed, old runs drawn), then ticked boxes are read. */
+  private async reconcileBookNotes(path: string, isCurrent: () => boolean): Promise<void> {
+    try {
+      await this.plugin.bookCallouts.reconcile(path);
+      if (this.closed || !isCurrent() || !this.map) return;
+      const read = readBookPipeline(this.map);
+      if (read.kind !== "usable" || read.data.phase !== "gate2") return;
+      for (const card of this.bookReviewCards(read.data)) await this.queueBookResolve(card.id);
+    } catch {
+      // Fire and forget from the map opening: the aligner logs its own failures, and nothing here may break the map.
+    }
   }
   /** The attention chapter after the one opened last (wraps around); the first one when none was opened yet. */
   private nextBookReviewCard(cards: readonly Gate2Card[]): Gate2Card | undefined {

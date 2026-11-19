@@ -118,6 +118,25 @@ test('lengthRange: ambiguous (two ranges, mixed language), inverted and zero inp
   assert.deepEqual(range(undefined), { value: undefined, heard: [] });
 });
 
+test('lengthRange (review-b S6): to / and as separators, 左右 / 上下 as about, 不超過 as a maximum only, and an unread number with a unit is logged as invalid', () => {
+  assert.deepEqual(range('300 to 500 words').value, { min: 300, max: 500, unit: 'words' });
+  assert.deepEqual(range('between 300 and 500 words per chapter').value, { min: 300, max: 500, unit: 'words' });
+  assert.deepEqual(range('每章 500 字左右'), { value: { min: 400, max: 600, unit: '字' }, heard: [] });
+  assert.deepEqual(range('每章 500 字上下').value, { min: 400, max: 600, unit: '字' });
+  assert.deepEqual(range('每章約 500 字左右'), { value: { min: 400, max: 600, unit: '字' }, heard: [] }, 'prefix and suffix together are one rule');
+  assert.deepEqual(range('每章不超過 500 字'), { value: { min: 1, max: 500, unit: '字' }, heard: [] });
+  assert.deepEqual(range('no more than 500 words'), { value: { min: 1, max: 500, unit: 'words' }, heard: [] });
+  assert.equal(L.lengthReason('每章不超過 500 字', '字'.repeat(100)), undefined, 'a short chapter is never under a maximum-only rule');
+  assert.equal(L.lengthReason('每章不超過 500 字', '字'.repeat(700)).kind, 'over');
+  assert.deepEqual(range('每章 500 字起跳'), { value: undefined, heard: ['invalid'] }, 'a number with a unit that does not parse is heard');
+  assert.deepEqual(range('簡短一點'), { value: undefined, heard: [] });
+});
+
+test('chapterLength (review-b M1): words with CJK characters dominating counts the characters plus the Latin words', () => {
+  assert.equal(L.chapterLength('這是一個關於 AI 的章節，內容很長很長很長。', 'words'), 17 + 1);
+  assert.equal(L.chapterLength('Mostly English words here 一點', 'words'), 4, 'Latin dominates: words only');
+});
+
 test('chapterLength: 字 counts CJK characters plus Latin words; words counts Latin words (CJK only text falls back to its characters); notes, addresses, images, markers, hidden records and callouts do not count', () => {
   assert.equal(L.chapterLength('你好，世界！', '字'), 4);
   assert.equal(L.chapterLength('你好 world 2024 年', '字'), 2 + 1 + 1 + 1);

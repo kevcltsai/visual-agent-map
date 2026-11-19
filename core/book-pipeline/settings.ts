@@ -90,10 +90,16 @@ const NUM = "(\\d{1,3}(?:,\\d{3})+|\\d+)";
 const UNIT = "(?:個)?\\s*(字數|字符|字|words?)(?![A-Za-z])";
 const unitOf = (word: string): LengthUnit => (/^w/i.test(word) ? "words" : "字");
 const RANGE = new RegExp(
-  `(?<![\\d.])${NUM}\\s*(?:(?:個)?\\s*(?:字數|字符|字|words?))?\\s*[–\\-~～至到—]\\s*${NUM}\\s*${UNIT}`,
+  `(?<![\\d.])${NUM}\\s*(?:(?:個)?\\s*(?:字數|字符|字|words?))?\\s*(?:[–\\-~～至到—]|\\bto\\b|\\band\\b)\\s*${NUM}\\s*${UNIT}`,
   "giu"
 );
 const APPROX = new RegExp(`(?:大約|大约|約|约|about|around|approx(?:imately)?\\.?)\\s*${NUM}\\s*${UNIT}`, "giu");
+const APPROX_SUFFIX = new RegExp(`${NUM}\\s*${UNIT}\\s*(?:左右|上下|前後|前后)`, "giu");
+const MAX_ONLY = new RegExp(
+  `(?:不超過|不超过|不多於|不多于|至多|最多|no more than|at most|up to)\\s*${NUM}\\s*${UNIT}`,
+  "giu"
+);
+const NUMBER_UNIT = new RegExp(`${NUM}\\s*${UNIT}`, "iu");
 const toInt = (value: string): number => Number(value.replace(/,/g, ""));
 
 /**
@@ -114,7 +120,19 @@ export function lengthRange(
     const n = toInt(m[1]);
     found.push({ min: Math.round(n * 0.8), max: Math.round(n * 1.2), unit: unitOf(m[2]), approx: true });
   }
-  if (!found.length) return undefined;
+  // What is left after the ranges and "about N" are taken out: "N 字左右|上下" (about, +-20%) and "不超過 N 字" (a maximum only).
+  const rest = value.replace(RANGE, " ").replace(APPROX, " ");
+  for (const m of rest.matchAll(APPROX_SUFFIX)) {
+    const n = toInt(m[1]);
+    found.push({ min: Math.round(n * 0.8), max: Math.round(n * 1.2), unit: unitOf(m[2]), approx: true });
+  }
+  for (const m of rest.replace(APPROX_SUFFIX, " ").matchAll(MAX_ONLY))
+    found.push({ min: 1, max: toInt(m[1]), unit: unitOf(m[2]), approx: true });
+  if (!found.length) {
+    // A number with a unit that no phrasing above reads is logged, never silently dropped.
+    if (NUMBER_UNIT.test(value)) onIgnored?.("invalid");
+    return undefined;
+  }
   if (found.length > 1) {
     onIgnored?.("ambiguous");
     return undefined;
@@ -135,7 +153,7 @@ const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hang
 const LATIN_WORD = /[\p{Script=Latin}\p{N}]+(?:['’][\p{Script=Latin}]+)?/gu;
 /**
  * How long a chapter text is in the unit: `字` = every CJK character plus every Latin or number word; `words` = Latin and number words
- * (a text with none counts its CJK characters, so a Chinese chapter is never "0 words"). The text is the proof projection: notes are
+ * (a text where CJK characters dominate counts them too, so a Chinese chapter is never "0 words" or a handful). The text is the proof projection: notes are
  * already out; here the link addresses, images, captions' syntax, picture markers, hidden records and the program's callouts go too.
  */
 export function chapterLength(body: string, unit: LengthUnit): number {
@@ -158,7 +176,8 @@ export function chapterLength(body: string, unit: LengthUnit): number {
   const cjk = (text.match(CJK) ?? []).length;
   const words = (text.replace(CJK, " ").match(LATIN_WORD) ?? []).length;
   if (unit === "字") return cjk + words;
-  return words || cjk;
+  // A chapter written mostly in CJK counts its characters too (plus the Latin words); one in Latin script counts words only.
+  return cjk > words ? cjk + words : words || cjk;
 }
 
 /** Why a chapter is out of range: what was asked, what was measured, and the rule version (all of it feeds the review fingerprint). */

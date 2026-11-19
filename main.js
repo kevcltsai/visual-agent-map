@@ -6357,7 +6357,7 @@ var zhCN = {
   "ui.book_fail_other": "\u53D1\u751F\u672A\u9884\u671F\u7684\u9519\u8BEF",
   "ui.book_resume": "\u4ECE\u505C\u5904\u7EE7\u7EED",
   "ui.book_restart": "\u91CD\u65B0\u8BBE\u7F6E\u518D\u5F00\u59CB",
-  "ui.book_map_changed_0_1": "\u5730\u56FE\u53D8\u4E86\uFF1A\u591A {0} \u7AE0\u3001\u5C11 {1} \u7AE0",
+  "ui.book_map_changed_0_1": "\u5FC3\u667A\u56FE\u53D8\u4E86\uFF1A\u591A {0} \u7AE0\u3001\u5C11 {1} \u7AE0",
   "ui.book_map_replan": "\u91CD\u65B0\u89C4\u5212",
   "ui.book_map_keep": "\u7167\u65E7\u8DD1\u5B8C\uFF08\u4E0D\u542B\u65B0\u5361\uFF09",
   "ui.book_refused_empty": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u53EA\u6709\u6839\u8BAE\u9898\u3001\u6CA1\u6709\u7AE0\u8282\u5361\u7247\uFF0C\u6CA1\u6709\u4E1C\u897F\u53EF\u4EE5\u5199\u3002\u8BF7\u5148\u52A0\u4E0A\u7AE0\u8282\u5361\u7247\u3002",
@@ -21747,6 +21747,375 @@ function collapsedAncestors(nodes, id) {
   return result;
 }
 
+// layouts/balanced.ts
+var SIDE_DEADBAND = 150;
+function sideFromOffset(dx) {
+  if (dx > SIDE_DEADBAND) return "right";
+  if (dx < -SIDE_DEADBAND) return "left";
+  return void 0;
+}
+function sideFromTextBox(blockX, blockWidth, rootX) {
+  var _a2;
+  return (_a2 = sideFromOffset(blockX - rootX)) != null ? _a2 : blockX + blockWidth <= rootX ? "left" : "right";
+}
+function greedySides(topics, sizeOf, gap, loads = { left: 0, right: 0 }) {
+  const load = { ...loads };
+  const result = /* @__PURE__ */ new Map();
+  for (const topic of topics) {
+    const side = load.left < load.right ? "left" : "right";
+    result.set(topic.id, side);
+    load[side] += sizeOf(topic) + gap;
+  }
+  return result;
+}
+function assignSides(topics, sizeOf, gap, known) {
+  const sides = topics.map(known);
+  const loads = { left: 0, right: 0 };
+  topics.forEach((topic, index) => {
+    const side = sides[index];
+    if (side) loads[side] += sizeOf(topic) + gap;
+  });
+  const rest = greedySides(
+    topics.filter((_, index) => !sides[index]),
+    sizeOf,
+    gap,
+    loads
+  );
+  return new Map(topics.map((topic, index) => {
+    var _a2;
+    return [topic.id, (_a2 = sides[index]) != null ? _a2 : rest.get(topic.id)];
+  }));
+}
+
+// layouts/compose.ts
+function isBranchDirection(value) {
+  return value === "right" || value === "left" || value === "down" || value === "up";
+}
+function allowsBranchLayout(mapDirection) {
+  return mapDirection === "right" || mapDirection === "left" || mapDirection === "down" || mapDirection === "up" || mapDirection === "balanced";
+}
+function branchDirectionOf(node) {
+  if (!(node == null ? void 0 : node.parentId)) return void 0;
+  const layout = node.layout;
+  if (!layout || typeof layout !== "object" || Array.isArray(layout)) return void 0;
+  const direction = layout.direction;
+  return isBranchDirection(direction) ? direction : void 0;
+}
+var sideOf = (dx) => sideFromOffset(dx);
+function cleanBranchLayouts(nodes, mapDirection, aim = false) {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const done = /* @__PURE__ */ new Set();
+  const directionAbove = (id, from) => {
+    var _a2;
+    const own2 = layoutDirectionIn(byId, id, void 0);
+    if (own2) return own2;
+    if (mapDirection !== "balanced") return allowsBranchLayout(mapDirection) ? mapDirection : void 0;
+    let topic = from;
+    while ((topic == null ? void 0 : topic.parentId) && ((_a2 = byId.get(topic.parentId)) == null ? void 0 : _a2.parentId)) topic = byId.get(topic.parentId);
+    const root = (topic == null ? void 0 : topic.parentId) ? byId.get(topic.parentId) : void 0;
+    return topic && root ? sideOf(topic.x - root.x) : void 0;
+  };
+  const clean3 = (node) => {
+    done.add(node.id);
+    if (node.layout === void 0) return;
+    const direction = aim ? void 0 : branchDirectionOf(node);
+    if (!direction) {
+      delete node.layout;
+      return;
+    }
+    const above = directionAbove(node.parentId, node);
+    if (isBranchDirection(above) && direction === oppositeDirection(above)) delete node.layout;
+    else node.layout = { direction };
+  };
+  for (const node of nodes) {
+    const chain = [];
+    for (let at = node; at && !done.has(at.id); at = at.parentId ? byId.get(at.parentId) : void 0)
+      chain.push(at);
+    for (const item of chain.reverse()) clean3(item);
+  }
+}
+function layoutDirectionIn(byId, id, fallback) {
+  const seen = /* @__PURE__ */ new Set();
+  for (let node = byId.get(id); node && !seen.has(node.id); node = node.parentId ? byId.get(node.parentId) : void 0) {
+    seen.add(node.id);
+    const own2 = branchDirectionOf(node);
+    if (own2) return own2;
+  }
+  return fallback;
+}
+function layoutDirectionFor(nodes, id, mapDirection) {
+  var _a2;
+  if (!allowsBranchLayout(mapDirection)) return mapDirection;
+  return (_a2 = layoutDirectionIn(new Map(nodes.map((node) => [node.id, node])), id, mapDirection)) != null ? _a2 : mapDirection;
+}
+var oppositeDirection = (direction) => direction === "right" ? "left" : direction === "left" ? "right" : direction === "down" ? "up" : "down";
+function composePositions(input2) {
+  const { width, column, mapDirection, engine } = input2;
+  const arrange = (roots, direction) => {
+    var _a2, _b2;
+    const heads = [];
+    const walk2 = (node, root) => {
+      for (const child of [...input2.kidsOf(node), ...input2.joinsOf(node)]) {
+        if (branchDirectionOf(child)) heads.push({ node: child, root });
+        else walk2(child, root);
+      }
+    };
+    for (const root of roots) walk2(root, root);
+    const tree = { roots, kidsOf: input2.kidsOf, joinsOf: input2.joinsOf, heightFor: input2.heightFor };
+    if (!heads.length) return engine(direction, tree);
+    const vertical = direction === "down" || direction === "up";
+    const blocks = heads.map(({ node, root }) => {
+      const placed2 = arrange([node], branchDirectionOf(node));
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      const byId = /* @__PURE__ */ new Map();
+      const collect = (item) => {
+        byId.set(item.id, item);
+        for (const child of [...input2.kidsOf(item), ...input2.joinsOf(item)]) collect(child);
+      };
+      collect(node);
+      for (const [id, point] of placed2) {
+        minX = Math.min(minX, point.x);
+        maxX = Math.max(maxX, point.x + width);
+        minY = Math.min(minY, point.y);
+        maxY = Math.max(maxY, point.y + input2.heightFor(byId.get(id)));
+      }
+      const slots = Math.max(1, Math.ceil((maxX - minX + column - width) / column));
+      return { node, root, placed: placed2, minX, maxX, minY, maxY, slots };
+    });
+    const byHead = new Map(blocks.map((block) => [block.node.id, block]));
+    const padOf = (node) => {
+      const block = byHead.get(node.id);
+      if (!block || !vertical) return [];
+      return Array.from({ length: block.slots }, (_, index) => ({ id: `${node.id}\0pad${index}` }));
+    };
+    const pads = /* @__PURE__ */ new Set();
+    const outer = {
+      roots,
+      kidsOf: (node) => {
+        if (!byHead.has(node.id)) return input2.kidsOf(node);
+        const list2 = padOf(node);
+        for (const item of list2) pads.add(item.id);
+        return list2;
+      },
+      joinsOf: (node) => byHead.has(node.id) ? [] : input2.joinsOf(node),
+      heightFor: (node) => {
+        if (pads.has(node.id)) return 0;
+        const block = byHead.get(node.id);
+        return block && !vertical ? block.maxY - block.minY : input2.heightFor(node);
+      }
+    };
+    const placed = engine(direction, outer);
+    const result = /* @__PURE__ */ new Map();
+    for (const [id, point] of placed) if (!pads.has(id) && !byHead.has(id)) result.set(id, point);
+    for (const block of blocks) {
+      const at = placed.get(block.node.id);
+      let dx, dy;
+      if (vertical) {
+        dx = at.x + column / 2 - (block.minX + block.maxX) / 2;
+        dy = direction === "down" ? at.y - block.minY : at.y + input2.heightFor(block.node) - block.maxY;
+      } else {
+        const toRight = direction === "right" || direction === "balanced" && at.x >= ((_b2 = (_a2 = placed.get(block.root.id)) == null ? void 0 : _a2.x) != null ? _b2 : at.x);
+        dx = toRight ? at.x - block.minX : at.x + width - block.maxX;
+        dy = at.y - block.minY;
+      }
+      for (const [id, point] of block.placed) result.set(id, { x: point.x + dx, y: point.y + dy });
+    }
+    return result;
+  };
+  return arrange(input2.roots, mapDirection);
+}
+
+// layouts/fishbone.ts
+var BONE_RUN = 1 / Math.tan(Math.PI / 3);
+function fishbonePositions(input2) {
+  const { roots, kidsOf, joinsOf, heightFor, width, column, gap, left, top } = input2;
+  const rib = column - width;
+  const childrenOf = (node) => [...kidsOf(node), ...joinsOf(node)];
+  const fishes = roots.map((root) => {
+    const sizes = /* @__PURE__ */ new Map();
+    const stack = (list2) => list2.reduce((total2, item) => total2 + sizes.get(item.id), 0) + Math.max(0, list2.length - 1) * gap;
+    const measure = (node) => {
+      const kids = childrenOf(node);
+      for (const kid of kids) measure(kid);
+      sizes.set(node.id, Math.max(heightFor(node), stack(kids)));
+    };
+    const place = (node, depth, bandTop, out2) => {
+      const kids = childrenOf(node);
+      let next = bandTop + (sizes.get(node.id) - stack(kids)) / 2;
+      const centres = kids.map((kid) => {
+        const centre2 = place(kid, depth + 1, next, out2);
+        next += sizes.get(kid.id) + gap;
+        return centre2;
+      });
+      const own2 = heightFor(node);
+      const centre = centres.length ? (centres[0] + centres[centres.length - 1]) / 2 : bandTop + sizes.get(node.id) / 2;
+      out2.push({ id: node.id, x: -depth * column, centre, height: own2 });
+      return centre;
+    };
+    const topics = childrenOf(root).map((topic, index) => {
+      const side = index % 2 === 0 ? 1 : -1;
+      const details = childrenOf(topic);
+      for (const detail of details) measure(detail);
+      const cards = [];
+      let cursor = gap;
+      for (const detail of details) {
+        const at = cards.length;
+        const centre = place(detail, 0, cursor, cards);
+        const edge2 = centre * BONE_RUN - rib;
+        for (let i = at; i < cards.length; i++) cards[i].x += edge2 - width;
+        cursor += sizes.get(detail.id) + gap;
+      }
+      const length = Math.max(column, cursor);
+      const run = length * BONE_RUN;
+      const height = heightFor(topic);
+      const lefts = [-width / 2, ...cards.map((card) => card.x)];
+      const rights = [width / 2, run, ...cards.map((card) => card.x + width)];
+      return {
+        topic,
+        side,
+        length,
+        height,
+        cards,
+        minX: Math.min(...lefts),
+        maxX: Math.max(...rights)
+      };
+    });
+    const rootHeight = heightFor(root);
+    const out = [{ id: root.id, x: 0, y: -rootHeight / 2, height: rootHeight }];
+    const edge = { above: -rib, below: -rib };
+    for (const fish of topics) {
+      const key4 = fish.side === 1 ? "above" : "below";
+      const at = edge[key4] - fish.maxX;
+      const attachY = -fish.side * fish.length;
+      out.push({
+        id: fish.topic.id,
+        x: at - width / 2,
+        y: attachY - fish.side * (fish.height / 2) - fish.height / 2,
+        height: fish.height
+      });
+      for (const card of fish.cards)
+        out.push({
+          id: card.id,
+          x: at + card.x,
+          y: attachY + fish.side * card.centre - card.height / 2,
+          height: card.height
+        });
+      edge[key4] = at + fish.minX - rib;
+    }
+    const minX = Math.min(...out.map((card) => card.x));
+    const minY = Math.min(...out.map((card) => card.y));
+    const maxY = Math.max(...out.map((card) => card.y + card.height));
+    return { out, minX, minY, maxY };
+  });
+  const result = /* @__PURE__ */ new Map();
+  const headX = left + Math.max(0, ...fishes.map((fish) => -fish.minX));
+  let offset = top;
+  for (const fish of fishes) {
+    for (const card of fish.out) result.set(card.id, { x: headX + card.x, y: offset + card.y - fish.minY });
+    offset += fish.maxY - fish.minY + gap;
+  }
+  return result;
+}
+
+// layouts/radial.ts
+var TAU = Math.PI * 2;
+var GROW = 6;
+var MAX_ROUNDS = 60;
+function touching(placed, width, gap, stats) {
+  const list2 = [...placed.values()].sort((a, b) => a.y - b.y);
+  const depths = /* @__PURE__ */ new Set();
+  for (let i = 0; i < list2.length; i++) {
+    const a = list2[i];
+    for (let j = i + 1; j < list2.length; j++) {
+      const b = list2[j];
+      if (b.y >= a.y + a.height + gap) break;
+      if (stats) stats.checks++;
+      if (Math.abs(a.x - b.x) < width && a.y < b.y + b.height + gap) depths.add(Math.max(a.depth, b.depth));
+    }
+  }
+  return depths;
+}
+function radialPositions(input2) {
+  const { roots, kidsOf, joinsOf, heightFor, width, column, gap, left, top } = input2;
+  const result = /* @__PURE__ */ new Map();
+  let offset = top;
+  for (const root of roots) {
+    const spots = [];
+    const leaves = /* @__PURE__ */ new Map();
+    const childrenOf = (node) => [...kidsOf(node), ...joinsOf(node)];
+    const count4 = (node) => {
+      const kids = childrenOf(node);
+      const total2 = kids.length ? kids.reduce((sum2, kid) => sum2 + count4(kid), 0) : 1;
+      leaves.set(node.id, total2);
+      return total2;
+    };
+    count4(root);
+    const spread = (node, depth, start, end) => {
+      spots.push({ id: node.id, depth, angle: (start + end) / 2, height: heightFor(node) });
+      let next = start;
+      const share = (end - start) / leaves.get(node.id);
+      for (const kid of childrenOf(node)) {
+        const slice = share * leaves.get(kid.id);
+        spread(kid, depth + 1, next, next + slice);
+        next += slice;
+      }
+    };
+    spread(root, 0, 0, TAU);
+    const deepest = Math.max(...spots.map((spot) => spot.depth));
+    const base = Array.from({ length: deepest + 1 }, (_, depth) => depth * column);
+    const place = () => {
+      const radii = [];
+      base.forEach((value, depth) => radii.push(depth ? Math.max(value, radii[depth - 1] + column) : 0));
+      return new Map(
+        spots.map((spot) => {
+          const radius = radii[spot.depth];
+          return [
+            spot.id,
+            {
+              x: Math.round(radius * Math.sin(spot.angle) - width / 2),
+              y: Math.round(-radius * Math.cos(spot.angle) - spot.height / 2),
+              depth: spot.depth,
+              height: spot.height
+            }
+          ];
+        })
+      );
+    };
+    const fine = column / GROW;
+    const clash = () => {
+      if (input2.stats) input2.stats.rounds++;
+      return touching(place(), width, gap, input2.stats);
+    };
+    let step = fine;
+    let touched = clash();
+    let low = base.slice();
+    for (let round3 = 0; touched.size && round3 < MAX_ROUNDS; round3++) {
+      low = base.slice();
+      for (const depth of touched) base[depth] += step;
+      step *= 2;
+      touched = clash();
+    }
+    if (!touched.size && low.some((value, depth) => base[depth] - value > fine)) {
+      let high = base.slice();
+      while (high.some((value, depth) => value - low[depth] > fine)) {
+        const mid = high.map((value, depth) => (value + low[depth]) / 2);
+        base.splice(0, base.length, ...mid);
+        if (clash().size) low = mid;
+        else high = mid;
+      }
+      base.splice(0, base.length, ...high);
+    }
+    const placed = place();
+    const minX = Math.min(...[...placed.values()].map((point) => point.x));
+    const minY = Math.min(...[...placed.values()].map((point) => point.y));
+    const maxY = Math.max(...[...placed.values()].map((point) => point.y + point.height));
+    for (const [id, point] of placed)
+      result.set(id, { x: Math.round(left) + point.x - minX, y: offset + point.y - minY });
+    offset += maxY - minY + gap;
+  }
+  return result;
+}
+
 // map-graph.ts
 var CARD_WIDTH = 280;
 var CARD_WIDTH_MIN = 200;
@@ -21837,6 +22206,687 @@ function applyCollapseLevel(nodes, shownLevels) {
   }
 }
 
+// layouts/vertical.ts
+function verticalPositions(input2) {
+  const { roots, kidsOf, joinsOf, heightFor, column, rowGap, flip, left, top } = input2;
+  const cardWidth = (node) => {
+    var _a2, _b2;
+    return (_b2 = (_a2 = input2.widthFor) == null ? void 0 : _a2.call(input2, node)) != null ? _b2 : CARD_WIDTH;
+  };
+  const widths = /* @__PURE__ */ new Map();
+  const spans = /* @__PURE__ */ new Map();
+  const rowWidth = (list2) => list2.reduce((total2, item) => total2 + widths.get(item.id), 0);
+  const measure = (node) => {
+    const kids = kidsOf(node);
+    const extra = joinsOf(node);
+    for (const child of [...kids, ...extra]) measure(child);
+    widths.set(node.id, Math.max(column, rowWidth(kids), rowWidth(extra), cardWidth(node) + column - CARD_WIDTH));
+    spans.set(node.id, 1 + Math.max(0, ...kids.map((kid) => spans.get(kid.id))));
+  };
+  const xs = /* @__PURE__ */ new Map();
+  const depths = /* @__PURE__ */ new Map();
+  const place = (node, depth, start) => {
+    const kids = kidsOf(node);
+    const extra = joinsOf(node);
+    const width = widths.get(node.id);
+    const row = (list2, level) => {
+      let next2 = start + (width - rowWidth(list2)) / 2;
+      return list2.map((item) => {
+        place(item, level, next2);
+        const x = xs.get(item.id);
+        next2 += widths.get(item.id);
+        return x;
+      });
+    };
+    const kidXs = row(kids, depth + 1);
+    const joinXs = row(extra, depth + spans.get(node.id));
+    const own2 = kidXs.length ? kidXs : joinXs;
+    depths.set(node.id, depth);
+    const centres = (list2, xsOf) => xsOf.map((x, i) => x + cardWidth(list2[i]) / 2);
+    const ownList = kidXs.length ? kids : extra;
+    const ownCentres = centres(ownList, own2);
+    xs.set(
+      node.id,
+      own2.length ? (ownCentres[0] + ownCentres[ownCentres.length - 1]) / 2 - cardWidth(node) / 2 : start + Math.max(0, CARD_WIDTH - cardWidth(node)) / 2
+    );
+  };
+  let cursor = left;
+  const order = [];
+  const collect = (node) => {
+    order.push(node);
+    for (const child of [...kidsOf(node), ...joinsOf(node)]) collect(child);
+  };
+  for (const root of roots) {
+    measure(root);
+    place(root, 0, cursor);
+    cursor += widths.get(root.id);
+    collect(root);
+  }
+  const deepest = Math.max(0, ...depths.values());
+  const heights = Array.from({ length: deepest + 1 }, () => 0);
+  for (const node of order) heights[depths.get(node.id)] = Math.max(heights[depths.get(node.id)], heightFor(node));
+  const tops = [];
+  let next = top;
+  for (let step = 0; step <= deepest; step++) {
+    const level = flip ? deepest - step : step;
+    tops[level] = next;
+    next += heights[level] + rowGap;
+  }
+  const result = /* @__PURE__ */ new Map();
+  for (const node of order) {
+    const level = depths.get(node.id);
+    const y = flip ? tops[level] + heights[level] - heightFor(node) : tops[level];
+    result.set(node.id, { x: xs.get(node.id), y });
+  }
+  return result;
+}
+
+// layouts/timeline.ts
+function timelinePositions(input2) {
+  const { roots, kidsOf, joinsOf, heightFor, width, column, gap, left, top } = input2;
+  const result = /* @__PURE__ */ new Map();
+  let offset = top;
+  for (const root of roots) {
+    const heights = /* @__PURE__ */ new Map();
+    const measure = (node) => {
+      heights.set(node.id, heightFor(node));
+      for (const child of [...kidsOf(node), ...joinsOf(node)]) measure(child);
+    };
+    measure(root);
+    const cards = [{ id: root.id, x: left, y: 0 }];
+    let cursor = left + column;
+    [...kidsOf(root), ...joinsOf(root)].forEach((topic, index) => {
+      const placed = verticalPositions({
+        roots: [topic],
+        kidsOf,
+        joinsOf,
+        heightFor,
+        column,
+        rowGap: column - width,
+        flip: index % 2 === 1,
+        left: cursor,
+        top: 0
+      });
+      const axis = placed.get(topic.id).y;
+      let reach = cursor;
+      for (const [id, point] of placed) {
+        cards.push({ id, x: point.x, y: point.y - axis });
+        reach = Math.max(reach, point.x);
+      }
+      cursor = reach + column;
+    });
+    const minY = Math.min(...cards.map((card) => card.y));
+    const maxY = Math.max(...cards.map((card) => card.y + heights.get(card.id)));
+    for (const card of cards) result.set(card.id, { x: card.x, y: offset + card.y - minY });
+    offset += maxY - minY + gap;
+  }
+  return result;
+}
+
+// map-layout.ts
+var WIDTH = 300;
+function widthExcess(node) {
+  var _a2;
+  return Math.max(0, ((_a2 = node.width) != null ? _a2 : CARD_WIDTH) - CARD_WIDTH);
+}
+function textBlockWidth(node) {
+  var _a2;
+  return node.path === "" ? (_a2 = node.width) != null ? _a2 : CARD_WIDTH : CARD_WIDTH;
+}
+function obstacleWidth(node) {
+  var _a2;
+  return node.path === "" ? Math.max(WIDTH, (_a2 = node.width) != null ? _a2 : 0) : WIDTH;
+}
+function textParentNarrow(parent) {
+  return parent.path === "" ? Math.max(0, CARD_WIDTH - textBlockWidth(parent)) : 0;
+}
+function knownSide(topic, root) {
+  return topic.path === "" ? sideFromTextBox(topic.x, textBlockWidth(topic), root.x) : sideFromOffset(topic.x - root.x);
+}
+var LAYOUT_GAP = 24;
+var SPACING = {
+  compact: { column: 330, gap: 12 },
+  standard: { column: 360, gap: LAYOUT_GAP },
+  spacious: { column: 420, gap: 48 }
+};
+function isStoredLayoutSpacing(value) {
+  return value === "compact" || value === "spacious";
+}
+var DEFAULT_CARD_HEIGHT = 180;
+function isLayoutKind(value) {
+  return value === "right" || value === "left" || value === "down" || value === "up" || value === "balanced" || value === "radial" || value === "timeline" || value === "fishbone";
+}
+function layoutOf(map) {
+  var _a2, _b2;
+  const stored = map && !map.aim ? (_a2 = map.layout) == null ? void 0 : _a2.direction : void 0;
+  const direction = isLayoutKind(stored) ? stored : "right";
+  const spacing = map && !map.aim ? (_b2 = map.layout) == null ? void 0 : _b2.spacing : void 0;
+  return isStoredLayoutSpacing(spacing) ? { direction, spacing } : { direction };
+}
+function resolveLayout(layout) {
+  const direction = typeof layout === "string" ? layout : layout.direction;
+  const spacing = typeof layout === "string" ? void 0 : layout.spacing;
+  return { direction, ...SPACING[isStoredLayoutSpacing(spacing) ? spacing : "standard"] };
+}
+var isVertical = (direction) => direction === "down" || direction === "up";
+var signOf = (direction) => direction === "left" ? -1 : 1;
+function medianHeight(values) {
+  const sorted = values.filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
+  if (!sorted.length) return void 0;
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+var cardHeight = (heightOf, id) => {
+  const value = heightOf == null ? void 0 : heightOf(id);
+  return value !== void 0 && Number.isFinite(value) && value > 0 ? value : DEFAULT_CARD_HEIGHT;
+};
+function structureOf(nodes, folded2) {
+  var _a2, _b2;
+  const ids2 = new Map(nodes.map((node) => [node.id, node]));
+  const children = /* @__PURE__ */ new Map();
+  const joins = /* @__PURE__ */ new Map();
+  const add = (map, key4, node) => {
+    var _a3;
+    return map.set(key4, [...(_a3 = map.get(key4)) != null ? _a3 : [], node]);
+  };
+  for (const node of nodes) {
+    if (!node.parentId) continue;
+    const sources = node.aimKind !== "question" && ((_a2 = node.aimConvergesFromNodeIds) == null ? void 0 : _a2.length) ? parentIdsForNode(node).map((id) => ids2.get(id)) : [];
+    const anchor = (_b2 = sources[0]) == null ? void 0 : _b2.parentId;
+    if (anchor && ids2.has(anchor) && sources.every((source) => source && source.parentId === anchor))
+      add(joins, anchor, node);
+    else add(children, node.parentId, node);
+  }
+  const kidsOf = (node) => {
+    var _a3;
+    return folded2 && node.collapsed ? [] : (_a3 = children.get(node.id)) != null ? _a3 : [];
+  };
+  const joinsOf = (node) => {
+    var _a3;
+    return folded2 && node.collapsed ? [] : ((_a3 = joins.get(node.id)) != null ? _a3 : []).filter((join5) => {
+      var _a4;
+      return !(folded2 && ((_a4 = ids2.get(join5.parentId)) == null ? void 0 : _a4.collapsed));
+    });
+  };
+  return { kidsOf, joinsOf };
+}
+function horizontalPositions(input2) {
+  var _a2;
+  const { roots, kidsOf, joinsOf, heightFor, column: COLUMN, gap: LAYOUT_GAP2, sign, left, top } = input2;
+  const result = /* @__PURE__ */ new Map();
+  const sizes = /* @__PURE__ */ new Map();
+  const spans = /* @__PURE__ */ new Map();
+  const depths = /* @__PURE__ */ new Map();
+  const byId = /* @__PURE__ */ new Map();
+  const stackHeight = (list2) => list2.reduce((total2, item) => total2 + sizes.get(item.id), 0) + Math.max(0, list2.length - 1) * LAYOUT_GAP2;
+  const measure = (node) => {
+    const kids = kidsOf(node);
+    const extra = joinsOf(node);
+    byId.set(node.id, node);
+    for (const child of [...kids, ...extra]) measure(child);
+    sizes.set(node.id, Math.max(heightFor(node), stackHeight(kids), stackHeight(extra)));
+    spans.set(node.id, 1 + Math.max(0, ...kids.map((kid) => spans.get(kid.id))));
+  };
+  const place = (node, depth, topY) => {
+    const kids = kidsOf(node);
+    const extra = joinsOf(node);
+    const size = sizes.get(node.id);
+    const stack = (list3, column) => {
+      let next = topY + (size - stackHeight(list3)) / 2;
+      return list3.map((item) => {
+        const y2 = place(item, column, next);
+        next += sizes.get(item.id) + LAYOUT_GAP2;
+        return y2;
+      });
+    };
+    const kidYs = stack(kids, depth + 1);
+    const joinYs = stack(extra, depth + spans.get(node.id));
+    const list2 = kidYs.length ? kids : extra;
+    const ys = kidYs.length ? kidYs : joinYs;
+    const own2 = heightFor(node);
+    let y = topY + (size - own2) / 2;
+    if (ys.length) {
+      const first = ys[0] + heightFor(list2[0]) / 2;
+      const last = ys[ys.length - 1] + heightFor(list2[list2.length - 1]) / 2;
+      y = (first + last) / 2 - own2 / 2;
+    }
+    result.set(node.id, { x: 0, y: top + y });
+    depths.set(node.id, depth);
+    return y;
+  };
+  let offset = 0;
+  for (const root of roots) {
+    measure(root);
+    place(root, 0, offset);
+    offset += sizes.get(root.id) + LAYOUT_GAP2;
+  }
+  const widest = [];
+  for (const [id, depth] of depths) widest[depth] = Math.max((_a2 = widest[depth]) != null ? _a2 : 0, widthExcess(byId.get(id)));
+  const shiftAt = (depth) => {
+    var _a3, _b2;
+    let total2 = 0;
+    if (sign > 0) for (let k = 0; k < depth; k++) total2 += (_a3 = widest[k]) != null ? _a3 : 0;
+    else for (let k = 1; k <= depth; k++) total2 += (_b2 = widest[k]) != null ? _b2 : 0;
+    return total2;
+  };
+  for (const [id, point] of result) {
+    const depth = depths.get(id);
+    const narrow2 = sign < 0 ? Math.max(0, CARD_WIDTH - textBlockWidth(byId.get(id))) : 0;
+    point.x = left + sign * (depth * COLUMN + shiftAt(depth)) + narrow2;
+  }
+  return { placed: result, sizes };
+}
+function balancedPositions(nodes, input2, reset) {
+  const { roots, kidsOf, joinsOf, heightFor, gap, left, top } = input2;
+  const sizes = horizontalPositions({ ...input2, sign: 1 }).sizes;
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const halves = roots.map((root) => {
+    var _a2;
+    const rootNode = (_a2 = byId.get(root.id)) != null ? _a2 : root;
+    const sides = assignSides(
+      kidsOf(root),
+      (topic) => sizes.get(topic.id),
+      gap,
+      (topic) => {
+        var _a3;
+        return reset ? void 0 : knownSide((_a3 = byId.get(topic.id)) != null ? _a3 : topic, rootNode);
+      }
+    );
+    const half = (side) => horizontalPositions({
+      ...input2,
+      roots: [root],
+      kidsOf: (node) => node.id === root.id ? kidsOf(node).filter((kid) => sides.get(kid.id) === side) : kidsOf(node),
+      joinsOf: (node) => node.id === root.id && side === "left" ? [] : joinsOf(node),
+      sign: side === "left" ? -1 : 1,
+      left: 0,
+      top: 0
+    }).placed;
+    return { root, right: half("right"), left: half("left") };
+  });
+  const reach = Math.max(0, ...halves.flatMap(({ left: placed }) => [...placed.values()].map((point) => -point.x)));
+  const rootX = left + reach;
+  const result = /* @__PURE__ */ new Map();
+  let offset = 0;
+  for (const { root, right, left: leftHalf } of halves) {
+    const centreOf2 = (placed) => placed.get(root.id).y + heightFor(root) / 2;
+    const middle = Math.max(centreOf2(right), centreOf2(leftHalf));
+    const entries = [];
+    for (const half of [
+      { placed: right, isLeft: false },
+      { placed: leftHalf, isLeft: true }
+    ]) {
+      const { placed, isLeft } = half;
+      const shift = middle - centreOf2(placed);
+      for (const [id, point] of placed)
+        if (!(isLeft && id === root.id)) entries.push([id, { x: rootX + point.x, y: point.y + shift }]);
+    }
+    const heightOfId = (id) => heightFor(byId.get(id));
+    const first = Math.min(...entries.map(([, point]) => point.y));
+    const last = Math.max(...entries.map(([id, point]) => point.y + heightOfId(id)));
+    for (const [id, point] of entries) result.set(id, { x: point.x, y: top + offset + point.y - first });
+    offset += last - first + gap;
+  }
+  return result;
+}
+function positions(nodes, roots, left, top, folded2 = false, heightOf, layout = "right", reset = false) {
+  const { direction, column: COLUMN, gap: LAYOUT_GAP2 } = resolveLayout(layout);
+  const { kidsOf, joinsOf } = structureOf(nodes, folded2);
+  const heightFor = (node) => cardHeight(heightOf, node.id);
+  const engine = (kind, tree2) => {
+    if (kind === "down" || kind === "up")
+      return verticalPositions({
+        ...tree2,
+        column: COLUMN,
+        rowGap: COLUMN - WIDTH,
+        flip: kind === "up",
+        left,
+        top,
+        widthFor: textBlockWidth
+      });
+    const flat = { ...tree2, column: COLUMN, gap: LAYOUT_GAP2, left, top };
+    if (kind === "radial") return radialPositions({ ...flat, width: WIDTH });
+    if (kind === "timeline") return timelinePositions({ ...flat, width: WIDTH });
+    if (kind === "fishbone") return fishbonePositions({ ...flat, width: WIDTH });
+    const input2 = { ...flat, sign: signOf(kind) };
+    if (kind === "balanced") return balancedPositions(nodes, input2, reset);
+    return horizontalPositions(input2).placed;
+  };
+  const tree = { roots, kidsOf, joinsOf, heightFor };
+  if (allowsBranchLayout(direction) && nodes.some((node) => branchDirectionOf(node)))
+    return composePositions({ ...tree, width: WIDTH, column: COLUMN, mapDirection: direction, engine });
+  return engine(direction, tree);
+}
+function arrangeMap(nodes, hidden, heightOf, layout = "right", options = {}) {
+  const laidOut = (hidden == null ? void 0 : hidden.size) ? nodes.filter((node) => !hidden.has(node.id)) : nodes;
+  const roots = laidOut.filter((node) => !node.parentId);
+  const placed = positions(laidOut, roots, 80, 80, true, heightOf, layout, options.reset === true);
+  return nodes.map((node) => ({ ...node, ...placed.get(node.id) }));
+}
+function rearrangeWhole(nodes, heightOf, layout) {
+  const roots = nodes.filter((node) => !node.parentId);
+  if (!roots.length) return nodes;
+  const placed = positions(nodes, roots, 80, 80, true, heightOf, layout);
+  const anchor = roots[0];
+  const dx = anchor.x - placed.get(anchor.id).x;
+  const dy = anchor.y - placed.get(anchor.id).y;
+  return nodes.map((node) => {
+    const point = placed.get(node.id);
+    if (!point || node.id === anchor.id) return node;
+    return { ...node, x: Math.round(point.x + dx), y: Math.round(point.y + dy) };
+  });
+}
+function arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, layout) {
+  var _a2;
+  const { direction, column: COLUMN, gap: LAYOUT_GAP2 } = resolveLayout(layout);
+  const placed = positions(fresh, roots, 0, 0, false, heightOf, layout);
+  const cardSpan = parent.path === "" ? CARD_WIDTH : WIDTH;
+  const rootCentres = roots.map((root) => placed.get(root.id).x + cardSpan / 2);
+  const middle = rootCentres.length ? (Math.min(...rootCentres) + Math.max(...rootCentres)) / 2 : cardSpan / 2;
+  let shiftX = parent.x + (parent.path === "" ? (_a2 = parent.width) != null ? _a2 : WIDTH : WIDTH) / 2 - middle;
+  const rowGap = COLUMN - WIDTH;
+  const rootTop = Math.min(...roots.map((root) => placed.get(root.id).y));
+  const rootBottom = Math.max(...roots.map((root) => placed.get(root.id).y + cardHeight(heightOf, root.id)));
+  const shiftY = direction === "up" ? parent.y - rowGap - rootBottom : parent.y + cardHeight(heightOf, parent.id) + rowGap - rootTop;
+  const fixed2 = nodes.filter((node) => !newIds.has(node.id));
+  for (; ; ) {
+    let next = shiftX;
+    for (const [id, point] of placed) {
+      const own2 = cardHeight(heightOf, id);
+      const topY = point.y + shiftY;
+      for (const node of fixed2) {
+        const other = cardHeight(heightOf, node.id);
+        const x = point.x + shiftX;
+        if (x < node.x + obstacleWidth(node) + LAYOUT_GAP2 && node.x < x + WIDTH + LAYOUT_GAP2 && topY < node.y + other + LAYOUT_GAP2 && node.y < topY + own2 + LAYOUT_GAP2)
+          next = Math.max(next, node.x + obstacleWidth(node) + LAYOUT_GAP2 - point.x);
+      }
+    }
+    if (next === shiftX) break;
+    shiftX = next;
+  }
+  return nodes.map((node) => {
+    const point = placed.get(node.id);
+    return point ? { ...node, x: Math.round(point.x + shiftX), y: Math.round(point.y + shiftY) } : node;
+  });
+}
+function branchSide(byId, node) {
+  var _a2;
+  let topic = node;
+  while (topic.parentId && ((_a2 = byId.get(topic.parentId)) == null ? void 0 : _a2.parentId)) topic = byId.get(topic.parentId);
+  const root = topic.parentId ? byId.get(topic.parentId) : void 0;
+  return root ? knownSide(topic, root) : void 0;
+}
+function arrangeBalancedBranch(nodes, parent, fresh, roots, newIds, heightOf, minTop, layout) {
+  var _a2;
+  const { gap } = resolveLayout(layout);
+  const spacing = typeof layout === "string" ? void 0 : layout.spacing;
+  const as = (direction) => spacing ? { direction, spacing } : { direction };
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  if (parent.parentId)
+    return arrangeNewBranch(nodes, parent.id, newIds, heightOf, minTop, as((_a2 = branchSide(byId, parent)) != null ? _a2 : "right"));
+  const older = nodes.filter((node) => !newIds.has(node.id));
+  const { kidsOf } = structureOf(older, true);
+  const { sizes } = horizontalPositions({
+    roots: [parent],
+    kidsOf,
+    joinsOf: () => [],
+    heightFor: (node) => cardHeight(heightOf, node.id),
+    column: 0,
+    gap,
+    sign: 1,
+    left: 0,
+    top: 0
+  });
+  const loads = { left: 0, right: 0 };
+  for (const kid of kidsOf(parent)) {
+    const side = knownSide(kid, parent);
+    if (side) loads[side] += sizes.get(kid.id) + gap;
+  }
+  const { sizes: freshSizes } = horizontalPositions({
+    roots,
+    kidsOf: (node) => fresh.filter((item) => item.parentId === node.id),
+    joinsOf: () => [],
+    heightFor: (node) => cardHeight(heightOf, node.id),
+    column: 0,
+    gap,
+    sign: 1,
+    left: 0,
+    top: 0
+  });
+  const sides = greedySides(roots, (root) => freshSizes.get(root.id), gap, loads);
+  const below = (id) => [
+    id,
+    ...fresh.filter((item) => item.parentId === id).flatMap((item) => below(item.id))
+  ];
+  let current = nodes;
+  const pending2 = new Set(newIds);
+  for (const side of ["right", "left"]) {
+    const mine = new Set(roots.filter((root) => sides.get(root.id) === side).flatMap((root) => below(root.id)));
+    if (!mine.size) continue;
+    for (const id of mine) pending2.delete(id);
+    const others = new Set(pending2);
+    const placed = arrangeNewBranch(
+      current.filter((node) => !others.has(node.id)),
+      parent.id,
+      mine,
+      heightOf,
+      minTop,
+      as(side)
+    );
+    const moved = new Map(placed.map((node) => [node.id, node]));
+    current = current.map((node) => {
+      var _a3;
+      return (_a3 = moved.get(node.id)) != null ? _a3 : node;
+    });
+  }
+  return current;
+}
+function arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout = "right") {
+  const { direction, column: COLUMN, gap: LAYOUT_GAP2 } = resolveLayout(layout);
+  const parent = nodes.find((node) => node.id === parentId);
+  if (!parent || !newIds.size) return nodes;
+  const actual = layoutDirectionFor(nodes, parentId, direction);
+  if (actual !== direction) {
+    const spacing = typeof layout === "string" ? void 0 : layout.spacing;
+    const own2 = { direction: actual, ...spacing ? { spacing } : {} };
+    return arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, own2);
+  }
+  const fresh = nodes.filter((node) => newIds.has(node.id));
+  const roots = fresh.filter((node) => node.parentId === parentId);
+  if (direction === "radial" || direction === "timeline" || direction === "fishbone")
+    return rearrangeWhole(nodes, heightOf, layout);
+  if (isVertical(direction)) return arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, layout);
+  if (direction === "balanced")
+    return arrangeBalancedBranch(nodes, parent, fresh, roots, newIds, heightOf, minTop, layout);
+  const startX = signOf(direction) > 0 ? parent.x + COLUMN + widthExcess(parent) : parent.x - COLUMN - Math.max(0, ...roots.map(widthExcess)) - textParentNarrow(parent);
+  const placed = positions(fresh, roots, startX, 0, false, heightOf, layout);
+  const centers = roots.map((root) => placed.get(root.id).y + cardHeight(heightOf, root.id) / 2);
+  const center = centers.length ? (Math.min(...centers) + Math.max(...centers)) / 2 : 0;
+  let offset = parent.y + cardHeight(heightOf, parent.id) / 2 - center;
+  if (minTop !== void 0 && placed.size)
+    offset = Math.max(offset, minTop - Math.min(...[...placed.values()].map((point) => point.y)));
+  const fixed2 = nodes.filter((node) => !newIds.has(node.id));
+  for (; ; ) {
+    let next = offset;
+    for (const [id, point] of placed) {
+      const own2 = cardHeight(heightOf, id);
+      for (const node of fixed2) {
+        const other = cardHeight(heightOf, node.id);
+        const top = point.y + offset;
+        if (point.x - node.x < obstacleWidth(node) && node.x - point.x < WIDTH && top < node.y + other + LAYOUT_GAP2 && node.y < top + own2 + LAYOUT_GAP2)
+          next = Math.max(next, node.y + other + LAYOUT_GAP2 - point.y);
+      }
+    }
+    if (next === offset) break;
+    offset = next;
+  }
+  return nodes.map((node) => {
+    const point = placed.get(node.id);
+    return point ? { ...node, x: point.x, y: Math.round(point.y + offset) } : node;
+  });
+}
+function arrangeNewTree(nodes, rootId, newIds, heightOf, layout = "right") {
+  const { direction, column: COLUMN, gap: LAYOUT_GAP2 } = resolveLayout(layout);
+  const gap = LAYOUT_GAP2;
+  const root = nodes.find((node) => node.id === rootId);
+  if (!root || !newIds.has(rootId)) return nodes;
+  const fixed2 = nodes.filter((node) => !newIds.has(node.id));
+  const fixedRoots = fixed2.filter((node) => !node.parentId);
+  if (isVertical(direction)) {
+    const anchors = fixedRoots.length ? fixedRoots : fixed2;
+    const x = fixed2.length ? Math.max(...fixed2.map((node) => node.x)) + COLUMN : 80;
+    const placed2 = positions(
+      nodes.filter((node) => newIds.has(node.id)),
+      [root],
+      x,
+      0,
+      false,
+      heightOf,
+      layout
+    );
+    const rootPoint = placed2.get(rootId);
+    const rowTop = anchors.length ? Math.min(...anchors.map((node) => node.y)) : 80;
+    const rowBottom = anchors.length ? Math.max(...anchors.map((node) => node.y + cardHeight(heightOf, node.id))) : 80 + cardHeight(heightOf, rootId);
+    const shiftY = direction === "up" ? rowBottom - (rootPoint.y + cardHeight(heightOf, rootId)) : rowTop - rootPoint.y;
+    return nodes.map((node) => {
+      const point = placed2.get(node.id);
+      return point ? { ...node, x: Math.round(point.x), y: Math.round(point.y + shiftY) } : node;
+    });
+  }
+  if (direction === "balanced") {
+    const top2 = fixed2.length ? Math.max(...fixed2.map((node) => node.y + cardHeight(heightOf, node.id))) + gap : 80;
+    const placed2 = positions(
+      nodes.filter((node) => newIds.has(node.id)),
+      [root],
+      fixedRoots.length ? 0 : 80,
+      top2,
+      false,
+      heightOf,
+      layout,
+      true
+    );
+    const shiftX = fixedRoots.length ? Math.min(...fixedRoots.map((node) => node.x)) - placed2.get(rootId).x : 0;
+    return nodes.map((node) => {
+      const point = placed2.get(node.id);
+      return point ? { ...node, x: point.x + shiftX, y: point.y } : node;
+    });
+  }
+  const left = Math.min(...(fixedRoots.length ? fixedRoots : fixed2).map((node) => node.x), fixed2.length ? Infinity : 80);
+  const top = fixed2.length ? Math.max(...fixed2.map((node) => node.y + cardHeight(heightOf, node.id))) + LAYOUT_GAP2 : 80;
+  const placed = positions(
+    nodes.filter((node) => newIds.has(node.id)),
+    [root],
+    left,
+    top,
+    false,
+    heightOf,
+    layout
+  );
+  return nodes.map((node) => {
+    const point = placed.get(node.id);
+    return point ? { ...node, x: point.x, y: Math.round(point.y) } : node;
+  });
+}
+function reorderSiblings(nodes, parentId, movedId, beforeId) {
+  var _a2;
+  if (movedId === beforeId) return nodes;
+  const group = (_a2 = nodes.find((node) => node.id === movedId)) == null ? void 0 : _a2.afterTextId;
+  const slots = nodes.flatMap(
+    (node, index) => node.parentId === parentId && node.afterTextId === group ? [index] : []
+  );
+  const kids = slots.map((index) => nodes[index]);
+  const moved = kids.find((node) => node.id === movedId);
+  if (!moved || !kids.some((node) => node.id === beforeId)) return nodes;
+  const others = kids.filter((node) => node !== moved);
+  const at = others.findIndex((node) => node.id === beforeId);
+  const order = [...others.slice(0, at), moved, ...others.slice(at)];
+  const result = nodes.slice();
+  slots.forEach((index, place) => {
+    result[index] = order[place];
+  });
+  return result;
+}
+function orderSiblings(nodes, parentId, orderedIds) {
+  var _a2;
+  if (orderedIds.length < 2 || new Set(orderedIds).size !== orderedIds.length) return nodes;
+  const group = (_a2 = nodes.find((node) => node.id === orderedIds[0])) == null ? void 0 : _a2.afterTextId;
+  const slots = nodes.flatMap(
+    (node, index) => node.parentId === parentId && node.afterTextId === group ? [index] : []
+  );
+  const listed = new Set(orderedIds);
+  const wanted = orderedIds.map((id) => slots.map((index) => nodes[index]).find((node) => node.id === id));
+  if (wanted.some((node) => !node)) return nodes;
+  const places = slots.filter((index) => listed.has(nodes[index].id));
+  if (places.every((index, at) => nodes[index] === wanted[at])) return nodes;
+  const result = nodes.slice();
+  places.forEach((index, at) => {
+    result[index] = wanted[at];
+  });
+  return result;
+}
+function shiftSibling(nodes, id, offset) {
+  const moved = nodes.find((node) => node.id === id);
+  if (!(moved == null ? void 0 : moved.parentId)) return nodes;
+  const slots = nodes.flatMap(
+    (node, index) => node.parentId === moved.parentId && node.afterTextId === moved.afterTextId ? [index] : []
+  );
+  const order = slots.map((index) => nodes[index]);
+  const from = order.indexOf(moved);
+  const to = from + offset;
+  if (to < 0 || to >= order.length) return nodes;
+  [order[from], order[to]] = [order[to], order[from]];
+  const result = nodes.slice();
+  slots.forEach((index, place) => {
+    result[index] = order[place];
+  });
+  return result;
+}
+function reorderTopLevel(nodes, rootId, movedId, dropX) {
+  if (!Number.isFinite(dropX)) return nodes;
+  const slots = nodes.flatMap((node, index) => node.parentId === rootId && !node.afterTextId ? [index] : []);
+  const moved = slots.map((index) => nodes[index]).find((node) => node.id === movedId);
+  if (!moved) return nodes;
+  const others = slots.map((index) => nodes[index]).filter((node) => node !== moved);
+  const at = others.findIndex((node) => node.x + WIDTH / 2 > dropX);
+  const order = at < 0 ? [...others, moved] : [...others.slice(0, at), moved, ...others.slice(at)];
+  const result = nodes.slice();
+  slots.forEach((index, place) => {
+    result[index] = order[place];
+  });
+  return result;
+}
+function cardsOverlapAny(nodes, ids2, heightOf) {
+  const shown = visibleNodes(nodes);
+  const box = (node) => {
+    var _a2;
+    return {
+      left: node.x,
+      right: node.x + ((_a2 = node.width) != null ? _a2 : CARD_WIDTH),
+      top: node.y,
+      bottom: node.y + cardHeight(heightOf, node.id)
+    };
+  };
+  for (const node of shown) {
+    if (!ids2.has(node.id)) continue;
+    const a = box(node);
+    for (const other of shown) {
+      if (other.id === node.id) continue;
+      const b = box(other);
+      if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) return true;
+    }
+  }
+  return false;
+}
+function cardsChangedHeight(seen, now) {
+  const changed = /* @__PURE__ */ new Set();
+  if (!seen.size) return changed;
+  for (const [id, height] of now) {
+    const before = seen.get(id);
+    if (!(height > 0)) continue;
+    if (before === void 0 || height > before + 1) changed.add(id);
+  }
+  return changed;
+}
+
 // experiences/visual-map/presentation-order.ts
 function readingOrder(topics, opts = {}) {
   var _a2, _b2;
@@ -21878,7 +22928,18 @@ function readingOrder(topics, opts = {}) {
   }
   const sortedRoots = [...roots].sort(byPosition);
   const sortedKids = /* @__PURE__ */ new Map();
-  for (const [id, list2] of children) sortedKids.set(id, [...list2].sort(byPosition));
+  const rootIds = new Set(roots.map((root) => root.id));
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const half = (node) => {
+    var _a3;
+    const root = node.parentId ? byId.get(node.parentId) : void 0;
+    return root && ((_a3 = sideFromOffset(node.x - root.x)) != null ? _a3 : node.x < root.x ? "left" : "right") === "left" ? 1 : 0;
+  };
+  for (const [id, list2] of children)
+    sortedKids.set(
+      id,
+      [...list2].sort(opts.balanced && rootIds.has(id) ? (a, b) => half(a) - half(b) || byPosition(a, b) : byPosition)
+    );
   const walk2 = (withHidden) => {
     const seen = /* @__PURE__ */ new Set();
     const out = [];
@@ -21899,6 +22960,9 @@ function readingOrder(topics, opts = {}) {
   const cut = nodes.filter((node, index) => position.get(node.id) === index && !reachable.has(node.id));
   for (const node of cut.sort(byPosition)) order.push(node.id);
   return order;
+}
+function bookReadingOrder(map) {
+  return readingOrder(map.nodes, { includeHidden: true, balanced: layoutOf(map).direction === "balanced" });
 }
 function stepOrder(order, currentId, delta) {
   const total2 = order.length;
@@ -23824,1056 +24888,6 @@ var KNOWLEDGE_GAP_MARKERS = ["\u6A21\u578B\u77E5\u8B58\u4E0D\u8DB3", "\u6A21\u57
 var KNOWLEDGE_GAP_MARKER_EN = "model knowledge is insufficient";
 function hasKnowledgeGapMarker(text10) {
   return KNOWLEDGE_GAP_MARKERS.some((marker3) => text10.includes(marker3)) || text10.toLowerCase().includes(KNOWLEDGE_GAP_MARKER_EN);
-}
-
-// layouts/balanced.ts
-var SIDE_DEADBAND = 150;
-function sideFromOffset(dx) {
-  if (dx > SIDE_DEADBAND) return "right";
-  if (dx < -SIDE_DEADBAND) return "left";
-  return void 0;
-}
-function sideFromTextBox(blockX, blockWidth, rootX) {
-  var _a2;
-  return (_a2 = sideFromOffset(blockX - rootX)) != null ? _a2 : blockX + blockWidth <= rootX ? "left" : "right";
-}
-function greedySides(topics, sizeOf, gap, loads = { left: 0, right: 0 }) {
-  const load = { ...loads };
-  const result = /* @__PURE__ */ new Map();
-  for (const topic of topics) {
-    const side = load.left < load.right ? "left" : "right";
-    result.set(topic.id, side);
-    load[side] += sizeOf(topic) + gap;
-  }
-  return result;
-}
-function assignSides(topics, sizeOf, gap, known) {
-  const sides = topics.map(known);
-  const loads = { left: 0, right: 0 };
-  topics.forEach((topic, index) => {
-    const side = sides[index];
-    if (side) loads[side] += sizeOf(topic) + gap;
-  });
-  const rest = greedySides(
-    topics.filter((_, index) => !sides[index]),
-    sizeOf,
-    gap,
-    loads
-  );
-  return new Map(topics.map((topic, index) => {
-    var _a2;
-    return [topic.id, (_a2 = sides[index]) != null ? _a2 : rest.get(topic.id)];
-  }));
-}
-
-// layouts/compose.ts
-function isBranchDirection(value) {
-  return value === "right" || value === "left" || value === "down" || value === "up";
-}
-function allowsBranchLayout(mapDirection) {
-  return mapDirection === "right" || mapDirection === "left" || mapDirection === "down" || mapDirection === "up" || mapDirection === "balanced";
-}
-function branchDirectionOf(node) {
-  if (!(node == null ? void 0 : node.parentId)) return void 0;
-  const layout = node.layout;
-  if (!layout || typeof layout !== "object" || Array.isArray(layout)) return void 0;
-  const direction = layout.direction;
-  return isBranchDirection(direction) ? direction : void 0;
-}
-var sideOf = (dx) => sideFromOffset(dx);
-function cleanBranchLayouts(nodes, mapDirection, aim = false) {
-  const byId = new Map(nodes.map((node) => [node.id, node]));
-  const done = /* @__PURE__ */ new Set();
-  const directionAbove = (id, from) => {
-    var _a2;
-    const own2 = layoutDirectionIn(byId, id, void 0);
-    if (own2) return own2;
-    if (mapDirection !== "balanced") return allowsBranchLayout(mapDirection) ? mapDirection : void 0;
-    let topic = from;
-    while ((topic == null ? void 0 : topic.parentId) && ((_a2 = byId.get(topic.parentId)) == null ? void 0 : _a2.parentId)) topic = byId.get(topic.parentId);
-    const root = (topic == null ? void 0 : topic.parentId) ? byId.get(topic.parentId) : void 0;
-    return topic && root ? sideOf(topic.x - root.x) : void 0;
-  };
-  const clean3 = (node) => {
-    done.add(node.id);
-    if (node.layout === void 0) return;
-    const direction = aim ? void 0 : branchDirectionOf(node);
-    if (!direction) {
-      delete node.layout;
-      return;
-    }
-    const above = directionAbove(node.parentId, node);
-    if (isBranchDirection(above) && direction === oppositeDirection(above)) delete node.layout;
-    else node.layout = { direction };
-  };
-  for (const node of nodes) {
-    const chain = [];
-    for (let at = node; at && !done.has(at.id); at = at.parentId ? byId.get(at.parentId) : void 0)
-      chain.push(at);
-    for (const item of chain.reverse()) clean3(item);
-  }
-}
-function layoutDirectionIn(byId, id, fallback) {
-  const seen = /* @__PURE__ */ new Set();
-  for (let node = byId.get(id); node && !seen.has(node.id); node = node.parentId ? byId.get(node.parentId) : void 0) {
-    seen.add(node.id);
-    const own2 = branchDirectionOf(node);
-    if (own2) return own2;
-  }
-  return fallback;
-}
-function layoutDirectionFor(nodes, id, mapDirection) {
-  var _a2;
-  if (!allowsBranchLayout(mapDirection)) return mapDirection;
-  return (_a2 = layoutDirectionIn(new Map(nodes.map((node) => [node.id, node])), id, mapDirection)) != null ? _a2 : mapDirection;
-}
-var oppositeDirection = (direction) => direction === "right" ? "left" : direction === "left" ? "right" : direction === "down" ? "up" : "down";
-function composePositions(input2) {
-  const { width, column, mapDirection, engine } = input2;
-  const arrange = (roots, direction) => {
-    var _a2, _b2;
-    const heads = [];
-    const walk2 = (node, root) => {
-      for (const child of [...input2.kidsOf(node), ...input2.joinsOf(node)]) {
-        if (branchDirectionOf(child)) heads.push({ node: child, root });
-        else walk2(child, root);
-      }
-    };
-    for (const root of roots) walk2(root, root);
-    const tree = { roots, kidsOf: input2.kidsOf, joinsOf: input2.joinsOf, heightFor: input2.heightFor };
-    if (!heads.length) return engine(direction, tree);
-    const vertical = direction === "down" || direction === "up";
-    const blocks = heads.map(({ node, root }) => {
-      const placed2 = arrange([node], branchDirectionOf(node));
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      const byId = /* @__PURE__ */ new Map();
-      const collect = (item) => {
-        byId.set(item.id, item);
-        for (const child of [...input2.kidsOf(item), ...input2.joinsOf(item)]) collect(child);
-      };
-      collect(node);
-      for (const [id, point] of placed2) {
-        minX = Math.min(minX, point.x);
-        maxX = Math.max(maxX, point.x + width);
-        minY = Math.min(minY, point.y);
-        maxY = Math.max(maxY, point.y + input2.heightFor(byId.get(id)));
-      }
-      const slots = Math.max(1, Math.ceil((maxX - minX + column - width) / column));
-      return { node, root, placed: placed2, minX, maxX, minY, maxY, slots };
-    });
-    const byHead = new Map(blocks.map((block) => [block.node.id, block]));
-    const padOf = (node) => {
-      const block = byHead.get(node.id);
-      if (!block || !vertical) return [];
-      return Array.from({ length: block.slots }, (_, index) => ({ id: `${node.id}\0pad${index}` }));
-    };
-    const pads = /* @__PURE__ */ new Set();
-    const outer = {
-      roots,
-      kidsOf: (node) => {
-        if (!byHead.has(node.id)) return input2.kidsOf(node);
-        const list2 = padOf(node);
-        for (const item of list2) pads.add(item.id);
-        return list2;
-      },
-      joinsOf: (node) => byHead.has(node.id) ? [] : input2.joinsOf(node),
-      heightFor: (node) => {
-        if (pads.has(node.id)) return 0;
-        const block = byHead.get(node.id);
-        return block && !vertical ? block.maxY - block.minY : input2.heightFor(node);
-      }
-    };
-    const placed = engine(direction, outer);
-    const result = /* @__PURE__ */ new Map();
-    for (const [id, point] of placed) if (!pads.has(id) && !byHead.has(id)) result.set(id, point);
-    for (const block of blocks) {
-      const at = placed.get(block.node.id);
-      let dx, dy;
-      if (vertical) {
-        dx = at.x + column / 2 - (block.minX + block.maxX) / 2;
-        dy = direction === "down" ? at.y - block.minY : at.y + input2.heightFor(block.node) - block.maxY;
-      } else {
-        const toRight = direction === "right" || direction === "balanced" && at.x >= ((_b2 = (_a2 = placed.get(block.root.id)) == null ? void 0 : _a2.x) != null ? _b2 : at.x);
-        dx = toRight ? at.x - block.minX : at.x + width - block.maxX;
-        dy = at.y - block.minY;
-      }
-      for (const [id, point] of block.placed) result.set(id, { x: point.x + dx, y: point.y + dy });
-    }
-    return result;
-  };
-  return arrange(input2.roots, mapDirection);
-}
-
-// layouts/fishbone.ts
-var BONE_RUN = 1 / Math.tan(Math.PI / 3);
-function fishbonePositions(input2) {
-  const { roots, kidsOf, joinsOf, heightFor, width, column, gap, left, top } = input2;
-  const rib = column - width;
-  const childrenOf = (node) => [...kidsOf(node), ...joinsOf(node)];
-  const fishes = roots.map((root) => {
-    const sizes = /* @__PURE__ */ new Map();
-    const stack = (list2) => list2.reduce((total2, item) => total2 + sizes.get(item.id), 0) + Math.max(0, list2.length - 1) * gap;
-    const measure = (node) => {
-      const kids = childrenOf(node);
-      for (const kid of kids) measure(kid);
-      sizes.set(node.id, Math.max(heightFor(node), stack(kids)));
-    };
-    const place = (node, depth, bandTop, out2) => {
-      const kids = childrenOf(node);
-      let next = bandTop + (sizes.get(node.id) - stack(kids)) / 2;
-      const centres = kids.map((kid) => {
-        const centre2 = place(kid, depth + 1, next, out2);
-        next += sizes.get(kid.id) + gap;
-        return centre2;
-      });
-      const own2 = heightFor(node);
-      const centre = centres.length ? (centres[0] + centres[centres.length - 1]) / 2 : bandTop + sizes.get(node.id) / 2;
-      out2.push({ id: node.id, x: -depth * column, centre, height: own2 });
-      return centre;
-    };
-    const topics = childrenOf(root).map((topic, index) => {
-      const side = index % 2 === 0 ? 1 : -1;
-      const details = childrenOf(topic);
-      for (const detail of details) measure(detail);
-      const cards = [];
-      let cursor = gap;
-      for (const detail of details) {
-        const at = cards.length;
-        const centre = place(detail, 0, cursor, cards);
-        const edge2 = centre * BONE_RUN - rib;
-        for (let i = at; i < cards.length; i++) cards[i].x += edge2 - width;
-        cursor += sizes.get(detail.id) + gap;
-      }
-      const length = Math.max(column, cursor);
-      const run = length * BONE_RUN;
-      const height = heightFor(topic);
-      const lefts = [-width / 2, ...cards.map((card) => card.x)];
-      const rights = [width / 2, run, ...cards.map((card) => card.x + width)];
-      return {
-        topic,
-        side,
-        length,
-        height,
-        cards,
-        minX: Math.min(...lefts),
-        maxX: Math.max(...rights)
-      };
-    });
-    const rootHeight = heightFor(root);
-    const out = [{ id: root.id, x: 0, y: -rootHeight / 2, height: rootHeight }];
-    const edge = { above: -rib, below: -rib };
-    for (const fish of topics) {
-      const key4 = fish.side === 1 ? "above" : "below";
-      const at = edge[key4] - fish.maxX;
-      const attachY = -fish.side * fish.length;
-      out.push({
-        id: fish.topic.id,
-        x: at - width / 2,
-        y: attachY - fish.side * (fish.height / 2) - fish.height / 2,
-        height: fish.height
-      });
-      for (const card of fish.cards)
-        out.push({
-          id: card.id,
-          x: at + card.x,
-          y: attachY + fish.side * card.centre - card.height / 2,
-          height: card.height
-        });
-      edge[key4] = at + fish.minX - rib;
-    }
-    const minX = Math.min(...out.map((card) => card.x));
-    const minY = Math.min(...out.map((card) => card.y));
-    const maxY = Math.max(...out.map((card) => card.y + card.height));
-    return { out, minX, minY, maxY };
-  });
-  const result = /* @__PURE__ */ new Map();
-  const headX = left + Math.max(0, ...fishes.map((fish) => -fish.minX));
-  let offset = top;
-  for (const fish of fishes) {
-    for (const card of fish.out) result.set(card.id, { x: headX + card.x, y: offset + card.y - fish.minY });
-    offset += fish.maxY - fish.minY + gap;
-  }
-  return result;
-}
-
-// layouts/radial.ts
-var TAU = Math.PI * 2;
-var GROW = 6;
-var MAX_ROUNDS = 60;
-function touching(placed, width, gap, stats) {
-  const list2 = [...placed.values()].sort((a, b) => a.y - b.y);
-  const depths = /* @__PURE__ */ new Set();
-  for (let i = 0; i < list2.length; i++) {
-    const a = list2[i];
-    for (let j = i + 1; j < list2.length; j++) {
-      const b = list2[j];
-      if (b.y >= a.y + a.height + gap) break;
-      if (stats) stats.checks++;
-      if (Math.abs(a.x - b.x) < width && a.y < b.y + b.height + gap) depths.add(Math.max(a.depth, b.depth));
-    }
-  }
-  return depths;
-}
-function radialPositions(input2) {
-  const { roots, kidsOf, joinsOf, heightFor, width, column, gap, left, top } = input2;
-  const result = /* @__PURE__ */ new Map();
-  let offset = top;
-  for (const root of roots) {
-    const spots = [];
-    const leaves = /* @__PURE__ */ new Map();
-    const childrenOf = (node) => [...kidsOf(node), ...joinsOf(node)];
-    const count4 = (node) => {
-      const kids = childrenOf(node);
-      const total2 = kids.length ? kids.reduce((sum2, kid) => sum2 + count4(kid), 0) : 1;
-      leaves.set(node.id, total2);
-      return total2;
-    };
-    count4(root);
-    const spread = (node, depth, start, end) => {
-      spots.push({ id: node.id, depth, angle: (start + end) / 2, height: heightFor(node) });
-      let next = start;
-      const share = (end - start) / leaves.get(node.id);
-      for (const kid of childrenOf(node)) {
-        const slice = share * leaves.get(kid.id);
-        spread(kid, depth + 1, next, next + slice);
-        next += slice;
-      }
-    };
-    spread(root, 0, 0, TAU);
-    const deepest = Math.max(...spots.map((spot) => spot.depth));
-    const base = Array.from({ length: deepest + 1 }, (_, depth) => depth * column);
-    const place = () => {
-      const radii = [];
-      base.forEach((value, depth) => radii.push(depth ? Math.max(value, radii[depth - 1] + column) : 0));
-      return new Map(
-        spots.map((spot) => {
-          const radius = radii[spot.depth];
-          return [
-            spot.id,
-            {
-              x: Math.round(radius * Math.sin(spot.angle) - width / 2),
-              y: Math.round(-radius * Math.cos(spot.angle) - spot.height / 2),
-              depth: spot.depth,
-              height: spot.height
-            }
-          ];
-        })
-      );
-    };
-    const fine = column / GROW;
-    const clash = () => {
-      if (input2.stats) input2.stats.rounds++;
-      return touching(place(), width, gap, input2.stats);
-    };
-    let step = fine;
-    let touched = clash();
-    let low = base.slice();
-    for (let round3 = 0; touched.size && round3 < MAX_ROUNDS; round3++) {
-      low = base.slice();
-      for (const depth of touched) base[depth] += step;
-      step *= 2;
-      touched = clash();
-    }
-    if (!touched.size && low.some((value, depth) => base[depth] - value > fine)) {
-      let high = base.slice();
-      while (high.some((value, depth) => value - low[depth] > fine)) {
-        const mid = high.map((value, depth) => (value + low[depth]) / 2);
-        base.splice(0, base.length, ...mid);
-        if (clash().size) low = mid;
-        else high = mid;
-      }
-      base.splice(0, base.length, ...high);
-    }
-    const placed = place();
-    const minX = Math.min(...[...placed.values()].map((point) => point.x));
-    const minY = Math.min(...[...placed.values()].map((point) => point.y));
-    const maxY = Math.max(...[...placed.values()].map((point) => point.y + point.height));
-    for (const [id, point] of placed)
-      result.set(id, { x: Math.round(left) + point.x - minX, y: offset + point.y - minY });
-    offset += maxY - minY + gap;
-  }
-  return result;
-}
-
-// layouts/vertical.ts
-function verticalPositions(input2) {
-  const { roots, kidsOf, joinsOf, heightFor, column, rowGap, flip, left, top } = input2;
-  const cardWidth = (node) => {
-    var _a2, _b2;
-    return (_b2 = (_a2 = input2.widthFor) == null ? void 0 : _a2.call(input2, node)) != null ? _b2 : CARD_WIDTH;
-  };
-  const widths = /* @__PURE__ */ new Map();
-  const spans = /* @__PURE__ */ new Map();
-  const rowWidth = (list2) => list2.reduce((total2, item) => total2 + widths.get(item.id), 0);
-  const measure = (node) => {
-    const kids = kidsOf(node);
-    const extra = joinsOf(node);
-    for (const child of [...kids, ...extra]) measure(child);
-    widths.set(node.id, Math.max(column, rowWidth(kids), rowWidth(extra), cardWidth(node) + column - CARD_WIDTH));
-    spans.set(node.id, 1 + Math.max(0, ...kids.map((kid) => spans.get(kid.id))));
-  };
-  const xs = /* @__PURE__ */ new Map();
-  const depths = /* @__PURE__ */ new Map();
-  const place = (node, depth, start) => {
-    const kids = kidsOf(node);
-    const extra = joinsOf(node);
-    const width = widths.get(node.id);
-    const row = (list2, level) => {
-      let next2 = start + (width - rowWidth(list2)) / 2;
-      return list2.map((item) => {
-        place(item, level, next2);
-        const x = xs.get(item.id);
-        next2 += widths.get(item.id);
-        return x;
-      });
-    };
-    const kidXs = row(kids, depth + 1);
-    const joinXs = row(extra, depth + spans.get(node.id));
-    const own2 = kidXs.length ? kidXs : joinXs;
-    depths.set(node.id, depth);
-    const centres = (list2, xsOf) => xsOf.map((x, i) => x + cardWidth(list2[i]) / 2);
-    const ownList = kidXs.length ? kids : extra;
-    const ownCentres = centres(ownList, own2);
-    xs.set(
-      node.id,
-      own2.length ? (ownCentres[0] + ownCentres[ownCentres.length - 1]) / 2 - cardWidth(node) / 2 : start + Math.max(0, CARD_WIDTH - cardWidth(node)) / 2
-    );
-  };
-  let cursor = left;
-  const order = [];
-  const collect = (node) => {
-    order.push(node);
-    for (const child of [...kidsOf(node), ...joinsOf(node)]) collect(child);
-  };
-  for (const root of roots) {
-    measure(root);
-    place(root, 0, cursor);
-    cursor += widths.get(root.id);
-    collect(root);
-  }
-  const deepest = Math.max(0, ...depths.values());
-  const heights = Array.from({ length: deepest + 1 }, () => 0);
-  for (const node of order) heights[depths.get(node.id)] = Math.max(heights[depths.get(node.id)], heightFor(node));
-  const tops = [];
-  let next = top;
-  for (let step = 0; step <= deepest; step++) {
-    const level = flip ? deepest - step : step;
-    tops[level] = next;
-    next += heights[level] + rowGap;
-  }
-  const result = /* @__PURE__ */ new Map();
-  for (const node of order) {
-    const level = depths.get(node.id);
-    const y = flip ? tops[level] + heights[level] - heightFor(node) : tops[level];
-    result.set(node.id, { x: xs.get(node.id), y });
-  }
-  return result;
-}
-
-// layouts/timeline.ts
-function timelinePositions(input2) {
-  const { roots, kidsOf, joinsOf, heightFor, width, column, gap, left, top } = input2;
-  const result = /* @__PURE__ */ new Map();
-  let offset = top;
-  for (const root of roots) {
-    const heights = /* @__PURE__ */ new Map();
-    const measure = (node) => {
-      heights.set(node.id, heightFor(node));
-      for (const child of [...kidsOf(node), ...joinsOf(node)]) measure(child);
-    };
-    measure(root);
-    const cards = [{ id: root.id, x: left, y: 0 }];
-    let cursor = left + column;
-    [...kidsOf(root), ...joinsOf(root)].forEach((topic, index) => {
-      const placed = verticalPositions({
-        roots: [topic],
-        kidsOf,
-        joinsOf,
-        heightFor,
-        column,
-        rowGap: column - width,
-        flip: index % 2 === 1,
-        left: cursor,
-        top: 0
-      });
-      const axis = placed.get(topic.id).y;
-      let reach = cursor;
-      for (const [id, point] of placed) {
-        cards.push({ id, x: point.x, y: point.y - axis });
-        reach = Math.max(reach, point.x);
-      }
-      cursor = reach + column;
-    });
-    const minY = Math.min(...cards.map((card) => card.y));
-    const maxY = Math.max(...cards.map((card) => card.y + heights.get(card.id)));
-    for (const card of cards) result.set(card.id, { x: card.x, y: offset + card.y - minY });
-    offset += maxY - minY + gap;
-  }
-  return result;
-}
-
-// map-layout.ts
-var WIDTH = 300;
-function widthExcess(node) {
-  var _a2;
-  return Math.max(0, ((_a2 = node.width) != null ? _a2 : CARD_WIDTH) - CARD_WIDTH);
-}
-function textBlockWidth(node) {
-  var _a2;
-  return node.path === "" ? (_a2 = node.width) != null ? _a2 : CARD_WIDTH : CARD_WIDTH;
-}
-function obstacleWidth(node) {
-  var _a2;
-  return node.path === "" ? Math.max(WIDTH, (_a2 = node.width) != null ? _a2 : 0) : WIDTH;
-}
-function textParentNarrow(parent) {
-  return parent.path === "" ? Math.max(0, CARD_WIDTH - textBlockWidth(parent)) : 0;
-}
-function knownSide(topic, root) {
-  return topic.path === "" ? sideFromTextBox(topic.x, textBlockWidth(topic), root.x) : sideFromOffset(topic.x - root.x);
-}
-var LAYOUT_GAP = 24;
-var SPACING = {
-  compact: { column: 330, gap: 12 },
-  standard: { column: 360, gap: LAYOUT_GAP },
-  spacious: { column: 420, gap: 48 }
-};
-function isStoredLayoutSpacing(value) {
-  return value === "compact" || value === "spacious";
-}
-var DEFAULT_CARD_HEIGHT = 180;
-function isLayoutKind(value) {
-  return value === "right" || value === "left" || value === "down" || value === "up" || value === "balanced" || value === "radial" || value === "timeline" || value === "fishbone";
-}
-function layoutOf(map) {
-  var _a2, _b2;
-  const stored = map && !map.aim ? (_a2 = map.layout) == null ? void 0 : _a2.direction : void 0;
-  const direction = isLayoutKind(stored) ? stored : "right";
-  const spacing = map && !map.aim ? (_b2 = map.layout) == null ? void 0 : _b2.spacing : void 0;
-  return isStoredLayoutSpacing(spacing) ? { direction, spacing } : { direction };
-}
-function resolveLayout(layout) {
-  const direction = typeof layout === "string" ? layout : layout.direction;
-  const spacing = typeof layout === "string" ? void 0 : layout.spacing;
-  return { direction, ...SPACING[isStoredLayoutSpacing(spacing) ? spacing : "standard"] };
-}
-var isVertical = (direction) => direction === "down" || direction === "up";
-var signOf = (direction) => direction === "left" ? -1 : 1;
-function medianHeight(values) {
-  const sorted = values.filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
-  if (!sorted.length) return void 0;
-  const mid = sorted.length >> 1;
-  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-var cardHeight = (heightOf, id) => {
-  const value = heightOf == null ? void 0 : heightOf(id);
-  return value !== void 0 && Number.isFinite(value) && value > 0 ? value : DEFAULT_CARD_HEIGHT;
-};
-function structureOf(nodes, folded2) {
-  var _a2, _b2;
-  const ids2 = new Map(nodes.map((node) => [node.id, node]));
-  const children = /* @__PURE__ */ new Map();
-  const joins = /* @__PURE__ */ new Map();
-  const add = (map, key4, node) => {
-    var _a3;
-    return map.set(key4, [...(_a3 = map.get(key4)) != null ? _a3 : [], node]);
-  };
-  for (const node of nodes) {
-    if (!node.parentId) continue;
-    const sources = node.aimKind !== "question" && ((_a2 = node.aimConvergesFromNodeIds) == null ? void 0 : _a2.length) ? parentIdsForNode(node).map((id) => ids2.get(id)) : [];
-    const anchor = (_b2 = sources[0]) == null ? void 0 : _b2.parentId;
-    if (anchor && ids2.has(anchor) && sources.every((source) => source && source.parentId === anchor))
-      add(joins, anchor, node);
-    else add(children, node.parentId, node);
-  }
-  const kidsOf = (node) => {
-    var _a3;
-    return folded2 && node.collapsed ? [] : (_a3 = children.get(node.id)) != null ? _a3 : [];
-  };
-  const joinsOf = (node) => {
-    var _a3;
-    return folded2 && node.collapsed ? [] : ((_a3 = joins.get(node.id)) != null ? _a3 : []).filter((join5) => {
-      var _a4;
-      return !(folded2 && ((_a4 = ids2.get(join5.parentId)) == null ? void 0 : _a4.collapsed));
-    });
-  };
-  return { kidsOf, joinsOf };
-}
-function horizontalPositions(input2) {
-  var _a2;
-  const { roots, kidsOf, joinsOf, heightFor, column: COLUMN, gap: LAYOUT_GAP2, sign, left, top } = input2;
-  const result = /* @__PURE__ */ new Map();
-  const sizes = /* @__PURE__ */ new Map();
-  const spans = /* @__PURE__ */ new Map();
-  const depths = /* @__PURE__ */ new Map();
-  const byId = /* @__PURE__ */ new Map();
-  const stackHeight = (list2) => list2.reduce((total2, item) => total2 + sizes.get(item.id), 0) + Math.max(0, list2.length - 1) * LAYOUT_GAP2;
-  const measure = (node) => {
-    const kids = kidsOf(node);
-    const extra = joinsOf(node);
-    byId.set(node.id, node);
-    for (const child of [...kids, ...extra]) measure(child);
-    sizes.set(node.id, Math.max(heightFor(node), stackHeight(kids), stackHeight(extra)));
-    spans.set(node.id, 1 + Math.max(0, ...kids.map((kid) => spans.get(kid.id))));
-  };
-  const place = (node, depth, topY) => {
-    const kids = kidsOf(node);
-    const extra = joinsOf(node);
-    const size = sizes.get(node.id);
-    const stack = (list3, column) => {
-      let next = topY + (size - stackHeight(list3)) / 2;
-      return list3.map((item) => {
-        const y2 = place(item, column, next);
-        next += sizes.get(item.id) + LAYOUT_GAP2;
-        return y2;
-      });
-    };
-    const kidYs = stack(kids, depth + 1);
-    const joinYs = stack(extra, depth + spans.get(node.id));
-    const list2 = kidYs.length ? kids : extra;
-    const ys = kidYs.length ? kidYs : joinYs;
-    const own2 = heightFor(node);
-    let y = topY + (size - own2) / 2;
-    if (ys.length) {
-      const first = ys[0] + heightFor(list2[0]) / 2;
-      const last = ys[ys.length - 1] + heightFor(list2[list2.length - 1]) / 2;
-      y = (first + last) / 2 - own2 / 2;
-    }
-    result.set(node.id, { x: 0, y: top + y });
-    depths.set(node.id, depth);
-    return y;
-  };
-  let offset = 0;
-  for (const root of roots) {
-    measure(root);
-    place(root, 0, offset);
-    offset += sizes.get(root.id) + LAYOUT_GAP2;
-  }
-  const widest = [];
-  for (const [id, depth] of depths) widest[depth] = Math.max((_a2 = widest[depth]) != null ? _a2 : 0, widthExcess(byId.get(id)));
-  const shiftAt = (depth) => {
-    var _a3, _b2;
-    let total2 = 0;
-    if (sign > 0) for (let k = 0; k < depth; k++) total2 += (_a3 = widest[k]) != null ? _a3 : 0;
-    else for (let k = 1; k <= depth; k++) total2 += (_b2 = widest[k]) != null ? _b2 : 0;
-    return total2;
-  };
-  for (const [id, point] of result) {
-    const depth = depths.get(id);
-    const narrow2 = sign < 0 ? Math.max(0, CARD_WIDTH - textBlockWidth(byId.get(id))) : 0;
-    point.x = left + sign * (depth * COLUMN + shiftAt(depth)) + narrow2;
-  }
-  return { placed: result, sizes };
-}
-function balancedPositions(nodes, input2, reset) {
-  const { roots, kidsOf, joinsOf, heightFor, gap, left, top } = input2;
-  const sizes = horizontalPositions({ ...input2, sign: 1 }).sizes;
-  const byId = new Map(nodes.map((node) => [node.id, node]));
-  const halves = roots.map((root) => {
-    var _a2;
-    const rootNode = (_a2 = byId.get(root.id)) != null ? _a2 : root;
-    const sides = assignSides(
-      kidsOf(root),
-      (topic) => sizes.get(topic.id),
-      gap,
-      (topic) => {
-        var _a3;
-        return reset ? void 0 : knownSide((_a3 = byId.get(topic.id)) != null ? _a3 : topic, rootNode);
-      }
-    );
-    const half = (side) => horizontalPositions({
-      ...input2,
-      roots: [root],
-      kidsOf: (node) => node.id === root.id ? kidsOf(node).filter((kid) => sides.get(kid.id) === side) : kidsOf(node),
-      joinsOf: (node) => node.id === root.id && side === "left" ? [] : joinsOf(node),
-      sign: side === "left" ? -1 : 1,
-      left: 0,
-      top: 0
-    }).placed;
-    return { root, right: half("right"), left: half("left") };
-  });
-  const reach = Math.max(0, ...halves.flatMap(({ left: placed }) => [...placed.values()].map((point) => -point.x)));
-  const rootX = left + reach;
-  const result = /* @__PURE__ */ new Map();
-  let offset = 0;
-  for (const { root, right, left: leftHalf } of halves) {
-    const centreOf2 = (placed) => placed.get(root.id).y + heightFor(root) / 2;
-    const middle = Math.max(centreOf2(right), centreOf2(leftHalf));
-    const entries = [];
-    for (const half of [
-      { placed: right, isLeft: false },
-      { placed: leftHalf, isLeft: true }
-    ]) {
-      const { placed, isLeft } = half;
-      const shift = middle - centreOf2(placed);
-      for (const [id, point] of placed)
-        if (!(isLeft && id === root.id)) entries.push([id, { x: rootX + point.x, y: point.y + shift }]);
-    }
-    const heightOfId = (id) => heightFor(byId.get(id));
-    const first = Math.min(...entries.map(([, point]) => point.y));
-    const last = Math.max(...entries.map(([id, point]) => point.y + heightOfId(id)));
-    for (const [id, point] of entries) result.set(id, { x: point.x, y: top + offset + point.y - first });
-    offset += last - first + gap;
-  }
-  return result;
-}
-function positions(nodes, roots, left, top, folded2 = false, heightOf, layout = "right", reset = false) {
-  const { direction, column: COLUMN, gap: LAYOUT_GAP2 } = resolveLayout(layout);
-  const { kidsOf, joinsOf } = structureOf(nodes, folded2);
-  const heightFor = (node) => cardHeight(heightOf, node.id);
-  const engine = (kind, tree2) => {
-    if (kind === "down" || kind === "up")
-      return verticalPositions({
-        ...tree2,
-        column: COLUMN,
-        rowGap: COLUMN - WIDTH,
-        flip: kind === "up",
-        left,
-        top,
-        widthFor: textBlockWidth
-      });
-    const flat = { ...tree2, column: COLUMN, gap: LAYOUT_GAP2, left, top };
-    if (kind === "radial") return radialPositions({ ...flat, width: WIDTH });
-    if (kind === "timeline") return timelinePositions({ ...flat, width: WIDTH });
-    if (kind === "fishbone") return fishbonePositions({ ...flat, width: WIDTH });
-    const input2 = { ...flat, sign: signOf(kind) };
-    if (kind === "balanced") return balancedPositions(nodes, input2, reset);
-    return horizontalPositions(input2).placed;
-  };
-  const tree = { roots, kidsOf, joinsOf, heightFor };
-  if (allowsBranchLayout(direction) && nodes.some((node) => branchDirectionOf(node)))
-    return composePositions({ ...tree, width: WIDTH, column: COLUMN, mapDirection: direction, engine });
-  return engine(direction, tree);
-}
-function arrangeMap(nodes, hidden, heightOf, layout = "right", options = {}) {
-  const laidOut = (hidden == null ? void 0 : hidden.size) ? nodes.filter((node) => !hidden.has(node.id)) : nodes;
-  const roots = laidOut.filter((node) => !node.parentId);
-  const placed = positions(laidOut, roots, 80, 80, true, heightOf, layout, options.reset === true);
-  return nodes.map((node) => ({ ...node, ...placed.get(node.id) }));
-}
-function rearrangeWhole(nodes, heightOf, layout) {
-  const roots = nodes.filter((node) => !node.parentId);
-  if (!roots.length) return nodes;
-  const placed = positions(nodes, roots, 80, 80, true, heightOf, layout);
-  const anchor = roots[0];
-  const dx = anchor.x - placed.get(anchor.id).x;
-  const dy = anchor.y - placed.get(anchor.id).y;
-  return nodes.map((node) => {
-    const point = placed.get(node.id);
-    if (!point || node.id === anchor.id) return node;
-    return { ...node, x: Math.round(point.x + dx), y: Math.round(point.y + dy) };
-  });
-}
-function arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, layout) {
-  var _a2;
-  const { direction, column: COLUMN, gap: LAYOUT_GAP2 } = resolveLayout(layout);
-  const placed = positions(fresh, roots, 0, 0, false, heightOf, layout);
-  const cardSpan = parent.path === "" ? CARD_WIDTH : WIDTH;
-  const rootCentres = roots.map((root) => placed.get(root.id).x + cardSpan / 2);
-  const middle = rootCentres.length ? (Math.min(...rootCentres) + Math.max(...rootCentres)) / 2 : cardSpan / 2;
-  let shiftX = parent.x + (parent.path === "" ? (_a2 = parent.width) != null ? _a2 : WIDTH : WIDTH) / 2 - middle;
-  const rowGap = COLUMN - WIDTH;
-  const rootTop = Math.min(...roots.map((root) => placed.get(root.id).y));
-  const rootBottom = Math.max(...roots.map((root) => placed.get(root.id).y + cardHeight(heightOf, root.id)));
-  const shiftY = direction === "up" ? parent.y - rowGap - rootBottom : parent.y + cardHeight(heightOf, parent.id) + rowGap - rootTop;
-  const fixed2 = nodes.filter((node) => !newIds.has(node.id));
-  for (; ; ) {
-    let next = shiftX;
-    for (const [id, point] of placed) {
-      const own2 = cardHeight(heightOf, id);
-      const topY = point.y + shiftY;
-      for (const node of fixed2) {
-        const other = cardHeight(heightOf, node.id);
-        const x = point.x + shiftX;
-        if (x < node.x + obstacleWidth(node) + LAYOUT_GAP2 && node.x < x + WIDTH + LAYOUT_GAP2 && topY < node.y + other + LAYOUT_GAP2 && node.y < topY + own2 + LAYOUT_GAP2)
-          next = Math.max(next, node.x + obstacleWidth(node) + LAYOUT_GAP2 - point.x);
-      }
-    }
-    if (next === shiftX) break;
-    shiftX = next;
-  }
-  return nodes.map((node) => {
-    const point = placed.get(node.id);
-    return point ? { ...node, x: Math.round(point.x + shiftX), y: Math.round(point.y + shiftY) } : node;
-  });
-}
-function branchSide(byId, node) {
-  var _a2;
-  let topic = node;
-  while (topic.parentId && ((_a2 = byId.get(topic.parentId)) == null ? void 0 : _a2.parentId)) topic = byId.get(topic.parentId);
-  const root = topic.parentId ? byId.get(topic.parentId) : void 0;
-  return root ? knownSide(topic, root) : void 0;
-}
-function arrangeBalancedBranch(nodes, parent, fresh, roots, newIds, heightOf, minTop, layout) {
-  var _a2;
-  const { gap } = resolveLayout(layout);
-  const spacing = typeof layout === "string" ? void 0 : layout.spacing;
-  const as = (direction) => spacing ? { direction, spacing } : { direction };
-  const byId = new Map(nodes.map((node) => [node.id, node]));
-  if (parent.parentId)
-    return arrangeNewBranch(nodes, parent.id, newIds, heightOf, minTop, as((_a2 = branchSide(byId, parent)) != null ? _a2 : "right"));
-  const older = nodes.filter((node) => !newIds.has(node.id));
-  const { kidsOf } = structureOf(older, true);
-  const { sizes } = horizontalPositions({
-    roots: [parent],
-    kidsOf,
-    joinsOf: () => [],
-    heightFor: (node) => cardHeight(heightOf, node.id),
-    column: 0,
-    gap,
-    sign: 1,
-    left: 0,
-    top: 0
-  });
-  const loads = { left: 0, right: 0 };
-  for (const kid of kidsOf(parent)) {
-    const side = knownSide(kid, parent);
-    if (side) loads[side] += sizes.get(kid.id) + gap;
-  }
-  const { sizes: freshSizes } = horizontalPositions({
-    roots,
-    kidsOf: (node) => fresh.filter((item) => item.parentId === node.id),
-    joinsOf: () => [],
-    heightFor: (node) => cardHeight(heightOf, node.id),
-    column: 0,
-    gap,
-    sign: 1,
-    left: 0,
-    top: 0
-  });
-  const sides = greedySides(roots, (root) => freshSizes.get(root.id), gap, loads);
-  const below = (id) => [
-    id,
-    ...fresh.filter((item) => item.parentId === id).flatMap((item) => below(item.id))
-  ];
-  let current = nodes;
-  const pending2 = new Set(newIds);
-  for (const side of ["right", "left"]) {
-    const mine = new Set(roots.filter((root) => sides.get(root.id) === side).flatMap((root) => below(root.id)));
-    if (!mine.size) continue;
-    for (const id of mine) pending2.delete(id);
-    const others = new Set(pending2);
-    const placed = arrangeNewBranch(
-      current.filter((node) => !others.has(node.id)),
-      parent.id,
-      mine,
-      heightOf,
-      minTop,
-      as(side)
-    );
-    const moved = new Map(placed.map((node) => [node.id, node]));
-    current = current.map((node) => {
-      var _a3;
-      return (_a3 = moved.get(node.id)) != null ? _a3 : node;
-    });
-  }
-  return current;
-}
-function arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout = "right") {
-  const { direction, column: COLUMN, gap: LAYOUT_GAP2 } = resolveLayout(layout);
-  const parent = nodes.find((node) => node.id === parentId);
-  if (!parent || !newIds.size) return nodes;
-  const actual = layoutDirectionFor(nodes, parentId, direction);
-  if (actual !== direction) {
-    const spacing = typeof layout === "string" ? void 0 : layout.spacing;
-    const own2 = { direction: actual, ...spacing ? { spacing } : {} };
-    return arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, own2);
-  }
-  const fresh = nodes.filter((node) => newIds.has(node.id));
-  const roots = fresh.filter((node) => node.parentId === parentId);
-  if (direction === "radial" || direction === "timeline" || direction === "fishbone")
-    return rearrangeWhole(nodes, heightOf, layout);
-  if (isVertical(direction)) return arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, layout);
-  if (direction === "balanced")
-    return arrangeBalancedBranch(nodes, parent, fresh, roots, newIds, heightOf, minTop, layout);
-  const startX = signOf(direction) > 0 ? parent.x + COLUMN + widthExcess(parent) : parent.x - COLUMN - Math.max(0, ...roots.map(widthExcess)) - textParentNarrow(parent);
-  const placed = positions(fresh, roots, startX, 0, false, heightOf, layout);
-  const centers = roots.map((root) => placed.get(root.id).y + cardHeight(heightOf, root.id) / 2);
-  const center = centers.length ? (Math.min(...centers) + Math.max(...centers)) / 2 : 0;
-  let offset = parent.y + cardHeight(heightOf, parent.id) / 2 - center;
-  if (minTop !== void 0 && placed.size)
-    offset = Math.max(offset, minTop - Math.min(...[...placed.values()].map((point) => point.y)));
-  const fixed2 = nodes.filter((node) => !newIds.has(node.id));
-  for (; ; ) {
-    let next = offset;
-    for (const [id, point] of placed) {
-      const own2 = cardHeight(heightOf, id);
-      for (const node of fixed2) {
-        const other = cardHeight(heightOf, node.id);
-        const top = point.y + offset;
-        if (point.x - node.x < obstacleWidth(node) && node.x - point.x < WIDTH && top < node.y + other + LAYOUT_GAP2 && node.y < top + own2 + LAYOUT_GAP2)
-          next = Math.max(next, node.y + other + LAYOUT_GAP2 - point.y);
-      }
-    }
-    if (next === offset) break;
-    offset = next;
-  }
-  return nodes.map((node) => {
-    const point = placed.get(node.id);
-    return point ? { ...node, x: point.x, y: Math.round(point.y + offset) } : node;
-  });
-}
-function arrangeNewTree(nodes, rootId, newIds, heightOf, layout = "right") {
-  const { direction, column: COLUMN, gap: LAYOUT_GAP2 } = resolveLayout(layout);
-  const gap = LAYOUT_GAP2;
-  const root = nodes.find((node) => node.id === rootId);
-  if (!root || !newIds.has(rootId)) return nodes;
-  const fixed2 = nodes.filter((node) => !newIds.has(node.id));
-  const fixedRoots = fixed2.filter((node) => !node.parentId);
-  if (isVertical(direction)) {
-    const anchors = fixedRoots.length ? fixedRoots : fixed2;
-    const x = fixed2.length ? Math.max(...fixed2.map((node) => node.x)) + COLUMN : 80;
-    const placed2 = positions(
-      nodes.filter((node) => newIds.has(node.id)),
-      [root],
-      x,
-      0,
-      false,
-      heightOf,
-      layout
-    );
-    const rootPoint = placed2.get(rootId);
-    const rowTop = anchors.length ? Math.min(...anchors.map((node) => node.y)) : 80;
-    const rowBottom = anchors.length ? Math.max(...anchors.map((node) => node.y + cardHeight(heightOf, node.id))) : 80 + cardHeight(heightOf, rootId);
-    const shiftY = direction === "up" ? rowBottom - (rootPoint.y + cardHeight(heightOf, rootId)) : rowTop - rootPoint.y;
-    return nodes.map((node) => {
-      const point = placed2.get(node.id);
-      return point ? { ...node, x: Math.round(point.x), y: Math.round(point.y + shiftY) } : node;
-    });
-  }
-  if (direction === "balanced") {
-    const top2 = fixed2.length ? Math.max(...fixed2.map((node) => node.y + cardHeight(heightOf, node.id))) + gap : 80;
-    const placed2 = positions(
-      nodes.filter((node) => newIds.has(node.id)),
-      [root],
-      fixedRoots.length ? 0 : 80,
-      top2,
-      false,
-      heightOf,
-      layout,
-      true
-    );
-    const shiftX = fixedRoots.length ? Math.min(...fixedRoots.map((node) => node.x)) - placed2.get(rootId).x : 0;
-    return nodes.map((node) => {
-      const point = placed2.get(node.id);
-      return point ? { ...node, x: point.x + shiftX, y: point.y } : node;
-    });
-  }
-  const left = Math.min(...(fixedRoots.length ? fixedRoots : fixed2).map((node) => node.x), fixed2.length ? Infinity : 80);
-  const top = fixed2.length ? Math.max(...fixed2.map((node) => node.y + cardHeight(heightOf, node.id))) + LAYOUT_GAP2 : 80;
-  const placed = positions(
-    nodes.filter((node) => newIds.has(node.id)),
-    [root],
-    left,
-    top,
-    false,
-    heightOf,
-    layout
-  );
-  return nodes.map((node) => {
-    const point = placed.get(node.id);
-    return point ? { ...node, x: point.x, y: Math.round(point.y) } : node;
-  });
-}
-function reorderSiblings(nodes, parentId, movedId, beforeId) {
-  var _a2;
-  if (movedId === beforeId) return nodes;
-  const group = (_a2 = nodes.find((node) => node.id === movedId)) == null ? void 0 : _a2.afterTextId;
-  const slots = nodes.flatMap(
-    (node, index) => node.parentId === parentId && node.afterTextId === group ? [index] : []
-  );
-  const kids = slots.map((index) => nodes[index]);
-  const moved = kids.find((node) => node.id === movedId);
-  if (!moved || !kids.some((node) => node.id === beforeId)) return nodes;
-  const others = kids.filter((node) => node !== moved);
-  const at = others.findIndex((node) => node.id === beforeId);
-  const order = [...others.slice(0, at), moved, ...others.slice(at)];
-  const result = nodes.slice();
-  slots.forEach((index, place) => {
-    result[index] = order[place];
-  });
-  return result;
-}
-function orderSiblings(nodes, parentId, orderedIds) {
-  var _a2;
-  if (orderedIds.length < 2 || new Set(orderedIds).size !== orderedIds.length) return nodes;
-  const group = (_a2 = nodes.find((node) => node.id === orderedIds[0])) == null ? void 0 : _a2.afterTextId;
-  const slots = nodes.flatMap(
-    (node, index) => node.parentId === parentId && node.afterTextId === group ? [index] : []
-  );
-  const listed = new Set(orderedIds);
-  const wanted = orderedIds.map((id) => slots.map((index) => nodes[index]).find((node) => node.id === id));
-  if (wanted.some((node) => !node)) return nodes;
-  const places = slots.filter((index) => listed.has(nodes[index].id));
-  if (places.every((index, at) => nodes[index] === wanted[at])) return nodes;
-  const result = nodes.slice();
-  places.forEach((index, at) => {
-    result[index] = wanted[at];
-  });
-  return result;
-}
-function shiftSibling(nodes, id, offset) {
-  const moved = nodes.find((node) => node.id === id);
-  if (!(moved == null ? void 0 : moved.parentId)) return nodes;
-  const slots = nodes.flatMap(
-    (node, index) => node.parentId === moved.parentId && node.afterTextId === moved.afterTextId ? [index] : []
-  );
-  const order = slots.map((index) => nodes[index]);
-  const from = order.indexOf(moved);
-  const to = from + offset;
-  if (to < 0 || to >= order.length) return nodes;
-  [order[from], order[to]] = [order[to], order[from]];
-  const result = nodes.slice();
-  slots.forEach((index, place) => {
-    result[index] = order[place];
-  });
-  return result;
-}
-function reorderTopLevel(nodes, rootId, movedId, dropX) {
-  if (!Number.isFinite(dropX)) return nodes;
-  const slots = nodes.flatMap((node, index) => node.parentId === rootId && !node.afterTextId ? [index] : []);
-  const moved = slots.map((index) => nodes[index]).find((node) => node.id === movedId);
-  if (!moved) return nodes;
-  const others = slots.map((index) => nodes[index]).filter((node) => node !== moved);
-  const at = others.findIndex((node) => node.x + WIDTH / 2 > dropX);
-  const order = at < 0 ? [...others, moved] : [...others.slice(0, at), moved, ...others.slice(at)];
-  const result = nodes.slice();
-  slots.forEach((index, place) => {
-    result[index] = order[place];
-  });
-  return result;
-}
-function cardsOverlapAny(nodes, ids2, heightOf) {
-  const shown = visibleNodes(nodes);
-  const box = (node) => {
-    var _a2;
-    return {
-      left: node.x,
-      right: node.x + ((_a2 = node.width) != null ? _a2 : CARD_WIDTH),
-      top: node.y,
-      bottom: node.y + cardHeight(heightOf, node.id)
-    };
-  };
-  for (const node of shown) {
-    if (!ids2.has(node.id)) continue;
-    const a = box(node);
-    for (const other of shown) {
-      if (other.id === node.id) continue;
-      const b = box(other);
-      if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) return true;
-    }
-  }
-  return false;
-}
-function cardsChangedHeight(seen, now) {
-  const changed = /* @__PURE__ */ new Set();
-  if (!seen.size) return changed;
-  for (const [id, height] of now) {
-    const before = seen.get(id);
-    if (!(height > 0)) continue;
-    if (before === void 0 || height > before + 1) changed.add(id);
-  }
-  return changed;
 }
 
 // map-model.ts
@@ -31524,7 +31538,7 @@ ${body}`);
    * owner chose is kept. A pure folder move (same name), a note that is not a map node and a note edited while this runs are left alone
    * (the write is guarded against the text read here). Returns whether the title was changed.
    */
-  async followRenamedTitle(oldPath, newPath, mapNodePaths) {
+  async followRenamedTitle(oldPath, newPath, mapNodePaths, onRefused) {
     const file = this.app.vault.getAbstractFileByPath(newPath);
     if (!(file instanceof import_obsidian13.TFile) || file.extension !== "md") return false;
     const oldName = baseName2(oldPath).replace(/\.md$/, "");
@@ -31533,7 +31547,9 @@ ${body}`);
     const raw = await this.app.vault.read(file);
     const content = decodeCalloutSections(upgradeLegacyAimText(raw));
     if (noteTitle(content, frontmatter(content), file.basename) !== oldName) return false;
-    return await this.updateNoteGuarded(newPath, { title: file.basename }, { expectedContent: raw }) === "written";
+    const result = await this.updateNoteGuarded(newPath, { title: file.basename }, { expectedContent: raw });
+    if (result !== "written") onRefused == null ? void 0 : onRefused("changed_meanwhile");
+    return result === "written";
   }
   /** Whether any map lists `path` as a node; only map files are read. */
   async isMapNodePath(path) {
@@ -45996,7 +46012,27 @@ function snapshotNotes(raw) {
   return items;
 }
 var LEAD = /^\s*(?:>\s*)*(?:[-*+]\s+|\d+[.)]\s+)?/;
+var BASE_PUNCT = /* @__PURE__ */ new Set([...` ,.;:!?'"()\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF01\uFF1F\uFF08\uFF09\u300C\u300D\u300E\u300F\u2018\u2019\u201C\u201D\u2026\u2014`]);
+var TOKEN3 = /⟦L\d+⟧/g;
+function whitelistBreach(original, before, lines) {
+  var _a2, _b2;
+  const allowed = new Set([...original.replace(TOKEN3, "")].filter((c) => !/[\p{L}\p{N}\p{M}\s]/u.test(c)));
+  for (const c of BASE_PUNCT) allowed.add(c);
+  for (const mark2 of ["```", "~~~", "$$"])
+    if (lines.join("\n").includes(mark2) && !original.includes(mark2)) return "block syntax";
+  for (const [i, line2] of lines.entries()) {
+    const body = line2.slice((_b2 = (_a2 = LEAD.exec(line2)) == null ? void 0 : _a2[0].length) != null ? _b2 : 0);
+    if (/^\s{0,3}(?:`{3,}|~{3,}|\$\$|\[\^|#)/.test(body) || /^\s{0,3}([-*_=])\1{2,}/.test(body) || /^\s{0,3}(?:[-*_]\s*){3,}$/.test(body))
+      return "block syntax";
+    if (/^\s*(?:[-*+]|\d+[.)])(\s|$)/.test(body)) return "list mark";
+    const indent2 = (t2) => /^(?: {4,}|\t)/.test(t2);
+    if (indent2(line2) && !indent2(before[i])) return "indent";
+    for (const c of body.replace(TOKEN3, "")) if (!/[\p{L}\p{N}\p{M}\s]/u.test(c) && !allowed.has(c)) return "character";
+  }
+  return null;
+}
 function checkRewrite(item, reply) {
+  var _a2;
   const no = (reason) => ({ ok: false, reason });
   const text10 = reply.replace(/\r\n?/g, "\n");
   if (!text10.trim()) return no("empty paragraph");
@@ -46005,11 +46041,11 @@ function checkRewrite(item, reply) {
   if (lines.length !== before.length) return no("line count changed");
   if (lines.some((line2) => !line2.trim())) return no("blank line");
   if (lines.some((line2, i) => {
-    var _a2, _b2;
-    return ((_a2 = LEAD.exec(line2)) == null ? void 0 : _a2[0].trim()) !== ((_b2 = LEAD.exec(before[i])) == null ? void 0 : _b2[0].trim());
+    var _a3, _b2;
+    return ((_a3 = LEAD.exec(line2)) == null ? void 0 : _a3[0].trim()) !== ((_b2 = LEAD.exec(before[i])) == null ? void 0 : _b2[0].trim());
   }))
     return no("list or quote mark changed");
-  const bad = forbiddenSyntax(text10);
+  const bad = (_a2 = forbiddenSyntax(text10)) != null ? _a2 : whitelistBreach(item.text, before, lines);
   if (bad) return no(`new ${bad}`);
   if (/⟦\/?N/.test(text10)) return no("note marker left");
   const seen = /* @__PURE__ */ new Set();
@@ -46061,7 +46097,7 @@ function applyReplies(raw, items, replies) {
     }
     skipped2++;
     for (const n of notes.filter((f) => item.numbers.includes(f.n) && !f.note.endsWith(SKIP_MARK)))
-      marks.push({ from: n.to - 2, to: n.to - 2, insert: SKIP_MARK });
+      if (!marks.some((m) => m.from === n.to - 2)) marks.push({ from: n.to - 2, to: n.to - 2, insert: SKIP_MARK });
   }
   const free = marks.filter((m) => !edits.some((e) => m.from >= e.from && m.from <= e.to));
   const { text: text10, ranges } = runEdits(raw, [...edits, ...free]);
@@ -52207,7 +52243,7 @@ var BookPipelineRuns = class {
   orderOf(map) {
     const roots = map.nodes.filter((node) => !node.parentId);
     if (roots.length !== 1) throw new BookPipelineRunError("root");
-    const order = readingOrder(map.nodes, { includeHidden: true });
+    const order = bookReadingOrder(map);
     if (order.length < 2) throw new BookPipelineRunError("empty");
     return order;
   }
@@ -52348,7 +52384,7 @@ var BookPipelineRuns = class {
   }
   /** The map's cards in reading order (every card, hidden ones too). */
   mapIds(map) {
-    return readingOrder(map.nodes, { includeHidden: true });
+    return bookReadingOrder(map);
   }
   /**
    * The map's cards differ from the accepted set: the run is saved as paused first (so nothing new is admitted and every result still
@@ -53795,8 +53831,9 @@ function structureNote(issue2) {
   if (!structure2) return { issueText: t("ui.book_checked_notice_0", String(notices)) };
   return { issueText: t("ui.book_structure_notice_0_1", String(structure2), String(notices)) };
 }
-function bookCardView(note, accepted = false, stale = false) {
+function bookCardView(note, accepted = false, stale = false, resolved = false) {
   var _a2;
+  accepted = accepted || resolved;
   const stage = (_a2 = readPipelineStage(note.pipelineStage)) != null ? _a2 : "pending";
   const role = readBookRole(note.bookRole);
   const issue2 = typeof note.pipelineIssue === "string" && note.pipelineIssue ? note.pipelineIssue : void 0;
@@ -66724,8 +66761,10 @@ var FIELD_LABEL = {
   length: "coffee.book_length",
   style: "coffee.book_style"
 };
-function mentionedDeletedChapters(text10, deletedTitles) {
-  const lower6 = text10.toLowerCase();
+function mentionedDeletedChapters(text10, deletedTitles, existingTitles = []) {
+  let lower6 = text10.toLowerCase();
+  const present = existingTitles.map((title) => title.trim().toLowerCase()).filter(Boolean);
+  for (const title of present.sort((a, b) => b.length - a.length)) lower6 = lower6.split(title).join(" ");
   return deletedTitles.filter((title) => title.trim().length >= 2 && lower6.includes(title.trim().toLowerCase()));
 }
 function deletedChapterTitles(snapshot, currentTitles) {
@@ -66739,7 +66778,7 @@ function deletedChapterTitles(snapshot, currentTitles) {
   }
   return out;
 }
-function renderBookSettingsFields(parent, current, deletedTitles = []) {
+function renderBookSettingsFields(parent, current, deletedTitles = [], chapterTitles = []) {
   var _a2;
   const areas = /* @__PURE__ */ new Map();
   for (const field of BOOK_SETTING_FIELDS) {
@@ -66760,7 +66799,7 @@ function renderBookSettingsFields(parent, current, deletedTitles = []) {
     areas.set(field, area);
     const hint = parent.createEl("p", { cls: "vam-book-start-hint", attr: { id: `${id}-hint`, role: "status" } });
     const refresh = () => {
-      const found = mentionedDeletedChapters(area.value, deletedTitles);
+      const found = mentionedDeletedChapters(area.value, deletedTitles, chapterTitles);
       hint.setText(found.length ? t("ui.book_deleted_chapter_hint_0", found.join("\u3001")) : "");
       hint.toggleClass("is-empty", !found.length);
     };
@@ -66857,7 +66896,12 @@ var BookStartModal = class extends import_obsidian32.Modal {
       text: t("ui.book_start_suggesting")
     });
     this.suggestingEl.setAttr("role", "status");
-    this.fields = renderBookSettingsFields(settings, this.input.settings, this.input.deletedChapterTitles);
+    this.fields = renderBookSettingsFields(
+      settings,
+      this.input.settings,
+      this.input.deletedChapterTitles,
+      this.input.chapterTitles
+    );
     this.refreshEstimate();
     const actions = modalActions(this);
     const cancel = actions.createEl("button", { text: t("ui.cancel") });
@@ -79798,7 +79842,7 @@ ${t("ui.book_role_running_suffix")}` : first);
         cardRevision(read.data, node.id)
       );
     })();
-    const bookCard = bookCardView(note != null ? note : {}, bookDone, bookStale);
+    const bookCard = bookCardView(note != null ? note : {}, bookDone, bookStale, this.isBookCardResolved(node.id));
     if (!loading) {
       const statusText = research ? this.researchStageText(research) : merging ? t("ui.merging") : active ? t("ui.ai_running") : queued ? t("ui.research_queued") : (note == null ? void 0 : note.status) === "completed" ? t("ui.researched") : note ? topicStatusLabel(note.status, this.plugin.settings.language) : t("ui.note_missing");
       if (research) {
@@ -84382,6 +84426,19 @@ ${t("ui.book_role_running_suffix")}` : first);
       noteOf: (id) => this.notes.get(id)
     }).filter((entry) => this.bookResolved.get(entry.card.id) !== entry.fp).map((entry) => entry.card);
   }
+  /** Whether the chapter's box is ticked for the attention it has now (its card then looks done on the map). */
+  isBookCardResolved(id) {
+    const ticked = this.bookResolved.get(id);
+    const read = ticked && this.map && this.hasBookPipeline() ? readBookPipeline(this.map) : void 0;
+    if ((read == null ? void 0 : read.kind) !== "usable" || !this.notes.get(id)) return false;
+    const data = read.data;
+    return reviewEntries({
+      proofContext: { runId: data.runId, revisionOf: (card) => cardRevision(data, card) },
+      order: [id],
+      titleOf: () => id,
+      noteOf: (card) => this.notes.get(card)
+    }).some((entry) => entry.fp === ticked);
+  }
   queueBookResolve(id) {
     this.bookNoteChain = this.bookNoteChain.then(() => this.resolveBookNote(id)).catch(() => void 0);
     return this.bookNoteChain;
@@ -84562,6 +84619,15 @@ ${t("ui.book_role_running_suffix")}` : first);
     const settings = this.plugin.settings;
     const suggesting = new AbortController();
     const suggestTimer = window.setTimeout(() => suggesting.abort(), BOOK_SUGGEST_TIMEOUT_MS);
+    const chapterTitles = new Map(
+      map.nodes.map((node) => {
+        var _a3, _b3, _c2;
+        return [
+          node.id,
+          (_c2 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _c2 : ((_b3 = node.path.split("/").pop()) != null ? _b3 : "").replace(/\.md$/, "")
+        ];
+      })
+    );
     const modal = new BookStartModal(this.app, {
       cards: readingOrder(map.nodes, { includeHidden: true }).length,
       models: {
@@ -84575,11 +84641,9 @@ ${t("ui.book_role_running_suffix")}` : first);
       settings: (_c = rootNote == null ? void 0 : rootNote.bookSettings) != null ? _c : {},
       deletedChapterTitles: deletedChapterTitles(
         existing.kind === "usable" ? existing.data.chapters : void 0,
-        new Map(map.nodes.map((node) => {
-          var _a3, _b3;
-          return [node.id, (_b3 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b3 : ""];
-        }))
+        chapterTitles
       ),
+      chapterTitles: [...chapterTitles.values()],
       onClose: () => {
         window.clearTimeout(suggestTimer);
         suggesting.abort();
@@ -91407,6 +91471,7 @@ var BookNotesApply = class {
     if (job) {
       job.cancelled = true;
       this.ports.cancel(path);
+      job.abort.abort();
       return;
     }
     const why2 = this.disabledReason(path);
@@ -91494,6 +91559,7 @@ var BookNotesApply = class {
     }
     this.ports.releaseHighlight();
     this.lastUndo = null;
+    if (outcome.restored) this.ports.undone(last.path);
     if (!outcome.restored) return this.ports.notice(t("ui.book_note_undo_none"));
     this.ports.notice(
       outcome.skipped ? t("ui.book_note_undo_partial_0_1", outcome.restored, outcome.skipped) : t("ui.book_note_undo_done_0", outcome.restored)
@@ -95978,7 +96044,7 @@ var ELEMENT_NODE = 1;
 var TEXT_NODE = 3;
 var PLACEHOLDER_OPEN = "\u27E6";
 var PLACEHOLDER_CLOSE = "\u27E7";
-var TOKEN3 = /⟦(\/?)(\d+)(\/?)⟧/g;
+var TOKEN4 = /⟦(\/?)(\d+)(\/?)⟧/g;
 var BLOCK_TAGS2 = /* @__PURE__ */ new Set([
   "address",
   "article",
@@ -96113,7 +96179,7 @@ function buildText(nodes, parts) {
   return out;
 }
 function hasTranslatableText(text10) {
-  return HAS_LETTER.test(text10.replace(TOKEN3, ""));
+  return HAS_LETTER.test(text10.replace(TOKEN4, ""));
 }
 function extractSegments(root) {
   const units = [];
@@ -96146,7 +96212,7 @@ function extractSegments(root) {
     const raw = buildText(run, parts);
     const text10 = raw.trim();
     if (!text10 || !hasTranslatableText(text10) || raw.includes("\u27E6\u27E6")) return;
-    const stripped = raw.replace(TOKEN3, "");
+    const stripped = raw.replace(TOKEN4, "");
     if (stripped.includes(PLACEHOLDER_OPEN) || stripped.includes(PLACEHOLDER_CLOSE)) return;
     const lead = raw.slice(0, raw.length - raw.trimStart().length);
     const trail = raw.slice(raw.trimEnd().length);
@@ -96179,13 +96245,13 @@ function extractSegments(root) {
   walk2(root);
   return { units };
 }
-var tokensOf = (text10) => [...text10.matchAll(TOKEN3)].map((match) => match[0]);
+var tokensOf = (text10) => [...text10.matchAll(TOKEN4)].map((match) => match[0]);
 function placeholdersMatch(source, translated) {
   if (!translated.trim()) return false;
   const a = tokensOf(source);
   const b = tokensOf(translated);
   if (a.length !== b.length || a.some((token, i) => token !== b[i])) return false;
-  const rest = translated.replace(TOKEN3, "");
+  const rest = translated.replace(TOKEN4, "");
   return !rest.includes(PLACEHOLDER_OPEN) && !rest.includes(PLACEHOLDER_CLOSE);
 }
 function rebuild(unit2, translated, doc) {
@@ -96202,7 +96268,7 @@ function rebuild(unit2, translated, doc) {
   };
   addText(unit2.lead);
   let last = 0;
-  for (const match of translated.matchAll(TOKEN3)) {
+  for (const match of translated.matchAll(TOKEN4)) {
     addText(translated.slice(last, match.index));
     last = ((_a2 = match.index) != null ? _a2 : 0) + match[0].length;
     const part = unit2.parts[Number(match[2]) - 1];
@@ -104557,6 +104623,10 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       },
       highlight: (path, ranges) => this.bookHighlights.show(path, ranges),
       releaseHighlight: () => this.bookHighlights.release(),
+      undone: (path) => {
+        const map = this.bookChapterMaps.get(path);
+        if (map) void this.bookCallouts.reconcile(map);
+      },
       changed: () => this.bookNotes.paint(),
       now: () => Date.now(),
       setTimer: (run, ms) => window.setTimeout(run, ms),
@@ -104764,7 +104834,8 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
   async runBookNotes(path, signal) {
     for (const { file, map } of await this.repo.readableMaps()) {
       const node = map.nodes.find((item) => item.path === path);
-      if (node && readBookPipeline(map).kind === "usable")
+      const read = readBookPipeline(map);
+      if (node && read.kind === "usable" && effectiveOrder(read.data).includes(node.id))
         return await this.bookPipelineRuns.applyNotes(file.path, node.id, { signal });
     }
     throw new BookPipelineRunError("missing");
@@ -104824,7 +104895,8 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       })
     );
     if (!candidates.size) return found;
-    for (const { file, map } of await this.repo.readableMaps()) {
+    const maps = await this.repo.readableMaps();
+    for (const { file, map } of maps) {
       const read = readBookPipeline(map);
       if (read.kind !== "usable") continue;
       for (const node of map.nodes)
@@ -104833,6 +104905,9 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
           this.bookChapterMaps.set(node.path, file.path);
         }
     }
+    const live2 = new Set(maps.map(({ file }) => file.path));
+    for (const [chapter, mapPath] of this.bookChapterMaps)
+      if (!live2.has(mapPath) || candidates.has(chapter) && !found.has(chapter)) this.bookChapterMaps.delete(chapter);
     return found;
   }
   refreshBookNotesSoon() {
@@ -105627,6 +105702,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
    * is left to the scoped read-back at the end of this write (which waits while a chat batch holds a view).
    */
   async applyRenames(renames) {
+    var _a2;
     const pairs = renames.map((rename) => rename.pair);
     let failed = false;
     try {
@@ -105637,10 +105713,28 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
         sourceError = replaceError instanceof Error ? replaceError : new Error(String(replaceError));
       }
       const { changed, error, nodePaths } = await this.rebaseMaps(pairs);
-      for (const [from, to] of pairs) await this.repo.followRenamedTitle(from, to, nodePaths).catch(() => false);
+      const origins = /* @__PURE__ */ new Map();
+      for (const {
+        pair: [from, to],
+        external
+      } of renames) {
+        const origin = (_a2 = origins.get(from)) != null ? _a2 : from;
+        origins.delete(from);
+        if (external) origins.set(to, origin);
+      }
+      for (const [to, from] of origins)
+        await this.repo.followRenamedTitle(
+          from,
+          to,
+          nodePaths,
+          (reason) => this.logs.appendLog("info", `title_follow_refused reason=${reason}`)
+        ).catch(() => {
+          this.logs.appendLog("info", "title_follow_refused reason=error");
+          return false;
+        });
       const vamFile = renames.some(({ file }) => {
-        var _a2;
-        const frontmatter2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter;
+        var _a3;
+        const frontmatter2 = (_a3 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a3.frontmatter;
         return [frontmatter2 == null ? void 0 : frontmatter2["agent-map-node"], frontmatter2 == null ? void 0 : frontmatter2["visual-agent-map"]].some(
           (value) => value === true || value === "true"
         );

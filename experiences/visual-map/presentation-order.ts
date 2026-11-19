@@ -75,9 +75,7 @@ export function readingOrder(topics: readonly MapNode[], opts: ReadingOrderOptio
   for (const [id, list] of children)
     sortedKids.set(
       id,
-      [...list].sort(
-        opts.balanced && rootIds.has(id) ? (a, b) => half(a) - half(b) || byPosition(a, b) : byPosition
-      )
+      [...list].sort(opts.balanced && rootIds.has(id) ? (a, b) => half(a) - half(b) || byPosition(a, b) : byPosition)
     );
   const walk = (withHidden: boolean): string[] => {
     const seen = new Set<string>();

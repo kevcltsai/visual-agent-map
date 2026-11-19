@@ -31,6 +31,9 @@ export interface FindImagesRequest extends BookStepBase {
 /** One offered picture: the shared candidate plus the one plain line the finder wrote about it. */
 export interface FoundImage extends ImageCandidate {
   caption: string;
+  /** Creator and license, only when the finder reported them from the source page (never filled in by the program). */
+  author?: string;
+  license?: string;
 }
 /** The answer: up to {@link PER_SLOT_MAX} candidates per slot index; `found` counts the kept images, `offTopic` those the model marked as not relevant or described no content for. */
 export interface FoundImages {
@@ -43,7 +46,13 @@ const EXCLUDE_MAX = 30;
 const EXCLUDE_ITEM_MAX = 120;
 const PER_SLOT_MAX = 3;
 const CAPTION_MAX = 200;
+const CREDIT_MAX = 100;
 const SLOT_TEXT_MAX = 160;
+
+/** An optional credit field: one short line, empty when absent. */
+function creditText(value: unknown): string {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, CREDIT_MAX) : "";
+}
 
 /** Per slot, each image goes through the shared candidate parser on its own, so the caption stays with the image the parser kept. */
 function parseFound(raw: string): FoundImages {
@@ -72,7 +81,14 @@ function parseFound(raw: string): FoundImages {
       const [candidate] = parseImageCandidates(JSON.stringify({ images: [item] }));
       if (!candidate || list.some(have => have.url === candidate.url)) continue;
       const caption = typeof item.caption === "string" && item.caption.trim() ? item.caption : item.shows;
-      list.push({ ...candidate, caption: caption.replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX) });
+      const author = creditText(item.author);
+      const license = creditText(item.license);
+      list.push({
+        ...candidate,
+        caption: caption.replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX),
+        ...(author ? { author } : {}),
+        ...(license ? { license } : {})
+      });
       out.found++;
     }
     out.bySlot.set(index, list);
@@ -83,7 +99,7 @@ function parseFound(raw: string): FoundImages {
 /** The map chat's image candidates (same parser: https links with an https source page), asked per picture position for the book's sources. */
 export const findImagesStep: StepDefinition<FindImagesRequest, FoundImages> = {
   id: "book-pipeline.find-images",
-  version: 5,
+  version: 6,
   render: ({ chapter, slots, exclude, language, languageRetry, again }) =>
     renderTemplate(template, {
       chapter: JSON.stringify(chapter),

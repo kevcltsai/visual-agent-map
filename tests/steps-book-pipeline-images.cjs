@@ -108,7 +108,7 @@ test('slots: two markers become two standard images with one plain caption line 
   const r = await picRig({ finder: () => found({ 1: [cand(1)], 2: [cand(2)] }) });
   await run(r);
   const detail = (await r.note(0)).detail;
-  assert.match(detail, /正文一。SecretRootTitle\n\n!\[Work 1\]\(https:\/\/upload\.wikimedia\.org[^)\s]+\)\nCaption 1\n\n正文二。\n\n!\[Work 2\]\([^)\s]+\)\nCaption 2\n\n正文三。\n\n### 來源\n/);
+  assert.match(detail, /正文一。SecretRootTitle\n\n!\[Work 1\]\(https:\/\/upload\.wikimedia\.org[^)\s]+\)\nCaption 1\n來源：commons\.wikimedia\.org（\[連結\]\(https:\/\/commons\.wikimedia\.org\/wiki\/File:W1\.jpg\)）\n\n正文二。\n\n!\[Work 2\]\([^)\s]+\)\nCaption 2\n來源：commons\.wikimedia\.org（\[連結\]\([^)\s]+\)）\n\n正文三。\n\n### 來源\n- https:\/\/example\.com\/a\n- 圖「Work 1」：commons\.wikimedia\.org（\[連結\]\(https:\/\/commons\.wikimedia\.org\/wiki\/File:W1\.jpg\)）\n- 圖「Work 2」：/);
   assert.ok(!/〔圖位|無圖：|### 圖像/.test(detail));
   assert.equal(r.calls.length, 1, 'one search call per card');
   assert.equal(r.calls[0].model, 'm4', 'the picture model (not the author model m2)');
@@ -166,8 +166,8 @@ test('slots: a malicious title or caption (HTML, links, line breaks, a slot mark
   assert.ok(!/<img|<[A-Za-z]|〔圖位/.test(detail));
   assert.ok(!/\]\(https:\/\/evil/.test(detail.replace(/\\\]\\\(/g, '')));
   assert.ok(!/\[click\]\(/.test(detail));
-  const lines = detail.split('\n'); const at = lines.findIndex(l => l.startsWith('![')); assert.ok(lines[at + 1] && !lines[at + 1].includes('![') && lines[at + 2] === '');
-  const added = lines.slice(at, at + 2).join('\n');
+  const lines = detail.split('\n'); const at = lines.findIndex(l => l.startsWith('![')); assert.ok(lines[at + 1] && !lines[at + 1].includes('![') && lines[at + 3] === '');
+  const added = lines.slice(at, at + 3).join('\n');
   assert.equal(unsafeBody(added, new Set(bodyImageUrls(added))), false);
   assert.equal(stageOf(r.raw(0)), 'checked');
 });
@@ -413,7 +413,7 @@ test('images: the find-images step keeps up to 3 candidates per slot with the ca
   assert.equal(parsed.offTopic, 2);
   assert.equal(parsed.found, 4);
   assert.equal(findImagesStep.parse('not json').found, 0);
-  assert.equal(findImagesStep.version, 5);
+  assert.equal(findImagesStep.version, 6);
   const prompt = findImagesStep.render({ chapter: 'q', slots: [{ index: 1, kind: 'diagram', explains: 'perspective' }], exclude: Array.from({ length: 40 }, (_, i) => `k${i}${'x'.repeat(200)}`), language: 'en', model: 'm', reasoning: 'low' });
   assert.equal(JSON.parse(/exclude list[^\[]*(\[.*\])/.exec(prompt)[1]).length, 30);
   assert.ok(!/x{121}/.test(prompt));
@@ -492,7 +492,7 @@ test('slots: CRLF text is filled with CRLF lines and verifies; no marker is left
   const text = `前。\r\n\r\n${mk(1)}\r\n\r\n後。\r\n`;
   const fig = m.figureOf({ imageUrl: 'https://a.example/x.jpg', sourceUrl: 'https://b.example', title: 'T', caption: 'C' }, 'https://a.example/x.jpg', 'zh-TW');
   const done = m.fillSlotMarkers(text, slots, new Map([[1, { figure: fig }]]));
-  assert.equal(done.text, '前。\r\n\r\n![T](https://a.example/x.jpg)\r\nC\r\n\r\n後。\r\n');
+  assert.equal(done.text, '前。\r\n\r\n![T](https://a.example/x.jpg)\r\nC\r\n來源：b.example（[連結](https://b.example/)）\r\n\r\n後。\r\n');
   assert.equal(m.verifyFill(text, done, slots), undefined);
   const none = m.fillSlotMarkers(text, slots, new Map());
   assert.equal(m.verifyFill(text, none, slots), undefined);
@@ -677,7 +677,75 @@ test('stripImageLines: a sentence right after an image line is dropped as its ca
   assert.equal(IS.stripImageLines(`前。\n\n${img}\n圖說\n\n後。`), '前。\n\n後。');
   assert.equal(IS.stripImageLines(`前。\n\n${img}\n圖說`), '前。\n');
   assert.equal(IS.stripImageLines(`${img}\n1730 年是…\n接下來的正文。\n`), '1730 年是…\n接下來的正文。\n');
+  assert.equal(IS.stripImageLines(`前。\n\n${img}\n圖說\n來源：a.org（[連結](https://a.org/)）\n\n後。`), '前。\n\n後。', 'the caption and its source line both leave the proof text');
 });
+
+const { findImagesStep } = require('./support-ai-calls.cjs').loadWithAiCalls('core/steps/book-pipeline/find-images.ts');
+const FIG_SLOTS = [{ index: 1 }];
+const fillSourced = (candidate, language = 'zh-TW') => {
+  const m = S.load('core/book-pipeline/image-slots.ts');
+  const fig = m.figureOf(candidate, 'https://a.example/x.jpg', language);
+  return { m, fig, done: m.fillSlotMarkers(`前。\n\n${mk(1)}\n\n後。\n`, FIG_SLOTS, new Map([[1, { figure: fig }]])) };
+};
+const srcBase = { imageUrl: 'https://a.example/x.jpg', sourceUrl: 'https://www.b.example/page', title: 'T', caption: 'C' };
+
+test('source line: under the caption in the book language; site from the host; author and license only when reported', () => {
+  assert.equal(fillSourced(srcBase).fig.source.line, '來源：b.example（[連結](https://www.b.example/page)）');
+  const full = fillSourced({ ...srcBase, author: 'Ada L.', license: 'CC BY-SA 4.0' });
+  assert.equal(full.fig.source.line, '來源：b.example · 作者 Ada L. · CC BY-SA 4.0（[連結](https://www.b.example/page)）');
+  assert.match(full.done.text, /!\[T\]\(https:\/\/a\.example\/x\.jpg\)\nC\n來源：b\.example · 作者 Ada L\./);
+  assert.equal(full.m.verifyFill(`前。\n\n${mk(1)}\n\n後。\n`, full.done, FIG_SLOTS), undefined);
+  assert.equal(fillSourced({ ...srcBase, author: 'Ada', license: 'CC0' }, 'en').fig.source.line, 'Source: b.example · by Ada · CC0 ([link](https://www.b.example/page))');
+  assert.equal(fillSourced({ ...srcBase, author: '  ', license: '' }).fig.source.line, fillSourced(srcBase).fig.source.line);
+  assert.equal(fillSourced({ ...srcBase, author: 'Ada' }, 'zh-CN').fig.source.line.slice(0, 3), '來源：', 'a Simplified book writes its notes in the Traditional note language');
+});
+
+test('source line: an unsafe page address gets no source line; author and license text is escaped and capped', () => {
+  for (const sourceUrl of ['http://b.example/x', 'javascript:alert(1)', 'https://user:pw@b.example/x', 'not a url', `https://b.example/${'a'.repeat(1100)}`]) {
+    const { fig, done } = fillSourced({ ...srcBase, sourceUrl });
+    assert.equal(fig.source, undefined, sourceUrl.slice(0, 30));
+    assert.ok(!/來源：/.test(done.text));
+  }
+  const evil = '[x](https://evil.example) <b>hi</b> > [!vam-book]- 〔圖位 2：boom〕\n# head ![i](https://evil.example/y)';
+  const { fig, done } = fillSourced({ ...srcBase, author: evil, license: `${evil}${'z'.repeat(300)}` });
+  const line = fig.source.line;
+  assert.ok(!line.includes('\n') && !/<[A-Za-z]|〔圖位|\[!vam-book/.test(line));
+  assert.ok(!/(^|[^\\])\[x\]\(/.test(line) && !/(^|[^\\])!\[/.test(line), 'no live link or image from the text');
+  assert.ok(line.length < 400);
+  const unsafe = S.load('experiences/visual-map/book-pipeline-run.ts').unsafeBody;
+  assert.equal(unsafe(done.added.join('\n'), new Set(['https://a.example/x.jpg'])), false, 'the exit check accepts the written lines');
+  const paren = fillSourced({ ...srcBase, sourceUrl: 'https://b.example/a_(b)' }).fig.source.line;
+  assert.ok(paren.endsWith('(https://b.example/a_%28b%29)）'));
+});
+
+test('find-images parse: author and license are kept as short one-line text only when given', () => {
+  const item = (n, over = {}) => ({ title: `T${n}`, shows: 's', caption: 'c', relevant: true, imageUrl: `https://a.org/${n}.jpg`, sourceUrl: 'https://b.org/p', ...over });
+  const parsed = findImagesStep.parse(JSON.stringify({ slots: [{ slot: 1, images: [item(1, { author: ' Ada\n  Lovelace ', license: 'CC BY 4.0' }), item(2), item(3, { author: 5, license: 'x'.repeat(500) })] }] }));
+  const [a, b, c] = parsed.bySlot.get(1);
+  assert.equal(a.author, 'Ada Lovelace'); assert.equal(a.license, 'CC BY 4.0');
+  assert.ok(!('author' in b) && !('license' in b));
+  assert.ok(!('author' in c)); assert.equal(c.license.length, 100);
+});
+
+test('find-images prompt: asks for optional author and license, and says a caption never describes what a picture lacks', () => {
+  const prompt = findImagesStep.render({ chapter: 'q', slots: [{ index: 1, kind: 'diagram', explains: 'p' }], exclude: [], language: 'en', model: 'm', reasoning: 'low' });
+  assert.match(prompt, /"author":"creator name","license":"license name"/);
+  assert.match(prompt, /never write a sentence about what the picture lacks or does not show/);
+  assert.match(prompt, /Never guess or invent an author or a license/);
+});
+
+test('slots run: the sources of the placed pictures join the card\'s Sources section once, the author\'s own lines stay; a second fill adds nothing', async () => {
+  const r = await picRig({ finder: () => found({ 1: [cand(1, { author: 'Ada', license: 'CC0' })], 2: [cand(2, { source: 'https://commons.wikimedia.org/wiki/File:W1.jpg' })] }) });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.match(detail, /來源：commons\.wikimedia\.org · 作者 Ada · CC0（\[連結\]/);
+  const section = detail.slice(detail.indexOf('### 來源'));
+  assert.equal(section.split('commons.wikimedia.org/wiki/File:W1.jpg').length - 1, 1, 'two pictures of one page: one entry');
+  assert.match(section, /^### 來源\n- https:\/\/example\.com\/a\n- 圖「Work 1」：commons\.wikimedia\.org · 作者 Ada · CC0（/);
+  assert.equal(S.load('core/book-pipeline/note-sections.ts').addPictureSources(detail, [{ href: 'https://commons.wikimedia.org/wiki/File:W1.jpg', entry: 'again' }], 'zh-TW'), detail);
+  assert.ok(!/〔圖位/.test(detail));
+});
+
 
 test('slots: a card removed from the map while the search ran is not written, and its claimed pictures are not held', async () => {
   const r = await picRig({ slots: 1, text: () => `${BODY}\n\n${mk(1)}\n\n尾。\n`, finder: () => found({ 1: [cand(1)] }) });

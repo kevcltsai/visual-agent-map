@@ -250,3 +250,22 @@ test('composeProofSection: lines per item (note only when not met), the two mode
   assert.deepEqual({ ...proof.findProofModels(proof.composeProofRecord('k', res), 'k') }, {});
   assert.equal(proof.findProofModels(proof.composeProofRecord('k', res), 'other'), undefined);
 });
+
+test('addPictureSources: entries go to the end of the Sources section (before a hidden callout) or a new section; each address once; CRLF kept', () => {
+  const e = (n, extra = '') => ({ href: `https://s.example/${n}`, entry: `圖 ${n}：s.example（[連結](https://s.example/${n})）${extra}` });
+  const hidden = '> [!vam-book]- 研究備註\n> <!-- book-slots:v1 {"slots":[],"bad":0} -->';
+  const withSection = `正文。\n\n## 來源\n- https://own.example/a\n\n${hidden}\n`;
+  const added = sections.addPictureSources(withSection, [e(1), e(1), e(2)], 'zh-TW');
+  assert.equal(added, `正文。\n\n## 來源\n- https://own.example/a\n- ${e(1).entry}\n- ${e(2).entry}\n\n${hidden}\n`);
+  assert.equal(sections.addPictureSources(added, [e(1), e(2)], 'zh-TW'), added, 'a second fill adds nothing');
+  assert.equal(sections.addPictureSources(withSection, [], 'zh-TW'), withSection);
+  const own = '正文。\n\n## Sources\n- https://s.example/1\n';
+  assert.equal(sections.addPictureSources(own, [e(1)], 'en'), own, 'the author already cites that page');
+  const none = sections.addPictureSources(`正文。\n\n${hidden}\n`, [e(1)], 'zh-TW');
+  assert.equal(none, `正文。\n\n## 來源\n\n- ${e(1).entry}\n\n${hidden}\n`);
+  assert.match(sections.addPictureSources('Text.\n', [e(1)], 'en'), /^Text\.\n\n## Sources\n\n- 圖 1/);
+  const crlf = sections.addPictureSources('正文。\r\n\r\n## 來源\r\n- a\r\n', [e(3)], 'zh-TW');
+  assert.equal(crlf, `正文。\r\n\r\n## 來源\r\n- a\r\n- ${e(3).entry}\r\n`);
+  const afterHeading = sections.addPictureSources('正文。\n\n## 來源\n\n## 其他\nx\n', [e(4)], 'zh-TW');
+  assert.equal(afterHeading, `正文。\n\n## 來源\n- ${e(4).entry}\n\n## 其他\nx\n`);
+});

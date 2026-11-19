@@ -10,7 +10,7 @@ import {
   isResearchNotesHeading,
   SECTION_NAME
 } from "../../ai/section-aliases";
-import { NOTE_LANGUAGES, translate } from "../../i18n";
+import { NOTE_LANGUAGES, translate, translateNote, type ContentLanguage } from "../../i18n";
 import { isBookPlanTitle } from "./plan-text";
 import { demoteHeadings } from "./text";
 import { findProofModels, findProofRecord, PROOF_STATUSES, type ProofItemResult, type ProofResult } from "./proof";
@@ -712,6 +712,44 @@ export function setImageSection(detail: string, section: string | null, language
   if (section === null) return lines.join("\n");
   const heading = /^zh/i.test(language) ? IMAGES_HEADING.zh : IMAGES_HEADING.en;
   return withImageBlock(lines, `### ${heading}\n\n${section.trim()}`);
+}
+
+/**
+ * The sources of the placed pictures added to the card's Sources section as list entries (a new section when the card has none), each
+ * page address once: an entry whose address the section already holds is skipped, so a repeated fill never doubles a line. The author's
+ * own source lines stay as they are. Entries are built by the caller from escaped text.
+ */
+export function addPictureSources(
+  detail: string,
+  sources: readonly { href: string; entry: string }[],
+  language: string
+): string {
+  const lines = detail.split("\n");
+  const fenced = fencedLines(lines);
+  const cr = detail.includes("\r\n") ? "\r" : "";
+  const section = findSection(lines, fenced, text => isNewSourcesHeading(text));
+  const have = section ? lines.slice(section.at, section.end).join("\n") : "";
+  const seen = new Set<string>();
+  const fresh = sources.filter(({ href }) => {
+    const encoded = href.replace(/\(/g, "%28").replace(/\)/g, "%29");
+    if (seen.has(href) || have.includes(href) || have.includes(encoded)) return false;
+    seen.add(href);
+    return true;
+  });
+  if (!fresh.length) return detail;
+  const items = fresh.map(({ entry }) => `- ${entry}${cr}`);
+  if (!section)
+    return withImageBlock(
+      lines,
+      `## ${translateNote(language as ContentLanguage, "detail.sources_heading")}\n\n${items.join("\n")}`
+    );
+  const hidden = hiddenRanges(lines, fenced).find(range => range.start > section.at && range.start < section.end);
+  let at = hidden?.start ?? section.end;
+  while (at > section.at + 1 && !lines[at - 1].trim()) at--;
+  const previous = lines[at - 1].trim();
+  const lead = /^[-*+]\s/.test(previous) || at === section.at + 1 ? [] : [cr];
+  const tail = at < lines.length && lines[at].trim() ? [cr] : [];
+  return [...lines.slice(0, at), ...lead, ...items, ...tail, ...lines.slice(at)].join("\n");
 }
 
 /**

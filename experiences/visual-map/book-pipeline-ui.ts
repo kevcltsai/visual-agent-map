@@ -1,5 +1,6 @@
 import type { TranslationKey } from "../../i18n";
 import { t } from "../../i18n";
+import { splitLengthIssue, type LengthReason } from "../../core/book-pipeline/settings";
 import {
   readBookRole,
   readPipelineStage,
@@ -453,7 +454,8 @@ const REASON_KEY: Record<string, TranslationKey> = {
   all_facts_unverified: "ui.book_reason_all_facts_unverified",
   invalid_step: "ui.book_reason_invalid_reply",
   unsafe_body: "ui.book_reason_unsafe_body",
-  no_view: "ui.book_reason_no_view"
+  no_view: "ui.book_reason_no_view",
+  chapters_too_long: "ui.book_reason_chapters_too_long"
 };
 
 /** A step failure with a plain sentence (cause and next step) instead of "step failed: reason"; keyed `step:code`. */
@@ -473,6 +475,23 @@ const PLAIN_KEY: Record<string, TranslationKey> = {
 
 /** Turns the neutral issue code (`write failed: invalid_reply`, `proof unmet: C1 C3`) into the sentence shown on the card. */
 export function bookIssueText(issue: string): string {
+  const { rest, length } = splitLengthIssue(issue);
+  if (!length) return plainIssueText(issue);
+  const sentence = lengthText(length);
+  return rest ? `${plainIssueText(rest)}${t("ui.book_panel_lead_sep")}${sentence}` : sentence;
+}
+/** The sentence for a chapter outside the asked length: what was measured and the range (numbers and the unit only). */
+export function lengthText(length: LengthReason): string {
+  const unit = length.unit === "字" ? t("ui.book_length_unit_chars") : t("ui.book_length_unit_words");
+  return t(
+    length.kind === "over" ? "ui.book_reason_length_over_0_1_2_3" : "ui.book_reason_length_under_0_1_2_3",
+    String(length.measured),
+    unit,
+    String(length.min),
+    String(length.max)
+  );
+}
+function plainIssueText(issue: string): string {
   const failed = /^(plan|write|proof) failed: (\S+)$/.exec(issue.trim());
   if (failed) {
     const step = failed[1] as keyof typeof STEP_KEY;

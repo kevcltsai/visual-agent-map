@@ -1,5 +1,6 @@
 import { latestStoredProof, neutralizeText } from "../../core/book-pipeline/note-sections";
 import type { PipelineStage } from "../../core/book-pipeline/model";
+import type { LengthReason } from "../../core/book-pipeline/settings";
 
 /**
  * Pure helpers of a single-card rerun at gate 2 (T5): the unverified sources a card names, the one-line instruction "use other
@@ -90,7 +91,8 @@ const oneLine = (value: string, max: number): string =>
  */
 export function proofFixInstruction(
   items: readonly { id: string; type: string; status: string; note: string; sources: readonly string[] }[],
-  checklist: readonly { id: string; text: string }[]
+  checklist: readonly { id: string; text: string }[],
+  length?: LengthReason
 ): string {
   const failed = items.filter(item => item.type === "fact" && item.status === "unmet");
   const structure = items.filter(item => item.type !== "fact" && item.status === "unmet");
@@ -104,7 +106,11 @@ export function proofFixInstruction(
     "The previous version of this chapter failed the fact check on these points (JSON strings; rewrite the chapter so they are correct and supported): ";
   const leadStructure =
     "The previous version of this chapter did not meet these structure points of its checklist (JSON strings; the chapter text itself, not the sources list, must cover them): ";
-  let room = FIX_INSTRUCTION_MAX - avoid.length - 1;
+  // The length point is short and fixed (numbers and constant words), so it is reserved first and never squeezed out by long notes.
+  const lengthPiece = length
+    ? `The previous version of this chapter is ${length.measured} ${length.unit} long, outside the asked ${length.min} to ${length.max} ${length.unit}; ${length.kind === "over" ? "shorten" : "lengthen"} the chapter text to fit that range while keeping every checklist point. `
+    : "";
+  let room = FIX_INSTRUCTION_MAX - avoid.length - 1 - lengthPiece.length;
   const piece = (list: typeof items, intro: string): string => {
     const before = room;
     room -= intro.length;
@@ -119,7 +125,7 @@ export function proofFixInstruction(
     if (!points.length) room = before;
     return points.length ? intro + points.join(" ") + " " : "";
   };
-  const text = piece(failed, lead) + piece(structure, leadStructure);
+  const text = piece(failed, lead) + piece(structure, leadStructure) + lengthPiece;
   return neutralizeText(text + avoid);
 }
 /** What a rerun compares: the stage, the issue code and each proof item's id, status and sources. In memory only. */

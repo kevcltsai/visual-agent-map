@@ -37,6 +37,10 @@ export const BOOK_AUTHOR_RULES = [
 /** The author's extra requirements: the fixed chapter rules, then the effective whole-book settings (when the owner set any). */
 export function bookAuthorRequirements(settings: BookSettings, slots: readonly ImageSlot[] = []): string {
   const lines = BOOK_SETTING_FIELDS.filter(field => settings[field]).map(field => `- ${field}: ${settings[field]}`);
+  const range = lengthRange(settings.length);
+  const lengthRule = range
+    ? `\n\nLength rule (hard): the chapter text itself must be between ${range.min} and ${range.max} ${range.unit === "字" ? "characters (字)" : "words"}; sources, notes and picture markers do not count. Do not write much shorter or longer.`
+    : "";
   const plan = slots.length
     ? `\n\nImage plan for this chapter (the planner's data, JSON strings; leave one marker per slot as the rules say):\n${slots
         .map(
@@ -46,7 +50,7 @@ export function bookAuthorRequirements(settings: BookSettings, slots: readonly I
         .join("\n")}`
     : "";
   return lines.length
-    ? `${BOOK_AUTHOR_RULES}\n\nWhole-book settings (follow them):\n${lines.join("\n")}${plan}`
+    ? `${BOOK_AUTHOR_RULES}\n\nWhole-book settings (follow them):\n${lines.join("\n")}${lengthRule}${plan}`
     : `${BOOK_AUTHOR_RULES}${plan}`;
 }
 
@@ -65,4 +69,136 @@ export function cleanBookSettingsInput(input: unknown): BookSettings {
     if (line) out[field] = line;
   }
   return out;
+}
+
+// ---- chapter length ------------------------------------------------------------------------------------------------------------
+
+/** Bumped when the parsing or the tolerance changes; it is part of the length reason, so an earlier tick no longer counts. */
+export const LENGTH_RULE_VERSION = 1;
+/** A chapter is out of range only above max x this or below min x this. */
+export const LENGTH_HIGH = 1.2;
+export const LENGTH_LOW = 0.8;
+export type LengthUnit = "字" | "words";
+export interface LengthRange {
+  min: number;
+  max: number;
+  unit: LengthUnit;
+}
+export type LengthIgnored = "ambiguous" | "inverted" | "invalid";
+
+const NUM = "(\\d{1,3}(?:,\\d{3})+|\\d+)";
+const UNIT = "(?:個)?\\s*(字數|字符|字|words?)(?![A-Za-z])";
+const unitOf = (word: string): LengthUnit => (/^w/i.test(word) ? "words" : "字");
+const RANGE = new RegExp(
+  `(?<![\\d.])${NUM}\\s*(?:(?:個)?\\s*(?:字數|字符|字|words?))?\\s*[–\\-~～至到—]\\s*${NUM}\\s*${UNIT}`,
+  "giu"
+);
+const APPROX = new RegExp(`(?:大約|大约|約|约|about|around|approx(?:imately)?\\.?)\\s*${NUM}\\s*${UNIT}`, "giu");
+const toInt = (value: string): number => Number(value.replace(/,/g, ""));
+
+/**
+ * The chapter length the owner asked for in the `length` setting, or undefined (no check). `N–M 字|words` (separators – - ~ ～ 至 到 —,
+ * thousands separators allowed) is a range; `約 N 字` is N +-20%. More than one range, an inverted range or a zero value is not
+ * guessed: undefined, and `onIgnored` hears why (the caller logs it).
+ */
+export function lengthRange(
+  text: string | undefined,
+  onIgnored?: (reason: LengthIgnored) => void
+): LengthRange | undefined {
+  const value = (text ?? "").normalize("NFKC");
+  if (!value.trim()) return undefined;
+  const found: { min: number; max: number; unit: LengthUnit; approx: boolean }[] = [];
+  for (const m of value.matchAll(RANGE))
+    found.push({ min: toInt(m[1]), max: toInt(m[2]), unit: unitOf(m[3]), approx: false });
+  for (const m of value.matchAll(APPROX)) {
+    const n = toInt(m[1]);
+    found.push({ min: Math.round(n * 0.8), max: Math.round(n * 1.2), unit: unitOf(m[2]), approx: true });
+  }
+  if (!found.length) return undefined;
+  if (found.length > 1) {
+    onIgnored?.("ambiguous");
+    return undefined;
+  }
+  const one = found[0];
+  if (!one.approx && one.min > one.max) {
+    onIgnored?.("inverted");
+    return undefined;
+  }
+  if (!Number.isFinite(one.min) || !Number.isFinite(one.max) || one.min < 1 || one.max > 10_000_000) {
+    onIgnored?.("invalid");
+    return undefined;
+  }
+  return { min: one.min, max: one.max, unit: one.unit };
+}
+
+const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu;
+const LATIN_WORD = /[\p{Script=Latin}\p{N}]+(?:['’][\p{Script=Latin}]+)?/gu;
+/**
+ * How long a chapter text is in the unit: `字` = every CJK character plus every Latin or number word; `words` = Latin and number words
+ * (a text with none counts its CJK characters, so a Chinese chapter is never "0 words"). The text is the proof projection: notes are
+ * already out; here the link addresses, images, captions' syntax, picture markers, hidden records and the program's callouts go too.
+ */
+export function chapterLength(body: string, unit: LengthUnit): number {
+  const lines: string[] = [];
+  let callout = false;
+  for (const line of body.replace(/\r\n?/g, "\n").split("\n")) {
+    if (/^\s*>\s*\[!vam-/.test(line)) callout = true;
+    else if (callout && !/^\s*>/.test(line)) callout = false;
+    if (!callout) lines.push(line);
+  }
+  const text = lines
+    .join("\n")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/%%[\s\S]*?%%/g, " ")
+    .replace(/〔圖位[^〕]*〕/g, " ")
+    .replace(/!\[\[[^\]]*\]\]/g, " ")
+    .replace(/!\[[^\]\n]*\]\([^)\n]*\)/g, " ")
+    .replace(/\[([^\]\n]*)\]\([^)\n]*\)/g, "$1")
+    .replace(/https?:\/\/\S+/g, " ");
+  const cjk = (text.match(CJK) ?? []).length;
+  const words = (text.replace(CJK, " ").match(LATIN_WORD) ?? []).length;
+  if (unit === "字") return cjk + words;
+  return words || cjk;
+}
+
+/** Why a chapter is out of range: what was asked, what was measured, and the rule version (all of it feeds the review fingerprint). */
+export interface LengthReason extends LengthRange {
+  kind: "over" | "under";
+  measured: number;
+  version: number;
+}
+export function lengthReason(
+  settingLength: string | undefined,
+  body: string,
+  onIgnored?: (reason: LengthIgnored) => void
+): LengthReason | undefined {
+  const range = lengthRange(settingLength, onIgnored);
+  if (!range) return undefined;
+  const measured = chapterLength(body, range.unit);
+  const kind = measured > range.max * LENGTH_HIGH ? "over" : measured < range.min * LENGTH_LOW ? "under" : undefined;
+  return kind ? { ...range, kind, measured, version: LENGTH_RULE_VERSION } : undefined;
+}
+/** The one issue token of a length reason (no spaces): it sits in the card's issue field and so in the attention fingerprint. */
+export const lengthToken = (r: LengthReason): string =>
+  `length:${r.kind}:${r.measured}:${r.min}-${r.max}:${r.unit}:v${r.version}`;
+const TOKEN = /(?:^|\s)length:(over|under):(\d+):(\d+)-(\d+):(字|words):v(\d+)(?=\s|$)/u;
+/** An issue field split into its length reason (when it carries one) and the rest (`length unmet:` alone leaves nothing). */
+export function splitLengthIssue(issue: string): { rest: string; length?: LengthReason } {
+  const m = TOKEN.exec(issue);
+  if (!m) return { rest: issue };
+  const rest = issue
+    .replace(TOKEN, "")
+    .trim()
+    .replace(/^length unmet:?$/, "");
+  return {
+    rest,
+    length: {
+      kind: m[1] as "over" | "under",
+      measured: Number(m[2]),
+      min: Number(m[3]),
+      max: Number(m[4]),
+      unit: m[5] as LengthUnit,
+      version: Number(m[6])
+    }
+  };
 }

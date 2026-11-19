@@ -93,3 +93,59 @@ test('the author rules say the chapter text is required and comes first; a sourc
   assert.match(BOOK_AUTHOR_RULES, /chapter text itself is required and comes first in the Detail[\s\S]*only sources and notes[\s\S]*invalid/);
   assert.match(bookAuthorRequirements({}, []), /chapter text itself is required/);
 });
+
+// ---- chapter length (T10c, Bug3) ----
+const L = S.load('core/book-pipeline/settings.ts');
+const range = text => { const heard = []; const value = L.lengthRange(text, why => heard.push(why)); return { value: value && { ...value }, heard }; };
+
+test('lengthRange: N–M with every separator, thousands separators, 約 N as +-20%, both units', () => {
+  for (const sep of ['–', '-', '~', '～', '至', '到', ' – ']) assert.deepEqual(range(`每章 300${sep}500 字`).value, { min: 300, max: 500, unit: '字' }, sep);
+  assert.deepEqual(range('每章約 300–500 字').value, { min: 300, max: 500, unit: '字' }, '約 before a range is still the range');
+  assert.deepEqual(range('1,000–1,500 字').value, { min: 1000, max: 1500, unit: '字' });
+  assert.deepEqual(range('about 500 words per chapter').value, { min: 400, max: 600, unit: 'words' });
+  assert.deepEqual(range('每章約 1,000 字').value, { min: 800, max: 1200, unit: '字' });
+  assert.deepEqual(range('300-500 words').value, { min: 300, max: 500, unit: 'words' });
+  assert.deepEqual(range('300 字 – 500 字').value, { min: 300, max: 500, unit: '字' });
+});
+
+test('lengthRange: ambiguous (two ranges, mixed language), inverted and zero input mean no check and say why; plain text means no check quietly', () => {
+  assert.deepEqual(range('每章 300–500 字，英文 200–300 words'), { value: undefined, heard: ['ambiguous'] });
+  assert.deepEqual(range('300–500 字或 800–900 字'), { value: undefined, heard: ['ambiguous'] });
+  assert.deepEqual(range('每章 500–300 字'), { value: undefined, heard: ['inverted'] });
+  assert.deepEqual(range('每章 0–0 字'), { value: undefined, heard: ['invalid'] });
+  assert.deepEqual(range('簡短一點'), { value: undefined, heard: [] });
+  assert.deepEqual(range('2024-05 年的書'), { value: undefined, heard: [] }, 'a date is not a range: no unit follows');
+  assert.deepEqual(range(undefined), { value: undefined, heard: [] });
+});
+
+test('chapterLength: 字 counts CJK characters plus Latin words; words counts Latin words (CJK only text falls back to its characters); notes, addresses, images, markers, hidden records and callouts do not count', () => {
+  assert.equal(L.chapterLength('你好，世界！', '字'), 4);
+  assert.equal(L.chapterLength('你好 world 2024 年', '字'), 2 + 1 + 1 + 1);
+  assert.equal(L.chapterLength('Hello brave new world, it\'s 2024.', 'words'), 6);
+  assert.equal(L.chapterLength('你好，世界', 'words'), 4);
+  const noisy = '正文四字\n![圖說文字](https://example.org/a.png)\n看 [連結文字](https://example.org/very/long/path) 與 https://example.org/x\n〔圖位 1：不算〕\n<!-- book-body:v1 {"fp":"0123456789abcdef"} -->\n> [!vam-review] 這是程式的框\n> 框內的字\n\n收尾';
+  assert.equal(L.chapterLength(noisy, '字'), 12, 'text, the link label and the closing words only');
+  assert.equal(L.chapterLength('字'.repeat(1000) + '\r\n' + '字'.repeat(1000), '字'), 2000, 'CRLF and a long text');
+});
+
+test('lengthReason: above max x 1.2 is over, below min x 0.8 is under, the edges are inside; the token round-trips and carries range, unit, count and rule version', () => {
+  const ask = (n, setting = '每章 100–200 字') => L.lengthReason(setting, '字'.repeat(n));
+  assert.equal(ask(240), undefined); assert.equal(ask(80), undefined);
+  const over = ask(241); const under = ask(79);
+  assert.deepEqual({ ...over }, { min: 100, max: 200, unit: '字', kind: 'over', measured: 241, version: L.LENGTH_RULE_VERSION });
+  assert.equal(under.kind, 'under');
+  assert.equal(L.lengthToken(over), 'length:over:241:100-200:字:v1');
+  assert.deepEqual({ ...L.splitLengthIssue('proof unmet: C1 length:over:241:100-200:字:v1').length }, { ...over });
+  assert.equal(L.splitLengthIssue('proof unmet: C1 length:over:241:100-200:字:v1').rest, 'proof unmet: C1');
+  assert.equal(L.splitLengthIssue('length unmet: length:under:79:100-200:字:v1').rest, '');
+  assert.equal(L.splitLengthIssue('proof unmet: C1').length, undefined);
+  assert.equal(L.lengthReason('', '字'.repeat(999)), undefined);
+});
+
+test('bookAuthorRequirements: a hard length rule line appears only when the length setting is one readable range', () => {
+  assert.match(L.bookAuthorRequirements({ length: '每章 300–500 字' }), /Length rule \(hard\): the chapter text itself must be between 300 and 500 characters/);
+  assert.match(L.bookAuthorRequirements({ length: '300-500 words' }), /between 300 and 500 words/);
+  assert.doesNotMatch(L.bookAuthorRequirements({ length: '短一點' }), /Length rule/);
+  assert.doesNotMatch(L.bookAuthorRequirements({ length: '300–500 字，200–300 words' }), /Length rule/);
+  assert.doesNotMatch(L.bookAuthorRequirements({ tone: 'warm' }), /Length rule/);
+});

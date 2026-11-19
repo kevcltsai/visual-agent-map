@@ -107,7 +107,13 @@ import {
   proofVerdict,
   type ProofResult
 } from "../../core/book-pipeline/proof";
-import { effectiveSettings } from "../../core/book-pipeline/settings";
+import {
+  effectiveSettings,
+  lengthReason,
+  lengthToken,
+  type LengthIgnored,
+  type LengthReason
+} from "../../core/book-pipeline/settings";
 import { escapeMarkdownText, unescapeMarkdownText } from "../../core/book-pipeline/text";
 import type { ReasoningLevel } from "../../ai/types";
 import type { ContentLanguage } from "../../i18n";
@@ -131,7 +137,12 @@ import {
   type ProbedCandidate,
   type SlotOutcome
 } from "../../core/book-pipeline/image-slots";
-import { cardPlanStep, type CardPlanRequest, type CardPlanResult } from "../../core/steps/book-pipeline/card-plan";
+import {
+  cardPlanFits,
+  cardPlanStep,
+  type CardPlanRequest,
+  type CardPlanResult
+} from "../../core/steps/book-pipeline/card-plan";
 import {
   globalPlanStep,
   type GlobalPlanRequest,
@@ -401,6 +412,8 @@ interface Drive {
   config: BookRunConfig;
   rootId: string;
   cards: Map<string, CardInfo>;
+  /** Each card's parent on the map (as loaded): a chapter's child cards are the cards of the order whose parent it is. */
+  parents: Map<string, string | null>;
   /** Cards that already had a `book-role` when loaded (the owner's choice; the global plan does not overwrite it), and the missing ones with their default. */
   ownerRoles: Set<string>;
   missingRoles: Map<string, BookRole>;
@@ -1413,6 +1426,7 @@ export class BookPipelineRuns {
       extra: new Map(),
       avoid: new Set(),
       fixable: new Map(),
+      parents: new Map(),
       overwrite: new Map(),
       plans: new Map(),
       authorModels: new Map(),
@@ -1564,6 +1578,7 @@ export class BookPipelineRuns {
     if (map.nodes.filter(node => !node.parentId).length !== 1) throw new BookPipelineRunError("root");
     drive.ownerRoles.clear();
     drive.missingRoles.clear();
+    drive.parents = new Map(map.nodes.map(node => [node.id, node.parentId]));
     for (const id of order) {
       const node = map.nodes.find(item => item.id === id);
       if (!node) {
@@ -1933,7 +1948,8 @@ export class BookPipelineRuns {
       settings: before.settings,
       cards: order.map(id => {
         const info = drive.cards.get(id) as CardInfo;
-        return { id, title: info.title, summary: info.summary };
+        const children = this.childCardsOf(drive, id).map(child => child.title);
+        return { id, title: info.title, summary: info.summary, ...(children.length ? { children } : {}) };
       })
     };
     const result: GlobalPlanResult = await untilAborted(
@@ -1976,6 +1992,14 @@ export class BookPipelineRuns {
     };
   }
 
+  /** A chapter's child cards: the cards of the run whose parent on the map it is, in reading order. */
+  private childCardsOf(drive: Drive, nodeId: string): { title: string; summary: string }[] {
+    return drive.store.state.order.flatMap(id => {
+      const info = drive.parents.get(id) === nodeId ? drive.cards.get(id) : undefined;
+      return info ? [{ title: info.title, summary: info.summary }] : [];
+    });
+  }
+
   private async execPlan(drive: Drive, token: StepToken, nodeId: string): Promise<Outcome> {
     const signal = drive.controller.signal;
     const info = drive.cards.get(nodeId);
@@ -1993,11 +2017,17 @@ export class BookPipelineRuns {
     };
     const previous = side(index - 1);
     const next = side(index + 1);
+    const children = this.childCardsOf(drive, nodeId);
     const request: CardPlanRequest = {
       ...this.base(drive, drive.config.planModel),
       thread: book.thread,
       settings,
       materials: book.materials,
+      chapters: order.flatMap((id, at) => {
+        const own = id === nodeId ? card.title : drive.cards.get(id)?.title;
+        return own === undefined ? [] : [{ position: at + 1, title: own }];
+      }),
+      ...(children.length ? { children } : {}),
       card: {
         id: nodeId,
         position: index + 1,
@@ -2010,6 +2040,11 @@ export class BookPipelineRuns {
       ...(next ? { next } : {}),
       ...(drive.extra.has(nodeId) ? { instruction: drive.extra.get(nodeId) } : {})
     };
+    // The chapter list is the authority and is never shortened: when it alone does not fit, the step is refused here (no call is made).
+    if (!cardPlanFits(request)) {
+      this.log(drive, "plan_refused", nodeId, "plan", "chapters_too_long");
+      return { kind: "failed", reason: "chapters_too_long", forceReview: true };
+    }
     const result: CardPlanResult = await untilAborted(
       signal,
       this.ports.runPlan(cardPlanStep, request, { signal, admission: drive.admission })
@@ -2563,6 +2598,10 @@ export class BookPipelineRuns {
     }
     // The same reducer judges a fresh and a stored proof; a stored "checked" with every structure point unmet is needs-review.
     const verdict: ProofResult = { ...result, aggregate: proofVerdict(result, !body.trim()) };
+    // The length rule: a third reason beside the facts and the structure. It never lowers another failure; with nothing else wrong it
+    // still makes the chapter need a look, and it stays so once the one automatic redo is spent (no silent "checked").
+    const length = await this.lengthOf(drive, nodeId, body);
+    const lengthIssue = length ? lengthToken(length) : "";
     // Some unmet structure items do not stop the card: it stays checked, and the count is kept in its issue field for the card's small note.
     const structureUnmet = verdict.items
       .filter(item => item.type !== "fact" && item.status === "unmet")
@@ -2571,8 +2610,9 @@ export class BookPipelineRuns {
     return {
       kind: "ok",
       after: async () => {
-        if (verdict.aggregate === "needs-review" && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0)
-          drive.fixable.set(nodeId, proofFixInstruction(verdict.items, checklist));
+        const stage = verdict.aggregate === "needs-review" || length ? "needs-review" : "checked";
+        if (stage === "needs-review" && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0)
+          drive.fixable.set(nodeId, proofFixInstruction(verdict.items, checklist, length));
         else if (!drive.job) {
           drive.extra.delete(nodeId);
           drive.avoid.delete(nodeId);
@@ -2580,17 +2620,27 @@ export class BookPipelineRuns {
         await this.setStage(
           drive,
           nodeId,
-          verdict.aggregate,
+          stage,
           verdict.aggregate === "needs-review"
-            ? verdict.factsUnverified
-              ? "proof unmet: facts_unverified"
-              : `proof unmet: ${unmetIds(verdict.items)}`
-            : noticed.length
-              ? `structure unmet: ${noticed.join(" ")}`
-              : null
+            ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}`
+            : lengthIssue
+              ? `length unmet: ${lengthIssue}`
+              : noticed.length
+                ? `structure unmet: ${noticed.join(" ")}`
+                : null
         );
       }
     };
+  }
+
+  /** The chapter's length reason against the effective `length` setting (read now, so a changed setting counts at once); a setting that cannot be read as one range is logged and not checked. */
+  private async lengthOf(drive: Drive, nodeId: string, body: string): Promise<LengthReason | undefined> {
+    const rootInfo = drive.cards.get(drive.rootId);
+    if (!rootInfo) return undefined;
+    const root = await this.ports.readCard(rootInfo.path);
+    const settings = effectiveSettings(root.settings, parseBookPlanDecisions(root.raw));
+    const ignored = (reason: LengthIgnored): void => this.log(drive, "length_rule_ignored", nodeId, "proof", reason);
+    return lengthReason(settings.length, body, ignored);
   }
 
   /** Best effort: replaces the proof records in the research notes with the failed proof's partial record (its own key), under the same guards as every card write. Never throws. */

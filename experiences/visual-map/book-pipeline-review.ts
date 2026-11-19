@@ -13,7 +13,8 @@ import {
 import { failedProofKey, proofKey } from "../../core/book-pipeline/proof";
 import { parseChecklist, parseImageSlots } from "../../core/book-pipeline/plan-text";
 import { escapeMarkdownText, hashText, unescapeMarkdownText } from "../../core/book-pipeline/text";
-import { bookCardView, bookIssueText } from "./book-pipeline-ui";
+import { splitLengthIssue } from "../../core/book-pipeline/settings";
+import { bookCardView, bookIssueText, lengthText } from "./book-pipeline-ui";
 import { bodyImageUrls } from "./book-pipeline-run";
 
 import { projectProofBody } from "../../core/book-pipeline/book-notes";
@@ -118,6 +119,11 @@ export const plainNote = (text: string): string =>
 
 /** The reason of a needs-review card in words: the proof's own notes of the items not met, else the count, else a plain sentence; never a code. */
 export function reasonOf(issue: string, proof: StoredProofView | undefined): string {
+  const { rest, length } = splitLengthIssue(issue);
+  if (length) {
+    const sentence = lengthText(length);
+    return rest ? `${reasonOf(rest, proof)}${t("ui.book_panel_lead_sep")}${sentence}` : sentence;
+  }
   if (!/^proof unmet/.test(issue.trim())) return bookIssueText(issue);
   if (/facts_unverified/.test(issue)) return t("ui.book_reason_all_facts_unverified");
   const open = (proof?.items ?? []).filter(item => item.status !== "met");

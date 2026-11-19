@@ -12855,10 +12855,16 @@ var NUM = "(\\d{1,3}(?:,\\d{3})+|\\d+)";
 var UNIT = "(?:\u500B)?\\s*(\u5B57\u6578|\u5B57\u7B26|\u5B57|words?)(?![A-Za-z])";
 var unitOf = (word) => /^w/i.test(word) ? "words" : "\u5B57";
 var RANGE = new RegExp(
-  `(?<![\\d.])${NUM}\\s*(?:(?:\u500B)?\\s*(?:\u5B57\u6578|\u5B57\u7B26|\u5B57|words?))?\\s*[\u2013\\-~\uFF5E\u81F3\u5230\u2014]\\s*${NUM}\\s*${UNIT}`,
+  `(?<![\\d.])${NUM}\\s*(?:(?:\u500B)?\\s*(?:\u5B57\u6578|\u5B57\u7B26|\u5B57|words?))?\\s*(?:[\u2013\\-~\uFF5E\u81F3\u5230\u2014]|\\bto\\b|\\band\\b)\\s*${NUM}\\s*${UNIT}`,
   "giu"
 );
 var APPROX = new RegExp(`(?:\u5927\u7D04|\u5927\u7EA6|\u7D04|\u7EA6|about|around|approx(?:imately)?\\.?)\\s*${NUM}\\s*${UNIT}`, "giu");
+var APPROX_SUFFIX = new RegExp(`${NUM}\\s*${UNIT}\\s*(?:\u5DE6\u53F3|\u4E0A\u4E0B|\u524D\u5F8C|\u524D\u540E)`, "giu");
+var MAX_ONLY = new RegExp(
+  `(?:\u4E0D\u8D85\u904E|\u4E0D\u8D85\u8FC7|\u4E0D\u591A\u65BC|\u4E0D\u591A\u4E8E|\u81F3\u591A|\u6700\u591A|no more than|at most|up to)\\s*${NUM}\\s*${UNIT}`,
+  "giu"
+);
+var NUMBER_UNIT = new RegExp(`${NUM}\\s*${UNIT}`, "iu");
 var toInt = (value) => Number(value.replace(/,/g, ""));
 function lengthRange(text10, onIgnored) {
   const value = (text10 != null ? text10 : "").normalize("NFKC");
@@ -12870,7 +12876,17 @@ function lengthRange(text10, onIgnored) {
     const n = toInt(m[1]);
     found.push({ min: Math.round(n * 0.8), max: Math.round(n * 1.2), unit: unitOf(m[2]), approx: true });
   }
-  if (!found.length) return void 0;
+  const rest = value.replace(RANGE, " ").replace(APPROX, " ");
+  for (const m of rest.matchAll(APPROX_SUFFIX)) {
+    const n = toInt(m[1]);
+    found.push({ min: Math.round(n * 0.8), max: Math.round(n * 1.2), unit: unitOf(m[2]), approx: true });
+  }
+  for (const m of rest.replace(APPROX_SUFFIX, " ").matchAll(MAX_ONLY))
+    found.push({ min: 1, max: toInt(m[1]), unit: unitOf(m[2]), approx: true });
+  if (!found.length) {
+    if (NUMBER_UNIT.test(value)) onIgnored == null ? void 0 : onIgnored("invalid");
+    return void 0;
+  }
   if (found.length > 1) {
     onIgnored == null ? void 0 : onIgnored("ambiguous");
     return void 0;
@@ -12901,7 +12917,7 @@ function chapterLength(body, unit2) {
   const cjk = ((_a2 = text10.match(CJK)) != null ? _a2 : []).length;
   const words2 = ((_b2 = text10.replace(CJK, " ").match(LATIN_WORD)) != null ? _b2 : []).length;
   if (unit2 === "\u5B57") return cjk + words2;
-  return words2 || cjk;
+  return cjk > words2 ? cjk + words2 : words2 || cjk;
 }
 function lengthReason(settingLength, body, onIgnored) {
   const range = lengthRange(settingLength, onIgnored);
@@ -51121,9 +51137,11 @@ function readBodyRecord(detail) {
     if (!m) return;
     try {
       const data = JSON.parse(m[1]);
-      if (typeof data.fp !== "string" || !/^[0-9a-f]{16}$/.test(data.fp)) return;
+      const fp = typeof data.fp === "string" && /^[0-9a-f]{16}$/.test(data.fp) ? data.fp : void 0;
+      const kept = typeof data.kept === "string" && /^[0-9a-f]{16}$/.test(data.kept) ? data.kept : void 0;
+      if (!fp && !kept) return;
       found = {
-        fp: data.fp,
+        ...fp ? { fp } : {},
         ...typeof data.kept === "string" && /^[0-9a-f]{16}$/.test(data.kept) ? { kept: data.kept } : {}
       };
     } catch (e) {
@@ -51159,7 +51177,7 @@ function oldNoteLooksUntouched(detail) {
 }
 function bodyState(detail) {
   const record = readBodyRecord(detail);
-  if (!record) return !integrityText(detail) ? "empty" : oldNoteLooksUntouched(detail) ? "clean" : "unknown";
+  if (!(record == null ? void 0 : record.fp)) return !integrityText(detail) ? "empty" : oldNoteLooksUntouched(detail) ? "clean" : "unknown";
   return record.fp === integrityFp(detail) ? "clean" : "edited";
 }
 var isUntouched = (detail) => {
@@ -51178,11 +51196,10 @@ function stampDetail(detail) {
   return replaceResearchRecord(detail, compose({ fp }));
 }
 function keepDetail(detail) {
-  var _a2;
   const old = readBodyRecord(detail);
   const kept = integrityFp(detail);
   if ((old == null ? void 0 : old.kept) === kept) return detail;
-  return replaceResearchRecord(detail, compose({ fp: (_a2 = old == null ? void 0 : old.fp) != null ? _a2 : kept, kept }));
+  return replaceResearchRecord(detail, compose({ ...(old == null ? void 0 : old.fp) ? { fp: old.fp } : {}, kept }));
 }
 function programStamp(baseDetail, nextDetail) {
   return bodyState(baseDetail) === "clean" ? stampDetail(nextDetail) : nextDetail;
@@ -51200,6 +51217,10 @@ function programStampRaw(baseRaw, nextRaw) {
   const base = detailBlockOf(baseRaw);
   return base !== void 0 && bodyState(base) === "clean" ? stampRaw(nextRaw) : nextRaw;
 }
+var isKeptRaw = (raw) => {
+  var _a2;
+  return isKept((_a2 = detailBlockOf(raw)) != null ? _a2 : "");
+};
 var bodyStateRaw = (raw) => {
   var _a2;
   return bodyState((_a2 = detailBlockOf(raw)) != null ? _a2 : "");
@@ -52046,7 +52067,7 @@ var BookPipelineRuns = class {
       outcome = applyReplies(text10, items, replies);
       return outcome.text;
     });
-    refuseIfGone();
+    if (!(written2 === "written" && outcome)) refuseIfGone();
     if (written2 === "refused") throw new BookPipelineRunError("stale");
     const done = written2 === "written" && outcome ? outcome : void 0;
     if (!done) return { applied: 0, skipped: 0, marked: 0, edits: [] };
@@ -52058,7 +52079,7 @@ var BookPipelineRuns = class {
     var _a2;
     const stateOrder = effectiveOrder(state);
     const at = stateOrder.indexOf(nodeId);
-    const revision = cardRevision(state, nodeId);
+    const revision = `${cardRevision(state, nodeId)}.${state.revision}`;
     for (const other of [stateOrder[at - 1], stateOrder[at + 1]]) {
       const path = other ? (_a2 = map.nodes.find((item) => item.id === other)) == null ? void 0 : _a2.path : void 0;
       if (!path || this.disposed) continue;
@@ -52485,8 +52506,19 @@ var BookPipelineRuns = class {
       return { kind: "cancelled" };
     return { kind: "failed", reason: reasonOf(error) };
   }
-  authorize(drive, token) {
-    return () => !this.dead(drive) && !drive.controller.signal.aborted && isCurrent(drive.store.state, token);
+  authorize(drive, token, nodeId) {
+    return () => !this.dead(drive) && !drive.controller.signal.aborted && isCurrent(drive.store.state, token) && // A card the reader removed from the map is not written, even by a call already in flight (plan §14-3).
+    !(nodeId !== void 0 && drive.members !== void 0 && !drive.members.has(nodeId));
+  }
+  /**
+   * The map file changed (the plugin's modify event): the drive of that map learns the card ids now, so a write already in flight to a
+   * card that just left the map is refused synchronously at its commit. No drive: nothing to do.
+   */
+  async mapModified(mapPath) {
+    const drive = this.drives.get(mapPath);
+    if (!drive || this.dead(drive)) return;
+    const map = await this.ports.readMap(mapPath).catch(() => void 0);
+    if (map && !this.dead(drive)) drive.members = new Set(map.nodes.map((node) => node.id));
   }
   base(drive, model) {
     return { language: drive.config.language, model, reasoning: drive.config.reasoning, usageMapPath: drive.mapPath };
@@ -52562,6 +52594,9 @@ var BookPipelineRuns = class {
     for (const [nodeId, instruction] of queued) {
       if (this.dead(drive) || drive.controller.signal.aborted) break;
       if (drive.stages.get(nodeId) !== "needs-review") continue;
+      const kept = drive.cards.get(nodeId);
+      const keptRaw = kept ? await this.ports.readCard(kept.path).catch(() => void 0) : void 0;
+      if (keptRaw && isKeptRaw(keptRaw.raw)) continue;
       const done = await drive.store.commit((state) => requestAutoFix(state, nodeId));
       if (!(done == null ? void 0 : done.accepted)) continue;
       const own2 = drive.cards.get(nodeId);
@@ -52686,6 +52721,16 @@ var BookPipelineRuns = class {
       return info ? [{ title: info.title, summary: info.summary }] : [];
     });
   }
+  /**
+   * Whether the program may rewrite this chapter text: it is as the program left it (or there is none) and not kept, or the reader gave a
+   * one-time permission for exactly this text. A kept choice wins over clean/empty: an older note the reader kept has no program fingerprint.
+   */
+  mayOverwriteCard(drive, nodeId, raw) {
+    const state = bodyStateRaw(raw);
+    if ((state === "clean" || state === "empty") && !isKeptRaw(raw)) return true;
+    const permit = drive.overwrite.get(nodeId);
+    return !!permit && permit.runId === drive.store.state.runId && permit.fingerprint === integrityFpRaw(raw);
+  }
   async execPlan(drive, token, nodeId) {
     var _a2, _b2;
     const signal = drive.controller.signal;
@@ -52693,6 +52738,10 @@ var BookPipelineRuns = class {
     const rootInfo = drive.cards.get(drive.rootId);
     if (!info || !rootInfo) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
+    if (!this.mayOverwriteCard(drive, nodeId, card.raw)) {
+      this.log(drive, "plan_skipped", nodeId, "plan", "hand_edited");
+      return { kind: "ok", after: () => this.setStage(drive, nodeId, "planned", null) };
+    }
     const root = await this.ports.readCard(rootInfo.path);
     const book = parseBookPlanBody(root.raw);
     const settings = effectiveSettings(root.settings, parseBookPlanDecisions(root.raw));
@@ -52772,7 +52821,7 @@ var BookPipelineRuns = class {
     const written2 = await this.ports.updateNoteGuarded(
       path,
       { prompt, summary: result.covers },
-      { expectedContent: card.raw, authorize: this.authorize(drive, token) }
+      { expectedContent: card.raw, authorize: this.authorize(drive, token, nodeId) }
     );
     if (written2 === "discarded") return { kind: "failed", reason: "discarded" };
     drive.plans.set(nodeId, result);
@@ -52787,12 +52836,7 @@ var BookPipelineRuns = class {
     drive.imagesDone.delete(nodeId);
     const card = await this.ports.readCard(info.path);
     const root = await this.ports.readCard(rootInfo.path);
-    const permit = drive.overwrite.get(nodeId);
-    const mayOverwrite = (raw) => {
-      const state = bodyStateRaw(raw);
-      if (state === "clean" || state === "empty") return true;
-      return !!permit && permit.runId === drive.store.state.runId && permit.fingerprint === integrityFpRaw(raw);
-    };
+    const mayOverwrite = (raw) => this.mayOverwriteCard(drive, nodeId, raw);
     if (!mayOverwrite(card.raw)) {
       if (isKept(card.detail)) {
         drive.imagesDone.add(nodeId);
@@ -52824,11 +52868,14 @@ var BookPipelineRuns = class {
     }
     if (!await this.ensureBackup(drive, nodeId, info.path, card.raw))
       return { kind: "failed", reason: "backup_failed", forceReview: true };
-    const authorize = this.authorize(drive, token);
+    const authorize = this.authorize(drive, token, nodeId);
     let changedByHand = false;
+    const notesOf = (raw) => findNotes(raw).map((found) => `${found.n}|${found.selected}|${found.note}`).join("\n");
+    const startNotes = notesOf(card.raw);
     const authorizeWrite = (current) => {
       if (!authorize()) return false;
-      if (current === void 0 || mayOverwrite(current)) return true;
+      if (current === void 0) return true;
+      if (mayOverwrite(current) && notesOf(current) === startNotes) return true;
       changedByHand = true;
       return false;
     };
@@ -77418,7 +77465,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const raw = file instanceof import_obsidian38.TFile ? await this.app.vault.read(file).catch(() => null) : null;
       if (raw !== null) {
         const state = bodyStateRaw(raw);
-        if (state !== "clean" && state !== "empty") {
+        if (state !== "clean" && state !== "empty" || isKeptRaw(raw)) {
           this.bookRerunAsk = { path, nodeId: node.id, fp: integrityFpRaw(raw) };
           this.bookBarFocus = "rerun-go";
           return;
@@ -90983,6 +91030,8 @@ var BookHandEdits = class {
     __publicField(this, "inflight", /* @__PURE__ */ new Set());
     __publicField(this, "done", /* @__PURE__ */ new Set());
     __publicField(this, "disposed", false);
+    /** Maps being drained: one drain per map at a time. The value is whether another settle came meanwhile (the drain looks once more). */
+    __publicField(this, "draining", /* @__PURE__ */ new Map());
   }
   dispose() {
     this.disposed = true;
@@ -91028,6 +91077,20 @@ var BookHandEdits = class {
   /** The book is at the checkpoint with nothing running: every queued rewrite of the map runs now, one after another. */
   async drain(mapPath) {
     if (this.disposed) return;
+    if (this.draining.has(mapPath)) {
+      this.draining.set(mapPath, true);
+      return;
+    }
+    try {
+      do {
+        this.draining.set(mapPath, false);
+        await this.drainOnce(mapPath);
+      } while (this.draining.get(mapPath) && !this.disposed);
+    } finally {
+      this.draining.delete(mapPath);
+    }
+  }
+  async drainOnce(mapPath) {
     try {
       const map = await this.ports.readMap(mapPath);
       const read = readBookPipeline(map);
@@ -91071,6 +91134,10 @@ var BookHandEdits = class {
         status: t("ui.book_review_hand_failed_0", t("ui.book_plain_write_hand_edited"))
       });
     } catch (error) {
+      if ((error == null ? void 0 : error.code) === "busy") {
+        await this.patch(path, { queued: true, status: t("ui.book_review_hand_queued") });
+        return;
+      }
       await this.patch(path, {
         clearRewrite: true,
         queued: false,
@@ -91209,21 +91276,25 @@ var BookNotes = class {
   }
   /** The menu items for the active editor; null when the note is not a chapter (no item at all). */
   menu(editor) {
-    var _a2;
+    var _a2, _b2, _c, _d, _e;
     if (!this.isChapter(editor.path)) return null;
     const { from, to } = editor.selection();
     const text10 = editor.text();
     const check = checkSelection(text10, from, to);
     const count4 = countNotes(text10);
+    const blocked = (_d = (_c = (_b2 = this.ports).addBlocked) == null ? void 0 : _c.call(_b2, (_a2 = editor.path) != null ? _a2 : "")) != null ? _d : null;
     return {
-      add: check.ok ? { title: t("ui.book_note_add"), disabled: false } : { title: t("ui.book_note_add_disabled_0", t(WHY[check.reason])), disabled: true },
-      ...this.ports.applyStatus((_a2 = editor.path) != null ? _a2 : "").running ? { apply: { title: t("ui.book_note_cancel_menu") } } : count4 ? { apply: { title: t("ui.book_note_apply_menu_0", count4) } } : {}
+      add: blocked ? { title: t("ui.book_note_add_disabled_0", blocked), disabled: true } : check.ok ? { title: t("ui.book_note_add"), disabled: false } : { title: t("ui.book_note_add_disabled_0", t(WHY[check.reason])), disabled: true },
+      ...this.ports.applyStatus((_e = editor.path) != null ? _e : "").running ? { apply: { title: t("ui.book_note_cancel_menu") } } : count4 ? { apply: { title: t("ui.book_note_apply_menu_0", count4) } } : {}
     };
   }
   /** The command: asks for the note and writes it. */
   add(editor) {
+    var _a2, _b2;
     const path = editor.path;
     if (!path || !this.isChapter(path)) return this.ports.notice(t("ui.book_note_not_chapter"));
+    const blocked = (_b2 = (_a2 = this.ports).addBlocked) == null ? void 0 : _b2.call(_a2, path);
+    if (blocked) return this.ports.notice(blocked);
     const { from, to } = editor.selection();
     const check = checkSelection(editor.text(), from, to);
     if (!check.ok) return this.ports.notice(t(WHY[check.reason]));
@@ -91240,7 +91311,10 @@ var BookNotes = class {
     if (path && this.isChapter(path)) this.ports.applyNotes(path);
   }
   async commit(path, from, to, selected, note) {
+    var _a2, _b2;
     let failure;
+    const blocked = (_b2 = (_a2 = this.ports).addBlocked) == null ? void 0 : _b2.call(_a2, path);
+    if (blocked) return this.ports.notice(blocked);
     try {
       const result = await this.ports.write(path, (text10) => {
         const added = addNote(text10, from, to, selected, note);
@@ -104432,6 +104506,10 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       askNote: (selected, submit) => new BookNoteModal(this.app, selected, submit).open(),
       notice: (message) => void new import_obsidian52.Notice(message),
       applyNotes: (path) => this.applyBookNotes(path),
+      addBlocked: (path) => {
+        const map = this.bookChapterMaps.get(path);
+        return map && this.bookPipelineRuns.isRunning(map) ? t("ui.book_refused_drive_running") : null;
+      },
       applyStatus: (path) => {
         var _a2;
         const running2 = this.bookNotesApply.isRunning(path);
@@ -104845,8 +104923,10 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
     this.registerEvent(this.app.workspace.on("editor-change", () => notes.paint()));
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
-        if (file instanceof import_obsidian52.TFile && this.isMap(file)) this.refreshBookNotesSoon();
-        else notes.paint();
+        if (file instanceof import_obsidian52.TFile && this.isMap(file)) {
+          this.refreshBookNotesSoon();
+          void this.bookPipelineRuns.mapModified(file.path);
+        } else notes.paint();
       })
     );
     this.app.workspace.onLayoutReady(() => this.refreshBookNotesSoon());

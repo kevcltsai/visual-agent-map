@@ -226,6 +226,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "book-apply-notes.en": {
+      "builder": "core/steps/book-pipeline/apply-notes.ts applyNotesStep",
+      "language": "en",
+      "schema": true
+    },
+    "book-apply-notes.zh": {
+      "builder": "core/steps/book-pipeline/apply-notes.ts applyNotesStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "book-apply-notes.zh-CN": {
+      "builder": "core/steps/book-pipeline/apply-notes.ts applyNotesStep",
+      "language": "zh-CN",
+      "schema": true
+    },
     "book-card-plan.en": {
       "builder": "core/steps/book-pipeline/card-plan.ts cardPlanStep",
       "language": "en",

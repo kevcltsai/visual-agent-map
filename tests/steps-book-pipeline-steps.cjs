@@ -16,6 +16,8 @@ const settings = load('core/book-pipeline/settings.ts');
 const pipelineLog = load('core/book-pipeline/log.ts');
 const globalPlan = load('core/steps/book-pipeline/global-plan.ts');
 const cardPlan = load('core/steps/book-pipeline/card-plan.ts');
+const applyNotes = load('core/steps/book-pipeline/apply-notes.ts');
+const notesApply = load('core/book-pipeline/notes-apply.ts');
 const proofMod = loadWithAiCalls('core/steps/book-pipeline/proofread.ts');
 const runMod = loadWithAiCalls('core/steps/book-pipeline/run.ts');
 const { AiExchangeLog } = load('ai-exchange-log.ts');
@@ -619,4 +621,65 @@ test('suggest-settings: a reply with a missing, extra or non-string field is ref
   const bad = [{ ...sug, extra: 'x' }, { ...sug, reader: 5 }, (({ style, ...rest }) => rest)(sug), []];
   for (const reply of bad) assert.throws(() => suggest.parseSuggestSettings(JSON.stringify(reply)), /reply|string/i);
   assert.throws(() => suggest.parseSuggestSettings('not json'), /JSON/);
+});
+
+// ---- apply-notes: the rewrite of annotated paragraphs ----
+const NOTE_BODY = 'Brunelleschi showed linear ==perspective==%%備註#2：say what it is%% in [[Florence]] around 1415 ![](https://x.y/a.png).';
+const encodedItem = () => notesApply.encodeParagraph('p1', NOTE_BODY);
+const applyRequest = (items = [encodedItem()]) => ({ ...base, settings: { reader: 'adults' }, plan: 'P', items });
+const applyReply = (...paragraphs) => JSON.stringify({ paragraphs });
+const GOOD = 'Brunelleschi showed linear perspective, the way lines meet, in ⟦L1⟧ around 1415 ⟦L2⟧.';
+
+test('apply-notes: the prompt shows note markers and link tokens only, never a link address', () => {
+  const request = applyRequest();
+  const prompt = applyNotes.applyNotesStep.render(request);
+  assert.match(prompt, /⟦N2⟧perspective⟦\/N2⟧/);
+  assert.ok(prompt.includes('⟦L1⟧') && prompt.includes('⟦L2⟧'));
+  assert.ok(!prompt.includes('Florence') && !prompt.includes('x.y/a.png'));
+  assert.doesNotThrow(() => applyNotes.applyNotesStep.policy(prompt, request));
+  assert.throws(() => applyNotes.applyNotesStep.policy(prompt, applyRequest([])), /at least one/);
+});
+
+test('apply-notes: a good reply returns the paragraph with its links back exactly once', () => {
+  const out = applyNotes.parseApplyNotes(applyReply({ id: 'p1', text: GOOD }), applyRequest());
+  assert.equal(out.paragraphs[0].text, 'Brunelleschi showed linear perspective, the way lines meet, in [[Florence]] around 1415 ![](https://x.y/a.png).');
+  assert.ok(out.paragraphs[0].text.includes('[[Florence]]') && out.paragraphs[0].text.includes('![](https://x.y/a.png)'));
+  assert.ok(!/[⟦⟧]/.test(out.paragraphs[0].text));
+});
+
+test('apply-notes: ids must be exactly the sent ids (unknown, duplicate, missing, extra field)', () => {
+  const ok = { id: 'p1', text: GOOD };
+  const two = applyRequest([encodedItem(), { ...encodedItem(), id: 'p2' }]);
+  assert.throws(() => applyNotes.parseApplyNotes(applyReply({ ...ok, id: 'p9' }), applyRequest()), /not sent/);
+  assert.throws(() => applyNotes.parseApplyNotes(applyReply(ok, ok), two), /repeats/);
+  assert.throws(() => applyNotes.parseApplyNotes(applyReply(ok), two), /exactly the paragraphs/);
+  assert.throws(() => applyNotes.parseApplyNotes(applyReply(ok, ok, ok), two), /exactly the paragraphs/);
+  assert.throws(() => applyNotes.parseApplyNotes(applyReply({ ...ok, extra: 1 }), applyRequest()), /unexpected fields/);
+  assert.throws(() => applyNotes.parseApplyNotes('{"paragraphs":[]}', applyRequest()), /exactly/);
+  assert.throws(() => applyNotes.parseApplyNotes('nope', applyRequest()), /JSON/);
+});
+
+test('apply-notes: every link token must come back exactly once, and no note marker or unknown token may stay', () => {
+  const t = text => () => applyNotes.parseApplyNotes(applyReply({ id: 'p1', text }), applyRequest());
+  assert.throws(t('Linear perspective in ⟦L1⟧ around 1415.'), /link token missing/);
+  assert.throws(t('Linear ⟦L1⟧ ⟦L1⟧ ⟦L2⟧.'), /repeated/);
+  assert.throws(t('Linear ⟦L1⟧ ⟦L2⟧ ⟦L3⟧.'), /unknown link token/);
+  assert.throws(t('Linear ⟦N2⟧perspective⟦/N2⟧ ⟦L1⟧ ⟦L2⟧.'), /note marker left/);
+  assert.throws(t('Linear ⟦X⟧ ⟦L1⟧ ⟦L2⟧.'), /unknown token/);
+});
+
+test('apply-notes: a reply with a callout, checkbox, new link, %%, ==, heading or html is refused whole', () => {
+  const t = text => () => applyNotes.parseApplyNotes(applyReply({ id: 'p1', text }), applyRequest());
+  const cases = { callout: '[!note] x ⟦L1⟧ ⟦L2⟧', checkbox: '[ ] x ⟦L1⟧ ⟦L2⟧', 'new link': 'x [a](http://b.c) ⟦L1⟧ ⟦L2⟧', 'new link bare': 'x https://b.c ⟦L1⟧ ⟦L2⟧', 'new link wiki': 'x [[A]] ⟦L1⟧ ⟦L2⟧', comment: 'x %%c%% ⟦L1⟧ ⟦L2⟧', highlight: 'x ==h== ⟦L1⟧ ⟦L2⟧', heading: '## x ⟦L1⟧ ⟦L2⟧', html: 'x <b>y</b> ⟦L1⟧ ⟦L2⟧' };
+  for (const [name, text] of Object.entries(cases)) assert.throws(t(text), /refused/, name);
+});
+
+test('apply-notes: lines, list marks and blank lines are kept', () => {
+  const item = notesApply.encodeParagraph('p1', '- first ==a==%%備註#1：n%%\n- second');
+  const run = text => () => applyNotes.parseApplyNotes(applyReply({ id: 'p1', text }), applyRequest([item]));
+  assert.deepEqual(plain(applyNotes.parseApplyNotes(applyReply({ id: 'p1', text: '- first A\n- second' }), applyRequest([item]))).paragraphs[0].text, '- first A\n- second');
+  assert.throws(run('- first A - second'), /line count/);
+  assert.throws(run('- first A\nsecond'), /list or quote mark/);
+  assert.throws(run('- first A\n\n'), /line count|blank/);
+  assert.throws(run('   '), /empty|non-empty/);
 });

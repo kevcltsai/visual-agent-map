@@ -8,6 +8,26 @@ import { fencedLines, withoutHiddenCallouts } from "./note-sections";
 /** `==text==%%備註#n：note%%`: the annotated text has no `==` or line break, the note has no `%%` or line break. */
 const NOTE_WRAPPER = /==((?:(?!==)[^\r\n])+?)==%%備註#\d+：(?:(?!%%)[^\r\n])*%%/g;
 
+/** One note found in a text: `[from, to)` is the whole wrapper, `n` its number, `selected` the annotated text, `note` the note text. */
+export interface FoundNote {
+  from: number;
+  to: number;
+  n: number;
+  selected: string;
+  note: string;
+}
+const NOTE_PARTS = /==((?:(?!==)[^\r\n])+?)==%%備註#(\d+)：((?:(?!%%)[^\r\n])*)%%/g;
+/** Every program note wrapper in `text`, in order (no mask: the caller restricts them to the lines it cares about). */
+export function findNotes(text: string): FoundNote[] {
+  return [...text.matchAll(NOTE_PARTS)].map(m => ({
+    from: m.index ?? 0,
+    to: (m.index ?? 0) + m[0].length,
+    n: Number(m[2]),
+    selected: m[1],
+    note: m[3]
+  }));
+}
+
 /** The proof body of a chapter: the program's note wrappers removed, the annotated text kept. */
 export const projectProofBody = (body: string): string => body.replace(NOTE_WRAPPER, "$1");
 

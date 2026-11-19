@@ -2352,3 +2352,22 @@ test('keepBookMap refuses a run that did not pause for the map', async () => {
   await r.runs.start(r.mapPath);
   await assert.rejects(r.runs.keepBookMap(r.mapPath), refusal('not_stopped'));
 });
+
+test('a card already missing when a drive opens: the start snapshot gives its note, so its program callouts are cleaned; old data without it changes nothing', async () => {
+  for (const snapshot of [true, false]) {
+    const cleared = [];
+    const r = await rig({ titles: FOUR, ports: { callouts: { reconcile: async () => undefined, clear: async () => true, clearNotes: async (path, runId, cards) => { cleared.push(...cards.map(c => `${c.id}|${c.path}`)); return true; } } } });
+    await r.runs.start(r.mapPath);
+    let s = await r.state();
+    sameJson(Object.keys(s.chapters).sort(), r.nodes.map(n => n.id).sort());
+    sameJson(s.chapters[r.nodes[3].id], { title: 'SecretTitleC', path: r.nodes[3].path });
+    if (!snapshot) await r.repo.updateMap(r.mapPath, d => { delete d.bookPipeline.chapters; });
+    await dropCard(r, 3);
+    await r.runs.confirmGate1(r.mapPath); await finished(r);
+    s = await r.state();
+    assert.equal(s.pauseReason, 'map'); sameJson(s.changed.missing, [r.nodes[3].id]);
+    sameJson(cleared, snapshot ? [`${r.nodes[3].id}|${r.nodes[3].path}`] : [], snapshot ? 'cleaned from the snapshot' : 'no snapshot: nothing known, nothing cleaned');
+    await r.runs.keepBookMap(r.mapPath); await finished(r);
+    assert.equal((await r.state()).phase, 'gate2');
+  }
+});

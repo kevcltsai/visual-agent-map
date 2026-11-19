@@ -132,6 +132,26 @@ test('bar ETA: shown only while planning or writing and only with an estimate (t
   assert.equal(all(draw(progress({ phase: 'gate2', active: false, etaSeconds: 600 })), 'vam-book-bar-eta').length, 0);
 });
 
+test('bar: a map change shows the changed mode with the counts, three real buttons and no card id', () => {
+  setUiLanguage('zh-TW');
+  const data = { v: 1, runId: 'r', phase: 'writing', status: 'stopped', pauseReason: 'map', changed: { added: ['node-secret-1'], missing: ['node-secret-2'] }, order: ['node-secret-2', 'b'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x' };
+  const state = bundle.bookBarState(data, undefined, () => undefined);
+  assert.equal(state.mode, 'changed');
+  const calls = [];
+  const bar = dom.element('div');
+  bundle.renderBookBar(bar, state, { stop: () => calls.push('stop'), resume() {}, addBudget() {}, confirmGate1() {}, mapChanged: { replan: () => calls.push('replan'), keep: () => calls.push('keep') } });
+  assert.equal(one(bar, 'vam-book-map-changed').text, '心智圖變了：多 1 章、少 1 章');
+  const buttons = dom.findAll(bar, i => i.tag === 'button');
+  assert.equal(buttons.length, 3);
+  assert.ok(one(bar, 'vam-book-map-replan') && one(bar, 'vam-book-map-keep') && one(bar, 'vam-book-stop'));
+  assert.equal(JSON.stringify(dom.findAll(bar, () => true).map(i => [i.text, i.attrs ?? {}])).includes('node-secret'), false, 'no id in text or attributes');
+  assert.equal(bundle.bookTitleText(state).includes('node-secret'), false);
+  assert.equal(bundle.bookProgressText(state).includes('node-secret'), false);
+  // The live progress count wins over the saved one.
+  const live = bundle.bookBarState(data, { runId: 'r', phase: 'writing', status: 'stopped', active: false, pauseReason: 'map', mapChange: { added: 2, missing: 0 }, total: 2, counts: { pending: 2, planned: 0, written: 0, checked: 0, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [] }, () => undefined);
+  assert.deepEqual(live.mapChange, { added: 2, missing: 0 });
+});
+
 // ---- part B: the view ----
 const MAP = 'Agent Workspace/Topics/map-bk2/Map.md';
 async function viewRig({ book = true, phase = 'gate2' } = {}) {

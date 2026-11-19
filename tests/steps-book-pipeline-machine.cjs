@@ -555,3 +555,39 @@ test('model: trial must be a list of ids that are in the order; an older run wit
   const old = { ...ok }; delete old.trial;
   assert.equal(model.readBookPipeline({ bookPipeline: old }).kind, 'usable');
 });
+
+test('map change: acceptMapChange with every trial card removed refills the trial from what remains and gate 1 goes back to planning', () => {
+  const order = ['a', 'b', 'c', 'd', 'e'];
+  const gate = { ...plain(trialRun(order)), phase: 'gate1' };
+  const paused = machine.pauseForMap(gate, { added: [], missing: ['a', 'b', 'c'] });
+  assert.deepEqual([paused.status, paused.pauseReason], ['stopped', 'map']);
+  const next = machine.acceptMapChange(paused, ['d', 'e'], 'later');
+  assert.deepEqual(plain(next.removed), ['a', 'b', 'c']);
+  assert.deepEqual(plain(next.trial), ['d', 'e']);
+  assert.deepEqual([next.phase, next.phaseStartedAt, next.status, next.pauseReason, next.changed], ['planning', 'later', 'running', undefined, undefined]);
+  assert.deepEqual(plain(next.accepted), ['d', 'e']);
+  assert.deepEqual(plain(model.effectiveOrder(next)), ['d', 'e']);
+  assert.equal(model.readBookPipeline({ bookPipeline: plain(next) }).kind, 'usable');
+  // Only some trial cards removed: the trial stays, the phase stays.
+  const some = machine.acceptMapChange(machine.pauseForMap(gate, { added: [], missing: ['a'] }), ['b', 'c', 'd', 'e'], 'later');
+  assert.deepEqual([plain(some.trial), some.phase], [['a', 'b', 'c'], 'gate1']);
+});
+
+test('map change: effectiveOrder and mapDifference on older data (no accepted/removed/ignored) fall back to order', () => {
+  const old = plain(fresh());
+  for (const key of ['accepted', 'ignored', 'removed', 'changed']) delete old[key];
+  assert.deepEqual(plain(model.effectiveOrder(old)), IDS);
+  assert.deepEqual(plain(model.mapDifference(old, ['a', 'b', 'c'])), { added: [], missing: [] });
+  assert.deepEqual(plain(model.mapDifference(old, ['b', 'c', 'x'])), { added: ['x'], missing: ['a'] });
+  assert.deepEqual(plain(model.effectiveOrder({ order: IDS, removed: ['b'] })), ['a', 'c']);
+  assert.equal(model.readBookPipeline({ bookPipeline: old }).kind, 'usable');
+});
+
+test('map change: the new fields are validated when present and optional when absent', () => {
+  const ok = plain(fresh());
+  for (const bad of [{ accepted: 'a' }, { ignored: [1] }, { removed: [''] }, { pauseReason: 'other' }, { changed: { added: 'x', missing: [] } }, { changed: { added: [], missing: [3] } }, { chapters: 'x' }, { chapters: { a: { title: 1, path: 'a.md' } } }, { chapters: { a: { title: 'A' } } }]) {
+    assert.equal(model.readBookPipeline({ bookPipeline: { ...ok, ...bad } }).kind, 'unusable', JSON.stringify(bad));
+  }
+  assert.equal(model.readBookPipeline({ bookPipeline: { ...ok, pauseReason: 'map', changed: { added: ['x'], missing: [] }, removed: ['a'], ignored: ['x'], accepted: ['a'] } }).kind, 'usable');
+  assert.equal(model.readBookPipeline({ bookPipeline: { ...ok, chapters: { a: { title: 'A', path: 'a.md' } } } }).kind, 'usable');
+});

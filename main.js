@@ -12681,6 +12681,10 @@ function problem(raw) {
     const list2 = raw[key4];
     if (list2 !== void 0 && (!Array.isArray(list2) || list2.some((id) => typeof id !== "string" || !id))) return key4;
   }
+  if (raw.chapters !== void 0 && (!isObject(raw.chapters) || Object.values(raw.chapters).some(
+    (entry) => !isObject(entry) || typeof entry.title !== "string" || typeof entry.path !== "string"
+  )))
+    return "chapters";
   if (raw.changed !== void 0) {
     const changed = raw.changed;
     if (!isObject(changed) || !Array.isArray(changed.added) || !Array.isArray(changed.missing) || changed.added.concat(changed.missing).some((id) => typeof id !== "string"))
@@ -45457,6 +45461,7 @@ function newBookPipeline(input2) {
     status: "running",
     order: [...input2.order],
     accepted: [...input2.order],
+    ...input2.chapters && Object.keys(input2.chapters).length ? { chapters: { ...input2.chapters } } : {},
     globalPlanned: false,
     attempts: { global: 0 },
     revisions: {},
@@ -51457,6 +51462,12 @@ var BookPipelineRuns = class {
           order,
           now: this.ports.now(),
           staleStages: stale,
+          chapters: Object.fromEntries(
+            order.flatMap((id) => {
+              const info = drive.cards.get(id);
+              return info ? [[id, { title: info.title, path: info.path }]] : [];
+            })
+          ),
           autoRoles: [.../* @__PURE__ */ new Set([...prior.filter((id) => order.includes(id)), ...drive.missingRoles.keys()])]
         });
         if (this.dead(drive)) return;
@@ -52194,8 +52205,9 @@ var BookPipelineRuns = class {
     drive.controller.abort();
     const state = drive.store.state;
     const gone = change2.missing.flatMap((id) => {
-      const info = drive.cards.get(id);
-      return info ? [{ id, path: info.path }] : [];
+      var _a3, _b2, _c, _d;
+      const path = (_d = (_a3 = drive.cards.get(id)) == null ? void 0 : _a3.path) != null ? _d : (_c = (_b2 = state.chapters) == null ? void 0 : _b2[id]) == null ? void 0 : _c.path;
+      return path ? [{ id, path }] : [];
     });
     if (gone.length && ((_a2 = this.ports.callouts) == null ? void 0 : _a2.clearNotes))
       await this.ports.callouts.clearNotes(drive.mapPath, state.runId, gone).catch(() => false);

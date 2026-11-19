@@ -69,6 +69,8 @@ export function newBookPipeline(input: {
   staleStages?: readonly string[];
   /** Cards whose role the pipeline wrote itself (see `BookPipelineData.autoRoles`). */
   autoRoles?: readonly string[];
+  /** The id -> title and note path of every chapter now (see `BookPipelineData.chapters`). */
+  chapters?: Readonly<Record<string, { title: string; path: string }>>;
 }): BookPipelineData {
   if (!input.order.length) throw new Error("empty order");
   if (input.order.includes("global")) throw new Error("reserved node id");
@@ -79,6 +81,7 @@ export function newBookPipeline(input: {
     status: "running",
     order: [...input.order],
     accepted: [...input.order],
+    ...(input.chapters && Object.keys(input.chapters).length ? { chapters: { ...input.chapters } } : {}),
     globalPlanned: false,
     attempts: { global: 0 },
     revisions: {},

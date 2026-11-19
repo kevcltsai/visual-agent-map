@@ -161,6 +161,8 @@ export interface BookPipelineData {
   ignored?: string[];
   /** Cards of `order` that are no longer on the map: a terminal state (never retried, no budget, left out of every count and neighbour). Absent = none. */
   removed?: string[];
+  /** The chapters at start or replan: card id -> its title and note path then. Lets a later run name and clean a card that is already gone from the map. Absent = older data (nothing known). */
+  chapters?: Record<string, { title: string; path: string }>;
   budget: PipelineBudget;
   /** Raised by every owner stop; a step result carries the one it started under (absent = 0). */
   stopEpoch?: number;
@@ -196,6 +198,14 @@ function problem(raw: unknown): string | undefined {
     const list = raw[key];
     if (list !== undefined && (!Array.isArray(list) || list.some(id => typeof id !== "string" || !id))) return key;
   }
+  if (
+    raw.chapters !== undefined &&
+    (!isObject(raw.chapters) ||
+      Object.values(raw.chapters).some(
+        entry => !isObject(entry) || typeof entry.title !== "string" || typeof entry.path !== "string"
+      ))
+  )
+    return "chapters";
   if (raw.changed !== undefined) {
     const changed = raw.changed;
     if (

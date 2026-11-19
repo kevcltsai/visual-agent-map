@@ -873,6 +873,12 @@ export class BookPipelineRuns {
           order,
           now: this.ports.now(),
           staleStages: stale,
+          chapters: Object.fromEntries(
+            order.flatMap(id => {
+              const info = drive.cards.get(id);
+              return info ? [[id, { title: info.title, path: info.path }]] : [];
+            })
+          ),
           autoRoles: [...new Set([...prior.filter(id => order.includes(id)), ...drive.missingRoles.keys()])]
         });
         if (this.dead(drive)) return;
@@ -1690,8 +1696,9 @@ export class BookPipelineRuns {
     drive.controller.abort();
     const state = drive.store.state;
     const gone = change.missing.flatMap(id => {
-      const info = drive.cards.get(id);
-      return info ? [{ id, path: info.path }] : [];
+      // A card already missing when this drive opened was never loaded: the snapshot taken at start or replan knows its note.
+      const path = drive.cards.get(id)?.path ?? state.chapters?.[id]?.path;
+      return path ? [{ id, path }] : [];
     });
     if (gone.length && this.ports.callouts?.clearNotes)
       await this.ports.callouts.clearNotes(drive.mapPath, state.runId, gone).catch(() => false);

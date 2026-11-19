@@ -863,3 +863,25 @@ test('T4 images: the automatic redo of a card may pick that card\'s own pictures
   assert.ok(!r.calls[1].exclude.some(key => /w1/i.test(key)), 'its own old picture is not excluded');
   assert.equal(figures((await r.note(0)).detail).length, 1, 'the redo shows the picture again');
 });
+
+test('slots: a card deleted from the map during the picture search pauses the run for the map, writes no picture and is not sent to review', async () => {
+  const dropped = [];
+  const r = await picRig({ titles: ['SecretRootTitle', 'SecretChapterY'], finder: async request => {
+    if (/SecretChapterY/.test(request.chapter) && !dropped.length) {
+      dropped.push(r.nodes[1].id);
+      await r.repo.updateMap(r.mapPath, d => { d.nodes = d.nodes.filter(n => n.id !== r.nodes[1].id); });
+    }
+    return found({ 1: [cand(1)], 2: [cand(2)] });
+  } });
+  await r.runs.start(r.mapPath);
+  await r.runs.confirmGate1(r.mapPath);
+  while (r.runs.isRunning(r.mapPath)) await tick();
+  await settle();
+  const s = await r.state();
+  assert.equal(s.pauseReason, 'map');
+  assert.deepEqual(plain(s.changed.missing), dropped);
+  const gone = r.nodes.findIndex(n => n.id === dropped[0]);
+  assert.equal(figures((await r.note(gone)).detail).length, 0, 'no picture written for the deleted card');
+  for (let i = 0; i < r.nodes.length; i++) assert.notEqual(stageOf(r.raw(i)), 'needs-review');
+  assert.ok(!/SecretChapterY|SecretRootTitle/.test(JSON.stringify(r.stat.logs)), 'no title in the log');
+});

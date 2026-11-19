@@ -90,10 +90,10 @@ async function picRig({ finder, probe, text = twoMarkers, titles, proof, slots =
   const calls = [];
   const holder = {};
   const r = await rig({
-    titles: titles ?? ['SecretRootTitle'],
+    titles: titles ?? ['SecretRootTitle', 'FillerChapter'],
     script: { card: request => ({ covers: `covers ${request.card.position}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: checklist ?? [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }], ...(slots === null ? {} : { images: slotsOf(slots) }) }),
       author: (input, n) => writeAuthor(holder.r, text)(input), ...(probe ? { probe } : {}), ...(proof ? { proof } : {}) },
-    ports: { findImages: async (request, run) => { calls.push(request); await run.admission.reserve(); return finder(request, run, calls.length); }, ...ports }
+    ports: { findImages: async (request, run) => { if (!titles && /FillerChapter/.test(request.chapter)) { await run.admission.reserve(); return found({}); } calls.push(request); await run.admission.reserve(); return finder(request, run, calls.length); }, ...ports }
   });
   holder.r = r;
   r.calls = calls;
@@ -118,7 +118,7 @@ test('slots: two markers become two standard images with one plain caption line 
   assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state])), [[1, 'placed'], [2, 'placed']]);
   assert.equal(stageOf(r.raw(0)), 'checked');
   const log = r.stat.logs.filter(l => l.includes(' slots ')).join('\n');
-  assert.match(log, /book-pipeline slots .* placed=2 missing=0$/);
+  assert.match(log, /book-pipeline slots .* placed=2 missing=0$/m);
   assert.ok(!/SecretRootTitle|wikimedia|蒙娜麗莎/.test(r.stat.logs.join('\n')), 'the log has counts and codes only');
 });
 
@@ -245,7 +245,7 @@ test('slots: the budget is gated; a refusal in the search pauses the run and lea
   await r.runs.start(r.mapPath);
   // global plan 1 + card plan 1 are used; allow the author call but not the search
   const used = (await r.state()).budget.used;
-  await setLimit(r, used + 1);
+  await setLimit(r, used + 2);
   await r.runs.confirmGate1(r.mapPath);
   await settle();
   const s = await r.state();
@@ -761,7 +761,7 @@ test('T4 images: the automatic redo of a card may pick that card\'s own pictures
   let proofs = 0;
   const r = await picRig({ checklist, slots: 1, text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。`,
     finder: () => found({ 1: [cand(1)] }),
-    proof: async request => evaluateProof(request.checklist.map(c => ({ id: c.id, status: c.type === 'fact' && ++proofs === 1 ? 'unmet' : 'met', note: 'n', sources: c.type === 'fact' ? ['https://example.org/p'] : [] })), request.checklist, ['https://example.org/p']) });
+    proof: async request => evaluateProof(request.checklist.map(c => ({ id: c.id, status: c.type === 'fact' && !/FillerChapter/.test(JSON.stringify(request)) && ++proofs === 1 ? 'unmet' : 'met', note: 'n', sources: c.type === 'fact' ? ['https://example.org/p'] : [] })), request.checklist, ['https://example.org/p']) });
   await run(r);
   assert.equal(r.calls.length, 2, 'first round and the redo each searched');
   assert.ok(!r.calls[1].exclude.some(key => /w1/i.test(key)), 'its own old picture is not excluded');

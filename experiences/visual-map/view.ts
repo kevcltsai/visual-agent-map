@@ -12435,7 +12435,7 @@ export class VisualAgentMapView extends ItemView {
         cardRevision(read.data, node.id)
       );
     })();
-    const bookCard = bookCardView(note ?? {}, bookDone, bookStale);
+    const bookCard = bookCardView(note ?? {}, bookDone, bookStale, this.isBookCardResolved(node.id));
     if (!loading) {
       const statusText = research
         ? this.researchStageText(research)
@@ -17390,6 +17390,19 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Chapters whose review box is ticked for the attention they have now (fingerprint they were ticked for); the bar does not count them. */
   private readonly bookResolved = new Map<string, string>();
+  /** Whether the chapter's box is ticked for the attention it has now (its card then looks done on the map). */
+  private isBookCardResolved(id: string): boolean {
+    const ticked = this.bookResolved.get(id);
+    const read = ticked && this.map && this.hasBookPipeline() ? readBookPipeline(this.map) : undefined;
+    if (read?.kind !== "usable" || !this.notes.get(id)) return false;
+    const data = read.data;
+    return reviewEntries({
+      proofContext: { runId: data.runId, revisionOf: card => cardRevision(data, card) },
+      order: [id],
+      titleOf: () => id,
+      noteOf: card => this.notes.get(card)
+    }).some(entry => entry.fp === ticked);
+  }
   /** Resolutions run one after another (each reads the note and may write it). */
   private bookNoteChain: Promise<void> = Promise.resolve();
   private queueBookResolve(id: string): Promise<void> {

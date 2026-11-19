@@ -223,4 +223,8 @@ test('stale proof (T6c): reviewEntries flags the chapter with the edited problem
   assert.equal(ui.bookCardView({ pipelineStage: 'checked' }, false, false).edited, undefined);
   assert.equal(ui.bookCardView({ pipelineStage: 'checked' }, true, true).edited, undefined, 'an accepted book shows no proof marks');
   assert.equal(ui.bookCardView({ pipelineStage: 'writing' }, false, true).edited, undefined);
+  const ticked = ui.bookCardView({ pipelineStage: 'needs-review', pipelineIssue: 'x', pipelineSeam: 's（第 2 張，版本 1）' }, false, false, true);
+  assert.deepEqual([ticked.hideStage, ticked.issueText, ticked.seam], [true, undefined, false], 'review-a B3: a ticked box looks done like an accepted book');
+  assert.equal(ui.bookCardView({ pipelineStage: 'checked' }, false, true, true).edited, undefined, 'a ticked edited chapter loses its edited pill');
+  assert.equal(ui.bookCardView({ pipelineStage: 'needs-review', pipelineIssue: 'x' }, false, false, false).hideStage, undefined, 'not ticked: unchanged');
 });

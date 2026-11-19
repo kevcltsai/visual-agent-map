@@ -670,7 +670,8 @@ export default class VisualAgentMapPlugin extends Plugin {
       })
     );
     if (!candidates.size) return found;
-    for (const { file, map } of await this.repo.readableMaps()) {
+    const maps = await this.repo.readableMaps();
+    for (const { file, map } of maps) {
       const read = readBookPipeline(map);
       if (read.kind !== "usable") continue;
       for (const node of map.nodes)
@@ -679,6 +680,10 @@ export default class VisualAgentMapPlugin extends Plugin {
           this.bookChapterMaps.set(node.path, file.path);
         }
     }
+    // A closed, renamed or deleted map, or a chapter that left the book, no longer points anywhere.
+    const live = new Set(maps.map(({ file }) => file.path));
+    for (const [chapter, mapPath] of this.bookChapterMaps)
+      if (!live.has(mapPath) || (candidates.has(chapter) && !found.has(chapter))) this.bookChapterMaps.delete(chapter);
     return found;
   }
   private refreshBookNotesSoon(): void {

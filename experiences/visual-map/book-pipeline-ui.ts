@@ -572,8 +572,12 @@ export interface BookCardView {
   summaryPrefix?: string;
 }
 
-/** `accepted`: the book's phase is done; the proof marks (needs-review pill, issue line, seam pill) are hidden, the data is untouched. */
-export function bookCardView(note: BookCardInput, accepted = false, stale = false): BookCardView {
+/**
+ * `accepted`: the book's phase is done; the proof marks (needs-review pill, issue line, seam pill) are hidden, the data is untouched.
+ * `resolved`: the reader ticked this chapter's box for the attention it has now; its marks go the same way (review-a B3).
+ */
+export function bookCardView(note: BookCardInput, accepted = false, stale = false, resolved = false): BookCardView {
+  accepted = accepted || resolved;
   const stage = readPipelineStage(note.pipelineStage) ?? "pending";
   const role = readBookRole(note.bookRole);
   const issue = typeof note.pipelineIssue === "string" && note.pipelineIssue ? note.pipelineIssue : undefined;

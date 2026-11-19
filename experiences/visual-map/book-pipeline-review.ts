@@ -17,6 +17,7 @@ import { bookCardView, bookIssueText } from "./book-pipeline-ui";
 import { bodyImageUrls } from "./book-pipeline-run";
 
 import { projectProofBody } from "../../core/book-pipeline/book-notes";
+import { integrityFp } from "../../core/book-pipeline/body-integrity";
 
 export { countNotes, projectProofBody, wrapNote } from "../../core/book-pipeline/book-notes";
 
@@ -45,6 +46,10 @@ export interface Gate2Card {
   seam: boolean;
   /** The chapter text changed after its stored proof (the proof no longer fits): shown as "edited, not re-checked". */
   proofStale?: boolean;
+  /** The run skipped this chapter because the reader's hand has been on it (the card is needs-review for that reason only). */
+  handEdited?: boolean;
+  /** With `handEdited`: the integrity fingerprint of the text the run skipped (the one a rewrite permission is bound to). */
+  bodyFp?: string;
 }
 
 /** The input shape `galleryBare` reads from a card note. */
@@ -54,7 +59,8 @@ interface GalleryNote {
 }
 
 /** The kinds of problem a chapter can have. A new kind (a hand-edited chapter, say) is one more entry in {@link PROBLEM_RULES}. */
-export type ReviewProblemKind = "failed" | "unfinished" | "structure" | "facts" | "images" | "seam" | "edited";
+export type ReviewProblemKind =
+  "failed" | "unfinished" | "structure" | "facts" | "images" | "seam" | "edited" | "hand-edited";
 export interface ReviewProblem {
   kind: ReviewProblemKind;
   /** The plain sentence the reader sees. */
@@ -64,8 +70,10 @@ export interface ReviewProblem {
 const PROBLEM_RULES: readonly { kind: ReviewProblemKind; of: (card: Gate2Card) => string | undefined }[] = [
   {
     kind: "failed",
-    of: card => (card.stage === "needs-review" ? card.failureText || t("ui.book_issue_unknown") : undefined)
+    of: card =>
+      card.stage === "needs-review" && !card.handEdited ? card.failureText || t("ui.book_issue_unknown") : undefined
   },
+  { kind: "hand-edited", of: card => (card.handEdited ? t("ui.book_review_hand_edited") : undefined) },
   {
     kind: "unfinished",
     of: card =>
@@ -81,7 +89,7 @@ const PROBLEM_RULES: readonly { kind: ReviewProblemKind; of: (card: Gate2Card) =
   },
   { kind: "images", of: card => (card.galleryBare ? t("ui.book_panel_g2_reason_images") : undefined) },
   { kind: "seam", of: card => (card.seam ? t("ui.book_panel_g2_reason_seam") : undefined) },
-  { kind: "edited", of: card => (card.proofStale ? t("ui.book_stale_proof") : undefined) }
+  { kind: "edited", of: card => (card.proofStale && !card.handEdited ? t("ui.book_stale_proof") : undefined) }
 ];
 
 /**
@@ -157,6 +165,7 @@ export function gate2Cards(input: {
     const proof = checked || view.stage === "needs-review" ? latestStoredProof(note?.detail ?? "") : undefined;
     const structure = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue.trim());
     const role = typeof note?.bookRole === "string" ? note.bookRole : undefined;
+    const handEdited = view.stage === "needs-review" && /^write failed: hand_edited$/.test(issue.trim());
     const stale =
       !!input.proofContext &&
       proofIsStale(
@@ -180,6 +189,7 @@ export function gate2Cards(input: {
         : 0,
       galleryBare: checked && galleryBare(role, note),
       seam: view.seam,
+      ...(handEdited ? { handEdited: true, bodyFp: integrityFp(note?.detail ?? "") } : {}),
       ...(stale ? { proofStale: true } : {})
     };
   });
@@ -336,19 +346,34 @@ export function reviewCallout(
   reasons: readonly string[],
   nextLink: BookNoteLink | undefined,
   fp: string,
-  runId: string
+  runId: string,
+  hand?: HandEditBox
 ): string {
   const next = linksLine([["ui.book_note_review_next_0", nextLink]]);
   return quoted([
     `> [!vam-review] ${t("ui.book_note_review_title")}`,
     ...reasons.slice(0, 5).map(reason => `> ・${plainText(reason)}`),
-    `> - [ ] ${t("ui.book_note_review_accept")}`,
-    `> - [ ] ${t("ui.book_note_review_fixed")}`,
+    // A hand-edited chapter has two separate answers: keep it (a resolution) or rewrite it (a one-time command bound to the text and to `op`).
+    `> - [ ] ${t(hand ? "ui.book_note_review_keep" : "ui.book_note_review_accept")}`,
+    `> - [ ] ${t(hand ? "ui.book_note_review_rewrite" : "ui.book_note_review_fixed")}`,
+    ...(hand?.status ? [`> ${plainText(hand.status)}`] : []),
     ...(next ? [next] : []),
-    `> %%vam-review:${idPart(runId)}:${idPart(card.id)}:${idPart(fp)}%%`,
+    `> %%vam-review:${idPart(runId)}:${idPart(card.id)}:${idPart(fp)}${handSuffix(hand)}%%`,
     VERSION_LINE
   ]);
 }
+
+/** What a hand-edited chapter's box carries besides the usual: the operation id, the text it was written for, a queued rewrite, a status line. */
+export interface HandEditBox {
+  op: string;
+  ifp: string;
+  queued?: boolean;
+  /** One plain line under the two boxes ("queued", why the last rewrite did not happen); it starts with ⏳ or ⚠. */
+  status?: string;
+}
+const handSuffix = (hand: HandEditBox | undefined): string =>
+  hand ? `:${idPart(hand.op)}:${idPart(hand.ifp)}${hand.queued ? ":q" : ""}` : "";
+const STATUS_LINE = /^[ \t]{0,3}>[ \t]?[⏳⚠]/u;
 
 // ---- reading and editing a note's raw text ----
 
@@ -433,6 +458,10 @@ export interface ReviewState {
   accept: boolean;
   fixed: boolean;
   collapsed: boolean;
+  /** A hand-edited chapter's box: its operation id, the integrity fingerprint of the text it was written for, and a queued rewrite. */
+  op?: string;
+  ifp?: string;
+  queued?: boolean;
 }
 
 /** The review box of a note as it stands: its marker and which of its two boxes are ticked; undefined when the note has none. */
@@ -451,13 +480,59 @@ export function readReviewState(text: string): ReviewState | undefined {
     fp: box.fp ?? "",
     accept: ticks[0] === true,
     fixed: ticks[1] === true,
-    collapsed: box.sign === "-"
+    collapsed: box.sign === "-",
+    ...(box.op ? { op: box.op, ifp: box.ifp ?? "", ...(box.queued ? { queued: true } : {}) } : {})
   };
 }
 
 /** Handled: one of the two boxes is ticked and the box was written for the chapter's attention as it is now (a changed fingerprint voids the tick). */
 export const isReviewResolved = (state: ReviewState | undefined, fp: string): boolean =>
-  !!state && (state.accept || state.fixed) && state.fp === fp;
+  !!state && (state.op ? state.accept : state.accept || state.fixed) && state.fp === fp;
+
+/** A hand-edited chapter's box with the reader's "rewrite" ticked and not yet carried out (the one-time command). */
+export const isRewriteAsked = (state: ReviewState | undefined): boolean => !!state?.op && state.fixed;
+
+/**
+ * A hand-edited chapter's box changed in place: the rewrite tick cleared, the operation id, the text it is bound to, the queue mark and the
+ * status line set as `patch` says. Any other box, or a text without one, comes back unchanged.
+ */
+export function patchHandBox(
+  text: string,
+  patch: { op?: string; ifp?: string; queued?: boolean; status?: string | null; clearRewrite?: boolean }
+): string {
+  const lines = text.split("\n");
+  const box = ownedIn(lines).find(c => c.kind === "review" && c.op);
+  if (!box) return text;
+  const cr = lines[box.start].endsWith("\r") ? "\r" : "";
+  const out: string[] = [];
+  let ticks = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (i < box.start || i >= box.end) {
+      out.push(line);
+      continue;
+    }
+    if (STATUS_LINE.test(bare(line))) continue;
+    if (CHECKBOX.test(bare(line))) {
+      ticks++;
+      out.push(ticks === 2 && patch.clearRewrite ? line.replace(/\[[xX]\]/, "[ ]") : line);
+      if (ticks === 2 && patch.status) out.push(`> ${plainText(patch.status)}${cr}`);
+      continue;
+    }
+    if (i > box.start && OWNER_MARKER_LINE.test(bare(line))) {
+      const op = patch.op ?? box.op ?? "";
+      const ifp = patch.ifp ?? box.ifp ?? "";
+      const queued = patch.queued ?? box.queued ?? false;
+      out.push(
+        `> %%vam-review:${idPart(box.runId)}:${idPart(box.nodeId)}:${idPart(box.fp ?? "")}:${idPart(op)}:${idPart(ifp)}${queued ? ":q" : ""}%%${cr}`
+      );
+      continue;
+    }
+    out.push(line);
+  }
+  return out.join("\n");
+}
+const OWNER_MARKER_LINE = /^[ \t]{0,3}>[ \t]?%%vam-review:/;
 
 /**
  * A checked or needs-review card whose chapter text changed after its proofread: a proof was stored, but none (finished or failed) fits

@@ -3272,6 +3272,16 @@ var en = {
   "ui.book_note_undo_none": "Nothing was restored: those paragraphs were edited after the rewrite.",
   "ui.book_note_undo_done_0": "Restored {0} paragraph(s); the notes are back.",
   "ui.book_note_undo_partial_0_1": "Restored {0} paragraph(s); {1} were edited after the rewrite and were not restored.",
+  "ui.book_review_hand_edited": "This chapter has your own edits; this rerun did not rewrite it",
+  "ui.book_note_review_keep": "Keep my version",
+  "ui.book_note_review_rewrite": "Rewrite this chapter with AI (overwrites your edits; backed up first)",
+  "ui.book_plain_write_hand_edited": "The chapter has your own edits, so it was left as it is.",
+  "ui.book_refused_text_changed": "The chapter text changed since you chose to rewrite it, so nothing was overwritten.",
+  "ui.book_review_hand_queued": "\u23F3 Queued; it will be rewritten after the whole book finishes",
+  "ui.book_review_hand_failed_0": "\u26A0 Not rewritten: {0}",
+  "ui.book_review_hand_changed": "\u26A0 The chapter text changed again; the queued rewrite was cancelled",
+  "ui.book_rerun_overwrite_ask": "Rerunning will overwrite your edits (backed up first). Rerun anyway?",
+  "ui.book_rerun_overwrite_go": "Rerun anyway",
   "ui.book_stale_proof": "Edited, not re-checked",
   "ui.book_panel_reason_unmet_plain": "Some items did not pass proofreading",
   "ui.book_progress_line_global": "Planning the whole book",
@@ -6460,6 +6470,16 @@ var zhCN = {
   "ui.book_note_undo_none": "\u6CA1\u6709\u8FD8\u539F\u4EFB\u4F55\u6BB5\u843D\uFF1A\u90A3\u4E9B\u6BB5\u843D\u5728\u6539\u5199\u540E\u53C8\u88AB\u6539\u8FC7\u3002",
   "ui.book_note_undo_done_0": "\u5DF2\u8FD8\u539F {0} \u6BB5\uFF0C\u5907\u6CE8\u90FD\u653E\u56DE\u53BB\u4E86\u3002",
   "ui.book_note_undo_partial_0_1": "\u5DF2\u8FD8\u539F {0} \u6BB5\uFF1B\u53E6\u6709 {1} \u6BB5\u5728\u6539\u5199\u540E\u53C8\u88AB\u6539\u8FC7\uFF0C\u6CA1\u6709\u8FD8\u539F\u3002",
+  "ui.book_review_hand_edited": "\u8FD9\u7AE0\u6709\u4F60\u624B\u6539\u7684\u5185\u5BB9\uFF0C\u8FD9\u6B21\u91CD\u8DD1\u6CA1\u6709\u91CD\u5199\u5B83",
+  "ui.book_note_review_keep": "\u4FDD\u7559\u6211\u7684\u7248\u672C",
+  "ui.book_note_review_rewrite": "\u7528 AI \u91CD\u5199\u8FD9\u7AE0\uFF08\u4F1A\u76D6\u6389\u4F60\u7684\u4FEE\u6539\uFF0C\u6539\u524D\u5148\u5907\u4EFD\uFF09",
+  "ui.book_plain_write_hand_edited": "\u8FD9\u7AE0\u6709\u4F60\u624B\u6539\u7684\u5185\u5BB9\uFF0C\u6240\u4EE5\u6CA1\u6709\u52A8\u5B83\u3002",
+  "ui.book_refused_text_changed": "\u4F60\u9009\u62E9\u91CD\u5199\u4E4B\u540E\uFF0C\u8FD9\u7AE0\u7684\u6587\u5B57\u53C8\u53D8\u4E86\uFF0C\u6240\u4EE5\u6CA1\u6709\u76D6\u6389\u4EFB\u4F55\u4E1C\u897F\u3002",
+  "ui.book_review_hand_queued": "\u23F3 \u5DF2\u6392\u5165\uFF0C\u5168\u4E66\u8DD1\u5B8C\u540E\u91CD\u5199",
+  "ui.book_review_hand_failed_0": "\u26A0 \u6CA1\u6709\u91CD\u5199\uFF1A{0}",
+  "ui.book_review_hand_changed": "\u26A0 \u8FD9\u7AE0\u7684\u6587\u5B57\u53C8\u53D8\u4E86\uFF0C\u5DF2\u53D6\u6D88\u6392\u961F\u7684\u91CD\u5199",
+  "ui.book_rerun_overwrite_ask": "\u91CD\u8DD1\u4F1A\u76D6\u6389\u4F60\u7684\u4FEE\u6539\uFF08\u6539\u524D\u5148\u5907\u4EFD\uFF09\uFF0C\u4ECD\u8981\u91CD\u8DD1\u5417\uFF1F",
+  "ui.book_rerun_overwrite_go": "\u4ECD\u8981",
   "ui.book_stale_proof": "\u5DF2\u4FEE\u6539\uFF0C\u672A\u91CD\u65B0\u6821\u5BF9",
   "ui.book_panel_reason_unmet_plain": "\u6709\u51E0\u9879\u5185\u5BB9\u6CA1\u901A\u8FC7\u6821\u5BF9",
   "ui.book_progress_line_global": "\u6B63\u5728\u89C4\u5212\u5168\u4E66",
@@ -9648,6 +9668,16 @@ var zhTW = {
   "ui.book_note_undo_none": "\u6C92\u6709\u9084\u539F\u4EFB\u4F55\u6BB5\u843D\uFF1A\u90A3\u4E9B\u6BB5\u843D\u5728\u6539\u5BEB\u5F8C\u53C8\u88AB\u6539\u904E\u3002",
   "ui.book_note_undo_done_0": "\u5DF2\u9084\u539F {0} \u6BB5\uFF0C\u5099\u8A3B\u90FD\u653E\u56DE\u53BB\u4E86\u3002",
   "ui.book_note_undo_partial_0_1": "\u5DF2\u9084\u539F {0} \u6BB5\uFF1B\u53E6\u6709 {1} \u6BB5\u5728\u6539\u5BEB\u5F8C\u53C8\u88AB\u6539\u904E\uFF0C\u6C92\u6709\u9084\u539F\u3002",
+  "ui.book_review_hand_edited": "\u9019\u7AE0\u6709\u4F60\u624B\u6539\u7684\u5167\u5BB9\uFF0C\u9019\u6B21\u91CD\u8DD1\u6C92\u6709\u91CD\u5BEB\u5B83",
+  "ui.book_note_review_keep": "\u4FDD\u7559\u6211\u7684\u7248\u672C",
+  "ui.book_note_review_rewrite": "\u7528 AI \u91CD\u5BEB\u9019\u7AE0\uFF08\u6703\u84CB\u6389\u4F60\u7684\u4FEE\u6539\uFF0C\u6539\u524D\u5148\u5099\u4EFD\uFF09",
+  "ui.book_plain_write_hand_edited": "\u9019\u7AE0\u6709\u4F60\u624B\u6539\u7684\u5167\u5BB9\uFF0C\u6240\u4EE5\u6C92\u6709\u52D5\u5B83\u3002",
+  "ui.book_refused_text_changed": "\u4F60\u9078\u64C7\u91CD\u5BEB\u4E4B\u5F8C\uFF0C\u9019\u7AE0\u7684\u6587\u5B57\u53C8\u8B8A\u4E86\uFF0C\u6240\u4EE5\u6C92\u6709\u84CB\u6389\u4EFB\u4F55\u6771\u897F\u3002",
+  "ui.book_review_hand_queued": "\u23F3 \u5DF2\u6392\u5165\uFF0C\u5168\u66F8\u8DD1\u5B8C\u5F8C\u91CD\u5BEB",
+  "ui.book_review_hand_failed_0": "\u26A0 \u6C92\u6709\u91CD\u5BEB\uFF1A{0}",
+  "ui.book_review_hand_changed": "\u26A0 \u9019\u7AE0\u7684\u6587\u5B57\u53C8\u8B8A\u4E86\uFF0C\u5DF2\u53D6\u6D88\u6392\u968A\u7684\u91CD\u5BEB",
+  "ui.book_rerun_overwrite_ask": "\u91CD\u8DD1\u6703\u84CB\u6389\u4F60\u7684\u4FEE\u6539\uFF08\u6539\u524D\u5148\u5099\u4EFD\uFF09\uFF0C\u4ECD\u8981\u91CD\u8DD1\u55CE\uFF1F",
+  "ui.book_rerun_overwrite_go": "\u4ECD\u8981",
   "ui.book_stale_proof": "\u5DF2\u4FEE\u6539\uFF0C\u672A\u91CD\u65B0\u6821\u5C0D",
   "ui.book_panel_reason_unmet_plain": "\u6709\u5E7E\u9805\u5167\u5BB9\u6C92\u901A\u904E\u6821\u5C0D",
   "ui.book_progress_line_global": "\u6B63\u5728\u898F\u5283\u5168\u66F8",
@@ -30624,7 +30654,7 @@ var Repository = class {
     const { expectedContent, authorize, finalize, ...writeOptions } = options;
     let outcome = "written";
     await this.app.vault.process(this.file(path), (content) => {
-      if (expectedContent !== void 0 && content !== expectedContent || authorize && !authorize()) {
+      if (expectedContent !== void 0 && content !== expectedContent || authorize && !authorize(content)) {
         outcome = "discarded";
         return content;
       }
@@ -43058,7 +43088,7 @@ var HIDDEN_CALLOUT = "vam-book";
 var HIDDEN_HEAD = /^[ \t]{0,3}>[ \t]?\[!vam-book\][+-]?(?:[ \t].*)?$/i;
 var QUOTE_LINE2 = /^[ \t]{0,3}>/;
 var LOG_LINE = /^(?:[-*+][ \t]+)?\d{4}-\d{2}-\d{2}/;
-var ANY_RECORD = /<!-- book-(?:proof|slots):v1 \{.*\} -->/;
+var ANY_RECORD = /<!-- book-(?:proof|slots|body):v1 \{.*\} -->/;
 var bare = (line2) => line2.replace(/\r$/, "");
 function fencedLines2(lines) {
   const flags = [];
@@ -43132,7 +43162,7 @@ function neutralizeDetail(content) {
   return `${content.slice(0, from)}${neutralize(content.slice(from, end))}${content.slice(end)}`;
 }
 var PROGRAM_HEAD = /^[ \t]{0,3}>[ \t]?\[!(vam-trial|vam-review)\]([+-])?(?:[ \t].*)?$/i;
-var OWNER_LINE = /^[ \t]{0,3}>[ \t]?%%vam-(trial|review):([\w.-]+):([\w.-]+)(?::([\w.-]+))?%%[ \t]*$/;
+var OWNER_LINE = /^[ \t]{0,3}>[ \t]?%%vam-(trial|review):([\w.-]+):([\w.-]+)(?::([\w.-]+))?(?::([\w.-]+):([\w.-]+)(?::(q))?)?%%[ \t]*$/;
 function programCalloutRanges(lines, fenced = fencedLines2(lines)) {
   var _a2;
   const found = [];
@@ -43154,7 +43184,8 @@ function programCalloutRanges(lines, fenced = fencedLines2(lines)) {
           sign: (_a2 = head2[2]) != null ? _a2 : "",
           runId: owner[2],
           nodeId: owner[3],
-          ...owner[4] ? { fp: owner[4] } : {}
+          ...owner[4] ? { fp: owner[4] } : {},
+          ...owner[5] ? { op: owner[5], ifp: owner[6], ...owner[7] ? { queued: true } : {} } : {}
         });
         break;
       }
@@ -43308,7 +43339,7 @@ function hideUpdateLog(text10, own2) {
   if (!moved.length) return text10;
   return appendHidden(lines.join("\n"), moved.map((line2) => `> ${line2}`).join("\n"));
 }
-var RECORD_COPY = /(?:<|&lt;)!-- book-(?:proof|slots):v1 /;
+var RECORD_COPY = /(?:<|&lt;)!-- book-(?:proof|slots|body):v1 /;
 function dropRecordCopies(text10) {
   let lines = text10.split("\n");
   const fenced = fencedLines2(lines);
@@ -43380,7 +43411,7 @@ function appendResearchNote(detail, record) {
   if (key4 && findProofRecord(unquoted(detail), key4)) return { text: detail, appended: false };
   return { text: appendHidden(detail, quoteAll(record)), appended: true };
 }
-var PIPELINE_RECORD = /^<!-- (book-(?:proof|slots)):v1 (\{.*\}) -->$/;
+var PIPELINE_RECORD = /^<!-- (book-(?:proof|slots|body)):v1 (\{.*\}) -->$/;
 var PROOF_ITEM_LINE = /^- .+ (?:達成|未達成|待查)：/;
 var QUOTE_BLANK = /^[ \t]{0,3}>[ \t]*\r?$/;
 var validJson = (text10) => {
@@ -44350,9 +44381,9 @@ var TopicRuns = class {
       template: input2.template,
       language: input2.language
     };
-    const compose = (_a2 = this.ports.composeWriteback) != null ? _a2 : composeWriteback;
+    const compose2 = (_a2 = this.ports.composeWriteback) != null ? _a2 : composeWriteback;
     if (mode !== "fresh") {
-      const composed = compose({ ...base, now: /* @__PURE__ */ new Date() });
+      const composed = compose2({ ...base, now: /* @__PURE__ */ new Date() });
       return composed.ok ? composed : { ok: false, message: t("ui.writeback_top_failed") };
     }
     const stopped = { ok: false, message: t("ui.research_stopped_existing_content_was_preserved") };
@@ -44368,7 +44399,7 @@ var TopicRuns = class {
         };
       const backup = await hooks.backupNote(path, raw.original);
       if (!backup.ok) return failed;
-      const composed = compose({ ...base, now: /* @__PURE__ */ new Date(), backupPath: backup.path });
+      const composed = compose2({ ...base, now: /* @__PURE__ */ new Date(), backupPath: backup.path });
       if (!composed.ok) return failed;
       if (await hooks.readRaw(path) !== raw.started) return failed;
       if (signal.aborted) return stopped;
@@ -50667,6 +50698,106 @@ function sameReviewResult(before, after) {
   return !!before && !!after && before.stage === "needs-review" && after.stage === "needs-review" && before.issue === after.issue && before.items.length === after.items.length && before.items.every((item, at) => item === after.items[at]);
 }
 
+// core/book-pipeline/body-integrity.ts
+var BODY_LINE = /^(?:[ \t]{0,3}>[ \t]?)*<!-- book-body:v1 (\{.*\}) -->$/;
+function integrityText(detail) {
+  const lines = withoutHiddenCallouts(detail.replace(/\r\n/g, "\n").split("\n"));
+  return projectProofBody(lines.join("\n")).trim();
+}
+var integrityFp = (detail) => hashText(integrityText(detail));
+function readBodyRecord(detail) {
+  const lines = detail.split("\n");
+  const fenced = fencedLines2(lines);
+  let found;
+  lines.forEach((line2, at) => {
+    const m = fenced[at] ? null : BODY_LINE.exec(line2.replace(/\r$/, "").trim());
+    if (!m) return;
+    try {
+      const data = JSON.parse(m[1]);
+      if (typeof data.fp !== "string" || !/^[0-9a-f]{16}$/.test(data.fp)) return;
+      found = {
+        fp: data.fp,
+        ...typeof data.kept === "string" && /^[0-9a-f]{16}$/.test(data.kept) ? { kept: data.kept } : {}
+      };
+    } catch (e) {
+    }
+  });
+  return found;
+}
+var PROOF_KEY_LINE = /^<!-- book-proof:v1 (\{.*\}) -->$/;
+var IMAGE_URL = /!\[[^\]\n]*\]\((https:\/\/[^)\s]+)\)/g;
+function oldNoteLooksUntouched(detail) {
+  var _a2, _b2, _c;
+  const proofKeys = extractProofRecords(detail).map((record) => {
+    var _a3;
+    return PROOF_KEY_LINE.exec((_a3 = record.split("\n").pop()) != null ? _a3 : "");
+  }).flatMap((m) => {
+    var _a3;
+    try {
+      const key4 = JSON.parse((_a3 = m == null ? void 0 : m[1]) != null ? _a3 : "").key;
+      return typeof key4 === "string" ? [key4] : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const latest = (_a2 = proofKeys[proofKeys.length - 1]) == null ? void 0 : _a2.replace(/:failed$/, "");
+  if (!latest) return false;
+  const parts = latest.split(":");
+  if (parts.length < 5) return false;
+  const stored = parts[parts.length - 2];
+  if (stored !== hashText(projectProofBody(stripImageLines(chapterBody(detail))))) return false;
+  const placed = ((_c = (_b2 = latestSlotsRecord(detail)) == null ? void 0 : _b2.slots) != null ? _c : []).filter((slot) => slot.state === "placed" && slot.hash).map((slot) => slot.hash).sort();
+  const inText = [...integrityText(detail).matchAll(IMAGE_URL)].map((m) => shortHash2(m[1])).sort();
+  return placed.length === inText.length && placed.every((hash, at) => hash === inText[at]);
+}
+function bodyState(detail) {
+  const record = readBodyRecord(detail);
+  if (!record) return !integrityText(detail) ? "empty" : oldNoteLooksUntouched(detail) ? "clean" : "unknown";
+  return record.fp === integrityFp(detail) ? "clean" : "edited";
+}
+var isKept = (detail) => {
+  const record = readBodyRecord(detail);
+  return !!(record == null ? void 0 : record.kept) && record.kept === integrityFp(detail);
+};
+var compose = (record) => `<!-- book-body:v1 ${JSON.stringify(record)} -->`;
+function stampDetail(detail) {
+  const fp = integrityFp(detail);
+  const old = readBodyRecord(detail);
+  if (old && old.fp === fp && !old.kept) return detail;
+  return replaceResearchRecord(detail, compose({ fp }));
+}
+function keepDetail(detail) {
+  var _a2;
+  const old = readBodyRecord(detail);
+  const kept = integrityFp(detail);
+  if ((old == null ? void 0 : old.kept) === kept) return detail;
+  return replaceResearchRecord(detail, compose({ fp: (_a2 = old == null ? void 0 : old.fp) != null ? _a2 : kept, kept }));
+}
+function programStamp(baseDetail, nextDetail) {
+  return bodyState(baseDetail) === "clean" ? stampDetail(nextDetail) : nextDetail;
+}
+var spliceDetail = (raw, change2) => {
+  const detail = detailBlockOf(raw);
+  if (detail === void 0) return raw;
+  const at = raw.indexOf(detail);
+  const next = change2(detail);
+  return next === detail ? raw : `${raw.slice(0, at)}${next}${raw.slice(at + detail.length)}`;
+};
+var stampRaw = (raw) => spliceDetail(raw, stampDetail);
+var keepRaw = (raw) => spliceDetail(raw, keepDetail);
+function programStampRaw(baseRaw, nextRaw) {
+  const base = detailBlockOf(baseRaw);
+  return base !== void 0 && bodyState(base) === "clean" ? stampRaw(nextRaw) : nextRaw;
+}
+var bodyStateRaw = (raw) => {
+  var _a2;
+  return bodyState((_a2 = detailBlockOf(raw)) != null ? _a2 : "");
+};
+var integrityFpRaw = (raw) => {
+  var _a2;
+  return integrityFp((_a2 = detailBlockOf(raw)) != null ? _a2 : "");
+};
+
 // experiences/visual-map/book-pipeline-run.ts
 var BOOK_POOL = 5;
 var BookPipelineRunError = class extends Error {
@@ -50692,7 +50823,13 @@ var ETA_MIN_CARDS = 5;
 var code2 = (value) => value.replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 60) || "failed";
 var reasonOf = (error) => isProofFailure(error) ? error.code : isBookStepError(error) ? "invalid_reply" : "failed";
 var internalCode = (error) => `internal_${(typeof (error == null ? void 0 : error.name) === "string" ? error.name : "unknown").replace(/[^A-Za-z0-9_]/g, "_").slice(0, 40)}`;
-var NO_FAILURE_SECTION = /* @__PURE__ */ new Set(["discarded", "card_removed", "backup_failed", "missing"]);
+var NO_FAILURE_SECTION = /* @__PURE__ */ new Set([
+  "discarded",
+  "card_removed",
+  "backup_failed",
+  "missing",
+  "hand_edited"
+]);
 var STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" };
 var ACTION_OF = { plan: "card_plan", write: "card_write", proof: "card_proof" };
 var singleLineText = (value, max) => Array.from(value.replace(/\s+/g, " ").trim()).slice(0, max).join("");
@@ -51172,7 +51309,8 @@ var BookPipelineRuns = class {
         result = { unchanged: settled2 && sameReviewResult(snapshots == null ? void 0 : snapshots.before, snapshots == null ? void 0 : snapshots.after) };
       },
       true,
-      swap
+      swap,
+      options.overwrite
     );
     return result;
   }
@@ -51203,11 +51341,19 @@ var BookPipelineRuns = class {
       );
     });
   }
-  cardJob(mapPath, nodeId, phases, refusal, steps, extra, finish, track = false, swap = false) {
+  cardJob(mapPath, nodeId, phases, refusal, steps, extra, finish, track = false, swap = false, overwrite) {
     return this.enter(mapPath, async (drive) => {
+      var _a2;
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       if (!data.order.includes(nodeId)) throw new BookPipelineRunError("missing");
       if (!phases.includes(data.phase)) throw new BookPipelineRunError(refusal);
+      if (overwrite) {
+        const path = (_a2 = drive.cards.get(nodeId)) == null ? void 0 : _a2.path;
+        const current = path ? await this.ports.readCard(path).catch(() => void 0) : void 0;
+        if (!current) throw new BookPipelineRunError("unreadable");
+        if (integrityFpRaw(current.raw) !== overwrite.fingerprint) throw new BookPipelineRunError("text_changed");
+        drive.overwrite.set(nodeId, { runId: data.runId, ...overwrite });
+      }
       let refused = false;
       await drive.store.commit((state) => {
         const next = resumeRun(state);
@@ -51501,6 +51647,7 @@ var BookPipelineRuns = class {
       extra: /* @__PURE__ */ new Map(),
       avoid: /* @__PURE__ */ new Set(),
       fixable: /* @__PURE__ */ new Map(),
+      overwrite: /* @__PURE__ */ new Map(),
       plans: /* @__PURE__ */ new Map(),
       authorModels: /* @__PURE__ */ new Map(),
       started: /* @__PURE__ */ new Map(),
@@ -51525,7 +51672,7 @@ var BookPipelineRuns = class {
     });
   }
   async go(drive, setup, onSetup) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d, _e;
     let refusal;
     try {
       await setup(drive);
@@ -51563,6 +51710,7 @@ var BookPipelineRuns = class {
         }
       } finally {
         this.drives.delete(drive.mapPath);
+        if (!this.disposed) (_e = (_d = this.ports).settled) == null ? void 0 : _e.call(_d, drive.mapPath);
       }
     }
     if (refusal) throw refusal;
@@ -51913,7 +52061,7 @@ var BookPipelineRuns = class {
       const path = await this.stillOnMap(drive, nodeId);
       if (!path) return;
       const card = await this.ports.readCard(path);
-      const next = this.proofSectionOf(drive, { failure: code2(reason) }, {})(card.raw);
+      const next = programStampRaw(card.raw, this.proofSectionOf(drive, { failure: code2(reason) }, {})(card.raw));
       if (next === card.raw || !await this.ensureBackup(drive, nodeId, path, card.raw)) return;
       await this.ports.updateNoteRawGuarded(path, () => next, {
         expectedContent: card.raw,
@@ -52061,9 +52209,51 @@ var BookPipelineRuns = class {
     drive.imagesDone.delete(nodeId);
     const card = await this.ports.readCard(info.path);
     const root = await this.ports.readCard(rootInfo.path);
+    const permit = drive.overwrite.get(nodeId);
+    const mayOverwrite = (raw) => {
+      const state = bodyStateRaw(raw);
+      if (state === "clean" || state === "empty") return true;
+      return !!permit && permit.runId === drive.store.state.runId && permit.fingerprint === integrityFpRaw(raw);
+    };
+    if (!mayOverwrite(card.raw)) {
+      if (isKept(card.detail)) {
+        drive.imagesDone.add(nodeId);
+        this.ports.log(
+          formatPipelineLog({
+            event: "hand_edit_kept",
+            runId: token.runId,
+            card: nodeId,
+            step: "write",
+            attempt: 0,
+            result: "skipped",
+            ms: 0
+          })
+        );
+        return { kind: "ok", after: () => this.setStage(drive, nodeId, "written", null) };
+      }
+      this.ports.log(
+        formatPipelineLog({
+          event: "hand_edit_skipped",
+          runId: token.runId,
+          card: nodeId,
+          step: "write",
+          attempt: 0,
+          result: bodyStateRaw(card.raw),
+          ms: 0
+        })
+      );
+      return { kind: "failed", reason: "hand_edited", forceReview: true };
+    }
     if (!await this.ensureBackup(drive, nodeId, info.path, card.raw))
       return { kind: "failed", reason: "backup_failed", forceReview: true };
     const authorize = this.authorize(drive, token);
+    let changedByHand = false;
+    const authorizeWrite = (current) => {
+      if (!authorize()) return false;
+      if (current === void 0 || mayOverwrite(current)) return true;
+      changedByHand = true;
+      return false;
+    };
     const slots = parseImageSlots(card.prompt);
     const knownLines = new Set(card.raw.split("\n"));
     const ownRecords = extractProofRecords(normalizeWorkRecords(card.detail)).map(quoteAll);
@@ -52092,7 +52282,7 @@ var BookPipelineRuns = class {
         emptyBody = true;
         return null;
       }
-      return restore(cleaned);
+      return stampRaw(restore(cleaned));
     };
     const done = await untilAborted(
       signal,
@@ -52108,10 +52298,11 @@ var BookPipelineRuns = class {
         ...drive.avoid.has(nodeId) ? { instruction: drive.extra.get(nodeId) } : {},
         signal,
         admission: drive.admission,
-        authorize,
+        authorize: authorizeWrite,
         finalize
       })
     );
+    if (changedByHand) return { kind: "failed", reason: "hand_edited", forceReview: true };
     if (unsafe) return { kind: "failed", reason: "unsafe_body", forceReview: true };
     if (emptyBody) return { kind: "failed", reason: "no_body" };
     if (done.outcome === "budget-exhausted") return { kind: "budget" };
@@ -52132,7 +52323,7 @@ var BookPipelineRuns = class {
     if (carried !== written2.detail) {
       const outcome = await this.ports.updateNoteGuarded(
         path,
-        { detail: carried },
+        { detail: programStamp(written2.detail, carried) },
         { expectedContent: written2.raw, authorize }
       );
       if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
@@ -52148,7 +52339,7 @@ var BookPipelineRuns = class {
     }
     if (replacements.size) {
       const held = holdProofLines(written2.raw, knownLines);
-      const cleaned = held.restore(replaceBodyImages(held.text, replacements));
+      const cleaned = programStampRaw(written2.raw, held.restore(replaceBodyImages(held.text, replacements)));
       const outcome = await this.ports.updateNoteRawGuarded(path, () => cleaned, {
         expectedContent: written2.raw,
         authorize
@@ -52352,7 +52543,8 @@ var BookPipelineRuns = class {
     if (bad) return `slots_${bad}`;
     if (this.exitCheck(result.added.join("\n"), new Set(result.placed.map((item) => item.href)))) return "slots_unsafe";
     const withSources = addPictureSources(result.text, result.sources, language2);
-    const detail = slots.length ? replaceResearchRecord(withSources, composeSlotsRecord(result)) : withSources;
+    const slotted = slots.length ? replaceResearchRecord(withSources, composeSlotsRecord(result)) : withSources;
+    const detail = programStamp(latest.detail, slotted);
     if (detail === latest.detail) return result;
     const outside = residualMarkerLines(latest.raw).length - residualMarkerLines(latest.detail).length;
     const outcome = await this.ports.updateNoteGuarded(
@@ -52438,7 +52630,7 @@ var BookPipelineRuns = class {
         ...(stored == null ? void 0 : stored.model) ? { model: stored.model } : {},
         authorModel: (_a2 = drive.authorModels.get(nodeId)) != null ? _a2 : stored == null ? void 0 : stored.authorModel
       };
-      const next = this.proofSectionOf(drive, { result }, models, imageLine)(card.raw);
+      const next = programStampRaw(card.raw, this.proofSectionOf(drive, { result }, models, imageLine)(card.raw));
       if (next !== card.raw) {
         const path = await this.stillOnMap(drive, nodeId);
         if (!path) return { kind: "failed", reason: "card_removed" };
@@ -52741,6 +52933,14 @@ function renderBookBar(parent, state, actions) {
       t("ui.book_bar_finish_go"),
       actions.finish
     );
+  if ((state.mode === "gate2" || state.mode === "done") && actions.rerunAsk)
+    renderAsk(
+      bar,
+      "vam-book-rerun-ask",
+      t("ui.book_rerun_overwrite_ask"),
+      t("ui.book_rerun_overwrite_go"),
+      actions.rerunAsk
+    );
   const progressText = bookProgressText(state);
   renderProgressLine(bar, state, progressText);
   const track = bar.createDiv("vam-book-track");
@@ -52830,6 +53030,7 @@ var REFUSAL_KEY = {
   cancelled: "ui.book_refused_cancelled",
   stale: "ui.book_refused_stale",
   backup_failed: "ui.book_refused_backup_failed",
+  text_changed: "ui.book_refused_text_changed",
   nothing: "ui.book_refused_nothing"
 };
 function bookRefusalText(error) {
@@ -52881,6 +53082,7 @@ var REASON_KEY = {
 };
 var PLAIN_KEY = {
   "write:no_body": "ui.book_plain_write_no_body",
+  "write:hand_edited": "ui.book_plain_write_hand_edited",
   "proof:no_body": "ui.book_plain_proof_no_body",
   "proof:empty_list": "ui.book_plain_proof_empty_list",
   "proof:unparsable": "ui.book_plain_proof_unparsable",
@@ -52972,8 +53174,9 @@ function isBookGate1Waiting(progress, data) {
 var PROBLEM_RULES = [
   {
     kind: "failed",
-    of: (card) => card.stage === "needs-review" ? card.failureText || t("ui.book_issue_unknown") : void 0
+    of: (card) => card.stage === "needs-review" && !card.handEdited ? card.failureText || t("ui.book_issue_unknown") : void 0
   },
+  { kind: "hand-edited", of: (card) => card.handEdited ? t("ui.book_review_hand_edited") : void 0 },
   {
     kind: "unfinished",
     of: (card) => card.stage !== "needs-review" && card.stage !== "checked" ? t("ui.book_panel_g2_reason_unfinished") : void 0
@@ -52988,7 +53191,7 @@ var PROBLEM_RULES = [
   },
   { kind: "images", of: (card) => card.galleryBare ? t("ui.book_panel_g2_reason_images") : void 0 },
   { kind: "seam", of: (card) => card.seam ? t("ui.book_panel_g2_reason_seam") : void 0 },
-  { kind: "edited", of: (card) => card.proofStale ? t("ui.book_stale_proof") : void 0 }
+  { kind: "edited", of: (card) => card.proofStale && !card.handEdited ? t("ui.book_stale_proof") : void 0 }
 ];
 function reviewProblems(card) {
   const out = [];
@@ -53019,7 +53222,7 @@ function galleryBare(role, note) {
 }
 function gate2Cards(input2) {
   return input2.order.map((id, at) => {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     const note = input2.noteOf(id);
     const view = bookCardView(note != null ? note : {});
     const issue2 = typeof (note == null ? void 0 : note.pipelineIssue) === "string" ? note.pipelineIssue : "";
@@ -53027,6 +53230,7 @@ function gate2Cards(input2) {
     const proof = checked2 || view.stage === "needs-review" ? latestStoredProof((_a2 = note == null ? void 0 : note.detail) != null ? _a2 : "") : void 0;
     const structure2 = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue2.trim());
     const role = typeof (note == null ? void 0 : note.bookRole) === "string" ? note.bookRole : void 0;
+    const handEdited = view.stage === "needs-review" && /^write failed: hand_edited$/.test(issue2.trim());
     const stale = !!input2.proofContext && proofIsStale(
       { prompt: (_b2 = note == null ? void 0 : note.prompt) != null ? _b2 : "", detail: (_c = note == null ? void 0 : note.detail) != null ? _c : "" },
       view.stage,
@@ -53045,6 +53249,7 @@ function gate2Cards(input2) {
       factsOpen: checked2 ? ((_d = proof == null ? void 0 : proof.items) != null ? _d : []).filter((item) => item.type === "fact" && item.status !== "met").length : 0,
       galleryBare: checked2 && galleryBare(role, note),
       seam: view.seam,
+      ...handEdited ? { handEdited: true, bodyFp: integrityFp((_e = note == null ? void 0 : note.detail) != null ? _e : "") } : {},
       ...stale ? { proofStale: true } : {}
     };
   });
@@ -53127,18 +53332,22 @@ function trialCallout(i, n, prevLink, nextLink, stopped, owner) {
     VERSION_LINE
   ]);
 }
-function reviewCallout(card, reasons, nextLink, fp, runId) {
+function reviewCallout(card, reasons, nextLink, fp, runId, hand) {
   const next = linksLine([["ui.book_note_review_next_0", nextLink]]);
   return quoted([
     `> [!vam-review] ${t("ui.book_note_review_title")}`,
     ...reasons.slice(0, 5).map((reason) => `> \u30FB${plainText(reason)}`),
-    `> - [ ] ${t("ui.book_note_review_accept")}`,
-    `> - [ ] ${t("ui.book_note_review_fixed")}`,
+    // A hand-edited chapter has two separate answers: keep it (a resolution) or rewrite it (a one-time command bound to the text and to `op`).
+    `> - [ ] ${t(hand ? "ui.book_note_review_keep" : "ui.book_note_review_accept")}`,
+    `> - [ ] ${t(hand ? "ui.book_note_review_rewrite" : "ui.book_note_review_fixed")}`,
+    ...(hand == null ? void 0 : hand.status) ? [`> ${plainText(hand.status)}`] : [],
     ...next ? [next] : [],
-    `> %%vam-review:${idPart(runId)}:${idPart(card.id)}:${idPart(fp)}%%`,
+    `> %%vam-review:${idPart(runId)}:${idPart(card.id)}:${idPart(fp)}${handSuffix(hand)}%%`,
     VERSION_LINE
   ]);
 }
+var handSuffix = (hand) => hand ? `:${idPart(hand.op)}:${idPart(hand.ifp)}${hand.queued ? ":q" : ""}` : "";
+var STATUS_LINE = /^[ \t]{0,3}>[ \t]?[⏳⚠]/u;
 var DETAIL_START3 = "<!-- visual-agent-map:detail:start -->";
 var DETAIL_END3 = "<!-- visual-agent-map:detail:end -->";
 var CHECKBOX = /^[ \t]{0,3}>[ \t]?[-*+][ \t]+\[([ xX])\]/;
@@ -53197,7 +53406,7 @@ function collapseReviewCallouts(text10) {
   return changed ? lines.join("\n") : text10;
 }
 function readReviewState(text10) {
-  var _a2;
+  var _a2, _b2;
   const lines = text10.split("\n");
   const box = ownedIn(lines).find((c) => c.kind === "review" && c.fp);
   if (!box) return void 0;
@@ -53212,10 +53421,47 @@ function readReviewState(text10) {
     fp: (_a2 = box.fp) != null ? _a2 : "",
     accept: ticks[0] === true,
     fixed: ticks[1] === true,
-    collapsed: box.sign === "-"
+    collapsed: box.sign === "-",
+    ...box.op ? { op: box.op, ifp: (_b2 = box.ifp) != null ? _b2 : "", ...box.queued ? { queued: true } : {} } : {}
   };
 }
-var isReviewResolved = (state, fp) => !!state && (state.accept || state.fixed) && state.fp === fp;
+var isReviewResolved = (state, fp) => !!state && (state.op ? state.accept : state.accept || state.fixed) && state.fp === fp;
+var isRewriteAsked = (state) => !!(state == null ? void 0 : state.op) && state.fixed;
+function patchHandBox(text10, patch) {
+  var _a2, _b2, _c, _d, _e, _f, _g;
+  const lines = text10.split("\n");
+  const box = ownedIn(lines).find((c) => c.kind === "review" && c.op);
+  if (!box) return text10;
+  const cr = lines[box.start].endsWith("\r") ? "\r" : "";
+  const out = [];
+  let ticks = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line2 = lines[i];
+    if (i < box.start || i >= box.end) {
+      out.push(line2);
+      continue;
+    }
+    if (STATUS_LINE.test(bare2(line2))) continue;
+    if (CHECKBOX.test(bare2(line2))) {
+      ticks++;
+      out.push(ticks === 2 && patch.clearRewrite ? line2.replace(/\[[xX]\]/, "[ ]") : line2);
+      if (ticks === 2 && patch.status) out.push(`> ${plainText(patch.status)}${cr}`);
+      continue;
+    }
+    if (i > box.start && OWNER_MARKER_LINE.test(bare2(line2))) {
+      const op = (_b2 = (_a2 = patch.op) != null ? _a2 : box.op) != null ? _b2 : "";
+      const ifp = (_d = (_c = patch.ifp) != null ? _c : box.ifp) != null ? _d : "";
+      const queued = (_f = (_e = patch.queued) != null ? _e : box.queued) != null ? _f : false;
+      out.push(
+        `> %%vam-review:${idPart(box.runId)}:${idPart(box.nodeId)}:${idPart((_g = box.fp) != null ? _g : "")}:${idPart(op)}:${idPart(ifp)}${queued ? ":q" : ""}%%${cr}`
+      );
+      continue;
+    }
+    out.push(line2);
+  }
+  return out.join("\n");
+}
+var OWNER_MARKER_LINE = /^[ \t]{0,3}>[ \t]?%%vam-review:/;
 function proofIsStale(card, stage, nodeId, runId, revision) {
   if (stage !== "checked" && stage !== "needs-review") return false;
   if (!latestStoredProof(card.detail)) return false;
@@ -53281,8 +53527,12 @@ function alignCallouts(text10, want) {
     const state = readReviewState(out);
     if (state && state.fp === idPart(want.review.fp)) {
       if (isReviewResolved(state, state.fp)) out = collapseReviewCallouts(out);
-    } else out = putProgramCallout(out, want.review.build());
-  } else out = removeProgramCallouts(out, "review");
+    } else out = putProgramCallout(out, want.review.build(state));
+  } else {
+    const state = readReviewState(out);
+    const queued = !!(state == null ? void 0 : state.queued) && state.runId === idPart(want.runId) && state.nodeId === idPart(want.nodeId);
+    if (!queued) out = removeProgramCallouts(out, "review");
+  }
   return out;
 }
 var hasProgramCallouts = (text10) => findProgramCallouts(text10).length > 0;
@@ -53345,6 +53595,16 @@ var BookCallouts = class {
   }
   release(mapPath, tail) {
     if (this.tails.get(mapPath) === tail) this.tails.delete(mapPath);
+  }
+  /** The hand-edited chapter's box content: the queue (operation, text fingerprint, queued mark) is carried over while the text is the one it was queued for. */
+  handBox(card, prior) {
+    var _a2, _b2, _c, _d;
+    if (!card.handEdited) return void 0;
+    const ifp = (_a2 = card.bodyFp) != null ? _a2 : "";
+    if ((prior == null ? void 0 : prior.op) && prior.queued && prior.ifp === idPart(ifp))
+      return { op: prior.op, ifp, queued: true, status: t("ui.book_review_hand_queued") };
+    const op = (_d = (_c = (_b2 = this.ports).newId) == null ? void 0 : _c.call(_b2)) != null ? _d : hashText(`${Date.now()}:${Math.random()}`);
+    return { op, ifp };
   }
   fail(runId, nodeId, result) {
     this.ports.log(
@@ -53454,12 +53714,13 @@ var BookCallouts = class {
           nodeId: entry.card.id,
           review: {
             fp: entry.fp,
-            build: () => reviewCallout(
+            build: (prior) => reviewCallout(
               entry.card,
               entry.problems.map((problem3) => problem3.text),
               link(next),
               entry.fp,
-              data.runId
+              data.runId,
+              this.handBox(entry.card, prior)
             )
           }
         });
@@ -68708,6 +68969,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     __publicField(this, "removalRun", null);
     /** True while a drag that started inside this view (for example a card's own cover image) is under way. */
     __publicField(this, "internalDrag", false);
+    /** The chapter whose card rerun is waiting for "overwrite your edits?"; bound to the text (integrity fingerprint) it asked about. */
+    __publicField(this, "bookRerunAsk", null);
     // ---- Clipboard: copy and paste of branches inside one map (decisions #25, #29) -----------------------------------
     /** Listeners are on the document (a card without focus sends the event with `body` as target), one per window. */
     __publicField(this, "unbindClipboard", null);
@@ -76460,13 +76723,59 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const path = this.path;
     if (!path) return;
     void this.bookEntry(async () => {
-      try {
-        await runTrackedRerun(this.bookReview, node.id, () => this.plugin.rerunBookCard(path, node.id));
-      } finally {
-        await this.rereadBookCard(node.id);
-        if (!this.closed) this.render();
+      const file = this.app.vault.getAbstractFileByPath(node.path);
+      const raw = file instanceof import_obsidian38.TFile ? await this.app.vault.read(file).catch(() => null) : null;
+      if (raw !== null) {
+        const state = bodyStateRaw(raw);
+        if (state !== "clean" && state !== "empty") {
+          this.bookRerunAsk = { path, nodeId: node.id, fp: integrityFpRaw(raw) };
+          this.bookBarFocus = "rerun-go";
+          return;
+        }
       }
+      await this.runBookCardRerunNow(path, node.id);
     });
+  }
+  async runBookCardRerunNow(path, nodeId, overwrite) {
+    try {
+      await runTrackedRerun(
+        this.bookReview,
+        nodeId,
+        () => this.plugin.rerunBookCard(path, nodeId, overwrite ? { overwrite } : {})
+      );
+    } finally {
+      await this.rereadBookCard(nodeId);
+      if (!this.closed) this.render();
+    }
+  }
+  /** The bar's question for it; an ask whose text has changed (or whose map is not this one) is dropped, never answered. */
+  bookRerunAskFor(path) {
+    const ask = this.bookRerunAsk;
+    if (!ask) return void 0;
+    const note = this.notes.get(ask.nodeId);
+    if (ask.path !== path || note && integrityFp(note.detail) !== ask.fp) {
+      this.bookRerunAsk = null;
+      return void 0;
+    }
+    return {
+      cancel: () => {
+        this.bookRerunAsk = null;
+        this.bookBarFocus = "rerun-opener";
+        if (!this.closed) this.render();
+      },
+      confirm: () => {
+        this.bookRerunAsk = null;
+        void this.bookEntry(async () => {
+          var _a2;
+          const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === ask.nodeId);
+          const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
+          const raw = file instanceof import_obsidian38.TFile ? await this.app.vault.read(file).catch(() => null) : null;
+          if (raw === null || integrityFpRaw(raw) !== ask.fp) return;
+          await this.runBookCardRerunNow(path, ask.nodeId, { operation: crypto.randomUUID(), fingerprint: ask.fp });
+        });
+      },
+      ...this.bookBarFocus === "rerun-go" ? { focus: "go" } : {}
+    };
   }
   /** "Rerun this picture-book card" (plan, write, proof): only on a map with `bookPipeline` at gate 1, gate 2 or done. */
   addBookRerunMenuItem(menu, node) {
@@ -83160,6 +83469,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const gate2Attention = state.mode === "gate2" ? this.bookReviewCards(read.data) : [];
     if (state.mode === "gate2") state.review = { total: state.total, attention: gate2Attention.length };
     const gate1Ask = ((_a2 = this.bookGate1Ask) == null ? void 0 : _a2.path) === path ? this.bookGate1Ask : null;
+    const rerunAsk = this.bookRerunAskFor(path);
     renderBookBar(toolbar, state, {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
@@ -83201,6 +83511,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           ...this.bookBarFocus === "gate1-go" ? { focus: "go" } : {}
         }
       } : {},
+      ...rerunAsk ? { rerunAsk } : {},
       nextReview: () => {
         const next = this.nextBookReviewCard(gate2Attention);
         if (next) void this.openBookNote(next.id);
@@ -83233,7 +83544,9 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       "gate1-go": ".vam-book-gate1-ask .vam-book-ask-go",
       "gate1-opener": ".vam-book-confirm",
       "finish-go": ".vam-book-finish-ask .vam-book-ask-go",
-      "finish-opener": ".vam-book-finish"
+      "finish-opener": ".vam-book-finish",
+      "rerun-go": ".vam-book-rerun-ask .vam-book-ask-go",
+      "rerun-opener": ".vam-node-rerun"
     }[focus];
     (_a2 = this.contentEl.querySelector(selector)) == null ? void 0 : _a2.focus();
   }
@@ -83282,10 +83595,16 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     })[0];
     const state = readReviewState(text10);
     this.notes.set(id, note);
+    if (isRewriteAsked(state))
+      void this.plugin.bookHandEdits.tick(mapPath, id).then(async () => {
+        await this.rereadBookCard(id);
+        if (!this.closed && this.map === map) this.render();
+      });
     if (!entry || !isReviewResolved(state, entry.fp)) {
       this.bookResolved.delete(id);
     } else {
       this.bookResolved.set(id, entry.fp);
+      if (state == null ? void 0 : state.op) await this.plugin.bookHandEdits.keep(node.path);
       if (state && !state.collapsed) await this.plugin.bookCallouts.collapse(node.path);
       if (entry.problems.every((problem3) => problem3.kind === "seam")) {
         await this.plugin.confirmBookSeam(mapPath, id).catch(() => void 0);
@@ -83310,6 +83629,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       if (this.closed || !isCurrent2() || !this.map) return;
       const read = readBookPipeline(this.map);
       if (read.kind !== "usable" || read.data.phase !== "gate2") return;
+      void this.plugin.bookHandEdits.drain(path);
       for (const card of this.bookReviewCards(read.data)) await this.queueBookResolve(card.id);
     } catch (e) {
     }
@@ -89879,6 +90199,117 @@ async function applyMathRepair(vault, plan) {
   }
   return { changed, skipped: skipped2 };
 }
+
+// experiences/visual-map/book-pipeline-handedit.ts
+var BookHandEdits = class {
+  constructor(ports) {
+    this.ports = ports;
+    /** Operations being carried out, and the ones that have been (a repeated tick of the same box never charges twice). */
+    __publicField(this, "inflight", /* @__PURE__ */ new Set());
+    __publicField(this, "done", /* @__PURE__ */ new Set());
+    __publicField(this, "disposed", false);
+  }
+  dispose() {
+    this.disposed = true;
+  }
+  /** "Keep my version" was ticked: the chapter text as it is now is recorded as kept. */
+  async keep(path) {
+    if (this.disposed) return;
+    await this.ports.write(path, keepRaw).catch(() => void 0);
+  }
+  /** A save of a chapter note: when its rewrite box is ticked, carry the rewrite out (or queue it). */
+  async tick(mapPath, nodeId) {
+    var _a2;
+    if (this.disposed) return;
+    try {
+      const map = await this.ports.readMap(mapPath);
+      const read = readBookPipeline(map);
+      const node = map.nodes.find((item) => item.id === nodeId);
+      if (read.kind !== "usable" || !node || !read.data.order.includes(nodeId)) return;
+      const card = await this.ports.readCard(node.path);
+      const state = readReviewState(card.raw);
+      if (!isRewriteAsked(state) || !(state == null ? void 0 : state.op)) return;
+      const op = state.op;
+      if (this.inflight.has(op) || this.done.has(op)) return;
+      const now = integrityFpRaw(card.raw);
+      if (now !== state.ifp) {
+        await this.patch(node.path, {
+          clearRewrite: true,
+          queued: false,
+          op: this.ports.newId(),
+          ifp: now,
+          status: t("ui.book_review_hand_changed")
+        });
+        return;
+      }
+      if (this.ports.isRunning(mapPath) || read.data.phase !== "gate2") {
+        await this.patch(node.path, { queued: true, status: t("ui.book_review_hand_queued") });
+        return;
+      }
+      await this.carryOut(mapPath, nodeId, node.path, op, (_a2 = state.ifp) != null ? _a2 : now);
+    } catch (e) {
+    }
+  }
+  /** The book is at the checkpoint with nothing running: every queued rewrite of the map runs now, one after another. */
+  async drain(mapPath) {
+    if (this.disposed) return;
+    try {
+      const map = await this.ports.readMap(mapPath);
+      const read = readBookPipeline(map);
+      if (read.kind !== "usable" || read.data.phase !== "gate2" || this.ports.isRunning(mapPath)) return;
+      for (const id of read.data.order) {
+        if (this.disposed || this.ports.isRunning(mapPath)) return;
+        const node = map.nodes.find((item) => item.id === id);
+        if (!node) continue;
+        const card = await this.ports.readCard(node.path).catch(() => void 0);
+        const state = card ? readReviewState(card.raw) : void 0;
+        if ((state == null ? void 0 : state.queued) && isRewriteAsked(state)) await this.tick(mapPath, id);
+      }
+    } catch (e) {
+    }
+  }
+  async carryOut(mapPath, nodeId, path, op, ifp) {
+    this.inflight.add(op);
+    try {
+      this.ports.log(
+        formatPipelineLog({
+          event: "hand_edit_rewrite",
+          runId: "-",
+          card: nodeId,
+          step: "write",
+          attempt: 0,
+          result: "start",
+          ms: 0
+        })
+      );
+      await this.ports.rerunCard(mapPath, nodeId, { overwrite: { operation: op, fingerprint: ifp } });
+      const after = await this.ports.readCard(path).catch(() => void 0);
+      const state = after ? bodyStateRaw(after.raw) : void 0;
+      if (state === "clean") {
+        this.done.add(op);
+        return;
+      }
+      await this.patch(path, {
+        clearRewrite: true,
+        queued: false,
+        op: this.ports.newId(),
+        status: t("ui.book_review_hand_failed_0", t("ui.book_plain_write_hand_edited"))
+      });
+    } catch (error) {
+      await this.patch(path, {
+        clearRewrite: true,
+        queued: false,
+        op: this.ports.newId(),
+        status: t("ui.book_review_hand_failed_0", bookRefusalText(error))
+      });
+    } finally {
+      this.inflight.delete(op);
+    }
+  }
+  async patch(path, patch) {
+    await this.ports.write(path, (text10) => patchHandBox(text10, patch)).catch(() => void 0);
+  }
+};
 
 // experiences/visual-map/book-pipeline-notes-ui.ts
 var import_obsidian39 = require("obsidian");
@@ -103206,6 +103637,17 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
         return this.app.vault.read(file);
       },
       write: (path, transform) => this.bookNoteWriter(path, transform),
+      log: (line2) => this.logs.appendLog("info", line2),
+      newId: () => crypto.randomUUID()
+    }));
+    /** The reader's two answers on a hand-edited chapter's box (keep; rewrite now or queued behind a running book). */
+    __publicField(this, "bookHandEdits", new BookHandEdits({
+      readMap: (path) => this.repo.readMap(path),
+      readCard: (path) => this.readBookCard(path),
+      write: (path, transform) => this.bookNoteWriter(path, transform),
+      rerunCard: (mapPath, nodeId, options) => this.bookPipelineRuns.rerunCard(mapPath, nodeId, options),
+      isRunning: (mapPath) => this.bookPipelineRuns.isRunning(mapPath),
+      newId: () => crypto.randomUUID(),
       log: (line2) => this.logs.appendLog("info", line2)
     }));
     /** The reader's notes of a picture-book chapter: editor-menu item, commands, input dialog and the header action. */
@@ -103326,7 +103768,9 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
         (_a2 = this.views().find((view) => view.mapPath === mapPath)) == null ? void 0 : _a2.refreshBookProgress();
         this.bookNotes.paint();
       },
-      callouts: { reconcile: (path) => this.bookCallouts.reconcile(path), clear: (path) => this.bookCallouts.clear(path) }
+      callouts: { reconcile: (path) => this.bookCallouts.reconcile(path), clear: (path) => this.bookCallouts.clear(path) },
+      // A drive is over: a rewrite the reader queued behind it may run now.
+      settled: (mapPath) => void this.bookHandEdits.drain(mapPath)
     }));
     /** Suggestions awaiting a decision; onload replaces it with the persisted store, {@link topicRuns} reads whichever is current. */
     __publicField(this, "pendingSuggestions", /* @__PURE__ */ new Map());
@@ -104770,6 +105214,7 @@ ${t("ui.organize_link_wait_hint")}`;
     this.argumentRuns.dispose();
     this.bookPipelineRuns.dispose();
     this.bookCallouts.dispose();
+    this.bookHandEdits.dispose();
     if (this.bookNotesTimer !== null) window.clearTimeout(this.bookNotesTimer);
     this.bookNotesTimer = null;
     this.bookNotesApply.dispose();

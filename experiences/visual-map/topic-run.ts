@@ -113,7 +113,7 @@ export interface RunRepository {
       detailTemplate?: DetailTemplate;
       newVisualReferences?: boolean;
       expectedContent?: string;
-      authorize?: () => boolean;
+      authorize?: (current?: string) => boolean;
       finalize?: (content: string) => string | null;
     }
   ): Promise<"written" | "discarded">;
@@ -236,7 +236,7 @@ export interface ResearchStart extends WritebackHooks {
    * topic changed or the guarded write was refused (the failure text still goes to `failed`; callers must not match it).
    */
   pipeline?: {
-    authorize: () => boolean;
+    authorize: (current?: string) => boolean;
     /** Runs on the file text inside the write itself; null refuses the write (the author's body is never saved unchecked). */
     finalize: (content: string) => string | null;
     onBudgetExhausted: () => void;

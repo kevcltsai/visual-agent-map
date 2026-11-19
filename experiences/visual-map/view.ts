@@ -338,7 +338,9 @@ import {
   readPipelineStage,
   type BookPipelineData
 } from "../../core/book-pipeline/model";
+import { bodyStateRaw, integrityFp, integrityFpRaw } from "../../core/book-pipeline/body-integrity";
 import {
+  type BookBarActions,
   bookBarState,
   bookCardView,
   bookRefusalText,
@@ -352,6 +354,7 @@ import {
   BookReviewMemory,
   countNotes,
   isReviewResolved,
+  isRewriteAsked,
   proofIsStale,
   readReviewState,
   reviewEntries,
@@ -9824,13 +9827,64 @@ export class VisualAgentMapView extends ItemView {
     const path = this.path;
     if (!path) return;
     void this.bookEntry(async () => {
-      try {
-        await runTrackedRerun(this.bookReview, node.id, () => this.plugin.rerunBookCard(path, node.id));
-      } finally {
-        await this.rereadBookCard(node.id);
-        if (!this.closed) this.render();
+      // A chapter the reader's hand has been on is not overwritten without a question (decision G): the bar asks once, bound to this text.
+      const file = this.app.vault.getAbstractFileByPath(node.path);
+      const raw = file instanceof TFile ? await this.app.vault.read(file).catch(() => null) : null;
+      if (raw !== null) {
+        const state = bodyStateRaw(raw);
+        if (state !== "clean" && state !== "empty") {
+          this.bookRerunAsk = { path, nodeId: node.id, fp: integrityFpRaw(raw) };
+          this.bookBarFocus = "rerun-go";
+          return;
+        }
       }
+      await this.runBookCardRerunNow(path, node.id);
     });
+  }
+  private async runBookCardRerunNow(
+    path: string,
+    nodeId: string,
+    overwrite?: { operation: string; fingerprint: string }
+  ): Promise<void> {
+    try {
+      await runTrackedRerun(this.bookReview, nodeId, () =>
+        this.plugin.rerunBookCard(path, nodeId, overwrite ? { overwrite } : {})
+      );
+    } finally {
+      await this.rereadBookCard(nodeId);
+      if (!this.closed) this.render();
+    }
+  }
+  /** The chapter whose card rerun is waiting for "overwrite your edits?"; bound to the text (integrity fingerprint) it asked about. */
+  private bookRerunAsk: { path: string; nodeId: string; fp: string } | null = null;
+  /** The bar's question for it; an ask whose text has changed (or whose map is not this one) is dropped, never answered. */
+  private bookRerunAskFor(path: string): BookBarActions["rerunAsk"] {
+    const ask = this.bookRerunAsk;
+    if (!ask) return undefined;
+    const note = this.notes.get(ask.nodeId);
+    if (ask.path !== path || (note && integrityFp(note.detail) !== ask.fp)) {
+      this.bookRerunAsk = null;
+      return undefined;
+    }
+    return {
+      cancel: () => {
+        this.bookRerunAsk = null;
+        this.bookBarFocus = "rerun-opener";
+        if (!this.closed) this.render();
+      },
+      confirm: () => {
+        this.bookRerunAsk = null;
+        void this.bookEntry(async () => {
+          const node = this.map?.nodes.find(item => item.id === ask.nodeId);
+          const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
+          const raw = file instanceof TFile ? await this.app.vault.read(file).catch(() => null) : null;
+          // The text changed since the question: it expires, nothing is rewritten.
+          if (raw === null || integrityFpRaw(raw) !== ask.fp) return;
+          await this.runBookCardRerunNow(path, ask.nodeId, { operation: crypto.randomUUID(), fingerprint: ask.fp });
+        });
+      },
+      ...(this.bookBarFocus === "rerun-go" ? { focus: "go" as const } : {})
+    };
   }
   /** "Rerun this picture-book card" (plan, write, proof): only on a map with `bookPipeline` at gate 1, gate 2 or done. */
   private addBookRerunMenuItem(menu: Menu, node: MapNode): void {
@@ -17127,6 +17181,7 @@ export class VisualAgentMapView extends ItemView {
     const gate2Attention = state.mode === "gate2" ? this.bookReviewCards(read.data) : [];
     if (state.mode === "gate2") state.review = { total: state.total, attention: gate2Attention.length };
     const gate1Ask = this.bookGate1Ask?.path === path ? this.bookGate1Ask : null;
+    const rerunAsk = this.bookRerunAskFor(path);
     renderBookBar(toolbar, state, {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
@@ -17166,6 +17221,7 @@ export class VisualAgentMapView extends ItemView {
             }
           }
         : {}),
+      ...(rerunAsk ? { rerunAsk } : {}),
       nextReview: () => {
         const next = this.nextBookReviewCard(gate2Attention);
         if (next) void this.openBookNote(next.id);
@@ -17197,7 +17253,8 @@ export class VisualAgentMapView extends ItemView {
   /** The map whose bar is asking "finish anyway?" (chapters still need a look). */
   private bookFinishAsking: string | null = null;
   /** Where the keyboard goes after the next paint of the bar (the repaint rebuilds the buttons). */
-  private bookBarFocus: "gate1-go" | "gate1-opener" | "finish-go" | "finish-opener" | null = null;
+  private bookBarFocus:
+    "gate1-go" | "gate1-opener" | "finish-go" | "finish-opener" | "rerun-go" | "rerun-opener" | null = null;
   /** The chapter the "next chapter to check" link opened last (the link cycles from there in reading order). */
   private bookReviewLast: string | null = null;
   private applyBookBarFocus(): void {
@@ -17208,7 +17265,9 @@ export class VisualAgentMapView extends ItemView {
       "gate1-go": ".vam-book-gate1-ask .vam-book-ask-go",
       "gate1-opener": ".vam-book-confirm",
       "finish-go": ".vam-book-finish-ask .vam-book-ask-go",
-      "finish-opener": ".vam-book-finish"
+      "finish-opener": ".vam-book-finish",
+      "rerun-go": ".vam-book-rerun-ask .vam-book-ask-go",
+      "rerun-opener": ".vam-node-rerun"
     }[focus];
     this.contentEl.querySelector<HTMLElement>(selector)?.focus();
   }
@@ -17260,10 +17319,18 @@ export class VisualAgentMapView extends ItemView {
     })[0];
     const state = readReviewState(text);
     this.notes.set(id, note);
+    // A hand-edited chapter's "rewrite" tick is a one-time command, not a resolution: it runs now, or waits in the box behind a running book.
+    if (isRewriteAsked(state))
+      void this.plugin.bookHandEdits.tick(mapPath, id).then(async () => {
+        await this.rereadBookCard(id);
+        if (!this.closed && this.map === map) this.render();
+      });
     if (!entry || !isReviewResolved(state, entry.fp)) {
       this.bookResolved.delete(id);
     } else {
       this.bookResolved.set(id, entry.fp);
+      // "Keep my version": the chapter text as it is now is recorded as kept, so a later run leaves it alone.
+      if (state?.op) await this.plugin.bookHandEdits.keep(node.path);
       if (state && !state.collapsed) await this.plugin.bookCallouts.collapse(node.path);
       if (entry.problems.every(problem => problem.kind === "seam")) {
         await this.plugin.confirmBookSeam(mapPath, id).catch(() => undefined);
@@ -17295,6 +17362,8 @@ export class VisualAgentMapView extends ItemView {
       if (this.closed || !isCurrent() || !this.map) return;
       const read = readBookPipeline(this.map);
       if (read.kind !== "usable" || read.data.phase !== "gate2") return;
+      // A rewrite queued in a box before the map was closed runs now when nothing is running.
+      void this.plugin.bookHandEdits.drain(path);
       for (const card of this.bookReviewCards(read.data)) await this.queueBookResolve(card.id);
     } catch {
       // Fire and forget from the map opening: the aligner logs its own failures, and nothing here may break the map.

@@ -1,7 +1,9 @@
+import { t } from "../../i18n";
 import { cardRevision } from "../../core/book-pipeline/machine";
 import type { MapDocument } from "../../map-model";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
 import { readBookPipeline, type BookPipelineData } from "../../core/book-pipeline/model";
+import { hashText } from "../../core/book-pipeline/text";
 import type { PipelineCard } from "./book-pipeline-run";
 import {
   collapseReviewCallouts,
@@ -14,8 +16,11 @@ import {
   removeProgramCalloutsWhere,
   reviewCallout,
   reviewEntries,
+  type Gate2Card,
+  type HandEditBox,
   trialCallout,
-  type BookNoteLink
+  type BookNoteLink,
+  type ReviewState
 } from "./book-pipeline-review";
 
 /**
@@ -107,13 +112,15 @@ export interface WantedCallouts {
   runId: string;
   nodeId: string;
   trial?: string;
-  review?: { fp: string; build: () => string };
+  /** `build` gets the box the note carries now (when it is being written again): a queued rewrite of an unchanged hand-edited text is carried over. */
+  review?: { fp: string; build: (prior?: ReviewState) => string };
 }
 
 /**
  * `text` with the program's callouts as `want` says. Callouts of another run (or another chapter) always go. A review box that was
  * written for the same fingerprint stays as it is (a tick stays) and is folded when one of its boxes is ticked; one for another
- * fingerprint is written again unticked. With `want` undefined every program callout goes. Running it again changes nothing.
+ * fingerprint is written again unticked (a queued rewrite for a hand-edited text that has not changed is carried over). A queued box of this run
+ * stays also when `want` has no review (the run is between two checkpoints). With `want` undefined every program callout goes. Running it again changes nothing.
  */
 export function alignCallouts(text: string, want: WantedCallouts | undefined): string {
   if (!want) return removeProgramCallouts(text);
@@ -123,8 +130,12 @@ export function alignCallouts(text: string, want: WantedCallouts | undefined): s
     const state = readReviewState(out);
     if (state && state.fp === idPart(want.review.fp)) {
       if (isReviewResolved(state, state.fp)) out = collapseReviewCallouts(out);
-    } else out = putProgramCallout(out, want.review.build());
-  } else out = removeProgramCallouts(out, "review");
+    } else out = putProgramCallout(out, want.review.build(state));
+  } else {
+    const state = readReviewState(out);
+    const queued = !!state?.queued && state.runId === idPart(want.runId) && state.nodeId === idPart(want.nodeId);
+    if (!queued) out = removeProgramCallouts(out, "review");
+  }
   return out;
 }
 
@@ -141,6 +152,8 @@ export interface BookCalloutPorts {
   /** {@link createNoteWriter}. */
   write(path: string, transform: (text: string) => string): Promise<NoteWriteResult>;
   log(line: string): void;
+  /** A fresh id for the operation a hand-edited chapter's box carries. */
+  newId?(): string;
 }
 
 /**
@@ -214,6 +227,16 @@ export class BookCallouts {
   }
   private release(mapPath: string, tail: Promise<unknown>): void {
     if (this.tails.get(mapPath) === tail) this.tails.delete(mapPath);
+  }
+
+  /** The hand-edited chapter's box content: the queue (operation, text fingerprint, queued mark) is carried over while the text is the one it was queued for. */
+  private handBox(card: Gate2Card, prior: ReviewState | undefined): HandEditBox | undefined {
+    if (!card.handEdited) return undefined;
+    const ifp = card.bodyFp ?? "";
+    if (prior?.op && prior.queued && prior.ifp === idPart(ifp))
+      return { op: prior.op, ifp, queued: true, status: t("ui.book_review_hand_queued") };
+    const op = this.ports.newId?.() ?? hashText(`${Date.now()}:${Math.random()}`);
+    return { op, ifp };
   }
 
   private fail(runId: string, nodeId: string, result: string): void {
@@ -331,13 +354,14 @@ export class BookCallouts {
           nodeId: entry.card.id,
           review: {
             fp: entry.fp,
-            build: () =>
+            build: prior =>
               reviewCallout(
                 entry.card,
                 entry.problems.map(problem => problem.text),
                 link(next),
                 entry.fp,
-                data.runId
+                data.runId,
+                this.handBox(entry.card, prior)
               )
           }
         });

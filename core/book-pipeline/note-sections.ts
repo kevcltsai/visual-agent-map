@@ -26,7 +26,7 @@ export const HIDDEN_CALLOUT = "vam-book";
 const HIDDEN_HEAD = /^[ \t]{0,3}>[ \t]?\[!vam-book\][+-]?(?:[ \t].*)?$/i;
 const QUOTE_LINE = /^[ \t]{0,3}>/;
 const LOG_LINE = /^(?:[-*+][ \t]+)?\d{4}-\d{2}-\d{2}/;
-const ANY_RECORD = /<!-- book-(?:proof|slots):v1 \{.*\} -->/;
+const ANY_RECORD = /<!-- book-(?:proof|slots|body):v1 \{.*\} -->/;
 const bare = (line: string): string => line.replace(/\r$/, "");
 
 /** Per line: true inside a fenced code block (the fence lines included). */
@@ -131,7 +131,8 @@ export function neutralizeDetail(content: string): string | null {
 }
 
 const PROGRAM_HEAD = /^[ \t]{0,3}>[ \t]?\[!(vam-trial|vam-review)\]([+-])?(?:[ \t].*)?$/i;
-const OWNER_LINE = /^[ \t]{0,3}>[ \t]?%%vam-(trial|review):([\w.-]+):([\w.-]+)(?::([\w.-]+))?%%[ \t]*$/;
+const OWNER_LINE =
+  /^[ \t]{0,3}>[ \t]?%%vam-(trial|review):([\w.-]+):([\w.-]+)(?::([\w.-]+))?(?::([\w.-]+):([\w.-]+)(?::(q))?)?%%[ \t]*$/;
 export interface ProgramCallout {
   kind: "trial" | "review";
   /** Line range: `start` is the head line, `end` is exclusive. */
@@ -142,6 +143,10 @@ export interface ProgramCallout {
   nodeId: string;
   /** The attention fingerprint of a review callout. */
   fp?: string;
+  /** A hand-edited chapter's box: the rewrite operation it carries, the integrity fingerprint of the text it was written for, and whether the rewrite is queued. */
+  op?: string;
+  ifp?: string;
+  queued?: boolean;
 }
 
 /**
@@ -168,7 +173,8 @@ export function programCalloutRanges(lines: string[], fenced = fencedLines(lines
           sign: (head[2] ?? "") as "" | "+" | "-",
           runId: owner[2],
           nodeId: owner[3],
-          ...(owner[4] ? { fp: owner[4] } : {})
+          ...(owner[4] ? { fp: owner[4] } : {}),
+          ...(owner[5] ? { op: owner[5], ifp: owner[6], ...(owner[7] ? { queued: true } : {}) } : {})
         });
         break;
       }
@@ -360,7 +366,7 @@ function hideUpdateLog(text: string, own?: (line: string) => boolean): string {
   return appendHidden(lines.join("\n"), moved.map(line => `> ${line}`).join("\n"));
 }
 
-const RECORD_COPY = /(?:<|&lt;)!-- book-(?:proof|slots):v1 /;
+const RECORD_COPY = /(?:<|&lt;)!-- book-(?:proof|slots|body):v1 /;
 
 /**
  * A visible copy of the work-record callout: the author model saw the card's old Research notes callout and wrote it again in its text (the
@@ -471,7 +477,7 @@ export function appendResearchNote(detail: string, record: string): { text: stri
   return { text: appendHidden(detail, quoteAll(record)), appended: true };
 }
 
-const PIPELINE_RECORD = /^<!-- (book-(?:proof|slots)):v1 (\{.*\}) -->$/;
+const PIPELINE_RECORD = /^<!-- (book-(?:proof|slots|body)):v1 (\{.*\}) -->$/;
 const PROOF_ITEM_LINE = /^- .+ (?:達成|未達成|待查)：/;
 const QUOTE_BLANK = /^[ \t]{0,3}>[ \t]*\r?$/;
 const validJson = (text: string): boolean => {

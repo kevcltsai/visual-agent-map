@@ -147,6 +147,8 @@ export interface BookBarActions {
   openTrial?: () => void;
   /** Gate 1: the first press found unapplied notes in the trial; the bar asks once. `focus`: where the keyboard goes after this paint. */
   gate1Ask?: { count: number; cancel: () => void; confirm: () => void; focus?: "go" | "opener" };
+  /** Gate 2 or done: a card rerun found a hand-edited chapter; the bar asks once before it overwrites it (decision G). */
+  rerunAsk?: { cancel: () => void; confirm: () => void; focus?: "go" | "opener" };
   /** Gate 2: the link that opens the next chapter that needs a look (the view cycles in reading order). */
   nextReview?: () => void;
   /** Gate 2: "review finished". With chapters left (`state.review.attention` > 0) the bar asks once in place before it calls `confirm`. */
@@ -280,6 +282,14 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
       t("ui.book_bar_finish_go"),
       actions.finish
     );
+  if ((state.mode === "gate2" || state.mode === "done") && actions.rerunAsk)
+    renderAsk(
+      bar,
+      "vam-book-rerun-ask",
+      t("ui.book_rerun_overwrite_ask"),
+      t("ui.book_rerun_overwrite_go"),
+      actions.rerunAsk
+    );
   const progressText = bookProgressText(state);
   renderProgressLine(bar, state, progressText);
   const track = bar.createDiv("vam-book-track");
@@ -390,6 +400,7 @@ const REFUSAL_KEY: Record<BookRunRefusal, TranslationKey> = {
   cancelled: "ui.book_refused_cancelled",
   stale: "ui.book_refused_stale",
   backup_failed: "ui.book_refused_backup_failed",
+  text_changed: "ui.book_refused_text_changed",
   nothing: "ui.book_refused_nothing"
 };
 
@@ -448,6 +459,7 @@ const REASON_KEY: Record<string, TranslationKey> = {
 /** A step failure with a plain sentence (cause and next step) instead of "step failed: reason"; keyed `step:code`. */
 const PLAIN_KEY: Record<string, TranslationKey> = {
   "write:no_body": "ui.book_plain_write_no_body",
+  "write:hand_edited": "ui.book_plain_write_hand_edited",
   "proof:no_body": "ui.book_plain_proof_no_body",
   "proof:empty_list": "ui.book_plain_proof_empty_list",
   "proof:unparsable": "ui.book_plain_proof_unparsable",

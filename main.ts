@@ -28,6 +28,7 @@ import {
   minimalChange,
   type OpenNoteView
 } from "./experiences/visual-map/book-pipeline-callouts";
+import { BookHandEdits } from "./experiences/visual-map/book-pipeline-handedit";
 import {
   BookNoteModal,
   BookNotes,
@@ -501,6 +502,17 @@ export default class VisualAgentMapPlugin extends Plugin {
       return this.app.vault.read(file);
     },
     write: (path, transform) => this.bookNoteWriter(path, transform),
+    log: line => this.logs.appendLog("info", line),
+    newId: () => crypto.randomUUID()
+  });
+  /** The reader's two answers on a hand-edited chapter's box (keep; rewrite now or queued behind a running book). */
+  readonly bookHandEdits = new BookHandEdits({
+    readMap: path => this.repo.readMap(path),
+    readCard: path => this.readBookCard(path),
+    write: (path, transform) => this.bookNoteWriter(path, transform),
+    rerunCard: (mapPath, nodeId, options) => this.bookPipelineRuns.rerunCard(mapPath, nodeId, options),
+    isRunning: mapPath => this.bookPipelineRuns.isRunning(mapPath),
+    newId: () => crypto.randomUUID(),
     log: line => this.logs.appendLog("info", line)
   });
   /** The reader's notes of a picture-book chapter: editor-menu item, commands, input dialog and the header action. */
@@ -808,7 +820,9 @@ export default class VisualAgentMapPlugin extends Plugin {
         ?.refreshBookProgress();
       this.bookNotes.paint();
     },
-    callouts: { reconcile: path => this.bookCallouts.reconcile(path), clear: path => this.bookCallouts.clear(path) }
+    callouts: { reconcile: path => this.bookCallouts.reconcile(path), clear: path => this.bookCallouts.clear(path) },
+    // A drive is over: a rewrite the reader queued behind it may run now.
+    settled: mapPath => void this.bookHandEdits.drain(mapPath)
   });
   /** A card note as the picture-book runner reads it (fields, text and the raw file). */
   private async readBookCard(path: string): Promise<PipelineCard> {
@@ -2098,7 +2112,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   rerunBookCard(
     mapPath: string,
     nodeId: string,
-    options: { avoidSources?: readonly string[] } = {}
+    options: { avoidSources?: readonly string[]; overwrite?: { operation: string; fingerprint: string } } = {}
   ): Promise<BookRerunResult> {
     return this.bookPipelineRuns.rerunCard(mapPath, nodeId, options);
   }
@@ -2117,6 +2131,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.argumentRuns.dispose();
     this.bookPipelineRuns.dispose();
     this.bookCallouts.dispose();
+    this.bookHandEdits.dispose();
     if (this.bookNotesTimer !== null) window.clearTimeout(this.bookNotesTimer);
     this.bookNotesTimer = null;
     this.bookNotesApply.dispose();

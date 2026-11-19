@@ -1,0 +1,158 @@
+/**
+ * Has the reader's hand been on a picture-book chapter since the program last wrote it? The program stores, in the hidden record
+ * `<!-- book-body:v1 {"fp":"…"} -->` of the chapter's work callout, the fingerprint of the chapter as it left the program. The integrity
+ * text behind it keeps the chapter text, its pictures, captions and sources; it leaves out only what the program itself owns (the hidden
+ * `[!vam-book]` callouts, the trial and review boxes with their markers) and the reader's note wrappers (see book-notes), and a line
+ * break is not an edit (CRLF and LF are the same). Applying notes and typing never refresh the fingerprint, so both count as a hand edit.
+ *
+ * Every program write that changes the text stores the new fingerprint in the same write ({@link stampDetail}); a later program
+ * transform ({@link programStamp}) refreshes it only when the text it starts from still carries its own fingerprint.
+ */
+import { projectProofBody } from "./book-notes";
+import { latestSlotsRecord, shortHash, stripImageLines } from "./image-slots";
+import {
+  chapterBody,
+  detailBlockOf,
+  extractProofRecords,
+  fencedLines,
+  replaceResearchRecord,
+  withoutHiddenCallouts
+} from "./note-sections";
+import { hashText } from "./text";
+
+const BODY_LINE = /^(?:[ \t]{0,3}>[ \t]?)*<!-- book-body:v1 (\{.*\}) -->$/;
+
+/** What the hidden record holds: the fingerprint of the chapter as the program wrote it, and the one the reader chose to keep. */
+export interface BodyRecord {
+  fp: string;
+  /** The fingerprint of the text the reader chose "keep my version" for. */
+  kept?: string;
+}
+
+/** The text the fingerprint is made of, from a Detail (the text between the managed markers). */
+export function integrityText(detail: string): string {
+  const lines = withoutHiddenCallouts(detail.replace(/\r\n/g, "\n").split("\n"));
+  return projectProofBody(lines.join("\n")).trim();
+}
+export const integrityFp = (detail: string): string => hashText(integrityText(detail));
+
+/** The latest valid record of a Detail; undefined when none. */
+export function readBodyRecord(detail: string): BodyRecord | undefined {
+  const lines = detail.split("\n");
+  const fenced = fencedLines(lines);
+  let found: BodyRecord | undefined;
+  lines.forEach((line, at) => {
+    const m = fenced[at] ? null : BODY_LINE.exec(line.replace(/\r$/, "").trim());
+    if (!m) return;
+    try {
+      const data = JSON.parse(m[1]) as { fp?: unknown; kept?: unknown };
+      if (typeof data.fp !== "string" || !/^[0-9a-f]{16}$/.test(data.fp)) return;
+      found = {
+        fp: data.fp,
+        ...(typeof data.kept === "string" && /^[0-9a-f]{16}$/.test(data.kept) ? { kept: data.kept } : {})
+      };
+    } catch {
+      // a damaged record is no record
+    }
+  });
+  return found;
+}
+
+const PROOF_KEY_LINE = /^<!-- book-proof:v1 (\{.*\}) -->$/;
+const IMAGE_URL = /!\[[^\]\n]*\]\((https:\/\/[^)\s]+)\)/g;
+
+/**
+ * An older note (written before the fingerprint existed) with text and no record: it counts as untouched only when two records the program
+ * already stored still fit it. The stored proof's text hash must equal the hash of the chapter text as it is now (the text without pictures
+ * and captions), and the pictures in the text must be the ones the `book-slots` record lists by hash (no more, no fewer). The caption lines
+ * themselves have no stored hash, so a caption edit alone is not seen here. Anything else: unknown (possibly edited).
+ */
+export function oldNoteLooksUntouched(detail: string): boolean {
+  const proofKeys = extractProofRecords(detail)
+    .map(record => PROOF_KEY_LINE.exec(record.split("\n").pop() ?? ""))
+    .flatMap(m => {
+      try {
+        const key = (JSON.parse(m?.[1] ?? "") as { key?: unknown }).key;
+        return typeof key === "string" ? [key] : [];
+      } catch {
+        return [];
+      }
+    });
+  const latest = proofKeys[proofKeys.length - 1]?.replace(/:failed$/, "");
+  if (!latest) return false;
+  const parts = latest.split(":");
+  if (parts.length < 5) return false;
+  const stored = parts[parts.length - 2];
+  if (stored !== hashText(projectProofBody(stripImageLines(chapterBody(detail))))) return false;
+  const placed = (latestSlotsRecord(detail)?.slots ?? [])
+    .filter(slot => slot.state === "placed" && slot.hash)
+    .map(slot => slot.hash as string)
+    .sort();
+  const inText = [...integrityText(detail).matchAll(IMAGE_URL)].map(m => shortHash(m[1])).sort();
+  return placed.length === inText.length && placed.every((hash, at) => hash === inText[at]);
+}
+
+/**
+ * empty: no chapter text at all (nothing to lose); clean: the text is as the program left it; edited: the text differs from the stored
+ * fingerprint; unknown: text but no fingerprint (an older note): possibly edited, handled like edited by every automatic flow.
+ */
+export type BodyState = "empty" | "clean" | "edited" | "unknown";
+export function bodyState(detail: string): BodyState {
+  const record = readBodyRecord(detail);
+  if (!record) return !integrityText(detail) ? "empty" : oldNoteLooksUntouched(detail) ? "clean" : "unknown";
+  return record.fp === integrityFp(detail) ? "clean" : "edited";
+}
+/** Whether the program may rewrite the text without asking: it is as the program left it, or there is none. */
+export const isUntouched = (detail: string): boolean => {
+  const state = bodyState(detail);
+  return state === "clean" || state === "empty";
+};
+/** The reader chose "keep my version" for the text as it is now. */
+export const isKept = (detail: string): boolean => {
+  const record = readBodyRecord(detail);
+  return !!record?.kept && record.kept === integrityFp(detail);
+};
+
+const compose = (record: BodyRecord): string => `<!-- book-body:v1 ${JSON.stringify(record)} -->`;
+
+/** `detail` with the record set to its own fingerprint (the program just wrote this text). A kept choice does not survive a new text. */
+export function stampDetail(detail: string): string {
+  const fp = integrityFp(detail);
+  const old = readBodyRecord(detail);
+  if (old && old.fp === fp && !old.kept) return detail;
+  return replaceResearchRecord(detail, compose({ fp }));
+}
+
+/** `detail` with the reader's "keep" for the text as it is now (the stored program fingerprint stays, or is absent for an older note). */
+export function keepDetail(detail: string): string {
+  const old = readBodyRecord(detail);
+  const kept = integrityFp(detail);
+  if (old?.kept === kept) return detail;
+  return replaceResearchRecord(detail, compose({ fp: old?.fp ?? kept, kept }));
+}
+
+/**
+ * A later program change of the text (a failed picture swapped out, a slot filled): the stored fingerprint follows only when the text it
+ * started from still equalled it. Otherwise the record is left as it is and the chapter stays "hand-edited".
+ */
+export function programStamp(baseDetail: string, nextDetail: string): string {
+  return bodyState(baseDetail) === "clean" ? stampDetail(nextDetail) : nextDetail;
+}
+
+// ---- the same on a note's whole raw text (the Detail block is where the record lives) ----
+
+const spliceDetail = (raw: string, change: (detail: string) => string): string => {
+  const detail = detailBlockOf(raw);
+  if (detail === undefined) return raw;
+  const at = raw.indexOf(detail);
+  const next = change(detail);
+  return next === detail ? raw : `${raw.slice(0, at)}${next}${raw.slice(at + detail.length)}`;
+};
+export const stampRaw = (raw: string): string => spliceDetail(raw, stampDetail);
+export const keepRaw = (raw: string): string => spliceDetail(raw, keepDetail);
+export function programStampRaw(baseRaw: string, nextRaw: string): string {
+  const base = detailBlockOf(baseRaw);
+  return base !== undefined && bodyState(base) === "clean" ? stampRaw(nextRaw) : nextRaw;
+}
+export const bodyStateRaw = (raw: string): BodyState => bodyState(detailBlockOf(raw) ?? "");
+export const integrityFpRaw = (raw: string): string => integrityFp(detailBlockOf(raw) ?? "");

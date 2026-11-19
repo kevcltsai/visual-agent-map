@@ -146,6 +146,14 @@ import {
   type CardResultSnapshot
 } from "./book-pipeline-rerun";
 import { readingOrder } from "./presentation-order";
+import {
+  bodyStateRaw,
+  integrityFpRaw,
+  isKept,
+  programStamp,
+  programStampRaw,
+  stampRaw
+} from "../../core/book-pipeline/body-integrity";
 
 /** At most this many cards are in a step at once (the whole-book plan runs alone before them). */
 export const BOOK_POOL = 5;
@@ -172,7 +180,9 @@ export type BookRunRefusal =
   | "cancelled"
   | "stale"
   | "backup_failed"
-  | "nothing";
+  | "nothing"
+  /** A rewrite the reader allowed was for a text that has changed since: nothing is rewritten. */
+  | "text_changed";
 export class BookPipelineRunError extends Error {
   constructor(readonly code: BookRunRefusal) {
     super(`book pipeline refused: ${code}`);
@@ -219,7 +229,7 @@ export interface AuthorInput {
   /** The program's one-line request to use other sources (a source swap); absent for a normal write. Never carries untrusted text. */
   instruction?: string;
   /** Checked synchronously inside the write: false (a stop, a replaced run, a removed card) means nothing is written. */
-  authorize: () => boolean;
+  authorize: (current?: string) => boolean;
   /** Runs inside the author's write on the text about to be saved: the cleaned text, or null (nothing is written). Pass it to the guarded write. */
   finalize: (content: string) => string | null;
 }
@@ -231,7 +241,7 @@ export type AuthorOutcome =
   | { outcome: "discarded" };
 export type GuardOptions = {
   expectedContent?: string;
-  authorize?: () => boolean;
+  authorize?: (current?: string) => boolean;
   /** Runs inside the same write on the text the patch produced; null refuses the write. */
   finalize?: (content: string) => string | null;
 };
@@ -257,6 +267,8 @@ export interface BookPipelinePorts {
   ): Promise<Output>;
   /** Production: `runProofread(aiCalls, request, run)`. */
   runProofread(request: ProofreadRequest, run: ProofreadRun): Promise<ProofResult>;
+  /** A drive of the map has ended (any way); queued work waits for this. Optional: fire and forget. */
+  settled?(mapPath: string): void;
   /** The author step: the card's single-card research (charts off, fresh write-back). Never writes the card's frontmatter. */
   author(input: AuthorInput): Promise<AuthorOutcome>;
   probeImage(url: string, signal: AbortSignal): Promise<{ ok: true } | { ok: false; reason: string }>;
@@ -393,6 +405,8 @@ interface Drive {
   avoid: Set<string>;
   /** Cards whose proofread named unmet points, waiting for the one automatic redo once every card has had its first round: the program-built request line. */
   fixable: Map<string, string>;
+  /** The reader's one-time permission to rewrite a hand-edited chapter: bound to the run, the card, the operation and the text it was given for. */
+  overwrite: Map<string, { runId: string; operation: string; fingerprint: string }>;
   /** In memory only: the single-card rerun in progress. */
   rerun?: { nodeId: string; startedAt: number };
   /** The plan a card's plan step wrote in this drive. */
@@ -424,7 +438,13 @@ const reasonOf = (error: unknown): string =>
 const internalCode = (error: unknown): string =>
   `internal_${(typeof (error as { name?: unknown } | null)?.name === "string" ? (error as { name: string }).name : "unknown").replace(/[^A-Za-z0-9_]/g, "_").slice(0, 40)}`;
 /** Failure reasons after which the card's proof-result section is not written (the write never reached the card, or the card is gone). */
-const NO_FAILURE_SECTION: ReadonlySet<string> = new Set(["discarded", "card_removed", "backup_failed", "missing"]);
+const NO_FAILURE_SECTION: ReadonlySet<string> = new Set([
+  "discarded",
+  "card_removed",
+  "backup_failed",
+  "missing",
+  "hand_edited"
+]);
 const STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" } as const;
 const ACTION_OF = { plan: "card_plan", write: "card_write", proof: "card_proof" } as const;
 const singleLineText = (value: string, max: number): string =>
@@ -981,7 +1001,11 @@ export class BookPipelineRuns {
   async rerunCard(
     mapPath: string,
     nodeId: string,
-    options: { avoidSources?: readonly string[] } = {}
+    options: {
+      avoidSources?: readonly string[];
+      /** The reader's one-time permission to rewrite a hand-edited chapter: bound to this operation and the text (its integrity fingerprint) it was given for. */
+      overwrite?: { operation: string; fingerprint: string };
+    } = {}
   ): Promise<BookRerunResult> {
     const swap = options.avoidSources !== undefined;
     let result: BookRerunResult = { unchanged: false };
@@ -998,7 +1022,8 @@ export class BookPipelineRuns {
         result = { unchanged: settled && sameReviewResult(snapshots?.before, snapshots?.after) };
       },
       true,
-      swap
+      swap,
+      options.overwrite
     );
     return result;
   }
@@ -1042,12 +1067,22 @@ export class BookPipelineRuns {
     /** A rerun: its time is shown, and the card's result is compared before and after. */
     track = false,
     /** The extra line is the program's source swap: the author gets it too. */
-    swap = false
+    swap = false,
+    /** A rewrite the reader allowed over a hand-edited chapter (see {@link BookPipelineRuns.rerunCard}). */
+    overwrite?: { operation: string; fingerprint: string }
   ): Promise<void> {
     return this.enter(mapPath, async drive => {
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       if (!data.order.includes(nodeId)) throw new BookPipelineRunError("missing");
       if (!phases.includes(data.phase)) throw new BookPipelineRunError(refusal);
+      if (overwrite) {
+        // Bound to the text it was given for: if the chapter changed since, nothing is rewritten (the write checks again inside itself).
+        const path = drive.cards.get(nodeId)?.path;
+        const current = path ? await this.ports.readCard(path).catch(() => undefined) : undefined;
+        if (!current) throw new BookPipelineRunError("unreadable");
+        if (integrityFpRaw(current.raw) !== overwrite.fingerprint) throw new BookPipelineRunError("text_changed");
+        drive.overwrite.set(nodeId, { runId: data.runId, ...overwrite });
+      }
       let refused = false;
       await drive.store.commit(state => {
         const next = resumeRun(state);
@@ -1364,6 +1399,7 @@ export class BookPipelineRuns {
       extra: new Map(),
       avoid: new Set(),
       fixable: new Map(),
+      overwrite: new Map(),
       plans: new Map(),
       authorModels: new Map(),
       started: new Map(),
@@ -1427,6 +1463,8 @@ export class BookPipelineRuns {
         }
       } finally {
         this.drives.delete(drive.mapPath);
+        // A drive is over: a rewrite the reader queued behind it may run now (it checks the phase itself).
+        if (!this.disposed) this.ports.settled?.(drive.mapPath);
       }
     }
     if (refusal) throw refusal;
@@ -1827,7 +1865,7 @@ export class BookPipelineRuns {
       const path = await this.stillOnMap(drive, nodeId);
       if (!path) return;
       const card = await this.ports.readCard(path);
-      const next = this.proofSectionOf(drive, { failure: code(reason) }, {})(card.raw);
+      const next = programStampRaw(card.raw, this.proofSectionOf(drive, { failure: code(reason) }, {})(card.raw));
       if (next === card.raw || !(await this.ensureBackup(drive, nodeId, path, card.raw))) return;
       await this.ports.updateNoteRawGuarded(path, () => next, {
         expectedContent: card.raw,
@@ -1979,9 +2017,54 @@ export class BookPipelineRuns {
     drive.imagesDone.delete(nodeId);
     const card = await this.ports.readCard(info.path);
     const root = await this.ports.readCard(rootInfo.path);
+    // The reader's hand: a chapter whose text is not as the program left it (or whose state is not known) is rewritten only with the
+    // reader's one-time permission for exactly this text. The same check runs again inside the write itself (see `authorizeWrite`).
+    const permit = drive.overwrite.get(nodeId);
+    const mayOverwrite = (raw: string): boolean => {
+      const state = bodyStateRaw(raw);
+      if (state === "clean" || state === "empty") return true;
+      return !!permit && permit.runId === drive.store.state.runId && permit.fingerprint === integrityFpRaw(raw);
+    };
+    if (!mayOverwrite(card.raw)) {
+      // "Keep my version" was chosen for this very text: the chapter stays as it is and goes on to its proofread.
+      if (isKept(card.detail)) {
+        drive.imagesDone.add(nodeId);
+        this.ports.log(
+          formatPipelineLog({
+            event: "hand_edit_kept",
+            runId: token.runId,
+            card: nodeId,
+            step: "write",
+            attempt: 0,
+            result: "skipped",
+            ms: 0
+          })
+        );
+        return { kind: "ok", after: () => this.setStage(drive, nodeId, "written", null) };
+      }
+      this.ports.log(
+        formatPipelineLog({
+          event: "hand_edit_skipped",
+          runId: token.runId,
+          card: nodeId,
+          step: "write",
+          attempt: 0,
+          result: bodyStateRaw(card.raw),
+          ms: 0
+        })
+      );
+      return { kind: "failed", reason: "hand_edited", forceReview: true };
+    }
     if (!(await this.ensureBackup(drive, nodeId, info.path, card.raw)))
       return { kind: "failed", reason: "backup_failed", forceReview: true };
     const authorize = this.authorize(drive, token);
+    let changedByHand = false;
+    const authorizeWrite = (current?: string): boolean => {
+      if (!authorize()) return false;
+      if (current === undefined || mayOverwrite(current)) return true;
+      changedByHand = true;
+      return false;
+    };
     const slots = parseImageSlots(card.prompt);
     // The body is cleaned inside the author's own write (same `vault.process`): only standard https pictures are ever saved, and
     // an unsafe body is refused whole, so the card keeps its text from before this step.
@@ -2015,7 +2098,8 @@ export class BookPipelineRuns {
         emptyBody = true;
         return null;
       }
-      return restore(cleaned);
+      // The text and its new fingerprint are one write: from here on the chapter counts as "as the program left it".
+      return stampRaw(restore(cleaned));
     };
     // Nothing of this card's frontmatter is written while the author runs: the research write compares the whole file.
     const done = await untilAborted(
@@ -2032,10 +2116,11 @@ export class BookPipelineRuns {
         ...(drive.avoid.has(nodeId) ? { instruction: drive.extra.get(nodeId) } : {}),
         signal,
         admission: drive.admission,
-        authorize,
+        authorize: authorizeWrite,
         finalize
       })
     );
+    if (changedByHand) return { kind: "failed", reason: "hand_edited", forceReview: true };
     if (unsafe) return { kind: "failed", reason: "unsafe_body", forceReview: true };
     if (emptyBody) return { kind: "failed", reason: "no_body" };
     if (done.outcome === "budget-exhausted") return { kind: "budget" };
@@ -2062,7 +2147,7 @@ export class BookPipelineRuns {
     if (carried !== written.detail) {
       const outcome = await this.ports.updateNoteGuarded(
         path,
-        { detail: carried },
+        { detail: programStamp(written.detail, carried) },
         { expectedContent: written.raw, authorize }
       );
       if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
@@ -2078,7 +2163,7 @@ export class BookPipelineRuns {
     }
     if (replacements.size) {
       const held = holdProofLines(written.raw, knownLines);
-      const cleaned = held.restore(replaceBodyImages(held.text, replacements));
+      const cleaned = programStampRaw(written.raw, held.restore(replaceBodyImages(held.text, replacements)));
       const outcome = await this.ports.updateNoteRawGuarded(path, () => cleaned, {
         expectedContent: written.raw,
         authorize
@@ -2307,7 +2392,9 @@ export class BookPipelineRuns {
     // The exit check: nothing but the placed addresses may be an image in what this write adds.
     if (this.exitCheck(result.added.join("\n"), new Set(result.placed.map(item => item.href)))) return "slots_unsafe";
     const withSources = addPictureSources(result.text, result.sources, language);
-    const detail = slots.length ? replaceResearchRecord(withSources, composeSlotsRecord(result)) : withSources;
+    const slotted = slots.length ? replaceResearchRecord(withSources, composeSlotsRecord(result)) : withSources;
+    // The slot fill is the program's own change of the text: its fingerprint follows only if the text it started from still had it.
+    const detail = programStamp(latest.detail, slotted);
     if (detail === latest.detail) return result;
     const outside = residualMarkerLines(latest.raw).length - residualMarkerLines(latest.detail).length;
     const outcome = await this.ports.updateNoteGuarded(
@@ -2400,7 +2487,7 @@ export class BookPipelineRuns {
         ...(stored?.model ? { model: stored.model } : {}),
         authorModel: drive.authorModels.get(nodeId) ?? stored?.authorModel
       };
-      const next = this.proofSectionOf(drive, { result }, models, imageLine)(card.raw);
+      const next = programStampRaw(card.raw, this.proofSectionOf(drive, { result }, models, imageLine)(card.raw));
       if (next !== card.raw) {
         const path = await this.stillOnMap(drive, nodeId);
         if (!path) return { kind: "failed", reason: "card_removed" };

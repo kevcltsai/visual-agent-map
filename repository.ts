@@ -1767,14 +1767,15 @@ export class Repository {
       detailTemplate?: DetailTemplate;
       newVisualReferences?: boolean;
       expectedContent?: string;
-      authorize?: () => boolean;
+      /** Gets the file text the callback was given (so a check can look at the text as it is now, not as the caller last read it). */
+      authorize?: (current?: string) => boolean;
       finalize?: (content: string) => string | null;
     } = {}
   ): Promise<"written" | "discarded"> {
     const { expectedContent, authorize, finalize, ...writeOptions } = options;
     let outcome: "written" | "discarded" = "written";
     await this.app.vault.process(this.file(path), content => {
-      if ((expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize())) {
+      if ((expectedContent !== undefined && content !== expectedContent) || (authorize && !authorize(content))) {
         outcome = "discarded";
         return content;
       }

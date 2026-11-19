@@ -45857,15 +45857,15 @@ function parseApplyNotes(raw, request) {
   const root = parseJson(raw);
   exactKeys(root, ["paragraphs"]);
   const entries = arrayOf(root.paragraphs, "paragraphs");
-  if (entries.length !== request.items.length) fail2("The reply must hold exactly the paragraphs sent");
+  if (entries.length !== request.items.length) fail2("paragraph count mismatch");
   const seen = /* @__PURE__ */ new Set();
   const paragraphs = entries.map((entry) => {
     const one = recordOf2(entry, "paragraph");
     exactKeys(one, ["id", "text"]);
     const id = textOf(one.id, "paragraph id");
     const item = request.items.find((i) => i.id === id);
-    if (!item) return fail2("The reply has a paragraph id that was not sent");
-    if (seen.has(id)) fail2("The reply repeats a paragraph id");
+    if (!item) return fail2("unknown paragraph id");
+    if (seen.has(id)) fail2("repeated paragraph id");
     seen.add(id);
     const check = checkRewrite(item, textOf(one.text, "paragraph text"));
     if (!check.ok) return fail2(`Paragraph rewrite refused: ${check.reason}`);
@@ -45887,8 +45887,8 @@ var applyNotesStep = {
   },
   schema: APPLY_NOTES_SCHEMA,
   policy: (prompt, request) => {
-    if (!request.items.length) fail2("Applying notes needs at least one paragraph");
-    if (request.items.length > MAX_NOTE_PARAGRAPHS) fail2("Too many paragraphs to rewrite at once");
+    if (!request.items.length) fail2("no paragraph to rewrite");
+    if (request.items.length > MAX_NOTE_PARAGRAPHS) fail2("too many paragraphs");
     overBudget2(prompt, APPLY_NOTES_SCHEMA);
   },
   parse: parseApplyNotes

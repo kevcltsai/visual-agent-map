@@ -637,7 +637,7 @@ test('apply-notes: the prompt shows note markers and link tokens only, never a l
   assert.ok(prompt.includes('⟦L1⟧') && prompt.includes('⟦L2⟧'));
   assert.ok(!prompt.includes('Florence') && !prompt.includes('x.y/a.png'));
   assert.doesNotThrow(() => applyNotes.applyNotesStep.policy(prompt, request));
-  assert.throws(() => applyNotes.applyNotesStep.policy(prompt, applyRequest([])), /at least one/);
+  assert.throws(() => applyNotes.applyNotesStep.policy(prompt, applyRequest([])), /no paragraph/);
 });
 
 test('apply-notes: a good reply returns the paragraph with its links back exactly once', () => {
@@ -650,12 +650,12 @@ test('apply-notes: a good reply returns the paragraph with its links back exactl
 test('apply-notes: ids must be exactly the sent ids (unknown, duplicate, missing, extra field)', () => {
   const ok = { id: 'p1', text: GOOD };
   const two = applyRequest([encodedItem(), { ...encodedItem(), id: 'p2' }]);
-  assert.throws(() => applyNotes.parseApplyNotes(applyReply({ ...ok, id: 'p9' }), applyRequest()), /not sent/);
-  assert.throws(() => applyNotes.parseApplyNotes(applyReply(ok, ok), two), /repeats/);
-  assert.throws(() => applyNotes.parseApplyNotes(applyReply(ok), two), /exactly the paragraphs/);
-  assert.throws(() => applyNotes.parseApplyNotes(applyReply(ok, ok, ok), two), /exactly the paragraphs/);
+  assert.throws(() => applyNotes.parseApplyNotes(applyReply({ ...ok, id: 'p9' }), applyRequest()), /unknown paragraph id/);
+  assert.throws(() => applyNotes.parseApplyNotes(applyReply(ok, ok), two), /repeated paragraph id/);
+  assert.throws(() => applyNotes.parseApplyNotes(applyReply(ok), two), /count mismatch/);
+  assert.throws(() => applyNotes.parseApplyNotes(applyReply(ok, ok, ok), two), /count mismatch/);
   assert.throws(() => applyNotes.parseApplyNotes(applyReply({ ...ok, extra: 1 }), applyRequest()), /unexpected fields/);
-  assert.throws(() => applyNotes.parseApplyNotes('{"paragraphs":[]}', applyRequest()), /exactly/);
+  assert.throws(() => applyNotes.parseApplyNotes('{"paragraphs":[]}', applyRequest()), /count mismatch/);
   assert.throws(() => applyNotes.parseApplyNotes('nope', applyRequest()), /JSON/);
 });
 

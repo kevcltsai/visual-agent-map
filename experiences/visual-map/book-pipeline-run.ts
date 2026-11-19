@@ -811,7 +811,7 @@ export function replaceBodyImages(content: string, replacements: ReadonlyMap<str
 }
 
 /** The neighbour's "join not yet checked" line (a rerun and an applied note both write it). */
-function seamText(language: string, at: number, revision: number): string {
+function seamText(language: string, at: number, revision: number | string): string {
   return /^zh/i.test(language)
     ? `鄰卡企劃或正文已變更，尚未人工核對（第 ${at + 1} 張，版本 ${revision}）`
     : `Neighbouring card's plan or text changed; not yet checked by a person (card ${at + 1}, revision ${revision})`;
@@ -1414,7 +1414,9 @@ export class BookPipelineRuns {
       outcome = applyReplies(text, items, replies);
       return outcome.text;
     });
-    refuseIfGone();
+    // A cancel that arrives after the transform has written is too late to undo anything: the job finishes normally (undo record,
+    // highlight, seams). Only a job that wrote nothing reports the cancel.
+    if (!(written === "written" && outcome)) refuseIfGone();
     if (written === "refused") throw new BookPipelineRunError("stale");
     const done = written === "written" && outcome ? outcome : undefined;
     if (!done) return { applied: 0, skipped: 0, marked: 0, edits: [] };
@@ -1432,7 +1434,9 @@ export class BookPipelineRuns {
   ): Promise<void> {
     const stateOrder = effectiveOrder(state);
     const at = stateOrder.indexOf(nodeId);
-    const revision = cardRevision(state, nodeId);
+    // The card's revision and the map's own (every saved change of the run counts one, an applied notes job included): a second apply
+    // writes a different line, so an accepted tick of a neighbour's mixed box no longer counts (plan §7-2).
+    const revision = `${cardRevision(state, nodeId)}.${state.revision}`;
     for (const other of [stateOrder[at - 1], stateOrder[at + 1]]) {
       const path = other ? map.nodes.find(item => item.id === other)?.path : undefined;
       if (!path || this.disposed) continue;

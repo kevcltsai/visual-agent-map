@@ -1754,6 +1754,30 @@ test('apply notes: rewrites the paragraph once, spends one unit, keeps phase and
   assert.ok(line && /applied=1/.test(line) && !line.includes('Alpha') && !line.includes('Secret'));
 });
 
+test('apply notes (review-a B4, plan 7-2): each apply writes a new seam line, so an accepted tick of the neighbour\'s box is void again', async () => {
+  const { attentionFingerprint } = S.load('experiences/visual-map/book-pipeline-review.ts');
+  const r = await notesRig();
+  await r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  const first = (await r.note(2)).pipelineSeam;
+  const accepted = attentionFingerprint({ stage: 'needs-review', issue: 'x', seam: first });
+  await r.repo.updateNoteGuarded(r.nodes[1].path, { detail: `${P1}\n\nA plain paragraph.` }, { authorize: () => true, finalize: c => c });
+  await r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  const second = (await r.note(2)).pipelineSeam;
+  assert.ok(first && second && first !== second, 'the seam line changed');
+  assert.notEqual(attentionFingerprint({ stage: 'needs-review', issue: 'x', seam: second }), accepted, 'the old tick no longer counts');
+});
+
+test('apply notes (review-a M1): a cancel that arrives after the writer wrote still finishes normally (edits kept for undo, both seams marked)', async () => {
+  const r = await notesRig();
+  const real = r.ports.notes.write;
+  r.ports.notes = { ...r.ports.notes, write: async (path, transform) => { const out = await real(path, transform); r.runs.cancelNotes(r.mapPath); return out; } };
+  const result = await r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  assert.equal(result.applied, 1);
+  assert.equal(result.edits.length, 1, 'the undo record is there');
+  assert.ok(r.cardRaw().includes('Alpha BETA2 gamma.'));
+  assert.ok((await r.note(0)).pipelineSeam && (await r.note(2)).pipelineSeam, 'both seams are marked');
+});
+
 test('apply notes: a stopped book stays stopped (phase and status untouched, one unit spent)', async () => {
   const r = await notesRig();
   await r.runs.stop(r.mapPath, { saved: true }); await settle();

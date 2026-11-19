@@ -400,21 +400,27 @@ export interface BookCardView {
   issueText?: string;
   /** True when a neighbouring card changed and the owner has not confirmed the join yet. */
   seam: boolean;
+  /** Book accepted (done): the stage pill of a needs-review card is not drawn. */
+  hideStage?: boolean;
   /** Screen prefix of the summary (never written to the note); none while the card has no plan yet. */
   summaryPrefix?: string;
 }
 
-export function bookCardView(note: BookCardInput): BookCardView {
+/** `accepted`: the book's phase is done; the proof marks (needs-review pill, issue line, seam pill) are hidden, the data is untouched. */
+export function bookCardView(note: BookCardInput, accepted = false): BookCardView {
   const stage = readPipelineStage(note.pipelineStage) ?? "pending";
   const role = readBookRole(note.bookRole);
   const issue = typeof note.pipelineIssue === "string" && note.pipelineIssue ? note.pipelineIssue : undefined;
   return {
     stage,
     stageText: t(STAGE_KEY[stage]),
-    seam: typeof note.pipelineSeam === "string" && note.pipelineSeam.trim() !== "",
+    seam: !accepted && typeof note.pipelineSeam === "string" && note.pipelineSeam.trim() !== "",
+    ...(accepted && stage === "needs-review" ? { hideStage: true } : {}),
     ...(role ? { roleText: t(ROLE_KEY[role]) } : {}),
-    ...(stage === "needs-review" && issue ? { issueText: t("ui.book_issue_0", bookIssueText(issue)) } : {}),
-    ...(stage === "checked" && issue ? structureNote(issue) : {}),
+    ...(!accepted && stage === "needs-review" && issue
+      ? { issueText: t("ui.book_issue_0", bookIssueText(issue)) }
+      : {}),
+    ...(!accepted && stage === "checked" && issue ? structureNote(issue) : {}),
     ...(stage === "pending"
       ? {}
       : { summaryPrefix: t(stage === "planned" ? "ui.book_summary_plan" : "ui.book_summary_done") })
@@ -451,7 +457,8 @@ export function renderBookCardLabels(
       elapsed.setAttr("aria-hidden", "true");
       writing.track(elapsed);
     }
-  } else header.createSpan({ cls: `vam-status vam-book-state is-${view.stage}`, text: view.stageText });
+  } else if (!view.hideStage)
+    header.createSpan({ cls: `vam-status vam-book-state is-${view.stage}`, text: view.stageText });
   if (view.seam) {
     const seam = header.createSpan({ cls: "vam-status vam-book-state is-seam", text: t("ui.book_seam_label") });
     seam.setAttr("title", t("ui.book_seam_reason"));

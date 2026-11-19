@@ -52086,7 +52086,7 @@ function structureNote(issue2) {
   if (!structure2) return { issueText: t("ui.book_checked_notice_0", String(notices)) };
   return { issueText: t("ui.book_structure_notice_0_1", String(structure2), String(notices)) };
 }
-function bookCardView(note) {
+function bookCardView(note, accepted = false) {
   var _a2;
   const stage = (_a2 = readPipelineStage(note.pipelineStage)) != null ? _a2 : "pending";
   const role = readBookRole(note.bookRole);
@@ -52094,10 +52094,11 @@ function bookCardView(note) {
   return {
     stage,
     stageText: t(STAGE_KEY[stage]),
-    seam: typeof note.pipelineSeam === "string" && note.pipelineSeam.trim() !== "",
+    seam: !accepted && typeof note.pipelineSeam === "string" && note.pipelineSeam.trim() !== "",
+    ...accepted && stage === "needs-review" ? { hideStage: true } : {},
     ...role ? { roleText: t(ROLE_KEY[role]) } : {},
-    ...stage === "needs-review" && issue2 ? { issueText: t("ui.book_issue_0", bookIssueText(issue2)) } : {},
-    ...stage === "checked" && issue2 ? structureNote(issue2) : {},
+    ...!accepted && stage === "needs-review" && issue2 ? { issueText: t("ui.book_issue_0", bookIssueText(issue2)) } : {},
+    ...!accepted && stage === "checked" && issue2 ? structureNote(issue2) : {},
     ...stage === "pending" ? {} : { summaryPrefix: t(stage === "planned" ? "ui.book_summary_plan" : "ui.book_summary_done") }
   };
 }
@@ -52123,7 +52124,8 @@ function renderBookCardLabels(header2, view, writing) {
       elapsed.setAttr("aria-hidden", "true");
       writing.track(elapsed);
     }
-  } else header2.createSpan({ cls: `vam-status vam-book-state is-${view.stage}`, text: view.stageText });
+  } else if (!view.hideStage)
+    header2.createSpan({ cls: `vam-status vam-book-state is-${view.stage}`, text: view.stageText });
   if (view.seam) {
     const seam = header2.createSpan({ cls: "vam-status vam-book-state is-seam", text: t("ui.book_seam_label") });
     seam.setAttr("title", t("ui.book_seam_reason"));
@@ -77822,7 +77824,13 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     if (research) this.researchSigs.set(node.path, this.researchSig(research));
     else this.researchSigs.delete(node.path);
     const active = merging || this.plugin.topicRuns.isBusy(node.path) || ((_k = this.plugin.quickExpandPending) == null ? void 0 : _k.has(node.path)) || this.startingTasks.has(node.path);
-    const bookCard = bookCardView(note != null ? note : {});
+    const bookDone = !!note && this.hasBookPipeline() && (() => {
+      var _a3, _b3, _c2;
+      const read = this.map ? readBookPipeline(this.map) : void 0;
+      if ((read == null ? void 0 : read.kind) !== "usable") return false;
+      return ((_c2 = (_b3 = this.plugin.getBookPipelineProgress((_a3 = this.path) != null ? _a3 : "")) == null ? void 0 : _b3.phase) != null ? _c2 : read.data.phase) === "done";
+    })();
+    const bookCard = bookCardView(note != null ? note : {}, bookDone);
     if (!loading) {
       const statusText = research ? this.researchStageText(research) : merging ? t("ui.merging") : active ? t("ui.ai_running") : queued ? t("ui.research_queued") : (note == null ? void 0 : note.status) === "completed" ? t("ui.researched") : note ? topicStatusLabel(note.status, this.plugin.settings.language) : t("ui.note_missing");
       if (research) {

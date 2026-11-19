@@ -95,9 +95,12 @@ test('whitelist (review-a B1): a refused reply changes nothing, so the hidden re
   const request = { items: items.map(i => i.encoded) };
   const good = na.applyReplies(raw, items, replies(items));
   const fenced = JSON.stringify({ paragraphs: [{ id: 'p1', text: 'Brunelleschi showed linear perspective ⟦L1⟧\n```' }, { id: 'p2', text: 'x ⟦L1⟧' }] });
-  assert.throws(() => steps.parseApplyNotes(fenced, { ...request, items: request.items }), /refused|line count/);
+  const mixed = steps.parseApplyNotes(fenced, { ...request, items: request.items });
+  assert.deepEqual([...mixed.refused.map(r => r.id)], ['p1'], 'the fenced paragraph is refused, not the step');
   const fixed = JSON.stringify({ paragraphs: [{ id: 'p1', text: 'Brunelleschi showed linear perspective ⟦L1⟧\n```' }] });
-  assert.throws(() => steps.parseApplyNotes(fixed, { items: [request.items[0]] }), /refused/);
+  const only = steps.parseApplyNotes(fixed, { items: [request.items[0]] });
+  assert.equal(only.paragraphs.length, 0);
+  assert.equal(only.refused.length, 1);
   assert.ok(good.text.includes(record), 'the hidden record is in the written text');
   assert.equal(sections.chapterBody(good.text).includes('proof-record'), false, 'the record stays out of the chapter text');
   assert.equal(na.undoApplied(good.text, good.applied).text, raw, 'the undo of the accepted apply is whole');
@@ -227,4 +230,41 @@ test('stale proof (T6c): reviewEntries flags the chapter with the edited problem
   assert.deepEqual([ticked.hideStage, ticked.issueText, ticked.seam], [true, undefined, false], 'review-a B3: a ticked box looks done like an accepted book');
   assert.equal(ui.bookCardView({ pipelineStage: 'checked' }, false, true, true).edited, undefined, 'a ticked edited chapter loses its edited pill');
   assert.equal(ui.bookCardView({ pipelineStage: 'needs-review', pipelineIssue: 'x' }, false, false, false).hideStage, undefined, 'not ticked: unchanged');
+});
+
+test('whitelist (fix3): a line body must start with a letter, number, link token or opening mark; no mark the original used lets a block start through', () => {
+  const dash = { text: 'one - two\nline', links: [] };
+  const eq = { text: 'a = b\nline', links: [] };
+  const pipe = { text: 'a | b - c\nline', links: [] };
+  const bad = [
+    [dash, 'one - two\n--'], [dash, 'one - two\n---'], [dash, 'one - two\n- - -'], [eq, 'a = b\n='], [eq, 'a = b\n=='],
+    [pipe, 'a | b - c\n|-|-|'], [dash, 'Word\n--'], [dash, 'word\n-'], [dash, '-- one\nline'], [dash, '/ one\nline'], [dash, '% one\nline']
+  ];
+  for (const [item, text] of bad) assert.equal(na.checkRewrite(item, text).ok, false, JSON.stringify(text));
+  assert.equal(na.checkRewrite({ text: 'Word\nline', links: [] }, 'Word\n--').ok, false, 'setext under a single word');
+});
+
+test('whitelist (fix3): common prose marks pass', () => {
+  const ok = ['菲利波·布魯內萊斯基', '《蒙娜麗莎》', 'one-point perspective', 'about 30%', '約 1415～1420 年', '「引言」與『書名』：好；對、是。', 'a / b – c — d', '〈短篇〉 ok'];
+  for (const text of ok) assert.equal(na.checkRewrite({ text: 'x', links: [] }, text).ok, true, text);
+  assert.equal(na.checkRewrite({ text: 'x ⟦L1⟧', links: ['[a](b)'] }, '⟦L1⟧ x').ok, true, 'a line may start with a link token');
+});
+
+test('whitelist (fix3): one refused paragraph is skipped with its note kept; the valid ones are applied', () => {
+  const steps = load('core/steps/book-pipeline/apply-notes.ts');
+  const items = na.snapshotNotes(RAW);
+  const request = { items: items.map(i => i.encoded) };
+  const body = JSON.stringify({ paragraphs: [{ id: 'p1', text: '-- Brunelleschi showed linear perspective ⟦L1⟧' }, { id: 'p2', text: 'Second remark here with ⟦L1⟧.' }] });
+  const parsed = steps.parseApplyNotes(body, request);
+  assert.equal(parsed.paragraphs.length, 1);
+  assert.equal(parsed.refused.length, 1);
+  assert.equal(parsed.refused[0].id, 'p1');
+  assert.ok(parsed.refused[0].reason);
+  assert.throws(() => steps.parseApplyNotes(JSON.stringify({ paragraphs: [{ id: 'p1', text: 'x' }] }), request), /count/, 'the id set stays strict');
+  const out = na.applyReplies(RAW, items, [...parsed.paragraphs], parsed.refused.map(r => r.id));
+  assert.equal(out.skipped, 1);
+  assert.equal(out.applied.length, 1);
+  assert.ok(out.text.includes(`==perspective==%%備註#2：說明是什麼${na.SKIP_MARK}%%`), 'the refused paragraph keeps its marked span and note');
+  assert.ok(out.text.includes('Second remark'), 'the valid paragraph is rewritten');
+  assert.ok(out.text.includes(`說明是什麼${na.SKIP_MARK}%%`), 'its note says it was skipped');
 });

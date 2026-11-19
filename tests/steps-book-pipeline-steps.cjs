@@ -662,28 +662,28 @@ test('apply-notes: ids must be exactly the sent ids (unknown, duplicate, missing
 });
 
 test('apply-notes: every link token must come back exactly once, and no note marker or unknown token may stay', () => {
-  const t = text => () => applyNotes.parseApplyNotes(applyReply({ id: 'p1', text }), applyRequest());
-  assert.throws(t('Linear perspective in ⟦L1⟧ around 1415.'), /link token missing/);
-  assert.throws(t('Linear ⟦L1⟧ ⟦L1⟧ ⟦L2⟧.'), /repeated/);
-  assert.throws(t('Linear ⟦L1⟧ ⟦L2⟧ ⟦L3⟧.'), /unknown link token/);
-  assert.throws(t('Linear ⟦N2⟧perspective⟦/N2⟧ ⟦L1⟧ ⟦L2⟧.'), /note marker left/);
-  assert.throws(t('Linear ⟦X⟧ ⟦L1⟧ ⟦L2⟧.'), /unknown token/);
+  const t = text => plain(applyNotes.parseApplyNotes(applyReply({ id: 'p1', text }), applyRequest()));
+  assert.match(t('Linear perspective in ⟦L1⟧ around 1415.').refused[0].reason, /link token missing/);
+  assert.match(t('Linear ⟦L1⟧ ⟦L1⟧ ⟦L2⟧.').refused[0].reason, /repeated/);
+  assert.match(t('Linear ⟦L1⟧ ⟦L2⟧ ⟦L3⟧.').refused[0].reason, /unknown link token/);
+  assert.match(t('Linear ⟦N2⟧perspective⟦/N2⟧ ⟦L1⟧ ⟦L2⟧.').refused[0].reason, /note marker left/);
+  assert.match(t('Linear ⟦X⟧ ⟦L1⟧ ⟦L2⟧.').refused[0].reason, /unknown token/);
 });
 
-test('apply-notes: a reply with a callout, checkbox, new link, %%, ==, heading or html is refused whole', () => {
-  const t = text => () => applyNotes.parseApplyNotes(applyReply({ id: 'p1', text }), applyRequest());
+test('apply-notes: a reply with a callout, checkbox, new link, %%, ==, heading or html is refused (skipped, not fatal)', () => {
+  const t = text => plain(applyNotes.parseApplyNotes(applyReply({ id: 'p1', text }), applyRequest()));
   const cases = { callout: '[!note] x ⟦L1⟧ ⟦L2⟧', checkbox: '[ ] x ⟦L1⟧ ⟦L2⟧', 'new link': 'x [a](http://b.c) ⟦L1⟧ ⟦L2⟧', 'new link bare': 'x https://b.c ⟦L1⟧ ⟦L2⟧', 'new link wiki': 'x [[A]] ⟦L1⟧ ⟦L2⟧', comment: 'x %%c%% ⟦L1⟧ ⟦L2⟧', highlight: 'x ==h== ⟦L1⟧ ⟦L2⟧', heading: '## x ⟦L1⟧ ⟦L2⟧', html: 'x <b>y</b> ⟦L1⟧ ⟦L2⟧' };
-  for (const [name, text] of Object.entries(cases)) assert.throws(t(text), /refused/, name);
+  for (const [name, text] of Object.entries(cases)) assert.equal(t(text).refused.length, 1, name);
 });
 
 test('apply-notes: lines, list marks and blank lines are kept', () => {
   const item = notesApply.encodeParagraph('p1', '- first ==a==%%備註#1：n%%\n- second');
-  const run = text => () => applyNotes.parseApplyNotes(applyReply({ id: 'p1', text }), applyRequest([item]));
+  const run = text => plain(applyNotes.parseApplyNotes(applyReply({ id: 'p1', text }), applyRequest([item]))).refused[0]?.reason ?? '';
   assert.deepEqual(plain(applyNotes.parseApplyNotes(applyReply({ id: 'p1', text: '- first A\n- second' }), applyRequest([item]))).paragraphs[0].text, '- first A\n- second');
-  assert.throws(run('- first A - second'), /line count/);
-  assert.throws(run('- first A\nsecond'), /list or quote mark/);
-  assert.throws(run('- first A\n\n'), /line count|blank/);
-  assert.throws(run('   '), /empty|non-empty/);
+  assert.match(run('- first A - second'), /line count/);
+  assert.match(run('- first A\nsecond'), /list or quote mark/);
+  assert.match(run('- first A\n\n'), /line count|blank/);
+  assert.throws(() => run('   '), /empty|non-empty/);
 });
 
 test('T10a verdict reducer: all structure points unmet or an empty chapter is needs-review (also for a stored checked result); some unmet structure with met facts stays checked', () => {

@@ -46012,18 +46012,22 @@ function snapshotNotes(raw) {
   return items;
 }
 var LEAD = /^\s*(?:>\s*)*(?:[-*+]\s+|\d+[.)]\s+)?/;
-var BASE_PUNCT = /* @__PURE__ */ new Set([...` ,.;:!?'"()\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF01\uFF1F\uFF08\uFF09\u300C\u300D\u300E\u300F\u2018\u2019\u201C\u201D\u2026\u2014`]);
+var BASE_PUNCT = /* @__PURE__ */ new Set([...` ,.;:!?'"()\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF01\uFF1F\uFF08\uFF09\u300C\u300D\u300E\u300F\u2018\u2019\u201C\u201D\u2026\u2014\u2013/%\xB7\u300A\u300B\u3008\u3009\uFF5E-`]);
+var OPENERS = /* @__PURE__ */ new Set([...`'"(\uFF08\u300C\u300E\u2018\u201C\u300A\u3008`]);
+var STARTS_LIKE_PROSE = /^[\p{L}\p{N}]/u;
 var TOKEN3 = /⟦L\d+⟧/g;
 function whitelistBreach(original, before, lines) {
-  var _a2, _b2;
+  var _a2, _b2, _c;
   const allowed = new Set([...original.replace(TOKEN3, "")].filter((c) => !/[\p{L}\p{N}\p{M}\s]/u.test(c)));
   for (const c of BASE_PUNCT) allowed.add(c);
   for (const mark2 of ["```", "~~~", "$$"])
     if (lines.join("\n").includes(mark2) && !original.includes(mark2)) return "block syntax";
   for (const [i, line2] of lines.entries()) {
     const body = line2.slice((_b2 = (_a2 = LEAD.exec(line2)) == null ? void 0 : _a2[0].length) != null ? _b2 : 0);
-    if (/^\s{0,3}(?:`{3,}|~{3,}|\$\$|\[\^|#)/.test(body) || /^\s{0,3}([-*_=])\1{2,}/.test(body) || /^\s{0,3}(?:[-*_]\s*){3,}$/.test(body))
+    const first = body.replace(/^\s+/, "");
+    if (!STARTS_LIKE_PROSE.test(first) && !first.startsWith("\u27E6L") && !OPENERS.has((_c = first[0]) != null ? _c : ""))
       return "block syntax";
+    if (/^\s{0,3}(?:`{3,}|~{3,}|\$\$|\[\^|#)/.test(body)) return "block syntax";
     if (/^\s*(?:[-*+]|\d+[.)])(\s|$)/.test(body)) return "list mark";
     const indent2 = (t2) => /^(?: {4,}|\t)/.test(t2);
     if (indent2(line2) && !indent2(before[i])) return "indent";
@@ -46075,12 +46079,21 @@ function runEdits(raw, edits) {
   }
   return { text: out + raw.slice(pos), ranges };
 }
-function applyReplies(raw, items, replies) {
+function applyReplies(raw, items, replies, refused = []) {
   const paragraphs = chapterParagraphs(raw);
   const notes = findNotes(raw);
   const edits = [];
   const marks = [];
   let skipped2 = 0;
+  const skipNotes = (item) => {
+    skipped2++;
+    for (const n of notes.filter((f) => item.numbers.includes(f.n) && !f.note.endsWith(SKIP_MARK)))
+      if (!marks.some((m) => m.from === n.to - 2)) marks.push({ from: n.to - 2, to: n.to - 2, insert: SKIP_MARK });
+  };
+  for (const id of refused) {
+    const item = items.find((i) => i.id === id);
+    if (item) skipNotes(item);
+  }
   for (const reply of replies) {
     const item = items.find((i) => i.id === reply.id);
     if (!item) continue;
@@ -46095,9 +46108,7 @@ function applyReplies(raw, items, replies) {
       });
       continue;
     }
-    skipped2++;
-    for (const n of notes.filter((f) => item.numbers.includes(f.n) && !f.note.endsWith(SKIP_MARK)))
-      if (!marks.some((m) => m.from === n.to - 2)) marks.push({ from: n.to - 2, to: n.to - 2, insert: SKIP_MARK });
+    skipNotes(item);
   }
   const free = marks.filter((m) => !edits.some((e) => m.from >= e.from && m.from <= e.to));
   const { text: text10, ranges } = runEdits(raw, [...edits, ...free]);
@@ -46261,7 +46272,7 @@ Rules for every paragraph you return:
 - Remove all note marks \u27E6N..\u27E7 and \u27E6/N..\u27E7; keep the words that were inside them unless a note asks to change them.
 - A token such as \u27E6L1\u27E7 stands for a link or a picture. Keep every token of the paragraph exactly once, unchanged, and add no token.
 - Keep the same number of lines, and keep each line's list or quote mark (for example "- " or "> ") as it was. Add no blank line.
-- Write plain text only. Do not add headings, callouts, checkboxes, links, addresses, highlights (==), comments (%%) or HTML.
+- Write plain prose only: no headings, no lists, no code, no links, no addresses, no callouts, checkboxes, highlights (==), comments (%%) or HTML. Keep the placeholders. Marks you may use: letters, numbers, spaces, and ordinary punctuation such as , . ; : ! ? ' " ( ) - \u2013 \u2014 / % \xB7 \u2026 \uFF5E \u300A\u300B \u300C\u300D \u300E\u300F and their full-width forms. A line must begin with a letter, a number, a \u27E6L token or an opening quote or bracket.
 - Keep the chapter's voice, the plan and the settings. Use only facts, numbers and names that appear in the supplied text or the notes.
 
 Return only JSON: {"paragraphs":[{"id":"","text":""}]}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.
@@ -46306,7 +46317,9 @@ function parseApplyNotes(raw, request) {
   const entries = arrayOf(root.paragraphs, "paragraphs");
   if (entries.length !== request.items.length) fail2("paragraph count mismatch");
   const seen = /* @__PURE__ */ new Set();
-  const paragraphs = entries.map((entry) => {
+  const paragraphs = [];
+  const refused = [];
+  for (const entry of entries) {
     const one = recordOf2(entry, "paragraph");
     exactKeys(one, ["id", "text"]);
     const id = textOf(one.id, "paragraph id");
@@ -46315,10 +46328,10 @@ function parseApplyNotes(raw, request) {
     if (seen.has(id)) fail2("repeated paragraph id");
     seen.add(id);
     const check = checkRewrite(item, textOf(one.text, "paragraph text"));
-    if (!check.ok) return fail2(`Paragraph rewrite refused: ${check.reason}`);
-    return { id, text: check.text };
-  });
-  return { paragraphs };
+    if (check.ok) paragraphs.push({ id, text: check.text });
+    else refused.push({ id, reason: check.reason });
+  }
+  return { paragraphs, refused };
 }
 var applyNotesStep = {
   id: "book-pipeline.apply-notes",
@@ -52076,9 +52089,11 @@ var BookPipelineRuns = class {
     );
     const admission = createBudgetAdmission(createStoreBudgetPort(store));
     let replies;
+    let refused;
     try {
       const result = await untilAborted(signal, this.ports.runPlan(applyNotesStep, request, { signal, admission }));
       replies = result.paragraphs;
+      refused = result.refused;
     } catch (error) {
       if (error instanceof BookPipelineRunError) throw error;
       if (isBudgetExhausted(error)) throw new BookPipelineRunError("budget");
@@ -52100,7 +52115,12 @@ var BookPipelineRuns = class {
         outcome = void 0;
         return text10;
       }
-      outcome = applyReplies(text10, items, replies);
+      outcome = applyReplies(
+        text10,
+        items,
+        replies,
+        refused.map((r) => r.id)
+      );
       return outcome.text;
     });
     if (!(written2 === "written" && outcome)) refuseIfGone();
@@ -52108,7 +52128,7 @@ var BookPipelineRuns = class {
     const done = written2 === "written" && outcome ? outcome : void 0;
     if (!done) return { applied: 0, skipped: 0, marked: 0, edits: [] };
     if (done.applied.length) await this.markNeighbourSeams(mapPath, again.data, nodeId, config.language, fresh);
-    return { applied: done.applied.length, skipped: done.skipped, marked: done.marked, edits: done.applied };
+    return { applied: done.applied.length, skipped: done.skipped, marked: done.marked, edits: done.applied, refused };
   }
   /** The body changed: both neighbours' joins are worth a look, as after a rerun. */
   async markNeighbourSeams(mapPath, state, nodeId, language2, map) {

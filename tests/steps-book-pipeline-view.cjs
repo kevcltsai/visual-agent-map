@@ -1364,6 +1364,24 @@ test('review box: a tick for the attention it has now resolves the chapter (the 
   assert.equal(r.view.bookResolved.has(r.ids.a), false);
   assert.deepEqual(r.attention(), [r.ids.a]);
 });
+test('card (review-a B3): after a tick resolves the chapter, its card hides the needs-review pill and the issue line', async () => {
+  const r = await boxRig();
+  Object.assign(r.view.notes.get(r.ids.a), { pipelineStage: 'needs-review', pipelineIssue: 'proof unmet: C1' });
+  const marks = () => {
+    const stage = r.paint();
+    const card = dom.findAll(stage, i => i.cls.includes('vam-node') && i.text.includes('需人看')).length;
+    return { pills: dom.findAll(stage, i => i.cls.includes('vam-book-state') && i.text === '需人看').length, issues: dom.findAll(stage, i => i.cls.includes('vam-card-book-issue')).length, card };
+  };
+  const before = marks();
+  assert.equal(before.pills, 1, 'the pill shows before the tick');
+  assert.equal(before.issues, 1, 'the issue line shows before the tick');
+  await r.writeBox({ ticked: true });
+  await r.modified();
+  assert.ok(r.view.bookResolved.has(r.ids.a));
+  const after = marks();
+  assert.equal(after.pills, 0, 'no needs-review pill once resolved');
+  assert.equal(after.issues, 0, 'no issue line once resolved');
+});
 // ---- T9: a hand-edited chapter's box (keep / rewrite) and the rerun question (G) ----
 const { stampDetail, integrityFpRaw } = support.load('core/book-pipeline/body-integrity.ts');
 async function handRig() {

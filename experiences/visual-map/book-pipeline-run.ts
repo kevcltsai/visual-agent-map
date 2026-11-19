@@ -823,6 +823,8 @@ export interface NotesApplyResult {
   skipped: number;
   marked: number;
   edits: AppliedEdit[];
+  /** Paragraphs whose rewrite was refused (left alone, note kept), with the reason. */
+  refused?: { id: string; reason: string }[];
 }
 
 export class BookPipelineRuns {
@@ -1385,9 +1387,11 @@ export class BookPipelineRuns {
     );
     const admission = createBudgetAdmission(createStoreBudgetPort(store));
     let replies: { id: string; text: string }[];
+    let refused: { id: string; reason: string }[];
     try {
       const result = await untilAborted(signal, this.ports.runPlan(applyNotesStep, request, { signal, admission }));
       replies = result.paragraphs;
+      refused = result.refused;
     } catch (error) {
       if (error instanceof BookPipelineRunError) throw error;
       if (isBudgetExhausted(error)) throw new BookPipelineRunError("budget");
@@ -1411,7 +1415,12 @@ export class BookPipelineRuns {
         outcome = undefined;
         return text;
       }
-      outcome = applyReplies(text, items, replies);
+      outcome = applyReplies(
+        text,
+        items,
+        replies,
+        refused.map(r => r.id)
+      );
       return outcome.text;
     });
     // A cancel that arrives after the transform has written is too late to undo anything: the job finishes normally (undo record,
@@ -1421,7 +1430,7 @@ export class BookPipelineRuns {
     const done = written === "written" && outcome ? outcome : undefined;
     if (!done) return { applied: 0, skipped: 0, marked: 0, edits: [] };
     if (done.applied.length) await this.markNeighbourSeams(mapPath, again.data, nodeId, config.language, fresh);
-    return { applied: done.applied.length, skipped: done.skipped, marked: done.marked, edits: done.applied };
+    return { applied: done.applied.length, skipped: done.skipped, marked: done.marked, edits: done.applied, refused };
   }
 
   /** The body changed: both neighbours' joins are worth a look, as after a rerun. */

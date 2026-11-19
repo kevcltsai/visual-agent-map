@@ -1713,7 +1713,7 @@ const { createNoteWriter } = S.load('experiences/visual-map/book-pipeline-callou
 const { SKIP_MARK } = S.load('core/book-pipeline/notes-apply.ts');
 const NW = (text, n, note) => `==${text}==%%備註#${n}：${note}%%`;
 const P1 = `Alpha ${NW('beta', 1, 'shorter')} gamma.`;
-const reply = request => ({ paragraphs: request.items.map(item => ({ id: item.id, text: 'Alpha BETA2 gamma.' })) });
+const reply = request => ({ paragraphs: request.items.map(item => ({ id: item.id, text: 'Alpha BETA2 gamma.' })), refused: [] });
 
 /** A run waiting at gate 1 whose card A (nodes[1]) has one annotated paragraph; the notes ports write through the real writer with no editor open. */
 async function notesRig(over = {}) {

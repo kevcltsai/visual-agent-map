@@ -110,7 +110,10 @@ export function snapshotNotes(raw: string): NoteItem[] {
 const LEAD = /^\s*(?:>\s*)*(?:[-*+]\s+|\d+[.)]\s+)?/;
 
 /** Prose punctuation any rewrite may use; every other mark must already be in the original paragraph. */
-const BASE_PUNCT = new Set([..." ,.;:!?'\"()，。、；：！？（）「」『』‘’“”…—"]);
+const BASE_PUNCT = new Set([..." ,.;:!?'\"()，。、；：！？（）「」『』‘’“”…—–/%·《》〈〉～-"]);
+/** A line body may only start with a letter, a number, a link token or one of these opening marks. */
+const OPENERS = new Set([..."'\"(（「『‘“《〈"]);
+const STARTS_LIKE_PROSE = /^[\p{L}\p{N}]/u;
 const TOKEN = /⟦L\d+⟧/g;
 
 /**
@@ -125,12 +128,10 @@ function whitelistBreach(original: string, before: string[], lines: string[]): s
     if (lines.join("\n").includes(mark) && !original.includes(mark)) return "block syntax";
   for (const [i, line] of lines.entries()) {
     const body = line.slice(LEAD.exec(line)?.[0].length ?? 0);
-    if (
-      /^\s{0,3}(?:`{3,}|~{3,}|\$\$|\[\^|#)/.test(body) ||
-      /^\s{0,3}([-*_=])\1{2,}/.test(body) ||
-      /^\s{0,3}(?:[-*_]\s*){3,}$/.test(body)
-    )
+    const first = body.replace(/^\s+/, "");
+    if (!STARTS_LIKE_PROSE.test(first) && !first.startsWith("⟦L") && !OPENERS.has(first[0] ?? ""))
       return "block syntax";
+    if (/^\s{0,3}(?:`{3,}|~{3,}|\$\$|\[\^|#)/.test(body)) return "block syntax";
     if (/^\s*(?:[-*+]|\d+[.)])(\s|$)/.test(body)) return "list mark";
     const indent = (t: string): boolean => /^(?: {4,}|\t)/.test(t);
     if (indent(line) && !indent(before[i])) return "indent";
@@ -214,13 +215,23 @@ function runEdits(raw: string, edits: Edit[]): { text: string; ranges: Map<Edit,
 export function applyReplies(
   raw: string,
   items: readonly NoteItem[],
-  replies: readonly { id: string; text: string }[]
+  replies: readonly { id: string; text: string }[],
+  refused: readonly string[] = []
 ): ApplyOutcome {
   const paragraphs = chapterParagraphs(raw);
   const notes = findNotes(raw);
   const edits: Edit[] = [];
   const marks: Edit[] = [];
   let skipped = 0;
+  const skipNotes = (item: NoteItem): void => {
+    skipped++;
+    for (const n of notes.filter(f => item.numbers.includes(f.n) && !f.note.endsWith(SKIP_MARK)))
+      if (!marks.some(m => m.from === n.to - 2)) marks.push({ from: n.to - 2, to: n.to - 2, insert: SKIP_MARK });
+  };
+  for (const id of refused) {
+    const item = items.find(i => i.id === id);
+    if (item) skipNotes(item);
+  }
   for (const reply of replies) {
     const item = items.find(i => i.id === reply.id);
     if (!item) continue;
@@ -235,9 +246,7 @@ export function applyReplies(
       });
       continue;
     }
-    skipped++;
-    for (const n of notes.filter(f => item.numbers.includes(f.n) && !f.note.endsWith(SKIP_MARK)))
-      if (!marks.some(m => m.from === n.to - 2)) marks.push({ from: n.to - 2, to: n.to - 2, insert: SKIP_MARK });
+    skipNotes(item);
   }
   const free = marks.filter(m => !edits.some(e => m.from >= e.from && m.from <= e.to));
   const { text, ranges } = runEdits(raw, [...edits, ...free]);

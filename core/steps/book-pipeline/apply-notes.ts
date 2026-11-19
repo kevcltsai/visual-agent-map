@@ -26,6 +26,8 @@ export interface ApplyNotesRequest extends BookStepBase {
 export interface ApplyNotesResult {
   /** One per sent id; the links are already restored. */
   paragraphs: { id: string; text: string }[];
+  /** Paragraphs whose rewrite was refused: left alone, their notes kept, with the reason. */
+  refused: { id: string; reason: string }[];
 }
 
 export const MAX_NOTE_PARAGRAPHS = 60;
@@ -54,7 +56,9 @@ export function parseApplyNotes(raw: string, request: ApplyNotesRequest): ApplyN
   const entries = arrayOf(root.paragraphs, "paragraphs");
   if (entries.length !== request.items.length) fail("paragraph count mismatch");
   const seen = new Set<string>();
-  const paragraphs = entries.map(entry => {
+  const paragraphs: { id: string; text: string }[] = [];
+  const refused: { id: string; reason: string }[] = [];
+  for (const entry of entries) {
     const one = recordOf(entry, "paragraph");
     exactKeys(one, ["id", "text"]);
     const id = textOf(one.id, "paragraph id");
@@ -63,10 +67,10 @@ export function parseApplyNotes(raw: string, request: ApplyNotesRequest): ApplyN
     if (seen.has(id)) fail("repeated paragraph id");
     seen.add(id);
     const check = checkRewrite(item, textOf(one.text, "paragraph text"));
-    if (!check.ok) return fail(`Paragraph rewrite refused: ${check.reason}`);
-    return { id, text: check.text };
-  });
-  return { paragraphs };
+    if (check.ok) paragraphs.push({ id, text: check.text });
+    else refused.push({ id, reason: check.reason });
+  }
+  return { paragraphs, refused };
 }
 
 /** The rewrite of the paragraphs that carry the reader's notes. Text-only; the program, not the model, finds the paragraphs and writes. */

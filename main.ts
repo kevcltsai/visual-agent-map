@@ -523,6 +523,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     askNote: (selected, submit) => new BookNoteModal(this.app, selected, submit).open(),
     notice: message => void new Notice(message),
     applyNotes: path => this.applyBookNotes(path),
+    addBlocked: path => {
+      const map = this.bookChapterMaps.get(path);
+      return map && this.bookPipelineRuns.isRunning(map) ? t("ui.book_refused_drive_running") : null;
+    },
     applyStatus: path => {
       const running = this.bookNotesApply.isRunning(path);
       const disabled = this.bookNotesApply.disabledReason(path);

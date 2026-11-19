@@ -68,7 +68,7 @@ import {
   type ApplyNotesRequest
 } from "../../core/steps/book-pipeline/apply-notes";
 import { applyReplies, snapshotNotes, type AppliedEdit, type ApplyOutcome } from "../../core/book-pipeline/notes-apply";
-import { projectProofBody } from "../../core/book-pipeline/book-notes";
+import { findNotes, projectProofBody } from "../../core/book-pipeline/book-notes";
 import {
   appendResearchNote,
   carryWorkLog,
@@ -2306,9 +2306,17 @@ export class BookPipelineRuns {
       return { kind: "failed", reason: "backup_failed", forceReview: true };
     const authorize = this.authorize(drive, token, nodeId);
     let changedByHand = false;
+    // The reader's notes (==text==%%備註#n：…%%) in the text this step started from: a note added (or taken off) before the write is
+    // a change the author's text does not contain, so the write is refused like a hand edit (the note and the text stay).
+    const notesOf = (raw: string): string =>
+      findNotes(raw)
+        .map(found => `${found.n}|${found.selected}|${found.note}`)
+        .join("\n");
+    const startNotes = notesOf(card.raw);
     const authorizeWrite = (current?: string): boolean => {
       if (!authorize()) return false;
-      if (current === undefined || mayOverwrite(current)) return true;
+      if (current === undefined) return true;
+      if (mayOverwrite(current) && notesOf(current) === startNotes) return true;
       changedByHand = true;
       return false;
     };

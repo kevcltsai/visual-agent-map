@@ -174,7 +174,8 @@ function world({ chapters = ['N/c.md'], files = {} } = {}) {
     askNote: (selected, submit) => { w.asks++; w.asked.push(selected); w.submit = submit; },
     notice: m => w.notices.push(m),
     applyNotes: p => w.applied.push(p),
-    applyStatus: p => w.status[p] ?? { running: false }
+    applyStatus: p => w.status[p] ?? { running: false },
+    addBlocked: p => w.blocked?.[p] ?? null
   });
   w.editor = (tab, word) => ({ path: tab.path, text: () => tab.text, selection: () => { const [from, to] = word ? sel(tab.text, word) : [0, 0]; return { from, to }; } });
   return w;
@@ -225,6 +226,21 @@ test('command: asks for the note, writes it through the writer, tells the reader
   assert.equal(w.live(tab).length, 1, 'the header action appeared with the first note');
   assert.equal(w.live(tab)[0].label, '套用 1 則備註');
 });
+test('review-a B2: while the map\'s drive runs the add item is disabled with the apply reason, and the command asks nothing', async () => {
+  const w = world();
+  const tab = w.open('N/c.md'); await w.notes.refresh();
+  w.blocked = { 'N/c.md': '圖文書正在執行' };
+  const plan = w.notes.menu(w.editor(tab, '小熊'));
+  assert.equal(plan.add.disabled, true);
+  assert.match(plan.add.title, /圖文書正在執行/);
+  w.notes.add(w.editor(tab, '小熊'));
+  assert.equal(w.asks, 0, 'no dialog');
+  assert.deepEqual(w.notices, ['圖文書正在執行']);
+  w.blocked = {}; w.notices.length = 0;
+  w.notes.add(w.editor(tab, '小熊'));
+  assert.equal(w.asks, 1, 'allowed again once the drive ends');
+});
+
 test('command: a bad note text is answered in the dialog and nothing is written; a bad selection never opens the dialog', async () => {
   const w = world();
   const tab = w.open('N/c.md'); await w.notes.refresh();

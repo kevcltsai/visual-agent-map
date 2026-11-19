@@ -2101,6 +2101,21 @@ test('T9 callback window: a permission bound to one text does not cover text typ
   assert.ok((await r.note(1)).detail.includes('LATER'));
 });
 
+test('review-a B2: a reader\'s note added between the backup and the write survives (the write is refused like a hand edit)', async () => {
+  const { wrapNote } = S.load('core/book-pipeline/book-notes.ts');
+  const r = await rig({ script: { author: async (input, n) => {
+    await input.admission.reserve();
+    if (n === 2) await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(bodyOf(TITLES[1]), wrapNote(bodyOf(TITLES[1]), 1, 'keep this note')), {});
+    const out = await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(TITLES[1]) + ` v${n}` }, { authorize: input.authorize, finalize: input.finalize });
+    return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+  } } });
+  await finish(r);
+  await rerun(r, 1);
+  assert.ok((await r.note(1)).detail.includes('%%備註#1：keep this note%%'), 'the note survived');
+  assert.ok(!(await r.note(1)).detail.includes(' v2'), 'the author text did not land');
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: hand_edited');
+});
+
 test('T9 detection through the notes: a reader\'s note on the chapter is not a hand edit, a changed word is', async () => {
   const r = await rig();
   await finish(r);

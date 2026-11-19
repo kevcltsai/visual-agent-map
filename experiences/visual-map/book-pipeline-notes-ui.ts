@@ -54,6 +54,8 @@ export interface BookNotesPorts {
   applyNotes(path: string): void;
   /** What the header action shows for this chapter: the running clock, or the reason it is disabled. */
   applyStatus(path: string): { running: boolean; elapsed?: string; disabled?: string };
+  /** Why adding a note is blocked now (a drive of the map is rewriting chapters: a note added meanwhile could be lost); absent or null: allowed. */
+  addBlocked?(path: string): string | null;
 }
 
 /** What the editor menu should show for the active editor: nothing for a note that is not a chapter. */
@@ -145,10 +147,13 @@ export class BookNotes {
     const text = editor.text();
     const check = checkSelection(text, from, to);
     const count = countNotes(text);
+    const blocked = this.ports.addBlocked?.(editor.path ?? "") ?? null;
     return {
-      add: check.ok
-        ? { title: t("ui.book_note_add"), disabled: false }
-        : { title: t("ui.book_note_add_disabled_0", t(WHY[check.reason])), disabled: true },
+      add: blocked
+        ? { title: t("ui.book_note_add_disabled_0", blocked), disabled: true }
+        : check.ok
+          ? { title: t("ui.book_note_add"), disabled: false }
+          : { title: t("ui.book_note_add_disabled_0", t(WHY[check.reason])), disabled: true },
       ...(this.ports.applyStatus(editor.path ?? "").running
         ? { apply: { title: t("ui.book_note_cancel_menu") } }
         : count
@@ -161,6 +166,8 @@ export class BookNotes {
   add(editor: NotesEditor): void {
     const path = editor.path;
     if (!path || !this.isChapter(path)) return this.ports.notice(t("ui.book_note_not_chapter"));
+    const blocked = this.ports.addBlocked?.(path);
+    if (blocked) return this.ports.notice(blocked);
     const { from, to } = editor.selection();
     const check = checkSelection(editor.text(), from, to);
     if (!check.ok) return this.ports.notice(t(WHY[check.reason]));
@@ -180,6 +187,8 @@ export class BookNotes {
 
   private async commit(path: string, from: number, to: number, selected: string, note: string): Promise<void> {
     let failure: NoteRefusal | "note" | undefined;
+    const blocked = this.ports.addBlocked?.(path);
+    if (blocked) return this.ports.notice(blocked);
     try {
       const result = await this.ports.write(path, text => {
         const added = addNote(text, from, to, selected, note);

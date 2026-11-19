@@ -48,7 +48,7 @@ async function rig(over = {}) {
     updateMap: (path, change) => repo.updateMap(path, d => { change(d); if (d.bookPipeline) delete d.bookPipeline.trial; }),
     readCard: async path => {
       const note = await repo.readNote(path);
-      return { path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(path), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}) } };
+      return { path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(path), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineRole ? { pipelineRole: note.pipelineRole } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}) } };
     },
     writePipelineFields: (path, patch) => { stat.writes++; return repo.writePipelineFields(path, patch); },
     updateNoteGuarded: (path, patch, options) => repo.updateNoteGuarded(path, patch, options),

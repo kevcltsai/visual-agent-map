@@ -250,3 +250,41 @@ test('reserveBudget is pure', () => {
   assert.deepEqual(before, { used: 2, limit: 3 });
   assert.equal(model.reserveBudget({ used: 3, limit: 3 }), null);
 });
+
+test('pipeline-role: read, written with the role, an invalid value removes it; an older note has none', async () => {
+  const { repo, note } = await oneNote();
+  assert.equal('pipelineRole' in (await repo.readNote(note.path)), false);
+  await repo.writePipelineFields(note.path, { bookRole: 'body', pipelineRole: 'body' });
+  assert.equal((await repo.readNote(note.path)).pipelineRole, 'body');
+  await repo.writePipelineFields(note.path, { pipelineRole: 'bogus' });
+  assert.equal('pipelineRole' in (await repo.readNote(note.path)), false, 'an invalid value removes the key');
+  assert.equal(model.readPipelineFields({ 'pipeline-role': 'gallery' }).pipelineRole, 'gallery');
+});
+
+test('writePipelineRole writes book-role and pipeline-role together only while the role is the pipeline\'s (decided in the file transaction)', async () => {
+  const { repo, note } = await oneNote();
+  assert.equal(await repo.writePipelineRole(note.path, 'intro'), true, 'no role yet');
+  let read = await repo.readNote(note.path);
+  assert.deepEqual([read.bookRole, read.pipelineRole], ['intro', 'intro']);
+  assert.equal(await repo.writePipelineRole(note.path, 'body'), true, 'still the pipeline\'s');
+  await repo.writePipelineFields(note.path, { bookRole: 'gallery' });
+  assert.equal(await repo.writePipelineRole(note.path, 'closing'), false, 'changed by hand');
+  read = await repo.readNote(note.path);
+  assert.deepEqual([read.bookRole, read.pipelineRole], ['gallery', 'body']);
+  await repo.writePipelineFields(note.path, { pipelineRole: null });
+  assert.equal(await repo.writePipelineRole(note.path, 'closing'), true, 'older data (no pipeline-role) writes as before');
+});
+
+test('wiring: the plugin\'s readCard port carries pipelineRole and its writePipelineRole port is the repository\'s guarded write', async () => {
+  const env = fixture('en');
+  const note = await S.topicNote(env.repo, 'Chapter');
+  const plugin = new Main.default({}, { id: 'vam', version: '0.0.0' });
+  plugin.repo = env.repo;
+  plugin.app = env.app;
+  const ports = plugin.bookPipelineRuns.ports;
+  assert.equal(await ports.writePipelineRole(note.path, 'intro'), true);
+  assert.deepEqual({ ...(await ports.readCard(note.path)).fields }, { bookRole: 'intro', pipelineRole: 'intro' });
+  await env.repo.writePipelineFields(note.path, { bookRole: 'gallery' });
+  assert.deepEqual({ ...(await ports.readCard(note.path)).fields }, { bookRole: 'gallery', pipelineRole: 'intro' });
+  assert.equal(await ports.writePipelineRole(note.path, 'body'), false);
+});

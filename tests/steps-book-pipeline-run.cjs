@@ -46,9 +46,10 @@ async function rig(over = {}) {
     updateMap: (path, change) => repo.updateMap(path, d => { change(d); if (!over.trial && d.bookPipeline) delete d.bookPipeline.trial; }),
     readCard: async path => {
       const note = await repo.readNote(path);
-      return { path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(path), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}) } };
+      return { path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(path), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineRole ? { pipelineRole: note.pipelineRole } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}) } };
     },
     writePipelineFields: (path, patch) => { stat.writes++; return repo.writePipelineFields(path, patch); },
+    ...(over.noRolePort ? {} : { writePipelineRole: (path, role) => repo.writePipelineRole(path, role) }),
     updateNoteGuarded: (path, patch, options) => repo.updateNoteGuarded(path, patch, options),
     updateNoteRawGuarded: (path, transform, options) => repo.updateNoteRawGuarded(path, transform, options),
     runPlan: async (step, request, run) => {
@@ -161,6 +162,68 @@ test('book roles: an owner-set role is never overwritten, on the first run, afte
   await r.runs.start(r.mapPath);
   assert.equal((await r.note(2)).bookRole, 'body', 'the earlier plan role is not frozen');
   assert.equal((await r.note(1)).bookRole, 'body', 'the owner role is kept');
+});
+
+test('book roles: a role changed by hand after the first run survives a rerun (pipeline-role differs), even with only the older id list', async () => {
+  const holder = {};
+  let roles = ['intro', 'body', 'body'];
+  const r = await rig({ script: { global: () => planRoles(holder.r, roles) } });
+  holder.r = r;
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.note(1)).bookRole, 'body');
+  assert.equal((await r.note(1)).pipelineRole, 'body', 'the pipeline records what it wrote');
+  // the owner edits the frontmatter by hand: book-role only
+  await r.repo.writePipelineFields(r.nodes[1].path, { bookRole: 'gallery' });
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'done'; });
+  roles = ['intro', 'body', 'closing'];
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.note(1)).bookRole, 'gallery', 'the hand-changed role is kept');
+  assert.equal((await r.note(1)).pipelineRole, 'body', 'the record is not touched');
+  assert.equal((await r.note(2)).bookRole, 'closing', 'a pipeline-owned role is still reassigned');
+  assert.equal((await r.note(2)).pipelineRole, 'closing');
+});
+
+test('book roles: the role changed while the global plan is awaited is not overwritten (decided at the write)', async () => {
+  for (const noRolePort of [false, true]) {
+    const holder = {};
+    const r = await rig({ noRolePort, script: { global: async () => { await holder.r.repo.writePipelineFields(holder.r.nodes[2].path, { bookRole: 'gallery' }); return planRoles(holder.r, ['intro', 'body', 'closing']); } } });
+    holder.r = r;
+    await r.runs.start(r.mapPath);
+    assert.equal((await r.note(2)).bookRole, 'gallery', `kept (rolePort ${!noRolePort})`);
+    assert.equal((await r.note(2)).pipelineRole, 'intro', 'the default the pipeline had written');
+    assert.equal((await r.note(1)).bookRole, 'body');
+  }
+});
+
+test('book roles: older data without pipeline-role keeps the old behaviour (the id list decides; the plan writes pipeline-role)', async () => {
+  const holder = {};
+  const r = await rig({ script: { global: () => planRoles(holder.r, ['intro', 'body', 'closing']) } });
+  holder.r = r;
+  await r.runs.start(r.mapPath);
+  // simulate a run saved by an older version: the id list stays, the pipeline-role keys are gone
+  for (let i = 0; i < 3; i++) await r.repo.writePipelineFields(r.nodes[i].path, { pipelineRole: null });
+  assert.ok((await r.state()).autoRoles.includes(r.nodes[2].id));
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'done'; });
+  holder.r = r;
+  const g = r.script.global;
+  r.script.global = () => planRoles(r, ['intro', 'body', 'gallery']);
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.note(2)).bookRole, 'gallery', 'an id-listed pipeline role is still overridable');
+  assert.equal((await r.note(2)).pipelineRole, 'gallery');
+});
+
+test('gate 1 bar: progressed is called after the drive ended (the run no longer running), so the toolbar redraws without reopening the view', async () => {
+  const seen = [];
+  const r = await rig({ ports: { progressed: () => seen.push({ running: ports().runs.isRunning(r.mapPath), phase: r.runs.getProgress(r.mapPath)?.phase }) } });
+  const ports = () => r;
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.state()).phase, 'gate1');
+  assert.equal(r.runs.isRunning(r.mapPath), false);
+  assert.ok(seen.length > 0 && seen.at(-1).running === false, `the last progressed call comes after the drive ended: ${JSON.stringify(seen.at(-1))}`);
+  seen.length = 0;
+  await r.runs.confirmGate1(r.mapPath);
+  while (r.runs.isRunning(r.mapPath)) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(seen.at(-1)?.running, false, 'the same at the end of the write drive (gate 2)');
 });
 
 test('book roles: data without autoRoles behaves as before (every existing role is the owner\'s; nothing is added to the saved shape)', async () => {

@@ -4962,16 +4962,26 @@ export class VisualAgentMapView extends ItemView {
     if (!this.mergeUnlocked([node.id, parent.id])) return;
     await this.mapChange(map => {
       if (!canParent(map.nodes, node.id, parent.id)) throw new Error(t("ui.circular_links_are_not_allowed"));
+      // The siblings first take the order on screen, so the moved topic's place among them in the map's order is what is seen.
+      map.nodes = this.onScreenSiblingOrder(map);
       const moving = map.nodes.find(item => item.id === node.id)!;
       const oldParentId = moving.parentId;
       moving.parentId = parent.id;
       // A move is explicit: the topic no longer follows a text block (moving it onto its own topic makes it a direct child).
       delete moving.afterTextId;
       map.nodes.find(item => item.id === parent.id)!.collapsed = false;
+      // The order is decided before the layout: the topic comes last among the new parent's direct children (text-follower
+      // groups and every other card keep their places), the place the arrangement gives it below them.
+      map.nodes = this.moveLastAmongSiblings(map.nodes, parent.id, node.id);
       const movedIds = new Set([node.id, ...descendants(map.nodes, node.id)]);
       this.closeGapAt(map, oldParentId, parent.id, movedIds);
       this.arrangeBranch(map, parent.id, movedIds, undefined);
     });
+  }
+  /** `id` placed after the other direct children of `parentId` (not text followers) in the map's order; the rest keep their places. */
+  private moveLastAmongSiblings(nodes: MapNode[], parentId: string, id: string): MapNode[] {
+    const kids = nodes.filter(item => item.parentId === parentId && !item.afterTextId).map(item => item.id);
+    return orderSiblings(nodes, parentId, [...kids.filter(kid => kid !== id), id]);
   }
   /**
    * A card left `oldParentId`: that branch is laid out again so the place it left closes up. Only that branch moves; the rest of
@@ -10219,12 +10229,15 @@ export class VisualAgentMapView extends ItemView {
     await this.mapChange(map => {
       const moved = new Set<string>();
       const branchOf = new Map<string, Set<string>>();
+      // The siblings take the order on screen first; each moved topic then comes last among the new parent's children (before the layout).
+      if (target) map.nodes = this.onScreenSiblingOrder(map);
       for (const root of roots) {
         if (target && !canParent(map.nodes, root.id, target.id))
           throw new Error(t("ui.circular_links_are_not_allowed"));
         const moving = map.nodes.find(item => item.id === root.id)!;
         moving.parentId = target?.id ?? null;
         delete moving.afterTextId;
+        if (target) map.nodes = this.moveLastAmongSiblings(map.nodes, target.id, root.id);
         const branch = new Set([root.id, ...descendants(map.nodes, root.id)]);
         branchOf.set(root.id, branch);
         for (const id of branch) moved.add(id);
@@ -15366,9 +15379,11 @@ export class VisualAgentMapView extends ItemView {
         if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) return;
         await this.mapChange(map => {
           if (!canParent(map.nodes, node.id, parentId)) throw new Error(t("ui.circular_links_are_not_allowed"));
+          if (parentId) map.nodes = this.onScreenSiblingOrder(map);
           const moving = map.nodes.find(n => n.id === node.id)!;
           moving.parentId = parentId;
           delete moving.afterTextId;
+          if (parentId) map.nodes = this.moveLastAmongSiblings(map.nodes, parentId, node.id);
           const branch = new Set([node.id, ...descendants(map.nodes, node.id)]);
           const parent = parentId ? map.nodes.find(n => n.id === parentId) : undefined;
           if (parent) {

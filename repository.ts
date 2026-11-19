@@ -151,6 +151,8 @@ export interface Note {
   /** Picture-book pipeline fields (frontmatter `pipeline-stage`, `book-role`, `pipeline-issue`, `pipeline-seam`); each absent when the note has none. */
   pipelineStage?: PipelineStage;
   bookRole?: BookRole;
+  /** Frontmatter `pipeline-role`: the role the pipeline wrote (a different `book-role` is the owner's). */
+  pipelineRole?: BookRole;
   pipelineIssue?: string;
   pipelineSeam?: string;
   /** The root topic's `book-*` settings; absent when none is set. */
@@ -2132,6 +2134,22 @@ export class Repository {
     const values = pipelineFrontmatter(patch);
     if (!Object.keys(values).length) return;
     await this.app.vault.process(this.file(path), content => setFrontmatterKeys(content, values));
+  }
+
+  /**
+   * Writes the pipeline's role choice (`book-role` and `pipeline-role` together) only while the card's role is still the pipeline's:
+   * decided inside the same file transaction. A `book-role` that differs from a present `pipeline-role` was changed by hand and stays.
+   * Returns whether it wrote. A note without `pipeline-role` (older data) is written as before.
+   */
+  async writePipelineRole(path: string, role: BookRole): Promise<boolean> {
+    let wrote = false;
+    await this.app.vault.process(this.file(path), content => {
+      const fm = readPipelineFields(frontmatter(content));
+      if (fm.pipelineRole && fm.bookRole && fm.bookRole !== fm.pipelineRole) return content;
+      wrote = true;
+      return setFrontmatterKeys(content, pipelineFrontmatter({ bookRole: role, pipelineRole: role }));
+    });
+    return wrote;
   }
 
   /** Sets or removes the root topic's `book-*` settings only (same contract as {@link writePipelineFields}). */

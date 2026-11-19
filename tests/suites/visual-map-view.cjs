@@ -510,6 +510,8 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   const view = {
     renderDisclosure(parent) { return parent.createDiv('vam-disclosure-body'); }, renderHypothesisSection() {}, renderMarkerSection() {}, renderLinkSection() {}, renderColorSection() {}, renderStyleSection() {}, renderCoverSection() {}, renderAiLockSection() {}, renderBranchLayoutSection() {}, branchLayoutChoices: () => [], cardSearchSources: VisualAgentMapView.prototype.cardSearchSources, renderAddSubtopic() {},
     cardHeightOf: () => 100, arrangeBranch: VisualAgentMapView.prototype.arrangeBranch, arrangeTree: VisualAgentMapView.prototype.arrangeTree,
+    // The on-screen sibling order is covered by the move tests in steps-after-text-view.cjs; here the stored order is kept.
+    onScreenSiblingOrder: map => map.nodes, moveLastAmongSiblings: VisualAgentMapView.prototype.moveLastAmongSiblings,
     map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },

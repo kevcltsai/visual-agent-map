@@ -51,7 +51,7 @@ async function rig() {
   const ports = {
     mutate: work => { const next = queue.then(work); queue = next.catch(() => undefined); return next; },
     readMap: p => repo.readMap(p), updateMap: (p, change) => repo.updateMap(p, change),
-    readCard: async p => { const note = await repo.readNote(p); return { path: p, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(p), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}), ...(note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {}) } }; },
+    readCard: async p => { const note = await repo.readNote(p); return { path: p, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(p), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineRole ? { pipelineRole: note.pipelineRole } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}), ...(note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {}) } }; },
     writePipelineFields: (p, patch) => repo.writePipelineFields(p, patch),
     updateNoteGuarded: (p, patch, options) => repo.updateNoteGuarded(p, patch, options),
     updateNoteRawGuarded: (p, transform, options) => repo.updateNoteRawGuarded(p, transform, options),

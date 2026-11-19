@@ -262,6 +262,11 @@ export interface BookPipelinePorts {
   updateMap(path: string, change: (map: MapDocument) => void): Promise<MapDocument>;
   readCard(path: string): Promise<PipelineCard>;
   writePipelineFields(path: string, patch: PipelineFieldsPatch): Promise<void>;
+  /**
+   * Writes `book-role` and `pipeline-role` together inside one file transaction, only while the role is still the pipeline's
+   * (a `book-role` differing from a present `pipeline-role` was changed by hand). Returns whether it wrote. Absent: a read-then-write fallback.
+   */
+  writePipelineRole?(path: string, role: BookRole): Promise<boolean>;
   updateNoteGuarded(path: string, patch: NotePatch, options: GuardOptions): Promise<"written" | "discarded">;
   updateNoteRawGuarded(
     path: string,
@@ -862,7 +867,7 @@ export class BookPipelineRuns {
         });
         initial = state;
         // First start: a missing role gets its default (root and first-level topics intro, the rest body); an existing one is kept.
-        for (const [id, role] of drive.missingRoles) await this.writeFields(drive, id, { bookRole: role });
+        for (const [id, role] of drive.missingRoles) await this.writeRole(drive, id, role);
         drive.missingRoles.clear();
         // Attach right after the write: the repaint that follows it (main.mutate reads the views back) already asks for progress.
         this.attachStore(drive, state);
@@ -1472,6 +1477,13 @@ export class BookPipelineRuns {
         }
       } finally {
         this.drives.delete(drive.mapPath);
+        // The toolbar shows the run's state (gate 1's question, a finished round): redraw it now the drive is no longer running.
+        if (!this.disposed)
+          try {
+            this.ports.progressed?.(drive.mapPath);
+          } catch {
+            // a failed repaint never keeps the drive's end (the busy slot, the settled hook) from finishing
+          }
         // A drive is over: a rewrite the reader queued behind it may run now (it checks the phase itself).
         if (!this.disposed) this.ports.settled?.(drive.mapPath);
       }
@@ -1561,7 +1573,11 @@ export class BookPipelineRuns {
       try {
         const card = await this.ports.readCard(node.path);
         if (card.fields.bookRole) {
-          if (!autoRoles.has(id)) drive.ownerRoles.add(id);
+          // A recorded pipeline-role is the proof: a different book-role was changed by hand. Without one (older data) the id list decides.
+          const owner = card.fields.pipelineRole
+            ? card.fields.bookRole !== card.fields.pipelineRole
+            : !autoRoles.has(id);
+          if (owner) drive.ownerRoles.add(id);
         } else drive.missingRoles.set(id, !node.parentId || node.parentId === drive.rootId ? "intro" : "body");
         drive.cards.set(id, {
           path: node.path,
@@ -1794,6 +1810,21 @@ export class BookPipelineRuns {
       // the card is gone or unreadable: the in-memory stage still leads the run
     }
   }
+  /** The pipeline's role choice: true when written, false when the card's role is the owner's (or the card is gone). */
+  private async writeRole(drive: Drive, nodeId: string, role: BookRole): Promise<boolean> {
+    const info = drive.cards.get(nodeId);
+    if (!info || this.dead(drive)) return false;
+    try {
+      if (this.ports.writePipelineRole) return await this.ports.writePipelineRole(info.path, role);
+      const now = await this.ports.readCard(info.path);
+      const f = now.fields;
+      if (f.pipelineRole && f.bookRole && f.bookRole !== f.pipelineRole) return false;
+      await this.ports.writePipelineFields(info.path, { bookRole: role, pipelineRole: role });
+      return true;
+    } catch {
+      return false;
+    }
+  }
   private async setStage(drive: Drive, nodeId: string, stage: PipelineStage, issue: string | null): Promise<void> {
     drive.stages.set(nodeId, stage);
     await this.writeFields(drive, nodeId, { pipelineStage: stage, pipelineIssue: issue });
@@ -1929,8 +1960,17 @@ export class BookPipelineRuns {
         for (const { id, role } of result.cards) {
           const info = drive.cards.get(id);
           if (!info || drive.ownerRoles.has(id)) continue;
-          info.role = role;
-          await this.writeFields(drive, id, { bookRole: role });
+          // The owner may have changed the role while the plan was awaited: the write decides again at commit.
+          if (await this.writeRole(drive, id, role)) {
+            info.role = role;
+            continue;
+          }
+          const now = await this.ports.readCard(info.path).catch(() => undefined);
+          const f = now?.fields;
+          if (f?.bookRole && f.pipelineRole && f.bookRole !== f.pipelineRole) {
+            drive.ownerRoles.add(id);
+            info.role = f.bookRole;
+          } else info.role = role; // a failed write: the in-memory role still leads the run
         }
       }
     };

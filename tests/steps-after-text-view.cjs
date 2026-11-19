@@ -270,6 +270,89 @@ test('move: dragging a follower elsewhere, Move to..., or onto its own topic cle
   assert.equal(h.view.reparentTargetAt(10, 10, [h.child], 'x'), null, 'a direct child is already there');
 });
 
+// Bug5: the book order is the reading order (siblings by position); every arrangement lays siblings out in array order. A moved
+// topic therefore takes its place among its new siblings in the array BEFORE the branch is laid out, so Auto layout keeps it.
+const bookOrder = (h, titles = true) => {
+  const ids = readingOrder(h.view.map.nodes, { includeHidden: true });
+  return titles ? ids.map(id => h.view.notes.get(id)?.title) : ids;
+};
+const { readingOrder } = load('experiences/visual-map/presentation-order.ts');
+const arrangedHarness = async (direction, build = () => []) => {
+  const h = await harness(build, { direction, other: true });
+  // X is created first, under Child: its array place is before A and B, which the new siblings' arrangement must not follow.
+  await h.view.addNode(h.view.map.nodes.find(n => n.id === h.child.id), 'X', true, false, 'topic', false, {});
+  for (const title of ['A', 'B']) await h.view.addNode(h.view.map.nodes[0], title, true, false, 'topic', false, {});
+  await h.view.hydrate();
+  await h.view.mapChange(m => h.view.arrangeAll(m), false);
+  await h.view.hydrate();
+  return h;
+};
+for (const direction of ['right', 'radial', 'timeline', 'fishbone']) {
+  test(`Bug5: moving a topic to a new parent puts it last among the new siblings, and Auto layout keeps that book order (${direction})`, async () => {
+    const h = await arrangedHarness(direction);
+    const root = h.view.map.nodes[0];
+    const x = h.node('X');
+    const before = bookOrder(h);
+    await h.view.moveTopic(x, root);
+    await h.settle();
+    await h.view.hydrate();
+    const kids = () => h.view.map.nodes.filter(n => n.parentId === root.id && !n.afterTextId).map(n => n.id);
+    assert.equal(kids().at(-1), x.id, 'last among the new siblings in the map order (array)');
+    const moved = bookOrder(h);
+    // undo / redo: the move is one step, redo restores the same order, and the map order stays the last sibling
+    await h.view.travel(false);
+    assert.equal(h.node('X').parentId, h.child.id, 'undo');
+    assert.deepEqual(bookOrder(h), before, 'undo restores the book order');
+    await h.view.travel(true);
+    assert.equal(h.node('X').parentId, root.id, 'redo');
+    assert.equal(kids().at(-1), x.id, 'redo: still last');
+    assert.deepEqual(bookOrder(h), moved, 'redo restores the moved book order');
+    await h.view.mapChange(m => h.view.arrangeAll(m), false);
+    await h.view.hydrate();
+    assert.deepEqual(bookOrder(h), moved, `the book order equals the map order after Auto layout (${direction})`);
+  });
+}
+
+test('Bug5: text followers keep their group and places when a topic moves in; an explicit insert position (chatMoveBefore) is not turned into an append', async () => {
+  const h = await arrangedHarness('right', ({ root }) => [txt({ parentId: root.id, x: 420, y: 300 })]);
+  await h.view.addNode(h.view.map.nodes[0], 'F1', true, false, 'topic', false, {}, 't1');
+  await h.view.hydrate();
+  const root = h.view.map.nodes[0];
+  const order = () => h.view.map.nodes.filter(n => n.parentId === root.id).map(n => `${h.view.notes.get(n.id)?.title}${n.afterTextId ? '@' + n.afterTextId : ''}`);
+  const x = h.node('X');
+  await h.view.moveTopic(x, root);
+  await h.settle();
+  await h.view.hydrate();
+  const direct = order().filter(t => !t.includes('@'));
+  assert.equal(direct.at(-1), 'X', 'last among the direct children');
+  assert.deepEqual(plain(order().filter(t => t.includes('@'))), ['F1@t1'], 'the follower group is untouched');
+  assert.equal(h.node('F1').afterTextId, 't1');
+  // explicit insert: X goes in front of A, not to the end
+  await h.view.moveTopic(h.node('B'), h.view.map.nodes.find(n => n.id === h.child.id));
+  await h.settle();
+  await h.view.hydrate();
+  const ok = await h.view.chatMoveBefore(h.node('X'), root, h.node('A'));
+  await h.settle();
+  await h.view.hydrate();
+  assert.equal(ok, true);
+  const kids = order().filter(t => !t.includes('@'));
+  assert.ok(kids.indexOf('X') < kids.indexOf('A'), `X sits before A (${kids.join(',')})`);
+  assert.notEqual(kids.at(-1), 'X', 'not appended');
+});
+
+test('Bug5: dragging or "Move to..." (moveBranches) places the topic last among the new siblings in the map order too', async () => {
+  const h = await arrangedHarness('right');
+  const root = h.view.map.nodes[0];
+  await h.view.moveBranches([h.node('X')], root);
+  await h.settle();
+  await h.view.hydrate();
+  const kids = h.view.map.nodes.filter(n => n.parentId === root.id && !n.afterTextId).map(n => h.view.notes.get(n.id)?.title);
+  assert.equal(kids.at(-1), 'X');
+  const moved = readingOrder(h.view.map.nodes, { includeHidden: true });
+  await h.view.mapChange(m => h.view.arrangeAll(m), false);
+  assert.deepEqual(plain(readingOrder(h.view.map.nodes, { includeHidden: true })), plain(moved), 'Auto layout keeps the book order');
+});
+
 test('R2: coordinate-only writes (updateMap) keep the text block and the field; the saved map reopens', async () => {
   const h = await harness();
   await h.addFollower('C1');

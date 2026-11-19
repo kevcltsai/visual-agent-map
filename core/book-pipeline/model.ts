@@ -42,6 +42,8 @@ export function plainPipelineLine(value: unknown): string | undefined {
 export interface PipelineFields {
   pipelineStage?: PipelineStage;
   bookRole?: BookRole;
+  /** The role the pipeline itself wrote; a `book-role` that differs from it was changed by hand. Absent = older data. */
+  pipelineRole?: BookRole;
   pipelineIssue?: string;
   pipelineSeam?: string;
 }
@@ -49,11 +51,13 @@ export interface PipelineFields {
 export function readPipelineFields(fm: Record<string, unknown>): PipelineFields {
   const stage = readPipelineStage(fm["pipeline-stage"]);
   const role = readBookRole(fm["book-role"]);
+  const pipelineRole = readBookRole(fm["pipeline-role"]);
   const issue = plainPipelineLine(fm["pipeline-issue"]);
   const seam = plainPipelineLine(fm["pipeline-seam"]);
   return {
     ...(stage ? { pipelineStage: stage } : {}),
     ...(role ? { bookRole: role } : {}),
+    ...(pipelineRole ? { pipelineRole } : {}),
     ...(issue ? { pipelineIssue: issue } : {}),
     ...(seam ? { pipelineSeam: seam } : {})
   };
@@ -62,12 +66,14 @@ export function readPipelineFields(fm: Record<string, unknown>): PipelineFields 
 export interface PipelineFieldsPatch {
   pipelineStage?: PipelineStage | null;
   bookRole?: BookRole | null;
+  pipelineRole?: BookRole | null;
   pipelineIssue?: string | null;
   pipelineSeam?: string | null;
 }
 const FIELD_KEYS = {
   pipelineStage: "pipeline-stage",
   bookRole: "book-role",
+  pipelineRole: "pipeline-role",
   pipelineIssue: "pipeline-issue",
   pipelineSeam: "pipeline-seam"
 } as const;
@@ -82,7 +88,7 @@ export function pipelineFrontmatter(patch: PipelineFieldsPatch): Record<string, 
         ? null
         : field === "pipelineStage"
           ? (readPipelineStage(value) ?? null)
-          : field === "bookRole"
+          : field === "bookRole" || field === "pipelineRole"
             ? (readBookRole(value) ?? null)
             : (plainPipelineLine(value) ?? null);
     values[FIELD_KEYS[field]] = clean;

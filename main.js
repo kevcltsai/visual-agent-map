@@ -12593,11 +12593,13 @@ function plainPipelineLine(value) {
 function readPipelineFields(fm) {
   const stage = readPipelineStage(fm["pipeline-stage"]);
   const role = readBookRole(fm["book-role"]);
+  const pipelineRole = readBookRole(fm["pipeline-role"]);
   const issue2 = plainPipelineLine(fm["pipeline-issue"]);
   const seam = plainPipelineLine(fm["pipeline-seam"]);
   return {
     ...stage ? { pipelineStage: stage } : {},
     ...role ? { bookRole: role } : {},
+    ...pipelineRole ? { pipelineRole } : {},
     ...issue2 ? { pipelineIssue: issue2 } : {},
     ...seam ? { pipelineSeam: seam } : {}
   };
@@ -12605,6 +12607,7 @@ function readPipelineFields(fm) {
 var FIELD_KEYS = {
   pipelineStage: "pipeline-stage",
   bookRole: "book-role",
+  pipelineRole: "pipeline-role",
   pipelineIssue: "pipeline-issue",
   pipelineSeam: "pipeline-seam"
 };
@@ -12614,7 +12617,7 @@ function pipelineFrontmatter(patch) {
   for (const field of Object.keys(FIELD_KEYS)) {
     const value = patch[field];
     if (value === void 0) continue;
-    const clean3 = value === null ? null : field === "pipelineStage" ? (_a2 = readPipelineStage(value)) != null ? _a2 : null : field === "bookRole" ? (_b2 = readBookRole(value)) != null ? _b2 : null : (_c = plainPipelineLine(value)) != null ? _c : null;
+    const clean3 = value === null ? null : field === "pipelineStage" ? (_a2 = readPipelineStage(value)) != null ? _a2 : null : field === "bookRole" || field === "pipelineRole" ? (_b2 = readBookRole(value)) != null ? _b2 : null : (_c = plainPipelineLine(value)) != null ? _c : null;
     values[FIELD_KEYS[field]] = clean3;
   }
   return values;
@@ -30948,6 +30951,21 @@ ${body}`);
     const values = pipelineFrontmatter(patch);
     if (!Object.keys(values).length) return;
     await this.app.vault.process(this.file(path), (content) => setFrontmatterKeys(content, values));
+  }
+  /**
+   * Writes the pipeline's role choice (`book-role` and `pipeline-role` together) only while the card's role is still the pipeline's:
+   * decided inside the same file transaction. A `book-role` that differs from a present `pipeline-role` was changed by hand and stays.
+   * Returns whether it wrote. A note without `pipeline-role` (older data) is written as before.
+   */
+  async writePipelineRole(path, role) {
+    let wrote = false;
+    await this.app.vault.process(this.file(path), (content) => {
+      const fm = readPipelineFields(frontmatter(content));
+      if (fm.pipelineRole && fm.bookRole && fm.bookRole !== fm.pipelineRole) return content;
+      wrote = true;
+      return setFrontmatterKeys(content, pipelineFrontmatter({ bookRole: role, pipelineRole: role }));
+    });
+    return wrote;
   }
   /** Sets or removes the root topic's `book-*` settings only (same contract as {@link writePipelineFields}). */
   async writeBookSettings(path, patch) {
@@ -51221,7 +51239,7 @@ var BookPipelineRuns = class {
           doc.bookPipeline = state;
         });
         initial = state;
-        for (const [id, role] of drive.missingRoles) await this.writeFields(drive, id, { bookRole: role });
+        for (const [id, role] of drive.missingRoles) await this.writeRole(drive, id, role);
         drive.missingRoles.clear();
         this.attachStore(drive, state);
       });
@@ -51740,7 +51758,7 @@ var BookPipelineRuns = class {
     });
   }
   async go(drive, setup, onSetup) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     let refusal;
     try {
       await setup(drive);
@@ -51778,7 +51796,12 @@ var BookPipelineRuns = class {
         }
       } finally {
         this.drives.delete(drive.mapPath);
-        if (!this.disposed) (_e = (_d = this.ports).settled) == null ? void 0 : _e.call(_d, drive.mapPath);
+        if (!this.disposed)
+          try {
+            (_e = (_d = this.ports).progressed) == null ? void 0 : _e.call(_d, drive.mapPath);
+          } catch (e) {
+          }
+        if (!this.disposed) (_g = (_f = this.ports).settled) == null ? void 0 : _g.call(_f, drive.mapPath);
       }
     }
     if (refusal) throw refusal;
@@ -51850,7 +51873,8 @@ var BookPipelineRuns = class {
       try {
         const card = await this.ports.readCard(node.path);
         if (card.fields.bookRole) {
-          if (!autoRoles.has(id)) drive.ownerRoles.add(id);
+          const owner = card.fields.pipelineRole ? card.fields.bookRole !== card.fields.pipelineRole : !autoRoles.has(id);
+          if (owner) drive.ownerRoles.add(id);
         } else drive.missingRoles.set(id, !node.parentId || node.parentId === drive.rootId ? "intro" : "body");
         drive.cards.set(id, {
           path: node.path,
@@ -52052,6 +52076,21 @@ var BookPipelineRuns = class {
     } catch (e) {
     }
   }
+  /** The pipeline's role choice: true when written, false when the card's role is the owner's (or the card is gone). */
+  async writeRole(drive, nodeId, role) {
+    const info = drive.cards.get(nodeId);
+    if (!info || this.dead(drive)) return false;
+    try {
+      if (this.ports.writePipelineRole) return await this.ports.writePipelineRole(info.path, role);
+      const now = await this.ports.readCard(info.path);
+      const f = now.fields;
+      if (f.pipelineRole && f.bookRole && f.bookRole !== f.pipelineRole) return false;
+      await this.ports.writePipelineFields(info.path, { bookRole: role, pipelineRole: role });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
   async setStage(drive, nodeId, stage, issue2) {
     drive.stages.set(nodeId, stage);
     await this.writeFields(drive, nodeId, { pipelineStage: stage, pipelineIssue: issue2 });
@@ -52181,8 +52220,16 @@ var BookPipelineRuns = class {
         for (const { id, role } of result.cards) {
           const info = drive.cards.get(id);
           if (!info || drive.ownerRoles.has(id)) continue;
-          info.role = role;
-          await this.writeFields(drive, id, { bookRole: role });
+          if (await this.writeRole(drive, id, role)) {
+            info.role = role;
+            continue;
+          }
+          const now = await this.ports.readCard(info.path).catch(() => void 0);
+          const f = now == null ? void 0 : now.fields;
+          if ((f == null ? void 0 : f.bookRole) && f.pipelineRole && f.bookRole !== f.pipelineRole) {
+            drive.ownerRoles.add(id);
+            info.role = f.bookRole;
+          } else info.role = role;
         }
       }
     };
@@ -72300,15 +72347,22 @@ ${request.requirements}` : preset.text,
     if (!this.mergeUnlocked([node.id, parent.id])) return;
     await this.mapChange((map) => {
       if (!canParent(map.nodes, node.id, parent.id)) throw new Error(t("ui.circular_links_are_not_allowed"));
+      map.nodes = this.onScreenSiblingOrder(map);
       const moving = map.nodes.find((item) => item.id === node.id);
       const oldParentId = moving.parentId;
       moving.parentId = parent.id;
       delete moving.afterTextId;
       map.nodes.find((item) => item.id === parent.id).collapsed = false;
+      map.nodes = this.moveLastAmongSiblings(map.nodes, parent.id, node.id);
       const movedIds = /* @__PURE__ */ new Set([node.id, ...descendants(map.nodes, node.id)]);
       this.closeGapAt(map, oldParentId, parent.id, movedIds);
       this.arrangeBranch(map, parent.id, movedIds, void 0);
     });
+  }
+  /** `id` placed after the other direct children of `parentId` (not text followers) in the map's order; the rest keep their places. */
+  moveLastAmongSiblings(nodes, parentId, id) {
+    const kids = nodes.filter((item) => item.parentId === parentId && !item.afterTextId).map((item) => item.id);
+    return orderSiblings(nodes, parentId, [...kids.filter((kid) => kid !== id), id]);
   }
   /**
    * A card left `oldParentId`: that branch is laid out again so the place it left closes up. Only that branch moves; the rest of
@@ -77143,12 +77197,14 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       var _a2;
       const moved = /* @__PURE__ */ new Set();
       const branchOf = /* @__PURE__ */ new Map();
+      if (target) map.nodes = this.onScreenSiblingOrder(map);
       for (const root of roots) {
         if (target && !canParent(map.nodes, root.id, target.id))
           throw new Error(t("ui.circular_links_are_not_allowed"));
         const moving = map.nodes.find((item) => item.id === root.id);
         moving.parentId = (_a2 = target == null ? void 0 : target.id) != null ? _a2 : null;
         delete moving.afterTextId;
+        if (target) map.nodes = this.moveLastAmongSiblings(map.nodes, target.id, root.id);
         const branch = /* @__PURE__ */ new Set([root.id, ...descendants(map.nodes, root.id)]);
         branchOf.set(root.id, branch);
         for (const id of branch) moved.add(id);
@@ -81861,9 +81917,11 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) return;
         await this.mapChange((map) => {
           if (!canParent(map.nodes, node.id, parentId)) throw new Error(t("ui.circular_links_are_not_allowed"));
+          if (parentId) map.nodes = this.onScreenSiblingOrder(map);
           const moving = map.nodes.find((n) => n.id === node.id);
           moving.parentId = parentId;
           delete moving.afterTextId;
+          if (parentId) map.nodes = this.moveLastAmongSiblings(map.nodes, parentId, node.id);
           const branch = /* @__PURE__ */ new Set([node.id, ...descendants(map.nodes, node.id)]);
           const parent2 = parentId ? map.nodes.find((n) => n.id === parentId) : void 0;
           if (parent2) {
@@ -103802,6 +103860,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       updateMap: (path, change2) => this.repo.updateMap(path, change2),
       readCard: (path) => this.readBookCard(path),
       writePipelineFields: (path, patch) => this.repo.writePipelineFields(path, patch),
+      writePipelineRole: (path, role) => this.repo.writePipelineRole(path, role),
       updateNoteGuarded: (path, patch, options) => this.repo.updateNoteGuarded(path, patch, options),
       updateNoteRawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
       runPlan: (step, request, run) => runPlanStep(this.aiCalls, step, request, run),
@@ -104168,6 +104227,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       fields: {
         ...note.pipelineStage ? { pipelineStage: note.pipelineStage } : {},
         ...note.bookRole ? { bookRole: note.bookRole } : {},
+        ...note.pipelineRole ? { pipelineRole: note.pipelineRole } : {},
         ...note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {},
         ...note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {}
       }

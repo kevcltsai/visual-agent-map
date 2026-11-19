@@ -774,6 +774,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     updateMap: (path, change) => this.repo.updateMap(path, change),
     readCard: path => this.readBookCard(path),
     writePipelineFields: (path, patch) => this.repo.writePipelineFields(path, patch),
+    writePipelineRole: (path, role) => this.repo.writePipelineRole(path, role),
     updateNoteGuarded: (path, patch, options) => this.repo.updateNoteGuarded(path, patch, options),
     updateNoteRawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
     runPlan: (step, request, run) => runPlanStep(this.aiCalls, step, request, run),
@@ -841,6 +842,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       fields: {
         ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}),
         ...(note.bookRole ? { bookRole: note.bookRole } : {}),
+        ...(note.pipelineRole ? { pipelineRole: note.pipelineRole } : {}),
         ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}),
         ...(note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {})
       }

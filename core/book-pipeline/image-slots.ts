@@ -5,7 +5,7 @@
  * `pickForSlot` seam (the picture-quality work replaces only that function). No I/O, no model text is trusted here.
  */
 
-import { noteLanguageOf, translate, type ContentLanguage } from "../../i18n";
+import { noteLanguageOf, translate, translateNote, type ContentLanguage } from "../../i18n";
 import { imageKey } from "./image-dedupe";
 import { fencedLines } from "./note-sections";
 import { escapeMarkdownText } from "./text";
@@ -177,6 +177,9 @@ export interface SlotCandidate {
   sourceUrl: string;
   title: string;
   caption: string;
+  /** Creator and license as the finder reported them from the source page; never invented here. */
+  author?: string;
+  license?: string;
 }
 export interface PickContext {
   chapter: { id: string; title: string };
@@ -224,6 +227,8 @@ export interface SlotFigure {
   href: string;
   alt: string;
   caption: string;
+  /** Where the picture came from; absent when the source page is not a usable https address. */
+  source?: { href: string; line: string; entry: string };
 }
 export type SlotOutcome = { figure: SlotFigure } | { reasonCode: SlotReasonCode; reasonText?: string };
 
@@ -237,12 +242,64 @@ function plainLine(text: string): string {
     : text;
 }
 
+const SOURCE_URL_MAX = 1000;
+const CREDIT_TEXT_MAX = 80;
+
+/**
+ * The source of a picture: one line under the caption and the matching entry of the card's sources list. The page address must be https
+ * without credentials; the site name is its host (never model text); author and license are untrusted text, escaped and capped, and
+ * left out when the finder did not report them.
+ */
+export function sourceOf(
+  candidate: SlotCandidate,
+  alt: string,
+  language: string
+): { href: string; line: string; entry: string } | undefined {
+  let page: URL;
+  try {
+    page = new URL(candidate.sourceUrl.trim());
+  } catch {
+    return undefined;
+  }
+  if (page.protocol !== "https:" || page.username || page.password || page.href.length > SOURCE_URL_MAX)
+    return undefined;
+  const href = page.href.replace(/\(/g, "%28").replace(/\)/g, "%29");
+  const lang = language as ContentLanguage;
+  const credit = (value: string | undefined, max: number): string =>
+    plainLine(escapeMarkdownText((value ?? "").replace(/[〔〕]/g, " "), max));
+  const author = credit(candidate.author, CREDIT_TEXT_MAX);
+  const license = credit(candidate.license, CREDIT_TEXT_MAX);
+  const site = escapeMarkdownText(page.hostname.replace(/^www\./i, ""), 100);
+  const parts = [
+    site,
+    ...(author ? [translateNote(lang, "note.image_author_0", author)] : []),
+    ...(license ? [license] : [])
+  ];
+  const detail = translateNote(
+    lang,
+    "note.image_source_0_1",
+    parts.join(" · "),
+    `[${translateNote(lang, "note.image_link")}](${href})`
+  );
+  return {
+    href: page.href,
+    line: translateNote(lang, "note.image_source_label_0", detail),
+    entry: translateNote(lang, "note.image_source_entry_0_1", alt, detail)
+  };
+}
+
 /** A finder caption is one plain line (what it is, where to look); an empty one falls back to the title. */
 export function figureOf(candidate: SlotCandidate, href: string, language: string): SlotFigure {
   // The marker brackets are taken out first: a caption must never read as a slot marker.
   const plain = (value: string): string => value.replace(/[〔〕]/g, " ");
   const alt = escapeMarkdownText(plain(candidate.title), 80) || (/^zh/i.test(language) ? "圖" : "image");
-  return { href, alt, caption: plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt };
+  const source = sourceOf(candidate, alt, language);
+  return {
+    href,
+    alt,
+    caption: plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
+    ...(source ? { source } : {})
+  };
 }
 
 /**
@@ -290,6 +347,8 @@ export interface FillResult {
   missing: { index: number; reasonCode: SlotReasonCode }[];
   /** Marker lines refused whole (reworded, or an index the plan does not have). */
   bad: number;
+  /** The sources of the pictures placed (page address, and the entry for the card's sources list), in slot order. */
+  sources: { href: string; entry: string }[];
   /** The figure lines this call wrote, so the independent check can tell them from the author's text. */
   added: string[];
 }
@@ -315,6 +374,7 @@ export function fillSlotMarkers(
   const figureAt = new Map<number, SlotFigure>();
   const missing: FillResult["missing"] = [];
   const placed: FillResult["placed"] = [];
+  const sources: FillResult["sources"] = [];
   const planned = new Set(slots.map(slot => slot.index));
   const badIndexes = new Set<number>();
   for (const at of scan.badLines) {
@@ -332,6 +392,7 @@ export function fillSlotMarkers(
     } else if (outcome && "figure" in outcome) {
       figureAt.set(at, outcome.figure);
       placed.push({ index: slot.index, href: outcome.figure.href });
+      if (outcome.figure.source) sources.push({ href: outcome.figure.source.href, entry: outcome.figure.source.entry });
     } else {
       missing.push({ index: slot.index, reasonCode: outcome?.reasonCode ?? "not_found" });
     }
@@ -360,6 +421,11 @@ export function fillSlotMarkers(
       const caption = `${figure.caption}${cr}`;
       added.push(image, caption);
       out.push(image, caption);
+      if (figure.source) {
+        const source = `${figure.source.line}${cr}`;
+        added.push(source);
+        out.push(source);
+      }
       if (!isBlank(lines[at + 1])) out.push(cr ? "\r" : "");
       return;
     }
@@ -378,7 +444,7 @@ export function fillSlotMarkers(
     }
     push(line);
   });
-  return { text: out.join("\n"), placed, missing, bad: scan.badLines.length, added };
+  return { text: out.join("\n"), placed, missing, bad: scan.badLines.length, sources, added };
 }
 
 /** Lines as the independent check compares them: markers out, blank lines out. Lines in fences and quotes are compared as they are. */
@@ -499,6 +565,8 @@ export function latestSlotsRecord(detail: string): SlotsRecord | undefined {
 }
 
 const IMAGE_IN_LINE = /!\[[^\]\n]*\]\((https:\/\/[^)\s]+)\)/g;
+/** The source line the fill writes under a caption (its label in the three note languages). */
+const SOURCE_LINE = /^(?:來源|来源|Source)[:：][ \t]*\S/;
 const IMAGE_ONLY_LINE = /^[ \t]*!\[[^\]\n]*\]\(https:\/\/[^)\s]+\)[ \t]*\r?$/;
 
 /**
@@ -511,14 +579,12 @@ export function stripImageLines(text: string): string {
   const out: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     if (!guarded[i] && IMAGE_ONLY_LINE.test(lines[i])) {
-      if (
-        i + 1 < lines.length &&
-        !isBlank(lines[i + 1]) &&
-        !guarded[i + 1] &&
-        !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[i + 1]) &&
-        (isBlank(lines[i + 2]) || /^\s*#/.test(lines[i + 2]))
-      )
-        i++;
+      const plainAt = (at: number): boolean =>
+        at < lines.length && !isBlank(lines[at]) && !guarded[at] && !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[at]);
+      const endsAt = (at: number): boolean => isBlank(lines[at]) || /^\s*#/.test(lines[at]);
+      // The caption line, and the source line right after it, go with the picture.
+      if (plainAt(i + 1) && plainAt(i + 2) && SOURCE_LINE.test(lines[i + 2]) && endsAt(i + 3)) i += 2;
+      else if (plainAt(i + 1) && endsAt(i + 2)) i++;
       continue;
     }
     out.push(lines[i]);

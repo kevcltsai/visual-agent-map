@@ -66,6 +66,7 @@ import {
   findStoredProof,
   findStoredProofModels,
   extractProofRecords,
+  addPictureSources,
   carryImageSection,
   dropPlaceholderSections,
   replaceBookPlanSection,
@@ -1923,7 +1924,9 @@ export class BookPipelineRuns {
               imageUrl: candidate.url,
               sourceUrl: candidate.source,
               title: candidate.title,
-              caption: candidate.caption
+              caption: candidate.caption,
+              ...(candidate.author ? { author: candidate.author } : {}),
+              ...(candidate.license ? { license: candidate.license } : {})
             },
             href,
             loaded: href ? (loadedHref.get(href) ?? false) : false,
@@ -1968,7 +1971,7 @@ export class BookPipelineRuns {
       for (const key of claimed) drive.usedImages.delete(key);
     };
     try {
-      const result = await this.writeFilled(latest, slots, outcomes, authorize);
+      const result = await this.writeFilled(latest, slots, outcomes, language, authorize);
       if (typeof result === "string") {
         release();
         return { kind: "failed", reason: result };
@@ -2035,6 +2038,7 @@ export class BookPipelineRuns {
     latest: PipelineCard,
     slots: readonly ImageSlot[],
     outcomes: ReadonlyMap<number, SlotOutcome>,
+    language: string,
     authorize: () => boolean
   ): Promise<FillResult | string> {
     const result = fillSlotMarkers(latest.detail, slots, outcomes);
@@ -2042,7 +2046,8 @@ export class BookPipelineRuns {
     if (bad) return `slots_${bad}`;
     // The exit check: nothing but the placed addresses may be an image in what this write adds.
     if (this.exitCheck(result.added.join("\n"), new Set(result.placed.map(item => item.href)))) return "slots_unsafe";
-    const detail = slots.length ? replaceResearchRecord(result.text, composeSlotsRecord(result)) : result.text;
+    const withSources = addPictureSources(result.text, result.sources, language);
+    const detail = slots.length ? replaceResearchRecord(withSources, composeSlotsRecord(result)) : withSources;
     if (detail === latest.detail) return result;
     const outside = residualMarkerLines(latest.raw).length - residualMarkerLines(latest.detail).length;
     const outcome = await this.ports.updateNoteGuarded(
@@ -2061,7 +2066,7 @@ export class BookPipelineRuns {
   private async settleStrayMarkers(path: string, authorize: () => boolean): Promise<Outcome | undefined> {
     const latest = await this.ports.readCard(path);
     if (!residualMarkerLines(latest.detail).length) return undefined;
-    const result = await this.writeFilled(latest, [], new Map(), authorize);
+    const result = await this.writeFilled(latest, [], new Map(), "", authorize);
     return typeof result === "string" ? { kind: "failed", reason: result } : undefined;
   }
 

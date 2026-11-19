@@ -351,6 +351,7 @@ import {
   renderBookCardLabels,
   runBookEntry
 } from "./book-pipeline-ui";
+import { hasProgramCallouts } from "./book-pipeline-callouts";
 import {
   BookReviewMemory,
   countNotes,
@@ -17251,7 +17252,7 @@ export class VisualAgentMapView extends ItemView {
       if (state && !state.collapsed) await this.plugin.bookCallouts.collapse(node.path);
       if (entry.problems.every(problem => problem.kind === "seam")) {
         await this.plugin.confirmBookSeam(mapPath, id).catch(() => undefined);
-        await this.plugin.bookCallouts.reconcile(mapPath);
+        await this.plugin.bookCallouts.reconcile(mapPath, this.bookMayCarryCallouts);
         await this.rereadBookCard(id);
       }
     }
@@ -17264,10 +17265,18 @@ export class VisualAgentMapView extends ItemView {
     const id = this.map?.nodes.find(node => node.path === path)?.id;
     if (id && read.data.order.includes(id)) void this.queueBookResolve(id);
   }
+  /**
+   * Whether a note of this map may carry a program callout, from the note text this view already holds (the callouts sit in the
+   * Detail, which is in memory): a note with none is not read again on a map open. A note not loaded is unknown (read it).
+   */
+  private readonly bookMayCarryCallouts = (id: string): boolean | undefined => {
+    const note = this.notes.get(id);
+    return note ? hasProgramCallouts(note.detail) : undefined;
+  };
   /** After a map opens: its notes are aligned with its run (stale boxes of an earlier run removed, old runs drawn), then ticked boxes are read. */
   private async reconcileBookNotes(path: string, isCurrent: () => boolean): Promise<void> {
     try {
-      await this.plugin.bookCallouts.reconcile(path);
+      await this.plugin.bookCallouts.reconcile(path, this.bookMayCarryCallouts);
       if (this.closed || !isCurrent() || !this.map) return;
       const read = readBookPipeline(this.map);
       if (read.kind !== "usable" || read.data.phase !== "gate2") return;

@@ -181,3 +181,42 @@ test('reconcile: asks that arrive while one waits share it', async () => {
   assert.equal(r.callouts.reconcile('M'), first);
   await first;
 });
+
+test('reconcile: with a hint, a map of plain notes (no picture book, or no marker) reads and writes nothing', async () => {
+  const plain = ['x1', 'x2', 'x3', 'x4', 'x5'];
+  const build = data => {
+    const notes = new Map(); const nodes = [];
+    for (const id of ['n1', 'n2', ...plain]) { nodes.push({ id, path: `N/${id}.md` }); notes.set(`N/${id}.md`, note(`Body ${id}`)); }
+    const map = { id: 'm', nodes }; if (data) map.bookPipeline = data;
+    const count = { text: 0, card: 0, write: 0 };
+    const callouts = new b.BookCallouts({
+      readMap: async () => map,
+      readCard: async path => { count.card++; const raw = notes.get(path); return { path, title: path, summary: '', prompt: '', detail: raw, raw, settings: {}, fields: { pipelineStage: 'checked', bookRole: 'body' } }; },
+      readText: async path => { count.text++; return notes.get(path); },
+      write: async () => { count.write++; return 'written'; },
+      log() {}
+    });
+    return { callouts, count, notes };
+  };
+  const none = () => false;
+  const noBook = build(undefined);
+  await noBook.callouts.reconcile('M', none);
+  assert.deepEqual(noBook.count, { text: 0, card: 0, write: 0 }, 'no picture book: no read');
+  const writing = build(DATA({ phase: 'writing' }));
+  await writing.callouts.reconcile('M', none);
+  assert.deepEqual(writing.count, { text: 0, card: 0, write: 0 }, 'a book with no marker in a non-gate phase: no read');
+  // Without the hint the same map is read note by note (the old, slower behaviour stays for callers that have no notes in memory).
+  const unhinted = build(undefined);
+  await unhinted.callouts.reconcile('M');
+  assert.equal(unhinted.count.text, 7);
+});
+test('reconcile: with a hint, only a note that may carry a callout is read and rewritten; unknown is read', async () => {
+  const r = rig(undefined, ['x1', 'x2']);
+  const stale = b.putProgramCallout(note('B'), b.trialCallout(1, 2, undefined, undefined, false, { runId: 'old', nodeId: 'x1' }));
+  r.notes.set('N/x1.md', stale);
+  r.notes.set('N/x2.md', stale);
+  await r.callouts.reconcile('M', id => (id === 'x1' ? true : id === 'x2' ? false : undefined));
+  assert.deepEqual(r.kinds('x1'), [], 'the note with a marker is cleaned');
+  assert.deepEqual(r.kinds('x2'), ['trial:old'], 'a note known to have none is not touched');
+  assert.deepEqual(r.kinds('n1'), [], 'an unknown note is read (and was clean)');
+});

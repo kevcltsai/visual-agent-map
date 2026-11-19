@@ -142,6 +142,13 @@ export interface BookCalloutPorts {
   log(line: string): void;
 }
 
+/**
+ * What the caller already knows without a read: whether a note may carry a program callout (true), certainly does not (false), or is
+ * not known (undefined: read it). The map view answers it from the notes it holds in memory, so opening a map with no picture book in
+ * it reads no note at all.
+ */
+export type MayCarryCallouts = (nodeId: string) => boolean | undefined;
+
 export class BookCallouts {
   private readonly tails = new Map<string, Promise<unknown>>();
   private readonly waiting = new Map<string, Promise<void>>();
@@ -150,17 +157,19 @@ export class BookCallouts {
   constructor(private readonly ports: BookCalloutPorts) {}
 
   /** Aligns the chapter notes of this map's current run; asks that arrive while one waits to start share it. Failures are logged, never thrown. */
-  reconcile(mapPath: string): Promise<void> {
-    const queued = this.waiting.get(mapPath);
+  reconcile(mapPath: string, mayCarry?: MayCarryCallouts): Promise<void> {
+    // A call with a hint and one without are different jobs: the one without reads every note and must not borrow a hint.
+    const key = `${mapPath}\u0000${mayCarry ? "hint" : "all"}`;
+    const queued = this.waiting.get(key);
     if (queued) return queued;
     const job = this.enqueue(mapPath, async () => {
-      this.waiting.delete(mapPath);
-      await this.align(mapPath);
+      this.waiting.delete(key);
+      await this.align(mapPath, mayCarry);
     }).then(
       () => undefined,
       () => undefined
     );
-    this.waiting.set(mapPath, job);
+    this.waiting.set(key, job);
     return job;
   }
 
@@ -213,9 +222,14 @@ export class BookCallouts {
   }
 
   /** The cards of the run in reading order with their note paths; a card whose note cannot be read is left out (and logged). */
-  private async cardsOf(map: MapDocument, data: BookPipelineData): Promise<{ id: string; card: PipelineCard }[]> {
+  private async cardsOf(
+    map: MapDocument,
+    data: BookPipelineData,
+    skip?: (id: string) => boolean
+  ): Promise<{ id: string; card: PipelineCard }[]> {
     const out: { id: string; card: PipelineCard }[] = [];
     for (const id of data.order) {
+      if (skip?.(id)) continue;
       const node = map.nodes.find(item => item.id === id);
       if (!node) continue;
       try {
@@ -251,16 +265,19 @@ export class BookCallouts {
     }
   }
 
-  private async align(mapPath: string): Promise<void> {
+  private async align(mapPath: string, mayCarry?: MayCarryCallouts): Promise<void> {
+    const clean = (id: string): boolean => mayCarry?.(id) === false;
     const map = await this.ports.readMap(mapPath);
     const read = readBookPipeline(map);
     if (read.kind === "absent") {
-      await this.dropStale(map, undefined, new Set());
+      await this.dropStale(map, undefined, new Set(), clean);
       return;
     }
     if (read.kind !== "usable") return;
     const data = read.data;
-    const cards = await this.cardsOf(map, data);
+    // Gates need every chapter read (the trial hint, the review boxes); any other phase wants no callout, so a chapter known to have none is left unread.
+    const gate = data.phase === "gate1" || data.phase === "gate2";
+    const cards = await this.cardsOf(map, data, gate ? undefined : clean);
     const byId = new Map(cards.map(item => [item.id, item.card]));
     const link = (id: string | undefined): BookNoteLink | undefined => {
       const card = id ? byId.get(id) : undefined;
@@ -331,18 +348,23 @@ export class BookCallouts {
       if (alignCallouts(card.raw, want) === card.raw) continue;
       await this.put(data.runId, id, card.path, text => alignCallouts(text, want));
     }
-    await this.dropStale(map, data.runId, new Set(data.order));
+    await this.dropStale(map, data.runId, new Set(data.order), clean);
   }
 
   /**
    * The notes of the map that are not chapters of the current run (or of any run, when there is none): every program callout whose
    * run is not the current one goes. This is what cleans up after an abandon or a restart whose clear failed.
    */
-  private async dropStale(map: MapDocument, runId: string | undefined, chapters: Set<string>): Promise<void> {
+  private async dropStale(
+    map: MapDocument,
+    runId: string | undefined,
+    chapters: Set<string>,
+    known: (id: string) => boolean
+  ): Promise<void> {
     const current = runId === undefined ? undefined : idPart(runId);
     for (const node of map.nodes) {
       if (this.disposed) return;
-      if (chapters.has(node.id)) continue;
+      if (chapters.has(node.id) || known(node.id)) continue;
       let raw: string;
       try {
         raw = await this.ports.readText(node.path);

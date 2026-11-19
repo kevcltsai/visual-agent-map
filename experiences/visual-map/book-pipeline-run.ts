@@ -2015,6 +2015,10 @@ export class BookPipelineRuns {
     for (const [nodeId, instruction] of queued) {
       if (this.dead(drive) || drive.controller.signal.aborted) break;
       if (drive.stages.get(nodeId) !== "needs-review") continue;
+      // A kept chapter is not rewritten by an automatic redo (§8): no auto-fix for it.
+      const kept = drive.cards.get(nodeId);
+      const keptRaw = kept ? await this.ports.readCard(kept.path).catch(() => undefined) : undefined;
+      if (keptRaw && isKeptRaw(keptRaw.raw)) continue;
       const done = await drive.store.commit(state => requestAutoFix(state, nodeId));
       if (!done?.accepted) continue;
       // The rewrite may pick this card's own pictures again.
@@ -2148,12 +2152,28 @@ export class BookPipelineRuns {
     });
   }
 
+  /**
+   * Whether the program may rewrite this chapter text: it is as the program left it (or there is none) and not kept, or the reader gave a
+   * one-time permission for exactly this text. A kept choice wins over clean/empty: an older note the reader kept has no program fingerprint.
+   */
+  private mayOverwriteCard(drive: Drive, nodeId: string, raw: string): boolean {
+    const state = bodyStateRaw(raw);
+    if ((state === "clean" || state === "empty") && !isKeptRaw(raw)) return true;
+    const permit = drive.overwrite.get(nodeId);
+    return !!permit && permit.runId === drive.store.state.runId && permit.fingerprint === integrityFpRaw(raw);
+  }
+
   private async execPlan(drive: Drive, token: StepToken, nodeId: string): Promise<Outcome> {
     const signal = drive.controller.signal;
     const info = drive.cards.get(nodeId);
     const rootInfo = drive.cards.get(drive.rootId);
     if (!info || !rootInfo) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
+    // A chapter the program may not rewrite (hand-edited, unknown or kept, and no permission) gets no plan: the write step would refuse it anyway.
+    if (!this.mayOverwriteCard(drive, nodeId, card.raw)) {
+      this.log(drive, "plan_skipped", nodeId, "plan", "hand_edited");
+      return { kind: "ok", after: () => this.setStage(drive, nodeId, "planned", null) };
+    }
     const root = await this.ports.readCard(rootInfo.path);
     const book = parseBookPlanBody(root.raw);
     const settings = effectiveSettings(root.settings, parseBookPlanDecisions(root.raw));
@@ -2251,13 +2271,7 @@ export class BookPipelineRuns {
     const root = await this.ports.readCard(rootInfo.path);
     // The reader's hand: a chapter whose text is not as the program left it (or whose state is not known) is rewritten only with the
     // reader's one-time permission for exactly this text. The same check runs again inside the write itself (see `authorizeWrite`).
-    const permit = drive.overwrite.get(nodeId);
-    const mayOverwrite = (raw: string): boolean => {
-      const state = bodyStateRaw(raw);
-      // A kept choice wins over clean/empty: an older note the reader kept has no program fingerprint and must stay as it is.
-      if ((state === "clean" || state === "empty") && !isKeptRaw(raw)) return true;
-      return !!permit && permit.runId === drive.store.state.runId && permit.fingerprint === integrityFpRaw(raw);
-    };
+    const mayOverwrite = (raw: string): boolean => this.mayOverwriteCard(drive, nodeId, raw);
     if (!mayOverwrite(card.raw)) {
       // "Keep my version" was chosen for this very text: the chapter stays as it is and goes on to its proofread.
       if (isKept(card.detail)) {

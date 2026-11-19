@@ -1884,8 +1884,8 @@ const { detailBlockOf } = S.load('core/book-pipeline/note-sections.ts');
 const HAND = ' HAND-EDIT';
 const handEdit = (r, i, extra = HAND) => r.repo.updateNoteRawGuarded(r.nodes[i].path, c => c.replace(bodyOf(TITLES[i]), bodyOf(TITLES[i]) + extra), {});
 /** The book is back in the writing phase with the named chapters planned again (what a whole-book redo or an interrupted run leaves), then resumed to the checkpoint. */
-async function redo(r, indexes) {
-  for (const i of indexes) await r.repo.writePipelineFields(r.nodes[i].path, { pipelineStage: 'planned', pipelineIssue: null });
+async function redo(r, indexes, stage = 'planned') {
+  for (const i of indexes) await r.repo.writePipelineFields(r.nodes[i].path, { pipelineStage: stage, pipelineIssue: null });
   await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'writing'; d.bookPipeline.status = 'stopped'; delete d.bookPipeline.pauseReason; });
   await r.runs.resume(r.mapPath);
   while (r.runs.isRunning(r.mapPath)) await tick();
@@ -1979,6 +1979,29 @@ test('T9 keep: "keep my version" makes a whole-book redo leave the chapter alone
   await redo(r, [1]);
   assert.equal(r.stat.author.length, authors, 'still not written');
   assert.equal((await r.note(1)).pipelineIssue, 'write failed: hand_edited');
+});
+
+test('review-b S3: a redo of the whole book makes no plan call for a hand-edited or kept chapter, and a kept chapter gets no proof the second time and no auto-fix', async () => {
+  const r = await rig();
+  await finish(r);
+  await handEdit(r, 1);
+  await handEdit(r, 2);
+  await r.repo.updateNoteRawGuarded(r.nodes[2].path, keepRaw, {});
+  const plans = r.stat.plan.length;
+  const authors = r.stat.author.length;
+  await redo(r, [0, 1, 2], null);
+  const planned = r.stat.plan.slice(plans);
+  assert.ok(planned.includes(r.nodes[0].id), 'a clean chapter is planned (the test really replans)');
+  assert.ok(!planned.includes(r.nodes[1].id), 'hand-edited: no plan call');
+  assert.ok(!planned.includes(r.nodes[2].id), 'kept: no plan call');
+  assert.ok(!r.stat.author.slice(authors).some(id => id === r.nodes[1].id || id === r.nodes[2].id), 'neither is written');
+  const calls = () => r.stat.plan.length + r.stat.proof.length + r.stat.author.length;
+  const first = calls();
+  await redo(r, [0, 1, 2], null);
+  const again = r.stat.plan.slice(plans).filter(id => id === r.nodes[1].id || id === r.nodes[2].id);
+  assert.equal(again.length, 0, 'still no plan call on the next redo');
+  assert.ok(calls() - first <= 2 * (r.nodes.length), 'no per-chapter retry storm');
+  assert.ok(r.stat.logs.some(l => l.includes('plan_skipped')));
 });
 
 test('T9 rerun: without permission a single-card rerun leaves a hand-edited chapter alone', async () => {

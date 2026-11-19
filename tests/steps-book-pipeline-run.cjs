@@ -383,7 +383,7 @@ test('exit safety: a body the exit check refuses is not written at all (the card
 test('probe failure reasons are words in the output language (zh: 無法載入 / 空圖 / 逾時 / 已中止; en: English)', async () => {
   for (const [language, expected] of [['zh-TW', ['無圖：無法載入', '無圖：空圖', '無圖：逾時', '無圖：已中止']], ['en', ['No picture: could not load', 'No picture: empty image', 'No picture: timed out', 'No picture: aborted']]]) {
     const reasons = ['load_failed', 'empty', 'timeout', 'aborted'];
-    const r = await rig({ titles: ['SecretRootTitle'], script: { author: async input => {
+    const r = await rig({ titles: ['SecretRootTitle', 'Chapter'], script: { author: async input => {
       await input.admission.reserve();
       await r.repo.updateNoteGuarded(input.path, { detail: reasons.map((_, i) => `![p${i}](https://x.example/${i}.png)`).join('\n\n') }, { authorize: input.authorize, finalize: input.finalize });
       return { outcome: 'written' };
@@ -1471,12 +1471,82 @@ test('restart: a run stopped in planning is replaced by a fresh run with the mod
   assert.ok(authorModels.length > 0 && authorModels.every(m => m === 'm9'), `the new run uses the models read again: ${authorModels}`);
 });
 
-test('restart: a done or gate run is not replaced by a restart', async () => {
+test('restart: a running gate run is not replaced by a restart; a run stopped at a gate is', async () => {
   const r = await rig();
   await r.runs.start(r.mapPath);
   assert.equal((await r.state()).phase, 'gate1');
-  await assert.rejects(() => r.runs.start(r.mapPath, { restart: true }), e => e.code === 'exists');
+  await assert.rejects(() => r.runs.start(r.mapPath, { restart: true }), e => e.code === 'exists', 'a gate that is not stopped keeps its own flow');
   await r.runs.stop(r.mapPath, { saved: true });
-  assert.equal((await r.state()).status, 'stopped');
-  await assert.rejects(() => r.runs.start(r.mapPath, { restart: true }), e => e.code === 'exists', 'stopped at a gate keeps its own flow');
+  let s = await r.state();
+  assert.equal(s.status, 'stopped'); assert.equal(s.phase, 'gate1', 'stop at a gate holds the same gate');
+  const oldId = s.runId;
+  await assert.rejects(() => r.runs.start(r.mapPath), e => e.code === 'exists', 'a plain start still refuses a stopped run');
+  await r.runs.start(r.mapPath, { restart: true });
+  s = await r.state();
+  assert.notEqual(s.runId, oldId, 'the gate-stopped run was replaced by a new one');
+  assert.equal(s.phase, 'gate1'); assert.equal(s.status, 'running');
+});
+
+test('stop at gate 1 and gate 2: the run holds the same gate; continue returns to it with no card work redone', async () => {
+  const r = await rig();
+  await r.runs.start(r.mapPath);
+  await r.runs.stop(r.mapPath, { saved: true });
+  let s = await r.state();
+  assert.deepEqual([s.phase, s.status], ['gate1', 'stopped']);
+  const authored = r.stat.author.length;
+  await r.runs.resume(r.mapPath);
+  s = await r.state();
+  assert.deepEqual([s.phase, s.status], ['gate1', 'running'], 'continue returns to gate 1');
+  assert.equal(r.stat.author.length, authored);
+  await r.runs.confirmGate1(r.mapPath); await settle();
+  assert.equal((await r.state()).phase, 'gate2');
+  await r.runs.stop(r.mapPath, { saved: true });
+  s = await r.state();
+  assert.deepEqual([s.phase, s.status], ['gate2', 'stopped']);
+  await r.runs.resume(r.mapPath);
+  s = await r.state();
+  assert.deepEqual([s.phase, s.status], ['gate2', 'running'], 'continue returns to gate 2');
+});
+
+test('abandon: a stopped run (planning or a gate) and a done run lose bookPipeline; every note is byte-identical; a plain start works after; a running gate and a drive refuse', async () => {
+  const r = await rig();
+  await r.runs.start(r.mapPath);
+  await assert.rejects(() => r.runs.abandon(r.mapPath), e => e.code === 'not_stopped', 'a gate that is waiting is not abandoned');
+  await r.runs.stop(r.mapPath, { saved: true });
+  const before = r.nodes.map((n, i) => JSON.stringify(r.raw(i)));
+  await r.runs.abandon(r.mapPath);
+  const map = await r.repo.readMap(r.mapPath);
+  assert.equal(map.bookPipeline, undefined, 'the map is a normal mind map');
+  assert.equal(r.runs.getProgress(r.mapPath), undefined, 'the progress record is dropped');
+  assert.deepEqual(r.nodes.map((n, i) => JSON.stringify(r.raw(i))), before, 'notes untouched');
+  await assert.rejects(() => r.runs.abandon(r.mapPath), e => e.code === 'missing');
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.state()).phase, 'gate1', 'a plain start works afterwards');
+  await confirmDone(r.runs, r.mapPath);
+  await r.runs.finishRun(r.mapPath);
+  assert.equal((await r.state()).phase, 'done');
+  const doneBefore = r.nodes.map((n, i) => JSON.stringify(r.raw(i)));
+  await r.runs.abandon(r.mapPath);
+  assert.equal((await r.repo.readMap(r.mapPath)).bookPipeline, undefined, 'done: the book is removed');
+  assert.deepEqual(r.nodes.map((n, i) => JSON.stringify(r.raw(i))), doneBefore, 'done: notes untouched');
+});
+
+test('abandon: a drive of the map refuses (busy) and an interrupted run (saved running, no drive) is abandoned', async () => {
+  const hold = defer();
+  const r = await rig({ script: { global: () => hold.promise.then(() => ({ thread: 't', cards: r.nodes.map((n, i) => ({ id: n.id, role: i ? 'body' : 'intro' })), materials: [], decisions: {} })) } });
+  const started = r.runs.start(r.mapPath);
+  await settle();
+  await assert.rejects(() => r.runs.abandon(r.mapPath), e => e.code === 'busy');
+  await r.runs.stop(r.mapPath); await started.catch(() => undefined);
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.status = 'running'; });
+  await r.runs.abandon(r.mapPath);
+  assert.equal((await r.repo.readMap(r.mapPath)).bookPipeline, undefined);
+  hold.resolve(); await settle();
+  assert.equal((await r.repo.readMap(r.mapPath)).bookPipeline, undefined, 'the old drive\'s late result writes nothing');
+});
+
+test('start: a map with only a root topic and no chapter cards is refused with "empty" and nothing is written', async () => {
+  const r = await rig({ titles: ['Only root'] });
+  await assert.rejects(() => r.runs.start(r.mapPath), e => e.code === 'empty');
+  assert.equal((await r.repo.readMap(r.mapPath)).bookPipeline, undefined);
 });

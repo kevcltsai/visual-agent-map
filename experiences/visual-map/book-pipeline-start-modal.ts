@@ -122,8 +122,8 @@ export interface BookStartInput {
   modelChoice: Omit<BookModelChoiceInput, "models">;
   /** The root topic's current whole-book settings, shown in the fields. */
   settings: BookSettings;
-  /** Called once, after the card closed, with what the owner changed and the suggestions to take (possibly nothing). */
-  onStart: (patch: BookSettingsPatch) => void;
+  /** Called once, after the card closed, with what the owner changed and the suggestions to take (possibly nothing), and the four models picked in the card (saved only now, never by a Cancel). */
+  onStart: (patch: BookSettingsPatch, models: BookStartModels) => void;
   /** Called when the card closes for any reason: a suggestion still being made is dropped. */
   onClose?: () => void;
 }
@@ -271,10 +271,8 @@ export class BookStartModal extends Modal {
     renderBookModelChoice(choice, {
       ...this.input.modelChoice,
       models: this.input.models,
-      onChange: (key, model) => {
-        this.input.modelChoice.onChange(key, model);
-        this.refreshModels();
-      }
+      // A pick only changes this card's copy; it is saved when Start is pressed.
+      onChange: () => this.refreshModels()
     });
     change.addEventListener("click", () => {
       choice.hidden = !choice.hidden;
@@ -312,6 +310,6 @@ export class BookStartModal extends Modal {
     for (const [field, area] of this.fields?.areas ?? []) typed[field] = area.value;
     const patch = bookSettingsPatch(this.input.settings, typed, this.suggested);
     this.close();
-    this.input.onStart(patch);
+    this.input.onStart(patch, { ...this.input.models });
   }
 }

@@ -3141,6 +3141,14 @@ var en = {
   "ui.book_fail_other": "An unexpected error happened",
   "ui.book_resume": "Continue from where it stopped",
   "ui.book_restart": "Change settings and start over",
+  "ui.book_refused_empty": "This mind map has only a root topic and no chapter cards, so there is nothing to write. Add chapter cards first.",
+  "ui.book_refused_not_stopped": "The picture book is waiting at a check point. Stop it first, then give it up.",
+  "ui.book_abandon": "Give up this book",
+  "ui.book_remove": "Remove picture book",
+  "ui.book_abandon_title": "Give up this picture book?",
+  "ui.book_abandon_body": "The chapter notes already written stay exactly as they are. Only the picture-book progress is removed from this mind map, and it becomes a normal mind map again. You can press Picture book later to start fresh.",
+  "ui.book_abandon_confirm": "Yes, give it up",
+  "ui.book_abandoned": "This is a normal mind map again. Your notes were not changed.",
   "ui.book_add_budget": "Add 100 calls",
   "ui.book_budget_used_up_0_1": "Call budget used up: {0}/{1} used",
   "ui.book_confirm_gate1": "Looks good, run the whole book",
@@ -6307,6 +6315,14 @@ var zhCN = {
   "ui.book_fail_other": "\u53D1\u751F\u672A\u9884\u671F\u7684\u9519\u8BEF",
   "ui.book_resume": "\u4ECE\u505C\u5904\u7EE7\u7EED",
   "ui.book_restart": "\u91CD\u65B0\u8BBE\u7F6E\u518D\u5F00\u59CB",
+  "ui.book_refused_empty": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u53EA\u6709\u6839\u8BAE\u9898\u3001\u6CA1\u6709\u7AE0\u8282\u5361\u7247\uFF0C\u6CA1\u6709\u4E1C\u897F\u53EF\u4EE5\u5199\u3002\u8BF7\u5148\u52A0\u4E0A\u7AE0\u8282\u5361\u7247\u3002",
+  "ui.book_refused_not_stopped": "\u56FE\u6587\u4E66\u6B63\u505C\u5728\u68C0\u67E5\u70B9\u3002\u8BF7\u5148\u505C\u6B62\uFF0C\u518D\u653E\u5F03\u3002",
+  "ui.book_abandon": "\u653E\u5F03\u8FD9\u672C",
+  "ui.book_remove": "\u79FB\u9664\u56FE\u6587\u4E66",
+  "ui.book_abandon_title": "\u653E\u5F03\u8FD9\u672C\u56FE\u6587\u4E66\uFF1F",
+  "ui.book_abandon_body": "\u5DF2\u5199\u597D\u7684\u7AE0\u8282\u7B14\u8BB0\u4F1A\u539F\u5C01\u4E0D\u52A8\u4FDD\u7559\u3002\u53EA\u4F1A\u4ECE\u8FD9\u5F20\u5FC3\u667A\u56FE\u79FB\u9664\u56FE\u6587\u4E66\u7684\u8FDB\u5EA6\uFF0C\u5B83\u4F1A\u53D8\u56DE\u666E\u901A\u5FC3\u667A\u56FE\u3002\u4E4B\u540E\u6309\u201C\u56FE\u6587\u4E66\u201D\u53EF\u4EE5\u91CD\u65B0\u5F00\u59CB\u3002",
+  "ui.book_abandon_confirm": "\u786E\u5B9A\u653E\u5F03",
+  "ui.book_abandoned": "\u5DF2\u53D8\u56DE\u666E\u901A\u5FC3\u667A\u56FE\uFF0C\u4F60\u7684\u7B14\u8BB0\u6CA1\u6709\u88AB\u6539\u52A8\u3002",
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u989D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
   "ui.book_confirm_gate1": "\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66",
@@ -9473,6 +9489,14 @@ var zhTW = {
   "ui.book_fail_other": "\u767C\u751F\u672A\u9810\u671F\u7684\u932F\u8AA4",
   "ui.book_resume": "\u5F9E\u505C\u8655\u7E7C\u7E8C",
   "ui.book_restart": "\u91CD\u65B0\u8A2D\u5B9A\u518D\u958B\u59CB",
+  "ui.book_refused_empty": "\u9019\u5F35\u5FC3\u667A\u5716\u53EA\u6709\u6839\u8B70\u984C\u3001\u6C92\u6709\u7AE0\u7BC0\u5361\u7247\uFF0C\u6C92\u6709\u6771\u897F\u53EF\u4EE5\u5BEB\u3002\u8ACB\u5148\u52A0\u4E0A\u7AE0\u7BC0\u5361\u7247\u3002",
+  "ui.book_refused_not_stopped": "\u5716\u6587\u66F8\u6B63\u505C\u5728\u6AA2\u67E5\u9EDE\u3002\u8ACB\u5148\u505C\u6B62\uFF0C\u518D\u653E\u68C4\u3002",
+  "ui.book_abandon": "\u653E\u68C4\u9019\u672C",
+  "ui.book_remove": "\u79FB\u9664\u5716\u6587\u66F8",
+  "ui.book_abandon_title": "\u653E\u68C4\u9019\u672C\u5716\u6587\u66F8\uFF1F",
+  "ui.book_abandon_body": "\u5DF2\u5BEB\u597D\u7684\u7AE0\u7BC0\u7B46\u8A18\u6703\u539F\u5C01\u4E0D\u52D5\u4FDD\u7559\u3002\u53EA\u6703\u5F9E\u9019\u5F35\u5FC3\u667A\u5716\u79FB\u9664\u5716\u6587\u66F8\u7684\u9032\u5EA6\uFF0C\u5B83\u6703\u8B8A\u56DE\u4E00\u822C\u5FC3\u667A\u5716\u3002\u4E4B\u5F8C\u6309\u300C\u5716\u6587\u66F8\u300D\u53EF\u4EE5\u91CD\u65B0\u958B\u59CB\u3002",
+  "ui.book_abandon_confirm": "\u78BA\u5B9A\u653E\u68C4",
+  "ui.book_abandoned": "\u5DF2\u8B8A\u56DE\u4E00\u822C\u5FC3\u667A\u5716\uFF0C\u4F60\u7684\u7B46\u8A18\u6C92\u6709\u88AB\u66F4\u52D5\u3002",
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u984D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
   "ui.book_confirm_gate1": "\u9019\u6A23\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u66F8",
@@ -50445,7 +50469,7 @@ var BookPipelineRuns = class {
   }
   /** Starts a new run (writes `bookPipeline` to the map file) and drives it until it ends, pauses or reaches a gate. */
   async start(mapPath, options = {}) {
-    const replaceable = (data) => data.phase === "done" || options.restart === true && data.status === "stopped" && (data.phase === "planning" || data.phase === "writing");
+    const replaceable = (data) => data.phase === "done" || options.restart === true && data.status === "stopped";
     return this.enter(mapPath, async (drive) => {
       if (this.ports.blocked(mapPath)) throw new BookPipelineRunError("blocked");
       const runId = this.ports.newId();
@@ -50482,6 +50506,31 @@ var BookPipelineRuns = class {
       });
       if (!initial || this.dead(drive)) return;
       this.log(drive, "start", "-", "plan", "ok");
+    });
+  }
+  /**
+   * "Give up this book": removes `bookPipeline` from the map file so it is a normal mind map again. Only for a run that is stopped (or
+   * interrupted) or done, and never beside a drive of the map. No note is read or written; backups stay. The progress record the
+   * plugin kept for the map is dropped with it.
+   */
+  async abandon(mapPath) {
+    return this.enter(mapPath, async (drive) => {
+      if (this.ports.blocked(mapPath)) throw new BookPipelineRunError("blocked");
+      await this.ports.mutate(async () => {
+        if (this.dead(drive)) return;
+        const found = readBookPipeline(await this.ports.readMap(mapPath));
+        if (found.kind === "absent") throw new BookPipelineRunError("missing");
+        if (found.kind === "unusable") throw new BookPipelineRunError("unusable");
+        const waiting = (found.data.phase === "gate1" || found.data.phase === "gate2") && found.data.status === "running";
+        if (waiting) throw new BookPipelineRunError("not_stopped");
+        await this.ports.updateMap(mapPath, (doc) => {
+          const again = readBookPipeline(doc);
+          if (again.kind !== "usable" || again.data.runId !== found.data.runId)
+            throw new BookPipelineRunError("not_stopped");
+          delete doc.bookPipeline;
+        });
+        this.last.delete(mapPath);
+      });
     });
   }
   /** Continues a stopped (or interrupted) run from the cards' stages; `addBudget` first raises the call limit (the "add 100" button). */
@@ -50841,7 +50890,9 @@ var BookPipelineRuns = class {
   orderOf(map) {
     const roots = map.nodes.filter((node) => !node.parentId);
     if (roots.length !== 1) throw new BookPipelineRunError("root");
-    return readingOrder(map.nodes, { includeHidden: true });
+    const order = readingOrder(map.nodes, { includeHidden: true });
+    if (order.length < 2) throw new BookPipelineRunError("empty");
+    return order;
   }
   attachStore(drive, state) {
     drive.store = new PipelineStore(state, (next) => this.persist(drive, next));
@@ -51893,6 +51944,7 @@ function bookEtaText(seconds) {
   return minutes < 1 ? t("ui.book_eta_under_minute") : t("ui.book_eta_0", minutes);
 }
 function renderBookBar(parent, state, actions) {
+  var _a2;
   const { counts, total: total2 } = state;
   const bar = parent.createDiv("vam-book-bar");
   bar.dataset.mode = state.mode;
@@ -51916,7 +51968,7 @@ function renderBookBar(parent, state, actions) {
     );
     opener.setAttr("aria-expanded", String(open2));
   }
-  if (state.phase === "gate1" && state.mode !== "done") {
+  if (state.phase === "gate1" && state.mode !== "done" && state.mode !== "stopped") {
     makeButton(buttons, t("ui.book_confirm_gate1"), "mod-cta vam-book-confirm", actions.confirmGate1);
   }
   if (state.mode === "budget") {
@@ -51929,11 +51981,34 @@ function renderBookBar(parent, state, actions) {
       "mod-cta vam-book-resume",
       actions.resume
     );
-    if (actions.restart && (state.phase === "planning" || state.phase === "writing"))
+    if (actions.restart && state.phase !== "done")
       makeButton(buttons, t("ui.book_restart"), "vam-book-restart", actions.restart);
   } else if (state.mode === "planning" || state.mode === "writing")
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+  else if ((state.mode === "gate1" || state.mode === "gate2") && !state.rerun)
+    makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   if (state.rerun) makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+  if (actions.abandon && (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")) {
+    const abandon = actions.abandon;
+    const ask = makeButton(
+      buttons,
+      t(state.mode === "done" ? "ui.book_remove" : "ui.book_abandon"),
+      "vam-book-abandon",
+      abandon.ask
+    );
+    ask.setAttr("aria-expanded", String(abandon.asking));
+  }
+  if (((_a2 = actions.abandon) == null ? void 0 : _a2.asking) && (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")) {
+    const abandon = actions.abandon;
+    const card = bar.createDiv("vam-book-abandon-card");
+    card.setAttr("role", "group");
+    card.setAttr("aria-label", t("ui.book_abandon_title"));
+    card.createEl("b", { text: t("ui.book_abandon_title") });
+    card.createEl("p", { text: t("ui.book_abandon_body") });
+    const row = card.createDiv("vam-book-abandon-actions");
+    makeButton(row, t("ui.cancel"), "vam-book-abandon-cancel", abandon.cancel);
+    makeButton(row, t("ui.book_abandon_confirm"), "mod-warning vam-book-abandon-confirm", abandon.confirm);
+  }
   const progressText = bookProgressText(state);
   renderProgressLine(bar, state, progressText);
   if (state.phase === "gate2" || state.phase === "done")
@@ -52001,6 +52076,8 @@ var REFUSAL_KEY = {
   unreadable: "ui.book_refused_unreadable",
   not_gate1: "ui.book_refused_not_gate1",
   not_gate: "ui.book_refused_not_gate",
+  empty: "ui.book_refused_empty",
+  not_stopped: "ui.book_refused_not_stopped",
   instruction: "ui.book_refused_instruction"
 };
 function bookRefusalText(error) {
@@ -52321,10 +52398,8 @@ var BookStartModal = class extends import_obsidian24.Modal {
     renderBookModelChoice(choice, {
       ...this.input.modelChoice,
       models: this.input.models,
-      onChange: (key4, model) => {
-        this.input.modelChoice.onChange(key4, model);
-        this.refreshModels();
-      }
+      // A pick only changes this card's copy; it is saved when Start is pressed.
+      onChange: () => this.refreshModels()
     });
     change2.addEventListener("click", () => {
       choice.hidden = !choice.hidden;
@@ -52364,7 +52439,7 @@ var BookStartModal = class extends import_obsidian24.Modal {
     for (const [field, area] of (_b2 = (_a2 = this.fields) == null ? void 0 : _a2.areas) != null ? _b2 : []) typed[field] = area.value;
     const patch = bookSettingsPatch(this.input.settings, typed, this.suggested);
     this.close();
-    this.input.onStart(patch);
+    this.input.onStart(patch, { ...this.input.models });
   }
 };
 
@@ -67893,6 +67968,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     __publicField(this, "heightsSeenMap", null);
     __publicField(this, "settling", false);
     __publicField(this, "bookPipelineSeen", null);
+    /** The map whose bar shows the "give up this book" confirmation card (in-page; never window.confirm). */
+    __publicField(this, "bookAbandonAsking", null);
     // ---- Picture-book gate panel (04b) ---------------------------------------------------------------------------
     __publicField(this, "bookPanel", new GatePanelState());
     __publicField(this, "bookSideEl", null);
@@ -82300,10 +82377,26 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
       restart: () => void this.startBookPipelineFromUi({ restart: true }),
+      abandon: {
+        asking: this.bookAbandonAsking === path,
+        ask: () => this.askBookAbandon(path, true),
+        cancel: () => this.askBookAbandon(path, false),
+        confirm: () => {
+          this.bookAbandonAsking = null;
+          void this.bookEntry(async () => {
+            await this.plugin.abandonBookPipeline(path);
+            new import_obsidian38.Notice(t("ui.book_abandoned"));
+          });
+        }
+      },
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
       confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path)),
       panel: { open: this.bookPanel.open, toggle: () => this.toggleBookPanel() }
     });
+  }
+  askBookAbandon(path, asking) {
+    this.bookAbandonAsking = asking ? path : null;
+    if (!this.closed) this.render();
   }
   /** Runs `work` so the chat's open state is not saved as the user's choice (the panel folded it, not the user). */
   withChatForced(work) {
@@ -82643,9 +82736,10 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const path = this.path;
     const roots = map.nodes.filter((node) => !node.parentId);
     const existing = readBookPipeline(map);
-    const restart = options.restart === true && existing.kind === "usable" && existing.data.status === "stopped" && (existing.data.phase === "planning" || existing.data.phase === "writing");
+    const restart = options.restart === true && existing.kind === "usable" && existing.data.status === "stopped";
     const startable = existing.kind === "absent" || existing.kind === "usable" && existing.data.phase === "done" || restart;
-    if (!startable || roots.length !== 1) return this.bookEntry(() => this.plugin.startBookPipeline(path));
+    if (!startable || roots.length !== 1 || map.nodes.length < 2)
+      return this.bookEntry(() => this.plugin.startBookPipeline(path));
     if ((_a2 = this.bookStartModal) == null ? void 0 : _a2.isShown) return;
     const root = roots.length === 1 ? roots[0] : void 0;
     const rootNote = root ? await this.plugin.repo.readNote(root.path).catch(() => null) : null;
@@ -82661,15 +82755,29 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         images: settings.bookImageModel,
         proof: settings.bookProofModel
       },
-      modelChoice: this.bookModelChoice(),
+      // Nothing is saved while the card is open: Start saves the picks (see onStart).
+      modelChoice: { ...this.bookModelChoice(), onChange: () => void 0 },
       settings: (_c = rootNote == null ? void 0 : rootNote.bookSettings) != null ? _c : {},
       onClose: () => {
         window.clearTimeout(suggestTimer);
         suggesting.abort();
       },
-      onStart: (patch) => {
+      onStart: (patch, picked) => {
         void this.bookEntry(async () => {
           if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");
+          const keys = {
+            plan: "bookPlanModel",
+            write: "bookWriteModel",
+            images: "bookImageModel",
+            proof: "bookProofModel"
+          };
+          let modelsChanged = false;
+          for (const step of Object.keys(keys))
+            if (picked[step] && this.plugin.settings[keys[step]] !== picked[step]) {
+              this.plugin.settings[keys[step]] = picked[step];
+              modelsChanged = true;
+            }
+          if (modelsChanged) await this.plugin.saveSettings();
           if (root && Object.keys(patch).length) await this.plugin.repo.writeBookSettings(root.path, patch);
           await this.plugin.startBookPipeline(path, restart ? { restart: true } : void 0);
         });
@@ -103243,6 +103351,9 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   stopBookPipeline(mapPath, options = {}) {
     return this.bookPipelineRuns.stop(mapPath, options);
+  }
+  abandonBookPipeline(mapPath) {
+    return this.bookPipelineRuns.abandon(mapPath);
   }
   resumeBookPipeline(mapPath, options = {}) {
     return this.bookPipelineRuns.resume(mapPath, options);

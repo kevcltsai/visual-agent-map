@@ -154,6 +154,8 @@ export type BookRunRefusal =
   | "unreadable"
   | "not_gate1"
   | "not_gate"
+  | "empty"
+  | "not_stopped"
   | "instruction";
 export class BookPipelineRunError extends Error {
   constructor(readonly code: BookRunRefusal) {
@@ -735,12 +737,9 @@ export class BookPipelineRuns {
 
   /** Starts a new run (writes `bookPipeline` to the map file) and drives it until it ends, pauses or reaches a gate. */
   async start(mapPath: string, options: { restart?: boolean } = {}): Promise<void> {
-    // A restart (the stopped bar's "reconfigure and start over") may replace a run that is stopped before its first gate; nothing else.
+    // A restart (the stopped bar's "reconfigure and start over") may replace a run that is stopped in any phase before done; nothing else.
     const replaceable = (data: BookPipelineData): boolean =>
-      data.phase === "done" ||
-      (options.restart === true &&
-        data.status === "stopped" &&
-        (data.phase === "planning" || data.phase === "writing"));
+      data.phase === "done" || (options.restart === true && data.status === "stopped");
     return this.enter(mapPath, async drive => {
       if (this.ports.blocked(mapPath)) throw new BookPipelineRunError("blocked");
       const runId = this.ports.newId();
@@ -779,6 +778,33 @@ export class BookPipelineRuns {
       });
       if (!initial || this.dead(drive)) return;
       this.log(drive, "start", "-", "plan", "ok");
+    });
+  }
+
+  /**
+   * "Give up this book": removes `bookPipeline` from the map file so it is a normal mind map again. Only for a run that is stopped (or
+   * interrupted) or done, and never beside a drive of the map. No note is read or written; backups stay. The progress record the
+   * plugin kept for the map is dropped with it.
+   */
+  async abandon(mapPath: string): Promise<void> {
+    return this.enter(mapPath, async drive => {
+      if (this.ports.blocked(mapPath)) throw new BookPipelineRunError("blocked");
+      await this.ports.mutate(async () => {
+        if (this.dead(drive)) return;
+        const found = readBookPipeline(await this.ports.readMap(mapPath));
+        if (found.kind === "absent") throw new BookPipelineRunError("missing");
+        if (found.kind === "unusable") throw new BookPipelineRunError("unusable");
+        const waiting =
+          (found.data.phase === "gate1" || found.data.phase === "gate2") && found.data.status === "running";
+        if (waiting) throw new BookPipelineRunError("not_stopped");
+        await this.ports.updateMap(mapPath, doc => {
+          const again = readBookPipeline(doc);
+          if (again.kind !== "usable" || again.data.runId !== found.data.runId)
+            throw new BookPipelineRunError("not_stopped");
+          delete doc.bookPipeline;
+        });
+        this.last.delete(mapPath);
+      });
     });
   }
 
@@ -1167,7 +1193,10 @@ export class BookPipelineRuns {
   private orderOf(map: MapDocument): string[] {
     const roots = map.nodes.filter(node => !node.parentId);
     if (roots.length !== 1) throw new BookPipelineRunError("root");
-    return readingOrder(map.nodes, { includeHidden: true });
+    const order = readingOrder(map.nodes, { includeHidden: true });
+    // A root alone has no chapter to write.
+    if (order.length < 2) throw new BookPipelineRunError("empty");
+    return order;
   }
   private attachStore(drive: Drive, state: BookPipelineData): void {
     drive.store = new PipelineStore(state, next => this.persist(drive, next));

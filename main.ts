@@ -1753,6 +1753,9 @@ export default class VisualAgentMapPlugin extends Plugin {
   stopBookPipeline(mapPath: string, options: { saved?: boolean } = {}): Promise<void> {
     return this.bookPipelineRuns.stop(mapPath, options);
   }
+  abandonBookPipeline(mapPath: string): Promise<void> {
+    return this.bookPipelineRuns.abandon(mapPath);
+  }
   resumeBookPipeline(mapPath: string, options: { addBudget?: number } = {}): Promise<void> {
     return this.bookPipelineRuns.resume(mapPath, options);
   }

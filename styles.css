@@ -2317,6 +2317,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-panel-summary.vam-book-panel-g2-line[data-state="attention"] { color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
 .vam-book-panel-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .vam-book-rerun-hint { margin-top: 4px; font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.vam-book-abandon-card { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); }
+.vam-book-abandon-card p { margin: 4px 0 8px; color: var(--text-muted); font-size: var(--font-ui-small); }
+.vam-book-abandon-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .vam-node-header > .vam-node-rerun { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .vam-node-header > .vam-node-rerun .svg-icon { width: 12px; height: 12px; }
 .vam-node-header > .vam-node-rerun:disabled { opacity: 0.5; cursor: not-allowed; }

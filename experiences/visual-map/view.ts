@@ -17120,10 +17120,28 @@ export class VisualAgentMapView extends ItemView {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
       resume: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path)),
       restart: () => void this.startBookPipelineFromUi({ restart: true }),
+      abandon: {
+        asking: this.bookAbandonAsking === path,
+        ask: () => this.askBookAbandon(path, true),
+        cancel: () => this.askBookAbandon(path, false),
+        confirm: () => {
+          this.bookAbandonAsking = null;
+          void this.bookEntry(async () => {
+            await this.plugin.abandonBookPipeline(path);
+            new Notice(t("ui.book_abandoned"));
+          });
+        }
+      },
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
       confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path)),
       panel: { open: this.bookPanel.open, toggle: () => this.toggleBookPanel() }
     });
+  }
+  /** The map whose bar shows the "give up this book" confirmation card (in-page; never window.confirm). */
+  private bookAbandonAsking: string | null = null;
+  private askBookAbandon(path: string, asking: boolean): void {
+    this.bookAbandonAsking = asking ? path : null;
+    if (!this.closed) this.render();
   }
   // ---- Picture-book gate panel (04b) ---------------------------------------------------------------------------
   private readonly bookPanel = new GatePanelState();
@@ -17476,15 +17494,13 @@ export class VisualAgentMapView extends ItemView {
     // A map with a run still going (or one that cannot be read) has nothing to confirm: the entry answers with its own sentence.
     // So does a map without exactly one root topic: the card would only lead to the same refusal.
     const existing = readBookPipeline(map);
-    // A restart is only for a run stopped before its first gate: the card opens, and confirming replaces that run.
-    const restart =
-      options.restart === true &&
-      existing.kind === "usable" &&
-      existing.data.status === "stopped" &&
-      (existing.data.phase === "planning" || existing.data.phase === "writing");
+    // A restart is only for a run that is stopped (any phase before done): the card opens, and confirming replaces that run.
+    const restart = options.restart === true && existing.kind === "usable" && existing.data.status === "stopped";
     const startable =
       existing.kind === "absent" || (existing.kind === "usable" && existing.data.phase === "done") || restart;
-    if (!startable || roots.length !== 1) return this.bookEntry(() => this.plugin.startBookPipeline(path));
+    // A root alone (no chapter cards) gets the runner's plain refusal instead of a card that could only lead to it.
+    if (!startable || roots.length !== 1 || map.nodes.length < 2)
+      return this.bookEntry(() => this.plugin.startBookPipeline(path));
     if (this.bookStartModal?.isShown) return;
     const root = roots.length === 1 ? roots[0] : undefined;
     const rootNote = root ? await this.plugin.repo.readNote(root.path).catch(() => null) : null;
@@ -17501,16 +17517,31 @@ export class VisualAgentMapView extends ItemView {
         images: settings.bookImageModel,
         proof: settings.bookProofModel
       },
-      modelChoice: this.bookModelChoice(),
+      // Nothing is saved while the card is open: Start saves the picks (see onStart).
+      modelChoice: { ...this.bookModelChoice(), onChange: () => undefined },
       settings: rootNote?.bookSettings ?? {},
       onClose: () => {
         window.clearTimeout(suggestTimer);
         suggesting.abort();
       },
-      onStart: patch => {
+      onStart: (patch, picked) => {
         void this.bookEntry(async () => {
           // A chat chain holding the map refuses before anything is written.
           if (this.bookPipelineBlocked()) throw new BookPipelineRunError("blocked");
+          // The models picked in the card are saved only now (a Cancel leaves the settings as they were).
+          const keys = {
+            plan: "bookPlanModel",
+            write: "bookWriteModel",
+            images: "bookImageModel",
+            proof: "bookProofModel"
+          } as const;
+          let modelsChanged = false;
+          for (const step of Object.keys(keys) as (keyof typeof keys)[])
+            if (picked[step] && this.plugin.settings[keys[step]] !== picked[step]) {
+              this.plugin.settings[keys[step]] = picked[step];
+              modelsChanged = true;
+            }
+          if (modelsChanged) await this.plugin.saveSettings();
           // Only the fields the owner changed (or left empty with a suggestion) are written, and only to the root topic.
           if (root && Object.keys(patch).length) await this.plugin.repo.writeBookSettings(root.path, patch);
           await this.plugin.startBookPipeline(path, restart ? { restart: true } : undefined);

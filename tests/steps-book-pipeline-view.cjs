@@ -266,7 +266,8 @@ async function harness({ book, stages = {}, issue, phase }) {
     startBookPipeline: async (p, o) => { entries.push(o ? ['start', p, o] : ['start', p]); },
     stopBookPipeline: async p => { entries.push(['stop', p]); },
     resumeBookPipeline: async (p, o) => { entries.push(['resume', p, o]); },
-    confirmBookGate1: async p => { entries.push(['confirm', p]); }
+    confirmBookGate1: async p => { entries.push(['confirm', p]); },
+    abandonBookPipeline: async p => { entries.push(['abandon', p]); }
   });
   support.attachTopicRuns(plugin);
   const view = new VisualAgentMapView({ app }, plugin);
@@ -554,14 +555,38 @@ test('start card: "Change" unfolds four dropdowns (plan, author, pictures, proof
   assert.equal(selects[1].value, h.plugin.settings.bookWriteModel);
   const before = texts(modal.modalEl).find(x => x.startsWith('3 張卡'));
   selects[1].value = 'claude:sonnet'; selects[1].change();
-  assert.equal(h.plugin.settings.bookWriteModel, 'claude:sonnet');
-  assert.equal(h.ctl.saves.length, 1);
+  assert.notEqual(h.plugin.settings.bookWriteModel, 'claude:sonnet', 'a pick is not saved while the card is open');
+  assert.equal(h.ctl.saves.length, 0);
   assert.ok(texts(modal.modalEl).includes('模型：企劃 M:claude:sonnet、寫作 M:claude:sonnet、找圖 M:claude:haiku、校對 M:claude:haiku'));
   const after = texts(modal.modalEl).find(x => x.startsWith('3 張卡'));
   assert.match(before, /最多 16 次/); assert.match(after, /最多 16 次/);
   assert.notEqual(before, after, 'the time follows the model');
   change.click();
   for (const select of selects) assert.equal(shown(select), false, 'folds again');
+  cardButton(modal, '開始').click(); await dom.tick();
+  assert.equal(h.plugin.settings.bookWriteModel, 'claude:sonnet', 'Start saves the pick');
+  assert.equal(h.ctl.saves.length, 1);
+});
+
+test('start card: Cancel after changing the models leaves the saved models exactly as they were (nothing saved, nothing started)', async () => {
+  const h = await harness({ book: false });
+  const was = { plan: h.plugin.settings.bookPlanModel, write: h.plugin.settings.bookWriteModel, images: h.plugin.settings.bookImageModel, proof: h.plugin.settings.bookProofModel };
+  const modal = await openCard(h);
+  cardButton(modal, '更改').click();
+  const selects = dom.findAll(modal.modalEl, i => i.tag === 'select');
+  selects[0].value = 'claude:opus'; selects[0].change();
+  selects[1].value = 'claude:haiku'; selects[1].change();
+  cardButton(modal, '取消').click(); await dom.tick();
+  assert.deepEqual({ plan: h.plugin.settings.bookPlanModel, write: h.plugin.settings.bookWriteModel, images: h.plugin.settings.bookImageModel, proof: h.plugin.settings.bookProofModel }, was);
+  assert.equal(h.ctl.saves.length, 0); assert.equal(h.entries.length, 0);
+});
+
+test('start: a map with a root and no chapter cards opens no card; the entry gives its plain refusal', async () => {
+  const h = await harness({ book: false });
+  h.view.map.nodes = h.view.map.nodes.filter(n => n.id === h.ids.root);
+  await h.view.startBookPipelineFromUi();
+  assert.equal(h.view.bookStartModal, null);
+  assert.equal(h.entries.length, 1);
 });
 
 // ---- the start card's grey suggestions (T1 P1b) ----
@@ -1032,22 +1057,93 @@ test('T5 bar: while a run with a trial is planning, the sentence says which tria
   lang('zh-TW');
 });
 
-test('restart: the stopped bar shows both buttons before gate 1 only; planning and writing show it, gate1, gate2, done, budget pause and running do not', () => {
+test('stop and restart: stop shows at gate 1 and gate 2 (not at done); a stopped run in any phase before done shows continue, restart and give up; a budget pause and a running run show no restart', () => {
   lang('zh-TW');
-  for (const phase of ['planning', 'writing']) {
+  for (const phase of ['gate1', 'gate2']) {
+    const d = draw(bookData({ phase }), progress({ phase, active: false }), noStage, true);
+    assert.ok(buttonsOf(d.bar).some(b => b.text === '停止'), `stop at ${phase}`);
+    buttonsOf(d.bar).find(b => b.text === '停止').click();
+    assert.deepEqual(d.log, ['stop']);
+  }
+  const done = draw(bookData({ phase: 'done' }), progress({ phase: 'done', active: false }), noStage, true);
+  assert.ok(!buttonsOf(done.bar).some(b => b.text === '停止'), 'no stop when done');
+  const rerunning = draw(bookData({ phase: 'gate2' }), progress({ phase: 'gate2', rerun: { nodeId: 'a', startedAt: 1 } }), noStage, true);
+  assert.equal(buttonsOf(rerunning.bar).filter(b => b.text === '停止').length, 1, 'a rerun at a gate has one stop button');
+  for (const phase of ['planning', 'writing', 'gate1', 'gate2']) {
     const d = draw(bookData({ status: 'stopped', phase }), progress({ status: 'stopped', active: false, phase }), noStage, true);
-    assert.deepEqual(buttonsOf(d.bar).map(b => b.text), ['從停處繼續', '重新設定再開始'], phase);
+    assert.deepEqual(buttonsOf(d.bar).map(b => b.text), ['從停處繼續', '重新設定再開始'], phase + ' (no abandon without the action)');
     buttonsOf(d.bar)[1].click();
     assert.deepEqual(d.log, ['restart']);
-  }
-  for (const phase of ['gate1', 'gate2', 'done']) {
-    const d = draw(bookData({ status: 'stopped', phase }), progress({ status: 'stopped', active: false, phase }), noStage, true);
-    assert.ok(!buttonsOf(d.bar).some(b => b.text === '重新設定再開始'), phase);
   }
   const running = draw(bookData(), progress(), noStage, true);
   assert.ok(!buttonsOf(running.bar).some(b => b.text === '重新設定再開始'));
   const budget = draw(bookData({ status: 'stopped', pauseReason: 'budget' }), progress({ status: 'stopped', active: false, pauseReason: 'budget' }), noStage, true);
   assert.ok(!buttonsOf(budget.bar).some(b => b.text === '重新設定再開始'));
+  const gate1Stopped = draw(bookData({ status: 'stopped', phase: 'gate1' }), progress({ status: 'stopped', active: false, phase: 'gate1' }), noStage, true);
+  assert.ok(!buttonsOf(gate1Stopped.bar).some(b => b.text === '這樣可以，跑完全書'), 'a stopped gate 1 shows no confirm beside the three choices');
+});
+
+test('abandon: stopped, budget pause and done show the entry (放棄這本 / 移除圖文書); running and the waiting gates do not; the confirmation card has the notes-kept sentence, Cancel and confirm', () => {
+  lang('zh-TW');
+  const abandon = (asking = false) => { const log = []; return { log, abandon: { asking, ask: () => log.push('ask'), cancel: () => log.push('cancel'), confirm: () => log.push('confirm') } }; };
+  const drawWith = (data, prog, a) => { const c = calls(); c.actions.abandon = a.abandon; c.actions.restart = () => undefined; const parent = dom.element('div'); return renderedBar(parent, data, prog, c); };
+  const renderedBar = (parent, data, prog, c) => ui.renderBookBar(parent, ui.bookBarState(data, prog, noStage), c.actions);
+  const labelOf = (data, prog) => { const a = abandon(); const bar = drawWith(data, prog, a); return [buttonsOf(bar).map(b => b.text), a, bar]; };
+  let [texts1, a1, bar1] = labelOf(bookData({ status: 'stopped', phase: 'gate1' }), progress({ status: 'stopped', active: false, phase: 'gate1' }));
+  assert.deepEqual(texts1, ['從停處繼續', '重新設定再開始', '放棄這本']);
+  buttonsOf(bar1).find(b => b.text === '放棄這本').click();
+  assert.deepEqual(a1.log, ['ask']);
+  assert.ok(texts1.includes('放棄這本'));
+  const budgetTexts = labelOf(bookData({ status: 'stopped', pauseReason: 'budget' }), progress({ status: 'stopped', active: false, pauseReason: 'budget' }))[0];
+  assert.ok(budgetTexts.includes('放棄這本'));
+  assert.deepEqual(labelOf(bookData({ phase: 'done' }), progress({ phase: 'done', active: false }))[0].filter(x => x.includes('移除') || x.includes('放棄')), ['移除圖文書']);
+  for (const phase of ['writing', 'gate1', 'gate2']) assert.ok(!labelOf(bookData({ phase }), progress({ phase, active: phase === 'writing' }))[0].some(x => x === '放棄這本' || x === '移除圖文書'), phase);
+  for (const data of [bookData({ status: 'stopped', phase: 'writing' }), bookData({ phase: 'done' })]) {
+    const a = abandon(true);
+    const bar = drawWith(data, progress({ phase: data.phase, status: data.status, active: false }), a);
+    const card = dom.find(bar, i => i.cls.includes('vam-book-abandon-card'));
+    assert.ok(card, 'the card is drawn in the bar (no window.confirm)');
+    assert.ok(texts(card).some(x => x.includes('已寫好的章節筆記會原封不動保留')));
+    assert.ok(!/地圖/.test(texts(card).join('')));
+    dom.find(card, i => i.cls.includes('vam-book-abandon-cancel')).click();
+    dom.find(card, i => i.cls.includes('vam-book-abandon-confirm')).click();
+    assert.deepEqual(a.log, ['cancel', 'confirm']);
+  }
+});
+
+test('abandon (view): asking shows the card; Cancel clears it without an entry; confirm calls the plugin entry once with this map; running stays without the entry', async () => {
+  const h = await harness({ book: true, phase: 'writing' });
+  h.view.map.bookPipeline.status = 'stopped';
+  h.plugin.getBookPipelineProgress = () => progress({ status: 'stopped', active: false });
+  const draw1 = () => { const t = dom.element('div'); h.view.renderBookPipelineBar(t); return t.children[0]; };
+  buttonsOf(draw1()).find(b => b.text === '放棄這本').click();
+  assert.equal(h.view.rendered, 1);
+  assert.ok(dom.find(draw1(), i => i.cls.includes('vam-book-abandon-card')));
+  dom.find(draw1(), i => i.cls.includes('vam-book-abandon-cancel')).click();
+  assert.equal(dom.find(draw1(), i => i.cls.includes('vam-book-abandon-card')), undefined);
+  assert.equal(h.entries.length, 0);
+  buttonsOf(draw1()).find(b => b.text === '放棄這本').click();
+  dom.find(draw1(), i => i.cls.includes('vam-book-abandon-confirm')).click();
+  await dom.tick();
+  assert.equal(JSON.stringify(h.entries), JSON.stringify([['abandon', MAP]]));
+  assert.equal(dom.find(draw1(), i => i.cls.includes('vam-book-abandon-card')), undefined, 'the card closes once confirmed');
+  delete h.view.map.bookPipeline;
+  assert.equal((await openCard(h))?.isOpen, true, 'after the book is given up, 圖文書 opens the start card as for a fresh map');
+});
+
+test('restart (view): a run stopped at a gate opens the card and Start forwards the restart flag; a running gate and a plain gate refuse', async () => {
+  for (const phase of ['gate1', 'gate2']) {
+    const g = await harness({ book: true });
+    g.view.map.bookPipeline = bookData({ status: 'stopped', phase, order: [g.ids.root, g.ids.a, g.ids.b] });
+    await g.view.startBookPipelineFromUi({ restart: true });
+    assert.ok(g.view.bookStartModal?.isOpen, phase);
+    cardButton(g.view.bookStartModal, '開始').click(); await dom.tick();
+    assert.equal(JSON.stringify(g.entries), JSON.stringify([['start', MAP, { restart: true }]]), phase);
+    const running = await harness({ book: true });
+    running.view.map.bookPipeline = bookData({ status: 'running', phase, order: [running.ids.root, running.ids.a, running.ids.b] });
+    await running.view.startBookPipelineFromUi({ restart: true });
+    assert.equal(running.view.bookStartModal, null, 'a waiting gate is not restarted');
+  }
 });
 
 test('restart: the card opens with the current settings; Start replaces the stopped run (restart flag, settings written first); Cancel leaves everything; gate and running runs refuse a restart', async () => {
@@ -1069,9 +1165,9 @@ test('restart: the card opens with the current settings; Start replaces the stop
   dom.findAll(modal.modalEl, i => i.tag === 'textarea').find(f => f.value === 'warm').value = 'cold';
   cardButton(modal, '開始').click(); await dom.tick();
   assert.equal(JSON.stringify(h.entries), JSON.stringify([['start', MAP, { restart: true }]]));
-  for (const phase of ['gate1', 'gate2', 'done']) {
+  for (const phase of ['done']) {
     const g = await harness({ book: true });
-    g.view.map.bookPipeline = bookData({ status: phase === 'done' ? 'running' : 'stopped', phase, order: [g.ids.root, g.ids.a, g.ids.b] });
+    g.view.map.bookPipeline = bookData({ status: 'running', phase, order: [g.ids.root, g.ids.a, g.ids.b] });
     await g.view.startBookPipelineFromUi({ restart: true });
     if (phase === 'done') { assert.ok(g.view.bookStartModal?.isOpen, 'done opens its normal card'); assert.equal(g.entries.length, 0); }
     else { assert.equal(g.view.bookStartModal, null, phase); assert.equal(g.entries.length, 1, phase); assert.equal(g.entries[0].length, 2, 'no restart flag is forwarded for ' + phase); }

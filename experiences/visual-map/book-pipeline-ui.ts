@@ -132,8 +132,10 @@ function countStages(stages: (PipelineStage | undefined)[]): Record<PipelineStag
 export interface BookBarActions {
   stop: () => void;
   resume: () => void;
-  /** "Reconfigure and start over" (a run stopped before its first gate); a bar drawn without it shows no such button. */
+  /** "Reconfigure and start over" (a run stopped in any phase before done); a bar drawn without it shows no such button. */
   restart?: () => void;
+  /** "Give up this book" (stopped) and "remove the picture book" (done): the in-bar confirmation card; a bar drawn without it shows no such button. */
+  abandon?: { asking: boolean; ask: () => void; cancel: () => void; confirm: () => void };
   addBudget: () => void;
   confirmGate1: () => void;
   /** The gate panel's opener (04b); a bar drawn without it (older callers) shows no such button. */
@@ -187,7 +189,7 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     );
     opener.setAttr("aria-expanded", String(open));
   }
-  if (state.phase === "gate1" && state.mode !== "done") {
+  if (state.phase === "gate1" && state.mode !== "done" && state.mode !== "stopped") {
     makeButton(buttons, t("ui.book_confirm_gate1"), "mod-cta vam-book-confirm", actions.confirmGate1);
   }
   if (state.mode === "budget") {
@@ -200,11 +202,35 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
       "mod-cta vam-book-resume",
       actions.resume
     );
-    if (actions.restart && (state.phase === "planning" || state.phase === "writing"))
+    if (actions.restart && state.phase !== "done")
       makeButton(buttons, t("ui.book_restart"), "vam-book-restart", actions.restart);
   } else if (state.mode === "planning" || state.mode === "writing")
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+  // At a gate nothing runs unless a trial retry or a card rerun does (their own stop is below); stopping only holds the run.
+  else if ((state.mode === "gate1" || state.mode === "gate2") && !state.rerun)
+    makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   if (state.rerun) makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+  if (actions.abandon && (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")) {
+    const abandon = actions.abandon;
+    const ask = makeButton(
+      buttons,
+      t(state.mode === "done" ? "ui.book_remove" : "ui.book_abandon"),
+      "vam-book-abandon",
+      abandon.ask
+    );
+    ask.setAttr("aria-expanded", String(abandon.asking));
+  }
+  if (actions.abandon?.asking && (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")) {
+    const abandon = actions.abandon;
+    const card = bar.createDiv("vam-book-abandon-card");
+    card.setAttr("role", "group");
+    card.setAttr("aria-label", t("ui.book_abandon_title"));
+    card.createEl("b", { text: t("ui.book_abandon_title") });
+    card.createEl("p", { text: t("ui.book_abandon_body") });
+    const row = card.createDiv("vam-book-abandon-actions");
+    makeButton(row, t("ui.cancel"), "vam-book-abandon-cancel", abandon.cancel);
+    makeButton(row, t("ui.book_abandon_confirm"), "mod-warning vam-book-abandon-confirm", abandon.confirm);
+  }
   const progressText = bookProgressText(state);
   renderProgressLine(bar, state, progressText);
   // The cards carry "rerun this card" at gate 2 and when done: say so once, under the steps.
@@ -285,6 +311,8 @@ const REFUSAL_KEY: Record<BookRunRefusal, TranslationKey> = {
   unreadable: "ui.book_refused_unreadable",
   not_gate1: "ui.book_refused_not_gate1",
   not_gate: "ui.book_refused_not_gate",
+  empty: "ui.book_refused_empty",
+  not_stopped: "ui.book_refused_not_stopped",
   instruction: "ui.book_refused_instruction"
 };
 

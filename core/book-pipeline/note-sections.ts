@@ -836,6 +836,45 @@ export function chapterBody(detail: string): string {
   return lines.join("\n").replace(/\s+$/, "");
 }
 
+const IMAGE_ONLY_LINE = /^\s*(?:(?:!\[[^\]]*\]\([^)]*\)|!\[\[[^\]]*\]\])\s*)+$/;
+
+/**
+ * Per line of a whole note text: true where the visible chapter text stands (the lines a reader's note may be put on). Not in it: anything
+ * outside the Detail block, code fences, the hidden work records and the program's own callouts, headings, picture-only lines and the
+ * sections the system adds (research notes, update log, sources, open questions, the pictures section). Same rules as {@link chapterBody}.
+ */
+export function chapterTextMask(lines: string[]): boolean[] {
+  const mask = lines.map(() => false);
+  const start = lines.findIndex(line => line.trim() === DETAIL_START);
+  const end = start < 0 ? -1 : lines.findIndex((line, i) => i > start && line.trim() === DETAIL_END);
+  if (start < 0 || end < 0) return mask;
+  let index = lines.slice(start + 1, end).map((_, i) => start + 1 + i);
+  let cur = index.map(i => lines[i]);
+  const drop = (from: number, to: number): void => {
+    index = [...index.slice(0, from), ...index.slice(to)];
+    cur = [...cur.slice(0, from), ...cur.slice(to)];
+  };
+  const fenced = fencedLines(cur);
+  const gone = [
+    ...hiddenRanges(cur, fenced),
+    ...programCalloutRanges(cur, fenced).map(({ start: from, end: to }) => ({ start: from, end: to }))
+  ];
+  const keep = cur.map((_, i) => !gone.some(range => i >= range.start && i < range.end));
+  index = index.filter((_, i) => keep[i]);
+  cur = cur.filter((_, i) => keep[i]);
+  for (;;) {
+    const section = findSection(cur, fencedLines(cur), text => isSystemSection(text)) ?? findImageSection(cur);
+    if (!section) break;
+    drop(section.at, section.end);
+  }
+  const code = fencedLines(cur);
+  cur.forEach((line, i) => {
+    const text = bare(line);
+    mask[index[i]] = !code[i] && !HEADING.test(text) && !IMAGE_ONLY_LINE.test(text);
+  });
+  return mask;
+}
+
 const REFERENCE_START = "<!-- visual-agent-map:references:start -->";
 const DETAIL_START = "<!-- visual-agent-map:detail:start -->";
 const DETAIL_END = "<!-- visual-agent-map:detail:end -->";

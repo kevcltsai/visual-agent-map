@@ -25,6 +25,14 @@ import {
   minimalChange,
   type OpenNoteView
 } from "./experiences/visual-map/book-pipeline-callouts";
+import {
+  BookNoteModal,
+  BookNotes,
+  type NotesEditor,
+  type NotesLeaf
+} from "./experiences/visual-map/book-pipeline-notes-ui";
+import { countNotes } from "./core/book-pipeline/book-notes";
+import { readBookPipeline } from "./core/book-pipeline/model";
 import { runPlanStep } from "./core/steps/book-pipeline/run";
 import { runProofread } from "./core/steps/book-pipeline/proofread";
 import { runFindImages } from "./core/steps/book-pipeline/find-images";
@@ -45,6 +53,7 @@ import {
   getLanguage,
   loadMermaid,
   MarkdownView,
+  type Editor,
   normalizePath,
   requestUrl,
   Notice,
@@ -467,6 +476,11 @@ export default class VisualAgentMapPlugin extends Plugin {
    * commands call those). The map's open view supplies the author call and the image probe; without one they fail.
    */
   /** The picture-book chapter notes' callouts (trial hint, review box); every program write to a chapter note goes through its writer. */
+  /** The write coordinator of the chapter notes: the callouts, the reader's notes and (T6) the rewrite all go through it. */
+  private readonly bookNoteWriter = createNoteWriter({
+    openViews: path => this.openMarkdownViews(path),
+    rawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options)
+  });
   readonly bookCallouts = new BookCallouts({
     readMap: path => this.repo.readMap(path),
     readCard: path => this.readBookCard(path),
@@ -475,12 +489,149 @@ export default class VisualAgentMapPlugin extends Plugin {
       if (!(file instanceof TFile)) throw new Error("missing");
       return this.app.vault.read(file);
     },
-    write: createNoteWriter({
-      openViews: path => this.openMarkdownViews(path),
-      rawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options)
-    }),
+    write: (path, transform) => this.bookNoteWriter(path, transform),
     log: line => this.logs.appendLog("info", line)
   });
+  /** The reader's notes of a picture-book chapter: editor-menu item, commands, input dialog and the header action. */
+  private readonly bookNotes = new BookNotes({
+    leaves: () => this.bookNoteLeaves(),
+    chapterPaths: paths => this.bookChapterPaths(paths),
+    write: (path, transform) => this.bookNoteWriter(path, transform),
+    askNote: (selected, submit) => new BookNoteModal(this.app, selected, submit).open(),
+    notice: message => void new Notice(message),
+    applyNotes: path => this.applyBookNotes(path)
+  });
+  private bookNotesTimer: number | null = null;
+  /**
+   * T6 SEAM: applying the notes of a chapter (the AI rewrite) is the next ticket's work. The header action, the editor-menu item and the
+   * command all end here; until T6 replaces the body, it only says so.
+   */
+  private applyBookNotes(_path: string): void {
+    new Notice(t("ui.book_note_apply_not_yet"));
+  }
+  /** Every markdown tab as the notes controller sees it. */
+  private bookNoteLeaves(): NotesLeaf[] {
+    const out: NotesLeaf[] = [];
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view;
+      if (!(view instanceof MarkdownView)) continue;
+      out.push({
+        key: view,
+        path: () => view.file?.path,
+        text: () => view.editor.getValue(),
+        addAction: (label, run) => {
+          const el = view.addAction("pencil", label, run);
+          el.addClass("vam-book-apply-notes");
+          const span = el.createSpan({ cls: "vam-book-apply-label", text: label });
+          return {
+            setLabel: next => {
+              el.setAttr("aria-label", next);
+              span.setText(next);
+            },
+            remove: () => el.remove()
+          };
+        }
+      });
+    }
+    return out;
+  }
+  /** Of the notes shown, the ones that are chapters of a usable picture book. Maps are read only when a shown note says it is a map node. */
+  private async bookChapterPaths(paths: string[]): Promise<Set<string>> {
+    const found = new Set<string>();
+    const candidates = new Set(
+      paths.filter(path => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        return file instanceof TFile && this.app.metadataCache.getFileCache(file)?.frontmatter?.["agent-map-node"];
+      })
+    );
+    if (!candidates.size) return found;
+    for (const { map } of await this.repo.readableMaps()) {
+      const read = readBookPipeline(map);
+      if (read.kind !== "usable") continue;
+      for (const node of map.nodes)
+        if (candidates.has(node.path) && read.data.order.includes(node.id)) found.add(node.path);
+    }
+    return found;
+  }
+  private refreshBookNotesSoon(): void {
+    if (this.bookNotesTimer !== null) window.clearTimeout(this.bookNotesTimer);
+    this.bookNotesTimer = window.setTimeout(() => {
+      this.bookNotesTimer = null;
+      void this.bookNotes.refresh();
+    }, 300);
+  }
+  /** The active markdown editor as the notes controller reads it (source and live preview; reading mode has no editor). */
+  private bookNotesEditor(editor: Editor, file: TFile | null): NotesEditor {
+    return {
+      path: file?.path,
+      text: () => editor.getValue(),
+      selection: () => ({
+        from: editor.posToOffset(editor.getCursor("from")),
+        to: editor.posToOffset(editor.getCursor("to"))
+      })
+    };
+  }
+  private registerBookNotes(): void {
+    const notes = this.bookNotes;
+    this.registerEvent(
+      this.app.workspace.on("editor-menu", (menu, editor, view) => {
+        const plan = notes.menu(this.bookNotesEditor(editor, view.file));
+        if (!plan) return;
+        menu.addItem(item =>
+          item
+            .setTitle(plan.add.title)
+            .setIcon("pencil")
+            .setDisabled(plan.add.disabled)
+            .onClick(() => notes.add(this.bookNotesEditor(editor, view.file)))
+        );
+        const apply = plan.apply;
+        if (apply)
+          menu.addItem(item =>
+            item
+              .setTitle(apply.title)
+              .setIcon("pencil")
+              .onClick(() => notes.apply(view.file?.path))
+          );
+      })
+    );
+    this.localizedCommands.push({
+      command: this.addCommand({
+        id: "book-note-add",
+        name: t("ui.command_book_note_add"),
+        editorCheckCallback: (checking, editor, ctx) => {
+          if (!notes.isChapter(ctx.file?.path)) return false;
+          if (!checking) notes.add(this.bookNotesEditor(editor, ctx.file));
+          return true;
+        }
+      }),
+      key: "ui.command_book_note_add"
+    });
+    this.localizedCommands.push({
+      command: this.addCommand({
+        id: "book-note-apply",
+        name: t("ui.command_book_note_apply"),
+        checkCallback: checking => {
+          const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+          const path = view?.file?.path;
+          if (!view || !notes.isChapter(path) || !countNotes(view.editor.getValue())) return false;
+          if (!checking) notes.apply(path);
+          return true;
+        }
+      }),
+      key: "ui.command_book_note_apply"
+    });
+    this.registerEvent(this.app.workspace.on("file-open", () => this.refreshBookNotesSoon()));
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.refreshBookNotesSoon()));
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.refreshBookNotesSoon()));
+    this.registerEvent(this.app.workspace.on("editor-change", () => notes.paint()));
+    this.registerEvent(
+      this.app.vault.on("modify", file => {
+        if (file instanceof TFile && this.isMap(file)) this.refreshBookNotesSoon();
+        else notes.paint();
+      })
+    );
+    this.app.workspace.onLayoutReady(() => this.refreshBookNotesSoon());
+  }
   readonly bookPipelineRuns = new BookPipelineRuns({
     mutate: work => this.mutate(work),
     readMap: path => this.repo.readMap(path),
@@ -1155,6 +1306,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.settingTab = new VisualAgentMapSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
     this.registerNoteStyleEntrypoints();
+    this.registerBookNotes();
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
         if (file instanceof TFile && this.isMap(file))
@@ -1832,6 +1984,9 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.argumentRuns.dispose();
     this.bookPipelineRuns.dispose();
     this.bookCallouts.dispose();
+    if (this.bookNotesTimer !== null) window.clearTimeout(this.bookNotesTimer);
+    this.bookNotesTimer = null;
+    this.bookNotes.dispose();
     // In-flight work (a long Obsidian rename, a queued mutation) must not write into the vault after this point.
     this.repo?.dispose();
     void this.coffeeManager?.stop();

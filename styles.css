@@ -2282,3 +2282,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 /* The program's hints in a picture-book chapter: the trial note at gate 1 (info look) and the review box at gate 2 (warning look). */
 .callout[data-callout="vam-trial"] { --callout-color: var(--color-blue-rgb); --callout-icon: lucide-info; }
 .callout[data-callout="vam-review"] { --callout-color: var(--color-orange-rgb); --callout-icon: lucide-alert-triangle; }
+.view-action.vam-book-apply-notes { width: auto; gap: 4px; padding-inline: 6px; }
+.vam-book-apply-label { font-size: var(--font-ui-smaller); }
+.vam-book-note-selected { margin-block: 0 8px; padding: 4px 8px; border-left: 3px solid var(--interactive-accent); color: var(--text-muted); }
+.vam-book-note-problem:empty { display: none; }
+.vam-book-note-problem { color: var(--text-error); margin-block: 4px 0; }

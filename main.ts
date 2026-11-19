@@ -16,8 +16,15 @@ import {
   BookPipelineRunError,
   BookPipelineRuns,
   type BookPipelineProgress,
+  type PipelineCard,
   type BookRerunResult
 } from "./experiences/visual-map/book-pipeline-run";
+import {
+  BookCallouts,
+  createNoteWriter,
+  minimalChange,
+  type OpenNoteView
+} from "./experiences/visual-map/book-pipeline-callouts";
 import { runPlanStep } from "./core/steps/book-pipeline/run";
 import { runProofread } from "./core/steps/book-pipeline/proofread";
 import { runFindImages } from "./core/steps/book-pipeline/find-images";
@@ -459,31 +466,21 @@ export default class VisualAgentMapPlugin extends Plugin {
    * Picture-book pipeline runner, keyed by map path. Entries: {@link startBookPipeline} and friends (the screen and the
    * commands call those). The map's open view supplies the author call and the image probe; without one they fail.
    */
+  /** The picture-book chapter notes' callouts (trial hint, review box); every program write to a chapter note goes through its writer. */
+  readonly bookCallouts = new BookCallouts({
+    readMap: path => this.repo.readMap(path),
+    readCard: path => this.readBookCard(path),
+    write: createNoteWriter({
+      openViews: path => this.openMarkdownViews(path),
+      rawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options)
+    }),
+    log: line => this.logs.appendLog("info", line)
+  });
   readonly bookPipelineRuns = new BookPipelineRuns({
     mutate: work => this.mutate(work),
     readMap: path => this.repo.readMap(path),
     updateMap: (path, change) => this.repo.updateMap(path, change),
-    readCard: async path => {
-      const note = await this.repo.readNote(path);
-      const file = this.app.vault.getAbstractFileByPath(path);
-      if (!(file instanceof TFile)) throw new Error("missing");
-      const raw = await this.app.vault.read(file);
-      return {
-        path,
-        title: note.title,
-        summary: note.summary,
-        prompt: note.prompt,
-        detail: note.detail,
-        raw,
-        settings: note.bookSettings ?? {},
-        fields: {
-          ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}),
-          ...(note.bookRole ? { bookRole: note.bookRole } : {}),
-          ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}),
-          ...(note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {})
-        }
-      };
-    },
+    readCard: path => this.readBookCard(path),
     writePipelineFields: (path, patch) => this.repo.writePipelineFields(path, patch),
     updateNoteGuarded: (path, patch, options) => this.repo.updateNoteGuarded(path, patch, options),
     updateNoteRawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
@@ -521,8 +518,52 @@ export default class VisualAgentMapPlugin extends Plugin {
     progressed: mapPath =>
       this.views()
         .find(view => view.mapPath === mapPath)
-        ?.refreshBookProgress()
+        ?.refreshBookProgress(),
+    callouts: { reconcile: path => this.bookCallouts.reconcile(path), clear: path => this.bookCallouts.clear(path) }
   });
+  /** A card note as the picture-book runner reads it (fields, text and the raw file). */
+  private async readBookCard(path: string): Promise<PipelineCard> {
+    const note = await this.repo.readNote(path);
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) throw new Error("missing");
+    const raw = await this.app.vault.read(file);
+    return {
+      path,
+      title: note.title,
+      summary: note.summary,
+      prompt: note.prompt,
+      detail: note.detail,
+      raw,
+      settings: note.bookSettings ?? {},
+      fields: {
+        ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}),
+        ...(note.bookRole ? { bookRole: note.bookRole } : {}),
+        ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}),
+        ...(note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {})
+      }
+    };
+  }
+  /** Every markdown view that has this note open (any mode), as the write coordinator edits it. */
+  private openMarkdownViews(path: string): OpenNoteView[] {
+    const out: OpenNoteView[] = [];
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const view = leaf.view;
+      if (!(view instanceof MarkdownView) || view.file?.path !== path) continue;
+      out.push({
+        text: () => view.editor.getValue(),
+        replace: next => {
+          const editor = view.editor;
+          const change = minimalChange(editor.getValue(), next);
+          if (!change) return true;
+          editor.transaction({
+            changes: [{ from: editor.offsetToPos(change.from), to: editor.offsetToPos(change.to), text: change.insert }]
+          });
+          return true;
+        }
+      });
+    }
+    return out;
+  }
   /** Suggestions awaiting a decision; onload replaces it with the persisted store, {@link topicRuns} reads whichever is current. */
   pendingSuggestions: Map<string, Suggestion[]> = new Map();
   readonly pendingResearchOptions = new Map<string, TaskOptions>();
@@ -1785,6 +1826,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.topicRuns.dispose();
     this.argumentRuns.dispose();
     this.bookPipelineRuns.dispose();
+    this.bookCallouts.dispose();
     // In-flight work (a long Obsidian rename, a queued mutation) must not write into the vault after this point.
     this.repo?.dispose();
     void this.coffeeManager?.stop();

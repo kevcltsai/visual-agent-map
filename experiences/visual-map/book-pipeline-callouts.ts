@@ -1,0 +1,329 @@
+import type { MapDocument } from "../../map-model";
+import { formatPipelineLog } from "../../core/book-pipeline/log";
+import { readBookPipeline, type BookPipelineData } from "../../core/book-pipeline/model";
+import type { PipelineCard } from "./book-pipeline-run";
+import {
+  collapseReviewCallouts,
+  findProgramCallouts,
+  idPart,
+  isReviewResolved,
+  putProgramCallout,
+  readReviewState,
+  removeProgramCallouts,
+  removeProgramCalloutsWhere,
+  reviewCallout,
+  reviewEntries,
+  trialCallout,
+  type BookNoteLink
+} from "./book-pipeline-review";
+
+/**
+ * The program's callouts in the chapter notes of a picture book, and the one way every program write to a chapter note goes in.
+ * `createNoteWriter` is that single write coordinator; `BookCallouts` aligns the notes of a map with its run (a trial hint at gate 1, a
+ * review box at gate 2, nothing otherwise). Aligning is idempotent: it reads the run and the notes as they are now and writes only
+ * what differs, so any trigger (a phase change, a rerun, a map opening) can ask for it again without harm.
+ */
+
+// ---- the write coordinator ----
+
+/** A markdown view that has the note open: its live text (typed but maybe not yet saved) and a way to replace it as an editor edit. */
+export interface OpenNoteView {
+  text(): string;
+  /** Applies `next` as one editor transaction; false when it could not. */
+  replace(next: string): boolean;
+}
+export interface NoteWritePorts {
+  /** Every markdown view that has this note open right now (a note open in two panes has two). */
+  openViews(path: string): OpenNoteView[];
+  /** `updateNoteRawGuarded`: `authorize` runs inside the write on the text it is given; false writes nothing and answers "discarded". */
+  rawGuarded(
+    path: string,
+    transform: (content: string) => string,
+    options: { authorize: () => boolean }
+  ): Promise<"written" | "discarded">;
+}
+/** written: the text changed; unchanged: it already was as wanted; refused: nothing was written (views disagree, or the note changed under us). */
+export type NoteWriteResult = "written" | "unchanged" | "refused";
+
+/** The smallest single replacement that turns `before` into `after` (common head and tail kept), so a cursor elsewhere in the text stays put. */
+export function minimalChange(before: string, after: string): { from: number; to: number; insert: string } | null {
+  if (before === after) return null;
+  let head = 0;
+  const max = Math.min(before.length, after.length);
+  while (head < max && before.charCodeAt(head) === after.charCodeAt(head)) head++;
+  let tail = 0;
+  while (tail < max - head && before.charCodeAt(before.length - 1 - tail) === after.charCodeAt(after.length - 1 - tail))
+    tail++;
+  return { from: head, to: before.length - tail, insert: after.slice(head, after.length - tail) };
+}
+
+/**
+ * The write coordinator of the chapter notes. A note a markdown view has open is changed through that view's editor (one
+ * transaction on the live text, so nothing typed is lost); two views that disagree about the text refuse. A note no view has open goes
+ * through the guarded file write, whose `authorize` checks again, inside the write, that no view has opened it meanwhile; if one has,
+ * the file is left alone and the write is retried once through the editor.
+ */
+export function createNoteWriter(
+  ports: NoteWritePorts
+): (path: string, transform: (text: string) => string) => Promise<NoteWriteResult> {
+  const viaEditor = (views: OpenNoteView[], transform: (text: string) => string): NoteWriteResult => {
+    const texts = views.map(view => view.text());
+    if (texts.some(text => text !== texts[0])) return "refused";
+    const next = transform(texts[0]);
+    if (next === texts[0]) return "unchanged";
+    return views[0].replace(next) ? "written" : "refused";
+  };
+  return async (path, transform) => {
+    const views = ports.openViews(path);
+    if (views.length) return viaEditor(views, transform);
+    let opened = false;
+    let same = false;
+    const outcome = await ports.rawGuarded(
+      path,
+      content => {
+        const next = transform(content);
+        same = next === content;
+        return next;
+      },
+      {
+        authorize: () => {
+          opened = ports.openViews(path).length > 0;
+          return !opened;
+        }
+      }
+    );
+    if (outcome === "written") return same ? "unchanged" : "written";
+    if (!opened) return "refused";
+    const now = ports.openViews(path);
+    return now.length ? viaEditor(now, transform) : "refused";
+  };
+}
+
+// ---- aligning a text with what the run wants ----
+
+/** What one chapter note should carry now (the trial hint, the review box); undefined: nothing of the program's. */
+export interface WantedCallouts {
+  runId: string;
+  nodeId: string;
+  trial?: string;
+  review?: { fp: string; build: () => string };
+}
+
+/**
+ * `text` with the program's callouts as `want` says. Callouts of another run (or another chapter) always go. A review box that was
+ * written for the same fingerprint stays as it is (a tick stays) and is folded when one of its boxes is ticked; one for another
+ * fingerprint is written again unticked. With `want` undefined every program callout goes. Running it again changes nothing.
+ */
+export function alignCallouts(text: string, want: WantedCallouts | undefined): string {
+  if (!want) return removeProgramCallouts(text);
+  let out = removeProgramCalloutsWhere(text, c => c.runId !== idPart(want.runId) || c.nodeId !== idPart(want.nodeId));
+  out = want.trial ? putProgramCallout(out, want.trial) : removeProgramCallouts(out, "trial");
+  if (want.review) {
+    const state = readReviewState(out);
+    if (state && state.fp === idPart(want.review.fp)) {
+      if (isReviewResolved(state, state.fp)) out = collapseReviewCallouts(out);
+    } else out = putProgramCallout(out, want.review.build());
+  } else out = removeProgramCallouts(out, "review");
+  return out;
+}
+
+/** Whether a note text carries any callout of the program (the cheap "is there anything to clean" check). */
+export const hasProgramCallouts = (text: string): boolean => findProgramCallouts(text).length > 0;
+
+// ---- the map-level aligner ----
+
+export interface BookCalloutPorts {
+  readMap(path: string): Promise<MapDocument>;
+  readCard(path: string): Promise<PipelineCard>;
+  /** {@link createNoteWriter}. */
+  write(path: string, transform: (text: string) => string): Promise<NoteWriteResult>;
+  log(line: string): void;
+}
+
+export class BookCallouts {
+  private readonly tails = new Map<string, Promise<unknown>>();
+  private readonly waiting = new Map<string, Promise<void>>();
+  private disposed = false;
+
+  constructor(private readonly ports: BookCalloutPorts) {}
+
+  /** Aligns the chapter notes of this map's current run; asks that arrive while one waits to start share it. Failures are logged, never thrown. */
+  reconcile(mapPath: string): Promise<void> {
+    const queued = this.waiting.get(mapPath);
+    if (queued) return queued;
+    const job = this.enqueue(mapPath, async () => {
+      this.waiting.delete(mapPath);
+      await this.align(mapPath);
+    }).then(
+      () => undefined,
+      () => undefined
+    );
+    this.waiting.set(mapPath, job);
+    return job;
+  }
+
+  /** Takes every program callout (any run) off the chapters of the map's run; true when every note is clean. Called before the run is abandoned or replaced. */
+  clear(mapPath: string): Promise<boolean> {
+    return this.enqueue(mapPath, () => this.sweep(mapPath)).catch(() => false);
+  }
+
+  /** Folds a ticked review box (the box at once; the ticks and marker stay). */
+  collapse(path: string): Promise<NoteWriteResult> {
+    return this.disposed ? Promise.resolve("refused") : this.ports.write(path, collapseReviewCallouts);
+  }
+
+  /** Resolves when every queued job has ended (tests, and a clean shutdown). */
+  async idle(): Promise<void> {
+    for (let again = true; again;) {
+      const before = [...this.tails.values()];
+      await Promise.all(before.map(tail => tail.catch(() => undefined)));
+      again = [...this.tails.values()].some(tail => !before.includes(tail));
+    }
+  }
+
+  /** Plugin unload: nothing is written afterwards. */
+  dispose(): void {
+    this.disposed = true;
+    this.waiting.clear();
+  }
+
+  private enqueue<T>(mapPath: string, job: () => Promise<T>): Promise<T> {
+    const tail = this.tails.get(mapPath) ?? Promise.resolve();
+    const next = tail.then(
+      () => (this.disposed ? (undefined as T) : job()),
+      () => (this.disposed ? (undefined as T) : job())
+    );
+    this.tails.set(mapPath, next);
+    void next.then(
+      () => this.release(mapPath, next),
+      () => this.release(mapPath, next)
+    );
+    return next;
+  }
+  private release(mapPath: string, tail: Promise<unknown>): void {
+    if (this.tails.get(mapPath) === tail) this.tails.delete(mapPath);
+  }
+
+  private fail(runId: string, nodeId: string, result: string): void {
+    this.ports.log(
+      formatPipelineLog({ event: "callout_failed", runId, card: nodeId, step: "proof", attempt: 0, result, ms: 0 })
+    );
+  }
+
+  /** The cards of the run in reading order with their note paths; a card whose note cannot be read is left out (and logged). */
+  private async cardsOf(map: MapDocument, data: BookPipelineData): Promise<{ id: string; card: PipelineCard }[]> {
+    const out: { id: string; card: PipelineCard }[] = [];
+    for (const id of data.order) {
+      const node = map.nodes.find(item => item.id === id);
+      if (!node) continue;
+      try {
+        out.push({ id, card: await this.ports.readCard(node.path) });
+      } catch {
+        this.fail(data.runId, id, "unreadable");
+      }
+    }
+    return out;
+  }
+
+  private async sweep(mapPath: string): Promise<boolean> {
+    const map = await this.ports.readMap(mapPath);
+    const read = readBookPipeline(map);
+    if (read.kind !== "usable") return true;
+    let clean = true;
+    for (const { id, card } of await this.cardsOf(map, read.data)) {
+      if (this.disposed) return false;
+      if (!hasProgramCallouts(card.raw)) continue;
+      if (!(await this.put(read.data.runId, id, card.path, text => alignCallouts(text, undefined)))) clean = false;
+    }
+    return clean;
+  }
+
+  private async put(runId: string, id: string, path: string, transform: (text: string) => string): Promise<boolean> {
+    try {
+      const result = await this.ports.write(path, transform);
+      if (result === "refused") this.fail(runId, id, "refused");
+      return result !== "refused";
+    } catch {
+      this.fail(runId, id, "error");
+      return false;
+    }
+  }
+
+  private async align(mapPath: string): Promise<void> {
+    const map = await this.ports.readMap(mapPath);
+    const read = readBookPipeline(map);
+    if (read.kind !== "usable") return;
+    const data = read.data;
+    const cards = await this.cardsOf(map, data);
+    const byId = new Map(cards.map(item => [item.id, item.card]));
+    const link = (id: string | undefined): BookNoteLink | undefined => {
+      const card = id ? byId.get(id) : undefined;
+      return card ? { path: card.path, title: card.title } : undefined;
+    };
+    const wanted = new Map<string, WantedCallouts>();
+    if (data.phase === "gate1") {
+      const trial = data.trial ?? [];
+      trial.forEach((id, at) => {
+        if (!byId.has(id)) return;
+        wanted.set(id, {
+          runId: data.runId,
+          nodeId: id,
+          trial: trialCallout(
+            at + 1,
+            trial.length,
+            link(trial[at - 1]),
+            link(trial[at + 1]),
+            data.status === "stopped",
+            {
+              runId: data.runId,
+              nodeId: id
+            }
+          )
+        });
+      });
+    } else if (data.phase === "gate2") {
+      const entries = reviewEntries({
+        order: cards.map(item => item.id),
+        titleOf: id => byId.get(id)?.title ?? id,
+        noteOf: id => {
+          const card = byId.get(id);
+          return card
+            ? {
+                prompt: card.prompt,
+                detail: card.detail,
+                pipelineStage: card.fields.pipelineStage,
+                pipelineIssue: card.fields.pipelineIssue,
+                pipelineSeam: card.fields.pipelineSeam,
+                bookRole: card.fields.bookRole
+              }
+            : undefined;
+        }
+      });
+      entries.forEach((entry, at) => {
+        const next = entries.length > 1 ? entries[(at + 1) % entries.length].card.id : undefined;
+        wanted.set(entry.card.id, {
+          runId: data.runId,
+          nodeId: entry.card.id,
+          review: {
+            fp: entry.fp,
+            build: () =>
+              reviewCallout(
+                entry.card,
+                entry.problems.map(problem => problem.text),
+                link(next),
+                entry.fp,
+                data.runId
+              )
+          }
+        });
+      });
+    }
+    // Any other phase wants none: a callout left from an earlier phase or run goes now.
+    for (const { id, card } of cards) {
+      if (this.disposed) return;
+      const want = wanted.get(id) ?? { runId: data.runId, nodeId: id };
+      if (alignCallouts(card.raw, want) === card.raw) continue;
+      await this.put(data.runId, id, card.path, text => alignCallouts(text, want));
+    }
+  }
+}

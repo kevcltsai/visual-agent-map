@@ -262,6 +262,14 @@ export interface BookPipelinePorts {
   log(line: string): void;
   /** Called when the sub-step changes without a saved state change (the card is now finding pictures), so the screen can repaint. */
   progressed?(mapPath: string): void;
+  /** The program's callouts in the chapter notes (trial hint, review box). Absent: the notes are not touched. */
+  callouts?: BookCalloutPort;
+}
+/** What the runner asks of the callouts in the notes: align them with the run now (never throws), or take them all off before the run is replaced. */
+export interface BookCalloutPort {
+  reconcile(mapPath: string): void | Promise<void>;
+  /** True when every chapter note is clean; a false is logged by the port and does not stop the caller. */
+  clear(mapPath: string): Promise<boolean>;
 }
 
 export interface BookPipelineProgress {
@@ -337,6 +345,8 @@ interface CardInfo {
 }
 interface Drive {
   mapPath: string;
+  /** `phase:status` as last written; a change of it asks the notes to follow. */
+  syncKey?: string;
   controller: AbortController;
   store: PipelineStore;
   admission: AdmissionContext;
@@ -765,6 +775,9 @@ export class BookPipelineRuns {
           autoRoles: [...new Set([...prior.filter(id => order.includes(id)), ...drive.missingRoles.keys()])]
         });
         if (this.dead(drive)) return;
+        // The old run's callouts go first; a failure is logged and the next map opening cleans what is left (other run id).
+        if (read.kind === "usable") await this.ports.callouts?.clear(mapPath);
+        if (this.dead(drive)) return;
         await this.ports.updateMap(mapPath, doc => {
           const found = readBookPipeline(doc);
           if (found.kind === "unusable" || (found.kind === "usable" && !replaceable(found.data)))
@@ -799,6 +812,9 @@ export class BookPipelineRuns {
         const waiting =
           (found.data.phase === "gate1" || found.data.phase === "gate2") && found.data.status === "running";
         if (waiting) throw new BookPipelineRunError("not_stopped");
+        // The run's callouts go before the run does: afterwards no order is left to find them by.
+        await this.ports.callouts?.clear(mapPath);
+        if (this.dead(drive)) return;
         await this.ports.updateMap(mapPath, doc => {
           const again = readBookPipeline(doc);
           if (again.kind !== "usable" || again.data.runId !== found.data.runId)
@@ -1004,6 +1020,7 @@ export class BookPipelineRuns {
           drive.rerun = undefined;
         }
         finish?.(drive, track ? { before, after: await this.cardSnapshot(drive, nodeId) } : undefined);
+        this.syncReviewNotes(drive);
       };
       this.log(drive, "rerun", nodeId, kinds[0], kinds.length === 1 ? "plan_only" : "full");
     });
@@ -1064,6 +1081,7 @@ export class BookPipelineRuns {
           : `Neighbouring card's plan or text changed; not yet checked by a person (card ${at + 1}, revision ${revision})`
       });
     }
+    this.syncReviewNotes(drive);
   }
 
   /**
@@ -1201,17 +1219,35 @@ export class BookPipelineRuns {
     return order;
   }
   private attachStore(drive: Drive, state: BookPipelineData): void {
+    drive.syncKey = `${state.phase}:${state.status}`;
     drive.store = new PipelineStore(state, next => this.persist(drive, next));
     drive.admission = createBudgetAdmission(createStoreBudgetPort(drive.store));
   }
   /** The state goes to the map file through the plugin's write queue (never from inside a `mutate` callback). */
-  private persist(drive: Drive, state: BookPipelineData): Promise<void> {
-    return this.ports.mutate(async () => {
+  private async persist(drive: Drive, state: BookPipelineData): Promise<void> {
+    await this.ports.mutate(async () => {
       if (this.dead(drive) || drive.store.isDisposed) return;
       await this.ports.updateMap(drive.mapPath, doc => {
         doc.bookPipeline = state;
       });
     });
+    // A new phase or a stop/resume changes what the chapter notes should say (the trial hint, the review box).
+    const key = `${state.phase}:${state.status}`;
+    if (drive.syncKey !== undefined && drive.syncKey !== key) this.syncNotes(drive);
+    drive.syncKey = key;
+  }
+  /** Asks the notes to follow the run (fire and forget: the port logs its own failures; nothing here waits for a note write). */
+  private syncNotes(drive: Drive): void {
+    if (this.dead(drive) || !this.ports.callouts) return;
+    try {
+      void Promise.resolve(this.ports.callouts.reconcile(drive.mapPath)).catch(() => undefined);
+    } catch {
+      // a port that throws must not stop the run
+    }
+  }
+  /** A card's result changed at gate 2 (a failure, a join to check, a rerun): its review box is written, rewritten or taken off. */
+  private syncReviewNotes(drive: Drive): void {
+    if (drive.store?.state.phase === "gate2") this.syncNotes(drive);
   }
   /** Reads the saved state of a map for resume and gate confirmation, and loads the cards. */
   private async openSaved(
@@ -1501,6 +1537,7 @@ export class BookPipelineRuns {
       pipelineIssue: `${step} failed: ${code(reason)}`
     });
     if (step !== "plan" && !NO_FAILURE_SECTION.has(reason)) await this.writeFailureSection(drive, nodeId, reason);
+    this.syncReviewNotes(drive);
   }
   /**
    * The one automatic redo (plan 2026 flow v3, E), after every card has had its first round: a card whose proofread named unmet points

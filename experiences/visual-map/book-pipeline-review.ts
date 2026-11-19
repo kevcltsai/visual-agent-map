@@ -47,22 +47,51 @@ interface GalleryNote {
   detail?: string;
 }
 
+/** The kinds of problem a chapter can have. A new kind (a hand-edited chapter, say) is one more entry in {@link PROBLEM_RULES}. */
+export type ReviewProblemKind = "failed" | "unfinished" | "structure" | "facts" | "images" | "seam";
+export interface ReviewProblem {
+  kind: ReviewProblemKind;
+  /** The plain sentence the reader sees. */
+  text: string;
+}
+/** In the order the sentences are listed: the first rule that applies to a card comes first. */
+const PROBLEM_RULES: readonly { kind: ReviewProblemKind; of: (card: Gate2Card) => string | undefined }[] = [
+  {
+    kind: "failed",
+    of: card => (card.stage === "needs-review" ? card.failureText || t("ui.book_issue_unknown") : undefined)
+  },
+  {
+    kind: "unfinished",
+    of: card =>
+      card.stage !== "needs-review" && card.stage !== "checked" ? t("ui.book_panel_g2_reason_unfinished") : undefined
+  },
+  {
+    kind: "structure",
+    of: card => (card.structureUnmet > 0 ? t("ui.book_panel_g2_reason_structure_0", card.structureUnmet) : undefined)
+  },
+  {
+    kind: "facts",
+    of: card => (card.factsOpen > 0 ? t("ui.book_panel_g2_reason_facts_0", card.factsOpen) : undefined)
+  },
+  { kind: "images", of: card => (card.galleryBare ? t("ui.book_panel_g2_reason_images") : undefined) },
+  { kind: "seam", of: card => (card.seam ? t("ui.book_panel_g2_reason_seam") : undefined) }
+];
+
 /**
- * The one place that decides whether a chapter is "fine": every reason below keeps the card in the attention list and keeps the
+ * The one place that decides whether a chapter is "fine": every problem below keeps the card in the attention list and keeps the
  * panel from saying "all done". A needs-review or unfinished card, unmet structure items, facts not confirmed, a gallery chapter
  * with no picture at all, and a join not yet confirmed all count. A slot that found no picture in an ordinary chapter does not: the
  * chapter simply has fewer pictures (its text still stands).
  */
-export function attentionReasons(card: Gate2Card): string[] {
-  const out: string[] = [];
-  if (card.stage === "needs-review") out.push(card.failureText || t("ui.book_issue_unknown"));
-  else if (card.stage !== "checked") out.push(t("ui.book_panel_g2_reason_unfinished"));
-  if (card.structureUnmet > 0) out.push(t("ui.book_panel_g2_reason_structure_0", card.structureUnmet));
-  if (card.factsOpen > 0) out.push(t("ui.book_panel_g2_reason_facts_0", card.factsOpen));
-  if (card.galleryBare) out.push(t("ui.book_panel_g2_reason_images"));
-  if (card.seam) out.push(t("ui.book_panel_g2_reason_seam"));
+export function reviewProblems(card: Gate2Card): ReviewProblem[] {
+  const out: ReviewProblem[] = [];
+  for (const rule of PROBLEM_RULES) {
+    const text = rule.of(card);
+    if (text !== undefined) out.push({ kind: rule.kind, text });
+  }
   return out;
 }
+export const attentionReasons = (card: Gate2Card): string[] => reviewProblems(card).map(problem => problem.text);
 export const needsAttention = (card: Gate2Card): boolean => attentionReasons(card).length > 0;
 
 /** Codes the proofreader may have copied into its notes (C1, N2) are not for the reader. */
@@ -170,6 +199,43 @@ export interface AttentionFpInput {
 export const attentionFingerprint = (input: AttentionFpInput): string =>
   hashText(JSON.stringify([input.stage, input.issue ?? "", input.proofKey ?? "", input.seam ?? ""]));
 
+/** A stable fingerprint of the newest stored proof of a Detail (what the proofreader found), or "" when there is none. */
+export const proofFingerprint = (detail: string): string => {
+  const proof = latestStoredProof(detail);
+  return proof ? hashText(JSON.stringify(proof)) : "";
+};
+
+/** A chapter that needs a look, with its problems and the fingerprint a tick on its box must match. */
+export interface ReviewEntry {
+  card: Gate2Card;
+  problems: ReviewProblem[];
+  fp: string;
+}
+/** The chapters of the run that need a look, in reading order, from their notes; the one function the callouts, the cards and the bar all read. */
+export function reviewEntries(input: {
+  order: readonly string[];
+  titleOf: (id: string) => string;
+  noteOf: (id: string) => Gate2NoteInput | undefined;
+}): ReviewEntry[] {
+  const out: ReviewEntry[] = [];
+  for (const card of gate2Cards(input)) {
+    const problems = reviewProblems(card);
+    if (!problems.length) continue;
+    const note = input.noteOf(card.id);
+    out.push({
+      card,
+      problems,
+      fp: attentionFingerprint({
+        stage: card.stage,
+        issue: typeof note?.pipelineIssue === "string" ? note.pipelineIssue : "",
+        proofKey: proofFingerprint(note?.detail ?? ""),
+        seam: typeof note?.pipelineSeam === "string" ? note.pipelineSeam : ""
+      })
+    });
+  }
+  return out;
+}
+
 // ---- plain text and links ----
 
 /**
@@ -199,7 +265,7 @@ const noteLink = (link: BookNoteLink | undefined): string => {
   const title = linkPart(link.title, 60);
   return title ? `[[${path}|${title}]]` : `[[${path}]]`;
 };
-const idPart = (value: string): string => value.replace(/[^\w.-]/g, "");
+export const idPart = (value: string): string => value.replace(/[^\w.-]/g, "");
 
 // ---- the callouts ----
 
@@ -283,18 +349,21 @@ function ownedIn(lines: string[]): ProgramCallout[] {
 }
 export const findProgramCallouts = (text: string): ProgramCallout[] => ownedIn(text.split("\n"));
 
-/** The text without the program's callouts of `kind` (all kinds when omitted), each with the one blank line it brought. Nothing else changes. */
-export function removeProgramCallouts(text: string, kind?: "trial" | "review"): string {
+/** The text without the program's callouts that `drop` picks, each with the one blank line it brought. Nothing else changes. */
+export function removeProgramCalloutsWhere(text: string, drop: (callout: ProgramCallout) => boolean): string {
   const lines = text.split("\n");
-  const drop = ownedIn(lines).filter(c => !kind || c.kind === kind);
-  if (!drop.length) return text;
   const gone = new Set<number>();
-  for (const c of drop) {
+  const picked = ownedIn(lines).filter(drop);
+  if (!picked.length) return text;
+  for (const c of picked) {
     for (let i = c.start; i < c.end; i++) gone.add(i);
     if (c.end < lines.length && !bare(lines[c.end]).trim()) gone.add(c.end);
   }
   return lines.filter((_, i) => !gone.has(i)).join("\n");
 }
+/** The text without the program's callouts of `kind` (all kinds when omitted). */
+export const removeProgramCallouts = (text: string, kind?: "trial" | "review"): string =>
+  removeProgramCalloutsWhere(text, c => !kind || c.kind === kind);
 
 /**
  * `callout` (a {@link trialCallout} or {@link reviewCallout} text) at the top of the Detail block, replacing the program's callouts of the

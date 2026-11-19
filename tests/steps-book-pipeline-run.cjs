@@ -11,6 +11,7 @@ const { cardRevision } = S.load('core/book-pipeline/machine.ts');
 const { proofKey, evaluateProof, composeProofRecord } = S.load('core/book-pipeline/proof.ts');
 const { findStoredProof, withoutResearchNotes, chapterBody, appendResearchNote, dropPlaceholderSections, markOldProofRecords } = S.load('core/book-pipeline/note-sections.ts');
 const { parseChecklist } = S.load('core/book-pipeline/plan-text.ts');
+const { stampDetail } = S.load('core/book-pipeline/body-integrity.ts');
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const defer = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
@@ -323,7 +324,8 @@ test('pictures: when the exit check finds an unsafe body nothing is written, the
 /** The saved card text must hold only https standard pictures and no HTML tag, whatever way the step ended. */
 const MALICIOUS = bodyText => `${bodyText}\n\n![](http://evil.example/x.png)\n\n<img src="http://evil.example/i.png">\n\n<svg><image href="http://evil.example/s.svg"/></svg>\n\n<style>@import url(http://evil.example/c.css)</style>\n\n![ok](https://ok.example/d.png)`;
 const assertSafeCard = (r, i) => {
-  const detail = r.raw(i).replace(/^---\n[\s\S]*?\n---\n/, '');
+  // the program's own hidden fingerprint record (a comment line) is not author text
+  const detail = r.raw(i).replace(/^---\n[\s\S]*?\n---\n/, '').replace(/^> <!-- book-body:v1 \{[^<]*\} -->\n/m, '');
   assert.ok(!unsafeBody(detail, new Set(['https://ok.example/d.png'])), 'only https standard pictures and no HTML tag');
   assert.ok(!/<img|<svg|<style|!\[[^\]]*\]\(http:/.test(r.raw(i)), 'no tag and no http picture left');
 };
@@ -986,7 +988,7 @@ test('T1 carry-over: a rewrite keeps the card\'s latest proof record only and th
   detail = markOldProofRecords(detail, 'k3');
   assert.ok(detail.includes('（舊版）校對'));
   await r.repo.updateNoteRawGuarded(r.nodes[0].path, c => c.replace(/\n> \[!vam-book\]- 校對結果（最新一次）(\n>.*)*/, '\n'), {});
-  await r.repo.updateNoteGuarded(r.nodes[0].path, { detail }, {});
+  await r.repo.updateNoteGuarded(r.nodes[0].path, { detail: stampDetail(detail) }, {});
   await r.repo.updateNoteGuarded(r.nodes[0].path, {}, { detailTemplate: undefined });
   await rerun(r, 0);
   const out = (await r.note(0)).detail;
@@ -1179,7 +1181,7 @@ test('B2 run: the card\'s own old log and records still become hidden; the log d
   await finish(r);
   let detail = '舊內文。\n\n### 更新紀錄\n\n- 2026-01-01\u3000OLDLOG\n';
   await r.repo.updateNoteRawGuarded(r.nodes[0].path, c => c.replace(/\n> \[!vam-book\]- 校對結果（最新一次）(\n>.*)*/, '\n'), {});
-  await r.repo.updateNoteGuarded(r.nodes[0].path, { detail }, {});
+  await r.repo.updateNoteGuarded(r.nodes[0].path, { detail: stampDetail(detail) }, {});
   const sizes = [];
   for (let i = 0; i < 3; i++) {
     await rerun(r, 0);
@@ -1754,4 +1756,198 @@ test('apply notes: no note, no run and a missing card are refused without a call
   await assert.rejects(r.runs.applyNotes(r.mapPath, r.nodes[2].id), refusal('nothing'));
   await assert.rejects(r.runs.applyNotes(r.mapPath, 'no-such-card'), refusal('missing'));
   assert.equal(r.calls.length, 0);
+});
+
+// ---- T9: the reader's hand on a chapter (the program never overwrites it without the reader's one-time permission) ----
+const { bodyStateRaw, integrityFpRaw, keepRaw, readBodyRecord } = S.load('core/book-pipeline/body-integrity.ts');
+const { detailBlockOf } = S.load('core/book-pipeline/note-sections.ts');
+const HAND = ' HAND-EDIT';
+const handEdit = (r, i, extra = HAND) => r.repo.updateNoteRawGuarded(r.nodes[i].path, c => c.replace(bodyOf(TITLES[i]), bodyOf(TITLES[i]) + extra), {});
+/** The book is back in the writing phase with the named chapters planned again (what a whole-book redo or an interrupted run leaves), then resumed to the checkpoint. */
+async function redo(r, indexes) {
+  for (const i of indexes) await r.repo.writePipelineFields(r.nodes[i].path, { pipelineStage: 'planned', pipelineIssue: null });
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'writing'; d.bookPipeline.status = 'stopped'; delete d.bookPipeline.pauseReason; });
+  await r.runs.resume(r.mapPath);
+  while (r.runs.isRunning(r.mapPath)) await tick();
+  await settle();
+}
+
+test('T9 stamp: every program write of a chapter leaves its fingerprint, so a finished book reads as untouched', async () => {
+  const r = await rig();
+  await finish(r);
+  for (let i = 0; i < 3; i++) {
+    const detail = detailBlockOf(r.raw(i));
+    assert.equal(readBodyRecord(detail).fp, require('node:crypto') && readBodyRecord(detail).fp, 'a record exists');
+    assert.equal(bodyStateRaw(r.raw(i)), 'clean', `chapter ${i} is as the program left it`);
+  }
+});
+
+test('T9 commit point: the author write itself carries the fingerprint (stop during the picture probe still leaves a clean chapter)', async () => {
+  const hold = defer();
+  const r = await rig({ script: { probe: async () => { await hold.promise; return { ok: true }; }, author: async input => { await input.admission.reserve(); await r.repo.updateNoteGuarded(input.path, { detail: `${bodyOf('x')}\n\n![ok](https://ok.example/d.png)` }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } } });
+  await r.runs.start(r.mapPath);
+  const confirm = r.runs.confirmGate1(r.mapPath);
+  await settle();
+  assert.equal(bodyStateRaw(r.raw(1)), 'clean', 'text and fingerprint were one write');
+  await r.runs.stop(r.mapPath); hold.resolve(); await confirm.catch(() => undefined);
+  assert.equal(bodyStateRaw(r.raw(1)), 'clean');
+});
+
+test('T9 auto skip: a whole-book redo skips the hand-edited chapter (needs-review, text untouched, no author call for it) and the other chapters still run', async () => {
+  const r = await rig();
+  await finish(r);
+  await handEdit(r, 1);
+  const before = r.raw(1);
+  const authors = r.stat.author.length;
+  await redo(r, [1, 2]);
+  assert.equal(r.stat.author.length, authors + 1, 'only the untouched chapter was written again');
+  assert.equal(r.stat.author.at(-1), r.nodes[2].id);
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: hand_edited');
+  assert.ok((await r.note(1)).detail.includes(HAND), 'the reader\'s text is still there');
+  assert.equal(detailBlockOf(r.raw(1)), detailBlockOf(before), 'nothing of the chapter was written');
+  assert.equal(stageOf(r.raw(2)), 'checked');
+  assert.equal((await r.state()).phase, 'gate2');
+  assert.ok(r.stat.logs.some(l => l.includes('hand_edit_skipped')));
+});
+
+test('T9 unknown: an older chapter with text and no fingerprint (and no stored proof to vouch for it) is skipped like a hand-edited one', async () => {
+  const r = await rig();
+  await finish(r);
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/\n> <!-- book-body:v1 .*-->/, '').replace(/\n> \[!vam-book\]- 校對結果（最新一次）(\n>.*)*/, '\n'), {});
+  assert.equal(bodyStateRaw(r.raw(1)), 'unknown');
+  const authors = r.stat.author.length;
+  await redo(r, [1]);
+  assert.equal(r.stat.author.length, authors, 'not written');
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: hand_edited');
+});
+
+test('T9 keep: "keep my version" makes a whole-book redo leave the chapter alone and send it on to its proofread', async () => {
+  const r = await rig();
+  await finish(r);
+  await handEdit(r, 1);
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, keepRaw, {});
+  const before = detailBlockOf(r.raw(1));
+  const authors = r.stat.author.length;
+  const proofs = r.stat.proof.length;
+  await redo(r, [1]);
+  assert.equal(r.stat.author.length, authors, 'not written');
+  assert.equal(r.stat.proof.length, proofs + 1, 'proofread though');
+  assert.equal(stageOf(r.raw(1)), 'checked');
+  assert.ok((await r.note(1)).detail.includes(HAND));
+  assert.ok(r.stat.logs.some(l => l.includes('hand_edit_kept')));
+  assert.ok(detailBlockOf(r.raw(1)).includes(HAND) && before.includes(HAND));
+  // typing again after the keep is a new edit: the keep no longer covers it
+  await handEdit(r, 1, ' MORE');
+  assert.equal(bodyStateRaw(r.raw(1)), 'edited');
+  await redo(r, [1]);
+  assert.equal(r.stat.author.length, authors, 'still not written');
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: hand_edited');
+});
+
+test('T9 rerun: without permission a single-card rerun leaves a hand-edited chapter alone', async () => {
+  const r = await rig();
+  await finish(r);
+  await handEdit(r, 1);
+  const authors = r.stat.author.length;
+  await rerun(r, 1);
+  assert.equal(r.stat.author.length, authors);
+  assert.ok((await r.note(1)).detail.includes(HAND));
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: hand_edited');
+});
+
+test('T9 F: a rerun with the reader\'s permission for this text backs the chapter up first, rewrites it once and the chapter is clean again', async () => {
+  const seen = { backupsAtAuthor: -1 };
+  const r = await rig({ script: { author: async (input, n) => {
+    seen.backupsAtAuthor = r.stat.backups.filter(p => p === input.path).length;
+    await input.admission.reserve(); const note = await r.repo.readNote(input.path);
+    const out = await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) + ` v${n}` }, { authorize: input.authorize, finalize: input.finalize });
+    return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+  } } });
+  await finish(r);
+  await handEdit(r, 1);
+  const fingerprint = integrityFpRaw(r.raw(1));
+  const authors = r.stat.author.length;
+  const used = (await r.state()).budget.used;
+  await r.runs.rerunCard(r.mapPath, r.nodes[1].id, { overwrite: { operation: 'op-1', fingerprint } });
+  while (r.runs.isRunning(r.mapPath)) await tick();
+  await settle();
+  assert.equal(r.stat.author.length, authors + 1, 'written once');
+  assert.ok(seen.backupsAtAuthor >= 1, 'the backup came first');
+  assert.ok(!(await r.note(1)).detail.includes(HAND));
+  assert.equal(bodyStateRaw(r.raw(1)), 'clean');
+  assert.ok((await r.state()).budget.used > used, 'it costs calls');
+  assert.notEqual((await r.note(1)).pipelineIssue, 'write failed: hand_edited');
+  // the permission was for that one rerun: the next hand edit is protected again
+  await handEdit(r, 1, ' AGAIN');
+  await rerun(r, 1);
+  assert.equal(r.stat.author.length, authors + 1);
+});
+
+test('T9 F: a permission bound to older text is refused (text_changed) with nothing written and no call', async () => {
+  const r = await rig();
+  await finish(r);
+  await handEdit(r, 1);
+  const fingerprint = integrityFpRaw(r.raw(1));
+  await handEdit(r, 1, ' TYPED-AFTER');
+  const authors = r.stat.author.length;
+  const used = (await r.state()).budget.used;
+  await assert.rejects(r.runs.rerunCard(r.mapPath, r.nodes[1].id, { overwrite: { operation: 'op-2', fingerprint } }), e => e instanceof BookPipelineRunError && e.code === 'text_changed');
+  assert.equal(r.stat.author.length, authors);
+  assert.equal((await r.state()).budget.used, used, 'nothing was charged');
+  assert.ok((await r.note(1)).detail.includes('TYPED-AFTER'));
+});
+
+test('T9 F: with no budget left the permission rewrites nothing and the chapter keeps the reader\'s text', async () => {
+  const r = await rig();
+  await finish(r);
+  await handEdit(r, 1);
+  const fingerprint = integrityFpRaw(r.raw(1));
+  await setLimit(r, (await r.state()).budget.used);
+  const authors = r.stat.author.length;
+  await r.runs.rerunCard(r.mapPath, r.nodes[1].id, { overwrite: { operation: 'op-3', fingerprint } }).catch(() => undefined);
+  while (r.runs.isRunning(r.mapPath)) await tick();
+  await settle();
+  assert.equal(r.stat.author.length, authors, 'no author call without budget');
+  assert.ok((await r.note(1)).detail.includes(HAND));
+});
+
+test('T9 callback window: typing after the check but before the write is not overwritten (the write checks the text it is about to replace)', async () => {
+  const r = await rig({ script: { author: async (input, n) => {
+    await input.admission.reserve();
+    if (n === 2) await handEdit(r, 1, ' TYPED-IN-THE-WINDOW');
+    const out = await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(TITLES[1]) + ` v${n}` }, { authorize: input.authorize, finalize: input.finalize });
+    return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+  } } });
+  await finish(r);
+  await rerun(r, 1);
+  assert.ok((await r.note(1)).detail.includes('TYPED-IN-THE-WINDOW'), 'the typing survived');
+  assert.ok(!(await r.note(1)).detail.includes(' v2'));
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: hand_edited');
+});
+
+test('T9 callback window: a permission bound to one text does not cover text typed after it was given', async () => {
+  const r = await rig({ script: { author: async (input, n) => {
+    await input.admission.reserve();
+    if (n === 2) await handEdit(r, 1, ' LATER');
+    const out = await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(TITLES[1]) + ` v${n}` }, { authorize: input.authorize, finalize: input.finalize });
+    return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+  } } });
+  await finish(r);
+  await handEdit(r, 1);
+  const fingerprint = integrityFpRaw(r.raw(1));
+  await r.runs.rerunCard(r.mapPath, r.nodes[1].id, { overwrite: { operation: 'op-4', fingerprint } });
+  while (r.runs.isRunning(r.mapPath)) await tick();
+  await settle();
+  assert.ok((await r.note(1)).detail.includes('LATER'));
+});
+
+test('T9 detection through the notes: a reader\'s note on the chapter is not a hand edit, a changed word is', async () => {
+  const r = await rig();
+  await finish(r);
+  const { wrapNote } = S.load('core/book-pipeline/book-notes.ts');
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(bodyOf(TITLES[1]), wrapNote(bodyOf(TITLES[1]), 1, 'please check this')), {});
+  assert.equal(bodyStateRaw(r.raw(1)), 'clean', 'a note alone does not count');
+  await handEdit(r, 1, ' WORD');
+  assert.equal(bodyStateRaw(r.raw(1)), 'edited');
 });

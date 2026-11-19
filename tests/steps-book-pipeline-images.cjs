@@ -13,6 +13,7 @@ const { cardRevision } = S.load('core/book-pipeline/machine.ts');
 const { proofKey, evaluateProof } = S.load('core/book-pipeline/proof.ts');
 const { findStoredProof, withoutResearchNotes } = S.load('core/book-pipeline/note-sections.ts');
 const { parseChecklist } = S.load('core/book-pipeline/plan-text.ts');
+const { stampDetail } = S.load('core/book-pipeline/body-integrity.ts');
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const defer = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
@@ -260,7 +261,7 @@ test('slots: the budget is gated; a refusal in the search pauses the run and lea
 const OLD_DETAIL = '舊文。\n\n### 圖像\n\n![Old](https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Old.jpg/1280px-Old.jpg)\nOld／來源：commons.wikimedia.org\n\n### 來源\n- https://example.com/a\n';
 test('old Prompt (no image plan): no search, no record, a stray marker line is deleted, the existing picture section is carried over word for word (#12, #16)', async () => {
   const r = await picRig({ slots: null, text: () => `新文。\n\n${mk(1)}\n\n尾。\n\n### 來源\n- https://example.com/a\n`, finder: () => found({ 1: [cand(1)] }) });
-  await r.repo.updateNote(r.nodes[0].path, { detail: OLD_DETAIL });
+  await r.repo.updateNote(r.nodes[0].path, { detail: stampDetail(OLD_DETAIL) });
   await run(r);
   const detail = (await r.note(0)).detail;
   assert.equal(r.calls.length, 0, 'no search call');
@@ -274,7 +275,7 @@ test('old Prompt (no image plan): no search, no record, a stray marker line is d
 
 test('image plan with 0 slots: no search, no record, the old picture section is not carried over (the card has a plan)', async () => {
   const r = await picRig({ slots: 0, text: () => `新文。\n\n${mk(1)}\n\n尾。\n`, finder: () => found({}) });
-  await r.repo.updateNote(r.nodes[0].path, { detail: OLD_DETAIL });
+  await r.repo.updateNote(r.nodes[0].path, { detail: stampDetail(OLD_DETAIL) });
   await run(r);
   const detail = (await r.note(0)).detail;
   assert.equal(r.calls.length, 0);
@@ -502,7 +503,8 @@ test('slots: CRLF text is filled with CRLF lines and verifies; no marker is left
 // ---- the old run's stages (R1-1): a card planned/written/checked by the old version, standard and textbook template, closed and resumed ----
 const TEMPLATES = { standard: '## 核心結論\n舊內文。\n\n## 背景與機制\n說明。', textbook: '## 章節本文\n舊內文。\n\n## 本章小結\n說明。' };
 async function reopen(r, stage, detail) {
-  await r.repo.updateNote(r.nodes[0].path, { detail });
+  // a card the program left in that state carries its fingerprint (an old card without one would count as possibly hand-edited)
+  await r.repo.updateNote(r.nodes[0].path, { detail: stampDetail(detail) });
   await r.repo.writePipelineFields(r.nodes[0].path, stage ? { pipelineStage: stage, pipelineIssue: null } : { pipelineStage: null });
   await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'writing'; d.bookPipeline.status = 'stopped'; delete d.bookPipeline.pauseReason; });
   const again = new BookPipelineRuns(r.ports);
@@ -525,7 +527,7 @@ for (const [kind, template] of Object.entries(TEMPLATES)) {
     assert.ok(!/book-slots|〔圖位/.test((await r.note(0)).detail));
     assert.equal(stageOf(r.raw(0)), 'checked');
     // written: the author committed; the old picture section stays word for word, no search, no record
-    await r.repo.updateNote(r.nodes[0].path, { detail: old });
+    await r.repo.updateNote(r.nodes[0].path, { detail: stampDetail(old) });
     before = authorCalls();
     const proofs = r.stat.proof.length;
     await reopen(r, 'written', old);

@@ -1325,7 +1325,8 @@ test('toolbar source: the panel, its toggle and the finish modal are gone from t
 // ---- the review boxes in the notes (T4): a tick in a chapter note resolves it in the bar; opening the map reconciles ----
 async function boxRig({ stage = 'needs-review', seam } = {}) {
   const g = await gateRig({ phase: 'gate2' });
-  const calls = { collapse: [], reconcile: [], seam: [], renders: 0 };
+  const calls = { collapse: [], reconcile: [], seam: [], renders: 0, drain: [], tick: [], keep: [] };
+  g.plugin.bookHandEdits = { drain: async path => { calls.drain.push(path); }, tick: async (path, id) => { calls.tick.push([path, id]); }, keep: async path => { calls.keep.push(path); } };
   g.plugin.bookCallouts = { collapse: async path => { calls.collapse.push(path); return 'written'; }, reconcile: async path => { calls.reconcile.push(path); } };
   g.plugin.confirmBookSeam = async (path, id) => { calls.seam.push([path, id]); };
   g.view.rereadBookCard = async () => {};

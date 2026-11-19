@@ -215,7 +215,7 @@ test('right-click rerun through the view: "same result" lands on the review memo
   await click();
   assert.ok(!h.view.bookReview.unchanged.has(node.id), 'a changed result clears it');
   const view_ts = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(view_ts, /runTrackedRerun\(this\.bookReview, node\.id,/);
+  assert.match(view_ts, /runTrackedRerun\(this\.bookReview, nodeId,/);
   assert.match(view_ts, /dom\?\.setAttr\("aria-disabled", "true"\)/);
 });
 

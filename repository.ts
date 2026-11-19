@@ -2571,7 +2571,12 @@ export class Repository {
    * owner chose is kept. A pure folder move (same name), a note that is not a map node and a note edited while this runs are left alone
    * (the write is guarded against the text read here). Returns whether the title was changed.
    */
-  async followRenamedTitle(oldPath: string, newPath: string, mapNodePaths?: ReadonlySet<string>): Promise<boolean> {
+  async followRenamedTitle(
+    oldPath: string,
+    newPath: string,
+    mapNodePaths?: ReadonlySet<string>,
+    onRefused?: (reason: string) => void
+  ): Promise<boolean> {
     const file = this.app.vault.getAbstractFileByPath(newPath);
     if (!(file instanceof TFile) || file.extension !== "md") return false;
     const oldName = baseName(oldPath).replace(/\.md$/, "");
@@ -2580,7 +2585,9 @@ export class Repository {
     const raw = await this.app.vault.read(file);
     const content = decodeCalloutSections(upgradeLegacyAimText(raw));
     if (noteTitle(content, frontmatter(content), file.basename) !== oldName) return false;
-    return (await this.updateNoteGuarded(newPath, { title: file.basename }, { expectedContent: raw })) === "written";
+    const result = await this.updateNoteGuarded(newPath, { title: file.basename }, { expectedContent: raw });
+    if (result !== "written") onRefused?.("changed_meanwhile");
+    return result === "written";
   }
 
   /** Whether any map lists `path` as a node; only map files are read. */

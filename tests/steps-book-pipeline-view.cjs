@@ -538,12 +538,12 @@ test('start card: opens with the estimate (1+5N calls, about minutes), the six s
   for (const select of selects) assert.ok(shown(select), 'the four dropdowns are always shown');
   assert.equal(dom.find(modal.modalEl, i => i.cls.includes('vam-book-start-models-change')), undefined, 'no change link');
   assert.deepEqual(dom.findAll(modal.modalEl, i => i.tag === 'button').map(b => b.text), ['取消', '開始']);
-  // DOM order: intro, estimate, models, settings.
+  // DOM order: intro, estimate, models, stops, settings.
   const order = dom.findAll(modal.modalEl, () => true);
   const at = pred => order.findIndex(pred);
   const iIntro = at(i => i.cls.includes('vam-modal-intro')), iEst = at(i => i.cls.includes('vam-book-start-estimate'));
-  const iModels = at(i => i.cls.includes('vam-book-start-model-choice')), iSettings = at(i => i.cls.includes('vam-book-start-settings'));
-  assert.ok(iIntro >= 0 && iIntro < iEst && iEst < iModels && iModels < iSettings, [iIntro, iEst, iModels, iSettings].join(','));
+  const iModels = at(i => i.cls.includes('vam-book-start-model-choice')), iStops = at(i => i.cls.includes('vam-book-start-stops')), iSettings = at(i => i.cls.includes('vam-book-start-settings'));
+  assert.ok(iIntro >= 0 && iIntro < iEst && iEst < iModels && iModels < iStops && iStops < iSettings, [iIntro, iEst, iModels, iStops, iSettings].join(','));
   void s;
   assert.equal(dom.focusedNow().text, '取消', 'the keyboard starts on Cancel, so a stray Enter never starts the run');
   cardButton(modal, '取消').click();

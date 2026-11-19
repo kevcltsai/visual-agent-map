@@ -236,8 +236,6 @@ export class BookStartModal extends Modal {
     contentEl.createEl("p", { cls: "vam-modal-intro", text: t("ui.book_start_intro") });
     this.estimateEl = contentEl.createEl("p", { cls: "vam-book-start-estimate" });
     this.estimateEl.setAttr("role", "status");
-    contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_stops") });
-    contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_rerun_hint") });
     const choice = contentEl.createDiv({ cls: "vam-book-start-model-choice" });
     renderBookModelChoice(choice, {
       ...this.input.modelChoice,
@@ -245,6 +243,8 @@ export class BookStartModal extends Modal {
       // A pick only changes this card's copy; it is saved when Start is pressed.
       onChange: () => this.refreshEstimate()
     });
+    contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_stops") });
+    contentEl.createEl("p", { cls: "vam-book-start-stops", text: t("ui.book_start_rerun_hint") });
     const settings = contentEl.createDiv({ cls: "vam-book-start-settings" });
     settings.setAttr("role", "group");
     settings.setAttr("aria-label", t("ui.book_start_settings"));

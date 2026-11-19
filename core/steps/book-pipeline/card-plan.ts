@@ -2,8 +2,10 @@ import type { BookRole, BookSettings } from "../../book-pipeline/model";
 import type { ChecklistItem, ChecklistType } from "../../book-pipeline/plan-text";
 import { cleanSlotText, MAX_IMAGE_SLOTS, type ImageSlot } from "../../book-pipeline/image-slots";
 import { singleLine } from "../../book-pipeline/text";
+import { estimateTokens } from "../../../ai/context-builder";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import {
+  BOOK_STEP_TOKEN_BUDGET,
   arrayOf,
   exactKeys,
   fail,
@@ -16,9 +18,20 @@ import {
 } from "./base";
 import template from "./card-plan.md";
 import requestTemplate from "./card-plan-request.md";
+import childrenTemplate from "./card-plan-children.md";
 
 export interface CardNeighbour {
   position: number;
+  title: string;
+  summary: string;
+}
+/** One chapter of the book as it is on the map now. */
+export interface CardPlanChapter {
+  position: number;
+  title: string;
+}
+/** A child card of the chapter on the map (reading order). */
+export interface CardChild {
   title: string;
   summary: string;
 }
@@ -28,6 +41,10 @@ export interface CardPlanRequest extends BookStepBase {
   settings: BookSettings;
   materials: readonly { name: string; use: string }[];
   card: { id: string; position: number; total: number; role: BookRole; title: string; summary: string };
+  /** The complete current chapter list, in reading order: the authority for which chapters exist. Never shortened; a list that does not fit refuses the step. */
+  chapters: readonly CardPlanChapter[];
+  /** The chapter's child cards on the map, in reading order (supplementary owner data; trimmed to fit, never the chapter list). */
+  children?: readonly CardChild[];
   previous?: CardNeighbour;
   next?: CardNeighbour;
   /** The owner's one-line extra request for this card (single-card replan); absent on a normal plan. */
@@ -166,29 +183,85 @@ const extraRequest = (instruction: string | undefined): string => {
   return line ? `\n\n${renderTemplate(requestTemplate, { instruction: JSON.stringify(line) })}` : "";
 };
 
+/** The longest a child card's title and summary are in the request. */
+export const CHILD_TITLE_MAX = 80;
+export const CHILD_SUMMARY_MAX = 200;
+/** The child-card block is cut to about this many tokens (the existing estimate); the rest is only counted. */
+export const CHILD_CARDS_TOKENS = 6000;
+/** The chapter list is the authority: titles are put in whole (only whitespace is collapsed). */
+const wholeLine = (value: string): string => singleLine(value, Number.MAX_SAFE_INTEGER);
+
+const baseRender = (request: CardPlanRequest): string =>
+  renderTemplate(template, {
+    languageInstruction: languageInstruction(request.language, request.card.title),
+    thread: JSON.stringify(cap(request.thread, 1200)),
+    settings: JSON.stringify(request.settings),
+    card: JSON.stringify({
+      position: request.card.position,
+      total: request.card.total,
+      role: request.card.role,
+      title: cap(request.card.title, 200),
+      summary: cap(request.card.summary, 500)
+    }),
+    previous: neighbour(request.previous),
+    next: neighbour(request.next),
+    materials: JSON.stringify(request.materials.map(m => ({ name: cap(m.name, 120), use: cap(m.use, 240) }))),
+    chapters: JSON.stringify(request.chapters.map(c => ({ position: c.position, title: wholeLine(c.title) })))
+  });
+const childSection = (items: readonly CardChild[], shown: number): string =>
+  items.length
+    ? `\n\n${renderTemplate(childrenTemplate, {
+        children: JSON.stringify(items.slice(0, shown)),
+        unlisted:
+          shown < items.length
+            ? `${items.length - shown} more child cards are not listed here (the list is cut to fit); cover the listed ones, say in covers that others exist, and do not claim to cover every child card.`
+            : "All of this chapter's child cards are listed."
+      })}`
+    : "";
+/**
+ * The request as it will be sent, or undefined when the chapter list itself does not fit the step's budget (then the step is refused).
+ * Child cards are trimmed first: to {@link CHILD_CARDS_TOKENS} and to whatever room the rest of the request leaves.
+ */
+export function fitCardPlan(request: CardPlanRequest): { prompt: string; shown: number; total: number } | undefined {
+  const items = (request.children ?? []).map(c => ({
+    title: cap(c.title, CHILD_TITLE_MAX),
+    summary: cap(c.summary, CHILD_SUMMARY_MAX)
+  }));
+  const base = baseRender(request);
+  const extra = extraRequest(request.instruction);
+  const used = estimateTokens(base + extra + JSON.stringify(CARD_PLAN_SCHEMA));
+  if (used > BOOK_STEP_TOKEN_BUDGET) return undefined;
+  const room = Math.min(CHILD_CARDS_TOKENS, BOOK_STEP_TOKEN_BUDGET - used);
+  const tokens = (k: number): number => estimateTokens(childSection(items, k));
+  let low = 0;
+  let high = items.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (tokens(mid) <= room) low = mid;
+    else high = mid - 1;
+  }
+  let shown = low;
+  while (shown > 0 && tokens(shown) > room) shown--;
+  // Not even the "n not listed" note fits: the child cards are left out whole.
+  const section = tokens(shown) <= room ? childSection(items, shown) : "";
+  return { prompt: base + section + extra, shown: section ? shown : 0, total: items.length };
+}
+/** Whether the chapter list fits (the runner asks before the call, and logs a refusal). */
+export const cardPlanFits = (request: CardPlanRequest): boolean => !!fitCardPlan(request);
+
 /** One card's brief and acceptance checklist. Text-only. */
 export const cardPlanStep: StepDefinition<CardPlanRequest, CardPlanResult> = {
   id: "book-pipeline.card-plan",
   version: 1,
-  render: request =>
-    renderTemplate(template, {
-      languageInstruction: languageInstruction(request.language, request.card.title),
-      thread: JSON.stringify(cap(request.thread, 1200)),
-      settings: JSON.stringify(request.settings),
-      card: JSON.stringify({
-        position: request.card.position,
-        total: request.card.total,
-        role: request.card.role,
-        title: cap(request.card.title, 200),
-        summary: cap(request.card.summary, 500)
-      }),
-      previous: neighbour(request.previous),
-      next: neighbour(request.next),
-      materials: JSON.stringify(request.materials.map(m => ({ name: cap(m.name, 120), use: cap(m.use, 240) })))
-    }) + extraRequest(request.instruction),
+  render: request => {
+    const fitted = fitCardPlan(request);
+    // A request that does not fit is refused by `policy` before it is sent; this only keeps `render` total.
+    return fitted ? fitted.prompt : baseRender(request) + extraRequest(request.instruction);
+  },
   schema: CARD_PLAN_SCHEMA,
   policy: (prompt, request) => {
     if (!request.card.title.trim()) fail("A card plan needs a card title");
+    if (!cardPlanFits(request)) fail("The chapter list is too long for one request");
     overBudget(prompt, CARD_PLAN_SCHEMA);
   },
   parse: parseCardPlan

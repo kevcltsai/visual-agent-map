@@ -1,7 +1,9 @@
 import { BOOK_ROLES, BOOK_SETTING_FIELDS, type BookRole, type BookSettings } from "../../book-pipeline/model";
 import { singleLine } from "../../book-pipeline/text";
+import { estimateTokens } from "../../../ai/context-builder";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import {
+  BOOK_STEP_TOKEN_BUDGET,
   arrayOf,
   exactKeys,
   fail,
@@ -13,11 +15,14 @@ import {
   type BookStepBase
 } from "./base";
 import template from "./global-plan.md";
+import childrenTemplate from "./global-plan-children.md";
 
 export interface GlobalPlanCard {
   id: string;
   title: string;
   summary: string;
+  /** Titles of the card's child cards on the map, in reading order (titles only). */
+  children?: readonly string[];
 }
 export interface GlobalPlanRequest extends BookStepBase {
   bookTitle: string;
@@ -110,19 +115,60 @@ export function parseGlobalPlan(raw: string, request: GlobalPlanRequest): Global
 }
 
 const cap = (value: string, max: number): string => singleLine(value, max);
+/** A child title in the request is at most this long. */
+export const GLOBAL_CHILD_TITLE_MAX = 80;
+/** All child titles together are cut to about this many tokens (the existing estimate), in reading order. */
+export const GLOBAL_CHILD_TOKENS = 3000;
+type CardEntry = { id: string; title: string; summary: string; children?: string[]; moreChildren?: number };
+const entriesOf = (request: GlobalPlanRequest, shown: ReadonlyMap<number, number>): CardEntry[] =>
+  request.cards.map((card, at) => {
+    const entry: CardEntry = { id: card.id, title: cap(card.title, 200), summary: cap(card.summary, 500) };
+    const all = (card.children ?? []).map(title => cap(title, GLOBAL_CHILD_TITLE_MAX));
+    if (!all.length) return entry;
+    const k = shown.get(at) ?? 0;
+    if (k) entry.children = all.slice(0, k);
+    if (k < all.length) entry.moreChildren = all.length - k;
+    return entry;
+  });
+const render = (request: GlobalPlanRequest, shown: ReadonlyMap<number, number>, rule: boolean): string =>
+  renderTemplate(template, {
+    languageInstruction: languageInstruction(request.language, request.bookTitle),
+    bookTitle: JSON.stringify(cap(request.bookTitle, 200)),
+    settings: JSON.stringify(request.settings),
+    cards: JSON.stringify(entriesOf(request, shown))
+  }) + (rule ? `\n\n${childrenTemplate}` : "");
+/** The request as it will be sent: child titles in reading order up to the token cap and the room the step's budget leaves. */
+function fitGlobalPlan(request: GlobalPlanRequest): string {
+  const none = new Map<number, number>();
+  const withChildren = request.cards.some(card => card.children?.length);
+  if (!withChildren) return render(request, none, false);
+  const room = Math.min(
+    GLOBAL_CHILD_TOKENS,
+    BOOK_STEP_TOKEN_BUDGET - estimateTokens(render(request, none, true) + JSON.stringify(GLOBAL_PLAN_SCHEMA))
+  );
+  const shown = new Map<number, number>();
+  let spent = 0;
+  let full = true;
+  request.cards.forEach((card, at) => {
+    let k = 0;
+    for (const title of card.children ?? []) {
+      const cost = estimateTokens(JSON.stringify(cap(title, GLOBAL_CHILD_TITLE_MAX))) + 1;
+      if (!full || spent + cost > room) {
+        full = false;
+        break;
+      }
+      spent += cost;
+      k++;
+    }
+    shown.set(at, k);
+  });
+  return render(request, shown, true);
+}
 /** The whole-book plan: one call over every card's title and summary. Text-only. */
 export const globalPlanStep: StepDefinition<GlobalPlanRequest, GlobalPlanResult> = {
   id: "book-pipeline.global-plan",
   version: 1,
-  render: request =>
-    renderTemplate(template, {
-      languageInstruction: languageInstruction(request.language, request.bookTitle),
-      bookTitle: JSON.stringify(cap(request.bookTitle, 200)),
-      settings: JSON.stringify(request.settings),
-      cards: JSON.stringify(
-        request.cards.map(card => ({ id: card.id, title: cap(card.title, 200), summary: cap(card.summary, 500) }))
-      )
-    }),
+  render: request => fitGlobalPlan(request),
   schema: GLOBAL_PLAN_SCHEMA,
   policy: (prompt, request) => {
     if (!request.cards.length) fail("A book plan needs cards");

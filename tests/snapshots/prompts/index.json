@@ -241,6 +241,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "book-card-plan-children.en": {
+      "builder": "core/steps/book-pipeline/card-plan.ts cardPlanStep (child cards)",
+      "language": "en",
+      "schema": true
+    },
+    "book-card-plan-children.zh": {
+      "builder": "core/steps/book-pipeline/card-plan.ts cardPlanStep (child cards)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "book-card-plan-children.zh-CN": {
+      "builder": "core/steps/book-pipeline/card-plan.ts cardPlanStep (child cards)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "book-card-plan.en": {
       "builder": "core/steps/book-pipeline/card-plan.ts cardPlanStep",
       "language": "en",
@@ -270,6 +285,21 @@
       "builder": "core/steps/book-pipeline/find-images.ts findImagesStep",
       "language": "zh-CN",
       "schema": false
+    },
+    "book-global-plan-children.en": {
+      "builder": "core/steps/book-pipeline/global-plan.ts globalPlanStep (child cards)",
+      "language": "en",
+      "schema": true
+    },
+    "book-global-plan-children.zh": {
+      "builder": "core/steps/book-pipeline/global-plan.ts globalPlanStep (child cards)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "book-global-plan-children.zh-CN": {
+      "builder": "core/steps/book-pipeline/global-plan.ts globalPlanStep (child cards)",
+      "language": "zh-CN",
+      "schema": true
     },
     "book-global-plan.en": {
       "builder": "core/steps/book-pipeline/global-plan.ts globalPlanStep",

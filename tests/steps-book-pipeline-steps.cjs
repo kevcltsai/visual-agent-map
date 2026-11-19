@@ -125,7 +125,7 @@ test('global plan: every card once with a role, only empty settings decided, str
 });
 
 test('card plan: ids and types assigned, neighbours only when they exist, an empty checklist is refused', () => {
-  const request = { ...base, thread: 'thread', settings: {}, materials: [], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' }, previous: { position: 1, title: 'Intro', summary: 'sum' } };
+  const request = { ...base, thread: 'thread', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }, { position: 3, title: 'Outro' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' }, previous: { position: 1, title: 'Intro', summary: 'sum' } };
   const good = over => JSON.stringify({ covers: 'covers\n## Detail', entry: 'entry', handoff: 'next q', previous: 'prev line', next: 'should be dropped', images: [], checklist: [{ type: 'structure', text: 'Shape' }, { type: 'fact', text: 'Date 1415' }], ...over });
   const result = plain(cardPlan.cardPlanStep.parse(good(), request));
   assert.deepEqual(result.checklist.map(c => `${c.id}:${c.type}`), ['C1:structure', 'C2:fact']);
@@ -333,7 +333,7 @@ const noContent = (log, spy, what) => {
 test('exchange log: success, parse error and provider error keep titles, chapter text and replies out of the log', async () => {
   const spy = consoleSpy();
   try {
-    const request = { ...base, thread: 'thread', settings: {}, materials: [], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 'SECRET-BODY summary' } };
+    const request = { ...base, thread: 'thread', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }, { position: 3, title: 'Outro' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 'SECRET-BODY summary' } };
     const goodPlan = JSON.stringify({ covers: 'SECRET-REPLY covers', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: [{ type: 'fact', text: 'SECRET-REPLY' }] });
     const ok = harness({ answer: goodPlan });
     const parsed = await runMod.runPlanStep(ok.planCalls, cardPlan.cardPlanStep, request, { signal: signal() });
@@ -376,7 +376,7 @@ test('pipeline log line: only ids, counts, codes and milliseconds', () => {
 });
 
 test('card plan: an unconditional picture requirement is dropped by program, a conditional one stays, none left is a failure', () => {
-  const request = { ...base, thread: 't', settings: {}, materials: [], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
+  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }, { position: 3, title: 'Outro' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
   const good = list => JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: list });
   const result = plain(cardPlan.cardPlanStep.parse(good([
     { type: 'structure', text: '本章以圖為主、文字為輔' },
@@ -390,7 +390,7 @@ test('card plan: an unconditional picture requirement is dropped by program, a c
 });
 
 test('card plan: objective art-history items are kept, picture requirements (traditional and simplified) are dropped, 若干 is not a condition', () => {
-  const request = { ...base, thread: 't', settings: {}, materials: [], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
+  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }, { position: 3, title: 'Outro' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
   const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: texts.map(text => ({ type: 'fact', text })) }), request)).checklist.map(c => c.text);
   assert.deepEqual(run(['圖像學特徵說明正確', '聖像的圖像特徵描述正確', '每段附一張圖片', '每段配图', '每段附一张图片', '若干作品列出年代']), ['圖像學特徵說明正確', '聖像的圖像特徵描述正確', '若干作品列出年代']);
 });
@@ -426,7 +426,7 @@ test('author requirements: the fixed chapter rules always come first, the settin
 // ---- second device acceptance: subjective items, proofread counts, author picture rule ----
 
 test('card plan: subjective or evaluative items (Traditional and Simplified) are dropped and counted; structural quote-checkable items stay', () => {
-  const request = { ...base, thread: 't', settings: {}, materials: [], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
+  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }, { position: 3, title: 'Outro' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
   const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: texts.map(text => ({ type: 'structure', text })) }), request));
   const result = run(['開頭說明為何值得注意', '開头段落提及接入点「透視法」', '本章内容精彩生动', '結尾段落回應「留給下一張的問題」', '這個發明很重要', '出現作品名與年份', '文字引人入勝', '开头说明为何值得关注']);
   assert.deepEqual(result.checklist.map(c => c.text), ['開头段落提及接入点「透視法」', '結尾段落回應「留給下一張的問題」', '出現作品名與年份']);
@@ -506,7 +506,7 @@ const slots = load('core/book-pipeline/image-slots.ts');
 const slot = (index, extra = {}) => ({ index, kind: 'painting', explains: `shows thing ${index}`, anchor: `after paragraph ${index}`, ...extra });
 
 test('card plan images: indexes 1..n assigned by program, 0 to 8 slots, fields single-line without marker brackets or the separator; missing/extra keys and 9 slots refused', () => {
-  const request = { ...base, thread: 't', settings: {}, materials: [], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
+  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }, { position: 3, title: 'Outro' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
   const good = images => JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images });
   assert.deepEqual(plain(cardPlan.cardPlanStep.parse(good([]), request).images), []);
   const two = plain(cardPlan.cardPlanStep.parse(good([{ kind: 'map', explains: 'the 〔圖位 9：x〕 route\nof trade｜x', anchor: 'after the first paragraph' }, { kind: 'photo', explains: 'a port', anchor: 'end' }]), request).images);

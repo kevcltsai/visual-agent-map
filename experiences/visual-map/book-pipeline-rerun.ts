@@ -1,7 +1,7 @@
 import { latestStoredProof, neutralizeText } from "../../core/book-pipeline/note-sections";
 import type { PipelineStage } from "../../core/book-pipeline/model";
 import { lengthNeeded, lengthTarget, type LengthReason } from "../../core/book-pipeline/settings";
-import { isBookCheckId } from "../../core/book-pipeline/proof";
+import { BOOK_CHECK_IDS, isBookCheckId } from "../../core/book-pipeline/proof";
 
 /**
  * Pure helpers of a single-card rerun at gate 2 (T5): the unverified sources a card names, the one-line instruction "use other
@@ -82,23 +82,42 @@ const FIX_INSTRUCTION_MAX = 1000;
 const FIX_ITEM_MAX = 140;
 /** The "do not use these" list never takes more than this, so the unmet points always have room. */
 const FIX_AVOID_MAX = 450;
+/** The research-voice sentences take at most this much of the instruction, each whole up to {@link FIX_VOICE_SENTENCE_MAX}. */
+const FIX_VOICE_MAX = 520;
+const FIX_VOICE_SENTENCE_MAX = 240;
 const oneLine = (value: string, max: number): string =>
   Array.from(value.replace(/\s+/g, " ").trim()).slice(0, max).join("");
 /**
  * The automatic redo's one line when the proofread did not pass: constant words plus, for each fact point that did not hold, its
  * checklist text and the verifier's note, each as a JSON string cut to a few hundred characters (so a model sentence is data in
  * quotes, never an instruction line), then the `[!vam-book]` callout type neutralized. Only the author gets it; the proofread never does.
- * Unverified sources become the "do not use these" list of {@link avoidSourcesInstruction}.
+ * Unverified sources become the "do not use these" list of {@link avoidSourcesInstruction}. `voice` is the chapter's research-voice
+ * sentences (`researchVoiceSentences`): when V1 is unmet they go first, whole (the proof note cuts them to 60 characters, too short
+ * for the author to find and copy the line; live v5 left 5 of 7 in place), in place of the V1 note.
  */
 export function proofFixInstruction(
   items: readonly { id: string; type: string; status: string; note: string; sources: readonly string[] }[],
   checklist: readonly { id: string; text: string }[],
-  length?: LengthReason
+  length?: LengthReason,
+  voice: readonly string[] = []
 ): string {
   const failed = items.filter(item => item.type === "fact" && item.status === "unmet");
+  const voiceUnmet = items.some(item => item.id === BOOK_CHECK_IDS.voice && item.status === "unmet");
+  const voiceIntro =
+    "These sentences of the chapter attribute a fact to a vague source or carry research voice (JSON strings, each a whole sentence): for each, @@replace the whole line that holds it, copied exactly, with that line stating the fact as the book's own (or without the sentence); the source belongs only in the sources section. ";
+  const quoted: string[] = [];
+  let voiceRoom = FIX_VOICE_MAX - voiceIntro.length;
+  for (const sentence of voiceUnmet ? voice : []) {
+    const point = JSON.stringify(oneLine(sentence, FIX_VOICE_SENTENCE_MAX));
+    if (point.length + 1 > voiceRoom) continue;
+    quoted.push(point);
+    voiceRoom -= point.length + 1;
+  }
+  const voicePiece = quoted.length ? voiceIntro + quoted.join(" ") + " " : "";
   // The whole-book points (names, research voice, repetition) first: they are short and a long chapter point must not squeeze them out.
   const structure = items
     .filter(item => item.type !== "fact" && item.status === "unmet")
+    .filter(item => !(voicePiece && item.id === BOOK_CHECK_IDS.voice))
     .sort((a, b) => Number(isBookCheckId(b.id)) - Number(isBookCheckId(a.id)));
   let sources = cleanAvoidSources(
     items.filter(item => item.type === "fact" && item.status !== "met").flatMap(item => item.sources)
@@ -118,7 +137,7 @@ export function proofFixInstruction(
       ? `The chapter came out at only ${length.measured} ${length.unit}, short of the asked ${length.min} to ${length.max} ${length.unit}: add about ${lengthNeeded(length)} ${length.unit} of new text in @@insert blocks as the expansion rules say; keep every checklist point. `
       : `The chapter is ${length.measured} ${length.unit} long, over the asked ${length.min} to ${length.max} ${length.unit}: shorten it to at most ${length.max} ${length.unit}, about ${lengthTarget(length)} ${length.unit}, with @@replace blocks; keep every checklist point and every picture. `
     : "";
-  let room = FIX_INSTRUCTION_MAX - avoid.length - 1 - lengthPiece.length;
+  let room = FIX_INSTRUCTION_MAX - avoid.length - 1 - lengthPiece.length - voicePiece.length;
   const piece = (list: typeof items, intro: string): string => {
     const before = room;
     room -= intro.length;
@@ -135,7 +154,7 @@ export function proofFixInstruction(
     if (!points.length) room = before;
     return points.length ? intro + points.join(" ") + " " : "";
   };
-  const text = piece(failed, lead) + piece(structure, leadStructure) + lengthPiece;
+  const text = voicePiece + piece(failed, lead) + piece(structure, leadStructure) + lengthPiece;
   return neutralizeText(text + avoid);
 }
 /** What a rerun compares: the stage, the issue code and each proof item's id, status and sources. In memory only. */

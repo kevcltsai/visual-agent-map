@@ -2815,6 +2815,54 @@ test('T10c length (strict after the fix round): an expansion that lands between 
   assert.equal(stageOf(r.raw(1)), 'needs-review');
 });
 
+// Extra expand passes (live v5: one expand adds about 1.4–2.2k characters whatever is asked): an author whose every fix call adds one new section.
+const passAuthor = (r, seen, adds) => async input => {
+  seen.push(input);
+  await input.admission.reserve();
+  const mine = seen.filter(call => call.nodeId === input.nodeId).length;
+  const n = adds(mine - 1, input.nodeId);
+  const fix = input.requirements !== undefined;
+  const answer = n ? ['@@insert after: ### 土壤', `### 新節${n}`, '', `新節段落${'好'.repeat(n)}`].join('\n') : '@@insert after: ### 土壤\n本次無新增內容。';
+  const out = await r.repo.updateNoteGuarded(input.path, { detail: fix ? answer : DRAFT }, { authorize: input.authorize, finalize: input.finalize });
+  return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+};
+
+test('expand passes: two short chapters still under the minimum after the fix round get extra expand passes until they reach it; every call is within the estimate and logged', async () => {
+  const seen = [];
+  const r = await lenRig();
+  r.script.author = passAuthor(r, seen, (call, id) => (id === r.nodes[0].id ? 150 + call : 20 + call));
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const { MAX_AUTO_FIXES, BOOK_EXPAND_PASSES } = S.load('core/book-pipeline/model.ts');
+  const log = r.stat.logs.join('\n');
+  for (const at of [1, 2]) {
+    const id = r.nodes[at].id;
+    const calls = seen.filter(input => input.nodeId === id);
+    assert.equal(calls.length, 4, 'first draft, the fix round and two expand passes');
+    assert.ok(calls.length <= 1 + MAX_AUTO_FIXES + BOOK_EXPAND_PASSES, 'within the estimate');
+    assert.match(calls[3].requirements, /Expansion \(hard requirement/);
+    assert.ok(calls[3].requirements.includes('### 新節22'), 'the pass sees the chapter as the passes before left it');
+    assert.equal(calls[3].instruction, undefined, 'the fix points are not asked again');
+    const detail = (await r.note(at)).detail;
+    for (const n of [21, 22, 23]) assert.ok(detail.includes(`### 新節${n}`), detail);
+    assert.equal(stageOf(r.raw(at)), 'checked', `chapter ${at} reached the minimum`);
+    assert.equal(log.split('\n').filter(line => line.includes('author_call') && line.includes(`card=${id} `) && line.includes('result=expand_pass')).length, 2);
+    assert.match(log, new RegExp(`expand_merge [^\\n]*card=${id} [^\\n]*result=written [^\\n]*pass=2 requested=\\d+ parsed=1 applied=1 [^\\n]*net=\\d+`));
+  }
+});
+
+test('expand passes: a pass that adds nothing ends the passes; the chapter keeps what it has and needs review with the length reason', async () => {
+  const seen = [];
+  const r = await lenRig();
+  r.script.author = passAuthor(r, seen, (call, id) => (id === r.nodes[1].id ? (call === 1 ? 30 : 0) : 150 + call));
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const id = r.nodes[1].id;
+  assert.equal(seen.filter(input => input.nodeId === id).length, 3, 'first draft, the fix round, one pass that added nothing: no second pass');
+  assert.ok((await r.note(1)).detail.includes('### 新節30'));
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.match((await r.note(1)).pipelineIssue, /length:under:\d+:100-200/);
+  assert.match(r.stat.logs.join('\n'), new RegExp(`expand_merge [^\\n]*card=${id} [^\\n]*result=no_edits [^\\n]*pass=1 [^\\n]*noop=1`));
+});
+
 test('T10c length expand: the redo keeps the card\'s Summary (keepSummary reaches the author only for the expansion)', async () => {
   const seen = [];
   const r = await lenRig();

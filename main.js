@@ -12717,6 +12717,7 @@ var PIPELINE_STATUSES = ["running", "stopped"];
 var DEFAULT_BUDGET_LIMIT = 300;
 var MAX_STEP_ATTEMPTS = 3;
 var MAX_AUTO_FIXES = 1;
+var BOOK_EXPAND_PASSES = 2;
 var TRIAL_SIZE = 3;
 var STEPS = ["plan", "write", "proof"];
 function readPipelineStage(value) {
@@ -14279,6 +14280,14 @@ var VAGUE_SOURCE_PATTERNS = [
   /根據(?:現有|相關|網路|網上|一些|部分|手邊|可得|公開)?的?資料|根据(?:现有|相关|网络|网上|一些|部分|手边|可得|公开)?的?资料/gu,
   /推廣(?:單位|中心|部門|處)[^。！？\n]{0,12}?(?:建議|指出|提到|提醒|強調|說明|列為|給)|推广(?:单位|中心|部门|处)[^。！？\n]{0,12}?(?:建议|指出|提到|提醒|强调|说明|列为|给)/gu,
   /(?<=^|[，。；：、！？,;:\s]|有|些|項|项)研究(?:也|都)?(?:指出|顯示|显示|發現|发现)/gmu,
+  // Missed in live v5 (each still a vague attribution): 「推廣單位都說過」, 「可以當作旁證」, 「不同來源給的／寫的」, 「不同來源的數字」,
+  // 「依園藝資料」, 「以家庭栽培資料為準」, 「農業改良場介紹」. Not flagged: 「前一章說過」, 「不同來源的水質」, 「依資料夾」, 「以實際觀察為準」, 「改良場位於桃園」.
+  /(?:單位|单位|大學|大学|機構|机构|專家|专家|學者|学者|來源|来源|網站|网站)(?:都|也|曾|都曾|也曾)?(?:說過|说过)/gu,
+  /(?:當作|当作|當成|当成|作為|作为|做為|视为|視為)旁(?:證|证)/gu,
+  /不同(?:的)?(?:來源|来源|資料|资料|網站|网站|文獻|文献)(?:給|给|寫|写|列|提供)的|不同(?:的)?(?:來源|来源|資料|资料|網站|网站|文獻|文献)(?:的|對|对)[^，。！？\n]{0,8}?(?:數字|数字|說法|说法|建議|建议|數據|数据|天數|天数)/gu,
+  /依(?:照|據|据)?(?:園藝|园艺|栽培|家庭栽培|農業|农业|一般|相關|相关|網路|网络|公開|公开)的?(?:資料|资料)(?![庫库夾夹])/gu,
+  /以[^，。！？\n]{0,6}?(?:資料|资料|來源|来源)(?:為準|为准)/gu,
+  /(?:改良場|改良场|試驗所|试验所|試驗場|试验场)[^。！？\n]{0,12}?(?:建議|建议|指出|提到|提醒|強調|强调|說明|说明|介紹|介绍|說過|说过|列為|列为)/gu,
   /\b(?:some |available |existing )?sources (?:say|suggest|indicate|show)\b/gu,
   /\baccording to (?:the |some |available |existing )?(?:data|sources|information)\b/gu,
   /(?:^|[.!?]\s+|\bsome )(?:studies|research) (?:shows?|suggests?|indicates?)\b/gmu
@@ -15208,23 +15217,37 @@ function applyChapterEdits(detail, edits) {
   const crlf = detail.includes("\r\n");
   let text10 = crlf ? detail.replace(/\r\n/g, "\n") : detail;
   let applied = 0;
+  let mismatched = 0;
   for (const edit of edits) {
     if (edit.kind !== "replace") continue;
     const region = chapterRegion(text10.split("\n"));
+    const before = applied;
     for (let from = 0; ; ) {
-      const at = text10.indexOf(edit.find, from);
-      if (at < 0) break;
-      const first = text10.slice(0, at).split("\n").length - 1;
+      const at2 = text10.indexOf(edit.find, from);
+      if (at2 < 0) break;
+      const first = text10.slice(0, at2).split("\n").length - 1;
       const count4 = edit.find.split("\n").length;
-      const end = at + edit.find.length;
-      const whole = (at === 0 || text10[at - 1] === "\n") && (end === text10.length || text10[end] === "\n");
+      const end = at2 + edit.find.length;
+      const whole = (at2 === 0 || text10[at2 - 1] === "\n") && (end === text10.length || text10[end] === "\n");
       if (whole && region.slice(first, first + count4).every(Boolean)) {
-        text10 = text10.slice(0, at) + edit.text + text10.slice(at + edit.find.length);
+        text10 = text10.slice(0, at2) + edit.text + text10.slice(at2 + edit.find.length);
         applied++;
         break;
       }
-      from = at + 1;
+      from = at2 + 1;
     }
+    if (applied > before) continue;
+    const lines = text10.split("\n");
+    const want = edit.find.split("\n").map(spaceKey);
+    const at = want.some(Boolean) ? lines.findIndex(
+      (_, i) => i + want.length <= lines.length && want.every((key4, k) => region[i + k] && spaceKey(lines[i + k]) === key4)
+    ) : -1;
+    if (at < 0) {
+      mismatched++;
+      continue;
+    }
+    text10 = [...lines.slice(0, at), ...edit.text.split("\n"), ...lines.slice(at + want.length)].join("\n");
+    applied++;
   }
   for (const edit of edits) {
     if (edit.kind !== "insert") continue;
@@ -15238,8 +15261,9 @@ function applyChapterEdits(detail, edits) {
     text10 = [...lines.slice(0, a), ...a > 0 ? [""] : [], ...edit.text.split("\n"), ...tail].join("\n");
     applied++;
   }
-  return { detail: crlf ? text10.replace(/\n/g, "\r\n") : text10, applied };
+  return { detail: crlf ? text10.replace(/\n/g, "\r\n") : text10, applied, mismatched };
 }
+var spaceKey = (line2) => line2.replace(/\s+/g, " ").trim();
 var echoKey = (text10) => text10.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 var ECHO_MIN = 12;
 var META_NOTE = /^[\s*_>]*[（(]([^（）()]*)[）)][\s*_]*$/u;
@@ -15257,7 +15281,7 @@ function isEchoedLine(line2, sent) {
   const key4 = echoKey(line2);
   return key4.length >= ECHO_MIN && echoKey(sent).includes(key4);
 }
-var dropEchoes = (text10, sent) => text10.split("\n").filter((line2) => !isEchoedLine(line2, sent)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+var dropEchoes = (text10, sent, stats) => text10.split("\n").filter((line2) => !(isEchoedLine(line2, sent) && (stats ? ++stats.echo : true))).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 function isNoOpLine(line2) {
   const text10 = line2.trim().replace(/^[>\s*_（(「『"'-]+|[\s。．.!！）)」』"'*_]+$/gu, "").trim();
   if (!text10 || Array.from(text10).length > 40) return false;
@@ -15267,14 +15291,14 @@ function isNoOpLine(line2) {
     text10
   );
 }
-var dropNoOps = (text10) => text10.split("\n").filter((line2) => !isNoOpLine(line2)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+var dropNoOps = (text10, stats) => text10.split("\n").filter((line2) => !(isNoOpLine(line2) && (stats ? ++stats.noop : true))).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 var GENERIC_HEADING = /預告|预告|沒講完|没讲完|未講完|未讲完|小細節|小细节|(?:^|[:：、\s])(?:補充|补充)(?:說明|说明|資料|资料|內容|内容)?$|^(?:其他|其它|更多細節|更多细节|補遺|补遗)$|^(?:more details|additional (?:notes?|details?|information)|miscellaneous|extra notes?|other notes?)$/iu;
 var isGenericHeading = (heading) => GENERIC_HEADING.test(
   heading.replace(/^[ \t]*#{1,6}[ \t]+/, "").replace(/[ \t]*#*[ \t]*$/, "").trim()
 );
 var PREVIEW_WORD = /預告|预告/u;
 var MAX_INSERTED_SECTIONS = 3;
-function keepOwnSections(text10, seen, scope, cap4) {
+function keepOwnSections(text10, seen, scope, cap4, stats) {
   var _a2;
   const guide = scope.role === "intro" || scope.role === "closing";
   const others = (_a2 = scope.others) != null ? _a2 : [];
@@ -15285,7 +15309,7 @@ function keepOwnSections(text10, seen, scope, cap4) {
   const flushLead = () => {
     const paragraphs = lead.join("\n").split(/\n[ \t]*\n/);
     out.push(
-      ...paragraphs.filter((paragraph) => !(guide && names3(paragraph))).join("\n\n").split("\n")
+      ...paragraphs.filter((paragraph) => !(guide && names3(paragraph) && ++stats.scope)).join("\n\n").split("\n")
     );
     lead = [];
   };
@@ -15301,7 +15325,7 @@ function keepOwnSections(text10, seen, scope, cap4) {
     const heading = lines[i];
     const section3 = lines.slice(i, end);
     const key4 = headingKey(heading);
-    const bad = seen.has(key4) || isGenericHeading(heading) || guide && (!!headingNamesChapter(heading, others) || names3(section3.join("\n")));
+    const bad = seen.has(key4) ? ++stats.repeat : isGenericHeading(heading) ? ++stats.generic : guide && (!!headingNamesChapter(heading, others) || names3(section3.join("\n"))) ? ++stats.scope : 0;
     if (!bad && cap4.left <= 0) cap4.dropped++;
     else if (!bad) {
       cap4.left--;
@@ -15345,18 +15369,56 @@ function dropProcessNotes(detail) {
   const text10 = out.join("\n");
   return { detail: crlf ? text10.replace(/\n/g, "\r\n") : text10, removed };
 }
-function expandChapterDetail(oldDetail, newDetail, language2, sent = "", scope = {}) {
+var emptyExpandStats = () => ({
+  parsed: 0,
+  applied: 0,
+  echo: 0,
+  noop: 0,
+  generic: 0,
+  repeat: 0,
+  scope: 0,
+  mismatch: 0,
+  cap: 0,
+  voice: 0
+});
+function dropVoiceSentences(text10, stats) {
+  var _a2, _b2;
+  const lines = text10.split("\n");
+  const fenced = fencedLines(lines);
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line2 = lines[i];
+    if (fenced[i] || HEADING.test(line2) || !researchVoiceHits(line2).length) {
+      out.push(line2);
+      continue;
+    }
+    const prefix = (_b2 = (_a2 = /^[ \t>]*(?:(?:[-*+]|\d+[.)])[ \t]+)?/.exec(line2)) == null ? void 0 : _a2[0]) != null ? _b2 : "";
+    const rest = sentencesOf(line2.slice(prefix.length));
+    const kept = rest.filter((sentence) => !(researchVoiceHits(sentence).length && ++stats.voice));
+    if (kept.length === rest.length) {
+      stats.voice++;
+      continue;
+    }
+    if (kept.length) out.push(prefix + kept.join(/\p{Script=Han}/u.test(line2) ? "" : " "));
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+function expandChapterDetail(oldDetail, newDetail, language2, sent = "", scope = {}, stats = emptyExpandStats()) {
   const parsed = parseChapterEdits(chapterBody(newDetail));
   if (!parsed) return void 0;
+  stats.parsed = parsed.length;
   const seen = chapterHeadingKeys(oldDetail);
   const cap4 = { left: MAX_INSERTED_SECTIONS, dropped: 0 };
   const edits = parsed.flatMap((edit) => {
-    const plain = dropNoOps(dropEchoes(edit.text, sent));
-    const text10 = edit.kind === "insert" ? keepOwnSections(plain, seen, scope, cap4) : plain;
+    const plain = dropVoiceSentences(dropNoOps(dropEchoes(edit.text, sent, stats), stats), stats);
+    const text10 = edit.kind === "insert" ? keepOwnSections(plain, seen, scope, cap4, stats) : plain;
     if (!text10 && (edit.kind === "insert" || edit.text.trim())) return [];
     return [{ ...edit, text: text10 }];
   });
+  stats.cap = cap4.dropped;
   const done = applyChapterEdits(oldDetail, edits);
+  stats.applied = done.applied;
+  stats.mismatch = done.mismatched;
   if (!done.applied) return void 0;
   const lines = newDetail.split("\n");
   const section3 = findSection(lines, fencedLines(lines), (text10) => isSourcesHeading(text10));
@@ -15412,6 +15474,10 @@ function effectiveSettings(current, decided) {
   }
   return out;
 }
+var BOOK_VOICE_RULES = [
+  "- The chapter text reads as a finished book: never write research or process notes in it (what was searched, what was or was not found, that the data is insufficient, what still has to be checked). Such notes belong only in the open-questions or notes sections the template adds after the chapter text.",
+  `- State facts as the book's own: never attribute them in the text to a vague source (\u300C\u6709\u8CC7\u6599\u6307\u51FA\u300D\u300C\u7814\u7A76\u6307\u51FA\u300D\u300C\u67D0\u5927\u5B78\u63A8\u5EE3\u55AE\u4F4D\u5EFA\u8B70\u300D\u300C\u8FB2\u696D\u6539\u826F\u5834\u7684\u8CC7\u6599\u6307\u51FA\u300D\u300C\u4E0D\u540C\u4F86\u6E90\u7D66\u7684\u300D\u300C\u4F9D\u5712\u85DD\u8CC7\u6599\u300D\u300C\u53EF\u4EE5\u7576\u4F5C\u65C1\u8B49\u300D, "sources say"); the source goes in the sources section.`
+];
 var BOOK_AUTHOR_RULES = [
   "Chapter writing rules (follow them):",
   "- Write the chapter as the role named in the brief says.",
@@ -15419,8 +15485,7 @@ var BOOK_AUTHOR_RULES = [
   "- Open by picking up the brief's entry point (how this chapter continues from the previous card).",
   "- End with one sentence that leads into the next card, taking up the question the brief leaves for it. If the brief has no next card (the last card), do not lead into a next card; close the whole book as the brief says.",
   "- The closing sentence belongs to the last paragraph of the chapter's own text, before any open-questions, sources or notes sections the template adds; those sections are not the chapter's ending.",
-  "- The chapter text reads as a finished book: never write research or process notes in it (what was searched, what was or was not found, that the data is insufficient, what still has to be checked). Such notes belong only in the open-questions or notes sections the template adds after the chapter text.",
-  `- State facts as the book's own: never attribute them in the text to a vague source (\u300C\u6709\u8CC7\u6599\u6307\u51FA\u300D\u300C\u7814\u7A76\u6307\u51FA\u300D\u300C\u67D0\u5927\u5B78\u63A8\u5EE3\u55AE\u4F4D\u5EFA\u8B70\u300D\u300C\u8FB2\u696D\u6539\u826F\u5834\u7684\u8CC7\u6599\u6307\u51FA\u300D, "sources say"); the source goes in the sources section.`,
+  ...BOOK_VOICE_RULES,
   "- An intro chapter is a guide only: at most one or two sentences of preview for each later chapter, no section of its own for a later chapter, and none of a later chapter's details (numbers, steps, tables).",
   "- Never write image links or Markdown images yourself; the system searches for pictures after the writing and embeds the verified ones itself.",
   "- Image slots: when an image plan is given below, put one marker for each slot on a line of its own, right after the paragraph the slot belongs to (its position), in exactly this form: \u3014\u5716\u4F4D n\uFF1Awhat the picture explains\u3015 (n is the slot number; copy the wording of what it explains from the plan). One marker per slot, each number once; do not invent, repeat, merge or reword markers; never put a marker inside a code block or a quote, or inside a sentence. The chapter must read in full without the markers. When no image plan is given, or it lists no slot, leave no marker at all.",
@@ -15470,6 +15535,8 @@ function bookExpandRequirements(settings, body, length, instruction, scope = {})
     "- `@@insert after: <an existing heading of the chapter, copied exactly>`, then the new paragraphs or ### sections that go at the end of that section. `@@insert` alone puts the text before the chapter's last section, so the chapter's ending stays last.",
     "- `@@replace`, then one passage of whole lines copied exactly from the chapter, then a line `@@with`, then the corrected passage (nothing after `@@with` deletes the passage). Use it only for the points to correct listed below.",
     "The program puts the blocks into the chapter; text outside a block is ignored. Keep the chapter's voice and terms. No picture markers, no image links, no update log, and no notes about where the text goes or how the chapter is built.",
+    `Voice of every new or corrected line (hard requirement; the program drops a new sentence that breaks it):
+${BOOK_VOICE_RULES.join("\n")}`,
     `New ### headings (hard requirement): each names a concrete point of this chapter's own plan that the chapter has not written yet, is unique in the chapter, and is never generic (no \u300C\u88DC\u5145\u300D, \u300C\u5C0F\u7D30\u7BC0\u300D, \u300C\u9810\u544A\u88E1\u6C92\u8B1B\u5B8C\u7684\u2026\u300D, "more details"). If there is nothing to add, return no block at all, never a sentence such as \u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D. The program drops generic or repeated headings and such lines.`,
     ...expandScopeLines(scope),
     ...lines.length ? [`Whole-book settings (follow them; the length is handled above):
@@ -53167,10 +53234,23 @@ function avoidSourcesInstruction(addresses) {
 var FIX_INSTRUCTION_MAX = 1e3;
 var FIX_ITEM_MAX = 140;
 var FIX_AVOID_MAX = 450;
+var FIX_VOICE_MAX = 520;
+var FIX_VOICE_SENTENCE_MAX = 240;
 var oneLine2 = (value, max) => Array.from(value.replace(/\s+/g, " ").trim()).slice(0, max).join("");
-function proofFixInstruction(items, checklist, length) {
+function proofFixInstruction(items, checklist, length, voice = []) {
   const failed = items.filter((item) => item.type === "fact" && item.status === "unmet");
-  const structure2 = items.filter((item) => item.type !== "fact" && item.status === "unmet").sort((a, b) => Number(isBookCheckId(b.id)) - Number(isBookCheckId(a.id)));
+  const voiceUnmet = items.some((item) => item.id === BOOK_CHECK_IDS.voice && item.status === "unmet");
+  const voiceIntro = "These sentences of the chapter attribute a fact to a vague source or carry research voice (JSON strings, each a whole sentence): for each, @@replace the whole line that holds it, copied exactly, with that line stating the fact as the book's own (or without the sentence); the source belongs only in the sources section. ";
+  const quoted2 = [];
+  let voiceRoom = FIX_VOICE_MAX - voiceIntro.length;
+  for (const sentence of voiceUnmet ? voice : []) {
+    const point = JSON.stringify(oneLine2(sentence, FIX_VOICE_SENTENCE_MAX));
+    if (point.length + 1 > voiceRoom) continue;
+    quoted2.push(point);
+    voiceRoom -= point.length + 1;
+  }
+  const voicePiece = quoted2.length ? voiceIntro + quoted2.join(" ") + " " : "";
+  const structure2 = items.filter((item) => item.type !== "fact" && item.status === "unmet").filter((item) => !(voicePiece && item.id === BOOK_CHECK_IDS.voice)).sort((a, b) => Number(isBookCheckId(b.id)) - Number(isBookCheckId(a.id)));
   let sources = cleanAvoidSources(
     items.filter((item) => item.type === "fact" && item.status !== "met").flatMap((item) => item.sources)
   );
@@ -53179,7 +53259,7 @@ function proofFixInstruction(items, checklist, length) {
   const lead = "The chapter failed the fact check on these points (JSON strings; correct each with a @@replace block so it is correct and supported): ";
   const leadStructure2 = "The chapter did not meet these structure points of its checklist (JSON strings; cover them in the chapter text with @@insert or @@replace blocks, not in the sources list): ";
   const lengthPiece = length ? length.kind === "under" ? `The chapter came out at only ${length.measured} ${length.unit}, short of the asked ${length.min} to ${length.max} ${length.unit}: add about ${lengthNeeded(length)} ${length.unit} of new text in @@insert blocks as the expansion rules say; keep every checklist point. ` : `The chapter is ${length.measured} ${length.unit} long, over the asked ${length.min} to ${length.max} ${length.unit}: shorten it to at most ${length.max} ${length.unit}, about ${lengthTarget(length)} ${length.unit}, with @@replace blocks; keep every checklist point and every picture. ` : "";
-  let room = FIX_INSTRUCTION_MAX - avoid.length - 1 - lengthPiece.length;
+  let room = FIX_INSTRUCTION_MAX - avoid.length - 1 - lengthPiece.length - voicePiece.length;
   const piece = (list2, intro) => {
     var _a2, _b2;
     const before = room;
@@ -53196,7 +53276,7 @@ function proofFixInstruction(items, checklist, length) {
     if (!points.length) room = before;
     return points.length ? intro + points.join(" ") + " " : "";
   };
-  const text10 = piece(failed, lead) + piece(structure2, leadStructure2) + lengthPiece;
+  const text10 = voicePiece + piece(failed, lead) + piece(structure2, leadStructure2) + lengthPiece;
   return neutralizeText(text10 + avoid);
 }
 function cardResultSnapshot(stage, issue2, detail) {
@@ -54871,7 +54951,15 @@ var BookPipelineRuns = class {
       const done = await drive.store.commit((state) => reopenTrialFix(state, id));
       if (!(done == null ? void 0 : done.accepted)) continue;
       const items = ((_c = proof == null ? void 0 : proof.items) != null ? _c : []).map((item) => ({ ...item, sources: [...item.sources] }));
-      drive.fixable.set(id, proofFixInstruction(items, [...parseChecklist(card.prompt), ...BOOK_CHECKS], length));
+      drive.fixable.set(
+        id,
+        proofFixInstruction(
+          items,
+          [...parseChecklist(card.prompt), ...BOOK_CHECKS],
+          length,
+          researchVoiceSentences(chapterBody(card.detail))
+        )
+      );
       drive.expand.add(id);
     }
   }
@@ -55129,7 +55217,7 @@ var BookPipelineRuns = class {
     return { kind: "ok", after: () => this.setStage(drive, nodeId, "planned", null) };
   }
   async execWrite(drive, token, nodeId) {
-    var _a2, _b2, _c;
+    var _a2, _b2;
     const signal = drive.controller.signal;
     const info = drive.cards.get(nodeId);
     const rootInfo = drive.cards.get(drive.rootId);
@@ -55183,8 +55271,8 @@ var BookPipelineRuns = class {
     const slots = parseImageSlots(card.prompt);
     const settings = effectiveSettings(root.settings, parseBookPlanDecisions(root.raw));
     const expanding = drive.avoid.has(nodeId) && drive.expand.has(nodeId);
-    const oldBody = chapterBody(card.detail);
-    const now = expanding ? lengthReason(settings.length, lengthBody(oldBody), void 0, true) : void 0;
+    let oldBody = chapterBody(card.detail);
+    let now = expanding ? lengthReason(settings.length, lengthBody(oldBody), void 0, true) : void 0;
     const scope = {
       role: info.role,
       others: effectiveOrder(drive.store.state).flatMap(
@@ -55194,10 +55282,12 @@ var BookPipelineRuns = class {
         }
       )
     };
-    const requirements = expanding ? bookExpandRequirements(settings, oldBody, now, drive.extra.get(nodeId), scope) : void 0;
-    const oldDetail = expanding ? detailBlockOf(card.raw) : void 0;
+    let requirements = expanding ? bookExpandRequirements(settings, oldBody, now, drive.extra.get(nodeId), scope) : void 0;
+    let oldDetail = expanding ? detailBlockOf(card.raw) : void 0;
     let noEdits = false;
     let lostText = false;
+    let stats = emptyExpandStats();
+    let net = 0;
     const expand2 = (content) => {
       const next = detailBlockOf(content);
       if (oldDetail === void 0 || next === void 0) return content;
@@ -55206,7 +55296,8 @@ var BookPipelineRuns = class {
         next,
         drive.config.language,
         fixInstructionText(requirements != null ? requirements : ""),
-        scope
+        scope,
+        stats
       );
       if (!merged) {
         noEdits = true;
@@ -55236,9 +55327,10 @@ ${oldBody}`).some((url) => !pictures.has(url)) || (short == null ? void 0 : shor
         lostText = true;
         return null;
       }
+      net = Array.from(body).length - Array.from(oldBody).length;
       return replaceDetailBlock(content, merged.detail);
     };
-    const knownLines = new Set(card.raw.split("\n"));
+    let knownLines = new Set(card.raw.split("\n"));
     const ownRecords = extractProofRecords(normalizeWorkRecords(card.detail)).map(quoteAll);
     let unsafe = false;
     let unsafeRule = "";
@@ -55295,51 +55387,80 @@ ${oldDetail}`);
       return stampRaw(merged);
     };
     const attempt = attemptsOf(drive.store.state, nodeId).write;
-    this.ports.log(
-      formatPipelineLog({
-        event: "author_call",
-        runId: token.runId,
-        card: nodeId,
-        step: "write",
-        attempt,
-        result: ((_a2 = drive.rerun) == null ? void 0 : _a2.nodeId) === nodeId ? "rerun" : expanding ? "fix_round" : drive.avoid.has(nodeId) ? "source_swap" : attempt > 1 ? "retry" : "first_draft",
-        ms: 0,
-        counts: { round: autoFixesOf(drive.store.state, nodeId) }
-      })
-    );
-    const done = await untilAborted(
-      signal,
-      this.ports.author({
-        mapPath: drive.mapPath,
-        nodeId,
-        path: info.path,
-        settings,
-        slots: expanding ? [] : slots != null ? slots : [],
-        language: drive.config.language,
-        model: drive.config.authorModel,
-        reasoning: drive.config.reasoning,
-        ...drive.avoid.has(nodeId) ? { instruction: drive.extra.get(nodeId) } : {},
-        ...requirements !== void 0 ? { keepSummary: true, requirements } : {},
-        ...drive.ownSummary.has(nodeId) ? { keepSummary: true } : {},
-        signal,
-        admission: drive.admission,
-        authorize: authorizeWrite,
-        finalize
-      })
-    );
-    if (changedByHand) return { kind: "failed", reason: "hand_edited", forceReview: true };
-    if (unsafe) {
+    const callAuthor = (pass) => {
+      var _a3;
       this.ports.log(
         formatPipelineLog({
-          event: "write_refused",
+          event: "author_call",
           runId: token.runId,
           card: nodeId,
           step: "write",
-          attempt: attemptsOf(drive.store.state, nodeId).write,
-          result: unsafeRule || "unknown",
-          ms: 0
+          attempt,
+          result: pass ? "expand_pass" : ((_a3 = drive.rerun) == null ? void 0 : _a3.nodeId) === nodeId ? "rerun" : expanding ? "fix_round" : drive.avoid.has(nodeId) ? "source_swap" : attempt > 1 ? "retry" : "first_draft",
+          ms: 0,
+          counts: { round: autoFixesOf(drive.store.state, nodeId), ...pass ? { pass } : {} }
         })
       );
+      return untilAborted(
+        signal,
+        this.ports.author({
+          mapPath: drive.mapPath,
+          nodeId,
+          path: info.path,
+          settings,
+          slots: expanding ? [] : slots != null ? slots : [],
+          language: drive.config.language,
+          model: drive.config.authorModel,
+          reasoning: drive.config.reasoning,
+          ...drive.avoid.has(nodeId) && !pass ? { instruction: drive.extra.get(nodeId) } : {},
+          ...requirements !== void 0 ? { keepSummary: true, requirements } : {},
+          ...drive.ownSummary.has(nodeId) ? { keepSummary: true } : {},
+          signal,
+          admission: drive.admission,
+          authorize: authorizeWrite,
+          finalize
+        })
+      );
+    };
+    const logMerge = (pass, outcome) => {
+      if (!expanding) return;
+      const ok = !unsafe && !noEdits && !lostText && !emptyBody && outcome === "written";
+      this.ports.log(
+        formatPipelineLog({
+          event: "expand_merge",
+          runId: token.runId,
+          card: nodeId,
+          step: "write",
+          attempt,
+          result: unsafe ? "unsafe" : noEdits ? "no_edits" : lostText ? "lost_text" : emptyBody ? "no_body" : outcome,
+          ms: 0,
+          counts: {
+            pass,
+            requested: (now == null ? void 0 : now.kind) === "under" ? lengthNeeded(now) : 0,
+            ...stats,
+            unsafe: unsafe ? 1 : 0,
+            net: ok ? Math.max(net, 0) : 0,
+            cut: ok ? Math.max(-net, 0) : 0
+          }
+        })
+      );
+    };
+    const logRefused = () => this.ports.log(
+      formatPipelineLog({
+        event: "write_refused",
+        runId: token.runId,
+        card: nodeId,
+        step: "write",
+        attempt: attemptsOf(drive.store.state, nodeId).write,
+        result: unsafeRule || "unknown",
+        ms: 0
+      })
+    );
+    const done = await callAuthor(0);
+    logMerge(0, done.outcome);
+    if (changedByHand) return { kind: "failed", reason: "hand_edited", forceReview: true };
+    if (unsafe) {
+      logRefused();
       return { kind: "failed", reason: "unsafe_body", forceReview: true };
     }
     if (noEdits) return { kind: "failed", reason: "fix_no_edits", forceReview: true };
@@ -55349,6 +55470,31 @@ ${oldDetail}`);
     if (done.outcome === "cancelled") return { kind: "cancelled" };
     if (done.outcome === "failed") return { kind: "failed", reason: done.reason };
     if (done.outcome === "discarded") return { kind: "failed", reason: "discarded" };
+    for (let pass = 1; expanding && (now == null ? void 0 : now.kind) === "under" && pass <= BOOK_EXPAND_PASSES; pass++) {
+      const at = await this.stillOnMap(drive, nodeId);
+      if (!at) break;
+      const latest = await this.ports.readCard(at);
+      const body = chapterBody(latest.detail);
+      const short = lengthReason(settings.length, lengthBody(body), void 0, true);
+      if ((short == null ? void 0 : short.kind) !== "under" || short.measured <= now.measured) break;
+      oldBody = body;
+      now = short;
+      oldDetail = detailBlockOf(latest.raw);
+      requirements = bookExpandRequirements(settings, body, short, void 0, scope);
+      knownLines = new Set(latest.raw.split("\n"));
+      noEdits = lostText = unsafe = emptyBody = false;
+      unsafeRule = "";
+      stats = emptyExpandStats();
+      net = 0;
+      const more = await callAuthor(pass);
+      logMerge(pass, more.outcome);
+      if (changedByHand) return { kind: "failed", reason: "hand_edited", forceReview: true };
+      if (unsafe) logRefused();
+      if (unsafe || noEdits || lostText || emptyBody) break;
+      if (more.outcome === "cancelled") return { kind: "cancelled" };
+      if (more.outcome === "discarded") return { kind: "failed", reason: "discarded" };
+      if (more.outcome !== "written") break;
+    }
     drive.authorModels.set(nodeId, drive.config.authorModel);
     const path = await this.stillOnMap(drive, nodeId);
     if (!path) return { kind: "failed", reason: "card_removed" };
@@ -55387,7 +55533,7 @@ ${oldDetail}`);
       if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
     }
     drive.sub.set(nodeId, { step: "images", startedAt: Date.parse(this.ports.now()) });
-    (_c = (_b2 = this.ports).progressed) == null ? void 0 : _c.call(_b2, drive.mapPath);
+    (_b2 = (_a2 = this.ports).progressed) == null ? void 0 : _b2.call(_a2, drive.mapPath);
     const filled = expanding ? await this.settleStrayMarkers(path, authorize) : await this.fillSlots(drive, token, nodeId, path, slots, authorize);
     if (filled) return filled;
     drive.imagesDone.add(nodeId);
@@ -55854,7 +56000,10 @@ ${oldDetail}`);
         const rewrite = verdict.aggregate === "needs-review" || !!length;
         const stage = rewrite || pictureIssue ? "needs-review" : "checked";
         if (rewrite && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0) {
-          drive.fixable.set(nodeId, proofFixInstruction(verdict.items, [...checklist, ...BOOK_CHECKS], length));
+          drive.fixable.set(
+            nodeId,
+            proofFixInstruction(verdict.items, [...checklist, ...BOOK_CHECKS], length, researchVoiceSentences(chapter))
+          );
           drive.expand.add(nodeId);
         } else if (!drive.job) {
           drive.extra.delete(nodeId);
@@ -69491,7 +69640,6 @@ var BOOK_STEP_SECONDS = {
 };
 var BOOK_IMAGE_SEARCHES = 2;
 var BOOK_IMAGE_CALLS_PER_SEARCH = 2;
-var BOOK_EXPAND_PASSES = 2;
 function bookChapterCalls() {
   const writes = 1 + MAX_AUTO_FIXES;
   return {

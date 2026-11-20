@@ -505,3 +505,26 @@ test('T4 proofFixInstruction: a long note or many points never leave an unclosed
   assert.doesNotMatch(hidden, /\[!vam-book\]/i);
   assert.equal(R.proofFixInstruction([], []).includes('failed the fact check'), false);
 });
+
+test('proofFixInstruction (live v5): with V1 unmet the chapter\'s research-voice sentences go first, whole (not cut to 60 characters), before the fact points; without them the V1 note stays', () => {
+  const R = S.load('experiences/visual-map/book-pipeline-rerun.ts');
+  const { BOOK_CHECKS, researchVoiceSentences } = S.load('core/book-pipeline/prose-checks.ts');
+  const long = '美國馬里蘭大學推廣單位的容器蔬菜表，把小番茄、青蔥和小白菜各自建議的最小盆量都列了出來，而且數字和前面的建議相差不遠，可以當作旁證。';
+  assert.ok(Array.from(long).length > 60);
+  const body = `盆子要夠大。${long}\n\n不同來源寫的天數略有差異。`;
+  const voice = researchVoiceSentences(body);
+  assert.deepEqual([...voice], [long, '不同來源寫的天數略有差異。']);
+  const items = [
+    { id: 'C1', type: 'fact', status: 'unmet', note: 'WRONGDATE', sources: [] },
+    { id: 'V1', type: 'structure', status: 'unmet', note: 'Remove: 「美國馬里蘭大學推廣單位的容器蔬菜表…」', sources: [] }
+  ];
+  const line = R.proofFixInstruction(items, [{ id: 'C1', text: 'date' }, ...BOOK_CHECKS], undefined, voice);
+  assert.ok(line.includes(JSON.stringify(long)), line);
+  assert.ok(line.indexOf(long) < line.indexOf('WRONGDATE'), 'the V1 sentences come before the fact points');
+  assert.ok(!line.includes('Remove: '), 'the cut V1 note is replaced by the whole sentences');
+  assert.ok(line.length <= 1000);
+  const met = R.proofFixInstruction([{ ...items[1], status: 'met' }], [...BOOK_CHECKS], undefined, voice);
+  assert.ok(!met.includes(long), 'V1 met: no sentences');
+  const noVoice = R.proofFixInstruction(items, [{ id: 'C1', text: 'date' }, ...BOOK_CHECKS]);
+  assert.ok(noVoice.includes('Remove: '), 'no sentences given: the note stays');
+});

@@ -13,7 +13,13 @@ import {
 import { NOTE_LANGUAGES, translate, translateNote, type ContentLanguage } from "../../i18n";
 import type { BookRole } from "./model";
 import { isBookPlanTitle } from "./plan-text";
-import { headingNamesChapter, isProcessNoteSentence, sentencesOf, sentenceNamesChapters } from "./prose-checks";
+import {
+  headingNamesChapter,
+  isProcessNoteSentence,
+  researchVoiceHits,
+  sentencesOf,
+  sentenceNamesChapters
+} from "./prose-checks";
 import { demoteHeadings } from "./text";
 import { findProofModels, findProofRecord, PROOF_STATUSES, type ProofItemResult, type ProofResult } from "./proof";
 
@@ -1112,13 +1118,18 @@ function insertAt(lines: string[], after: string | undefined): number {
  * A Detail with the change blocks put in by the program: every exact passage of whole lines replaced once (only inside the chapter text), then every
  * insertion placed. The hidden records, the program's callouts, the picture section and the system's sections stay as they are.
  */
-export function applyChapterEdits(detail: string, edits: readonly ChapterEdit[]): { detail: string; applied: number } {
+export function applyChapterEdits(
+  detail: string,
+  edits: readonly ChapterEdit[]
+): { detail: string; applied: number; mismatched: number } {
   const crlf = detail.includes("\r\n");
   let text = crlf ? detail.replace(/\r\n/g, "\n") : detail;
   let applied = 0;
+  let mismatched = 0;
   for (const edit of edits) {
     if (edit.kind !== "replace") continue;
     const region = chapterRegion(text.split("\n"));
+    const before = applied;
     for (let from = 0; ;) {
       const at = text.indexOf(edit.find, from);
       if (at < 0) break;
@@ -1134,6 +1145,22 @@ export function applyChapterEdits(detail: string, edits: readonly ChapterEdit[])
       }
       from = at + 1;
     }
+    if (applied > before) continue;
+    // No exact copy: the same whole lines with their whitespace normalised (the author re-spaced a sentence it quoted, live v5).
+    const lines = text.split("\n");
+    const want = edit.find.split("\n").map(spaceKey);
+    const at = want.some(Boolean)
+      ? lines.findIndex(
+          (_, i) =>
+            i + want.length <= lines.length && want.every((key, k) => region[i + k] && spaceKey(lines[i + k]) === key)
+        )
+      : -1;
+    if (at < 0) {
+      mismatched++;
+      continue;
+    }
+    text = [...lines.slice(0, at), ...edit.text.split("\n"), ...lines.slice(at + want.length)].join("\n");
+    applied++;
   }
   for (const edit of edits) {
     if (edit.kind !== "insert") continue;
@@ -1147,8 +1174,9 @@ export function applyChapterEdits(detail: string, edits: readonly ChapterEdit[])
     text = [...lines.slice(0, a), ...(a > 0 ? [""] : []), ...edit.text.split("\n"), ...tail].join("\n");
     applied++;
   }
-  return { detail: crlf ? text.replace(/\n/g, "\r\n") : text, applied };
+  return { detail: crlf ? text.replace(/\n/g, "\r\n") : text, applied, mismatched };
 }
+const spaceKey = (line: string): string => line.replace(/\s+/g, " ").trim();
 
 /** Letters and digits only (NFKC, lower case): how an echoed line is compared with the request text. */
 const echoKey = (text: string): string =>
@@ -1181,10 +1209,10 @@ export function isEchoedLine(line: string, sent: string): boolean {
   const key = echoKey(line);
   return key.length >= ECHO_MIN && echoKey(sent).includes(key);
 }
-const dropEchoes = (text: string, sent: string): string =>
+const dropEchoes = (text: string, sent: string, stats?: ExpandStats): string =>
   text
     .split("\n")
-    .filter(line => !isEchoedLine(line, sent))
+    .filter(line => !(isEchoedLine(line, sent) && (stats ? ++stats.echo : true)))
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -1208,10 +1236,10 @@ export function isNoOpLine(line: string): boolean {
     )
   );
 }
-const dropNoOps = (text: string): string =>
+const dropNoOps = (text: string, stats?: ExpandStats): string =>
   text
     .split("\n")
-    .filter(line => !isNoOpLine(line))
+    .filter(line => !(isNoOpLine(line) && (stats ? ++stats.noop : true)))
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -1244,7 +1272,8 @@ function keepOwnSections(
   text: string,
   seen: Set<string>,
   scope: ExpandScope,
-  cap: { left: number; dropped: number }
+  cap: { left: number; dropped: number },
+  stats: ExpandStats
 ): string {
   const guide = scope.role === "intro" || scope.role === "closing";
   const others = scope.others ?? [];
@@ -1256,7 +1285,7 @@ function keepOwnSections(
     const paragraphs = lead.join("\n").split(/\n[ \t]*\n/);
     out.push(
       ...paragraphs
-        .filter(paragraph => !(guide && names(paragraph)))
+        .filter(paragraph => !(guide && names(paragraph) && ++stats.scope))
         .join("\n\n")
         .split("\n")
     );
@@ -1274,10 +1303,13 @@ function keepOwnSections(
     const heading = lines[i];
     const section = lines.slice(i, end);
     const key = headingKey(heading);
-    const bad =
-      seen.has(key) ||
-      isGenericHeading(heading) ||
-      (guide && (!!headingNamesChapter(heading, others) || names(section.join("\n"))));
+    const bad = seen.has(key)
+      ? ++stats.repeat
+      : isGenericHeading(heading)
+        ? ++stats.generic
+        : guide && (!!headingNamesChapter(heading, others) || names(section.join("\n")))
+          ? ++stats.scope
+          : 0;
     if (!bad && cap.left <= 0) cap.dropped++;
     else if (!bad) {
       cap.left--;
@@ -1336,6 +1368,65 @@ export function dropProcessNotes(detail: string): { detail: string; removed: str
 }
 
 /**
+ * What one in-place redo did with the author's answer, for its log line: blocks parsed and applied, and what was left out per rule
+ * (echoed request lines, "nothing added" lines, generic or repeated headings, sections or paragraphs about another chapter in an
+ * intro or closing, replacements whose lines were not found, sections over the cap, research-voice or vague-source sentences).
+ */
+export interface ExpandStats {
+  parsed: number;
+  applied: number;
+  echo: number;
+  noop: number;
+  generic: number;
+  repeat: number;
+  scope: number;
+  mismatch: number;
+  cap: number;
+  voice: number;
+}
+export const emptyExpandStats = (): ExpandStats => ({
+  parsed: 0,
+  applied: 0,
+  echo: 0,
+  noop: 0,
+  generic: 0,
+  repeat: 0,
+  scope: 0,
+  mismatch: 0,
+  cap: 0,
+  voice: 0
+});
+/**
+ * New text without its research-voice or vague-source sentences (live v5: 6 of 7 vague attributions came in with the expansion):
+ * each such sentence of a non-heading line goes, a line left empty goes; `stats.voice` counts them. Fenced lines stay.
+ */
+function dropVoiceSentences(text: string, stats: ExpandStats): string {
+  const lines = text.split("\n");
+  const fenced = fencedLines(lines);
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (fenced[i] || HEADING.test(line) || !researchVoiceHits(line).length) {
+      out.push(line);
+      continue;
+    }
+    const prefix = /^[ \t>]*(?:(?:[-*+]|\d+[.)])[ \t]+)?/.exec(line)?.[0] ?? "";
+    const rest = sentencesOf(line.slice(prefix.length));
+    const kept = rest.filter(sentence => !(researchVoiceHits(sentence).length && ++stats.voice));
+    // A hit that spans sentences (none of them alone matches): the whole line goes.
+    if (kept.length === rest.length) {
+      stats.voice++;
+      continue;
+    }
+    if (kept.length) out.push(prefix + kept.join(/\p{Script=Han}/u.test(line) ? "" : " "));
+  }
+  return out
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
  * The automatic redo of a chapter, done by the program: the author's answer (`newDetail`, already cleaned) carries only change blocks,
  * which go into the chapter as it was (`oldDetail`); the source entries the answer added join the chapter's Sources section. Lines that
  * echo the request (`sent`, see {@link isEchoedLine}) or only say nothing was added ({@link isNoOpLine}) are left out of every block, and an
@@ -1348,20 +1439,25 @@ export function expandChapterDetail(
   newDetail: string,
   language: string,
   sent = "",
-  scope: ExpandScope = {}
+  scope: ExpandScope = {},
+  stats: ExpandStats = emptyExpandStats()
 ): { detail: string; applied: number; dropped: number } | undefined {
   const parsed = parseChapterEdits(chapterBody(newDetail));
   if (!parsed) return undefined;
+  stats.parsed = parsed.length;
   const seen = chapterHeadingKeys(oldDetail);
   const cap = { left: MAX_INSERTED_SECTIONS, dropped: 0 };
   const edits = parsed.flatMap((edit): ChapterEdit[] => {
-    const plain = dropNoOps(dropEchoes(edit.text, sent));
-    const text = edit.kind === "insert" ? keepOwnSections(plain, seen, scope, cap) : plain;
+    const plain = dropVoiceSentences(dropNoOps(dropEchoes(edit.text, sent, stats), stats), stats);
+    const text = edit.kind === "insert" ? keepOwnSections(plain, seen, scope, cap, stats) : plain;
     // An insertion that was only an echo is no insertion; a replacement that became empty would delete the passage, so it goes too.
     if (!text && (edit.kind === "insert" || edit.text.trim())) return [];
     return [{ ...edit, text }];
   });
+  stats.cap = cap.dropped;
   const done = applyChapterEdits(oldDetail, edits);
+  stats.applied = done.applied;
+  stats.mismatch = done.mismatched;
   if (!done.applied) return undefined;
   const lines = newDetail.split("\n");
   const section = findSection(lines, fencedLines(lines), text => isSourcesHeading(text));

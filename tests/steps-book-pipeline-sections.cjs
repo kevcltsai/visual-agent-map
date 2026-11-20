@@ -484,3 +484,48 @@ test('lengthReason: the first verdict keeps the 0.8x / 1.2x tolerance; after the
   assert.equal(lengthReason('100-200 字', '好'.repeat(230), undefined, true)?.kind, 'over', 'strict holds the maximum itself too (owner decision, book reverify 3)');
   assert.equal(lengthReason('100-200 字', '好'.repeat(200), undefined, true), undefined, 'the maximum itself is allowed');
 });
+
+test('V1 (live v5): every expand or fix request carries the author voice rules (no research voice, no vague source), the first draft keeps them too', () => {
+  const { bookExpandRequirements, bookAuthorRequirements, BOOK_VOICE_RULES } = load('core/book-pipeline/settings.ts');
+  const under = bookExpandRequirements({}, '內容', { kind: 'under', measured: 10, min: 100, max: 200, unit: '字', version: 1 });
+  const fix = bookExpandRequirements({}, '內容', undefined, 'POINTS');
+  for (const text of [under, fix, bookAuthorRequirements({})])
+    for (const rule of BOOK_VOICE_RULES) assert.ok(text.includes(rule), text);
+  assert.match(fix, /never attribute them in the text to a vague source/);
+  assert.ok(fix.indexOf('never attribute them') < fix.indexOf('<<<CHAPTER'), 'the rules are instructions, before the chapter data');
+});
+
+test('V1 merge (live v5): a newly inserted or replaced sentence with a vague source or research voice is dropped (the rest of its line stays) and counted; the stats name what each rule dropped', () => {
+  const { expandChapterDetail, emptyExpandStats } = sections;
+  const old = ['## 開場', '', '開場段落。', '', '### 土壤', '', '土壤段落。', '', '### 小結', '', '結尾一句。'].join('\n');
+  const answer = [
+    '@@insert after: ### 土壤',
+    '### 盆子大小', '',
+    '盆子至少要深二十公分。不同來源給的最低盆量不完全一樣。根要有地方長。',
+    '美國華盛頓州立大學、伊利諾大學的推廣單位都說過類似的觀念。',
+    '', '### 補充', '', '補充段落。',
+    '@@insert after: ### 土壤', '本次無新增內容。',
+    '@@replace', '土壤段落。', '@@with', '土壤要鬆。依園藝資料，有些品種寫得更長。',
+    '@@replace', '不在章節裡的一行。', '@@with', '無效。'
+  ].join('\n');
+  const stats = emptyExpandStats();
+  const merged = expandChapterDetail(old, answer, 'zh-TW', '', {}, stats);
+  assert.ok(merged);
+  const detail = merged.detail;
+  assert.ok(detail.includes('盆子至少要深二十公分。根要有地方長。'), detail);
+  assert.ok(detail.includes('土壤要鬆。') && !detail.includes('依園藝資料'), detail);
+  for (const gone of ['不同來源給的', '都說過', '### 補充', '本次無新增內容']) assert.ok(!detail.includes(gone), gone);
+  assert.deepEqual({ ...stats }, { parsed: 4, applied: 2, echo: 0, noop: 1, generic: 1, repeat: 0, scope: 0, mismatch: 1, cap: 0, voice: 3 });
+});
+
+test('@@replace matches the chapter lines after whitespace normalisation (a re-spaced copy still replaces whole lines only)', () => {
+  const { applyChapterEdits } = sections;
+  const old = ['## 開場', '', '有資料指出，小白菜  覆土約 0.3 公分。', '', '結尾。'].join('\n');
+  const done = applyChapterEdits(old, [{ kind: 'replace', find: '有資料指出，小白菜 覆土約 0.3 公分。  ', text: '小白菜覆土約 0.3 公分。' }]);
+  assert.equal(done.applied, 1);
+  assert.equal(done.mismatched, 0);
+  assert.ok(done.detail.includes('\n小白菜覆土約 0.3 公分。\n') && !done.detail.includes('有資料指出'), done.detail);
+  const part = applyChapterEdits(old, [{ kind: 'replace', find: '有資料指出，', text: 'X' }]);
+  assert.equal(part.applied, 0, 'part of a line is never a match');
+  assert.equal(part.mismatched, 1);
+});

@@ -255,6 +255,20 @@ test('prose checks (live v4): citation-style vague sources are research voice (�
     assert.deepEqual(hit(text), [], text);
 });
 
+test('prose checks (live v5): the vague attributions the v5 run missed are research voice (說過, 旁證, 不同來源給的／寫的, 依園藝資料, 以栽培資料為準, 改良場介紹); ordinary prose with the same words is not', () => {
+  const hit = text => plain(prose.researchVoiceHits(text));
+  assert.deepEqual(hit('美國華盛頓州立大學、伊利諾大學的推廣單位都說過類似的觀念。'), ['單位都說過']);
+  assert.deepEqual(hit('美國馬里蘭大學推廣單位的容器蔬菜表也列出相近的數字，可以當作旁證。'), ['當作旁證']);
+  assert.deepEqual(hit('不同來源給的最低盆量不完全一樣。'), ['不同來源給的']);
+  assert.deepEqual(hit('不同來源寫的天數略有差異。'), ['不同來源寫的']);
+  assert.deepEqual(hit('不同來源的數字略有出入，有的甚至寫到十到十二小時。'), ['不同來源的數字']);
+  assert.deepEqual(hit('依園藝資料，有些品種寫得更長。'), ['依園藝資料']);
+  assert.deepEqual(hit('小白菜的天數以家庭栽培資料為準。'), ['以家庭栽培資料為準']);
+  assert.deepEqual(hit('桃園區農業改良場介紹葉菜類的育苗移植時，也是把幼苗育到3到4片本葉。'), ['改良場介紹']);
+  for (const text of ['我們在前一章說過，土要鬆。', '老師說過要多澆水。', '不同來源的水質差很多。', '把照片依資料夾分類。', '以實際觀察為準。', '改良場位於桃園。', '他手上有旁證。'])
+    assert.deepEqual(hit(text), [], text);
+});
+
 test('prose checks: the V1 note quotes the offending sentences and every note is in the note language (zh-TW, zh-CN, en); an intro that previews a later chapter too much makes R1 unmet', () => {
   const items = ['N1', 'V1', 'R1'].map(id => ({ id, type: 'structure', status: 'met', note: '', sources: [] }));
   const result = { aggregate: 'checked', items };

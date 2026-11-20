@@ -22,6 +22,15 @@ export function settingsVersion(settings: BookSettings): string {
   return hashText(JSON.stringify(BOOK_SETTING_FIELDS.map(field => settings[field] ?? "")));
 }
 
+/**
+ * The two voice rules (no research or process notes, no vague source in the text): in the first draft's rules and in every in-place
+ * redo's request (live v5: 6 of 7 vague attributions were added by the expansion, whose request lacked them).
+ */
+export const BOOK_VOICE_RULES: readonly string[] = [
+  "- The chapter text reads as a finished book: never write research or process notes in it (what was searched, what was or was not found, that the data is insufficient, what still has to be checked). Such notes belong only in the open-questions or notes sections the template adds after the chapter text.",
+  '- State facts as the book\'s own: never attribute them in the text to a vague source (「有資料指出」「研究指出」「某大學推廣單位建議」「農業改良場的資料指出」「不同來源給的」「依園藝資料」「可以當作旁證」, "sources say"); the source goes in the sources section.'
+];
+
 /** What every chapter's author is told besides the card's own brief: the role, the opening, the ending, and no log-style ending. */
 export const BOOK_AUTHOR_RULES = [
   "Chapter writing rules (follow them):",
@@ -30,8 +39,7 @@ export const BOOK_AUTHOR_RULES = [
   "- Open by picking up the brief's entry point (how this chapter continues from the previous card).",
   "- End with one sentence that leads into the next card, taking up the question the brief leaves for it. If the brief has no next card (the last card), do not lead into a next card; close the whole book as the brief says.",
   "- The closing sentence belongs to the last paragraph of the chapter's own text, before any open-questions, sources or notes sections the template adds; those sections are not the chapter's ending.",
-  "- The chapter text reads as a finished book: never write research or process notes in it (what was searched, what was or was not found, that the data is insufficient, what still has to be checked). Such notes belong only in the open-questions or notes sections the template adds after the chapter text.",
-  '- State facts as the book\'s own: never attribute them in the text to a vague source (「有資料指出」「研究指出」「某大學推廣單位建議」「農業改良場的資料指出」, "sources say"); the source goes in the sources section.',
+  ...BOOK_VOICE_RULES,
   "- An intro chapter is a guide only: at most one or two sentences of preview for each later chapter, no section of its own for a later chapter, and none of a later chapter's details (numbers, steps, tables).",
   "- Never write image links or Markdown images yourself; the system searches for pictures after the writing and embeds the verified ones itself.",
   "- Image slots: when an image plan is given below, put one marker for each slot on a line of its own, right after the paragraph the slot belongs to (its position), in exactly this form: 〔圖位 n：what the picture explains〕 (n is the slot number; copy the wording of what it explains from the plan). One marker per slot, each number once; do not invent, repeat, merge or reword markers; never put a marker inside a code block or a quote, or inside a sentence. The chapter must read in full without the markers. When no image plan is given, or it lists no slot, leave no marker at all.",
@@ -117,6 +125,7 @@ export function bookExpandRequirements(
     "- `@@insert after: <an existing heading of the chapter, copied exactly>`, then the new paragraphs or ### sections that go at the end of that section. `@@insert` alone puts the text before the chapter's last section, so the chapter's ending stays last.",
     "- `@@replace`, then one passage of whole lines copied exactly from the chapter, then a line `@@with`, then the corrected passage (nothing after `@@with` deletes the passage). Use it only for the points to correct listed below.",
     "The program puts the blocks into the chapter; text outside a block is ignored. Keep the chapter's voice and terms. No picture markers, no image links, no update log, and no notes about where the text goes or how the chapter is built.",
+    `Voice of every new or corrected line (hard requirement; the program drops a new sentence that breaks it):\n${BOOK_VOICE_RULES.join("\n")}`,
     'New ### headings (hard requirement): each names a concrete point of this chapter\'s own plan that the chapter has not written yet, is unique in the chapter, and is never generic (no 「補充」, 「小細節」, 「預告裡沒講完的…」, "more details"). If there is nothing to add, return no block at all, never a sentence such as 「本次無新增內容」. The program drops generic or repeated headings and such lines.',
     ...expandScopeLines(scope),
     ...(lines.length ? [`Whole-book settings (follow them; the length is handled above):\n${lines.join("\n")}`] : []),

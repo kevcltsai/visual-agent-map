@@ -2,6 +2,7 @@ import { App, Modal } from "obsidian";
 import { t, type TranslationKey } from "../../i18n";
 import { modalActions } from "../../ui/modals/action-bar";
 import {
+  BOOK_EXPAND_PASSES,
   BOOK_SETTING_FIELDS,
   DEFAULT_BUDGET_LIMIT,
   MAX_AUTO_FIXES,
@@ -39,8 +40,7 @@ export const BOOK_IMAGE_SEARCHES = 2;
 /** Each picture search may be asked once more when its captions come back in another language. */
 export const BOOK_IMAGE_CALLS_PER_SEARCH = 2;
 
-/** The extra in-place expand passes of a short chapter: writing-model calls only (no picture search, no proofread of their own). */
-export const BOOK_EXPAND_PASSES = 2;
+export { BOOK_EXPAND_PASSES };
 
 /**
  * The AI calls of one chapter at most, step by step: one plan, then each write (the first and the {@link MAX_AUTO_FIXES} automatic

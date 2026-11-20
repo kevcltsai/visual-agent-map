@@ -67,6 +67,7 @@ import {
   MAX_STEP_ATTEMPTS,
   attemptsOf,
   effectiveOrder,
+  BOOK_EXPAND_PASSES,
   mapDifference,
   readBookPipeline,
   reserveBudget,
@@ -109,6 +110,7 @@ import {
   chapterBody,
   detailBlockOf,
   dropProcessNotes,
+  emptyExpandStats,
   expandChapterDetail,
   replaceDetailBlock,
   neutralizeText
@@ -142,6 +144,7 @@ import {
   fixInstructionText,
   effectiveSettings,
   imageCountRange,
+  lengthNeeded,
   lengthReason,
   lengthBody,
   lengthToken,
@@ -189,7 +192,7 @@ import {
   type GlobalPlanResult
 } from "../../core/steps/book-pipeline/global-plan";
 import type { ProofreadRequest, ProofreadRun } from "../../core/steps/book-pipeline/proofread";
-import { BOOK_CHECKS } from "../../core/book-pipeline/prose-checks";
+import { BOOK_CHECKS, researchVoiceSentences } from "../../core/book-pipeline/prose-checks";
 import type { StepDefinition } from "../../core/step-runner";
 import { untilAborted } from "./argument-run";
 import {
@@ -2427,7 +2430,15 @@ export class BookPipelineRuns {
       const done = await drive.store.commit(state => reopenTrialFix(state, id));
       if (!done?.accepted) continue;
       const items = (proof?.items ?? []).map(item => ({ ...item, sources: [...item.sources] }));
-      drive.fixable.set(id, proofFixInstruction(items, [...parseChecklist(card.prompt), ...BOOK_CHECKS], length));
+      drive.fixable.set(
+        id,
+        proofFixInstruction(
+          items,
+          [...parseChecklist(card.prompt), ...BOOK_CHECKS],
+          length,
+          researchVoiceSentences(chapterBody(card.detail))
+        )
+      );
       drive.expand.add(id);
     }
   }
@@ -2766,9 +2777,9 @@ export class BookPipelineRuns {
     // author sees the chapter and returns only change blocks, which the program puts into the chapter as it is (one call; its pictures
     // and records stay). It never rewrites the chapter: an answer with no usable block leaves the chapter as it was, needs-review.
     const expanding = drive.avoid.has(nodeId) && drive.expand.has(nodeId);
-    const oldBody = chapterBody(card.detail);
+    let oldBody = chapterBody(card.detail);
     // The fix round asks for the setting's minimum itself (the 0.8x tolerance is only the first verdict's).
-    const now = expanding ? lengthReason(settings.length, lengthBody(oldBody), undefined, true) : undefined;
+    let now = expanding ? lengthReason(settings.length, lengthBody(oldBody), undefined, true) : undefined;
     // The chapter's role and the other chapters (what it must not cover): told to the author, enforced in the merge.
     const scope = {
       role: info.role,
@@ -2776,12 +2787,15 @@ export class BookPipelineRuns {
         id === nodeId || id === drive.rootId ? [] : [drive.cards.get(id)?.title ?? ""].filter(Boolean)
       )
     };
-    const requirements = expanding
+    let requirements = expanding
       ? bookExpandRequirements(settings, oldBody, now, drive.extra.get(nodeId), scope)
       : undefined;
-    const oldDetail = expanding ? detailBlockOf(card.raw) : undefined;
+    let oldDetail = expanding ? detailBlockOf(card.raw) : undefined;
     let noEdits = false;
     let lostText = false;
+    // What the latest in-place merge did (its log line) and how many characters it added to the chapter text.
+    let stats = emptyExpandStats();
+    let net = 0;
     const expand = (content: string): string | null => {
       const next = detailBlockOf(content);
       if (oldDetail === undefined || next === undefined) return content;
@@ -2790,7 +2804,8 @@ export class BookPipelineRuns {
         next,
         drive.config.language,
         fixInstructionText(requirements ?? ""),
-        scope
+        scope,
+        stats
       );
       if (!merged) {
         noEdits = true;
@@ -2823,11 +2838,12 @@ export class BookPipelineRuns {
         lostText = true;
         return null;
       }
+      net = Array.from(body).length - Array.from(oldBody).length;
       return replaceDetailBlock(content, merged.detail);
     };
     // The body is cleaned inside the author's own write (same `vault.process`): only standard https pictures are ever saved, and
     // an unsafe body is refused whole, so the card keeps its text from before this step.
-    const knownLines: ReadonlySet<string> = new Set(card.raw.split("\n"));
+    let knownLines: ReadonlySet<string> = new Set(card.raw.split("\n"));
     const ownRecords = extractProofRecords(normalizeWorkRecords(card.detail)).map(quoteAll);
     let unsafe = false;
     // Which check refused the write (logged: live v5 showed only `unsafe_body`).
@@ -2895,50 +2911,77 @@ export class BookPipelineRuns {
     };
     // Why the author is called now (live v5: an intro's second writing call had no visible reason in the log).
     const attempt = attemptsOf(drive.store.state, nodeId).write;
-    this.ports.log(
-      formatPipelineLog({
-        event: "author_call",
-        runId: token.runId,
-        card: nodeId,
-        step: "write",
-        attempt,
-        result:
-          drive.rerun?.nodeId === nodeId
-            ? "rerun"
-            : expanding
-              ? "fix_round"
-              : drive.avoid.has(nodeId)
-                ? "source_swap"
-                : attempt > 1
-                  ? "retry"
-                  : "first_draft",
-        ms: 0,
-        counts: { round: autoFixesOf(drive.store.state, nodeId) }
-      })
-    );
-    // Nothing of this card's frontmatter is written while the author runs: the research write compares the whole file.
-    const done = await untilAborted(
-      signal,
-      this.ports.author({
-        mapPath: drive.mapPath,
-        nodeId,
-        path: info.path,
-        settings,
-        slots: expanding ? [] : (slots ?? []),
-        language: drive.config.language,
-        model: drive.config.authorModel,
-        reasoning: drive.config.reasoning,
-        ...(drive.avoid.has(nodeId) ? { instruction: drive.extra.get(nodeId) } : {}),
-        ...(requirements !== undefined ? { keepSummary: true, requirements } : {}),
-        ...(drive.ownSummary.has(nodeId) ? { keepSummary: true } : {}),
+    // One author call: pass 0 is the write (or the fix round), pass 1.. an extra expand pass of a chapter still too short.
+    const callAuthor = (pass: number): Promise<AuthorOutcome> => {
+      this.ports.log(
+        formatPipelineLog({
+          event: "author_call",
+          runId: token.runId,
+          card: nodeId,
+          step: "write",
+          attempt,
+          result: pass
+            ? "expand_pass"
+            : drive.rerun?.nodeId === nodeId
+              ? "rerun"
+              : expanding
+                ? "fix_round"
+                : drive.avoid.has(nodeId)
+                  ? "source_swap"
+                  : attempt > 1
+                    ? "retry"
+                    : "first_draft",
+          ms: 0,
+          counts: { round: autoFixesOf(drive.store.state, nodeId), ...(pass ? { pass } : {}) }
+        })
+      );
+      // Nothing of this card's frontmatter is written while the author runs: the research write compares the whole file.
+      return untilAborted(
         signal,
-        admission: drive.admission,
-        authorize: authorizeWrite,
-        finalize
-      })
-    );
-    if (changedByHand) return { kind: "failed", reason: "hand_edited", forceReview: true };
-    if (unsafe) {
+        this.ports.author({
+          mapPath: drive.mapPath,
+          nodeId,
+          path: info.path,
+          settings,
+          slots: expanding ? [] : (slots ?? []),
+          language: drive.config.language,
+          model: drive.config.authorModel,
+          reasoning: drive.config.reasoning,
+          ...(drive.avoid.has(nodeId) && !pass ? { instruction: drive.extra.get(nodeId) } : {}),
+          ...(requirements !== undefined ? { keepSummary: true, requirements } : {}),
+          ...(drive.ownSummary.has(nodeId) ? { keepSummary: true } : {}),
+          signal,
+          admission: drive.admission,
+          authorize: authorizeWrite,
+          finalize
+        })
+      );
+    };
+    // One line per in-place merge: what was asked, what the answer's blocks became (dropped per rule) and the characters it added.
+    const logMerge = (pass: number, outcome: string): void => {
+      if (!expanding) return;
+      const ok = !unsafe && !noEdits && !lostText && !emptyBody && outcome === "written";
+      this.ports.log(
+        formatPipelineLog({
+          event: "expand_merge",
+          runId: token.runId,
+          card: nodeId,
+          step: "write",
+          attempt,
+          result: unsafe ? "unsafe" : noEdits ? "no_edits" : lostText ? "lost_text" : emptyBody ? "no_body" : outcome,
+          ms: 0,
+          counts: {
+            pass,
+            requested: now?.kind === "under" ? lengthNeeded(now) : 0,
+            ...stats,
+            unsafe: unsafe ? 1 : 0,
+            net: ok ? Math.max(net, 0) : 0,
+            cut: ok ? Math.max(-net, 0) : 0
+          }
+        })
+      );
+    };
+    const logRefused = (): void =>
       this.ports.log(
         formatPipelineLog({
           event: "write_refused",
@@ -2950,6 +2993,11 @@ export class BookPipelineRuns {
           ms: 0
         })
       );
+    const done = await callAuthor(0);
+    logMerge(0, done.outcome);
+    if (changedByHand) return { kind: "failed", reason: "hand_edited", forceReview: true };
+    if (unsafe) {
+      logRefused();
       return { kind: "failed", reason: "unsafe_body", forceReview: true };
     }
     if (noEdits) return { kind: "failed", reason: "fix_no_edits", forceReview: true };
@@ -2959,6 +3007,35 @@ export class BookPipelineRuns {
     if (done.outcome === "cancelled") return { kind: "cancelled" };
     if (done.outcome === "failed") return { kind: "failed", reason: done.reason };
     if (done.outcome === "discarded") return { kind: "failed", reason: "discarded" };
+    // A chapter still under the minimum after the fix round gets up to BOOK_EXPAND_PASSES more expand passes, each only while the one
+    // before added text (live v5: one expand adds about 1.4–2.2k characters whatever is asked). A pass that adds nothing, is refused or
+    // fails ends the passes; the chapter keeps what it has and the proofread's length reason sends it to a person.
+    for (let pass = 1; expanding && now?.kind === "under" && pass <= BOOK_EXPAND_PASSES; pass++) {
+      const at = await this.stillOnMap(drive, nodeId);
+      if (!at) break;
+      const latest = await this.ports.readCard(at);
+      const body = chapterBody(latest.detail);
+      const short = lengthReason(settings.length, lengthBody(body), undefined, true);
+      if (short?.kind !== "under" || short.measured <= now.measured) break;
+      oldBody = body;
+      now = short;
+      oldDetail = detailBlockOf(latest.raw);
+      requirements = bookExpandRequirements(settings, body, short, undefined, scope);
+      knownLines = new Set(latest.raw.split("\n"));
+      noEdits = lostText = unsafe = emptyBody = false;
+      unsafeRule = "";
+      stats = emptyExpandStats();
+      net = 0;
+      const more = await callAuthor(pass);
+      logMerge(pass, more.outcome);
+      if (changedByHand) return { kind: "failed", reason: "hand_edited", forceReview: true };
+      if (unsafe) logRefused();
+      // The merge refused this pass (its write left the chapter as the fix round saved it): the passes end here.
+      if (unsafe || noEdits || lostText || emptyBody) break;
+      if (more.outcome === "cancelled") return { kind: "cancelled" };
+      if (more.outcome === "discarded") return { kind: "failed", reason: "discarded" };
+      if (more.outcome !== "written") break;
+    }
     drive.authorModels.set(nodeId, drive.config.authorModel);
     // What is saved holds only standard https pictures. The program (not the model) probes them; a failed one becomes a plain "no picture" line.
     const path = await this.stillOnMap(drive, nodeId);
@@ -3519,7 +3596,10 @@ export class BookPipelineRuns {
         const rewrite = verdict.aggregate === "needs-review" || !!length;
         const stage = rewrite || pictureIssue ? "needs-review" : "checked";
         if (rewrite && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0) {
-          drive.fixable.set(nodeId, proofFixInstruction(verdict.items, [...checklist, ...BOOK_CHECKS], length));
+          drive.fixable.set(
+            nodeId,
+            proofFixInstruction(verdict.items, [...checklist, ...BOOK_CHECKS], length, researchVoiceSentences(chapter))
+          );
           drive.expand.add(nodeId);
         } else if (!drive.job) {
           drive.extra.delete(nodeId);

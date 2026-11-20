@@ -20,6 +20,8 @@ export const DEFAULT_BUDGET_LIMIT = 300;
 export const MAX_STEP_ATTEMPTS = 3;
 /** The automatic redo one card may get (the program's own retry of the author step after a proofread named unmet points). */
 export const MAX_AUTO_FIXES = 1;
+/** The extra in-place expand passes of a short chapter: writing-model calls only (no picture search, no proofread of their own). */
+export const BOOK_EXPAND_PASSES = 2;
 /** How many cards (the first in reading order) the trial run before gate 1 covers. */
 export const TRIAL_SIZE = 3;
 export const STEPS = ["plan", "write", "proof"] as const;

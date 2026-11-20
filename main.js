@@ -69192,6 +69192,7 @@ var ARROW_OFFSETS = /* @__PURE__ */ new Map([
   ["ArrowDown", 1],
   ["ArrowRight", 1]
 ]);
+var DOC_DRAG_ENDS = ["pointerup", "pointercancel", "lostpointercapture"];
 var TOOLS_MIN_ZOOM = 0.6;
 var TASK_PROGRESS_PREFIX = "vam-task:";
 var MERGE_DONE_NOTICE_MS = 15e3;
@@ -80041,6 +80042,10 @@ ${t("ui.book_role_running_suffix")}` : first);
       this.cardChecks.set(node.id, select);
       select.addEventListener("click", (event) => {
         event.stopPropagation();
+        if (Date.now() < this.suppressClickUntil) {
+          event.preventDefault();
+          return;
+        }
         this.applySelectionChange(this.selection.setChecked(node.id, select.checked));
       });
     }
@@ -90252,6 +90257,12 @@ ${addition}` : addition },
         (_d2 = this.dragFrame) != null ? _d2 : this.dragFrame = window.requestAnimationFrame(paint);
       };
       const doc = (_d = this.contentEl) == null ? void 0 : _d.ownerDocument;
+      const win = doc == null ? void 0 : doc.defaultView;
+      const pointerId = event.pointerId;
+      const docEnd = (e) => {
+        if (e.pointerId === pointerId) finish(e);
+      };
+      const blur = () => finish({ type: "pointercancel" });
       const esc = (e) => {
         if (e.key !== "Escape" || !(moved || travelled)) return;
         e.preventDefault();
@@ -90279,6 +90290,8 @@ ${addition}` : addition },
         card.removeEventListener("pointercancel", finish);
         card.removeEventListener("lostpointercapture", finish);
         doc == null ? void 0 : doc.removeEventListener("keydown", esc, true);
+        for (const name2 of DOC_DRAG_ENDS) doc == null ? void 0 : doc.removeEventListener(name2, docEnd, true);
+        win == null ? void 0 : win.removeEventListener("blur", blur);
         this.dragCleanup = null;
       };
       const finish = (e) => {
@@ -90365,6 +90378,8 @@ ${addition}` : addition },
       card.addEventListener("pointercancel", finish);
       card.addEventListener("lostpointercapture", finish);
       doc == null ? void 0 : doc.addEventListener("keydown", esc, true);
+      for (const name2 of DOC_DRAG_ENDS) doc == null ? void 0 : doc.addEventListener(name2, docEnd, true);
+      win == null ? void 0 : win.addEventListener("blur", blur);
     });
   }
   /**

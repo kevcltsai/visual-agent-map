@@ -92061,7 +92061,10 @@ var BookNotesApply = class {
     }
     this.ports.releaseHighlight();
     this.lastUndo = null;
-    if (outcome.restored) this.ports.undone(last.path);
+    if (outcome.restored) {
+      await this.ports.flush(last.path).catch(() => void 0);
+      if (!this.disposed) this.ports.undone(last.path);
+    }
     if (!outcome.restored) return this.ports.notice(t("ui.book_note_undo_none"));
     this.ports.notice(
       outcome.skipped ? t("ui.book_note_undo_partial_0_1", outcome.restored, outcome.skipped) : t("ui.book_note_undo_done_0", outcome.restored)
@@ -92079,6 +92082,23 @@ var BookNotesApply = class {
     this.tick = null;
   }
 };
+
+// experiences/visual-map/book-applied-notice.ts
+function showAppliedNotice(host, timers, message, label, onClick, ms) {
+  const box = host.createDiv({ cls: "vam-book-applied-notice", attr: { role: "status" } });
+  box.createSpan({ text: message });
+  box.createEl("a", { text: label, cls: "vam-book-undo-link", href: "#" }).addEventListener("click", (event) => {
+    event.preventDefault();
+    onClick();
+  });
+  const timer = timers.set(() => box.remove(), ms);
+  return {
+    hide: () => {
+      timers.clear(timer);
+      box.remove();
+    }
+  };
+}
 
 // experiences/visual-map/book-applied-highlight.ts
 var import_state2 = require("@codemirror/state");
@@ -92141,6 +92161,30 @@ var AppliedHighlights = class {
   }
   dispose() {
     this.release();
+  }
+};
+function lineSpans(text10, ranges) {
+  const lineAt = (offset) => {
+    let n = 0;
+    for (let i = text10.indexOf("\n"); i !== -1 && i < offset; i = text10.indexOf("\n", i + 1)) n++;
+    return n;
+  };
+  return ranges.filter((r) => r.from < r.to).map((r) => ({ start: lineAt(r.from), end: lineAt(Math.max(r.from, r.to - 1)) }));
+}
+var ReadingMarks = class {
+  constructor() {
+    __publicField(this, "marks", null);
+  }
+  set(path, spans) {
+    this.marks = spans.length ? { path, spans } : null;
+  }
+  clear() {
+    this.marks = null;
+  }
+  /** True when the section `[lineStart, lineEnd]` of `path` overlaps a marked span. */
+  wears(path, lineStart, lineEnd2) {
+    const marks = this.marks;
+    return !!marks && marks.path === path && marks.spans.some((s) => s.start <= lineEnd2 && s.end >= lineStart);
   }
 };
 
@@ -99533,7 +99577,7 @@ var diagramType = (source) => {
 function overlaps(a, spans) {
   return spans.some((b) => a.start < b.end && b.start < a.end);
 }
-function lineSpans(source) {
+function lineSpans2(source) {
   const lines = [];
   let offset = 0;
   for (const text10 of source.split("\n")) {
@@ -99556,7 +99600,7 @@ function mermaidLabelSpans(source) {
   const add = (span) => {
     if (span && span.end > span.start && !overlaps(span, spans)) spans.push(span);
   };
-  const lines = lineSpans(source);
+  const lines = lineSpans2(source);
   for (const { text: text10, offset } of lines) {
     if (FLOW_SKIP_LINE.test(text10)) continue;
     for (const match of text10.matchAll(/"([^"\n]+)"/g))
@@ -105125,22 +105169,21 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       reasonText: (error) => bookErrorReason(error),
       write: (path, transform) => this.bookNoteWriter(path, transform),
       notice: (message) => void new import_obsidian52.Notice(message),
-      noticeAction: (message, label, onClick, ms) => {
-        const notice = new import_obsidian52.Notice(
-          createFragment((fragment) => {
-            fragment.createSpan({ text: message });
-            const link = fragment.createEl("a", { text: label, cls: "vam-book-undo-link", href: "#" });
-            link.addEventListener("click", (event) => {
-              event.preventDefault();
-              onClick();
-            });
-          }),
-          ms
-        );
-        return { hide: () => notice.hide() };
-      },
+      noticeAction: (message, label, onClick, ms) => showAppliedNotice(
+        document.body,
+        { set: (run, delay) => window.setTimeout(run, delay), clear: (handle) => window.clearTimeout(handle) },
+        message,
+        label,
+        onClick,
+        ms
+      ),
       highlight: (path, ranges) => this.bookHighlights.show(path, ranges),
       releaseHighlight: () => this.bookHighlights.release(),
+      flush: async (path) => {
+        var _a2;
+        for (const leaf of this.app.workspace.getLeavesOfType("markdown"))
+          if (leaf.view instanceof import_obsidian52.MarkdownView && ((_a2 = leaf.view.file) == null ? void 0 : _a2.path) === path) await leaf.view.save();
+      },
       undone: (path) => {
         const map = this.bookChapterMaps.get(path);
         if (map) void this.bookCallouts.reconcile(map);
@@ -105158,6 +105201,8 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       setTimer: (run, ms) => window.setTimeout(run, ms),
       clearTimer: (handle) => window.clearTimeout(handle)
     }));
+    /** The reading view's mark: the rendered sections of the changed lines wear the same light-green class (post-processor + a re-render). */
+    __publicField(this, "readingMarks", new ReadingMarks());
     __publicField(this, "bookPipelineRuns", new BookPipelineRuns({
       mutate: (work) => this.mutate(work),
       readMap: (path) => this.repo.readMap(path),
@@ -105326,6 +105371,17 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
   get chartJobs() {
     return this.topicRuns.chartJobs;
   }
+  setReadingMarks(view, ranges) {
+    var _a2, _b2;
+    const path = (_a2 = view.file) == null ? void 0 : _a2.path;
+    if (!path) return;
+    if (ranges == null ? void 0 : ranges.length) this.readingMarks.set(path, lineSpans(view.editor.getValue(), ranges));
+    else this.readingMarks.clear();
+    const container = (_b2 = view.previewMode) == null ? void 0 : _b2.containerEl;
+    if (ranges == null ? void 0 : ranges.length) {
+      if (view.getMode() === "preview") view.previewMode.rerender(true);
+    } else container == null ? void 0 : container.querySelectorAll(".vam-book-applied").forEach((el) => el.removeClass("vam-book-applied"));
+  }
   bookHighlightTargets() {
     const out = [];
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
@@ -105339,7 +105395,10 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
           var _a2;
           return (_a2 = view.file) == null ? void 0 : _a2.path;
         },
-        set: (ranges) => cm.dispatch({ effects: setApplied.of(ranges) })
+        set: (ranges) => {
+          cm.dispatch({ effects: setApplied.of(ranges) });
+          this.setReadingMarks(view, ranges);
+        }
       });
     }
     return out;
@@ -105507,6 +105566,11 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       key: "ui.command_book_note_undo"
     });
     this.registerEditorExtension(appliedExtension);
+    this.registerMarkdownPostProcessor((el, ctx) => {
+      const info = ctx.getSectionInfo(el);
+      if (info && this.readingMarks.wears(ctx.sourcePath, info.lineStart, info.lineEnd))
+        el.addClass("vam-book-applied");
+    });
     this.registerEvent(this.app.workspace.on("file-open", () => this.bookHighlights.sync()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.bookHighlights.sync()));
     this.registerEvent(this.app.workspace.on("layout-change", () => this.bookHighlights.sync()));

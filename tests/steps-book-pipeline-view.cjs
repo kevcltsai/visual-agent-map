@@ -184,7 +184,7 @@ test('issue text: neutral codes become Chinese reasons; unknown codes get the ge
 });
 
 test('issue text: every code the runner, the proof and the author wiring can produce has its own sentence in all three languages', () => {
-  const codes = ['missing', 'card_removed', 'backup_failed', 'discarded', 'empty_list', 'no_body', 'invalid_reply', 'invalid_step', 'failed', 'author_failed', 'unparsable', 'missing_item', 'duplicate_item', 'unknown_item', 'no_open_page', 'all_facts_unverified', 'unsafe_body', 'no_view'];
+  const codes = ['missing', 'card_removed', 'backup_failed', 'discarded', 'empty_list', 'no_body', 'invalid_reply', 'invalid_step', 'failed', 'author_failed', 'unparsable', 'missing_item', 'duplicate_item', 'unknown_item', 'no_open_page', 'all_facts_unverified', 'unsafe_body', 'no_view', 'fix_no_edits', 'fix_lost_text'];
   for (const language of ['zh-TW', 'zh-CN', 'en']) {
     lang(language);
     const generic = ui.bookIssueText('write failed: brand_new_code');

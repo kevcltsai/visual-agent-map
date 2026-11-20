@@ -7,7 +7,7 @@
 
 import { noteLanguageOf, translate, translateNote, type ContentLanguage } from "../../i18n";
 import { imageKey } from "./image-dedupe";
-import { workKey } from "./image-quality";
+import { isDocumentFile, workKey } from "./image-quality";
 import { fencedLines } from "./note-sections";
 import { escapeMarkdownText } from "./text";
 
@@ -183,6 +183,8 @@ export interface SlotCandidate {
   sourceUrl: string;
   title: string;
   caption: string;
+  /** What the file page says about the file (the program's Commons search); absent for the finder's pictures, whose caption is its own description. */
+  description?: string;
   /** Creator and license as the finder reported them from the source page; never invented here. */
   author?: string;
   license?: string;
@@ -516,6 +518,8 @@ export interface SlotRecordItem {
   reasonCode?: SlotReasonCode;
   /** A short hash of the placed picture's key: enough to see that the picture is still there, no address. */
   hash?: string;
+  /** The placed file names none of the words its slot asks for (decided when it was placed: see the run's fill). */
+  off?: true;
 }
 export interface SlotsRecord {
   slots: SlotRecordItem[];
@@ -542,9 +546,17 @@ export function shortHash(url: string): string {
 }
 
 /** The one machine line the guarded write puts into the research notes (`replaceResearchRecord` keeps only the latest). It holds numbers, codes and hashes only. */
-export function composeSlotsRecord(result: Pick<FillResult, "placed" | "missing" | "bad">): string {
+export function composeSlotsRecord(
+  result: Pick<FillResult, "placed" | "missing" | "bad">,
+  off: ReadonlySet<number> = new Set()
+): string {
   const slots: SlotRecordItem[] = [
-    ...result.placed.map(item => ({ index: item.index, state: "placed" as const, hash: shortHash(item.href) })),
+    ...result.placed.map(item => ({
+      index: item.index,
+      state: "placed" as const,
+      hash: shortHash(item.href),
+      ...(off.has(item.index) ? { off: true as const } : {})
+    })),
     ...result.missing.map(item => ({ index: item.index, state: "missing" as const, reasonCode: item.reasonCode }))
   ].sort((a, b) => a.index - b.index);
   return `<!-- book-slots:v1 ${JSON.stringify({ slots, bad: result.bad })} -->`;
@@ -572,7 +584,8 @@ export function latestSlotsRecord(detail: string): SlotsRecord | undefined {
           index: raw.index as number,
           state,
           ...(reasonCode ? { reasonCode } : {}),
-          ...(typeof raw.hash === "string" && /^[0-9a-f]{8}$/.test(raw.hash) ? { hash: raw.hash } : {})
+          ...(typeof raw.hash === "string" && /^[0-9a-f]{8}$/.test(raw.hash) ? { hash: raw.hash } : {}),
+          ...(state === "placed" && raw.off === true ? { off: true as const } : {})
         });
       }
       found = { slots: items, bad: Number.isInteger(data.bad) && (data.bad as number) > 0 ? (data.bad as number) : 0 };
@@ -693,7 +706,8 @@ export interface ImageTextCheck {
 /**
  * R1-3: every proof recomputes this (it is not in the proof's key): the number of pictures equals the placed slots, and for each
  * placed slot the keywords of what it explains appear in the paragraph before or after its picture (the picture block itself,
- * caption included, is not the text around it). `body` is the chapter text (see chapterBody).
+ * caption included, is not the text around it). A picture that is a document page (PDF, DjVu, TIFF scan) or that the record marks
+ * as naming nothing its slot asks for is a mismatch whatever the text says. `body` is the chapter text (see chapterBody).
  */
 export function checkImageText(
   body: string,
@@ -706,13 +720,15 @@ export function checkImageText(
   const lines = body.split("\n");
   const guarded = protectedLines(lines);
   // Paragraph blocks: runs of non-blank lines outside fences and quotes; a block with an image is a figure block.
-  const blocks: { text: string; hashes: string[] }[] = [];
+  const blocks: { text: string; hashes: string[]; docs: string[] }[] = [];
   let current: string[] = [];
   let hashes: string[] = [];
+  let docs: string[] = [];
   const close = (): void => {
-    if (current.length) blocks.push({ text: current.join("\n"), hashes });
+    if (current.length) blocks.push({ text: current.join("\n"), hashes, docs });
     current = [];
     hashes = [];
+    docs = [];
   };
   lines.forEach((line, at) => {
     if (guarded[at] || isBlank(line)) {
@@ -720,7 +736,10 @@ export function checkImageText(
       return;
     }
     current.push(line);
-    for (const m of line.matchAll(IMAGE_IN_LINE)) hashes.push(shortHash(m[1]));
+    for (const m of line.matchAll(IMAGE_IN_LINE)) {
+      hashes.push(shortHash(m[1]));
+      if (isDocumentFile(m[1])) docs.push(shortHash(m[1]));
+    }
   });
   close();
   const imageCount = blocks.reduce((sum, block) => sum + block.hashes.length, 0);
@@ -733,6 +752,11 @@ export function checkImageText(
     const at = blocks.findIndex(block => item.hash !== undefined && block.hashes.includes(item.hash));
     const slot = slots.find(entry => entry.index === item.index);
     if (at < 0 || !slot) continue;
+    // A page of a PDF or scan, or a file that names nothing the slot asks for, never matches its text, whatever the caption says.
+    if (item.off || blocks[at].docs.includes(item.hash as string)) {
+      issues.push({ index: item.index, code: "mismatch" });
+      continue;
+    }
     const around = [at - 1, at + 1]
       .map(i => blocks[i])
       .filter(block => block && !block.hashes.length)

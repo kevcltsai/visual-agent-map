@@ -78,7 +78,7 @@ async function rig(over = {}) {
 const setLimit = (r, limit) => r.repo.updateMap(r.mapPath, d => { d.bookPipeline.budget.limit = limit; });
 
 const BODY = '正文開頭《蒙娜麗莎》結尾。';
-const writeAuthor = (r, text) => async input => { await input.admission.reserve(); const n = await r.repo.readNote(input.path); const out = await r.repo.updateNoteGuarded(input.path, { detail: typeof text === 'function' ? text(n.title) : text }, { authorize: input.authorize, finalize: input.finalize }); return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; };
+const writeAuthor = (r, text) => async input => { await input.admission.reserve(); const n = await r.repo.readNote(input.path); const out = await r.repo.updateNoteGuarded(input.path, { detail: typeof text === 'function' ? text(n.title, input) : text }, { authorize: input.authorize, finalize: input.finalize }); return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; };
 const cand = (n, over = {}) => ({ title: `Work ${n}`, caption: `Caption ${n}`, url: `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/W${n}.jpg/1280px-W${n}.jpg`, source: `https://commons.wikimedia.org/wiki/File:W${n}.jpg`, ...over });
 /** The finder's answer: `{ 1: [cand...], 2: [...] }` by slot index. */
 const found = bySlotObj => { const bySlot = new Map(Object.entries(bySlotObj).map(([k, v]) => [Number(k), v])); return { bySlot, found: [...bySlot.values()].reduce((n, v) => n + v.length, 0), offTopic: 0 }; };
@@ -613,10 +613,11 @@ for (const [kind, template] of Object.entries(TEMPLATES)) {
 
 test('proofread: the request body has no image line or caption; the result section has one 圖文 line before the model lines; a missing or off-topic picture is a notice (image notice), never needs-review', async () => {
   const text = () => `開頭。\n\nexplains perspective 的說明。\n\n${mk(1)}\n\n另一段。\n\n${mk(2)}\n\n尾。\n\n### 來源\n- https://example.com/a\n`;
-  const r = await picRig({ text, finder: () => found({ 1: [cand(1)] }) });
+  // The picture names its slot's words (a file that names none is off its text: see the off-topic test).
+  const r = await picRig({ text, finder: () => found({ 1: [cand(1, { title: 'Perspective study 1' })] }) });
   await run(r);
   const body = r.stat.proof[0].body;
-  assert.ok(!/!\[|Caption 1|Work 1|upload\.wikimedia/.test(body), body);
+  assert.ok(!/!\[|Caption 1|Perspective study 1|upload\.wikimedia/.test(body), body);
   assert.match(body, /explains perspective 的說明。/);
   const raw = r.raw(0);
   const section = /> \[!vam-book\]- 校對結果[^\n]*\n((?:>[^\n]*(?:\n|$))*)/.exec(raw)?.[1] ?? '';
@@ -630,7 +631,7 @@ test('proofread: the request body has no image line or caption; the result secti
 
 test('proofread: all pictures placed next to their text: the 圖文 line says ok and the card carries no issue; an old Prompt says no image plan', async () => {
   const text = () => `開頭。\n\nexplains 1 perspective 的 explains perspective。\n\n${mk(1)}\n\n尾。\n\n### 來源\n- https://example.com/a\n`;
-  const r = await picRig({ text, slots: 1, finder: () => found({ 1: [cand(1)] }) });
+  const r = await picRig({ text, slots: 1, finder: () => found({ 1: [cand(1, { caption: 'A perspective drawing' })] }) });
   await run(r);
   assert.ok(!(await r.note(0)).pipelineIssue, (await r.note(0)).pipelineIssue);
   assert.match(r.raw(0), /- 圖文：?.*1/);
@@ -865,16 +866,18 @@ test('T4 images: when every slot has its picture there is no second search; a se
   assert.equal(stageOf(b.raw(0)), 'checked');
 });
 
-test('T4 images: the automatic redo of a card may pick that card\'s own pictures again', async () => {
+test('T4 images: the automatic redo of a card edits it in place: its placed picture stays and no new search runs', async () => {
   const checklist = [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'fact', text: 'a date' }];
   let proofs = 0;
-  const r = await picRig({ checklist, slots: 1, text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。`,
+  const r = await picRig({ checklist, slots: 1,
+    text: (title, input) => input.requirements !== undefined ? `@@replace\n正文一。${title}\n@@with\n正文一（更正）。${title}` : `正文一。${title}\n\n${mk(1)}\n\n正文二。`,
     finder: () => found({ 1: [cand(1)] }),
     proof: async request => evaluateProof(request.checklist.map(c => ({ id: c.id, status: c.type === 'fact' && !/FillerChapter/.test(request.body) && ++proofs === 1 ? 'unmet' : 'met', note: 'n', sources: c.type === 'fact' ? ['https://example.org/p'] : [] })), request.checklist, ['https://example.org/p']) });
   await run(r);
-  assert.equal(r.calls.length, 2, 'first round and the redo each searched');
-  assert.ok(!r.calls[1].exclude.some(key => /w1/i.test(key)), 'its own old picture is not excluded');
-  assert.equal(figures((await r.note(0)).detail).length, 1, 'the redo shows the picture again');
+  assert.equal(r.calls.length, 1, 'only the first round searched');
+  const detail = (await r.note(0)).detail;
+  assert.equal(figures(detail).length, 1, 'the redo keeps the picture');
+  assert.ok(detail.includes('正文一（更正）。') && detail.includes('正文二。'), 'the corrected line is in, the rest stays');
 });
 
 test('slots: a card deleted from the map during the picture search pauses the run for the map, writes no picture and is not sent to review', async () => {
@@ -998,24 +1001,24 @@ test('quality run: two chapters offered the same work as two Commons files place
 
 // ---- the program's own Commons search for slots still empty, and the picture shortfall verdict ----
 const C = S.load('core/book-pipeline/commons-search.ts');
-/** A Commons API answer (formatversion 2) for files `names` in search order; `over` per file overrides imageinfo fields. */
-const commonsAnswer = (names, over = {}) => JSON.stringify({ query: { pages: names.map((name, i) => ({ index: i + 1, title: `File:${name}`, imageinfo: [{
+/** A Commons API answer (formatversion 2) for files `names` in search order; `over` per file overrides imageinfo fields; `categories` is every file's category line. */
+const commonsAnswer = (names, over = {}, categories = '') => JSON.stringify({ query: { pages: names.map((name, i) => ({ index: i + 1, title: `File:${name}`, imageinfo: [{
   url: `https://upload.wikimedia.org/wikipedia/commons/a/ab/${name}`,
   thumburl: `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/${name}/1280px-${name}`,
   mime: 'image/jpeg', thumbmime: 'image/jpeg',
   descriptionurl: `https://commons.wikimedia.org/wiki/File:${name}`,
-  extmetadata: { Artist: { value: '<a href="//commons.wikimedia.org/wiki/User:Ann">Ann &amp; Bo</a>' }, LicenseShortName: { value: 'CC BY-SA 4.0' } },
+  extmetadata: { Artist: { value: '<a href="//commons.wikimedia.org/wiki/User:Ann">Ann &amp; Bo</a>' }, LicenseShortName: { value: 'CC BY-SA 4.0' }, ...(categories ? { Categories: { value: categories } } : {}) },
   ...(over[name] ?? {}) }] })) } });
 const queryOf = url => new URL(url).searchParams.get('gsrsearch');
 
 test('commons parse: safe types only (an SVG through its PNG thumbnail), https, the file page as source, plain credits, the subject rule', () => {
-  const slot = { index: 1, explains: '葉背的蚜蟲' };
+  const slot = { index: 1, explains: '葉背的蚜蟲', search: 'aphids leaf' };
   const text = commonsAnswer(['Aphids.jpg', 'Scan.tif', 'Drawing.svg', 'Plain.png', 'Http.jpg'], {
     'Scan.tif': { mime: 'image/tiff', thumbmime: 'image/tiff' },
     'Drawing.svg': { mime: 'image/svg+xml', thumbmime: 'image/png', thumburl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Drawing.svg/1280px-Drawing.svg.png' },
     'Plain.png': { thumburl: undefined, url: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Plain.png', mime: 'image/png', thumbmime: undefined },
     'Http.jpg': { thumburl: 'http://upload.wikimedia.org/x/Http.jpg' }
-  });
+  }, 'Aphids on leaves');
   const got = C.parseCommonsAnswer(text, slot);
   assert.deepEqual(plain(got.map(c => c.title)), ['Aphids', 'Drawing', 'Plain']);
   assert.equal(got[0].source, 'https://commons.wikimedia.org/wiki/File:Aphids.jpg');
@@ -1029,7 +1032,7 @@ test('commons parse: safe types only (an SVG through its PNG thumbnail), https, 
 
 test('commons search: the finder\'s English words first, the slot line second only when the first gave nothing; at most 2 requests a slot, 3 candidates', async () => {
   const asked = [];
-  const fetch = async url => { asked.push(url); const q = queryOf(url); return { status: 200, text: q === 'aphids leaf' ? '{}' : commonsAnswer(['A1.jpg', 'A2.jpg', 'A3.jpg', 'A4.jpg']) }; };
+  const fetch = async url => { asked.push(url); const q = queryOf(url); return { status: 200, text: q === 'aphids leaf' ? '{}' : commonsAnswer(['A1.jpg', 'A2.jpg', 'A3.jpg', 'A4.jpg'], {}, 'Aphids on a leaf|Drip irrigation') }; };
   const ctl = new AbortController();
   const out = await C.searchCommons([
     { index: 1, explains: '葉背的蚜蟲', search: 'aphids leaf' },
@@ -1105,7 +1108,7 @@ test('commons fallback: a picture another chapter shows is not taken again; a fa
   const detail = (await r.note(0)).detail;
   assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state, s.reasonCode ?? ''])), [[1, 'placed', ''], [2, 'missing', 'not_found']]);
   assert.equal(stageOf(r.raw(0)), 'checked', 'no picture setting: a missing picture stays a notice');
-  const twice = await picRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: () => found({}), ports: { fetchCommons: async () => ({ status: 200, text: commonsAnswer(['Same.jpg']) }) } });
+  const twice = await picRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: () => found({}), ports: { fetchCommons: async () => ({ status: 200, text: commonsAnswer(['Same.jpg'], {}, 'Perspective drawings that explains') }) } });
   await run(twice);
   const all = [...figures((await twice.note(0)).detail), ...figures((await twice.note(1)).detail)].filter(f => /Same\.jpg/.test(f));
   assert.equal(all.length, 1, 'one Commons file is placed once in the book');
@@ -1130,4 +1133,91 @@ test('shortfall: under the owner\'s minimum the chapter ends needs-review with a
   await run(ok);
   assert.equal(stageOf(ok.raw(0)), 'checked');
   assert.ok(!/images:under|images unmet/.test((await ok.note(0)).pipelineIssue ?? ''), 'no shortfall (picture notices may remain)');
+});
+
+// ---- repro v3: Commons filled 29 of 41 slots with PDF / scan first pages whose plan captions had nothing to do with the picture ----
+/** Encoded as Commons writes it (brackets too, as in the v3 addresses). */
+const v3Enc = file => encodeURIComponent(file).replace(/\(/g, '%28').replace(/\)/g, '%29');
+const v3Thumb = (hash, file, width = 960) => `https://thumb.wikimedia.org/wikipedia/commons/thumb/${hash[0]}/${hash}/${v3Enc(file)}/page1-${width}px-${v3Enc(file)}.jpg?utm_source=commons.wikimedia.org`;
+const V3_DOCS = {
+  swatow: ['2c', 'A_pronouncing_and_defining_dictionary_of_the_Swatow_dialect,_arranged_according_to_syllables_and_tones_(IA_pronouncingdefin00fielrich).pdf', 'application/pdf'],
+  oj: ['a0', 'OJ_C_202501145_of_2025_-_EN_English.pdf', 'application/pdf'],
+  igo: ['3d', 'The_historic_archaeology_of_a_Chinese_mining_venture_near_Igo_in_Northern_California_(IA_historicarchaeol00ritt).pdf', 'application/pdf'],
+  containers: ['63', 'Containers_for_fruits_and_vegetables_(IA_CAT87204671).pdf', 'application/pdf'],
+  home: ['0f', 'Home_Vegetable_Gardening.djvu', 'image/vnd.djvu']
+};
+/** The v3 document files as the API answers them: the file is a PDF or DjVu, its thumbnail a JPEG of page 1. */
+const v3DocAnswer = keys => commonsAnswer(keys.map(key => V3_DOCS[key][1]), Object.fromEntries(keys.map(key => {
+  const [hash, file, mime] = V3_DOCS[key];
+  return [file, { mime, thumbmime: 'image/jpeg', thumburl: v3Thumb(hash, file), url: `https://upload.wikimedia.org/wikipedia/commons/${hash[0]}/${hash}/${v3Enc(file)}` }];
+})), 'Bok choy|Harvesting vegetables|Containers|Vegetable gardening');
+
+test('repro v3 G: a PDF or DjVu page is never taken from Commons, even when its title or categories name the slot, nor a JPEG made from one', () => {
+  const slot = { index: 1, kind: '採收動作特寫照片', explains: '手從小白菜的外葉摘起', search: 'harvesting bok choy outer leaves' };
+  assert.deepEqual(plain(C.parseCommonsAnswer(v3DocAnswer(['swatow', 'oj', 'igo', 'containers', 'home']), slot)), [], 'document files and their page thumbnails');
+  const relabelled = commonsAnswer(['Scan_page.jpg'], { 'Scan_page.jpg': { thumburl: v3Thumb('2c', V3_DOCS.swatow[1]) } }, 'Bok choy|Harvesting');
+  assert.deepEqual(plain(C.parseCommonsAnswer(relabelled, slot)), [], 'a page thumbnail of a PDF, whatever the stated type');
+  for (const mime of ['image/tiff', 'audio/ogg', 'video/webm', 'image/gif'])
+    assert.deepEqual(plain(C.parseCommonsAnswer(commonsAnswer(['Bok_choy_harvest.x'], { 'Bok_choy_harvest.x': { mime } }), slot)), [], mime);
+  const Q2 = S.load('core/book-pipeline/image-quality.ts');
+  assert.ok(Object.values(V3_DOCS).every(([hash, file]) => Q2.isDocumentFile(v3Thumb(hash, file))));
+  assert.equal(Q2.isDocumentFile('https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Perm%C3%A9abilit%C3%A9_pot_de_fleur_10L_1h.jpg/1280px-Perm%C3%A9abilit%C3%A9_pot_de_fleur_10L_1h.jpg'), false);
+});
+
+test('repro v3 G: a Commons file must name the slot\'s words (title, description or categories); a photo slot refuses covers, printed pages and maps', () => {
+  const slot = { index: 1, kind: '採收動作特寫照片', explains: '手從小白菜的外葉摘起', search: 'harvesting bok choy outer leaves' };
+  const titles = text => plain(C.parseCommonsAnswer(text, slot).map(c => c.title));
+  assert.deepEqual(titles(commonsAnswer(['Chinese_mining_camp_ruins.jpg', 'Bok_choy_harvest_2019.jpg'])), ['Bok choy harvest 2019'], 'the title alone is enough when it names the slot');
+  assert.deepEqual(titles(commonsAnswer(['IMG_2041.jpg'], {}, 'Brassica rapa chinensis|Harvesting|Bok choy')), ['IMG 2041'], 'the categories name it');
+  assert.deepEqual(titles(commonsAnswer(['IMG_2041.jpg'], { 'IMG_2041.jpg': { extmetadata: { ImageDescription: { value: '<p>Picking the <b>outer leaves</b> of bok choy</p>' } } } })), ['IMG 2041'], 'the description names it');
+  assert.deepEqual(titles(commonsAnswer(['IMG_2041.jpg'], {}, 'Gardening')), [], 'one shared word is not enough');
+  assert.deepEqual(titles(commonsAnswer(['Bok_choy_seed_catalog_cover.jpg', 'Bok_choy_field_map.png'])), [], 'a cover or a map for a photo slot');
+  assert.deepEqual(titles(commonsAnswer(['Bok_choy_harvest.jpg'], {}, 'Book covers')), [], 'a print genre in the categories');
+  assert.deepEqual(plain(C.parseCommonsAnswer(commonsAnswer(['Bok_choy_field_map.png']), { ...slot, kind: '產地地圖' }).map(c => c.title)), ['Bok choy field map'], 'a map slot takes a map');
+  assert.deepEqual(plain(C.parseCommonsAnswer(commonsAnswer(['IMG_1.jpg']), { index: 1, explains: '手從小白菜的外葉摘起' })), [], 'no English words and no Chinese title: not found');
+  const got = C.parseCommonsAnswer(commonsAnswer(['IMG_2041.jpg'], {}, 'Bok choy|Harvesting'), slot)[0];
+  assert.equal(got.description, 'Bok choy; Harvesting', 'what the file page says is kept for the record');
+  assert.match(C.commonsSearchUrl('x'), /iiextmetadatafilter=Artist%7CLicenseShortName%7CImageDescription%7CCategories/);
+});
+
+test('repro v3 G: a chapter whose Commons answers are all document pages places none of them; the empty slots are not_found and count toward the shortfall', async () => {
+  const r = await picRig({
+    finder: (req, run, n) => n === 1 ? { ...found({ 1: [], 2: [] }), hints: new Map([[1, { search: 'harvesting bok choy outer leaves' }], [2, { search: 'potting soil containers' }]]) } : found({}),
+    ports: { fetchCommons: async () => ({ status: 200, text: v3DocAnswer(['swatow', 'oj', 'igo', 'containers', 'home']) }) }
+  });
+  await r.repo.writeBookSettings(r.nodes[0].path, { style: '每章圖片 2 張' });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.equal(figures(detail).filter(f => /\.(pdf|djvu)|page1-/.test(f)).length, 0, 'zero document pages');
+  assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state, s.reasonCode ?? ''])), [[1, 'missing', 'not_found'], [2, 'missing', 'not_found']]);
+  assert.equal(stageOf(r.raw(0)), 'needs-review');
+  assert.match((await r.note(0)).pipelineIssue, /images:under:0:2/);
+});
+
+test('repro v3 I: a placed document page is image_N_mismatch even when the text around it talks about its slot; so is a picture the record marks off', () => {
+  const slots = S.load('core/book-pipeline/image-slots.ts');
+  const [hash, file] = V3_DOCS.swatow;
+  const pdf = v3Thumb(hash, file);
+  const photo = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Bok_choy.jpg/1280px-Bok_choy.jpg';
+  const plan = [{ index: 1, kind: '照片', explains: '小白菜外葉採收', anchor: 'a' }, { index: 2, kind: '照片', explains: '小白菜外葉採收', anchor: 'b' }];
+  const body = `從小白菜外葉採收開始。\n\n![A pronouncing dictionary](${pdf})\n手從小白菜的外葉摘起\n\n小白菜外葉採收要輕。\n\n![Bok choy](${photo})\n小白菜外葉\n\n小白菜外葉採收完畢。`;
+  const record = { slots: [{ index: 1, state: 'placed', hash: slots.shortHash(pdf) }, { index: 2, state: 'placed', hash: slots.shortHash(photo) }], bad: 0 };
+  assert.deepEqual(plain(slots.imageIssueTokens(slots.checkImageText(body, plan, record))), ['image_1_mismatch']);
+  const marked = slots.composeSlotsRecord({ placed: [{ index: 1, href: pdf }, { index: 2, href: photo }], missing: [], bad: 0 }, new Set([2]));
+  const read = slots.latestSlotsRecord(`x\n${marked}\n`);
+  assert.deepEqual(plain(read.slots.map(s => [s.index, s.off ?? false])), [[1, false], [2, true]]);
+  assert.deepEqual(plain(slots.imageIssueTokens(slots.checkImageText(body, plan, read))), ['image_1_mismatch', 'image_2_mismatch']);
+  assert.match(slots.composeImageTextLine('zh-TW', slots.checkImageText(body, plan, read)), /圖 1/);
+  const hand = slots.latestSlotsRecord('<!-- book-slots:v1 {"slots":[{"index":1,"state":"missing","off":true},{"index":2,"state":"placed","off":"yes"}],"bad":0} -->');
+  assert.deepEqual(plain(hand.slots.map(s => s.off ?? false)), [false, false], 'only a placed item with off: true');
+});
+
+test('repro v3 I: a finder picture whose title and caption name nothing its slot asks for is recorded off and reported image_N_mismatch without a model call', async () => {
+  const text = () => `開頭。\n\nexplains 1 perspective 的 explains perspective。\n\n${mk(1)}\n\n尾。\n\n### 來源\n- https://example.com/a\n`;
+  const r = await picRig({ text, slots: 1, finder: () => found({ 1: [cand(1, { title: 'Swatow dialect dictionary', caption: '汕頭話字典封面' })] }) });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.deepEqual(plain(recordOf(detail).slots), [{ index: 1, state: 'placed', hash: recordOf(detail).slots[0].hash, off: true }]);
+  assert.equal((await r.note(0)).pipelineIssue, 'image notice: image_1_mismatch');
+  assert.equal(stageOf(r.raw(0)), 'checked', 'a notice, never needs-review');
 });

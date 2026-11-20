@@ -3223,6 +3223,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_reason_chapters_too_long": "章节清单太长，无法放进同一次企划请求",
   "ui.book_reason_all_facts_unverified": "所有事实项目都无法查证",
   "ui.book_reason_unsafe_body": "图片内容不安全，卡片保持原样",
+  "ui.book_reason_fix_no_edits": "自动修正没有给出可用的修改，章节保持原样",
+  "ui.book_reason_fix_lost_text": "自动修正会删掉图片或让章节太短，章节保持原样",
   "ui.book_reason_no_view": "地图已不在界面上，运行已停止",
   "ui.book_plain_write_no_body": "AI 这次没写出正文，卡片保持原样。请点“重跑这张”再写一次。",
   "ui.book_plain_proof_no_body": "这张卡还没有正文，没有东西可校对。请点“重跑这张”重写，或打开卡片自己补上内文。",

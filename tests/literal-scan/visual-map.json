@@ -35,16 +35,6 @@
     },
     {
       "file": "experiences/visual-map/book-pipeline-rerun.ts",
-      "text": "The previous version of this chapter did not meet these structure points",
-      "reason": "model-facing one-line request to the author composed by the program from a constant sentence plus the unmet structure points as JSON strings; the owner never types it, no model sentence is an instruction line, and the proofread never receives it"
-    },
-    {
-      "file": "experiences/visual-map/book-pipeline-rerun.ts",
-      "text": "The previous version of this chapter failed the fact check on these points",
-      "reason": "model-facing one-line request to the author composed by the program from a constant sentence plus the failed fact points as JSON strings; the owner never types it, no model sentence is an instruction line, and the proofread never receives it"
-    },
-    {
-      "file": "experiences/visual-map/book-pipeline-rerun.ts",
       "text": "The chapter failed the fact check on these points (JSON stri",
       "reason": "model-facing one-line request to the author composed by the program from constant words plus numbers, the unit and the failed points as JSON strings; the owner never types it, no model sentence is an instruction line, and the proofread never receives it"
     },
@@ -56,6 +46,11 @@
     {
       "file": "experiences/visual-map/book-pipeline-rerun.ts",
       "text": "of new text in @@insert blocks as the expansion rules say; k",
+      "reason": "model-facing one-line request to the author composed by the program from constant words plus numbers, the unit and the failed points as JSON strings; the owner never types it, no model sentence is an instruction line, and the proofread never receives it"
+    },
+    {
+      "file": "experiences/visual-map/book-pipeline-rerun.ts",
+      "text": ", with @@replace blocks; keep every checklist point and ever",
       "reason": "model-facing one-line request to the author composed by the program from constant words plus numbers, the unit and the failed points as JSON strings; the owner never types it, no model sentence is an instruction line, and the proofread never receives it"
     }
   ]

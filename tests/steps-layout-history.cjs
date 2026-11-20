@@ -387,6 +387,79 @@ test('persona 11: a card dropped on empty canvas, away from its siblings, keeps 
   assert.deepEqual(Array.from(h.view.map.nodes, n => h.titleOf(n.id)), ['Root', 'A', 'B', 'C', 'D'], 'array order untouched');
 });
 
+const kidOrder = h => Array.from(h.view.map.nodes.filter(n => n.parentId === h.node('Root').id).map(n => h.titleOf(n.id)));
+const dropAt = (h, title, x, y) => h.view.mapChange(map => h.view.placeDroppedCard(map, map.nodes.find(n => n.id === h.node(title).id), { x, y }));
+
+for (const direction of ['radial', 'timeline', 'fishbone']) {
+  test(`drag reorder (${direction}): a card dropped above a sibling takes its place in the array, survives Auto layout, one undo restores order and position`, async () => {
+    const h = await harness(SIBLINGS);
+    await h.view.mapChange(map => { map.layout = { direction }; });
+    const origin = { x: h.node('D').x, y: h.node('D').y };
+    await dropAt(h, 'D', 420, 0);
+    assert.deepEqual(kidOrder(h), ['D', 'A', 'B', 'C']);
+    await h.view.mapChange(map => h.view.arrangeAll(map));
+    assert.deepEqual(kidOrder(h), ['D', 'A', 'B', 'C'], 'Auto layout keeps the order');
+    await h.view.travel(false); await h.view.travel(false);
+    assert.deepEqual(kidOrder(h), ['A', 'B', 'C', 'D'], 'undo restores the order');
+    assert.deepEqual({ x: h.node('D').x, y: h.node('D').y }, origin, 'and the position');
+  });
+}
+
+test('drag reorder (radial): a drop that crosses no sibling leaves the array alone; a drop into the middle lands between', async () => {
+  const h = await harness(SIBLINGS);
+  await h.view.mapChange(map => { map.layout = { direction: 'radial' }; });
+  await dropAt(h, 'D', 430, 770);
+  assert.deepEqual(kidOrder(h), ['A', 'B', 'C', 'D']);
+  await dropAt(h, 'A', 420, 400);
+  assert.deepEqual(kidOrder(h), ['B', 'A', 'C', 'D']);
+  await dropAt(h, 'D', 420, 5000);
+  assert.deepEqual(kidOrder(h), ['B', 'A', 'C', 'D'], 'dropped below everything it already is below: no change');
+  await dropAt(h, 'A', 420, 9000);
+  assert.deepEqual(kidOrder(h), ['B', 'C', 'D', 'A'], 'dropped below the last one');
+});
+
+const BAL = [['Root', null, 80, 80], ['A', 'Root', 420, 80], ['B', 'Root', 420, 304], ['L1', 'Root', -300, 80], ['L2', 'Root', -300, 304], ['C', 'Root', 420, 528]];
+
+test('drag reorder (balanced): only the siblings on the card\'s own side are reordered; the other side keeps its order, Auto layout keeps both', async () => {
+  const h = await harness(BAL);
+  await h.view.mapChange(map => { map.layout = { direction: 'balanced' }; });
+  await dropAt(h, 'C', 420, 0);
+  const right = kidOrder(h).filter(t => !t.startsWith('L'));
+  const left = kidOrder(h).filter(t => t.startsWith('L'));
+  assert.deepEqual(right, ['C', 'A', 'B']);
+  assert.deepEqual(left, ['L1', 'L2']);
+  await h.view.mapChange(map => h.view.arrangeAll(map));
+  assert.deepEqual(kidOrder(h).filter(t => !t.startsWith('L')), ['C', 'A', 'B'], 'right side order after Auto layout');
+  assert.deepEqual(kidOrder(h).filter(t => t.startsWith('L')), ['L1', 'L2']);
+  await h.undoAll();
+  assert.deepEqual(kidOrder(h).filter(t => !t.startsWith('L')), ['A', 'B', 'C']);
+});
+
+test('drag reorder (balanced): dragging one left card below its left sibling does not touch the right side', async () => {
+  const h = await harness(BAL);
+  await h.view.mapChange(map => { map.layout = { direction: 'balanced' }; });
+  const before = kidOrder(h);
+  await dropAt(h, 'L1', -300, 900);
+  assert.deepEqual(kidOrder(h).filter(t => !t.startsWith('L')), ['A', 'B', 'C']);
+  assert.deepEqual(kidOrder(h).filter(t => t.startsWith('L')), ['L2', 'L1']);
+  assert.notDeepEqual(kidOrder(h), before);
+});
+
+test('drag reorder (radial): a drag into a different parent (reparent) still puts the card last under the new parent', async () => {
+  const h = await harness([...SIBLINGS, ['A1', 'A', 600, 80]]);
+  await h.view.mapChange(map => { map.layout = { direction: 'radial' }; });
+  await h.view.moveTopic(h.node('D'), h.node('A'));
+  const kids = Array.from(h.view.map.nodes.filter(n => n.parentId === h.node('A').id).map(n => h.titleOf(n.id)));
+  assert.deepEqual(kids, ['A1', 'D']);
+  assert.deepEqual(kidOrder(h), ['A', 'B', 'C']);
+});
+
+test('drag reorder: a right-direction map is unchanged by the new rule, and a drop with no parent does not throw', async () => {
+  const h = await harness(SIBLINGS);
+  await dropAt(h, 'Root', 90, 90);
+  assert.deepEqual(kidOrder(h), ['A', 'B', 'C', 'D']);
+});
+
 test('persona 11: Alt+arrow trades places with the sibling, stays after Auto layout, is one undo, and stops at the ends', async () => {
   const h = await harness(SIBLINGS);
   await h.view.shiftSiblingByKey(h.node('D'), -1);

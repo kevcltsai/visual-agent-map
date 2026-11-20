@@ -54233,6 +54233,26 @@ function proofIsStale(card, stage, nodeId, runId, revision) {
 }
 
 // experiences/visual-map/book-pipeline-callouts.ts
+function editorViewsOf(path, views) {
+  var _a2;
+  const out = [];
+  for (const view of views) {
+    if (((_a2 = view.file) == null ? void 0 : _a2.path) !== path || view.getMode() === "preview") continue;
+    out.push({
+      text: () => view.editor.getValue(),
+      replace: (next) => {
+        const editor = view.editor;
+        const change2 = minimalChange(editor.getValue(), next);
+        if (!change2) return true;
+        editor.transaction({
+          changes: [{ from: editor.offsetToPos(change2.from), to: editor.offsetToPos(change2.to), text: change2.insert }]
+        });
+        return true;
+      }
+    });
+  }
+  return out;
+}
 function minimalChange(before, after) {
   if (before === after) return null;
   let head2 = 0;
@@ -105071,25 +105091,10 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
   }
   /** Every markdown view that has this note open (any mode), as the write coordinator edits it. */
   openMarkdownViews(path) {
-    var _a2;
-    const out = [];
-    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
-      const view = leaf.view;
-      if (!(view instanceof import_obsidian52.MarkdownView) || ((_a2 = view.file) == null ? void 0 : _a2.path) !== path) continue;
-      out.push({
-        text: () => view.editor.getValue(),
-        replace: (next) => {
-          const editor = view.editor;
-          const change2 = minimalChange(editor.getValue(), next);
-          if (!change2) return true;
-          editor.transaction({
-            changes: [{ from: editor.offsetToPos(change2.from), to: editor.offsetToPos(change2.to), text: change2.insert }]
-          });
-          return true;
-        }
-      });
-    }
-    return out;
+    const views = [];
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown"))
+      if (leaf.view instanceof import_obsidian52.MarkdownView) views.push(leaf.view);
+    return editorViewsOf(path, views);
   }
   recordFailure(context, error) {
     const message = error instanceof Error ? error.message : String(error);

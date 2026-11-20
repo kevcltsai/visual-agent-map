@@ -220,3 +220,28 @@ test('reconcile: with a hint, only a note that may carry a callout is read and r
   assert.deepEqual(r.kinds('x2'), ['trial:old'], 'a note known to have none is not touched');
   assert.deepEqual(r.kinds('n1'), [], 'an unknown note is read (and was clean)');
 });
+
+// ---- reading (preview) mode ----
+const mdView = (path, mode, text, log) => ({
+  file: { path }, getMode: () => mode,
+  editor: { getValue: () => text, offsetToPos: n => ({ line: 0, ch: n }), transaction: spec => log.push(spec) }
+});
+test('editorViewsOf: a view in reading mode is not an editor path, so the note is written as a file', async () => {
+  const log = []; let file = 'abc';
+  const views = [mdView('p', 'preview', 'stale', log), mdView('other', 'source', 'x', log)];
+  assert.equal(b.editorViewsOf('p', views).length, 0);
+  const write = b.createNoteWriter({
+    openViews: path => b.editorViewsOf(path, views),
+    rawGuarded: async (path, transform, o) => { if (!o.authorize()) return 'discarded'; file = transform(file); return 'written'; }
+  });
+  assert.equal(await write('p', upper), 'written');
+  assert.equal(file, 'ABC');
+  assert.deepEqual(log, []);
+});
+test('editorViewsOf: a view in live preview or source mode edits through the editor', async () => {
+  const log = [];
+  const views = [mdView('p', 'source', 'abc', log)];
+  const write = b.createNoteWriter({ openViews: path => b.editorViewsOf(path, views), rawGuarded: async () => 'written' });
+  assert.equal(await write('p', upper), 'written');
+  assert.equal(log.length, 1);
+});

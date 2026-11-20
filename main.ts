@@ -25,7 +25,7 @@ import { backupNoteFile } from "./experiences/visual-map/note-backup";
 import {
   BookCallouts,
   createNoteWriter,
-  minimalChange,
+  editorViewsOf,
   type OpenNoteView
 } from "./experiences/visual-map/book-pipeline-callouts";
 import { BookHandEdits } from "./experiences/visual-map/book-pipeline-handedit";
@@ -871,24 +871,10 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   /** Every markdown view that has this note open (any mode), as the write coordinator edits it. */
   private openMarkdownViews(path: string): OpenNoteView[] {
-    const out: OpenNoteView[] = [];
-    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
-      const view = leaf.view;
-      if (!(view instanceof MarkdownView) || view.file?.path !== path) continue;
-      out.push({
-        text: () => view.editor.getValue(),
-        replace: next => {
-          const editor = view.editor;
-          const change = minimalChange(editor.getValue(), next);
-          if (!change) return true;
-          editor.transaction({
-            changes: [{ from: editor.offsetToPos(change.from), to: editor.offsetToPos(change.to), text: change.insert }]
-          });
-          return true;
-        }
-      });
-    }
-    return out;
+    const views: MarkdownView[] = [];
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown"))
+      if (leaf.view instanceof MarkdownView) views.push(leaf.view);
+    return editorViewsOf(path, views);
   }
   /** Suggestions awaiting a decision; onload replaces it with the persisted store, {@link topicRuns} reads whichever is current. */
   pendingSuggestions: Map<string, Suggestion[]> = new Map();

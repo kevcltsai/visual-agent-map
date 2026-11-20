@@ -51,6 +51,44 @@ export interface NoteWritePorts {
 /** written: the text changed; unchanged: it already was as wanted; refused: nothing was written (views disagree, or the note changed under us). */
 export type NoteWriteResult = "written" | "unchanged" | "refused";
 
+/** The part of a markdown view the coordinator needs (Obsidian's `MarkdownView` satisfies it). */
+export interface MarkdownViewLike {
+  file: { path: string } | null;
+  getMode(): string;
+  editor: {
+    getValue(): string;
+    offsetToPos(offset: number): { line: number; ch: number };
+    transaction(spec: {
+      changes: { from: { line: number; ch: number }; to: { line: number; ch: number }; text: string }[];
+    }): void;
+  };
+}
+
+/**
+ * The views of `path` the coordinator may edit through. A view in reading (preview) mode is left out: its editor is not the live
+ * text there (it may be stale or its edit may never show), so a note only a reading view has open is written as a file; Obsidian
+ * reloads the view from the file.
+ */
+export function editorViewsOf(path: string, views: MarkdownViewLike[]): OpenNoteView[] {
+  const out: OpenNoteView[] = [];
+  for (const view of views) {
+    if (view.file?.path !== path || view.getMode() === "preview") continue;
+    out.push({
+      text: () => view.editor.getValue(),
+      replace: next => {
+        const editor = view.editor;
+        const change = minimalChange(editor.getValue(), next);
+        if (!change) return true;
+        editor.transaction({
+          changes: [{ from: editor.offsetToPos(change.from), to: editor.offsetToPos(change.to), text: change.insert }]
+        });
+        return true;
+      }
+    });
+  }
+  return out;
+}
+
 /** The smallest single replacement that turns `before` into `after` (common head and tail kept), so a cursor elsewhere in the text stays put. */
 export function minimalChange(before: string, after: string): { from: number; to: number; insert: string } | null {
   if (before === after) return null;

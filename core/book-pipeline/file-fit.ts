@@ -25,7 +25,11 @@ const stem = (word: string): string =>
 
 /** The words a slot asks for (stemmed, no duplicates). */
 export function askWords(ask: SlotAsk): string[] {
-  return [...new Set([ask.explains, ...(ask.terms ?? []), ask.subject, ask.search].flatMap(text => slotKeywords(text ?? "")).map(stem))];
+  return [
+    ...new Set(
+      [ask.explains, ...(ask.terms ?? []), ask.subject, ask.search].flatMap(text => slotKeywords(text ?? "")).map(stem)
+    )
+  ];
 }
 
 /** How many of `words` the text has: a Latin word as a whole (stemmed) word, a Han pair anywhere. */

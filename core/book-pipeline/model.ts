@@ -192,7 +192,8 @@ export interface BookPipelineData {
  * sentence, `claimB` the words used, `suggestion` the right ones. It concerns `a` only.
  */
 export interface ConsistencyFinding {
-  kind?: "reference";
+  /** Absent: two chapters disagree (the model's finding). `removed`: chapter `a` still names the removed chapter `b` (title in `claimB`, found by the program). */
+  kind?: "reference" | "removed";
   a: string;
   b: string;
   claimA: string;
@@ -232,7 +233,7 @@ function consistencyShape(value: unknown): boolean {
       value.findings.every(
         item =>
           isObject(item) &&
-          (item.kind === undefined || item.kind === "reference") &&
+          (item.kind === undefined || item.kind === "reference" || item.kind === "removed") &&
           isText(item.a) &&
           isText(item.b) &&
           isText(item.claimA) &&

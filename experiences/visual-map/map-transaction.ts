@@ -106,8 +106,14 @@ export interface Transaction {
    * Rewrites the note at `path` through `write(path)` (which must write that file and nothing else). Commit runs it
    * before any move; undo writes the original text back after the moves; redo runs `write` again before the moves.
    * Undo and redo refuse (`guard`) when title, summary, detail or status differ from what this step left or found.
+   * `settle` runs on the note once the moves are done (their link rewrites are in it): at commit before what this step left
+   * is recorded, and again at redo, so a redone note is the text undo expects.
    */
-  rewriteNote(path: string, write: (path: string, attachment: AttachmentPath) => Promise<void>): Transaction;
+  rewriteNote(
+    path: string,
+    write: (path: string, attachment: AttachmentPath) => Promise<void>,
+    settle?: (path: string) => Promise<void>
+  ): Transaction;
   /**
    * Stores `data` as an attachment of `sourcePath` before any note or map write; the callbacks of `editMap` and
    * `rewriteNote` get its path through `attachment(key)`. A file with the same content already in the chosen folder is
@@ -214,6 +220,7 @@ type NoteGuard = Pick<Note, (typeof GUARD_FIELDS)[number]>;
 interface NoteOp {
   path: string;
   write: (path: string, attachment: AttachmentPath) => Promise<void>;
+  settle?: (path: string) => Promise<void>;
 }
 interface NoteRecord extends NoteOp {
   guardBefore: NoteGuard;
@@ -489,7 +496,13 @@ export function begin(deps: TransactionDeps): Transaction {
         // Undo writes the original text after the moves (a move rewrites links in other notes); redo writes before them.
         // A rename-back puts the note at `note.path` first, but a failed step finds it at `at` again.
         if (undoing) notes.after.push({ path: at, restore, apply: () => writeText(repo, note.path, note.beforeText) });
-        else notes.before.push({ path: note.path, restore, apply: () => note.write(note.path, attachment) });
+        else {
+          notes.before.push({ path: note.path, restore, apply: () => note.write(note.path, attachment) });
+          // The same text as the commit left: settle again once the moves rewrote their links (else undo would refuse it).
+          const settle = note.settle;
+          if (settle)
+            notes.after.push({ path: note.path, restore, apply: () => settle(noteAt(ops, note.path, "undo")) });
+        }
       }
       await run(files, maps, rebuild, notes, refresh);
     };
@@ -565,9 +578,9 @@ export function begin(deps: TransactionDeps): Transaction {
       edits.push({ mapPath, edit });
       return transaction;
     },
-    rewriteNote(path, write) {
+    rewriteNote(path, write, settle) {
       deps.guardPath?.(path);
-      noteOps.push({ path, write });
+      noteOps.push({ path, write, ...(settle ? { settle } : {}) });
       return transaction;
     },
     createAttachment(key, source) {
@@ -671,6 +684,7 @@ export function begin(deps: TransactionDeps): Transaction {
           if (op.kind === "create") op.original = to;
           else op.target = to;
         }
+        for (const note of noteRecords) await note.settle?.(noteAt(ops, note.path, "undo"));
         for (const note of noteRecords) note.guardAfter = guardOf(await repo.readNote(noteAt(ops, note.path, "undo")));
         const resolve = (originalPath: string): string => {
           const found = started.get(originalPath);

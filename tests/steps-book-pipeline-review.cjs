@@ -361,3 +361,21 @@ test('T10c length: a different range, measured count, unit or rule version chang
   assert.equal(b.isReviewResolved(ticked, fp('length unmet: length:over:260:100-200:字:v1')), false, 'the measured number moved: the tick is void');
   assert.equal(b.isReviewResolved(ticked, fp('length unmet: length:over:241:100-300:字:v1')), false, 'the asked range changed: the tick is void');
 });
+
+test('C7 hand-edited wording: text the program never wrote (no fingerprint, no [!vam-book] callout, a review box does not count) says it was there before the book', () => {
+  const integrity = require('./support-replay.cjs').load('core/book-pipeline/body-integrity.ts');
+  const box = review({ stage: 'needs-review' });
+  const of = detail => b.gate2Cards({ order: ['n1'], titleOf: () => 'T', noteOf: () => ({ detail, pipelineStage: 'needs-review', pipelineIssue: 'write failed: hand_edited' }) })[0];
+  const before = of(`${box}\n\n我自己寫的內容。`);
+  assert.equal(before.handEdited, true);
+  assert.equal(before.handBeforeBook, true);
+  assert.deepEqual([...b.reviewProblems(before).map(p => p.text)], ['這張卡加入書之前就有內容，這次重跑沒有重寫它']);
+  const stamped = of(integrity.stampDetail('程式寫的。').replace('程式寫的', '我改過的'));
+  assert.equal(stamped.handBeforeBook, undefined);
+  assert.deepEqual([...b.reviewProblems(stamped).map(p => p.text)], ['這章有你手改的內容，這次重跑沒有重寫它']);
+  const withCallout = of('舊的內容。\n\n> [!vam-book]- 研究筆記\n> x\n');
+  assert.equal(withCallout.handBeforeBook, undefined, 'a [!vam-book] callout shows the program wrote here');
+  assert.equal(of('x').handBeforeBook, true);
+  const notHand = b.gate2Cards({ order: ['n1'], titleOf: () => 'T', noteOf: () => ({ detail: 'x', pipelineStage: 'needs-review', pipelineIssue: 'proof failed: timeout' }) })[0];
+  assert.equal(notHand.handBeforeBook, undefined, 'only a hand-edited skip');
+});

@@ -3198,6 +3198,7 @@ var en = {
   "ui.book_reason_length_over_0_1_2_3": "The chapter is {0} {1}, longer than the {2}\u2013{3} {1} you asked for",
   "ui.book_reason_chapter_ref_0_1_2_3": "Wrong chapter number: in \u201C{0}\u201D, \u201C{1}\u201D means \u3008{2}\u3009, which is {3}",
   "ui.book_reason_inconsistent_0_1_2": "Says something differently from \u3008{0}\u3009: this chapter says \u201C{1}\u201D, \u3008{0}\u3009 says \u201C{2}\u201D",
+  "ui.book_reason_removed_ref_0_1": "This chapter still mentions the removed \u3008{0}\u3009: \u201C{1}\u201D",
   "ui.book_reason_length_under_0_1_2_3": "The chapter is {0} {1}, shorter than the {2}\u2013{3} {1} you asked for",
   "ui.book_reason_images_under_0_1": "Too few pictures: {0} placed, the setting asks for at least {1}",
   "ui.book_length_unit_chars": "characters",
@@ -3299,6 +3300,7 @@ var en = {
   "ui.book_note_undo_done_0": "Restored {0} paragraph(s); the notes are back.",
   "ui.book_note_undo_partial_0_1": "Restored {0} paragraph(s); {1} were edited after the rewrite and were not restored.",
   "ui.book_review_hand_edited": "This chapter has your own edits; this rerun did not rewrite it",
+  "ui.book_review_hand_before_book": "This card had its own text before it joined the book; this rerun did not rewrite it",
   "ui.book_note_review_keep": "Keep my version",
   "ui.book_note_review_rewrite": "Rewrite this chapter with AI (overwrites your edits; backed up first)",
   "ui.book_plain_write_hand_edited": "The chapter has your own edits, so it was left as it is.",
@@ -6431,6 +6433,7 @@ var zhCN = {
   "ui.book_reason_length_over_0_1_2_3": "\u8FD9\u7AE0\u6709 {0} {1}\uFF0C\u6BD4\u4F60\u8BBE\u5B9A\u7684 {2}\u2013{3} {1} \u957F",
   "ui.book_reason_chapter_ref_0_1_2_3": "\u7AE0\u53F7\u6307\u9519\uFF1A\u201C{0}\u201D\u91CC\u7684\u201C{1}\u201D\u8BF4\u7684\u662F\u3008{2}\u3009\uFF0C\u90A3\u662F{3}",
   "ui.book_reason_inconsistent_0_1_2": "\u548C\u3008{0}\u3009\u8BF4\u6CD5\u4E0D\u4E00\u81F4\uFF1A\u8FD9\u7AE0\u5199\u201C{1}\u201D\uFF0C\u3008{0}\u3009\u5199\u201C{2}\u201D",
+  "ui.book_reason_removed_ref_0_1": "\u8FD9\u7AE0\u8FD8\u63D0\u5230\u5DF2\u79FB\u9664\u7684\u3008{0}\u3009\uFF1A\u201C{1}\u201D",
   "ui.book_reason_length_under_0_1_2_3": "\u8FD9\u7AE0\u53EA\u6709 {0} {1}\uFF0C\u6BD4\u4F60\u8BBE\u5B9A\u7684 {2}\u2013{3} {1} \u77ED",
   "ui.book_reason_images_under_0_1": "\u56FE\u7247\u4E0D\u8DB3\uFF1A\u653E\u4E86 {0} \u5F20\uFF0C\u8BBE\u7F6E\u81F3\u5C11 {1} \u5F20",
   "ui.book_length_unit_chars": "\u5B57",
@@ -6532,6 +6535,7 @@ var zhCN = {
   "ui.book_note_undo_done_0": "\u5DF2\u8FD8\u539F {0} \u6BB5\uFF0C\u5907\u6CE8\u90FD\u653E\u56DE\u53BB\u4E86\u3002",
   "ui.book_note_undo_partial_0_1": "\u5DF2\u8FD8\u539F {0} \u6BB5\uFF1B\u53E6\u6709 {1} \u6BB5\u5728\u6539\u5199\u540E\u53C8\u88AB\u6539\u8FC7\uFF0C\u6CA1\u6709\u8FD8\u539F\u3002",
   "ui.book_review_hand_edited": "\u8FD9\u7AE0\u6709\u4F60\u624B\u6539\u7684\u5185\u5BB9\uFF0C\u8FD9\u6B21\u91CD\u8DD1\u6CA1\u6709\u91CD\u5199\u5B83",
+  "ui.book_review_hand_before_book": "\u8FD9\u5F20\u5361\u52A0\u5165\u4E66\u4E4B\u524D\u5C31\u6709\u5185\u5BB9\uFF0C\u8FD9\u6B21\u91CD\u8DD1\u6CA1\u6709\u91CD\u5199\u5B83",
   "ui.book_note_review_keep": "\u4FDD\u7559\u6211\u7684\u7248\u672C",
   "ui.book_note_review_rewrite": "\u7528 AI \u91CD\u5199\u8FD9\u7AE0\uFF08\u4F1A\u76D6\u6389\u4F60\u7684\u4FEE\u6539\uFF0C\u6539\u524D\u5148\u5907\u4EFD\uFF09",
   "ui.book_plain_write_hand_edited": "\u8FD9\u7AE0\u6709\u4F60\u624B\u6539\u7684\u5185\u5BB9\uFF0C\u6240\u4EE5\u6CA1\u6709\u52A8\u5B83\u3002",
@@ -9664,6 +9668,7 @@ var zhTW = {
   "ui.book_reason_length_over_0_1_2_3": "\u9019\u7AE0\u6709 {0} {1}\uFF0C\u6BD4\u4F60\u8A2D\u5B9A\u7684 {2}\u2013{3} {1} \u9577",
   "ui.book_reason_chapter_ref_0_1_2_3": "\u7AE0\u865F\u6307\u932F\uFF1A\u300C{0}\u300D\u88E1\u7684\u300C{1}\u300D\u8AAA\u7684\u662F\u3008{2}\u3009\uFF0C\u90A3\u662F{3}",
   "ui.book_reason_inconsistent_0_1_2": "\u548C\u3008{0}\u3009\u8AAA\u6CD5\u4E0D\u4E00\u81F4\uFF1A\u9019\u7AE0\u5BEB\u300C{1}\u300D\uFF0C\u3008{0}\u3009\u5BEB\u300C{2}\u300D",
+  "ui.book_reason_removed_ref_0_1": "\u9019\u7AE0\u9084\u63D0\u5230\u5DF2\u79FB\u9664\u7684\u3008{0}\u3009\uFF1A\u300C{1}\u300D",
   "ui.book_reason_length_under_0_1_2_3": "\u9019\u7AE0\u53EA\u6709 {0} {1}\uFF0C\u6BD4\u4F60\u8A2D\u5B9A\u7684 {2}\u2013{3} {1} \u77ED",
   "ui.book_reason_images_under_0_1": "\u5716\u7247\u4E0D\u8DB3\uFF1A\u653E\u4E86 {0} \u5F35\uFF0C\u8A2D\u5B9A\u81F3\u5C11 {1} \u5F35",
   "ui.book_length_unit_chars": "\u5B57",
@@ -9765,6 +9770,7 @@ var zhTW = {
   "ui.book_note_undo_done_0": "\u5DF2\u9084\u539F {0} \u6BB5\uFF0C\u5099\u8A3B\u90FD\u653E\u56DE\u53BB\u4E86\u3002",
   "ui.book_note_undo_partial_0_1": "\u5DF2\u9084\u539F {0} \u6BB5\uFF1B\u53E6\u6709 {1} \u6BB5\u5728\u6539\u5BEB\u5F8C\u53C8\u88AB\u6539\u904E\uFF0C\u6C92\u6709\u9084\u539F\u3002",
   "ui.book_review_hand_edited": "\u9019\u7AE0\u6709\u4F60\u624B\u6539\u7684\u5167\u5BB9\uFF0C\u9019\u6B21\u91CD\u8DD1\u6C92\u6709\u91CD\u5BEB\u5B83",
+  "ui.book_review_hand_before_book": "\u9019\u5F35\u5361\u52A0\u5165\u66F8\u4E4B\u524D\u5C31\u6709\u5167\u5BB9\uFF0C\u9019\u6B21\u91CD\u8DD1\u6C92\u6709\u91CD\u5BEB\u5B83",
   "ui.book_note_review_keep": "\u4FDD\u7559\u6211\u7684\u7248\u672C",
   "ui.book_note_review_rewrite": "\u7528 AI \u91CD\u5BEB\u9019\u7AE0\uFF08\u6703\u84CB\u6389\u4F60\u7684\u4FEE\u6539\uFF0C\u6539\u524D\u5148\u5099\u4EFD\uFF09",
   "ui.book_plain_write_hand_edited": "\u9019\u7AE0\u6709\u4F60\u624B\u6539\u7684\u5167\u5BB9\uFF0C\u6240\u4EE5\u6C92\u6709\u52D5\u5B83\u3002",
@@ -12763,7 +12769,7 @@ function consistencyShape(value) {
   if (value.revisions !== void 0 && (!isObject(value.revisions) || !Object.values(value.revisions).every(isCount)))
     return false;
   return value.findings === void 0 || Array.isArray(value.findings) && value.findings.every(
-    (item) => isObject(item) && (item.kind === void 0 || item.kind === "reference") && isText(item.a) && isText(item.b) && isText(item.claimA) && isText(item.claimB) && isText(item.suggestion)
+    (item) => isObject(item) && (item.kind === void 0 || item.kind === "reference" || item.kind === "removed") && isText(item.a) && isText(item.b) && isText(item.claimA) && isText(item.claimB) && isText(item.suggestion)
   );
 }
 function problem(raw) {
@@ -12842,6 +12848,111 @@ function attemptsOf(data, nodeId) {
 }
 function reserveBudget(budget) {
   return budget.used >= budget.limit ? null : { used: budget.used + 1, limit: budget.limit };
+}
+
+// ai/section-aliases.ts
+var name = (zhTW2, en2) => ({ zh: zhTW2, en: en2 });
+var SECTION_NAME = {
+  // sources role: any one of the three names; a structure uses the one that fits its type
+  sources: name("\u4F86\u6E90", "Sources"),
+  source: name("\u51FA\u8655", "Source"),
+  references: name("\u53C3\u8003\u8CC7\u6599", "References"),
+  // log role (unchanged name)
+  log: name("\u66F4\u65B0\u7D00\u9304", "Update log"),
+  // log role for the picture-book chapter template: only when no section has the standard log name
+  researchNotes: name("\u7814\u7A76\u5099\u8A3B", "Research notes"),
+  // atomic
+  oneSentence: name("\u4E00\u53E5\u8A71", "In one sentence"),
+  why: name("\u70BA\u4EC0\u9EBC", "Why"),
+  // hypothesis
+  ifTrue: name("\u5982\u679C\u6210\u7ACB\u6703\u770B\u5230", "If true we would see"),
+  evidenceTable: name("\u8B49\u64DA\u5C0D\u7167", "Evidence table"),
+  // evidence
+  summary: name("\u6458\u8981", "Summary"),
+  relatedTopics: name("\u548C\u54EA\u4E9B\u8B70\u984C\u6709\u95DC", "Related topics"),
+  // conclusion
+  confidence: name("\u4FE1\u5FC3", "Confidence"),
+  scope: name("\u9069\u7528\u7BC4\u570D", "Scope"),
+  impact: name("\u5F71\u97FF\u8207\u4E0B\u4E00\u6B65", "Impact and next steps"),
+  // action
+  goalDone: name("\u76EE\u6A19\u8207\u5B8C\u6210\u689D\u4EF6", "Goal and done-when"),
+  steps: name("\u6B65\u9A5F", "Steps")
+};
+var NEW_STANDARD_HEADING_KEYS = [
+  "detail.background_and_mechanism",
+  "detail.disagreements_and_limits",
+  "detail.open_questions_to_check",
+  "detail.sources_heading"
+];
+var lowered = (value) => value.trim().toLocaleLowerCase();
+var SPELLINGS = ["zh-TW", "zh-CN", "en"];
+var spellings = (key4) => SPELLINGS.map((locale) => translate(locale, key4));
+var both = (value) => [value.zh, value.en];
+var rows;
+var researchNotesNames = () => [...both(SECTION_NAME.researchNotes), "\u7814\u7A76\u5907\u6CE8"];
+function sectionAliasRows() {
+  if (rows) return rows;
+  const sourcesNames = [
+    ...both(SECTION_NAME.sources),
+    ...both(SECTION_NAME.source),
+    ...both(SECTION_NAME.references),
+    ...spellings("detail.sources_heading"),
+    "\u51FA\u5904",
+    "\u53C2\u8003\u8D44\u6599"
+  ];
+  const legacySources = spellings("detail.evidence_and_sources");
+  rows = [
+    // role sources: the old standard name, and the three new names for each other
+    { names: sourcesNames, aliases: [...sourcesNames, ...legacySources] },
+    // Research notes: a note that only has the old log heading still lines up with it
+    { names: researchNotesNames(), aliases: spellings("detail.update_log") },
+    // standard / textbook
+    { names: spellings("detail.background_and_mechanism"), aliases: spellings("detail.key_knowledge") },
+    { names: spellings("detail.disagreements_and_limits"), aliases: spellings("detail.tradeoffs_and_limitations") },
+    { names: spellings("detail.open_questions_to_check"), aliases: spellings("detail.open_questions") },
+    // atomic
+    { names: both(SECTION_NAME.oneSentence), aliases: ["\u5B9A\u7FA9", "Definition"] },
+    { names: both(SECTION_NAME.why), aliases: ["\u89E3\u91CB", "Explanation"] },
+    // hypothesis: the old support and counterevidence sections both land on the one table
+    { names: both(SECTION_NAME.ifTrue), aliases: ["\u9810\u6E2C", "Prediction"] },
+    { names: both(SECTION_NAME.evidenceTable), aliases: ["\u652F\u6301", "\u53CD\u99C1", "Support", "Counterevidence"] },
+    // evidence
+    { names: both(SECTION_NAME.summary), aliases: ["\u5167\u5BB9", "Content"] },
+    { names: both(SECTION_NAME.relatedTopics), aliases: ["\u652F\u6301\u6216\u53CD\u99C1", "Supports or refutes"] },
+    // conclusion
+    { names: both(SECTION_NAME.confidence), aliases: ["\u4FE1\u5FC3\u7A0B\u5EA6"] },
+    { names: both(SECTION_NAME.scope), aliases: ["\u9069\u7528\u7BC4\u570D\u8207\u9650\u5236", "Scope and limits"] },
+    { names: both(SECTION_NAME.impact), aliases: ["\u5F8C\u7E8C\u884C\u52D5", "Next actions"] },
+    // action
+    { names: both(SECTION_NAME.goalDone), aliases: ["\u76EE\u6A19", "\u5B8C\u6210\u689D\u4EF6", "Goal", "Done when"] },
+    { names: both(SECTION_NAME.steps), aliases: ["\u6AA2\u67E5\u9EDE", "Checkpoints"] }
+  ];
+  return rows;
+}
+function sectionAliasesFor(heading) {
+  const key4 = lowered(heading);
+  const result = [];
+  for (const row of sectionAliasRows())
+    if (row.names.some((entry) => lowered(entry) === key4)) {
+      for (const alias of row.aliases)
+        if (lowered(alias) !== key4 && !result.some((existing) => lowered(existing) === lowered(alias)))
+          result.push(alias);
+    }
+  return result;
+}
+function isNewSourcesHeading(heading) {
+  const key4 = lowered(heading);
+  return sectionAliasRows()[0].names.some((entry) => lowered(entry) === key4);
+}
+function isOpenQuestionsHeading(heading) {
+  const key4 = lowered(heading);
+  return [...spellings("detail.open_questions_to_check"), ...spellings("detail.open_questions")].some(
+    (entry) => lowered(entry) === key4
+  );
+}
+function isResearchNotesHeading(heading) {
+  const key4 = lowered(heading);
+  return researchNotesNames().some((entry) => lowered(entry) === key4);
 }
 
 // core/book-pipeline/image-dedupe.ts
@@ -12960,111 +13071,6 @@ function workKey(imageUrl, author) {
 }
 var isDocumentFile = (url) => /\.(?:pdf|djvu?|tiff?)(?:[/?#]|$)|\/page\d+-\d*px-/i.test(url);
 
-// ai/section-aliases.ts
-var name = (zhTW2, en2) => ({ zh: zhTW2, en: en2 });
-var SECTION_NAME = {
-  // sources role: any one of the three names; a structure uses the one that fits its type
-  sources: name("\u4F86\u6E90", "Sources"),
-  source: name("\u51FA\u8655", "Source"),
-  references: name("\u53C3\u8003\u8CC7\u6599", "References"),
-  // log role (unchanged name)
-  log: name("\u66F4\u65B0\u7D00\u9304", "Update log"),
-  // log role for the picture-book chapter template: only when no section has the standard log name
-  researchNotes: name("\u7814\u7A76\u5099\u8A3B", "Research notes"),
-  // atomic
-  oneSentence: name("\u4E00\u53E5\u8A71", "In one sentence"),
-  why: name("\u70BA\u4EC0\u9EBC", "Why"),
-  // hypothesis
-  ifTrue: name("\u5982\u679C\u6210\u7ACB\u6703\u770B\u5230", "If true we would see"),
-  evidenceTable: name("\u8B49\u64DA\u5C0D\u7167", "Evidence table"),
-  // evidence
-  summary: name("\u6458\u8981", "Summary"),
-  relatedTopics: name("\u548C\u54EA\u4E9B\u8B70\u984C\u6709\u95DC", "Related topics"),
-  // conclusion
-  confidence: name("\u4FE1\u5FC3", "Confidence"),
-  scope: name("\u9069\u7528\u7BC4\u570D", "Scope"),
-  impact: name("\u5F71\u97FF\u8207\u4E0B\u4E00\u6B65", "Impact and next steps"),
-  // action
-  goalDone: name("\u76EE\u6A19\u8207\u5B8C\u6210\u689D\u4EF6", "Goal and done-when"),
-  steps: name("\u6B65\u9A5F", "Steps")
-};
-var NEW_STANDARD_HEADING_KEYS = [
-  "detail.background_and_mechanism",
-  "detail.disagreements_and_limits",
-  "detail.open_questions_to_check",
-  "detail.sources_heading"
-];
-var lowered = (value) => value.trim().toLocaleLowerCase();
-var SPELLINGS = ["zh-TW", "zh-CN", "en"];
-var spellings = (key4) => SPELLINGS.map((locale) => translate(locale, key4));
-var both = (value) => [value.zh, value.en];
-var rows;
-var researchNotesNames = () => [...both(SECTION_NAME.researchNotes), "\u7814\u7A76\u5907\u6CE8"];
-function sectionAliasRows() {
-  if (rows) return rows;
-  const sourcesNames = [
-    ...both(SECTION_NAME.sources),
-    ...both(SECTION_NAME.source),
-    ...both(SECTION_NAME.references),
-    ...spellings("detail.sources_heading"),
-    "\u51FA\u5904",
-    "\u53C2\u8003\u8D44\u6599"
-  ];
-  const legacySources = spellings("detail.evidence_and_sources");
-  rows = [
-    // role sources: the old standard name, and the three new names for each other
-    { names: sourcesNames, aliases: [...sourcesNames, ...legacySources] },
-    // Research notes: a note that only has the old log heading still lines up with it
-    { names: researchNotesNames(), aliases: spellings("detail.update_log") },
-    // standard / textbook
-    { names: spellings("detail.background_and_mechanism"), aliases: spellings("detail.key_knowledge") },
-    { names: spellings("detail.disagreements_and_limits"), aliases: spellings("detail.tradeoffs_and_limitations") },
-    { names: spellings("detail.open_questions_to_check"), aliases: spellings("detail.open_questions") },
-    // atomic
-    { names: both(SECTION_NAME.oneSentence), aliases: ["\u5B9A\u7FA9", "Definition"] },
-    { names: both(SECTION_NAME.why), aliases: ["\u89E3\u91CB", "Explanation"] },
-    // hypothesis: the old support and counterevidence sections both land on the one table
-    { names: both(SECTION_NAME.ifTrue), aliases: ["\u9810\u6E2C", "Prediction"] },
-    { names: both(SECTION_NAME.evidenceTable), aliases: ["\u652F\u6301", "\u53CD\u99C1", "Support", "Counterevidence"] },
-    // evidence
-    { names: both(SECTION_NAME.summary), aliases: ["\u5167\u5BB9", "Content"] },
-    { names: both(SECTION_NAME.relatedTopics), aliases: ["\u652F\u6301\u6216\u53CD\u99C1", "Supports or refutes"] },
-    // conclusion
-    { names: both(SECTION_NAME.confidence), aliases: ["\u4FE1\u5FC3\u7A0B\u5EA6"] },
-    { names: both(SECTION_NAME.scope), aliases: ["\u9069\u7528\u7BC4\u570D\u8207\u9650\u5236", "Scope and limits"] },
-    { names: both(SECTION_NAME.impact), aliases: ["\u5F8C\u7E8C\u884C\u52D5", "Next actions"] },
-    // action
-    { names: both(SECTION_NAME.goalDone), aliases: ["\u76EE\u6A19", "\u5B8C\u6210\u689D\u4EF6", "Goal", "Done when"] },
-    { names: both(SECTION_NAME.steps), aliases: ["\u6AA2\u67E5\u9EDE", "Checkpoints"] }
-  ];
-  return rows;
-}
-function sectionAliasesFor(heading) {
-  const key4 = lowered(heading);
-  const result = [];
-  for (const row of sectionAliasRows())
-    if (row.names.some((entry) => lowered(entry) === key4)) {
-      for (const alias of row.aliases)
-        if (lowered(alias) !== key4 && !result.some((existing) => lowered(existing) === lowered(alias)))
-          result.push(alias);
-    }
-  return result;
-}
-function isNewSourcesHeading(heading) {
-  const key4 = lowered(heading);
-  return sectionAliasRows()[0].names.some((entry) => lowered(entry) === key4);
-}
-function isOpenQuestionsHeading(heading) {
-  const key4 = lowered(heading);
-  return [...spellings("detail.open_questions_to_check"), ...spellings("detail.open_questions")].some(
-    (entry) => lowered(entry) === key4
-  );
-}
-function isResearchNotesHeading(heading) {
-  const key4 = lowered(heading);
-  return researchNotesNames().some((entry) => lowered(entry) === key4);
-}
-
 // core/book-pipeline/text.ts
 var import_node_crypto = require("node:crypto");
 function demoteHeadings(text10) {
@@ -13086,6 +13092,542 @@ function unescapeMarkdownText(text10) {
 }
 function hashText(text10) {
   return (0, import_node_crypto.createHash)("sha256").update(text10.replace(/\r\n?/g, "\n")).digest("hex").slice(0, 16);
+}
+
+// core/book-pipeline/image-slots.ts
+var MAX_SEARCH_TERMS = 4;
+var SEARCH_TERM_MAX = 60;
+function cleanSearchTerms(values) {
+  const out = [];
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const term = cleanSlotText(value.replace(/[,;]/g, " "), SEARCH_TERM_MAX);
+    if (!/[A-Za-z]/.test(term) || out.some((have) => have.toLowerCase() === term.toLowerCase())) continue;
+    out.push(term);
+    if (out.length >= MAX_SEARCH_TERMS) break;
+  }
+  return out;
+}
+var DEFAULT_IMAGE_SLOTS = 8;
+var MAX_IMAGE_SLOTS = 12;
+var imageSlotCap = (range) => {
+  var _a2;
+  return Math.min(MAX_IMAGE_SLOTS, Math.max(DEFAULT_IMAGE_SLOTS, (_a2 = range == null ? void 0 : range.max) != null ? _a2 : 0));
+};
+function cleanSlotText(value, max) {
+  const text10 = value.replace(/[〔〕｜]/g, " ").replace(/\s+/g, " ").trim();
+  return Array.from(text10).slice(0, max).join("").trim();
+}
+var STANDALONE_MARKER = /^\s*〔圖位 ([1-9]\d*)：([^〔〕]+?)〕\s*$/;
+var MARKER_OPEN = "\u3014\u5716\u4F4D";
+var OPEN_FENCE = /^[ \t]*(`{3,}|~{3,})(.*)$/;
+var QUOTE_LINE = /^ {0,3}>/;
+var INDENTED_CODE = /^(?: {4}|\t)/;
+var BLOCK_START = /^ {0,3}(?:#{1,6}(?:\s|$)|[-*+]\s|\d+[.)]\s|(?:[-*_][ \t]*){3,}$)/;
+function protectedLines(lines) {
+  const out = [];
+  let fence;
+  let quote3 = false;
+  let code3 = false;
+  for (const line2 of lines) {
+    if (fence) {
+      out.push(true);
+      const close = OPEN_FENCE.exec(line2);
+      if (close && close[1][0] === fence.char && close[1].length >= fence.size && !close[2].trim()) fence = void 0;
+      continue;
+    }
+    const open2 = OPEN_FENCE.exec(line2);
+    if (open2 && !(open2[1][0] === "`" && open2[2].includes("`"))) {
+      fence = { char: open2[1][0], size: open2[1].length };
+      out.push(true);
+      quote3 = false;
+      code3 = false;
+      continue;
+    }
+    const blank2 = !line2.trim();
+    const prevBlank = out.length === 0 || !lines[out.length - 1].trim();
+    if (QUOTE_LINE.test(line2)) {
+      quote3 = true;
+      code3 = false;
+      out.push(true);
+    } else if (quote3 && !blank2 && !BLOCK_START.test(line2)) {
+      out.push(true);
+    } else if (INDENTED_CODE.test(line2) && !blank2 && (prevBlank || code3)) {
+      quote3 = false;
+      code3 = true;
+      out.push(true);
+    } else {
+      if (!blank2) code3 = false;
+      quote3 = false;
+      out.push(false);
+    }
+  }
+  return out;
+}
+function markerCore(line2) {
+  return stripSearchTerms(line2).trim().replace(/^(?:[-+*]|\d+[.)])\s+/, "").replace(/^[*_~]+/, "").replace(/[*_~]+$/, "").trim();
+}
+function markerLineKind(line2) {
+  const core2 = markerCore(line2);
+  if (STANDALONE_MARKER.test(core2)) return "own";
+  return /^〔圖位[^〔〕]*〕$/.test(core2) ? "bad" : void 0;
+}
+function isShell(rest) {
+  return /^(?:[-+]|\d+[.)])?$/.test(rest.replace(/[\s*_~]+/g, ""));
+}
+function scanSlotMarkers(content, slots) {
+  const lines = content.split(/\r?\n/);
+  const guarded = protectedLines(lines);
+  const planned = new Set(slots.map((slot) => slot.index));
+  const scan3 = { found: /* @__PURE__ */ new Map(), duplicateLines: [], badLines: [], inlineLines: [], omitted: [] };
+  lines.forEach((line2, at) => {
+    var _a2;
+    if (guarded[at] || !line2.includes(MARKER_OPEN)) return;
+    const kind = markerLineKind(line2);
+    if (kind === "own") {
+      const index = Number((_a2 = STANDALONE_MARKER.exec(markerCore(line2))) == null ? void 0 : _a2[1]);
+      if (!planned.has(index)) scan3.badLines.push(at);
+      else if (scan3.found.has(index)) scan3.duplicateLines.push(at);
+      else scan3.found.set(index, at);
+      return;
+    }
+    if (kind === "bad") {
+      scan3.badLines.push(at);
+      return;
+    }
+    scan3.inlineLines.push(at);
+  });
+  scan3.omitted = slots.map((slot) => slot.index).filter((index) => !scan3.found.has(index));
+  return scan3;
+}
+var INLINE_MARKER = /〔圖位[^〔〕\n]*〕|〔圖位\s*\d+\s*[：:]|〔圖位/g;
+function residualMarkerLines(content) {
+  const lines = content.split(/\r?\n/);
+  const guarded = protectedLines(lines);
+  const out = [];
+  lines.forEach((line2, at) => {
+    if (!guarded[at] && line2.includes(MARKER_OPEN)) out.push(at);
+  });
+  return out;
+}
+var isHttps = (url) => {
+  try {
+    return new URL(url).protocol === "https:";
+  } catch (e) {
+    return false;
+  }
+};
+function pickForSlot(ctx, candidates) {
+  const secure = candidates.filter((item) => isHttps(item.imageUrl));
+  const picked = new Set([...ctx.alreadyPicked].map(imageKey));
+  const hit = secure.find((item) => {
+    const work = workKey(item.imageUrl, item.author);
+    return !picked.has(imageKey(item.imageUrl)) && !(work && picked.has(work));
+  });
+  if (hit) return { candidate: hit };
+  if (candidates.length && !secure.length) return { none: true, reasonCode: "unsafe_url" };
+  return { none: true, reasonCode: "not_found" };
+}
+function plainLine(text10) {
+  return text10 && /^[\s\p{P}\p{S}]+$/u.test(text10) && /^[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]/.test(text10) && !text10.startsWith("\\") ? `\\${text10}` : text10;
+}
+var SOURCE_URL_MAX = 1e3;
+var CREDIT_TEXT_MAX = 80;
+function sourceOf(candidate, alt, language2) {
+  let page;
+  try {
+    page = new URL(candidate.sourceUrl.trim());
+  } catch (e) {
+    return void 0;
+  }
+  if (page.protocol !== "https:" || page.username || page.password || page.href.length > SOURCE_URL_MAX)
+    return void 0;
+  const href = page.href.replace(/\(/g, "%28").replace(/\)/g, "%29");
+  const lang = language2;
+  const credit = (value, max) => plainLine(escapeMarkdownText((value != null ? value : "").replace(/[〔〕]/g, " "), max));
+  const author = credit(candidate.author, CREDIT_TEXT_MAX);
+  const license = credit(candidate.license, CREDIT_TEXT_MAX);
+  const site = escapeMarkdownText(page.hostname.replace(/^www\./i, ""), 100);
+  const parts = [
+    site,
+    ...author ? [translateNote(lang, "note.image_author_0", author)] : [],
+    ...license ? [license] : []
+  ];
+  const detail = translateNote(
+    lang,
+    "note.image_source_0_1",
+    parts.join(" \xB7 "),
+    `[${translateNote(lang, "note.image_link")}](${href})`
+  );
+  return {
+    href: page.href,
+    line: translateNote(lang, "note.image_source_label_0", detail),
+    entry: translateNote(lang, "note.image_source_entry_0_1", alt, detail)
+  };
+}
+function figureOf(candidate, href, language2) {
+  const plain = (value) => value.replace(/[〔〕]/g, " ");
+  const alt = escapeMarkdownText(plain(candidate.title), 80) || (/^zh/i.test(language2) ? "\u5716" : "image");
+  const source = sourceOf(candidate, alt, language2);
+  return {
+    href,
+    alt,
+    caption: candidate.loose ? translateNote(language2, "note.image_file_caption_0", alt) : plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
+    ...source ? { source } : {}
+  };
+}
+function choosePictures(chapter, slots, perSlot, taken, language2) {
+  var _a2;
+  const outcomes = /* @__PURE__ */ new Map();
+  const alreadyPicked = /* @__PURE__ */ new Set();
+  for (const slot of slots) {
+    const all = (_a2 = perSlot.get(slot.index)) != null ? _a2 : [];
+    const usable = all.filter((item) => {
+      if (!item.href || !item.loaded || taken(imageKey(item.href))) return false;
+      const work = workKey(item.href, item.candidate.author);
+      return !(work && taken(work));
+    });
+    const pick8 = pickForSlot(
+      { chapter, slot, allSlots: slots, alreadyPicked },
+      usable.map((item) => ({ ...item.candidate, imageUrl: item.href }))
+    );
+    if ("candidate" in pick8) {
+      alreadyPicked.add(pick8.candidate.imageUrl);
+      const work = workKey(pick8.candidate.imageUrl, pick8.candidate.author);
+      if (work) alreadyPicked.add(work);
+      const figure = figureOf(pick8.candidate, pick8.candidate.imageUrl, language2);
+      outcomes.set(slot.index, { figure: work ? { ...figure, work } : figure });
+      continue;
+    }
+    let reasonCode = pick8.reasonCode;
+    if (!usable.length) {
+      if (!all.length) reasonCode = "not_found";
+      else if (all.every((item) => !item.href)) reasonCode = "unsafe_url";
+      else if (all.some((item) => item.href && !item.loaded && !item.skipped)) reasonCode = "load_failed";
+      else if (all.some((item) => item.skipped)) reasonCode = "probe_capped";
+      else reasonCode = "not_found";
+    }
+    outcomes.set(slot.index, { reasonCode, ...pick8.reasonText ? { reasonText: pick8.reasonText } : {} });
+  }
+  return outcomes;
+}
+var BAD_INDEX = /〔圖位\s*(\d+)/;
+var isBlank = (line2) => line2 === void 0 || !line2.trim();
+function fillSlotMarkers(content, slots, outcomes) {
+  var _a2;
+  const lines = content.split("\n");
+  const scan3 = scanSlotMarkers(content, slots);
+  const cr = content.includes("\r\n") ? "\r" : "";
+  const figureAt = /* @__PURE__ */ new Map();
+  const missing = [];
+  const placed = [];
+  const sources = [];
+  const planned = new Set(slots.map((slot) => slot.index));
+  const badIndexes = /* @__PURE__ */ new Set();
+  for (const at of scan3.badLines) {
+    const m = BAD_INDEX.exec(lines[at]);
+    if (m && planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
+  }
+  for (const at of scan3.inlineLines)
+    for (const m of lines[at].matchAll(/〔圖位\s*(\d+)/g)) if (planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
+  for (const slot of slots) {
+    const at = scan3.found.get(slot.index);
+    const outcome = outcomes.get(slot.index);
+    if (at === void 0) {
+      missing.push({ index: slot.index, reasonCode: badIndexes.has(slot.index) ? "bad_marker" : "author_omitted" });
+    } else if (outcome && "figure" in outcome) {
+      figureAt.set(at, outcome.figure);
+      placed.push({ index: slot.index, href: outcome.figure.href });
+      if (outcome.figure.source) sources.push({ href: outcome.figure.source.href, entry: outcome.figure.source.entry });
+    } else {
+      missing.push({ index: slot.index, reasonCode: (_a2 = outcome == null ? void 0 : outcome.reasonCode) != null ? _a2 : "not_found" });
+    }
+  }
+  const dropped = new Set(
+    [...scan3.badLines, ...scan3.duplicateLines, ...scan3.found.values()].filter((at) => !figureAt.has(at))
+  );
+  const inline = new Set(scan3.inlineLines);
+  const added = [];
+  const out = [];
+  let removed = false;
+  const push = (line2) => {
+    if (removed && isBlank(line2) && (!out.length || isBlank(out[out.length - 1]))) {
+      removed = false;
+      return;
+    }
+    removed = false;
+    out.push(line2);
+  };
+  lines.forEach((line2, at) => {
+    const figure = figureAt.get(at);
+    if (figure) {
+      if (out.length && !isBlank(out[out.length - 1])) out.push("");
+      const image = `![${figure.alt}](${figure.href})${cr}`;
+      const caption = `${figure.caption}${cr}`;
+      added.push(image, caption);
+      out.push(image, caption);
+      if (figure.source) {
+        const source = `${figure.source.line}${cr}`;
+        added.push(source);
+        out.push(source);
+      }
+      if (!isBlank(lines[at + 1])) out.push(cr ? "\r" : "");
+      return;
+    }
+    if (dropped.has(at)) {
+      removed = true;
+      return;
+    }
+    if (inline.has(at)) {
+      const rest = line2.replace(INLINE_MARKER, "");
+      if (isShell(rest)) {
+        removed = true;
+        return;
+      }
+      push(rest);
+      return;
+    }
+    push(line2);
+  });
+  return { text: out.join("\n"), placed, missing, bad: scan3.badLines.length, sources, added };
+}
+function withoutMarkers(text10) {
+  const lines = text10.split("\n");
+  const guarded = protectedLines(lines);
+  const out = [];
+  lines.forEach((line2, at) => {
+    if (guarded[at] || !line2.includes(MARKER_OPEN)) {
+      out.push(line2);
+      return;
+    }
+    if (markerLineKind(line2)) return;
+    const rest = line2.replace(INLINE_MARKER, "");
+    if (!isShell(rest)) out.push(rest);
+  });
+  return out.map((line2) => line2.replace(/\s+$/, "")).filter((line2) => line2.trim());
+}
+function verifyFill(original, result, slots) {
+  const seen = [...result.placed, ...result.missing].map((item) => item.index).sort((a, b) => a - b);
+  const want = slots.map((slot) => slot.index).sort((a, b) => a - b);
+  if (seen.length !== want.length || seen.some((index, i) => index !== want[i])) return "count";
+  if (residualMarkerLines(result.text).length) return "residual";
+  const rest = withoutMarkers(result.text);
+  for (const line2 of result.added) {
+    const at = rest.indexOf(line2.replace(/\s+$/, ""));
+    if (at < 0) return "deleted_text";
+    rest.splice(at, 1);
+  }
+  const before = withoutMarkers(original);
+  return before.length === rest.length && before.every((line2, i) => line2 === rest[i]) ? void 0 : "deleted_text";
+}
+var REASONS = [
+  "author_omitted",
+  "bad_marker",
+  "not_found",
+  "load_failed",
+  "unsafe_url",
+  "probe_capped"
+];
+function shortHash(url) {
+  let hash = 2166136261;
+  for (const char of imageKey(url)) {
+    hash ^= char.codePointAt(0);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+function composeSlotsRecord(result, off = /* @__PURE__ */ new Set()) {
+  const slots = [
+    ...result.placed.map((item) => ({
+      index: item.index,
+      state: "placed",
+      hash: shortHash(item.href),
+      ...off.has(item.index) ? { off: true } : {}
+    })),
+    ...result.missing.map((item) => ({ index: item.index, state: "missing", reasonCode: item.reasonCode }))
+  ].sort((a, b) => a.index - b.index);
+  return `<!-- book-slots:v1 ${JSON.stringify({ slots, bad: result.bad })} -->`;
+}
+var RECORD_LINE = /^(?:[ \t]{0,3}>[ \t]?)*<!-- book-slots:v1 (\{.*\}) -->$/;
+function latestSlotsRecord(detail) {
+  const lines = detail.split("\n");
+  const fenced = fencedLines(lines);
+  let found;
+  lines.forEach((line2, at) => {
+    const m = fenced[at] ? null : RECORD_LINE.exec(line2.replace(/\r$/, "").trim());
+    if (!m) return;
+    try {
+      const data = JSON.parse(m[1]);
+      if (!Array.isArray(data.slots)) return;
+      const items = [];
+      for (const raw of data.slots.slice(0, MAX_IMAGE_SLOTS)) {
+        if (!raw || !Number.isInteger(raw.index) || raw.index < 1) continue;
+        const state = raw.state === "placed" ? "placed" : raw.state === "missing" ? "missing" : void 0;
+        if (!state) continue;
+        const reasonCode = REASONS.find((code3) => code3 === raw.reasonCode);
+        items.push({
+          index: raw.index,
+          state,
+          ...reasonCode ? { reasonCode } : {},
+          ...typeof raw.hash === "string" && /^[0-9a-f]{8}$/.test(raw.hash) ? { hash: raw.hash } : {},
+          ...state === "placed" && raw.off === true ? { off: true } : {}
+        });
+      }
+      found = { slots: items, bad: Number.isInteger(data.bad) && data.bad > 0 ? data.bad : 0 };
+    } catch (e) {
+    }
+  });
+  return found;
+}
+var IMAGE_IN_LINE = /!\[[^\]\n]*\]\((https:\/\/[^)\s]+)\)/g;
+var SOURCE_LINE = /^(?:來源|来源|Source)[:：][ \t]*\S/;
+var IMAGE_ONLY_LINE = /^[ \t]*!\[[^\]\n]*\]\(https:\/\/[^)\s]+\)[ \t]*\r?$/;
+function stripImageLines(text10) {
+  const lines = text10.split("\n");
+  const guarded = protectedLines(lines);
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!guarded[i] && IMAGE_ONLY_LINE.test(lines[i])) {
+      const plainAt = (at) => at < lines.length && !isBlank(lines[at]) && !guarded[at] && !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[at]);
+      const endsAt = (at) => isBlank(lines[at]) || /^\s*#/.test(lines[at]);
+      if (plainAt(i + 1) && plainAt(i + 2) && SOURCE_LINE.test(lines[i + 2]) && endsAt(i + 3)) i += 2;
+      else if (plainAt(i + 1) && endsAt(i + 2)) i++;
+      continue;
+    }
+    out.push(lines[i]);
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+function describeSlots(slots, record, imageUrls) {
+  const now = new Set(imageUrls.map(shortHash));
+  return slots.map((slot) => {
+    const item = record == null ? void 0 : record.slots.find((entry) => entry.index === slot.index);
+    if (!item) return { index: slot.index, state: "unrecorded" };
+    if (item.state === "missing")
+      return {
+        index: slot.index,
+        state: "missing",
+        ...item.reasonCode ? { reasonCode: item.reasonCode } : {}
+      };
+    return { index: slot.index, state: item.hash && now.has(item.hash) ? "placed" : "edited" };
+  });
+}
+var STOP_CJK = /* @__PURE__ */ new Set([..."\u7684\u4E86\u662F\u5728\u548C\u8207\u4E0E\u53CA\u6216\u5C0D\u5BF9\u628A\u88AB\u70BA\u4E3A\u4EE5\u4E4B\u65BC\u4E8E\u4E26\u5E76\u4E2D\u4E0A\u4E0B\u9019\u8FD9\u90A3\u4E00\u500B\u4E2A\u4E5F\u90FD\u5C31\u800C\u4F46"]);
+var STOP_WORDS = /* @__PURE__ */ new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "that",
+  "this",
+  "from",
+  "into",
+  "over",
+  "about",
+  "how",
+  "what"
+]);
+function slotKeywords(explains) {
+  var _a2, _b2;
+  const out = /* @__PURE__ */ new Set();
+  for (const word of (_a2 = explains.toLowerCase().match(/[a-z0-9][a-z0-9'-]{2,}/g)) != null ? _a2 : [])
+    if (!STOP_WORDS.has(word)) out.add(word);
+  for (const run of (_b2 = explains.match(/\p{Script=Han}+/gu)) != null ? _b2 : []) {
+    let part = "";
+    const flush = () => {
+      const chars = Array.from(part);
+      for (let i = 0; i + 1 < chars.length; i++) out.add(chars[i] + chars[i + 1]);
+      part = "";
+    };
+    for (const char of run) {
+      if (STOP_CJK.has(char)) flush();
+      else part += char;
+    }
+    flush();
+  }
+  return [...out];
+}
+var KEYWORD_HITS = 2;
+function checkImageText(body, slots, record) {
+  var _a2;
+  const empty = { planned: 0, placed: 0, imageCount: 0, bad: 0, issues: [] };
+  if (!(slots == null ? void 0 : slots.length)) return { kind: "none", ...empty };
+  if (!record) return { kind: "unrecorded", ...empty, planned: slots.length };
+  const lines = body.split("\n");
+  const guarded = protectedLines(lines);
+  const blocks = [];
+  let current = [];
+  let hashes = [];
+  let docs = [];
+  const close = () => {
+    if (current.length) blocks.push({ text: current.join("\n"), hashes, docs });
+    current = [];
+    hashes = [];
+    docs = [];
+  };
+  lines.forEach((line2, at) => {
+    if (guarded[at] || isBlank(line2)) {
+      close();
+      return;
+    }
+    current.push(line2);
+    for (const m of line2.matchAll(IMAGE_IN_LINE)) {
+      hashes.push(shortHash(m[1]));
+      if (isDocumentFile(m[1])) docs.push(shortHash(m[1]));
+    }
+  });
+  close();
+  const imageCount = blocks.reduce((sum2, block) => sum2 + block.hashes.length, 0);
+  const placedItems = record.slots.filter((item) => item.state === "placed");
+  const issues = [];
+  for (const item of record.slots)
+    if (item.state === "missing") issues.push({ index: item.index, code: (_a2 = item.reasonCode) != null ? _a2 : "not_found" });
+  if (imageCount !== placedItems.length) issues.push({ code: "count" });
+  for (const item of placedItems) {
+    const at = blocks.findIndex((block) => item.hash !== void 0 && block.hashes.includes(item.hash));
+    const slot = slots.find((entry) => entry.index === item.index);
+    if (at < 0 || !slot) continue;
+    if (item.off || blocks[at].docs.includes(item.hash)) {
+      issues.push({ index: item.index, code: "mismatch" });
+      continue;
+    }
+    const around = [at - 1, at + 1].map((i) => blocks[i]).filter((block) => block && !block.hashes.length).map((block) => block.text.toLowerCase()).join("\n");
+    const words2 = slotKeywords(slot.explains);
+    const hits = words2.filter((word) => around.includes(word)).length;
+    if (words2.length && hits < Math.min(KEYWORD_HITS, words2.length))
+      issues.push({ index: item.index, code: "mismatch" });
+  }
+  return { kind: "checked", planned: slots.length, placed: placedItems.length, imageCount, bad: record.bad, issues };
+}
+function composeImageTextLine(language2, check) {
+  const note = noteLanguageOf(language2);
+  if (check.kind === "none") return translate(note, "detail.book_slots_none");
+  if (check.kind === "unrecorded") return translate(note, "detail.book_slots_unrecorded");
+  const joiner = /^zh/i.test(language2) ? "\uFF1B" : "; ";
+  const parts = check.issues.map(
+    (issue2) => issue2.code === "count" ? translate(note, "detail.book_slots_count_0_1", String(check.imageCount), String(check.placed)) : translate(
+      note,
+      "detail.book_slots_slot_0_1",
+      String(issue2.index),
+      translate(note, `detail.book_slots_reason_${issue2.code}`)
+    )
+  );
+  if (check.bad) parts.push(translate(note, "detail.book_slots_bad_0", String(check.bad)));
+  return parts.length ? translate(note, "detail.book_slots_issues_0", parts.join(joiner)) : translate(note, "detail.book_slots_ok_0", String(check.placed));
+}
+function imageIssueTokens(check) {
+  const tokens2 = check.issues.map(
+    (issue2) => issue2.code === "count" ? "image_count" : issue2.code === "mismatch" ? `image_${issue2.index}_mismatch` : `image_${issue2.index}`
+  );
+  return check.bad ? [...tokens2, "image_marker"] : tokens2;
+}
+var pictureShortfallToken = (placed, minimum) => `images:under:${placed}:${minimum}`;
+var SHORTFALL = /(?:^|\s)images:under:(\d+):(\d+)(?=\s|$)/;
+function splitPictureIssue(issue2) {
+  const m = SHORTFALL.exec(issue2);
+  if (!m) return { rest: issue2 };
+  const rest = issue2.replace(SHORTFALL, "").trim().replace(/^images unmet:(?:\s+\S+)*$|^images unmet$/, "");
+  return { rest, shortfall: { placed: Number(m[1]), minimum: Number(m[2]) } };
 }
 
 // core/note-placeholder.ts
@@ -13805,7 +14347,7 @@ var CALLOUT_HEAD = /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?(?:[ \t].*)?$/;
 var RECORD_KEY = /^<!-- book-proof:v1 (\{.*\}) -->$/;
 var HIDDEN_CALLOUT = "vam-book";
 var HIDDEN_HEAD = /^[ \t]{0,3}>[ \t]?\[!vam-book\][+-]?(?:[ \t].*)?$/i;
-var QUOTE_LINE = /^[ \t]{0,3}>/;
+var QUOTE_LINE2 = /^[ \t]{0,3}>/;
 var LOG_LINE = /^(?:[-*+][ \t]+)?\d{4}-\d{2}-\d{2}/;
 var ANY_RECORD = /<!-- book-(?:proof|slots|body):v1 \{.*\} -->/;
 var bare = (line2) => line2.replace(/\r$/, "");
@@ -13855,7 +14397,7 @@ function recordKey(record) {
 }
 function quoteRunEnd(lines, fenced, from) {
   let end = from;
-  while (end < lines.length && !fenced[end] && QUOTE_LINE.test(lines[end])) end++;
+  while (end < lines.length && !fenced[end] && QUOTE_LINE2.test(lines[end])) end++;
   return end;
 }
 function hiddenRanges(lines, fenced) {
@@ -14358,7 +14900,7 @@ function chapterBody(detail) {
   }
   return lines.join("\n").replace(/\s+$/, "");
 }
-var IMAGE_ONLY_LINE = /^\s*(?:(?:!\[[^\]]*\]\([^)]*\)|!\[\[[^\]]*\]\])\s*)+$/;
+var IMAGE_ONLY_LINE2 = /^\s*(?:(?:!\[[^\]]*\]\([^)]*\)|!\[\[[^\]]*\]\])\s*)+$/;
 function chapterTextMask(lines) {
   var _a2;
   const mask = lines.map(() => false);
@@ -14387,7 +14929,7 @@ function chapterTextMask(lines) {
   const code3 = fencedLines(cur);
   cur.forEach((line2, i) => {
     const text10 = bare(line2);
-    mask[index[i]] = !code3[i] && !HEADING.test(text10) && !IMAGE_ONLY_LINE.test(text10);
+    mask[index[i]] = !code3[i] && !HEADING.test(text10) && !IMAGE_ONLY_LINE2.test(text10);
   });
   return mask;
 }
@@ -14399,7 +14941,7 @@ function detailBlockOf(content) {
   const end = content.indexOf(DETAIL_END, start + 1);
   return start < 0 || end < 0 ? void 0 : content.slice(start + DETAIL_START.length, end);
 }
-function protectedLines(lines, withDetail = true) {
+function protectedLines2(lines, withDetail = true) {
   var _a2;
   const flags = fencedLines(lines);
   if (((_a2 = lines[0]) == null ? void 0 : _a2.trim()) === "---") {
@@ -14418,7 +14960,7 @@ function protectedLines(lines, withDetail = true) {
 }
 function replaceProofSection(content, heading, body) {
   const lines = content.split("\n");
-  const flags = protectedLines(lines);
+  const flags = protectedLines2(lines);
   const names3 = new Set(NOTE_LANGUAGES.map((locale) => translate(locale, "detail.book_proof_heading").trim()));
   const entry = `> [!${HIDDEN_CALLOUT}]- ${heading}
 ${quoteAll(body.trim())}`;
@@ -14471,7 +15013,7 @@ function dropPlaceholderSections(content) {
   const placeholders = PLACEHOLDERS();
   let lines = content.split("\n");
   for (let from = 0; ; ) {
-    const flags = protectedLines(lines, false);
+    const flags = protectedLines2(lines, false);
     const hit = findSection(lines, flags, (_, level) => level >= 3, from);
     if (!hit) break;
     let end = hit.end;
@@ -14740,540 +15282,33 @@ function expandChapterDetail(oldDetail, newDetail, language2, sent = "", scope =
   };
 }
 
-// core/book-pipeline/image-slots.ts
-var MAX_SEARCH_TERMS = 4;
-var SEARCH_TERM_MAX = 60;
-function cleanSearchTerms(values) {
-  const out = [];
-  for (const value of values) {
-    if (typeof value !== "string") continue;
-    const term = cleanSlotText(value.replace(/[,;]/g, " "), SEARCH_TERM_MAX);
-    if (!/[A-Za-z]/.test(term) || out.some((have) => have.toLowerCase() === term.toLowerCase())) continue;
-    out.push(term);
-    if (out.length >= MAX_SEARCH_TERMS) break;
-  }
-  return out;
-}
-var DEFAULT_IMAGE_SLOTS = 8;
-var MAX_IMAGE_SLOTS = 12;
-var imageSlotCap = (range) => {
-  var _a2;
-  return Math.min(MAX_IMAGE_SLOTS, Math.max(DEFAULT_IMAGE_SLOTS, (_a2 = range == null ? void 0 : range.max) != null ? _a2 : 0));
-};
-function cleanSlotText(value, max) {
-  const text10 = value.replace(/[〔〕｜]/g, " ").replace(/\s+/g, " ").trim();
-  return Array.from(text10).slice(0, max).join("").trim();
-}
-var STANDALONE_MARKER = /^\s*〔圖位 ([1-9]\d*)：([^〔〕]+?)〕\s*$/;
-var MARKER_OPEN = "\u3014\u5716\u4F4D";
-var OPEN_FENCE = /^[ \t]*(`{3,}|~{3,})(.*)$/;
-var QUOTE_LINE2 = /^ {0,3}>/;
-var INDENTED_CODE = /^(?: {4}|\t)/;
-var BLOCK_START = /^ {0,3}(?:#{1,6}(?:\s|$)|[-*+]\s|\d+[.)]\s|(?:[-*_][ \t]*){3,}$)/;
-function protectedLines2(lines) {
-  const out = [];
-  let fence;
-  let quote3 = false;
-  let code3 = false;
-  for (const line2 of lines) {
-    if (fence) {
-      out.push(true);
-      const close = OPEN_FENCE.exec(line2);
-      if (close && close[1][0] === fence.char && close[1].length >= fence.size && !close[2].trim()) fence = void 0;
-      continue;
-    }
-    const open2 = OPEN_FENCE.exec(line2);
-    if (open2 && !(open2[1][0] === "`" && open2[2].includes("`"))) {
-      fence = { char: open2[1][0], size: open2[1].length };
-      out.push(true);
-      quote3 = false;
-      code3 = false;
-      continue;
-    }
-    const blank2 = !line2.trim();
-    const prevBlank = out.length === 0 || !lines[out.length - 1].trim();
-    if (QUOTE_LINE2.test(line2)) {
-      quote3 = true;
-      code3 = false;
-      out.push(true);
-    } else if (quote3 && !blank2 && !BLOCK_START.test(line2)) {
-      out.push(true);
-    } else if (INDENTED_CODE.test(line2) && !blank2 && (prevBlank || code3)) {
-      quote3 = false;
-      code3 = true;
-      out.push(true);
-    } else {
-      if (!blank2) code3 = false;
-      quote3 = false;
-      out.push(false);
-    }
-  }
-  return out;
-}
-function markerCore(line2) {
-  return stripSearchTerms(line2).trim().replace(/^(?:[-+*]|\d+[.)])\s+/, "").replace(/^[*_~]+/, "").replace(/[*_~]+$/, "").trim();
-}
-function markerLineKind(line2) {
-  const core2 = markerCore(line2);
-  if (STANDALONE_MARKER.test(core2)) return "own";
-  return /^〔圖位[^〔〕]*〕$/.test(core2) ? "bad" : void 0;
-}
-function isShell(rest) {
-  return /^(?:[-+]|\d+[.)])?$/.test(rest.replace(/[\s*_~]+/g, ""));
-}
-function scanSlotMarkers(content, slots) {
-  const lines = content.split(/\r?\n/);
-  const guarded = protectedLines2(lines);
-  const planned = new Set(slots.map((slot) => slot.index));
-  const scan3 = { found: /* @__PURE__ */ new Map(), duplicateLines: [], badLines: [], inlineLines: [], omitted: [] };
-  lines.forEach((line2, at) => {
-    var _a2;
-    if (guarded[at] || !line2.includes(MARKER_OPEN)) return;
-    const kind = markerLineKind(line2);
-    if (kind === "own") {
-      const index = Number((_a2 = STANDALONE_MARKER.exec(markerCore(line2))) == null ? void 0 : _a2[1]);
-      if (!planned.has(index)) scan3.badLines.push(at);
-      else if (scan3.found.has(index)) scan3.duplicateLines.push(at);
-      else scan3.found.set(index, at);
-      return;
-    }
-    if (kind === "bad") {
-      scan3.badLines.push(at);
-      return;
-    }
-    scan3.inlineLines.push(at);
-  });
-  scan3.omitted = slots.map((slot) => slot.index).filter((index) => !scan3.found.has(index));
-  return scan3;
-}
-var INLINE_MARKER = /〔圖位[^〔〕\n]*〕|〔圖位\s*\d+\s*[：:]|〔圖位/g;
-function residualMarkerLines(content) {
-  const lines = content.split(/\r?\n/);
-  const guarded = protectedLines2(lines);
-  const out = [];
-  lines.forEach((line2, at) => {
-    if (!guarded[at] && line2.includes(MARKER_OPEN)) out.push(at);
-  });
-  return out;
-}
-var isHttps = (url) => {
-  try {
-    return new URL(url).protocol === "https:";
-  } catch (e) {
-    return false;
-  }
-};
-function pickForSlot(ctx, candidates) {
-  const secure = candidates.filter((item) => isHttps(item.imageUrl));
-  const picked = new Set([...ctx.alreadyPicked].map(imageKey));
-  const hit = secure.find((item) => {
-    const work = workKey(item.imageUrl, item.author);
-    return !picked.has(imageKey(item.imageUrl)) && !(work && picked.has(work));
-  });
-  if (hit) return { candidate: hit };
-  if (candidates.length && !secure.length) return { none: true, reasonCode: "unsafe_url" };
-  return { none: true, reasonCode: "not_found" };
-}
-function plainLine(text10) {
-  return text10 && /^[\s\p{P}\p{S}]+$/u.test(text10) && /^[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]/.test(text10) && !text10.startsWith("\\") ? `\\${text10}` : text10;
-}
-var SOURCE_URL_MAX = 1e3;
-var CREDIT_TEXT_MAX = 80;
-function sourceOf(candidate, alt, language2) {
-  let page;
-  try {
-    page = new URL(candidate.sourceUrl.trim());
-  } catch (e) {
-    return void 0;
-  }
-  if (page.protocol !== "https:" || page.username || page.password || page.href.length > SOURCE_URL_MAX)
-    return void 0;
-  const href = page.href.replace(/\(/g, "%28").replace(/\)/g, "%29");
-  const lang = language2;
-  const credit = (value, max) => plainLine(escapeMarkdownText((value != null ? value : "").replace(/[〔〕]/g, " "), max));
-  const author = credit(candidate.author, CREDIT_TEXT_MAX);
-  const license = credit(candidate.license, CREDIT_TEXT_MAX);
-  const site = escapeMarkdownText(page.hostname.replace(/^www\./i, ""), 100);
-  const parts = [
-    site,
-    ...author ? [translateNote(lang, "note.image_author_0", author)] : [],
-    ...license ? [license] : []
-  ];
-  const detail = translateNote(
-    lang,
-    "note.image_source_0_1",
-    parts.join(" \xB7 "),
-    `[${translateNote(lang, "note.image_link")}](${href})`
-  );
-  return {
-    href: page.href,
-    line: translateNote(lang, "note.image_source_label_0", detail),
-    entry: translateNote(lang, "note.image_source_entry_0_1", alt, detail)
-  };
-}
-function figureOf(candidate, href, language2) {
-  const plain = (value) => value.replace(/[〔〕]/g, " ");
-  const alt = escapeMarkdownText(plain(candidate.title), 80) || (/^zh/i.test(language2) ? "\u5716" : "image");
-  const source = sourceOf(candidate, alt, language2);
-  return {
-    href,
-    alt,
-    caption: candidate.loose ? translateNote(language2, "note.image_file_caption_0", alt) : plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
-    ...source ? { source } : {}
-  };
-}
-function choosePictures(chapter, slots, perSlot, taken, language2) {
-  var _a2;
-  const outcomes = /* @__PURE__ */ new Map();
-  const alreadyPicked = /* @__PURE__ */ new Set();
-  for (const slot of slots) {
-    const all = (_a2 = perSlot.get(slot.index)) != null ? _a2 : [];
-    const usable = all.filter((item) => {
-      if (!item.href || !item.loaded || taken(imageKey(item.href))) return false;
-      const work = workKey(item.href, item.candidate.author);
-      return !(work && taken(work));
-    });
-    const pick8 = pickForSlot(
-      { chapter, slot, allSlots: slots, alreadyPicked },
-      usable.map((item) => ({ ...item.candidate, imageUrl: item.href }))
-    );
-    if ("candidate" in pick8) {
-      alreadyPicked.add(pick8.candidate.imageUrl);
-      const work = workKey(pick8.candidate.imageUrl, pick8.candidate.author);
-      if (work) alreadyPicked.add(work);
-      const figure = figureOf(pick8.candidate, pick8.candidate.imageUrl, language2);
-      outcomes.set(slot.index, { figure: work ? { ...figure, work } : figure });
-      continue;
-    }
-    let reasonCode = pick8.reasonCode;
-    if (!usable.length) {
-      if (!all.length) reasonCode = "not_found";
-      else if (all.every((item) => !item.href)) reasonCode = "unsafe_url";
-      else if (all.some((item) => item.href && !item.loaded && !item.skipped)) reasonCode = "load_failed";
-      else if (all.some((item) => item.skipped)) reasonCode = "probe_capped";
-      else reasonCode = "not_found";
-    }
-    outcomes.set(slot.index, { reasonCode, ...pick8.reasonText ? { reasonText: pick8.reasonText } : {} });
-  }
-  return outcomes;
-}
-var BAD_INDEX = /〔圖位\s*(\d+)/;
-var isBlank = (line2) => line2 === void 0 || !line2.trim();
-function fillSlotMarkers(content, slots, outcomes) {
-  var _a2;
-  const lines = content.split("\n");
-  const scan3 = scanSlotMarkers(content, slots);
-  const cr = content.includes("\r\n") ? "\r" : "";
-  const figureAt = /* @__PURE__ */ new Map();
-  const missing = [];
-  const placed = [];
-  const sources = [];
-  const planned = new Set(slots.map((slot) => slot.index));
-  const badIndexes = /* @__PURE__ */ new Set();
-  for (const at of scan3.badLines) {
-    const m = BAD_INDEX.exec(lines[at]);
-    if (m && planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
-  }
-  for (const at of scan3.inlineLines)
-    for (const m of lines[at].matchAll(/〔圖位\s*(\d+)/g)) if (planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
-  for (const slot of slots) {
-    const at = scan3.found.get(slot.index);
-    const outcome = outcomes.get(slot.index);
-    if (at === void 0) {
-      missing.push({ index: slot.index, reasonCode: badIndexes.has(slot.index) ? "bad_marker" : "author_omitted" });
-    } else if (outcome && "figure" in outcome) {
-      figureAt.set(at, outcome.figure);
-      placed.push({ index: slot.index, href: outcome.figure.href });
-      if (outcome.figure.source) sources.push({ href: outcome.figure.source.href, entry: outcome.figure.source.entry });
-    } else {
-      missing.push({ index: slot.index, reasonCode: (_a2 = outcome == null ? void 0 : outcome.reasonCode) != null ? _a2 : "not_found" });
-    }
-  }
-  const dropped = new Set(
-    [...scan3.badLines, ...scan3.duplicateLines, ...scan3.found.values()].filter((at) => !figureAt.has(at))
-  );
-  const inline = new Set(scan3.inlineLines);
-  const added = [];
-  const out = [];
-  let removed = false;
-  const push = (line2) => {
-    if (removed && isBlank(line2) && (!out.length || isBlank(out[out.length - 1]))) {
-      removed = false;
-      return;
-    }
-    removed = false;
-    out.push(line2);
-  };
-  lines.forEach((line2, at) => {
-    const figure = figureAt.get(at);
-    if (figure) {
-      if (out.length && !isBlank(out[out.length - 1])) out.push("");
-      const image = `![${figure.alt}](${figure.href})${cr}`;
-      const caption = `${figure.caption}${cr}`;
-      added.push(image, caption);
-      out.push(image, caption);
-      if (figure.source) {
-        const source = `${figure.source.line}${cr}`;
-        added.push(source);
-        out.push(source);
-      }
-      if (!isBlank(lines[at + 1])) out.push(cr ? "\r" : "");
-      return;
-    }
-    if (dropped.has(at)) {
-      removed = true;
-      return;
-    }
-    if (inline.has(at)) {
-      const rest = line2.replace(INLINE_MARKER, "");
-      if (isShell(rest)) {
-        removed = true;
-        return;
-      }
-      push(rest);
-      return;
-    }
-    push(line2);
-  });
-  return { text: out.join("\n"), placed, missing, bad: scan3.badLines.length, sources, added };
-}
-function withoutMarkers(text10) {
-  const lines = text10.split("\n");
-  const guarded = protectedLines2(lines);
-  const out = [];
-  lines.forEach((line2, at) => {
-    if (guarded[at] || !line2.includes(MARKER_OPEN)) {
-      out.push(line2);
-      return;
-    }
-    if (markerLineKind(line2)) return;
-    const rest = line2.replace(INLINE_MARKER, "");
-    if (!isShell(rest)) out.push(rest);
-  });
-  return out.map((line2) => line2.replace(/\s+$/, "")).filter((line2) => line2.trim());
-}
-function verifyFill(original, result, slots) {
-  const seen = [...result.placed, ...result.missing].map((item) => item.index).sort((a, b) => a - b);
-  const want = slots.map((slot) => slot.index).sort((a, b) => a - b);
-  if (seen.length !== want.length || seen.some((index, i) => index !== want[i])) return "count";
-  if (residualMarkerLines(result.text).length) return "residual";
-  const rest = withoutMarkers(result.text);
-  for (const line2 of result.added) {
-    const at = rest.indexOf(line2.replace(/\s+$/, ""));
-    if (at < 0) return "deleted_text";
-    rest.splice(at, 1);
-  }
-  const before = withoutMarkers(original);
-  return before.length === rest.length && before.every((line2, i) => line2 === rest[i]) ? void 0 : "deleted_text";
-}
-var REASONS = [
-  "author_omitted",
-  "bad_marker",
-  "not_found",
-  "load_failed",
-  "unsafe_url",
-  "probe_capped"
-];
-function shortHash(url) {
-  let hash = 2166136261;
-  for (const char of imageKey(url)) {
-    hash ^= char.codePointAt(0);
-    hash = Math.imul(hash, 16777619) >>> 0;
-  }
-  return hash.toString(16).padStart(8, "0");
-}
-function composeSlotsRecord(result, off = /* @__PURE__ */ new Set()) {
-  const slots = [
-    ...result.placed.map((item) => ({
-      index: item.index,
-      state: "placed",
-      hash: shortHash(item.href),
-      ...off.has(item.index) ? { off: true } : {}
-    })),
-    ...result.missing.map((item) => ({ index: item.index, state: "missing", reasonCode: item.reasonCode }))
-  ].sort((a, b) => a.index - b.index);
-  return `<!-- book-slots:v1 ${JSON.stringify({ slots, bad: result.bad })} -->`;
-}
-var RECORD_LINE = /^(?:[ \t]{0,3}>[ \t]?)*<!-- book-slots:v1 (\{.*\}) -->$/;
-function latestSlotsRecord(detail) {
-  const lines = detail.split("\n");
-  const fenced = fencedLines(lines);
-  let found;
-  lines.forEach((line2, at) => {
-    const m = fenced[at] ? null : RECORD_LINE.exec(line2.replace(/\r$/, "").trim());
-    if (!m) return;
-    try {
-      const data = JSON.parse(m[1]);
-      if (!Array.isArray(data.slots)) return;
-      const items = [];
-      for (const raw of data.slots.slice(0, MAX_IMAGE_SLOTS)) {
-        if (!raw || !Number.isInteger(raw.index) || raw.index < 1) continue;
-        const state = raw.state === "placed" ? "placed" : raw.state === "missing" ? "missing" : void 0;
-        if (!state) continue;
-        const reasonCode = REASONS.find((code3) => code3 === raw.reasonCode);
-        items.push({
-          index: raw.index,
-          state,
-          ...reasonCode ? { reasonCode } : {},
-          ...typeof raw.hash === "string" && /^[0-9a-f]{8}$/.test(raw.hash) ? { hash: raw.hash } : {},
-          ...state === "placed" && raw.off === true ? { off: true } : {}
-        });
-      }
-      found = { slots: items, bad: Number.isInteger(data.bad) && data.bad > 0 ? data.bad : 0 };
-    } catch (e) {
-    }
-  });
-  return found;
-}
-var IMAGE_IN_LINE = /!\[[^\]\n]*\]\((https:\/\/[^)\s]+)\)/g;
-var SOURCE_LINE = /^(?:來源|来源|Source)[:：][ \t]*\S/;
-var IMAGE_ONLY_LINE2 = /^[ \t]*!\[[^\]\n]*\]\(https:\/\/[^)\s]+\)[ \t]*\r?$/;
-function stripImageLines(text10) {
-  const lines = text10.split("\n");
-  const guarded = protectedLines2(lines);
-  const out = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (!guarded[i] && IMAGE_ONLY_LINE2.test(lines[i])) {
-      const plainAt = (at) => at < lines.length && !isBlank(lines[at]) && !guarded[at] && !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[at]);
-      const endsAt = (at) => isBlank(lines[at]) || /^\s*#/.test(lines[at]);
-      if (plainAt(i + 1) && plainAt(i + 2) && SOURCE_LINE.test(lines[i + 2]) && endsAt(i + 3)) i += 2;
-      else if (plainAt(i + 1) && endsAt(i + 2)) i++;
-      continue;
-    }
-    out.push(lines[i]);
-  }
-  return out.join("\n").replace(/\n{3,}/g, "\n\n");
-}
-function describeSlots(slots, record, imageUrls) {
-  const now = new Set(imageUrls.map(shortHash));
-  return slots.map((slot) => {
-    const item = record == null ? void 0 : record.slots.find((entry) => entry.index === slot.index);
-    if (!item) return { index: slot.index, state: "unrecorded" };
-    if (item.state === "missing")
-      return {
-        index: slot.index,
-        state: "missing",
-        ...item.reasonCode ? { reasonCode: item.reasonCode } : {}
-      };
-    return { index: slot.index, state: item.hash && now.has(item.hash) ? "placed" : "edited" };
-  });
-}
-var STOP_CJK = /* @__PURE__ */ new Set([..."\u7684\u4E86\u662F\u5728\u548C\u8207\u4E0E\u53CA\u6216\u5C0D\u5BF9\u628A\u88AB\u70BA\u4E3A\u4EE5\u4E4B\u65BC\u4E8E\u4E26\u5E76\u4E2D\u4E0A\u4E0B\u9019\u8FD9\u90A3\u4E00\u500B\u4E2A\u4E5F\u90FD\u5C31\u800C\u4F46"]);
-var STOP_WORDS = /* @__PURE__ */ new Set([
-  "the",
-  "and",
-  "for",
-  "with",
-  "that",
-  "this",
-  "from",
-  "into",
-  "over",
-  "about",
-  "how",
-  "what"
-]);
-function slotKeywords(explains) {
-  var _a2, _b2;
-  const out = /* @__PURE__ */ new Set();
-  for (const word of (_a2 = explains.toLowerCase().match(/[a-z0-9][a-z0-9'-]{2,}/g)) != null ? _a2 : [])
-    if (!STOP_WORDS.has(word)) out.add(word);
-  for (const run of (_b2 = explains.match(/\p{Script=Han}+/gu)) != null ? _b2 : []) {
-    let part = "";
-    const flush = () => {
-      const chars = Array.from(part);
-      for (let i = 0; i + 1 < chars.length; i++) out.add(chars[i] + chars[i + 1]);
-      part = "";
+// core/book-pipeline/book-notes.ts
+var NOTE_WRAPPER = /==((?:(?!==)[^\r\n])+?)==%%備註#\d+：(?:(?!%%)[^\r\n])*%%/g;
+var NOTE_PARTS = /==((?:(?!==)[^\r\n])+?)==%%備註#(\d+)：((?:(?!%%)[^\r\n])*)%%/g;
+function findNotes(text10) {
+  return [...text10.matchAll(NOTE_PARTS)].map((m) => {
+    var _a2, _b2;
+    return {
+      from: (_a2 = m.index) != null ? _a2 : 0,
+      to: ((_b2 = m.index) != null ? _b2 : 0) + m[0].length,
+      n: Number(m[2]),
+      selected: m[1],
+      note: m[3]
     };
-    for (const char of run) {
-      if (STOP_CJK.has(char)) flush();
-      else part += char;
-    }
-    flush();
-  }
-  return [...out];
-}
-var KEYWORD_HITS = 2;
-function checkImageText(body, slots, record) {
-  var _a2;
-  const empty = { planned: 0, placed: 0, imageCount: 0, bad: 0, issues: [] };
-  if (!(slots == null ? void 0 : slots.length)) return { kind: "none", ...empty };
-  if (!record) return { kind: "unrecorded", ...empty, planned: slots.length };
-  const lines = body.split("\n");
-  const guarded = protectedLines2(lines);
-  const blocks = [];
-  let current = [];
-  let hashes = [];
-  let docs = [];
-  const close = () => {
-    if (current.length) blocks.push({ text: current.join("\n"), hashes, docs });
-    current = [];
-    hashes = [];
-    docs = [];
-  };
-  lines.forEach((line2, at) => {
-    if (guarded[at] || isBlank(line2)) {
-      close();
-      return;
-    }
-    current.push(line2);
-    for (const m of line2.matchAll(IMAGE_IN_LINE)) {
-      hashes.push(shortHash(m[1]));
-      if (isDocumentFile(m[1])) docs.push(shortHash(m[1]));
-    }
   });
-  close();
-  const imageCount = blocks.reduce((sum2, block) => sum2 + block.hashes.length, 0);
-  const placedItems = record.slots.filter((item) => item.state === "placed");
-  const issues = [];
-  for (const item of record.slots)
-    if (item.state === "missing") issues.push({ index: item.index, code: (_a2 = item.reasonCode) != null ? _a2 : "not_found" });
-  if (imageCount !== placedItems.length) issues.push({ code: "count" });
-  for (const item of placedItems) {
-    const at = blocks.findIndex((block) => item.hash !== void 0 && block.hashes.includes(item.hash));
-    const slot = slots.find((entry) => entry.index === item.index);
-    if (at < 0 || !slot) continue;
-    if (item.off || blocks[at].docs.includes(item.hash)) {
-      issues.push({ index: item.index, code: "mismatch" });
-      continue;
-    }
-    const around = [at - 1, at + 1].map((i) => blocks[i]).filter((block) => block && !block.hashes.length).map((block) => block.text.toLowerCase()).join("\n");
-    const words2 = slotKeywords(slot.explains);
-    const hits = words2.filter((word) => around.includes(word)).length;
-    if (words2.length && hits < Math.min(KEYWORD_HITS, words2.length))
-      issues.push({ index: item.index, code: "mismatch" });
-  }
-  return { kind: "checked", planned: slots.length, placed: placedItems.length, imageCount, bad: record.bad, issues };
 }
-function composeImageTextLine(language2, check) {
-  const note = noteLanguageOf(language2);
-  if (check.kind === "none") return translate(note, "detail.book_slots_none");
-  if (check.kind === "unrecorded") return translate(note, "detail.book_slots_unrecorded");
-  const joiner = /^zh/i.test(language2) ? "\uFF1B" : "; ";
-  const parts = check.issues.map(
-    (issue2) => issue2.code === "count" ? translate(note, "detail.book_slots_count_0_1", String(check.imageCount), String(check.placed)) : translate(
-      note,
-      "detail.book_slots_slot_0_1",
-      String(issue2.index),
-      translate(note, `detail.book_slots_reason_${issue2.code}`)
-    )
-  );
-  if (check.bad) parts.push(translate(note, "detail.book_slots_bad_0", String(check.bad)));
-  return parts.length ? translate(note, "detail.book_slots_issues_0", parts.join(joiner)) : translate(note, "detail.book_slots_ok_0", String(check.placed));
+var projectProofBody = (body) => body.replace(NOTE_WRAPPER, "$1");
+function wrapNote(text10, n, note) {
+  const bad = (value) => !value.trim() || /[\r\n]/.test(value) || /==|%%/.test(value);
+  if (bad(text10) || bad(note) || !Number.isInteger(n) || n < 1) return null;
+  return `==${text10}==%%\u5099\u8A3B#${n}\uFF1A${note}%%`;
 }
-function imageIssueTokens(check) {
-  const tokens2 = check.issues.map(
-    (issue2) => issue2.code === "count" ? "image_count" : issue2.code === "mismatch" ? `image_${issue2.index}_mismatch` : `image_${issue2.index}`
-  );
-  return check.bad ? [...tokens2, "image_marker"] : tokens2;
-}
-var pictureShortfallToken = (placed, minimum) => `images:under:${placed}:${minimum}`;
-var SHORTFALL = /(?:^|\s)images:under:(\d+):(\d+)(?=\s|$)/;
-function splitPictureIssue(issue2) {
-  const m = SHORTFALL.exec(issue2);
-  if (!m) return { rest: issue2 };
-  const rest = issue2.replace(SHORTFALL, "").trim().replace(/^images unmet:(?:\s+\S+)*$|^images unmet$/, "");
-  return { rest, shortfall: { placed: Number(m[1]), minimum: Number(m[2]) } };
+function countNotes(text10) {
+  var _a2;
+  const lines = text10.split("\n");
+  const fenced = fencedLines(lines);
+  const kept = withoutHiddenCallouts(lines.filter((_, i) => !fenced[i]));
+  return ((_a2 = kept.join("\n").match(NOTE_WRAPPER)) != null ? _a2 : []).length;
 }
 
 // core/book-pipeline/settings.ts
@@ -15381,7 +15416,7 @@ function cleanBookSettingsInput(input2) {
   }
   return out;
 }
-var LENGTH_RULE_VERSION = 1;
+var LENGTH_RULE_VERSION = 2;
 var LENGTH_HIGH = 1.2;
 var LENGTH_LOW = 0.8;
 var NUM = "(\\d{1,3}(?:,\\d{3})+|\\d+)";
@@ -15461,6 +15496,7 @@ function imageCountRange(settings) {
 }
 var CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu;
 var LATIN_WORD = /[\p{Script=Latin}\p{N}]+(?:['’][\p{Script=Latin}]+)?/gu;
+var lengthBody = (chapter) => projectProofBody(stripImageLines(chapter));
 function chapterLength(body, unit2) {
   var _a2, _b2;
   const lines = [];
@@ -15481,7 +15517,8 @@ function lengthReason(settingLength, body, onIgnored, strict = false) {
   if (!range) return void 0;
   const measured = chapterLength(body, range.unit);
   const low = strict ? 1 : LENGTH_LOW;
-  const kind = measured > range.max * LENGTH_HIGH ? "over" : measured < range.min * low ? "under" : void 0;
+  const high = strict ? 1 : LENGTH_HIGH;
+  const kind = measured > range.max * high ? "over" : measured < range.min * low ? "under" : void 0;
   return kind ? { ...range, kind, measured, version: LENGTH_RULE_VERSION } : void 0;
 }
 var lengthToken = (r) => `length:${r.kind}:${r.measured}:${r.min}-${r.max}:${r.unit}:v${r.version}`;
@@ -27800,35 +27837,6 @@ function titleProblemText(text10) {
   return "";
 }
 
-// core/book-pipeline/book-notes.ts
-var NOTE_WRAPPER = /==((?:(?!==)[^\r\n])+?)==%%備註#\d+：(?:(?!%%)[^\r\n])*%%/g;
-var NOTE_PARTS = /==((?:(?!==)[^\r\n])+?)==%%備註#(\d+)：((?:(?!%%)[^\r\n])*)%%/g;
-function findNotes(text10) {
-  return [...text10.matchAll(NOTE_PARTS)].map((m) => {
-    var _a2, _b2;
-    return {
-      from: (_a2 = m.index) != null ? _a2 : 0,
-      to: ((_b2 = m.index) != null ? _b2 : 0) + m[0].length,
-      n: Number(m[2]),
-      selected: m[1],
-      note: m[3]
-    };
-  });
-}
-var projectProofBody = (body) => body.replace(NOTE_WRAPPER, "$1");
-function wrapNote(text10, n, note) {
-  const bad = (value) => !value.trim() || /[\r\n]/.test(value) || /==|%%/.test(value);
-  if (bad(text10) || bad(note) || !Number.isInteger(n) || n < 1) return null;
-  return `==${text10}==%%\u5099\u8A3B#${n}\uFF1A${note}%%`;
-}
-function countNotes(text10) {
-  var _a2;
-  const lines = text10.split("\n");
-  const fenced = fencedLines(lines);
-  const kept = withoutHiddenCallouts(lines.filter((_, i) => !fenced[i]));
-  return ((_a2 = kept.join("\n").match(NOTE_WRAPPER)) != null ? _a2 : []).length;
-}
-
 // core/book-pipeline/body-integrity.ts
 var BODY_LINE = /^(?:[ \t]{0,3}>[ \t]?)*<!-- book-body:v1 (\{.*\}) -->$/;
 var OPEN_ITEMS_LINE = /^\s*<!--\s*aim-open-items\s+\[[^\n]*\]\s*-->\s*$/;
@@ -28689,7 +28697,12 @@ function begin(deps) {
       for (const note of noteRecords) {
         const at = noteAt(ops, note.path, direction), restore = await readText(repo, at);
         if (undoing) notes.after.push({ path: at, restore, apply: () => writeText(repo, note.path, note.beforeText) });
-        else notes.before.push({ path: note.path, restore, apply: () => note.write(note.path, attachment) });
+        else {
+          notes.before.push({ path: note.path, restore, apply: () => note.write(note.path, attachment) });
+          const settle = note.settle;
+          if (settle)
+            notes.after.push({ path: note.path, restore, apply: () => settle(noteAt(ops, note.path, "undo")) });
+        }
       }
       await run(files, maps, rebuild2, notes, refresh);
     };
@@ -28759,10 +28772,10 @@ function begin(deps) {
       edits.push({ mapPath, edit });
       return transaction;
     },
-    rewriteNote(path, write) {
+    rewriteNote(path, write, settle) {
       var _a2;
       (_a2 = deps.guardPath) == null ? void 0 : _a2.call(deps, path);
-      noteOps.push({ path, write });
+      noteOps.push({ path, write, ...settle ? { settle } : {} });
       return transaction;
     },
     createAttachment(key4, source) {
@@ -28771,6 +28784,7 @@ function begin(deps) {
       return transaction;
     },
     async commit(options = {}) {
+      var _a2;
       if (committed) throw new Error("A transaction can only be committed once.");
       committed = true;
       for (const note of noteOps)
@@ -28861,6 +28875,7 @@ function begin(deps) {
           if (op.kind === "create") op.original = to;
           else op.target = to;
         }
+        for (const note of noteRecords) await ((_a2 = note.settle) == null ? void 0 : _a2.call(note, noteAt(ops, note.path, "undo")));
         for (const note of noteRecords) note.guardAfter = guardOf(await repo.readNote(noteAt(ops, note.path, "undo")));
         const resolve = (originalPath) => {
           const found = started.get(originalPath);
@@ -46732,8 +46747,48 @@ function chapterInconsistencies(data, nodeId) {
         suggestion: finding.suggestion,
         reference: true
       }
+    ] : [] : finding.kind === "removed" ? finding.a === nodeId ? [
+      {
+        kind: "removed",
+        other: finding.b,
+        own: finding.claimA,
+        theirs: finding.claimB,
+        suggestion: finding.suggestion
+      }
     ] : [] : finding.a === nodeId ? [{ other: finding.b, own: finding.claimA, theirs: finding.claimB, suggestion: finding.suggestion }] : finding.b === nodeId ? [{ other: finding.a, own: finding.claimB, theirs: finding.claimA, suggestion: finding.suggestion }] : []
   );
+}
+var REMOVED_QUOTE_MAX = 80;
+var QUOTE_SPLIT = /(?<=[。！？!?])|\n+/u;
+function removedChapterRefs(data, chapters) {
+  var _a2, _b2, _c, _d, _e, _f, _g;
+  const present = new Set(
+    [
+      ...chapters.map((chapter) => chapter.title),
+      ...effectiveOrder(data).map((id) => {
+        var _a3, _b3, _c2;
+        return (_c2 = (_b3 = (_a3 = data.chapters) == null ? void 0 : _a3[id]) == null ? void 0 : _b3.title) != null ? _c2 : "";
+      })
+    ].map((title) => title.trim())
+  );
+  const out = [];
+  for (const id of (_a2 = data.removed) != null ? _a2 : []) {
+    const title = (_e = (_d = (_c = (_b2 = data.chapters) == null ? void 0 : _b2[id]) == null ? void 0 : _c.title) == null ? void 0 : _d.trim()) != null ? _e : "";
+    if (Array.from(title).length < 2 || present.has(title)) continue;
+    for (const chapter of chapters) {
+      if (!chapter.text.includes(title)) continue;
+      const sentence = (_g = (_f = chapter.text.split(QUOTE_SPLIT).find((part) => part.includes(title))) == null ? void 0 : _f.trim()) != null ? _g : title;
+      out.push({
+        kind: "removed",
+        a: chapter.id,
+        b: id,
+        claimA: Array.from(sentence).slice(0, REMOVED_QUOTE_MAX).join(""),
+        claimB: title,
+        suggestion: ""
+      });
+    }
+  }
+  return out;
 }
 
 // core/book-pipeline/budget.ts
@@ -53694,6 +53749,7 @@ var BookPipelineRuns = class {
       overwrite: /* @__PURE__ */ new Map(),
       plans: /* @__PURE__ */ new Map(),
       planSkipped: /* @__PURE__ */ new Set(),
+      ownSummary: /* @__PURE__ */ new Set(),
       authorModels: /* @__PURE__ */ new Map(),
       started: /* @__PURE__ */ new Map(),
       durations: { plan: [], write: [] },
@@ -54122,6 +54178,7 @@ var BookPipelineRuns = class {
       }
       const references2 = chapterReferenceFindings(ordered);
       const chapters = ordered.filter((chapter) => chapter.text);
+      const removed = removedChapterRefs(drive.store.state, chapters);
       const found = chapters.length < 2 ? [] : await this.ports.checkConsistency(
         { ...this.base(drive, drive.config.proofModel), chapters: compactChapters(chapters) },
         { signal: drive.controller.signal, admission: drive.admission }
@@ -54135,7 +54192,8 @@ var BookPipelineRuns = class {
           claimA: issue2.claimA,
           claimB: issue2.claimB,
           suggestion: issue2.suggestion
-        }))
+        })),
+        ...removed
       ];
       const done = await drive.store.commit((state) => applyConsistency(state, token, findings));
       if (!(done == null ? void 0 : done.accepted)) {
@@ -54420,6 +54478,8 @@ var BookPipelineRuns = class {
     const rootInfo = drive.cards.get(drive.rootId);
     if (!info || !rootInfo) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
+    if (isKeptRaw(card.raw) || bodyStateRaw(card.raw) === "unknown" && !pipelineWroteRaw(card.raw))
+      drive.ownSummary.add(nodeId);
     if (!this.mayOverwriteCard(drive, nodeId, card.raw)) {
       this.log(drive, "plan_skipped", nodeId, "plan", "hand_edited");
       drive.planSkipped.add(nodeId);
@@ -54504,7 +54564,7 @@ var BookPipelineRuns = class {
     );
     const written2 = await this.ports.updateNoteGuarded(
       path,
-      { prompt, summary: result.covers },
+      drive.ownSummary.has(nodeId) ? { prompt } : { prompt, summary: result.covers },
       { expectedContent: card.raw, authorize: this.authorize(drive, token, nodeId) }
     );
     if (written2 === "discarded") return { kind: "failed", reason: "discarded" };
@@ -54567,7 +54627,7 @@ var BookPipelineRuns = class {
     const settings = effectiveSettings(root.settings, parseBookPlanDecisions(root.raw));
     const expanding = drive.avoid.has(nodeId) && drive.expand.has(nodeId);
     const oldBody = chapterBody(card.detail);
-    const now = expanding ? lengthReason(settings.length, oldBody, void 0, true) : void 0;
+    const now = expanding ? lengthReason(settings.length, lengthBody(oldBody), void 0, true) : void 0;
     const scope = {
       role: info.role,
       others: effectiveOrder(drive.store.state).flatMap(
@@ -54600,7 +54660,7 @@ var BookPipelineRuns = class {
       const body = chapterBody(merged.detail);
       const pictures = new Set(bodyImageUrls(`
 ${body}`));
-      const short = lengthReason(settings.length, body);
+      const short = lengthReason(settings.length, lengthBody(body));
       if (bodyImageUrls(`
 ${oldBody}`).some((url) => !pictures.has(url)) || (short == null ? void 0 : short.kind) === "under" && !((now == null ? void 0 : now.kind) === "under" && short.measured >= now.measured)) {
         lostText = true;
@@ -54671,6 +54731,7 @@ ${oldDetail}`);
         reasoning: drive.config.reasoning,
         ...drive.avoid.has(nodeId) ? { instruction: drive.extra.get(nodeId) } : {},
         ...requirements !== void 0 ? { keepSummary: true, requirements } : {},
+        ...drive.ownSummary.has(nodeId) ? { keepSummary: true } : {},
         signal,
         admission: drive.admission,
         authorize: authorizeWrite,
@@ -55033,6 +55094,7 @@ ${oldDetail}`);
     const info = drive.cards.get(nodeId);
     if (!info) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
+    if (isKeptRaw(card.raw)) return { kind: "ok", after: () => this.setStage(drive, nodeId, "checked", null) };
     const checklist = parseChecklist(card.prompt);
     const chapter = chapterBody(card.detail);
     const body = projectProofBody(stripImageLines(chapter));
@@ -55113,7 +55175,7 @@ ${oldDetail}`);
       }
     }
     const verdict = { ...result, aggregate: proofVerdict(result, !body.trim()) };
-    const length = await this.lengthOf(drive, nodeId, body);
+    const length = await this.lengthOf(drive, nodeId, lengthBody(chapter));
     const lengthIssue = length ? lengthToken(length) : "";
     const structureUnmet = verdict.items.filter((item) => item.type !== "fact" && item.status === "unmet").map((item) => code2(item.id));
     const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
@@ -55309,7 +55371,7 @@ function bookBarState(data, progress, stageOf, mapIds) {
     added: (_h = (_g = data.changed) == null ? void 0 : _g.added.length) != null ? _h : 0,
     missing: (_j = (_i = data.changed) == null ? void 0 : _i.missing.length) != null ? _j : 0
   } : void 0;
-  const gateChange = !mapChange && !active && status !== "stopped" && mapIds && (phase === "gate1" || phase === "gate2") ? countChange(mapDifference(data, mapIds)) : void 0;
+  const gateChange = !mapChange && !active && status !== "stopped" && mapIds && (phase === "gate1" || phase === "gate2" || phase === "done") ? countChange(mapDifference(data, mapIds)) : void 0;
   const mode = mapChange ? "changed" : status === "stopped" && pauseReason === "budget" ? "budget" : status === "stopped" || interrupted ? "stopped" : phase;
   const current = mode === "planning" || mode === "writing" ? currentOf2(data, progress, stageOf) : void 0;
   const rerunning = !!(progress == null ? void 0 : progress.active) && !!progress.rerun && order.includes(progress.rerun.nodeId);
@@ -55404,7 +55466,7 @@ function renderBookBar(parent, state, actions) {
     }
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   }
-  if ((state.mode === "gate1" || state.mode === "gate2") && state.mapChange)
+  if ((state.mode === "gate1" || state.mode === "gate2" || state.mode === "done") && state.mapChange)
     top.createSpan({
       cls: "vam-book-bar-counts vam-book-map-changed",
       text: t("ui.book_map_changed_0_1", state.mapChange.added, state.mapChange.missing)
@@ -55774,12 +55836,16 @@ var PROBLEM_RULES = [
     kind: "failed",
     of: (card) => card.stage === "needs-review" && !card.handEdited && !card.consistencyOnly ? card.failureText || t("ui.book_issue_unknown") : void 0
   },
-  { kind: "hand-edited", of: (card) => card.handEdited ? t("ui.book_review_hand_edited") : void 0 },
+  {
+    kind: "hand-edited",
+    of: (card) => card.handEdited ? t(card.handBeforeBook ? "ui.book_review_hand_before_book" : "ui.book_review_hand_edited") : void 0
+  },
   {
     kind: "consistency",
     of: (card) => {
       var _a2;
       return ((_a2 = card.inconsistencies) == null ? void 0 : _a2.length) ? card.inconsistencies.map((item) => {
+        if (item.kind === "removed") return t("ui.book_reason_removed_ref_0_1", item.theirs, item.own);
         if (item.reference)
           return t("ui.book_reason_chapter_ref_0_1_2_3", item.own, item.theirs, item.otherTitle, item.suggestion);
         const sentence = t("ui.book_reason_inconsistent_0_1_2", item.otherTitle, item.own, item.theirs);
@@ -55853,7 +55919,7 @@ function seamFromOf(seam, order, at, titleOf) {
 }
 function gate2Cards(input2) {
   return input2.order.map((id, at) => {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const note = input2.noteOf(id);
     const view = bookCardView(note != null ? note : {});
     const issue2 = typeof (note == null ? void 0 : note.pipelineIssue) === "string" ? note.pipelineIssue : "";
@@ -55862,14 +55928,16 @@ function gate2Cards(input2) {
     const structure2 = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue2.trim());
     const role = typeof (note == null ? void 0 : note.bookRole) === "string" ? note.bookRole : void 0;
     const handEdited = view.stage === "needs-review" && /^write failed: hand_edited$/.test(issue2.trim());
-    const stale = !!input2.proofContext && proofIsStale(
-      { prompt: (_b2 = note == null ? void 0 : note.prompt) != null ? _b2 : "", detail: (_c = note == null ? void 0 : note.detail) != null ? _c : "" },
+    const beforeBook = handEdited && !((_c = readBodyRecord((_b2 = note == null ? void 0 : note.detail) != null ? _b2 : "")) == null ? void 0 : _c.fp) && !hasHiddenCallout((_d = note == null ? void 0 : note.detail) != null ? _d : "");
+    const kept = isKept((_e = note == null ? void 0 : note.detail) != null ? _e : "");
+    const stale = !kept && !!input2.proofContext && proofIsStale(
+      { prompt: (_f = note == null ? void 0 : note.prompt) != null ? _f : "", detail: (_g = note == null ? void 0 : note.detail) != null ? _g : "" },
       view.stage,
       id,
       input2.proofContext.runId,
       input2.proofContext.revisionOf(id)
     );
-    const inconsistencies = ((_e = (_d = input2.inconsistencies) == null ? void 0 : _d.call(input2, id)) != null ? _e : []).map((item) => ({
+    const inconsistencies = ((_i = (_h = input2.inconsistencies) == null ? void 0 : _h.call(input2, id)) != null ? _i : []).map((item) => ({
       ...item,
       otherTitle: input2.titleOf(item.other)
     }));
@@ -55881,12 +55949,13 @@ function gate2Cards(input2) {
       stage: view.stage,
       ...role ? { role } : {},
       ...view.stage === "needs-review" && issue2 ? { failureText: reasonOf2(issue2, proof) } : {},
-      structureUnmet: checked2 && structure2 ? structure2[1].split(" ").filter((token) => !token.startsWith("image_")).length : 0,
-      factsOpen: checked2 ? ((_f = proof == null ? void 0 : proof.items) != null ? _f : []).filter((item) => item.type === "fact" && item.status !== "met").length : 0,
+      structureUnmet: checked2 && structure2 && !kept ? structure2[1].split(" ").filter((token) => !token.startsWith("image_")).length : 0,
+      factsOpen: checked2 && !kept ? ((_j = proof == null ? void 0 : proof.items) != null ? _j : []).filter((item) => item.type === "fact" && item.status !== "met").length : 0,
       galleryBare: checked2 && galleryBare(role, note),
       seam: view.seam,
       ...view.seam ? seamFromOf(note == null ? void 0 : note.pipelineSeam, input2.order, at, input2.titleOf) : {},
-      ...handEdited ? { handEdited: true, bodyFp: integrityFp((_g = note == null ? void 0 : note.detail) != null ? _g : "") } : {},
+      ...handEdited ? { handEdited: true, bodyFp: integrityFp((_k = note == null ? void 0 : note.detail) != null ? _k : "") } : {},
+      ...beforeBook ? { handBeforeBook: true } : {},
       ...stale ? { proofStale: true } : {},
       ...inconsistencies.length ? { inconsistencies } : {},
       ...consistencyOnly ? { consistencyOnly: true } : {}
@@ -76693,7 +76762,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
    * notes go to Unassigned, their subtopics move under the new topic. One history step; a failure puts everything back.
    */
   async mergeSelected(title, snapshot, content, asked) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     const stale = () => {
       throw new Error(t("ui.merge_draft_stale"));
     };
@@ -76836,6 +76905,12 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       }
       throw this.mergeError(error);
     }
+    if (this.hasBookPipeline())
+      try {
+        const path = (_f = (await repo.readMap(mapPath)).nodes.find((item) => item.id === created.id)) == null ? void 0 : _f.path;
+        if (path) await this.app.vault.process(repo.file(path), bookMergeStampRaw);
+      } catch (e) {
+      }
     if (content) this.mergeDrafts.forget(mapPath, content.task);
     const mergeStep = this.mergeEntry(entry);
     this.history.push(mergeStep);
@@ -76893,12 +76968,20 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     const parkFolder = repo.topicFolder(mapPath, "Unassigned"), viewport = clone((_b2 = (_a2 = this.map) == null ? void 0 : _a2.viewport) != null ? _b2 : before.viewport);
     let entry;
     try {
-      const tx = this.beginMapTransaction().rewriteNote(target.path, async (path) => {
-        await repo.updateNote(path, patch, { detailTemplate, newVisualReferences: true });
-        if (book) await this.app.vault.process(repo.file(path), bookMergeStampRaw);
-        if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
-        if (asked) await repo.writeTopicAppearance(path, asked);
-      });
+      const tx = this.beginMapTransaction().rewriteNote(
+        target.path,
+        async (path) => {
+          await repo.updateNote(path, patch, { detailTemplate, newVisualReferences: true });
+          if (book) await this.app.vault.process(repo.file(path), bookMergeStampRaw);
+          if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
+          if (asked) await repo.writeTopicAppearance(path, asked);
+        },
+        // Parking the children rewrites the links to them in the merged text: the program's fingerprint is taken again from the
+        // text as committed (before the step records it, so undo still recognises it; redo does it again).
+        book ? async (path) => {
+          await this.app.vault.process(repo.file(path), bookMergeStampRaw);
+        } : void 0
+      );
       for (const child of children) tx.park(child.path, parkFolder, before.id, "unassigned");
       entry = await tx.editMap(mapPath, (map) => {
         map.viewport = clone(viewport);
@@ -93277,10 +93360,19 @@ var BookHandEdits = class {
   dispose() {
     this.disposed = true;
   }
-  /** "Keep my version" was ticked: the chapter text as it is now is recorded as kept. */
+  /**
+   * "Keep my version" was ticked: the chapter text as it is now is recorded as kept, and the chapter is done (`checked`, no issue):
+   * the kept text is the reader's answer, not a failed write. A later edit voids the kept record and the box asks again.
+   */
   async keep(path) {
     if (this.disposed) return;
-    await this.ports.write(path, keepRaw).catch(() => void 0);
+    try {
+      await this.ports.write(path, keepRaw);
+      const card = await this.ports.readCard(path);
+      if (this.disposed || !isKeptRaw(card.raw)) return;
+      await this.ports.writeFields(path, { pipelineStage: "checked", pipelineIssue: null });
+    } catch (e) {
+    }
   }
   /** A save of a chapter note: when its rewrite box is ticked, carry the rewrite out (or queue it). */
   async tick(mapPath, nodeId) {
@@ -106911,6 +107003,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       readMap: (path) => this.repo.readMap(path),
       readCard: (path) => this.readBookCard(path),
       write: (path, transform) => this.bookNoteWriter(path, transform),
+      writeFields: (path, patch) => this.repo.writePipelineFields(path, patch),
       rerunCard: (mapPath, nodeId, options) => this.bookPipelineRuns.rerunCard(mapPath, nodeId, options),
       isRunning: (mapPath) => this.bookPipelineRuns.isRunning(mapPath),
       newId: () => crypto.randomUUID(),

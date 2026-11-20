@@ -120,6 +120,8 @@ export function compactChapters(
  * With `reference`: this chapter's sentence `own` names `other` by the wrong words `theirs`; `suggestion` is the right ones.
  */
 export interface ChapterInconsistency {
+  /** `removed`: this chapter still names a removed chapter (`theirs` is its title, `own` the sentence that names it). */
+  kind?: "removed";
   other: string;
   own: string;
   theirs: string;
@@ -147,10 +149,65 @@ export function chapterInconsistencies(data: BookPipelineData, nodeId: string): 
             }
           ]
         : []
-      : finding.a === nodeId
-        ? [{ other: finding.b, own: finding.claimA, theirs: finding.claimB, suggestion: finding.suggestion }]
-        : finding.b === nodeId
-          ? [{ other: finding.a, own: finding.claimB, theirs: finding.claimA, suggestion: finding.suggestion }]
+      : finding.kind === "removed"
+        ? finding.a === nodeId
+          ? [
+              {
+                kind: "removed",
+                other: finding.b,
+                own: finding.claimA,
+                theirs: finding.claimB,
+                suggestion: finding.suggestion
+              }
+            ]
           : []
+        : finding.a === nodeId
+          ? [{ other: finding.b, own: finding.claimA, theirs: finding.claimB, suggestion: finding.suggestion }]
+          : finding.b === nodeId
+            ? [{ other: finding.a, own: finding.claimB, theirs: finding.claimA, suggestion: finding.suggestion }]
+            : []
   );
+}
+
+/** The longest sentence a removed-chapter finding quotes (characters). */
+const REMOVED_QUOTE_MAX = 80;
+/** A quoted sentence ends at its stop mark or at the line's end (the quote is one line in the review box). */
+const QUOTE_SPLIT = /(?<=[。！？!?])|\n+/u;
+/**
+ * The program's own check beside the model's: a chapter text that still names a removed chapter by its title (a literal match). A title
+ * shorter than two characters, or one a present chapter also has, is not looked for. One finding per chapter and removed title; the
+ * quoted sentence is the first one that names it.
+ */
+export function removedChapterRefs(
+  data: Pick<BookPipelineData, "order" | "removed" | "chapters">,
+  chapters: readonly { id: string; title: string; text: string }[]
+): ConsistencyFinding[] {
+  const present = new Set(
+    [
+      ...chapters.map(chapter => chapter.title),
+      ...effectiveOrder(data).map(id => data.chapters?.[id]?.title ?? "")
+    ].map(title => title.trim())
+  );
+  const out: ConsistencyFinding[] = [];
+  for (const id of data.removed ?? []) {
+    const title = data.chapters?.[id]?.title?.trim() ?? "";
+    if (Array.from(title).length < 2 || present.has(title)) continue;
+    for (const chapter of chapters) {
+      if (!chapter.text.includes(title)) continue;
+      const sentence =
+        chapter.text
+          .split(QUOTE_SPLIT)
+          .find(part => part.includes(title))
+          ?.trim() ?? title;
+      out.push({
+        kind: "removed",
+        a: chapter.id,
+        b: id,
+        claimA: Array.from(sentence).slice(0, REMOVED_QUOTE_MAX).join(""),
+        claimB: title,
+        suggestion: ""
+      });
+    }
+  }
+  return out;
 }

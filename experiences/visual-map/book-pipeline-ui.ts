@@ -115,9 +115,14 @@ export function bookBarState(
             missing: data.changed?.missing.length ?? 0
           })
       : undefined;
-  // Waiting at a gate: the same wording shows a map that differs from the book's chapters, before the owner continues.
+  // Waiting at a gate, or a finished book: the same wording shows a map that differs from the book's chapters (a line only; nothing
+  // is planned again on its own).
   const gateChange =
-    !mapChange && !active && status !== "stopped" && mapIds && (phase === "gate1" || phase === "gate2")
+    !mapChange &&
+    !active &&
+    status !== "stopped" &&
+    mapIds &&
+    (phase === "gate1" || phase === "gate2" || phase === "done")
       ? countChange(mapDifference(data, mapIds))
       : undefined;
   const mode: BookBarMode = mapChange
@@ -277,7 +282,7 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     }
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   }
-  if ((state.mode === "gate1" || state.mode === "gate2") && state.mapChange)
+  if ((state.mode === "gate1" || state.mode === "gate2" || state.mode === "done") && state.mapChange)
     top.createSpan({
       cls: "vam-book-bar-counts vam-book-map-changed",
       text: t("ui.book_map_changed_0_1", state.mapChange.added, state.mapChange.missing)

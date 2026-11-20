@@ -6998,6 +6998,15 @@ export class VisualAgentMapView extends ItemView {
       }
       throw this.mergeError(error);
     }
+    // Parking the sources rewrote the links to them in the merged text: the program's fingerprint is taken again from the text as
+    // committed, at the note's path now (it may have taken the title's file name). Undo parks the note and never compares its text.
+    if (this.hasBookPipeline())
+      try {
+        const path = (await repo.readMap(mapPath)).nodes.find(item => item.id === created.id)?.path;
+        if (path) await this.app.vault.process(repo.file(path), bookMergeStampRaw);
+      } catch {
+        // the merge itself is done; without the new fingerprint the chapter only counts as hand-edited
+      }
     if (content) this.mergeDrafts.forget(mapPath, content.task);
     const mergeStep = this.mergeEntry(entry);
     this.history.push(mergeStep);
@@ -7076,12 +7085,22 @@ export class VisualAgentMapView extends ItemView {
       viewport = clone(this.map?.viewport ?? before.viewport);
     let entry: TransactionEntry;
     try {
-      const tx = this.beginMapTransaction().rewriteNote(target.path, async path => {
-        await repo.updateNote(path, patch, { detailTemplate, newVisualReferences: true });
-        if (book) await this.app.vault.process(repo.file(path), bookMergeStampRaw);
-        if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
-        if (asked) await repo.writeTopicAppearance(path, asked);
-      });
+      const tx = this.beginMapTransaction().rewriteNote(
+        target.path,
+        async path => {
+          await repo.updateNote(path, patch, { detailTemplate, newVisualReferences: true });
+          if (book) await this.app.vault.process(repo.file(path), bookMergeStampRaw);
+          if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
+          if (asked) await repo.writeTopicAppearance(path, asked);
+        },
+        // Parking the children rewrites the links to them in the merged text: the program's fingerprint is taken again from the
+        // text as committed (before the step records it, so undo still recognises it; redo does it again).
+        book
+          ? async path => {
+              await this.app.vault.process(repo.file(path), bookMergeStampRaw);
+            }
+          : undefined
+      );
       for (const child of children) tx.park(child.path, parkFolder, before.id, "unassigned");
       entry = await tx
         .editMap(mapPath, map => {

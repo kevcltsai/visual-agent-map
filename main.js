@@ -6461,7 +6461,7 @@ var zhCN = {
   "ui.book_panel_g2_reason_facts_0": "\u6709 {0} \u9879\u4E8B\u5B9E\u8FD8\u6CA1\u67E5\u8BC1\u5230\u6765\u6E90",
   "ui.book_panel_g2_reason_images": "\u8FD9\u7AE0\u662F\u56FE\u96C6\uFF0C\u5374\u6CA1\u6709\u627E\u5230\u5408\u9002\u7684\u56FE",
   "ui.book_panel_g2_reason_seam": "\u524D\u540E\u7AE0\u6539\u8FC7\uFF0C\u8854\u63A5\u8FD8\u6CA1\u786E\u8BA4",
-  "ui.book_panel_g2_reason_seam_0": "\u300C{0}\u300D\u6539\u8FC7\uFF0C\u548C\u8FD9\u7AE0\u7684\u8854\u63A5\u8FD8\u6CA1\u786E\u8BA4",
+  "ui.book_panel_g2_reason_seam_0": "\u201C{0}\u201D\u6539\u8FC7\uFF0C\u548C\u8FD9\u7AE0\u7684\u8854\u63A5\u8FD8\u6CA1\u786E\u8BA4",
   "ui.book_note_trial_title_0": "\u8BD5\u8DD1\u7B2C {0}\uFF0F{1} \u7AE0",
   "ui.book_note_trial_next": "\u770B\u5B8C\u540E\u56DE\u5FC3\u667A\u56FE\uFF0C\u6309\u201C\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66\u201D\u3002",
   "ui.book_note_trial_stopped": "\u8FD9\u672C\u4E66\u5DF2\u505C\u6B62\u3002\u5148\u5728\u5FC3\u667A\u56FE\u5DE5\u5177\u680F\u6309\u201C\u7EE7\u7EED\u201D\uFF0C\u518D\u6309\u201C\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66\u201D\u3002",
@@ -27596,6 +27596,7 @@ function mergedDetail(sources) {
 ${source.detail.trim()}`).join("\n\n");
   return readBodyRecord(detail) ? stampDetail(detail) : detail;
 }
+var bookMergeStampRaw = (raw) => bodyStateRaw(raw) === "empty" ? raw : stampRaw(raw);
 function mergedStatus(detail) {
   return detail.trim() ? "completed" : "idea";
 }
@@ -75852,6 +75853,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
           sourcePaths: sources.map((source) => source.path),
           status: mergedStatus(detail)
         });
+      if (this.hasBookPipeline()) await this.app.vault.process(repo.file(created.path), bookMergeStampRaw);
       const tx = this.beginMapTransaction().create(created.path, parkFolder, before.id, sanitizeGeneratedTitle(title));
       for (const source of sources) tx.park(source.path, parkFolder, before.id, "unassigned");
       entry = await tx.editMap(mapPath, (map, resolve) => {
@@ -75946,11 +75948,13 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       patch = { detail, status: mergedStatus(detail), sourcePaths };
     }
     if (name2 && name2 !== sourceNotes[0].title) patch.title = name2;
+    const book = this.hasBookPipeline();
     const parkFolder = repo.topicFolder(mapPath, "Unassigned"), viewport = clone((_b2 = (_a2 = this.map) == null ? void 0 : _a2.viewport) != null ? _b2 : before.viewport);
     let entry;
     try {
       const tx = this.beginMapTransaction().rewriteNote(target.path, async (path) => {
         await repo.updateNote(path, patch, { detailTemplate, newVisualReferences: true });
+        if (book) await this.app.vault.process(repo.file(path), bookMergeStampRaw);
         if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
         if (asked) await repo.writeTopicAppearance(path, asked);
       });

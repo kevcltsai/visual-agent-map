@@ -3421,6 +3421,7 @@ export const en = {
   "ui.book_issue_step_0_1": "{0} failed: {1}",
   "ui.book_issue_unmet_0": "Proofreading found unmet items: {0}",
   "ui.book_reason_length_over_0_1_2_3": "The chapter is {0} {1}, longer than the {2}–{3} {1} you asked for",
+  "ui.book_reason_chapter_ref_0_1_2_3": "Wrong chapter number: in “{0}”, “{1}” means 〈{2}〉, which is {3}",
   "ui.book_reason_inconsistent_0_1_2":
     "Says something differently from 〈{0}〉: this chapter says “{1}”, 〈{0}〉 says “{2}”",
   "ui.book_reason_length_under_0_1_2_3": "The chapter is {0} {1}, shorter than the {2}–{3} {1} you asked for",

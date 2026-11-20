@@ -3198,6 +3198,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_issue_step_0_1": "{0}失敗：{1}",
   "ui.book_issue_unmet_0": "校對未達成項目：{0}",
   "ui.book_reason_length_over_0_1_2_3": "這章有 {0} {1}，比你設定的 {2}–{3} {1} 長",
+  "ui.book_reason_chapter_ref_0_1_2_3": "章號指錯：「{0}」裡的「{1}」說的是〈{2}〉，那是{3}",
   "ui.book_reason_inconsistent_0_1_2": "和〈{0}〉說法不一致：這章寫「{1}」，〈{0}〉寫「{2}」",
   "ui.book_reason_length_under_0_1_2_3": "這章只有 {0} {1}，比你設定的 {2}–{3} {1} 短",
   "ui.book_reason_images_under_0_1": "圖片不足：放了 {0} 張，設定至少 {1} 張",

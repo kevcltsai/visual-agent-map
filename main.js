@@ -14712,7 +14712,9 @@ function composeImageTextLine(language2, check) {
   return parts.length ? translate(note, "detail.book_slots_issues_0", parts.join(joiner)) : translate(note, "detail.book_slots_ok_0", String(check.placed));
 }
 function imageIssueTokens(check) {
-  const tokens2 = check.issues.map((issue2) => issue2.code === "count" ? "image_count" : `image_${issue2.index}`);
+  const tokens2 = check.issues.map(
+    (issue2) => issue2.code === "count" ? "image_count" : issue2.code === "mismatch" ? `image_${issue2.index}_mismatch` : `image_${issue2.index}`
+  );
   return check.bad ? [...tokens2, "image_marker"] : tokens2;
 }
 
@@ -53825,7 +53827,7 @@ var BookPipelineRuns = class {
           drive,
           nodeId,
           stage,
-          verdict.aggregate === "needs-review" ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}` : lengthIssue ? `length unmet: ${[lengthIssue, ...noticed].join(" ")}` : noticed.length ? `structure unmet: ${noticed.join(" ")}` : null
+          verdict.aggregate === "needs-review" ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}` : lengthIssue ? `length unmet: ${[lengthIssue, ...noticed].join(" ")}` : structureUnmet.length ? `structure unmet: ${noticed.join(" ")}` : noticed.length ? `image notice: ${noticed.join(" ")}` : null
         );
       }
     };
@@ -54351,7 +54353,7 @@ function plainIssueText(issue2) {
   return t("ui.book_issue_unknown");
 }
 function structureNote(issue2) {
-  const found = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue2.trim());
+  const found = /^(?:structure unmet|image notice): (\S+(?: \S+)*)$/.exec(issue2.trim());
   if (!found) return {};
   const tokens2 = found[1].split(" ");
   const notices = tokens2.filter((token) => token.startsWith("image_")).length;

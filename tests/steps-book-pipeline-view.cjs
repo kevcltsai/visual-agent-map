@@ -497,6 +497,7 @@ test('model: failureCode must be a neutral code; a pauseReason of failed is read
 
 test('a checked card with unmet structure items shows only a small count; a checked card without them, and a malformed issue, show nothing', () => {
   setUiLanguage('zh-TW');
+  assert.equal(ui.bookCardView({ pipelineStage: 'checked', pipelineIssue: 'image notice: image_3 image_6_mismatch' }).issueText, '通過，2 處可留意');
   assert.equal(ui.bookCardView({ pipelineStage: 'checked', pipelineIssue: 'structure unmet: C2 C3' }).issueText, '結構 2 項未達成');
   assert.equal(ui.bookCardView({ pipelineStage: 'checked' }).issueText, undefined);
   assert.equal(ui.bookCardView({ pipelineStage: 'checked', pipelineIssue: 'whatever <b>' }).issueText, undefined);

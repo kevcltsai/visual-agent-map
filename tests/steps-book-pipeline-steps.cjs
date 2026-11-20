@@ -845,3 +845,12 @@ test('T10c global plan: child titles ride per card with moreChildren, only with 
   const longTitle = globalPlan.globalPlanStep.render(globalRequest({ cards: [{ ...cards[0], children: ['題'.repeat(300)] }] }));
   assert.ok(longTitle.includes(`"${'題'.repeat(80)}"`) && !longTitle.includes('題'.repeat(81)));
 });
+
+test('rerun fix 3: card and global plan prompts number chapters only from the authoritative list and never number a non-listed topic', () => {
+  const card = cardPlan.cardPlanStep.render(planBase());
+  assert.match(card, /Number chapters only from this list: chapter n is the entry with position n\./);
+  assert.match(card, /never gets a chapter number and is never announced as a chapter/);
+  const global = globalPlan.globalPlanStep.render(globalRequest());
+  assert.match(global, /Number chapters only from this list: chapter n is the n-th card in the order you return\./);
+  assert.match(global, /never give a chapter number to, preview or announce as a chapter a topic that is not a card/);
+});

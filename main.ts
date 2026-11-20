@@ -841,7 +841,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.registerEditorExtension(appliedExtension);
     this.registerMarkdownPostProcessor((el, ctx) => {
       const info = ctx.getSectionInfo(el);
-      if (info && this.readingHighlight.marks.wears(ctx.sourcePath, sectionSource(info.text, info.lineStart, info.lineEnd)))
+      if (
+        info &&
+        this.readingHighlight.marks.wears(ctx.sourcePath, sectionSource(info.text, info.lineStart, info.lineEnd))
+      )
         el.addClass("vam-book-applied");
       // A reading view of a chapter shows new text (an apply or undo written to the file): the header action follows it now.
       if (this.bookChapterMaps.has(ctx.sourcePath)) this.paintBookNotesSoon();

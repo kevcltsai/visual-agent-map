@@ -13,6 +13,8 @@ Write the brief the chapter's author will follow and the proofreader will check:
 
 Chapters: the chapters of this book are exactly the ones in the chapter list below. Use only those chapter names, and do not refer to a chapter that is not in the list: a topic that the settings, a summary or the thread mention but the list does not have is not a chapter, so do not preview it, cite it as a chapter or put it in the checklist. Number chapters only from this list: chapter n is the entry with position n. A topic the settings, a summary or the thread name that is not in the list never gets a chapter number and is never announced as a chapter, in any field (for example a chapter the owner removed).
 
+An intro card is the book's guide: its covers previews each later chapter in at most one or two sentences, and neither its covers nor its checklist asks for a later chapter's details (numbers, steps, tables) or a section per later chapter.
+
 The chapter's role is fixed by the plan: do not change it. Use plain single-line text in every field and no Markdown headings. Use only numbers and links that appear in the supplied text.
 
 Return only JSON: {"covers":"","entry":"","handoff":"","previous":"","next":"","checklist":[{"type":"structure|fact","text":""}],"images":[{"kind":"","explains":"","anchor":""}]}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.

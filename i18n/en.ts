@@ -3476,12 +3476,14 @@ export const en = {
   "ui.book_note_trial_next": "Once you have read it, go back to the mind map and press “Run the whole book”.",
   "ui.book_note_trial_stopped":
     "The book is stopped. Press “Continue” on the mind map toolbar first, then “Run the whole book”.",
+  "ui.book_note_trial_edit": "To change a passage: select the text, right-click and choose “Add a note”.",
   "ui.book_note_prev_0": "Previous chapter: {0}",
   "ui.book_note_next_0": "Next chapter: {0}",
   "ui.book_note_review_title": "This chapter needs a look",
   "ui.book_note_review_accept": "Accept it as it is, no change needed",
   "ui.book_note_review_fixed": "I fixed it",
   "ui.book_note_review_next_0": "Next chapter to check: {0}",
+  "ui.book_note_review_handled_0": "Handled (you chose “{0}”)",
   "ui.book_note_add": "Picture book: add a note",
   "ui.book_note_add_disabled_0": "Picture book: add a note ({0})",
   "ui.book_note_why_empty": "select some text first",
@@ -3565,7 +3567,9 @@ export const en = {
   "ui.book_role_ai_set": "Chapter role handed back to AI; the next plan may change it.",
   "ui.book_role_running_suffix": "The book is running; this takes effect from the next load.",
   "ui.book_role_failed": "Could not change the chapter role.",
-  "ui.book_deleted_chapter_hint_0": "This mentions a chapter that is no longer on the map: {0}"
+  "ui.book_deleted_chapter_hint_0": "This mentions a chapter that is no longer on the map: {0}",
+  "ui.book_deleted_chapter_hint_keep":
+    "Change this text if you like; if you leave it, the book follows the chapters the map has now."
 } as const;
 
 export type TranslationKey = keyof typeof en;

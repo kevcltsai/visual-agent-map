@@ -2245,7 +2245,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-start-settings label { display: block; margin-top: 8px; font-size: var(--font-ui-small); color: var(--text-muted); }
 .vam-book-start-model-choice label { margin: 0; font-size: var(--font-ui-small); color: var(--text-muted); }
 .vam-book-start-suggesting { margin: 2px 0 0; font-size: var(--font-ui-small); color: var(--text-faint); }
-.vam-book-start-hint { margin: 2px 0 0; font-size: var(--font-ui-small); color: var(--text-warning, var(--text-muted)); }
+.vam-book-start-hint { margin: 2px 0 0; font-size: var(--font-ui-small); color: var(--text-warning, var(--text-muted)); white-space: pre-line; }
 .vam-book-start-hint.is-empty { display: none; }
 .vam-book-start-field.vam-book-start-suggested::placeholder { font-style: italic; color: var(--text-muted); opacity: 0.85; }
 .vam-book-start-field { width: 100%; resize: vertical; }

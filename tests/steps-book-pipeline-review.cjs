@@ -94,6 +94,7 @@ test('trial callout: title, next step, links, owner marker and version; stopped 
   const t1 = trial(false);
   assert.match(t1, /^> \[!vam-trial\] 試跑第 1／3 章\n/);
   assert.match(t1, /這樣可以，跑完全書/);
+  assert.match(t1, /\n> 想改哪一段：選取文字，右鍵「加備註」。\n/, 'mockup ⑦-2: how to ask for a change');
   assert.match(t1, /下一章：\[\[Notes\/Next\|第二章\]\]/);
   assert.ok(!/上一章/.test(t1), 'no previous link when there is none');
   assert.match(t1, /\n> %%vam-trial:run-1:n1%%\n/);
@@ -189,10 +190,10 @@ test('CRLF text keeps its line endings through put, collapse and remove', () => 
   assert.ok(!/[^\r]\n/.test(folded));
   assert.equal(b.removeProgramCallouts(folded), base);
 });
-test('collapse: folds the review box once, keeps ticks and marker, repeat changes nothing, a trial hint is not folded', () => {
+test('collapse: folds the review box once under its handled title, keeps ticks and marker, repeat changes nothing, a trial hint is not folded', () => {
   const put = b.putProgramCallout(note('Body'), tick(review(), 0));
   const folded = b.collapseReviewCallouts(put);
-  assert.match(folded, /> \[!vam-review\]- 這章要你看/);
+  assert.match(folded, /> \[!vam-review\]- 已處理（你選了「接受現在這樣，不用改」）\n/);
   assert.equal(b.collapseReviewCallouts(folded), folded);
   const state = b.readReviewState(folded);
   assert.deepEqual({ a: state.accept, f: state.fixed, c: state.collapsed }, { a: true, f: false, c: true });
@@ -200,6 +201,35 @@ test('collapse: folds the review box once, keeps ticks and marker, repeat change
   assert.equal(b.collapseReviewCallouts(withTrial), withTrial);
   assert.equal(b.collapseReviewCallouts('no block'), 'no block');
 });
+test('handled title (mockup ⑦-3): either box ends the same way: titled "handled" while open, then folded; unticked opens with the question again; CRLF kept', () => {
+  for (const at of [0, 1]) {
+    const put = b.putProgramCallout(note('Body'), tick(review(), at));
+    const label = at === 0 ? '接受現在這樣，不用改' : '我改好了';
+    const shown = b.markReviewHandled(put);
+    assert.match(shown, new RegExp(`> \\[!vam-review\\] 已處理（你選了「${label}」）\n`), 'open, titled handled');
+    assert.equal(b.markReviewHandled(shown), shown, 'again: unchanged');
+    const st = b.readReviewState(shown);
+    assert.deepEqual({ c: st.collapsed, h: st.handled }, { c: false, h: true });
+    const folded = b.collapseReviewCallouts(shown);
+    assert.match(folded, new RegExp(`> \\[!vam-review\\]- 已處理（你選了「${label}」）\n`));
+    const untick = folded.replace('[x]', '[ ]');
+    const open = b.reopenReviewCallouts(untick);
+    assert.match(open, /> \[!vam-review\] 這章要你看\n/);
+    assert.deepEqual({ c: b.readReviewState(open).collapsed, h: b.readReviewState(open).handled }, { c: false, h: false });
+    assert.equal(b.reopenReviewCallouts(folded), folded, 'a ticked box is not reopened');
+  }
+  const unticked = b.putProgramCallout(note('Body'), review());
+  assert.equal(b.markReviewHandled(unticked), unticked, 'nothing ticked: nothing to mark');
+  assert.equal(b.readReviewState(unticked).handled, false);
+  // a hand-edited box: only "keep" answers it; "rewrite" is a command, not an answer
+  const hand = b.putProgramCallout(note('Body'), b.reviewCallout(card(), ['x'], link, 'abc123', 'run-1', { op: 'op1', ifp: 'f1' }));
+  assert.equal(b.markReviewHandled(tick(hand, 1)), tick(hand, 1));
+  assert.match(b.markReviewHandled(tick(hand, 0)), /已處理（你選了「保留我的版本」）/);
+  const crlf = b.putProgramCallout(note('Body').replace(/\n/g, '\r\n'), tick(review(), 0));
+  assert.ok(!/[^\r]\n/.test(b.collapseReviewCallouts(b.markReviewHandled(crlf))), 'CRLF stays');
+  assert.equal(b.chapterBody(b.collapseReviewCallouts(put0())), b.chapterBody(put0()), 'the chapter text does not move');
+});
+const put0 = () => b.putProgramCallout(note('Body'), tick(review(), 0));
 test('review state: first or second box ticks count, the fingerprint decides if the tick still stands', () => {
   const put = at => b.putProgramCallout(note('Body'), at === undefined ? review() : tick(review(), at));
   const none = b.readReviewState(put());

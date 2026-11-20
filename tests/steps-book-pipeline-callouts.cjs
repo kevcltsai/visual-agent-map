@@ -82,6 +82,19 @@ test('align: the same fingerprint keeps a tick (and folds it); a new fingerprint
   assert.equal(b.readReviewState(fresh).accept, false);
   assert.equal(kinds(fresh).length, 1);
 });
+test('align: at gate 2 an answered box stays folded under its handled title when the chapter no longer asks; an unanswered one goes; after gate 2 every box goes', () => {
+  const ticked = tick(b.alignCallouts(note(), want({ review: box('fp1') })), 1);
+  const kept = b.alignCallouts(ticked, want({ keepAnswered: true }));
+  assert.equal(b.readReviewState(kept).collapsed, true);
+  assert.match(kept, /\[!vam-review\]- 已處理（你選了「我改好了」）/);
+  assert.equal(b.alignCallouts(kept, want({ keepAnswered: true })), kept, 'again: unchanged');
+  const open = b.alignCallouts(note(), want({ review: box('fp1') }));
+  assert.deepEqual(kinds(b.alignCallouts(open, want({ keepAnswered: true }))), [], 'unanswered goes');
+  assert.deepEqual(kinds(b.alignCallouts(ticked, want())), [], 'no gate 2: goes');
+  // unticked after the fold: the same fingerprint opens it again with the question
+  const reopened = b.alignCallouts(b.alignCallouts(ticked, want({ review: box('fp1') })).replace('[x]', '[ ]'), want({ review: box('fp1') }));
+  assert.deepEqual({ c: b.readReviewState(reopened).collapsed, h: b.readReviewState(reopened).handled }, { c: false, h: false });
+});
 test('align: a callout of another run or another chapter always goes', () => {
   const other = b.alignCallouts(note(), { runId: 'old', nodeId: 'n1', review: box() });
   assert.deepEqual(kinds(b.alignCallouts(other, want())), []);

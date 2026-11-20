@@ -3244,12 +3244,14 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_note_trial_title_0": "试跑第 {0}／{1} 章",
   "ui.book_note_trial_next": "看完后回心智图，按“这样可以，跑完全书”。",
   "ui.book_note_trial_stopped": "这本书已停止。先在心智图工具栏按“继续”，再按“这样可以，跑完全书”。",
+  "ui.book_note_trial_edit": "想改哪一段：选取文字，右键“加备注”。",
   "ui.book_note_prev_0": "上一章：{0}",
   "ui.book_note_next_0": "下一章：{0}",
   "ui.book_note_review_title": "这章要你看",
   "ui.book_note_review_accept": "接受现在这样，不用改",
   "ui.book_note_review_fixed": "我改好了",
   "ui.book_note_review_next_0": "下一章要看的：{0}",
+  "ui.book_note_review_handled_0": "已处理（你选了“{0}”）",
   "ui.book_note_add": "图文书：加备注",
   "ui.book_note_add_disabled_0": "图文书：加备注（{0}）",
   "ui.book_note_why_empty": "先选取一段文字",
@@ -3329,5 +3331,6 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_role_ai_set": "章节角色已交给 AI，下次规划可能会调整。",
   "ui.book_role_running_suffix": "图文书正在执行，要等下次载入才生效。",
   "ui.book_role_failed": "无法更改章节角色。",
-  "ui.book_deleted_chapter_hint_0": "这里提到已不在心智图上的章：{0}"
+  "ui.book_deleted_chapter_hint_0": "这里提到已不在心智图上的章：{0}",
+  "ui.book_deleted_chapter_hint_keep": "要的话改掉这段文字；不改也会照目前的章来写。"
 };

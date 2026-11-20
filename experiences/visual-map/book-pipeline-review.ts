@@ -340,6 +340,7 @@ export function trialCallout(
   return quoted([
     `> [!vam-trial] ${t("ui.book_note_trial_title_0", i, n)}`,
     `> ${stopped ? t("ui.book_note_trial_stopped") : t("ui.book_note_trial_next")}`,
+    `> ${t("ui.book_note_trial_edit")}`,
     ...(links ? [links] : []),
     `> %%vam-trial:${idPart(owner.runId)}:${idPart(owner.nodeId)}%%`,
     VERSION_LINE
@@ -446,16 +447,79 @@ export function putProgramCallout(text: string, callout: string): string {
   return [...lines.slice(0, span.from + 1), ...block, ...lines.slice(span.from + 1)].join("\n");
 }
 
-/** The review box folded (`[!vam-review]-`): the ticks and the marker stay. Already folded, or no review box: the text comes back unchanged. */
-export function collapseReviewCallouts(text: string): string {
+/**
+ * The header of a review box (`[!vam-review]` with its fold sign) with `title`; the sign is `sign` (kept when undefined). The line
+ * ending stays.
+ */
+const retitle = (line: string, title: string, sign?: "" | "-"): string => {
+  const cr = line.endsWith("\r") ? "\r" : "";
+  return (
+    bare(line).replace(
+      /(\[!vam-review\])([+-]?).*$/i,
+      (_, head: string, was: string) => `${head}${sign ?? was} ${title}`
+    ) + cr
+  );
+};
+/** The words of the box the reader ticked as the answer (accept or keep; "I fixed it" only on a plain box); undefined when none is. */
+function answerOf(lines: string[], box: ProgramCallout): string | undefined {
+  const ticks: { on: boolean; label: string }[] = [];
+  for (let i = box.start + 1; i < box.end; i++) {
+    const m = CHECKBOX.exec(bare(lines[i]));
+    if (m) ticks.push({ on: m[1] !== " ", label: bare(lines[i]).slice(m[0].length).trim() });
+  }
+  const answer = ticks[0]?.on ? ticks[0] : !box.op && ticks[1]?.on ? ticks[1] : undefined;
+  return answer ? plainText(answer.label) : undefined;
+}
+/** The review boxes changed line by line: `edit` gets each box and the lines; it returns the new header or undefined (unchanged). */
+function editReviewHeaders(text: string, edit: (box: ProgramCallout, lines: string[]) => string | undefined): string {
   const lines = text.split("\n");
   let changed = false;
   for (const c of ownedIn(lines)) {
-    if (c.kind !== "review" || c.sign === "-") continue;
-    lines[c.start] = lines[c.start].replace(REVIEW_SIGN, "[!vam-review]-");
+    if (c.kind !== "review") continue;
+    const next = edit(c, lines);
+    if (next === undefined || next === lines[c.start]) continue;
+    lines[c.start] = next;
     changed = true;
   }
   return changed ? lines.join("\n") : text;
+}
+/** The handled title of a ticked box ("Handled (you chose …)"); undefined when nothing that answers it is ticked. */
+const handledTitle = (lines: string[], box: ProgramCallout): string | undefined => {
+  const answer = answerOf(lines, box);
+  return answer === undefined ? undefined : t("ui.book_note_review_handled_0", answer);
+};
+
+/**
+ * The ticked review box says it is handled ("Handled (you chose …)") and stays open: what the reader sees the moment after the tick,
+ * before it folds (mockup ⑦-3: it folds three seconds later). No ticked box: the text comes back unchanged.
+ */
+export function markReviewHandled(text: string): string {
+  return editReviewHeaders(text, (box, lines) => {
+    const title = handledTitle(lines, box);
+    return title === undefined ? undefined : retitle(lines[box.start], title);
+  });
+}
+
+/**
+ * The review box folded (`[!vam-review]-`) under its handled title when it is ticked: the ticks and the marker stay. Already folded,
+ * or no review box: the text comes back unchanged.
+ */
+export function collapseReviewCallouts(text: string): string {
+  return editReviewHeaders(text, (box, lines) => {
+    const title = handledTitle(lines, box);
+    return title === undefined
+      ? box.sign === "-"
+        ? undefined
+        : lines[box.start].replace(REVIEW_SIGN, "[!vam-review]-")
+      : retitle(lines[box.start], title, "-");
+  });
+}
+
+/** A review box no longer ticked opens again with its question as title (it was folded or titled "handled" when it was ticked). */
+export function reopenReviewCallouts(text: string): string {
+  return editReviewHeaders(text, (box, lines) =>
+    answerOf(lines, box) === undefined ? retitle(lines[box.start], t("ui.book_note_review_title"), "") : undefined
+  );
 }
 
 export interface ReviewState {
@@ -465,6 +529,8 @@ export interface ReviewState {
   accept: boolean;
   fixed: boolean;
   collapsed: boolean;
+  /** Its title is no longer the question (it was titled "handled" when it was ticked). */
+  handled: boolean;
   /** A hand-edited chapter's box: its operation id, the integrity fingerprint of the text it was written for, and a queued rewrite. */
   op?: string;
   ifp?: string;
@@ -488,6 +554,7 @@ export function readReviewState(text: string): ReviewState | undefined {
     accept: ticks[0] === true,
     fixed: ticks[1] === true,
     collapsed: box.sign === "-",
+    handled: !bare(lines[box.start]).endsWith(` ${t("ui.book_note_review_title")}`),
     ...(box.op ? { op: box.op, ifp: box.ifp ?? "", ...(box.queued ? { queued: true } : {}) } : {})
   };
 }

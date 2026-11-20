@@ -3255,7 +3255,8 @@ var en = {
   "ui.book_note_why_outside": "notes go in the chapter text only",
   "ui.book_note_why_changed": "the text changed, select it again",
   "ui.book_note_title": "Add a note",
-  "ui.book_note_input_label": "Note for the selected text",
+  "ui.book_note_input_ask": "What to change",
+  "ui.book_note_add_button": "Add",
   "ui.book_note_input_hint": "One line, without == or %%. The note stays hidden when reading.",
   "ui.book_note_bad_empty": "Write the note first.",
   "ui.book_note_bad_marks": "The note cannot hold == or %% or a line break.",
@@ -6474,7 +6475,8 @@ var zhCN = {
   "ui.book_note_why_outside": "\u5907\u6CE8\u53EA\u80FD\u52A0\u5728\u7AE0\u8282\u6B63\u6587",
   "ui.book_note_why_changed": "\u539F\u6587\u5DF2\u6539\uFF0C\u8BF7\u91CD\u65B0\u9009\u53D6",
   "ui.book_note_title": "\u52A0\u5907\u6CE8",
-  "ui.book_note_input_label": "\u5BF9\u9009\u53D6\u6587\u5B57\u7684\u5907\u6CE8",
+  "ui.book_note_input_ask": "\u60F3\u600E\u4E48\u6539",
+  "ui.book_note_add_button": "\u52A0\u4E0A",
   "ui.book_note_input_hint": "\u4E00\u884C\u6587\u5B57\uFF0C\u4E0D\u80FD\u542B == \u6216 %%\u3002\u9605\u8BFB\u65F6\u4E0D\u4F1A\u663E\u793A\u5907\u6CE8\u3002",
   "ui.book_note_bad_empty": "\u8BF7\u5148\u5199\u5907\u6CE8\u3002",
   "ui.book_note_bad_marks": "\u5907\u6CE8\u4E0D\u80FD\u542B ==\u3001%% \u6216\u6362\u884C\u3002",
@@ -9693,7 +9695,8 @@ var zhTW = {
   "ui.book_note_why_outside": "\u5099\u8A3B\u53EA\u80FD\u52A0\u5728\u7AE0\u7BC0\u6B63\u6587",
   "ui.book_note_why_changed": "\u539F\u6587\u5DF2\u6539\uFF0C\u8ACB\u91CD\u65B0\u9078\u53D6",
   "ui.book_note_title": "\u52A0\u5099\u8A3B",
-  "ui.book_note_input_label": "\u5C0D\u9078\u53D6\u6587\u5B57\u7684\u5099\u8A3B",
+  "ui.book_note_input_ask": "\u60F3\u600E\u9EBC\u6539",
+  "ui.book_note_add_button": "\u52A0\u4E0A",
   "ui.book_note_input_hint": "\u4E00\u884C\u6587\u5B57\uFF0C\u4E0D\u80FD\u542B == \u6216 %%\u3002\u95B1\u8B80\u6642\u4E0D\u6703\u986F\u793A\u5099\u8A3B\u3002",
   "ui.book_note_bad_empty": "\u8ACB\u5148\u5BEB\u5099\u8A3B\u3002",
   "ui.book_note_bad_marks": "\u5099\u8A3B\u4E0D\u80FD\u542B ==\u3001%% \u6216\u63DB\u884C\u3002",
@@ -91750,15 +91753,19 @@ var BookNoteModal = class extends import_obsidian39.Modal {
   onOpen() {
     this.titleEl.setText(t("ui.book_note_title"));
     this.contentEl.createEl("p", { text: this.selected, cls: "vam-book-note-selected" });
-    const input2 = this.contentEl.createEl("input", { type: "text", cls: "vam-name-input vam-book-note-input" });
-    input2.setAttr("aria-label", t("ui.book_note_input_label"));
+    this.contentEl.createEl("label", { text: t("ui.book_note_input_ask"), attr: { for: "vam-book-note-input" } });
+    const input2 = this.contentEl.createEl("input", {
+      type: "text",
+      cls: "vam-name-input vam-book-note-input",
+      attr: { id: "vam-book-note-input" }
+    });
     this.contentEl.createEl("p", { text: t("ui.book_note_input_hint"), cls: "vam-annotated-note-hint" });
     const problem3 = this.contentEl.createEl("p", { cls: "vam-book-note-problem" });
     problem3.setAttr("role", "alert");
     const actions = modalActions(this);
     actionStatus(actions);
     actions.createEl("button", { text: t("ui.cancel") }).addEventListener("click", () => this.close());
-    const ok = actions.createEl("button", { text: t("ui.save"), cls: "mod-cta" });
+    const ok = actions.createEl("button", { text: t("ui.book_note_add_button"), cls: "mod-cta" });
     const send = () => {
       const answer = this.submit(input2.value);
       if (answer === null) this.close();

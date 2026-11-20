@@ -167,6 +167,8 @@ export interface BookPipelineData {
   autoRoles?: string[];
   /** Per card, how many automatic redos it has used (at most {@link MAX_AUTO_FIXES}). Absent = none (older data); an owner stop or reopen never resets it. */
   autoFixes?: Record<string, number>;
+  /** Per card, the extra expand passes used in this run across all its fix rounds (at most {@link BOOK_EXPAND_PASSES}). Absent = none; a reopen keeps it. */
+  expandPasses?: Record<string, number>;
   /** The trial cards (the first in reading order): only they run before gate 1, which shows their finished result. Absent = an older run: every card is planned before gate 1 as before. */
   trial?: string[];
   /** The map's card set (ids) the run accepted: the cards of the map when it started, or when the owner chose "carry on as before". Absent = older data: `order`. */
@@ -318,6 +320,11 @@ function problem(raw: unknown): string | undefined {
     (!isObject(raw.autoFixes) || Object.values(raw.autoFixes).some(value => !isCount(value)))
   )
     return "autoFixes";
+  if (
+    raw.expandPasses !== undefined &&
+    (!isObject(raw.expandPasses) || Object.values(raw.expandPasses).some(value => !isCount(value)))
+  )
+    return "expandPasses";
   if (
     raw.trial !== undefined &&
     (!Array.isArray(raw.trial) || raw.trial.some(id => typeof id !== "string" || !(raw.order as string[]).includes(id)))

@@ -11,6 +11,7 @@
 import {
   DEFAULT_BUDGET_LIMIT,
   FAILURE_CODE,
+  BOOK_EXPAND_PASSES,
   MAX_AUTO_FIXES,
   MAX_STEP_ATTEMPTS,
   TRIAL_SIZE,
@@ -272,6 +273,7 @@ export function retryTrial(data: BookPipelineData, now: string): BookPipelineDat
     next.attempts[id] = emptyAttempts();
     next.revisions[id] = cardRevision(next, id) + 1;
     if (next.autoFixes) delete next.autoFixes[id];
+    if (next.expandPasses) delete next.expandPasses[id];
   }
   next.revision++;
   return next;
@@ -530,6 +532,19 @@ export function requestAutoFix(data: BookPipelineData, nodeId: string): Committe
   return { state: next, accepted: true };
 }
 
+/** The extra expand passes a card has used in this run (all fix rounds together). */
+export function expandPassesOf(data: BookPipelineData, nodeId: string): number {
+  return data.expandPasses?.[nodeId] ?? 0;
+}
+/** Counts one extra expand pass before it runs (saved with the run, so a resume keeps it). Not accepted once {@link BOOK_EXPAND_PASSES} are used. */
+export function useExpandPass(data: BookPipelineData, nodeId: string): Committed {
+  if (expandPassesOf(data, nodeId) >= BOOK_EXPAND_PASSES) return { state: data, accepted: false };
+  const next = clone(data);
+  next.expandPasses = { ...(next.expandPasses ?? {}), [nodeId]: expandPassesOf(data, nodeId) + 1 };
+  next.revision++;
+  return { state: next, accepted: true };
+}
+
 /**
  * After gate 1 a trial chapter that still needs a person gets the full book's fix round like every other chapter (live v5: two short
  * trial chapters were never fixed again): its automatic-redo count starts over once. Only in the writing phase, only for a trial card.
@@ -553,6 +568,7 @@ export function resetCard(data: BookPipelineData, nodeId: string): BookPipelineD
   if (!effectiveOrder(data).includes(nodeId)) return data;
   const next = clone(data);
   next.attempts[nodeId] = emptyAttempts();
+  if (next.expandPasses) delete next.expandPasses[nodeId];
   next.revisions[nodeId] = cardRevision(next, nodeId) + 1;
   next.revision++;
   return next;

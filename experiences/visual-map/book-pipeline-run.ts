@@ -42,6 +42,7 @@ import {
   applyReset,
   applySuccess,
   autoFixesOf,
+  useExpandPass,
   beginStep,
   cardRevision,
   confirmGate1,
@@ -3017,6 +3018,9 @@ export class BookPipelineRuns {
       const body = chapterBody(latest.detail);
       const short = lengthReason(settings.length, lengthBody(body), undefined, true);
       if (short?.kind !== "under" || short.measured <= now.measured) break;
+      // The cap is per chapter and run, not per fix round (a trial chapter has two): counted and saved before the call.
+      const used = await drive.store.commit(state => useExpandPass(state, nodeId));
+      if (!used?.accepted) break;
       oldBody = body;
       now = short;
       oldDetail = detailBlockOf(latest.raw);

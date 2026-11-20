@@ -57,6 +57,11 @@ export function bookChapterCalls(): { plan: number; write: number; images: numbe
   };
 }
 
+/** What a trial chapter's second fix round adds at most: one write, its picture searches (with language retry) and one proofread. */
+export function bookTrialExtraCalls(): number {
+  return 1 + BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH + 1;
+}
+
 export interface BookStartEstimate {
   cards: number;
   /** An upper bound of a run with no failed step: the whole-book plan, then {@link bookChapterCalls} for each card. */
@@ -90,7 +95,8 @@ export function bookStartEstimate(cards: number, models?: BookStartModels): Book
   return {
     cards: n,
     // The global plan, every chapter's calls, and the one whole-book consistency check once there are two chapters to compare.
-    calls: 1 + n * (per.plan + per.write + per.images + per.proof) + (n >= 2 ? 1 : 0),
+    // A trial chapter has a second fix round (before and after gate 1): one more write with its searches and proofread each.
+    calls: 1 + n * (per.plan + per.write + per.images + per.proof) + trial * bookTrialExtraCalls() + (n >= 2 ? 1 : 0),
     limit: DEFAULT_BUDGET_LIMIT,
     seconds: time("global") + rounds * perCard
   };

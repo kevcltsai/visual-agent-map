@@ -591,3 +591,15 @@ test('map change: the new fields are validated when present and optional when ab
   assert.equal(model.readBookPipeline({ bookPipeline: { ...ok, pauseReason: 'map', changed: { added: ['x'], missing: [] }, removed: ['a'], ignored: ['x'], accepted: ['a'] } }).kind, 'usable');
   assert.equal(model.readBookPipeline({ bookPipeline: { ...ok, chapters: { a: { title: 'A', path: 'a.md' } } } }).kind, 'usable');
 });
+
+test('expand passes: useExpandPass counts per card, stops at BOOK_EXPAND_PASSES, survives a reopen and starts over with the card reset', () => {
+  const state = { v: 1, runId: 'r', phase: 'writing', status: 'running', order: ['a'], globalPlanned: true, attempts: { global: 1, a: { plan: 1, write: 1, proof: 0 } }, revisions: { a: 0 }, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x' };
+  const one = machine.useExpandPass(state, 'a');
+  assert.equal(one.accepted, true);
+  const two = machine.useExpandPass(one.state, 'a');
+  assert.equal(two.accepted, true);
+  assert.equal(machine.expandPassesOf(two.state, 'a'), 2);
+  assert.equal(machine.useExpandPass(two.state, 'a').accepted, false, 'the cap is per chapter and run');
+  assert.equal(machine.useExpandPass(two.state, 'b').accepted, true, 'another chapter has its own');
+  assert.equal(machine.expandPassesOf(machine.resetCard(two.state, 'a'), 'a'), 0);
+});

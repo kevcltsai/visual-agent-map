@@ -12841,6 +12841,8 @@ function problem(raw) {
     return "autoRoles";
   if (raw.autoFixes !== void 0 && (!isObject(raw.autoFixes) || Object.values(raw.autoFixes).some((value) => !isCount(value))))
     return "autoFixes";
+  if (raw.expandPasses !== void 0 && (!isObject(raw.expandPasses) || Object.values(raw.expandPasses).some((value) => !isCount(value))))
+    return "expandPasses";
   if (raw.trial !== void 0 && (!Array.isArray(raw.trial) || raw.trial.some((id) => typeof id !== "string" || !raw.order.includes(id))))
     return "trial";
   if (!isObject(raw.budget) || !isCount(raw.budget.used) || !isCount(raw.budget.limit) || raw.budget.limit < 1)
@@ -47745,6 +47747,7 @@ function retryTrial(data, now) {
     next.attempts[id] = emptyAttempts();
     next.revisions[id] = cardRevision(next, id) + 1;
     if (next.autoFixes) delete next.autoFixes[id];
+    if (next.expandPasses) delete next.expandPasses[id];
   }
   next.revision++;
   return next;
@@ -47942,6 +47945,18 @@ function requestAutoFix(data, nodeId) {
   next.revision++;
   return { state: next, accepted: true };
 }
+function expandPassesOf(data, nodeId) {
+  var _a2, _b2;
+  return (_b2 = (_a2 = data.expandPasses) == null ? void 0 : _a2[nodeId]) != null ? _b2 : 0;
+}
+function useExpandPass(data, nodeId) {
+  var _a2;
+  if (expandPassesOf(data, nodeId) >= BOOK_EXPAND_PASSES) return { state: data, accepted: false };
+  const next = clone2(data);
+  next.expandPasses = { ...(_a2 = next.expandPasses) != null ? _a2 : {}, [nodeId]: expandPassesOf(data, nodeId) + 1 };
+  next.revision++;
+  return { state: next, accepted: true };
+}
 function reopenTrialFix(data, nodeId) {
   var _a2;
   if (data.phase !== "writing" || data.status !== "running" || !((_a2 = data.trial) == null ? void 0 : _a2.includes(nodeId)) || !autoFixesOf(data, nodeId))
@@ -47955,6 +47970,7 @@ function resetCard(data, nodeId) {
   if (!effectiveOrder(data).includes(nodeId)) return data;
   const next = clone2(data);
   next.attempts[nodeId] = emptyAttempts();
+  if (next.expandPasses) delete next.expandPasses[nodeId];
   next.revisions[nodeId] = cardRevision(next, nodeId) + 1;
   next.revision++;
   return next;
@@ -55477,6 +55493,8 @@ ${oldDetail}`);
       const body = chapterBody(latest.detail);
       const short = lengthReason(settings.length, lengthBody(body), void 0, true);
       if ((short == null ? void 0 : short.kind) !== "under" || short.measured <= now.measured) break;
+      const used = await drive.store.commit((state) => useExpandPass(state, nodeId));
+      if (!(used == null ? void 0 : used.accepted)) break;
       oldBody = body;
       now = short;
       oldDetail = detailBlockOf(latest.raw);
@@ -69649,6 +69667,9 @@ function bookChapterCalls() {
     proof: writes
   };
 }
+function bookTrialExtraCalls() {
+  return 1 + BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH + 1;
+}
 function bookModelSpeed(model) {
   const id = model.toLowerCase();
   return id.includes("haiku") ? 0.5 : id.includes("opus") ? 1.8 : 1;
@@ -69668,7 +69689,8 @@ function bookStartEstimate(cards, models) {
   return {
     cards: n,
     // The global plan, every chapter's calls, and the one whole-book consistency check once there are two chapters to compare.
-    calls: 1 + n * (per.plan + per.write + per.images + per.proof) + (n >= 2 ? 1 : 0),
+    // A trial chapter has a second fix round (before and after gate 1): one more write with its searches and proofread each.
+    calls: 1 + n * (per.plan + per.write + per.images + per.proof) + trial * bookTrialExtraCalls() + (n >= 2 ? 1 : 0),
     limit: DEFAULT_BUDGET_LIMIT,
     seconds: time("global") + rounds * perCard
   };

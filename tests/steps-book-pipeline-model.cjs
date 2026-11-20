@@ -291,3 +291,13 @@ test('wiring: the plugin\'s readCard port carries pipelineRole and its writePipe
   assert.deepEqual({ ...(await ports.readCard(note.path)).fields }, { bookRole: 'gallery', pipelineRole: 'intro' });
   assert.equal(await ports.writePipelineRole(note.path, 'body'), false);
 });
+
+test('expandPasses is optional: an old map reads without it, a valid one round-trips, a bad one is unusable', () => {
+  const ok = core.serializeMap(baseMap({ aiMode: 'quick', bookPipeline: { ...usable(), expandPasses: { a: 2 } } }));
+  assert.equal(roundTrip(ok), ok);
+  assert.deepEqual(plain(model.readBookPipeline(core.parseMap(ok)).data.expandPasses), { a: 2 });
+  for (const bad of [[1], 'x', { a: -1 }, { a: 1.5 }]) {
+    const text = core.serializeMap(baseMap({ aiMode: 'quick', bookPipeline: { ...usable(), expandPasses: bad } }));
+    assert.notEqual(model.readBookPipeline(core.parseMap(text)).kind, 'usable');
+  }
+});

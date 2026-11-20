@@ -2863,6 +2863,45 @@ test('expand passes: a pass that adds nothing ends the passes; the chapter keeps
   assert.match(r.stat.logs.join('\n'), new RegExp(`expand_merge [^\\n]*card=${id} [^\\n]*result=no_edits [^\\n]*pass=1 [^\\n]*noop=1`));
 });
 
+test('expand passes: a trial chapter has two fix rounds (before and after gate 1) but at most BOOK_EXPAND_PASSES extra passes in all; its writing calls stay at draft + two fix rounds + the capped passes', async () => {
+  const seen = [];
+  const r = await trialRig({ titles: ['A', 'B', 'C', 'D', 'E'] });
+  await r.repo.writeBookSettings(r.nodes[0].path, { length: LEN_SETTING });
+  r.script.author = passAuthor(r, seen, call => 5 + call);
+  await r.runs.start(r.mapPath);
+  while (r.runs.isRunning(r.mapPath) && (await r.state()).phase !== 'gate1') await new Promise(resolve => setImmediate(resolve));
+  await confirmDone(r.runs, r.mapPath);
+  const { MAX_AUTO_FIXES, BOOK_EXPAND_PASSES } = S.load('core/book-pipeline/model.ts');
+  const trial = r.nodes.slice(0, 3);
+  const log = r.stat.logs.join('\n');
+  const s = await r.state();
+  for (const node of trial) {
+    const calls = seen.filter(input => input.nodeId === node.id).length;
+    assert.equal(calls, 1 + 2 * MAX_AUTO_FIXES + BOOK_EXPAND_PASSES, 'draft, two fix rounds, the capped passes');
+    assert.ok(calls <= 1 + 2 * MAX_AUTO_FIXES + BOOK_EXPAND_PASSES, `${node.id}: ${calls} writing calls`);
+    assert.ok(log.split('\n').filter(line => line.includes('author_call') && line.includes(`card=${node.id} `) && line.includes('result=expand_pass')).length <= BOOK_EXPAND_PASSES);
+    assert.ok((s.expandPasses?.[node.id] ?? 0) <= BOOK_EXPAND_PASSES);
+  }
+  assert.ok(trial.some(node => s.expandPasses?.[node.id] === BOOK_EXPAND_PASSES), 'the cap was reached');
+});
+
+test('expand passes: the budget running out during an extra pass ends the passes; the chapter carries on to its proofread and the run continues', async () => {
+  const seen = [];
+  const r = await lenRig();
+  const base = passAuthor(r, seen, call => 5 + call);
+  r.script.author = async input => {
+    const mine = seen.filter(call => call.nodeId === input.nodeId).length;
+    if (input.nodeId === r.nodes[1].id && mine === 2) { seen.push(input); return { outcome: 'budget-exhausted' }; }
+    return base(input);
+  };
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const id = r.nodes[1].id;
+  assert.equal(seen.filter(input => input.nodeId === id).length, 3, 'first draft, fix round, one pass that hit the budget: no second pass');
+  assert.equal(r.stat.proof.length >= 3, true, 'the chapter was still proofread');
+  assert.equal((await r.state()).phase, 'gate2');
+  assert.equal((await r.state()).expandPasses[id], 1);
+});
+
 test('T10c length expand: the redo keeps the card\'s Summary (keepSummary reaches the author only for the expansion)', async () => {
   const seen = [];
   const r = await lenRig();

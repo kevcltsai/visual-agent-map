@@ -3309,7 +3309,7 @@ var en = {
   "ui.book_seam_label": "Check seam",
   "ui.book_seam_reason": "A neighboring card's plan or body changed and has not been checked by hand.",
   "ui.book_card_menu_rerun": "Rerun this picture-book card",
-  "ui.book_card_menu_rerun_sub": 'Plan \u2192 write \u2192 proofread, about 2 minutes; other chapters keep their text, only their previous/next lines are updated and marked "seam needs a look"',
+  "ui.book_card_menu_rerun_sub": 'Plan \u2192 write \u2192 proofread, about 2 minutes; other chapters stay, only marked "seam needs a look"',
   "ui.book_rerun_tag": "Working",
   "ui.book_panel_lead_sep": ", ",
   "ui.book_panel_reason_unchecked_0": "{0} items could not be checked against a source.",
@@ -6529,7 +6529,7 @@ var zhCN = {
   "ui.book_seam_label": "\u63A5\u7F1D\u9700\u770B",
   "ui.book_seam_reason": "\u90BB\u5361\u4F01\u5212\u6216\u6B63\u6587\u5DF2\u53D8\u66F4\uFF0C\u5C1A\u672A\u4EBA\u5DE5\u6838\u5BF9\u3002",
   "ui.book_card_menu_rerun": "\u91CD\u8DD1\u56FE\u6587\u4E66\u8FD9\u4E00\u5F20",
-  "ui.book_card_menu_rerun_sub": "\u4F01\u5212 \u2192 \u5199 \u2192 \u6821\uFF0C\u7EA6 2 \u5206\u949F\uFF1B\u524D\u540E\u7AE0\u6B63\u6587\u4E0D\u52A8\uFF0C\u53EA\u66F4\u65B0\u201C\u524D\u4E00\u5F20\uFF0F\u540E\u4E00\u5F20\u201D\u5E76\u6807\u201C\u63A5\u7F1D\u9700\u770B\u201D",
+  "ui.book_card_menu_rerun_sub": "\u4F01\u5212 \u2192 \u5199 \u2192 \u6821\uFF0C\u7EA6 2 \u5206\u949F\uFF1B\u524D\u540E\u7AE0\u4E0D\u52A8\uFF0C\u53EA\u6807\u201C\u63A5\u7F1D\u9700\u770B\u201D",
   "ui.book_rerun_tag": "\u5904\u7406\u4E2D",
   "ui.book_panel_lead_sep": "\uFF0C",
   "ui.book_panel_reason_unchecked_0": "\u6709 {0} \u9879\u6CA1\u80FD\u6838\u5BF9\u5230\u6765\u6E90\u3002",
@@ -9749,7 +9749,7 @@ var zhTW = {
   "ui.book_seam_label": "\u63A5\u7E2B\u9700\u770B",
   "ui.book_seam_reason": "\u9130\u5361\u4F01\u5283\u6216\u6B63\u6587\u5DF2\u8B8A\u66F4\uFF0C\u5C1A\u672A\u4EBA\u5DE5\u6838\u5C0D\u3002",
   "ui.book_card_menu_rerun": "\u91CD\u8DD1\u5716\u6587\u66F8\u9019\u4E00\u5F35",
-  "ui.book_card_menu_rerun_sub": "\u4F01\u5283 \u2192 \u5BEB \u2192 \u6821\uFF0C\u7D04 2 \u5206\u9418\uFF1B\u524D\u5F8C\u7AE0\u6B63\u6587\u4E0D\u52D5\uFF0C\u53EA\u66F4\u65B0\u300C\u524D\u4E00\u5F35\uFF0F\u5F8C\u4E00\u5F35\u300D\u4E26\u6A19\u300C\u63A5\u7E2B\u9700\u770B\u300D",
+  "ui.book_card_menu_rerun_sub": "\u4F01\u5283 \u2192 \u5BEB \u2192 \u6821\uFF0C\u7D04 2 \u5206\u9418\uFF1B\u524D\u5F8C\u7AE0\u4E0D\u52D5\uFF0C\u53EA\u6A19\u300C\u63A5\u7E2B\u9700\u770B\u300D",
   "ui.book_rerun_tag": "\u8655\u7406\u4E2D",
   "ui.book_panel_lead_sep": "\uFF0C",
   "ui.book_panel_reason_unchecked_0": "\u6709 {0} \u9805\u6C92\u80FD\u6838\u5C0D\u5230\u4F86\u6E90\u3002",
@@ -12794,6 +12794,226 @@ function reserveBudget(budget) {
   return budget.used >= budget.limit ? null : { used: budget.used + 1, limit: budget.limit };
 }
 
+// core/book-pipeline/image-dedupe.ts
+function imageKey(url) {
+  var _a2;
+  let parsed;
+  try {
+    parsed = new URL(url.trim());
+  } catch (e) {
+    return url.trim().toLowerCase();
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (/^(upload|thumb)\.wikimedia\.org$/.test(host)) {
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    let name2 = (_a2 = parts[parts.length - 1]) != null ? _a2 : "";
+    const thumbAt = parts.indexOf("thumb");
+    if (thumbAt >= 0 && parts.length >= thumbAt + 5) name2 = parts[parts.length - 2];
+    try {
+      name2 = decodeURIComponent(name2);
+    } catch (e) {
+    }
+    return name2.toLowerCase();
+  }
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.href;
+}
+
+// core/book-pipeline/image-quality.ts
+var WIKI_HOST = /(^|\.)(wikimedia|wikipedia)\.org$/i;
+var FILE_PAGE = /^\/wiki\/(?:File|Image):[^/]+$/i;
+function plainWords(text10) {
+  return text10.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+function wikimediaFile(imageUrl) {
+  let url;
+  try {
+    url = new URL(imageUrl.trim());
+  } catch (e) {
+    return void 0;
+  }
+  const host = url.hostname.toLowerCase();
+  const parts = url.pathname.split("/").filter(Boolean);
+  const decode2 = (value) => {
+    try {
+      return decodeURIComponent(value);
+    } catch (e) {
+      return value;
+    }
+  };
+  if (/^(upload|thumb)\.wikimedia\.org$/.test(host) && parts[0] === "wikipedia" && parts.length >= 5) {
+    const thumbAt = parts.indexOf("thumb");
+    const name2 = thumbAt === 2 && parts.length >= 7 ? parts[5] : parts[parts.length - 1];
+    return { project: parts[1].toLowerCase(), name: decode2(name2) };
+  }
+  const filePath = /^\/wiki\/Special:FilePath\/([^/]+)$/i.exec(url.pathname);
+  if (host === "commons.wikimedia.org" && filePath) return { project: "commons", name: decode2(filePath[1]) };
+  return void 0;
+}
+function filePageOf(imageUrl) {
+  const file = wikimediaFile(imageUrl);
+  if (!file || !/^[a-z-]+$/.test(file.project)) return void 0;
+  const host = file.project === "commons" ? "commons.wikimedia.org" : `${file.project}.wikipedia.org`;
+  return `https://${host}/wiki/File:${encodeURIComponent(file.name.replace(/ /g, "_"))}`;
+}
+function fileSourceOf(candidate) {
+  let source;
+  try {
+    source = new URL(candidate.source);
+  } catch (e) {
+    return void 0;
+  }
+  const wikiSource = WIKI_HOST.test(source.hostname);
+  if (wikiSource && FILE_PAGE.test(source.pathname)) return candidate;
+  const page = filePageOf(candidate.url);
+  if (page) {
+    const { author: _author, license: _license, ...rest } = candidate;
+    return { ...rest, source: page };
+  }
+  return wikiSource ? void 0 : candidate;
+}
+function fileNameOf(imageUrl) {
+  var _a2;
+  const file = wikimediaFile(imageUrl);
+  if (file) return file.name;
+  try {
+    const last = (_a2 = new URL(imageUrl).pathname.split("/").filter(Boolean).pop()) != null ? _a2 : "";
+    return decodeURIComponent(last);
+  } catch (e) {
+    return "";
+  }
+}
+function bySubject(candidate, subject) {
+  var _a2;
+  const who = plainWords(subject != null ? subject : "");
+  if (!who) return true;
+  const words2 = who.split(" ");
+  const latin = /^[a-z0-9 ]+$/.test(who);
+  const key4 = latin ? words2[words2.length - 1] : who;
+  const names3 = (text10) => latin ? ` ${plainWords(text10)} `.includes(` ${key4} `) : plainWords(text10).includes(key4);
+  if ((_a2 = candidate.author) == null ? void 0 : _a2.trim()) return names3(candidate.author);
+  const file = fileNameOf(candidate.url).replace(/\.[a-z0-9]{2,5}$/i, "").replace(/_/g, " ");
+  const credit = /\b(?:by|par|von|di|por|door)\s+(.+)$/i.exec(file);
+  if (credit && !names3(credit[1])) return false;
+  return names3(file) || !latin && names3(candidate.title);
+}
+var EDIT_WORDS = /\b(?:cropped|crop|edited|edit|restored|retouched|retouch|cleaned|version|ver|v\d)\b/g;
+function workKey(imageUrl, author) {
+  const who = plainWords((author != null ? author : "").replace(/\([^)]*\)/g, " "));
+  if (!who) return void 0;
+  const stem = plainWords(
+    fileNameOf(imageUrl).replace(/\.[a-z0-9]{2,5}$/i, "").replace(/^\d+px-/i, "")
+  ).replace(EDIT_WORDS, " ").replace(/\b\d{5,}\b/g, " ").replace(/\s+/g, " ").trim();
+  if (stem.replace(/ /g, "").length < 4) return void 0;
+  return `work:${stem}|${who}`;
+}
+
+// ai/section-aliases.ts
+var name = (zhTW2, en2) => ({ zh: zhTW2, en: en2 });
+var SECTION_NAME = {
+  // sources role: any one of the three names; a structure uses the one that fits its type
+  sources: name("\u4F86\u6E90", "Sources"),
+  source: name("\u51FA\u8655", "Source"),
+  references: name("\u53C3\u8003\u8CC7\u6599", "References"),
+  // log role (unchanged name)
+  log: name("\u66F4\u65B0\u7D00\u9304", "Update log"),
+  // log role for the picture-book chapter template: only when no section has the standard log name
+  researchNotes: name("\u7814\u7A76\u5099\u8A3B", "Research notes"),
+  // atomic
+  oneSentence: name("\u4E00\u53E5\u8A71", "In one sentence"),
+  why: name("\u70BA\u4EC0\u9EBC", "Why"),
+  // hypothesis
+  ifTrue: name("\u5982\u679C\u6210\u7ACB\u6703\u770B\u5230", "If true we would see"),
+  evidenceTable: name("\u8B49\u64DA\u5C0D\u7167", "Evidence table"),
+  // evidence
+  summary: name("\u6458\u8981", "Summary"),
+  relatedTopics: name("\u548C\u54EA\u4E9B\u8B70\u984C\u6709\u95DC", "Related topics"),
+  // conclusion
+  confidence: name("\u4FE1\u5FC3", "Confidence"),
+  scope: name("\u9069\u7528\u7BC4\u570D", "Scope"),
+  impact: name("\u5F71\u97FF\u8207\u4E0B\u4E00\u6B65", "Impact and next steps"),
+  // action
+  goalDone: name("\u76EE\u6A19\u8207\u5B8C\u6210\u689D\u4EF6", "Goal and done-when"),
+  steps: name("\u6B65\u9A5F", "Steps")
+};
+var NEW_STANDARD_HEADING_KEYS = [
+  "detail.background_and_mechanism",
+  "detail.disagreements_and_limits",
+  "detail.open_questions_to_check",
+  "detail.sources_heading"
+];
+var lowered = (value) => value.trim().toLocaleLowerCase();
+var SPELLINGS = ["zh-TW", "zh-CN", "en"];
+var spellings = (key4) => SPELLINGS.map((locale) => translate(locale, key4));
+var both = (value) => [value.zh, value.en];
+var rows;
+var researchNotesNames = () => [...both(SECTION_NAME.researchNotes), "\u7814\u7A76\u5907\u6CE8"];
+function sectionAliasRows() {
+  if (rows) return rows;
+  const sourcesNames = [
+    ...both(SECTION_NAME.sources),
+    ...both(SECTION_NAME.source),
+    ...both(SECTION_NAME.references),
+    ...spellings("detail.sources_heading"),
+    "\u51FA\u5904",
+    "\u53C2\u8003\u8D44\u6599"
+  ];
+  const legacySources = spellings("detail.evidence_and_sources");
+  rows = [
+    // role sources: the old standard name, and the three new names for each other
+    { names: sourcesNames, aliases: [...sourcesNames, ...legacySources] },
+    // Research notes: a note that only has the old log heading still lines up with it
+    { names: researchNotesNames(), aliases: spellings("detail.update_log") },
+    // standard / textbook
+    { names: spellings("detail.background_and_mechanism"), aliases: spellings("detail.key_knowledge") },
+    { names: spellings("detail.disagreements_and_limits"), aliases: spellings("detail.tradeoffs_and_limitations") },
+    { names: spellings("detail.open_questions_to_check"), aliases: spellings("detail.open_questions") },
+    // atomic
+    { names: both(SECTION_NAME.oneSentence), aliases: ["\u5B9A\u7FA9", "Definition"] },
+    { names: both(SECTION_NAME.why), aliases: ["\u89E3\u91CB", "Explanation"] },
+    // hypothesis: the old support and counterevidence sections both land on the one table
+    { names: both(SECTION_NAME.ifTrue), aliases: ["\u9810\u6E2C", "Prediction"] },
+    { names: both(SECTION_NAME.evidenceTable), aliases: ["\u652F\u6301", "\u53CD\u99C1", "Support", "Counterevidence"] },
+    // evidence
+    { names: both(SECTION_NAME.summary), aliases: ["\u5167\u5BB9", "Content"] },
+    { names: both(SECTION_NAME.relatedTopics), aliases: ["\u652F\u6301\u6216\u53CD\u99C1", "Supports or refutes"] },
+    // conclusion
+    { names: both(SECTION_NAME.confidence), aliases: ["\u4FE1\u5FC3\u7A0B\u5EA6"] },
+    { names: both(SECTION_NAME.scope), aliases: ["\u9069\u7528\u7BC4\u570D\u8207\u9650\u5236", "Scope and limits"] },
+    { names: both(SECTION_NAME.impact), aliases: ["\u5F8C\u7E8C\u884C\u52D5", "Next actions"] },
+    // action
+    { names: both(SECTION_NAME.goalDone), aliases: ["\u76EE\u6A19", "\u5B8C\u6210\u689D\u4EF6", "Goal", "Done when"] },
+    { names: both(SECTION_NAME.steps), aliases: ["\u6AA2\u67E5\u9EDE", "Checkpoints"] }
+  ];
+  return rows;
+}
+function sectionAliasesFor(heading) {
+  const key4 = lowered(heading);
+  const result = [];
+  for (const row of sectionAliasRows())
+    if (row.names.some((entry) => lowered(entry) === key4)) {
+      for (const alias of row.aliases)
+        if (lowered(alias) !== key4 && !result.some((existing) => lowered(existing) === lowered(alias)))
+          result.push(alias);
+    }
+  return result;
+}
+function isNewSourcesHeading(heading) {
+  const key4 = lowered(heading);
+  return sectionAliasRows()[0].names.some((entry) => lowered(entry) === key4);
+}
+function isOpenQuestionsHeading(heading) {
+  const key4 = lowered(heading);
+  return [...spellings("detail.open_questions_to_check"), ...spellings("detail.open_questions")].some(
+    (entry) => lowered(entry) === key4
+  );
+}
+function isResearchNotesHeading(heading) {
+  const key4 = lowered(heading);
+  return researchNotesNames().some((entry) => lowered(entry) === key4);
+}
+
 // core/book-pipeline/text.ts
 var import_node_crypto = require("node:crypto");
 function demoteHeadings(text10) {
@@ -12815,6 +13035,1665 @@ function unescapeMarkdownText(text10) {
 }
 function hashText(text10) {
   return (0, import_node_crypto.createHash)("sha256").update(text10.replace(/\r\n?/g, "\n")).digest("hex").slice(0, 16);
+}
+
+// core/book-pipeline/plan-text.ts
+var pick = (words2, language2) => instructionLanguageOf(language2) === "zh" ? words2.zh : words2.en;
+var matches = (words2, value) => value === words2.zh || value === words2.en;
+var ROLE_WORDS = {
+  intro: { zh: "\u5C0E\u8B80", en: "Intro" },
+  body: { zh: "\u672C\u6587", en: "Body" },
+  gallery: { zh: "\u7D20\u6750\u5C0E\u89BD", en: "Gallery" },
+  closing: { zh: "\u6536\u5C3E", en: "Closing" }
+};
+var TYPE_WORDS = {
+  structure: { zh: "\u7D50\u69CB\u578B", en: "structure" },
+  fact: { zh: "\u4E8B\u5BE6\u578B", en: "fact" }
+};
+var SETTING_WORDS = {
+  reader: { zh: "\u8B80\u8005", en: "Reader" },
+  goal: { zh: "\u76EE\u6A19", en: "Goal" },
+  angle: { zh: "\u5207\u5165\u89D2\u5EA6", en: "Angle" },
+  tone: { zh: "\u8A9E\u6C23", en: "Tone" },
+  length: { zh: "\u7BC7\u5E45", en: "Length" },
+  style: { zh: "\u98A8\u683C", en: "Style" }
+};
+var L = {
+  role: { zh: "\u89D2\u8272", en: "Role" },
+  covers: { zh: "\u672C\u7AE0\u6703\u8B1B", en: "This chapter covers" },
+  entry: { zh: "\u63A5\u5165\u9EDE", en: "Entry point" },
+  handoff: { zh: "\u7559\u7D66\u4E0B\u4E00\u5F35\u7684\u554F\u984C", en: "Question left for the next card" },
+  previous: { zh: "\u524D\u4E00\u5F35", en: "Previous card" },
+  next: { zh: "\u5F8C\u4E00\u5F35", en: "Next card" },
+  checklist: { zh: "\u9A57\u6536\u6E05\u55AE", en: "Acceptance checklist" },
+  images: { zh: "\u5716\u5B89\u6392", en: "Image plan" },
+  imageSlot: { zh: "\u5716\u4F4D", en: "Image slot" },
+  position: { zh: "\u4F4D\u7F6E", en: "Position" },
+  none: { zh: "\u7121", en: "none" },
+  plan: { zh: "\u5168\u66F8\u4F01\u5283", en: "Book plan" },
+  thread: { zh: "\u5168\u66F8\u4E3B\u7DDA", en: "Book thread" },
+  decisions: { zh: "\u7DE8\u8F2F\u6C7A\u5B9A", en: "Editorial decisions" },
+  materials: { zh: "\u7D20\u6750\u767B\u8A18\u8868", en: "Material register" }
+};
+var safe = (value, max = 400) => escapeMarkdownText(singleLine(value, max), max);
+var colon = (language2) => instructionLanguageOf(language2) === "zh" ? "\uFF1A" : ": ";
+var SLOT_SEPARATOR = "\uFF5C";
+function composeImageSlots(images, language2) {
+  const c = colon(language2);
+  const head2 = pick(L.images, language2);
+  if (!images.length) return [`${head2}${c}${pick(L.none, language2)}`];
+  return [
+    `${head2}${c.trim()}`,
+    ...images.slice(0, MAX_IMAGE_SLOTS).map(
+      (slot, at) => `- ${pick(L.imageSlot, language2)} ${at + 1}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.kind, 40), 40)}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.explains, 200), 200)}${SLOT_SEPARATOR}${pick(L.position, language2)}${c}${safe(cleanSlotText(slot.anchor, 120), 120)}`
+    )
+  ];
+}
+function composeCardPrompt(plan, language2) {
+  const c = colon(language2);
+  const neighbour2 = (label, n) => n ? `${pick(label, language2)}${c}(${n.position}) ${safe(n.title, 120)}${safe(n.summary, 240) ? ` \u2014 ${safe(n.summary, 240)}` : ""}` : `${pick(label, language2)}${c}${pick(L.none, language2)}`;
+  const lines = [
+    `${pick(L.role, language2)}${c}${pick(ROLE_WORDS[plan.role], language2)}`,
+    `${pick(L.covers, language2)}${c}${safe(plan.covers)}`,
+    `${pick(L.entry, language2)}${c}${safe(plan.entry)}`,
+    `${pick(L.handoff, language2)}${c}${safe(plan.handoff)}`,
+    neighbour2(L.previous, plan.previous),
+    neighbour2(L.next, plan.next),
+    ...plan.images ? composeImageSlots(plan.images, language2) : [],
+    `${pick(L.checklist, language2)}${c.trim()}`,
+    ...plan.checklist.map((item) => `- ${item.id} [${pick(TYPE_WORDS[item.type], language2)}] ${safe(item.text)}`)
+  ];
+  return demoteHeadings(lines.join("\n"));
+}
+var CHECK_LINE = /^[-*]\s+(C\d+)\s+\[([^\]]+)\]\s+(.+?)\s*$/;
+function parseChecklist(prompt) {
+  const items = [];
+  for (const line2 of prompt.split(/\r?\n/)) {
+    const m = CHECK_LINE.exec(line2);
+    if (!m) continue;
+    const type = Object.keys(TYPE_WORDS).find((key4) => matches(TYPE_WORDS[key4], m[2].trim()));
+    if (type) items.push({ id: m[1], type, text: unescapeMarkdownText(m[3]) });
+  }
+  return items;
+}
+var IMAGES_HEAD = /^(\S[^:：]*)[:：]\s*(.*)$/;
+var SLOT_LINE = /^[-*]\s+(?:圖位|Image slot)\s+(\d+)\s*｜(.*)$/;
+function parseImageSlots(prompt) {
+  const lines = prompt.split(/\r?\n/);
+  const at = lines.findIndex((line2) => {
+    const m = IMAGES_HEAD.exec(line2);
+    return !!m && matches(L.images, m[1].trim());
+  });
+  if (at < 0) return void 0;
+  const slots = [];
+  for (const line2 of lines.slice(at + 1)) {
+    const m = SLOT_LINE.exec(line2);
+    if (!m) break;
+    const index = Number(m[1]);
+    const parts = m[2].split(SLOT_SEPARATOR);
+    if (parts.length < 3 || index < 1 || slots.some((slot) => slot.index === index) || slots.length >= MAX_IMAGE_SLOTS)
+      continue;
+    const place = /^[^:：]*[:：]\s*(.*)$/.exec(parts[parts.length - 1]);
+    if (!place) continue;
+    slots.push({
+      index,
+      kind: unescapeMarkdownText(parts[0].trim()),
+      explains: unescapeMarkdownText(parts.slice(1, -1).join(SLOT_SEPARATOR).trim()),
+      anchor: unescapeMarkdownText(place[1].trim())
+    });
+  }
+  return slots;
+}
+function parseCardPrompt(prompt) {
+  const out = {};
+  for (const line2 of prompt.split(/\r?\n/)) {
+    const m = /^([^:：]+)[:：]\s*(.*)$/.exec(line2);
+    if (!m) continue;
+    const label = m[1].trim();
+    for (const key4 of ["role", "covers", "entry", "handoff", "previous", "next"])
+      if (matches(L[key4], label) && out[key4] === void 0) out[key4] = unescapeMarkdownText(m[2].trim());
+  }
+  return out;
+}
+function rewriteNeighbourLine(prompt, key4, neighbour2) {
+  var _a2, _b2;
+  const lines = prompt.split("\n");
+  const at = lines.findIndex((line3) => {
+    const m = /^([^:：]+)[:：]/.exec(line3);
+    return !!m && matches(L[key4], m[1].trim());
+  });
+  if (at < 0) return void 0;
+  const head2 = (_b2 = (_a2 = /^([^:：]+[:：]\s*)/.exec(lines[at].replace(/\r$/, ""))) == null ? void 0 : _a2[1]) != null ? _b2 : "";
+  const english = !lines[at].startsWith(L[key4].zh);
+  const summary = neighbour2 ? safe(neighbour2.summary, 240) : "";
+  const line2 = neighbour2 ? `${head2}(${neighbour2.position}) ${safe(neighbour2.title, 120)}${summary ? ` \u2014 ${summary}` : ""}` : `${head2}${english ? L.none.en : L.none.zh}`;
+  if (lines[at].replace(/\r$/, "") === line2) return void 0;
+  lines[at] = lines[at].endsWith("\r") ? `${line2}\r` : line2;
+  return lines.join("\n");
+}
+function composeBookPlan(plan, language2) {
+  const c = colon(language2);
+  const decisions = BOOK_SETTING_FIELDS.filter((field) => {
+    var _a2;
+    return (_a2 = plan.decisions[field]) == null ? void 0 : _a2.trim();
+  }).map(
+    (field) => `- ${pick(SETTING_WORDS[field], language2)}${c}${safe(plan.decisions[field])}`
+  );
+  const materials = plan.materials.map((m) => `- ${safe(m.name, 120)}${c}${safe(m.use, 240)}`);
+  return [
+    `## ${pick(L.plan, language2)}`,
+    "",
+    `### ${pick(L.thread, language2)}`,
+    safe(plan.thread, 1200),
+    "",
+    `### ${pick(L.decisions, language2)}`,
+    ...decisions,
+    "",
+    `### ${pick(L.materials, language2)}`,
+    ...materials,
+    ""
+  ].join("\n");
+}
+var isBookPlanTitle = (title) => matches(L.plan, title.trim());
+var PLAN_CALLOUT = /^[ \t]{0,3}>[ \t]?\[!vam-book\][+-]?[ \t]+(.+?)[ \t]*$/i;
+var QUOTE_PREFIX = /^[ \t]{0,3}>[ \t]?/;
+function planLines(markdown) {
+  const lines = markdown.split(/\r?\n/);
+  const callout2 = lines.findIndex((line2) => {
+    const m = PLAN_CALLOUT.exec(line2);
+    return !!m && isBookPlanTitle(m[1]);
+  });
+  if (callout2 >= 0) {
+    const body = [];
+    for (const line2 of lines.slice(callout2 + 1)) {
+      if (!QUOTE_PREFIX.test(line2)) break;
+      body.push(line2.replace(QUOTE_PREFIX, ""));
+    }
+    return body;
+  }
+  const start = lines.findIndex((line2) => {
+    const m = /^##[ \t]+(.+?)\s*$/.exec(line2);
+    return !!m && matches(L.plan, m[1]);
+  });
+  return start < 0 ? void 0 : lines.slice(start + 1);
+}
+function parseBookPlanDecisions(markdown) {
+  const plan = planLines(markdown);
+  if (!plan) return {};
+  const out = {};
+  let inDecisions = false;
+  for (const line2 of plan) {
+    if (/^##(?!#)/.test(line2)) break;
+    const sub = /^###[ \t]+(.+?)\s*$/.exec(line2);
+    if (sub) {
+      inDecisions = matches(L.decisions, sub[1]);
+      continue;
+    }
+    if (!inDecisions) continue;
+    const m = /^[-*]\s+([^:：]+)[:：]\s*(.+?)\s*$/.exec(line2);
+    if (!m) continue;
+    const field = BOOK_SETTING_FIELDS.find((key4) => matches(SETTING_WORDS[key4], m[1].trim()));
+    if (field && out[field] === void 0) out[field] = unescapeMarkdownText(m[2]);
+  }
+  return out;
+}
+function parseBookPlanBody(markdown) {
+  const plan = planLines(markdown);
+  const thread = [];
+  const materials = [];
+  if (!plan) return { thread: "", materials };
+  let part;
+  for (const line2 of plan) {
+    if (/^##(?!#)/.test(line2)) break;
+    const sub = /^###[ \t]+(.+?)\s*$/.exec(line2);
+    if (sub) {
+      part = matches(L.thread, sub[1]) ? "thread" : matches(L.materials, sub[1]) ? "materials" : void 0;
+      continue;
+    }
+    if (part === "thread" && line2.trim()) thread.push(line2.trim());
+    if (part === "materials") {
+      const m = /^[-*]\s+(.+?)[:：]\s*(.+?)\s*$/.exec(line2);
+      if (m) materials.push({ name: unescapeMarkdownText(m[1]), use: unescapeMarkdownText(m[2]) });
+    }
+  }
+  return { thread: unescapeMarkdownText(thread.join(" ")), materials };
+}
+
+// core/book-pipeline/proof.ts
+var PROOF_STATUSES = ["met", "unmet", "unverified"];
+var ProofFailure = class extends Error {
+  /**
+   * The judgments already made when the failure is "no page opened" or "all facts unverified": the structure items are real
+   * results, so the caller keeps them in the research notes (the card still needs a human).
+   */
+  constructor(code3, partial, counts) {
+    super(code3);
+    this.code = code3;
+    this.partial = partial;
+    this.counts = counts;
+    this.name = "ProofFailure";
+  }
+};
+var isProofFailure = (error) => !!error && typeof error === "object" && error.name === "ProofFailure";
+var TRACKING = /^(?:utm_[a-z0-9_]*|fbclid|gclid)$/i;
+var normalizeUrl = (value) => {
+  if (typeof value !== "string") return void 0;
+  const text10 = value.trim();
+  if (!text10 || /[\s\p{Cc}]/u.test(text10)) return void 0;
+  let url;
+  try {
+    url = new URL(text10);
+  } catch (e) {
+    return void 0;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:" || url.username || url.password || !url.hostname)
+    return void 0;
+  const kept = url.search.slice(1).split("&").filter((pair5) => pair5 && !TRACKING.test(pair5.split("=")[0])).map(samePercent);
+  const query = kept.length ? `?${kept.join("&")}` : "";
+  return `${url.host.toLowerCase().replace(/^www\./, "")}${samePercent(url.pathname).replace(/\/+$/, "")}${query}`;
+};
+var samePercent = (text10) => text10.replace(/%([0-9a-fA-F]{2})/g, (_, hex) => {
+  const ch = String.fromCharCode(parseInt(hex, 16));
+  return "!$'()*,;:@".includes(ch) ? ch : `%${hex.toUpperCase()}`;
+});
+function sourceDiagnostics(raw, openedUrls) {
+  var _a2;
+  const opened = new Set(openedUrls.map(normalizeUrl).filter((key4) => !!key4));
+  const cited = /* @__PURE__ */ new Map();
+  for (const item of raw) for (const source of item.sources) cited.set((_a2 = normalizeUrl(source)) != null ? _a2 : source, source);
+  const hosts = /* @__PURE__ */ new Set();
+  let matched = 0;
+  for (const [key4, source] of cited) {
+    if (opened.has(key4)) matched++;
+    else
+      try {
+        hosts.add(new URL(source).hostname.toLowerCase().replace(/^www\./, ""));
+      } catch (e) {
+      }
+  }
+  return {
+    sourcesCited: cited.size,
+    sourcesMatched: matched,
+    eventUrls: opened.size,
+    unmatchedHosts: [...hosts].slice(0, 5)
+  };
+}
+function safeHref(value) {
+  if (typeof value !== "string") return void 0;
+  const text10 = value.trim();
+  if (!text10 || text10.length > 2e3 || /[\s\p{Cc}<>"`\\]/u.test(text10)) return void 0;
+  let url;
+  try {
+    url = new URL(text10);
+  } catch (e) {
+    return void 0;
+  }
+  if (url.protocol !== "https:" || url.username || url.password || !url.hostname) return void 0;
+  return url.href.replace(/%(?![0-9a-fA-F]{2})/g, "%25").replace(/[()[\]']/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+var squash = (text10) => text10.replace(/\s+/g, " ").trim();
+var LEAK_RUN = 40;
+function sharesLongRun(text10, body) {
+  const hay = squash(body);
+  const chars = Array.from(squash(text10));
+  if (chars.length < LEAK_RUN || hay.length < LEAK_RUN) return false;
+  for (let i = 0; i + LEAK_RUN <= chars.length; i++)
+    if (hay.includes(chars.slice(i, i + LEAK_RUN).join(""))) return true;
+  return false;
+}
+var withoutUrls = (text10) => text10.replace(/https?:\/\/[\x21-\x7e]+/gi, " ");
+var decoded = (text10) => {
+  const forms = [text10];
+  try {
+    const once = decodeURIComponent(text10);
+    forms.push(once, once.replace(/[+_-]+/g, " "));
+  } catch (e) {
+  }
+  return forms;
+};
+var LEAK_NOTE = "\u4F86\u6E90\u7591\u4F3C\u5916\u6D29\u6B63\u6587";
+function evaluateProof(raw, checklist, openedUrls, guard) {
+  if (!checklist.length) throw new ProofFailure("empty_list");
+  const known = new Map(checklist.map((item) => [item.id, item]));
+  const seen = /* @__PURE__ */ new Set();
+  for (const item of raw) {
+    if (!known.has(item.id)) throw new ProofFailure("unknown_item");
+    if (seen.has(item.id)) throw new ProofFailure("duplicate_item");
+    seen.add(item.id);
+  }
+  if (checklist.some((item) => !seen.has(item.id))) throw new ProofFailure("missing_item");
+  const guardBody = guard ? withoutUrls(guard.body) : "";
+  const leaks = (text10) => !!guard && decoded(text10).some((form) => sharesLongRun(form, guardBody));
+  const opened = /* @__PURE__ */ new Map();
+  const leakedKeys = /* @__PURE__ */ new Set();
+  for (const url of openedUrls) {
+    const key4 = normalizeUrl(url);
+    const href = safeHref(url);
+    if (!key4 || !href) continue;
+    if (leaks(url)) leakedKeys.add(key4);
+    else if (!opened.has(key4)) opened.set(key4, href);
+  }
+  const noPage = !opened.size && !leakedKeys.size;
+  const items = checklist.map((entry) => {
+    const item = raw.find((candidate) => candidate.id === entry.id);
+    const sources = [];
+    let leaked = false;
+    for (const source of item.sources) {
+      const key4 = normalizeUrl(source);
+      if (key4 && leakedKeys.has(key4)) leaked = true;
+      const real = key4 ? opened.get(key4) : void 0;
+      if (real && !sources.includes(real)) sources.push(real);
+    }
+    const note = singleLine(item.note, 300);
+    if (leaked) return { id: entry.id, type: entry.type, status: "unverified", note: LEAK_NOTE, sources: [] };
+    const status = item.status === "met" && entry.type === "fact" && !sources.length ? "unverified" : item.status;
+    return { id: entry.id, type: entry.type, status, note, sources };
+  });
+  const facts = items.filter((item) => item.type === "fact");
+  const result = {
+    items,
+    aggregate: proofVerdict({ items })
+  };
+  const partial = { items, aggregate: "needs-review" };
+  if (noPage) throw new ProofFailure("no_open_page", partial);
+  if (facts.length && facts.every((item) => item.status === "unverified"))
+    return { items, aggregate: "needs-review", factsUnverified: true };
+  return result;
+}
+var BOOK_CHECK_IDS = { names: "N1", voice: "V1", repeat: "R1" };
+var BOOK_IDS = new Set(Object.values(BOOK_CHECK_IDS));
+var isBookCheckId = (id) => BOOK_IDS.has(id);
+function proofVerdict(result, bodyEmpty = false) {
+  const facts = result.items.filter((item) => item.type === "fact");
+  if (bodyEmpty || result.aggregate === "needs-review" || result.factsUnverified) return "needs-review";
+  if (result.items.some((item) => item.status === "unmet")) return "needs-review";
+  if (facts.length && facts.every((item) => item.status === "unverified")) return "needs-review";
+  return "checked";
+}
+var failedProofKey = (key4) => `${key4}:failed`;
+function proofKey(parts) {
+  const list2 = hashText(JSON.stringify(parts.checklist.map((item) => [item.id, item.type, item.text])));
+  return `${parts.runId}:${parts.nodeId}:${parts.revision}:${hashText(parts.body)}:${list2}`;
+}
+var safeCount = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
+var RECORD = /^<!-- book-proof:v1 (\{.*\}) -->$/;
+var escapeJson = (text10) => text10.replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
+var STATUS_WORDS = { met: "\u9054\u6210", unmet: "\u672A\u9054\u6210", unverified: "\u5F85\u67E5" };
+var safeModelId = (value) => typeof value === "string" ? value.replace(/[^A-Za-z0-9_.:/-]/g, "").slice(0, 60) : "";
+function cleanResult(result) {
+  return {
+    aggregate: result.aggregate,
+    ...result.factsUnverified ? { factsUnverified: true } : {},
+    items: result.items.map((item) => ({
+      id: escapeMarkdownText(item.id, 20),
+      type: item.type,
+      status: item.status,
+      note: escapeMarkdownText(item.note, 300),
+      sources: item.sources.map(safeHref).filter((href) => !!href)
+    })),
+    ...result.counts ? { counts: { openedPages: safeCount(result.counts.openedPages), searches: safeCount(result.counts.searches) } } : {}
+  };
+}
+function composeProofRecord(key4, result, failure, models) {
+  const clean3 = cleanResult(result);
+  const model = safeModelId(models == null ? void 0 : models.model);
+  const authorModel = safeModelId(models == null ? void 0 : models.authorModel);
+  const lines = [
+    (failure ? `\u6821\u5C0D\u5931\u6557\uFF08\u539F\u56E0\uFF1A${failure}\uFF1B\u4EE5\u4E0B\u662F\u5DF2\u5224\u65B7\u7684\u7D50\u679C\uFF0C\u4ECD\u9700\u4EBA\u770B\uFF09` : `\u6821\u5C0D\uFF08${clean3.aggregate === "checked" ? "\u5DF2\u6821" : clean3.factsUnverified ? "\u9700\u4EBA\u770B\uFF1B\u4E8B\u5BE6\u9805\u76EE\u7686\u5F85\u67E5" : "\u9700\u4EBA\u770B"}\uFF09`) + (clean3.counts ? ` \u958B\u9801 ${clean3.counts.openedPages} \u6B21\u3001\u641C\u5C0B ${clean3.counts.searches} \u6B21` : "")
+  ];
+  for (const item of clean3.items)
+    lines.push(
+      `- ${item.id} ${STATUS_WORDS[item.status]}\uFF1A${item.note}${item.sources.length ? `\uFF08\u958B\u9801\uFF1A${item.sources.map((href) => `\`${href}\``).join(" ")}\uFF09` : ""}`
+    );
+  lines.push(
+    `<!-- book-proof:v1 ${escapeJson(
+      JSON.stringify({
+        key: key4,
+        result: clean3,
+        ...failure ? { failed: failure } : {},
+        ...model ? { model } : {},
+        ...authorModel ? { authorModel } : {}
+      })
+    )} -->`
+  );
+  return lines.join("\n");
+}
+function findProofModels(notes, key4) {
+  for (const line2 of notes.split(/\r?\n/)) {
+    const m = RECORD.exec(line2.trim());
+    if (!m) continue;
+    try {
+      const data = JSON.parse(m[1]);
+      if (data.key !== key4) continue;
+      const model = safeModelId(data.model);
+      const authorModel = safeModelId(data.authorModel);
+      return { ...model ? { model } : {}, ...authorModel ? { authorModel } : {} };
+    } catch (e) {
+    }
+  }
+  return void 0;
+}
+function findProofRecord(notes, key4) {
+  for (const line2 of notes.split(/\r?\n/)) {
+    const m = RECORD.exec(line2.trim());
+    if (!m) continue;
+    try {
+      const data = JSON.parse(m[1]);
+      if (data.key === key4 && data.result && Array.isArray(data.result.items)) return data.result;
+    } catch (e) {
+    }
+  }
+  return void 0;
+}
+var proofSectionHeading = (language2) => translate(noteLanguageOf(language2), "detail.book_proof_heading");
+function composeProofSection(language2, outcome, models, modelLabel = (id) => id, imageLine) {
+  const note = noteLanguageOf(language2);
+  if ("failure" in outcome)
+    return `- ${translate(note, "detail.book_proof_failed_0", escapeMarkdownText(outcome.failure, 60) || "failed")}`;
+  const colon2 = /^zh/i.test(language2) ? "\uFF1A" : ": ";
+  const words2 = {
+    met: translate(note, "detail.book_proof_met"),
+    unmet: translate(note, "detail.book_proof_unmet"),
+    unverified: translate(note, "detail.book_proof_unverified")
+  };
+  const lines = cleanResult(outcome.result).items.map(
+    (item) => `- ${item.id} ${words2[item.status]}${item.status !== "met" && item.note ? `${colon2}${item.note}` : ""}`
+  );
+  const shown = (id) => safeModelId(id) ? escapeMarkdownText(modelLabel(safeModelId(id)), 80) : translate(note, "detail.book_model_unrecorded");
+  if (imageLine) lines.push(`- ${imageLine}`);
+  lines.push(`- ${translate(note, "detail.book_proof_author_model_0", shown(models.authorModel))}`);
+  lines.push(`- ${translate(note, "detail.book_proof_proof_model_0", shown(models.model))}`);
+  return lines.join("\n");
+}
+
+// core/book-pipeline/note-sections.ts
+var BOOK_PLAN_HEADING = "\u5168\u66F8\u4F01\u5283";
+var DEFAULT_RESEARCH_HEADING = "\u7814\u7A76\u5099\u8A3B";
+var HEADING = /^[ \t]{0,3}(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/;
+var FENCE = /^[ \t]{0,3}(`{3,}|~{3,})/;
+var CALLOUT_HEAD = /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?(?:[ \t].*)?$/;
+var RECORD_KEY = /^<!-- book-proof:v1 (\{.*\}) -->$/;
+var HIDDEN_CALLOUT = "vam-book";
+var HIDDEN_HEAD = /^[ \t]{0,3}>[ \t]?\[!vam-book\][+-]?(?:[ \t].*)?$/i;
+var QUOTE_LINE = /^[ \t]{0,3}>/;
+var LOG_LINE = /^(?:[-*+][ \t]+)?\d{4}-\d{2}-\d{2}/;
+var ANY_RECORD = /<!-- book-(?:proof|slots|body):v1 \{.*\} -->/;
+var bare = (line2) => line2.replace(/\r$/, "");
+function fencedLines(lines) {
+  const flags = [];
+  let open2;
+  for (const line2 of lines) {
+    const m = FENCE.exec(line2);
+    if (open2) {
+      flags.push(true);
+      if (m && m[1][0] === open2[0] && m[1].length >= open2.length && !line2.replace(FENCE, "").trim()) open2 = void 0;
+    } else if (m) {
+      open2 = m[1];
+      flags.push(true);
+    } else flags.push(false);
+  }
+  return flags;
+}
+function findSection(lines, fenced, matches2, from = 0) {
+  for (let i = from; i < lines.length; i++) {
+    const m = fenced[i] ? null : HEADING.exec(lines[i].replace(/\r$/, ""));
+    if (!m || !matches2(m[2], m[1].length)) continue;
+    let end = lines.length;
+    for (let j = i + 1; j < lines.length; j++) {
+      const n = fenced[j] ? null : HEADING.exec(lines[j].replace(/\r$/, ""));
+      if (n && n[1].length <= m[1].length) {
+        end = j;
+        break;
+      }
+    }
+    return { at: i, end, text: m[2] };
+  }
+  return void 0;
+}
+var unquoted = (text10) => text10.replace(/^[ \t]{0,3}>[ \t]?/gm, "");
+function recordKey(record) {
+  for (const line2 of record.split(/\r?\n/)) {
+    const m = RECORD_KEY.exec(line2.trim());
+    if (!m) continue;
+    try {
+      const key4 = JSON.parse(m[1]).key;
+      if (typeof key4 === "string") return key4;
+    } catch (e) {
+    }
+  }
+  return void 0;
+}
+function quoteRunEnd(lines, fenced, from) {
+  let end = from;
+  while (end < lines.length && !fenced[end] && QUOTE_LINE.test(lines[end])) end++;
+  return end;
+}
+function hiddenRanges(lines, fenced) {
+  const found = [];
+  for (let i = 0; i < lines.length; ) {
+    if (!fenced[i] && HIDDEN_HEAD.test(bare(lines[i]))) {
+      const end = quoteRunEnd(lines, fenced, i + 1);
+      found.push({ start: i, end });
+      i = end;
+    } else i++;
+  }
+  return found;
+}
+var HIDDEN_TYPE = /\[!\s*vam-(?:book|trial|review)\s*(?:\|[^\]]*)?\]/gi;
+var OWNER_MARKER = /%%(?=[ \t]*vam-(?:trial|review|callout-version)\b)/gi;
+var neutralize = (text10) => text10.replace(HIDDEN_TYPE, "[!note]").replace(OWNER_MARKER, "\uFF05\uFF05");
+var neutralizeText = (text10) => neutralize(text10);
+function neutralizeDetail(content) {
+  const start = content.indexOf(DETAIL_START);
+  const end = content.lastIndexOf(DETAIL_END);
+  if (start < 0 || end < start + DETAIL_START.length) return null;
+  const from = start + DETAIL_START.length;
+  return `${content.slice(0, from)}${neutralize(content.slice(from, end))}${content.slice(end)}`;
+}
+var PROGRAM_HEAD = /^[ \t]{0,3}>[ \t]?\[!(vam-trial|vam-review)\]([+-])?(?:[ \t].*)?$/i;
+var OWNER_LINE = /^[ \t]{0,3}>[ \t]?%%vam-(trial|review):([\w.-]+):([\w.-]+)(?::([\w.-]+))?(?::([\w.-]+):([\w.-]+)(?::(q))?)?%%[ \t]*$/;
+function programCalloutRanges(lines, fenced = fencedLines(lines)) {
+  var _a2;
+  const found = [];
+  for (let i = 0; i < lines.length; ) {
+    const head2 = fenced[i] ? null : PROGRAM_HEAD.exec(bare(lines[i]));
+    if (!head2) {
+      i++;
+      continue;
+    }
+    const end = quoteRunEnd(lines, fenced, i + 1);
+    const kind = head2[1].toLowerCase() === "vam-trial" ? "trial" : "review";
+    for (let j = i + 1; j < end; j++) {
+      const owner = OWNER_LINE.exec(bare(lines[j]));
+      if (owner && owner[1] === kind) {
+        found.push({
+          kind,
+          start: i,
+          end,
+          sign: (_a2 = head2[2]) != null ? _a2 : "",
+          runId: owner[2],
+          nodeId: owner[3],
+          ...owner[4] ? { fp: owner[4] } : {},
+          ...owner[5] ? { op: owner[5], ifp: owner[6], ...owner[7] ? { queued: true } : {} } : {}
+        });
+        break;
+      }
+    }
+    i = end;
+  }
+  return found;
+}
+function withoutHiddenCallouts(lines) {
+  const fenced = fencedLines(lines);
+  const own2 = programCalloutRanges(lines, fenced).map(({ start, end }) => ({
+    start,
+    end: end < lines.length && !lines[end].trim() ? end + 1 : end
+  }));
+  const ranges = [...hiddenRanges(lines, fenced), ...own2];
+  if (!ranges.length) return lines;
+  return lines.filter((_, i) => !ranges.some((range) => i >= range.start && i < range.end));
+}
+function recordLines(lines, fenced) {
+  const mask = lines.map(() => false);
+  const section3 = findSection(lines, fenced, (text10) => isResearchNotesHeading(text10));
+  if (section3) for (let i = section3.at + 1; i < section3.end; i++) mask[i] = true;
+  for (const range of hiddenRanges(lines, fenced)) for (let i = range.start; i < range.end; i++) mask[i] = true;
+  return mask;
+}
+var quoteAll = (text10) => text10.split(/\r?\n/).map((line2) => line2.trim() ? `> ${line2}` : ">").join("\n");
+function appendHidden(text10, quoted2, atTop = false) {
+  const lines = text10.split("\n");
+  const last = hiddenRanges(lines, fencedLines(lines)).pop();
+  if (!last) {
+    const base = text10.replace(/\s+$/, "");
+    return `${base ? `${base}
+
+` : ""}> [!${HIDDEN_CALLOUT}]- ${DEFAULT_RESEARCH_HEADING}
+${quoted2}
+`;
+  }
+  const titleOnly = last.end === last.start + 1;
+  if (atTop) lines.splice(last.start + 1, 0, ...quoted2.split("\n"));
+  else {
+    const blankTail = !titleOnly && /^>[ \t]*\r?$/.test(lines[last.end - 1]);
+    lines.splice(last.end, 0, ...`${titleOnly || blankTail ? "" : ">\n"}${quoted2}`.split("\n"));
+  }
+  return lines.join("\n");
+}
+function spliceBlock(lines, at, end, middle) {
+  const before = lines.slice(0, at);
+  while (before.length && !before[before.length - 1].trim()) before.pop();
+  const rest = lines.slice(end);
+  const newline = rest.length > 0 && rest[rest.length - 1] === "";
+  while (rest.length && !rest[0].trim()) rest.shift();
+  while (rest.length && !rest[rest.length - 1].trim()) rest.pop();
+  const parts = [before, middle, rest].filter((part) => part.length);
+  const out = parts.flatMap((part, i) => i ? ["", ...part] : part);
+  return newline || !rest.length ? [...out, ""] : out;
+}
+function calloutBlocks(lines, fenced, from, to) {
+  const found = [];
+  for (let i = from; i < to; ) {
+    if (!fenced[i] && CALLOUT_HEAD.test(bare(lines[i]))) {
+      const end = Math.min(quoteRunEnd(lines, fenced, i + 1), to);
+      found.push({ start: i, end });
+      i = end;
+    } else i++;
+  }
+  return found;
+}
+var asHidden = (head2) => head2.replace(/^(>[ \t]?)\[![A-Za-z][\w-]*\]/, `$1[!${HIDDEN_CALLOUT}]`);
+function hideResearchSection(text10) {
+  let lines = text10.split("\n");
+  for (let from = 0; ; ) {
+    const fenced = fencedLines(lines);
+    const section3 = findSection(lines, fenced, (name3) => isResearchNotesHeading(name3), from);
+    if (!section3) return lines.join("\n");
+    const blocks = calloutBlocks(lines, fenced, section3.at + 1, section3.end);
+    const name2 = section3.text.trim().toLowerCase();
+    const mine = blocks.filter(
+      (block) => {
+        var _a2;
+        return ((_a2 = /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[block.start]))) == null ? void 0 : _a2[1].toLowerCase()) === name2 || lines.slice(block.start, block.end).some((line2) => ANY_RECORD.test(line2));
+      }
+    );
+    if (!mine.length) {
+      from = section3.at + 1;
+      continue;
+    }
+    for (const block of mine) lines[block.start] = asHidden(lines[block.start]);
+    const covered = new Set(
+      blocks.flatMap((block) => lines.slice(block.start, block.end).map((_, k) => block.start + k))
+    );
+    const others = lines.slice(section3.at + 1, section3.end).some((line2, k) => line2.trim() && !covered.has(section3.at + 1 + k));
+    if (mine.length < blocks.length || others) {
+      from = section3.at + 1;
+      continue;
+    }
+    const body = lines.slice(section3.at + 1, section3.end);
+    while (body.length && !body[0].trim()) body.shift();
+    while (body.length && !body[body.length - 1].trim()) body.pop();
+    lines = spliceBlock(lines, section3.at, section3.end, body);
+    from = section3.at;
+  }
+}
+var updateLogNames = () => new Set(
+  [
+    SECTION_NAME.log.zh,
+    SECTION_NAME.log.en,
+    ...NOTE_LANGUAGES.map((locale) => translate(locale, "detail.update_log"))
+  ].map((name2) => name2.trim().toLowerCase())
+);
+function hideUpdateLog(text10, own2) {
+  const names3 = updateLogNames();
+  let lines = text10.split("\n");
+  const moved = [];
+  for (let from = 0; ; ) {
+    const section3 = findSection(
+      lines,
+      fencedLines(lines),
+      (name2, level) => level >= 3 && names3.has(name2.trim().toLowerCase()),
+      from
+    );
+    if (!section3) break;
+    const ranges = hiddenRanges(lines, fencedLines(lines)).filter((r) => r.start > section3.at && r.end <= section3.end);
+    const inHidden = (i) => ranges.some((r) => i >= r.start && i < r.end);
+    const isText3 = lines.map((line2, i) => i > section3.at && i < section3.end && !inHidden(i) && line2.trim() !== "");
+    const body = lines.filter((_, i) => isText3[i]).map(bare);
+    const hidden = ranges.flatMap((r, i) => i ? ["", ...lines.slice(r.start, r.end)] : lines.slice(r.start, r.end));
+    if (!body.length || !own2 && !body.every((line2) => LOG_LINE.test(line2))) {
+      from = section3.at + 1;
+      continue;
+    }
+    if (own2) {
+      const mine = body.filter((line2) => own2(line2.trim()));
+      if (!mine.length) {
+        from = section3.at + 1;
+        continue;
+      }
+      moved.push(...mine);
+      const rest = lines.filter((line2, i) => isText3[i] && !own2(bare(line2).trim()));
+      lines = spliceBlock(lines, section3.at, section3.end, [
+        ...rest.length ? [lines[section3.at], "", ...rest] : [],
+        ...rest.length && hidden.length ? [""] : [],
+        ...hidden
+      ]);
+      from = section3.at + 1;
+      continue;
+    }
+    moved.push(...body);
+    lines = spliceBlock(lines, section3.at, section3.end, hidden);
+    from = section3.at;
+  }
+  if (!moved.length) return text10;
+  return appendHidden(lines.join("\n"), moved.map((line2) => `> ${line2}`).join("\n"));
+}
+var RECORD_COPY = /(?:<|&lt;)!-- book-(?:proof|slots|body):v1 /;
+function dropRecordCopies(text10) {
+  let lines = text10.split("\n");
+  const fenced = fencedLines(lines);
+  const older = [];
+  for (let from = 0; ; ) {
+    const section3 = findSection(lines, fenced, (name2) => isResearchNotesHeading(name2), from);
+    if (!section3) break;
+    older.push(section3);
+    from = section3.at + 1;
+  }
+  const drop = calloutBlocks(lines, fenced, 0, lines.length).filter((block) => {
+    var _a2, _b2;
+    if (older.some((section3) => block.start > section3.at && block.start < section3.end)) return false;
+    if (HIDDEN_HEAD.test(bare(lines[block.start]))) return false;
+    const title = (_b2 = (_a2 = /^[ \t]{0,3}>[ \t]?\[![A-Za-z][\w-]*\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[block.start]))) == null ? void 0 : _a2[1]) != null ? _b2 : "";
+    return isResearchNotesHeading(title) && lines.slice(block.start, block.end).some((line2) => RECORD_COPY.test(line2));
+  });
+  for (const block of drop.reverse()) lines = spliceBlock(lines, block.start, block.end, []);
+  return lines.join("\n");
+}
+function normalizeWorkRecords(detail) {
+  return hideUpdateLog(hideResearchSection(dropRecordCopies(detail)));
+}
+function hidePipelineLog(detail, known, backupPath) {
+  var _a2;
+  const marker3 = "\0";
+  const shapes = NOTE_LANGUAGES.map(
+    (locale) => translate(locale, "note.writeback_fresh_replaced_0", marker3).split(marker3)
+  ).filter((parts) => parts.length === 2);
+  const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const stamp = /^(.*\/)?(.+) \d{4}-\d{2}-\d{2} \d{6}(?: \(\d+\))?\.md$/.exec(backupPath != null ? backupPath : "");
+  const pathShape = stamp ? `${escape((_a2 = stamp[1]) != null ? _a2 : "")}${escape(stamp[2])} \\d{4}-\\d{2}-\\d{2} \\d{6}(?: \\(\\d+\\))?\\.md` : "";
+  const ownLine = stamp ? shapes.map(
+    ([head2, tail]) => new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escape(head2)}${pathShape}${escape(tail)}$`)
+  ) : [];
+  return hideUpdateLog(dropRecordCopies(detail), (line2) => known.has(line2) || ownLine.some((re) => re.test(line2)));
+}
+function replacedLineTest() {
+  const marker3 = "\0";
+  const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const shapes = NOTE_LANGUAGES.map(
+    (locale) => translate(locale, "note.writeback_fresh_replaced_0", marker3).split(marker3)
+  ).filter((parts) => parts.length === 2);
+  const res = shapes.map(
+    ([head2, tail]) => new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escape(head2)}.+${escape(tail)}$`)
+  );
+  return (line2) => res.some((re) => re.test(line2));
+}
+function workLogLines(detail) {
+  const lines = detail.split("\n");
+  const fenced = fencedLines(lines);
+  const mask = recordLines(lines, fenced);
+  return lines.map((line2, i) => mask[i] ? unquoted(bare(line2)).trim() : "").filter((line2) => LOG_LINE.test(line2));
+}
+function carryWorkLog(oldDetail, newDetail) {
+  const newLines = workLogLines(newDetail);
+  const have = new Set(newLines);
+  const isReplaced = replacedLineTest();
+  const oldLines = workLogLines(oldDetail);
+  const lastOldReplaced = oldLines.filter(isReplaced).pop();
+  const keepOldReplaced = newLines.some(isReplaced) ? void 0 : lastOldReplaced;
+  const add = oldLines.filter(
+    (line2) => !have.has(line2) && (!isReplaced(line2) || line2 === keepOldReplaced && keepOldReplaced !== void 0)
+  );
+  return add.length ? appendHidden(newDetail, add.map((line2) => `> ${line2}`).join("\n"), true) : newDetail;
+}
+function appendResearchNote(detail, record) {
+  const key4 = recordKey(record);
+  if (key4 && findProofRecord(unquoted(detail), key4)) return { text: detail, appended: false };
+  return { text: appendHidden(detail, quoteAll(record)), appended: true };
+}
+var PIPELINE_RECORD = /^<!-- (book-(?:proof|slots|body)):v1 (\{.*\}) -->$/;
+var PROOF_ITEM_LINE = /^- .+ (?:達成|未達成|待查)：/;
+var QUOTE_BLANK = /^[ \t]{0,3}>[ \t]*\r?$/;
+var validJson = (text10) => {
+  try {
+    return typeof JSON.parse(text10) === "object";
+  } catch (e) {
+    return false;
+  }
+};
+function replaceResearchRecord(detail, record) {
+  var _a2;
+  const tag = ((_a2 = record.split(/\r?\n/).map((line2) => PIPELINE_RECORD.exec(line2.trim())).find(Boolean)) != null ? _a2 : [])[1];
+  const base = detail;
+  const lines = base.split("\n");
+  const mask = recordLines(lines, fencedLines(lines));
+  if (!tag || !mask.some(Boolean)) return appendResearchNote(base, record).text;
+  const plain = lines.map((line2, i) => mask[i] ? unquoted(line2).replace(/\r$/, "") : "");
+  const fenced = fencedLines(plain);
+  const drop = /* @__PURE__ */ new Set();
+  for (let k = 0; k < plain.length; k++) {
+    const m = !mask[k] || fenced[k] ? null : PIPELINE_RECORD.exec(plain[k].trim());
+    if (!m || m[1] !== tag || !validJson(m[2])) continue;
+    drop.add(k);
+    let j = k - 1;
+    if (tag === "book-proof") {
+      while (j >= 0 && mask[j] && !fenced[j] && !drop.has(j) && PROOF_ITEM_LINE.test(plain[j])) drop.add(j--);
+      if (j >= 0 && mask[j] && !fenced[j] && !drop.has(j) && PROOF_HEADER.test(plain[j].trim())) drop.add(j--);
+    }
+    if (j >= 0 && mask[j] && !drop.has(j) && QUOTE_BLANK.test(lines[j])) drop.add(j);
+  }
+  return appendResearchNote(lines.filter((_, i) => !drop.has(i)).join("\n"), record).text;
+}
+var PROOF_HEADER = /^(?:（舊版）)?校對(?:失敗)?（/;
+function extractProofRecords(detail) {
+  const lines = detail.split("\n");
+  const mask = recordLines(lines, fencedLines(lines));
+  const records = [];
+  const plain = lines.map((line2, i) => mask[i] ? unquoted(line2).replace(/\r$/, "") : "");
+  for (let k = 0; k < plain.length; k++) {
+    if (!mask[k] || !RECORD_KEY.test(plain[k].trim())) continue;
+    const own2 = [plain[k].trim()];
+    let j = k - 1;
+    while (j >= 0 && mask[j] && PROOF_ITEM_LINE.test(plain[j])) own2.unshift(plain[j--]);
+    if (j >= 0 && mask[j] && PROOF_HEADER.test(plain[j].trim())) own2.unshift(plain[j].trim());
+    records.push(own2.join("\n"));
+  }
+  return records;
+}
+function findStoredProof(detail, key4) {
+  return findProofRecord(unquoted(detail), key4);
+}
+function findStoredProofModels(detail, key4) {
+  return findProofModels(unquoted(detail), key4);
+}
+var shortText = (value, max) => typeof value === "string" ? Array.from(value).slice(0, max).join("") : "";
+var count = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
+function latestStoredProof(detail) {
+  const lines = detail.split("\n");
+  const mask = recordLines(lines, fencedLines(lines));
+  let found;
+  for (const [at, line2] of lines.entries()) {
+    if (!mask[at]) continue;
+    const m = RECORD_KEY.exec(unquoted(line2).trim());
+    if (!m) continue;
+    try {
+      const data = JSON.parse(m[1]);
+      const result = data.result;
+      if (!result || !Array.isArray(result.items)) continue;
+      const items = [];
+      for (const raw of result.items.slice(0, 100)) {
+        if (!raw || typeof raw !== "object") continue;
+        const status = PROOF_STATUSES.find((item) => item === raw.status);
+        if (!status || typeof raw.id !== "string") continue;
+        items.push({
+          id: shortText(raw.id, 20),
+          type: raw.type === "structure" ? "structure" : "fact",
+          status,
+          note: shortText(raw.note, 300),
+          sources: Array.isArray(raw.sources) ? raw.sources.filter((src) => typeof src === "string").slice(0, 10).map((src) => shortText(src, 300)) : []
+        });
+      }
+      const counts = result.counts;
+      found = {
+        aggregate: result.aggregate === "checked" ? "checked" : "needs-review",
+        factsUnverified: result.factsUnverified === true,
+        ...typeof data.failed === "string" ? { failed: shortText(data.failed, 40) } : {},
+        ...counts && typeof counts === "object" ? { counts: { openedPages: count(counts.openedPages), searches: count(counts.searches) } } : {},
+        items
+      };
+    } catch (e) {
+    }
+  }
+  return found;
+}
+function replaceBookPlanSection(content, markdown) {
+  var _a2;
+  const body = demoteHeadings(markdown.replace(/\r\n?/g, "\n")).trim();
+  const entry = `> [!${HIDDEN_CALLOUT}]- ${BOOK_PLAN_HEADING}
+${quoteAll(body)}`.split("\n");
+  let lines = content.split("\n");
+  const fenced = fencedLines(lines);
+  if (((_a2 = lines[0]) == null ? void 0 : _a2.trim()) === "---") {
+    for (let i = 1; i < lines.length; i++) {
+      for (let k = 0; k <= i; k++) fenced[k] = true;
+      if (lines[i].trim() === "---") break;
+    }
+  }
+  const titleOf = (line2) => {
+    var _a3, _b2;
+    return (_b2 = (_a3 = /^[ \t]{0,3}>[ \t]?\[![^\]]+\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(line2))) == null ? void 0 : _a3[1]) != null ? _b2 : "";
+  };
+  const isPlan = (range) => isBookPlanTitle(titleOf(lines[range.start]));
+  const callout2 = hiddenRanges(lines, fenced).find(isPlan);
+  const section3 = findSection(lines, fenced, (text10, level) => level === 2 && text10 === BOOK_PLAN_HEADING);
+  const edits = [];
+  const apart = callout2 && !(section3 && callout2.start > section3.at && callout2.end <= section3.end);
+  if (section3) {
+    const kept = hiddenRanges(lines, fenced).filter((range) => range.start > section3.at && range.end <= section3.end && !isPlan(range)).map((range) => lines.slice(range.start, range.end));
+    const middle = kept.flatMap((block, i) => i ? ["", ...block] : block);
+    edits.push({
+      at: section3.at,
+      end: section3.end,
+      middle: apart ? middle : [...entry, ...middle.length ? ["", ...middle] : []]
+    });
+  }
+  if (callout2 && apart) edits.push({ at: callout2.start, end: callout2.end, middle: entry });
+  if (!edits.length) {
+    const base = content.replace(/\s+$/, "");
+    return `${base ? `${base}
+
+` : ""}${entry.join("\n")}
+`;
+  }
+  for (const edit of edits.sort((x, y) => y.at - x.at)) lines = spliceBlock(lines, edit.at, edit.end, edit.middle);
+  return lines.join("\n");
+}
+var isUpdateLogHeading = (text10) => [SECTION_NAME.log.zh, SECTION_NAME.log.en].some((name2) => name2.toLowerCase() === text10.trim().toLowerCase());
+var IMAGES_HEADING = { zh: "\u5716\u50CF", en: "Images" };
+var isImagesHeading = (text10) => [IMAGES_HEADING.zh, IMAGES_HEADING.en, "\u56FE\u50CF"].some((name2) => name2.toLowerCase() === text10.trim().toLowerCase());
+var isSourcesHeading = (text10) => isNewSourcesHeading(text10.replace(/[：:][ \t]*$/, ""));
+var isSystemSection = (text10) => isResearchNotesHeading(text10) || isUpdateLogHeading(text10) || isSourcesHeading(text10) || isOpenQuestionsHeading(text10);
+function findImageSection(lines) {
+  const fenced = fencedLines(lines);
+  for (let from = 0; ; ) {
+    const s = findSection(lines, fenced, (text10, level) => level === 3 && isImagesHeading(text10), from);
+    if (!s) return void 0;
+    const hidden = hiddenRanges(lines, fenced).find((range) => range.start > s.at && range.start < s.end);
+    if (hidden) s.end = hidden.start;
+    const body = lines.slice(s.at + 1, s.end).map((l) => l.replace(/\r$/, "")).filter((l) => l.trim());
+    const ok = body.length > 0 && body.length % 2 === 0 && body.every(
+      (l, i) => i % 2 === 0 ? /^!\[[^\]]*\]\(https:\/\/\S+\)$/.test(l) : !/!\[|^\s*(#|[-*+>]|\d+[.)])|<!--/.test(l)
+    );
+    if (ok) return s;
+    from = s.at + 1;
+  }
+}
+function withImageBlock(lines, block) {
+  var _a2, _b2, _c;
+  const fenced = fencedLines(lines);
+  const sources = findSection(lines, fenced, (text10) => isSourcesHeading(text10));
+  const other = findSection(
+    lines,
+    fenced,
+    (text10) => isOpenQuestionsHeading(text10) || isResearchNotesHeading(text10) || isUpdateLogHeading(text10)
+  );
+  const hidden = hiddenRanges(lines, fenced)[0];
+  const at = Math.min((_a2 = sources == null ? void 0 : sources.at) != null ? _a2 : lines.length, (_b2 = other == null ? void 0 : other.at) != null ? _b2 : lines.length, (_c = hidden == null ? void 0 : hidden.start) != null ? _c : lines.length);
+  const head2 = lines.slice(0, at).join("\n").replace(/\s+$/, "");
+  const tail = lines.slice(at).join("\n");
+  return `${head2 ? `${head2}
+
+` : ""}${block}
+${tail ? `
+${tail}` : ""}`;
+}
+function addPictureSources(detail, sources, language2) {
+  var _a2;
+  const lines = detail.split("\n");
+  const fenced = fencedLines(lines);
+  const cr = detail.includes("\r\n") ? "\r" : "";
+  const section3 = findSection(lines, fenced, (text10) => isSourcesHeading(text10));
+  const have = section3 ? lines.slice(section3.at, section3.end).join("\n") : "";
+  const seen = /* @__PURE__ */ new Set();
+  const fresh = sources.filter(({ href }) => {
+    const encoded = href.replace(/\(/g, "%28").replace(/\)/g, "%29");
+    if (seen.has(href) || have.includes(href) || have.includes(encoded)) return false;
+    seen.add(href);
+    return true;
+  });
+  if (!fresh.length) return detail;
+  const items = fresh.map(({ entry }) => `- ${entry}${cr}`);
+  if (!section3)
+    return withImageBlock(
+      lines,
+      `## ${translateNote(language2, "detail.sources_heading")}
+
+${items.join("\n")}`
+    );
+  const hidden = hiddenRanges(lines, fenced).find((range) => range.start > section3.at && range.start < section3.end);
+  let at = (_a2 = hidden == null ? void 0 : hidden.start) != null ? _a2 : section3.end;
+  while (at > section3.at + 1 && !lines[at - 1].trim()) at--;
+  const previous = lines[at - 1].trim();
+  const lead = /^[-*+]\s/.test(previous) || at === section3.at + 1 ? [] : [cr];
+  const tail = at < lines.length && lines[at].trim() ? [cr] : [];
+  return [...lines.slice(0, at), ...lead, ...items, ...tail, ...lines.slice(at)].join("\n");
+}
+function carryImageSection(oldDetail, newDetail) {
+  const oldLines = oldDetail.split("\n");
+  const old = findImageSection(oldLines);
+  if (!old || findImageSection(newDetail.split("\n"))) return newDetail;
+  const block = oldLines.slice(old.at, old.end).join("\n").replace(/\s+$/, "");
+  return withImageBlock(newDetail.split("\n"), block);
+}
+function chapterBody(detail) {
+  var _a2;
+  let lines = withoutHiddenCallouts(detail.split("\n"));
+  for (; ; ) {
+    const section3 = (_a2 = findSection(lines, fencedLines(lines), (text10) => isSystemSection(text10))) != null ? _a2 : findImageSection(lines);
+    if (!section3) break;
+    lines = [...lines.slice(0, section3.at), ...lines.slice(section3.end)];
+  }
+  return lines.join("\n").replace(/\s+$/, "");
+}
+var IMAGE_ONLY_LINE = /^\s*(?:(?:!\[[^\]]*\]\([^)]*\)|!\[\[[^\]]*\]\])\s*)+$/;
+function chapterTextMask(lines) {
+  var _a2;
+  const mask = lines.map(() => false);
+  const start = lines.findIndex((line2) => line2.trim() === DETAIL_START);
+  const end = start < 0 ? -1 : lines.findIndex((line2, i) => i > start && line2.trim() === DETAIL_END);
+  if (start < 0 || end < 0) return mask;
+  let index = lines.slice(start + 1, end).map((_, i) => start + 1 + i);
+  let cur = index.map((i) => lines[i]);
+  const drop = (from, to) => {
+    index = [...index.slice(0, from), ...index.slice(to)];
+    cur = [...cur.slice(0, from), ...cur.slice(to)];
+  };
+  const fenced = fencedLines(cur);
+  const gone = [
+    ...hiddenRanges(cur, fenced),
+    ...programCalloutRanges(cur, fenced).map(({ start: from, end: to }) => ({ start: from, end: to }))
+  ];
+  const keep = cur.map((_, i) => !gone.some((range) => i >= range.start && i < range.end));
+  index = index.filter((_, i) => keep[i]);
+  cur = cur.filter((_, i) => keep[i]);
+  for (; ; ) {
+    const section3 = (_a2 = findSection(cur, fencedLines(cur), (text10) => isSystemSection(text10))) != null ? _a2 : findImageSection(cur);
+    if (!section3) break;
+    drop(section3.at, section3.end);
+  }
+  const code3 = fencedLines(cur);
+  cur.forEach((line2, i) => {
+    const text10 = bare(line2);
+    mask[index[i]] = !code3[i] && !HEADING.test(text10) && !IMAGE_ONLY_LINE.test(text10);
+  });
+  return mask;
+}
+var REFERENCE_START = "<!-- visual-agent-map:references:start -->";
+var DETAIL_START = "<!-- visual-agent-map:detail:start -->";
+var DETAIL_END = "<!-- visual-agent-map:detail:end -->";
+function detailBlockOf(content) {
+  const start = content.indexOf(DETAIL_START);
+  const end = content.indexOf(DETAIL_END, start + 1);
+  return start < 0 || end < 0 ? void 0 : content.slice(start + DETAIL_START.length, end);
+}
+function protectedLines(lines, withDetail = true) {
+  var _a2;
+  const flags = fencedLines(lines);
+  if (((_a2 = lines[0]) == null ? void 0 : _a2.trim()) === "---") {
+    for (let i = 1; i < lines.length; i++) {
+      for (let k = 0; k <= i; k++) flags[k] = true;
+      if (lines[i].trim() === "---") break;
+    }
+  }
+  let inDetail = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === DETAIL_START) inDetail = true;
+    if (inDetail && withDetail) flags[i] = true;
+    if (lines[i].trim() === DETAIL_END) inDetail = false;
+  }
+  return flags;
+}
+function replaceProofSection(content, heading, body) {
+  const lines = content.split("\n");
+  const flags = protectedLines(lines);
+  const names3 = new Set(NOTE_LANGUAGES.map((locale) => translate(locale, "detail.book_proof_heading").trim()));
+  const entry = `> [!${HIDDEN_CALLOUT}]- ${heading}
+${quoteAll(body.trim())}`;
+  const join5 = (before, after) => {
+    const lead = before && !before.endsWith("\n") ? `${before}
+
+` : before ? `${before}
+` : "";
+    return `${lead}${entry}${after ? `
+
+${after}` : "\n"}`;
+  };
+  const callout2 = hiddenRanges(lines, flags).find((range) => {
+    var _a2, _b2;
+    const title = (_b2 = (_a2 = /^>[ \t]?\[![^\]]+\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[range.start]))) == null ? void 0 : _a2[1]) != null ? _b2 : "";
+    return names3.has(title);
+  });
+  if (callout2)
+    return join5(lines.slice(0, callout2.start).join("\n"), lines.slice(callout2.end).join("\n").replace(/^\s+/, ""));
+  const found = findSection(lines, flags, (text10, level) => level === 2 && names3.has(text10.trim()));
+  if (found) {
+    let end = found.at + 1;
+    if (end < found.end && !lines[end].trim()) end++;
+    while (end < found.end && /^- /.test(lines[end])) end++;
+    while (end > found.at + 1 && !lines[end - 1].trim()) end--;
+    return join5(lines.slice(0, found.at).join("\n"), lines.slice(end).join("\n").replace(/^\s+/, ""));
+  }
+  const marker3 = lines.findIndex((line2, i) => !flags[i] && line2.trim() === REFERENCE_START);
+  if (marker3 >= 0) {
+    const before = lines.slice(0, marker3).join("\n").replace(/\s+$/, "");
+    return `${before ? `${before}
+
+` : ""}${entry}
+
+${lines.slice(marker3).join("\n")}`;
+  }
+  const base = content.replace(/\s+$/, "");
+  return `${base ? `${base}
+
+` : ""}${entry}
+`;
+}
+var PLACEHOLDERS = () => /* @__PURE__ */ new Set([
+  ...NOTE_LANGUAGES.map((locale) => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
+  "No new content this time",
+  "\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9"
+]);
+function dropPlaceholderSections(content) {
+  var _a2, _b2;
+  const placeholders = PLACEHOLDERS();
+  let lines = content.split("\n");
+  for (let from = 0; ; ) {
+    const flags = protectedLines(lines, false);
+    const hit = findSection(lines, flags, (_, level) => level >= 3, from);
+    if (!hit) break;
+    let end = hit.end;
+    for (let i = hit.at + 1; i < hit.end; i++)
+      if (lines[i].trim().startsWith("<!-- visual-agent-map:")) {
+        end = i;
+        break;
+      }
+    const body = lines.slice(hit.at + 1, end).join("\n").trim();
+    if (!placeholders.has(body.replace(/[.。]$/, ""))) {
+      from = hit.at + 1;
+      continue;
+    }
+    lines = [...lines.slice(0, hit.at), ...lines.slice(end)];
+    if (hit.at > 0 && !((_a2 = lines[hit.at - 1]) == null ? void 0 : _a2.trim()) && !((_b2 = lines[hit.at]) == null ? void 0 : _b2.trim())) lines.splice(hit.at, 1);
+    from = Math.max(0, hit.at - 1);
+  }
+  return lines.join("\n");
+}
+
+// core/book-pipeline/image-slots.ts
+var DEFAULT_IMAGE_SLOTS = 8;
+var MAX_IMAGE_SLOTS = 12;
+var imageSlotCap = (range) => {
+  var _a2;
+  return Math.min(MAX_IMAGE_SLOTS, Math.max(DEFAULT_IMAGE_SLOTS, (_a2 = range == null ? void 0 : range.max) != null ? _a2 : 0));
+};
+function cleanSlotText(value, max) {
+  const text10 = value.replace(/[〔〕｜]/g, " ").replace(/\s+/g, " ").trim();
+  return Array.from(text10).slice(0, max).join("").trim();
+}
+var STANDALONE_MARKER = /^\s*〔圖位 ([1-9]\d*)：([^〔〕]+?)〕\s*$/;
+var MARKER_OPEN = "\u3014\u5716\u4F4D";
+var OPEN_FENCE = /^[ \t]*(`{3,}|~{3,})(.*)$/;
+var QUOTE_LINE2 = /^ {0,3}>/;
+var INDENTED_CODE = /^(?: {4}|\t)/;
+var BLOCK_START = /^ {0,3}(?:#{1,6}(?:\s|$)|[-*+]\s|\d+[.)]\s|(?:[-*_][ \t]*){3,}$)/;
+function protectedLines2(lines) {
+  const out = [];
+  let fence;
+  let quote3 = false;
+  let code3 = false;
+  for (const line2 of lines) {
+    if (fence) {
+      out.push(true);
+      const close = OPEN_FENCE.exec(line2);
+      if (close && close[1][0] === fence.char && close[1].length >= fence.size && !close[2].trim()) fence = void 0;
+      continue;
+    }
+    const open2 = OPEN_FENCE.exec(line2);
+    if (open2 && !(open2[1][0] === "`" && open2[2].includes("`"))) {
+      fence = { char: open2[1][0], size: open2[1].length };
+      out.push(true);
+      quote3 = false;
+      code3 = false;
+      continue;
+    }
+    const blank2 = !line2.trim();
+    const prevBlank = out.length === 0 || !lines[out.length - 1].trim();
+    if (QUOTE_LINE2.test(line2)) {
+      quote3 = true;
+      code3 = false;
+      out.push(true);
+    } else if (quote3 && !blank2 && !BLOCK_START.test(line2)) {
+      out.push(true);
+    } else if (INDENTED_CODE.test(line2) && !blank2 && (prevBlank || code3)) {
+      quote3 = false;
+      code3 = true;
+      out.push(true);
+    } else {
+      if (!blank2) code3 = false;
+      quote3 = false;
+      out.push(false);
+    }
+  }
+  return out;
+}
+function markerCore(line2) {
+  return line2.trim().replace(/^(?:[-+*]|\d+[.)])\s+/, "").replace(/^[*_~]+/, "").replace(/[*_~]+$/, "").trim();
+}
+function markerLineKind(line2) {
+  const core2 = markerCore(line2);
+  if (STANDALONE_MARKER.test(core2)) return "own";
+  return /^〔圖位[^〔〕]*〕$/.test(core2) ? "bad" : void 0;
+}
+function isShell(rest) {
+  return /^(?:[-+]|\d+[.)])?$/.test(rest.replace(/[\s*_~]+/g, ""));
+}
+function scanSlotMarkers(content, slots) {
+  const lines = content.split(/\r?\n/);
+  const guarded = protectedLines2(lines);
+  const planned = new Set(slots.map((slot) => slot.index));
+  const scan3 = { found: /* @__PURE__ */ new Map(), duplicateLines: [], badLines: [], inlineLines: [], omitted: [] };
+  lines.forEach((line2, at) => {
+    var _a2;
+    if (guarded[at] || !line2.includes(MARKER_OPEN)) return;
+    const kind = markerLineKind(line2);
+    if (kind === "own") {
+      const index = Number((_a2 = STANDALONE_MARKER.exec(markerCore(line2))) == null ? void 0 : _a2[1]);
+      if (!planned.has(index)) scan3.badLines.push(at);
+      else if (scan3.found.has(index)) scan3.duplicateLines.push(at);
+      else scan3.found.set(index, at);
+      return;
+    }
+    if (kind === "bad") {
+      scan3.badLines.push(at);
+      return;
+    }
+    scan3.inlineLines.push(at);
+  });
+  scan3.omitted = slots.map((slot) => slot.index).filter((index) => !scan3.found.has(index));
+  return scan3;
+}
+var INLINE_MARKER = /〔圖位[^〔〕\n]*〕|〔圖位\s*\d+\s*[：:]|〔圖位/g;
+function residualMarkerLines(content) {
+  const lines = content.split(/\r?\n/);
+  const guarded = protectedLines2(lines);
+  const out = [];
+  lines.forEach((line2, at) => {
+    if (!guarded[at] && line2.includes(MARKER_OPEN)) out.push(at);
+  });
+  return out;
+}
+var isHttps = (url) => {
+  try {
+    return new URL(url).protocol === "https:";
+  } catch (e) {
+    return false;
+  }
+};
+function pickForSlot(ctx, candidates) {
+  const secure = candidates.filter((item) => isHttps(item.imageUrl));
+  const picked = new Set([...ctx.alreadyPicked].map(imageKey));
+  const hit = secure.find((item) => {
+    const work = workKey(item.imageUrl, item.author);
+    return !picked.has(imageKey(item.imageUrl)) && !(work && picked.has(work));
+  });
+  if (hit) return { candidate: hit };
+  if (candidates.length && !secure.length) return { none: true, reasonCode: "unsafe_url" };
+  return { none: true, reasonCode: "not_found" };
+}
+function plainLine(text10) {
+  return text10 && /^[\s\p{P}\p{S}]+$/u.test(text10) && /^[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]/.test(text10) && !text10.startsWith("\\") ? `\\${text10}` : text10;
+}
+var SOURCE_URL_MAX = 1e3;
+var CREDIT_TEXT_MAX = 80;
+function sourceOf(candidate, alt, language2) {
+  let page;
+  try {
+    page = new URL(candidate.sourceUrl.trim());
+  } catch (e) {
+    return void 0;
+  }
+  if (page.protocol !== "https:" || page.username || page.password || page.href.length > SOURCE_URL_MAX)
+    return void 0;
+  const href = page.href.replace(/\(/g, "%28").replace(/\)/g, "%29");
+  const lang = language2;
+  const credit = (value, max) => plainLine(escapeMarkdownText((value != null ? value : "").replace(/[〔〕]/g, " "), max));
+  const author = credit(candidate.author, CREDIT_TEXT_MAX);
+  const license = credit(candidate.license, CREDIT_TEXT_MAX);
+  const site = escapeMarkdownText(page.hostname.replace(/^www\./i, ""), 100);
+  const parts = [
+    site,
+    ...author ? [translateNote(lang, "note.image_author_0", author)] : [],
+    ...license ? [license] : []
+  ];
+  const detail = translateNote(
+    lang,
+    "note.image_source_0_1",
+    parts.join(" \xB7 "),
+    `[${translateNote(lang, "note.image_link")}](${href})`
+  );
+  return {
+    href: page.href,
+    line: translateNote(lang, "note.image_source_label_0", detail),
+    entry: translateNote(lang, "note.image_source_entry_0_1", alt, detail)
+  };
+}
+function figureOf(candidate, href, language2) {
+  const plain = (value) => value.replace(/[〔〕]/g, " ");
+  const alt = escapeMarkdownText(plain(candidate.title), 80) || (/^zh/i.test(language2) ? "\u5716" : "image");
+  const source = sourceOf(candidate, alt, language2);
+  return {
+    href,
+    alt,
+    caption: plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
+    ...source ? { source } : {}
+  };
+}
+function choosePictures(chapter, slots, perSlot, taken, language2) {
+  var _a2;
+  const outcomes = /* @__PURE__ */ new Map();
+  const alreadyPicked = /* @__PURE__ */ new Set();
+  for (const slot of slots) {
+    const all = (_a2 = perSlot.get(slot.index)) != null ? _a2 : [];
+    const usable = all.filter((item) => {
+      if (!item.href || !item.loaded || taken(imageKey(item.href))) return false;
+      const work = workKey(item.href, item.candidate.author);
+      return !(work && taken(work));
+    });
+    const pick8 = pickForSlot(
+      { chapter, slot, allSlots: slots, alreadyPicked },
+      usable.map((item) => ({ ...item.candidate, imageUrl: item.href }))
+    );
+    if ("candidate" in pick8) {
+      alreadyPicked.add(pick8.candidate.imageUrl);
+      const work = workKey(pick8.candidate.imageUrl, pick8.candidate.author);
+      if (work) alreadyPicked.add(work);
+      const figure = figureOf(pick8.candidate, pick8.candidate.imageUrl, language2);
+      outcomes.set(slot.index, { figure: work ? { ...figure, work } : figure });
+      continue;
+    }
+    let reasonCode = pick8.reasonCode;
+    if (!usable.length) {
+      if (!all.length) reasonCode = "not_found";
+      else if (all.every((item) => !item.href)) reasonCode = "unsafe_url";
+      else if (all.some((item) => item.href && !item.loaded && !item.skipped)) reasonCode = "load_failed";
+      else if (all.some((item) => item.skipped)) reasonCode = "probe_capped";
+      else reasonCode = "not_found";
+    }
+    outcomes.set(slot.index, { reasonCode, ...pick8.reasonText ? { reasonText: pick8.reasonText } : {} });
+  }
+  return outcomes;
+}
+var BAD_INDEX = /〔圖位\s*(\d+)/;
+var isBlank = (line2) => line2 === void 0 || !line2.trim();
+function fillSlotMarkers(content, slots, outcomes) {
+  var _a2;
+  const lines = content.split("\n");
+  const scan3 = scanSlotMarkers(content, slots);
+  const cr = content.includes("\r\n") ? "\r" : "";
+  const figureAt = /* @__PURE__ */ new Map();
+  const missing = [];
+  const placed = [];
+  const sources = [];
+  const planned = new Set(slots.map((slot) => slot.index));
+  const badIndexes = /* @__PURE__ */ new Set();
+  for (const at of scan3.badLines) {
+    const m = BAD_INDEX.exec(lines[at]);
+    if (m && planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
+  }
+  for (const at of scan3.inlineLines)
+    for (const m of lines[at].matchAll(/〔圖位\s*(\d+)/g)) if (planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
+  for (const slot of slots) {
+    const at = scan3.found.get(slot.index);
+    const outcome = outcomes.get(slot.index);
+    if (at === void 0) {
+      missing.push({ index: slot.index, reasonCode: badIndexes.has(slot.index) ? "bad_marker" : "author_omitted" });
+    } else if (outcome && "figure" in outcome) {
+      figureAt.set(at, outcome.figure);
+      placed.push({ index: slot.index, href: outcome.figure.href });
+      if (outcome.figure.source) sources.push({ href: outcome.figure.source.href, entry: outcome.figure.source.entry });
+    } else {
+      missing.push({ index: slot.index, reasonCode: (_a2 = outcome == null ? void 0 : outcome.reasonCode) != null ? _a2 : "not_found" });
+    }
+  }
+  const dropped = new Set(
+    [...scan3.badLines, ...scan3.duplicateLines, ...scan3.found.values()].filter((at) => !figureAt.has(at))
+  );
+  const inline = new Set(scan3.inlineLines);
+  const added = [];
+  const out = [];
+  let removed = false;
+  const push = (line2) => {
+    if (removed && isBlank(line2) && (!out.length || isBlank(out[out.length - 1]))) {
+      removed = false;
+      return;
+    }
+    removed = false;
+    out.push(line2);
+  };
+  lines.forEach((line2, at) => {
+    const figure = figureAt.get(at);
+    if (figure) {
+      if (out.length && !isBlank(out[out.length - 1])) out.push("");
+      const image = `![${figure.alt}](${figure.href})${cr}`;
+      const caption = `${figure.caption}${cr}`;
+      added.push(image, caption);
+      out.push(image, caption);
+      if (figure.source) {
+        const source = `${figure.source.line}${cr}`;
+        added.push(source);
+        out.push(source);
+      }
+      if (!isBlank(lines[at + 1])) out.push(cr ? "\r" : "");
+      return;
+    }
+    if (dropped.has(at)) {
+      removed = true;
+      return;
+    }
+    if (inline.has(at)) {
+      const rest = line2.replace(INLINE_MARKER, "");
+      if (isShell(rest)) {
+        removed = true;
+        return;
+      }
+      push(rest);
+      return;
+    }
+    push(line2);
+  });
+  return { text: out.join("\n"), placed, missing, bad: scan3.badLines.length, sources, added };
+}
+function withoutMarkers(text10) {
+  const lines = text10.split("\n");
+  const guarded = protectedLines2(lines);
+  const out = [];
+  lines.forEach((line2, at) => {
+    if (guarded[at] || !line2.includes(MARKER_OPEN)) {
+      out.push(line2);
+      return;
+    }
+    if (markerLineKind(line2)) return;
+    const rest = line2.replace(INLINE_MARKER, "");
+    if (!isShell(rest)) out.push(rest);
+  });
+  return out.map((line2) => line2.replace(/\s+$/, "")).filter((line2) => line2.trim());
+}
+function verifyFill(original, result, slots) {
+  const seen = [...result.placed, ...result.missing].map((item) => item.index).sort((a, b) => a - b);
+  const want = slots.map((slot) => slot.index).sort((a, b) => a - b);
+  if (seen.length !== want.length || seen.some((index, i) => index !== want[i])) return "count";
+  if (residualMarkerLines(result.text).length) return "residual";
+  const rest = withoutMarkers(result.text);
+  for (const line2 of result.added) {
+    const at = rest.indexOf(line2.replace(/\s+$/, ""));
+    if (at < 0) return "deleted_text";
+    rest.splice(at, 1);
+  }
+  const before = withoutMarkers(original);
+  return before.length === rest.length && before.every((line2, i) => line2 === rest[i]) ? void 0 : "deleted_text";
+}
+var REASONS = [
+  "author_omitted",
+  "bad_marker",
+  "not_found",
+  "load_failed",
+  "unsafe_url",
+  "probe_capped"
+];
+function shortHash(url) {
+  let hash = 2166136261;
+  for (const char of imageKey(url)) {
+    hash ^= char.codePointAt(0);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+function composeSlotsRecord(result) {
+  const slots = [
+    ...result.placed.map((item) => ({ index: item.index, state: "placed", hash: shortHash(item.href) })),
+    ...result.missing.map((item) => ({ index: item.index, state: "missing", reasonCode: item.reasonCode }))
+  ].sort((a, b) => a.index - b.index);
+  return `<!-- book-slots:v1 ${JSON.stringify({ slots, bad: result.bad })} -->`;
+}
+var RECORD_LINE = /^(?:[ \t]{0,3}>[ \t]?)*<!-- book-slots:v1 (\{.*\}) -->$/;
+function latestSlotsRecord(detail) {
+  const lines = detail.split("\n");
+  const fenced = fencedLines(lines);
+  let found;
+  lines.forEach((line2, at) => {
+    const m = fenced[at] ? null : RECORD_LINE.exec(line2.replace(/\r$/, "").trim());
+    if (!m) return;
+    try {
+      const data = JSON.parse(m[1]);
+      if (!Array.isArray(data.slots)) return;
+      const items = [];
+      for (const raw of data.slots.slice(0, MAX_IMAGE_SLOTS)) {
+        if (!raw || !Number.isInteger(raw.index) || raw.index < 1) continue;
+        const state = raw.state === "placed" ? "placed" : raw.state === "missing" ? "missing" : void 0;
+        if (!state) continue;
+        const reasonCode = REASONS.find((code3) => code3 === raw.reasonCode);
+        items.push({
+          index: raw.index,
+          state,
+          ...reasonCode ? { reasonCode } : {},
+          ...typeof raw.hash === "string" && /^[0-9a-f]{8}$/.test(raw.hash) ? { hash: raw.hash } : {}
+        });
+      }
+      found = { slots: items, bad: Number.isInteger(data.bad) && data.bad > 0 ? data.bad : 0 };
+    } catch (e) {
+    }
+  });
+  return found;
+}
+var IMAGE_IN_LINE = /!\[[^\]\n]*\]\((https:\/\/[^)\s]+)\)/g;
+var SOURCE_LINE = /^(?:來源|来源|Source)[:：][ \t]*\S/;
+var IMAGE_ONLY_LINE2 = /^[ \t]*!\[[^\]\n]*\]\(https:\/\/[^)\s]+\)[ \t]*\r?$/;
+function stripImageLines(text10) {
+  const lines = text10.split("\n");
+  const guarded = protectedLines2(lines);
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!guarded[i] && IMAGE_ONLY_LINE2.test(lines[i])) {
+      const plainAt = (at) => at < lines.length && !isBlank(lines[at]) && !guarded[at] && !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[at]);
+      const endsAt = (at) => isBlank(lines[at]) || /^\s*#/.test(lines[at]);
+      if (plainAt(i + 1) && plainAt(i + 2) && SOURCE_LINE.test(lines[i + 2]) && endsAt(i + 3)) i += 2;
+      else if (plainAt(i + 1) && endsAt(i + 2)) i++;
+      continue;
+    }
+    out.push(lines[i]);
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+function describeSlots(slots, record, imageUrls) {
+  const now = new Set(imageUrls.map(shortHash));
+  return slots.map((slot) => {
+    const item = record == null ? void 0 : record.slots.find((entry) => entry.index === slot.index);
+    if (!item) return { index: slot.index, state: "unrecorded" };
+    if (item.state === "missing")
+      return {
+        index: slot.index,
+        state: "missing",
+        ...item.reasonCode ? { reasonCode: item.reasonCode } : {}
+      };
+    return { index: slot.index, state: item.hash && now.has(item.hash) ? "placed" : "edited" };
+  });
+}
+var STOP_CJK = /* @__PURE__ */ new Set([..."\u7684\u4E86\u662F\u5728\u548C\u8207\u4E0E\u53CA\u6216\u5C0D\u5BF9\u628A\u88AB\u70BA\u4E3A\u4EE5\u4E4B\u65BC\u4E8E\u4E26\u5E76\u4E2D\u4E0A\u4E0B\u9019\u8FD9\u90A3\u4E00\u500B\u4E2A\u4E5F\u90FD\u5C31\u800C\u4F46"]);
+var STOP_WORDS = /* @__PURE__ */ new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "that",
+  "this",
+  "from",
+  "into",
+  "over",
+  "about",
+  "how",
+  "what"
+]);
+function slotKeywords(explains) {
+  var _a2, _b2;
+  const out = /* @__PURE__ */ new Set();
+  for (const word of (_a2 = explains.toLowerCase().match(/[a-z0-9][a-z0-9'-]{2,}/g)) != null ? _a2 : [])
+    if (!STOP_WORDS.has(word)) out.add(word);
+  for (const run of (_b2 = explains.match(/\p{Script=Han}+/gu)) != null ? _b2 : []) {
+    let part = "";
+    const flush = () => {
+      const chars = Array.from(part);
+      for (let i = 0; i + 1 < chars.length; i++) out.add(chars[i] + chars[i + 1]);
+      part = "";
+    };
+    for (const char of run) {
+      if (STOP_CJK.has(char)) flush();
+      else part += char;
+    }
+    flush();
+  }
+  return [...out];
+}
+var KEYWORD_HITS = 2;
+function checkImageText(body, slots, record) {
+  var _a2;
+  const empty = { planned: 0, placed: 0, imageCount: 0, bad: 0, issues: [] };
+  if (!(slots == null ? void 0 : slots.length)) return { kind: "none", ...empty };
+  if (!record) return { kind: "unrecorded", ...empty, planned: slots.length };
+  const lines = body.split("\n");
+  const guarded = protectedLines2(lines);
+  const blocks = [];
+  let current = [];
+  let hashes = [];
+  const close = () => {
+    if (current.length) blocks.push({ text: current.join("\n"), hashes });
+    current = [];
+    hashes = [];
+  };
+  lines.forEach((line2, at) => {
+    if (guarded[at] || isBlank(line2)) {
+      close();
+      return;
+    }
+    current.push(line2);
+    for (const m of line2.matchAll(IMAGE_IN_LINE)) hashes.push(shortHash(m[1]));
+  });
+  close();
+  const imageCount = blocks.reduce((sum2, block) => sum2 + block.hashes.length, 0);
+  const placedItems = record.slots.filter((item) => item.state === "placed");
+  const issues = [];
+  for (const item of record.slots)
+    if (item.state === "missing") issues.push({ index: item.index, code: (_a2 = item.reasonCode) != null ? _a2 : "not_found" });
+  if (imageCount !== placedItems.length) issues.push({ code: "count" });
+  for (const item of placedItems) {
+    const at = blocks.findIndex((block) => item.hash !== void 0 && block.hashes.includes(item.hash));
+    const slot = slots.find((entry) => entry.index === item.index);
+    if (at < 0 || !slot) continue;
+    const around = [at - 1, at + 1].map((i) => blocks[i]).filter((block) => block && !block.hashes.length).map((block) => block.text.toLowerCase()).join("\n");
+    const words2 = slotKeywords(slot.explains);
+    const hits = words2.filter((word) => around.includes(word)).length;
+    if (words2.length && hits < Math.min(KEYWORD_HITS, words2.length))
+      issues.push({ index: item.index, code: "mismatch" });
+  }
+  return { kind: "checked", planned: slots.length, placed: placedItems.length, imageCount, bad: record.bad, issues };
+}
+function composeImageTextLine(language2, check) {
+  const note = noteLanguageOf(language2);
+  if (check.kind === "none") return translate(note, "detail.book_slots_none");
+  if (check.kind === "unrecorded") return translate(note, "detail.book_slots_unrecorded");
+  const joiner = /^zh/i.test(language2) ? "\uFF1B" : "; ";
+  const parts = check.issues.map(
+    (issue2) => issue2.code === "count" ? translate(note, "detail.book_slots_count_0_1", String(check.imageCount), String(check.placed)) : translate(
+      note,
+      "detail.book_slots_slot_0_1",
+      String(issue2.index),
+      translate(note, `detail.book_slots_reason_${issue2.code}`)
+    )
+  );
+  if (check.bad) parts.push(translate(note, "detail.book_slots_bad_0", String(check.bad)));
+  return parts.length ? translate(note, "detail.book_slots_issues_0", parts.join(joiner)) : translate(note, "detail.book_slots_ok_0", String(check.placed));
+}
+function imageIssueTokens(check) {
+  const tokens2 = check.issues.map((issue2) => issue2.code === "count" ? "image_count" : `image_${issue2.index}`);
+  return check.bad ? [...tokens2, "image_marker"] : tokens2;
 }
 
 // core/book-pipeline/settings.ts
@@ -12922,6 +14801,30 @@ function lengthRange(text10, onIgnored) {
     return void 0;
   }
   return { min: one.min, max: one.max, unit: one.unit };
+}
+var PICTURE_WORD = "(?:\u5716\u7247|\u56FE\u7247|\u914D\u5716|\u914D\u56FE|\u63D2\u5716|\u63D2\u56FE|\u5716\u50CF|\u56FE\u50CF|\u7167\u7247|\u5716|\u56FE|images?|pictures?|illustrations?|photos?|figures?)";
+var COUNT_SEP = "\\s*(?:[\u2013\\-~\u81F3\u5230\u2014]|\\bto\\b)\\s*";
+var COUNT = `(\\d{1,2})(?:${COUNT_SEP}(\\d{1,2}))?`;
+var COUNT_THEN_UNIT = new RegExp(`(?<![\\d.,])${COUNT}(?:\\s*(?:\u5F35|\u5F20|\u5E45)|\\s+${PICTURE_WORD}(?![A-Za-z]))`, "giu");
+var UNIT_THEN_COUNT = new RegExp(
+  `${PICTURE_WORD}\\s*[:\uFF1A]?\\s*(?:\u6BCF\u7AE0\\s*)?${COUNT}(?![\\d.,]|\\s*(?:\u500B)?\\s*(?:\u5B57|words?))`,
+  "giu"
+);
+var HAS_PICTURE_WORD = new RegExp(PICTURE_WORD, "iu");
+function imageCountRange(settings) {
+  var _a2, _b2;
+  const found = /* @__PURE__ */ new Set();
+  for (const field of BOOK_SETTING_FIELDS) {
+    const value = ((_a2 = settings[field]) != null ? _a2 : "").normalize("NFKC");
+    if (!HAS_PICTURE_WORD.test(value)) continue;
+    for (const pattern of [COUNT_THEN_UNIT, UNIT_THEN_COUNT])
+      for (const m of value.matchAll(pattern)) found.add(`${m[1]}-${(_b2 = m[2]) != null ? _b2 : m[1]}`);
+  }
+  if (found.size !== 1) return void 0;
+  const [min, max] = [...found][0].split("-").map(Number);
+  if (min > max || max < 1) return void 0;
+  const top = Math.min(max, MAX_IMAGE_SLOTS);
+  return { min: Math.min(min, top), max: top };
 }
 var CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu;
 var LATIN_WORD = /[\p{Script=Latin}\p{N}]+(?:['’][\p{Script=Latin}]+)?/gu;
@@ -15478,7 +17381,7 @@ var CoffeeStorage = class {
   }
   topicFolder(topic) {
     const slug = topicSlug(topic).slice(0, 64);
-    return `${this.folder}/${slug}\uFF08${shortHash(topic.trim())}\uFF09`;
+    return `${this.folder}/${slug}\uFF08${shortHash2(topic.trim())}\uFF09`;
   }
   titlePath(topic, id) {
     var _a2;
@@ -16396,7 +18299,7 @@ ${session.observerDraftMarkdown}`);
           skipped2++;
           continue;
         }
-        const id = (_b2 = side == null ? void 0 : side.id) != null ? _b2 : `legacy-${shortHash(file.path)}`, target = this.titlePath(topic, id);
+        const id = (_b2 = side == null ? void 0 : side.id) != null ? _b2 : `legacy-${shortHash2(file.path)}`, target = this.titlePath(topic, id);
         if (!this.renameFile) throw new Error("FileManager rename is unavailable");
         await this.ensureFolder(target.split("/").slice(0, -1).join("/"));
         if (side) await this.moveManagedFile(file, side.id, target);
@@ -16439,7 +18342,7 @@ ${session.observerDraftMarkdown}`);
   }
   async delete(id, markdownPath) {
     var _a2, _b2;
-    const safeId = /^[a-zA-Z0-9-]+$/.test(id) ? id : `legacy-${shortHash(id)}`, file = await this.openMarkdown(markdownPath != null ? markdownPath : id), sidePath = `${this.hidden}/${safeId}.json`, trashFolder = `${this.hidden}/trash`, bundlePath = `${trashFolder}/${safeId}-${Date.now()}.json`;
+    const safeId = /^[a-zA-Z0-9-]+$/.test(id) ? id : `legacy-${shortHash2(id)}`, file = await this.openMarkdown(markdownPath != null ? markdownPath : id), sidePath = `${this.hidden}/${safeId}.json`, trashFolder = `${this.hidden}/trash`, bundlePath = `${trashFolder}/${safeId}-${Date.now()}.json`;
     await this.ensureFolder(trashFolder);
     let raw = await this.vault.read(file), sideRaw = await this.vault.adapter.read(sidePath).catch(() => void 0);
     const record = {
@@ -16664,7 +18567,7 @@ function contentHash(value) {
 function demoteRootHeadings(markdown) {
   return markdown.split("\n").map((line2) => /^(#{1,2})\s/.test(line2) ? `##${line2}` : line2).join("\n");
 }
-function shortHash(value) {
+function shortHash2(value) {
   let hash = 2166136261;
   for (const character of value.normalize("NFC").trim()) hash = Math.imul(hash ^ character.codePointAt(0), 16777619);
   return (hash >>> 0).toString(16).padStart(8, "0").slice(0, 8);
@@ -23542,7 +25445,7 @@ function customDetailCallout(language2, values) {
 }
 
 // ai/markdown-blocks.ts
-function fencedLines(lines) {
+function fencedLines2(lines) {
   let fence = null;
   return lines.map((line2) => {
     const open2 = /^\s*(`{3,}|~{3,})/.exec(line2);
@@ -23560,7 +25463,7 @@ function fencedLines(lines) {
 }
 function normalizeDetailHeadings(markdown) {
   const lines = markdown.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const parents = [];
   return lines.map((line2, index) => {
     var _a2, _b2;
@@ -23603,7 +25506,7 @@ function maskInlineCode(line2) {
 function normalizeMathDelimiters(markdown) {
   if (!/\\[[\]()]/.test(markdown)) return markdown;
   const lines = markdown.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const masked = lines.map((line2, index) => code3[index] ? line2 : maskInlineCode(line2));
   const tokens2 = [];
   masked.forEach((line2, index) => {
@@ -23692,7 +25595,7 @@ function frontmatterLines(lines) {
 function guardInlineHtmlLinks(text10, options = {}) {
   if (!/&#8203;|<(?:sup|sub|kbd|mark|span|small|u)\b/i.test(text10)) return text10;
   const lines = text10.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const front = options.frontmatter ? frontmatterLines(lines) : lines.map(() => false);
   let offset = 0;
   return lines.map((line2, index) => {
@@ -23702,111 +25605,6 @@ function guardInlineHtmlLinks(text10, options = {}) {
     if (options.range && (start < options.range.start || start >= options.range.end)) return line2;
     return guardInlineHtmlLine(line2.replace(OLD_LEAD, "$1"));
   }).join("\n");
-}
-
-// ai/section-aliases.ts
-var name = (zhTW2, en2) => ({ zh: zhTW2, en: en2 });
-var SECTION_NAME = {
-  // sources role: any one of the three names; a structure uses the one that fits its type
-  sources: name("\u4F86\u6E90", "Sources"),
-  source: name("\u51FA\u8655", "Source"),
-  references: name("\u53C3\u8003\u8CC7\u6599", "References"),
-  // log role (unchanged name)
-  log: name("\u66F4\u65B0\u7D00\u9304", "Update log"),
-  // log role for the picture-book chapter template: only when no section has the standard log name
-  researchNotes: name("\u7814\u7A76\u5099\u8A3B", "Research notes"),
-  // atomic
-  oneSentence: name("\u4E00\u53E5\u8A71", "In one sentence"),
-  why: name("\u70BA\u4EC0\u9EBC", "Why"),
-  // hypothesis
-  ifTrue: name("\u5982\u679C\u6210\u7ACB\u6703\u770B\u5230", "If true we would see"),
-  evidenceTable: name("\u8B49\u64DA\u5C0D\u7167", "Evidence table"),
-  // evidence
-  summary: name("\u6458\u8981", "Summary"),
-  relatedTopics: name("\u548C\u54EA\u4E9B\u8B70\u984C\u6709\u95DC", "Related topics"),
-  // conclusion
-  confidence: name("\u4FE1\u5FC3", "Confidence"),
-  scope: name("\u9069\u7528\u7BC4\u570D", "Scope"),
-  impact: name("\u5F71\u97FF\u8207\u4E0B\u4E00\u6B65", "Impact and next steps"),
-  // action
-  goalDone: name("\u76EE\u6A19\u8207\u5B8C\u6210\u689D\u4EF6", "Goal and done-when"),
-  steps: name("\u6B65\u9A5F", "Steps")
-};
-var NEW_STANDARD_HEADING_KEYS = [
-  "detail.background_and_mechanism",
-  "detail.disagreements_and_limits",
-  "detail.open_questions_to_check",
-  "detail.sources_heading"
-];
-var lowered = (value) => value.trim().toLocaleLowerCase();
-var SPELLINGS = ["zh-TW", "zh-CN", "en"];
-var spellings = (key4) => SPELLINGS.map((locale) => translate(locale, key4));
-var both = (value) => [value.zh, value.en];
-var rows;
-var researchNotesNames = () => [...both(SECTION_NAME.researchNotes), "\u7814\u7A76\u5907\u6CE8"];
-function sectionAliasRows() {
-  if (rows) return rows;
-  const sourcesNames = [
-    ...both(SECTION_NAME.sources),
-    ...both(SECTION_NAME.source),
-    ...both(SECTION_NAME.references),
-    ...spellings("detail.sources_heading"),
-    "\u51FA\u5904",
-    "\u53C2\u8003\u8D44\u6599"
-  ];
-  const legacySources = spellings("detail.evidence_and_sources");
-  rows = [
-    // role sources: the old standard name, and the three new names for each other
-    { names: sourcesNames, aliases: [...sourcesNames, ...legacySources] },
-    // Research notes: a note that only has the old log heading still lines up with it
-    { names: researchNotesNames(), aliases: spellings("detail.update_log") },
-    // standard / textbook
-    { names: spellings("detail.background_and_mechanism"), aliases: spellings("detail.key_knowledge") },
-    { names: spellings("detail.disagreements_and_limits"), aliases: spellings("detail.tradeoffs_and_limitations") },
-    { names: spellings("detail.open_questions_to_check"), aliases: spellings("detail.open_questions") },
-    // atomic
-    { names: both(SECTION_NAME.oneSentence), aliases: ["\u5B9A\u7FA9", "Definition"] },
-    { names: both(SECTION_NAME.why), aliases: ["\u89E3\u91CB", "Explanation"] },
-    // hypothesis: the old support and counterevidence sections both land on the one table
-    { names: both(SECTION_NAME.ifTrue), aliases: ["\u9810\u6E2C", "Prediction"] },
-    { names: both(SECTION_NAME.evidenceTable), aliases: ["\u652F\u6301", "\u53CD\u99C1", "Support", "Counterevidence"] },
-    // evidence
-    { names: both(SECTION_NAME.summary), aliases: ["\u5167\u5BB9", "Content"] },
-    { names: both(SECTION_NAME.relatedTopics), aliases: ["\u652F\u6301\u6216\u53CD\u99C1", "Supports or refutes"] },
-    // conclusion
-    { names: both(SECTION_NAME.confidence), aliases: ["\u4FE1\u5FC3\u7A0B\u5EA6"] },
-    { names: both(SECTION_NAME.scope), aliases: ["\u9069\u7528\u7BC4\u570D\u8207\u9650\u5236", "Scope and limits"] },
-    { names: both(SECTION_NAME.impact), aliases: ["\u5F8C\u7E8C\u884C\u52D5", "Next actions"] },
-    // action
-    { names: both(SECTION_NAME.goalDone), aliases: ["\u76EE\u6A19", "\u5B8C\u6210\u689D\u4EF6", "Goal", "Done when"] },
-    { names: both(SECTION_NAME.steps), aliases: ["\u6AA2\u67E5\u9EDE", "Checkpoints"] }
-  ];
-  return rows;
-}
-function sectionAliasesFor(heading) {
-  const key4 = lowered(heading);
-  const result = [];
-  for (const row of sectionAliasRows())
-    if (row.names.some((entry) => lowered(entry) === key4)) {
-      for (const alias of row.aliases)
-        if (lowered(alias) !== key4 && !result.some((existing) => lowered(existing) === lowered(alias)))
-          result.push(alias);
-    }
-  return result;
-}
-function isNewSourcesHeading(heading) {
-  const key4 = lowered(heading);
-  return sectionAliasRows()[0].names.some((entry) => lowered(entry) === key4);
-}
-function isOpenQuestionsHeading(heading) {
-  const key4 = lowered(heading);
-  return [...spellings("detail.open_questions_to_check"), ...spellings("detail.open_questions")].some(
-    (entry) => lowered(entry) === key4
-  );
-}
-function isResearchNotesHeading(heading) {
-  const key4 = lowered(heading);
-  return researchNotesNames().some((entry) => lowered(entry) === key4);
 }
 
 // ai/detail-templates.ts
@@ -23968,7 +25766,7 @@ function normalizeTemplates(value) {
 }
 function countItems(body) {
   const lines = body.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const outside = lines.filter((_, index) => !code3[index]);
   const headings = outside.filter((line2) => /^####\s+\S/.test(line2)).length;
   if (headings) return headings;
@@ -23977,7 +25775,7 @@ function countItems(body) {
 function sectionBodies(detail, template2) {
   const lookup = sectionLookup(template2);
   const lines = detail.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const bodies = /* @__PURE__ */ new Map();
   let current;
   lines.forEach((line2, index) => {
@@ -24137,7 +25935,7 @@ var UNSAFE_LINE = [
 ];
 var CLASS_ANNOTATION = /<<[A-Za-z][A-Za-z0-9_]*>>/g;
 var CLASS_DECLARATION = /^class\s+[A-Za-z_][A-Za-z0-9_-]*(?:~[A-Za-z0-9_, ]*~)?(?=\s*(?:\{|\["[^"\]]*"\])?\s*$)/;
-var FENCE = /^(`{3,}|~{3,})(.*)$/;
+var FENCE2 = /^(`{3,}|~{3,})(.*)$/;
 var PREFIX = /^(?:[ \t]+|>|(?:[-*+]|\d+[.)])(?=[ \t])|\[[ xX]\](?=[ \t]))/;
 function core(line2) {
   let rest = line2;
@@ -24145,7 +25943,7 @@ function core(line2) {
   return rest;
 }
 function fenceOf(line2) {
-  const fence = FENCE.exec(core(line2));
+  const fence = FENCE2.exec(core(line2));
   return fence && !(fence[1][0] === "`" && fence[2].includes("`")) ? fence : null;
 }
 function unsafeMermaid(body) {
@@ -24170,7 +25968,7 @@ function neutralizeUnsafeMermaid(markdown) {
     for (let next = index + 1; next < lines.length; next++) {
       lines[next] = lines[next].replace(BR_TAG, " ");
       const content = core(lines[next]);
-      const close = FENCE.exec(content);
+      const close = FENCE2.exec(content);
       if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
       body.push(content);
     }
@@ -24235,7 +26033,7 @@ async function demoteUnparsableMermaid(markdown, check) {
     for (; next < count4; next++) {
       const raw = parts[at(next)];
       const content = core(raw);
-      const close = FENCE.exec(content);
+      const close = FENCE2.exec(content);
       if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
       body.push(
         raw.startsWith(prefix) ? raw.slice(prefix.length) : raw.startsWith(continued) ? raw.slice(continued.length) : content
@@ -24281,7 +26079,7 @@ function mermaidBlocks(markdown) {
     for (; next < lines.length; next++) {
       const raw = lines[next];
       const content = core(raw);
-      const close = FENCE.exec(content);
+      const close = FENCE2.exec(content);
       if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
       body.push(
         raw.startsWith(prefix) ? raw.slice(prefix.length) : raw.startsWith(continued) ? raw.slice(continued.length) : content
@@ -24298,7 +26096,7 @@ function mermaidBlocks(markdown) {
     const body = [];
     for (let next = index + 1; next < lines.length; next++) {
       const content = core(lines[next]);
-      const close = FENCE.exec(content);
+      const close = FENCE2.exec(content);
       if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
       body.push(content);
     }
@@ -24469,13 +26267,13 @@ var ANY_HEADING = /^#{3,4}[ \t]+(?:先前研究的來源|Sources from earlier re
 var TOKEN2 = /!?\[\[[^\]]+\]\]|!?\[[^\]]*\]\(\s*<?[^)\s>]+[^)]*\)|<?https?:\/\/[^\s<>"'`)\]]+>?/g;
 function outsideCode(text10) {
   const lines = text10.replace(/\r\n/g, "\n").split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   return lines.filter((_, index) => !code3[index]);
 }
 function keysOf(text10) {
   return [...linksOf([text10]).keys()];
 }
-function plainLine(line2) {
+function plainLine2(line2) {
   const stripped = line2.replace(/^[ \t]*(?:>[ \t]*)*/, "").replace(/^(?:[-*+]|\d+[.)])[ \t]+/, "").replace(/\[\^[^\]\s]+\](?!\()/g, "").replace(/!(\[[^\]]*\]\()/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
   return `- ${stripped}`;
 }
@@ -24505,7 +26303,7 @@ function carriedSourceLines(previousTexts, nextTexts) {
     const definition = /^[ \t]*\[\^[^\]\s]+\]:[ \t]*(.*)$/.exec(line2);
     if (definition) add(`- ${definition[1].trim()}`);
     else if (/^[ \t]*(?:\||#{1,6}[ \t])/.test(line2)) for (const token of linkTokens(line2, open2)) add(`- ${token}`);
-    else add(plainLine(line2));
+    else add(plainLine2(line2));
     for (const key4 of keys) covered.add(key4);
   }
   return lines;
@@ -24515,7 +26313,7 @@ function carryForwardSources(detail, previousTexts, nextTexts, language2, templa
   if (!carried.length) return detail;
   const heading = translateNote(language2, HEADING_KEY);
   const lines = detail.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const existing = lines.findIndex((line2, index) => !code3[index] && ANY_HEADING.test(line2));
   if (existing >= 0) return insertAfterBlock(lines, code3, existing, carried, /^#{1,4}[ \t]/);
   const keys = sourcesHeadingKeys(template2);
@@ -24546,7 +26344,7 @@ function insertAfterBlock(lines, code3, start, add, stop, separate = false) {
 
 // core/steps/task/merge-check.ts
 var UPDATE_LOG_HEADING = /^(#{1,6})[ \t]+.*(?:更新紀錄|更新记录|Update log)/i;
-var HEADING = /^(#{1,6})[ \t]+\S/;
+var HEADING2 = /^(#{1,6})[ \t]+\S/;
 function withoutUpdateLog(text10, logHeadings) {
   const names3 = new Set(logHeadings.map((name2) => name2.trim().toLocaleLowerCase()).filter(Boolean));
   const isLog = (line2) => {
@@ -24558,7 +26356,7 @@ function withoutUpdateLog(text10, logHeadings) {
   const lines = text10.replace(/\r\n/g, "\n").split("\n"), kept = [];
   let skipping = 0;
   for (const line2 of lines) {
-    const heading = HEADING.exec(line2);
+    const heading = HEADING2.exec(line2);
     if (skipping && heading && heading[1].length <= skipping) skipping = 0;
     if (!skipping) {
       const log = isLog(line2);
@@ -24586,7 +26384,7 @@ function numbersOf(texts, logHeadings) {
   }
   return out;
 }
-function decoded(value) {
+function decoded2(value) {
   try {
     return decodeURIComponent(value);
   } catch (e) {
@@ -24597,7 +26395,7 @@ function linksOf(texts) {
   const out = /* @__PURE__ */ new Map();
   const add = (kind, raw) => {
     const shown = raw.trim().replace(/[.,;:!?*_'"]+$/, "");
-    const key4 = decoded(shown).toLowerCase().replace(/\/+$/, "").replace(/\.md$/, "");
+    const key4 = decoded2(shown).toLowerCase().replace(/\/+$/, "").replace(/\.md$/, "");
     if (key4) out.set(`${kind}${key4}`, shown);
   };
   for (const text10 of texts) {
@@ -24723,7 +26521,7 @@ var FOOTNOTE_DEFINITION = /^[ \t]*(?:>[ \t]*)*\[\^([^\]\s]+)\]:[ \t]*(.*)$/;
 var FOOTNOTE_REF = /\[\^([^\]\s]+)\](?!\(|:)/g;
 function footnoteDefinitions(text10) {
   const lines = text10.replace(/\r\n/g, "\n").split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const out = /* @__PURE__ */ new Map();
   lines.forEach((line2, index) => {
     const match = code3[index] ? null : FOOTNOTE_DEFINITION.exec(line2);
@@ -24759,7 +26557,7 @@ function quoteMissingLines(oldDetail, detail, missing, template2, language2, log
   const logNames = new Set(logHeadings.map(key2).filter(Boolean));
   const titles = keptTitles();
   const oldLines = oldDetail.replace(/\r\n/g, "\n").split("\n");
-  const oldCode = fencedLines(oldLines);
+  const oldCode = fencedLines2(oldLines);
   const oldDefinitions = footnoteDefinitions(oldDetail);
   const groups = /* @__PURE__ */ new Map();
   const covered = /* @__PURE__ */ new Set();
@@ -24811,7 +26609,7 @@ function quoteMissingLines(oldDetail, detail, missing, template2, language2, log
 }
 function insertIntoSection(detail, index, block, template2, lookup) {
   const lines = detail.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const sections = [];
   lines.forEach((line2, at) => {
     const match = code3[at] ? null : /^###[ \t]+(.+?)[ \t]*$/.exec(line2);
@@ -25368,1792 +27166,6 @@ function titleProblemText(text10) {
   return "";
 }
 
-// core/book-pipeline/image-dedupe.ts
-function imageKey(url) {
-  var _a2;
-  let parsed;
-  try {
-    parsed = new URL(url.trim());
-  } catch (e) {
-    return url.trim().toLowerCase();
-  }
-  const host = parsed.hostname.toLowerCase();
-  if (/^(upload|thumb)\.wikimedia\.org$/.test(host)) {
-    const parts = parsed.pathname.split("/").filter(Boolean);
-    let name2 = (_a2 = parts[parts.length - 1]) != null ? _a2 : "";
-    const thumbAt = parts.indexOf("thumb");
-    if (thumbAt >= 0 && parts.length >= thumbAt + 5) name2 = parts[parts.length - 2];
-    try {
-      name2 = decodeURIComponent(name2);
-    } catch (e) {
-    }
-    return name2.toLowerCase();
-  }
-  parsed.search = "";
-  parsed.hash = "";
-  return parsed.href;
-}
-
-// core/book-pipeline/image-quality.ts
-var WIKI_HOST = /(^|\.)(wikimedia|wikipedia)\.org$/i;
-var FILE_PAGE = /^\/wiki\/(?:File|Image):[^/]+$/i;
-function plainWords(text10) {
-  return text10.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-}
-function wikimediaFile(imageUrl) {
-  let url;
-  try {
-    url = new URL(imageUrl.trim());
-  } catch (e) {
-    return void 0;
-  }
-  const host = url.hostname.toLowerCase();
-  const parts = url.pathname.split("/").filter(Boolean);
-  const decode2 = (value) => {
-    try {
-      return decodeURIComponent(value);
-    } catch (e) {
-      return value;
-    }
-  };
-  if (/^(upload|thumb)\.wikimedia\.org$/.test(host) && parts[0] === "wikipedia" && parts.length >= 5) {
-    const thumbAt = parts.indexOf("thumb");
-    const name2 = thumbAt === 2 && parts.length >= 7 ? parts[5] : parts[parts.length - 1];
-    return { project: parts[1].toLowerCase(), name: decode2(name2) };
-  }
-  const filePath = /^\/wiki\/Special:FilePath\/([^/]+)$/i.exec(url.pathname);
-  if (host === "commons.wikimedia.org" && filePath) return { project: "commons", name: decode2(filePath[1]) };
-  return void 0;
-}
-function filePageOf(imageUrl) {
-  const file = wikimediaFile(imageUrl);
-  if (!file || !/^[a-z-]+$/.test(file.project)) return void 0;
-  const host = file.project === "commons" ? "commons.wikimedia.org" : `${file.project}.wikipedia.org`;
-  return `https://${host}/wiki/File:${encodeURIComponent(file.name.replace(/ /g, "_"))}`;
-}
-function fileSourceOf(candidate) {
-  let source;
-  try {
-    source = new URL(candidate.source);
-  } catch (e) {
-    return void 0;
-  }
-  const wikiSource = WIKI_HOST.test(source.hostname);
-  if (wikiSource && FILE_PAGE.test(source.pathname)) return candidate;
-  const page = filePageOf(candidate.url);
-  if (page) {
-    const { author: _author, license: _license, ...rest } = candidate;
-    return { ...rest, source: page };
-  }
-  return wikiSource ? void 0 : candidate;
-}
-function fileNameOf(imageUrl) {
-  var _a2;
-  const file = wikimediaFile(imageUrl);
-  if (file) return file.name;
-  try {
-    const last = (_a2 = new URL(imageUrl).pathname.split("/").filter(Boolean).pop()) != null ? _a2 : "";
-    return decodeURIComponent(last);
-  } catch (e) {
-    return "";
-  }
-}
-function bySubject(candidate, subject) {
-  var _a2;
-  const who = plainWords(subject != null ? subject : "");
-  if (!who) return true;
-  const words2 = who.split(" ");
-  const latin = /^[a-z0-9 ]+$/.test(who);
-  const key4 = latin ? words2[words2.length - 1] : who;
-  const names3 = (text10) => latin ? ` ${plainWords(text10)} `.includes(` ${key4} `) : plainWords(text10).includes(key4);
-  if ((_a2 = candidate.author) == null ? void 0 : _a2.trim()) return names3(candidate.author);
-  const file = fileNameOf(candidate.url).replace(/\.[a-z0-9]{2,5}$/i, "").replace(/_/g, " ");
-  const credit = /\b(?:by|par|von|di|por|door)\s+(.+)$/i.exec(file);
-  if (credit && !names3(credit[1])) return false;
-  return names3(file) || !latin && names3(candidate.title);
-}
-var EDIT_WORDS = /\b(?:cropped|crop|edited|edit|restored|retouched|retouch|cleaned|version|ver|v\d)\b/g;
-function workKey(imageUrl, author) {
-  const who = plainWords((author != null ? author : "").replace(/\([^)]*\)/g, " "));
-  if (!who) return void 0;
-  const stem = plainWords(
-    fileNameOf(imageUrl).replace(/\.[a-z0-9]{2,5}$/i, "").replace(/^\d+px-/i, "")
-  ).replace(EDIT_WORDS, " ").replace(/\b\d{5,}\b/g, " ").replace(/\s+/g, " ").trim();
-  if (stem.replace(/ /g, "").length < 4) return void 0;
-  return `work:${stem}|${who}`;
-}
-
-// core/book-pipeline/image-slots.ts
-var MAX_IMAGE_SLOTS = 8;
-function cleanSlotText(value, max) {
-  const text10 = value.replace(/[〔〕｜]/g, " ").replace(/\s+/g, " ").trim();
-  return Array.from(text10).slice(0, max).join("").trim();
-}
-var STANDALONE_MARKER = /^\s*〔圖位 ([1-9]\d*)：([^〔〕]+?)〕\s*$/;
-var MARKER_OPEN = "\u3014\u5716\u4F4D";
-var OPEN_FENCE = /^[ \t]*(`{3,}|~{3,})(.*)$/;
-var QUOTE_LINE = /^ {0,3}>/;
-var INDENTED_CODE = /^(?: {4}|\t)/;
-var BLOCK_START = /^ {0,3}(?:#{1,6}(?:\s|$)|[-*+]\s|\d+[.)]\s|(?:[-*_][ \t]*){3,}$)/;
-function protectedLines(lines) {
-  const out = [];
-  let fence;
-  let quote3 = false;
-  let code3 = false;
-  for (const line2 of lines) {
-    if (fence) {
-      out.push(true);
-      const close = OPEN_FENCE.exec(line2);
-      if (close && close[1][0] === fence.char && close[1].length >= fence.size && !close[2].trim()) fence = void 0;
-      continue;
-    }
-    const open2 = OPEN_FENCE.exec(line2);
-    if (open2 && !(open2[1][0] === "`" && open2[2].includes("`"))) {
-      fence = { char: open2[1][0], size: open2[1].length };
-      out.push(true);
-      quote3 = false;
-      code3 = false;
-      continue;
-    }
-    const blank2 = !line2.trim();
-    const prevBlank = out.length === 0 || !lines[out.length - 1].trim();
-    if (QUOTE_LINE.test(line2)) {
-      quote3 = true;
-      code3 = false;
-      out.push(true);
-    } else if (quote3 && !blank2 && !BLOCK_START.test(line2)) {
-      out.push(true);
-    } else if (INDENTED_CODE.test(line2) && !blank2 && (prevBlank || code3)) {
-      quote3 = false;
-      code3 = true;
-      out.push(true);
-    } else {
-      if (!blank2) code3 = false;
-      quote3 = false;
-      out.push(false);
-    }
-  }
-  return out;
-}
-function markerCore(line2) {
-  return line2.trim().replace(/^(?:[-+*]|\d+[.)])\s+/, "").replace(/^[*_~]+/, "").replace(/[*_~]+$/, "").trim();
-}
-function markerLineKind(line2) {
-  const core2 = markerCore(line2);
-  if (STANDALONE_MARKER.test(core2)) return "own";
-  return /^〔圖位[^〔〕]*〕$/.test(core2) ? "bad" : void 0;
-}
-function isShell(rest) {
-  return /^(?:[-+]|\d+[.)])?$/.test(rest.replace(/[\s*_~]+/g, ""));
-}
-function scanSlotMarkers(content, slots) {
-  const lines = content.split(/\r?\n/);
-  const guarded = protectedLines(lines);
-  const planned = new Set(slots.map((slot) => slot.index));
-  const scan3 = { found: /* @__PURE__ */ new Map(), duplicateLines: [], badLines: [], inlineLines: [], omitted: [] };
-  lines.forEach((line2, at) => {
-    var _a2;
-    if (guarded[at] || !line2.includes(MARKER_OPEN)) return;
-    const kind = markerLineKind(line2);
-    if (kind === "own") {
-      const index = Number((_a2 = STANDALONE_MARKER.exec(markerCore(line2))) == null ? void 0 : _a2[1]);
-      if (!planned.has(index)) scan3.badLines.push(at);
-      else if (scan3.found.has(index)) scan3.duplicateLines.push(at);
-      else scan3.found.set(index, at);
-      return;
-    }
-    if (kind === "bad") {
-      scan3.badLines.push(at);
-      return;
-    }
-    scan3.inlineLines.push(at);
-  });
-  scan3.omitted = slots.map((slot) => slot.index).filter((index) => !scan3.found.has(index));
-  return scan3;
-}
-var INLINE_MARKER = /〔圖位[^〔〕\n]*〕|〔圖位\s*\d+\s*[：:]|〔圖位/g;
-function residualMarkerLines(content) {
-  const lines = content.split(/\r?\n/);
-  const guarded = protectedLines(lines);
-  const out = [];
-  lines.forEach((line2, at) => {
-    if (!guarded[at] && line2.includes(MARKER_OPEN)) out.push(at);
-  });
-  return out;
-}
-var isHttps = (url) => {
-  try {
-    return new URL(url).protocol === "https:";
-  } catch (e) {
-    return false;
-  }
-};
-function pickForSlot(ctx, candidates) {
-  const secure = candidates.filter((item) => isHttps(item.imageUrl));
-  const picked = new Set([...ctx.alreadyPicked].map(imageKey));
-  const hit = secure.find((item) => {
-    const work = workKey(item.imageUrl, item.author);
-    return !picked.has(imageKey(item.imageUrl)) && !(work && picked.has(work));
-  });
-  if (hit) return { candidate: hit };
-  if (candidates.length && !secure.length) return { none: true, reasonCode: "unsafe_url" };
-  return { none: true, reasonCode: "not_found" };
-}
-function plainLine2(text10) {
-  return text10 && /^[\s\p{P}\p{S}]+$/u.test(text10) && /^[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]/.test(text10) && !text10.startsWith("\\") ? `\\${text10}` : text10;
-}
-var SOURCE_URL_MAX = 1e3;
-var CREDIT_TEXT_MAX = 80;
-function sourceOf(candidate, alt, language2) {
-  let page;
-  try {
-    page = new URL(candidate.sourceUrl.trim());
-  } catch (e) {
-    return void 0;
-  }
-  if (page.protocol !== "https:" || page.username || page.password || page.href.length > SOURCE_URL_MAX)
-    return void 0;
-  const href = page.href.replace(/\(/g, "%28").replace(/\)/g, "%29");
-  const lang = language2;
-  const credit = (value, max) => plainLine2(escapeMarkdownText((value != null ? value : "").replace(/[〔〕]/g, " "), max));
-  const author = credit(candidate.author, CREDIT_TEXT_MAX);
-  const license = credit(candidate.license, CREDIT_TEXT_MAX);
-  const site = escapeMarkdownText(page.hostname.replace(/^www\./i, ""), 100);
-  const parts = [
-    site,
-    ...author ? [translateNote(lang, "note.image_author_0", author)] : [],
-    ...license ? [license] : []
-  ];
-  const detail = translateNote(
-    lang,
-    "note.image_source_0_1",
-    parts.join(" \xB7 "),
-    `[${translateNote(lang, "note.image_link")}](${href})`
-  );
-  return {
-    href: page.href,
-    line: translateNote(lang, "note.image_source_label_0", detail),
-    entry: translateNote(lang, "note.image_source_entry_0_1", alt, detail)
-  };
-}
-function figureOf(candidate, href, language2) {
-  const plain = (value) => value.replace(/[〔〕]/g, " ");
-  const alt = escapeMarkdownText(plain(candidate.title), 80) || (/^zh/i.test(language2) ? "\u5716" : "image");
-  const source = sourceOf(candidate, alt, language2);
-  return {
-    href,
-    alt,
-    caption: plainLine2(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
-    ...source ? { source } : {}
-  };
-}
-function choosePictures(chapter, slots, perSlot, taken, language2) {
-  var _a2;
-  const outcomes = /* @__PURE__ */ new Map();
-  const alreadyPicked = /* @__PURE__ */ new Set();
-  for (const slot of slots) {
-    const all = (_a2 = perSlot.get(slot.index)) != null ? _a2 : [];
-    const usable = all.filter((item) => {
-      if (!item.href || !item.loaded || taken(imageKey(item.href))) return false;
-      const work = workKey(item.href, item.candidate.author);
-      return !(work && taken(work));
-    });
-    const pick8 = pickForSlot(
-      { chapter, slot, allSlots: slots, alreadyPicked },
-      usable.map((item) => ({ ...item.candidate, imageUrl: item.href }))
-    );
-    if ("candidate" in pick8) {
-      alreadyPicked.add(pick8.candidate.imageUrl);
-      const work = workKey(pick8.candidate.imageUrl, pick8.candidate.author);
-      if (work) alreadyPicked.add(work);
-      const figure = figureOf(pick8.candidate, pick8.candidate.imageUrl, language2);
-      outcomes.set(slot.index, { figure: work ? { ...figure, work } : figure });
-      continue;
-    }
-    let reasonCode = pick8.reasonCode;
-    if (!usable.length) {
-      if (!all.length) reasonCode = "not_found";
-      else if (all.every((item) => !item.href)) reasonCode = "unsafe_url";
-      else if (all.some((item) => item.href && !item.loaded && !item.skipped)) reasonCode = "load_failed";
-      else if (all.some((item) => item.skipped)) reasonCode = "probe_capped";
-      else reasonCode = "not_found";
-    }
-    outcomes.set(slot.index, { reasonCode, ...pick8.reasonText ? { reasonText: pick8.reasonText } : {} });
-  }
-  return outcomes;
-}
-var BAD_INDEX = /〔圖位\s*(\d+)/;
-var isBlank = (line2) => line2 === void 0 || !line2.trim();
-function fillSlotMarkers(content, slots, outcomes) {
-  var _a2;
-  const lines = content.split("\n");
-  const scan3 = scanSlotMarkers(content, slots);
-  const cr = content.includes("\r\n") ? "\r" : "";
-  const figureAt = /* @__PURE__ */ new Map();
-  const missing = [];
-  const placed = [];
-  const sources = [];
-  const planned = new Set(slots.map((slot) => slot.index));
-  const badIndexes = /* @__PURE__ */ new Set();
-  for (const at of scan3.badLines) {
-    const m = BAD_INDEX.exec(lines[at]);
-    if (m && planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
-  }
-  for (const at of scan3.inlineLines)
-    for (const m of lines[at].matchAll(/〔圖位\s*(\d+)/g)) if (planned.has(Number(m[1]))) badIndexes.add(Number(m[1]));
-  for (const slot of slots) {
-    const at = scan3.found.get(slot.index);
-    const outcome = outcomes.get(slot.index);
-    if (at === void 0) {
-      missing.push({ index: slot.index, reasonCode: badIndexes.has(slot.index) ? "bad_marker" : "author_omitted" });
-    } else if (outcome && "figure" in outcome) {
-      figureAt.set(at, outcome.figure);
-      placed.push({ index: slot.index, href: outcome.figure.href });
-      if (outcome.figure.source) sources.push({ href: outcome.figure.source.href, entry: outcome.figure.source.entry });
-    } else {
-      missing.push({ index: slot.index, reasonCode: (_a2 = outcome == null ? void 0 : outcome.reasonCode) != null ? _a2 : "not_found" });
-    }
-  }
-  const dropped = new Set(
-    [...scan3.badLines, ...scan3.duplicateLines, ...scan3.found.values()].filter((at) => !figureAt.has(at))
-  );
-  const inline = new Set(scan3.inlineLines);
-  const added = [];
-  const out = [];
-  let removed = false;
-  const push = (line2) => {
-    if (removed && isBlank(line2) && (!out.length || isBlank(out[out.length - 1]))) {
-      removed = false;
-      return;
-    }
-    removed = false;
-    out.push(line2);
-  };
-  lines.forEach((line2, at) => {
-    const figure = figureAt.get(at);
-    if (figure) {
-      if (out.length && !isBlank(out[out.length - 1])) out.push("");
-      const image = `![${figure.alt}](${figure.href})${cr}`;
-      const caption = `${figure.caption}${cr}`;
-      added.push(image, caption);
-      out.push(image, caption);
-      if (figure.source) {
-        const source = `${figure.source.line}${cr}`;
-        added.push(source);
-        out.push(source);
-      }
-      if (!isBlank(lines[at + 1])) out.push(cr ? "\r" : "");
-      return;
-    }
-    if (dropped.has(at)) {
-      removed = true;
-      return;
-    }
-    if (inline.has(at)) {
-      const rest = line2.replace(INLINE_MARKER, "");
-      if (isShell(rest)) {
-        removed = true;
-        return;
-      }
-      push(rest);
-      return;
-    }
-    push(line2);
-  });
-  return { text: out.join("\n"), placed, missing, bad: scan3.badLines.length, sources, added };
-}
-function withoutMarkers(text10) {
-  const lines = text10.split("\n");
-  const guarded = protectedLines(lines);
-  const out = [];
-  lines.forEach((line2, at) => {
-    if (guarded[at] || !line2.includes(MARKER_OPEN)) {
-      out.push(line2);
-      return;
-    }
-    if (markerLineKind(line2)) return;
-    const rest = line2.replace(INLINE_MARKER, "");
-    if (!isShell(rest)) out.push(rest);
-  });
-  return out.map((line2) => line2.replace(/\s+$/, "")).filter((line2) => line2.trim());
-}
-function verifyFill(original, result, slots) {
-  const seen = [...result.placed, ...result.missing].map((item) => item.index).sort((a, b) => a - b);
-  const want = slots.map((slot) => slot.index).sort((a, b) => a - b);
-  if (seen.length !== want.length || seen.some((index, i) => index !== want[i])) return "count";
-  if (residualMarkerLines(result.text).length) return "residual";
-  const rest = withoutMarkers(result.text);
-  for (const line2 of result.added) {
-    const at = rest.indexOf(line2.replace(/\s+$/, ""));
-    if (at < 0) return "deleted_text";
-    rest.splice(at, 1);
-  }
-  const before = withoutMarkers(original);
-  return before.length === rest.length && before.every((line2, i) => line2 === rest[i]) ? void 0 : "deleted_text";
-}
-var REASONS = [
-  "author_omitted",
-  "bad_marker",
-  "not_found",
-  "load_failed",
-  "unsafe_url",
-  "probe_capped"
-];
-function shortHash2(url) {
-  let hash = 2166136261;
-  for (const char of imageKey(url)) {
-    hash ^= char.codePointAt(0);
-    hash = Math.imul(hash, 16777619) >>> 0;
-  }
-  return hash.toString(16).padStart(8, "0");
-}
-function composeSlotsRecord(result) {
-  const slots = [
-    ...result.placed.map((item) => ({ index: item.index, state: "placed", hash: shortHash2(item.href) })),
-    ...result.missing.map((item) => ({ index: item.index, state: "missing", reasonCode: item.reasonCode }))
-  ].sort((a, b) => a.index - b.index);
-  return `<!-- book-slots:v1 ${JSON.stringify({ slots, bad: result.bad })} -->`;
-}
-var RECORD_LINE = /^(?:[ \t]{0,3}>[ \t]?)*<!-- book-slots:v1 (\{.*\}) -->$/;
-function latestSlotsRecord(detail) {
-  const lines = detail.split("\n");
-  const fenced = fencedLines2(lines);
-  let found;
-  lines.forEach((line2, at) => {
-    const m = fenced[at] ? null : RECORD_LINE.exec(line2.replace(/\r$/, "").trim());
-    if (!m) return;
-    try {
-      const data = JSON.parse(m[1]);
-      if (!Array.isArray(data.slots)) return;
-      const items = [];
-      for (const raw of data.slots.slice(0, MAX_IMAGE_SLOTS)) {
-        if (!raw || !Number.isInteger(raw.index) || raw.index < 1) continue;
-        const state = raw.state === "placed" ? "placed" : raw.state === "missing" ? "missing" : void 0;
-        if (!state) continue;
-        const reasonCode = REASONS.find((code3) => code3 === raw.reasonCode);
-        items.push({
-          index: raw.index,
-          state,
-          ...reasonCode ? { reasonCode } : {},
-          ...typeof raw.hash === "string" && /^[0-9a-f]{8}$/.test(raw.hash) ? { hash: raw.hash } : {}
-        });
-      }
-      found = { slots: items, bad: Number.isInteger(data.bad) && data.bad > 0 ? data.bad : 0 };
-    } catch (e) {
-    }
-  });
-  return found;
-}
-var IMAGE_IN_LINE = /!\[[^\]\n]*\]\((https:\/\/[^)\s]+)\)/g;
-var SOURCE_LINE = /^(?:來源|来源|Source)[:：][ \t]*\S/;
-var IMAGE_ONLY_LINE = /^[ \t]*!\[[^\]\n]*\]\(https:\/\/[^)\s]+\)[ \t]*\r?$/;
-function stripImageLines(text10) {
-  const lines = text10.split("\n");
-  const guarded = protectedLines(lines);
-  const out = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (!guarded[i] && IMAGE_ONLY_LINE.test(lines[i])) {
-      const plainAt = (at) => at < lines.length && !isBlank(lines[at]) && !guarded[at] && !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[at]);
-      const endsAt = (at) => isBlank(lines[at]) || /^\s*#/.test(lines[at]);
-      if (plainAt(i + 1) && plainAt(i + 2) && SOURCE_LINE.test(lines[i + 2]) && endsAt(i + 3)) i += 2;
-      else if (plainAt(i + 1) && endsAt(i + 2)) i++;
-      continue;
-    }
-    out.push(lines[i]);
-  }
-  return out.join("\n").replace(/\n{3,}/g, "\n\n");
-}
-function describeSlots(slots, record, imageUrls) {
-  const now = new Set(imageUrls.map(shortHash2));
-  return slots.map((slot) => {
-    const item = record == null ? void 0 : record.slots.find((entry) => entry.index === slot.index);
-    if (!item) return { index: slot.index, state: "unrecorded" };
-    if (item.state === "missing")
-      return {
-        index: slot.index,
-        state: "missing",
-        ...item.reasonCode ? { reasonCode: item.reasonCode } : {}
-      };
-    return { index: slot.index, state: item.hash && now.has(item.hash) ? "placed" : "edited" };
-  });
-}
-var STOP_CJK = /* @__PURE__ */ new Set([..."\u7684\u4E86\u662F\u5728\u548C\u8207\u4E0E\u53CA\u6216\u5C0D\u5BF9\u628A\u88AB\u70BA\u4E3A\u4EE5\u4E4B\u65BC\u4E8E\u4E26\u5E76\u4E2D\u4E0A\u4E0B\u9019\u8FD9\u90A3\u4E00\u500B\u4E2A\u4E5F\u90FD\u5C31\u800C\u4F46"]);
-var STOP_WORDS = /* @__PURE__ */ new Set([
-  "the",
-  "and",
-  "for",
-  "with",
-  "that",
-  "this",
-  "from",
-  "into",
-  "over",
-  "about",
-  "how",
-  "what"
-]);
-function slotKeywords(explains) {
-  var _a2, _b2;
-  const out = /* @__PURE__ */ new Set();
-  for (const word of (_a2 = explains.toLowerCase().match(/[a-z0-9][a-z0-9'-]{2,}/g)) != null ? _a2 : [])
-    if (!STOP_WORDS.has(word)) out.add(word);
-  for (const run of (_b2 = explains.match(/\p{Script=Han}+/gu)) != null ? _b2 : []) {
-    let part = "";
-    const flush = () => {
-      const chars = Array.from(part);
-      for (let i = 0; i + 1 < chars.length; i++) out.add(chars[i] + chars[i + 1]);
-      part = "";
-    };
-    for (const char of run) {
-      if (STOP_CJK.has(char)) flush();
-      else part += char;
-    }
-    flush();
-  }
-  return [...out];
-}
-var KEYWORD_HITS = 2;
-function checkImageText(body, slots, record) {
-  var _a2;
-  const empty = { planned: 0, placed: 0, imageCount: 0, bad: 0, issues: [] };
-  if (!(slots == null ? void 0 : slots.length)) return { kind: "none", ...empty };
-  if (!record) return { kind: "unrecorded", ...empty, planned: slots.length };
-  const lines = body.split("\n");
-  const guarded = protectedLines(lines);
-  const blocks = [];
-  let current = [];
-  let hashes = [];
-  const close = () => {
-    if (current.length) blocks.push({ text: current.join("\n"), hashes });
-    current = [];
-    hashes = [];
-  };
-  lines.forEach((line2, at) => {
-    if (guarded[at] || isBlank(line2)) {
-      close();
-      return;
-    }
-    current.push(line2);
-    for (const m of line2.matchAll(IMAGE_IN_LINE)) hashes.push(shortHash2(m[1]));
-  });
-  close();
-  const imageCount = blocks.reduce((sum2, block) => sum2 + block.hashes.length, 0);
-  const placedItems = record.slots.filter((item) => item.state === "placed");
-  const issues = [];
-  for (const item of record.slots)
-    if (item.state === "missing") issues.push({ index: item.index, code: (_a2 = item.reasonCode) != null ? _a2 : "not_found" });
-  if (imageCount !== placedItems.length) issues.push({ code: "count" });
-  for (const item of placedItems) {
-    const at = blocks.findIndex((block) => item.hash !== void 0 && block.hashes.includes(item.hash));
-    const slot = slots.find((entry) => entry.index === item.index);
-    if (at < 0 || !slot) continue;
-    const around = [at - 1, at + 1].map((i) => blocks[i]).filter((block) => block && !block.hashes.length).map((block) => block.text.toLowerCase()).join("\n");
-    const words2 = slotKeywords(slot.explains);
-    const hits = words2.filter((word) => around.includes(word)).length;
-    if (words2.length && hits < Math.min(KEYWORD_HITS, words2.length))
-      issues.push({ index: item.index, code: "mismatch" });
-  }
-  return { kind: "checked", planned: slots.length, placed: placedItems.length, imageCount, bad: record.bad, issues };
-}
-function composeImageTextLine(language2, check) {
-  const note = noteLanguageOf(language2);
-  if (check.kind === "none") return translate(note, "detail.book_slots_none");
-  if (check.kind === "unrecorded") return translate(note, "detail.book_slots_unrecorded");
-  const joiner = /^zh/i.test(language2) ? "\uFF1B" : "; ";
-  const parts = check.issues.map(
-    (issue2) => issue2.code === "count" ? translate(note, "detail.book_slots_count_0_1", String(check.imageCount), String(check.placed)) : translate(
-      note,
-      "detail.book_slots_slot_0_1",
-      String(issue2.index),
-      translate(note, `detail.book_slots_reason_${issue2.code}`)
-    )
-  );
-  if (check.bad) parts.push(translate(note, "detail.book_slots_bad_0", String(check.bad)));
-  return parts.length ? translate(note, "detail.book_slots_issues_0", parts.join(joiner)) : translate(note, "detail.book_slots_ok_0", String(check.placed));
-}
-function imageIssueTokens(check) {
-  const tokens2 = check.issues.map((issue2) => issue2.code === "count" ? "image_count" : `image_${issue2.index}`);
-  return check.bad ? [...tokens2, "image_marker"] : tokens2;
-}
-
-// core/note-placeholder.ts
-var isPlaceholder = (value) => value === translate("zh-TW", "detail.no_conclusion_yet") || value === translate("en", "detail.no_conclusion_yet");
-
-// core/book-pipeline/plan-text.ts
-var pick = (words2, language2) => instructionLanguageOf(language2) === "zh" ? words2.zh : words2.en;
-var matches = (words2, value) => value === words2.zh || value === words2.en;
-var ROLE_WORDS = {
-  intro: { zh: "\u5C0E\u8B80", en: "Intro" },
-  body: { zh: "\u672C\u6587", en: "Body" },
-  gallery: { zh: "\u7D20\u6750\u5C0E\u89BD", en: "Gallery" },
-  closing: { zh: "\u6536\u5C3E", en: "Closing" }
-};
-var TYPE_WORDS = {
-  structure: { zh: "\u7D50\u69CB\u578B", en: "structure" },
-  fact: { zh: "\u4E8B\u5BE6\u578B", en: "fact" }
-};
-var SETTING_WORDS = {
-  reader: { zh: "\u8B80\u8005", en: "Reader" },
-  goal: { zh: "\u76EE\u6A19", en: "Goal" },
-  angle: { zh: "\u5207\u5165\u89D2\u5EA6", en: "Angle" },
-  tone: { zh: "\u8A9E\u6C23", en: "Tone" },
-  length: { zh: "\u7BC7\u5E45", en: "Length" },
-  style: { zh: "\u98A8\u683C", en: "Style" }
-};
-var L = {
-  role: { zh: "\u89D2\u8272", en: "Role" },
-  covers: { zh: "\u672C\u7AE0\u6703\u8B1B", en: "This chapter covers" },
-  entry: { zh: "\u63A5\u5165\u9EDE", en: "Entry point" },
-  handoff: { zh: "\u7559\u7D66\u4E0B\u4E00\u5F35\u7684\u554F\u984C", en: "Question left for the next card" },
-  previous: { zh: "\u524D\u4E00\u5F35", en: "Previous card" },
-  next: { zh: "\u5F8C\u4E00\u5F35", en: "Next card" },
-  checklist: { zh: "\u9A57\u6536\u6E05\u55AE", en: "Acceptance checklist" },
-  images: { zh: "\u5716\u5B89\u6392", en: "Image plan" },
-  imageSlot: { zh: "\u5716\u4F4D", en: "Image slot" },
-  position: { zh: "\u4F4D\u7F6E", en: "Position" },
-  none: { zh: "\u7121", en: "none" },
-  plan: { zh: "\u5168\u66F8\u4F01\u5283", en: "Book plan" },
-  thread: { zh: "\u5168\u66F8\u4E3B\u7DDA", en: "Book thread" },
-  decisions: { zh: "\u7DE8\u8F2F\u6C7A\u5B9A", en: "Editorial decisions" },
-  materials: { zh: "\u7D20\u6750\u767B\u8A18\u8868", en: "Material register" }
-};
-var safe = (value, max = 400) => escapeMarkdownText(singleLine(value, max), max);
-var neighbourSentence = (value) => {
-  const text10 = safe(value, 240);
-  return /^(?:null|undefined)$/i.test(text10.trim()) || isPlaceholder(text10.trim()) ? "" : text10;
-};
-var colon = (language2) => instructionLanguageOf(language2) === "zh" ? "\uFF1A" : ": ";
-var SLOT_SEPARATOR = "\uFF5C";
-function composeImageSlots(images, language2) {
-  const c = colon(language2);
-  const head2 = pick(L.images, language2);
-  if (!images.length) return [`${head2}${c}${pick(L.none, language2)}`];
-  return [
-    `${head2}${c.trim()}`,
-    ...images.slice(0, MAX_IMAGE_SLOTS).map(
-      (slot, at) => `- ${pick(L.imageSlot, language2)} ${at + 1}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.kind, 40), 40)}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.explains, 200), 200)}${SLOT_SEPARATOR}${pick(L.position, language2)}${c}${safe(cleanSlotText(slot.anchor, 120), 120)}`
-    )
-  ];
-}
-function composeCardPrompt(plan, language2) {
-  const c = colon(language2);
-  const neighbour2 = (label, n) => n ? `${pick(label, language2)}${c}(${n.position}) ${safe(n.title, 120)}${neighbourSentence(n.summary) ? ` \u2014 ${neighbourSentence(n.summary)}` : ""}` : `${pick(label, language2)}${c}${pick(L.none, language2)}`;
-  const lines = [
-    `${pick(L.role, language2)}${c}${pick(ROLE_WORDS[plan.role], language2)}`,
-    `${pick(L.covers, language2)}${c}${safe(plan.covers)}`,
-    `${pick(L.entry, language2)}${c}${safe(plan.entry)}`,
-    `${pick(L.handoff, language2)}${c}${safe(plan.handoff)}`,
-    neighbour2(L.previous, plan.previous),
-    neighbour2(L.next, plan.next),
-    ...plan.images ? composeImageSlots(plan.images, language2) : [],
-    `${pick(L.checklist, language2)}${c.trim()}`,
-    ...plan.checklist.map((item) => `- ${item.id} [${pick(TYPE_WORDS[item.type], language2)}] ${safe(item.text)}`)
-  ];
-  return demoteHeadings(lines.join("\n"));
-}
-var CHECK_LINE = /^[-*]\s+(C\d+)\s+\[([^\]]+)\]\s+(.+?)\s*$/;
-function parseChecklist(prompt) {
-  const items = [];
-  for (const line2 of prompt.split(/\r?\n/)) {
-    const m = CHECK_LINE.exec(line2);
-    if (!m) continue;
-    const type = Object.keys(TYPE_WORDS).find((key4) => matches(TYPE_WORDS[key4], m[2].trim()));
-    if (type) items.push({ id: m[1], type, text: unescapeMarkdownText(m[3]) });
-  }
-  return items;
-}
-var IMAGES_HEAD = /^(\S[^:：]*)[:：]\s*(.*)$/;
-var SLOT_LINE = /^[-*]\s+(?:圖位|Image slot)\s+(\d+)\s*｜(.*)$/;
-function parseImageSlots(prompt) {
-  const lines = prompt.split(/\r?\n/);
-  const at = lines.findIndex((line2) => {
-    const m = IMAGES_HEAD.exec(line2);
-    return !!m && matches(L.images, m[1].trim());
-  });
-  if (at < 0) return void 0;
-  const slots = [];
-  for (const line2 of lines.slice(at + 1)) {
-    const m = SLOT_LINE.exec(line2);
-    if (!m) break;
-    const index = Number(m[1]);
-    const parts = m[2].split(SLOT_SEPARATOR);
-    if (parts.length < 3 || index < 1 || slots.some((slot) => slot.index === index) || slots.length >= MAX_IMAGE_SLOTS)
-      continue;
-    const place = /^[^:：]*[:：]\s*(.*)$/.exec(parts[parts.length - 1]);
-    if (!place) continue;
-    slots.push({
-      index,
-      kind: unescapeMarkdownText(parts[0].trim()),
-      explains: unescapeMarkdownText(parts.slice(1, -1).join(SLOT_SEPARATOR).trim()),
-      anchor: unescapeMarkdownText(place[1].trim())
-    });
-  }
-  return slots;
-}
-function parseCardPrompt(prompt) {
-  const out = {};
-  for (const line2 of prompt.split(/\r?\n/)) {
-    const m = /^([^:：]+)[:：]\s*(.*)$/.exec(line2);
-    if (!m) continue;
-    const label = m[1].trim();
-    for (const key4 of ["role", "covers", "entry", "handoff", "previous", "next"])
-      if (matches(L[key4], label) && out[key4] === void 0) out[key4] = unescapeMarkdownText(m[2].trim());
-  }
-  return out;
-}
-function rewriteNeighbourLine(prompt, key4, neighbour2) {
-  var _a2, _b2;
-  const lines = prompt.split("\n");
-  const at = lines.findIndex((line3) => {
-    const m = /^([^:：]+)[:：]/.exec(line3);
-    return !!m && matches(L[key4], m[1].trim());
-  });
-  if (at < 0) return void 0;
-  const head2 = (_b2 = (_a2 = /^([^:：]+[:：]\s*)/.exec(lines[at].replace(/\r$/, ""))) == null ? void 0 : _a2[1]) != null ? _b2 : "";
-  const english = !lines[at].startsWith(L[key4].zh);
-  const summary = neighbour2 ? neighbourSentence(neighbour2.summary) : "";
-  const line2 = neighbour2 ? `${head2}(${neighbour2.position}) ${safe(neighbour2.title, 120)}${summary ? ` \u2014 ${summary}` : ""}` : `${head2}${english ? L.none.en : L.none.zh}`;
-  if (lines[at].replace(/\r$/, "") === line2) return void 0;
-  lines[at] = lines[at].endsWith("\r") ? `${line2}\r` : line2;
-  return lines.join("\n");
-}
-function retargetNeighbourLine(prompt, key4, neighbour2) {
-  if (!neighbour2) return rewriteNeighbourLine(prompt, key4, null);
-  const value = parseCardPrompt(prompt)[key4];
-  if (value === void 0) return void 0;
-  const title = unescapeMarkdownText(safe(neighbour2.title, 120));
-  const m = /^\((\d+)\) ([\s\S]*)$/.exec(value);
-  const rest = m && (m[2] === title || m[2].startsWith(`${title} \u2014 `)) ? m[2].slice(title.length + 3) : void 0;
-  if (m && rest !== void 0 && Number(m[1]) === neighbour2.position) return void 0;
-  return rewriteNeighbourLine(prompt, key4, rest === void 0 ? neighbour2 : { ...neighbour2, summary: rest });
-}
-function composeBookPlan(plan, language2) {
-  const c = colon(language2);
-  const decisions = BOOK_SETTING_FIELDS.filter((field) => {
-    var _a2;
-    return (_a2 = plan.decisions[field]) == null ? void 0 : _a2.trim();
-  }).map(
-    (field) => `- ${pick(SETTING_WORDS[field], language2)}${c}${safe(plan.decisions[field])}`
-  );
-  const materials = plan.materials.map((m) => `- ${safe(m.name, 120)}${c}${safe(m.use, 240)}`);
-  return [
-    `## ${pick(L.plan, language2)}`,
-    "",
-    `### ${pick(L.thread, language2)}`,
-    safe(plan.thread, 1200),
-    "",
-    `### ${pick(L.decisions, language2)}`,
-    ...decisions,
-    "",
-    `### ${pick(L.materials, language2)}`,
-    ...materials,
-    ""
-  ].join("\n");
-}
-var isBookPlanTitle = (title) => matches(L.plan, title.trim());
-var PLAN_CALLOUT = /^[ \t]{0,3}>[ \t]?\[!vam-book\][+-]?[ \t]+(.+?)[ \t]*$/i;
-var QUOTE_PREFIX = /^[ \t]{0,3}>[ \t]?/;
-function planLines(markdown) {
-  const lines = markdown.split(/\r?\n/);
-  const callout2 = lines.findIndex((line2) => {
-    const m = PLAN_CALLOUT.exec(line2);
-    return !!m && isBookPlanTitle(m[1]);
-  });
-  if (callout2 >= 0) {
-    const body = [];
-    for (const line2 of lines.slice(callout2 + 1)) {
-      if (!QUOTE_PREFIX.test(line2)) break;
-      body.push(line2.replace(QUOTE_PREFIX, ""));
-    }
-    return body;
-  }
-  const start = lines.findIndex((line2) => {
-    const m = /^##[ \t]+(.+?)\s*$/.exec(line2);
-    return !!m && matches(L.plan, m[1]);
-  });
-  return start < 0 ? void 0 : lines.slice(start + 1);
-}
-function parseBookPlanDecisions(markdown) {
-  const plan = planLines(markdown);
-  if (!plan) return {};
-  const out = {};
-  let inDecisions = false;
-  for (const line2 of plan) {
-    if (/^##(?!#)/.test(line2)) break;
-    const sub = /^###[ \t]+(.+?)\s*$/.exec(line2);
-    if (sub) {
-      inDecisions = matches(L.decisions, sub[1]);
-      continue;
-    }
-    if (!inDecisions) continue;
-    const m = /^[-*]\s+([^:：]+)[:：]\s*(.+?)\s*$/.exec(line2);
-    if (!m) continue;
-    const field = BOOK_SETTING_FIELDS.find((key4) => matches(SETTING_WORDS[key4], m[1].trim()));
-    if (field && out[field] === void 0) out[field] = unescapeMarkdownText(m[2]);
-  }
-  return out;
-}
-function parseBookPlanBody(markdown) {
-  const plan = planLines(markdown);
-  const thread = [];
-  const materials = [];
-  if (!plan) return { thread: "", materials };
-  let part;
-  for (const line2 of plan) {
-    if (/^##(?!#)/.test(line2)) break;
-    const sub = /^###[ \t]+(.+?)\s*$/.exec(line2);
-    if (sub) {
-      part = matches(L.thread, sub[1]) ? "thread" : matches(L.materials, sub[1]) ? "materials" : void 0;
-      continue;
-    }
-    if (part === "thread" && line2.trim()) thread.push(line2.trim());
-    if (part === "materials") {
-      const m = /^[-*]\s+(.+?)[:：]\s*(.+?)\s*$/.exec(line2);
-      if (m) materials.push({ name: unescapeMarkdownText(m[1]), use: unescapeMarkdownText(m[2]) });
-    }
-  }
-  return { thread: unescapeMarkdownText(thread.join(" ")), materials };
-}
-
-// core/book-pipeline/proof.ts
-var PROOF_STATUSES = ["met", "unmet", "unverified"];
-var ProofFailure = class extends Error {
-  /**
-   * The judgments already made when the failure is "no page opened" or "all facts unverified": the structure items are real
-   * results, so the caller keeps them in the research notes (the card still needs a human).
-   */
-  constructor(code3, partial, counts) {
-    super(code3);
-    this.code = code3;
-    this.partial = partial;
-    this.counts = counts;
-    this.name = "ProofFailure";
-  }
-};
-var isProofFailure = (error) => !!error && typeof error === "object" && error.name === "ProofFailure";
-var TRACKING = /^(?:utm_[a-z0-9_]*|fbclid|gclid)$/i;
-var normalizeUrl = (value) => {
-  if (typeof value !== "string") return void 0;
-  const text10 = value.trim();
-  if (!text10 || /[\s\p{Cc}]/u.test(text10)) return void 0;
-  let url;
-  try {
-    url = new URL(text10);
-  } catch (e) {
-    return void 0;
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:" || url.username || url.password || !url.hostname)
-    return void 0;
-  const kept = url.search.slice(1).split("&").filter((pair5) => pair5 && !TRACKING.test(pair5.split("=")[0])).map(samePercent);
-  const query = kept.length ? `?${kept.join("&")}` : "";
-  return `${url.host.toLowerCase().replace(/^www\./, "")}${samePercent(url.pathname).replace(/\/+$/, "")}${query}`;
-};
-var samePercent = (text10) => text10.replace(/%([0-9a-fA-F]{2})/g, (_, hex) => {
-  const ch = String.fromCharCode(parseInt(hex, 16));
-  return "!$'()*,;:@".includes(ch) ? ch : `%${hex.toUpperCase()}`;
-});
-function sourceDiagnostics(raw, openedUrls) {
-  var _a2;
-  const opened = new Set(openedUrls.map(normalizeUrl).filter((key4) => !!key4));
-  const cited = /* @__PURE__ */ new Map();
-  for (const item of raw) for (const source of item.sources) cited.set((_a2 = normalizeUrl(source)) != null ? _a2 : source, source);
-  const hosts = /* @__PURE__ */ new Set();
-  let matched = 0;
-  for (const [key4, source] of cited) {
-    if (opened.has(key4)) matched++;
-    else
-      try {
-        hosts.add(new URL(source).hostname.toLowerCase().replace(/^www\./, ""));
-      } catch (e) {
-      }
-  }
-  return {
-    sourcesCited: cited.size,
-    sourcesMatched: matched,
-    eventUrls: opened.size,
-    unmatchedHosts: [...hosts].slice(0, 5)
-  };
-}
-function safeHref(value) {
-  if (typeof value !== "string") return void 0;
-  const text10 = value.trim();
-  if (!text10 || text10.length > 2e3 || /[\s\p{Cc}<>"`\\]/u.test(text10)) return void 0;
-  let url;
-  try {
-    url = new URL(text10);
-  } catch (e) {
-    return void 0;
-  }
-  if (url.protocol !== "https:" || url.username || url.password || !url.hostname) return void 0;
-  return url.href.replace(/%(?![0-9a-fA-F]{2})/g, "%25").replace(/[()[\]']/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
-}
-var squash = (text10) => text10.replace(/\s+/g, " ").trim();
-var LEAK_RUN = 40;
-function sharesLongRun(text10, body) {
-  const hay = squash(body);
-  const chars = Array.from(squash(text10));
-  if (chars.length < LEAK_RUN || hay.length < LEAK_RUN) return false;
-  for (let i = 0; i + LEAK_RUN <= chars.length; i++)
-    if (hay.includes(chars.slice(i, i + LEAK_RUN).join(""))) return true;
-  return false;
-}
-var withoutUrls = (text10) => text10.replace(/https?:\/\/[\x21-\x7e]+/gi, " ");
-var decoded2 = (text10) => {
-  const forms = [text10];
-  try {
-    const once = decodeURIComponent(text10);
-    forms.push(once, once.replace(/[+_-]+/g, " "));
-  } catch (e) {
-  }
-  return forms;
-};
-var LEAK_NOTE = "\u4F86\u6E90\u7591\u4F3C\u5916\u6D29\u6B63\u6587";
-function evaluateProof(raw, checklist, openedUrls, guard) {
-  if (!checklist.length) throw new ProofFailure("empty_list");
-  const known = new Map(checklist.map((item) => [item.id, item]));
-  const seen = /* @__PURE__ */ new Set();
-  for (const item of raw) {
-    if (!known.has(item.id)) throw new ProofFailure("unknown_item");
-    if (seen.has(item.id)) throw new ProofFailure("duplicate_item");
-    seen.add(item.id);
-  }
-  if (checklist.some((item) => !seen.has(item.id))) throw new ProofFailure("missing_item");
-  const guardBody = guard ? withoutUrls(guard.body) : "";
-  const leaks = (text10) => !!guard && decoded2(text10).some((form) => sharesLongRun(form, guardBody));
-  const opened = /* @__PURE__ */ new Map();
-  const leakedKeys = /* @__PURE__ */ new Set();
-  for (const url of openedUrls) {
-    const key4 = normalizeUrl(url);
-    const href = safeHref(url);
-    if (!key4 || !href) continue;
-    if (leaks(url)) leakedKeys.add(key4);
-    else if (!opened.has(key4)) opened.set(key4, href);
-  }
-  const noPage = !opened.size && !leakedKeys.size;
-  const items = checklist.map((entry) => {
-    const item = raw.find((candidate) => candidate.id === entry.id);
-    const sources = [];
-    let leaked = false;
-    for (const source of item.sources) {
-      const key4 = normalizeUrl(source);
-      if (key4 && leakedKeys.has(key4)) leaked = true;
-      const real = key4 ? opened.get(key4) : void 0;
-      if (real && !sources.includes(real)) sources.push(real);
-    }
-    const note = singleLine(item.note, 300);
-    if (leaked) return { id: entry.id, type: entry.type, status: "unverified", note: LEAK_NOTE, sources: [] };
-    const status = item.status === "met" && entry.type === "fact" && !sources.length ? "unverified" : item.status;
-    return { id: entry.id, type: entry.type, status, note, sources };
-  });
-  const facts = items.filter((item) => item.type === "fact");
-  const result = {
-    items,
-    aggregate: proofVerdict({ items })
-  };
-  const partial = { items, aggregate: "needs-review" };
-  if (noPage) throw new ProofFailure("no_open_page", partial);
-  if (facts.length && facts.every((item) => item.status === "unverified"))
-    return { items, aggregate: "needs-review", factsUnverified: true };
-  return result;
-}
-var BOOK_CHECK_IDS = { names: "N1", voice: "V1", repeat: "R1" };
-var BOOK_IDS = new Set(Object.values(BOOK_CHECK_IDS));
-var isBookCheckId = (id) => BOOK_IDS.has(id);
-function proofVerdict(result, bodyEmpty = false) {
-  const facts = result.items.filter((item) => item.type === "fact");
-  if (bodyEmpty || result.aggregate === "needs-review" || result.factsUnverified) return "needs-review";
-  if (result.items.some((item) => item.status === "unmet")) return "needs-review";
-  if (facts.length && facts.every((item) => item.status === "unverified")) return "needs-review";
-  return "checked";
-}
-var failedProofKey = (key4) => `${key4}:failed`;
-function proofKey(parts) {
-  const list2 = hashText(JSON.stringify(parts.checklist.map((item) => [item.id, item.type, item.text])));
-  return `${parts.runId}:${parts.nodeId}:${parts.revision}:${hashText(parts.body)}:${list2}`;
-}
-var safeCount = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
-var RECORD = /^<!-- book-proof:v1 (\{.*\}) -->$/;
-var escapeJson = (text10) => text10.replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
-var STATUS_WORDS = { met: "\u9054\u6210", unmet: "\u672A\u9054\u6210", unverified: "\u5F85\u67E5" };
-var safeModelId = (value) => typeof value === "string" ? value.replace(/[^A-Za-z0-9_.:/-]/g, "").slice(0, 60) : "";
-function cleanResult(result) {
-  return {
-    aggregate: result.aggregate,
-    ...result.factsUnverified ? { factsUnverified: true } : {},
-    items: result.items.map((item) => ({
-      id: escapeMarkdownText(item.id, 20),
-      type: item.type,
-      status: item.status,
-      note: escapeMarkdownText(item.note, 300),
-      sources: item.sources.map(safeHref).filter((href) => !!href)
-    })),
-    ...result.counts ? { counts: { openedPages: safeCount(result.counts.openedPages), searches: safeCount(result.counts.searches) } } : {}
-  };
-}
-function composeProofRecord(key4, result, failure, models) {
-  const clean3 = cleanResult(result);
-  const model = safeModelId(models == null ? void 0 : models.model);
-  const authorModel = safeModelId(models == null ? void 0 : models.authorModel);
-  const lines = [
-    (failure ? `\u6821\u5C0D\u5931\u6557\uFF08\u539F\u56E0\uFF1A${failure}\uFF1B\u4EE5\u4E0B\u662F\u5DF2\u5224\u65B7\u7684\u7D50\u679C\uFF0C\u4ECD\u9700\u4EBA\u770B\uFF09` : `\u6821\u5C0D\uFF08${clean3.aggregate === "checked" ? "\u5DF2\u6821" : clean3.factsUnverified ? "\u9700\u4EBA\u770B\uFF1B\u4E8B\u5BE6\u9805\u76EE\u7686\u5F85\u67E5" : "\u9700\u4EBA\u770B"}\uFF09`) + (clean3.counts ? ` \u958B\u9801 ${clean3.counts.openedPages} \u6B21\u3001\u641C\u5C0B ${clean3.counts.searches} \u6B21` : "")
-  ];
-  for (const item of clean3.items)
-    lines.push(
-      `- ${item.id} ${STATUS_WORDS[item.status]}\uFF1A${item.note}${item.sources.length ? `\uFF08\u958B\u9801\uFF1A${item.sources.map((href) => `\`${href}\``).join(" ")}\uFF09` : ""}`
-    );
-  lines.push(
-    `<!-- book-proof:v1 ${escapeJson(
-      JSON.stringify({
-        key: key4,
-        result: clean3,
-        ...failure ? { failed: failure } : {},
-        ...model ? { model } : {},
-        ...authorModel ? { authorModel } : {}
-      })
-    )} -->`
-  );
-  return lines.join("\n");
-}
-function findProofModels(notes, key4) {
-  for (const line2 of notes.split(/\r?\n/)) {
-    const m = RECORD.exec(line2.trim());
-    if (!m) continue;
-    try {
-      const data = JSON.parse(m[1]);
-      if (data.key !== key4) continue;
-      const model = safeModelId(data.model);
-      const authorModel = safeModelId(data.authorModel);
-      return { ...model ? { model } : {}, ...authorModel ? { authorModel } : {} };
-    } catch (e) {
-    }
-  }
-  return void 0;
-}
-function findProofRecord(notes, key4) {
-  for (const line2 of notes.split(/\r?\n/)) {
-    const m = RECORD.exec(line2.trim());
-    if (!m) continue;
-    try {
-      const data = JSON.parse(m[1]);
-      if (data.key === key4 && data.result && Array.isArray(data.result.items)) return data.result;
-    } catch (e) {
-    }
-  }
-  return void 0;
-}
-var proofSectionHeading = (language2) => translate(noteLanguageOf(language2), "detail.book_proof_heading");
-function composeProofSection(language2, outcome, models, modelLabel = (id) => id, imageLine) {
-  const note = noteLanguageOf(language2);
-  if ("failure" in outcome)
-    return `- ${translate(note, "detail.book_proof_failed_0", escapeMarkdownText(outcome.failure, 60) || "failed")}`;
-  const colon2 = /^zh/i.test(language2) ? "\uFF1A" : ": ";
-  const words2 = {
-    met: translate(note, "detail.book_proof_met"),
-    unmet: translate(note, "detail.book_proof_unmet"),
-    unverified: translate(note, "detail.book_proof_unverified")
-  };
-  const lines = cleanResult(outcome.result).items.map(
-    (item) => `- ${item.id} ${words2[item.status]}${item.status !== "met" && item.note ? `${colon2}${item.note}` : ""}`
-  );
-  const shown = (id) => safeModelId(id) ? escapeMarkdownText(modelLabel(safeModelId(id)), 80) : translate(note, "detail.book_model_unrecorded");
-  if (imageLine) lines.push(`- ${imageLine}`);
-  lines.push(`- ${translate(note, "detail.book_proof_author_model_0", shown(models.authorModel))}`);
-  lines.push(`- ${translate(note, "detail.book_proof_proof_model_0", shown(models.model))}`);
-  return lines.join("\n");
-}
-
-// core/book-pipeline/note-sections.ts
-var BOOK_PLAN_HEADING = "\u5168\u66F8\u4F01\u5283";
-var DEFAULT_RESEARCH_HEADING = "\u7814\u7A76\u5099\u8A3B";
-var HEADING2 = /^[ \t]{0,3}(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/;
-var FENCE2 = /^[ \t]{0,3}(`{3,}|~{3,})/;
-var CALLOUT_HEAD = /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?(?:[ \t].*)?$/;
-var RECORD_KEY = /^<!-- book-proof:v1 (\{.*\}) -->$/;
-var HIDDEN_CALLOUT = "vam-book";
-var HIDDEN_HEAD = /^[ \t]{0,3}>[ \t]?\[!vam-book\][+-]?(?:[ \t].*)?$/i;
-var QUOTE_LINE2 = /^[ \t]{0,3}>/;
-var LOG_LINE = /^(?:[-*+][ \t]+)?\d{4}-\d{2}-\d{2}/;
-var ANY_RECORD = /<!-- book-(?:proof|slots|body):v1 \{.*\} -->/;
-var bare = (line2) => line2.replace(/\r$/, "");
-function fencedLines2(lines) {
-  const flags = [];
-  let open2;
-  for (const line2 of lines) {
-    const m = FENCE2.exec(line2);
-    if (open2) {
-      flags.push(true);
-      if (m && m[1][0] === open2[0] && m[1].length >= open2.length && !line2.replace(FENCE2, "").trim()) open2 = void 0;
-    } else if (m) {
-      open2 = m[1];
-      flags.push(true);
-    } else flags.push(false);
-  }
-  return flags;
-}
-function findSection(lines, fenced, matches2, from = 0) {
-  for (let i = from; i < lines.length; i++) {
-    const m = fenced[i] ? null : HEADING2.exec(lines[i].replace(/\r$/, ""));
-    if (!m || !matches2(m[2], m[1].length)) continue;
-    let end = lines.length;
-    for (let j = i + 1; j < lines.length; j++) {
-      const n = fenced[j] ? null : HEADING2.exec(lines[j].replace(/\r$/, ""));
-      if (n && n[1].length <= m[1].length) {
-        end = j;
-        break;
-      }
-    }
-    return { at: i, end, text: m[2] };
-  }
-  return void 0;
-}
-var unquoted = (text10) => text10.replace(/^[ \t]{0,3}>[ \t]?/gm, "");
-function recordKey(record) {
-  for (const line2 of record.split(/\r?\n/)) {
-    const m = RECORD_KEY.exec(line2.trim());
-    if (!m) continue;
-    try {
-      const key4 = JSON.parse(m[1]).key;
-      if (typeof key4 === "string") return key4;
-    } catch (e) {
-    }
-  }
-  return void 0;
-}
-function quoteRunEnd(lines, fenced, from) {
-  let end = from;
-  while (end < lines.length && !fenced[end] && QUOTE_LINE2.test(lines[end])) end++;
-  return end;
-}
-function hiddenRanges(lines, fenced) {
-  const found = [];
-  for (let i = 0; i < lines.length; ) {
-    if (!fenced[i] && HIDDEN_HEAD.test(bare(lines[i]))) {
-      const end = quoteRunEnd(lines, fenced, i + 1);
-      found.push({ start: i, end });
-      i = end;
-    } else i++;
-  }
-  return found;
-}
-var HIDDEN_TYPE = /\[!\s*vam-(?:book|trial|review)\s*(?:\|[^\]]*)?\]/gi;
-var OWNER_MARKER = /%%(?=[ \t]*vam-(?:trial|review|callout-version)\b)/gi;
-var neutralize = (text10) => text10.replace(HIDDEN_TYPE, "[!note]").replace(OWNER_MARKER, "\uFF05\uFF05");
-var neutralizeText = (text10) => neutralize(text10);
-function neutralizeDetail(content) {
-  const start = content.indexOf(DETAIL_START);
-  const end = content.lastIndexOf(DETAIL_END);
-  if (start < 0 || end < start + DETAIL_START.length) return null;
-  const from = start + DETAIL_START.length;
-  return `${content.slice(0, from)}${neutralize(content.slice(from, end))}${content.slice(end)}`;
-}
-var PROGRAM_HEAD = /^[ \t]{0,3}>[ \t]?\[!(vam-trial|vam-review)\]([+-])?(?:[ \t].*)?$/i;
-var OWNER_LINE = /^[ \t]{0,3}>[ \t]?%%vam-(trial|review):([\w.-]+):([\w.-]+)(?::([\w.-]+))?(?::([\w.-]+):([\w.-]+)(?::(q))?)?%%[ \t]*$/;
-function programCalloutRanges(lines, fenced = fencedLines2(lines)) {
-  var _a2;
-  const found = [];
-  for (let i = 0; i < lines.length; ) {
-    const head2 = fenced[i] ? null : PROGRAM_HEAD.exec(bare(lines[i]));
-    if (!head2) {
-      i++;
-      continue;
-    }
-    const end = quoteRunEnd(lines, fenced, i + 1);
-    const kind = head2[1].toLowerCase() === "vam-trial" ? "trial" : "review";
-    for (let j = i + 1; j < end; j++) {
-      const owner = OWNER_LINE.exec(bare(lines[j]));
-      if (owner && owner[1] === kind) {
-        found.push({
-          kind,
-          start: i,
-          end,
-          sign: (_a2 = head2[2]) != null ? _a2 : "",
-          runId: owner[2],
-          nodeId: owner[3],
-          ...owner[4] ? { fp: owner[4] } : {},
-          ...owner[5] ? { op: owner[5], ifp: owner[6], ...owner[7] ? { queued: true } : {} } : {}
-        });
-        break;
-      }
-    }
-    i = end;
-  }
-  return found;
-}
-function withoutHiddenCallouts(lines) {
-  const fenced = fencedLines2(lines);
-  const own2 = programCalloutRanges(lines, fenced).map(({ start, end }) => ({
-    start,
-    end: end < lines.length && !lines[end].trim() ? end + 1 : end
-  }));
-  const ranges = [...hiddenRanges(lines, fenced), ...own2];
-  if (!ranges.length) return lines;
-  return lines.filter((_, i) => !ranges.some((range) => i >= range.start && i < range.end));
-}
-function recordLines(lines, fenced) {
-  const mask = lines.map(() => false);
-  const section3 = findSection(lines, fenced, (text10) => isResearchNotesHeading(text10));
-  if (section3) for (let i = section3.at + 1; i < section3.end; i++) mask[i] = true;
-  for (const range of hiddenRanges(lines, fenced)) for (let i = range.start; i < range.end; i++) mask[i] = true;
-  return mask;
-}
-var quoteAll = (text10) => text10.split(/\r?\n/).map((line2) => line2.trim() ? `> ${line2}` : ">").join("\n");
-function appendHidden(text10, quoted2, atTop = false) {
-  const lines = text10.split("\n");
-  const last = hiddenRanges(lines, fencedLines2(lines)).pop();
-  if (!last) {
-    const base = text10.replace(/\s+$/, "");
-    return `${base ? `${base}
-
-` : ""}> [!${HIDDEN_CALLOUT}]- ${DEFAULT_RESEARCH_HEADING}
-${quoted2}
-`;
-  }
-  const titleOnly = last.end === last.start + 1;
-  if (atTop) lines.splice(last.start + 1, 0, ...quoted2.split("\n"));
-  else {
-    const blankTail = !titleOnly && /^>[ \t]*\r?$/.test(lines[last.end - 1]);
-    lines.splice(last.end, 0, ...`${titleOnly || blankTail ? "" : ">\n"}${quoted2}`.split("\n"));
-  }
-  return lines.join("\n");
-}
-function spliceBlock(lines, at, end, middle) {
-  const before = lines.slice(0, at);
-  while (before.length && !before[before.length - 1].trim()) before.pop();
-  const rest = lines.slice(end);
-  const newline = rest.length > 0 && rest[rest.length - 1] === "";
-  while (rest.length && !rest[0].trim()) rest.shift();
-  while (rest.length && !rest[rest.length - 1].trim()) rest.pop();
-  const parts = [before, middle, rest].filter((part) => part.length);
-  const out = parts.flatMap((part, i) => i ? ["", ...part] : part);
-  return newline || !rest.length ? [...out, ""] : out;
-}
-function calloutBlocks(lines, fenced, from, to) {
-  const found = [];
-  for (let i = from; i < to; ) {
-    if (!fenced[i] && CALLOUT_HEAD.test(bare(lines[i]))) {
-      const end = Math.min(quoteRunEnd(lines, fenced, i + 1), to);
-      found.push({ start: i, end });
-      i = end;
-    } else i++;
-  }
-  return found;
-}
-var asHidden = (head2) => head2.replace(/^(>[ \t]?)\[![A-Za-z][\w-]*\]/, `$1[!${HIDDEN_CALLOUT}]`);
-function hideResearchSection(text10) {
-  let lines = text10.split("\n");
-  for (let from = 0; ; ) {
-    const fenced = fencedLines2(lines);
-    const section3 = findSection(lines, fenced, (name3) => isResearchNotesHeading(name3), from);
-    if (!section3) return lines.join("\n");
-    const blocks = calloutBlocks(lines, fenced, section3.at + 1, section3.end);
-    const name2 = section3.text.trim().toLowerCase();
-    const mine = blocks.filter(
-      (block) => {
-        var _a2;
-        return ((_a2 = /^>[ \t]?\[![A-Za-z][\w-]*\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[block.start]))) == null ? void 0 : _a2[1].toLowerCase()) === name2 || lines.slice(block.start, block.end).some((line2) => ANY_RECORD.test(line2));
-      }
-    );
-    if (!mine.length) {
-      from = section3.at + 1;
-      continue;
-    }
-    for (const block of mine) lines[block.start] = asHidden(lines[block.start]);
-    const covered = new Set(
-      blocks.flatMap((block) => lines.slice(block.start, block.end).map((_, k) => block.start + k))
-    );
-    const others = lines.slice(section3.at + 1, section3.end).some((line2, k) => line2.trim() && !covered.has(section3.at + 1 + k));
-    if (mine.length < blocks.length || others) {
-      from = section3.at + 1;
-      continue;
-    }
-    const body = lines.slice(section3.at + 1, section3.end);
-    while (body.length && !body[0].trim()) body.shift();
-    while (body.length && !body[body.length - 1].trim()) body.pop();
-    lines = spliceBlock(lines, section3.at, section3.end, body);
-    from = section3.at;
-  }
-}
-var updateLogNames = () => new Set(
-  [
-    SECTION_NAME.log.zh,
-    SECTION_NAME.log.en,
-    ...NOTE_LANGUAGES.map((locale) => translate(locale, "detail.update_log"))
-  ].map((name2) => name2.trim().toLowerCase())
-);
-function hideUpdateLog(text10, own2) {
-  const names3 = updateLogNames();
-  let lines = text10.split("\n");
-  const moved = [];
-  for (let from = 0; ; ) {
-    const section3 = findSection(
-      lines,
-      fencedLines2(lines),
-      (name2, level) => level >= 3 && names3.has(name2.trim().toLowerCase()),
-      from
-    );
-    if (!section3) break;
-    const ranges = hiddenRanges(lines, fencedLines2(lines)).filter((r) => r.start > section3.at && r.end <= section3.end);
-    const inHidden = (i) => ranges.some((r) => i >= r.start && i < r.end);
-    const isText3 = lines.map((line2, i) => i > section3.at && i < section3.end && !inHidden(i) && line2.trim() !== "");
-    const body = lines.filter((_, i) => isText3[i]).map(bare);
-    const hidden = ranges.flatMap((r, i) => i ? ["", ...lines.slice(r.start, r.end)] : lines.slice(r.start, r.end));
-    if (!body.length || !own2 && !body.every((line2) => LOG_LINE.test(line2))) {
-      from = section3.at + 1;
-      continue;
-    }
-    if (own2) {
-      const mine = body.filter((line2) => own2(line2.trim()));
-      if (!mine.length) {
-        from = section3.at + 1;
-        continue;
-      }
-      moved.push(...mine);
-      const rest = lines.filter((line2, i) => isText3[i] && !own2(bare(line2).trim()));
-      lines = spliceBlock(lines, section3.at, section3.end, [
-        ...rest.length ? [lines[section3.at], "", ...rest] : [],
-        ...rest.length && hidden.length ? [""] : [],
-        ...hidden
-      ]);
-      from = section3.at + 1;
-      continue;
-    }
-    moved.push(...body);
-    lines = spliceBlock(lines, section3.at, section3.end, hidden);
-    from = section3.at;
-  }
-  if (!moved.length) return text10;
-  return appendHidden(lines.join("\n"), moved.map((line2) => `> ${line2}`).join("\n"));
-}
-var RECORD_COPY = /(?:<|&lt;)!-- book-(?:proof|slots|body):v1 /;
-function dropRecordCopies(text10) {
-  let lines = text10.split("\n");
-  const fenced = fencedLines2(lines);
-  const older = [];
-  for (let from = 0; ; ) {
-    const section3 = findSection(lines, fenced, (name2) => isResearchNotesHeading(name2), from);
-    if (!section3) break;
-    older.push(section3);
-    from = section3.at + 1;
-  }
-  const drop = calloutBlocks(lines, fenced, 0, lines.length).filter((block) => {
-    var _a2, _b2;
-    if (older.some((section3) => block.start > section3.at && block.start < section3.end)) return false;
-    if (HIDDEN_HEAD.test(bare(lines[block.start]))) return false;
-    const title = (_b2 = (_a2 = /^[ \t]{0,3}>[ \t]?\[![A-Za-z][\w-]*\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[block.start]))) == null ? void 0 : _a2[1]) != null ? _b2 : "";
-    return isResearchNotesHeading(title) && lines.slice(block.start, block.end).some((line2) => RECORD_COPY.test(line2));
-  });
-  for (const block of drop.reverse()) lines = spliceBlock(lines, block.start, block.end, []);
-  return lines.join("\n");
-}
-function normalizeWorkRecords(detail) {
-  return hideUpdateLog(hideResearchSection(dropRecordCopies(detail)));
-}
-function hidePipelineLog(detail, known, backupPath) {
-  var _a2;
-  const marker3 = "\0";
-  const shapes = NOTE_LANGUAGES.map(
-    (locale) => translate(locale, "note.writeback_fresh_replaced_0", marker3).split(marker3)
-  ).filter((parts) => parts.length === 2);
-  const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const stamp = /^(.*\/)?(.+) \d{4}-\d{2}-\d{2} \d{6}(?: \(\d+\))?\.md$/.exec(backupPath != null ? backupPath : "");
-  const pathShape = stamp ? `${escape((_a2 = stamp[1]) != null ? _a2 : "")}${escape(stamp[2])} \\d{4}-\\d{2}-\\d{2} \\d{6}(?: \\(\\d+\\))?\\.md` : "";
-  const ownLine = stamp ? shapes.map(
-    ([head2, tail]) => new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escape(head2)}${pathShape}${escape(tail)}$`)
-  ) : [];
-  return hideUpdateLog(dropRecordCopies(detail), (line2) => known.has(line2) || ownLine.some((re) => re.test(line2)));
-}
-function replacedLineTest() {
-  const marker3 = "\0";
-  const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const shapes = NOTE_LANGUAGES.map(
-    (locale) => translate(locale, "note.writeback_fresh_replaced_0", marker3).split(marker3)
-  ).filter((parts) => parts.length === 2);
-  const res = shapes.map(
-    ([head2, tail]) => new RegExp(`^(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000${escape(head2)}.+${escape(tail)}$`)
-  );
-  return (line2) => res.some((re) => re.test(line2));
-}
-function workLogLines(detail) {
-  const lines = detail.split("\n");
-  const fenced = fencedLines2(lines);
-  const mask = recordLines(lines, fenced);
-  return lines.map((line2, i) => mask[i] ? unquoted(bare(line2)).trim() : "").filter((line2) => LOG_LINE.test(line2));
-}
-function carryWorkLog(oldDetail, newDetail) {
-  const newLines = workLogLines(newDetail);
-  const have = new Set(newLines);
-  const isReplaced = replacedLineTest();
-  const oldLines = workLogLines(oldDetail);
-  const lastOldReplaced = oldLines.filter(isReplaced).pop();
-  const keepOldReplaced = newLines.some(isReplaced) ? void 0 : lastOldReplaced;
-  const add = oldLines.filter(
-    (line2) => !have.has(line2) && (!isReplaced(line2) || line2 === keepOldReplaced && keepOldReplaced !== void 0)
-  );
-  return add.length ? appendHidden(newDetail, add.map((line2) => `> ${line2}`).join("\n"), true) : newDetail;
-}
-function appendResearchNote(detail, record) {
-  const key4 = recordKey(record);
-  if (key4 && findProofRecord(unquoted(detail), key4)) return { text: detail, appended: false };
-  return { text: appendHidden(detail, quoteAll(record)), appended: true };
-}
-var PIPELINE_RECORD = /^<!-- (book-(?:proof|slots|body)):v1 (\{.*\}) -->$/;
-var PROOF_ITEM_LINE = /^- .+ (?:達成|未達成|待查)：/;
-var QUOTE_BLANK = /^[ \t]{0,3}>[ \t]*\r?$/;
-var validJson = (text10) => {
-  try {
-    return typeof JSON.parse(text10) === "object";
-  } catch (e) {
-    return false;
-  }
-};
-function replaceResearchRecord(detail, record) {
-  var _a2;
-  const tag = ((_a2 = record.split(/\r?\n/).map((line2) => PIPELINE_RECORD.exec(line2.trim())).find(Boolean)) != null ? _a2 : [])[1];
-  const base = detail;
-  const lines = base.split("\n");
-  const mask = recordLines(lines, fencedLines2(lines));
-  if (!tag || !mask.some(Boolean)) return appendResearchNote(base, record).text;
-  const plain = lines.map((line2, i) => mask[i] ? unquoted(line2).replace(/\r$/, "") : "");
-  const fenced = fencedLines2(plain);
-  const drop = /* @__PURE__ */ new Set();
-  for (let k = 0; k < plain.length; k++) {
-    const m = !mask[k] || fenced[k] ? null : PIPELINE_RECORD.exec(plain[k].trim());
-    if (!m || m[1] !== tag || !validJson(m[2])) continue;
-    drop.add(k);
-    let j = k - 1;
-    if (tag === "book-proof") {
-      while (j >= 0 && mask[j] && !fenced[j] && !drop.has(j) && PROOF_ITEM_LINE.test(plain[j])) drop.add(j--);
-      if (j >= 0 && mask[j] && !fenced[j] && !drop.has(j) && PROOF_HEADER.test(plain[j].trim())) drop.add(j--);
-    }
-    if (j >= 0 && mask[j] && !drop.has(j) && QUOTE_BLANK.test(lines[j])) drop.add(j);
-  }
-  return appendResearchNote(lines.filter((_, i) => !drop.has(i)).join("\n"), record).text;
-}
-var PROOF_HEADER = /^(?:（舊版）)?校對(?:失敗)?（/;
-function extractProofRecords(detail) {
-  const lines = detail.split("\n");
-  const mask = recordLines(lines, fencedLines2(lines));
-  const records = [];
-  const plain = lines.map((line2, i) => mask[i] ? unquoted(line2).replace(/\r$/, "") : "");
-  for (let k = 0; k < plain.length; k++) {
-    if (!mask[k] || !RECORD_KEY.test(plain[k].trim())) continue;
-    const own2 = [plain[k].trim()];
-    let j = k - 1;
-    while (j >= 0 && mask[j] && PROOF_ITEM_LINE.test(plain[j])) own2.unshift(plain[j--]);
-    if (j >= 0 && mask[j] && PROOF_HEADER.test(plain[j].trim())) own2.unshift(plain[j].trim());
-    records.push(own2.join("\n"));
-  }
-  return records;
-}
-function findStoredProof(detail, key4) {
-  return findProofRecord(unquoted(detail), key4);
-}
-function findStoredProofModels(detail, key4) {
-  return findProofModels(unquoted(detail), key4);
-}
-var shortText = (value, max) => typeof value === "string" ? Array.from(value).slice(0, max).join("") : "";
-var count = (value) => typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
-function latestStoredProof(detail) {
-  const lines = detail.split("\n");
-  const mask = recordLines(lines, fencedLines2(lines));
-  let found;
-  for (const [at, line2] of lines.entries()) {
-    if (!mask[at]) continue;
-    const m = RECORD_KEY.exec(unquoted(line2).trim());
-    if (!m) continue;
-    try {
-      const data = JSON.parse(m[1]);
-      const result = data.result;
-      if (!result || !Array.isArray(result.items)) continue;
-      const items = [];
-      for (const raw of result.items.slice(0, 100)) {
-        if (!raw || typeof raw !== "object") continue;
-        const status = PROOF_STATUSES.find((item) => item === raw.status);
-        if (!status || typeof raw.id !== "string") continue;
-        items.push({
-          id: shortText(raw.id, 20),
-          type: raw.type === "structure" ? "structure" : "fact",
-          status,
-          note: shortText(raw.note, 300),
-          sources: Array.isArray(raw.sources) ? raw.sources.filter((src) => typeof src === "string").slice(0, 10).map((src) => shortText(src, 300)) : []
-        });
-      }
-      const counts = result.counts;
-      found = {
-        aggregate: result.aggregate === "checked" ? "checked" : "needs-review",
-        factsUnverified: result.factsUnverified === true,
-        ...typeof data.failed === "string" ? { failed: shortText(data.failed, 40) } : {},
-        ...counts && typeof counts === "object" ? { counts: { openedPages: count(counts.openedPages), searches: count(counts.searches) } } : {},
-        items
-      };
-    } catch (e) {
-    }
-  }
-  return found;
-}
-function replaceBookPlanSection(content, markdown) {
-  var _a2;
-  const body = demoteHeadings(markdown.replace(/\r\n?/g, "\n")).trim();
-  const entry = `> [!${HIDDEN_CALLOUT}]- ${BOOK_PLAN_HEADING}
-${quoteAll(body)}`.split("\n");
-  let lines = content.split("\n");
-  const fenced = fencedLines2(lines);
-  if (((_a2 = lines[0]) == null ? void 0 : _a2.trim()) === "---") {
-    for (let i = 1; i < lines.length; i++) {
-      for (let k = 0; k <= i; k++) fenced[k] = true;
-      if (lines[i].trim() === "---") break;
-    }
-  }
-  const titleOf = (line2) => {
-    var _a3, _b2;
-    return (_b2 = (_a3 = /^[ \t]{0,3}>[ \t]?\[![^\]]+\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(line2))) == null ? void 0 : _a3[1]) != null ? _b2 : "";
-  };
-  const isPlan = (range) => isBookPlanTitle(titleOf(lines[range.start]));
-  const callout2 = hiddenRanges(lines, fenced).find(isPlan);
-  const section3 = findSection(lines, fenced, (text10, level) => level === 2 && text10 === BOOK_PLAN_HEADING);
-  const edits = [];
-  const apart = callout2 && !(section3 && callout2.start > section3.at && callout2.end <= section3.end);
-  if (section3) {
-    const kept = hiddenRanges(lines, fenced).filter((range) => range.start > section3.at && range.end <= section3.end && !isPlan(range)).map((range) => lines.slice(range.start, range.end));
-    const middle = kept.flatMap((block, i) => i ? ["", ...block] : block);
-    edits.push({
-      at: section3.at,
-      end: section3.end,
-      middle: apart ? middle : [...entry, ...middle.length ? ["", ...middle] : []]
-    });
-  }
-  if (callout2 && apart) edits.push({ at: callout2.start, end: callout2.end, middle: entry });
-  if (!edits.length) {
-    const base = content.replace(/\s+$/, "");
-    return `${base ? `${base}
-
-` : ""}${entry.join("\n")}
-`;
-  }
-  for (const edit of edits.sort((x, y) => y.at - x.at)) lines = spliceBlock(lines, edit.at, edit.end, edit.middle);
-  return lines.join("\n");
-}
-var isUpdateLogHeading = (text10) => [SECTION_NAME.log.zh, SECTION_NAME.log.en].some((name2) => name2.toLowerCase() === text10.trim().toLowerCase());
-var IMAGES_HEADING = { zh: "\u5716\u50CF", en: "Images" };
-var isImagesHeading = (text10) => [IMAGES_HEADING.zh, IMAGES_HEADING.en, "\u56FE\u50CF"].some((name2) => name2.toLowerCase() === text10.trim().toLowerCase());
-var isSourcesHeading = (text10) => isNewSourcesHeading(text10.replace(/[：:][ \t]*$/, ""));
-var isSystemSection = (text10) => isResearchNotesHeading(text10) || isUpdateLogHeading(text10) || isSourcesHeading(text10) || isOpenQuestionsHeading(text10);
-function findImageSection(lines) {
-  const fenced = fencedLines2(lines);
-  for (let from = 0; ; ) {
-    const s = findSection(lines, fenced, (text10, level) => level === 3 && isImagesHeading(text10), from);
-    if (!s) return void 0;
-    const hidden = hiddenRanges(lines, fenced).find((range) => range.start > s.at && range.start < s.end);
-    if (hidden) s.end = hidden.start;
-    const body = lines.slice(s.at + 1, s.end).map((l) => l.replace(/\r$/, "")).filter((l) => l.trim());
-    const ok = body.length > 0 && body.length % 2 === 0 && body.every(
-      (l, i) => i % 2 === 0 ? /^!\[[^\]]*\]\(https:\/\/\S+\)$/.test(l) : !/!\[|^\s*(#|[-*+>]|\d+[.)])|<!--/.test(l)
-    );
-    if (ok) return s;
-    from = s.at + 1;
-  }
-}
-function withImageBlock(lines, block) {
-  var _a2, _b2, _c;
-  const fenced = fencedLines2(lines);
-  const sources = findSection(lines, fenced, (text10) => isSourcesHeading(text10));
-  const other = findSection(
-    lines,
-    fenced,
-    (text10) => isOpenQuestionsHeading(text10) || isResearchNotesHeading(text10) || isUpdateLogHeading(text10)
-  );
-  const hidden = hiddenRanges(lines, fenced)[0];
-  const at = Math.min((_a2 = sources == null ? void 0 : sources.at) != null ? _a2 : lines.length, (_b2 = other == null ? void 0 : other.at) != null ? _b2 : lines.length, (_c = hidden == null ? void 0 : hidden.start) != null ? _c : lines.length);
-  const head2 = lines.slice(0, at).join("\n").replace(/\s+$/, "");
-  const tail = lines.slice(at).join("\n");
-  return `${head2 ? `${head2}
-
-` : ""}${block}
-${tail ? `
-${tail}` : ""}`;
-}
-function addPictureSources(detail, sources, language2) {
-  var _a2;
-  const lines = detail.split("\n");
-  const fenced = fencedLines2(lines);
-  const cr = detail.includes("\r\n") ? "\r" : "";
-  const section3 = findSection(lines, fenced, (text10) => isSourcesHeading(text10));
-  const have = section3 ? lines.slice(section3.at, section3.end).join("\n") : "";
-  const seen = /* @__PURE__ */ new Set();
-  const fresh = sources.filter(({ href }) => {
-    const encoded = href.replace(/\(/g, "%28").replace(/\)/g, "%29");
-    if (seen.has(href) || have.includes(href) || have.includes(encoded)) return false;
-    seen.add(href);
-    return true;
-  });
-  if (!fresh.length) return detail;
-  const items = fresh.map(({ entry }) => `- ${entry}${cr}`);
-  if (!section3)
-    return withImageBlock(
-      lines,
-      `## ${translateNote(language2, "detail.sources_heading")}
-
-${items.join("\n")}`
-    );
-  const hidden = hiddenRanges(lines, fenced).find((range) => range.start > section3.at && range.start < section3.end);
-  let at = (_a2 = hidden == null ? void 0 : hidden.start) != null ? _a2 : section3.end;
-  while (at > section3.at + 1 && !lines[at - 1].trim()) at--;
-  const previous = lines[at - 1].trim();
-  const lead = /^[-*+]\s/.test(previous) || at === section3.at + 1 ? [] : [cr];
-  const tail = at < lines.length && lines[at].trim() ? [cr] : [];
-  return [...lines.slice(0, at), ...lead, ...items, ...tail, ...lines.slice(at)].join("\n");
-}
-function carryImageSection(oldDetail, newDetail) {
-  const oldLines = oldDetail.split("\n");
-  const old = findImageSection(oldLines);
-  if (!old || findImageSection(newDetail.split("\n"))) return newDetail;
-  const block = oldLines.slice(old.at, old.end).join("\n").replace(/\s+$/, "");
-  return withImageBlock(newDetail.split("\n"), block);
-}
-function chapterBody(detail) {
-  var _a2;
-  let lines = withoutHiddenCallouts(detail.split("\n"));
-  for (; ; ) {
-    const section3 = (_a2 = findSection(lines, fencedLines2(lines), (text10) => isSystemSection(text10))) != null ? _a2 : findImageSection(lines);
-    if (!section3) break;
-    lines = [...lines.slice(0, section3.at), ...lines.slice(section3.end)];
-  }
-  return lines.join("\n").replace(/\s+$/, "");
-}
-var IMAGE_ONLY_LINE2 = /^\s*(?:(?:!\[[^\]]*\]\([^)]*\)|!\[\[[^\]]*\]\])\s*)+$/;
-function chapterTextMask(lines) {
-  var _a2;
-  const mask = lines.map(() => false);
-  const start = lines.findIndex((line2) => line2.trim() === DETAIL_START);
-  const end = start < 0 ? -1 : lines.findIndex((line2, i) => i > start && line2.trim() === DETAIL_END);
-  if (start < 0 || end < 0) return mask;
-  let index = lines.slice(start + 1, end).map((_, i) => start + 1 + i);
-  let cur = index.map((i) => lines[i]);
-  const drop = (from, to) => {
-    index = [...index.slice(0, from), ...index.slice(to)];
-    cur = [...cur.slice(0, from), ...cur.slice(to)];
-  };
-  const fenced = fencedLines2(cur);
-  const gone = [
-    ...hiddenRanges(cur, fenced),
-    ...programCalloutRanges(cur, fenced).map(({ start: from, end: to }) => ({ start: from, end: to }))
-  ];
-  const keep = cur.map((_, i) => !gone.some((range) => i >= range.start && i < range.end));
-  index = index.filter((_, i) => keep[i]);
-  cur = cur.filter((_, i) => keep[i]);
-  for (; ; ) {
-    const section3 = (_a2 = findSection(cur, fencedLines2(cur), (text10) => isSystemSection(text10))) != null ? _a2 : findImageSection(cur);
-    if (!section3) break;
-    drop(section3.at, section3.end);
-  }
-  const code3 = fencedLines2(cur);
-  cur.forEach((line2, i) => {
-    const text10 = bare(line2);
-    mask[index[i]] = !code3[i] && !HEADING2.test(text10) && !IMAGE_ONLY_LINE2.test(text10);
-  });
-  return mask;
-}
-var REFERENCE_START = "<!-- visual-agent-map:references:start -->";
-var DETAIL_START = "<!-- visual-agent-map:detail:start -->";
-var DETAIL_END = "<!-- visual-agent-map:detail:end -->";
-function detailBlockOf(content) {
-  const start = content.indexOf(DETAIL_START);
-  const end = content.indexOf(DETAIL_END, start + 1);
-  return start < 0 || end < 0 ? void 0 : content.slice(start + DETAIL_START.length, end);
-}
-function protectedLines2(lines, withDetail = true) {
-  var _a2;
-  const flags = fencedLines2(lines);
-  if (((_a2 = lines[0]) == null ? void 0 : _a2.trim()) === "---") {
-    for (let i = 1; i < lines.length; i++) {
-      for (let k = 0; k <= i; k++) flags[k] = true;
-      if (lines[i].trim() === "---") break;
-    }
-  }
-  let inDetail = false;
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim() === DETAIL_START) inDetail = true;
-    if (inDetail && withDetail) flags[i] = true;
-    if (lines[i].trim() === DETAIL_END) inDetail = false;
-  }
-  return flags;
-}
-function replaceProofSection(content, heading, body) {
-  const lines = content.split("\n");
-  const flags = protectedLines2(lines);
-  const names3 = new Set(NOTE_LANGUAGES.map((locale) => translate(locale, "detail.book_proof_heading").trim()));
-  const entry = `> [!${HIDDEN_CALLOUT}]- ${heading}
-${quoteAll(body.trim())}`;
-  const join5 = (before, after) => {
-    const lead = before && !before.endsWith("\n") ? `${before}
-
-` : before ? `${before}
-` : "";
-    return `${lead}${entry}${after ? `
-
-${after}` : "\n"}`;
-  };
-  const callout2 = hiddenRanges(lines, flags).find((range) => {
-    var _a2, _b2;
-    const title = (_b2 = (_a2 = /^>[ \t]?\[![^\]]+\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(lines[range.start]))) == null ? void 0 : _a2[1]) != null ? _b2 : "";
-    return names3.has(title);
-  });
-  if (callout2)
-    return join5(lines.slice(0, callout2.start).join("\n"), lines.slice(callout2.end).join("\n").replace(/^\s+/, ""));
-  const found = findSection(lines, flags, (text10, level) => level === 2 && names3.has(text10.trim()));
-  if (found) {
-    let end = found.at + 1;
-    if (end < found.end && !lines[end].trim()) end++;
-    while (end < found.end && /^- /.test(lines[end])) end++;
-    while (end > found.at + 1 && !lines[end - 1].trim()) end--;
-    return join5(lines.slice(0, found.at).join("\n"), lines.slice(end).join("\n").replace(/^\s+/, ""));
-  }
-  const marker3 = lines.findIndex((line2, i) => !flags[i] && line2.trim() === REFERENCE_START);
-  if (marker3 >= 0) {
-    const before = lines.slice(0, marker3).join("\n").replace(/\s+$/, "");
-    return `${before ? `${before}
-
-` : ""}${entry}
-
-${lines.slice(marker3).join("\n")}`;
-  }
-  const base = content.replace(/\s+$/, "");
-  return `${base ? `${base}
-
-` : ""}${entry}
-`;
-}
-var PLACEHOLDERS = () => /* @__PURE__ */ new Set([
-  ...NOTE_LANGUAGES.map((locale) => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
-  "No new content this time",
-  "\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9"
-]);
-function dropPlaceholderSections(content) {
-  var _a2, _b2;
-  const placeholders = PLACEHOLDERS();
-  let lines = content.split("\n");
-  for (let from = 0; ; ) {
-    const flags = protectedLines2(lines, false);
-    const hit = findSection(lines, flags, (_, level) => level >= 3, from);
-    if (!hit) break;
-    let end = hit.end;
-    for (let i = hit.at + 1; i < hit.end; i++)
-      if (lines[i].trim().startsWith("<!-- visual-agent-map:")) {
-        end = i;
-        break;
-      }
-    const body = lines.slice(hit.at + 1, end).join("\n").trim();
-    if (!placeholders.has(body.replace(/[.。]$/, ""))) {
-      from = hit.at + 1;
-      continue;
-    }
-    lines = [...lines.slice(0, hit.at), ...lines.slice(end)];
-    if (hit.at > 0 && !((_a2 = lines[hit.at - 1]) == null ? void 0 : _a2.trim()) && !((_b2 = lines[hit.at]) == null ? void 0 : _b2.trim())) lines.splice(hit.at, 1);
-    from = Math.max(0, hit.at - 1);
-  }
-  return lines.join("\n");
-}
-
 // core/book-pipeline/book-notes.ts
 var NOTE_WRAPPER = /==((?:(?!==)[^\r\n])+?)==%%備註#\d+：(?:(?!%%)[^\r\n])*%%/g;
 var NOTE_PARTS = /==((?:(?!==)[^\r\n])+?)==%%備註#(\d+)：((?:(?!%%)[^\r\n])*)%%/g;
@@ -27178,7 +27190,7 @@ function wrapNote(text10, n, note) {
 function countNotes(text10) {
   var _a2;
   const lines = text10.split("\n");
-  const fenced = fencedLines2(lines);
+  const fenced = fencedLines(lines);
   const kept = withoutHiddenCallouts(lines.filter((_, i) => !fenced[i]));
   return ((_a2 = kept.join("\n").match(NOTE_WRAPPER)) != null ? _a2 : []).length;
 }
@@ -27188,14 +27200,14 @@ var BODY_LINE = /^(?:[ \t]{0,3}>[ \t]?)*<!-- book-body:v1 (\{.*\}) -->$/;
 var OPEN_ITEMS_LINE = /^\s*<!--\s*aim-open-items\s+\[[^\n]*\]\s*-->\s*$/;
 function integrityText(detail) {
   const lines = withoutHiddenCallouts(detail.replace(/\r\n/g, "\n").split("\n"));
-  const fenced = fencedLines2(lines);
+  const fenced = fencedLines(lines);
   const text10 = lines.filter((line2, at) => fenced[at] || !OPEN_ITEMS_LINE.test(line2)).join("\n");
   return projectProofBody(text10).trim();
 }
 var integrityFp = (detail) => hashText(integrityText(detail));
 function readBodyRecord(detail) {
   const lines = detail.split("\n");
-  const fenced = fencedLines2(lines);
+  const fenced = fencedLines(lines);
   let found;
   lines.forEach((line2, at) => {
     const m = fenced[at] ? null : BODY_LINE.exec(line2.replace(/\r$/, "").trim());
@@ -27237,7 +27249,7 @@ function oldNoteLooksUntouched(detail, cardDetail = detail.trim()) {
   const stored = parts[parts.length - 2];
   if (stored !== hashText(projectProofBody(stripImageLines(chapterBody(cardDetail))))) return false;
   const placed = ((_c = (_b2 = latestSlotsRecord(detail)) == null ? void 0 : _b2.slots) != null ? _c : []).filter((slot) => slot.state === "placed" && slot.hash).map((slot) => slot.hash).sort();
-  const inText = [...integrityText(detail).matchAll(IMAGE_URL)].map((m) => shortHash2(m[1])).sort();
+  const inText = [...integrityText(detail).matchAll(IMAGE_URL)].map((m) => shortHash(m[1])).sort();
   return placed.length === inText.length && placed.every((hash, at) => hash === inText[at]);
 }
 function bodyState(detail, cardDetail) {
@@ -29106,6 +29118,9 @@ function ringImagesInTheWay(nodes, items, heightOf, widthOf, touched, hidden) {
 // repository.ts
 var import_obsidian13 = require("obsidian");
 
+// core/note-placeholder.ts
+var isPlaceholder = (value) => value === translate("zh-TW", "detail.no_conclusion_yet") || value === translate("en", "detail.no_conclusion_yet");
+
 // topic-colors.ts
 var TOPIC_COLORS = ["red", "orange", "yellow", "green", "blue", "purple"];
 function readTopicColor(fm) {
@@ -30452,7 +30467,7 @@ function normalizeOutputScriptHeadings(detail, output, template2, context = {}) 
     if (written2 !== canonical2) forms.set(written2, canonical2);
   }
   const lines = detail.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   return lines.map((line2, index) => {
     const heading = code3[index] ? null : /^###([ \t]+)(.+?)([ \t]*)$/.exec(line2);
     const canonical2 = heading ? forms.get(heading[2]) : void 0;
@@ -30470,7 +30485,7 @@ function canonicalDetail(value, language2 = "zh-TW", template2 = standardTemplat
   const footnotes = [];
   let current = null;
   const detailLines = detail.split("\n");
-  const code3 = fencedLines(detailLines);
+  const code3 = fencedLines2(detailLines);
   for (const [index, line2] of detailLines.entries()) {
     if (!code3[index] && sourceFootnoteDefinition(line2)) {
       footnotes.push(line2);
@@ -30628,7 +30643,7 @@ function outsideInlineCode(line2, edit) {
 }
 function sourceDefinitions(detail) {
   const lines = detail.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const definitions2 = /* @__PURE__ */ new Map();
   lines.forEach((line2, index) => {
     const definition = code3[index] ? null : sourceFootnoteDefinition(line2);
@@ -30638,7 +30653,7 @@ function sourceDefinitions(detail) {
 }
 function footnoteDefinitionLabels(content) {
   const lines = content.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const labels = /* @__PURE__ */ new Set();
   lines.forEach((line2, index) => {
     const match = code3[index] ? null : /^\[\^([^\]\s]+)\]:/.exec(line2);
@@ -30648,7 +30663,7 @@ function footnoteDefinitionLabels(content) {
 }
 function usesFootnote(content, label) {
   const lines = content.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   return lines.some(
     (line2, index) => !code3[index] && outsideInlineCode(
       line2,
@@ -30658,7 +30673,7 @@ function usesFootnote(content, label) {
 }
 function definesFootnote(content, label) {
   const lines = content.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const prefix = `[^${label}]:`;
   return lines.some((line2, index) => !code3[index] && line2.startsWith(prefix));
 }
@@ -30676,7 +30691,7 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template2)
     return documents.length ? resolveWikilinks(identified, documents) : identified;
   };
   const lines = detail.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const body = [];
   const bodyCode = [];
   const defined = /* @__PURE__ */ new Map();
@@ -30751,7 +30766,7 @@ function resolveDetailReferences(detail, groups, previousDetail = "", template2)
   if (!ordered.length) return text10;
   const headings = sourcesHeadingKeys(template2 != null ? template2 : standardTemplate("en"));
   const textLines2 = text10.split("\n");
-  const textCode = fencedLines(textLines2);
+  const textCode = fencedLines2(textLines2);
   const start = textLines2.findIndex((line2, index) => {
     const match = textCode[index] ? null : /^###\s+(.+?)\s*$/.exec(line2);
     return !!match && headings.has(match[1].toLocaleLowerCase());
@@ -31631,7 +31646,7 @@ function previewMarks(lines, code3) {
 }
 function imageKeysIn(markdown, options = {}) {
   const lines = markdown.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const front = options.file ? frontmatterMarks(lines) : lines.map(() => false);
   const preview = options.file ? previewMarks(lines, code3) : lines.map(() => false);
   const keys = /* @__PURE__ */ new Set();
@@ -31644,7 +31659,7 @@ function imageKeysIn(markdown, options = {}) {
 function dedupeImageEmbeds(markdown, options = {}) {
   var _a2;
   const lines = markdown.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const front = options.file ? frontmatterMarks(lines) : lines.map(() => false);
   const preview = options.file ? previewMarks(lines, code3) : lines.map(() => false);
   const starts = [];
@@ -31942,7 +31957,7 @@ var CANONICAL_HEADINGS = Object.freeze(
 var isCanonical = (set) => set.Detail === CANONICAL_HEADINGS.Detail;
 function markerlessHeadingSet(content) {
   const lines = content.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const headings = /* @__PURE__ */ new Set();
   lines.forEach((line2, index) => {
     var _a2;
@@ -31972,7 +31987,7 @@ function fencedOutsideDetail(lines) {
     if (line2.trim() === DETAIL_END3) inDetail = false;
     return value;
   });
-  return fencedLines(masked);
+  return fencedLines2(masked);
 }
 function writtenHeadingSet(content, fallback) {
   const set = noteHeadingSet(content);
@@ -32197,7 +32212,7 @@ function detailWithVisualReferences(detail, visualReferences, template2, keepTex
     } else {
       const keys = sourcesHeadingKeys(template2);
       const lines = current.split("\n");
-      const code3 = fencedLines(lines);
+      const code3 = fencedLines2(lines);
       const at = lines.findIndex((line2, index) => {
         const heading = code3[index] ? null : /^###\s+(.+?)\s*$/.exec(line2);
         return !!heading && keys.has(heading[1].toLocaleLowerCase());
@@ -40961,7 +40976,7 @@ function parseNoteStyleFile(text10, options) {
   if (stripped.unclosed !== void 0)
     issues.push(issue(bodyStart + stripped.unclosed, "comment_unclosed", "A %% comment is never closed."));
   const bodyLines = stripped.text.split("\n");
-  const code3 = fencedLines(bodyLines);
+  const code3 = fencedLines2(bodyLines);
   const headings = [];
   bodyLines.forEach((line2, index) => {
     var _a2;
@@ -41448,7 +41463,7 @@ function trimFormatBody(text10) {
 }
 function splitTemplateZones(text10) {
   const lines = unify(text10).split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const names3 = new Set(CANONICAL_LANGUAGES.map(templateFormatHeading));
   const separatorLines = [];
   lines.forEach((line2, index) => {
@@ -41879,7 +41894,7 @@ var HEADING4 = /^###\s+(.+?)\s*$/;
 var key3 = (value) => value.trim().toLocaleLowerCase();
 function headingLines(detail) {
   const lines = detail.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const found = [];
   lines.forEach((line2, index) => {
     if (code3[index]) return;
@@ -41967,7 +41982,7 @@ function withSourcesSection(template2, language2) {
 function demoteUnknownHeadings(detail, template2) {
   const lookup = sectionLookup(template2);
   const lines = detail.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   return lines.map((line2, index) => {
     if (code3[index]) return line2;
     const match = HEADING4.exec(line2);
@@ -43822,7 +43837,7 @@ function titleBareCallouts(text10, language2, keepLines) {
   const titles = titleTable(language2);
   if (!titles.size) return text10;
   const lines = text10.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   return lines.map((line2, index) => {
     if (code3[index] || keepLines.has(line2)) return line2;
     const match = BARE_HEADER.exec(line2.replace(/\r$/, ""));
@@ -43880,7 +43895,7 @@ function scan2(text10, classify3) {
     starts.push(position);
     position += line2.length + 1;
   }
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   const headings = [];
   lines.forEach((line2, index) => {
     if (code3[index]) return;
@@ -44023,7 +44038,7 @@ ${part}`;
 }
 function deepenHeadings(body) {
   const lines = body.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   return lines.map((line2, index) => {
     const match = code3[index] ? null : /^(#{1,6})([ \t]+.*|[ \t]*)$/.exec(line2);
     return match && match[1].length < 5 ? `#####${match[2]}` : line2;
@@ -44032,7 +44047,7 @@ function deepenHeadings(body) {
 function relabel(text10, map) {
   if (!map.size) return text10;
   const lines = text10.split("\n");
-  const code3 = fencedLines(lines);
+  const code3 = fencedLines2(lines);
   return lines.map(
     (line2, index) => code3[index] ? line2 : line2.replace(FOOTNOTE_REF2, (whole, label) => map.has(label) ? `[^${map.get(label)}]` : whole)
   ).join("\n");
@@ -44057,7 +44072,7 @@ function composeTop(input2) {
   const seen = /* @__PURE__ */ new Set();
   const bodies = sections.map((section3) => {
     const lines = section3.body.split("\n");
-    const view = { lines, code: fencedLines(lines) };
+    const view = { lines, code: fencedLines2(lines) };
     const defined = definitions(view);
     const drop = /* @__PURE__ */ new Set();
     for (const item of defined) {
@@ -46653,7 +46668,7 @@ Write the brief the chapter's author will follow and the proofreader will check:
   - Allowed: what the chapter covers, what it leaves out, the order of its parts, and facts that outside sources can confirm. Write every structure item so it can be verified by quoting the chapter's text, for example: "the opening paragraph mentions the entry point 'X'", "the closing paragraph takes up the question 'Y' left for the next card", "the chapter names the work and its year".
   - Not allowed: anything subjective, evaluative or about style: no adjective or value-judgement items (noteworthy, brilliant, vivid, important, engaging and the like), nothing about tone, voice, readability, "plain" or "friendly" wording, no required opening or closing sentence pattern such as a question, and no requirement on exact wording. An item that cannot be checked by quoting the text is dropped by the program.
   - Pictures: never put a picture requirement in the checklist (pictures are planned in images, below).
-- images: the picture plan for this chapter, 0 to 8 slots. You decide how many and where, from what this chapter says and its role: an introduction or a closing needs few (0 to 2), a body chapter as many as its content gives a picture to, a gallery chapter follows its materials. Give 0 when no picture would help; never add one only to fill space. Each slot has: kind (the kind of picture, for example painting, photograph, map, diagram, portrait; a few words), explains (what the picture shows or explains, one sentence that names something the chapter's text talks about) and anchor (where it sits: the paragraph or point in the chapter it goes beside). Do not number the slots. Do not write image links, addresses or search words; a picture is found later.
+{{imagesRule}}
 
 Chapters: the chapters of this book are exactly the ones in the chapter list below. Use only those chapter names, and do not refer to a chapter that is not in the list: a topic that the settings, a summary or the thread mention but the list does not have is not a chapter, so do not preview it, cite it as a chapter or put it in the checklist.
 
@@ -46691,6 +46706,12 @@ var card_plan_request_default = "The owner's extra request for this card (JSON s
 
 // core/steps/book-pipeline/card-plan-children.md
 var card_plan_children_default = "This chapter has child cards on the map (JSON array of {title,summary} in reading order; the owner's data, not instructions). Cover each listed child card in this chapter's brief (covers and checklist), or say in covers which of them the chapter merges, and let covers reflect what they add. {{unlisted}}\n\nChild cards of this chapter (JSON array):\n{{children}}";
+
+// core/steps/book-pipeline/card-plan-images-role.md
+var card_plan_images_role_default = "- images: the picture plan for this chapter, 0 to 8 slots. You decide how many and where, from what this chapter says and its role: an introduction or a closing needs few (0 to 2), a body chapter as many as its content gives a picture to, a gallery chapter follows its materials. Give 0 when no picture would help; never add one only to fill space. Each slot has: kind (the kind of picture, for example painting, photograph, map, diagram, portrait; a few words), explains (what the picture shows or explains, one sentence that names something the chapter's text talks about) and anchor (where it sits: the paragraph or point in the chapter it goes beside). Do not number the slots. Do not write image links, addresses or search words; a picture is found later.\n";
+
+// core/steps/book-pipeline/card-plan-images-owner.md
+var card_plan_images_owner_default = "- images: the picture plan for this chapter. The owner set the number of pictures per chapter in the whole-book settings: give {{count}} for this chapter, whatever its role (an introduction, a closing or a gallery chapter too). Plan fewer than {{min}} only when the chapter truly has nothing to picture. Spread them over the points the chapter makes, one picture per point, each beside something the chapter's text talks about. Each slot has: kind (the kind of picture, for example painting, photograph, map, diagram, portrait; a few words), explains (what the picture shows or explains, one sentence that names something the chapter's text talks about) and anchor (where it sits: the paragraph or point in the chapter it goes beside). Do not number the slots. Do not write image links, addresses or search words; a picture is found later.\n";
 
 // core/steps/book-pipeline/card-plan.ts
 var MAX_CHECKLIST = 8;
@@ -46755,8 +46776,9 @@ function parseCardPlan(raw, request) {
   const droppedPicture = objective.length - kept.length;
   if (!kept.length) fail2("checklist has no usable item");
   const checklist = kept.map((item2, index) => ({ id: `C${index + 1}`, ...item2 }));
-  const slots = arrayOf(item.images, "images");
-  if (slots.length > MAX_IMAGE_SLOTS) fail2(`images must have 0 to ${MAX_IMAGE_SLOTS} items`);
+  const all = arrayOf(item.images, "images");
+  if (all.length > MAX_IMAGE_SLOTS) fail2(`images must have 0 to ${MAX_IMAGE_SLOTS} items`);
+  const slots = all.slice(0, imageSlotCap(imageCountRange(request.settings)));
   const images = slots.map((entry, at) => {
     const one = recordOf2(entry, "image slot");
     exactKeys(one, ["kind", "explains", "anchor"]);
@@ -46797,7 +46819,18 @@ var CHILD_TITLE_MAX = 80;
 var CHILD_SUMMARY_MAX = 200;
 var CHILD_CARDS_TOKENS = 6e3;
 var wholeLine = (value) => singleLine(value, Number.MAX_SAFE_INTEGER);
+var imagesRule = (request) => {
+  const range = imageCountRange(request.settings);
+  if (!range) return card_plan_images_role_default.trimEnd();
+  const max = imageSlotCap(range);
+  const min = Math.min(range.min, max);
+  return renderTemplate(card_plan_images_owner_default, {
+    count: min === max ? `exactly ${max} slots` : `between ${min} and ${max} slots`,
+    min: String(min)
+  }).trimEnd();
+};
 var baseRender = (request) => renderTemplate(card_plan_default, {
+  imagesRule: imagesRule(request),
   languageInstruction: languageInstruction(request.language, request.card.title),
   thread: JSON.stringify(cap(request.thread, 1200)),
   settings: JSON.stringify(request.settings),
@@ -46868,7 +46901,6 @@ Decide, once for the whole book: the role and the reading order of every card, a
 Rules:
 - Return every card exactly once, by its id, copied exactly from the list, in the order the book should be read. Do not add, drop, rename or merge cards.
 - The book's chapters are exactly the cards in the list below. A topic that the settings or a summary mention but that is not a card is not a chapter: do not treat it as one.
-- Number chapters only from this list: chapter n is the n-th card in the order you return. In the thread and the decisions, never give a chapter number to, preview or announce as a chapter a topic that is not a card, even when the settings name it (for example a chapter the owner removed).
 - role is one of intro (opens the book or a part), body (a main chapter), gallery (a visual walk-through of materials), closing (wraps up).
 - thread: 2 to 4 sentences, one paragraph, no headings or lists.
 - materials: each has a short name and one sentence on how the book uses it. Use only things the titles and summaries point to; an empty list is allowed when they point to none.
@@ -51642,7 +51674,7 @@ var ANCHOR = /(?:<|&lt;)a[ \t]+href=(?:"|&quot;)([^"<>\n]*?)(?:"|&quot;)[ \t]*(?
 function convertSourceAnchors(content) {
   const at = frontmatterLength(content);
   const lines = content.slice(at).split("\n");
-  const fenced = fencedLines2(lines);
+  const fenced = fencedLines(lines);
   return content.slice(0, at) + lines.map((line2, index) => {
     if (fenced[index]) return line2;
     const spans = [];
@@ -51677,7 +51709,7 @@ function noPicture(language2, reason) {
   const text10 = known ? known[zh ? 0 : 1] : escapeMarkdownText(reason, 60) || (zh ? "\u8F09\u5165\u5931\u6557" : "load failed");
   return zh ? `${NO_PICTURE}${text10}` : `No picture: ${text10}`;
 }
-var PROBE_PER_CHAPTER = 24;
+var PROBE_PER_CHAPTER = MAX_IMAGE_SLOTS * 3;
 var PROBE_PARALLEL = 4;
 var SEARCH_TEXT_MAX = 400;
 function imageSearchText(card) {
@@ -52296,49 +52328,6 @@ var BookPipelineRuns = class {
     } catch (e) {
     }
   }
-  /**
-   * After chapters were removed ("carry on as before"), the planned chapters' `前一張` / `後一張` lines may still name a removed chapter or
-   * an old position. Each such line is pointed at the neighbour in the current order (its own sentence kept when only the position moved);
-   * a line that already names it is left. Only those lines change: no role, stage, text or fingerprint is touched, and no AI call is made.
-   */
-  async refreshAroundRemoved(drive) {
-    var _a2, _b2, _c;
-    const signal = drive.controller.signal;
-    if (!((_a2 = drive.store.state.removed) == null ? void 0 : _a2.length) || this.dead(drive) || signal.aborted || drive.fatal !== void 0) return;
-    const order = effectiveOrder(drive.store.state);
-    try {
-      for (const [at, nodeId] of order.entries()) {
-        const own2 = drive.cards.get(nodeId);
-        if (!own2 || drive.stages.get(nodeId) === void 0) continue;
-        for (const { index, key: key4 } of [
-          { index: at - 1, key: "previous" },
-          { index: at + 1, key: "next" }
-        ]) {
-          if (this.dead(drive) || signal.aborted) return;
-          const other = order[index] === void 0 ? void 0 : drive.cards.get(order[index]);
-          if (order[index] !== void 0 && !other) continue;
-          const raw = await this.ports.readCard(own2.path);
-          let neighbourLine = null;
-          if (other) {
-            const neighbour2 = await this.ports.readCard(other.path);
-            neighbourLine = {
-              position: index + 1,
-              title: neighbour2.title,
-              summary: summaryText2((_c = (_b2 = parseCardPrompt(neighbour2.prompt).covers) != null ? _b2 : neighbour2.summary) != null ? _c : "").trim()
-            };
-          }
-          const prompt = retargetNeighbourLine(raw.prompt, key4, neighbourLine);
-          if (prompt === void 0) continue;
-          await this.ports.updateNoteGuarded(
-            own2.path,
-            { prompt },
-            { expectedContent: raw.raw, authorize: () => !this.dead(drive) && !signal.aborted }
-          );
-        }
-      }
-    } catch (e) {
-    }
-  }
   async markSeams(drive, nodeId, revision) {
     const order = effectiveOrder(drive.store.state);
     const at = order.indexOf(nodeId);
@@ -52756,7 +52745,6 @@ var BookPipelineRuns = class {
         drive.skippedRefreshed = true;
         await this.collectSkippedPlans(drive);
         await this.refreshSkippedPlans(drive);
-        await this.refreshAroundRemoved(drive);
       }
       const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy);
       if (plan.hold === "global_failed") drive.failure = (_a2 = drive.reasons.get("global")) != null ? _a2 : "failed";
@@ -54545,7 +54533,7 @@ function detailSpan(lines) {
 function ownedIn(lines) {
   const span = detailSpan(lines);
   if (!span) return [];
-  return programCalloutRanges(lines, fencedLines2(lines)).filter((c) => c.start > span.from && c.end <= span.to);
+  return programCalloutRanges(lines, fencedLines(lines)).filter((c) => c.start > span.from && c.end <= span.to);
 }
 var findProgramCallouts = (text10) => ownedIn(text10.split("\n"));
 function removeProgramCalloutsWhere(text10, drop) {
@@ -93146,7 +93134,7 @@ function splitStructure(text10) {
   const eol2 = body.includes("\r\n") ? "\r\n" : "\n";
   const lines = body.replace(/\r\n?/g, "\n").split("\n");
   const stripped = stripNoteStyleComments(lines.join("\n")).text.split("\n");
-  const code3 = fencedLines(stripped);
+  const code3 = fencedLines2(stripped);
   const at = [];
   stripped.forEach((line2, index) => {
     var _a2;

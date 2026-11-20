@@ -88,13 +88,18 @@ export class AppliedHighlights {
 }
 
 /** The 0-based line span of each offset range in `text` (CRLF-safe: lines are counted by "\n"). */
-export function lineSpans(text: string, ranges: readonly { from: number; to: number }[]): { start: number; end: number }[] {
+export function lineSpans(
+  text: string,
+  ranges: readonly { from: number; to: number }[]
+): { start: number; end: number }[] {
   const lineAt = (offset: number): number => {
     let n = 0;
     for (let i = text.indexOf("\n"); i !== -1 && i < offset; i = text.indexOf("\n", i + 1)) n++;
     return n;
   };
-  return ranges.filter(r => r.from < r.to).map(r => ({ start: lineAt(r.from), end: lineAt(Math.max(r.from, r.to - 1)) }));
+  return ranges
+    .filter(r => r.from < r.to)
+    .map(r => ({ start: lineAt(r.from), end: lineAt(Math.max(r.from, r.to - 1)) }));
 }
 
 /** The reading view's twin of the CM6 mark: which rendered sections (by their line span) wear the light-green class. */

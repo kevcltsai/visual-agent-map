@@ -787,7 +787,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.registerEditorExtension(appliedExtension);
     this.registerMarkdownPostProcessor((el, ctx) => {
       const info = ctx.getSectionInfo(el);
-      if (info && this.readingMarks.wears(ctx.sourcePath, info.lineStart, info.lineEnd)) el.addClass("vam-book-applied");
+      if (info && this.readingMarks.wears(ctx.sourcePath, info.lineStart, info.lineEnd))
+        el.addClass("vam-book-applied");
     });
     this.registerEvent(this.app.workspace.on("file-open", () => this.bookHighlights.sync()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.bookHighlights.sync()));

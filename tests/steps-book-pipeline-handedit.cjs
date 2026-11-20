@@ -62,6 +62,12 @@ test('old note, branch 1 (proof hash): the text still hashes as the stored proof
   assert.equal(b.bodyState(withSlots(BODY, 1)), 'unknown', 'text and slots but no proof to vouch for it');
   assert.equal(b.bodyState(proofRecord(BODY)), 'unknown', 'a proof but a picture the slots do not list (no slots record)');
 });
+test('old note, no evidence (owner decision 2026-11-20): text with no record of any kind is rewritable; a keep record is evidence, so a text changed after keep is unknown', () => {
+  assert.equal(b.bodyState(BODY), 'clean', 'no body record, no stored proof, no slots record');
+  const kept = b.keepDetail(BODY);
+  assert.equal(b.isKept(kept), true);
+  assert.equal(b.bodyState(kept.replace('第二段', '第三段')), 'unknown', 'kept, then changed: still held');
+});
 test('old note, branch 2 (picture hashes): a picture swapped, added or removed against the book-slots record: unknown', () => {
   assert.equal(b.bodyState(OLD.replace(url(1), url(9))), 'unknown', 'swapped');
   assert.equal(b.bodyState(withSlots(proofRecord(BODY), 1, 2)), 'unknown', 'a listed picture is gone from the text');

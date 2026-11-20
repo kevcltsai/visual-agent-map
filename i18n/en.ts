@@ -3376,6 +3376,7 @@ export const en = {
   "ui.book_resume": "Continue from where it stopped",
   "ui.book_restart": "Change settings and start over",
   "ui.book_map_changed_0_1": "The map changed: {0} chapters added, {1} removed",
+  "ui.book_map_reordered": "The map changed: the chapters are in a different order",
   "ui.book_map_replan": "Plan again",
   "ui.book_map_keep": "Carry on as before (without the new cards)",
   "ui.book_refused_empty":

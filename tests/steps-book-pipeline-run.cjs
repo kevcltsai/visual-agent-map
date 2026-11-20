@@ -48,7 +48,7 @@ async function rig(over = {}) {
     updateMap: (path, change) => repo.updateMap(path, d => { change(d); if (!over.trial && d.bookPipeline) delete d.bookPipeline.trial; }),
     readCard: async path => {
       const note = await repo.readNote(path);
-      return { path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(path), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineRole ? { pipelineRole: note.pipelineRole } : {}), ...(note.bookRoleBy ? { bookRoleBy: note.bookRoleBy } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}) } };
+      return { path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(path), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineRole ? { pipelineRole: note.pipelineRole } : {}), ...(note.bookRoleBy ? { bookRoleBy: note.bookRoleBy } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}), ...(note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {}) } };
     },
     writePipelineFields: (path, patch) => { stat.writes++; return repo.writePipelineFields(path, patch); },
     ...(over.noRolePort ? {} : { writePipelineRole: (path, role) => repo.writePipelineRole(path, role) }),
@@ -2199,6 +2199,33 @@ test('T9 keep: "keep my version" makes a whole-book redo leave the chapter alone
   assert.equal((await r.note(1)).pipelineIssue, 'write failed: hand_edited');
 });
 
+test('accept as it is (Primary decision C3): a program chapter recorded as kept is left alone by a whole-book redo and checked; the card\'s own rerun still rewrites it', async () => {
+  const r = await rig();
+  await finish(r);
+  assert.equal(bodyStateRaw(r.raw(1)), 'clean');
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, keepRaw, {});
+  const before = detailBlockOf(r.raw(1));
+  const authors = r.stat.author.length;
+  await redo(r, [1]);
+  assert.equal(r.stat.author.length, authors, 'the whole-book redo does not write the accepted chapter');
+  assert.equal(detailBlockOf(r.raw(1)), before, 'its text is unchanged');
+  assert.equal(stageOf(r.raw(1)), 'checked');
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'gate2'; d.bookPipeline.status = 'running'; });
+  await rerun(r, 1);
+  assert.equal(r.stat.author.length, authors + 1, 'the card\'s own rerun (the reader asked) rewrites it');
+  assert.notEqual(detailBlockOf(r.raw(1)), before);
+});
+
+test('seams: a whole-book redo writes every chapter beside its neighbours again, so the join marks an earlier single-card rerun left are cleared', async () => {
+  const r = await rig();
+  await finish(r);
+  await rerun(r, 1);
+  const seam = i => /^pipeline-seam: (.*)$/m.exec(r.raw(i))?.[1];
+  assert.ok(seam(0) !== undefined && seam(2) !== undefined, 'the single rerun marked both neighbours');
+  await redo(r, [0, 1, 2]);
+  assert.deepEqual([0, 1, 2].map(seam), [undefined, undefined, undefined], 'all stale join marks are gone');
+});
+
 test('review-b S3: a redo of the whole book makes no plan call for a hand-edited or kept chapter, and a kept chapter gets no proof the second time and no auto-fix', async () => {
   const r = await rig();
   await finish(r);
@@ -3168,6 +3195,17 @@ test('fix3 retargetNeighbourLine: a line naming the neighbour is left; a moved p
   assert.equal(retargetNeighbourLine('角色：本文', 'next', null), undefined, 'no such line');
 });
 
+test('dropEntryNaming: the entry line goes only when it names a removed chapter; other lines, a missing line, a one-character title and English labels', () => {
+  const { dropEntryNaming } = S.load('core/book-pipeline/plan-text.ts');
+  const prompt = '角色：本文\n接入點：接著「烘焙」講的火候\n交接：留給下一張';
+  assert.equal(dropEntryNaming(prompt, ['烘焙']), '角色：本文\n交接：留給下一張');
+  assert.equal(dropEntryNaming(prompt, ['沖煮']), undefined, 'names no removed chapter');
+  assert.equal(dropEntryNaming('角色：本文\n交接：烘焙', ['烘焙']), undefined, 'no entry line (another line naming it is not touched)');
+  assert.equal(dropEntryNaming('接入點：豆子', ['豆']), undefined, 'a one-character title is not looked for');
+  assert.equal(dropEntryNaming('接入點: 接著 烘焙 ', [' 烘焙 ']), '', 'half-width colon, padded title');
+  assert.equal(dropEntryNaming('Role: body\nEntry point: after Roasting\n', ['Roasting']), 'Role: body\n');
+});
+
 test('fix3 composeCardPrompt / rewriteNeighbourLine: a literal null or undefined description is never written (the title alone stays)', () => {
   const { composeCardPrompt, rewriteNeighbourLine } = S.load('core/book-pipeline/plan-text.ts');
   const prompt = composeCardPrompt({ role: 'body', covers: 'c', entry: 'e', handoff: 'h', previous: { position: 3, title: 'Seeds', summary: 'null' }, next: { position: 5, title: 'Veg', summary: ' undefined ' }, checklist: [{ id: 'C1', type: 'structure', text: 'x' }] }, 'zh-TW');
@@ -3191,12 +3229,18 @@ test('fix3 a chapter removed while writing, then "carry on": the neighbours\' pr
   await r.runs.start(r.mapPath);
   const roles = []; for (let i = 0; i < 4; i++) roles.push((await r.note(i)).bookRole);
   assert.ok((await promptLine(r, 0, '後一張')).startsWith('(2) SecretTitleA'), 'planned against the old order');
+  // The entry line of chapter 2 names the chapter that goes; chapter 3's names one that stays.
+  const withEntry = async (i, text) => { const n = await r.note(i); assert.match(n.prompt, /^接入點：/m); await r.repo.updateNoteGuarded(r.nodes[i].path, { prompt: n.prompt.replace(/^接入點：.*$/m, `接入點：${text}`) }, {}); };
+  await withEntry(2, '接著 SecretTitleA 講到的步驟');
+  await withEntry(3, '接著 SecretTitleB 的結尾');
   const base = r.script.author; let hit = false;
   r.script.author = async (input, n) => { if (!hit) { hit = true; await dropCard(r, 1); } return base(input, n); };
   await r.runs.confirmGate1(r.mapPath); await finished(r);
   assert.equal((await r.state()).pauseReason, 'map');
   await r.runs.keepBookMap(r.mapPath); await finished(r);
   assert.equal((await r.state()).phase, 'gate2');
+  assert.equal(await promptLine(r, 2, '接入點'), undefined, 'the entry line naming the removed chapter is gone (a join no longer there)');
+  assert.equal(await promptLine(r, 3, '接入點'), '接著 SecretTitleB 的結尾', 'an entry line naming a chapter that stays is kept');
   assert.equal(await promptLine(r, 0, '後一張'), '(2) SecretTitleB — covers 3', 'the previous chapter now points past the removed one');
   assert.equal(await promptLine(r, 2, '前一張'), '(1) SecretRootTitle — covers 1', 'the next chapter names its new neighbour');
   assert.equal(await promptLine(r, 3, '前一張'), '(2) SecretTitleB — p', 'only the position moved: the sentence is kept');

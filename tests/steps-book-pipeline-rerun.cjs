@@ -74,7 +74,7 @@ async function rig(over = {}) {
 }
 /** Lowers the saved call limit (the pipeline has no port for it; the file is the owner's control). */
 const setLimit = (r, limit) => r.repo.updateMap(r.mapPath, d => { d.bookPipeline.budget.limit = limit; });
-const seamOf = raw => /^pipeline-seam: (.*)$/m.exec(raw)?.[1];
+const seamOf = raw => /^pipeline-seam: (.*)$/m.exec(raw)?.[1]?.replace(/^"(.*)"$/, "$1"); // a rewritten frontmatter may quote it
 const noSeam = raw => raw.replace(/^pipeline-seam: .*\n/m, '');
 const ids = r => r.nodes.map(n => n.id);
 /** Author that rewrites the chapter; a second pass keeps the research notes and changes the text. */
@@ -137,13 +137,16 @@ test('rerunCard at gate 2 runs plan, author and proofread of that card only; nei
   assert.equal((await r.state()).phase, 'done'); assert.equal(stageOf(r.raw(3)), 'checked');
 });
 
-test('a seam is cleared only by confirmSeam: not by a proofread, a rerun or a whole run; confirming is the owner action, idempotent, and refuses beside a drive', async () => {
+test('a seam is cleared by confirmSeam or a whole run (Primary decision: a whole-book rewrite clears stale joins), never by a card rerun; confirming is the owner action, idempotent, and refuses beside a drive', async () => {
   const r = await rig();
   r.script.author = authorFor(r);
   await r.repo.writePipelineFields(r.nodes[1].path, { pipelineSeam: 'seam one' });
   await r.repo.writePipelineFields(r.nodes[3].path, { pipelineSeam: 'seam three' });
   await toGate2(r);
-  assert.equal(stageOf(r.raw(1)), 'checked'); assert.equal(seamOf(r.raw(1)), 'seam one', 'the proofread did not clear it');
+  assert.equal(seamOf(r.raw(1)), undefined, 'the whole run wrote the chapter again: its old join mark went');
+  await r.repo.writePipelineFields(r.nodes[1].path, { pipelineSeam: 'seam one' });
+  await r.repo.writePipelineFields(r.nodes[3].path, { pipelineSeam: 'seam three' });
+  assert.equal(stageOf(r.raw(1)), 'checked');
   await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
   assert.equal(stageOf(r.raw(1)), 'checked'); assert.equal(seamOf(r.raw(1)), 'seam one', 'a rerun of the card itself does not clear it either');
   await r.runs.confirmSeam(r.mapPath, r.nodes[1].id);

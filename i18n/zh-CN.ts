@@ -3153,6 +3153,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_resume": "从停处继续",
   "ui.book_restart": "重新设置再开始",
   "ui.book_map_changed_0_1": "心智图变了：多 {0} 章、少 {1} 章",
+  "ui.book_map_reordered": "心智图变了：章节顺序不同",
   "ui.book_map_replan": "重新规划",
   "ui.book_map_keep": "照旧跑完（不含新卡）",
   "ui.book_refused_empty": "这张心智图只有根议题、没有章节卡片，没有东西可以写。请先加上章节卡片。",

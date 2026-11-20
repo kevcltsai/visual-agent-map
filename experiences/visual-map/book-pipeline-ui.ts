@@ -35,7 +35,8 @@ export interface BookBarState {
   counts: Record<PipelineStage | "pending", number>;
   budget: { used: number; limit: number };
   /** The run paused because the map's cards changed: how many chapters were added and removed (counts only, never ids). */
-  mapChange?: { added: number; missing: number };
+  /** `reordered`: a finished book whose map has the same chapters in another order (no count to show). */
+  mapChange?: { added: number; missing: number; reordered?: true };
   /** The neutral code of why the run stopped by itself; the bar shows it in words and offers "retry". */
   failure?: string;
   /** Seconds left, as the runner estimated them (only after at least five cards of the phase finished); absent means no number is shown. */
@@ -126,6 +127,13 @@ export function bookBarState(
     (phase === "done" || (!active && status !== "stopped" && (phase === "gate1" || phase === "gate2")))
       ? countChange(mapDifference(data, mapIds))
       : undefined;
+  // A finished book whose chapters only moved (a topic moved, nothing added or removed): the same line, without counts.
+  const reordered =
+    phase === "done" && gateChange && !gateChange.added && !gateChange.missing && mapIds
+      ? sameOrder(order, mapIds)
+        ? undefined
+        : { added: 0, missing: 0, reordered: true as const }
+      : undefined;
   const mode: BookBarMode = mapChange
     ? "changed"
     : status === "stopped" && pauseReason === "budget"
@@ -150,6 +158,7 @@ export function bookBarState(
     ...(rerunning ? { rerun: true as const } : {}),
     ...(mapChange ? { mapChange } : {}),
     ...(gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {}),
+    ...(reordered ? { mapChange: reordered } : {}),
     ...(mode === "gate1" && data.trial?.length ? { trialCount: data.trial.length } : {}),
     ...(mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {}),
     ...(progress?.etaSeconds !== undefined && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0
@@ -157,6 +166,14 @@ export function bookBarState(
       : {})
   };
 }
+
+/** Whether the map lists the book's chapters in the book's order (cards that are not chapters are skipped). */
+const sameOrder = (order: readonly string[], mapIds: readonly string[]): boolean => {
+  const chapters = new Set(order);
+  return mapIds.filter(id => chapters.has(id)).join("\n") === order.join("\n");
+};
+const mapChangeText = (change: NonNullable<BookBarState["mapChange"]>): string =>
+  change.reordered ? t("ui.book_map_reordered") : t("ui.book_map_changed_0_1", change.added, change.missing);
 
 const countChange = (change: { added: string[]; missing: string[] }): { added: number; missing: number } => ({
   added: change.added.length,
@@ -287,10 +304,7 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   }
   if ((state.mode === "gate1" || state.mode === "gate2" || state.mode === "done") && state.mapChange)
-    top.createSpan({
-      cls: "vam-book-bar-counts vam-book-map-changed",
-      text: t("ui.book_map_changed_0_1", state.mapChange.added, state.mapChange.missing)
-    });
+    top.createSpan({ cls: "vam-book-bar-counts vam-book-map-changed", text: mapChangeText(state.mapChange) });
   if (state.mode === "gate1" && state.trialCount) {
     top.createSpan({
       cls: "vam-book-bar-counts",

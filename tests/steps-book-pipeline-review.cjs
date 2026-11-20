@@ -362,6 +362,20 @@ test('T10c length: a different range, measured count, unit or rule version chang
   assert.equal(b.isReviewResolved(ticked, fp('length unmet: length:over:241:100-300:字:v1')), false, 'the asked range changed: the tick is void');
 });
 
+test('kept text: no hand-edit question and no consistency findings while the keep holds; an edit after the keep asks the hand-edit question again whatever the stage says', () => {
+  const integrity = require('./support-replay.cjs').load('core/book-pipeline/body-integrity.ts');
+  const kept = integrity.keepDetail(integrity.stampDetail('程式寫的。').replace('程式寫的', '我改過的'));
+  const found = [{ other: 'n2', own: 'x', theirs: 'y', suggestion: 'z' }];
+  const of = (detail, stage = 'checked') => b.gate2Cards({ order: ['n1'], titleOf: () => 'T', noteOf: () => ({ detail, pipelineStage: stage, pipelineIssue: null }), inconsistencies: () => found })[0];
+  const held = of(kept);
+  assert.ok(!held.handEdited, 'the keep is the reader\'s answer');
+  assert.equal(held.inconsistencies?.length ?? 0, 0, 'the consistency check does not ask about a kept text again');
+  const later = of(kept.replace('我改過的', '我又改了'));
+  assert.equal(later.handEdited, true, 'edited since the keep: the box asks again although the stage is still checked');
+  assert.equal(later.inconsistencies.length, 1, 'no longer kept: the findings show again');
+  assert.ok(b.reviewProblems(later).some(p => p.text === '這章有你手改的內容，這次重跑沒有重寫它'));
+});
+
 test('C7 hand-edited wording: text the program never wrote (no fingerprint, no [!vam-book] callout, a review box does not count) says it was there before the book', () => {
   const integrity = require('./support-replay.cjs').load('core/book-pipeline/body-integrity.ts');
   const box = review({ stage: 'needs-review' });

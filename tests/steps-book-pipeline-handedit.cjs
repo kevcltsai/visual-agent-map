@@ -300,6 +300,34 @@ test('controller: keep writes the choice into the chapter and marks it checked w
   assert.equal(d.state.writes, 0);
   assert.equal(d.state.fields.length, 0);
 });
+test('controller: keep is judged on the text the write saw (an open editor saves later, the disk read lags behind): the chapter is checked', async () => {
+  const r = rig();
+  const stale = r.state.raw;
+  const ctl = new b.BookHandEdits({ ...r.ctl.ports, readCard: async () => ({ path: PATH, title: 'T', raw: stale, detail: '' }) });
+  await ctl.keep(PATH);
+  assert.equal(b.isKeptRaw(r.state.raw), true, 'the editor text holds the keep');
+  assert.deepEqual(JSON.parse(JSON.stringify(r.state.fields)), [{ path: PATH, patch: { pipelineStage: 'checked', pipelineIssue: null } }], 'checked although the disk still shows the text before the keep');
+});
+test('controller: "accept as it is" records the program\'s own text as kept and checks it; a hand-edited, empty or refused text is not kept', async () => {
+  const clean = rig();
+  clean.setDetail(b.stampDetail(BODY));
+  await clean.ctl.keep(PATH, true);
+  assert.equal(b.isKeptRaw(clean.state.raw), true);
+  assert.deepEqual(JSON.parse(JSON.stringify(clean.state.fields)), [{ path: PATH, patch: { pipelineStage: 'checked', pipelineIssue: null } }]);
+  const edited = rig();
+  await edited.ctl.keep(PATH, true);
+  assert.equal(b.isKeptRaw(edited.state.raw), false, 'a hand-edited text is answered by the keep box, not by accept');
+  assert.equal(edited.state.fields.length, 0);
+  const empty = rig();
+  empty.setDetail('');
+  await empty.ctl.keep(PATH, true);
+  assert.equal(empty.state.fields.length, 0, 'an empty chapter is not accepted as kept');
+  const refused = rig();
+  refused.setDetail(b.stampDetail(BODY));
+  const ctl = new b.BookHandEdits({ ...refused.ctl.ports, write: async () => 'refused' });
+  await ctl.keep(PATH, true);
+  assert.equal(refused.state.fields.length, 0, 'a refused write marks nothing');
+});
 test('controller: a refused keep (the writer throws, or the note has no Detail block to keep) writes no stage', async () => {
   const r = rig();
   const ctl = new b.BookHandEdits({ ...r.ctl.ports, write: async () => { throw new Error('refused'); } });

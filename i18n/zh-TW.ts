@@ -3154,6 +3154,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_resume": "從停處繼續",
   "ui.book_restart": "重新設定再開始",
   "ui.book_map_changed_0_1": "心智圖變了：多 {0} 章、少 {1} 章",
+  "ui.book_map_reordered": "心智圖變了：章節順序不同",
   "ui.book_map_replan": "重新規劃",
   "ui.book_map_keep": "照舊跑完（不含新卡）",
   "ui.book_refused_empty": "這張心智圖只有根議題、沒有章節卡片，沒有東西可以寫。請先加上章節卡片。",

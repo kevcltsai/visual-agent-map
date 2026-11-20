@@ -1321,6 +1321,20 @@ test('toolbar gate 2 with chapters to check: the sentence, 下一章要看的 cy
   assert.equal(JSON.stringify(g.entries), JSON.stringify([['finish', MAP]]));
 });
 
+test('toolbar gate 2: chapters that only wait for a join to be confirmed are counted apart from the ones to look at', async () => {
+  lang('zh-TW');
+  const g = await gateRig({ phase: 'gate2', stages: { root: 'checked', a: 'checked', b: 'needs-review' } });
+  g.view.notes.get(g.ids.b).pipelineIssue = 'proof unmet: C1';
+  g.view.notes.get(g.ids.a).pipelineSeam = g.ids.b;
+  assert.ok(texts(g.drawBar()).includes('3 章寫好了，1 章要你看，1 章銜接待確認'));
+  assert.deepEqual(g.labels(g.drawBar()), ['下一章要看的', '驗收完成', '停止'], 'a join to confirm is still a chapter the link goes to');
+  delete g.view.notes.get(g.ids.a).pipelineSeam;
+  assert.ok(texts(g.drawBar()).includes('3 章寫好了，1 章要你看'), 'no join left: the usual sentence');
+  lang('en'); assert.equal(tr('ui.book_bar_review_seam_0_1_2', 3, 1, 1), '3 chapters written, 1 need a look, 1 joins to confirm');
+  lang('zh-CN'); assert.equal(tr('ui.book_bar_review_seam_0_1_2', 3, 1, 1), '3 章写好了，1 章要你看，1 章衔接待确认');
+  lang('zh-TW');
+});
+
 test('toolbar gate 2 with nothing to check: no link, and 驗收完成 finishes at once', async () => {
   lang('zh-TW');
   const g = await gateRig({ phase: 'gate2', stages: { root: 'checked', a: 'checked', b: 'checked' } });
@@ -1368,7 +1382,7 @@ test('toolbar source: the panel, its toggle and the finish modal are gone from t
 async function boxRig({ stage = 'needs-review', seam } = {}) {
   const g = await gateRig({ phase: 'gate2' });
   const calls = { collapse: [], reconcile: [], seam: [], renders: 0, drain: [], tick: [], keep: [], handled: [], reopen: [] };
-  g.plugin.bookHandEdits = { drain: async path => { calls.drain.push(path); }, tick: async (path, id) => { calls.tick.push([path, id]); }, keep: async path => { calls.keep.push(path); } };
+  g.plugin.bookHandEdits = { drain: async path => { calls.drain.push(path); }, tick: async (path, id) => { calls.tick.push([path, id]); }, keep: async (path, accept) => { calls.keep.push(accept ? [path, 'accept'] : path); } };
   g.plugin.bookCallouts = { collapse: async path => { calls.collapse.push(path); return 'written'; }, reconcile: async path => { calls.reconcile.push(path); }, markHandled: async path => { calls.handled.push(path); return 'written'; }, reopen: async path => { calls.reopen.push(path); return 'written'; } };
   // The fold waits three seconds in the product; here it waits for the next timer turn (see `folded`).
   g.view.bookFoldDelayMs = 0;
@@ -1462,7 +1476,7 @@ async function handRig() {
   const tickAt = at => r.view.app.vault.process(file, raw => { let n = 0; return raw.replace(/\[ \]/g, m => (n++ === at ? '[x]' : m)); });
   return { ...r, e, tickAt };
 }
-test('T9 box: ticking "rewrite" calls the hand-edit controller (not a resolution, nothing collapses); ticking "keep" records the keep and resolves; a plain box never calls keep', async () => {
+test('T9 box: ticking "rewrite" calls the hand-edit controller (not a resolution, nothing collapses); ticking "keep" records the keep and resolves; a plain box records "accept as it is" as an accepted keep', async () => {
   const r = await handRig();
   await r.tickAt(1);
   await r.modified(); await dom.tick();
@@ -1479,7 +1493,9 @@ test('T9 box: ticking "rewrite" calls the hand-edit controller (not a resolution
   const plain = await boxRig();
   await plain.writeBox({ ticked: true });
   await plain.modified();
-  assert.deepEqual(plain.calls.keep, [], 'a box without an operation id is no hand-edit box');
+  // Contract change (Primary decision, principle C3): "accept as it is" on a program-written chapter is recorded like a keep, once, so a
+  // whole-book rerun leaves it alone; it is still no hand-edit box (no tick).
+  assert.deepEqual(plain.calls.keep, [[plain.node.path, 'accept']], 'accept as it is records the program text as kept');
   assert.deepEqual(plain.calls.tick, []);
 });
 
@@ -1553,6 +1569,21 @@ test('review box: a tick written for an older fingerprint does not resolve; a ti
   assert.deepEqual(r.attention(), [r.ids.a]);
   assert.deepEqual(r.calls.collapse, []);
 });
+test('review box: the answer is recorded once (a later save of the handled box records nothing); a handled box for an attention the chapter no longer has is written again', async () => {
+  const r = await boxRig();
+  await r.writeBox({ ticked: true });
+  await r.modified();
+  assert.deepEqual(r.calls.keep, [[r.node.path, 'accept']]);
+  await r.view.app.vault.process(r.view.app.vault.getAbstractFileByPath(r.node.path), raw => bundle.markReviewHandled(raw));
+  await r.modified(); await r.folded();
+  assert.deepEqual(r.calls.keep, [[r.node.path, 'accept']], 'the save after the box said handled does not record again (the kept record stays on the text it was given)');
+  const s = await boxRig();
+  await s.writeBox({ ticked: true, fp: 'answered-for-older-text' });
+  await s.view.app.vault.process(s.view.app.vault.getAbstractFileByPath(s.node.path), raw => bundle.markReviewHandled(raw));
+  await s.modified();
+  assert.deepEqual(s.calls.reconcile, [MAP], 'the box asks again for what the chapter needs now (a kept text edited since)');
+  assert.deepEqual(s.calls.keep, [], 'nothing is kept for an answer that no longer fits');
+});
 test('review box: a chapter whose only problem was the join confirms the join when ticked, then the boxes are reconciled', async () => {
   const r = await boxRig({ stage: 'checked', seam: 'n:1' });
   await r.view.hydrate();
@@ -1564,6 +1595,7 @@ test('review box: a chapter whose only problem was the join confirms the join wh
   assert.deepEqual(r.calls.collapse, [r.node.path]);
   assert.deepEqual(r.calls.seam, [[MAP, r.ids.a]]);
   assert.deepEqual(r.calls.reconcile, [MAP]);
+  assert.deepEqual(r.calls.keep, [], 'a join to confirm is not a text to keep');
 });
 test('review box: only a chapter of the open book at gate 2 is looked at; after the view closes nothing runs', async () => {
   const r = await boxRig();

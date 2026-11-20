@@ -192,13 +192,20 @@ export interface BookPipelineData {
  * sentence, `claimB` the words used, `suggestion` the right ones. It concerns `a` only.
  */
 export interface ConsistencyFinding {
-  /** Absent: two chapters disagree (the model's finding). `removed`: chapter `a` still names the removed chapter `b` (title in `claimB`, found by the program). */
-  kind?: "reference" | "removed";
+  /**
+   * Absent: two chapters disagree (the model's finding, or the program's number check; `a` and `b` may be one chapter). `removed`:
+   * chapter `a` still names the removed chapter `b` (title in `claimB`, found by the program). `direction`: chapter `a` says
+   * chapter `b`'s subject comes later or came earlier (pointer words in `claimB`) and it is the other way (`suggestion`).
+   */
+  kind?: "reference" | "removed" | "direction";
   a: string;
   b: string;
   claimA: string;
   claimB: string;
   suggestion: string;
+  /** The claim is the model's paraphrase (no sentence of the chapter matched it): shown without quotes. */
+  looseA?: true;
+  looseB?: true;
 }
 export interface BookConsistency {
   /** The chapters and revisions it was asked for (`consistencyKey`). */
@@ -233,7 +240,12 @@ function consistencyShape(value: unknown): boolean {
       value.findings.every(
         item =>
           isObject(item) &&
-          (item.kind === undefined || item.kind === "reference" || item.kind === "removed") &&
+          (item.kind === undefined ||
+            item.kind === "reference" ||
+            item.kind === "removed" ||
+            item.kind === "direction") &&
+          (item.looseA === undefined || item.looseA === true) &&
+          (item.looseB === undefined || item.looseB === true) &&
           isText(item.a) &&
           isText(item.b) &&
           isText(item.claimA) &&

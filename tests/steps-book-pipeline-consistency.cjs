@@ -282,3 +282,126 @@ test('removed reference through the check: stored with its kind, shown on the na
   const entries = review.reviewEntries({ order: ['a'], titleOf: id => data.chapters[id].title, noteOf: id => notes[id], inconsistencies: id => consistency.chapterInconsistencies(data, id) });
   assert.deepEqual(plain(entries[0].problems.map(p => p.text)), ['和〈照顧〉說法不一致：這章寫「三天」，〈照顧〉寫「一到兩天」，統一寫一到三天', '這章還提到已移除的〈換盆〉：「之後見換盆。」']);
 });
+
+// ---- the program's own checks beside the call (v5 live run) ----
+
+const cross = load('core/book-pipeline/cross-checks.ts');
+// Sentences from the v5 book (家庭菜園入門), cut to the paragraphs that matter.
+const V5 = {
+  intro: '### 光線是陽台最先要量的條件\n\n一般來說，大部分蔬菜最喜歡全日照，也就是一天有八小時左右的直射陽光；如果只有四小時上下的半日照，也不用氣餒，有些葉菜和辛香料比較耐陰，一樣種得起來。',
+  soil: '陽台的盆子也要放對位置。大多數蔬菜都喜歡日照，一天最好有四到六小時的光，小番茄要求更高。\n\n所以青蔥的盆要比小白菜深一點，大約二十到三十公分，寬度可以窄一些。一個中型的長條盆或直徑約二十公分的深盆，就能種上幾株蔥。',
+  harvest: '所以要先「發酵」。做法是：把果實切開，放進一個小玻璃杯。放大約 3 到 7 天，天氣越冷越久。\n\n需要說明的是，不同網站對發酵天數的建議不太一致，有的說 1 到 2 天、有的說 3 到 5 天，主要是看室溫高低，所以以上面的描述為主。\n\n至於如何播種、育苗，留到後面的章節再講，這裡只要先把種子好好收著就行。',
+  picks: '### 小白菜：最容易成功的第一選擇\n\n在一般的家庭栽培資料裡，小白菜從播種到採收大約 25 至 30 天，也有寫約 30 天的。它的根系比較淺，所以不需要很深的盆子，盆土深度至少 10 公分、用排水良好的壤土就可以。\n\n### 小番茄：最有成就感，也最考驗耐心\n\n依園藝資料，小番茄品種從定植到採收，常見是 50 至 65 天；有一個 25 到 30 公分深的大盆，才考慮小番茄。\n\n澆水的原則，前面講過：保持土壤濕潤但不積水。'
+};
+const v5Book = () => [
+  { id: 'intro', title: '家庭菜園入門', text: V5.intro },
+  { id: 'soil', title: '土壤與容器準備', text: V5.soil },
+  { id: 'sow', title: '播種與育苗', text: '撒種後蓋薄土。' },
+  { id: 'water', title: '澆水施肥與病蟲害', text: '看土再澆水。' },
+  { id: 'harvest', title: '採收與保存', text: V5.harvest },
+  { id: 'picks', title: '新手推薦蔬菜', text: V5.picks }
+];
+
+test('quantitiesIn: ranges, Han numerals, 「兩三」, at-least/at-most words; a bare 「一天」, an ordinal and a month name are not amounts', () => {
+  const q = text => plain(cross.quantitiesIn(text)).map(({ unit, low, high }) => [unit, low, high]);
+  assert.deepEqual(q('一天最好有四到六小時的光'), [['h', 4, 6]]);
+  assert.deepEqual(q('大約 25 至 30 天'), [['day', 25, 30]]);
+  assert.deepEqual(q('只有兩三個小時的光'), [['h', 2, 3]]);
+  assert.deepEqual(q('土量最好有十五到二十公升以上，深度至少三十公分'), [['l', 15, null], ['cm', 30, null]]);
+  assert.deepEqual(q('直徑不到20公分'), [['cm', 0, 20]]);
+  assert.deepEqual(q('小白菜一個多月就能收'), [['month', 1, 1.99]]);
+  assert.deepEqual(q('3月播種，第3天發芽，一年四季都行'), []);
+});
+
+test('numericFindings: v5 missed 「八小時」 against 「四到六小時」 for most vegetables; the claims are the chapters\' own sentences', () => {
+  const found = plain(cross.numericFindings(v5Book()));
+  const light = found.find(f => f.a === 'intro' && f.b === 'soil');
+  assert.deepEqual(light, {
+    a: 'intro', b: 'soil',
+    claimA: '一般來說，大部分蔬菜最喜歡全日照，也就是一天有八小時左右的直射陽光；',
+    claimB: '大多數蔬菜都喜歡日照，一天最好有四到六小時的光，小番茄要求更高。',
+    suggestion: ''
+  });
+  // v5 missed 5 (tomato light, another pair): 「至少六小時」 against 「4 到 5 小時」 for the same plant.
+  const tomato = cross.numericFindings([
+    { id: 'x', title: '入門', text: '吃果實的蔬菜，例如番茄、辣椒，至少要六小時的直射陽光。' },
+    { id: 'y', title: '推薦', text: '小番茄喜歡陽光，番茄每天有 4 到 5 小時的直射陽光就夠了。' }
+  ]);
+  assert.equal(tomato.length, 1);
+  assert.deepEqual([tomato[0].a, tomato[0].b], ['x', 'y']);
+});
+
+test('numericFindings: different subjects, different measures, meeting ranges and alternatives in one chapter are not contradictions', () => {
+  const found = plain(cross.numericFindings(v5Book()));
+  // 小白菜 25–30 days and 小番茄 50–65 days: the book's headings name them as two subjects.
+  assert.ok(!found.some(f => f.claimA.includes('25 至 30 天') || f.claimB.includes('50 至 65 天')));
+  // 「直徑約二十公分」 and 「25 到 30 公分深」 measure different things.
+  assert.ok(!found.some(f => f.claimA.includes('直徑約二十公分') || f.claimB.includes('直徑約二十公分')));
+  // v5 missed 6: the chapter itself gives 3–5 days, inside its 3–7 days, and says to follow the description: not flagged.
+  assert.ok(!found.some(f => f.a === 'harvest' && f.b === 'harvest'));
+  // 「至少 10 公分」 meets 「十五到二十公分」.
+  assert.deepEqual(plain(cross.numericFindings([
+    { id: 'x', title: '土', text: '小白菜的盆，盆土深度大約十五到二十公分就夠了。' },
+    { id: 'y', title: '菜', text: '小白菜的盆，盆土深度至少 10 公分就夠了。' }
+  ])), []);
+  // Same words, other subject named in the book's headings: 小白菜 vs 小番茄 盆深.
+  assert.deepEqual(plain(cross.numericFindings([
+    { id: 'x', title: '土', text: '### 小白菜：淺盆\n\n小白菜的盆，盆土深度大約十五公分就夠了。' },
+    { id: 'y', title: '菜', text: '### 小番茄：深盆\n\n小番茄的盆，盆土深度大約三十公分就夠了。' }
+  ])), []);
+  // A pair the model already reported is not added twice.
+  const known = [{ a: 'intro', b: 'soil', claimA: '八小時左右', claimB: '四到六小時', suggestion: '' }];
+  assert.ok(!cross.numericFindings(v5Book(), known).some(f => f.a === 'intro' && f.b === 'soil'));
+});
+
+test('directionFindings: v5 「播種、育苗留到後面的章節再講」 in chapter 5 points back to chapter 3; a pointer that goes the right way, a tie or no title word is not judged', () => {
+  assert.deepEqual(plain(cross.directionFindings(v5Book())), [
+    { kind: 'direction', a: 'harvest', b: 'sow', claimA: '至於如何播種、育苗，留到後面的章節再講，這裡只要先把種子好好收著就行。', claimB: '留到後面', suggestion: '前面的第3章' }
+  ], '「澆水的原則，前面講過」 in chapter 6 points at chapter 4: right');
+  const book = [
+    { id: 'a', title: '播種與育苗', text: '移植前面講過了。' },
+    { id: 'b', title: '移植與換盆', text: '換盆的事後面會講。' },
+    { id: 'c', title: '換盆', text: '這章講換盆。' }
+  ];
+  assert.deepEqual(plain(cross.directionFindings(book).map(f => [f.a, f.b, f.suggestion])), [['a', 'b', '後面的第2章']], 'b\'s 換盆 points at the later 換盆 chapter: right');
+  assert.deepEqual(plain(cross.directionFindings([{ id: 'x', title: '播種', text: 'x' }, { id: 'y', title: '育苗', text: 'y' }, { id: 'z', title: '採收', text: '播種、育苗後面會講。' }])), [], 'two chapters named once each: a tie, not judged');
+  assert.deepEqual(plain(cross.directionFindings([{ id: 'a', title: '甲', text: '后面的章节再讲播种。' }, { id: 'b', title: '播种', text: 'x' }])), [], 'later chapter: right');
+  assert.equal(cross.directionFindings([{ id: 'a', title: '播种', text: 'x' }, { id: 'b', title: '乙', text: '播种留到后面的章节。' }])[0].suggestion, '前面的第1章');
+});
+
+test('verbatimQuote: the model\'s quote is kept when the chapter has it; a paraphrase becomes the chapter\'s sentence with the same amount; nothing matching is undefined', () => {
+  const text = '它的根系比較淺，所以不需要很深的盆子。盆土深度至少 10 公分、用排水良好的壤土就可以。\n\n小白菜約 25 至 30 天可採。';
+  assert.equal(cross.verbatimQuote('盆土深度至少10公分，用排水良好的壤土就可以', text), '盆土深度至少10公分，用排水良好的壤土就可以', 'spacing and punctuation aside');
+  assert.equal(cross.verbatimQuote('第6章說小白菜的盆深度至少10公分', text), '盆土深度至少 10 公分、用排水良好的壤土就可以。');
+  assert.equal(cross.verbatimQuote('第6章說小白菜的盆深度至少十公分', text), '盆土深度至少 10 公分、用排水良好的壤土就可以。', 'Han and Arabic numerals are the same amount');
+  assert.equal(cross.verbatimQuote('盆深十五公分', text), undefined);
+  assert.equal(cross.verbatimQuote('壤土比較好', text), undefined, 'no amount to look for');
+});
+
+test('the review box: a paraphrase is not shown in quotes, a chapter that contradicts itself says so, a wrong direction names where the chapter is; the stored kinds read back', () => {
+  review.setUiLanguage('zh-TW');
+  const { state } = written();
+  const begun = machine.beginConsistency(state);
+  const found = [
+    { a: 'a', b: 'c', claimA: '三天就發芽。', claimB: '第3章說一到兩天', suggestion: '', looseB: true },
+    { a: 'c', b: 'c', claimA: '放 3 到 7 天。', claimB: '有的說 1 到 2 天。', suggestion: '' },
+    { kind: 'direction', a: 'c', b: 'a', claimA: '發芽留到後面的章節再講。', claimB: '留到後面', suggestion: '前面的第1章' }
+  ];
+  const data = machine.applyConsistency(begun.state, begun.token, found).state;
+  assert.equal(model.readBookPipeline({ bookPipeline: plain(data) }).kind, 'usable');
+  const bad = plain(data); bad.consistency.findings[0].looseB = false;
+  assert.equal(model.readBookPipeline({ bookPipeline: bad }).kind, 'unusable');
+  const titles = { a: '發芽', b: '換盆', c: '照顧' };
+  const entries = review.reviewEntries({ order: IDS, titleOf: id => titles[id], noteOf: () => ({ pipelineStage: 'needs-review', pipelineIssue: 'consistency' }), inconsistencies: id => consistency.chapterInconsistencies(data, id) });
+  const textOf = id => plain(entries.find(e => e.card.id === id).problems.map(p => p.text));
+  assert.deepEqual(textOf('a'), ['和〈照顧〉說法不一致：這章寫「三天就發芽。」，〈照顧〉寫（大意）第3章說一到兩天']);
+  assert.deepEqual(textOf('c'), [
+    '和〈發芽〉說法不一致：這章寫（大意）第3章說一到兩天，〈發芽〉寫「三天就發芽。」',
+    '這章前後說法不一致：先寫「放 3 到 7 天。」，後面又寫「有的說 1 到 2 天。」',
+    '前後指錯：「發芽留到後面的章節再講。」裡的「留到後面」說的是〈發芽〉，那是前面的第1章'
+  ]);
+  review.setUiLanguage('en');
+  const en = review.reviewEntries({ order: ['a'], titleOf: id => titles[id], noteOf: () => ({ pipelineStage: 'needs-review', pipelineIssue: 'consistency' }), inconsistencies: id => consistency.chapterInconsistencies(data, id) });
+  assert.equal(en[0].problems[0].text, 'Says something differently from 〈照顧〉: this chapter says “三天就發芽。”, 〈照顧〉 says (paraphrased) 第3章說一到兩天');
+  review.setUiLanguage('zh-TW');
+});

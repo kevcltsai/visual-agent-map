@@ -3149,6 +3149,7 @@ var en = {
   "ui.book_resume": "Continue from where it stopped",
   "ui.book_restart": "Change settings and start over",
   "ui.book_map_changed_0_1": "The map changed: {0} chapters added, {1} removed",
+  "ui.book_map_reordered": "The map changed: the chapters are in a different order",
   "ui.book_map_replan": "Plan again",
   "ui.book_map_keep": "Carry on as before (without the new cards)",
   "ui.book_refused_empty": "This mind map has only a root topic and no chapter cards, so there is nothing to write. Add chapter cards first.",
@@ -3173,6 +3174,7 @@ var en = {
   "ui.book_bar_notes_ask_0": "{0} notes are not applied yet. Run the whole book anyway?",
   "ui.book_bar_go_anyway": "Run anyway",
   "ui.book_bar_review_0_1": "{0} chapters written, {1} need a look",
+  "ui.book_bar_review_seam_0_1_2": "{0} chapters written, {1} need a look, {2} joins to confirm",
   "ui.book_bar_next_review": "Next chapter to check",
   "ui.book_bar_finish": "Finish review",
   "ui.book_bar_finish_ask_0": "{0} chapters are not handled yet. Finish anyway?",
@@ -6391,6 +6393,7 @@ var zhCN = {
   "ui.book_resume": "\u4ECE\u505C\u5904\u7EE7\u7EED",
   "ui.book_restart": "\u91CD\u65B0\u8BBE\u7F6E\u518D\u5F00\u59CB",
   "ui.book_map_changed_0_1": "\u5FC3\u667A\u56FE\u53D8\u4E86\uFF1A\u591A {0} \u7AE0\u3001\u5C11 {1} \u7AE0",
+  "ui.book_map_reordered": "\u5FC3\u667A\u56FE\u53D8\u4E86\uFF1A\u7AE0\u8282\u987A\u5E8F\u4E0D\u540C",
   "ui.book_map_replan": "\u91CD\u65B0\u89C4\u5212",
   "ui.book_map_keep": "\u7167\u65E7\u8DD1\u5B8C\uFF08\u4E0D\u542B\u65B0\u5361\uFF09",
   "ui.book_refused_empty": "\u8FD9\u5F20\u5FC3\u667A\u56FE\u53EA\u6709\u6839\u8BAE\u9898\u3001\u6CA1\u6709\u7AE0\u8282\u5361\u7247\uFF0C\u6CA1\u6709\u4E1C\u897F\u53EF\u4EE5\u5199\u3002\u8BF7\u5148\u52A0\u4E0A\u7AE0\u8282\u5361\u7247\u3002",
@@ -6415,6 +6418,7 @@ var zhCN = {
   "ui.book_bar_notes_ask_0": "\u8FD8\u6709 {0} \u5219\u5907\u6CE8\u6CA1\u5957\u7528\uFF0C\u4ECD\u8981\u8DD1\u5B8C\u5168\u4E66\u5417\uFF1F",
   "ui.book_bar_go_anyway": "\u4ECD\u8981",
   "ui.book_bar_review_0_1": "{0} \u7AE0\u5199\u597D\u4E86\uFF0C{1} \u7AE0\u8981\u4F60\u770B",
+  "ui.book_bar_review_seam_0_1_2": "{0} \u7AE0\u5199\u597D\u4E86\uFF0C{1} \u7AE0\u8981\u4F60\u770B\uFF0C{2} \u7AE0\u8854\u63A5\u5F85\u786E\u8BA4",
   "ui.book_bar_next_review": "\u4E0B\u4E00\u7AE0\u8981\u770B\u7684",
   "ui.book_bar_finish": "\u9A8C\u6536\u5B8C\u6210",
   "ui.book_bar_finish_ask_0": "\u8FD8\u6709 {0} \u7AE0\u6CA1\u5904\u7406\uFF0C\u4ECD\u8981\u5B8C\u6210\u5417\uFF1F",
@@ -9633,6 +9637,7 @@ var zhTW = {
   "ui.book_resume": "\u5F9E\u505C\u8655\u7E7C\u7E8C",
   "ui.book_restart": "\u91CD\u65B0\u8A2D\u5B9A\u518D\u958B\u59CB",
   "ui.book_map_changed_0_1": "\u5FC3\u667A\u5716\u8B8A\u4E86\uFF1A\u591A {0} \u7AE0\u3001\u5C11 {1} \u7AE0",
+  "ui.book_map_reordered": "\u5FC3\u667A\u5716\u8B8A\u4E86\uFF1A\u7AE0\u7BC0\u9806\u5E8F\u4E0D\u540C",
   "ui.book_map_replan": "\u91CD\u65B0\u898F\u5283",
   "ui.book_map_keep": "\u7167\u820A\u8DD1\u5B8C\uFF08\u4E0D\u542B\u65B0\u5361\uFF09",
   "ui.book_refused_empty": "\u9019\u5F35\u5FC3\u667A\u5716\u53EA\u6709\u6839\u8B70\u984C\u3001\u6C92\u6709\u7AE0\u7BC0\u5361\u7247\uFF0C\u6C92\u6709\u6771\u897F\u53EF\u4EE5\u5BEB\u3002\u8ACB\u5148\u52A0\u4E0A\u7AE0\u7BC0\u5361\u7247\u3002",
@@ -9657,6 +9662,7 @@ var zhTW = {
   "ui.book_bar_notes_ask_0": "\u9084\u6709 {0} \u5247\u5099\u8A3B\u6C92\u5957\u7528\uFF0C\u4ECD\u8981\u8DD1\u5B8C\u5168\u66F8\u55CE\uFF1F",
   "ui.book_bar_go_anyway": "\u4ECD\u8981",
   "ui.book_bar_review_0_1": "{0} \u7AE0\u5BEB\u597D\u4E86\uFF0C{1} \u7AE0\u8981\u4F60\u770B",
+  "ui.book_bar_review_seam_0_1_2": "{0} \u7AE0\u5BEB\u597D\u4E86\uFF0C{1} \u7AE0\u8981\u4F60\u770B\uFF0C{2} \u7AE0\u929C\u63A5\u5F85\u78BA\u8A8D",
   "ui.book_bar_next_review": "\u4E0B\u4E00\u7AE0\u8981\u770B\u7684",
   "ui.book_bar_finish": "\u9A57\u6536\u5B8C\u6210",
   "ui.book_bar_finish_ask_0": "\u9084\u6709 {0} \u7AE0\u6C92\u8655\u7406\uFF0C\u4ECD\u8981\u5B8C\u6210\u55CE\uFF1F",
@@ -13826,6 +13832,18 @@ function retargetNeighbourLine(prompt, key4, neighbour2) {
   const rest = m && (m[2] === title || m[2].startsWith(`${title} \u2014 `)) ? m[2].slice(title.length + 3) : void 0;
   if (m && rest !== void 0 && Number(m[1]) === neighbour2.position) return void 0;
   return rewriteNeighbourLine(prompt, key4, rest === void 0 ? neighbour2 : { ...neighbour2, summary: rest });
+}
+function dropEntryNaming(prompt, titles) {
+  const lines = prompt.split("\n");
+  const at = lines.findIndex((line2) => {
+    const m = /^([^:：]+)[:：]/.exec(line2);
+    return !!m && matches(L.entry, m[1].trim());
+  });
+  if (at < 0) return void 0;
+  const value = lines[at].replace(/^[^:：]+[:：]/, "");
+  if (!titles.some((title) => Array.from(title.trim()).length >= 2 && value.includes(title.trim()))) return void 0;
+  lines.splice(at, 1);
+  return lines.join("\n");
 }
 function composeBookPlan(plan, language2) {
   const c = colon(language2);
@@ -53701,7 +53719,7 @@ var BookPipelineRuns = class {
     );
     return result;
   }
-  /** The owner's "seam checked": the only thing that clears `pipeline-seam` (a proofread or any automatic step never does). */
+  /** The owner's "seam checked" clears `pipeline-seam` (a proofread never does; a whole-book rewrite does, see `clearSeams`). */
   async confirmSeam(mapPath, nodeId) {
     return this.enter(mapPath, async (drive) => {
       const map = await this.ports.readMap(mapPath);
@@ -53908,14 +53926,30 @@ var BookPipelineRuns = class {
    * a line that already names it is left. Only those lines change: no role, stage, text or fingerprint is touched, and no AI call is made.
    */
   async refreshAroundRemoved(drive) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const signal = drive.controller.signal;
     if (!((_a2 = drive.store.state.removed) == null ? void 0 : _a2.length) || this.dead(drive) || signal.aborted || drive.fatal !== void 0) return;
     const order = effectiveOrder(drive.store.state);
+    const present = new Set(order.map((id) => {
+      var _a3, _b3;
+      return (_b3 = (_a3 = drive.cards.get(id)) == null ? void 0 : _a3.title.trim()) != null ? _b3 : "";
+    }));
+    const gone = ((_b2 = drive.store.state.removed) != null ? _b2 : []).map((id) => {
+      var _a3, _b3, _c2, _d2;
+      return (_d2 = (_c2 = (_b3 = (_a3 = drive.store.state.chapters) == null ? void 0 : _a3[id]) == null ? void 0 : _b3.title) == null ? void 0 : _c2.trim()) != null ? _d2 : "";
+    }).filter((title) => title && !present.has(title));
     try {
       for (const [at, nodeId] of order.entries()) {
         const own2 = drive.cards.get(nodeId);
         if (!own2 || drive.stages.get(nodeId) === void 0) continue;
+        const before = await this.ports.readCard(own2.path);
+        const dropped = gone.length ? dropEntryNaming(before.prompt, gone) : void 0;
+        if (dropped !== void 0 && !this.dead(drive) && !signal.aborted)
+          await this.ports.updateNoteGuarded(
+            own2.path,
+            { prompt: dropped },
+            { expectedContent: before.raw, authorize: () => !this.dead(drive) && !signal.aborted }
+          );
         for (const { index, key: key4 } of [
           { index: at - 1, key: "previous" },
           { index: at + 1, key: "next" }
@@ -53930,7 +53964,7 @@ var BookPipelineRuns = class {
             neighbourLine = {
               position: index + 1,
               title: neighbour2.title,
-              summary: summaryText2((_c = (_b2 = parseCardPrompt(neighbour2.prompt).covers) != null ? _b2 : neighbour2.summary) != null ? _c : "").trim()
+              summary: summaryText2((_d = (_c = parseCardPrompt(neighbour2.prompt).covers) != null ? _c : neighbour2.summary) != null ? _d : "").trim()
             };
           }
           const prompt = retargetNeighbourLine(raw.prompt, key4, neighbourLine);
@@ -54914,8 +54948,9 @@ var BookPipelineRuns = class {
    * one-time permission for exactly this text. A kept choice wins over clean/empty: an older note the reader kept has no program fingerprint.
    */
   mayOverwriteCard(drive, nodeId, raw) {
+    var _a2;
     const state = bodyStateRaw(raw);
-    if ((state === "clean" || state === "empty") && !isKeptRaw(raw)) return true;
+    if ((state === "clean" || state === "empty") && (!isKeptRaw(raw) || ((_a2 = drive.rerun) == null ? void 0 : _a2.nodeId) === nodeId)) return true;
     const permit = drive.overwrite.get(nodeId);
     return !!permit && permit.runId === drive.store.state.runId && permit.fingerprint === integrityFpRaw(raw);
   }
@@ -54926,7 +54961,7 @@ var BookPipelineRuns = class {
     const rootInfo = drive.cards.get(drive.rootId);
     if (!info || !rootInfo) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
-    if (isKeptRaw(card.raw) || bodyStateRaw(card.raw) === "unknown" && !pipelineWroteRaw(card.raw))
+    if (isKeptRaw(card.raw) && bodyStateRaw(card.raw) !== "clean" || bodyStateRaw(card.raw) === "unknown" && !pipelineWroteRaw(card.raw))
       drive.ownSummary.add(nodeId);
     if (!this.mayOverwriteCard(drive, nodeId, card.raw)) {
       this.log(drive, "plan_skipped", nodeId, "plan", "hand_edited");
@@ -55237,7 +55272,29 @@ ${oldDetail}`);
     const filled = expanding ? await this.settleStrayMarkers(path, authorize) : await this.fillSlots(drive, token, nodeId, path, slots, authorize);
     if (filled) return filled;
     drive.imagesDone.add(nodeId);
-    return { kind: "ok", after: () => this.setStage(drive, nodeId, "written", null) };
+    return {
+      kind: "ok",
+      after: async () => {
+        await this.setStage(drive, nodeId, "written", null);
+        await this.clearSeams(drive, nodeId);
+      }
+    };
+  }
+  /**
+   * The whole run wrote this chapter again, beside its neighbours as they are now: the join marks of the chapter and of both neighbours
+   * (left by an earlier single-card rerun) are stale and go (Primary decision). A single-card job sets its neighbours' marks itself.
+   */
+  async clearSeams(drive, nodeId) {
+    if (drive.job) return;
+    const order = effectiveOrder(drive.store.state);
+    const at = order.indexOf(nodeId);
+    if (at < 0) return;
+    for (const id of [order[at - 1], nodeId, order[at + 1]]) {
+      const info = id ? drive.cards.get(id) : void 0;
+      if (!info || this.dead(drive)) continue;
+      const card = await this.ports.readCard(info.path).catch(() => void 0);
+      if ((card == null ? void 0 : card.fields.pipelineSeam) !== void 0) await this.writeFields(drive, id, { pipelineSeam: null });
+    }
   }
   /**
    * The picture slots of one written card. No picture plan in the Prompt (`slots` undefined, #12): no search, no record, only a stray
@@ -55860,7 +55917,8 @@ function bookBarState(data, progress, stageOf, mapIds) {
     added: (_h = (_g = data.changed) == null ? void 0 : _g.added.length) != null ? _h : 0,
     missing: (_j = (_i = data.changed) == null ? void 0 : _i.missing.length) != null ? _j : 0
   } : void 0;
-  const gateChange = !mapChange && !active && status !== "stopped" && mapIds && (phase === "gate1" || phase === "gate2" || phase === "done") ? countChange(mapDifference(data, mapIds)) : void 0;
+  const gateChange = !mapChange && mapIds && (phase === "done" || !active && status !== "stopped" && (phase === "gate1" || phase === "gate2")) ? countChange(mapDifference(data, mapIds)) : void 0;
+  const reordered = phase === "done" && gateChange && !gateChange.added && !gateChange.missing && mapIds ? sameOrder(order, mapIds) ? void 0 : { added: 0, missing: 0, reordered: true } : void 0;
   const mode = mapChange ? "changed" : status === "stopped" && pauseReason === "budget" ? "budget" : status === "stopped" || interrupted ? "stopped" : phase;
   const current = mode === "planning" || mode === "writing" ? currentOf2(data, progress, stageOf) : void 0;
   const rerunning = !!(progress == null ? void 0 : progress.active) && !!progress.rerun && order.includes(progress.rerun.nodeId);
@@ -55877,11 +55935,17 @@ function bookBarState(data, progress, stageOf, mapIds) {
     ...rerunning ? { rerun: true } : {},
     ...mapChange ? { mapChange } : {},
     ...gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {},
+    ...reordered ? { mapChange: reordered } : {},
     ...mode === "gate1" && ((_n = data.trial) == null ? void 0 : _n.length) ? { trialCount: data.trial.length } : {},
     ...mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {},
     ...(progress == null ? void 0 : progress.etaSeconds) !== void 0 && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0 ? { etaSeconds: progress.etaSeconds } : {}
   };
 }
+var sameOrder = (order, mapIds) => {
+  const chapters = new Set(order);
+  return mapIds.filter((id) => chapters.has(id)).join("\n") === order.join("\n");
+};
+var mapChangeText = (change2) => change2.reordered ? t("ui.book_map_reordered") : t("ui.book_map_changed_0_1", change2.added, change2.missing);
 var countChange = (change2) => ({
   added: change2.added.length,
   missing: change2.missing.length
@@ -55957,10 +56021,7 @@ function renderBookBar(parent, state, actions) {
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   }
   if ((state.mode === "gate1" || state.mode === "gate2" || state.mode === "done") && state.mapChange)
-    top.createSpan({
-      cls: "vam-book-bar-counts vam-book-map-changed",
-      text: t("ui.book_map_changed_0_1", state.mapChange.added, state.mapChange.missing)
-    });
+    top.createSpan({ cls: "vam-book-bar-counts vam-book-map-changed", text: mapChangeText(state.mapChange) });
   if (state.mode === "gate1" && state.trialCount) {
     top.createSpan({
       cls: "vam-book-bar-counts",
@@ -55972,7 +56033,12 @@ function renderBookBar(parent, state, actions) {
   if (state.mode === "gate2" && state.review) {
     top.createSpan({
       cls: "vam-book-bar-counts",
-      text: t("ui.book_bar_review_0_1", state.review.total, state.review.attention)
+      text: state.review.seam ? t(
+        "ui.book_bar_review_seam_0_1_2",
+        state.review.total,
+        state.review.attention - state.review.seam,
+        state.review.seam
+      ) : t("ui.book_bar_review_0_1", state.review.total, state.review.attention)
     });
     if (actions.nextReview && state.review.attention > 0)
       makeButton(buttons, t("ui.book_bar_next_review"), "vam-book-link vam-book-next-review", actions.nextReview);
@@ -56421,7 +56487,7 @@ function seamFromOf(seam, order, at, titleOf) {
 }
 function gate2Cards(input2) {
   return input2.order.map((id, at) => {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
     const note = input2.noteOf(id);
     const view = bookCardView(note != null ? note : {});
     const issue2 = typeof (note == null ? void 0 : note.pipelineIssue) === "string" ? note.pipelineIssue : "";
@@ -56429,17 +56495,19 @@ function gate2Cards(input2) {
     const proof = checked2 || view.stage === "needs-review" ? latestStoredProof((_a2 = note == null ? void 0 : note.detail) != null ? _a2 : "") : void 0;
     const structure2 = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue2.trim());
     const role = typeof (note == null ? void 0 : note.bookRole) === "string" ? note.bookRole : void 0;
-    const handEdited = view.stage === "needs-review" && /^write failed: hand_edited$/.test(issue2.trim());
-    const beforeBook = handEdited && !((_c = readBodyRecord((_b2 = note == null ? void 0 : note.detail) != null ? _b2 : "")) == null ? void 0 : _c.fp) && !hasHiddenCallout((_d = note == null ? void 0 : note.detail) != null ? _d : "");
-    const kept = isKept((_e = note == null ? void 0 : note.detail) != null ? _e : "");
+    const kept = isKept((_b2 = note == null ? void 0 : note.detail) != null ? _b2 : "");
+    const record = readBodyRecord((_c = note == null ? void 0 : note.detail) != null ? _c : "");
+    const keptVoided = !kept && !!(record == null ? void 0 : record.kept);
+    const handEdited = keptVoided || view.stage === "needs-review" && /^write failed: hand_edited$/.test(issue2.trim());
+    const beforeBook = handEdited && !(record == null ? void 0 : record.fp) && !hasHiddenCallout((_d = note == null ? void 0 : note.detail) != null ? _d : "");
     const stale = !kept && !!input2.proofContext && proofIsStale(
-      { prompt: (_f = note == null ? void 0 : note.prompt) != null ? _f : "", detail: (_g = note == null ? void 0 : note.detail) != null ? _g : "" },
+      { prompt: (_e = note == null ? void 0 : note.prompt) != null ? _e : "", detail: (_f = note == null ? void 0 : note.detail) != null ? _f : "" },
       view.stage,
       id,
       input2.proofContext.runId,
       input2.proofContext.revisionOf(id)
     );
-    const inconsistencies = ((_i = (_h = input2.inconsistencies) == null ? void 0 : _h.call(input2, id)) != null ? _i : []).map((item) => ({
+    const inconsistencies = (kept ? [] : (_h = (_g = input2.inconsistencies) == null ? void 0 : _g.call(input2, id)) != null ? _h : []).map((item) => ({
       ...item,
       otherTitle: input2.titleOf(item.other)
     }));
@@ -56452,11 +56520,11 @@ function gate2Cards(input2) {
       ...role ? { role } : {},
       ...view.stage === "needs-review" && issue2 ? { failureText: reasonOf2(issue2, proof) } : {},
       structureUnmet: checked2 && structure2 && !kept ? structure2[1].split(" ").filter((token) => !token.startsWith("image_")).length : 0,
-      factsOpen: checked2 && !kept ? ((_j = proof == null ? void 0 : proof.items) != null ? _j : []).filter((item) => item.type === "fact" && item.status !== "met").length : 0,
+      factsOpen: checked2 && !kept ? ((_i = proof == null ? void 0 : proof.items) != null ? _i : []).filter((item) => item.type === "fact" && item.status !== "met").length : 0,
       galleryBare: checked2 && galleryBare(role, note),
       seam: view.seam,
       ...view.seam ? seamFromOf(note == null ? void 0 : note.pipelineSeam, input2.order, at, input2.titleOf) : {},
-      ...handEdited ? { handEdited: true, bodyFp: integrityFp((_k = note == null ? void 0 : note.detail) != null ? _k : "") } : {},
+      ...handEdited ? { handEdited: true, bodyFp: integrityFp((_j = note == null ? void 0 : note.detail) != null ? _j : "") } : {},
       ...beforeBook ? { handBeforeBook: true } : {},
       ...stale ? { proofStale: true } : {},
       ...inconsistencies.length ? { inconsistencies } : {},
@@ -87015,8 +87083,8 @@ ${t("ui.book_role_running_suffix")}` : first);
         var _a3;
         return readPipelineStage((_a3 = this.notes.get(id)) == null ? void 0 : _a3.pipelineStage);
       },
-      // A run paused for a map change counts the map as it is now (a card removed after the pause counts at once).
-      map.nodes.map((node) => node.id)
+      // A run paused for a map change, a gate or a finished book counts the map as it is now, the way the runner reads it.
+      bookReadingOrder(map)
     );
     if (state.mode !== "changed") this.bookMapFocusedRun = null;
     else if (this.bookMapFocusedRun !== read.data.runId) {
@@ -87026,7 +87094,10 @@ ${t("ui.book_role_running_suffix")}` : first);
     if (state.mode !== "gate1") this.bookGate1Ask = null;
     if (state.mode !== "gate2") this.bookFinishAsking = null;
     const gate2Attention = state.mode === "gate2" ? this.bookReviewCards(read.data) : [];
-    if (state.mode === "gate2") state.review = { total: state.total, attention: gate2Attention.length };
+    if (state.mode === "gate2") {
+      const seam = gate2Attention.filter((card) => reviewProblems(card).every((problem3) => problem3.kind === "seam")).length;
+      state.review = { total: state.total, attention: gate2Attention.length, ...seam ? { seam } : {} };
+    }
     if (state.mode === "gate1" && state.trialCount) {
       const trial = new Set(this.effectiveTrial(read.data));
       const n = this.bookReviewCards(read.data).filter((card) => trial.has(card.id)).length;
@@ -87192,14 +87263,16 @@ ${t("ui.book_role_running_suffix")}` : first);
       this.cancelBookFold(id);
       if (entry && state && state.fp === entry.fp && (state.collapsed || state.handled))
         await this.plugin.bookCallouts.reopen(node.path);
+      else if (entry && state && state.fp !== entry.fp && (state.collapsed || state.handled))
+        await this.plugin.bookCallouts.reconcile(mapPath, this.bookMayCarryCallouts);
     } else if (state && !state.collapsed && !this.bookFoldDue.delete(id)) {
       this.bookResolved.set(id, entry.fp);
-      if (state.op) await this.plugin.bookHandEdits.keep(node.path);
+      if (state.accept && !state.handled) await this.keepBookAnswer(node.path, state, entry.problems);
       await this.plugin.bookCallouts.markHandled(node.path);
       this.scheduleBookFold(id);
     } else {
       this.bookResolved.set(id, entry.fp);
-      if (state == null ? void 0 : state.op) await this.plugin.bookHandEdits.keep(node.path);
+      if ((state == null ? void 0 : state.accept) && !state.handled) await this.keepBookAnswer(node.path, state, entry.problems);
       if (state && !state.collapsed) await this.plugin.bookCallouts.collapse(node.path);
       if (entry.problems.every((problem3) => problem3.kind === "seam")) {
         await this.plugin.confirmBookSeam(mapPath, id).catch(() => void 0);
@@ -87208,6 +87281,15 @@ ${t("ui.book_role_running_suffix")}` : first);
       }
     }
     if (!this.closed && this.map === map) this.render();
+  }
+  /**
+   * The first answer of a box: "keep my version" records the text as kept; "accept as it is" (Primary decision, principle C3: the
+   * reader's answer stands) records the program's own text the same way, so a whole-book rerun no longer rewrites it. A box that only
+   * asks about a join is a join to confirm, not a text to keep.
+   */
+  async keepBookAnswer(path, state, problems) {
+    if (state.op) await this.plugin.bookHandEdits.keep(path);
+    else if (!problems.every((problem3) => problem3.kind === "seam")) await this.plugin.bookHandEdits.keep(path, true);
   }
   scheduleBookFold(id) {
     if (this.bookFoldTimers.has(id)) return;
@@ -93864,14 +93946,21 @@ var BookHandEdits = class {
   }
   /**
    * "Keep my version" was ticked: the chapter text as it is now is recorded as kept, and the chapter is done (`checked`, no issue):
-   * the kept text is the reader's answer, not a failed write. A later edit voids the kept record and the box asks again.
+   * the kept text is the reader's answer, not a failed write. A later edit voids the kept record and the box asks again. `accept`:
+   * "accept as it is" on a chapter the program wrote: the same record for the program's own text, so a whole-book rerun leaves it
+   * alone (the card's own rerun still rewrites it).
    */
-  async keep(path) {
+  async keep(path, accept = false) {
     if (this.disposed) return;
     try {
-      await this.ports.write(path, keepRaw);
-      const card = await this.ports.readCard(path);
-      if (this.disposed || !isKeptRaw(card.raw)) return;
+      let kept = false;
+      const result = await this.ports.write(path, (text10) => {
+        if (accept && bodyStateRaw(text10) !== "clean") return text10;
+        const next = keepRaw(text10);
+        kept = isKeptRaw(next);
+        return next;
+      });
+      if (this.disposed || !kept || result === "refused") return;
       await this.ports.writeFields(path, { pipelineStage: "checked", pipelineIssue: null });
     } catch (e) {
     }

@@ -862,7 +862,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     fetchCommons: async url => {
       if (!url.startsWith(`${COMMONS_API}?`)) throw new Error("refused");
       const response = await requestUrl({ url, method: "GET", throw: false });
-      return { status: response.status, text: response.text };
+      return { status: response.status, text: response.text, headers: response.headers };
     },
     author: async input => {
       const view = this.views().find(item => item.mapPath === input.mapPath);

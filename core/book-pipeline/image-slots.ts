@@ -48,9 +48,13 @@ export const MAX_IMAGE_SLOTS = 12;
 export const imageSlotCap = (range?: { max: number }): number =>
   Math.min(MAX_IMAGE_SLOTS, Math.max(DEFAULT_IMAGE_SLOTS, range?.max ?? 0));
 
-/** Why a slot ended without a picture (`probe_capped`: its candidates were left unprobed by the per-chapter limit). Only `author_omitted` and `bad_marker` come from the marker scan. */
+/**
+ * Why a slot ended without a picture (`probe_capped`: its candidates were left unprobed by the per-chapter limit; `rate_limited`:
+ * Wikimedia Commons kept answering "too many requests" before the slot was searched). Only `author_omitted` and `bad_marker` come
+ * from the marker scan.
+ */
 export type SlotReasonCode =
-  "author_omitted" | "bad_marker" | "not_found" | "load_failed" | "unsafe_url" | "probe_capped";
+  "author_omitted" | "bad_marker" | "not_found" | "load_failed" | "unsafe_url" | "probe_capped" | "rate_limited";
 
 /** Text of a slot field: one line, with the marker brackets and the Prompt field separator taken out. */
 export function cleanSlotText(value: string, max: number): string {
@@ -203,8 +207,6 @@ export interface SlotCandidate {
   caption: string;
   /** What the file page says about the file (the program's Commons search); absent for the finder's pictures, whose caption is its own description. */
   description?: string;
-  /** The program's Commons search could not tie the file to everything its slot asks for: the caption names the file, and the proof marks a mismatch. */
-  loose?: true;
   /** Creator and license as the finder reported them from the source page; never invented here. */
   author?: string;
   license?: string;
@@ -321,7 +323,7 @@ export function sourceOf(
   };
 }
 
-/** A finder caption is one plain line (what it is, where to look); an empty one falls back to the title; a loose Commons file reads `Picture: <its name>`. */
+/** A finder caption is one plain line (what it is, where to look); an empty one falls back to the title. */
 export function figureOf(candidate: SlotCandidate, href: string, language: string): SlotFigure {
   // The marker brackets are taken out first: a caption must never read as a slot marker.
   const plain = (value: string): string => value.replace(/[〔〕]/g, " ");
@@ -330,9 +332,7 @@ export function figureOf(candidate: SlotCandidate, href: string, language: strin
   return {
     href,
     alt,
-    caption: candidate.loose
-      ? translateNote(language as ContentLanguage, "note.image_file_caption_0", alt)
-      : plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
+    caption: plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
     ...(source ? { source } : {})
   };
 }
@@ -554,7 +554,8 @@ const REASONS: readonly SlotReasonCode[] = [
   "not_found",
   "load_failed",
   "unsafe_url",
-  "probe_capped"
+  "probe_capped",
+  "rate_limited"
 ];
 
 /** FNV-1a over the picture key: 8 hex characters. */
@@ -828,19 +829,37 @@ export function imageIssueTokens(check: ImageTextCheck): string[] {
 
 /**
  * The issue token of a chapter that ended with fewer placed pictures than the owner's minimum pictures per chapter (no spaces):
- * `images:under:<placed>:<minimum>`. It makes the chapter needs-review without asking for a rewrite of its text.
+ * `images:under:<placed>:<minimum>`, with `:limited` when Wikimedia Commons' request limit left slots unsearched. It makes the
+ * chapter needs-review without asking for a rewrite of its text.
  */
-export const pictureShortfallToken = (placed: number, minimum: number): string => `images:under:${placed}:${minimum}`;
-const SHORTFALL = /(?:^|\s)images:under:(\d+):(\d+)(?=\s|$)/;
-/** An issue field split into its picture shortfall (when it carries one) and the rest (`images unmet:` with only notice tokens left leaves nothing). */
-export function splitPictureIssue(issue: string): { rest: string; shortfall?: { placed: number; minimum: number } } {
+export const pictureShortfallToken = (placed: number, minimum: number, limited = false): string =>
+  `images:under:${placed}:${minimum}${limited ? ":limited" : ""}`;
+/**
+ * The issue token of the placed pictures the program's check found off their text (`images:off:2,3,8`). Every such picture is a
+ * reason to look (Primary decision after the v5 run): the chapter is needs-review without a rewrite of its text.
+ */
+export const pictureMismatchToken = (indexes: readonly number[]): string => `images:off:${indexes.join(",")}`;
+const SHORTFALL = /(?:^|\s)images:under:(\d+):(\d+)(:limited)?(?=\s|$)/;
+const OFF = /(?:^|\s)images:off:(\d+(?:,\d+)*)(?=\s|$)/;
+/** An issue field split into its picture shortfall and mismatches (when it carries them) and the rest (`images unmet:` with only notice tokens left leaves nothing). */
+export function splitPictureIssue(issue: string): {
+  rest: string;
+  shortfall?: { placed: number; minimum: number; limited?: true };
+  off?: number[];
+} {
   const m = SHORTFALL.exec(issue);
-  if (!m) return { rest: issue };
+  const o = OFF.exec(issue);
+  if (!m && !o) return { rest: issue };
   const rest = issue
     .replace(SHORTFALL, "")
+    .replace(OFF, "")
     .trim()
     .replace(/^images unmet:(?:\s+\S+)*$|^images unmet$/, "");
-  return { rest, shortfall: { placed: Number(m[1]), minimum: Number(m[2]) } };
+  return {
+    rest,
+    ...(m ? { shortfall: { placed: Number(m[1]), minimum: Number(m[2]), ...(m[3] ? { limited: true as const } : {}) } } : {}),
+    ...(o ? { off: o[1].split(",").map(Number) } : {})
+  };
 }
 
 /**

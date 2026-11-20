@@ -18,7 +18,7 @@ import { isBudgetExhausted } from "../../core/admission";
 import { createBudgetAdmission, createStoreBudgetPort } from "../../core/book-pipeline/budget";
 import { imageKey } from "../../core/book-pipeline/image-dedupe";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
-import { searchCommons, type CommonsFetch } from "../../core/book-pipeline/commons-search";
+import { searchCommons, type CommonsFetch, type CommonsQueue } from "../../core/book-pipeline/commons-search";
 import { askWords, wordHits } from "../../core/book-pipeline/file-fit";
 import {
   PipelineStore,
@@ -153,6 +153,7 @@ import {
   imageIssueTokens,
   latestSlotsRecord,
   pictureShortfallToken,
+  pictureMismatchToken,
   stripImageLines,
   fillSlotMarkers,
   residualMarkerLines,
@@ -350,6 +351,8 @@ export interface BookPipelinePorts {
   ): Promise<FoundImages>;
   /** Production: a GET of a Wikimedia Commons API address through `requestUrl` (any other address is refused). Absent: no program search after the finder. */
   fetchCommons?: CommonsFetch;
+  /** The queue every Commons request waits in. Absent: the shared production queue (1 s between requests); tests pass one without real waits. */
+  commonsQueue?: CommonsQueue;
   backupNote(path: string, raw: string): Promise<{ ok: true; path: string } | { ok: false }>;
   /**
    * Applying the reader's notes (absent: refused as unreadable). `readText` is the note as the writer will see it (an open editor's text
@@ -2961,7 +2964,6 @@ export class BookPipelineRuns {
               title: candidate.title,
               caption: candidate.caption,
               ...(candidate.description !== undefined ? { description: candidate.description } : {}),
-              ...(candidate.loose ? { loose: true as const } : {}),
               ...(candidate.author ? { author: candidate.author } : {}),
               ...(candidate.license ? { license: candidate.license } : {})
             },
@@ -2982,6 +2984,7 @@ export class BookPipelineRuns {
     };
     let commonsAsked = 0;
     let commonsLimited = false;
+    const commonsCut = new Set<number>();
     let commonsNoHint = 0;
     try {
       const round1 = await search(wanted, false, exclude);
@@ -3020,10 +3023,15 @@ export class BookPipelineRuns {
               ...hints.get(slot.index)
             })),
             this.ports.fetchCommons,
-            { signal, skip: url => seen.has(imageKey(url)) || taken(imageKey(url)) }
+            {
+              signal,
+              skip: url => seen.has(imageKey(url)) || taken(imageKey(url)),
+              ...(this.ports.commonsQueue ? { queue: this.ports.commonsQueue } : {})
+            }
           );
           commonsAsked = commons.requests;
           commonsLimited = commons.limited;
+          for (const index of commons.cut) commonsCut.add(index);
           // Slots with no English search words (none planned, none from the finder): their Commons queries are the slot line, which rarely matches a file.
           commonsNoHint = lacking.filter(slot => !slot.search?.length && !hints.get(slot.index)?.search).length;
           if (signal.aborted) throw new Error("aborted");
@@ -3045,6 +3053,12 @@ export class BookPipelineRuns {
     // The card may have left the map while the search and the probes ran: nothing is claimed or written for it.
     if (!(await this.stillOnMap(drive, nodeId))) return { kind: "failed", reason: "card_removed" };
     const outcomes = choosePictures({ id: nodeId, title: latest.title }, slots, perSlot, taken, language);
+    // A slot Commons' request limit kept from being searched says so (the shortfall reason then names the limit), not "not found".
+    for (const index of commonsCut) {
+      const outcome = outcomes.get(index);
+      if (outcome && "reasonCode" in outcome && outcome.reasonCode === "not_found")
+        outcomes.set(index, { reasonCode: "rate_limited" });
+    }
     // Claim in the same synchronous turn as the choice: chapters run side by side, so the exclude list alone cannot stop a repeat.
     const claimed = [...outcomes.values()].flatMap(outcome =>
       "figure" in outcome ? [imageKey(outcome.figure.href)] : []
@@ -3064,10 +3078,6 @@ export class BookPipelineRuns {
       if (!outcome || !("figure" in outcome)) continue;
       const placed = (perSlot.get(slot.index) ?? []).find(item => item.href === outcome.figure.href)?.candidate;
       if (!placed) continue;
-      if (placed.loose) {
-        off.add(slot.index);
-        continue;
-      }
       const about = `${placed.title} ${placed.description ?? placed.caption}`;
       const words = askWords({ explains: slot.explains, terms: slot.search, ...hints.get(slot.index) });
       if (words.length && !wordHits(words, about)) off.add(slot.index);
@@ -3292,15 +3302,24 @@ export class BookPipelineRuns {
       .filter(item => item.type !== "fact" && item.status === "unmet")
       .map(item => code(item.id));
     const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
-    // Fewer pictures than the owner's minimum is a reason to look (never a rewrite of the text): see pictureShortfallToken.
+    // Fewer pictures than the owner's minimum, and any placed picture off its text, are reasons to look (never a rewrite of the
+    // text): see pictureShortfallToken and pictureMismatchToken.
     const minimum = await this.pictureMinimum(drive);
-    const shortIssue =
-      minimum !== undefined && imageCheck.placed < minimum ? pictureShortfallToken(imageCheck.placed, minimum) : "";
+    const limited = imageCheck.issues.some(issue => issue.code === "rate_limited");
+    const offIndexes = imageCheck.issues.flatMap(issue =>
+      issue.code === "mismatch" && issue.index !== undefined ? [issue.index] : []
+    );
+    const pictureIssue = [
+      ...(minimum !== undefined && imageCheck.placed < minimum
+        ? [pictureShortfallToken(imageCheck.placed, minimum, limited)]
+        : []),
+      ...(offIndexes.length ? [pictureMismatchToken(offIndexes)] : [])
+    ].join(" ");
     return {
       kind: "ok",
       after: async () => {
         const rewrite = verdict.aggregate === "needs-review" || !!length;
-        const stage = rewrite || shortIssue ? "needs-review" : "checked";
+        const stage = rewrite || pictureIssue ? "needs-review" : "checked";
         if (rewrite && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0) {
           drive.fixable.set(nodeId, proofFixInstruction(verdict.items, [...checklist, ...BOOK_CHECKS], length));
           drive.expand.add(nodeId);
@@ -3314,11 +3333,11 @@ export class BookPipelineRuns {
           nodeId,
           stage,
           verdict.aggregate === "needs-review"
-            ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}${shortIssue ? ` ${shortIssue}` : ""}`
+            ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}${pictureIssue ? ` ${pictureIssue}` : ""}`
             : lengthIssue
-              ? `length unmet: ${[lengthIssue, ...(shortIssue ? [shortIssue] : []), ...noticed].join(" ")}`
-              : shortIssue
-                ? `images unmet: ${[shortIssue, ...noticed].join(" ")}`
+              ? `length unmet: ${[lengthIssue, ...(pictureIssue ? [pictureIssue] : []), ...noticed].join(" ")}`
+              : pictureIssue
+                ? `images unmet: ${[pictureIssue, ...noticed].join(" ")}`
                 : structureUnmet.length
                   ? `structure unmet: ${noticed.join(" ")}`
                   : noticed.length

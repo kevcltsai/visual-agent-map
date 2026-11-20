@@ -82,6 +82,8 @@ const writeAuthor = (r, text) => async input => { await input.admission.reserve(
 const cand = (n, over = {}) => ({ title: `Work ${n}`, caption: `Caption ${n}`, url: `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/W${n}.jpg/1280px-W${n}.jpg`, source: `https://commons.wikimedia.org/wiki/File:W${n}.jpg`, ...over });
 /** The finder's answer: `{ 1: [cand...], 2: [...] }` by slot index. */
 const found = bySlotObj => { const bySlot = new Map(Object.entries(bySlotObj).map(([k, v]) => [Number(k), v])); return { bySlot, found: [...bySlot.values()].reduce((n, v) => n + v.length, 0), offTopic: 0 }; };
+/** The stage of a chapter whose placed pictures the fixture text names nothing of: every picture off its text is a reason to look (Primary decision after the v5 run). */
+const MISMATCH_STAGE = 'needs-review';
 const slotsOf = n => Array.from({ length: n }, (_, i) => ({ index: i + 1, kind: 'diagram', explains: `explains ${i + 1} perspective`, anchor: `after paragraph ${i + 1}` }));
 const mk = (n, text = `explains ${n} perspective`) => `〔圖位 ${n}：${text}〕`;
 /** Two paragraphs, each followed by its marker line, then a Sources section. */
@@ -94,7 +96,8 @@ async function picRig({ finder, probe, text = twoMarkers, titles, proof, slots =
     titles: titles ?? ['SecretRootTitle', 'FillerChapter'],
     script: { card: request => ({ covers: `covers ${request.card.position}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: checklist ?? [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }], ...(slots === null ? {} : { images: Array.isArray(slots) ? slots : slotsOf(slots) }) }),
       author: (input, n) => writeAuthor(holder.r, text)(input), ...(probe ? { probe } : {}), ...(proof ? { proof } : {}) },
-    ports: { findImages: async (request, run) => { if (!titles && /FillerChapter/.test(request.chapter)) { await run.admission.reserve(); return found({}); } calls.push(request); await run.admission.reserve(); return finder(request, run, calls.length); }, ...ports }
+    // A Commons queue without the production 1 s spacing (the queue's own tests check the spacing and the 429 waits).
+    ports: { commonsQueue: new C.CommonsQueue(0, async () => {}), findImages: async (request, run) => { if (!titles && /FillerChapter/.test(request.chapter)) { await run.admission.reserve(); return found({}); } calls.push(request); await run.admission.reserve(); return finder(request, run, calls.length); }, ...ports }
   });
   holder.r = r;
   r.calls = calls;
@@ -117,7 +120,7 @@ test('slots: two markers become two standard images with one plain caption line 
   assert.match(r.calls[0].chapter, /SecretRootTitle/);
   assert.equal(detail.split('book-slots:v1').length - 1, 1, 'one record');
   assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state])), [[1, 'placed'], [2, 'placed']]);
-  assert.equal(stageOf(r.raw(0)), 'checked');
+  assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE);
   const log = r.stat.logs.filter(l => l.includes(' slots ')).join('\n');
   assert.match(log, /book-pipeline slots .* placed=2 missing=0$/m);
   assert.ok(!/SecretRootTitle|wikimedia|蒙娜麗莎/.test(r.stat.logs.join('\n')), 'the log has counts and codes only');
@@ -180,7 +183,7 @@ test('slots: a marker inside a quote or a code fence stays word for word and doe
   const detail = (await r.note(0)).detail;
   assert.ok(detail.includes(`> ${mk(1, '引用')}\n`) && detail.includes(`\`\`\`\n${mk(2, '程式')}\n\`\`\``), 'quote and fence verbatim');
   assert.equal(figures(detail).length, 2);
-  assert.equal(stageOf(r.raw(0)), 'checked');
+  assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE);
   assert.deepEqual(recordOf(detail).slots.map(s => s.state), ['placed', 'placed']);
 });
 
@@ -196,7 +199,7 @@ test('slots: a repeated marker keeps the first, an out-of-range or reworded mark
   assert.deepEqual(rec.slots.map(s => [s.index, s.state, s.reasonCode]), [[1, 'placed', undefined], [2, 'missing', 'bad_marker']]);
   assert.equal(rec.bad, 2);
   assert.equal(r.calls[0].slots.length, 1, 'only the slot that has a valid marker is searched');
-  assert.equal(stageOf(r.raw(0)), 'checked');
+  assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE);
 });
 
 test('slots: markers on the same line (adjacent or inside a sentence) are removed without leaving a blank line, the rest of the line stays; no search when no slot has a marker', async () => {
@@ -455,7 +458,7 @@ test('slots: another chapter whose note cannot be read does not fail this chapte
   r.ports.readCard = path => (gone && path === r.nodes[1].path ? Promise.reject(new Error('deleted')) : read(path));
   await run(r);
   assert.equal(figures((await r.note(0)).detail).length, 1);
-  assert.equal(stageOf(r.raw(0)), 'checked');
+  assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE);
 });
 
 test('slots load: 5 chapters x 8 slots whose candidates all fail probe at most 36 addresses a chapter and 4 at a time, one search call each, and every card still ends checked', async () => {
@@ -524,7 +527,7 @@ test('T9 fingerprint: filling the slots (pictures placed, or missing and their m
   ]) {
     const r = await picRig(over);
     await run(r);
-    assert.equal(stageOf(r.raw(0)), 'checked', name);
+    assert.equal(stageOf(r.raw(0)), name === 'placed' || name.startsWith('a body picture') ? MISMATCH_STAGE : 'checked', name);
     assert.equal(bodyStateRaw(r.raw(0)), 'clean', name);
   }
 });
@@ -600,14 +603,14 @@ for (const [kind, template] of Object.entries(TEMPLATES)) {
     const again = (await r.note(0)).detail;
     assert.equal(figures(again).length, 2);
     assert.equal(again.split('book-slots:v1').length - 1, 1);
-    assert.equal(stageOf(r.raw(0)), 'checked');
+    assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE);
     // written, pictures and record in the text: the search is not repeated and the record is kept
     const authors = r.stat.author.length;
     await reopen(r, 'written', again);
     assert.equal(r.calls.length, 2, 'no search again');
     assert.equal(r.stat.author.length, authors, 'no author again');
     assert.equal((await r.note(0)).detail, again);
-    assert.equal(stageOf(r.raw(0)), 'checked');
+    assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE);
   });
 }
 
@@ -853,7 +856,7 @@ test('T4 images: a slot the first search left empty is searched once more (anoth
   assert.equal(figures(detail).length, 2);
   assert.match(detail, /!\[Work 2\]/);
   assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state])), [[1, 'placed'], [2, 'placed']]);
-  assert.equal(stageOf(r.raw(0)), 'checked');
+  assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE);
 });
 
 test('T4 images: when every slot has its picture there is no second search; a search that failed is not asked again', async () => {
@@ -1109,21 +1112,26 @@ test('commons fallback: a picture another chapter shows is not taken again; a fa
   await run(r);
   const detail = (await r.note(0)).detail;
   assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state, s.reasonCode ?? ''])), [[1, 'placed', ''], [2, 'missing', 'not_found']]);
-  assert.equal(stageOf(r.raw(0)), 'checked', 'no picture setting: a missing picture stays a notice');
+  assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE, 'the placed picture is off the fixture text');
+  assert.ok(!/images:under/.test((await r.note(0)).pipelineIssue), 'no picture setting: a missing picture stays a notice, no shortfall');
   assert.match(r.stat.logs.join('\n'), /slots .* commons_nohint=1/, 'a slot without English search words is counted');
-  const twice = await picRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: () => found({}), ports: { fetchCommons: async () => ({ status: 200, text: commonsAnswer(['Same.jpg'], {}, 'Perspective drawings that explains') }) } });
+  // The finder's English words let the file keep its slot line as caption (a file it could caption only by its name is not placed).
+  const twice = await picRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: () => ({ ...found({}), hints: new Map([[1, { search: 'perspective' }], [2, { search: 'perspective' }]]) }), ports: { fetchCommons: async () => ({ status: 200, text: commonsAnswer(['Same.jpg'], {}, 'Perspective drawings that explains') }) } });
   await run(twice);
   const all = [...figures((await twice.note(0)).detail), ...figures((await twice.note(1)).detail)].filter(f => /Same\.jpg/.test(f));
   assert.equal(all.length, 1, 'one Commons file is placed once in the book');
 });
 
 test('shortfall: under the owner\'s minimum the chapter ends needs-review with a plain reason, counts for review and gets no rewrite; enough pictures stay checked', async () => {
-  const r = await picRig({ finder: () => found({ 1: [cand(1)] }) });
+  // The text and the captions name what each picture shows, so a placed picture is no mismatch here.
+  const fit = n => cand(n, { caption: `explains ${n} perspective` });
+  const named = title => `正文一 explains 1 perspective。${title}\n\n${mk(1)}\n\n正文二 explains 2 perspective。\n\n${mk(2)}\n\n正文三 explains 2 perspective。\n\n### 來源\n- https://example.com/a\n`;
+  const r = await picRig({ text: named, finder: () => found({ 1: [fit(1)] }) });
   await r.repo.writeBookSettings(r.nodes[0].path, { style: '每章圖片 2 張' });
   await run(r);
   assert.equal(stageOf(r.raw(0)), 'needs-review');
   const issue = (await r.note(0)).pipelineIssue;
-  assert.match(issue, /^images unmet: images:under:1:2 image_2( image_1_mismatch)?$/);
+  assert.equal(issue, 'images unmet: images:under:1:2 image_2');
   assert.equal(r.stat.author.filter(id => id === r.nodes[0].id).length, 1, 'no automatic rewrite for too few pictures');
   const review = S.load('experiences/visual-map/book-pipeline-review.ts');
   assert.equal(review.reasonOf(issue, undefined), 'Too few pictures: 1 placed, the setting asks for at least 2', 'test locale is en');
@@ -1131,7 +1139,7 @@ test('shortfall: under the owner\'s minimum the chapter ends needs-review with a
   assert.ok(both.startsWith(review.reasonOf('proof unmet: facts_unverified', undefined)) && both.endsWith('Too few pictures: 0 placed, the setting asks for at least 6'), both);
   const ui = S.load('experiences/visual-map/book-pipeline-ui.ts');
   assert.match(ui.bookIssueText('length unmet: length:under:10:100-200:字:v1 images:under:1:6 image_2'), /^\S.*\S\s+Too few pictures: 1 placed, the setting asks for at least 6$/);
-  const ok = await picRig({ finder: () => found({ 1: [cand(1)], 2: [cand(2)] }) });
+  const ok = await picRig({ text: named, finder: () => found({ 1: [fit(1)], 2: [fit(2)] }) });
   await ok.repo.writeBookSettings(ok.nodes[0].path, { style: '每章圖片 2 張' });
   await run(ok);
   assert.equal(stageOf(ok.raw(0)), 'checked');
@@ -1221,8 +1229,14 @@ test('repro v3 I: a finder picture whose title and caption name nothing its slot
   await run(r);
   const detail = (await r.note(0)).detail;
   assert.deepEqual(plain(recordOf(detail).slots), [{ index: 1, state: 'placed', hash: recordOf(detail).slots[0].hash, off: true }]);
-  assert.equal((await r.note(0)).pipelineIssue, 'image notice: image_1_mismatch');
-  assert.equal(stageOf(r.raw(0)), 'checked', 'a notice, never needs-review');
+  // Primary decision after the v5 run: every picture off its text is a reason to look (it was a notice before), never a rewrite.
+  const issue = (await r.note(0)).pipelineIssue;
+  assert.equal(issue, 'images unmet: images:off:1 image_1_mismatch');
+  assert.equal(stageOf(r.raw(0)), 'needs-review');
+  assert.equal(r.stat.author.filter(id => id === r.nodes[0].id).length, 1, 'no automatic rewrite for a picture off its text');
+  const review = S.load('experiences/visual-map/book-pipeline-review.ts');
+  assert.equal(review.reasonOf(issue, undefined), 'Pictures 1 do not match the text around them');
+  assert.equal(review.reasonOf('proof unmet: facts_unverified images:under:0:6:limited images:off:2,3', undefined).split(', ').length >= 3, true);
 });
 
 // ---- repro v4 K: 15 pictures for 6 chapters of 6–10; a plain Commons word search ranked scanned books (PDF/DjVu) first ----

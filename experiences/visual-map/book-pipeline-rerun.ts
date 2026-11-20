@@ -1,6 +1,6 @@
 import { latestStoredProof, neutralizeText } from "../../core/book-pipeline/note-sections";
 import type { PipelineStage } from "../../core/book-pipeline/model";
-import { lengthTarget, type LengthReason } from "../../core/book-pipeline/settings";
+import { lengthNeeded, lengthTarget, type LengthReason } from "../../core/book-pipeline/settings";
 import { isBookCheckId } from "../../core/book-pipeline/proof";
 
 /**
@@ -106,15 +106,19 @@ export function proofFixInstruction(
   // Whole pieces only: a cut in the middle of a JSON string would leave an unclosed quote, so what does not fit is left out.
   while (sources.length && avoidSourcesInstruction(sources).length > FIX_AVOID_MAX) sources = sources.slice(0, -1);
   const avoid = avoidSourcesInstruction(sources);
-  const lead =
-    "The previous version of this chapter failed the fact check on these points (JSON strings; rewrite the chapter so they are correct and supported): ";
-  const leadStructure =
-    "The previous version of this chapter did not meet these structure points of its checklist (JSON strings; the chapter text itself, not the sources list, must cover them): ";
+  // A too-short chapter is expanded, not rewritten (`bookExpandRequirements`): its points are fixed with change blocks.
+  const expand = length?.kind === "under";
+  const lead = expand
+    ? "The chapter failed the fact check on these points (JSON strings; correct each with a @@replace block so it is correct and supported): "
+    : "The previous version of this chapter failed the fact check on these points (JSON strings; rewrite the chapter so they are correct and supported): ";
+  const leadStructure = expand
+    ? "The chapter did not meet these structure points of its checklist (JSON strings; cover them in the chapter text with @@insert or @@replace blocks, not in the sources list): "
+    : "The previous version of this chapter did not meet these structure points of its checklist (JSON strings; the chapter text itself, not the sources list, must cover them): ";
   // The length point is short and fixed (numbers and constant words), so it is reserved first and never squeezed out by long notes.
-  // The redo is a fresh write that does not see the previous text, so the piece names the absolute target, not only "longer".
+  // Too short: the redo sees the chapter and adds to it, so the piece names the new text it needs; too long: a fresh write to the target.
   const lengthPiece = length
-    ? length.kind === "under"
-      ? `The previous version of this chapter came out at only ${length.measured} ${length.unit}, short of the asked ${length.min} to ${length.max} ${length.unit}: lengthen it to at least ${length.min} ${length.unit}, about ${lengthTarget(length)} ${length.unit} (about ${Math.round((lengthTarget(length) / Math.max(1, length.measured)) * 10) / 10} times as long), by developing each section with more explanation and concrete examples, not by repetition; keep every checklist point. `
+    ? expand
+      ? `The chapter came out at only ${length.measured} ${length.unit}, short of the asked ${length.min} to ${length.max} ${length.unit}: add about ${lengthNeeded(length)} ${length.unit} of new text in @@insert blocks as the expansion rules say; keep every checklist point. `
       : `The previous version of this chapter is ${length.measured} ${length.unit} long, over the asked ${length.min} to ${length.max} ${length.unit}: shorten it to at most ${length.max} ${length.unit}, about ${lengthTarget(length)} ${length.unit}; keep every checklist point. `
     : "";
   let room = FIX_INSTRUCTION_MAX - avoid.length - 1 - lengthPiece.length;

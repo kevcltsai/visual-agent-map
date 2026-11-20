@@ -88,7 +88,9 @@ import {
   replaceProofSection,
   replaceResearchRecord,
   chapterBody,
-  detailBlockOf
+  detailBlockOf,
+  expandChapterDetail,
+  replaceDetailBlock
 } from "../../core/book-pipeline/note-sections";
 import {
   composeBookPlan,
@@ -114,6 +116,7 @@ import {
   type ProofResult
 } from "../../core/book-pipeline/proof";
 import {
+  bookExpandRequirements,
   effectiveSettings,
   lengthReason,
   lengthToken,
@@ -262,6 +265,8 @@ export interface AuthorInput {
   admission: AdmissionContext;
   /** The program's one-line request to use other sources (a source swap); absent for a normal write. Never carries untrusted text. */
   instruction?: string;
+  /** The whole requirements instead of the ones built from `settings`, `slots` and `instruction` (the expansion of a too-short chapter). */
+  requirements?: string;
   /** Checked synchronously inside the write: false (a stop, a replaced run, a removed card) means nothing is written. */
   authorize: (current?: string) => boolean;
   /** Runs inside the author's write on the text about to be saved: the cleaned text, or null (nothing is written). Pass it to the guarded write. */
@@ -452,6 +457,8 @@ interface Drive {
   avoid: Set<string>;
   /** Cards whose proofread named unmet points, waiting for the one automatic redo once every card has had its first round: the program-built request line. */
   fixable: Map<string, string>;
+  /** Cards whose automatic redo adds to the too-short chapter (the program puts the author's new text in) instead of writing it anew. */
+  expand: Set<string>;
   /** The reader's one-time permission to rewrite a hand-edited chapter: bound to the run, the card, the operation and the text it was given for. */
   overwrite: Map<string, { runId: string; operation: string; fingerprint: string }>;
   /** In memory only: the single-card rerun in progress. */
@@ -1155,6 +1162,7 @@ export class BookPipelineRuns {
       if (refused) throw new BookPipelineRunError("budget");
       if (extra) drive.extra.set(nodeId, extra);
       if (extra && swap) drive.avoid.add(nodeId);
+      if (extra) drive.expand.delete(nodeId);
       const kinds = steps(data.phase);
       drive.job = async () => {
         const before = track ? await this.cardSnapshot(drive, nodeId) : undefined;
@@ -1619,6 +1627,7 @@ export class BookPipelineRuns {
       extra: new Map(),
       avoid: new Set(),
       fixable: new Map(),
+      expand: new Set(),
       parents: new Map(),
       overwrite: new Map(),
       plans: new Map(),
@@ -2165,10 +2174,11 @@ export class BookPipelineRuns {
       if (keptRaw && isKeptRaw(keptRaw.raw)) continue;
       const done = await drive.store.commit(state => requestAutoFix(state, nodeId));
       if (!done?.accepted) continue;
-      // The rewrite may pick this card's own pictures again.
+      // The rewrite may pick this card's own pictures again (an expansion keeps them).
       const own = drive.cards.get(nodeId);
       const current = own ? await this.ports.readCard(own.path).catch(() => undefined) : undefined;
-      if (current) for (const url of bodyImageUrls(current.detail)) drive.usedImages.delete(imageKey(url));
+      if (current && !drive.expand.has(nodeId))
+        for (const url of bodyImageUrls(current.detail)) drive.usedImages.delete(imageKey(url));
       drive.extra.set(nodeId, instruction);
       drive.avoid.add(nodeId);
       drive.reasons.delete(nodeId);
@@ -2467,6 +2477,21 @@ export class BookPipelineRuns {
       return false;
     };
     const slots = parseImageSlots(card.prompt);
+    const settings = effectiveSettings(root.settings, parseBookPlanDecisions(root.raw));
+    // The automatic redo of a too-short chapter (measured again now, so a changed setting counts): the author sees the chapter and
+    // returns only change blocks, which the program puts into the chapter as it is (one call; its pictures and records stay).
+    const now =
+      drive.avoid.has(nodeId) && drive.expand.has(nodeId)
+        ? lengthReason(settings.length, chapterBody(card.detail))
+        : undefined;
+    const expanding = now?.kind === "under" ? now : undefined;
+    const oldDetail = expanding ? detailBlockOf(card.raw) : undefined;
+    const expand = (content: string): string => {
+      const next = detailBlockOf(content);
+      if (oldDetail === undefined || next === undefined) return content;
+      const merged = expandChapterDetail(oldDetail, next, drive.config.language);
+      return merged ? replaceDetailBlock(content, merged.detail) : content;
+    };
     // The body is cleaned inside the author's own write (same `vault.process`): only standard https pictures are ever saved, and
     // an unsafe body is refused whole, so the card keeps its text from before this step.
     const knownLines: ReadonlySet<string> = new Set(card.raw.split("\n"));
@@ -2501,7 +2526,8 @@ export class BookPipelineRuns {
         return null;
       }
       // The text and its new fingerprint are one write: from here on the chapter counts as "as the program left it".
-      return stampRaw(restore(cleaned));
+      // An expansion puts the cleaned change blocks into the chapter as it was, inside the same write.
+      return stampRaw(expanding ? expand(restore(cleaned)) : restore(cleaned));
     };
     // Nothing of this card's frontmatter is written while the author runs: the research write compares the whole file.
     const done = await untilAborted(
@@ -2510,12 +2536,22 @@ export class BookPipelineRuns {
         mapPath: drive.mapPath,
         nodeId,
         path: info.path,
-        settings: effectiveSettings(root.settings, parseBookPlanDecisions(root.raw)),
-        slots: slots ?? [],
+        settings,
+        slots: expanding ? [] : (slots ?? []),
         language: drive.config.language,
         model: drive.config.authorModel,
         reasoning: drive.config.reasoning,
         ...(drive.avoid.has(nodeId) ? { instruction: drive.extra.get(nodeId) } : {}),
+        ...(expanding
+          ? {
+              requirements: bookExpandRequirements(
+                settings,
+                chapterBody(card.detail),
+                expanding,
+                drive.extra.get(nodeId)
+              )
+            }
+          : {}),
         signal,
         admission: drive.admission,
         authorize: authorizeWrite,
@@ -2575,7 +2611,10 @@ export class BookPipelineRuns {
     // The picture slots (T2): the author's markers become verified pictures in one guarded write, or the stage does not advance.
     drive.sub.set(nodeId, { step: "images", startedAt: Date.parse(this.ports.now()) });
     this.ports.progressed?.(drive.mapPath);
-    const filled = await this.fillSlots(drive, token, nodeId, path, slots, authorize);
+    // An expansion keeps the chapter's pictures and their record: no new search, only a stray marker line goes.
+    const filled = expanding
+      ? await this.settleStrayMarkers(path, authorize)
+      : await this.fillSlots(drive, token, nodeId, path, slots, authorize);
     if (filled) return filled;
     drive.imagesDone.add(nodeId);
     return { kind: "ok", after: () => this.setStage(drive, nodeId, "written", null) };
@@ -2936,11 +2975,14 @@ export class BookPipelineRuns {
       kind: "ok",
       after: async () => {
         const stage = verdict.aggregate === "needs-review" || length ? "needs-review" : "checked";
-        if (stage === "needs-review" && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0)
+        if (stage === "needs-review" && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0) {
           drive.fixable.set(nodeId, proofFixInstruction(verdict.items, [...checklist, ...BOOK_CHECKS], length));
-        else if (!drive.job) {
+          if (length?.kind === "under") drive.expand.add(nodeId);
+          else drive.expand.delete(nodeId);
+        } else if (!drive.job) {
           drive.extra.delete(nodeId);
           drive.avoid.delete(nodeId);
+          drive.expand.delete(nodeId);
         }
         await this.setStage(
           drive,

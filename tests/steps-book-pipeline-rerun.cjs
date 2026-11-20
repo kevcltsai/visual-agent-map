@@ -453,17 +453,33 @@ test('proofFixInstruction: the whole-book points (names, research voice) come be
   assert.ok(line.length <= 1000);
 });
 
-test('proofFixInstruction: an under-length chapter is asked to expand to a concrete target (the redo does not see the old text); over says shorten with the maximum', () => {
+test('proofFixInstruction: an under-length chapter is asked for the missing new text in @@insert blocks (the program keeps the chapter); over says shorten with the maximum', () => {
   const R = S.load('experiences/visual-map/book-pipeline-rerun.ts');
   const under = R.proofFixInstruction([], [], { kind: 'under', measured: 3184, min: 5000, max: 8000, unit: '字', version: 1 });
-  assert.match(under, /came out at only 3184 字, short of the asked 5000 to 8000 字: lengthen it to at least 5000 字, about 6500 字 \(about 2 times as long\)/);
-  assert.match(under, /more explanation and concrete examples, not by repetition/);
+  assert.match(under, /came out at only 3184 字, short of the asked 5000 to 8000 字: add about 3316 字 of new text in @@insert blocks/);
+  assert.doesNotMatch(under, /rewrite|lengthen/);
   assert.ok(under.split(' Do not rely')[0].length <= 300, 'the length piece stays short, so fact points beside it keep their room');
   const tiny = R.proofFixInstruction([], [], { kind: 'under', measured: 0, min: 100, max: 200, unit: '字', version: 1 });
-  assert.match(tiny, /about 150 字 \(about 150 times as long\)/, 'a zero measure never divides by zero');
+  assert.match(tiny, /add about 150 字 of new text/, 'a zero measure asks for the whole target');
   const over = R.proofFixInstruction([], [], { kind: 'over', measured: 9800, min: 5000, max: 8000, unit: '字', version: 1 });
   assert.match(over, /9800 字 long, over the asked 5000 to 8000 字: shorten it to at most 8000 字, about 6500 字/);
-  assert.doesNotMatch(over, /lengthen/);
+  assert.doesNotMatch(over, /@@/);
+});
+
+test('proofFixInstruction: with a too-short chapter the fact and whole-book points (N1/V1) still come first and say to fix them with change blocks', () => {
+  const R = S.load('experiences/visual-map/book-pipeline-rerun.ts');
+  const { BOOK_CHECKS } = S.load('core/book-pipeline/prose-checks.ts');
+  const items = [
+    { id: 'C1', type: 'fact', status: 'unmet', note: 'wrong year', sources: [] },
+    { id: 'N1', type: 'structure', status: 'unmet', note: '「桃樂絲」→「多蘿西婭」', sources: [] },
+    { id: 'V1', type: 'structure', status: 'unmet', note: '「本次搜尋」', sources: [] }
+  ];
+  const line = R.proofFixInstruction(items, [{ id: 'C1', text: 'the year is right' }, ...BOOK_CHECKS], { kind: 'under', measured: 2253, min: 5000, max: 8000, unit: '字', version: 1 });
+  assert.match(line, /fact check on these points \(JSON strings; correct each with a @@replace block/);
+  assert.match(line, /structure points of its checklist \(JSON strings; cover them in the chapter text with @@insert or @@replace blocks/);
+  assert.ok(line.indexOf('wrong year') < line.indexOf('add about 4247 字'), 'facts first, then the length');
+  assert.ok(line.includes('多蘿西婭') && line.includes('本次搜尋'), line);
+  assert.ok(line.length <= 1000);
 });
 
 test('T4 proofFixInstruction: a long note or many points never leave an unclosed JSON string; the line stays within 1000 characters', () => {

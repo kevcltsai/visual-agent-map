@@ -153,6 +153,27 @@ test('bar: in the trial the fix round shows the trial done count, not chapter 1/
   assert.equal(text([{ nodeId: 'b', step: 'write', startedAt: 1 }]), '正在試跑第 2／3 章', 'a trial chapter in its first write is named');
 });
 
+test('bar: the fix line follows the chapter still being fixed and keeps the fix label between its steps', () => {
+  setUiLanguage('zh-TW');
+  const trial = { v: 1, runId: 'r', phase: 'planning', status: 'running', order: ['a', 'b', 'c', 'd'], trial: ['a', 'b', 'c'], globalPlanned: true, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', autoFixes: { a: 1, b: 1, c: 1 } };
+  const tp = current => ({ runId: 'r', phase: 'planning', status: 'running', active: true, total: 4, counts: { pending: 1, planned: 0, written: 2, checked: 1, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current });
+  const done = { a: 'checked' };
+  const ttext = current => bundle.bookProgressText(bundle.bookBarState(trial, tp(current), id => done[id]));
+  // chapter 1 is proofread (counted done) but its step has not left the runner yet: chapter 2, still in its fix, is named
+  assert.equal(ttext([{ nodeId: 'a', step: 'proof', startedAt: 1 }, { nodeId: 'b', step: 'write', startedAt: 2 }, { nodeId: 'c', step: 'write', startedAt: 3 }]), '正在修正第 2 章・已完成 1／3 章');
+  const whole = { v: 1, runId: 'r', phase: 'writing', status: 'running', order: ['a', 'b', 'c', 'd', 'e', 'f'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', autoFixes: { f: 1 } };
+  const wp = current => ({ runId: 'r', phase: 'writing', status: 'running', active: true, total: 6, counts: { pending: 0, planned: 0, written: 1, checked: 5, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current });
+  const stages = { a: 'checked', b: 'checked', c: 'checked', d: 'checked', e: 'checked', f: 'written' };
+  const wtext = current => bundle.bookProgressText(bundle.bookBarState(whole, wp(current), id => stages[id]));
+  assert.equal(wtext([{ nodeId: 'f', step: 'write', startedAt: 1 }]), '正在修正第 6 章・已完成 5／6 章');
+  // between two steps of chapter 6's fix (nothing in work), never "writing chapter 6/6"
+  assert.equal(wtext(undefined), '正在修正第 6 章・已完成 5／6 章');
+  assert.equal(wtext([]), '正在修正第 6 章・已完成 5／6 章');
+  // once chapter 6 is done, no fix line is left
+  stages.f = 'needs-review';
+  assert.equal(wtext(undefined), '正在寫第 6／6 章');
+});
+
 test('bar: a map change shows the changed mode with the counts, three real buttons and no card id', () => {
   setUiLanguage('zh-TW');
   const data = { v: 1, runId: 'r', phase: 'writing', status: 'stopped', pauseReason: 'map', changed: { added: ['node-secret-1'], missing: ['node-secret-2'] }, order: ['node-secret-2', 'b'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x' };

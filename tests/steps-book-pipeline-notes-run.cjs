@@ -11,7 +11,8 @@ export { BookNotesApply, NOTES_TIMEOUT_MS, UNDO_NOTICE_MS } from "./experiences/
 export { stampRaw, bodyStateRaw, readBodyRecord, integrityFpRaw } from "./core/book-pipeline/body-integrity";
 export { AppliedHighlights, HIGHLIGHT_MS, appliedField, setApplied } from "./experiences/visual-map/book-applied-highlight";
 export { locateApplied, locateAppliedShown } from "./core/book-pipeline/notes-apply";
-export { lineSpans, ReadingMarks } from "./experiences/visual-map/book-applied-highlight";
+export { ReadingMarks, sectionSource } from "./experiences/visual-map/book-applied-highlight";
+export { shownText } from "./experiences/visual-map/book-pipeline-callouts";
 export { showAppliedNotice } from "./experiences/visual-map/book-applied-notice";
 export { EditorState } from "@codemirror/state";
 export { setUiLanguage } from "./i18n";
@@ -153,6 +154,13 @@ test('undo success: the paragraph comes back with its note; the notice is releas
   assert.equal(r.ctl.canUndo(), false);
   await r.ctl.undo();
   assert.match(r.notices.at(-1), /沒有可還原/);
+});
+test('undo repaints the header action at once (live v4 P: reading mode has no editor event)', async () => {
+  const r = rig({ text: detail(`${P_NEW}\n\n別的段`), run: async () => applied() });
+  r.ctl.press('N/c.md'); await flush();
+  const before = r.changed;
+  await r.ctl.undo();
+  assert.ok(r.changed > before);
 });
 test('undo (review-a M3): a successful undo asks for the map boxes to be aligned again; a refused or empty one does not', async () => {
   const r = rig({ text: detail(`${P_NEW}\n\n別的段`), run: async () => applied() });
@@ -314,18 +322,42 @@ test('applied notice: bottom-right box removed by its own 10 s timer; undo click
   assert.equal(c.timers.length, 0);
 });
 
-test('reading marks: line spans of changed ranges (CRLF-safe), sections overlap, clear removes', () => {
+test('reading marks: a section is matched by its source text (CRLF-safe), on its own note only; clear removes', () => {
   const text = 'a\r\nb\r\n\r\nc\r\nd';
-  const from = text.indexOf('c');
-  const spans = b.lineSpans(text, [{ from, to: from + 1 }]);
-  assert.equal(JSON.stringify(spans), JSON.stringify([{ start: 3, end: 3 }]));
+  assert.equal(b.sectionSource(text, 3, 4), 'c\r\nd');
   const m = new b.ReadingMarks();
-  m.set('n.md', spans);
-  assert.equal(m.wears('n.md', 3, 3), true);
-  assert.equal(m.wears('n.md', 0, 1), false);
-  assert.equal(m.wears('o.md', 3, 3), false);
+  m.set('n.md', ['c\nd']);
+  assert.equal(m.wears('n.md', b.sectionSource(text, 3, 4)), true);
+  assert.equal(m.wears('n.md', b.sectionSource(text, 0, 1)), false);
+  assert.equal(m.wears('o.md', b.sectionSource(text, 3, 4)), false);
   m.clear();
-  assert.equal(m.wears('n.md', 3, 3), false);
+  assert.equal(m.wears('n.md', b.sectionSource(text, 3, 4)), false);
+  m.set('n.md', ['', '  ']);
+  assert.equal(m.wears('n.md', ''), false, 'an empty text marks nothing');
+});
+
+test('reading mode apply (live v4 P): the mark is set while the view still shows the old text and lands on the new paragraph when it renders, also after a callout moved the lines', () => {
+  const callout = '> [!vam-review] 待審\n> 已修改，未重新校對';
+  const before = detail('Para A\n\n==Para B==%%備註#1：改%%');
+  const after = detail(callout + '\n\nPara A\n\nPara B new');
+  const m = new b.ReadingMarks();
+  m.set('n.md', ['Para B new']);
+  const lines = t => t.split('\n');
+  const sectionAt = (t, needle) => { const i = lines(t).findIndex(l => l.includes(needle)); return b.sectionSource(t, i, i); };
+  // the old render (before the view reloaded the file): nothing is marked
+  assert.equal(m.wears('n.md', sectionAt(before, 'Para B')), false);
+  assert.equal(m.wears('n.md', sectionAt(before, 'Para A')), false);
+  // the new render: only the applied paragraph, never the callout or another paragraph
+  assert.equal(m.wears('n.md', sectionAt(after, 'Para B new')), true);
+  assert.equal(m.wears('n.md', sectionAt(after, 'Para A')), false);
+  const ci = lines(after).findIndex(l => l.includes('[!vam-review]'));
+  assert.equal(m.wears('n.md', b.sectionSource(after, ci, ci + 1)), false);
+});
+
+test('reading mode (live v4 P): the header counts the notes in the text the view shows, not its editor that reading mode leaves behind', () => {
+  const view = mode => ({ getMode: () => mode, getViewData: () => 'shown', editor: { getValue: () => 'editor' } });
+  assert.equal(b.shownText(view('preview')), 'shown');
+  assert.equal(b.shownText(view('source')), 'editor');
 });
 
 test('applied marks follow the paragraph text, never the review callout, in reading and edit mode', () => {
@@ -339,9 +371,9 @@ test('applied marks follow the paragraph text, never the review callout, in read
   assert.notEqual(found[0].from, stale.from);
   // reading mode: only the paragraph's line wears the mark, the callout lines do not
   const m = new b.ReadingMarks();
-  m.set('n.md', b.lineSpans(now, found));
-  assert.equal(m.wears('n.md', 0, 3), false);
-  assert.equal(m.wears('n.md', 6, 6), true);
+  m.set('n.md', ['Para B new']);
+  assert.equal(m.wears('n.md', b.sectionSource(now, 1, 2)), false);
+  assert.equal(m.wears('n.md', b.sectionSource(now, 6, 6)), true);
   // edit mode: the CM6 mark covers exactly the paragraph
   const state = b.EditorState.create({ doc: now, extensions: [b.appliedField] }).update({ effects: b.setApplied.of(found) }).state;
   const marked = [];

@@ -195,6 +195,8 @@ export class BookNotesApply {
     }
     this.ports.releaseHighlight();
     this.lastUndo = null;
+    // The header action counts the notes that came back (no editor event in reading mode).
+    if (!this.disposed) this.ports.changed();
     if (outcome.restored) {
       await this.ports.flush(last.path).catch(() => undefined);
       if (!this.disposed) this.ports.undone(last.path);

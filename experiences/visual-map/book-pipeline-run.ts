@@ -475,6 +475,8 @@ interface Drive {
   failure?: string;
   /** Keys (see imageKey) of the pictures this run already embedded: one picture is used once in a book. */
   usedImages: Set<string>;
+  /** Work keys (see workKey) this run placed, by the card that placed them: one work is shown once in a book, even under another file name. */
+  usedWorks: Map<string, string>;
   /** The drive-wide gate of picture probes in flight (see {@link PROBE_PARALLEL}). */
   probeGate: { active: number; waiters: Array<() => void> };
   done: Promise<void>;
@@ -1585,6 +1587,7 @@ export class BookPipelineRuns {
       disposed: false,
       rootId: "",
       usedImages: new Set<string>(),
+      usedWorks: new Map<string, string>(),
       probeGate: { active: 0, waiters: [] },
       done: Promise.resolve()
     } as unknown as Drive;
@@ -2633,7 +2636,9 @@ export class BookPipelineRuns {
       );
     };
     const perSlot = new Map<number, ProbedCandidate[]>();
-    const taken = (key: string): boolean => drive.usedImages.has(key) || others.has(key);
+    // A work key another chapter of this run claimed is taken; this chapter's own (a rerun) is not.
+    const taken = (key: string): boolean =>
+      drive.usedImages.has(key) || others.has(key) || (drive.usedWorks.get(key) ?? nodeId) !== nodeId;
     try {
       const round1 = await search(wanted, false, exclude);
       for (const [index, list] of await probeFound(wanted, round1)) perSlot.set(index, list);
@@ -2664,8 +2669,15 @@ export class BookPipelineRuns {
       "figure" in outcome ? [imageKey(outcome.figure.href)] : []
     );
     for (const key of claimed) drive.usedImages.add(key);
+    const works = [...outcomes.values()].flatMap(outcome =>
+      "figure" in outcome && outcome.figure.work && !drive.usedWorks.has(outcome.figure.work)
+        ? [outcome.figure.work]
+        : []
+    );
+    for (const key of works) drive.usedWorks.set(key, nodeId);
     const release = (): void => {
       for (const key of claimed) drive.usedImages.delete(key);
+      for (const key of works) drive.usedWorks.delete(key);
     };
     try {
       const result = await this.writeFilled(latest, slots, outcomes, language, authorize);

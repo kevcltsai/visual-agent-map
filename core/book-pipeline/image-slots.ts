@@ -7,6 +7,7 @@
 
 import { noteLanguageOf, translate, translateNote, type ContentLanguage } from "../../i18n";
 import { imageKey } from "./image-dedupe";
+import { workKey } from "./image-quality";
 import { fencedLines } from "./note-sections";
 import { escapeMarkdownText } from "./text";
 
@@ -185,7 +186,7 @@ export interface PickContext {
   chapter: { id: string; title: string };
   slot: ImageSlot;
   allSlots: readonly ImageSlot[];
-  /** Picture addresses already placed in this chapter: one address is never placed twice (same chapter). */
+  /** Picture addresses (and work keys, see workKey) already placed in this chapter: one picture or work is never placed twice (same chapter). */
   alreadyPicked: ReadonlySet<string>;
 }
 export type SlotPick = { candidate: SlotCandidate } | { none: true; reasonCode: SlotReasonCode; reasonText?: string };
@@ -206,7 +207,10 @@ export function pickForSlot(ctx: PickContext, candidates: readonly SlotCandidate
   const secure = candidates.filter(item => isHttps(item.imageUrl));
   // One picture is one file: a thumbnail and the original of the same file count as the same address.
   const picked = new Set([...ctx.alreadyPicked].map(imageKey));
-  const hit = secure.find(item => !picked.has(imageKey(item.imageUrl)));
+  const hit = secure.find(item => {
+    const work = workKey(item.imageUrl, item.author);
+    return !picked.has(imageKey(item.imageUrl)) && !(work && picked.has(work));
+  });
   if (hit) return { candidate: hit };
   if (candidates.length && !secure.length) return { none: true, reasonCode: "unsafe_url" };
   return { none: true, reasonCode: "not_found" };
@@ -229,6 +233,8 @@ export interface SlotFigure {
   caption: string;
   /** Where the picture came from; absent when the source page is not a usable https address. */
   source?: { href: string; line: string; entry: string };
+  /** The work key (see workKey) when the author is known: the run claims it so no other chapter shows the same work under another file. */
+  work?: string;
 }
 export type SlotOutcome = { figure: SlotFigure } | { reasonCode: SlotReasonCode; reasonText?: string };
 
@@ -303,8 +309,9 @@ export function figureOf(candidate: SlotCandidate, href: string, language: strin
 }
 
 /**
- * Decides every slot in order: the candidates that loaded, passed the address check and are not `taken` (the key of a picture another
- * chapter shows or claimed) go to {@link pickForSlot}; the first slot of the chapter takes first, and one picture is never placed twice.
+ * Decides every slot in order: the candidates that loaded, passed the address check and are not `taken` (the address key, or the work
+ * key, of a picture another chapter shows or claimed) go to {@link pickForSlot}; the first slot of the chapter takes first, and one
+ * picture or work is never placed twice.
  * A slot without a pick gets the most telling reason. Pure and synchronous, so the caller can claim the picks in the same turn.
  */
 export function choosePictures(
@@ -318,14 +325,21 @@ export function choosePictures(
   const alreadyPicked = new Set<string>();
   for (const slot of slots) {
     const all = perSlot.get(slot.index) ?? [];
-    const usable = all.filter(item => item.href && item.loaded && !taken(imageKey(item.href)));
+    const usable = all.filter(item => {
+      if (!item.href || !item.loaded || taken(imageKey(item.href))) return false;
+      const work = workKey(item.href, item.candidate.author);
+      return !(work && taken(work));
+    });
     const pick = pickForSlot(
       { chapter, slot, allSlots: slots, alreadyPicked },
       usable.map(item => ({ ...item.candidate, imageUrl: item.href as string }))
     );
     if ("candidate" in pick) {
       alreadyPicked.add(pick.candidate.imageUrl);
-      outcomes.set(slot.index, { figure: figureOf(pick.candidate, pick.candidate.imageUrl, language) });
+      const work = workKey(pick.candidate.imageUrl, pick.candidate.author);
+      if (work) alreadyPicked.add(work);
+      const figure = figureOf(pick.candidate, pick.candidate.imageUrl, language);
+      outcomes.set(slot.index, { figure: work ? { ...figure, work } : figure });
       continue;
     }
     let reasonCode = pick.reasonCode;

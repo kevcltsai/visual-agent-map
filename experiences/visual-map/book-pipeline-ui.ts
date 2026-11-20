@@ -555,6 +555,7 @@ export function lengthText(length: LengthReason): string {
   );
 }
 function plainIssueText(issue: string): string {
+  if (issue.trim() === "consistency") return t("ui.book_issue_consistency");
   const failed = /^(plan|write|proof) failed: (\S+)$/.exec(issue.trim());
   if (failed) {
     const step = failed[1] as keyof typeof STEP_KEY;

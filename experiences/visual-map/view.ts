@@ -470,6 +470,7 @@ import { normalizeVaultPath } from "../../core/map-chat-guard";
 import { MapChatFiles } from "../../core/map-chat-files";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
 import { cardRevision } from "../../core/book-pipeline/machine";
+import { chapterInconsistencies } from "../../core/book-pipeline/consistency";
 import { GateError, applyPause } from "../../core/argument-map/machine";
 import { effectiveVerdict, managedNodeIds, readArgumentMap } from "../../core/argument-map/model";
 import {
@@ -17465,6 +17466,7 @@ export class VisualAgentMapView extends ItemView {
     return reviewEntries({
       proofContext: { runId: data.runId, revisionOf: id => cardRevision(data, id) },
       order: effectiveOrder(data),
+      inconsistencies: id => chapterInconsistencies(data, id),
       titleOf: id => this.notes.get(id)?.title ?? map.nodes.find(node => node.id === id)?.path ?? id,
       noteOf: id => this.notes.get(id)
     })
@@ -17482,6 +17484,7 @@ export class VisualAgentMapView extends ItemView {
     return reviewEntries({
       proofContext: { runId: data.runId, revisionOf: card => cardRevision(data, card) },
       order: [id],
+      inconsistencies: card => chapterInconsistencies(data, card),
       titleOf: () => id,
       noteOf: card => this.notes.get(card)
     }).some(entry => entry.fp === ticked);
@@ -17511,6 +17514,7 @@ export class VisualAgentMapView extends ItemView {
     const entry = reviewEntries({
       proofContext: { runId: read.data.runId, revisionOf: other => cardRevision(read.data, other) },
       order: [id],
+      inconsistencies: other => chapterInconsistencies(read.data, other),
       titleOf: () => note.title,
       noteOf: () => note
     })[0];

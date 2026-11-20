@@ -75,7 +75,10 @@ export function parseConsistency(raw: string, chapters: number): RawInconsistenc
       if (!valid(a) || !valid(b) || a === b) return fail("An issue names a chapter the book does not have");
       const claimA = singleLine(textOf(item.claimA, "claimA"), CONSISTENCY_CLAIM_CHARS);
       const claimB = singleLine(textOf(item.claimB, "claimB"), CONSISTENCY_CLAIM_CHARS);
-      const suggestion = singleLine(typeof item.suggestion === "string" ? item.suggestion : "", CONSISTENCY_CLAIM_CHARS);
+      const suggestion = singleLine(
+        typeof item.suggestion === "string" ? item.suggestion : "",
+        CONSISTENCY_CLAIM_CHARS
+      );
       return a < b ? { a, b, claimA, claimB, suggestion } : { a: b, b: a, claimA: claimB, claimB: claimA, suggestion };
     });
 }
@@ -88,7 +91,11 @@ export const consistencyStep: StepDefinition<ConsistencyRequest, RawInconsistenc
     renderTemplate(template, {
       languageInstruction: languageInstruction(request.language, request.chapters[0]?.text ?? ""),
       chapters: JSON.stringify(
-        request.chapters.map((chapter, at) => ({ number: at + 1, title: singleLine(chapter.title, 200), text: chapter.text }))
+        request.chapters.map((chapter, at) => ({
+          number: at + 1,
+          title: singleLine(chapter.title, 200),
+          text: chapter.text
+        }))
       )
     }),
   schema: CONSISTENCY_SCHEMA,

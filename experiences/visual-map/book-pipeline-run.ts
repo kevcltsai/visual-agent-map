@@ -2079,8 +2079,7 @@ export class BookPipelineRuns {
    * {@link markInconsistent}). A failure is retried like a step and never holds the run: after the last attempt the phase moves on.
    */
   private async consistency(drive: Drive): Promise<void> {
-    const check = this.ports.checkConsistency;
-    if (!check) return;
+    if (!this.ports.checkConsistency) return;
     const begun = await drive.store.commit(state => {
       const dispatched = beginConsistency(state);
       return dispatched
@@ -2094,7 +2093,15 @@ export class BookPipelineRuns {
       const attempt = drive.store.state.consistency?.attempts ?? 0;
       const ms = Math.max(0, Date.parse(this.ports.now()) - startedAt || 0);
       this.ports.log(
-        formatPipelineLog({ event: "step", runId: token.runId, card: "consistency", step: "proof", attempt, result, ms })
+        formatPipelineLog({
+          event: "step",
+          runId: token.runId,
+          card: "consistency",
+          step: "proof",
+          attempt,
+          result,
+          ms
+        })
       );
     };
     try {
@@ -2110,7 +2117,7 @@ export class BookPipelineRuns {
       const found =
         chapters.length < 2
           ? []
-          : await check(
+          : await this.ports.checkConsistency(
               { ...this.base(drive, drive.config.proofModel), chapters: compactChapters(chapters) },
               { signal: drive.controller.signal, admission: drive.admission }
             );

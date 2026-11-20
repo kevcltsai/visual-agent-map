@@ -161,7 +161,8 @@ export function nextActions(
   if (actions.length) return { actions };
   // Nothing left to start. Busy cards are still working; otherwise the phase is complete.
   if (busy.size) return { actions: [] };
-  if (data.phase === "writing" && options.consistency && consistencyDue(data)) return { actions: [{ type: "book_consistency" }] };
+  if (data.phase === "writing" && options.consistency && consistencyDue(data))
+    return { actions: [{ type: "book_consistency" }] };
   return { actions: [{ type: "advance_phase" }] };
 }
 

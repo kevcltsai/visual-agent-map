@@ -14,6 +14,7 @@ import { failedProofKey, proofKey } from "../../core/book-pipeline/proof";
 import { parseChecklist, parseImageSlots } from "../../core/book-pipeline/plan-text";
 import { escapeMarkdownText, hashText, unescapeMarkdownText } from "../../core/book-pipeline/text";
 import { splitLengthIssue } from "../../core/book-pipeline/settings";
+import type { ChapterInconsistency } from "../../core/book-pipeline/consistency";
 import { bookCardView, bookIssueText, lengthText } from "./book-pipeline-ui";
 import { bodyImageUrls } from "./book-pipeline-run";
 
@@ -51,6 +52,10 @@ export interface Gate2Card {
   handEdited?: boolean;
   /** With `handEdited`: the integrity fingerprint of the text the run skipped (the one a rewrite permission is bound to). */
   bodyFp?: string;
+  /** What the last whole-book consistency check found for this chapter (absent: nothing, or the chapter changed since). */
+  inconsistencies?: (ChapterInconsistency & { otherTitle: string })[];
+  /** The card is needs-review only because of the consistency check (issue `consistency`); its findings say why. */
+  consistencyOnly?: boolean;
 }
 
 /** The input shape `galleryBare` reads from a card note. */
@@ -61,20 +66,33 @@ interface GalleryNote {
 
 /** The kinds of problem a chapter can have. A new kind (a hand-edited chapter, say) is one more entry in {@link PROBLEM_RULES}. */
 export type ReviewProblemKind =
-  "failed" | "unfinished" | "structure" | "facts" | "images" | "seam" | "edited" | "hand-edited";
+  "failed" | "unfinished" | "structure" | "facts" | "images" | "seam" | "edited" | "hand-edited" | "consistency";
 export interface ReviewProblem {
   kind: ReviewProblemKind;
   /** The plain sentence the reader sees. */
   text: string;
 }
 /** In the order the sentences are listed: the first rule that applies to a card comes first. */
-const PROBLEM_RULES: readonly { kind: ReviewProblemKind; of: (card: Gate2Card) => string | undefined }[] = [
+/** A rule gives one sentence, or one per finding (the consistency check: each pair of chapters is its own line). */
+const PROBLEM_RULES: readonly { kind: ReviewProblemKind; of: (card: Gate2Card) => string | string[] | undefined }[] = [
   {
     kind: "failed",
     of: card =>
-      card.stage === "needs-review" && !card.handEdited ? card.failureText || t("ui.book_issue_unknown") : undefined
+      card.stage === "needs-review" && !card.handEdited && !card.consistencyOnly
+        ? card.failureText || t("ui.book_issue_unknown")
+        : undefined
   },
   { kind: "hand-edited", of: card => (card.handEdited ? t("ui.book_review_hand_edited") : undefined) },
+  {
+    kind: "consistency",
+    of: card =>
+      card.inconsistencies?.length
+        ? card.inconsistencies.map(item => {
+            const sentence = t("ui.book_reason_inconsistent_0_1_2", item.otherTitle, item.own, item.theirs);
+            return item.suggestion ? `${sentence}${t("ui.book_panel_lead_sep")}${item.suggestion}` : sentence;
+          })
+        : undefined
+  },
   {
     kind: "unfinished",
     of: card =>
@@ -102,8 +120,9 @@ const PROBLEM_RULES: readonly { kind: ReviewProblemKind; of: (card: Gate2Card) =
 export function reviewProblems(card: Gate2Card): ReviewProblem[] {
   const out: ReviewProblem[] = [];
   for (const rule of PROBLEM_RULES) {
-    const text = rule.of(card);
-    if (text !== undefined) out.push({ kind: rule.kind, text });
+    const found = rule.of(card);
+    for (const text of found === undefined ? [] : Array.isArray(found) ? found : [found])
+      out.push({ kind: rule.kind, text });
   }
   return out;
 }
@@ -162,6 +181,8 @@ export function gate2Cards(input: {
   noteOf: (id: string) => Gate2NoteInput | undefined;
   /** The run and each card's revision: with it a chapter whose stored proof no longer fits its text is flagged `proofStale`. */
   proofContext?: { runId: string; revisionOf: (id: string) => number };
+  /** What the last whole-book consistency check found for a chapter (`chapterInconsistencies`). Absent: not shown. */
+  inconsistencies?: (id: string) => ChapterInconsistency[];
 }): Gate2Card[] {
   return input.order.map((id, at): Gate2Card => {
     const note = input.noteOf(id);
@@ -181,6 +202,12 @@ export function gate2Cards(input: {
         input.proofContext.runId,
         input.proofContext.revisionOf(id)
       );
+    const inconsistencies = (input.inconsistencies?.(id) ?? []).map(item => ({
+      ...item,
+      otherTitle: input.titleOf(item.other)
+    }));
+    const consistencyOnly =
+      view.stage === "needs-review" && issue.trim() === "consistency" && inconsistencies.length > 0;
     return {
       id,
       index: at + 1,
@@ -196,7 +223,9 @@ export function gate2Cards(input: {
       galleryBare: checked && galleryBare(role, note),
       seam: view.seam,
       ...(handEdited ? { handEdited: true, bodyFp: integrityFp(note?.detail ?? "") } : {}),
-      ...(stale ? { proofStale: true } : {})
+      ...(stale ? { proofStale: true } : {}),
+      ...(inconsistencies.length ? { inconsistencies } : {}),
+      ...(consistencyOnly ? { consistencyOnly: true } : {})
     };
   });
 }
@@ -232,6 +261,8 @@ export interface AttentionFpInput {
   seam?: string;
   /** The stored proof no longer fits the text. Part of the hash only when true, so every earlier fingerprint stays the same. */
   stale?: boolean;
+  /** The consistency findings shown for the chapter. Part of the hash only when present, so every earlier fingerprint stays the same. */
+  inconsistencies?: readonly ChapterInconsistency[];
 }
 export const attentionFingerprint = (input: AttentionFpInput): string =>
   hashText(
@@ -240,7 +271,10 @@ export const attentionFingerprint = (input: AttentionFpInput): string =>
       input.issue ?? "",
       input.proofKey ?? "",
       input.seam ?? "",
-      ...(input.stale ? ["edited"] : [])
+      ...(input.stale ? ["edited"] : []),
+      ...(input.inconsistencies?.length
+        ? [input.inconsistencies.map(item => [item.other, item.own, item.theirs, item.suggestion])]
+        : [])
     ])
   );
 
@@ -262,6 +296,7 @@ export function reviewEntries(input: {
   titleOf: (id: string) => string;
   noteOf: (id: string) => Gate2NoteInput | undefined;
   proofContext?: { runId: string; revisionOf: (id: string) => number };
+  inconsistencies?: (id: string) => ChapterInconsistency[];
 }): ReviewEntry[] {
   const out: ReviewEntry[] = [];
   for (const card of gate2Cards(input)) {
@@ -276,7 +311,13 @@ export function reviewEntries(input: {
         issue: typeof note?.pipelineIssue === "string" ? note.pipelineIssue : "",
         proofKey: proofFingerprint(note?.detail ?? ""),
         seam: typeof note?.pipelineSeam === "string" ? note.pipelineSeam : "",
-        stale: card.proofStale === true
+        stale: card.proofStale === true,
+        inconsistencies: card.inconsistencies?.map(({ other, own, theirs, suggestion }) => ({
+          other,
+          own,
+          theirs,
+          suggestion
+        }))
       })
     });
   }

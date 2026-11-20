@@ -2925,3 +2925,43 @@ test('fix3 a chapter removed while writing, then "carry on": the neighbours\' pr
   assert.equal(await promptLine(r, 3, '後一張'), '無', 'an unaffected line is left as it was');
   for (const i of [0, 2, 3]) assert.equal((await r.note(i)).bookRole, roles[i], `role of card ${i} unchanged`);
 });
+
+// ---- the whole-book consistency check ----
+
+test('consistency: one check after every chapter is proofread costs one call, marks the two chapters it names needs-review, and their review box says what differs', async () => {
+  const { reviewEntries } = S.load('experiences/visual-map/book-pipeline-review.ts');
+  const { chapterInconsistencies } = S.load('core/book-pipeline/consistency.ts');
+  const asked = [];
+  const r = await rig({ ports: { checkConsistency: async (request, run) => { asked.push(request); await run.admission.reserve(); return [{ a: 1, b: 3, claimA: '三天', claimB: '一到兩天', suggestion: '統一寫一到三天' }]; } } });
+  await r.runs.start(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
+  const s = await r.state();
+  assert.equal(s.phase, 'gate2');
+  assert.equal(asked.length, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(asked[0].chapters.map(c => c.title))), TITLES);
+  assert.ok(asked[0].chapters.every((c, i) => c.text.includes(bodyOf(TITLES[i]))));
+  assert.equal(s.budget.used, 1 + 3 + 3 + 3 + 1);
+  assert.deepEqual([stageOf(r.raw(0)), stageOf(r.raw(1)), stageOf(r.raw(2))], ['needs-review', 'checked', 'needs-review']);
+  assert.equal(r.runs.getProgress(r.mapPath).counts.checked, 1);
+  assert.equal((await r.note(2)).pipelineIssue, 'consistency');
+  const ids = r.nodes.map(n => n.id);
+  const entries = reviewEntries({ order: ids, titleOf: id => TITLES[ids.indexOf(id)], noteOf: id => ({ pipelineStage: stageOf(r.raw(ids.indexOf(id))), pipelineIssue: 'consistency' }), inconsistencies: id => chapterInconsistencies(s, id) });
+  assert.equal(entries.find(e => e.card.id === ids[2]).problems[0].text, `Says something differently from 〈${TITLES[0]}〉: this chapter says “一到兩天”, 〈${TITLES[0]}〉 says “三天”, 統一寫一到三天`);
+  assert.ok(r.stat.logs.some(line => /consistency/.test(line) && /ok:1/.test(line)));
+  assert.ok(!r.stat.logs.some(line => line.includes('三天')), 'the log carries no claim text');
+});
+
+test('consistency: a check that fails three times never holds the run (gate 2, no chapter marked); no port means no check', async () => {
+  let calls = 0;
+  const r = await rig({ ports: { checkConsistency: async () => { calls++; throw new Error('bad reply'); } } });
+  await r.runs.start(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
+  const s = await r.state();
+  assert.equal(s.phase, 'gate2');
+  assert.equal(calls, 3);
+  for (let i = 0; i < 3; i++) assert.equal(stageOf(r.raw(i)), 'checked');
+  const none = await rig();
+  await none.runs.start(none.mapPath);
+  await confirmDone(none.runs, none.mapPath);
+  assert.equal((await none.state()).consistency, undefined);
+});

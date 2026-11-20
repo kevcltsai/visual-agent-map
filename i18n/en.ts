@@ -3385,9 +3385,10 @@ export const en = {
   "ui.book_remove": "Remove picture book",
   "ui.book_abandon_title": "Give up this picture book?",
   "ui.book_abandon_body":
-    "The chapter notes already written stay exactly as they are. Only the picture-book progress is removed from this mind map, and it becomes a normal mind map again. You can press Picture book later to start fresh.",
+    "The chapter text already written is kept; only the picture-book hint boxes in the notes are removed, along with the picture-book progress on this mind map, and it becomes a normal mind map again. You can press Picture book later to start fresh.",
   "ui.book_abandon_confirm": "Yes, give it up",
-  "ui.book_abandoned": "This is a normal mind map again. Your notes were not changed.",
+  "ui.book_abandoned":
+    "This is a normal mind map again. The chapter text was not changed; only the picture-book hint boxes were removed.",
   "ui.book_add_budget": "Add 100 calls",
   "ui.book_budget_used_up_0_1": "Call budget used up: {0}/{1} used",
   "ui.book_bar_trial_ready_0": "The {0} trial chapters are written",

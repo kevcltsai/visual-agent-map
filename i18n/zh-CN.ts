@@ -3163,9 +3163,9 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_remove": "移除图文书",
   "ui.book_abandon_title": "放弃这本图文书？",
   "ui.book_abandon_body":
-    "已写好的章节笔记会原封不动保留。只会从这张心智图移除图文书的进度，它会变回普通心智图。之后按“图文书”可以重新开始。",
+    "已写好的章节正文会保留，只会去掉图文书放进笔记的提示框，并从这张心智图移除图文书的进度，它会变回普通心智图。之后按“图文书”可以重新开始。",
   "ui.book_abandon_confirm": "确定放弃",
-  "ui.book_abandoned": "已变回普通心智图，你的笔记没有被改动。",
+  "ui.book_abandoned": "已变回普通心智图，章节正文没有被改动，只去掉了图文书的提示框。",
   "ui.book_add_budget": "再加 100 次",
   "ui.book_budget_used_up_0_1": "额度用完：已用 {0}／{1} 次",
   "ui.book_bar_trial_ready_0": "试跑的 {0} 章写好了",

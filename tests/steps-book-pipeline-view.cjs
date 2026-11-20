@@ -1063,7 +1063,7 @@ test('abandon: stopped, budget pause and done show the entry (放棄這本 / 移
     const bar = drawWith(data, progress({ phase: data.phase, status: data.status, active: false }), a);
     const card = dom.find(bar, i => i.cls.includes('vam-book-abandon-card'));
     assert.ok(card, 'the card is drawn in the bar (no window.confirm)');
-    assert.ok(texts(card).some(x => x.includes('已寫好的章節筆記會原封不動保留')));
+    assert.ok(texts(card).some(x => x.includes('已寫好的章節正文會保留，只會拿掉圖文書放進筆記的提示框')));
     assert.ok(!/地圖/.test(texts(card).join('')));
     dom.find(card, i => i.cls.includes('vam-book-abandon-cancel')).click();
     dom.find(card, i => i.cls.includes('vam-book-abandon-confirm')).click();

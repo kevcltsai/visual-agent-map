@@ -17903,6 +17903,7 @@ export class VisualAgentMapView extends ItemView {
             authorize: input.authorize,
             finalize: input.finalize,
             ...(input.keepSummary ? { keepSummary: true } : {}),
+            ...(input.inPlace ? { keepStatusOnFailure: true } : {}),
             onBudgetExhausted: () => {
               exhausted = true;
             },
@@ -17910,7 +17911,11 @@ export class VisualAgentMapView extends ItemView {
               discarded = true;
             }
           },
-          request: { admission: input.admission, noContentLog: true },
+          request: {
+            admission: input.admission,
+            noContentLog: true,
+            ...(input.inPlace ? { searchOptional: true } : {})
+          },
           template: "book-chapter"
         }
       );

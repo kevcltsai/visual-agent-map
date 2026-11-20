@@ -112,6 +112,10 @@ const EXPAND_BODY_MAX = 40_000;
  * data. `length` is the chapter's length reason (none: only the points are fixed). `instruction` is the redo's point list
  * (`proofFixInstruction`), last.
  */
+/** The request of an expand pass after an answer with no usable block (the chapter is still short): name the sections, then write them. */
+export const BOOK_EXPAND_RETRY_INSTRUCTION =
+  "The last answer had no usable change block and the chapter is still too short (hard requirement): first choose 2 to 4 concrete points of this chapter's own plan that the text does not explain yet, then write each as a new ### section in its own @@insert block. An answer with no block is not accepted this time.";
+
 export function bookExpandRequirements(
   settings: BookSettings,
   body: string,

@@ -235,7 +235,8 @@ export class AiTaskService {
       context.researchMode === "research" &&
       role === undefined &&
       !input.countRepair;
-    const requiresWeb = countsWeb;
+    // The picture-book's in-place fix edits a chapter that was researched when it was written: no retrieval is not a failure there (live v6).
+    const requiresWeb = countsWeb && !context.searchOptional;
     let retrievals = 0;
     // Argument-evidence only: this call's web events, kept so the pages the provider opened can back a source proof.
     const webEvents: CodexWebSearchEvent[] = [];

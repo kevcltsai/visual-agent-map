@@ -21,7 +21,7 @@ import { escapeMarkdownText, hashText, unescapeMarkdownText } from "../../core/b
 import { splitLengthIssue } from "../../core/book-pipeline/settings";
 import type { ChapterInconsistency } from "../../core/book-pipeline/consistency";
 import { bookCardView, bookIssueText, lengthText, pictureSentences } from "./book-pipeline-ui";
-import { joinReasons } from "./book-pipeline-reasons";
+import { joinReasons, splitCarriedIssue } from "./book-pipeline-reasons";
 import { bodyImageUrls } from "./book-pipeline-run";
 
 import { projectProofBody } from "../../core/book-pipeline/book-notes";
@@ -176,6 +176,8 @@ export { joinReasons };
 
 /** The reason of a needs-review card in words: the proof's own notes of the items not met, else the count, else a plain sentence; never a code. */
 export function reasonOf(issue: string, proof: StoredProofView | undefined): string {
+  const carried = splitCarriedIssue(issue);
+  if (carried) return joinReasons([bookIssueText(carried.failure), reasonOf(carried.carried, proof)]);
   const pictures = splitPictureIssue(issue);
   const sentences = pictureSentences(pictures);
   if (sentences.length) return joinReasons(pictures.rest ? [reasonOf(pictures.rest, proof), ...sentences] : sentences);

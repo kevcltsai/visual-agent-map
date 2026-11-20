@@ -157,6 +157,8 @@ export interface TaskContext {
   admission?: AdmissionContext;
   /** Trusted: the exchange log keeps this task's metadata but never its prompt or reply (the picture-book pipeline's owner text); never serialized. */
   noContentLog?: boolean;
+  /** Trusted: a research call that may search but is not failed when it made no web retrieval (the picture-book's in-place fix of a chapter it already researched); never serialized. */
+  searchOptional?: boolean;
 }
 /** Provider-neutral web activity event; Claude events are translated into the Codex App Server shape. */
 export interface WebSearchEvent {

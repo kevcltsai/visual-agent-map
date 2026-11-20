@@ -10,6 +10,7 @@
  * the map file. Only ids, counts and codes are logged.
  */
 import type { AdmissionContext } from "../../core/admission";
+import { carryIssue } from "./book-pipeline-reasons";
 import type { FindImagesRequest, FoundImages } from "../../core/steps/book-pipeline/find-images";
 import type { ConsistencyRequest, RawInconsistency } from "../../core/steps/book-pipeline/consistency";
 import { chapterReferenceFindings } from "../../core/book-pipeline/chapter-references";
@@ -142,6 +143,7 @@ import {
 } from "../../core/book-pipeline/proof";
 import {
   bookExpandRequirements,
+  BOOK_EXPAND_RETRY_INSTRUCTION,
   fixInstructionText,
   effectiveSettings,
   imageCountRange,
@@ -305,6 +307,8 @@ export interface AuthorInput {
   requirements?: string;
   /** The write keeps the card's Summary (an expansion's answer only describes what it added). */
   keepSummary?: boolean;
+  /** An in-place fix or expansion of a chapter that has its text: a call with no web search is not failed, and a failed call leaves the card's status as it was. */
+  inPlace?: boolean;
   /** Checked synchronously inside the write: false (a stop, a replaced run, a removed card) means nothing is written. */
   authorize: (current?: string) => boolean;
   /** Runs inside the author's write on the text about to be saved: the cleaned text, or null (nothing is written). Pass it to the guarded write. */
@@ -2403,13 +2407,16 @@ export class BookPipelineRuns {
     await this.writeFields(drive, nodeId, { pipelineStage: stage, pipelineIssue: issue });
   }
   private async markReview(drive: Drive, nodeId: string, step: PipelineStep, reason: string): Promise<void> {
+    const failure = `${step} failed: ${code(reason)}`;
+    // A failed rewrite of a chapter that still has its text keeps every reason it had (length, pictures, the proof's points) beside
+    // the failure, and its latest proof section (live v6: 「寫作失敗」 alone replaced 「只有 2913 字」 and the picture shortfall).
+    const issue =
+      step === "write" && reason !== "hand_edited" ? carryIssue(failure, await this.issueWithBody(drive, nodeId)) : failure;
     drive.stages.set(nodeId, "needs-review");
     drive.reviewStep.set(nodeId, step);
-    await this.writeFields(drive, nodeId, {
-      pipelineStage: "needs-review",
-      pipelineIssue: `${step} failed: ${code(reason)}`
-    });
-    if (step !== "plan" && !NO_FAILURE_SECTION.has(reason)) await this.writeFailureSection(drive, nodeId, reason);
+    await this.writeFields(drive, nodeId, { pipelineStage: "needs-review", pipelineIssue: issue });
+    if (step !== "plan" && issue === failure && !NO_FAILURE_SECTION.has(reason))
+      await this.writeFailureSection(drive, nodeId, reason);
     this.syncReviewNotes(drive);
   }
   /**
@@ -2511,6 +2518,14 @@ export class BookPipelineRuns {
       );
   }
   /** Best effort: the card's proof-result section says "failed: reason" (no model). Never throws; skipped when nothing is known to be safe to write. */
+  /** The card's issue now, when the card still has chapter text (the reasons that text still has); else undefined. */
+  private async issueWithBody(drive: Drive, nodeId: string): Promise<string | undefined> {
+    const info = drive.cards.get(nodeId);
+    const card = info ? await this.ports.readCard(info.path).catch(() => undefined) : undefined;
+    if (!card || !chapterBody(card.detail).trim()) return undefined;
+    const issue = card.fields.pipelineIssue;
+    return typeof issue === "string" ? issue : undefined;
+  }
   private async writeFailureSection(drive: Drive, nodeId: string, reason: string): Promise<void> {
     try {
       if (this.dead(drive) || drive.controller.signal.aborted) return;
@@ -2956,6 +2971,7 @@ export class BookPipelineRuns {
           ...(drive.avoid.has(nodeId) && !pass ? { instruction: drive.extra.get(nodeId) } : {}),
           ...(requirements !== undefined ? { keepSummary: true, requirements } : {}),
           ...(drive.ownSummary.has(nodeId) ? { keepSummary: true } : {}),
+          ...(expanding ? { inPlace: true } : {}),
           signal,
           admission: drive.admission,
           authorize: authorizeWrite,
@@ -3006,30 +3022,42 @@ export class BookPipelineRuns {
       logRefused();
       return { kind: "failed", reason: "unsafe_body", forceReview: true };
     }
-    if (noEdits) return { kind: "failed", reason: "fix_no_edits", forceReview: true };
-    if (lostText) return { kind: "failed", reason: "fix_lost_text", forceReview: true };
-    if (emptyBody) return { kind: "failed", reason: "no_body" };
+    // An in-place expansion of a short chapter whose answer had no usable block is a failed attempt, not the end: the remaining
+    // expand passes still run, each asking for concrete new sections (live v6: 〈澆水〉 stopped at 2913 字 after one no_edits).
+    let retryNoEdits = noEdits && expanding && now?.kind === "under";
+    let wrote = !noEdits;
+    if (noEdits && !retryNoEdits) return { kind: "failed", reason: "fix_no_edits", forceReview: true };
     if (done.outcome === "budget-exhausted") return { kind: "budget" };
     if (done.outcome === "cancelled") return { kind: "cancelled" };
-    if (done.outcome === "failed") return { kind: "failed", reason: done.reason };
-    if (done.outcome === "discarded") return { kind: "failed", reason: "discarded" };
+    if (!retryNoEdits) {
+      if (lostText) return { kind: "failed", reason: "fix_lost_text", forceReview: true };
+      if (emptyBody) return { kind: "failed", reason: "no_body" };
+      if (done.outcome === "failed") return { kind: "failed", reason: done.reason };
+      if (done.outcome === "discarded") return { kind: "failed", reason: "discarded" };
+    }
     // A chapter still under the minimum after the fix round gets up to BOOK_EXPAND_PASSES more expand passes, each only while the one
-    // before added text (live v5: one expand adds about 1.4–2.2k characters whatever is asked). A pass that adds nothing, is refused or
-    // fails ends the passes; the chapter keeps what it has and the proofread's length reason sends it to a person.
+    // before added text or gave no usable block (live v5: one expand adds about 1.4–2.2k characters whatever is asked). A pass that is
+    // refused or fails ends the passes; the chapter keeps what it has and the proofread's length reason sends it to a person.
     for (let pass = 1; expanding && now?.kind === "under" && pass <= BOOK_EXPAND_PASSES; pass++) {
       const at = await this.stillOnMap(drive, nodeId);
       if (!at) break;
       const latest = await this.ports.readCard(at);
       const body = chapterBody(latest.detail);
       const short = lengthReason(settings.length, lengthBody(body), undefined, true);
-      if (short?.kind !== "under" || short.measured <= now.measured) break;
+      if (short?.kind !== "under" || (!retryNoEdits && short.measured <= now.measured)) break;
       // The cap is per chapter and run, not per fix round (a trial chapter has two): counted and saved before the call.
       const used = await drive.store.commit(state => useExpandPass(state, nodeId));
       if (!used?.accepted) break;
       oldBody = body;
       now = short;
       oldDetail = detailBlockOf(latest.raw);
-      requirements = bookExpandRequirements(settings, body, short, undefined, scope);
+      requirements = bookExpandRequirements(
+        settings,
+        body,
+        short,
+        retryNoEdits ? BOOK_EXPAND_RETRY_INSTRUCTION : undefined,
+        scope
+      );
       knownLines = new Set(latest.raw.split("\n"));
       noEdits = lostText = unsafe = emptyBody = false;
       unsafeRule = "";
@@ -3039,12 +3067,18 @@ export class BookPipelineRuns {
       logMerge(pass, more.outcome);
       if (changedByHand) return { kind: "failed", reason: "hand_edited", forceReview: true };
       if (unsafe) logRefused();
-      // The merge refused this pass (its write left the chapter as the fix round saved it): the passes end here.
-      if (unsafe || noEdits || lostText || emptyBody) break;
       if (more.outcome === "cancelled") return { kind: "cancelled" };
+      // No usable block again: one more pass (while any is left) with the same stronger request.
+      retryNoEdits = noEdits;
+      if (noEdits) continue;
+      // The merge refused this pass (its write left the chapter as the fix round saved it): the passes end here.
+      if (unsafe || lostText || emptyBody) break;
       if (more.outcome === "discarded") return { kind: "failed", reason: "discarded" };
       if (more.outcome !== "written") break;
+      wrote = true;
     }
+    // Every pass gave no usable block (or none was left to use): the chapter stays as it was, needs-review.
+    if (!wrote) return { kind: "failed", reason: "fix_no_edits", forceReview: true };
     drive.authorModels.set(nodeId, drive.config.authorModel);
     // What is saved holds only standard https pictures. The program (not the model) probes them; a failed one becomes a plain "no picture" line.
     const path = await this.stillOnMap(drive, nodeId);

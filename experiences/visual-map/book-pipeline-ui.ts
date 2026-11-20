@@ -3,7 +3,7 @@ import { t } from "../../i18n";
 import { isBookStepError } from "../../core/steps/book-pipeline/base";
 import { splitLengthIssue, type LengthReason } from "../../core/book-pipeline/settings";
 import { splitPictureIssue } from "../../core/book-pipeline/image-slots";
-import { joinReasons } from "./book-pipeline-reasons";
+import { joinReasons, splitCarriedIssue } from "./book-pipeline-reasons";
 import {
   effectiveOrder,
   mapDifference,
@@ -612,6 +612,8 @@ const PLAIN_KEY: Record<string, TranslationKey> = {
 
 /** Turns the neutral issue code (`write failed: invalid_reply`, `proof unmet: C1 C3`) into the sentence shown on the card. */
 export function bookIssueText(issue: string): string {
+  const carried = splitCarriedIssue(issue);
+  if (carried) return joinReasons([bookIssueText(carried.failure), bookIssueText(carried.carried)]);
   const pictures = splitPictureIssue(issue);
   const sentences = pictureSentences(pictures);
   if (sentences.length) return joinReasons(pictures.rest ? [bookIssueText(pictures.rest), ...sentences] : sentences);

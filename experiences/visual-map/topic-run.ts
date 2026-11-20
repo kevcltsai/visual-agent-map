@@ -243,6 +243,8 @@ export interface ResearchStart extends WritebackHooks {
     onDiscarded?: () => void;
     /** The write leaves the note's Summary as it is (a chapter expansion: the answer only describes what it added). */
     keepSummary?: boolean;
+    /** A failed call leaves the note's status as it was (an in-place fix of a chapter that keeps its text is never an error card; live v6). */
+    keepStatusOnFailure?: boolean;
   };
 }
 
@@ -1624,7 +1626,10 @@ export class TopicRuns {
               exchangeId,
               t("log.topic_write_failed_0", error instanceof Error ? error.message : String(error))
             );
-          await repo.updateNote(path, { status: "error", lastError: failureReason(error) });
+          await repo.updateNote(path, {
+            status: options.pipeline?.keepStatusOnFailure ? note.status : "error",
+            lastError: failureReason(error)
+          });
           fail(this.ports.recordFailure(t("log.ai_task_failed"), error));
         })
       )

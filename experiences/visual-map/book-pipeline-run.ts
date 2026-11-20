@@ -124,7 +124,9 @@ import {
   parseCardPrompt,
   parseChecklist,
   parseImageSlots,
+  dropEntryLine,
   dropEntryNaming,
+  neighbourLineTitle,
   retargetNeighbourLine,
   rewriteNeighbourLine
 } from "../../core/book-pipeline/plan-text";
@@ -1451,7 +1453,18 @@ export class BookPipelineRuns {
         if (!own || drive.stages.get(nodeId) === undefined) continue;
         // The `接入點` line that still names a removed chapter goes (Primary decision: a join that is no longer there).
         const before = await this.ports.readCard(own.path);
-        const dropped = gone.length ? dropEntryNaming(before.prompt, gone) : undefined;
+        // The entry point also goes when the previous line named a removed chapter (the entry paraphrases it, not always by its exact title).
+        const oldPrevious = neighbourLineTitle(before.prompt, "previous");
+        const previousId = order[at - 1];
+        const previousGone =
+          oldPrevious !== undefined &&
+          gone.includes(oldPrevious) &&
+          (previousId === undefined || drive.cards.get(previousId)?.title.trim() !== oldPrevious);
+        const dropped = previousGone
+          ? dropEntryLine(before.prompt)
+          : gone.length
+            ? dropEntryNaming(before.prompt, gone)
+            : undefined;
         if (dropped !== undefined && !this.dead(drive) && !signal.aborted)
           await this.ports.updateNoteGuarded(
             own.path,

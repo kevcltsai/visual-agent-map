@@ -3376,6 +3376,51 @@ test('fix3 a chapter removed while writing, then "carry on": the neighbours\' pr
   for (const i of [0, 2, 3]) assert.equal((await r.note(i)).bookRole, roles[i], `role of card ${i} unchanged`);
 });
 
+test('fix5 an entry line that only paraphrases the removed chapter (no exact title) goes with the previous-line retarget', async () => {
+  const r = await rig({ titles: FOUR });
+  await r.runs.start(r.mapPath);
+  const n = await r.note(2);
+  await r.repo.updateNoteGuarded(r.nodes[2].path, { prompt: n.prompt.replace(/^接入點：.*$/m, '接入點：承接上一章的那些步驟，從這裡開始') }, {});
+  const base = r.script.author; let hit = false;
+  r.script.author = async (input, k) => { if (!hit) { hit = true; await dropCard(r, 1); } return base(input, k); };
+  await r.runs.confirmGate1(r.mapPath); await finished(r);
+  await r.runs.keepBookMap(r.mapPath); await finished(r);
+  assert.equal(await promptLine(r, 2, '接入點'), undefined, 'previous chapter removed: the paraphrased join is gone too');
+  assert.equal(await promptLine(r, 3, '接入點') !== undefined, true, 'a chapter whose previous stays keeps its entry');
+});
+
+test('fix5 whole-book rerun after the book title (root topic) is renamed: plans and intro see the new title, the root is not hand-edited, no old title in entry or previous/next lines', async () => {
+  const seen = [];
+  const r = await rig({ titles: FOUR });
+  const g = r.script.global, c = r.script.card;
+  r.script.global = (request, n) => { seen.push(JSON.stringify(request)); return g(request, n); };
+  r.script.card = (request, n) => { seen.push(JSON.stringify(request)); return { ...c(request, n), entry: `接著 ${request.previous?.title ?? ''} 的收尾` }; };
+  await finish(r);
+  assert.equal((await r.state()).phase, 'gate2');
+  // The rename: the root topic's title (the map's name follows it).
+  const oldPath = r.nodes[0].path;
+  const newPath = await r.repo.renameNote(oldPath, 'BrandNewBookTitle');
+  r.nodes[0].path = newPath; r.nodes[0].title = 'BrandNewBookTitle';
+  await r.repo.updateMap(r.mapPath, d => { d.title = 'BrandNewBookTitle'; const n = d.nodes.find(x => x.id === r.nodes[0].id); n.title = 'BrandNewBookTitle'; n.path = newPath; });
+  await r.runs.stop(r.mapPath, { saved: true });
+  seen.length = 0; const authors = r.stat.author.length;
+  await r.runs.start(r.mapPath, { restart: true });
+  await confirmDone(r.runs, r.mapPath);
+  await settle();
+  assert.ok(seen.length >= 4, 'plans ran again');
+  assert.ok(seen.every(x => !x.includes('SecretRootTitle')), 'no plan request carries the old title');
+  assert.ok(seen.some(x => x.includes('BrandNewBookTitle')), 'the new title is in the plans');
+  assert.equal(r.stat.author.length, authors + 4, 'every chapter, the root included, is written again');
+  assert.ok(!r.stat.logs.some(l => l.includes('hand_edit_skipped') || l.includes('plan_skipped')), 'the root is not read as hand-edited');
+  for (let i = 0; i < 4; i++) {
+    const n = await r.note(i);
+    assert.equal(n.pipelineIssue, undefined, `chapter ${i} has no issue`);
+    assert.ok(!n.prompt.includes('SecretRootTitle'), `chapter ${i}: no old title in its prompt (entry, previous, next)`);
+  }
+  assert.ok((await promptLine(r, 1, '前一張')).includes('BrandNewBookTitle'));
+  assert.ok((await promptLine(r, 1, '接入點')).includes('BrandNewBookTitle'));
+});
+
 // ---- the whole-book consistency check ----
 
 test('consistency: one check after every chapter is proofread costs one call, marks the two chapters it names needs-review, and their review box says what differs', async () => {

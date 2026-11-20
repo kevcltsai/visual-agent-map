@@ -13872,14 +13872,23 @@ function retargetNeighbourLine(prompt, key4, neighbour2) {
   return rewriteNeighbourLine(prompt, key4, rest === void 0 ? neighbour2 : { ...neighbour2, summary: rest });
 }
 function dropEntryNaming(prompt, titles) {
+  const value = parseCardPrompt(prompt).entry;
+  if (value === void 0) return void 0;
+  if (!titles.some((title) => Array.from(title.trim()).length >= 2 && value.includes(title.trim()))) return void 0;
+  return dropEntryLine(prompt);
+}
+function neighbourLineTitle(prompt, key4) {
+  var _a2;
+  const m = /^\(\d+\) ([\s\S]*)$/.exec((_a2 = parseCardPrompt(prompt)[key4]) != null ? _a2 : "");
+  return m ? m[1].split(" \u2014 ")[0].trim() : void 0;
+}
+function dropEntryLine(prompt) {
   const lines = prompt.split("\n");
   const at = lines.findIndex((line2) => {
     const m = /^([^:：]+)[:：]/.exec(line2);
     return !!m && matches(L.entry, m[1].trim());
   });
   if (at < 0) return void 0;
-  const value = lines[at].replace(/^[^:：]+[:：]/, "");
-  if (!titles.some((title) => Array.from(title.trim()).length >= 2 && value.includes(title.trim()))) return void 0;
   lines.splice(at, 1);
   return lines.join("\n");
 }
@@ -28598,6 +28607,7 @@ var MergeDrafts = class {
       task.draft = result;
       this.ports.changed();
       await this.ports.write(task, result, check);
+      if (!this.ports.closed()) this.ports.changed();
     } catch (error) {
       const live2 = this.tasks.get(task.mapPath) === task;
       if (live2) this.forget(task.mapPath, task);
@@ -54075,7 +54085,7 @@ var BookPipelineRuns = class {
    * a line that already names it is left. Only those lines change: no role, stage, text or fingerprint is touched, and no AI call is made.
    */
   async refreshAroundRemoved(drive) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     const signal = drive.controller.signal;
     if (!((_a2 = drive.store.state.removed) == null ? void 0 : _a2.length) || this.dead(drive) || signal.aborted || drive.fatal !== void 0) return;
     const order = effectiveOrder(drive.store.state);
@@ -54092,7 +54102,10 @@ var BookPipelineRuns = class {
         const own2 = drive.cards.get(nodeId);
         if (!own2 || drive.stages.get(nodeId) === void 0) continue;
         const before = await this.ports.readCard(own2.path);
-        const dropped = gone.length ? dropEntryNaming(before.prompt, gone) : void 0;
+        const oldPrevious = neighbourLineTitle(before.prompt, "previous");
+        const previousId = order[at - 1];
+        const previousGone = oldPrevious !== void 0 && gone.includes(oldPrevious) && (previousId === void 0 || ((_c = drive.cards.get(previousId)) == null ? void 0 : _c.title.trim()) !== oldPrevious);
+        const dropped = previousGone ? dropEntryLine(before.prompt) : gone.length ? dropEntryNaming(before.prompt, gone) : void 0;
         if (dropped !== void 0 && !this.dead(drive) && !signal.aborted)
           await this.ports.updateNoteGuarded(
             own2.path,
@@ -54113,7 +54126,7 @@ var BookPipelineRuns = class {
             neighbourLine = {
               position: index + 1,
               title: neighbour2.title,
-              summary: summaryText2((_d = (_c = parseCardPrompt(neighbour2.prompt).covers) != null ? _c : neighbour2.summary) != null ? _d : "").trim()
+              summary: summaryText2((_e = (_d = parseCardPrompt(neighbour2.prompt).covers) != null ? _d : neighbour2.summary) != null ? _e : "").trim()
             };
           }
           const prompt = retargetNeighbourLine(raw.prompt, key4, neighbourLine);
@@ -94274,7 +94287,7 @@ var BookHandEdits = class {
   }
   /** A save of a chapter note: when its rewrite box is ticked, carry the rewrite out (or queue it). */
   async tick(mapPath, nodeId) {
-    var _a2;
+    var _a2, _b2, _c;
     if (this.disposed) return;
     try {
       const map = await this.ports.readMap(mapPath);
@@ -94282,6 +94295,11 @@ var BookHandEdits = class {
       const node = map.nodes.find((item) => item.id === nodeId);
       if (read.kind !== "usable" || !node || !effectiveOrder(read.data).includes(nodeId)) return;
       const card = await this.ports.readCard(node.path);
+      if (((_a2 = readBodyRecord(card.detail)) == null ? void 0 : _a2.kept) && !isKeptRaw(card.raw) && ((_b2 = card.fields) == null ? void 0 : _b2.pipelineStage) === "checked")
+        await this.ports.writeFields(node.path, {
+          pipelineStage: "needs-review",
+          pipelineIssue: "write failed: hand_edited"
+        });
       const state = readReviewState(card.raw);
       if (!isRewriteAsked(state) || !(state == null ? void 0 : state.op)) return;
       const op = state.op;
@@ -94301,7 +94319,7 @@ var BookHandEdits = class {
         await this.patch(node.path, { queued: true, status: t("ui.book_review_hand_queued") });
         return;
       }
-      await this.carryOut(mapPath, nodeId, node.path, op, (_a2 = state.ifp) != null ? _a2 : now);
+      await this.carryOut(mapPath, nodeId, node.path, op, (_c = state.ifp) != null ? _c : now);
     } catch (e) {
     }
   }

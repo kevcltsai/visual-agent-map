@@ -300,6 +300,26 @@ test('controller: keep writes the choice into the chapter and marks it checked w
   assert.equal(d.state.writes, 0);
   assert.equal(d.state.fields.length, 0);
 });
+test('controller: a kept chapter edited again gets needs-review + write failed: hand_edited on save; a still-kept or non-checked chapter is not touched', async () => {
+  const r = rig();
+  await r.ctl.keep(PATH);
+  r.state.fields.length = 0;
+  const stage = { v: 'checked' };
+  const ctl = new b.BookHandEdits({
+    readMap: async () => r.map,
+    readCard: async () => ({ path: PATH, title: 'T', raw: r.state.raw, detail: r.state.raw.split(START + '\n')[1].split('\n' + END)[0], fields: { pipelineStage: stage.v } }),
+    write: r.write, writeFields: async (path, patch) => { r.state.fields.push({ path, patch }); },
+    rerunCard: async () => ({ unchanged: true }), isRunning: () => false, newId: () => 'x', log: () => {}
+  });
+  await ctl.tick(MAP, 'n1');
+  assert.deepEqual(r.state.fields, [], 'text still as kept: nothing');
+  r.setDetail(r.state.raw.split(START + '\n')[1].split('\n' + END)[0].replace('第三段', '第四段'));
+  await ctl.tick(MAP, 'n1');
+  assert.deepEqual(JSON.parse(JSON.stringify(r.state.fields)), [{ path: PATH, patch: { pipelineStage: 'needs-review', pipelineIssue: 'write failed: hand_edited' } }]);
+  r.state.fields.length = 0; stage.v = 'needs-review';
+  await ctl.tick(MAP, 'n1');
+  assert.deepEqual(r.state.fields, [], 'already needs-review');
+});
 test('controller: keep is judged on the text the write saw (an open editor saves later, the disk read lags behind): the chapter is checked', async () => {
   const r = rig();
   const stale = r.state.raw;

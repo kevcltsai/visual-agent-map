@@ -1,4 +1,4 @@
-import { bodyStateRaw, integrityFpRaw, isKeptRaw, keepRaw } from "../../core/book-pipeline/body-integrity";
+import { bodyStateRaw, integrityFpRaw, isKeptRaw, keepRaw, readBodyRecord } from "../../core/book-pipeline/body-integrity";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
 import { effectiveOrder, readBookPipeline, type PipelineFieldsPatch } from "../../core/book-pipeline/model";
 import { t } from "../../i18n";
@@ -81,6 +81,12 @@ export class BookHandEdits {
       const node = map.nodes.find(item => item.id === nodeId);
       if (read.kind !== "usable" || !node || !effectiveOrder(read.data).includes(nodeId)) return;
       const card = await this.ports.readCard(node.path);
+      // A kept text edited since: the keep no longer holds, so the stage says what the box says (the same as any hand edit).
+      if (readBodyRecord(card.detail)?.kept && !isKeptRaw(card.raw) && card.fields?.pipelineStage === "checked")
+        await this.ports.writeFields(node.path, {
+          pipelineStage: "needs-review",
+          pipelineIssue: "write failed: hand_edited"
+        });
       const state = readReviewState(card.raw);
       if (!isRewriteAsked(state) || !state?.op) return;
       const op = state.op;

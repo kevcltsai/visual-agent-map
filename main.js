@@ -14740,19 +14740,30 @@ var BOOK_AUTHOR_RULES = [
 function bookAuthorRequirements(settings, slots = []) {
   const lines = BOOK_SETTING_FIELDS.filter((field) => settings[field]).map((field) => `- ${field}: ${settings[field]}`);
   const range = lengthRange(settings.length);
-  const lengthRule = range ? `
+  const lengthRule = range ? `${bookLengthRule(range)}
 
-Length rule (hard): the chapter text itself must be between ${range.min} and ${range.max} ${range.unit === "\u5B57" ? "characters (\u5B57)" : "words"}; sources, notes and picture markers do not count. Do not write much shorter or longer.` : "";
+` : "";
   const plan = slots.length ? `
 
 Image plan for this chapter (the planner's data, JSON strings; leave one marker per slot as the rules say):
 ${slots.map(
     (slot) => `- slot ${slot.index}: kind ${JSON.stringify(slot.kind)}, explains ${JSON.stringify(slot.explains)}, position ${JSON.stringify(slot.anchor)}`
   ).join("\n")}` : "";
-  return lines.length ? `${BOOK_AUTHOR_RULES}
+  return lines.length ? `${lengthRule}${BOOK_AUTHOR_RULES}
 
 Whole-book settings (follow them):
-${lines.join("\n")}${lengthRule}${plan}` : `${BOOK_AUTHOR_RULES}${plan}`;
+${lines.join("\n")}${plan}` : `${BOOK_AUTHOR_RULES}${plan}`;
+}
+var lengthTarget = (range) => Math.round((range.min + range.max) / 2);
+var unitName = (unit2) => unit2 === "\u5B57" ? "characters (\u5B57)" : "words";
+function bookLengthRule(range) {
+  const target = lengthTarget(range);
+  const unit2 = unitName(range.unit);
+  const per = range.unit === "\u5B57" ? 1e3 : 600;
+  const sections = Math.min(12, Math.round(target / per));
+  const counted = range.unit === "\u5B57" ? "only the chapter text's own characters count (punctuation, spaces, sources, notes and picture markers do not)" : "only the chapter text's own words count (sources, notes and picture markers do not)";
+  const plan = range.min > 1 && sections >= 3 ? ` This is a long chapter: plan it as about ${sections} ### sections of about ${Math.round(target / sections / 50) * 50} ${unit2} each, develop each one fully with explanation and concrete examples, and do not finish before the text reaches ${range.min} ${unit2}.` : "";
+  return `Length (hard requirement, measured by the program): the chapter text must be between ${range.min} and ${range.max} ${unit2}; aim for about ${target}. ${counted[0].toUpperCase()}${counted.slice(1)}. A chapter outside the range fails the check.${plan}`;
 }
 var BOOK_SETTING_INPUT_MAX = 200;
 function cleanBookSettingsInput(input2) {
@@ -51583,7 +51594,7 @@ function proofFixInstruction(items, checklist, length) {
   const avoid = avoidSourcesInstruction(sources);
   const lead = "The previous version of this chapter failed the fact check on these points (JSON strings; rewrite the chapter so they are correct and supported): ";
   const leadStructure2 = "The previous version of this chapter did not meet these structure points of its checklist (JSON strings; the chapter text itself, not the sources list, must cover them): ";
-  const lengthPiece = length ? `The previous version of this chapter is ${length.measured} ${length.unit} long, outside the asked ${length.min} to ${length.max} ${length.unit}; ${length.kind === "over" ? "shorten" : "lengthen"} the chapter text to fit that range while keeping every checklist point. ` : "";
+  const lengthPiece = length ? length.kind === "under" ? `The previous version of this chapter came out at only ${length.measured} ${length.unit}, short of the asked ${length.min} to ${length.max} ${length.unit}: lengthen it to at least ${length.min} ${length.unit}, about ${lengthTarget(length)} ${length.unit} (about ${Math.round(lengthTarget(length) / Math.max(1, length.measured) * 10) / 10} times as long), by developing each section with more explanation and concrete examples, not by repetition; keep every checklist point. ` : `The previous version of this chapter is ${length.measured} ${length.unit} long, over the asked ${length.min} to ${length.max} ${length.unit}: shorten it to at most ${length.max} ${length.unit}, about ${lengthTarget(length)} ${length.unit}; keep every checklist point. ` : "";
   let room = FIX_INSTRUCTION_MAX - avoid.length - 1 - lengthPiece.length;
   const piece = (list2, intro) => {
     var _a2, _b2;

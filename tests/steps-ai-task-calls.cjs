@@ -153,6 +153,16 @@ test('re-ask that still finds no search: failed(original), second begin then fai
   assert.equal(h.order[7][1], h.ids[1]);
 });
 
+test('searchOptional (live v6 Y, the book\'s in-place fix): no web-search-only flag, an answer with no search is accepted, one runtime call', async () => {
+  const h = rig({ handler: call => { call.controls.onRequest({}); if (call.controls.webSearchOnly) throw searchNotPerformedError(); return answer(call); } });
+  const result = await h.service.askModel(context({ researchMode: 'research', researchDepth: 'normal', searchOptional: true }), 'gpt-6-luna', 'low', undefined, h.mark);
+  assert.equal(h.state.calls.length, 1);
+  assert.equal(h.state.calls[0].controls.webSearchOnly, undefined);
+  assert.equal(h.state.calls[0].controls.webSearch, true, 'searching is still allowed');
+  assert.equal(result.retrievals, 0);
+  assert.equal(h.names().includes('failed'), false);
+});
+
 test('an aborted signal is not re-asked: one runtime call, one failed entry', async () => {
   const controller = new AbortController();
   const h = rig({ handler: call => { call.controls.onRequest({}); controller.abort(); throw searchNotPerformedError(); } });

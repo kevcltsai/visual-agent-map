@@ -293,6 +293,17 @@ export function locateApplied(raw: string, afters: readonly string[]): { from: n
 }
 
 /**
+ * {@link locateApplied} in the text the note shows now: an open view's editor buffer when there is one (the apply wrote there and the
+ * file on disk catches up only when the editor saves), else the file.
+ */
+export async function locateAppliedShown(
+  shown: { editor(): string | undefined; file(): Promise<string> },
+  afters: readonly string[]
+): Promise<{ from: number; to: number }[]> {
+  return locateApplied(shown.editor() ?? (await shown.file()), afters);
+}
+
+/**
  * `raw` with each recorded paragraph put back as it was (its note wrappers with it). A recorded `after` that is not found exactly
  * once is skipped and counted.
  */

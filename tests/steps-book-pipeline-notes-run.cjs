@@ -10,7 +10,7 @@ const b = loadSource(`
 export { BookNotesApply, NOTES_TIMEOUT_MS, UNDO_NOTICE_MS } from "./experiences/visual-map/book-pipeline-notes-apply";
 export { stampRaw, bodyStateRaw, readBodyRecord, integrityFpRaw } from "./core/book-pipeline/body-integrity";
 export { AppliedHighlights, HIGHLIGHT_MS, appliedField, setApplied } from "./experiences/visual-map/book-applied-highlight";
-export { locateApplied } from "./core/book-pipeline/notes-apply";
+export { locateApplied, locateAppliedShown } from "./core/book-pipeline/notes-apply";
 export { lineSpans, ReadingMarks } from "./experiences/visual-map/book-applied-highlight";
 export { showAppliedNotice } from "./experiences/visual-map/book-applied-notice";
 export { EditorState } from "@codemirror/state";
@@ -350,4 +350,20 @@ test('applied marks follow the paragraph text, never the review callout, in read
   // a callout-only text, a missing or duplicated paragraph: no mark
   assert.equal(b.locateApplied(detail(callout), ['已修改，未重新校對']).length, 0);
   assert.equal(b.locateApplied(now.replace('Para B new', 'Para A'), ['Para A']).length, 0);
+});
+
+test('edit mode: the mark is found in the editor buffer, not the file on disk the editor has not saved yet', async () => {
+  const callout = '> [!vam-review] 待審\n> 已修改，未重新校對';
+  const disk = detail(callout + '\n\nPara A\n\nPara B old');
+  const buffer = '---\ntags: [x]\n---\r\n' + detail(callout + '\n\nPara A\n\nPara B new');
+  // reading the stale file (what the highlight did before) finds nothing
+  assert.equal(b.locateApplied(disk, ['Para B new']).length, 0);
+  const found = await b.locateAppliedShown({ editor: () => buffer, file: async () => disk }, ['Para B new']);
+  assert.equal(JSON.stringify(found), JSON.stringify([{ from: buffer.indexOf('Para B new'), to: buffer.indexOf('Para B new') + 10 }]));
+  // the callout is still never marked from the buffer
+  assert.equal((await b.locateAppliedShown({ editor: () => buffer, file: async () => disk }, ['已修改，未重新校對'])).length, 0);
+  // no open view (reading the file is unchanged)
+  const now = detail(callout + '\n\nPara B new');
+  const fromFile = await b.locateAppliedShown({ editor: () => undefined, file: async () => now }, ['Para B new']);
+  assert.equal(fromFile[0].from, now.indexOf('Para B new'));
 });

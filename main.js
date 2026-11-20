@@ -46866,6 +46866,10 @@ function locateApplied(raw, afters) {
   }
   return out;
 }
+async function locateAppliedShown(shown, afters) {
+  var _a2;
+  return locateApplied((_a2 = shown.editor()) != null ? _a2 : await shown.file(), afters);
+}
 function undoApplied(raw, edits) {
   const paragraphs = chapterParagraphs(raw);
   const run = [];
@@ -106510,7 +106514,14 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
     let found = ranges;
     try {
       const file = this.app.vault.getAbstractFileByPath(path);
-      if (file instanceof import_obsidian52.TFile) found = locateApplied(await this.app.vault.read(file), afters);
+      if (file instanceof import_obsidian52.TFile)
+        found = await locateAppliedShown(
+          { editor: () => {
+            var _a2;
+            return (_a2 = this.openMarkdownViews(path)[0]) == null ? void 0 : _a2.text();
+          }, file: () => this.app.vault.read(file) },
+          afters
+        );
     } catch (e) {
       found = [];
     }

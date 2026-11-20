@@ -36,7 +36,7 @@ import {
   type NotesLeaf
 } from "./experiences/visual-map/book-pipeline-notes-ui";
 import { BookNotesApply } from "./experiences/visual-map/book-pipeline-notes-apply";
-import { locateApplied } from "./core/book-pipeline/notes-apply";
+import { locateAppliedShown } from "./core/book-pipeline/notes-apply";
 import { showAppliedNotice } from "./experiences/visual-map/book-applied-notice";
 import {
   AppliedHighlights,
@@ -617,7 +617,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     let found = ranges;
     try {
       const file = this.app.vault.getAbstractFileByPath(path);
-      if (file instanceof TFile) found = locateApplied(await this.app.vault.read(file), afters);
+      if (file instanceof TFile)
+        found = await locateAppliedShown(
+          { editor: () => this.openMarkdownViews(path)[0]?.text(), file: () => this.app.vault.read(file) },
+          afters
+        );
     } catch {
       found = [];
     }

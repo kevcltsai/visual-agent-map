@@ -279,6 +279,20 @@ export function applyReplies(
 }
 
 /**
+ * Where each applied paragraph (by its `after` text) stands in the note as it is now: the offsets the apply returned went stale when the
+ * program stamped the review box after it. Only prose paragraphs are searched (never a callout); one that is not found exactly once is left out.
+ */
+export function locateApplied(raw: string, afters: readonly string[]): { from: number; to: number }[] {
+  const paragraphs = chapterParagraphs(raw);
+  const out: { from: number; to: number }[] = [];
+  for (const after of afters) {
+    const same = paragraphs.filter(p => p.text === after);
+    if (same.length === 1) out.push({ from: same[0].from, to: same[0].to });
+  }
+  return out;
+}
+
+/**
  * `raw` with each recorded paragraph put back as it was (its note wrappers with it). A recorded `after` that is not found exactly
  * once is skipped and counted.
  */

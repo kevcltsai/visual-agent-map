@@ -28,7 +28,7 @@ export interface NotesApplyPorts {
   notice(message: string): void;
   /** A notice with one clickable word; `hide` closes it. */
   noticeAction(message: string, label: string, onClick: () => void, ms: number): { hide(): void };
-  highlight(path: string, ranges: readonly { from: number; to: number }[]): void;
+  highlight(path: string, ranges: readonly { from: number; to: number }[], afters: readonly string[]): void;
   releaseHighlight(): void;
   /** Saves the open editor of this chapter to its file: the callouts are read from the file, so the undone text must be there first. */
   flush(path: string): Promise<void>;
@@ -158,7 +158,8 @@ export class BookNotesApply {
     this.lastUndo = { path, edits: result.edits.map(edit => ({ before: edit.before, after: edit.after })) };
     this.ports.highlight(
       path,
-      result.edits.map(edit => ({ from: edit.from, to: edit.to }))
+      result.edits.map(edit => ({ from: edit.from, to: edit.to })),
+      result.edits.map(edit => edit.after)
     );
     this.undoNotice?.hide();
     const text =

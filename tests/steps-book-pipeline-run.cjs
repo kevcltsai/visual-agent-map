@@ -2140,6 +2140,21 @@ test('T9 review box: ticking "accept" and collapsing the review box is not a han
   assert.equal(bodyStateRaw(r.raw(1)), 'clean');
 });
 
+const TODO_AFTER = c => c.replace('<!-- visual-agent-map:detail:end -->\n', '<!-- visual-agent-map:detail:end -->\n<!-- aim-open-items ["check the second source"] -->\n');
+test('T9 keep, open items: a kept chapter with an AIM open-items marker saved after its Detail stays kept (same fingerprint from the card reader and the raw block)', async () => {
+  const r = await rig();
+  await finish(r);
+  await handEdit(r, 1);
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, keepRaw, {});
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, TODO_AFTER, {});
+  assert.ok((await r.note(1)).detail.includes('aim-open-items'), 'the card reader appends the marker');
+  const authors = r.stat.author.length;
+  await redo(r, [1]);
+  assert.equal(r.stat.author.length, authors, 'not written');
+  assert.ok(r.stat.logs.some(l => l.includes('hand_edit_kept')));
+  assert.ok(!r.stat.logs.some(l => l.includes('hand_edit_skipped')));
+  assert.ok((await r.note(1)).detail.includes(HAND));
+});
 test('T9 keep: "keep my version" makes a whole-book redo leave the chapter alone and send it on to its proofread', async () => {
   const r = await rig();
   await finish(r);
@@ -2725,6 +2740,15 @@ test('T12 neighbours: the first and the last chapter have one neighbour; a remov
   await rerun(gone, 3);
   assert.equal(gone.raw(2), removedBefore, 'the removed card is never written');
   assert.equal((await promptLine(gone, 1, '後一張')), '(3) SecretTitleC — NEWCOVERS 3', 'the surviving neighbour on the left follows');
+});
+
+test('T12 neighbours, open items: an untouched neighbour with an AIM open-items marker saved after its Detail still gets its line refreshed', async () => {
+  const r = await neighbourRig();
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, TODO_AFTER, {});
+  assert.ok((await r.note(1)).detail.includes('aim-open-items'));
+  assert.equal(bodyStateRaw(r.raw(1)), 'clean');
+  await rerun(r, 2);
+  assert.equal((await promptLine(r, 1, '後一張')), `(3) SecretTitleB — NEWCOVERS 3`, 'left neighbour follows');
 });
 
 test('T12 neighbours: a neighbour whose text the reader edited by hand is not touched; its seam is still marked; running the rewrite again changes nothing', async () => {

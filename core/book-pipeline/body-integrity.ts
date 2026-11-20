@@ -31,10 +31,15 @@ export interface BodyRecord {
   kept?: string;
 }
 
+const OPEN_ITEMS_LINE = /^\s*<!--\s*aim-open-items\s+\[[^\n]*\]\s*-->\s*$/;
 /** The text the fingerprint is made of, from a Detail (the text between the managed markers). */
 export function integrityText(detail: string): string {
   const lines = withoutHiddenCallouts(detail.replace(/\r\n/g, "\n").split("\n"));
-  return projectProofBody(lines.join("\n")).trim();
+  // The AIM open-items marker is no chapter text: the card reader appends it to the Detail when it is saved after the block, the raw
+  // Detail block does not hold it. Left out here, every caller (card Detail or raw block) gets the same fingerprint.
+  const fenced = fencedLines(lines);
+  const text = lines.filter((line, at) => fenced[at] || !OPEN_ITEMS_LINE.test(line)).join("\n");
+  return projectProofBody(text).trim();
 }
 export const integrityFp = (detail: string): string => hashText(integrityText(detail));
 

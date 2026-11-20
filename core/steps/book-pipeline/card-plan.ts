@@ -1,6 +1,7 @@
 import type { BookRole, BookSettings } from "../../book-pipeline/model";
 import type { ChecklistItem, ChecklistType } from "../../book-pipeline/plan-text";
-import { cleanSlotText, MAX_IMAGE_SLOTS, type ImageSlot } from "../../book-pipeline/image-slots";
+import { cleanSlotText, imageSlotCap, MAX_IMAGE_SLOTS, type ImageSlot } from "../../book-pipeline/image-slots";
+import { imageRangeOf } from "../../book-pipeline/settings";
 import { singleLine } from "../../book-pipeline/text";
 import { estimateTokens } from "../../../ai/context-builder";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
@@ -141,7 +142,8 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
   if (!kept.length) fail("checklist has no usable item");
   const checklist = kept.map((item, index): ChecklistItem => ({ id: `C${index + 1}`, ...item }));
   const slots = arrayOf(item.images, "images");
-  if (slots.length > MAX_IMAGE_SLOTS) fail(`images must have 0 to ${MAX_IMAGE_SLOTS} items`);
+  const limit = imageSlotCap(imageRangeOf(request.settings));
+  if (slots.length > limit) fail(`images must have 0 to ${limit} items`);
   const images = slots.map((entry, at): ImageSlot => {
     const one = recordOf(entry, "image slot");
     exactKeys(one, ["kind", "explains", "anchor"]);
@@ -191,6 +193,15 @@ export const CHILD_CARDS_TOKENS = 6000;
 /** The chapter list is the authority: titles are put in whole (only whitespace is collapsed). */
 const wholeLine = (value: string): string => singleLine(value, Number.MAX_SAFE_INTEGER);
 
+/** The images rule of the brief: nothing added by default, or (when the owner's settings give a picture count) the owner's range for every role. */
+const imagesRule = (request: CardPlanRequest): string => {
+  const range = imageRangeOf(request.settings);
+  if (!range) return "";
+  const max = imageSlotCap(range);
+  const min = Math.min(range.min, max);
+  return `\n\nOwner's picture count (the whole-book settings ask for ${range.min} to ${range.max} pictures per chapter; this beats the images defaults above): plan between ${min} and ${max} image slots for every chapter role, an introduction and a closing included, each beside something the chapter's text talks about. Plan fewer than ${min} only when the chapter truly has nothing to picture; where any picture can help, plan at least ${min}.`;
+};
+
 const baseRender = (request: CardPlanRequest): string =>
   renderTemplate(template, {
     languageInstruction: languageInstruction(request.language, request.card.title),
@@ -207,7 +218,7 @@ const baseRender = (request: CardPlanRequest): string =>
     next: neighbour(request.next),
     materials: JSON.stringify(request.materials.map(m => ({ name: cap(m.name, 120), use: cap(m.use, 240) }))),
     chapters: JSON.stringify(request.chapters.map(c => ({ position: c.position, title: wholeLine(c.title) })))
-  });
+  }) + imagesRule(request);
 const childSection = (items: readonly CardChild[], shown: number): string =>
   items.length
     ? `\n\n${renderTemplate(childrenTemplate, {

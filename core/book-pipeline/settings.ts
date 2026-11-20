@@ -149,6 +149,42 @@ export function lengthRange(
   return { min: one.min, max: one.max, unit: one.unit };
 }
 
+export interface ImageRange {
+  min: number;
+  max: number;
+}
+const IMG_UNIT = "(?:張|幅|images?|pictures?|photos?|illustrations?|figures?)(?![A-Za-z])";
+const IMG_RANGE = new RegExp(
+  `(?<![\\d.])(\\d+)\\s*(?:${IMG_UNIT})?\\s*(?:[–\\-~～至到—]|\\bto\\b)\\s*(\\d+)\\s*${IMG_UNIT}`,
+  "giu"
+);
+const IMG_APPROX = new RegExp(`(?:大約|大约|約|约|about|around|approx(?:imately)?\\.?)\\s*(\\d+)\\s*${IMG_UNIT}`, "giu");
+/**
+ * The pictures per chapter the owner asked for in a setting, or undefined. `N–M 張|images` (separators – - ~ ～ 至 到 —) is a range;
+ * `約 N 張` is N +-20% (at least 1). More than one range, an inverted one or a zero or very large value is not guessed: undefined.
+ */
+export function imageRange(text: string | undefined): ImageRange | undefined {
+  const value = (text ?? "").normalize("NFKC");
+  if (!value.trim()) return undefined;
+  const found: ImageRange[] = [];
+  for (const m of value.matchAll(IMG_RANGE)) found.push({ min: Number(m[1]), max: Number(m[2]) });
+  for (const m of value.replace(IMG_RANGE, " ").matchAll(IMG_APPROX)) {
+    const n = Number(m[1]);
+    found.push({ min: Math.max(1, Math.round(n * 0.8)), max: Math.max(1, Math.round(n * 1.2)) });
+  }
+  if (found.length !== 1) return undefined;
+  const { min, max } = found[0];
+  return min >= 1 && max >= min && max <= 100 ? { min, max } : undefined;
+}
+/** The picture count range from the whole-book settings: the first field that states one (the style field first, where it is usually typed). */
+export function imageRangeOf(settings: BookSettings): ImageRange | undefined {
+  for (const field of ["style", "goal", "angle", "tone", "reader", "length"] as const) {
+    const range = imageRange(settings[field]);
+    if (range) return range;
+  }
+  return undefined;
+}
+
 const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu;
 const LATIN_WORD = /[\p{Script=Latin}\p{N}]+(?:['’][\p{Script=Latin}]+)?/gu;
 /**

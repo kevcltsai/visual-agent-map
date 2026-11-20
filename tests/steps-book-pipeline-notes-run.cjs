@@ -11,7 +11,7 @@ export { BookNotesApply, NOTES_TIMEOUT_MS, UNDO_NOTICE_MS } from "./experiences/
 export { stampRaw, bodyStateRaw, readBodyRecord, integrityFpRaw } from "./core/book-pipeline/body-integrity";
 export { AppliedHighlights, HIGHLIGHT_MS, appliedField, setApplied } from "./experiences/visual-map/book-applied-highlight";
 export { locateApplied, locateAppliedShown } from "./core/book-pipeline/notes-apply";
-export { ReadingMarks, sectionSource } from "./experiences/visual-map/book-applied-highlight";
+export { ReadingMarks, rerenderReadingViews, sectionSource } from "./experiences/visual-map/book-applied-highlight";
 export { shownText } from "./experiences/visual-map/book-pipeline-callouts";
 export { showAppliedNotice } from "./experiences/visual-map/book-applied-notice";
 export { EditorState } from "@codemirror/state";
@@ -398,4 +398,13 @@ test('edit mode: the mark is found in the editor buffer, not the file on disk th
   const now = detail(callout + '\n\nPara B new');
   const fromFile = await b.locateAppliedShown({ editor: () => undefined, file: async () => now }, ['Para B new']);
   assert.equal(fromFile[0].from, now.indexOf('Para B new'));
+});
+
+test('undo: open reading views of that note render again at once; editing views and other notes are left alone', () => {
+  const hits = [];
+  const view = (path, reading, name) => ({ path, reading, rerender: () => hits.push(name) });
+  const n = b.rerenderReadingViews([view('n.md', true, 'a'), view('n.md', false, 'edit'), view('o.md', true, 'other'), view('n.md', true, 'b'), view(undefined, true, 'none')], 'n.md');
+  assert.equal(n, 2);
+  assert.deepEqual(hits, ['a', 'b']);
+  assert.equal(b.rerenderReadingViews([], 'n.md'), 0);
 });

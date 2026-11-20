@@ -125,6 +125,47 @@ export function rerenderReadingViews(views: readonly RenderableView[], path: str
   return count;
 }
 
+/** A view of a note as the reading mark needs it: re-render a reading view, or drop stale marked elements from an editing one. */
+export interface ReadingTarget extends RenderableView {
+  unmark(): void;
+}
+export interface ReadingHighlightPorts {
+  /** Every open markdown view now (reading or editing). */
+  views(): ReadingTarget[];
+  setTimer(run: () => void, ms: number): unknown;
+  clearTimer(handle: unknown): void;
+}
+/**
+ * The reading view's mark for 10 s, set from the applied paragraphs themselves: it does not wait for an editor (a reading-only view has
+ * no CM6 editor, and an empty set of located ranges must not cancel it).
+ */
+export class ReadingHighlight {
+  readonly marks = new ReadingMarks();
+  private shown: { path: string; timer: unknown } | null = null;
+  constructor(private readonly ports: ReadingHighlightPorts) {}
+
+  show(path: string, texts: readonly string[]): void {
+    this.release();
+    this.marks.set(path, texts);
+    if (!texts.some(text => normalSection(text))) return;
+    this.shown = { path, timer: this.ports.setTimer(() => this.release(), HIGHLIGHT_MS) };
+    rerenderReadingViews(this.ports.views(), path);
+  }
+
+  release(): void {
+    const shown = this.shown;
+    this.shown = null;
+    this.marks.clear();
+    if (!shown) return;
+    this.ports.clearTimer(shown.timer);
+    for (const view of this.ports.views())
+      if (view.path === shown.path) {
+        if (view.reading) view.rerender();
+        else view.unmark();
+      }
+  }
+}
+
 /** The source lines `[lineStart, lineEnd]` of `text` (a section of the reading view). */
 export function sectionSource(text: string, lineStart: number, lineEnd: number): string {
   return text

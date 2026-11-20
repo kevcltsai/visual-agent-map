@@ -11,7 +11,7 @@ export { BookNotesApply, NOTES_TIMEOUT_MS, UNDO_NOTICE_MS } from "./experiences/
 export { stampRaw, bodyStateRaw, readBodyRecord, integrityFpRaw } from "./core/book-pipeline/body-integrity";
 export { AppliedHighlights, HIGHLIGHT_MS, appliedField, setApplied } from "./experiences/visual-map/book-applied-highlight";
 export { locateApplied, locateAppliedShown } from "./core/book-pipeline/notes-apply";
-export { ReadingMarks, rerenderReadingViews, sectionSource } from "./experiences/visual-map/book-applied-highlight";
+export { ReadingMarks, ReadingHighlight, rerenderReadingViews, sectionSource } from "./experiences/visual-map/book-applied-highlight";
 export { shownText } from "./experiences/visual-map/book-pipeline-callouts";
 export { showAppliedNotice } from "./experiences/visual-map/book-applied-notice";
 export { EditorState } from "@codemirror/state";
@@ -398,6 +398,29 @@ test('edit mode: the mark is found in the editor buffer, not the file on disk th
   const now = detail(callout + '\n\nPara B new');
   const fromFile = await b.locateAppliedShown({ editor: () => undefined, file: async () => now }, ['Para B new']);
   assert.equal(fromFile[0].from, now.indexOf('Para B new'));
+});
+
+test('reading mode (v6 Z): with no editor open and no located ranges, the applied paragraphs still wear the mark in the reading view for 10 s, then it clears', () => {
+  const c = clock();
+  const hits = [];
+  const view = (path, reading, name) => ({ path, reading, rerender: () => hits.push(name), unmark: () => hits.push('unmark:' + name) });
+  const views = [view('n.md', true, 'read'), view('n.md', false, 'edit'), view('o.md', true, 'other')];
+  const h = new b.ReadingHighlight({ views: () => views, setTimer: c.set, clearTimer: c.clear });
+  h.show('n.md', ['Para B new']);
+  assert.equal(h.marks.wears('n.md', 'Para B new'), true);
+  assert.equal(h.marks.wears('o.md', 'Para B new'), false);
+  assert.deepEqual(hits, ['read'], 'the reading view of that note renders again now');
+  c.advance(b.HIGHLIGHT_MS - 1);
+  assert.equal(h.marks.wears('n.md', 'Para B new'), true);
+  c.advance(1);
+  assert.equal(h.marks.wears('n.md', 'Para B new'), false);
+  assert.deepEqual(hits, ['read', 'read', 'unmark:edit']);
+  assert.equal(c.timers.length, 0);
+  // a newer apply replaces the old timer; an empty apply marks nothing and leaves no timer
+  h.show('n.md', ['x']);
+  h.show('n.md', ['  ']);
+  assert.equal(h.marks.wears('n.md', 'x'), false);
+  assert.equal(c.timers.length, 0);
 });
 
 test('undo: open reading views of that note render again at once; editing views and other notes are left alone', () => {

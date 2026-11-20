@@ -42,7 +42,7 @@ import { showAppliedNotice } from "./experiences/visual-map/book-applied-notice"
 import {
   AppliedHighlights,
   appliedExtension,
-  ReadingMarks,
+  ReadingHighlight,
   rerenderReadingViews,
   sectionSource,
   setApplied,
@@ -577,7 +577,10 @@ export default class VisualAgentMapPlugin extends Plugin {
         ms
       ),
     highlight: (path, ranges, afters) => void this.showBookHighlight(path, ranges, afters),
-    releaseHighlight: () => this.bookHighlights.release(),
+    releaseHighlight: () => {
+      this.bookHighlights.release();
+      this.readingHighlight.release();
+    },
     flush: async path => {
       for (const leaf of this.app.workspace.getLeavesOfType("markdown"))
         if (leaf.view instanceof MarkdownView && leaf.view.file?.path === path) await leaf.view.save();
@@ -610,21 +613,27 @@ export default class VisualAgentMapPlugin extends Plugin {
     setTimer: (run, ms) => window.setTimeout(run, ms),
     clearTimer: handle => window.clearTimeout(handle as number)
   });
-  /** The reading view's mark: the rendered sections of the changed lines wear the same light-green class (post-processor + a re-render). */
-  private readonly readingMarks = new ReadingMarks();
-  /** The paragraphs of the last apply (their text), for the reading view's mark. */
-  private bookAppliedTexts: { path: string; texts: readonly string[] } | null = null;
-  private setReadingMarks(view: MarkdownView, ranges: readonly { from: number; to: number }[] | null): void {
-    const path = view.file?.path;
-    if (!path) return;
-    const applied = this.bookAppliedTexts;
-    if (ranges?.length) this.readingMarks.set(path, applied?.path === path ? applied.texts : []);
-    else this.readingMarks.clear();
-    const container = view.previewMode?.containerEl;
-    if (ranges?.length) {
-      if (view.getMode() === "preview") view.previewMode.rerender(true);
-    } else container?.querySelectorAll(".vam-book-applied").forEach(el => el.removeClass("vam-book-applied"));
-  }
+  /** The reading view's mark: the rendered sections of the applied paragraphs wear the same light-green class for 10 s (post-processor + a re-render). */
+  private readonly readingHighlight = new ReadingHighlight({
+    views: () =>
+      this.app.workspace.getLeavesOfType("markdown").flatMap(leaf => {
+        const view = leaf.view;
+        if (!(view instanceof MarkdownView)) return [];
+        return [
+          {
+            path: view.file?.path,
+            reading: view.getMode() === "preview",
+            rerender: () => view.previewMode.rerender(true),
+            unmark: () =>
+              view.previewMode?.containerEl
+                ?.querySelectorAll(".vam-book-applied")
+                .forEach(el => el.removeClass("vam-book-applied"))
+          }
+        ];
+      }),
+    setTimer: (run, ms) => window.setTimeout(run, ms),
+    clearTimer: handle => window.clearTimeout(handle as number)
+  });
   /** The marks follow the paragraphs' text in the note as it is now (the offsets of the apply are stale once the review box is stamped), never a callout. */
   private async showBookHighlight(
     path: string,
@@ -642,8 +651,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     } catch {
       found = [];
     }
-    this.bookAppliedTexts = { path, texts: afters };
     this.bookHighlights.show(path, found);
+    this.readingHighlight.show(path, afters);
   }
   private bookHighlightTargets(): HighlightTarget[] {
     const out: HighlightTarget[] = [];
@@ -655,10 +664,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       out.push({
         key: view,
         path: () => view.file?.path,
-        set: ranges => {
-          cm.dispatch({ effects: setApplied.of(ranges) });
-          this.setReadingMarks(view, ranges);
-        }
+        set: ranges => cm.dispatch({ effects: setApplied.of(ranges) })
       });
     }
     return out;
@@ -835,7 +841,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.registerEditorExtension(appliedExtension);
     this.registerMarkdownPostProcessor((el, ctx) => {
       const info = ctx.getSectionInfo(el);
-      if (info && this.readingMarks.wears(ctx.sourcePath, sectionSource(info.text, info.lineStart, info.lineEnd)))
+      if (info && this.readingHighlight.marks.wears(ctx.sourcePath, sectionSource(info.text, info.lineStart, info.lineEnd)))
         el.addClass("vam-book-applied");
       // A reading view of a chapter shows new text (an apply or undo written to the file): the header action follows it now.
       if (this.bookChapterMaps.has(ctx.sourcePath)) this.paintBookNotesSoon();
@@ -2262,6 +2268,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.bookPaintTimer = null;
     this.bookNotesApply.dispose();
     this.bookHighlights.dispose();
+    this.readingHighlight.release();
     this.bookNotes.dispose();
     // In-flight work (a long Obsidian rename, a queued mutation) must not write into the vault after this point.
     this.repo?.dispose();

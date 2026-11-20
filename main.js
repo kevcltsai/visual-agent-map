@@ -3309,7 +3309,7 @@ var en = {
   "ui.book_seam_label": "Check seam",
   "ui.book_seam_reason": "A neighboring card's plan or body changed and has not been checked by hand.",
   "ui.book_card_menu_rerun": "Rerun this picture-book card",
-  "ui.book_card_menu_rerun_sub": 'Plan \u2192 write \u2192 proofread, about 2 minutes; other chapters stay, only marked "seam needs a look"',
+  "ui.book_card_menu_rerun_sub": 'Plan \u2192 write \u2192 proofread, about 2 minutes; other chapters keep their text, only their previous/next lines are updated and marked "seam needs a look"',
   "ui.book_rerun_tag": "Working",
   "ui.book_panel_lead_sep": ", ",
   "ui.book_panel_reason_unchecked_0": "{0} items could not be checked against a source.",
@@ -6529,7 +6529,7 @@ var zhCN = {
   "ui.book_seam_label": "\u63A5\u7F1D\u9700\u770B",
   "ui.book_seam_reason": "\u90BB\u5361\u4F01\u5212\u6216\u6B63\u6587\u5DF2\u53D8\u66F4\uFF0C\u5C1A\u672A\u4EBA\u5DE5\u6838\u5BF9\u3002",
   "ui.book_card_menu_rerun": "\u91CD\u8DD1\u56FE\u6587\u4E66\u8FD9\u4E00\u5F20",
-  "ui.book_card_menu_rerun_sub": "\u4F01\u5212 \u2192 \u5199 \u2192 \u6821\uFF0C\u7EA6 2 \u5206\u949F\uFF1B\u524D\u540E\u7AE0\u4E0D\u52A8\uFF0C\u53EA\u6807\u201C\u63A5\u7F1D\u9700\u770B\u201D",
+  "ui.book_card_menu_rerun_sub": "\u4F01\u5212 \u2192 \u5199 \u2192 \u6821\uFF0C\u7EA6 2 \u5206\u949F\uFF1B\u524D\u540E\u7AE0\u6B63\u6587\u4E0D\u52A8\uFF0C\u53EA\u66F4\u65B0\u201C\u524D\u4E00\u5F20\uFF0F\u540E\u4E00\u5F20\u201D\u5E76\u6807\u201C\u63A5\u7F1D\u9700\u770B\u201D",
   "ui.book_rerun_tag": "\u5904\u7406\u4E2D",
   "ui.book_panel_lead_sep": "\uFF0C",
   "ui.book_panel_reason_unchecked_0": "\u6709 {0} \u9879\u6CA1\u80FD\u6838\u5BF9\u5230\u6765\u6E90\u3002",
@@ -9749,7 +9749,7 @@ var zhTW = {
   "ui.book_seam_label": "\u63A5\u7E2B\u9700\u770B",
   "ui.book_seam_reason": "\u9130\u5361\u4F01\u5283\u6216\u6B63\u6587\u5DF2\u8B8A\u66F4\uFF0C\u5C1A\u672A\u4EBA\u5DE5\u6838\u5C0D\u3002",
   "ui.book_card_menu_rerun": "\u91CD\u8DD1\u5716\u6587\u66F8\u9019\u4E00\u5F35",
-  "ui.book_card_menu_rerun_sub": "\u4F01\u5283 \u2192 \u5BEB \u2192 \u6821\uFF0C\u7D04 2 \u5206\u9418\uFF1B\u524D\u5F8C\u7AE0\u4E0D\u52D5\uFF0C\u53EA\u6A19\u300C\u63A5\u7E2B\u9700\u770B\u300D",
+  "ui.book_card_menu_rerun_sub": "\u4F01\u5283 \u2192 \u5BEB \u2192 \u6821\uFF0C\u7D04 2 \u5206\u9418\uFF1B\u524D\u5F8C\u7AE0\u6B63\u6587\u4E0D\u52D5\uFF0C\u53EA\u66F4\u65B0\u300C\u524D\u4E00\u5F35\uFF0F\u5F8C\u4E00\u5F35\u300D\u4E26\u6A19\u300C\u63A5\u7E2B\u9700\u770B\u300D",
   "ui.book_rerun_tag": "\u8655\u7406\u4E2D",
   "ui.book_panel_lead_sep": "\uFF0C",
   "ui.book_panel_reason_unchecked_0": "\u6709 {0} \u9805\u6C92\u80FD\u6838\u5C0D\u5230\u4F86\u6E90\u3002",
@@ -13037,6 +13037,9 @@ function hashText(text10) {
   return (0, import_node_crypto.createHash)("sha256").update(text10.replace(/\r\n?/g, "\n")).digest("hex").slice(0, 16);
 }
 
+// core/note-placeholder.ts
+var isPlaceholder = (value) => value === translate("zh-TW", "detail.no_conclusion_yet") || value === translate("en", "detail.no_conclusion_yet");
+
 // core/book-pipeline/plan-text.ts
 var pick = (words2, language2) => instructionLanguageOf(language2) === "zh" ? words2.zh : words2.en;
 var matches = (words2, value) => value === words2.zh || value === words2.en;
@@ -13076,6 +13079,10 @@ var L = {
   materials: { zh: "\u7D20\u6750\u767B\u8A18\u8868", en: "Material register" }
 };
 var safe = (value, max = 400) => escapeMarkdownText(singleLine(value, max), max);
+var neighbourSentence = (value) => {
+  const text10 = safe(value, 240);
+  return /^(?:null|undefined)$/i.test(text10.trim()) || isPlaceholder(text10.trim()) ? "" : text10;
+};
 var colon = (language2) => instructionLanguageOf(language2) === "zh" ? "\uFF1A" : ": ";
 var SLOT_SEPARATOR = "\uFF5C";
 function composeImageSlots(images, language2) {
@@ -13091,7 +13098,7 @@ function composeImageSlots(images, language2) {
 }
 function composeCardPrompt(plan, language2) {
   const c = colon(language2);
-  const neighbour2 = (label, n) => n ? `${pick(label, language2)}${c}(${n.position}) ${safe(n.title, 120)}${safe(n.summary, 240) ? ` \u2014 ${safe(n.summary, 240)}` : ""}` : `${pick(label, language2)}${c}${pick(L.none, language2)}`;
+  const neighbour2 = (label, n) => n ? `${pick(label, language2)}${c}(${n.position}) ${safe(n.title, 120)}${neighbourSentence(n.summary) ? ` \u2014 ${neighbourSentence(n.summary)}` : ""}` : `${pick(label, language2)}${c}${pick(L.none, language2)}`;
   const lines = [
     `${pick(L.role, language2)}${c}${pick(ROLE_WORDS[plan.role], language2)}`,
     `${pick(L.covers, language2)}${c}${safe(plan.covers)}`,
@@ -13165,11 +13172,21 @@ function rewriteNeighbourLine(prompt, key4, neighbour2) {
   if (at < 0) return void 0;
   const head2 = (_b2 = (_a2 = /^([^:：]+[:：]\s*)/.exec(lines[at].replace(/\r$/, ""))) == null ? void 0 : _a2[1]) != null ? _b2 : "";
   const english = !lines[at].startsWith(L[key4].zh);
-  const summary = neighbour2 ? safe(neighbour2.summary, 240) : "";
+  const summary = neighbour2 ? neighbourSentence(neighbour2.summary) : "";
   const line2 = neighbour2 ? `${head2}(${neighbour2.position}) ${safe(neighbour2.title, 120)}${summary ? ` \u2014 ${summary}` : ""}` : `${head2}${english ? L.none.en : L.none.zh}`;
   if (lines[at].replace(/\r$/, "") === line2) return void 0;
   lines[at] = lines[at].endsWith("\r") ? `${line2}\r` : line2;
   return lines.join("\n");
+}
+function retargetNeighbourLine(prompt, key4, neighbour2) {
+  if (!neighbour2) return rewriteNeighbourLine(prompt, key4, null);
+  const value = parseCardPrompt(prompt)[key4];
+  if (value === void 0) return void 0;
+  const title = unescapeMarkdownText(safe(neighbour2.title, 120));
+  const m = /^\((\d+)\) ([\s\S]*)$/.exec(value);
+  const rest = m && (m[2] === title || m[2].startsWith(`${title} \u2014 `)) ? m[2].slice(title.length + 3) : void 0;
+  if (m && rest !== void 0 && Number(m[1]) === neighbour2.position) return void 0;
+  return rewriteNeighbourLine(prompt, key4, rest === void 0 ? neighbour2 : { ...neighbour2, summary: rest });
 }
 function composeBookPlan(plan, language2) {
   const c = colon(language2);
@@ -29117,9 +29134,6 @@ function ringImagesInTheWay(nodes, items, heightOf, widthOf, touched, hidden) {
 
 // repository.ts
 var import_obsidian13 = require("obsidian");
-
-// core/note-placeholder.ts
-var isPlaceholder = (value) => value === translate("zh-TW", "detail.no_conclusion_yet") || value === translate("en", "detail.no_conclusion_yet");
 
 // topic-colors.ts
 var TOPIC_COLORS = ["red", "orange", "yellow", "green", "blue", "purple"];
@@ -46901,6 +46915,7 @@ Decide, once for the whole book: the role and the reading order of every card, a
 Rules:
 - Return every card exactly once, by its id, copied exactly from the list, in the order the book should be read. Do not add, drop, rename or merge cards.
 - The book's chapters are exactly the cards in the list below. A topic that the settings or a summary mention but that is not a card is not a chapter: do not treat it as one.
+- Number chapters only from this list: chapter n is the n-th card in the order you return. In the thread and the decisions, never give a chapter number to, preview or announce as a chapter a topic that is not a card, even when the settings name it (for example a chapter the owner removed).
 - role is one of intro (opens the book or a part), body (a main chapter), gallery (a visual walk-through of materials), closing (wraps up).
 - thread: 2 to 4 sentences, one paragraph, no headings or lists.
 - materials: each has a short name and one sentence on how the book uses it. Use only things the titles and summaries point to; an empty list is allowed when they point to none.
@@ -52328,6 +52343,49 @@ var BookPipelineRuns = class {
     } catch (e) {
     }
   }
+  /**
+   * After chapters were removed ("carry on as before"), the planned chapters' `前一張` / `後一張` lines may still name a removed chapter or
+   * an old position. Each such line is pointed at the neighbour in the current order (its own sentence kept when only the position moved);
+   * a line that already names it is left. Only those lines change: no role, stage, text or fingerprint is touched, and no AI call is made.
+   */
+  async refreshAroundRemoved(drive) {
+    var _a2, _b2, _c;
+    const signal = drive.controller.signal;
+    if (!((_a2 = drive.store.state.removed) == null ? void 0 : _a2.length) || this.dead(drive) || signal.aborted || drive.fatal !== void 0) return;
+    const order = effectiveOrder(drive.store.state);
+    try {
+      for (const [at, nodeId] of order.entries()) {
+        const own2 = drive.cards.get(nodeId);
+        if (!own2 || drive.stages.get(nodeId) === void 0) continue;
+        for (const { index, key: key4 } of [
+          { index: at - 1, key: "previous" },
+          { index: at + 1, key: "next" }
+        ]) {
+          if (this.dead(drive) || signal.aborted) return;
+          const other = order[index] === void 0 ? void 0 : drive.cards.get(order[index]);
+          if (order[index] !== void 0 && !other) continue;
+          const raw = await this.ports.readCard(own2.path);
+          let neighbourLine = null;
+          if (other) {
+            const neighbour2 = await this.ports.readCard(other.path);
+            neighbourLine = {
+              position: index + 1,
+              title: neighbour2.title,
+              summary: summaryText2((_c = (_b2 = parseCardPrompt(neighbour2.prompt).covers) != null ? _b2 : neighbour2.summary) != null ? _c : "").trim()
+            };
+          }
+          const prompt = retargetNeighbourLine(raw.prompt, key4, neighbourLine);
+          if (prompt === void 0) continue;
+          await this.ports.updateNoteGuarded(
+            own2.path,
+            { prompt },
+            { expectedContent: raw.raw, authorize: () => !this.dead(drive) && !signal.aborted }
+          );
+        }
+      }
+    } catch (e) {
+    }
+  }
   async markSeams(drive, nodeId, revision) {
     const order = effectiveOrder(drive.store.state);
     const at = order.indexOf(nodeId);
@@ -52745,6 +52803,7 @@ var BookPipelineRuns = class {
         drive.skippedRefreshed = true;
         await this.collectSkippedPlans(drive);
         await this.refreshSkippedPlans(drive);
+        await this.refreshAroundRemoved(drive);
       }
       const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy);
       if (plan.hold === "global_failed") drive.failure = (_a2 = drive.reasons.get("global")) != null ? _a2 : "failed";

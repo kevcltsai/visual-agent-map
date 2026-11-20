@@ -86,7 +86,7 @@ export function parseConsistency(raw: string, chapters: number): RawInconsistenc
 /** The whole-book consistency check: one text-only call over every chapter's text (no web, no tools). */
 export const consistencyStep: StepDefinition<ConsistencyRequest, RawInconsistency[]> = {
   id: "book-pipeline.consistency",
-  version: 2,
+  version: 3,
   render: request =>
     renderTemplate(template, {
       languageInstruction: languageInstruction(request.language, request.chapters[0]?.text ?? ""),

@@ -120,13 +120,19 @@ export function compactChapters(
  * With `reference`: this chapter's sentence `own` names `other` by the wrong words `theirs`; `suggestion` is the right ones.
  */
 export interface ChapterInconsistency {
-  /** `removed`: this chapter still names a removed chapter (`theirs` is its title, `own` the sentence that names it). */
-  kind?: "removed";
+  /**
+   * `removed`: this chapter still names a removed chapter (`theirs` is its title, `own` the sentence that names it). `direction`: the
+   * sentence `own` says `other`'s subject comes later or came earlier by the words `theirs`; `suggestion` is where it really is.
+   */
+  kind?: "removed" | "direction";
   other: string;
   own: string;
   theirs: string;
   suggestion: string;
   reference?: true;
+  /** `own`/`theirs` is the model's paraphrase, not the chapter's sentence (shown without quotes). */
+  ownLoose?: true;
+  theirsLoose?: true;
 }
 /**
  * The findings of the last check that name this chapter, as long as the chapter is the text that was checked (a chapter written again
@@ -136,9 +142,13 @@ export function chapterInconsistencies(data: BookPipelineData, nodeId: string): 
   const check = data.consistency;
   if (!check?.findings?.length || !check.revisions) return [];
   if (check.revisions[nodeId] === undefined || check.revisions[nodeId] !== revisionOf(data, nodeId)) return [];
-  return check.findings.flatMap((finding: ConsistencyFinding): ChapterInconsistency[] =>
-    finding.kind === "reference"
-      ? finding.a === nodeId
+  return check.findings.flatMap((finding: ConsistencyFinding): ChapterInconsistency[] => {
+    const loose = (own?: true, theirs?: true) => ({
+      ...(own ? { ownLoose: true as const } : {}),
+      ...(theirs ? { theirsLoose: true as const } : {})
+    });
+    if (finding.kind === "reference")
+      return finding.a === nodeId
         ? [
             {
               other: finding.b,
@@ -148,25 +158,41 @@ export function chapterInconsistencies(data: BookPipelineData, nodeId: string): 
               reference: true
             }
           ]
-        : []
-      : finding.kind === "removed"
-        ? finding.a === nodeId
-          ? [
-              {
-                kind: "removed",
-                other: finding.b,
-                own: finding.claimA,
-                theirs: finding.claimB,
-                suggestion: finding.suggestion
-              }
-            ]
-          : []
-        : finding.a === nodeId
-          ? [{ other: finding.b, own: finding.claimA, theirs: finding.claimB, suggestion: finding.suggestion }]
-          : finding.b === nodeId
-            ? [{ other: finding.a, own: finding.claimB, theirs: finding.claimA, suggestion: finding.suggestion }]
-            : []
-  );
+        : [];
+    if (finding.kind === "removed" || finding.kind === "direction")
+      return finding.a === nodeId
+        ? [
+            {
+              kind: finding.kind,
+              other: finding.b,
+              own: finding.claimA,
+              theirs: finding.claimB,
+              suggestion: finding.suggestion
+            }
+          ]
+        : [];
+    if (finding.a === nodeId)
+      return [
+        {
+          other: finding.b,
+          own: finding.claimA,
+          theirs: finding.claimB,
+          suggestion: finding.suggestion,
+          ...loose(finding.looseA, finding.looseB)
+        }
+      ];
+    if (finding.b === nodeId)
+      return [
+        {
+          other: finding.a,
+          own: finding.claimB,
+          theirs: finding.claimA,
+          suggestion: finding.suggestion,
+          ...loose(finding.looseB, finding.looseA)
+        }
+      ];
+    return [];
+  });
 }
 
 /** The longest sentence a removed-chapter finding quotes (characters). */

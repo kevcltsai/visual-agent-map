@@ -106,9 +106,17 @@ const PROBLEM_RULES: readonly { kind: ReviewProblemKind; of: (card: Gate2Card) =
       card.inconsistencies?.length
         ? card.inconsistencies.map(item => {
             if (item.kind === "removed") return t("ui.book_reason_removed_ref_0_1", item.theirs, item.own);
+            if (item.kind === "direction")
+              return t("ui.book_reason_direction_0_1_2_3", item.own, item.theirs, item.otherTitle, item.suggestion);
             if (item.reference)
               return t("ui.book_reason_chapter_ref_0_1_2_3", item.own, item.theirs, item.otherTitle, item.suggestion);
-            const sentence = t("ui.book_reason_inconsistent_0_1_2", item.otherTitle, item.own, item.theirs);
+            // A quote is the chapter's own sentence; a claim no sentence matched is the model's paraphrase, shown as such.
+            const own = t(item.ownLoose ? "ui.book_paraphrase_0" : "ui.book_quote_0", item.own);
+            const theirs = t(item.theirsLoose ? "ui.book_paraphrase_0" : "ui.book_quote_0", item.theirs);
+            const sentence =
+              item.other === card.id
+                ? t("ui.book_reason_inconsistent_self_0_1", own, theirs)
+                : t("ui.book_reason_inconsistent_0_1_2", item.otherTitle, own, theirs);
             return item.suggestion ? `${sentence}${t("ui.book_panel_lead_sep")}${item.suggestion}` : sentence;
           })
         : undefined

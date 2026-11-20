@@ -318,6 +318,19 @@ test('slots: a picture claimed by a chapter whose write is blocked by the exit c
   assert.ok(figures((await r.note(1)).detail).length === 1);
 });
 
+test('quality run: a write blocked by the exit check releases the claimed work, so the other chapter offered the same work (another file, same author) places it', async () => {
+  const name = title => /SecretTitleA/.test(title) ? 'Sir_Winston_Churchill_-_19086236948.jpg' : 'Sir_Winston_Churchill_(cropped).jpg';
+  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], slots: 1, text: title => `${BODY} ${title}\n\n${mk(1)}\n\n尾。\n`,
+    finder: req => { const n = name(req.chapter); return found({ 1: [cand(0, { url: commons(n), source: `https://commons.wikimedia.org/wiki/File:${n}`, author: 'Yousuf Karsh' })] }); } });
+  const first = defer();
+  const finder = r.ports.findImages;
+  r.ports.findImages = async (request, runInfo) => { if (/SecretTitleA/.test(request.chapter)) await first.promise; return finder(request, runInfo); };
+  let blocked = 0;
+  r.runs.exitCheck = text => { if (!/!\[/.test(text) || blocked++) return false; first.resolve(); return true; };
+  await run(r);
+  assert.equal(figures((await r.note(1)).detail).length, 1, 'the work released by the blocked write went to the other chapter');
+});
+
 const embedded = async (r, n) => { const out = []; for (let i = 0; i < n; i++) out.push(...figures((await r.note(i)).detail)); return out; };
 
 test('sections: chapterBody drops the picture section; setImageSection puts it before Sources, replaces an old one and removes on null', () => {

@@ -51223,7 +51223,7 @@ function readBodyRecord(detail) {
 }
 var PROOF_KEY_LINE = /^<!-- book-proof:v1 (\{.*\}) -->$/;
 var IMAGE_URL = /!\[[^\]\n]*\]\((https:\/\/[^)\s]+)\)/g;
-function oldNoteLooksUntouched(detail) {
+function oldNoteLooksUntouched(detail, cardDetail = detail.trim()) {
   var _a2, _b2, _c;
   const proofKeys = extractProofRecords(detail).map((record) => {
     var _a3;
@@ -51242,14 +51242,18 @@ function oldNoteLooksUntouched(detail) {
   const parts = latest.split(":");
   if (parts.length < 5) return false;
   const stored = parts[parts.length - 2];
-  if (stored !== hashText(projectProofBody(stripImageLines(chapterBody(detail.trim()))))) return false;
+  if (stored !== hashText(projectProofBody(stripImageLines(chapterBody(cardDetail))))) return false;
   const placed = ((_c = (_b2 = latestSlotsRecord(detail)) == null ? void 0 : _b2.slots) != null ? _c : []).filter((slot) => slot.state === "placed" && slot.hash).map((slot) => slot.hash).sort();
   const inText = [...integrityText(detail).matchAll(IMAGE_URL)].map((m) => shortHash2(m[1])).sort();
   return placed.length === inText.length && placed.every((hash, at) => hash === inText[at]);
 }
-function bodyState(detail) {
+function bodyState(detail, cardDetail) {
   const record = readBodyRecord(detail);
-  if (!(record == null ? void 0 : record.fp)) return !integrityText(detail) ? "empty" : oldNoteLooksUntouched(detail) ? "clean" : "unknown";
+  if (!(record == null ? void 0 : record.fp)) {
+    if (!integrityText(detail)) return "empty";
+    if (!record && !extractProofRecords(detail).length && !latestSlotsRecord(detail)) return "clean";
+    return oldNoteLooksUntouched(detail, cardDetail) ? "clean" : "unknown";
+  }
   return record.fp === integrityFp(detail) ? "clean" : "edited";
 }
 var isUntouched = (detail) => {
@@ -51276,6 +51280,23 @@ function keepDetail(detail) {
 function programStamp(baseDetail, nextDetail) {
   return bodyState(baseDetail) === "clean" ? stampDetail(nextDetail) : nextDetail;
 }
+var OPEN_ITEMS_MARKER2 = /\n*^<!--\s*aim-open-items\s+\[[^\n]*\]\s*-->[ \t]*$/m;
+var DETAIL_START3 = "<!-- visual-agent-map:detail:start -->";
+var DETAIL_END3 = "<!-- visual-agent-map:detail:end -->";
+function cardDetailOf(raw) {
+  var _a2;
+  const block = detailBlockOf(raw);
+  if (block === void 0) return void 0;
+  const detail = block.trim();
+  if (OPEN_ITEMS_MARKER2.test(detail)) return detail;
+  const end = raw.indexOf(DETAIL_END3, raw.indexOf(DETAIL_START3) + 1);
+  const after = raw.slice(end + DETAIL_END3.length);
+  const next = after.search(/^## /m);
+  const marker3 = (_a2 = OPEN_ITEMS_MARKER2.exec(next >= 0 ? after.slice(0, next) : after)) == null ? void 0 : _a2[0].trim();
+  return marker3 ? `${detail}
+
+${marker3}` : detail;
+}
 var spliceDetail = (raw, change2) => {
   const detail = detailBlockOf(raw);
   if (detail === void 0) return raw;
@@ -51287,7 +51308,7 @@ var stampRaw = (raw) => spliceDetail(raw, stampDetail);
 var keepRaw = (raw) => spliceDetail(raw, keepDetail);
 function programStampRaw(baseRaw, nextRaw) {
   const base = detailBlockOf(baseRaw);
-  return base !== void 0 && bodyState(base) === "clean" ? stampRaw(nextRaw) : nextRaw;
+  return base !== void 0 && bodyState(base, cardDetailOf(baseRaw)) === "clean" ? stampRaw(nextRaw) : nextRaw;
 }
 var isKeptRaw = (raw) => {
   var _a2;
@@ -51295,7 +51316,7 @@ var isKeptRaw = (raw) => {
 };
 var bodyStateRaw = (raw) => {
   var _a2;
-  return bodyState((_a2 = detailBlockOf(raw)) != null ? _a2 : "");
+  return bodyState((_a2 = detailBlockOf(raw)) != null ? _a2 : "", cardDetailOf(raw));
 };
 var integrityFpRaw = (raw) => {
   var _a2;
@@ -54182,17 +54203,17 @@ function reviewCallout(card, reasons, nextLink, fp, runId, hand) {
 }
 var handSuffix = (hand) => hand ? `:${idPart(hand.op)}:${idPart(hand.ifp)}${hand.queued ? ":q" : ""}` : "";
 var STATUS_LINE = /^[ \t]{0,3}>[ \t]?[⏳⚠]/u;
-var DETAIL_START3 = "<!-- visual-agent-map:detail:start -->";
-var DETAIL_END3 = "<!-- visual-agent-map:detail:end -->";
+var DETAIL_START4 = "<!-- visual-agent-map:detail:start -->";
+var DETAIL_END4 = "<!-- visual-agent-map:detail:end -->";
 var CHECKBOX = /^[ \t]{0,3}>[ \t]?[-*+][ \t]+\[([ xX])\]/;
 var REVIEW_SIGN = /\[!vam-review\][+-]?/i;
 var bare2 = (line2) => line2.replace(/\r$/, "");
 function detailSpan(lines) {
-  const from = lines.findIndex((line2) => bare2(line2).trim() === DETAIL_START3);
+  const from = lines.findIndex((line2) => bare2(line2).trim() === DETAIL_START4);
   if (from < 0) return void 0;
   let to = -1;
   for (let i = lines.length - 1; i > from; i--) {
-    if (bare2(lines[i]).trim() === DETAIL_END3) {
+    if (bare2(lines[i]).trim() === DETAIL_END4) {
       to = i;
       break;
     }

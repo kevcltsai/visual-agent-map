@@ -17881,8 +17881,8 @@ export class VisualAgentMapView extends ItemView {
       requirements:
         input.requirements ??
         (input.instruction
-          ? `${bookAuthorRequirements(input.settings, input.slots)}\n\n${input.instruction}`
-          : bookAuthorRequirements(input.settings, input.slots)),
+          ? `${bookAuthorRequirements(input.settings, input.slots, input.chapters)}\n\n${input.instruction}`
+          : bookAuthorRequirements(input.settings, input.slots, input.chapters)),
       outputLanguage: input.language
     };
     this.bookAuthoring.set(node.path, Date.now());

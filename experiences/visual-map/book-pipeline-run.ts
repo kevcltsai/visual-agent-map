@@ -293,6 +293,8 @@ export interface AuthorInput {
   settings: BookSettings;
   /** The card's planned picture slots (from its `## Prompt`); empty when the plan has none or the Prompt has no image plan: the author then leaves no marker. */
   slots: readonly ImageSlot[];
+  /** The whole book's chapters with each brief's covers line (`current` marks this one); absent for an expansion. */
+  chapters?: readonly { title: string; covers: string; current?: boolean }[];
   language: ContentLanguage;
   model: string;
   reasoning: ReasoningLevel;
@@ -2791,6 +2793,8 @@ export class BookPipelineRuns {
     // author sees the chapter and returns only change blocks, which the program puts into the chapter as it is (one call; its pictures
     // and records stay). It never rewrites the chapter: an answer with no usable block leaves the chapter as it was, needs-review.
     const expanding = drive.avoid.has(nodeId) && drive.expand.has(nodeId);
+    // A first write sees the whole plan (every chapter is planned before any is written); an in-place expansion does not.
+    const chapters = expanding ? undefined : await this.authorChapters(drive, nodeId, card);
     let oldBody = chapterBody(card.detail);
     // The fix round asks for the setting's minimum itself (the 0.8x tolerance is only the first verdict's).
     let now = expanding ? lengthReason(settings.length, lengthBody(oldBody), undefined, true) : undefined;
@@ -2958,6 +2962,7 @@ export class BookPipelineRuns {
           path: info.path,
           settings,
           slots: expanding ? [] : (slots ?? []),
+          ...(chapters ? { chapters } : {}),
           language: drive.config.language,
           model: drive.config.authorModel,
           reasoning: drive.config.reasoning,
@@ -3641,6 +3646,17 @@ export class BookPipelineRuns {
         );
       }
     };
+  }
+
+  /** The book's chapters for the author: the proofread's list with this chapter marked (the whole plan, so links and ownership are known). */
+  private async authorChapters(
+    drive: Drive,
+    nodeId: string,
+    card: { title: string; prompt: string }
+  ): Promise<{ title: string; covers: string; current?: boolean }[]> {
+    const ids = effectiveOrder(drive.store.state).filter(id => drive.cards.has(id));
+    const chapters = await this.proofChapters(drive, nodeId, card);
+    return chapters.map((chapter, at) => (ids[at] === nodeId ? { ...chapter, current: true } : chapter));
   }
 
   /** The book's chapters in reading order for the proofread: each title and its Prompt's covers line (an unreadable card keeps its title only). */

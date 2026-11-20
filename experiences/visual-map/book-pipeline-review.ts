@@ -51,6 +51,8 @@ export interface Gate2Card {
   galleryBare: boolean;
   /** A neighbouring card changed and the owner has not confirmed the join. */
   seam: boolean;
+  /** With `seam`: the title of the neighbour whose change the seam names (absent when that card is no longer next to this one). */
+  seamFrom?: string;
   /** The chapter text changed after its stored proof (the proof no longer fits): shown as "edited, not re-checked". */
   proofStale?: boolean;
   /** The run skipped this chapter because the reader's hand has been on it (the card is needs-review for that reason only). */
@@ -112,7 +114,15 @@ const PROBLEM_RULES: readonly { kind: ReviewProblemKind; of: (card: Gate2Card) =
     of: card => (card.factsOpen > 0 ? t("ui.book_panel_g2_reason_facts_0", card.factsOpen) : undefined)
   },
   { kind: "images", of: card => (card.galleryBare ? t("ui.book_panel_g2_reason_images") : undefined) },
-  { kind: "seam", of: card => (card.seam ? t("ui.book_panel_g2_reason_seam") : undefined) },
+  {
+    kind: "seam",
+    of: card =>
+      card.seam
+        ? card.seamFrom
+          ? t("ui.book_panel_g2_reason_seam_0", card.seamFrom)
+          : t("ui.book_panel_g2_reason_seam")
+        : undefined
+  },
   { kind: "edited", of: card => (card.proofStale && !card.handEdited ? t("ui.book_stale_proof") : undefined) }
 ];
 
@@ -185,6 +195,22 @@ export interface Gate2NoteInput {
 }
 
 /** The chapters of the run in reading order as `Gate2Card`s, from their notes (what the gate 2 panel used to build). */
+/**
+ * The neighbour a seam line names (the run writes "… (card N, revision R)" / "（第 N 張，版本 R）", N the changed card's place then). Named
+ * only while that place is still right next to this chapter, so a later reorder never names the wrong chapter (the plain sentence stays).
+ */
+function seamFromOf(
+  seam: unknown,
+  order: readonly string[],
+  at: number,
+  titleOf: (id: string) => string
+): { seamFrom?: string } {
+  const m = typeof seam === "string" ? /(?:第\s*|card\s+)(\d+)/i.exec(seam) : null;
+  const other = m ? Number(m[1]) - 1 : -1;
+  if (other !== at - 1 && other !== at + 1) return {};
+  const title = order[other] === undefined ? "" : titleOf(order[other]).trim();
+  return title ? { seamFrom: title } : {};
+}
 export function gate2Cards(input: {
   order: readonly string[];
   titleOf: (id: string) => string;
@@ -232,6 +258,7 @@ export function gate2Cards(input: {
         : 0,
       galleryBare: checked && galleryBare(role, note),
       seam: view.seam,
+      ...(view.seam ? seamFromOf(note?.pipelineSeam, input.order, at, input.titleOf) : {}),
       ...(handEdited ? { handEdited: true, bodyFp: integrityFp(note?.detail ?? "") } : {}),
       ...(stale ? { proofStale: true } : {}),
       ...(inconsistencies.length ? { inconsistencies } : {}),

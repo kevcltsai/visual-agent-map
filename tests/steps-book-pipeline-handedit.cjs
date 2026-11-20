@@ -62,11 +62,31 @@ test('old note, branch 1 (proof hash): the text still hashes as the stored proof
   assert.equal(b.bodyState(withSlots(BODY, 1)), 'unknown', 'text and slots but no proof to vouch for it');
   assert.equal(b.bodyState(proofRecord(BODY)), 'unknown', 'a proof but a picture the slots do not list (no slots record)');
 });
-test('old note, no evidence (owner decision 2026-11-20): text with no record of any kind is rewritable; a keep record is evidence, so a text changed after keep is unknown', () => {
-  assert.equal(b.bodyState(BODY), 'clean', 'no body record, no stored proof, no slots record');
+// Owner requirement (both hold): text with no record of any kind is rewritable only when the pipeline itself wrote the chapter before (an
+// older build); a card the pipeline never wrote (the reader's own research) is held like a hand edit (re-verify 2, C7).
+test('old note, no evidence (owner decision 2026-11-20): text with no record of any kind is rewritable when the pipeline wrote it; a keep record is evidence, so a text changed after keep is unknown', () => {
+  assert.equal(b.bodyState(BODY, undefined, true), 'clean', 'no body record, no stored proof, no slots record, written by the pipeline');
+  assert.equal(b.bodyState(BODY), 'unknown', 'the same text the pipeline never wrote: held');
+  assert.equal(b.bodyState(`${BODY}\n\n> [!vam-book]- 研究備註\n> 2026-11-01 寫入`), 'clean', 'a hidden work callout in the Detail is the evidence');
   const kept = b.keepDetail(BODY);
   assert.equal(b.isKept(kept), true);
   assert.equal(b.bodyState(kept.replace('第二段', '第三段')), 'unknown', 'kept, then changed: still held');
+});
+const rawNote = (fm, detail) => `---\ntitle: x\n${fm}---\n# x\n\n## 詳細內容\n\n<!-- visual-agent-map:detail:start -->\n${detail}\n<!-- visual-agent-map:detail:end -->\n`;
+test('C7 raw evidence: only what the pipeline wrote on a chapter (a written/checked stage, a [!vam-book] callout anywhere) makes a record-less text rewritable; plan fields are no evidence; an empty card stays rewritable', () => {
+  assert.equal(b.bodyStateRaw(rawNote('pipeline-stage: "checked"\n', BODY)), 'clean', 'older build, checked');
+  assert.equal(b.bodyStateRaw(rawNote('pipeline-stage: written\n', BODY)), 'clean', 'older build, written');
+  assert.equal(b.bodyStateRaw(rawNote('pipeline-stage: checked\n', BODY).replace(/\n/g, '\r\n')), 'clean', 'CRLF note');
+  assert.equal(b.bodyStateRaw(`${rawNote('', BODY)}\n> [!vam-book]- 校對結果（最新一次）\n> - 通過\n`), 'clean', 'proofread result callout after the Detail');
+  // Never part of a book: the plan writes book-role / pipeline-role on every card of the run before a word is written, the owner's role
+  // choice writes book-role-by, and a skipped chapter gets planned / needs-review: none of these says the pipeline wrote the text.
+  const research = rawNote('book-role: "body"\npipeline-role: "body"\nbook-role-by: owner\n', BODY);
+  assert.equal(b.bodyStateRaw(research), 'unknown', 'research text, plan fields only');
+  assert.equal(b.bodyStateRaw(rawNote('pipeline-stage: needs-review\npipeline-issue: "write failed: hand_edited"\n', BODY)), 'unknown', 'skipped before: still held');
+  assert.equal(b.bodyStateRaw(rawNote('pipeline-stage: planned\n', BODY)), 'unknown');
+  assert.equal(b.bodyStateRaw(rawNote('', '```\n> [!vam-book]- x\n```\n正文。')), 'unknown', 'a callout inside code is no evidence');
+  assert.equal(b.bodyStateRaw(rawNote('', '')), 'empty', 'an empty card is rewritable');
+  assert.equal(b.bodyStateRaw(rawNote('book-role: "body"\n', '\n\n')), 'empty');
 });
 test('old note, branch 2 (picture hashes): a picture swapped, added or removed against the book-slots record: unknown', () => {
   assert.equal(b.bodyState(OLD.replace(url(1), url(9))), 'unknown', 'swapped');

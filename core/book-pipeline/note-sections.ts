@@ -107,6 +107,12 @@ function hiddenRanges(lines: string[], fenced: boolean[]): { start: number; end:
   return found;
 }
 
+/** Whether a text (a Detail or a whole note) holds any of the pipeline's hidden `[!vam-book]` callouts (outside code). */
+export function hasHiddenCallout(text: string): boolean {
+  const lines = text.split("\n");
+  return hiddenRanges(lines, fencedLines(lines)).length > 0;
+}
+
 /** The hidden callout type as Obsidian may read it: spaces inside the brackets, a `|metadata` tail. */
 const HIDDEN_TYPE = /\[!\s*vam-(?:book|trial|review)\s*(?:\|[^\]]*)?\]/gi;
 /** The program's owner markers (`%%vam-trial:…%%`, `%%vam-review:…%%`, the version line): an author's copy is turned into full-width percent signs. */

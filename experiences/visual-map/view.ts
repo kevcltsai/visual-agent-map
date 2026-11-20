@@ -704,6 +704,8 @@ const ARROW_OFFSETS = new Map<string, -1 | 1>([
   ["ArrowDown", 1],
   ["ArrowRight", 1]
 ]);
+// Pointer events on the document that end a card drag whose card did not get them.
+const DOC_DRAG_ENDS = ["pointerup", "pointercancel", "lostpointercapture"] as const;
 /** Zoom below which a card's tool row is hidden (its counter-scaled size would cover the neighbouring cards). */
 const TOOLS_MIN_ZOOM = 0.6;
 const TASK_PROGRESS_PREFIX = "vam-task:";
@@ -12469,6 +12471,11 @@ export class VisualAgentMapView extends ItemView {
       this.cardChecks.set(node.id, select);
       select.addEventListener("click", event => {
         event.stopPropagation();
+        // The click that ends a drag grabbed by the checkbox is no tick: preventDefault puts the box back as it was.
+        if (Date.now() < this.suppressClickUntil) {
+          event.preventDefault();
+          return;
+        }
         this.applySelectionChange(this.selection.setChecked(node.id, select.checked));
       });
     }
@@ -23604,6 +23611,14 @@ export class VisualAgentMapView extends ItemView {
       };
       // Esc is a document key while the pointer is down (the card may not hold the focus): it cancels a drag that has begun.
       const doc = this.contentEl?.ownerDocument;
+      const win = doc?.defaultView;
+      // The release can reach the document and not the card (a lost capture, a release outside the window): it still ends
+      // the drag, so the cards never stay at the drag position. Losing the window ends it as a cancel.
+      const pointerId = event.pointerId;
+      const docEnd = (e: PointerEvent): void => {
+        if (e.pointerId === pointerId) finish(e);
+      };
+      const blur = (): void => finish({ type: "pointercancel" } as PointerEvent);
       const esc = (e: KeyboardEvent): void => {
         if (e.key !== "Escape" || !(moved || travelled)) return;
         e.preventDefault();
@@ -23631,6 +23646,8 @@ export class VisualAgentMapView extends ItemView {
         card.removeEventListener("pointercancel", finish);
         card.removeEventListener("lostpointercapture", finish);
         doc?.removeEventListener("keydown", esc, true);
+        for (const name of DOC_DRAG_ENDS) doc?.removeEventListener(name, docEnd, true);
+        win?.removeEventListener("blur", blur);
         this.dragCleanup = null;
       };
       // The drop's own work comes first; a repaint that was asked for during the drag then runs once.
@@ -23726,6 +23743,8 @@ export class VisualAgentMapView extends ItemView {
       card.addEventListener("pointercancel", finish);
       card.addEventListener("lostpointercapture", finish);
       doc?.addEventListener("keydown", esc, true);
+      for (const name of DOC_DRAG_ENDS) doc?.addEventListener(name, docEnd, true);
+      win?.addEventListener("blur", blur);
     });
   }
   /**

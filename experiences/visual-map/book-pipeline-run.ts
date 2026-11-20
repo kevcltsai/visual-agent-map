@@ -1073,6 +1073,13 @@ export class BookPipelineRuns {
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       if (data.phase === "done") return;
       if (data.phase !== "gate2") throw new BookPipelineRunError("not_gate");
+      // The map's cards differ from the book's chapters: the run pauses as "map changed" (the bar offers replan / keep / stop) instead of finishing.
+      const change = mapDifference(data, this.mapIds(await this.ports.readMap(mapPath)));
+      if (change.added.length || change.missing.length) {
+        await drive.store.commit(state => ({ state: pauseForMap(state, change), accepted: true }));
+        this.log(drive, "map_changed", "-", "proof", `added:${change.added.length},missing:${change.missing.length}`);
+        return;
+      }
       let refusal: BookRunRefusal | undefined;
       await drive.store.commit(state => {
         const running = resumeRun(state);

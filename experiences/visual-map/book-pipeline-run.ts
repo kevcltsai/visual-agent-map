@@ -2665,7 +2665,12 @@ export class BookPipelineRuns {
     const expand = (content: string): string | null => {
       const next = detailBlockOf(content);
       if (oldDetail === undefined || next === undefined) return content;
-      const merged = expandChapterDetail(oldDetail, next, drive.config.language, fixInstructionText(requirements ?? ""));
+      const merged = expandChapterDetail(
+        oldDetail,
+        next,
+        drive.config.language,
+        fixInstructionText(requirements ?? "")
+      );
       if (!merged) {
         noEdits = true;
         return null;

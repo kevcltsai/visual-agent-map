@@ -53993,7 +53993,12 @@ var BookPipelineRuns = class {
     const expand2 = (content) => {
       const next = detailBlockOf(content);
       if (oldDetail === void 0 || next === void 0) return content;
-      const merged = expandChapterDetail(oldDetail, next, drive.config.language, fixInstructionText(requirements != null ? requirements : ""));
+      const merged = expandChapterDetail(
+        oldDetail,
+        next,
+        drive.config.language,
+        fixInstructionText(requirements != null ? requirements : "")
+      );
       if (!merged) {
         noEdits = true;
         return null;

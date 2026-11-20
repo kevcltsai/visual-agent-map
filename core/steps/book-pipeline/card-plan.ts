@@ -1,7 +1,7 @@
 import type { BookRole, BookSettings } from "../../book-pipeline/model";
 import type { ChecklistItem, ChecklistType } from "../../book-pipeline/plan-text";
 import { cleanSlotText, imageSlotCap, MAX_IMAGE_SLOTS, type ImageSlot } from "../../book-pipeline/image-slots";
-import { imageRangeOf } from "../../book-pipeline/settings";
+import { imageCountRange } from "../../book-pipeline/settings";
 import { singleLine } from "../../book-pipeline/text";
 import { estimateTokens } from "../../../ai/context-builder";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
@@ -141,9 +141,10 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
   const droppedPicture = objective.length - kept.length;
   if (!kept.length) fail("checklist has no usable item");
   const checklist = kept.map((item, index): ChecklistItem => ({ id: `C${index + 1}`, ...item }));
-  const slots = arrayOf(item.images, "images");
-  const limit = imageSlotCap(imageRangeOf(request.settings));
-  if (slots.length > limit) fail(`images must have 0 to ${limit} items`);
+  const all = arrayOf(item.images, "images");
+  if (all.length > MAX_IMAGE_SLOTS) fail(`images must have 0 to ${MAX_IMAGE_SLOTS} items`);
+  // Over the owner's maximum (or the default eight without a setting): the first ones are kept; under the minimum: kept as planned, never padded.
+  const slots = all.slice(0, imageSlotCap(imageCountRange(request.settings)));
   const images = slots.map((entry, at): ImageSlot => {
     const one = recordOf(entry, "image slot");
     exactKeys(one, ["kind", "explains", "anchor"]);
@@ -193,17 +194,22 @@ export const CHILD_CARDS_TOKENS = 6000;
 /** The chapter list is the authority: titles are put in whole (only whitespace is collapsed). */
 const wholeLine = (value: string): string => singleLine(value, Number.MAX_SAFE_INTEGER);
 
-/** The images rule of the brief: nothing added by default, or (when the owner's settings give a picture count) the owner's range for every role. */
+const SLOT_FIELDS =
+  "Each slot has: kind (the kind of picture, for example painting, photograph, map, diagram, portrait; a few words), explains (what the picture shows or explains, one sentence that names something the chapter's text talks about) and anchor (where it sits: the paragraph or point in the chapter it goes beside). Do not number the slots. Do not write image links, addresses or search words; a picture is found later.";
+/** The planner decides the count by role (no pictures-per-chapter setting): the wording is unchanged. */
+const ROLE_IMAGES_RULE = `- images: the picture plan for this chapter, 0 to 8 slots. You decide how many and where, from what this chapter says and its role: an introduction or a closing needs few (0 to 2), a body chapter as many as its content gives a picture to, a gallery chapter follows its materials. Give 0 when no picture would help; never add one only to fill space. ${SLOT_FIELDS}`;
+/** The owner set the count in the whole-book settings: it holds for every role and beats the defaults. */
 const imagesRule = (request: CardPlanRequest): string => {
-  const range = imageRangeOf(request.settings);
-  if (!range) return "";
+  const range = imageCountRange(request.settings);
+  if (!range) return ROLE_IMAGES_RULE;
   const max = imageSlotCap(range);
   const min = Math.min(range.min, max);
-  return `\n\nOwner's picture count (the whole-book settings ask for ${range.min} to ${range.max} pictures per chapter; this beats the images defaults above): plan between ${min} and ${max} image slots for every chapter role, an introduction and a closing included, each beside something the chapter's text talks about. Plan fewer than ${min} only when the chapter truly has nothing to picture; where any picture can help, plan at least ${min}.`;
+  return `- images: the picture plan for this chapter. The owner set the number of pictures per chapter in the whole-book settings: give ${min === max ? `exactly ${max} slots` : `between ${min} and ${max} slots`} for this chapter, whatever its role (an introduction, a closing or a gallery chapter too). Plan fewer than ${min} only when the chapter truly has nothing to picture. Spread them over the points the chapter makes, one picture per point, each beside something the chapter's text talks about. ${SLOT_FIELDS}`;
 };
 
 const baseRender = (request: CardPlanRequest): string =>
   renderTemplate(template, {
+    imagesRule: imagesRule(request),
     languageInstruction: languageInstruction(request.language, request.card.title),
     thread: JSON.stringify(cap(request.thread, 1200)),
     settings: JSON.stringify(request.settings),
@@ -218,7 +224,7 @@ const baseRender = (request: CardPlanRequest): string =>
     next: neighbour(request.next),
     materials: JSON.stringify(request.materials.map(m => ({ name: cap(m.name, 120), use: cap(m.use, 240) }))),
     chapters: JSON.stringify(request.chapters.map(c => ({ position: c.position, title: wholeLine(c.title) })))
-  }) + imagesRule(request);
+  });
 const childSection = (items: readonly CardChild[], shown: number): string =>
   items.length
     ? `\n\n${renderTemplate(childrenTemplate, {

@@ -54987,7 +54987,7 @@ function bookBarState(data, progress, stageOf, mapIds) {
   } : void 0;
   const gateChange = !mapChange && !active && status !== "stopped" && mapIds && (phase === "gate1" || phase === "gate2") ? countChange(mapDifference(data, mapIds)) : void 0;
   const mode = mapChange ? "changed" : status === "stopped" && pauseReason === "budget" ? "budget" : status === "stopped" || interrupted ? "stopped" : phase;
-  const current = mode === "planning" || mode === "writing" ? currentOf2(data, progress) : void 0;
+  const current = mode === "planning" || mode === "writing" ? currentOf2(data, progress, stageOf) : void 0;
   const rerunning = !!(progress == null ? void 0 : progress.active) && !!progress.rerun && order.includes(progress.rerun.nodeId);
   return {
     mode,
@@ -55010,17 +55010,27 @@ var countChange = (change2) => ({
   added: change2.added.length,
   missing: change2.missing.length
 });
-function currentOf2(data, progress) {
+function currentOf2(data, progress, stageOf) {
   var _a2, _b2;
-  if (!(progress == null ? void 0 : progress.active) || !((_a2 = progress.current) == null ? void 0 : _a2.length)) return void 0;
-  const position = (nodeId) => nodeId === "global" ? -1 : effectiveOrder(data).indexOf(nodeId);
-  const entries = progress.current.filter((item) => item.nodeId === "global" || position(item.nodeId) >= 0);
-  if (!entries.length) return void 0;
-  entries.sort((a, b) => position(a.nodeId) - position(b.nodeId));
+  if (!(progress == null ? void 0 : progress.active)) return void 0;
+  const order = effectiveOrder(data);
+  const position = (nodeId) => nodeId === "global" ? -1 : order.indexOf(nodeId);
+  const settled2 = (nodeId) => {
+    const stage = stageOf(nodeId);
+    return stage === "checked" || stage === "needs-review";
+  };
   const fixing = (nodeId) => {
     var _a3, _b3;
-    return nodeId !== "global" && ((_b3 = (_a3 = data.autoFixes) == null ? void 0 : _a3[nodeId]) != null ? _b3 : 0) > 0;
+    return nodeId !== "global" && ((_b3 = (_a3 = data.autoFixes) == null ? void 0 : _a3[nodeId]) != null ? _b3 : 0) > 0 && !settled2(nodeId);
   };
+  const entries = ((_a2 = progress.current) != null ? _a2 : []).filter(
+    (item) => item.nodeId === "global" || position(item.nodeId) >= 0 && !settled2(item.nodeId)
+  );
+  if (!entries.length) {
+    const waiting = order.find(fixing);
+    return waiting ? { step: "write", chapter: position(waiting) + 1, fix: true } : void 0;
+  }
+  entries.sort((a, b) => position(a.nodeId) - position(b.nodeId));
   const first = (_b2 = entries.find((item) => !fixing(item.nodeId))) != null ? _b2 : entries[0];
   if (first.nodeId === "global") return { step: "global" };
   return {
@@ -55849,6 +55859,9 @@ function editorViewsOf(path, views) {
     });
   }
   return out;
+}
+function shownText(view) {
+  return view.getMode() === "preview" ? view.getViewData() : view.editor.getValue();
 }
 function minimalChange(before, after) {
   if (before === after) return null;
@@ -93402,6 +93415,7 @@ var BookNotesApply = class {
     }
     this.ports.releaseHighlight();
     this.lastUndo = null;
+    if (!this.disposed) this.ports.changed();
     if (outcome.restored) {
       await this.ports.flush(last.path).catch(() => void 0);
       if (!this.disposed) this.ports.undone(last.path);
@@ -93504,30 +93518,27 @@ var AppliedHighlights = class {
     this.release();
   }
 };
-function lineSpans(text10, ranges) {
-  const lineAt = (offset) => {
-    let n = 0;
-    for (let i = text10.indexOf("\n"); i !== -1 && i < offset; i = text10.indexOf("\n", i + 1)) n++;
-    return n;
-  };
-  return ranges.filter((r) => r.from < r.to).map((r) => ({ start: lineAt(r.from), end: lineAt(Math.max(r.from, r.to - 1)) }));
-}
 var ReadingMarks = class {
   constructor() {
     __publicField(this, "marks", null);
   }
-  set(path, spans) {
-    this.marks = spans.length ? { path, spans } : null;
+  set(path, texts) {
+    const kept = texts.map(normalSection).filter((text10) => text10);
+    this.marks = kept.length ? { path, texts: new Set(kept) } : null;
   }
   clear() {
     this.marks = null;
   }
-  /** True when the section `[lineStart, lineEnd]` of `path` overlaps a marked span. */
-  wears(path, lineStart, lineEnd2) {
+  /** True when the section of `path` whose source is `section` is one of the marked paragraphs. */
+  wears(path, section3) {
     const marks = this.marks;
-    return !!marks && marks.path === path && marks.spans.some((s) => s.start <= lineEnd2 && s.end >= lineStart);
+    return !!marks && marks.path === path && marks.texts.has(normalSection(section3));
   }
 };
+function sectionSource(text10, lineStart, lineEnd2) {
+  return text10.split("\n").slice(lineStart, lineEnd2 + 1).join("\n");
+}
+var normalSection = (text10) => text10.replace(/\r/g, "").trim();
 
 // core/steps/book-pipeline/run.ts
 var planFailMessage = (error) => isBookStepError(error) ? "invalid_reply" : "failed";
@@ -101028,7 +101039,7 @@ var diagramType = (source) => {
 function overlaps(a, spans) {
   return spans.some((b) => a.start < b.end && b.start < a.end);
 }
-function lineSpans2(source) {
+function lineSpans(source) {
   const lines = [];
   let offset = 0;
   for (const text10 of source.split("\n")) {
@@ -101051,7 +101062,7 @@ function mermaidLabelSpans(source) {
   const add = (span) => {
     if (span && span.end > span.start && !overlaps(span, spans)) spans.push(span);
   };
-  const lines = lineSpans2(source);
+  const lines = lineSpans(source);
   for (const { text: text10, offset } of lines) {
     if (FLOW_SKIP_LINE.test(text10)) continue;
     for (const match of text10.matchAll(/"([^"\n]+)"/g))
@@ -106654,6 +106665,9 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
     }));
     /** The reading view's mark: the rendered sections of the changed lines wear the same light-green class (post-processor + a re-render). */
     __publicField(this, "readingMarks", new ReadingMarks());
+    /** The paragraphs of the last apply (their text), for the reading view's mark. */
+    __publicField(this, "bookAppliedTexts", null);
+    __publicField(this, "bookPaintTimer", null);
     __publicField(this, "bookPipelineRuns", new BookPipelineRuns({
       mutate: (work) => this.mutate(work),
       readMap: (path) => this.repo.readMap(path),
@@ -106833,7 +106847,8 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
     var _a2, _b2;
     const path = (_a2 = view.file) == null ? void 0 : _a2.path;
     if (!path) return;
-    if (ranges == null ? void 0 : ranges.length) this.readingMarks.set(path, lineSpans(view.editor.getValue(), ranges));
+    const applied = this.bookAppliedTexts;
+    if (ranges == null ? void 0 : ranges.length) this.readingMarks.set(path, (applied == null ? void 0 : applied.path) === path ? applied.texts : []);
     else this.readingMarks.clear();
     const container = (_b2 = view.previewMode) == null ? void 0 : _b2.containerEl;
     if (ranges == null ? void 0 : ranges.length) {
@@ -106856,6 +106871,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
     } catch (e) {
       found = [];
     }
+    this.bookAppliedTexts = { path, texts: afters };
     this.bookHighlights.show(path, found);
   }
   bookHighlightTargets() {
@@ -106914,7 +106930,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
           var _a2;
           return (_a2 = view.file) == null ? void 0 : _a2.path;
         },
-        text: () => view.editor.getValue(),
+        text: () => shownText(view),
         addAction: (label, run) => {
           const el = view.addAction("pencil", label, run);
           el.addClass("vam-book-apply-notes");
@@ -106962,6 +106978,13 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
     for (const [chapter, mapPath] of this.bookChapterMaps)
       if (!live2.has(mapPath) || candidates.has(chapter) && !found.has(chapter)) this.bookChapterMaps.delete(chapter);
     return found;
+  }
+  paintBookNotesSoon() {
+    if (this.bookPaintTimer !== null) return;
+    this.bookPaintTimer = window.setTimeout(() => {
+      this.bookPaintTimer = null;
+      this.bookNotes.paint();
+    }, 50);
   }
   refreshBookNotesSoon() {
     if (this.bookNotesTimer !== null) window.clearTimeout(this.bookNotesTimer);
@@ -107022,7 +107045,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
           const view = this.app.workspace.getActiveViewOfType(import_obsidian52.MarkdownView);
           const path = (_a2 = view == null ? void 0 : view.file) == null ? void 0 : _a2.path;
           const running2 = !!path && this.bookNotesApply.isRunning(path);
-          if (!view || !notes.isChapter(path) || !running2 && !countNotes(view.editor.getValue())) return false;
+          if (!view || !notes.isChapter(path) || !running2 && !countNotes(shownText(view))) return false;
           if (!checking) notes.apply(path);
           return true;
         }
@@ -107044,8 +107067,9 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
     this.registerEditorExtension(appliedExtension);
     this.registerMarkdownPostProcessor((el, ctx) => {
       const info = ctx.getSectionInfo(el);
-      if (info && this.readingMarks.wears(ctx.sourcePath, info.lineStart, info.lineEnd))
+      if (info && this.readingMarks.wears(ctx.sourcePath, sectionSource(info.text, info.lineStart, info.lineEnd)))
         el.addClass("vam-book-applied");
+      if (this.bookChapterMaps.has(ctx.sourcePath)) this.paintBookNotesSoon();
     });
     this.registerEvent(this.app.workspace.on("file-open", () => this.bookHighlights.sync()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.bookHighlights.sync()));
@@ -108222,6 +108246,8 @@ ${t("ui.organize_link_wait_hint")}`;
     this.bookHandEdits.dispose();
     if (this.bookNotesTimer !== null) window.clearTimeout(this.bookNotesTimer);
     this.bookNotesTimer = null;
+    if (this.bookPaintTimer !== null) window.clearTimeout(this.bookPaintTimer);
+    this.bookPaintTimer = null;
     this.bookNotesApply.dispose();
     this.bookHighlights.dispose();
     this.bookNotes.dispose();

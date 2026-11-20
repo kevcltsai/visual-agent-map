@@ -412,6 +412,14 @@ export function bookProgressText(state: BookBarState): string {
   const { total } = state;
   if (state.mode === "planning" && state.trialSize && state.current?.step !== "global") {
     // The trial chapters go all the way to the proofread before gate 1; the first chapters of the reading order are the trial's.
+    // Only fix rounds in work: a named fix line with the trial's done count, never "chapter 1/3" again.
+    if (state.current?.fix)
+      return t(
+        "ui.book_progress_line_fix_0_1_2",
+        state.current.chapter ?? 1,
+        Math.min(settledCount(state), state.trialSize),
+        state.trialSize
+      );
     const settled = Math.min(state.counts.checked + state.counts["needs-review"], state.trialSize - 1);
     return t(
       "ui.book_progress_line_trial_0_1",
@@ -422,9 +430,9 @@ export function bookProgressText(state: BookBarState): string {
   const at = Math.min(state.current?.chapter ?? settledCount(state) + 1, Math.max(total, 1));
   // Writing the whole book is one plain line ("Writing chapter 3/31"): the bar below shows how many are done.
   if (state.mode === "writing")
-    // Only fix rounds in work: the done count of the whole book, never "chapter 4/15" after chapter 15 (reused words, no new string).
+    // Only fix rounds in work: a named fix line with the whole-book done count, never a restarted counter.
     return state.current?.fix
-      ? t("ui.book_progress_line_done_0_1", settledCount(state), total)
+      ? t("ui.book_progress_line_fix_0_1_2", state.current.chapter ?? 1, settledCount(state), total)
       : t("ui.book_progress_line_write_0_1", at, total);
   const sentence =
     state.mode === "planning"

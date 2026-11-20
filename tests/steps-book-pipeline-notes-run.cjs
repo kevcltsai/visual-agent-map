@@ -10,6 +10,7 @@ const b = loadSource(`
 export { BookNotesApply, NOTES_TIMEOUT_MS, UNDO_NOTICE_MS } from "./experiences/visual-map/book-pipeline-notes-apply";
 export { stampRaw, bodyStateRaw, readBodyRecord, integrityFpRaw } from "./core/book-pipeline/body-integrity";
 export { AppliedHighlights, HIGHLIGHT_MS, appliedField, setApplied } from "./experiences/visual-map/book-applied-highlight";
+export { locateApplied } from "./core/book-pipeline/notes-apply";
 export { lineSpans, ReadingMarks } from "./experiences/visual-map/book-applied-highlight";
 export { showAppliedNotice } from "./experiences/visual-map/book-applied-notice";
 export { EditorState } from "@codemirror/state";
@@ -325,4 +326,28 @@ test('reading marks: line spans of changed ranges (CRLF-safe), sections overlap,
   assert.equal(m.wears('o.md', 3, 3), false);
   m.clear();
   assert.equal(m.wears('n.md', 3, 3), false);
+});
+
+test('applied marks follow the paragraph text, never the review callout, in reading and edit mode', () => {
+  const callout = '> [!vam-review] 這章要你看\n> 已修改，未重新校對';
+  const old = detail('> [!vam-review] 這章要你看\n\nPara A\n\nPara B new');
+  const stale = { from: old.indexOf('Para B new'), to: old.indexOf('Para B new') + 10 };
+  // the program added the 「已修改」 line after the offsets were taken: the stale range now hits the callout
+  const now = detail(callout + '\n\nPara A\n\nPara B new');
+  const found = b.locateApplied(now, ['Para B new']);
+  assert.equal(JSON.stringify(found), JSON.stringify([{ from: now.indexOf('Para B new'), to: now.indexOf('Para B new') + 10 }]));
+  assert.notEqual(found[0].from, stale.from);
+  // reading mode: only the paragraph's line wears the mark, the callout lines do not
+  const m = new b.ReadingMarks();
+  m.set('n.md', b.lineSpans(now, found));
+  assert.equal(m.wears('n.md', 0, 3), false);
+  assert.equal(m.wears('n.md', 6, 6), true);
+  // edit mode: the CM6 mark covers exactly the paragraph
+  const state = b.EditorState.create({ doc: now, extensions: [b.appliedField] }).update({ effects: b.setApplied.of(found) }).state;
+  const marked = [];
+  state.field(b.appliedField).between(0, now.length, (f, t) => { marked.push([f, t]); });
+  assert.equal(JSON.stringify(marked), JSON.stringify([[found[0].from, found[0].to]]));
+  // a callout-only text, a missing or duplicated paragraph: no mark
+  assert.equal(b.locateApplied(detail(callout), ['已修改，未重新校對']).length, 0);
+  assert.equal(b.locateApplied(now.replace('Para B new', 'Para A'), ['Para A']).length, 0);
 });

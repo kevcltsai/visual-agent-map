@@ -214,6 +214,91 @@ test('fishbone: a picked head and topic move the spine with them', () => {
   assert.equal(spine.attrs.d, geometry.fishboneSpinePathData(box(0, 0), [box(400, 50), box(400, 250), box(400, 400)]));
 });
 
+// UI check of 55ab3563: some group releases never reached the card, the drag stayed on and the cards stayed at the drag
+// position until Esc. The document and the window end it too, once.
+const withDocument = h => {
+  const listen = () => { const on = new Map(); return { on, addEventListener(name, fn) { on.set(name, fn); }, removeEventListener(name, fn) { if (on.get(name) === fn) on.delete(name); } }; };
+  const win = listen(), doc = { ...listen(), defaultView: win };
+  h.view.contentEl = { ownerDocument: doc };
+  return { doc, win, docFire: (name, x, y, pointerId = 1) => doc.on.get(name)?.({ type: name, clientX: x, clientY: y, pointerId }) };
+};
+
+test('a group release that reaches only the document still ends the drag and saves it (empty canvas)', () => {
+  const h = harness(); const d = withDocument(h);
+  h.down('a'); h.fire('a', 'pointermove', 40, 10);
+  d.docFire('pointerup', 9, 9, 2);
+  assert.equal(h.view.dragging, true, 'another pointer does not end it');
+  d.docFire('pointerup', 40, 10);
+  assert.equal(h.view.dragging, false); assert.equal(h.changes.length, 1);
+  assert.deepEqual([h.saved().a, h.saved().b], [[440, 10], [440, 210]]);
+  assert.deepEqual([...d.doc.on.keys(), ...d.win.on.keys()], [], 'no listener is left on the document or window');
+  assert.equal(h.cards.a.handlers.size, 1, 'only pointerdown stays on the card');
+  h.fire('a', 'pointerup', 40, 10);
+  assert.equal(h.changes.length, 1, 'a late card release saves nothing more');
+});
+
+test('a lost capture at the document or a window blur puts the group back and writes nothing', () => {
+  for (const ending of ['lostpointercapture', 'pointercancel', 'blur']) {
+    const h = harness(); const d = withDocument(h);
+    h.down('a'); h.fire('a', 'pointermove', 60, 60); h.flush();
+    assert.equal(h.cards.b.style.left, '460px');
+    if (ending === 'blur') d.win.on.get('blur')(); else d.docFire(ending, 60, 60);
+    assert.equal(h.view.dragging, false, ending); assert.equal(h.changes.length, 0, ending);
+    assert.equal(h.cards.a.style.left, '400px', ending); assert.equal(h.cards.b.style.top, '200px', ending);
+    assert.deepEqual([...d.doc.on.keys(), ...d.win.on.keys()], [], ending);
+  }
+});
+
+test('a group drag released on a card through the document still ends the drag', () => {
+  const h = harness(); const d = withDocument(h);
+  h.view.canSelectTopics = () => true;
+  h.view.reparentTargetAt = () => ({ node: h.doc.nodes.find(n => n.id === 'd'), invalid: false });
+  const moved = [];
+  h.view.moveBranches = async (roots, target) => { moved.push([roots.map(r => r.id).sort(), target.id]); };
+  h.cards.d.classList = { add() {}, remove() {} };
+  h.down('a'); h.fire('a', 'pointermove', 40, 400);
+  d.docFire('pointerup', 40, 400);
+  assert.equal(h.view.dragging, false); assert.deepEqual(moved, [[['a', 'b'], 'd']]);
+  assert.equal(h.cards.a.style.left, '400px', 'the cards go back; the move repaints them under the new parent');
+});
+
+// UI check of 55ab3563: a group drag grabbed at a card's checkbox un-ticked that card on release (the click after the drag).
+const renderedCheckbox = () => {
+  const { VisualAgentMapView: View } = support.load('main.ts', { obsidian: support.obsidian }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
+  const element = tag => ({ tag, children: [], dataset: {}, style: {}, listeners: new Map(), classList: { add() {}, remove() {} },
+    createDiv(options) { const child = element('div'); child.cls = options?.cls ?? options; this.children.push(child); return child; },
+    createEl(name, options) { const child = element(name); child.text = options?.text; child.type = options?.type; this.children.push(child); return child; },
+    createSpan(options) { const child = element('span'); child.cls = options?.cls; this.children.push(child); return child; },
+    setAttr(name, value) { this[name] = value; }, addClass(name) { this.cls = name; }, toggleClass() {}, setPointerCapture() {}, closest: () => null,
+    addEventListener(name, fn) { this.listeners.set(name, fn); }, removeEventListener(name) { this.listeners.delete(name); }
+  });
+  const nodes = [support.node('a'), Object.assign(support.node('b'), { x: 400 })];
+  const view = new View({ app: {} }, support.attachTopicRuns({ running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(), expansionBatches: new Map(), detailsShown: () => false, setOutlineActive() {} }));
+  view.stageEl = element('stage'); view.map = support.map(nodes);
+  view.notes = new Map(nodes.map(n => [n.id, { title: n.id, summary: '', status: 'completed' }]));
+  view.render = () => {}; view.enqueue = work => work(); view.mapChange = async () => {};
+  view.edgeEls = new Map(); view.relationEls = new Map(); view.relationHitEls = new Map(); view.relationGapEls = new Map();
+  setSelection(view, true, ['a', 'b']);
+  for (const n of nodes) view.renderNode(n);
+  const card = view.cardEls.get('a');
+  const box = view.cardChecks.get('a');
+  const click = () => { const e = { prevented: false, preventDefault() { this.prevented = true; }, stopPropagation() {} }; box.checked = !box.checked; box.listeners.get('click')(e); if (e.prevented) box.checked = !box.checked; };
+  return { view, card, box, click };
+};
+
+test('a group drag grabbed at the checkbox keeps the card ticked; a plain checkbox click still unticks it', () => {
+  const h = renderedCheckbox();
+  assert.equal(h.box.checked, true);
+  h.card.listeners.get('pointerdown')({ target: h.box, button: 0, pointerId: 1, clientX: 0, clientY: 0 });
+  h.card.listeners.get('pointermove')({ type: 'pointermove', clientX: 60, clientY: 40 });
+  h.card.listeners.get('pointerup')({ type: 'pointerup', clientX: 60, clientY: 40 });
+  h.click();
+  assert.deepEqual([...h.view.selection.state.multiSelected].sort(), ['a', 'b']); assert.equal(h.box.checked, true);
+  h.view.suppressClickUntil = 0;
+  h.click();
+  assert.deepEqual([...h.view.selection.state.multiSelected], ['b'], 'a plain click on the checkbox unticks');
+});
+
 // The undo history keeps every saved change for the life of the map. A change built inside the drag shared its scope with the
 // card, so each drop kept the whole replaced card tree (about 2,300 nodes on a 72-card map) in memory until the map was closed.
 // Everything the view or the loaded module could hold on to is defined here at the top level, so only the saved change can

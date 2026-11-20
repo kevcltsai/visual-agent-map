@@ -151,6 +151,7 @@ test('group drag: dropping the picked branches on a card outside them moves them
   const after = h.saved();
   assert.equal(after.a.parentId, 'd'); assert.equal(after.b.parentId, 'd'); assert.equal(after.c.parentId, 'a', 'c travels inside a');
   assert.equal(h.view.selection.state.multiSelected.size, 0, 'moving a group clears the selection, like Move to...');
+  assert.equal(h.view.dragging, false, 'a drop on a card ends the drag');
 });
 
 test('group drag: a picked card or a descendant of one is refused with a Notice, nothing is written', () => {
@@ -170,6 +171,7 @@ test('group drag: empty space still moves the whole group, and a timeline group 
   h.drag('a', 1500, 900); h.drop('a', 1500, 900);
   assert.equal(h.changes.length, 1); const after = h.saved();
   assert.equal(after.a.parentId, 'root'); assert.equal(after.a.x, 400 + 1500 - 410);
+  assert.equal(h.view.dragging, false, 'a drop on empty canvas ends the drag');
   const t = harness();
   t.doc.layout = { direction: 'timeline' };
   setSelection(t.view, true, ['a']);

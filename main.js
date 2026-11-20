@@ -3309,6 +3309,7 @@ var en = {
   "ui.book_progress_line_write_0_1": "Writing chapter {0}/{1}",
   "ui.book_progress_line_sep": ", ",
   "ui.book_progress_line_done_0_1": "{0}/{1} chapters done",
+  "ui.book_progress_line_fix_0_1_2": "Fixing chapter {0} \xB7 {1}/{2} chapters done",
   "ui.book_panel_rerun_card": "Rerun this card",
   "ui.book_panel_rerun_card_0": "Rerun this book card: {0} (plan \u2192 write \u2192 check)",
   "ui.book_seam_label": "Check seam",
@@ -6534,6 +6535,7 @@ var zhCN = {
   "ui.book_progress_line_write_0_1": "\u6B63\u5728\u5199\u7B2C {0}\uFF0F{1} \u7AE0",
   "ui.book_progress_line_sep": "\uFF0C",
   "ui.book_progress_line_done_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
+  "ui.book_progress_line_fix_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u7B2C {0} \u7AE0\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u7AE0",
   "ui.book_panel_rerun_card": "\u91CD\u8DD1\u8FD9\u5F20",
   "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u56FE\u6587\u4E66\u8FD9\u4E00\u5F20\uFF1A{0}\uFF08\u4F01\u5212 \u2192 \u5199 \u2192 \u6821\uFF09",
   "ui.book_seam_label": "\u63A5\u7F1D\u9700\u770B",
@@ -9759,6 +9761,7 @@ var zhTW = {
   "ui.book_progress_line_write_0_1": "\u6B63\u5728\u5BEB\u7B2C {0}\uFF0F{1} \u7AE0",
   "ui.book_progress_line_sep": "\uFF0C",
   "ui.book_progress_line_done_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
+  "ui.book_progress_line_fix_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u7B2C {0} \u7AE0\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u7AE0",
   "ui.book_panel_rerun_card": "\u91CD\u8DD1\u9019\u5F35",
   "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u5716\u6587\u66F8\u9019\u4E00\u5F35\uFF1A{0}\uFF08\u4F01\u5283 \u2192 \u5BEB \u2192 \u6821\uFF09",
   "ui.book_seam_label": "\u63A5\u7E2B\u9700\u770B",
@@ -54942,20 +54945,27 @@ function renderAsk(bar, cls, question, goText, ask) {
 }
 var settledCount = (state) => state.counts.checked + state.counts["needs-review"];
 function bookProgressText(state) {
-  var _a2, _b2, _c, _d, _e, _f, _g;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
   const { total: total2 } = state;
   if (state.mode === "planning" && state.trialSize && ((_a2 = state.current) == null ? void 0 : _a2.step) !== "global") {
+    if ((_b2 = state.current) == null ? void 0 : _b2.fix)
+      return t(
+        "ui.book_progress_line_fix_0_1_2",
+        (_c = state.current.chapter) != null ? _c : 1,
+        Math.min(settledCount(state), state.trialSize),
+        state.trialSize
+      );
     const settled2 = Math.min(state.counts.checked + state.counts["needs-review"], state.trialSize - 1);
     return t(
       "ui.book_progress_line_trial_0_1",
-      Math.min((_c = (_b2 = state.current) == null ? void 0 : _b2.chapter) != null ? _c : settled2 + 1, state.trialSize),
+      Math.min((_e = (_d = state.current) == null ? void 0 : _d.chapter) != null ? _e : settled2 + 1, state.trialSize),
       state.trialSize
     );
   }
-  const at = Math.min((_e = (_d = state.current) == null ? void 0 : _d.chapter) != null ? _e : settledCount(state) + 1, Math.max(total2, 1));
+  const at = Math.min((_g = (_f = state.current) == null ? void 0 : _f.chapter) != null ? _g : settledCount(state) + 1, Math.max(total2, 1));
   if (state.mode === "writing")
-    return ((_f = state.current) == null ? void 0 : _f.fix) ? t("ui.book_progress_line_done_0_1", settledCount(state), total2) : t("ui.book_progress_line_write_0_1", at, total2);
-  const sentence = state.mode === "planning" ? !state.globalDone || ((_g = state.current) == null ? void 0 : _g.step) === "global" ? t("ui.book_progress_line_global") : t("ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
+    return ((_h = state.current) == null ? void 0 : _h.fix) ? t("ui.book_progress_line_fix_0_1_2", (_i = state.current.chapter) != null ? _i : 1, settledCount(state), total2) : t("ui.book_progress_line_write_0_1", at, total2);
+  const sentence = state.mode === "planning" ? !state.globalDone || ((_j = state.current) == null ? void 0 : _j.step) === "global" ? t("ui.book_progress_line_global") : t("ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
   return `${sentence}${t("ui.book_progress_line_sep")}${t("ui.book_progress_line_done_0_1", settledCount(state), total2)}`;
 }
 function renderProgressLine(bar, state, text10) {

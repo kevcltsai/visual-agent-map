@@ -3319,6 +3319,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_progress_line_write_0_1": "正在寫第 {0}／{1} 章",
   "ui.book_progress_line_sep": "，",
   "ui.book_progress_line_done_0_1": "已完成 {0}／{1} 章",
+  "ui.book_progress_line_fix_0_1_2": "正在修正第 {0} 章・已完成 {1}／{2} 章",
   "ui.book_panel_rerun_card": "重跑這張",
   "ui.book_panel_rerun_card_0": "重跑圖文書這一張：{0}（企劃 → 寫 → 校）",
   "ui.book_seam_label": "接縫需看",

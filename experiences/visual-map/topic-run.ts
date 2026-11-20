@@ -241,6 +241,8 @@ export interface ResearchStart extends WritebackHooks {
     finalize: (content: string) => string | null;
     onBudgetExhausted: () => void;
     onDiscarded?: () => void;
+    /** The write leaves the note's Summary as it is (a chapter expansion: the answer only describes what it added). */
+    keepSummary?: boolean;
   };
 }
 
@@ -1535,7 +1537,7 @@ export class TopicRuns {
           }
           // Model text never makes a hidden callout (the stylesheet hides that type vault-wide); the pipeline writes its own after this.
           const patch: NotePatch = {
-            summary: neutralizeText(result.summary),
+            ...(options.pipeline?.keepSummary ? {} : { summary: neutralizeText(result.summary) }),
             detail: neutralizeText(composed.detail),
             visualReferences: neutralizeText(
               visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language))

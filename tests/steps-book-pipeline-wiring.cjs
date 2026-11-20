@@ -134,6 +134,14 @@ test('runBookAuthor: calls researchChild as a rewrite without charts, with admis
   assert.equal(book.pipeline.authorize, input.authorize); assert.equal(book.pipeline.finalize, input.finalize);
 });
 
+test('runBookAuthor: keepSummary and whole requirements (the expansion) reach researchChild; a normal write has neither', async () => {
+  const h = authorView(async (child, signal, accepted, choices, charts, onResult) => onResult({}));
+  await proto.runBookAuthor.call(h.view, h.input({ keepSummary: true, requirements: 'EXPAND' }));
+  await proto.runBookAuthor.call(h.view, h.input());
+  assert.equal(h.calls[0][8].pipeline.keepSummary, true); assert.equal(h.calls[0][3].requirements, 'EXPAND');
+  assert.equal('keepSummary' in h.calls[1][8].pipeline, false);
+});
+
 test('runBookAuthor: the card\'s image slots reach the author requirements; no slots (or an input without the field) gives the rules and no plan block', async () => {
   const h = authorView(async (child, signal, accepted, choices, charts, onResult) => onResult({}));
   await proto.runBookAuthor.call(h.view, h.input({ slots: [{ index: 1, kind: 'map', explains: 'the route', anchor: 'after paragraph 1' }] }));

@@ -123,6 +123,7 @@ import { escapeMarkdownText, unescapeMarkdownText } from "../../core/book-pipeli
 import type { ReasoningLevel } from "../../ai/types";
 import type { ContentLanguage } from "../../i18n";
 import type { MapDocument } from "../../map-model";
+import { isPlaceholder } from "../../core/note-placeholder";
 import type { NotePatch } from "../../repository";
 import { isBookStepError, type BookStepBase } from "../../core/steps/book-pipeline/base";
 import {
@@ -209,6 +210,9 @@ function unmetIds(items: readonly { id: string; type: string; status: string }[]
   const pick = unmet.filter(item => item.type === "fact");
   return (pick.length ? pick : unmet).map(item => code(item.id)).join(" ") || "no_body";
 }
+
+/** A card's summary as a neighbour description: the "no conclusion yet" placeholder says nothing, so it is blank. */
+const summaryText = (summary: string): string => (isPlaceholder(summary.trim()) ? "" : summary);
 
 export class BookPipelineRunError extends Error {
   constructor(readonly code: BookRunRefusal) {
@@ -451,6 +455,8 @@ interface Drive {
   rerun?: { nodeId: string; startedAt: number };
   /** The plan a card's plan step wrote in this drive. */
   plans: Map<string, CardPlanResult>;
+  /** Chapters this drive's plan step left alone (hand-edited, unknown or kept): their previous/next lines are refreshed by the program. */
+  planSkipped: Set<string>;
   /** The model id each card's author step was dispatched with in this drive (the proof result section shows it). */
   authorModels: Map<string, string>;
   /** When each card's first step started in this drive, and the durations (ms) of the cards that finished their phase. */
@@ -1216,7 +1222,7 @@ export class BookPipelineRuns {
     if (at < 0 || !own) return;
     try {
       const card = await this.ports.readCard(own.path);
-      const covers = (parseCardPrompt(card.prompt).covers ?? card.summary ?? "").trim();
+      const covers = summaryText(parseCardPrompt(card.prompt).covers ?? card.summary ?? "").trim();
       if (!covers) return;
       const sides = [
         { id: order[at - 1], key: "next" as const },
@@ -1237,6 +1243,48 @@ export class BookPipelineRuns {
       }
     } catch {
       // a neighbour that cannot be read or written keeps its old line; the seam mark already tells the reader to look
+    }
+  }
+
+  /**
+   * A chapter the plan step left alone keeps its old Prompt, so its `前一張` / `後一張` lines would still describe the neighbours of an
+   * earlier order. After a plan step they are rewritten by the program from the current order (the Prompt is not under the chapter's
+   * integrity fingerprint, so the reader's text and its state are untouched). A line that already says it, or a chapter without one, is left.
+   */
+  private async refreshSkippedPlans(drive: Drive): Promise<void> {
+    const signal = drive.controller.signal;
+    if (!drive.planSkipped.size || this.dead(drive) || signal.aborted || drive.fatal !== undefined) return;
+    const order = effectiveOrder(drive.store.state);
+    try {
+      for (const nodeId of [...drive.planSkipped]) {
+        const at = order.indexOf(nodeId);
+        const own = drive.cards.get(nodeId);
+        if (at < 0 || !own) continue;
+        for (const { index, key } of [
+          { index: at - 1, key: "previous" as const },
+          { index: at + 1, key: "next" as const }
+        ]) {
+          const other = order[index] === undefined ? undefined : drive.cards.get(order[index]);
+          if (this.dead(drive) || signal.aborted) return;
+          const raw = await this.ports.readCard(own.path);
+          if (!other) continue;
+          const neighbour = await this.ports.readCard(other.path);
+          const covers = summaryText(parseCardPrompt(neighbour.prompt).covers ?? neighbour.summary ?? "").trim();
+          const prompt = rewriteNeighbourLine(raw.prompt, key, {
+            position: index + 1,
+            title: neighbour.title,
+            summary: covers
+          });
+          if (prompt === undefined) continue;
+          await this.ports.updateNoteGuarded(
+            own.path,
+            { prompt },
+            { expectedContent: raw.raw, authorize: () => !this.dead(drive) && !signal.aborted }
+          );
+        }
+      }
+    } catch {
+      // a chapter that cannot be read or written keeps its old lines; the reader sees its hand-edit box anyway
     }
   }
 
@@ -1503,6 +1551,7 @@ export class BookPipelineRuns {
       parents: new Map(),
       overwrite: new Map(),
       plans: new Map(),
+      planSkipped: new Set(),
       authorModels: new Map(),
       started: new Map(),
       durations: { plan: [], write: [] },
@@ -1858,6 +1907,7 @@ export class BookPipelineRuns {
           return "dropped";
         }
         await outcome.after?.();
+        if (action.type === "card_plan") await this.refreshSkippedPlans(drive);
         this.recordDuration(drive, kind, nodeId, Date.parse(this.ports.now()), drive.store.state.phase);
         await report("ok");
         return "ok";
@@ -2114,7 +2164,7 @@ export class BookPipelineRuns {
       cards: order.map(id => {
         const info = drive.cards.get(id) as CardInfo;
         const children = this.childCardsOf(drive, id).map(child => child.title);
-        return { id, title: info.title, summary: info.summary, ...(children.length ? { children } : {}) };
+        return { id, title: info.title, summary: summaryText(info.summary), ...(children.length ? { children } : {}) };
       })
     };
     const result: GlobalPlanResult = await untilAborted(
@@ -2161,7 +2211,7 @@ export class BookPipelineRuns {
   private childCardsOf(drive: Drive, nodeId: string): { title: string; summary: string }[] {
     return effectiveOrder(drive.store.state).flatMap(id => {
       const info = drive.parents.get(id) === nodeId ? drive.cards.get(id) : undefined;
-      return info ? [{ title: info.title, summary: info.summary }] : [];
+      return info ? [{ title: info.title, summary: summaryText(info.summary) }] : [];
     });
   }
 
@@ -2185,8 +2235,10 @@ export class BookPipelineRuns {
     // A chapter the program may not rewrite (hand-edited, unknown or kept, and no permission) gets no plan: the write step would refuse it anyway.
     if (!this.mayOverwriteCard(drive, nodeId, card.raw)) {
       this.log(drive, "plan_skipped", nodeId, "plan", "hand_edited");
+      drive.planSkipped.add(nodeId);
       return { kind: "ok", after: () => this.setStage(drive, nodeId, "planned", null) };
     }
+    drive.planSkipped.delete(nodeId);
     const root = await this.ports.readCard(rootInfo.path);
     const book = parseBookPlanBody(root.raw);
     const settings = effectiveSettings(root.settings, parseBookPlanDecisions(root.raw));
@@ -2194,7 +2246,7 @@ export class BookPipelineRuns {
     const index = order.indexOf(nodeId);
     const side = (at: number): { position: number; title: string; summary: string } | undefined => {
       const other = order[at] === undefined ? undefined : drive.cards.get(order[at]);
-      return other ? { position: at + 1, title: other.title, summary: other.summary } : undefined;
+      return other ? { position: at + 1, title: other.title, summary: summaryText(other.summary) } : undefined;
     };
     const previous = side(index - 1);
     const next = side(index + 1);

@@ -1,4 +1,5 @@
 import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
+import { isPlaceholder } from "./core/note-placeholder";
 import { resolveAimContentLanguage } from "./core/content-language";
 import { resolveMapTextLanguage, textLanguageOf } from "./experiences/visual-map/map-text-language";
 import {
@@ -646,8 +647,7 @@ type NoteSection =
 const noteContentLanguage = (fm: Record<string, unknown>): NoteLanguage | undefined =>
   isNoteLanguage(fm["content-language"]) ? fm["content-language"] : undefined;
 const placeholder = (language: NoteLanguage): string => translate(language, "detail.no_conclusion_yet");
-export const isPlaceholder = (value: string): boolean =>
-  value === translate("zh-TW", "detail.no_conclusion_yet") || value === translate("en", "detail.no_conclusion_yet");
+export { isPlaceholder };
 const previewHeading = (language: NoteLanguage): NoteSection => translate(language, "detail.preview") as NoteSection;
 
 /**

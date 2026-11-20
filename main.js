@@ -21429,12 +21429,12 @@ async function collectExportScene(source, isCurrent2) {
       item.title = wrapText(title, titleEl.offsetWidth);
     }
     const summaryEl = card.querySelector(".vam-card-summary");
-    const summaryText2 = (_e = (_d = (_c = summaryEl == null ? void 0 : summaryEl.querySelector(".vam-card-preview-text")) != null ? _c : summaryEl) == null ? void 0 : _d.textContent) == null ? void 0 : _e.trim();
-    if (summaryEl && summaryText2 && summaryEl.offsetWidth > 0) {
+    const summaryText3 = (_e = (_d = (_c = summaryEl == null ? void 0 : summaryEl.querySelector(".vam-card-preview-text")) != null ? _c : summaryEl) == null ? void 0 : _d.textContent) == null ? void 0 : _e.trim();
+    if (summaryEl && summaryText3 && summaryEl.offsetWidth > 0) {
       const summaryStyle = computed(summaryEl);
       const clamp2 = parseInt(summaryStyle.getPropertyValue("-webkit-line-clamp"), 10);
       const size = parseFloat(summaryStyle.fontSize);
-      const lines = wrapText(summaryText2, summaryEl.offsetWidth);
+      const lines = wrapText(summaryText3, summaryEl.offsetWidth);
       item.summary = {
         lines: Number.isFinite(clamp2) && clamp2 > 0 ? lines.slice(0, clamp2) : lines,
         x: box.x + summaryEl.offsetLeft,
@@ -27141,6 +27141,9 @@ function ringImagesInTheWay(nodes, items, heightOf, widthOf, touched, hidden) {
 // repository.ts
 var import_obsidian13 = require("obsidian");
 
+// core/note-placeholder.ts
+var isPlaceholder = (value) => value === translate("zh-TW", "detail.no_conclusion_yet") || value === translate("en", "detail.no_conclusion_yet");
+
 // topic-colors.ts
 var TOPIC_COLORS = ["red", "orange", "yellow", "green", "blue", "purple"];
 function readTopicColor(fm) {
@@ -29970,7 +29973,6 @@ function noteTitle(content, fm, fallback) {
 }
 var noteContentLanguage = (fm) => isNoteLanguage(fm["content-language"]) ? fm["content-language"] : void 0;
 var placeholder = (language2) => translate(language2, "detail.no_conclusion_yet");
-var isPlaceholder = (value) => value === translate("zh-TW", "detail.no_conclusion_yet") || value === translate("en", "detail.no_conclusion_yet");
 var previewHeading = (language2) => translate(language2, "detail.preview");
 var CANONICAL_HEADINGS = Object.freeze(
   Object.fromEntries(Object.keys(NOTE_HEADING_SETS[0]).map((name2) => [name2, name2]))
@@ -42958,7 +42960,7 @@ function composeImageSlots(images, language2) {
 }
 function composeCardPrompt(plan, language2) {
   const c = colon(language2);
-  const neighbour2 = (label, n) => n ? `${pick(label, language2)}${c}(${n.position}) ${safe(n.title, 120)} \u2014 ${safe(n.summary, 240)}` : `${pick(label, language2)}${c}${pick(L.none, language2)}`;
+  const neighbour2 = (label, n) => n ? `${pick(label, language2)}${c}(${n.position}) ${safe(n.title, 120)}${safe(n.summary, 240) ? ` \u2014 ${safe(n.summary, 240)}` : ""}` : `${pick(label, language2)}${c}${pick(L.none, language2)}`;
   const lines = [
     `${pick(L.role, language2)}${c}${pick(ROLE_WORDS[plan.role], language2)}`,
     `${pick(L.covers, language2)}${c}${safe(plan.covers)}`,
@@ -43031,7 +43033,8 @@ function rewriteNeighbourLine(prompt, key4, neighbour2) {
   });
   if (at < 0) return void 0;
   const head2 = (_b2 = (_a2 = /^([^:：]+[:：]\s*)/.exec(lines[at].replace(/\r$/, ""))) == null ? void 0 : _a2[1]) != null ? _b2 : "";
-  const line2 = `${head2}(${neighbour2.position}) ${safe(neighbour2.title, 120)} \u2014 ${safe(neighbour2.summary, 240)}`;
+  const summary = safe(neighbour2.summary, 240);
+  const line2 = `${head2}(${neighbour2.position}) ${safe(neighbour2.title, 120)}${summary ? ` \u2014 ${summary}` : ""}`;
   if (lines[at].replace(/\r$/, "") === line2) return void 0;
   lines[at] = lines[at].endsWith("\r") ? `${line2}\r` : line2;
   return lines.join("\n");
@@ -51302,6 +51305,7 @@ function unmetIds(items) {
   const pick8 = unmet.filter((item) => item.type === "fact");
   return (pick8.length ? pick8 : unmet).map((item) => code2(item.id)).join(" ") || "no_body";
 }
+var summaryText2 = (summary) => isPlaceholder(summary.trim()) ? "" : summary;
 var BookPipelineRunError = class extends Error {
   constructor(code3) {
     super(`book pipeline refused: ${code3}`);
@@ -51944,7 +51948,7 @@ var BookPipelineRuns = class {
     if (at < 0 || !own2) return;
     try {
       const card = await this.ports.readCard(own2.path);
-      const covers = ((_b2 = (_a2 = parseCardPrompt(card.prompt).covers) != null ? _a2 : card.summary) != null ? _b2 : "").trim();
+      const covers = summaryText2((_b2 = (_a2 = parseCardPrompt(card.prompt).covers) != null ? _a2 : card.summary) != null ? _b2 : "").trim();
       if (!covers) return;
       const sides = [
         { id: order[at - 1], key: "next" },
@@ -51962,6 +51966,47 @@ var BookPipelineRuns = class {
           { prompt },
           { expectedContent: raw.raw, authorize: () => !this.dead(drive) && !signal.aborted }
         );
+      }
+    } catch (e) {
+    }
+  }
+  /**
+   * A chapter the plan step left alone keeps its old Prompt, so its `前一張` / `後一張` lines would still describe the neighbours of an
+   * earlier order. After a plan step they are rewritten by the program from the current order (the Prompt is not under the chapter's
+   * integrity fingerprint, so the reader's text and its state are untouched). A line that already says it, or a chapter without one, is left.
+   */
+  async refreshSkippedPlans(drive) {
+    var _a2, _b2;
+    const signal = drive.controller.signal;
+    if (!drive.planSkipped.size || this.dead(drive) || signal.aborted || drive.fatal !== void 0) return;
+    const order = effectiveOrder(drive.store.state);
+    try {
+      for (const nodeId of [...drive.planSkipped]) {
+        const at = order.indexOf(nodeId);
+        const own2 = drive.cards.get(nodeId);
+        if (at < 0 || !own2) continue;
+        for (const { index, key: key4 } of [
+          { index: at - 1, key: "previous" },
+          { index: at + 1, key: "next" }
+        ]) {
+          const other = order[index] === void 0 ? void 0 : drive.cards.get(order[index]);
+          if (this.dead(drive) || signal.aborted) return;
+          const raw = await this.ports.readCard(own2.path);
+          if (!other) continue;
+          const neighbour2 = await this.ports.readCard(other.path);
+          const covers = summaryText2((_b2 = (_a2 = parseCardPrompt(neighbour2.prompt).covers) != null ? _a2 : neighbour2.summary) != null ? _b2 : "").trim();
+          const prompt = rewriteNeighbourLine(raw.prompt, key4, {
+            position: index + 1,
+            title: neighbour2.title,
+            summary: covers
+          });
+          if (prompt === void 0) continue;
+          await this.ports.updateNoteGuarded(
+            own2.path,
+            { prompt },
+            { expectedContent: raw.raw, authorize: () => !this.dead(drive) && !signal.aborted }
+          );
+        }
       }
     } catch (e) {
     }
@@ -52205,6 +52250,7 @@ var BookPipelineRuns = class {
       parents: /* @__PURE__ */ new Map(),
       overwrite: /* @__PURE__ */ new Map(),
       plans: /* @__PURE__ */ new Map(),
+      planSkipped: /* @__PURE__ */ new Set(),
       authorModels: /* @__PURE__ */ new Map(),
       started: /* @__PURE__ */ new Map(),
       durations: { plan: [], write: [] },
@@ -52513,6 +52559,7 @@ var BookPipelineRuns = class {
           return "dropped";
         }
         await ((_a2 = outcome.after) == null ? void 0 : _a2.call(outcome));
+        if (action.type === "card_plan") await this.refreshSkippedPlans(drive);
         this.recordDuration(drive, kind, nodeId, Date.parse(this.ports.now()), drive.store.state.phase);
         await report("ok");
         return "ok";
@@ -52745,7 +52792,7 @@ var BookPipelineRuns = class {
       cards: order.map((id) => {
         const info = drive.cards.get(id);
         const children = this.childCardsOf(drive, id).map((child) => child.title);
-        return { id, title: info.title, summary: info.summary, ...children.length ? { children } : {} };
+        return { id, title: info.title, summary: summaryText2(info.summary), ...children.length ? { children } : {} };
       })
     };
     const result = await untilAborted(
@@ -52790,7 +52837,7 @@ var BookPipelineRuns = class {
   childCardsOf(drive, nodeId) {
     return effectiveOrder(drive.store.state).flatMap((id) => {
       const info = drive.parents.get(id) === nodeId ? drive.cards.get(id) : void 0;
-      return info ? [{ title: info.title, summary: info.summary }] : [];
+      return info ? [{ title: info.title, summary: summaryText2(info.summary) }] : [];
     });
   }
   /**
@@ -52812,8 +52859,10 @@ var BookPipelineRuns = class {
     const card = await this.ports.readCard(info.path);
     if (!this.mayOverwriteCard(drive, nodeId, card.raw)) {
       this.log(drive, "plan_skipped", nodeId, "plan", "hand_edited");
+      drive.planSkipped.add(nodeId);
       return { kind: "ok", after: () => this.setStage(drive, nodeId, "planned", null) };
     }
+    drive.planSkipped.delete(nodeId);
     const root = await this.ports.readCard(rootInfo.path);
     const book = parseBookPlanBody(root.raw);
     const settings = effectiveSettings(root.settings, parseBookPlanDecisions(root.raw));
@@ -52821,7 +52870,7 @@ var BookPipelineRuns = class {
     const index = order.indexOf(nodeId);
     const side = (at) => {
       const other = order[at] === void 0 ? void 0 : drive.cards.get(order[at]);
-      return other ? { position: at + 1, title: other.title, summary: other.summary } : void 0;
+      return other ? { position: at + 1, title: other.title, summary: summaryText2(other.summary) } : void 0;
     };
     const previous = side(index - 1);
     const next = side(index + 1);
@@ -80182,16 +80231,16 @@ ${t("ui.book_role_running_suffix")}` : first);
       bars.createSpan({ cls: "vam-loading-bar" });
       bars.createSpan({ cls: "vam-loading-bar" });
     } else if (!note || !isPlaceholder(note.summary)) {
-      const summaryText2 = card.createEl("p", {
+      const summaryText3 = card.createEl("p", {
         cls: "vam-card-summary",
         text: (_D = note == null ? void 0 : note.summary) != null ? _D : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
         attr: { title: (_E = note == null ? void 0 : note.summary) != null ? _E : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
-      if (textEditable) summaryText2.addClass("is-inline-editable");
+      if (textEditable) summaryText3.addClass("is-inline-editable");
       if (note && bookCard.summaryPrefix && this.hasBookPipeline())
-        summaryText2.insertBefore(
-          summaryText2.createSpan({ cls: "vam-book-summary-prefix", text: bookCard.summaryPrefix }),
-          summaryText2.firstChild
+        summaryText3.insertBefore(
+          summaryText3.createSpan({ cls: "vam-book-summary-prefix", text: bookCard.summaryPrefix }),
+          summaryText3.firstChild
         );
     }
     if (note && bookCard.issueText && this.hasBookPipeline())

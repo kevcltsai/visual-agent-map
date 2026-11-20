@@ -2622,3 +2622,44 @@ test('T12 rewriteNeighbourLine: keeps the label and colon (English, CRLF), write
   assert.equal(rewriteNeighbourLine('Role: Body', 'next', n), undefined, 'no such line');
   assert.equal(rewriteNeighbourLine(out, 'next', n), undefined, 'already says it');
 });
+
+// ---- fix packet 5: skipped chapters' neighbour lines follow the order; placeholder summaries are not descriptions ----
+test('fix5 skipped chapter: a hand-edited chapter the plan step leaves alone gets its previous/next lines rewritten from the current covers (text and fingerprint untouched)', async () => {
+  const r = await rig();
+  await finish(r);
+  await handEdit(r, 1);
+  const stale = await promptLine(r, 1, '後一張');
+  const fp = integrityFpRaw(r.raw(1));
+  const base = r.script.card; r.script.card = (request, n) => ({ ...base(request, n), covers: `NEWCOVERS ${request.card.position}` });
+  await redo(r, [1, 2], null);
+  assert.equal(stageOf(r.raw(1)), 'needs-review', 'chapter 1 was skipped');
+  assert.notEqual(stale, '(3) SecretTitleB — NEWCOVERS 3');
+  assert.equal(await promptLine(r, 1, '後一張'), '(3) SecretTitleB — NEWCOVERS 3', 'next line follows the neighbour\'s current covers');
+  assert.ok((await promptLine(r, 1, '前一張')).startsWith('(1) SecretRootTitle'), 'previous line names the current previous chapter');
+  assert.equal(integrityFpRaw(r.raw(1)), fp, 'the integrity fingerprint is not touched');
+  assert.equal(bodyStateRaw(r.raw(1)), 'edited');
+  assert.ok((await r.note(1)).detail.includes(HAND));
+});
+
+test('fix5 placeholder: a neighbour whose summary is the "no conclusion yet" placeholder is sent (and written) with an empty description', async () => {
+  const r = await rig();
+  const PLACEHOLDER = '尚未形成結論';
+  await r.repo.updateNoteRawGuarded(r.nodes[2].path, c => c.split('summary of SecretTitleB').join(PLACEHOLDER), {});
+  const seen = [];
+  const base = r.script.card; r.script.card = (request, n) => { seen.push(request); return base(request, n); };
+  const baseGlobal = r.script.global; let globalRequest; r.script.global = (request, n) => { globalRequest = request; return baseGlobal(request, n); };
+  await r.runs.start(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
+  const forA = seen.find(request => request.card.id === r.nodes[1].id);
+  assert.equal(forA.next.title, 'SecretTitleB');
+  assert.equal(forA.next.summary, '', 'the placeholder is not a description');
+  assert.equal(forA.previous.summary, 'summary of SecretRootTitle', 'a real summary is kept');
+  assert.equal(globalRequest.cards.find(c => c.id === r.nodes[2].id).summary, '');
+  assert.ok(!/尚未形成結論/.test(await promptLine(r, 1, '後一張')), 'the written line has no placeholder');
+});
+
+test('fix5 rewriteNeighbourLine: an empty summary leaves no dangling dash', () => {
+  const { rewriteNeighbourLine } = S.load('core/book-pipeline/plan-text.ts');
+  const out = rewriteNeighbourLine('後一張：(3) old — old', 'next', { position: 5, title: 'T', summary: '' });
+  assert.equal(out, '後一張：(5) T');
+});

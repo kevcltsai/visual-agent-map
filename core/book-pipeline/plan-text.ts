@@ -97,7 +97,7 @@ export function composeCardPrompt(plan: CardPlanText, language: ContentLanguage)
   const c = colon(language);
   const neighbour = (label: Words, n: CardPlanText["previous"]): string =>
     n
-      ? `${pick(label, language)}${c}(${n.position}) ${safe(n.title, 120)} — ${safe(n.summary, 240)}`
+      ? `${pick(label, language)}${c}(${n.position}) ${safe(n.title, 120)}${safe(n.summary, 240) ? ` — ${safe(n.summary, 240)}` : ""}`
       : `${pick(label, language)}${c}${pick(L.none, language)}`;
   const lines = [
     `${pick(L.role, language)}${c}${pick(ROLE_WORDS[plan.role], language)}`,
@@ -191,7 +191,8 @@ export function rewriteNeighbourLine(
   });
   if (at < 0) return undefined;
   const head = /^([^:：]+[:：]\s*)/.exec(lines[at].replace(/\r$/, ""))?.[1] ?? "";
-  const line = `${head}(${neighbour.position}) ${safe(neighbour.title, 120)} — ${safe(neighbour.summary, 240)}`;
+  const summary = safe(neighbour.summary, 240);
+  const line = `${head}(${neighbour.position}) ${safe(neighbour.title, 120)}${summary ? ` — ${summary}` : ""}`;
   if (lines[at].replace(/\r$/, "") === line) return undefined;
   lines[at] = lines[at].endsWith("\r") ? `${line}\r` : line;
   return lines.join("\n");

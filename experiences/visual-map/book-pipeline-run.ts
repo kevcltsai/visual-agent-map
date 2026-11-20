@@ -155,6 +155,7 @@ import {
   imageIssueTokens,
   latestSlotsRecord,
   pictureShortfallToken,
+  captionLatinIssue,
   stripImageLines,
   fillSlotMarkers,
   residualMarkerLines,
@@ -2746,6 +2747,19 @@ export class BookPipelineRuns {
         noEdits = true;
         return null;
       }
+      if (merged.dropped)
+        this.ports.log(
+          formatPipelineLog({
+            event: "expand_capped",
+            runId: token.runId,
+            card: nodeId,
+            step: "write",
+            attempt: attemptsOf(drive.store.state, nodeId).write,
+            result: "dropped",
+            ms: 0,
+            counts: { dropped: merged.dropped }
+          })
+        );
       // A process note the fix left in place (flagged, then copied through) goes now; one that carries a fact stays for the proofread.
       const scrubbed = dropProcessNotes(merged.detail);
       if (scrubbed.removed.length) merged.detail = scrubbed.detail;
@@ -2830,6 +2844,29 @@ export class BookPipelineRuns {
       }
       return stampRaw(merged);
     };
+    // Why the author is called now (live v5: an intro's second writing call had no visible reason in the log).
+    const attempt = attemptsOf(drive.store.state, nodeId).write;
+    this.ports.log(
+      formatPipelineLog({
+        event: "author_call",
+        runId: token.runId,
+        card: nodeId,
+        step: "write",
+        attempt,
+        result:
+          drive.rerun?.nodeId === nodeId
+            ? "rerun"
+            : expanding
+              ? "fix_round"
+              : drive.avoid.has(nodeId)
+                ? "source_swap"
+                : attempt > 1
+                  ? "retry"
+                  : "first_draft",
+        ms: 0,
+        counts: { round: autoFixesOf(drive.store.state, nodeId) }
+      })
+    );
     // Nothing of this card's frontmatter is written while the author runs: the research write compares the whole file.
     const done = await untilAborted(
       signal,
@@ -3353,8 +3390,13 @@ export class BookPipelineRuns {
     const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
     // Fewer pictures than the owner's minimum is a reason to look (never a rewrite of the text): see pictureShortfallToken.
     const minimum = await this.pictureMinimum(drive);
-    const shortIssue =
-      minimum !== undefined && imageCheck.placed < minimum ? pictureShortfallToken(imageCheck.placed, minimum) : "";
+    // So is a lowercase English word left in a Chinese caption (live v5: 「果實long在藤上」).
+    const shortIssue = [
+      minimum !== undefined && imageCheck.placed < minimum ? pictureShortfallToken(imageCheck.placed, minimum) : "",
+      captionLatinIssue(chapter, drive.config.language)
+    ]
+      .filter(Boolean)
+      .join(" ");
     return {
       kind: "ok",
       after: async () => {

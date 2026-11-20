@@ -14,6 +14,7 @@ export { neutralizeDetail, neutralizeText, chapterBody } from "./core/book-pipel
 export { proofKey } from "./core/book-pipeline/proof";
 export { setUiLanguage } from "./i18n";
 export { shortHash } from "./core/book-pipeline/image-slots";
+export { bookIssueText } from "./experiences/visual-map/book-pipeline-ui";
 `, { obsidian: { ...S.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice([]), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
 b.setUiLanguage('zh-TW');
 
@@ -54,6 +55,18 @@ test('plainNote and reasonOf: codes never reach the reader, at most 3 distinct p
   assert.equal(reason, ['a', 'b', 'c'].join('，'));
   assert.ok(!/\bC\d/.test(b.reasonOf('proof unmet: C1', { items: [{ id: 'C1', type: 'fact', status: 'unmet', note: 'C1', sources: [] }] })));
   assert.match(b.reasonOf('proof unmet: facts_unverified', undefined), /./);
+});
+test('reasons joined: no separator after a sentence end (live v5 「位置不符。，」), in the review panel and on the card; a caption with English reads as its own reason', () => {
+  const items = [{ id: 'C1', type: 'fact', status: 'unmet', note: '位置不符。', sources: [] }, { id: 'C2', type: 'fact', status: 'unmet', note: '刪除或改寫', sources: [] }];
+  const reason = b.reasonOf('proof unmet: C1 C2 images:under:1:2', { items });
+  assert.ok(!/。，/.test(reason), reason);
+  assert.match(reason, /^位置不符。刪除或改寫，圖片不足/);
+  const card = b.bookIssueText('write failed: no_body images:under:1:2');
+  assert.ok(!/。，/.test(card) && /圖片不足/.test(card), card);
+  assert.ok(!/。，/.test(b.bookIssueText('write failed: no_body length:over:241:100-200:字:v1')));
+  assert.match(b.reasonOf('images unmet: captions:latin', undefined), /英文字/);
+  assert.match(b.bookIssueText('images unmet: images:under:0:1 captions:latin'), /圖片不足.*，圖說的中文裡夾著英文字/);
+  assert.equal(b.joinReasons(['Too short.', 'Check it']), 'Too short. Check it');
 });
 test('galleryBare: only a gallery chapter whose every slot is missing', () => {
   const prompt = '圖安排：\n- 圖位 1｜圖表｜睡眠週期｜位置：第二段\n- 圖位 2｜照片｜腦波｜位置：結尾\n';

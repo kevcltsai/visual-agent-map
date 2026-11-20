@@ -198,6 +198,11 @@ test('proofIsStale: true only after the chapter text changed since a stored proo
   const noted = detail.replace('A plain', W('A plain', 5, 'a note'));
   assert.equal(stale(noted), false, 'adding a note keeps the proof key');
   assert.equal(review.proofIsStale(card(detail), 'checked', 'n1', 'r2', 2), true, 'another run');
+  // A redo that wrote nothing (live v5: a refused fix) bumps the revision; the same text keeps its proof, an edited one does not.
+  assert.equal(review.proofIsStale(card(detail), 'needs-review', 'n1', 'r1', 5), false, 'later revision, unchanged text');
+  assert.equal(review.proofIsStale(card(detail.replace(P2, `${P2} edited`)), 'needs-review', 'n1', 'r1', 5), true, 'later revision, changed text');
+  assert.equal(review.proofIsStale(card(detail), 'needs-review', 'n1', 'r1', 1), true, 'a proof of a later revision does not count');
+  assert.equal(review.proofIsStale(card(detail), 'needs-review', 'n1', 'r1', 23), true, 'only 20 revisions back');
 });
 
 test('keep (T9): a kept text drops the stale, open-fact and unmet-structure marks; an edit after the keep brings the chapter back to the list', () => {

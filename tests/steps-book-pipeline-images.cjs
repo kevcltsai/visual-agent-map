@@ -157,6 +157,29 @@ test('slots: addresses to an inner network, with credentials or an odd port are 
   assert.deepEqual(r.stat.probes.filter(u => /127\.0|\.local|8443/.test(u)), []);
 });
 
+test('U zh-TW captions: common Simplified characters are written in Traditional; a lowercase English word left in a Chinese caption makes the chapter need a look', async () => {
+  const r = await picRig({ slots: 1, text: () => `${BODY}\n\n${mk(1)}\n\n尾。\n`, finder: () => found({ 1: [cand(1, { caption: '樱桃番茄的果實long在藤上' })] }) });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.ok(detail.includes('櫻桃番茄的果實long在藤上') && !detail.includes('樱'), 'caption in Traditional characters');
+  assert.equal(stageOf(r.raw(0)), 'needs-review');
+  assert.match((await r.note(0)).pipelineIssue, /captions:latin/);
+  const IS = S.load('core/book-pipeline/image-slots.ts');
+  const caption = (text, language) => IS.figureOf({ imageUrl: 'https://a.example/x.jpg', sourceUrl: 'https://b.example', title: 'T', caption: text }, 'https://a.example/x.jpg', language).caption;
+  assert.equal(caption('樱桃番茄', 'zh-TW'), '櫻桃番茄');
+  assert.equal(caption('这种叶子长时间发黄', 'zh-TW'), '這種葉子長時間發黃');
+  assert.equal(caption('樱桃番茄', 'zh-CN'), '樱桃番茄', 'a Simplified book keeps its characters');
+  const fig = text => `前。\n\n![T](https://a.example/x.jpg)\n${text}\n\n後。`;
+  assert.equal(IS.captionLatinIssue(fig('果實long在藤上'), 'zh-TW'), 'captions:latin');
+  assert.equal(IS.captionLatinIssue(fig('果實 long 在藤上'), 'zh-CN'), 'captions:latin');
+  assert.equal(IS.captionLatinIssue(fig('櫻桃番茄 Solanum lycopersicum'), 'zh-TW'), '', 'a capitalised name stays');
+  assert.equal(IS.captionLatinIssue(fig('圖：Cherry tomato.jpg'), 'zh-TW'), '', 'a file name');
+  assert.equal(IS.captionLatinIssue(fig('A tomato long on the vine'), 'en'), '', 'only Chinese books');
+  assert.equal(IS.captionLatinIssue('果實long在藤上', 'zh-TW'), '', 'prose, not a caption');
+  assert.equal(IS.splitPictureIssue('images unmet: captions:latin').captionLatin, true);
+  assert.equal(IS.splitPictureIssue('images unmet: captions:latin').rest, '');
+});
+
 test('slots: a malicious title or caption (HTML, links, line breaks, a slot marker, an image) becomes plain escaped single-line text', async () => {
   const evil = 'Evil <img src=x onerror=alert(1)> [click](https://evil.example/x)\nsecond line ![x](https://evil.example/y) 〔圖位 2：boom〕';
   const r = await picRig({ slots: 1, text: () => `${BODY}\n\n${mk(1)}\n\n尾。\n`, finder: () => found({ 1: [cand(1, { title: evil, caption: evil })] }) });

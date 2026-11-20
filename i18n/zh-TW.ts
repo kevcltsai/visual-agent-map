@@ -3207,6 +3207,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_reason_removed_ref_0_1": "這章還提到已移除的〈{0}〉：「{1}」",
   "ui.book_reason_length_under_0_1_2_3": "這章只有 {0} {1}，比你設定的 {2}–{3} {1} 短",
   "ui.book_reason_images_under_0_1": "圖片不足：放了 {0} 張，設定至少 {1} 張",
+  "ui.book_reason_caption_latin": "圖說的中文裡夾著英文字，請檢查用字",
   "ui.book_length_unit_chars": "字",
   "ui.book_length_unit_words": "個英文字",
   "ui.book_structure_unmet_0": "結構 {0} 項未達成",

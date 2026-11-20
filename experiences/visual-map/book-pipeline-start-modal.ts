@@ -39,13 +39,22 @@ export const BOOK_IMAGE_SEARCHES = 2;
 /** Each picture search may be asked once more when its captions come back in another language. */
 export const BOOK_IMAGE_CALLS_PER_SEARCH = 2;
 
+/** The extra in-place expand passes of a short chapter: writing-model calls only (no picture search, no proofread of their own). */
+export const BOOK_EXPAND_PASSES = 2;
+
 /**
  * The AI calls of one chapter at most, step by step: one plan, then each write (the first and the {@link MAX_AUTO_FIXES} automatic
- * redo) runs the author, the picture searches (each with its caption-language retry) and the proofread. Failed-step retries are not in it.
+ * redo) runs the author, the picture searches (each with its caption-language retry) and the proofread; the
+ * {@link BOOK_EXPAND_PASSES} expand passes add writing calls. Failed-step retries are not in it.
  */
 export function bookChapterCalls(): { plan: number; write: number; images: number; proof: number } {
   const writes = 1 + MAX_AUTO_FIXES;
-  return { plan: 1, write: writes, images: writes * BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH, proof: writes };
+  return {
+    plan: 1,
+    write: writes + BOOK_EXPAND_PASSES,
+    images: writes * BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH,
+    proof: writes
+  };
 }
 
 export interface BookStartEstimate {
@@ -71,7 +80,10 @@ export function bookStartEstimate(cards: number, models?: BookStartModels): Book
   };
   const per = bookChapterCalls();
   const writes = 1 + MAX_AUTO_FIXES;
-  const perCard = time("plan") + writes * (time("write") + BOOK_IMAGE_SEARCHES * time("images") + time("proof"));
+  const perCard =
+    time("plan") +
+    writes * (time("write") + BOOK_IMAGE_SEARCHES * time("images") + time("proof")) +
+    BOOK_EXPAND_PASSES * time("write");
   // The trial cards run first and wait for the owner; the rest follow, BOOK_POOL at a time.
   const trial = Math.min(n, TRIAL_SIZE);
   const rounds = Math.ceil(trial / BOOK_POOL) + Math.ceil((n - trial) / BOOK_POOL);

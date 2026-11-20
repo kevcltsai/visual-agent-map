@@ -3433,6 +3433,7 @@ export const en = {
   "ui.book_reason_removed_ref_0_1": "This chapter still mentions the removed 〈{0}〉: “{1}”",
   "ui.book_reason_length_under_0_1_2_3": "The chapter is {0} {1}, shorter than the {2}–{3} {1} you asked for",
   "ui.book_reason_images_under_0_1": "Too few pictures: {0} placed, the setting asks for at least {1}",
+  "ui.book_reason_caption_latin": "A picture caption has an English word in the Chinese text: check the wording",
   "ui.book_length_unit_chars": "characters",
   "ui.book_length_unit_words": "words",
   "ui.book_structure_unmet_0": "Structure: {0} item(s) unmet",

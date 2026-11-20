@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
 const { load: loadReplay } = require('./support-replay.cjs');
-const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages, unsafeBody, convertSourceAnchors, expansionUnsafe } = S.load('experiences/visual-map/book-pipeline-run.ts');
+const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages, unsafeBody, convertSourceAnchors, expansionUnsafe, expansionUnsafeRule } = S.load('experiences/visual-map/book-pipeline-run.ts');
 const { BudgetExhaustedError } = S.load('core/admission.ts');
 const { readBookPipeline } = S.load('core/book-pipeline/model.ts');
 const { cardRevision } = S.load('core/book-pipeline/machine.ts');
@@ -441,6 +441,7 @@ test('pictures: when the exit check finds an unsafe body nothing is written, the
   assert.equal((await r.note(1)).pipelineIssue, 'write failed: unsafe_body');
   const log = r.stat.logs.join('\n');
   assert.ok(log.includes('unsafe_body') && !/Secret|ok\.example|e\.example/.test(log));
+  assert.match(log, /write_refused [^\n]*result=exit_check/, 'the log names the check that refused the write');
 });
 
 /** The saved card text must hold only https standard pictures and no HTML tag, whatever way the step ended. */
@@ -2526,6 +2527,24 @@ test('T10c length: a chapter that is too short is asked for new text in change b
   assert.match((await r.note(1)).pipelineIssue, /^proof unmet: C2 length:over:\d+:100-200:字:v\d+$/, 'length does not lower the fact failure, and sits beside it');
 });
 
+test('R trial fix after gate 1: a trial chapter still too short after its trial redo gets one more fix round once gate 1 is confirmed; the log names why the author is called', async () => {
+  const seen = [];
+  const r = await lenRig({ trial: true });
+  r.script.author = lengthAuthor(r, seen, 10, 10);
+  await r.runs.start(r.mapPath);
+  while (r.runs.isRunning(r.mapPath)) await new Promise(resolve => setImmediate(resolve));
+  const id = r.nodes[1].id;
+  assert.ok((await r.state()).trial.includes(id), 'the chapter is in the trial');
+  const fixes = () => seen.filter(([at, instruction]) => at === id && instruction !== undefined).length;
+  assert.equal(fixes(), 1, 'the trial redo before gate 1');
+  await confirmDone(r.runs, r.mapPath);
+  assert.equal(fixes(), 2, 'one more fix round after gate 1');
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  const log = r.stat.logs.join('\n');
+  assert.match(log, new RegExp(`author_call [^\\n]*card=${id} [^\\n]*result=first_draft`));
+  assert.equal(log.split('\n').filter(line => line.includes('author_call') && line.includes(`card=${id} `) && line.includes('result=fix_round')).length, 2);
+});
+
 // The expansion of a too-short chapter: the one redo sees the chapter and returns change blocks; the program puts them in.
 const DRAFT = ['## 開場', '', '開場段落。', '', '### 土壤', '', '土壤段落。', '', '### 小結', '', '結尾一句，帶到下一章。'].join('\n');
 const expandAuthor = (r, seen, answer) => async input => {
@@ -2535,6 +2554,18 @@ const expandAuthor = (r, seen, answer) => async input => {
   const out = await r.repo.updateNoteGuarded(input.path, { detail: fix ? answer : DRAFT }, { authorize: input.authorize, finalize: input.finalize });
   return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
 };
+
+test('expand cap: an answer with more than 3 new sections keeps the first 3, drops the rest and logs how many', async () => {
+  const seen = [];
+  const r = await lenRig();
+  const section = name => [`### ${name}`, '', `${name}段落${'好'.repeat(40)}`, ''];
+  const answer = ['@@insert after: ### 土壤', ...section('甲節'), ...section('乙節'), ...section('丙節'), ...section('丁節')].join('\n');
+  r.script.author = async input => expandAuthor(r, seen, input.nodeId === r.nodes[1].id ? answer : DRAFT + '\n\n' + '好'.repeat(150))(input);
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const detail = (await r.note(1)).detail;
+  assert.ok(detail.includes('### 丙節') && !detail.includes('### 丁節'));
+  assert.match(r.stat.logs.join('\n'), new RegExp(`expand_capped [^\\n]*card=${r.nodes[1].id} [^\\n]*dropped=1`));
+});
 
 test('T10c length expand: the one redo of a too-short chapter gets the chapter text and the missing amount; the blocks land after their heading and before the ending; the chapter reaches the range with no extra call', async () => {
   const seen = [];
@@ -2595,6 +2626,14 @@ test('expansionUnsafe: only what the merged chapter adds is checked; a second co
   assert.equal(expansionUnsafe(add('〔圖位 1：x〕'), old, answer, allowed), false, 'a marker line of the answer');
   assert.equal(expansionUnsafe(add('〔圖位 2：y〕'), old, answer, allowed), true, 'a marker line from nowhere');
   assert.equal(expansionUnsafe(add('---\n<b>x</b>\n---'), old, answer, allowed), true, 'added text starting with --- is not skipped as frontmatter');
+  // An allowed picture written raw (upper-case host, non-ASCII path): the cleaning's standard form is what is listed (live v5 false refusal).
+  const std = new Set(['https://upload.example.org/a/%E6%A8%B1.png']);
+  assert.equal(unsafeBody('\n![s](https://UPLOAD.example.org/a/樱.png)', std), false, 'raw form of an allowed address');
+  assert.equal(unsafeBody('\n![s](https://other.example.org/a/樱.png)', std), true, 'another address stays refused');
+  assert.equal(expansionUnsafeRule(add('![s](https://UPLOAD.example.org/a/樱.png)'), old, answer, std), undefined);
+  assert.equal(expansionUnsafeRule(add('<b>x</b>'), old, answer, allowed), 'body');
+  assert.equal(expansionUnsafeRule(add('> [!vam-book]- 研究備註'), old, answer, allowed), 'hidden_callout');
+  assert.equal(expansionUnsafeRule(add('〔圖位 2：y〕'), old, answer, allowed), 'slot_marker');
 });
 
 test('T10c length expand (security): an answer that adds an unsafe or http picture, a hidden callout, an owner marker or a tag is refused whole (validated, never cleaned); the chapter keeps its draft', async () => {
@@ -2615,6 +2654,7 @@ test('T10c length expand (security): an answer that adds an unsafe or http pictu
     assert.ok(!detail.includes('INJECT') && !detail.includes('好'.repeat(140)), `${name}: nothing of the answer is saved`);
     assert.ok(detail.includes('土壤段落。'), `${name}: the draft stays`);
     assert.match((await r.note(1)).pipelineIssue, /unsafe_body/, name);
+    assert.match(r.stat.logs.join('\n'), /write_refused [^\n]*result=(?:answer|merged)_[a-z_]+/, `${name}: the log names the rule`);
   }
 });
 

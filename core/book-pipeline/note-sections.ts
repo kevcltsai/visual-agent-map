@@ -1232,12 +1232,15 @@ export interface ExpandScope {
   others?: readonly string[];
 }
 const PREVIEW_WORD = /預告|预告/u;
+/** The most new sections (a heading and its text) one expansion may add to a chapter. */
+export const MAX_INSERTED_SECTIONS = 3;
 /**
  * The new text of one insertion with what does not deepen the chapter left out: a section (heading and its paragraphs) whose heading is
  * generic or repeats a heading the chapter has (or an earlier insertion added); for an intro or closing chapter also a section that
  * names another chapter (heading or text) or previews, and a paragraph outside a section that does. `seen` collects the heading keys kept.
+ * At most `cap.left` new sections are kept over the whole answer; the rest are dropped and counted in `cap.dropped`.
  */
-function keepOwnSections(text: string, seen: Set<string>, scope: ExpandScope): string {
+function keepOwnSections(text: string, seen: Set<string>, scope: ExpandScope, cap: { left: number; dropped: number }): string {
   const guide = scope.role === "intro" || scope.role === "closing";
   const others = scope.others ?? [];
   const names = (part: string): boolean => PREVIEW_WORD.test(part) || sentenceNamesChapters(part, others).length > 0;
@@ -1270,7 +1273,9 @@ function keepOwnSections(text: string, seen: Set<string>, scope: ExpandScope): s
       seen.has(key) ||
       isGenericHeading(heading) ||
       (guide && (!!headingNamesChapter(heading, others) || names(section.join("\n"))));
-    if (!bad) {
+    if (!bad && cap.left <= 0) cap.dropped++;
+    else if (!bad) {
+      cap.left--;
       seen.add(key);
       out.push(...section);
     }
@@ -1331,6 +1336,7 @@ export function dropProcessNotes(detail: string): { detail: string; removed: str
  * echo the request (`sent`, see {@link isEchoedLine}) or only say nothing was added ({@link isNoOpLine}) are left out of every block, and an
  * insertion keeps only the sections that deepen this chapter (see `keepOwnSections`; `scope` is its role and the other chapters' titles). Undefined when no block applies (an answer with no
  * block line, or blocks that match nothing): the caller keeps the chapter as it was; a whole chapter is never put in.
+ * At most {@link MAX_INSERTED_SECTIONS} new sections go in per answer (live v5: one expand added many); `dropped` counts the rest.
  */
 export function expandChapterDetail(
   oldDetail: string,
@@ -1338,13 +1344,14 @@ export function expandChapterDetail(
   language: string,
   sent = "",
   scope: ExpandScope = {}
-): { detail: string; applied: number } | undefined {
+): { detail: string; applied: number; dropped: number } | undefined {
   const parsed = parseChapterEdits(chapterBody(newDetail));
   if (!parsed) return undefined;
   const seen = chapterHeadingKeys(oldDetail);
+  const cap = { left: MAX_INSERTED_SECTIONS, dropped: 0 };
   const edits = parsed.flatMap((edit): ChapterEdit[] => {
     const plain = dropNoOps(dropEchoes(edit.text, sent));
-    const text = edit.kind === "insert" ? keepOwnSections(plain, seen, scope) : plain;
+    const text = edit.kind === "insert" ? keepOwnSections(plain, seen, scope, cap) : plain;
     // An insertion that was only an echo is no insertion; a replacement that became empty would delete the passage, so it goes too.
     if (!text && (edit.kind === "insert" || edit.text.trim())) return [];
     return [{ ...edit, text }];
@@ -1362,6 +1369,7 @@ export function expandChapterDetail(
     : [];
   return {
     detail: sources.length ? addPictureSources(done.detail, sources, language) : done.detail,
-    applied: done.applied
+    applied: done.applied,
+    dropped: cap.dropped
   };
 }

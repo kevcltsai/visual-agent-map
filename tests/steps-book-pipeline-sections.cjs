@@ -323,6 +323,21 @@ test('expandChapterDetail: insertions go to the end of the named section or befo
   assert.ok(!detail.includes('@@') && !detail.includes('preamble'));
 });
 
+test('expandChapterDetail: at most 3 new sections per expansion (over all insert blocks); the rest are dropped and counted, text without a heading stays', () => {
+  const { expandChapterDetail, MAX_INSERTED_SECTIONS } = sections;
+  assert.equal(MAX_INSERTED_SECTIONS, 3);
+  const old = ['## 開場', '', '開場段落。', '', '### 土壤', '', '土壤段落。', '', '### 小結', '', '結尾一句。'].join('\n');
+  const answer = [
+    '@@insert after: ### 土壤', '### 甲節', '', '甲段落。', '', '### 乙節', '', '乙段落。',
+    '@@insert after: ### 開場', '補充段落。', '', '### 丙節', '', '丙段落。', '', '### 丁節', '', '丁段落。', '', '### 戊節', '', '戊段落。'
+  ].join('\n');
+  const { detail, dropped } = expandChapterDetail(old, answer, 'zh-TW');
+  assert.equal(dropped, 2);
+  for (const kept of ['### 甲節', '甲段落。', '### 乙節', '### 丙節', '丙段落。', '補充段落。']) assert.ok(detail.includes(kept), kept);
+  for (const gone of ['### 丁節', '丁段落。', '### 戊節', '戊段落。']) assert.ok(!detail.includes(gone), gone);
+  assert.equal(expandChapterDetail(old, ['@@insert after: ### 土壤', '### 甲節', '', '甲段落。'].join('\n'), 'zh-TW').dropped, 0);
+});
+
 test('expandChapterDetail: an answer with no block line, or blocks that apply nowhere, is undefined (the chapter is never rewritten); CRLF stays CRLF; a chapter with no headings gets an insertion before its last paragraph', () => {
   const { expandChapterDetail } = sections;
   const old = '\r\n第一段很長的內容。\r\n\r\n最後一段。\r\n';

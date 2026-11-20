@@ -10,6 +10,7 @@ import { imageKey } from "./image-dedupe";
 import { isDocumentFile, workKey } from "./image-quality";
 import { fencedLines, stripSearchTerms } from "./note-sections";
 import { escapeMarkdownText } from "./text";
+import { hasLatinWord, toTraditional } from "./caption-script";
 
 /** One planned picture position. `index` is assigned by the program in order (1..n); the model never writes it. */
 export interface ImageSlot {
@@ -321,6 +322,9 @@ export function sourceOf(
   };
 }
 
+/** A Traditional Chinese book's caption in Traditional characters (see `toTraditional`); other languages unchanged. */
+const traditionalIf = (language: string, text: string): string => (/^zh-(?:TW|Hant)/i.test(language) ? toTraditional(text) : text);
+
 /** A finder caption is one plain line (what it is, where to look); an empty one falls back to the title; a loose Commons file reads `Picture: <its name>`. */
 export function figureOf(candidate: SlotCandidate, href: string, language: string): SlotFigure {
   // The marker brackets are taken out first: a caption must never read as a slot marker.
@@ -332,7 +336,7 @@ export function figureOf(candidate: SlotCandidate, href: string, language: strin
     alt,
     caption: candidate.loose
       ? translateNote(language as ContentLanguage, "note.image_file_caption_0", alt)
-      : plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
+      : traditionalIf(language, plainLine(escapeMarkdownText(plain(candidate.caption), 160))) || alt,
     ...(source ? { source } : {})
   };
 }
@@ -628,22 +632,41 @@ const IMAGE_ONLY_LINE = /^[ \t]*!\[[^\]\n]*\]\(https:\/\/[^)\s]+\)[ \t]*\r?$/;
  * picture or its caption is never a claim to check. Lines in fences and quotes stay.
  */
 export function stripImageLines(text: string): string {
+  return splitImageLines(text).text;
+}
+/** The caption lines of the pictures in a text (the line right after an image line, as {@link stripImageLines} takes them out). */
+export function captionLines(text: string): string[] {
+  return splitImageLines(text).captions;
+}
+/**
+ * The issue token of a Chinese chapter with a lowercase English word left in a picture caption (no spaces): needs-review, no rewrite of
+ * the text (see `hasLatinWord`).
+ */
+export const CAPTION_LATIN_TOKEN = "captions:latin";
+/** A Chinese chapter's captions that mix in a lowercase English word: the issue token, else "". */
+export function captionLatinIssue(text: string, language: string): string {
+  return /^zh/i.test(language) && captionLines(text).some(hasLatinWord) ? CAPTION_LATIN_TOKEN : "";
+}
+function splitImageLines(text: string): { text: string; captions: string[] } {
   const lines = text.split("\n");
   const guarded = protectedLines(lines);
   const out: string[] = [];
+  const captions: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     if (!guarded[i] && IMAGE_ONLY_LINE.test(lines[i])) {
       const plainAt = (at: number): boolean =>
         at < lines.length && !isBlank(lines[at]) && !guarded[at] && !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[at]);
       const endsAt = (at: number): boolean => isBlank(lines[at]) || /^\s*#/.test(lines[at]);
       // The caption line, and the source line right after it, go with the picture.
-      if (plainAt(i + 1) && plainAt(i + 2) && SOURCE_LINE.test(lines[i + 2]) && endsAt(i + 3)) i += 2;
-      else if (plainAt(i + 1) && endsAt(i + 2)) i++;
+      if (plainAt(i + 1) && plainAt(i + 2) && SOURCE_LINE.test(lines[i + 2]) && endsAt(i + 3)) {
+        captions.push(lines[i + 1]);
+        i += 2;
+      } else if (plainAt(i + 1) && endsAt(i + 2)) captions.push(lines[++i]);
       continue;
     }
     out.push(lines[i]);
   }
-  return out.join("\n").replace(/\n{3,}/g, "\n\n");
+  return { text: out.join("\n").replace(/\n{3,}/g, "\n\n"), captions };
 }
 
 /** What the slot looks like now, read from the record, the plan and the body: `edited` = the recorded picture is no longer in the text (replaced or deleted by hand). */
@@ -832,15 +855,26 @@ export function imageIssueTokens(check: ImageTextCheck): string[] {
  */
 export const pictureShortfallToken = (placed: number, minimum: number): string => `images:under:${placed}:${minimum}`;
 const SHORTFALL = /(?:^|\s)images:under:(\d+):(\d+)(?=\s|$)/;
-/** An issue field split into its picture shortfall (when it carries one) and the rest (`images unmet:` with only notice tokens left leaves nothing). */
-export function splitPictureIssue(issue: string): { rest: string; shortfall?: { placed: number; minimum: number } } {
+const CAPTION_LATIN = /(?:^|\s)captions:latin(?=\s|$)/;
+/** An issue field split into its picture tokens (a shortfall, English left in captions) and the rest (`images unmet:` with only notice tokens left leaves nothing). */
+export function splitPictureIssue(issue: string): {
+  rest: string;
+  shortfall?: { placed: number; minimum: number };
+  captionLatin?: true;
+} {
   const m = SHORTFALL.exec(issue);
-  if (!m) return { rest: issue };
+  const latin = CAPTION_LATIN.test(issue);
+  if (!m && !latin) return { rest: issue };
   const rest = issue
     .replace(SHORTFALL, "")
+    .replace(CAPTION_LATIN, "")
     .trim()
     .replace(/^images unmet:(?:\s+\S+)*$|^images unmet$/, "");
-  return { rest, shortfall: { placed: Number(m[1]), minimum: Number(m[2]) } };
+  return {
+    rest,
+    ...(m ? { shortfall: { placed: Number(m[1]), minimum: Number(m[2]) } } : {}),
+    ...(latin ? { captionLatin: true as const } : {})
+  };
 }
 
 /**

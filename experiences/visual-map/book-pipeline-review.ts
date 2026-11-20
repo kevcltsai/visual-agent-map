@@ -20,7 +20,8 @@ import { parseChecklist, parseImageSlots } from "../../core/book-pipeline/plan-t
 import { escapeMarkdownText, hashText, unescapeMarkdownText } from "../../core/book-pipeline/text";
 import { splitLengthIssue } from "../../core/book-pipeline/settings";
 import type { ChapterInconsistency } from "../../core/book-pipeline/consistency";
-import { bookCardView, bookIssueText, lengthText, shortfallText } from "./book-pipeline-ui";
+import { bookCardView, bookIssueText, lengthText, pictureSentences } from "./book-pipeline-ui";
+import { joinReasons } from "./book-pipeline-reasons";
 import { bodyImageUrls } from "./book-pipeline-run";
 
 import { projectProofBody } from "../../core/book-pipeline/book-notes";
@@ -163,26 +164,13 @@ export const plainNote = (text: string): string =>
     .replace(/\s+/g, " ")
     .trim();
 
-/**
- * Reasons in one line: the panel's separator between them, none after a piece that already ends a sentence (live v5: 「位置不符。，刪除或改寫…」);
- * a sentence end in a Latin script keeps one space.
- */
-export function joinReasons(parts: readonly string[]): string {
-  const sep = t("ui.book_panel_lead_sep");
-  return parts.reduce((out, part, at) => {
-    if (!at) return part;
-    if (!/[。！？.!?]\s*$/.test(out)) return out + sep + part;
-    return /[.!?]\s*$/.test(out) ? `${out.trimEnd()} ${part}` : out.trimEnd() + part;
-  }, "");
-}
+export { joinReasons };
 
 /** The reason of a needs-review card in words: the proof's own notes of the items not met, else the count, else a plain sentence; never a code. */
 export function reasonOf(issue: string, proof: StoredProofView | undefined): string {
   const pictures = splitPictureIssue(issue);
-  if (pictures.shortfall) {
-    const sentence = shortfallText(pictures.shortfall);
-    return pictures.rest ? joinReasons([reasonOf(pictures.rest, proof), sentence]) : sentence;
-  }
+  const sentences = pictureSentences(pictures);
+  if (sentences.length) return joinReasons(pictures.rest ? [reasonOf(pictures.rest, proof), ...sentences] : sentences);
   const { rest, length } = splitLengthIssue(issue);
   if (length) {
     const sentence = lengthText(length);

@@ -21,6 +21,8 @@ export interface NotesApplyPorts {
   /** The code of a runner refusal, undefined for any other error. */
   codeOf(error: unknown): string | undefined;
   refusalText(error: unknown): string;
+  /** A plain localized reason for a failure that is not a refusal (never the raw error message). */
+  reasonText(error: unknown): string;
   write(path: string, transform: (text: string) => string): Promise<NoteWriteResult>;
   notice(message: string): void;
   /** A notice with one clickable word; `hide` closes it. */
@@ -131,9 +133,7 @@ export class BookNotesApply {
     const code = this.ports.codeOf(error);
     if (code === "cancelled" && job.timedOut && !job.cancelled) return this.ports.notice(t("ui.book_note_timeout"));
     if (code) return this.ports.notice(this.ports.refusalText(error));
-    const message = (error as { message?: unknown } | null)?.message;
-    const cause = (typeof message === "string" ? message : String(error)).slice(0, 120);
-    this.ports.notice(t("ui.book_note_ai_failed_0", cause));
+    this.ports.notice(t("ui.book_note_ai_failed_0", this.ports.reasonText(error)));
   }
 
   private done(path: string, result: NotesApplyResult): void {

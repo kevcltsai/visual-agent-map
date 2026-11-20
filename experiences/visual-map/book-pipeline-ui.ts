@@ -1,5 +1,6 @@
 import type { TranslationKey } from "../../i18n";
 import { t } from "../../i18n";
+import { isBookStepError } from "../../core/steps/book-pipeline/base";
 import { splitLengthIssue, type LengthReason } from "../../core/book-pipeline/settings";
 import {
   effectiveOrder,
@@ -433,12 +434,15 @@ const REFUSAL_KEY: Record<BookRunRefusal, TranslationKey> = {
   nothing: "ui.book_refused_nothing"
 };
 
-/** The message for a rejected entry call: the refusal's own sentence, or the generic one with a short cause. Never throws. */
+/** A plain localized reason for an error that is not a runner refusal; the raw message (English, internal) is never shown. */
+export function bookErrorReason(error: unknown): string {
+  return t(isBookStepError(error) ? "ui.book_reason_invalid_reply" : "ui.book_reason_failed");
+}
+
+/** The message for a rejected entry call: the refusal's own sentence, or the generic one with a plain reason. Never throws. */
 export function bookRefusalText(error: unknown): string {
   if (error instanceof BookPipelineRunError && error.code in REFUSAL_KEY) return t(REFUSAL_KEY[error.code]);
-  const message = (error as { message?: unknown } | null)?.message;
-  const cause = typeof message === "string" ? message : String(error);
-  return t("ui.book_failed_0", cause.slice(0, 120));
+  return t("ui.book_failed_0", bookErrorReason(error));
 }
 
 /** Runs one runner entry; a refusal (or any error) is shown through `notify` instead of being thrown. */

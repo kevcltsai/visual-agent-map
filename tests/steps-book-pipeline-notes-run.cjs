@@ -46,6 +46,7 @@ function rig({ run, text = '', busy = null } = {}) {
     mapBusy: () => r.busy,
     codeOf: e => e && e.code,
     refusalText: e => `refused:${e.code}`,
+    reasonText: e => `reason:${e.name}`,
     write: async (path, transform) => { const next = transform(r.text); r.writes.push(path); if (r.refuse) return 'refused'; if (next === r.text) return 'unchanged'; r.text = next; return 'written'; },
     notice: m => r.notices.push(m),
     noticeAction: (message, label, onClick, ms) => { const a = { message, label, onClick, ms, hidden: false }; r.actions.push(a); return { hide: () => { a.hidden = true; } }; },
@@ -101,11 +102,12 @@ test('timeout: after 3 minutes the job is aborted and the notice says the notes 
   assert.match(r.notices[0], /太久.*備註都還在/);
   assert.equal(r.ctl.isRunning('N/c.md'), false);
 });
-test('AI failure: the notice names the cause and says the notes are kept', async () => {
+test('AI failure: the notice shows the plain reason from the port, never the raw message, and says the notes are kept', async () => {
   const r = rig({ run: async () => { throw new Error('provider down'); } });
   r.ctl.press('N/c.md');
   await flush();
-  assert.match(r.notices[0], /失敗（provider down）.*備註都還在/);
+  assert.match(r.notices[0], /失敗（reason:Error）.*備註都還在/);
+  assert.doesNotMatch(r.notices[0], /provider down/);
 });
 test('messages: nothing sendable, and every note skipped, say why (different texts)', async () => {
   const r = rig({ run: async () => ({ applied: 0, skipped: 0, marked: 0, edits: [] }) });

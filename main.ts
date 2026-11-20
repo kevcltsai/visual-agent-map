@@ -20,7 +20,7 @@ import {
   type BookRerunResult,
   type NotesApplyResult
 } from "./experiences/visual-map/book-pipeline-run";
-import { bookRefusalText } from "./experiences/visual-map/book-pipeline-ui";
+import { bookErrorReason, bookRefusalText } from "./experiences/visual-map/book-pipeline-ui";
 import { backupNoteFile } from "./experiences/visual-map/note-backup";
 import {
   BookCallouts,
@@ -555,6 +555,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     },
     codeOf: error => (error instanceof BookPipelineRunError ? error.code : undefined),
     refusalText: error => bookRefusalText(error),
+    reasonText: error => bookErrorReason(error),
     write: (path, transform) => this.bookNoteWriter(path, transform),
     notice: message => void new Notice(message),
     noticeAction: (message, label, onClick, ms) => {

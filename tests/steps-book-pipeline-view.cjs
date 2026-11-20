@@ -19,6 +19,7 @@ const bundle = loadSource(`
 export * from "./experiences/visual-map/book-pipeline-ui";
 export { bookStartEstimate, bookStartEstimateText, bookSettingsPatch, BookStartModal, BOOK_SUGGEST_TIMEOUT_MS } from "./experiences/visual-map/book-pipeline-start-modal";
 export { deletedChapterTitles, mentionedDeletedChapters, renderBookSettingsFields } from "./experiences/visual-map/book-pipeline-start-modal";
+export { BookStepError } from "./core/steps/book-pipeline/base";
 export { BookPipelineRunError, stepCounts } from "./experiences/visual-map/book-pipeline-run";
 export { readBookPipeline } from "./core/book-pipeline/model";
 export { reviewEntries, reviewCallout, putProgramCallout } from "./experiences/visual-map/book-pipeline-review";
@@ -150,8 +151,18 @@ test('refusal text: every refusal code has a Chinese sentence in all three langu
     assert.equal(seen.size, codes.length, `${language}: one sentence per code`);
   }
   lang('zh-TW');
-  assert.match(ui.bookRefusalText(new Error('boom')), /^圖文書流水線無法執行：boom/);
-  assert.match(ui.bookRefusalText('weird'), /weird/);
+  assert.equal(ui.bookRefusalText(new Error('boom')), '圖文書流水線無法執行：執行失敗');
+  assert.equal(ui.bookRefusalText('weird'), '圖文書流水線無法執行：執行失敗');
+  for (const language of ['zh-TW', 'en', 'zh-CN']) {
+    lang(language);
+    const raw = 'Paragraph rewrite refused: new character';
+    for (const error of [new bundle.BookStepError(raw), new Error(raw), raw]) {
+      const text = ui.bookRefusalText(error);
+      assert.ok(!/refused|character|ui\./.test(text), `${language}: no raw message in "${text}"`);
+    }
+    assert.notEqual(ui.bookErrorReason(new bundle.BookStepError('x')), ui.bookErrorReason(new Error('x')));
+  }
+  lang('zh-TW');
   const messages = [];
   await ui.runBookEntry(() => Promise.reject(new runModule.BookPipelineRunError('root')), m => messages.push(m));
   await ui.runBookEntry(() => Promise.resolve(), m => messages.push(m));

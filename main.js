@@ -53766,11 +53766,12 @@ var REFUSAL_KEY = {
   text_changed: "ui.book_refused_text_changed",
   nothing: "ui.book_refused_nothing"
 };
+function bookErrorReason(error) {
+  return t(isBookStepError(error) ? "ui.book_reason_invalid_reply" : "ui.book_reason_failed");
+}
 function bookRefusalText(error) {
   if (error instanceof BookPipelineRunError && error.code in REFUSAL_KEY) return t(REFUSAL_KEY[error.code]);
-  const message = error == null ? void 0 : error.message;
-  const cause = typeof message === "string" ? message : String(error);
-  return t("ui.book_failed_0", cause.slice(0, 120));
+  return t("ui.book_failed_0", bookErrorReason(error));
 }
 async function runBookEntry(entry, notify2) {
   try {
@@ -91569,9 +91570,7 @@ var BookNotesApply = class {
     const code3 = this.ports.codeOf(error);
     if (code3 === "cancelled" && job.timedOut && !job.cancelled) return this.ports.notice(t("ui.book_note_timeout"));
     if (code3) return this.ports.notice(this.ports.refusalText(error));
-    const message = error == null ? void 0 : error.message;
-    const cause = (typeof message === "string" ? message : String(error)).slice(0, 120);
-    this.ports.notice(t("ui.book_note_ai_failed_0", cause));
+    this.ports.notice(t("ui.book_note_ai_failed_0", this.ports.reasonText(error)));
   }
   done(path, result) {
     var _a2, _b2, _c;
@@ -104663,6 +104662,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       },
       codeOf: (error) => error instanceof BookPipelineRunError ? error.code : void 0,
       refusalText: (error) => bookRefusalText(error),
+      reasonText: (error) => bookErrorReason(error),
       write: (path, transform) => this.bookNoteWriter(path, transform),
       notice: (message) => void new import_obsidian52.Notice(message),
       noticeAction: (message, label, onClick, ms) => {

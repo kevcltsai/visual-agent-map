@@ -4,6 +4,8 @@
  * model: research-voice phrases and a person name spelled differently from a chapter title. A program hit makes the item unmet
  * whatever the model said; the model can still find more. Pure.
  */
+import { translateNote, type ContentLanguage } from "../../i18n";
+import type { BookRole } from "./model";
 import type { ChecklistItem } from "./plan-text";
 import { BOOK_CHECK_IDS, proofVerdict, type ProofResult } from "./proof";
 
@@ -73,16 +75,67 @@ export const RESEARCH_VOICE_PATTERNS: readonly RegExp[] = [
   /\b(?:this|my|our) (?:search|query|lookup)\b/gu
 ];
 
-/** The research-voice phrases the text holds, in list order, each once; then what the patterns matched (each text once, not one already listed). */
-export function researchVoiceHits(body: string): string[] {
+/**
+ * Citation-style process voice: a fact attributed in the text to a vague source instead of being stated (the 2026-11-20 v4 run's
+ * 「美國○○大學推廣單位建議」 seven times in one chapter, 「農業改良場的資料指出」, 「有資料指出」). Decision (2026-11-20, Primary): a
+ * finished book states the fact and keeps the source in its Sources section, so these are flagged whether or not an institution is
+ * named: 「有(些)…資料/研究/文章指出」, 「…的資料指出/顯示/提到」, 「據資料」, 「根據(現有/相關/網路…)資料」, 「推廣單位…建議」, an unnamed
+ * 「研究指出」 (at a sentence or clause start, or after 有/些/項). Not flagged: a named study (「哈佛大學的研究指出」), a named record
+ * (「根據氣象局資料」), 資料庫/資料夾, a bare 研究.
+ */
+export const VAGUE_SOURCE_PATTERNS: readonly RegExp[] = [
+  /有(?:些|一些)?[^\s，。、；！？,.]{0,4}?(?:資料|资料|研究|文獻|文献|論文|论文|文章|報告|报告)(?:也|都)?(?:指出|顯示|显示|建議|建议|提到|表示|認為|认为)/gu,
+  /(?:資料|资料)(?:也|則|则|都)?(?:指出|顯示|显示|提到|表示)/gu,
+  /(?<![根依])據(?:資料|資訊)|(?<![根依])据(?:资料|资讯)/gu,
+  /根據(?:現有|相關|網路|網上|一些|部分|手邊|可得|公開)?的?資料|根据(?:现有|相关|网络|网上|一些|部分|手边|可得|公开)?的?资料/gu,
+  /推廣(?:單位|中心|部門|處)[^。！？\n]{0,12}?(?:建議|指出|提到|提醒|強調|說明|列為|給)|推广(?:单位|中心|部门|处)[^。！？\n]{0,12}?(?:建议|指出|提到|提醒|强调|说明|列为|给)/gu,
+  /(?<=^|[，。；：、！？,;:\s]|有|些|項|项)研究(?:也|都)?(?:指出|顯示|显示|發現|发现)/gmu,
+  /\b(?:some |available |existing )?sources (?:say|suggest|indicate|show)\b/gu,
+  /\baccording to (?:the |some |available |existing )?(?:data|sources|information)\b/gu,
+  /(?:^|[.!?]\s+|\bsome )(?:studies|research) (?:shows?|suggests?|indicates?)\b/gmu
+];
+
+const hitsOf = (
+  body: string,
+  phrases: readonly string[],
+  patterns: readonly RegExp[],
+  hits: string[] = []
+): string[] => {
   const text = body.toLowerCase();
-  const hits = RESEARCH_VOICE_PHRASES.filter(phrase => text.includes(phrase));
-  for (const pattern of RESEARCH_VOICE_PATTERNS)
+  for (const phrase of phrases) if (text.includes(phrase) && !hits.includes(phrase)) hits.push(phrase);
+  for (const pattern of patterns)
     for (const match of text.matchAll(pattern)) {
-      const found = match[0];
+      const found = match[0].replace(/^[\s.!?]+/, "");
       if (!hits.some(hit => hit.includes(found) || found.includes(hit))) hits.push(found);
     }
   return hits;
+};
+
+/** The research-voice phrases the text holds, in list order, each once; then what the patterns matched (each text once, not one already listed); then the vague-source attributions. */
+export function researchVoiceHits(body: string): string[] {
+  return hitsOf(body, [], VAGUE_SOURCE_PATTERNS, processVoiceHits(body));
+}
+/** Only the process notes (searches, what was or was not found, data insufficient), not the vague-source attributions. */
+export function processVoiceHits(body: string): string[] {
+  return hitsOf(body, RESEARCH_VOICE_PHRASES, RESEARCH_VOICE_PATTERNS);
+}
+
+/** The sentences of a text (Chinese and English end marks; each line apart), trimmed, empty ones left out. */
+export function sentencesOf(text: string): string[] {
+  return text
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .flatMap(line => line.match(/[^。！？!?]*?(?:[。！？!?]+|\.(?=\s|$)|$)/gu) ?? [])
+    .map(sentence => sentence.trim())
+    .filter(Boolean);
+}
+/** The sentences that hold a research-voice hit (each once, in text order): what the fix instruction quotes so the author finds the exact passage. */
+export function researchVoiceSentences(body: string): string[] {
+  return sentencesOf(body).filter(sentence => researchVoiceHits(sentence).length);
+}
+/** A sentence that is only a process note: it holds a process hit and no number, link, picture or emphasis (nothing a reader would lose). */
+export function isProcessNoteSentence(sentence: string): boolean {
+  return processVoiceHits(sentence).length > 0 && !/[\p{Nd}[\]()（）*`]|https?:/u.test(sentence);
 }
 
 const DOT = /[・·•‧･]/gu;
@@ -138,27 +191,111 @@ export function nameVariantHits(body: string, titles: readonly string[]): NameVa
   return hits;
 }
 
-const MAX_NOTE_ITEMS = 4;
+/** Letters and digits only (NFKC, lower case): how a chapter title is found in a heading or a sentence. */
+export const titleKey = (text: string): string =>
+  text
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, "");
 /**
- * The proof result with the program's own findings applied: a research-voice phrase makes V1 unmet, a name variant makes N1 unmet,
- * each with a note naming what to change; the verdict is judged again. Items the program finds nothing for keep the model's result.
+ * The other chapter a heading names: its whole key holds a title's key, or its lead (before a colon or dash, at least two letters)
+ * is part of a title's key (「土壤與容器：預告裡沒講完的小細節」 names 〈土壤與容器準備〉). Undefined when it names none.
  */
-export function applyProseChecks(result: ProofResult, body: string, titles: readonly string[]): ProofResult {
-  const voice = researchVoiceHits(body).slice(0, MAX_NOTE_ITEMS);
+export function headingNamesChapter(heading: string, others: readonly string[]): string | undefined {
+  const text = heading.replace(/^[ \t]*#{1,6}[ \t]+/, "");
+  const key = titleKey(text);
+  const lead = titleKey(text.split(/[:：—–]/u)[0]);
+  return others.find(title => {
+    const t = titleKey(title);
+    return !!t && (key.includes(t) || (lead.length >= 2 && t.includes(lead)));
+  });
+}
+/** The other chapter titles a sentence names (whole title, punctuation aside). */
+export const sentenceNamesChapters = (sentence: string, others: readonly string[]): string[] => {
+  const key = titleKey(sentence);
+  return others.filter(title => titleKey(title) && key.includes(titleKey(title)));
+};
+
+/** The most sentences an intro may give one later chapter (owner rule 2026-11-20: a guide, one or two sentences of preview each). */
+export const INTRO_PREVIEW_MAX = 2;
+/**
+ * The later chapters an intro previews too much: a heading of its own that names the chapter, or more than {@link INTRO_PREVIEW_MAX}
+ * sentences naming its title. Topics without the title are beyond this check (the model's R1 item covers them).
+ */
+export function introPreviewHits(body: string, others: readonly string[]): string[] {
+  const over = new Set<string>();
+  const counts = new Map<string, number>();
+  for (const line of body.replace(/\r\n?/g, "\n").split("\n")) {
+    if (/^[ \t]*#{1,6}[ \t]+/.test(line)) {
+      const named = headingNamesChapter(line, others);
+      if (named) over.add(named);
+      continue;
+    }
+    for (const sentence of sentencesOf(line))
+      for (const title of sentenceNamesChapters(sentence, others)) counts.set(title, (counts.get(title) ?? 0) + 1);
+  }
+  for (const [title, n] of counts) if (n > INTRO_PREVIEW_MAX) over.add(title);
+  return others.filter(title => over.has(title));
+}
+
+const MAX_NOTE_ITEMS = 4;
+/** The longest a quoted sentence in a note is (characters): enough for the author to find the passage. */
+const NOTE_SENTENCE_MAX = 60;
+const quoteCut = (text: string): string => {
+  const chars = Array.from(text);
+  return `「${chars.length > NOTE_SENTENCE_MAX ? chars.slice(0, NOTE_SENTENCE_MAX).join("") + "…" : text}」`;
+};
+/** What the proofread knows about the chapter besides its text: the note language, its role and its own title. */
+export interface ProseCheckContext {
+  language?: ContentLanguage;
+  role?: BookRole;
+  title?: string;
+}
+/**
+ * The proof result with the program's own findings applied: a research-voice sentence makes V1 unmet, a name variant makes N1 unmet,
+ * an intro that previews a later chapter too much makes R1 unmet, each with a note (in the note language) naming what to change; the
+ * verdict is judged again. Items the program finds nothing for keep the model's result.
+ */
+export function applyProseChecks(
+  result: ProofResult,
+  body: string,
+  titles: readonly string[],
+  context: ProseCheckContext = {}
+): ProofResult {
+  const language = context.language ?? "en";
+  const voice = researchVoiceSentences(body).slice(0, MAX_NOTE_ITEMS);
   const names = nameVariantHits(body, titles).slice(0, MAX_NOTE_ITEMS);
-  if (!voice.length && !names.length) return result;
+  const own = titleKey(context.title ?? "");
+  const previews =
+    context.role === "intro"
+      ? introPreviewHits(
+          body,
+          titles.filter(title => titleKey(title) !== own)
+        )
+      : [];
+  if (!voice.length && !names.length && !previews.length) return result;
   const items = result.items.map(item => {
     if (item.id === BOOK_CHECK_IDS.voice && voice.length)
       return {
         ...item,
         status: "unmet" as const,
-        note: `Remove the research or process wording: ${voice.map(phrase => `「${phrase}」`).join(" ")}`
+        note: translateNote(language, "detail.book_check_voice_0", voice.map(quoteCut).join(" "))
       };
     if (item.id === BOOK_CHECK_IDS.names && names.length)
       return {
         ...item,
         status: "unmet" as const,
-        note: `Write the names as the chapter titles do: ${names.map(hit => `「${hit.variant}」→「${hit.title}」`).join(" ")}`
+        note: translateNote(
+          language,
+          "detail.book_check_names_0",
+          names.map(hit => `「${hit.variant}」→「${hit.title}」`).join(" ")
+        )
+      };
+    if (item.id === BOOK_CHECK_IDS.repeat && previews.length)
+      return {
+        ...item,
+        status: "unmet" as const,
+        note: translateNote(language, "detail.book_check_preview_0", previews.map(title => `〈${title}〉`).join(""))
       };
     return item;
   });

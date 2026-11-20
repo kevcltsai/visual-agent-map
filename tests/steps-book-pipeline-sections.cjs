@@ -304,7 +304,7 @@ test('expandChapterDetail: insertions go to the end of the named section or befo
   const answer = [
     'preamble is ignored',
     '@@insert after: ### 土壤', '### 排水', '', '排水段落。',
-    '@@insert', '### 補充', '', '補充段落。',
+    '@@insert', '### 盆器', '', '盆器段落。',
     '@@insert after: ### 不存在', '孤兒段落。',
     '@@replace', '土壤段落。', '@@with', '土壤段落（更正）。',
     '@@replace', '找不到的句子。', '@@with', '無效。',
@@ -314,8 +314,8 @@ test('expandChapterDetail: insertions go to the end of the named section or befo
   const { detail, applied } = expandChapterDetail(old, answer, 'zh-TW');
   assert.equal(applied, 4, 'the passage that is not in the chapter is not applied');
   const at = text => detail.indexOf(text);
-  assert.ok(at('土壤段落（更正）。') > at('### 土壤') && at('### 排水') > at('土壤段落（更正）。') && at('### 排水') < at('### 補充'));
-  assert.ok(at('### 補充') < at('### 小結') && at('孤兒段落。') < at('### 小結'), 'unknown anchor: before the last section');
+  assert.ok(at('土壤段落（更正）。') > at('### 土壤') && at('### 排水') > at('土壤段落（更正）。') && at('### 排水') < at('### 盆器'));
+  assert.ok(at('### 盆器') < at('### 小結') && at('孤兒段落。') < at('### 小結'), 'unknown anchor: before the last section');
   assert.ok(at('結尾一句。') < at('### 圖像'), 'the ending stays the chapter\'s last text');
   assert.ok(detail.includes('> 土壤段落。'), 'the hidden record is not a chapter passage');
   assert.ok(detail.includes('<!-- book-slots:v1') && detail.includes('![a](https://example.org/a.png)'));
@@ -350,6 +350,85 @@ test('expandChapterDetail: lines echoing the request are left out of every block
   assert.ok(done.detail.includes('新段落。') && done.detail.includes('開場段落。') && !done.detail.includes('本章結構') && !done.detail.includes('voice'), done.detail);
 });
 
+// Live run v4 (2026-11-20), 〈家庭菜園入門〉 (intro): the model's no-op line went in as prose, and four patch sections pre-told later chapters.
+const V4_OTHERS = ['土壤與容器準備', '播種與育苗', '澆水施肥與病蟲害', '採收與保存', '新手推薦蔬菜'];
+const V4_INTRO = ['## 開場', '', '我的陽台，到底能不能種菜？', '', '### 為什麼先做小的？', '', '先從一盆開始。', '', '### 小結', '', '下一章先準備盆和土。'].join('\n');
+const V4_ANSWER = [
+  '@@insert after: ### 為什麼先做小的？',
+  '本次無新增內容。',
+  '',
+  '### 把陽台條件看得更細一點',
+  '',
+  '早上曬到的東向陽台，比西曬的陽台溫和。',
+  '',
+  '### 土壤與容器：預告裡沒講完的小細節',
+  '',
+  '第一站提到培養土，這裡先補三個初學者常問的小問題，細節留到第二章。',
+  '',
+  '### 播種與育苗：預告裡沒講完的小細節',
+  '',
+  '覆土厚度為種子直徑的 2 到 3 倍，是一個記憶口訣，不用拿尺量。',
+  '',
+  '### 澆水、施肥與病蟲害：預告裡沒講完的小細節',
+  '',
+  '用手指測土再澆水。',
+  '',
+  '### 採收與保存：預告裡沒講完的小細節',
+  '',
+  '採收的關鍵是「勤摘」。'
+].join('\n');
+
+test('expandChapterDetail (live v4): the no-op line 「本次無新增內容。」 and the four 「預告裡沒講完的小細節」 sections of an intro are dropped; the section that deepens the intro stays', () => {
+  const { expandChapterDetail } = sections;
+  const { detail } = expandChapterDetail(V4_INTRO, V4_ANSWER, 'zh-TW', '', { role: 'intro', others: V4_OTHERS });
+  assert.ok(!detail.includes('本次無新增內容'), detail);
+  assert.ok(!detail.includes('預告裡沒講完') && !detail.includes('覆土厚度') && !detail.includes('勤摘') && !detail.includes('第一站提到培養土'), detail);
+  assert.ok(detail.includes('### 把陽台條件看得更細一點') && detail.includes('早上曬到的東向陽台'), detail);
+  assert.ok(!/\n{3,}/.test(detail), 'no double blank line left');
+  // A body chapter keeps a section named after its own topic, but never a generic or repeated heading nor a no-op line.
+  const body = expandChapterDetail(V4_INTRO, ['@@insert', '### 補充', '', '補充段落。', '', '### 為什麼先做小的？', '', '重複段落。', '', '### 盆器的材質', '', '塑膠盆輕。', '@@insert', 'No new content.'].join('\n'), 'zh-TW', '', { role: 'body', others: V4_OTHERS });
+  assert.ok(body.detail.includes('### 盆器的材質') && !body.detail.includes('補充段落') && !body.detail.includes('重複段落') && !body.detail.includes('No new content'), body.detail);
+  assert.equal(body.applied, 1);
+  // An answer that is only a no-op line applies nothing: the chapter stays as it was.
+  assert.equal(expandChapterDetail(V4_INTRO, '@@insert\n本次無新增內容。\n', 'zh-TW'), undefined);
+  // A @@with that is only a no-op line never deletes the passage.
+  assert.equal(expandChapterDetail(V4_INTRO, '@@replace\n先從一盆開始。\n@@with\n無需修改。\n', 'zh-TW'), undefined);
+  // Closing: a paragraph that names another chapter goes; its own paragraph stays.
+  const closing = expandChapterDetail(V4_INTRO, ['@@insert', '回頭看〈採收與保存〉的做法，摘外葉就好。', '', '一年後，你的陽台會是什麼樣子？'].join('\n'), 'zh-TW', '', { role: 'closing', others: V4_OTHERS });
+  assert.ok(!closing.detail.includes('摘外葉') && closing.detail.includes('一年後'), closing.detail);
+});
+
+test('isNoOpLine / isGenericHeading: zh-TW, zh-CN and English no-op lines and generic headings; real prose and real headings are kept', () => {
+  for (const line of ['本次無新增內容。', '（本次無新增內容）', '無需修改。', '本章没有新增内容', '本次无需修改', 'No new content.', 'Nothing to add.', 'No changes needed.'])
+    assert.equal(sections.isNoOpLine(line), true, line);
+  for (const line of ['本次新增兩段。', '無論如何都要先修改盆土。', '沒有排水孔的盆不要用。', 'No soil, no harvest.', ''])
+    assert.equal(sections.isNoOpLine(line), false, line);
+  for (const heading of ['### 土壤與容器：預告裡沒講完的小細節', '### 補充', '### 补充说明', '### 其他', '### More details', '### Additional notes'])
+    assert.equal(sections.isGenericHeading(heading), true, heading);
+  for (const heading of ['### 補充水分的時機', '### 為什麼先做小的？', '### 把陽台條件看得更細一點', '### Details of drainage'])
+    assert.equal(sections.isGenericHeading(heading), false, heading);
+});
+
+test('dropProcessNotes (live v4 〈採收與保存〉): the flagged process-note sentence the fix left in goes; a sentence carrying a number stays; headings, records and sources stay', () => {
+  const LINE = '至於一天中什麼時候採，現有資料不足，我沒有查到可靠的官方建議，所以這裡只分享常見的家庭做法，請當作參考。很多人習慣在早上或傍晚採葉菜，因為中午太陽大，葉片容易軟軟垂垂的。';
+  const detail = ['## 採收', '', LINE, '', '我沒有查到可靠的官方建議。', '', '本次搜尋只找到 2 篇文章。', '', '## 來源', '', '- [沒有查到](https://example.org/a)', '', '> [!vam-book]- 研究備註', '> 現有資料不足，我沒有查到。', ''].join('\n');
+  const out = sections.dropProcessNotes(detail);
+  assert.deepEqual([...out.removed], ['至於一天中什麼時候採，現有資料不足，我沒有查到可靠的官方建議，所以這裡只分享常見的家庭做法，請當作參考。', '我沒有查到可靠的官方建議。']);
+  assert.ok(out.detail.includes('\n很多人習慣在早上或傍晚採葉菜，因為中午太陽大，葉片容易軟軟垂垂的。\n'), out.detail);
+  assert.ok(out.detail.includes('本次搜尋只找到 2 篇文章。'), 'a sentence with a number is not deleted (the proofread flags it again)');
+  assert.ok(out.detail.includes('- [沒有查到](https://example.org/a)') && out.detail.includes('> 現有資料不足，我沒有查到。'), 'sources and records stay');
+  assert.ok(!/\n{3,}/.test(out.detail), out.detail);
+  assert.equal(sections.dropProcessNotes('## A\n\n普通段落。\n').detail, '## A\n\n普通段落。\n', 'nothing to drop: unchanged');
+  assert.equal(sections.dropProcessNotes('I could not find the source. Water daily.').detail, 'Water daily.');
+});
+
+test('dropProcessNotes: CRLF text keeps CRLF and drops the process-note sentence', () => {
+  const out = sections.dropProcessNotes('## A\r\n\r\n我沒有查到可靠的官方建議。\r\n\r\n普通段落。\r\n');
+  assert.deepEqual([...out.removed], ['我沒有查到可靠的官方建議。']);
+  assert.ok(out.detail.includes('普通段落。') && !out.detail.includes('我沒有查到'), out.detail);
+  assert.ok(!/(^|[^\r])\n/.test(out.detail), 'line endings stay CRLF');
+});
+
 test('expandChapterDetail: a @@replace passage applies only as whole lines (never a part of a line)', () => {
   const { expandChapterDetail } = sections;
   const old = '\n## 開場\n\n開場段落有圖。\n\n結尾。\n';
@@ -362,8 +441,27 @@ test('bookExpandRequirements: the chapter goes in as data, the amount is the tar
   const { bookExpandRequirements } = load('core/book-pipeline/settings.ts');
   const text = bookExpandRequirements({ tone: '親切', length: '每章約5000至8000字' }, '## 開場\n內容', { kind: 'under', measured: 2253, min: 5000, max: 8000, unit: '字', version: 1 }, 'POINTS');
   assert.match(text, /the chapter text is 2253 characters \(字\), short of the asked 5000 to 8000/);
-  assert.match(text, /Write about 4247 characters \(字\) of new text \(the whole chapter then about 6500\)/);
+  // The ask is the setting's minimum at least (never the 0.8x tolerance), aiming at the midpoint.
+  assert.match(text, /Write about 4247 characters \(字\) of new text, never less than 2747 characters \(字\) \(the whole chapter must reach at least 5000 characters \(字\); aim at about 6500\)/);
   assert.match(text, /<<<CHAPTER\n## 開場\n內容\nCHAPTER>>>\n\nPOINTS$/);
   assert.match(text, /- tone: 親切/);
   assert.doesNotMatch(text, /- length:/);
+  assert.match(text, /New ### headings \(hard requirement\).*never generic.*「本次無新增內容」/s);
+  assert.doesNotMatch(text, /This chapter's role|Do not cover/, 'no scope given: no scope lines');
+  // An intro is told its role and the other chapters as "do not cover".
+  const intro = bookExpandRequirements({}, '內容', undefined, undefined, { role: 'intro', others: ['土壤與容器準備', '播種與育苗'] });
+  assert.match(intro, /This chapter's role: intro, the book's guide\. Deepen its own covers only: at most one or two sentences of preview for each later chapter/);
+  assert.ok(intro.includes('Do not cover (each has its own chapter; JSON strings): "土壤與容器準備" "播種與育苗"'), intro);
+  const closing = bookExpandRequirements({}, '內容', undefined, undefined, { role: 'closing', others: ['A'] });
+  assert.match(closing, /This chapter's role: closing\. Deepen its own covers only/);
+});
+
+test('lengthReason: the first verdict keeps the 0.8x tolerance; after the fix round (strict) a chapter below the minimum is under', () => {
+  const { lengthReason } = load('core/book-pipeline/settings.ts');
+  const body = '好'.repeat(90);
+  assert.equal(lengthReason('100-200 字', body), undefined, '90 of 100 is within the tolerance');
+  assert.equal(lengthReason('100-200 字', body, undefined, true)?.kind, 'under');
+  assert.equal(lengthReason('100-200 字', body, undefined, true)?.measured, 90);
+  assert.equal(lengthReason('100-200 字', '好'.repeat(100), undefined, true), undefined, 'the minimum itself is enough');
+  assert.equal(lengthReason('100-200 字', '好'.repeat(230), undefined, true), undefined, 'strict is about the minimum only; the 1.2x top stays');
 });

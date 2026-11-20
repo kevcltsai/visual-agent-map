@@ -1979,6 +1979,11 @@ export const en = {
   "detail.book_proof_heading": "Proofread result (latest)",
   "detail.book_proof_met": "met",
   "detail.book_proof_unmet": "not met",
+  "detail.book_check_voice_0":
+    "Remove or rewrite these sentences in research or process voice (state the fact; the source belongs in Sources): {0}",
+  "detail.book_check_names_0": "Write the names as the chapter titles do: {0}",
+  "detail.book_check_preview_0":
+    "The intro is a guide only, with at most one or two sentences of preview for each later chapter; it previews too much of: {0}",
   "detail.book_proof_unverified": "to check",
   "detail.book_proof_failed_0": "Failed: {0}",
   "detail.book_proof_author_model_0": "Author model: {0}",

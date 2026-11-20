@@ -97,6 +97,7 @@ import {
   replaceResearchRecord,
   chapterBody,
   detailBlockOf,
+  dropProcessNotes,
   expandChapterDetail,
   replaceDetailBlock,
   neutralizeText
@@ -2656,9 +2657,17 @@ export class BookPipelineRuns {
     // and records stay). It never rewrites the chapter: an answer with no usable block leaves the chapter as it was, needs-review.
     const expanding = drive.avoid.has(nodeId) && drive.expand.has(nodeId);
     const oldBody = chapterBody(card.detail);
-    const now = expanding ? lengthReason(settings.length, oldBody) : undefined;
+    // The fix round asks for the setting's minimum itself (the 0.8x tolerance is only the first verdict's).
+    const now = expanding ? lengthReason(settings.length, oldBody, undefined, true) : undefined;
+    // The chapter's role and the other chapters (what it must not cover): told to the author, enforced in the merge.
+    const scope = {
+      role: info.role,
+      others: effectiveOrder(drive.store.state).flatMap(id =>
+        id === nodeId || id === drive.rootId ? [] : [drive.cards.get(id)?.title ?? ""].filter(Boolean)
+      )
+    };
     const requirements = expanding
-      ? bookExpandRequirements(settings, oldBody, now, drive.extra.get(nodeId))
+      ? bookExpandRequirements(settings, oldBody, now, drive.extra.get(nodeId), scope)
       : undefined;
     const oldDetail = expanding ? detailBlockOf(card.raw) : undefined;
     let noEdits = false;
@@ -2670,12 +2679,16 @@ export class BookPipelineRuns {
         oldDetail,
         next,
         drive.config.language,
-        fixInstructionText(requirements ?? "")
+        fixInstructionText(requirements ?? ""),
+        scope
       );
       if (!merged) {
         noEdits = true;
         return null;
       }
+      // A process note the fix left in place (flagged, then copied through) goes now; one that carries a fact stays for the proofread.
+      const scrubbed = dropProcessNotes(merged.detail);
+      if (scrubbed.removed.length) merged.detail = scrubbed.detail;
       // A fix never drops a picture the chapter had, nor makes the chapter shorter than the asked minimum (or shorter than it was, if it already was).
       const body = chapterBody(merged.detail);
       const pictures = new Set(bodyImageUrls(`\n${body}`));
@@ -3183,6 +3196,7 @@ export class BookPipelineRuns {
             body,
             checklist: [...checklist, ...BOOK_CHECKS],
             title: card.title,
+            role: drive.cards.get(nodeId)?.role,
             chapters: await this.proofChapters(drive, nodeId, card)
           },
           { signal, admission: drive.admission }
@@ -3314,7 +3328,8 @@ export class BookPipelineRuns {
     const root = await this.ports.readCard(rootInfo.path);
     const settings = effectiveSettings(root.settings, parseBookPlanDecisions(root.raw));
     const ignored = (reason: LengthIgnored): void => this.log(drive, "length_rule_ignored", nodeId, "proof", reason);
-    return lengthReason(settings.length, body, ignored);
+    // After the automatic fix round the asked minimum itself holds: a chapter still below it needs a person.
+    return lengthReason(settings.length, body, ignored, autoFixesOf(drive.store.state, nodeId) > 0);
   }
 
   /** The owner's minimum pictures per chapter (whole-book settings, see imageCountRange), or undefined without a picture setting. */

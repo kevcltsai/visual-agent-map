@@ -236,6 +236,52 @@ test('prose checks: research-voice phrases in zh-TW, zh-CN and English are found
   assert.deepEqual(plain(prose.researchVoiceHits('')), []);
 });
 
+test('prose checks (live v4): citation-style vague sources are research voice (「推廣單位建議」, 「農業改良場的資料指出」, 「有資料指出」); a named study or record is not', () => {
+  const hit = text => plain(prose.researchVoiceHits(text));
+  assert.deepEqual(hit('美國多所大學推廣單位（如內布拉斯加大學）也建議，容器一定要有足夠的排水孔。'), ['推廣單位（如內布拉斯加大學）也建議']);
+  assert.deepEqual(hit('威斯康辛大學推廣單位建議，像番茄、甜椒、茄子這類長得大的蔬菜。'), ['推廣單位建議']);
+  assert.deepEqual(hit('台灣農業改良場的資料指出，幼苗 3 到 4 片本葉期，根系發育完整。'), ['資料指出']);
+  assert.deepEqual(hit('有資料指出，小白菜覆土約 0.3 到 0.5 公分。'), ['有資料指出']);
+  assert.deepEqual(hit('有衛教文章建議把葉片攤開吹乾。'), ['有衛教文章建議']);
+  assert.deepEqual(hit('也有論文指出，排水層會讓整體保水量上升。'), ['有論文指出']);
+  assert.deepEqual(hit('研究指出，番茄喜光。'), ['研究指出']);
+  assert.deepEqual(hit('根據資料，台北年均溫 23 度。'), ['根據資料']);
+  assert.deepEqual(hit('有资料指出，小白菜覆土很浅。'), ['有资料指出']);
+  assert.deepEqual(hit('推广单位建议每天浇水。'), ['推广单位建议']);
+  assert.deepEqual(hit('Some sources say tomatoes need sun.'), ['some sources say']);
+  assert.deepEqual(hit('According to the data, tomatoes need sun.'), ['according to the data']);
+  assert.deepEqual(hit('Research shows that tomatoes need sun.'), ['research shows']);
+  for (const text of ['哈佛大學 2019 年的研究指出，番茄喜光。', '根據氣象局資料，台北年均溫 23 度。', '把照片存進資料夾和資料庫。', '她在研究光線。', 'A 2019 Harvard study shows tomatoes need sun.', '推廣這種做法的人很多。'])
+    assert.deepEqual(hit(text), [], text);
+});
+
+test('prose checks: the V1 note quotes the offending sentences and every note is in the note language (zh-TW, zh-CN, en); an intro that previews a later chapter too much makes R1 unmet', () => {
+  const items = ['N1', 'V1', 'R1'].map(id => ({ id, type: 'structure', status: 'met', note: '', sources: [] }));
+  const result = { aggregate: 'checked', items };
+  const body = '番茄要曬太陽。至於一天中什麼時候採，現有資料不足，我沒有查到可靠的官方建議。桃樂絲・蘭格拍過農場。';
+  const titles = ['多蘿西婭・蘭格'];
+  const note = (language, id) => prose.applyProseChecks(result, body, titles, { language }).items.find(item => item.id === id).note;
+  assert.equal(note('zh-TW', 'V1'), '刪除或改寫這些研究、處理過程口吻的句子（直接寫事實，來源放在「來源」）：「至於一天中什麼時候採，現有資料不足，我沒有查到可靠的官方建議。」');
+  assert.equal(note('zh-TW', 'N1'), '人名請照章名的寫法：「桃樂絲・蘭格」→「多蘿西婭・蘭格」');
+  // A Simplified Chinese interface writes its notes in the note language (zh-TW), like every other proof line.
+  assert.equal(note('zh-CN', 'V1'), note('zh-TW', 'V1'));
+  assert.match(note('en', 'V1'), /^Remove or rewrite these sentences in research or process voice/);
+  assert.match(prose.applyProseChecks(result, body, titles).items[1].note, /^Remove or rewrite/, 'no language: English');
+  for (const language of ['zh-TW', 'zh-CN']) assert.doesNotMatch(note(language, 'V1') + note(language, 'N1'), /[A-Za-z]{3,}/, language);
+  // Intro (live v4): a section per later chapter, or more than two sentences naming one, is too much preview.
+  const others = ['家庭菜園入門', '土壤與容器準備', '播種與育苗', '採收與保存'];
+  const intro = ['我的陽台能不能種菜？接下來依序是土壤與容器準備、播種與育苗、採收與保存。', '', '### 土壤與容器：預告裡沒講完的小細節', '', '盆的材質。', '', '播種與育苗要淺覆土。播種與育苗要保濕。播種與育苗要移植。'].join('\n');
+  assert.deepEqual(plain(prose.introPreviewHits(intro, others.slice(1))), ['土壤與容器準備', '播種與育苗']);
+  const judged = prose.applyProseChecks(result, intro, others, { language: 'zh-TW', role: 'intro', title: '家庭菜園入門' });
+  const r1 = judged.items.find(item => item.id === 'R1');
+  assert.equal(r1.status, 'unmet');
+  assert.equal(r1.note, '導讀章只做導覽，每個後續章節最多預告一兩句；這些章節預告過多：〈土壤與容器準備〉〈播種與育苗〉');
+  assert.equal(judged.aggregate, 'needs-review');
+  // One or two sentences each is a guide; a body chapter is not checked for previews.
+  assert.equal(prose.applyProseChecks(result, intro.split('\n')[0], others, { role: 'intro', title: '家庭菜園入門' }), result);
+  assert.equal(prose.applyProseChecks(result, intro, others, { role: 'body', title: '家庭菜園入門' }), result);
+});
+
 test('prose checks: a dotted person name that shares a chapter title\'s family name but not its spelling is a variant (live run: 桃樂絲・蘭格, 理察・艾維頓, 歐文・潘)', () => {
   const titles = ['多蘿西婭・蘭格', '理查・艾維頓', '艾文・潘', '尤瑟夫・卡許', '羅伯特・卡帕', '亨利・卡蒂埃-布列松', '技法與器材'];
   const body = '攝影師桃樂絲・蘭格拍下移民母親；理察・艾維頓的白底肖像與歐文・潘的角落肖像，都和卡什一樣講究光。';
@@ -267,7 +313,7 @@ test('runProofread: the chapter list and covers lines reach the prompt; a progra
   assert.equal(result.aggregate, 'needs-review');
   const by = id => result.items.find(entry => entry.id === id);
   assert.equal(by('N1').status, 'unmet'); assert.match(by('N1').note, /「桃樂絲・蘭格」→「多蘿西婭・蘭格」/);
-  assert.equal(by('V1').status, 'unmet'); assert.match(by('V1').note, /「本次搜尋」/);
+  assert.equal(by('V1').status, 'unmet'); assert.match(by('V1').note, /^Remove or rewrite these sentences in research or process voice .*: 「桃樂絲・蘭格的作品；本次搜尋未取得原始底片。」$/);
   assert.equal(by('R1').status, 'met');
   // A clean chapter with the model's met stays checked; the model's R1 unmet alone needs review.
   const clean = harness({ answer: reply(allMet), events: [search('q'), page('https://example.org/a')] });

@@ -1,6 +1,7 @@
 import type { AdmissionContext } from "../../admission";
 import type { AiCalls } from "../../ai-calls";
 import { openedUrlsFromEvents, searchEventCount } from "../../argument-map/source-proof";
+import type { BookRole } from "../../book-pipeline/model";
 import type { ChecklistItem } from "../../book-pipeline/plan-text";
 import {
   evaluateProof,
@@ -29,6 +30,8 @@ export interface ProofreadRequest extends BookStepBase {
   checklist: readonly ChecklistItem[];
   /** The chapter's own title (absent: not shown). */
   title?: string;
+  /** The chapter's role (an intro is checked for previewing later chapters too much); absent: not checked. */
+  role?: BookRole;
   /** Every chapter in reading order: its title (the authoritative spelling of a person's name) and its covers line (may be empty). */
   chapters?: readonly ProofChapter[];
 }
@@ -164,7 +167,8 @@ export async function runProofread(
         const judged = evaluateProof(parsed, request.checklist, opened, { body: request.body });
         // The program's own findings (research voice, a person name spelled unlike its chapter title) override the model's "met".
         const titles = (request.chapters ?? []).map(chapter => chapter.title);
-        return { ...applyProseChecks(judged, request.body, titles), counts };
+        const context = { language: request.language, role: request.role, title: request.title };
+        return { ...applyProseChecks(judged, request.body, titles, context), counts };
       } catch (error) {
         // The counts travel with a failure too: they are the only trace of what a no-content-log call did.
         if (isProofFailure(error))

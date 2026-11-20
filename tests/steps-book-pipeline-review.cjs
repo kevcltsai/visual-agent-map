@@ -67,6 +67,27 @@ test('galleryBare: only a gallery chapter whose every slot is missing', () => {
 });
 
 // ---- fingerprint ----
+test('seam reason names the chapter that changed (re-verify 2 item 3: after "rewrite with AI" the neighbour box says why it is new), only while that chapter is still next to it', () => {
+  const order = ['a', 'b', 'c', 'd'];
+  const titles = { a: '豆子', b: '手沖', c: '法式濾壓', d: '水質' };
+  const entries = (seams, ord = order) => b.reviewEntries({
+    order: ord,
+    titleOf: id => titles[id],
+    noteOf: id => ({ pipelineStage: 'checked', ...(seams[id] ? { pipelineSeam: seams[id] } : {}) })
+  });
+  const zh = n => `鄰卡企劃或正文已變更，尚未人工核對（第 ${n} 張，版本 4）`;
+  const one = entries({ c: zh(2) });
+  assert.equal(one.map(e => e.card.id).join(), 'c', 'the neighbour of the rewritten chapter is listed (seam counts, design §7-3)');
+  assert.equal(one[0].problems.map(p => p.text).join('|'), '「手沖」改過，和這章的銜接還沒確認');
+  assert.equal(entries({ a: zh(2) })[0].problems[0].text, '「手沖」改過，和這章的銜接還沒確認', 'the next chapter names it too');
+  assert.equal(entries({ c: zh(2) }, ['a', 'c', 'b', 'd'])[0].problems[0].text, '前後章改過，銜接還沒確認', 'reordered: card 2 is no longer next to it, no title is guessed');
+  assert.equal(entries({ d: zh(1) })[0].problems[0].text, '前後章改過，銜接還沒確認', 'not adjacent');
+  assert.equal(entries({ c: 'Neighbouring card\'s plan or text changed; not yet checked by a person (card 2, revision 4)' })[0].problems[0].text, '「手沖」改過，和這章的銜接還沒確認', 'the English seam line');
+  assert.equal(entries({ c: '舊格式' })[0].problems[0].text, '前後章改過，銜接還沒確認', 'no position: the plain sentence');
+  const box = b.reviewCallout(one[0].card, one[0].problems.map(p => p.text), undefined, one[0].fp, 'run-1');
+  assert.ok(box.includes('> ・「手沖」改過，和這章的銜接還沒確認'), 'the reason is in the box');
+});
+
 test('fingerprint: stage, issue codes, proof key and the full seam value each change it; the same input is stable', () => {
   const base = { stage: 'checked', issue: 'structure unmet: S1', proofKey: 'r:n:1:h:l', seam: '前後章變了（第 2 張，版本 2）' };
   const fp = b.attentionFingerprint(base);

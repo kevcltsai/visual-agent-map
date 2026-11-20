@@ -4943,7 +4943,7 @@ export class VisualAgentMapView extends ItemView {
           {
             label: t("ui.structure_review_merge_confirm", name(node)),
             warning: true,
-            action: () => run(() => this.removeToUnassigned(node, false, into.id))
+            action: () => run(() => this.removeInQueue(node, false, into.id))
           }
         ],
         () => resolve(false)
@@ -6420,8 +6420,17 @@ export class VisualAgentMapView extends ItemView {
     this.render();
     return { before, after };
   }
-  /** Removes a topic (or its branch) to Unassigned in one undo step; `adopterId` first takes over its children (merge). */
-  private async removeToUnassigned(node: MapNode, branch: boolean, adopterId?: string): Promise<void> {
+  /**
+   * Removes a topic (or its branch) to Unassigned in one undo step; `adopterId` first takes over its children (merge). It runs in the
+   * plugin's write queue like the right-click removal, so a book run's state write (also queued) never reads Map.md before the removal
+   * and saves it after (which put the removed card back on the map while its note sat in Unassigned). Callers already in the queue use
+   * {@link removeInQueue}.
+   */
+  removeToUnassigned(node: MapNode, branch: boolean, adopterId?: string): Promise<void> {
+    return this.plugin.mutate(() => this.removeInQueue(node, branch, adopterId));
+  }
+  /** {@link removeToUnassigned} for a caller that already holds the write queue. */
+  private async removeInQueue(node: MapNode, branch: boolean, adopterId?: string): Promise<void> {
     await this.removeToUnassignedEntry(node, branch, adopterId);
   }
   /** The same, handing back the undo step it pushed (undefined when nothing was removed). */
@@ -7200,7 +7209,7 @@ export class VisualAgentMapView extends ItemView {
       const previous = this.history.undoEntry;
       this.focusNodeId = next?.id ?? null;
       try {
-        await this.removeToUnassigned(node, false);
+        await this.removeInQueue(node, false);
       } finally {
         this.focusNodeId = null;
       }
@@ -7226,12 +7235,12 @@ export class VisualAgentMapView extends ItemView {
         {
           label: t("ui.remove_only_this_node_children_become_roots"),
           warning: true,
-          action: () => run(() => this.removeToUnassigned(node, false))
+          action: () => run(() => this.removeInQueue(node, false))
         },
         {
           label: t("ui.remove_entire_branch"),
           warning: true,
-          action: () => run(() => this.removeToUnassigned(node, true))
+          action: () => run(() => this.removeInQueue(node, true))
         }
       ],
       hooks.dismissed

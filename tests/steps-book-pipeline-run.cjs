@@ -2008,6 +2008,24 @@ test('T9 no records: a chapter with no record and no older evidence is backed up
   assert.equal(bodyStateRaw(r.raw(1)), 'clean');
 });
 
+test('C7 never in a book: a card the pipeline never wrote that already has text (the reader\'s research) is not rewritten by the run: skipped with the hand-edit box, text kept; the empty cards are written', async () => {
+  const r = await rig();
+  const RESEARCH = '### 核心結論\n\n磨豆機每次用後乾刷，定期拆洗刀盤。這是讀者自己的研究正文，不是程式寫的。';
+  await r.repo.updateNoteGuarded(r.nodes[1].path, { detail: RESEARCH }, {});
+  assert.equal(bodyStateRaw(r.raw(1)), 'unknown', 'no pipeline evidence on the card');
+  await finish(r);
+  assert.ok(!r.stat.author.includes(r.nodes[1].id), 'not rewritten');
+  assert.ok((await r.note(1)).detail.includes('這是讀者自己的研究正文'), 'the research text is kept');
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: hand_edited', 'held with the hand-edit review box');
+  assert.equal(bodyStateRaw(r.raw(1)), 'unknown', 'the plan fields the run wrote (book-role, pipeline-role, the stage) are no evidence');
+  assert.ok(r.stat.author.includes(r.nodes[0].id) && r.stat.author.includes(r.nodes[2].id), 'the empty cards are written');
+  // A second whole-book run holds it again: the skip left no pipeline evidence on it.
+  const authors = r.stat.author.length;
+  await redo(r, [1]);
+  assert.equal(r.stat.author.length, authors, 'still not written');
+  assert.ok((await r.note(1)).detail.includes('這是讀者自己的研究正文'));
+});
+
 test('T9 keep (review-b B1): keeping a note that has no record stays kept: a whole-book redo does not write it and the record holds no program fingerprint', async () => {
   const r = await rig();
   await finish(r);

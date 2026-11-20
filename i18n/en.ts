@@ -3475,6 +3475,7 @@ export const en = {
   "ui.book_panel_g2_reason_facts_0": "{0} facts could not be confirmed against a source",
   "ui.book_panel_g2_reason_images": "This is a picture chapter but no fitting picture was found",
   "ui.book_panel_g2_reason_seam": "A neighbouring chapter changed; the join is not confirmed",
+  "ui.book_panel_g2_reason_seam_0": '"{0}" changed; its join with this chapter is not confirmed',
   "ui.book_note_trial_title_0": "Trial chapter {0} of {1}",
   "ui.book_note_trial_next": "Once you have read it, go back to the mind map and press “Run the whole book”.",
   "ui.book_note_trial_stopped":

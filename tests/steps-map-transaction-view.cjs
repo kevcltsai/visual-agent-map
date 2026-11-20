@@ -42,7 +42,7 @@ async function harness() {
   class Modal extends dom.makeModal() { open() { super.open(); this.close(); } }
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Notice: dom.makeNotice(notices) } }, { createFragment: dom.createFragment });
   const plugin = withExpansionCoordinator({
-    repo: spy, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false
+    repo: spy, settings, running: new Set(), logs: { appendLog() {} }, mutate: work => work(), rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false
   });
   const view = new VisualAgentMapView({ app }, plugin);
   view.path = MAP; view.map = await repo.readMap(MAP); view.contentEl = element('div'); view.stageEl = element('div');
@@ -227,6 +227,26 @@ test('removeToUnassigned R4: undo after an unrecorded structural write to Map.md
   assert.equal(error.kind, 'stale');
   assert.deepEqual(h.snapshot(), before);
   assert.equal((await h.repo.readMap(MAP)).title, 'Written by AIM');
+});
+
+test('removeToUnassigned Q1 (book re-verify 2): it runs in the plugin write queue, so a write already queued (a book run reading Map.md, then saving it) lands first and the removal is not undone by it', async () => {
+  const h = await branchHarness();
+  let queue = Promise.resolve();
+  h.view.plugin.mutate = work => { const next = queue.then(work); queue = next.catch(() => undefined); return next; };
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  // The run's state write: read-modify-write of Map.md in the queue (the stale copy would put the removed card back if the removal ran meanwhile).
+  const runWrite = h.view.plugin.mutate(async () => { const map = await h.repo.readMap(MAP); await gate; map.title = 'run state'; await h.repo.saveMap(MAP, map); });
+  const childPath = h.node(h.ids.child).path;
+  const removal = h.view.removeToUnassigned(h.node(h.ids.child), false);
+  for (let i = 0; i < 5; i++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.exists(childPath), true, 'the removal waits for the queued write');
+  release();
+  await Promise.all([runWrite, removal]);
+  const saved = await h.repo.readMap(MAP);
+  assert.equal(saved.title, 'run state', 'the run write landed');
+  assert.ok(!saved.nodes.some(n => n.id === h.ids.child), 'the removed card is not on the map');
+  assert.equal(h.exists(childPath), false, 'its note was parked');
 });
 
 test('removeToUnassigned V1: adopter takes the children and expands; undo restores everything and redo returns the removed state', async () => {

@@ -3244,6 +3244,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_panel_g2_reason_facts_0": "有 {0} 項事實還沒查證到來源",
   "ui.book_panel_g2_reason_images": "這章是圖集，卻沒有找到合適的圖",
   "ui.book_panel_g2_reason_seam": "前後章改過，銜接還沒確認",
+  "ui.book_panel_g2_reason_seam_0": "「{0}」改過，和這章的銜接還沒確認",
   "ui.book_note_trial_title_0": "試跑第 {0}／{1} 章",
   "ui.book_note_trial_next": "看完後回心智圖，按「這樣可以，跑完全書」。",
   "ui.book_note_trial_stopped": "這本書已停止。先在心智圖工具列按「繼續」，再按「這樣可以，跑完全書」。",

@@ -16,6 +16,7 @@ import {
   detailBlockOf,
   extractProofRecords,
   fencedLines,
+  hasHiddenCallout,
   replaceResearchRecord,
   withoutHiddenCallouts
 } from "./note-sections";
@@ -106,15 +107,17 @@ export function oldNoteLooksUntouched(detail: string, cardDetail: string = detai
  * empty: no chapter text at all (nothing to lose); clean: the text is as the program left it; edited: the text differs from the stored
  * fingerprint; unknown: text, no fingerprint, and the older records ({@link oldNoteLooksUntouched}) do not fit it: possibly edited,
  * handled like edited by every automatic flow. Text with no record of any kind (no body record, no stored proof, no slots record) is
- * "clean" (owner decision 2026-11-20): nothing says the reader touched it, so it is rewritten like any other chapter, after the usual backup.
+ * "clean" only when the pipeline itself wrote this chapter before (`wrote`, see {@link pipelineWroteRaw}): an older build's chapter is
+ * rewritten after the usual backup (owner decision 2026-11-20). A card the pipeline never wrote that already has text (the reader's own
+ * research, say) stays "unknown": it is skipped with the review box, never rewritten without asking (owner requirement, both hold).
  * `cardDetail` is the Detail as the card reader gives it (see {@link cardDetailOf}); only the older-note fallback uses it.
  */
 export type BodyState = "empty" | "clean" | "edited" | "unknown";
-export function bodyState(detail: string, cardDetail?: string): BodyState {
+export function bodyState(detail: string, cardDetail?: string, wrote: boolean = hasHiddenCallout(detail)): BodyState {
   const record = readBodyRecord(detail);
   if (!record?.fp) {
     if (!integrityText(detail)) return "empty";
-    if (!record && !extractProofRecords(detail).length && !latestSlotsRecord(detail)) return "clean";
+    if (wrote && !record && !extractProofRecords(detail).length && !latestSlotsRecord(detail)) return "clean";
   }
   return vouched(detail, cardDetail) ? "clean" : record?.fp ? "edited" : "unknown";
 }
@@ -194,5 +197,19 @@ export function programStampRaw(baseRaw: string, nextRaw: string): string {
   return base !== undefined && vouched(base, cardDetailOf(baseRaw)) ? stampRaw(nextRaw) : nextRaw;
 }
 export const isKeptRaw = (raw: string): boolean => isKept(detailBlockOf(raw) ?? "");
-export const bodyStateRaw = (raw: string): BodyState => bodyState(detailBlockOf(raw) ?? "", cardDetailOf(raw));
+const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
+/** Only the pipeline's proofread sets these stages, and only on a chapter it wrote (a skipped chapter gets planned or needs-review). */
+const WRITTEN_STAGE = /^pipeline-stage:[ \t]*["']?(?:written|checked)["']?[ \t]*\r?$/m;
+/**
+ * Evidence, in a note's raw text, that the pipeline itself wrote this chapter at some time: one of its hidden `[!vam-book]` callouts (work
+ * records, proofread result), or a `written`/`checked` stage. Fields the plan writes on every card of a run (`book-role`, `pipeline-role`)
+ * and the owner's role choice (`book-role-by`) are no such evidence: they are there before a single word was written.
+ */
+export function pipelineWroteRaw(raw: string): boolean {
+  if (hasHiddenCallout(raw)) return true;
+  const fm = FRONTMATTER.exec(raw)?.[1];
+  return !!fm && WRITTEN_STAGE.test(fm);
+}
+export const bodyStateRaw = (raw: string): BodyState =>
+  bodyState(detailBlockOf(raw) ?? "", cardDetailOf(raw), pipelineWroteRaw(raw));
 export const integrityFpRaw = (raw: string): string => integrityFp(detailBlockOf(raw) ?? "");

@@ -7,7 +7,7 @@ Rules for every paragraph you return:
 - Remove all note marks ⟦N..⟧ and ⟦/N..⟧; keep the words that were inside them unless a note asks to change them.
 - A token such as ⟦L1⟧ stands for a link or a picture. Keep every token of the paragraph exactly once, unchanged, and add no token.
 - Keep the same number of lines, and keep each line's list or quote mark (for example "- " or "> ") as it was. Add no blank line.
-- Write plain prose only: no headings, no lists, no code, no links, no addresses, no callouts, checkboxes, highlights (==), comments (%%) or HTML. Keep the placeholders. Marks you may use: letters, numbers, spaces, and ordinary punctuation such as , . ; : ! ? ' " ( ) - – — / % · … ～ 《》 「」 『』. A line must begin with a letter, a number, a ⟦L token or an opening quote or bracket.
+- Write plain prose only: no headings, no lists, no code, no links, no addresses, no callouts, checkboxes, highlights (==), comments (%%) or HTML. Keep the placeholders. Marks you may use: letters, numbers, spaces, and ordinary punctuation such as , . ; : ! ? ' " ( ) - – — / % · ‧ ・ … ～ 《》 「」 『』 【】. A line must begin with a letter, a number, a ⟦L token, an opening quote or bracket (including 【), or …….
 - Keep the chapter's voice, the plan and the settings. Use only facts, numbers and names that appear in the supplied text or the notes.
 
 Return only JSON: {"paragraphs":[{"id":"","text":""}]}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.

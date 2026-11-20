@@ -45961,7 +45961,7 @@ function countNotes(text10) {
 // core/book-pipeline/notes-apply.ts
 var SKIP_MARK = " \u26A0 \u539F\u6587\u5DF2\u6539\uFF0C\u9019\u5247\u6C92\u5957\u7528";
 var REFUSED_MARK = " \u26A0 AI \u6539\u5BEB\u4E0D\u5408\u683C\u5F0F\uFF0C\u9019\u5247\u6C92\u5957\u7528";
-var hasMark = (note) => note.endsWith(SKIP_MARK) || note.endsWith(REFUSED_MARK);
+var stripMark = (note) => note.endsWith(SKIP_MARK) ? note.slice(0, -SKIP_MARK.length) : note.endsWith(REFUSED_MARK) ? note.slice(0, -REFUSED_MARK.length) : note;
 function chapterParagraphs(raw) {
   const lines = raw.split("\n");
   const mask = chapterTextMask(lines);
@@ -46013,7 +46013,7 @@ function encodeParagraph(id, text10) {
     return `\u27E6L${links.length}\u27E7`;
   });
   if (swallowed || encoded.includes("|") || forbiddenSyntax(encoded)) return null;
-  return { id, text: encoded, links, notes: found.map((f) => ({ id: `N${f.n}`, note: f.note })) };
+  return { id, text: encoded, links, notes: found.map((f) => ({ id: `N${f.n}`, note: stripMark(f.note) })) };
 }
 function snapshotNotes(raw) {
   const items = [];
@@ -46035,8 +46035,8 @@ function sameLead(original, reply) {
   const lead = leadOf(reply);
   return !lead.includes("	") && canonLead(lead) === canonLead(leadOf(original));
 }
-var BASE_PUNCT = /* @__PURE__ */ new Set([...` ,.;:!?'"()\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF01\uFF1F\uFF08\uFF09\u300C\u300D\u300E\u300F\u2018\u2019\u201C\u201D\u2026\u2014\u2013/%\xB7\u300A\u300B\u3008\u3009\uFF5E-`]);
-var OPENERS = /* @__PURE__ */ new Set([...`'"(\uFF08\u300C\u300E\u2018\u201C\u300A\u3008`]);
+var BASE_PUNCT = /* @__PURE__ */ new Set([...` ,.;:!?'"()\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF01\uFF1F\uFF08\uFF09\u300C\u300D\u300E\u300F\u2018\u2019\u201C\u201D\u2026\u2014\u2013/%\xB7\u300A\u300B\u3008\u3009\uFF5E\u2027\u30FB\u3010\u3011-`]);
+var OPENERS = /* @__PURE__ */ new Set([...`'"(\uFF08\u300C\u300E\u2018\u201C\u300A\u3008\u3010\u2026`]);
 var STARTS_LIKE_PROSE = /^[\p{L}\p{N}]/u;
 var TOKEN3 = /⟦L\d+⟧/g;
 function whitelistBreach(original, before, lines) {
@@ -46106,8 +46106,11 @@ function applyReplies(raw, items, replies, refused = []) {
   let skipped2 = 0;
   const skipNotes = (item, mark2) => {
     skipped2++;
-    for (const n of notes.filter((f) => item.numbers.includes(f.n) && !hasMark(f.note)))
-      if (!marks.some((m) => m.from === n.to - 2)) marks.push({ from: n.to - 2, to: n.to - 2, insert: mark2 });
+    const other = mark2 === SKIP_MARK ? REFUSED_MARK : SKIP_MARK;
+    for (const n of notes.filter((f) => item.numbers.includes(f.n) && !f.note.endsWith(mark2))) {
+      const stale = n.note.endsWith(other) ? other.length : 0;
+      if (!marks.some((m) => m.to === n.to - 2)) marks.push({ from: n.to - 2 - stale, to: n.to - 2, insert: mark2 });
+    }
   };
   for (const id of refused) {
     const item = items.find((i) => i.id === id);
@@ -46291,7 +46294,7 @@ Rules for every paragraph you return:
 - Remove all note marks \u27E6N..\u27E7 and \u27E6/N..\u27E7; keep the words that were inside them unless a note asks to change them.
 - A token such as \u27E6L1\u27E7 stands for a link or a picture. Keep every token of the paragraph exactly once, unchanged, and add no token.
 - Keep the same number of lines, and keep each line's list or quote mark (for example "- " or "> ") as it was. Add no blank line.
-- Write plain prose only: no headings, no lists, no code, no links, no addresses, no callouts, checkboxes, highlights (==), comments (%%) or HTML. Keep the placeholders. Marks you may use: letters, numbers, spaces, and ordinary punctuation such as , . ; : ! ? ' " ( ) - \u2013 \u2014 / % \xB7 \u2026 \uFF5E \u300A\u300B \u300C\u300D \u300E\u300F. A line must begin with a letter, a number, a \u27E6L token or an opening quote or bracket.
+- Write plain prose only: no headings, no lists, no code, no links, no addresses, no callouts, checkboxes, highlights (==), comments (%%) or HTML. Keep the placeholders. Marks you may use: letters, numbers, spaces, and ordinary punctuation such as , . ; : ! ? ' " ( ) - \u2013 \u2014 / % \xB7 \u2027 \u30FB \u2026 \uFF5E \u300A\u300B \u300C\u300D \u300E\u300F \u3010\u3011. A line must begin with a letter, a number, a \u27E6L token, an opening quote or bracket (including \u3010), or \u2026\u2026.
 - Keep the chapter's voice, the plan and the settings. Use only facts, numbers and names that appear in the supplied text or the notes.
 
 Return only JSON: {"paragraphs":[{"id":"","text":""}]}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.

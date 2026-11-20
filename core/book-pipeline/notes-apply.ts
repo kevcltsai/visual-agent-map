@@ -12,7 +12,13 @@ import { chapterTextMask } from "./note-sections";
 export const SKIP_MARK = " ⚠ 原文已改，這則沒套用";
 /** Written the same way when the AI's rewrite of the paragraph was refused (wrong format); the paragraph is untouched. */
 export const REFUSED_MARK = " ⚠ AI 改寫不合格式，這則沒套用";
-const hasMark = (note: string): boolean => note.endsWith(SKIP_MARK) || note.endsWith(REFUSED_MARK);
+/** A note text without the program's own mark (it is program text and never goes to the model). */
+const stripMark = (note: string): string =>
+  note.endsWith(SKIP_MARK)
+    ? note.slice(0, -SKIP_MARK.length)
+    : note.endsWith(REFUSED_MARK)
+      ? note.slice(0, -REFUSED_MARK.length)
+      : note;
 
 /** A run of consecutive visible, non-blank chapter lines. `[from, to)` is the raw range (without the final `\r`); `text` uses `\n`. */
 export interface NoteParagraph {
@@ -95,7 +101,7 @@ export function encodeParagraph(id: string, text: string): EncodedItem | null {
     return `⟦L${links.length}⟧`;
   });
   if (swallowed || encoded.includes("|") || forbiddenSyntax(encoded)) return null;
-  return { id, text: encoded, links, notes: found.map(f => ({ id: `N${f.n}`, note: f.note })) };
+  return { id, text: encoded, links, notes: found.map(f => ({ id: `N${f.n}`, note: stripMark(f.note) })) };
 }
 
 /** The paragraphs that carry a note, numbered `p1..pn` in order. */
@@ -122,9 +128,9 @@ function sameLead(original: string, reply: string): boolean {
 }
 
 /** Prose punctuation any rewrite may use; every other mark must already be in the original paragraph. */
-const BASE_PUNCT = new Set([..." ,.;:!?'\"()，。、；：！？（）「」『』‘’“”…—–/%·《》〈〉～-"]);
+const BASE_PUNCT = new Set([..." ,.;:!?'\"()，。、；：！？（）「」『』‘’“”…—–/%·《》〈〉～‧・【】-"]);
 /** A line body may only start with a letter, a number, a link token or one of these opening marks. */
-const OPENERS = new Set([..."'\"(（「『‘“《〈"]);
+const OPENERS = new Set([..."'\"(（「『‘“《〈【…"]);
 const STARTS_LIKE_PROSE = /^[\p{L}\p{N}]/u;
 const TOKEN = /⟦L\d+⟧/g;
 
@@ -236,8 +242,12 @@ export function applyReplies(
   let skipped = 0;
   const skipNotes = (item: NoteItem, mark: string): void => {
     skipped++;
-    for (const n of notes.filter(f => item.numbers.includes(f.n) && !hasMark(f.note)))
-      if (!marks.some(m => m.from === n.to - 2)) marks.push({ from: n.to - 2, to: n.to - 2, insert: mark });
+    const other = mark === SKIP_MARK ? REFUSED_MARK : SKIP_MARK;
+    for (const n of notes.filter(f => item.numbers.includes(f.n) && !f.note.endsWith(mark))) {
+      // The other mark is stale: it is replaced by the current reason.
+      const stale = n.note.endsWith(other) ? other.length : 0;
+      if (!marks.some(m => m.to === n.to - 2)) marks.push({ from: n.to - 2 - stale, to: n.to - 2, insert: mark });
+    }
   };
   for (const id of refused) {
     const item = items.find(i => i.id === id);

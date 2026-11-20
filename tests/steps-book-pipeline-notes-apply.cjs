@@ -301,3 +301,37 @@ test('applyReplies (fix 4): a refused reply gets the refusal mark, not the chang
   const changed = na.applyReplies(RAW.replace('showed linear', 'showed a linear'), items, [], [items[0].id]);
   assert.ok(changed.text.includes(`說明是什麼${na.REFUSED_MARK}%%`), 'refused wins over the edit: the mark names the reply');
 });
+
+test('fix5 marks: a note carrying the other mark gets the current reason instead (both directions); the same mark is not doubled', () => {
+  const marked = mark => RAW.replace('說明是什麼%%', `說明是什麼${mark}%%`);
+  // refused mark, then the paragraph changed meanwhile -> skip mark replaces it
+  const refusedRaw = marked(na.REFUSED_MARK);
+  const items = na.snapshotNotes(RAW);
+  const a = na.applyReplies(refusedRaw, items, [{ id: 'p1', text: 'x' }]);
+  assert.ok(a.text.includes(`說明是什麼${na.SKIP_MARK}%%`));
+  assert.ok(!a.text.includes(na.REFUSED_MARK));
+  // skip mark, then a refused reply -> refused mark replaces it
+  const skipRaw = marked(na.SKIP_MARK);
+  const b = na.applyReplies(skipRaw, na.snapshotNotes(skipRaw), [], ['p1']);
+  assert.ok(b.text.includes(`說明是什麼${na.REFUSED_MARK}%%`));
+  assert.ok(!b.text.includes(na.SKIP_MARK));
+  assert.equal(b.marked, 1);
+  // same mark again: unchanged
+  const c = na.applyReplies(refusedRaw, na.snapshotNotes(refusedRaw), [], ['p1']);
+  assert.equal(c.text, refusedRaw);
+});
+
+test('fix5 encode: a program mark on a note never goes to the model', () => {
+  for (const mark of [na.SKIP_MARK, na.REFUSED_MARK]) {
+    const raw = RAW.replace('說明是什麼%%', `說明是什麼${mark}%%`);
+    const item = na.snapshotNotes(raw)[0];
+    assert.equal(item.encoded.notes.find(n => n.id === 'N2').note, '說明是什麼');
+    assert.ok(!JSON.stringify(item.encoded).includes('⚠'));
+  }
+});
+
+test('fix5 punctuation: ‧ ・ 【】 are allowed in a rewrite, a line may start with 【 or ……, other new marks still refuse', () => {
+  const item = { text: 'Plain words here', links: [] };
+  for (const ok of ['Plain ‧ words・here', '【Plain】 words here', '……Plain words here']) assert.equal(na.checkRewrite(item, ok).ok, true, ok);
+  assert.equal(na.checkRewrite(item, 'Plain ★ words here').ok, false);
+});

@@ -536,6 +536,10 @@ test('author requirements: the fixed chapter rules always come first, the settin
   assert.match(none, /Open with this chapter's own scene, question or claim/); assert.match(none, /Do not open by recapping or pointing back to the previous chapter/); assert.match(none, /never cards/); assert.match(none, /End with one sentence that leads into the next chapter/); assert.match(none, /Do not end the chapter with an update log/); assert.match(none, /no next chapter \(the last card\).*close the whole book/); assert.match(none, /what the later chapters show together and why/);
   const some = settings.bookAuthorRequirements({ tone: 'warm' });
   assert.ok(some.startsWith(none)); assert.match(some, /- tone: warm/);
+  assert.doesNotMatch(none, /The whole book's chapters/, 'no chapter list when none is given');
+  const book = settings.bookAuthorRequirements({}, [], [{ title: 'A', covers: 'a "x"' }, { title: 'B', covers: 'b', current: true }]);
+  assert.match(book, /The whole book's chapters in reading order/);
+  assert.match(book, /- 1: "A" covers "a \\"x\\""/); assert.match(book, /- 2 \(this chapter\): "B" covers "b"/);
 });
 
 // ---- second device acceptance: subjective items, proofread counts, author picture rule ----

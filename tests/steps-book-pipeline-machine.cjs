@@ -471,7 +471,7 @@ test('requestAutoFix: one redo per card, a revision rise, attempts kept, the use
   assert.equal(model.readBookPipeline({ bookPipeline: plain(first.state) }).kind, 'usable');
 });
 
-test('trial: a new run carries the first three cards; only they run (plan, write, proof) before gate 1, then the rest after the confirmation', () => {
+test('trial: a new run carries the first three cards; every card is planned first, then only the trial cards are written and proofread before gate 1, then the rest after the confirmation', () => {
   const order = ['a', 'b', 'c', 'd', 'e'];
   let state = trialRun(order);
   assert.deepEqual(state.trial, ['a', 'b', 'c']);
@@ -479,8 +479,10 @@ test('trial: a new run carries the first three cards; only they run (plan, write
   assert.deepEqual(trialRun(['a', 'b']).trial, ['a', 'b'], 'fewer than three: all of them');
   const stages = Object.fromEntries(order.map(id => [id, undefined]));
   state = succeed(state, 'global');
-  assert.deepEqual(actionsOf(state, stages).actions.map(a => `${a.type}:${a.nodeId}`), ['card_plan:a', 'card_plan:b', 'card_plan:c'], 'cards d and e are not planned yet');
-  for (const id of ['a', 'b', 'c']) { state = succeed(state, 'plan', id); stages[id] = 'planned'; }
+  assert.deepEqual(actionsOf(state, stages).actions.map(a => `${a.type}:${a.nodeId}`), ['card_plan:a', 'card_plan:b', 'card_plan:c', 'card_plan:d', 'card_plan:e'], 'every card is planned first, the trial too');
+  for (const id of ['a', 'b', 'c', 'd']) { state = succeed(state, 'plan', id); stages[id] = 'planned'; }
+  assert.deepEqual(actionsOf(state, stages, new Set(['e'])).actions, [], 'no chapter is written while another is still being planned');
+  state = succeed(state, 'plan', 'e'); stages.e = 'planned';
   assert.deepEqual(actionsOf(state, stages).actions.map(a => `${a.type}:${a.nodeId}`), ['card_write:a', 'card_write:b', 'card_write:c'], 'the trial goes on to the author while the phase is still planning');
   assert.equal(state.phase, 'planning');
   for (const id of ['a', 'b', 'c']) { state = succeed(state, 'write', id); stages[id] = 'written'; }
@@ -493,7 +495,7 @@ test('trial: a new run carries the first three cards; only they run (plan, write
   assert.equal(state.phase, 'gate1', 'a needs-review trial card does not hold gate 1 back');
   assert.deepEqual(actionsOf(state, stages), { actions: [], hold: 'gate1' });
   state = machine.confirmGate1(state, NOW);
-  assert.deepEqual(actionsOf(state, stages).actions.map(a => `${a.type}:${a.nodeId}`), ['card_plan:d', 'card_plan:e'], 'after the confirmation the trial cards start no further call');
+  assert.deepEqual(actionsOf(state, stages).actions.map(a => `${a.type}:${a.nodeId}`), ['card_write:d', 'card_write:e'], 'after the confirmation the trial cards start no further call');
 });
 
 test('trial: the whole-book plan must be done first, and a one-card or three-card book goes straight from the trial to gate 2 after the confirmation', () => {
@@ -527,10 +529,10 @@ test('retryTrial: back to planning with only the trial cards reset (stage cleare
   assert.equal(machine.cardRevision(retried, 'a'), 3, 'a result still in flight can no longer commit');
   assert.equal(retried.globalPlanned, true, 'the whole-book plan stays');
   assert.deepEqual(actionsOf(retried, stages).actions.map(a => `${a.type}:${a.nodeId}`), ['reset_stage:a', 'reset_stage:b', 'reset_stage:c']);
-  const cleared = { a: undefined, b: undefined, c: undefined, d: undefined };
+  const cleared = { a: undefined, b: undefined, c: undefined, d: 'planned' };
   let next = retried;
   for (const id of ['a', 'b', 'c']) next = machine.applyReset(next, id);
-  assert.deepEqual(actionsOf(next, cleared).actions.map(a => `${a.type}:${a.nodeId}`), ['card_plan:a', 'card_plan:b', 'card_plan:c']);
+  assert.deepEqual(actionsOf(next, cleared).actions.map(a => `${a.type}:${a.nodeId}`), ['card_plan:a', 'card_plan:b', 'card_plan:c'], 'the card outside the trial keeps its plan');
   assert.equal(machine.retryTrial(succeed(trialRun(order), 'global'), NOW).phase, 'planning', 'not at gate 1: no-op');
   const old = fresh(); old.phase = 'gate1';
   assert.equal(machine.retryTrial(old, NOW), old, 'an older run has no trial to retry');

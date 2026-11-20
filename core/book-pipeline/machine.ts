@@ -138,19 +138,20 @@ export function nextActions(
       return { actions: busy.has("global") ? [] : [{ type: "global_plan" }] };
     }
   }
+  // Every chapter is planned before any chapter is written (a trial too): a brief written later cannot change a chapter already written.
+  const allPlanned = order.every(id => ranked(stages[id]) >= 1);
   for (const nodeId of order) {
     if (busy.has(nodeId)) continue;
     const stage = stages[nodeId];
     if (stage === "needs-review" || stage === "checked") continue;
     const attempts = attemptsOf(data, nodeId);
-    // The stage a card needs a step for: planning phase only plans (a run with a trial: only its trial cards, all the way to the proofread);
-    // writing phase plans leftovers, writes, proofs.
+    // The stage a card needs a step for: every card is planned first; then the planning phase writes and proofs its trial cards only
+    // (a run without a trial: none), and the writing phase writes and proofs the rest.
     const trialCard = !!data.trial?.includes(nodeId);
-    if (data.phase === "planning" && data.trial && !trialCard) continue;
     const step: PipelineStep | null =
       stage === undefined
         ? "plan"
-        : data.phase === "planning" && !trialCard
+        : !allPlanned || (data.phase === "planning" && !trialCard)
           ? null
           : stage === "planned"
             ? "write"

@@ -1456,18 +1456,18 @@ const trialRig = (over = {}) => {
   return rig({ trial: true, titles: T5_TITLES, ...over, ports: { config: () => ({ planModel: models.plan, authorModel: models.author, imageModel: 'm4', proofModel: models.proof, reasoning: 'low', language: 'zh-TW' }), ...over.ports } }).then(r => ({ ...r, models }));
 };
 
-test('T5 trial: only the first three cards are planned, written and proofread before gate 1; after confirm the rest run and the trial cards get no more calls', async () => {
+test('T5 trial: every card is planned, then only the first three are written and proofread before gate 1; after confirm the rest run and the trial cards get no more calls', async () => {
   const r = await trialRig();
   const trial = r.nodes.slice(0, 3).map(n => n.id);
   await r.runs.start(r.mapPath);
   let s = await r.state();
   same(s.trial, trial);
   assert.equal(s.phase, 'gate1'); assert.equal(s.status, 'running');
-  same(r.stat.plan, ['global', ...trial]);
+  same(r.stat.plan, ['global', ...r.nodes.map(n => n.id)], 'the whole book is planned before the trial is written');
   same(r.stat.author, trial);
   assert.equal(r.stat.proof.length, 3);
   for (let i = 0; i < 3; i++) { assert.equal(stageOf(r.raw(i)), 'checked'); assert.ok((await r.note(i)).detail.includes(bodyOf(T5_TITLES[i]))); }
-  for (let i = 3; i < 5; i++) { assert.equal(stageOf(r.raw(i)), undefined, 'a card outside the trial is untouched'); assert.ok(!(await r.note(i)).detail.includes('SecretBody')); }
+  for (let i = 3; i < 5; i++) { assert.equal(stageOf(r.raw(i)), 'planned', 'a card outside the trial is planned, not written'); assert.ok(!(await r.note(i)).detail.includes('SecretBody')); }
   await confirmDone(r.runs, r.mapPath);
   s = await r.state();
   assert.equal(s.phase, 'gate2');
@@ -1565,7 +1565,7 @@ test('T5 trial: stop during the trial keeps the trial; resume finishes it withou
   assert.equal(s.phase, 'gate1'); assert.equal(s.status, 'running');
   for (let i = 0; i < 3; i++) assert.equal(stageOf(r.raw(i)), 'checked');
   assert.equal(r.stat.author.filter(id => id === r.nodes[0].id).length, 1, 'a card finished before the stop is not written again');
-  assert.equal(stageOf(r.raw(3)), undefined);
+  assert.equal(stageOf(r.raw(3)), 'planned', 'a card outside the trial is planned but not written');
 });
 
 test('restart: a run stopped in planning is replaced by a fresh run with the models read again; the old drive\'s late plan is dropped; a running run and a plain start are refused', async () => {

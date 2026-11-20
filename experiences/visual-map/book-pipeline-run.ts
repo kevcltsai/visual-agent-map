@@ -44,6 +44,7 @@ import {
   nextActions,
   pauseForMap,
   recoverInterrupted,
+  reopenTrialFix,
   requestAutoFix,
   resetCard,
   resumeRun,
@@ -87,6 +88,7 @@ import {
   hidePipelineLog,
   findStoredProof,
   findStoredProofModels,
+  latestStoredProof,
   extractProofRecords,
   addPictureSources,
   carryImageSection,
@@ -847,7 +849,10 @@ export function unsafeBody(content: string, allowed: ReadonlySet<string>): boole
       else if (body[p] === ")") depth--;
       p++;
     }
-    if (body[p] !== ")" || !allowed.has(body.slice(at + head[0].length, p))) return true;
+    // The address as written or in the standard form the cleaning gives it (live v5: a raw non-ASCII or upper-case https address of an
+    // allowed picture refused a whole expansion); anything that does not parse as a safe https address must be listed as written.
+    const href = body.slice(at + head[0].length, p);
+    if (body[p] !== ")" || !(allowed.has(href) || allowed.has(safeHref(href) ?? ""))) return true;
   }
   return false;
 }
@@ -876,13 +881,23 @@ export function expansionUnsafe(
   allowed: ReadonlySet<string>,
   unsafe: (content: string, allowed: ReadonlySet<string>) => boolean = unsafeBody
 ): boolean {
+  return expansionUnsafeRule(detail, oldDetail, answerLines, allowed, unsafe) !== undefined;
+}
+/** Which rule of {@link expansionUnsafe} refuses the text (`hidden_callout`, `slot_marker`, `body`, `picture`), or undefined: the log names it. */
+export function expansionUnsafeRule(
+  detail: string,
+  oldDetail: string,
+  answerLines: ReadonlySet<string>,
+  allowed: ReadonlySet<string>,
+  unsafe: (content: string, allowed: ReadonlySet<string>) => boolean = unsafeBody
+): string | undefined {
   const added = addedLines(detail, oldDetail);
   const text = added.join("\n");
-  if (neutralizeText(text) !== text) return true;
-  if (added.some(line => residualMarkerLines(line).length > 0 && !answerLines.has(line))) return true;
+  if (neutralizeText(text) !== text) return "hidden_callout";
+  if (added.some(line => residualMarkerLines(line).length > 0 && !answerLines.has(line))) return "slot_marker";
   // The leading line break: added text that starts with `---` is never read as frontmatter (and so skipped).
-  if (unsafe(`\n${text}`, allowed)) return true;
-  return bodyImageUrls(`\n${text}`).some(url => !allowed.has(url));
+  if (unsafe(`\n${text}`, allowed)) return "body";
+  return bodyImageUrls(`\n${text}`).some(url => !allowed.has(url)) ? "picture" : undefined;
 }
 
 /** The distinct addresses (standard form) of a note's body that an image would load and that may be probed: https only; never the frontmatter. */
@@ -1071,6 +1086,7 @@ export class BookPipelineRuns {
         });
         if (!moved) throw new BookPipelineRunError("not_gate1");
         this.log(drive, "gate1", "-", "write", "confirmed");
+        await this.queueTrialFixes(drive);
       },
       true
     );
@@ -2349,6 +2365,28 @@ export class BookPipelineRuns {
     this.syncReviewNotes(drive);
   }
   /**
+   * Gate 1 confirmed: a trial chapter still needing a person (its proof's unmet points or its length) joins the full book's fix round,
+   * with the instruction its stored proof and its length give now. A hand-edited or kept chapter is not queued.
+   */
+  private async queueTrialFixes(drive: Drive): Promise<void> {
+    for (const id of drive.store.state.trial ?? []) {
+      const info = drive.cards.get(id);
+      if (!info || drive.stages.get(id) !== "needs-review") continue;
+      const card = await this.ports.readCard(info.path).catch(() => undefined);
+      if (!card || isKeptRaw(card.raw) || /^write failed: hand_edited$/.test(String(card.fields.pipelineIssue ?? "").trim()))
+        continue;
+      const proof = latestStoredProof(card.detail);
+      const length = await this.lengthOf(drive, id, lengthBody(chapterBody(card.detail)));
+      if (proof?.aggregate !== "needs-review" && !length) continue;
+      const done = await drive.store.commit(state => reopenTrialFix(state, id));
+      if (!done?.accepted) continue;
+      const items = (proof?.items ?? []).map(item => ({ ...item, sources: [...item.sources] }));
+      drive.fixable.set(id, proofFixInstruction(items, [...parseChecklist(card.prompt), ...BOOK_CHECKS], length));
+      drive.expand.add(id);
+    }
+  }
+
+  /**
    * The one automatic redo (plan 2026 flow v3, E), after every card has had its first round: a card whose proofread named unmet points
    * gets its text written again by the author alone (the plan and the checklist stay, attempts are not reset), then proofread once more.
    * The real points go to the author only (never to the proofread). A refused or no longer allowed request leaves the card needs-review.
@@ -2729,6 +2767,8 @@ export class BookPipelineRuns {
     const knownLines: ReadonlySet<string> = new Set(card.raw.split("\n"));
     const ownRecords = extractProofRecords(normalizeWorkRecords(card.detail)).map(quoteAll);
     let unsafe = false;
+    // Which check refused the write (logged: live v5 showed only `unsafe_body`).
+    let unsafeRule = "";
     let emptyBody = false;
     const finalize = (original: string): string | null => {
       // The card's own stored records come back from the card (carried below), never from what the author kept of them: an exact copy is cut out first.
@@ -2750,18 +2790,21 @@ export class BookPipelineRuns {
       // carries a hidden callout or owner marker, a tag, or a picture that is not https.
       const oldUrls = oldDetail === undefined ? [] : bodyImageUrls(`\n${oldDetail}`);
       const allowed = new Set([...urls.filter(isHttps), ...oldUrls]);
-      const check = (text: string, base: string, answer: string): boolean =>
-        expansionUnsafe(text, base, new Set(answer.split("\n")), allowed, (body, ok) => this.exitCheck(body, ok));
+      const check = (text: string, base: string, answer: string): string | undefined =>
+        expansionUnsafeRule(text, base, new Set(answer.split("\n")), allowed, (body, ok) => this.exitCheck(body, ok));
       if (oldDetail !== undefined) {
         const answer = detailBlockOf(anchored) ?? "";
-        if (unsafeUrls.size || check(answer, oldDetail, answer)) {
+        const rule = unsafeUrls.size ? "picture_not_https" : check(answer, oldDetail, answer);
+        if (rule) {
           unsafe = true;
+          unsafeRule = `answer_${rule}`;
           return null;
         }
       }
       const cleaned = replaceBodyImages(content, unsafeUrls);
       if (this.exitCheck(cleaned, new Set(urls.filter(isHttps)))) {
         unsafe = true;
+        unsafeRule = "exit_check";
         return null;
       }
       // An author result whose Detail holds no chapter text (only sources and notes) is refused: the card keeps its text.
@@ -2778,8 +2821,11 @@ export class BookPipelineRuns {
       const merged = expand(restore(cleaned));
       if (merged === null) return null;
       const final = detailBlockOf(merged);
-      if (final === undefined || neutralizeDetail(merged) === null || check(final, oldDetail, detail ?? "")) {
+      const rule =
+        final === undefined || neutralizeDetail(merged) === null ? "shape" : check(final, oldDetail, detail ?? "");
+      if (rule) {
         unsafe = true;
+        unsafeRule = `merged_${rule}`;
         return null;
       }
       return stampRaw(merged);
@@ -2806,7 +2852,20 @@ export class BookPipelineRuns {
       })
     );
     if (changedByHand) return { kind: "failed", reason: "hand_edited", forceReview: true };
-    if (unsafe) return { kind: "failed", reason: "unsafe_body", forceReview: true };
+    if (unsafe) {
+      this.ports.log(
+        formatPipelineLog({
+          event: "write_refused",
+          runId: token.runId,
+          card: nodeId,
+          step: "write",
+          attempt: attemptsOf(drive.store.state, nodeId).write,
+          result: unsafeRule || "unknown",
+          ms: 0
+        })
+      );
+      return { kind: "failed", reason: "unsafe_body", forceReview: true };
+    }
     if (noEdits) return { kind: "failed", reason: "fix_no_edits", forceReview: true };
     if (lostText) return { kind: "failed", reason: "fix_lost_text", forceReview: true };
     if (emptyBody) return { kind: "failed", reason: "no_body" };

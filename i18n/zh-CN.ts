@@ -3228,7 +3228,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_reason_no_open_page": "校对时没有成功打开任何来源页",
   "ui.book_reason_chapters_too_long": "章节清单太长，无法放进同一次企划请求",
   "ui.book_reason_all_facts_unverified": "所有事实项目都无法查证",
-  "ui.book_reason_unsafe_body": "图片内容不安全，卡片保持原样",
+  "ui.book_reason_unsafe_body": "写出的内容没通过安全检查，这次没有写入，卡片保持原样",
   "ui.book_reason_fix_no_edits": "自动修正没有给出可用的修改，章节保持原样",
   "ui.book_reason_fix_lost_text": "自动修正会删掉图片或让章节太短，章节保持原样",
   "ui.book_reason_no_view": "地图已不在界面上，运行已停止",

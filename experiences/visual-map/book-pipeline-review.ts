@@ -163,23 +163,36 @@ export const plainNote = (text: string): string =>
     .replace(/\s+/g, " ")
     .trim();
 
+/**
+ * Reasons in one line: the panel's separator between them, none after a piece that already ends a sentence (live v5: 「位置不符。，刪除或改寫…」);
+ * a sentence end in a Latin script keeps one space.
+ */
+export function joinReasons(parts: readonly string[]): string {
+  const sep = t("ui.book_panel_lead_sep");
+  return parts.reduce((out, part, at) => {
+    if (!at) return part;
+    if (!/[。！？.!?]\s*$/.test(out)) return out + sep + part;
+    return /[.!?]\s*$/.test(out) ? `${out.trimEnd()} ${part}` : out.trimEnd() + part;
+  }, "");
+}
+
 /** The reason of a needs-review card in words: the proof's own notes of the items not met, else the count, else a plain sentence; never a code. */
 export function reasonOf(issue: string, proof: StoredProofView | undefined): string {
   const pictures = splitPictureIssue(issue);
   if (pictures.shortfall) {
     const sentence = shortfallText(pictures.shortfall);
-    return pictures.rest ? `${reasonOf(pictures.rest, proof)}${t("ui.book_panel_lead_sep")}${sentence}` : sentence;
+    return pictures.rest ? joinReasons([reasonOf(pictures.rest, proof), sentence]) : sentence;
   }
   const { rest, length } = splitLengthIssue(issue);
   if (length) {
     const sentence = lengthText(length);
-    return rest ? `${reasonOf(rest, proof)}${t("ui.book_panel_lead_sep")}${sentence}` : sentence;
+    return rest ? joinReasons([reasonOf(rest, proof), sentence]) : sentence;
   }
   if (!/^proof unmet/.test(issue.trim())) return bookIssueText(issue);
   if (/facts_unverified/.test(issue)) return t("ui.book_reason_all_facts_unverified");
   const open = (proof?.items ?? []).filter(item => item.status !== "met");
   const notes = [...new Set(open.map(item => plainNote(unescapeMarkdownText(item.note))).filter(Boolean))].slice(0, 3);
-  if (notes.length) return notes.join(t("ui.book_panel_lead_sep"));
+  if (notes.length) return joinReasons(notes);
   return open.length ? t("ui.book_panel_reason_unchecked_0", open.length) : t("ui.book_panel_reason_unmet_plain");
 }
 
@@ -718,12 +731,15 @@ export function proofIsStale(
 ): boolean {
   if (stage !== "checked" && stage !== "needs-review") return false;
   if (!latestStoredProof(card.detail)) return false;
-  const key = proofKey({
-    runId,
-    nodeId,
-    revision,
-    body: projectProofBody(stripImageLines(chapterBody(card.detail))),
-    checklist: parseChecklist(card.prompt)
-  });
-  return !findStoredProof(card.detail, key) && !findStoredProof(card.detail, failedProofKey(key));
+  const body = projectProofBody(stripImageLines(chapterBody(card.detail)));
+  const checklist = parseChecklist(card.prompt);
+  // A stored proof of this run for this very text stays valid at a later revision: a redo that wrote nothing (live v5, a refused
+  // fix) bumps the revision but leaves the text, so the chapter is not "changed, not proofread again".
+  for (let at = revision; at >= Math.max(0, revision - STALE_REVISIONS); at--) {
+    const key = proofKey({ runId, nodeId, revision: at, body, checklist });
+    if (findStoredProof(card.detail, key) || findStoredProof(card.detail, failedProofKey(key))) return false;
+  }
+  return true;
 }
+/** How many earlier revisions {@link proofIsStale} looks back for a proof of the same text. */
+const STALE_REVISIONS = 20;

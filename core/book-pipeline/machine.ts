@@ -530,6 +530,19 @@ export function requestAutoFix(data: BookPipelineData, nodeId: string): Committe
   return { state: next, accepted: true };
 }
 
+/**
+ * After gate 1 a trial chapter that still needs a person gets the full book's fix round like every other chapter (live v5: two short
+ * trial chapters were never fixed again): its automatic-redo count starts over once. Only in the writing phase, only for a trial card.
+ */
+export function reopenTrialFix(data: BookPipelineData, nodeId: string): Committed {
+  if (data.phase !== "writing" || data.status !== "running" || !data.trial?.includes(nodeId) || !autoFixesOf(data, nodeId))
+    return { state: data, accepted: false };
+  const next = clone(data);
+  if (next.autoFixes) delete next.autoFixes[nodeId];
+  next.revision++;
+  return { state: next, accepted: true };
+}
+
 /** A card was reset by the owner or needs another pass (single-card rerun): its counters and its stage start over. */
 export function resetCard(data: BookPipelineData, nodeId: string): BookPipelineData {
   if (!effectiveOrder(data).includes(nodeId)) return data;

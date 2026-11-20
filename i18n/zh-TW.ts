@@ -3229,7 +3229,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_reason_no_open_page": "校對時沒有成功開啟任何來源頁",
   "ui.book_reason_chapters_too_long": "章節清單太長，無法放進同一次企劃請求",
   "ui.book_reason_all_facts_unverified": "所有事實項目都無法查證",
-  "ui.book_reason_unsafe_body": "圖片內容不安全，卡片維持原樣",
+  "ui.book_reason_unsafe_body": "寫出的內容沒通過安全檢查，這次沒有寫入，卡片維持原樣",
   "ui.book_reason_fix_no_edits": "自動修正沒有給出可用的修改，章節維持原樣",
   "ui.book_reason_fix_lost_text": "自動修正會刪掉圖片或讓章節太短，章節維持原樣",
   "ui.book_reason_no_view": "心智圖已不在畫面上，執行已停止",

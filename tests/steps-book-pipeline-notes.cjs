@@ -433,7 +433,8 @@ test('dialog: shows the selected text and one input; save with a bad note keeps 
   assert.ok(dom.texts(modal.contentEl).includes('小熊'));
   const input = dom.find(modal.contentEl, i => i.tag === 'input');
   assert.ok(input);
-  const save = dom.button(modal.modalEl, '儲存');
+  assert.ok(dom.find(modal.contentEl, i => i.tag === 'label' && i.text === '想怎麼改' && i.attrs.for === input.attrs.id), 'mockup ⑦-4: a visible "想怎麼改" label names the input');
+  const save = dom.button(modal.modalEl, '加上');
   input.value = 'bad'; save.click();
   assert.equal(modal.closeCount, 0);
   assert.ok(dom.texts(modal.contentEl).includes('不行'));

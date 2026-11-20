@@ -218,15 +218,20 @@ export class BookNoteModal extends Modal {
   onOpen(): void {
     this.titleEl.setText(t("ui.book_note_title"));
     this.contentEl.createEl("p", { text: this.selected, cls: "vam-book-note-selected" });
-    const input = this.contentEl.createEl("input", { type: "text", cls: "vam-name-input vam-book-note-input" });
-    input.setAttr("aria-label", t("ui.book_note_input_label"));
+    // Mockup ⑦-4: a visible "what to change" label names the input (its accessible name is the same words).
+    this.contentEl.createEl("label", { text: t("ui.book_note_input_ask"), attr: { for: "vam-book-note-input" } });
+    const input = this.contentEl.createEl("input", {
+      type: "text",
+      cls: "vam-name-input vam-book-note-input",
+      attr: { id: "vam-book-note-input" }
+    });
     this.contentEl.createEl("p", { text: t("ui.book_note_input_hint"), cls: "vam-annotated-note-hint" });
     const problem = this.contentEl.createEl("p", { cls: "vam-book-note-problem" });
     problem.setAttr("role", "alert");
     const actions = modalActions(this);
     actionStatus(actions);
     actions.createEl("button", { text: t("ui.cancel") }).addEventListener("click", () => this.close());
-    const ok = actions.createEl("button", { text: t("ui.save"), cls: "mod-cta" });
+    const ok = actions.createEl("button", { text: t("ui.book_note_add_button"), cls: "mod-cta" });
     const send = (): void => {
       const answer = this.submit(input.value);
       if (answer === null) this.close();

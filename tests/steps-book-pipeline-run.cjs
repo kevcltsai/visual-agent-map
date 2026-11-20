@@ -1975,7 +1975,7 @@ test('T9 auto skip: a whole-book redo skips the hand-edited chapter (needs-revie
 test('T9 unknown: an older chapter with text and no fingerprint (and no stored proof to vouch for it) is skipped like a hand-edited one', async () => {
   const r = await rig();
   await finish(r);
-  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/\n> <!-- book-body:v1 .*-->/, '').replace(/\n> \[!vam-book\]- 校對結果（最新一次）(\n>.*)*/, '\n'), {});
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/\n> <!-- book-body:v1 .*-->/, '').replace(/\n> <!-- book-proof:v1 .*-->/, '').replace(/\n> \[!vam-book\]- 校對結果（最新一次）(\n>.*)*/, '\n'), {});
   assert.equal(bodyStateRaw(r.raw(1)), 'unknown');
   const authors = r.stat.author.length;
   await redo(r, [1]);
@@ -1986,7 +1986,7 @@ test('T9 unknown: an older chapter with text and no fingerprint (and no stored p
 test('T9 keep (review-b B1): keeping a note that has no record stays kept: a whole-book redo does not write it and the record holds no program fingerprint', async () => {
   const r = await rig();
   await finish(r);
-  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/\n> <!-- book-body:v1 .*-->/, '').replace(/\n> \[!vam-book\]- 校對結果（最新一次）(\n>.*)*/, '\n'), {});
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/\n> <!-- book-body:v1 .*-->/, '').replace(/\n> <!-- book-proof:v1 .*-->/, '').replace(/\n> \[!vam-book\]- 校對結果（最新一次）(\n>.*)*/, '\n'), {});
   assert.equal(bodyStateRaw(r.raw(1)), 'unknown');
   await r.repo.updateNoteRawGuarded(r.nodes[1].path, keepRaw, {});
   assert.equal(readBodyRecord(detailBlockOf(r.raw(1))).fp, undefined, 'no program fingerprint is stored');
@@ -1997,6 +1997,67 @@ test('T9 keep (review-b B1): keeping a note that has no record stays kept: a who
   assert.ok(r.stat.logs.some(l => l.includes('hand_edit_kept')));
   const { isKeptRaw } = S.load('core/book-pipeline/body-integrity.ts');
   assert.equal(isKeptRaw(r.raw(1)), true, 'the view still asks (G) for a manual rerun');
+});
+
+// An older build wrote the chapters: text, the stored proof and the slots record, but no book-body record (real vault case, 2026-11-20).
+const olderBuild = c => c.replace(/\n> <!-- book-body:v1 .*-->/, '');
+test('T9 older build: a chapter the program wrote before the fingerprint existed (stored proof still fits) is rewritten by a whole-book redo, after a backup', async () => {
+  const r = await rig();
+  await finish(r);
+  for (let i = 0; i < 3; i++) await r.repo.updateNoteRawGuarded(r.nodes[i].path, olderBuild, {});
+  assert.ok(detailBlockOf(r.raw(1)).startsWith('\n'), 'the stored Detail starts with a line break (the card reader trims it)');
+  assert.equal(readBodyRecord(detailBlockOf(r.raw(1))), undefined);
+  assert.equal(bodyStateRaw(r.raw(1)), 'clean', 'the stored proof vouches for the text');
+  const authors = r.stat.author.length;
+  const backups = r.stat.backups.length;
+  await redo(r, [0, 1, 2]);
+  assert.equal(r.stat.author.length, authors + 3, 'every chapter was written again');
+  assert.ok(r.stat.backups.length > backups, 'backed up before the rewrite');
+  for (let i = 0; i < 3; i++) {
+    assert.equal(stageOf(r.raw(i)), 'checked');
+    assert.equal((await r.note(i)).pipelineIssue, undefined);
+    assert.equal(bodyStateRaw(r.raw(i)), 'clean');
+    assert.ok(readBodyRecord(detailBlockOf(r.raw(i))).fp, 'the rewrite stores the fingerprint');
+  }
+  assert.ok(!r.stat.logs.some(l => l.includes('hand_edit_skipped')));
+});
+
+test('T9 older build: a real hand edit on such a chapter is still seen (the stored proof no longer fits) and skipped', async () => {
+  const r = await rig();
+  await finish(r);
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, olderBuild, {});
+  await handEdit(r, 1);
+  assert.equal(bodyStateRaw(r.raw(1)), 'unknown');
+  const authors = r.stat.author.length;
+  await redo(r, [1]);
+  assert.equal(r.stat.author.length, authors, 'not written');
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: hand_edited');
+  assert.ok((await r.note(1)).detail.includes(HAND));
+});
+
+test('T9 older build, stuck run: every chapter wrongly left needs-review hand_edited at gate 2 (with the review box) is rewritten after stop and restart', async () => {
+  const r = await rig();
+  await finish(r);
+  const box = '> [!vam-review] 這章要你看\n> ・這章有你手改的內容，這次重跑沒有重寫它\n> - [ ] 保留我的版本\n> - [ ] 用 AI 重寫這章（會蓋掉你的修改，改前先備份）\n> %%vam-review:old-run:n:0ad38d4019197e76:op:54c47c406daba134%%\n> %%vam-callout-version:1%%\n';
+  for (let i = 0; i < 3; i++) {
+    await r.repo.updateNoteRawGuarded(r.nodes[i].path, c => olderBuild(c).replace('<!-- visual-agent-map:detail:start -->\n', `<!-- visual-agent-map:detail:start -->\n${box}`), {});
+    await r.repo.writePipelineFields(r.nodes[i].path, { pipelineStage: 'needs-review', pipelineIssue: 'write failed: hand_edited' });
+    assert.equal(bodyStateRaw(r.raw(i)), 'clean', `chapter ${i}: the program's box is not the reader's hand`);
+  }
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.accepted = [...d.bookPipeline.order]; });
+  assert.equal((await r.state()).phase, 'gate2');
+  await r.runs.stop(r.mapPath, { saved: true });
+  const authors = r.stat.author.length;
+  await r.runs.start(r.mapPath, { restart: true });
+  await confirmDone(r.runs, r.mapPath);
+  await settle();
+  assert.equal(r.stat.author.length, authors + 3, 'all three chapters rewritten');
+  for (let i = 0; i < 3; i++) {
+    assert.equal(stageOf(r.raw(i)), 'checked');
+    assert.equal((await r.note(i)).pipelineIssue, undefined);
+    assert.equal(bodyStateRaw(r.raw(i)), 'clean');
+  }
+  assert.ok(!r.stat.logs.some(l => l.includes('hand_edit_skipped') || l.includes('plan_skipped')));
 });
 
 test('T9 keep: "keep my version" makes a whole-book redo leave the chapter alone and send it on to its proofread', async () => {

@@ -68,6 +68,23 @@ test('old note, branch 2 (picture hashes): a picture swapped, added or removed a
   const twoInText = proofRecord(BODY.replace('第二段。', `${fig(2)}\n\n第二段。`));
   assert.equal(b.bodyState(withSlots(twoInText, 1)), 'unknown', 'a picture in the text that the record does not list');
 });
+// The stored shape of a real older chapter (sanitized from a vault, 2026-11-20): the Detail starts with a line break after the start
+// marker, while the proof step hashed the Detail as the card reader gives it (trimmed). 15 of 15 such chapters read as "unknown" before.
+const STORED_DETAIL = '\n開場一段。\n\n第二段講原理。\n\n### 來源\n\n- [來源 A](https://example.com/a)\n';
+const storedOld = () => {
+  const vouched = STORED_DETAIL.trim();
+  const key = `r0:n1:2:${b.hashText(b.projectProofBody(b.stripImageLines(b.chapterBody(vouched))))}:listhash`;
+  const slots = b.composeSlotsRecord({ placed: [], missing: [{ index: 1, reasonCode: 'not_found' }], bad: 0 });
+  return b.appendResearchNote(b.replaceResearchRecord(STORED_DETAIL, slots), `<!-- book-proof:v1 ${JSON.stringify({ key })} -->`).text;
+};
+test('old note, stored shape: a Detail that starts with a line break (as saved) is vouched for by its proof; a review box on top is not an edit; a changed word is', () => {
+  const old = storedOld();
+  assert.ok(old.startsWith('\n'));
+  assert.equal(b.readBodyRecord(old), undefined);
+  assert.equal(b.bodyState(old), 'clean');
+  assert.equal(b.bodyState(`\n> [!vam-review] 這章要你看\n> ・x\n> %%vam-review:r:n:f%%\n${old}`), 'clean', 'the program\'s review box');
+  assert.equal(b.bodyState(old.replace('第二段', '第三段')), 'unknown');
+});
 test('old note: ACCEPTED LIMIT - a caption-only edit is not seen (book-slots stores picture hashes only, no caption hash); a new note sees it', () => {
   assert.equal(b.bodyState(OLD.replace('Caption 1', 'Caption one')), 'clean');
   assert.equal(b.bodyState(b.stampDetail(BODY).replace('Caption 1', 'Caption one')), 'edited');

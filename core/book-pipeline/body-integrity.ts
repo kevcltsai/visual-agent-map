@@ -86,7 +86,8 @@ export function oldNoteLooksUntouched(detail: string): boolean {
   const parts = latest.split(":");
   if (parts.length < 5) return false;
   const stored = parts[parts.length - 2];
-  if (stored !== hashText(projectProofBody(stripImageLines(chapterBody(detail))))) return false;
+  // The proof step hashed the Detail as the card reader gives it (trimmed: no line break after the start marker); the same here.
+  if (stored !== hashText(projectProofBody(stripImageLines(chapterBody(detail.trim()))))) return false;
   const placed = (latestSlotsRecord(detail)?.slots ?? [])
     .filter(slot => slot.state === "placed" && slot.hash)
     .map(slot => slot.hash as string)

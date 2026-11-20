@@ -3317,6 +3317,8 @@ export class BookPipelineRuns {
               signal,
               skip: url => seen.has(imageKey(url)) || taken(imageKey(url)),
               run: drive.commonsBudget,
+              // The run's clock (a test's fake clock too): the chapter deadline and a Retry-After date are judged on it.
+              now: () => Date.parse(this.ports.now()),
               ...(this.ports.commonsQueue ? { queue: this.ports.commonsQueue } : {})
             }
           );

@@ -1346,6 +1346,33 @@ test('commons run budget: once a book run has waited 180 s on 429 answers, no ch
   assert.equal(after.limited, true); assert.deepEqual(plain(after.cut), [1]);
 });
 
+test('commons run (v6 #4, whole run): 9 chapters whose Commons search always answers 429 with Retry-After 29 s (an HTTP date) stop waiting within 180 s of the run clock; every slot is rate_limited, every chapter images:limited, and the run completes', async () => {
+  let clock = Date.parse('2026-11-17T00:00:00.000Z');
+  let slept = 0;
+  let requests = 0;
+  const titles = Array.from({ length: 9 }, (_, i) => `Chapter${i + 1}`);
+  const text = () => `開頭。\n\nexplains 1 perspective 的 explains perspective。\n\n${mk(1)}\n\n尾。\n\n### 來源\n- https://example.com/a\n`;
+  const r = await picRig({ text, slots: 1, titles,
+    finder: () => ({ ...found({ 1: [] }), hints: new Map([[1, { search: 'perspective drawing grid' }]]) }),
+    ports: {
+      now: () => new Date(clock).toISOString(),
+      commonsQueue: new C.CommonsQueue(0, async ms => { slept += ms; clock += ms; }),
+      // Retry-After as an HTTP date 29 s ahead of the run clock: the wait is judged on the run's clock, not the machine's.
+      fetchCommons: async () => { requests++; return { status: 429, text: '', headers: { 'Retry-After': new Date(clock + 29000).toUTCString() } }; }
+    } });
+  await run(r);
+  assert.ok(slept <= C.COMMONS_RUN_BACKOFF_MS, `the run waited ${slept} ms on 429 answers`);
+  assert.ok(slept > C.COMMONS_RUN_BACKOFF_MS - 30000, `close to the run cap (${slept} ms)`);
+  assert.ok(requests < 9 * 2, `after the cap no chapter asks Commons (${requests} requests)`);
+  for (let i = 0; i < titles.length; i++) {
+    const note = await r.note(i);
+    assert.deepEqual(plain(recordOf(note.detail).slots.map(s => [s.index, s.state, s.reasonCode ?? ''])), [[1, 'missing', 'rate_limited']], titles[i]);
+    assert.match(note.pipelineIssue, /(?:^|\s)images:limited(?:\s|$)/, titles[i]);
+  }
+  assert.equal((await r.state()).phase, 'gate2', 'the run completed (waiting for the reader at gate 2)');
+  assert.equal(r.runs.isRunning(r.mapPath), false);
+});
+
 // ---- repro v4 L: two Commons files placed under a slot line that says something the picture does not show ----
 const V4_POT = { index: 3, kind: '示意圖', explains: '比較有排水孔的盆和只在盆底鋪碎石的盆。', search: 'pot drainage hole gravel' };
 const V4_PAKCHOI = { index: 4, kind: '示意圖', explains: '小白菜淺覆土播種的方式，呼應好光性種子的特性。', search: 'pak choi sowing seeds' };

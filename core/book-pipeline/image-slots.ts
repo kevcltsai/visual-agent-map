@@ -775,6 +775,23 @@ export function imageIssueTokens(check: ImageTextCheck): string[] {
 }
 
 /**
+ * The issue token of a chapter that ended with fewer placed pictures than the owner's minimum pictures per chapter (no spaces):
+ * `images:under:<placed>:<minimum>`. It makes the chapter needs-review without asking for a rewrite of its text.
+ */
+export const pictureShortfallToken = (placed: number, minimum: number): string => `images:under:${placed}:${minimum}`;
+const SHORTFALL = /(?:^|\s)images:under:(\d+):(\d+)(?=\s|$)/;
+/** An issue field split into its picture shortfall (when it carries one) and the rest (`images unmet:` with only notice tokens left leaves nothing). */
+export function splitPictureIssue(issue: string): { rest: string; shortfall?: { placed: number; minimum: number } } {
+  const m = SHORTFALL.exec(issue);
+  if (!m) return { rest: issue };
+  const rest = issue
+    .replace(SHORTFALL, "")
+    .trim()
+    .replace(/^images unmet:(?:\s+\S+)*$|^images unmet$/, "");
+  return { rest, shortfall: { placed: Number(m[1]), minimum: Number(m[2]) } };
+}
+
+/**
  * The Haiku merge gate of T2 from the stored records (what the tester computes after the live run): of the chapters whose plan has
  * slots, the share with at least one picture placed (must be at least 60%), and the share of slots the author left a valid marker for
  * (the Sonnet sample must be 100%).

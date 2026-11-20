@@ -41,6 +41,8 @@ export interface FoundImages {
   bySlot: Map<number, FoundImage[]>;
   found: number;
   offTopic: number;
+  /** Per slot index, what the finder said about the position: the person whose work it shows, and English words for a Commons file search (the program's own search uses them). */
+  hints?: Map<number, { subject?: string; search?: string }>;
 }
 
 const EXCLUDE_MAX = 30;
@@ -49,6 +51,7 @@ const PER_SLOT_MAX = 3;
 const CAPTION_MAX = 200;
 const CREDIT_MAX = 100;
 const SLOT_TEXT_MAX = 160;
+const SEARCH_MAX = 80;
 
 /** An optional credit field: one short line, empty when absent. */
 function creditText(value: unknown): string {
@@ -57,7 +60,7 @@ function creditText(value: unknown): string {
 
 /** Per slot, each image goes through the shared candidate parser on its own, so the caption stays with the image the parser kept; then the source rule and the subject rule (see image-quality). */
 function parseFound(raw: string): FoundImages {
-  const out: FoundImages = { bySlot: new Map(), found: 0, offTopic: 0 };
+  const out: FoundImages = { bySlot: new Map(), found: 0, offTopic: 0, hints: new Map() };
   const start = raw.indexOf("{"),
     end = raw.lastIndexOf("}");
   if (start < 0 || end <= start) return out;
@@ -69,10 +72,13 @@ function parseFound(raw: string): FoundImages {
   }
   if (!Array.isArray(parsed.slots)) return out;
   for (const entry of parsed.slots as Array<Record<string, unknown> | null>) {
-    if (!entry || !Number.isInteger(entry.slot) || !Array.isArray(entry.images)) continue;
+    if (!entry || !Number.isInteger(entry.slot)) continue;
     const index = entry.slot as number;
-    const list = out.bySlot.get(index) ?? [];
     const subject = creditText(entry.subject);
+    const search = creditText(entry.search).slice(0, SEARCH_MAX).trim();
+    if (subject || search) out.hints?.set(index, { ...(subject ? { subject } : {}), ...(search ? { search } : {}) });
+    if (!Array.isArray(entry.images)) continue;
+    const list = out.bySlot.get(index) ?? [];
     for (const item of entry.images as Array<Record<string, unknown> | null>) {
       if (list.length >= PER_SLOT_MAX) break;
       if (!item || typeof item !== "object") continue;
@@ -106,7 +112,7 @@ function parseFound(raw: string): FoundImages {
 /** The map chat's image candidates (same parser: https links with an https source page), asked per picture position for the book's sources. */
 export const findImagesStep: StepDefinition<FindImagesRequest, FoundImages> = {
   id: "book-pipeline.find-images",
-  version: 7,
+  version: 8,
   render: ({ chapter, slots, exclude, language, languageRetry, again }) =>
     renderTemplate(template, {
       chapter: JSON.stringify(chapter),

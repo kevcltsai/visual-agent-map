@@ -1,6 +1,6 @@
 import { t } from "../../i18n";
 import type { PipelineStage } from "../../core/book-pipeline/model";
-import { describeSlots, latestSlotsRecord, stripImageLines } from "../../core/book-pipeline/image-slots";
+import { describeSlots, latestSlotsRecord, splitPictureIssue, stripImageLines } from "../../core/book-pipeline/image-slots";
 import {
   chapterBody,
   fencedLines,
@@ -14,7 +14,7 @@ import { failedProofKey, proofKey } from "../../core/book-pipeline/proof";
 import { parseChecklist, parseImageSlots } from "../../core/book-pipeline/plan-text";
 import { escapeMarkdownText, hashText, unescapeMarkdownText } from "../../core/book-pipeline/text";
 import { splitLengthIssue } from "../../core/book-pipeline/settings";
-import { bookCardView, bookIssueText, lengthText } from "./book-pipeline-ui";
+import { bookCardView, bookIssueText, lengthText, shortfallText } from "./book-pipeline-ui";
 import { bodyImageUrls } from "./book-pipeline-run";
 
 import { projectProofBody } from "../../core/book-pipeline/book-notes";
@@ -119,6 +119,11 @@ export const plainNote = (text: string): string =>
 
 /** The reason of a needs-review card in words: the proof's own notes of the items not met, else the count, else a plain sentence; never a code. */
 export function reasonOf(issue: string, proof: StoredProofView | undefined): string {
+  const pictures = splitPictureIssue(issue);
+  if (pictures.shortfall) {
+    const sentence = shortfallText(pictures.shortfall);
+    return pictures.rest ? `${reasonOf(pictures.rest, proof)}${t("ui.book_panel_lead_sep")}${sentence}` : sentence;
+  }
   const { rest, length } = splitLengthIssue(issue);
   if (length) {
     const sentence = lengthText(length);

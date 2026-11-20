@@ -533,7 +533,7 @@ test('proofread: a whole-card failure carries the judged items as a partial resu
 
 test('author requirements: the fixed chapter rules always come first, the settings after', () => {
   const none = settings.bookAuthorRequirements({});
-  assert.match(none, /Open by picking up the brief's entry point/); assert.match(none, /End with one sentence that leads into the next card/); assert.match(none, /Do not end the chapter with an update log/); assert.match(none, /no next card \(the last card\).*close the whole book/);
+  assert.match(none, /Open with this chapter's own scene, question or claim/); assert.match(none, /Do not open by recapping or pointing back to the previous chapter/); assert.match(none, /never cards/); assert.match(none, /End with one sentence that leads into the next chapter/); assert.match(none, /Do not end the chapter with an update log/); assert.match(none, /no next chapter \(the last card\).*close the whole book/); assert.match(none, /what the later chapters show together and why/);
   const some = settings.bookAuthorRequirements({ tone: 'warm' });
   assert.ok(some.startsWith(none)); assert.match(some, /- tone: warm/);
 });

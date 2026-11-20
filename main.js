@@ -71404,7 +71404,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     (_a2 = this.bookStartModal) == null ? void 0 : _a2.close();
     this.bookStartModal = null;
     this.bookResolved.clear();
-    for (const id of [...this.bookFoldTimers.keys()]) this.cancelBookFold(id);
     if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
     this.chatSourceCache = null;
     this.unsyncedPaths = null;
@@ -71415,6 +71414,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     this.closeMapSearch(false);
     this.exitPresentation(false);
     this.cancelLinking(false);
+    for (const id of [...this.bookFoldTimers.keys()]) this.cancelBookFold(id);
     (_d = this.suspendSummaryEdit) == null ? void 0 : _d.call(this);
     this.pendingSummary = null;
     this.summaryEditDraft = null;

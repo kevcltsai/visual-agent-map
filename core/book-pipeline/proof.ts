@@ -28,7 +28,7 @@ export interface ProofItemResult {
 }
 export interface ProofResult {
   items: ProofItemResult[];
-  /** `needs-review` when a fact item is unmet (a source contradicts the list); otherwise `checked`. Unmet structure items and unverified items are recorded, not blocking. */
+  /** `needs-review` when any item is unmet (a fact contradicted by a source, a structure point the chapter misses); otherwise `checked`. Unverified items are recorded, not blocking. */
   aggregate: "checked" | "needs-review";
   /**
    * True when pages were opened but every fact item stayed "unverified": retrying the proofread cannot help (the one automatic rewrite of the text still runs), so the judged items are kept,
@@ -251,21 +251,24 @@ export function evaluateProof(
   return result;
 }
 
+/** The ids of the whole-book items the proofread adds to every chapter's checklist (`prose-checks.ts`). They never collide with a plan's `C1..Cn`. */
+export const BOOK_CHECK_IDS = { names: "N1", voice: "V1", repeat: "R1" } as const;
+const BOOK_IDS = new Set<string>(Object.values(BOOK_CHECK_IDS));
+export const isBookCheckId = (id: string): boolean => BOOK_IDS.has(id);
+
 /**
- * The one verdict reducer, for a new proof and a stored one alike (a cache hit is judged again): needs-review when a fact point is
- * unmet, when the facts are all unverified, when the proof already said needs-review for a whole-card reason, when every structure
- * point is unmet (the chapter did not do what its list asked at all) or when the chapter text is empty; else checked.
+ * The one verdict reducer, for a new proof and a stored one alike (a cache hit is judged again): needs-review when any point is unmet
+ * (a fact, a plan's structure point or a whole-book item {@link BOOK_CHECK_IDS}), when the facts are all unverified, when the proof
+ * already said needs-review for a whole-card reason or when the chapter text is empty; else checked. Nothing found unmet ends checked.
  */
 export function proofVerdict(
-  result: { items: readonly { type: string; status: string }[]; aggregate?: string; factsUnverified?: boolean },
+  result: { items: readonly { id?: string; type: string; status: string }[]; aggregate?: string; factsUnverified?: boolean },
   bodyEmpty = false
 ): "checked" | "needs-review" {
-  const structure = result.items.filter(item => item.type !== "fact");
   const facts = result.items.filter(item => item.type === "fact");
   if (bodyEmpty || result.aggregate === "needs-review" || result.factsUnverified) return "needs-review";
-  if (facts.some(item => item.status === "unmet")) return "needs-review";
+  if (result.items.some(item => item.status === "unmet")) return "needs-review";
   if (facts.length && facts.every(item => item.status === "unverified")) return "needs-review";
-  if (structure.length && structure.every(item => item.status === "unmet")) return "needs-review";
   return "checked";
 }
 

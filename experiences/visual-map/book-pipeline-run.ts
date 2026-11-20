@@ -155,6 +155,7 @@ import {
   type GlobalPlanResult
 } from "../../core/steps/book-pipeline/global-plan";
 import type { ProofreadRequest, ProofreadRun } from "../../core/steps/book-pipeline/proofread";
+import { BOOK_CHECKS } from "../../core/book-pipeline/prose-checks";
 import type { StepDefinition } from "../../core/step-runner";
 import { untilAborted } from "./argument-run";
 import {
@@ -495,6 +496,8 @@ const NO_FAILURE_SECTION: ReadonlySet<string> = new Set([
 ]);
 const STEP_OF = { card_plan: "plan", card_write: "write", card_proof: "proof" } as const;
 const ACTION_OF = { plan: "card_plan", write: "card_write", proof: "card_proof" } as const;
+/** How many characters of one chapter's covers line the proofread gets (15 chapters stay a few thousand characters). */
+const PROOF_COVERS_MAX = 160;
 const singleLineText = (value: string, max: number): string =>
   Array.from(value.replace(/\s+/g, " ").trim()).slice(0, max).join("");
 
@@ -2795,7 +2798,13 @@ export class BookPipelineRuns {
       // A whole-card failure keeps the judgments already made (the structure items) in the research notes; the card still needs a human.
       const call = this.ports
         .runProofread(
-          { ...this.base(drive, drive.config.proofModel), body, checklist },
+          {
+            ...this.base(drive, drive.config.proofModel),
+            body,
+            checklist: [...checklist, ...BOOK_CHECKS],
+            title: card.title,
+            chapters: await this.proofChapters(drive, nodeId, card)
+          },
           { signal, admission: drive.admission }
         )
         .catch(async (error: unknown) => {
@@ -2869,7 +2878,7 @@ export class BookPipelineRuns {
       after: async () => {
         const stage = verdict.aggregate === "needs-review" || length ? "needs-review" : "checked";
         if (stage === "needs-review" && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0)
-          drive.fixable.set(nodeId, proofFixInstruction(verdict.items, checklist, length));
+          drive.fixable.set(nodeId, proofFixInstruction(verdict.items, [...checklist, ...BOOK_CHECKS], length));
         else if (!drive.job) {
           drive.extra.delete(nodeId);
           drive.avoid.delete(nodeId);
@@ -2888,6 +2897,23 @@ export class BookPipelineRuns {
         );
       }
     };
+  }
+
+  /** The book's chapters in reading order for the proofread: each title and its Prompt's covers line (an unreadable card keeps its title only). */
+  private async proofChapters(
+    drive: Drive,
+    nodeId: string,
+    card: { title: string; prompt: string }
+  ): Promise<{ title: string; covers: string }[]> {
+    const chapters: { title: string; covers: string }[] = [];
+    for (const id of effectiveOrder(drive.store.state)) {
+      const info = drive.cards.get(id);
+      if (!info) continue;
+      const other = id === nodeId ? card : await this.ports.readCard(info.path).catch(() => undefined);
+      const covers = other ? (parseCardPrompt(other.prompt).covers ?? "") : "";
+      chapters.push({ title: other?.title ?? info.title, covers: singleLineText(covers, PROOF_COVERS_MAX) });
+    }
+    return chapters;
   }
 
   /** The chapter's length reason against the effective `length` setting (read now, so a changed setting counts at once); a setting that cannot be read as one range is logged and not checked. */

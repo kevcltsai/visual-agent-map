@@ -3099,7 +3099,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_button_title": "開始圖文書流水線：企劃、確認、作者、校對",
   "ui.book_start_title": "把這張心智圖變成一本有圖的書",
   "ui.book_start_intro": "會依這張心智圖的主題與卡片，由 AI 企劃、寫作、找圖、校對每一章。",
-  "ui.book_start_estimate_0_1_2": "{0} 張卡 · 約 {1} · 最多 {2} 次 AI 呼叫。",
+  "ui.book_start_estimate_0_1_2_3": "{0} 張卡 · 約 {1} · 最多 {2} 次 AI 呼叫（步驟失敗重試另計；到 {3} 次會先停下）。",
   "ui.book_start_under_minute": "不到 1 分鐘",
   "ui.book_start_minutes_0": "{0} 分鐘",
   "ui.book_start_stops": "中間只會停兩次，讓你確認。",

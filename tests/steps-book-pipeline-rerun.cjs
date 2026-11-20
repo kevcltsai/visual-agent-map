@@ -437,6 +437,22 @@ test('T5 progress.rerun: present (card, start) only while a single-card rerun ru
 });
 
 // ---- T4: the automatic redo's instruction lines ----
+test('proofFixInstruction: the whole-book points (names, research voice) come before the plan\'s structure points and carry the program\'s reason', () => {
+  const long = 'x'.repeat(260);
+  const items = [
+    ...Array.from({ length: 6 }, (_, i) => ({ id: `C${i + 1}`, type: 'structure', status: 'unmet', note: long, sources: [] })),
+    { id: 'N1', type: 'structure', status: 'unmet', note: 'Write the names as the chapter titles do: 「桃樂絲・蘭格」→「多蘿西婭・蘭格」', sources: [] },
+    { id: 'V1', type: 'structure', status: 'unmet', note: 'Remove the research or process wording: 「本次搜尋」', sources: [] }
+  ];
+  const R = S.load('experiences/visual-map/book-pipeline-rerun.ts');
+  const { BOOK_CHECKS } = S.load('core/book-pipeline/prose-checks.ts');
+  const list = [...items.slice(0, 6).map(entry => ({ id: entry.id, text: long })), ...BOOK_CHECKS];
+  const line = R.proofFixInstruction(items, list);
+  assert.ok(line.includes('桃樂絲・蘭格') && line.includes('多蘿西婭・蘭格'), line);
+  assert.ok(line.includes('本次搜尋'), line);
+  assert.ok(line.length <= 1000);
+});
+
 test('T4 proofFixInstruction: a long note or many points never leave an unclosed JSON string; the line stays within 1000 characters', () => {
   const R = S.load('experiences/visual-map/book-pipeline-rerun.ts');
   const quoted = line => line.match(/"(?:[^"\\]|\\.)*"/g) ?? [];

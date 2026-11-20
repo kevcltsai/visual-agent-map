@@ -3,6 +3,9 @@ import { t, type TranslationKey } from "../../i18n";
 import { modalActions } from "../../ui/modals/action-bar";
 import {
   BOOK_SETTING_FIELDS,
+  DEFAULT_BUDGET_LIMIT,
+  MAX_AUTO_FIXES,
+  TRIAL_SIZE,
   type BookSettingField,
   type BookSettings,
   type BookSettingsPatch
@@ -17,18 +20,41 @@ import { BOOK_POOL } from "./book-pipeline-run";
  * shows in an empty field and is used when the field stays empty). The only decisions are Start and Cancel.
  */
 
-/** The median wall time of one card in a live run (stage 7 measurement). The estimate says "about"; T2 live runs may recalibrate it. */
-export const BOOK_CARD_P50_SECONDS = 88.5;
 /** How long the start card waits for its grey suggestions before it stays blank. */
 export const BOOK_SUGGEST_TIMEOUT_MS = 20_000;
-/** The whole-book plan before the first card: about 135 seconds (stage 7 measurement: the plan took 2m15s). */
-export const BOOK_PLAN_SECONDS = 135;
+
+/**
+ * One AI call of each step, measured in a live full run (2026-11-20, 15 chapters; the 75th percentile of each step's call time) with the
+ * model it was measured on. Another model scales the time by {@link bookModelSpeed}.
+ */
+export const BOOK_STEP_SECONDS: Record<"global" | keyof BookStartModels, { seconds: number; model: string }> = {
+  global: { seconds: 20, model: "opus" },
+  plan: { seconds: 20, model: "opus" },
+  write: { seconds: 63, model: "sonnet" },
+  images: { seconds: 55, model: "haiku" },
+  proof: { seconds: 19, model: "sonnet" }
+};
+/** One write of a chapter is followed by up to two picture searches (the second only when the first finds too little). */
+export const BOOK_IMAGE_SEARCHES = 2;
+/** Each picture search may be asked once more when its captions come back in another language. */
+export const BOOK_IMAGE_CALLS_PER_SEARCH = 2;
+
+/**
+ * The AI calls of one chapter at most, step by step: one plan, then each write (the first and the {@link MAX_AUTO_FIXES} automatic
+ * redo) runs the author, the picture searches (each with its caption-language retry) and the proofread. Failed-step retries are not in it.
+ */
+export function bookChapterCalls(): { plan: number; write: number; images: number; proof: number } {
+  const writes = 1 + MAX_AUTO_FIXES;
+  return { plan: 1, write: writes, images: writes * BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH, proof: writes };
+}
 
 export interface BookStartEstimate {
   cards: number;
-  /** One whole-book plan, then plan, write, find pictures and proofread for each card. */
+  /** An upper bound of a run with no failed step: the whole-book plan, then {@link bookChapterCalls} for each card. */
   calls: number;
-  /** The plan, then cards run {@link BOOK_POOL} at a time, each taking about the measured median. */
+  /** The run's call budget: it pauses there whatever happens (failed-step retries included). */
+  limit: number;
+  /** The plan, then the trial cards and the rest {@link BOOK_POOL} at a time, each card with its redo and both searches (no language retry). */
   seconds: number;
 }
 /** Time relative to a Sonnet-class model (an assumption, not a measurement): Haiku is about twice as fast, Opus slower. Calls do not change with the model. */
@@ -36,31 +62,34 @@ export function bookModelSpeed(model: string): number {
   const id = model.toLowerCase();
   return id.includes("haiku") ? 0.5 : id.includes("opus") ? 1.8 : 1;
 }
-/** How the time of one card splits over its four steps (they sum to 1). */
-const CARD_TIME_SHARE = { plan: 0.1, write: 0.5, images: 0.2, proof: 0.2 };
 export function bookStartEstimate(cards: number, models?: BookStartModels): BookStartEstimate {
   const n = Math.max(0, Math.floor(cards));
-  const speed = (step: keyof BookStartModels): number => (models ? bookModelSpeed(models[step]) : 1);
-  const perCard =
-    BOOK_CARD_P50_SECONDS *
-    (CARD_TIME_SHARE.plan * speed("plan") +
-      CARD_TIME_SHARE.write * speed("write") +
-      CARD_TIME_SHARE.images * speed("images") +
-      CARD_TIME_SHARE.proof * speed("proof"));
+  const time = (step: keyof typeof BOOK_STEP_SECONDS): number => {
+    const measured = BOOK_STEP_SECONDS[step];
+    const model = step === "global" ? models?.plan : models?.[step];
+    return measured.seconds * (model ? bookModelSpeed(model) / bookModelSpeed(measured.model) : 1);
+  };
+  const per = bookChapterCalls();
+  const writes = 1 + MAX_AUTO_FIXES;
+  const perCard = time("plan") + writes * (time("write") + BOOK_IMAGE_SEARCHES * time("images") + time("proof"));
+  // The trial cards run first and wait for the owner; the rest follow, BOOK_POOL at a time.
+  const trial = Math.min(n, TRIAL_SIZE);
+  const rounds = Math.ceil(trial / BOOK_POOL) + Math.ceil((n - trial) / BOOK_POOL);
   return {
     cards: n,
-    // An upper bound: the plan, then per chapter write, proofread, and up to two image searches (the second only when the first finds too little).
-    calls: 1 + 5 * n,
-    seconds: BOOK_PLAN_SECONDS * speed("plan") + Math.ceil(n / BOOK_POOL) * perCard
+    calls: 1 + n * (per.plan + per.write + per.images + per.proof),
+    limit: DEFAULT_BUDGET_LIMIT,
+    seconds: time("global") + rounds * perCard
   };
 }
 export function bookStartEstimateText(estimate: BookStartEstimate): string {
   const minutes = Math.round(estimate.seconds / 60);
   return t(
-    "ui.book_start_estimate_0_1_2",
+    "ui.book_start_estimate_0_1_2_3",
     estimate.cards,
     minutes < 1 ? t("ui.book_start_under_minute") : t("ui.book_start_minutes_0", minutes),
-    estimate.calls
+    estimate.calls,
+    estimate.limit
   );
 }
 

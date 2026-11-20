@@ -857,7 +857,7 @@ test('T4 images: the automatic redo of a card may pick that card\'s own pictures
   let proofs = 0;
   const r = await picRig({ checklist, slots: 1, text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。`,
     finder: () => found({ 1: [cand(1)] }),
-    proof: async request => evaluateProof(request.checklist.map(c => ({ id: c.id, status: c.type === 'fact' && !/FillerChapter/.test(JSON.stringify(request)) && ++proofs === 1 ? 'unmet' : 'met', note: 'n', sources: c.type === 'fact' ? ['https://example.org/p'] : [] })), request.checklist, ['https://example.org/p']) });
+    proof: async request => evaluateProof(request.checklist.map(c => ({ id: c.id, status: c.type === 'fact' && !/FillerChapter/.test(request.body) && ++proofs === 1 ? 'unmet' : 'met', note: 'n', sources: c.type === 'fact' ? ['https://example.org/p'] : [] })), request.checklist, ['https://example.org/p']) });
   await run(r);
   assert.equal(r.calls.length, 2, 'first round and the redo each searched');
   assert.ok(!r.calls[1].exclude.some(key => /w1/i.test(key)), 'its own old picture is not excluded');

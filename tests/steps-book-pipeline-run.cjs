@@ -18,6 +18,8 @@ const defer = () => { let resolve; const promise = new Promise(r => { resolve = 
 const settle = async () => { for (let i = 0; i < 30; i++) await tick(); };
 const TITLES = ['SecretRootTitle', 'SecretTitleA', 'SecretTitleB'];
 const bodyOf = title => `SecretBody ${title}`;
+/** The one automatic redo edits the chapter in place: a change block that puts `next` (default: the same text) where `line` was. */
+const fixOf = (line, next = line) => `@@replace\n${line}\n@@with\n${next}`;
 const stageOf = raw => /^pipeline-stage: "?([a-z-]+)"?$/m.exec(raw)?.[1];
 
 /** A map of one root and two child cards (reading order: root, A, B), the fake ports and call counters. `over` replaces ports/script. */
@@ -36,7 +38,7 @@ async function rig(over = {}) {
   let ids = 0;
   const script = { global: () => ({ thread: 'one thread', cards: nodes.map((n, i) => ({ id: n.id, role: i ? 'body' : 'intro' })), materials: [{ name: 'm', use: 'u' }], decisions: { reader: 'kids' } }),
     card: request => ({ covers: `covers ${request.card.position}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }] }),
-    author: async input => { await input.admission.reserve(); const note = await repo.readNote(input.path); const r = await repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return r === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; },
+    author: async input => { await input.admission.reserve(); const note = await repo.readNote(input.path); const r = await repo.updateNoteGuarded(input.path, { detail: input.requirements !== undefined ? fixOf(bodyOf(note.title)) : bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return r === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; },
     proof: async request => ({ items: request.checklist.map(c => ({ id: c.id, type: c.type, status: 'met', note: 'fine', sources: [] })), aggregate: 'checked' }),
     probe: async () => ({ ok: true }), ...over.script };
   const ports = {
@@ -1340,7 +1342,7 @@ test('B2 run: an author who keeps the old `### 研究備註` section loses no te
 const FACTS = [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'fact', text: 'a date' }];
 const factCard = { card: () => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: FACTS }) };
 const verdictOf = (request, factStatus, note = 'judged') => evaluateProof(request.checklist.map(c => ({ id: c.id, status: c.type === 'fact' ? factStatus : 'met', note: c.type === 'fact' ? note : 'ok', sources: c.type === 'fact' ? ['https://example.org/p'] : [] })), request.checklist, ['https://example.org/p']);
-const writeAs = (r, seen) => async input => { seen.push([input.nodeId, input.instruction]); await input.admission.reserve(); const note = await r.repo.readNote(input.path); const out = await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; };
+const writeAs = (r, seen) => async input => { seen.push([input.nodeId, input.instruction]); await input.admission.reserve(); const note = await r.repo.readNote(input.path); const out = await r.repo.updateNoteGuarded(input.path, { detail: input.requirements !== undefined ? fixOf(bodyOf(note.title)) : bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; };
 
 test('T4 autofix: an unmet fact is redone once by the author alone, after every card had its first round; the reason goes to the author, never the plan or the proofread; the second verdict ends it', async () => {
   const seen = [];
@@ -2444,13 +2446,13 @@ const lenRig = async (over = {}, setting = LEN_SETTING) => {
   return r;
 };
 const longBody = (title, n) => `${bodyOf(title)} ${'好'.repeat(n)}`;
-/** An author that writes `first` characters, then `later` once it was given an instruction (the one automatic redo). */
+/** An author that writes `first` characters, then (the one automatic redo, in place) replaces that text with `later` characters. */
 const lengthAuthor = (r, seen, first, later) => async input => {
   seen.push([input.nodeId, input.instruction]);
   await input.admission.reserve();
   const note = await r.repo.readNote(input.path);
-  const n = input.instruction !== undefined ? later : first;
-  const out = await r.repo.updateNoteGuarded(input.path, { detail: longBody(note.title, n) }, { authorize: input.authorize, finalize: input.finalize });
+  const detail = input.requirements !== undefined ? fixOf(longBody(note.title, first), longBody(note.title, later)) : longBody(note.title, first);
+  const out = await r.repo.updateNoteGuarded(input.path, { detail }, { authorize: input.authorize, finalize: input.finalize });
   return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
 };
 
@@ -2534,7 +2536,7 @@ test('T10c length expand: the one redo of a too-short chapter gets the chapter t
   assert.equal(bodyStateRaw(r.raw(1)), 'clean', 'the merged text carries the program\'s fingerprint');
 });
 
-test('T10c length expand: a fact failure beside the length keeps the fact points (first) in the redo, and an answer with no block lines that is shorter is added, never replacing the chapter', async () => {
+test('T10c length expand: a fact failure beside the length keeps the fact points (first) in the redo; an answer with no block lines is never put in (no rewrite): the chapter stays, needs-review with fix_no_edits', async () => {
   const seen = [];
   const r = await lenRig({ script: { ...factCard, proof: async request => verdictOf(request, 'unmet', 'WRONGDATE') } });
   r.script.author = expandAuthor(r, seen, '新增的一段，沒有區塊行。');
@@ -2544,8 +2546,9 @@ test('T10c length expand: a fact failure beside the length keeps the fact points
   assert.ok(fix.requirements.indexOf('WRONGDATE') > fix.requirements.indexOf('CHAPTER>>>'), 'the points follow the chapter data');
   assert.ok(fix.requirements.indexOf('WRONGDATE') < fix.requirements.indexOf('add about'), 'facts before the length');
   const detail = (await r.note(1)).detail;
-  assert.ok(detail.includes('開場段落。') && detail.includes('新增的一段') && detail.indexOf('新增的一段') < detail.indexOf('### 小結'), detail);
-  assert.match((await r.note(1)).pipelineIssue, /^proof unmet: C2 length:under:/);
+  assert.ok(detail.includes('開場段落。') && detail.includes('結尾一句') && !detail.includes('新增的一段'), detail);
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: fix_no_edits');
 });
 
 test('expansionUnsafe: only what the merged chapter adds is checked; a second copy of an old record line, a new tag, a picture outside old ∪ answer or a slot marker the answer did not have is refused', () => {
@@ -2586,6 +2589,82 @@ test('T10c length expand (security): an answer that adds an unsafe or http pictu
     assert.ok(detail.includes('土壤段落。'), `${name}: the draft stays`);
     assert.match((await r.note(1)).pipelineIssue, /unsafe_body/, name);
   }
+});
+
+// Every automatic redo edits in place (live run 2026-11-20: 〈澆水施肥與病蟲害〉 sent back only for research voice V1 was rewritten whole, 4072 → 3081 字, 7 → 5 pictures).
+const V1_LINE = '我在查資料時，只找到兩個來源。';
+const V1_DRAFT = ['## 澆水', '', `澆水段落${'好'.repeat(60)}`, '', V1_LINE, '', '![p](https://img.example/p.png)', '', '### 小結', '', `結尾${'好'.repeat(60)}`].join('\n');
+const v1Rig = async (answer, statuses = { V1: 'unmet' }) => {
+  const seen = [];
+  const proofs = [];
+  const r = await lenRig({ script: { ...factCard, proof: async request => { const mine = request.body.includes('澆水段落') && proofs.push(request) === 1; return unjudged(request, mine ? statuses : {}); } } });
+  r.script.author = async input => {
+    seen.push(input);
+    await input.admission.reserve();
+    const detail = input.requirements !== undefined ? (input.nodeId === r.nodes[1].id ? answer : fixOf(bodyOf((await r.repo.readNote(input.path)).title))) : input.nodeId === r.nodes[1].id ? V1_DRAFT : `${bodyOf((await r.repo.readNote(input.path)).title)} ${'好'.repeat(150)}`;
+    const out = await r.repo.updateNoteGuarded(input.path, { detail }, { authorize: input.authorize, finalize: input.finalize });
+    return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+  };
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  return { r, fix: seen.filter(input => input.nodeId === r.nodes[1].id)[1], detail: (await r.note(1)).detail };
+};
+
+test('fix in place: a chapter sent back only for research voice (V1) gets a correction request with the chapter as data; the @@replace changes that line only, length and picture stay', async () => {
+  const { r, fix, detail } = await v1Rig(['@@replace', V1_LINE, '@@with', '常見的做法有兩種。'].join('\n'));
+  assert.ok(fix, 'the one redo ran');
+  assert.match(fix.requirements, /^Correction \(hard requirement; this run edits the chapter below in place, it does not rewrite it\)/);
+  assert.match(fix.requirements, /at least 100 characters/, 'the minimum is named');
+  assert.ok(fix.requirements.includes(`<<<CHAPTER\n## 澆水`) && fix.requirements.includes(V1_LINE), 'the redo sees the chapter it edits');
+  assert.match(fix.instruction ?? fix.requirements, /note V1/);
+  assert.equal(fix.keepSummary, true);
+  assert.deepEqual([...fix.slots], []);
+  assert.ok(!detail.includes(V1_LINE) && detail.includes('常見的做法有兩種。'), detail);
+  assert.ok(detail.includes('![p](https://img.example/p.png)') && detail.includes(`澆水段落${'好'.repeat(60)}`) && detail.includes(`結尾${'好'.repeat(60)}`), 'the rest of the chapter and its picture stay');
+  assert.equal(stageOf(r.raw(1)), 'checked');
+});
+
+test('fix in place: a V1-only redo answered with a whole shorter chapter and no blocks is never put in: the chapter, its length and its picture stay; needs-review with fix_no_edits', async () => {
+  const { r, detail } = await v1Rig(['## 澆水', '', '重寫的短章。'].join('\n'));
+  assert.ok(detail.includes(V1_LINE) && detail.includes('![p](https://img.example/p.png)') && !detail.includes('重寫的短章'), detail);
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: fix_no_edits');
+});
+
+test('fix in place: a redo whose blocks would drop a placed picture or cut the chapter below the minimum is refused whole (fix_lost_text); the chapter stays', async () => {
+  for (const answer of [
+    ['@@replace', '![p](https://img.example/p.png)', '@@with', ''].join('\n'),
+    ['@@replace', `澆水段落${'好'.repeat(60)}`, '@@with', '短。', '@@replace', `結尾${'好'.repeat(60)}`, '@@with', '尾。'].join('\n')
+  ]) {
+    const { r, detail } = await v1Rig(answer);
+    assert.equal(detail.includes('![p](https://img.example/p.png)') && detail.includes(`澆水段落${'好'.repeat(60)}`) && detail.includes(V1_LINE), true, answer);
+    assert.equal((await r.note(1)).pipelineIssue, 'write failed: fix_lost_text', answer);
+  }
+});
+
+test('fix in place: mixed reasons (a fact, research voice and too long) ask for change blocks in one request; @@replace blocks fix the lines and shorten', async () => {
+  const long = `澆水段落${'好'.repeat(60)}`;
+  const { r, fix, detail } = await v1Rig(['@@replace', V1_LINE, '@@with', '常見的做法有兩種。', '@@replace', long, '@@with', '澆水段落，早晚各一次。'].join('\n'), { V1: 'unmet', C2: 'unmet' });
+  assert.ok(fix);
+  assert.match(fix.instruction, /failed the fact check on these points \(JSON strings; correct each with a @@replace block/);
+  assert.match(fix.instruction, /note V1/);
+  assert.doesNotMatch(fix.instruction, /rewrite the chapter/);
+  assert.match(fix.requirements, /^Correction/);
+  assert.ok(!detail.includes(V1_LINE) && !detail.includes(long) && detail.includes('澆水段落，早晚各一次。') && detail.includes('![p](https://img.example/p.png)'), detail);
+  assert.equal(stageOf(r.raw(1)), 'checked');
+});
+
+test('fix in place: an expansion line that echoes the request is dropped (the live run\'s exact line, and a copied instruction sentence); the new paragraph goes in', async () => {
+  const seen = [];
+  const r = await lenRig();
+  const echoed = '（本章結構以既有標題為準，以下新增段落接在章節正文各處；若找不到對應標題，請放在結語之前。）';
+  const added = `排水段落${'好'.repeat(140)}`;
+  r.script.author = expandAuthor(r, seen, ['@@insert after: ### 土壤', echoed, '', added, '', 'Keep the chapter\'s voice and terms.'].join('\n'));
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const fix = seen.filter(input => input.nodeId === r.nodes[1].id)[1];
+  assert.ok(fix.requirements.includes('Keep the chapter\'s voice and terms.'), 'the sentence was in the request');
+  const detail = (await r.note(1)).detail;
+  assert.ok(detail.includes(added), detail);
+  assert.ok(!detail.includes('本章結構以既有標題為準') && !detail.includes('voice and terms'), detail);
 });
 
 test('T10c length expand: the redo keeps the card\'s Summary (keepSummary reaches the author only for the expansion)', async () => {

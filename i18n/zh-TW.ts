@@ -3224,6 +3224,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_reason_chapters_too_long": "章節清單太長，無法放進同一次企劃請求",
   "ui.book_reason_all_facts_unverified": "所有事實項目都無法查證",
   "ui.book_reason_unsafe_body": "圖片內容不安全，卡片維持原樣",
+  "ui.book_reason_fix_no_edits": "自動修正沒有給出可用的修改，章節維持原樣",
+  "ui.book_reason_fix_lost_text": "自動修正會刪掉圖片或讓章節太短，章節維持原樣",
   "ui.book_reason_no_view": "心智圖已不在畫面上，執行已停止",
   "ui.book_plain_write_no_body": "AI 這次沒寫出正文，卡片維持原樣。請按「重跑這張」再寫一次。",
   "ui.book_plain_proof_no_body": "這張卡還沒有正文，沒東西可校對。請按「重跑這張」重寫，或打開卡片自己補上內文。",

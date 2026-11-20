@@ -529,6 +529,8 @@ const REASON_KEY: Record<string, TranslationKey> = {
   all_facts_unverified: "ui.book_reason_all_facts_unverified",
   invalid_step: "ui.book_reason_invalid_reply",
   unsafe_body: "ui.book_reason_unsafe_body",
+  fix_no_edits: "ui.book_reason_fix_no_edits",
+  fix_lost_text: "ui.book_reason_fix_lost_text",
   no_view: "ui.book_reason_no_view",
   chapters_too_long: "ui.book_reason_chapters_too_long"
 };

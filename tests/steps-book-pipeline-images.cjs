@@ -78,7 +78,7 @@ async function rig(over = {}) {
 const setLimit = (r, limit) => r.repo.updateMap(r.mapPath, d => { d.bookPipeline.budget.limit = limit; });
 
 const BODY = '正文開頭《蒙娜麗莎》結尾。';
-const writeAuthor = (r, text) => async input => { await input.admission.reserve(); const n = await r.repo.readNote(input.path); const out = await r.repo.updateNoteGuarded(input.path, { detail: typeof text === 'function' ? text(n.title) : text }, { authorize: input.authorize, finalize: input.finalize }); return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; };
+const writeAuthor = (r, text) => async input => { await input.admission.reserve(); const n = await r.repo.readNote(input.path); const out = await r.repo.updateNoteGuarded(input.path, { detail: typeof text === 'function' ? text(n.title, input) : text }, { authorize: input.authorize, finalize: input.finalize }); return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; };
 const cand = (n, over = {}) => ({ title: `Work ${n}`, caption: `Caption ${n}`, url: `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/W${n}.jpg/1280px-W${n}.jpg`, source: `https://commons.wikimedia.org/wiki/File:W${n}.jpg`, ...over });
 /** The finder's answer: `{ 1: [cand...], 2: [...] }` by slot index. */
 const found = bySlotObj => { const bySlot = new Map(Object.entries(bySlotObj).map(([k, v]) => [Number(k), v])); return { bySlot, found: [...bySlot.values()].reduce((n, v) => n + v.length, 0), offTopic: 0 }; };
@@ -865,16 +865,18 @@ test('T4 images: when every slot has its picture there is no second search; a se
   assert.equal(stageOf(b.raw(0)), 'checked');
 });
 
-test('T4 images: the automatic redo of a card may pick that card\'s own pictures again', async () => {
+test('T4 images: the automatic redo of a card edits it in place: its placed picture stays and no new search runs', async () => {
   const checklist = [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'fact', text: 'a date' }];
   let proofs = 0;
-  const r = await picRig({ checklist, slots: 1, text: title => `正文一。${title}\n\n${mk(1)}\n\n正文二。`,
+  const r = await picRig({ checklist, slots: 1,
+    text: (title, input) => input.requirements !== undefined ? `@@replace\n正文一。${title}\n@@with\n正文一（更正）。${title}` : `正文一。${title}\n\n${mk(1)}\n\n正文二。`,
     finder: () => found({ 1: [cand(1)] }),
     proof: async request => evaluateProof(request.checklist.map(c => ({ id: c.id, status: c.type === 'fact' && !/FillerChapter/.test(request.body) && ++proofs === 1 ? 'unmet' : 'met', note: 'n', sources: c.type === 'fact' ? ['https://example.org/p'] : [] })), request.checklist, ['https://example.org/p']) });
   await run(r);
-  assert.equal(r.calls.length, 2, 'first round and the redo each searched');
-  assert.ok(!r.calls[1].exclude.some(key => /w1/i.test(key)), 'its own old picture is not excluded');
-  assert.equal(figures((await r.note(0)).detail).length, 1, 'the redo shows the picture again');
+  assert.equal(r.calls.length, 1, 'only the first round searched');
+  const detail = (await r.note(0)).detail;
+  assert.equal(figures(detail).length, 1, 'the redo keeps the picture');
+  assert.ok(detail.includes('正文一（更正）。') && detail.includes('正文二。'), 'the corrected line is in, the rest stays');
 });
 
 test('slots: a card deleted from the map during the picture search pauses the run for the map, writes no picture and is not sent to review', async () => {

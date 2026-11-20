@@ -323,21 +323,37 @@ test('expandChapterDetail: insertions go to the end of the named section or befo
   assert.ok(!detail.includes('@@') && !detail.includes('preamble'));
 });
 
-test('expandChapterDetail: an answer with no block line is added when shorter and left to the caller (undefined) when it is a whole longer chapter; CRLF stays CRLF; a chapter with no headings gets the text before its last paragraph', () => {
+test('expandChapterDetail: an answer with no block line, or blocks that apply nowhere, is undefined (the chapter is never rewritten); CRLF stays CRLF; a chapter with no headings gets an insertion before its last paragraph', () => {
   const { expandChapterDetail } = sections;
   const old = '\r\n第一段很長的內容。\r\n\r\n最後一段。\r\n';
-  const short = expandChapterDetail(old, '\n新段落。\n', 'zh-TW');
+  assert.equal(expandChapterDetail(old, '\n新段落。\n', 'zh-TW'), undefined, 'a shorter answer with no block is not put in');
+  assert.equal(expandChapterDetail(old, '\n' + '整章重寫'.repeat(20) + '\n', 'zh-TW'), undefined, 'a whole longer chapter is not put in');
+  assert.equal(expandChapterDetail(old, '\n@@insert\n\n', 'zh-TW'), undefined, 'an empty block is no usable block');
+  const short = expandChapterDetail(old, '\n@@insert\n新段落。\n', 'zh-TW');
   assert.ok(short.detail.includes('\r\n') && !/[^\r]\n/.test(short.detail), 'line endings kept');
   assert.ok(short.detail.indexOf('新段落。') > short.detail.indexOf('第一段') && short.detail.indexOf('新段落。') < short.detail.indexOf('最後一段。'));
-  assert.equal(expandChapterDetail(old, '\n' + '整章重寫'.repeat(20) + '\n', 'zh-TW'), undefined);
-  assert.equal(expandChapterDetail(old, '\n@@insert\n\n', 'zh-TW').detail, old, 'an empty block changes nothing');
+});
+
+test('expandChapterDetail: lines echoing the request are left out of every block (the live run\'s exact line, a copied request sentence); a plain bracketed sentence stays', () => {
+  const { expandChapterDetail, isEchoedLine } = sections;
+  const echoed = '（本章結構以既有標題為準，以下新增段落接在章節正文各處；若找不到對應標題，請放在結語之前。）';
+  const sent = 'Expansion (hard requirement). The program puts the blocks into the chapter; text outside a block is ignored. Keep the chapter\'s voice and terms.';
+  assert.equal(isEchoedLine(echoed, ''), true, 'the exact line, with no request text at all');
+  assert.equal(isEchoedLine('(The new paragraphs below are placed after the existing headings.)', ''), true);
+  assert.equal(isEchoedLine('  keep the chapter’s VOICE and terms ', sent), true, 'a copy of a request sentence (case, quotes and spaces aside)');
+  assert.equal(isEchoedLine('（番茄一天要六小時以上的日照。）', sent), false);
+  assert.equal(isEchoedLine('（詳見本章後段）', sent), false, 'a reference to the chapter that is not about placement');
+  assert.equal(isEchoedLine('Keep it.', sent), false, 'a short phrase is the chapter\'s own');
+  const old = '\n## 開場\n\n開場段落。\n\n### 小結\n\n結尾。\n';
+  const done = expandChapterDetail(old, ['', '@@insert after: ## 開場', echoed, '', '新段落。', '@@replace', '開場段落。', '@@with', echoed, '@@insert', 'Keep the chapter\'s voice and terms.'].join('\n'), 'zh-TW', sent);
+  assert.equal(done.applied, 1, 'the insertion with real text; the replacement that was only an echo and the echo-only insertion are dropped');
+  assert.ok(done.detail.includes('新段落。') && done.detail.includes('開場段落。') && !done.detail.includes('本章結構') && !done.detail.includes('voice'), done.detail);
 });
 
 test('expandChapterDetail: a @@replace passage applies only as whole lines (never a part of a line)', () => {
   const { expandChapterDetail } = sections;
   const old = '\n## 開場\n\n開場段落有圖。\n\n結尾。\n';
-  const part = expandChapterDetail(old, '\n@@replace\n段落有\n@@with\n![x](https://example.org/x.png)\n', 'zh-TW');
-  assert.equal(part.applied, 0); assert.equal(part.detail, old);
+  assert.equal(expandChapterDetail(old, '\n@@replace\n段落有\n@@with\n![x](https://example.org/x.png)\n', 'zh-TW'), undefined, 'nothing applies');
   const whole = expandChapterDetail(old, '\n@@replace\n開場段落有圖。\n@@with\n開場段落（新）。\n', 'zh-TW');
   assert.equal(whole.applied, 1); assert.ok(whole.detail.includes('開場段落（新）。') && !whole.detail.includes('開場段落有圖。'));
 });

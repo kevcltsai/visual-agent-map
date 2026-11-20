@@ -16,6 +16,8 @@ const defer = () => { let resolve; const promise = new Promise(r => { resolve = 
 const settle = async () => { for (let i = 0; i < 30; i++) await tick(); };
 const TITLES = ['SecretRootTitle', 'SecretTitleA', 'SecretTitleB', 'SecretTitleC'];
 const bodyOf = title => `SecretBody ${title}`;
+/** The one automatic redo edits the chapter in place: a change block that puts `next` (default: the same text) where `line` was. */
+const fixOf = (line, next = line) => `@@replace\n${line}\n@@with\n${next}`;
 const stageOf = raw => /^pipeline-stage: "?([a-z-]+)"?$/m.exec(raw)?.[1];
 
 /** A map of one root and two child cards (reading order: root, A, B), the fake ports and call counters. `over` replaces ports/script. */
@@ -34,7 +36,7 @@ async function rig(over = {}) {
   let ids = 0;
   const script = { global: () => ({ thread: 'one thread', cards: nodes.map((n, i) => ({ id: n.id, role: i ? 'body' : 'intro' })), materials: [{ name: 'm', use: 'u' }], decisions: { reader: 'kids' } }),
     card: request => ({ covers: `covers ${request.card.position}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }] }),
-    author: async input => { await input.admission.reserve(); const note = await repo.readNote(input.path); const r = await repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return r === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; },
+    author: async input => { await input.admission.reserve(); const note = await repo.readNote(input.path); const r = await repo.updateNoteGuarded(input.path, { detail: input.requirements !== undefined ? fixOf(bodyOf(note.title)) : bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return r === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; },
     proof: async request => ({ items: request.checklist.map(c => ({ id: c.id, type: c.type, status: 'met', note: 'fine', sources: [] })), aggregate: 'checked' }),
     probe: async () => ({ ok: true }), ...over.script };
   const ports = {
@@ -453,7 +455,7 @@ test('proofFixInstruction: the whole-book points (names, research voice) come be
   assert.ok(line.length <= 1000);
 });
 
-test('proofFixInstruction: an under-length chapter is asked for the missing new text in @@insert blocks (the program keeps the chapter); over says shorten with the maximum', () => {
+test('proofFixInstruction: an under-length chapter is asked for the missing new text in @@insert blocks (the program keeps the chapter); over says shorten with the maximum in @@replace blocks', () => {
   const R = S.load('experiences/visual-map/book-pipeline-rerun.ts');
   const under = R.proofFixInstruction([], [], { kind: 'under', measured: 3184, min: 5000, max: 8000, unit: '字', version: 1 });
   assert.match(under, /came out at only 3184 字, short of the asked 5000 to 8000 字: add about 3316 字 of new text in @@insert blocks/);
@@ -462,8 +464,8 @@ test('proofFixInstruction: an under-length chapter is asked for the missing new 
   const tiny = R.proofFixInstruction([], [], { kind: 'under', measured: 0, min: 100, max: 200, unit: '字', version: 1 });
   assert.match(tiny, /add about 150 字 of new text/, 'a zero measure asks for the whole target');
   const over = R.proofFixInstruction([], [], { kind: 'over', measured: 9800, min: 5000, max: 8000, unit: '字', version: 1 });
-  assert.match(over, /9800 字 long, over the asked 5000 to 8000 字: shorten it to at most 8000 字, about 6500 字/);
-  assert.doesNotMatch(over, /@@/);
+  assert.match(over, /9800 字 long, over the asked 5000 to 8000 字: shorten it to at most 8000 字, about 6500 字, with @@replace blocks/);
+  assert.doesNotMatch(over, /rewrite/, 'a too-long chapter is edited in place too');
 });
 
 test('proofFixInstruction: with a too-short chapter the fact and whole-book points (N1/V1) still come first and say to fix them with change blocks', () => {

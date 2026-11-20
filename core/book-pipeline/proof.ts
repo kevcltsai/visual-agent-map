@@ -262,7 +262,11 @@ export const isBookCheckId = (id: string): boolean => BOOK_IDS.has(id);
  * already said needs-review for a whole-card reason or when the chapter text is empty; else checked. Nothing found unmet ends checked.
  */
 export function proofVerdict(
-  result: { items: readonly { id?: string; type: string; status: string }[]; aggregate?: string; factsUnverified?: boolean },
+  result: {
+    items: readonly { id?: string; type: string; status: string }[];
+    aggregate?: string;
+    factsUnverified?: boolean;
+  },
   bodyEmpty = false
 ): "checked" | "needs-review" {
   const facts = result.items.filter(item => item.type === "fact");

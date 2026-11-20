@@ -92253,7 +92253,9 @@ var proofreadStep = {
       languageInstruction: languageInstruction(request.language, request.body),
       checklist: JSON.stringify(request.checklist.map((item) => ({ id: item.id, type: item.type, text: item.text }))),
       title: JSON.stringify((_a2 = request.title) != null ? _a2 : ""),
-      chapters: JSON.stringify(((_b2 = request.chapters) != null ? _b2 : []).map((chapter) => ({ title: chapter.title, covers: chapter.covers }))),
+      chapters: JSON.stringify(
+        ((_b2 = request.chapters) != null ? _b2 : []).map((chapter) => ({ title: chapter.title, covers: chapter.covers }))
+      ),
       body: JSON.stringify(request.body)
     });
   },

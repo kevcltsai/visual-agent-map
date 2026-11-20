@@ -98,7 +98,9 @@ export const proofreadStep: StepDefinition<ProofreadRequest, RawProofItem[]> = {
       languageInstruction: languageInstruction(request.language, request.body),
       checklist: JSON.stringify(request.checklist.map(item => ({ id: item.id, type: item.type, text: item.text }))),
       title: JSON.stringify(request.title ?? ""),
-      chapters: JSON.stringify((request.chapters ?? []).map(chapter => ({ title: chapter.title, covers: chapter.covers }))),
+      chapters: JSON.stringify(
+        (request.chapters ?? []).map(chapter => ({ title: chapter.title, covers: chapter.covers }))
+      ),
       body: JSON.stringify(request.body)
     }),
   schema: PROOFREAD_SCHEMA,

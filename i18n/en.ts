@@ -3315,7 +3315,8 @@ export const en = {
   "ui.book_start_title": "Turn this map into a book with pictures",
   "ui.book_start_intro":
     "From the topics and cards of this map, the AI plans, writes, finds pictures for and proofreads every chapter.",
-  "ui.book_start_estimate_0_1_2_3": "{0} cards · about {1} · up to {2} AI calls (a failed step's retry not included; the run pauses at {3}).",
+  "ui.book_start_estimate_0_1_2_3":
+    "{0} cards · about {1} · up to {2} AI calls (a failed step's retry not included; the run pauses at {3}).",
   "ui.book_start_under_minute": "under 1 minute",
   "ui.book_start_minutes_0": "{0} minutes",
   "ui.book_start_stops": "It stops only twice for you to confirm.",

@@ -224,7 +224,7 @@ test('controller: a refusal, a budget shortage or a failed write leaves the chap
     ['refused text_changed', async () => { throw new b.BookPipelineRunError('text_changed'); }, /⚠ 沒有重寫：.*文字又變了/],
     ['budget', async () => { throw new b.BookPipelineRunError('budget'); }, /⚠ 沒有重寫：/],
     ['still edited (the run skipped it)', async () => ({ unchanged: true }), /⚠ 沒有重寫：這章有你手改的內容/],
-    ['a plain error', async () => { throw new Error('boom'); }, /⚠ 沒有重寫：.*boom/]
+    ['a plain error', async () => { throw new Error('boom'); }, /⚠ 沒有重寫：圖文書流水線無法執行：執行失敗$/m]
   ];
   for (const [name, rerun, status] of cases) {
     const r = rig({ rerun });

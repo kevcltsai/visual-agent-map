@@ -17821,9 +17821,11 @@ export class VisualAgentMapView extends ItemView {
       researchMode: "research",
       researchDepth: "normal",
       visualMode: "off",
-      requirements: input.instruction
-        ? `${bookAuthorRequirements(input.settings, input.slots)}\n\n${input.instruction}`
-        : bookAuthorRequirements(input.settings, input.slots),
+      requirements:
+        input.requirements ??
+        (input.instruction
+          ? `${bookAuthorRequirements(input.settings, input.slots)}\n\n${input.instruction}`
+          : bookAuthorRequirements(input.settings, input.slots)),
       outputLanguage: input.language
     };
     this.bookAuthoring.set(node.path, Date.now());
@@ -17843,6 +17845,7 @@ export class VisualAgentMapView extends ItemView {
           pipeline: {
             authorize: input.authorize,
             finalize: input.finalize,
+            ...(input.keepSummary ? { keepSummary: true } : {}),
             onBudgetExhausted: () => {
               exhausted = true;
             },

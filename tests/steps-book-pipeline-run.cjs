@@ -2601,6 +2601,7 @@ test('a card deleted before its author commits: the result is dropped, the attem
   await r.runs.confirmGate1(r.mapPath); await finished(r);
   let s = await r.state();
   assert.equal(s.pauseReason, 'map'); sameJson(s.changed.missing, [victim]);
+  sameJson(r.runs.getProgress(r.mapPath).mapChange, { added: 0, missing: 1 }, 'a card deleted while running reads as one chapter less');
   assert.equal(s.attempts[victim].write, 0, 'the attempt is given back');
   assert.ok(s.budget.used > before, 'the call that was sent counts');
   for (let i = 0; i < 4; i++) assert.notEqual(stageOf(r.raw(i)), 'needs-review');

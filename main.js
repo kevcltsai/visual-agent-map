@@ -3239,12 +3239,14 @@ var en = {
   "ui.book_note_trial_title_0": "Trial chapter {0} of {1}",
   "ui.book_note_trial_next": "Once you have read it, go back to the mind map and press \u201CRun the whole book\u201D.",
   "ui.book_note_trial_stopped": "The book is stopped. Press \u201CContinue\u201D on the mind map toolbar first, then \u201CRun the whole book\u201D.",
+  "ui.book_note_trial_edit": "To change a passage: select the text, right-click and choose \u201CAdd a note\u201D.",
   "ui.book_note_prev_0": "Previous chapter: {0}",
   "ui.book_note_next_0": "Next chapter: {0}",
   "ui.book_note_review_title": "This chapter needs a look",
   "ui.book_note_review_accept": "Accept it as it is, no change needed",
   "ui.book_note_review_fixed": "I fixed it",
   "ui.book_note_review_next_0": "Next chapter to check: {0}",
+  "ui.book_note_review_handled_0": "Handled (you chose \u201C{0}\u201D)",
   "ui.book_note_add": "Picture book: add a note",
   "ui.book_note_add_disabled_0": "Picture book: add a note ({0})",
   "ui.book_note_why_empty": "select some text first",
@@ -3320,7 +3322,8 @@ var en = {
   "ui.book_role_ai_set": "Chapter role handed back to AI; the next plan may change it.",
   "ui.book_role_running_suffix": "The book is running; this takes effect from the next load.",
   "ui.book_role_failed": "Could not change the chapter role.",
-  "ui.book_deleted_chapter_hint_0": "This mentions a chapter that is no longer on the map: {0}"
+  "ui.book_deleted_chapter_hint_0": "This mentions a chapter that is no longer on the map: {0}",
+  "ui.book_deleted_chapter_hint_keep": "Change this text if you like; if you leave it, the book follows the chapters the map has now."
 };
 
 // i18n/zh-CN.ts
@@ -6455,12 +6458,14 @@ var zhCN = {
   "ui.book_note_trial_title_0": "\u8BD5\u8DD1\u7B2C {0}\uFF0F{1} \u7AE0",
   "ui.book_note_trial_next": "\u770B\u5B8C\u540E\u56DE\u5FC3\u667A\u56FE\uFF0C\u6309\u201C\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66\u201D\u3002",
   "ui.book_note_trial_stopped": "\u8FD9\u672C\u4E66\u5DF2\u505C\u6B62\u3002\u5148\u5728\u5FC3\u667A\u56FE\u5DE5\u5177\u680F\u6309\u201C\u7EE7\u7EED\u201D\uFF0C\u518D\u6309\u201C\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66\u201D\u3002",
+  "ui.book_note_trial_edit": "\u60F3\u6539\u54EA\u4E00\u6BB5\uFF1A\u9009\u53D6\u6587\u5B57\uFF0C\u53F3\u952E\u201C\u52A0\u5907\u6CE8\u201D\u3002",
   "ui.book_note_prev_0": "\u4E0A\u4E00\u7AE0\uFF1A{0}",
   "ui.book_note_next_0": "\u4E0B\u4E00\u7AE0\uFF1A{0}",
   "ui.book_note_review_title": "\u8FD9\u7AE0\u8981\u4F60\u770B",
   "ui.book_note_review_accept": "\u63A5\u53D7\u73B0\u5728\u8FD9\u6837\uFF0C\u4E0D\u7528\u6539",
   "ui.book_note_review_fixed": "\u6211\u6539\u597D\u4E86",
   "ui.book_note_review_next_0": "\u4E0B\u4E00\u7AE0\u8981\u770B\u7684\uFF1A{0}",
+  "ui.book_note_review_handled_0": "\u5DF2\u5904\u7406\uFF08\u4F60\u9009\u4E86\u201C{0}\u201D\uFF09",
   "ui.book_note_add": "\u56FE\u6587\u4E66\uFF1A\u52A0\u5907\u6CE8",
   "ui.book_note_add_disabled_0": "\u56FE\u6587\u4E66\uFF1A\u52A0\u5907\u6CE8\uFF08{0}\uFF09",
   "ui.book_note_why_empty": "\u5148\u9009\u53D6\u4E00\u6BB5\u6587\u5B57",
@@ -6536,7 +6541,8 @@ var zhCN = {
   "ui.book_role_ai_set": "\u7AE0\u8282\u89D2\u8272\u5DF2\u4EA4\u7ED9 AI\uFF0C\u4E0B\u6B21\u89C4\u5212\u53EF\u80FD\u4F1A\u8C03\u6574\u3002",
   "ui.book_role_running_suffix": "\u56FE\u6587\u4E66\u6B63\u5728\u6267\u884C\uFF0C\u8981\u7B49\u4E0B\u6B21\u8F7D\u5165\u624D\u751F\u6548\u3002",
   "ui.book_role_failed": "\u65E0\u6CD5\u66F4\u6539\u7AE0\u8282\u89D2\u8272\u3002",
-  "ui.book_deleted_chapter_hint_0": "\u8FD9\u91CC\u63D0\u5230\u5DF2\u4E0D\u5728\u5FC3\u667A\u56FE\u4E0A\u7684\u7AE0\uFF1A{0}"
+  "ui.book_deleted_chapter_hint_0": "\u8FD9\u91CC\u63D0\u5230\u5DF2\u4E0D\u5728\u5FC3\u667A\u56FE\u4E0A\u7684\u7AE0\uFF1A{0}",
+  "ui.book_deleted_chapter_hint_keep": "\u8981\u7684\u8BDD\u6539\u6389\u8FD9\u6BB5\u6587\u5B57\uFF1B\u4E0D\u6539\u4E5F\u4F1A\u7167\u76EE\u524D\u7684\u7AE0\u6765\u5199\u3002"
 };
 
 // i18n/zh-TW.ts
@@ -9671,12 +9677,14 @@ var zhTW = {
   "ui.book_note_trial_title_0": "\u8A66\u8DD1\u7B2C {0}\uFF0F{1} \u7AE0",
   "ui.book_note_trial_next": "\u770B\u5B8C\u5F8C\u56DE\u5FC3\u667A\u5716\uFF0C\u6309\u300C\u9019\u6A23\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u66F8\u300D\u3002",
   "ui.book_note_trial_stopped": "\u9019\u672C\u66F8\u5DF2\u505C\u6B62\u3002\u5148\u5728\u5FC3\u667A\u5716\u5DE5\u5177\u5217\u6309\u300C\u7E7C\u7E8C\u300D\uFF0C\u518D\u6309\u300C\u9019\u6A23\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u66F8\u300D\u3002",
+  "ui.book_note_trial_edit": "\u60F3\u6539\u54EA\u4E00\u6BB5\uFF1A\u9078\u53D6\u6587\u5B57\uFF0C\u53F3\u9375\u300C\u52A0\u5099\u8A3B\u300D\u3002",
   "ui.book_note_prev_0": "\u4E0A\u4E00\u7AE0\uFF1A{0}",
   "ui.book_note_next_0": "\u4E0B\u4E00\u7AE0\uFF1A{0}",
   "ui.book_note_review_title": "\u9019\u7AE0\u8981\u4F60\u770B",
   "ui.book_note_review_accept": "\u63A5\u53D7\u73FE\u5728\u9019\u6A23\uFF0C\u4E0D\u7528\u6539",
   "ui.book_note_review_fixed": "\u6211\u6539\u597D\u4E86",
   "ui.book_note_review_next_0": "\u4E0B\u4E00\u7AE0\u8981\u770B\u7684\uFF1A{0}",
+  "ui.book_note_review_handled_0": "\u5DF2\u8655\u7406\uFF08\u4F60\u9078\u4E86\u300C{0}\u300D\uFF09",
   "ui.book_note_add": "\u5716\u6587\u66F8\uFF1A\u52A0\u5099\u8A3B",
   "ui.book_note_add_disabled_0": "\u5716\u6587\u66F8\uFF1A\u52A0\u5099\u8A3B\uFF08{0}\uFF09",
   "ui.book_note_why_empty": "\u5148\u9078\u53D6\u4E00\u6BB5\u6587\u5B57",
@@ -9752,7 +9760,8 @@ var zhTW = {
   "ui.book_role_ai_set": "\u7AE0\u7BC0\u89D2\u8272\u5DF2\u4EA4\u7D66 AI\uFF0C\u4E0B\u6B21\u898F\u5283\u53EF\u80FD\u6703\u8ABF\u6574\u3002",
   "ui.book_role_running_suffix": "\u5716\u6587\u66F8\u6B63\u5728\u57F7\u884C\uFF0C\u8981\u7B49\u4E0B\u6B21\u8F09\u5165\u624D\u751F\u6548\u3002",
   "ui.book_role_failed": "\u7121\u6CD5\u66F4\u6539\u7AE0\u7BC0\u89D2\u8272\u3002",
-  "ui.book_deleted_chapter_hint_0": "\u9019\u88E1\u63D0\u5230\u5DF2\u4E0D\u5728\u5FC3\u667A\u5716\u4E0A\u7684\u7AE0\uFF1A{0}"
+  "ui.book_deleted_chapter_hint_0": "\u9019\u88E1\u63D0\u5230\u5DF2\u4E0D\u5728\u5FC3\u667A\u5716\u4E0A\u7684\u7AE0\uFF1A{0}",
+  "ui.book_deleted_chapter_hint_keep": "\u8981\u7684\u8A71\u6539\u6389\u9019\u6BB5\u6587\u5B57\uFF1B\u4E0D\u6539\u4E5F\u6703\u7167\u76EE\u524D\u7684\u7AE0\u4F86\u5BEB\u3002"
 };
 
 // i18n/languages.ts
@@ -53600,7 +53609,7 @@ var PHASE_KEY = {
   gate2: "ui.book_phase_gate2",
   done: "ui.book_phase_done"
 };
-function bookBarState(data, progress, stageOf) {
+function bookBarState(data, progress, stageOf, mapIds) {
   var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
   const savedDone = data.phase === "done" && (!progress || progress.runId === data.runId);
   const phase = savedDone ? "done" : (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : data.phase;
@@ -53613,7 +53622,7 @@ function bookBarState(data, progress, stageOf) {
   const budget = (_f = progress == null ? void 0 : progress.budget) != null ? _f : data.budget;
   const failure = progress ? progress.failureCode : data.failureCode;
   const interrupted = (phase === "planning" || phase === "writing") && !active;
-  const mapChange = status === "stopped" && pauseReason === "map" && !active ? (_k = progress == null ? void 0 : progress.mapChange) != null ? _k : {
+  const mapChange = status === "stopped" && pauseReason === "map" && !active ? mapIds ? countChange(mapDifference(data, mapIds)) : (_k = progress == null ? void 0 : progress.mapChange) != null ? _k : {
     added: (_h = (_g = data.changed) == null ? void 0 : _g.added.length) != null ? _h : 0,
     missing: (_j = (_i = data.changed) == null ? void 0 : _i.missing.length) != null ? _j : 0
   } : void 0;
@@ -53636,6 +53645,10 @@ function bookBarState(data, progress, stageOf) {
     ...(progress == null ? void 0 : progress.etaSeconds) !== void 0 && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0 ? { etaSeconds: progress.etaSeconds } : {}
   };
 }
+var countChange = (change2) => ({
+  added: change2.added.length,
+  missing: change2.missing.length
+});
 function currentOf2(data, progress) {
   var _a2;
   if (!(progress == null ? void 0 : progress.active) || !((_a2 = progress.current) == null ? void 0 : _a2.length)) return void 0;
@@ -54186,6 +54199,7 @@ function trialCallout(i, n, prevLink, nextLink, stopped, owner) {
   return quoted([
     `> [!vam-trial] ${t("ui.book_note_trial_title_0", i, n)}`,
     `> ${stopped ? t("ui.book_note_trial_stopped") : t("ui.book_note_trial_next")}`,
+    `> ${t("ui.book_note_trial_edit")}`,
     ...links ? [links] : [],
     `> %%vam-trial:${idPart(owner.runId)}:${idPart(owner.nodeId)}%%`,
     VERSION_LINE
@@ -54255,15 +54269,56 @@ function putProgramCallout(text10, callout2) {
   const block = [...callout2.split("\n").map((line2) => line2 + cr), cr];
   return [...lines.slice(0, span.from + 1), ...block, ...lines.slice(span.from + 1)].join("\n");
 }
-function collapseReviewCallouts(text10) {
+var retitle = (line2, title, sign) => {
+  const cr = line2.endsWith("\r") ? "\r" : "";
+  return bare2(line2).replace(
+    /(\[!vam-review\])([+-]?).*$/i,
+    (_, head2, was) => `${head2}${sign != null ? sign : was} ${title}`
+  ) + cr;
+};
+function answerOf(lines, box) {
+  var _a2, _b2;
+  const ticks = [];
+  for (let i = box.start + 1; i < box.end; i++) {
+    const m = CHECKBOX.exec(bare2(lines[i]));
+    if (m) ticks.push({ on: m[1] !== " ", label: bare2(lines[i]).slice(m[0].length).trim() });
+  }
+  const answer = ((_a2 = ticks[0]) == null ? void 0 : _a2.on) ? ticks[0] : !box.op && ((_b2 = ticks[1]) == null ? void 0 : _b2.on) ? ticks[1] : void 0;
+  return answer ? plainText(answer.label) : void 0;
+}
+function editReviewHeaders(text10, edit) {
   const lines = text10.split("\n");
   let changed = false;
   for (const c of ownedIn(lines)) {
-    if (c.kind !== "review" || c.sign === "-") continue;
-    lines[c.start] = lines[c.start].replace(REVIEW_SIGN, "[!vam-review]-");
+    if (c.kind !== "review") continue;
+    const next = edit(c, lines);
+    if (next === void 0 || next === lines[c.start]) continue;
+    lines[c.start] = next;
     changed = true;
   }
   return changed ? lines.join("\n") : text10;
+}
+var handledTitle = (lines, box) => {
+  const answer = answerOf(lines, box);
+  return answer === void 0 ? void 0 : t("ui.book_note_review_handled_0", answer);
+};
+function markReviewHandled(text10) {
+  return editReviewHeaders(text10, (box, lines) => {
+    const title = handledTitle(lines, box);
+    return title === void 0 ? void 0 : retitle(lines[box.start], title);
+  });
+}
+function collapseReviewCallouts(text10) {
+  return editReviewHeaders(text10, (box, lines) => {
+    const title = handledTitle(lines, box);
+    return title === void 0 ? box.sign === "-" ? void 0 : lines[box.start].replace(REVIEW_SIGN, "[!vam-review]-") : retitle(lines[box.start], title, "-");
+  });
+}
+function reopenReviewCallouts(text10) {
+  return editReviewHeaders(
+    text10,
+    (box, lines) => answerOf(lines, box) === void 0 ? retitle(lines[box.start], t("ui.book_note_review_title"), "") : void 0
+  );
 }
 function readReviewState(text10) {
   var _a2, _b2;
@@ -54282,6 +54337,7 @@ function readReviewState(text10) {
     accept: ticks[0] === true,
     fixed: ticks[1] === true,
     collapsed: box.sign === "-",
+    handled: !bare2(lines[box.start]).endsWith(` ${t("ui.book_note_review_title")}`),
     ...box.op ? { op: box.op, ifp: (_b2 = box.ifp) != null ? _b2 : "", ...box.queued ? { queued: true } : {} } : {}
   };
 }
@@ -54400,6 +54456,7 @@ function createNoteWriter(ports) {
   };
 }
 function alignCallouts(text10, want) {
+  var _a2;
   if (!want) return removeProgramCallouts(text10);
   let out = removeProgramCalloutsWhere(text10, (c) => c.runId !== idPart(want.runId) || c.nodeId !== idPart(want.nodeId));
   out = want.trial ? putProgramCallout(out, want.trial) : removeProgramCallouts(out, "trial");
@@ -54407,11 +54464,14 @@ function alignCallouts(text10, want) {
     const state = readReviewState(out);
     if (state && state.fp === idPart(want.review.fp)) {
       if (isReviewResolved(state, state.fp)) out = collapseReviewCallouts(out);
+      else if (state.collapsed || state.handled) out = reopenReviewCallouts(out);
     } else out = putProgramCallout(out, want.review.build(state));
   } else {
     const state = readReviewState(out);
-    const queued = !!(state == null ? void 0 : state.queued) && state.runId === idPart(want.runId) && state.nodeId === idPart(want.nodeId);
-    if (!queued) out = removeProgramCallouts(out, "review");
+    const own2 = !!state && state.runId === idPart(want.runId) && state.nodeId === idPart(want.nodeId);
+    const answered = own2 && want.keepAnswered === true && isReviewResolved(state, (_a2 = state == null ? void 0 : state.fp) != null ? _a2 : "");
+    if (answered) out = collapseReviewCallouts(out);
+    else if (!(own2 && (state == null ? void 0 : state.queued))) out = removeProgramCallouts(out, "review");
   }
   return out;
 }
@@ -54460,9 +54520,17 @@ var BookCallouts = class {
       return clean3;
     }).catch(() => false);
   }
-  /** Folds a ticked review box (the box at once; the ticks and marker stay). */
+  /** Folds a ticked review box under its "handled" title (the ticks and marker stay). */
   collapse(path) {
     return this.disposed ? Promise.resolve("refused") : this.ports.write(path, collapseReviewCallouts);
+  }
+  /** Titles a ticked review box "handled" and leaves it open (it folds a moment later, see {@link collapse}). */
+  markHandled(path) {
+    return this.disposed ? Promise.resolve("refused") : this.ports.write(path, markReviewHandled);
+  }
+  /** Opens a review box that is no longer ticked again, with its question as title. */
+  reopen(path) {
+    return this.disposed ? Promise.resolve("refused") : this.ports.write(path, reopenReviewCallouts);
   }
   /** Resolves when every queued job has ended (tests, and a clean shutdown). */
   async idle() {
@@ -54626,7 +54694,11 @@ var BookCallouts = class {
     }
     for (const { id, card } of cards) {
       if (this.disposed) return;
-      const want = (_b2 = wanted.get(id)) != null ? _b2 : { runId: data.runId, nodeId: id };
+      const want = (_b2 = wanted.get(id)) != null ? _b2 : {
+        runId: data.runId,
+        nodeId: id,
+        ...data.phase === "gate2" ? { keepAnswered: true } : {}
+      };
       const now = await this.ports.readText(card.path).catch(() => card.raw);
       if (alignCallouts(now, want) === now) continue;
       await this.put(data.runId, id, card.path, (text10) => alignCallouts(text10, want));
@@ -66960,7 +67032,10 @@ function renderBookSettingsFields(parent, current, deletedTitles = [], chapterTi
     const hint = parent.createEl("p", { cls: "vam-book-start-hint", attr: { id: `${id}-hint`, role: "status" } });
     const refresh = () => {
       const found = mentionedDeletedChapters(area.value, deletedTitles, chapterTitles);
-      hint.setText(found.length ? t("ui.book_deleted_chapter_hint_0", found.join("\u3001")) : "");
+      hint.setText(
+        found.length ? `${t("ui.book_deleted_chapter_hint_0", found.join("\u3001"))}
+${t("ui.book_deleted_chapter_hint_keep")}` : ""
+      );
       hint.toggleClass("is-empty", !found.length);
     };
     if (deletedTitles.length) {
@@ -69936,6 +70011,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     __publicField(this, "bookResolved", /* @__PURE__ */ new Map());
     /** Resolutions run one after another (each reads the note and may write it). */
     __publicField(this, "bookNoteChain", Promise.resolve());
+    /** How long a ticked review box stays open under its "handled" title before it folds (mockup ⑦-3; tests shorten it). */
+    __publicField(this, "bookFoldDelayMs", 3e3);
+    /** Ticked boxes waiting to fold, by card id. */
+    __publicField(this, "bookFoldTimers", /* @__PURE__ */ new Map());
+    /** Cards whose wait is over: their next resolution folds the box (and confirms a join). */
+    __publicField(this, "bookFoldDue", /* @__PURE__ */ new Set());
     /**
      * Whether a note of this map may carry a program callout, from the note text this view already holds (the callouts sit in the
      * Detail, which is in memory): a note with none is not read again on a map open. A note not loaded is unknown (read it).
@@ -71317,6 +71398,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     (_a2 = this.bookStartModal) == null ? void 0 : _a2.close();
     this.bookStartModal = null;
     this.bookResolved.clear();
+    for (const id of [...this.bookFoldTimers.keys()]) this.cancelBookFold(id);
     if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
     this.chatSourceCache = null;
     this.unsyncedPaths = null;
@@ -84525,13 +84607,16 @@ ${t("ui.book_role_running_suffix")}` : first);
     const read = readBookPipeline(this.map);
     if (read.kind !== "usable") return;
     const path = this.path;
+    const map = this.map;
     const state = bookBarState(
       read.data,
       this.plugin.getBookPipelineProgress(path),
       (id) => {
         var _a3;
         return readPipelineStage((_a3 = this.notes.get(id)) == null ? void 0 : _a3.pipelineStage);
-      }
+      },
+      // A run paused for a map change counts the map as it is now (a card removed after the pause counts at once).
+      map.nodes.map((node) => node.id)
     );
     if (state.mode !== "changed") this.bookMapFocusedRun = null;
     else if (this.bookMapFocusedRun !== read.data.runId) {
@@ -84696,6 +84781,14 @@ ${t("ui.book_role_running_suffix")}` : first);
       });
     if (!entry || !isReviewResolved(state, entry.fp)) {
       this.bookResolved.delete(id);
+      this.cancelBookFold(id);
+      if (entry && state && state.fp === entry.fp && (state.collapsed || state.handled))
+        await this.plugin.bookCallouts.reopen(node.path);
+    } else if (state && !state.collapsed && !this.bookFoldDue.delete(id)) {
+      this.bookResolved.set(id, entry.fp);
+      if (state.op) await this.plugin.bookHandEdits.keep(node.path);
+      await this.plugin.bookCallouts.markHandled(node.path);
+      this.scheduleBookFold(id);
     } else {
       this.bookResolved.set(id, entry.fp);
       if (state == null ? void 0 : state.op) await this.plugin.bookHandEdits.keep(node.path);
@@ -84707,6 +84800,22 @@ ${t("ui.book_role_running_suffix")}` : first);
       }
     }
     if (!this.closed && this.map === map) this.render();
+  }
+  scheduleBookFold(id) {
+    if (this.bookFoldTimers.has(id)) return;
+    const timer = window.setTimeout(() => {
+      this.bookFoldTimers.delete(id);
+      if (this.closed) return;
+      this.bookFoldDue.add(id);
+      void this.queueBookResolve(id);
+    }, this.bookFoldDelayMs);
+    this.bookFoldTimers.set(id, timer);
+  }
+  cancelBookFold(id) {
+    const timer = this.bookFoldTimers.get(id);
+    if (timer !== void 0) window.clearTimeout(timer);
+    this.bookFoldTimers.delete(id);
+    this.bookFoldDue.delete(id);
   }
   /** A save of a chapter note of the open book: its box may have been ticked or unticked. */
   onBookNoteModified(path) {

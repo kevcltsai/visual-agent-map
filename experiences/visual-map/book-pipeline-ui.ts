@@ -4,6 +4,7 @@ import { isBookStepError } from "../../core/steps/book-pipeline/base";
 import { splitLengthIssue, type LengthReason } from "../../core/book-pipeline/settings";
 import {
   effectiveOrder,
+  mapDifference,
   readBookRole,
   readPipelineStage,
   type BookPipelineData,
@@ -79,11 +80,14 @@ const PHASE_KEY: Record<BookPipelineData["phase"], TranslationKey> = {
 /**
  * What the bar shows. The live numbers come from the runner (`getBookPipelineProgress`); after a reload the runner has none,
  * so the saved state and the cards' stages stand in, and a run that was "running" with nothing driving it reads as stopped.
+ * `mapIds` (the map's cards in reading order, as the runner reads them): a run paused for a map change counts what differs now, so a
+ * card added or removed after the pause is counted at once (the runner's numbers are from the moment it paused).
  */
 export function bookBarState(
   data: BookPipelineData,
   progress: BookPipelineProgress | undefined,
-  stageOf: (nodeId: string) => PipelineStage | undefined
+  stageOf: (nodeId: string) => PipelineStage | undefined,
+  mapIds?: readonly string[]
 ): BookBarState {
   // The saved "done" of the same run is final: a runner record that still says gate2 is older than the owner's acceptance.
   const savedDone = data.phase === "done" && (!progress || progress.runId === data.runId);
@@ -99,10 +103,12 @@ export function bookBarState(
   const interrupted = (phase === "planning" || phase === "writing") && !active;
   const mapChange =
     status === "stopped" && pauseReason === "map" && !active
-      ? (progress?.mapChange ?? {
-          added: data.changed?.added.length ?? 0,
-          missing: data.changed?.missing.length ?? 0
-        })
+      ? mapIds
+        ? countChange(mapDifference(data, mapIds))
+        : (progress?.mapChange ?? {
+            added: data.changed?.added.length ?? 0,
+            missing: data.changed?.missing.length ?? 0
+          })
       : undefined;
   const mode: BookBarMode = mapChange
     ? "changed"
@@ -131,6 +137,11 @@ export function bookBarState(
       : {})
   };
 }
+
+const countChange = (change: { added: string[]; missing: string[] }): { added: number; missing: number } => ({
+  added: change.added.length,
+  missing: change.missing.length
+});
 
 /** The run's busiest-first card for the progress sentence: the whole-book plan first, then the earliest chapter in the reading order. */
 function currentOf(data: BookPipelineData, progress: BookPipelineProgress | undefined): BookCurrent | undefined {

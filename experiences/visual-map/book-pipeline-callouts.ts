@@ -7,6 +7,8 @@ import { hashText } from "../../core/book-pipeline/text";
 import type { PipelineCard } from "./book-pipeline-run";
 import {
   collapseReviewCallouts,
+  markReviewHandled,
+  reopenReviewCallouts,
   findProgramCallouts,
   idPart,
   isReviewResolved,
@@ -152,6 +154,8 @@ export interface WantedCallouts {
   trial?: string;
   /** `build` gets the box the note carries now (when it is being written again): a queued rewrite of an unchanged hand-edited text is carried over. */
   review?: { fp: string; build: (prior?: ReviewState) => string };
+  /** Gate 2: a review box the reader answered stays (folded) even when the chapter no longer asks for one. */
+  keepAnswered?: boolean;
 }
 
 /**
@@ -168,11 +172,16 @@ export function alignCallouts(text: string, want: WantedCallouts | undefined): s
     const state = readReviewState(out);
     if (state && state.fp === idPart(want.review.fp)) {
       if (isReviewResolved(state, state.fp)) out = collapseReviewCallouts(out);
+      else if (state.collapsed || state.handled) out = reopenReviewCallouts(out);
     } else out = putProgramCallout(out, want.review.build(state));
   } else {
     const state = readReviewState(out);
-    const queued = !!state?.queued && state.runId === idPart(want.runId) && state.nodeId === idPart(want.nodeId);
-    if (!queued) out = removeProgramCallouts(out, "review");
+    const own = !!state && state.runId === idPart(want.runId) && state.nodeId === idPart(want.nodeId);
+    // A box the reader answered stays folded under its "handled" title while the book is at gate 2 (whatever the answer cleared, such
+    // as a join to check, no longer asks for it): ticking either box ends the same way (mockup ⑦-3).
+    const answered = own && want.keepAnswered === true && isReviewResolved(state, state?.fp ?? "");
+    if (answered) out = collapseReviewCallouts(out);
+    else if (!(own && state?.queued)) out = removeProgramCallouts(out, "review");
   }
   return out;
 }
@@ -249,9 +258,17 @@ export class BookCallouts {
     }).catch(() => false);
   }
 
-  /** Folds a ticked review box (the box at once; the ticks and marker stay). */
+  /** Folds a ticked review box under its "handled" title (the ticks and marker stay). */
   collapse(path: string): Promise<NoteWriteResult> {
     return this.disposed ? Promise.resolve("refused") : this.ports.write(path, collapseReviewCallouts);
+  }
+  /** Titles a ticked review box "handled" and leaves it open (it folds a moment later, see {@link collapse}). */
+  markHandled(path: string): Promise<NoteWriteResult> {
+    return this.disposed ? Promise.resolve("refused") : this.ports.write(path, markReviewHandled);
+  }
+  /** Opens a review box that is no longer ticked again, with its question as title. */
+  reopen(path: string): Promise<NoteWriteResult> {
+    return this.disposed ? Promise.resolve("refused") : this.ports.write(path, reopenReviewCallouts);
   }
 
   /** Resolves when every queued job has ended (tests, and a clean shutdown). */
@@ -427,7 +444,11 @@ export class BookCallouts {
     // Any other phase wants none: a callout left from an earlier phase or run goes now.
     for (const { id, card } of cards) {
       if (this.disposed) return;
-      const want = wanted.get(id) ?? { runId: data.runId, nodeId: id };
+      const want = wanted.get(id) ?? {
+        runId: data.runId,
+        nodeId: id,
+        ...(data.phase === "gate2" ? { keepAnswered: true } : {})
+      };
       // The note as it is now, not as it was read with the cards: a chapter written meanwhile has lost its callouts.
       const now = await this.ports.readText(card.path).catch(() => card.raw);
       if (alignCallouts(now, want) === now) continue;

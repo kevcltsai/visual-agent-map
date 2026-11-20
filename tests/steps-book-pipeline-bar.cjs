@@ -153,6 +153,22 @@ test('bar: a map change shows the changed mode with the counts, three real butto
   assert.deepEqual(live.mapChange, { added: 2, missing: 0 });
 });
 
+test('bar: a run paused for a map change counts the map as it is now (a card removed or added after the pause counts at once)', () => {
+  setUiLanguage('zh-TW');
+  const data = { v: 1, runId: 'r', phase: 'writing', status: 'stopped', pauseReason: 'map', changed: { added: ['new'], missing: [] }, accepted: ['a', 'b', 'c'], order: ['a', 'b', 'c'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x' };
+  const progress = { runId: 'r', phase: 'writing', status: 'stopped', active: false, pauseReason: 'map', mapChange: { added: 1, missing: 0 }, total: 3, counts: { pending: 3, planned: 0, written: 0, checked: 0, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [] };
+  const text = mapIds => {
+    const bar = dom.element('div');
+    bundle.renderBookBar(bar, bundle.bookBarState(data, progress, () => undefined, mapIds), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, mapChanged: { replan() {}, keep() {} } });
+    return one(bar, 'vam-book-map-changed').text;
+  };
+  assert.equal(text(['a', 'b', 'c', 'new']), '心智圖變了：多 1 章、少 0 章', 'as it paused');
+  assert.equal(text(['a', 'b', 'c']), '心智圖變了：多 0 章、少 0 章', 'the added card removed again: the stale "1 more" is gone');
+  assert.equal(text(['a', 'c', 'new']), '心智圖變了：多 1 章、少 1 章', 'a chapter card deleted while paused');
+  assert.equal(text(['a', 'c']), '心智圖變了：多 0 章、少 1 章');
+  assert.equal(text(undefined), '心智圖變了：多 1 章、少 0 章', 'no map at hand: the runner\'s numbers');
+});
+
 // ---- part B: the view ----
 const MAP = 'Agent Workspace/Topics/map-bk2/Map.md';
 async function viewRig({ book = true, phase = 'gate2' } = {}) {

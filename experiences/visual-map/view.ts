@@ -3027,6 +3027,7 @@ export class VisualAgentMapView extends ItemView {
     this.bookStartModal?.close();
     this.bookStartModal = null;
     this.bookResolved.clear();
+    for (const id of [...this.bookFoldTimers.keys()]) this.cancelBookFold(id);
     if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
     this.chatSourceCache = null;
     this.unsyncedPaths = null;
@@ -17320,8 +17321,13 @@ export class VisualAgentMapView extends ItemView {
     const read = readBookPipeline(this.map);
     if (read.kind !== "usable") return;
     const path = this.path;
-    const state = bookBarState(read.data, this.plugin.getBookPipelineProgress(path), id =>
-      readPipelineStage(this.notes.get(id)?.pipelineStage)
+    const map = this.map;
+    const state = bookBarState(
+      read.data,
+      this.plugin.getBookPipelineProgress(path),
+      id => readPipelineStage(this.notes.get(id)?.pipelineStage),
+      // A run paused for a map change counts the map as it is now (a card removed after the pause counts at once).
+      map.nodes.map(node => node.id)
     );
     // The map-changed choice takes the keyboard once when it appears (the same way the inline asks do).
     if (state.mode !== "changed") this.bookMapFocusedRun = null;
@@ -17506,6 +17512,16 @@ export class VisualAgentMapView extends ItemView {
       });
     if (!entry || !isReviewResolved(state, entry.fp)) {
       this.bookResolved.delete(id);
+      this.cancelBookFold(id);
+      // Unticked: the box asks its question again (it was titled "handled" or folded when it was ticked).
+      if (entry && state && state.fp === entry.fp && (state.collapsed || state.handled))
+        await this.plugin.bookCallouts.reopen(node.path);
+    } else if (state && !state.collapsed && !this.bookFoldDue.delete(id)) {
+      // Just ticked: the count drops now, the box says "handled" and folds three seconds later (mockup ⑦-3), in either view mode.
+      this.bookResolved.set(id, entry.fp);
+      if (state.op) await this.plugin.bookHandEdits.keep(node.path);
+      await this.plugin.bookCallouts.markHandled(node.path);
+      this.scheduleBookFold(id);
     } else {
       this.bookResolved.set(id, entry.fp);
       // "Keep my version": the chapter text as it is now is recorded as kept, so a later run leaves it alone.
@@ -17518,6 +17534,28 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     if (!this.closed && this.map === map) this.render();
+  }
+  /** How long a ticked review box stays open under its "handled" title before it folds (mockup ⑦-3; tests shorten it). */
+  private bookFoldDelayMs = 3000;
+  /** Ticked boxes waiting to fold, by card id. */
+  private readonly bookFoldTimers = new Map<string, number>();
+  /** Cards whose wait is over: their next resolution folds the box (and confirms a join). */
+  private readonly bookFoldDue = new Set<string>();
+  private scheduleBookFold(id: string): void {
+    if (this.bookFoldTimers.has(id)) return;
+    const timer = window.setTimeout(() => {
+      this.bookFoldTimers.delete(id);
+      if (this.closed) return;
+      this.bookFoldDue.add(id);
+      void this.queueBookResolve(id);
+    }, this.bookFoldDelayMs);
+    this.bookFoldTimers.set(id, timer);
+  }
+  private cancelBookFold(id: string): void {
+    const timer = this.bookFoldTimers.get(id);
+    if (timer !== undefined) window.clearTimeout(timer);
+    this.bookFoldTimers.delete(id);
+    this.bookFoldDue.delete(id);
   }
   /** A save of a chapter note of the open book: its box may have been ticked or unticked. */
   private onBookNoteModified(path: string): void {

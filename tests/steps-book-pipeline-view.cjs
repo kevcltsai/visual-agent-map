@@ -22,7 +22,7 @@ export { deletedChapterTitles, mentionedDeletedChapters, renderBookSettingsField
 export { BookStepError } from "./core/steps/book-pipeline/base";
 export { BookPipelineRunError, stepCounts } from "./experiences/visual-map/book-pipeline-run";
 export { readBookPipeline } from "./core/book-pipeline/model";
-export { reviewEntries, reviewCallout, putProgramCallout } from "./experiences/visual-map/book-pipeline-review";
+export { reviewEntries, reviewCallout, putProgramCallout, collapseReviewCallouts, markReviewHandled } from "./experiences/visual-map/book-pipeline-review";
 export { VisualAgentMapView } from "./experiences/visual-map/view";
 export { setUiLanguage, t } from "./i18n";
 `, { obsidian: { ...support.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice(notices), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, Option: OptionStub, window: { setTimeout: (fn, ms) => (ms === 20000 && timers.hold ? (timers.held.push(fn), 99) : setTimeout(fn, ms)), clearTimeout, setInterval, clearInterval } });
@@ -1337,9 +1337,11 @@ test('toolbar source: the panel, its toggle and the finish modal are gone from t
 // ---- the review boxes in the notes (T4): a tick in a chapter note resolves it in the bar; opening the map reconciles ----
 async function boxRig({ stage = 'needs-review', seam } = {}) {
   const g = await gateRig({ phase: 'gate2' });
-  const calls = { collapse: [], reconcile: [], seam: [], renders: 0, drain: [], tick: [], keep: [] };
+  const calls = { collapse: [], reconcile: [], seam: [], renders: 0, drain: [], tick: [], keep: [], handled: [], reopen: [] };
   g.plugin.bookHandEdits = { drain: async path => { calls.drain.push(path); }, tick: async (path, id) => { calls.tick.push([path, id]); }, keep: async path => { calls.keep.push(path); } };
-  g.plugin.bookCallouts = { collapse: async path => { calls.collapse.push(path); return 'written'; }, reconcile: async path => { calls.reconcile.push(path); } };
+  g.plugin.bookCallouts = { collapse: async path => { calls.collapse.push(path); return 'written'; }, reconcile: async path => { calls.reconcile.push(path); }, markHandled: async path => { calls.handled.push(path); return 'written'; }, reopen: async path => { calls.reopen.push(path); return 'written'; } };
+  // The fold waits three seconds in the product; here it waits for the next timer turn (see `folded`).
+  g.view.bookFoldDelayMs = 0;
   g.plugin.confirmBookSeam = async (path, id) => { calls.seam.push([path, id]); };
   g.view.rereadBookCard = async () => {};
   const node = g.view.map.nodes.find(n => n.id === g.ids.a);
@@ -1356,24 +1358,48 @@ async function boxRig({ stage = 'needs-review', seam } = {}) {
   };
   g.view.render = () => { calls.renders++; };
   const modified = async () => { g.view.onBookNoteModified(node.path); await g.view.bookNoteChain; };
+  const folded = async () => { await new Promise(resolve => setTimeout(resolve, 5)); await g.view.bookNoteChain; };
   const attention = () => Array.from(g.view.bookReviewCards(g.view.map.bookPipeline), c => c.id).filter(id => id === g.ids.a);
-  return { ...g, calls, node, fresh, writeBox, modified, attention };
+  return { ...g, calls, node, fresh, writeBox, modified, folded, attention };
 }
-test('review box: a tick for the attention it has now resolves the chapter (the bar stops counting it, the box folds at once); unticking brings it back', async () => {
+test('review box: a tick for the attention it has now resolves the chapter (the bar stops counting it at once, the box says handled and folds after the wait); unticking brings it back', async () => {
   const r = await boxRig();
   assert.deepEqual(r.attention(), [r.ids.a]);
   const e = await r.writeBox({ ticked: true });
   await r.modified();
   assert.equal(r.view.bookResolved.get(r.ids.a), e.fp);
-  assert.deepEqual(r.calls.collapse, [r.node.path]);
-  assert.deepEqual(r.attention(), []);
+  assert.deepEqual(r.attention(), [], 'the count drops at once');
+  assert.deepEqual(r.calls.handled, [r.node.path], 'titled handled at once');
+  assert.deepEqual(r.calls.collapse, [], 'not folded yet');
+  await r.modified();
+  assert.deepEqual(r.calls.collapse, [], 'a save during the wait does not fold it early');
+  await r.folded();
+  assert.deepEqual(r.calls.collapse, [r.node.path], 'folded after the wait');
   assert.deepEqual(r.calls.seam, [], 'a chapter with a real problem does not confirm a join');
   assert.ok(r.calls.renders >= 1);
   const file = r.view.app.vault.getAbstractFileByPath(r.node.path);
-  await r.view.app.vault.process(file, raw => raw.replace('[x]', '[ ]'));
+  await r.view.app.vault.process(file, raw => bundle.collapseReviewCallouts(raw).replace('[x]', '[ ]'));
   await r.modified();
   assert.equal(r.view.bookResolved.has(r.ids.a), false);
   assert.deepEqual(r.attention(), [r.ids.a]);
+  assert.deepEqual(r.calls.reopen, [r.node.path], 'unticked: the box asks again');
+});
+test('review box: unticked during the wait, the fold is cancelled; a closed view folds nothing', async () => {
+  const r = await boxRig();
+  await r.writeBox({ ticked: true });
+  await r.modified();
+  const file = r.view.app.vault.getAbstractFileByPath(r.node.path);
+  await r.view.app.vault.process(file, raw => bundle.markReviewHandled(raw).replace('[x]', '[ ]'));
+  await r.modified();
+  await r.folded();
+  assert.deepEqual(r.calls.collapse, [], 'the wait was cancelled');
+  assert.deepEqual(r.calls.reopen, [r.node.path]);
+  const c = await boxRig();
+  await c.writeBox({ ticked: true });
+  await c.modified();
+  await c.view.onClose();
+  await c.folded();
+  assert.deepEqual(c.calls.collapse, []);
 });
 test('card (review-a B3): after a tick resolves the chapter, its card hides the needs-review pill and the issue line', async () => {
   const r = await boxRig();
@@ -1503,6 +1529,9 @@ test('review box: a chapter whose only problem was the join confirms the join wh
   assert.deepEqual(r.attention(), [r.ids.a]);
   await r.writeBox({ ticked: true });
   await r.modified();
+  assert.deepEqual(r.calls.seam, [], 'the join is confirmed when the box folds, like any other answer');
+  await r.folded();
+  assert.deepEqual(r.calls.collapse, [r.node.path]);
   assert.deepEqual(r.calls.seam, [[MAP, r.ids.a]]);
   assert.deepEqual(r.calls.reconcile, [MAP]);
 });
@@ -1583,7 +1612,7 @@ test('T14 hint: the warning line sits under the field that names a deleted chapt
   const { parent, f } = field('zh-TW', ['研磨'], { angle: '從研磨切入', tone: '輕鬆' });
   const shown = hints(parent).filter(h => !h.cls.includes('is-empty'));
   assert.equal(shown.length, 1, 'only the field that names it');
-  assert.equal(shown[0].text, '這裡提到已不在心智圖上的章：研磨');
+  assert.equal(shown[0].text, '這裡提到已不在心智圖上的章：研磨\n要的話改掉這段文字；不改也會照目前的章來寫。');
   assert.equal(shown[0].attrs.role, 'status');
   assert.equal(f.areas.get('angle').attrs['aria-describedby'], 'vam-book-start-angle-hint');
   assert.equal(shown[0].attrs.id, 'vam-book-start-angle-hint');
@@ -1594,8 +1623,8 @@ test('T14 hint: the warning line sits under the field that names a deleted chapt
   area.value = '研磨與沖煮'; area.listeners.input.forEach(fn => fn());
   assert.equal(hints(parent).filter(h => !h.cls.includes('is-empty')).length, 1);
   assert.ok(!f.areas.get('angle').disabled, 'the field stays editable');
-  assert.equal(field('en', ['Grind'], { goal: 'about grind' }).parent && hints(field('en', ['Grind'], { goal: 'about grind' }).parent).find(h => !h.cls.includes('is-empty')).text, 'This mentions a chapter that is no longer on the map: Grind');
-  assert.equal(hints(field('zh-CN', ['研磨'], { goal: '研磨' }).parent).find(h => !h.cls.includes('is-empty')).text, '这里提到已不在心智图上的章：研磨');
+  assert.equal(field('en', ['Grind'], { goal: 'about grind' }).parent && hints(field('en', ['Grind'], { goal: 'about grind' }).parent).find(h => !h.cls.includes('is-empty')).text, 'This mentions a chapter that is no longer on the map: Grind\nChange this text if you like; if you leave it, the book follows the chapters the map has now.');
+  assert.equal(hints(field('zh-CN', ['研磨'], { goal: '研磨' }).parent).find(h => !h.cls.includes('is-empty')).text, '这里提到已不在心智图上的章：研磨\n要的话改掉这段文字；不改也会照目前的章来写。');
   setUiLanguage('zh-TW');
   assert.equal(hints(field('zh-TW', [], { goal: '研磨' }).parent).filter(h => !h.cls.includes('is-empty')).length, 0, 'no deleted chapter: no hint');
 });
@@ -1609,7 +1638,7 @@ test('T14 hint: the start card of a finished book with a snapshot shows the line
   await h.view.startBookPipelineFromUi();
   const modal = h.view.bookStartModal;
   const shown = dom.findAll(modal.modalEl, i => i.cls.includes('vam-book-start-hint') && !i.cls.includes('is-empty'));
-  assert.deepEqual(shown.map(i => i.text), ['這裡提到已不在心智圖上的章：研磨']);
+  assert.deepEqual(shown.map(i => i.text), ['這裡提到已不在心智圖上的章：研磨\n要的話改掉這段文字；不改也會照目前的章來寫。']);
   dom.findAll(modal.modalEl, i => i.tag === 'button').find(b => b.text === '開始').click();
   await dom.tick();
   assert.ok(h.entries.some(e => e[0] === 'start'), 'only a hint: the run starts');

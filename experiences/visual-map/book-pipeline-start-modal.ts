@@ -203,7 +203,11 @@ export function renderBookSettingsFields(
     const hint = parent.createEl("p", { cls: "vam-book-start-hint", attr: { id: `${id}-hint`, role: "status" } });
     const refresh = (): void => {
       const found = mentionedDeletedChapters(area.value, deletedTitles, chapterTitles);
-      hint.setText(found.length ? t("ui.book_deleted_chapter_hint_0", found.join("、")) : "");
+      hint.setText(
+        found.length
+          ? `${t("ui.book_deleted_chapter_hint_0", found.join("、"))}\n${t("ui.book_deleted_chapter_hint_keep")}`
+          : ""
+      );
       hint.toggleClass("is-empty", !found.length);
     };
     if (deletedTitles.length) {

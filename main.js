@@ -3201,6 +3201,7 @@ var en = {
   "ui.book_reason_removed_ref_0_1": "This chapter still mentions the removed \u3008{0}\u3009: \u201C{1}\u201D",
   "ui.book_reason_length_under_0_1_2_3": "The chapter is {0} {1}, shorter than the {2}\u2013{3} {1} you asked for",
   "ui.book_reason_images_under_0_1": "Too few pictures: {0} placed, the setting asks for at least {1}",
+  "ui.book_reason_caption_latin": "A picture caption has an English word in the Chinese text: check the wording",
   "ui.book_length_unit_chars": "characters",
   "ui.book_length_unit_words": "words",
   "ui.book_structure_unmet_0": "Structure: {0} item(s) unmet",
@@ -3223,7 +3224,7 @@ var en = {
   "ui.book_reason_no_open_page": "no source page was opened while proofreading",
   "ui.book_reason_chapters_too_long": "the chapter list is too long for one planning request",
   "ui.book_reason_all_facts_unverified": "none of the factual items could be verified",
-  "ui.book_reason_unsafe_body": "the picture text was not safe, so the card was left as it was",
+  "ui.book_reason_unsafe_body": "the written text did not pass the safety check; nothing was written and the card was left as it was",
   "ui.book_reason_fix_no_edits": "the automatic fix gave no usable edit, so the chapter was left as it was",
   "ui.book_reason_fix_lost_text": "the automatic fix would have removed a picture or made the chapter too short, so the chapter was left as it was",
   "ui.book_reason_no_view": "the map is no longer open, so the run stopped",
@@ -6437,6 +6438,7 @@ var zhCN = {
   "ui.book_reason_removed_ref_0_1": "\u8FD9\u7AE0\u8FD8\u63D0\u5230\u5DF2\u79FB\u9664\u7684\u3008{0}\u3009\uFF1A\u201C{1}\u201D",
   "ui.book_reason_length_under_0_1_2_3": "\u8FD9\u7AE0\u53EA\u6709 {0} {1}\uFF0C\u6BD4\u4F60\u8BBE\u5B9A\u7684 {2}\u2013{3} {1} \u77ED",
   "ui.book_reason_images_under_0_1": "\u56FE\u7247\u4E0D\u8DB3\uFF1A\u653E\u4E86 {0} \u5F20\uFF0C\u8BBE\u7F6E\u81F3\u5C11 {1} \u5F20",
+  "ui.book_reason_caption_latin": "\u56FE\u8BF4\u7684\u4E2D\u6587\u91CC\u5939\u7740\u82F1\u6587\u5B57\uFF0C\u8BF7\u68C0\u67E5\u7528\u5B57",
   "ui.book_length_unit_chars": "\u5B57",
   "ui.book_length_unit_words": "\u4E2A\u82F1\u6587\u8BCD",
   "ui.book_structure_unmet_0": "\u7ED3\u6784 {0} \u9879\u672A\u8FBE\u6210",
@@ -6459,7 +6461,7 @@ var zhCN = {
   "ui.book_reason_no_open_page": "\u6821\u5BF9\u65F6\u6CA1\u6709\u6210\u529F\u6253\u5F00\u4EFB\u4F55\u6765\u6E90\u9875",
   "ui.book_reason_chapters_too_long": "\u7AE0\u8282\u6E05\u5355\u592A\u957F\uFF0C\u65E0\u6CD5\u653E\u8FDB\u540C\u4E00\u6B21\u4F01\u5212\u8BF7\u6C42",
   "ui.book_reason_all_facts_unverified": "\u6240\u6709\u4E8B\u5B9E\u9879\u76EE\u90FD\u65E0\u6CD5\u67E5\u8BC1",
-  "ui.book_reason_unsafe_body": "\u56FE\u7247\u5185\u5BB9\u4E0D\u5B89\u5168\uFF0C\u5361\u7247\u4FDD\u6301\u539F\u6837",
+  "ui.book_reason_unsafe_body": "\u5199\u51FA\u7684\u5185\u5BB9\u6CA1\u901A\u8FC7\u5B89\u5168\u68C0\u67E5\uFF0C\u8FD9\u6B21\u6CA1\u6709\u5199\u5165\uFF0C\u5361\u7247\u4FDD\u6301\u539F\u6837",
   "ui.book_reason_fix_no_edits": "\u81EA\u52A8\u4FEE\u6B63\u6CA1\u6709\u7ED9\u51FA\u53EF\u7528\u7684\u4FEE\u6539\uFF0C\u7AE0\u8282\u4FDD\u6301\u539F\u6837",
   "ui.book_reason_fix_lost_text": "\u81EA\u52A8\u4FEE\u6B63\u4F1A\u5220\u6389\u56FE\u7247\u6216\u8BA9\u7AE0\u8282\u592A\u77ED\uFF0C\u7AE0\u8282\u4FDD\u6301\u539F\u6837",
   "ui.book_reason_no_view": "\u5730\u56FE\u5DF2\u4E0D\u5728\u754C\u9762\u4E0A\uFF0C\u8FD0\u884C\u5DF2\u505C\u6B62",
@@ -9673,6 +9675,7 @@ var zhTW = {
   "ui.book_reason_removed_ref_0_1": "\u9019\u7AE0\u9084\u63D0\u5230\u5DF2\u79FB\u9664\u7684\u3008{0}\u3009\uFF1A\u300C{1}\u300D",
   "ui.book_reason_length_under_0_1_2_3": "\u9019\u7AE0\u53EA\u6709 {0} {1}\uFF0C\u6BD4\u4F60\u8A2D\u5B9A\u7684 {2}\u2013{3} {1} \u77ED",
   "ui.book_reason_images_under_0_1": "\u5716\u7247\u4E0D\u8DB3\uFF1A\u653E\u4E86 {0} \u5F35\uFF0C\u8A2D\u5B9A\u81F3\u5C11 {1} \u5F35",
+  "ui.book_reason_caption_latin": "\u5716\u8AAA\u7684\u4E2D\u6587\u88E1\u593E\u8457\u82F1\u6587\u5B57\uFF0C\u8ACB\u6AA2\u67E5\u7528\u5B57",
   "ui.book_length_unit_chars": "\u5B57",
   "ui.book_length_unit_words": "\u500B\u82F1\u6587\u5B57",
   "ui.book_structure_unmet_0": "\u7D50\u69CB {0} \u9805\u672A\u9054\u6210",
@@ -9695,7 +9698,7 @@ var zhTW = {
   "ui.book_reason_no_open_page": "\u6821\u5C0D\u6642\u6C92\u6709\u6210\u529F\u958B\u555F\u4EFB\u4F55\u4F86\u6E90\u9801",
   "ui.book_reason_chapters_too_long": "\u7AE0\u7BC0\u6E05\u55AE\u592A\u9577\uFF0C\u7121\u6CD5\u653E\u9032\u540C\u4E00\u6B21\u4F01\u5283\u8ACB\u6C42",
   "ui.book_reason_all_facts_unverified": "\u6240\u6709\u4E8B\u5BE6\u9805\u76EE\u90FD\u7121\u6CD5\u67E5\u8B49",
-  "ui.book_reason_unsafe_body": "\u5716\u7247\u5167\u5BB9\u4E0D\u5B89\u5168\uFF0C\u5361\u7247\u7DAD\u6301\u539F\u6A23",
+  "ui.book_reason_unsafe_body": "\u5BEB\u51FA\u7684\u5167\u5BB9\u6C92\u901A\u904E\u5B89\u5168\u6AA2\u67E5\uFF0C\u9019\u6B21\u6C92\u6709\u5BEB\u5165\uFF0C\u5361\u7247\u7DAD\u6301\u539F\u6A23",
   "ui.book_reason_fix_no_edits": "\u81EA\u52D5\u4FEE\u6B63\u6C92\u6709\u7D66\u51FA\u53EF\u7528\u7684\u4FEE\u6539\uFF0C\u7AE0\u7BC0\u7DAD\u6301\u539F\u6A23",
   "ui.book_reason_fix_lost_text": "\u81EA\u52D5\u4FEE\u6B63\u6703\u522A\u6389\u5716\u7247\u6216\u8B93\u7AE0\u7BC0\u592A\u77ED\uFF0C\u7AE0\u7BC0\u7DAD\u6301\u539F\u6A23",
   "ui.book_reason_no_view": "\u5FC3\u667A\u5716\u5DF2\u4E0D\u5728\u756B\u9762\u4E0A\uFF0C\u57F7\u884C\u5DF2\u505C\u6B62",
@@ -13097,6 +13100,21 @@ function hashText(text10) {
   return (0, import_node_crypto.createHash)("sha256").update(text10.replace(/\r\n?/g, "\n")).digest("hex").slice(0, 16);
 }
 
+// core/book-pipeline/caption-script.ts
+var PAIRS = "\u6A31\u6AFB\u5B9E\u5BE6\u53F6\u8449\u79CD\u7A2E\u957F\u9577\u53D1\u767C\u8FD9\u9019\u4E3A\u70BA\u65F6\u6642\u4EEC\u5011\u4E2A\u500B\u6765\u4F86\u56FD\u570B\u8BF4\u8AAA\u4F1A\u6703\u5BF9\u5C0D\u5B66\u5B78\u8FC7\u904E\u8FD8\u9084\u4E48\u9EBC\u6837\u6A23\u5F00\u958B\u5173\u95DC\u4E1C\u6771\u8F66\u8ECA\u95E8\u9580\u95EE\u554F\u95F4\u9593\u89C1\u898B\u73B0\u73FE\u89C9\u89BA\u8BA4\u8A8D\u8BA9\u8B93\u8BDD\u8A71\u8BED\u8A9E\u8BFB\u8B80\u5199\u5BEB\u4E66\u66F8\u753B\u756B\u56FE\u5716\u9E1F\u9CE5\u9C7C\u9B5A\u9A6C\u99AC\u9F99\u9F8D\u98CE\u98A8\u6C14\u6C23\u7535\u96FB\u4E1A\u696D\u519C\u8FB2\u4EA7\u7522\u5934\u982D\u4F53\u9AD4\u52A8\u52D5\u8282\u7BC0\u534E\u83EF\u56ED\u5712\u8FDC\u9060\u8FD0\u904B\u8FDB\u9032\u8FB9\u908A\u8FBE\u9054\u5904\u8655\u52A1\u52D9\u5E7F\u5EE3\u5E94\u61C9\u6811\u6A39\u6865\u6A4B\u697C\u6A13\u673A\u6A5F\u6742\u96DC\u6761\u689D\u6781\u6975\u6B22\u6B61\u7EBF\u7DDA\u7EA2\u7D05\u7EFF\u7DA0\u84DD\u85CD\u9EC4\u9EC3\u7ECF\u7D93\u7ED3\u7D50\u7ED9\u7D66\u7EDF\u7D71\u7ED8\u7E6A\u7EC7\u7E54\u7EC6\u7D30\u7EA7\u7D1A\u7EAA\u7D00\u7EA6\u7D04\u7F51\u7DB2\u7F57\u7F85\u8054\u806F\u58F0\u8072\u542C\u807D\u4E70\u8CB7\u5356\u8CE3\u8D1D\u8C9D\u8D35\u8CB4\u8D39\u8CBB\u8D44\u8CC7\u8D28\u8CEA\u8F6C\u8F49\u8F6E\u8F2A\u8F7B\u8F15\u8F83\u8F03\u9009\u9078\u9002\u9069\u949F\u9418\u94C1\u9435\u94F6\u9280\u94B1\u9322\u9547\u93AE\u95FB\u805E\u961F\u968A\u9633\u967D\u9634\u9670\u9645\u969B\u9646\u9678\u96BE\u96E3\u96FE\u9727\u9759\u975C\u9875\u9801\u9876\u9802\u9879\u9805\u987A\u9806\u987B\u9808\u9886\u9818\u9898\u984C\u989C\u984F\u7C7B\u985E\u663E\u986F\u996D\u98EF\u9986\u9928\u9E21\u96DE\u9C9C\u9BAE\u9EA6\u9EA5\u9F50\u9F4A\u9F7F\u9F52\u9F9F\u9F9C\u83B2\u84EE\u82F9\u860B\u830E\u8396\u835A\u83A2\u6768\u694A\u67A3\u68D7\u6807\u6A19\u68C0\u6AA2\u6C49\u6F22\u6C64\u6E6F\u6E7E\u7063\u706F\u71C8\u70ED\u71B1\u7231\u611B\u72B6\u72C0\u732A\u8C6C\u73AF\u74B0\u76D8\u76E4\u786E\u78BA\u793C\u79AE\u79BB\u96E2\u79EF\u7A4D\u79F0\u7A31\u7B14\u7B46\u7B80\u7C21\u7EB8\u7D19\u7EC3\u7DF4\u7EC4\u7D44\u7EC8\u7D42\u7EED\u7E8C\u7EF4\u7DAD\u7F16\u7DE8\u7F18\u7DE3\u4E60\u7FD2\u5723\u8056\u80A4\u819A\u80DC\u52DD\u8111\u8166\u811A\u8173\u836F\u85E5\u83B7\u7372\u841D\u863F\u8425\u71DF\u866B\u87F2\u867E\u8766\u8681\u87FB\u8865\u88DC\u88C5\u88DD\u89C2\u89C0\u89C4\u898F\u89C6\u8996\u8BA1\u8A08\u8BB0\u8A18\u8BBE\u8A2D\u8BC1\u8B49\u8BC6\u8B58\u8BCD\u8A5E\u8BD1\u8B6F\u8BD5\u8A66\u8BD7\u8A69\u8BE5\u8A72\u8BE6\u8A73\u8C22\u8B1D\u8D22\u8CA1\u8D27\u8CA8\u8D2D\u8CFC\u8D5B\u8CFD\u8FDE\u9023\u90AE\u90F5\u9171\u91AC\u94A2\u92FC\u9505\u934B\u955C\u93E1\u95EA\u9583\u95ED\u9589\u9636\u968E\u9648\u9673\u968F\u96A8\u9690\u96B1\u9E23\u9CF4\u9E2D\u9D28\u9E45\u9D5D\u9E70\u9DF9\u58F3\u6BBC\u836B\u852D\u7EF5\u7DBF\u8721\u881F";
+var TRADITIONAL = /* @__PURE__ */ new Map();
+for (let i = 0; i + 1 < PAIRS.length; i += 2) TRADITIONAL.set(PAIRS[i], PAIRS[i + 1]);
+function toTraditional(text10) {
+  return text10.replace(/\p{Script=Han}/gu, (char) => {
+    var _a2;
+    return (_a2 = TRADITIONAL.get(char)) != null ? _a2 : char;
+  });
+}
+var LATIN_IN_HAN = /\p{Script=Han}[ \t]?[a-z]{2,}(?![A-Za-z])|(?<![A-Za-z])[a-z]{2,}[ \t]?\p{Script=Han}/u;
+function hasLatinWord(caption) {
+  return LATIN_IN_HAN.test(caption);
+}
+
 // core/book-pipeline/image-slots.ts
 var MAX_SEARCH_TERMS = 4;
 var SEARCH_TERM_MAX = 60;
@@ -13268,6 +13286,7 @@ function sourceOf(candidate, alt, language2) {
     entry: translateNote(lang, "note.image_source_entry_0_1", alt, detail)
   };
 }
+var traditionalIf = (language2, text10) => /^zh-(?:TW|Hant)/i.test(language2) ? toTraditional(text10) : text10;
 function figureOf(candidate, href, language2) {
   const plain = (value) => value.replace(/[〔〕]/g, " ");
   const alt = escapeMarkdownText(plain(candidate.title), 80) || (/^zh/i.test(language2) ? "\u5716" : "image");
@@ -13275,7 +13294,7 @@ function figureOf(candidate, href, language2) {
   return {
     href,
     alt,
-    caption: candidate.loose ? translateNote(language2, "note.image_file_caption_0", alt) : plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
+    caption: candidate.loose ? translateNote(language2, "note.image_file_caption_0", alt) : traditionalIf(language2, plainLine(escapeMarkdownText(plain(candidate.caption), 160))) || alt,
     ...source ? { source } : {}
   };
 }
@@ -13486,20 +13505,33 @@ var IMAGE_IN_LINE = /!\[[^\]\n]*\]\((https:\/\/[^)\s]+)\)/g;
 var SOURCE_LINE = /^(?:來源|来源|Source)[:：][ \t]*\S/;
 var IMAGE_ONLY_LINE = /^[ \t]*!\[[^\]\n]*\]\(https:\/\/[^)\s]+\)[ \t]*\r?$/;
 function stripImageLines(text10) {
+  return splitImageLines(text10).text;
+}
+function captionLines(text10) {
+  return splitImageLines(text10).captions;
+}
+var CAPTION_LATIN_TOKEN = "captions:latin";
+function captionLatinIssue(text10, language2) {
+  return /^zh/i.test(language2) && captionLines(text10).some(hasLatinWord) ? CAPTION_LATIN_TOKEN : "";
+}
+function splitImageLines(text10) {
   const lines = text10.split("\n");
   const guarded = protectedLines(lines);
   const out = [];
+  const captions = [];
   for (let i = 0; i < lines.length; i++) {
     if (!guarded[i] && IMAGE_ONLY_LINE.test(lines[i])) {
       const plainAt = (at) => at < lines.length && !isBlank(lines[at]) && !guarded[at] && !/^\s*(#|[-*+]\s|\d+[.)]\s)/.test(lines[at]);
       const endsAt = (at) => isBlank(lines[at]) || /^\s*#/.test(lines[at]);
-      if (plainAt(i + 1) && plainAt(i + 2) && SOURCE_LINE.test(lines[i + 2]) && endsAt(i + 3)) i += 2;
-      else if (plainAt(i + 1) && endsAt(i + 2)) i++;
+      if (plainAt(i + 1) && plainAt(i + 2) && SOURCE_LINE.test(lines[i + 2]) && endsAt(i + 3)) {
+        captions.push(lines[i + 1]);
+        i += 2;
+      } else if (plainAt(i + 1) && endsAt(i + 2)) captions.push(lines[++i]);
       continue;
     }
     out.push(lines[i]);
   }
-  return out.join("\n").replace(/\n{3,}/g, "\n\n");
+  return { text: out.join("\n").replace(/\n{3,}/g, "\n\n"), captions };
 }
 function describeSlots(slots, record, imageUrls) {
   const now = new Set(imageUrls.map(shortHash));
@@ -13626,11 +13658,17 @@ function imageIssueTokens(check) {
 }
 var pictureShortfallToken = (placed, minimum) => `images:under:${placed}:${minimum}`;
 var SHORTFALL = /(?:^|\s)images:under:(\d+):(\d+)(?=\s|$)/;
+var CAPTION_LATIN = /(?:^|\s)captions:latin(?=\s|$)/;
 function splitPictureIssue(issue2) {
   const m = SHORTFALL.exec(issue2);
-  if (!m) return { rest: issue2 };
-  const rest = issue2.replace(SHORTFALL, "").trim().replace(/^images unmet:(?:\s+\S+)*$|^images unmet$/, "");
-  return { rest, shortfall: { placed: Number(m[1]), minimum: Number(m[2]) } };
+  const latin = CAPTION_LATIN.test(issue2);
+  if (!m && !latin) return { rest: issue2 };
+  const rest = issue2.replace(SHORTFALL, "").replace(CAPTION_LATIN, "").trim().replace(/^images unmet:(?:\s+\S+)*$|^images unmet$/, "");
+  return {
+    rest,
+    ...m ? { shortfall: { placed: Number(m[1]), minimum: Number(m[2]) } } : {},
+    ...latin ? { captionLatin: true } : {}
+  };
 }
 
 // core/note-placeholder.ts
@@ -15190,7 +15228,8 @@ var isGenericHeading = (heading) => GENERIC_HEADING.test(
   heading.replace(/^[ \t]*#{1,6}[ \t]+/, "").replace(/[ \t]*#*[ \t]*$/, "").trim()
 );
 var PREVIEW_WORD = /預告|预告/u;
-function keepOwnSections(text10, seen, scope) {
+var MAX_INSERTED_SECTIONS = 3;
+function keepOwnSections(text10, seen, scope, cap4) {
   var _a2;
   const guide = scope.role === "intro" || scope.role === "closing";
   const others = (_a2 = scope.others) != null ? _a2 : [];
@@ -15218,7 +15257,9 @@ function keepOwnSections(text10, seen, scope) {
     const section3 = lines.slice(i, end);
     const key4 = headingKey(heading);
     const bad = seen.has(key4) || isGenericHeading(heading) || guide && (!!headingNamesChapter(heading, others) || names3(section3.join("\n")));
-    if (!bad) {
+    if (!bad && cap4.left <= 0) cap4.dropped++;
+    else if (!bad) {
+      cap4.left--;
       seen.add(key4);
       out.push(...section3);
     }
@@ -15263,9 +15304,10 @@ function expandChapterDetail(oldDetail, newDetail, language2, sent = "", scope =
   const parsed = parseChapterEdits(chapterBody(newDetail));
   if (!parsed) return void 0;
   const seen = chapterHeadingKeys(oldDetail);
+  const cap4 = { left: MAX_INSERTED_SECTIONS, dropped: 0 };
   const edits = parsed.flatMap((edit) => {
     const plain = dropNoOps(dropEchoes(edit.text, sent));
-    const text10 = edit.kind === "insert" ? keepOwnSections(plain, seen, scope) : plain;
+    const text10 = edit.kind === "insert" ? keepOwnSections(plain, seen, scope, cap4) : plain;
     if (!text10 && (edit.kind === "insert" || edit.text.trim())) return [];
     return [{ ...edit, text: text10 }];
   });
@@ -15281,7 +15323,8 @@ function expandChapterDetail(oldDetail, newDetail, language2, sent = "", scope =
   }) : [];
   return {
     detail: sources.length ? addPictureSources(done.detail, sources, language2) : done.detail,
-    applied: done.applied
+    applied: done.applied,
+    dropped: cap4.dropped
   };
 }
 
@@ -47383,6 +47426,15 @@ function requestAutoFix(data, nodeId) {
   next.revision++;
   return { state: next, accepted: true };
 }
+function reopenTrialFix(data, nodeId) {
+  var _a2;
+  if (data.phase !== "writing" || data.status !== "running" || !((_a2 = data.trial) == null ? void 0 : _a2.includes(nodeId)) || !autoFixesOf(data, nodeId))
+    return { state: data, accepted: false };
+  const next = clone2(data);
+  if (next.autoFixes) delete next.autoFixes[nodeId];
+  next.revision++;
+  return { state: next, accepted: true };
+}
 function resetCard(data, nodeId) {
   if (!effectiveOrder(data).includes(nodeId)) return data;
   const next = clone2(data);
@@ -52975,6 +53027,7 @@ function rebuildBody(content, resolve) {
 }
 var MARKERS = /<!-- visual-agent-map:(?:detail|references):(?:start|end) -->/g;
 function unsafeBody(content, allowed) {
+  var _a2;
   const body = content.slice(frontmatterLength(content)).replace(MARKERS, " ");
   if (/<[A-Za-z/!?]/.test(body)) return true;
   for (let at = body.indexOf("!["); at >= 0; at = body.indexOf("![", at + 2)) {
@@ -52993,7 +53046,8 @@ function unsafeBody(content, allowed) {
       else if (body[p] === ")") depth--;
       p++;
     }
-    if (body[p] !== ")" || !allowed.has(body.slice(at + head2[0].length, p))) return true;
+    const href = body.slice(at + head2[0].length, p);
+    if (body[p] !== ")" || !(allowed.has(href) || allowed.has((_a2 = safeHref2(href)) != null ? _a2 : ""))) return true;
   }
   return false;
 }
@@ -53008,15 +53062,15 @@ function addedLines2(text10, base) {
     return left === 0;
   });
 }
-function expansionUnsafe(detail, oldDetail, answerLines, allowed, unsafe = unsafeBody) {
+function expansionUnsafeRule(detail, oldDetail, answerLines, allowed, unsafe = unsafeBody) {
   const added = addedLines2(detail, oldDetail);
   const text10 = added.join("\n");
-  if (neutralizeText(text10) !== text10) return true;
-  if (added.some((line2) => residualMarkerLines(line2).length > 0 && !answerLines.has(line2))) return true;
+  if (neutralizeText(text10) !== text10) return "hidden_callout";
+  if (added.some((line2) => residualMarkerLines(line2).length > 0 && !answerLines.has(line2))) return "slot_marker";
   if (unsafe(`
-${text10}`, allowed)) return true;
+${text10}`, allowed)) return "body";
   return bodyImageUrls(`
-${text10}`).some((url) => !allowed.has(url));
+${text10}`).some((url) => !allowed.has(url)) ? "picture" : void 0;
 }
 function bodyImageUrls(content) {
   const urls = /* @__PURE__ */ new Set();
@@ -53177,6 +53231,7 @@ var BookPipelineRuns = class {
         });
         if (!moved) throw new BookPipelineRunError("not_gate1");
         this.log(drive, "gate1", "-", "write", "confirmed");
+        await this.queueTrialFixes(drive);
       },
       true
     );
@@ -54323,6 +54378,28 @@ var BookPipelineRuns = class {
     this.syncReviewNotes(drive);
   }
   /**
+   * Gate 1 confirmed: a trial chapter still needing a person (its proof's unmet points or its length) joins the full book's fix round,
+   * with the instruction its stored proof and its length give now. A hand-edited or kept chapter is not queued.
+   */
+  async queueTrialFixes(drive) {
+    var _a2, _b2, _c;
+    for (const id of (_a2 = drive.store.state.trial) != null ? _a2 : []) {
+      const info = drive.cards.get(id);
+      if (!info || drive.stages.get(id) !== "needs-review") continue;
+      const card = await this.ports.readCard(info.path).catch(() => void 0);
+      if (!card || isKeptRaw(card.raw) || /^write failed: hand_edited$/.test(String((_b2 = card.fields.pipelineIssue) != null ? _b2 : "").trim()))
+        continue;
+      const proof = latestStoredProof(card.detail);
+      const length = await this.lengthOf(drive, id, lengthBody(chapterBody(card.detail)));
+      if ((proof == null ? void 0 : proof.aggregate) !== "needs-review" && !length) continue;
+      const done = await drive.store.commit((state) => reopenTrialFix(state, id));
+      if (!(done == null ? void 0 : done.accepted)) continue;
+      const items = ((_c = proof == null ? void 0 : proof.items) != null ? _c : []).map((item) => ({ ...item, sources: [...item.sources] }));
+      drive.fixable.set(id, proofFixInstruction(items, [...parseChecklist(card.prompt), ...BOOK_CHECKS], length));
+      drive.expand.add(id);
+    }
+  }
+  /**
    * The one automatic redo (plan 2026 flow v3, E), after every card has had its first round: a card whose proofread named unmet points
    * gets its text written again by the author alone (the plan and the checklist stay, attempts are not reset), then proofread once more.
    * The real points go to the author only (never to the proofread). A refused or no longer allowed request leaves the card needs-review.
@@ -54575,7 +54652,7 @@ var BookPipelineRuns = class {
     return { kind: "ok", after: () => this.setStage(drive, nodeId, "planned", null) };
   }
   async execWrite(drive, token, nodeId) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     const signal = drive.controller.signal;
     const info = drive.cards.get(nodeId);
     const rootInfo = drive.cards.get(drive.rootId);
@@ -54658,6 +54735,19 @@ var BookPipelineRuns = class {
         noEdits = true;
         return null;
       }
+      if (merged.dropped)
+        this.ports.log(
+          formatPipelineLog({
+            event: "expand_capped",
+            runId: token.runId,
+            card: nodeId,
+            step: "write",
+            attempt: attemptsOf(drive.store.state, nodeId).write,
+            result: "dropped",
+            ms: 0,
+            counts: { dropped: merged.dropped }
+          })
+        );
       const scrubbed = dropProcessNotes(merged.detail);
       if (scrubbed.removed.length) merged.detail = scrubbed.detail;
       const body = chapterBody(merged.detail);
@@ -54674,6 +54764,7 @@ ${oldBody}`).some((url) => !pictures.has(url)) || (short == null ? void 0 : shor
     const knownLines = new Set(card.raw.split("\n"));
     const ownRecords = extractProofRecords(normalizeWorkRecords(card.detail)).map(quoteAll);
     let unsafe = false;
+    let unsafeRule = "";
     let emptyBody = false;
     const finalize = (original) => {
       var _a3;
@@ -54693,17 +54784,20 @@ ${oldBody}`).some((url) => !pictures.has(url)) || (short == null ? void 0 : shor
       const oldUrls = oldDetail === void 0 ? [] : bodyImageUrls(`
 ${oldDetail}`);
       const allowed = /* @__PURE__ */ new Set([...urls.filter(isHttps2), ...oldUrls]);
-      const check = (text10, base, answer) => expansionUnsafe(text10, base, new Set(answer.split("\n")), allowed, (body, ok) => this.exitCheck(body, ok));
+      const check = (text10, base, answer) => expansionUnsafeRule(text10, base, new Set(answer.split("\n")), allowed, (body, ok) => this.exitCheck(body, ok));
       if (oldDetail !== void 0) {
         const answer = (_a3 = detailBlockOf(anchored)) != null ? _a3 : "";
-        if (unsafeUrls.size || check(answer, oldDetail, answer)) {
+        const rule2 = unsafeUrls.size ? "picture_not_https" : check(answer, oldDetail, answer);
+        if (rule2) {
           unsafe = true;
+          unsafeRule = `answer_${rule2}`;
           return null;
         }
       }
       const cleaned = replaceBodyImages(content, unsafeUrls);
       if (this.exitCheck(cleaned, new Set(urls.filter(isHttps2)))) {
         unsafe = true;
+        unsafeRule = "exit_check";
         return null;
       }
       const detail = detailBlockOf(cleaned);
@@ -54715,12 +54809,27 @@ ${oldDetail}`);
       const merged = expand2(restore(cleaned));
       if (merged === null) return null;
       const final = detailBlockOf(merged);
-      if (final === void 0 || neutralizeDetail(merged) === null || check(final, oldDetail, detail != null ? detail : "")) {
+      const rule = final === void 0 || neutralizeDetail(merged) === null ? "shape" : check(final, oldDetail, detail != null ? detail : "");
+      if (rule) {
         unsafe = true;
+        unsafeRule = `merged_${rule}`;
         return null;
       }
       return stampRaw(merged);
     };
+    const attempt = attemptsOf(drive.store.state, nodeId).write;
+    this.ports.log(
+      formatPipelineLog({
+        event: "author_call",
+        runId: token.runId,
+        card: nodeId,
+        step: "write",
+        attempt,
+        result: ((_a2 = drive.rerun) == null ? void 0 : _a2.nodeId) === nodeId ? "rerun" : expanding ? "fix_round" : drive.avoid.has(nodeId) ? "source_swap" : attempt > 1 ? "retry" : "first_draft",
+        ms: 0,
+        counts: { round: autoFixesOf(drive.store.state, nodeId) }
+      })
+    );
     const done = await untilAborted(
       signal,
       this.ports.author({
@@ -54742,7 +54851,20 @@ ${oldDetail}`);
       })
     );
     if (changedByHand) return { kind: "failed", reason: "hand_edited", forceReview: true };
-    if (unsafe) return { kind: "failed", reason: "unsafe_body", forceReview: true };
+    if (unsafe) {
+      this.ports.log(
+        formatPipelineLog({
+          event: "write_refused",
+          runId: token.runId,
+          card: nodeId,
+          step: "write",
+          attempt: attemptsOf(drive.store.state, nodeId).write,
+          result: unsafeRule || "unknown",
+          ms: 0
+        })
+      );
+      return { kind: "failed", reason: "unsafe_body", forceReview: true };
+    }
     if (noEdits) return { kind: "failed", reason: "fix_no_edits", forceReview: true };
     if (lostText) return { kind: "failed", reason: "fix_lost_text", forceReview: true };
     if (emptyBody) return { kind: "failed", reason: "no_body" };
@@ -54788,7 +54910,7 @@ ${oldDetail}`);
       if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
     }
     drive.sub.set(nodeId, { step: "images", startedAt: Date.parse(this.ports.now()) });
-    (_b2 = (_a2 = this.ports).progressed) == null ? void 0 : _b2.call(_a2, drive.mapPath);
+    (_c = (_b2 = this.ports).progressed) == null ? void 0 : _c.call(_b2, drive.mapPath);
     const filled = expanding ? await this.settleStrayMarkers(path, authorize) : await this.fillSlots(drive, token, nodeId, path, slots, authorize);
     if (filled) return filled;
     drive.imagesDone.add(nodeId);
@@ -55183,7 +55305,10 @@ ${oldDetail}`);
     const structureUnmet = verdict.items.filter((item) => item.type !== "fact" && item.status === "unmet").map((item) => code2(item.id));
     const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
     const minimum = await this.pictureMinimum(drive);
-    const shortIssue = minimum !== void 0 && imageCheck.placed < minimum ? pictureShortfallToken(imageCheck.placed, minimum) : "";
+    const shortIssue = [
+      minimum !== void 0 && imageCheck.placed < minimum ? pictureShortfallToken(imageCheck.placed, minimum) : "",
+      captionLatinIssue(chapter, drive.config.language)
+    ].filter(Boolean).join(" ");
     return {
       kind: "ok",
       after: async () => {
@@ -55337,6 +55462,16 @@ ${oldDetail}`);
     );
   }
 };
+
+// experiences/visual-map/book-pipeline-reasons.ts
+function joinReasons(parts) {
+  const sep2 = t("ui.book_panel_lead_sep");
+  return parts.reduce((out, part, at) => {
+    if (!at) return part;
+    if (!/[。！？.!?]\s*$/.test(out)) return out + sep2 + part;
+    return /[.!?]\s*$/.test(out) ? `${out.trimEnd()} ${part}` : out.trimEnd() + part;
+  }, "");
+}
 
 // experiences/visual-map/book-pipeline-ui.ts
 var FAILURE_KEY = {
@@ -55735,14 +55870,18 @@ var PLAIN_KEY = {
 };
 function bookIssueText(issue2) {
   const pictures = splitPictureIssue(issue2);
-  if (pictures.shortfall) {
-    const sentence2 = shortfallText(pictures.shortfall);
-    return pictures.rest ? `${bookIssueText(pictures.rest)}${t("ui.book_panel_lead_sep")}${sentence2}` : sentence2;
-  }
+  const sentences = pictureSentences(pictures);
+  if (sentences.length) return joinReasons(pictures.rest ? [bookIssueText(pictures.rest), ...sentences] : sentences);
   const { rest, length } = splitLengthIssue(issue2);
   if (!length) return plainIssueText(issue2);
   const sentence = lengthText(length);
-  return rest ? `${plainIssueText(rest)}${t("ui.book_panel_lead_sep")}${sentence}` : sentence;
+  return rest ? joinReasons([plainIssueText(rest), sentence]) : sentence;
+}
+function pictureSentences(pictures) {
+  return [
+    ...pictures.shortfall ? [shortfallText(pictures.shortfall)] : [],
+    ...pictures.captionLatin ? [t("ui.book_reason_caption_latin")] : []
+  ];
 }
 function shortfallText(shortfall) {
   return t("ui.book_reason_images_under_0_1", String(shortfall.placed), String(shortfall.minimum));
@@ -55891,20 +56030,18 @@ var plainNote = (text10) => text10.replace(/\b[CN]\d+\b\s*[:：]?/g, "").replace
 function reasonOf2(issue2, proof) {
   var _a2;
   const pictures = splitPictureIssue(issue2);
-  if (pictures.shortfall) {
-    const sentence = shortfallText(pictures.shortfall);
-    return pictures.rest ? `${reasonOf2(pictures.rest, proof)}${t("ui.book_panel_lead_sep")}${sentence}` : sentence;
-  }
+  const sentences = pictureSentences(pictures);
+  if (sentences.length) return joinReasons(pictures.rest ? [reasonOf2(pictures.rest, proof), ...sentences] : sentences);
   const { rest, length } = splitLengthIssue(issue2);
   if (length) {
     const sentence = lengthText(length);
-    return rest ? `${reasonOf2(rest, proof)}${t("ui.book_panel_lead_sep")}${sentence}` : sentence;
+    return rest ? joinReasons([reasonOf2(rest, proof), sentence]) : sentence;
   }
   if (!/^proof unmet/.test(issue2.trim())) return bookIssueText(issue2);
   if (/facts_unverified/.test(issue2)) return t("ui.book_reason_all_facts_unverified");
   const open2 = ((_a2 = proof == null ? void 0 : proof.items) != null ? _a2 : []).filter((item) => item.status !== "met");
   const notes = [...new Set(open2.map((item) => plainNote(unescapeMarkdownText(item.note))).filter(Boolean))].slice(0, 3);
-  if (notes.length) return notes.join(t("ui.book_panel_lead_sep"));
+  if (notes.length) return joinReasons(notes);
   return open2.length ? t("ui.book_panel_reason_unchecked_0", open2.length) : t("ui.book_panel_reason_unmet_plain");
 }
 function galleryBare(role, note) {
@@ -56230,15 +56367,15 @@ var OWNER_MARKER_LINE = /^[ \t]{0,3}>[ \t]?%%vam-review:/;
 function proofIsStale(card, stage, nodeId, runId, revision) {
   if (stage !== "checked" && stage !== "needs-review") return false;
   if (!latestStoredProof(card.detail)) return false;
-  const key4 = proofKey({
-    runId,
-    nodeId,
-    revision,
-    body: projectProofBody(stripImageLines(chapterBody(card.detail))),
-    checklist: parseChecklist(card.prompt)
-  });
-  return !findStoredProof(card.detail, key4) && !findStoredProof(card.detail, failedProofKey(key4));
+  const body = projectProofBody(stripImageLines(chapterBody(card.detail)));
+  const checklist = parseChecklist(card.prompt);
+  for (let at = revision; at >= Math.max(0, revision - STALE_REVISIONS); at--) {
+    const key4 = proofKey({ runId, nodeId, revision: at, body, checklist });
+    if (findStoredProof(card.detail, key4) || findStoredProof(card.detail, failedProofKey(key4))) return false;
+  }
+  return true;
 }
+var STALE_REVISIONS = 20;
 
 // experiences/visual-map/book-pipeline-callouts.ts
 function editorViewsOf(path, views) {
@@ -68797,9 +68934,15 @@ var BOOK_STEP_SECONDS = {
 };
 var BOOK_IMAGE_SEARCHES = 2;
 var BOOK_IMAGE_CALLS_PER_SEARCH = 2;
+var BOOK_EXPAND_PASSES = 2;
 function bookChapterCalls() {
   const writes = 1 + MAX_AUTO_FIXES;
-  return { plan: 1, write: writes, images: writes * BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH, proof: writes };
+  return {
+    plan: 1,
+    write: writes + BOOK_EXPAND_PASSES,
+    images: writes * BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH,
+    proof: writes
+  };
 }
 function bookModelSpeed(model) {
   const id = model.toLowerCase();
@@ -68814,7 +68957,7 @@ function bookStartEstimate(cards, models) {
   };
   const per = bookChapterCalls();
   const writes = 1 + MAX_AUTO_FIXES;
-  const perCard = time("plan") + writes * (time("write") + BOOK_IMAGE_SEARCHES * time("images") + time("proof"));
+  const perCard = time("plan") + writes * (time("write") + BOOK_IMAGE_SEARCHES * time("images") + time("proof")) + BOOK_EXPAND_PASSES * time("write");
   const trial = Math.min(n, TRIAL_SIZE);
   const rounds = Math.ceil(trial / BOOK_POOL) + Math.ceil((n - trial) / BOOK_POOL);
   return {

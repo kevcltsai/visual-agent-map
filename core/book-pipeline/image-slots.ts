@@ -771,7 +771,11 @@ export function composeImageTextLine(language: ContentLanguage, check: ImageText
 /** The pipeline issue tokens of a check (they count as "worth a look", never as needs-review): one per issue; `image_N` is a slot with no picture, `image_N_mismatch` a placed picture that does not match its text. */
 export function imageIssueTokens(check: ImageTextCheck): string[] {
   const tokens = check.issues.map(issue =>
-    issue.code === "count" ? "image_count" : issue.code === "mismatch" ? `image_${issue.index}_mismatch` : `image_${issue.index}`
+    issue.code === "count"
+      ? "image_count"
+      : issue.code === "mismatch"
+        ? `image_${issue.index}_mismatch`
+        : `image_${issue.index}`
   );
   return check.bad ? [...tokens, "image_marker"] : tokens;
 }

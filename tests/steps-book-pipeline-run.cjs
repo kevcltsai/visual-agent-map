@@ -2102,6 +2102,44 @@ test('T9 older build, stuck run: every chapter wrongly left needs-review hand_ed
   assert.ok(!r.stat.logs.some(l => l.includes('hand_edit_skipped') || l.includes('plan_skipped')));
 });
 
+// Live acceptance (2026-11-20): a chapter whose notes were applied read as hand-edited on the next whole-book rerun. Applying notes and
+// undoing that apply are program writes; a review box (ticked, collapsed) is the program's own callout. None of them is the reader's hand.
+const { stampRaw } = S.load('core/book-pipeline/body-integrity.ts');
+async function stampedNotesRig(extra = '') {
+  const r = await notesRig();
+  const path = r.nodes[1].path;
+  await r.repo.updateNoteRawGuarded(path, c => stampRaw(c.replace(P1, 'Alpha beta gamma.')), {});
+  await r.repo.updateNoteRawGuarded(path, c => c.replace('Alpha beta gamma.', P1 + extra), {});
+  return r;
+}
+test('T9 apply notes: the AI rewrite of an untouched chapter stores the new fingerprint, so it is not a hand edit', async () => {
+  const r = await stampedNotesRig();
+  assert.equal(bodyStateRaw(r.cardRaw()), 'clean', 'a note on the text is not an edit');
+  const before = readBodyRecord(detailBlockOf(r.cardRaw())).fp;
+  const result = await r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  assert.equal(result.applied, 1);
+  assert.ok(r.cardRaw().includes('Alpha BETA2 gamma.'));
+  assert.notEqual(readBodyRecord(detailBlockOf(r.cardRaw())).fp, before, 'the fingerprint follows the AI rewrite');
+  assert.equal(bodyStateRaw(r.cardRaw()), 'clean');
+});
+test('T9 apply notes: a chapter the reader had already edited stays hand-edited after an apply', async () => {
+  const r = await stampedNotesRig(' HAND');
+  assert.equal(bodyStateRaw(r.cardRaw()), 'edited');
+  const fp = readBodyRecord(detailBlockOf(r.cardRaw())).fp;
+  await r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  assert.ok(r.cardRaw().includes('Alpha BETA2 gamma.'));
+  assert.equal(readBodyRecord(detailBlockOf(r.cardRaw())).fp, fp, 'the record is left as it was');
+  assert.equal(bodyStateRaw(r.cardRaw()), 'edited');
+});
+test('T9 review box: ticking "accept" and collapsing the review box is not a hand edit', async () => {
+  const r = await rig();
+  await finish(r);
+  const box = '> [!vam-review]- 這章要你看\n> ・已修改，未重新校對\n> - [x] 接受現在這樣，不用改\n> - [ ] 我改好了\n> %%vam-review:run:n:f653b1e7e2b15838%%\n';
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace('<!-- visual-agent-map:detail:start -->\n', `<!-- visual-agent-map:detail:start -->\n${box}\n`), {});
+  assert.ok(r.raw(1).includes('- [x] 接受現在這樣'));
+  assert.equal(bodyStateRaw(r.raw(1)), 'clean');
+});
+
 test('T9 keep: "keep my version" makes a whole-book redo leave the chapter alone and send it on to its proofread', async () => {
   const r = await rig();
   await finish(r);

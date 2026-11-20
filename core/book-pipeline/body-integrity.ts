@@ -3,7 +3,8 @@
  * `<!-- book-body:v1 {"fp":"…"} -->` of the chapter's work callout, the fingerprint of the chapter as it left the program. The integrity
  * text behind it keeps the chapter text, its pictures, captions and sources; it leaves out only what the program itself owns (the hidden
  * `[!vam-book]` callouts, the trial and review boxes with their markers) and the reader's note wrappers (see book-notes), and a line
- * break is not an edit (CRLF and LF are the same). Applying notes and typing never refresh the fingerprint, so both count as a hand edit.
+ * break is not an edit (CRLF and LF are the same). Typing never refreshes the fingerprint, so it counts as a hand edit; applying notes (the
+ * AI's rewrite) and undoing that apply are program writes and refresh it when the chapter was untouched before.
  *
  * Every program write that changes the text stores the new fingerprint in the same write ({@link stampDetail}); a later program
  * transform ({@link programStamp}) refreshes it only when the text it starts from still carries its own fingerprint.
@@ -109,9 +110,13 @@ export function bodyState(detail: string, cardDetail?: string): BodyState {
   if (!record?.fp) {
     if (!integrityText(detail)) return "empty";
     if (!record && !extractProofRecords(detail).length && !latestSlotsRecord(detail)) return "clean";
-    return oldNoteLooksUntouched(detail, cardDetail) ? "clean" : "unknown";
   }
-  return record.fp === integrityFp(detail) ? "clean" : "edited";
+  return vouched(detail, cardDetail) ? "clean" : record?.fp ? "edited" : "unknown";
+}
+/** The text still carries the program's own fingerprint, or (an older note) the older records vouch for it. Text with no record is not vouched for. */
+function vouched(detail: string, cardDetail?: string): boolean {
+  const fp = readBodyRecord(detail)?.fp;
+  return fp ? fp === integrityFp(detail) : !!integrityText(detail) && oldNoteLooksUntouched(detail, cardDetail);
 }
 /** Whether the program may rewrite the text without asking: it is as the program left it, or there is none. */
 export const isUntouched = (detail: string): boolean => {
@@ -143,11 +148,12 @@ export function keepDetail(detail: string): string {
 }
 
 /**
- * A later program change of the text (a failed picture swapped out, a slot filled): the stored fingerprint follows only when the text it
- * started from still equalled it. Otherwise the record is left as it is and the chapter stays "hand-edited".
+ * A later program change of the text (a failed picture swapped out, a slot filled, notes applied or that apply undone): the stored
+ * fingerprint follows only when the text it started from still equalled it (or, an older note, its older records vouched for it). Otherwise
+ * the record is left as it is and the chapter stays "hand-edited"; text with no record stays without one.
  */
 export function programStamp(baseDetail: string, nextDetail: string): string {
-  return bodyState(baseDetail) === "clean" ? stampDetail(nextDetail) : nextDetail;
+  return vouched(baseDetail) ? stampDetail(nextDetail) : nextDetail;
 }
 
 // ---- the same on a note's whole raw text (the Detail block is where the record lives) ----
@@ -180,7 +186,7 @@ export const stampRaw = (raw: string): string => spliceDetail(raw, stampDetail);
 export const keepRaw = (raw: string): string => spliceDetail(raw, keepDetail);
 export function programStampRaw(baseRaw: string, nextRaw: string): string {
   const base = detailBlockOf(baseRaw);
-  return base !== undefined && bodyState(base, cardDetailOf(baseRaw)) === "clean" ? stampRaw(nextRaw) : nextRaw;
+  return base !== undefined && vouched(base, cardDetailOf(baseRaw)) ? stampRaw(nextRaw) : nextRaw;
 }
 export const isKeptRaw = (raw: string): boolean => isKept(detailBlockOf(raw) ?? "");
 export const bodyStateRaw = (raw: string): BodyState => bodyState(detailBlockOf(raw) ?? "", cardDetailOf(raw));

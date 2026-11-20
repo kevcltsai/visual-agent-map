@@ -8,6 +8,7 @@ const S = require('./support.cjs');
 
 const b = loadSource(`
 export { BookNotesApply, NOTES_TIMEOUT_MS, UNDO_NOTICE_MS } from "./experiences/visual-map/book-pipeline-notes-apply";
+export { stampRaw, bodyStateRaw, readBodyRecord, integrityFpRaw } from "./core/book-pipeline/body-integrity";
 export { AppliedHighlights, HIGHLIGHT_MS, appliedField, setApplied } from "./experiences/visual-map/book-applied-highlight";
 export { EditorState } from "@codemirror/state";
 export { setUiLanguage } from "./i18n";
@@ -174,6 +175,21 @@ test('cancel (review-a M2): pressing again aborts the job\'s own signal even whe
   assert.equal(signal.aborted, true);
   assert.equal(r.ctl.isRunning('N/c.md'), false);
   assert.equal(r.notices.at(-1), 'refused:cancelled');
+});
+test('undo (T9, live acceptance 2026-11-20): putting the text back is a program write: an untouched chapter gets the fingerprint of the restored text; a hand-edited one stays hand-edited', async () => {
+  const r = rig({ text: b.stampRaw(detail(`${P_NEW}\n\n別的段`)), run: async () => applied() });
+  r.ctl.press('N/c.md'); await flush();
+  await r.ctl.undo();
+  assert.ok(r.text.includes(P_OLD));
+  assert.equal(b.bodyStateRaw(r.text), 'clean', 'not a hand edit');
+  assert.equal(b.readBodyRecord(r.text.split('detail:start -->')[1]).fp, b.integrityFpRaw(r.text), 'the fingerprint of the restored text');
+  const q = rig({ text: b.stampRaw(detail(`${P_NEW}\n\n別的段`)).replace('別的段', '別的段 手改'), run: async () => applied() });
+  q.ctl.press('N/c.md'); await flush();
+  const fp = b.readBodyRecord(q.text.split('detail:start -->')[1]).fp;
+  await q.ctl.undo();
+  assert.ok(q.text.includes(P_OLD));
+  assert.equal(b.bodyStateRaw(q.text), 'edited');
+  assert.equal(b.readBodyRecord(q.text.split('detail:start -->')[1]).fp, fp, 'the record is left as it was');
 });
 test('undo partial and none: a paragraph edited since is left alone and reported', async () => {
   const two = { applied: 2, skipped: 0, marked: 0, edits: [

@@ -1,4 +1,5 @@
 import { t } from "../../i18n";
+import { programStampRaw } from "../../core/book-pipeline/body-integrity";
 import { undoApplied } from "../../core/book-pipeline/notes-apply";
 import type { NotesApplyResult } from "./book-pipeline-run";
 import type { NoteWriteResult } from "./book-pipeline-callouts";
@@ -182,7 +183,8 @@ export class BookNotesApply {
       const written = await this.ports.write(last.path, text => {
         const result = undoApplied(text, last.edits);
         outcome = { restored: result.restored, skipped: result.skipped };
-        return result.text;
+        // Putting the program's earlier text back is a program write too: the fingerprint follows when the chapter was untouched.
+        return programStampRaw(text, result.text);
       });
       if (written === "refused" || !outcome) return this.ports.notice(t("ui.book_note_undo_refused"));
     } catch {

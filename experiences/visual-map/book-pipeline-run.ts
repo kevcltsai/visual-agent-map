@@ -1488,7 +1488,8 @@ export class BookPipelineRuns {
         replies,
         refused.map(r => r.id)
       );
-      return outcome.text;
+      // The AI's rewrite is a program write: a chapter that was as the program left it keeps a matching fingerprint (a hand edit stays one).
+      return programStampRaw(text, outcome.text);
     });
     // A cancel that arrives after the transform has written is too late to undo anything: the job finishes normally (undo record,
     // highlight, seams). Only a job that wrote nothing reports the cancel.

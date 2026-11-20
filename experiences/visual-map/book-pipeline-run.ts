@@ -2950,9 +2950,11 @@ export class BookPipelineRuns {
             ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}`
             : lengthIssue
               ? `length unmet: ${[lengthIssue, ...noticed].join(" ")}`
-              : noticed.length
+              : structureUnmet.length
                 ? `structure unmet: ${noticed.join(" ")}`
-                : null
+                : noticed.length
+                  ? `image notice: ${noticed.join(" ")}`
+                  : null
         );
       }
     };

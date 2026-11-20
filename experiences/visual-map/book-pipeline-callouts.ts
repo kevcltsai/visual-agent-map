@@ -1,5 +1,6 @@
 import { t } from "../../i18n";
 import { cardRevision } from "../../core/book-pipeline/machine";
+import { chapterInconsistencies } from "../../core/book-pipeline/consistency";
 import type { MapDocument } from "../../map-model";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
 import { effectiveOrder, readBookPipeline, type BookPipelineData } from "../../core/book-pipeline/model";
@@ -406,6 +407,7 @@ export class BookCallouts {
       const entries = reviewEntries({
         proofContext: { runId: data.runId, revisionOf: id => cardRevision(data, id) },
         order: cards.map(item => item.id),
+        inconsistencies: id => chapterInconsistencies(data, id),
         titleOf: id => byId.get(id)?.title ?? id,
         noteOf: id => {
           const card = byId.get(id);

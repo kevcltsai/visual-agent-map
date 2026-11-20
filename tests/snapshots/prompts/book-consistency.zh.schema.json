@@ -1,0 +1,44 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "a": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "b": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "claimA": {
+            "type": "string",
+            "minLength": 1
+          },
+          "claimB": {
+            "type": "string",
+            "minLength": 1
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "a",
+          "b",
+          "claimA",
+          "claimB",
+          "suggestion"
+        ]
+      }
+    }
+  },
+  "required": [
+    "issues"
+  ]
+}

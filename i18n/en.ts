@@ -3417,9 +3417,12 @@ export const en = {
   "ui.book_summary_done": "What it covers: ",
   "ui.book_issue_0": "Needs a look: {0}",
   "ui.book_issue_unknown": "Needs a manual look (the reason code is not recognized).",
+  "ui.book_issue_consistency": "Says something differently from another chapter; have a look.",
   "ui.book_issue_step_0_1": "{0} failed: {1}",
   "ui.book_issue_unmet_0": "Proofreading found unmet items: {0}",
   "ui.book_reason_length_over_0_1_2_3": "The chapter is {0} {1}, longer than the {2}–{3} {1} you asked for",
+  "ui.book_reason_inconsistent_0_1_2":
+    "Says something differently from 〈{0}〉: this chapter says “{1}”, 〈{0}〉 says “{2}”",
   "ui.book_reason_length_under_0_1_2_3": "The chapter is {0} {1}, shorter than the {2}–{3} {1} you asked for",
   "ui.book_reason_images_under_0_1": "Too few pictures: {0} placed, the setting asks for at least {1}",
   "ui.book_length_unit_chars": "characters",

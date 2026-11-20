@@ -271,6 +271,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "book-consistency.en": {
+      "builder": "core/steps/book-pipeline/consistency.ts consistencyStep",
+      "language": "en",
+      "schema": true
+    },
+    "book-consistency.zh": {
+      "builder": "core/steps/book-pipeline/consistency.ts consistencyStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "book-consistency.zh-CN": {
+      "builder": "core/steps/book-pipeline/consistency.ts consistencyStep",
+      "language": "zh-CN",
+      "schema": true
+    },
     "book-find-images.en": {
       "builder": "core/steps/book-pipeline/find-images.ts findImagesStep",
       "language": "en",

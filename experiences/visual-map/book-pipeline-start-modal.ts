@@ -77,7 +77,8 @@ export function bookStartEstimate(cards: number, models?: BookStartModels): Book
   const rounds = Math.ceil(trial / BOOK_POOL) + Math.ceil((n - trial) / BOOK_POOL);
   return {
     cards: n,
-    calls: 1 + n * (per.plan + per.write + per.images + per.proof),
+    // The global plan, every chapter's calls, and the one whole-book consistency check once there are two chapters to compare.
+    calls: 1 + n * (per.plan + per.write + per.images + per.proof) + (n >= 2 ? 1 : 0),
     limit: DEFAULT_BUDGET_LIMIT,
     seconds: time("global") + rounds * perCard
   };

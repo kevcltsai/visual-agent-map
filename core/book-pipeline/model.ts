@@ -176,12 +176,34 @@ export interface BookPipelineData {
   /** The chapters at start or replan: card id -> its title and note path then. Lets a later run name and clean a card that is already gone from the map. Absent = older data (nothing known). */
   chapters?: Record<string, { title: string; path: string }>;
   budget: PipelineBudget;
+  /** The whole-book consistency check of the writing phase (one call). Absent: not asked yet (or older data). */
+  consistency?: BookConsistency;
   /** Raised by every owner stop; a step result carries the one it started under (absent = 0). */
   stopEpoch?: number;
   /** Raised on every committed transition of the whole state. */
   revision: number;
   startedAt: string;
   phaseStartedAt: string;
+}
+
+/** Two chapters (card ids) that state the same fact differently: what each says (model text, one line) and a suggested fix. */
+export interface ConsistencyFinding {
+  a: string;
+  b: string;
+  claimA: string;
+  claimB: string;
+  suggestion: string;
+}
+export interface BookConsistency {
+  /** The chapters and revisions it was asked for (`consistencyKey`). */
+  key: string;
+  /** Calls started for `key` (counted before the call, given back on a stop or budget pause). */
+  attempts: number;
+  /** The check for `key` finished (with or without findings); a failed check that used every attempt is never `done`. */
+  done?: boolean;
+  /** Each chapter's revision when the finished check read it: a finding counts for a chapter only while its revision is the same. */
+  revisions?: Record<string, number>;
+  findings?: ConsistencyFinding[];
 }
 
 export type BookPipelineRead =
@@ -192,6 +214,27 @@ export const FAILURE_CODE = /^[A-Za-z0-9_.:-]{1,60}$/;
 const isObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
 const isCount = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 0;
+
+const isText = (value: unknown): value is string => typeof value === "string";
+function consistencyShape(value: unknown): boolean {
+  if (!isObject(value) || !isText(value.key) || !isCount(value.attempts)) return false;
+  if (value.done !== undefined && typeof value.done !== "boolean") return false;
+  if (value.revisions !== undefined && (!isObject(value.revisions) || !Object.values(value.revisions).every(isCount)))
+    return false;
+  return (
+    value.findings === undefined ||
+    (Array.isArray(value.findings) &&
+      value.findings.every(
+        item =>
+          isObject(item) &&
+          isText(item.a) &&
+          isText(item.b) &&
+          isText(item.claimA) &&
+          isText(item.claimB) &&
+          isText(item.suggestion)
+      ))
+  );
+}
 
 function problem(raw: unknown): string | undefined {
   if (!isObject(raw)) return "not an object";
@@ -261,6 +304,7 @@ function problem(raw: unknown): string | undefined {
     return "trial";
   if (!isObject(raw.budget) || !isCount(raw.budget.used) || !isCount(raw.budget.limit) || raw.budget.limit < 1)
     return "budget";
+  if (raw.consistency !== undefined && !consistencyShape(raw.consistency)) return "consistency";
   if (raw.stopEpoch !== undefined && !isCount(raw.stopEpoch)) return "stopEpoch";
   if (!isCount(raw.revision)) return "revision";
   if (typeof raw.startedAt !== "string" || typeof raw.phaseStartedAt !== "string") return "timestamps";

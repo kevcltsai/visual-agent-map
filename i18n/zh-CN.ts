@@ -3206,7 +3206,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_reason_removed_ref_0_1": "这章还提到已移除的〈{0}〉：“{1}”",
   "ui.book_reason_length_under_0_1_2_3": "这章只有 {0} {1}，比你设定的 {2}–{3} {1} 短",
   "ui.book_reason_images_under_0_1": "图片不足：放了 {0} 张，设置至少 {1} 张",
-  "ui.book_reason_images_under_limited_0_1": "图片不足：放了 {0} 张，设置至少 {1} 张；Wikimedia Commons 限制请求次数，有些图位没查到，稍后可重跑这张",
+  "ui.book_reason_images_limited": "Commons 暂时限制请求，图位未补齐",
   "ui.book_reason_images_off_0": "第 {0} 张图和前后文对不上",
   "ui.book_length_unit_chars": "字",
   "ui.book_length_unit_words": "个英文词",

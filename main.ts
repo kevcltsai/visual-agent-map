@@ -861,7 +861,13 @@ export default class VisualAgentMapPlugin extends Plugin {
     // requestUrl has no abort: searchCommons races its own timeout. Only the Commons API is asked (the address is built by the program).
     fetchCommons: async url => {
       if (!url.startsWith(`${COMMONS_API}?`)) throw new Error("refused");
-      const response = await requestUrl({ url, method: "GET", throw: false });
+      // Wikimedia asks API clients to name themselves; only the plugin name and version (no user data).
+      const response = await requestUrl({
+        url,
+        method: "GET",
+        headers: { "Api-User-Agent": `VisualAgentMap-Obsidian-plugin/${this.manifest.version}` },
+        throw: false
+      });
       return { status: response.status, text: response.text, headers: response.headers };
     },
     author: async input => {

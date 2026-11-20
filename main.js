@@ -1913,6 +1913,7 @@ var en = {
   "detail.book_slots_reason_load_failed": "the picture did not load",
   "detail.book_slots_reason_unsafe_url": "the picture address is not safe",
   "detail.book_slots_reason_probe_capped": "not checked: too many candidates to probe",
+  "detail.book_slots_reason_rate_limited": "not searched: Wikimedia Commons limited the requests",
   "detail.book_slots_reason_mismatch": "does not match the text around it",
   "detail.book_slots_count_0_1": "picture count ({0}) is not the placed slots ({1})",
   "detail.book_slots_bad_0": "{0} slot markers were refused and removed",
@@ -2394,7 +2395,6 @@ var en = {
   "note.callout_titles_4": "none",
   "note.visual_reference": "Visual reference",
   "note.image_author_0": "by {0}",
-  "note.image_file_caption_0": "Picture: {0}",
   "note.image_link": "link",
   "note.image_source_0_1": "{0} ({1})",
   "note.image_source_label_0": "Source: {0}",
@@ -3201,6 +3201,8 @@ var en = {
   "ui.book_reason_removed_ref_0_1": "This chapter still mentions the removed \u3008{0}\u3009: \u201C{1}\u201D",
   "ui.book_reason_length_under_0_1_2_3": "The chapter is {0} {1}, shorter than the {2}\u2013{3} {1} you asked for",
   "ui.book_reason_images_under_0_1": "Too few pictures: {0} placed, the setting asks for at least {1}",
+  "ui.book_reason_images_limited": "Commons temporarily limited requests; some picture positions were not filled",
+  "ui.book_reason_images_off_0": "Pictures {0} do not match the text around them",
   "ui.book_length_unit_chars": "characters",
   "ui.book_length_unit_words": "words",
   "ui.book_structure_unmet_0": "Structure: {0} item(s) unmet",
@@ -5148,6 +5150,7 @@ var zhCN = {
   "detail.book_slots_reason_load_failed": "\u56FE\u52A0\u8F7D\u5931\u8D25",
   "detail.book_slots_reason_unsafe_url": "\u56FE\u7F51\u5740\u4E0D\u5B89\u5168",
   "detail.book_slots_reason_probe_capped": "\u5019\u9009\u592A\u591A\uFF0C\u6CA1\u9010\u4E00\u68C0\u67E5",
+  "detail.book_slots_reason_rate_limited": "Wikimedia Commons \u9650\u5236\u8BF7\u6C42\u6B21\u6570\uFF0C\u6CA1\u67E5\u5230",
   "detail.book_slots_reason_mismatch": "\u4E0E\u524D\u540E\u6587\u5BF9\u4E0D\u4E0A",
   "detail.book_slots_count_0_1": "\u56FE\u6570\u4E0E\u5DF2\u653E\u56FE\u4F4D\u4E0D\u7B26\uFF08{0}\uFF0F{1}\uFF09",
   "detail.book_slots_bad_0": "{0} \u4E2A\u56FE\u4F4D\u6807\u8BB0\u4E0D\u5408\u683C\uFF0C\u5DF2\u5220\u9664",
@@ -5629,7 +5632,6 @@ var zhCN = {
   "note.callout_titles_4": "\u9519\u8BEF:bug|\u5F15\u7528:quote,cite",
   "note.visual_reference": "\u89C6\u89C9\u53C2\u8003",
   "note.image_author_0": "\u4F5C\u8005 {0}",
-  "note.image_file_caption_0": "\u56FE\uFF1A{0}",
   "note.image_link": "\u94FE\u63A5",
   "note.image_source_0_1": "{0}\uFF08{1}\uFF09",
   "note.image_source_label_0": "\u6765\u6E90\uFF1A{0}",
@@ -6436,6 +6438,8 @@ var zhCN = {
   "ui.book_reason_removed_ref_0_1": "\u8FD9\u7AE0\u8FD8\u63D0\u5230\u5DF2\u79FB\u9664\u7684\u3008{0}\u3009\uFF1A\u201C{1}\u201D",
   "ui.book_reason_length_under_0_1_2_3": "\u8FD9\u7AE0\u53EA\u6709 {0} {1}\uFF0C\u6BD4\u4F60\u8BBE\u5B9A\u7684 {2}\u2013{3} {1} \u77ED",
   "ui.book_reason_images_under_0_1": "\u56FE\u7247\u4E0D\u8DB3\uFF1A\u653E\u4E86 {0} \u5F20\uFF0C\u8BBE\u7F6E\u81F3\u5C11 {1} \u5F20",
+  "ui.book_reason_images_limited": "Commons \u6682\u65F6\u9650\u5236\u8BF7\u6C42\uFF0C\u56FE\u4F4D\u672A\u8865\u9F50",
+  "ui.book_reason_images_off_0": "\u7B2C {0} \u5F20\u56FE\u548C\u524D\u540E\u6587\u5BF9\u4E0D\u4E0A",
   "ui.book_length_unit_chars": "\u5B57",
   "ui.book_length_unit_words": "\u4E2A\u82F1\u6587\u8BCD",
   "ui.book_structure_unmet_0": "\u7ED3\u6784 {0} \u9879\u672A\u8FBE\u6210",
@@ -8383,6 +8387,7 @@ var zhTW = {
   "detail.book_slots_reason_load_failed": "\u5716\u8F09\u5165\u5931\u6557",
   "detail.book_slots_reason_unsafe_url": "\u5716\u7DB2\u5740\u4E0D\u5B89\u5168",
   "detail.book_slots_reason_probe_capped": "\u5019\u9078\u592A\u591A\uFF0C\u6C92\u9010\u4E00\u6AA2\u67E5",
+  "detail.book_slots_reason_rate_limited": "Wikimedia Commons \u9650\u5236\u8ACB\u6C42\u6B21\u6578\uFF0C\u6C92\u67E5\u5230",
   "detail.book_slots_reason_mismatch": "\u8207\u524D\u5F8C\u6587\u5C0D\u4E0D\u4E0A",
   "detail.book_slots_count_0_1": "\u5716\u6578\u8207\u5DF2\u653E\u5716\u4F4D\u4E0D\u7B26\uFF08{0}\uFF0F{1}\uFF09",
   "detail.book_slots_bad_0": "{0} \u500B\u5716\u4F4D\u6A19\u8A18\u4E0D\u5408\u683C\uFF0C\u5DF2\u522A\u9664",
@@ -8864,7 +8869,6 @@ var zhTW = {
   "note.callout_titles_4": "\u932F\u8AA4:bug|\u5F15\u8FF0:quote,cite",
   "note.visual_reference": "\u8996\u89BA\u53C3\u8003",
   "note.image_author_0": "\u4F5C\u8005 {0}",
-  "note.image_file_caption_0": "\u5716\uFF1A{0}",
   "note.image_link": "\u9023\u7D50",
   "note.image_source_0_1": "{0}\uFF08{1}\uFF09",
   "note.image_source_label_0": "\u4F86\u6E90\uFF1A{0}",
@@ -9671,6 +9675,8 @@ var zhTW = {
   "ui.book_reason_removed_ref_0_1": "\u9019\u7AE0\u9084\u63D0\u5230\u5DF2\u79FB\u9664\u7684\u3008{0}\u3009\uFF1A\u300C{1}\u300D",
   "ui.book_reason_length_under_0_1_2_3": "\u9019\u7AE0\u53EA\u6709 {0} {1}\uFF0C\u6BD4\u4F60\u8A2D\u5B9A\u7684 {2}\u2013{3} {1} \u77ED",
   "ui.book_reason_images_under_0_1": "\u5716\u7247\u4E0D\u8DB3\uFF1A\u653E\u4E86 {0} \u5F35\uFF0C\u8A2D\u5B9A\u81F3\u5C11 {1} \u5F35",
+  "ui.book_reason_images_limited": "Commons \u66AB\u6642\u9650\u5236\u8ACB\u6C42\uFF0C\u5716\u4F4D\u672A\u88DC\u9F4A",
+  "ui.book_reason_images_off_0": "\u7B2C {0} \u5F35\u5716\u548C\u524D\u5F8C\u6587\u5C0D\u4E0D\u4E0A",
   "ui.book_length_unit_chars": "\u5B57",
   "ui.book_length_unit_words": "\u500B\u82F1\u6587\u5B57",
   "ui.book_structure_unmet_0": "\u7D50\u69CB {0} \u9805\u672A\u9054\u6210",
@@ -13272,7 +13278,7 @@ function figureOf(candidate, href, language2) {
   return {
     href,
     alt,
-    caption: candidate.loose ? translateNote(language2, "note.image_file_caption_0", alt) : plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
+    caption: plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
     ...source ? { source } : {}
   };
 }
@@ -13426,7 +13432,8 @@ var REASONS = [
   "not_found",
   "load_failed",
   "unsafe_url",
-  "probe_capped"
+  "probe_capped",
+  "rate_limited"
 ];
 function shortHash(url) {
   let hash = 2166136261;
@@ -13622,12 +13629,23 @@ function imageIssueTokens(check) {
   return check.bad ? [...tokens2, "image_marker"] : tokens2;
 }
 var pictureShortfallToken = (placed, minimum) => `images:under:${placed}:${minimum}`;
+var PICTURE_LIMITED_TOKEN = "images:limited";
+var pictureMismatchToken = (indexes) => `images:off:${indexes.join(",")}`;
 var SHORTFALL = /(?:^|\s)images:under:(\d+):(\d+)(?=\s|$)/;
+var LIMITED = /(?:^|\s)images:limited(?=\s|$)/;
+var OFF = /(?:^|\s)images:off:(\d+(?:,\d+)*)(?=\s|$)/;
 function splitPictureIssue(issue2) {
   const m = SHORTFALL.exec(issue2);
-  if (!m) return { rest: issue2 };
-  const rest = issue2.replace(SHORTFALL, "").trim().replace(/^images unmet:(?:\s+\S+)*$|^images unmet$/, "");
-  return { rest, shortfall: { placed: Number(m[1]), minimum: Number(m[2]) } };
+  const o = OFF.exec(issue2);
+  const limited = LIMITED.test(issue2);
+  if (!m && !o && !limited) return { rest: issue2 };
+  const rest = issue2.replace(SHORTFALL, "").replace(LIMITED, "").replace(OFF, "").trim().replace(/^images unmet:(?:\s+\S+)*$|^images unmet$/, "");
+  return {
+    rest,
+    ...m ? { shortfall: { placed: Number(m[1]), minimum: Number(m[2]) } } : {},
+    ...limited ? { limited: true } : {},
+    ...o ? { off: o[1].split(",").map(Number) } : {}
+  };
 }
 
 // core/note-placeholder.ts
@@ -46880,7 +46898,10 @@ var COMMONS_REQUESTS_PER_SLOT = 3;
 var COMMONS_PER_SLOT = 3;
 var COMMONS_REQUEST_MS = 1e4;
 var COMMONS_CHAPTER_MS = 45e3;
-var COMMONS_SPACING_MS = 300;
+var COMMONS_SPACING_MS = 1e3;
+var COMMONS_BACKOFF_MS = [2e3, 4e3, 8e3];
+var COMMONS_BACKOFF_TOTAL_MS = 3e4;
+var COMMONS_RUN_BACKOFF_MS = 18e4;
 var QUERY_MAX = 80;
 var CREDIT_MAX = 100;
 var CAPTION_MAX = 200;
@@ -46915,8 +46936,12 @@ function plainCredit(value, max = CREDIT_MAX) {
   if (typeof value !== "string") return "";
   return value.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().slice(0, max);
 }
-function parseCommonsAnswer(text10, slot) {
+function parseCommonsAnswer(text10, slot, rejected) {
   var _a2, _b2, _c, _d, _e, _f, _g, _h;
+  const refuse = (rule) => {
+    var _a3;
+    if (rejected) rejected[rule] = ((_a3 = rejected[rule]) != null ? _a3 : 0) + 1;
+  };
   let parsed;
   try {
     parsed = JSON.parse(text10);
@@ -46931,35 +46956,53 @@ function parseCommonsAnswer(text10, slot) {
     if (!info || typeof page.title !== "string") continue;
     const url = typeof info.thumburl === "string" ? info.thumburl : typeof info.url === "string" ? info.url : "";
     const shown = typeof info.thumbmime === "string" ? info.thumbmime : info.mime;
-    if (typeof info.mime !== "string" || !FILE_MIME.test(info.mime)) continue;
-    if (!/^https:\/\//.test(url) || typeof shown !== "string" || !SHOWN_MIME.test(shown)) continue;
-    if (typeof info.descriptionurl !== "string") continue;
-    if ([url, page.title, info.url].some((value) => typeof value === "string" && isDocumentFile(value))) continue;
+    if ([url, page.title, info.url].some((value) => typeof value === "string" && isDocumentFile(value))) {
+      refuse("document");
+      continue;
+    }
+    if (typeof info.mime !== "string" || !FILE_MIME.test(info.mime) || !/^https:\/\//.test(url) || typeof shown !== "string" || !SHOWN_MIME.test(shown) || typeof info.descriptionurl !== "string") {
+      refuse("type");
+      continue;
+    }
     const meta = (_b2 = info.extmetadata) != null ? _b2 : {};
     const author = plainCredit((_c = meta.Artist) == null ? void 0 : _c.value);
     const license = plainCredit((_d = meta.LicenseShortName) == null ? void 0 : _d.value);
     const categories = plainCredit((_e = meta.Categories) == null ? void 0 : _e.value, DESCRIPTION_MAX).replace(/\|/g, "; ");
     const about = plainCredit((_f = meta.ImageDescription) == null ? void 0 : _f.value, DESCRIPTION_MAX);
     const title = page.title.replace(/^File:/i, "").replace(/\.[a-z0-9]{2,5}$/i, "").replace(/_/g, " ").trim();
-    if (wrongGenre(slot.kind, `${title} ${categories}`)) continue;
+    if (wrongGenre(slot.kind, `${title} ${categories}`)) {
+      refuse("genre");
+      continue;
+    }
     const words2 = askWords(slot);
     const said = `${title} ${about} ${categories}`;
-    if (wordHits(words2, said) < Math.min(FIT_HITS, words2.length) || !words2.length) continue;
+    if (wordHits(words2, said) < Math.min(FIT_HITS, words2.length) || !words2.length) {
+      refuse("words");
+      continue;
+    }
     const terms = (((_g = slot.terms) == null ? void 0 : _g.length) ? slot.terms : [(_h = slot.search) != null ? _h : ""]).map((term) => askWords({ explains: "", search: term })).filter((term) => term.length);
     const hit = terms.filter((term) => wordHits(term, said) === term.length).length;
-    const fits = terms.length > 0 && hit >= Math.ceil(terms.length / 2);
+    if (!terms.length || hit < Math.ceil(terms.length / 2)) {
+      refuse("caption");
+      continue;
+    }
     const candidate = fileSourceOf({
       title: title || page.title,
       url,
       source: info.descriptionurl,
-      caption: (fits ? slot.explains : title || page.title).replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX),
+      caption: slot.explains.replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX),
       description: [about, categories].filter(Boolean).join(" \xB7 ").slice(0, DESCRIPTION_MAX),
       ...author ? { author } : {},
-      ...license ? { license } : {},
-      ...fits ? {} : { loose: true }
+      ...license ? { license } : {}
     });
-    if (!candidate || !bySubject(candidate, slot.subject)) continue;
-    if (out.some((have) => have.url === candidate.url)) continue;
+    if (!candidate || !bySubject(candidate, slot.subject)) {
+      refuse("subject");
+      continue;
+    }
+    if (out.some((have) => have.url === candidate.url)) {
+      refuse("repeat");
+      continue;
+    }
     out.push(candidate);
   }
   return out;
@@ -46978,8 +47021,10 @@ function bounded(work, ms, signal) {
   });
 }
 var CommonsQueue = class {
-  constructor(spacing = COMMONS_SPACING_MS) {
+  /** `sleep`: how a wait is spent (tests: no real time); it resolves early on abort. */
+  constructor(spacing = COMMONS_SPACING_MS, sleep = abortableSleep) {
     this.spacing = spacing;
+    this.sleep = sleep;
     __publicField(this, "tail", Promise.resolve());
   }
   /** `run`'s answer, or undefined when `skip()` says no once the turn came. The next turn waits for this one to settle. */
@@ -46995,43 +47040,79 @@ var CommonsQueue = class {
     return answer;
   }
   pause() {
-    return this.spacing > 0 ? new Promise((resolve) => window.setTimeout(resolve, this.spacing)) : Promise.resolve();
+    return this.spacing > 0 ? this.sleep(this.spacing) : Promise.resolve();
   }
 };
+function abortableSleep(ms, signal) {
+  return new Promise((resolve) => {
+    const done = () => {
+      window.clearTimeout(timer);
+      signal == null ? void 0 : signal.removeEventListener("abort", done);
+      resolve();
+    };
+    const timer = window.setTimeout(done, ms);
+    signal == null ? void 0 : signal.addEventListener("abort", done, { once: true });
+  });
+}
+function retryAfterMs(headers, now) {
+  var _a2, _b2;
+  const raw = (_b2 = (_a2 = Object.entries(headers != null ? headers : {}).find(([name2]) => name2.toLowerCase() === "retry-after")) == null ? void 0 : _a2[1]) == null ? void 0 : _b2.trim();
+  if (!raw) return void 0;
+  if (/^\d+$/.test(raw)) return Number(raw) * 1e3;
+  const at = Date.parse(raw);
+  return Number.isNaN(at) ? void 0 : Math.max(0, at - now);
+}
 var commonsQueue = new CommonsQueue();
 async function searchCommons(slots, fetch, options) {
-  var _a2, _b2;
+  var _a2, _b2, _c;
   const now = (_a2 = options.now) != null ? _a2 : Date.now;
   const deadline = now() + COMMONS_CHAPTER_MS;
   const queue = (_b2 = options.queue) != null ? _b2 : commonsQueue;
   const bySlot = /* @__PURE__ */ new Map();
   let requests = 0;
   let limited = false;
+  let waited = 0;
+  const cut = [];
+  const rejected = {};
+  const run = (_c = options.run) != null ? _c : { waited: 0, spent: false };
+  if (run.spent) limited = true;
+  const stopped = () => limited || run.spent || options.signal.aborted || now() >= deadline;
+  const ask = (query, retry) => queue.turn(stopped, async () => {
+    var _a3;
+    requests++;
+    const answer = await bounded(
+      Promise.resolve().then(() => fetch(commonsSearchUrl(query))),
+      COMMONS_REQUEST_MS,
+      options.signal
+    );
+    if ((answer == null ? void 0 : answer.status) !== 429) return answer;
+    const wait = (_a3 = retryAfterMs(answer.headers, now())) != null ? _a3 : COMMONS_BACKOFF_MS[retry];
+    if (wait !== void 0 && run.waited + wait > COMMONS_RUN_BACKOFF_MS) run.spent = true;
+    if (run.spent || retry >= COMMONS_BACKOFF_MS.length || wait === void 0 || waited + wait > COMMONS_BACKOFF_TOTAL_MS || now() + wait >= deadline) {
+      limited = true;
+      return answer;
+    }
+    waited += wait;
+    run.waited += wait;
+    await queue.sleep(wait, options.signal);
+    return answer;
+  });
   for (const slot of slots) {
     const list2 = [];
     for (const query of commonsQueries(slot)) {
-      if (list2.length || limited || options.signal.aborted || now() >= deadline) break;
-      const answer = await queue.turn(
-        () => limited || options.signal.aborted || now() >= deadline,
-        () => {
-          requests++;
-          return bounded(
-            Promise.resolve().then(() => fetch(commonsSearchUrl(query))),
-            COMMONS_REQUEST_MS,
-            options.signal
-          );
-        }
-      );
-      if ((answer == null ? void 0 : answer.status) === 429) limited = true;
+      if (list2.length || stopped()) break;
+      let answer = await ask(query, 0);
+      for (let retry = 1; (answer == null ? void 0 : answer.status) === 429 && !stopped(); retry++) answer = await ask(query, retry);
       if (!answer || answer.status !== 200) continue;
-      for (const candidate of parseCommonsAnswer(answer.text, slot)) {
+      for (const candidate of parseCommonsAnswer(answer.text, slot, rejected)) {
         if (list2.length >= COMMONS_PER_SLOT) break;
         if (!options.skip(candidate.url)) list2.push(candidate);
       }
     }
     if (list2.length) bySlot.set(slot.index, list2);
+    else if (limited || run.spent) cut.push(slot.index);
   }
-  return { bySlot, requests, limited };
+  return { bySlot, requests, limited: limited || run.spent, cut, rejected };
 }
 
 // core/book-pipeline/machine.ts
@@ -53760,6 +53841,7 @@ var BookPipelineRuns = class {
       disposed: false,
       rootId: "",
       usedImages: /* @__PURE__ */ new Set(),
+      commonsBudget: { waited: 0, spent: false },
       usedWorks: /* @__PURE__ */ new Map(),
       probeGate: { active: 0, waiters: [] },
       done: Promise.resolve()
@@ -54869,7 +54951,6 @@ ${oldDetail}`);
                 title: candidate.title,
                 caption: candidate.caption,
                 ...candidate.description !== void 0 ? { description: candidate.description } : {},
-                ...candidate.loose ? { loose: true } : {},
                 ...candidate.author ? { author: candidate.author } : {},
                 ...candidate.license ? { license: candidate.license } : {}
               },
@@ -54893,9 +54974,13 @@ ${oldDetail}`);
     };
     let commonsAsked = 0;
     let commonsLimited = false;
+    const commonsCut = /* @__PURE__ */ new Set();
     let commonsNoHint = 0;
+    let commonsRejected = {};
+    const rounds = [];
     try {
       const round1 = await search(wanted, false, exclude);
+      rounds.push(round1);
       keepHints(round1);
       for (const [index, list2] of await probeFound(wanted, round1)) perSlot.set(index, list2);
       if (round1) {
@@ -54908,6 +54993,7 @@ ${oldDetail}`);
           ...new Set([...perSlot.values()].flatMap((list2) => list2.map((item) => imageKey(item.candidate.imageUrl))))
         ];
         const second = await search(lacking2, true, [...tried, ...exclude]);
+        rounds.push(second);
         keepHints(second);
         if (second) {
           for (const [index, list2] of await probeFound(lacking2, second))
@@ -54937,10 +55023,17 @@ ${oldDetail}`);
               };
             }),
             this.ports.fetchCommons,
-            { signal, skip: (url) => seen.has(imageKey(url)) || taken(imageKey(url)) }
+            {
+              signal,
+              skip: (url) => seen.has(imageKey(url)) || taken(imageKey(url)),
+              run: drive.commonsBudget,
+              ...this.ports.commonsQueue ? { queue: this.ports.commonsQueue } : {}
+            }
           );
           commonsAsked = commons.requests;
           commonsLimited = commons.limited;
+          commonsRejected = commons.rejected;
+          for (const index of commons.cut) commonsCut.add(index);
           commonsNoHint = lacking2.filter((slot) => {
             var _a3, _b3;
             return !((_a3 = slot.search) == null ? void 0 : _a3.length) && !((_b3 = hints.get(slot.index)) == null ? void 0 : _b3.search);
@@ -54961,7 +55054,23 @@ ${oldDetail}`);
     }
     const latest = await this.ports.readCard(path);
     if (!await this.stillOnMap(drive, nodeId)) return { kind: "failed", reason: "card_removed" };
-    const outcomes = choosePictures({ id: nodeId, title: latest.title }, slots, perSlot, taken, language2);
+    const refusedTaken = /* @__PURE__ */ new Set();
+    const outcomes = choosePictures(
+      { id: nodeId, title: latest.title },
+      slots,
+      perSlot,
+      (key4) => {
+        const used = taken(key4);
+        if (used) refusedTaken.add(key4);
+        return used;
+      },
+      language2
+    );
+    for (const index of commonsCut) {
+      const outcome = outcomes.get(index);
+      if (outcome && "reasonCode" in outcome && outcome.reasonCode === "not_found")
+        outcomes.set(index, { reasonCode: "rate_limited" });
+    }
     const claimed = [...outcomes.values()].flatMap(
       (outcome) => "figure" in outcome ? [imageKey(outcome.figure.href)] : []
     );
@@ -54976,10 +55085,6 @@ ${oldDetail}`);
       if (!outcome || !("figure" in outcome)) continue;
       const placed = (_d = ((_c = perSlot.get(slot.index)) != null ? _c : []).find((item) => item.href === outcome.figure.href)) == null ? void 0 : _d.candidate;
       if (!placed) continue;
-      if (placed.loose) {
-        off.add(slot.index);
-        continue;
-      }
       const about = `${placed.title} ${(_e = placed.description) != null ? _e : placed.caption}`;
       const words2 = askWords({ explains: slot.explains, terms: slot.search, ...hints.get(slot.index) });
       if (words2.length && !wordHits(words2, about)) off.add(slot.index);
@@ -55008,7 +55113,14 @@ ${oldDetail}`);
             missing: result.missing.length,
             ...commonsAsked ? { commons: commonsAsked } : {},
             ...commonsLimited ? { commons_limited: 1 } : {},
-            ...commonsNoHint ? { commons_nohint: commonsNoHint } : {}
+            ...commonsNoHint ? { commons_nohint: commonsNoHint } : {},
+            ...Object.fromEntries(
+              rounds.flatMap(
+                (round3, i) => round3 ? [[`r${i + 1}_found`, round3.found], [`r${i + 1}_offTopic`, round3.offTopic]] : []
+              )
+            ),
+            ...refusedTaken.size ? { taken: refusedTaken.size } : {},
+            ...Object.fromEntries(Object.entries(commonsRejected).map(([rule, n]) => [`commons_rej_${rule}`, n]))
           },
           hosts: { name: "reason", list: [...new Set(result.missing.map((item) => item.reasonCode))] }
         })
@@ -55180,12 +55292,20 @@ ${oldDetail}`);
     const structureUnmet = verdict.items.filter((item) => item.type !== "fact" && item.status === "unmet").map((item) => code2(item.id));
     const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
     const minimum = await this.pictureMinimum(drive);
-    const shortIssue = minimum !== void 0 && imageCheck.placed < minimum ? pictureShortfallToken(imageCheck.placed, minimum) : "";
+    const limited = imageCheck.issues.some((issue2) => issue2.code === "rate_limited");
+    const offIndexes = imageCheck.issues.flatMap(
+      (issue2) => issue2.code === "mismatch" && issue2.index !== void 0 ? [issue2.index] : []
+    );
+    const pictureIssue = [
+      ...minimum !== void 0 && imageCheck.placed < minimum ? [pictureShortfallToken(imageCheck.placed, minimum)] : [],
+      ...limited ? [PICTURE_LIMITED_TOKEN] : [],
+      ...offIndexes.length ? [pictureMismatchToken(offIndexes)] : []
+    ].join(" ");
     return {
       kind: "ok",
       after: async () => {
         const rewrite = verdict.aggregate === "needs-review" || !!length;
-        const stage = rewrite || shortIssue ? "needs-review" : "checked";
+        const stage = rewrite || pictureIssue ? "needs-review" : "checked";
         if (rewrite && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0) {
           drive.fixable.set(nodeId, proofFixInstruction(verdict.items, [...checklist, ...BOOK_CHECKS], length));
           drive.expand.add(nodeId);
@@ -55198,7 +55318,7 @@ ${oldDetail}`);
           drive,
           nodeId,
           stage,
-          verdict.aggregate === "needs-review" ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}${shortIssue ? ` ${shortIssue}` : ""}` : lengthIssue ? `length unmet: ${[lengthIssue, ...shortIssue ? [shortIssue] : [], ...noticed].join(" ")}` : shortIssue ? `images unmet: ${[shortIssue, ...noticed].join(" ")}` : structureUnmet.length ? `structure unmet: ${noticed.join(" ")}` : noticed.length ? `image notice: ${noticed.join(" ")}` : null
+          verdict.aggregate === "needs-review" ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}${pictureIssue ? ` ${pictureIssue}` : ""}` : lengthIssue ? `length unmet: ${[lengthIssue, ...pictureIssue ? [pictureIssue] : [], ...noticed].join(" ")}` : pictureIssue ? `images unmet: ${[pictureIssue, ...noticed].join(" ")}` : structureUnmet.length ? `structure unmet: ${noticed.join(" ")}` : noticed.length ? `image notice: ${noticed.join(" ")}` : null
         );
       }
     };
@@ -55729,10 +55849,8 @@ var PLAIN_KEY = {
 };
 function bookIssueText(issue2) {
   const pictures = splitPictureIssue(issue2);
-  if (pictures.shortfall) {
-    const sentence2 = shortfallText(pictures.shortfall);
-    return pictures.rest ? `${bookIssueText(pictures.rest)}${t("ui.book_panel_lead_sep")}${sentence2}` : sentence2;
-  }
+  const pictureText = pictureIssueText(pictures);
+  if (pictureText) return pictures.rest ? `${bookIssueText(pictures.rest)}${t("ui.book_panel_lead_sep")}${pictureText}` : pictureText;
   const { rest, length } = splitLengthIssue(issue2);
   if (!length) return plainIssueText(issue2);
   const sentence = lengthText(length);
@@ -55740,6 +55858,14 @@ function bookIssueText(issue2) {
 }
 function shortfallText(shortfall) {
   return t("ui.book_reason_images_under_0_1", String(shortfall.placed), String(shortfall.minimum));
+}
+function pictureIssueText(pictures) {
+  var _a2;
+  return [
+    ...pictures.shortfall ? [shortfallText(pictures.shortfall)] : [],
+    ...pictures.limited ? [t("ui.book_reason_images_limited")] : [],
+    ...((_a2 = pictures.off) == null ? void 0 : _a2.length) ? [t("ui.book_reason_images_off_0", pictures.off.map(String).join(t("ui.argument_list_sep")))] : []
+  ].join(t("ui.book_panel_lead_sep"));
 }
 function lengthText(length) {
   const unit2 = length.unit === "\u5B57" ? t("ui.book_length_unit_chars") : t("ui.book_length_unit_words");
@@ -55885,10 +56011,8 @@ var plainNote = (text10) => text10.replace(/\b[CN]\d+\b\s*[:：]?/g, "").replace
 function reasonOf2(issue2, proof) {
   var _a2;
   const pictures = splitPictureIssue(issue2);
-  if (pictures.shortfall) {
-    const sentence = shortfallText(pictures.shortfall);
-    return pictures.rest ? `${reasonOf2(pictures.rest, proof)}${t("ui.book_panel_lead_sep")}${sentence}` : sentence;
-  }
+  const pictureText = pictureIssueText(pictures);
+  if (pictureText) return pictures.rest ? `${reasonOf2(pictures.rest, proof)}${t("ui.book_panel_lead_sep")}${pictureText}` : pictureText;
   const { rest, length } = splitLengthIssue(issue2);
   if (length) {
     const sentence = lengthText(length);
@@ -107106,8 +107230,13 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       // requestUrl has no abort: searchCommons races its own timeout. Only the Commons API is asked (the address is built by the program).
       fetchCommons: async (url) => {
         if (!url.startsWith(`${COMMONS_API}?`)) throw new Error("refused");
-        const response = await (0, import_obsidian52.requestUrl)({ url, method: "GET", throw: false });
-        return { status: response.status, text: response.text };
+        const response = await (0, import_obsidian52.requestUrl)({
+          url,
+          method: "GET",
+          headers: { "Api-User-Agent": `VisualAgentMap-Obsidian-plugin/${this.manifest.version}` },
+          throw: false
+        });
+        return { status: response.status, text: response.text, headers: response.headers };
       },
       author: async (input2) => {
         const view = this.views().find((item) => item.mapPath === input2.mapPath);

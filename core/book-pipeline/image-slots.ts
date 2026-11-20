@@ -829,35 +829,43 @@ export function imageIssueTokens(check: ImageTextCheck): string[] {
 
 /**
  * The issue token of a chapter that ended with fewer placed pictures than the owner's minimum pictures per chapter (no spaces):
- * `images:under:<placed>:<minimum>`, with `:limited` when Wikimedia Commons' request limit left slots unsearched. It makes the
- * chapter needs-review without asking for a rewrite of its text.
+ * `images:under:<placed>:<minimum>`. It makes the chapter needs-review without asking for a rewrite of its text.
  */
-export const pictureShortfallToken = (placed: number, minimum: number, limited = false): string =>
-  `images:under:${placed}:${minimum}${limited ? ":limited" : ""}`;
+export const pictureShortfallToken = (placed: number, minimum: number): string => `images:under:${placed}:${minimum}`;
+/**
+ * The issue token of a chapter where Wikimedia Commons' request limit left a slot unsearched (`rate_limited`), with or without a
+ * shortfall: the chapter is needs-review (run it again later), without a rewrite of its text.
+ */
+export const PICTURE_LIMITED_TOKEN = "images:limited";
 /**
  * The issue token of the placed pictures the program's check found off their text (`images:off:2,3,8`). Every such picture is a
  * reason to look (Primary decision after the v5 run): the chapter is needs-review without a rewrite of its text.
  */
 export const pictureMismatchToken = (indexes: readonly number[]): string => `images:off:${indexes.join(",")}`;
-const SHORTFALL = /(?:^|\s)images:under:(\d+):(\d+)(:limited)?(?=\s|$)/;
+const SHORTFALL = /(?:^|\s)images:under:(\d+):(\d+)(?=\s|$)/;
+const LIMITED = /(?:^|\s)images:limited(?=\s|$)/;
 const OFF = /(?:^|\s)images:off:(\d+(?:,\d+)*)(?=\s|$)/;
-/** An issue field split into its picture shortfall and mismatches (when it carries them) and the rest (`images unmet:` with only notice tokens left leaves nothing). */
+/** An issue field split into its picture shortfall, Commons limit and mismatches (when it carries them) and the rest (`images unmet:` with only notice tokens left leaves nothing). */
 export function splitPictureIssue(issue: string): {
   rest: string;
-  shortfall?: { placed: number; minimum: number; limited?: true };
+  shortfall?: { placed: number; minimum: number };
+  limited?: true;
   off?: number[];
 } {
   const m = SHORTFALL.exec(issue);
   const o = OFF.exec(issue);
-  if (!m && !o) return { rest: issue };
+  const limited = LIMITED.test(issue);
+  if (!m && !o && !limited) return { rest: issue };
   const rest = issue
     .replace(SHORTFALL, "")
+    .replace(LIMITED, "")
     .replace(OFF, "")
     .trim()
     .replace(/^images unmet:(?:\s+\S+)*$|^images unmet$/, "");
   return {
     rest,
-    ...(m ? { shortfall: { placed: Number(m[1]), minimum: Number(m[2]), ...(m[3] ? { limited: true as const } : {}) } } : {}),
+    ...(m ? { shortfall: { placed: Number(m[1]), minimum: Number(m[2]) } } : {}),
+    ...(limited ? { limited: true as const } : {}),
     ...(o ? { off: o[1].split(",").map(Number) } : {})
   };
 }

@@ -18,7 +18,13 @@ import { isBudgetExhausted } from "../../core/admission";
 import { createBudgetAdmission, createStoreBudgetPort } from "../../core/book-pipeline/budget";
 import { imageKey } from "../../core/book-pipeline/image-dedupe";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
-import { searchCommons, type CommonsFetch, type CommonsQueue } from "../../core/book-pipeline/commons-search";
+import {
+  searchCommons,
+  type CommonsFetch,
+  type CommonsQueue,
+  type CommonsRejection,
+  type CommonsRunBudget
+} from "../../core/book-pipeline/commons-search";
 import { askWords, wordHits } from "../../core/book-pipeline/file-fit";
 import {
   PipelineStore,
@@ -154,6 +160,7 @@ import {
   latestSlotsRecord,
   pictureShortfallToken,
   pictureMismatchToken,
+  PICTURE_LIMITED_TOKEN,
   stripImageLines,
   fillSlotMarkers,
   residualMarkerLines,
@@ -521,6 +528,8 @@ interface Drive {
   failure?: string;
   /** Keys (see imageKey) of the pictures this run already embedded: one picture is used once in a book. */
   usedImages: Set<string>;
+  /** The 429 waits this run spent on Wikimedia Commons, all chapters together (see COMMONS_RUN_BACKOFF_MS). */
+  commonsBudget: CommonsRunBudget;
   /** Work keys (see workKey) this run placed, by the card that placed them: one work is shown once in a book, even under another file name. */
   usedWorks: Map<string, string>;
   /** The drive-wide gate of picture probes in flight (see {@link PROBE_PARALLEL}). */
@@ -1720,6 +1729,7 @@ export class BookPipelineRuns {
       disposed: false,
       rootId: "",
       usedImages: new Set<string>(),
+      commonsBudget: { waited: 0, spent: false },
       usedWorks: new Map<string, string>(),
       probeGate: { active: 0, waiters: [] },
       done: Promise.resolve()
@@ -2986,8 +2996,11 @@ export class BookPipelineRuns {
     let commonsLimited = false;
     const commonsCut = new Set<number>();
     let commonsNoHint = 0;
+    let commonsRejected: Partial<Record<CommonsRejection, number>> = {};
+    const rounds: (FoundImages | undefined)[] = [];
     try {
       const round1 = await search(wanted, false, exclude);
+      rounds.push(round1);
       keepHints(round1);
       for (const [index, list] of await probeFound(wanted, round1)) perSlot.set(index, list);
       // A second search (once) for the slots the first one left without a usable picture: another direction, the tried addresses excluded.
@@ -2998,6 +3011,7 @@ export class BookPipelineRuns {
           ...new Set([...perSlot.values()].flatMap(list => list.map(item => imageKey(item.candidate.imageUrl))))
         ];
         const second = await search(lacking, true, [...tried, ...exclude]);
+        rounds.push(second);
         keepHints(second);
         if (second) {
           for (const [index, list] of await probeFound(lacking, second))
@@ -3026,11 +3040,13 @@ export class BookPipelineRuns {
             {
               signal,
               skip: url => seen.has(imageKey(url)) || taken(imageKey(url)),
+              run: drive.commonsBudget,
               ...(this.ports.commonsQueue ? { queue: this.ports.commonsQueue } : {})
             }
           );
           commonsAsked = commons.requests;
           commonsLimited = commons.limited;
+          commonsRejected = commons.rejected;
           for (const index of commons.cut) commonsCut.add(index);
           // Slots with no English search words (none planned, none from the finder): their Commons queries are the slot line, which rarely matches a file.
           commonsNoHint = lacking.filter(slot => !slot.search?.length && !hints.get(slot.index)?.search).length;
@@ -3052,7 +3068,19 @@ export class BookPipelineRuns {
     const latest = await this.ports.readCard(path);
     // The card may have left the map while the search and the probes ran: nothing is claimed or written for it.
     if (!(await this.stillOnMap(drive, nodeId))) return { kind: "failed", reason: "card_removed" };
-    const outcomes = choosePictures({ id: nodeId, title: latest.title }, slots, perSlot, taken, language);
+    // Addresses or works refused because this book already shows them (counted for the log).
+    const refusedTaken = new Set<string>();
+    const outcomes = choosePictures(
+      { id: nodeId, title: latest.title },
+      slots,
+      perSlot,
+      key => {
+        const used = taken(key);
+        if (used) refusedTaken.add(key);
+        return used;
+      },
+      language
+    );
     // A slot Commons' request limit kept from being searched says so (the shortfall reason then names the limit), not "not found".
     for (const index of commonsCut) {
       const outcome = outcomes.get(index);
@@ -3106,7 +3134,14 @@ export class BookPipelineRuns {
             missing: result.missing.length,
             ...(commonsAsked ? { commons: commonsAsked } : {}),
             ...(commonsLimited ? { commons_limited: 1 } : {}),
-            ...(commonsNoHint ? { commons_nohint: commonsNoHint } : {})
+            ...(commonsNoHint ? { commons_nohint: commonsNoHint } : {}),
+            ...Object.fromEntries(
+              rounds.flatMap((round, i) =>
+                round ? [[`r${i + 1}_found`, round.found], [`r${i + 1}_offTopic`, round.offTopic]] : []
+              )
+            ),
+            ...(refusedTaken.size ? { taken: refusedTaken.size } : {}),
+            ...Object.fromEntries(Object.entries(commonsRejected).map(([rule, n]) => [`commons_rej_${rule}`, n]))
           },
           hosts: { name: "reason", list: [...new Set(result.missing.map(item => item.reasonCode))] }
         })
@@ -3311,8 +3346,9 @@ export class BookPipelineRuns {
     );
     const pictureIssue = [
       ...(minimum !== undefined && imageCheck.placed < minimum
-        ? [pictureShortfallToken(imageCheck.placed, minimum, limited)]
+        ? [pictureShortfallToken(imageCheck.placed, minimum)]
         : []),
+      ...(limited ? [PICTURE_LIMITED_TOKEN] : []),
       ...(offIndexes.length ? [pictureMismatchToken(offIndexes)] : [])
     ].join(" ");
     return {

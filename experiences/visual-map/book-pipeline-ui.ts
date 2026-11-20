@@ -592,18 +592,15 @@ export function bookIssueText(issue: string): string {
   const sentence = lengthText(length);
   return rest ? `${plainIssueText(rest)}${t("ui.book_panel_lead_sep")}${sentence}` : sentence;
 }
-/** The sentence for a chapter with fewer pictures than the owner's minimum (numbers only; says so when Commons' request limit is why). */
-export function shortfallText(shortfall: { placed: number; minimum: number; limited?: true }): string {
-  return t(
-    shortfall.limited ? "ui.book_reason_images_under_limited_0_1" : "ui.book_reason_images_under_0_1",
-    String(shortfall.placed),
-    String(shortfall.minimum)
-  );
+/** The sentence for a chapter with fewer pictures than the owner's minimum (numbers only). */
+export function shortfallText(shortfall: { placed: number; minimum: number }): string {
+  return t("ui.book_reason_images_under_0_1", String(shortfall.placed), String(shortfall.minimum));
 }
-/** The picture sentences of an issue (shortfall, then the pictures off their text); empty when it has neither. */
+/** The picture sentences of an issue (shortfall, Commons' request limit, then the pictures off their text); empty when it has none. */
 export function pictureIssueText(pictures: ReturnType<typeof splitPictureIssue>): string {
   return [
     ...(pictures.shortfall ? [shortfallText(pictures.shortfall)] : []),
+    ...(pictures.limited ? [t("ui.book_reason_images_limited")] : []),
     ...(pictures.off?.length
       ? [t("ui.book_reason_images_off_0", pictures.off.map(String).join(t("ui.argument_list_sep")))]
       : [])

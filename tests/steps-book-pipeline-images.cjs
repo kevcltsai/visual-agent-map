@@ -122,7 +122,7 @@ test('slots: two markers become two standard images with one plain caption line 
   assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state])), [[1, 'placed'], [2, 'placed']]);
   assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE);
   const log = r.stat.logs.filter(l => l.includes(' slots ')).join('\n');
-  assert.match(log, /book-pipeline slots .* placed=2 missing=0$/m);
+  assert.match(log, /book-pipeline slots .* placed=2 missing=0 r1_found=2 r1_offTopic=0$/m);
   assert.ok(!/SecretRootTitle|wikimedia|蒙娜麗莎/.test(r.stat.logs.join('\n')), 'the log has counts and codes only');
 });
 
@@ -134,7 +134,7 @@ test('slots: a slot with no loadable or no found picture loses its whole marker 
     assert.match(note.detail, /正文一。SecretRootTitle\n\n正文二。\n\n正文三。\n\n### 來源/);
     assert.ok(!/〔圖位|無圖：|### 圖像|!\[/.test(note.detail));
     assert.deepEqual(recordOf(note.detail).slots.map(s => [s.state, s.reasonCode]), [['missing', reason], ['missing', reason]]);
-    assert.match(r.stat.logs.join('\n'), new RegExp(`slots .* placed=0 missing=2 reason=${reason}$`, 'm'));
+    assert.match(r.stat.logs.join('\n'), new RegExp(`slots .* placed=0 missing=2(?: r[12]_(?:found|offTopic)=\\d+)+ reason=${reason}$`, 'm'));
     assert.equal(stageOf(r.raw(0)), 'checked');
   }
 });
@@ -1176,7 +1176,7 @@ test('repro v3 G: a PDF or DjVu page is never taken from Commons, even when its 
 });
 
 test('repro v3 G: a Commons file must name the slot\'s words (title, description or categories); a photo slot refuses covers, printed pages and maps', () => {
-  const slot = { index: 1, kind: '採收動作特寫照片', explains: '手從小白菜的外葉摘起', search: 'harvesting bok choy outer leaves' };
+  const slot = { index: 1, kind: '採收動作特寫照片', explains: '手從小白菜的外葉摘起', terms: ['bok choy', 'harvest'], search: 'harvesting bok choy outer leaves' };
   const titles = text => plain(C.parseCommonsAnswer(text, slot).map(c => c.title));
   assert.deepEqual(titles(commonsAnswer(['Chinese_mining_camp_ruins.jpg', 'Bok_choy_harvest_2019.jpg'])), ['Bok choy harvest 2019'], 'the title alone is enough when it names the slot');
   assert.deepEqual(titles(commonsAnswer(['IMG_2041.jpg'], {}, 'Brassica rapa chinensis|Harvesting|Bok choy')), ['IMG 2041'], 'the categories name it');
@@ -1186,6 +1186,10 @@ test('repro v3 G: a Commons file must name the slot\'s words (title, description
   assert.deepEqual(titles(commonsAnswer(['Bok_choy_harvest.jpg'], {}, 'Book covers')), [], 'a print genre in the categories');
   assert.deepEqual(plain(C.parseCommonsAnswer(commonsAnswer(['Bok_choy_field_map.png']), { ...slot, kind: '產地地圖' }).map(c => c.title)), ['Bok choy field map'], 'a map slot takes a map');
   assert.deepEqual(plain(C.parseCommonsAnswer(commonsAnswer(['IMG_1.jpg']), { index: 1, explains: '手從小白菜的外葉摘起' })), [], 'no English words and no Chinese title: not found');
+  const phraseOnly = { index: 1, kind: slot.kind, explains: slot.explains, search: slot.search };
+  const rejected = {};
+  assert.deepEqual(plain(C.parseCommonsAnswer(commonsAnswer(['Bok_choy_harvest_2019.jpg']), phraseOnly, rejected)), [], 'only the finder phrase, not all its words named: dropped (no file-name caption)');
+  assert.deepEqual(rejected, { caption: 1 }, 'counted per rule');
   const got = C.parseCommonsAnswer(commonsAnswer(['IMG_2041.jpg'], {}, 'Bok choy|Harvesting'), slot)[0];
   assert.equal(got.description, 'Bok choy; Harvesting', 'what the file page says is kept for the record');
   assert.match(C.commonsSearchUrl('x'), /iiextmetadatafilter=Artist%7CLicenseShortName%7CImageDescription%7CCategories/);
@@ -1236,7 +1240,11 @@ test('repro v3 I: a finder picture whose title and caption name nothing its slot
   assert.equal(r.stat.author.filter(id => id === r.nodes[0].id).length, 1, 'no automatic rewrite for a picture off its text');
   const review = S.load('experiences/visual-map/book-pipeline-review.ts');
   assert.equal(review.reasonOf(issue, undefined), 'Pictures 1 do not match the text around them');
-  assert.equal(review.reasonOf('proof unmet: facts_unverified images:under:0:6:limited images:off:2,3', undefined).split(', ').length >= 3, true);
+  const both = review.reasonOf('proof unmet: facts_unverified images:under:0:6 images:limited images:off:2,3', undefined);
+  assert.equal(both.split(', ').length >= 4, true, both);
+  assert.match(both, /Commons temporarily limited requests/);
+  const pictures = S.load('core/book-pipeline/image-slots.ts').splitPictureIssue('images unmet: images:limited');
+  assert.deepEqual(plain(pictures), { rest: '', limited: true }, 'the limit alone is a reason to look');
 });
 
 // ---- repro v4 K: 15 pictures for 6 chapters of 6–10; a plain Commons word search ranked scanned books (PDF/DjVu) first ----
@@ -1245,23 +1253,74 @@ const v4PdfAnswer = () => commonsAnswer(Array.from({ length: 10 }, (_, i) => `Hi
 
 test('repro v4 K: every Commons query asks for bitmap files only (20 a request), so a slot is filled where the plain search gave only PDFs', async () => {
   const asked = [];
-  const fetch = async url => { const q = new URL(url).searchParams.get('gsrsearch'); asked.push(q); return { status: 200, text: /filetype:bitmap$/.test(q) ? commonsAnswer(['Plastic_and_terracotta_pots.jpg']) : v4PdfAnswer() }; };
-  const out = await C.searchCommons([{ index: 2, kind: '範例照片', explains: '塑膠盆、陶盆、不織布袋並排放在一起', search: 'plastic terracotta fabric pots' }], fetch, { signal: new AbortController().signal, skip: () => false });
+  const fetch = async url => { const q = new URL(url).searchParams.get('gsrsearch'); asked.push(q); return { status: 200, text: /filetype:bitmap$/.test(q) ? commonsAnswer(['Plastic_terracotta_and_fabric_pots.jpg']) : v4PdfAnswer() }; };
+  const out = await C.searchCommons([{ index: 2, kind: '範例照片', explains: '塑膠盆、陶盆、不織布袋並排放在一起', search: 'plastic terracotta fabric pots' }], fetch, { signal: new AbortController().signal, skip: () => false, queue: new C.CommonsQueue(0, async () => {}) });
   assert.deepEqual(asked, ['plastic terracotta fabric pots filetype:bitmap']);
-  assert.deepEqual(plain(out.bySlot.get(2).map(c => c.title)), ['Plastic and terracotta pots']);
+  assert.deepEqual(plain(out.bySlot.get(2).map(c => c.title)), ['Plastic terracotta and fabric pots']);
   assert.equal(new URL(C.commonsSearchUrl('x')).searchParams.get('gsrlimit'), '20');
   assert.deepEqual(plain(C.parseCommonsAnswer(v4PdfAnswer(), { index: 2, explains: 'x', search: 'pots containers' })), [], 'the PDFs stay refused');
 });
 
-test('repro v4 K: a slot asks up to 3 queries (search words, subject, its line) only while nothing is usable; a 429 asks nothing more in the chapter', async () => {
+test('repro v4 K: a slot asks up to 3 queries (search words, subject, its line) only while nothing is usable; a 429 is asked again after 2 s, 4 s, 8 s (or its Retry-After), then the chapter stops', async () => {
   const asked = [];
-  const out = await C.searchCommons([{ index: 1, explains: '葉背的蚜蟲', subject: 'Ann', search: 'aphids leaf' }], async url => { asked.push(queryOf(url)); return { status: 200, text: '{}' }; }, { signal: new AbortController().signal, skip: () => false });
+  const quiet = () => new C.CommonsQueue(0, async () => {});
+  const out = await C.searchCommons([{ index: 1, explains: '葉背的蚜蟲', subject: 'Ann', search: 'aphids leaf' }], async url => { asked.push(queryOf(url)); return { status: 200, text: '{}' }; }, { signal: new AbortController().signal, skip: () => false, queue: quiet() });
   assert.deepEqual(asked, ['aphids leaf', 'Ann', '葉背的蚜蟲']);
   assert.equal(out.requests, 3); assert.equal(out.limited, false);
-  let n = 0;
-  const limited = await C.searchCommons([{ index: 1, explains: 'a', search: 'b' }, { index: 2, explains: 'c', search: 'd' }], async () => { n++; return { status: 429, text: 'You are making too many requests to the API.' }; }, { signal: new AbortController().signal, skip: () => false });
-  assert.equal(n, 1, 'one 429 ends the chapter\'s Commons search');
-  assert.equal(limited.limited, true); assert.equal(limited.bySlot.size, 0);
+  const slots = [{ index: 1, explains: 'a', search: 'bok choy' }, { index: 2, explains: 'c', search: 'flower pot' }];
+  const tooMany = (headers) => ({ status: 429, text: 'You are making too many requests to the API.', ...(headers ? { headers } : {}) });
+  const fit = { status: 200, text: commonsAnswer(['Bok_choy.jpg']) };
+  const sequence = async (answers) => {
+    const waits = []; const queries = [];
+    const queue = new C.CommonsQueue(0, async ms => { waits.push(ms); });
+    let n = 0;
+    const result = await C.searchCommons(slots, async url => { queries.push(queryOf(url)); return answers[n++] ?? fit; }, { signal: new AbortController().signal, skip: () => false, queue });
+    return { result, waits, queries };
+  };
+  const twice = await sequence([tooMany(), tooMany(), fit]);
+  assert.deepEqual(twice.waits, [2000, 4000], 'no Retry-After: 2 s, then 4 s');
+  assert.deepEqual(twice.queries.slice(0, 3), ['bok choy', 'bok choy', 'bok choy'], 'the same query asked again');
+  assert.equal(twice.result.limited, false); assert.ok(twice.result.bySlot.has(1));
+  const named = await sequence([tooMany({ 'Retry-After': '3' }), fit]);
+  assert.deepEqual(named.waits, [3000], 'Retry-After in seconds');
+  assert.equal(named.result.limited, false);
+  const always = await sequence(Array.from({ length: 20 }, () => tooMany()));
+  assert.equal(always.result.requests, 4, 'the first ask and 3 retries, then nothing more in the chapter');
+  assert.deepEqual(always.waits, [2000, 4000, 8000]);
+  assert.equal(always.result.limited, true); assert.equal(always.result.bySlot.size, 0);
+  assert.deepEqual(plain(always.result.cut), [1, 2], 'both slots left unsearched');
+  assert.equal(C.retryAfterMs({ 'retry-after': 'Wed, 21 Oct 2026 07:28:05 GMT' }, Date.parse('Wed, 21 Oct 2026 07:28:00 GMT')), 5000, 'an HTTP date');
+  assert.equal(C.retryAfterMs({ 'Retry-After': 'soon' }, 0), undefined);
+});
+
+test('commons limit in a run: a slot Commons kept answering 429 for is rate_limited, and the chapter is needs-review with images:limited', async () => {
+  const text = () => `開頭。\n\nexplains 1 perspective 的 explains perspective。\n\n${mk(1)}\n\n尾。\n\n### 來源\n- https://example.com/a\n`;
+  const r = await picRig({ text, slots: 1,
+    finder: (req, run, n) => n === 1 ? { ...found({ 1: [] }), hints: new Map([[1, { search: 'perspective drawing grid' }]]) } : found({}),
+    ports: { fetchCommons: async () => ({ status: 429, text: '' }) } });
+  await run(r);
+  const note = await r.note(0);
+  assert.deepEqual(plain(recordOf(note.detail).slots.map(s => [s.index, s.state, s.reasonCode ?? ''])), [[1, 'missing', 'rate_limited']]);
+  assert.equal(stageOf(r.raw(0)), 'needs-review');
+  assert.match(note.pipelineIssue, /(?:^|\s)images:limited(?:\s|$)/);
+  assert.match(r.stat.logs.join('\n'), /commons=4 commons_limited=1/);
+});
+
+test('commons run budget: once a book run has waited 180 s on 429 answers, no chapter asks Commons anything more', async () => {
+  let clock = 0;
+  const queue = new C.CommonsQueue(0, async ms => { clock += ms; });
+  const run = { waited: 0, spent: false };
+  let requests = 0;
+  const fetch = async () => { requests++; return { status: 429, text: '' }; };
+  const chapter = () => C.searchCommons([{ index: 1, explains: 'a', search: 'b' }], fetch, { signal: new AbortController().signal, skip: () => false, queue, run, now: () => clock });
+  for (let i = 0; i < 20 && !run.spent; i++) await chapter();
+  assert.equal(run.spent, true);
+  assert.ok(run.waited <= C.COMMONS_RUN_BACKOFF_MS, `waited ${run.waited}`);
+  assert.ok(run.waited > C.COMMONS_RUN_BACKOFF_MS - 14000, 'close to the budget');
+  const before = requests;
+  const after = await chapter();
+  assert.equal(requests, before, 'no more Commons queries in this run');
+  assert.equal(after.limited, true); assert.deepEqual(plain(after.cut), [1]);
 });
 
 // ---- repro v4 L: two Commons files placed under a slot line that says something the picture does not show ----
@@ -1272,33 +1331,26 @@ const v4File = (name, description, categories) => commonsAnswer([name], { [name]
 const V4_POT_FILE = v4File('Glazed_Flowerpot.jpg', 'Green glazed flower pot with slightly flaring sides.  Rounded, molded lip.  Inside unglazed.  One drainage hole in bottom.  Made by Joseph Oser. Title: Glazed Flowerpot', 'PD-Art (PD-US-expired)|Images uploaded by Fæ|PD US expired|Collections of the Missouri History Museum');
 const V4_PAKCHOI_FILE = v4File('Brassica_rapa_Pak_Choi_Weiß_(white-stemmed_pak_choi)_(SaatPilot).jpg', 'This white-stemmed pak choi, offered by SaatPilot as ‘Pak Choi Weiß’, is a non-heading Chinese cabbage (Brassica rapa subsp. chinensis) that forms an open rosette of green, spoon-shaped leaves on broad, crisp, pale stalks. Young leaves can be cut as baby leaf; whole heads need more space', 'Brassica rapa subsp. chinensis|Self-published work');
 
-test('repro v4 L: a Commons file that does not name every search word of its slot keeps its own name as caption and is marked loose; a full match keeps the slot line', () => {
-  const pot = C.parseCommonsAnswer(V4_POT_FILE, V4_POT)[0];
-  assert.equal(pot.title, 'Glazed Flowerpot');
-  assert.equal(pot.caption, 'Glazed Flowerpot', 'never "比較有排水孔的盆和只在盆底鋪碎石的盆"');
-  assert.equal(pot.loose, true);
-  const pak = C.parseCommonsAnswer(V4_PAKCHOI_FILE, V4_PAKCHOI)[0];
-  assert.equal(pak.loose, true);
-  assert.ok(!/播種/.test(pak.caption), 'never "小白菜淺覆土播種的方式"');
+test('repro v4 L: a Commons file that does not name every search word of its slot is not taken (no file-name caption); a full match keeps the slot line', () => {
+  assert.deepEqual(plain(C.parseCommonsAnswer(V4_POT_FILE, V4_POT)), [], 'never "比較有排水孔的盆和只在盆底鋪碎石的盆" under a glazed flowerpot');
+  assert.deepEqual(plain(C.parseCommonsAnswer(V4_PAKCHOI_FILE, V4_PAKCHOI)), [], 'never "小白菜淺覆土播種的方式" under a pak choi rosette');
   const full = C.parseCommonsAnswer(commonsAnswer(['Sowing_pak_choi_seeds.jpg']), V4_PAKCHOI)[0];
-  assert.equal(full.caption, V4_PAKCHOI.explains); assert.equal(full.loose, undefined);
-  const slots = S.load('core/book-pipeline/image-slots.ts');
-  const fig = slots.figureOf({ imageUrl: pot.url, sourceUrl: pot.source, title: pot.title, caption: pot.caption, loose: true }, pot.url, 'zh-TW');
-  assert.equal(fig.caption, '圖：Glazed Flowerpot');
-  assert.equal(slots.figureOf({ imageUrl: pot.url, sourceUrl: pot.source, title: pot.title, caption: pot.caption, loose: true }, pot.url, 'en').caption, 'Picture: Glazed Flowerpot');
+  assert.equal(full.caption, V4_PAKCHOI.explains); assert.equal('loose' in full, false);
 });
 
-test('repro v4 L: placed from Commons, the loose file reads "圖：<name>" in the chapter and the proof reports image_N_mismatch', async () => {
+test('repro v4 L: a Commons file that names too little of its slot is not placed: the slot stays empty (not_found), no "圖：<name>" line', async () => {
   const text = () => `開頭。\n\nexplains 1 perspective 的 explains perspective。\n\n${mk(1)}\n\n尾。\n\n### 來源\n- https://example.com/a\n`;
   const r = await picRig({ text, slots: 1,
     finder: (req, run, n) => n === 1 ? { ...found({ 1: [] }), hints: new Map([[1, { search: 'perspective drawing grid' }]]) } : found({}),
     ports: { fetchCommons: async () => ({ status: 200, text: v4File('Perspective_drawing_of_a_house.jpg', 'A perspective drawing', 'Perspective') }) } });
   await run(r);
   const note = await r.note(0);
-  assert.match(note.detail, /!\[Perspective drawing of a house\]\([^)\s]+\)\n圖：Perspective drawing of a house\n來源：/);
-  assert.equal(recordOf(note.detail).slots[0].off, true);
-  assert.equal(note.pipelineIssue, 'image notice: image_1_mismatch');
-  assert.match(r.stat.logs.join('\n'), /slots .* commons=1(?! .*commons_nohint)/, 'the slot had English search words');
+  assert.doesNotMatch(note.detail, /Perspective drawing of a house|圖：/);
+  assert.deepEqual(plain(recordOf(note.detail).slots.map(s => [s.index, s.state, s.reasonCode ?? ''])), [[1, 'missing', 'not_found']]);
+  const log = r.stat.logs.join('\n');
+  assert.match(log, /slots .* commons=2(?! .*commons_nohint)/, 'the slot had English search words; the refused file asks the next query');
+  assert.match(log, /commons_rej_caption=2/, 'the refusal is counted per rule');
+  assert.match(log, /r1_found=0/, 'the finder rounds are counted');
 });
 
 // ---- planned English search terms (card plan slot field `search`), the shared Commons queue, the relaxed caption rule ----
@@ -1308,16 +1360,13 @@ test('commons queries: the planner\'s English terms first, the finder\'s words s
   assert.deepEqual(plain(C.commonsQueries({ index: 1, explains: '盆底的排水孔', terms: [] , search: 'pot hole' })), ['pot hole', '盆底的排水孔'], 'no planned terms: as before');
 });
 
-test('commons caption: the slot line stays when the file names at least half (rounded up) of the planned terms; fewer is the file\'s name and loose', () => {
+test('commons caption: the file is taken with the slot line when it names at least half (rounded up) of the planned terms; fewer is not taken', () => {
   const slot = terms => ({ index: 3, kind: '示意圖', explains: '比較有排水孔的盆和只在盆底鋪碎石的盆。', terms });
   const two = C.parseCommonsAnswer(V4_POT_FILE, slot(['flower pot', 'drainage hole', 'gravel layer', 'potting soil']))[0];
-  assert.equal(two.caption, '比較有排水孔的盆和只在盆底鋪碎石的盆。', '2 of 4 terms'); assert.equal(two.loose, undefined);
-  const one = C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage hole', 'gravel layer', 'potting soil']))[0];
-  assert.equal(one.caption, 'Glazed Flowerpot', '1 of 3 terms (2 needed)'); assert.equal(one.loose, true);
-  const half = C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage hole', 'gravel layer']))[0];
-  assert.equal(half.loose, undefined, '1 of 2 terms is half');
-  const partial = C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage gravel', 'pot soil', 'clay saucer']))[0];
-  assert.equal(partial.loose, true, 'a term counts only when the file has all its words');
+  assert.equal(two.caption, '比較有排水孔的盆和只在盆底鋪碎石的盆。', '2 of 4 terms');
+  assert.deepEqual(plain(C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage hole', 'gravel layer', 'potting soil']))), [], '1 of 3 terms (2 needed)');
+  assert.equal(C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage hole', 'gravel layer'])).length, 1, '1 of 2 terms is half');
+  assert.deepEqual(plain(C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage gravel', 'pot soil', 'clay saucer']))), [], 'a term counts only when the file has all its words');
 });
 
 test('commons queue: concurrent chapters ask one request at a time through one queue; a chapter stopped while waiting asks nothing', async () => {

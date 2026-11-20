@@ -133,6 +133,16 @@ test('bar ETA: shown only while planning or writing and only with an estimate (t
   assert.equal(all(draw(progress({ phase: 'gate2', active: false, etaSeconds: 600 })), 'vam-book-bar-eta').length, 0);
 });
 
+test('bar: the automatic fix round keeps the whole-book count; a first-time chapter in work is still named', () => {
+  setUiLanguage('zh-TW');
+  const data = { v: 1, runId: 'r', phase: 'writing', status: 'running', order: ['a', 'b', 'c', 'd'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', autoFixes: { a: 1 } };
+  const progress = current => ({ runId: 'r', phase: 'writing', status: 'running', active: true, total: 4, counts: { pending: 0, planned: 1, written: 0, checked: 2, 'needs-review': 1 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current });
+  const text = current => bundle.bookProgressText(bundle.bookBarState(data, progress(current), () => undefined));
+  assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }]), '已完成 3／4 章', 'only the fix of chapter 1: no "writing chapter 1/4" after chapter 4');
+  assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }, { nodeId: 'd', step: 'write', startedAt: 2 }]), '正在寫第 4／4 章', 'a first-time chapter in work is the one named');
+  assert.equal(text([{ nodeId: 'b', step: 'write', startedAt: 1 }]), '正在寫第 2／4 章', 'no fix round: unchanged');
+});
+
 test('bar: a map change shows the changed mode with the counts, three real buttons and no card id', () => {
   setUiLanguage('zh-TW');
   const data = { v: 1, runId: 'r', phase: 'writing', status: 'stopped', pauseReason: 'map', changed: { added: ['node-secret-1'], missing: ['node-secret-2'] }, order: ['node-secret-2', 'b'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x' };

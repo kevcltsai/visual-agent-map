@@ -15,7 +15,7 @@ export { parseTemplateBlock } from "./core/blocks/template-block";
 export { BUILTIN_BLOCKS, builtinTemplateText } from "./core/blocks/builtin";
 export { noteLanguageOf, translate } from "./i18n";
 export { templateFromDetail } from "./ai/detail-sections";
-export { normalizeWorkRecords, carryWorkLog, workLogLines, chapterBody, extractProofRecords } from "./core/book-pipeline/note-sections";
+export { normalizeWorkRecords, carryWorkLog, workLogLines, chapterBody, extractProofRecords, expandChapterDetail } from "./core/book-pipeline/note-sections";
 `);
 
 const N = M;
@@ -137,6 +137,25 @@ test('fresh write-back (old format card): the write-back log ends in one hidden 
     assert.ok(detail.includes('- [[來源A]]'), 'sources kept');
     assert.equal(N.normalizeWorkRecords(detail), detail, `${language}: idempotent`);
     assert.equal(N.chapterBody(detail).includes('舊紀錄'), false, 'the chapter text has no log line');
+  }
+});
+
+test('an expansion answer (change blocks only) passes the real fresh write-back; the merged Detail keeps the template: lead, body, sources and the one log callout (3 languages)', () => {
+  for (const language of LANGUAGES) {
+    const note = M.noteLanguageOf(language);
+    const template = builtinTemplate(BOOK_ID, language);
+    const card = asCard(oldFor(template, note), write(template, note, 'fresh', oldFor(template, note), replyFor(template, 'A')));
+    const reply = ['@@insert after: ### 自訂小標', '', '新增段落 ADDED', '', '@@replace', '自由正文 FREE-A', '@@with', '自由正文（更正）'].join('\n');
+    const written = asCard(card, write(template, note, 'fresh', card, reply));
+    assert.ok(written.includes('@@insert') && written.includes('@@replace'), `${language}: the block lines reach the pipeline`);
+    const merged = N.expandChapterDetail(card, written, language);
+    assert.equal(merged.applied, 2, language);
+    const detail = merged.detail;
+    assert.ok(detail.startsWith('導讀 LEAD-A') && detail.includes('新增段落 ADDED') && detail.includes('自由正文（更正）') && !detail.includes('@@'), language);
+    assert.ok(detail.includes('- [[來源A]]'), `${language}: sources kept`);
+    assert.equal(hiddenCount(detail), 1, `${language}: one log callout`);
+    assert.equal(N.normalizeWorkRecords(detail), detail, `${language}: idempotent`);
+    assert.ok(N.chapterBody(detail).includes('新增段落 ADDED') && !N.chapterBody(detail).includes('舊紀錄'), language);
   }
 });
 

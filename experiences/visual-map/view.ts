@@ -17845,6 +17845,7 @@ export class VisualAgentMapView extends ItemView {
           pipeline: {
             authorize: input.authorize,
             finalize: input.finalize,
+            ...(input.keepSummary ? { keepSummary: true } : {}),
             onBudgetExhausted: () => {
               exhausted = true;
             },

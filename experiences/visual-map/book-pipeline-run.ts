@@ -90,7 +90,8 @@ import {
   chapterBody,
   detailBlockOf,
   expandChapterDetail,
-  replaceDetailBlock
+  replaceDetailBlock,
+  neutralizeText
 } from "../../core/book-pipeline/note-sections";
 import {
   composeBookPlan,
@@ -267,6 +268,8 @@ export interface AuthorInput {
   instruction?: string;
   /** The whole requirements instead of the ones built from `settings`, `slots` and `instruction` (the expansion of a too-short chapter). */
   requirements?: string;
+  /** The write keeps the card's Summary (an expansion's answer only describes what it added). */
+  keepSummary?: boolean;
   /** Checked synchronously inside the write: false (a stop, a replaced run, a removed card) means nothing is written. */
   authorize: (current?: string) => boolean;
   /** Runs inside the author's write on the text about to be saved: the cleaned text, or null (nothing is written). Pass it to the guarded write. */
@@ -816,6 +819,39 @@ export function unsafeBody(content: string, allowed: ReadonlySet<string>): boole
     if (body[p] !== ")" || !allowed.has(body.slice(at + head[0].length, p))) return true;
   }
   return false;
+}
+
+/** The lines of `text` that `base` does not have (counted: a line twice in `text` and once in `base` is new once). */
+export function addedLines(text: string, base: string): string[] {
+  const pool = new Map<string, number>();
+  for (const line of base.split("\n")) pool.set(line, (pool.get(line) ?? 0) + 1);
+  return text.split("\n").filter(line => {
+    const left = pool.get(line) ?? 0;
+    if (left > 0) pool.set(line, left - 1);
+    return left === 0;
+  });
+}
+
+/**
+ * The check of an expanded chapter, run on the text about to be saved: the lines it has that the chapter before did not (`oldDetail`)
+ * must hold no hidden callout type or owner marker, no HTML tag or comment, and only pictures whose address is in `allowed` (the old
+ * chapter's and the cleaned answer's https addresses); a picture-slot marker line must be one the cleaned answer has (`answerLines`).
+ * `unsafe` is the body exit check. True means the write is refused.
+ */
+export function expansionUnsafe(
+  detail: string,
+  oldDetail: string,
+  answerLines: ReadonlySet<string>,
+  allowed: ReadonlySet<string>,
+  unsafe: (content: string, allowed: ReadonlySet<string>) => boolean = unsafeBody
+): boolean {
+  const added = addedLines(detail, oldDetail);
+  const text = added.join("\n");
+  if (neutralizeText(text) !== text) return true;
+  if (added.some(line => residualMarkerLines(line).length > 0 && !answerLines.has(line))) return true;
+  // The leading line break: added text that starts with `---` is never read as frontmatter (and so skipped).
+  if (unsafe(`\n${text}`, allowed)) return true;
+  return bodyImageUrls(`\n${text}`).some(url => !allowed.has(url));
 }
 
 /** The distinct addresses (standard form) of a note's body that an image would load and that may be probed: https only; never the frontmatter. */
@@ -2504,7 +2540,8 @@ export class BookPipelineRuns {
       const held = holdProofLines(cut, knownLines);
       const restore = held.restore;
       // R1-6: anchors become markdown links first; the picture scan and the cleaning then run on the final text. Placeholder sections go.
-      const content = neutralizeDetail(dropPlaceholderSections(convertSourceAnchors(held.text)));
+      const anchored = dropPlaceholderSections(convertSourceAnchors(held.text));
+      const content = neutralizeDetail(anchored);
       if (content === null) {
         emptyBody = true;
         return null;
@@ -2513,6 +2550,19 @@ export class BookPipelineRuns {
       const unsafeUrls = new Map(
         urls.filter(url => !isHttps(url)).map(url => [url, noPicture(drive.config.language, "unsafe")])
       );
+      // An expansion validates before it transforms: what the answer adds to the chapter is refused whole, never cleaned, when it
+      // carries a hidden callout or owner marker, a tag, or a picture that is not https.
+      const oldUrls = oldDetail === undefined ? [] : bodyImageUrls(`\n${oldDetail}`);
+      const allowed = new Set([...urls.filter(isHttps), ...oldUrls]);
+      const check = (text: string, base: string, answer: string): boolean =>
+        expansionUnsafe(text, base, new Set(answer.split("\n")), allowed, (body, ok) => this.exitCheck(body, ok));
+      if (oldDetail !== undefined) {
+        const answer = detailBlockOf(anchored) ?? "";
+        if (unsafeUrls.size || check(answer, oldDetail, answer)) {
+          unsafe = true;
+          return null;
+        }
+      }
       const cleaned = replaceBodyImages(content, unsafeUrls);
       if (this.exitCheck(cleaned, new Set(urls.filter(isHttps)))) {
         unsafe = true;
@@ -2526,8 +2576,16 @@ export class BookPipelineRuns {
         return null;
       }
       // The text and its new fingerprint are one write: from here on the chapter counts as "as the program left it".
-      // An expansion puts the cleaned change blocks into the chapter as it was, inside the same write.
-      return stampRaw(expanding ? expand(restore(cleaned)) : restore(cleaned));
+      // An expansion puts the cleaned change blocks into the chapter as it was, inside the same write; the merged text is checked
+      // again as it will be saved (the old chapter's records and pictures stay; everything new must come from the cleaned answer).
+      if (oldDetail === undefined) return stampRaw(restore(cleaned));
+      const merged = expand(restore(cleaned));
+      const final = detailBlockOf(merged);
+      if (final === undefined || neutralizeDetail(merged) === null || check(final, oldDetail, detail ?? "")) {
+        unsafe = true;
+        return null;
+      }
+      return stampRaw(merged);
     };
     // Nothing of this card's frontmatter is written while the author runs: the research write compares the whole file.
     const done = await untilAborted(
@@ -2544,6 +2602,7 @@ export class BookPipelineRuns {
         ...(drive.avoid.has(nodeId) ? { instruction: drive.extra.get(nodeId) } : {}),
         ...(expanding
           ? {
+              keepSummary: true,
               requirements: bookExpandRequirements(
                 settings,
                 chapterBody(card.detail),

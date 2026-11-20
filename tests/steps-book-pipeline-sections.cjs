@@ -333,6 +333,15 @@ test('expandChapterDetail: an answer with no block line is added when shorter an
   assert.equal(expandChapterDetail(old, '\n@@insert\n\n', 'zh-TW').detail, old, 'an empty block changes nothing');
 });
 
+test('expandChapterDetail: a @@replace passage applies only as whole lines (never a part of a line)', () => {
+  const { expandChapterDetail } = sections;
+  const old = '\n## 開場\n\n開場段落有圖。\n\n結尾。\n';
+  const part = expandChapterDetail(old, '\n@@replace\n段落有\n@@with\n![x](https://example.org/x.png)\n', 'zh-TW');
+  assert.equal(part.applied, 0); assert.equal(part.detail, old);
+  const whole = expandChapterDetail(old, '\n@@replace\n開場段落有圖。\n@@with\n開場段落（新）。\n', 'zh-TW');
+  assert.equal(whole.applied, 1); assert.ok(whole.detail.includes('開場段落（新）。') && !whole.detail.includes('開場段落有圖。'));
+});
+
 test('bookExpandRequirements: the chapter goes in as data, the amount is the target minus the measure, the length setting is left out and the point list comes last', () => {
   const { bookExpandRequirements } = load('core/book-pipeline/settings.ts');
   const text = bookExpandRequirements({ tone: '親切', length: '每章約5000至8000字' }, '## 開場\n內容', { kind: 'under', measured: 2253, min: 5000, max: 8000, unit: '字', version: 1 }, 'POINTS');

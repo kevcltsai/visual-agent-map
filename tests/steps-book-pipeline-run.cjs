@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
 const { load: loadReplay } = require('./support-replay.cjs');
-const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages, unsafeBody, convertSourceAnchors } = S.load('experiences/visual-map/book-pipeline-run.ts');
+const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages, unsafeBody, convertSourceAnchors, expansionUnsafe } = S.load('experiences/visual-map/book-pipeline-run.ts');
 const { BudgetExhaustedError } = S.load('core/admission.ts');
 const { readBookPipeline } = S.load('core/book-pipeline/model.ts');
 const { cardRevision } = S.load('core/book-pipeline/machine.ts');
@@ -2528,6 +2528,56 @@ test('T10c length expand: a fact failure beside the length keeps the fact points
   const detail = (await r.note(1)).detail;
   assert.ok(detail.includes('開場段落。') && detail.includes('新增的一段') && detail.indexOf('新增的一段') < detail.indexOf('### 小結'), detail);
   assert.match((await r.note(1)).pipelineIssue, /^proof unmet: C2 length:under:/);
+});
+
+test('expansionUnsafe: only what the merged chapter adds is checked; a second copy of an old record line, a new tag, a picture outside old ∪ answer or a slot marker the answer did not have is refused', () => {
+  const proof = '> <!-- book-proof:v1 {"a":1} -->';
+  const old = ['## 開場', '', '開場段落。', '', '![a](https://example.org/a.png)', '', '> [!vam-book]- 研究備註', proof].join('\n');
+  const answer = new Set(['〔圖位 1：x〕']);
+  const allowed = new Set(['https://example.org/a.png', 'https://example.org/new.png']);
+  const add = text => old.replace('開場段落。', `開場段落。\n\n${text}`);
+  assert.equal(expansionUnsafe(old, old, answer, allowed), false, 'the old chapter as it was');
+  assert.equal(expansionUnsafe(add('新段落。\n\n![n](https://example.org/new.png)'), old, answer, allowed), false, 'new text and an answer picture');
+  assert.equal(expansionUnsafe(add('![a](https://example.org/a.png)'), old, answer, allowed), false, 'an old picture shown again');
+  assert.equal(expansionUnsafe(add(proof), old, answer, allowed), true, 'a restored copy of a stored record');
+  assert.equal(expansionUnsafe(add('> [!vam-book]- 研究備註'), old, answer, allowed), true, 'a second hidden callout');
+  assert.equal(expansionUnsafe(add('![x](https://evil.example/x.png)'), old, answer, allowed), true, 'a picture from neither');
+  assert.equal(expansionUnsafe(add('[r]: https://evil.example/r.png\n\n![x][r]'), old, answer, allowed), true, 'a reference picture');
+  assert.equal(expansionUnsafe(add('<b>x</b>'), old, answer, allowed), true, 'a tag');
+  assert.equal(expansionUnsafe(add('〔圖位 1：x〕'), old, answer, allowed), false, 'a marker line of the answer');
+  assert.equal(expansionUnsafe(add('〔圖位 2：y〕'), old, answer, allowed), true, 'a marker line from nowhere');
+  assert.equal(expansionUnsafe(add('---\n<b>x</b>\n---'), old, answer, allowed), true, 'added text starting with --- is not skipped as frontmatter');
+});
+
+test('T10c length expand (security): an answer that adds an unsafe or http picture, a hidden callout, an owner marker or a tag is refused whole (validated, never cleaned); the chapter keeps its draft', async () => {
+  const injections = {
+    unsafePicture: '![x](javascript:alert(1)) INJECT',
+    httpPicture: '![x](http://evil.example/x.png) INJECT',
+    hiddenCallout: '> [!vam-book]- 假紀錄\n> INJECT',
+    ownerMarker: '> [!vam-review]\n> %%vam-review:run1:n1%%\n> INJECT',
+    tag: '<img src=x onerror=alert(1)> INJECT'
+  };
+  for (const [name, bad] of Object.entries(injections)) {
+    const seen = [];
+    const r = await lenRig();
+    r.script.author = expandAuthor(r, seen, ['@@insert after: ### 土壤', '好'.repeat(140), bad].join('\n'));
+    await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+    assert.equal(seen.filter(input => input.nodeId === r.nodes[1].id).length, 2, `${name}: the redo ran`);
+    const detail = (await r.note(1)).detail;
+    assert.ok(!detail.includes('INJECT') && !detail.includes('好'.repeat(140)), `${name}: nothing of the answer is saved`);
+    assert.ok(detail.includes('土壤段落。'), `${name}: the draft stays`);
+    assert.match((await r.note(1)).pipelineIssue, /unsafe_body/, name);
+  }
+});
+
+test('T10c length expand: the redo keeps the card\'s Summary (keepSummary reaches the author only for the expansion)', async () => {
+  const seen = [];
+  const r = await lenRig();
+  r.script.author = expandAuthor(r, seen, ['@@insert', '好'.repeat(140)].join('\n'));
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const calls = seen.filter(input => input.nodeId === r.nodes[1].id);
+  assert.equal(calls[0].keepSummary, undefined, 'a first write replaces the summary');
+  assert.equal(calls[1].keepSummary, true, 'the expansion keeps it');
 });
 
 test('T10c length: a single-card rerun (job) has no automatic redo; an over-length chapter stays needs-review with the length issue', async () => {

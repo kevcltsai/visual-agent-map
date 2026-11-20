@@ -14314,7 +14314,9 @@ function applyChapterEdits(detail, edits) {
       if (at < 0) break;
       const first = text10.slice(0, at).split("\n").length - 1;
       const count4 = edit.find.split("\n").length;
-      if (region.slice(first, first + count4).every(Boolean)) {
+      const end = at + edit.find.length;
+      const whole = (at === 0 || text10[at - 1] === "\n") && (end === text10.length || text10[end] === "\n");
+      if (whole && region.slice(first, first + count4).every(Boolean)) {
         text10 = text10.slice(0, at) + edit.text + text10.slice(at + edit.find.length);
         applied++;
         break;
@@ -45380,7 +45382,7 @@ var TopicRuns = class {
       steerObserver(observer, options.steer)
     ).then(
       (result) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
         progress == null ? void 0 : progress.end(path, progressAttempt);
         const latest = await repo.readNote(path, options.map);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
@@ -45445,7 +45447,7 @@ var TopicRuns = class {
           return;
         }
         const patch = {
-          summary: neutralizeText(result.summary),
+          ...((_l = options.pipeline) == null ? void 0 : _l.keepSummary) ? {} : { summary: neutralizeText(result.summary) },
           detail: neutralizeText(composed.detail),
           visualReferences: neutralizeText(
             visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2))
@@ -45473,31 +45475,31 @@ var TopicRuns = class {
           if (outcome === "discarded") {
             await repo.updateNote(path, { status: note.status });
             if (exchangeId)
-              (_l = exchanges()) == null ? void 0 : _l.failed(
+              (_m = exchanges()) == null ? void 0 : _m.failed(
                 exchangeId,
                 t(refused ? "log.result_refused_not_written" : "log.stale_result_not_written")
               );
-            (_n = (_m = options.pipeline) == null ? void 0 : _m.onDiscarded) == null ? void 0 : _n.call(_m);
+            (_o = (_n = options.pipeline) == null ? void 0 : _n.onDiscarded) == null ? void 0 : _o.call(_n);
             fail4(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
             return;
           }
         } else await repo.updateNote(path, patch, writeOptions);
         const saved = await repo.readNote(path, options.map);
-        (_o = options.onWritten) == null ? void 0 : _o.call(options, { before: { ...latest, status: note.status }, after: saved });
-        if (exchangeId) (_p = exchanges()) == null ? void 0 : _p.completed(exchangeId);
+        (_p = options.onWritten) == null ? void 0 : _p.call(options, { before: { ...latest, status: note.status }, after: saved });
+        if (exchangeId) (_q = exchanges()) == null ? void 0 : _q.completed(exchangeId);
         this.ports.clearOtherHistory(options.origin);
-        (_r = options.queueCharts) == null ? void 0 : _r.call(options, {
+        (_s = options.queueCharts) == null ? void 0 : _s.call(options, {
           path,
           saved,
           context: writeContext,
           detail: saved.detail,
           formatIssues: mode === "top" ? [] : result.formatIssues,
           model: used.model,
-          language: (_q = context.outputLanguage) != null ? _q : settings().language,
+          language: (_r = context.outputLanguage) != null ? _r : settings().language,
           template: writeContext.detailTemplate,
           ...mode === "top" ? this.chartGuard(mode, composed.record) : {}
         });
-        (_s = options.done) == null ? void 0 : _s.call(options, result);
+        (_t = options.done) == null ? void 0 : _t.call(options, result);
       })
     ).catch(
       (error) => this.ports.mutate()(async () => {
@@ -52080,6 +52082,27 @@ function unsafeBody(content, allowed) {
   }
   return false;
 }
+function addedLines2(text10, base) {
+  var _a2;
+  const pool = /* @__PURE__ */ new Map();
+  for (const line2 of base.split("\n")) pool.set(line2, ((_a2 = pool.get(line2)) != null ? _a2 : 0) + 1);
+  return text10.split("\n").filter((line2) => {
+    var _a3;
+    const left = (_a3 = pool.get(line2)) != null ? _a3 : 0;
+    if (left > 0) pool.set(line2, left - 1);
+    return left === 0;
+  });
+}
+function expansionUnsafe(detail, oldDetail, answerLines, allowed, unsafe = unsafeBody) {
+  const added = addedLines2(detail, oldDetail);
+  const text10 = added.join("\n");
+  if (neutralizeText(text10) !== text10) return true;
+  if (added.some((line2) => residualMarkerLines(line2).length > 0 && !answerLines.has(line2))) return true;
+  if (unsafe(`
+${text10}`, allowed)) return true;
+  return bodyImageUrls(`
+${text10}`).some((url) => !allowed.has(url));
+}
 function bodyImageUrls(content) {
   const urls = /* @__PURE__ */ new Set();
   rebuildBody(content, (href) => {
@@ -53584,10 +53607,12 @@ var BookPipelineRuns = class {
     let unsafe = false;
     let emptyBody = false;
     const finalize = (original) => {
+      var _a3;
       const cut = ownRecords.reduce((text10, record) => text10.split(record).join(""), original);
       const held = holdProofLines(cut, knownLines);
       const restore = held.restore;
-      const content = neutralizeDetail(dropPlaceholderSections(convertSourceAnchors(held.text)));
+      const anchored = dropPlaceholderSections(convertSourceAnchors(held.text));
+      const content = neutralizeDetail(anchored);
       if (content === null) {
         emptyBody = true;
         return null;
@@ -53596,6 +53621,17 @@ var BookPipelineRuns = class {
       const unsafeUrls = new Map(
         urls.filter((url) => !isHttps2(url)).map((url) => [url, noPicture(drive.config.language, "unsafe")])
       );
+      const oldUrls = oldDetail === void 0 ? [] : bodyImageUrls(`
+${oldDetail}`);
+      const allowed = /* @__PURE__ */ new Set([...urls.filter(isHttps2), ...oldUrls]);
+      const check = (text10, base, answer) => expansionUnsafe(text10, base, new Set(answer.split("\n")), allowed, (body, ok) => this.exitCheck(body, ok));
+      if (oldDetail !== void 0) {
+        const answer = (_a3 = detailBlockOf(anchored)) != null ? _a3 : "";
+        if (unsafeUrls.size || check(answer, oldDetail, answer)) {
+          unsafe = true;
+          return null;
+        }
+      }
       const cleaned = replaceBodyImages(content, unsafeUrls);
       if (this.exitCheck(cleaned, new Set(urls.filter(isHttps2)))) {
         unsafe = true;
@@ -53606,7 +53642,14 @@ var BookPipelineRuns = class {
         emptyBody = true;
         return null;
       }
-      return stampRaw(expanding ? expand2(restore(cleaned)) : restore(cleaned));
+      if (oldDetail === void 0) return stampRaw(restore(cleaned));
+      const merged = expand2(restore(cleaned));
+      const final = detailBlockOf(merged);
+      if (final === void 0 || neutralizeDetail(merged) === null || check(final, oldDetail, detail != null ? detail : "")) {
+        unsafe = true;
+        return null;
+      }
+      return stampRaw(merged);
     };
     const done = await untilAborted(
       signal,
@@ -53621,6 +53664,7 @@ var BookPipelineRuns = class {
         reasoning: drive.config.reasoning,
         ...drive.avoid.has(nodeId) ? { instruction: drive.extra.get(nodeId) } : {},
         ...expanding ? {
+          keepSummary: true,
           requirements: bookExpandRequirements(
             settings,
             chapterBody(card.detail),
@@ -85671,6 +85715,7 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
           pipeline: {
             authorize: input2.authorize,
             finalize: input2.finalize,
+            ...input2.keepSummary ? { keepSummary: true } : {},
             onBudgetExhausted: () => {
               exhausted = true;
             },

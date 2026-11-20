@@ -1232,6 +1232,16 @@ test('research pipeline: the summary and the visual references the author wrote 
   assert.ok(w && !/vam-book/i.test(`${w.summary}${w.detail}${w.visualReferences}`) && w.summary.includes('[!note]- x') && w.detail.includes('[!note]- d') && w.visualReferences.includes('SPAM'), 'a plain research write: no hidden type in summary, detail or references');
 });
 
+test('research pipeline: keepSummary (a chapter expansion) writes the detail and leaves the Summary out of the patch; without it the summary is written', async () => {
+  const h = guardedRuns();
+  await (await h.runs.start('A.md', 'research', h.options({ pipeline: hooks({ keepSummary: true }).pipeline }))).finished;
+  assert.deepEqual(h.log.failed, []);
+  assert.equal('summary' in h.guardedCalls[0].patch, false); assert.equal(typeof h.guardedCalls[0].patch.detail, 'string');
+  const h2 = guardedRuns();
+  await (await h2.runs.start('A.md', 'research', h2.options({ pipeline: hooks().pipeline }))).finished;
+  assert.equal(typeof h2.guardedCalls[0].patch.summary, 'string');
+});
+
 test('research pipeline: a discarded guarded write (stopped run or owner edit) saves nothing of the result, restores the status and reports through failed', async () => {
   for (const verdict of ['discarded']) {
     const h = guardedRuns({ onGuarded: () => verdict });

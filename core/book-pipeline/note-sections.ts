@@ -1101,7 +1101,7 @@ function insertAt(lines: string[], after: string | undefined): number {
 }
 
 /**
- * A Detail with the change blocks put in by the program: every exact passage replaced once (only inside the chapter text), then every
+ * A Detail with the change blocks put in by the program: every exact passage of whole lines replaced once (only inside the chapter text), then every
  * insertion placed. The hidden records, the program's callouts, the picture section and the system's sections stay as they are.
  */
 export function applyChapterEdits(detail: string, edits: readonly ChapterEdit[]): { detail: string; applied: number } {
@@ -1116,7 +1116,10 @@ export function applyChapterEdits(detail: string, edits: readonly ChapterEdit[])
       if (at < 0) break;
       const first = text.slice(0, at).split("\n").length - 1;
       const count = edit.find.split("\n").length;
-      if (region.slice(first, first + count).every(Boolean)) {
+      const end = at + edit.find.length;
+      // Whole lines only: a passage that starts or ends inside a line could join text into a new marker or image.
+      const whole = (at === 0 || text[at - 1] === "\n") && (end === text.length || text[end] === "\n");
+      if (whole && region.slice(first, first + count).every(Boolean)) {
         text = text.slice(0, at) + edit.text + text.slice(at + edit.find.length);
         applied++;
         break;

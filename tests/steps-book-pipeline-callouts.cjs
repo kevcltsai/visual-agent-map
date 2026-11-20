@@ -191,7 +191,7 @@ test('reconcile: with a hint, a map of plain notes (no picture book, or no marke
     const count = { text: 0, card: 0, write: 0 };
     const callouts = new b.BookCallouts({
       readMap: async () => map,
-      readCard: async path => { count.card++; const raw = notes.get(path); return { path, title: path, summary: '', prompt: '', detail: raw, raw, settings: {}, fields: { pipelineStage: 'checked', bookRole: 'body' } }; },
+      readCard: async path => { count.card++; const raw = notes.get(path); return { path, title: path.slice(2, -3), summary: '', prompt: '', detail: raw, raw, settings: {}, fields: { pipelineStage: 'checked', bookRole: 'body' } }; },
       readText: async path => { count.text++; return notes.get(path); },
       write: async () => { count.write++; return 'written'; },
       log() {}
@@ -244,4 +244,32 @@ test('editorViewsOf: a view in live preview or source mode edits through the edi
   const write = b.createNoteWriter({ openViews: path => b.editorViewsOf(path, views), rawGuarded: async () => 'written' });
   assert.equal(await write('p', upper), 'written');
   assert.equal(log.length, 1);
+});
+
+// ---- fix packet 5: the third trial chapter ----
+test('reconcile: gate 1 with three trial chapters writes the callout on every one (numbering 1/3, 2/3, 3/3), also when one already carries an older one', async () => {
+  const r = rig(DATA({ phase: 'gate1', order: ['n1', 'n2', 'n3'], trial: ['n1', 'n2', 'n3'] }), ['n3']);
+  // n3 was written before: it carries a trial callout of this run with another count, and a stale review box
+  r.notes.set('N/n3.md', b.putProgramCallout(note('B3'), b.trialCallout(1, 2, undefined, undefined, false, { runId: 'r1', nodeId: 'n3' })));
+  await r.callouts.reconcile('M');
+  for (const id of ['n1', 'n2', 'n3']) assert.deepEqual(r.kinds(id), ['trial:r1'], id);
+  assert.ok(r.notes.get('N/n3.md').includes('3／3') || r.notes.get('N/n3.md').includes('3/3'), 'third chapter says 3 of 3');
+});
+test('reconcile: a chapter rewritten after the aligner read it (its snapshot already shows the callout) still gets the callout', async () => {
+  const r = rig(DATA({ phase: 'gate1', order: ['n1', 'n2', 'n3'], trial: ['n1', 'n2', 'n3'] }), ['n3']);
+  await r.callouts.reconcile('M');
+  assert.deepEqual(r.kinds('n3'), ['trial:r1']);
+  const withHint = r.notes.get('N/n3.md');
+  // n3 is read (callout present), then the chapter is written again (callout gone) before the aligner reaches it
+  const snapshot = new Map(r.notes);
+  const callouts = new b.BookCallouts({
+    readMap: async () => r.map,
+    readCard: async path => { const raw = snapshot.get(path) ?? r.notes.get(path); if (path === 'N/n3.md') r.notes.set(path, note('Body n3 rewritten')); return { path, title: path.slice(2, -3), summary: '', prompt: '', detail: raw, raw, settings: {}, fields: { pipelineStage: 'checked', bookRole: 'body' } }; },
+    readText: async path => r.notes.get(path),
+    write: async (path, transform) => { const next = transform(r.notes.get(path)); if (next === r.notes.get(path)) return 'unchanged'; r.notes.set(path, next); return 'written'; },
+    log: () => undefined
+  });
+  assert.ok(withHint.includes('vam-trial'));
+  await callouts.reconcile('M');
+  assert.deepEqual(r.kinds('n3'), ['trial:r1'], 'the rewritten chapter carries the hint again');
 });

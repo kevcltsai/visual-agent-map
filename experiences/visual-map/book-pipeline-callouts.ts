@@ -428,7 +428,9 @@ export class BookCallouts {
     for (const { id, card } of cards) {
       if (this.disposed) return;
       const want = wanted.get(id) ?? { runId: data.runId, nodeId: id };
-      if (alignCallouts(card.raw, want) === card.raw) continue;
+      // The note as it is now, not as it was read with the cards: a chapter written meanwhile has lost its callouts.
+      const now = await this.ports.readText(card.path).catch(() => card.raw);
+      if (alignCallouts(now, want) === now) continue;
       await this.put(data.runId, id, card.path, text => alignCallouts(text, want));
     }
     await this.dropStale(map, data.runId, new Set(effectiveOrder(data)), clean);

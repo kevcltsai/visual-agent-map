@@ -54577,7 +54577,8 @@ var BookCallouts = class {
     for (const { id, card } of cards) {
       if (this.disposed) return;
       const want = (_b2 = wanted.get(id)) != null ? _b2 : { runId: data.runId, nodeId: id };
-      if (alignCallouts(card.raw, want) === card.raw) continue;
+      const now = await this.ports.readText(card.path).catch(() => card.raw);
+      if (alignCallouts(now, want) === now) continue;
       await this.put(data.runId, id, card.path, (text10) => alignCallouts(text10, want));
     }
     await this.dropStale(map, data.runId, new Set(effectiveOrder(data)), clean3);

@@ -4,7 +4,7 @@
  * (labelled lines plus an acceptance checklist whose items carry a stable id and a type). Pure.
  */
 import { instructionLanguageOf, type ContentLanguage } from "../../i18n";
-import { cleanSlotText, MAX_IMAGE_SLOTS, type ImageSlot } from "./image-slots";
+import { cleanSearchTerms, cleanSlotText, MAX_IMAGE_SLOTS, type ImageSlot } from "./image-slots";
 import { BOOK_ROLES, BOOK_SETTING_FIELDS, type BookRole, type BookSettings } from "./model";
 import { demoteHeadings, escapeMarkdownText, singleLine, unescapeMarkdownText } from "./text";
 import { isPlaceholder } from "../note-placeholder";
@@ -51,6 +51,7 @@ const L = {
   images: { zh: "圖安排", en: "Image plan" },
   imageSlot: { zh: "圖位", en: "Image slot" },
   position: { zh: "位置", en: "Position" },
+  search: { zh: "英文搜尋詞", en: "Search terms" },
   none: { zh: "無", en: "none" },
   plan: { zh: "全書企劃", en: "Book plan" },
   thread: { zh: "全書主線", en: "Book thread" },
@@ -83,7 +84,17 @@ export interface CardPlanText {
 }
 
 const SLOT_SEPARATOR = "｜";
-/** The image plan lines: `圖安排：` then one `- 圖位 n｜類型｜要說明的事｜位置：…` line per slot; `圖安排：無` when the planner arranged none. */
+const TERM_SEPARATOR = ", ";
+const searchPart = (slot: ImageSlot, language: ContentLanguage): string => {
+  const terms = cleanSearchTerms(slot.search ?? []);
+  return terms.length
+    ? `${SLOT_SEPARATOR}${pick(L.search, language)}${colon(language)}${terms.map(term => safe(term, 80)).join(TERM_SEPARATOR)}`
+    : "";
+};
+/**
+ * The image plan lines: `圖安排：` then one `- 圖位 n｜類型｜要說明的事｜位置：…｜英文搜尋詞：a, b` line per slot (the search part only when
+ * the slot has terms); `圖安排：無` when the planner arranged none.
+ */
 export function composeImageSlots(images: readonly ImageSlot[], language: ContentLanguage): string[] {
   const c = colon(language);
   const head = pick(L.images, language);
@@ -94,7 +105,7 @@ export function composeImageSlots(images: readonly ImageSlot[], language: Conten
       .slice(0, MAX_IMAGE_SLOTS)
       .map(
         (slot, at) =>
-          `- ${pick(L.imageSlot, language)} ${at + 1}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.kind, 40), 40)}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.explains, 200), 200)}${SLOT_SEPARATOR}${pick(L.position, language)}${c}${safe(cleanSlotText(slot.anchor, 120), 120)}`
+          `- ${pick(L.imageSlot, language)} ${at + 1}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.kind, 40), 40)}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.explains, 200), 200)}${SLOT_SEPARATOR}${pick(L.position, language)}${c}${safe(cleanSlotText(slot.anchor, 120), 120)}${searchPart(slot, language)}`
       )
   ];
 }
@@ -153,15 +164,21 @@ export function parseImageSlots(prompt: string): ImageSlot[] | undefined {
     if (!m) break;
     const index = Number(m[1]);
     const parts = m[2].split(SLOT_SEPARATOR);
+    // The optional last part `英文搜尋詞：a, b` (a slot planned before search terms existed has none).
+    const tail = /^([^:：]*)[:：]\s*(.*)$/.exec(parts[parts.length - 1] ?? "");
+    const search = tail && matches(L.search, tail[1].trim()) ? tail[2] : undefined;
+    if (search !== undefined) parts.pop();
     if (parts.length < 3 || index < 1 || slots.some(slot => slot.index === index) || slots.length >= MAX_IMAGE_SLOTS)
       continue;
     const place = /^[^:：]*[:：]\s*(.*)$/.exec(parts[parts.length - 1]);
     if (!place) continue;
+    const terms = search === undefined ? [] : cleanSearchTerms(unescapeMarkdownText(search).split(","));
     slots.push({
       index,
       kind: unescapeMarkdownText(parts[0].trim()),
       explains: unescapeMarkdownText(parts.slice(1, -1).join(SLOT_SEPARATOR).trim()),
-      anchor: unescapeMarkdownText(place[1].trim())
+      anchor: unescapeMarkdownText(place[1].trim()),
+      ...(terms.length ? { search: terms } : {})
     });
   }
   return slots;

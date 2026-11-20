@@ -20,6 +20,24 @@ export interface ImageSlot {
   explains: string;
   /** Where in the chapter it sits (for example "after the paragraph on perspective"). */
   anchor: string;
+  /** The planner's English search terms for a Commons file search (2 to 4). Absent on a slot planned before they existed. */
+  search?: string[];
+}
+
+/** At most this many English search terms a slot, each at most {@link SEARCH_TERM_MAX} characters. */
+export const MAX_SEARCH_TERMS = 4;
+export const SEARCH_TERM_MAX = 60;
+/** Search terms as stored: one line each, no list separator, Latin letters only kept (a term without one is dropped), no duplicates. */
+export function cleanSearchTerms(values: readonly unknown[]): string[] {
+  const out: string[] = [];
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const term = cleanSlotText(value.replace(/[,;]/g, " "), SEARCH_TERM_MAX);
+    if (!/[A-Za-z]/.test(term) || out.some(have => have.toLowerCase() === term.toLowerCase())) continue;
+    out.push(term);
+    if (out.length >= MAX_SEARCH_TERMS) break;
+  }
+  return out;
 }
 
 /** The planner may arrange this many slots for one card when the owner gave no picture count. */

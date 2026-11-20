@@ -2980,6 +2980,7 @@ export class BookPipelineRuns {
               index: slot.index,
               kind: slot.kind,
               explains: slot.explains,
+              ...(slot.search?.length ? { terms: slot.search } : {}),
               ...hints.get(slot.index)
             })),
             this.ports.fetchCommons,
@@ -2987,8 +2988,8 @@ export class BookPipelineRuns {
           );
           commonsAsked = commons.requests;
           commonsLimited = commons.limited;
-          // Slots the finder gave no English search words for: their Commons queries are the slot line, which rarely matches a file.
-          commonsNoHint = lacking.filter(slot => !hints.get(slot.index)?.search).length;
+          // Slots with no English search words (none planned, none from the finder): their Commons queries are the slot line, which rarely matches a file.
+          commonsNoHint = lacking.filter(slot => !slot.search?.length && !hints.get(slot.index)?.search).length;
           if (signal.aborted) throw new Error("aborted");
           const asFound: FoundImages = {
             bySlot: commons.bySlot,
@@ -3032,7 +3033,7 @@ export class BookPipelineRuns {
         continue;
       }
       const about = `${placed.title} ${placed.description ?? placed.caption}`;
-      const words = askWords({ explains: slot.explains, ...hints.get(slot.index) });
+      const words = askWords({ explains: slot.explains, terms: slot.search, ...hints.get(slot.index) });
       if (words.length && !wordHits(words, about)) off.add(slot.index);
     }
     const release = (): void => {

@@ -65,12 +65,22 @@
           "anchor": {
             "type": "string",
             "minLength": 1
+          },
+          "search": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 4,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
         "required": [
           "kind",
           "explains",
-          "anchor"
+          "anchor",
+          "search"
         ]
       }
     }

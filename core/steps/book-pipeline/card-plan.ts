@@ -1,6 +1,13 @@
 import type { BookRole, BookSettings } from "../../book-pipeline/model";
 import type { ChecklistItem, ChecklistType } from "../../book-pipeline/plan-text";
-import { cleanSlotText, imageSlotCap, MAX_IMAGE_SLOTS, type ImageSlot } from "../../book-pipeline/image-slots";
+import {
+  cleanSearchTerms,
+  cleanSlotText,
+  imageSlotCap,
+  MAX_IMAGE_SLOTS,
+  MAX_SEARCH_TERMS,
+  type ImageSlot
+} from "../../book-pipeline/image-slots";
 import { imageCountRange } from "../../book-pipeline/settings";
 import { singleLine } from "../../book-pipeline/text";
 import { estimateTokens } from "../../../ai/context-builder";
@@ -100,9 +107,15 @@ export const CARD_PLAN_SCHEMA = {
         properties: {
           kind: { type: "string", minLength: 1 },
           explains: { type: "string", minLength: 1 },
-          anchor: { type: "string", minLength: 1 }
+          anchor: { type: "string", minLength: 1 },
+          search: {
+            type: "array",
+            minItems: 2,
+            maxItems: MAX_SEARCH_TERMS,
+            items: { type: "string", minLength: 1 }
+          }
         },
-        required: ["kind", "explains", "anchor"]
+        required: ["kind", "explains", "anchor", "search"]
       }
     }
   },
@@ -149,16 +162,19 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
   const slots = all.slice(0, imageSlotCap(imageCountRange(request.settings)));
   const images = slots.map((entry, at): ImageSlot => {
     const one = recordOf(entry, "image slot");
-    exactKeys(one, ["kind", "explains", "anchor"]);
+    // `search` is asked for but optional here: a slot without usable English terms is kept (the Commons search then falls back).
+    exactKeys(one, "search" in one ? ["kind", "explains", "anchor", "search"] : ["kind", "explains", "anchor"]);
     const field = (value: unknown, what: string, max: number): string => {
       const text = cleanSlotText(singleLine(textOf(value, what), 400), max);
       return text || fail(`${what} must be a non-empty string`);
     };
+    const terms = Array.isArray(one.search) ? cleanSearchTerms(one.search) : [];
     return {
       index: at + 1,
       kind: field(one.kind, "image kind", 40),
       explains: field(one.explains, "image explains", 200),
-      anchor: field(one.anchor, "image anchor", 120)
+      anchor: field(one.anchor, "image anchor", 120),
+      ...(terms.length ? { search: terms } : {})
     };
   });
   const side = (value: unknown, present: boolean, what: string): string =>

@@ -4,9 +4,11 @@
  */
 import { slotKeywords } from "./image-slots";
 
-/** What the slot asks for: its line in the book's language, and the finder's subject and English Commons search words. */
+/** What the slot asks for: its line in the book's language, the planner's English search terms, and the finder's subject and English search words. */
 export interface SlotAsk {
   explains: string;
+  /** The planner's English search terms (the card plan's slot field). */
+  terms?: readonly string[];
   subject?: string;
   search?: string;
 }
@@ -23,7 +25,7 @@ const stem = (word: string): string =>
 
 /** The words a slot asks for (stemmed, no duplicates). */
 export function askWords(ask: SlotAsk): string[] {
-  return [...new Set([ask.explains, ask.subject, ask.search].flatMap(text => slotKeywords(text ?? "")).map(stem))];
+  return [...new Set([ask.explains, ...(ask.terms ?? []), ask.subject, ask.search].flatMap(text => slotKeywords(text ?? "")).map(stem))];
 }
 
 /** How many of `words` the text has: a Latin word as a whole (stemmed) word, a Han pair anywhere. */

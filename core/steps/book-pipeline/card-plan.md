@@ -15,7 +15,7 @@ Chapters: the chapters of this book are exactly the ones in the chapter list bel
 
 The chapter's role is fixed by the plan: do not change it. Use plain single-line text in every field and no Markdown headings. Use only numbers and links that appear in the supplied text.
 
-Return only JSON: {"covers":"","entry":"","handoff":"","previous":"","next":"","checklist":[{"type":"structure|fact","text":""}],"images":[{"kind":"","explains":"","anchor":""}]}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.
+Return only JSON: {"covers":"","entry":"","handoff":"","previous":"","next":"","checklist":[{"type":"structure|fact","text":""}],"images":[{"kind":"","explains":"","anchor":"","search":["",""]}]}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.
 
 {{languageInstruction}}
 

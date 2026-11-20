@@ -54000,14 +54000,23 @@ var countChange = (change2) => ({
   missing: change2.missing.length
 });
 function currentOf2(data, progress) {
-  var _a2;
+  var _a2, _b2;
   if (!(progress == null ? void 0 : progress.active) || !((_a2 = progress.current) == null ? void 0 : _a2.length)) return void 0;
   const position = (nodeId) => nodeId === "global" ? -1 : effectiveOrder(data).indexOf(nodeId);
   const entries = progress.current.filter((item) => item.nodeId === "global" || position(item.nodeId) >= 0);
   if (!entries.length) return void 0;
   entries.sort((a, b) => position(a.nodeId) - position(b.nodeId));
-  const first = entries[0];
-  return first.nodeId === "global" ? { step: "global" } : { step: first.step, chapter: position(first.nodeId) + 1 };
+  const fixing = (nodeId) => {
+    var _a3, _b3;
+    return nodeId !== "global" && ((_b3 = (_a3 = data.autoFixes) == null ? void 0 : _a3[nodeId]) != null ? _b3 : 0) > 0;
+  };
+  const first = (_b2 = entries.find((item) => !fixing(item.nodeId))) != null ? _b2 : entries[0];
+  if (first.nodeId === "global") return { step: "global" };
+  return {
+    step: first.step,
+    chapter: position(first.nodeId) + 1,
+    ...fixing(first.nodeId) ? { fix: true } : {}
+  };
 }
 function countStages(stages) {
   const counts = { pending: 0, planned: 0, written: 0, checked: 0, "needs-review": 0 };
@@ -54177,7 +54186,7 @@ function renderAsk(bar, cls, question, goText, ask) {
 }
 var settledCount = (state) => state.counts.checked + state.counts["needs-review"];
 function bookProgressText(state) {
-  var _a2, _b2, _c, _d, _e, _f;
+  var _a2, _b2, _c, _d, _e, _f, _g;
   const { total: total2 } = state;
   if (state.mode === "planning" && state.trialSize && ((_a2 = state.current) == null ? void 0 : _a2.step) !== "global") {
     const settled2 = Math.min(state.counts.checked + state.counts["needs-review"], state.trialSize - 1);
@@ -54188,8 +54197,9 @@ function bookProgressText(state) {
     );
   }
   const at = Math.min((_e = (_d = state.current) == null ? void 0 : _d.chapter) != null ? _e : settledCount(state) + 1, Math.max(total2, 1));
-  if (state.mode === "writing") return t("ui.book_progress_line_write_0_1", at, total2);
-  const sentence = state.mode === "planning" ? !state.globalDone || ((_f = state.current) == null ? void 0 : _f.step) === "global" ? t("ui.book_progress_line_global") : t("ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
+  if (state.mode === "writing")
+    return ((_f = state.current) == null ? void 0 : _f.fix) ? t("ui.book_progress_line_done_0_1", settledCount(state), total2) : t("ui.book_progress_line_write_0_1", at, total2);
+  const sentence = state.mode === "planning" ? !state.globalDone || ((_g = state.current) == null ? void 0 : _g.step) === "global" ? t("ui.book_progress_line_global") : t("ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
   return `${sentence}${t("ui.book_progress_line_sep")}${t("ui.book_progress_line_done_0_1", settledCount(state), total2)}`;
 }
 function renderProgressLine(bar, state, text10) {

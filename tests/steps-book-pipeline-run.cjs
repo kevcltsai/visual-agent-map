@@ -2663,3 +2663,33 @@ test('fix5 rewriteNeighbourLine: an empty summary leaves no dangling dash', () =
   const out = rewriteNeighbourLine('後一張：(3) old — old', 'next', { position: 5, title: 'T', summary: '' });
   assert.equal(out, '後一張：(5) T');
 });
+
+// ---- fix packet 6: the no-neighbour form, and a redo that never plans still refreshes skipped chapters ----
+test('fix6 rewriteNeighbourLine: null writes the no-neighbour form for either end, in the line\'s own language, CRLF kept, idempotent', () => {
+  const { rewriteNeighbourLine } = S.load('core/book-pipeline/plan-text.ts');
+  const next = rewriteNeighbourLine('後一張：(3) old — old', 'next', null);
+  assert.equal(next, '後一張：無', 'last chapter, Chinese');
+  const prev = rewriteNeighbourLine('Role: Body\r\nPrevious card: (1) old — old\r\nNext card: (3) x', 'previous', null);
+  assert.equal(prev, 'Role: Body\r\nPrevious card: none\r\nNext card: (3) x', 'first chapter, English, CRLF');
+  assert.equal(rewriteNeighbourLine(next, 'next', null), undefined, 'already says it');
+});
+
+test('fix6 redo at planned: no plan step runs, yet a skipped (hand-edited) last chapter\'s stale next line becomes "none"; no AI call, fingerprint untouched, idempotent', async () => {
+  const r = await rig();
+  await finish(r);
+  await handEdit(r, 2);
+  const last = await promptLine(r, 2, '後一張');
+  assert.equal(last, '無', 'the last chapter starts with none');
+  await r.repo.updateNoteRawGuarded(r.nodes[2].path, c => c.replace(/^後一張[:：] ?.*$/m, '後一張：(9) stale — old'), {});
+  const fp = integrityFpRaw(r.raw(2));
+  let calls = 0;
+  { const f = r.script.card; r.script.card = (...a) => { calls++; return f(...a); }; }
+  await redo(r, [1]);
+  assert.equal(await promptLine(r, 2, '後一張'), '無');
+  assert.equal(integrityFpRaw(r.raw(2)), fp, 'fingerprint untouched');
+  assert.ok((await r.note(2)).detail.includes(HAND));
+  const before = r.raw(2);
+  await redo(r, [1]);
+  assert.equal(r.raw(2), before, 'a second drive changes nothing');
+  assert.equal(calls, 0, 'no plan call');
+});

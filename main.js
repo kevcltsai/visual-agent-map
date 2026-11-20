@@ -43033,8 +43033,9 @@ function rewriteNeighbourLine(prompt, key4, neighbour2) {
   });
   if (at < 0) return void 0;
   const head2 = (_b2 = (_a2 = /^([^:：]+[:：]\s*)/.exec(lines[at].replace(/\r$/, ""))) == null ? void 0 : _a2[1]) != null ? _b2 : "";
-  const summary = safe(neighbour2.summary, 240);
-  const line2 = `${head2}(${neighbour2.position}) ${safe(neighbour2.title, 120)}${summary ? ` \u2014 ${summary}` : ""}`;
+  const english = !lines[at].startsWith(L[key4].zh);
+  const summary = neighbour2 ? safe(neighbour2.summary, 240) : "";
+  const line2 = neighbour2 ? `${head2}(${neighbour2.position}) ${safe(neighbour2.title, 120)}${summary ? ` \u2014 ${summary}` : ""}` : `${head2}${english ? L.none.en : L.none.zh}`;
   if (lines[at].replace(/\r$/, "") === line2) return void 0;
   lines[at] = lines[at].endsWith("\r") ? `${line2}\r` : line2;
   return lines.join("\n");
@@ -51973,6 +51974,18 @@ var BookPipelineRuns = class {
     } catch (e) {
     }
   }
+  /** Chapters already planned that the program may not rewrite (hand-edited, unknown or kept, no permission): added to `planSkipped`, so a redo that never plans still refreshes them. */
+  async collectSkippedPlans(drive) {
+    try {
+      for (const nodeId of effectiveOrder(drive.store.state)) {
+        const own2 = drive.cards.get(nodeId);
+        if (!own2 || drive.stages.get(nodeId) === void 0) continue;
+        if (!this.mayOverwriteCard(drive, nodeId, (await this.ports.readCard(own2.path)).raw))
+          drive.planSkipped.add(nodeId);
+      }
+    } catch (e) {
+    }
+  }
   /**
    * A chapter the plan step left alone keeps its old Prompt, so its `前一張` / `後一張` lines would still describe the neighbours of an
    * earlier order. After a plan step they are rewritten by the program from the current order (the Prompt is not under the chapter's
@@ -51995,14 +52008,17 @@ var BookPipelineRuns = class {
           const other = order[index] === void 0 ? void 0 : drive.cards.get(order[index]);
           if (this.dead(drive) || signal.aborted) return;
           const raw = await this.ports.readCard(own2.path);
-          if (!other) continue;
-          const neighbour2 = await this.ports.readCard(other.path);
-          const covers = summaryText2((_b2 = (_a2 = parseCardPrompt(neighbour2.prompt).covers) != null ? _a2 : neighbour2.summary) != null ? _b2 : "").trim();
-          const prompt = rewriteNeighbourLine(raw.prompt, key4, {
-            position: index + 1,
-            title: neighbour2.title,
-            summary: covers
-          });
+          if (order[index] !== void 0 && !other) continue;
+          let neighbourLine = null;
+          if (other) {
+            const neighbour2 = await this.ports.readCard(other.path);
+            neighbourLine = {
+              position: index + 1,
+              title: neighbour2.title,
+              summary: summaryText2((_b2 = (_a2 = parseCardPrompt(neighbour2.prompt).covers) != null ? _a2 : neighbour2.summary) != null ? _b2 : "").trim()
+            };
+          }
+          const prompt = rewriteNeighbourLine(raw.prompt, key4, neighbourLine);
           if (prompt === void 0) continue;
           await this.ports.updateNoteGuarded(
             own2.path,
@@ -52422,7 +52438,15 @@ var BookPipelineRuns = class {
     var _a2, _b2;
     const inflight = /* @__PURE__ */ new Map();
     while (!this.dead(drive) && drive.fatal === void 0) {
-      if (await this.pauseOnMapChange(drive)) break;
+      if (await this.pauseOnMapChange(drive)) {
+        drive.skippedRefreshed = false;
+        break;
+      }
+      if (!drive.skippedRefreshed) {
+        drive.skippedRefreshed = true;
+        await this.collectSkippedPlans(drive);
+        await this.refreshSkippedPlans(drive);
+      }
       const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy);
       if (plan.hold === "global_failed") drive.failure = (_a2 = drive.reasons.get("global")) != null ? _a2 : "failed";
       if (plan.hold) break;

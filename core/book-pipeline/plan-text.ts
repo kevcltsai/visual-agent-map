@@ -177,12 +177,12 @@ export function parseCardPrompt(
 
 /**
  * A card plan's `前一張` or `後一張` line rewritten to describe `neighbour` (position, title and a sentence), keeping the line's own label
- * and colon. `undefined` when the Prompt has no such line (the reader took it out) or the line already says exactly this.
+ * and colon. `null` writes the no-neighbour form. `undefined` when the Prompt has no such line (the reader took it out) or the line already says exactly this.
  */
 export function rewriteNeighbourLine(
   prompt: string,
   key: "previous" | "next",
-  neighbour: { position: number; title: string; summary: string }
+  neighbour: { position: number; title: string; summary: string } | null
 ): string | undefined {
   const lines = prompt.split("\n");
   const at = lines.findIndex(line => {
@@ -191,8 +191,12 @@ export function rewriteNeighbourLine(
   });
   if (at < 0) return undefined;
   const head = /^([^:：]+[:：]\s*)/.exec(lines[at].replace(/\r$/, ""))?.[1] ?? "";
-  const summary = safe(neighbour.summary, 240);
-  const line = `${head}(${neighbour.position}) ${safe(neighbour.title, 120)}${summary ? ` — ${summary}` : ""}`;
+  // `null`: no such card (the first or last chapter), written as the card plan writes it, in the language of the line's own label.
+  const english = !lines[at].startsWith(L[key].zh);
+  const summary = neighbour ? safe(neighbour.summary, 240) : "";
+  const line = neighbour
+    ? `${head}(${neighbour.position}) ${safe(neighbour.title, 120)}${summary ? ` — ${summary}` : ""}`
+    : `${head}${english ? L.none.en : L.none.zh}`;
   if (lines[at].replace(/\r$/, "") === line) return undefined;
   lines[at] = lines[at].endsWith("\r") ? `${line}\r` : line;
   return lines.join("\n");

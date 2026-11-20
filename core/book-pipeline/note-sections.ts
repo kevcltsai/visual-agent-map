@@ -994,3 +994,189 @@ export function dropPlaceholderSections(content: string): string {
   }
   return lines.join("\n");
 }
+
+/** A whole note text with its Detail block (between the managed markers) replaced by `detail`; a note without the block is returned as it is. */
+export function replaceDetailBlock(content: string, detail: string): string {
+  const start = content.indexOf(DETAIL_START);
+  const end = content.indexOf(DETAIL_END, start + 1);
+  if (start < 0 || end < 0) return content;
+  return content.slice(0, start + DETAIL_START.length) + detail + content.slice(end);
+}
+
+// ---- the automatic expansion of a too-short chapter ---------------------------------------------------------------------------------
+
+/**
+ * One change the author returns for a too-short chapter: new text put after an existing heading's section (no heading, or one the
+ * chapter does not have: before the chapter's last section, so its ending stays last), or one passage of the chapter replaced word for word.
+ */
+export type ChapterEdit =
+  { kind: "insert"; after?: string; text: string } | { kind: "replace"; find: string; text: string };
+const EDIT_HEAD = /^[ \t]*@@[ \t]*(insert|replace|with)\b(?:[ \t]+after\b)?[ \t]*[:：]?[ \t]*(.*?)[ \t]*$/i;
+const blockText = (lines: readonly string[]): string =>
+  lines
+    .join("\n")
+    .replace(/^(?:[ \t]*\n)+/, "")
+    .replace(/\s+$/, "");
+
+/** The change blocks of an expansion answer (`@@insert [after: heading]`, `@@replace` … `@@with` …); undefined when the text has no block line at all. Text before the first block is ignored. */
+export function parseChapterEdits(text: string): ChapterEdit[] | undefined {
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  if (!lines.some(line => EDIT_HEAD.test(line))) return undefined;
+  const edits: ChapterEdit[] = [];
+  let open:
+    | { kind: "insert"; after: string; lines: string[] }
+    | { kind: "replace"; find: string[]; lines?: string[] }
+    | undefined;
+  const close = (): void => {
+    if (open?.kind === "insert") {
+      const body = blockText(open.lines);
+      if (body) edits.push({ kind: "insert", ...(open.after ? { after: open.after } : {}), text: body });
+    } else if (open?.kind === "replace" && open.lines) {
+      const find = open.find.join("\n").trim();
+      if (find) edits.push({ kind: "replace", find, text: blockText(open.lines) });
+    }
+    open = undefined;
+  };
+  for (const line of lines) {
+    const m = EDIT_HEAD.exec(line);
+    const kind = m?.[1].toLowerCase();
+    if (kind === "insert") {
+      close();
+      open = { kind: "insert", after: m?.[2] ?? "", lines: [] };
+    } else if (kind === "replace") {
+      close();
+      open = { kind: "replace", find: m?.[2] ? [m[2]] : [] };
+    } else if (kind === "with") {
+      if (open?.kind === "replace" && !open.lines) open.lines = m?.[2] ? [m[2]] : [];
+    } else if (open?.kind === "insert") open.lines.push(line);
+    else if (open?.kind === "replace") (open.lines ?? open.find).push(line);
+  }
+  close();
+  return edits;
+}
+
+/** Per line of a Detail: true where the chapter text stands (headings and blank lines included); not the hidden records, the program's callouts or the system's sections. */
+function chapterRegion(lines: string[]): boolean[] {
+  const fenced = fencedLines(lines);
+  const region = lines.map(() => true);
+  const drop = (start: number, end: number): void => {
+    for (let i = start; i < end; i++) region[i] = false;
+  };
+  for (const range of [...hiddenRanges(lines, fenced), ...programCalloutRanges(lines, fenced)])
+    drop(range.start, range.end);
+  for (let from = 0; ;) {
+    const section = findSection(lines, fenced, text => isSystemSection(text), from);
+    if (!section) break;
+    drop(section.at, section.end);
+    from = section.at + 1;
+  }
+  const images = findImageSection(lines);
+  if (images) drop(images.at, images.end);
+  return region;
+}
+const headingKey = (text: string): string =>
+  text
+    .replace(/^[ \t]*#{1,6}[ \t]+/, "")
+    .replace(/[ \t]*#*[ \t]*$/, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+/** Where an insertion goes: the end of the named heading's section, else before the chapter's last heading (or its last paragraph). */
+function insertAt(lines: string[], after: string | undefined): number {
+  const region = chapterRegion(lines);
+  const fenced = fencedLines(lines);
+  const level = (i: number): number => (region[i] && !fenced[i] ? (HEADING.exec(bare(lines[i]))?.[1].length ?? 0) : 0);
+  const heads = lines.map((_, i) => i).filter(i => level(i) > 0);
+  const named = after ? heads.find(i => headingKey(bare(lines[i])) === headingKey(after)) : undefined;
+  if (named !== undefined) {
+    const own = level(named);
+    for (let j = named + 1; j < lines.length; j++) if (!region[j] || (level(j) > 0 && level(j) <= own)) return j;
+    return lines.length;
+  }
+  const text = lines.map((_, i) => i).filter(i => region[i] && lines[i].trim());
+  if (!text.length) {
+    const outside = region.indexOf(false);
+    return outside < 0 ? lines.length : outside;
+  }
+  const last = heads[heads.length - 1];
+  if (last !== undefined && last > text[0]) return last;
+  let k = text[text.length - 1];
+  while (k > 0 && region[k - 1] && lines[k - 1].trim()) k--;
+  return k;
+}
+
+/**
+ * A Detail with the change blocks put in by the program: every exact passage of whole lines replaced once (only inside the chapter text), then every
+ * insertion placed. The hidden records, the program's callouts, the picture section and the system's sections stay as they are.
+ */
+export function applyChapterEdits(detail: string, edits: readonly ChapterEdit[]): { detail: string; applied: number } {
+  const crlf = detail.includes("\r\n");
+  let text = crlf ? detail.replace(/\r\n/g, "\n") : detail;
+  let applied = 0;
+  for (const edit of edits) {
+    if (edit.kind !== "replace") continue;
+    const region = chapterRegion(text.split("\n"));
+    for (let from = 0; ;) {
+      const at = text.indexOf(edit.find, from);
+      if (at < 0) break;
+      const first = text.slice(0, at).split("\n").length - 1;
+      const count = edit.find.split("\n").length;
+      const end = at + edit.find.length;
+      // Whole lines only: a passage that starts or ends inside a line could join text into a new marker or image.
+      const whole = (at === 0 || text[at - 1] === "\n") && (end === text.length || text[end] === "\n");
+      if (whole && region.slice(first, first + count).every(Boolean)) {
+        text = text.slice(0, at) + edit.text + text.slice(at + edit.find.length);
+        applied++;
+        break;
+      }
+      from = at + 1;
+    }
+  }
+  for (const edit of edits) {
+    if (edit.kind !== "insert") continue;
+    const lines = text.split("\n");
+    const p = insertAt(lines, edit.after);
+    let a = p;
+    while (a > 0 && !lines[a - 1].trim()) a--;
+    let b = p;
+    while (b < lines.length && !lines[b].trim()) b++;
+    const tail = b < lines.length ? ["", ...lines.slice(b)] : [""];
+    text = [...lines.slice(0, a), ...(a > 0 ? [""] : []), ...edit.text.split("\n"), ...tail].join("\n");
+    applied++;
+  }
+  return { detail: crlf ? text.replace(/\n/g, "\r\n") : text, applied };
+}
+
+/**
+ * The automatic expansion of a too-short chapter, done by the program: the author's answer (`newDetail`, already cleaned) carries only
+ * change blocks, which go into the chapter as it was (`oldDetail`); the source entries the answer added join the chapter's Sources section.
+ * An answer with no block line is a whole chapter: undefined (the caller keeps it as written) when it is not shorter than the old
+ * chapter text, else it is put in as one insertion, so the expansion never makes the chapter shorter.
+ */
+export function expandChapterDetail(
+  oldDetail: string,
+  newDetail: string,
+  language: string
+): { detail: string; applied: number } | undefined {
+  const answer = chapterBody(newDetail);
+  let edits = parseChapterEdits(answer);
+  if (!edits) {
+    if (Array.from(answer.trim()).length >= Array.from(chapterBody(oldDetail).trim()).length) return undefined;
+    edits = answer.trim() ? [{ kind: "insert", text: answer.trim() }] : [];
+  }
+  const done = applyChapterEdits(oldDetail, edits);
+  const lines = newDetail.split("\n");
+  const section = findSection(lines, fencedLines(lines), text => isSourcesHeading(text));
+  const sources = section
+    ? lines.slice(section.at + 1, section.end).flatMap(line => {
+        const entry = /^[ \t]*[-*+][ \t]+(.+?)\s*$/.exec(line)?.[1];
+        const href = entry ? /https:\/\/[^\s)<>\]]+/.exec(entry)?.[0] : undefined;
+        return entry && href ? [{ href, entry }] : [];
+      })
+    : [];
+  return {
+    detail: sources.length ? addPictureSources(done.detail, sources, language) : done.detail,
+    applied: done.applied
+  };
+}

@@ -291,3 +291,63 @@ test('T10a (decision #24): a double sources heading around long commentary reads
   const detail = `### 來源\n\n${PROSE}\n\n### 參考資料\n\n${LIST}`;
   assert.equal(sections.chapterBody(detail), '');
 });
+
+// ---- the expansion of a too-short chapter (the program puts the author's change blocks in) ----
+test('expandChapterDetail: insertions go to the end of the named section or before the last heading; replaces only touch the chapter text; hidden records, pictures and sources stay; new sources join', () => {
+  const { expandChapterDetail, parseChapterEdits, chapterBody } = sections;
+  const old = [
+    '', '## 開場', '', '開場段落。', '', '### 土壤', '', '土壤段落。', '', '### 小結', '', '結尾一句。', '',
+    '### 圖像', '', '![a](https://example.org/a.png)', '圖說 a', '',
+    '## 來源', '', '- [舊來源](https://example.org/old)', '',
+    '> [!vam-book]- 研究備註', '> 土壤段落。', '> <!-- book-slots:v1 {"slots":[]} -->', ''
+  ].join('\n');
+  const answer = [
+    'preamble is ignored',
+    '@@insert after: ### 土壤', '### 排水', '', '排水段落。',
+    '@@insert', '### 補充', '', '補充段落。',
+    '@@insert after: ### 不存在', '孤兒段落。',
+    '@@replace', '土壤段落。', '@@with', '土壤段落（更正）。',
+    '@@replace', '找不到的句子。', '@@with', '無效。',
+    '', '## 來源', '', '- [新來源](https://example.org/new)', '- [舊來源](https://example.org/old)'
+  ].join('\n');
+  assert.equal(parseChapterEdits(chapterBody(answer)).length, 5);
+  const { detail, applied } = expandChapterDetail(old, answer, 'zh-TW');
+  assert.equal(applied, 4, 'the passage that is not in the chapter is not applied');
+  const at = text => detail.indexOf(text);
+  assert.ok(at('土壤段落（更正）。') > at('### 土壤') && at('### 排水') > at('土壤段落（更正）。') && at('### 排水') < at('### 補充'));
+  assert.ok(at('### 補充') < at('### 小結') && at('孤兒段落。') < at('### 小結'), 'unknown anchor: before the last section');
+  assert.ok(at('結尾一句。') < at('### 圖像'), 'the ending stays the chapter\'s last text');
+  assert.ok(detail.includes('> 土壤段落。'), 'the hidden record is not a chapter passage');
+  assert.ok(detail.includes('<!-- book-slots:v1') && detail.includes('![a](https://example.org/a.png)'));
+  assert.ok(detail.includes('https://example.org/new') && detail.split('https://example.org/old').length === 2, 'new source added once');
+  assert.ok(!detail.includes('@@') && !detail.includes('preamble'));
+});
+
+test('expandChapterDetail: an answer with no block line is added when shorter and left to the caller (undefined) when it is a whole longer chapter; CRLF stays CRLF; a chapter with no headings gets the text before its last paragraph', () => {
+  const { expandChapterDetail } = sections;
+  const old = '\r\n第一段很長的內容。\r\n\r\n最後一段。\r\n';
+  const short = expandChapterDetail(old, '\n新段落。\n', 'zh-TW');
+  assert.ok(short.detail.includes('\r\n') && !/[^\r]\n/.test(short.detail), 'line endings kept');
+  assert.ok(short.detail.indexOf('新段落。') > short.detail.indexOf('第一段') && short.detail.indexOf('新段落。') < short.detail.indexOf('最後一段。'));
+  assert.equal(expandChapterDetail(old, '\n' + '整章重寫'.repeat(20) + '\n', 'zh-TW'), undefined);
+  assert.equal(expandChapterDetail(old, '\n@@insert\n\n', 'zh-TW').detail, old, 'an empty block changes nothing');
+});
+
+test('expandChapterDetail: a @@replace passage applies only as whole lines (never a part of a line)', () => {
+  const { expandChapterDetail } = sections;
+  const old = '\n## 開場\n\n開場段落有圖。\n\n結尾。\n';
+  const part = expandChapterDetail(old, '\n@@replace\n段落有\n@@with\n![x](https://example.org/x.png)\n', 'zh-TW');
+  assert.equal(part.applied, 0); assert.equal(part.detail, old);
+  const whole = expandChapterDetail(old, '\n@@replace\n開場段落有圖。\n@@with\n開場段落（新）。\n', 'zh-TW');
+  assert.equal(whole.applied, 1); assert.ok(whole.detail.includes('開場段落（新）。') && !whole.detail.includes('開場段落有圖。'));
+});
+
+test('bookExpandRequirements: the chapter goes in as data, the amount is the target minus the measure, the length setting is left out and the point list comes last', () => {
+  const { bookExpandRequirements } = load('core/book-pipeline/settings.ts');
+  const text = bookExpandRequirements({ tone: '親切', length: '每章約5000至8000字' }, '## 開場\n內容', { kind: 'under', measured: 2253, min: 5000, max: 8000, unit: '字', version: 1 }, 'POINTS');
+  assert.match(text, /the chapter text is 2253 characters \(字\), short of the asked 5000 to 8000/);
+  assert.match(text, /Write about 4247 characters \(字\) of new text \(the whole chapter then about 6500\)/);
+  assert.match(text, /<<<CHAPTER\n## 開場\n內容\nCHAPTER>>>\n\nPOINTS$/);
+  assert.match(text, /- tone: 親切/);
+  assert.doesNotMatch(text, /- length:/);
+});

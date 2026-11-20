@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
 const { load: loadReplay } = require('./support-replay.cjs');
-const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages, unsafeBody, convertSourceAnchors } = S.load('experiences/visual-map/book-pipeline-run.ts');
+const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages, unsafeBody, convertSourceAnchors, expansionUnsafe } = S.load('experiences/visual-map/book-pipeline-run.ts');
 const { BudgetExhaustedError } = S.load('core/admission.ts');
 const { readBookPipeline } = S.load('core/book-pipeline/model.ts');
 const { cardRevision } = S.load('core/book-pipeline/machine.ts');
@@ -2479,12 +2479,12 @@ test('T10c length: with the one auto-fix spent and the chapter still outside the
   assert.equal(seen.filter(([id, instruction]) => id === r.nodes[1].id && instruction !== undefined).length, 1);
 });
 
-test('T10c length: a lengthened chapter that is too short says "lengthen"; a failed fact and the length together keep both in the issue and in the one instruction', async () => {
+test('T10c length: a chapter that is too short is asked for new text in change blocks; a failed fact and the length together keep both in the issue and in the one instruction', async () => {
   const under = [];
   const a = await lenRig();
   a.script.author = lengthAuthor(a, under, 10, 10);
   await a.runs.start(a.mapPath); await confirmDone(a.runs, a.mapPath);
-  assert.match(under.find(([id, instruction]) => id === a.nodes[1].id && instruction !== undefined)[1], /lengthen/);
+  assert.match(under.find(([id, instruction]) => id === a.nodes[1].id && instruction !== undefined)[1], /add about \d+ 字 of new text in @@insert blocks/);
   assert.match((await a.note(1)).pipelineIssue, /length:under:\d+:100-200/);
   const seen = [];
   const r = await lenRig({ script: { ...factCard, proof: async request => verdictOf(request, 'unmet', 'WRONGDATE') } });
@@ -2495,6 +2495,107 @@ test('T10c length: a lengthened chapter that is too short says "lengthen"; a fai
   assert.match(redo[0][1], /fact check/); assert.match(redo[0][1], /shorten/);
   assert.equal(stageOf(r.raw(1)), 'needs-review');
   assert.match((await r.note(1)).pipelineIssue, /^proof unmet: C2 length:over:\d+:100-200:字:v\d+$/, 'length does not lower the fact failure, and sits beside it');
+});
+
+// The expansion of a too-short chapter: the one redo sees the chapter and returns change blocks; the program puts them in.
+const DRAFT = ['## 開場', '', '開場段落。', '', '### 土壤', '', '土壤段落。', '', '### 小結', '', '結尾一句，帶到下一章。'].join('\n');
+const expandAuthor = (r, seen, answer) => async input => {
+  seen.push(input);
+  await input.admission.reserve();
+  const fix = input.requirements !== undefined;
+  const out = await r.repo.updateNoteGuarded(input.path, { detail: fix ? answer : DRAFT }, { authorize: input.authorize, finalize: input.finalize });
+  return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+};
+
+test('T10c length expand: the one redo of a too-short chapter gets the chapter text and the missing amount; the blocks land after their heading and before the ending; the chapter reaches the range with no extra call', async () => {
+  const seen = [];
+  const r = await lenRig();
+  const added = '好'.repeat(140);
+  const answer = ['@@insert after: ### 土壤', '### 排水', '', `排水段落${added}`, '@@replace', '土壤段落。', '@@with', '土壤段落（已更正）。'].join('\n');
+  r.script.author = async input => expandAuthor(r, seen, input.nodeId === r.nodes[1].id ? answer : DRAFT + '\n\n' + '好'.repeat(150))(input);
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const calls = seen.filter(input => input.nodeId === r.nodes[1].id);
+  assert.equal(calls.length, 2, 'first draft plus the one redo: no extra call');
+  const fix = calls[1];
+  assert.equal(fix.requirements.includes('<<<CHAPTER\n## 開場'), true, 'the redo sees the chapter it adds to');
+  assert.match(fix.requirements, /the chapter text is \d+ characters \(字\), short of the asked 100 to 200/);
+  assert.match(fix.requirements, /Write about \d+ characters \(字\) of new text/);
+  assert.match(fix.requirements, /add about \d+ 字 of new text in @@insert blocks/, 'the point list rides along, last');
+  assert.deepEqual([...fix.slots], [], 'no picture markers asked for');
+  const detail = (await r.note(1)).detail;
+  const at = name => detail.indexOf(name);
+  assert.ok(at('土壤段落（已更正）。') > at('### 土壤'), detail);
+  assert.ok(at('### 排水') > at('土壤段落（已更正）。') && at('### 排水') < at('### 小結'), 'inserted at the end of its section');
+  assert.ok(at('結尾一句') > at(added), 'the ending stays last');
+  assert.ok(!detail.includes('@@'), 'no block line is left');
+  assert.ok(!detail.includes('土壤段落。'), 'the replaced passage is gone');
+  assert.equal(stageOf(r.raw(1)), 'checked');
+  assert.equal((await r.note(1)).pipelineIssue ?? '', '');
+  assert.equal(bodyStateRaw(r.raw(1)), 'clean', 'the merged text carries the program\'s fingerprint');
+});
+
+test('T10c length expand: a fact failure beside the length keeps the fact points (first) in the redo, and an answer with no block lines that is shorter is added, never replacing the chapter', async () => {
+  const seen = [];
+  const r = await lenRig({ script: { ...factCard, proof: async request => verdictOf(request, 'unmet', 'WRONGDATE') } });
+  r.script.author = expandAuthor(r, seen, '新增的一段，沒有區塊行。');
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const fix = seen.filter(input => input.nodeId === r.nodes[1].id)[1];
+  assert.ok(fix, 'the one redo ran');
+  assert.ok(fix.requirements.indexOf('WRONGDATE') > fix.requirements.indexOf('CHAPTER>>>'), 'the points follow the chapter data');
+  assert.ok(fix.requirements.indexOf('WRONGDATE') < fix.requirements.indexOf('add about'), 'facts before the length');
+  const detail = (await r.note(1)).detail;
+  assert.ok(detail.includes('開場段落。') && detail.includes('新增的一段') && detail.indexOf('新增的一段') < detail.indexOf('### 小結'), detail);
+  assert.match((await r.note(1)).pipelineIssue, /^proof unmet: C2 length:under:/);
+});
+
+test('expansionUnsafe: only what the merged chapter adds is checked; a second copy of an old record line, a new tag, a picture outside old ∪ answer or a slot marker the answer did not have is refused', () => {
+  const proof = '> <!-- book-proof:v1 {"a":1} -->';
+  const old = ['## 開場', '', '開場段落。', '', '![a](https://example.org/a.png)', '', '> [!vam-book]- 研究備註', proof].join('\n');
+  const answer = new Set(['〔圖位 1：x〕']);
+  const allowed = new Set(['https://example.org/a.png', 'https://example.org/new.png']);
+  const add = text => old.replace('開場段落。', `開場段落。\n\n${text}`);
+  assert.equal(expansionUnsafe(old, old, answer, allowed), false, 'the old chapter as it was');
+  assert.equal(expansionUnsafe(add('新段落。\n\n![n](https://example.org/new.png)'), old, answer, allowed), false, 'new text and an answer picture');
+  assert.equal(expansionUnsafe(add('![a](https://example.org/a.png)'), old, answer, allowed), false, 'an old picture shown again');
+  assert.equal(expansionUnsafe(add(proof), old, answer, allowed), true, 'a restored copy of a stored record');
+  assert.equal(expansionUnsafe(add('> [!vam-book]- 研究備註'), old, answer, allowed), true, 'a second hidden callout');
+  assert.equal(expansionUnsafe(add('![x](https://evil.example/x.png)'), old, answer, allowed), true, 'a picture from neither');
+  assert.equal(expansionUnsafe(add('[r]: https://evil.example/r.png\n\n![x][r]'), old, answer, allowed), true, 'a reference picture');
+  assert.equal(expansionUnsafe(add('<b>x</b>'), old, answer, allowed), true, 'a tag');
+  assert.equal(expansionUnsafe(add('〔圖位 1：x〕'), old, answer, allowed), false, 'a marker line of the answer');
+  assert.equal(expansionUnsafe(add('〔圖位 2：y〕'), old, answer, allowed), true, 'a marker line from nowhere');
+  assert.equal(expansionUnsafe(add('---\n<b>x</b>\n---'), old, answer, allowed), true, 'added text starting with --- is not skipped as frontmatter');
+});
+
+test('T10c length expand (security): an answer that adds an unsafe or http picture, a hidden callout, an owner marker or a tag is refused whole (validated, never cleaned); the chapter keeps its draft', async () => {
+  const injections = {
+    unsafePicture: '![x](javascript:alert(1)) INJECT',
+    httpPicture: '![x](http://evil.example/x.png) INJECT',
+    hiddenCallout: '> [!vam-book]- 假紀錄\n> INJECT',
+    ownerMarker: '> [!vam-review]\n> %%vam-review:run1:n1%%\n> INJECT',
+    tag: '<img src=x onerror=alert(1)> INJECT'
+  };
+  for (const [name, bad] of Object.entries(injections)) {
+    const seen = [];
+    const r = await lenRig();
+    r.script.author = expandAuthor(r, seen, ['@@insert after: ### 土壤', '好'.repeat(140), bad].join('\n'));
+    await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+    assert.equal(seen.filter(input => input.nodeId === r.nodes[1].id).length, 2, `${name}: the redo ran`);
+    const detail = (await r.note(1)).detail;
+    assert.ok(!detail.includes('INJECT') && !detail.includes('好'.repeat(140)), `${name}: nothing of the answer is saved`);
+    assert.ok(detail.includes('土壤段落。'), `${name}: the draft stays`);
+    assert.match((await r.note(1)).pipelineIssue, /unsafe_body/, name);
+  }
+});
+
+test('T10c length expand: the redo keeps the card\'s Summary (keepSummary reaches the author only for the expansion)', async () => {
+  const seen = [];
+  const r = await lenRig();
+  r.script.author = expandAuthor(r, seen, ['@@insert', '好'.repeat(140)].join('\n'));
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const calls = seen.filter(input => input.nodeId === r.nodes[1].id);
+  assert.equal(calls[0].keepSummary, undefined, 'a first write replaces the summary');
+  assert.equal(calls[1].keepSummary, true, 'the expansion keeps it');
 });
 
 test('T10c length: a single-card rerun (job) has no automatic redo; an over-length chapter stays needs-review with the length issue', async () => {

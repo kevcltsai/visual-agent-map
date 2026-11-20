@@ -110,7 +110,10 @@ export class ReadingMarks {
 
 /** The source lines `[lineStart, lineEnd]` of `text` (a section of the reading view). */
 export function sectionSource(text: string, lineStart: number, lineEnd: number): string {
-  return text.split("\n").slice(lineStart, lineEnd + 1).join("\n");
+  return text
+    .split("\n")
+    .slice(lineStart, lineEnd + 1)
+    .join("\n");
 }
 
 const normalSection = (text: string): string => text.replace(/\r/g, "").trim();

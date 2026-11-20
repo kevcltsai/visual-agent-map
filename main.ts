@@ -36,6 +36,7 @@ import {
   type NotesLeaf
 } from "./experiences/visual-map/book-pipeline-notes-ui";
 import { BookNotesApply } from "./experiences/visual-map/book-pipeline-notes-apply";
+import { locateApplied } from "./core/book-pipeline/notes-apply";
 import { showAppliedNotice } from "./experiences/visual-map/book-applied-notice";
 import {
   AppliedHighlights,
@@ -571,7 +572,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         onClick,
         ms
       ),
-    highlight: (path, ranges) => this.bookHighlights.show(path, ranges),
+    highlight: (path, ranges, afters) => void this.showBookHighlight(path, ranges, afters),
     releaseHighlight: () => this.bookHighlights.release(),
     flush: async path => {
       for (const leaf of this.app.workspace.getLeavesOfType("markdown"))
@@ -605,6 +606,21 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (ranges?.length) {
       if (view.getMode() === "preview") view.previewMode.rerender(true);
     } else container?.querySelectorAll(".vam-book-applied").forEach(el => el.removeClass("vam-book-applied"));
+  }
+  /** The marks follow the paragraphs' text in the note as it is now (the offsets of the apply are stale once the review box is stamped), never a callout. */
+  private async showBookHighlight(
+    path: string,
+    ranges: readonly { from: number; to: number }[],
+    afters: readonly string[]
+  ): Promise<void> {
+    let found = ranges;
+    try {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (file instanceof TFile) found = locateApplied(await this.app.vault.read(file), afters);
+    } catch {
+      found = [];
+    }
+    this.bookHighlights.show(path, found);
   }
   private bookHighlightTargets(): HighlightTarget[] {
     const out: HighlightTarget[] = [];

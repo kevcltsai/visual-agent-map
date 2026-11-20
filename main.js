@@ -46756,6 +46756,15 @@ function applyReplies(raw, items, replies, refused = []) {
   });
   return { text: text10, applied: applied.sort((a, b) => a.from - b.from), skipped: skipped2, marked: free.length };
 }
+function locateApplied(raw, afters) {
+  const paragraphs = chapterParagraphs(raw);
+  const out = [];
+  for (const after of afters) {
+    const same2 = paragraphs.filter((p) => p.text === after);
+    if (same2.length === 1) out.push({ from: same2[0].from, to: same2[0].to });
+  }
+  return out;
+}
 function undoApplied(raw, edits) {
   const paragraphs = chapterParagraphs(raw);
   const run = [];
@@ -92765,7 +92774,8 @@ var BookNotesApply = class {
     this.lastUndo = { path, edits: result.edits.map((edit) => ({ before: edit.before, after: edit.after })) };
     this.ports.highlight(
       path,
-      result.edits.map((edit) => ({ from: edit.from, to: edit.to }))
+      result.edits.map((edit) => ({ from: edit.from, to: edit.to })),
+      result.edits.map((edit) => edit.after)
     );
     (_c = this.undoNotice) == null ? void 0 : _c.hide();
     const text10 = t("ui.book_note_applied_n_0", result.applied) + (changed ? t("ui.book_note_applied_skipped_0", changed) : "") + (refused ? t("ui.book_note_applied_refused_0", refused) : "") + " \xB7 ";
@@ -105932,7 +105942,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
         onClick,
         ms
       ),
-      highlight: (path, ranges) => this.bookHighlights.show(path, ranges),
+      highlight: (path, ranges, afters) => void this.showBookHighlight(path, ranges, afters),
       releaseHighlight: () => this.bookHighlights.release(),
       flush: async (path) => {
         var _a2;
@@ -106142,6 +106152,17 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
     if (ranges == null ? void 0 : ranges.length) {
       if (view.getMode() === "preview") view.previewMode.rerender(true);
     } else container == null ? void 0 : container.querySelectorAll(".vam-book-applied").forEach((el) => el.removeClass("vam-book-applied"));
+  }
+  /** The marks follow the paragraphs' text in the note as it is now (the offsets of the apply are stale once the review box is stamped), never a callout. */
+  async showBookHighlight(path, ranges, afters) {
+    let found = ranges;
+    try {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (file instanceof import_obsidian52.TFile) found = locateApplied(await this.app.vault.read(file), afters);
+    } catch (e) {
+      found = [];
+    }
+    this.bookHighlights.show(path, found);
   }
   bookHighlightTargets() {
     const out = [];

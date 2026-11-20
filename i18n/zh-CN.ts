@@ -3169,6 +3169,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_add_budget": "再加 100 次",
   "ui.book_budget_used_up_0_1": "额度用完：已用 {0}／{1} 次",
   "ui.book_bar_trial_ready_0": "试跑的 {0} 章写好了",
+  "ui.book_bar_trial_review_0_1": "试跑的 {0} 章写好了，{1} 章要你看",
   "ui.book_bar_open_first": "打开第 1 章",
   "ui.book_bar_notes_ask_0": "还有 {0} 则备注没套用，仍要跑完全书吗？",
   "ui.book_bar_go_anyway": "仍要",

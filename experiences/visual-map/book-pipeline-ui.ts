@@ -49,6 +49,8 @@ export interface BookBarState {
   rerun?: true;
   /** Gate 1: how many chapters the trial has ("the 3 trial chapters are written"); absent for a run without a trial. */
   trialCount?: number;
+  /** Gate 1: how many of the trial chapters need a look (shown after the trial sentence; nothing when 0). */
+  trialAttention?: number;
   /** Gate 2: the chapters written and how many still need a look; the view fills it from the notes (see its `bookReviewCount`). */
   review?: { total: number; attention: number };
 }
@@ -250,7 +252,12 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   }
   if (state.mode === "gate1" && state.trialCount) {
-    top.createSpan({ cls: "vam-book-bar-counts", text: t("ui.book_bar_trial_ready_0", state.trialCount) });
+    top.createSpan({
+      cls: "vam-book-bar-counts",
+      text: state.trialAttention
+        ? t("ui.book_bar_trial_review_0_1", state.trialCount, state.trialAttention)
+        : t("ui.book_bar_trial_ready_0", state.trialCount)
+    });
     if (actions.openTrial)
       makeButton(buttons, t("ui.book_bar_open_first"), "vam-book-link vam-book-open-first", actions.openTrial);
   }

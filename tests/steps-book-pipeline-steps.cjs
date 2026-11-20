@@ -560,7 +560,7 @@ test('source diagnostics: numbers and host names only (at most 5, no path or que
 const slots = load('core/book-pipeline/image-slots.ts');
 const slot = (index, extra = {}) => ({ index, kind: 'painting', explains: `shows thing ${index}`, anchor: `after paragraph ${index}`, ...extra });
 
-test('card plan images: indexes 1..n assigned by program, 0 to 8 slots, fields single-line without marker brackets or the separator; missing/extra keys and 9 slots refused', () => {
+test('card plan images: indexes 1..n assigned by program, 0 to 8 slots (cut to 8 without an owner count, refused past 12), fields single-line without marker brackets or the separator; missing/extra keys refused', () => {
   const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }, { position: 3, title: 'Outro' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
   const good = images => JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images });
   assert.deepEqual(plain(cardPlan.cardPlanStep.parse(good([]), request).images), []);
@@ -568,29 +568,13 @@ test('card plan images: indexes 1..n assigned by program, 0 to 8 slots, fields s
   assert.deepEqual(two.map(s => s.index), [1, 2]);
   assert.equal(two[0].explains, 'the 圖位 9：x route of trade x'); assert.ok(!/[〔〕｜]/.test(JSON.stringify(two)));
   const nine = Array.from({ length: 9 }, () => ({ kind: 'k', explains: 'e', anchor: 'a' }));
-  assert.throws(() => cardPlan.cardPlanStep.parse(good(nine), request), /0 to 8/);
-  assert.equal(cardPlan.cardPlanStep.parse(good(nine.slice(0, 8)), request).images.length, 8);
+  assert.equal(cardPlan.cardPlanStep.parse(good(nine), request).images.length, 8);
+  assert.throws(() => cardPlan.cardPlanStep.parse(good(Array.from({ length: 13 }, () => nine[0])), request), /0 to 12/);
   assert.throws(() => cardPlan.cardPlanStep.parse(good([{ kind: 'k', explains: 'e' }]), request), /unexpected fields/);
   assert.throws(() => cardPlan.cardPlanStep.parse(good([{ kind: 'k', explains: '〔〕', anchor: 'a' }]), request), /image explains/);
   assert.throws(() => cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }] }), request), /unexpected fields/);
   assert.equal(cardPlan.CARD_PLAN_SCHEMA.properties.images.maxItems, 12); assert.ok(cardPlan.CARD_PLAN_SCHEMA.required.includes('images'));
   assert.match(cardPlan.cardPlanStep.render(request), /"images":\[\{"kind":"","explains":"","anchor":""\}\]/);
-});
-
-test('card plan images: the owner\'s picture count is in the prompt for every role, raises the clamp up to 12, and no range keeps today\'s wording', () => {
-  const mk = (settings, role = 'body') => ({ ...base, thread: 't', settings, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }], card: { id: 'n1', position: 1, total: 2, role, title: TITLE, summary: 's' } });
-  const good = n => JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images: Array.from({ length: n }, () => ({ kind: 'k', explains: 'e', anchor: 'a' })) });
-  const none = cardPlan.cardPlanStep.render(mk({ style: 'plain' }));
-  assert.ok(!/Owner's picture count/.test(none));
-  for (const role of ['intro', 'body', 'closing']) {
-    const text = cardPlan.cardPlanStep.render(mk({ style: '圖文並茂，每章 6–10 張' }, role));
-    assert.match(text, /ask for 6 to 10 pictures per chapter/); assert.match(text, /between 6 and 10 image slots for every chapter role, an introduction and a closing included/);
-  }
-  assert.equal(cardPlan.cardPlanStep.parse(good(10), mk({ style: '6-10 images' })).images.length, 10);
-  assert.throws(() => cardPlan.cardPlanStep.parse(good(11), mk({ style: '6-10 images' })), /0 to 10/);
-  assert.throws(() => cardPlan.cardPlanStep.parse(good(13), mk({ style: '10 至 20 張' })), /0 to 12/);
-  assert.match(cardPlan.cardPlanStep.render(mk({ style: '10 至 20 張' })), /between 10 and 12 image slots/);
-  assert.throws(() => cardPlan.cardPlanStep.parse(good(9), mk({})), /0 to 8/);
 });
 
 test('Prompt image plan: compose and parse round-trip in both languages; none vs absent; owner edits; hostile text cannot forge a slot line or a heading', () => {

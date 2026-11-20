@@ -45,6 +45,8 @@ export interface BookBarState {
   globalDone: boolean;
   /** What the run is doing right now (memory only; absent after a reload or while nothing runs). */
   current?: BookCurrent;
+  /** The whole-book consistency check is running (no chapter step is): the sentence says so instead of "writing". */
+  checking?: true;
   /** The run has a trial (the first chapters before gate 1): while it is planning, the bar says which trial chapter is written. */
   trialSize?: number;
   /** A single-card rerun is in progress (memory only): the bar keeps its stop button; the card itself says "working". */
@@ -143,6 +145,9 @@ export function bookBarState(
     budget,
     globalDone: data.globalPlanned === true,
     ...(current ? { current } : {}),
+    ...(!current && mode === "writing" && active && data.consistency?.done === false
+      ? { checking: true as const }
+      : {}),
     ...(data.trial?.length && mode === "planning" && data.globalPlanned ? { trialSize: data.trial.length } : {}),
     ...(rerunning ? { rerun: true as const } : {}),
     ...(mapChange ? { mapChange } : {}),
@@ -454,6 +459,8 @@ export function bookProgressText(state: BookBarState): string {
   }
   const at = Math.min(state.current?.chapter ?? settledCount(state) + 1, Math.max(total, 1));
   // Writing the whole book is one plain line ("Writing chapter 3/31"): the bar below shows how many are done.
+  if (state.mode === "writing" && state.checking)
+    return t("ui.book_progress_line_check_0_1", settledCount(state), total);
   if (state.mode === "writing")
     // Only fix rounds in work: a named fix line with the whole-book done count, never a restarted counter.
     return state.current?.fix

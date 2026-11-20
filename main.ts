@@ -43,6 +43,7 @@ import {
   AppliedHighlights,
   appliedExtension,
   ReadingMarks,
+  rerenderReadingViews,
   sectionSource,
   setApplied,
   type HighlightTarget
@@ -582,6 +583,17 @@ export default class VisualAgentMapPlugin extends Plugin {
         if (leaf.view instanceof MarkdownView && leaf.view.file?.path === path) await leaf.view.save();
     },
     undone: path => {
+      rerenderReadingViews(
+        this.app.workspace
+          .getLeavesOfType("markdown")
+          .flatMap(leaf => (leaf.view instanceof MarkdownView ? [leaf.view] : []))
+          .map(view => ({
+            path: view.file?.path,
+            reading: view.getMode() === "preview",
+            rerender: () => view.previewMode.rerender(true)
+          })),
+        path
+      );
       const map = this.bookChapterMaps.get(path);
       if (map) void this.bookCallouts.reconcile(map);
     },

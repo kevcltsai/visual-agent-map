@@ -108,6 +108,23 @@ export class ReadingMarks {
   }
 }
 
+/** A view of a note in reading mode, as far as a forced re-render needs it. */
+export interface RenderableView {
+  path: string | undefined;
+  reading: boolean;
+  rerender(): void;
+}
+/** The text of a note went back (undo): its open reading views render again now, not when Obsidian next gets to it. Returns how many. */
+export function rerenderReadingViews(views: readonly RenderableView[], path: string): number {
+  let count = 0;
+  for (const view of views)
+    if (view.path === path && view.reading) {
+      view.rerender();
+      count++;
+    }
+  return count;
+}
+
 /** The source lines `[lineStart, lineEnd]` of `text` (a section of the reading view). */
 export function sectionSource(text: string, lineStart: number, lineEnd: number): string {
   return text

@@ -3238,6 +3238,7 @@ var en = {
   "ui.book_panel_g2_reason_facts_0": "{0} facts could not be confirmed against a source",
   "ui.book_panel_g2_reason_images": "This is a picture chapter but no fitting picture was found",
   "ui.book_panel_g2_reason_seam": "A neighbouring chapter changed; the join is not confirmed",
+  "ui.book_panel_g2_reason_seam_0": '"{0}" changed; its join with this chapter is not confirmed',
   "ui.book_note_trial_title_0": "Trial chapter {0} of {1}",
   "ui.book_note_trial_next": "Once you have read it, go back to the mind map and press \u201CRun the whole book\u201D.",
   "ui.book_note_trial_stopped": "The book is stopped. Press \u201CContinue\u201D on the mind map toolbar first, then \u201CRun the whole book\u201D.",
@@ -6460,6 +6461,7 @@ var zhCN = {
   "ui.book_panel_g2_reason_facts_0": "\u6709 {0} \u9879\u4E8B\u5B9E\u8FD8\u6CA1\u67E5\u8BC1\u5230\u6765\u6E90",
   "ui.book_panel_g2_reason_images": "\u8FD9\u7AE0\u662F\u56FE\u96C6\uFF0C\u5374\u6CA1\u6709\u627E\u5230\u5408\u9002\u7684\u56FE",
   "ui.book_panel_g2_reason_seam": "\u524D\u540E\u7AE0\u6539\u8FC7\uFF0C\u8854\u63A5\u8FD8\u6CA1\u786E\u8BA4",
+  "ui.book_panel_g2_reason_seam_0": "\u300C{0}\u300D\u6539\u8FC7\uFF0C\u548C\u8FD9\u7AE0\u7684\u8854\u63A5\u8FD8\u6CA1\u786E\u8BA4",
   "ui.book_note_trial_title_0": "\u8BD5\u8DD1\u7B2C {0}\uFF0F{1} \u7AE0",
   "ui.book_note_trial_next": "\u770B\u5B8C\u540E\u56DE\u5FC3\u667A\u56FE\uFF0C\u6309\u201C\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66\u201D\u3002",
   "ui.book_note_trial_stopped": "\u8FD9\u672C\u4E66\u5DF2\u505C\u6B62\u3002\u5148\u5728\u5FC3\u667A\u56FE\u5DE5\u5177\u680F\u6309\u201C\u7EE7\u7EED\u201D\uFF0C\u518D\u6309\u201C\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66\u201D\u3002",
@@ -9682,6 +9684,7 @@ var zhTW = {
   "ui.book_panel_g2_reason_facts_0": "\u6709 {0} \u9805\u4E8B\u5BE6\u9084\u6C92\u67E5\u8B49\u5230\u4F86\u6E90",
   "ui.book_panel_g2_reason_images": "\u9019\u7AE0\u662F\u5716\u96C6\uFF0C\u537B\u6C92\u6709\u627E\u5230\u5408\u9069\u7684\u5716",
   "ui.book_panel_g2_reason_seam": "\u524D\u5F8C\u7AE0\u6539\u904E\uFF0C\u929C\u63A5\u9084\u6C92\u78BA\u8A8D",
+  "ui.book_panel_g2_reason_seam_0": "\u300C{0}\u300D\u6539\u904E\uFF0C\u548C\u9019\u7AE0\u7684\u929C\u63A5\u9084\u6C92\u78BA\u8A8D",
   "ui.book_note_trial_title_0": "\u8A66\u8DD1\u7B2C {0}\uFF0F{1} \u7AE0",
   "ui.book_note_trial_next": "\u770B\u5B8C\u5F8C\u56DE\u5FC3\u667A\u5716\uFF0C\u6309\u300C\u9019\u6A23\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u66F8\u300D\u3002",
   "ui.book_note_trial_stopped": "\u9019\u672C\u66F8\u5DF2\u505C\u6B62\u3002\u5148\u5728\u5FC3\u667A\u5716\u5DE5\u5177\u5217\u6309\u300C\u7E7C\u7E8C\u300D\uFF0C\u518D\u6309\u300C\u9019\u6A23\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u66F8\u300D\u3002",
@@ -13601,6 +13604,10 @@ function hiddenRanges(lines, fenced) {
     } else i++;
   }
   return found;
+}
+function hasHiddenCallout(text10) {
+  const lines = text10.split("\n");
+  return hiddenRanges(lines, fencedLines(lines)).length > 0;
 }
 var HIDDEN_TYPE = /\[!\s*vam-(?:book|trial|review)\s*(?:\|[^\]]*)?\]/gi;
 var OWNER_MARKER = /%%(?=[ \t]*vam-(?:trial|review|callout-version)\b)/gi;
@@ -27461,11 +27468,11 @@ function oldNoteLooksUntouched(detail, cardDetail = detail.trim()) {
   const inText = [...integrityText(detail).matchAll(IMAGE_URL)].map((m) => shortHash(m[1])).sort();
   return placed.length === inText.length && placed.every((hash, at) => hash === inText[at]);
 }
-function bodyState(detail, cardDetail) {
+function bodyState(detail, cardDetail, wrote = hasHiddenCallout(detail)) {
   const record = readBodyRecord(detail);
   if (!(record == null ? void 0 : record.fp)) {
     if (!integrityText(detail)) return "empty";
-    if (!record && !extractProofRecords(detail).length && !latestSlotsRecord(detail)) return "clean";
+    if (wrote && !record && !extractProofRecords(detail).length && !latestSlotsRecord(detail)) return "clean";
   }
   return vouched(detail, cardDetail) ? "clean" : (record == null ? void 0 : record.fp) ? "edited" : "unknown";
 }
@@ -27532,9 +27539,17 @@ var isKeptRaw = (raw) => {
   var _a2;
   return isKept((_a2 = detailBlockOf(raw)) != null ? _a2 : "");
 };
+var FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
+var WRITTEN_STAGE = /^pipeline-stage:[ \t]*["']?(?:written|checked)["']?[ \t]*\r?$/m;
+function pipelineWroteRaw(raw) {
+  var _a2;
+  if (hasHiddenCallout(raw)) return true;
+  const fm = (_a2 = FRONTMATTER.exec(raw)) == null ? void 0 : _a2[1];
+  return !!fm && WRITTEN_STAGE.test(fm);
+}
 var bodyStateRaw = (raw) => {
   var _a2;
-  return bodyState((_a2 = detailBlockOf(raw)) != null ? _a2 : "", cardDetailOf(raw));
+  return bodyState((_a2 = detailBlockOf(raw)) != null ? _a2 : "", cardDetailOf(raw), pipelineWroteRaw(raw));
 };
 var integrityFpRaw = (raw) => {
   var _a2;
@@ -54850,7 +54865,10 @@ var PROBLEM_RULES = [
     of: (card) => card.factsOpen > 0 ? t("ui.book_panel_g2_reason_facts_0", card.factsOpen) : void 0
   },
   { kind: "images", of: (card) => card.galleryBare ? t("ui.book_panel_g2_reason_images") : void 0 },
-  { kind: "seam", of: (card) => card.seam ? t("ui.book_panel_g2_reason_seam") : void 0 },
+  {
+    kind: "seam",
+    of: (card) => card.seam ? card.seamFrom ? t("ui.book_panel_g2_reason_seam_0", card.seamFrom) : t("ui.book_panel_g2_reason_seam") : void 0
+  },
   { kind: "edited", of: (card) => card.proofStale && !card.handEdited ? t("ui.book_stale_proof") : void 0 }
 ];
 function reviewProblems(card) {
@@ -54890,6 +54908,13 @@ function galleryBare(role, note) {
   const states = describeSlots(slots, latestSlotsRecord(detail), bodyImageUrls(chapterBody(detail)));
   return states.some((slot) => slot.state === "missing") && !states.some((slot) => slot.state === "placed" || slot.state === "edited");
 }
+function seamFromOf(seam, order, at, titleOf) {
+  const m = typeof seam === "string" ? /(?:第\s*|card\s+)(\d+)/i.exec(seam) : null;
+  const other = m ? Number(m[1]) - 1 : -1;
+  if (other !== at - 1 && other !== at + 1) return {};
+  const title = order[other] === void 0 ? "" : titleOf(order[other]).trim();
+  return title ? { seamFrom: title } : {};
+}
 function gate2Cards(input2) {
   return input2.order.map((id, at) => {
     var _a2, _b2, _c, _d, _e;
@@ -54919,6 +54944,7 @@ function gate2Cards(input2) {
       factsOpen: checked2 ? ((_d = proof == null ? void 0 : proof.items) != null ? _d : []).filter((item) => item.type === "fact" && item.status !== "met").length : 0,
       galleryBare: checked2 && galleryBare(role, note),
       seam: view.seam,
+      ...view.seam ? seamFromOf(note == null ? void 0 : note.pipelineSeam, input2.order, at, input2.titleOf) : {},
       ...handEdited ? { handEdited: true, bodyFp: integrityFp((_e = note == null ? void 0 : note.detail) != null ? _e : "") } : {},
       ...stale ? { proofStale: true } : {}
     };
@@ -74028,7 +74054,7 @@ ${request.requirements}` : preset.text,
           {
             label: t("ui.structure_review_merge_confirm", name2(node)),
             warning: true,
-            action: () => run(() => this.removeToUnassigned(node, false, into.id))
+            action: () => run(() => this.removeInQueue(node, false, into.id))
           }
         ],
         () => resolve(false)
@@ -75362,8 +75388,17 @@ ${request.requirements}` : preset.text,
     this.render();
     return { before, after };
   }
-  /** Removes a topic (or its branch) to Unassigned in one undo step; `adopterId` first takes over its children (merge). */
-  async removeToUnassigned(node, branch, adopterId) {
+  /**
+   * Removes a topic (or its branch) to Unassigned in one undo step; `adopterId` first takes over its children (merge). It runs in the
+   * plugin's write queue like the right-click removal, so a book run's state write (also queued) never reads Map.md before the removal
+   * and saves it after (which put the removed card back on the map while its note sat in Unassigned). Callers already in the queue use
+   * {@link removeInQueue}.
+   */
+  removeToUnassigned(node, branch, adopterId) {
+    return this.plugin.mutate(() => this.removeInQueue(node, branch, adopterId));
+  }
+  /** {@link removeToUnassigned} for a caller that already holds the write queue. */
+  async removeInQueue(node, branch, adopterId) {
     await this.removeToUnassignedEntry(node, branch, adopterId);
   }
   /** The same, handing back the undo step it pushed (undefined when nothing was removed). */
@@ -76035,7 +76070,7 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
       const previous = this.history.undoEntry;
       this.focusNodeId = (_a3 = next == null ? void 0 : next.id) != null ? _a3 : null;
       try {
-        await this.removeToUnassigned(node, false);
+        await this.removeInQueue(node, false);
       } finally {
         this.focusNodeId = null;
       }
@@ -76058,12 +76093,12 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
         {
           label: t("ui.remove_only_this_node_children_become_roots"),
           warning: true,
-          action: () => run(() => this.removeToUnassigned(node, false))
+          action: () => run(() => this.removeInQueue(node, false))
         },
         {
           label: t("ui.remove_entire_branch"),
           warning: true,
-          action: () => run(() => this.removeToUnassigned(node, true))
+          action: () => run(() => this.removeInQueue(node, true))
         }
       ],
       hooks.dismissed

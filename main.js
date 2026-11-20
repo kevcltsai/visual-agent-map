@@ -14617,8 +14617,13 @@ var ECHO_MIN = 12;
 var META_NOTE = /^[\s*_>]*[（(]([^（）()]*)[）)][\s*_]*$/u;
 var META_SELF = /本章|本節|本段|章節|以下|上述|this chapter|this section|the chapter|below|above/i;
 var META_PLACE = /標題|結構|新增|插入|放在|接在|段落|heading|structure|insert|placed|placement|new (?:text|paragraphs?|sections?)|blocks?/i;
+var SEARCH_TERMS_SEGMENT = /[｜|]\s*(?:英文搜[尋寻索]詞|英文搜[尋寻索]词|Search terms)\s*[：:]/i;
+function stripSearchTerms(text10) {
+  return text10.replace(/\s*[｜|]\s*(?:英文搜[尋寻索]詞|英文搜[尋寻索]词|Search terms)\s*[：:][^〕〔\n]*/gi, "");
+}
 function isEchoedLine(line2, sent) {
   var _a2;
+  if (SEARCH_TERMS_SEGMENT.test(line2)) return true;
   const note = (_a2 = META_NOTE.exec(line2)) == null ? void 0 : _a2[1];
   if (note !== void 0 && META_SELF.test(note) && META_PLACE.test(note)) return true;
   const key4 = echoKey(line2);
@@ -14806,7 +14811,7 @@ function protectedLines2(lines) {
   return out;
 }
 function markerCore(line2) {
-  return line2.trim().replace(/^(?:[-+*]|\d+[.)])\s+/, "").replace(/^[*_~]+/, "").replace(/[*_~]+$/, "").trim();
+  return stripSearchTerms(line2).trim().replace(/^(?:[-+*]|\d+[.)])\s+/, "").replace(/^[*_~]+/, "").replace(/[*_~]+$/, "").trim();
 }
 function markerLineKind(line2) {
   const core2 = markerCore(line2);

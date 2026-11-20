@@ -341,6 +341,8 @@ test('expandChapterDetail: lines echoing the request are left out of every block
   assert.equal(isEchoedLine(echoed, ''), true, 'the exact line, with no request text at all');
   assert.equal(isEchoedLine('(The new paragraphs below are placed after the existing headings.)', ''), true);
   assert.equal(isEchoedLine('  keep the chapter’s VOICE and terms ', sent), true, 'a copy of a request sentence (case, quotes and spaces aside)');
+  assert.equal(isEchoedLine('圖位 1｜photo｜a pot｜位置：end｜英文搜尋詞：flower pot', ''), true, 'a plan line with search terms');
+  assert.equal(isEchoedLine('Image slot 1｜photo｜a pot｜Search terms: flower pot', ''), true);
   assert.equal(isEchoedLine('（番茄一天要六小時以上的日照。）', sent), false);
   assert.equal(isEchoedLine('（詳見本章後段）', sent), false, 'a reference to the chapter that is not about placement');
   assert.equal(isEchoedLine('Keep it.', sent), false, 'a short phrase is the chapter\'s own');

@@ -8,7 +8,7 @@
 import { noteLanguageOf, translate, translateNote, type ContentLanguage } from "../../i18n";
 import { imageKey } from "./image-dedupe";
 import { isDocumentFile, workKey } from "./image-quality";
-import { fencedLines } from "./note-sections";
+import { fencedLines, stripSearchTerms } from "./note-sections";
 import { escapeMarkdownText } from "./text";
 
 /** One planned picture position. `index` is assigned by the program in order (1..n); the model never writes it. */
@@ -138,7 +138,7 @@ export interface SlotScan {
  */
 /** A marker line's text without its list symbol and the emphasis symbols around it (`- **〔圖位 1：x〕**` -> `〔圖位 1：x〕`). */
 function markerCore(line: string): string {
-  return line
+  return stripSearchTerms(line)
     .trim()
     .replace(/^(?:[-+*]|\d+[.)])\s+/, "")
     .replace(/^[*_~]+/, "")

@@ -1163,12 +1163,19 @@ const META_NOTE = /^[\s*_>]*[（(]([^（）()]*)[）)][\s*_]*$/u;
 const META_SELF = /本章|本節|本段|章節|以下|上述|this chapter|this section|the chapter|below|above/i;
 const META_PLACE =
   /標題|結構|新增|插入|放在|接在|段落|heading|structure|insert|placed|placement|new (?:text|paragraphs?|sections?)|blocks?/i;
+/** The plan's per-slot search part (`｜英文搜尋詞：a, b`, zh-CN `英文搜索词`, en `Search terms:`): author-prompt text, never chapter text or part of a marker. */
+export const SEARCH_TERMS_SEGMENT = /[｜|]\s*(?:英文搜[尋寻索]詞|英文搜[尋寻索]词|Search terms)\s*[：:]/i;
+/** `text` with a search-terms segment cut off from its start to the end (or to the marker's closing `〕`). */
+export function stripSearchTerms(text: string): string {
+  return text.replace(/\s*[｜|]\s*(?:英文搜[尋寻索]詞|英文搜[尋寻索]词|Search terms)\s*[：:][^〕〔\n]*/gi, "");
+}
 /**
  * The lines of a change block that are the request echoed back or a note about the edit itself, not chapter text: a line whose letters
  * and digits are a copy of the request text actually sent (`sent`, its chapter data left out), or a bracketed note about the chapter's
  * structure or where the text goes (the 2026-11-20 run saved 「（本章結構以既有標題為準，以下新增段落接在章節正文各處；若找不到對應標題，請放在結語之前。）」).
  */
 export function isEchoedLine(line: string, sent: string): boolean {
+  if (SEARCH_TERMS_SEGMENT.test(line)) return true;
   const note = META_NOTE.exec(line)?.[1];
   if (note !== undefined && META_SELF.test(note) && META_PLACE.test(note)) return true;
   const key = echoKey(line);

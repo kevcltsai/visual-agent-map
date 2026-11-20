@@ -704,6 +704,9 @@ test('image slot markers: grammar, one count per index, bad/duplicate/inline cla
   const scan = slots.scanSlotMarkers(body, plan);
   assert.deepEqual(plain([...scan.found]), [[1, 1], [2, 8]]);
   assert.deepEqual(plain(scan.duplicateLines), [4]); assert.deepEqual(plain(scan.badLines), [5, 6, 7]); assert.deepEqual(plain(scan.inlineLines), [9]); assert.deepEqual(plain(scan.omitted), [3]);
+  // a search-terms segment the author copied from the plan into the marker (all three languages) still matches the slot
+  for (const seg of ['｜英文搜尋詞：Mona Lisa, Leonardo', '｜英文搜索词：Mona Lisa', '｜Search terms: Mona Lisa, Leonardo']) assert.deepEqual(plain([...slots.scanSlotMarkers('a\n〔圖位 1：x' + seg + '〕\nb', plan).found]), [[1, 1]], seg);
+  assert.deepEqual(plain([...slots.scanSlotMarkers('a\n〔圖位 1：x〕｜英文搜尋詞：a, b\nb', plan).found]), [[1, 1]], 'segment after the marker');
   // CRLF line endings
   assert.deepEqual(plain([...slots.scanSlotMarkers('a\r\n〔圖位 1：x〕\r\nb', plan).found]), [[1, 1]]);
   // fences and quotes: kept as written, not counted, never residual

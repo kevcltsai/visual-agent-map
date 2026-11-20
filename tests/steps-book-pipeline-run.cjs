@@ -45,7 +45,8 @@ async function rig(over = {}) {
     mutate: work => { const next = queue.then(work); queue = next.catch(() => undefined); return next; },
     readMap: path => repo.readMap(path),
     // Most tests here pin the older run without a trial (every card planned before gate 1): the run's `trial` is dropped unless `over.trial`.
-    updateMap: (path, change) => repo.updateMap(path, d => { change(d); if (!over.trial && d.bookPipeline) delete d.bookPipeline.trial; }),
+    // Trial tests run the trial at once (as a run that is past its plan review) unless `over.planReview` keeps the plan review.
+    updateMap: (path, change) => repo.updateMap(path, d => { change(d); if (d.bookPipeline) { if (!over.trial) delete d.bookPipeline.trial; if (!over.planReview) delete d.bookPipeline.planReview; } }),
     readCard: async path => {
       const note = await repo.readNote(path);
       return { path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: contents.get(path), settings: note.bookSettings ?? {}, fields: { ...(note.pipelineStage ? { pipelineStage: note.pipelineStage } : {}), ...(note.bookRole ? { bookRole: note.bookRole } : {}), ...(note.pipelineRole ? { pipelineRole: note.pipelineRole } : {}), ...(note.bookRoleBy ? { bookRoleBy: note.bookRoleBy } : {}), ...(note.pipelineIssue ? { pipelineIssue: note.pipelineIssue } : {}), ...(note.pipelineSeam ? { pipelineSeam: note.pipelineSeam } : {}) } };
@@ -1531,6 +1532,52 @@ test('T5 trial: fewer than three cards: the trial is every card, and gate 1 show
   await confirmDone(r.runs, r.mapPath);
   assert.equal((await r.state()).phase, 'gate2');
   assert.equal(r.stat.author.length, 2, 'nothing is written twice');
+});
+
+test('plan review: every chapter is planned, then the run waits for the owner before any chapter is written; "try" runs the trial to its gate 1', async () => {
+  const r = await trialRig({ planReview: true });
+  const trial = r.nodes.slice(0, 3).map(n => n.id);
+  await r.runs.start(r.mapPath);
+  let s = await r.state();
+  assert.equal(s.phase, 'gate1'); assert.equal(s.planReview, true);
+  same(r.stat.plan, ['global', ...r.nodes.map(n => n.id)], 'the whole book is planned');
+  assert.equal(r.stat.author.length, 0, 'nothing is written at the plan review');
+  await assert.rejects(() => r.runs.backToPlan(r.mapPath), e => e.code === 'not_gate1', 'already at the plan');
+  await r.runs.startTrial(r.mapPath); await idle(r);
+  s = await r.state();
+  assert.equal(s.phase, 'gate1'); assert.equal(s.planReview, undefined);
+  same(r.stat.author, trial, 'only the trial is written');
+  await assert.rejects(() => r.runs.startTrial(r.mapPath), e => e.code === 'not_gate1', 'the trial already ran');
+});
+
+test('plan review: "skip the trial" writes the whole book, each chapter once', async () => {
+  const r = await trialRig({ planReview: true });
+  await r.runs.start(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
+  const s = await r.state();
+  assert.equal(s.phase, 'gate2'); assert.equal(s.trial, undefined); assert.equal(s.planReview, undefined);
+  same(r.stat.author, r.nodes.map(n => n.id));
+  same(r.stat.plan, ['global', ...r.nodes.map(n => n.id)], 'nothing is planned again');
+});
+
+test('back to the plan: the trial chapters return to planned with their plans kept; the next trial writes them again without a new plan', async () => {
+  const r = await trialRig({ planReview: true });
+  const trial = r.nodes.slice(0, 3).map(n => n.id);
+  await r.runs.start(r.mapPath);
+  await r.runs.startTrial(r.mapPath); await idle(r);
+  const prompts = [0, 1, 2].map(i => r.raw(i).match(/## Prompt[\s\S]*?(?=\n## |$)/)?.[0]);
+  await r.runs.backToPlan(r.mapPath);
+  let s = await r.state();
+  assert.equal(s.phase, 'gate1'); assert.equal(s.planReview, true);
+  for (let i = 0; i < 3; i++) assert.equal(stageOf(r.raw(i)), 'planned');
+  same([0, 1, 2].map(i => r.raw(i).match(/## Prompt[\s\S]*?(?=\n## |$)/)?.[0]), prompts, 'the plans stay for the owner to edit');
+  const planned = r.stat.plan.length;
+  await r.runs.startTrial(r.mapPath); await idle(r);
+  s = await r.state();
+  assert.equal(s.phase, 'gate1'); assert.equal(s.planReview, undefined);
+  assert.equal(r.stat.plan.length, planned, 'no chapter is planned again');
+  same(r.stat.author, [...trial, ...trial], 'the trial is written again');
+  for (let i = 0; i < 3; i++) assert.equal(stageOf(r.raw(i)), 'checked');
 });
 
 test('T5 trial: retry while a trial card is needs-review: its counters start over and it is tried again', async () => {

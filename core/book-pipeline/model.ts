@@ -171,6 +171,8 @@ export interface BookPipelineData {
   expandPasses?: Record<string, number>;
   /** The trial cards (the first in reading order): only they run before gate 1, which shows their finished result. Absent = an older run: every card is planned before gate 1 as before. */
   trial?: string[];
+  /** True while the run waits (or will wait) at the plan review: every chapter is planned, then gate 1 shows the plan before the trial. Absent = the trial runs (or an older run). */
+  planReview?: boolean;
   /** The map's card set (ids) the run accepted: the cards of the map when it started, or when the owner chose "carry on as before". Absent = older data: `order`. */
   accepted?: string[];
   /** New cards (not in `order`) the owner chose to leave out with "carry on as before". Absent = none. */
@@ -330,6 +332,7 @@ function problem(raw: unknown): string | undefined {
     (!Array.isArray(raw.trial) || raw.trial.some(id => typeof id !== "string" || !(raw.order as string[]).includes(id)))
   )
     return "trial";
+  if (raw.planReview !== undefined && raw.planReview !== true) return "planReview";
   if (!isObject(raw.budget) || !isCount(raw.budget.used) || !isCount(raw.budget.limit) || raw.budget.limit < 1)
     return "budget";
   if (raw.consistency !== undefined && !consistencyShape(raw.consistency)) return "consistency";

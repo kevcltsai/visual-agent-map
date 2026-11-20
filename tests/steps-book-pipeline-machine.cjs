@@ -483,6 +483,14 @@ test('trial: a new run carries the first three cards; every card is planned firs
   for (const id of ['a', 'b', 'c', 'd']) { state = succeed(state, 'plan', id); stages[id] = 'planned'; }
   assert.deepEqual(actionsOf(state, stages, new Set(['e'])).actions, [], 'no chapter is written while another is still being planned');
   state = succeed(state, 'plan', 'e'); stages.e = 'planned';
+  assert.equal(state.planReview, true, 'a new run waits at the plan review');
+  assert.deepEqual(actionsOf(state, stages).actions, [{ type: 'advance_phase' }], 'nothing is written before the owner saw the plan');
+  state = machine.advancePhase(state, stages, NOW);
+  assert.equal(state.phase, 'gate1');
+  assert.equal(machine.backToPlan(state, NOW), state, 'already at the plan: a no-op');
+  state = machine.startTrial(state, NOW);
+  assert.equal(state.phase, 'planning'); assert.equal(state.planReview, undefined);
+  assert.equal(machine.startTrial(state, NOW), state, 'not at the plan review: a no-op');
   assert.deepEqual(actionsOf(state, stages).actions.map(a => `${a.type}:${a.nodeId}`), ['card_write:a', 'card_write:b', 'card_write:c'], 'the trial goes on to the author while the phase is still planning');
   assert.equal(state.phase, 'planning');
   for (const id of ['a', 'b', 'c']) { state = succeed(state, 'write', id); stages[id] = 'written'; }
@@ -494,8 +502,24 @@ test('trial: a new run carries the first three cards; every card is planned firs
   state = machine.advancePhase(state, stages, NOW);
   assert.equal(state.phase, 'gate1', 'a needs-review trial card does not hold gate 1 back');
   assert.deepEqual(actionsOf(state, stages), { actions: [], hold: 'gate1' });
+  const back = machine.backToPlan(state, NOW);
+  assert.equal(back.phase, 'gate1'); assert.equal(back.planReview, true, 'back to the plan review');
+  assert.deepEqual(plain(back.attempts.a), { plan: 0, write: 0, proof: 0 }, 'the trial counters start over');
+  assert.equal(machine.cardRevision(back, 'a'), machine.cardRevision(state, 'a') + 1, 'a result still in flight can no longer commit');
   state = machine.confirmGate1(state, NOW);
   assert.deepEqual(actionsOf(state, stages).actions.map(a => `${a.type}:${a.nodeId}`), ['card_write:d', 'card_write:e'], 'after the confirmation the trial cards start no further call');
+});
+
+test('plan review: "skip the trial" confirms gate 1 without a trial, and every chapter is written in the writing phase', () => {
+  const order = ['a', 'b', 'c', 'd'];
+  let state = succeed(trialRun(order), 'global');
+  const stages = Object.fromEntries(order.map(id => [id, 'planned']));
+  state = machine.advancePhase(state, stages, NOW);
+  assert.equal(state.phase, 'gate1'); assert.equal(state.planReview, true);
+  state = machine.confirmGate1(state, NOW);
+  assert.equal(state.phase, 'writing'); assert.equal(state.trial, undefined); assert.equal(state.planReview, undefined);
+  assert.deepEqual(actionsOf(state, stages).actions.map(a => `${a.type}:${a.nodeId}`), ['card_write:a', 'card_write:b', 'card_write:c', 'card_write:d']);
+  assert.equal(model.readBookPipeline({ bookPipeline: { ...plain(trialRun(order)), planReview: false } }).kind !== 'usable', true, 'planReview is true or absent');
 });
 
 test('trial: the whole-book plan must be done first, and a one-card or three-card book goes straight from the trial to gate 2 after the confirmation', () => {

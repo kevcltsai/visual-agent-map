@@ -96,6 +96,7 @@ export function newBookPipeline(input: {
     ...(input.staleStages?.length ? { pendingReset: [...input.staleStages] } : {}),
     ...(input.autoRoles?.length ? { autoRoles: [...input.autoRoles] } : {}),
     trial: input.order.slice(0, TRIAL_SIZE),
+    planReview: true,
     budget: { used: 0, limit: input.budgetLimit ?? DEFAULT_BUDGET_LIMIT },
     revision: 0,
     startedAt: input.now,
@@ -151,7 +152,7 @@ export function nextActions(
     const step: PipelineStep | null =
       stage === undefined
         ? "plan"
-        : !allPlanned || (data.phase === "planning" && !trialCard)
+        : !allPlanned || (data.phase === "planning" && (!trialCard || data.planReview))
           ? null
           : stage === "planned"
             ? "write"
@@ -248,7 +249,9 @@ export function advancePhase(data: BookPipelineData, stages: CardStages, now: st
   }
   const order = effectiveOrder(next);
   const all = (min: number): boolean => order.every(id => ranked(stages[id]) >= min);
-  const trialDone = next.trial ? next.trial.every(id => !order.includes(id) || ranked(stages[id]) >= 3) : all(1);
+  // A plan review (the owner has not chosen yet whether to run the trial) is reached once every chapter is planned.
+  const trialDone =
+    next.trial && !next.planReview ? next.trial.every(id => !order.includes(id) || ranked(stages[id]) >= 3) : all(1);
   if (next.phase === "planning" && next.globalPlanned && trialDone) next.phase = "gate1";
   else if (next.phase === "writing" && all(3)) next.phase = "gate2";
   else return data;
@@ -280,10 +283,45 @@ export function retryTrial(data: BookPipelineData, now: string): BookPipelineDat
   return next;
 }
 
-/** The owner confirmed gate 1: writing may start. A no-op outside gate 1. */
+/** At the plan review (gate 1 before the trial ran): the owner chose to run the trial. A no-op elsewhere. */
+export function startTrial(data: BookPipelineData, now: string): BookPipelineData {
+  if (data.phase !== "gate1" || data.status !== "running" || !data.planReview || !data.trial?.length) return data;
+  const next = clone(data);
+  delete next.planReview;
+  next.phase = "planning";
+  next.phaseStartedAt = now;
+  next.revision++;
+  return next;
+}
+
+/**
+ * At the trial's gate 1: the owner wants to change the plan first. The run goes back to the plan review; the trial chapters keep their
+ * plans (the owner edits them in the notes) and go back to planned, so the next trial writes them again from the edited plans. Their
+ * counters start over. A no-op elsewhere. The caller writes the planned stage onto the trial cards.
+ */
+export function backToPlan(data: BookPipelineData, now: string): BookPipelineData {
+  if (data.phase !== "gate1" || data.status !== "running" || data.planReview || !data.trial?.length) return data;
+  const next = clone(data);
+  next.planReview = true;
+  next.phaseStartedAt = now;
+  for (const id of data.trial) {
+    next.attempts[id] = emptyAttempts();
+    next.revisions[id] = cardRevision(next, id) + 1;
+    if (next.autoFixes) delete next.autoFixes[id];
+    if (next.expandPasses) delete next.expandPasses[id];
+  }
+  next.revision++;
+  return next;
+}
+
+/** The owner confirmed gate 1: writing may start. At the plan review this skips the trial (every chapter is written like the rest). A no-op outside gate 1. */
 export function confirmGate1(data: BookPipelineData, now: string): BookPipelineData {
   if (data.phase !== "gate1" || data.status !== "running") return data;
   const next = clone(data);
+  if (next.planReview) {
+    delete next.planReview;
+    delete next.trial;
+  }
   next.phase = "writing";
   next.phaseStartedAt = now;
   next.revision++;

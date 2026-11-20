@@ -86,3 +86,34 @@ export class AppliedHighlights {
     this.release();
   }
 }
+
+/** The 0-based line span of each offset range in `text` (CRLF-safe: lines are counted by "\n"). */
+export function lineSpans(
+  text: string,
+  ranges: readonly { from: number; to: number }[]
+): { start: number; end: number }[] {
+  const lineAt = (offset: number): number => {
+    let n = 0;
+    for (let i = text.indexOf("\n"); i !== -1 && i < offset; i = text.indexOf("\n", i + 1)) n++;
+    return n;
+  };
+  return ranges
+    .filter(r => r.from < r.to)
+    .map(r => ({ start: lineAt(r.from), end: lineAt(Math.max(r.from, r.to - 1)) }));
+}
+
+/** The reading view's twin of the CM6 mark: which rendered sections (by their line span) wear the light-green class. */
+export class ReadingMarks {
+  private marks: { path: string; spans: { start: number; end: number }[] } | null = null;
+  set(path: string, spans: { start: number; end: number }[]): void {
+    this.marks = spans.length ? { path, spans } : null;
+  }
+  clear(): void {
+    this.marks = null;
+  }
+  /** True when the section `[lineStart, lineEnd]` of `path` overlaps a marked span. */
+  wears(path: string, lineStart: number, lineEnd: number): boolean {
+    const marks = this.marks;
+    return !!marks && marks.path === path && marks.spans.some(s => s.start <= lineEnd && s.end >= lineStart);
+  }
+}

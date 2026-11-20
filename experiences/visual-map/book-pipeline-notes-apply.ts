@@ -30,6 +30,8 @@ export interface NotesApplyPorts {
   noticeAction(message: string, label: string, onClick: () => void, ms: number): { hide(): void };
   highlight(path: string, ranges: readonly { from: number; to: number }[]): void;
   releaseHighlight(): void;
+  /** Saves the open editor of this chapter to its file: the callouts are read from the file, so the undone text must be there first. */
+  flush(path: string): Promise<void>;
   /** A chapter's text went back to an earlier state (undo): the map's boxes must be aligned again. */
   undone(path: string): void;
   /** The header action and menu must repaint (state changed). */
@@ -192,7 +194,10 @@ export class BookNotesApply {
     }
     this.ports.releaseHighlight();
     this.lastUndo = null;
-    if (outcome.restored) this.ports.undone(last.path);
+    if (outcome.restored) {
+      await this.ports.flush(last.path).catch(() => undefined);
+      if (!this.disposed) this.ports.undone(last.path);
+    }
     if (!outcome.restored) return this.ports.notice(t("ui.book_note_undo_none"));
     this.ports.notice(
       outcome.skipped

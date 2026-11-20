@@ -36,9 +36,12 @@ import {
   type NotesLeaf
 } from "./experiences/visual-map/book-pipeline-notes-ui";
 import { BookNotesApply } from "./experiences/visual-map/book-pipeline-notes-apply";
+import { showAppliedNotice } from "./experiences/visual-map/book-applied-notice";
 import {
   AppliedHighlights,
   appliedExtension,
+  lineSpans,
+  ReadingMarks,
   setApplied,
   type HighlightTarget
 } from "./experiences/visual-map/book-applied-highlight";
@@ -558,22 +561,21 @@ export default class VisualAgentMapPlugin extends Plugin {
     reasonText: error => bookErrorReason(error),
     write: (path, transform) => this.bookNoteWriter(path, transform),
     notice: message => void new Notice(message),
-    noticeAction: (message, label, onClick, ms) => {
-      const notice = new Notice(
-        createFragment(fragment => {
-          fragment.createSpan({ text: message });
-          const link = fragment.createEl("a", { text: label, cls: "vam-book-undo-link", href: "#" });
-          link.addEventListener("click", event => {
-            event.preventDefault();
-            onClick();
-          });
-        }),
+    noticeAction: (message, label, onClick, ms) =>
+      showAppliedNotice(
+        document.body,
+        { set: (run, delay) => window.setTimeout(run, delay), clear: handle => window.clearTimeout(handle as number) },
+        message,
+        label,
+        onClick,
         ms
-      );
-      return { hide: () => notice.hide() };
-    },
+      ),
     highlight: (path, ranges) => this.bookHighlights.show(path, ranges),
     releaseHighlight: () => this.bookHighlights.release(),
+    flush: async path => {
+      for (const leaf of this.app.workspace.getLeavesOfType("markdown"))
+        if (leaf.view instanceof MarkdownView && leaf.view.file?.path === path) await leaf.view.save();
+    },
     undone: path => {
       const map = this.bookChapterMaps.get(path);
       if (map) void this.bookCallouts.reconcile(map);
@@ -591,6 +593,18 @@ export default class VisualAgentMapPlugin extends Plugin {
     setTimer: (run, ms) => window.setTimeout(run, ms),
     clearTimer: handle => window.clearTimeout(handle as number)
   });
+  /** The reading view's mark: the rendered sections of the changed lines wear the same light-green class (post-processor + a re-render). */
+  private readonly readingMarks = new ReadingMarks();
+  private setReadingMarks(view: MarkdownView, ranges: readonly { from: number; to: number }[] | null): void {
+    const path = view.file?.path;
+    if (!path) return;
+    if (ranges?.length) this.readingMarks.set(path, lineSpans(view.editor.getValue(), ranges));
+    else this.readingMarks.clear();
+    const container = view.previewMode?.containerEl;
+    if (ranges?.length) {
+      if (view.getMode() === "preview") view.previewMode.rerender(true);
+    } else container?.querySelectorAll(".vam-book-applied").forEach(el => el.removeClass("vam-book-applied"));
+  }
   private bookHighlightTargets(): HighlightTarget[] {
     const out: HighlightTarget[] = [];
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
@@ -601,7 +615,10 @@ export default class VisualAgentMapPlugin extends Plugin {
       out.push({
         key: view,
         path: () => view.file?.path,
-        set: ranges => cm.dispatch({ effects: setApplied.of(ranges) })
+        set: ranges => {
+          cm.dispatch({ effects: setApplied.of(ranges) });
+          this.setReadingMarks(view, ranges);
+        }
       });
     }
     return out;
@@ -768,6 +785,11 @@ export default class VisualAgentMapPlugin extends Plugin {
       key: "ui.command_book_note_undo"
     });
     this.registerEditorExtension(appliedExtension);
+    this.registerMarkdownPostProcessor((el, ctx) => {
+      const info = ctx.getSectionInfo(el);
+      if (info && this.readingMarks.wears(ctx.sourcePath, info.lineStart, info.lineEnd))
+        el.addClass("vam-book-applied");
+    });
     this.registerEvent(this.app.workspace.on("file-open", () => this.bookHighlights.sync()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.bookHighlights.sync()));
     this.registerEvent(this.app.workspace.on("layout-change", () => this.bookHighlights.sync()));

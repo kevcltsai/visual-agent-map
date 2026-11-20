@@ -10,6 +10,8 @@ const b = loadSource(`
 export { BookNotesApply, NOTES_TIMEOUT_MS, UNDO_NOTICE_MS } from "./experiences/visual-map/book-pipeline-notes-apply";
 export { stampRaw, bodyStateRaw, readBodyRecord, integrityFpRaw } from "./core/book-pipeline/body-integrity";
 export { AppliedHighlights, HIGHLIGHT_MS, appliedField, setApplied } from "./experiences/visual-map/book-applied-highlight";
+export { lineSpans, ReadingMarks } from "./experiences/visual-map/book-applied-highlight";
+export { showAppliedNotice } from "./experiences/visual-map/book-applied-notice";
 export { EditorState } from "@codemirror/state";
 export { setUiLanguage } from "./i18n";
 `, { obsidian: { ...S.obsidian } }, {});
@@ -39,7 +41,7 @@ function clock() {
 
 function rig({ run, text = '', busy = null } = {}) {
   const c = clock();
-  const r = { c, notices: [], actions: [], writes: [], highlights: [], undones: [], releases: 0, changed: 0, cancels: [], text, busy };
+  const r = { c, notices: [], actions: [], writes: [], highlights: [], undones: [], order: [], releases: 0, changed: 0, cancels: [], text, busy };
   r.deferred = null;
   r.ports = {
     run: (path, signal) => run ? run(path, signal, r) : new Promise((resolve, reject) => { r.deferred = { resolve, reject }; signal.addEventListener('abort', () => reject(Object.assign(new Error('cancelled'), { code: 'cancelled' }))); }),
@@ -53,7 +55,8 @@ function rig({ run, text = '', busy = null } = {}) {
     noticeAction: (message, label, onClick, ms) => { const a = { message, label, onClick, ms, hidden: false }; r.actions.push(a); return { hide: () => { a.hidden = true; } }; },
     highlight: (path, ranges) => r.highlights.push({ path, ranges }),
     releaseHighlight: () => { r.releases++; },
-    undone: path => { r.undones.push(path); },
+    flush: async path => { r.order.push('flush:' + path); },
+    undone: path => { r.order.push('undone'); r.undones.push(path); },
     changed: () => { r.changed++; },
     now: () => c.t, setTimer: c.set, clearTimer: c.clear, setTick: c.tick, clearTick: c.clear
   };
@@ -156,6 +159,7 @@ test('undo (review-a M3): a successful undo asks for the map boxes to be aligned
   assert.deepEqual(r.undones, []);
   await r.ctl.undo();
   assert.deepEqual(r.undones, ['N/c.md']);
+  assert.equal(r.order.join(), 'flush:N/c.md,undone', 'the editor is saved to the file before the callouts are re-aligned');
   const q = rig({ text: detail(`${P_NEW}\n\n別的段`), run: async () => applied() });
   q.ctl.press('N/c.md'); await flush();
   q.refuse = true;
@@ -287,4 +291,38 @@ test('highlight field: the marks map through edits, out-of-range ranges are drop
   assert.equal(at, 4, 'mapped through the insert');
   state = state.update({ effects: b.setApplied.of(null) }).state;
   assert.equal(count(state), 0);
+});
+
+test('applied notice: bottom-right box removed by its own 10 s timer; undo click works; hide clears the timer', () => {
+  const c = clock();
+  const made = [];
+  const host = { createDiv: o => { const box = { o, removed: false, clicks: [], createSpan() {}, createEl: () => ({ addEventListener: (_t, fn) => box.clicks.push(fn) }), remove() { box.removed = true; } }; made.push(box); return box; } };
+  const timers = { set: c.set, clear: c.clear };
+  let undone = 0;
+  const n = b.showAppliedNotice(host, timers, 'm', 'u', () => undone++, 10000);
+  assert.equal(made[0].o.cls, 'vam-book-applied-notice');
+  made[0].clicks[0]({ preventDefault() {} });
+  assert.equal(undone, 1);
+  c.advance(9999);
+  assert.equal(made[0].removed, false);
+  c.advance(1);
+  assert.equal(made[0].removed, true);
+  const n2 = b.showAppliedNotice(host, timers, 'm', 'u', () => {}, 10000);
+  n2.hide();
+  assert.equal(made[1].removed, true);
+  assert.equal(c.timers.length, 0);
+});
+
+test('reading marks: line spans of changed ranges (CRLF-safe), sections overlap, clear removes', () => {
+  const text = 'a\r\nb\r\n\r\nc\r\nd';
+  const from = text.indexOf('c');
+  const spans = b.lineSpans(text, [{ from, to: from + 1 }]);
+  assert.equal(JSON.stringify(spans), JSON.stringify([{ start: 3, end: 3 }]));
+  const m = new b.ReadingMarks();
+  m.set('n.md', spans);
+  assert.equal(m.wears('n.md', 3, 3), true);
+  assert.equal(m.wears('n.md', 0, 1), false);
+  assert.equal(m.wears('o.md', 3, 3), false);
+  m.clear();
+  assert.equal(m.wears('n.md', 3, 3), false);
 });

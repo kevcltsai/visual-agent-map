@@ -2946,6 +2946,7 @@ export class BookPipelineRuns {
     };
     let commonsAsked = 0;
     let commonsLimited = false;
+    let commonsNoHint = 0;
     try {
       const round1 = await search(wanted, false, exclude);
       keepHints(round1);
@@ -2986,6 +2987,8 @@ export class BookPipelineRuns {
           );
           commonsAsked = commons.requests;
           commonsLimited = commons.limited;
+          // Slots the finder gave no English search words for: their Commons queries are the slot line, which rarely matches a file.
+          commonsNoHint = lacking.filter(slot => !hints.get(slot.index)?.search).length;
           if (signal.aborted) throw new Error("aborted");
           const asFound: FoundImages = {
             bySlot: commons.bySlot,
@@ -3055,7 +3058,8 @@ export class BookPipelineRuns {
             placed: result.placed.length,
             missing: result.missing.length,
             ...(commonsAsked ? { commons: commonsAsked } : {}),
-            ...(commonsLimited ? { commons_limited: 1 } : {})
+            ...(commonsLimited ? { commons_limited: 1 } : {}),
+            ...(commonsNoHint ? { commons_nohint: commonsNoHint } : {})
           },
           hosts: { name: "reason", list: [...new Set(result.missing.map(item => item.reasonCode))] }
         })

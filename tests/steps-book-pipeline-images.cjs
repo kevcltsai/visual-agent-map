@@ -1108,6 +1108,7 @@ test('commons fallback: a picture another chapter shows is not taken again; a fa
   const detail = (await r.note(0)).detail;
   assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state, s.reasonCode ?? ''])), [[1, 'placed', ''], [2, 'missing', 'not_found']]);
   assert.equal(stageOf(r.raw(0)), 'checked', 'no picture setting: a missing picture stays a notice');
+  assert.match(r.stat.logs.join('\n'), /slots .* commons_nohint=1/, 'a slot without English search words is counted');
   const twice = await picRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: () => found({}), ports: { fetchCommons: async () => ({ status: 200, text: commonsAnswer(['Same.jpg'], {}, 'Perspective drawings that explains') }) } });
   await run(twice);
   const all = [...figures((await twice.note(0)).detail), ...figures((await twice.note(1)).detail)].filter(f => /Same\.jpg/.test(f));
@@ -1251,8 +1252,9 @@ test('repro v4 K: a slot asks up to 3 queries (search words, subject, its line) 
 const V4_POT = { index: 3, kind: '示意圖', explains: '比較有排水孔的盆和只在盆底鋪碎石的盆。', search: 'pot drainage hole gravel' };
 const V4_PAKCHOI = { index: 4, kind: '示意圖', explains: '小白菜淺覆土播種的方式，呼應好光性種子的特性。', search: 'pak choi sowing seeds' };
 const v4File = (name, description, categories) => commonsAnswer([name], { [name]: { extmetadata: { ImageDescription: { value: description }, Categories: { value: categories } } } });
-const V4_POT_FILE = v4File('Glazed_Flowerpot.jpg', 'Glazed flowerpot with a drainage hole', 'Flower pots in museums|Glazed pottery');
-const V4_PAKCHOI_FILE = v4File('Brassica_rapa_Pak_Choi_Weiß_(white-stemmed_pak_choi)_(SaatPilot).jpg', 'Pak Choi Weiß, white-stemmed pak choi', 'Brassica rapa subsp. chinensis|SaatPilot');
+/** The two v4 files with their real file page text (2026-11-20). */
+const V4_POT_FILE = v4File('Glazed_Flowerpot.jpg', 'Green glazed flower pot with slightly flaring sides.  Rounded, molded lip.  Inside unglazed.  One drainage hole in bottom.  Made by Joseph Oser. Title: Glazed Flowerpot', 'PD-Art (PD-US-expired)|Images uploaded by Fæ|PD US expired|Collections of the Missouri History Museum');
+const V4_PAKCHOI_FILE = v4File('Brassica_rapa_Pak_Choi_Weiß_(white-stemmed_pak_choi)_(SaatPilot).jpg', 'This white-stemmed pak choi, offered by SaatPilot as ‘Pak Choi Weiß’, is a non-heading Chinese cabbage (Brassica rapa subsp. chinensis) that forms an open rosette of green, spoon-shaped leaves on broad, crisp, pale stalks. Young leaves can be cut as baby leaf; whole heads need more space', 'Brassica rapa subsp. chinensis|Self-published work');
 
 test('repro v4 L: a Commons file that does not name every search word of its slot keeps its own name as caption and is marked loose; a full match keeps the slot line', () => {
   const pot = C.parseCommonsAnswer(V4_POT_FILE, V4_POT)[0];
@@ -1280,4 +1282,5 @@ test('repro v4 L: placed from Commons, the loose file reads "圖：<name>" in th
   assert.match(note.detail, /!\[Perspective drawing of a house\]\([^)\s]+\)\n圖：Perspective drawing of a house\n來源：/);
   assert.equal(recordOf(note.detail).slots[0].off, true);
   assert.equal(note.pipelineIssue, 'image notice: image_1_mismatch');
+  assert.match(r.stat.logs.join('\n'), /slots .* commons=1(?! .*commons_nohint)/, 'the slot had English search words');
 });

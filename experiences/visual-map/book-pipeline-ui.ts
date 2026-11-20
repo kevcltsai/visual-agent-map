@@ -55,7 +55,7 @@ export interface BookBarState {
   /** Gate 1: how many of the trial chapters need a look (shown after the trial sentence; nothing when 0). */
   trialAttention?: number;
   /** Gate 2: the chapters written and how many still need a look; the view fills it from the notes (see its `bookReviewCount`). */
-  review?: { total: number; attention: number };
+  review?: { total: number; attention: number; seam?: number };
 }
 export interface BookCurrent {
   /** The whole-book plan, or a chapter step. */
@@ -119,12 +119,11 @@ export function bookBarState(
       : undefined;
   // Waiting at a gate, or a finished book: the same wording shows a map that differs from the book's chapters (a line only; nothing
   // is planned again on its own).
+  // A finished book is final whatever its saved status or the runner's last record say.
   const gateChange =
     !mapChange &&
-    !active &&
-    status !== "stopped" &&
     mapIds &&
-    (phase === "gate1" || phase === "gate2" || phase === "done")
+    (phase === "done" || (!active && status !== "stopped" && (phase === "gate1" || phase === "gate2")))
       ? countChange(mapDifference(data, mapIds))
       : undefined;
   const mode: BookBarMode = mapChange
@@ -305,7 +304,14 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
   if (state.mode === "gate2" && state.review) {
     top.createSpan({
       cls: "vam-book-bar-counts",
-      text: t("ui.book_bar_review_0_1", state.review.total, state.review.attention)
+      text: state.review.seam
+        ? t(
+            "ui.book_bar_review_seam_0_1_2",
+            state.review.total,
+            state.review.attention - state.review.seam,
+            state.review.seam
+          )
+        : t("ui.book_bar_review_0_1", state.review.total, state.review.attention)
     });
     if (actions.nextReview && state.review.attention > 0)
       makeButton(buttons, t("ui.book_bar_next_review"), "vam-book-link vam-book-next-review", actions.nextReview);

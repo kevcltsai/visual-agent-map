@@ -3404,6 +3404,7 @@ export const en = {
   "ui.book_bar_notes_ask_0": "{0} notes are not applied yet. Run the whole book anyway?",
   "ui.book_bar_go_anyway": "Run anyway",
   "ui.book_bar_review_0_1": "{0} chapters written, {1} need a look",
+  "ui.book_bar_review_seam_0_1_2": "{0} chapters written, {1} need a look, {2} joins to confirm",
   "ui.book_bar_next_review": "Next chapter to check",
   "ui.book_bar_finish": "Finish review",
   "ui.book_bar_finish_ask_0": "{0} chapters are not handled yet. Finish anyway?",

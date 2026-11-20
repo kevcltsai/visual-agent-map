@@ -3179,6 +3179,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_bar_notes_ask_0": "還有 {0} 則備註沒套用，仍要跑完全書嗎？",
   "ui.book_bar_go_anyway": "仍要",
   "ui.book_bar_review_0_1": "{0} 章寫好了，{1} 章要你看",
+  "ui.book_bar_review_seam_0_1_2": "{0} 章寫好了，{1} 章要你看，{2} 章銜接待確認",
   "ui.book_bar_next_review": "下一章要看的",
   "ui.book_bar_finish": "驗收完成",
   "ui.book_bar_finish_ask_0": "還有 {0} 章沒處理，仍要完成嗎？",

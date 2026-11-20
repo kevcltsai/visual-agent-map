@@ -112,6 +112,7 @@ import {
   parseCardPrompt,
   parseChecklist,
   parseImageSlots,
+  dropEntryNaming,
   retargetNeighbourLine,
   rewriteNeighbourLine
 } from "../../core/book-pipeline/plan-text";
@@ -1172,7 +1173,7 @@ export class BookPipelineRuns {
     return result;
   }
 
-  /** The owner's "seam checked": the only thing that clears `pipeline-seam` (a proofread or any automatic step never does). */
+  /** The owner's "seam checked" clears `pipeline-seam` (a proofread never does; a whole-book rewrite does, see `clearSeams`). */
   async confirmSeam(mapPath: string, nodeId: string): Promise<void> {
     return this.enter(mapPath, async drive => {
       const map = await this.ports.readMap(mapPath);
@@ -1405,10 +1406,24 @@ export class BookPipelineRuns {
     const signal = drive.controller.signal;
     if (!drive.store.state.removed?.length || this.dead(drive) || signal.aborted || drive.fatal !== undefined) return;
     const order = effectiveOrder(drive.store.state);
+    // The removed chapters' titles (a title a chapter of the book still has is not one).
+    const present = new Set(order.map(id => drive.cards.get(id)?.title.trim() ?? ""));
+    const gone = (drive.store.state.removed ?? [])
+      .map(id => drive.store.state.chapters?.[id]?.title?.trim() ?? "")
+      .filter(title => title && !present.has(title));
     try {
       for (const [at, nodeId] of order.entries()) {
         const own = drive.cards.get(nodeId);
         if (!own || drive.stages.get(nodeId) === undefined) continue;
+        // The `接入點` line that still names a removed chapter goes (Primary decision: a join that is no longer there).
+        const before = await this.ports.readCard(own.path);
+        const dropped = gone.length ? dropEntryNaming(before.prompt, gone) : undefined;
+        if (dropped !== undefined && !this.dead(drive) && !signal.aborted)
+          await this.ports.updateNoteGuarded(
+            own.path,
+            { prompt: dropped },
+            { expectedContent: before.raw, authorize: () => !this.dead(drive) && !signal.aborted }
+          );
         for (const { index, key } of [
           { index: at - 1, key: "previous" as const },
           { index: at + 1, key: "next" as const }
@@ -2505,7 +2520,8 @@ export class BookPipelineRuns {
    */
   private mayOverwriteCard(drive: Drive, nodeId: string, raw: string): boolean {
     const state = bodyStateRaw(raw);
-    if ((state === "clean" || state === "empty") && !isKeptRaw(raw)) return true;
+    // A kept text the program wrote itself ("accept as it is"): only the card's own rerun (the reader's explicit ask) rewrites it.
+    if ((state === "clean" || state === "empty") && (!isKeptRaw(raw) || drive.rerun?.nodeId === nodeId)) return true;
     const permit = drive.overwrite.get(nodeId);
     return !!permit && permit.runId === drive.store.state.runId && permit.fingerprint === integrityFpRaw(raw);
   }
@@ -2517,7 +2533,10 @@ export class BookPipelineRuns {
     if (!info || !rootInfo) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
     // The reader's own Summary (a kept chapter, or a card the pipeline never wrote that has text): the plan and the write keep it.
-    if (isKeptRaw(card.raw) || (bodyStateRaw(card.raw) === "unknown" && !pipelineWroteRaw(card.raw)))
+    if (
+      (isKeptRaw(card.raw) && bodyStateRaw(card.raw) !== "clean") ||
+      (bodyStateRaw(card.raw) === "unknown" && !pipelineWroteRaw(card.raw))
+    )
       drive.ownSummary.add(nodeId);
     // A chapter the program may not rewrite (hand-edited, unknown or kept, and no permission) gets no plan: the write step would refuse it anyway.
     if (!this.mayOverwriteCard(drive, nodeId, card.raw)) {
@@ -2866,7 +2885,30 @@ export class BookPipelineRuns {
       : await this.fillSlots(drive, token, nodeId, path, slots, authorize);
     if (filled) return filled;
     drive.imagesDone.add(nodeId);
-    return { kind: "ok", after: () => this.setStage(drive, nodeId, "written", null) };
+    return {
+      kind: "ok",
+      after: async () => {
+        await this.setStage(drive, nodeId, "written", null);
+        await this.clearSeams(drive, nodeId);
+      }
+    };
+  }
+
+  /**
+   * The whole run wrote this chapter again, beside its neighbours as they are now: the join marks of the chapter and of both neighbours
+   * (left by an earlier single-card rerun) are stale and go (Primary decision). A single-card job sets its neighbours' marks itself.
+   */
+  private async clearSeams(drive: Drive, nodeId: string): Promise<void> {
+    if (drive.job) return;
+    const order = effectiveOrder(drive.store.state);
+    const at = order.indexOf(nodeId);
+    if (at < 0) return;
+    for (const id of [order[at - 1], nodeId, order[at + 1]]) {
+      const info = id ? drive.cards.get(id) : undefined;
+      if (!info || this.dead(drive)) continue;
+      const card = await this.ports.readCard(info.path).catch(() => undefined);
+      if (card?.fields.pipelineSeam !== undefined) await this.writeFields(drive, id, { pipelineSeam: null });
+    }
   }
 
   /**

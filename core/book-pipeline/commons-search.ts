@@ -4,13 +4,16 @@
  * request after {@link COMMONS_CHAPTER_MS} for the chapter. The answers go through the same rules as the finder's (file page source,
  * the subject rule); the caller probes them and dedupes by address and work as for any candidate. Only photographs and drawings are
  * taken (never a page of a PDF, DjVu or TIFF scan), and only a file whose title, description or categories name what the slot asks for.
+ * Every query asks for bitmap files only: a plain word search ranks scanned books (PDF, DjVu) first, whose pages the rules refuse.
+ * A rate-limit answer (429) ends the search of the chapter. Worst case: {@link COMMONS_REQUESTS_PER_SLOT} requests a slot, and none
+ * after {@link COMMONS_CHAPTER_MS}.
  */
 import { askWords, wordHits, wrongGenre } from "./file-fit";
 import { bySubject, fileSourceOf, isDocumentFile } from "./image-quality";
 
 /** The only address the search asks (the port refuses any other). */
 export const COMMONS_API = "https://commons.wikimedia.org/w/api.php";
-export const COMMONS_REQUESTS_PER_SLOT = 2;
+export const COMMONS_REQUESTS_PER_SLOT = 3;
 export const COMMONS_PER_SLOT = 3;
 export const COMMONS_REQUEST_MS = 10_000;
 export const COMMONS_CHAPTER_MS = 45_000;
@@ -48,6 +51,8 @@ export interface CommonsCandidate {
   caption: string;
   /** What the file page says about the file: its description and categories (plain text, capped). */
   description: string;
+  /** The file does not name every English search word of its slot: the caption is the file's own name, not the slot's line. */
+  loose?: true;
   author?: string;
   license?: string;
 }
@@ -60,8 +65,8 @@ export function commonsSearchUrl(query: string): string {
     formatversion: "2",
     generator: "search",
     gsrnamespace: "6",
-    gsrsearch: query,
-    gsrlimit: "10",
+    gsrsearch: `${query} filetype:bitmap`,
+    gsrlimit: "20",
     prop: "imageinfo",
     iiprop: "url|mime|thumbmime|extmetadata",
     iiurlwidth: "1280",
@@ -138,17 +143,20 @@ export function parseCommonsAnswer(text: string, slot: CommonsSlot): CommonsCand
       .trim();
     if (wrongGenre(slot.kind, `${title} ${categories}`)) continue;
     const words = askWords(slot);
-    if (wordHits(words, `${title} ${about} ${categories}`) < Math.min(FIT_HITS, words.length) || !words.length)
-      continue;
+    const said = `${title} ${about} ${categories}`;
+    if (wordHits(words, said) < Math.min(FIT_HITS, words.length) || !words.length) continue;
+    // The slot's line is the caption only when the file names every English search word of the slot; else the file's own name is.
+    const terms = askWords({ explains: "", search: slot.search });
+    const fits = terms.length > 0 && wordHits(terms, said) === terms.length;
     const candidate = fileSourceOf<CommonsCandidate>({
       title: title || page.title,
       url,
       source: info.descriptionurl,
-      // The program writes no caption of its own: the slot's line (in the book's language) says what the picture is for.
-      caption: slot.explains.replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX),
+      caption: (fits ? slot.explains : title || page.title).replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX),
       description: [about, categories].filter(Boolean).join(" · ").slice(0, DESCRIPTION_MAX),
       ...(author ? { author } : {}),
-      ...(license ? { license } : {})
+      ...(license ? { license } : {}),
+      ...(fits ? {} : { loose: true as const })
     });
     if (!candidate || !bySubject(candidate, slot.subject)) continue;
     if (out.some(have => have.url === candidate.url)) continue;
@@ -173,28 +181,31 @@ function bounded<T>(work: Promise<T>, ms: number, signal: AbortSignal): Promise<
 }
 
 /**
- * Up to {@link COMMONS_PER_SLOT} candidates per slot, slots in order, one request at a time. A slot's second query is asked only when
- * the first gave nothing usable. `skip` refuses addresses the chapter already tried or the book uses. Never throws (a Stop ends early).
+ * Up to {@link COMMONS_PER_SLOT} candidates per slot, slots in order, one request at a time. A slot's next query is asked only when
+ * the ones before gave nothing usable. `skip` refuses addresses the chapter already tried or the book uses. A 429 answer asks nothing
+ * more (`limited`). Never throws (a Stop ends early).
  */
 export async function searchCommons(
   slots: readonly CommonsSlot[],
   fetch: CommonsFetch,
   options: { signal: AbortSignal; skip: (url: string) => boolean; now?: () => number }
-): Promise<{ bySlot: Map<number, CommonsCandidate[]>; requests: number }> {
+): Promise<{ bySlot: Map<number, CommonsCandidate[]>; requests: number; limited: boolean }> {
   const now = options.now ?? Date.now;
   const deadline = now() + COMMONS_CHAPTER_MS;
   const bySlot = new Map<number, CommonsCandidate[]>();
   let requests = 0;
+  let limited = false;
   for (const slot of slots) {
     const list: CommonsCandidate[] = [];
     for (const query of commonsQueries(slot)) {
-      if (list.length || options.signal.aborted || now() >= deadline) break;
+      if (list.length || limited || options.signal.aborted || now() >= deadline) break;
       requests++;
       const answer = await bounded(
         Promise.resolve().then(() => fetch(commonsSearchUrl(query))),
         COMMONS_REQUEST_MS,
         options.signal
       );
+      if (answer?.status === 429) limited = true;
       if (!answer || answer.status !== 200) continue;
       for (const candidate of parseCommonsAnswer(answer.text, slot)) {
         if (list.length >= COMMONS_PER_SLOT) break;
@@ -203,5 +214,5 @@ export async function searchCommons(
     }
     if (list.length) bySlot.set(slot.index, list);
   }
-  return { bySlot, requests };
+  return { bySlot, requests, limited };
 }

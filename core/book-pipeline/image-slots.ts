@@ -185,6 +185,8 @@ export interface SlotCandidate {
   caption: string;
   /** What the file page says about the file (the program's Commons search); absent for the finder's pictures, whose caption is its own description. */
   description?: string;
+  /** The program's Commons search could not tie the file to everything its slot asks for: the caption names the file, and the proof marks a mismatch. */
+  loose?: true;
   /** Creator and license as the finder reported them from the source page; never invented here. */
   author?: string;
   license?: string;
@@ -301,7 +303,7 @@ export function sourceOf(
   };
 }
 
-/** A finder caption is one plain line (what it is, where to look); an empty one falls back to the title. */
+/** A finder caption is one plain line (what it is, where to look); an empty one falls back to the title; a loose Commons file reads `Picture: <its name>`. */
 export function figureOf(candidate: SlotCandidate, href: string, language: string): SlotFigure {
   // The marker brackets are taken out first: a caption must never read as a slot marker.
   const plain = (value: string): string => value.replace(/[〔〕]/g, " ");
@@ -310,7 +312,9 @@ export function figureOf(candidate: SlotCandidate, href: string, language: strin
   return {
     href,
     alt,
-    caption: plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
+    caption: candidate.loose
+      ? translateNote(language as ContentLanguage, "note.image_file_caption_0", alt)
+      : plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
     ...(source ? { source } : {})
   };
 }

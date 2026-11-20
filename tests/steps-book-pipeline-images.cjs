@@ -1009,7 +1009,7 @@ const commonsAnswer = (names, over = {}, categories = '') => JSON.stringify({ qu
   descriptionurl: `https://commons.wikimedia.org/wiki/File:${name}`,
   extmetadata: { Artist: { value: '<a href="//commons.wikimedia.org/wiki/User:Ann">Ann &amp; Bo</a>' }, LicenseShortName: { value: 'CC BY-SA 4.0' }, ...(categories ? { Categories: { value: categories } } : {}) },
   ...(over[name] ?? {}) }] })) } });
-const queryOf = url => new URL(url).searchParams.get('gsrsearch');
+const queryOf = url => new URL(url).searchParams.get('gsrsearch').replace(/ filetype:bitmap$/, '');
 
 test('commons parse: safe types only (an SVG through its PNG thumbnail), https, the file page as source, plain credits, the subject rule', () => {
   const slot = { index: 1, explains: '葉背的蚜蟲', search: 'aphids leaf' };
@@ -1030,7 +1030,7 @@ test('commons parse: safe types only (an SVG through its PNG thumbnail), https, 
   assert.deepEqual(plain(C.parseCommonsAnswer('{"batchcomplete":true}', slot)), [], 'no hits');
 });
 
-test('commons search: the finder\'s English words first, the slot line second only when the first gave nothing; at most 2 requests a slot, 3 candidates', async () => {
+test('commons search: the finder\'s English words first, the slot line next only when the ones before gave nothing; at most 3 requests a slot, 3 candidates', async () => {
   const asked = [];
   const fetch = async url => { asked.push(url); const q = queryOf(url); return { status: 200, text: q === 'aphids leaf' ? '{}' : commonsAnswer(['A1.jpg', 'A2.jpg', 'A3.jpg', 'A4.jpg'], {}, 'Aphids on a leaf|Drip irrigation') }; };
   const ctl = new AbortController();
@@ -1220,4 +1220,64 @@ test('repro v3 I: a finder picture whose title and caption name nothing its slot
   assert.deepEqual(plain(recordOf(detail).slots), [{ index: 1, state: 'placed', hash: recordOf(detail).slots[0].hash, off: true }]);
   assert.equal((await r.note(0)).pipelineIssue, 'image notice: image_1_mismatch');
   assert.equal(stageOf(r.raw(0)), 'checked', 'a notice, never needs-review');
+});
+
+// ---- repro v4 K: 15 pictures for 6 chapters of 6–10; a plain Commons word search ranked scanned books (PDF/DjVu) first ----
+/** What Commons answered the v4 queries without a file type: ten scanned books (PDF pages), no photograph. */
+const v4PdfAnswer = () => commonsAnswer(Array.from({ length: 10 }, (_, i) => `History_of_ancient_pottery_${i}.pdf`), Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`History_of_ancient_pottery_${i}.pdf`, { mime: 'application/pdf', thumbmime: 'image/jpeg' }])), 'Pots|Containers');
+
+test('repro v4 K: every Commons query asks for bitmap files only (20 a request), so a slot is filled where the plain search gave only PDFs', async () => {
+  const asked = [];
+  const fetch = async url => { const q = new URL(url).searchParams.get('gsrsearch'); asked.push(q); return { status: 200, text: /filetype:bitmap$/.test(q) ? commonsAnswer(['Plastic_and_terracotta_pots.jpg']) : v4PdfAnswer() }; };
+  const out = await C.searchCommons([{ index: 2, kind: '範例照片', explains: '塑膠盆、陶盆、不織布袋並排放在一起', search: 'plastic terracotta fabric pots' }], fetch, { signal: new AbortController().signal, skip: () => false });
+  assert.deepEqual(asked, ['plastic terracotta fabric pots filetype:bitmap']);
+  assert.deepEqual(plain(out.bySlot.get(2).map(c => c.title)), ['Plastic and terracotta pots']);
+  assert.equal(new URL(C.commonsSearchUrl('x')).searchParams.get('gsrlimit'), '20');
+  assert.deepEqual(plain(C.parseCommonsAnswer(v4PdfAnswer(), { index: 2, explains: 'x', search: 'pots containers' })), [], 'the PDFs stay refused');
+});
+
+test('repro v4 K: a slot asks up to 3 queries (search words, subject, its line) only while nothing is usable; a 429 asks nothing more in the chapter', async () => {
+  const asked = [];
+  const out = await C.searchCommons([{ index: 1, explains: '葉背的蚜蟲', subject: 'Ann', search: 'aphids leaf' }], async url => { asked.push(queryOf(url)); return { status: 200, text: '{}' }; }, { signal: new AbortController().signal, skip: () => false });
+  assert.deepEqual(asked, ['aphids leaf', 'Ann', '葉背的蚜蟲']);
+  assert.equal(out.requests, 3); assert.equal(out.limited, false);
+  let n = 0;
+  const limited = await C.searchCommons([{ index: 1, explains: 'a', search: 'b' }, { index: 2, explains: 'c', search: 'd' }], async () => { n++; return { status: 429, text: 'You are making too many requests to the API.' }; }, { signal: new AbortController().signal, skip: () => false });
+  assert.equal(n, 1, 'one 429 ends the chapter\'s Commons search');
+  assert.equal(limited.limited, true); assert.equal(limited.bySlot.size, 0);
+});
+
+// ---- repro v4 L: two Commons files placed under a slot line that says something the picture does not show ----
+const V4_POT = { index: 3, kind: '示意圖', explains: '比較有排水孔的盆和只在盆底鋪碎石的盆。', search: 'pot drainage hole gravel' };
+const V4_PAKCHOI = { index: 4, kind: '示意圖', explains: '小白菜淺覆土播種的方式，呼應好光性種子的特性。', search: 'pak choi sowing seeds' };
+const v4File = (name, description, categories) => commonsAnswer([name], { [name]: { extmetadata: { ImageDescription: { value: description }, Categories: { value: categories } } } });
+const V4_POT_FILE = v4File('Glazed_Flowerpot.jpg', 'Glazed flowerpot with a drainage hole', 'Flower pots in museums|Glazed pottery');
+const V4_PAKCHOI_FILE = v4File('Brassica_rapa_Pak_Choi_Weiß_(white-stemmed_pak_choi)_(SaatPilot).jpg', 'Pak Choi Weiß, white-stemmed pak choi', 'Brassica rapa subsp. chinensis|SaatPilot');
+
+test('repro v4 L: a Commons file that does not name every search word of its slot keeps its own name as caption and is marked loose; a full match keeps the slot line', () => {
+  const pot = C.parseCommonsAnswer(V4_POT_FILE, V4_POT)[0];
+  assert.equal(pot.title, 'Glazed Flowerpot');
+  assert.equal(pot.caption, 'Glazed Flowerpot', 'never "比較有排水孔的盆和只在盆底鋪碎石的盆"');
+  assert.equal(pot.loose, true);
+  const pak = C.parseCommonsAnswer(V4_PAKCHOI_FILE, V4_PAKCHOI)[0];
+  assert.equal(pak.loose, true);
+  assert.ok(!/播種/.test(pak.caption), 'never "小白菜淺覆土播種的方式"');
+  const full = C.parseCommonsAnswer(commonsAnswer(['Sowing_pak_choi_seeds.jpg']), V4_PAKCHOI)[0];
+  assert.equal(full.caption, V4_PAKCHOI.explains); assert.equal(full.loose, undefined);
+  const slots = S.load('core/book-pipeline/image-slots.ts');
+  const fig = slots.figureOf({ imageUrl: pot.url, sourceUrl: pot.source, title: pot.title, caption: pot.caption, loose: true }, pot.url, 'zh-TW');
+  assert.equal(fig.caption, '圖：Glazed Flowerpot');
+  assert.equal(slots.figureOf({ imageUrl: pot.url, sourceUrl: pot.source, title: pot.title, caption: pot.caption, loose: true }, pot.url, 'en').caption, 'Picture: Glazed Flowerpot');
+});
+
+test('repro v4 L: placed from Commons, the loose file reads "圖：<name>" in the chapter and the proof reports image_N_mismatch', async () => {
+  const text = () => `開頭。\n\nexplains 1 perspective 的 explains perspective。\n\n${mk(1)}\n\n尾。\n\n### 來源\n- https://example.com/a\n`;
+  const r = await picRig({ text, slots: 1,
+    finder: (req, run, n) => n === 1 ? { ...found({ 1: [] }), hints: new Map([[1, { search: 'perspective drawing grid' }]]) } : found({}),
+    ports: { fetchCommons: async () => ({ status: 200, text: v4File('Perspective_drawing_of_a_house.jpg', 'A perspective drawing', 'Perspective') }) } });
+  await run(r);
+  const note = await r.note(0);
+  assert.match(note.detail, /!\[Perspective drawing of a house\]\([^)\s]+\)\n圖：Perspective drawing of a house\n來源：/);
+  assert.equal(recordOf(note.detail).slots[0].off, true);
+  assert.equal(note.pipelineIssue, 'image notice: image_1_mismatch');
 });

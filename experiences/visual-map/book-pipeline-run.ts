@@ -2925,6 +2925,7 @@ export class BookPipelineRuns {
               title: candidate.title,
               caption: candidate.caption,
               ...(candidate.description !== undefined ? { description: candidate.description } : {}),
+              ...(candidate.loose ? { loose: true as const } : {}),
               ...(candidate.author ? { author: candidate.author } : {}),
               ...(candidate.license ? { license: candidate.license } : {})
             },
@@ -2944,6 +2945,7 @@ export class BookPipelineRuns {
       for (const [index, hint] of from?.hints ?? []) hints.set(index, { ...hints.get(index), ...hint });
     };
     let commonsAsked = 0;
+    let commonsLimited = false;
     try {
       const round1 = await search(wanted, false, exclude);
       keepHints(round1);
@@ -2983,6 +2985,7 @@ export class BookPipelineRuns {
             { signal, skip: url => seen.has(imageKey(url)) || taken(imageKey(url)) }
           );
           commonsAsked = commons.requests;
+          commonsLimited = commons.limited;
           if (signal.aborted) throw new Error("aborted");
           const asFound: FoundImages = {
             bySlot: commons.bySlot,
@@ -3021,6 +3024,10 @@ export class BookPipelineRuns {
       if (!outcome || !("figure" in outcome)) continue;
       const placed = (perSlot.get(slot.index) ?? []).find(item => item.href === outcome.figure.href)?.candidate;
       if (!placed) continue;
+      if (placed.loose) {
+        off.add(slot.index);
+        continue;
+      }
       const about = `${placed.title} ${placed.description ?? placed.caption}`;
       const words = askWords({ explains: slot.explains, ...hints.get(slot.index) });
       if (words.length && !wordHits(words, about)) off.add(slot.index);
@@ -3047,7 +3054,8 @@ export class BookPipelineRuns {
           counts: {
             placed: result.placed.length,
             missing: result.missing.length,
-            ...(commonsAsked ? { commons: commonsAsked } : {})
+            ...(commonsAsked ? { commons: commonsAsked } : {}),
+            ...(commonsLimited ? { commons_limited: 1 } : {})
           },
           hosts: { name: "reason", list: [...new Set(result.missing.map(item => item.reasonCode))] }
         })

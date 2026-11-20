@@ -2380,6 +2380,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "note.callout_titles_4": "错误:bug|引用:quote,cite",
   "note.visual_reference": "视觉参考",
   "note.image_author_0": "作者 {0}",
+  "note.image_file_caption_0": "图：{0}",
   "note.image_link": "链接",
   "note.image_source_0_1": "{0}（{1}）",
   "note.image_source_label_0": "来源：{0}",

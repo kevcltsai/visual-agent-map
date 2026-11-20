@@ -2548,6 +2548,7 @@ export const en = {
   "note.callout_titles_4": "none",
   "note.visual_reference": "Visual reference",
   "note.image_author_0": "by {0}",
+  "note.image_file_caption_0": "Picture: {0}",
   "note.image_link": "link",
   "note.image_source_0_1": "{0} ({1})",
   "note.image_source_label_0": "Source: {0}",

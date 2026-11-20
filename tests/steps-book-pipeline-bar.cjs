@@ -138,7 +138,7 @@ test('bar: the automatic fix round keeps the whole-book count; a first-time chap
   const data = { v: 1, runId: 'r', phase: 'writing', status: 'running', order: ['a', 'b', 'c', 'd'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', autoFixes: { a: 1 } };
   const progress = current => ({ runId: 'r', phase: 'writing', status: 'running', active: true, total: 4, counts: { pending: 0, planned: 1, written: 0, checked: 2, 'needs-review': 1 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current });
   const text = current => bundle.bookProgressText(bundle.bookBarState(data, progress(current), () => undefined));
-  assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }]), '已完成 3／4 章', 'only the fix of chapter 1: no "writing chapter 1/4" after chapter 4');
+  assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }]), '正在修正第 1 章・已完成 3／4 章', 'only the fix of chapter 1: named fix line with the whole-book count');
   assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }, { nodeId: 'd', step: 'write', startedAt: 2 }]), '正在寫第 4／4 章', 'a first-time chapter in work is the one named');
   assert.equal(text([{ nodeId: 'b', step: 'write', startedAt: 1 }]), '正在寫第 2／4 章', 'no fix round: unchanged');
 });
@@ -148,7 +148,7 @@ test('bar: in the trial the fix round shows the trial done count, not chapter 1/
   const data = { v: 1, runId: 'r', phase: 'planning', status: 'running', order: ['a', 'b', 'c', 'd', 'e'], trial: ['a', 'b', 'c'], globalPlanned: true, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', autoFixes: { a: 1 } };
   const progress = current => ({ runId: 'r', phase: 'planning', status: 'running', active: true, total: 5, counts: { pending: 2, planned: 0, written: 0, checked: 3, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current });
   const text = current => bundle.bookProgressText(bundle.bookBarState(data, progress(current), () => undefined));
-  assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }]), '已完成 3／3 章', 'fix only: the trial done count');
+  assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }]), '正在修正第 1 章・已完成 3／3 章', 'fix only: named fix line with the trial done count');
   assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }, { nodeId: 'c', step: 'write', startedAt: 2 }]), '正在試跑第 3／3 章', 'initial write alongside a fix is named');
   assert.equal(text([{ nodeId: 'b', step: 'write', startedAt: 1 }]), '正在試跑第 2／3 章', 'a trial chapter in its first write is named');
 });

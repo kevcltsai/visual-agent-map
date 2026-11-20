@@ -3551,7 +3551,7 @@ export const en = {
   "ui.book_seam_reason": "A neighboring card's plan or body changed and has not been checked by hand.",
   "ui.book_card_menu_rerun": "Rerun this picture-book card",
   "ui.book_card_menu_rerun_sub":
-    'Plan → write → proofread, about 2 minutes; other chapters stay, only marked "seam needs a look"',
+    'Plan → write → proofread, about 2 minutes; other chapters keep their text, only their previous/next lines are updated and marked "seam needs a look"',
   "ui.book_rerun_tag": "Working",
   "ui.book_panel_lead_sep": ", ",
   "ui.book_panel_reason_unchecked_0": "{0} items could not be checked against a source.",

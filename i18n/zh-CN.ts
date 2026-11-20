@@ -3315,7 +3315,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_seam_label": "接缝需看",
   "ui.book_seam_reason": "邻卡企划或正文已变更，尚未人工核对。",
   "ui.book_card_menu_rerun": "重跑图文书这一张",
-  "ui.book_card_menu_rerun_sub": "企划 → 写 → 校，约 2 分钟；前后章不动，只标“接缝需看”",
+  "ui.book_card_menu_rerun_sub": "企划 → 写 → 校，约 2 分钟；前后章正文不动，只更新“前一张／后一张”并标“接缝需看”",
   "ui.book_rerun_tag": "处理中",
   "ui.book_panel_lead_sep": "，",
   "ui.book_panel_reason_unchecked_0": "有 {0} 项没能核对到来源。",

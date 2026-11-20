@@ -2418,13 +2418,14 @@ export class VisualAgentMapView extends ItemView {
   }
   private mapSearchResult(): MapSearchResult | null {
     if (!this.map || !this.mapSearch) return null;
-    const vertical = ["down", "up"].includes(layoutOf(this.map).direction);
+    const direction = layoutOf(this.map).direction;
     return searchMap(
       this.map.nodes,
       supersededAimNodeIds(this.map),
       id => this.notes.get(id)?.title ?? "",
       this.mapSearch.query,
-      vertical ? "x" : "y"
+      ["down", "up"].includes(direction) ? "x" : "y",
+      direction === "balanced"
     );
   }
   private mapSearchCountText(): string {
@@ -2511,11 +2512,14 @@ export class VisualAgentMapView extends ItemView {
   private presentationOrder(): string[] {
     if (!this.map) return [];
     const shown = new Set(this.canvasNodes().map(node => node.id));
-    const vertical = ["down", "up"].includes(layoutOf(this.map).direction);
+    const direction = layoutOf(this.map).direction;
+    const vertical = ["down", "up"].includes(direction);
     return readingOrder(
       this.map.nodes.filter(node => shown.has(node.id)),
       {
         siblingAxis: vertical ? "x" : "y",
+        // A balanced map reads its right half, then its left half: the picture book's order (bookReadingOrder).
+        balanced: direction === "balanced",
         textNodes: treeTextNodes(
           this.map.canvasItems ?? [],
           this.map.nodes.map(node => node.id)
@@ -5118,53 +5122,76 @@ export class VisualAgentMapView extends ItemView {
     card.y = Math.round(position.y);
     if (!card.parentId || map.aim) return;
     if (this.droppedAmongSiblings(map, card)) map.nodes = this.onScreenSiblingOrder(map, card.parentId);
-    else this.reorderDroppedByRow(map, card, before);
+    else this.reorderDroppedByRow(map, new Map([[card.id, before]]));
   }
   /**
    * A balanced, radial, timeline or fishbone map lays siblings out in array order while the picture book reads them by y
    * (bookReadingOrder), so a card dropped past a sibling moves to its place in the array too, or Auto layout would put it back.
-   * Only the dropped card moves; the others keep their order. A drop that crosses no sibling changes nothing. In a balanced
-   * root the siblings are those on the card's own side (`sideFromOffset`, as bookReadingOrder), so the other side is left alone.
+   * `moved` holds the dropped cards (one, or a picked group) with where each was before. Only those cards move; the others keep
+   * their order, and dropped cards that land in the same gap keep their on-screen order. A drop that crosses no sibling changes
+   * nothing. In a balanced root the siblings are those on the card's own side (`sideFromOffset`, as bookReadingOrder).
    */
-  private reorderDroppedByRow(map: MapDocument, card: MapNode, before: { x: number; y: number }): void {
-    const direction = this.directionOf(map, card.id);
-    if (!["balanced", "radial", "timeline", "fishbone"].includes(direction)) return;
-    if (ringMemberIds(map.nodes, map.canvasItems ?? []).has(card.id)) return;
-    const parent = map.nodes.find(item => item.id === card.parentId);
-    if (!parent) return;
-    const split = direction === "balanced" && !parent.parentId && !card.afterTextId;
-    const halfAt = (x: number): string =>
-      split ? (sideFromOffset(x - parent.x) ?? (x < parent.x ? "left" : "right")) : "";
-    const group = map.nodes.filter(
-      item => item.parentId === card.parentId && item.afterTextId === card.afterTextId && item.id !== card.id
-    );
+  private reorderDroppedByRow(map: MapDocument, moved: ReadonlyMap<string, { x: number; y: number }>): void {
+    const rings = ringMemberIds(map.nodes, map.canvasItems ?? []);
+    const byKey = new Map<string, MapNode[]>();
+    for (const id of moved.keys()) {
+      const card = map.nodes.find(item => item.id === id);
+      if (!card?.parentId || rings.has(card.id)) continue;
+      if (!["balanced", "radial", "timeline", "fishbone"].includes(this.directionOf(map, card.id))) continue;
+      const key = `${card.parentId}\u0000${card.afterTextId ?? ""}`;
+      const list = byKey.get(key);
+      if (list) list.push(card);
+      else byKey.set(key, [card]);
+    }
     const byRow = bySiblingAxis("y");
-    const sameHalf = (half: string) => group.filter(item => halfAt(item.x) === half).sort(byRow);
-    const rankedAt = (half: string, at: { x: number; y: number }) => {
-      const row = sameHalf(half);
-      return { row, below: row.filter(item => byRow(item, at) < 0).map(item => item.id) };
-    };
-    const was = rankedAt(halfAt(before.x), before);
-    const now = rankedAt(halfAt(card.x), card);
-    if (!now.row.length) return;
-    if (halfAt(before.x) === halfAt(card.x) && was.below.join() === now.below.join()) return;
-    const next = now.row[now.below.length];
-    const ids = map.nodes
-      .filter(item => item.parentId === card.parentId && item.afterTextId === card.afterTextId && item.id !== card.id)
-      .map(item => item.id);
-    if (next) ids.splice(ids.indexOf(next.id), 0, card.id);
-    else ids.splice(ids.indexOf(now.row[now.row.length - 1].id) + 1, 0, card.id);
-    map.nodes = orderSiblings(map.nodes, card.parentId!, ids);
+    for (const cards of byKey.values()) {
+      const { parentId, afterTextId } = cards[0];
+      const parent = map.nodes.find(item => item.id === parentId);
+      if (!parent) continue;
+      const split = this.directionOf(map, cards[0].id) === "balanced" && !parent.parentId && !afterTextId;
+      const halfAt = (x: number): string =>
+        split ? (sideFromOffset(x - parent.x) ?? (x < parent.x ? "left" : "right")) : "";
+      const dropped = new Set(cards.map(card => card.id));
+      const siblings = map.nodes.filter(item => item.parentId === parentId && item.afterTextId === afterTextId);
+      const rowOf = (half: string) =>
+        siblings.filter(item => !dropped.has(item.id) && halfAt(item.x) === half).sort(byRow);
+      const belowAt = (at: { x: number; y: number }) => rowOf(halfAt(at.x)).filter(item => byRow(item, at) < 0).length;
+      const crossed = cards.some(card => {
+        const before = moved.get(card.id)!;
+        return halfAt(before.x) !== halfAt(card.x) || belowAt(before) !== belowAt(card);
+      });
+      if (!crossed) continue;
+      const placed = cards.filter(card => rowOf(halfAt(card.x)).length).sort(byRow);
+      const ids = siblings.filter(item => !placed.includes(item)).map(item => item.id);
+      const lastAfter = new Map<string, string>();
+      for (const card of placed) {
+        const half = halfAt(card.x);
+        const row = rowOf(half);
+        const next = row[belowAt(card)];
+        if (next) {
+          ids.splice(ids.indexOf(next.id), 0, card.id);
+          continue;
+        }
+        ids.splice(ids.indexOf(lastAfter.get(half) ?? row[row.length - 1].id) + 1, 0, card.id);
+        lastAfter.set(half, card.id);
+      }
+      map.nodes = orderSiblings(map.nodes, parentId!, ids);
+    }
   }
   /**
    * Whether a dropped card sits in its siblings' lane: close to their column (right/left maps) or row (down/up maps), and
    * between them or within one card of the first or last. Anywhere else is empty canvas, where a drop only moves the card.
    */
-  private droppedAmongSiblings(map: MapDocument, card: MapNode): boolean {
+  private droppedAmongSiblings(map: MapDocument, card: MapNode, dropped?: ReadonlySet<string>): boolean {
     // A ring card is placed by hand: dropping it only moves it.
     if (ringMemberIds(map.nodes, map.canvasItems ?? []).has(card.id)) return false;
+    // In a group drop the lane is that of the siblings left in place, not of the other dropped cards.
     const others = map.nodes.filter(
-      item => item.parentId === card.parentId && item.afterTextId === card.afterTextId && item.id !== card.id
+      item =>
+        item.parentId === card.parentId &&
+        item.afterTextId === card.afterTextId &&
+        item.id !== card.id &&
+        !dropped?.has(item.id)
     );
     if (!others.length) return false;
     const direction = this.directionOf(map, card.id) as LayoutKind;
@@ -23376,6 +23403,19 @@ export class VisualAgentMapView extends ItemView {
         current.x = Math.round(origin.x + dx);
         current.y = Math.round(origin.y + dy);
       }
+      // Like a single dropped card: the group takes its place among its siblings, so Auto layout keeps the new order.
+      if (map.aim) return;
+      const rows = new Map<string, { x: number; y: number }>();
+      const aligned = new Set<string>();
+      const dropped = new Set(from.keys());
+      for (const [id, origin] of from) {
+        const current = map.nodes.find(n => n.id === id);
+        if (!current?.parentId) continue;
+        if (this.droppedAmongSiblings(map, current, dropped)) aligned.add(current.parentId);
+        else rows.set(id, origin);
+      }
+      for (const parentId of aligned) map.nodes = this.onScreenSiblingOrder(map, parentId);
+      this.reorderDroppedByRow(map, rows);
     };
   }
   private enableDrag(

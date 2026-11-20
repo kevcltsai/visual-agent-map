@@ -445,6 +445,72 @@ test('drag reorder (balanced): dragging one left card below its left sibling doe
   assert.notDeepEqual(kidOrder(h), before);
 });
 
+const groupDrop = (h, titles, dx, dy) => {
+  const origins = new Map(titles.map(t => [h.node(t).id, { x: h.node(t).x, y: h.node(t).y }]));
+  return h.view.mapChange(h.view.groupDropEdit(origins, dx, dy));
+};
+
+for (const direction of ['radial', 'timeline', 'fishbone']) {
+  test(`group drag reorder (${direction}): two picked cards dropped above the others keep their relative order, survive Auto layout, one undo restores`, async () => {
+    const h = await harness(SIBLINGS);
+    await h.view.mapChange(map => { map.layout = { direction }; });
+    const origin = ['C', 'D'].map(t => ({ x: h.node(t).x, y: h.node(t).y }));
+    await groupDrop(h, ['C', 'D'], 0, -800);
+    assert.deepEqual(kidOrder(h), ['C', 'D', 'A', 'B']);
+    await h.view.mapChange(map => h.view.arrangeAll(map));
+    assert.deepEqual(kidOrder(h), ['C', 'D', 'A', 'B'], 'Auto layout keeps the order');
+    await h.view.travel(false); await h.view.travel(false);
+    assert.deepEqual(kidOrder(h), ['A', 'B', 'C', 'D'], 'one undo (plus the layout) restores the order');
+    assert.deepEqual(['C', 'D'].map(t => ({ x: h.node(t).x, y: h.node(t).y })), origin, 'and the positions');
+  });
+}
+
+test('group drag reorder (radial): dropped below the last sibling keeps the pair in order; a drop that crosses nothing changes nothing', async () => {
+  const h = await harness(SIBLINGS);
+  await h.view.mapChange(map => { map.layout = { direction: 'radial' }; });
+  await groupDrop(h, ['A', 'B'], 0, 30);
+  assert.deepEqual(kidOrder(h), ['A', 'B', 'C', 'D'], 'no sibling crossed');
+  await groupDrop(h, ['A', 'B'], 0, 2000);
+  assert.deepEqual(kidOrder(h), ['C', 'D', 'A', 'B']);
+});
+
+test('group drag reorder (balanced): picked right cards reorder on their side only; the left side keeps its order', async () => {
+  const h = await harness(BAL);
+  await h.view.mapChange(map => { map.layout = { direction: 'balanced' }; });
+  await groupDrop(h, ['B', 'C'], 0, -600);
+  assert.deepEqual(kidOrder(h).filter(t => !t.startsWith('L')), ['B', 'C', 'A']);
+  assert.deepEqual(kidOrder(h).filter(t => t.startsWith('L')), ['L1', 'L2']);
+  await h.view.mapChange(map => h.view.arrangeAll(map));
+  assert.deepEqual(kidOrder(h).filter(t => !t.startsWith('L')), ['B', 'C', 'A'], 'Auto layout keeps it');
+});
+
+test('group drag (right map): picked cards dropped in their lane take their on-screen places; dropped off the lane only move', async () => {
+  const h = await harness(SIBLINGS);
+  await groupDrop(h, ['C', 'D'], 0, -800);
+  assert.deepEqual(kidOrder(h), ['C', 'D', 'A', 'B']);
+  const far = await harness(SIBLINGS);
+  await groupDrop(far, ['C', 'D'], 3000, -800);
+  assert.deepEqual(kidOrder(far), ['A', 'B', 'C', 'D']);
+});
+
+test('balanced reading order: presentation and search follow the book order (right half, then left); a right map stays by y', async () => {
+  const { bookReadingOrder } = load('experiences/visual-map/presentation-order.ts');
+  const h = await harness(BAL);
+  await h.view.mapChange(map => { map.layout = { direction: 'balanced' }; });
+  h.view.canvasNodes = () => h.view.map.nodes;
+  h.view.mapSearch = { query: '' };
+  const book = Array.from(bookReadingOrder(h.view.map));
+  assert.deepEqual(book.map(id => h.titleOf(id)), ['Root', 'A', 'B', 'C', 'L1', 'L2']);
+  assert.deepEqual(Array.from(h.view.presentationOrder()), book, 'presentation == book');
+  assert.deepEqual(Array.from(h.view.mapSearchResult().order), book, 'search == book');
+  const r = await harness(BAL);
+  r.view.canvasNodes = () => r.view.map.nodes;
+  r.view.mapSearch = { query: '' };
+  const byY = ['Root', 'L1', 'A', 'L2', 'B', 'C'];
+  assert.deepEqual(Array.from(r.view.presentationOrder(), id => r.titleOf(id)), byY);
+  assert.deepEqual(Array.from(r.view.mapSearchResult().order, id => r.titleOf(id)), byY);
+});
+
 test('drag reorder (radial): a drag into a different parent (reparent) still puts the card last under the new parent', async () => {
   const h = await harness([...SIBLINGS, ['A1', 'A', 600, 80]]);
   await h.view.mapChange(map => { map.layout = { direction: 'radial' }; });

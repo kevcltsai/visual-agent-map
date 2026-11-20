@@ -8,17 +8,21 @@ export interface MapSearchResult {
   matches: string[];
 }
 
-/** `skip` holds ids that are not on the canvas (interim AIM results already superseded); `siblingAxis` follows the layout direction. */
+/**
+ * `skip` holds ids that are not on the canvas (interim AIM results already superseded); `siblingAxis` follows the layout direction;
+ * `balanced` reads a balanced map's right half, then its left half, as the picture book does.
+ */
 export function searchMap(
   nodes: readonly MapNode[],
   skip: ReadonlySet<string>,
   titleOf: (id: string) => string,
   query: string,
-  siblingAxis: "y" | "x"
+  siblingAxis: "y" | "x",
+  balanced = false
 ): MapSearchResult {
   const order = readingOrder(
     nodes.filter(node => !skip.has(node.id)),
-    { includeHidden: true, siblingAxis }
+    { includeHidden: true, siblingAxis, balanced }
   );
   return { order, matches: findMatches(order, titleOf, query) };
 }

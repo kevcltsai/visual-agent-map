@@ -3280,6 +3280,11 @@ export const zhTW: Record<TranslationKey, string> = {
     "沒有改寫任何段落：這章的備註都沒有可送出的段落（含連結、表格或特殊標記的段落不會送出）。章節沒有改動，備註都還在。",
   "ui.book_note_none_skipped_0":
     "沒有改寫任何段落：{0} 段都被略過，因為等待期間原文被改過。那些備註旁已加註記，備註都還在。",
+  "ui.book_note_none_refused_0":
+    "沒有改寫任何段落：{0} 段的 AI 改寫格式不合，都沒套用。那些備註旁已加註記，備註都還在。",
+  "ui.book_note_none_mixed_0_1":
+    "沒有改寫任何段落：{0} 段因等待期間原文被改過而略過，{1} 段的 AI 改寫格式不合。那些備註旁已加註記，備註都還在。",
+  "ui.book_note_applied_refused_0": "（{0} 段 AI 改寫格式不合，沒套用）",
   "ui.book_note_timeout": "AI 花太久了。章節沒有改動，備註都還在。",
   "ui.book_note_ai_failed_0": "AI 改寫失敗（{0}）。章節沒有改動，備註都還在。",
   "ui.command_book_note_undo": "圖文書：還原上次套用",

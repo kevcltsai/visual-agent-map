@@ -3272,6 +3272,9 @@ var en = {
   "ui.book_note_undo_label": "Undo",
   "ui.book_note_none_sendable": "Nothing was rewritten: none of the notes could be sent (paragraphs with links, tables or special marks are not sent). The chapter is unchanged and your notes are still there.",
   "ui.book_note_none_skipped_0": "Nothing was rewritten: all {0} paragraph(s) were skipped because the text changed while waiting. A mark was added beside those notes; your notes are still there.",
+  "ui.book_note_none_refused_0": "Nothing was rewritten: the AI's rewrite of all {0} paragraph(s) was not in an acceptable format. A mark was added beside those notes; your notes are still there.",
+  "ui.book_note_none_mixed_0_1": "Nothing was rewritten: {0} paragraph(s) were skipped because the text changed while waiting, and the AI's rewrite of {1} was not in an acceptable format. A mark was added beside those notes; your notes are still there.",
+  "ui.book_note_applied_refused_0": " ({0} not applied: bad AI format)",
   "ui.book_note_timeout": "The AI took too long. The chapter was not changed and your notes are still there.",
   "ui.book_note_ai_failed_0": "The AI rewrite failed ({0}). The chapter was not changed and your notes are still there.",
   "ui.command_book_note_undo": "Picture book: undo the last applied notes",
@@ -6485,6 +6488,9 @@ var zhCN = {
   "ui.book_note_undo_label": "\u8FD8\u539F",
   "ui.book_note_none_sendable": "\u6CA1\u6709\u6539\u5199\u4EFB\u4F55\u6BB5\u843D\uFF1A\u8FD9\u7AE0\u7684\u5907\u6CE8\u90FD\u6CA1\u6709\u53EF\u53D1\u9001\u7684\u6BB5\u843D\uFF08\u542B\u94FE\u63A5\u3001\u8868\u683C\u6216\u7279\u6B8A\u6807\u8BB0\u7684\u6BB5\u843D\u4E0D\u4F1A\u53D1\u9001\uFF09\u3002\u7AE0\u8282\u6CA1\u6709\u6539\u52A8\uFF0C\u5907\u6CE8\u90FD\u8FD8\u5728\u3002",
   "ui.book_note_none_skipped_0": "\u6CA1\u6709\u6539\u5199\u4EFB\u4F55\u6BB5\u843D\uFF1A{0} \u6BB5\u90FD\u88AB\u7565\u8FC7\uFF0C\u56E0\u4E3A\u7B49\u5F85\u671F\u95F4\u539F\u6587\u88AB\u6539\u8FC7\u3002\u90A3\u4E9B\u5907\u6CE8\u65C1\u5DF2\u52A0\u6807\u8BB0\uFF0C\u5907\u6CE8\u90FD\u8FD8\u5728\u3002",
+  "ui.book_note_none_refused_0": "\u6CA1\u6709\u6539\u5199\u4EFB\u4F55\u6BB5\u843D\uFF1A{0} \u6BB5\u7684 AI \u6539\u5199\u683C\u5F0F\u4E0D\u5408\uFF0C\u90FD\u6CA1\u5957\u7528\u3002\u90A3\u4E9B\u5907\u6CE8\u65C1\u5DF2\u52A0\u6807\u8BB0\uFF0C\u5907\u6CE8\u90FD\u8FD8\u5728\u3002",
+  "ui.book_note_none_mixed_0_1": "\u6CA1\u6709\u6539\u5199\u4EFB\u4F55\u6BB5\u843D\uFF1A{0} \u6BB5\u56E0\u7B49\u5F85\u671F\u95F4\u539F\u6587\u88AB\u6539\u8FC7\u800C\u7565\u8FC7\uFF0C{1} \u6BB5\u7684 AI \u6539\u5199\u683C\u5F0F\u4E0D\u5408\u3002\u90A3\u4E9B\u5907\u6CE8\u65C1\u5DF2\u52A0\u6807\u8BB0\uFF0C\u5907\u6CE8\u90FD\u8FD8\u5728\u3002",
+  "ui.book_note_applied_refused_0": "\uFF08{0} \u6BB5 AI \u6539\u5199\u683C\u5F0F\u4E0D\u5408\uFF0C\u6CA1\u5957\u7528\uFF09",
   "ui.book_note_timeout": "AI \u7528\u65F6\u592A\u4E45\u3002\u7AE0\u8282\u6CA1\u6709\u6539\u52A8\uFF0C\u5907\u6CE8\u90FD\u8FD8\u5728\u3002",
   "ui.book_note_ai_failed_0": "AI \u6539\u5199\u5931\u8D25\uFF08{0}\uFF09\u3002\u7AE0\u8282\u6CA1\u6709\u6539\u52A8\uFF0C\u5907\u6CE8\u90FD\u8FD8\u5728\u3002",
   "ui.command_book_note_undo": "\u56FE\u6587\u4E66\uFF1A\u8FD8\u539F\u4E0A\u6B21\u5957\u7528",
@@ -9698,6 +9704,9 @@ var zhTW = {
   "ui.book_note_undo_label": "\u9084\u539F",
   "ui.book_note_none_sendable": "\u6C92\u6709\u6539\u5BEB\u4EFB\u4F55\u6BB5\u843D\uFF1A\u9019\u7AE0\u7684\u5099\u8A3B\u90FD\u6C92\u6709\u53EF\u9001\u51FA\u7684\u6BB5\u843D\uFF08\u542B\u9023\u7D50\u3001\u8868\u683C\u6216\u7279\u6B8A\u6A19\u8A18\u7684\u6BB5\u843D\u4E0D\u6703\u9001\u51FA\uFF09\u3002\u7AE0\u7BC0\u6C92\u6709\u6539\u52D5\uFF0C\u5099\u8A3B\u90FD\u9084\u5728\u3002",
   "ui.book_note_none_skipped_0": "\u6C92\u6709\u6539\u5BEB\u4EFB\u4F55\u6BB5\u843D\uFF1A{0} \u6BB5\u90FD\u88AB\u7565\u904E\uFF0C\u56E0\u70BA\u7B49\u5F85\u671F\u9593\u539F\u6587\u88AB\u6539\u904E\u3002\u90A3\u4E9B\u5099\u8A3B\u65C1\u5DF2\u52A0\u8A3B\u8A18\uFF0C\u5099\u8A3B\u90FD\u9084\u5728\u3002",
+  "ui.book_note_none_refused_0": "\u6C92\u6709\u6539\u5BEB\u4EFB\u4F55\u6BB5\u843D\uFF1A{0} \u6BB5\u7684 AI \u6539\u5BEB\u683C\u5F0F\u4E0D\u5408\uFF0C\u90FD\u6C92\u5957\u7528\u3002\u90A3\u4E9B\u5099\u8A3B\u65C1\u5DF2\u52A0\u8A3B\u8A18\uFF0C\u5099\u8A3B\u90FD\u9084\u5728\u3002",
+  "ui.book_note_none_mixed_0_1": "\u6C92\u6709\u6539\u5BEB\u4EFB\u4F55\u6BB5\u843D\uFF1A{0} \u6BB5\u56E0\u7B49\u5F85\u671F\u9593\u539F\u6587\u88AB\u6539\u904E\u800C\u7565\u904E\uFF0C{1} \u6BB5\u7684 AI \u6539\u5BEB\u683C\u5F0F\u4E0D\u5408\u3002\u90A3\u4E9B\u5099\u8A3B\u65C1\u5DF2\u52A0\u8A3B\u8A18\uFF0C\u5099\u8A3B\u90FD\u9084\u5728\u3002",
+  "ui.book_note_applied_refused_0": "\uFF08{0} \u6BB5 AI \u6539\u5BEB\u683C\u5F0F\u4E0D\u5408\uFF0C\u6C92\u5957\u7528\uFF09",
   "ui.book_note_timeout": "AI \u82B1\u592A\u4E45\u4E86\u3002\u7AE0\u7BC0\u6C92\u6709\u6539\u52D5\uFF0C\u5099\u8A3B\u90FD\u9084\u5728\u3002",
   "ui.book_note_ai_failed_0": "AI \u6539\u5BEB\u5931\u6557\uFF08{0}\uFF09\u3002\u7AE0\u7BC0\u6C92\u6709\u6539\u52D5\uFF0C\u5099\u8A3B\u90FD\u9084\u5728\u3002",
   "ui.command_book_note_undo": "\u5716\u6587\u66F8\uFF1A\u9084\u539F\u4E0A\u6B21\u5957\u7528",
@@ -45948,6 +45957,8 @@ function countNotes(text10) {
 
 // core/book-pipeline/notes-apply.ts
 var SKIP_MARK = " \u26A0 \u539F\u6587\u5DF2\u6539\uFF0C\u9019\u5247\u6C92\u5957\u7528";
+var REFUSED_MARK = " \u26A0 AI \u6539\u5BEB\u4E0D\u5408\u683C\u5F0F\uFF0C\u9019\u5247\u6C92\u5957\u7528";
+var hasMark = (note) => note.endsWith(SKIP_MARK) || note.endsWith(REFUSED_MARK);
 function chapterParagraphs(raw) {
   const lines = raw.split("\n");
   const mask = chapterTextMask(lines);
@@ -46012,6 +46023,15 @@ function snapshotNotes(raw) {
   return items;
 }
 var LEAD = /^\s*(?:>\s*)*(?:[-*+]\s+|\d+[.)]\s+)?/;
+var canonLead = (lead) => lead.replace(/> ?/g, ">").replace(/([-*+]|\d+[.)]) ?$/, "$1");
+var leadOf = (line2) => {
+  var _a2, _b2;
+  return (_b2 = (_a2 = LEAD.exec(line2)) == null ? void 0 : _a2[0]) != null ? _b2 : "";
+};
+function sameLead(original, reply) {
+  const lead = leadOf(reply);
+  return !lead.includes("	") && canonLead(lead) === canonLead(leadOf(original));
+}
 var BASE_PUNCT = /* @__PURE__ */ new Set([...` ,.;:!?'"()\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF01\uFF1F\uFF08\uFF09\u300C\u300D\u300E\u300F\u2018\u2019\u201C\u201D\u2026\u2014\u2013/%\xB7\u300A\u300B\u3008\u3009\uFF5E-`]);
 var OPENERS = /* @__PURE__ */ new Set([...`'"(\uFF08\u300C\u300E\u2018\u201C\u300A\u3008`]);
 var STARTS_LIKE_PROSE = /^[\p{L}\p{N}]/u;
@@ -46044,11 +46064,7 @@ function checkRewrite(item, reply) {
   const before = item.text.split("\n");
   if (lines.length !== before.length) return no("line count changed");
   if (lines.some((line2) => !line2.trim())) return no("blank line");
-  if (lines.some((line2, i) => {
-    var _a3, _b2;
-    return ((_a3 = LEAD.exec(line2)) == null ? void 0 : _a3[0].trim()) !== ((_b2 = LEAD.exec(before[i])) == null ? void 0 : _b2[0].trim());
-  }))
-    return no("list or quote mark changed");
+  if (lines.some((line2, i) => !sameLead(before[i], line2))) return no("list or quote mark changed");
   const bad = (_a2 = forbiddenSyntax(text10)) != null ? _a2 : whitelistBreach(item.text, before, lines);
   if (bad) return no(`new ${bad}`);
   if (/⟦\/?N/.test(text10)) return no("note marker left");
@@ -46085,14 +46101,14 @@ function applyReplies(raw, items, replies, refused = []) {
   const edits = [];
   const marks = [];
   let skipped2 = 0;
-  const skipNotes = (item) => {
+  const skipNotes = (item, mark2) => {
     skipped2++;
-    for (const n of notes.filter((f) => item.numbers.includes(f.n) && !f.note.endsWith(SKIP_MARK)))
-      if (!marks.some((m) => m.from === n.to - 2)) marks.push({ from: n.to - 2, to: n.to - 2, insert: SKIP_MARK });
+    for (const n of notes.filter((f) => item.numbers.includes(f.n) && !hasMark(f.note)))
+      if (!marks.some((m) => m.from === n.to - 2)) marks.push({ from: n.to - 2, to: n.to - 2, insert: mark2 });
   };
   for (const id of refused) {
     const item = items.find((i) => i.id === id);
-    if (item) skipNotes(item);
+    if (item) skipNotes(item, REFUSED_MARK);
   }
   for (const reply of replies) {
     const item = items.find((i) => i.id === reply.id);
@@ -46108,7 +46124,7 @@ function applyReplies(raw, items, replies, refused = []) {
       });
       continue;
     }
-    skipNotes(item);
+    skipNotes(item, SKIP_MARK);
   }
   const free = marks.filter((m) => !edits.some((e) => m.from >= e.from && m.from <= e.to));
   const { text: text10, ranges } = runEdits(raw, [...edits, ...free]);
@@ -46272,7 +46288,7 @@ Rules for every paragraph you return:
 - Remove all note marks \u27E6N..\u27E7 and \u27E6/N..\u27E7; keep the words that were inside them unless a note asks to change them.
 - A token such as \u27E6L1\u27E7 stands for a link or a picture. Keep every token of the paragraph exactly once, unchanged, and add no token.
 - Keep the same number of lines, and keep each line's list or quote mark (for example "- " or "> ") as it was. Add no blank line.
-- Write plain prose only: no headings, no lists, no code, no links, no addresses, no callouts, checkboxes, highlights (==), comments (%%) or HTML. Keep the placeholders. Marks you may use: letters, numbers, spaces, and ordinary punctuation such as , . ; : ! ? ' " ( ) - \u2013 \u2014 / % \xB7 \u2026 \uFF5E \u300A\u300B \u300C\u300D \u300E\u300F and their full-width forms. A line must begin with a letter, a number, a \u27E6L token or an opening quote or bracket.
+- Write plain prose only: no headings, no lists, no code, no links, no addresses, no callouts, checkboxes, highlights (==), comments (%%) or HTML. Keep the placeholders. Marks you may use: letters, numbers, spaces, and ordinary punctuation such as , . ; : ! ? ' " ( ) - \u2013 \u2014 / % \xB7 \u2026 \uFF5E \u300A\u300B \u300C\u300D \u300E\u300F. A line must begin with a letter, a number, a \u27E6L token or an opening quote or bracket.
 - Keep the chapter's voice, the plan and the settings. Use only facts, numbers and names that appear in the supplied text or the notes.
 
 Return only JSON: {"paragraphs":[{"id":"","text":""}]}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.
@@ -91538,10 +91554,12 @@ var BookNotesApply = class {
     this.ports.notice(t("ui.book_note_ai_failed_0", cause));
   }
   done(path, result) {
-    var _a2;
+    var _a2, _b2, _c;
+    const refused = Math.min((_b2 = (_a2 = result.refused) == null ? void 0 : _a2.length) != null ? _b2 : 0, result.skipped);
+    const changed = result.skipped - refused;
     if (!result.applied) {
       this.ports.notice(
-        t(result.skipped ? "ui.book_note_none_skipped_0" : "ui.book_note_none_sendable", result.skipped)
+        !result.skipped ? t("ui.book_note_none_sendable") : !refused ? t("ui.book_note_none_skipped_0", changed) : !changed ? t("ui.book_note_none_refused_0", refused) : t("ui.book_note_none_mixed_0_1", changed, refused)
       );
       return;
     }
@@ -91550,8 +91568,8 @@ var BookNotesApply = class {
       path,
       result.edits.map((edit) => ({ from: edit.from, to: edit.to }))
     );
-    (_a2 = this.undoNotice) == null ? void 0 : _a2.hide();
-    const text10 = t("ui.book_note_applied_n_0", result.applied) + (result.skipped ? t("ui.book_note_applied_skipped_0", result.skipped) : "") + " \xB7 ";
+    (_c = this.undoNotice) == null ? void 0 : _c.hide();
+    const text10 = t("ui.book_note_applied_n_0", result.applied) + (changed ? t("ui.book_note_applied_skipped_0", changed) : "") + (refused ? t("ui.book_note_applied_refused_0", refused) : "") + " \xB7 ";
     this.undoNotice = this.ports.noticeAction(
       text10,
       t("ui.book_note_undo_label"),

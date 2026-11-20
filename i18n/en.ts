@@ -3511,6 +3511,11 @@ export const en = {
     "Nothing was rewritten: none of the notes could be sent (paragraphs with links, tables or special marks are not sent). The chapter is unchanged and your notes are still there.",
   "ui.book_note_none_skipped_0":
     "Nothing was rewritten: all {0} paragraph(s) were skipped because the text changed while waiting. A mark was added beside those notes; your notes are still there.",
+  "ui.book_note_none_refused_0":
+    "Nothing was rewritten: the AI's rewrite of all {0} paragraph(s) was not in an acceptable format. A mark was added beside those notes; your notes are still there.",
+  "ui.book_note_none_mixed_0_1":
+    "Nothing was rewritten: {0} paragraph(s) were skipped because the text changed while waiting, and the AI's rewrite of {1} was not in an acceptable format. A mark was added beside those notes; your notes are still there.",
+  "ui.book_note_applied_refused_0": " ({0} not applied: bad AI format)",
   "ui.book_note_timeout": "The AI took too long. The chapter was not changed and your notes are still there.",
   "ui.book_note_ai_failed_0":
     "The AI rewrite failed ({0}). The chapter was not changed and your notes are still there.",

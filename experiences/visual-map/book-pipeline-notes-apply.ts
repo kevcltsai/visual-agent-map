@@ -137,9 +137,18 @@ export class BookNotesApply {
   }
 
   private done(path: string, result: NotesApplyResult): void {
+    // `skipped` counts both reasons; `refused` (the reply's format) is a part of it, the rest is text that changed while waiting.
+    const refused = Math.min(result.refused?.length ?? 0, result.skipped);
+    const changed = result.skipped - refused;
     if (!result.applied) {
       this.ports.notice(
-        t(result.skipped ? "ui.book_note_none_skipped_0" : "ui.book_note_none_sendable", result.skipped)
+        !result.skipped
+          ? t("ui.book_note_none_sendable")
+          : !refused
+            ? t("ui.book_note_none_skipped_0", changed)
+            : !changed
+              ? t("ui.book_note_none_refused_0", refused)
+              : t("ui.book_note_none_mixed_0_1", changed, refused)
       );
       return;
     }
@@ -151,7 +160,8 @@ export class BookNotesApply {
     this.undoNotice?.hide();
     const text =
       t("ui.book_note_applied_n_0", result.applied) +
-      (result.skipped ? t("ui.book_note_applied_skipped_0", result.skipped) : "") +
+      (changed ? t("ui.book_note_applied_skipped_0", changed) : "") +
+      (refused ? t("ui.book_note_applied_refused_0", refused) : "") +
       " · ";
     this.undoNotice = this.ports.noticeAction(
       text,

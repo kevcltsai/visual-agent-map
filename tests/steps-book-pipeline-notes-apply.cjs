@@ -264,7 +264,40 @@ test('whitelist (fix3): one refused paragraph is skipped with its note kept; the
   const out = na.applyReplies(RAW, items, [...parsed.paragraphs], parsed.refused.map(r => r.id));
   assert.equal(out.skipped, 1);
   assert.equal(out.applied.length, 1);
-  assert.ok(out.text.includes(`==perspective==%%備註#2：說明是什麼${na.SKIP_MARK}%%`), 'the refused paragraph keeps its marked span and note');
+  assert.ok(out.text.includes(`==perspective==%%備註#2：說明是什麼${na.REFUSED_MARK}%%`), 'the refused paragraph keeps its marked span and note');
   assert.ok(out.text.includes('Second remark'), 'the valid paragraph is rewritten');
-  assert.ok(out.text.includes(`說明是什麼${na.SKIP_MARK}%%`), 'its note says it was skipped');
+  assert.ok(out.text.includes(`說明是什麼${na.REFUSED_MARK}%%`), 'its note says it was skipped');
+});
+
+test('checkRewrite (fix 4): indented code through the lead whitespace is refused; the original lead may only gain one space after a mark', () => {
+  const chk = (original, reply) => na.checkRewrite({ text: original, links: [] }, reply).ok;
+  const bad = [
+    ['- first\n- second item', '-     code one\n- second item'],
+    ['- first\n- second', '- first\n-     code two'],
+    ['1. first\n2. second', '1.     code\n2. second'],
+    ['> quoted one\n> quoted two', '>     code\n> quoted two'],
+    ['First alpha line\nsecond line of p1', '   \tFirst alpha line\nsecond line of p1'],
+    ['First alpha line\nsecond line of p1', ' \tFirst alpha line\nsecond line of p1'],
+    ['First alpha line\nsecond line of p1', '  \tFirst alpha line\nsecond line of p1'],
+    ['First alpha line\nsecond', '    First alpha line\nsecond'],
+    ['- first\n- second', '-\tfirst\n- second'],
+    ['> a\n> b', '>\ta\n> b']
+  ];
+  for (const [o, r] of bad) assert.equal(chk(o, r), false, JSON.stringify(r));
+  assert.equal(chk('- a\n- b', '- c\n- d'), true, 'same leads pass');
+  assert.equal(chk('>a\n>b', '> a\n> b'), true, 'one space after > may be added');
+  assert.equal(chk('- a\n- b', '-  c\n- d'), false, 'two spaces after a marker are not the original');
+  assert.equal(chk('x\n    y', 'p\n    q'), true, 'an indent the original had is kept');
+});
+
+test('applyReplies (fix 4): a refused reply gets the refusal mark, not the changed-text mark; each mark once, never stacked', () => {
+  const items = na.snapshotNotes(RAW);
+  const first = na.applyReplies(RAW, items, [], items.map(i => i.id));
+  assert.equal(first.skipped, 2);
+  assert.ok(first.text.includes(`說明是什麼${na.REFUSED_MARK}%%`));
+  assert.ok(!first.text.includes(na.SKIP_MARK));
+  const again = na.applyReplies(first.text, na.snapshotNotes(first.text), [], na.snapshotNotes(first.text).map(i => i.id));
+  assert.equal(again.marked, 0, 'a note that already has a mark is not marked again');
+  const changed = na.applyReplies(RAW.replace('showed linear', 'showed a linear'), items, [], [items[0].id]);
+  assert.ok(changed.text.includes(`說明是什麼${na.REFUSED_MARK}%%`), 'refused wins over the edit: the mark names the reply');
 });

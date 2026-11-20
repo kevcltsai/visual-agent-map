@@ -10,6 +10,9 @@ import { chapterTextMask } from "./note-sections";
 
 /** Written inside the note text of a note that was not applied because its paragraph changed; the program reads it back. */
 export const SKIP_MARK = " ⚠ 原文已改，這則沒套用";
+/** Written the same way when the AI's rewrite of the paragraph was refused (wrong format); the paragraph is untouched. */
+export const REFUSED_MARK = " ⚠ AI 改寫不合格式，這則沒套用";
+const hasMark = (note: string): boolean => note.endsWith(SKIP_MARK) || note.endsWith(REFUSED_MARK);
 
 /** A run of consecutive visible, non-blank chapter lines. `[from, to)` is the raw range (without the final `\r`); `text` uses `\n`. */
 export interface NoteParagraph {
@@ -109,6 +112,15 @@ export function snapshotNotes(raw: string): NoteItem[] {
 
 const LEAD = /^\s*(?:>\s*)*(?:[-*+]\s+|\d+[.)]\s+)?/;
 
+/** A lead with one space after each `>` and after the marker dropped, so only that single space may differ from the original. */
+const canonLead = (lead: string): string => lead.replace(/> ?/g, ">").replace(/([-*+]|\d+[.)]) ?$/, "$1");
+const leadOf = (line: string): string => LEAD.exec(line)?.[0] ?? "";
+/** The reply lead is the original's, give or take one space after `>` or the marker; a tab is never allowed (so no 4-column run appears that the original lacks). */
+function sameLead(original: string, reply: string): boolean {
+  const lead = leadOf(reply);
+  return !lead.includes("\t") && canonLead(lead) === canonLead(leadOf(original));
+}
+
 /** Prose punctuation any rewrite may use; every other mark must already be in the original paragraph. */
 const BASE_PUNCT = new Set([..." ,.;:!?'\"()，。、；：！？（）「」『』‘’“”…—–/%·《》〈〉～-"]);
 /** A line body may only start with a letter, a number, a link token or one of these opening marks. */
@@ -150,8 +162,7 @@ export function checkRewrite(item: Pick<EncodedItem, "text" | "links">, reply: s
   const before = item.text.split("\n");
   if (lines.length !== before.length) return no("line count changed");
   if (lines.some(line => !line.trim())) return no("blank line");
-  if (lines.some((line, i) => LEAD.exec(line)?.[0].trim() !== LEAD.exec(before[i])?.[0].trim()))
-    return no("list or quote mark changed");
+  if (lines.some((line, i) => !sameLead(before[i], line))) return no("list or quote mark changed");
   const bad = forbiddenSyntax(text) ?? whitelistBreach(item.text, before, lines);
   if (bad) return no(`new ${bad}`);
   if (/⟦\/?N/.test(text)) return no("note marker left");
@@ -210,7 +221,7 @@ function runEdits(raw: string, edits: Edit[]): { text: string; ranges: Map<Edit,
 
 /**
  * `raw` with each reply paragraph written over its original, in one pass. `replies` hold the paragraph id and the checked text
- * (links already restored). An original that is not found exactly once is not replaced; its notes get {@link SKIP_MARK} (once).
+ * (links already restored). An original that is not found exactly once is not replaced; its notes get {@link SKIP_MARK}; a refused reply gets {@link REFUSED_MARK} (once each).
  */
 export function applyReplies(
   raw: string,
@@ -223,14 +234,14 @@ export function applyReplies(
   const edits: Edit[] = [];
   const marks: Edit[] = [];
   let skipped = 0;
-  const skipNotes = (item: NoteItem): void => {
+  const skipNotes = (item: NoteItem, mark: string): void => {
     skipped++;
-    for (const n of notes.filter(f => item.numbers.includes(f.n) && !f.note.endsWith(SKIP_MARK)))
-      if (!marks.some(m => m.from === n.to - 2)) marks.push({ from: n.to - 2, to: n.to - 2, insert: SKIP_MARK });
+    for (const n of notes.filter(f => item.numbers.includes(f.n) && !hasMark(f.note)))
+      if (!marks.some(m => m.from === n.to - 2)) marks.push({ from: n.to - 2, to: n.to - 2, insert: mark });
   };
   for (const id of refused) {
     const item = items.find(i => i.id === id);
-    if (item) skipNotes(item);
+    if (item) skipNotes(item, REFUSED_MARK);
   }
   for (const reply of replies) {
     const item = items.find(i => i.id === reply.id);
@@ -246,7 +257,7 @@ export function applyReplies(
       });
       continue;
     }
-    skipNotes(item);
+    skipNotes(item, SKIP_MARK);
   }
   const free = marks.filter(m => !edits.some(e => m.from >= e.from && m.from <= e.to));
   const { text, ranges } = runEdits(raw, [...edits, ...free]);

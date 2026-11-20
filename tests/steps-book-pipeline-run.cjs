@@ -1710,7 +1710,7 @@ test('callouts: abandon and a restart clear the notes while bookPipeline still e
 
 // ---- T6b: applying the reader's notes (the notes slot of BookPipelineRuns) ------------------------------------------------------------
 const { createNoteWriter } = S.load('experiences/visual-map/book-pipeline-callouts.ts');
-const { SKIP_MARK } = S.load('core/book-pipeline/notes-apply.ts');
+const { SKIP_MARK, REFUSED_MARK } = S.load('core/book-pipeline/notes-apply.ts');
 const NW = (text, n, note) => `==${text}==%%備註#${n}：${note}%%`;
 const P1 = `Alpha ${NW('beta', 1, 'shorter')} gamma.`;
 const reply = request => ({ paragraphs: request.items.map(item => ({ id: item.id, text: 'Alpha BETA2 gamma.' })), refused: [] });
@@ -1892,6 +1892,23 @@ test('apply notes: a paragraph edited during the call is skipped (marked in its 
   assert.equal(result.applied, 0); assert.equal(result.skipped, 1);
   assert.ok(r.cardRaw().includes(SKIP_MARK) && r.cardRaw().includes('edited.'));
   assert.ok(!(await r.note(0)).pipelineSeam && !(await r.note(2)).pipelineSeam);
+});
+
+test('apply notes: a refused id is marked with the refusal mark, counted skipped, and left out of the undo record', async () => {
+  const P2 = `Delta ${NW('eps', 2, 'longer')} zeta.`;
+  const r = await notesRig({
+    notes: async request => ({
+      paragraphs: [{ id: request.items[0].id, text: 'Alpha BETA2 gamma.' }],
+      refused: [{ id: request.items[1].id, reason: 'new list mark' }]
+    })
+  });
+  await r.repo.updateNoteGuarded(r.nodes[1].path, { detail: `${P1}\n\n${P2}` }, { authorize: () => true, finalize: c => c });
+  const result = await r.runs.applyNotes(r.mapPath, r.nodes[1].id);
+  assert.equal(result.applied, 1); assert.equal(result.skipped, 1);
+  assert.ok(r.cardRaw().includes(`longer${REFUSED_MARK}%%`), 'the refused note carries the refusal mark');
+  assert.ok(!r.cardRaw().includes(SKIP_MARK), 'not the changed-text mark');
+  assert.ok(r.cardRaw().includes(P2.replace('longer%%', `longer${REFUSED_MARK}%%`)), 'the refused paragraph is otherwise untouched');
+  assert.deepEqual(JSON.parse(JSON.stringify(result.edits.map(e => e.before))), [P1], 'the undo record leaves the refused paragraph out');
 });
 
 test('apply notes: no note, no run and a missing card are refused without a call', async () => {

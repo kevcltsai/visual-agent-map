@@ -437,6 +437,19 @@ test('T5 progress.rerun: present (card, start) only while a single-card rerun ru
 });
 
 // ---- T4: the automatic redo's instruction lines ----
+test('proofFixInstruction: an under-length chapter is asked to expand to a concrete target (the redo does not see the old text); over says shorten with the maximum', () => {
+  const R = S.load('experiences/visual-map/book-pipeline-rerun.ts');
+  const under = R.proofFixInstruction([], [], { kind: 'under', measured: 3184, min: 5000, max: 8000, unit: '字', version: 1 });
+  assert.match(under, /came out at only 3184 字, short of the asked 5000 to 8000 字: lengthen it to at least 5000 字, about 6500 字 \(about 2 times as long\)/);
+  assert.match(under, /more explanation and concrete examples, not by repetition/);
+  assert.ok(under.split(' Do not rely')[0].length <= 300, 'the length piece stays short, so fact points beside it keep their room');
+  const tiny = R.proofFixInstruction([], [], { kind: 'under', measured: 0, min: 100, max: 200, unit: '字', version: 1 });
+  assert.match(tiny, /about 150 字 \(about 150 times as long\)/, 'a zero measure never divides by zero');
+  const over = R.proofFixInstruction([], [], { kind: 'over', measured: 9800, min: 5000, max: 8000, unit: '字', version: 1 });
+  assert.match(over, /9800 字 long, over the asked 5000 to 8000 字: shorten it to at most 8000 字, about 6500 字/);
+  assert.doesNotMatch(over, /lengthen/);
+});
+
 test('T4 proofFixInstruction: a long note or many points never leave an unclosed JSON string; the line stays within 1000 characters', () => {
   const R = S.load('experiences/visual-map/book-pipeline-rerun.ts');
   const quoted = line => line.match(/"(?:[^"\\]|\\.)*"/g) ?? [];

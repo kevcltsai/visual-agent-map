@@ -46029,7 +46029,11 @@ async function searchCommons(slots, fetch, options) {
     for (const query of commonsQueries(slot)) {
       if (list2.length || options.signal.aborted || now() >= deadline) break;
       requests++;
-      const answer = await bounded(Promise.resolve().then(() => fetch(commonsSearchUrl(query))), COMMONS_REQUEST_MS, options.signal);
+      const answer = await bounded(
+        Promise.resolve().then(() => fetch(commonsSearchUrl(query))),
+        COMMONS_REQUEST_MS,
+        options.signal
+      );
       if (!answer || answer.status !== 200) continue;
       for (const candidate of parseCommonsAnswer(answer.text, slot)) {
         if (list2.length >= COMMONS_PER_SLOT) break;
@@ -53800,7 +53804,11 @@ var BookPipelineRuns = class {
           attempt,
           result: "ok",
           ms: 0,
-          counts: { placed: result.placed.length, missing: result.missing.length, ...commonsAsked ? { commons: commonsAsked } : {} },
+          counts: {
+            placed: result.placed.length,
+            missing: result.missing.length,
+            ...commonsAsked ? { commons: commonsAsked } : {}
+          },
           hosts: { name: "reason", list: [...new Set(result.missing.map((item) => item.reasonCode))] }
         })
       );
@@ -92968,7 +92976,11 @@ async function runFindImages(aiCalls, request, run) {
         failMessage: () => "failed",
         usage: { action: "other", mapPath: request.usageMapPath },
         ...run.admission ? { admission: run.admission } : {},
-        task: { webSearchOnly: true, searchBudget: findImagesSearchBudget(asked.slots.length), timeoutMs: 2 * 60 * 1e3 }
+        task: {
+          webSearchOnly: true,
+          searchBudget: findImagesSearchBudget(asked.slots.length),
+          timeoutMs: 2 * 60 * 1e3
+        }
       },
       (raw) => prepared.parse(raw)
     );

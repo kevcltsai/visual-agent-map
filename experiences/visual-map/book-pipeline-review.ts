@@ -1,6 +1,11 @@
 import { t } from "../../i18n";
 import type { PipelineStage } from "../../core/book-pipeline/model";
-import { describeSlots, latestSlotsRecord, splitPictureIssue, stripImageLines } from "../../core/book-pipeline/image-slots";
+import {
+  describeSlots,
+  latestSlotsRecord,
+  splitPictureIssue,
+  stripImageLines
+} from "../../core/book-pipeline/image-slots";
 import {
   chapterBody,
   fencedLines,

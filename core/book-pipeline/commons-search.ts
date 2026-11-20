@@ -63,7 +63,11 @@ export function commonsSearchUrl(query: string): string {
 /** The queries for a slot, best first: the finder's search words, the subject, then what the slot explains (one line, capped). */
 export function commonsQueries(slot: CommonsSlot): string[] {
   const line = (value: string | undefined): string =>
-    (value ?? "").replace(/[\s"|]+/g, " ").trim().slice(0, QUERY_MAX).trim();
+    (value ?? "")
+      .replace(/[\s"|]+/g, " ")
+      .trim()
+      .slice(0, QUERY_MAX)
+      .trim();
   const all = [line(slot.search), line(slot.subject), line(slot.explains)].filter(Boolean);
   return [...new Set(all)].slice(0, COMMONS_REQUESTS_PER_SLOT);
 }
@@ -92,7 +96,9 @@ export function parseCommonsAnswer(text: string, slot: CommonsSlot): CommonsCand
   } catch {
     return [];
   }
-  const pages = Array.isArray(parsed?.query?.pages) ? (parsed.query.pages as Array<Record<string, unknown> | null>) : [];
+  const pages = Array.isArray(parsed?.query?.pages)
+    ? (parsed.query.pages as Array<Record<string, unknown> | null>)
+    : [];
   const ranked = pages
     .filter((page): page is Record<string, unknown> => !!page && typeof page === "object")
     .sort((a, b) => (Number(a.index) || 0) - (Number(b.index) || 0));
@@ -107,7 +113,11 @@ export function parseCommonsAnswer(text: string, slot: CommonsSlot): CommonsCand
     const meta = (info.extmetadata ?? {}) as Record<string, { value?: unknown } | undefined>;
     const author = plainCredit(meta.Artist?.value);
     const license = plainCredit(meta.LicenseShortName?.value);
-    const title = page.title.replace(/^File:/i, "").replace(/\.[a-z0-9]{2,5}$/i, "").replace(/_/g, " ").trim();
+    const title = page.title
+      .replace(/^File:/i, "")
+      .replace(/\.[a-z0-9]{2,5}$/i, "")
+      .replace(/_/g, " ")
+      .trim();
     const candidate = fileSourceOf<CommonsCandidate>({
       title: title || page.title,
       url,
@@ -157,7 +167,11 @@ export async function searchCommons(
     for (const query of commonsQueries(slot)) {
       if (list.length || options.signal.aborted || now() >= deadline) break;
       requests++;
-      const answer = await bounded(Promise.resolve().then(() => fetch(commonsSearchUrl(query))), COMMONS_REQUEST_MS, options.signal);
+      const answer = await bounded(
+        Promise.resolve().then(() => fetch(commonsSearchUrl(query))),
+        COMMONS_REQUEST_MS,
+        options.signal
+      );
       if (!answer || answer.status !== 200) continue;
       for (const candidate of parseCommonsAnswer(answer.text, slot)) {
         if (list.length >= COMMONS_PER_SLOT) break;

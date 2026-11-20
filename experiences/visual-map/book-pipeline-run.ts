@@ -2779,7 +2779,11 @@ export class BookPipelineRuns {
           attempt,
           result: "ok",
           ms: 0,
-          counts: { placed: result.placed.length, missing: result.missing.length, ...(commonsAsked ? { commons: commonsAsked } : {}) },
+          counts: {
+            placed: result.placed.length,
+            missing: result.missing.length,
+            ...(commonsAsked ? { commons: commonsAsked } : {})
+          },
           hosts: { name: "reason", list: [...new Set(result.missing.map(item => item.reasonCode))] }
         })
       );
@@ -2972,7 +2976,8 @@ export class BookPipelineRuns {
     const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
     // Fewer pictures than the owner's minimum is a reason to look (never a rewrite of the text): see pictureShortfallToken.
     const minimum = await this.pictureMinimum(drive);
-    const shortIssue = minimum !== undefined && imageCheck.placed < minimum ? pictureShortfallToken(imageCheck.placed, minimum) : "";
+    const shortIssue =
+      minimum !== undefined && imageCheck.placed < minimum ? pictureShortfallToken(imageCheck.placed, minimum) : "";
     return {
       kind: "ok",
       after: async () => {

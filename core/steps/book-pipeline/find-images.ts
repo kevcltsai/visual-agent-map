@@ -168,7 +168,11 @@ export async function runFindImages(
         failMessage: () => "failed",
         usage: { action: "other", mapPath: request.usageMapPath },
         ...(run.admission ? { admission: run.admission } : {}),
-        task: { webSearchOnly: true, searchBudget: findImagesSearchBudget(asked.slots.length), timeoutMs: 2 * 60 * 1000 }
+        task: {
+          webSearchOnly: true,
+          searchBudget: findImagesSearchBudget(asked.slots.length),
+          timeoutMs: 2 * 60 * 1000
+        }
       },
       raw => prepared.parse(raw)
     );

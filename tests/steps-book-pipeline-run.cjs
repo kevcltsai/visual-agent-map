@@ -8,6 +8,20 @@ const { BookPipelineRuns, BookPipelineRunError, bodyImageUrls, replaceBodyImages
 const { BudgetExhaustedError } = S.load('core/admission.ts');
 const { readBookPipeline } = S.load('core/book-pipeline/model.ts');
 const { cardRevision } = S.load('core/book-pipeline/machine.ts');
+const review = S.load('experiences/visual-map/book-pipeline-review.ts');
+/** The sentences the review box of chapter `i` lists after the run (gate 2's own rules): the box must say what really happened. */
+const boxReasons = async (r, i) => {
+  const s = await r.state();
+  const note = await r.note(i);
+  const card = review.gate2Cards({ order: [r.nodes[i].id], titleOf: () => note.title, noteOf: () => note, proofContext: { runId: s.runId, revisionOf: id => cardRevision(s, id) } })[0];
+  return review.reviewProblems(card);
+};
+/** An unsafe_body chapter's box names the refused write and never says the text was changed (nothing was written). */
+const assertUnsafeBox = async (r, i, label = '') => {
+  const problems = await boxReasons(r, i);
+  assert.ok(problems.some(p => p.kind === 'failed' && /safety check|安全檢查/.test(p.text)), `${label} the box names the failed safety check: ${JSON.stringify(problems)}`);
+  assert.ok(!problems.some(p => p.kind === 'edited' || /已修改|changed, not proofread/i.test(p.text)), `${label} no "changed" line: ${JSON.stringify(problems)}`);
+};
 const { proofKey, evaluateProof, composeProofRecord } = S.load('core/book-pipeline/proof.ts');
 const { findStoredProof, withoutResearchNotes, chapterBody, appendResearchNote, dropPlaceholderSections, markOldProofRecords } = S.load('core/book-pipeline/note-sections.ts');
 const { parseChecklist } = S.load('core/book-pipeline/plan-text.ts');
@@ -439,6 +453,7 @@ test('pictures: when the exit check finds an unsafe body nothing is written, the
   assert.ok(!(await r.note(1)).detail.includes('無圖'), 'the cleaned result is not written');
   assert.equal(stageOf(r.raw(1)), 'needs-review');
   assert.equal((await r.note(1)).pipelineIssue, 'write failed: unsafe_body');
+  await assertUnsafeBox(r, 1);
   const log = r.stat.logs.join('\n');
   assert.ok(log.includes('unsafe_body') && !/Secret|ok\.example|e\.example/.test(log));
   assert.match(log, /write_refused [^\n]*result=exit_check/, 'the log names the check that refused the write');
@@ -503,6 +518,7 @@ test('exit safety: a body the exit check refuses is not written at all (the card
   assert.ok(before().endsWith(FAIL_SECTION)); assert.equal(before().slice(0, -FAIL_SECTION.length), earlier);
   assert.equal(stageOf(r.raw(1)), 'needs-review');
   assert.equal((await r.note(1)).pipelineIssue, 'write failed: unsafe_body');
+  await assertUnsafeBox(r, 1);
 });
 
 test('probe failure reasons are words in the output language (zh: 無法載入 / 空圖 / 逾時 / 已中止; en: English)', async () => {
@@ -2633,7 +2649,8 @@ test('T10c length expand: a fact failure beside the length keeps the fact points
   const detail = (await r.note(1)).detail;
   assert.ok(detail.includes('開場段落。') && detail.includes('結尾一句') && !detail.includes('新增的一段'), detail);
   assert.equal(stageOf(r.raw(1)), 'needs-review');
-  assert.equal((await r.note(1)).pipelineIssue, 'write failed: fix_no_edits');
+  // Contract change W (live v6): the failed fix keeps the reasons the chapter had (here the fact point and the length).
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: fix_no_edits + proof unmet: C2 length:under:23:100-200:字:v2');
 });
 
 test('expansionUnsafe: only what the merged chapter adds is checked; a second copy of an old record line, a new tag, a picture outside old ∪ answer or a slot marker the answer did not have is refused', () => {
@@ -2681,6 +2698,7 @@ test('T10c length expand (security): an answer that adds an unsafe or http pictu
     assert.ok(!detail.includes('INJECT') && !detail.includes('好'.repeat(140)), `${name}: nothing of the answer is saved`);
     assert.ok(detail.includes('土壤段落。'), `${name}: the draft stays`);
     assert.match((await r.note(1)).pipelineIssue, /unsafe_body/, name);
+    await assertUnsafeBox(r, 1, name);
     assert.match(r.stat.logs.join('\n'), /write_refused [^\n]*result=(?:answer|merged)_[a-z_]+/, `${name}: the log names the rule`);
   }
 });
@@ -2721,7 +2739,8 @@ test('fix in place: a V1-only redo answered with a whole shorter chapter and no 
   const { r, detail } = await v1Rig(['## 澆水', '', '重寫的短章。'].join('\n'));
   assert.ok(detail.includes(V1_LINE) && detail.includes('![p](https://img.example/p.png)') && !detail.includes('重寫的短章'), detail);
   assert.equal(stageOf(r.raw(1)), 'needs-review');
-  assert.equal((await r.note(1)).pipelineIssue, 'write failed: fix_no_edits');
+  // Contract change W: the V1 reason stays beside the failure.
+  assert.equal((await r.note(1)).pipelineIssue, 'write failed: fix_no_edits + proof unmet: V1');
 });
 
 test('fix in place: a redo whose blocks would drop a placed picture or cut the chapter below the minimum is refused whole (fix_lost_text); the chapter stays', async () => {
@@ -2731,7 +2750,7 @@ test('fix in place: a redo whose blocks would drop a placed picture or cut the c
   ]) {
     const { r, detail } = await v1Rig(answer);
     assert.equal(detail.includes('![p](https://img.example/p.png)') && detail.includes(`澆水段落${'好'.repeat(60)}`) && detail.includes(V1_LINE), true, answer);
-    assert.equal((await r.note(1)).pipelineIssue, 'write failed: fix_lost_text', answer);
+    assert.equal((await r.note(1)).pipelineIssue, 'write failed: fix_lost_text + proof unmet: V1', answer);
   }
 });
 
@@ -2850,13 +2869,18 @@ test('expand passes: two short chapters still under the minimum after the fix ro
   }
 });
 
-test('expand passes: a pass that adds nothing ends the passes; the chapter keeps what it has and needs review with the length reason', async () => {
+// Contract change X (live v6): a pass with no usable block no longer ends the passes; the next one (while any is left) asks again with BOOK_EXPAND_RETRY_INSTRUCTION.
+test('expand passes: a pass that adds nothing is asked once more with the retry request (X), then the cap ends the passes; the chapter keeps what it has and needs review with the length reason', async () => {
   const seen = [];
   const r = await lenRig();
   r.script.author = passAuthor(r, seen, (call, id) => (id === r.nodes[1].id ? (call === 1 ? 30 : 0) : 150 + call));
   await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
   const id = r.nodes[1].id;
-  assert.equal(seen.filter(input => input.nodeId === id).length, 3, 'first draft, the fix round, one pass that added nothing: no second pass');
+  const calls = seen.filter(input => input.nodeId === id);
+  assert.equal(calls.length, 4, 'first draft, the fix round, two passes that added nothing (the second with the retry request): no third');
+  const { BOOK_EXPAND_RETRY_INSTRUCTION } = S.load('core/book-pipeline/settings.ts');
+  assert.ok(!calls[2].requirements.includes(BOOK_EXPAND_RETRY_INSTRUCTION));
+  assert.ok(calls[3].requirements.includes(BOOK_EXPAND_RETRY_INSTRUCTION));
   assert.ok((await r.note(1)).detail.includes('### 新節30'));
   assert.equal(stageOf(r.raw(1)), 'needs-review');
   assert.match((await r.note(1)).pipelineIssue, /length:under:\d+:100-200/);

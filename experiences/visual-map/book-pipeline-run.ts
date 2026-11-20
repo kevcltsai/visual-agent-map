@@ -501,6 +501,8 @@ interface Drive {
   backedUp: Set<string>;
   backupPaths: Map<string, string>;
   reasons: Map<string, string>;
+  /** The issue a chapter had when its automatic fix began (its field is cleared meanwhile): a failed fix carries it (W). */
+  fixIssues: Map<string, string>;
   busy: Set<string>;
   stopRequested: boolean;
   disposed: boolean;
@@ -1753,6 +1755,7 @@ export class BookPipelineRuns {
       backedUp: new Set(),
       backupPaths: new Map(),
       reasons: new Map(),
+      fixIssues: new Map(),
       busy: new Set(),
       extra: new Map(),
       avoid: new Set(),
@@ -2412,7 +2415,9 @@ export class BookPipelineRuns {
     // A failed rewrite of a chapter that still has its text keeps every reason it had (length, pictures, the proof's points) beside
     // the failure, and its latest proof section (live v6: 「寫作失敗」 alone replaced 「只有 2913 字」 and the picture shortfall).
     const issue =
-      step === "write" && reason !== "hand_edited" ? carryIssue(failure, await this.issueWithBody(drive, nodeId)) : failure;
+      step === "write" && reason !== "hand_edited"
+        ? carryIssue(failure, (await this.issueWithBody(drive, nodeId)) || drive.fixIssues.get(nodeId))
+        : failure;
     drive.stages.set(nodeId, "needs-review");
     drive.reviewStep.set(nodeId, step);
     await this.writeFields(drive, nodeId, { pipelineStage: "needs-review", pipelineIssue: issue });
@@ -2483,6 +2488,9 @@ export class BookPipelineRuns {
       drive.reasons.delete(nodeId);
       drive.reviewStep.delete(nodeId);
       drive.imagesDone.delete(nodeId);
+      const before = current?.fields.pipelineIssue;
+      if (typeof before === "string" && before.trim()) drive.fixIssues.set(nodeId, before);
+      else drive.fixIssues.delete(nodeId);
       drive.stages.set(nodeId, "planned");
       await this.writeFields(drive, nodeId, { pipelineStage: "planned", pipelineIssue: null });
       this.ports.log(

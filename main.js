@@ -27056,9 +27056,12 @@ function countNotes(text10) {
 
 // core/book-pipeline/body-integrity.ts
 var BODY_LINE = /^(?:[ \t]{0,3}>[ \t]?)*<!-- book-body:v1 (\{.*\}) -->$/;
+var OPEN_ITEMS_LINE = /^\s*<!--\s*aim-open-items\s+\[[^\n]*\]\s*-->\s*$/;
 function integrityText(detail) {
   const lines = withoutHiddenCallouts(detail.replace(/\r\n/g, "\n").split("\n"));
-  return projectProofBody(lines.join("\n")).trim();
+  const fenced = fencedLines2(lines);
+  const text10 = lines.filter((line2, at) => fenced[at] || !OPEN_ITEMS_LINE.test(line2)).join("\n");
+  return projectProofBody(text10).trim();
 }
 var integrityFp = (detail) => hashText(integrityText(detail));
 function readBodyRecord(detail) {

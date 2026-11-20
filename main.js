@@ -51242,7 +51242,7 @@ function oldNoteLooksUntouched(detail) {
   const parts = latest.split(":");
   if (parts.length < 5) return false;
   const stored = parts[parts.length - 2];
-  if (stored !== hashText(projectProofBody(stripImageLines(chapterBody(detail))))) return false;
+  if (stored !== hashText(projectProofBody(stripImageLines(chapterBody(detail.trim()))))) return false;
   const placed = ((_c = (_b2 = latestSlotsRecord(detail)) == null ? void 0 : _b2.slots) != null ? _c : []).filter((slot) => slot.state === "placed" && slot.hash).map((slot) => slot.hash).sort();
   const inText = [...integrityText(detail).matchAll(IMAGE_URL)].map((m) => shortHash2(m[1])).sort();
   return placed.length === inText.length && placed.every((hash, at) => hash === inText[at]);

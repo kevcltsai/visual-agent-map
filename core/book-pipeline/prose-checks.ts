@@ -54,10 +54,35 @@ export const RESEARCH_VOICE_PHRASES: readonly string[] = [
   "this research could not"
 ];
 
-/** The research-voice phrases the text holds, in list order, each once. */
+/**
+ * Research-voice patterns beyond the fixed phrases: a "data is insufficient" note about this book's own material, "not found" in a
+ * search sense, this search/query/research. A bare 資料不足 is left alone (「當時資料不足，天文學家誤判」 is history, not process voice):
+ * it needs a qualifier that points at the writer's own material (現有, 目前, 手邊, 本次…) or the label form 「資料不足：」.
+ */
+export const RESEARCH_VOICE_PATTERNS: readonly RegExp[] = [
+  /(?:現有|目前|現階段|手邊|可得|可用|本次|這次|此次|现有|现阶段|手边|这次)的?(?:資料|資訊|文獻|资料|资讯|信息|数据|文献)仍?不足/gu,
+  /(?:資料|資訊|资料|资讯|信息)不足[：:]/gu,
+  /本次(?:搜尋|查詢|研究|檢索|搜索|查询|检索)/gu,
+  /這次(?:搜尋|查詢|檢索)|这次(?:搜索|查询|检索)/gu,
+  /未能?查(?:到|得|詢到|询到)/gu,
+  /沒有?查到|没有?查到/gu,
+  /查無|查无/gu,
+  /\bno (?:data|information|sources?|results?|records?) (?:was |were )?found\b/gu,
+  /\b(?:available|existing|current) (?:data|information|sources?) (?:is|are|was|were) insufficient\b/gu,
+  /\b(?:i|we) (?:did not|didn't|could not|couldn't|was unable to|were unable to) find\b/gu,
+  /\b(?:this|my|our) (?:search|query|lookup)\b/gu
+];
+
+/** The research-voice phrases the text holds, in list order, each once; then what the patterns matched (each text once, not one already listed). */
 export function researchVoiceHits(body: string): string[] {
   const text = body.toLowerCase();
-  return RESEARCH_VOICE_PHRASES.filter(phrase => text.includes(phrase));
+  const hits = RESEARCH_VOICE_PHRASES.filter(phrase => text.includes(phrase));
+  for (const pattern of RESEARCH_VOICE_PATTERNS)
+    for (const match of text.matchAll(pattern)) {
+      const found = match[0];
+      if (!hits.some(hit => hit.includes(found) || found.includes(hit))) hits.push(found);
+    }
+  return hits;
 }
 
 const DOT = /[・·•‧･]/gu;

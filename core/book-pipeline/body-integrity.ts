@@ -70,7 +70,7 @@ const IMAGE_URL = /!\[[^\]\n]*\]\((https:\/\/[^)\s]+)\)/g;
  * and captions), and the pictures in the text must be the ones the `book-slots` record lists by hash (no more, no fewer). The caption lines
  * themselves have no stored hash, so a caption edit alone is not seen here. Anything else: unknown (possibly edited).
  */
-export function oldNoteLooksUntouched(detail: string): boolean {
+export function oldNoteLooksUntouched(detail: string, cardDetail: string = detail.trim()): boolean {
   const proofKeys = extractProofRecords(detail)
     .map(record => PROOF_KEY_LINE.exec(record.split("\n").pop() ?? ""))
     .flatMap(m => {
@@ -86,8 +86,8 @@ export function oldNoteLooksUntouched(detail: string): boolean {
   const parts = latest.split(":");
   if (parts.length < 5) return false;
   const stored = parts[parts.length - 2];
-  // The proof step hashed the Detail as the card reader gives it (trimmed: no line break after the start marker); the same here.
-  if (stored !== hashText(projectProofBody(stripImageLines(chapterBody(detail.trim()))))) return false;
+  // The proof step hashed the Detail as the card reader gives it (trimmed, plus an open-items marker saved after the block); the same here.
+  if (stored !== hashText(projectProofBody(stripImageLines(chapterBody(cardDetail))))) return false;
   const placed = (latestSlotsRecord(detail)?.slots ?? [])
     .filter(slot => slot.state === "placed" && slot.hash)
     .map(slot => slot.hash as string)
@@ -98,12 +98,19 @@ export function oldNoteLooksUntouched(detail: string): boolean {
 
 /**
  * empty: no chapter text at all (nothing to lose); clean: the text is as the program left it; edited: the text differs from the stored
- * fingerprint; unknown: text but no fingerprint (an older note): possibly edited, handled like edited by every automatic flow.
+ * fingerprint; unknown: text, no fingerprint, and the older records ({@link oldNoteLooksUntouched}) do not fit it: possibly edited,
+ * handled like edited by every automatic flow. Text with no record of any kind (no body record, no stored proof, no slots record) is
+ * "clean" (owner decision 2026-11-20): nothing says the reader touched it, so it is rewritten like any other chapter, after the usual backup.
+ * `cardDetail` is the Detail as the card reader gives it (see {@link cardDetailOf}); only the older-note fallback uses it.
  */
 export type BodyState = "empty" | "clean" | "edited" | "unknown";
-export function bodyState(detail: string): BodyState {
+export function bodyState(detail: string, cardDetail?: string): BodyState {
   const record = readBodyRecord(detail);
-  if (!record?.fp) return !integrityText(detail) ? "empty" : oldNoteLooksUntouched(detail) ? "clean" : "unknown";
+  if (!record?.fp) {
+    if (!integrityText(detail)) return "empty";
+    if (!record && !extractProofRecords(detail).length && !latestSlotsRecord(detail)) return "clean";
+    return oldNoteLooksUntouched(detail, cardDetail) ? "clean" : "unknown";
+  }
   return record.fp === integrityFp(detail) ? "clean" : "edited";
 }
 /** Whether the program may rewrite the text without asking: it is as the program left it, or there is none. */
@@ -145,6 +152,23 @@ export function programStamp(baseDetail: string, nextDetail: string): string {
 
 // ---- the same on a note's whole raw text (the Detail block is where the record lives) ----
 
+/** The AIM open-items marker the card reader (repository `detailWithOpenItems`) appends to the Detail when it is saved after the block. */
+const OPEN_ITEMS_MARKER = /\n*^<!--\s*aim-open-items\s+\[[^\n]*\]\s*-->[ \t]*$/m;
+const DETAIL_START = "<!-- visual-agent-map:detail:start -->";
+const DETAIL_END = "<!-- visual-agent-map:detail:end -->";
+/** The Detail of a note's raw text as the card reader gives it (what the proof step hashed): trimmed, plus an open-items marker saved after it. */
+export function cardDetailOf(raw: string): string | undefined {
+  const block = detailBlockOf(raw);
+  if (block === undefined) return undefined;
+  const detail = block.trim();
+  if (OPEN_ITEMS_MARKER.test(detail)) return detail;
+  const end = raw.indexOf(DETAIL_END, raw.indexOf(DETAIL_START) + 1);
+  const after = raw.slice(end + DETAIL_END.length);
+  const next = after.search(/^## /m);
+  const marker = OPEN_ITEMS_MARKER.exec(next >= 0 ? after.slice(0, next) : after)?.[0].trim();
+  return marker ? `${detail}\n\n${marker}` : detail;
+}
+
 const spliceDetail = (raw: string, change: (detail: string) => string): string => {
   const detail = detailBlockOf(raw);
   if (detail === undefined) return raw;
@@ -156,8 +180,8 @@ export const stampRaw = (raw: string): string => spliceDetail(raw, stampDetail);
 export const keepRaw = (raw: string): string => spliceDetail(raw, keepDetail);
 export function programStampRaw(baseRaw: string, nextRaw: string): string {
   const base = detailBlockOf(baseRaw);
-  return base !== undefined && bodyState(base) === "clean" ? stampRaw(nextRaw) : nextRaw;
+  return base !== undefined && bodyState(base, cardDetailOf(baseRaw)) === "clean" ? stampRaw(nextRaw) : nextRaw;
 }
 export const isKeptRaw = (raw: string): boolean => isKept(detailBlockOf(raw) ?? "");
-export const bodyStateRaw = (raw: string): BodyState => bodyState(detailBlockOf(raw) ?? "");
+export const bodyStateRaw = (raw: string): BodyState => bodyState(detailBlockOf(raw) ?? "", cardDetailOf(raw));
 export const integrityFpRaw = (raw: string): string => integrityFp(detailBlockOf(raw) ?? "");

@@ -11,6 +11,8 @@
  */
 import type { AdmissionContext } from "../../core/admission";
 import type { FindImagesRequest, FoundImages } from "../../core/steps/book-pipeline/find-images";
+import type { ConsistencyRequest, RawInconsistency } from "../../core/steps/book-pipeline/consistency";
+import { chapterInconsistencies, compactChapters } from "../../core/book-pipeline/consistency";
 import { isBudgetExhausted } from "../../core/admission";
 import { createBudgetAdmission, createStoreBudgetPort } from "../../core/book-pipeline/budget";
 import { imageKey } from "../../core/book-pipeline/image-dedupe";
@@ -23,6 +25,10 @@ import {
   advancePhase,
   applyBudgetExhausted,
   applyCancelled,
+  applyConsistency,
+  applyConsistencyStopped,
+  beginConsistency,
+  CONSISTENCY_BUSY,
   applyFailure,
   applyReset,
   applySuccess,
@@ -317,6 +323,14 @@ export interface BookPipelinePorts {
   ): Promise<Output>;
   /** Production: `runProofread(aiCalls, request, run)`. */
   runProofread(request: ProofreadRequest, run: ProofreadRun): Promise<ProofResult>;
+  /**
+   * Production: `runConsistency(aiCalls, request, run)`: the one whole-book consistency check after every chapter is proofread.
+   * Absent: the writing phase moves on to gate 2 without it.
+   */
+  checkConsistency?(
+    request: ConsistencyRequest,
+    run: { signal: AbortSignal; admission?: AdmissionContext }
+  ): Promise<RawInconsistency[]>;
   /** A drive of the map has ended (any way); queued work waits for this. Optional: fire and forget. */
   settled?(mapPath: string): void;
   /** The author step: the card's single-card research (charts off, fresh write-back). Never writes the card's frontmatter. */
@@ -1888,7 +1902,9 @@ export class BookPipelineRuns {
         await this.refreshSkippedPlans(drive);
         await this.refreshAroundRemoved(drive);
       }
-      const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy);
+      const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy, {
+        consistency: !!this.ports.checkConsistency && !drive.job
+      });
       if (plan.hold === "global_failed") drive.failure = drive.reasons.get("global") ?? "failed";
       if (plan.hold) break;
       let started = 0;
@@ -1901,11 +1917,27 @@ export class BookPipelineRuns {
         } else if (action.type === "mark_needs_review") {
           await this.markReview(drive, action.nodeId, action.step, drive.reasons.get(action.nodeId) ?? "failed");
           changed = true;
+        } else if (action.type === "book_consistency") {
+          // The automatic redos go first: the check reads the chapters as they end up.
+          if (await this.startFixes(drive)) {
+            changed = true;
+            continue;
+          }
+          drive.busy.add(CONSISTENCY_BUSY);
+          started++;
+          inflight.set(
+            CONSISTENCY_BUSY,
+            this.consistency(drive).finally(() => {
+              drive.busy.delete(CONSISTENCY_BUSY);
+              inflight.delete(CONSISTENCY_BUSY);
+            })
+          );
         } else if (action.type === "advance_phase") {
           if (await this.startFixes(drive)) {
             changed = true;
             continue;
           }
+          if (await this.markInconsistent(drive)) changed = true;
           const before = drive.store.state;
           await drive.store.commit(state => ({
             state: advancePhase(state, this.stagesOf(drive), this.ports.now()),
@@ -2096,6 +2128,97 @@ export class BookPipelineRuns {
       }
     }
     return "none";
+  }
+
+  /**
+   * The one whole-book consistency check (writing phase, every chapter proofread, the automatic redos done): the chapters' texts go
+   * to the proof model in one text-only call; what it finds is kept in the run and marks the chapters it names (see
+   * {@link markInconsistent}). A failure is retried like a step and never holds the run: after the last attempt the phase moves on.
+   */
+  private async consistency(drive: Drive): Promise<void> {
+    if (!this.ports.checkConsistency) return;
+    const begun = await drive.store.commit(state => {
+      const dispatched = beginConsistency(state);
+      return dispatched
+        ? { state: dispatched.state, accepted: true, token: dispatched.token }
+        : { state, accepted: false as const, token: undefined };
+    });
+    if (!begun?.accepted || !begun.token) return;
+    const token = begun.token;
+    const startedAt = Date.parse(this.ports.now());
+    const report = (result: string): void => {
+      const attempt = drive.store.state.consistency?.attempts ?? 0;
+      const ms = Math.max(0, Date.parse(this.ports.now()) - startedAt || 0);
+      this.ports.log(
+        formatPipelineLog({
+          event: "step",
+          runId: token.runId,
+          card: "consistency",
+          step: "proof",
+          attempt,
+          result,
+          ms
+        })
+      );
+    };
+    try {
+      const chapters: { id: string; title: string; text: string }[] = [];
+      for (const id of effectiveOrder(drive.store.state)) {
+        const info = drive.cards.get(id);
+        if (!info) continue;
+        const card = await this.ports.readCard(info.path).catch(() => undefined);
+        const text = card ? projectProofBody(stripImageLines(chapterBody(card.detail))).trim() : "";
+        if (text) chapters.push({ id, title: card?.title ?? info.title, text });
+      }
+      // Fewer than two chapters with text: nothing to compare, no call.
+      const found =
+        chapters.length < 2
+          ? []
+          : await this.ports.checkConsistency(
+              { ...this.base(drive, drive.config.proofModel), chapters: compactChapters(chapters) },
+              { signal: drive.controller.signal, admission: drive.admission }
+            );
+      if (this.dead(drive)) return;
+      const findings = found.map(issue => ({
+        a: chapters[issue.a - 1].id,
+        b: chapters[issue.b - 1].id,
+        claimA: issue.claimA,
+        claimB: issue.claimB,
+        suggestion: issue.suggestion
+      }));
+      const done = await drive.store.commit(state => applyConsistency(state, token, findings));
+      if (!done?.accepted) {
+        report("dropped");
+        return;
+      }
+      await this.markInconsistent(drive);
+      report(`ok:${findings.length}`);
+    } catch (error) {
+      if (this.dead(drive)) return;
+      const outcome = this.classify(drive, error);
+      if (outcome.kind === "budget" || outcome.kind === "cancelled") {
+        await drive.store.commit(state => applyConsistencyStopped(state, token, outcome.kind === "budget"));
+        if (outcome.kind === "budget") drive.controller.abort();
+        report(outcome.kind);
+        return;
+      }
+      report(`failed:${code(outcome.kind === "failed" ? outcome.reason : "failed")}`);
+    }
+  }
+  /**
+   * The chapters the last consistency check named (and that were not written again since) become needs-review with the issue
+   * `consistency`; their review box says what differs. A chapter already needing review keeps its own issue. Idempotent.
+   */
+  private async markInconsistent(drive: Drive): Promise<boolean> {
+    const state = drive.store.state;
+    if (state.phase !== "writing" || !state.consistency?.findings?.length) return false;
+    let marked = false;
+    for (const id of effectiveOrder(state)) {
+      if (drive.stages.get(id) !== "checked" || !chapterInconsistencies(state, id).length) continue;
+      await this.setStage(drive, id, "needs-review", "consistency");
+      marked = true;
+    }
+    return marked;
   }
 
   /** A card that finished its phase's last step (planned in planning, proofread in writing) adds its wall time to the estimate. */

@@ -537,7 +537,7 @@ test('start card: opens with the estimate (every step counted, about minutes), t
   assert.ok(modal.isOpen);
   assert.equal(h.entries.length, 0, 'nothing starts before the owner presses Start');
   const all = texts(modal.modalEl);
-  assert.ok(all.includes('3 張卡 · 約 8 分鐘 · 最多 40 次 AI 呼叫（步驟失敗重試另計；到 300 次會先停下）。'), all.join('|'));
+  assert.ok(all.includes('3 張卡 · 約 8 分鐘 · 最多 41 次 AI 呼叫（步驟失敗重試另計；到 300 次會先停下）。'), all.join('|'));
   assert.ok(all.includes('中間只會停兩次，讓你確認。'));
   assert.ok(all.includes('某一章不滿意，可以只重跑那一章。'));
   assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined, 'no collapsed block: the settings are always open');
@@ -577,7 +577,7 @@ test('start card: the four dropdowns (plan, author, pictures, proofread) carry t
   assert.notEqual(h.plugin.settings.bookWriteModel, 'claude:sonnet', 'a pick is not saved while the card is open');
   assert.equal(h.ctl.saves.length, 0);
   const after = texts(modal.modalEl).find(x => x.startsWith('3 張卡'));
-  assert.match(before, /最多 40 次/); assert.match(after, /最多 40 次/);
+  assert.match(before, /最多 41 次/); assert.match(after, /最多 41 次/);
   assert.notEqual(before, after, 'the time follows the model');
   cardButton(modal, '開始').click(); await dom.tick();
   assert.equal(h.plugin.settings.bookWriteModel, 'claude:sonnet', 'Start saves the pick');
@@ -724,7 +724,8 @@ test('start card: the estimate counts every step of a chapter (plan, write and i
   const start = bundleStart;
   assert.equal(JSON.stringify(start.bookChapterCalls()), JSON.stringify({ plan: 1, write: 2, images: 8, proof: 2 }));
   const e15 = start.bookStartEstimate(15);
-  assert.equal(e15.calls, 1 + 15 * 13);
+  // + 1: the one whole-book consistency check (owner-required, 2026-11-20).
+  assert.equal(e15.calls, 2 + 15 * 13);
   assert.equal(e15.limit, 300);
   // The live full run of 2026-11-20 (owner models, 15 chapters, ai-usage.json): opus 16 (global + 15 plans), sonnet 29 writes and 29 proofs, haiku 58 searches, 132 calls in about 26 minutes.
   const per = start.bookChapterCalls();
@@ -739,10 +740,12 @@ test('start card: the estimate counts every step of a chapter (plan, write and i
   // Another model scales its step: Sonnet for pictures doubles the picture time; Haiku for the plan cuts it.
   assert.equal(start.bookStartEstimate(1, { ...owner, images: 'claude:sonnet' }).seconds, 20 + 20 + 2 * (63 + 2 * 110 + 19));
   assert.equal(JSON.stringify(start.bookStartEstimate(0)), JSON.stringify({ cards: 0, calls: 1, limit: 300, seconds: 20 }));
+  assert.equal(start.bookStartEstimate(1).calls, 1 + 13, 'one chapter: nothing to compare, no consistency check');
+  assert.equal(start.bookStartEstimate(2).calls, 2 + 2 * 13, 'two chapters: one consistency check');
   lang('zh-TW');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15)), '15 張卡 · 約 27 分鐘 · 最多 196 次 AI 呼叫（步驟失敗重試另計；到 300 次會先停下）。');
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15)), '15 張卡 · 約 27 分鐘 · 最多 197 次 AI 呼叫（步驟失敗重試另計；到 300 次會先停下）。');
   lang('en');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15)), "15 cards · about 27 minutes · up to 196 AI calls (a failed step's retry not included; the run pauses at 300).");
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15)), "15 cards · about 27 minutes · up to 197 AI calls (a failed step's retry not included; the run pauses at 300).");
   lang('zh-TW');
 });
 

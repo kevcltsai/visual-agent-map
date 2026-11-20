@@ -19,9 +19,11 @@ import {
   emptyAttempts,
   mapDifference,
   type BookPipelineData,
+  type ConsistencyFinding,
   type PipelineStage,
   type PipelineStep
 } from "./model";
+import { consistencyKey } from "./consistency";
 
 export type PipelineStepKind = "global" | PipelineStep;
 
@@ -31,7 +33,12 @@ export type PipelineAction =
   | { type: "card_plan" | "card_write" | "card_proof"; nodeId: string }
   /** The step's attempts are used up: write `needs-review` on the card, then keep going. */
   | { type: "mark_needs_review"; nodeId: string; step: PipelineStep }
+  /** Every chapter is written and proofread: the one whole-book consistency check runs before the phase moves on. */
+  | { type: "book_consistency" }
   | { type: "advance_phase" };
+
+/** The busy key of the consistency check (never a card id: card ids are map node ids). */
+export const CONSISTENCY_BUSY = "#consistency";
 
 /** Why nothing (more) runs. `gate1`/`gate2` wait for the owner; `done` is final. */
 export type PipelineHold = "stopped" | "budget" | "global_failed" | "gate1" | "gate2" | "done" | "empty";
@@ -106,7 +113,9 @@ export function cardRevision(data: BookPipelineData, nodeId: string): number {
 export function nextActions(
   data: BookPipelineData,
   stages: CardStages,
-  busy: ReadonlySet<string> = new Set()
+  busy: ReadonlySet<string> = new Set(),
+  /** `consistency`: the runner can run the whole-book check (absent: the writing phase moves on without it, as before). */
+  options: { consistency?: boolean } = {}
 ): PipelinePlan {
   if (data.status === "stopped") return { actions: [], hold: data.pauseReason === "budget" ? "budget" : "stopped" };
   if (data.phase === "done") return { actions: [], hold: "done" };
@@ -152,7 +161,77 @@ export function nextActions(
   if (actions.length) return { actions };
   // Nothing left to start. Busy cards are still working; otherwise the phase is complete.
   if (busy.size) return { actions: [] };
+  if (data.phase === "writing" && options.consistency && consistencyDue(data))
+    return { actions: [{ type: "book_consistency" }] };
   return { actions: [{ type: "advance_phase" }] };
+}
+
+/**
+ * Whether the whole-book check still has to run: never asked, asked for other chapter revisions (a chapter was written again), or
+ * unfinished with attempts left. A check that failed {@link MAX_STEP_ATTEMPTS} times for the same chapters does not hold the run.
+ */
+export function consistencyDue(data: BookPipelineData): boolean {
+  const check = data.consistency;
+  if (!check || check.key !== consistencyKey(data)) return true;
+  return !check.done && check.attempts < MAX_STEP_ATTEMPTS;
+}
+
+/** A dispatched consistency check: the run, stop generation and chapter revisions it started under. */
+export interface ConsistencyToken {
+  runId: string;
+  stopEpoch: number;
+  key: string;
+}
+/**
+ * Starts the check: counts one attempt for the current chapters (saved before the call). An earlier result stays until a new one
+ * commits (its findings count only for chapters that did not change). Null when it may not start.
+ */
+export function beginConsistency(data: BookPipelineData): { state: BookPipelineData; token: ConsistencyToken } | null {
+  if (data.status !== "running" || data.phase !== "writing" || !consistencyDue(data)) return null;
+  const key = consistencyKey(data);
+  const next = clone(data);
+  const same = next.consistency?.key === key ? next.consistency.attempts : 0;
+  next.consistency = { ...(next.consistency ?? {}), key, attempts: same + 1, done: false };
+  next.revision++;
+  return { state: next, token: { runId: next.runId, stopEpoch: next.stopEpoch ?? 0, key } };
+}
+const consistencyCurrent = (data: BookPipelineData, token: ConsistencyToken): boolean =>
+  data.runId === token.runId &&
+  data.status === "running" &&
+  data.phase === "writing" &&
+  (data.stopEpoch ?? 0) === token.stopEpoch &&
+  consistencyKey(data) === token.key;
+/** The check finished: its findings and the revisions it read are kept; a result for chapters that changed meanwhile is dropped. */
+export function applyConsistency(
+  data: BookPipelineData,
+  token: ConsistencyToken,
+  findings: readonly ConsistencyFinding[]
+): Committed {
+  if (!consistencyCurrent(data, token)) return { state: data, accepted: false };
+  const next = clone(data);
+  const revisions = Object.fromEntries(effectiveOrder(next).map(id => [id, cardRevision(next, id)]));
+  next.consistency = {
+    key: token.key,
+    attempts: next.consistency?.key === token.key ? next.consistency.attempts : 1,
+    done: true,
+    revisions,
+    findings: findings.map(finding => ({ ...finding }))
+  };
+  next.revision++;
+  return { state: next, accepted: true };
+}
+/** The check was stopped or hit the budget (not a failure): its attempt is given back; with `budget` the run pauses for it. */
+export function applyConsistencyStopped(data: BookPipelineData, token: ConsistencyToken, budget: boolean): Committed {
+  if (data.runId !== token.runId) return { state: data, accepted: false };
+  const next = clone(data);
+  if (next.consistency?.key === token.key) next.consistency.attempts = Math.max(0, next.consistency.attempts - 1);
+  if (budget) {
+    next.status = "stopped";
+    next.pauseReason = "budget";
+    delete next.failureCode;
+  }
+  next.revision++;
+  return { state: next, accepted: true };
 }
 
 /** Moves the phase on when it is complete (planning to gate1, writing to gate2); a no-op elsewhere. */

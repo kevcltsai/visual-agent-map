@@ -371,6 +371,7 @@ test('collect snapshots: chart step (chart.add@1)', () => {
   const bookFind = support.load('core/steps/book-pipeline/find-images.ts', { obsidian: support.obsidian });
   const bookApply = support.load('core/steps/book-pipeline/apply-notes.ts', { obsidian: support.obsidian });
   const bookSuggest = support.load('core/steps/book-pipeline/suggest-settings.ts', { obsidian: support.obsidian });
+  const bookConsistency = support.load('core/steps/book-pipeline/consistency.ts', { obsidian: support.obsidian });
   for (const [language, tag] of LANGUAGES) {
     const base = { language, model: 'claude-haiku-4-5', reasoning: 'low' };
     const cards = [{ id: 'n1', title: 'Introduction to Western art', summary: 'What the book covers' }, { id: 'n2', title: 'Renaissance', summary: 'Perspective and the workshop' }, { id: 'n3', title: 'Baroque', summary: 'Light and drama' }];
@@ -382,6 +383,7 @@ test('collect snapshots: chart step (chart.add@1)', () => {
     record(`book-apply-notes.${tag}`, 'core/steps/book-pipeline/apply-notes.ts applyNotesStep', language, bookApply.applyNotesStep.render({ ...base, settings: { reader: 'Curious adults', tone: 'warm' }, plan: 'Perspective and the workshop; opens from the introduction and hands over to the Baroque.', items: [{ id: 'p1', text: 'Brunelleschi showed linear ⟦N2⟧perspective⟦/N2⟧ around 1415. ⟦L1⟧', links: ['![[mona.jpg]]'], notes: [{ id: 'N2', note: 'Say what perspective is in one phrase' }] }] }), bookApply.applyNotesStep.schema);
     record(`book-suggest-settings.${tag}`, 'core/steps/book-pipeline/suggest-settings.ts suggestSettingsStep', language, bookSuggest.suggestSettingsStep.render({ ...base, bookTitle: 'Introduction to psychology', summary: 'How people think, feel and behave', chapters: ['Perception', 'Memory', 'Emotion'] }), bookSuggest.suggestSettingsStep.schema);
     record(`book-proofread.${tag}`, 'core/steps/book-pipeline/proofread.ts proofreadStep', language, bookProof.proofreadStep.render({ ...base, body: 'Brunelleschi demonstrated linear perspective around 1415.', checklist: [{ id: 'C1', type: 'structure', text: 'Names the technique' }, { id: 'C2', type: 'fact', text: 'States the date of the demonstration' }] }), bookProof.proofreadStep.schema);
+    record(`book-consistency.${tag}`, 'core/steps/book-pipeline/consistency.ts consistencyStep', language, bookConsistency.consistencyStep.render({ ...base, chapters: [{ title: 'Sowing', text: 'The seeds sprout in about three days.' }, { title: 'Care', text: 'Expect sprouts after one to two days.' }] }), bookConsistency.consistencyStep.schema);
   }
   for (const [language, tag] of LANGUAGES) record(`chart.add-none.${tag}`, 'core/steps/chart/step.ts chartStep (no existing diagram)', language, chartStep.render({ title: 'Topic T', detail: language === 'en' ? 'Plain text.' : '純文字。', language, existingCount: 0, existingTypes: [], remaining: 3 }), chartStep.schema);
 });

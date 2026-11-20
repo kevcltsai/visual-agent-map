@@ -3230,6 +3230,25 @@ test('consistency: one check after every chapter is proofread costs one call, ma
   assert.ok(!r.stat.logs.some(line => line.includes('三天')), 'the log carries no claim text');
 });
 
+test('consistency: a wrong chapter number in a chapter is found without a model call and marks only that chapter', async () => {
+  const { chapterInconsistencies } = S.load('core/book-pipeline/consistency.ts');
+  let r;
+  const asked = [];
+  r = await rig({
+    ports: { checkConsistency: async (request, run) => { asked.push(request); await run.admission.reserve(); return []; } },
+    script: { author: async input => { await input.admission.reserve(); const note = await r.repo.readNote(input.path); const extra = note.title === TITLES[0] ? `\n\n細節都留給第二章「${TITLES[2]}」。` : ''; await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) + extra }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } }
+  });
+  await r.runs.start(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
+  const s = await r.state();
+  assert.equal(s.phase, 'gate2');
+  assert.equal(asked.length, 1, 'still one call per book');
+  assert.equal(s.budget.used, 1 + 3 + 3 + 3 + 1);
+  assert.deepEqual([stageOf(r.raw(0)), stageOf(r.raw(1)), stageOf(r.raw(2))], ['needs-review', 'checked', 'checked']);
+  const ids = r.nodes.map(n => n.id);
+  assert.deepEqual(JSON.parse(JSON.stringify(chapterInconsistencies(s, ids[0]))), [{ other: ids[2], own: `細節都留給第二章「${TITLES[2]}」。`, theirs: '第二章', suggestion: '第三章', reference: true }]);
+});
+
 test('consistency: a check that fails three times never holds the run (gate 2, no chapter marked); no port means no check', async () => {
   let calls = 0;
   const r = await rig({ ports: { checkConsistency: async () => { calls++; throw new Error('bad reply'); } } });

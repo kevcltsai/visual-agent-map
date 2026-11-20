@@ -186,10 +186,14 @@ export interface BookPipelineData {
   phaseStartedAt: string;
 }
 
-/** Two chapters (card ids) that state the same fact differently: what each says (model text, one line) and a suggested fix. */
+/**
+ * Two chapters (card ids) that state the same fact differently: what each says (model text, one line) and a suggested fix. With
+ * `kind: "reference"` (found without a model): chapter `a` names chapter `b` by a wrong number or "next/previous"; `claimA` is the
+ * sentence, `claimB` the words used, `suggestion` the right ones. It concerns `a` only.
+ */
 export interface ConsistencyFinding {
   /** Absent: two chapters disagree (the model's finding). `removed`: chapter `a` still names the removed chapter `b` (title in `claimB`, found by the program). */
-  kind?: "removed";
+  kind?: "reference" | "removed";
   a: string;
   b: string;
   claimA: string;
@@ -229,7 +233,7 @@ function consistencyShape(value: unknown): boolean {
       value.findings.every(
         item =>
           isObject(item) &&
-          (item.kind === undefined || item.kind === "removed") &&
+          (item.kind === undefined || item.kind === "reference" || item.kind === "removed") &&
           isText(item.a) &&
           isText(item.b) &&
           isText(item.claimA) &&

@@ -105,6 +105,8 @@ const PROBLEM_RULES: readonly { kind: ReviewProblemKind; of: (card: Gate2Card) =
       card.inconsistencies?.length
         ? card.inconsistencies.map(item => {
             if (item.kind === "removed") return t("ui.book_reason_removed_ref_0_1", item.theirs, item.own);
+            if (item.reference)
+              return t("ui.book_reason_chapter_ref_0_1_2_3", item.own, item.theirs, item.otherTitle, item.suggestion);
             const sentence = t("ui.book_reason_inconsistent_0_1_2", item.otherTitle, item.own, item.theirs);
             return item.suggestion ? `${sentence}${t("ui.book_panel_lead_sep")}${item.suggestion}` : sentence;
           })

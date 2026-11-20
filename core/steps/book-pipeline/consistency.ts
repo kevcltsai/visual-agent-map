@@ -30,7 +30,7 @@ export interface RawInconsistency {
   suggestion: string;
 }
 
-export const CONSISTENCY_MAX_ISSUES = 20;
+export const CONSISTENCY_MAX_ISSUES = 40;
 export const CONSISTENCY_CLAIM_CHARS = 160;
 const KEYS = ["a", "b", "claimA", "claimB", "suggestion"] as const;
 
@@ -86,10 +86,11 @@ export function parseConsistency(raw: string, chapters: number): RawInconsistenc
 /** The whole-book consistency check: one text-only call over every chapter's text (no web, no tools). */
 export const consistencyStep: StepDefinition<ConsistencyRequest, RawInconsistency[]> = {
   id: "book-pipeline.consistency",
-  version: 1,
+  version: 2,
   render: request =>
     renderTemplate(template, {
       languageInstruction: languageInstruction(request.language, request.chapters[0]?.text ?? ""),
+      maxIssues: String(CONSISTENCY_MAX_ISSUES),
       chapters: JSON.stringify(
         request.chapters.map((chapter, at) => ({
           number: at + 1,

@@ -3319,7 +3319,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_seam_label": "接縫需看",
   "ui.book_seam_reason": "鄰卡企劃或正文已變更，尚未人工核對。",
   "ui.book_card_menu_rerun": "重跑圖文書這一張",
-  "ui.book_card_menu_rerun_sub": "企劃 → 寫 → 校，約 2 分鐘；前後章不動，只標「接縫需看」",
+  "ui.book_card_menu_rerun_sub": "企劃 → 寫 → 校，約 2 分鐘；前後章正文不動，只更新「前一張／後一張」並標「接縫需看」",
   "ui.book_rerun_tag": "處理中",
   "ui.book_panel_lead_sep": "，",
   "ui.book_panel_reason_unchecked_0": "有 {0} 項沒能核對到來源。",

@@ -2877,3 +2877,51 @@ test('fix6 redo at planned: no plan step runs, yet a skipped (hand-edited) last 
   assert.equal(r.raw(2), before, 'a second drive changes nothing');
   assert.equal(calls, 0, 'no plan call');
 });
+
+// ---- rerun fix 3: neighbours around a chapter removed mid-writing, and no literal "null" description ----
+test('fix3 retargetNeighbourLine: a line naming the neighbour is left; a moved position keeps its sentence; another chapter is rewritten; null gives none', () => {
+  const { retargetNeighbourLine } = S.load('core/book-pipeline/plan-text.ts');
+  const prompt = '角色：本文\n前一張：(2) A — about a\n後一張：(4) Gone — about gone';
+  assert.equal(retargetNeighbourLine(prompt, 'previous', { position: 2, title: 'A', summary: 'new' }), undefined, 'already names it');
+  assert.equal(retargetNeighbourLine(prompt, 'previous', { position: 1, title: 'A', summary: 'new' }), '角色：本文\n前一張：(1) A — about a\n後一張：(4) Gone — about gone', 'only the position moved');
+  assert.equal(retargetNeighbourLine(prompt, 'next', { position: 4, title: 'C', summary: 'covers c' }), '角色：本文\n前一張：(2) A — about a\n後一張：(4) C — covers c', 'a removed chapter is replaced');
+  assert.equal(retargetNeighbourLine(prompt, 'next', null), '角色：本文\n前一張：(2) A — about a\n後一張：無');
+  assert.equal(retargetNeighbourLine('角色：本文', 'next', null), undefined, 'no such line');
+});
+
+test('fix3 composeCardPrompt / rewriteNeighbourLine: a literal null or undefined description is never written (the title alone stays)', () => {
+  const { composeCardPrompt, rewriteNeighbourLine } = S.load('core/book-pipeline/plan-text.ts');
+  const prompt = composeCardPrompt({ role: 'body', covers: 'c', entry: 'e', handoff: 'h', previous: { position: 3, title: 'Seeds', summary: 'null' }, next: { position: 5, title: 'Veg', summary: ' undefined ' }, checklist: [{ id: 'C1', type: 'structure', text: 'x' }] }, 'zh-TW');
+  assert.ok(prompt.includes('前一張：(3) Seeds\n'), prompt);
+  assert.ok(prompt.includes('後一張：(5) Veg\n'), prompt);
+  assert.ok(!/null|undefined/.test(prompt));
+  assert.equal(rewriteNeighbourLine('後一張：(3) old — old', 'next', { position: 5, title: 'T', summary: 'NULL' }), '後一張：(5) T');
+});
+
+test('fix3 a planned chapter whose plan step answers "null" for its neighbours writes their titles only', async () => {
+  const r = await rig({ titles: FOUR });
+  const base = r.script.card; r.script.card = (request, n) => ({ ...base(request, n), previous: 'null', next: 'null' });
+  await r.runs.start(r.mapPath);
+  await r.runs.confirmGate1(r.mapPath); await finished(r);
+  assert.equal(await promptLine(r, 2, '前一張'), '(2) SecretTitleA');
+  assert.equal(await promptLine(r, 2, '後一張'), '(4) SecretTitleC');
+});
+
+test('fix3 a chapter removed while writing, then "carry on": the neighbours\' previous/next lines skip it and roles do not change', async () => {
+  const r = await rig({ titles: FOUR });
+  await r.runs.start(r.mapPath);
+  const roles = []; for (let i = 0; i < 4; i++) roles.push((await r.note(i)).bookRole);
+  assert.ok((await promptLine(r, 0, '後一張')).startsWith('(2) SecretTitleA'), 'planned against the old order');
+  const base = r.script.author; let hit = false;
+  r.script.author = async (input, n) => { if (!hit) { hit = true; await dropCard(r, 1); } return base(input, n); };
+  await r.runs.confirmGate1(r.mapPath); await finished(r);
+  assert.equal((await r.state()).pauseReason, 'map');
+  await r.runs.keepBookMap(r.mapPath); await finished(r);
+  assert.equal((await r.state()).phase, 'gate2');
+  assert.equal(await promptLine(r, 0, '後一張'), '(2) SecretTitleB — covers 3', 'the previous chapter now points past the removed one');
+  assert.equal(await promptLine(r, 2, '前一張'), '(1) SecretRootTitle — covers 1', 'the next chapter names its new neighbour');
+  assert.equal(await promptLine(r, 3, '前一張'), '(2) SecretTitleB — p', 'only the position moved: the sentence is kept');
+  assert.equal(await promptLine(r, 2, '後一張'), '(3) SecretTitleC — n');
+  assert.equal(await promptLine(r, 3, '後一張'), '無', 'an unaffected line is left as it was');
+  for (const i of [0, 2, 3]) assert.equal((await r.note(i)).bookRole, roles[i], `role of card ${i} unchanged`);
+});

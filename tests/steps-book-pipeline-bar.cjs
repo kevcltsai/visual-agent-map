@@ -215,7 +215,7 @@ test('right-click: the rerun item and its disabled sub line show at gate 2 and d
     assert.ok(at >= 0, phase);
     assert.equal(items[at].disabled, false);
     // The second line is a note (never the permanent grey "disabled" line it was): it describes the rerun while it can be used.
-    assert.equal(items[at + 1].title, '企劃 → 寫 → 校，約 2 分鐘；前後章不動，只標「接縫需看」');
+    assert.equal(items[at + 1].title, '企劃 → 寫 → 校，約 2 分鐘；前後章正文不動，只更新「前一張／後一張」並標「接縫需看」');
     assert.notEqual(items[at + 1].disabled, true);
   }
   // When it cannot be used the second line says why.

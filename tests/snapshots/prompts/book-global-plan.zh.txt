@@ -5,6 +5,7 @@ Decide, once for the whole book: the role and the reading order of every card, a
 Rules:
 - Return every card exactly once, by its id, copied exactly from the list, in the order the book should be read. Do not add, drop, rename or merge cards.
 - The book's chapters are exactly the cards in the list below. A topic that the settings or a summary mention but that is not a card is not a chapter: do not treat it as one.
+- Number chapters only from this list: chapter n is the n-th card in the order you return. In the thread and the decisions, never give a chapter number to, preview or announce as a chapter a topic that is not a card, even when the settings name it (for example a chapter the owner removed).
 - role is one of intro (opens the book or a part), body (a main chapter), gallery (a visual walk-through of materials), closing (wraps up).
 - thread: 2 to 4 sentences, one paragraph, no headings or lists.
 - materials: each has a short name and one sentence on how the book uses it. Use only things the titles and summaries point to; an empty list is allowed when they point to none.

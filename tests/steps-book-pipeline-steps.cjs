@@ -13,6 +13,7 @@ const textLib = load('core/book-pipeline/text.ts');
 const planText = load('core/book-pipeline/plan-text.ts');
 const proof = load('core/book-pipeline/proof.ts');
 const prose = load('core/book-pipeline/prose-checks.ts');
+const noteSections = load('core/book-pipeline/note-sections.ts');
 const settings = load('core/book-pipeline/settings.ts');
 const pipelineLog = load('core/book-pipeline/log.ts');
 const globalPlan = load('core/steps/book-pipeline/global-plan.ts');
@@ -294,6 +295,47 @@ test('prose checks: the V1 note quotes the offending sentences and every note is
   // One or two sentences each is a guide; a body chapter is not checked for previews.
   assert.equal(prose.applyProseChecks(result, intro.split('\n')[0], others, { role: 'intro', title: '家庭菜園入門' }), result);
   assert.equal(prose.applyProseChecks(result, intro, others, { role: 'body', title: '家庭菜園入門' }), result);
+});
+
+test('prose checks (live v6): a reader-visible [!note]/[!question] box under the Sources is in V1\'s scope; the pipeline\'s vam-* boxes and boxes in the chapter text are not read twice', () => {
+  const detail = [
+    '澆水要看土。',
+    '',
+    '> [!tip] 提示',
+    '> 早上澆。',
+    '',
+    '### 來源',
+    '',
+    '- [農業部](https://example.org)',
+    '',
+    '> [!note]- 待確認事項',
+    '> 現有資料不足：蚜蟲的處理方法，搜尋結果沒有找到直接的官方來源。',
+    '',
+    '> [!question] 問題',
+    '> 小白菜「30 天」屬一般經驗值，本次未取得台灣在地權威來源逐項佐證。',
+    '',
+    '> [!question] 待確認',
+    '> 小番茄從播種到首次採收「三個月以上」未找到可直接引用的來源。',
+    '',
+    '> [!vam-book]- 研究備註',
+    '> 搜尋結果：無'
+  ].join('\n');
+  const body = noteSections.chapterBody(detail);
+  assert.doesNotMatch(body, /待確認事項/, 'the Sources section (and its box) is not chapter text');
+  const notes = noteSections.readerCallouts(detail);
+  assert.match(notes, /^\[!note\]- 待確認事項\n現有資料不足/);
+  assert.match(notes, /本次未取得台灣在地權威來源/);
+  assert.match(notes, /未找到可直接引用的來源/);
+  assert.doesNotMatch(notes, /研究備註|早上澆/);
+  assert.equal(noteSections.readerCallouts('澆水要看土。'), '');
+  const items = ['V1'].map(id => ({ id, type: 'structure', status: 'met', note: '', sources: [] }));
+  const result = { aggregate: 'checked', items };
+  assert.equal(prose.applyProseChecks(result, body, []), result, 'without the boxes V1 stays met (the v6 miss)');
+  const judged = prose.applyProseChecks(result, body, [], { language: 'zh-TW', readerNotes: notes });
+  assert.equal(judged.items[0].status, 'unmet');
+  for (const quote of ['搜尋結果沒有找到', '本次未取得台灣在地權威來源', '未找到可直接引用的來源']) assert.match(judged.items[0].note, new RegExp(quote));
+  // Prose about a source that is not process voice stays clean.
+  assert.deepEqual(plain(prose.researchVoiceHits('他終於找到水源。')), []);
 });
 
 test('prose checks: a dotted person name that shares a chapter title\'s family name but not its spelling is a variant (live run: 桃樂絲・蘭格, 理察・艾維頓, 歐文・潘)', () => {

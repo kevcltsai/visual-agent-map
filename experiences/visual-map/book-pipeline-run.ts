@@ -110,6 +110,7 @@ import {
   replaceProofSection,
   replaceResearchRecord,
   chapterBody,
+  readerCallouts,
   detailBlockOf,
   dropProcessNotes,
   emptyExpandStats,
@@ -2446,7 +2447,7 @@ export class BookPipelineRuns {
           items,
           [...parseChecklist(card.prompt), ...BOOK_CHECKS],
           length,
-          researchVoiceSentences(chapterBody(card.detail))
+          researchVoiceSentences(`${chapterBody(card.detail)}\n\n${readerCallouts(card.detail)}`)
         )
       );
       drive.expand.add(id);
@@ -3547,7 +3548,8 @@ export class BookPipelineRuns {
             checklist: [...checklist, ...BOOK_CHECKS],
             title: card.title,
             role: drive.cards.get(nodeId)?.role,
-            chapters: await this.proofChapters(drive, nodeId, card)
+            chapters: await this.proofChapters(drive, nodeId, card),
+            readerNotes: readerCallouts(card.detail)
           },
           { signal, admission: drive.admission }
         )

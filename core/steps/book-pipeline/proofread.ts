@@ -34,6 +34,8 @@ export interface ProofreadRequest extends BookStepBase {
   role?: BookRole;
   /** Every chapter in reading order: its title (the authoritative spelling of a person's name) and its covers line (may be empty). */
   chapters?: readonly ProofChapter[];
+  /** The reader-visible callouts outside the chapter text (a `[!question]` box under the Sources): the research-voice check reads them. */
+  readerNotes?: string;
 }
 export interface ProofChapter {
   title: string;
@@ -167,7 +169,12 @@ export async function runProofread(
         const judged = evaluateProof(parsed, request.checklist, opened, { body: request.body });
         // The program's own findings (research voice, a person name spelled unlike its chapter title) override the model's "met".
         const titles = (request.chapters ?? []).map(chapter => chapter.title);
-        const context = { language: request.language, role: request.role, title: request.title };
+        const context = {
+          language: request.language,
+          role: request.role,
+          title: request.title,
+          readerNotes: request.readerNotes
+        };
         return { ...applyProseChecks(judged, request.body, titles, context), counts };
       } catch (error) {
         // The counts travel with a failure too: they are the only trace of what a no-content-log call did.

@@ -853,6 +853,22 @@ export function chapterBody(detail: string): string {
   return lines.join("\n").replace(/\s+$/, "");
 }
 
+/**
+ * The text of the reader-visible callouts of a Detail that {@link chapterBody} leaves out (a `[!note]`/`[!question]` box the author put
+ * under the Sources section, live v6): not the pipeline's own `vam-*` callouts, not a box the chapter text already holds. The research-voice
+ * check reads these too, since a reader sees them. Quote prefixes removed, one box per paragraph; "" when there is none.
+ */
+export function readerCallouts(detail: string): string {
+  const lines = withoutHiddenCallouts(detail.split("\n"));
+  const body = chapterBody(detail);
+  return calloutBlocks(lines, fencedLines(lines), 0, lines.length)
+    .filter(block => !/^[ \t]{0,3}>[ \t]?\[!\s*vam-/i.test(bare(lines[block.start])))
+    .map(block => lines.slice(block.start, block.end).join("\n"))
+    .filter(text => !body.includes(text))
+    .map(text => unquoted(text).replace(/\r/g, "").trim())
+    .join("\n\n");
+}
+
 const IMAGE_ONLY_LINE = /^\s*(?:(?:!\[[^\]]*\]\([^)]*\)|!\[\[[^\]]*\]\])\s*)+$/;
 
 /**

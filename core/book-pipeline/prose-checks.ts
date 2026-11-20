@@ -69,6 +69,8 @@ export const RESEARCH_VOICE_PATTERNS: readonly RegExp[] = [
   /未能?查(?:到|得|詢到|询到)/gu,
   /沒有?查到|没有?查到/gu,
   /查無|查无/gu,
+  // Live v6 (a reader-visible box): 「未找到可直接引用的來源」, 「本次未取得台灣在地權威來源」: what this research did not get, said of a source.
+  /未能?(?:找到|取得|得到)[^。！？\n]{0,12}?(?:來源|来源|文獻|文献|出處|出处)/gu,
   /\bno (?:data|information|sources?|results?|records?) (?:was |were )?found\b/gu,
   /\b(?:available|existing|current) (?:data|information|sources?) (?:is|are|was|were) insufficient\b/gu,
   /\b(?:i|we) (?:did not|didn't|could not|couldn't|was unable to|were unable to) find\b/gu,
@@ -258,6 +260,8 @@ export interface ProseCheckContext {
   language?: ContentLanguage;
   role?: BookRole;
   title?: string;
+  /** The reader-visible callouts outside the chapter text (`readerCallouts`): the research-voice check reads them too. */
+  readerNotes?: string;
 }
 /**
  * The proof result with the program's own findings applied: a research-voice sentence makes V1 unmet, a name variant makes N1 unmet,
@@ -271,7 +275,10 @@ export function applyProseChecks(
   context: ProseCheckContext = {}
 ): ProofResult {
   const language = context.language ?? "en";
-  const voice = researchVoiceSentences(body).slice(0, MAX_NOTE_ITEMS);
+  const voice = researchVoiceSentences(context.readerNotes ? `${body}\n\n${context.readerNotes}` : body).slice(
+    0,
+    MAX_NOTE_ITEMS
+  );
   const names = nameVariantHits(body, titles).slice(0, MAX_NOTE_ITEMS);
   const own = titleKey(context.title ?? "");
   const previews =

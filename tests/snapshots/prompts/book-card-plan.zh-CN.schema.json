@@ -49,7 +49,7 @@
     "images": {
       "type": "array",
       "minItems": 0,
-      "maxItems": 8,
+      "maxItems": 12,
       "items": {
         "type": "object",
         "additionalProperties": false,

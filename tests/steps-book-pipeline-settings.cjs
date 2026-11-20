@@ -98,6 +98,17 @@ test('the author rules say the chapter text is required and comes first; a sourc
 const L = S.load('core/book-pipeline/settings.ts');
 const range = text => { const heard = []; const value = L.lengthRange(text, why => heard.push(why)); return { value: value && { ...value }, heard }; };
 
+test('imageRange: N–M 張|images with every separator, 約 N, units; ambiguous, inverted, zero, huge and unit-less numbers mean none; imageRangeOf scans the fields', () => {
+  for (const [text, min, max] of [['每章 6–10 張', 6, 10], ['6-10 張', 6, 10], ['6~10張', 6, 10], ['6～10 張圖', 6, 10], ['6至10張', 6, 10], ['6到10 張', 6, 10], ['6 to 10 images', 6, 10], ['約 10 張', 8, 12], ['about 5 pictures', 4, 6], ['６–１０ 張', 6, 10]])
+    assert.deepEqual({ ...L.imageRange(text) }, { min, max }, text);
+  for (const text of ['', undefined, '圖文並茂', '6–10', '2000–3000 字', '6–10 張，3–4 張', '10–6 張', '0–3 張', '1–500 張', '約 3 張，6–8 張'])
+    assert.equal(L.imageRange(text), undefined, String(text));
+  assert.deepEqual({ ...L.imageRangeOf({ style: 'x', tone: '6-10 張', length: '2000-3000 字' }) }, { min: 6, max: 10 });
+  assert.equal(L.imageRangeOf({ length: '2000-3000 字' }), undefined);
+  const I = S.load('core/book-pipeline/image-slots.ts');
+  assert.deepEqual([I.imageSlotCap(), I.imageSlotCap({ max: 5 }), I.imageSlotCap({ max: 10 }), I.imageSlotCap({ max: 40 })], [8, 8, 10, 12]);
+});
+
 test('lengthRange: N–M with every separator, thousands separators, 約 N as +-20%, both units', () => {
   for (const sep of ['–', '-', '~', '～', '至', '到', ' – ']) assert.deepEqual(range(`每章 300${sep}500 字`).value, { min: 300, max: 500, unit: '字' }, sep);
   assert.deepEqual(range('每章約 300–500 字').value, { min: 300, max: 500, unit: '字' }, '約 before a range is still the range');

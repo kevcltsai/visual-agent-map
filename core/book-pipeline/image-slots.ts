@@ -22,8 +22,13 @@ export interface ImageSlot {
   anchor: string;
 }
 
-/** The planner may arrange at most this many slots for one card. */
-export const MAX_IMAGE_SLOTS = 8;
+/** The planner may arrange this many slots for one card when the owner gave no picture count. */
+export const DEFAULT_IMAGE_SLOTS = 8;
+/** The hard ceiling for one card's slots (an owner's picture count raises the limit up to here, never past it). */
+export const MAX_IMAGE_SLOTS = 12;
+/** The slot limit for a card: the owner's range maximum when it is above the default, never above {@link MAX_IMAGE_SLOTS}. */
+export const imageSlotCap = (range?: { max: number }): number =>
+  Math.min(MAX_IMAGE_SLOTS, Math.max(DEFAULT_IMAGE_SLOTS, range?.max ?? 0));
 
 /** Why a slot ended without a picture (`probe_capped`: its candidates were left unprobed by the per-chapter limit). Only `author_omitted` and `bad_marker` come from the marker scan. */
 export type SlotReasonCode =

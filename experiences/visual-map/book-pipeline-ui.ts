@@ -413,7 +413,8 @@ export function bookProgressText(state: BookBarState): string {
   if (state.mode === "planning" && state.trialSize && state.current?.step !== "global") {
     // The trial chapters go all the way to the proofread before gate 1; the first chapters of the reading order are the trial's.
     // Only fix rounds in work: the trial's done count, never "chapter 1/3" again (reused words, no new string).
-    if (state.current?.fix) return t("ui.book_progress_line_done_0_1", Math.min(settledCount(state), state.trialSize), state.trialSize);
+    if (state.current?.fix)
+      return t("ui.book_progress_line_done_0_1", Math.min(settledCount(state), state.trialSize), state.trialSize);
     const settled = Math.min(state.counts.checked + state.counts["needs-review"], state.trialSize - 1);
     return t(
       "ui.book_progress_line_trial_0_1",

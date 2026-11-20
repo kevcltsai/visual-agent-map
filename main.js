@@ -54643,7 +54643,8 @@ function bookProgressText(state) {
   var _a2, _b2, _c, _d, _e, _f, _g, _h;
   const { total: total2 } = state;
   if (state.mode === "planning" && state.trialSize && ((_a2 = state.current) == null ? void 0 : _a2.step) !== "global") {
-    if ((_b2 = state.current) == null ? void 0 : _b2.fix) return t("ui.book_progress_line_done_0_1", Math.min(settledCount(state), state.trialSize), state.trialSize);
+    if ((_b2 = state.current) == null ? void 0 : _b2.fix)
+      return t("ui.book_progress_line_done_0_1", Math.min(settledCount(state), state.trialSize), state.trialSize);
     const settled2 = Math.min(state.counts.checked + state.counts["needs-review"], state.trialSize - 1);
     return t(
       "ui.book_progress_line_trial_0_1",

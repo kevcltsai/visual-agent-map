@@ -92,6 +92,11 @@ export function editorViewsOf(path: string, views: MarkdownViewLike[]): OpenNote
   return out;
 }
 
+/** The text a markdown view shows now: its editor in source and live preview; in reading mode the view's data (the editor is not kept in step there). */
+export function shownText(view: { getMode(): string; getViewData(): string; editor: { getValue(): string } }): string {
+  return view.getMode() === "preview" ? view.getViewData() : view.editor.getValue();
+}
+
 /** The smallest single replacement that turns `before` into `after` (common head and tail kept), so a cursor elsewhere in the text stays put. */
 export function minimalChange(before: string, after: string): { from: number; to: number; insert: string } | null {
   if (before === after) return null;

@@ -26,6 +26,7 @@ import {
   BookCallouts,
   createNoteWriter,
   editorViewsOf,
+  shownText,
   type OpenNoteView
 } from "./experiences/visual-map/book-pipeline-callouts";
 import { BookHandEdits } from "./experiences/visual-map/book-pipeline-handedit";
@@ -41,8 +42,8 @@ import { showAppliedNotice } from "./experiences/visual-map/book-applied-notice"
 import {
   AppliedHighlights,
   appliedExtension,
-  lineSpans,
   ReadingMarks,
+  sectionSource,
   setApplied,
   type HighlightTarget
 } from "./experiences/visual-map/book-applied-highlight";
@@ -598,10 +599,13 @@ export default class VisualAgentMapPlugin extends Plugin {
   });
   /** The reading view's mark: the rendered sections of the changed lines wear the same light-green class (post-processor + a re-render). */
   private readonly readingMarks = new ReadingMarks();
+  /** The paragraphs of the last apply (their text), for the reading view's mark. */
+  private bookAppliedTexts: { path: string; texts: readonly string[] } | null = null;
   private setReadingMarks(view: MarkdownView, ranges: readonly { from: number; to: number }[] | null): void {
     const path = view.file?.path;
     if (!path) return;
-    if (ranges?.length) this.readingMarks.set(path, lineSpans(view.editor.getValue(), ranges));
+    const applied = this.bookAppliedTexts;
+    if (ranges?.length) this.readingMarks.set(path, applied?.path === path ? applied.texts : []);
     else this.readingMarks.clear();
     const container = view.previewMode?.containerEl;
     if (ranges?.length) {
@@ -625,6 +629,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     } catch {
       found = [];
     }
+    this.bookAppliedTexts = { path, texts: afters };
     this.bookHighlights.show(path, found);
   }
   private bookHighlightTargets(): HighlightTarget[] {
@@ -677,7 +682,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       out.push({
         key: view,
         path: () => view.file?.path,
-        text: () => view.editor.getValue(),
+        text: () => shownText(view),
         addAction: (label, run) => {
           const el = view.addAction("pencil", label, run);
           el.addClass("vam-book-apply-notes");
@@ -725,6 +730,14 @@ export default class VisualAgentMapPlugin extends Plugin {
     for (const [chapter, mapPath] of this.bookChapterMaps)
       if (!live.has(mapPath) || (candidates.has(chapter) && !found.has(chapter))) this.bookChapterMaps.delete(chapter);
     return found;
+  }
+  private bookPaintTimer: number | null = null;
+  private paintBookNotesSoon(): void {
+    if (this.bookPaintTimer !== null) return;
+    this.bookPaintTimer = window.setTimeout(() => {
+      this.bookPaintTimer = null;
+      this.bookNotes.paint();
+    }, 50);
   }
   private refreshBookNotesSoon(): void {
     if (this.bookNotesTimer !== null) window.clearTimeout(this.bookNotesTimer);
@@ -787,7 +800,7 @@ export default class VisualAgentMapPlugin extends Plugin {
           const view = this.app.workspace.getActiveViewOfType(MarkdownView);
           const path = view?.file?.path;
           const running = !!path && this.bookNotesApply.isRunning(path);
-          if (!view || !notes.isChapter(path) || (!running && !countNotes(view.editor.getValue()))) return false;
+          if (!view || !notes.isChapter(path) || (!running && !countNotes(shownText(view)))) return false;
           if (!checking) notes.apply(path);
           return true;
         }
@@ -809,8 +822,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.registerEditorExtension(appliedExtension);
     this.registerMarkdownPostProcessor((el, ctx) => {
       const info = ctx.getSectionInfo(el);
-      if (info && this.readingMarks.wears(ctx.sourcePath, info.lineStart, info.lineEnd))
+      if (info && this.readingMarks.wears(ctx.sourcePath, sectionSource(info.text, info.lineStart, info.lineEnd)))
         el.addClass("vam-book-applied");
+      // A reading view of a chapter shows new text (an apply or undo written to the file): the header action follows it now.
+      if (this.bookChapterMaps.has(ctx.sourcePath)) this.paintBookNotesSoon();
     });
     this.registerEvent(this.app.workspace.on("file-open", () => this.bookHighlights.sync()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.bookHighlights.sync()));
@@ -2224,6 +2239,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.bookHandEdits.dispose();
     if (this.bookNotesTimer !== null) window.clearTimeout(this.bookNotesTimer);
     this.bookNotesTimer = null;
+    if (this.bookPaintTimer !== null) window.clearTimeout(this.bookPaintTimer);
+    this.bookPaintTimer = null;
     this.bookNotesApply.dispose();
     this.bookHighlights.dispose();
     this.bookNotes.dispose();

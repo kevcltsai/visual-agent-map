@@ -4,7 +4,7 @@ import { descendants, inheritModel, type MapNode } from "../../map-model";
 import { actionStatus, modalActions } from "../../ui/modals/action-bar";
 import { titleProblemText } from "../../ui/modals/title-check";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
-import { readBodyRecord, stampDetail } from "../../core/book-pipeline/body-integrity";
+import { bodyStateRaw, readBodyRecord, stampDetail, stampRaw } from "../../core/book-pipeline/body-integrity";
 import type { TopicColor, TopicStyle } from "../../topic-colors";
 import type { TopicMarker } from "../../topic-markers";
 
@@ -83,6 +83,12 @@ export function mergedDetail(sources: { title: string; detail: string }[]): stri
   // program's own write: its record holds the merged text's fingerprint, so a book rerun does not read the merged card as hand-edited.
   return readBodyRecord(detail) ? stampDetail(detail) : detail;
 }
+
+/**
+ * A merge in a book map is a program write (re-verify item 5: merged cards are not hand edits): the merged note's whole raw text gets a
+ * fresh body record, so a book rerun may rewrite it even when no source carried a record. An empty merge is left without one.
+ */
+export const bookMergeStampRaw = (raw: string): string => (bodyStateRaw(raw) === "empty" ? raw : stampRaw(raw));
 
 /** A merged note with any content is completed; an all-empty merge stays an idea. */
 export function mergedStatus(detail: string): "completed" | "idea" {

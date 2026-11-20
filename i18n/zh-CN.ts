@@ -3243,7 +3243,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_panel_g2_reason_facts_0": "有 {0} 项事实还没查证到来源",
   "ui.book_panel_g2_reason_images": "这章是图集，却没有找到合适的图",
   "ui.book_panel_g2_reason_seam": "前后章改过，衔接还没确认",
-  "ui.book_panel_g2_reason_seam_0": "「{0}」改过，和这章的衔接还没确认",
+  "ui.book_panel_g2_reason_seam_0": "“{0}”改过，和这章的衔接还没确认",
   "ui.book_note_trial_title_0": "试跑第 {0}／{1} 章",
   "ui.book_note_trial_next": "看完后回心智图，按“这样可以，跑完全书”。",
   "ui.book_note_trial_stopped": "这本书已停止。先在心智图工具栏按“继续”，再按“这样可以，跑完全书”。",

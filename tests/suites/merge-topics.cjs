@@ -31,7 +31,7 @@ test('canvas pointer intent: the middle button always pans and other buttons do 
 });
 
 // Merge topics, Phase 2 (structure merge): eligibility, Detail concatenation, reading order.
-const { mergeEligibility, mergedDetail, mergedStatus, readingOrder } = load('experiences/visual-map/merge-topics.ts', { obsidian: require('../support.cjs').obsidian });
+const { mergeEligibility, mergedDetail, bookMergeStampRaw, mergedStatus, readingOrder } = load('experiences/visual-map/merge-topics.ts', { obsidian: require('../support.cjs').obsidian });
 const { node: mnode, plain } = require('../support.cjs');
 const family = () => {
   const root = mnode('root'), a = mnode('a', 'root'), b = mnode('b', 'root'), c = mnode('c', 'root'), a1 = mnode('a1', 'a'), r2 = mnode('r2');
@@ -123,8 +123,25 @@ test('merged Detail of book chapters (T9, re-verify item 5): one body record wit
   assert.equal((detail.match(/book-body:v1/g) ?? []).length, 1, 'the sources\' records are replaced by one');
   assert.equal(bi.bodyState(detail), 'clean', 'not a hand edit');
   assert.equal(bi.readBodyRecord(detail).fp, bi.integrityFp(detail));
-  assert.equal(bi.bodyState(mergedDetail([{ title: 'A', detail: '甲。' }, { title: 'B', detail: '乙。' }])), 'clean', 'no record, no older evidence: rewritable');
+  // A merge of cards without a record carries none (outside a book map nothing changes); in a book map the view stamps the
+  // merged note (bookMergeStampRaw, next test), so it stays rewritable.
+  const plainMerge = mergedDetail([{ title: 'A', detail: '甲。' }, { title: 'B', detail: '乙。' }]);
+  assert.equal(bi.readBodyRecord(plainMerge), undefined);
+  assert.equal(bi.bodyState(bi.stampDetail(plainMerge)), 'clean', 'no record, no older evidence: rewritable once stamped');
   assert.equal(mergedDetail([{ title: 'A', detail: '甲。' }]), '### A\n\n甲。', 'a non-book merge is unchanged');
+});
+
+test('book map merge (re-verify item 5): a merge of record-less cards is stamped and stays rewritable; a prose card never in the book still skips; an empty merge gets no record', () => {
+  const bi = load('core/book-pipeline/body-integrity.ts');
+  const note = detail => `---\ntitle: X\n---\n<!-- visual-agent-map:detail:start -->\n${detail}\n<!-- visual-agent-map:detail:end -->\n`;
+  const merged = note(mergedDetail([{ title: 'A', detail: '甲。' }, { title: 'B', detail: '乙。' }]));
+  assert.equal(bi.bodyStateRaw(merged), 'unknown', 'unstamped, the merge would read as the reader\'s own text');
+  const stamped = bookMergeStampRaw(merged);
+  assert.equal(bi.bodyStateRaw(stamped), 'clean', 'the merge is a program write');
+  assert.equal(bookMergeStampRaw(stamped), stamped, 'stamping twice changes nothing');
+  assert.equal(bi.bodyStateRaw(note('我自己的研究筆記。')), 'unknown', 'a never-in-book prose card is not merged, not stamped: skipped');
+  const empty = note('');
+  assert.equal(bookMergeStampRaw(empty), empty);
 });
 
 test('merged status: completed when any content, idea when empty', () => {

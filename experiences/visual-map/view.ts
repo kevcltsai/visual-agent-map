@@ -613,6 +613,7 @@ import {
   mergedAiLocked,
   sharedMergeAppearance,
   mergedDetail,
+  bookMergeStampRaw,
   mergedStatus,
   mergeEligibility,
   MergeTopicsModal,
@@ -6945,6 +6946,7 @@ export class VisualAgentMapView extends ItemView {
           sourcePaths: sources.map(source => source.path),
           status: mergedStatus(detail)
         });
+      if (this.hasBookPipeline()) await this.app.vault.process(repo.file(created.path), bookMergeStampRaw);
       // The sources may hold the title's file name until they are parked: the merged note takes it once they are.
       const tx = this.beginMapTransaction().create(created.path, parkFolder, before.id, sanitizeGeneratedTitle(title));
       for (const source of sources) tx.park(source.path, parkFolder, before.id, "unassigned");
@@ -7068,12 +7070,14 @@ export class VisualAgentMapView extends ItemView {
       patch = { detail, status: mergedStatus(detail), sourcePaths };
     }
     if (name && name !== sourceNotes[0].title) patch.title = name;
+    const book = this.hasBookPipeline();
     const parkFolder = repo.topicFolder(mapPath, "Unassigned"),
       viewport = clone(this.map?.viewport ?? before.viewport);
     let entry: TransactionEntry;
     try {
       const tx = this.beginMapTransaction().rewriteNote(target.path, async path => {
         await repo.updateNote(path, patch, { detailTemplate, newVisualReferences: true });
+        if (book) await this.app.vault.process(repo.file(path), bookMergeStampRaw);
         if (mergedAiLocked(sourceNotes)) await repo.writeAiLocked(path, true);
         if (asked) await repo.writeTopicAppearance(path, asked);
       });

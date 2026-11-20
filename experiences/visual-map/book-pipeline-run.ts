@@ -12,6 +12,7 @@
 import type { AdmissionContext } from "../../core/admission";
 import type { FindImagesRequest, FoundImages } from "../../core/steps/book-pipeline/find-images";
 import type { ConsistencyRequest, RawInconsistency } from "../../core/steps/book-pipeline/consistency";
+import { chapterReferenceFindings } from "../../core/book-pipeline/chapter-references";
 import { chapterInconsistencies, compactChapters } from "../../core/book-pipeline/consistency";
 import { isBudgetExhausted } from "../../core/admission";
 import { createBudgetAdmission, createStoreBudgetPort } from "../../core/book-pipeline/budget";
@@ -64,6 +65,7 @@ import {
   type BookPipelineData,
   type BookRole,
   type BookSettings,
+  type ConsistencyFinding,
   type PipelineFields,
   type PipelineFieldsPatch,
   type PipelinePhase,
@@ -2165,14 +2167,17 @@ export class BookPipelineRuns {
       );
     };
     try {
-      const chapters: { id: string; title: string; text: string }[] = [];
+      const ordered: { id: string; title: string; text: string }[] = [];
       for (const id of effectiveOrder(drive.store.state)) {
         const info = drive.cards.get(id);
         if (!info) continue;
         const card = await this.ports.readCard(info.path).catch(() => undefined);
         const text = card ? projectProofBody(stripImageLines(chapterBody(card.detail))).trim() : "";
-        if (text) chapters.push({ id, title: card?.title ?? info.title, text });
+        ordered.push({ id, title: card?.title ?? info.title, text });
       }
+      // Chapter numbers count every chapter in order; the model compares the ones with text.
+      const references = chapterReferenceFindings(ordered);
+      const chapters = ordered.filter(chapter => chapter.text);
       // Fewer than two chapters with text: nothing to compare, no call.
       const found =
         chapters.length < 2
@@ -2182,13 +2187,16 @@ export class BookPipelineRuns {
               { signal: drive.controller.signal, admission: drive.admission }
             );
       if (this.dead(drive)) return;
-      const findings = found.map(issue => ({
-        a: chapters[issue.a - 1].id,
-        b: chapters[issue.b - 1].id,
-        claimA: issue.claimA,
-        claimB: issue.claimB,
-        suggestion: issue.suggestion
-      }));
+      const findings: ConsistencyFinding[] = [
+        ...references,
+        ...found.map(issue => ({
+          a: chapters[issue.a - 1].id,
+          b: chapters[issue.b - 1].id,
+          claimA: issue.claimA,
+          claimB: issue.claimB,
+          suggestion: issue.suggestion
+        }))
+      ];
       const done = await drive.store.commit(state => applyConsistency(state, token, findings));
       if (!done?.accepted) {
         report("dropped");

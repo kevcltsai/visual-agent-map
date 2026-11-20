@@ -2293,3 +2293,5 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-state.is-edited { font-weight: 600; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
 .vam-book-state.is-edited::before { background: var(--color-orange); }
 .view-action.vam-book-apply-notes.is-disabled { opacity: 0.5; }
+
+.vam-book-applied-notice { position: fixed; right: 16px; bottom: 16px; z-index: var(--layer-notice); max-width: 360px; padding: 8px 12px; border-radius: var(--radius-m); background: var(--background-secondary); border: 1px solid var(--background-modifier-border); box-shadow: var(--shadow-s); color: var(--text-normal); font-size: var(--font-ui-small); }

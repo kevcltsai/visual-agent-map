@@ -3393,6 +3393,7 @@ export const en = {
   "ui.book_add_budget": "Add 100 calls",
   "ui.book_budget_used_up_0_1": "Call budget used up: {0}/{1} used",
   "ui.book_bar_trial_ready_0": "The {0} trial chapters are written",
+  "ui.book_bar_trial_review_0_1": "The {0} trial chapters are written, {1} need a look",
   "ui.book_bar_open_first": "Open chapter 1",
   "ui.book_bar_notes_ask_0": "{0} notes are not applied yet. Run the whole book anyway?",
   "ui.book_bar_go_anyway": "Run anyway",

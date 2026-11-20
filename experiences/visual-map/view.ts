@@ -17347,6 +17347,11 @@ export class VisualAgentMapView extends ItemView {
     if (state.mode !== "gate2") this.bookFinishAsking = null;
     const gate2Attention = state.mode === "gate2" ? this.bookReviewCards(read.data) : [];
     if (state.mode === "gate2") state.review = { total: state.total, attention: gate2Attention.length };
+    if (state.mode === "gate1" && state.trialCount) {
+      const trial = new Set(this.effectiveTrial(read.data));
+      const n = this.bookReviewCards(read.data).filter(card => trial.has(card.id)).length;
+      if (n > 0) state.trialAttention = n;
+    }
     const gate1Ask = this.bookGate1Ask?.path === path ? this.bookGate1Ask : null;
     const rerunAsk = this.bookRerunAskFor(path);
     renderBookBar(toolbar, state, {

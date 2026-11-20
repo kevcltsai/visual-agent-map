@@ -35,8 +35,6 @@ export interface FoundImage extends ImageCandidate {
   caption: string;
   /** What the file page says about the file (only the program's Commons search sets it). */
   description?: string;
-  /** Only the program's Commons search sets it: the file does not name every search word of its slot (see CommonsCandidate). */
-  loose?: true;
   /** Creator and license, only when the finder reported them from the source page (never filled in by the program). */
   author?: string;
   license?: string;

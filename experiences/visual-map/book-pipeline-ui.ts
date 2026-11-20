@@ -600,16 +600,20 @@ export function bookIssueText(issue: string): string {
   const sentence = lengthText(length);
   return rest ? joinReasons([plainIssueText(rest), sentence]) : sentence;
 }
-/** The sentences of an issue's picture tokens: too few pictures, then English words left in a Chinese caption. */
-export function pictureSentences(pictures: ReturnType<typeof splitPictureIssue>): string[] {
-  return [
-    ...(pictures.shortfall ? [shortfallText(pictures.shortfall)] : []),
-    ...(pictures.captionLatin ? [t("ui.book_reason_caption_latin")] : [])
-  ];
-}
 /** The sentence for a chapter with fewer pictures than the owner's minimum (numbers only). */
 export function shortfallText(shortfall: { placed: number; minimum: number }): string {
   return t("ui.book_reason_images_under_0_1", String(shortfall.placed), String(shortfall.minimum));
+}
+/** The picture sentences of an issue: shortfall, Commons' request limit, the pictures off their text, then English left in a Chinese caption. */
+export function pictureSentences(pictures: ReturnType<typeof splitPictureIssue>): string[] {
+  return [
+    ...(pictures.shortfall ? [shortfallText(pictures.shortfall)] : []),
+    ...(pictures.limited ? [t("ui.book_reason_images_limited")] : []),
+    ...(pictures.off?.length
+      ? [t("ui.book_reason_images_off_0", pictures.off.map(String).join(t("ui.argument_list_sep")))]
+      : []),
+    ...(pictures.captionLatin ? [t("ui.book_reason_caption_latin")] : [])
+  ];
 }
 /** The sentence for a chapter outside the asked length: what was measured and the range (numbers and the unit only). */
 export function lengthText(length: LengthReason): string {

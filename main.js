@@ -14307,6 +14307,8 @@ var RESEARCH_VOICE_PATTERNS = [
   /未能?查(?:到|得|詢到|询到)/gu,
   /沒有?查到|没有?查到/gu,
   /查無|查无/gu,
+  // Live v6 (a reader-visible box): 「未找到可直接引用的來源」, 「本次未取得台灣在地權威來源」: what this research did not get, said of a source.
+  /未能?(?:找到|取得|得到)[^。！？\n]{0,12}?(?:來源|来源|文獻|文献|出處|出处)/gu,
   /\bno (?:data|information|sources?|results?|records?) (?:was |were )?found\b/gu,
   /\b(?:available|existing|current) (?:data|information|sources?) (?:is|are|was|were) insufficient\b/gu,
   /\b(?:i|we) (?:did not|didn't|could not|couldn't|was unable to|were unable to) find\b/gu,
@@ -14435,7 +14437,12 @@ var quoteCut = (text10) => {
 function applyProseChecks(result, body, titles, context = {}) {
   var _a2, _b2;
   const language2 = (_a2 = context.language) != null ? _a2 : "en";
-  const voice = researchVoiceSentences(body).slice(0, MAX_NOTE_ITEMS);
+  const voice = researchVoiceSentences(context.readerNotes ? `${body}
+
+${context.readerNotes}` : body).slice(
+    0,
+    MAX_NOTE_ITEMS
+  );
   const names3 = nameVariantHits(body, titles).slice(0, MAX_NOTE_ITEMS);
   const own2 = titleKey((_b2 = context.title) != null ? _b2 : "");
   const previews = context.role === "intro" ? introPreviewHits(
@@ -15034,6 +15041,11 @@ function chapterBody(detail) {
   }
   return lines.join("\n").replace(/\s+$/, "");
 }
+function readerCallouts(detail) {
+  const lines = withoutHiddenCallouts(detail.split("\n"));
+  const body = chapterBody(detail);
+  return calloutBlocks(lines, fencedLines(lines), 0, lines.length).filter((block) => !/^[ \t]{0,3}>[ \t]?\[!\s*vam-/i.test(bare(lines[block.start]))).map((block) => lines.slice(block.start, block.end).join("\n")).filter((text10) => !body.includes(text10)).map((text10) => unquoted(text10).replace(/\r/g, "").trim()).join("\n\n");
+}
 var IMAGE_ONLY_LINE2 = /^\s*(?:(?:!\[[^\]]*\]\([^)]*\)|!\[\[[^\]]*\]\])\s*)+$/;
 function chapterTextMask(lines) {
   var _a2;
@@ -15567,6 +15579,7 @@ function bookLengthRule(range) {
 }
 var lengthNeeded = (r) => Math.max(lengthTarget(r) - r.measured, r.min - r.measured, 0);
 var EXPAND_BODY_MAX = 4e4;
+var BOOK_EXPAND_RETRY_INSTRUCTION = "The last answer had no usable change block and the chapter is still too short (hard requirement): first choose 2 to 4 concrete points of this chapter's own plan that the text does not explain yet, then write each as a new ### section in its own @@insert block. An answer with no block is not accepted this time.";
 function bookExpandRequirements(settings, body, length, instruction, scope = {}) {
   const lines = BOOK_SETTING_FIELDS.filter((field) => field !== "length" && settings[field]).map(
     (field) => `- ${field}: ${settings[field]}`
@@ -46168,7 +46181,7 @@ var TopicRuns = class {
       })
     ).catch(
       (error) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2;
+        var _a3, _b3, _c2, _d2;
         progress == null ? void 0 : progress.end(path, progressAttempt);
         if (options.pipeline && isBudgetExhausted(error)) {
           await repo.updateNote(path, { status: note.status });
@@ -46186,7 +46199,10 @@ var TopicRuns = class {
             exchangeId,
             t("log.topic_write_failed_0", error instanceof Error ? error.message : String(error))
           );
-        await repo.updateNote(path, { status: "error", lastError: failureReason(error) });
+        await repo.updateNote(path, {
+          status: ((_d2 = options.pipeline) == null ? void 0 : _d2.keepStatusOnFailure) ? note.status : "error",
+          lastError: failureReason(error)
+        });
         fail4(this.ports.recordFailure(t("log.ai_task_failed"), error));
       })
     ).finally(() => {
@@ -46709,6 +46725,28 @@ var TopicRuns = class {
     this.stopAll();
   }
 };
+
+// experiences/visual-map/book-pipeline-reasons.ts
+function joinReasons(parts) {
+  const sep2 = t("ui.book_panel_lead_sep");
+  return parts.reduce((out, part, at) => {
+    if (!at) return part;
+    if (!/[。！？.!?]\s*$/.test(out)) return out + sep2 + part;
+    return /[.!?]\s*$/.test(out) ? `${out.trimEnd()} ${part}` : out.trimEnd() + part;
+  }, "");
+}
+var CARRIED = /^((?:plan|write|proof) failed: \S+) \+ (\S[\s\S]*)$/;
+var FAILED_ONLY = /^(?:plan|write|proof) failed: \S+$/;
+function splitCarriedIssue(issue2) {
+  const found = CARRIED.exec(issue2.trim());
+  return found ? { failure: found[1], carried: found[2].trim() } : void 0;
+}
+function carryIssue(failure, previous) {
+  var _a2, _b2;
+  const before = (previous != null ? previous : "").trim();
+  const carried = (_b2 = (_a2 = splitCarriedIssue(before)) == null ? void 0 : _a2.carried) != null ? _b2 : FAILED_ONLY.test(before) ? "" : before;
+  return carried ? `${failure} + ${carried}` : failure;
+}
 
 // core/book-pipeline/chapter-references.ts
 var CJK_DIGIT = {
@@ -54483,6 +54521,7 @@ var BookPipelineRuns = class {
       backedUp: /* @__PURE__ */ new Set(),
       backupPaths: /* @__PURE__ */ new Map(),
       reasons: /* @__PURE__ */ new Map(),
+      fixIssues: /* @__PURE__ */ new Map(),
       busy: /* @__PURE__ */ new Set(),
       extra: /* @__PURE__ */ new Map(),
       avoid: /* @__PURE__ */ new Set(),
@@ -55064,13 +55103,13 @@ var BookPipelineRuns = class {
     await this.writeFields(drive, nodeId, { pipelineStage: stage, pipelineIssue: issue2 });
   }
   async markReview(drive, nodeId, step, reason) {
+    const failure = `${step} failed: ${code2(reason)}`;
+    const issue2 = step === "write" && reason !== "hand_edited" ? carryIssue(failure, await this.issueWithBody(drive, nodeId) || drive.fixIssues.get(nodeId)) : failure;
     drive.stages.set(nodeId, "needs-review");
     drive.reviewStep.set(nodeId, step);
-    await this.writeFields(drive, nodeId, {
-      pipelineStage: "needs-review",
-      pipelineIssue: `${step} failed: ${code2(reason)}`
-    });
-    if (step !== "plan" && !NO_FAILURE_SECTION.has(reason)) await this.writeFailureSection(drive, nodeId, reason);
+    await this.writeFields(drive, nodeId, { pipelineStage: "needs-review", pipelineIssue: issue2 });
+    if (step !== "plan" && issue2 === failure && !NO_FAILURE_SECTION.has(reason))
+      await this.writeFailureSection(drive, nodeId, reason);
     this.syncReviewNotes(drive);
   }
   /**
@@ -55097,7 +55136,9 @@ var BookPipelineRuns = class {
           items,
           [...parseChecklist(card.prompt), ...BOOK_CHECKS],
           length,
-          researchVoiceSentences(chapterBody(card.detail))
+          researchVoiceSentences(`${chapterBody(card.detail)}
+
+${readerCallouts(card.detail)}`)
         )
       );
       drive.expand.add(id);
@@ -55131,6 +55172,9 @@ var BookPipelineRuns = class {
       drive.reasons.delete(nodeId);
       drive.reviewStep.delete(nodeId);
       drive.imagesDone.delete(nodeId);
+      const before = current == null ? void 0 : current.fields.pipelineIssue;
+      if (typeof before === "string" && before.trim()) drive.fixIssues.set(nodeId, before);
+      else drive.fixIssues.delete(nodeId);
       drive.stages.set(nodeId, "planned");
       await this.writeFields(drive, nodeId, { pipelineStage: "planned", pipelineIssue: null });
       this.ports.log(
@@ -55164,6 +55208,14 @@ var BookPipelineRuns = class {
     );
   }
   /** Best effort: the card's proof-result section says "failed: reason" (no model). Never throws; skipped when nothing is known to be safe to write. */
+  /** The card's issue now, when the card still has chapter text (the reasons that text still has); else undefined. */
+  async issueWithBody(drive, nodeId) {
+    const info = drive.cards.get(nodeId);
+    const card = info ? await this.ports.readCard(info.path).catch(() => void 0) : void 0;
+    if (!card || !chapterBody(card.detail).trim()) return void 0;
+    const issue2 = card.fields.pipelineIssue;
+    return typeof issue2 === "string" ? issue2 : void 0;
+  }
   async writeFailureSection(drive, nodeId, reason) {
     try {
       if (this.dead(drive) || drive.controller.signal.aborted) return;
@@ -55557,6 +55609,7 @@ ${oldDetail}`);
           ...drive.avoid.has(nodeId) && !pass ? { instruction: drive.extra.get(nodeId) } : {},
           ...requirements !== void 0 ? { keepSummary: true, requirements } : {},
           ...drive.ownSummary.has(nodeId) ? { keepSummary: true } : {},
+          ...expanding ? { inPlace: true } : {},
           signal,
           admission: drive.admission,
           authorize: authorizeWrite,
@@ -55605,26 +55658,36 @@ ${oldDetail}`);
       logRefused();
       return { kind: "failed", reason: "unsafe_body", forceReview: true };
     }
-    if (noEdits) return { kind: "failed", reason: "fix_no_edits", forceReview: true };
-    if (lostText) return { kind: "failed", reason: "fix_lost_text", forceReview: true };
-    if (emptyBody) return { kind: "failed", reason: "no_body" };
+    let retryNoEdits = noEdits && expanding && (now == null ? void 0 : now.kind) === "under";
+    let wrote = !noEdits;
+    if (noEdits && !retryNoEdits) return { kind: "failed", reason: "fix_no_edits", forceReview: true };
     if (done.outcome === "budget-exhausted") return { kind: "budget" };
     if (done.outcome === "cancelled") return { kind: "cancelled" };
-    if (done.outcome === "failed") return { kind: "failed", reason: done.reason };
-    if (done.outcome === "discarded") return { kind: "failed", reason: "discarded" };
+    if (!retryNoEdits) {
+      if (lostText) return { kind: "failed", reason: "fix_lost_text", forceReview: true };
+      if (emptyBody) return { kind: "failed", reason: "no_body" };
+      if (done.outcome === "failed") return { kind: "failed", reason: done.reason };
+      if (done.outcome === "discarded") return { kind: "failed", reason: "discarded" };
+    }
     for (let pass = 1; expanding && (now == null ? void 0 : now.kind) === "under" && pass <= BOOK_EXPAND_PASSES; pass++) {
       const at = await this.stillOnMap(drive, nodeId);
       if (!at) break;
       const latest = await this.ports.readCard(at);
       const body = chapterBody(latest.detail);
       const short = lengthReason(settings.length, lengthBody(body), void 0, true);
-      if ((short == null ? void 0 : short.kind) !== "under" || short.measured <= now.measured) break;
+      if ((short == null ? void 0 : short.kind) !== "under" || !retryNoEdits && short.measured <= now.measured) break;
       const used = await drive.store.commit((state) => useExpandPass(state, nodeId));
       if (!(used == null ? void 0 : used.accepted)) break;
       oldBody = body;
       now = short;
       oldDetail = detailBlockOf(latest.raw);
-      requirements = bookExpandRequirements(settings, body, short, void 0, scope);
+      requirements = bookExpandRequirements(
+        settings,
+        body,
+        short,
+        retryNoEdits ? BOOK_EXPAND_RETRY_INSTRUCTION : void 0,
+        scope
+      );
       knownLines = new Set(latest.raw.split("\n"));
       noEdits = lostText = unsafe = emptyBody = false;
       unsafeRule = "";
@@ -55634,11 +55697,15 @@ ${oldDetail}`);
       logMerge(pass, more.outcome);
       if (changedByHand) return { kind: "failed", reason: "hand_edited", forceReview: true };
       if (unsafe) logRefused();
-      if (unsafe || noEdits || lostText || emptyBody) break;
       if (more.outcome === "cancelled") return { kind: "cancelled" };
+      retryNoEdits = noEdits;
+      if (noEdits) continue;
+      if (unsafe || lostText || emptyBody) break;
       if (more.outcome === "discarded") return { kind: "failed", reason: "discarded" };
       if (more.outcome !== "written") break;
+      wrote = true;
     }
+    if (!wrote) return { kind: "failed", reason: "fix_no_edits", forceReview: true };
     drive.authorModels.set(nodeId, drive.config.authorModel);
     const path = await this.stillOnMap(drive, nodeId);
     if (!path) return { kind: "failed", reason: "card_removed" };
@@ -55859,6 +55926,8 @@ ${oldDetail}`);
               signal,
               skip: (url) => seen.has(imageKey(url)) || taken(imageKey(url)),
               run: drive.commonsBudget,
+              // The run's clock (a test's fake clock too): the chapter deadline and a Retry-After date are judged on it.
+              now: () => Date.parse(this.ports.now()),
               ...this.ports.commonsQueue ? { queue: this.ports.commonsQueue } : {}
             }
           );
@@ -56065,7 +56134,8 @@ ${oldDetail}`);
           checklist: [...checklist, ...BOOK_CHECKS],
           title: card.title,
           role: (_a2 = drive.cards.get(nodeId)) == null ? void 0 : _a2.role,
-          chapters: await this.proofChapters(drive, nodeId, card)
+          chapters: await this.proofChapters(drive, nodeId, card),
+          readerNotes: readerCallouts(card.detail)
         },
         { signal, admission: drive.admission }
       ).catch(async (error) => {
@@ -56300,16 +56370,6 @@ ${oldDetail}`);
     );
   }
 };
-
-// experiences/visual-map/book-pipeline-reasons.ts
-function joinReasons(parts) {
-  const sep2 = t("ui.book_panel_lead_sep");
-  return parts.reduce((out, part, at) => {
-    if (!at) return part;
-    if (!/[。！？.!?]\s*$/.test(out)) return out + sep2 + part;
-    return /[.!?]\s*$/.test(out) ? `${out.trimEnd()} ${part}` : out.trimEnd() + part;
-  }, "");
-}
 
 // experiences/visual-map/book-pipeline-ui.ts
 var FAILURE_KEY = {
@@ -56732,6 +56792,8 @@ var PLAIN_KEY = {
   "proof:failed": "ui.book_plain_proof_failed"
 };
 function bookIssueText(issue2) {
+  const carried = splitCarriedIssue(issue2);
+  if (carried) return joinReasons([bookIssueText(carried.failure), bookIssueText(carried.carried)]);
   const pictures = splitPictureIssue(issue2);
   const sentences = pictureSentences(pictures);
   if (sentences.length) return joinReasons(pictures.rest ? [bookIssueText(pictures.rest), ...sentences] : sentences);
@@ -56899,6 +56961,8 @@ function reviewProblems(card) {
 var plainNote = (text10) => text10.replace(/\b[CN]\d+\b\s*[:：]?/g, "").replace(/\s+/g, " ").trim();
 function reasonOf2(issue2, proof) {
   var _a2;
+  const carried = splitCarriedIssue(issue2);
+  if (carried) return joinReasons([bookIssueText(carried.failure), reasonOf2(carried.carried, proof)]);
   const pictures = splitPictureIssue(issue2);
   const sentences = pictureSentences(pictures);
   if (sentences.length) return joinReasons(pictures.rest ? [reasonOf2(pictures.rest, proof), ...sentences] : sentences);
@@ -88029,6 +88093,7 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots, i
             authorize: input2.authorize,
             finalize: input2.finalize,
             ...input2.keepSummary ? { keepSummary: true } : {},
+            ...input2.inPlace ? { keepStatusOnFailure: true } : {},
             onBudgetExhausted: () => {
               exhausted = true;
             },
@@ -88036,7 +88101,11 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots, i
               discarded = true;
             }
           },
-          request: { admission: input2.admission, noContentLog: true },
+          request: {
+            admission: input2.admission,
+            noContentLog: true,
+            ...input2.inPlace ? { searchOptional: true } : {}
+          },
           template: "book-chapter"
         }
       );
@@ -95021,6 +95090,32 @@ function rerenderReadingViews(views, path) {
     }
   return count4;
 }
+var ReadingHighlight = class {
+  constructor(ports) {
+    this.ports = ports;
+    __publicField(this, "marks", new ReadingMarks());
+    __publicField(this, "shown", null);
+  }
+  show(path, texts) {
+    this.release();
+    this.marks.set(path, texts);
+    if (!texts.some((text10) => normalSection(text10))) return;
+    this.shown = { path, timer: this.ports.setTimer(() => this.release(), HIGHLIGHT_MS) };
+    rerenderReadingViews(this.ports.views(), path);
+  }
+  release() {
+    const shown = this.shown;
+    this.shown = null;
+    this.marks.clear();
+    if (!shown) return;
+    this.ports.clearTimer(shown.timer);
+    for (const view of this.ports.views())
+      if (view.path === shown.path) {
+        if (view.reading) view.rerender();
+        else view.unmark();
+      }
+  }
+};
 function sectionSource(text10, lineStart, lineEnd2) {
   return text10.split("\n").slice(lineStart, lineEnd2 + 1).join("\n");
 }
@@ -95184,7 +95279,12 @@ async function runProofread(aiCalls, request, run) {
         counts = { ...counts, sources: sourceDiagnostics(parsed, opened) };
         const judged = evaluateProof(parsed, request.checklist, opened, { body: request.body });
         const titles = ((_a2 = request.chapters) != null ? _a2 : []).map((chapter) => chapter.title);
-        const context = { language: request.language, role: request.role, title: request.title };
+        const context = {
+          language: request.language,
+          role: request.role,
+          title: request.title,
+          readerNotes: request.readerNotes
+        };
         return { ...applyProseChecks(judged, request.body, titles, context), counts };
       } catch (error) {
         if (isProofFailure(error))
@@ -105754,7 +105854,7 @@ var AiTaskService = class {
     });
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
     const countsWeb = ((_e = context.mode) != null ? _e : "task") === "task" && context.researchMode === "research" && role === void 0 && !input2.countRepair;
-    const requiresWeb = countsWeb;
+    const requiresWeb = countsWeb && !context.searchOptional;
     let retrievals = 0;
     const webEvents = [];
     const keepsEvents = shape2.argumentEvidenceNeedIds !== void 0;
@@ -108130,7 +108230,10 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
         ms
       ),
       highlight: (path, ranges, afters) => void this.showBookHighlight(path, ranges, afters),
-      releaseHighlight: () => this.bookHighlights.release(),
+      releaseHighlight: () => {
+        this.bookHighlights.release();
+        this.readingHighlight.release();
+      },
       flush: async (path) => {
         var _a2;
         for (const leaf of this.app.workspace.getLeavesOfType("markdown"))
@@ -108164,10 +108267,27 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       setTimer: (run, ms) => window.setTimeout(run, ms),
       clearTimer: (handle) => window.clearTimeout(handle)
     }));
-    /** The reading view's mark: the rendered sections of the changed lines wear the same light-green class (post-processor + a re-render). */
-    __publicField(this, "readingMarks", new ReadingMarks());
-    /** The paragraphs of the last apply (their text), for the reading view's mark. */
-    __publicField(this, "bookAppliedTexts", null);
+    /** The reading view's mark: the rendered sections of the applied paragraphs wear the same light-green class for 10 s (post-processor + a re-render). */
+    __publicField(this, "readingHighlight", new ReadingHighlight({
+      views: () => this.app.workspace.getLeavesOfType("markdown").flatMap((leaf) => {
+        var _a2;
+        const view = leaf.view;
+        if (!(view instanceof import_obsidian52.MarkdownView)) return [];
+        return [
+          {
+            path: (_a2 = view.file) == null ? void 0 : _a2.path,
+            reading: view.getMode() === "preview",
+            rerender: () => view.previewMode.rerender(true),
+            unmark: () => {
+              var _a3, _b2;
+              return (_b2 = (_a3 = view.previewMode) == null ? void 0 : _a3.containerEl) == null ? void 0 : _b2.querySelectorAll(".vam-book-applied").forEach((el) => el.removeClass("vam-book-applied"));
+            }
+          }
+        ];
+      }),
+      setTimer: (run, ms) => window.setTimeout(run, ms),
+      clearTimer: (handle) => window.clearTimeout(handle)
+    }));
     __publicField(this, "bookPaintTimer", null);
     __publicField(this, "bookPipelineRuns", new BookPipelineRuns({
       mutate: (work) => this.mutate(work),
@@ -108349,18 +108469,6 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
   get chartJobs() {
     return this.topicRuns.chartJobs;
   }
-  setReadingMarks(view, ranges) {
-    var _a2, _b2;
-    const path = (_a2 = view.file) == null ? void 0 : _a2.path;
-    if (!path) return;
-    const applied = this.bookAppliedTexts;
-    if (ranges == null ? void 0 : ranges.length) this.readingMarks.set(path, (applied == null ? void 0 : applied.path) === path ? applied.texts : []);
-    else this.readingMarks.clear();
-    const container = (_b2 = view.previewMode) == null ? void 0 : _b2.containerEl;
-    if (ranges == null ? void 0 : ranges.length) {
-      if (view.getMode() === "preview") view.previewMode.rerender(true);
-    } else container == null ? void 0 : container.querySelectorAll(".vam-book-applied").forEach((el) => el.removeClass("vam-book-applied"));
-  }
   /** The marks follow the paragraphs' text in the note as it is now (the offsets of the apply are stale once the review box is stamped), never a callout. */
   async showBookHighlight(path, ranges, afters) {
     let found = ranges;
@@ -108377,8 +108485,8 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
     } catch (e) {
       found = [];
     }
-    this.bookAppliedTexts = { path, texts: afters };
     this.bookHighlights.show(path, found);
+    this.readingHighlight.show(path, afters);
   }
   bookHighlightTargets() {
     const out = [];
@@ -108393,10 +108501,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
           var _a2;
           return (_a2 = view.file) == null ? void 0 : _a2.path;
         },
-        set: (ranges) => {
-          cm.dispatch({ effects: setApplied.of(ranges) });
-          this.setReadingMarks(view, ranges);
-        }
+        set: (ranges) => cm.dispatch({ effects: setApplied.of(ranges) })
       });
     }
     return out;
@@ -108573,7 +108678,7 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
     this.registerEditorExtension(appliedExtension);
     this.registerMarkdownPostProcessor((el, ctx) => {
       const info = ctx.getSectionInfo(el);
-      if (info && this.readingMarks.wears(ctx.sourcePath, sectionSource(info.text, info.lineStart, info.lineEnd)))
+      if (info && this.readingHighlight.marks.wears(ctx.sourcePath, sectionSource(info.text, info.lineStart, info.lineEnd)))
         el.addClass("vam-book-applied");
       if (this.bookChapterMaps.has(ctx.sourcePath)) this.paintBookNotesSoon();
     });
@@ -109762,6 +109867,7 @@ ${t("ui.organize_link_wait_hint")}`;
     this.bookPaintTimer = null;
     this.bookNotesApply.dispose();
     this.bookHighlights.dispose();
+    this.readingHighlight.release();
     this.bookNotes.dispose();
     (_a2 = this.repo) == null ? void 0 : _a2.dispose();
     void ((_b2 = this.coffeeManager) == null ? void 0 : _b2.stop());

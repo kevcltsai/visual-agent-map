@@ -2637,7 +2637,7 @@ test('R trial fix after gate 1: a trial chapter still too short after its trial 
 
 test('W trial (live v6 〈土壤〉): the reasons a trial chapter had at gate 1 survive to gate 2 beside a failed fix after gate 1 (author_failed); the box names both', async () => {
   const seen = [];
-  const r = await lenRig({ trial: true, script: { ...factCard, proof: async request => verdictOf(request, 'unmet', 'WRONGDATE') } });
+  const r = await lenRig({ trial: true, planReview: true, script: { ...factCard, proof: async request => verdictOf(request, 'unmet', 'WRONGDATE') } });
   const id = r.nodes[1].id;
   const write = lengthAuthor(r, seen, 10, 10);
   r.script.author = async input => {
@@ -2647,8 +2647,8 @@ test('W trial (live v6 〈土壤〉): the reasons a trial chapter had at gate 1 
     }
     return write(input);
   };
-  await r.runs.start(r.mapPath);
-  while (r.runs.isRunning(r.mapPath)) await new Promise(resolve => setImmediate(resolve));
+  await r.runs.start(r.mapPath); await idle(r);
+  await r.runs.startTrial(r.mapPath); await idle(r);
   const atGate1 = (await r.note(1)).pipelineIssue;
   assert.match(atGate1, /C2/); assert.match(atGate1, /length:under/);
   await confirmDone(r.runs, r.mapPath);
@@ -2977,11 +2977,14 @@ test('expand passes (live v6 〈澆水〉, X): a fix round with no usable block 
 
 test('expand passes: a trial chapter has two fix rounds (before and after gate 1) but at most BOOK_EXPAND_PASSES extra passes in all; its writing calls stay at draft + two fix rounds + the capped passes', async () => {
   const seen = [];
-  const r = await trialRig({ titles: ['A', 'B', 'C', 'D', 'E'] });
+  // The plan-review flow: the run stops at the plan review, "try" writes the trial to its gate 1, then the rest; the bound is the same.
+  const r = await trialRig({ titles: ['A', 'B', 'C', 'D', 'E'], planReview: true });
   await r.repo.writeBookSettings(r.nodes[0].path, { length: LEN_SETTING });
   r.script.author = passAuthor(r, seen, call => 5 + call);
-  await r.runs.start(r.mapPath);
-  while (r.runs.isRunning(r.mapPath) && (await r.state()).phase !== 'gate1') await new Promise(resolve => setImmediate(resolve));
+  await r.runs.start(r.mapPath); await idle(r);
+  assert.equal((await r.state()).planReview, true); assert.equal(seen.length, 0, 'nothing is written at the plan review');
+  await r.runs.startTrial(r.mapPath); await idle(r);
+  assert.equal((await r.state()).phase, 'gate1');
   await confirmDone(r.runs, r.mapPath);
   const { MAX_AUTO_FIXES, BOOK_EXPAND_PASSES } = S.load('core/book-pipeline/model.ts');
   const trial = r.nodes.slice(0, 3);

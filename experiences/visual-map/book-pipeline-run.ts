@@ -15,6 +15,7 @@ import { isBudgetExhausted } from "../../core/admission";
 import { createBudgetAdmission, createStoreBudgetPort } from "../../core/book-pipeline/budget";
 import { imageKey } from "../../core/book-pipeline/image-dedupe";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
+import { searchCommons, type CommonsFetch } from "../../core/book-pipeline/commons-search";
 import {
   PipelineStore,
   addBudget,
@@ -119,6 +120,7 @@ import {
 import {
   bookExpandRequirements,
   effectiveSettings,
+  imageCountRange,
   lengthReason,
   lengthToken,
   type LengthIgnored,
@@ -138,6 +140,7 @@ import {
   composeSlotsRecord,
   imageIssueTokens,
   latestSlotsRecord,
+  pictureShortfallToken,
   stripImageLines,
   fillSlotMarkers,
   residualMarkerLines,
@@ -324,6 +327,8 @@ export interface BookPipelinePorts {
     request: FindImagesRequest,
     run: { signal: AbortSignal; admission?: AdmissionContext }
   ): Promise<FoundImages>;
+  /** Production: a GET of a Wikimedia Commons API address through `requestUrl` (any other address is refused). Absent: no program search after the finder. */
+  fetchCommons?: CommonsFetch;
   backupNote(path: string, raw: string): Promise<{ ok: true; path: string } | { ok: false }>;
   /**
    * Applying the reader's notes (absent: refused as unreadable). `readText` is the note as the writer will see it (an open editor's text
@@ -2784,8 +2789,14 @@ export class BookPipelineRuns {
     // A work key another chapter of this run claimed is taken; this chapter's own (a rerun) is not.
     const taken = (key: string): boolean =>
       drive.usedImages.has(key) || others.has(key) || (drive.usedWorks.get(key) ?? nodeId) !== nodeId;
+    const hints = new Map<number, { subject?: string; search?: string }>();
+    const keepHints = (from: FoundImages | undefined): void => {
+      for (const [index, hint] of from?.hints ?? []) hints.set(index, { ...hints.get(index), ...hint });
+    };
+    let commonsAsked = 0;
     try {
       const round1 = await search(wanted, false, exclude);
+      keepHints(round1);
       for (const [index, list] of await probeFound(wanted, round1)) perSlot.set(index, list);
       // A second search (once) for the slots the first one left without a usable picture: another direction, the tried addresses excluded.
       if (round1) {
@@ -2795,8 +2806,35 @@ export class BookPipelineRuns {
           ...new Set([...perSlot.values()].flatMap(list => list.map(item => imageKey(item.candidate.imageUrl))))
         ];
         const second = await search(lacking, true, [...tried, ...exclude]);
+        keepHints(second);
         if (second) {
           for (const [index, list] of await probeFound(lacking, second))
+            perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
+        }
+      }
+      // The program's own search (no model call) for the slots still without a usable picture: Wikimedia Commons, bounded per slot and
+      // per chapter; its candidates are probed, deduped and chosen like the finder's.
+      if (this.ports.fetchCommons) {
+        const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
+        const lacking = wanted.filter(slot => !("figure" in (provisional.get(slot.index) ?? {})));
+        if (lacking.length) {
+          const seen = new Set([
+            ...exclude,
+            ...[...perSlot.values()].flatMap(list => list.map(item => imageKey(item.candidate.imageUrl)))
+          ]);
+          const commons = await searchCommons(
+            lacking.map(slot => ({ index: slot.index, explains: slot.explains, ...hints.get(slot.index) })),
+            this.ports.fetchCommons,
+            { signal, skip: url => seen.has(imageKey(url)) || taken(imageKey(url)) }
+          );
+          commonsAsked = commons.requests;
+          if (signal.aborted) throw new Error("aborted");
+          const asFound: FoundImages = {
+            bySlot: commons.bySlot,
+            found: [...commons.bySlot.values()].reduce((n, list) => n + list.length, 0),
+            offTopic: 0
+          };
+          for (const [index, list] of await probeFound(lacking, asFound))
             perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
         }
       }
@@ -2839,7 +2877,11 @@ export class BookPipelineRuns {
           attempt,
           result: "ok",
           ms: 0,
-          counts: { placed: result.placed.length, missing: result.missing.length },
+          counts: {
+            placed: result.placed.length,
+            missing: result.missing.length,
+            ...(commonsAsked ? { commons: commonsAsked } : {})
+          },
           hosts: { name: "reason", list: [...new Set(result.missing.map(item => item.reasonCode))] }
         })
       );
@@ -3030,11 +3072,16 @@ export class BookPipelineRuns {
       .filter(item => item.type !== "fact" && item.status === "unmet")
       .map(item => code(item.id));
     const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
+    // Fewer pictures than the owner's minimum is a reason to look (never a rewrite of the text): see pictureShortfallToken.
+    const minimum = await this.pictureMinimum(drive);
+    const shortIssue =
+      minimum !== undefined && imageCheck.placed < minimum ? pictureShortfallToken(imageCheck.placed, minimum) : "";
     return {
       kind: "ok",
       after: async () => {
-        const stage = verdict.aggregate === "needs-review" || length ? "needs-review" : "checked";
-        if (stage === "needs-review" && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0) {
+        const rewrite = verdict.aggregate === "needs-review" || !!length;
+        const stage = rewrite || shortIssue ? "needs-review" : "checked";
+        if (rewrite && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0) {
           drive.fixable.set(nodeId, proofFixInstruction(verdict.items, [...checklist, ...BOOK_CHECKS], length));
           if (length?.kind === "under") drive.expand.add(nodeId);
           else drive.expand.delete(nodeId);
@@ -3048,14 +3095,16 @@ export class BookPipelineRuns {
           nodeId,
           stage,
           verdict.aggregate === "needs-review"
-            ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}`
+            ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}${shortIssue ? ` ${shortIssue}` : ""}`
             : lengthIssue
-              ? `length unmet: ${[lengthIssue, ...noticed].join(" ")}`
-              : structureUnmet.length
-                ? `structure unmet: ${noticed.join(" ")}`
-                : noticed.length
-                  ? `image notice: ${noticed.join(" ")}`
-                  : null
+              ? `length unmet: ${[lengthIssue, ...(shortIssue ? [shortIssue] : []), ...noticed].join(" ")}`
+              : shortIssue
+                ? `images unmet: ${[shortIssue, ...noticed].join(" ")}`
+                : structureUnmet.length
+                  ? `structure unmet: ${noticed.join(" ")}`
+                  : noticed.length
+                    ? `image notice: ${noticed.join(" ")}`
+                    : null
         );
       }
     };
@@ -3086,6 +3135,14 @@ export class BookPipelineRuns {
     const settings = effectiveSettings(root.settings, parseBookPlanDecisions(root.raw));
     const ignored = (reason: LengthIgnored): void => this.log(drive, "length_rule_ignored", nodeId, "proof", reason);
     return lengthReason(settings.length, body, ignored);
+  }
+
+  /** The owner's minimum pictures per chapter (whole-book settings, see imageCountRange), or undefined without a picture setting. */
+  private async pictureMinimum(drive: Drive): Promise<number | undefined> {
+    const rootInfo = drive.cards.get(drive.rootId);
+    if (!rootInfo) return undefined;
+    const root = await this.ports.readCard(rootInfo.path);
+    return imageCountRange(effectiveSettings(root.settings, parseBookPlanDecisions(root.raw)))?.min;
   }
 
   /** Best effort: replaces the proof records in the research notes with the failed proof's partial record (its own key), under the same guards as every card write. Never throws. */

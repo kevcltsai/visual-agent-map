@@ -2,6 +2,7 @@ import type { TranslationKey } from "../../i18n";
 import { t } from "../../i18n";
 import { isBookStepError } from "../../core/steps/book-pipeline/base";
 import { splitLengthIssue, type LengthReason } from "../../core/book-pipeline/settings";
+import { splitPictureIssue } from "../../core/book-pipeline/image-slots";
 import {
   effectiveOrder,
   mapDifference,
@@ -538,10 +539,19 @@ const PLAIN_KEY: Record<string, TranslationKey> = {
 
 /** Turns the neutral issue code (`write failed: invalid_reply`, `proof unmet: C1 C3`) into the sentence shown on the card. */
 export function bookIssueText(issue: string): string {
+  const pictures = splitPictureIssue(issue);
+  if (pictures.shortfall) {
+    const sentence = shortfallText(pictures.shortfall);
+    return pictures.rest ? `${bookIssueText(pictures.rest)}${t("ui.book_panel_lead_sep")}${sentence}` : sentence;
+  }
   const { rest, length } = splitLengthIssue(issue);
   if (!length) return plainIssueText(issue);
   const sentence = lengthText(length);
   return rest ? `${plainIssueText(rest)}${t("ui.book_panel_lead_sep")}${sentence}` : sentence;
+}
+/** The sentence for a chapter with fewer pictures than the owner's minimum (numbers only). */
+export function shortfallText(shortfall: { placed: number; minimum: number }): string {
+  return t("ui.book_reason_images_under_0_1", String(shortfall.placed), String(shortfall.minimum));
 }
 /** The sentence for a chapter outside the asked length: what was measured and the range (numbers and the unit only). */
 export function lengthText(length: LengthReason): string {

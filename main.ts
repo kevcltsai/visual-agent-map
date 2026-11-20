@@ -51,6 +51,7 @@ import { effectiveOrder, readBookPipeline } from "./core/book-pipeline/model";
 import { runPlanStep } from "./core/steps/book-pipeline/run";
 import { runProofread } from "./core/steps/book-pipeline/proofread";
 import { runFindImages } from "./core/steps/book-pipeline/find-images";
+import { COMMONS_API } from "./core/book-pipeline/commons-search";
 import { runSuggestSettings } from "./core/steps/book-pipeline/suggest-settings";
 import type { BookSettings } from "./core/book-pipeline/model";
 import {
@@ -819,6 +820,12 @@ export default class VisualAgentMapPlugin extends Plugin {
     runPlan: (step, request, run) => runPlanStep(this.aiCalls, step, request, run),
     runProofread: (request, run) => runProofread(this.aiCalls, request, run),
     findImages: (request, run) => runFindImages(this.aiCalls, request, run),
+    // requestUrl has no abort: searchCommons races its own timeout. Only the Commons API is asked (the address is built by the program).
+    fetchCommons: async url => {
+      if (!url.startsWith(`${COMMONS_API}?`)) throw new Error("refused");
+      const response = await requestUrl({ url, method: "GET", throw: false });
+      return { status: response.status, text: response.text };
+    },
     author: async input => {
       const view = this.views().find(item => item.mapPath === input.mapPath);
       if (view) return view.runBookAuthor(input);

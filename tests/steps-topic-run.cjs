@@ -1201,6 +1201,17 @@ test('research pipeline: the budget refusal is its own outcome: status restored,
   assert.equal(h.log.writes.some(([, patch]) => 'lastError' in patch || patch.status === 'error'), false);
 });
 
+test('research pipeline: keepStatusOnFailure (the book\'s in-place fix, live v6 Y) keeps the note\'s status on an AI failure and still records the error; without it the status is error', async () => {
+  const boom = async (_c, _m, _r, _s, _e, accepted) => { accepted(); throw new Error('boom'); };
+  const h = guardedRuns({ ask: boom });
+  await (await h.runs.start('A.md', 'research', h.options({ pipeline: hooks({ keepStatusOnFailure: true }).pipeline }))).finished;
+  assert.equal(h.store.get('A.md').status, 'idea', 'the chapter is not an error card');
+  assert.match(String(h.store.get('A.md').lastError), /boom/); assert.equal(h.log.failed.length, 1);
+  const plain = guardedRuns({ ask: boom });
+  await (await plain.runs.start('A.md', 'research', plain.options({ pipeline: hooks().pipeline }))).finished;
+  assert.equal(plain.store.get('A.md').status, 'error');
+});
+
 test('research pipeline: without the pipeline option a budget error is an ordinary failure, exactly as before', async () => {
   const h = guardedRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); throw new BudgetExhaustedError(); } });
   const handle = await h.runs.start('A.md', 'research', h.options());

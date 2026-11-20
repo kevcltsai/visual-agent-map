@@ -68,6 +68,25 @@ test('reasons joined: no separator after a sentence end (live v5 「位置不符
   assert.match(b.bookIssueText('images unmet: images:under:0:1 captions:latin'), /圖片不足.*，圖說的中文裡夾著英文字/);
   assert.equal(b.joinReasons(['Too short.', 'Check it']), 'Too short. Check it');
 });
+test('a failed automatic fix keeps the reasons the chapter had (live v6 W): the three v6 shapes name the failure and every shortfall, on the card and in the box', () => {
+  const { carryIssue } = loadSource('export { carryIssue } from "./experiences/visual-map/book-pipeline-reasons";');
+  const shapes = [
+    // 〈澆水〉: the expansion gave no usable block; the box said only 「寫作失敗」, no length, no pictures.
+    ['write failed: fix_no_edits', 'length unmet: length:under:2913:5000-8000:字:v2 images:under:2:6', [/章節維持原樣/, /2913 字/, /放了 2 張，設定至少 6 張/]],
+    // 〈土壤〉: gate 1 had C8 and the picture shortfall; the fix after gate 1 failed (author_failed).
+    ['write failed: author_failed', 'proof unmet: C8 images:under:3:6', [/寫作呼叫失敗/, /校對/, /放了 3 張，設定至少 6 張/]],
+    // 〈播種〉: the fix wrote no body; the facts still to check were lost.
+    ['write failed: no_body', 'proof unmet: facts_unverified', [/沒寫出正文/, /無法查證/]]
+  ];
+  for (const [failure, before, words] of shapes) {
+    const issue = carryIssue(failure, before);
+    assert.equal(issue, `${failure} + ${before}`);
+    for (const text of [b.bookIssueText(issue), b.reasonOf(issue, undefined)]) for (const word of words) assert.match(text, word, `${issue}: ${text}`);
+    assert.equal(carryIssue('write failed: no_body', issue), `write failed: no_body + ${before}`, 'an earlier failure is dropped, never stacked');
+  }
+  assert.equal(carryIssue('write failed: no_body', 'write failed: author_failed'), 'write failed: no_body');
+  assert.equal(carryIssue('write failed: no_body', undefined), 'write failed: no_body');
+});
 test('galleryBare: only a gallery chapter whose every slot is missing', () => {
   const prompt = '圖安排：\n- 圖位 1｜圖表｜睡眠週期｜位置：第二段\n- 圖位 2｜照片｜腦波｜位置：結尾\n';
   const rec = slots => `<!-- book-slots:v1 ${JSON.stringify({ slots, bad: 0 })} -->\n`;

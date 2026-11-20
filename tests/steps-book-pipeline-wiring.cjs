@@ -142,6 +142,14 @@ test('runBookAuthor: keepSummary and whole requirements (the expansion) reach re
   assert.equal('keepSummary' in h.calls[1][8].pipeline, false);
 });
 
+test('runBookAuthor: inPlace (a fix or expansion of a chapter that has its text, live v6 Y) asks with searchOptional and keeps the status on failure; a first draft has neither', async () => {
+  const h = authorView(async (child, signal, accepted, choices, charts, onResult) => onResult({}));
+  await proto.runBookAuthor.call(h.view, h.input({ inPlace: true, keepSummary: true, requirements: 'EXPAND' }));
+  await proto.runBookAuthor.call(h.view, h.input());
+  assert.equal(h.calls[0][8].request.searchOptional, true); assert.equal(h.calls[0][8].pipeline.keepStatusOnFailure, true);
+  assert.equal('searchOptional' in h.calls[1][8].request, false); assert.equal('keepStatusOnFailure' in h.calls[1][8].pipeline, false);
+});
+
 test('runBookAuthor: the card\'s image slots reach the author requirements; no slots (or an input without the field) gives the rules and no plan block', async () => {
   const h = authorView(async (child, signal, accepted, choices, charts, onResult) => onResult({}));
   await proto.runBookAuthor.call(h.view, h.input({ slots: [{ index: 1, kind: 'map', explains: 'the route', anchor: 'after paragraph 1' }] }));

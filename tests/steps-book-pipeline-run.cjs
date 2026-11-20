@@ -2588,6 +2588,31 @@ test('R trial fix after gate 1: a trial chapter still too short after its trial 
   assert.equal(log.split('\n').filter(line => line.includes('author_call') && line.includes(`card=${id} `) && line.includes('result=fix_round')).length, 2);
 });
 
+test('W trial (live v6 〈土壤〉): the reasons a trial chapter had at gate 1 survive to gate 2 beside a failed fix after gate 1 (author_failed); the box names both', async () => {
+  const seen = [];
+  const r = await lenRig({ trial: true, script: { ...factCard, proof: async request => verdictOf(request, 'unmet', 'WRONGDATE') } });
+  const id = r.nodes[1].id;
+  const write = lengthAuthor(r, seen, 10, 10);
+  r.script.author = async input => {
+    if (input.nodeId === id && input.requirements !== undefined && seen.filter(([at, instruction]) => at === id && instruction !== undefined).length === 1) {
+      seen.push([input.nodeId, input.instruction]);
+      return { outcome: 'failed', reason: 'author_failed' };
+    }
+    return write(input);
+  };
+  await r.runs.start(r.mapPath);
+  while (r.runs.isRunning(r.mapPath)) await new Promise(resolve => setImmediate(resolve));
+  const atGate1 = (await r.note(1)).pipelineIssue;
+  assert.match(atGate1, /C2/); assert.match(atGate1, /length:under/);
+  await confirmDone(r.runs, r.mapPath);
+  assert.equal(seen.filter(([at, instruction]) => at === id && instruction !== undefined).length, 2, 'the fix round after gate 1 ran');
+  const carried = atGate1.replace(/^(?:plan|write|proof) failed: \S+ \+ /, '');
+  assert.equal((await r.note(1)).pipelineIssue, `write failed: author_failed + ${carried}`);
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  const problems = (await boxReasons(r, 1)).map(p => p.text).join(' / ');
+  assert.match(problems, /writing call failed/, problems); assert.match(problems, /WRONGDATE/, problems); assert.match(problems, /shorter than the 100–200/, problems);
+});
+
 // The expansion of a too-short chapter: the one redo sees the chapter and returns change blocks; the program puts them in.
 const DRAFT = ['## 開場', '', '開場段落。', '', '### 土壤', '', '土壤段落。', '', '### 小結', '', '結尾一句，帶到下一章。'].join('\n');
 const expandAuthor = (r, seen, answer) => async input => {
@@ -2885,6 +2910,22 @@ test('expand passes: a pass that adds nothing is asked once more with the retry 
   assert.equal(stageOf(r.raw(1)), 'needs-review');
   assert.match((await r.note(1)).pipelineIssue, /length:under:\d+:100-200/);
   assert.match(r.stat.logs.join('\n'), new RegExp(`expand_merge [^\\n]*card=${id} [^\\n]*result=no_edits [^\\n]*pass=1 [^\\n]*noop=1`));
+});
+
+test('expand passes (live v6 〈澆水〉, X): a fix round with no usable block is followed by a pass that asks with the retry request; when that pass writes, the chapter keeps it', async () => {
+  const seen = [];
+  const r = await lenRig();
+  r.script.author = passAuthor(r, seen, (call, id) => (id === r.nodes[1].id ? (call === 1 ? 0 : 150) : 150 + call));
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const id = r.nodes[1].id;
+  const calls = seen.filter(input => input.nodeId === id);
+  assert.equal(calls.length, 3, 'first draft, the fix round with no block, one pass that wrote');
+  const { BOOK_EXPAND_RETRY_INSTRUCTION } = S.load('core/book-pipeline/settings.ts');
+  assert.ok(!calls[1].requirements.includes(BOOK_EXPAND_RETRY_INSTRUCTION));
+  assert.ok(calls[2].requirements.includes(BOOK_EXPAND_RETRY_INSTRUCTION), 'the pass after no_edits asks for concrete new sections');
+  assert.ok((await r.note(1)).detail.includes('### 新節150'));
+  assert.equal(stageOf(r.raw(1)), 'checked');
+  assert.ok(!/fix_no_edits/.test((await r.note(1)).pipelineIssue ?? ''));
 });
 
 test('expand passes: a trial chapter has two fix rounds (before and after gate 1) but at most BOOK_EXPAND_PASSES extra passes in all; its writing calls stay at draft + two fix rounds + the capped passes', async () => {

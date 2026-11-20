@@ -3098,7 +3098,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_button_title": "开始图文书流水线：企划、确认、作者、校对",
   "ui.book_start_title": "把这张思维导图变成一本有图的书",
   "ui.book_start_intro": "会依这张思维导图的主题与卡片，由 AI 企划、写作、找图、校对每一章。",
-  "ui.book_start_estimate_0_1_2": "{0} 张卡 · 约 {1} · 最多 {2} 次 AI 调用。",
+  "ui.book_start_estimate_0_1_2_3": "{0} 张卡 · 约 {1} · 最多 {2} 次 AI 调用（步骤失败重试另计；到 {3} 次会先停下）。",
   "ui.book_start_under_minute": "不到 1 分钟",
   "ui.book_start_minutes_0": "{0} 分钟",
   "ui.book_start_stops": "中间只会停两次，让你确认。",

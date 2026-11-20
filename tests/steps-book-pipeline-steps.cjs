@@ -12,6 +12,7 @@ const { loadWithAiCalls } = require('./support-ai-calls.cjs');
 const textLib = load('core/book-pipeline/text.ts');
 const planText = load('core/book-pipeline/plan-text.ts');
 const proof = load('core/book-pipeline/proof.ts');
+const prose = load('core/book-pipeline/prose-checks.ts');
 const settings = load('core/book-pipeline/settings.ts');
 const pipelineLog = load('core/book-pipeline/log.ts');
 const globalPlan = load('core/steps/book-pipeline/global-plan.ts');
@@ -167,7 +168,7 @@ test('proofread: an item the reply asserts without a source this call opened dro
   const unmet = proof.evaluateProof([item('C1', 'unmet'), item('C2', 'met', ['https://example.org/a'])], checklist, ['https://example.org/a']);
   assert.equal(unmet.aggregate, 'needs-review', 'T10a: the only structure point unmet = all unmet'); assert.equal(unmet.items[0].status, 'unmet');
   const partly = proof.evaluateProof([item('C1', 'unmet'), item('C2', 'met', ['https://example.org/a']), item('C3', 'met')], [{ id: 'C1', type: 'structure', text: 'a' }, { id: 'C3', type: 'structure', text: 'b' }, checklist[1]].map((c, i) => ({ ...c, id: ['C1', 'C3', 'C2'][i] })), ['https://example.org/a']);
-  assert.equal(partly.aggregate, 'checked', 'some structure points met stays checked');
+  assert.equal(partly.aggregate, 'needs-review', 'any unmet structure point needs a person (live re-verify: checked with structure unmet)');
   const factUnmet = proof.evaluateProof([item('C1'), item('C2', 'unmet', ['https://example.org/a'])], checklist, ['https://example.org/a']);
   assert.equal(factUnmet.aggregate, 'needs-review');
 });
@@ -222,6 +223,60 @@ test('runProofread: web search only, budget 4, localCodex false, one reservation
   // a second call does not see the first call's pages
   const second = harness({ answer: reply([item('C1'), item('C2', 'met', ['https://example.org/a'])]), events: [search('q')] });
   await assert.rejects(proofMod.runProofread(second.proofCalls, proofRequest(), { signal: signal() }), failure('no_open_page'));
+});
+
+// ---- the whole-book checks (names, research voice, repetition) ----
+
+test('prose checks: research-voice phrases in zh-TW, zh-CN and English are found; ordinary prose is not', () => {
+  assert.deepEqual(plain(prose.researchVoiceHits('本次搜尋未取得蘭格的原始底片資料。')), ['本次搜尋', '搜尋未取得']);
+  assert.deepEqual(plain(prose.researchVoiceHits('根據搜尋結果，她在 1936 年拍下這張照片。')), ['搜尋結果', '根據搜尋']);
+  assert.deepEqual(plain(prose.researchVoiceHits('本次检索没有找到。')), ['本次检索']);
+  assert.deepEqual(plain(prose.researchVoiceHits('As of my search, no print survives.')), ['my search']);
+  assert.deepEqual(plain(prose.researchVoiceHits('她在研究光線，也搜尋街頭的瞬間。Light shapes the face.')), []);
+  assert.deepEqual(plain(prose.researchVoiceHits('')), []);
+});
+
+test('prose checks: a dotted person name that shares a chapter title\'s family name but not its spelling is a variant (live run: 桃樂絲・蘭格, 理察・艾維頓, 歐文・潘)', () => {
+  const titles = ['多蘿西婭・蘭格', '理查・艾維頓', '艾文・潘', '尤瑟夫・卡許', '羅伯特・卡帕', '亨利・卡蒂埃-布列松', '技法與器材'];
+  const body = '攝影師桃樂絲・蘭格拍下移民母親；理察・艾維頓的白底肖像與歐文・潘的角落肖像，都和卡什一樣講究光。';
+  assert.deepEqual(plain(prose.nameVariantHits(body, titles)), [
+    { variant: '桃樂絲・蘭格', title: '多蘿西婭・蘭格' },
+    { variant: '理察・艾維頓', title: '理查・艾維頓' },
+    { variant: '歐文・潘', title: '艾文・潘' }
+  ]);
+  // The title's own spelling (any middle dot), a shared given name of another person, and a hyphenated family name spelled right are no hit.
+  assert.deepEqual(plain(prose.nameVariantHits('多蘿西婭·蘭格與羅伯特・法蘭克，還有亨利・卡蒂埃-布列松。', titles)), []);
+  assert.deepEqual(plain(prose.nameVariantHits('亨利・卡帝爾-布列松', ['亨利・卡蒂埃-布列松'])), []);
+  assert.deepEqual(plain(prose.nameVariantHits('昂利・卡蒂埃-布列松', ['亨利・卡蒂埃-布列松'])), [{ variant: '昂利・卡蒂埃-布列松', title: '亨利・卡蒂埃-布列松' }]);
+  // English titles are not checked by program; an empty body or list finds nothing.
+  assert.deepEqual(plain(prose.nameVariantHits('Dorothy Lange', ['Dorothea Lange'])), []);
+  assert.deepEqual(plain(prose.nameVariantHits('', titles)), []);
+});
+
+test('runProofread: the chapter list and covers lines reach the prompt; a program hit makes N1 or V1 unmet over the model\'s met and the chapter needs review; R1 unmet from the model needs review too', async () => {
+  const list = [...checklist, ...prose.BOOK_CHECKS];
+  const chapters = [{ title: '多蘿西婭・蘭格', covers: '移民母親與紀實攝影' }, { title: '大師作品參考', covers: '十位大師一覽' }];
+  const body = `${BODY} 桃樂絲・蘭格的作品；本次搜尋未取得原始底片。`;
+  const allMet = [item('C1'), item('C2', 'met', ['https://example.org/a']), item('N1'), item('V1'), item('R1')];
+  const h = harness({ answer: reply(allMet), events: [search('q'), page('https://example.org/a')] });
+  const result = await proofMod.runProofread(h.proofCalls, proofRequest({ body, checklist: list, title: '大師作品參考', chapters }), { signal: signal() });
+  const [prompt] = h.runs[0];
+  assert.ok(prompt.includes(JSON.stringify(chapters)), 'the chapter list with covers lines');
+  assert.ok(prompt.includes('this chapter\'s title is "大師作品參考"'));
+  for (const id of ['N1', 'V1', 'R1']) assert.ok(prompt.includes(`"id":"${id}"`));
+  assert.equal(result.aggregate, 'needs-review');
+  const by = id => result.items.find(entry => entry.id === id);
+  assert.equal(by('N1').status, 'unmet'); assert.match(by('N1').note, /「桃樂絲・蘭格」→「多蘿西婭・蘭格」/);
+  assert.equal(by('V1').status, 'unmet'); assert.match(by('V1').note, /「本次搜尋」/);
+  assert.equal(by('R1').status, 'met');
+  // A clean chapter with the model's met stays checked; the model's R1 unmet alone needs review.
+  const clean = harness({ answer: reply(allMet), events: [search('q'), page('https://example.org/a')] });
+  assert.equal((await proofMod.runProofread(clean.proofCalls, proofRequest({ checklist: list, chapters }), { signal: signal() })).aggregate, 'checked');
+  const repeat = harness({ answer: reply([...allMet.slice(0, 4), item('R1', 'unmet', [], 'The window-light exercise is taught again')]), events: [search('q'), page('https://example.org/a')] });
+  assert.equal((await proofMod.runProofread(repeat.proofCalls, proofRequest({ checklist: list, chapters }), { signal: signal() })).aggregate, 'needs-review');
+  // Any unmet point, a plan's own structure point included, needs review (live re-verify: "structure unmet: C4" ended checked).
+  assert.equal(proof.proofVerdict({ items: [{ id: 'C1', type: 'structure', status: 'unmet' }, { id: 'C3', type: 'structure', status: 'met' }] }), 'needs-review');
+  assert.equal(proof.proofVerdict({ items: [{ id: 'V1', type: 'structure', status: 'unmet' }, { id: 'C3', type: 'structure', status: 'met' }] }), 'needs-review');
 });
 
 // ---- proof record ----
@@ -686,10 +741,11 @@ test('apply-notes: lines, list marks and blank lines are kept', () => {
   assert.throws(() => run('   '), /empty|non-empty/);
 });
 
-test('T10a verdict reducer: all structure points unmet or an empty chapter is needs-review (also for a stored checked result); some unmet structure with met facts stays checked', () => {
+test('verdict reducer: any unmet point (some structure points included) or an empty chapter is needs-review (also for a stored checked result); all met stays checked', () => {
   const r = (...statuses) => ({ aggregate: 'checked', items: statuses.map(([type, status], i) => ({ type, status, id: `C${i + 1}` })) });
   assert.equal(proof.proofVerdict(r(['structure', 'unmet'], ['structure', 'unmet'], ['fact', 'met'])), 'needs-review');
-  assert.equal(proof.proofVerdict(r(['structure', 'unmet'], ['structure', 'met'], ['fact', 'met'])), 'checked');
+  assert.equal(proof.proofVerdict(r(['structure', 'unmet'], ['structure', 'met'], ['fact', 'met'])), 'needs-review');
+  assert.equal(proof.proofVerdict(r(['structure', 'met'], ['structure', 'met'], ['fact', 'met'])), 'checked');
   assert.equal(proof.proofVerdict(r(['structure', 'met'], ['fact', 'met']), true), 'needs-review');
   assert.equal(proof.proofVerdict(r(['structure', 'met'], ['fact', 'unmet'])), 'needs-review');
   assert.equal(proof.proofVerdict({ ...r(['structure', 'met']), aggregate: 'needs-review' }), 'needs-review');

@@ -1,6 +1,7 @@
 import { latestStoredProof, neutralizeText } from "../../core/book-pipeline/note-sections";
 import type { PipelineStage } from "../../core/book-pipeline/model";
 import type { LengthReason } from "../../core/book-pipeline/settings";
+import { isBookCheckId } from "../../core/book-pipeline/proof";
 
 /**
  * Pure helpers of a single-card rerun at gate 2 (T5): the unverified sources a card names, the one-line instruction "use other
@@ -95,7 +96,10 @@ export function proofFixInstruction(
   length?: LengthReason
 ): string {
   const failed = items.filter(item => item.type === "fact" && item.status === "unmet");
-  const structure = items.filter(item => item.type !== "fact" && item.status === "unmet");
+  // The whole-book points (names, research voice, repetition) first: they are short and a long chapter point must not squeeze them out.
+  const structure = items
+    .filter(item => item.type !== "fact" && item.status === "unmet")
+    .sort((a, b) => Number(isBookCheckId(b.id)) - Number(isBookCheckId(a.id)));
   let sources = cleanAvoidSources(
     items.filter(item => item.type === "fact" && item.status !== "met").flatMap(item => item.sources)
   );
@@ -117,7 +121,9 @@ export function proofFixInstruction(
     const points: string[] = [];
     for (const item of list) {
       const text = checklist.find(entry => entry.id === item.id)?.text ?? "";
-      const point = JSON.stringify(oneLine(`${text} / ${item.note}`, FIX_ITEM_MAX * 2));
+      // A whole-book point's note is the program's or verifier's exact reason (which name, which phrase): it goes first so a cut keeps it.
+      const pair = isBookCheckId(item.id) ? `${item.note} / ${text}` : `${text} / ${item.note}`;
+      const point = JSON.stringify(oneLine(pair, FIX_ITEM_MAX * 2));
       if (point.length + 1 > room) break;
       points.push(point);
       room -= point.length + 1;

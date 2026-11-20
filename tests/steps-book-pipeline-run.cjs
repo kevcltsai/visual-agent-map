@@ -2385,7 +2385,22 @@ test('T10a proof: a proof that says checked while every structure point is unmet
   assert.equal((await r.note(1)).pipelineIssue, 'proof unmet: C1');
 });
 
-test('T10a proof: a mixed fact and structure failure puts both in the one auto-fix request; a partly unmet structure with met facts stays checked', async () => {
+test('proof: the proofread gets the whole-book points and the chapter list (titles, covers lines) in reading order; a whole-book point unmet needs review and its note reaches the one auto-fix', async () => {
+  const seen = [];
+  const requests = [];
+  const r = await rig({ script: { ...factCard, proof: async request => { requests.push(request); return unjudged(request, request.body.includes(TITLES[1]) && requests.filter(q => q.body.includes(TITLES[1])).length === 1 ? { V1: 'unmet' } : {}); }, author: input => writeAs(r, seen)(input) } });
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const first = requests[0];
+  assert.equal(first.checklist.slice(-3).map(c => c.id).join(), 'N1,V1,R1');
+  assert.equal(first.chapters.map(c => c.title).join(), TITLES.join());
+  assert.ok(first.chapters.every(c => c.covers === 'c'), 'each chapter\'s covers line from its Prompt');
+  const redo = seen.filter(([, instruction]) => instruction !== undefined);
+  assert.equal(redo.length, 1);
+  assert.match(redo[0][1], /note V1/);
+  assert.equal(stageOf(r.raw(1)), 'checked', 'the re-proof passed');
+});
+
+test('T10a proof: a mixed fact and structure failure puts both in the one auto-fix request; a partly unmet structure with met facts needs review after its one auto-fix, with the point in the issue', async () => {
   const seen = [];
   let first = true;
   const r = await rig({ script: { ...factCard, proof: async request => { const out = first && request.body.includes(TITLES[1]) ? unjudged(request, { C1: 'unmet', C2: 'unmet' }) : unjudged(request, {}); if (request.body.includes(TITLES[1])) first = false; return out; }, author: input => writeAs(r, seen)(input) } });
@@ -2397,7 +2412,10 @@ test('T10a proof: a mixed fact and structure failure puts both in the one auto-f
   const three = [{ id: 'C1', type: 'structure', text: 'a' }, { id: 'C2', type: 'structure', text: 'b' }, { id: 'C3', type: 'fact', text: 'd' }];
   const p = await rig({ script: { card: () => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: three }), proof: async request => unjudged(request, { C1: 'unmet' }) } });
   await p.runs.start(p.mapPath); await confirmDone(p.runs, p.mapPath);
-  assert.equal(stageOf(p.raw(1)), 'checked');
+  // Live re-verify: "structure unmet: C4" ended checked. Any unmet point now needs review once the one auto-fix is spent.
+  assert.equal(stageOf(p.raw(1)), 'needs-review');
+  assert.equal((await p.state()).autoFixes[p.nodes[1].id], 1);
+  assert.equal((await p.note(1)).pipelineIssue, 'proof unmet: C1');
 });
 
 // ---- T10c: the length rule (Bug3) and the card-plan request (Bug4) ----
@@ -2513,14 +2531,14 @@ test('T10c plan request: a chapter list too long for the step is refused before 
   assert.equal(stageOf(r.raw(0)), 'needs-review');
 });
 
-test('T10c length: a pure length failure keeps the notice tokens of the card (a partly unmet structure point) and adds the length token; no token is dropped', async () => {
+test('T10c length: a length failure with a partly unmet structure point keeps both in the issue; no token is dropped', async () => {
   const three = [{ id: 'C1', type: 'structure', text: 'a' }, { id: 'C2', type: 'structure', text: 'b' }, { id: 'C3', type: 'fact', text: 'd' }];
   const r = await lenRig({ script: { card: () => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: three }), proof: async request => unjudged(request, { C1: 'unmet' }) } });
   r.script.author = lengthAuthor(r, [], 500, 500);
   await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
   assert.equal(stageOf(r.raw(1)), 'needs-review');
   const issue = (await r.note(1)).pipelineIssue;
-  assert.match(issue, /^length unmet: length:over:\d+:100-200:字:v\d+ C1$/, 'the length token and the structure token both stay');
+  assert.match(issue, /^proof unmet: C1 length:over:\d+:100-200:字:v\d+$/, 'the structure point and the length token both stay');
 });
 
 // ---- T11: cards added or removed while a run is in progress ----

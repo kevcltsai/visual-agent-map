@@ -13,6 +13,7 @@ import {
   type ProofStatus,
   type RawProofItem
 } from "../../book-pipeline/proof";
+import { applyProseChecks } from "../../book-pipeline/prose-checks";
 import { singleLine } from "../../book-pipeline/text";
 import { stepEffort } from "../../provider-step-runner";
 import { prepareStep, renderTemplate, type StepDefinition } from "../../step-runner";
@@ -22,10 +23,18 @@ import template from "./proofread.md";
 export const PROOF_SEARCH_BUDGET = 4;
 export const PROOF_TIMEOUT_MS = 4 * 60 * 1000;
 
-/** Everything the proofreader sees: the chapter text and its checklist. No title, no neighbours, no plan. */
+/** Everything the proofreader sees: the chapter text, its checklist and the book's chapter list (titles and covers lines). No plan. */
 export interface ProofreadRequest extends BookStepBase {
   body: string;
   checklist: readonly ChecklistItem[];
+  /** The chapter's own title (absent: not shown). */
+  title?: string;
+  /** Every chapter in reading order: its title (the authoritative spelling of a person's name) and its covers line (may be empty). */
+  chapters?: readonly ProofChapter[];
+}
+export interface ProofChapter {
+  title: string;
+  covers: string;
 }
 
 export const PROOFREAD_SCHEMA = {
@@ -88,6 +97,8 @@ export const proofreadStep: StepDefinition<ProofreadRequest, RawProofItem[]> = {
     renderTemplate(template, {
       languageInstruction: languageInstruction(request.language, request.body),
       checklist: JSON.stringify(request.checklist.map(item => ({ id: item.id, type: item.type, text: item.text }))),
+      title: JSON.stringify(request.title ?? ""),
+      chapters: JSON.stringify((request.chapters ?? []).map(chapter => ({ title: chapter.title, covers: chapter.covers }))),
       body: JSON.stringify(request.body)
     }),
   schema: PROOFREAD_SCHEMA,
@@ -148,7 +159,10 @@ export async function runProofread(
       try {
         const parsed = prepared.parse(raw);
         counts = { ...counts, sources: sourceDiagnostics(parsed, opened) };
-        return { ...evaluateProof(parsed, request.checklist, opened, { body: request.body }), counts };
+        const judged = evaluateProof(parsed, request.checklist, opened, { body: request.body });
+        // The program's own findings (research voice, a person name spelled unlike its chapter title) override the model's "met".
+        const titles = (request.chapters ?? []).map(chapter => chapter.title);
+        return { ...applyProseChecks(judged, request.body, titles), counts };
       } catch (error) {
         // The counts travel with a failure too: they are the only trace of what a no-content-log call did.
         if (isProofFailure(error))

@@ -3328,6 +3328,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_progress_line_sep": "，",
   "ui.book_progress_line_done_0_1": "已完成 {0}／{1} 章",
   "ui.book_progress_line_fix_0_1_2": "正在修正第 {0} 章・已完成 {1}／{2} 章",
+  "ui.book_progress_line_check_0_1": "正在检查全书一致性・已完成 {0}／{1} 章",
   "ui.book_panel_rerun_card": "重跑这张",
   "ui.book_panel_rerun_card_0": "重跑图文书这一张：{0}（企划 → 写 → 校）",
   "ui.book_seam_label": "接缝需看",

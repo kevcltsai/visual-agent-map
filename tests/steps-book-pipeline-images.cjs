@@ -427,7 +427,7 @@ test('images: the find-images step keeps up to 3 candidates per slot with the ca
   assert.equal(parsed.offTopic, 2);
   assert.equal(parsed.found, 4);
   assert.equal(findImagesStep.parse('not json').found, 0);
-  assert.equal(findImagesStep.version, 7);
+  assert.equal(findImagesStep.version, 8);
   const prompt = findImagesStep.render({ chapter: 'q', slots: [{ index: 1, kind: 'diagram', explains: 'perspective' }], exclude: Array.from({ length: 40 }, (_, i) => `k${i}${'x'.repeat(200)}`), language: 'en', model: 'm', reasoning: 'low' });
   assert.equal(JSON.parse(/exclude list[^\[]*(\[.*\])/.exec(prompt)[1]).length, 30);
   assert.ok(!/x{121}/.test(prompt));
@@ -994,4 +994,140 @@ test('quality run: two chapters offered the same work as two Commons files place
   while (r.runs.isRunning(r.mapPath)) await tick();
   await settle();
   assert.equal(figures((await r.note(owner)).detail).length, 1, 'its own work is not taken from itself');
+});
+
+// ---- the program's own Commons search for slots still empty, and the picture shortfall verdict ----
+const C = S.load('core/book-pipeline/commons-search.ts');
+/** A Commons API answer (formatversion 2) for files `names` in search order; `over` per file overrides imageinfo fields. */
+const commonsAnswer = (names, over = {}) => JSON.stringify({ query: { pages: names.map((name, i) => ({ index: i + 1, title: `File:${name}`, imageinfo: [{
+  url: `https://upload.wikimedia.org/wikipedia/commons/a/ab/${name}`,
+  thumburl: `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/${name}/1280px-${name}`,
+  mime: 'image/jpeg', thumbmime: 'image/jpeg',
+  descriptionurl: `https://commons.wikimedia.org/wiki/File:${name}`,
+  extmetadata: { Artist: { value: '<a href="//commons.wikimedia.org/wiki/User:Ann">Ann &amp; Bo</a>' }, LicenseShortName: { value: 'CC BY-SA 4.0' } },
+  ...(over[name] ?? {}) }] })) } });
+const queryOf = url => new URL(url).searchParams.get('gsrsearch');
+
+test('commons parse: safe types only (an SVG through its PNG thumbnail), https, the file page as source, plain credits, the subject rule', () => {
+  const slot = { index: 1, explains: '葉背的蚜蟲' };
+  const text = commonsAnswer(['Aphids.jpg', 'Scan.tif', 'Drawing.svg', 'Plain.png', 'Http.jpg'], {
+    'Scan.tif': { mime: 'image/tiff', thumbmime: 'image/tiff' },
+    'Drawing.svg': { mime: 'image/svg+xml', thumbmime: 'image/png', thumburl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Drawing.svg/1280px-Drawing.svg.png' },
+    'Plain.png': { thumburl: undefined, url: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Plain.png', mime: 'image/png', thumbmime: undefined },
+    'Http.jpg': { thumburl: 'http://upload.wikimedia.org/x/Http.jpg' }
+  });
+  const got = C.parseCommonsAnswer(text, slot);
+  assert.deepEqual(plain(got.map(c => c.title)), ['Aphids', 'Drawing', 'Plain']);
+  assert.equal(got[0].source, 'https://commons.wikimedia.org/wiki/File:Aphids.jpg');
+  assert.equal(got[0].author, 'Ann & Bo');
+  assert.equal(got[0].license, 'CC BY-SA 4.0');
+  assert.equal(got[0].caption, '葉背的蚜蟲', 'the slot line is the caption; the program writes none of its own');
+  assert.deepEqual(plain(C.parseCommonsAnswer(text, { ...slot, subject: 'Dorothea Lange' })), [], 'another author is refused for a named person');
+  assert.deepEqual(plain(C.parseCommonsAnswer('not json', slot)), []);
+  assert.deepEqual(plain(C.parseCommonsAnswer('{"batchcomplete":true}', slot)), [], 'no hits');
+});
+
+test('commons search: the finder\'s English words first, the slot line second only when the first gave nothing; at most 2 requests a slot, 3 candidates', async () => {
+  const asked = [];
+  const fetch = async url => { asked.push(url); const q = queryOf(url); return { status: 200, text: q === 'aphids leaf' ? '{}' : commonsAnswer(['A1.jpg', 'A2.jpg', 'A3.jpg', 'A4.jpg']) }; };
+  const ctl = new AbortController();
+  const out = await C.searchCommons([
+    { index: 1, explains: '葉背的蚜蟲', search: 'aphids leaf' },
+    { index: 2, explains: '滴灌', search: 'drip irrigation' },
+    { index: 3, explains: '堆肥' }
+  ], fetch, { signal: ctl.signal, skip: url => /A1\.jpg/.test(url) });
+  assert.deepEqual(asked.map(queryOf), ['aphids leaf', '葉背的蚜蟲', 'drip irrigation', '堆肥']);
+  assert.ok(asked.every(url => url.startsWith(`${C.COMMONS_API}?`) && /gsrnamespace=6/.test(url)), 'files only, the one API address');
+  assert.equal(out.requests, 4);
+  assert.deepEqual(plain(out.bySlot.get(2).map(c => c.title)), ['A2', 'A3', 'A4'], 'skipped addresses are left out; at most 3');
+  assert.deepEqual(plain(C.commonsQueries({ index: 1, explains: 'x "y" | z', search: 'x "y" | z' })), ['x y z'], 'one line, no duplicate query');
+});
+
+test('commons search: a request that fails, answers non-200, never answers or runs past the chapter deadline ends quietly; a Stop asks nothing more', async () => {
+  const ctl = new AbortController();
+  let n = 0;
+  const failing = async () => { n++; if (n === 1) throw new Error('offline'); return { status: 503, text: '' }; };
+  const a = await C.searchCommons([{ index: 1, explains: 'x', search: 'y' }], failing, { signal: ctl.signal, skip: () => false });
+  assert.equal(a.bySlot.size, 0); assert.equal(a.requests, 2);
+  const sync = await C.searchCommons([{ index: 1, explains: 'x' }], () => { throw new Error('sync'); }, { signal: ctl.signal, skip: () => false });
+  assert.equal(sync.bySlot.size, 0, 'a fetch that throws at once is a failed request too');
+  let clock = 0;
+  const b2 = await C.searchCommons([{ index: 1, explains: 'x' }, { index: 2, explains: 'y' }], async () => { clock += C.COMMONS_CHAPTER_MS; return { status: 200, text: '{}' }; }, { signal: ctl.signal, skip: () => false, now: () => clock });
+  assert.equal(b2.requests, 1, 'no new request after the chapter deadline');
+  const stop = new AbortController();
+  const hang = C.searchCommons([{ index: 1, explains: 'x' }, { index: 2, explains: 'y' }], () => new Promise(() => {}), { signal: stop.signal, skip: () => false });
+  stop.abort();
+  const c = await hang;
+  assert.equal(c.requests, 1); assert.equal(c.bySlot.size, 0);
+});
+
+test('find-images: the finder gives English Commons search words per position (also with no image), kept as a hint with the subject', () => {
+  const { findImagesStep } = require('./support-ai-calls.cjs').loadWithAiCalls('core/steps/book-pipeline/find-images.ts');
+  const parsed = findImagesStep.parse(JSON.stringify({ slots: [{ slot: 1, subject: 'Ansel Adams', search: ' Moon and\nHalf Dome ', images: [] }, { slot: 2, search: 'x'.repeat(300) }, { slot: 3, images: [] }] }));
+  assert.deepEqual(plain(parsed.hints.get(1)), { subject: 'Ansel Adams', search: 'Moon and Half Dome' });
+  assert.equal(parsed.hints.get(2).search.length, 80);
+  assert.equal(parsed.hints.has(3), false);
+  const prompt = findImagesStep.render({ chapter: 'q', slots: [{ index: 1, kind: 'diagram', explains: 'p' }], exclude: [], language: 'en', model: 'm', reasoning: 'low' });
+  assert.match(prompt, /"search" is 2 to 5 English words that a Wikimedia Commons file search would match/);
+});
+
+test('find-images: the search budget grows with the slots (about 1.5 a slot, at least 4, at most 18) so each slot can be searched', async () => {
+  const { runFindImages, findImagesSearchBudget } = require('./support-ai-calls.cjs').loadWithAiCalls('core/steps/book-pipeline/find-images.ts');
+  assert.deepEqual([0, 1, 2, 3, 6, 8, 9, 12, 40].map(findImagesSearchBudget), [4, 4, 4, 5, 9, 12, 14, 18, 18]);
+  const budgets = [];
+  const aiCalls = { run: async (prepared, options, parse) => { budgets.push(options.task.searchBudget); return parse('{"slots":[]}'); } };
+  const slots = Array.from({ length: 9 }, (_, i) => ({ index: i + 1, kind: 'diagram', explains: `p${i}` }));
+  await runFindImages(aiCalls, { chapter: 'q', slots, exclude: [], language: 'en', model: 'm', reasoning: 'low' }, { signal: new AbortController().signal });
+  await runFindImages(aiCalls, { chapter: 'q', slots: slots.slice(0, 2), exclude: [], language: 'en', model: 'm', reasoning: 'low' }, { signal: new AbortController().signal });
+  assert.deepEqual(budgets, [14, 4]);
+});
+
+test('repro v2: slots the finder left empty are filled from Commons (finder words first), probed and credited like any picture; no model call is added', async () => {
+  const asked = [];
+  const r = await picRig({
+    finder: (req, run, n) => n === 1 ? { ...found({ 1: [cand(1)], 2: [] }), hints: new Map([[2, { search: 'drip irrigation' }]]) } : found({}),
+    ports: { fetchCommons: async url => { asked.push(queryOf(url)); return { status: 200, text: commonsAnswer(['Drip_irrigation.jpg']) }; } }
+  });
+  await run(r);
+  assert.equal(r.calls.length, 2, 'the two finder calls only');
+  assert.equal(asked[0], 'drip irrigation');
+  const detail = (await r.note(0)).detail;
+  assert.equal(figures(detail).length, 2);
+  assert.match(detail, /!\[Drip irrigation\]\(https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/thumb\/a\/ab\/Drip_irrigation\.jpg\/1280px-Drip_irrigation\.jpg\)\nexplains 2 perspective\n來源：commons\.wikimedia\.org · 作者 Ann & Bo · CC BY-SA 4\.0（\[連結\]\(https:\/\/commons\.wikimedia\.org\/wiki\/File:Drip_irrigation\.jpg\)）/);
+  assert.ok(r.stat.probes.some(u => /Drip_irrigation/.test(u)), 'probed like the finder\'s candidates');
+  assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state])), [[1, 'placed'], [2, 'placed']]);
+  assert.match(r.stat.logs.join('\n'), /slots .* commons=1/);
+});
+
+test('commons fallback: a picture another chapter shows is not taken again; a failing Commons leaves the slot not_found and the chapter as before', async () => {
+  const r = await picRig({ finder: () => found({ 1: [cand(1)], 2: [] }), ports: { fetchCommons: async () => { throw new Error('offline'); } } });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state, s.reasonCode ?? ''])), [[1, 'placed', ''], [2, 'missing', 'not_found']]);
+  assert.equal(stageOf(r.raw(0)), 'checked', 'no picture setting: a missing picture stays a notice');
+  const twice = await picRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: () => found({}), ports: { fetchCommons: async () => ({ status: 200, text: commonsAnswer(['Same.jpg']) }) } });
+  await run(twice);
+  const all = [...figures((await twice.note(0)).detail), ...figures((await twice.note(1)).detail)].filter(f => /Same\.jpg/.test(f));
+  assert.equal(all.length, 1, 'one Commons file is placed once in the book');
+});
+
+test('shortfall: under the owner\'s minimum the chapter ends needs-review with a plain reason, counts for review and gets no rewrite; enough pictures stay checked', async () => {
+  const r = await picRig({ finder: () => found({ 1: [cand(1)] }) });
+  await r.repo.writeBookSettings(r.nodes[0].path, { style: '每章圖片 2 張' });
+  await run(r);
+  assert.equal(stageOf(r.raw(0)), 'needs-review');
+  const issue = (await r.note(0)).pipelineIssue;
+  assert.match(issue, /^images unmet: images:under:1:2 image_2( image_1_mismatch)?$/);
+  assert.equal(r.stat.author.filter(id => id === r.nodes[0].id).length, 1, 'no automatic rewrite for too few pictures');
+  const review = S.load('experiences/visual-map/book-pipeline-review.ts');
+  assert.equal(review.reasonOf(issue, undefined), 'Too few pictures: 1 placed, the setting asks for at least 2', 'test locale is en');
+  const both = review.reasonOf('proof unmet: facts_unverified images:under:0:6', undefined);
+  assert.ok(both.startsWith(review.reasonOf('proof unmet: facts_unverified', undefined)) && both.endsWith('Too few pictures: 0 placed, the setting asks for at least 6'), both);
+  const ui = S.load('experiences/visual-map/book-pipeline-ui.ts');
+  assert.match(ui.bookIssueText('length unmet: length:under:10:100-200:字:v1 images:under:1:6 image_2'), /^\S.*\S\s+Too few pictures: 1 placed, the setting asks for at least 6$/);
+  const ok = await picRig({ finder: () => found({ 1: [cand(1)], 2: [cand(2)] }) });
+  await ok.repo.writeBookSettings(ok.nodes[0].path, { style: '每章圖片 2 張' });
+  await run(ok);
+  assert.equal(stageOf(ok.raw(0)), 'checked');
+  assert.ok(!/images:under|images unmet/.test((await ok.note(0)).pipelineIssue ?? ''), 'no shortfall (picture notices may remain)');
 });

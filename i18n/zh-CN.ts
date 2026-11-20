@@ -3199,6 +3199,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_reason_length_over_0_1_2_3": "这章有 {0} {1}，比你设定的 {2}–{3} {1} 长",
   "ui.book_reason_inconsistent_0_1_2": "和〈{0}〉说法不一致：这章写“{1}”，〈{0}〉写“{2}”",
   "ui.book_reason_length_under_0_1_2_3": "这章只有 {0} {1}，比你设定的 {2}–{3} {1} 短",
+  "ui.book_reason_images_under_0_1": "图片不足：放了 {0} 张，设置至少 {1} 张",
   "ui.book_length_unit_chars": "字",
   "ui.book_length_unit_words": "个英文词",
   "ui.book_structure_unmet_0": "结构 {0} 项未达成",

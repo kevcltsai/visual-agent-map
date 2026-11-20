@@ -83,7 +83,7 @@ import {
   type PresentationAction,
   type PresentationState
 } from "./presentation-mode";
-import { alignSiblingsToScreen, bySiblingAxis, readingOrder } from "./presentation-order";
+import { alignSiblingsToScreen, bookReadingOrder, bySiblingAxis, readingOrder } from "./presentation-order";
 import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
 import { MergeDrafts, type ChatReplyStep, type MergeTask } from "./merge-drafts";
 import {
@@ -360,8 +360,11 @@ import {
   proofIsStale,
   readReviewState,
   reviewEntries,
+  reviewProblems,
   runTrackedRerun,
-  type Gate2Card
+  type Gate2Card,
+  type ReviewProblem,
+  type ReviewState
 } from "./book-pipeline-review";
 import {
   INTEGRATION_DEPTHS,
@@ -17366,8 +17369,8 @@ export class VisualAgentMapView extends ItemView {
       read.data,
       this.plugin.getBookPipelineProgress(path),
       id => readPipelineStage(this.notes.get(id)?.pipelineStage),
-      // A run paused for a map change counts the map as it is now (a card removed after the pause counts at once).
-      map.nodes.map(node => node.id)
+      // A run paused for a map change, a gate or a finished book counts the map as it is now, the way the runner reads it.
+      bookReadingOrder(map)
     );
     // The map-changed choice takes the keyboard once when it appears (the same way the inline asks do).
     if (state.mode !== "changed") this.bookMapFocusedRun = null;
@@ -17379,7 +17382,11 @@ export class VisualAgentMapView extends ItemView {
     if (state.mode !== "gate1") this.bookGate1Ask = null;
     if (state.mode !== "gate2") this.bookFinishAsking = null;
     const gate2Attention = state.mode === "gate2" ? this.bookReviewCards(read.data) : [];
-    if (state.mode === "gate2") state.review = { total: state.total, attention: gate2Attention.length };
+    if (state.mode === "gate2") {
+      // Chapters that only wait for a join to be confirmed are told apart (a rewrite marks its neighbours; that is not a new problem).
+      const seam = gate2Attention.filter(card => reviewProblems(card).every(problem => problem.kind === "seam")).length;
+      state.review = { total: state.total, attention: gate2Attention.length, ...(seam ? { seam } : {}) };
+    }
     if (state.mode === "gate1" && state.trialCount) {
       const trial = new Set(this.effectiveTrial(read.data));
       const n = this.bookReviewCards(read.data).filter(card => trial.has(card.id)).length;
@@ -17564,16 +17571,21 @@ export class VisualAgentMapView extends ItemView {
       // Unticked: the box asks its question again (it was titled "handled" or folded when it was ticked).
       if (entry && state && state.fp === entry.fp && (state.collapsed || state.handled))
         await this.plugin.bookCallouts.reopen(node.path);
+      // Answered for an attention the chapter no longer has (a kept text edited since, say): the box is written again and asks.
+      else if (entry && state && state.fp !== entry.fp && (state.collapsed || state.handled))
+        await this.plugin.bookCallouts.reconcile(mapPath, this.bookMayCarryCallouts);
     } else if (state && !state.collapsed && !this.bookFoldDue.delete(id)) {
       // Just ticked: the count drops now, the box says "handled" and folds three seconds later (mockup ⑦-3), in either view mode.
       this.bookResolved.set(id, entry.fp);
-      if (state.op) await this.plugin.bookHandEdits.keep(node.path);
+      // "Keep my version" is recorded once, at the tick (the box still asks its question): a later save of the note never moves the kept
+      // record to the new text.
+      if (state.accept && !state.handled) await this.keepBookAnswer(node.path, state, entry.problems);
       await this.plugin.bookCallouts.markHandled(node.path);
       this.scheduleBookFold(id);
     } else {
       this.bookResolved.set(id, entry.fp);
-      // "Keep my version": the chapter text as it is now is recorded as kept, so a later run leaves it alone.
-      if (state?.op) await this.plugin.bookHandEdits.keep(node.path);
+      // "Keep my version" ticked while no view was there to see it (the box still asks its question): recorded now, once.
+      if (state?.accept && !state.handled) await this.keepBookAnswer(node.path, state, entry.problems);
       if (state && !state.collapsed) await this.plugin.bookCallouts.collapse(node.path);
       if (entry.problems.every(problem => problem.kind === "seam")) {
         await this.plugin.confirmBookSeam(mapPath, id).catch(() => undefined);
@@ -17582,6 +17594,15 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     if (!this.closed && this.map === map) this.render();
+  }
+  /**
+   * The first answer of a box: "keep my version" records the text as kept; "accept as it is" (Primary decision, principle C3: the
+   * reader's answer stands) records the program's own text the same way, so a whole-book rerun no longer rewrites it. A box that only
+   * asks about a join is a join to confirm, not a text to keep.
+   */
+  private async keepBookAnswer(path: string, state: ReviewState, problems: readonly ReviewProblem[]): Promise<void> {
+    if (state.op) await this.plugin.bookHandEdits.keep(path);
+    else if (!problems.every(problem => problem.kind === "seam")) await this.plugin.bookHandEdits.keep(path, true);
   }
   /** How long a ticked review box stays open under its "handled" title before it folds (mockup ⑦-3; tests shorten it). */
   private bookFoldDelayMs = 3000;

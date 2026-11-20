@@ -245,6 +245,23 @@ export function retargetNeighbourLine(
   return rewriteNeighbourLine(prompt, key, rest === undefined ? neighbour : { ...neighbour, summary: rest });
 }
 
+/**
+ * The card plan's `接入點` line taken out when it names one of `titles` (chapters removed from the book): it describes a join that is no
+ * longer there. `undefined` when there is no such line or it names none of them. A title shorter than two characters is not looked for.
+ */
+export function dropEntryNaming(prompt: string, titles: readonly string[]): string | undefined {
+  const lines = prompt.split("\n");
+  const at = lines.findIndex(line => {
+    const m = /^([^:：]+)[:：]/.exec(line);
+    return !!m && matches(L.entry, m[1].trim());
+  });
+  if (at < 0) return undefined;
+  const value = lines[at].replace(/^[^:：]+[:：]/, "");
+  if (!titles.some(title => Array.from(title.trim()).length >= 2 && value.includes(title.trim()))) return undefined;
+  lines.splice(at, 1);
+  return lines.join("\n");
+}
+
 export function parseRoleWord(word: string): BookRole | undefined {
   return BOOK_ROLES.find(role => matches(ROLE_WORDS[role], word.trim()) || word.trim().toLowerCase() === role);
 }

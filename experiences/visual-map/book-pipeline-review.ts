@@ -249,11 +249,15 @@ export function gate2Cards(input: {
     const proof = checked || view.stage === "needs-review" ? latestStoredProof(note?.detail ?? "") : undefined;
     const structure = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue.trim());
     const role = typeof note?.bookRole === "string" ? note.bookRole : undefined;
-    const handEdited = view.stage === "needs-review" && /^write failed: hand_edited$/.test(issue.trim());
-    // Only a `[!vam-book]` callout (or the program's fingerprint) shows the program wrote this text; anything else came before the book.
-    const beforeBook = handEdited && !readBodyRecord(note?.detail ?? "")?.fp && !hasHiddenCallout(note?.detail ?? "");
     // "Keep my version" for this very text: the reader's answer stands, the proof's findings about it are not asked again.
     const kept = isKept(note?.detail ?? "");
+    const record = readBodyRecord(note?.detail ?? "");
+    // A kept text edited since: the keep no longer holds, the chapter asks the hand-edit question again (whatever its stage says now).
+    const keptVoided = !kept && !!record?.kept;
+    const handEdited =
+      keptVoided || (view.stage === "needs-review" && /^write failed: hand_edited$/.test(issue.trim()));
+    // Only a `[!vam-book]` callout (or the program's fingerprint) shows the program wrote this text; anything else came before the book.
+    const beforeBook = handEdited && !record?.fp && !hasHiddenCallout(note?.detail ?? "");
     const stale =
       !kept &&
       !!input.proofContext &&
@@ -264,7 +268,7 @@ export function gate2Cards(input: {
         input.proofContext.runId,
         input.proofContext.revisionOf(id)
       );
-    const inconsistencies = (input.inconsistencies?.(id) ?? []).map(item => ({
+    const inconsistencies = (kept ? [] : (input.inconsistencies?.(id) ?? [])).map(item => ({
       ...item,
       otherTitle: input.titleOf(item.other)
     }));

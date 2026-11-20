@@ -3376,6 +3376,7 @@ export const en = {
   "ui.book_resume": "Continue from where it stopped",
   "ui.book_restart": "Change settings and start over",
   "ui.book_map_changed_0_1": "The map changed: {0} chapters added, {1} removed",
+  "ui.book_map_reordered": "The map changed: the chapters are in a different order",
   "ui.book_map_replan": "Plan again",
   "ui.book_map_keep": "Carry on as before (without the new cards)",
   "ui.book_refused_empty":
@@ -3404,6 +3405,7 @@ export const en = {
   "ui.book_bar_notes_ask_0": "{0} notes are not applied yet. Run the whole book anyway?",
   "ui.book_bar_go_anyway": "Run anyway",
   "ui.book_bar_review_0_1": "{0} chapters written, {1} need a look",
+  "ui.book_bar_review_seam_0_1_2": "{0} chapters written, {1} need a look, {2} joins to confirm",
   "ui.book_bar_next_review": "Next chapter to check",
   "ui.book_bar_finish": "Finish review",
   "ui.book_bar_finish_ask_0": "{0} chapters are not handled yet. Finish anyway?",

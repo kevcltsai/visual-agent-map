@@ -235,6 +235,33 @@ test('bar: waiting at gate 1 or gate 2, or a finished book, shows the map-change
   assert.equal(one(bar, 'vam-book-map-replan'), undefined, 'done: no replan button');
 });
 
+test('bar: a finished book reminds of every map change on one line, also while the runner is busy (a card rerun); a reorder reads without counts', () => {
+  setUiLanguage('zh-TW');
+  const base = { v: 1, runId: 'r', phase: 'done', order: ['a', 'b', 'c'], accepted: ['a', 'b', 'c'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x' };
+  const live = { runId: 'r', phase: 'done', status: 'stopped', active: true, total: 3, counts: { pending: 0, planned: 0, written: 0, checked: 3, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [] };
+  for (const [status, progress] of [['running', undefined], ['running', live]]) {
+    const line = mapIds => {
+      const bar = dom.element('div');
+      bundle.renderBookBar(bar, bundle.bookBarState({ ...base, status }, progress, () => undefined, mapIds), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {} });
+      return one(bar, 'vam-book-map-changed')?.text;
+    };
+    const tag = status + (progress ? ' + active runner' : '');
+    assert.equal(line(['a', 'b', 'c']), undefined, tag + ': same map, no line');
+    assert.equal(line(['a', 'c']), '心智圖變了：多 0 章、少 1 章', tag + ': removed to unassigned');
+    assert.equal(line(['a', 'm']), '心智圖變了：多 1 章、少 2 章', tag + ': two cards merged into a new one');
+    assert.equal(line(['a', 'c', 'b']), '心智圖變了：章節順序不同', tag + ': a topic moved, nothing added or removed');
+    assert.equal(line(['root', 'a', 'b', 'c']), '心智圖變了：多 1 章、少 0 章', tag + ': a card added');
+  }
+  // Not at a gate: a reorder alone is not reported there (the gates keep their counts line).
+  const gate2 = bundle.bookBarState({ ...base, phase: 'gate2', status: 'running' }, undefined, () => undefined, ['a', 'c', 'b']);
+  assert.equal(gate2.mapChange, undefined);
+  setUiLanguage('en');
+  const bar = dom.element('div');
+  bundle.renderBookBar(bar, bundle.bookBarState({ ...base, status: 'running' }, undefined, () => undefined, ['c', 'b', 'a']), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {} });
+  assert.equal(one(bar, 'vam-book-map-changed').text, 'The map changed: the chapters are in a different order');
+  setUiLanguage('zh-TW');
+});
+
 test('finish at gate 2: a card added or removed pauses as map changed (no silent finish); keep removes it and the next finish completes', async () => {
   for (const kind of ['removed', 'added']) {
     const r = await rig();

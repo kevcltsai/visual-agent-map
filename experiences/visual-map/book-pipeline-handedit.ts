@@ -48,14 +48,24 @@ export class BookHandEdits {
 
   /**
    * "Keep my version" was ticked: the chapter text as it is now is recorded as kept, and the chapter is done (`checked`, no issue):
-   * the kept text is the reader's answer, not a failed write. A later edit voids the kept record and the box asks again.
+   * the kept text is the reader's answer, not a failed write. A later edit voids the kept record and the box asks again. `accept`:
+   * "accept as it is" on a chapter the program wrote: the same record for the program's own text, so a whole-book rerun leaves it
+   * alone (the card's own rerun still rewrites it).
    */
-  async keep(path: string): Promise<void> {
+  async keep(path: string, accept = false): Promise<void> {
     if (this.disposed) return;
     try {
-      await this.ports.write(path, keepRaw);
-      const card = await this.ports.readCard(path);
-      if (this.disposed || !isKeptRaw(card.raw)) return;
+      // Judged on the text the write itself saw: with the note open in an editor the file on disk is saved later, so reading it back
+      // right away may still show the text before the keep (the chapter then stayed needs-review).
+      let kept = false;
+      const result = await this.ports.write(path, text => {
+        // "Accept as it is" on a chapter the program wrote holds only for the program's own text (a failed or empty chapter is not kept).
+        if (accept && bodyStateRaw(text) !== "clean") return text;
+        const next = keepRaw(text);
+        kept = isKeptRaw(next);
+        return next;
+      });
+      if (this.disposed || !kept || result === "refused") return;
       await this.ports.writeFields(path, { pipelineStage: "checked", pipelineIssue: null });
     } catch {
       // the box stays as it is; the reader can tick again

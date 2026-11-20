@@ -3428,6 +3428,7 @@ export const en = {
   "ui.book_reason_length_over_0_1_2_3": "The chapter is {0} {1}, longer than the {2}–{3} {1} you asked for",
   "ui.book_reason_inconsistent_0_1_2":
     "Says something differently from 〈{0}〉: this chapter says “{1}”, 〈{0}〉 says “{2}”",
+  "ui.book_reason_removed_ref_0_1": "This chapter still mentions the removed 〈{0}〉: “{1}”",
   "ui.book_reason_length_under_0_1_2_3": "The chapter is {0} {1}, shorter than the {2}–{3} {1} you asked for",
   "ui.book_reason_images_under_0_1": "Too few pictures: {0} placed, the setting asks for at least {1}",
   "ui.book_length_unit_chars": "characters",
@@ -3546,6 +3547,8 @@ export const en = {
   "ui.book_note_undo_partial_0_1":
     "Restored {0} paragraph(s); {1} were edited after the rewrite and were not restored.",
   "ui.book_review_hand_edited": "This chapter has your own edits; this rerun did not rewrite it",
+  "ui.book_review_hand_before_book":
+    "This card had its own text before it joined the book; this rerun did not rewrite it",
   "ui.book_note_review_keep": "Keep my version",
   "ui.book_note_review_rewrite": "Rewrite this chapter with AI (overwrites your edits; backed up first)",
   "ui.book_plain_write_hand_edited": "The chapter has your own edits, so it was left as it is.",

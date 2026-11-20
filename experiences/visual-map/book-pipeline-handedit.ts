@@ -1,6 +1,6 @@
-import { bodyStateRaw, integrityFpRaw, keepRaw } from "../../core/book-pipeline/body-integrity";
+import { bodyStateRaw, integrityFpRaw, isKeptRaw, keepRaw } from "../../core/book-pipeline/body-integrity";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
-import { effectiveOrder, readBookPipeline } from "../../core/book-pipeline/model";
+import { effectiveOrder, readBookPipeline, type PipelineFieldsPatch } from "../../core/book-pipeline/model";
 import { t } from "../../i18n";
 import type { MapDocument } from "../../map-model";
 import type { NoteWriteResult } from "./book-pipeline-callouts";
@@ -19,6 +19,8 @@ export interface HandEditPorts {
   readCard(path: string): Promise<PipelineCard>;
   /** The callouts writer ({@link createNoteWriter}). */
   write(path: string, transform: (text: string) => string): Promise<NoteWriteResult>;
+  /** The card's pipeline frontmatter (repository `writePipelineFields`). */
+  writeFields(path: string, patch: PipelineFieldsPatch): Promise<void>;
   rerunCard(
     mapPath: string,
     nodeId: string,
@@ -44,10 +46,20 @@ export class BookHandEdits {
     this.disposed = true;
   }
 
-  /** "Keep my version" was ticked: the chapter text as it is now is recorded as kept. */
+  /**
+   * "Keep my version" was ticked: the chapter text as it is now is recorded as kept, and the chapter is done (`checked`, no issue):
+   * the kept text is the reader's answer, not a failed write. A later edit voids the kept record and the box asks again.
+   */
   async keep(path: string): Promise<void> {
     if (this.disposed) return;
-    await this.ports.write(path, keepRaw).catch(() => undefined);
+    try {
+      await this.ports.write(path, keepRaw);
+      const card = await this.ports.readCard(path);
+      if (this.disposed || !isKeptRaw(card.raw)) return;
+      await this.ports.writeFields(path, { pipelineStage: "checked", pipelineIssue: null });
+    } catch {
+      // the box stays as it is; the reader can tick again
+    }
   }
 
   /** A save of a chapter note: when its rewrite box is ticked, carry the rewrite out (or queue it). */

@@ -52,6 +52,8 @@ export function compactChapters(
 
 /** One finding as one chapter sees it: the other chapter, what this one says, what the other says, the suggested fix (may be empty). */
 export interface ChapterInconsistency {
+  /** `removed`: this chapter still names a removed chapter (`theirs` is its title, `own` the sentence that names it). */
+  kind?: "removed";
   other: string;
   own: string;
   theirs: string;
@@ -67,9 +69,56 @@ export function chapterInconsistencies(data: BookPipelineData, nodeId: string): 
   if (check.revisions[nodeId] === undefined || check.revisions[nodeId] !== revisionOf(data, nodeId)) return [];
   return check.findings.flatMap((finding: ConsistencyFinding): ChapterInconsistency[] =>
     finding.a === nodeId
-      ? [{ other: finding.b, own: finding.claimA, theirs: finding.claimB, suggestion: finding.suggestion }]
+      ? [
+          {
+            ...(finding.kind ? { kind: finding.kind } : {}),
+            other: finding.b,
+            own: finding.claimA,
+            theirs: finding.claimB,
+            suggestion: finding.suggestion
+          }
+        ]
+      : finding.kind
+        ? []
       : finding.b === nodeId
         ? [{ other: finding.a, own: finding.claimB, theirs: finding.claimA, suggestion: finding.suggestion }]
         : []
   );
+}
+
+/** The longest sentence a removed-chapter finding quotes (characters). */
+const REMOVED_QUOTE_MAX = 80;
+/**
+ * The program's own check beside the model's: a chapter text that still names a removed chapter by its title (a literal match). A title
+ * shorter than two characters, or one a present chapter also has, is not looked for. One finding per chapter and removed title; the
+ * quoted sentence is the first one that names it.
+ */
+export function removedChapterRefs(
+  data: Pick<BookPipelineData, "order" | "removed" | "chapters">,
+  chapters: readonly { id: string; title: string; text: string }[]
+): ConsistencyFinding[] {
+  const present = new Set(
+    [
+      ...chapters.map(chapter => chapter.title),
+      ...effectiveOrder(data).map(id => data.chapters?.[id]?.title ?? "")
+    ].map(title => title.trim())
+  );
+  const out: ConsistencyFinding[] = [];
+  for (const id of data.removed ?? []) {
+    const title = data.chapters?.[id]?.title?.trim() ?? "";
+    if (Array.from(title).length < 2 || present.has(title)) continue;
+    for (const chapter of chapters) {
+      if (!chapter.text.includes(title)) continue;
+      const sentence = chapter.text.split(SENTENCE).find(part => part.includes(title))?.trim() ?? title;
+      out.push({
+        kind: "removed",
+        a: chapter.id,
+        b: id,
+        claimA: Array.from(sentence).slice(0, REMOVED_QUOTE_MAX).join(""),
+        claimB: title,
+        suggestion: ""
+      });
+    }
+  }
+  return out;
 }

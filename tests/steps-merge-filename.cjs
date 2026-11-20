@@ -80,3 +80,47 @@ test('merge into a parent: a new name changes only the title; the parent keeps i
   assert.equal(node.path, `${NOTES}/Users.md`);
   assert.equal((await h.repo.readNote(node.path)).title, 'Customers');
 });
+
+// Book reverify 3: in a picture-book map the commit parks the sources, and Obsidian rewrites the links to them inside the merged
+// text; the program's fingerprint is taken from the text as committed, so the merged chapter is not "hand-edited" afterwards.
+async function bookHarness(titles) {
+  const h = await harness(titles);
+  const { newBookPipeline } = S.load('core/book-pipeline/machine.ts');
+  h.view.map.bookPipeline = newBookPipeline({ runId: 'r1', order: h.nodes.map(n => n.id), now: 'a' });
+  await h.repo.saveMap(MAP, h.view.map);
+  // Like Obsidian's FileManager.renameFile: the links to a moved note follow it.
+  const rename = h.app.fileManager.renameFile;
+  h.app.fileManager.renameFile = async (item, target) => {
+    const base = item.basename;
+    await rename(item, target);
+    for (const [path, text] of h.contents) if (typeof text === 'string' && text.includes(`[[${base}]]`)) h.contents.set(path, text.split(`[[${base}]]`).join(`[[${target.replace(/\.md$/, '')}]]`));
+  };
+  return h;
+}
+const { bodyStateRaw } = S.load('core/book-pipeline/body-integrity.ts');
+
+test('book map, merge into a parent: links rewritten at commit leave the merged chapter clean, and undo still works', async () => {
+  const h = await bookHarness(['Users', 'Kid1', 'Kid2']);
+  const [parent, k1, k2] = h.nodes;
+  k1.parentId = parent.id; k2.parentId = parent.id;
+  await h.repo.updateNote(k1.path, { detail: 'Kid1 text, see [[Kid2]] for more.' });
+  await h.repo.saveMap(MAP, h.view.map);
+  await h.view.hydrate();
+  await h.view.mergeSelected('Users', snapshot(h, [parent, k1, k2], parent.id));
+  const text = h.contents.get(`${NOTES}/Users.md`);
+  assert.match(text, /\[\[[^\]]*Unassigned\/Kid2\]\]/, 'the link was rewritten by the commit');
+  assert.equal(bodyStateRaw(text), 'clean');
+  await h.view.history.undoEntry.undo();
+  assert.ok(h.files.has(`${NOTES}/Kid1.md`) && h.files.has(`${NOTES}/Kid2.md`), 'undo brought the children back');
+});
+
+test('book map, same-level merge: links rewritten at commit leave the new chapter clean', async () => {
+  const h = await bookHarness(['Budget', 'Pricing']);
+  await h.repo.updateNote(h.nodes[0].path, { detail: 'Budget text, see [[Pricing]].' });
+  await h.view.hydrate();
+  await h.view.mergeSelected('Budget', snapshot(h, h.nodes));
+  const merged = h.view.map.nodes.find(n => !h.nodes.some(s => s.id === n.id));
+  const text = h.contents.get(merged.path);
+  assert.match(text, /\[\[[^\]]*Unassigned\/Pricing\]\]/, 'the link was rewritten by the commit');
+  assert.equal(bodyStateRaw(text), 'clean');
+});

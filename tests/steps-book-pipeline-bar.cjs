@@ -210,9 +210,9 @@ test('bar: a run paused for a map change counts the map as it is now (a card rem
   assert.equal(text(undefined), '心智圖變了：多 1 章、少 0 章', 'no map at hand: the runner\'s numbers');
 });
 
-test('bar: waiting at gate 1 or gate 2 shows the map-change line with live counts, and nothing when the map matches', () => {
+test('bar: waiting at gate 1 or gate 2, or a finished book, shows the map-change line with live counts, and nothing when the map matches', () => {
   setUiLanguage('zh-TW');
-  for (const phase of ['gate1', 'gate2']) {
+  for (const phase of ['gate1', 'gate2', 'done']) {
     const data = { v: 1, runId: 'r', phase, status: 'running', order: ['a', 'b', 'c'], accepted: ['a', 'b', 'c'], trial: ['a'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x' };
     const line = mapIds => {
       const state = bundle.bookBarState(data, undefined, () => undefined, mapIds);
@@ -227,6 +227,12 @@ test('bar: waiting at gate 1 or gate 2 shows the map-change line with live count
     assert.equal(line(['a', 'b', 'c', 'n']), '心智圖變了：多 1 章、少 0 章', phase + ': a card added');
     assert.equal(line(['a', 'c', 'n', 'm']), '心智圖變了：多 2 章、少 1 章', phase + ': both');
   }
+  // A finished book: the line only, never the replan/keep buttons (nothing is planned again on its own).
+  const done = bundle.bookBarState({ v: 1, runId: 'r', phase: 'done', status: 'running', order: ['a', 'b'], accepted: ['a', 'b'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x' }, undefined, () => undefined, ['a', 'b', 'n']);
+  const bar = dom.element('div');
+  bundle.renderBookBar(bar, done, { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, mapChanged: { replan() {}, keep() {} } });
+  assert.equal(one(bar, 'vam-book-map-changed')?.text, '心智圖變了：多 1 章、少 0 章');
+  assert.equal(one(bar, 'vam-book-map-replan'), undefined, 'done: no replan button');
 });
 
 test('finish at gate 2: a card added or removed pauses as map changed (no silent finish); keep removes it and the next finish completes', async () => {

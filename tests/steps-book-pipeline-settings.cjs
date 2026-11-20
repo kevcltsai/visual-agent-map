@@ -153,8 +153,8 @@ test('lengthReason: above max x 1.2 is over, below min x 0.8 is under, the edges
   const over = ask(241); const under = ask(79);
   assert.deepEqual({ ...over }, { min: 100, max: 200, unit: '字', kind: 'over', measured: 241, version: L.LENGTH_RULE_VERSION });
   assert.equal(under.kind, 'under');
-  assert.equal(L.lengthToken(over), 'length:over:241:100-200:字:v1');
-  assert.deepEqual({ ...L.splitLengthIssue('proof unmet: C1 length:over:241:100-200:字:v1').length }, { ...over });
+  assert.equal(L.lengthToken(over), 'length:over:241:100-200:字:v2', 'rule v2: one prose-only measure, strict both ways after the fix round');
+  assert.deepEqual({ ...L.splitLengthIssue('proof unmet: C1 length:over:241:100-200:字:v2').length }, { ...over });
   assert.equal(L.splitLengthIssue('proof unmet: C1 length:over:241:100-200:字:v1').rest, 'proof unmet: C1');
   assert.equal(L.splitLengthIssue('length unmet: length:under:79:100-200:字:v1').rest, '');
   assert.equal(L.splitLengthIssue('proof unmet: C1').length, undefined);

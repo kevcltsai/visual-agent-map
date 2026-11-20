@@ -456,12 +456,14 @@ test('bookExpandRequirements: the chapter goes in as data, the amount is the tar
   assert.match(closing, /This chapter's role: closing\. Deepen its own covers only/);
 });
 
-test('lengthReason: the first verdict keeps the 0.8x tolerance; after the fix round (strict) a chapter below the minimum is under', () => {
+test('lengthReason: the first verdict keeps the 0.8x / 1.2x tolerance; after the fix round (strict) a chapter below the minimum is under and one above the maximum is over', () => {
   const { lengthReason } = load('core/book-pipeline/settings.ts');
   const body = '好'.repeat(90);
   assert.equal(lengthReason('100-200 字', body), undefined, '90 of 100 is within the tolerance');
   assert.equal(lengthReason('100-200 字', body, undefined, true)?.kind, 'under');
   assert.equal(lengthReason('100-200 字', body, undefined, true)?.measured, 90);
   assert.equal(lengthReason('100-200 字', '好'.repeat(100), undefined, true), undefined, 'the minimum itself is enough');
-  assert.equal(lengthReason('100-200 字', '好'.repeat(230), undefined, true), undefined, 'strict is about the minimum only; the 1.2x top stays');
+  assert.equal(lengthReason('100-200 字', '好'.repeat(230)), undefined, 'first verdict: 230 of 200 is within the 1.2x tolerance');
+  assert.equal(lengthReason('100-200 字', '好'.repeat(230), undefined, true)?.kind, 'over', 'strict holds the maximum itself too (owner decision, book reverify 3)');
+  assert.equal(lengthReason('100-200 字', '好'.repeat(200), undefined, true), undefined, 'the maximum itself is allowed');
 });

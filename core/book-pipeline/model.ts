@@ -188,6 +188,8 @@ export interface BookPipelineData {
 
 /** Two chapters (card ids) that state the same fact differently: what each says (model text, one line) and a suggested fix. */
 export interface ConsistencyFinding {
+  /** Absent: two chapters disagree (the model's finding). `removed`: chapter `a` still names the removed chapter `b` (title in `claimB`, found by the program). */
+  kind?: "removed";
   a: string;
   b: string;
   claimA: string;
@@ -227,6 +229,7 @@ function consistencyShape(value: unknown): boolean {
       value.findings.every(
         item =>
           isObject(item) &&
+          (item.kind === undefined || item.kind === "removed") &&
           isText(item.a) &&
           isText(item.b) &&
           isText(item.claimA) &&

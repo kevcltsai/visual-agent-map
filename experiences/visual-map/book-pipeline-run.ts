@@ -12,7 +12,7 @@
 import type { AdmissionContext } from "../../core/admission";
 import type { FindImagesRequest, FoundImages } from "../../core/steps/book-pipeline/find-images";
 import type { ConsistencyRequest, RawInconsistency } from "../../core/steps/book-pipeline/consistency";
-import { chapterInconsistencies, compactChapters } from "../../core/book-pipeline/consistency";
+import { chapterInconsistencies, compactChapters, removedChapterRefs } from "../../core/book-pipeline/consistency";
 import { isBudgetExhausted } from "../../core/admission";
 import { createBudgetAdmission, createStoreBudgetPort } from "../../core/book-pipeline/budget";
 import { imageKey } from "../../core/book-pipeline/image-dedupe";
@@ -131,6 +131,7 @@ import {
   effectiveSettings,
   imageCountRange,
   lengthReason,
+  lengthBody,
   lengthToken,
   type LengthIgnored,
   type LengthReason
@@ -190,6 +191,7 @@ import {
   isKept,
   isKeptRaw,
   isUntouched,
+  pipelineWroteRaw,
   programStamp,
   programStampRaw,
   stampRaw
@@ -492,6 +494,11 @@ interface Drive {
   plans: Map<string, CardPlanResult>;
   /** Chapters this drive's plan step left alone (hand-edited, unknown or kept): their previous/next lines are refreshed by the program. */
   planSkipped: Set<string>;
+  /**
+   * Chapters whose Summary is the reader's own (a kept chapter, or text the pipeline never wrote): decided at the first plan step of this
+   * drive, before anything of the program is in the note. Their plan and write leave the Summary as it is.
+   */
+  ownSummary: Set<string>;
   /** The skipped chapters' neighbour lines were refreshed once for this order (cleared when the map changes). */
   skippedRefreshed?: boolean;
   /** The model id each card's author step was dispatched with in this drive (the proof result section shows it). */
@@ -1697,6 +1704,7 @@ export class BookPipelineRuns {
       overwrite: new Map(),
       plans: new Map(),
       planSkipped: new Set(),
+      ownSummary: new Set(),
       authorModels: new Map(),
       started: new Map(),
       durations: { plan: [], write: [] },
@@ -2173,7 +2181,8 @@ export class BookPipelineRuns {
         const text = card ? projectProofBody(stripImageLines(chapterBody(card.detail))).trim() : "";
         if (text) chapters.push({ id, title: card?.title ?? info.title, text });
       }
-      // Fewer than two chapters with text: nothing to compare, no call.
+      // Fewer than two chapters with text: nothing to compare, no call. The removed-chapter check is the program's own (no call).
+      const removed = removedChapterRefs(drive.store.state, chapters);
       const found =
         chapters.length < 2
           ? []
@@ -2189,6 +2198,7 @@ export class BookPipelineRuns {
         claimB: issue.claimB,
         suggestion: issue.suggestion
       }));
+      findings.push(...removed);
       const done = await drive.store.commit(state => applyConsistency(state, token, findings));
       if (!done?.accepted) {
         report("dropped");
@@ -2497,6 +2507,9 @@ export class BookPipelineRuns {
     const rootInfo = drive.cards.get(drive.rootId);
     if (!info || !rootInfo) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
+    // The reader's own Summary (a kept chapter, or a card the pipeline never wrote that has text): the plan and the write keep it.
+    if (isKeptRaw(card.raw) || (bodyStateRaw(card.raw) === "unknown" && !pipelineWroteRaw(card.raw)))
+      drive.ownSummary.add(nodeId);
     // A chapter the program may not rewrite (hand-edited, unknown or kept, and no permission) gets no plan: the write step would refuse it anyway.
     if (!this.mayOverwriteCard(drive, nodeId, card.raw)) {
       this.log(drive, "plan_skipped", nodeId, "plan", "hand_edited");
@@ -2583,7 +2596,7 @@ export class BookPipelineRuns {
     );
     const written = await this.ports.updateNoteGuarded(
       path,
-      { prompt, summary: result.covers },
+      drive.ownSummary.has(nodeId) ? { prompt } : { prompt, summary: result.covers },
       { expectedContent: card.raw, authorize: this.authorize(drive, token, nodeId) }
     );
     if (written === "discarded") return { kind: "failed", reason: "discarded" };
@@ -2658,7 +2671,7 @@ export class BookPipelineRuns {
     const expanding = drive.avoid.has(nodeId) && drive.expand.has(nodeId);
     const oldBody = chapterBody(card.detail);
     // The fix round asks for the setting's minimum itself (the 0.8x tolerance is only the first verdict's).
-    const now = expanding ? lengthReason(settings.length, oldBody, undefined, true) : undefined;
+    const now = expanding ? lengthReason(settings.length, lengthBody(oldBody), undefined, true) : undefined;
     // The chapter's role and the other chapters (what it must not cover): told to the author, enforced in the merge.
     const scope = {
       role: info.role,
@@ -2692,7 +2705,7 @@ export class BookPipelineRuns {
       // A fix never drops a picture the chapter had, nor makes the chapter shorter than the asked minimum (or shorter than it was, if it already was).
       const body = chapterBody(merged.detail);
       const pictures = new Set(bodyImageUrls(`\n${body}`));
-      const short = lengthReason(settings.length, body);
+      const short = lengthReason(settings.length, lengthBody(body));
       if (
         bodyImageUrls(`\n${oldBody}`).some(url => !pictures.has(url)) ||
         (short?.kind === "under" && !(now?.kind === "under" && short.measured >= now.measured))
@@ -2776,6 +2789,7 @@ export class BookPipelineRuns {
         reasoning: drive.config.reasoning,
         ...(drive.avoid.has(nodeId) ? { instruction: drive.extra.get(nodeId) } : {}),
         ...(requirements !== undefined ? { keepSummary: true, requirements } : {}),
+        ...(drive.ownSummary.has(nodeId) ? { keepSummary: true } : {}),
         signal,
         admission: drive.admission,
         authorize: authorizeWrite,
@@ -3159,6 +3173,8 @@ export class BookPipelineRuns {
     const info = drive.cards.get(nodeId);
     if (!info) return { kind: "failed", reason: "missing" };
     const card = await this.ports.readCard(info.path);
+    // "Keep my version" for this very text: the reader's answer is final, no proofread call; the chapter is done.
+    if (isKeptRaw(card.raw)) return { kind: "ok", after: () => this.setStage(drive, nodeId, "checked", null) };
     const checklist = parseChecklist(card.prompt);
     const chapter = chapterBody(card.detail);
     const body = projectProofBody(stripImageLines(chapter));
@@ -3247,7 +3263,7 @@ export class BookPipelineRuns {
     const verdict: ProofResult = { ...result, aggregate: proofVerdict(result, !body.trim()) };
     // The length rule: a third reason beside the facts and the structure. It never lowers another failure; with nothing else wrong it
     // still makes the chapter need a look, and it stays so once the one automatic redo is spent (no silent "checked").
-    const length = await this.lengthOf(drive, nodeId, body);
+    const length = await this.lengthOf(drive, nodeId, lengthBody(chapter));
     const lengthIssue = length ? lengthToken(length) : "";
     // Some unmet structure items do not stop the card: it stays checked, and the count is kept in its issue field for the card's small note.
     const structureUnmet = verdict.items

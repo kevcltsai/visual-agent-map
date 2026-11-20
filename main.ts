@@ -517,6 +517,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     readMap: path => this.repo.readMap(path),
     readCard: path => this.readBookCard(path),
     write: (path, transform) => this.bookNoteWriter(path, transform),
+    writeFields: (path, patch) => this.repo.writePipelineFields(path, patch),
     rerunCard: (mapPath, nodeId, options) => this.bookPipelineRuns.rerunCard(mapPath, nodeId, options),
     isRunning: mapPath => this.bookPipelineRuns.isRunning(mapPath),
     newId: () => crypto.randomUUID(),

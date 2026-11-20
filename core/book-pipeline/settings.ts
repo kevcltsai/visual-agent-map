@@ -3,7 +3,8 @@
  * frontmatter wins; a field the owner left empty takes the editorial decision saved in the root's `## 全書企劃` section.
  * Planning and writing both call this, never a private merge.
  */
-import { MAX_IMAGE_SLOTS, type ImageSlot } from "./image-slots";
+import { projectProofBody } from "./book-notes";
+import { MAX_IMAGE_SLOTS, stripImageLines, type ImageSlot } from "./image-slots";
 import { BOOK_SETTING_FIELDS, type BookRole, type BookSettings } from "./model";
 import { hashText, singleLine } from "./text";
 
@@ -169,7 +170,7 @@ export function cleanBookSettingsInput(input: unknown): BookSettings {
 // ---- chapter length ------------------------------------------------------------------------------------------------------------
 
 /** Bumped when the parsing or the tolerance changes; it is part of the length reason, so an earlier tick no longer counts. */
-export const LENGTH_RULE_VERSION = 1;
+export const LENGTH_RULE_VERSION = 2;
 /** A chapter is out of range only above max x this or below min x this. */
 export const LENGTH_HIGH = 1.2;
 export const LENGTH_LOW = 0.8;
@@ -284,9 +285,16 @@ export function imageCountRange(settings: BookSettings): ImageCountRange | undef
 const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu;
 const LATIN_WORD = /[\p{Script=Latin}\p{N}]+(?:['’][\p{Script=Latin}]+)?/gu;
 /**
+ * The text every length measurement reads, from a chapter body (`chapterBody`): the prose only. Pictures with their captions and source
+ * lines and the reader's notes do not count (the recorded counting rule). The first verdict, the fix round's target and its check, and
+ * the strict verdict after it all measure this same projection, so the numbers the reader sees agree.
+ */
+export const lengthBody = (chapter: string): string => projectProofBody(stripImageLines(chapter));
+
+/**
  * How long a chapter text is in the unit: `字` = every CJK character plus every Latin or number word; `words` = Latin and number words
- * (a text where CJK characters dominate counts them too, so a Chinese chapter is never "0 words" or a handful). The text is the proof projection: notes are
- * already out; here the link addresses, images, captions' syntax, picture markers, hidden records and the program's callouts go too.
+ * (a text where CJK characters dominate counts them too, so a Chinese chapter is never "0 words" or a handful). The text is {@link lengthBody}
+ * (prose only: notes, pictures and their captions are already out); here the link addresses, images, captions' syntax, picture markers, hidden records and the program's callouts go too.
  */
 export function chapterLength(body: string, unit: LengthUnit): number {
   const lines: string[] = [];
@@ -320,7 +328,8 @@ export interface LengthReason extends LengthRange {
 }
 /**
  * Why the chapter is out of range, or undefined. The 0.8x / 1.2x tolerance holds for the first verdict only; `strict` (after the
- * automatic fix round) measures against the asked minimum itself, so a chapter still below it needs a person (never silently accepted).
+ * automatic fix round) measures against the asked range itself, so a chapter still below its minimum or above its maximum needs a person
+ * (never silently accepted). `body` is {@link lengthBody} of the chapter.
  */
 export function lengthReason(
   settingLength: string | undefined,
@@ -332,7 +341,8 @@ export function lengthReason(
   if (!range) return undefined;
   const measured = chapterLength(body, range.unit);
   const low = strict ? 1 : LENGTH_LOW;
-  const kind = measured > range.max * LENGTH_HIGH ? "over" : measured < range.min * low ? "under" : undefined;
+  const high = strict ? 1 : LENGTH_HIGH;
+  const kind = measured > range.max * high ? "over" : measured < range.min * low ? "under" : undefined;
   return kind ? { ...range, kind, measured, version: LENGTH_RULE_VERSION } : undefined;
 }
 /** The one issue token of a length reason (no spaces): it sits in the card's issue field and so in the attention fingerprint. */

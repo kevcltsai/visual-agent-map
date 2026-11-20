@@ -2175,7 +2175,7 @@ test('T9 keep, open items: a kept chapter with an AIM open-items marker saved af
   assert.ok(!r.stat.logs.some(l => l.includes('hand_edit_skipped')));
   assert.ok((await r.note(1)).detail.includes(HAND));
 });
-test('T9 keep: "keep my version" makes a whole-book redo leave the chapter alone and send it on to its proofread', async () => {
+test('T9 keep: "keep my version" makes a whole-book redo leave the chapter alone; it is checked with no proofread call (the reader\'s answer is final)', async () => {
   const r = await rig();
   await finish(r);
   await handEdit(r, 1);
@@ -2185,8 +2185,9 @@ test('T9 keep: "keep my version" makes a whole-book redo leave the chapter alone
   const proofs = r.stat.proof.length;
   await redo(r, [1]);
   assert.equal(r.stat.author.length, authors, 'not written');
-  assert.equal(r.stat.proof.length, proofs + 1, 'proofread though');
+  assert.equal(r.stat.proof.length, proofs, 'no proofread call: the kept text is not judged again');
   assert.equal(stageOf(r.raw(1)), 'checked');
+  assert.equal((await r.note(1)).pipelineIssue, undefined, 'no issue left');
   assert.ok((await r.note(1)).detail.includes(HAND));
   assert.ok(r.stat.logs.some(l => l.includes('hand_edit_kept')));
   assert.ok(detailBlockOf(r.raw(1)).includes(HAND) && before.includes(HAND));

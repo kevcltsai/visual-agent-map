@@ -24,7 +24,8 @@ import { bookCardView, bookIssueText, lengthText, shortfallText } from "./book-p
 import { bodyImageUrls } from "./book-pipeline-run";
 
 import { projectProofBody } from "../../core/book-pipeline/book-notes";
-import { integrityFp } from "../../core/book-pipeline/body-integrity";
+import { integrityFp, isKept, readBodyRecord } from "../../core/book-pipeline/body-integrity";
+import { hasHiddenCallout } from "../../core/book-pipeline/note-sections";
 
 export { countNotes, projectProofBody, wrapNote } from "../../core/book-pipeline/book-notes";
 
@@ -57,6 +58,8 @@ export interface Gate2Card {
   proofStale?: boolean;
   /** The run skipped this chapter because the reader's hand has been on it (the card is needs-review for that reason only). */
   handEdited?: boolean;
+  /** With `handEdited`: the text was there before the book (no program fingerprint, no `[!vam-book]` callout); the run did not rewrite it. */
+  handBeforeBook?: boolean;
   /** With `handEdited`: the integrity fingerprint of the text the run skipped (the one a rewrite permission is bound to). */
   bodyFp?: string;
   /** What the last whole-book consistency check found for this chapter (absent: nothing, or the chapter changed since). */
@@ -89,12 +92,19 @@ const PROBLEM_RULES: readonly { kind: ReviewProblemKind; of: (card: Gate2Card) =
         ? card.failureText || t("ui.book_issue_unknown")
         : undefined
   },
-  { kind: "hand-edited", of: card => (card.handEdited ? t("ui.book_review_hand_edited") : undefined) },
+  {
+    kind: "hand-edited",
+    of: card =>
+      card.handEdited
+        ? t(card.handBeforeBook ? "ui.book_review_hand_before_book" : "ui.book_review_hand_edited")
+        : undefined
+  },
   {
     kind: "consistency",
     of: card =>
       card.inconsistencies?.length
         ? card.inconsistencies.map(item => {
+            if (item.kind === "removed") return t("ui.book_reason_removed_ref_0_1", item.theirs, item.own);
             const sentence = t("ui.book_reason_inconsistent_0_1_2", item.otherTitle, item.own, item.theirs);
             return item.suggestion ? `${sentence}${t("ui.book_panel_lead_sep")}${item.suggestion}` : sentence;
           })
@@ -229,7 +239,12 @@ export function gate2Cards(input: {
     const structure = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue.trim());
     const role = typeof note?.bookRole === "string" ? note.bookRole : undefined;
     const handEdited = view.stage === "needs-review" && /^write failed: hand_edited$/.test(issue.trim());
+    // Only a `[!vam-book]` callout (or the program's fingerprint) shows the program wrote this text; anything else came before the book.
+    const beforeBook = handEdited && !readBodyRecord(note?.detail ?? "")?.fp && !hasHiddenCallout(note?.detail ?? "");
+    // "Keep my version" for this very text: the reader's answer stands, the proof's findings about it are not asked again.
+    const kept = isKept(note?.detail ?? "");
     const stale =
+      !kept &&
       !!input.proofContext &&
       proofIsStale(
         { prompt: note?.prompt ?? "", detail: note?.detail ?? "" },
@@ -252,14 +267,16 @@ export function gate2Cards(input: {
       ...(role ? { role } : {}),
       ...(view.stage === "needs-review" && issue ? { failureText: reasonOf(issue, proof) } : {}),
       structureUnmet:
-        checked && structure ? structure[1].split(" ").filter(token => !token.startsWith("image_")).length : 0,
-      factsOpen: checked
+        checked && structure && !kept ? structure[1].split(" ").filter(token => !token.startsWith("image_")).length : 0,
+      factsOpen:
+        checked && !kept
         ? (proof?.items ?? []).filter(item => item.type === "fact" && item.status !== "met").length
         : 0,
       galleryBare: checked && galleryBare(role, note),
       seam: view.seam,
       ...(view.seam ? seamFromOf(note?.pipelineSeam, input.order, at, input.titleOf) : {}),
       ...(handEdited ? { handEdited: true, bodyFp: integrityFp(note?.detail ?? "") } : {}),
+      ...(beforeBook ? { handBeforeBook: true } : {}),
       ...(stale ? { proofStale: true } : {}),
       ...(inconsistencies.length ? { inconsistencies } : {}),
       ...(consistencyOnly ? { consistencyOnly: true } : {})

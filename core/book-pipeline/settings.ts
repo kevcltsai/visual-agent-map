@@ -158,10 +158,7 @@ const PICTURE_WORD =
 const COUNT_SEP = "\\s*(?:[–\\-~至到—]|\\bto\\b)\\s*";
 const COUNT = `(\\d{1,2})(?:${COUNT_SEP}(\\d{1,2}))?`;
 /** `6–10 張(圖)`, `8 張圖片`, `6 to 10 pictures`. */
-const COUNT_THEN_UNIT = new RegExp(
-  `(?<![\\d.,])${COUNT}(?:\\s*(?:張|张|幅)|\\s+${PICTURE_WORD}(?![A-Za-z]))`,
-  "giu"
-);
+const COUNT_THEN_UNIT = new RegExp(`(?<![\\d.,])${COUNT}(?:\\s*(?:張|张|幅)|\\s+${PICTURE_WORD}(?![A-Za-z]))`, "giu");
 /** `圖片 6–10`, `配圖：6 到 10 張`: a count right after a picture word, not followed by a length unit. */
 const UNIT_THEN_COUNT = new RegExp(
   `${PICTURE_WORD}\\s*[:：]?\\s*(?:每章\\s*)?${COUNT}(?![\\d.,]|\\s*(?:個)?\\s*(?:字|words?))`,

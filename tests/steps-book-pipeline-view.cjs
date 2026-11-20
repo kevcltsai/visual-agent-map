@@ -1174,7 +1174,7 @@ async function gateRig({ phase, stages = {}, trialNotes = [] }) {
 
 test('toolbar gate 1: the trial sentence, "open chapter 1" opens the first trial chapter, confirm and stop go to the plugin', async () => {
   lang('zh-TW');
-  const g = await gateRig({ phase: 'gate1' });
+  const g = await gateRig({ phase: 'gate1', stages: { root: 'checked', a: 'checked', b: 'checked' } });
   const bar = g.drawBar();
   assert.ok(texts(bar).includes('試跑的 3 章寫好了'));
   assert.deepEqual(g.labels(bar), ['打開第 1 章', '這樣可以，跑完全書', '停止']);

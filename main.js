@@ -3164,6 +3164,7 @@ var en = {
   "ui.book_add_budget": "Add 100 calls",
   "ui.book_budget_used_up_0_1": "Call budget used up: {0}/{1} used",
   "ui.book_bar_trial_ready_0": "The {0} trial chapters are written",
+  "ui.book_bar_trial_review_0_1": "The {0} trial chapters are written, {1} need a look",
   "ui.book_bar_open_first": "Open chapter 1",
   "ui.book_bar_notes_ask_0": "{0} notes are not applied yet. Run the whole book anyway?",
   "ui.book_bar_go_anyway": "Run anyway",
@@ -6384,6 +6385,7 @@ var zhCN = {
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u989D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
   "ui.book_bar_trial_ready_0": "\u8BD5\u8DD1\u7684 {0} \u7AE0\u5199\u597D\u4E86",
+  "ui.book_bar_trial_review_0_1": "\u8BD5\u8DD1\u7684 {0} \u7AE0\u5199\u597D\u4E86\uFF0C{1} \u7AE0\u8981\u4F60\u770B",
   "ui.book_bar_open_first": "\u6253\u5F00\u7B2C 1 \u7AE0",
   "ui.book_bar_notes_ask_0": "\u8FD8\u6709 {0} \u5219\u5907\u6CE8\u6CA1\u5957\u7528\uFF0C\u4ECD\u8981\u8DD1\u5B8C\u5168\u4E66\u5417\uFF1F",
   "ui.book_bar_go_anyway": "\u4ECD\u8981",
@@ -9604,6 +9606,7 @@ var zhTW = {
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u984D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
   "ui.book_bar_trial_ready_0": "\u8A66\u8DD1\u7684 {0} \u7AE0\u5BEB\u597D\u4E86",
+  "ui.book_bar_trial_review_0_1": "\u8A66\u8DD1\u7684 {0} \u7AE0\u5BEB\u597D\u4E86\uFF0C{1} \u7AE0\u8981\u4F60\u770B",
   "ui.book_bar_open_first": "\u6253\u958B\u7B2C 1 \u7AE0",
   "ui.book_bar_notes_ask_0": "\u9084\u6709 {0} \u5247\u5099\u8A3B\u6C92\u5957\u7528\uFF0C\u4ECD\u8981\u8DD1\u5B8C\u5168\u66F8\u55CE\uFF1F",
   "ui.book_bar_go_anyway": "\u4ECD\u8981",
@@ -54060,7 +54063,10 @@ function renderBookBar(parent, state, actions) {
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   }
   if (state.mode === "gate1" && state.trialCount) {
-    top.createSpan({ cls: "vam-book-bar-counts", text: t("ui.book_bar_trial_ready_0", state.trialCount) });
+    top.createSpan({
+      cls: "vam-book-bar-counts",
+      text: state.trialAttention ? t("ui.book_bar_trial_review_0_1", state.trialCount, state.trialAttention) : t("ui.book_bar_trial_ready_0", state.trialCount)
+    });
     if (actions.openTrial)
       makeButton(buttons, t("ui.book_bar_open_first"), "vam-book-link vam-book-open-first", actions.openTrial);
   }
@@ -85011,6 +85017,11 @@ ${t("ui.book_role_running_suffix")}` : first);
     if (state.mode !== "gate2") this.bookFinishAsking = null;
     const gate2Attention = state.mode === "gate2" ? this.bookReviewCards(read.data) : [];
     if (state.mode === "gate2") state.review = { total: state.total, attention: gate2Attention.length };
+    if (state.mode === "gate1" && state.trialCount) {
+      const trial = new Set(this.effectiveTrial(read.data));
+      const n = this.bookReviewCards(read.data).filter((card) => trial.has(card.id)).length;
+      if (n > 0) state.trialAttention = n;
+    }
     const gate1Ask = ((_a2 = this.bookGate1Ask) == null ? void 0 : _a2.path) === path ? this.bookGate1Ask : null;
     const rerunAsk = this.bookRerunAskFor(path);
     renderBookBar(toolbar, state, {

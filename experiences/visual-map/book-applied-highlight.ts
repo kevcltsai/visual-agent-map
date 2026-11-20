@@ -87,33 +87,30 @@ export class AppliedHighlights {
   }
 }
 
-/** The 0-based line span of each offset range in `text` (CRLF-safe: lines are counted by "\n"). */
-export function lineSpans(
-  text: string,
-  ranges: readonly { from: number; to: number }[]
-): { start: number; end: number }[] {
-  const lineAt = (offset: number): number => {
-    let n = 0;
-    for (let i = text.indexOf("\n"); i !== -1 && i < offset; i = text.indexOf("\n", i + 1)) n++;
-    return n;
-  };
-  return ranges
-    .filter(r => r.from < r.to)
-    .map(r => ({ start: lineAt(r.from), end: lineAt(Math.max(r.from, r.to - 1)) }));
-}
-
-/** The reading view's twin of the CM6 mark: which rendered sections (by their line span) wear the light-green class. */
+/**
+ * The reading view's twin of the CM6 mark: which rendered sections wear the light-green class. A section is matched by its source text
+ * (one applied paragraph), not by line numbers: the reading view may still show the text from before the apply when the mark is set,
+ * and a callout written afterwards moves the lines.
+ */
 export class ReadingMarks {
-  private marks: { path: string; spans: { start: number; end: number }[] } | null = null;
-  set(path: string, spans: { start: number; end: number }[]): void {
-    this.marks = spans.length ? { path, spans } : null;
+  private marks: { path: string; texts: Set<string> } | null = null;
+  set(path: string, texts: readonly string[]): void {
+    const kept = texts.map(normalSection).filter(text => text);
+    this.marks = kept.length ? { path, texts: new Set(kept) } : null;
   }
   clear(): void {
     this.marks = null;
   }
-  /** True when the section `[lineStart, lineEnd]` of `path` overlaps a marked span. */
-  wears(path: string, lineStart: number, lineEnd: number): boolean {
+  /** True when the section of `path` whose source is `section` is one of the marked paragraphs. */
+  wears(path: string, section: string): boolean {
     const marks = this.marks;
-    return !!marks && marks.path === path && marks.spans.some(s => s.start <= lineEnd && s.end >= lineStart);
+    return !!marks && marks.path === path && marks.texts.has(normalSection(section));
   }
 }
+
+/** The source lines `[lineStart, lineEnd]` of `text` (a section of the reading view). */
+export function sectionSource(text: string, lineStart: number, lineEnd: number): string {
+  return text.split("\n").slice(lineStart, lineEnd + 1).join("\n");
+}
+
+const normalSection = (text: string): string => text.replace(/\r/g, "").trim();

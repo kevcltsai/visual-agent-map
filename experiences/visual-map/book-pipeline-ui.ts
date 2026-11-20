@@ -127,7 +127,7 @@ export function bookBarState(
       : status === "stopped" || interrupted
         ? "stopped"
         : phase;
-  const current = mode === "planning" || mode === "writing" ? currentOf(data, progress) : undefined;
+  const current = mode === "planning" || mode === "writing" ? currentOf(data, progress, stageOf) : undefined;
   const rerunning = !!progress?.active && !!progress.rerun && order.includes(progress.rerun.nodeId);
   return {
     mode,
@@ -154,15 +154,34 @@ const countChange = (change: { added: string[]; missing: string[] }): { added: n
   missing: change.missing.length
 });
 
-/** The run's busiest-first card for the progress sentence: the whole-book plan first, then the earliest chapter in the reading order. */
-function currentOf(data: BookPipelineData, progress: BookPipelineProgress | undefined): BookCurrent | undefined {
-  if (!progress?.active || !progress.current?.length) return undefined;
-  const position = (nodeId: string): number => (nodeId === "global" ? -1 : effectiveOrder(data).indexOf(nodeId));
-  const entries = progress.current.filter(item => item.nodeId === "global" || position(item.nodeId) >= 0);
-  if (!entries.length) return undefined;
-  entries.sort((a, b) => position(a.nodeId) - position(b.nodeId));
+/**
+ * The run's busiest-first card for the progress sentence: the whole-book plan first, then the earliest chapter in the reading order.
+ * A chapter whose run is over (proofread, or stopped for a person) is no longer named, and a chapter in its fix round keeps the fix
+ * line until it is done, also between two of its steps (no step in work then).
+ */
+function currentOf(
+  data: BookPipelineData,
+  progress: BookPipelineProgress | undefined,
+  stageOf: (nodeId: string) => PipelineStage | undefined
+): BookCurrent | undefined {
+  if (!progress?.active) return undefined;
+  const order = effectiveOrder(data);
+  const position = (nodeId: string): number => (nodeId === "global" ? -1 : order.indexOf(nodeId));
+  const settled = (nodeId: string): boolean => {
+    const stage = stageOf(nodeId);
+    return stage === "checked" || stage === "needs-review";
+  };
   // A chapter in its automatic fix round is not "the chapter being written": a first-time chapter in work is named instead.
-  const fixing = (nodeId: string): boolean => nodeId !== "global" && (data.autoFixes?.[nodeId] ?? 0) > 0;
+  const fixing = (nodeId: string): boolean =>
+    nodeId !== "global" && (data.autoFixes?.[nodeId] ?? 0) > 0 && !settled(nodeId);
+  const entries = (progress.current ?? []).filter(
+    item => item.nodeId === "global" || (position(item.nodeId) >= 0 && !settled(item.nodeId))
+  );
+  if (!entries.length) {
+    const waiting = order.find(fixing);
+    return waiting ? { step: "write", chapter: position(waiting) + 1, fix: true } : undefined;
+  }
+  entries.sort((a, b) => position(a.nodeId) - position(b.nodeId));
   const first = entries.find(item => !fixing(item.nodeId)) ?? entries[0];
   if (first.nodeId === "global") return { step: "global" };
   return {

@@ -179,6 +179,50 @@ test('bar: a run paused for a map change counts the map as it is now (a card rem
   assert.equal(text(undefined), '心智圖變了：多 1 章、少 0 章', 'no map at hand: the runner\'s numbers');
 });
 
+test('bar: waiting at gate 1 or gate 2 shows the map-change line with live counts, and nothing when the map matches', () => {
+  setUiLanguage('zh-TW');
+  for (const phase of ['gate1', 'gate2']) {
+    const data = { v: 1, runId: 'r', phase, status: 'running', order: ['a', 'b', 'c'], accepted: ['a', 'b', 'c'], trial: ['a'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x' };
+    const line = mapIds => {
+      const state = bundle.bookBarState(data, undefined, () => undefined, mapIds);
+      assert.equal(state.mode, phase);
+      const bar = dom.element('div');
+      bundle.renderBookBar(bar, state, { stop() {}, resume() {}, addBudget() {}, confirmGate1() {} });
+      return one(bar, 'vam-book-map-changed')?.text;
+    };
+    assert.equal(line(['a', 'b', 'c']), undefined, phase + ': same map, no line');
+    assert.equal(line(undefined), undefined, phase + ': no map at hand');
+    assert.equal(line(['a', 'b']), '心智圖變了：多 0 章、少 1 章', phase + ': a card removed');
+    assert.equal(line(['a', 'b', 'c', 'n']), '心智圖變了：多 1 章、少 0 章', phase + ': a card added');
+    assert.equal(line(['a', 'c', 'n', 'm']), '心智圖變了：多 2 章、少 1 章', phase + ': both');
+  }
+});
+
+test('finish at gate 2: a card added or removed pauses as map changed (no silent finish); keep removes it and the next finish completes', async () => {
+  for (const kind of ['removed', 'added']) {
+    const r = await rig();
+    assert.equal((await r.stateOf()).phase, 'gate2');
+    const gone = r.nodes[2].id;
+    await r.repo.updateMap(r.mapPath, d => { if (kind === 'removed') d.nodes = d.nodes.filter(n => n.id !== gone); else d.nodes.push({ ...d.nodes[2], id: 'extra-card' }); });
+    await r.runs.finishRun(r.mapPath);
+    let st = await r.stateOf();
+    assert.equal(st.phase, 'gate2', kind + ': not finished');
+    assert.equal(st.status, 'stopped');
+    assert.equal(st.pauseReason, 'map');
+    const ids = (await r.repo.readMap(r.mapPath)).nodes.map(n => n.id);
+    const bar = bundle.bookBarState(st, r.runs.getProgress(r.mapPath), () => undefined, ids);
+    assert.equal(bar.mode, 'changed');
+    assert.equal(JSON.stringify(bar.mapChange), JSON.stringify(kind === 'removed' ? { added: 0, missing: 1 } : { added: 1, missing: 0 }));
+    await r.runs.keepBookMap(r.mapPath);
+    st = await r.stateOf();
+    assert.equal(st.status, 'running');
+    assert.equal(st.phase, 'gate2');
+    if (kind === 'removed') assert.ok(st.removed.includes(gone));
+    await r.runs.finishRun(r.mapPath);
+    assert.equal((await r.stateOf()).phase, 'done', kind + ': finishes after keep');
+  }
+});
+
 // ---- part B: the view ----
 const MAP = 'Agent Workspace/Topics/map-bk2/Map.md';
 async function viewRig({ book = true, phase = 'gate2' } = {}) {

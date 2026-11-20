@@ -115,6 +115,11 @@ export function bookBarState(
             missing: data.changed?.missing.length ?? 0
           })
       : undefined;
+  // Waiting at a gate: the same wording shows a map that differs from the book's chapters, before the owner continues.
+  const gateChange =
+    !mapChange && !active && status !== "stopped" && mapIds && (phase === "gate1" || phase === "gate2")
+      ? countChange(mapDifference(data, mapIds))
+      : undefined;
   const mode: BookBarMode = mapChange
     ? "changed"
     : status === "stopped" && pauseReason === "budget"
@@ -135,6 +140,7 @@ export function bookBarState(
     ...(data.trial?.length && mode === "planning" && data.globalPlanned ? { trialSize: data.trial.length } : {}),
     ...(rerunning ? { rerun: true as const } : {}),
     ...(mapChange ? { mapChange } : {}),
+    ...(gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {}),
     ...(mode === "gate1" && data.trial?.length ? { trialCount: data.trial.length } : {}),
     ...(mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {}),
     ...(progress?.etaSeconds !== undefined && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0
@@ -252,6 +258,11 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     }
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   }
+  if ((state.mode === "gate1" || state.mode === "gate2") && state.mapChange)
+    top.createSpan({
+      cls: "vam-book-bar-counts vam-book-map-changed",
+      text: t("ui.book_map_changed_0_1", state.mapChange.added, state.mapChange.missing)
+    });
   if (state.mode === "gate1" && state.trialCount) {
     top.createSpan({
       cls: "vam-book-bar-counts",

@@ -3321,6 +3321,7 @@ var en = {
   "ui.book_progress_line_sep": ", ",
   "ui.book_progress_line_done_0_1": "{0}/{1} chapters done",
   "ui.book_progress_line_fix_0_1_2": "Fixing chapter {0} \xB7 {1}/{2} chapters done",
+  "ui.book_progress_line_check_0_1": "Checking the whole book for consistency \xB7 {0}/{1} chapters done",
   "ui.book_panel_rerun_card": "Rerun this card",
   "ui.book_panel_rerun_card_0": "Rerun this book card: {0} (plan \u2192 write \u2192 check)",
   "ui.book_seam_label": "Check seam",
@@ -6558,6 +6559,7 @@ var zhCN = {
   "ui.book_progress_line_sep": "\uFF0C",
   "ui.book_progress_line_done_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
   "ui.book_progress_line_fix_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u7B2C {0} \u7AE0\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u7AE0",
+  "ui.book_progress_line_check_0_1": "\u6B63\u5728\u68C0\u67E5\u5168\u4E66\u4E00\u81F4\u6027\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
   "ui.book_panel_rerun_card": "\u91CD\u8DD1\u8FD9\u5F20",
   "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u56FE\u6587\u4E66\u8FD9\u4E00\u5F20\uFF1A{0}\uFF08\u4F01\u5212 \u2192 \u5199 \u2192 \u6821\uFF09",
   "ui.book_seam_label": "\u63A5\u7F1D\u9700\u770B",
@@ -9795,6 +9797,7 @@ var zhTW = {
   "ui.book_progress_line_sep": "\uFF0C",
   "ui.book_progress_line_done_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
   "ui.book_progress_line_fix_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u7B2C {0} \u7AE0\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u7AE0",
+  "ui.book_progress_line_check_0_1": "\u6B63\u5728\u6AA2\u67E5\u5168\u66F8\u4E00\u81F4\u6027\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
   "ui.book_panel_rerun_card": "\u91CD\u8DD1\u9019\u5F35",
   "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u5716\u6587\u66F8\u9019\u4E00\u5F35\uFF1A{0}\uFF08\u4F01\u5283 \u2192 \u5BEB \u2192 \u6821\uFF09",
   "ui.book_seam_label": "\u63A5\u7E2B\u9700\u770B",
@@ -55475,7 +55478,7 @@ var PHASE_KEY = {
   done: "ui.book_phase_done"
 };
 function bookBarState(data, progress, stageOf, mapIds) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
   const savedDone = data.phase === "done" && (!progress || progress.runId === data.runId);
   const phase = savedDone ? "done" : (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : data.phase;
   const status = savedDone ? data.status : (_b2 = progress == null ? void 0 : progress.status) != null ? _b2 : data.status;
@@ -55503,11 +55506,12 @@ function bookBarState(data, progress, stageOf, mapIds) {
     budget,
     globalDone: data.globalPlanned === true,
     ...current ? { current } : {},
-    ...((_l = data.trial) == null ? void 0 : _l.length) && mode === "planning" && data.globalPlanned ? { trialSize: data.trial.length } : {},
+    ...!current && mode === "writing" && active && ((_l = data.consistency) == null ? void 0 : _l.done) === false ? { checking: true } : {},
+    ...((_m = data.trial) == null ? void 0 : _m.length) && mode === "planning" && data.globalPlanned ? { trialSize: data.trial.length } : {},
     ...rerunning ? { rerun: true } : {},
     ...mapChange ? { mapChange } : {},
     ...gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {},
-    ...mode === "gate1" && ((_m = data.trial) == null ? void 0 : _m.length) ? { trialCount: data.trial.length } : {},
+    ...mode === "gate1" && ((_n = data.trial) == null ? void 0 : _n.length) ? { trialCount: data.trial.length } : {},
     ...mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {},
     ...(progress == null ? void 0 : progress.etaSeconds) !== void 0 && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0 ? { etaSeconds: progress.etaSeconds } : {}
   };
@@ -55739,6 +55743,8 @@ function bookProgressText(state) {
     );
   }
   const at = Math.min((_g = (_f = state.current) == null ? void 0 : _f.chapter) != null ? _g : settledCount(state) + 1, Math.max(total2, 1));
+  if (state.mode === "writing" && state.checking)
+    return t("ui.book_progress_line_check_0_1", settledCount(state), total2);
   if (state.mode === "writing")
     return ((_h = state.current) == null ? void 0 : _h.fix) ? t("ui.book_progress_line_fix_0_1_2", (_i = state.current.chapter) != null ? _i : 1, settledCount(state), total2) : t("ui.book_progress_line_write_0_1", at, total2);
   const sentence = state.mode === "planning" ? !state.globalDone || ((_j = state.current) == null ? void 0 : _j.step) === "global" ? t("ui.book_progress_line_global") : t("ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
@@ -94077,6 +94083,15 @@ var ReadingMarks = class {
     return !!marks && marks.path === path && marks.texts.has(normalSection(section3));
   }
 };
+function rerenderReadingViews(views, path) {
+  let count4 = 0;
+  for (const view of views)
+    if (view.path === path && view.reading) {
+      view.rerender();
+      count4++;
+    }
+  return count4;
+}
 function sectionSource(text10, lineStart, lineEnd2) {
   return text10.split("\n").slice(lineStart, lineEnd2 + 1).join("\n");
 }
@@ -107193,6 +107208,17 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
           if (leaf.view instanceof import_obsidian52.MarkdownView && ((_a2 = leaf.view.file) == null ? void 0 : _a2.path) === path) await leaf.view.save();
       },
       undone: (path) => {
+        rerenderReadingViews(
+          this.app.workspace.getLeavesOfType("markdown").flatMap((leaf) => leaf.view instanceof import_obsidian52.MarkdownView ? [leaf.view] : []).map((view) => {
+            var _a2;
+            return {
+              path: (_a2 = view.file) == null ? void 0 : _a2.path,
+              reading: view.getMode() === "preview",
+              rerender: () => view.previewMode.rerender(true)
+            };
+          }),
+          path
+        );
         const map = this.bookChapterMaps.get(path);
         if (map) void this.bookCallouts.reconcile(map);
       },

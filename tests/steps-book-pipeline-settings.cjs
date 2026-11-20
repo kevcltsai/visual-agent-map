@@ -162,11 +162,27 @@ test('lengthReason: above max x 1.2 is over, below min x 0.8 is under, the edges
 });
 
 test('bookAuthorRequirements: a hard length rule line appears only when the length setting is one readable range', () => {
-  assert.match(L.bookAuthorRequirements({ length: '每章 300–500 字' }), /Length rule \(hard\): the chapter text itself must be between 300 and 500 characters/);
+  assert.match(L.bookAuthorRequirements({ length: '每章 300–500 字' }), /Length \(hard requirement, measured by the program\): the chapter text must be between 300 and 500 characters \(字\); aim for about 400\./);
   assert.match(L.bookAuthorRequirements({ length: '300-500 words' }), /between 300 and 500 words/);
-  assert.doesNotMatch(L.bookAuthorRequirements({ length: '短一點' }), /Length rule/);
-  assert.doesNotMatch(L.bookAuthorRequirements({ length: '300–500 字，200–300 words' }), /Length rule/);
-  assert.doesNotMatch(L.bookAuthorRequirements({ tone: 'warm' }), /Length rule/);
+  assert.doesNotMatch(L.bookAuthorRequirements({ length: '短一點' }), /hard requirement/);
+  assert.doesNotMatch(L.bookAuthorRequirements({ length: '300–500 字，200–300 words' }), /hard requirement/);
+  assert.doesNotMatch(L.bookAuthorRequirements({ tone: 'warm' }), /hard requirement/);
+});
+
+test('bookAuthorRequirements: the length rule comes first, before the chapter rules, and a long range gets a section plan that scales with it', () => {
+  const text = L.bookAuthorRequirements({ length: '每章約5000至8000字，搭配6至10張示意照片或範例圖' });
+  assert.ok(text.startsWith('Length (hard requirement'), 'the length rule leads the requirements');
+  assert.ok(text.indexOf('Length (hard requirement') < text.indexOf('Chapter writing rules'));
+  assert.match(text, /between 5000 and 8000 characters \(字\); aim for about 6500\. Only the chapter text's own characters count \(punctuation/);
+  assert.match(text, /plan it as about 7 ### sections of about 950 characters \(字\) each/);
+  assert.match(text, /do not finish before the text reaches 5000 characters/);
+  assert.match(text, /- length: 每章約5000至8000字/, 'the setting line itself stays');
+  assert.match(L.bookAuthorRequirements({ length: '每章 10000–14000 字' }), /about 12 ### sections of about 1000 characters/);
+  assert.match(L.bookAuthorRequirements({ length: '每章 30000–40000 字' }), /about 12 ### sections/, 'the plan is bounded at 12 sections');
+  assert.doesNotMatch(L.bookAuthorRequirements({ length: '每章 300–500 字' }), /### sections/, 'a short chapter gets no section plan');
+  assert.match(L.bookAuthorRequirements({ length: '2000-3000 words' }), /about 4 ### sections of about 650 words each/);
+  assert.doesNotMatch(L.bookAuthorRequirements({ length: '不超過 8000 字' }), /### sections/, 'a maximum-only setting gets no "do not finish before" plan');
+  assert.match(L.bookAuthorRequirements({ length: '不超過 8000 字' }), /between 1 and 8000 characters/);
 });
 
 test('T10c splitLengthIssue: notice tokens beside a pure length issue are part of the issue but leave no text of their own', () => {

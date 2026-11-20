@@ -1,6 +1,6 @@
 import { latestStoredProof, neutralizeText } from "../../core/book-pipeline/note-sections";
 import type { PipelineStage } from "../../core/book-pipeline/model";
-import type { LengthReason } from "../../core/book-pipeline/settings";
+import { lengthTarget, type LengthReason } from "../../core/book-pipeline/settings";
 import { isBookCheckId } from "../../core/book-pipeline/proof";
 
 /**
@@ -111,8 +111,11 @@ export function proofFixInstruction(
   const leadStructure =
     "The previous version of this chapter did not meet these structure points of its checklist (JSON strings; the chapter text itself, not the sources list, must cover them): ";
   // The length point is short and fixed (numbers and constant words), so it is reserved first and never squeezed out by long notes.
+  // The redo is a fresh write that does not see the previous text, so the piece names the absolute target, not only "longer".
   const lengthPiece = length
-    ? `The previous version of this chapter is ${length.measured} ${length.unit} long, outside the asked ${length.min} to ${length.max} ${length.unit}; ${length.kind === "over" ? "shorten" : "lengthen"} the chapter text to fit that range while keeping every checklist point. `
+    ? length.kind === "under"
+      ? `The previous version of this chapter came out at only ${length.measured} ${length.unit}, short of the asked ${length.min} to ${length.max} ${length.unit}: lengthen it to at least ${length.min} ${length.unit}, about ${lengthTarget(length)} ${length.unit} (about ${Math.round((lengthTarget(length) / Math.max(1, length.measured)) * 10) / 10} times as long), by developing each section with more explanation and concrete examples, not by repetition; keep every checklist point. `
+      : `The previous version of this chapter is ${length.measured} ${length.unit} long, over the asked ${length.min} to ${length.max} ${length.unit}: shorten it to at most ${length.max} ${length.unit}, about ${lengthTarget(length)} ${length.unit}; keep every checklist point. `
     : "";
   let room = FIX_INSTRUCTION_MAX - avoid.length - 1 - lengthPiece.length;
   const piece = (list: typeof items, intro: string): string => {

@@ -38,9 +38,7 @@ export const BOOK_AUTHOR_RULES = [
 export function bookAuthorRequirements(settings: BookSettings, slots: readonly ImageSlot[] = []): string {
   const lines = BOOK_SETTING_FIELDS.filter(field => settings[field]).map(field => `- ${field}: ${settings[field]}`);
   const range = lengthRange(settings.length);
-  const lengthRule = range
-    ? `\n\nLength rule (hard): the chapter text itself must be between ${range.min} and ${range.max} ${range.unit === "字" ? "characters (字)" : "words"}; sources, notes and picture markers do not count. Do not write much shorter or longer.`
-    : "";
+  const lengthRule = range ? `${bookLengthRule(range)}\n\n` : "";
   const plan = slots.length
     ? `\n\nImage plan for this chapter (the planner's data, JSON strings; leave one marker per slot as the rules say):\n${slots
         .map(
@@ -50,8 +48,31 @@ export function bookAuthorRequirements(settings: BookSettings, slots: readonly I
         .join("\n")}`
     : "";
   return lines.length
-    ? `${BOOK_AUTHOR_RULES}\n\nWhole-book settings (follow them):\n${lines.join("\n")}${lengthRule}${plan}`
+    ? `${lengthRule}${BOOK_AUTHOR_RULES}\n\nWhole-book settings (follow them):\n${lines.join("\n")}${plan}`
     : `${BOOK_AUTHOR_RULES}${plan}`;
+}
+
+/** The length the author aims for: the middle of the asked range. */
+export const lengthTarget = (range: LengthRange): number => Math.round((range.min + range.max) / 2);
+const unitName = (unit: LengthUnit): string => (unit === "字" ? "characters (字)" : "words");
+/**
+ * The author's length rule, first in its requirements: the range, the target, how the program counts, and (for a long chapter) a
+ * section plan, because a model left to itself stops at its usual length (about 3,200 字 in the 2026-11-20 run asked for 5000–8000).
+ */
+export function bookLengthRule(range: LengthRange): string {
+  const target = lengthTarget(range);
+  const unit = unitName(range.unit);
+  const per = range.unit === "字" ? 1000 : 600;
+  const sections = Math.min(12, Math.round(target / per));
+  const counted =
+    range.unit === "字"
+      ? "only the chapter text's own characters count (punctuation, spaces, sources, notes and picture markers do not)"
+      : "only the chapter text's own words count (sources, notes and picture markers do not)";
+  const plan =
+    range.min > 1 && sections >= 3
+      ? ` This is a long chapter: plan it as about ${sections} ### sections of about ${Math.round(target / sections / 50) * 50} ${unit} each, develop each one fully with explanation and concrete examples, and do not finish before the text reaches ${range.min} ${unit}.`
+      : "";
+  return `Length (hard requirement, measured by the program): the chapter text must be between ${range.min} and ${range.max} ${unit}; aim for about ${target}. ${counted[0].toUpperCase()}${counted.slice(1)}. A chapter outside the range fails the check.${plan}`;
 }
 
 /** The longest a whole-book setting typed in the create dialog may be (characters). */

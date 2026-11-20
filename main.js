@@ -52212,6 +52212,12 @@ var BookPipelineRuns = class {
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       if (data.phase === "done") return;
       if (data.phase !== "gate2") throw new BookPipelineRunError("not_gate");
+      const change2 = mapDifference(data, this.mapIds(await this.ports.readMap(mapPath)));
+      if (change2.added.length || change2.missing.length) {
+        await drive.store.commit((state) => ({ state: pauseForMap(state, change2), accepted: true }));
+        this.log(drive, "map_changed", "-", "proof", `added:${change2.added.length},missing:${change2.missing.length}`);
+        return;
+      }
       let refusal;
       await drive.store.commit((state) => {
         const running2 = resumeRun(state);
@@ -54166,6 +54172,7 @@ function bookBarState(data, progress, stageOf, mapIds) {
     added: (_h = (_g = data.changed) == null ? void 0 : _g.added.length) != null ? _h : 0,
     missing: (_j = (_i = data.changed) == null ? void 0 : _i.missing.length) != null ? _j : 0
   } : void 0;
+  const gateChange = !mapChange && !active && status !== "stopped" && mapIds && (phase === "gate1" || phase === "gate2") ? countChange(mapDifference(data, mapIds)) : void 0;
   const mode = mapChange ? "changed" : status === "stopped" && pauseReason === "budget" ? "budget" : status === "stopped" || interrupted ? "stopped" : phase;
   const current = mode === "planning" || mode === "writing" ? currentOf2(data, progress) : void 0;
   const rerunning = !!(progress == null ? void 0 : progress.active) && !!progress.rerun && order.includes(progress.rerun.nodeId);
@@ -54180,6 +54187,7 @@ function bookBarState(data, progress, stageOf, mapIds) {
     ...((_l = data.trial) == null ? void 0 : _l.length) && mode === "planning" && data.globalPlanned ? { trialSize: data.trial.length } : {},
     ...rerunning ? { rerun: true } : {},
     ...mapChange ? { mapChange } : {},
+    ...gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {},
     ...mode === "gate1" && ((_m = data.trial) == null ? void 0 : _m.length) ? { trialCount: data.trial.length } : {},
     ...mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {},
     ...(progress == null ? void 0 : progress.etaSeconds) !== void 0 && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0 ? { etaSeconds: progress.etaSeconds } : {}
@@ -54249,6 +54257,11 @@ function renderBookBar(parent, state, actions) {
     }
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   }
+  if ((state.mode === "gate1" || state.mode === "gate2") && state.mapChange)
+    top.createSpan({
+      cls: "vam-book-bar-counts vam-book-map-changed",
+      text: t("ui.book_map_changed_0_1", state.mapChange.added, state.mapChange.missing)
+    });
   if (state.mode === "gate1" && state.trialCount) {
     top.createSpan({
       cls: "vam-book-bar-counts",

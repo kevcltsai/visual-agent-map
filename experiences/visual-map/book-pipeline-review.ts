@@ -167,7 +167,10 @@ export const plainNote = (text: string): string =>
 export function reasonOf(issue: string, proof: StoredProofView | undefined): string {
   const pictures = splitPictureIssue(issue);
   const pictureText = pictureIssueText(pictures);
-  if (pictureText) return pictures.rest ? `${reasonOf(pictures.rest, proof)}${t("ui.book_panel_lead_sep")}${pictureText}` : pictureText;
+  if (pictureText)
+    return pictures.rest
+      ? `${reasonOf(pictures.rest, proof)}${t("ui.book_panel_lead_sep")}${pictureText}`
+      : pictureText;
   const { rest, length } = splitLengthIssue(issue);
   if (length) {
     const sentence = lengthText(length);

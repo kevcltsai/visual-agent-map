@@ -593,7 +593,8 @@ const PLAIN_KEY: Record<string, TranslationKey> = {
 export function bookIssueText(issue: string): string {
   const pictures = splitPictureIssue(issue);
   const pictureText = pictureIssueText(pictures);
-  if (pictureText) return pictures.rest ? `${bookIssueText(pictures.rest)}${t("ui.book_panel_lead_sep")}${pictureText}` : pictureText;
+  if (pictureText)
+    return pictures.rest ? `${bookIssueText(pictures.rest)}${t("ui.book_panel_lead_sep")}${pictureText}` : pictureText;
   const { rest, length } = splitLengthIssue(issue);
   if (!length) return plainIssueText(issue);
   const sentence = lengthText(length);

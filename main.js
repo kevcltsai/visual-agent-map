@@ -55119,7 +55119,10 @@ ${oldDetail}`);
             ...commonsNoHint ? { commons_nohint: commonsNoHint } : {},
             ...Object.fromEntries(
               rounds.flatMap(
-                (round3, i) => round3 ? [[`r${i + 1}_found`, round3.found], [`r${i + 1}_offTopic`, round3.offTopic]] : []
+                (round3, i) => round3 ? [
+                  [`r${i + 1}_found`, round3.found],
+                  [`r${i + 1}_offTopic`, round3.offTopic]
+                ] : []
               )
             ),
             ...refusedTaken.size ? { taken: refusedTaken.size } : {},
@@ -55856,7 +55859,8 @@ var PLAIN_KEY = {
 function bookIssueText(issue2) {
   const pictures = splitPictureIssue(issue2);
   const pictureText = pictureIssueText(pictures);
-  if (pictureText) return pictures.rest ? `${bookIssueText(pictures.rest)}${t("ui.book_panel_lead_sep")}${pictureText}` : pictureText;
+  if (pictureText)
+    return pictures.rest ? `${bookIssueText(pictures.rest)}${t("ui.book_panel_lead_sep")}${pictureText}` : pictureText;
   const { rest, length } = splitLengthIssue(issue2);
   if (!length) return plainIssueText(issue2);
   const sentence = lengthText(length);
@@ -56018,7 +56022,8 @@ function reasonOf2(issue2, proof) {
   var _a2;
   const pictures = splitPictureIssue(issue2);
   const pictureText = pictureIssueText(pictures);
-  if (pictureText) return pictures.rest ? `${reasonOf2(pictures.rest, proof)}${t("ui.book_panel_lead_sep")}${pictureText}` : pictureText;
+  if (pictureText)
+    return pictures.rest ? `${reasonOf2(pictures.rest, proof)}${t("ui.book_panel_lead_sep")}${pictureText}` : pictureText;
   const { rest, length } = splitLengthIssue(issue2);
   if (length) {
     const sentence = lengthText(length);

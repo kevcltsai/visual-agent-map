@@ -3137,7 +3137,12 @@ export class BookPipelineRuns {
             ...(commonsNoHint ? { commons_nohint: commonsNoHint } : {}),
             ...Object.fromEntries(
               rounds.flatMap((round, i) =>
-                round ? [[`r${i + 1}_found`, round.found], [`r${i + 1}_offTopic`, round.offTopic]] : []
+                round
+                  ? [
+                      [`r${i + 1}_found`, round.found],
+                      [`r${i + 1}_offTopic`, round.offTopic]
+                    ]
+                  : []
               )
             ),
             ...(refusedTaken.size ? { taken: refusedTaken.size } : {}),

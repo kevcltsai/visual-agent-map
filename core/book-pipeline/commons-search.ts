@@ -281,7 +281,9 @@ function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
 }
 /** The wait a 429 answer names (Retry-After: seconds or an HTTP date), in ms; undefined when it names none. */
 export function retryAfterMs(headers: Record<string, string> | undefined, now: number): number | undefined {
-  const raw = Object.entries(headers ?? {}).find(([name]) => name.toLowerCase() === "retry-after")?.[1]?.trim();
+  const raw = Object.entries(headers ?? {})
+    .find(([name]) => name.toLowerCase() === "retry-after")?.[1]
+    ?.trim();
   if (!raw) return undefined;
   if (/^\d+$/.test(raw)) return Number(raw) * 1000;
   const at = Date.parse(raw);

@@ -422,6 +422,13 @@ test('dropProcessNotes (live v4 〈採收與保存〉): the flagged process-note
   assert.equal(sections.dropProcessNotes('I could not find the source. Water daily.').detail, 'Water daily.');
 });
 
+test('dropProcessNotes: CRLF text keeps CRLF and drops the process-note sentence', () => {
+  const out = sections.dropProcessNotes('## A\r\n\r\n我沒有查到可靠的官方建議。\r\n\r\n普通段落。\r\n');
+  assert.deepEqual([...out.removed], ['我沒有查到可靠的官方建議。']);
+  assert.ok(out.detail.includes('普通段落。') && !out.detail.includes('我沒有查到'), out.detail);
+  assert.ok(!/(^|[^\r])\n/.test(out.detail), 'line endings stay CRLF');
+});
+
 test('expandChapterDetail: a @@replace passage applies only as whole lines (never a part of a line)', () => {
   const { expandChapterDetail } = sections;
   const old = '\n## 開場\n\n開場段落有圖。\n\n結尾。\n';

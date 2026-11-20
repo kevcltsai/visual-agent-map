@@ -323,7 +323,8 @@ export function sourceOf(
 }
 
 /** A Traditional Chinese book's caption in Traditional characters (see `toTraditional`); other languages unchanged. */
-const traditionalIf = (language: string, text: string): string => (/^zh-(?:TW|Hant)/i.test(language) ? toTraditional(text) : text);
+const traditionalIf = (language: string, text: string): string =>
+  /^zh-(?:TW|Hant)/i.test(language) ? toTraditional(text) : text;
 
 /** A finder caption is one plain line (what it is, where to look); an empty one falls back to the title; a loose Commons file reads `Picture: <its name>`. */
 export function figureOf(candidate: SlotCandidate, href: string, language: string): SlotFigure {

@@ -1240,7 +1240,12 @@ export const MAX_INSERTED_SECTIONS = 3;
  * names another chapter (heading or text) or previews, and a paragraph outside a section that does. `seen` collects the heading keys kept.
  * At most `cap.left` new sections are kept over the whole answer; the rest are dropped and counted in `cap.dropped`.
  */
-function keepOwnSections(text: string, seen: Set<string>, scope: ExpandScope, cap: { left: number; dropped: number }): string {
+function keepOwnSections(
+  text: string,
+  seen: Set<string>,
+  scope: ExpandScope,
+  cap: { left: number; dropped: number }
+): string {
   const guide = scope.role === "intro" || scope.role === "closing";
   const others = scope.others ?? [];
   const names = (part: string): boolean => PREVIEW_WORD.test(part) || sentenceNamesChapters(part, others).length > 0;

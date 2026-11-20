@@ -2374,7 +2374,11 @@ export class BookPipelineRuns {
       const info = drive.cards.get(id);
       if (!info || drive.stages.get(id) !== "needs-review") continue;
       const card = await this.ports.readCard(info.path).catch(() => undefined);
-      if (!card || isKeptRaw(card.raw) || /^write failed: hand_edited$/.test(String(card.fields.pipelineIssue ?? "").trim()))
+      if (
+        !card ||
+        isKeptRaw(card.raw) ||
+        /^write failed: hand_edited$/.test(String(card.fields.pipelineIssue ?? "").trim())
+      )
         continue;
       const proof = latestStoredProof(card.detail);
       const length = await this.lengthOf(drive, id, lengthBody(chapterBody(card.detail)));

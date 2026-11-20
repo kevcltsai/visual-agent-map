@@ -535,7 +535,12 @@ export function requestAutoFix(data: BookPipelineData, nodeId: string): Committe
  * trial chapters were never fixed again): its automatic-redo count starts over once. Only in the writing phase, only for a trial card.
  */
 export function reopenTrialFix(data: BookPipelineData, nodeId: string): Committed {
-  if (data.phase !== "writing" || data.status !== "running" || !data.trial?.includes(nodeId) || !autoFixesOf(data, nodeId))
+  if (
+    data.phase !== "writing" ||
+    data.status !== "running" ||
+    !data.trial?.includes(nodeId) ||
+    !autoFixesOf(data, nodeId)
+  )
     return { state: data, accepted: false };
   const next = clone(data);
   if (next.autoFixes) delete next.autoFixes[nodeId];

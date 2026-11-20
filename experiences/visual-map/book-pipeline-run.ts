@@ -58,6 +58,8 @@ import {
   resumeRun,
   retryGlobalPlan,
   retryTrial,
+  startTrial,
+  backToPlan,
   stopRun,
   failRun,
   type PipelineAction,
@@ -1174,6 +1176,51 @@ export class BookPipelineRuns {
       },
       true
     );
+  }
+
+  /** The plan review: the owner chose to run the trial. The trial chapters are written from their plans as they are now. Refused (not_gate1) elsewhere. */
+  async startTrial(mapPath: string): Promise<void> {
+    return this.enter(
+      mapPath,
+      async drive => {
+        await this.openSaved(drive, mapPath);
+        let moved = false;
+        await drive.store.commit(state => {
+          const next = startTrial(resumeRun(state) ?? state, this.ports.now());
+          moved = next.phase !== state.phase;
+          return { state: moved ? next : state, accepted: true };
+        });
+        if (!moved) throw new BookPipelineRunError("not_gate1");
+        this.log(drive, "gate1", "-", "write", "trial_start");
+      },
+      true
+    );
+  }
+
+  /**
+   * The trial's gate 1: the owner wants to change the plan first. The run returns to the plan review; the trial chapters go back to
+   * planned (their plans stay for the owner to edit; their text stays until the next trial rewrites it). Refused (not_gate1) elsewhere.
+   */
+  async backToPlan(mapPath: string): Promise<void> {
+    return this.enter(mapPath, async drive => {
+      await this.openSaved(drive, mapPath);
+      let moved = false;
+      await drive.store.commit(state => {
+        const next = backToPlan(resumeRun(state) ?? state, this.ports.now());
+        moved = next.planReview === true && state.planReview !== true;
+        return { state: moved ? next : state, accepted: true };
+      });
+      if (!moved) throw new BookPipelineRunError("not_gate1");
+      for (const id of drive.store.state.trial ?? []) {
+        const own = drive.cards.get(id);
+        if (!own || drive.stages.get(id) === undefined) continue;
+        const current = await this.ports.readCard(own.path).catch(() => undefined);
+        if (current) for (const url of bodyImageUrls(current.detail)) drive.usedImages.delete(imageKey(url));
+        drive.stages.set(id, "planned");
+        await this.writeFields(drive, id, { pipelineStage: "planned", pipelineIssue: null });
+      }
+      this.log(drive, "gate1", "-", "plan", "back_to_plan");
+    });
   }
 
   /**

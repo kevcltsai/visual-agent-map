@@ -2233,6 +2233,12 @@ export default class VisualAgentMapPlugin extends Plugin {
   confirmBookGate1(mapPath: string): Promise<void> {
     return this.bookPipelineRuns.confirmGate1(mapPath);
   }
+  startBookTrial(mapPath: string): Promise<void> {
+    return this.bookPipelineRuns.startTrial(mapPath);
+  }
+  backBookToPlan(mapPath: string): Promise<void> {
+    return this.bookPipelineRuns.backToPlan(mapPath);
+  }
   rerunBookCard(
     mapPath: string,
     nodeId: string,

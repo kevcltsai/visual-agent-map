@@ -3122,6 +3122,7 @@ var en = {
   "ui.book_refused_disposed": "The plugin is shutting down.",
   "ui.book_refused_unreadable": "This map's data could not be read. Try again shortly.",
   "ui.book_chat_gate1_confirmed": "Plan confirmed. Starting to write.",
+  "ui.book_chat_trial_started": "Plan confirmed, running the trial.",
   "ui.book_refused_not_gate1": "The run is not waiting for your confirmation.",
   "ui.book_refused_not_gate": "The run is not at a checkpoint, so one card cannot be redone now.",
   "ui.book_refused_instruction": "Write what you want changed on this card first.",
@@ -3180,6 +3181,14 @@ var en = {
   "ui.book_bar_finish_ask_0": "{0} chapters are not handled yet. Finish anyway?",
   "ui.book_bar_finish_go": "Finish anyway",
   "ui.book_confirm_gate1": "Looks good, run the whole book",
+  "ui.book_phase_plan_review": "Plan ready, take a look",
+  "ui.book_phase_trial_review": "Trial written, take a look",
+  "ui.book_bar_plan_ready_0": "All {0} chapters are planned",
+  "ui.book_bar_open_plan": "Open the whole-book plan",
+  "ui.book_bar_start_trial_0": "Try {0} chapters",
+  "ui.book_skip_trial": "Skip the trial, write the whole book",
+  "ui.book_bar_back_to_plan": "Back to the plan",
+  "ui.book_bar_plan_hint": "To change it, edit the whole-book plan in the root note or a chapter's hint box, then go on.",
   "ui.book_stage_pending": "To plan",
   "ui.book_stage_planned": "Planned",
   "ui.book_stage_written": "Written",
@@ -6367,6 +6376,7 @@ var zhCN = {
   "ui.book_refused_disposed": "\u63D2\u4EF6\u6B63\u5728\u5173\u95ED\uFF0C\u65E0\u6CD5\u6267\u884C\u3002",
   "ui.book_refused_unreadable": "\u8BFB\u4E0D\u5230\u8FD9\u5F20\u5730\u56FE\u7684\u6570\u636E\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5\u3002",
   "ui.book_chat_gate1_confirmed": "\u5DF2\u786E\u8BA4\u4F01\u5212\uFF0C\u5F00\u59CB\u5199\u4F5C\u3002",
+  "ui.book_chat_trial_started": "\u5DF2\u786E\u8BA4\u4F01\u5212\uFF0C\u5F00\u59CB\u8BD5\u8DD1\u3002",
   "ui.book_refused_not_gate1": "\u5F53\u524D\u4E0D\u5728\u201C\u7B49\u4F60\u786E\u8BA4\u201D\u9636\u6BB5\uFF0C\u4E0D\u9700\u8981\u786E\u8BA4\u3002",
   "ui.book_refused_not_gate": "\u5F53\u524D\u4E0D\u5728\u5173\u5361\u4E0A\uFF0C\u73B0\u5728\u4E0D\u80FD\u5355\u72EC\u91CD\u8DD1\u4E00\u5F20\u5361\u3002",
   "ui.book_refused_instruction": "\u8BF7\u5148\u5199\u4E0B\u8FD9\u5F20\u5361\u8981\u600E\u4E48\u6539\u3002",
@@ -6425,6 +6435,14 @@ var zhCN = {
   "ui.book_bar_finish_ask_0": "\u8FD8\u6709 {0} \u7AE0\u6CA1\u5904\u7406\uFF0C\u4ECD\u8981\u5B8C\u6210\u5417\uFF1F",
   "ui.book_bar_finish_go": "\u4ECD\u8981\u5B8C\u6210",
   "ui.book_confirm_gate1": "\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66",
+  "ui.book_phase_plan_review": "\u4F01\u5212\u597D\u4E86\uFF0C\u7B49\u4F60\u770B",
+  "ui.book_phase_trial_review": "\u8BD5\u8DD1\u5199\u597D\u4E86\uFF0C\u7B49\u4F60\u770B",
+  "ui.book_bar_plan_ready_0": "{0} \u7AE0\u90FD\u4F01\u5212\u597D\u4E86",
+  "ui.book_bar_open_plan": "\u6253\u5F00\u5168\u4E66\u4F01\u5212",
+  "ui.book_bar_start_trial_0": "\u8BD5\u8DD1 {0} \u7AE0",
+  "ui.book_skip_trial": "\u8DF3\u8FC7\u8BD5\u8DD1\uFF0C\u76F4\u63A5\u5199\u5168\u4E66",
+  "ui.book_bar_back_to_plan": "\u56DE\u53BB\u6539\u4F01\u5212",
+  "ui.book_bar_plan_hint": "\u60F3\u6539\uFF1A\u76F4\u63A5\u5728\u6839\u7B14\u8BB0\u7684\u201C\u5168\u4E66\u4F01\u5212\u201D\u6216\u5404\u7AE0\u7684\u201C\u63D0\u793A\u201D\u91CC\u6539\u6587\u5B57\uFF0C\u6539\u5B8C\u518D\u6309\u4E0A\u9762\u4EFB\u4E00\u4E2A\u7EE7\u7EED\u3002",
   "ui.book_stage_pending": "\u5F85\u4F01\u5212",
   "ui.book_stage_planned": "\u5DF2\u4F01\u5212",
   "ui.book_stage_written": "\u5DF2\u5199",
@@ -9612,6 +9630,7 @@ var zhTW = {
   "ui.book_refused_disposed": "\u5916\u639B\u6B63\u5728\u95DC\u9589\uFF0C\u7121\u6CD5\u57F7\u884C\u3002",
   "ui.book_refused_unreadable": "\u8B80\u4E0D\u5230\u9019\u5F35\u5FC3\u667A\u5716\u7684\u8CC7\u6599\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002",
   "ui.book_chat_gate1_confirmed": "\u5DF2\u78BA\u8A8D\u4F01\u5283\uFF0C\u958B\u59CB\u5BEB\u4F5C\u3002",
+  "ui.book_chat_trial_started": "\u5DF2\u78BA\u8A8D\u4F01\u5283\uFF0C\u958B\u59CB\u8A66\u8DD1\u3002",
   "ui.book_refused_not_gate1": "\u76EE\u524D\u4E0D\u5728\u300C\u7B49\u4F60\u78BA\u8A8D\u300D\u968E\u6BB5\uFF0C\u4E0D\u9700\u8981\u78BA\u8A8D\u3002",
   "ui.book_refused_not_gate": "\u76EE\u524D\u4E0D\u5728\u95DC\u5361\u4E0A\uFF0C\u73FE\u5728\u4E0D\u80FD\u55AE\u7368\u91CD\u8DD1\u4E00\u5F35\u5361\u3002",
   "ui.book_refused_instruction": "\u8ACB\u5148\u5BEB\u4E0B\u9019\u5F35\u5361\u8981\u600E\u9EBC\u6539\u3002",
@@ -9670,6 +9689,14 @@ var zhTW = {
   "ui.book_bar_finish_ask_0": "\u9084\u6709 {0} \u7AE0\u6C92\u8655\u7406\uFF0C\u4ECD\u8981\u5B8C\u6210\u55CE\uFF1F",
   "ui.book_bar_finish_go": "\u4ECD\u8981\u5B8C\u6210",
   "ui.book_confirm_gate1": "\u9019\u6A23\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u66F8",
+  "ui.book_phase_plan_review": "\u4F01\u5283\u597D\u4E86\uFF0C\u7B49\u4F60\u770B",
+  "ui.book_phase_trial_review": "\u8A66\u8DD1\u5BEB\u597D\u4E86\uFF0C\u7B49\u4F60\u770B",
+  "ui.book_bar_plan_ready_0": "{0} \u7AE0\u90FD\u4F01\u5283\u597D\u4E86",
+  "ui.book_bar_open_plan": "\u6253\u958B\u5168\u66F8\u4F01\u5283",
+  "ui.book_bar_start_trial_0": "\u8A66\u8DD1 {0} \u7AE0",
+  "ui.book_skip_trial": "\u8DF3\u904E\u8A66\u8DD1\uFF0C\u76F4\u63A5\u5BEB\u5168\u66F8",
+  "ui.book_bar_back_to_plan": "\u56DE\u53BB\u6539\u4F01\u5283",
+  "ui.book_bar_plan_hint": "\u60F3\u6539\uFF1A\u76F4\u63A5\u5728\u6839\u7B46\u8A18\u7684\u300C\u5168\u66F8\u4F01\u5283\u300D\u6216\u5404\u7AE0\u7684\u300C\u63D0\u793A\u300D\u88E1\u6539\u6587\u5B57\uFF0C\u6539\u5B8C\u518D\u6309\u4E0A\u9762\u4EFB\u4E00\u500B\u7E7C\u7E8C\u3002",
   "ui.book_stage_pending": "\u5F85\u4F01\u5283",
   "ui.book_stage_planned": "\u5DF2\u4F01\u5283",
   "ui.book_stage_written": "\u5DF2\u5BEB",
@@ -12845,6 +12872,7 @@ function problem(raw) {
     return "expandPasses";
   if (raw.trial !== void 0 && (!Array.isArray(raw.trial) || raw.trial.some((id) => typeof id !== "string" || !raw.order.includes(id))))
     return "trial";
+  if (raw.planReview !== void 0 && raw.planReview !== true) return "planReview";
   if (!isObject(raw.budget) || !isCount(raw.budget.used) || !isCount(raw.budget.limit) || raw.budget.limit < 1)
     return "budget";
   if (raw.consistency !== void 0 && !consistencyShape(raw.consistency)) return "consistency";
@@ -47637,6 +47665,7 @@ function newBookPipeline(input2) {
     ...((_a2 = input2.staleStages) == null ? void 0 : _a2.length) ? { pendingReset: [...input2.staleStages] } : {},
     ...((_b2 = input2.autoRoles) == null ? void 0 : _b2.length) ? { autoRoles: [...input2.autoRoles] } : {},
     trial: input2.order.slice(0, TRIAL_SIZE),
+    planReview: true,
     budget: { used: 0, limit: (_c = input2.budgetLimit) != null ? _c : DEFAULT_BUDGET_LIMIT },
     revision: 0,
     startedAt: input2.now,
@@ -47673,7 +47702,7 @@ function nextActions(data, stages, busy = /* @__PURE__ */ new Set(), options = {
     if (stage === "needs-review" || stage === "checked") continue;
     const attempts = attemptsOf(data, nodeId);
     const trialCard = !!((_c = data.trial) == null ? void 0 : _c.includes(nodeId));
-    const step = stage === void 0 ? "plan" : !allPlanned || data.phase === "planning" && !trialCard ? null : stage === "planned" ? "write" : "proof";
+    const step = stage === void 0 ? "plan" : !allPlanned || data.phase === "planning" && (!trialCard || data.planReview) ? null : stage === "planned" ? "write" : "proof";
     if (!step) continue;
     if (attempts[step] >= MAX_STEP_ATTEMPTS) actions.push({ type: "mark_needs_review", nodeId, step });
     else actions.push({ type: step === "plan" ? "card_plan" : step === "write" ? "card_write" : "card_proof", nodeId });
@@ -47743,7 +47772,7 @@ function advancePhase(data, stages, now) {
   }
   const order = effectiveOrder(next);
   const all = (min) => order.every((id) => ranked(stages[id]) >= min);
-  const trialDone = next.trial ? next.trial.every((id) => !order.includes(id) || ranked(stages[id]) >= 3) : all(1);
+  const trialDone = next.trial && !next.planReview ? next.trial.every((id) => !order.includes(id) || ranked(stages[id]) >= 3) : all(1);
   if (next.phase === "planning" && next.globalPlanned && trialDone) next.phase = "gate1";
   else if (next.phase === "writing" && all(3)) next.phase = "gate2";
   else return data;
@@ -47769,9 +47798,38 @@ function retryTrial(data, now) {
   next.revision++;
   return next;
 }
+function startTrial(data, now) {
+  var _a2;
+  if (data.phase !== "gate1" || data.status !== "running" || !data.planReview || !((_a2 = data.trial) == null ? void 0 : _a2.length)) return data;
+  const next = clone2(data);
+  delete next.planReview;
+  next.phase = "planning";
+  next.phaseStartedAt = now;
+  next.revision++;
+  return next;
+}
+function backToPlan(data, now) {
+  var _a2;
+  if (data.phase !== "gate1" || data.status !== "running" || data.planReview || !((_a2 = data.trial) == null ? void 0 : _a2.length)) return data;
+  const next = clone2(data);
+  next.planReview = true;
+  next.phaseStartedAt = now;
+  for (const id of data.trial) {
+    next.attempts[id] = emptyAttempts();
+    next.revisions[id] = cardRevision(next, id) + 1;
+    if (next.autoFixes) delete next.autoFixes[id];
+    if (next.expandPasses) delete next.expandPasses[id];
+  }
+  next.revision++;
+  return next;
+}
 function confirmGate1(data, now) {
   if (data.phase !== "gate1" || data.status !== "running") return data;
   const next = clone2(data);
+  if (next.planReview) {
+    delete next.planReview;
+    delete next.trial;
+  }
   next.phase = "writing";
   next.phaseStartedAt = now;
   next.revision++;
@@ -53858,6 +53916,52 @@ var BookPipelineRuns = class {
       true
     );
   }
+  /** The plan review: the owner chose to run the trial. The trial chapters are written from their plans as they are now. Refused (not_gate1) elsewhere. */
+  async startTrial(mapPath) {
+    return this.enter(
+      mapPath,
+      async (drive) => {
+        await this.openSaved(drive, mapPath);
+        let moved = false;
+        await drive.store.commit((state) => {
+          var _a2;
+          const next = startTrial((_a2 = resumeRun(state)) != null ? _a2 : state, this.ports.now());
+          moved = next.phase !== state.phase;
+          return { state: moved ? next : state, accepted: true };
+        });
+        if (!moved) throw new BookPipelineRunError("not_gate1");
+        this.log(drive, "gate1", "-", "write", "trial_start");
+      },
+      true
+    );
+  }
+  /**
+   * The trial's gate 1: the owner wants to change the plan first. The run returns to the plan review; the trial chapters go back to
+   * planned (their plans stay for the owner to edit; their text stays until the next trial rewrites it). Refused (not_gate1) elsewhere.
+   */
+  async backToPlan(mapPath) {
+    return this.enter(mapPath, async (drive) => {
+      var _a2;
+      await this.openSaved(drive, mapPath);
+      let moved = false;
+      await drive.store.commit((state) => {
+        var _a3;
+        const next = backToPlan((_a3 = resumeRun(state)) != null ? _a3 : state, this.ports.now());
+        moved = next.planReview === true && state.planReview !== true;
+        return { state: moved ? next : state, accepted: true };
+      });
+      if (!moved) throw new BookPipelineRunError("not_gate1");
+      for (const id of (_a2 = drive.store.state.trial) != null ? _a2 : []) {
+        const own2 = drive.cards.get(id);
+        if (!own2 || drive.stages.get(id) === void 0) continue;
+        const current = await this.ports.readCard(own2.path).catch(() => void 0);
+        if (current) for (const url of bodyImageUrls(current.detail)) drive.usedImages.delete(imageKey(url));
+        drive.stages.set(id, "planned");
+        await this.writeFields(drive, id, { pipelineStage: "planned", pipelineIssue: null });
+      }
+      this.log(drive, "gate1", "-", "plan", "back_to_plan");
+    });
+  }
   /**
    * One card again (gate 2 or done): plan, author, proofread with the usual per-step retries, fence, backup and
    * budget rules; the card gets a new revision (so a new proof record; older records stay, marked old). The cards on both sides are
@@ -56257,12 +56361,12 @@ function bookBarState(data, progress, stageOf, mapIds) {
     globalDone: data.globalPlanned === true,
     ...current ? { current } : {},
     ...!current && mode === "writing" && active && ((_l = data.consistency) == null ? void 0 : _l.done) === false ? { checking: true } : {},
-    ...((_m = data.trial) == null ? void 0 : _m.length) && mode === "planning" && data.globalPlanned ? { trialSize: data.trial.length } : {},
+    ...((_m = data.trial) == null ? void 0 : _m.length) && !data.planReview && mode === "planning" && data.globalPlanned ? { trialSize: data.trial.length } : {},
     ...rerunning ? { rerun: true } : {},
     ...mapChange ? { mapChange } : {},
     ...gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {},
     ...reordered ? { mapChange: reordered } : {},
-    ...mode === "gate1" && ((_n = data.trial) == null ? void 0 : _n.length) ? { trialCount: data.trial.length } : {},
+    ...mode === "gate1" && ((_n = data.trial) == null ? void 0 : _n.length) ? data.planReview ? { planReview: true, trialCount: data.trial.length } : { trialCount: data.trial.length } : {},
     ...mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {},
     ...(progress == null ? void 0 : progress.etaSeconds) !== void 0 && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0 ? { etaSeconds: progress.etaSeconds } : {}
   };
@@ -56311,7 +56415,7 @@ function countStages(stages) {
   return counts;
 }
 function bookTitleText(state) {
-  const word = state.mode === "stopped" || state.mode === "changed" ? t("ui.book_phase_stopped") : state.mode === "budget" ? t("ui.book_phase_budget") : t(PHASE_KEY[state.mode]);
+  const word = state.mode === "stopped" || state.mode === "changed" ? t("ui.book_phase_stopped") : state.mode === "budget" ? t("ui.book_phase_budget") : state.mode === "gate1" && state.planReview ? t("ui.book_phase_plan_review") : state.mode === "gate1" && state.trialCount ? t("ui.book_phase_trial_review") : t(PHASE_KEY[state.mode]);
   return t("ui.book_bar_title_0", word);
 }
 function bookEtaText(seconds) {
@@ -56319,7 +56423,7 @@ function bookEtaText(seconds) {
   return minutes < 1 ? t("ui.book_eta_under_minute") : t("ui.book_eta_0", minutes);
 }
 function renderBookBar(parent, state, actions) {
-  var _a2, _b2, _c, _d;
+  var _a2, _b2, _c, _d, _e;
   const { counts, total: total2 } = state;
   const bar = parent.createDiv("vam-book-bar");
   bar.dataset.mode = state.mode;
@@ -56348,13 +56452,27 @@ function renderBookBar(parent, state, actions) {
   }
   if ((state.mode === "gate1" || state.mode === "gate2" || state.mode === "done") && state.mapChange)
     top.createSpan({ cls: "vam-book-bar-counts vam-book-map-changed", text: mapChangeText(state.mapChange) });
-  if (state.mode === "gate1" && state.trialCount) {
+  if (state.mode === "gate1" && state.planReview) {
+    top.createSpan({ cls: "vam-book-bar-counts", text: t("ui.book_bar_plan_ready_0", total2) });
+    top.createSpan({ cls: "vam-book-bar-counts vam-book-plan-hint", text: t("ui.book_bar_plan_hint") });
+    if (actions.openPlan)
+      makeButton(buttons, t("ui.book_bar_open_plan"), "vam-book-link vam-book-open-plan", actions.openPlan);
+    if (actions.startTrial)
+      makeButton(
+        buttons,
+        t("ui.book_bar_start_trial_0", (_a2 = state.trialCount) != null ? _a2 : 0),
+        "mod-cta vam-book-start-trial",
+        actions.startTrial
+      );
+  } else if (state.mode === "gate1" && state.trialCount) {
     top.createSpan({
       cls: "vam-book-bar-counts",
       text: state.trialAttention ? t("ui.book_bar_trial_review_0_1", state.trialCount, state.trialAttention) : t("ui.book_bar_trial_ready_0", state.trialCount)
     });
     if (actions.openTrial)
       makeButton(buttons, t("ui.book_bar_open_first"), "vam-book-link vam-book-open-first", actions.openTrial);
+    if (actions.backToPlan && !state.rerun)
+      makeButton(buttons, t("ui.book_bar_back_to_plan"), "vam-book-back-to-plan", actions.backToPlan);
   }
   if (state.mode === "gate2" && state.review) {
     top.createSpan({
@@ -56370,10 +56488,12 @@ function renderBookBar(parent, state, actions) {
       makeButton(buttons, t("ui.book_bar_next_review"), "vam-book-link vam-book-next-review", actions.nextReview);
   }
   if (state.phase === "gate1" && state.mode !== "done" && state.mode !== "stopped") {
-    makeButton(buttons, t("ui.book_confirm_gate1"), "mod-cta vam-book-confirm", actions.confirmGate1);
+    if (state.mode === "gate1" && state.planReview)
+      makeButton(buttons, t("ui.book_skip_trial"), "vam-book-confirm vam-book-skip-trial", actions.confirmGate1);
+    else makeButton(buttons, t("ui.book_confirm_gate1"), "mod-cta vam-book-confirm", actions.confirmGate1);
   }
   if (state.mode === "gate2" && actions.finish && state.review) {
-    const left = ((_b2 = (_a2 = state.review) == null ? void 0 : _a2.attention) != null ? _b2 : 0) > 0;
+    const left = ((_c = (_b2 = state.review) == null ? void 0 : _b2.attention) != null ? _c : 0) > 0;
     const finish = makeButton(
       buttons,
       t("ui.book_bar_finish"),
@@ -56410,7 +56530,7 @@ function renderBookBar(parent, state, actions) {
     );
     ask.setAttr("aria-expanded", String(abandon.asking));
   }
-  if (((_c = actions.abandon) == null ? void 0 : _c.asking) && (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")) {
+  if (((_d = actions.abandon) == null ? void 0 : _d.asking) && (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")) {
     const abandon = actions.abandon;
     const card = bar.createDiv("vam-book-abandon-card");
     card.setAttr("role", "group");
@@ -56429,7 +56549,7 @@ function renderBookBar(parent, state, actions) {
       t("ui.book_bar_go_anyway"),
       actions.gate1Ask
     );
-  if (state.mode === "gate2" && ((_d = actions.finish) == null ? void 0 : _d.asking) && state.review && state.review.attention > 0)
+  if (state.mode === "gate2" && ((_e = actions.finish) == null ? void 0 : _e.asking) && state.review && state.review.attention > 0)
     renderAsk(
       bar,
       "vam-book-finish-ask",
@@ -87465,6 +87585,13 @@ ${t("ui.book_role_running_suffix")}` : first);
         const first = this.effectiveTrial(read.data)[0];
         if (first) void this.openBookNote(first);
       },
+      openPlan: () => {
+        var _a3;
+        const root = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((node) => !node.parentId);
+        if (root) void this.openBookNote(root.id);
+      },
+      startTrial: () => void this.bookEntry(() => this.plugin.startBookTrial(path)),
+      backToPlan: () => void this.bookEntry(() => this.plugin.backBookToPlan(path)),
       ...gate1Ask ? {
         gate1Ask: {
           count: gate1Ask.count,
@@ -87740,14 +87867,16 @@ ${t("ui.book_role_running_suffix")}` : first);
   }
   /** The chat's "continue" while the run waits at gate 1: confirms the plan. null when this map is not waiting there. */
   bookGate1FromChat() {
+    var _a2;
     const path = this.path;
     const read = this.map ? readBookPipeline(this.map) : null;
     if (!path || !read || read.kind !== "usable") return null;
     if (!isBookGate1Waiting(this.plugin.getBookPipelineProgress(path), read.data)) return null;
-    return this.plugin.confirmBookGate1(path).then(
+    const review = read.data.planReview === true && !!((_a2 = read.data.trial) == null ? void 0 : _a2.length);
+    return (review ? this.plugin.startBookTrial(path) : this.plugin.confirmBookGate1(path)).then(
       () => {
         if (!this.closed) this.render();
-        return t("ui.book_chat_gate1_confirmed");
+        return t(review ? "ui.book_chat_trial_started" : "ui.book_chat_gate1_confirmed");
       },
       (error) => {
         if (!this.closed) this.render();
@@ -109601,6 +109730,12 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   confirmBookGate1(mapPath) {
     return this.bookPipelineRuns.confirmGate1(mapPath);
+  }
+  startBookTrial(mapPath) {
+    return this.bookPipelineRuns.startTrial(mapPath);
+  }
+  backBookToPlan(mapPath) {
+    return this.bookPipelineRuns.backToPlan(mapPath);
   }
   rerunBookCard(mapPath, nodeId, options = {}) {
     return this.bookPipelineRuns.rerunCard(mapPath, nodeId, options);

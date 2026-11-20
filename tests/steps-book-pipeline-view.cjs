@@ -1161,11 +1161,13 @@ test('restart: the card opens with the current settings; Start replaces the stop
 
 // ---- T3: the toolbar replaces the panel (no side column, no toggle, no finish modal) ----
 const WRAPPED = '==x==%%備註#1：y%%';
-async function gateRig({ phase, stages = {}, trialNotes = [] }) {
+async function gateRig({ phase, stages = {}, trialNotes = [], planReview = false }) {
   const h = await harness({ book: true, phase, stages });
-  h.view.map.bookPipeline = bookData({ phase, status: 'running', order: [h.ids.root, h.ids.a, h.ids.b], trial: [h.ids.root, h.ids.a, h.ids.b] });
+  h.view.map.bookPipeline = bookData({ phase, status: 'running', order: [h.ids.root, h.ids.a, h.ids.b], trial: [h.ids.root, h.ids.a, h.ids.b], ...(planReview ? { planReview: true } : {}) });
   h.plugin.getBookPipelineProgress = () => progress({ phase, active: false, total: 3, counts: { pending: 0, planned: 0, written: 0, checked: 3, 'needs-review': 0 } });
   h.plugin.finishBookRun = async p => { h.entries.push(['finish', p]); };
+  h.plugin.startBookTrial = async p => { h.entries.push(['trial', p]); };
+  h.plugin.backBookToPlan = async p => { h.entries.push(['back', p]); };
   const opened = [];
   h.view.openBookNote = async id => { opened.push(id); };
   const vault = h.view.app.vault;
@@ -1184,14 +1186,32 @@ test('toolbar gate 1: the trial sentence, "open chapter 1" opens the first trial
   const g = await gateRig({ phase: 'gate1', stages: { root: 'checked', a: 'checked', b: 'checked' } });
   const bar = g.drawBar();
   assert.ok(texts(bar).includes('試跑的 3 章寫好了'));
-  assert.deepEqual(g.labels(bar), ['打開第 1 章', '這樣可以，跑完全書', '停止']);
+  assert.ok(texts(bar).includes('圖文書：試跑寫好了，等你看'));
+  assert.deepEqual(g.labels(bar), ['打開第 1 章', '回去改企劃', '這樣可以，跑完全書', '停止']);
   g.click(bar, '打開第 1 章');
   assert.deepEqual(g.opened, [g.ids.root]);
   g.click(bar, '停止'); await dom.tick();
+  g.click(g.drawBar(), '回去改企劃'); await dom.tick();
   g.click(g.drawBar(), '這樣可以，跑完全書'); await dom.tick();
-  assert.equal(JSON.stringify(g.entries), JSON.stringify([['stop', MAP], ['confirm', MAP]]), 'no notes: the first press confirms at once');
+  assert.equal(JSON.stringify(g.entries), JSON.stringify([['stop', MAP], ['back', MAP], ['confirm', MAP]]), 'no notes: the first press confirms at once');
   assert.equal(dom.find(g.drawBar(), i => i.cls.includes('vam-book-gate1-ask')), undefined);
   assert.equal(dom.find(g.drawBar(), i => i.cls.includes('vam-book-panel') || i.cls.includes('vam-book-side')), undefined, 'no panel and no toggle');
+});
+
+test('toolbar plan review: the plan sentence and hint, "open the whole-book plan" opens the root, "try" and "skip" go to the plugin', async () => {
+  lang('zh-TW');
+  const g = await gateRig({ phase: 'gate1', planReview: true, stages: { root: 'planned', a: 'planned', b: 'planned' } });
+  const bar = g.drawBar();
+  assert.ok(texts(bar).includes('圖文書：企劃好了，等你看'));
+  assert.ok(texts(bar).includes('3 章都企劃好了'));
+  assert.ok(texts(bar).some(text => text.startsWith('想改：直接在根筆記的「全書企劃」')));
+  assert.ok(!texts(bar).includes('試跑的 3 章寫好了'), 'no trial sentence before the trial ran');
+  assert.deepEqual(g.labels(bar), ['打開全書企劃', '試跑 3 章', '跳過試跑，直接寫全書', '停止']);
+  g.click(bar, '打開全書企劃');
+  assert.deepEqual(g.opened, [g.ids.root]);
+  g.click(bar, '試跑 3 章'); await dom.tick();
+  g.click(g.drawBar(), '跳過試跑，直接寫全書'); await dom.tick();
+  assert.equal(JSON.stringify(g.entries), JSON.stringify([['trial', MAP], ['confirm', MAP]]));
 });
 
 test('toolbar gate 1 with notes not applied: the first press asks, only 仍要 confirms, Cancel gives the keyboard back to the opener; Escape cancels', async () => {

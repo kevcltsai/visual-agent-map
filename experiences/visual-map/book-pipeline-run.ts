@@ -14,6 +14,7 @@ import type { FindImagesRequest, FoundImages } from "../../core/steps/book-pipel
 import type { ConsistencyRequest, RawInconsistency } from "../../core/steps/book-pipeline/consistency";
 import { chapterReferenceFindings } from "../../core/book-pipeline/chapter-references";
 import { chapterInconsistencies, compactChapters, removedChapterRefs } from "../../core/book-pipeline/consistency";
+import { directionFindings, numericFindings, verbatimQuote } from "../../core/book-pipeline/cross-checks";
 import { isBudgetExhausted } from "../../core/admission";
 import { createBudgetAdmission, createStoreBudgetPort } from "../../core/book-pipeline/budget";
 import { imageKey } from "../../core/book-pipeline/image-dedupe";
@@ -2210,15 +2211,27 @@ export class BookPipelineRuns {
               { signal: drive.controller.signal, admission: drive.admission }
             );
       if (this.dead(drive)) return;
+      // The model's quotes are checked against the chapters: a claim no sentence matches is shown as a paraphrase.
+      const modelFindings = found.map((issue): ConsistencyFinding => {
+        const [x, y] = [chapters[issue.a - 1], chapters[issue.b - 1]];
+        const quoteA = verbatimQuote(issue.claimA, x.text);
+        const quoteB = verbatimQuote(issue.claimB, y.text);
+        return {
+          a: x.id,
+          b: y.id,
+          claimA: quoteA ?? issue.claimA,
+          claimB: quoteB ?? issue.claimB,
+          suggestion: issue.suggestion,
+          ...(quoteA === undefined ? { looseA: true as const } : {}),
+          ...(quoteB === undefined ? { looseB: true as const } : {})
+        };
+      });
+      // The program's own checks: numbers the model missed, and 「後面的章節」/「前面講過」 that point the wrong way.
       const findings: ConsistencyFinding[] = [
         ...references,
-        ...found.map(issue => ({
-          a: chapters[issue.a - 1].id,
-          b: chapters[issue.b - 1].id,
-          claimA: issue.claimA,
-          claimB: issue.claimB,
-          suggestion: issue.suggestion
-        })),
+        ...directionFindings(ordered),
+        ...modelFindings,
+        ...numericFindings(chapters, modelFindings),
         ...removed
       ];
       const done = await drive.store.commit(state => applyConsistency(state, token, findings));

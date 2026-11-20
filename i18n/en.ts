@@ -3429,7 +3429,11 @@ export const en = {
   "ui.book_reason_length_over_0_1_2_3": "The chapter is {0} {1}, longer than the {2}–{3} {1} you asked for",
   "ui.book_reason_chapter_ref_0_1_2_3": "Wrong chapter number: in “{0}”, “{1}” means 〈{2}〉, which is {3}",
   "ui.book_reason_inconsistent_0_1_2":
-    "Says something differently from 〈{0}〉: this chapter says “{1}”, 〈{0}〉 says “{2}”",
+    "Says something differently from 〈{0}〉: this chapter says {1}, 〈{0}〉 says {2}",
+  "ui.book_reason_inconsistent_self_0_1": "This chapter contradicts itself: it says {0}, and later {1}",
+  "ui.book_reason_direction_0_1_2_3": "Points the wrong way: in “{0}”, “{1}” means 〈{2}〉, which is {3}",
+  "ui.book_quote_0": "“{0}”",
+  "ui.book_paraphrase_0": "(paraphrased) {0}",
   "ui.book_reason_removed_ref_0_1": "This chapter still mentions the removed 〈{0}〉: “{1}”",
   "ui.book_reason_length_under_0_1_2_3": "The chapter is {0} {1}, shorter than the {2}–{3} {1} you asked for",
   "ui.book_reason_images_under_0_1": "Too few pictures: {0} placed, the setting asks for at least {1}",

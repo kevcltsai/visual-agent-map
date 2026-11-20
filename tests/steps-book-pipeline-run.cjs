@@ -3225,7 +3225,8 @@ test('consistency: one check after every chapter is proofread costs one call, ma
   assert.equal((await r.note(2)).pipelineIssue, 'consistency');
   const ids = r.nodes.map(n => n.id);
   const entries = reviewEntries({ order: ids, titleOf: id => TITLES[ids.indexOf(id)], noteOf: id => ({ pipelineStage: stageOf(r.raw(ids.indexOf(id))), pipelineIssue: 'consistency' }), inconsistencies: id => chapterInconsistencies(s, id) });
-  assert.equal(entries.find(e => e.card.id === ids[2]).problems[0].text, `Says something differently from 〈${TITLES[0]}〉: this chapter says “一到兩天”, 〈${TITLES[0]}〉 says “三天”, 統一寫一到三天`);
+  // Neither claim is in the chapters (bodies are `SecretBody <title>`): both are shown as paraphrases, not quotes.
+  assert.equal(entries.find(e => e.card.id === ids[2]).problems[0].text, `Says something differently from 〈${TITLES[0]}〉: this chapter says (paraphrased) 一到兩天, 〈${TITLES[0]}〉 says (paraphrased) 三天, 統一寫一到三天`);
   assert.ok(r.stat.logs.some(line => /consistency/.test(line) && /ok:1/.test(line)));
   assert.ok(!r.stat.logs.some(line => line.includes('三天')), 'the log carries no claim text');
 });
@@ -3247,6 +3248,37 @@ test('consistency: a wrong chapter number in a chapter is found without a model 
   assert.deepEqual([stageOf(r.raw(0)), stageOf(r.raw(1)), stageOf(r.raw(2))], ['needs-review', 'checked', 'checked']);
   const ids = r.nodes.map(n => n.id);
   assert.deepEqual(JSON.parse(JSON.stringify(chapterInconsistencies(s, ids[0]))), [{ other: ids[2], own: `細節都留給第二章「${TITLES[2]}」。`, theirs: '第二章', suggestion: '第三章', reference: true }]);
+});
+
+test('consistency: the model\'s paraphrase becomes the chapter\'s sentence, and the program adds a number and a direction the model missed, still one call', async () => {
+  const { chapterInconsistencies } = S.load('core/book-pipeline/consistency.ts');
+  const extra = [
+    '\n\n大多數蔬菜都喜歡日照，一天最好有四到六小時的光。',
+    '\n\n小白菜的盆，盆土深度至少 10 公分就可以。',
+    '\n\n一般來說，大部分蔬菜最喜歡日照，一天有八小時左右的光。\n\n至於SecretTitleA，留到後面的章節再講。'
+  ];
+  let r;
+  const asked = [];
+  r = await rig({
+    ports: { checkConsistency: async (request, run) => { asked.push(request); await run.admission.reserve(); return [{ a: 2, b: 3, claimA: '第2章說盆深至少十公分', claimB: '第3章說盆深三十公分', suggestion: '' }]; } },
+    script: { author: async input => { await input.admission.reserve(); const note = await r.repo.readNote(input.path); await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) + extra[TITLES.indexOf(note.title)] }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } }
+  });
+  await r.runs.start(r.mapPath);
+  await confirmDone(r.runs, r.mapPath);
+  const s = await r.state();
+  assert.equal(asked.length, 1, 'one call per book');
+  assert.equal(s.budget.used, 1 + 3 + 3 + 3 + 1);
+  const ids = r.nodes.map(n => n.id);
+  const plainOf = value => JSON.parse(JSON.stringify(value));
+  assert.deepEqual(plainOf(chapterInconsistencies(s, ids[1])), [
+    { other: ids[2], own: '小白菜的盆，盆土深度至少 10 公分就可以。', theirs: '第3章說盆深三十公分', suggestion: '', theirsLoose: true }
+  ]);
+  assert.deepEqual(plainOf(chapterInconsistencies(s, ids[0])), [
+    { other: ids[2], own: '大多數蔬菜都喜歡日照，一天最好有四到六小時的光。', theirs: '一般來說，大部分蔬菜最喜歡日照，一天有八小時左右的光。', suggestion: '' }
+  ]);
+  const third = plainOf(chapterInconsistencies(s, ids[2]));
+  assert.ok(third.some(item => item.kind === 'direction' && item.other === ids[1] && item.theirs === '留到後面' && item.suggestion === '前面的第2章'));
+  assert.deepEqual([stageOf(r.raw(0)), stageOf(r.raw(1)), stageOf(r.raw(2))], ['needs-review', 'needs-review', 'needs-review']);
 });
 
 test('consistency: a check that fails three times never holds the run (gate 2, no chapter marked); no port means no check', async () => {

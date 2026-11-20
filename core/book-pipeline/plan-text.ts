@@ -7,6 +7,7 @@ import { instructionLanguageOf, type ContentLanguage } from "../../i18n";
 import { cleanSlotText, MAX_IMAGE_SLOTS, type ImageSlot } from "./image-slots";
 import { BOOK_ROLES, BOOK_SETTING_FIELDS, type BookRole, type BookSettings } from "./model";
 import { demoteHeadings, escapeMarkdownText, singleLine, unescapeMarkdownText } from "./text";
+import { isPlaceholder } from "../note-placeholder";
 
 type Words = { zh: string; en: string };
 const pick = (words: Words, language: ContentLanguage): string =>
@@ -60,6 +61,12 @@ const L = {
 /** One safe line of model text for a note: one line, no heading, and no Markdown/Obsidian syntax that could take effect. */
 const safe = (value: unknown, max = 400): string => escapeMarkdownText(singleLine(value, max), max);
 
+/** A neighbour's one-sentence description: a model's literal `null` / `undefined` or the "no conclusion yet" placeholder says nothing, so it is blank. */
+const neighbourSentence = (value: unknown): string => {
+  const text = safe(value, 240);
+  return /^(?:null|undefined)$/i.test(text.trim()) || isPlaceholder(text.trim()) ? "" : text;
+};
+
 const colon = (language: ContentLanguage): string => (instructionLanguageOf(language) === "zh" ? "：" : ": ");
 
 export interface CardPlanText {
@@ -97,7 +104,7 @@ export function composeCardPrompt(plan: CardPlanText, language: ContentLanguage)
   const c = colon(language);
   const neighbour = (label: Words, n: CardPlanText["previous"]): string =>
     n
-      ? `${pick(label, language)}${c}(${n.position}) ${safe(n.title, 120)}${safe(n.summary, 240) ? ` — ${safe(n.summary, 240)}` : ""}`
+      ? `${pick(label, language)}${c}(${n.position}) ${safe(n.title, 120)}${neighbourSentence(n.summary) ? ` — ${neighbourSentence(n.summary)}` : ""}`
       : `${pick(label, language)}${c}${pick(L.none, language)}`;
   const lines = [
     `${pick(L.role, language)}${c}${pick(ROLE_WORDS[plan.role], language)}`,
@@ -193,13 +200,32 @@ export function rewriteNeighbourLine(
   const head = /^([^:：]+[:：]\s*)/.exec(lines[at].replace(/\r$/, ""))?.[1] ?? "";
   // `null`: no such card (the first or last chapter), written as the card plan writes it, in the language of the line's own label.
   const english = !lines[at].startsWith(L[key].zh);
-  const summary = neighbour ? safe(neighbour.summary, 240) : "";
+  const summary = neighbour ? neighbourSentence(neighbour.summary) : "";
   const line = neighbour
     ? `${head}(${neighbour.position}) ${safe(neighbour.title, 120)}${summary ? ` — ${summary}` : ""}`
     : `${head}${english ? L.none.en : L.none.zh}`;
   if (lines[at].replace(/\r$/, "") === line) return undefined;
   lines[at] = lines[at].endsWith("\r") ? `${line}\r` : line;
   return lines.join("\n");
+}
+
+/**
+ * Like {@link rewriteNeighbourLine}, but leaves a line that already names `neighbour` (same position and title) alone, and keeps the
+ * line's own sentence when only the position moved (a chapter before it was removed). Any other line is rewritten with `neighbour.summary`.
+ */
+export function retargetNeighbourLine(
+  prompt: string,
+  key: "previous" | "next",
+  neighbour: { position: number; title: string; summary: string } | null
+): string | undefined {
+  if (!neighbour) return rewriteNeighbourLine(prompt, key, null);
+  const value = parseCardPrompt(prompt)[key];
+  if (value === undefined) return undefined;
+  const title = unescapeMarkdownText(safe(neighbour.title, 120));
+  const m = /^\((\d+)\) ([\s\S]*)$/.exec(value);
+  const rest = m && (m[2] === title || m[2].startsWith(`${title} — `)) ? m[2].slice(title.length + 3) : undefined;
+  if (m && rest !== undefined && Number(m[1]) === neighbour.position) return undefined;
+  return rewriteNeighbourLine(prompt, key, rest === undefined ? neighbour : { ...neighbour, summary: rest });
 }
 
 export function parseRoleWord(word: string): BookRole | undefined {

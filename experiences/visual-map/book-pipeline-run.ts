@@ -98,6 +98,7 @@ import {
   parseCardPrompt,
   parseChecklist,
   parseImageSlots,
+  retargetNeighbourLine,
   rewriteNeighbourLine
 } from "../../core/book-pipeline/plan-text";
 import {
@@ -1312,6 +1313,50 @@ export class BookPipelineRuns {
     }
   }
 
+  /**
+   * After chapters were removed ("carry on as before"), the planned chapters' `前一張` / `後一張` lines may still name a removed chapter or
+   * an old position. Each such line is pointed at the neighbour in the current order (its own sentence kept when only the position moved);
+   * a line that already names it is left. Only those lines change: no role, stage, text or fingerprint is touched, and no AI call is made.
+   */
+  private async refreshAroundRemoved(drive: Drive): Promise<void> {
+    const signal = drive.controller.signal;
+    if (!drive.store.state.removed?.length || this.dead(drive) || signal.aborted || drive.fatal !== undefined) return;
+    const order = effectiveOrder(drive.store.state);
+    try {
+      for (const [at, nodeId] of order.entries()) {
+        const own = drive.cards.get(nodeId);
+        if (!own || drive.stages.get(nodeId) === undefined) continue;
+        for (const { index, key } of [
+          { index: at - 1, key: "previous" as const },
+          { index: at + 1, key: "next" as const }
+        ]) {
+          if (this.dead(drive) || signal.aborted) return;
+          const other = order[index] === undefined ? undefined : drive.cards.get(order[index]);
+          if (order[index] !== undefined && !other) continue;
+          const raw = await this.ports.readCard(own.path);
+          let neighbourLine: { position: number; title: string; summary: string } | null = null;
+          if (other) {
+            const neighbour = await this.ports.readCard(other.path);
+            neighbourLine = {
+              position: index + 1,
+              title: neighbour.title,
+              summary: summaryText(parseCardPrompt(neighbour.prompt).covers ?? neighbour.summary ?? "").trim()
+            };
+          }
+          const prompt = retargetNeighbourLine(raw.prompt, key, neighbourLine);
+          if (prompt === undefined) continue;
+          await this.ports.updateNoteGuarded(
+            own.path,
+            { prompt },
+            { expectedContent: raw.raw, authorize: () => !this.dead(drive) && !signal.aborted }
+          );
+        }
+      }
+    } catch {
+      // a chapter that cannot be read or written keeps its old lines
+    }
+  }
+
   private async markSeams(drive: Drive, nodeId: string, revision: number): Promise<void> {
     const order = effectiveOrder(drive.store.state);
     const at = order.indexOf(nodeId);
@@ -1783,6 +1828,7 @@ export class BookPipelineRuns {
         drive.skippedRefreshed = true;
         await this.collectSkippedPlans(drive);
         await this.refreshSkippedPlans(drive);
+        await this.refreshAroundRemoved(drive);
       }
       const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy);
       if (plan.hold === "global_failed") drive.failure = drive.reasons.get("global") ?? "failed";

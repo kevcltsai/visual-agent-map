@@ -46237,7 +46237,11 @@ function formatPipelineLog(e) {
 var stem = (word) => /^[a-z]/.test(word) && word.length > 3 ? word.replace(/ies$/, "y").replace(/(lea|[lr])ves$/, "$1f").replace(/(ch|sh|x|ss|o)es$/, "$1").replace(/([^s])s$/, "$1") : word;
 function askWords(ask) {
   var _a2;
-  return [...new Set([ask.explains, ...(_a2 = ask.terms) != null ? _a2 : [], ask.subject, ask.search].flatMap((text10) => slotKeywords(text10 != null ? text10 : "")).map(stem))];
+  return [
+    ...new Set(
+      [ask.explains, ...(_a2 = ask.terms) != null ? _a2 : [], ask.subject, ask.search].flatMap((text10) => slotKeywords(text10 != null ? text10 : "")).map(stem)
+    )
+  ];
 }
 function wordHits(words2, text10) {
   var _a2;

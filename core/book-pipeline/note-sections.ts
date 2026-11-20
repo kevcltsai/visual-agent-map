@@ -1148,24 +1148,60 @@ export function applyChapterEdits(detail: string, edits: readonly ChapterEdit[])
   return { detail: crlf ? text.replace(/\n/g, "\r\n") : text, applied };
 }
 
+/** Letters and digits only (NFKC, lower case): how an echoed line is compared with the request text. */
+const echoKey = (text: string): string =>
+  text
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, "");
+/** The shortest line (letters and digits) that counts as a copy of the request text: a short phrase may well be the chapter's own. */
+const ECHO_MIN = 12;
+/** A whole-line note in brackets that talks about the chapter's structure or where the new text goes (the author's note to the program, never prose). */
+const META_NOTE = /^[\s*_>]*[（(]([^（）()]*)[）)][\s*_]*$/u;
+const META_SELF = /本章|本節|本段|章節|以下|上述|this chapter|this section|the chapter|below|above/i;
+const META_PLACE =
+  /標題|結構|新增|插入|放在|接在|段落|heading|structure|insert|placed|placement|new (?:text|paragraphs?|sections?)|blocks?/i;
 /**
- * The automatic expansion of a too-short chapter, done by the program: the author's answer (`newDetail`, already cleaned) carries only
- * change blocks, which go into the chapter as it was (`oldDetail`); the source entries the answer added join the chapter's Sources section.
- * An answer with no block line is a whole chapter: undefined (the caller keeps it as written) when it is not shorter than the old
- * chapter text, else it is put in as one insertion, so the expansion never makes the chapter shorter.
+ * The lines of a change block that are the request echoed back or a note about the edit itself, not chapter text: a line whose letters
+ * and digits are a copy of the request text actually sent (`sent`, its chapter data left out), or a bracketed note about the chapter's
+ * structure or where the text goes (the 2026-11-20 run saved 「（本章結構以既有標題為準，以下新增段落接在章節正文各處；若找不到對應標題，請放在結語之前。）」).
+ */
+export function isEchoedLine(line: string, sent: string): boolean {
+  const note = META_NOTE.exec(line)?.[1];
+  if (note !== undefined && META_SELF.test(note) && META_PLACE.test(note)) return true;
+  const key = echoKey(line);
+  return key.length >= ECHO_MIN && echoKey(sent).includes(key);
+}
+const dropEchoes = (text: string, sent: string): string =>
+  text
+    .split("\n")
+    .filter(line => !isEchoedLine(line, sent))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+/**
+ * The automatic redo of a chapter, done by the program: the author's answer (`newDetail`, already cleaned) carries only change blocks,
+ * which go into the chapter as it was (`oldDetail`); the source entries the answer added join the chapter's Sources section. Lines that
+ * echo the request (`sent`, see {@link isEchoedLine}) are left out of every block. Undefined when no block applies (an answer with no
+ * block line, or blocks that match nothing): the caller keeps the chapter as it was; a whole chapter is never put in.
  */
 export function expandChapterDetail(
   oldDetail: string,
   newDetail: string,
-  language: string
+  language: string,
+  sent = ""
 ): { detail: string; applied: number } | undefined {
-  const answer = chapterBody(newDetail);
-  let edits = parseChapterEdits(answer);
-  if (!edits) {
-    if (Array.from(answer.trim()).length >= Array.from(chapterBody(oldDetail).trim()).length) return undefined;
-    edits = answer.trim() ? [{ kind: "insert", text: answer.trim() }] : [];
-  }
+  const parsed = parseChapterEdits(chapterBody(newDetail));
+  if (!parsed) return undefined;
+  const edits = parsed.flatMap((edit): ChapterEdit[] => {
+    const text = dropEchoes(edit.text, sent);
+    // An insertion that was only an echo is no insertion; a replacement that became empty would delete the passage, so it goes too.
+    if (!text && (edit.kind === "insert" || edit.text.trim())) return [];
+    return [{ ...edit, text }];
+  });
   const done = applyChapterEdits(oldDetail, edits);
+  if (!done.applied) return undefined;
   const lines = newDetail.split("\n");
   const section = findSection(lines, fencedLines(lines), text => isSourcesHeading(text));
   const sources = section

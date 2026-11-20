@@ -106,20 +106,17 @@ export function proofFixInstruction(
   // Whole pieces only: a cut in the middle of a JSON string would leave an unclosed quote, so what does not fit is left out.
   while (sources.length && avoidSourcesInstruction(sources).length > FIX_AVOID_MAX) sources = sources.slice(0, -1);
   const avoid = avoidSourcesInstruction(sources);
-  // A too-short chapter is expanded, not rewritten (`bookExpandRequirements`): its points are fixed with change blocks.
-  const expand = length?.kind === "under";
-  const lead = expand
-    ? "The chapter failed the fact check on these points (JSON strings; correct each with a @@replace block so it is correct and supported): "
-    : "The previous version of this chapter failed the fact check on these points (JSON strings; rewrite the chapter so they are correct and supported): ";
-  const leadStructure = expand
-    ? "The chapter did not meet these structure points of its checklist (JSON strings; cover them in the chapter text with @@insert or @@replace blocks, not in the sources list): "
-    : "The previous version of this chapter did not meet these structure points of its checklist (JSON strings; the chapter text itself, not the sources list, must cover them): ";
+  // Every redo edits the chapter in place (`bookExpandRequirements`): its points are fixed with change blocks, never a rewrite.
+  const lead =
+    "The chapter failed the fact check on these points (JSON strings; correct each with a @@replace block so it is correct and supported): ";
+  const leadStructure =
+    "The chapter did not meet these structure points of its checklist (JSON strings; cover them in the chapter text with @@insert or @@replace blocks, not in the sources list): ";
   // The length point is short and fixed (numbers and constant words), so it is reserved first and never squeezed out by long notes.
-  // Too short: the redo sees the chapter and adds to it, so the piece names the new text it needs; too long: a fresh write to the target.
+  // Too short: new text in @@insert blocks; too long: shorter passages in @@replace blocks.
   const lengthPiece = length
-    ? expand
+    ? length.kind === "under"
       ? `The chapter came out at only ${length.measured} ${length.unit}, short of the asked ${length.min} to ${length.max} ${length.unit}: add about ${lengthNeeded(length)} ${length.unit} of new text in @@insert blocks as the expansion rules say; keep every checklist point. `
-      : `The previous version of this chapter is ${length.measured} ${length.unit} long, over the asked ${length.min} to ${length.max} ${length.unit}: shorten it to at most ${length.max} ${length.unit}, about ${lengthTarget(length)} ${length.unit}; keep every checklist point. `
+      : `The chapter is ${length.measured} ${length.unit} long, over the asked ${length.min} to ${length.max} ${length.unit}: shorten it to at most ${length.max} ${length.unit}, about ${lengthTarget(length)} ${length.unit}, with @@replace blocks; keep every checklist point and every picture. `
     : "";
   let room = FIX_INSTRUCTION_MAX - avoid.length - 1 - lengthPiece.length;
   const piece = (list: typeof items, intro: string): string => {

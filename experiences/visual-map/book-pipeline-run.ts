@@ -126,6 +126,7 @@ import {
 } from "../../core/book-pipeline/proof";
 import {
   bookExpandRequirements,
+  fixInstructionText,
   effectiveSettings,
   imageCountRange,
   lengthReason,
@@ -480,7 +481,7 @@ interface Drive {
   avoid: Set<string>;
   /** Cards whose proofread named unmet points, waiting for the one automatic redo once every card has had its first round: the program-built request line. */
   fixable: Map<string, string>;
-  /** Cards whose automatic redo adds to the too-short chapter (the program puts the author's new text in) instead of writing it anew. */
+  /** Cards whose automatic redo edits the chapter in place (the program puts the author's change blocks in), never writing it anew. */
   expand: Set<string>;
   /** The reader's one-time permission to rewrite a hand-edited chapter: bound to the run, the card, the operation and the text it was given for. */
   overwrite: Map<string, { runId: string; operation: string; fingerprint: string }>;
@@ -2650,19 +2651,43 @@ export class BookPipelineRuns {
     };
     const slots = parseImageSlots(card.prompt);
     const settings = effectiveSettings(root.settings, parseBookPlanDecisions(root.raw));
-    // The automatic redo of a too-short chapter (measured again now, so a changed setting counts): the author sees the chapter and
-    // returns only change blocks, which the program puts into the chapter as it is (one call; its pictures and records stay).
-    const now =
-      drive.avoid.has(nodeId) && drive.expand.has(nodeId)
-        ? lengthReason(settings.length, chapterBody(card.detail))
-        : undefined;
-    const expanding = now?.kind === "under" ? now : undefined;
+    // The automatic redo (any reason; the length measured again now, so a changed setting counts) edits the chapter in place: the
+    // author sees the chapter and returns only change blocks, which the program puts into the chapter as it is (one call; its pictures
+    // and records stay). It never rewrites the chapter: an answer with no usable block leaves the chapter as it was, needs-review.
+    const expanding = drive.avoid.has(nodeId) && drive.expand.has(nodeId);
+    const oldBody = chapterBody(card.detail);
+    const now = expanding ? lengthReason(settings.length, oldBody) : undefined;
+    const requirements = expanding
+      ? bookExpandRequirements(settings, oldBody, now, drive.extra.get(nodeId))
+      : undefined;
     const oldDetail = expanding ? detailBlockOf(card.raw) : undefined;
-    const expand = (content: string): string => {
+    let noEdits = false;
+    let lostText = false;
+    const expand = (content: string): string | null => {
       const next = detailBlockOf(content);
       if (oldDetail === undefined || next === undefined) return content;
-      const merged = expandChapterDetail(oldDetail, next, drive.config.language);
-      return merged ? replaceDetailBlock(content, merged.detail) : content;
+      const merged = expandChapterDetail(
+        oldDetail,
+        next,
+        drive.config.language,
+        fixInstructionText(requirements ?? "")
+      );
+      if (!merged) {
+        noEdits = true;
+        return null;
+      }
+      // A fix never drops a picture the chapter had, nor makes the chapter shorter than the asked minimum (or shorter than it was, if it already was).
+      const body = chapterBody(merged.detail);
+      const pictures = new Set(bodyImageUrls(`\n${body}`));
+      const short = lengthReason(settings.length, body);
+      if (
+        bodyImageUrls(`\n${oldBody}`).some(url => !pictures.has(url)) ||
+        (short?.kind === "under" && !(now?.kind === "under" && short.measured >= now.measured))
+      ) {
+        lostText = true;
+        return null;
+      }
+      return replaceDetailBlock(content, merged.detail);
     };
     // The body is cleaned inside the author's own write (same `vault.process`): only standard https pictures are ever saved, and
     // an unsafe body is refused whole, so the card keeps its text from before this step.
@@ -2716,6 +2741,7 @@ export class BookPipelineRuns {
       // again as it will be saved (the old chapter's records and pictures stay; everything new must come from the cleaned answer).
       if (oldDetail === undefined) return stampRaw(restore(cleaned));
       const merged = expand(restore(cleaned));
+      if (merged === null) return null;
       const final = detailBlockOf(merged);
       if (final === undefined || neutralizeDetail(merged) === null || check(final, oldDetail, detail ?? "")) {
         unsafe = true;
@@ -2736,17 +2762,7 @@ export class BookPipelineRuns {
         model: drive.config.authorModel,
         reasoning: drive.config.reasoning,
         ...(drive.avoid.has(nodeId) ? { instruction: drive.extra.get(nodeId) } : {}),
-        ...(expanding
-          ? {
-              keepSummary: true,
-              requirements: bookExpandRequirements(
-                settings,
-                chapterBody(card.detail),
-                expanding,
-                drive.extra.get(nodeId)
-              )
-            }
-          : {}),
+        ...(requirements !== undefined ? { keepSummary: true, requirements } : {}),
         signal,
         admission: drive.admission,
         authorize: authorizeWrite,
@@ -2755,6 +2771,8 @@ export class BookPipelineRuns {
     );
     if (changedByHand) return { kind: "failed", reason: "hand_edited", forceReview: true };
     if (unsafe) return { kind: "failed", reason: "unsafe_body", forceReview: true };
+    if (noEdits) return { kind: "failed", reason: "fix_no_edits", forceReview: true };
+    if (lostText) return { kind: "failed", reason: "fix_lost_text", forceReview: true };
     if (emptyBody) return { kind: "failed", reason: "no_body" };
     if (done.outcome === "budget-exhausted") return { kind: "budget" };
     if (done.outcome === "cancelled") return { kind: "cancelled" };
@@ -3233,8 +3251,7 @@ export class BookPipelineRuns {
         const stage = rewrite || shortIssue ? "needs-review" : "checked";
         if (rewrite && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0) {
           drive.fixable.set(nodeId, proofFixInstruction(verdict.items, [...checklist, ...BOOK_CHECKS], length));
-          if (length?.kind === "under") drive.expand.add(nodeId);
-          else drive.expand.delete(nodeId);
+          drive.expand.add(nodeId);
         } else if (!drive.job) {
           drive.extra.delete(nodeId);
           drive.avoid.delete(nodeId);

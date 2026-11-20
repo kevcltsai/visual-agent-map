@@ -3448,6 +3448,9 @@ export const en = {
   "ui.book_reason_chapters_too_long": "the chapter list is too long for one planning request",
   "ui.book_reason_all_facts_unverified": "none of the factual items could be verified",
   "ui.book_reason_unsafe_body": "the picture text was not safe, so the card was left as it was",
+  "ui.book_reason_fix_no_edits": "the automatic fix gave no usable edit, so the chapter was left as it was",
+  "ui.book_reason_fix_lost_text":
+    "the automatic fix would have removed a picture or made the chapter too short, so the chapter was left as it was",
   "ui.book_reason_no_view": "the map is no longer open, so the run stopped",
   "ui.book_plain_write_no_body":
     'The AI wrote no chapter text this time, so the card is unchanged. Use "Rerun this card" to write it again.',

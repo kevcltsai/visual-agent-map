@@ -1174,7 +1174,7 @@ async function gateRig({ phase, stages = {}, trialNotes = [] }) {
 
 test('toolbar gate 1: the trial sentence, "open chapter 1" opens the first trial chapter, confirm and stop go to the plugin', async () => {
   lang('zh-TW');
-  const g = await gateRig({ phase: 'gate1' });
+  const g = await gateRig({ phase: 'gate1', stages: { root: 'checked', a: 'checked', b: 'checked' } });
   const bar = g.drawBar();
   assert.ok(texts(bar).includes('試跑的 3 章寫好了'));
   assert.deepEqual(g.labels(bar), ['打開第 1 章', '這樣可以，跑完全書', '停止']);
@@ -1272,6 +1272,18 @@ test('toolbar writing and planning: one chapter sentence, the stop button, and n
   assert.deepEqual(buttonsOf(d.bar).map(b => b.text), ['停止']);
   d.bar.children.length && buttonsOf(d.bar)[0].click();
   assert.deepEqual(d.log, ['stop']);
+});
+
+test('toolbar gate 1: trial chapters needing review are counted after the trial sentence; nothing extra at 0', async () => {
+  lang('zh-TW');
+  const g = await gateRig({ phase: 'gate1', stages: { root: 'checked', a: 'needs-review', b: 'needs-review' } });
+  for (const key of ['a', 'b']) g.view.notes.get(g.ids[key]).pipelineIssue = 'proof unmet: C1';
+  assert.ok(texts(g.drawBar()).includes('試跑的 3 章寫好了，2 章要你看'));
+  const none = await gateRig({ phase: 'gate1', stages: { root: 'checked', a: 'checked', b: 'checked' } });
+  assert.ok(texts(none.drawBar()).includes('試跑的 3 章寫好了'));
+  assert.ok(!texts(none.drawBar()).some(x => x.includes('要你看')));
+  lang('en'); assert.equal(tr('ui.book_bar_trial_review_0_1', 3, 2), 'The 3 trial chapters are written, 2 need a look');
+  lang('zh-CN'); assert.equal(tr('ui.book_bar_trial_review_0_1', 3, 2), '试跑的 3 章写好了，2 章要你看');
 });
 
 test('toolbar gate 2 with chapters to check: the sentence, 下一章要看的 cycles in reading order, 驗收完成 asks in place, focus, Cancel and Escape', async () => {

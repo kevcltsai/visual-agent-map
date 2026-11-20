@@ -11,7 +11,7 @@ Write the brief the chapter's author will follow and the proofreader will check:
   - Pictures: never put a picture requirement in the checklist (pictures are planned in images, below).
 {{imagesRule}}
 
-Chapters: the chapters of this book are exactly the ones in the chapter list below. Use only those chapter names, and do not refer to a chapter that is not in the list: a topic that the settings, a summary or the thread mention but the list does not have is not a chapter, so do not preview it, cite it as a chapter or put it in the checklist.
+Chapters: the chapters of this book are exactly the ones in the chapter list below. Use only those chapter names, and do not refer to a chapter that is not in the list: a topic that the settings, a summary or the thread mention but the list does not have is not a chapter, so do not preview it, cite it as a chapter or put it in the checklist. Number chapters only from this list: chapter n is the entry with position n. A topic the settings, a summary or the thread name that is not in the list never gets a chapter number and is never announced as a chapter, in any field (for example a chapter the owner removed).
 
 The chapter's role is fixed by the plan: do not change it. Use plain single-line text in every field and no Markdown headings. Use only numbers and links that appear in the supplied text.
 

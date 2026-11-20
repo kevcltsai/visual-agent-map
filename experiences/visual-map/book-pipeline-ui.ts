@@ -49,6 +49,8 @@ export interface BookBarState {
   rerun?: true;
   /** Gate 1: how many chapters the trial has ("the 3 trial chapters are written"); absent for a run without a trial. */
   trialCount?: number;
+  /** Gate 1: how many of the trial chapters need a look (shown after the trial sentence; nothing when 0). */
+  trialAttention?: number;
   /** Gate 2: the chapters written and how many still need a look; the view fills it from the notes (see its `bookReviewCount`). */
   review?: { total: number; attention: number };
 }
@@ -57,6 +59,8 @@ export interface BookCurrent {
   step: "global" | "plan" | "write" | "images" | "proof";
   /** 1-based position in the reading order; absent for the whole-book plan. */
   chapter?: number;
+  /** Every chapter in work is in its one automatic fix round: the sentence keeps the whole-book count instead of going back to an early chapter. */
+  fix?: true;
 }
 
 const FAILURE_KEY: Record<string, TranslationKey> = {
@@ -150,8 +154,15 @@ function currentOf(data: BookPipelineData, progress: BookPipelineProgress | unde
   const entries = progress.current.filter(item => item.nodeId === "global" || position(item.nodeId) >= 0);
   if (!entries.length) return undefined;
   entries.sort((a, b) => position(a.nodeId) - position(b.nodeId));
-  const first = entries[0];
-  return first.nodeId === "global" ? { step: "global" } : { step: first.step, chapter: position(first.nodeId) + 1 };
+  // A chapter in its automatic fix round is not "the chapter being written": a first-time chapter in work is named instead.
+  const fixing = (nodeId: string): boolean => nodeId !== "global" && (data.autoFixes?.[nodeId] ?? 0) > 0;
+  const first = entries.find(item => !fixing(item.nodeId)) ?? entries[0];
+  if (first.nodeId === "global") return { step: "global" };
+  return {
+    step: first.step,
+    chapter: position(first.nodeId) + 1,
+    ...(fixing(first.nodeId) ? { fix: true as const } : {})
+  };
 }
 
 function countStages(stages: (PipelineStage | undefined)[]): Record<PipelineStage | "pending", number> {
@@ -241,7 +252,12 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   }
   if (state.mode === "gate1" && state.trialCount) {
-    top.createSpan({ cls: "vam-book-bar-counts", text: t("ui.book_bar_trial_ready_0", state.trialCount) });
+    top.createSpan({
+      cls: "vam-book-bar-counts",
+      text: state.trialAttention
+        ? t("ui.book_bar_trial_review_0_1", state.trialCount, state.trialAttention)
+        : t("ui.book_bar_trial_ready_0", state.trialCount)
+    });
     if (actions.openTrial)
       makeButton(buttons, t("ui.book_bar_open_first"), "vam-book-link vam-book-open-first", actions.openTrial);
   }
@@ -393,7 +409,11 @@ export function bookProgressText(state: BookBarState): string {
   }
   const at = Math.min(state.current?.chapter ?? settledCount(state) + 1, Math.max(total, 1));
   // Writing the whole book is one plain line ("Writing chapter 3/31"): the bar below shows how many are done.
-  if (state.mode === "writing") return t("ui.book_progress_line_write_0_1", at, total);
+  if (state.mode === "writing")
+    // Only fix rounds in work: the done count of the whole book, never "chapter 4/15" after chapter 15 (reused words, no new string).
+    return state.current?.fix
+      ? t("ui.book_progress_line_done_0_1", settledCount(state), total)
+      : t("ui.book_progress_line_write_0_1", at, total);
   const sentence =
     state.mode === "planning"
       ? !state.globalDone || state.current?.step === "global"

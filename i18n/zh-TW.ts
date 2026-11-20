@@ -3170,6 +3170,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_add_budget": "再加 100 次",
   "ui.book_budget_used_up_0_1": "額度用完：已用 {0}／{1} 次",
   "ui.book_bar_trial_ready_0": "試跑的 {0} 章寫好了",
+  "ui.book_bar_trial_review_0_1": "試跑的 {0} 章寫好了，{1} 章要你看",
   "ui.book_bar_open_first": "打開第 1 章",
   "ui.book_bar_notes_ask_0": "還有 {0} 則備註沒套用，仍要跑完全書嗎？",
   "ui.book_bar_go_anyway": "仍要",

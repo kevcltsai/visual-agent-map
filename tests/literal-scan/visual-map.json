@@ -45,8 +45,13 @@
     },
     {
       "file": "experiences/visual-map/book-pipeline-rerun.ts",
-      "text": "the chapter text to fit that range while keeping every check",
-      "reason": "model-facing one-line request to the author composed by the program from a constant sentence plus numbers and the unit; the owner never types it, no model sentence is part of it, and the proofread never receives it"
+      "text": "The previous version of this chapter came out at only",
+      "reason": "model-facing one-line length request to the author composed by the program from constant words plus numbers and the unit; the owner never types it, no model sentence is part of it, and the proofread never receives it"
+    },
+    {
+      "file": "experiences/visual-map/book-pipeline-rerun.ts",
+      "text": "times as long), by developing each section with more explana",
+      "reason": "model-facing one-line length request to the author composed by the program from constant words plus numbers and the unit; the owner never types it, no model sentence is part of it, and the proofread never receives it"
     }
   ]
 }

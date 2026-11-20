@@ -3164,6 +3164,7 @@ var en = {
   "ui.book_add_budget": "Add 100 calls",
   "ui.book_budget_used_up_0_1": "Call budget used up: {0}/{1} used",
   "ui.book_bar_trial_ready_0": "The {0} trial chapters are written",
+  "ui.book_bar_trial_review_0_1": "The {0} trial chapters are written, {1} need a look",
   "ui.book_bar_open_first": "Open chapter 1",
   "ui.book_bar_notes_ask_0": "{0} notes are not applied yet. Run the whole book anyway?",
   "ui.book_bar_go_anyway": "Run anyway",
@@ -6384,6 +6385,7 @@ var zhCN = {
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u989D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
   "ui.book_bar_trial_ready_0": "\u8BD5\u8DD1\u7684 {0} \u7AE0\u5199\u597D\u4E86",
+  "ui.book_bar_trial_review_0_1": "\u8BD5\u8DD1\u7684 {0} \u7AE0\u5199\u597D\u4E86\uFF0C{1} \u7AE0\u8981\u4F60\u770B",
   "ui.book_bar_open_first": "\u6253\u5F00\u7B2C 1 \u7AE0",
   "ui.book_bar_notes_ask_0": "\u8FD8\u6709 {0} \u5219\u5907\u6CE8\u6CA1\u5957\u7528\uFF0C\u4ECD\u8981\u8DD1\u5B8C\u5168\u4E66\u5417\uFF1F",
   "ui.book_bar_go_anyway": "\u4ECD\u8981",
@@ -9604,6 +9606,7 @@ var zhTW = {
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u984D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
   "ui.book_bar_trial_ready_0": "\u8A66\u8DD1\u7684 {0} \u7AE0\u5BEB\u597D\u4E86",
+  "ui.book_bar_trial_review_0_1": "\u8A66\u8DD1\u7684 {0} \u7AE0\u5BEB\u597D\u4E86\uFF0C{1} \u7AE0\u8981\u4F60\u770B",
   "ui.book_bar_open_first": "\u6253\u958B\u7B2C 1 \u7AE0",
   "ui.book_bar_notes_ask_0": "\u9084\u6709 {0} \u5247\u5099\u8A3B\u6C92\u5957\u7528\uFF0C\u4ECD\u8981\u8DD1\u5B8C\u5168\u66F8\u55CE\uFF1F",
   "ui.book_bar_go_anyway": "\u4ECD\u8981",
@@ -14737,19 +14740,30 @@ var BOOK_AUTHOR_RULES = [
 function bookAuthorRequirements(settings, slots = []) {
   const lines = BOOK_SETTING_FIELDS.filter((field) => settings[field]).map((field) => `- ${field}: ${settings[field]}`);
   const range = lengthRange(settings.length);
-  const lengthRule = range ? `
+  const lengthRule = range ? `${bookLengthRule(range)}
 
-Length rule (hard): the chapter text itself must be between ${range.min} and ${range.max} ${range.unit === "\u5B57" ? "characters (\u5B57)" : "words"}; sources, notes and picture markers do not count. Do not write much shorter or longer.` : "";
+` : "";
   const plan = slots.length ? `
 
 Image plan for this chapter (the planner's data, JSON strings; leave one marker per slot as the rules say):
 ${slots.map(
     (slot) => `- slot ${slot.index}: kind ${JSON.stringify(slot.kind)}, explains ${JSON.stringify(slot.explains)}, position ${JSON.stringify(slot.anchor)}`
   ).join("\n")}` : "";
-  return lines.length ? `${BOOK_AUTHOR_RULES}
+  return lines.length ? `${lengthRule}${BOOK_AUTHOR_RULES}
 
 Whole-book settings (follow them):
-${lines.join("\n")}${lengthRule}${plan}` : `${BOOK_AUTHOR_RULES}${plan}`;
+${lines.join("\n")}${plan}` : `${BOOK_AUTHOR_RULES}${plan}`;
+}
+var lengthTarget = (range) => Math.round((range.min + range.max) / 2);
+var unitName = (unit2) => unit2 === "\u5B57" ? "characters (\u5B57)" : "words";
+function bookLengthRule(range) {
+  const target = lengthTarget(range);
+  const unit2 = unitName(range.unit);
+  const per = range.unit === "\u5B57" ? 1e3 : 600;
+  const sections = Math.min(12, Math.round(target / per));
+  const counted = range.unit === "\u5B57" ? "only the chapter text's own characters count (punctuation, spaces, sources, notes and picture markers do not)" : "only the chapter text's own words count (sources, notes and picture markers do not)";
+  const plan = range.min > 1 && sections >= 3 ? ` This is a long chapter: plan it as about ${sections} ### sections of about ${Math.round(target / sections / 50) * 50} ${unit2} each, develop each one fully with explanation and concrete examples, and do not finish before the text reaches ${range.min} ${unit2}.` : "";
+  return `Length (hard requirement, measured by the program): the chapter text must be between ${range.min} and ${range.max} ${unit2}; aim for about ${target}. ${counted[0].toUpperCase()}${counted.slice(1)}. A chapter outside the range fails the check.${plan}`;
 }
 var BOOK_SETTING_INPUT_MAX = 200;
 function cleanBookSettingsInput(input2) {
@@ -46684,7 +46698,7 @@ Write the brief the chapter's author will follow and the proofreader will check:
   - Pictures: never put a picture requirement in the checklist (pictures are planned in images, below).
 {{imagesRule}}
 
-Chapters: the chapters of this book are exactly the ones in the chapter list below. Use only those chapter names, and do not refer to a chapter that is not in the list: a topic that the settings, a summary or the thread mention but the list does not have is not a chapter, so do not preview it, cite it as a chapter or put it in the checklist.
+Chapters: the chapters of this book are exactly the ones in the chapter list below. Use only those chapter names, and do not refer to a chapter that is not in the list: a topic that the settings, a summary or the thread mention but the list does not have is not a chapter, so do not preview it, cite it as a chapter or put it in the checklist. Number chapters only from this list: chapter n is the entry with position n. A topic the settings, a summary or the thread name that is not in the list never gets a chapter number and is never announced as a chapter, in any field (for example a chapter the owner removed).
 
 The chapter's role is fixed by the plan: do not change it. Use plain single-line text in every field and no Markdown headings. Use only numbers and links that appear in the supplied text.
 
@@ -51580,7 +51594,7 @@ function proofFixInstruction(items, checklist, length) {
   const avoid = avoidSourcesInstruction(sources);
   const lead = "The previous version of this chapter failed the fact check on these points (JSON strings; rewrite the chapter so they are correct and supported): ";
   const leadStructure2 = "The previous version of this chapter did not meet these structure points of its checklist (JSON strings; the chapter text itself, not the sources list, must cover them): ";
-  const lengthPiece = length ? `The previous version of this chapter is ${length.measured} ${length.unit} long, outside the asked ${length.min} to ${length.max} ${length.unit}; ${length.kind === "over" ? "shorten" : "lengthen"} the chapter text to fit that range while keeping every checklist point. ` : "";
+  const lengthPiece = length ? length.kind === "under" ? `The previous version of this chapter came out at only ${length.measured} ${length.unit}, short of the asked ${length.min} to ${length.max} ${length.unit}: lengthen it to at least ${length.min} ${length.unit}, about ${lengthTarget(length)} ${length.unit} (about ${Math.round(lengthTarget(length) / Math.max(1, length.measured) * 10) / 10} times as long), by developing each section with more explanation and concrete examples, not by repetition; keep every checklist point. ` : `The previous version of this chapter is ${length.measured} ${length.unit} long, over the asked ${length.min} to ${length.max} ${length.unit}: shorten it to at most ${length.max} ${length.unit}, about ${lengthTarget(length)} ${length.unit}; keep every checklist point. ` : "";
   let room = FIX_INSTRUCTION_MAX - avoid.length - 1 - lengthPiece.length;
   const piece = (list2, intro) => {
     var _a2, _b2;
@@ -54000,14 +54014,23 @@ var countChange = (change2) => ({
   missing: change2.missing.length
 });
 function currentOf2(data, progress) {
-  var _a2;
+  var _a2, _b2;
   if (!(progress == null ? void 0 : progress.active) || !((_a2 = progress.current) == null ? void 0 : _a2.length)) return void 0;
   const position = (nodeId) => nodeId === "global" ? -1 : effectiveOrder(data).indexOf(nodeId);
   const entries = progress.current.filter((item) => item.nodeId === "global" || position(item.nodeId) >= 0);
   if (!entries.length) return void 0;
   entries.sort((a, b) => position(a.nodeId) - position(b.nodeId));
-  const first = entries[0];
-  return first.nodeId === "global" ? { step: "global" } : { step: first.step, chapter: position(first.nodeId) + 1 };
+  const fixing = (nodeId) => {
+    var _a3, _b3;
+    return nodeId !== "global" && ((_b3 = (_a3 = data.autoFixes) == null ? void 0 : _a3[nodeId]) != null ? _b3 : 0) > 0;
+  };
+  const first = (_b2 = entries.find((item) => !fixing(item.nodeId))) != null ? _b2 : entries[0];
+  if (first.nodeId === "global") return { step: "global" };
+  return {
+    step: first.step,
+    chapter: position(first.nodeId) + 1,
+    ...fixing(first.nodeId) ? { fix: true } : {}
+  };
 }
 function countStages(stages) {
   const counts = { pending: 0, planned: 0, written: 0, checked: 0, "needs-review": 0 };
@@ -54051,7 +54074,10 @@ function renderBookBar(parent, state, actions) {
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   }
   if (state.mode === "gate1" && state.trialCount) {
-    top.createSpan({ cls: "vam-book-bar-counts", text: t("ui.book_bar_trial_ready_0", state.trialCount) });
+    top.createSpan({
+      cls: "vam-book-bar-counts",
+      text: state.trialAttention ? t("ui.book_bar_trial_review_0_1", state.trialCount, state.trialAttention) : t("ui.book_bar_trial_ready_0", state.trialCount)
+    });
     if (actions.openTrial)
       makeButton(buttons, t("ui.book_bar_open_first"), "vam-book-link vam-book-open-first", actions.openTrial);
   }
@@ -54177,7 +54203,7 @@ function renderAsk(bar, cls, question, goText, ask) {
 }
 var settledCount = (state) => state.counts.checked + state.counts["needs-review"];
 function bookProgressText(state) {
-  var _a2, _b2, _c, _d, _e, _f;
+  var _a2, _b2, _c, _d, _e, _f, _g;
   const { total: total2 } = state;
   if (state.mode === "planning" && state.trialSize && ((_a2 = state.current) == null ? void 0 : _a2.step) !== "global") {
     const settled2 = Math.min(state.counts.checked + state.counts["needs-review"], state.trialSize - 1);
@@ -54188,8 +54214,9 @@ function bookProgressText(state) {
     );
   }
   const at = Math.min((_e = (_d = state.current) == null ? void 0 : _d.chapter) != null ? _e : settledCount(state) + 1, Math.max(total2, 1));
-  if (state.mode === "writing") return t("ui.book_progress_line_write_0_1", at, total2);
-  const sentence = state.mode === "planning" ? !state.globalDone || ((_f = state.current) == null ? void 0 : _f.step) === "global" ? t("ui.book_progress_line_global") : t("ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
+  if (state.mode === "writing")
+    return ((_f = state.current) == null ? void 0 : _f.fix) ? t("ui.book_progress_line_done_0_1", settledCount(state), total2) : t("ui.book_progress_line_write_0_1", at, total2);
+  const sentence = state.mode === "planning" ? !state.globalDone || ((_g = state.current) == null ? void 0 : _g.step) === "global" ? t("ui.book_progress_line_global") : t("ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
   return `${sentence}${t("ui.book_progress_line_sep")}${t("ui.book_progress_line_done_0_1", settledCount(state), total2)}`;
 }
 function renderProgressLine(bar, state, text10) {
@@ -85001,6 +85028,11 @@ ${t("ui.book_role_running_suffix")}` : first);
     if (state.mode !== "gate2") this.bookFinishAsking = null;
     const gate2Attention = state.mode === "gate2" ? this.bookReviewCards(read.data) : [];
     if (state.mode === "gate2") state.review = { total: state.total, attention: gate2Attention.length };
+    if (state.mode === "gate1" && state.trialCount) {
+      const trial = new Set(this.effectiveTrial(read.data));
+      const n = this.bookReviewCards(read.data).filter((card) => trial.has(card.id)).length;
+      if (n > 0) state.trialAttention = n;
+    }
     const gate1Ask = ((_a2 = this.bookGate1Ask) == null ? void 0 : _a2.path) === path ? this.bookGate1Ask : null;
     const rerunAsk = this.bookRerunAskFor(path);
     renderBookBar(toolbar, state, {

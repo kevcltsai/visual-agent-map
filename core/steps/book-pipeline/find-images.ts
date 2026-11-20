@@ -4,6 +4,7 @@ import type { ImageCandidate } from "../../image-candidates";
 import { stepEffort } from "../../provider-step-runner";
 import { prepareStep, renderTemplate, type StepDefinition } from "../../step-runner";
 import { bySubject, fileSourceOf } from "../../book-pipeline/image-quality";
+import { MAX_IMAGE_SLOTS } from "../../book-pipeline/image-slots";
 import { parseImageCandidates } from "../image-search/step";
 import { languageInstruction, type BookStepBase } from "./base";
 import template from "./find-images.md";
@@ -141,6 +142,11 @@ function wrongCaptions(found: FoundImages, language: string): number {
   return n;
 }
 
+/** Searches one find-images call may make: about 1.5 per slot, never under 4, at most 18 (12 slots, {@link MAX_IMAGE_SLOTS}). */
+export function findImagesSearchBudget(slots: number): number {
+  return Math.min(Math.ceil(MAX_IMAGE_SLOTS * 1.5), Math.max(4, Math.ceil(slots * 1.5)));
+}
+
 /** One web search call for a chapter's pictures (every slot at once): web search only, the budget reserved before the provider is asked, no content in the exchange log. A caption in the wrong language gets one repeat ask; one still wrong is emptied (the figure then reads its title). */
 export async function runFindImages(
   aiCalls: AiCalls,
@@ -162,7 +168,7 @@ export async function runFindImages(
         failMessage: () => "failed",
         usage: { action: "other", mapPath: request.usageMapPath },
         ...(run.admission ? { admission: run.admission } : {}),
-        task: { webSearchOnly: true, searchBudget: 4, timeoutMs: 2 * 60 * 1000 }
+        task: { webSearchOnly: true, searchBudget: findImagesSearchBudget(asked.slots.length), timeoutMs: 2 * 60 * 1000 }
       },
       raw => prepared.parse(raw)
     );

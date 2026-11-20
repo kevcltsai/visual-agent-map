@@ -128,12 +128,12 @@ export function parseCommonsAnswer(text: string, slot: CommonsSlot): CommonsCand
 function bounded<T>(work: Promise<T>, ms: number, signal: AbortSignal): Promise<T | undefined> {
   return new Promise(resolve => {
     const done = (value: T | undefined): void => {
-      clearTimeout(timer);
+      window.clearTimeout(timer);
       signal.removeEventListener("abort", onAbort);
       resolve(value);
     };
     const onAbort = (): void => done(undefined);
-    const timer = setTimeout(() => done(undefined), ms);
+    const timer = window.setTimeout(() => done(undefined), ms);
     signal.addEventListener("abort", onAbort, { once: true });
     work.then(done, () => done(undefined));
   });
@@ -157,7 +157,7 @@ export async function searchCommons(
     for (const query of commonsQueries(slot)) {
       if (list.length || options.signal.aborted || now() >= deadline) break;
       requests++;
-      const answer = await bounded(fetch(commonsSearchUrl(query)), COMMONS_REQUEST_MS, options.signal);
+      const answer = await bounded(Promise.resolve().then(() => fetch(commonsSearchUrl(query))), COMMONS_REQUEST_MS, options.signal);
       if (!answer || answer.status !== 200) continue;
       for (const candidate of parseCommonsAnswer(answer.text, slot)) {
         if (list.length >= COMMONS_PER_SLOT) break;

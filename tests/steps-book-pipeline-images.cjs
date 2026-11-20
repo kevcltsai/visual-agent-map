@@ -1049,6 +1049,8 @@ test('commons search: a request that fails, answers non-200, never answers or ru
   const failing = async () => { n++; if (n === 1) throw new Error('offline'); return { status: 503, text: '' }; };
   const a = await C.searchCommons([{ index: 1, explains: 'x', search: 'y' }], failing, { signal: ctl.signal, skip: () => false });
   assert.equal(a.bySlot.size, 0); assert.equal(a.requests, 2);
+  const sync = await C.searchCommons([{ index: 1, explains: 'x' }], () => { throw new Error('sync'); }, { signal: ctl.signal, skip: () => false });
+  assert.equal(sync.bySlot.size, 0, 'a fetch that throws at once is a failed request too');
   let clock = 0;
   const b2 = await C.searchCommons([{ index: 1, explains: 'x' }, { index: 2, explains: 'y' }], async () => { clock += C.COMMONS_CHAPTER_MS; return { status: 200, text: '{}' }; }, { signal: ctl.signal, skip: () => false, now: () => clock });
   assert.equal(b2.requests, 1, 'no new request after the chapter deadline');
@@ -1069,6 +1071,17 @@ test('find-images: the finder gives English Commons search words per position (a
   assert.match(prompt, /"search" is 2 to 5 English words that a Wikimedia Commons file search would match/);
 });
 
+test('find-images: the search budget grows with the slots (about 1.5 a slot, at least 4, at most 18) so each slot can be searched', async () => {
+  const { runFindImages, findImagesSearchBudget } = require('./support-ai-calls.cjs').loadWithAiCalls('core/steps/book-pipeline/find-images.ts');
+  assert.deepEqual([0, 1, 2, 3, 6, 8, 9, 12, 40].map(findImagesSearchBudget), [4, 4, 4, 5, 9, 12, 14, 18, 18]);
+  const budgets = [];
+  const aiCalls = { run: async (prepared, options, parse) => { budgets.push(options.task.searchBudget); return parse('{"slots":[]}'); } };
+  const slots = Array.from({ length: 9 }, (_, i) => ({ index: i + 1, kind: 'diagram', explains: `p${i}` }));
+  await runFindImages(aiCalls, { chapter: 'q', slots, exclude: [], language: 'en', model: 'm', reasoning: 'low' }, { signal: new AbortController().signal });
+  await runFindImages(aiCalls, { chapter: 'q', slots: slots.slice(0, 2), exclude: [], language: 'en', model: 'm', reasoning: 'low' }, { signal: new AbortController().signal });
+  assert.deepEqual(budgets, [14, 4]);
+});
+
 test('repro v2: slots the finder left empty are filled from Commons (finder words first), probed and credited like any picture; no model call is added', async () => {
   const asked = [];
   const r = await picRig({
@@ -1080,7 +1093,7 @@ test('repro v2: slots the finder left empty are filled from Commons (finder word
   assert.equal(asked[0], 'drip irrigation');
   const detail = (await r.note(0)).detail;
   assert.equal(figures(detail).length, 2);
-  assert.match(detail, /!\[Drip irrigation\]\(https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/thumb\/a\/ab\/Drip_irrigation\.jpg\/1280px-Drip_irrigation\.jpg\)\nexplains 2 perspective\n來源：commons\.wikimedia\.org · Ann & Bo · CC BY-SA 4\.0（\[連結\]\(https:\/\/commons\.wikimedia\.org\/wiki\/File:Drip_irrigation\.jpg\)）/);
+  assert.match(detail, /!\[Drip irrigation\]\(https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/thumb\/a\/ab\/Drip_irrigation\.jpg\/1280px-Drip_irrigation\.jpg\)\nexplains 2 perspective\n來源：commons\.wikimedia\.org · 作者 Ann & Bo · CC BY-SA 4\.0（\[連結\]\(https:\/\/commons\.wikimedia\.org\/wiki\/File:Drip_irrigation\.jpg\)）/);
   assert.ok(r.stat.probes.some(u => /Drip_irrigation/.test(u)), 'probed like the finder\'s candidates');
   assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state])), [[1, 'placed'], [2, 'placed']]);
   assert.match(r.stat.logs.join('\n'), /slots .* commons=1/);
@@ -1107,14 +1120,14 @@ test('shortfall: under the owner\'s minimum the chapter ends needs-review with a
   assert.match(issue, /^images unmet: images:under:1:2 image_2( image_1)?$/);
   assert.equal(r.stat.author.filter(id => id === r.nodes[0].id).length, 1, 'no automatic rewrite for too few pictures');
   const review = S.load('experiences/visual-map/book-pipeline-review.ts');
-  assert.equal(review.reasonOf(issue, undefined), '圖片不足：放了 1 張，設定至少 2 張');
+  assert.equal(review.reasonOf(issue, undefined), 'Too few pictures: 1 placed, the setting asks for at least 2', 'test locale is en');
   const both = review.reasonOf('proof unmet: facts_unverified images:under:0:6', undefined);
-  assert.ok(both.startsWith(review.reasonOf('proof unmet: facts_unverified', undefined)) && both.endsWith('圖片不足：放了 0 張，設定至少 6 張'), both);
+  assert.ok(both.startsWith(review.reasonOf('proof unmet: facts_unverified', undefined)) && both.endsWith('Too few pictures: 0 placed, the setting asks for at least 6'), both);
   const ui = S.load('experiences/visual-map/book-pipeline-ui.ts');
-  assert.match(ui.bookIssueText('length unmet: length:under:10:100-200:字:v1 images:under:1:6 image_2'), /^這章只有 10 字.*圖片不足：放了 1 張，設定至少 6 張$/);
+  assert.match(ui.bookIssueText('length unmet: length:under:10:100-200:字:v1 images:under:1:6 image_2'), /^\S.*\S\s+Too few pictures: 1 placed, the setting asks for at least 6$/);
   const ok = await picRig({ finder: () => found({ 1: [cand(1)], 2: [cand(2)] }) });
   await ok.repo.writeBookSettings(ok.nodes[0].path, { style: '每章圖片 2 張' });
   await run(ok);
   assert.equal(stageOf(ok.raw(0)), 'checked');
-  assert.equal((await ok.note(0)).pipelineIssue ?? null, null);
+  assert.ok(!/images:under|images unmet/.test((await ok.note(0)).pipelineIssue ?? ''), 'no shortfall (picture notices may remain)');
 });

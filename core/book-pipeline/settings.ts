@@ -3,7 +3,7 @@
  * frontmatter wins; a field the owner left empty takes the editorial decision saved in the root's `## 全書企劃` section.
  * Planning and writing both call this, never a private merge.
  */
-import type { ImageSlot } from "./image-slots";
+import { MAX_IMAGE_SLOTS, type ImageSlot } from "./image-slots";
 import { BOOK_SETTING_FIELDS, type BookSettings } from "./model";
 import { hashText, singleLine } from "./text";
 
@@ -147,6 +147,43 @@ export function lengthRange(
     return undefined;
   }
   return { min: one.min, max: one.max, unit: one.unit };
+}
+
+export interface ImageCountRange {
+  min: number;
+  max: number;
+}
+const PICTURE_WORD =
+  "(?:圖片|图片|配圖|配图|插圖|插图|圖像|图像|照片|圖|图|images?|pictures?|illustrations?|photos?|figures?)";
+const COUNT_SEP = "\\s*(?:[–\\-~至到—]|\\bto\\b)\\s*";
+const COUNT = `(\\d{1,2})(?:${COUNT_SEP}(\\d{1,2}))?`;
+/** `6–10 張(圖)`, `8 張圖片`, `6 to 10 pictures`. */
+const COUNT_THEN_UNIT = new RegExp(`(?<![\\d.,])${COUNT}(?:\\s*(?:張|张|幅)|\\s+${PICTURE_WORD}(?![A-Za-z]))`, "giu");
+/** `圖片 6–10`, `配圖：6 到 10 張`: a count right after a picture word, not followed by a length unit. */
+const UNIT_THEN_COUNT = new RegExp(
+  `${PICTURE_WORD}\\s*[:：]?\\s*(?:每章\\s*)?${COUNT}(?![\\d.,]|\\s*(?:個)?\\s*(?:字|words?))`,
+  "giu"
+);
+const HAS_PICTURE_WORD = new RegExp(PICTURE_WORD, "iu");
+
+/**
+ * The pictures per chapter the owner asked for in any whole-book setting (「每章圖片 6–10 張」, "6 to 10 pictures"), or undefined
+ * (the planner decides by role). A single number is an exact count; the maximum is capped at {@link MAX_IMAGE_SLOTS}. Two different
+ * counts, an inverted range or a field with no picture word are not guessed: undefined.
+ */
+export function imageCountRange(settings: BookSettings): ImageCountRange | undefined {
+  const found = new Set<string>();
+  for (const field of BOOK_SETTING_FIELDS) {
+    const value = (settings[field] ?? "").normalize("NFKC");
+    if (!HAS_PICTURE_WORD.test(value)) continue;
+    for (const pattern of [COUNT_THEN_UNIT, UNIT_THEN_COUNT])
+      for (const m of value.matchAll(pattern)) found.add(`${m[1]}-${m[2] ?? m[1]}`);
+  }
+  if (found.size !== 1) return undefined;
+  const [min, max] = [...found][0].split("-").map(Number);
+  if (min > max || max < 1) return undefined;
+  const top = Math.min(max, MAX_IMAGE_SLOTS);
+  return { min: Math.min(min, top), max: top };
 }
 
 const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu;

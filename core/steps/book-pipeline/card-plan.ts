@@ -1,6 +1,7 @@
 import type { BookRole, BookSettings } from "../../book-pipeline/model";
 import type { ChecklistItem, ChecklistType } from "../../book-pipeline/plan-text";
-import { cleanSlotText, MAX_IMAGE_SLOTS, type ImageSlot } from "../../book-pipeline/image-slots";
+import { cleanSlotText, imageSlotCap, MAX_IMAGE_SLOTS, type ImageSlot } from "../../book-pipeline/image-slots";
+import { imageCountRange } from "../../book-pipeline/settings";
 import { singleLine } from "../../book-pipeline/text";
 import { estimateTokens } from "../../../ai/context-builder";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
@@ -19,6 +20,8 @@ import {
 import template from "./card-plan.md";
 import requestTemplate from "./card-plan-request.md";
 import childrenTemplate from "./card-plan-children.md";
+import roleImagesTemplate from "./card-plan-images-role.md";
+import ownerImagesTemplate from "./card-plan-images-owner.md";
 
 export interface CardNeighbour {
   position: number;
@@ -140,8 +143,10 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
   const droppedPicture = objective.length - kept.length;
   if (!kept.length) fail("checklist has no usable item");
   const checklist = kept.map((item, index): ChecklistItem => ({ id: `C${index + 1}`, ...item }));
-  const slots = arrayOf(item.images, "images");
-  if (slots.length > MAX_IMAGE_SLOTS) fail(`images must have 0 to ${MAX_IMAGE_SLOTS} items`);
+  const all = arrayOf(item.images, "images");
+  if (all.length > MAX_IMAGE_SLOTS) fail(`images must have 0 to ${MAX_IMAGE_SLOTS} items`);
+  // Over the owner's maximum (or the default eight without a setting): the first ones are kept; under the minimum: kept as planned, never padded.
+  const slots = all.slice(0, imageSlotCap(imageCountRange(request.settings)));
   const images = slots.map((entry, at): ImageSlot => {
     const one = recordOf(entry, "image slot");
     exactKeys(one, ["kind", "explains", "anchor"]);
@@ -191,8 +196,21 @@ export const CHILD_CARDS_TOKENS = 6000;
 /** The chapter list is the authority: titles are put in whole (only whitespace is collapsed). */
 const wholeLine = (value: string): string => singleLine(value, Number.MAX_SAFE_INTEGER);
 
+/** The planner decides the count by role (no pictures-per-chapter setting); with a setting the owner's count holds for every role and beats the defaults. */
+const imagesRule = (request: CardPlanRequest): string => {
+  const range = imageCountRange(request.settings);
+  if (!range) return roleImagesTemplate.trimEnd();
+  const max = imageSlotCap(range);
+  const min = Math.min(range.min, max);
+  return renderTemplate(ownerImagesTemplate, {
+    count: min === max ? `exactly ${max} slots` : `between ${min} and ${max} slots`,
+    min: String(min)
+  }).trimEnd();
+};
+
 const baseRender = (request: CardPlanRequest): string =>
   renderTemplate(template, {
+    imagesRule: imagesRule(request),
     languageInstruction: languageInstruction(request.language, request.card.title),
     thread: JSON.stringify(cap(request.thread, 1200)),
     settings: JSON.stringify(request.settings),

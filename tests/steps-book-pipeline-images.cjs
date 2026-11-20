@@ -458,7 +458,7 @@ test('slots: another chapter whose note cannot be read does not fail this chapte
   assert.equal(stageOf(r.raw(0)), 'checked');
 });
 
-test('slots load: 5 chapters x 8 slots whose candidates all fail probe at most 24 addresses a chapter and 4 at a time, one search call each, and every card still ends checked', async () => {
+test('slots load: 5 chapters x 8 slots whose candidates all fail probe at most 36 addresses a chapter and 4 at a time, one search call each, and every card still ends checked', async () => {
   const titles = ['T0', 'T1', 'T2', 'T3', 'T4'];
   let seq = 0;
   let inflight = 0, peak = 0;
@@ -470,7 +470,7 @@ test('slots load: 5 chapters x 8 slots whose candidates all fail probe at most 2
   assert.equal(r.calls.filter(c => c.again).length, 5);
   assert.ok(r.calls.every(c => c.slots.length === 8));
   assert.ok(peak <= 4 && peak >= 2, `peak ${peak}`);
-  assert.equal(r.stat.probes.length, 5 * 24, 'each chapter probes its first 24 distinct addresses; the limit covers both searches');
+  assert.equal(r.stat.probes.length, 5 * 36, 'each chapter probes its first 36 distinct addresses; the limit covers both searches');
   for (let i = 0; i < 5; i++) { assert.equal(stageOf(r.raw(i)), 'checked'); assert.equal(recordOf((await r.note(i)).detail).slots.length, 8); }
 });
 
@@ -802,13 +802,13 @@ test('slots: a card removed from the map while the search ran is not written, an
 });
 
 test('slots: candidates left unprobed by the per-chapter limit end probe_capped (not load_failed); an adjacent pair on one line is bad_marker (not author_omitted)', async () => {
-  const text = title => `${BODY}\n\n${Array.from({ length: 8 }, (_, i) => `${mk(i + 1)}\n\n段${i + 1}。`).join('\n\n')}\n`;
+  const text = title => `${BODY}\n\n${Array.from({ length: 12 }, (_, i) => `${mk(i + 1)}\n\n段${i + 1}。`).join('\n\n')}\n`;
   let seq = 0;
   const finder = req => found(Object.fromEntries(req.slots.map(s => [s.index, Array.from({ length: 4 }, () => cand(++seq))])));
-  const r = await picRig({ slots: 8, text, finder, probe: async () => ({ ok: false, reason: 'load_failed' }) });
+  const r = await picRig({ slots: 12, text, finder, probe: async () => ({ ok: false, reason: 'load_failed' }) });
   await run(r);
   const reasons = recordOf((await r.note(0)).detail).slots.map(s => s.reasonCode);
-  assert.deepEqual(reasons, ['load_failed', 'load_failed', 'load_failed', 'load_failed', 'load_failed', 'load_failed', 'probe_capped', 'probe_capped']);
+  assert.deepEqual(reasons, [...Array(9).fill('load_failed'), 'probe_capped', 'probe_capped', 'probe_capped'], '12 slots x 4 candidates: the first 36 addresses (9 slots) are probed');
   assert.match(r.stat.logs.join('\n'), /reason=load_failed,probe_capped|reason=probe_capped/);
   const pair = await picRig({ slots: 2, text: () => `${BODY}\n\n${mk(1)}${mk(2)}\n\n尾。\n`, finder: () => found({}) });
   await run(pair);

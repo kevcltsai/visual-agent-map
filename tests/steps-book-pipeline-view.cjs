@@ -537,7 +537,7 @@ test('start card: opens with the estimate (every step counted, about minutes), t
   assert.ok(modal.isOpen);
   assert.equal(h.entries.length, 0, 'nothing starts before the owner presses Start');
   const all = texts(modal.modalEl);
-  assert.ok(all.includes('3 張卡 · 約 8 分鐘 · 最多 40 次 AI 呼叫（步驟失敗重試另計；到 300 次會先停下）。'), all.join('|'));
+  assert.ok(all.includes('3 張卡 · 約 8 分鐘 · 最多 41 次 AI 呼叫（步驟失敗重試另計；到 300 次會先停下）。'), all.join('|'));
   assert.ok(all.includes('中間只會停兩次，讓你確認。'));
   assert.ok(all.includes('某一章不滿意，可以只重跑那一章。'));
   assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined, 'no collapsed block: the settings are always open');
@@ -577,7 +577,7 @@ test('start card: the four dropdowns (plan, author, pictures, proofread) carry t
   assert.notEqual(h.plugin.settings.bookWriteModel, 'claude:sonnet', 'a pick is not saved while the card is open');
   assert.equal(h.ctl.saves.length, 0);
   const after = texts(modal.modalEl).find(x => x.startsWith('3 張卡'));
-  assert.match(before, /最多 40 次/); assert.match(after, /最多 40 次/);
+  assert.match(before, /最多 41 次/); assert.match(after, /最多 41 次/);
   assert.notEqual(before, after, 'the time follows the model');
   cardButton(modal, '開始').click(); await dom.tick();
   assert.equal(h.plugin.settings.bookWriteModel, 'claude:sonnet', 'Start saves the pick');

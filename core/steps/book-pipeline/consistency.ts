@@ -72,7 +72,7 @@ export function parseConsistency(raw: string, chapters: number): RawInconsistenc
       const a = item.a;
       const b = item.b;
       const valid = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= chapters;
-      if (!valid(a) || !valid(b) || a === b) return fail("An issue names a chapter the book does not have");
+      if (!valid(a) || !valid(b) || a === b) return fail("Issue names an unknown chapter");
       const claimA = singleLine(textOf(item.claimA, "claimA"), CONSISTENCY_CLAIM_CHARS);
       const claimB = singleLine(textOf(item.claimB, "claimB"), CONSISTENCY_CLAIM_CHARS);
       const suggestion = singleLine(

@@ -318,6 +318,19 @@ test('slots: a picture claimed by a chapter whose write is blocked by the exit c
   assert.ok(figures((await r.note(1)).detail).length === 1);
 });
 
+test('quality run: a write blocked by the exit check releases the claimed work, so the other chapter offered the same work (another file, same author) places it', async () => {
+  const name = title => /SecretTitleA/.test(title) ? 'Sir_Winston_Churchill_-_19086236948.jpg' : 'Sir_Winston_Churchill_(cropped).jpg';
+  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], slots: 1, text: title => `${BODY} ${title}\n\n${mk(1)}\n\n尾。\n`,
+    finder: req => { const n = name(req.chapter); return found({ 1: [cand(0, { url: commons(n), source: `https://commons.wikimedia.org/wiki/File:${n}`, author: 'Yousuf Karsh' })] }); } });
+  const first = defer();
+  const finder = r.ports.findImages;
+  r.ports.findImages = async (request, runInfo) => { if (/SecretTitleA/.test(request.chapter)) await first.promise; return finder(request, runInfo); };
+  let blocked = 0;
+  r.runs.exitCheck = text => { if (!/!\[/.test(text) || blocked++) return false; first.resolve(); return true; };
+  await run(r);
+  assert.equal(figures((await r.note(1)).detail).length, 1, 'the work released by the blocked write went to the other chapter');
+});
+
 const embedded = async (r, n) => { const out = []; for (let i = 0; i < n; i++) out.push(...figures((await r.note(i)).detail)); return out; };
 
 test('sections: chapterBody drops the picture section; setImageSection puts it before Sources, replaces an old one and removes on null', () => {
@@ -407,14 +420,14 @@ test('slots: a later chapter is told the pictures other chapters already use; a 
 
 test('images: the find-images step keeps up to 3 candidates per slot with the caption of the image the parser kept, drops not-relevant or undescribed images, and counts them', () => {
   const { findImagesStep } = require('./support-ai-calls.cjs').loadWithAiCalls('core/steps/book-pipeline/find-images.ts');
-  const img = (n, extra) => ({ title: `T${n}`, caption: `C${n}`, imageUrl: `https://upload.wikimedia.org/a/ab/F${n}.jpg`, sourceUrl: 'https://commons.wikimedia.org/x', kind: 'diagram', shows: 'a thing', relevant: true, ...extra });
+  const img = (n, extra) => ({ title: `T${n}`, caption: `C${n}`, imageUrl: `https://upload.wikimedia.org/a/ab/F${n}.jpg`, sourceUrl: 'https://commons.wikimedia.org/wiki/File:F.jpg', kind: 'diagram', shows: 'a thing', relevant: true, ...extra });
   const parsed = findImagesStep.parse(JSON.stringify({ slots: [{ slot: 1, images: [img(1), img(2, { relevant: false }), img(3, { imageUrl: 'http://bad.example/x.jpg' }), img(4, { shows: '  ' }), img(5, { caption: undefined }), img(6), img(7), img(8)] }, { slot: 2, images: [img(9)] }, { slot: 'x', images: [img(10)] }, null] }));
   assert.deepEqual([...parsed.bySlot.get(1)].map(p => [p.title, p.caption]), [['T1', 'C1'], ['T5', 'a thing'], ['T6', 'C6']], 'the caption follows its own image though one before it was dropped');
   assert.deepEqual([...parsed.bySlot.keys()], [1, 2]);
   assert.equal(parsed.offTopic, 2);
   assert.equal(parsed.found, 4);
   assert.equal(findImagesStep.parse('not json').found, 0);
-  assert.equal(findImagesStep.version, 6);
+  assert.equal(findImagesStep.version, 7);
   const prompt = findImagesStep.render({ chapter: 'q', slots: [{ index: 1, kind: 'diagram', explains: 'perspective' }], exclude: Array.from({ length: 40 }, (_, i) => `k${i}${'x'.repeat(200)}`), language: 'en', model: 'm', reasoning: 'low' });
   assert.equal(JSON.parse(/exclude list[^\[]*(\[.*\])/.exec(prompt)[1]).length, 30);
   assert.ok(!/x{121}/.test(prompt));
@@ -809,7 +822,7 @@ test('images: the find-images prompt asks for captions in the book language; a C
   assert.match(findImagesStep.render({ ...base, language: 'zh-TW' }), /caption" in the language of the book/);
   assert.ok(!/not in the book's language/.test(findImagesStep.render({ ...base, language: 'zh-TW' })));
   assert.match(findImagesStep.render({ ...base, language: 'zh-TW', languageRetry: true }), /not in the book's language/);
-  const reply = caption => JSON.stringify({ slots: [{ slot: 1, images: [{ title: 'T', caption, imageUrl: 'https://upload.wikimedia.org/a/ab/F.jpg', sourceUrl: 'https://commons.wikimedia.org/x', kind: 'diagram', shows: 'a thing', relevant: true }] }] });
+  const reply = caption => JSON.stringify({ slots: [{ slot: 1, images: [{ title: 'T', caption, imageUrl: 'https://upload.wikimedia.org/a/ab/F.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:F.jpg', kind: 'diagram', shows: 'a thing', relevant: true }] }] });
   const rig = replies => { const prompts = []; return { prompts, aiCalls: { run: async (prepared, _o, parse) => { prompts.push(prepared.prompt); return parse(replies.shift()); } } }; };
   const run = { signal: new AbortController().signal };
   let r = rig([reply('This schematic lays out the procedure'), reply('示意圖：鈴聲與食物配對')]);
@@ -884,4 +897,101 @@ test('slots: a card deleted from the map during the picture search pauses the ru
   assert.equal(figures((await r.note(gone)).detail).length, 0, 'no picture written for the deleted card');
   for (let i = 0; i < r.nodes.length; i++) assert.notEqual(stageOf(r.raw(i)), 'needs-review');
   assert.ok(!/SecretChapterY|SecretRootTitle/.test(JSON.stringify(r.stat.logs)), 'no title in the log');
+});
+
+// ---- picture quality (full-run bugs 2-5): the subject rule, the file-page source rule, the same work under two file names ----
+const Q = S.load('core/book-pipeline/image-quality.ts');
+const commons = name => `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/${encodeURIComponent(name)}/1280px-${encodeURIComponent(name)}`;
+
+test('quality source: an article-page source becomes the file page and loses the credits read off the article; a file page stays; an underivable wiki page drops the picture', () => {
+  const base = { title: 't', caption: 'c', author: 'X', license: 'CC BY 4.0' };
+  const moved = Q.fileSourceOf({ ...base, url: commons('Tree_bud_at_f22.jpg'), source: 'https://en.wikipedia.org/wiki/Depth_of_field' });
+  assert.equal(moved.source, 'https://commons.wikimedia.org/wiki/File:Tree_bud_at_f22.jpg');
+  assert.ok(!('author' in moved) && !('license' in moved), 'credits from an article page are not kept');
+  const local = Q.fileSourceOf({ ...base, url: 'https://upload.wikimedia.org/wikipedia/en/a/ab/Poster (1).jpg', source: 'https://en.wikipedia.org/wiki/Film' });
+  assert.equal(local.source, 'https://en.wikipedia.org/wiki/File:Poster_(1).jpg', 'a local file gets its own wiki\'s file page');
+  const thumbHost = Q.fileSourceOf({ ...base, url: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bc/Sir_Winston_Churchill_-_19086236948.jpg/330px-Sir_Winston_Churchill_-_19086236948.jpg', source: 'https://en.wikipedia.org/wiki/The_Roaring_Lion' });
+  assert.equal(thumbHost.source, 'https://commons.wikimedia.org/wiki/File:Sir_Winston_Churchill_-_19086236948.jpg');
+  const filePage = { ...base, url: commons('Rule_of_thirds_photo.jpg'), source: 'https://en.wikipedia.org/wiki/File:Rule_of_thirds_photo.jpg' };
+  assert.equal(Q.fileSourceOf(filePage), filePage, 'a file page (any wiki) keeps its credits');
+  const blog = Q.fileSourceOf({ ...base, url: commons('A.jpg'), source: 'https://blog.example/post' });
+  assert.equal(blog.source, 'https://commons.wikimedia.org/wiki/File:A.jpg', 'a Commons image shown on another page still cites its file page');
+  assert.equal(Q.fileSourceOf({ ...base, url: 'https://img.example/a.jpg', source: 'https://en.wikipedia.org/wiki/Exposure' }), undefined, 'a wiki article for a non-wiki image: no file page, the picture goes');
+  const other = { ...base, url: 'https://img.example/a.jpg', source: 'https://museum.example/object/1' };
+  assert.equal(Q.fileSourceOf(other), other, 'other sites are kept as they are');
+});
+
+test('quality subject: a position about a named person keeps only that person\'s works (author first, else the file name); no subject keeps everything', () => {
+  const c = (name, author) => ({ title: 'title', url: commons(name), ...(author ? { author } : {}) });
+  const cameron = 'Julia Margaret Cameron';
+  assert.equal(Q.bySubject(c('Charles_Darwin_by_Julia_Margaret_Cameron,_c._1868.jpg', 'Julia Margaret Cameron (1815–1879)'), cameron), true);
+  assert.equal(Q.bySubject(c('Autoportraits_de_Félix_Nadar.jpg', 'Nadar'), cameron), false, 'Nadar self-portrait in the Cameron chapter');
+  assert.equal(Q.bySubject(c('Moonrise,_Hernandez,_New_Mexico.jpg', 'Ansel Adams'), 'Ansel Adams'), true);
+  assert.equal(Q.bySubject(c('Moonrise,_Hernandez,_New_Mexico.jpg'), 'Ansel Adams'), false, 'no author and the file does not name him: not shown to be his');
+  assert.equal(Q.bySubject(c('Portrait_of_Ansel_Adams_by_J._Malcolm_Greany.jpg'), 'Ansel Adams'), false, 'a portrait of the person by someone else');
+  assert.equal(Q.bySubject(c('Ansel_Adams_-_Tetons_and_Snake_River.jpg'), 'Ansel Adams'), true);
+  assert.equal(Q.bySubject(c('X.jpg', 'Henri Cartier-Bresson'), 'Henri Cartier-Bresson'), true);
+  assert.equal(Q.bySubject(c('Feynman_Technique.svg', 'WiredAlexandria'), ''), true, 'no subject: the rule does not apply');
+  assert.equal(Q.bySubject(c('Flowchart.svg', 'Someone Adamsson'), 'Ansel Adams'), false, 'the last name is matched as a whole word');
+  assert.equal(Q.bySubject({ title: '卡梅隆的丁尼生肖像', url: commons('T.jpg') }, '卡梅隆'), true, 'a subject in another script is matched as a whole name, the title included');
+  assert.equal(Q.bySubject({ title: '納達爾自拍像', url: commons('T.jpg') }, '卡梅隆'), false);
+  assert.equal(Q.bySubject(c('X.jpg', '  '), ''), true, 'a blank subject is no subject');
+});
+
+test('quality work key: the same work under two Commons files by one author is one work; another author, another subject or no author is not', () => {
+  const a = Q.workKey(commons('Sir_Winston_Churchill_(cropped).jpg'), 'Yousuf Karsh');
+  assert.ok(a);
+  assert.equal(Q.workKey('https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bc/Sir_Winston_Churchill_-_19086236948.jpg/330px-Sir_Winston_Churchill_-_19086236948.jpg', 'Yousuf  Karsh'), a);
+  assert.notEqual(Q.workKey(commons('Sir_Winston_Churchill.jpg'), 'Someone Else'), a);
+  assert.notEqual(Q.workKey(commons('Kew_fountain_(short_exposure).jpg'), 'P'), Q.workKey(commons('Kew_fountain_(long_exposure).jpg'), 'P'));
+  assert.equal(Q.workKey(commons('Sir_Winston_Churchill.jpg'), undefined), undefined);
+  assert.equal(Q.workKey(commons('A.jpg'), 'P'), undefined, 'a stem too short to tell works apart');
+});
+
+test('quality parse: the finder\'s subject refuses another person\'s work (counted off-topic); an article-page source is replaced by the file page', () => {
+  const { findImagesStep } = require('./support-ai-calls.cjs').loadWithAiCalls('core/steps/book-pipeline/find-images.ts');
+  const img = (name, extra) => ({ title: name, caption: 'c', shows: 's', relevant: true, imageUrl: commons(name), sourceUrl: `https://commons.wikimedia.org/wiki/File:${name}`, ...extra });
+  const parsed = findImagesStep.parse(JSON.stringify({ slots: [
+    { slot: 1, subject: 'Julia Margaret Cameron', images: [img('Autoportrait_Nadar.jpg', { author: 'Nadar' }), img('Tennyson_by_Julia_Margaret_Cameron.jpg', { author: 'Julia Margaret Cameron' })] },
+    { slot: 2, images: [img('ISO_comparison.jpg', { sourceUrl: 'https://en.wikipedia.org/wiki/Image_noise', author: 'A', license: 'L' }), img('Q.jpg', { imageUrl: 'https://img.example/q.jpg', sourceUrl: 'https://en.wikipedia.org/wiki/Exposure' })] }
+  ] }));
+  assert.deepEqual(plain(parsed.bySlot.get(1).map(i => i.title)), ['Tennyson_by_Julia_Margaret_Cameron.jpg']);
+  const [iso] = parsed.bySlot.get(2);
+  assert.equal(iso.source, 'https://commons.wikimedia.org/wiki/File:ISO_comparison.jpg');
+  assert.ok(!iso.author && !iso.license);
+  assert.equal(parsed.bySlot.get(2).length, 1);
+  assert.equal(parsed.offTopic, 2);
+  assert.equal(parsed.found, 2);
+  const prompt = findImagesStep.render({ chapter: 'q', slots: [{ index: 1, kind: 'photo', explains: 'p' }], exclude: [], language: 'en', model: 'm', reasoning: 'low', again: true });
+  assert.match(prompt, /"subject":""/); assert.match(prompt, /Category:<name>/); assert.match(prompt, /file description page/); assert.match(prompt, /never an article/);
+  assert.match(prompt, /second search[^\n]*Commons category and its subcategories/);
+});
+
+test('quality choose: within a chapter the same work is placed once (the next candidate fills the slot); a work another chapter claimed is taken', () => {
+  const { choosePictures } = S.load('core/book-pipeline/image-slots.ts');
+  const slots = slotsOf(2);
+  const probed = (name, author) => ({ candidate: { imageUrl: commons(name), sourceUrl: `https://commons.wikimedia.org/wiki/File:${name}`, title: name, caption: 'c', author }, href: commons(name), loaded: true });
+  const per = new Map([[1, [probed('Sir_Winston_Churchill_(cropped).jpg', 'Yousuf Karsh')]], [2, [probed('Sir_Winston_Churchill_-_19086236948.jpg', 'Yousuf Karsh'), probed('Audrey_Hepburn_Karsh.jpg', 'Yousuf Karsh')]]]);
+  const out = choosePictures({ id: 'n', title: 'T' }, slots, per, () => false, 'en');
+  assert.match(out.get(1).figure.href, /cropped/);
+  assert.match(out.get(2).figure.href, /Audrey/);
+  assert.ok(out.get(1).figure.work.startsWith('work:'));
+  const work = Q.workKey(commons('Sir_Winston_Churchill_(cropped).jpg'), 'Yousuf Karsh');
+  const taken = choosePictures({ id: 'n', title: 'T' }, slots.slice(0, 1), new Map([[1, [probed('Sir_Winston_Churchill_-_19086236948.jpg', 'Yousuf Karsh')]]]), key => key === work, 'en');
+  assert.equal(taken.get(1).reasonCode, 'not_found');
+});
+
+test('quality run: two chapters offered the same work as two Commons files place it once; the chapter that placed it may show it again on its redo', async () => {
+  const churchill = title => /SecretTitleA/.test(title) ? 'Sir_Winston_Churchill_-_19086236948.jpg' : 'Sir_Winston_Churchill_(cropped).jpg';
+  const r = await picRig({ titles: ['SecretRootTitle', 'SecretTitleA'], slots: 1, text: title => `${BODY} ${title}\n\n${mk(1)}\n\n尾。\n`,
+    finder: req => { const name = churchill(req.chapter); return found({ 1: [cand(0, { url: commons(name), source: `https://commons.wikimedia.org/wiki/File:${name}`, author: 'Yousuf Karsh' })] }); } });
+  await run(r);
+  assert.equal((await embedded(r, 2)).length, 1, 'one Churchill portrait in the whole book');
+  const states = [(await r.note(0)).detail, (await r.note(1)).detail].map(d => recordOf(d).slots[0]);
+  assert.deepEqual(states.map(s => s.state).sort(), ['missing', 'placed']);
+  const owner = states[0].state === 'placed' ? 0 : 1;
+  await r.runs.rerunCard(r.mapPath, r.nodes[owner].id);
+  while (r.runs.isRunning(r.mapPath)) await tick();
+  await settle();
+  assert.equal(figures((await r.note(owner)).detail).length, 1, 'its own work is not taken from itself');
 });

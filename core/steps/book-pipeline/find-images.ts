@@ -3,6 +3,7 @@ import type { AiCalls } from "../../ai-calls";
 import type { ImageCandidate } from "../../image-candidates";
 import { stepEffort } from "../../provider-step-runner";
 import { prepareStep, renderTemplate, type StepDefinition } from "../../step-runner";
+import { bySubject, fileSourceOf } from "../../book-pipeline/image-quality";
 import { parseImageCandidates } from "../image-search/step";
 import { languageInstruction, type BookStepBase } from "./base";
 import template from "./find-images.md";
@@ -35,7 +36,7 @@ export interface FoundImage extends ImageCandidate {
   author?: string;
   license?: string;
 }
-/** The answer: up to {@link PER_SLOT_MAX} candidates per slot index; `found` counts the kept images, `offTopic` those the model marked as not relevant or described no content for. */
+/** The answer: up to {@link PER_SLOT_MAX} candidates per slot index; `found` counts the kept images, `offTopic` those the model marked as not relevant or described no content for, or the program refused (not by the position's named person, or a source that is not the file page). */
 export interface FoundImages {
   bySlot: Map<number, FoundImage[]>;
   found: number;
@@ -54,7 +55,7 @@ function creditText(value: unknown): string {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, CREDIT_MAX) : "";
 }
 
-/** Per slot, each image goes through the shared candidate parser on its own, so the caption stays with the image the parser kept. */
+/** Per slot, each image goes through the shared candidate parser on its own, so the caption stays with the image the parser kept; then the source rule and the subject rule (see image-quality). */
 function parseFound(raw: string): FoundImages {
   const out: FoundImages = { bySlot: new Map(), found: 0, offTopic: 0 };
   const start = raw.indexOf("{"),
@@ -71,6 +72,7 @@ function parseFound(raw: string): FoundImages {
     if (!entry || !Number.isInteger(entry.slot) || !Array.isArray(entry.images)) continue;
     const index = entry.slot as number;
     const list = out.bySlot.get(index) ?? [];
+    const subject = creditText(entry.subject);
     for (const item of entry.images as Array<Record<string, unknown> | null>) {
       if (list.length >= PER_SLOT_MAX) break;
       if (!item || typeof item !== "object") continue;
@@ -78,17 +80,22 @@ function parseFound(raw: string): FoundImages {
         out.offTopic++;
         continue;
       }
-      const [candidate] = parseImageCandidates(JSON.stringify({ images: [item] }));
-      if (!candidate || list.some(have => have.url === candidate.url)) continue;
+      const [parsed] = parseImageCandidates(JSON.stringify({ images: [item] }));
+      if (!parsed || list.some(have => have.url === parsed.url)) continue;
       const caption = typeof item.caption === "string" && item.caption.trim() ? item.caption : item.shows;
       const author = creditText(item.author);
       const license = creditText(item.license);
-      list.push({
-        ...candidate,
+      const candidate = fileSourceOf<FoundImage>({
+        ...parsed,
         caption: caption.replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX),
         ...(author ? { author } : {}),
         ...(license ? { license } : {})
       });
+      if (!candidate || !bySubject(candidate, subject)) {
+        out.offTopic++;
+        continue;
+      }
+      list.push(candidate);
       out.found++;
     }
     out.bySlot.set(index, list);
@@ -99,7 +106,7 @@ function parseFound(raw: string): FoundImages {
 /** The map chat's image candidates (same parser: https links with an https source page), asked per picture position for the book's sources. */
 export const findImagesStep: StepDefinition<FindImagesRequest, FoundImages> = {
   id: "book-pipeline.find-images",
-  version: 6,
+  version: 7,
   render: ({ chapter, slots, exclude, language, languageRetry, again }) =>
     renderTemplate(template, {
       chapter: JSON.stringify(chapter),

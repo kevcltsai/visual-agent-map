@@ -3027,7 +3027,6 @@ export class VisualAgentMapView extends ItemView {
     this.bookStartModal?.close();
     this.bookStartModal = null;
     this.bookResolved.clear();
-    for (const id of [...this.bookFoldTimers.keys()]) this.cancelBookFold(id);
     if (this.highlightFadeTimer !== null) window.clearTimeout(this.highlightFadeTimer);
     this.chatSourceCache = null;
     this.unsyncedPaths = null;
@@ -3038,6 +3037,7 @@ export class VisualAgentMapView extends ItemView {
     this.closeMapSearch(false);
     this.exitPresentation(false);
     this.cancelLinking(false);
+    for (const id of [...this.bookFoldTimers.keys()]) this.cancelBookFold(id);
     this.suspendSummaryEdit?.();
     this.pendingSummary = null;
     this.summaryEditDraft = null;

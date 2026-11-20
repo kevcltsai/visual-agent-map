@@ -12928,12 +12928,13 @@ var EDIT_WORDS = /\b(?:cropped|crop|edited|edit|restored|retouched|retouch|clean
 function workKey(imageUrl, author) {
   const who = plainWords((author != null ? author : "").replace(/\([^)]*\)/g, " "));
   if (!who) return void 0;
-  const stem = plainWords(
+  const stem2 = plainWords(
     fileNameOf(imageUrl).replace(/\.[a-z0-9]{2,5}$/i, "").replace(/^\d+px-/i, "")
   ).replace(EDIT_WORDS, " ").replace(/\b\d{5,}\b/g, " ").replace(/\s+/g, " ").trim();
-  if (stem.replace(/ /g, "").length < 4) return void 0;
-  return `work:${stem}|${who}`;
+  if (stem2.replace(/ /g, "").length < 4) return void 0;
+  return `work:${stem2}|${who}`;
 }
+var isDocumentFile = (url) => /\.(?:pdf|djvu?|tiff?)(?:[/?#]|$)|\/page\d+-\d*px-/i.test(url);
 
 // ai/section-aliases.ts
 var name = (zhTW2, en2) => ({ zh: zhTW2, en: en2 });
@@ -14716,9 +14717,14 @@ function shortHash(url) {
   }
   return hash.toString(16).padStart(8, "0");
 }
-function composeSlotsRecord(result) {
+function composeSlotsRecord(result, off = /* @__PURE__ */ new Set()) {
   const slots = [
-    ...result.placed.map((item) => ({ index: item.index, state: "placed", hash: shortHash(item.href) })),
+    ...result.placed.map((item) => ({
+      index: item.index,
+      state: "placed",
+      hash: shortHash(item.href),
+      ...off.has(item.index) ? { off: true } : {}
+    })),
     ...result.missing.map((item) => ({ index: item.index, state: "missing", reasonCode: item.reasonCode }))
   ].sort((a, b) => a.index - b.index);
   return `<!-- book-slots:v1 ${JSON.stringify({ slots, bad: result.bad })} -->`;
@@ -14744,7 +14750,8 @@ function latestSlotsRecord(detail) {
           index: raw.index,
           state,
           ...reasonCode ? { reasonCode } : {},
-          ...typeof raw.hash === "string" && /^[0-9a-f]{8}$/.test(raw.hash) ? { hash: raw.hash } : {}
+          ...typeof raw.hash === "string" && /^[0-9a-f]{8}$/.test(raw.hash) ? { hash: raw.hash } : {},
+          ...state === "placed" && raw.off === true ? { off: true } : {}
         });
       }
       found = { slots: items, bad: Number.isInteger(data.bad) && data.bad > 0 ? data.bad : 0 };
@@ -14832,10 +14839,12 @@ function checkImageText(body, slots, record) {
   const blocks = [];
   let current = [];
   let hashes = [];
+  let docs = [];
   const close = () => {
-    if (current.length) blocks.push({ text: current.join("\n"), hashes });
+    if (current.length) blocks.push({ text: current.join("\n"), hashes, docs });
     current = [];
     hashes = [];
+    docs = [];
   };
   lines.forEach((line2, at) => {
     if (guarded[at] || isBlank(line2)) {
@@ -14843,7 +14852,10 @@ function checkImageText(body, slots, record) {
       return;
     }
     current.push(line2);
-    for (const m of line2.matchAll(IMAGE_IN_LINE)) hashes.push(shortHash(m[1]));
+    for (const m of line2.matchAll(IMAGE_IN_LINE)) {
+      hashes.push(shortHash(m[1]));
+      if (isDocumentFile(m[1])) docs.push(shortHash(m[1]));
+    }
   });
   close();
   const imageCount = blocks.reduce((sum2, block) => sum2 + block.hashes.length, 0);
@@ -14856,6 +14868,10 @@ function checkImageText(body, slots, record) {
     const at = blocks.findIndex((block) => item.hash !== void 0 && block.hashes.includes(item.hash));
     const slot = slots.find((entry) => entry.index === item.index);
     if (at < 0 || !slot) continue;
+    if (item.off || blocks[at].docs.includes(item.hash)) {
+      issues.push({ index: item.index, code: "mismatch" });
+      continue;
+    }
     const around = [at - 1, at + 1].map((i) => blocks[i]).filter((block) => block && !block.hashes.length).map((block) => block.text.toLowerCase()).join("\n");
     const words2 = slotKeywords(slot.explains);
     const hits = words2.filter((word) => around.includes(word)).length;
@@ -17619,10 +17635,10 @@ var CoffeeStorage = class {
   }
   titlePath(topic, id) {
     var _a2;
-    const directory = ((_a2 = this.locations.get(id)) == null ? void 0 : _a2.startsWith(`${this.folder}/Archive/`)) ? `${this.folder}/Archive` : this.topicFolder(topic), base = `${directory}/${topicSlug(topic)}.md`, stem = base.slice(0, -3);
+    const directory = ((_a2 = this.locations.get(id)) == null ? void 0 : _a2.startsWith(`${this.folder}/Archive/`)) ? `${this.folder}/Archive` : this.topicFolder(topic), base = `${directory}/${topicSlug(topic)}.md`, stem2 = base.slice(0, -3);
     let path = base, suffix = 2;
     while (this.vault.getAbstractFileByPath(path) && this.vault.getAbstractFileByPath(path) !== this.vault.getAbstractFileByPath(this.sessionPath(id)))
-      path = `${stem}\uFF08${suffix++}\uFF09.md`;
+      path = `${stem2}\uFF08${suffix++}\uFF09.md`;
     return path;
   }
   async ensureFolder(path) {
@@ -18679,18 +18695,18 @@ ${session.observerDraftMarkdown}`);
     if (record.version !== 1 || record.trashed !== true && record.restoreJournal === void 0 && !!originalPath && !!this.vault.getAbstractFileByPath(originalPath) || typeof record.id !== "string" || typeof record.markdown !== "string")
       throw new Error("Deleted Coffee Tables record is incomplete; no file was changed");
     const sidePath = this.sidecarPath(record.id), originalBundleSidecar = typeof record.sidecar === "string" ? record.sidecar : void 0, currentSidecar = await this.vault.adapter.read(sidePath).catch(() => void 0);
-    const base = typeof record.originalPath === "string" ? record.originalPath : this.titlePath(String(record.topic), record.id), stem = base.slice(0, -3);
+    const base = typeof record.originalPath === "string" ? record.originalPath : this.titlePath(String(record.topic), record.id), stem2 = base.slice(0, -3);
     let journal = record.restoreJournal;
     let target = (_a2 = journal == null ? void 0 : journal.targetPath) != null ? _a2 : base;
     if (!journal) {
       let suffix = 2;
-      while (this.vault.getAbstractFileByPath(target)) target = `${stem}\uFF08${suffix++}\uFF09.md`;
+      while (this.vault.getAbstractFileByPath(target)) target = `${stem2}\uFF08${suffix++}\uFF09.md`;
     }
     const existingTarget = this.vault.getAbstractFileByPath(target);
     if (existingTarget && (!(existingTarget instanceof import_obsidian7.TFile) || await this.vault.read(existingTarget) !== record.markdown)) {
       let suffix = 2;
       target = base;
-      while (this.vault.getAbstractFileByPath(target)) target = `${stem}\uFF08${suffix++}\uFF09.md`;
+      while (this.vault.getAbstractFileByPath(target)) target = `${stem2}\uFF08${suffix++}\uFF09.md`;
       journal = void 0;
     }
     const before = journal ? journal.sidecarBefore : currentSidecar;
@@ -23096,8 +23112,8 @@ function safeImageName(name2, mime) {
   if (!extension) return null;
   const leaf = (_a2 = String(name2 != null ? name2 : "").split(/[\\/]/).pop()) != null ? _a2 : "";
   const dot = leaf.lastIndexOf(".");
-  const stem = dot > 0 ? leaf.slice(0, dot) : leaf;
-  const cleaned = stem.replace(/[^A-Za-z0-9\-_ .]/g, "_").replace(/\.{2,}/g, ".").replace(/^[ .]+|[ .]+$/g, "").slice(0, NAME_LIMIT).replace(/[ .]+$/g, "");
+  const stem2 = dot > 0 ? leaf.slice(0, dot) : leaf;
+  const cleaned = stem2.replace(/[^A-Za-z0-9\-_ .]/g, "_").replace(/\.{2,}/g, ".").replace(/^[ .]+|[ .]+$/g, "").slice(0, NAME_LIMIT).replace(/[ .]+$/g, "");
   return `${cleaned || "image"}.${extension}`;
 }
 var SIZE_LIMIT = 65535 * 16;
@@ -23377,8 +23393,8 @@ function toDataUri(mime, bytes) {
   return `data:${mime};base64,${parts.join("")}`;
 }
 function exportFileStem(title) {
-  const stem = String(title != null ? title : "").replace(/[\\/:*?"<>|#^[\]]/g, "-").replace(/\s+/g, " ").trim().replace(/^\.+/, "").slice(0, 80).trim();
-  return stem || "Mind map";
+  const stem2 = String(title != null ? title : "").replace(/[\\/:*?"<>|#^[\]]/g, "-").replace(/\s+/g, " ").trim().replace(/^\.+/, "").slice(0, 80).trim();
+  return stem2 || "Mind map";
 }
 async function svgToPngBlob(svg, width, height, scale, env) {
   const w = Math.max(1, Math.round(width * scale));
@@ -29760,10 +29776,10 @@ function retargetWikilink(original, oldPath, newPath) {
   const parts = /^(!?)\[\[([^[\]\n]+)\]\]$/.exec(original);
   if (!parts) return null;
   const inner = parts[2], alias = inner.search(/\\?\|/), target = alias < 0 ? inner : inner.slice(0, alias), aliasPart = alias < 0 ? "" : inner.slice(alias), hash = target.indexOf("#"), pathPart = hash < 0 ? target : target.slice(0, hash), subPart = hash < 0 ? "" : target.slice(hash);
-  const trimmed2 = pathPart.trim(), hasExt = /\.md$/i.test(trimmed2), stem = hasExt ? stripMd(trimmed2) : trimmed2, oldStem = stripMd(oldPath), newStem = stripMd(newPath);
+  const trimmed2 = pathPart.trim(), hasExt = /\.md$/i.test(trimmed2), stem2 = hasExt ? stripMd(trimmed2) : trimmed2, oldStem = stripMd(oldPath), newStem = stripMd(newPath);
   let next;
-  if (stem === oldStem || trimmed2 === oldPath) next = hasExt ? newPath : newStem;
-  else if (!stem.includes("/") && stem === baseOf(oldStem)) {
+  if (stem2 === oldStem || trimmed2 === oldPath) next = hasExt ? newPath : newStem;
+  else if (!stem2.includes("/") && stem2 === baseOf(oldStem)) {
     if (baseOf(newStem) === baseOf(oldStem)) return original;
     next = hasExt ? `${baseOf(newStem)}.md` : baseOf(newStem);
   } else return null;
@@ -44520,9 +44536,9 @@ async function backupNote(port, input2) {
       }) : []
     );
     const base = ((_a2 = input2.notePath.split("/").pop()) != null ? _a2 : input2.notePath).replace(/\.md$/i, "");
-    const stem = `${base} ${formatDate(input2.now)} ${formatTime(input2.now)}`;
-    let name2 = `${stem}.md`;
-    for (let attempt = 1; taken.has(name2.toLocaleLowerCase()); attempt++) name2 = `${stem} (${attempt}).md`;
+    const stem2 = `${base} ${formatDate(input2.now)} ${formatTime(input2.now)}`;
+    let name2 = `${stem2}.md`;
+    for (let attempt = 1; taken.has(name2.toLocaleLowerCase()); attempt++) name2 = `${stem2} (${attempt}).md`;
     const path = `${folder}/${name2}`;
     await port.create(path, input2.content);
     return await port.read(path) === input2.content ? { ok: true, path } : { ok: false };
@@ -46161,6 +46177,43 @@ function formatPipelineLog(e) {
   ).map(([name2, n]) => ` ${code(name2)}=${Math.max(0, Math.trunc(Number(n) || 0))}`).join("")}${((_b2 = e.hosts) == null ? void 0 : _b2.list.length) ? ` ${code(e.hosts.name)}=${e.hosts.list.slice(0, 5).map(code).join(",")}` : ""}`;
 }
 
+// core/book-pipeline/file-fit.ts
+var stem = (word) => /^[a-z]/.test(word) && word.length > 3 ? word.replace(/ies$/, "y").replace(/(lea|[lr])ves$/, "$1f").replace(/(ch|sh|x|ss|o)es$/, "$1").replace(/([^s])s$/, "$1") : word;
+function askWords(ask) {
+  return [...new Set([ask.explains, ask.subject, ask.search].flatMap((text10) => slotKeywords(text10 != null ? text10 : "")).map(stem))];
+}
+function wordHits(words2, text10) {
+  var _a2;
+  const lower6 = text10.toLowerCase().replace(/_/g, " ");
+  const own2 = new Set(((_a2 = lower6.match(/[a-z0-9][a-z0-9'-]*/g)) != null ? _a2 : []).map(stem));
+  return words2.filter((word) => /^[a-z0-9]/.test(word) ? own2.has(word) : lower6.includes(word)).length;
+}
+var PHOTO_KIND = /photo|照片|相片|實拍|实拍|攝影|摄影|写真/i;
+var MAP_KIND = /\bmaps?\b|地圖|地图/i;
+var PRINT_WORDS = /* @__PURE__ */ new Set([
+  "cover",
+  "book",
+  "catalog",
+  "catalogue",
+  "journal",
+  "magazine",
+  "newspaper",
+  "document",
+  "dictionary",
+  "leaflet",
+  "pamphlet",
+  "manuscript",
+  "poster",
+  "report",
+  "page"
+]);
+function wrongGenre(kind, titleAndCategories) {
+  var _a2;
+  if (!kind || !PHOTO_KIND.test(kind)) return false;
+  const words2 = ((_a2 = titleAndCategories.toLowerCase().match(/[a-z]+/g)) != null ? _a2 : []).map(stem);
+  return words2.some((word) => PRINT_WORDS.has(word) || word === "map" && !MAP_KIND.test(kind));
+}
+
 // core/book-pipeline/commons-search.ts
 var COMMONS_API = "https://commons.wikimedia.org/w/api.php";
 var COMMONS_REQUESTS_PER_SLOT = 2;
@@ -46170,7 +46223,10 @@ var COMMONS_CHAPTER_MS = 45e3;
 var QUERY_MAX = 80;
 var CREDIT_MAX = 100;
 var CAPTION_MAX = 200;
-var SAFE_MIME = /^image\/(?:jpeg|png|gif|webp)$/i;
+var DESCRIPTION_MAX = 300;
+var FILE_MIME = /^image\/(?:jpeg|png|webp|svg\+xml)$/i;
+var SHOWN_MIME = /^image\/(?:jpeg|png|webp)$/i;
+var FIT_HITS = 2;
 function commonsSearchUrl(query) {
   const params = {
     action: "query",
@@ -46183,7 +46239,7 @@ function commonsSearchUrl(query) {
     prop: "imageinfo",
     iiprop: "url|mime|thumbmime|extmetadata",
     iiurlwidth: "1280",
-    iiextmetadatafilter: "Artist|LicenseShortName"
+    iiextmetadatafilter: "Artist|LicenseShortName|ImageDescription|Categories"
   };
   const pairs = Object.entries(params).map(([key4, value]) => `${key4}=${encodeURIComponent(value)}`);
   return `${COMMONS_API}?${pairs.join("&")}`;
@@ -46193,12 +46249,12 @@ function commonsQueries(slot) {
   const all = [line2(slot.search), line2(slot.subject), line2(slot.explains)].filter(Boolean);
   return [...new Set(all)].slice(0, COMMONS_REQUESTS_PER_SLOT);
 }
-function plainCredit(value) {
+function plainCredit(value, max = CREDIT_MAX) {
   if (typeof value !== "string") return "";
-  return value.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().slice(0, CREDIT_MAX);
+  return value.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().slice(0, max);
 }
 function parseCommonsAnswer(text10, slot) {
-  var _a2, _b2, _c, _d;
+  var _a2, _b2, _c, _d, _e, _f;
   let parsed;
   try {
     parsed = JSON.parse(text10);
@@ -46212,19 +46268,28 @@ function parseCommonsAnswer(text10, slot) {
     const info = Array.isArray(page.imageinfo) ? page.imageinfo[0] : void 0;
     if (!info || typeof page.title !== "string") continue;
     const url = typeof info.thumburl === "string" ? info.thumburl : typeof info.url === "string" ? info.url : "";
-    const mime = typeof info.thumbmime === "string" ? info.thumbmime : info.mime;
-    if (!/^https:\/\//.test(url) || typeof mime !== "string" || !SAFE_MIME.test(mime)) continue;
+    const shown = typeof info.thumbmime === "string" ? info.thumbmime : info.mime;
+    if (typeof info.mime !== "string" || !FILE_MIME.test(info.mime)) continue;
+    if (!/^https:\/\//.test(url) || typeof shown !== "string" || !SHOWN_MIME.test(shown)) continue;
     if (typeof info.descriptionurl !== "string") continue;
+    if ([url, page.title, info.url].some((value) => typeof value === "string" && isDocumentFile(value))) continue;
     const meta = (_b2 = info.extmetadata) != null ? _b2 : {};
     const author = plainCredit((_c = meta.Artist) == null ? void 0 : _c.value);
     const license = plainCredit((_d = meta.LicenseShortName) == null ? void 0 : _d.value);
+    const categories = plainCredit((_e = meta.Categories) == null ? void 0 : _e.value, DESCRIPTION_MAX).replace(/\|/g, "; ");
+    const about = plainCredit((_f = meta.ImageDescription) == null ? void 0 : _f.value, DESCRIPTION_MAX);
     const title = page.title.replace(/^File:/i, "").replace(/\.[a-z0-9]{2,5}$/i, "").replace(/_/g, " ").trim();
+    if (wrongGenre(slot.kind, `${title} ${categories}`)) continue;
+    const words2 = askWords(slot);
+    if (wordHits(words2, `${title} ${about} ${categories}`) < Math.min(FIT_HITS, words2.length) || !words2.length)
+      continue;
     const candidate = fileSourceOf({
       title: title || page.title,
       url,
       source: info.descriptionurl,
       // The program writes no caption of its own: the slot's line (in the book's language) says what the picture is for.
       caption: slot.explains.replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX),
+      description: [about, categories].filter(Boolean).join(" \xB7 ").slice(0, DESCRIPTION_MAX),
       ...author ? { author } : {},
       ...license ? { license } : {}
     });
@@ -54105,7 +54170,7 @@ ${oldDetail}`);
    * ends (budget, a refused or discarded write); undefined means the markers are settled and the card may advance to written.
    */
   async fillSlots(drive, token, nodeId, path, slots, authorize) {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d, _e;
     const signal = drive.controller.signal;
     const language2 = drive.config.language;
     const attempt = attemptsOf(drive.store.state, nodeId).write;
@@ -54173,6 +54238,7 @@ ${oldDetail}`);
                 sourceUrl: candidate.source,
                 title: candidate.title,
                 caption: candidate.caption,
+                ...candidate.description !== void 0 ? { description: candidate.description } : {},
                 ...candidate.author ? { author: candidate.author } : {},
                 ...candidate.license ? { license: candidate.license } : {}
               },
@@ -54227,7 +54293,12 @@ ${oldDetail}`);
             ...[...perSlot.values()].flatMap((list2) => list2.map((item) => imageKey(item.candidate.imageUrl)))
           ]);
           const commons = await searchCommons(
-            lacking2.map((slot) => ({ index: slot.index, explains: slot.explains, ...hints.get(slot.index) })),
+            lacking2.map((slot) => ({
+              index: slot.index,
+              kind: slot.kind,
+              explains: slot.explains,
+              ...hints.get(slot.index)
+            })),
             this.ports.fetchCommons,
             { signal, skip: (url) => seen.has(imageKey(url)) || taken(imageKey(url)) }
           );
@@ -54257,12 +54328,22 @@ ${oldDetail}`);
       (outcome) => "figure" in outcome && outcome.figure.work && !drive.usedWorks.has(outcome.figure.work) ? [outcome.figure.work] : []
     );
     for (const key4 of works) drive.usedWorks.set(key4, nodeId);
+    const off = /* @__PURE__ */ new Set();
+    for (const slot of slots) {
+      const outcome = outcomes.get(slot.index);
+      if (!outcome || !("figure" in outcome)) continue;
+      const placed = (_d = ((_c = perSlot.get(slot.index)) != null ? _c : []).find((item) => item.href === outcome.figure.href)) == null ? void 0 : _d.candidate;
+      if (!placed) continue;
+      const about = `${placed.title} ${(_e = placed.description) != null ? _e : placed.caption}`;
+      const words2 = askWords({ explains: slot.explains, ...hints.get(slot.index) });
+      if (words2.length && !wordHits(words2, about)) off.add(slot.index);
+    }
     const release2 = () => {
       for (const key4 of claimed) drive.usedImages.delete(key4);
       for (const key4 of works) drive.usedWorks.delete(key4);
     };
     try {
-      const result = await this.writeFilled(latest, slots, outcomes, language2, authorize);
+      const result = await this.writeFilled(latest, slots, outcomes, language2, authorize, off);
       if (typeof result === "string") {
         release2();
         return { kind: "failed", reason: result };
@@ -54327,13 +54408,13 @@ ${oldDetail}`);
    * the card changed since `latest`, or a marker is left outside fences and quotes). Returns the fill result, or a failure reason
    * (nothing was written): the three checks, the exit check, or a discarded write.
    */
-  async writeFilled(latest, slots, outcomes, language2, authorize) {
+  async writeFilled(latest, slots, outcomes, language2, authorize, off) {
     const result = fillSlotMarkers(latest.detail, slots, outcomes);
     const bad = verifyFill(latest.detail, result, slots);
     if (bad) return `slots_${bad}`;
     if (this.exitCheck(result.added.join("\n"), new Set(result.placed.map((item) => item.href)))) return "slots_unsafe";
     const withSources = addPictureSources(result.text, result.sources, language2);
-    const slotted = slots.length ? replaceResearchRecord(withSources, composeSlotsRecord(result)) : withSources;
+    const slotted = slots.length ? replaceResearchRecord(withSources, composeSlotsRecord(result, off)) : withSources;
     const detail = programStamp(latest.detail, slotted);
     if (detail === latest.detail) return result;
     const outside = residualMarkerLines(latest.raw).length - residualMarkerLines(latest.detail).length;
@@ -67554,9 +67635,9 @@ function stemOf(fileName) {
   var _a2;
   if (!fileName) return void 0;
   const leaf = (_a2 = fileName.split(/[\\/]/).pop()) != null ? _a2 : "";
-  const stem = leaf.replace(/\.(?:opml|mm|xml)$/i, "");
+  const stem2 = leaf.replace(/\.(?:opml|mm|xml)$/i, "");
   try {
-    return cleanTitle(stem, 0);
+    return cleanTitle(stem2, 0);
   } catch (e) {
     return void 0;
   }
@@ -67780,8 +67861,8 @@ function chooseAndImportExchange(host) {
 }
 var FORBIDDEN_NAME = /[\\/:*?"<>|#^[\]]/g;
 function exchangeFileStem(title) {
-  const stem = Array.from(title, (ch) => ch.charCodeAt(0) < 32 ? " " : ch).join("").replace(FORBIDDEN_NAME, " ").replace(/\s+/g, " ").trim().replace(/^\.+/, "").slice(0, 80).trim();
-  return stem || "map";
+  const stem2 = Array.from(title, (ch) => ch.charCodeAt(0) < 32 ? " " : ch).join("").replace(FORBIDDEN_NAME, " ").replace(/\s+/g, " ").trim().replace(/^\.+/, "").slice(0, 80).trim();
+  return stem2 || "map";
 }
 var EXTENSION2 = { opml: "opml", freemind: "mm" };
 async function exportMapExchange(vault, request) {
@@ -67791,10 +67872,10 @@ async function exportMapExchange(vault, request) {
   const text10 = request.format === "opml" ? toOpml(input2, notes) : toFreeMind(input2, notes);
   const slash = request.mapPath.lastIndexOf("/");
   const folder = slash < 0 ? "" : request.mapPath.slice(0, slash + 1);
-  const stem = exchangeFileStem(request.map.title);
+  const stem2 = exchangeFileStem(request.map.title);
   const extension = EXTENSION2[request.format];
   for (let attempt = 1; attempt <= 1e3; attempt++) {
-    const path = `${folder}${stem}${attempt === 1 ? "" : ` ${attempt}`}.${extension}`;
+    const path = `${folder}${stem2}${attempt === 1 ? "" : ` ${attempt}`}.${extension}`;
     if (vault.getAbstractFileByPath(path) || await vault.adapter.exists(path)) continue;
     try {
       await vault.create(path, text10);

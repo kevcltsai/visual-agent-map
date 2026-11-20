@@ -219,7 +219,7 @@ test('slots: a search that throws, never answers or is aborted does not make the
   await run(r);
   const s = await r.state();
   assert.equal(stageOf(r.raw(0)), 'checked');
-  assert.match((await r.note(0)).pipelineIssue ?? '', /^structure unmet: image_1 image_2$/, 'only the notice tokens of the missing pictures, never a failure or needs-review');
+  assert.match((await r.note(0)).pipelineIssue ?? '', /^image notice: image_1 image_2$/, 'only the notice tokens of the missing pictures, never a failure or needs-review');
   assert.deepEqual(recordOf((await r.note(0)).detail).slots.map(x => x.reasonCode), ['not_found', 'not_found']);
   assert.equal(s.cards?.[r.nodes[0].id]?.attempts?.write ?? 1, 1);
   assert.equal(r.calls.length, 1, 'no retry');
@@ -611,7 +611,7 @@ for (const [kind, template] of Object.entries(TEMPLATES)) {
   });
 }
 
-test('proofread: the request body has no image line or caption; the result section has one 圖文 line before the model lines; a missing or off-topic picture is a notice (structure unmet), never needs-review', async () => {
+test('proofread: the request body has no image line or caption; the result section has one 圖文 line before the model lines; a missing or off-topic picture is a notice (image notice), never needs-review', async () => {
   const text = () => `開頭。\n\nexplains perspective 的說明。\n\n${mk(1)}\n\n另一段。\n\n${mk(2)}\n\n尾。\n\n### 來源\n- https://example.com/a\n`;
   const r = await picRig({ text, finder: () => found({ 1: [cand(1)] }) });
   await run(r);
@@ -625,7 +625,7 @@ test('proofread: the request body has no image line or caption; the result secti
   assert.ok(at >= 0 && at === lines.length - 3, raw);
   assert.match(lines[at], /圖 2 沒找到合適的圖/);
   assert.equal(stageOf(raw), 'checked');
-  assert.match((await r.note(0)).pipelineIssue ?? '', /^structure unmet: image_2$/);
+  assert.match((await r.note(0)).pipelineIssue ?? '', /^image notice: image_2$/);
 });
 
 test('proofread: all pictures placed next to their text: the 圖文 line says ok and the card carries no issue; an old Prompt says no image plan', async () => {
@@ -1117,7 +1117,7 @@ test('shortfall: under the owner\'s minimum the chapter ends needs-review with a
   await run(r);
   assert.equal(stageOf(r.raw(0)), 'needs-review');
   const issue = (await r.note(0)).pipelineIssue;
-  assert.match(issue, /^images unmet: images:under:1:2 image_2( image_1)?$/);
+  assert.match(issue, /^images unmet: images:under:1:2 image_2( image_1_mismatch)?$/);
   assert.equal(r.stat.author.filter(id => id === r.nodes[0].id).length, 1, 'no automatic rewrite for too few pictures');
   const review = S.load('experiences/visual-map/book-pipeline-review.ts');
   assert.equal(review.reasonOf(issue, undefined), 'Too few pictures: 1 placed, the setting asks for at least 2', 'test locale is en');

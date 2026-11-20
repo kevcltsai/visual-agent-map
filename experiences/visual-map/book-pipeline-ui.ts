@@ -586,7 +586,7 @@ function plainIssueText(issue: string): string {
  * not unmet structure items: they are counted apart; anything else shows nothing.
  */
 function structureNote(issue: string): { issueText?: string } {
-  const found = /^structure unmet: (\S+(?: \S+)*)$/.exec(issue.trim());
+  const found = /^(?:structure unmet|image notice): (\S+(?: \S+)*)$/.exec(issue.trim());
   if (!found) return {};
   const tokens = found[1].split(" ");
   const notices = tokens.filter(token => token.startsWith("image_")).length;

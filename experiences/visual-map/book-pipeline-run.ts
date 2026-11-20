@@ -2994,9 +2994,11 @@ export class BookPipelineRuns {
               ? `length unmet: ${[lengthIssue, ...(shortIssue ? [shortIssue] : []), ...noticed].join(" ")}`
               : shortIssue
                 ? `images unmet: ${[shortIssue, ...noticed].join(" ")}`
-                : noticed.length
+                : structureUnmet.length
                   ? `structure unmet: ${noticed.join(" ")}`
-                  : null
+                  : noticed.length
+                    ? `image notice: ${noticed.join(" ")}`
+                    : null
         );
       }
     };

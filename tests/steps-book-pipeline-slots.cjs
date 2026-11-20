@@ -77,6 +77,8 @@ test('checkImageText: picture next to its text is ok; a missing slot, a picture 
   assert.equal(gone.bad, 1);
   assert.deepEqual(plain(slots.imageIssueTokens(gone)), ['image_2', 'image_marker']);
   assert.deepEqual(plain(slots.imageIssueTokens(deleted)), ['image_count']);
+  // A placed picture that does not match is named apart from a slot with no picture (live: slot 6 filled yet "image_6" read as missing).
+  assert.deepEqual(plain(slots.imageIssueTokens(off)), ['image_1_mismatch']);
   assert.equal(slots.checkImageText('x', undefined, undefined).kind, 'none');
   assert.equal(slots.checkImageText('x', [], undefined).kind, 'none');
   assert.equal(slots.checkImageText('x', plan, undefined).kind, 'unrecorded');

@@ -153,6 +153,38 @@ test('bar: in the trial the fix round shows the trial done count, not chapter 1/
   assert.equal(text([{ nodeId: 'b', step: 'write', startedAt: 1 }]), '正在試跑第 2／3 章', 'a trial chapter in its first write is named');
 });
 
+test('bar (live v6): in the trial fix round the fix line names the chapter still being fixed as the fixes finish out of order, also for a trial that is not the first chapters', () => {
+  setUiLanguage('zh-TW');
+  const stages = {};
+  const counts = () => {
+    const done = Object.values(stages).filter(stage => stage === 'checked' || stage === 'needs-review').length;
+    return { pending: 6 - 3, planned: 0, written: 3 - done, checked: done, 'needs-review': 0 };
+  };
+  const run = (order, trial) => {
+    const data = { v: 1, runId: 'r', phase: 'planning', status: 'running', order, trial, globalPlanned: true, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', autoFixes: Object.fromEntries(trial.map(id => [id, 1])) };
+    const progress = current => ({ runId: 'r', phase: 'planning', status: 'running', active: true, total: order.length, counts: counts(), budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current });
+    return busy => bundle.bookProgressText(bundle.bookBarState(data, progress(busy.map((nodeId, i) => ({ nodeId, step: 'proof', startedAt: i + 1 }))), id => stages[id]));
+  };
+  // v6: the three trial fixes run together; chapter 3 finishes first, then chapter 1, then chapter 2.
+  for (const key of Object.keys(stages)) delete stages[key];
+  let text = run(['a', 'b', 'c', 'd', 'e', 'f'], ['a', 'b', 'c']);
+  assert.equal(text(['a', 'b', 'c']), '正在修正第 1 章・已完成 0／3 章');
+  stages.c = 'checked';
+  assert.equal(text(['a', 'b', 'c']), '正在修正第 1 章・已完成 1／3 章', 'chapter 1 is still being fixed');
+  stages.a = 'checked';
+  assert.equal(text(['a', 'b']), '正在修正第 2 章・已完成 2／3 章', 'chapter 1 is done: chapter 2 is named');
+  assert.equal(text(['b']), '正在修正第 2 章・已完成 2／3 章');
+  // A trial picked from the middle of the book (reading order d, b, f): the chapter numbers are the book's.
+  for (const key of Object.keys(stages)) delete stages[key];
+  text = run(['a', 'b', 'c', 'd', 'e', 'f'], ['d', 'b', 'f']);
+  assert.equal(text(['d', 'b', 'f']), '正在修正第 2 章・已完成 0／3 章');
+  stages.b = 'needs-review';
+  assert.equal(text(['d', 'f']), '正在修正第 4 章・已完成 1／3 章');
+  stages.d = 'checked';
+  assert.equal(text(['f']), '正在修正第 6 章・已完成 2／3 章');
+  assert.equal(text([]), '正在修正第 6 章・已完成 2／3 章', 'between two steps of chapter 6\'s fix');
+});
+
 test('bar: the fix line follows the chapter still being fixed and keeps the fix label between its steps', () => {
   setUiLanguage('zh-TW');
   const trial = { v: 1, runId: 'r', phase: 'planning', status: 'running', order: ['a', 'b', 'c', 'd'], trial: ['a', 'b', 'c'], globalPlanned: true, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', autoFixes: { a: 1, b: 1, c: 1 } };

@@ -54640,20 +54640,21 @@ function renderAsk(bar, cls, question, goText, ask) {
 }
 var settledCount = (state) => state.counts.checked + state.counts["needs-review"];
 function bookProgressText(state) {
-  var _a2, _b2, _c, _d, _e, _f, _g;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h;
   const { total: total2 } = state;
   if (state.mode === "planning" && state.trialSize && ((_a2 = state.current) == null ? void 0 : _a2.step) !== "global") {
+    if ((_b2 = state.current) == null ? void 0 : _b2.fix) return t("ui.book_progress_line_done_0_1", Math.min(settledCount(state), state.trialSize), state.trialSize);
     const settled2 = Math.min(state.counts.checked + state.counts["needs-review"], state.trialSize - 1);
     return t(
       "ui.book_progress_line_trial_0_1",
-      Math.min((_c = (_b2 = state.current) == null ? void 0 : _b2.chapter) != null ? _c : settled2 + 1, state.trialSize),
+      Math.min((_d = (_c = state.current) == null ? void 0 : _c.chapter) != null ? _d : settled2 + 1, state.trialSize),
       state.trialSize
     );
   }
-  const at = Math.min((_e = (_d = state.current) == null ? void 0 : _d.chapter) != null ? _e : settledCount(state) + 1, Math.max(total2, 1));
+  const at = Math.min((_f = (_e = state.current) == null ? void 0 : _e.chapter) != null ? _f : settledCount(state) + 1, Math.max(total2, 1));
   if (state.mode === "writing")
-    return ((_f = state.current) == null ? void 0 : _f.fix) ? t("ui.book_progress_line_done_0_1", settledCount(state), total2) : t("ui.book_progress_line_write_0_1", at, total2);
-  const sentence = state.mode === "planning" ? !state.globalDone || ((_g = state.current) == null ? void 0 : _g.step) === "global" ? t("ui.book_progress_line_global") : t("ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
+    return ((_g = state.current) == null ? void 0 : _g.fix) ? t("ui.book_progress_line_done_0_1", settledCount(state), total2) : t("ui.book_progress_line_write_0_1", at, total2);
+  const sentence = state.mode === "planning" ? !state.globalDone || ((_h = state.current) == null ? void 0 : _h.step) === "global" ? t("ui.book_progress_line_global") : t("ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
   return `${sentence}${t("ui.book_progress_line_sep")}${t("ui.book_progress_line_done_0_1", settledCount(state), total2)}`;
 }
 function renderProgressLine(bar, state, text10) {

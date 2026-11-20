@@ -116,6 +116,17 @@ test('merged Detail: ### title sections in order, empty sources skipped, inner h
   assert.equal(mergedDetail([]), '');
 });
 
+test('merged Detail of book chapters (T9, re-verify item 5): one body record with the merged text\'s fingerprint, so a book rerun may rewrite it; a merge with no record stays rewritable', () => {
+  const bi = load('core/book-pipeline/body-integrity.ts');
+  const chapter = text => bi.stampDetail(`${text}\n\n### 來源\n- https://example.com/${text.length}\n`);
+  const detail = mergedDetail([{ title: 'A', detail: chapter('第一章正文。') }, { title: 'B', detail: chapter('第二章正文。') }]);
+  assert.equal((detail.match(/book-body:v1/g) ?? []).length, 1, 'the sources\' records are replaced by one');
+  assert.equal(bi.bodyState(detail), 'clean', 'not a hand edit');
+  assert.equal(bi.readBodyRecord(detail).fp, bi.integrityFp(detail));
+  assert.equal(bi.bodyState(mergedDetail([{ title: 'A', detail: '甲。' }, { title: 'B', detail: '乙。' }])), 'clean', 'no record, no older evidence: rewritable');
+  assert.equal(mergedDetail([{ title: 'A', detail: '甲。' }]), '### A\n\n甲。', 'a non-book merge is unchanged');
+});
+
 test('merged status: completed when any content, idea when empty', () => {
   assert.equal(mergedStatus('### A\n\nx'), 'completed');
   assert.equal(mergedStatus(''), 'idea');

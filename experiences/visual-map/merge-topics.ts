@@ -4,6 +4,7 @@ import { descendants, inheritModel, type MapNode } from "../../map-model";
 import { actionStatus, modalActions } from "../../ui/modals/action-bar";
 import { titleProblemText } from "../../ui/modals/title-check";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
+import { readBodyRecord, stampDetail } from "../../core/book-pipeline/body-integrity";
 import type { TopicColor, TopicStyle } from "../../topic-colors";
 import type { TopicMarker } from "../../topic-markers";
 
@@ -74,10 +75,13 @@ export function mergeEligibility(input: {
 
 /** The new note's Detail: each source with content, in order, under `### <title>`; empty sources are skipped. */
 export function mergedDetail(sources: { title: string; detail: string }[]): string {
-  return sources
+  const detail = sources
     .filter(source => source.detail.trim())
     .map(source => `### ${source.title}\n\n${source.detail.trim()}`)
     .join("\n\n");
+  // Book chapters carry their hidden work records along, the fingerprint of each source's text among them. The merged text is the
+  // program's own write: its record holds the merged text's fingerprint, so a book rerun does not read the merged card as hand-edited.
+  return readBodyRecord(detail) ? stampDetail(detail) : detail;
 }
 
 /** A merged note with any content is completed; an all-empty merge stays an idea. */

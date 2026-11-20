@@ -2383,6 +2383,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "note.callout_titles_4": "錯誤:bug|引述:quote,cite",
   "note.visual_reference": "視覺參考",
   "note.image_author_0": "作者 {0}",
+  "note.image_file_caption_0": "圖：{0}",
   "note.image_link": "連結",
   "note.image_source_0_1": "{0}（{1}）",
   "note.image_source_label_0": "來源：{0}",

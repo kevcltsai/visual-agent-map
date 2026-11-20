@@ -20,6 +20,24 @@ export interface ImageSlot {
   explains: string;
   /** Where in the chapter it sits (for example "after the paragraph on perspective"). */
   anchor: string;
+  /** The planner's English search terms for a Commons file search (2 to 4). Absent on a slot planned before they existed. */
+  search?: string[];
+}
+
+/** At most this many English search terms a slot, each at most {@link SEARCH_TERM_MAX} characters. */
+export const MAX_SEARCH_TERMS = 4;
+export const SEARCH_TERM_MAX = 60;
+/** Search terms as stored: one line each, no list separator, Latin letters only kept (a term without one is dropped), no duplicates. */
+export function cleanSearchTerms(values: readonly unknown[]): string[] {
+  const out: string[] = [];
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const term = cleanSlotText(value.replace(/[,;]/g, " "), SEARCH_TERM_MAX);
+    if (!/[A-Za-z]/.test(term) || out.some(have => have.toLowerCase() === term.toLowerCase())) continue;
+    out.push(term);
+    if (out.length >= MAX_SEARCH_TERMS) break;
+  }
+  return out;
 }
 
 /** The planner may arrange this many slots for one card when the owner gave no picture count. */
@@ -185,6 +203,8 @@ export interface SlotCandidate {
   caption: string;
   /** What the file page says about the file (the program's Commons search); absent for the finder's pictures, whose caption is its own description. */
   description?: string;
+  /** The program's Commons search could not tie the file to everything its slot asks for: the caption names the file, and the proof marks a mismatch. */
+  loose?: true;
   /** Creator and license as the finder reported them from the source page; never invented here. */
   author?: string;
   license?: string;
@@ -301,7 +321,7 @@ export function sourceOf(
   };
 }
 
-/** A finder caption is one plain line (what it is, where to look); an empty one falls back to the title. */
+/** A finder caption is one plain line (what it is, where to look); an empty one falls back to the title; a loose Commons file reads `Picture: <its name>`. */
 export function figureOf(candidate: SlotCandidate, href: string, language: string): SlotFigure {
   // The marker brackets are taken out first: a caption must never read as a slot marker.
   const plain = (value: string): string => value.replace(/[〔〕]/g, " ");
@@ -310,7 +330,9 @@ export function figureOf(candidate: SlotCandidate, href: string, language: strin
   return {
     href,
     alt,
-    caption: plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
+    caption: candidate.loose
+      ? translateNote(language as ContentLanguage, "note.image_file_caption_0", alt)
+      : plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
     ...(source ? { source } : {})
   };
 }

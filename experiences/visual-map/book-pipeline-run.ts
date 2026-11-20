@@ -2961,6 +2961,7 @@ export class BookPipelineRuns {
               title: candidate.title,
               caption: candidate.caption,
               ...(candidate.description !== undefined ? { description: candidate.description } : {}),
+              ...(candidate.loose ? { loose: true as const } : {}),
               ...(candidate.author ? { author: candidate.author } : {}),
               ...(candidate.license ? { license: candidate.license } : {})
             },
@@ -2980,6 +2981,8 @@ export class BookPipelineRuns {
       for (const [index, hint] of from?.hints ?? []) hints.set(index, { ...hints.get(index), ...hint });
     };
     let commonsAsked = 0;
+    let commonsLimited = false;
+    let commonsNoHint = 0;
     try {
       const round1 = await search(wanted, false, exclude);
       keepHints(round1);
@@ -3013,12 +3016,16 @@ export class BookPipelineRuns {
               index: slot.index,
               kind: slot.kind,
               explains: slot.explains,
+              ...(slot.search?.length ? { terms: slot.search } : {}),
               ...hints.get(slot.index)
             })),
             this.ports.fetchCommons,
             { signal, skip: url => seen.has(imageKey(url)) || taken(imageKey(url)) }
           );
           commonsAsked = commons.requests;
+          commonsLimited = commons.limited;
+          // Slots with no English search words (none planned, none from the finder): their Commons queries are the slot line, which rarely matches a file.
+          commonsNoHint = lacking.filter(slot => !slot.search?.length && !hints.get(slot.index)?.search).length;
           if (signal.aborted) throw new Error("aborted");
           const asFound: FoundImages = {
             bySlot: commons.bySlot,
@@ -3057,8 +3064,12 @@ export class BookPipelineRuns {
       if (!outcome || !("figure" in outcome)) continue;
       const placed = (perSlot.get(slot.index) ?? []).find(item => item.href === outcome.figure.href)?.candidate;
       if (!placed) continue;
+      if (placed.loose) {
+        off.add(slot.index);
+        continue;
+      }
       const about = `${placed.title} ${placed.description ?? placed.caption}`;
-      const words = askWords({ explains: slot.explains, ...hints.get(slot.index) });
+      const words = askWords({ explains: slot.explains, terms: slot.search, ...hints.get(slot.index) });
       if (words.length && !wordHits(words, about)) off.add(slot.index);
     }
     const release = (): void => {
@@ -3083,7 +3094,9 @@ export class BookPipelineRuns {
           counts: {
             placed: result.placed.length,
             missing: result.missing.length,
-            ...(commonsAsked ? { commons: commonsAsked } : {})
+            ...(commonsAsked ? { commons: commonsAsked } : {}),
+            ...(commonsLimited ? { commons_limited: 1 } : {}),
+            ...(commonsNoHint ? { commons_nohint: commonsNoHint } : {})
           },
           hosts: { name: "reason", list: [...new Set(result.missing.map(item => item.reasonCode))] }
         })

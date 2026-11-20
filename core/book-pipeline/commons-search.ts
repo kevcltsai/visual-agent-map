@@ -4,16 +4,21 @@
  * request after {@link COMMONS_CHAPTER_MS} for the chapter. The answers go through the same rules as the finder's (file page source,
  * the subject rule); the caller probes them and dedupes by address and work as for any candidate. Only photographs and drawings are
  * taken (never a page of a PDF, DjVu or TIFF scan), and only a file whose title, description or categories name what the slot asks for.
+ * Every query asks for bitmap files only: a plain word search ranks scanned books (PDF, DjVu) first, whose pages the rules refuse.
+ * A rate-limit answer (429) ends the search of the chapter. Worst case: {@link COMMONS_REQUESTS_PER_SLOT} requests a slot, and none
+ * after {@link COMMONS_CHAPTER_MS}. Chapters run side by side, so every request of every chapter goes through one shared queue: one
+ * request in flight, {@link COMMONS_SPACING_MS} between the end of one and the start of the next (a burst is what draws the 429).
  */
 import { askWords, wordHits, wrongGenre } from "./file-fit";
 import { bySubject, fileSourceOf, isDocumentFile } from "./image-quality";
 
 /** The only address the search asks (the port refuses any other). */
 export const COMMONS_API = "https://commons.wikimedia.org/w/api.php";
-export const COMMONS_REQUESTS_PER_SLOT = 2;
+export const COMMONS_REQUESTS_PER_SLOT = 3;
 export const COMMONS_PER_SLOT = 3;
 export const COMMONS_REQUEST_MS = 10_000;
 export const COMMONS_CHAPTER_MS = 45_000;
+export const COMMONS_SPACING_MS = 300;
 const QUERY_MAX = 80;
 const CREDIT_MAX = 100;
 const CAPTION_MAX = 200;
@@ -32,12 +37,14 @@ export interface CommonsResponse {
 /** GET of a {@link COMMONS_API} address (production: Obsidian's `requestUrl`, `throw: false`). */
 export type CommonsFetch = (url: string) => Promise<CommonsResponse>;
 
-/** A slot as the fallback sees it, with what the finder said about it (its subject, its English search words). */
+/** A slot as the fallback sees it: the plan's lines and English search terms, and what the finder said about it (its subject, its English search words). */
 export interface CommonsSlot {
   index: number;
   /** The plan's kind line (a photo slot refuses book covers, printed pages and maps). */
   kind?: string;
   explains: string;
+  /** The planner's English search terms (asked first). */
+  terms?: readonly string[];
   subject?: string;
   search?: string;
 }
@@ -48,6 +55,8 @@ export interface CommonsCandidate {
   caption: string;
   /** What the file page says about the file: its description and categories (plain text, capped). */
   description: string;
+  /** The file names fewer than half (rounded up) of its slot's English search terms: the caption is the file's own name, not the slot's line. */
+  loose?: true;
   author?: string;
   license?: string;
 }
@@ -60,8 +69,8 @@ export function commonsSearchUrl(query: string): string {
     formatversion: "2",
     generator: "search",
     gsrnamespace: "6",
-    gsrsearch: query,
-    gsrlimit: "10",
+    gsrsearch: `${query} filetype:bitmap`,
+    gsrlimit: "20",
     prop: "imageinfo",
     iiprop: "url|mime|thumbmime|extmetadata",
     iiurlwidth: "1280",
@@ -71,7 +80,10 @@ export function commonsSearchUrl(query: string): string {
   return `${COMMONS_API}?${pairs.join("&")}`;
 }
 
-/** The queries for a slot, best first: the finder's search words, the subject, then what the slot explains (one line, capped). */
+/**
+ * The queries for a slot, best first: the planner's English terms, the finder's search words, the subject, then what the slot
+ * explains (one line, capped; the book's language, so last).
+ */
 export function commonsQueries(slot: CommonsSlot): string[] {
   const line = (value: string | undefined): string =>
     (value ?? "")
@@ -79,7 +91,7 @@ export function commonsQueries(slot: CommonsSlot): string[] {
       .trim()
       .slice(0, QUERY_MAX)
       .trim();
-  const all = [line(slot.search), line(slot.subject), line(slot.explains)].filter(Boolean);
+  const all = [line(slot.terms?.join(" ")), line(slot.search), line(slot.subject), line(slot.explains)].filter(Boolean);
   return [...new Set(all)].slice(0, COMMONS_REQUESTS_PER_SLOT);
 }
 
@@ -138,17 +150,25 @@ export function parseCommonsAnswer(text: string, slot: CommonsSlot): CommonsCand
       .trim();
     if (wrongGenre(slot.kind, `${title} ${categories}`)) continue;
     const words = askWords(slot);
-    if (wordHits(words, `${title} ${about} ${categories}`) < Math.min(FIT_HITS, words.length) || !words.length)
-      continue;
+    const said = `${title} ${about} ${categories}`;
+    if (wordHits(words, said) < Math.min(FIT_HITS, words.length) || !words.length) continue;
+    // The slot's line is the caption only when the file names most (at least half, rounded up) of the slot's English terms, the
+    // planner's if it has them, else the finder's search words as one term; a term counts when the file has all its words. Else the
+    // file's own name is the caption.
+    const terms = (slot.terms?.length ? slot.terms : [slot.search ?? ""])
+      .map(term => askWords({ explains: "", search: term }))
+      .filter(term => term.length);
+    const hit = terms.filter(term => wordHits(term, said) === term.length).length;
+    const fits = terms.length > 0 && hit >= Math.ceil(terms.length / 2);
     const candidate = fileSourceOf<CommonsCandidate>({
       title: title || page.title,
       url,
       source: info.descriptionurl,
-      // The program writes no caption of its own: the slot's line (in the book's language) says what the picture is for.
-      caption: slot.explains.replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX),
+      caption: (fits ? slot.explains : title || page.title).replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX),
       description: [about, categories].filter(Boolean).join(" · ").slice(0, DESCRIPTION_MAX),
       ...(author ? { author } : {}),
-      ...(license ? { license } : {})
+      ...(license ? { license } : {}),
+      ...(fits ? {} : { loose: true as const })
     });
     if (!candidate || !bySubject(candidate, slot.subject)) continue;
     if (out.some(have => have.url === candidate.url)) continue;
@@ -173,28 +193,63 @@ function bounded<T>(work: Promise<T>, ms: number, signal: AbortSignal): Promise<
 }
 
 /**
- * Up to {@link COMMONS_PER_SLOT} candidates per slot, slots in order, one request at a time. A slot's second query is asked only when
- * the first gave nothing usable. `skip` refuses addresses the chapter already tried or the book uses. Never throws (a Stop ends early).
+ * One request at a time for every chapter: a turn starts when the one before it ended (answer, timeout or Stop) plus `spacing` ms.
+ * A turn whose chapter stopped or ran out of time while it waited asks nothing (`run` is not called).
+ */
+export class CommonsQueue {
+  private tail: Promise<void> = Promise.resolve();
+  constructor(private readonly spacing = COMMONS_SPACING_MS) {}
+  /** `run`'s answer, or undefined when `skip()` says no once the turn came. The next turn waits for this one to settle. */
+  turn<T>(skip: () => boolean, run: () => Promise<T | undefined>): Promise<T | undefined> {
+    let asked = false;
+    const answer = this.tail.then(() => {
+      if (skip()) return undefined;
+      asked = true;
+      return run();
+    });
+    const next = (): Promise<void> => (asked ? this.pause() : Promise.resolve());
+    this.tail = answer.then(next, next);
+    return answer;
+  }
+  private pause(): Promise<void> {
+    return this.spacing > 0 ? new Promise(resolve => window.setTimeout(resolve, this.spacing)) : Promise.resolve();
+  }
+}
+/** The queue the production search uses (shared by every chapter of every run). */
+export const commonsQueue = new CommonsQueue();
+
+/**
+ * Up to {@link COMMONS_PER_SLOT} candidates per slot, slots in order, one request at a time. A slot's next query is asked only when
+ * the ones before gave nothing usable. `skip` refuses addresses the chapter already tried or the book uses. A 429 answer asks nothing
+ * more (`limited`). Every request waits its turn in `queue` (default: the shared {@link commonsQueue}). Never throws (a Stop ends early).
  */
 export async function searchCommons(
   slots: readonly CommonsSlot[],
   fetch: CommonsFetch,
-  options: { signal: AbortSignal; skip: (url: string) => boolean; now?: () => number }
-): Promise<{ bySlot: Map<number, CommonsCandidate[]>; requests: number }> {
+  options: { signal: AbortSignal; skip: (url: string) => boolean; now?: () => number; queue?: CommonsQueue }
+): Promise<{ bySlot: Map<number, CommonsCandidate[]>; requests: number; limited: boolean }> {
   const now = options.now ?? Date.now;
   const deadline = now() + COMMONS_CHAPTER_MS;
+  const queue = options.queue ?? commonsQueue;
   const bySlot = new Map<number, CommonsCandidate[]>();
   let requests = 0;
+  let limited = false;
   for (const slot of slots) {
     const list: CommonsCandidate[] = [];
     for (const query of commonsQueries(slot)) {
-      if (list.length || options.signal.aborted || now() >= deadline) break;
-      requests++;
-      const answer = await bounded(
-        Promise.resolve().then(() => fetch(commonsSearchUrl(query))),
-        COMMONS_REQUEST_MS,
-        options.signal
+      if (list.length || limited || options.signal.aborted || now() >= deadline) break;
+      const answer = await queue.turn(
+        () => limited || options.signal.aborted || now() >= deadline,
+        () => {
+          requests++;
+          return bounded(
+            Promise.resolve().then(() => fetch(commonsSearchUrl(query))),
+            COMMONS_REQUEST_MS,
+            options.signal
+          );
+        }
       );
+      if (answer?.status === 429) limited = true;
       if (!answer || answer.status !== 200) continue;
       for (const candidate of parseCommonsAnswer(answer.text, slot)) {
         if (list.length >= COMMONS_PER_SLOT) break;
@@ -203,5 +258,5 @@ export async function searchCommons(
     }
     if (list.length) bySlot.set(slot.index, list);
   }
-  return { bySlot, requests };
+  return { bySlot, requests, limited };
 }

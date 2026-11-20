@@ -620,7 +620,41 @@ test('card plan images: indexes 1..n assigned by program, 0 to 8 slots (cut to 8
   assert.throws(() => cardPlan.cardPlanStep.parse(good([{ kind: 'k', explains: '〔〕', anchor: 'a' }]), request), /image explains/);
   assert.throws(() => cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }] }), request), /unexpected fields/);
   assert.equal(cardPlan.CARD_PLAN_SCHEMA.properties.images.maxItems, 12); assert.ok(cardPlan.CARD_PLAN_SCHEMA.required.includes('images'));
-  assert.match(cardPlan.cardPlanStep.render(request), /"images":\[\{"kind":"","explains":"","anchor":""\}\]/);
+  assert.match(cardPlan.cardPlanStep.render(request), /"images":\[\{"kind":"","explains":"","anchor":"","search":\["",""\]\}\]/);
+});
+
+test('card plan images: each slot asks for 2 to 4 English search terms; kept cleaned (no separator, Latin only, at most 4), and a slot without them still parses', () => {
+  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }, { position: 3, title: 'Outro' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
+  const good = images => JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images });
+  const search = cardPlan.CARD_PLAN_SCHEMA.properties.images.items.properties.search;
+  assert.equal(search.minItems, 2); assert.equal(search.maxItems, 4); assert.ok(cardPlan.CARD_PLAN_SCHEMA.properties.images.items.required.includes('search'));
+  assert.match(cardPlan.cardPlanStep.render(request), /search \(2 to 4 English search terms for a Wikimedia Commons file search/);
+  const [one, two, three] = plain(cardPlan.cardPlanStep.parse(good([
+    { kind: 'painting', explains: '蒙娜麗莎', anchor: 'a', search: ['Mona Lisa', 'Leonardo, da Vinci', '蒙娜麗莎', 'mona lisa', 'Louvre', 'Salai', 'Florence'] },
+    { kind: 'photo', explains: 'e', anchor: 'a' },
+    { kind: 'photo', explains: 'e', anchor: 'a', search: 'not a list' }
+  ]), request).images);
+  assert.deepEqual(one.search, ['Mona Lisa', 'Leonardo da Vinci', 'Louvre', 'Salai'], 'no comma, no Han-only term, no repeat, at most 4');
+  assert.equal(two.search, undefined, 'a slot without search terms is kept');
+  assert.equal(three.search, undefined);
+  assert.throws(() => cardPlan.cardPlanStep.parse(good([{ kind: 'k', explains: 'e', anchor: 'a', search: [], extra: 1 }]), request), /unexpected fields/);
+});
+
+test('Prompt image plan: search terms ride on the slot line (both languages) and come back; an older line without them parses as before', () => {
+  const plan = { role: 'body', covers: 'c', entry: 'e', handoff: 'h', checklist: [{ id: 'C1', type: 'fact', text: 'Date 1415' }] };
+  const images = [slot(1, { search: ['Mona Lisa', 'Leonardo da Vinci'] }), slot(2, { kind: '地圖', explains: '貿易路線：海上', anchor: '第二段後', search: ['Silk Road map', 'trade_route [old]'] }), slot(3)];
+  for (const lang of ['en', 'zh-TW']) {
+    const text = planText.composeCardPrompt({ ...plan, images }, lang);
+    assert.deepEqual(plain(planText.parseImageSlots(text)), images);
+  }
+  assert.match(planText.composeCardPrompt({ ...plan, images }, 'zh-TW'), /- 圖位 1｜painting｜shows thing 1｜位置：after paragraph 1｜英文搜尋詞：Mona Lisa, Leonardo da Vinci\n/);
+  assert.match(planText.composeCardPrompt({ ...plan, images }, 'en'), /- Image slot 1｜painting｜shows thing 1｜Position: after paragraph 1｜Search terms: Mona Lisa, Leonardo da Vinci\n/);
+  assert.match(planText.composeCardPrompt({ ...plan, images }, 'en'), /- Image slot 3｜painting｜shows thing 3｜Position: after paragraph 3\n/, 'no search part without terms');
+  // Old format (before search terms) and an owner's hand edit
+  const old = '圖安排：\n- 圖位 1｜照片｜盆底的排水孔｜位置：第二段後\n- 圖位 2｜示意圖｜碎石層｜位置：結尾';
+  assert.deepEqual(plain(planText.parseImageSlots(old)), [{ index: 1, kind: '照片', explains: '盆底的排水孔', anchor: '第二段後' }, { index: 2, kind: '示意圖', explains: '碎石層', anchor: '結尾' }]);
+  const edited = 'Image plan:\r\n- Image slot 1｜photo｜a pot｜Position: end｜Search terms: flower pot,  drainage hole ,,只有中文\r\n- Image slot 2｜photo｜x｜Position: y｜Search terms:';
+  assert.deepEqual(plain(planText.parseImageSlots(edited)), [{ index: 1, kind: 'photo', explains: 'a pot', anchor: 'end', search: ['flower pot', 'drainage hole'] }, { index: 2, kind: 'photo', explains: 'x', anchor: 'y' }]);
 });
 
 test('Prompt image plan: compose and parse round-trip in both languages; none vs absent; owner edits; hostile text cannot forge a slot line or a heading', () => {

@@ -4,7 +4,10 @@ export interface NoticeHost {
 }
 export interface NoticeBox {
   createSpan(o: { text: string }): unknown;
-  createEl(tag: "a", o: { text: string; cls: string; href: string }): { addEventListener(type: "click", fn: (e: { preventDefault(): void }) => void): void };
+  createEl(
+    tag: "a",
+    o: { text: string; cls: string; href: string }
+  ): { addEventListener(type: "click", fn: (e: { preventDefault(): void }) => void): void };
   remove(): void;
 }
 export function showAppliedNotice(

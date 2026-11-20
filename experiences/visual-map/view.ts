@@ -7094,8 +7094,12 @@ export class VisualAgentMapView extends ItemView {
           if (asked) await repo.writeTopicAppearance(path, asked);
         },
         // Parking the children rewrites the links to them in the merged text: the program's fingerprint is taken again from the
-        // text as committed (before the step records it, so undo still recognises it).
-        book ? path => this.app.vault.process(repo.file(path), bookMergeStampRaw) : undefined
+        // text as committed (before the step records it, so undo still recognises it; redo does it again).
+        book
+          ? async path => {
+              await this.app.vault.process(repo.file(path), bookMergeStampRaw);
+            }
+          : undefined
       );
       for (const child of children) tx.park(child.path, parkFolder, before.id, "unassigned");
       entry = await tx

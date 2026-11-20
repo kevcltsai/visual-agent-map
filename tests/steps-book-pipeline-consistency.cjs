@@ -172,3 +172,45 @@ test('review box: a chapter marked for the check says what differs and the fix, 
   const own = review.reviewEntries({ order: ['c'], titleOf: id => titles[id], noteOf: () => ({ pipelineStage: 'needs-review', pipelineIssue: 'proof failed: timeout' }), inconsistencies: id => consistency.chapterInconsistencies(data, id) });
   assert.deepEqual(plain(own[0].problems.map(p => p.kind)), ['failed', 'consistency']);
 });
+
+// ---- removed chapters still named ----
+
+test('removedChapterRefs: a chapter naming a removed chapter by title is found once per pair with the first sentence; short, still-present or unnamed titles are not', () => {
+  const data = { order: ['a', 'b', 'c', 'd'], removed: ['b', 'd'], chapters: { a: { title: '發芽', path: 'A' }, b: { title: '換盆', path: 'B' }, c: { title: '照顧', path: 'C' }, d: { title: '光', path: 'D' } } };
+  const chapters = [
+    { id: 'a', title: '發芽', text: '種子三天發芽。下一步見換盆一章。之後再換盆。' },
+    { id: 'c', title: '照顧', text: '照顧要用心。光很重要。' }
+  ];
+  assert.deepEqual(plain(consistency.removedChapterRefs(data, chapters)), [{ kind: 'removed', a: 'a', b: 'b', claimA: '下一步見換盆一章。', claimB: '換盆', suggestion: '' }]);
+  // A title a present chapter also has is not a removed reference.
+  const same = { ...data, chapters: { ...data.chapters, c: { title: '換盆', path: 'C' } } };
+  assert.deepEqual(plain(consistency.removedChapterRefs(same, [chapters[0], { id: 'c', title: '換盆', text: 'x' }])), []);
+  assert.deepEqual(plain(consistency.removedChapterRefs({ ...data, removed: [] }, chapters)), []);
+  assert.deepEqual(plain(consistency.removedChapterRefs({ order: ['a'], chapters: data.chapters }, chapters)), [], 'no removed list (older data)');
+  // A long sentence is quoted up to 80 characters.
+  const long = consistency.removedChapterRefs(data, [{ id: 'a', title: '發芽', text: `換盆${'字'.repeat(100)}。` }]);
+  assert.equal(Array.from(long[0].claimA).length, 80);
+});
+
+test('removed reference through the check: stored with its kind, shown on the naming chapter only, read back from the map, and the review box names the removed chapter', () => {
+  review.setUiLanguage('zh-TW');
+  const { state } = written();
+  state.removed = ['b'];
+  state.chapters = { a: { title: '發芽', path: 'A' }, b: { title: '換盆', path: 'B' }, c: { title: '照顧', path: 'C' } };
+  const refs = consistency.removedChapterRefs(state, [{ id: 'a', title: '發芽', text: '之後見換盆。' }, { id: 'c', title: '照顧', text: '照顧好。' }]);
+  const begun = machine.beginConsistency(state);
+  const data = machine.applyConsistency(begun.state, begun.token, [finding, ...refs]).state;
+  assert.deepEqual(plain(consistency.chapterInconsistencies(data, 'a')), [
+    { other: 'c', own: '三天', theirs: '一到兩天', suggestion: '統一寫一到三天' },
+    { kind: 'removed', other: 'b', own: '之後見換盆。', theirs: '換盆', suggestion: '' }
+  ]);
+  assert.deepEqual(plain(consistency.chapterInconsistencies(data, 'b')), [], 'the removed chapter is not told about itself');
+  assert.equal(consistency.chapterInconsistencies(data, 'c').length, 1, 'the other chapter sees only the model finding');
+  const read = load('core/book-pipeline/model.ts');
+  assert.equal(read.readBookPipeline({ bookPipeline: data }).kind, 'usable');
+  const bad = JSON.parse(JSON.stringify(data)); bad.consistency.findings[1].kind = 'other';
+  assert.equal(read.readBookPipeline({ bookPipeline: bad }).kind, 'unusable', 'an unknown kind is not read as a finding');
+  const notes = { a: { pipelineStage: 'needs-review', pipelineIssue: 'consistency' } };
+  const entries = review.reviewEntries({ order: ['a'], titleOf: id => data.chapters[id].title, noteOf: id => notes[id], inconsistencies: id => consistency.chapterInconsistencies(data, id) });
+  assert.deepEqual(plain(entries[0].problems.map(p => p.text)), ['和〈照顧〉說法不一致：這章寫「三天」，〈照顧〉寫「一到兩天」，統一寫一到三天', '這章還提到已移除的〈換盆〉：「之後見換盆。」']);
+});

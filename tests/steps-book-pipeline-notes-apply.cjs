@@ -200,6 +200,34 @@ test('proofIsStale: true only after the chapter text changed since a stored proo
   assert.equal(review.proofIsStale(card(detail), 'checked', 'n1', 'r2', 2), true, 'another run');
 });
 
+test('keep (T9): a kept text drops the stale, open-fact and unmet-structure marks; an edit after the keep brings the chapter back to the list', () => {
+  const integrity = load('core/book-pipeline/body-integrity.ts');
+  const checklist = [{ id: 'C1', type: 'structure', text: 'Names the technique' }, { id: 'F1', type: 'fact', text: 'Year 1415' }];
+  const prompt = '## Checklist\n- [ ] C1 structure: Names the technique\n- [ ] F1 fact: Year 1415\n';
+  const parse = load('core/book-pipeline/plan-text.ts').parseChecklist;
+  const key = text => proof.proofKey({ runId: 'r1', nodeId: 'n1', revision: 2, body: bookNotes.projectProofBody(imageSlots.stripImageLines(sections.chapterBody(text))), checklist: parse(prompt) });
+  const result = proof.evaluateProof([{ id: 'C1', status: 'unmet', note: 'no', sources: [] }, { id: 'F1', status: 'unmet', note: 'no', sources: [] }], checklist, ['https://example.org/a/']);
+  const body = detailOf(P2);
+  const detail = `${body}\n\n> [!vam-book]- Research notes\n${sections.quoteAll(proof.appendProofRecord('', key(body), result).text.trim())}\n`;
+  const cards = text => review.gate2Cards({
+    order: ['n1'], titleOf: () => 'T',
+    noteOf: () => ({ prompt, detail: text, pipelineStage: 'checked', pipelineIssue: 'structure unmet: C1' }),
+    proofContext: { runId: 'r1', revisionOf: () => 2 }
+  })[0];
+  const pick = c => [c.structureUnmet, c.factsOpen, !!c.proofStale];
+  assert.deepEqual(pick(cards(detail)), [1, 1, false], 'not kept: the open items count');
+  const edited = detail.replace(P2, `${P2} edited`);
+  assert.deepEqual(pick(cards(edited)), [1, 1, true], 'edited, not kept: stale too');
+  const kept = integrity.keepDetail(edited);
+  assert.equal(integrity.isKept(kept), true);
+  assert.deepEqual(pick(cards(kept)), [0, 0, false], 'kept: the reader\'s answer stands');
+  assert.equal(review.needsAttention(cards(kept)), false);
+  const after = kept.replace(`${P2} edited`, `${P2} edited again`);
+  assert.equal(integrity.isKept(after), false);
+  assert.deepEqual(pick(cards(after)), [1, 1, true], 'an edit after the keep: asked again');
+  assert.equal(review.needsAttention(cards(after)), true);
+});
+
 test('stale proof (T6c): reviewEntries flags the chapter with the edited problem and a new fingerprint; the card pill says edited', () => {
   const checklist = [{ id: 'C1', type: 'structure', text: 'Names the technique' }];
   const prompt = '## Checklist\n- [ ] C1 structure: Names the technique\n';

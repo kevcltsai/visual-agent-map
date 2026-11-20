@@ -154,7 +154,7 @@ const tickAt = (text, at) => { let n = 0; return text.replace(/\[ \]/g, m => (n+
 /** One hand-edited chapter at gate 2 with its box (op1, bound to the text as it is). */
 function rig({ phase = 'gate2', running = false, rerun } = {}) {
   const edited = b.stampDetail(BODY).replace('第二段', '第三段');
-  const state = { raw: '', running, phase, ids: 0, reruns: [], logs: [], writes: 0, backups: [] };
+  const state = { raw: '', running, phase, ids: 0, reruns: [], logs: [], writes: 0, backups: [], fields: [] };
   const setDetail = detail => { state.raw = state.raw ? state.raw.replace(/(<!-- visual-agent-map:detail:start -->\n)[\s\S]*?(\n<!-- visual-agent-map:detail:end -->)/, (_m, a, c) => `${a}${detail}${c}`) : note(detail); };
   setDetail(edited);
   const ifp = () => b.integrityFp(edited);
@@ -166,6 +166,7 @@ function rig({ phase = 'gate2', running = false, rerun } = {}) {
     readMap: async () => map,
     readCard: async () => ({ path: PATH, title: 'T', raw: state.raw, detail: detailOf() }),
     write,
+    writeFields: async (path, patch) => { state.fields.push({ path, patch }); },
     rerunCard: async (mapPath, nodeId, options) => {
       state.backups.push(state.raw); // the real run backs the note up before it writes; here: the text at the moment of the call
       state.reruns.push(options.overwrite);
@@ -284,10 +285,11 @@ test('controller: a refusal, a budget shortage or a failed write leaves the chap
     assert.equal(r.state.reruns.length, 2, `${name}: a new tick tries again`);
   }
 });
-test('controller: keep writes the choice into the chapter; a disposed controller does nothing', async () => {
+test('controller: keep writes the choice into the chapter and marks it checked with no issue; a disposed controller does nothing', async () => {
   const r = rig();
   await r.ctl.keep(PATH);
   assert.equal(b.isKept(r.state.raw.split(START + '\n')[1].split('\n' + END)[0]), true);
+  assert.deepEqual(JSON.parse(JSON.stringify(r.state.fields)), [{ path: PATH, patch: { pipelineStage: 'checked', pipelineIssue: null } }]);
   const d = rig();
   d.ctl.dispose();
   d.tickRewrite();
@@ -296,6 +298,18 @@ test('controller: keep writes the choice into the chapter; a disposed controller
   await d.ctl.keep(PATH);
   assert.equal(d.state.reruns.length, 0);
   assert.equal(d.state.writes, 0);
+  assert.equal(d.state.fields.length, 0);
+});
+test('controller: a refused keep (the writer throws, or the note has no Detail block to keep) writes no stage', async () => {
+  const r = rig();
+  const ctl = new b.BookHandEdits({ ...r.ctl.ports, write: async () => { throw new Error('refused'); } });
+  await ctl.keep(PATH);
+  assert.equal(r.state.fields.length, 0, 'the writer refused');
+  assert.equal(b.isKeptRaw(r.state.raw), false);
+  const plain = rig();
+  plain.state.raw = '# T\n\nno detail block\n';
+  await plain.ctl.keep(PATH);
+  assert.equal(plain.state.fields.length, 0, 'nothing kept, nothing marked');
 });
 
 // ---- H persistence: the queue lives in the box marker; a neighbour rerun that changes the box fingerprint does not lose it ----
@@ -363,6 +377,7 @@ test('review-b S5: a "busy" refusal leaves the rewrite queued (not failed); two 
     readMap: async () => map,
     readCard: async p => { const raw = texts[p === 'A' ? 'a' : 'b']; return { path: p, title: 'T', raw, detail: raw.split(START + '\n')[1].split('\n' + END)[0] }; },
     write: async (p, tr) => { const id = p === 'A' ? 'a' : 'b'; const next = tr(texts[id]); if (next === texts[id]) return 'unchanged'; texts[id] = next; return 'written'; },
+    writeFields: async () => undefined,
     rerunCard: async (_m, id) => {
       if (active) { busy++; const e = new Error('busy'); e.code = 'busy'; throw e; }
       active++; ran.push(id); await new Promise(res => setTimeout(res, 5));

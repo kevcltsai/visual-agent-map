@@ -110,8 +110,13 @@ test('book map, merge into a parent: links rewritten at commit leave the merged 
   const text = h.contents.get(`${NOTES}/Users.md`);
   assert.match(text, /\[\[[^\]]*Unassigned\/Kid2\]\]/, 'the link was rewritten by the commit');
   assert.equal(bodyStateRaw(text), 'clean');
-  await h.view.history.undoEntry.undo();
+  const entry = h.view.history.undoEntry;
+  await entry.undo();
   assert.ok(h.files.has(`${NOTES}/Kid1.md`) && h.files.has(`${NOTES}/Kid2.md`), 'undo brought the children back');
+  await entry.redo();
+  assert.equal(bodyStateRaw(h.contents.get(`${NOTES}/Users.md`)), 'clean', 'redo stamps the committed text again');
+  await entry.undo();
+  assert.ok(h.files.has(`${NOTES}/Kid1.md`), 'undo after redo is not refused');
 });
 
 test('book map, same-level merge: links rewritten at commit leave the new chapter clean', async () => {
@@ -123,4 +128,9 @@ test('book map, same-level merge: links rewritten at commit leave the new chapte
   const text = h.contents.get(merged.path);
   assert.match(text, /\[\[[^\]]*Unassigned\/Pricing\]\]/, 'the link was rewritten by the commit');
   assert.equal(bodyStateRaw(text), 'clean');
+  const entry = h.view.history.undoEntry;
+  await entry.undo();
+  await entry.redo();
+  const node = (await h.repo.readMap(MAP)).nodes.find(n => n.id === merged.id);
+  assert.equal(bodyStateRaw(h.contents.get(node.path)), 'clean', 'still clean after undo and redo');
 });

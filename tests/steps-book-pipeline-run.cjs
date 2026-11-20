@@ -2261,6 +2261,32 @@ test('T9 F: a rerun with the reader\'s permission for this text backs the chapte
   assert.equal(r.stat.author.length, authors + 1);
 });
 
+test('T9 own Summary: a rewrite the reader allowed of a kept chapter, or of text that was there before the book, keeps the reader\'s Summary (no plan summary, author keepSummary); a program chapter still gets a new one', async () => {
+  const r = await rig();
+  await r.repo.updateNote(r.nodes[2].path, { detail: 'MY OWN TEXT from before the book.', summary: 'BEFORE SUMMARY' });
+  const seen = [];
+  const base = r.script.author;
+  r.script.author = async (input, n) => { seen.push({ id: input.nodeId, keepSummary: input.keepSummary }); return base(input, n); };
+  await finish(r);
+  assert.equal((await r.note(2)).pipelineIssue, 'write failed: hand_edited', 'the before-book text was skipped');
+  assert.equal((await r.note(2)).summary, 'BEFORE SUMMARY');
+  assert.equal(seen.find(c => c.id === r.nodes[0].id).keepSummary, undefined, 'a program chapter: the summary is replaced');
+  assert.match((await r.note(0)).summary, /^covers /, 'the plan writes a program chapter\'s summary');
+  // chapter 1: the reader edits text and Summary, keeps it, then asks for a rewrite
+  await handEdit(r, 1);
+  await r.repo.updateNote(r.nodes[1].path, { summary: 'KEPT SUMMARY' });
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, keepRaw, {});
+  for (const [i, own] of [[1, 'KEPT SUMMARY'], [2, 'BEFORE SUMMARY']]) {
+    seen.length = 0;
+    await r.runs.rerunCard(r.mapPath, r.nodes[i].id, { overwrite: { operation: `op-${i}`, fingerprint: integrityFpRaw(r.raw(i)) } });
+    while (r.runs.isRunning(r.mapPath)) await tick();
+    await settle();
+    assert.deepEqual(seen.map(c => [c.id, c.keepSummary]), [[r.nodes[i].id, true]], `chapter ${i}: written once with keepSummary`);
+    assert.equal((await r.note(i)).summary, own, `chapter ${i}: the reader's Summary stays`);
+    assert.match((await r.note(i)).prompt, /covers/, `chapter ${i}: the plan was written`);
+  }
+});
+
 test('T9 F: a permission bound to older text is refused (text_changed) with nothing written and no call', async () => {
   const r = await rig();
   await finish(r);
@@ -2683,6 +2709,29 @@ test('fix in place (live v4): a process note the expansion leaves in is deleted 
   assert.ok(!fix.requirements.includes(`Do not cover (each has its own chapter; JSON strings): ${JSON.stringify((await r.note(1)).title)}`), 'its own title is not listed');
   const detail = (await r.note(1)).detail;
   assert.ok(!detail.includes('現有資料不足') && !detail.includes('沒有查到') && detail.includes(kept) && detail.includes('### 採收時間'), detail);
+});
+
+test('T10c length v2 (200-300): captions never count; 319 prose with a caption (366 in all) is checked with no fix, and a fix that lands at 320 prose stays needs-review (strict maximum)', async () => {
+  const seen = [];
+  const r = await lenRig({}, '每章 200–300 字');
+  const figure = `![P1](https://upload.wikimedia.org/wikipedia/commons/a/ab/P1.jpg)\n${'圖'.repeat(47)}`;
+  const first = { [r.nodes[0].id]: 250, [r.nodes[1].id]: 400, [r.nodes[2].id]: 319 };
+  r.script.author = async input => {
+    seen.push([input.nodeId, input.requirements]);
+    await input.admission.reserve();
+    const line = '好'.repeat(first[input.nodeId]);
+    const detail = input.requirements !== undefined ? fixOf(line, '好'.repeat(320)) : `${line}\n\n${figure}`;
+    const out = await r.repo.updateNoteGuarded(input.path, { detail }, { authorize: input.authorize, finalize: input.finalize });
+    return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+  };
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  assert.equal(seen.filter(([id, req]) => id === r.nodes[2].id && req !== undefined).length, 0, '319 prose: no fix round');
+  assert.equal(stageOf(r.raw(2)), 'checked');
+  assert.equal((await r.note(2)).pipelineIssue ?? '', '');
+  assert.equal(seen.filter(([id, req]) => id === r.nodes[1].id && req !== undefined).length, 1, 'one fix round for the long chapter');
+  assert.ok((await r.note(1)).detail.includes('圖'.repeat(47)), 'the picture stayed through the fix');
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  assert.equal((await r.note(1)).pipelineIssue, 'length unmet: length:over:320:200-300:字:v2');
 });
 
 test('T10c length (strict after the fix round): an expansion that lands between 0.8x and the minimum is not silently accepted: needs-review with the length reason; the redo asked for the minimum at least', async () => {

@@ -147,6 +147,19 @@ test('chapterLength: 字 counts CJK characters plus Latin words; words counts La
   assert.equal(L.chapterLength('字'.repeat(1000) + '\r\n' + '字'.repeat(1000), '字'), 2000, 'CRLF and a long text');
 });
 
+test('lengthBody (rule v2): one prose-only measure; a 200-300 chapter of 319 prose characters with a 47-character caption (366 in all) is inside the first verdict, and 320 prose is over after the fix round', () => {
+  const figure = `![P1](https://upload.wikimedia.org/wikipedia/commons/a/ab/P1.jpg)\n${'圖'.repeat(47)}`;
+  const chapter = prose => `${'好'.repeat(prose)}\n\n${figure}\n\n收尾。`;
+  const text = chapter(317);
+  assert.equal(L.chapterLength(text, '字'), 366, 'with the caption');
+  assert.equal(L.chapterLength(L.lengthBody(text), '字'), 319, 'prose only');
+  assert.equal(L.lengthReason('每章 200–300 字', L.lengthBody(text)), undefined, '319 is inside 1.2x 300');
+  assert.equal(L.lengthReason('每章 200–300 字', text)?.kind, 'over', 'the caption would have pushed it over (the old fix-round measure)');
+  const after = L.lengthReason('每章 200–300 字', L.lengthBody(chapter(318)), undefined, true);
+  assert.deepEqual([after?.kind, after?.measured], ['over', 320], 'strict after the fix round, measured on prose');
+  assert.equal(L.chapterLength(L.lengthBody('好%%a reader note%%\n\n> [!vam-book]- 研究筆記\n> 筆記不算'), '字'), 1, 'notes and the program\'s callout do not count');
+});
+
 test('lengthReason: above max x 1.2 is over, below min x 0.8 is under, the edges are inside; the token round-trips and carries range, unit, count and rule version', () => {
   const ask = (n, setting = '每章 100–200 字') => L.lengthReason(setting, '字'.repeat(n));
   assert.equal(ask(240), undefined); assert.equal(ask(80), undefined);

@@ -237,3 +237,49 @@ test('N12: a failing write callback restores the note text and nothing else move
   assert.equal(h.exists(h.a), true);
   assert.equal(h.calls.length, 0, 'the file was never touched');
 });
+
+test('N13: settle runs at commit after the moves (it sees the rewritten links), its text is what undo guards; redo settles again after its moves, so undo after redo still works', async () => {
+  const h = await harness();
+  const original = h.contents.get(h.parent);
+  const seen = [];
+  const settle = async path => { seen.push(h.contents.get(path)); await h.repo.updateNote(path, { detail: `${(await h.repo.readNote(path)).detail}\n\nSETTLED` }); };
+  const entry = await begin(h.deps).rewriteNote(h.parent, h.writes.push.bind(h.writes) && (async path => { await h.repo.updateNote(path, { summary: 'Merged summary', detail: 'Merged detail\n\nSee [[Child A]].' }); }), settle)
+    .park(h.a, UNASSIGNED, 'map-u', 'unassigned').park(h.b, UNASSIGNED, 'map-u', 'unassigned')
+    .editMap(MAP, (map, resolve) => { for (const node of map.nodes) if (node.path === h.a || node.path === h.b) node.path = resolve(node.path); })
+    .commit();
+  assert.equal(seen.length, 1);
+  assert.match(seen[0], new RegExp(`\\[\\[${UNASSIGNED}/Child A`), 'settle ran after the move rewrote the link');
+  assert.match(h.contents.get(h.parent), /SETTLED/);
+  await entry.undo();
+  assert.equal(h.contents.get(h.parent), original, 'the settled text passes the guard and undo restores the original');
+  await entry.redo();
+  assert.equal(seen.length, 2, 'redo settles again');
+  assert.match(seen[1], new RegExp(`\\[\\[${UNASSIGNED}/Child A`), 'after the redo moves');
+  assert.match(h.contents.get(h.parent), /SETTLED/);
+  await entry.undo();
+  assert.equal(h.contents.get(h.parent), original, 'undo after redo still restores');
+});
+
+test('N14: a failing settle rolls the whole step back (note text, files and map), at commit and at redo', async () => {
+  const h = await harness();
+  const before = h.snapshot();
+  const error = await h.rejected(begin(h.deps).rewriteNote(h.parent, async path => { await h.repo.updateNote(path, { summary: 'Merged' }); }, async () => { throw new Error('injected settle'); })
+    .park(h.a, UNASSIGNED, 'map-u', 'unassigned').commit());
+  assert.equal(error.message, 'injected settle');
+  assert.equal(h.contents.get(h.parent), before.get(h.parent));
+  assert.equal(h.exists(h.a), true, 'the parked child is back');
+  assert.equal(h.unassigned().length, 0);
+  let fail = false;
+  const entry = await begin(h.deps).rewriteNote(h.parent, async path => { await h.repo.updateNote(path, { summary: 'Merged' }); }, async () => { if (fail) throw new Error('injected redo settle'); })
+    .park(h.a, UNASSIGNED, 'map-u', 'unassigned').commit();
+  await entry.undo();
+  const undone = h.snapshot();
+  fail = true;
+  assert.equal((await h.rejected(entry.redo())).message, 'injected redo settle');
+  assert.equal(h.contents.get(h.parent), undone.get(h.parent), 'the redo was rolled back: the note text');
+  assert.equal(h.exists(h.a), true, 'and the child is back');
+  assert.equal(h.contents.get(MAP), undone.get(MAP), 'and the map');
+  fail = false;
+  await entry.redo();
+  assert.match(h.contents.get(h.parent), /Merged/, 'and can be retried');
+});

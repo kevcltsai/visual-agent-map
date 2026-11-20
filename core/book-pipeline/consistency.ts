@@ -80,9 +80,9 @@ export function chapterInconsistencies(data: BookPipelineData, nodeId: string): 
         ]
       : finding.kind
         ? []
-      : finding.b === nodeId
-        ? [{ other: finding.a, own: finding.claimB, theirs: finding.claimA, suggestion: finding.suggestion }]
-        : []
+        : finding.b === nodeId
+          ? [{ other: finding.a, own: finding.claimB, theirs: finding.claimA, suggestion: finding.suggestion }]
+          : []
   );
 }
 
@@ -109,7 +109,11 @@ export function removedChapterRefs(
     if (Array.from(title).length < 2 || present.has(title)) continue;
     for (const chapter of chapters) {
       if (!chapter.text.includes(title)) continue;
-      const sentence = chapter.text.split(SENTENCE).find(part => part.includes(title))?.trim() ?? title;
+      const sentence =
+        chapter.text
+          .split(SENTENCE)
+          .find(part => part.includes(title))
+          ?.trim() ?? title;
       out.push({
         kind: "removed",
         a: chapter.id,

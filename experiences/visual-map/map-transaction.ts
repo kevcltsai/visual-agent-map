@@ -106,8 +106,8 @@ export interface Transaction {
    * Rewrites the note at `path` through `write(path)` (which must write that file and nothing else). Commit runs it
    * before any move; undo writes the original text back after the moves; redo runs `write` again before the moves.
    * Undo and redo refuse (`guard`) when title, summary, detail or status differ from what this step left or found.
-   * `settle` (commit only) runs on the note once the moves are done (their link rewrites are in it), before what this step
-   * left is recorded; redo does not run it again.
+   * `settle` runs on the note once the moves are done (their link rewrites are in it): at commit before what this step left
+   * is recorded, and again at redo, so a redone note is the text undo expects.
    */
   rewriteNote(
     path: string,
@@ -496,7 +496,13 @@ export function begin(deps: TransactionDeps): Transaction {
         // Undo writes the original text after the moves (a move rewrites links in other notes); redo writes before them.
         // A rename-back puts the note at `note.path` first, but a failed step finds it at `at` again.
         if (undoing) notes.after.push({ path: at, restore, apply: () => writeText(repo, note.path, note.beforeText) });
-        else notes.before.push({ path: note.path, restore, apply: () => note.write(note.path, attachment) });
+        else {
+          notes.before.push({ path: note.path, restore, apply: () => note.write(note.path, attachment) });
+          // The same text as the commit left: settle again once the moves rewrote their links (else undo would refuse it).
+          const settle = note.settle;
+          if (settle)
+            notes.after.push({ path: note.path, restore, apply: () => settle(noteAt(ops, note.path, "undo")) });
+        }
       }
       await run(files, maps, rebuild, notes, refresh);
     };

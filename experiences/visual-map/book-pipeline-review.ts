@@ -270,8 +270,8 @@ export function gate2Cards(input: {
         checked && structure && !kept ? structure[1].split(" ").filter(token => !token.startsWith("image_")).length : 0,
       factsOpen:
         checked && !kept
-        ? (proof?.items ?? []).filter(item => item.type === "fact" && item.status !== "met").length
-        : 0,
+          ? (proof?.items ?? []).filter(item => item.type === "fact" && item.status !== "met").length
+          : 0,
       galleryBare: checked && galleryBare(role, note),
       seam: view.seam,
       ...(view.seam ? seamFromOf(note?.pipelineSeam, input.order, at, input.titleOf) : {}),

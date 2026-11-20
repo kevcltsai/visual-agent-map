@@ -54,6 +54,8 @@ export interface BookBarState {
   rerun?: true;
   /** Gate 1: how many chapters the trial has ("the 3 trial chapters are written"); absent for a run without a trial. */
   trialCount?: number;
+  /** Gate 1 before the trial: every chapter is planned and the owner looks at the plan (try the trial, or skip it). */
+  planReview?: true;
   /** Gate 1: how many of the trial chapters need a look (shown after the trial sentence; nothing when 0). */
   trialAttention?: number;
   /** Gate 2: the chapters written and how many still need a look; the view fills it from the notes (see its `bookReviewCount`). */
@@ -155,12 +157,18 @@ export function bookBarState(
     ...(!current && mode === "writing" && active && data.consistency?.done === false
       ? { checking: true as const }
       : {}),
-    ...(data.trial?.length && mode === "planning" && data.globalPlanned ? { trialSize: data.trial.length } : {}),
+    ...(data.trial?.length && !data.planReview && mode === "planning" && data.globalPlanned
+      ? { trialSize: data.trial.length }
+      : {}),
     ...(rerunning ? { rerun: true as const } : {}),
     ...(mapChange ? { mapChange } : {}),
     ...(gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {}),
     ...(reordered ? { mapChange: reordered } : {}),
-    ...(mode === "gate1" && data.trial?.length ? { trialCount: data.trial.length } : {}),
+    ...(mode === "gate1" && data.trial?.length
+      ? data.planReview
+        ? { planReview: true as const, trialCount: data.trial.length }
+        : { trialCount: data.trial.length }
+      : {}),
     ...(mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {}),
     ...(progress?.etaSeconds !== undefined && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0
       ? { etaSeconds: progress.etaSeconds }
@@ -237,6 +245,10 @@ export interface BookBarActions {
   confirmGate1: () => void;
   /** Gate 1: "open chapter 1" (the first trial chapter's note); a bar drawn without it shows no such link. */
   openTrial?: () => void;
+  /** The plan review: "open the whole-book plan" (the root note), "run the trial"; the trial's gate 1: "back to the plan". */
+  openPlan?: () => void;
+  startTrial?: () => void;
+  backToPlan?: () => void;
   /** Gate 1: the first press found unapplied notes in the trial; the bar asks once. `focus`: where the keyboard goes after this paint. */
   gate1Ask?: { count: number; cancel: () => void; confirm: () => void; focus?: "go" | "opener" };
   /** Gate 2 or done: a card rerun found a hand-edited chapter; the bar asks once before it overwrites it (decision G). */
@@ -260,7 +272,11 @@ export function bookTitleText(state: BookBarState): string {
       ? t("ui.book_phase_stopped")
       : state.mode === "budget"
         ? t("ui.book_phase_budget")
-        : t(PHASE_KEY[state.mode]);
+        : state.mode === "gate1" && state.planReview
+          ? t("ui.book_phase_plan_review")
+          : state.mode === "gate1" && state.trialCount
+            ? t("ui.book_phase_trial_review")
+            : t(PHASE_KEY[state.mode]);
   return t("ui.book_bar_title_0", word);
 }
 
@@ -306,7 +322,19 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
   }
   if ((state.mode === "gate1" || state.mode === "gate2" || state.mode === "done") && state.mapChange)
     top.createSpan({ cls: "vam-book-bar-counts vam-book-map-changed", text: mapChangeText(state.mapChange) });
-  if (state.mode === "gate1" && state.trialCount) {
+  if (state.mode === "gate1" && state.planReview) {
+    top.createSpan({ cls: "vam-book-bar-counts", text: t("ui.book_bar_plan_ready_0", total) });
+    top.createSpan({ cls: "vam-book-bar-counts vam-book-plan-hint", text: t("ui.book_bar_plan_hint") });
+    if (actions.openPlan)
+      makeButton(buttons, t("ui.book_bar_open_plan"), "vam-book-link vam-book-open-plan", actions.openPlan);
+    if (actions.startTrial)
+      makeButton(
+        buttons,
+        t("ui.book_bar_start_trial_0", state.trialCount ?? 0),
+        "mod-cta vam-book-start-trial",
+        actions.startTrial
+      );
+  } else if (state.mode === "gate1" && state.trialCount) {
     top.createSpan({
       cls: "vam-book-bar-counts",
       text: state.trialAttention
@@ -315,6 +343,8 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     });
     if (actions.openTrial)
       makeButton(buttons, t("ui.book_bar_open_first"), "vam-book-link vam-book-open-first", actions.openTrial);
+    if (actions.backToPlan && !state.rerun)
+      makeButton(buttons, t("ui.book_bar_back_to_plan"), "vam-book-back-to-plan", actions.backToPlan);
   }
   if (state.mode === "gate2" && state.review) {
     top.createSpan({
@@ -332,7 +362,10 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
       makeButton(buttons, t("ui.book_bar_next_review"), "vam-book-link vam-book-next-review", actions.nextReview);
   }
   if (state.phase === "gate1" && state.mode !== "done" && state.mode !== "stopped") {
-    makeButton(buttons, t("ui.book_confirm_gate1"), "mod-cta vam-book-confirm", actions.confirmGate1);
+    // At the plan review the same confirmation skips the trial (a plain button: the trial is the suggested way).
+    if (state.mode === "gate1" && state.planReview)
+      makeButton(buttons, t("ui.book_skip_trial"), "vam-book-confirm vam-book-skip-trial", actions.confirmGate1);
+    else makeButton(buttons, t("ui.book_confirm_gate1"), "mod-cta vam-book-confirm", actions.confirmGate1);
   }
   if (state.mode === "gate2" && actions.finish && state.review) {
     // Nothing left to look at: finish at once; otherwise the first press asks in place.

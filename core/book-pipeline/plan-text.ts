@@ -250,14 +250,26 @@ export function retargetNeighbourLine(
  * longer there. `undefined` when there is no such line or it names none of them. A title shorter than two characters is not looked for.
  */
 export function dropEntryNaming(prompt: string, titles: readonly string[]): string | undefined {
+  const value = parseCardPrompt(prompt).entry;
+  if (value === undefined) return undefined;
+  if (!titles.some(title => Array.from(title.trim()).length >= 2 && value.includes(title.trim()))) return undefined;
+  return dropEntryLine(prompt);
+}
+
+/** The title the card plan's `前一張` / `後一張` line names (`(3) Title — sentence`); undefined when absent or in the no-neighbour form. */
+export function neighbourLineTitle(prompt: string, key: "previous" | "next"): string | undefined {
+  const m = /^\(\d+\) ([\s\S]*)$/.exec(parseCardPrompt(prompt)[key] ?? "");
+  return m ? m[1].split(" — ")[0].trim() : undefined;
+}
+
+/** The prompt without its `接入點` line; `undefined` when it has none. */
+export function dropEntryLine(prompt: string): string | undefined {
   const lines = prompt.split("\n");
   const at = lines.findIndex(line => {
     const m = /^([^:：]+)[:：]/.exec(line);
     return !!m && matches(L.entry, m[1].trim());
   });
   if (at < 0) return undefined;
-  const value = lines[at].replace(/^[^:：]+[:：]/, "");
-  if (!titles.some(title => Array.from(title.trim()).length >= 2 && value.includes(title.trim()))) return undefined;
   lines.splice(at, 1);
   return lines.join("\n");
 }

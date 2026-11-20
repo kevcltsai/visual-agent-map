@@ -17420,6 +17420,12 @@ export class VisualAgentMapView extends ItemView {
         const first = this.effectiveTrial(read.data)[0];
         if (first) void this.openBookNote(first);
       },
+      openPlan: () => {
+        const root = this.map?.nodes.find(node => !node.parentId);
+        if (root) void this.openBookNote(root.id);
+      },
+      startTrial: () => void this.bookEntry(() => this.plugin.startBookTrial(path)),
+      backToPlan: () => void this.bookEntry(() => this.plugin.backBookToPlan(path)),
       ...(gate1Ask
         ? {
             gate1Ask: {
@@ -17737,10 +17743,12 @@ export class VisualAgentMapView extends ItemView {
     const read = this.map ? readBookPipeline(this.map) : null;
     if (!path || !read || read.kind !== "usable") return null;
     if (!isBookGate1Waiting(this.plugin.getBookPipelineProgress(path), read.data)) return null;
-    return this.plugin.confirmBookGate1(path).then(
+    // At the plan review "continue" runs the trial (the suggested way); skipping it is the toolbar's own button.
+    const review = read.data.planReview === true && !!read.data.trial?.length;
+    return (review ? this.plugin.startBookTrial(path) : this.plugin.confirmBookGate1(path)).then(
       () => {
         if (!this.closed) this.render();
-        return t("ui.book_chat_gate1_confirmed");
+        return t(review ? "ui.book_chat_trial_started" : "ui.book_chat_gate1_confirmed");
       },
       error => {
         if (!this.closed) this.render();

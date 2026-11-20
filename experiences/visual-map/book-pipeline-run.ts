@@ -59,6 +59,8 @@ import {
   resumeRun,
   retryGlobalPlan,
   retryTrial,
+  startTrial,
+  backToPlan,
   stopRun,
   failRun,
   type PipelineAction,
@@ -126,7 +128,9 @@ import {
   parseCardPrompt,
   parseChecklist,
   parseImageSlots,
+  dropEntryLine,
   dropEntryNaming,
+  neighbourLineTitle,
   retargetNeighbourLine,
   rewriteNeighbourLine
 } from "../../core/book-pipeline/plan-text";
@@ -1181,6 +1185,51 @@ export class BookPipelineRuns {
     );
   }
 
+  /** The plan review: the owner chose to run the trial. The trial chapters are written from their plans as they are now. Refused (not_gate1) elsewhere. */
+  async startTrial(mapPath: string): Promise<void> {
+    return this.enter(
+      mapPath,
+      async drive => {
+        await this.openSaved(drive, mapPath);
+        let moved = false;
+        await drive.store.commit(state => {
+          const next = startTrial(resumeRun(state) ?? state, this.ports.now());
+          moved = next.phase !== state.phase;
+          return { state: moved ? next : state, accepted: true };
+        });
+        if (!moved) throw new BookPipelineRunError("not_gate1");
+        this.log(drive, "gate1", "-", "write", "trial_start");
+      },
+      true
+    );
+  }
+
+  /**
+   * The trial's gate 1: the owner wants to change the plan first. The run returns to the plan review; the trial chapters go back to
+   * planned (their plans stay for the owner to edit; their text stays until the next trial rewrites it). Refused (not_gate1) elsewhere.
+   */
+  async backToPlan(mapPath: string): Promise<void> {
+    return this.enter(mapPath, async drive => {
+      await this.openSaved(drive, mapPath);
+      let moved = false;
+      await drive.store.commit(state => {
+        const next = backToPlan(resumeRun(state) ?? state, this.ports.now());
+        moved = next.planReview === true && state.planReview !== true;
+        return { state: moved ? next : state, accepted: true };
+      });
+      if (!moved) throw new BookPipelineRunError("not_gate1");
+      for (const id of drive.store.state.trial ?? []) {
+        const own = drive.cards.get(id);
+        if (!own || drive.stages.get(id) === undefined) continue;
+        const current = await this.ports.readCard(own.path).catch(() => undefined);
+        if (current) for (const url of bodyImageUrls(current.detail)) drive.usedImages.delete(imageKey(url));
+        drive.stages.set(id, "planned");
+        await this.writeFields(drive, id, { pipelineStage: "planned", pipelineIssue: null });
+      }
+      this.log(drive, "gate1", "-", "plan", "back_to_plan");
+    });
+  }
+
   /**
    * One card again (gate 2 or done): plan, author, proofread with the usual per-step retries, fence, backup and
    * budget rules; the card gets a new revision (so a new proof record; older records stay, marked old). The cards on both sides are
@@ -1460,7 +1509,18 @@ export class BookPipelineRuns {
         if (!own || drive.stages.get(nodeId) === undefined) continue;
         // The `接入點` line that still names a removed chapter goes (Primary decision: a join that is no longer there).
         const before = await this.ports.readCard(own.path);
-        const dropped = gone.length ? dropEntryNaming(before.prompt, gone) : undefined;
+        // The entry point also goes when the previous line named a removed chapter (the entry paraphrases it, not always by its exact title).
+        const oldPrevious = neighbourLineTitle(before.prompt, "previous");
+        const previousId = order[at - 1];
+        const previousGone =
+          oldPrevious !== undefined &&
+          gone.includes(oldPrevious) &&
+          (previousId === undefined || drive.cards.get(previousId)?.title.trim() !== oldPrevious);
+        const dropped = previousGone
+          ? dropEntryLine(before.prompt)
+          : gone.length
+            ? dropEntryNaming(before.prompt, gone)
+            : undefined;
         if (dropped !== undefined && !this.dead(drive) && !signal.aborted)
           await this.ports.updateNoteGuarded(
             own.path,

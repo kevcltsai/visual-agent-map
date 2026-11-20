@@ -217,6 +217,8 @@ export class MergeDrafts {
       task.draft = result;
       this.ports.changed();
       await this.ports.write(task, result, check);
+      // The write is done and the task forgotten: one last repaint, so every toolbar piece that follows the map (the book bar's counts) shows the merged map.
+      if (!this.ports.closed()) this.ports.changed();
     } catch (error) {
       // Nothing was written (a write that fails midway has already rolled itself back); the task is forgotten.
       const live = this.tasks.get(task.mapPath) === task;

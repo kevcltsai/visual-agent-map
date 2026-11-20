@@ -105,3 +105,16 @@ test('merge drafts: isMerging counts only this map and honours except; stopAll a
   await flush();
   assert.equal(w.writes.length, 0);
 });
+
+test('merge drafts: after a written AI merge the view is told to repaint once more (the book bar counts follow the merged map)', async () => {
+  let atWrite = -1;
+  const w = world({ write: async () => { atWrite = w.changes.length; w.drafts.forget('map.md', task); } });
+  const task = newTask('map.md');
+  w.drafts.start(task, () => {});
+  await flush();
+  w.asks[0].resolve(RESULT);
+  await task.run;
+  assert.equal(w.writes.length, 1);
+  assert.equal(w.changes.length, atWrite + 1, 'a repaint after the write returned, with the task already gone');
+  assert.equal(w.drafts.has('map.md'), false);
+});

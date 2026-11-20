@@ -229,6 +229,19 @@ test('handled title (mockup ⑦-3): either box ends the same way: titled "handle
   assert.ok(!/[^\r]\n/.test(b.collapseReviewCallouts(b.markReviewHandled(crlf))), 'CRLF stays');
   assert.equal(b.chapterBody(b.collapseReviewCallouts(put0())), b.chapterBody(put0()), 'the chapter text does not move');
 });
+test('old-build box: ticked and already folded with the old title 這章要你看 is retitled handled, stays folded, CRLF kept', () => {
+  for (const at of [0, 1]) {
+    const label = at === 0 ? '接受現在這樣，不用改' : '我改好了';
+    const old = b.putProgramCallout(note('Body'), tick(review(), at)).replace('[!vam-review]', '[!vam-review]-');
+    assert.match(old, /> \[!vam-review\]- 這章要你看\n/);
+    const fixed = b.markReviewHandled(old);
+    assert.match(fixed, new RegExp(`> \\[!vam-review\\]- 已處理（你選了「${label}」）\n`));
+    assert.equal(b.markReviewHandled(fixed), fixed);
+    assert.equal(b.collapseReviewCallouts(fixed), fixed);
+    const crlf = b.markReviewHandled(old.replace(/\n/g, '\r\n'));
+    assert.ok(!/[^\r]\n/.test(crlf) && crlf.includes('已處理'));
+  }
+});
 const put0 = () => b.putProgramCallout(note('Body'), tick(review(), 0));
 test('review state: first or second box ticks count, the fingerprint decides if the tick still stands', () => {
   const put = at => b.putProgramCallout(note('Body'), at === undefined ? review() : tick(review(), at));

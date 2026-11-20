@@ -14,11 +14,18 @@ import type { FindImagesRequest, FoundImages } from "../../core/steps/book-pipel
 import type { ConsistencyRequest, RawInconsistency } from "../../core/steps/book-pipeline/consistency";
 import { chapterReferenceFindings } from "../../core/book-pipeline/chapter-references";
 import { chapterInconsistencies, compactChapters, removedChapterRefs } from "../../core/book-pipeline/consistency";
+import { directionFindings, numericFindings, verbatimQuote } from "../../core/book-pipeline/cross-checks";
 import { isBudgetExhausted } from "../../core/admission";
 import { createBudgetAdmission, createStoreBudgetPort } from "../../core/book-pipeline/budget";
 import { imageKey } from "../../core/book-pipeline/image-dedupe";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
-import { searchCommons, type CommonsFetch } from "../../core/book-pipeline/commons-search";
+import {
+  searchCommons,
+  type CommonsFetch,
+  type CommonsQueue,
+  type CommonsRejection,
+  type CommonsRunBudget
+} from "../../core/book-pipeline/commons-search";
 import { askWords, wordHits } from "../../core/book-pipeline/file-fit";
 import {
   PipelineStore,
@@ -154,6 +161,8 @@ import {
   imageIssueTokens,
   latestSlotsRecord,
   pictureShortfallToken,
+  pictureMismatchToken,
+  PICTURE_LIMITED_TOKEN,
   stripImageLines,
   fillSlotMarkers,
   residualMarkerLines,
@@ -351,6 +360,8 @@ export interface BookPipelinePorts {
   ): Promise<FoundImages>;
   /** Production: a GET of a Wikimedia Commons API address through `requestUrl` (any other address is refused). Absent: no program search after the finder. */
   fetchCommons?: CommonsFetch;
+  /** The queue every Commons request waits in. Absent: the shared production queue (1 s between requests); tests pass one without real waits. */
+  commonsQueue?: CommonsQueue;
   backupNote(path: string, raw: string): Promise<{ ok: true; path: string } | { ok: false }>;
   /**
    * Applying the reader's notes (absent: refused as unreadable). `readText` is the note as the writer will see it (an open editor's text
@@ -519,6 +530,8 @@ interface Drive {
   failure?: string;
   /** Keys (see imageKey) of the pictures this run already embedded: one picture is used once in a book. */
   usedImages: Set<string>;
+  /** The 429 waits this run spent on Wikimedia Commons, all chapters together (see COMMONS_RUN_BACKOFF_MS). */
+  commonsBudget: CommonsRunBudget;
   /** Work keys (see workKey) this run placed, by the card that placed them: one work is shown once in a book, even under another file name. */
   usedWorks: Map<string, string>;
   /** The drive-wide gate of picture probes in flight (see {@link PROBE_PARALLEL}). */
@@ -1732,6 +1745,7 @@ export class BookPipelineRuns {
       disposed: false,
       rootId: "",
       usedImages: new Set<string>(),
+      commonsBudget: { waited: 0, spent: false },
       usedWorks: new Map<string, string>(),
       probeGate: { active: 0, waiters: [] },
       done: Promise.resolve()
@@ -2212,15 +2226,27 @@ export class BookPipelineRuns {
               { signal: drive.controller.signal, admission: drive.admission }
             );
       if (this.dead(drive)) return;
+      // The model's quotes are checked against the chapters: a claim no sentence matches is shown as a paraphrase.
+      const modelFindings = found.map((issue): ConsistencyFinding => {
+        const [x, y] = [chapters[issue.a - 1], chapters[issue.b - 1]];
+        const quoteA = verbatimQuote(issue.claimA, x.text);
+        const quoteB = verbatimQuote(issue.claimB, y.text);
+        return {
+          a: x.id,
+          b: y.id,
+          claimA: quoteA ?? issue.claimA,
+          claimB: quoteB ?? issue.claimB,
+          suggestion: issue.suggestion,
+          ...(quoteA === undefined ? { looseA: true as const } : {}),
+          ...(quoteB === undefined ? { looseB: true as const } : {})
+        };
+      });
+      // The program's own checks: numbers the model missed, and 「後面的章節」/「前面講過」 that point the wrong way.
       const findings: ConsistencyFinding[] = [
         ...references,
-        ...found.map(issue => ({
-          a: chapters[issue.a - 1].id,
-          b: chapters[issue.b - 1].id,
-          claimA: issue.claimA,
-          claimB: issue.claimB,
-          suggestion: issue.suggestion
-        })),
+        ...directionFindings(ordered),
+        ...modelFindings,
+        ...numericFindings(chapters, modelFindings),
         ...removed
       ];
       const done = await drive.store.commit(state => applyConsistency(state, token, findings));
@@ -3003,7 +3029,6 @@ export class BookPipelineRuns {
               title: candidate.title,
               caption: candidate.caption,
               ...(candidate.description !== undefined ? { description: candidate.description } : {}),
-              ...(candidate.loose ? { loose: true as const } : {}),
               ...(candidate.author ? { author: candidate.author } : {}),
               ...(candidate.license ? { license: candidate.license } : {})
             },
@@ -3024,9 +3049,13 @@ export class BookPipelineRuns {
     };
     let commonsAsked = 0;
     let commonsLimited = false;
+    const commonsCut = new Set<number>();
     let commonsNoHint = 0;
+    let commonsRejected: Partial<Record<CommonsRejection, number>> = {};
+    const rounds: (FoundImages | undefined)[] = [];
     try {
       const round1 = await search(wanted, false, exclude);
+      rounds.push(round1);
       keepHints(round1);
       for (const [index, list] of await probeFound(wanted, round1)) perSlot.set(index, list);
       // A second search (once) for the slots the first one left without a usable picture: another direction, the tried addresses excluded.
@@ -3037,6 +3066,7 @@ export class BookPipelineRuns {
           ...new Set([...perSlot.values()].flatMap(list => list.map(item => imageKey(item.candidate.imageUrl))))
         ];
         const second = await search(lacking, true, [...tried, ...exclude]);
+        rounds.push(second);
         keepHints(second);
         if (second) {
           for (const [index, list] of await probeFound(lacking, second))
@@ -3062,10 +3092,17 @@ export class BookPipelineRuns {
               ...hints.get(slot.index)
             })),
             this.ports.fetchCommons,
-            { signal, skip: url => seen.has(imageKey(url)) || taken(imageKey(url)) }
+            {
+              signal,
+              skip: url => seen.has(imageKey(url)) || taken(imageKey(url)),
+              run: drive.commonsBudget,
+              ...(this.ports.commonsQueue ? { queue: this.ports.commonsQueue } : {})
+            }
           );
           commonsAsked = commons.requests;
           commonsLimited = commons.limited;
+          commonsRejected = commons.rejected;
+          for (const index of commons.cut) commonsCut.add(index);
           // Slots with no English search words (none planned, none from the finder): their Commons queries are the slot line, which rarely matches a file.
           commonsNoHint = lacking.filter(slot => !slot.search?.length && !hints.get(slot.index)?.search).length;
           if (signal.aborted) throw new Error("aborted");
@@ -3086,7 +3123,25 @@ export class BookPipelineRuns {
     const latest = await this.ports.readCard(path);
     // The card may have left the map while the search and the probes ran: nothing is claimed or written for it.
     if (!(await this.stillOnMap(drive, nodeId))) return { kind: "failed", reason: "card_removed" };
-    const outcomes = choosePictures({ id: nodeId, title: latest.title }, slots, perSlot, taken, language);
+    // Addresses or works refused because this book already shows them (counted for the log).
+    const refusedTaken = new Set<string>();
+    const outcomes = choosePictures(
+      { id: nodeId, title: latest.title },
+      slots,
+      perSlot,
+      key => {
+        const used = taken(key);
+        if (used) refusedTaken.add(key);
+        return used;
+      },
+      language
+    );
+    // A slot Commons' request limit kept from being searched says so (the shortfall reason then names the limit), not "not found".
+    for (const index of commonsCut) {
+      const outcome = outcomes.get(index);
+      if (outcome && "reasonCode" in outcome && outcome.reasonCode === "not_found")
+        outcomes.set(index, { reasonCode: "rate_limited" });
+    }
     // Claim in the same synchronous turn as the choice: chapters run side by side, so the exclude list alone cannot stop a repeat.
     const claimed = [...outcomes.values()].flatMap(outcome =>
       "figure" in outcome ? [imageKey(outcome.figure.href)] : []
@@ -3106,10 +3161,6 @@ export class BookPipelineRuns {
       if (!outcome || !("figure" in outcome)) continue;
       const placed = (perSlot.get(slot.index) ?? []).find(item => item.href === outcome.figure.href)?.candidate;
       if (!placed) continue;
-      if (placed.loose) {
-        off.add(slot.index);
-        continue;
-      }
       const about = `${placed.title} ${placed.description ?? placed.caption}`;
       const words = askWords({ explains: slot.explains, terms: slot.search, ...hints.get(slot.index) });
       if (words.length && !wordHits(words, about)) off.add(slot.index);
@@ -3138,7 +3189,19 @@ export class BookPipelineRuns {
             missing: result.missing.length,
             ...(commonsAsked ? { commons: commonsAsked } : {}),
             ...(commonsLimited ? { commons_limited: 1 } : {}),
-            ...(commonsNoHint ? { commons_nohint: commonsNoHint } : {})
+            ...(commonsNoHint ? { commons_nohint: commonsNoHint } : {}),
+            ...Object.fromEntries(
+              rounds.flatMap((round, i) =>
+                round
+                  ? [
+                      [`r${i + 1}_found`, round.found],
+                      [`r${i + 1}_offTopic`, round.offTopic]
+                    ]
+                  : []
+              )
+            ),
+            ...(refusedTaken.size ? { taken: refusedTaken.size } : {}),
+            ...Object.fromEntries(Object.entries(commonsRejected).map(([rule, n]) => [`commons_rej_${rule}`, n]))
           },
           hosts: { name: "reason", list: [...new Set(result.missing.map(item => item.reasonCode))] }
         })
@@ -3334,15 +3397,25 @@ export class BookPipelineRuns {
       .filter(item => item.type !== "fact" && item.status === "unmet")
       .map(item => code(item.id));
     const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
-    // Fewer pictures than the owner's minimum is a reason to look (never a rewrite of the text): see pictureShortfallToken.
+    // Fewer pictures than the owner's minimum, and any placed picture off its text, are reasons to look (never a rewrite of the
+    // text): see pictureShortfallToken and pictureMismatchToken.
     const minimum = await this.pictureMinimum(drive);
-    const shortIssue =
-      minimum !== undefined && imageCheck.placed < minimum ? pictureShortfallToken(imageCheck.placed, minimum) : "";
+    const limited = imageCheck.issues.some(issue => issue.code === "rate_limited");
+    const offIndexes = imageCheck.issues.flatMap(issue =>
+      issue.code === "mismatch" && issue.index !== undefined ? [issue.index] : []
+    );
+    const pictureIssue = [
+      ...(minimum !== undefined && imageCheck.placed < minimum
+        ? [pictureShortfallToken(imageCheck.placed, minimum)]
+        : []),
+      ...(limited ? [PICTURE_LIMITED_TOKEN] : []),
+      ...(offIndexes.length ? [pictureMismatchToken(offIndexes)] : [])
+    ].join(" ");
     return {
       kind: "ok",
       after: async () => {
         const rewrite = verdict.aggregate === "needs-review" || !!length;
-        const stage = rewrite || shortIssue ? "needs-review" : "checked";
+        const stage = rewrite || pictureIssue ? "needs-review" : "checked";
         if (rewrite && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0) {
           drive.fixable.set(nodeId, proofFixInstruction(verdict.items, [...checklist, ...BOOK_CHECKS], length));
           drive.expand.add(nodeId);
@@ -3356,11 +3429,11 @@ export class BookPipelineRuns {
           nodeId,
           stage,
           verdict.aggregate === "needs-review"
-            ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}${shortIssue ? ` ${shortIssue}` : ""}`
+            ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}${pictureIssue ? ` ${pictureIssue}` : ""}`
             : lengthIssue
-              ? `length unmet: ${[lengthIssue, ...(shortIssue ? [shortIssue] : []), ...noticed].join(" ")}`
-              : shortIssue
-                ? `images unmet: ${[shortIssue, ...noticed].join(" ")}`
+              ? `length unmet: ${[lengthIssue, ...(pictureIssue ? [pictureIssue] : []), ...noticed].join(" ")}`
+              : pictureIssue
+                ? `images unmet: ${[pictureIssue, ...noticed].join(" ")}`
                 : structureUnmet.length
                   ? `structure unmet: ${noticed.join(" ")}`
                   : noticed.length

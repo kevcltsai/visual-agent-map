@@ -82,6 +82,8 @@ const writeAuthor = (r, text) => async input => { await input.admission.reserve(
 const cand = (n, over = {}) => ({ title: `Work ${n}`, caption: `Caption ${n}`, url: `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/W${n}.jpg/1280px-W${n}.jpg`, source: `https://commons.wikimedia.org/wiki/File:W${n}.jpg`, ...over });
 /** The finder's answer: `{ 1: [cand...], 2: [...] }` by slot index. */
 const found = bySlotObj => { const bySlot = new Map(Object.entries(bySlotObj).map(([k, v]) => [Number(k), v])); return { bySlot, found: [...bySlot.values()].reduce((n, v) => n + v.length, 0), offTopic: 0 }; };
+/** The stage of a chapter whose placed pictures the fixture text names nothing of: every picture off its text is a reason to look (Primary decision after the v5 run). */
+const MISMATCH_STAGE = 'needs-review';
 const slotsOf = n => Array.from({ length: n }, (_, i) => ({ index: i + 1, kind: 'diagram', explains: `explains ${i + 1} perspective`, anchor: `after paragraph ${i + 1}` }));
 const mk = (n, text = `explains ${n} perspective`) => `〔圖位 ${n}：${text}〕`;
 /** Two paragraphs, each followed by its marker line, then a Sources section. */
@@ -94,7 +96,8 @@ async function picRig({ finder, probe, text = twoMarkers, titles, proof, slots =
     titles: titles ?? ['SecretRootTitle', 'FillerChapter'],
     script: { card: request => ({ covers: `covers ${request.card.position}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: checklist ?? [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }], ...(slots === null ? {} : { images: Array.isArray(slots) ? slots : slotsOf(slots) }) }),
       author: (input, n) => writeAuthor(holder.r, text)(input), ...(probe ? { probe } : {}), ...(proof ? { proof } : {}) },
-    ports: { findImages: async (request, run) => { if (!titles && /FillerChapter/.test(request.chapter)) { await run.admission.reserve(); return found({}); } calls.push(request); await run.admission.reserve(); return finder(request, run, calls.length); }, ...ports }
+    // A Commons queue without the production 1 s spacing (the queue's own tests check the spacing and the 429 waits).
+    ports: { commonsQueue: new C.CommonsQueue(0, async () => {}), findImages: async (request, run) => { if (!titles && /FillerChapter/.test(request.chapter)) { await run.admission.reserve(); return found({}); } calls.push(request); await run.admission.reserve(); return finder(request, run, calls.length); }, ...ports }
   });
   holder.r = r;
   r.calls = calls;
@@ -117,9 +120,9 @@ test('slots: two markers become two standard images with one plain caption line 
   assert.match(r.calls[0].chapter, /SecretRootTitle/);
   assert.equal(detail.split('book-slots:v1').length - 1, 1, 'one record');
   assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state])), [[1, 'placed'], [2, 'placed']]);
-  assert.equal(stageOf(r.raw(0)), 'checked');
+  assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE);
   const log = r.stat.logs.filter(l => l.includes(' slots ')).join('\n');
-  assert.match(log, /book-pipeline slots .* placed=2 missing=0$/m);
+  assert.match(log, /book-pipeline slots .* placed=2 missing=0 r1_found=2 r1_offTopic=0$/m);
   assert.ok(!/SecretRootTitle|wikimedia|蒙娜麗莎/.test(r.stat.logs.join('\n')), 'the log has counts and codes only');
 });
 
@@ -131,7 +134,7 @@ test('slots: a slot with no loadable or no found picture loses its whole marker 
     assert.match(note.detail, /正文一。SecretRootTitle\n\n正文二。\n\n正文三。\n\n### 來源/);
     assert.ok(!/〔圖位|無圖：|### 圖像|!\[/.test(note.detail));
     assert.deepEqual(recordOf(note.detail).slots.map(s => [s.state, s.reasonCode]), [['missing', reason], ['missing', reason]]);
-    assert.match(r.stat.logs.join('\n'), new RegExp(`slots .* placed=0 missing=2 reason=${reason}$`, 'm'));
+    assert.match(r.stat.logs.join('\n'), new RegExp(`slots .* placed=0 missing=2(?: r[12]_(?:found|offTopic)=\\d+)+ reason=${reason}$`, 'm'));
     assert.equal(stageOf(r.raw(0)), 'checked');
   }
 });
@@ -180,7 +183,7 @@ test('slots: a marker inside a quote or a code fence stays word for word and doe
   const detail = (await r.note(0)).detail;
   assert.ok(detail.includes(`> ${mk(1, '引用')}\n`) && detail.includes(`\`\`\`\n${mk(2, '程式')}\n\`\`\``), 'quote and fence verbatim');
   assert.equal(figures(detail).length, 2);
-  assert.equal(stageOf(r.raw(0)), 'checked');
+  assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE);
   assert.deepEqual(recordOf(detail).slots.map(s => s.state), ['placed', 'placed']);
 });
 
@@ -196,7 +199,7 @@ test('slots: a repeated marker keeps the first, an out-of-range or reworded mark
   assert.deepEqual(rec.slots.map(s => [s.index, s.state, s.reasonCode]), [[1, 'placed', undefined], [2, 'missing', 'bad_marker']]);
   assert.equal(rec.bad, 2);
   assert.equal(r.calls[0].slots.length, 1, 'only the slot that has a valid marker is searched');
-  assert.equal(stageOf(r.raw(0)), 'checked');
+  assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE);
 });
 
 test('slots: markers on the same line (adjacent or inside a sentence) are removed without leaving a blank line, the rest of the line stays; no search when no slot has a marker', async () => {
@@ -455,7 +458,7 @@ test('slots: another chapter whose note cannot be read does not fail this chapte
   r.ports.readCard = path => (gone && path === r.nodes[1].path ? Promise.reject(new Error('deleted')) : read(path));
   await run(r);
   assert.equal(figures((await r.note(0)).detail).length, 1);
-  assert.equal(stageOf(r.raw(0)), 'checked');
+  assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE);
 });
 
 test('slots load: 5 chapters x 8 slots whose candidates all fail probe at most 36 addresses a chapter and 4 at a time, one search call each, and every card still ends checked', async () => {
@@ -524,7 +527,7 @@ test('T9 fingerprint: filling the slots (pictures placed, or missing and their m
   ]) {
     const r = await picRig(over);
     await run(r);
-    assert.equal(stageOf(r.raw(0)), 'checked', name);
+    assert.equal(stageOf(r.raw(0)), name === 'placed' || name.startsWith('a body picture') ? MISMATCH_STAGE : 'checked', name);
     assert.equal(bodyStateRaw(r.raw(0)), 'clean', name);
   }
 });
@@ -600,14 +603,14 @@ for (const [kind, template] of Object.entries(TEMPLATES)) {
     const again = (await r.note(0)).detail;
     assert.equal(figures(again).length, 2);
     assert.equal(again.split('book-slots:v1').length - 1, 1);
-    assert.equal(stageOf(r.raw(0)), 'checked');
+    assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE);
     // written, pictures and record in the text: the search is not repeated and the record is kept
     const authors = r.stat.author.length;
     await reopen(r, 'written', again);
     assert.equal(r.calls.length, 2, 'no search again');
     assert.equal(r.stat.author.length, authors, 'no author again');
     assert.equal((await r.note(0)).detail, again);
-    assert.equal(stageOf(r.raw(0)), 'checked');
+    assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE);
   });
 }
 
@@ -853,7 +856,7 @@ test('T4 images: a slot the first search left empty is searched once more (anoth
   assert.equal(figures(detail).length, 2);
   assert.match(detail, /!\[Work 2\]/);
   assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state])), [[1, 'placed'], [2, 'placed']]);
-  assert.equal(stageOf(r.raw(0)), 'checked');
+  assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE);
 });
 
 test('T4 images: when every slot has its picture there is no second search; a search that failed is not asked again', async () => {
@@ -1109,21 +1112,26 @@ test('commons fallback: a picture another chapter shows is not taken again; a fa
   await run(r);
   const detail = (await r.note(0)).detail;
   assert.deepEqual(plain(recordOf(detail).slots.map(s => [s.index, s.state, s.reasonCode ?? ''])), [[1, 'placed', ''], [2, 'missing', 'not_found']]);
-  assert.equal(stageOf(r.raw(0)), 'checked', 'no picture setting: a missing picture stays a notice');
+  assert.equal(stageOf(r.raw(0)), MISMATCH_STAGE, 'the placed picture is off the fixture text');
+  assert.ok(!/images:under/.test((await r.note(0)).pipelineIssue), 'no picture setting: a missing picture stays a notice, no shortfall');
   assert.match(r.stat.logs.join('\n'), /slots .* commons_nohint=1/, 'a slot without English search words is counted');
-  const twice = await picRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: () => found({}), ports: { fetchCommons: async () => ({ status: 200, text: commonsAnswer(['Same.jpg'], {}, 'Perspective drawings that explains') }) } });
+  // The finder's English words let the file keep its slot line as caption (a file it could caption only by its name is not placed).
+  const twice = await picRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: () => ({ ...found({}), hints: new Map([[1, { search: 'perspective' }], [2, { search: 'perspective' }]]) }), ports: { fetchCommons: async () => ({ status: 200, text: commonsAnswer(['Same.jpg'], {}, 'Perspective drawings that explains') }) } });
   await run(twice);
   const all = [...figures((await twice.note(0)).detail), ...figures((await twice.note(1)).detail)].filter(f => /Same\.jpg/.test(f));
   assert.equal(all.length, 1, 'one Commons file is placed once in the book');
 });
 
 test('shortfall: under the owner\'s minimum the chapter ends needs-review with a plain reason, counts for review and gets no rewrite; enough pictures stay checked', async () => {
-  const r = await picRig({ finder: () => found({ 1: [cand(1)] }) });
+  // The text and the captions name what each picture shows, so a placed picture is no mismatch here.
+  const fit = n => cand(n, { caption: `explains ${n} perspective` });
+  const named = title => `正文一 explains 1 perspective。${title}\n\n${mk(1)}\n\n正文二 explains 2 perspective。\n\n${mk(2)}\n\n正文三 explains 2 perspective。\n\n### 來源\n- https://example.com/a\n`;
+  const r = await picRig({ text: named, finder: () => found({ 1: [fit(1)] }) });
   await r.repo.writeBookSettings(r.nodes[0].path, { style: '每章圖片 2 張' });
   await run(r);
   assert.equal(stageOf(r.raw(0)), 'needs-review');
   const issue = (await r.note(0)).pipelineIssue;
-  assert.match(issue, /^images unmet: images:under:1:2 image_2( image_1_mismatch)?$/);
+  assert.equal(issue, 'images unmet: images:under:1:2 image_2');
   assert.equal(r.stat.author.filter(id => id === r.nodes[0].id).length, 1, 'no automatic rewrite for too few pictures');
   const review = S.load('experiences/visual-map/book-pipeline-review.ts');
   assert.equal(review.reasonOf(issue, undefined), 'Too few pictures: 1 placed, the setting asks for at least 2', 'test locale is en');
@@ -1131,7 +1139,7 @@ test('shortfall: under the owner\'s minimum the chapter ends needs-review with a
   assert.ok(both.startsWith(review.reasonOf('proof unmet: facts_unverified', undefined)) && both.endsWith('Too few pictures: 0 placed, the setting asks for at least 6'), both);
   const ui = S.load('experiences/visual-map/book-pipeline-ui.ts');
   assert.match(ui.bookIssueText('length unmet: length:under:10:100-200:字:v1 images:under:1:6 image_2'), /^\S.*\S\s+Too few pictures: 1 placed, the setting asks for at least 6$/);
-  const ok = await picRig({ finder: () => found({ 1: [cand(1)], 2: [cand(2)] }) });
+  const ok = await picRig({ text: named, finder: () => found({ 1: [fit(1)], 2: [fit(2)] }) });
   await ok.repo.writeBookSettings(ok.nodes[0].path, { style: '每章圖片 2 張' });
   await run(ok);
   assert.equal(stageOf(ok.raw(0)), 'checked');
@@ -1168,7 +1176,7 @@ test('repro v3 G: a PDF or DjVu page is never taken from Commons, even when its 
 });
 
 test('repro v3 G: a Commons file must name the slot\'s words (title, description or categories); a photo slot refuses covers, printed pages and maps', () => {
-  const slot = { index: 1, kind: '採收動作特寫照片', explains: '手從小白菜的外葉摘起', search: 'harvesting bok choy outer leaves' };
+  const slot = { index: 1, kind: '採收動作特寫照片', explains: '手從小白菜的外葉摘起', terms: ['bok choy', 'harvest'], search: 'harvesting bok choy outer leaves' };
   const titles = text => plain(C.parseCommonsAnswer(text, slot).map(c => c.title));
   assert.deepEqual(titles(commonsAnswer(['Chinese_mining_camp_ruins.jpg', 'Bok_choy_harvest_2019.jpg'])), ['Bok choy harvest 2019'], 'the title alone is enough when it names the slot');
   assert.deepEqual(titles(commonsAnswer(['IMG_2041.jpg'], {}, 'Brassica rapa chinensis|Harvesting|Bok choy')), ['IMG 2041'], 'the categories name it');
@@ -1178,6 +1186,10 @@ test('repro v3 G: a Commons file must name the slot\'s words (title, description
   assert.deepEqual(titles(commonsAnswer(['Bok_choy_harvest.jpg'], {}, 'Book covers')), [], 'a print genre in the categories');
   assert.deepEqual(plain(C.parseCommonsAnswer(commonsAnswer(['Bok_choy_field_map.png']), { ...slot, kind: '產地地圖' }).map(c => c.title)), ['Bok choy field map'], 'a map slot takes a map');
   assert.deepEqual(plain(C.parseCommonsAnswer(commonsAnswer(['IMG_1.jpg']), { index: 1, explains: '手從小白菜的外葉摘起' })), [], 'no English words and no Chinese title: not found');
+  const phraseOnly = { index: 1, kind: slot.kind, explains: slot.explains, search: slot.search };
+  const rejected = {};
+  assert.deepEqual(plain(C.parseCommonsAnswer(commonsAnswer(['Bok_choy_harvest_2019.jpg']), phraseOnly, rejected)), [], 'only the finder phrase, not all its words named: dropped (no file-name caption)');
+  assert.deepEqual(rejected, { caption: 1 }, 'counted per rule');
   const got = C.parseCommonsAnswer(commonsAnswer(['IMG_2041.jpg'], {}, 'Bok choy|Harvesting'), slot)[0];
   assert.equal(got.description, 'Bok choy; Harvesting', 'what the file page says is kept for the record');
   assert.match(C.commonsSearchUrl('x'), /iiextmetadatafilter=Artist%7CLicenseShortName%7CImageDescription%7CCategories/);
@@ -1221,8 +1233,18 @@ test('repro v3 I: a finder picture whose title and caption name nothing its slot
   await run(r);
   const detail = (await r.note(0)).detail;
   assert.deepEqual(plain(recordOf(detail).slots), [{ index: 1, state: 'placed', hash: recordOf(detail).slots[0].hash, off: true }]);
-  assert.equal((await r.note(0)).pipelineIssue, 'image notice: image_1_mismatch');
-  assert.equal(stageOf(r.raw(0)), 'checked', 'a notice, never needs-review');
+  // Primary decision after the v5 run: every picture off its text is a reason to look (it was a notice before), never a rewrite.
+  const issue = (await r.note(0)).pipelineIssue;
+  assert.equal(issue, 'images unmet: images:off:1 image_1_mismatch');
+  assert.equal(stageOf(r.raw(0)), 'needs-review');
+  assert.equal(r.stat.author.filter(id => id === r.nodes[0].id).length, 1, 'no automatic rewrite for a picture off its text');
+  const review = S.load('experiences/visual-map/book-pipeline-review.ts');
+  assert.equal(review.reasonOf(issue, undefined), 'Pictures 1 do not match the text around them');
+  const both = review.reasonOf('proof unmet: facts_unverified images:under:0:6 images:limited images:off:2,3', undefined);
+  assert.equal(both.split(', ').length >= 4, true, both);
+  assert.match(both, /Commons temporarily limited requests/);
+  const pictures = S.load('core/book-pipeline/image-slots.ts').splitPictureIssue('images unmet: images:limited');
+  assert.deepEqual(plain(pictures), { rest: '', limited: true }, 'the limit alone is a reason to look');
 });
 
 // ---- repro v4 K: 15 pictures for 6 chapters of 6–10; a plain Commons word search ranked scanned books (PDF/DjVu) first ----
@@ -1231,23 +1253,74 @@ const v4PdfAnswer = () => commonsAnswer(Array.from({ length: 10 }, (_, i) => `Hi
 
 test('repro v4 K: every Commons query asks for bitmap files only (20 a request), so a slot is filled where the plain search gave only PDFs', async () => {
   const asked = [];
-  const fetch = async url => { const q = new URL(url).searchParams.get('gsrsearch'); asked.push(q); return { status: 200, text: /filetype:bitmap$/.test(q) ? commonsAnswer(['Plastic_and_terracotta_pots.jpg']) : v4PdfAnswer() }; };
-  const out = await C.searchCommons([{ index: 2, kind: '範例照片', explains: '塑膠盆、陶盆、不織布袋並排放在一起', search: 'plastic terracotta fabric pots' }], fetch, { signal: new AbortController().signal, skip: () => false });
+  const fetch = async url => { const q = new URL(url).searchParams.get('gsrsearch'); asked.push(q); return { status: 200, text: /filetype:bitmap$/.test(q) ? commonsAnswer(['Plastic_terracotta_and_fabric_pots.jpg']) : v4PdfAnswer() }; };
+  const out = await C.searchCommons([{ index: 2, kind: '範例照片', explains: '塑膠盆、陶盆、不織布袋並排放在一起', search: 'plastic terracotta fabric pots' }], fetch, { signal: new AbortController().signal, skip: () => false, queue: new C.CommonsQueue(0, async () => {}) });
   assert.deepEqual(asked, ['plastic terracotta fabric pots filetype:bitmap']);
-  assert.deepEqual(plain(out.bySlot.get(2).map(c => c.title)), ['Plastic and terracotta pots']);
+  assert.deepEqual(plain(out.bySlot.get(2).map(c => c.title)), ['Plastic terracotta and fabric pots']);
   assert.equal(new URL(C.commonsSearchUrl('x')).searchParams.get('gsrlimit'), '20');
   assert.deepEqual(plain(C.parseCommonsAnswer(v4PdfAnswer(), { index: 2, explains: 'x', search: 'pots containers' })), [], 'the PDFs stay refused');
 });
 
-test('repro v4 K: a slot asks up to 3 queries (search words, subject, its line) only while nothing is usable; a 429 asks nothing more in the chapter', async () => {
+test('repro v4 K: a slot asks up to 3 queries (search words, subject, its line) only while nothing is usable; a 429 is asked again after 2 s, 4 s, 8 s (or its Retry-After), then the chapter stops', async () => {
   const asked = [];
-  const out = await C.searchCommons([{ index: 1, explains: '葉背的蚜蟲', subject: 'Ann', search: 'aphids leaf' }], async url => { asked.push(queryOf(url)); return { status: 200, text: '{}' }; }, { signal: new AbortController().signal, skip: () => false });
+  const quiet = () => new C.CommonsQueue(0, async () => {});
+  const out = await C.searchCommons([{ index: 1, explains: '葉背的蚜蟲', subject: 'Ann', search: 'aphids leaf' }], async url => { asked.push(queryOf(url)); return { status: 200, text: '{}' }; }, { signal: new AbortController().signal, skip: () => false, queue: quiet() });
   assert.deepEqual(asked, ['aphids leaf', 'Ann', '葉背的蚜蟲']);
   assert.equal(out.requests, 3); assert.equal(out.limited, false);
-  let n = 0;
-  const limited = await C.searchCommons([{ index: 1, explains: 'a', search: 'b' }, { index: 2, explains: 'c', search: 'd' }], async () => { n++; return { status: 429, text: 'You are making too many requests to the API.' }; }, { signal: new AbortController().signal, skip: () => false });
-  assert.equal(n, 1, 'one 429 ends the chapter\'s Commons search');
-  assert.equal(limited.limited, true); assert.equal(limited.bySlot.size, 0);
+  const slots = [{ index: 1, explains: 'a', search: 'bok choy' }, { index: 2, explains: 'c', search: 'flower pot' }];
+  const tooMany = (headers) => ({ status: 429, text: 'You are making too many requests to the API.', ...(headers ? { headers } : {}) });
+  const fit = { status: 200, text: commonsAnswer(['Bok_choy.jpg']) };
+  const sequence = async (answers) => {
+    const waits = []; const queries = [];
+    const queue = new C.CommonsQueue(0, async ms => { waits.push(ms); });
+    let n = 0;
+    const result = await C.searchCommons(slots, async url => { queries.push(queryOf(url)); return answers[n++] ?? fit; }, { signal: new AbortController().signal, skip: () => false, queue });
+    return { result, waits, queries };
+  };
+  const twice = await sequence([tooMany(), tooMany(), fit]);
+  assert.deepEqual(twice.waits, [2000, 4000], 'no Retry-After: 2 s, then 4 s');
+  assert.deepEqual(twice.queries.slice(0, 3), ['bok choy', 'bok choy', 'bok choy'], 'the same query asked again');
+  assert.equal(twice.result.limited, false); assert.ok(twice.result.bySlot.has(1));
+  const named = await sequence([tooMany({ 'Retry-After': '3' }), fit]);
+  assert.deepEqual(named.waits, [3000], 'Retry-After in seconds');
+  assert.equal(named.result.limited, false);
+  const always = await sequence(Array.from({ length: 20 }, () => tooMany()));
+  assert.equal(always.result.requests, 4, 'the first ask and 3 retries, then nothing more in the chapter');
+  assert.deepEqual(always.waits, [2000, 4000, 8000]);
+  assert.equal(always.result.limited, true); assert.equal(always.result.bySlot.size, 0);
+  assert.deepEqual(plain(always.result.cut), [1, 2], 'both slots left unsearched');
+  assert.equal(C.retryAfterMs({ 'retry-after': 'Wed, 21 Oct 2026 07:28:05 GMT' }, Date.parse('Wed, 21 Oct 2026 07:28:00 GMT')), 5000, 'an HTTP date');
+  assert.equal(C.retryAfterMs({ 'Retry-After': 'soon' }, 0), undefined);
+});
+
+test('commons limit in a run: a slot Commons kept answering 429 for is rate_limited, and the chapter is needs-review with images:limited', async () => {
+  const text = () => `開頭。\n\nexplains 1 perspective 的 explains perspective。\n\n${mk(1)}\n\n尾。\n\n### 來源\n- https://example.com/a\n`;
+  const r = await picRig({ text, slots: 1,
+    finder: (req, run, n) => n === 1 ? { ...found({ 1: [] }), hints: new Map([[1, { search: 'perspective drawing grid' }]]) } : found({}),
+    ports: { fetchCommons: async () => ({ status: 429, text: '' }) } });
+  await run(r);
+  const note = await r.note(0);
+  assert.deepEqual(plain(recordOf(note.detail).slots.map(s => [s.index, s.state, s.reasonCode ?? ''])), [[1, 'missing', 'rate_limited']]);
+  assert.equal(stageOf(r.raw(0)), 'needs-review');
+  assert.match(note.pipelineIssue, /(?:^|\s)images:limited(?:\s|$)/);
+  assert.match(r.stat.logs.join('\n'), /commons=4 commons_limited=1/);
+});
+
+test('commons run budget: once a book run has waited 180 s on 429 answers, no chapter asks Commons anything more', async () => {
+  let clock = 0;
+  const queue = new C.CommonsQueue(0, async ms => { clock += ms; });
+  const run = { waited: 0, spent: false };
+  let requests = 0;
+  const fetch = async () => { requests++; return { status: 429, text: '' }; };
+  const chapter = () => C.searchCommons([{ index: 1, explains: 'a', search: 'b' }], fetch, { signal: new AbortController().signal, skip: () => false, queue, run, now: () => clock });
+  for (let i = 0; i < 20 && !run.spent; i++) await chapter();
+  assert.equal(run.spent, true);
+  assert.ok(run.waited <= C.COMMONS_RUN_BACKOFF_MS, `waited ${run.waited}`);
+  assert.ok(run.waited > C.COMMONS_RUN_BACKOFF_MS - 14000, 'close to the budget');
+  const before = requests;
+  const after = await chapter();
+  assert.equal(requests, before, 'no more Commons queries in this run');
+  assert.equal(after.limited, true); assert.deepEqual(plain(after.cut), [1]);
 });
 
 // ---- repro v4 L: two Commons files placed under a slot line that says something the picture does not show ----
@@ -1258,33 +1331,26 @@ const v4File = (name, description, categories) => commonsAnswer([name], { [name]
 const V4_POT_FILE = v4File('Glazed_Flowerpot.jpg', 'Green glazed flower pot with slightly flaring sides.  Rounded, molded lip.  Inside unglazed.  One drainage hole in bottom.  Made by Joseph Oser. Title: Glazed Flowerpot', 'PD-Art (PD-US-expired)|Images uploaded by Fæ|PD US expired|Collections of the Missouri History Museum');
 const V4_PAKCHOI_FILE = v4File('Brassica_rapa_Pak_Choi_Weiß_(white-stemmed_pak_choi)_(SaatPilot).jpg', 'This white-stemmed pak choi, offered by SaatPilot as ‘Pak Choi Weiß’, is a non-heading Chinese cabbage (Brassica rapa subsp. chinensis) that forms an open rosette of green, spoon-shaped leaves on broad, crisp, pale stalks. Young leaves can be cut as baby leaf; whole heads need more space', 'Brassica rapa subsp. chinensis|Self-published work');
 
-test('repro v4 L: a Commons file that does not name every search word of its slot keeps its own name as caption and is marked loose; a full match keeps the slot line', () => {
-  const pot = C.parseCommonsAnswer(V4_POT_FILE, V4_POT)[0];
-  assert.equal(pot.title, 'Glazed Flowerpot');
-  assert.equal(pot.caption, 'Glazed Flowerpot', 'never "比較有排水孔的盆和只在盆底鋪碎石的盆"');
-  assert.equal(pot.loose, true);
-  const pak = C.parseCommonsAnswer(V4_PAKCHOI_FILE, V4_PAKCHOI)[0];
-  assert.equal(pak.loose, true);
-  assert.ok(!/播種/.test(pak.caption), 'never "小白菜淺覆土播種的方式"');
+test('repro v4 L: a Commons file that does not name every search word of its slot is not taken (no file-name caption); a full match keeps the slot line', () => {
+  assert.deepEqual(plain(C.parseCommonsAnswer(V4_POT_FILE, V4_POT)), [], 'never "比較有排水孔的盆和只在盆底鋪碎石的盆" under a glazed flowerpot');
+  assert.deepEqual(plain(C.parseCommonsAnswer(V4_PAKCHOI_FILE, V4_PAKCHOI)), [], 'never "小白菜淺覆土播種的方式" under a pak choi rosette');
   const full = C.parseCommonsAnswer(commonsAnswer(['Sowing_pak_choi_seeds.jpg']), V4_PAKCHOI)[0];
-  assert.equal(full.caption, V4_PAKCHOI.explains); assert.equal(full.loose, undefined);
-  const slots = S.load('core/book-pipeline/image-slots.ts');
-  const fig = slots.figureOf({ imageUrl: pot.url, sourceUrl: pot.source, title: pot.title, caption: pot.caption, loose: true }, pot.url, 'zh-TW');
-  assert.equal(fig.caption, '圖：Glazed Flowerpot');
-  assert.equal(slots.figureOf({ imageUrl: pot.url, sourceUrl: pot.source, title: pot.title, caption: pot.caption, loose: true }, pot.url, 'en').caption, 'Picture: Glazed Flowerpot');
+  assert.equal(full.caption, V4_PAKCHOI.explains); assert.equal('loose' in full, false);
 });
 
-test('repro v4 L: placed from Commons, the loose file reads "圖：<name>" in the chapter and the proof reports image_N_mismatch', async () => {
+test('repro v4 L: a Commons file that names too little of its slot is not placed: the slot stays empty (not_found), no "圖：<name>" line', async () => {
   const text = () => `開頭。\n\nexplains 1 perspective 的 explains perspective。\n\n${mk(1)}\n\n尾。\n\n### 來源\n- https://example.com/a\n`;
   const r = await picRig({ text, slots: 1,
     finder: (req, run, n) => n === 1 ? { ...found({ 1: [] }), hints: new Map([[1, { search: 'perspective drawing grid' }]]) } : found({}),
     ports: { fetchCommons: async () => ({ status: 200, text: v4File('Perspective_drawing_of_a_house.jpg', 'A perspective drawing', 'Perspective') }) } });
   await run(r);
   const note = await r.note(0);
-  assert.match(note.detail, /!\[Perspective drawing of a house\]\([^)\s]+\)\n圖：Perspective drawing of a house\n來源：/);
-  assert.equal(recordOf(note.detail).slots[0].off, true);
-  assert.equal(note.pipelineIssue, 'image notice: image_1_mismatch');
-  assert.match(r.stat.logs.join('\n'), /slots .* commons=1(?! .*commons_nohint)/, 'the slot had English search words');
+  assert.doesNotMatch(note.detail, /Perspective drawing of a house|圖：/);
+  assert.deepEqual(plain(recordOf(note.detail).slots.map(s => [s.index, s.state, s.reasonCode ?? ''])), [[1, 'missing', 'not_found']]);
+  const log = r.stat.logs.join('\n');
+  assert.match(log, /slots .* commons=2(?! .*commons_nohint)/, 'the slot had English search words; the refused file asks the next query');
+  assert.match(log, /commons_rej_caption=2/, 'the refusal is counted per rule');
+  assert.match(log, /r1_found=0/, 'the finder rounds are counted');
 });
 
 // ---- planned English search terms (card plan slot field `search`), the shared Commons queue, the relaxed caption rule ----
@@ -1294,16 +1360,13 @@ test('commons queries: the planner\'s English terms first, the finder\'s words s
   assert.deepEqual(plain(C.commonsQueries({ index: 1, explains: '盆底的排水孔', terms: [] , search: 'pot hole' })), ['pot hole', '盆底的排水孔'], 'no planned terms: as before');
 });
 
-test('commons caption: the slot line stays when the file names at least half (rounded up) of the planned terms; fewer is the file\'s name and loose', () => {
+test('commons caption: the file is taken with the slot line when it names at least half (rounded up) of the planned terms; fewer is not taken', () => {
   const slot = terms => ({ index: 3, kind: '示意圖', explains: '比較有排水孔的盆和只在盆底鋪碎石的盆。', terms });
   const two = C.parseCommonsAnswer(V4_POT_FILE, slot(['flower pot', 'drainage hole', 'gravel layer', 'potting soil']))[0];
-  assert.equal(two.caption, '比較有排水孔的盆和只在盆底鋪碎石的盆。', '2 of 4 terms'); assert.equal(two.loose, undefined);
-  const one = C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage hole', 'gravel layer', 'potting soil']))[0];
-  assert.equal(one.caption, 'Glazed Flowerpot', '1 of 3 terms (2 needed)'); assert.equal(one.loose, true);
-  const half = C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage hole', 'gravel layer']))[0];
-  assert.equal(half.loose, undefined, '1 of 2 terms is half');
-  const partial = C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage gravel', 'pot soil', 'clay saucer']))[0];
-  assert.equal(partial.loose, true, 'a term counts only when the file has all its words');
+  assert.equal(two.caption, '比較有排水孔的盆和只在盆底鋪碎石的盆。', '2 of 4 terms');
+  assert.deepEqual(plain(C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage hole', 'gravel layer', 'potting soil']))), [], '1 of 3 terms (2 needed)');
+  assert.equal(C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage hole', 'gravel layer'])).length, 1, '1 of 2 terms is half');
+  assert.deepEqual(plain(C.parseCommonsAnswer(V4_POT_FILE, slot(['drainage gravel', 'pot soil', 'clay saucer']))), [], 'a term counts only when the file has all its words');
 });
 
 test('commons queue: concurrent chapters ask one request at a time through one queue; a chapter stopped while waiting asks nothing', async () => {

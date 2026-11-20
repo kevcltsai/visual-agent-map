@@ -20,7 +20,7 @@ import { parseChecklist, parseImageSlots } from "../../core/book-pipeline/plan-t
 import { escapeMarkdownText, hashText, unescapeMarkdownText } from "../../core/book-pipeline/text";
 import { splitLengthIssue } from "../../core/book-pipeline/settings";
 import type { ChapterInconsistency } from "../../core/book-pipeline/consistency";
-import { bookCardView, bookIssueText, lengthText, shortfallText } from "./book-pipeline-ui";
+import { bookCardView, bookIssueText, lengthText, pictureIssueText } from "./book-pipeline-ui";
 import { bodyImageUrls } from "./book-pipeline-run";
 
 import { projectProofBody } from "../../core/book-pipeline/book-notes";
@@ -105,9 +105,17 @@ const PROBLEM_RULES: readonly { kind: ReviewProblemKind; of: (card: Gate2Card) =
       card.inconsistencies?.length
         ? card.inconsistencies.map(item => {
             if (item.kind === "removed") return t("ui.book_reason_removed_ref_0_1", item.theirs, item.own);
+            if (item.kind === "direction")
+              return t("ui.book_reason_direction_0_1_2_3", item.own, item.theirs, item.otherTitle, item.suggestion);
             if (item.reference)
               return t("ui.book_reason_chapter_ref_0_1_2_3", item.own, item.theirs, item.otherTitle, item.suggestion);
-            const sentence = t("ui.book_reason_inconsistent_0_1_2", item.otherTitle, item.own, item.theirs);
+            // A quote is the chapter's own sentence; a claim no sentence matched is the model's paraphrase, shown as such.
+            const own = t(item.ownLoose ? "ui.book_paraphrase_0" : "ui.book_quote_0", item.own);
+            const theirs = t(item.theirsLoose ? "ui.book_paraphrase_0" : "ui.book_quote_0", item.theirs);
+            const sentence =
+              item.other === card.id
+                ? t("ui.book_reason_inconsistent_self_0_1", own, theirs)
+                : t("ui.book_reason_inconsistent_0_1_2", item.otherTitle, own, theirs);
             return item.suggestion ? `${sentence}${t("ui.book_panel_lead_sep")}${item.suggestion}` : sentence;
           })
         : undefined
@@ -166,10 +174,11 @@ export const plainNote = (text: string): string =>
 /** The reason of a needs-review card in words: the proof's own notes of the items not met, else the count, else a plain sentence; never a code. */
 export function reasonOf(issue: string, proof: StoredProofView | undefined): string {
   const pictures = splitPictureIssue(issue);
-  if (pictures.shortfall) {
-    const sentence = shortfallText(pictures.shortfall);
-    return pictures.rest ? `${reasonOf(pictures.rest, proof)}${t("ui.book_panel_lead_sep")}${sentence}` : sentence;
-  }
+  const pictureText = pictureIssueText(pictures);
+  if (pictureText)
+    return pictures.rest
+      ? `${reasonOf(pictures.rest, proof)}${t("ui.book_panel_lead_sep")}${pictureText}`
+      : pictureText;
   const { rest, length } = splitLengthIssue(issue);
   if (length) {
     const sentence = lengthText(length);

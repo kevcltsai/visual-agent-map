@@ -1913,6 +1913,7 @@ var en = {
   "detail.book_slots_reason_load_failed": "the picture did not load",
   "detail.book_slots_reason_unsafe_url": "the picture address is not safe",
   "detail.book_slots_reason_probe_capped": "not checked: too many candidates to probe",
+  "detail.book_slots_reason_rate_limited": "not searched: Wikimedia Commons limited the requests",
   "detail.book_slots_reason_mismatch": "does not match the text around it",
   "detail.book_slots_count_0_1": "picture count ({0}) is not the placed slots ({1})",
   "detail.book_slots_bad_0": "{0} slot markers were refused and removed",
@@ -2394,7 +2395,6 @@ var en = {
   "note.callout_titles_4": "none",
   "note.visual_reference": "Visual reference",
   "note.image_author_0": "by {0}",
-  "note.image_file_caption_0": "Picture: {0}",
   "note.image_link": "link",
   "note.image_source_0_1": "{0} ({1})",
   "note.image_source_label_0": "Source: {0}",
@@ -3197,10 +3197,16 @@ var en = {
   "ui.book_issue_unmet_0": "Proofreading found unmet items: {0}",
   "ui.book_reason_length_over_0_1_2_3": "The chapter is {0} {1}, longer than the {2}\u2013{3} {1} you asked for",
   "ui.book_reason_chapter_ref_0_1_2_3": "Wrong chapter number: in \u201C{0}\u201D, \u201C{1}\u201D means \u3008{2}\u3009, which is {3}",
-  "ui.book_reason_inconsistent_0_1_2": "Says something differently from \u3008{0}\u3009: this chapter says \u201C{1}\u201D, \u3008{0}\u3009 says \u201C{2}\u201D",
+  "ui.book_reason_inconsistent_0_1_2": "Says something differently from \u3008{0}\u3009: this chapter says {1}, \u3008{0}\u3009 says {2}",
+  "ui.book_reason_inconsistent_self_0_1": "This chapter contradicts itself: it says {0}, and later {1}",
+  "ui.book_reason_direction_0_1_2_3": "Points the wrong way: in \u201C{0}\u201D, \u201C{1}\u201D means \u3008{2}\u3009, which is {3}",
+  "ui.book_quote_0": "\u201C{0}\u201D",
+  "ui.book_paraphrase_0": "(paraphrased) {0}",
   "ui.book_reason_removed_ref_0_1": "This chapter still mentions the removed \u3008{0}\u3009: \u201C{1}\u201D",
   "ui.book_reason_length_under_0_1_2_3": "The chapter is {0} {1}, shorter than the {2}\u2013{3} {1} you asked for",
   "ui.book_reason_images_under_0_1": "Too few pictures: {0} placed, the setting asks for at least {1}",
+  "ui.book_reason_images_limited": "Commons temporarily limited requests; some picture positions were not filled",
+  "ui.book_reason_images_off_0": "Pictures {0} do not match the text around them",
   "ui.book_length_unit_chars": "characters",
   "ui.book_length_unit_words": "words",
   "ui.book_structure_unmet_0": "Structure: {0} item(s) unmet",
@@ -5149,6 +5155,7 @@ var zhCN = {
   "detail.book_slots_reason_load_failed": "\u56FE\u52A0\u8F7D\u5931\u8D25",
   "detail.book_slots_reason_unsafe_url": "\u56FE\u7F51\u5740\u4E0D\u5B89\u5168",
   "detail.book_slots_reason_probe_capped": "\u5019\u9009\u592A\u591A\uFF0C\u6CA1\u9010\u4E00\u68C0\u67E5",
+  "detail.book_slots_reason_rate_limited": "Wikimedia Commons \u9650\u5236\u8BF7\u6C42\u6B21\u6570\uFF0C\u6CA1\u67E5\u5230",
   "detail.book_slots_reason_mismatch": "\u4E0E\u524D\u540E\u6587\u5BF9\u4E0D\u4E0A",
   "detail.book_slots_count_0_1": "\u56FE\u6570\u4E0E\u5DF2\u653E\u56FE\u4F4D\u4E0D\u7B26\uFF08{0}\uFF0F{1}\uFF09",
   "detail.book_slots_bad_0": "{0} \u4E2A\u56FE\u4F4D\u6807\u8BB0\u4E0D\u5408\u683C\uFF0C\u5DF2\u5220\u9664",
@@ -5630,7 +5637,6 @@ var zhCN = {
   "note.callout_titles_4": "\u9519\u8BEF:bug|\u5F15\u7528:quote,cite",
   "note.visual_reference": "\u89C6\u89C9\u53C2\u8003",
   "note.image_author_0": "\u4F5C\u8005 {0}",
-  "note.image_file_caption_0": "\u56FE\uFF1A{0}",
   "note.image_link": "\u94FE\u63A5",
   "note.image_source_0_1": "{0}\uFF08{1}\uFF09",
   "note.image_source_label_0": "\u6765\u6E90\uFF1A{0}",
@@ -6433,10 +6439,16 @@ var zhCN = {
   "ui.book_issue_unmet_0": "\u6821\u5BF9\u672A\u8FBE\u6210\u9879\u76EE\uFF1A{0}",
   "ui.book_reason_length_over_0_1_2_3": "\u8FD9\u7AE0\u6709 {0} {1}\uFF0C\u6BD4\u4F60\u8BBE\u5B9A\u7684 {2}\u2013{3} {1} \u957F",
   "ui.book_reason_chapter_ref_0_1_2_3": "\u7AE0\u53F7\u6307\u9519\uFF1A\u201C{0}\u201D\u91CC\u7684\u201C{1}\u201D\u8BF4\u7684\u662F\u3008{2}\u3009\uFF0C\u90A3\u662F{3}",
-  "ui.book_reason_inconsistent_0_1_2": "\u548C\u3008{0}\u3009\u8BF4\u6CD5\u4E0D\u4E00\u81F4\uFF1A\u8FD9\u7AE0\u5199\u201C{1}\u201D\uFF0C\u3008{0}\u3009\u5199\u201C{2}\u201D",
+  "ui.book_reason_inconsistent_0_1_2": "\u548C\u3008{0}\u3009\u8BF4\u6CD5\u4E0D\u4E00\u81F4\uFF1A\u8FD9\u7AE0\u5199{1}\uFF0C\u3008{0}\u3009\u5199{2}",
+  "ui.book_reason_inconsistent_self_0_1": "\u8FD9\u7AE0\u524D\u540E\u8BF4\u6CD5\u4E0D\u4E00\u81F4\uFF1A\u5148\u5199{0}\uFF0C\u540E\u9762\u53C8\u5199{1}",
+  "ui.book_reason_direction_0_1_2_3": "\u524D\u540E\u6307\u9519\uFF1A\u201C{0}\u201D\u91CC\u7684\u201C{1}\u201D\u8BF4\u7684\u662F\u3008{2}\u3009\uFF0C\u90A3\u662F{3}",
+  "ui.book_quote_0": "\u201C{0}\u201D",
+  "ui.book_paraphrase_0": "\uFF08\u5927\u610F\uFF09{0}",
   "ui.book_reason_removed_ref_0_1": "\u8FD9\u7AE0\u8FD8\u63D0\u5230\u5DF2\u79FB\u9664\u7684\u3008{0}\u3009\uFF1A\u201C{1}\u201D",
   "ui.book_reason_length_under_0_1_2_3": "\u8FD9\u7AE0\u53EA\u6709 {0} {1}\uFF0C\u6BD4\u4F60\u8BBE\u5B9A\u7684 {2}\u2013{3} {1} \u77ED",
   "ui.book_reason_images_under_0_1": "\u56FE\u7247\u4E0D\u8DB3\uFF1A\u653E\u4E86 {0} \u5F20\uFF0C\u8BBE\u7F6E\u81F3\u5C11 {1} \u5F20",
+  "ui.book_reason_images_limited": "Commons \u6682\u65F6\u9650\u5236\u8BF7\u6C42\uFF0C\u56FE\u4F4D\u672A\u8865\u9F50",
+  "ui.book_reason_images_off_0": "\u7B2C {0} \u5F20\u56FE\u548C\u524D\u540E\u6587\u5BF9\u4E0D\u4E0A",
   "ui.book_length_unit_chars": "\u5B57",
   "ui.book_length_unit_words": "\u4E2A\u82F1\u6587\u8BCD",
   "ui.book_structure_unmet_0": "\u7ED3\u6784 {0} \u9879\u672A\u8FBE\u6210",
@@ -8385,6 +8397,7 @@ var zhTW = {
   "detail.book_slots_reason_load_failed": "\u5716\u8F09\u5165\u5931\u6557",
   "detail.book_slots_reason_unsafe_url": "\u5716\u7DB2\u5740\u4E0D\u5B89\u5168",
   "detail.book_slots_reason_probe_capped": "\u5019\u9078\u592A\u591A\uFF0C\u6C92\u9010\u4E00\u6AA2\u67E5",
+  "detail.book_slots_reason_rate_limited": "Wikimedia Commons \u9650\u5236\u8ACB\u6C42\u6B21\u6578\uFF0C\u6C92\u67E5\u5230",
   "detail.book_slots_reason_mismatch": "\u8207\u524D\u5F8C\u6587\u5C0D\u4E0D\u4E0A",
   "detail.book_slots_count_0_1": "\u5716\u6578\u8207\u5DF2\u653E\u5716\u4F4D\u4E0D\u7B26\uFF08{0}\uFF0F{1}\uFF09",
   "detail.book_slots_bad_0": "{0} \u500B\u5716\u4F4D\u6A19\u8A18\u4E0D\u5408\u683C\uFF0C\u5DF2\u522A\u9664",
@@ -8866,7 +8879,6 @@ var zhTW = {
   "note.callout_titles_4": "\u932F\u8AA4:bug|\u5F15\u8FF0:quote,cite",
   "note.visual_reference": "\u8996\u89BA\u53C3\u8003",
   "note.image_author_0": "\u4F5C\u8005 {0}",
-  "note.image_file_caption_0": "\u5716\uFF1A{0}",
   "note.image_link": "\u9023\u7D50",
   "note.image_source_0_1": "{0}\uFF08{1}\uFF09",
   "note.image_source_label_0": "\u4F86\u6E90\uFF1A{0}",
@@ -9669,10 +9681,16 @@ var zhTW = {
   "ui.book_issue_unmet_0": "\u6821\u5C0D\u672A\u9054\u6210\u9805\u76EE\uFF1A{0}",
   "ui.book_reason_length_over_0_1_2_3": "\u9019\u7AE0\u6709 {0} {1}\uFF0C\u6BD4\u4F60\u8A2D\u5B9A\u7684 {2}\u2013{3} {1} \u9577",
   "ui.book_reason_chapter_ref_0_1_2_3": "\u7AE0\u865F\u6307\u932F\uFF1A\u300C{0}\u300D\u88E1\u7684\u300C{1}\u300D\u8AAA\u7684\u662F\u3008{2}\u3009\uFF0C\u90A3\u662F{3}",
-  "ui.book_reason_inconsistent_0_1_2": "\u548C\u3008{0}\u3009\u8AAA\u6CD5\u4E0D\u4E00\u81F4\uFF1A\u9019\u7AE0\u5BEB\u300C{1}\u300D\uFF0C\u3008{0}\u3009\u5BEB\u300C{2}\u300D",
+  "ui.book_reason_inconsistent_0_1_2": "\u548C\u3008{0}\u3009\u8AAA\u6CD5\u4E0D\u4E00\u81F4\uFF1A\u9019\u7AE0\u5BEB{1}\uFF0C\u3008{0}\u3009\u5BEB{2}",
+  "ui.book_reason_inconsistent_self_0_1": "\u9019\u7AE0\u524D\u5F8C\u8AAA\u6CD5\u4E0D\u4E00\u81F4\uFF1A\u5148\u5BEB{0}\uFF0C\u5F8C\u9762\u53C8\u5BEB{1}",
+  "ui.book_reason_direction_0_1_2_3": "\u524D\u5F8C\u6307\u932F\uFF1A\u300C{0}\u300D\u88E1\u7684\u300C{1}\u300D\u8AAA\u7684\u662F\u3008{2}\u3009\uFF0C\u90A3\u662F{3}",
+  "ui.book_quote_0": "\u300C{0}\u300D",
+  "ui.book_paraphrase_0": "\uFF08\u5927\u610F\uFF09{0}",
   "ui.book_reason_removed_ref_0_1": "\u9019\u7AE0\u9084\u63D0\u5230\u5DF2\u79FB\u9664\u7684\u3008{0}\u3009\uFF1A\u300C{1}\u300D",
   "ui.book_reason_length_under_0_1_2_3": "\u9019\u7AE0\u53EA\u6709 {0} {1}\uFF0C\u6BD4\u4F60\u8A2D\u5B9A\u7684 {2}\u2013{3} {1} \u77ED",
   "ui.book_reason_images_under_0_1": "\u5716\u7247\u4E0D\u8DB3\uFF1A\u653E\u4E86 {0} \u5F35\uFF0C\u8A2D\u5B9A\u81F3\u5C11 {1} \u5F35",
+  "ui.book_reason_images_limited": "Commons \u66AB\u6642\u9650\u5236\u8ACB\u6C42\uFF0C\u5716\u4F4D\u672A\u88DC\u9F4A",
+  "ui.book_reason_images_off_0": "\u7B2C {0} \u5F35\u5716\u548C\u524D\u5F8C\u6587\u5C0D\u4E0D\u4E0A",
   "ui.book_length_unit_chars": "\u5B57",
   "ui.book_length_unit_words": "\u500B\u82F1\u6587\u5B57",
   "ui.book_structure_unmet_0": "\u7D50\u69CB {0} \u9805\u672A\u9054\u6210",
@@ -12772,7 +12790,7 @@ function consistencyShape(value) {
   if (value.revisions !== void 0 && (!isObject(value.revisions) || !Object.values(value.revisions).every(isCount)))
     return false;
   return value.findings === void 0 || Array.isArray(value.findings) && value.findings.every(
-    (item) => isObject(item) && (item.kind === void 0 || item.kind === "reference" || item.kind === "removed") && isText(item.a) && isText(item.b) && isText(item.claimA) && isText(item.claimB) && isText(item.suggestion)
+    (item) => isObject(item) && (item.kind === void 0 || item.kind === "reference" || item.kind === "removed" || item.kind === "direction") && (item.looseA === void 0 || item.looseA === true) && (item.looseB === void 0 || item.looseB === true) && isText(item.a) && isText(item.b) && isText(item.claimA) && isText(item.claimB) && isText(item.suggestion)
   );
 }
 function problem(raw) {
@@ -13275,7 +13293,7 @@ function figureOf(candidate, href, language2) {
   return {
     href,
     alt,
-    caption: candidate.loose ? translateNote(language2, "note.image_file_caption_0", alt) : plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
+    caption: plainLine(escapeMarkdownText(plain(candidate.caption), 160)) || alt,
     ...source ? { source } : {}
   };
 }
@@ -13429,7 +13447,8 @@ var REASONS = [
   "not_found",
   "load_failed",
   "unsafe_url",
-  "probe_capped"
+  "probe_capped",
+  "rate_limited"
 ];
 function shortHash(url) {
   let hash = 2166136261;
@@ -13625,12 +13644,23 @@ function imageIssueTokens(check) {
   return check.bad ? [...tokens2, "image_marker"] : tokens2;
 }
 var pictureShortfallToken = (placed, minimum) => `images:under:${placed}:${minimum}`;
+var PICTURE_LIMITED_TOKEN = "images:limited";
+var pictureMismatchToken = (indexes) => `images:off:${indexes.join(",")}`;
 var SHORTFALL = /(?:^|\s)images:under:(\d+):(\d+)(?=\s|$)/;
+var LIMITED = /(?:^|\s)images:limited(?=\s|$)/;
+var OFF = /(?:^|\s)images:off:(\d+(?:,\d+)*)(?=\s|$)/;
 function splitPictureIssue(issue2) {
   const m = SHORTFALL.exec(issue2);
-  if (!m) return { rest: issue2 };
-  const rest = issue2.replace(SHORTFALL, "").trim().replace(/^images unmet:(?:\s+\S+)*$|^images unmet$/, "");
-  return { rest, shortfall: { placed: Number(m[1]), minimum: Number(m[2]) } };
+  const o = OFF.exec(issue2);
+  const limited = LIMITED.test(issue2);
+  if (!m && !o && !limited) return { rest: issue2 };
+  const rest = issue2.replace(SHORTFALL, "").replace(LIMITED, "").replace(OFF, "").trim().replace(/^images unmet:(?:\s+\S+)*$|^images unmet$/, "");
+  return {
+    rest,
+    ...m ? { shortfall: { placed: Number(m[1]), minimum: Number(m[2]) } } : {},
+    ...limited ? { limited: true } : {},
+    ...o ? { off: o[1].split(",").map(Number) } : {}
+  };
 }
 
 // core/note-placeholder.ts
@@ -19528,9 +19558,9 @@ function findRelatedSpeech(text10, targets) {
       0,
       ...paragraphs.map((paragraph) => {
         const candidateTokens = tokens(paragraph);
-        const shared = [...queryTokens].filter((token) => candidateTokens.has(token));
-        if (shared.length < 3) return 0;
-        const sharedWeight = shared.reduce((total2, token) => total2 + weight(token), 0);
+        const shared2 = [...queryTokens].filter((token) => candidateTokens.has(token));
+        if (shared2.length < 3) return 0;
+        const sharedWeight = shared2.reduce((total2, token) => total2 + weight(token), 0);
         const candidateWeight = [...candidateTokens].reduce((total2, token) => total2 + weight(token), 0);
         return 2 * sharedWeight / (queryWeight + candidateWeight);
       })
@@ -19541,8 +19571,8 @@ function findRelatedSpeech(text10, targets) {
   const [best, second] = scored;
   if (second && best.target.normalized !== second.target.normalized && best.score >= STRONG_RELATED_SPEECH_SCORE && second.score >= STRONG_RELATED_SPEECH_SCORE && best.score - second.score < AMBIGUOUS_SCORE_GAP) {
     const bestTokens = tokens(best.target.text), secondTokens = tokens(second.target.text);
-    const shared = [...bestTokens].filter((token) => secondTokens.has(token)).length;
-    const similarity = shared / Math.max(1, (/* @__PURE__ */ new Set([...bestTokens, ...secondTokens])).size);
+    const shared2 = [...bestTokens].filter((token) => secondTokens.has(token)).length;
+    const similarity = shared2 / Math.max(1, (/* @__PURE__ */ new Set([...bestTokens, ...secondTokens])).size);
     if (similarity >= NEAR_DUPLICATE_SPEECH_SIMILARITY) return null;
   }
   return best.target.id;
@@ -40536,8 +40566,8 @@ function withMapSources(mapGroups, own2 = []) {
 }
 function sharedSourceFindings(childCount, condense) {
   if (childCount <= 1) return void 0;
-  let shared;
-  return (signal) => shared != null ? shared : shared = condense(signal);
+  let shared2;
+  return (signal) => shared2 != null ? shared2 : shared2 = condense(signal);
 }
 
 // experiences/visual-map/outline-import.ts
@@ -46741,25 +46771,53 @@ function chapterInconsistencies(data, nodeId) {
   const check = data.consistency;
   if (!((_a2 = check == null ? void 0 : check.findings) == null ? void 0 : _a2.length) || !check.revisions) return [];
   if (check.revisions[nodeId] === void 0 || check.revisions[nodeId] !== revisionOf(data, nodeId)) return [];
-  return check.findings.flatMap(
-    (finding) => finding.kind === "reference" ? finding.a === nodeId ? [
-      {
-        other: finding.b,
-        own: finding.claimA,
-        theirs: finding.claimB,
-        suggestion: finding.suggestion,
-        reference: true
-      }
-    ] : [] : finding.kind === "removed" ? finding.a === nodeId ? [
-      {
-        kind: "removed",
-        other: finding.b,
-        own: finding.claimA,
-        theirs: finding.claimB,
-        suggestion: finding.suggestion
-      }
-    ] : [] : finding.a === nodeId ? [{ other: finding.b, own: finding.claimA, theirs: finding.claimB, suggestion: finding.suggestion }] : finding.b === nodeId ? [{ other: finding.a, own: finding.claimB, theirs: finding.claimA, suggestion: finding.suggestion }] : []
-  );
+  return check.findings.flatMap((finding) => {
+    const loose = (own2, theirs) => ({
+      ...own2 ? { ownLoose: true } : {},
+      ...theirs ? { theirsLoose: true } : {}
+    });
+    if (finding.kind === "reference")
+      return finding.a === nodeId ? [
+        {
+          other: finding.b,
+          own: finding.claimA,
+          theirs: finding.claimB,
+          suggestion: finding.suggestion,
+          reference: true
+        }
+      ] : [];
+    if (finding.kind === "removed" || finding.kind === "direction")
+      return finding.a === nodeId ? [
+        {
+          kind: finding.kind,
+          other: finding.b,
+          own: finding.claimA,
+          theirs: finding.claimB,
+          suggestion: finding.suggestion
+        }
+      ] : [];
+    if (finding.a === nodeId)
+      return [
+        {
+          other: finding.b,
+          own: finding.claimA,
+          theirs: finding.claimB,
+          suggestion: finding.suggestion,
+          ...loose(finding.looseA, finding.looseB)
+        }
+      ];
+    if (finding.b === nodeId)
+      return [
+        {
+          other: finding.a,
+          own: finding.claimB,
+          theirs: finding.claimA,
+          suggestion: finding.suggestion,
+          ...loose(finding.looseB, finding.looseA)
+        }
+      ];
+    return [];
+  });
 }
 var REMOVED_QUOTE_MAX = 80;
 var QUOTE_SPLIT = /(?<=[。！？!?])|\n+/u;
@@ -46792,6 +46850,319 @@ function removedChapterRefs(data, chapters) {
     }
   }
   return out;
+}
+
+// core/book-pipeline/cross-checks.ts
+var HAN_DIGIT = {
+  "\u3007": 0,
+  \u96F6: 0,
+  \u4E00: 1,
+  \u4E8C: 2,
+  \u5169: 2,
+  \u4E24: 2,
+  \u4E09: 3,
+  \u56DB: 4,
+  \u4E94: 5,
+  \u516D: 6,
+  \u4E03: 7,
+  \u516B: 8,
+  \u4E5D: 9
+};
+function numberRange(value) {
+  const ascii2 = value.replace(/[０-９]/g, (d) => String(d.charCodeAt(0) - 65296));
+  if (/^[0-9]+(?:\.[0-9]+)?$/.test(ascii2)) return [Number(ascii2), Number(ascii2)];
+  if (value === "\u534A") return [0.5, 0.5];
+  const chars = Array.from(value);
+  if (chars.length === 2 && chars.every((c) => HAN_DIGIT[c] !== void 0) && HAN_DIGIT[chars[1]] === HAN_DIGIT[chars[0]] + 1)
+    return [HAN_DIGIT[chars[0]], HAN_DIGIT[chars[1]]];
+  let total2 = 0;
+  let digit;
+  for (const c of chars) {
+    if (HAN_DIGIT[c] !== void 0) {
+      if (digit !== void 0) return void 0;
+      digit = HAN_DIGIT[c];
+    } else if (c === "\u5341" || c === "\u767E") {
+      total2 += (digit != null ? digit : 1) * (c === "\u5341" ? 10 : 100);
+      digit = void 0;
+    } else return void 0;
+  }
+  const n = total2 + (digit != null ? digit : 0);
+  return [n, n];
+}
+var UNIT_CLASS = {
+  \u5C0F\u6642: "h",
+  \u5C0F\u65F6: "h",
+  \u9418\u982D: "h",
+  \u949F\u5934: "h",
+  \u516C\u5206: "cm",
+  \u5398\u7C73: "cm",
+  \u91D0\u7C73: "cm",
+  cm: "cm",
+  \u516C\u91D0: "mm",
+  \u6BEB\u7C73: "mm",
+  mm: "mm",
+  \u516C\u5C3A: "m",
+  \u516C\u5347: "l",
+  \u5347: "l",
+  \u6BEB\u5347: "ml",
+  ml: "ml",
+  \u516C\u65A4: "kg",
+  kg: "kg",
+  \u516C\u514B: "g",
+  \u514B: "g",
+  \u6708: "month",
+  \u9031: "week",
+  \u5468: "week",
+  \u661F\u671F: "week",
+  \u5929: "day",
+  \u5E74: "year",
+  \u5EA6: "deg"
+};
+var NUM2 = String.raw`[0-9０-９]+(?:\.[0-9]+)?|[〇零一二兩两三四五六七八九十百半]+`;
+var QUANTITY = new RegExp(
+  String.raw`(第)?(至少|最少|起碼|起码|超過|超过|不到|最多|頂多|顶多)?\s*(${NUM2})(?:\s*(?:到|至|~|～|-|–|—|－)\s*(${NUM2}))?\s*(?:(個多|个多|個|个|多)\s*)?(小時|小时|鐘頭|钟头|公分|厘米|釐米|公釐|毫米|公尺|毫升|公升|升|公斤|公克|克|月|週|周|星期|天|年|度|cm|mm|ml|kg)(以上|以下|以內|以内|之內|之内)?`,
+  "giu"
+);
+function quantitiesIn(sentence) {
+  const out = [];
+  for (const match of sentence.matchAll(QUANTITY)) {
+    const [said, ordinal, before, first, second, counter, unitWord, after] = match;
+    if (ordinal) continue;
+    const unit2 = UNIT_CLASS[unitWord.toLowerCase()];
+    if (!unit2) continue;
+    if (unit2 === "month" && !counter) continue;
+    const a = numberRange(first);
+    const b = second === void 0 ? a : numberRange(second);
+    if (!a || !b) continue;
+    let low = Math.min(a[0], b[0]);
+    let high = Math.max(a[1], b[1]);
+    const more = !!counter && counter.endsWith("\u591A");
+    if (more) high = low + 0.99;
+    if (first === "\u4E00" && second === void 0 && !more && !before && !after) continue;
+    if (/至少|最少|起碼|起码|超過|超过/.test(before != null ? before : "") || after === "\u4EE5\u4E0A") high = Infinity;
+    if (/不到|最多|頂多|顶多/.test(before != null ? before : "") || /以下|以內|以内|之內|之内/.test(after != null ? after : "")) low = 0;
+    out.push({ unit: unit2, low, high, said: said.trim() });
+  }
+  return out;
+}
+var FUNCTION_CHARS = new Set(
+  Array.from(
+    "\u7684\u4E86\u662F\u5728\u548C\u8207\u4E0E\u53CA\u4E5F\u90FD\u5C31\u8981\u6709\u4F60\u6211\u4ED6\u5979\u5B83\u9019\u8FD9\u90A3\u6703\u4F1A\u80FD\u5F88\u66F4\u9084\u8FD8\u4E00\u500B\u4E2A\u4E0D\u5F97\u8457\u7740\u628A\u88AB\u8B93\u8BA9\u5C0D\u5BF9\u5F9E\u4ECE\u5411\u4EE5\u70BA\u4E3A\u800C\u4E14\u6216\u5247\u5219\u4E4B\u5176\u4E9B\u518D\u624D\u53EA\u6BCF\u591A\u5C11\u5927\u5C0F\u7D04\u7EA6"
+  )
+);
+var STOP_BIGRAMS = /* @__PURE__ */ new Set([
+  "\u53EF\u4EE5",
+  "\u9700\u8981",
+  "\u5EFA\u8B70",
+  "\u5EFA\u8BAE",
+  "\u5982\u679C",
+  "\u6240\u4EE5",
+  "\u56E0\u70BA",
+  "\u56E0\u4E3A",
+  "\u4F46\u662F",
+  "\u6BD4\u8F03",
+  "\u6BD4\u8F83",
+  "\u901A\u5E38",
+  "\u6700\u597D",
+  "\u5DE6\u53F3",
+  "\u4EE5\u4E0A",
+  "\u6642\u9593",
+  "\u65F6\u95F4",
+  "\u6642\u5019",
+  "\u65F6\u5019",
+  "\u65B9\u5F0F",
+  "\u60C5\u6CC1",
+  "\u60C5\u51B5",
+  "\u90E8\u5206",
+  "\u5730\u65B9"
+]);
+var HAN = /\p{Script=Han}/u;
+function topicWords(text10) {
+  const plain = text10.replace(QUANTITY, " ");
+  const words2 = /* @__PURE__ */ new Set();
+  const chars = Array.from(plain);
+  for (let i = 0; i + 1 < chars.length; i++) {
+    const [x, y] = [chars[i], chars[i + 1]];
+    if (!HAN.test(x) || !HAN.test(y) || FUNCTION_CHARS.has(x) || FUNCTION_CHARS.has(y)) continue;
+    if (/[〇零二兩两三四五六七八九十百半]/u.test(x + y)) continue;
+    const word = x + y;
+    if (!STOP_BIGRAMS.has(word)) words2.add(word);
+  }
+  return words2;
+}
+var MEASURE = /(深度|深|高度|高|長度|长度|長|长|寬度|宽度|寬|宽|直徑|直径|口徑|口径|厚度|厚|間隔|间隔|間距|间距|距離|距离|離|离)/gu;
+var MEASURE_KEY = {
+  \u6DF1\u5EA6: "\u6DF1",
+  \u9AD8\u5EA6: "\u9AD8",
+  \u9577\u5EA6: "\u9577",
+  \u957F\u5EA6: "\u9577",
+  \u957F: "\u9577",
+  \u5BEC\u5EA6: "\u5BEC",
+  \u5BBD\u5EA6: "\u5BEC",
+  \u5BBD: "\u5BEC",
+  \u76F4\u5F84: "\u76F4\u5F91",
+  \u53E3\u5F91: "\u76F4\u5F91",
+  \u53E3\u5F84: "\u76F4\u5F91",
+  \u539A\u5EA6: "\u539A",
+  \u95F4\u9694: "\u9593\u9694",
+  \u9593\u8DDD: "\u9593\u9694",
+  \u95F4\u8DDD: "\u9593\u9694",
+  \u8DDD\u96E2: "\u96E2",
+  \u8DDD\u79BB: "\u96E2",
+  \u79BB: "\u96E2"
+};
+var LENGTH = /* @__PURE__ */ new Set(["cm", "mm", "m"]);
+function measureOf(clause, quantity) {
+  var _a2, _b2, _c;
+  const at = clause.indexOf(quantity.said);
+  const after = (_a2 = /^\s*(深|高|長|长|寬|宽|厚)/u.exec(clause.slice(at + quantity.said.length))) == null ? void 0 : _a2[1];
+  const before = (_b2 = [...clause.slice(0, at).matchAll(MEASURE)].pop()) == null ? void 0 : _b2[1];
+  const word = before != null ? before : after;
+  return word && ((_c = MEASURE_KEY[word]) != null ? _c : word);
+}
+function subjectsOf(chapters) {
+  const found = /* @__PURE__ */ new Set();
+  for (const chapter of chapters)
+    for (const match of chapter.text.matchAll(/^\s*(?:#{1,6}\s+|\*\*)([^：:\n*]{2,6})[：:]/gmu)) {
+      const name2 = match[1].trim();
+      if (Array.from(name2).every((c) => HAN.test(c)) && !/[0-9一二三四五六七八九十]/u.test(name2)) found.add(name2);
+    }
+  return [...found];
+}
+var SKIP_LINE = /^\s*(?:#{1,6}\s|\||>|<!--)/;
+function sentencesOf2(chapter, text10) {
+  const out = [];
+  text10.split(/\n\s*\n/).forEach((block, paragraph) => {
+    const lines = block.split("\n").filter((line2) => line2.trim() && !SKIP_LINE.test(line2));
+    const parts = lines.join("\n").split(/(?<=[。！？!?；;])|\n/u).map((part) => part.replace(/^[\s>*-]*(?:\[[ xX]\]\s*)?/, "").trim()).filter(Boolean);
+    parts.forEach((part, at) => {
+      if (!quantitiesIn(part).length) return;
+      const lead = parts.slice(Math.max(0, at - 2), at).join("");
+      const about = topicWords(lead + part);
+      const clauses = part.split(/(?<=[，,、：:（）()])/u);
+      const quantities = clauses.flatMap(
+        (clause, i) => quantitiesIn(clause).map((quantity) => {
+          var _a2;
+          const near = topicWords(((_a2 = clauses[i - 1]) != null ? _a2 : "") + clause);
+          const measure = LENGTH.has(quantity.unit) ? measureOf(clause, quantity) : void 0;
+          return { quantity, near: near.size ? near : about, measure };
+        })
+      );
+      if (quantities.length)
+        out.push({
+          chapter,
+          paragraph,
+          text: part,
+          about,
+          quantities,
+          units: new Set(quantities.map((q) => q.quantity.unit))
+        });
+    });
+  });
+  return out;
+}
+var SAME_TOPIC_WORDS = 3;
+var SAME_NEAR_WORDS = 2;
+var NUMERIC_MAX_FINDINGS = 8;
+var QUOTE_MAX = 160;
+var shared = (x, y) => [...x].filter((word) => y.has(word)).length;
+var disjoint = (x, y) => x.high < y.low || y.high < x.low;
+var normal2 = (value) => value.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, "");
+function numericFindings(chapters, known = []) {
+  const sentences = chapters.flatMap((chapter, at) => sentencesOf2(at, chapter.text));
+  const subjects = subjectsOf(chapters);
+  const named = new Map(sentences.map((sentence) => [sentence, subjects.filter((name2) => sentence.text.includes(name2))]));
+  const otherThings = (x, y) => {
+    var _a2, _b2;
+    const [sx, sy] = [(_a2 = named.get(x)) != null ? _a2 : [], (_b2 = named.get(y)) != null ? _b2 : []];
+    return sx.length > 0 && sy.length > 0 && !sx.some((name2) => sy.includes(name2));
+  };
+  const best = /* @__PURE__ */ new Map();
+  for (let i = 0; i < sentences.length; i++) {
+    for (let j = i + 1; j < sentences.length; j++) {
+      const x = sentences[i];
+      const y = sentences[j];
+      if (x.chapter === y.chapter && x.paragraph === y.paragraph || ![...x.units].some((unit2) => y.units.has(unit2)))
+        continue;
+      const score = shared(x.about, y.about);
+      if (score < SAME_TOPIC_WORDS || otherThings(x, y)) continue;
+      for (const { quantity: qx, near: nx, measure: mx } of x.quantities) {
+        if (x.quantities.some(({ quantity: o }) => o !== qx && o.unit === qx.unit && disjoint(o, qx))) continue;
+        for (const { quantity: qy, near: ny, measure: my } of y.quantities) {
+          if (qx.unit !== qy.unit || !disjoint(qx, qy) || shared(nx, ny) < SAME_NEAR_WORDS) continue;
+          if (mx && my && mx !== my) continue;
+          if (y.quantities.some(({ quantity: o }) => o !== qy && o.unit === qy.unit && !disjoint(o, qx))) continue;
+          const key4 = `${x.chapter}:${y.chapter}:${qx.unit}`;
+          const held = best.get(key4);
+          if (!held || score > held.score) best.set(key4, { score, x, y, qx, qy });
+        }
+      }
+    }
+  }
+  const reported = (a, b, said) => known.some(
+    (finding) => (finding.a === a && finding.b === b || finding.a === b && finding.b === a) && said.some((text10) => normal2(finding.claimA + finding.claimB).includes(normal2(text10)))
+  );
+  return [...best.values()].sort((p, q) => q.score - p.score).filter(({ x, y, qx, qy }) => !reported(chapters[x.chapter].id, chapters[y.chapter].id, [qx.said, qy.said])).slice(0, NUMERIC_MAX_FINDINGS).sort((p, q) => p.x.chapter - q.x.chapter || p.y.chapter - q.y.chapter).map(({ x, y }) => ({
+    a: chapters[x.chapter].id,
+    b: chapters[y.chapter].id,
+    claimA: singleLine(x.text, QUOTE_MAX),
+    claimB: singleLine(y.text, QUOTE_MAX),
+    suggestion: ""
+  }));
+}
+var POINTER = /(留到後面|留到后面|留到之後|留到之后|後面的章節|后面的章节|之後的章節|之后的章节|後面幾章|后面几章|後續章節|后续章节|後面會講|后面会讲|後面會談|后面会谈|後面再講|后面再讲)|(前面講過|前面讲过|前面提過|前面提过|前面說過|前面说过|前面的章節|前面的章节|前幾章|前几章|之前的章節|之前的章节|前一章提過|前一章提过)/gu;
+function titleWords(title) {
+  return title.split(/[與与和及、,，\s:：/]+/u).map((word) => word.trim()).filter((word) => Array.from(word).length >= 2);
+}
+function directionFindings(chapters) {
+  const words2 = chapters.map((chapter) => titleWords(chapter.title));
+  const out = [];
+  chapters.forEach((chapter, self) => {
+    for (const paragraph of chapter.text.split(/\n\s*\n/)) {
+      if (SKIP_LINE.test(paragraph)) continue;
+      for (const sentence of paragraph.split(/(?<=[。！？!?])|\n/u)) {
+        const pointer = POINTER.exec(sentence);
+        POINTER.lastIndex = 0;
+        if (!pointer) continue;
+        const later = pointer[1] !== void 0;
+        const hits = words2.map((list2, at) => at === self ? 0 : list2.filter((word) => sentence.includes(word)).length);
+        const most = Math.max(...hits);
+        if (!most || hits.filter((n) => n === most).length > 1) continue;
+        const target = hits.indexOf(most);
+        if (later === target > self) continue;
+        const simplified = /[后们几说讲]/u.test(pointer[0]);
+        const side = target < self ? "\u524D\u9762" : simplified ? "\u540E\u9762" : "\u5F8C\u9762";
+        out.push({
+          kind: "direction",
+          a: chapter.id,
+          b: chapters[target].id,
+          claimA: singleLine(sentence.replace(/^[\s>*-]*(?:\[[ xX]\]\s*)?/, ""), QUOTE_MAX),
+          claimB: pointer[0],
+          suggestion: `${side}\u7684\u7B2C${target + 1}\u7AE0`
+        });
+      }
+    }
+  });
+  return out;
+}
+function verbatimQuote(claim2, text10) {
+  const want = normal2(claim2);
+  if (want && normal2(text10).includes(want)) return claim2;
+  const amounts = quantitiesIn(claim2);
+  if (!amounts.length) return void 0;
+  const words2 = topicWords(claim2);
+  let best;
+  for (const line2 of text10.split("\n")) {
+    if (SKIP_LINE.test(line2)) continue;
+    for (const part of line2.split(/(?<=[。！？!?])/u)) {
+      const sentence = part.replace(/^[\s>*-]*(?:\[[ xX]\]\s*)?/, "").trim();
+      const own2 = quantitiesIn(sentence);
+      if (!amounts.some((x) => own2.some((y) => x.unit === y.unit && x.low === y.low && x.high === y.high))) continue;
+      const score = shared(words2, topicWords(sentence));
+      if (!best || score > best.score) best = { sentence, score };
+    }
+  }
+  return best && singleLine(best.sentence, QUOTE_MAX);
 }
 
 // core/book-pipeline/budget.ts
@@ -46883,7 +47254,10 @@ var COMMONS_REQUESTS_PER_SLOT = 3;
 var COMMONS_PER_SLOT = 3;
 var COMMONS_REQUEST_MS = 1e4;
 var COMMONS_CHAPTER_MS = 45e3;
-var COMMONS_SPACING_MS = 300;
+var COMMONS_SPACING_MS = 1e3;
+var COMMONS_BACKOFF_MS = [2e3, 4e3, 8e3];
+var COMMONS_BACKOFF_TOTAL_MS = 3e4;
+var COMMONS_RUN_BACKOFF_MS = 18e4;
 var QUERY_MAX = 80;
 var CREDIT_MAX = 100;
 var CAPTION_MAX = 200;
@@ -46918,8 +47292,12 @@ function plainCredit(value, max = CREDIT_MAX) {
   if (typeof value !== "string") return "";
   return value.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().slice(0, max);
 }
-function parseCommonsAnswer(text10, slot) {
+function parseCommonsAnswer(text10, slot, rejected) {
   var _a2, _b2, _c, _d, _e, _f, _g, _h;
+  const refuse = (rule) => {
+    var _a3;
+    if (rejected) rejected[rule] = ((_a3 = rejected[rule]) != null ? _a3 : 0) + 1;
+  };
   let parsed;
   try {
     parsed = JSON.parse(text10);
@@ -46934,35 +47312,53 @@ function parseCommonsAnswer(text10, slot) {
     if (!info || typeof page.title !== "string") continue;
     const url = typeof info.thumburl === "string" ? info.thumburl : typeof info.url === "string" ? info.url : "";
     const shown = typeof info.thumbmime === "string" ? info.thumbmime : info.mime;
-    if (typeof info.mime !== "string" || !FILE_MIME.test(info.mime)) continue;
-    if (!/^https:\/\//.test(url) || typeof shown !== "string" || !SHOWN_MIME.test(shown)) continue;
-    if (typeof info.descriptionurl !== "string") continue;
-    if ([url, page.title, info.url].some((value) => typeof value === "string" && isDocumentFile(value))) continue;
+    if ([url, page.title, info.url].some((value) => typeof value === "string" && isDocumentFile(value))) {
+      refuse("document");
+      continue;
+    }
+    if (typeof info.mime !== "string" || !FILE_MIME.test(info.mime) || !/^https:\/\//.test(url) || typeof shown !== "string" || !SHOWN_MIME.test(shown) || typeof info.descriptionurl !== "string") {
+      refuse("type");
+      continue;
+    }
     const meta = (_b2 = info.extmetadata) != null ? _b2 : {};
     const author = plainCredit((_c = meta.Artist) == null ? void 0 : _c.value);
     const license = plainCredit((_d = meta.LicenseShortName) == null ? void 0 : _d.value);
     const categories = plainCredit((_e = meta.Categories) == null ? void 0 : _e.value, DESCRIPTION_MAX).replace(/\|/g, "; ");
     const about = plainCredit((_f = meta.ImageDescription) == null ? void 0 : _f.value, DESCRIPTION_MAX);
     const title = page.title.replace(/^File:/i, "").replace(/\.[a-z0-9]{2,5}$/i, "").replace(/_/g, " ").trim();
-    if (wrongGenre(slot.kind, `${title} ${categories}`)) continue;
+    if (wrongGenre(slot.kind, `${title} ${categories}`)) {
+      refuse("genre");
+      continue;
+    }
     const words2 = askWords(slot);
     const said = `${title} ${about} ${categories}`;
-    if (wordHits(words2, said) < Math.min(FIT_HITS, words2.length) || !words2.length) continue;
+    if (wordHits(words2, said) < Math.min(FIT_HITS, words2.length) || !words2.length) {
+      refuse("words");
+      continue;
+    }
     const terms = (((_g = slot.terms) == null ? void 0 : _g.length) ? slot.terms : [(_h = slot.search) != null ? _h : ""]).map((term) => askWords({ explains: "", search: term })).filter((term) => term.length);
     const hit = terms.filter((term) => wordHits(term, said) === term.length).length;
-    const fits = terms.length > 0 && hit >= Math.ceil(terms.length / 2);
+    if (!terms.length || hit < Math.ceil(terms.length / 2)) {
+      refuse("caption");
+      continue;
+    }
     const candidate = fileSourceOf({
       title: title || page.title,
       url,
       source: info.descriptionurl,
-      caption: (fits ? slot.explains : title || page.title).replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX),
+      caption: slot.explains.replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX),
       description: [about, categories].filter(Boolean).join(" \xB7 ").slice(0, DESCRIPTION_MAX),
       ...author ? { author } : {},
-      ...license ? { license } : {},
-      ...fits ? {} : { loose: true }
+      ...license ? { license } : {}
     });
-    if (!candidate || !bySubject(candidate, slot.subject)) continue;
-    if (out.some((have) => have.url === candidate.url)) continue;
+    if (!candidate || !bySubject(candidate, slot.subject)) {
+      refuse("subject");
+      continue;
+    }
+    if (out.some((have) => have.url === candidate.url)) {
+      refuse("repeat");
+      continue;
+    }
     out.push(candidate);
   }
   return out;
@@ -46981,8 +47377,10 @@ function bounded(work, ms, signal) {
   });
 }
 var CommonsQueue = class {
-  constructor(spacing = COMMONS_SPACING_MS) {
+  /** `sleep`: how a wait is spent (tests: no real time); it resolves early on abort. */
+  constructor(spacing = COMMONS_SPACING_MS, sleep = abortableSleep) {
     this.spacing = spacing;
+    this.sleep = sleep;
     __publicField(this, "tail", Promise.resolve());
   }
   /** `run`'s answer, or undefined when `skip()` says no once the turn came. The next turn waits for this one to settle. */
@@ -46998,43 +47396,79 @@ var CommonsQueue = class {
     return answer;
   }
   pause() {
-    return this.spacing > 0 ? new Promise((resolve) => window.setTimeout(resolve, this.spacing)) : Promise.resolve();
+    return this.spacing > 0 ? this.sleep(this.spacing) : Promise.resolve();
   }
 };
+function abortableSleep(ms, signal) {
+  return new Promise((resolve) => {
+    const done = () => {
+      window.clearTimeout(timer);
+      signal == null ? void 0 : signal.removeEventListener("abort", done);
+      resolve();
+    };
+    const timer = window.setTimeout(done, ms);
+    signal == null ? void 0 : signal.addEventListener("abort", done, { once: true });
+  });
+}
+function retryAfterMs(headers, now) {
+  var _a2, _b2;
+  const raw = (_b2 = (_a2 = Object.entries(headers != null ? headers : {}).find(([name2]) => name2.toLowerCase() === "retry-after")) == null ? void 0 : _a2[1]) == null ? void 0 : _b2.trim();
+  if (!raw) return void 0;
+  if (/^\d+$/.test(raw)) return Number(raw) * 1e3;
+  const at = Date.parse(raw);
+  return Number.isNaN(at) ? void 0 : Math.max(0, at - now);
+}
 var commonsQueue = new CommonsQueue();
 async function searchCommons(slots, fetch, options) {
-  var _a2, _b2;
+  var _a2, _b2, _c;
   const now = (_a2 = options.now) != null ? _a2 : Date.now;
   const deadline = now() + COMMONS_CHAPTER_MS;
   const queue = (_b2 = options.queue) != null ? _b2 : commonsQueue;
   const bySlot = /* @__PURE__ */ new Map();
   let requests = 0;
   let limited = false;
+  let waited = 0;
+  const cut = [];
+  const rejected = {};
+  const run = (_c = options.run) != null ? _c : { waited: 0, spent: false };
+  if (run.spent) limited = true;
+  const stopped = () => limited || run.spent || options.signal.aborted || now() >= deadline;
+  const ask = (query, retry) => queue.turn(stopped, async () => {
+    var _a3;
+    requests++;
+    const answer = await bounded(
+      Promise.resolve().then(() => fetch(commonsSearchUrl(query))),
+      COMMONS_REQUEST_MS,
+      options.signal
+    );
+    if ((answer == null ? void 0 : answer.status) !== 429) return answer;
+    const wait = (_a3 = retryAfterMs(answer.headers, now())) != null ? _a3 : COMMONS_BACKOFF_MS[retry];
+    if (wait !== void 0 && run.waited + wait > COMMONS_RUN_BACKOFF_MS) run.spent = true;
+    if (run.spent || retry >= COMMONS_BACKOFF_MS.length || wait === void 0 || waited + wait > COMMONS_BACKOFF_TOTAL_MS || now() + wait >= deadline) {
+      limited = true;
+      return answer;
+    }
+    waited += wait;
+    run.waited += wait;
+    await queue.sleep(wait, options.signal);
+    return answer;
+  });
   for (const slot of slots) {
     const list2 = [];
     for (const query of commonsQueries(slot)) {
-      if (list2.length || limited || options.signal.aborted || now() >= deadline) break;
-      const answer = await queue.turn(
-        () => limited || options.signal.aborted || now() >= deadline,
-        () => {
-          requests++;
-          return bounded(
-            Promise.resolve().then(() => fetch(commonsSearchUrl(query))),
-            COMMONS_REQUEST_MS,
-            options.signal
-          );
-        }
-      );
-      if ((answer == null ? void 0 : answer.status) === 429) limited = true;
+      if (list2.length || stopped()) break;
+      let answer = await ask(query, 0);
+      for (let retry = 1; (answer == null ? void 0 : answer.status) === 429 && !stopped(); retry++) answer = await ask(query, retry);
       if (!answer || answer.status !== 200) continue;
-      for (const candidate of parseCommonsAnswer(answer.text, slot)) {
+      for (const candidate of parseCommonsAnswer(answer.text, slot, rejected)) {
         if (list2.length >= COMMONS_PER_SLOT) break;
         if (!options.skip(candidate.url)) list2.push(candidate);
       }
     }
     if (list2.length) bySlot.set(slot.index, list2);
+    else if (limited || run.spent) cut.push(slot.index);
   }
-  return { bySlot, requests, limited };
+  return { bySlot, requests, limited: limited || run.spent, cut, rejected };
 }
 
 // core/book-pipeline/machine.ts
@@ -49565,7 +49999,7 @@ function arrangeUnarrangedArgumentMap(nodes, state) {
 
 // core/argument-map/source-proof.ts
 var QUOTE_MIN = 12;
-var QUOTE_MAX = 200;
+var QUOTE_MAX2 = 200;
 var QUOTE_FOLDED_MIN = 8;
 var FETCH_TIMEOUT_MS = 15e3;
 var MAX_PAGE_BYTES = 2 * 1024 * 1024;
@@ -49720,7 +50154,7 @@ async function verifySource(input2) {
   const quote3 = input2.quote.normalize("NFKC").trim();
   const length = Array.from(quote3).length;
   const foldedQuote = foldText(quote3);
-  if (length < QUOTE_MIN || length > QUOTE_MAX || Array.from(foldedQuote).length < QUOTE_FOLDED_MIN)
+  if (length < QUOTE_MIN || length > QUOTE_MAX2 || Array.from(foldedQuote).length < QUOTE_FOLDED_MIN)
     return fail4("bad_quote");
   if (!input2.claim.trim()) return fail4("bad_claim");
   const requested = new URL(url.href);
@@ -53763,6 +54197,7 @@ var BookPipelineRuns = class {
       disposed: false,
       rootId: "",
       usedImages: /* @__PURE__ */ new Set(),
+      commonsBudget: { waited: 0, spent: false },
       usedWorks: /* @__PURE__ */ new Map(),
       probeGate: { active: 0, waiters: [] },
       done: Promise.resolve()
@@ -54187,15 +54622,25 @@ var BookPipelineRuns = class {
         { signal: drive.controller.signal, admission: drive.admission }
       );
       if (this.dead(drive)) return;
+      const modelFindings = found.map((issue2) => {
+        const [x, y] = [chapters[issue2.a - 1], chapters[issue2.b - 1]];
+        const quoteA = verbatimQuote(issue2.claimA, x.text);
+        const quoteB = verbatimQuote(issue2.claimB, y.text);
+        return {
+          a: x.id,
+          b: y.id,
+          claimA: quoteA != null ? quoteA : issue2.claimA,
+          claimB: quoteB != null ? quoteB : issue2.claimB,
+          suggestion: issue2.suggestion,
+          ...quoteA === void 0 ? { looseA: true } : {},
+          ...quoteB === void 0 ? { looseB: true } : {}
+        };
+      });
       const findings = [
         ...references2,
-        ...found.map((issue2) => ({
-          a: chapters[issue2.a - 1].id,
-          b: chapters[issue2.b - 1].id,
-          claimA: issue2.claimA,
-          claimB: issue2.claimB,
-          suggestion: issue2.suggestion
-        })),
+        ...directionFindings(ordered),
+        ...modelFindings,
+        ...numericFindings(chapters, modelFindings),
         ...removed
       ];
       const done = await drive.store.commit((state) => applyConsistency(state, token, findings));
@@ -54872,7 +55317,6 @@ ${oldDetail}`);
                 title: candidate.title,
                 caption: candidate.caption,
                 ...candidate.description !== void 0 ? { description: candidate.description } : {},
-                ...candidate.loose ? { loose: true } : {},
                 ...candidate.author ? { author: candidate.author } : {},
                 ...candidate.license ? { license: candidate.license } : {}
               },
@@ -54896,9 +55340,13 @@ ${oldDetail}`);
     };
     let commonsAsked = 0;
     let commonsLimited = false;
+    const commonsCut = /* @__PURE__ */ new Set();
     let commonsNoHint = 0;
+    let commonsRejected = {};
+    const rounds = [];
     try {
       const round1 = await search(wanted, false, exclude);
+      rounds.push(round1);
       keepHints(round1);
       for (const [index, list2] of await probeFound(wanted, round1)) perSlot.set(index, list2);
       if (round1) {
@@ -54911,6 +55359,7 @@ ${oldDetail}`);
           ...new Set([...perSlot.values()].flatMap((list2) => list2.map((item) => imageKey(item.candidate.imageUrl))))
         ];
         const second = await search(lacking2, true, [...tried, ...exclude]);
+        rounds.push(second);
         keepHints(second);
         if (second) {
           for (const [index, list2] of await probeFound(lacking2, second))
@@ -54940,10 +55389,17 @@ ${oldDetail}`);
               };
             }),
             this.ports.fetchCommons,
-            { signal, skip: (url) => seen.has(imageKey(url)) || taken(imageKey(url)) }
+            {
+              signal,
+              skip: (url) => seen.has(imageKey(url)) || taken(imageKey(url)),
+              run: drive.commonsBudget,
+              ...this.ports.commonsQueue ? { queue: this.ports.commonsQueue } : {}
+            }
           );
           commonsAsked = commons.requests;
           commonsLimited = commons.limited;
+          commonsRejected = commons.rejected;
+          for (const index of commons.cut) commonsCut.add(index);
           commonsNoHint = lacking2.filter((slot) => {
             var _a3, _b3;
             return !((_a3 = slot.search) == null ? void 0 : _a3.length) && !((_b3 = hints.get(slot.index)) == null ? void 0 : _b3.search);
@@ -54964,7 +55420,23 @@ ${oldDetail}`);
     }
     const latest = await this.ports.readCard(path);
     if (!await this.stillOnMap(drive, nodeId)) return { kind: "failed", reason: "card_removed" };
-    const outcomes = choosePictures({ id: nodeId, title: latest.title }, slots, perSlot, taken, language2);
+    const refusedTaken = /* @__PURE__ */ new Set();
+    const outcomes = choosePictures(
+      { id: nodeId, title: latest.title },
+      slots,
+      perSlot,
+      (key4) => {
+        const used = taken(key4);
+        if (used) refusedTaken.add(key4);
+        return used;
+      },
+      language2
+    );
+    for (const index of commonsCut) {
+      const outcome = outcomes.get(index);
+      if (outcome && "reasonCode" in outcome && outcome.reasonCode === "not_found")
+        outcomes.set(index, { reasonCode: "rate_limited" });
+    }
     const claimed = [...outcomes.values()].flatMap(
       (outcome) => "figure" in outcome ? [imageKey(outcome.figure.href)] : []
     );
@@ -54979,10 +55451,6 @@ ${oldDetail}`);
       if (!outcome || !("figure" in outcome)) continue;
       const placed = (_d = ((_c = perSlot.get(slot.index)) != null ? _c : []).find((item) => item.href === outcome.figure.href)) == null ? void 0 : _d.candidate;
       if (!placed) continue;
-      if (placed.loose) {
-        off.add(slot.index);
-        continue;
-      }
       const about = `${placed.title} ${(_e = placed.description) != null ? _e : placed.caption}`;
       const words2 = askWords({ explains: slot.explains, terms: slot.search, ...hints.get(slot.index) });
       if (words2.length && !wordHits(words2, about)) off.add(slot.index);
@@ -55011,7 +55479,17 @@ ${oldDetail}`);
             missing: result.missing.length,
             ...commonsAsked ? { commons: commonsAsked } : {},
             ...commonsLimited ? { commons_limited: 1 } : {},
-            ...commonsNoHint ? { commons_nohint: commonsNoHint } : {}
+            ...commonsNoHint ? { commons_nohint: commonsNoHint } : {},
+            ...Object.fromEntries(
+              rounds.flatMap(
+                (round3, i) => round3 ? [
+                  [`r${i + 1}_found`, round3.found],
+                  [`r${i + 1}_offTopic`, round3.offTopic]
+                ] : []
+              )
+            ),
+            ...refusedTaken.size ? { taken: refusedTaken.size } : {},
+            ...Object.fromEntries(Object.entries(commonsRejected).map(([rule, n]) => [`commons_rej_${rule}`, n]))
           },
           hosts: { name: "reason", list: [...new Set(result.missing.map((item) => item.reasonCode))] }
         })
@@ -55183,12 +55661,20 @@ ${oldDetail}`);
     const structureUnmet = verdict.items.filter((item) => item.type !== "fact" && item.status === "unmet").map((item) => code2(item.id));
     const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
     const minimum = await this.pictureMinimum(drive);
-    const shortIssue = minimum !== void 0 && imageCheck.placed < minimum ? pictureShortfallToken(imageCheck.placed, minimum) : "";
+    const limited = imageCheck.issues.some((issue2) => issue2.code === "rate_limited");
+    const offIndexes = imageCheck.issues.flatMap(
+      (issue2) => issue2.code === "mismatch" && issue2.index !== void 0 ? [issue2.index] : []
+    );
+    const pictureIssue = [
+      ...minimum !== void 0 && imageCheck.placed < minimum ? [pictureShortfallToken(imageCheck.placed, minimum)] : [],
+      ...limited ? [PICTURE_LIMITED_TOKEN] : [],
+      ...offIndexes.length ? [pictureMismatchToken(offIndexes)] : []
+    ].join(" ");
     return {
       kind: "ok",
       after: async () => {
         const rewrite = verdict.aggregate === "needs-review" || !!length;
-        const stage = rewrite || shortIssue ? "needs-review" : "checked";
+        const stage = rewrite || pictureIssue ? "needs-review" : "checked";
         if (rewrite && !drive.job && autoFixesOf(drive.store.state, nodeId) === 0) {
           drive.fixable.set(nodeId, proofFixInstruction(verdict.items, [...checklist, ...BOOK_CHECKS], length));
           drive.expand.add(nodeId);
@@ -55201,7 +55687,7 @@ ${oldDetail}`);
           drive,
           nodeId,
           stage,
-          verdict.aggregate === "needs-review" ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}${shortIssue ? ` ${shortIssue}` : ""}` : lengthIssue ? `length unmet: ${[lengthIssue, ...shortIssue ? [shortIssue] : [], ...noticed].join(" ")}` : shortIssue ? `images unmet: ${[shortIssue, ...noticed].join(" ")}` : structureUnmet.length ? `structure unmet: ${noticed.join(" ")}` : noticed.length ? `image notice: ${noticed.join(" ")}` : null
+          verdict.aggregate === "needs-review" ? `${verdict.factsUnverified ? "proof unmet: facts_unverified" : `proof unmet: ${unmetIds(verdict.items)}`}${lengthIssue ? ` ${lengthIssue}` : ""}${pictureIssue ? ` ${pictureIssue}` : ""}` : lengthIssue ? `length unmet: ${[lengthIssue, ...pictureIssue ? [pictureIssue] : [], ...noticed].join(" ")}` : pictureIssue ? `images unmet: ${[pictureIssue, ...noticed].join(" ")}` : structureUnmet.length ? `structure unmet: ${noticed.join(" ")}` : noticed.length ? `image notice: ${noticed.join(" ")}` : null
         );
       }
     };
@@ -55735,10 +56221,9 @@ var PLAIN_KEY = {
 };
 function bookIssueText(issue2) {
   const pictures = splitPictureIssue(issue2);
-  if (pictures.shortfall) {
-    const sentence2 = shortfallText(pictures.shortfall);
-    return pictures.rest ? `${bookIssueText(pictures.rest)}${t("ui.book_panel_lead_sep")}${sentence2}` : sentence2;
-  }
+  const pictureText = pictureIssueText(pictures);
+  if (pictureText)
+    return pictures.rest ? `${bookIssueText(pictures.rest)}${t("ui.book_panel_lead_sep")}${pictureText}` : pictureText;
   const { rest, length } = splitLengthIssue(issue2);
   if (!length) return plainIssueText(issue2);
   const sentence = lengthText(length);
@@ -55746,6 +56231,14 @@ function bookIssueText(issue2) {
 }
 function shortfallText(shortfall) {
   return t("ui.book_reason_images_under_0_1", String(shortfall.placed), String(shortfall.minimum));
+}
+function pictureIssueText(pictures) {
+  var _a2;
+  return [
+    ...pictures.shortfall ? [shortfallText(pictures.shortfall)] : [],
+    ...pictures.limited ? [t("ui.book_reason_images_limited")] : [],
+    ...((_a2 = pictures.off) == null ? void 0 : _a2.length) ? [t("ui.book_reason_images_off_0", pictures.off.map(String).join(t("ui.argument_list_sep")))] : []
+  ].join(t("ui.book_panel_lead_sep"));
 }
 function lengthText(length) {
   const unit2 = length.unit === "\u5B57" ? t("ui.book_length_unit_chars") : t("ui.book_length_unit_words");
@@ -55852,9 +56345,13 @@ var PROBLEM_RULES = [
       var _a2;
       return ((_a2 = card.inconsistencies) == null ? void 0 : _a2.length) ? card.inconsistencies.map((item) => {
         if (item.kind === "removed") return t("ui.book_reason_removed_ref_0_1", item.theirs, item.own);
+        if (item.kind === "direction")
+          return t("ui.book_reason_direction_0_1_2_3", item.own, item.theirs, item.otherTitle, item.suggestion);
         if (item.reference)
           return t("ui.book_reason_chapter_ref_0_1_2_3", item.own, item.theirs, item.otherTitle, item.suggestion);
-        const sentence = t("ui.book_reason_inconsistent_0_1_2", item.otherTitle, item.own, item.theirs);
+        const own2 = t(item.ownLoose ? "ui.book_paraphrase_0" : "ui.book_quote_0", item.own);
+        const theirs = t(item.theirsLoose ? "ui.book_paraphrase_0" : "ui.book_quote_0", item.theirs);
+        const sentence = item.other === card.id ? t("ui.book_reason_inconsistent_self_0_1", own2, theirs) : t("ui.book_reason_inconsistent_0_1_2", item.otherTitle, own2, theirs);
         return item.suggestion ? `${sentence}${t("ui.book_panel_lead_sep")}${item.suggestion}` : sentence;
       }) : void 0;
     }
@@ -55891,10 +56388,9 @@ var plainNote = (text10) => text10.replace(/\b[CN]\d+\b\s*[:：]?/g, "").replace
 function reasonOf2(issue2, proof) {
   var _a2;
   const pictures = splitPictureIssue(issue2);
-  if (pictures.shortfall) {
-    const sentence = shortfallText(pictures.shortfall);
-    return pictures.rest ? `${reasonOf2(pictures.rest, proof)}${t("ui.book_panel_lead_sep")}${sentence}` : sentence;
-  }
+  const pictureText = pictureIssueText(pictures);
+  if (pictureText)
+    return pictures.rest ? `${reasonOf2(pictures.rest, proof)}${t("ui.book_panel_lead_sep")}${pictureText}` : pictureText;
   const { rest, length } = splitLengthIssue(issue2);
   if (length) {
     const sentence = lengthText(length);
@@ -87158,7 +87654,7 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
         this.selection.exitMultiSelect("backgroundRun");
         if (!this.closed) this.render();
         const sources = await this.batchSources((_a3 = request.referenceGroups) != null ? _a3 : [], nodes.length, current.model, signal);
-        const shared = {
+        const shared2 = {
           referenceGroups: sources.groups,
           requirements: request.requirements,
           ...request.noteStyle ? { noteStyle: request.noteStyle } : {},
@@ -87173,8 +87669,8 @@ ${input2.instruction}` : bookAuthorRequirements(input2.settings, input2.slots),
             researchDepth: (_a4 = request.researchDepth) != null ? _a4 : "normal",
             // Images the user asked for in the chat are a rule (VISUAL_ON); the dialog's Standard default lets the AI judge.
             visualMode: request.imagesRequired ? "on" : request.imageSearch ? "auto" : "off",
-            ...shared
-          } : { ...aiModeOptions(noteAiMode(note.researchMode), "research"), ...shared };
+            ...shared2
+          } : { ...aiModeOptions(noteAiMode(note.researchMode), "research"), ...shared2 };
         };
         if (retryBatchKey && ((_b3 = this.plugin.expansionBatches.get(retryBatchKey)) == null ? void 0 : _b3.status) !== "running")
           this.plugin.expansionBatches.delete(retryBatchKey);
@@ -94341,9 +94837,9 @@ var consistency_default = `You are the editor reading a finished book once more 
 
 Work through the book exhaustively, not by impression. For every subject (a plant, a tool, a material, a step, a person, a place) gather every number and amount any chapter gives about it: a duration or time until something happens, a size, depth, volume or distance, a count or spacing, a frequency, a temperature, a date, a name or the order of steps. Then compare each subject's values across all chapters, including an introduction or summary chapter that previews later ones: a preview that gives a different value from the chapter that treats it in detail is a contradiction.
 
-Report a pair of chapters when they state the same fact differently, so that a reader who follows both would be told two different things (for example one chapter says germination takes about three days and another one to two days; one says a pot 15 cm deep and another 10 cm for the same plant; one says 15 litres and another 20 litres; ranges such as 25\u201335 and 30\u201340 days that only partly overlap). Do not report a difference of wording or emphasis, a single value that lies inside the other chapter's range, or two statements about different things (another plant, another stage, another method). Do not judge whether a fact is true; only whether the chapters agree.
+Report a pair of chapters when they state the same fact differently, so that a reader who follows both would be told two different things (for example one chapter says germination takes about three days and another one to two days; one says a pot 15 cm deep and another 10 cm for the same plant; one says 15 litres and another 20 litres; ranges such as 25\u201335 and 30\u201340 days that only partly overlap). Advice that cannot both be followed is a contradiction too, even without a number (one chapter says to use a kind of soil, another to avoid it; one says to water on a fixed schedule, another to check the soil and not the calendar). Do not report a difference of wording or emphasis, a single value that lies inside the other chapter's range, or two statements about different things (another plant, another stage, another method). Do not judge whether a fact is true; only whether the chapters agree.
 
-For every contradiction return one entry: a and b are the two chapter numbers (1 is the first chapter in the list, a smaller than b); claimA quotes or closely paraphrases what chapter a says, claimB what chapter b says, each one short sentence naming the subject; suggestion is one short sentence on how to make them agree (which value to use in both, or that both should give the same range). A fact stated differently in three chapters is reported as two pairs. Report every contradiction you find, up to {{maxIssues}} entries; an empty list when the chapters agree.
+For every contradiction return one entry: a and b are the two chapter numbers (1 is the first chapter in the list, a smaller than b); claimA copies, character for character, the one sentence of chapter a that states the fact (as it stands in the text: no paraphrase, no added chapter name, no ellipsis), claimB the sentence of chapter b; suggestion is one short sentence on how to make them agree (which value to use in both, or that both should give the same range). A fact stated differently in three chapters is reported as two pairs. Report every contradiction you find, up to {{maxIssues}} entries; an empty list when the chapters agree.
 
 Write plain single-line text in every field, no Markdown. Return only JSON: {"issues":[{"a":1,"b":2,"claimA":"","claimB":"","suggestion":""}]}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.
 
@@ -94402,7 +94898,7 @@ function parseConsistency(raw, chapters) {
 }
 var consistencyStep = {
   id: "book-pipeline.consistency",
-  version: 2,
+  version: 3,
   render: (request) => {
     var _a2, _b2;
     return renderTemplate(consistency_default, {
@@ -100597,7 +101093,7 @@ ${fence}`, host, "", child);
       notesWithContent: scoped.notesWithContent,
       images: Object.keys(payload.assets).length
     };
-    const shared = {
+    const shared2 = {
       payload,
       counts,
       leakCategories,
@@ -100605,9 +101101,9 @@ ${fence}`, host, "", child);
       mermaidUndrawn: undrawn,
       mermaidBlocked: blocked
     };
-    if (leakCategories.length) return { ...shared, bytes: 0 };
+    if (leakCategories.length) return { ...shared2, bytes: 0 };
     const html = renderShareHtml(payload, ui);
-    return { ...shared, html, bytes: new TextEncoder().encode(html).length };
+    return { ...shared2, html, bytes: new TextEncoder().encode(html).length };
   }
 };
 
@@ -104402,7 +104898,7 @@ function readSecond2(value) {
     return void 0;
   const trimmed2 = quote3.normalize("NFKC").trim();
   const length = Array.from(trimmed2).length;
-  if (length < QUOTE_MIN || length > QUOTE_MAX || !claim2.trim()) return void 0;
+  if (length < QUOTE_MIN || length > QUOTE_MAX2 || !claim2.trim()) return void 0;
   try {
     const protocol = new URL(url.trim()).protocol;
     if (protocol !== "http:" && protocol !== "https:") return void 0;
@@ -104450,8 +104946,8 @@ function parseArgumentEvidence(value, needIds) {
     if (!claim2.trim()) return refuse("a found entry has no claim");
     const trimmed2 = quote3.normalize("NFKC").trim();
     const length = Array.from(trimmed2).length;
-    if (length < QUOTE_MIN || length > QUOTE_MAX || Array.from(foldText(trimmed2)).length < QUOTE_FOLDED_MIN2)
-      return refuse(`a quote must be ${QUOTE_MIN} to ${QUOTE_MAX} characters of real text`);
+    if (length < QUOTE_MIN || length > QUOTE_MAX2 || Array.from(foldText(trimmed2)).length < QUOTE_FOLDED_MIN2)
+      return refuse(`a quote must be ${QUOTE_MIN} to ${QUOTE_MAX2} characters of real text`);
     let protocol = "";
     try {
       protocol = new URL(url.trim()).protocol;
@@ -107132,8 +107628,13 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       // requestUrl has no abort: searchCommons races its own timeout. Only the Commons API is asked (the address is built by the program).
       fetchCommons: async (url) => {
         if (!url.startsWith(`${COMMONS_API}?`)) throw new Error("refused");
-        const response = await (0, import_obsidian52.requestUrl)({ url, method: "GET", throw: false });
-        return { status: response.status, text: response.text };
+        const response = await (0, import_obsidian52.requestUrl)({
+          url,
+          method: "GET",
+          headers: { "Api-User-Agent": `VisualAgentMap-Obsidian-plugin/${this.manifest.version}` },
+          throw: false
+        });
+        return { status: response.status, text: response.text, headers: response.headers };
       },
       author: async (input2) => {
         const view = this.views().find((item) => item.mapPath === input2.mapPath);

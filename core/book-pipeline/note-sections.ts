@@ -11,7 +11,9 @@ import {
   SECTION_NAME
 } from "../../ai/section-aliases";
 import { NOTE_LANGUAGES, translate, translateNote, type ContentLanguage } from "../../i18n";
+import type { BookRole } from "./model";
 import { isBookPlanTitle } from "./plan-text";
+import { headingNamesChapter, isProcessNoteSentence, sentencesOf, sentenceNamesChapters } from "./prose-checks";
 import { demoteHeadings } from "./text";
 import { findProofModels, findProofRecord, PROOF_STATUSES, type ProofItemResult, type ProofResult } from "./proof";
 
@@ -1181,21 +1183,161 @@ const dropEchoes = (text: string, sent: string): string =>
     .trim();
 
 /**
+ * A line that only says the answer adds nothing (the 2026-11-20 v4 run put the model's 「本次無新增內容。」 into the intro as prose):
+ * 「本次無新增內容」「無需修改」「本章没有新增内容」 "No new content." "Nothing to add.", brackets, quotes and end marks aside.
+ */
+export function isNoOpLine(line: string): boolean {
+  const text = line
+    .trim()
+    .replace(/^[>\s*_（(「『"'-]+|[\s。．.!！）)」』"'*_]+$/gu, "")
+    .trim();
+  if (!text || Array.from(text).length > 40) return false;
+  return (
+    /^(?:本次|此次|這次|这次|本章|本節|本节|這裡|这里)?(?:並|并)?(?:無|无|沒有|没有|不需|不須|无需|無需|毋須|毋须|不用|未)(?:任何)?(?:新增|新的|需要|要|作)?(?:的)?(?:內容|内容|修改|修正|更動|更动|更改|補充|补充|變更|变更|調整|调整|改動|改动)(?:之處|之处)?(?:可(?:新增|補充|补充))?$/u.test(
+      text
+    ) ||
+    /^(?:there is |there are )?(?:no (?:new content|new text|additions?|changes?|edits?)(?: (?:is |are )?(?:needed|required|necessary|to add|this time))?|nothing (?:new )?to (?:add|change))$/i.test(
+      text
+    )
+  );
+}
+const dropNoOps = (text: string): string =>
+  text
+    .split("\n")
+    .filter(line => !isNoOpLine(line))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+/** A heading that says nothing of its own: a supplement, the small details, what the preview did not finish (the v4 run's 「土壤與容器：預告裡沒講完的小細節」). */
+const GENERIC_HEADING =
+  /預告|预告|沒講完|没讲完|未講完|未讲完|小細節|小细节|(?:^|[:：、\s])(?:補充|补充)(?:說明|说明|資料|资料|內容|内容)?$|^(?:其他|其它|更多細節|更多细节|補遺|补遗)$|^(?:more details|additional (?:notes?|details?|information)|miscellaneous|extra notes?|other notes?)$/iu;
+export const isGenericHeading = (heading: string): boolean =>
+  GENERIC_HEADING.test(
+    heading
+      .replace(/^[ \t]*#{1,6}[ \t]+/, "")
+      .replace(/[ \t]*#*[ \t]*$/, "")
+      .trim()
+  );
+/** Where an expansion stands in the book: the chapter's role and the other chapters' titles (what it must not cover). */
+export interface ExpandScope {
+  role?: BookRole;
+  others?: readonly string[];
+}
+const PREVIEW_WORD = /預告|预告/u;
+/**
+ * The new text of one insertion with what does not deepen the chapter left out: a section (heading and its paragraphs) whose heading is
+ * generic or repeats a heading the chapter has (or an earlier insertion added); for an intro or closing chapter also a section that
+ * names another chapter (heading or text) or previews, and a paragraph outside a section that does. `seen` collects the heading keys kept.
+ */
+function keepOwnSections(text: string, seen: Set<string>, scope: ExpandScope): string {
+  const guide = scope.role === "intro" || scope.role === "closing";
+  const others = scope.others ?? [];
+  const names = (part: string): boolean => PREVIEW_WORD.test(part) || sentenceNamesChapters(part, others).length > 0;
+  const lines = text.split("\n");
+  const out: string[] = [];
+  let lead: string[] = [];
+  const flushLead = (): void => {
+    const paragraphs = lead.join("\n").split(/\n[ \t]*\n/);
+    out.push(
+      ...paragraphs
+        .filter(paragraph => !(guide && names(paragraph)))
+        .join("\n\n")
+        .split("\n")
+    );
+    lead = [];
+  };
+  for (let i = 0; i < lines.length;) {
+    if (!HEADING.test(lines[i])) {
+      lead.push(lines[i]);
+      i++;
+      continue;
+    }
+    flushLead();
+    let end = i + 1;
+    while (end < lines.length && !HEADING.test(lines[end])) end++;
+    const heading = lines[i];
+    const section = lines.slice(i, end);
+    const key = headingKey(heading);
+    const bad =
+      seen.has(key) ||
+      isGenericHeading(heading) ||
+      (guide && (!!headingNamesChapter(heading, others) || names(section.join("\n"))));
+    if (!bad) {
+      seen.add(key);
+      out.push(...section);
+    }
+    i = end;
+  }
+  flushLead();
+  return out
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+/** The heading keys of a Detail's chapter text (what an inserted heading must not repeat). */
+function chapterHeadingKeys(detail: string): Set<string> {
+  const lines = detail.replace(/\r\n?/g, "\n").split("\n");
+  const region = chapterRegion(lines);
+  const fenced = fencedLines(lines);
+  return new Set(lines.filter((line, i) => region[i] && !fenced[i] && HEADING.test(line)).map(headingKey));
+}
+
+/**
+ * A Detail with the self-contained process notes taken out of its chapter text (after the automatic fix, when the author left a flagged
+ * sentence such as 「現有資料不足，我沒有查到可靠的官方建議，所以這裡只分享常見的家庭做法，請當作參考。」): each sentence that is only a process
+ * note ({@link isProcessNoteSentence}) goes; a line left empty goes. Headings, hidden records, callouts, pictures and system sections
+ * stay. A sentence that carries a fact (a number, a link) stays, so the proofread flags it again and the chapter needs a person.
+ */
+export function dropProcessNotes(detail: string): { detail: string; removed: string[] } {
+  const crlf = detail.includes("\r\n");
+  const lines = (crlf ? detail.replace(/\r\n/g, "\n") : detail).split("\n");
+  const region = chapterRegion(lines);
+  const fenced = fencedLines(lines);
+  const removed: string[] = [];
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const sentences = region[i] && !fenced[i] && !HEADING.test(line) ? sentencesOf(line) : [];
+    if (!sentences.some(isProcessNoteSentence)) {
+      out.push(line);
+      continue;
+    }
+    const prefix = /^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?/.exec(line)?.[0] ?? "";
+    const rest = sentencesOf(line.slice(prefix.length));
+    removed.push(...rest.filter(isProcessNoteSentence));
+    const kept = rest
+      .filter(sentence => !isProcessNoteSentence(sentence))
+      .join(/\p{Script=Han}/u.test(line) ? "" : " ");
+    if (kept) out.push(prefix + kept);
+    // A line left empty goes with the blank line after it, so no double blank is left.
+    else if (i + 1 < lines.length && !lines[i + 1].trim() && (!out.length || !out[out.length - 1].trim())) i++;
+  }
+  if (!removed.length) return { detail, removed };
+  const text = out.join("\n");
+  return { detail: crlf ? text.replace(/\n/g, "\r\n") : text, removed };
+}
+
+/**
  * The automatic redo of a chapter, done by the program: the author's answer (`newDetail`, already cleaned) carries only change blocks,
  * which go into the chapter as it was (`oldDetail`); the source entries the answer added join the chapter's Sources section. Lines that
- * echo the request (`sent`, see {@link isEchoedLine}) are left out of every block. Undefined when no block applies (an answer with no
+ * echo the request (`sent`, see {@link isEchoedLine}) or only say nothing was added ({@link isNoOpLine}) are left out of every block, and an
+ * insertion keeps only the sections that deepen this chapter (see `keepOwnSections`; `scope` is its role and the other chapters' titles). Undefined when no block applies (an answer with no
  * block line, or blocks that match nothing): the caller keeps the chapter as it was; a whole chapter is never put in.
  */
 export function expandChapterDetail(
   oldDetail: string,
   newDetail: string,
   language: string,
-  sent = ""
+  sent = "",
+  scope: ExpandScope = {}
 ): { detail: string; applied: number } | undefined {
   const parsed = parseChapterEdits(chapterBody(newDetail));
   if (!parsed) return undefined;
+  const seen = chapterHeadingKeys(oldDetail);
   const edits = parsed.flatMap((edit): ChapterEdit[] => {
-    const text = dropEchoes(edit.text, sent);
+    const plain = dropNoOps(dropEchoes(edit.text, sent));
+    const text = edit.kind === "insert" ? keepOwnSections(plain, seen, scope) : plain;
     // An insertion that was only an echo is no insertion; a replacement that became empty would delete the passage, so it goes too.
     if (!text && (edit.kind === "insert" || edit.text.trim())) return [];
     return [{ ...edit, text }];

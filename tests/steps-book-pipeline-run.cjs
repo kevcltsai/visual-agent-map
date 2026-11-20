@@ -2643,13 +2643,15 @@ test('fix in place: a redo whose blocks would drop a placed picture or cut the c
 
 test('fix in place: mixed reasons (a fact, research voice and too long) ask for change blocks in one request; @@replace blocks fix the lines and shorten', async () => {
   const long = `澆水段落${'好'.repeat(60)}`;
-  const { r, fix, detail } = await v1Rig(['@@replace', V1_LINE, '@@with', '常見的做法有兩種。', '@@replace', long, '@@with', '澆水段落，早晚各一次。'].join('\n'), { V1: 'unmet', C2: 'unmet' });
+  // The shorter passage keeps the chapter at the minimum (after the fix round the minimum itself holds; see the strict length test).
+  const shorter = `澆水段落，早晚各一次${'好'.repeat(20)}。`;
+  const { r, fix, detail } = await v1Rig(['@@replace', V1_LINE, '@@with', '常見的做法有兩種。', '@@replace', long, '@@with', shorter].join('\n'), { V1: 'unmet', C2: 'unmet' });
   assert.ok(fix);
   assert.match(fix.instruction, /failed the fact check on these points \(JSON strings; correct each with a @@replace block/);
   assert.match(fix.instruction, /note V1/);
   assert.doesNotMatch(fix.instruction, /rewrite the chapter/);
   assert.match(fix.requirements, /^Correction/);
-  assert.ok(!detail.includes(V1_LINE) && !detail.includes(long) && detail.includes('澆水段落，早晚各一次。') && detail.includes('![p](https://img.example/p.png)'), detail);
+  assert.ok(!detail.includes(V1_LINE) && !detail.includes(long) && detail.includes(shorter) && detail.includes('![p](https://img.example/p.png)'), detail);
   assert.equal(stageOf(r.raw(1)), 'checked');
 });
 
@@ -2665,6 +2667,35 @@ test('fix in place: an expansion line that echoes the request is dropped (the li
   const detail = (await r.note(1)).detail;
   assert.ok(detail.includes(added), detail);
   assert.ok(!detail.includes('本章結構以既有標題為準') && !detail.includes('voice and terms'), detail);
+});
+
+test('fix in place (live v4): a process note the expansion leaves in is deleted by the program; the redo is told the role and the other chapters as "do not cover"', async () => {
+  const seen = [];
+  const r = await lenRig();
+  const note = '至於一天中什麼時候採，現有資料不足，我沒有查到可靠的官方建議，所以這裡只分享常見的家庭做法，請當作參考。';
+  const kept = `很多人習慣在早上或傍晚採葉菜${'好'.repeat(140)}。`;
+  r.script.author = expandAuthor(r, seen, ['@@insert after: ### 土壤', '### 採收時間', '', note + kept].join('\n'));
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const fix = seen.filter(input => input.nodeId === r.nodes[1].id)[1];
+  assert.match(fix.requirements, /This chapter's role: /);
+  assert.match(fix.requirements, /Do not cover \(each has its own chapter; JSON strings\): "/);
+  assert.ok(!fix.requirements.includes(`Do not cover (each has its own chapter; JSON strings): ${JSON.stringify((await r.note(1)).title)}`), 'its own title is not listed');
+  const detail = (await r.note(1)).detail;
+  assert.ok(!detail.includes('現有資料不足') && !detail.includes('沒有查到') && detail.includes(kept) && detail.includes('### 採收時間'), detail);
+});
+
+test('T10c length (strict after the fix round): an expansion that lands between 0.8x and the minimum is not silently accepted: needs-review with the length reason; the redo asked for the minimum at least', async () => {
+  const seen = [];
+  const r = await lenRig();
+  r.script.author = expandAuthor(r, seen, ['@@insert after: ### 土壤', '### 排水', '', `排水段落${'好'.repeat(58)}`].join('\n'));
+  await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath);
+  const fix = seen.filter(input => input.nodeId === r.nodes[1].id)[1];
+  assert.match(fix.requirements, /never less than \d+ characters \(字\) \(the whole chapter must reach at least 100 characters \(字\)/);
+  assert.ok((await r.note(1)).detail.includes('### 排水'), 'the expansion was put in');
+  const issue = (await r.note(1)).pipelineIssue;
+  const m = /length:under:(\d+):100-200/.exec(issue);
+  assert.ok(m && Number(m[1]) >= 80 && Number(m[1]) < 100, issue);
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
 });
 
 test('T10c length expand: the redo keeps the card\'s Summary (keepSummary reaches the author only for the expansion)', async () => {

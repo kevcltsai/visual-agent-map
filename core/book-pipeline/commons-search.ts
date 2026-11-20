@@ -2,9 +2,11 @@
  * The program's own picture search (no model call): a Wikimedia Commons file search for the picture slots the finder left without a
  * usable picture. At most {@link COMMONS_REQUESTS_PER_SLOT} requests a slot, each raced against {@link COMMONS_REQUEST_MS}, and no new
  * request after {@link COMMONS_CHAPTER_MS} for the chapter. The answers go through the same rules as the finder's (file page source,
- * the subject rule); the caller probes them and dedupes by address and work as for any candidate.
+ * the subject rule); the caller probes them and dedupes by address and work as for any candidate. Only photographs and drawings are
+ * taken (never a page of a PDF, DjVu or TIFF scan), and only a file whose title, description or categories name what the slot asks for.
  */
-import { bySubject, fileSourceOf } from "./image-quality";
+import { askWords, wordHits, wrongGenre } from "./file-fit";
+import { bySubject, fileSourceOf, isDocumentFile } from "./image-quality";
 
 /** The only address the search asks (the port refuses any other). */
 export const COMMONS_API = "https://commons.wikimedia.org/w/api.php";
@@ -15,8 +17,13 @@ export const COMMONS_CHAPTER_MS = 45_000;
 const QUERY_MAX = 80;
 const CREDIT_MAX = 100;
 const CAPTION_MAX = 200;
-/** What a book may show: the raster types the finder is held to (an SVG drawing only through its PNG thumbnail). */
-const SAFE_MIME = /^image\/(?:jpeg|png|gif|webp)$/i;
+const DESCRIPTION_MAX = 300;
+/** The file types a book may take from Commons: photographs and drawings (an SVG only through its PNG thumbnail). */
+const FILE_MIME = /^image\/(?:jpeg|png|webp|svg\+xml)$/i;
+/** What the book shows: the thumbnail's type. */
+const SHOWN_MIME = /^image\/(?:jpeg|png|webp)$/i;
+/** A file must name at least this many of the slot's words (all of them when the slot has fewer). */
+const FIT_HITS = 2;
 
 export interface CommonsResponse {
   status: number;
@@ -28,6 +35,8 @@ export type CommonsFetch = (url: string) => Promise<CommonsResponse>;
 /** A slot as the fallback sees it, with what the finder said about it (its subject, its English search words). */
 export interface CommonsSlot {
   index: number;
+  /** The plan's kind line (a photo slot refuses book covers, printed pages and maps). */
+  kind?: string;
   explains: string;
   subject?: string;
   search?: string;
@@ -37,6 +46,8 @@ export interface CommonsCandidate {
   url: string;
   source: string;
   caption: string;
+  /** What the file page says about the file: its description and categories (plain text, capped). */
+  description: string;
   author?: string;
   license?: string;
 }
@@ -54,7 +65,7 @@ export function commonsSearchUrl(query: string): string {
     prop: "imageinfo",
     iiprop: "url|mime|thumbmime|extmetadata",
     iiurlwidth: "1280",
-    iiextmetadatafilter: "Artist|LicenseShortName"
+    iiextmetadatafilter: "Artist|LicenseShortName|ImageDescription|Categories"
   };
   const pairs = Object.entries(params).map(([key, value]) => `${key}=${encodeURIComponent(value)}`);
   return `${COMMONS_API}?${pairs.join("&")}`;
@@ -72,8 +83,8 @@ export function commonsQueries(slot: CommonsSlot): string[] {
   return [...new Set(all)].slice(0, COMMONS_REQUESTS_PER_SLOT);
 }
 
-/** File page HTML credit (`<a …>Name</a>`) as one plain line. */
-function plainCredit(value: unknown): string {
+/** File page HTML (`<a …>Name</a>`) as one plain line, capped. */
+function plainCredit(value: unknown, max = CREDIT_MAX): string {
   if (typeof value !== "string") return "";
   return value
     .replace(/<[^>]*>/g, " ")
@@ -85,10 +96,13 @@ function plainCredit(value: unknown): string {
     .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, CREDIT_MAX);
+    .slice(0, max);
 }
 
-/** One search answer as candidates in search order: safe image types, an https thumbnail, the file page as source, the subject rule. */
+/**
+ * One search answer as candidates in search order: a photograph or drawing (no document page), an https thumbnail, the file page as
+ * source, the subject rule, a file that names what the slot asks for, and for a photo slot no print genre or map.
+ */
 export function parseCommonsAnswer(text: string, slot: CommonsSlot): CommonsCandidate[] {
   let parsed: { query?: { pages?: unknown } };
   try {
@@ -107,23 +121,32 @@ export function parseCommonsAnswer(text: string, slot: CommonsSlot): CommonsCand
     const info = Array.isArray(page.imageinfo) ? (page.imageinfo[0] as Record<string, unknown> | undefined) : undefined;
     if (!info || typeof page.title !== "string") continue;
     const url = typeof info.thumburl === "string" ? info.thumburl : typeof info.url === "string" ? info.url : "";
-    const mime = typeof info.thumbmime === "string" ? info.thumbmime : info.mime;
-    if (!/^https:\/\//.test(url) || typeof mime !== "string" || !SAFE_MIME.test(mime)) continue;
+    const shown = typeof info.thumbmime === "string" ? info.thumbmime : info.mime;
+    if (typeof info.mime !== "string" || !FILE_MIME.test(info.mime)) continue;
+    if (!/^https:\/\//.test(url) || typeof shown !== "string" || !SHOWN_MIME.test(shown)) continue;
     if (typeof info.descriptionurl !== "string") continue;
+    if ([url, page.title, info.url].some(value => typeof value === "string" && isDocumentFile(value))) continue;
     const meta = (info.extmetadata ?? {}) as Record<string, { value?: unknown } | undefined>;
     const author = plainCredit(meta.Artist?.value);
     const license = plainCredit(meta.LicenseShortName?.value);
+    const categories = plainCredit(meta.Categories?.value, DESCRIPTION_MAX).replace(/\|/g, "; ");
+    const about = plainCredit(meta.ImageDescription?.value, DESCRIPTION_MAX);
     const title = page.title
       .replace(/^File:/i, "")
       .replace(/\.[a-z0-9]{2,5}$/i, "")
       .replace(/_/g, " ")
       .trim();
+    if (wrongGenre(slot.kind, `${title} ${categories}`)) continue;
+    const words = askWords(slot);
+    if (wordHits(words, `${title} ${about} ${categories}`) < Math.min(FIT_HITS, words.length) || !words.length)
+      continue;
     const candidate = fileSourceOf<CommonsCandidate>({
       title: title || page.title,
       url,
       source: info.descriptionurl,
       // The program writes no caption of its own: the slot's line (in the book's language) says what the picture is for.
       caption: slot.explains.replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX),
+      description: [about, categories].filter(Boolean).join(" · ").slice(0, DESCRIPTION_MAX),
       ...(author ? { author } : {}),
       ...(license ? { license } : {})
     });

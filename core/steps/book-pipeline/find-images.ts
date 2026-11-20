@@ -33,6 +33,8 @@ export interface FindImagesRequest extends BookStepBase {
 /** One offered picture: the shared candidate plus the one plain line the finder wrote about it. */
 export interface FoundImage extends ImageCandidate {
   caption: string;
+  /** What the file page says about the file (only the program's Commons search sets it). */
+  description?: string;
   /** Creator and license, only when the finder reported them from the source page (never filled in by the program). */
   author?: string;
   license?: string;

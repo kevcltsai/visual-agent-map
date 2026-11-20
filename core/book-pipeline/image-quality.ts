@@ -138,3 +138,6 @@ export function workKey(imageUrl: string, author: string | undefined): string | 
   if (stem.replace(/ /g, "").length < 4) return undefined;
   return `work:${stem}|${who}`;
 }
+
+/** A page of a document file (PDF, DjVu, TIFF scan) or a thumbnail made from one (`….pdf/page1-960px-….jpg`): never a book picture. */
+export const isDocumentFile = (url: string): boolean => /\.(?:pdf|djvu?|tiff?)(?:[/?#]|$)|\/page\d+-\d*px-/i.test(url);

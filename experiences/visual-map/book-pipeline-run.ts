@@ -18,6 +18,7 @@ import { createBudgetAdmission, createStoreBudgetPort } from "../../core/book-pi
 import { imageKey } from "../../core/book-pipeline/image-dedupe";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
 import { searchCommons, type CommonsFetch } from "../../core/book-pipeline/commons-search";
+import { askWords, wordHits } from "../../core/book-pipeline/file-fit";
 import {
   PipelineStore,
   addBudget,
@@ -2905,6 +2906,7 @@ export class BookPipelineRuns {
               sourceUrl: candidate.source,
               title: candidate.title,
               caption: candidate.caption,
+              ...(candidate.description !== undefined ? { description: candidate.description } : {}),
               ...(candidate.author ? { author: candidate.author } : {}),
               ...(candidate.license ? { license: candidate.license } : {})
             },
@@ -2953,7 +2955,12 @@ export class BookPipelineRuns {
             ...[...perSlot.values()].flatMap(list => list.map(item => imageKey(item.candidate.imageUrl)))
           ]);
           const commons = await searchCommons(
-            lacking.map(slot => ({ index: slot.index, explains: slot.explains, ...hints.get(slot.index) })),
+            lacking.map(slot => ({
+              index: slot.index,
+              kind: slot.kind,
+              explains: slot.explains,
+              ...hints.get(slot.index)
+            })),
             this.ports.fetchCommons,
             { signal, skip: url => seen.has(imageKey(url)) || taken(imageKey(url)) }
           );
@@ -2988,12 +2995,24 @@ export class BookPipelineRuns {
         : []
     );
     for (const key of works) drive.usedWorks.set(key, nodeId);
+    // A placed file whose title and description (the finder's caption for its own pictures) name none of the words its slot asks
+    // for is recorded as off its text: the proof then reports it as a mismatch without asking a model.
+    const off = new Set<number>();
+    for (const slot of slots) {
+      const outcome = outcomes.get(slot.index);
+      if (!outcome || !("figure" in outcome)) continue;
+      const placed = (perSlot.get(slot.index) ?? []).find(item => item.href === outcome.figure.href)?.candidate;
+      if (!placed) continue;
+      const about = `${placed.title} ${placed.description ?? placed.caption}`;
+      const words = askWords({ explains: slot.explains, ...hints.get(slot.index) });
+      if (words.length && !wordHits(words, about)) off.add(slot.index);
+    }
     const release = (): void => {
       for (const key of claimed) drive.usedImages.delete(key);
       for (const key of works) drive.usedWorks.delete(key);
     };
     try {
-      const result = await this.writeFilled(latest, slots, outcomes, language, authorize);
+      const result = await this.writeFilled(latest, slots, outcomes, language, authorize, off);
       if (typeof result === "string") {
         release();
         return { kind: "failed", reason: result };
@@ -3065,7 +3084,8 @@ export class BookPipelineRuns {
     slots: readonly ImageSlot[],
     outcomes: ReadonlyMap<number, SlotOutcome>,
     language: string,
-    authorize: () => boolean
+    authorize: () => boolean,
+    off?: ReadonlySet<number>
   ): Promise<FillResult | string> {
     const result = fillSlotMarkers(latest.detail, slots, outcomes);
     const bad = verifyFill(latest.detail, result, slots);
@@ -3073,7 +3093,7 @@ export class BookPipelineRuns {
     // The exit check: nothing but the placed addresses may be an image in what this write adds.
     if (this.exitCheck(result.added.join("\n"), new Set(result.placed.map(item => item.href)))) return "slots_unsafe";
     const withSources = addPictureSources(result.text, result.sources, language);
-    const slotted = slots.length ? replaceResearchRecord(withSources, composeSlotsRecord(result)) : withSources;
+    const slotted = slots.length ? replaceResearchRecord(withSources, composeSlotsRecord(result, off)) : withSources;
     // The slot fill is the program's own change of the text: its fingerprint follows only if the text it started from still had it.
     const detail = programStamp(latest.detail, slotted);
     if (detail === latest.detail) return result;

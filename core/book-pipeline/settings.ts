@@ -3,7 +3,7 @@
  * frontmatter wins; a field the owner left empty takes the editorial decision saved in the root's `## 全書企劃` section.
  * Planning and writing both call this, never a private merge.
  */
-import type { ImageSlot } from "./image-slots";
+import { MAX_IMAGE_SLOTS, type ImageSlot } from "./image-slots";
 import { BOOK_SETTING_FIELDS, type BookSettings } from "./model";
 import { hashText, singleLine } from "./text";
 
@@ -149,40 +149,44 @@ export function lengthRange(
   return { min: one.min, max: one.max, unit: one.unit };
 }
 
-export interface ImageRange {
+export interface ImageCountRange {
   min: number;
   max: number;
 }
-const IMG_UNIT = "(?:張|幅|images?|pictures?|photos?|illustrations?|figures?)(?![A-Za-z])";
-const IMG_RANGE = new RegExp(
-  `(?<![\\d.])(\\d+)\\s*(?:${IMG_UNIT})?\\s*(?:[–\\-~～至到—]|\\bto\\b)\\s*(\\d+)\\s*${IMG_UNIT}`,
+const PICTURE_WORD =
+  "(?:圖片|图片|配圖|配图|插圖|插图|圖像|图像|照片|圖|图|images?|pictures?|illustrations?|photos?|figures?)";
+const COUNT_SEP = "\\s*(?:[–\\-~至到—]|\\bto\\b)\\s*";
+const COUNT = `(\\d{1,2})(?:${COUNT_SEP}(\\d{1,2}))?`;
+/** `6–10 張(圖)`, `8 張圖片`, `6 to 10 pictures`. */
+const COUNT_THEN_UNIT = new RegExp(
+  `(?<![\\d.,])${COUNT}(?:\\s*(?:張|张|幅)|\\s+${PICTURE_WORD}(?![A-Za-z]))`,
   "giu"
 );
-const IMG_APPROX = new RegExp(`(?:大約|大约|約|约|about|around|approx(?:imately)?\\.?)\\s*(\\d+)\\s*${IMG_UNIT}`, "giu");
+/** `圖片 6–10`, `配圖：6 到 10 張`: a count right after a picture word, not followed by a length unit. */
+const UNIT_THEN_COUNT = new RegExp(
+  `${PICTURE_WORD}\\s*[:：]?\\s*(?:每章\\s*)?${COUNT}(?![\\d.,]|\\s*(?:個)?\\s*(?:字|words?))`,
+  "giu"
+);
+const HAS_PICTURE_WORD = new RegExp(PICTURE_WORD, "iu");
+
 /**
- * The pictures per chapter the owner asked for in a setting, or undefined. `N–M 張|images` (separators – - ~ ～ 至 到 —) is a range;
- * `約 N 張` is N +-20% (at least 1). More than one range, an inverted one or a zero or very large value is not guessed: undefined.
+ * The pictures per chapter the owner asked for in any whole-book setting (「每章圖片 6–10 張」, "6 to 10 pictures"), or undefined
+ * (the planner decides by role). A single number is an exact count; the maximum is capped at {@link MAX_IMAGE_SLOTS}. Two different
+ * counts, an inverted range or a field with no picture word are not guessed: undefined.
  */
-export function imageRange(text: string | undefined): ImageRange | undefined {
-  const value = (text ?? "").normalize("NFKC");
-  if (!value.trim()) return undefined;
-  const found: ImageRange[] = [];
-  for (const m of value.matchAll(IMG_RANGE)) found.push({ min: Number(m[1]), max: Number(m[2]) });
-  for (const m of value.replace(IMG_RANGE, " ").matchAll(IMG_APPROX)) {
-    const n = Number(m[1]);
-    found.push({ min: Math.max(1, Math.round(n * 0.8)), max: Math.max(1, Math.round(n * 1.2)) });
+export function imageCountRange(settings: BookSettings): ImageCountRange | undefined {
+  const found = new Set<string>();
+  for (const field of BOOK_SETTING_FIELDS) {
+    const value = (settings[field] ?? "").normalize("NFKC");
+    if (!HAS_PICTURE_WORD.test(value)) continue;
+    for (const pattern of [COUNT_THEN_UNIT, UNIT_THEN_COUNT])
+      for (const m of value.matchAll(pattern)) found.add(`${m[1]}-${m[2] ?? m[1]}`);
   }
-  if (found.length !== 1) return undefined;
-  const { min, max } = found[0];
-  return min >= 1 && max >= min && max <= 100 ? { min, max } : undefined;
-}
-/** The picture count range from the whole-book settings: the first field that states one (the style field first, where it is usually typed). */
-export function imageRangeOf(settings: BookSettings): ImageRange | undefined {
-  for (const field of ["style", "goal", "angle", "tone", "reader", "length"] as const) {
-    const range = imageRange(settings[field]);
-    if (range) return range;
-  }
-  return undefined;
+  if (found.size !== 1) return undefined;
+  const [min, max] = [...found][0].split("-").map(Number);
+  if (min > max || max < 1) return undefined;
+  const top = Math.min(max, MAX_IMAGE_SLOTS);
+  return { min: Math.min(min, top), max: top };
 }
 
 const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu;

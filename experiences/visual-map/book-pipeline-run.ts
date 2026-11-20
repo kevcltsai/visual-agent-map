@@ -138,6 +138,7 @@ import {
   residualMarkerLines,
   scanSlotMarkers,
   verifyFill,
+  MAX_IMAGE_SLOTS,
   type FillResult,
   type ImageSlot,
   type ProbedCandidate,
@@ -601,10 +602,8 @@ function noPicture(language: string, reason: string): string {
   const text = known ? known[zh ? 0 : 1] : escapeMarkdownText(reason, 60) || (zh ? "載入失敗" : "load failed");
   return zh ? `${NO_PICTURE}${text}` : `No picture: ${text}`;
 }
-/** Picture probes of one chapter (at most 24 distinct addresses: 8 slots of 3 candidates) and probes in flight in the whole run. */
-export const PROBE_PER_CHAPTER = 24;
-/** Candidates the finder returns per slot at most; a chapter with more than eight slots probes this many for each. */
-export const PROBE_PER_SLOT = 3;
+/** Picture probes of one chapter (at most 36 distinct addresses: {@link MAX_IMAGE_SLOTS} slots of 3 candidates) and probes in flight in the whole run. */
+export const PROBE_PER_CHAPTER = MAX_IMAGE_SLOTS * 3;
 export const PROBE_PARALLEL = 4;
 const SEARCH_TEXT_MAX = 400;
 /** The chapter's search text: its title, summary and (at most five) `《work》` names from the text, one line with no address in it. */
@@ -2608,7 +2607,7 @@ export class BookPipelineRuns {
         index: slot.index,
         items: (from?.bySlot.get(slot.index) ?? []).map(candidate => {
           const href = safeHref(candidate.url);
-          if (href && !probes.has(href) && probes.size < Math.max(PROBE_PER_CHAPTER, slots.length * PROBE_PER_SLOT))
+          if (href && !probes.has(href) && probes.size < PROBE_PER_CHAPTER)
             probes.set(href, this.probeGated(drive, href));
           return { candidate, href };
         })

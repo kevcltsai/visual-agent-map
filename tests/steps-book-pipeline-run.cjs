@@ -4097,7 +4097,9 @@ test('R1 T1: a chapter that ends needs-review (author check unmet) still gets it
 
 // ---- R2 diagnostic reset: the AI slot lifecycle as invariants (I1-I4), checked after every combination of proof result, fix outcome, stop and budget ----
 const { checkAiProofInvariants } = require('./support-ai-proof-invariants.cjs');
-const invariantsOf = async (r, v, extra = {}) => checkAiProofInvariants(await r.state(), { stageOf: id => stageOf(r.raw(r.nodes.findIndex(n => n.id === id))), page: pageText(v), ...extra });
+const { aiProofKey, aiProofBody } = S.load('core/book-pipeline/ai-proof.ts');
+const currentKeys = async r => { const s = await r.state(); const keys = {}; for (const [i, n] of r.nodes.entries()) if (i > 0) { const note = await r.repo.readNote(n.path); keys[n.id] = aiProofKey(s.revisions[n.id] ?? 0, aiProofBody(chapterBody(note.detail))); } return keys; };
+const invariantsOf = async (r, v, extra = {}) => checkAiProofInvariants(await r.state(), { stageOf: id => stageOf(r.raw(r.nodes.findIndex(n => n.id === id))), page: pageText(v), keys: await currentKeys(r), ...extra });
 const plain = value => JSON.parse(JSON.stringify(value));
 const idA = r => r.nodes[1].id;
 const quoteOf = (request, from = 0, to = 11) => request.body.slice(from, to);
@@ -4199,3 +4201,23 @@ for (const [how, at] of [['stop', 'proof'], ['stop', 'fix'], ['budget', 'fix']])
     same(await invariantsOf(r, v, { applied: { [idA(r)]: ['Corrected b'] } }), [], 'finished');
   });
 }
+
+// ---- R4: the chapter AI proofread waits for the author side to settle (a queued automatic redo), and a stale slot is proofread again ----
+test('R4 combo: a needs-review chapter is rewritten by its one automatic redo BEFORE its chapter AI proofread; the AI fix stays in the final text (I5)', async () => {
+  const v = pageVault(); const events = []; let fixed = false;
+  const r = await aiRig({
+    ...factCard,
+    proof: async request => verdictOf(request, 'unmet', 'bad'),
+    author: async input => { events.push(`author:${input.nodeId}`); return writeAs(r, [])(input); },
+    aiProof: async request => { events.push(`ai:${request.title}`); return { checks: [request.title === 'SecretTitleA' && !fixed ? probOf(request) : okCheck(request)], prior: [], dropped: {} }; },
+    aiFix: async request => { fixed = true; return [{ id: 'P1', quote: request.chapters[0].text.slice(0, 11), replacement: 'Corrected b' }]; }
+  }, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  const lastAuthor = events.lastIndexOf(`author:${idA(r)}`);
+  const firstAi = events.indexOf('ai:SecretTitleA');
+  assert.ok(events.filter(e => e === `author:${idA(r)}`).length >= 2, `the automatic redo ran: ${events.join(',')}`);
+  assert.ok(lastAuthor >= 0 && firstAi > lastAuthor, `the chapter AI proofread came after the last author write: ${events.join(',')}`);
+  assert.ok(r.raw(1).includes('Corrected b'), 'the AI fix is in the final text');
+  assert.equal((await r.state()).phase, 'done');
+  same(await invariantsOf(r, v, { applied: { [idA(r)]: ['Corrected b'] } }), []);
+});

@@ -66,6 +66,7 @@ import {
   cardRevision,
   confirmGate1,
   finishRun,
+  invalidateStaleAiChapters,
   isCurrent,
   newBookPipeline,
   nextActions,
@@ -2246,8 +2247,10 @@ export class BookPipelineRuns {
         await this.refreshSkippedPlans(drive);
         await this.refreshAroundRemoved(drive);
       }
+      await drive.store.commit(state => invalidateStaleAiChapters(state));
       const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy, {
-        aiProof: !!this.ports.aiProof && !!this.ports.aiFix && !!this.ports.aiBookProof && !drive.job
+        aiProof: !!this.ports.aiProof && !!this.ports.aiFix && !!this.ports.aiBookProof && !drive.job,
+        authorPending: new Set(drive.fixable.keys())
       });
       if (plan.hold === "global_failed") drive.failure = drive.reasons.get("global") ?? "failed";
       if (plan.hold === "gate1" && drive.store.state.planReview) await this.writeBookStructure(drive);

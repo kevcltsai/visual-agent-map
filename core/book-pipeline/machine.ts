@@ -137,6 +137,8 @@ export function nextActions(
   busy: ReadonlySet<string> = new Set(),
   options: {
     /** The runner can run the AI proofread (chapter and book). */ aiProof?: boolean;
+    /** Chapters whose author side is not settled: an automatic redo (and its expansion) is queued, so their text will still change. */
+    authorPending?: ReadonlySet<string>;
   } = {}
 ): PipelinePlan {
   if (data.status === "stopped") return { actions: [], hold: data.pauseReason === "budget" ? "budget" : "stopped" };
@@ -174,7 +176,12 @@ export function nextActions(
     if (busy.has(nodeId)) continue;
     const stage = stages[nodeId];
     // A chapter that needs a person's look needs the AI's check most: it is proofread too (a chapter with no text is closed without a call).
-    if ((stage === "checked" || stage === "needs-review") && options.aiProof && aiChapterDue(data, nodeId)) {
+    if (
+      (stage === "checked" || stage === "needs-review") &&
+      options.aiProof &&
+      !options.authorPending?.has(nodeId) &&
+      aiChapterDue(data, nodeId)
+    ) {
       actions.push({ type: data.aiProof?.[nodeId]?.step === "fix" ? "ai_fix" : "ai_proof", nodeId });
       continue;
     }
@@ -208,6 +215,24 @@ export function nextActions(
 export function aiChapterDue(data: BookPipelineData, nodeId: string): boolean {
   if (data.bookProof || data.aiProof?.[nodeId]?.done) return false;
   return data.phase === "writing" || (data.phase === "planning" && !!data.trial?.includes(nodeId) && !data.planReview);
+}
+/**
+ * A chapter's AI proofread was made for a text that a later (non-AI) write changed, and the whole-book proofread has not begun: the stale
+ * slot is dropped so the chapter is proofread again on its final text (an AI fix keeps its slot current by rising the key with the revision).
+ */
+export function invalidateStaleAiChapters(data: BookPipelineData): Committed {
+  if (data.bookProof || data.status !== "running" || (data.phase !== "writing" && data.phase !== "planning"))
+    return { state: data, accepted: false };
+  const stale = effectiveOrder(data).filter(id => {
+    const slot = data.aiProof?.[id];
+    const seen = slot?.done ? /^(\d+):/.exec(slot.key) : null;
+    return !!seen && Number(seen[1]) !== cardRevision(data, id);
+  });
+  if (!stale.length) return { state: data, accepted: false };
+  const next = clone(data);
+  for (const id of stale) delete next.aiProof?.[id];
+  next.revision++;
+  return { state: next, accepted: true };
 }
 /** Whether the whole-book AI proofread still has to run (it is the last step before the book counts as done). */
 export function bookProofDue(data: BookPipelineData): boolean {

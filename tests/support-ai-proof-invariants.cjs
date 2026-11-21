@@ -14,6 +14,7 @@ const REFUSED = /^(fix_refused_|hand_edited$|fix_quote_missing$|fix_forbidden_)/
  * - `page`: the closing page text, when one was written.
  * - `refusedQuotes`: the quotes whose LAST fix event (the latest round that targeted that quote) was a block (I2, D6): their blocked reason is carried to the final check.
  * - `boxes`: per chapter id, the chapter's note text; the fix lines of all boxes (chapter and whole-book) must add up to the bar's number.
+ * - `keys`: per chapter id, the aiProofKey the chapter's CURRENT text and revision give (I5).
  * - `applied`: per chapter id (or "book"), the replacement texts the run wrote (I4).
  */
 function checkAiProofInvariants(data, options = {}) {
@@ -27,6 +28,13 @@ function checkAiProofInvariants(data, options = {}) {
       if (!slot) out.push(`I1 ${id}: phase=done but the chapter has no aiProof slot`);
       else if (!slot.done) out.push(`I1 ${id}: phase=done but the slot is not done`);
     }
+  }
+  // I5: at the end of a run every chapter's AI slot was made for the text the chapter has now (an AI fix rises the key with it), so the box
+  // never reports a verdict on a text that was rewritten later. Exempt: a chapter the whole-book proofread fixed (that fix rises the revision but not the chapter's key).
+  if (data.phase === 'done' && options.keys) {
+    const bookFixed = new Set((data.bookProof?.fixes ?? []).map(fix => fix.chapterId));
+    for (const id of order.filter(x => slots[x]?.done && !slots[x].incomplete && x in options.keys))
+      if (!bookFixed.has(id) && slots[id].key !== options.keys[id]) out.push(`I5 ${id}: the AI slot key ${slots[id].key} is not the current text's key ${options.keys[id]}`);
   }
   const all = [...order.map(id => [id, slots[id]]), ['book', data.bookProof]].filter(([, slot]) => slot);
   for (const [id, slot] of all) {

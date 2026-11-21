@@ -918,3 +918,27 @@ test('R1 T1: a needs-review chapter is also asked for its chapter AI proofread (
   const { state: start } = checkedRun();
   assert.deepEqual(plain(machine.nextActions(start, { a: 'needs-review', b: 'checked' }, new Set(), AI).actions), [{ type: 'ai_proof', nodeId: 'a' }, { type: 'ai_proof', nodeId: 'b' }]);
 });
+
+test('ai proof R4: a needs-review chapter with a queued automatic redo is not proofread until the redo settled', () => {
+  const { state, stages } = checkedRun();
+  const review = { ...stages, a: 'needs-review' };
+  const options = { aiProof: true, authorPending: new Set(['a']) };
+  assert.deepEqual(plain(machine.nextActions(state, review, new Set(), options).actions), [{ type: 'ai_proof', nodeId: 'b' }], 'only the settled chapter');
+  assert.deepEqual(plain(machine.nextActions(state, review, new Set(), AI).actions), [{ type: 'ai_proof', nodeId: 'a' }, { type: 'ai_proof', nodeId: 'b' }], 'settled: both');
+});
+
+test('ai proof R4: a chapter proofread for a text that a later write changed is dropped and due again, until the whole-book proofread begins', () => {
+  const { state, stages } = checkedRun();
+  const p = begin(state, { nodeId: 'a' }, `${machine.cardRevision(state, 'a')}:h`, 'proof');
+  let done = machine.applyAiProof(p.state, p.token, { checked: 3, pending: [], open: [] }).state;
+  assert.equal(done.aiProof.a.done, true);
+  assert.equal(machine.invalidateStaleAiChapters(done).accepted, false, 'the key matches the revision: nothing to do');
+  const rewritten = { ...done, revisions: { ...done.revisions, a: machine.cardRevision(done, 'a') + 1 } };
+  const res = machine.invalidateStaleAiChapters(rewritten);
+  assert.equal(res.accepted, true);
+  assert.equal(res.state.aiProof.a, undefined, 'the stale slot is dropped');
+  assert.deepEqual(plain(machine.nextActions(res.state, stages, new Set(), AI).actions), [{ type: 'ai_proof', nodeId: 'a' }, { type: 'ai_proof', nodeId: 'b' }], 'and the chapter is proofread again');
+  assert.equal(machine.invalidateStaleAiChapters({ ...rewritten, bookProof: { key: 'x', attempts: 0, round: 0, step: 'proof', checked: 0, fixed: 0, open: [] } }).accepted, false, 'not once the whole-book proofread began');
+  const abandoned = machine.abandonAi(state, 'a');
+  assert.equal(machine.invalidateStaleAiChapters({ ...abandoned, revisions: { a: 3 } }).accepted, false, 'a given-up slot (no key) is not looped');
+});

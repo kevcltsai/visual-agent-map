@@ -173,6 +173,10 @@ export interface BookPipelineData {
   trial?: string[];
   /** True while the run waits (or will wait) at the plan review: every chapter is planned, then gate 1 shows the plan before the trial. Absent = the trial runs (or an older run). */
   planReview?: boolean;
+  /** True once the chief editor's pass over every card's plan is done (or given up after {@link MAX_STEP_ATTEMPTS} failures). Absent = not yet; a replan clears it. */
+  planEdited?: true;
+  /** How many times that pass was started (counted before the call, given back by a stop); cleared with {@link BookPipelineData.planEdited}. Absent = none. */
+  planEditAttempts?: number;
   /** The map's card set (ids) the run accepted: the cards of the map when it started, or when the owner chose "carry on as before". Absent = older data: `order`. */
   accepted?: string[];
   /** New cards (not in `order`) the owner chose to leave out with "carry on as before". Absent = none. */
@@ -411,6 +415,8 @@ function problem(raw: unknown): string | undefined {
   )
     return "trial";
   if (raw.planReview !== undefined && raw.planReview !== true) return "planReview";
+  if (raw.planEdited !== undefined && raw.planEdited !== true) return "planEdited";
+  if (raw.planEditAttempts !== undefined && !isCount(raw.planEditAttempts)) return "planEditAttempts";
   if (!isObject(raw.budget) || !isCount(raw.budget.used) || !isCount(raw.budget.limit) || raw.budget.limit < 1)
     return "budget";
   if (raw.consistency !== undefined && !consistencyShape(raw.consistency)) return "consistency";

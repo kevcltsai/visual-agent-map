@@ -12,6 +12,7 @@ import {
   type BookSettingsPatch
 } from "../../core/book-pipeline/model";
 import { BOOK_SETTING_INPUT_MAX, cleanBookSettingsInput } from "../../core/book-pipeline/settings";
+import { PLAN_EDIT_MIN_CARDS } from "../../core/book-pipeline/machine";
 import { syncModelSelect } from "../../core/model-discovery";
 import { BOOK_POOL } from "./book-pipeline-run";
 
@@ -43,7 +44,7 @@ export const BOOK_IMAGE_CALLS_PER_SEARCH = 2;
 /*
  * The cover adds nothing to the estimate: a chapter's or section's cover rides in the first picture search the card already makes, and the
  * book's own cover (a root with no picture slots) is one search plus its caption-language retry, 2 calls, inside the 4 picture calls
- * bookChapterCalls() already reserves for every card. So the estimate stays the real maximum, 6 + 16 n.
+ * bookChapterCalls() already reserves for every card. So the estimate stays the real maximum, 7 + 16 n (6 + 16 n below three cards, where there is no plan edit).
  */
 
 export { BOOK_EXPAND_PASSES };
@@ -66,9 +67,12 @@ export function bookChapterCalls(): { plan: number; write: number; images: numbe
   };
 }
 
-/** The whole-book layer at most: the whole-book plan, and (with two chapters to compare) the whole-book AI proofread with its fix rounds. */
+/**
+ * The whole-book layer at most: the whole-book plan, the chief editor's one pass over the plans (with {@link PLAN_EDIT_MIN_CARDS} cards or
+ * more), and (with two chapters to compare) the whole-book AI proofread with its fix rounds.
+ */
 export function bookWholeCalls(cards: number): number {
-  return 1 + (cards >= 2 ? 1 + 2 * MAX_AI_FIX_ROUNDS : 0);
+  return 1 + (cards >= PLAN_EDIT_MIN_CARDS ? 1 : 0) + (cards >= 2 ? 1 + 2 * MAX_AI_FIX_ROUNDS : 0);
 }
 
 export interface BookStartEstimate {
@@ -112,7 +116,7 @@ export function bookStartEstimate(cards: number, trialCards: number, models?: Bo
     // The whole-book plan and proofread, and every chapter's calls: an upper bound.
     calls: bookWholeCalls(n) + n * (per.plan + per.write + per.images + per.proof + per.aiProof),
     limit: DEFAULT_BUDGET_LIMIT,
-    seconds: time("global") + rounds * perCard + (n >= 2 ? aiProof : 0)
+    seconds: time("global") + (n >= PLAN_EDIT_MIN_CARDS ? time("plan") : 0) + rounds * perCard + (n >= 2 ? aiProof : 0)
   };
 }
 export function bookStartEstimateText(

@@ -172,11 +172,11 @@ const PICTURE_VERB = /[附放配含]|嵌入|插入|每段|需有|要有|需要�
 const CONDITION =
   /無圖|无图|沒有圖|没有图|找不到|若找得到|若有|若無|若无|如果|如有|有找到|\b(?:if|unless|when (?:available|found|possible)|no (?:image|picture)|without)\b/i;
 /** A picture item that is not conditional: the first author version has no image step, so it could never be met. */
-const unconditionalPicture = (text: string): boolean =>
+export const unconditionalPicture = (text: string): boolean =>
   (PICTURE_ALONE.test(text) || (PICTURE_NOUN.test(text) && PICTURE_VERB.test(text))) && !CONDITION.test(text);
 
 /** Adjective or value-judgement wording (Traditional and Simplified): an item with one cannot be checked from the text, so the program drops it. */
-const SUBJECTIVE =
+export const SUBJECTIVE =
   /值得(?:注意|關注|关注|一提|留意)|精彩|精采|生動|生动|重要|引人入勝|引人入胜|有趣|吸引人|動人|动人|優美|优美|流暢|流畅|深刻|震撼|\b(?:noteworthy|worth noting|brilliant|vivid|engaging|compelling|interesting|important)\b/i;
 
 export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanResult {

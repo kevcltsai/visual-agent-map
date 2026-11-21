@@ -49,7 +49,7 @@ async function rig(over = {}) {
   // `over.nested`: the third card is a section of the second, so the trial (preface, chapter 1 and its sections) is the first three cards.
   if (over.nested && nodes.length > 2) nodes[2].parentId = nodes[1].id;
   await repo.updateMap(mapPath, d => { d.nodes.push(...nodes); });
-  const stat = { logs: [], plan: [], author: [], proof: [], probes: [], backups: [], writes: 0, ai: [] };
+  const stat = { logs: [], plan: [], planEdit: [], author: [], proof: [], probes: [], backups: [], writes: 0, ai: [] };
   let queue = Promise.resolve();
   let ids = 0;
   const script = { global: () => ({ thread: 'one thread', cards: nodes.map((n, i) => ({ id: n.id, role: i ? 'body' : 'intro' })), materials: [{ name: 'm', use: 'u' }], decisions: { reader: 'kids' } }),
@@ -58,6 +58,8 @@ async function rig(over = {}) {
     proof: async request => ({ items: request.checklist.map(c => ({ id: c.id, type: c.type, status: 'met', note: 'fine', sources: [] })), aggregate: 'checked' }),
     // The independent AI proofread (opt-in with `over.ai`): by default no check. 
     aiProof: async () => ({ checks: [], prior: [], dropped: {} }), aiFix: async () => [], aiBookProof: async () => ({ checks: [], prior: [], dropped: {} }),
+    // The chief editor's pass over the plans: by default nothing needs a change.
+    planEdit: () => [],
     probe: async () => ({ ok: true }), ...over.script };
   const ports = {
     mutate: work => { const next = queue.then(work); queue = next.catch(() => undefined); return next; },
@@ -75,6 +77,7 @@ async function rig(over = {}) {
     updateNoteRawGuarded: (path, transform, options) => repo.updateNoteRawGuarded(path, transform, options),
     runPlan: async (step, request, run) => {
       if (step.id === 'book-pipeline.global-plan') { stat.plan.push('global'); await run.admission.reserve(); return script.global(request, stat.plan.filter(x => x === 'global').length); }
+      if (step.id === 'book-pipeline.plan-edit') { stat.planEdit.push(request); await run.admission.reserve(); return script.planEdit(request, stat.planEdit.length); }
       stat.plan.push(request.card.id); await run.admission.reserve(); return script.card(request, stat.plan.filter(x => x === request.card.id).length);
     },
     runProofread: async (request, run) => { stat.proof.push(request); await run.admission.reserve(); return script.proof(request, stat.proof.length); },
@@ -122,7 +125,7 @@ test('three cards run to gate 1, wait there, then write and proof to gate 2 afte
   assert.equal(s.phase, 'done');
   assert.equal(r.stat.author.length, 3);
   for (let i = 0; i < 3; i++) { assert.equal(stageOf(r.raw(i)), 'checked'); assert.ok((await r.note(i)).detail.includes(bodyOf(TITLES[i]))); }
-  assert.equal(s.budget.used, 1 + 3 + 3 + 3);
+  assert.equal(s.budget.used, 1 + 3 + 1 + 3 + 3, 'whole-book plan, 3 card plans, the chief editor\'s pass, 3 writes, 3 proofs');
   assert.equal(r.runs.getProgress(r.mapPath).counts.checked, 3);
   assert.deepEqual([...new Set(r.stat.backups)].length, 3);
 });
@@ -326,7 +329,7 @@ test('the budget running out pauses without marking a card; addBudget resumes an
   const r = await rig();
   const other = await rig();
   await r.runs.start(r.mapPath);
-  await setLimit(r, 6); // 4 used by planning: two more calls
+  await setLimit(r, 7); // 5 used by planning (plan, 3 cards, the plan edit): two more calls
   await confirmDone(r.runs, r.mapPath);
   let s = await r.state();
   assert.equal(s.status, 'stopped'); assert.equal(s.pauseReason, 'budget'); assert.equal(s.phase, 'writing');
@@ -336,7 +339,7 @@ test('the budget running out pauses without marking a card; addBudget resumes an
   // the other map (its own budget gate) and a call without a gate are unaffected
   await other.runs.start(other.mapPath); await confirmDone(other.runs, other.mapPath);
   assert.equal((await other.state()).phase, 'done');
-  assert.equal((await other.state()).budget.used, 10);
+  assert.equal((await other.state()).budget.used, 11);
   await assert.rejects(() => r.runs.resume(r.mapPath), e => e instanceof BookPipelineRunError && e.code === 'budget');
   await r.runs.resume(r.mapPath, { addBudget: 100 });
   s = await r.state();
@@ -4006,10 +4009,10 @@ test('worst-case calls: every chapter redoes once, uses every AI round and nothi
     }, { titles });
     await finishAi(r);
     const s = await r.state();
-    const calls = r.stat.plan.length + r.stat.author.length + r.stat.proof.length + r.stat.ai.length;
+    const calls = r.stat.plan.length + r.stat.planEdit.length + r.stat.author.length + r.stat.proof.length + r.stat.ai.length;
     assert.equal(s.phase, 'done');
     assert.equal(s.budget.used, calls, 'the budget counts exactly the calls made');
-    assert.equal(calls, 6 + 10 * titles.length, 'this mock: 1 global plan + 5 book calls + 10 per card (no picture search here)');
+    assert.equal(calls, (titles.length >= 3 ? 7 : 6) + 10 * titles.length, 'this mock: 1 global plan + 5 book calls (+ the plan edit with three cards or more) + 10 per card (no picture search here)');
   }
 });
 
@@ -4049,11 +4052,11 @@ test('worst-case calls with picture search: every step uses its whole allowance 
     await r.repo.writeBookSettings(r.nodes[0].path, { length: LEN_SETTING });
     await finishAi(r);
     const s = await r.state();
-    const calls = r.stat.plan.length + r.stat.author.length + r.stat.proof.length + r.stat.ai.length + imageCalls;
+    const calls = r.stat.plan.length + r.stat.planEdit.length + r.stat.author.length + r.stat.proof.length + r.stat.ai.length + imageCalls;
     assert.equal(s.phase, 'done');
     assert.equal(s.budget.used, calls, 'the budget counts exactly the calls made');
     const estimate = bookStartEstimate(titles.length, titles.length).calls;
-    assert.equal(estimate, 6 + 16 * titles.length, 'the estimate is the whole-book calls and 16 per card; the covers add nothing');
+    assert.equal(estimate, (titles.length >= 3 ? 7 : 6) + 16 * titles.length, 'the estimate is the whole-book calls (the plan edit with three cards or more) and 16 per card; the covers add nothing');
     counted.set(`${variant}:${titles.length}`, calls);
     if (variant === 'cover-bare-root') {
       assert.ok(coverAsked >= 1, 'the bare root searched for its cover alone');
@@ -4064,7 +4067,7 @@ test('worst-case calls with picture search: every step uses its whole allowance 
       assert.equal(calls, counted.get(`plain:${titles.length}`), 'with and without a cover the same number of calls');
     }
     assert.ok(calls <= estimate && calls <= 300);
-    if (titles.length === 10 && variant === 'plain') assert.equal(estimate, 166);
+    if (titles.length === 10 && variant === 'plain') assert.equal(estimate, 167);
   }
   }
 });
@@ -4706,4 +4709,139 @@ test('ai chapter: one failed card read does not end the chapter check; the read 
   assert.equal(aiRuns(r, 'proof', 'SecretTitleA').length, 1, 'the chapter was still checked');
   const slot = (await r.state()).aiProof[r.nodes[1].id];
   assert.deepEqual([slot.done, slot.incomplete], [true, undefined]);
+});
+
+// ---- the chief editor's pass over the plans (every card planned, one call, before gate 1) ----
+const promptOf = async (r, i) => (await r.note(i)).prompt;
+const CL = [{ type: 'structure', text: 'names the earlier ideas "X" and "Y" and states that they lead to "Z"' }];
+const coversLine = prompt => /^本章會講[:：].*$/m.exec(prompt)?.[0];
+
+test('plan edit: one call sees every card; a change rewrites only the named card\'s Prompt and keeps its other lines and the others untouched', async () => {
+  const plainRig = await rig();
+  await plainRig.runs.start(plainRig.mapPath);
+  const before = [];
+  for (let i = 0; i < 3; i++) before.push(await promptOf(plainRig, i));
+  assert.equal(plainRig.stat.planEdit.length, 1, 'the pass is one call');
+  assert.deepEqual([...plainRig.stat.planEdit[0].cards.map(c => c.title)], TITLES, 'it reads every card, in reading order');
+  const r = await rig({ script: { planEdit: request => [{ id: request.cards[1].id, covers: 'edited covers', previous: 'edited previous', checklist: CL }] } });
+  await r.runs.start(r.mapPath);
+  const s = await r.state();
+  assert.equal(s.phase, 'gate1'); assert.equal(s.planEdited, true);
+  assert.equal(await promptOf(r, 0), before[0].replace('SecretTitleA — n', 'SecretTitleA — edited covers'), 'the card before: only its next line follows the new covers');
+  assert.equal(await promptOf(r, 2), before[2], 'the card after: its previous sentence (the plan\'s own) is untouched');
+  const after = await promptOf(r, 1);
+  assert.match(after, /本章會講[:：]\s*edited covers/);
+  assert.match(after, /edited previous/);
+  assert.deepEqual([...parseChecklist(after).map(c => c.text)], CL.map(c => c.text), 'the checklist is the replacement');
+  assert.equal(after.replace('edited covers', 'covers 2').replace('edited previous', 'p').replace(CL[0].text, 'has a beginning'), before[1].replace(/\n- C2 .*/, ''), 'every other line is carried over');
+  assert.equal(r.runs.isRunning(r.mapPath), false);
+  assert.ok(r.stat.logs.some(line => /plan_edit/.test(line) && /ok/.test(line)));
+});
+
+test('plan edit: a Prompt the owner edited while the call ran is not overwritten', async () => {
+  const holder = {};
+  const r = await rig({ script: { planEdit: async request => { await holder.r.repo.updateNoteGuarded(holder.r.nodes[1].path, { prompt: 'the owner wrote this' }, {}); return [{ id: request.cards[1].id, covers: 'edited covers', checklist: CL }, { id: request.cards[2].id, covers: 'edited covers', checklist: CL }]; } } });
+  holder.r = r;
+  await r.runs.start(r.mapPath);
+  assert.equal(await promptOf(r, 1), 'the owner wrote this');
+  assert.match(await promptOf(r, 2), /edited covers/, 'the other card is still edited');
+  assert.equal((await r.state()).planEdited, true);
+});
+
+test('plan edit: a stop during the call writes nothing and sets no flag; the pass runs again after a resume', async () => {
+  const hold = defer();
+  const holder = {};
+  let first = true;
+  const r = await rig({ script: { planEdit: async request => { if (first) { first = false; await hold.promise; } return [{ id: request.cards[1].id, covers: 'edited covers', checklist: CL }]; } } });
+  holder.r = r;
+  const started = r.runs.start(r.mapPath);
+  await settle();
+  const old = await promptOf(r, 1);
+  await r.runs.stop(r.mapPath, { saved: true });
+  hold.resolve();
+  await started.catch(() => undefined); await settle();
+  let s = await r.state();
+  assert.equal(s.planEdited, undefined, 'no flag'); assert.equal(s.planEditAttempts, undefined, 'the attempt is given back');
+  assert.equal(await promptOf(r, 1), old, 'nothing written');
+  await r.runs.resume(r.mapPath); await settle();
+  s = await r.state();
+  assert.equal(r.stat.planEdit.length, 2, 'the pass reran');
+  assert.equal(s.planEdited, true); assert.equal(s.phase, 'gate1');
+  assert.match(await promptOf(r, 1), /edited covers/);
+});
+
+test('plan edit: a failing call is tried three times, writes nothing, and the book goes on to gate 1 (no card is marked)', async () => {
+  const r = await rig({ script: { planEdit: () => { throw new Error('Bad reply'); } } });
+  const old = [];
+  await r.runs.start(r.mapPath);
+  const s = await r.state();
+  assert.equal(r.stat.planEdit.length, 3);
+  assert.equal(s.planEditAttempts, 3); assert.equal(s.planEdited, true); assert.equal(s.phase, 'gate1'); assert.equal(s.status, 'running');
+  for (let i = 0; i < 3; i++) { assert.equal(stageOf(r.raw(i)), 'planned'); old.push(await promptOf(r, i)); assert.match(old[i], /本章會講[:：]\s*covers/); }
+  assert.ok(r.stat.logs.some(line => /plan_edit/.test(line) && /failed/.test(line)));
+  assert.equal(s.budget.used, 1 + 3 + 3, 'every attempt is a call');
+});
+
+test('plan edit: a reload of the same planning run does not call the pass again; a replan (retryTrial) calls it again; the budget counts the call', async () => {
+  const r = await rig({ trial: true, planReview: true, titles: ['R', 'A', 'B', 'C'] });
+  await r.runs.start(r.mapPath);
+  let s = await r.state();
+  assert.equal(r.stat.planEdit.length, 1); assert.equal(s.planEdited, true);
+  assert.equal(s.budget.used, 1 + 4 + 1);
+  // the same run, back in planning, in a new runner: the flag keeps the pass from running again
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'planning'; });
+  const again = new r.runs.constructor(r.ports);
+  await again.resume(r.mapPath).catch(() => undefined); await settle();
+  assert.equal(r.stat.planEdit.length, 1, 'not again after a reload');
+  s = await r.state();
+  assert.equal(s.phase, 'gate1');
+  // a replan clears the flag
+  await again.retryTrial(r.mapPath); await settle();
+  assert.equal(r.stat.planEdit.length, 2, 'the replan runs the pass again');
+});
+
+test('plan edit: a book whose plans do not fit one request is refused before any call (plans_too_long), the attempts are used up and the book goes on to gate 1', async () => {
+  const titles = Array.from({ length: 40 }, (_, i) => `Card ${i}`);
+  const long = n => `${'x'.repeat(380)}${n}`;
+  const r = await rig({ titles, script: { card: () => ({ covers: long(1), entry: long(2), handoff: long(3), previous: long(4), next: long(5), checklist: Array.from({ length: 8 }, (_, i) => ({ id: `C${i + 1}`, type: 'structure', text: long(i) })) }) } });
+  await r.runs.start(r.mapPath);
+  const s = await r.state();
+  assert.equal(r.stat.planEdit.length, 0, 'no call was made');
+  assert.ok(r.stat.logs.some(line => line.includes('plan_refused') && line.includes('plans_too_long')), 'logged');
+  assert.equal(s.planEditAttempts, 3); assert.equal(s.planEdited, true); assert.equal(s.phase, 'gate1'); assert.equal(s.status, 'running');
+  assert.ok(r.stat.logs.some(line => /plan_edit/.test(line) && /failed:/.test(line)));
+  assert.equal(s.budget.used, 1 + 40, 'the refused attempts cost no call');
+});
+
+test('plan edit: one change to covers, points or previous without its replacement checklist makes the whole reply fail: nothing is written (a subject moved from one card to another cannot vanish), the attempt counts, and after the cap the run goes on', async () => {
+  const r = await rig({ script: { planEdit: request => [{ id: request.cards[1].id, covers: 'edited covers' }, { id: request.cards[2].id, covers: 'moved here', points: ['a', 'b', 'c'], checklist: CL }] } });
+  await r.runs.start(r.mapPath);
+  const before = await rig();
+  await before.runs.start(before.mapPath);
+  for (const i of [0, 1, 2]) assert.equal(await promptOf(r, i), await promptOf(before, i), `card ${i} is as planned`);
+  assert.equal((await r.note(1)).summary, 'covers 2', 'the summary stays too');
+  assert.equal(r.stat.planEdit.length, 3, 'each rejected reply counts as an attempt, up to the cap');
+  assert.equal((await r.state()).planEdited, true, 'after the cap the run passes on');
+});
+
+test('plan edit: a checklist sent without a covers, points or previous change is ignored; the rest of the change applies', async () => {
+  const r = await rig({ script: { planEdit: request => [{ id: request.cards[2].id, entry: 'edited entry', checklist: CL }] } });
+  await r.runs.start(r.mapPath);
+  const two = await promptOf(r, 2);
+  assert.match(two, /edited entry/); assert.deepEqual([...parseChecklist(two).map(c => c.text)], ['has a beginning', 'has an end']);
+  assert.equal((await r.state()).planEdited, true);
+});
+
+test('plan edit: new covers also set the map summary; a locked card (kept, hand-edited) is marked in the request and its change is dropped', async () => {
+  const r = await rig({ script: { planEdit: request => request.cards.slice(1).map(card => ({ id: card.id, covers: `edited ${card.title}`, checklist: CL })) } });
+  const RESEARCH = '### 核心結論\n\n這是讀者自己的研究正文。';
+  await r.repo.updateNoteGuarded(r.nodes[2].path, { detail: RESEARCH }, {});
+  const before2 = await promptOf(r, 2);
+  await r.runs.start(r.mapPath);
+  const request = r.stat.planEdit[0];
+  assert.deepEqual([...request.cards.map(c => !!c.locked)], [false, false, true], 'only the hand-written card is locked');
+  assert.equal((await r.note(1)).summary, 'edited SecretTitleA', 'the summary follows the covers like the plan step writes it');
+  assert.match(await promptOf(r, 1), /本章會講[:：]\s*edited SecretTitleA/);
+  assert.equal(await promptOf(r, 2), before2, 'the locked card keeps its plan');
+  assert.equal((await r.note(2)).summary, 'summary of SecretTitleB', 'and its summary');
 });

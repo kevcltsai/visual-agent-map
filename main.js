@@ -6642,7 +6642,7 @@ var zhCN = {
   "ui.book_progress_line_fix_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u7B2C {0} \u7AE0\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u7AE0",
   "ui.book_progress_line_fix_preface_0_1": "\u6B63\u5728\u4FEE\u6B63\u524D\u8A00\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u5F20\u5361",
   "ui.book_progress_line_fix_card_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u7B2C {0} \u7AE0\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u5F20\u5361",
-  "ui.book_progress_line_fix_section_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u300C{0}\u300D\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u5F20\u5361",
+  "ui.book_progress_line_fix_section_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u201C{0}\u201D\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u5F20\u5361",
   "ui.book_progress_line_check_0_1": "\u6B63\u5728\u68C0\u67E5\u5168\u4E66\u4E00\u81F4\u6027\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
   "ui.book_panel_rerun_card": "\u91CD\u8DD1\u8FD9\u5F20",
   "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u56FE\u6587\u4E66\u8FD9\u4E00\u5F20\uFF1A{0}\uFF08\u4F01\u5212 \u2192 \u5199 \u2192 \u6821\uFF09",

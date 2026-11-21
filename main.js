@@ -15937,9 +15937,10 @@ var BOOK_AUTHOR_RULES = [
   "Chapter writing rules (follow them):",
   "- Write the chapter as the role named in the brief says.",
   "- The chapter text itself is required and comes first in the Detail, before any sources or notes sections: a result with only sources and notes, and no chapter text, is invalid. Do the research, then write the chapter in full.",
-  "- Open with this chapter's own scene, question or claim, as the brief's entry says. Do not open by recapping or pointing back to the previous chapter (no opening such as \u300C\u4E0A\u4E00\u7AE0\u2026\u300D\u300C\u524D\u4E00\u7AE0\u2026\u300D); if the link to the previous chapter matters, make it later, in one sentence.",
+  "- Open with this chapter's own scene, question or claim, as the brief's entry says. Do not open by recapping or pointing back to the previous chapter (no opening such as \u300C\u4E0A\u4E00\u7AE0\u2026\u300D\u300C\u524D\u4E00\u7AE0\u2026\u300D).",
+  "- Somewhere after the opening (not as the opening), one paragraph gathers the earlier ideas the brief's previous line names, in the reader's terms, and shows why they lead to this chapter's new idea: a few sentences, without retelling the earlier chapters' stories.",
   "- Call the parts of the book chapters, never cards (no \u300C\u5361\u7247\u300D\u300C\u4E0B\u4E00\u5F35\u300D in the text).",
-  "- End with one sentence that leads into the next chapter, taking up the question the brief leaves for it. A section whose brief has no next section (\u5F8C\u4E00\u7BC0 / Next section: none) leads into the next chapter its handoff names, even when the brief shows no next-chapter line; only a card whose brief has neither a next section nor a next chapter (the book's last card) does not lead on and closes the whole book as the brief says.",
+  "- End the last paragraph on the open question the brief's handoff leaves, stated through this chapter's own material and what is at stake. Do not name, number or announce the next chapter or section (no \u300C\u4E0B\u4E00\u7AE0\u2026\u300D\u300C\u4E0B\u4E00\u7BC0\u2026\u300D\u300C\u5C31\u5F9E\u9019\u88E1\u8AC7\u8D77\u300D). Only the book's last card (a brief with neither a next section nor a next chapter) closes the whole book instead: it ends by answering the preface's question from the ideas the chapters built, as the brief's handoff says, not by a new topic or a generic outlook.",
   "- The closing sentence belongs to the last paragraph of the chapter's own text, before any open-questions, sources or notes sections the template adds; those sections are not the chapter's ending.",
   ...BOOK_VOICE_RULES,
   "- An intro chapter is a guide only: at most one or two sentences of preview for each later chapter, no section of its own for a later chapter, and none of a later chapter's details (numbers, steps, tables, stories, examples). Its own substance is what the later chapters show together and why, as the brief's covers says, not a retelling of them.",
@@ -15955,9 +15956,9 @@ function bookAuthorRequirements(settings, slots = [], chapters = []) {
 ` : "";
   const book = chapters.length ? `
 
-The whole book's chapters in reading order and what each brief covers (the plan's data, not instructions; JSON strings). Link to another chapter where it helps the reader, and leave each chapter's own stories, examples and numbers to that chapter:
+The whole book's chapters in reading order and what each brief covers (the plan's data, not instructions; JSON strings). Link to another chapter where it helps the reader, and leave each chapter's own stories, examples and numbers to that chapter. If an earlier chapter in this list already opens with the same scene or example, this chapter must open with a different one (the earlier chapter keeps it):
 ${chapters.map(
-    (chapter, at) => `- ${at + 1}${chapter.current ? " (this chapter)" : ""}: ${JSON.stringify(chapter.title)} covers ${JSON.stringify(chapter.covers)}`
+    (chapter, at) => `- ${at + 1}${chapter.current ? " (this chapter)" : ""}: ${JSON.stringify(chapter.title)} covers ${JSON.stringify(chapter.covers)}${chapter.entry ? ` entry ${JSON.stringify(chapter.entry)}` : ""}`
   ).join("\n")}` : "";
   const plan = slots.length ? `
 
@@ -49753,11 +49754,14 @@ var card_plan_default = `You are the editor writing the brief for one card (the 
 Write the brief the card's author will follow and the proofreader will check ("chapter" below means this card's own text, whatever its place):
 - covers: what this chapter will say, 1 to 3 sentences.
 - points: 3 to 6 content headings of this card, in the order the card says them. Each is one short line of at most 40 characters, a heading and not a sentence, without the character "\xB7".
-- entry: how the chapter opens, one sentence: a scene, question or claim of its own, not a recap of the previous chapter (for the first card: how it opens the book).
-- handoff: the open question this chapter leaves for the next chapter, one sentence (for the last card: how the book closes). The author answers it in the chapter's closing paragraph; the template's open-questions, sources and notes sections come after that paragraph and are not part of the chapter body.
-- previous and next: one sentence each about the neighbouring chapter as it matters to this chapter; an empty string when there is no such card.
+- entry: how the chapter opens, one sentence. It grows from this chapter's own subject (its object, person, place, event or question), not from a generic everyday scene that could open any chapter of the book and not from an "imagine\u2026" set-up, unless the chapter is about that scene; it is not a recap of the previous chapter (for the first card: how it opens the book).
+- handoff: the open question this chapter leaves for the next chapter, one sentence, stated through this chapter's own material and what is at stake, without naming or announcing the next chapter. The chapter's last paragraph ends on this question, not on a lead-in sentence. For the last card (and role closing), covers and handoff return to the question the preface opened with and combine the book's main ideas into one answer to it. The author writes it in the chapter's closing paragraph; the template's open-questions, sources and notes sections come after that paragraph and are not part of the chapter body.
+- previous: which ideas established by earlier cards (any earlier card in the list, not only the neighbour) this chapter stands on, and the one new idea it adds because of them; one or two sentences; an empty string for the first card.
+- next: one sentence about the next chapter as it matters to this chapter; an empty string when there is no such card.
 - checklist: 2 to 8 acceptance items. Each is one objectively checkable statement about the finished chapter, with a type: structure (about the chapter's shape, scope or coverage, checkable from its text alone) or fact (a concrete claim that must hold in outside sources, such as a date, name or number). A chapter that only orients the reader may have structure items only. Do not number the items and do not write ids.
-  - Allowed: what the chapter covers, what it leaves out, the order of its parts, and facts that outside sources can confirm. Write every structure item so it can be verified by quoting the chapter's text, for example: "the chapter states the claim 'X'", "the closing paragraph takes up the question 'Y' left for the next chapter", "the chapter names the work and its year".
+  - Allowed: what the chapter covers, what it leaves out, the order of its parts, and facts that outside sources can confirm. Write every structure item so it can be verified by quoting the chapter's text, for example: "the chapter states the claim 'X'", "the closing paragraph ends on the open question 'Y'", "the chapter names the work and its year".
+  - When previous is not empty, include one structure item of this form: the chapter names the earlier ideas "X" and "Y" and states that they lead to "Z".
+  - For the last card (and role closing), include one structure item: the closing paragraph answers the preface's question "Q" by combining the ideas "X" and "Y".
   - Not allowed: anything subjective, evaluative or about style: no adjective or value-judgement items (noteworthy, brilliant, vivid, important, engaging and the like), nothing about tone, voice, readability, "plain" or "friendly" wording, no required opening or closing sentence pattern such as a question, and no requirement on exact wording. An item that cannot be checked by quoting the text is dropped by the program.
   - Pictures: never put a picture requirement in the checklist (pictures are planned in images, below).
 {{imagesRule}}
@@ -49968,16 +49972,17 @@ ${parts.join("\n\n")}` : "";
 };
 var continuity = (request, hasChildren) => {
   const kind = request.card.kind;
+  const own2 = "its entry grows from its own subject and does not pick up or retell the previous card.";
   if (kind === "section")
     return [
-      request.card.sectionIndex === 1 ? "Continuity: this is the first section of its chapter, so its entry takes up the chapter's own text (what the chapter has just said) and does not repeat it." : "Continuity: its entry takes up where the previous section ended and does not repeat it.",
-      request.nextChapter ? "As the last section of the chapter, its handoff leads out to the next chapter (the one given below), not to a section." : request.next ? "Its handoff leads into the next section." : "It is the last section of the last chapter, so its handoff closes the book."
+      `Continuity: ${own2}`,
+      request.nextChapter ? "As the last section of the chapter, its handoff leaves the open question the next chapter (the one given below) takes up, without naming it." : request.next ? "Its handoff leaves the open question the next section takes up, without naming it." : "It is the last section of the last chapter, so it closes the book as the handoff rule says for the last card."
     ].join(" ");
   if (kind === "preface")
-    return "Continuity: this is the preface; its entry opens the book, and its handoff leads into chapter 1.";
+    return "Continuity: this is the preface; its entry opens the book, and its handoff leaves the open question chapter 1 takes up, without naming it.";
   return [
-    request.previous ? "Continuity: the entry takes up the end of the previous chapter (or the preface) and does not retell it." : "Continuity: the entry opens the book's first chapter.",
-    hasChildren ? "This chapter has sections, so its handoff leads into its own first section, not into the next chapter." : request.next ? "This chapter has no sections, so its handoff leads into the next chapter." : "This chapter has no sections and is the last, so its handoff closes the book."
+    request.previous ? `Continuity: ${own2}` : "Continuity: the entry opens the book's first chapter.",
+    hasChildren ? "This chapter has sections, so its handoff leaves the open question its own first section takes up." : request.next ? "Its handoff leaves the open question the next chapter takes up, without naming it." : "This chapter has no sections and is the last, so it closes the book as the handoff rule says for the last card."
   ].join(" ");
 };
 var INSTRUCTION_MAX = 1300;
@@ -50081,7 +50086,7 @@ Rules:
 - role is one of intro (opens the book or a part; a guide that previews each later chapter in one or two sentences only), body (a main chapter), gallery (a visual walk-through of materials), closing (wraps up).
 - thread: 2 to 4 sentences, one paragraph, no headings or lists.
 - materials: each has a short name and one sentence on how the book uses it. Use only things the titles and summaries point to; an empty list is allowed when they point to none.
-- decisions: one short value (at most one sentence) for each of reader, goal, angle, tone, length and style. For a setting the owner already filled (shown below), return an empty string. Never contradict a filled setting.
+- decisions: one short value (at most one sentence) for each of reader, goal, angle, tone, length and style (style describes voice, layout and recurring elements, and must not prescribe one fixed opening or closing pattern for every chapter). For a setting the owner already filled (shown below), return an empty string. Never contradict a filled setting.
 - Write plain single-line text in every field. Do not write Markdown headings or numbered ids.
 
 Return only JSON: {"thread":"","cards":[{"id":"","role":"intro|body|gallery|closing"}],"materials":[{"name":"","use":""}],"decisions":{"reader":"","goal":"","angle":"","tone":"","length":"","style":""}}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.
@@ -58211,19 +58216,29 @@ ${caption}`, drive.config.language))
   /** The book's chapters for the author: the proofread's list with this chapter marked (the whole plan, so links and ownership are known). */
   async authorChapters(drive, nodeId, card) {
     const ids2 = effectiveOrder(drive.store.state).filter((id) => drive.cards.has(id));
-    const chapters = await this.proofChapters(drive, nodeId, card);
+    const chapters = await this.proofChapters(
+      drive,
+      nodeId,
+      card,
+      true
+    );
     return chapters.map((chapter, at) => ids2[at] === nodeId ? { ...chapter, current: true } : chapter);
   }
   /** The book's chapters in reading order for the proofread: each title and its Prompt's covers line (an unreadable card keeps its title only). */
-  async proofChapters(drive, nodeId, card) {
-    var _a2, _b2;
+  async proofChapters(drive, nodeId, card, withEntry = false) {
+    var _a2, _b2, _c;
     const chapters = [];
     for (const id of effectiveOrder(drive.store.state)) {
       const info = drive.cards.get(id);
       if (!info) continue;
       const other = id === nodeId ? card : await this.ports.readCard(info.path).catch(() => void 0);
       const covers = other ? (_a2 = parseCardPrompt(other.prompt).covers) != null ? _a2 : "" : "";
-      chapters.push({ title: (_b2 = other == null ? void 0 : other.title) != null ? _b2 : info.title, covers: singleLineText(covers, PROOF_COVERS_MAX) });
+      const entry = withEntry && other ? singleLineText((_b2 = parseCardPrompt(other.prompt).entry) != null ? _b2 : "", PROOF_COVERS_MAX) : "";
+      chapters.push({
+        title: (_c = other == null ? void 0 : other.title) != null ? _c : info.title,
+        covers: singleLineText(covers, PROOF_COVERS_MAX),
+        ...entry ? { entry } : {}
+      });
     }
     return chapters;
   }
@@ -97869,7 +97884,7 @@ Write one suggestion for each of reader, goal, angle, tone, length and style:
 - angle: the viewpoint or path the book takes through the subject.
 - tone: the voice of the writing.
 - length: roughly how long one chapter is, in the unit natural to the book's language.
-- style: how a chapter is shaped and explained.
+- style: the voice, layout and recurring elements of a chapter; it must not prescribe one fixed opening or closing pattern for every chapter.
 
 Rules:
 - Every suggestion is specific to this subject and its field, not a generic phrase that fits any book.

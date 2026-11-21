@@ -3,6 +3,8 @@
 //   node scripts/book-fixture.mjs --session=<name>        seeds /private/tmp/vam-e2e-<name> (must already exist, made by test-harness --session=)
 //   node scripts/book-fixture.mjs --vault=<path>          any harness-owned disposable vault
 // Prints JSON { vault, mapPath, openExpression }; run `openExpression` with `obsidian-cdp.mjs eval` (or a scenario "eval" step) to open the map.
+// A fresh session vault starts in Restricted Mode: run `obsidian-cdp.mjs --vault=<path> trust` (or a {"trust": true} scenario step) before the plugin exists.
+// Ready-made check: node scripts/run-scenario.mjs scripts/scenarios/book-seeded.json --vault=<path>  (trusts, opens the map, shows the Start dialog, never presses Start).
 // Refuses the owner's vault, a vault without the harness marker, and a map that already exists with other content. Idempotent when identical.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";

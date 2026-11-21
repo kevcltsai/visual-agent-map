@@ -104,39 +104,54 @@ function lineStarts(raw: string): number[] {
   return starts;
 }
 
-/** The first cover block outside a code fence, or undefined. A damaged marker (not JSON, no hash) is not a block. */
+/** The index of the first `# Title` line outside the frontmatter and code fences, or -1. */
+function titleIndex(lines: readonly string[], fenced: readonly boolean[]): number {
+  let at = 0;
+  if (/^---\r?$/.test(lines[0] ?? "")) {
+    const close = lines.findIndex((value, i) => i > 0 && /^---\r?$/.test(value));
+    at = close < 0 ? 0 : close + 1;
+  }
+  for (let i = at; i < lines.length; i++) if (!fenced[i] && /^# /.test(lines[i])) return i;
+  return -1;
+}
+
+/**
+ * The cover block directly under the `# Title` line (only blank lines between), or undefined. A block anywhere else in the note (in
+ * Detail, below it, inside a fence) is just text and is never a cover block: map chat or an author could write one there. A damaged
+ * marker (not JSON, no hash, no end marker) is not a block.
+ */
 export function readCoverBlock(raw: string): CoverBlock | undefined {
   const lines = raw.split("\n");
   const fenced = fencedLines(lines);
+  const title = titleIndex(lines, fenced);
+  if (title < 0) return undefined;
+  let i = title + 1;
+  while (i < lines.length && lines[i].trim() === "") i++;
+  const m = i < lines.length && !fenced[i] ? START.exec(lines[i].replace(/\r$/, "")) : null;
+  if (!m) return undefined;
   const starts = lineStarts(raw);
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].replace(/\r$/, "");
-    const m = !fenced[i] ? START.exec(line) : null;
-    if (!m) continue;
-    let record: { file?: unknown; key?: unknown; hash?: unknown; missing?: unknown; off?: unknown };
-    try {
-      record = JSON.parse(m[1]) as typeof record;
-    } catch {
-      continue;
-    }
-    if (typeof record.hash !== "string") continue;
-    const end = lines.findIndex((value, at) => at > i && !fenced[at] && value.replace(/\r$/, "") === END_LINE);
-    if (end < 0) continue;
-    const inner = lines
-      .slice(i + 1, end)
-      .map(value => value.replace(/\r$/, ""))
-      .join("\n");
-    return {
-      ...(typeof record.file === "string" ? { file: record.file } : {}),
-      ...(typeof record.key === "string" ? { key: record.key } : {}),
-      missing: record.missing === 1,
-      off: record.off === 1,
-      intact: hashText(inner) === record.hash,
-      from: starts[i],
-      to: starts[end] + lines[end].replace(/\r$/, "").length
-    };
+  let record: { file?: unknown; key?: unknown; hash?: unknown; missing?: unknown; off?: unknown };
+  try {
+    record = JSON.parse(m[1]) as typeof record;
+  } catch {
+    return undefined;
   }
-  return undefined;
+  if (typeof record.hash !== "string") return undefined;
+  const end = lines.findIndex((value, at) => at > i && !fenced[at] && value.replace(/\r$/, "") === END_LINE);
+  if (end < 0) return undefined;
+  const inner = lines
+    .slice(i + 1, end)
+    .map(value => value.replace(/\r$/, ""))
+    .join("\n");
+  return {
+    ...(typeof record.file === "string" ? { file: record.file } : {}),
+    ...(typeof record.key === "string" ? { key: record.key } : {}),
+    missing: record.missing === 1,
+    off: record.off === 1,
+    intact: hashText(inner) === record.hash,
+    from: starts[i],
+    to: starts[end] + lines[end].replace(/\r$/, "").length
+  };
 }
 
 /** The picture key a card's cover block records (other cards read it, so the same picture is not used twice in a book). */
@@ -145,19 +160,15 @@ export function coverSourceKey(raw: string): string | undefined {
 }
 
 /**
- * The exact text of the cover block the note already had before a write: it sits directly under the `# Title` line (blank lines only
- * between). It may be the program's or one the owner edited (both are the note's own text, put back as they were); a block anywhere else
- * is not trusted. Call it on the note as it was before the write, never on text an author just wrote.
+ * The exact text of the cover block the note already has directly under its `# Title` (the program's, or one the owner edited: both are
+ * the note's own text, put back as they were). Call it on the note as it was before a write, never on text an author just wrote.
  */
 export function trustedCoverBlock(raw: string): string | undefined {
   const block = readCoverBlock(raw);
-  const title = titleLine(raw);
-  if (!block || !title) return undefined;
-  if (raw.slice(title.end, block.from).trim() !== "") return undefined;
-  return raw.slice(block.from, block.to).replace(/\r$/, "");
+  return block ? raw.slice(block.from, block.to).replace(/\r$/, "") : undefined;
 }
 
-/** Removes every cover block (outside code fences) and the blank lines after each; used on text that is not the program's. */
+/** Removes the block under the title and the blank lines after it (repeatedly, in case another follows); used on text that is not the program's. */
 export function stripAllCoverBlocks(raw: string): string {
   let text = raw;
   for (let i = 0; i < 20 && readCoverBlock(text); i++) text = stripCoverBlock(text);

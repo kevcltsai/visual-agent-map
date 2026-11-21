@@ -46,11 +46,15 @@ test('legacy layout (Prompt above Detail): the block stays under the title as we
   assert.ok(out.indexOf('## Prompt') < out.indexOf('## Detail'), 'the layout stays legacy');
 });
 
-test('a block that sits elsewhere in the note (below Detail, or glued to the title) is brought under the title; a second tidy changes nothing', async () => {
-  const lower = await tidy(`${GOLDEN.answer.input}\n${BLOCK}\n`);
-  assert.equal(lower, withBlock(GOLDEN.answer.expected, BLOCK));
+test('a block glued to the title is still under the title and is tidied into place; a block anywhere else is only text: tidying never moves it (a forged block cannot be brought under the title)', async () => {
   const glued = await tidy(GOLDEN.answer.input.replace('# 第一章\n\n', `# 第一章\n${BLOCK}\n`));
   assert.equal(glued, withBlock(GOLDEN.answer.expected, BLOCK));
+  assert.equal(await tidy(glued), glued);
+  const lower = await tidy(`${GOLDEN.answer.input}\n${BLOCK}\n`);
+  assert.ok(!lower.includes(`# 第一章\n\n${BLOCK}`), 'not moved under the title');
+  assert.ok(/book-cover:v1/.test(lower), 'its text is still in the note (not deleted)');
+  assert.equal(block.readCoverBlock(lower), undefined, 'it is not a cover block');
+  assert.equal(block.coverSourceKey(lower), undefined); assert.equal(block.coverOwnership(lower), 'none');
   assert.equal(await tidy(lower), lower);
 });
 

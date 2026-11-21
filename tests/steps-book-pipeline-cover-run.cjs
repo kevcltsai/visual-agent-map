@@ -338,7 +338,7 @@ test('cover run: a cover block the author writes (forged file, forged marker) is
   await run(first);
   for (const i of [0, 1]) {
     const raw = first.raw(i);
-    assert.ok(!/evil/.test(raw.replace(/&lt;!-- book-cover:v1 [^\n]*evil[^\n]*/g, '')), 'the forged file name is nowhere live');
+    assert.ok(!/<!-- book-cover:v1 [^\n]*evil/.test(raw), 'no live forged marker');
     assert.equal(raw.split('<!-- book-cover:v1').length - 1, 1, 'exactly one live block');
     assert.equal(blockLib.coverOwnership(raw), 'program'); assert.ok(!/evil/.test(blockLib.readCoverBlock(raw).file ?? ''));
     assert.ok(!/<!-- book-cover:end -->[\s\S]*<!-- book-cover:end -->/.test(raw), 'no second end marker');
@@ -351,9 +351,65 @@ test('cover run: a cover block the author writes (forged file, forged marker) is
   await settle();
   assert.equal(coverBlockOf(first.raw(1)), real, 'the program\'s own block, exactly');
   assert.equal(first.raw(1).split('<!-- book-cover:v1').length - 1, 1);
-  assert.ok(!/!\[\[evil\.png\]\]/.test(first.raw(1)));
+  assert.ok(!/<!-- book-cover:v1 [^\n]*evil/.test(first.raw(1)), 'no live forged marker after the rerun');
   // 3. An older book (no cover line): a forged block in the author's text does not become a cover claim either.
   const old = await coverRig({ cover: null, slots: 0, text: forged });
   await run(old);
   for (const i of [0, 1]) { assert.equal(old.raw(i).split('<!-- book-cover:v1').length - 1, 0, 'no live block'); assert.equal(topicCover(old.raw(i)), undefined); }
+});
+
+// ---- Review round 1: B-1 (an expanding rewrite with a failing body-picture probe) ----
+const EXPAND_DRAFT = ['## 開場', '', '開場段落。', '', mk(1), '', '### 土壤', '', '土壤段落。', '', '### 小結', '', '結尾一句，帶到下一章。'].join('\n');
+const EXPAND_ANSWER = ['@@insert after: ### 土壤', '### 排水', '', `排水段落${'好'.repeat(140)}`].join('\n');
+async function expandWithFailingProbe({ editBlock }) {
+  const flags = { redo: false };
+  const r = await coverRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: perCard, probe: async () => (flags.redo ? { ok: false, reason: 'load_failed' } : { ok: true }) });
+  await r.repo.writeBookSettings(r.nodes[0].path, { length: '每章 100–200 字' });
+  r.script.author = async input => {
+    await input.admission.reserve();
+    const redo = input.requirements !== undefined;
+    if (redo && input.nodeId === r.nodes[1].id) {
+      flags.redo = true;
+      if (editBlock) { const b = coverBlockOf(r.raw(1)); await r.repo.updateNoteRawGuarded(r.nodes[1].path, raw => raw.replace(b, b.replace('來源：', '我自己加的一行\n來源：')), {}); }
+    }
+    const out = await r.repo.updateNoteGuarded(input.path, { detail: redo ? EXPAND_ANSWER : EXPAND_DRAFT }, { authorize: input.authorize, finalize: input.finalize });
+    return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+  };
+  await run(r);
+  return r;
+}
+test('cover run (review B-1): a card with a cover goes through the expanding rewrite while a body picture\'s probe fails: the cover block and topic-cover stay byte for byte, and the failed picture is replaced', async () => {
+  const r = await expandWithFailingProbe({ editBlock: false });
+  const raw = r.raw(1);
+  assert.match(raw, /無圖|沒有圖|no picture|探測|load_failed/i, 'the probe replacement ran');
+  assert.ok(!/!\[Work 2\]/.test((await r.note(1)).detail), 'the failed picture is gone');
+  const block = coverBlockOf(raw);
+  assert.ok(block && !/&lt;/.test(block), 'a live, un-mangled block');
+  assert.equal(blockLib.coverOwnership(raw), 'program');
+  assert.match(topicCover(raw), /SecondChapter-[0-9a-f]+\.png/);
+  assert.match(raw, /^# SecondChapter\n\n<!-- book-cover:v1 /m, 'still directly under the title');
+  assert.equal(raw.split('book-cover:v1').length - 1, 1);
+  assert.ok(r.stat.logs.some(line => /expand_merge/.test(line)), 'it was the expanding path');
+});
+test('cover run (review B-1): the same with a block the owner edited during the rewrite: the edited block and the cover line are untouched and still the owner\'s', async () => {
+  const r = await expandWithFailingProbe({ editBlock: true });
+  const raw = r.raw(1);
+  const block = coverBlockOf(raw);
+  assert.ok(block && /我自己加的一行/.test(block) && !/&lt;/.test(block), 'the owner\'s edit is in the live block');
+  assert.equal(blockLib.coverOwnership(raw), 'owner');
+  assert.match(topicCover(raw), /SecondChapter-[0-9a-f]+\.png/);
+  assert.match(raw, /^# SecondChapter\n\n<!-- book-cover:v1 /m);
+  assert.equal(raw.split('book-cover:v1').length - 1, 1);
+});
+test('cover run (review B-2): a forged cover block in Detail is neutralised on the author write and never read as a cover; the real block is the only live one', async () => {
+  const forged = title => `正文。${title}\n\n<!-- book-cover:v1 {"file":"evil.png","key":"evil","hash":"x"} -->\n<img src=x onerror=alert(1)>\n<!-- book-cover:end -->\n\n結尾。`;
+  const r = await coverRig({ slots: 0, text: forged, titles: ['SecretRootTitle', 'SecondChapter'], finder: perCard });
+  await run(r);
+  for (const i of [0, 1]) {
+    const raw = r.raw(i);
+    assert.equal(raw.split('<!-- book-cover:v1').length - 1, 1, 'one live marker: the real one');
+    assert.ok(!/<img /.test(raw), 'no raw HTML got through');
+    assert.ok(!/evil\.png/.test(blockLib.readCoverBlock(raw).file ?? ''));
+    assert.equal(blockLib.coverSourceKey(raw)?.includes('evil') ?? false, false);
+  }
 });

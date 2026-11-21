@@ -202,7 +202,7 @@ import {
   coverOwnership,
   coverSourceKey,
   putCoverBlock,
-  stripAllCoverBlocks,
+  stripCoverBlock,
   trustedCoverBlock,
   type CoverLevel
 } from "../../core/book-pipeline/cover-block";
@@ -3645,12 +3645,13 @@ export class BookPipelineRuns {
     };
     // The cover block (under the title) is not the author's text: it is taken out before the cleaning and put back under the title after,
     // so neither the tag neutralizing nor the section rules can touch or move it.
-    // Only the block the program itself placed (read from the note as it was before this write: intact, directly under the title) is put
-    // back, as that exact text. A cover block in what the author wrote is never carried through: it is removed before the cleaning.
-    const trustedCover = trustedCoverBlock(card.raw);
+    // The cover block (the one directly under the title, as the note has it when this write happens, so an owner edit made while the author
+    // worked is kept) is lifted out before the cleaning and put back as it was. The author writes only the Detail, which is never under
+    // the title: a cover block in its text is just text and goes through the cleaning (the tag neutralizing) like the rest.
     const finalize = (original: string): string | null => {
-      const out = finalizeText(stripAllCoverBlocks(original));
-      return out === null || trustedCover === undefined ? out : putCoverBlock(out, trustedCover);
+      const cover = trustedCoverBlock(original);
+      const out = finalizeText(cover === undefined ? original : stripCoverBlock(original));
+      return out === null || cover === undefined ? out : putCoverBlock(out, cover);
     };
     // Why the author is called now (live v5: an intro's second writing call had no visible reason in the log).
     const attempt = attemptsOf(drive.store.state, nodeId).write;
@@ -3837,8 +3838,12 @@ export class BookPipelineRuns {
       if (!probed.ok) replacements.set(url, noPicture(drive.config.language, probed.reason));
     }
     if (replacements.size) {
-      const held = holdProofLines(written.raw, knownLines);
-      const cleaned = programStampRaw(written.raw, held.restore(replaceBodyImages(held.text, replacements)));
+      // The cover block (under the title) is not body text: it is lifted out first and put back as it was, so the rebuild below cannot touch it.
+      const cover = trustedCoverBlock(written.raw);
+      const bare = cover === undefined ? written.raw : stripCoverBlock(written.raw);
+      const held = holdProofLines(bare, knownLines);
+      const rebuilt = programStampRaw(bare, held.restore(replaceBodyImages(held.text, replacements)));
+      const cleaned = cover === undefined ? rebuilt : putCoverBlock(rebuilt, cover);
       const outcome = await this.ports.updateNoteRawGuarded(path, () => cleaned, {
         expectedContent: written.raw,
         authorize

@@ -4,7 +4,10 @@
 //   header button   .vam-book-button            opens the start dialog (or answers with a Notice when the map cannot start)
 //   start dialog    .vam-book-start-go          the Start button; .vam-book-start-field are the whole-book setting boxes
 //   progress bar    .vam-book-bar               its data-mode is planning | gate1 | writing | gate2 | done | stopped | budget | changed
-//   gate buttons    gate 1 (plan accepted): .vam-book-confirm   plan summary: .vam-book-open-plan   back: .vam-book-back-to-plan
+//   gate buttons    the ONLY owner gate is gate 1 (plan review): .vam-book-confirm   plan summary: .vam-book-open-plan   back: .vam-book-back-to-plan
+//                   the trial and gate 2 pass by themselves (the bar reads writing, then done): wait for barMode("done"), never for gate2
+//   done            .vam-book-open-issues (what is still open), .vam-book-abandon then .vam-book-abandon-confirm (remove the book state)
+//   live run        scripts/scenarios/book-live-gates.json (seed with --small; verified: 26 AI calls on claude:haiku)
 //   cover           has no DOM class: it is a note block, check it with coverBlockExpression(path)
 export const BOOK_SELECTORS = {
   startButton: ".vam-book-button",
@@ -27,7 +30,7 @@ export const BOOK_SELECTORS = {
   abandon: ".vam-book-abandon",
   abandonConfirm: ".vam-book-abandon-confirm",
   abandonCancel: ".vam-book-abandon-cancel",
-  cardState: ".vam-book-state",
+  cardState: ".vam-book-state", // card header chip: drawn only while the map tab is shown; a background-opened tab has none, so check the note's pipeline-stage frontmatter instead
   cardRole: ".vam-book-role",
   appliedNotice: ".vam-book-applied-notice"
 };

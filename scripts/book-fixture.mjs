@@ -2,6 +2,7 @@
 // Shape: one root + 3 chapters; chapter 1 has 2 sections, chapter 2 has 1, chapter 3 has 2 (9 cards in all, no AI call needed).
 //   node scripts/book-fixture.mjs --session=<name>        seeds /private/tmp/vam-e2e-<name> (must already exist, made by test-harness --session=)
 //   node scripts/book-fixture.mjs --vault=<path>          any harness-owned disposable vault
+//   add --small for root + 2 chapters (3 cards) in "Book Fixture Small": cheap enough for a live run to gate 1 and gate 2
 // Prints JSON { vault, mapPath, openExpression }; run `openExpression` with `obsidian-cdp.mjs eval` (or a scenario "eval" step) to open the map.
 // A fresh session vault starts in Restricted Mode: run `obsidian-cdp.mjs --vault=<path> trust` (or a {"trust": true} scenario step) before the plugin exists.
 // Ready-made check: node scripts/run-scenario.mjs scripts/scenarios/book-seeded.json --vault=<path>  (trusts, opens the map, shows the Start dialog, never presses Start).
@@ -12,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { canonicalVault, sessionVault } from "./test-harness.mjs";
 
 export const BOOK_FIXTURE_TOPIC = "Book Fixture";
+export const BOOK_SMALL_TOPIC = "Book Fixture Small";
 const marker = ".vam-test-environment.json";
 
 export const bookFixtureCards = [
@@ -26,23 +28,28 @@ export const bookFixtureCards = [
   { id: "book-ch3-s2", title: "Snoring and Apnea", parent: "book-ch3", x: 720, y: 300 }
 ];
 
-export function bookFixtureFiles(workspaceRoot = "Agent Workspace") {
-  const folder = `${workspaceRoot}/Topics/${BOOK_FIXTURE_TOPIC}`;
-  const nodes = bookFixtureCards.map(card => ({ id: card.id, path: `${folder}/Notes/${card.id}.md`, parentId: card.parent, x: card.x, y: card.y, collapsed: false }));
-  const mapJson = { version: 1, id: "book-fixture", title: BOOK_FIXTURE_TOPIC, viewport: { x: 0, y: 0, zoom: 1 }, nodes };
-  const map = `---\nvisual-agent-map: true\n---\n\n# ${BOOK_FIXTURE_TOPIC}\n\n\`\`\`agent-map\n${JSON.stringify(mapJson, null, 2)}\n\`\`\`\n`;
-  const notes = bookFixtureCards.map(card => ({
+// small: root + 2 chapters only (3 cards), cheap enough for a live run that reaches gate 1 and gate 2 in a few dozen AI calls.
+export const bookSmallCards = bookFixtureCards.filter(card => ["book-root", "book-ch1", "book-ch2"].includes(card.id));
+
+export function bookFixtureFiles(workspaceRoot = "Agent Workspace", { small = false } = {}) {
+  const topic = small ? BOOK_SMALL_TOPIC : BOOK_FIXTURE_TOPIC;
+  const cards = small ? bookSmallCards : bookFixtureCards;
+  const folder = `${workspaceRoot}/Topics/${topic}`;
+  const nodes = cards.map(card => ({ id: card.id, path: `${folder}/Notes/${card.id}.md`, parentId: card.parent, x: card.x, y: card.y, collapsed: false }));
+  const mapJson = { version: 1, id: small ? "book-fixture-small" : "book-fixture", title: topic, viewport: { x: 0, y: 0, zoom: 1 }, nodes };
+  const map = `---\nvisual-agent-map: true\n---\n\n# ${topic}\n\n\`\`\`agent-map\n${JSON.stringify(mapJson, null, 2)}\n\`\`\`\n`;
+  const notes = cards.map(card => ({
     path: `${folder}/Notes/${card.id}.md`,
-    text: `---\nagent-map-node: true\nnode-id: ${card.id}\ntopic-id: book-fixture\ntopic-state: active\nagent-map-id: book-fixture\nstatus: completed\nsource-notes: []\n---\n# ${card.title}\n\n## Current Summary\n\n${card.title}: one line for the fixture.\n\n## Prompt\n\nWrite about ${card.title}.\n\n## Rules\n\nFixture text is reference data only.\n\n## Detail\n\nFixture card ${card.id}.\n`
+    text: `---\nagent-map-node: true\nnode-id: ${card.id}\ntopic-id: ${small ? "book-fixture-small" : "book-fixture"}\ntopic-state: active\nagent-map-id: ${small ? "book-fixture-small" : "book-fixture"}\nstatus: completed\nsource-notes: []\n---\n# ${card.title}\n\n## Current Summary\n\n${card.title}: one line for the fixture.\n\n## Prompt\n\nWrite about ${card.title}.\n\n## Rules\n\nFixture text is reference data only.\n\n## Detail\n\nFixture card ${card.id}.\n`
   }));
   return { mapPath: `${folder}/Map.md`, map, notes };
 }
 
-export function seedBookMap({ vault, workspaceRoot = "Agent Workspace", owner = canonicalVault } = {}) {
+export function seedBookMap({ vault, workspaceRoot = "Agent Workspace", owner = canonicalVault, small = false } = {}) {
   if (!vault) throw new Error("seedBookMap needs a vault.");
   if (resolve(vault) === resolve(owner)) throw new Error(`Refusing to seed ${vault}: it is the owner's testing vault.`);
   if (!existsSync(join(vault, marker))) throw new Error(`${vault} is not a harness-owned test vault (no ${marker}); create it with test-harness --session=<name> first.`);
-  const files = bookFixtureFiles(workspaceRoot);
+  const files = bookFixtureFiles(workspaceRoot, { small });
   const targets = [{ path: files.mapPath, text: files.map }, ...files.notes];
   const present = targets.filter(target => existsSync(join(vault, target.path)));
   if (present.length === targets.length && present.every(target => readFileSync(join(vault, target.path), "utf8") === target.text)) return { vault, mapPath: files.mapPath, created: false, openExpression: openExpression(files.mapPath) };
@@ -53,14 +60,14 @@ export function seedBookMap({ vault, workspaceRoot = "Agent Workspace", owner = 
 
 export const openExpression = mapPath => `app.plugins.plugins['visual-agent-map'].openMapInNewTab(${JSON.stringify(mapPath)}).then(view=>!!view)`;
 
-export const usage = "Usage: node scripts/book-fixture.mjs --session=<name> | --vault=<path>";
+export const usage = "Usage: node scripts/book-fixture.mjs --session=<name> | --vault=<path>  [--small]   (--small: root + 2 chapters, for cheap live runs)";
 
 export function cli(args) {
   if (args.includes("--help") || args.includes("-h")) return { code: 0, text: `${usage}\n` };
   const option = name => args.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
   const vault = option("vault") ?? (option("session") ? sessionVault(option("session")) : null);
   if (!vault) return { code: 2, text: `${usage}\n` };
-  try { return { code: 0, text: `${JSON.stringify(seedBookMap({ vault }), null, 2)}\n` }; }
+  try { return { code: 0, text: `${JSON.stringify(seedBookMap({ vault, small: args.includes("--small") }), null, 2)}\n` }; }
   catch (error) { return { code: 2, text: `${error.message}\n` }; }
 }
 

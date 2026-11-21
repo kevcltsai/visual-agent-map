@@ -4,7 +4,8 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, fetchDepsTable } from '../scripts/test-harness.mjs';
+import vm from 'node:vm';
+import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, fetchDepsTable, reloadPluginExpression, reloadRunningPlugin } from '../scripts/test-harness.mjs';
 import { ownerBusyReasons, waitOwnerIdle } from '../scripts/owner-idle.mjs';
 import { policyAction, applyPolicy, policyExpression } from '../scripts/keep-background.mjs';
 
@@ -576,4 +577,26 @@ test('an unreadable appearance.json stops a refresh before any installed file or
   assert.equal(readFileSync(join(plugin, 'main.js'), 'utf8'), 'stale plugin build');
   assert.equal(readFileSync(join(vault, '.vam-test-environment.json'), 'utf8'), record);
   assert.deepEqual(readdirSync(plugin).filter(name => name.startsWith('.vam-update-')), [], 'no staging left behind');
+});
+
+// The owner's 2026-11-22 book ran a days-old build: --update-current replaced the files while Obsidian was open and never reloaded the plugin.
+test('a running Obsidian is made to load the new build: the plugin is disabled and enabled (enabled list untouched), a stale instance or a switched-off plugin is reported', async () => {
+  const fakeApp = (enabled, loads = true) => {
+    const calls = [];
+    const plugins = { enabledPlugins: new Set(enabled ? ['visual-agent-map'] : []), plugins: enabled ? { 'visual-agent-map': { manifest: { version: '0.34.0' } } } : {} };
+    plugins.disablePlugin = async id => { calls.push(`disable ${id}`); delete plugins.plugins[id]; };
+    plugins.enablePlugin = async id => { calls.push(`enable ${id}`); plugins.plugins[id] = loads ? { manifest: { version: '0.34.0' } } : undefined; };
+    plugins.disablePluginAndSave = plugins.enablePluginAndSave = async () => calls.push('saved');
+    return { app: { plugins }, calls };
+  };
+  const connect = fake => async () => ({ evaluate: expression => vm.runInNewContext(expression, { app: fake.app }), close() {} });
+  const live = fakeApp(true);
+  assert.deepEqual({ ...(await reloadRunningPlugin('/v', '0.34.0', connect(live))) }, { enabled: true, reloaded: true, version: '0.34.0' });
+  assert.deepEqual(live.calls, ['disable visual-agent-map', 'enable visual-agent-map'], 'the plugin is reloaded; the saved enabled list is never written');
+  await assert.rejects(reloadRunningPlugin('/v', '0.34.0', connect(fakeApp(true, false))), /old plugin is still running|did not load it/);
+  await assert.rejects(reloadRunningPlugin('/v', '0.35.0', connect(fakeApp(true))), /did not load it/, 'a version other than the installed one is not taken as loaded');
+  const off = fakeApp(false);
+  assert.equal((await reloadRunningPlugin('/v', '0.34.0', connect(off))).enabled, false);
+  assert.deepEqual(off.calls, [], 'a plugin the owner switched off is left off');
+  assert.doesNotMatch(reloadPluginExpression, /AndSave|focus|activate/);
 });

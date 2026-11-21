@@ -49915,19 +49915,16 @@ var unconditionalPicture = (text10) => (PICTURE_ALONE.test(text10) || PICTURE_NO
 var SUBJECTIVE = /值得(?:注意|關注|关注|一提|留意)|精彩|精采|生動|生动|重要|引人入勝|引人入胜|有趣|吸引人|動人|动人|優美|优美|流暢|流畅|深刻|震撼|\b(?:noteworthy|worth noting|brilliant|vivid|engaging|compelling|interesting|important)\b/i;
 function parseCardPlan(raw, request) {
   const item = parseJson(raw);
-  exactKeys(
-    item,
-    "cover" in item ? ["covers", "points", "entry", "handoff", "previous", "next", "checklist", "images", "cover"] : ["covers", "points", "entry", "handoff", "previous", "next", "checklist", "images"]
-  );
+  exactKeys(item, ["covers", "points", "entry", "handoff", "previous", "next", "checklist", "images", "cover"]);
   const points = arrayOf(item.points, "points").map((value) => singleLine(textOf(value, "points item"), POINT_MAX).replace(/·/g, "\u30FB")).filter(Boolean);
   if (points.length < MIN_POINTS) fail2(`points must have ${MIN_POINTS} to ${MAX_POINTS} items`);
   const entries = arrayOf(item.checklist, "checklist");
   if (entries.length < 1 || entries.length > MAX_CHECKLIST) fail2(`checklist must have 1 to ${MAX_CHECKLIST} items`);
   const parsed = entries.map((entry) => {
-    const one = recordOf2(entry, "checklist item");
-    exactKeys(one, ["type", "text"]);
-    if (one.type !== "structure" && one.type !== "fact") return fail2("unknown checklist type");
-    return { type: one.type, text: singleLine(textOf(one.text, "checklist text")) };
+    const one2 = recordOf2(entry, "checklist item");
+    exactKeys(one2, ["type", "text"]);
+    if (one2.type !== "structure" && one2.type !== "fact") return fail2("unknown checklist type");
+    return { type: one2.type, text: singleLine(textOf(one2.text, "checklist text")) };
   });
   const objective = parsed.filter((item2) => !SUBJECTIVE.test(item2.text));
   const dropped = parsed.length - objective.length;
@@ -49939,29 +49936,26 @@ function parseCardPlan(raw, request) {
   if (all.length > MAX_IMAGE_SLOTS) fail2(`images must have 0 to ${MAX_IMAGE_SLOTS} items`);
   const slots = all.slice(0, imageSlotCap(imageCountRange(request.settings)));
   const images = slots.map((entry, at) => {
-    const one = recordOf2(entry, "image slot");
-    exactKeys(one, "search" in one ? ["kind", "explains", "anchor", "search"] : ["kind", "explains", "anchor"]);
+    const one2 = recordOf2(entry, "image slot");
+    exactKeys(one2, "search" in one2 ? ["kind", "explains", "anchor", "search"] : ["kind", "explains", "anchor"]);
     const field = (value, what, max) => {
       const text10 = cleanSlotText(singleLine(textOf(value, what), 400), max);
       return text10 || fail2(`${what} must be a non-empty string`);
     };
-    const terms = Array.isArray(one.search) ? cleanSearchTerms(one.search) : [];
+    const terms = Array.isArray(one2.search) ? cleanSearchTerms(one2.search) : [];
     return {
       index: at + 1,
-      kind: field(one.kind, "image kind", 40),
-      explains: field(one.explains, "image explains", 200),
-      anchor: field(one.anchor, "image anchor", 120),
+      kind: field(one2.kind, "image kind", 40),
+      explains: field(one2.explains, "image explains", 200),
+      anchor: field(one2.anchor, "image anchor", 120),
       ...terms.length ? { search: terms } : {}
     };
   });
-  let cover;
-  if ("cover" in item) {
-    const one = recordOf2(item.cover, "cover");
-    exactKeys(one, "search" in one ? ["explains", "search"] : ["explains"]);
-    const explains = cleanSlotText(singleLine(textOf(one.explains, "cover explains"), 400), 200);
-    if (!explains) fail2("cover explains is empty");
-    cover = { explains, search: Array.isArray(one.search) ? cleanSearchTerms(one.search) : [] };
-  }
+  const one = recordOf2(item.cover, "cover");
+  exactKeys(one, "search" in one ? ["explains", "search"] : ["explains"]);
+  const explains = cleanSlotText(singleLine(textOf(one.explains, "cover explains"), 400), 200);
+  if (!explains) fail2("cover explains is empty");
+  const cover = { explains, search: Array.isArray(one.search) ? cleanSearchTerms(one.search) : [] };
   const side = (value, present, what) => present ? singleLine(textOf(value, what), 240) : "";
   return {
     covers: singleLine(textOf(item.covers, "covers")),
@@ -49972,7 +49966,7 @@ function parseCardPlan(raw, request) {
     next: side(item.next, !!request.next, "next"),
     checklist,
     images,
-    ...cover ? { cover } : {},
+    cover,
     ...dropped ? { droppedSubjective: dropped } : {},
     ...droppedPicture ? { droppedPicture } : {}
   };

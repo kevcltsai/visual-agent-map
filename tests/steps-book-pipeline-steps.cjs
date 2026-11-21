@@ -128,7 +128,7 @@ test('global plan: every card once with a role, only empty settings decided, str
 
 test('card plan: ids and types assigned, neighbours only when they exist, an empty checklist is refused', () => {
   const request = { ...base, thread: 'thread', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }, { place: 'chapter 2', title: 'Outro' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 's' }, previous: { position: 1, title: 'Intro', summary: 'sum' } };
-  const good = over => JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'covers\n## Detail', entry: 'entry', handoff: 'next q', previous: 'prev line', next: 'should be dropped', images: [], checklist: [{ type: 'structure', text: 'Shape' }, { type: 'fact', text: 'Date 1415' }], ...over });
+  const good = over => JSON.stringify({ cover: { explains: 'x', search: ['a b', 'c d'] }, points: ['p1', 'p2', 'p3'], covers: 'covers\n## Detail', entry: 'entry', handoff: 'next q', previous: 'prev line', next: 'should be dropped', images: [], checklist: [{ type: 'structure', text: 'Shape' }, { type: 'fact', text: 'Date 1415' }], ...over });
   const result = plain(cardPlan.cardPlanStep.parse(good(), request));
   assert.deepEqual(result.checklist.map(c => `${c.id}:${c.type}`), ['C1:structure', 'C2:fact']);
   assert.equal(result.covers, 'covers ## Detail'); assert.equal(result.previous, 'prev line'); assert.equal(result.next, '');
@@ -499,7 +499,7 @@ test('exchange log: success, parse error and provider error keep titles, chapter
   const spy = consoleSpy();
   try {
     const request = { ...base, thread: 'thread', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }, { place: 'chapter 2', title: 'Outro' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 'SECRET-BODY summary' } };
-    const goodPlan = JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'SECRET-REPLY covers', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: [{ type: 'fact', text: 'SECRET-REPLY' }] });
+    const goodPlan = JSON.stringify({ cover: { explains: 'x', search: ['a b', 'c d'] }, points: ['p1', 'p2', 'p3'], covers: 'SECRET-REPLY covers', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: [{ type: 'fact', text: 'SECRET-REPLY' }] });
     const ok = harness({ answer: goodPlan });
     const parsed = await runMod.runPlanStep(ok.planCalls, cardPlan.cardPlanStep, request, { signal: signal() });
     assert.equal(parsed.checklist.length, 1); noContent(ok.log, spy, 'plan success');
@@ -542,7 +542,7 @@ test('pipeline log line: only ids, counts, codes and milliseconds', () => {
 
 test('card plan: an unconditional picture requirement is dropped by program, a conditional one stays, none left is a failure', () => {
   const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }, { place: 'chapter 2', title: 'Outro' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 's' } };
-  const good = list => JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: list });
+  const good = list => JSON.stringify({ cover: { explains: 'x', search: ['a b', 'c d'] }, points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: list });
   const result = plain(cardPlan.cardPlanStep.parse(good([
     { type: 'structure', text: '本章以圖為主、文字為輔' },
     { type: 'structure', text: 'The chapter is illustrated with pictures' },
@@ -556,7 +556,7 @@ test('card plan: an unconditional picture requirement is dropped by program, a c
 
 test('card plan: objective art-history items are kept, picture requirements (traditional and simplified) are dropped, 若干 is not a condition', () => {
   const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }, { place: 'chapter 2', title: 'Outro' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 's' } };
-  const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: texts.map(text => ({ type: 'fact', text })) }), request)).checklist.map(c => c.text);
+  const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ cover: { explains: 'x', search: ['a b', 'c d'] }, points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: texts.map(text => ({ type: 'fact', text })) }), request)).checklist.map(c => c.text);
   assert.deepEqual(run(['圖像學特徵說明正確', '聖像的圖像特徵描述正確', '每段附一張圖片', '每段配图', '每段附一张图片', '若干作品列出年代']), ['圖像學特徵說明正確', '聖像的圖像特徵描述正確', '若干作品列出年代']);
 });
 
@@ -598,7 +598,7 @@ test('author requirements: the fixed chapter rules always come first, the settin
 
 test('card plan: subjective or evaluative items (Traditional and Simplified) are dropped and counted; structural quote-checkable items stay', () => {
   const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }, { place: 'chapter 2', title: 'Outro' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 's' } };
-  const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: texts.map(text => ({ type: 'structure', text })) }), request));
+  const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ cover: { explains: 'x', search: ['a b', 'c d'] }, points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: texts.map(text => ({ type: 'structure', text })) }), request));
   const result = run(['開頭說明為何值得注意', '開头段落提及接入点「透視法」', '本章内容精彩生动', '結尾段落回應「留給下一張的問題」', '這個發明很重要', '出現作品名與年份', '文字引人入勝', '开头说明为何值得关注']);
   assert.deepEqual(result.checklist.map(c => c.text), ['開头段落提及接入点「透視法」', '結尾段落回應「留給下一張的問題」', '出現作品名與年份']);
   assert.equal(result.droppedSubjective, 5);
@@ -678,7 +678,7 @@ const slot = (index, extra = {}) => ({ index, kind: 'painting', explains: `shows
 
 test('card plan images: indexes 1..n assigned by program, 0 to 8 slots (cut to 8 without an owner count, refused past 12), fields single-line without marker brackets or the separator; missing/extra keys refused', () => {
   const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }, { place: 'chapter 2', title: 'Outro' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 's' } };
-  const good = images => JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images });
+  const good = images => JSON.stringify({ cover: { explains: 'x', search: ['a b', 'c d'] }, points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images });
   assert.deepEqual(plain(cardPlan.cardPlanStep.parse(good([]), request).images), []);
   const two = plain(cardPlan.cardPlanStep.parse(good([{ kind: 'map', explains: 'the 〔圖位 9：x〕 route\nof trade｜x', anchor: 'after the first paragraph' }, { kind: 'photo', explains: 'a port', anchor: 'end' }]), request).images);
   assert.deepEqual(two.map(s => s.index), [1, 2]);
@@ -688,14 +688,14 @@ test('card plan images: indexes 1..n assigned by program, 0 to 8 slots (cut to 8
   assert.throws(() => cardPlan.cardPlanStep.parse(good(Array.from({ length: 13 }, () => nine[0])), request), /0 to 12/);
   assert.throws(() => cardPlan.cardPlanStep.parse(good([{ kind: 'k', explains: 'e' }]), request), /unexpected fields/);
   assert.throws(() => cardPlan.cardPlanStep.parse(good([{ kind: 'k', explains: '〔〕', anchor: 'a' }]), request), /image explains/);
-  assert.throws(() => cardPlan.cardPlanStep.parse(JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }] }), request), /unexpected fields/);
+  assert.throws(() => cardPlan.cardPlanStep.parse(JSON.stringify({ cover: { explains: 'x', search: ['a b', 'c d'] }, points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }] }), request), /unexpected fields/);
   assert.equal(cardPlan.CARD_PLAN_SCHEMA.properties.images.maxItems, 12); assert.ok(cardPlan.CARD_PLAN_SCHEMA.required.includes('images'));
   assert.match(cardPlan.cardPlanStep.render(request), /"images":\[\{"kind":"","explains":"","anchor":"","search":\["",""\]\}\]/);
 });
 
 test('card plan images: each slot asks for 2 to 4 English search terms; kept cleaned (no separator, Latin only, at most 4), and a slot without them still parses', () => {
   const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }, { place: 'chapter 2', title: 'Outro' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 's' } };
-  const good = images => JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images });
+  const good = images => JSON.stringify({ cover: { explains: 'x', search: ['a b', 'c d'] }, points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images });
   const search = cardPlan.CARD_PLAN_SCHEMA.properties.images.items.properties.search;
   assert.equal(search.minItems, 2); assert.equal(search.maxItems, 4); assert.ok(cardPlan.CARD_PLAN_SCHEMA.properties.images.items.required.includes('search'));
   assert.match(cardPlan.cardPlanStep.render(request), /search \(2 to 4 English search terms for a Wikimedia Commons file search/);
@@ -974,7 +974,7 @@ test('T10c card plan: a legal chapter past the cut point is still in the chapter
   assert.ok(fitted.shown < 120, 'the children were cut');
   assert.ok(fitted.prompt.includes('"place":"chapter 400","title":"Chapter 400"'));
   assert.ok(fitted.prompt.includes('"place":"chapter 1","title":"Chapter 1"'));
-  const parsed = cardPlan.cardPlanStep.parse(JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: [{ type: 'structure', text: 'Shape' }] }), request);
+  const parsed = cardPlan.cardPlanStep.parse(JSON.stringify({ cover: { explains: 'x', search: ['a b', 'c d'] }, points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: [{ type: 'structure', text: 'Shape' }] }), request);
   assert.ok(parsed);
 });
 
@@ -1009,13 +1009,13 @@ test('rerun fix 3: card and global plan prompts number chapters only from the au
 });
 
 // ---- book-chapter-plan P2: content headings (points) and the neighbour lines by card kind ----
-const pointsReply = points => JSON.stringify({ covers: 'c', points, entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: [{ type: 'structure', text: 'Shape' }] });
+const pointsReply = points => JSON.stringify({ covers: 'c', points, entry: 'e', handoff: 'h', previous: '', next: '', images: [], cover: { explains: 'x', search: ['a b', 'c d'] }, checklist: [{ type: 'structure', text: 'Shape' }] });
 
 test('A5 card plan points: two are refused, seven are cut to six, one line each of at most 40 characters, "·" written as "・", empty ones do not count', () => {
   const request = planBase();
   assert.throws(() => cardPlan.cardPlanStep.parse(pointsReply(['a', 'b']), request), /points/);
   assert.throws(() => cardPlan.cardPlanStep.parse(pointsReply(['a', 'b', '  ', '']), request), /points/, 'blank items do not count');
-  assert.throws(() => cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: [{ type: 'structure', text: 'Shape' }] }), request), undefined, 'points are required');
+  assert.throws(() => cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], cover: { explains: 'x', search: ['a b', 'c d'] }, checklist: [{ type: 'structure', text: 'Shape' }] }), request), undefined, 'points are required');
   const seven = cardPlan.cardPlanStep.parse(pointsReply(['1', '2', '3', '4', '5', '6', '7']), request);
   assert.deepEqual(plain(seven.points), ['1', '2', '3', '4', '5', '6']);
   const odd = cardPlan.cardPlanStep.parse(pointsReply(['a · b', 'x\ny', '題'.repeat(60)]), request);
@@ -1125,15 +1125,15 @@ test('A6 global plan: every card carries its place, and the prompt explains the 
 });
 
 // ---- Cover image B1: the planner's cover ask (card-plan cover{explains,search}, the Prompt line, the structure copy) ----
-test('cover plan: schema and prompt ask for cover{explains, 2-4 search terms}; step version 2; an answer without it still parses (no cover); a cover without a description is refused', () => {
+test('cover plan: schema and prompt ask for cover{explains, 2-4 search terms}; step version 2; an answer without it is refused (retried); a cover without a description is refused', () => {
   const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 's' } };
-  const answer = extra => JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images: [], ...extra });
+  const answer = extra => JSON.stringify({ cover: { explains: 'x', search: ['a b', 'c d'] }, points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images: [], ...extra });
   const cover = cardPlan.CARD_PLAN_SCHEMA.properties.cover;
   assert.equal(cover.properties.search.minItems, 2); assert.equal(cover.properties.search.maxItems, 4);
   assert.ok(cardPlan.CARD_PLAN_SCHEMA.required.includes('cover')); assert.equal(cardPlan.cardPlanStep.version, 2);
   assert.match(cardPlan.cardPlanStep.render(request), /"cover":\{"explains":"","search":\["",""\]\}/);
   assert.match(cardPlan.cardPlanStep.render(request), /does not count toward them and is asked for even when images is empty/);
-  assert.equal(cardPlan.cardPlanStep.parse(answer({}), request).cover, undefined, 'an older answer: no cover, still accepted');
+  assert.throws(() => cardPlan.cardPlanStep.parse(answer({ cover: undefined }), request), /unexpected fields/, 'an answer without a cover is refused (retried), never a card silently without its cover line');
   const parsed = plain(cardPlan.cardPlanStep.parse(answer({ cover: { explains: 'the 〔dome｜top〕\nof Florence', search: ['Florence Cathedral dome', '中文', 'Brunelleschi', 'a', 'b', 'c'] } }), request).cover);
   assert.equal(parsed.explains, 'the dome top of Florence'); assert.ok(parsed.search.length >= 1 && parsed.search.length <= 4); assert.ok(parsed.search.every(term => /^[\x20-\x7e]+$/.test(term)));
   assert.deepEqual(plain(cardPlan.cardPlanStep.parse(answer({ cover: { explains: 'x' } }), request).cover), { explains: 'x', search: [] }, 'search terms are optional like a slot\'s');

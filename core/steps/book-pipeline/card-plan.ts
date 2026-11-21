@@ -95,8 +95,8 @@ export interface CardPlanResult {
   checklist: ChecklistItem[];
   /** The image plan: 0 to 8 slots, indexes `1..n` assigned here in order. */
   images: ImageSlot[];
-  /** The card's cover picture ask; absent when an older answer has none (the card then gets no cover line). */
-  cover?: CoverPlan;
+  /** The card's cover picture ask (required: an answer without it is refused and retried). */
+  cover: CoverPlan;
   /** How many items the subjective-word filter dropped (absent when none); the runner logs the count. */
   droppedSubjective?: number;
   /** How many items the unconditional-picture filter dropped (absent when none). */
@@ -179,13 +179,8 @@ const SUBJECTIVE =
 
 export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanResult {
   const item = parseJson(raw);
-  // `cover` is asked for but optional here: an answer without it (an older one) is kept and its card gets no cover line.
-  exactKeys(
-    item,
-    "cover" in item
-      ? ["covers", "points", "entry", "handoff", "previous", "next", "checklist", "images", "cover"]
-      : ["covers", "points", "entry", "handoff", "previous", "next", "checklist", "images"]
-  );
+  // `cover` is required like the rest: an answer without it is a failure (retried), so a card never silently goes without its cover ask.
+  exactKeys(item, ["covers", "points", "entry", "handoff", "previous", "next", "checklist", "images", "cover"]);
   // Content headings: one line each, at most 40 characters, `·` (the Prompt line's separator) written as `・`; fewer than three is a failure (retried), more than six are cut.
   const points = arrayOf(item.points, "points")
     .map(value => singleLine(textOf(value, "points item"), POINT_MAX).replace(/·/g, "・"))
@@ -228,15 +223,12 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
       ...(terms.length ? { search: terms } : {})
     };
   });
-  let cover: CoverPlan | undefined;
-  if ("cover" in item) {
-    // Present but unusable (no description) is a failure (retried); search terms are optional like a slot's.
-    const one = recordOf(item.cover, "cover");
-    exactKeys(one, "search" in one ? ["explains", "search"] : ["explains"]);
-    const explains = cleanSlotText(singleLine(textOf(one.explains, "cover explains"), 400), 200);
-    if (!explains) fail("cover explains is empty");
-    cover = { explains, search: Array.isArray(one.search) ? cleanSearchTerms(one.search) : [] };
-  }
+  // An unusable cover (no description) is a failure (retried); search terms are optional like a slot's.
+  const one = recordOf(item.cover, "cover");
+  exactKeys(one, "search" in one ? ["explains", "search"] : ["explains"]);
+  const explains = cleanSlotText(singleLine(textOf(one.explains, "cover explains"), 400), 200);
+  if (!explains) fail("cover explains is empty");
+  const cover: CoverPlan = { explains, search: Array.isArray(one.search) ? cleanSearchTerms(one.search) : [] };
   const side = (value: unknown, present: boolean, what: string): string =>
     present ? singleLine(textOf(value, what), 240) : "";
   return {
@@ -248,7 +240,7 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
     next: side(item.next, !!request.next, "next"),
     checklist,
     images,
-    ...(cover ? { cover } : {}),
+    cover,
     ...(dropped ? { droppedSubjective: dropped } : {}),
     ...(droppedPicture ? { droppedPicture } : {})
   };

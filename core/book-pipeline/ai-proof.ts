@@ -173,9 +173,7 @@ export function reviewAiProof(raw: RawAiProof, input: AiReviewInput): AiProofRev
     }
     // A chapter that lists no sources gave the model nothing to check a fact or a number against: its "ok" is not a verification.
     const verdict: AiVerdict =
-      entry.verdict === "ok" &&
-      input.allowedSources?.length === 0 &&
-      (entry.kind === "fact" || entry.kind === "number")
+      entry.verdict === "ok" && input.allowedSources?.length === 0 && (entry.kind === "fact" || entry.kind === "number")
         ? "unverifiable"
         : entry.verdict;
     const other =

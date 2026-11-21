@@ -12,15 +12,16 @@ export * from "./core/book-pipeline/body-integrity";
 export { BookHandEdits } from "./experiences/visual-map/book-pipeline-handedit";
 export { BookCallouts } from "./experiences/visual-map/book-pipeline-callouts";
 export { BookPipelineRunError } from "./experiences/visual-map/book-pipeline-run";
-export { readReviewState, reviewCallout, putProgramCallout, patchHandBox, isRewriteAsked } from "./experiences/visual-map/book-pipeline-review";
+export { readReviewState, putProgramCallout, patchHandBox, isRewriteAsked } from "./experiences/visual-map/book-pipeline-review";
 export { appendResearchNote, replaceResearchRecord, chapterBody } from "./core/book-pipeline/note-sections";
 export { projectProofBody } from "./core/book-pipeline/book-notes";
 export { stripImageLines, composeSlotsRecord, shortHash } from "./core/book-pipeline/image-slots";
 export { hashText } from "./core/book-pipeline/text";
 export { newBookPipeline } from "./core/book-pipeline/machine";
-export { setUiLanguage } from "./i18n";
+export { setUiLanguage, t } from "./i18n";
 `, { obsidian: { ...S.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice([]), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
 b.setUiLanguage('zh-TW');
+const legacy = require('./support-legacy-boxes.cjs')(b);
 
 const url = n => `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/P${n}.jpg/1280px-P${n}.jpg`;
 const fig = (n, caption = `Caption ${n}`) => `![P${n}](${url(n)})\n${caption}`;
@@ -158,7 +159,7 @@ function rig({ phase = 'gate2', running = false, rerun } = {}) {
   const setDetail = detail => { state.raw = state.raw ? state.raw.replace(/(<!-- visual-agent-map:detail:start -->\n)[\s\S]*?(\n<!-- visual-agent-map:detail:end -->)/, (_m, a, c) => `${a}${detail}${c}`) : note(detail); };
   setDetail(edited);
   const ifp = () => b.integrityFp(edited);
-  state.raw = b.putProgramCallout(state.raw, b.reviewCallout(CARD, ['x'], undefined, 'fp1', 'r1', { op: 'op1', ifp: ifp() }));
+  state.raw = b.putProgramCallout(state.raw, legacy.reviewCallout(CARD, ['x'], undefined, 'fp1', 'r1', { op: 'op1', ifp: ifp() }));
   const map = { id: 'm', nodes: [{ id: 'n1', path: PATH }], bookPipeline: { ...b.newBookPipeline({ runId: 'r1', order: ['n1'], now: 'a' }), phase } };
   const detailOf = () => state.raw.split(START + '\n')[1].split('\n' + END)[0];
   const write = async (path, transform) => { const next = transform(state.raw); if (next === state.raw) return 'unchanged'; state.raw = next; state.writes++; return 'written'; };
@@ -199,7 +200,7 @@ test('controller F: a repeated tick (a second save, a reopen of the same box, a 
   await r.ctl.tick(MAP, 'n1');
   assert.equal(r.state.reruns.length, 1, 'in flight, then done');
   // the box comes back (a reconcile) with the same operation id and the tick still on: still one rewrite
-  r.state.raw = b.putProgramCallout(r.state.raw, b.reviewCallout(CARD, ['x'], undefined, 'fp1', 'r1', { op: 'op1', ifp: r.ifp() }));
+  r.state.raw = b.putProgramCallout(r.state.raw, legacy.reviewCallout(CARD, ['x'], undefined, 'fp1', 'r1', { op: 'op1', ifp: r.ifp() }));
   r.tickRewrite();
   await r.ctl.tick(MAP, 'n1');
   assert.equal(r.state.reruns.length, 1, 'the operation id was used');
@@ -406,7 +407,7 @@ test('review-b S5: a "busy" refusal leaves the rewrite queued (not failed); two 
   const texts = {};
   const make = id => {
     const edited = b.stampDetail(BODY).replace('第二段', '第三段');
-    let raw = b.putProgramCallout(note(edited), b.reviewCallout({ ...CARD, id }, ['x'], undefined, 'fp1', 'r1', { op: `op-${id}`, ifp: b.integrityFp(edited) }));
+    let raw = b.putProgramCallout(note(edited), legacy.reviewCallout({ ...CARD, id }, ['x'], undefined, 'fp1', 'r1', { op: `op-${id}`, ifp: b.integrityFp(edited) }));
     raw = b.patchHandBox(tickAt(raw, 1), { queued: true });
     texts[id] = raw;
   };

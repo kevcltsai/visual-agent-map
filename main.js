@@ -48586,7 +48586,7 @@ function gateWaitsForPerson(_data, gate) {
   return gate === "plan";
 }
 function nextActions(data, stages, busy = /* @__PURE__ */ new Set(), options = {}) {
-  var _a2, _b2, _c, _d, _e;
+  var _a2, _b2, _c, _d, _e, _f;
   if (data.status === "stopped") return { actions: [], hold: data.pauseReason === "budget" ? "budget" : "stopped" };
   if (data.phase === "done") return { actions: [], hold: "done" };
   const order = effectiveOrder(data);
@@ -48616,13 +48616,13 @@ function nextActions(data, stages, busy = /* @__PURE__ */ new Set(), options = {
   for (const nodeId of order) {
     if (busy.has(nodeId)) continue;
     const stage = stages[nodeId];
-    if ((stage === "checked" || stage === "needs-review") && options.aiProof && aiChapterDue(data, nodeId)) {
-      actions.push({ type: ((_d = (_c = data.aiProof) == null ? void 0 : _c[nodeId]) == null ? void 0 : _d.step) === "fix" ? "ai_fix" : "ai_proof", nodeId });
+    if ((stage === "checked" || stage === "needs-review") && options.aiProof && !((_c = options.authorPending) == null ? void 0 : _c.has(nodeId)) && aiChapterDue(data, nodeId)) {
+      actions.push({ type: ((_e = (_d = data.aiProof) == null ? void 0 : _d[nodeId]) == null ? void 0 : _e.step) === "fix" ? "ai_fix" : "ai_proof", nodeId });
       continue;
     }
     if (stage === "needs-review" || stage === "checked") continue;
     const attempts = attemptsOf(data, nodeId);
-    const trialCard = !!((_e = data.trial) == null ? void 0 : _e.includes(nodeId));
+    const trialCard = !!((_f = data.trial) == null ? void 0 : _f.includes(nodeId));
     const step = stage === void 0 ? "plan" : !allPlanned || data.phase === "planning" && (!trialCard || data.planReview) ? null : stage === "planned" ? "write" : "proof";
     if (!step) continue;
     if (attempts[step] >= MAX_STEP_ATTEMPTS) actions.push({ type: "mark_needs_review", nodeId, step });
@@ -48637,6 +48637,22 @@ function aiChapterDue(data, nodeId) {
   var _a2, _b2, _c;
   if (data.bookProof || ((_b2 = (_a2 = data.aiProof) == null ? void 0 : _a2[nodeId]) == null ? void 0 : _b2.done)) return false;
   return data.phase === "writing" || data.phase === "planning" && !!((_c = data.trial) == null ? void 0 : _c.includes(nodeId)) && !data.planReview;
+}
+function invalidateStaleAiChapters(data) {
+  var _a2;
+  if (data.bookProof || data.status !== "running" || data.phase !== "writing" && data.phase !== "planning")
+    return { state: data, accepted: false };
+  const stale = effectiveOrder(data).filter((id) => {
+    var _a3;
+    const slot = (_a3 = data.aiProof) == null ? void 0 : _a3[id];
+    const seen = (slot == null ? void 0 : slot.done) ? /^(\d+):/.exec(slot.key) : null;
+    return !!seen && Number(seen[1]) !== cardRevision(data, id);
+  });
+  if (!stale.length) return { state: data, accepted: false };
+  const next = clone2(data);
+  for (const id of stale) (_a2 = next.aiProof) == null ? true : delete _a2[id];
+  next.revision++;
+  return { state: next, accepted: true };
 }
 function bookProofDue(data) {
   var _a2;
@@ -55751,8 +55767,10 @@ var BookPipelineRuns = class {
         await this.refreshSkippedPlans(drive);
         await this.refreshAroundRemoved(drive);
       }
+      await drive.store.commit((state) => invalidateStaleAiChapters(state));
       const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy, {
-        aiProof: !!this.ports.aiProof && !!this.ports.aiFix && !!this.ports.aiBookProof && !drive.job
+        aiProof: !!this.ports.aiProof && !!this.ports.aiFix && !!this.ports.aiBookProof && !drive.job,
+        authorPending: new Set(drive.fixable.keys())
       });
       if (plan.hold === "global_failed") drive.failure = (_a2 = drive.reasons.get("global")) != null ? _a2 : "failed";
       if (plan.hold === "gate1" && drive.store.state.planReview) await this.writeBookStructure(drive);

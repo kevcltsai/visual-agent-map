@@ -1181,3 +1181,35 @@ test('cover plan: the book structure gets one 封面要找 line per card (no sea
   assert.ok(planText.composeBookStructure(entries, 'en').includes('Cover to find: 古代市集'));
   assert.equal(planText.composeBookStructure(entries.map(({ cover, ...rest }) => rest), 'zh-TW'), ['### 全書結構', '**前言：錢**', 'a', '**第 1 章　市集**', 'b', '- 節：以物易物 — c', '**第 2 章　金屬**', ''].join('\n'));
 });
+
+// ---- preface scope: chapter summaries in the chapter list, preface and body rules ----
+const chapterListOf = prompt => JSON.parse(prompt.slice(prompt.indexOf('\n[{"place"') + 1).split('\n')[0]);
+test('card plan: the chapter list carries summaries for the preface and chapters, not sections; summaries are cut', () => {
+  const chapters = [{ place: 'preface', title: 'Intro', summary: 'SUM-PREFACE' }, { place: 'chapter 1', title: 'Two', summary: '摘'.repeat(500) }, { place: 'section 1 of 1 in chapter 1', title: 'Sec' }];
+  const list = chapterListOf(cardPlan.fitCardPlan(planBase({ chapters })).prompt);
+  assert.equal(list[0].summary, 'SUM-PREFACE');
+  assert.equal(Array.from(list[1].summary).length, cardPlan.CHAPTER_SUMMARY_MAX);
+  assert.ok(!('summary' in list[2]), 'a section has no summary');
+  assert.ok(!('summary' in chapterListOf(cardPlan.fitCardPlan(planBase()).prompt)[0]), 'no summary given, none rendered');
+});
+
+test('card plan: 30 chapters with 120-character summaries fit; summaries that overflow are dropped before the step is refused', () => {
+  const make = (n, len, sum) => Array.from({ length: n }, (_, i) => ({ place: `chapter ${i + 1}`, title: `${i}`.padEnd(len, '章'), summary: '摘'.repeat(sum) }));
+  const normal = cardPlan.fitCardPlan(planBase({ chapters: make(30, 20, 120) }));
+  assert.ok(normal); assert.equal(chapterListOf(normal.prompt).filter(c => c.summary).length, 30);
+  // find a list whose titles fit alone but not with summaries
+  let n = 100; let found;
+  while (n < 5000) { const withSum = make(n, 40, 160); const titles = withSum.map(({ summary, ...c }) => c); if (!cardPlan.fitCardPlan(planBase({ chapters: titles }))) break; const f = cardPlan.fitCardPlan(planBase({ chapters: withSum })); if (f && !chapterListOf(f.prompt)[0].summary) { found = f; break; } n += 25; }
+  assert.ok(found, 'a size exists where summaries are dropped but the step still fits');
+  assert.equal(chapterListOf(found.prompt).length, n, 'every chapter is still listed');
+  assert.equal(cardPlan.fitCardPlan(planBase({ chapters: make(3000, 200, 160) })), undefined, 'a list of titles that does not fit is still refused');
+});
+
+test('card plan: the intro rule keeps the preface off the chapters\' subjects, and a body card does not preview the book', () => {
+  const prompt = cardPlan.cardPlanStep.render(planBase());
+  assert.match(prompt, /the question the whole book answers/); assert.match(prompt, /why these concepts are needed and how the chapters connect into one line of thought/);
+  assert.match(prompt, /No heading of the preface takes a chapter's own subject/); assert.match(prompt, /leaves the argument, examples and definitions to that chapter/);
+  assert.match(prompt, /no heading of the preface repeats the subject of a chapter/);
+  assert.match(prompt, /A chapter or a section does not preview the whole book's route or list the other chapters/);
+  assert.match(load('core/book-pipeline/settings.ts').bookAuthorRequirements({}), /does not preview the whole book's route or list the other chapters/);
+});

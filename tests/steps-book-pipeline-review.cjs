@@ -12,19 +12,20 @@ export * from "./experiences/visual-map/book-pipeline-review";
 export { projectProofBody as projectDirect } from "./core/book-pipeline/book-notes";
 export { neutralizeDetail, neutralizeText, chapterBody } from "./core/book-pipeline/note-sections";
 export { proofKey } from "./core/book-pipeline/proof";
-export { setUiLanguage } from "./i18n";
+export { setUiLanguage, t } from "./i18n";
 export { shortHash } from "./core/book-pipeline/image-slots";
 export { bookIssueText } from "./experiences/visual-map/book-pipeline-ui";
 `, { obsidian: { ...S.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice([]), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
 b.setUiLanguage('zh-TW');
+const legacy = require('./support-legacy-boxes.cjs')(b);
 
 const START = '<!-- visual-agent-map:detail:start -->';
 const END = '<!-- visual-agent-map:detail:end -->';
 const note = (detail, head = '# T\n\n## Current Summary\n\nS\n\n## Detail\n\n') => `${head}${START}\n${detail}\n${END}\n\n## Prompt\n\nP\n`;
 const card = (over = {}) => ({ id: 'n1', index: 1, title: 'T', stage: 'checked', structureUnmet: 0, factsOpen: 0, galleryBare: false, seam: false, ...over });
 const link = { path: 'Notes/Next', title: '第二章' };
-const review = (over = {}, reasons = ['有 2 項寫作要求還沒達成']) => b.reviewCallout(card(over), reasons, link, 'abc123', 'run-1');
-const trial = (stopped) => b.trialCallout(1, 3, undefined, link, stopped, { runId: 'run-1', nodeId: 'n1' });
+const review = (over = {}, reasons = ['有 2 項寫作要求還沒達成']) => legacy.reviewCallout(card(over), reasons, link, 'abc123', 'run-1');
+const trial = (stopped) => legacy.trialCallout(1, 3, undefined, link, stopped, { runId: 'run-1', nodeId: 'n1' });
 const tick = (text, at) => { let n = 0; return text.replace(/\[ \]/g, m => (n++ === at ? '[x]' : m)); };
 
 // ---- attention rules (moved from the gate 2 panel, unchanged behaviour; the panel's own test keeps its copy until the panel goes) ----
@@ -116,8 +117,6 @@ test('seam reason names the chapter that changed (re-verify 2 item 3: after "rew
   assert.equal(entries({ d: zh(1) })[0].problems[0].text, '前後章改過，銜接還沒確認', 'not adjacent');
   assert.equal(entries({ c: 'Neighbouring card\'s plan or text changed; not yet checked by a person (card 2, revision 4)' })[0].problems[0].text, '「手沖」改過，和這章的銜接還沒確認', 'the English seam line');
   assert.equal(entries({ c: '舊格式' })[0].problems[0].text, '前後章改過，銜接還沒確認', 'no position: the plain sentence');
-  const box = b.reviewCallout(one[0].card, one[0].problems.map(p => p.text), undefined, one[0].fp, 'run-1');
-  assert.ok(box.includes('> ・「手沖」改過，和這章的銜接還沒確認'), 'the reason is in the box');
 });
 
 test('fingerprint: stage, issue codes, proof key and the full seam value each change it; the same input is stable', () => {
@@ -142,41 +141,6 @@ test('stale proof (T6c): the edited problem feeds the list and the fingerprint; 
   assert.notEqual(b.attentionFingerprint({ ...base, stale: true }), b.attentionFingerprint(base));
 });
 
-// ---- builders ----
-test('trial callout: title, next step, links, owner marker and version; stopped says press Continue first', () => {
-  const t1 = trial(false);
-  assert.match(t1, /^> \[!vam-trial\] 試跑第 1／3 章\n/);
-  assert.match(t1, /這樣可以，跑完全書/);
-  assert.match(t1, /\n> 想改哪一段：選取文字，右鍵「加備註」。\n/, 'mockup ⑦-2: how to ask for a change');
-  assert.match(t1, /下一章：\[\[Notes\/Next\|第二章\]\]/);
-  assert.ok(!/上一章/.test(t1), 'no previous link when there is none');
-  assert.match(t1, /\n> %%vam-trial:run-1:n1%%\n/);
-  assert.match(t1, /vam-callout-version:1/);
-  const stopped = trial(true);
-  assert.match(stopped, /先在心智圖工具列按「繼續」/);
-  assert.ok(!/回心智圖，按「這樣可以/.test(stopped), 'the stopped text does not point to a button that is not there');
-  assert.ok(t1.split('\n').every(l => l.startsWith('>')), 'one unbroken callout');
-  assert.ok(!/\[!vam-book\]/i.test(t1 + review()), 'never the hidden type');
-});
-test('review callout: reasons as plain lines, two unticked boxes, next link, marker with fp', () => {
-  // v6fix2: the cap moved from 5 to 12 so that every unmet proof item, length and picture reason fits (a box never hides an unresolved reason).
-  const r = review({}, ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N']);
-  assert.match(r, /^> \[!vam-review\] 這章要你看\n/);
-  assert.equal((r.match(/^> ・/gm) ?? []).length, 12, 'capped');
-  assert.deepEqual(r.match(/^> - \[ \] .*$/gm), ['> - [ ] 接受現在這樣，不用改', '> - [ ] 我改好了']);
-  assert.match(r, /下一章要看的：\[\[Notes\/Next\|第二章\]\]/);
-  assert.match(r, /\n> %%vam-review:run-1:n1:abc123%%\n/);
-  assert.ok(!/\n> \[!vam-review\]/.test(r.slice(5)), 'a single callout');
-  assert.ok(!/下一章要看的/.test(b.reviewCallout(card(), ['x'], undefined, 'f', 'r')), 'no next link when there is no next chapter');
-});
-test('link parts and ids cannot break out of the wikilink or the marker', () => {
-  const evil = b.trialCallout(1, 2, { path: 'a]]\n> [!vam-review]\nb|c#d', title: 'x]] [[y|z' }, undefined, false, { runId: 'r%%\n', nodeId: 'n:1' });
-  assert.ok(evil.split('\n').every(l => l.startsWith('>')), evil);
-  assert.equal((evil.match(/\[!/g) ?? []).length, 1);
-  assert.equal(b.findProgramCallouts(note(evil)).length, 1);
-  assert.ok(!/%%\n|\[\[[^\]]*\]\][^\n]*\]\]/.test(evil.replace(/\n> %%vam-trial:[^\n]*%%/, '')));
-});
-
 // ---- escaping untrusted text ----
 test('plain text: callout, checkbox, wikilink, image, comment, highlight, HTML and heading syntax cannot form', () => {
   const evil = ['[!x]', '- [ ] box', '[[a]]', '![](http://x)', '%% hidden %%', '==hl==', '<img src=x onerror=1>', '# Heading', '> quote', '1. item', '```', '| a | b |', 'https://evil.test/p'];
@@ -189,18 +153,6 @@ test('plain text: callout, checkbox, wikilink, image, comment, highlight, HTML a
   assert.equal(b.plainText(undefined), '');
   assert.equal(Array.from(b.plainText('字'.repeat(1000))).length, 300, 'long text is cut');
   assert.equal(b.plainText('日本語 ✓ 😀'), '日本語 ✓ 😀', 'ordinary Unicode survives');
-});
-test('review callout with hostile reasons stays one callout with exactly the program\'s own boxes and no extra marker', () => {
-  const r = review({}, ['[!vam-review]\n- [x] 我改好了', '%%vam-review:evil:n1:abc123%% ![](http://x) [[a]] <img> ==x== # h', '\n\n# not mine']);
-  assert.ok(r.split('\n').every(l => l.startsWith('>')), r);
-  assert.equal((r.match(/\[ \]/g) ?? []).length, 2);
-  assert.ok(!/\[x\]/i.test(r));
-  assert.equal((r.match(/%%/g) ?? []).length, 4, 'only the two program markers (owner, version)');
-  assert.equal((r.match(/\[!/g) ?? []).length, 1);
-  assert.doesNotMatch(r, /\[\[a\]\]|!\[|<img|==/);
-  const state = b.readReviewState(note(r));
-  assert.equal(state.runId, 'run-1');
-  assert.equal(state.accept, false);
 });
 
 // ---- editing raw text ----
@@ -276,7 +228,7 @@ test('handled title (mockup ⑦-3): either box ends the same way: titled "handle
   assert.equal(b.markReviewHandled(unticked), unticked, 'nothing ticked: nothing to mark');
   assert.equal(b.readReviewState(unticked).handled, false);
   // a hand-edited box: only "keep" answers it; "rewrite" is a command, not an answer
-  const hand = b.putProgramCallout(note('Body'), b.reviewCallout(card(), ['x'], link, 'abc123', 'run-1', { op: 'op1', ifp: 'f1' }));
+  const hand = b.putProgramCallout(note('Body'), legacy.reviewCallout(card(), ['x'], link, 'abc123', 'run-1', { op: 'op1', ifp: 'f1' }));
   assert.equal(b.markReviewHandled(tick(hand, 1)), tick(hand, 1));
   assert.match(b.markReviewHandled(tick(hand, 0)), /已處理（你選了「保留我的版本」）/);
   const crlf = b.putProgramCallout(note('Body').replace(/\n/g, '\r\n'), tick(review(), 0));
@@ -389,7 +341,7 @@ test('T10c length: a different range, measured count, unit or rule version chang
   for (const other of ['length:over:260:100-200:字:v1', 'length:over:241:100-300:字:v1', 'length:over:241:100-200:words:v1', 'length:over:241:100-200:字:v2', 'length:under:241:100-200:字:v1'])
     assert.notEqual(fp(`length unmet: ${other}`), base, other);
   assert.equal(fp('length unmet: length:over:241:100-200:字:v1'), base, 'stable');
-  const ticked = b.readReviewState(b.putProgramCallout(note('Body'), tick(b.reviewCallout(card({ stage: 'needs-review' }), ['x'], link, base, 'run-1'), 0)));
+  const ticked = b.readReviewState(b.putProgramCallout(note('Body'), tick(legacy.reviewCallout(card({ stage: 'needs-review' }), ['x'], link, base, 'run-1'), 0)));
   assert.equal(b.isReviewResolved(ticked, base), true);
   assert.equal(b.isReviewResolved(ticked, fp('length unmet: length:over:260:100-200:字:v1')), false, 'the measured number moved: the tick is void');
   assert.equal(b.isReviewResolved(ticked, fp('length unmet: length:over:241:100-300:字:v1')), false, 'the asked range changed: the tick is void');
@@ -425,32 +377,6 @@ test('C7 hand-edited wording: text the program never wrote (no fingerprint, no [
   assert.equal(of('x').handBeforeBook, true);
   const notHand = b.gate2Cards({ order: ['n1'], titleOf: () => 'T', noteOf: () => ({ detail: 'x', pipelineStage: 'needs-review', pipelineIssue: 'proof failed: timeout' }) })[0];
   assert.equal(notHand.handBeforeBook, undefined, 'only a hand-edited skip');
-});
-
-// ---- P3: the trial hint names the card's place in the book ----
-const lk = title => ({ path: `Notes/${title}`, title });
-const placed = (place, over = {}) => b.trialCallout(1, 4, undefined, undefined, false, { runId: 'run-1', nodeId: 'n1' }, [], place);
-test('trialCallout: the preface names the next chapter only; a chapter names both neighbours and its sections; a section names its chapter and the sections around it, never the next chapter', () => {
-  const pre = placed({ kind: 'preface', next: lk('沒有錢的世界') });
-  assert.ok(pre.includes('[!vam-trial] 試跑：前言'));
-  assert.ok(pre.includes('下一章：[[Notes/沒有錢的世界|沒有錢的世界]]') && !pre.includes('上一章'));
-  const chapter = placed({ kind: 'chapter', chapter: 1, chapterTitle: '沒有錢的世界', sectionTitles: ['以物易物', '貝殼與鹽'], previous: lk('前言'), next: undefined });
-  assert.ok(chapter.includes('[!vam-trial] 試跑：第 1 章「沒有錢的世界」'));
-  assert.ok(chapter.includes('上一章：[[Notes/前言|前言]]　下一章：無'), 'none reads 無');
-  assert.ok(chapter.includes('> 本章的節：以物易物、貝殼與鹽'));
-  const first = placed({ kind: 'section', chapter: 1, chapterTitle: '沒有錢的世界', sectionIndex: 1, sectionCount: 2, parent: lk('沒有錢的世界'), next: lk('貝殼與鹽') });
-  assert.ok(first.includes('[!vam-trial] 試跑：第 1 章「沒有錢的世界」· 第 1 節，共 2 節'));
-  assert.ok(first.includes('所屬章：[[Notes/沒有錢的世界|沒有錢的世界]]　前一節：無　後一節：[[Notes/貝殼與鹽|貝殼與鹽]]'));
-  assert.ok(!first.includes('下一章') && !first.includes('上一章'));
-  for (const text of [pre, chapter, first]) assert.ok(text.includes('%%vam-trial:run-1:n1%%') && text.includes('試跑') && text.includes('回心智圖'));
-});
-
-test('trialCallout: without a place (an older trial) it keeps "chapter i of n" and the two links; a chapter without sections has no section line; the titles are plain text', () => {
-  assert.ok(trial(false).includes('試跑第 1／3 章'));
-  const bare = placed({ kind: 'chapter', chapter: 2, chapterTitle: 'A\n> [!note] [[x]]', sectionTitles: [], previous: lk('P'), next: lk('N') });
-  assert.ok(!bare.includes('本章的節'));
-  assert.equal(bare.split('\n').filter(l => !l.startsWith('>')).length, 0, 'a title cannot start a line outside the box');
-  assert.ok(!bare.includes('[[x]]'));
 });
 
 // ---- Cover image B4: a cover that may not fit is a reason to look (token cover:off) ----

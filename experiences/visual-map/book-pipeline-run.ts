@@ -3552,7 +3552,16 @@ export class BookPipelineRuns {
       materials: book.materials,
       chapters: order.flatMap(id => {
         const own = id === nodeId ? card.title : drive.cards.get(id)?.title;
-        return own === undefined ? [] : [{ place: this.placeOf(drive, structure, id), title: own }];
+        if (own === undefined) return [];
+        const at = structure.placeOf(id)?.kind;
+        const summary = summaryText(id === nodeId ? card.summary : (drive.cards.get(id)?.summary ?? "")).trim();
+        return [
+          {
+            place: this.placeOf(drive, structure, id),
+            title: own,
+            ...(summary && (at === "preface" || at === "chapter") ? { summary } : {})
+          }
+        ];
       }),
       ...(children.length ? { children } : {}),
       card: {

@@ -52,6 +52,11 @@ test('model text is escaped: no link, callout, comment, highlight, heading, HTML
   assert.equal(text.split('\n').filter(l => l.startsWith('- ')).length, 1, 'one bullet for one item');
 });
 
+test('B5: a bare web address in model text never becomes a link', () => {
+  const text = note([issue({ problem: '見 https://evil.example/login 與 www.x.example', chapterTitle: '章 http://e.example' })]);
+  assert.doesNotMatch(text, /:\/\//);
+});
+
 test('ownership: the marker must be the first line; the same name without it is never overwritten', () => {
   const mine = note([]);
   assert.ok(oi.isOpenIssuesNote(`﻿\n${mine}`)); assert.ok(!oi.isOpenIssuesNote(`# 我的筆記\n${oi.OPEN_ISSUES_MARKER}`)); assert.ok(!oi.isOpenIssuesNote(''));

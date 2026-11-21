@@ -145,9 +145,11 @@ export function chooseOpenIssuesFile(
   return undefined;
 }
 
-/** `escapeMarkdownText` plus no `==` (a highlight): the run of `=` becomes full-width. */
+/** `escapeMarkdownText` plus no `==` (a highlight) and no `://` (a bare address Obsidian would link): both become full-width. */
 const line = (text: string, max: number): string =>
-  escapeMarkdownText(text, max).replace(/={2,}/g, run => "＝".repeat(run.length));
+  escapeMarkdownText(text, max)
+    .replace(/={2,}/g, run => "＝".repeat(run.length))
+    .replace(/:\/\//g, ":／／");
 
 /**
  * The page text: marker, title, one summary line, then one bullet per open item (chapter, problem, why not solved). "All solved" only

@@ -42,6 +42,14 @@ test('program syntax in the new sentence is refused: %%, ==, a link, an address,
   assert.equal(run([edit('P1', S1, 'x')]).applied, 1);
 });
 
+test('B4: markdown-active characters that are not in the quote are refused: #tag, [^1], *emphasis*, $math$, backticks, _x_, ~~x~~, ^x', () => {
+  for (const bad of ['新句 #標籤。', '新句[^1]。', '新句 *強調* 。', '新句 $x^2$ 。', '新句 `code` 。', '新句 _斜_ 。', '新句 ~~刪~~ 。', '新句 ^上標。', '新句 | 欄 |。', '新句\\\\。'])
+    assert.equal(run([edit('P1', S1, bad)]).outcomes[0].reason, 'fix_forbidden_syntax', JSON.stringify(bad));
+  // a character the quote already had is not new syntax
+  const star = '這是 *重點* 句。';
+  assert.equal(run([edit('P1', star, '這是 *更重點* 句。')], {}, `${star}後文。`).applied, 1);
+});
+
 test('a fix that would delete or change a picture is refused and the text stays byte for byte', () => {
   const r = run([edit('P1', IMG, '一張圖的說明。')]);
   assert.deepEqual(plain(r.outcomes), [{ id: 'P1', applied: false, reason: 'fix_refused_picture' }]); assert.equal(r.text, TEXT);

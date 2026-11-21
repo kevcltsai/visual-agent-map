@@ -43,6 +43,7 @@ export interface AiFixGuard {
   shown?: string;
 }
 
+const ACTIVE_SYNTAX = "#[]()<>!%=|\\*_~$^`";
 const PICTURE = /!\[\[[^\]\n]*\]\]|!\[[^\]\n]*\]\([^)\n]*\)/g;
 const LINKS = /\[\[[^\]\n]*\]\]|\[[^\]\n]*\]\([^)\n]*\)|https?:\/\/[^\s<>)\]]+/g;
 const tokens = (text: string, pattern: RegExp): string => JSON.stringify(text.match(pattern) ?? []);
@@ -65,6 +66,9 @@ function tryEdit(text: string, edit: RawAiEdit, guard: AiFixGuard): { text: stri
   if (findNotes(text).some(note => at < note.to && end > note.from)) return { reason: "hand_edited" };
   if (!edit.replacement.trim() || /[\r\n]/.test(edit.replacement)) return { reason: "fix_forbidden_syntax" };
   if (forbiddenSyntax(edit.replacement)) return { reason: "fix_forbidden_syntax" };
+  // allow-list on top of the black-list: a character with Markdown or Obsidian meaning must already be in the quote
+  for (const char of Array.from(edit.replacement))
+    if (ACTIVE_SYNTAX.includes(char) && !quote.includes(char)) return { reason: "fix_forbidden_syntax" };
   const next = text.slice(0, at) + edit.replacement + text.slice(end);
   if (tokens(next, PICTURE) !== tokens(text, PICTURE)) return { reason: "fix_refused_picture" };
   if (tokens(withoutPictures(next), LINKS) !== tokens(withoutPictures(text), LINKS))

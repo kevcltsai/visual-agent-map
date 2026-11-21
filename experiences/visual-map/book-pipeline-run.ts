@@ -2545,6 +2545,7 @@ export class BookPipelineRuns {
       );
       if (this.dead(drive)) return;
       const result = applyAiEdits(detailBlockOf(raw) ?? "", targets, edits, {
+        shown: body,
         ...(range ? { length: { unit: range.unit, min: range.min } } : {})
       });
       const refused = refusedReasons(result.outcomes);

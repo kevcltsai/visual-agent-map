@@ -82,7 +82,7 @@ async function rig(over = {}) {
     probeImage: async (url, signal) => { stat.probes.push(url); return script.probe(url, signal, stat.probes.length); },
     ...(over.ai ? {
       aiProof: async (request, run) => { stat.ai.push(['proof', request]); await run.admission.reserve(); return script.aiProof(request, stat.ai.length); },
-      aiFix: async (request, run) => { stat.ai.push(['fix', request]); await run.admission.reserve(); return script.aiFix(request, stat.ai.length); },
+      aiFix: async (request, run) => { stat.ai.push(['fix', request]); await run.admission.reserve(); return script.aiFix(request, stat.ai.length, run); },
       aiBookProof: async (request, run) => { stat.ai.push(['book', request]); await run.admission.reserve(); return script.aiBookProof(request, stat.ai.length); }
     } : {}),
     backupNote: async path => { stat.backups.push(path); return { ok: true, path: `${path}.bak` }; },
@@ -3811,4 +3811,60 @@ test('ai chapter: without the three ports the AI proofread is off (an older host
   await runToEnd(r);
   const s = await r.state();
   assert.equal(s.phase, 'done'); assert.equal(s.aiProof, undefined);
+});
+
+test('ai chapter: the budget running out during the fix pauses the run; addBudget resumes and the chapter is fixed once', async () => {
+  let fixCalls = 0, applied = false;
+  const r = await aiRig({
+    aiProof: async request => ({ checks: request.title === 'SecretTitleA' && !applied ? [problem(request)] : [], prior: [], dropped: {} }),
+    aiFix: async (request, n, run) => {
+      fixCalls++;
+      if (fixCalls === 1) { for (;;) await run.admission.reserve(); } // the budget is gone: the reservation throws out of the call
+      applied = true;
+      return [{ id: 'P1', quote: request.chapters[0].text.slice(0, 11), replacement: 'Corrected b' }];
+    }
+  });
+  await runToEnd(r); while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+  let s = await r.state();
+  const id = r.nodes[1].id;
+  assert.equal(s.status, 'stopped'); assert.equal(s.pauseReason, 'budget');
+  assert.ok(!(await r.note(1)).detail.includes('Corrected b'));
+  await r.runs.resume(r.mapPath, { addBudget: 100 }); while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+  s = await r.state();
+  assert.equal(fixCalls, 2, 'the fix is asked again once, not repeated after it was applied');
+  assert.equal((await r.note(1)).detail.split('Corrected b').length - 1, 1);
+  assert.equal(s.aiProof[id].fixed, 1);
+});
+
+// A fix only touches the text the model was shown: a quote that sits in a hidden callout is never replaced.
+const hiddenFix = async (callout, quoteOf) => {
+  let planted = false, callouts = '';
+  const r = await aiRig({
+    aiProof: async request => {
+      if (request.title === 'SecretTitleA' && !planted) {
+        planted = true;
+        await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => stampRaw(c.replace('<!-- visual-agent-map:detail:end -->', `\n> [!vam-book]- hidden\n> ${callout}\n<!-- visual-agent-map:detail:end -->`)), {});
+        callouts = r.raw(1).match(/> \[!vam-book\]- hidden[\s\S]*?(?=<!-- visual-agent-map:detail:end)/)[0];
+      }
+      return { checks: request.title === 'SecretTitleA' ? [problem(request)] : [], prior: [], dropped: {} };
+    },
+    aiFix: async request => [{ id: 'P1', quote: quoteOf(request), replacement: 'Corrected b' }]
+  });
+  await runToEnd(r);
+  return { r, callouts };
+};
+
+test('ai chapter fix: a sentence in the body and in a hidden callout is refused, the callout stays byte for byte', async () => {
+  const { r, callouts } = await hiddenFix('SecretBody SecretTitleA', () => 'SecretBody SecretTitleA');
+  assert.ok(callouts.includes('SecretBody SecretTitleA'));
+  assert.ok(r.raw(1).includes(callouts), 'the callout is unchanged');
+  assert.ok(!r.raw(1).includes('Corrected b'));
+  same((await r.state()).aiProof[r.nodes[1].id].open.map(item => item.reason), ['fix_quote_missing']);
+});
+
+test('ai chapter fix: a quote only in a hidden callout is refused and nothing is written', async () => {
+  const { r, callouts } = await hiddenFix('CalloutOnly words', () => 'CalloutOnly words');
+  assert.ok(r.raw(1).includes(callouts));
+  assert.ok(!r.raw(1).includes('Corrected b'));
+  same((await r.state()).aiProof[r.nodes[1].id].open.map(item => item.reason), ['fix_quote_missing']);
 });

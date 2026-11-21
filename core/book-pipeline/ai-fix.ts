@@ -39,6 +39,8 @@ export interface AiFixApplied {
 export interface AiFixGuard {
   /** The asked chapter length (see `lengthRange`); absent: no length rule. */
   length?: { unit: LengthUnit; min: number };
+  /** The text the model was shown: a quote that is not in it exactly once is refused, so no hidden callout, system section or picture line is ever edited. */
+  shown?: string;
 }
 
 const PICTURE = /!\[\[[^\]\n]*\]\]|!\[[^\]\n]*\]\([^)\n]*\)/g;
@@ -53,6 +55,10 @@ const measure = (text: string, guard: AiFixGuard): number | undefined =>
 function tryEdit(text: string, edit: RawAiEdit, guard: AiFixGuard): { text: string } | { reason: AiFixRefusal } {
   const quote = edit.quote;
   if (!quote.trim()) return { reason: "fix_quote_missing" };
+  if (guard.shown !== undefined) {
+    const seen = guard.shown.indexOf(quote);
+    if (seen < 0 || guard.shown.indexOf(quote, seen + 1) >= 0) return { reason: "fix_quote_missing" };
+  }
   const at = text.indexOf(quote);
   if (at < 0 || text.indexOf(quote, at + 1) >= 0) return { reason: "fix_quote_missing" };
   const end = at + quote.length;

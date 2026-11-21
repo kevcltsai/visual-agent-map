@@ -123,3 +123,11 @@ test('runAiFix: text only, no web, one reservation, nothing of the chapter in th
   assert.deepEqual(plain(edits), [{ id: 'P1', chapter: 1, quote: S1, replacement: '新句。' }]);
   const dump = JSON.stringify(log.getEntries()); assert.ok(log.getEntries().length >= 1); assert.ok(!dump.includes('1503') && !dump.includes('蒙娜麗莎'));
 });
+
+test('with `shown`, a quote the model was not shown (or sees twice) is refused and the text is untouched', () => {
+  const text = `${S1}\n\n> [!vam-book]- 備註\n> 隱藏文字一句。`;
+  const hidden = run([edit('P1', '隱藏文字一句。', '改')], { shown: S1 }, text);
+  assert.deepEqual([hidden.applied, hidden.text, plain(hidden.outcomes)], [0, text, [{ id: 'P1', applied: false, reason: 'fix_quote_missing' }]]);
+  assert.equal(run([edit('P1', S1, '改')], { shown: S1 }, text).applied, 1);
+  assert.equal(run([edit('P1', S1, '改')], { shown: `${S1}${S1}` }, text).applied, 0);
+});

@@ -1,0 +1,2 @@
+
+Position 0 is not an illustration of one passage: it is the cover picture of the whole chapter (for the preface, of the whole book), one picture that stands for it. Treat it like the other positions, but offer for it only a direct https link to a JPEG, PNG, WebP or SVG file on upload.wikimedia.org (Wikimedia Commons), with that file's Commons description page as sourceUrl; a picture from any other site is not used as a cover. Never offer for position 0 an image you offer for another position.

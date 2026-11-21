@@ -316,6 +316,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "book-find-images-cover.en": {
+      "builder": "core/steps/book-pipeline/find-images.ts findImagesStep (with the cover position 0)",
+      "language": "en",
+      "schema": false
+    },
+    "book-find-images-cover.zh": {
+      "builder": "core/steps/book-pipeline/find-images.ts findImagesStep (with the cover position 0)",
+      "language": "zh-TW",
+      "schema": false
+    },
+    "book-find-images-cover.zh-CN": {
+      "builder": "core/steps/book-pipeline/find-images.ts findImagesStep (with the cover position 0)",
+      "language": "zh-CN",
+      "schema": false
+    },
     "book-find-images.en": {
       "builder": "core/steps/book-pipeline/find-images.ts findImagesStep",
       "language": "en",

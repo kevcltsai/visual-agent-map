@@ -185,6 +185,8 @@ import {
   type LengthReason
 } from "../../core/book-pipeline/settings";
 import { escapeMarkdownText, unescapeMarkdownText } from "../../core/book-pipeline/text";
+import { COVER_INDEX, coverAsSlot, coverCandidates } from "../../core/book-pipeline/cover";
+import { coverOwnership, coverSourceKey } from "../../core/book-pipeline/cover-block";
 import type { ReasoningLevel } from "../../ai/types";
 import type { ContentLanguage } from "../../i18n";
 import type { MapDocument } from "../../map-model";
@@ -1226,7 +1228,7 @@ export class BookPipelineRuns {
         for (const id of drive.store.state.trial ?? []) {
           const own = drive.cards.get(id);
           const current = own ? await this.ports.readCard(own.path).catch(() => undefined) : undefined;
-          if (current) for (const url of bodyImageUrls(current.detail)) drive.usedImages.delete(imageKey(url));
+          if (current) this.releasePictures(drive, current);
         }
         this.log(drive, "gate1", "-", "plan", "trial_retry");
       },
@@ -1271,7 +1273,7 @@ export class BookPipelineRuns {
         const own = drive.cards.get(id);
         if (!own || drive.stages.get(id) === undefined) continue;
         const current = await this.ports.readCard(own.path).catch(() => undefined);
-        if (current) for (const url of bodyImageUrls(current.detail)) drive.usedImages.delete(imageKey(url));
+        if (current) this.releasePictures(drive, current);
         drive.stages.set(id, "planned");
         await this.writeFields(drive, id, { pipelineStage: "planned", pipelineIssue: null });
       }
@@ -3118,8 +3120,7 @@ export class BookPipelineRuns {
       // The rewrite may pick this card's own pictures again (an expansion keeps them).
       const own = drive.cards.get(nodeId);
       const current = own ? await this.ports.readCard(own.path).catch(() => undefined) : undefined;
-      if (current && !drive.expand.has(nodeId))
-        for (const url of bodyImageUrls(current.detail)) drive.usedImages.delete(imageKey(url));
+      if (current && !drive.expand.has(nodeId)) this.releasePictures(drive, current);
       drive.extra.set(nodeId, instruction);
       drive.avoid.add(nodeId);
       drive.reasons.delete(nodeId);
@@ -3830,6 +3831,13 @@ export class BookPipelineRuns {
     }
   }
 
+  /** A card's own pictures are free to be picked again: its body pictures and its cover (see {@link coverSourceKey}). */
+  private releasePictures(drive: Drive, card: Pick<PipelineCard, "detail" | "raw">): void {
+    for (const url of bodyImageUrls(card.detail)) drive.usedImages.delete(imageKey(url));
+    const cover = coverSourceKey(card.raw);
+    if (cover) drive.usedImages.delete(cover);
+  }
+
   /**
    * The picture slots of one written card. No picture plan in the Prompt (`slots` undefined, #12): no search, no record, only a stray
    * marker line is deleted. With a plan: scan the markers, one search call for the slots that have a marker (an optional gain: a
@@ -3852,17 +3860,37 @@ export class BookPipelineRuns {
     if (!slots) return this.settleStrayMarkers(path, authorize);
     const first = await this.ports.readCard(path);
     const marked = slots.length ? scanSlotMarkers(first.detail, slots).found : new Map<number, number>();
+    // The cover ask (plan 2026-11-21-book-cover-image): only a card whose Prompt has the cover line (an older book has none), and only
+    // while the cover is not the owner's (a replaced, switched-off or edited cover is never searched for again).
+    const coverPlan = parseCardCover(first.prompt);
+    const coverSlot = coverPlan && coverOwnership(first.raw) !== "owner" ? coverAsSlot(coverPlan) : undefined;
     const others = new Set<string>();
-    if (slots.length) {
+    if (slots.length || coverSlot) {
       // What the other chapters already show (not this card's own old pictures: a rerun may pick again).
       for (const info of drive.cards.values())
         if (info.path !== path) {
           // A card deleted meanwhile is skipped: it must not fail this chapter.
           const other = await this.ports.readCard(info.path).catch(() => undefined);
-          if (other) for (const url of bodyImageUrls(other.detail)) others.add(imageKey(url));
+          if (other) {
+            for (const url of bodyImageUrls(other.detail)) others.add(imageKey(url));
+            const cover = coverSourceKey(other.raw);
+            if (cover) others.add(cover);
+          }
         }
     }
     const wanted = slots.filter(slot => marked.has(slot.index));
+    // The cover rides in the first search (after the body slots, so the probe limit never takes a body picture's place); it is never asked again.
+    const asked = coverSlot ? [...wanted, coverSlot] : wanted;
+    // Only Wikimedia upload addresses can be a cover (they are the only ones downloaded): the rest is dropped before anything is probed or chosen.
+    const coverOnly = (from: FoundImages | undefined): FoundImages | undefined =>
+      from && coverSlot
+        ? {
+            ...from,
+            bySlot: new Map(
+              [...from.bySlot].map(([index, list]) => [index, index === COVER_INDEX ? coverCandidates(list) : list])
+            )
+          }
+        : from;
     const exclude = [...new Set([...drive.usedImages, ...others])];
     // One search call for `list`; a failed or timed-out call is an optional gain lost (undefined), never a failure of the chapter.
     const search = async (
@@ -3947,10 +3975,10 @@ export class BookPipelineRuns {
     let commonsRejected: Partial<Record<CommonsRejection, number>> = {};
     const rounds: (FoundImages | undefined)[] = [];
     try {
-      const round1 = await search(wanted, false, exclude);
+      const round1 = await search(asked, false, exclude);
       rounds.push(round1);
       keepHints(round1);
-      for (const [index, list] of await probeFound(wanted, round1)) perSlot.set(index, list);
+      for (const [index, list] of await probeFound(asked, coverOnly(round1))) perSlot.set(index, list);
       // A second search (once) for the slots the first one left without a usable picture: another direction, the tried addresses excluded.
       if (round1) {
         const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
@@ -3969,8 +3997,15 @@ export class BookPipelineRuns {
       // The program's own search (no model call) for the slots still without a usable picture: Wikimedia Commons, bounded per slot and
       // per chapter; its candidates are probed, deduped and chosen like the finder's.
       if (this.ports.fetchCommons) {
-        const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
-        const lacking = wanted.filter(slot => !("figure" in (provisional.get(slot.index) ?? {})));
+        const provisional = choosePictures(
+          { id: nodeId, title: first.title },
+          coverSlot ? [coverSlot, ...slots] : slots,
+          perSlot,
+          taken,
+          language
+        );
+        // The cover is the last one asked of Commons, so it never takes a body picture's share of the chapter's requests.
+        const lacking = asked.filter(slot => !("figure" in (provisional.get(slot.index) ?? {})));
         if (lacking.length) {
           const seen = new Set([
             ...exclude,
@@ -4006,7 +4041,7 @@ export class BookPipelineRuns {
             found: [...commons.bySlot.values()].reduce((n, list) => n + list.length, 0),
             offTopic: 0
           };
-          for (const [index, list] of await probeFound(lacking, asFound))
+          for (const [index, list] of await probeFound(lacking, coverOnly(asFound) ?? asFound))
             perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
         }
       }
@@ -4020,9 +4055,10 @@ export class BookPipelineRuns {
     if (!(await this.stillOnMap(drive, nodeId))) return { kind: "failed", reason: "card_removed" };
     // Addresses or works refused because this book already shows them (counted for the log).
     const refusedTaken = new Set<string>();
+    // The cover is slot 0 and decided first, so it takes its picture before any body slot can; its key is claimed with the rest.
     const outcomes = choosePictures(
       { id: nodeId, title: latest.title },
-      slots,
+      coverSlot ? [coverSlot, ...slots] : slots,
       perSlot,
       key => {
         const used = taken(key);
@@ -4065,7 +4101,8 @@ export class BookPipelineRuns {
       for (const key of works) drive.usedWorks.delete(key);
     };
     try {
-      const result = await this.writeFilled(latest, slots, outcomes, language, authorize, off);
+      const bodyOutcomes = new Map([...outcomes].filter(([index]) => index !== COVER_INDEX));
+      const result = await this.writeFilled(latest, slots, bodyOutcomes, language, authorize, off);
       if (typeof result === "string") {
         release();
         return { kind: "failed", reason: result };

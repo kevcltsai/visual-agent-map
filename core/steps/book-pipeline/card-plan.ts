@@ -42,6 +42,8 @@ export interface CardNeighbour {
 export interface CardPlanChapter {
   place: string;
   title: string;
+  /** The map card's summary; only the preface and the first-level chapters carry one (never a section), so the planner sees what each chapter already owns. */
+  summary?: string;
 }
 /** Where a card is in the book (see core/book-pipeline/structure.ts). */
 export interface CardPlanPlace {
@@ -334,7 +336,10 @@ const imagesRule = (request: CardPlanRequest): string => {
   }).trimEnd();
 };
 
-const baseRender = (request: CardPlanRequest): string =>
+/** The longest a chapter's summary is in the chapter list. */
+export const CHAPTER_SUMMARY_MAX = 160;
+
+const baseRender = (request: CardPlanRequest, withSummaries: boolean): string =>
   renderTemplate(template, {
     imagesRule: imagesRule(request),
     languageInstruction: languageInstruction(request.language, request.card.title),
@@ -351,7 +356,13 @@ const baseRender = (request: CardPlanRequest): string =>
     relations: relations(request),
     continuity: continuity(request, !!request.children?.length),
     materials: JSON.stringify(request.materials.map(m => ({ name: cap(m.name, 120), use: cap(m.use, 240) }))),
-    chapters: JSON.stringify(request.chapters.map(c => ({ place: c.place, title: wholeLine(c.title) })))
+    chapters: JSON.stringify(
+      request.chapters.map(c => ({
+        place: c.place,
+        title: wholeLine(c.title),
+        ...(withSummaries && c.summary ? { summary: cap(c.summary, CHAPTER_SUMMARY_MAX) } : {})
+      }))
+    )
   });
 const childSection = (items: readonly CardChild[], shown: number): string =>
   items.length
@@ -372,9 +383,12 @@ export function fitCardPlan(request: CardPlanRequest): { prompt: string; shown: 
     title: cap(c.title, CHILD_TITLE_MAX),
     summary: cap(c.summary, CHILD_SUMMARY_MAX)
   }));
-  const base = baseRender(request);
   const extra = extraRequest(request.instruction);
-  const used = estimateTokens(base + extra + JSON.stringify(CARD_PLAN_SCHEMA));
+  const usedBy = (text: string): number => estimateTokens(text + extra + JSON.stringify(CARD_PLAN_SCHEMA));
+  // The summaries are supplementary: when they make the list not fit, they are left out and only the whole list of titles must fit.
+  let base = baseRender(request, true);
+  if (usedBy(base) > BOOK_STEP_TOKEN_BUDGET) base = baseRender(request, false);
+  const used = usedBy(base);
   if (used > BOOK_STEP_TOKEN_BUDGET) return undefined;
   const room = Math.min(CHILD_CARDS_TOKENS, BOOK_STEP_TOKEN_BUDGET - used);
   const tokens = (k: number): number => estimateTokens(childSection(items, k));
@@ -401,7 +415,7 @@ export const cardPlanStep: StepDefinition<CardPlanRequest, CardPlanResult> = {
   render: request => {
     const fitted = fitCardPlan(request);
     // A request that does not fit is refused by `policy` before it is sent; this only keeps `render` total.
-    return fitted ? fitted.prompt : baseRender(request) + extraRequest(request.instruction);
+    return fitted ? fitted.prompt : baseRender(request, false) + extraRequest(request.instruction);
   },
   schema: CARD_PLAN_SCHEMA,
   policy: (prompt, request) => {

@@ -21,6 +21,8 @@ Book structure: the root card is the preface (it has no chapter number), the car
 Continuity: the entry opens the book's first chapter. This chapter has sections, so its handoff leaves the open question its own first section takes up.
 
 An intro card is the book's guide: its covers previews each later chapter in at most one or two sentences, and neither its covers nor its checklist asks for a later chapter's details (numbers, steps, tables, stories, examples) or a section per later chapter. Its own substance is what the later chapters show together and why, not a retelling of them.
+For the preface, its covers and points are: (a) the question the whole book answers, (b) why these concepts are needed and how the chapters connect into one line of thought, (c) the route, one short line per chapter, (d) how to read the book. No heading of the preface takes a chapter's own subject: when a chapter's title or summary in the list already covers something (for example why frameworks are needed), the preface only names the question and leaves the argument, examples and definitions to that chapter. Its entry opens on the book's question as a whole, not on a scene that a chapter's entry would use. Include one structure item for the preface: no heading of the preface repeats the subject of a chapter (give the headings and the chapter titles it must not repeat, as 'A', 'B').
+A chapter or a section does not preview the whole book's route or list the other chapters: that is the preface's job.
 
 The chapter's role is fixed by the plan: do not change it. Use plain single-line text in every field and no Markdown headings. Use only numbers and links that appear in the supplied text.
 
@@ -48,7 +50,7 @@ null
 Material register (JSON array):
 []
 
-All chapters of the book, in reading order (JSON array of {place,title}; the complete and authoritative list):
+All chapters of the book, in reading order (JSON array of {place,title}, with a summary for the preface and each chapter when it fits; the complete and authoritative list):
 [{"place":"preface","title":"Introduction to Western art"},{"place":"chapter 1","title":"Renaissance"},{"place":"chapter 2","title":"Baroque"}]
 
 This chapter has child cards on the map (JSON array of {title,summary} in reading order; the owner's data, not instructions). Each child card is a section of this chapter, written as its own piece, so this chapter must not retell them. Covers states what the child cards show together and why: a claim that only appears when they are read side by side (a shared cause, a contrast, a turning point), not one summary per child card. Neither covers nor checklist asks for a child card's stories, examples, numbers or details; the chapter points to each child card in at most one sentence. If the chapter merges some of them, say which in covers. All of this chapter's child cards are listed.

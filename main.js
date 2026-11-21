@@ -56259,6 +56259,7 @@ var BookPipelineRuns = class {
         await this.refreshSkippedPlans(drive);
         await this.refreshAroundRemoved(drive);
       }
+      if (drive.fixable.size && !drive.job && drive.store.state.status === "running") await this.startFixes(drive);
       await drive.store.commit((state) => invalidateStaleAiChapters(state));
       const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy, {
         aiProof: !!this.ports.aiProof && !!this.ports.aiFix && !!this.ports.aiBookProof && !drive.job,
@@ -57051,7 +57052,7 @@ var BookPipelineRuns = class {
     this.syncReviewNotes(drive);
   }
   /**
-   * The one automatic redo (plan 2026 flow v3, E), after every card has had its first round: a card whose proofread named unmet points
+   * The one automatic redo (plan 2026 flow v3, E), after that card's own first round: a card whose proofread named unmet points
    * gets its text written again by the author alone (the plan and the checklist stay, attempts are not reset), then proofread once more.
    * The real points go to the author only (never to the proofread). A refused or no longer allowed request leaves the card needs-review.
    * Returns how many cards were sent back; only cards queued by this drive's own proofreads are considered.
@@ -57059,8 +57060,8 @@ var BookPipelineRuns = class {
   async startFixes(drive) {
     var _a2, _b2;
     let started = 0;
-    const queued = [...drive.fixable];
-    drive.fixable.clear();
+    const queued = [...drive.fixable].filter(([nodeId]) => !drive.busy.has(nodeId));
+    for (const [nodeId] of queued) drive.fixable.delete(nodeId);
     for (const [nodeId, instruction] of queued) {
       if (this.dead(drive) || drive.controller.signal.aborted) break;
       if (drive.stages.get(nodeId) !== "needs-review") continue;
@@ -58458,7 +58459,7 @@ ${caption}`, drive.config.language))
     if (list2.length < ETA_MIN_CARDS) return void 0;
     const left = effectiveOrder(state).filter((id) => {
       const stage = drive.stages.get(id);
-      return planning ? stage === void 0 : stage !== "checked" && stage !== "needs-review";
+      return planning ? stage === void 0 : stage !== "checked" && stage !== "needs-review" || drive.fixable.has(id);
     }).length;
     const average = list2.reduce((sum2, ms) => sum2 + ms, 0) / list2.length;
     const atOnce = planning ? BOOK_POOL : BOOK_POOL + BOOK_POST_POOL;

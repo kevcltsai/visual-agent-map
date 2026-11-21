@@ -1436,7 +1436,11 @@ export class BookPipelineRuns {
       const missing: string[] = [];
       for (const id of effectiveOrder(data)) {
         const info = drive.cards.get(id);
-        if (data.aiProof?.[id]?.done || !info || (drive.stages.get(id) !== "checked" && drive.stages.get(id) !== "needs-review"))
+        if (
+          data.aiProof?.[id]?.done ||
+          !info ||
+          (drive.stages.get(id) !== "checked" && drive.stages.get(id) !== "needs-review")
+        )
           continue;
         const card = await this.ports.readCard(info.path).catch(() => undefined);
         if (card && aiProofBody(chapterBody(card.detail)).trim()) missing.push(id);

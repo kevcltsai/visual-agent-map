@@ -74,6 +74,16 @@
       "file": "core/steps/book-pipeline/card-plan.ts",
       "text": "This chapter has no sections, so its handoff leads into the ",
       "reason": "model-facing constant sentence of the card plan's continuity block, chosen by the card's kind; no owner or model text becomes part of it"
+    },
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "This chapter has no sections and is the last, so its handoff",
+      "reason": "model-facing constant sentence of the card plan's continuity block, chosen by the card's kind; no owner or model text becomes part of it"
+    },
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "It is the last section of the last chapter, so its handoff c",
+      "reason": "model-facing constant sentence of the card plan's continuity block, chosen by the card's kind; no owner or model text becomes part of it"
     }
   ]
 }

@@ -14039,11 +14039,19 @@ function dropEntryNaming(prompt, titles) {
 function neighbourLineTitle(prompt, key4, kind) {
   const value = parseCardPrompt(prompt)[key4];
   if (value === void 0) return void 0;
-  const plain = kind === "section" && key4 !== "parent";
-  const m = plain ? { 1: value } : /^\([^)]+\) ([\s\S]*)$/.exec(value);
-  if (!m) return void 0;
-  const title = m[1].split(" \u2014 ")[0].trim();
+  const title = value.replace(/^\([^)]+\) /, "").split(" \u2014 ")[0].trim();
   return title && !matches(L.none, title) ? title : void 0;
+}
+function dropParentLine(prompt) {
+  const lines = prompt.split("\n");
+  const words2 = labelsOf("parent");
+  const at = lines.findIndex((line2) => {
+    const m = /^([^:：]+)[:：]/.exec(line2);
+    return !!m && words2.some((w) => matches(w, m[1].trim()));
+  });
+  if (at < 0) return void 0;
+  lines.splice(at, 1);
+  return lines.join("\n");
 }
 function dropEntryLine(prompt) {
   const lines = prompt.split("\n");
@@ -15731,7 +15739,7 @@ var BOOK_AUTHOR_RULES = [
   "- The chapter text itself is required and comes first in the Detail, before any sources or notes sections: a result with only sources and notes, and no chapter text, is invalid. Do the research, then write the chapter in full.",
   "- Open with this chapter's own scene, question or claim, as the brief's entry says. Do not open by recapping or pointing back to the previous chapter (no opening such as \u300C\u4E0A\u4E00\u7AE0\u2026\u300D\u300C\u524D\u4E00\u7AE0\u2026\u300D); if the link to the previous chapter matters, make it later, in one sentence.",
   "- Call the parts of the book chapters, never cards (no \u300C\u5361\u7247\u300D\u300C\u4E0B\u4E00\u5F35\u300D in the text).",
-  "- End with one sentence that leads into the next chapter, taking up the question the brief leaves for it. If the brief has no next chapter (the last card), do not lead into a next chapter; close the whole book as the brief says.",
+  "- End with one sentence that leads into the next chapter, taking up the question the brief leaves for it. A section whose brief has no next section (\u5F8C\u4E00\u7BC0 / Next section: none) leads into the next chapter its handoff names, even when the brief shows no next-chapter line; only a card whose brief has neither a next section nor a next chapter (the book's last card) does not lead on and closes the whole book as the brief says.",
   "- The closing sentence belongs to the last paragraph of the chapter's own text, before any open-questions, sources or notes sections the template adds; those sections are not the chapter's ending.",
   ...BOOK_VOICE_RULES,
   "- An intro chapter is a guide only: at most one or two sentences of preview for each later chapter, no section of its own for a later chapter, and none of a later chapter's details (numbers, steps, tables, stories, examples). Its own substance is what the later chapters show together and why, as the brief's covers says, not a retelling of them.",
@@ -49059,13 +49067,13 @@ var continuity = (request, hasChildren) => {
   if (kind === "section")
     return [
       request.card.sectionIndex === 1 ? "Continuity: this is the first section of its chapter, so its entry takes up the chapter's own text (what the chapter has just said) and does not repeat it." : "Continuity: its entry takes up where the previous section ended and does not repeat it.",
-      request.nextChapter ? "As the last section of the chapter, its handoff leads out to the next chapter (the one given below), not to a section." : request.next ? "Its handoff leads into the next section." : "Its handoff closes the chapter."
+      request.nextChapter ? "As the last section of the chapter, its handoff leads out to the next chapter (the one given below), not to a section." : request.next ? "Its handoff leads into the next section." : "It is the last section of the last chapter, so its handoff closes the book."
     ].join(" ");
   if (kind === "preface")
     return "Continuity: this is the preface; its entry opens the book, and its handoff leads into chapter 1.";
   return [
     request.previous ? "Continuity: the entry takes up the end of the previous chapter (or the preface) and does not retell it." : "Continuity: the entry opens the book's first chapter.",
-    hasChildren ? "This chapter has sections, so its handoff leads into its own first section, not into the next chapter." : "This chapter has no sections, so its handoff leads into the next chapter."
+    hasChildren ? "This chapter has sections, so its handoff leads into its own first section, not into the next chapter." : request.next ? "This chapter has no sections, so its handoff leads into the next chapter." : "This chapter has no sections and is the last, so its handoff closes the book."
   ].join(" ");
 };
 var INSTRUCTION_MAX = 1300;
@@ -54628,7 +54636,7 @@ var BookPipelineRuns = class {
    * a line that already names it is left. Only those lines change: no role, stage, text or fingerprint is touched, and no AI call is made.
    */
   async refreshAroundRemoved(drive) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     const signal = drive.controller.signal;
     if (!((_a2 = drive.store.state.removed) == null ? void 0 : _a2.length) || this.dead(drive) || signal.aborted || drive.fatal !== void 0) return;
     const order = effectiveOrder(drive.store.state);
@@ -54656,6 +54664,16 @@ var BookPipelineRuns = class {
             { prompt: dropped },
             { expectedContent: before.raw, authorize: () => !this.dead(drive) && !signal.aborted }
           );
+        if (((_e = structure2.placeOf(nodeId)) == null ? void 0 : _e.kind) !== "section") {
+          const old = await this.ports.readCard(own2.path);
+          const withoutParent = dropParentLine(old.prompt);
+          if (withoutParent !== void 0 && !this.dead(drive) && !signal.aborted)
+            await this.ports.updateNoteGuarded(
+              own2.path,
+              { prompt: withoutParent },
+              { expectedContent: old.raw, authorize: () => !this.dead(drive) && !signal.aborted }
+            );
+        }
         for (const { id: otherId, key: key4 } of this.neighbourSides(structure2, nodeId)) {
           if (this.dead(drive) || signal.aborted) return;
           const other = otherId === void 0 ? void 0 : drive.cards.get(otherId);
@@ -54666,7 +54684,7 @@ var BookPipelineRuns = class {
             const neighbour2 = await this.ports.readCard(other.path);
             neighbourLine = this.neighbourCardOf(structure2, nodeId, otherId, key4, neighbour2);
           }
-          const prompt = retargetNeighbourLine(raw.prompt, key4, neighbourLine, (_e = structure2.placeOf(nodeId)) == null ? void 0 : _e.kind);
+          const prompt = retargetNeighbourLine(raw.prompt, key4, neighbourLine, (_f = structure2.placeOf(nodeId)) == null ? void 0 : _f.kind);
           if (prompt === void 0) continue;
           await this.ports.updateNoteGuarded(
             own2.path,

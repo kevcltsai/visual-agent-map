@@ -3710,3 +3710,16 @@ test('P3 neighbours: a removed chapter is skipped (chapters are renumbered); a s
   assert.ok((await promptLine(r, 1, '下一章')).startsWith('(2) ChapC'), 'chapter A now leads to chapter C, numbered 2');
   assert.equal(await promptLine(r, 2, '所屬章'), '(1) ChapA');
 });
+
+test('P3 neighbours: a section whose chapter was removed becomes a chapter and loses its 所屬章 line', async () => {
+  const r = await sectionRig({ titles: ['BookRoot', 'ChapA', 'SecA1', 'ChapB', 'ChapC'] });
+  await r.runs.start(r.mapPath);
+  assert.equal(await promptLine(r, 2, '所屬章'), '(1) ChapA');
+  const base = r.script.author; let hit = false;
+  r.script.author = async (input, n) => { if (!hit) { hit = true; await r.repo.updateMap(r.mapPath, d => { d.nodes.find(n2 => n2.id === r.nodes[2].id).parentId = r.nodes[0].id; d.nodes = d.nodes.filter(n2 => n2.id !== r.nodes[1].id); }); } return base(input, n); };
+  await r.runs.confirmGate1(r.mapPath); while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+  assert.equal((await r.state()).pauseReason, 'map');
+  await r.runs.keepBookMap(r.mapPath); while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+  assert.equal(await promptLine(r, 2, '所屬章'), undefined, 'no chapter line on what is a chapter now');
+  assert.ok((await promptLine(r, 2, '上一章')).startsWith('(前言) BookRoot'), 'it has chapter neighbours now');
+});

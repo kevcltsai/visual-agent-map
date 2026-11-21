@@ -150,6 +150,8 @@ test('T1 fallback: the frozen T1 parseCardPrompt / parseChecklist read a new-for
     assert.deepEqual(plain(t1ParseCardPrompt(prompt)), plain(t1ParseCardPrompt(oldPrompt)), 'slot lines add nothing to the labelled lines');
     assert.deepEqual(plain(t1ParseChecklist(prompt)), plain(t1ParseChecklist(oldPrompt)), 'slot lines are not checklist items');
     assert.equal(t1ParseChecklist(prompt).length, 2);
+    assert.equal(t1ParseCardPrompt(prompt).previous, undefined, 'the frozen reader knows no new label');
+    assert.equal(t1ParseCardPrompt(prompt).next, undefined);
     assert.equal(t1ParseCardPrompt(planText.composeCardPrompt({ ...plan, images: [] }, lang)).covers, 'c');
   }
 });

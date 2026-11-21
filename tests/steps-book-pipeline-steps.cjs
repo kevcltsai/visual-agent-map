@@ -583,7 +583,7 @@ test('proofread: a whole-card failure carries the judged items as a partial resu
 
 test('author requirements: the fixed chapter rules always come first, the settings after', () => {
   const none = settings.bookAuthorRequirements({});
-  assert.match(none, /Open with this chapter's own scene, question or claim/); assert.match(none, /Do not open by recapping or pointing back to the previous chapter/); assert.match(none, /never cards/); assert.match(none, /End with one sentence that leads into the next chapter/); assert.match(none, /Do not end the chapter with an update log/); assert.match(none, /no next chapter \(the last card\).*close the whole book/); assert.match(none, /what the later chapters show together and why/);
+  assert.match(none, /Open with this chapter's own scene, question or claim/); assert.match(none, /Do not open by recapping or pointing back to the previous chapter/); assert.match(none, /never cards/); assert.match(none, /End with one sentence that leads into the next chapter/); assert.match(none, /Do not end the chapter with an update log/); assert.match(none, /A section whose brief has no next section .* leads into the next chapter its handoff names/); assert.match(none, /neither a next section nor a next chapter \(the book's last card\).*closes the whole book/); assert.match(none, /what the later chapters show together and why/);
   const some = settings.bookAuthorRequirements({ tone: 'warm' });
   assert.ok(some.startsWith(none)); assert.match(some, /- tone: warm/);
   assert.doesNotMatch(none, /The whole book's chapters/, 'no chapter list when none is given');
@@ -1070,6 +1070,7 @@ test('A6 neighbourLineTitle / rewriteNeighbourLine / retargetNeighbourLine take 
   assert.equal(neighbourLineTitle('Previous chapter: (Preface) Intro', 'previous'), 'Intro');
   assert.equal(neighbourLineTitle('前一張：(3) Old — x', 'previous'), 'Old', 'an old line is read');
   assert.equal(neighbourLineTitle('前一節：S1 — x', 'previous', 'section'), 'S1');
+  assert.equal(neighbourLineTitle('前一張：(3) X — s', 'previous', 'section'), 'X', 'an old numbered line read for a section');
   assert.equal(neighbourLineTitle('所屬章：(2) Two', 'parent', 'section'), 'Two');
   assert.equal(neighbourLineTitle('前一節：無', 'previous', 'section'), undefined);
   assert.equal(neighbourLineTitle('上一章：無', 'previous'), undefined);
@@ -1098,10 +1099,16 @@ test('A6 card plan request: a section prompt carries its chapter and (last secti
   const firstSection = cardPlan.cardPlanStep.render(planBase({ card: { id: 's1', kind: 'section', chapter: 2, sectionIndex: 1, sectionCount: 2, role: 'body', title: 'One', summary: 's' }, parent: { position: 2, title: 'Chapter two' }, next: { title: 'Two', summary: 't' } }));
   assert.match(firstSection, /first section of its chapter, so its entry takes up the chapter's own text/);
   assert.ok(!/Next chapter, which/.test(firstSection));
-  const chapter = cardPlan.cardPlanStep.render(planBase({ previous: { position: 'preface', title: 'Intro', summary: 'i' } }));
+  const chapter = cardPlan.cardPlanStep.render(planBase({ previous: { position: 'preface', title: 'Intro', summary: 'i' }, next: { position: 2, title: 'Next', summary: 'n' } }));
   assert.ok(!/belongs to|Next chapter, which/.test(chapter));
   assert.match(chapter, /"place":"preface","title":"Intro"/);
   assert.match(chapter, /takes up the end of the previous chapter .* and does not retell it\. This chapter has no sections, so its handoff leads into the next chapter\./);
+  const lastChapter = cardPlan.cardPlanStep.render(planBase({ previous: { position: 1, title: 'One', summary: 'o' } }));
+  assert.match(lastChapter, /has no sections and is the last, so its handoff closes the book/);
+  assert.ok(!/leads into the next chapter/.test(lastChapter));
+  const lastSection = cardPlan.cardPlanStep.render(planBase({ card: { id: 's2', kind: 'section', chapter: 2, sectionIndex: 2, sectionCount: 2, role: 'body', title: 'Two', summary: 's' }, parent: { position: 2, title: 'Chapter two' }, previous: { title: 'One', summary: 'o' } }));
+  assert.match(lastSection, /last section of the last chapter, so its handoff closes the book/);
+  assert.ok(!/closes the chapter|leads out to the next chapter/.test(lastSection));
   const withSections = cardPlan.cardPlanStep.render(planBase({ children: [{ title: 'S1', summary: 'a' }] }));
   assert.match(withSections, /handoff leads into its own first section/);
 });

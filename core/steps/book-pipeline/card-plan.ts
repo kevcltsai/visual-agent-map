@@ -265,7 +265,7 @@ const continuity = (request: CardPlanRequest, hasChildren: boolean): string => {
         ? "As the last section of the chapter, its handoff leads out to the next chapter (the one given below), not to a section."
         : request.next
           ? "Its handoff leads into the next section."
-          : "Its handoff closes the chapter."
+          : "It is the last section of the last chapter, so its handoff closes the book."
     ].join(" ");
   if (kind === "preface")
     return "Continuity: this is the preface; its entry opens the book, and its handoff leads into chapter 1.";
@@ -275,7 +275,9 @@ const continuity = (request: CardPlanRequest, hasChildren: boolean): string => {
       : "Continuity: the entry opens the book's first chapter.",
     hasChildren
       ? "This chapter has sections, so its handoff leads into its own first section, not into the next chapter."
-      : "This chapter has no sections, so its handoff leads into the next chapter."
+      : request.next
+        ? "This chapter has no sections, so its handoff leads into the next chapter."
+        : "This chapter has no sections and is the last, so its handoff closes the book."
   ].join(" ");
 };
 

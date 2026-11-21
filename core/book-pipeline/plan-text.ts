@@ -367,11 +367,25 @@ export function dropEntryNaming(prompt: string, titles: readonly string[]): stri
 export function neighbourLineTitle(prompt: string, key: NeighbourKey, kind?: CardKind): string | undefined {
   const value = parseCardPrompt(prompt)[key];
   if (value === undefined) return undefined;
-  const plain = kind === "section" && key !== "parent";
-  const m = plain ? { 1: value } : /^\([^)]+\) ([\s\S]*)$/.exec(value);
-  if (!m) return undefined;
-  const title = m[1].split(" — ")[0].trim();
+  // A leading `(position) ` is dropped whatever the kind: an old `前一張：(3) X — s` line read for a section still has it.
+  const title = value
+    .replace(/^\([^)]+\) /, "")
+    .split(" — ")[0]
+    .trim();
   return title && !matches(L.none, title) ? title : undefined;
+}
+
+/** The prompt without its `所屬章` line (a card that is no longer a section); `undefined` when it has none. */
+export function dropParentLine(prompt: string): string | undefined {
+  const lines = prompt.split("\n");
+  const words = labelsOf("parent");
+  const at = lines.findIndex(line => {
+    const m = /^([^:：]+)[:：]/.exec(line);
+    return !!m && words.some(w => matches(w, m[1].trim()));
+  });
+  if (at < 0) return undefined;
+  lines.splice(at, 1);
+  return lines.join("\n");
 }
 
 /** The prompt without its `接入點` line; `undefined` when it has none. */

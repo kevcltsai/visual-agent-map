@@ -134,6 +134,7 @@ import {
   parseChecklist,
   parseImageSlots,
   dropEntryLine,
+  dropParentLine,
   dropEntryNaming,
   neighbourLineTitle,
   retargetNeighbourLine,
@@ -1581,6 +1582,17 @@ export class BookPipelineRuns {
             { prompt: dropped },
             { expectedContent: before.raw, authorize: () => !this.dead(drive) && !signal.aborted }
           );
+        // A section whose chapter was removed became a chapter: its old `所屬章` line goes.
+        if (structure.placeOf(nodeId)?.kind !== "section") {
+          const old = await this.ports.readCard(own.path);
+          const withoutParent = dropParentLine(old.prompt);
+          if (withoutParent !== undefined && !this.dead(drive) && !signal.aborted)
+            await this.ports.updateNoteGuarded(
+              own.path,
+              { prompt: withoutParent },
+              { expectedContent: old.raw, authorize: () => !this.dead(drive) && !signal.aborted }
+            );
+        }
         for (const { id: otherId, key } of this.neighbourSides(structure, nodeId)) {
           if (this.dead(drive) || signal.aborted) return;
           const other = otherId === undefined ? undefined : drive.cards.get(otherId);

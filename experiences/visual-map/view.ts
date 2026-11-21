@@ -17603,6 +17603,8 @@ export class VisualAgentMapView extends ItemView {
   /** After a map opens: its notes are aligned with its run (stale boxes of an earlier run removed, old runs drawn), then ticked boxes are read. */
   private async reconcileBookNotes(path: string, isCurrent: () => boolean): Promise<void> {
     try {
+      // A finished book whose rerun was cut short (the plugin was unloaded) is closed first, so the boxes below follow the repaired state.
+      await this.plugin.bookPipelineRuns?.repairFinished(path).catch(() => undefined);
       await this.plugin.bookCallouts.reconcile(path, this.bookMayCarryCallouts);
       if (this.closed || !isCurrent() || !this.map) return;
       const read = readBookPipeline(this.map);

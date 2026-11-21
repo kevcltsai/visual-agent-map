@@ -1421,6 +1421,40 @@ export class BookPipelineRuns {
     if (!(await this.writeClosingPage(drive))) this.log(drive, "open_issues_write", nodeId, "proof", "failed");
   }
 
+  /**
+   * A finished book is read again (the map opens; the one entry for this repair): a chapter with text that the book lists but that has
+   * no finished AI proofread slot (a rerun cut short by an unload: its slot was cleared or left open and nothing closed it) is closed as incomplete and the
+   * closing page is written again, so the bar and the page never show the book as solved. A book with no such chapter is not touched.
+   */
+  async repairFinished(mapPath: string): Promise<void> {
+    if (this.disposed || !this.ports.aiProof || !this.ports.aiFix || !this.ports.aiBookProof) return;
+    const read = readBookPipeline(await this.ports.readMap(mapPath));
+    if (read.kind !== "usable" || read.data.phase !== "done") return;
+    if (effectiveOrder(read.data).every(id => read.data.aiProof?.[id]?.done)) return;
+    return this.enter(mapPath, async drive => {
+      const data = await this.openSaved(drive, mapPath, { allowDone: true });
+      const missing: string[] = [];
+      for (const id of effectiveOrder(data)) {
+        const info = drive.cards.get(id);
+        if (data.aiProof?.[id]?.done || !info || (drive.stages.get(id) !== "checked" && drive.stages.get(id) !== "needs-review"))
+          continue;
+        const card = await this.ports.readCard(info.path).catch(() => undefined);
+        if (card && aiProofBody(chapterBody(card.detail)).trim()) missing.push(id);
+      }
+      if (!missing.length || this.dead(drive)) return;
+      await drive.store.commit(state =>
+        state.phase === "done"
+          ? {
+              state: missing.reduce((next, id) => (next.aiProof?.[id]?.done ? next : abandonAi(next, id)), state),
+              accepted: true
+            }
+          : { state, accepted: false }
+      );
+      if (!(await this.writeClosingPage(drive))) this.log(drive, "open_issues_write", missing[0], "proof", "failed");
+      this.syncNotes(drive);
+    });
+  }
+
   /** The card's result as the rerun compares it (memory only); undefined when the card cannot be read. */
   private async cardSnapshot(drive: Drive, nodeId: string): Promise<CardResultSnapshot | undefined> {
     const path = drive.cards.get(nodeId)?.path;

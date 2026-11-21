@@ -4157,11 +4157,14 @@ const cutRerun = async (how, stepOfCut) => {
   const running = r.runs.rerunCard(r.mapPath, idA(r)).catch(() => undefined);
   while (!reached && r.runs.isRunning(r.mapPath)) await tick();
   if (how === 'stop') { await r.runs.stop(r.mapPath); hold.resolve(); }
+  if (how === 'dispose') { r.runs.dispose(); hold.resolve(); }
   await running;
   while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+  // the plugin is unloaded: the map is opened again by a new session, which reads the finished book
+  if (how === 'dispose') { const again = new BookPipelineRuns(r.ports); await again.repairFinished(r.mapPath); await settle(); }
   return { r, v };
 };
-for (const how of ['stop', 'budget']) for (const at of ['proof', 'fix']) {
+for (const how of ['stop', 'budget', 'dispose']) for (const at of ['proof', 'fix']) {
   test(`R2 combo N2: a finished book, one chapter written again, ${how} during its AI ${at}: the chapter is incomplete and the page says so`, async () => {
     const { r, v } = await cutRerun(how, at);
     same(await invariantsOf(r, v), []);

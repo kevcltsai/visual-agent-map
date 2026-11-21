@@ -339,6 +339,17 @@ export function applyAiProof(
   delete slot.pending;
   if (result.pending.length && slot.round < MAX_AI_FIX_ROUNDS) {
     slot.step = "fix";
+    // Ids are renumbered by every check: an earlier refusal follows its quote to the new id, and is dropped when no new problem has it.
+    const same = (a: AiProofPending, b: AiProofPending): boolean =>
+      a.quote.replace(/\s+/g, "") === b.quote.replace(/\s+/g, "") && (a.chapter ?? 1) === (b.chapter ?? 1);
+    const carried: Record<string, string> = {};
+    for (const [oldId, reason] of Object.entries(found.refused ?? {})) {
+      const old = (found.pending ?? []).find(target => target.id === oldId);
+      const now = old ? result.pending.find(item => same(item, old)) : undefined;
+      if (now) carried[now.id] = reason;
+    }
+    if (Object.keys(carried).length) slot.refused = carried;
+    else delete slot.refused;
     slot.pending = result.pending.map(item => ({ ...item }));
     slot.open = result.open.map(item => ({ ...item }));
   } else {
@@ -396,8 +407,8 @@ export function applyAiFix(
     round: found.round + 1,
     step: "proof",
     fixed: found.fixed + result.applied,
-    // Ids are renumbered by every check: only this round's refusals name this round's targets.
-    refused: { ...(result.refused ?? {}) }
+    // `found.refused` already names this round's targets (see applyAiProof); this round's refusals are added.
+    refused: { ...(found.refused ?? {}), ...(result.refused ?? {}) }
   };
   if (result.replacements?.length) slot.applied = [...(found.applied ?? []), ...result.replacements];
   for (const id of result.appliedIds ?? []) delete slot.refused?.[id];

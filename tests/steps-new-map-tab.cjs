@@ -29,9 +29,14 @@ const HANDLER_ONLY = ['layout-change'];
 function makeWorld({ existingTitles = [], realRepo = null, setStateFails = false, notices = [], focusNewTab = true, events = SHOW_EVENTS } = {}) {
   const newViews = [], leaves = [], allLeaves = [], getLeafCalls = [], revealed = [], active = [], viewStates = [], defaultOpens = [], detached = [], handlers = {}, writes = [];
   const counts = { transform: 0, layouts: 0 };
+  // Every timer the fake world starts is counted, so flush() waits until they have all fired instead of sleeping a fixed time a loaded machine can overrun.
+  // A timer the product cleared never fires, so a destroyed handle stops counting.
+  const timers = new Set();
+  const pendingTimers = () => { for (const timer of timers) if (timer._destroyed) timers.delete(timer); return timers.size; };
+  const later = (fn, ms) => { const timer = setTimeout(() => { timers.delete(timer); fn(); }, ms); timers.add(timer); return timer; };
   const { VisualAgentMapView, default: Plugin } = load('main.ts', { obsidian: { ...obsidian, MarkdownView: class {}, FuzzySuggestModal, Modal: CapturingModal, Notice: dom.makeNotice(notices) } }, {
     createFragment: dom.createFragment, CSS: { escape: x => x },
-    setTimeout: fn => setTimeout(fn, 0), clearInterval, // the 250 ms viewport save timer and the title refresh run at once
+    setTimeout: fn => later(fn, 0), clearInterval, // the 250 ms viewport save timer and the title refresh run at once
     activeDocument: { get activeElement() { throw STOP; } }
   }, { define: { activeDocument: 'window.activeDocument' } });
   const plugin = new Plugin();
@@ -49,9 +54,9 @@ function makeWorld({ existingTitles = [], realRepo = null, setStateFails = false
   };
   plugin.ready = Promise.resolve();
   if (realRepo) plugin.rebuildDerivedData = async () => {};
-  const emit = (name, delay) => setTimeout(() => (handlers[name] ?? []).forEach(cb => cb(workspace.activeLeaf)), delay);
+  const emit = (name, delay) => later(() => (handlers[name] ?? []).forEach(cb => cb(workspace.activeLeaf)), delay);
   let activeEventPending = false;
-  const requestActiveLeafEvents = () => { if (activeEventPending) return; activeEventPending = true; setTimeout(() => { activeEventPending = false; if (events.includes('active-leaf-change')) emit('active-leaf-change', 0); }, 0); };
+  const requestActiveLeafEvents = () => { if (activeEventPending) return; activeEventPending = true; later(() => { activeEventPending = false; if (events.includes('active-leaf-change')) emit('active-leaf-change', 0); }, 0); };
   const workspace = {
     activeLeaf: null, selected: null,
     getLeavesOfType: () => leaves,
@@ -72,7 +77,7 @@ function makeWorld({ existingTitles = [], realRepo = null, setStateFails = false
       workspace.selected = leaf;
       emit('resize', 0); // the workspace "resize" event (requestResize): not a view.onResize
       if (events.includes('layout-change')) emit('layout-change', 10); // handler-only, see the header
-      if (leaf.view && events.includes('resize-observer')) setTimeout(() => leaf.view?.onResize?.(), 20);
+      if (leaf.view && events.includes('resize-observer')) later(() => leaf.view?.onResize?.(), 20);
     },
     revealLeaf: async leaf => { revealed.push(leaf); workspace.selectTab(leaf); },
     setActiveLeaf: (leaf, params) => {
@@ -155,7 +160,9 @@ function makeWorld({ existingTitles = [], realRepo = null, setStateFails = false
     if (leaf) leaves.push(l);
     return { view, leaf: l, calls };
   };
-  const flush = () => new Promise(resolve => setTimeout(resolve, 40));
+  // Waits for the world's own timers (none is longer than 20 ms), then lets the promise chains they started finish; no fixed sleep.
+  const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+  const flush = async () => { for (let round = 0; round < 2000; round++) { await tick(); await new Promise(resolve => setImmediate(resolve)); if (pendingTimers() === 0) { await tick(); if (pendingTimers() === 0) return; } } throw new Error('flush: timers never settled'); };
   // A tab opened in the background (focusNewTab off): hidden until something selects it.
   const hiddenTab = async (file = 'Maps/B/Map.md') => {
     const leaf = workspace.getLeaf('tab');

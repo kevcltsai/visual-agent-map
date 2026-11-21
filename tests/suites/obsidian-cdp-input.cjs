@@ -74,8 +74,24 @@ test('CLI click and key commands appear in the usage text', async () => {
 
 test('background rendering is enabled for session vaults and never for the owner vault', async () => {
   const { rendersInBackground } = await lib();
-  assert.equal(rendersInBackground('/private/tmp/vam-e2e-hrf'), true);
-  assert.equal(rendersInBackground('/x/vaults/vam-e2e-current'), false);
-  assert.equal(rendersInBackground('/x/vaults/vam-e2e-current/'), false);
-  assert.equal(rendersInBackground('/x/vaults/../vaults/vam-e2e-current'), false);
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'vam-cdp-owner-')));
+  try {
+    const owner = path.join(dir, 'vaults', 'vam-e2e-current');
+    const renamed = path.join(dir, 'my-owner-vault');
+    fs.mkdirSync(owner, { recursive: true });
+    fs.mkdirSync(renamed);
+    fs.symlinkSync(owner, path.join(dir, 'alias'));
+    fs.symlinkSync(renamed, path.join(dir, 'alias2'));
+    assert.equal(rendersInBackground('/private/tmp/vam-e2e-hrf', {}), true);
+    assert.equal(rendersInBackground(renamed, {}), true, 'without the override a renamed folder is a session vault');
+    assert.equal(rendersInBackground(owner, {}), false);
+    assert.equal(rendersInBackground(owner + '/', {}), false);
+    assert.equal(rendersInBackground(path.join(dir, 'vaults', '..', 'vaults', 'vam-e2e-current'), {}), false);
+    assert.equal(rendersInBackground(path.join(dir, 'alias'), {}), false, 'a symlink to the owner vault');
+    assert.equal(rendersInBackground(renamed, { VAM_OWNER_VAULT: renamed }), false, 'VAM_OWNER_VAULT with any folder name');
+    assert.equal(rendersInBackground(path.join(dir, 'alias2'), { VAM_OWNER_VAULT: renamed }), false, 'a symlink to the VAM_OWNER_VAULT path');
+    assert.equal(rendersInBackground(owner, { VAM_OWNER_VAULT: renamed }), false);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

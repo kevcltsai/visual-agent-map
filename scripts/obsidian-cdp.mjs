@@ -123,7 +123,12 @@ export async function clickSelector(cdp, selector) {
 // empty: DOM reads there are unreliable. Focus emulation keeps frames running without focusing or raising the window. It
 // applies to this connection only and is never set for the owner's vault.
 export const ownerVaultName = "vam-e2e-current";
-export const rendersInBackground = vault => basename(resolve(vault)) !== ownerVaultName;
+// Decided on the real path (what pageTarget matches on), so a symlink or a differently named VAM_OWNER_VAULT cannot slip through.
+export function rendersInBackground(vault, env = process.env) {
+  const real = canonicalPath(vault);
+  if (basename(real) === ownerVaultName) return false;
+  return !(env.VAM_OWNER_VAULT && real === canonicalPath(env.VAM_OWNER_VAULT));
+}
 
 export async function connectCdp(vault) {
   const page = await pageTarget(vault);
@@ -154,7 +159,8 @@ export async function connectCdp(vault) {
   });
   // Enabling Runtime replays the exceptions and console messages buffered since the page started.
   await send("Runtime.enable");
-  if (rendersInBackground(vault)) await send("Emulation.setFocusEmulationEnabled", { enabled: true });
+  // Best effort: a window that refuses it keeps working, only without background frames.
+  if (rendersInBackground(vault)) await send("Emulation.setFocusEmulationEnabled", { enabled: true }).catch(() => {});
   return {
     ...createInput(send),
     async evaluate(expression) {

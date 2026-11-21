@@ -183,7 +183,7 @@ test('the book prompt carries every chapter with its number, the leads and the p
   assert.ok(prompt.includes('[{"number":1,"title":"一","text":"第一章說發芽要三天。"},{"number":2,'));
   assert.ok(prompt.includes('["chapter 1 vs chapter 2"]')); assert.ok(prompt.includes('[{"id":"B1","quote":"q","problem":"p"}]'));
   assert.ok(!prompt.includes(base.model));
-  assert.throws(() => stepMod.aiBookProofStep.policy('p', bookRequest({ chapters: [{ title: 'x', text: ' ' }] })), /needs the chapter text/);
+  assert.throws(() => stepMod.aiBookProofStep.policy('p', bookRequest({ chapters: [{ title: 'x', text: ' ' }] })), /needs the text/);
 });
 
 test('runAiBookProof: a text-only call; the quote is checked in the chapter it names, other chapters are ignored, no web search', async () => {

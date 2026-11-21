@@ -1373,7 +1373,7 @@ test('commons run (v6 #4, whole run): 9 chapters whose Commons search always ans
     assert.deepEqual(plain(recordOf(note.detail).slots.map(s => [s.index, s.state, s.reasonCode ?? ''])), [[1, 'missing', 'rate_limited']], titles[i]);
     assert.match(note.pipelineIssue, /(?:^|\s)images:limited(?:\s|$)/, titles[i]);
   }
-  assert.equal((await r.state()).phase, 'gate2', 'the run completed (waiting for the reader at gate 2)');
+  assert.equal((await r.state()).phase, 'done', 'the run completed (the final gate no longer waits)');
   assert.equal(r.runs.isRunning(r.mapPath), false);
 });
 

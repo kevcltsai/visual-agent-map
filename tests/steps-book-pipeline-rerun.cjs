@@ -84,7 +84,8 @@ const authorFor = r => async (input, n) => {
   const out = await r.repo.updateNoteGuarded(input.path, { detail: text }, { authorize: input.authorize, finalize: input.finalize });
   return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
 };
-const toGate2 = async r => { await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath); };
+// The run now finishes by itself (the final gate no longer waits); these tests are about a book saved at gate 2 (an older save), so the finished run is put back there.
+const toGate2 = async r => { await r.runs.start(r.mapPath); await confirmDone(r.runs, r.mapPath); await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'gate2'; d.bookPipeline.status = 'running'; delete d.bookPipeline.pauseReason; }); };
 
 test('rerunCard is refused at gate 1 (the trial screen has its own retry) and in the writing phase', async () => {
   const r = await rig();
@@ -176,7 +177,8 @@ test('the budget running out during a rerun pauses with its own reason (no needs
   assert.equal(r.runs.getProgress(r.mapPath).pauseReason, 'budget');
   await assert.rejects(() => r.runs.rerunCard(r.mapPath, r.nodes[2].id), e => e.code === 'budget');
   await r.runs.resume(r.mapPath, { addBudget: 100 });
-  s = await r.state(); assert.equal(s.status, 'running'); assert.equal(s.phase, 'gate2');
+  s = await r.state(); assert.equal(s.status, 'running'); assert.equal(s.phase, 'done', 'the resumed run finishes by itself');
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'gate2'; });
   await r.runs.rerunCard(r.mapPath, r.nodes[2].id);
   assert.equal(stageOf(r.raw(2)), 'checked'); assert.equal((await r.state()).phase, 'gate2');
 });

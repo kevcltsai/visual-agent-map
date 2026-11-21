@@ -72,6 +72,8 @@ async function rig() {
   const runs = new bundle.BookPipelineRuns(ports);
   await runs.start(mapPath);
   await confirmDone(runs, mapPath);
+  // The run finishes by itself now; these tests are about a book saved at gate 2 (an older save), so it is put back there.
+  await repo.updateMap(mapPath, d => { d.bookPipeline.phase = 'gate2'; d.bookPipeline.status = 'running'; delete d.bookPipeline.pauseReason; });
   const noteOf = new Map();
   const reload = async () => { for (const n of nodes) noteOf.set(n.id, await repo.readNote(n.path)); };
   return { repo, runs, nodes, mapPath, stat, script, reload, noteOf, stateOf: async () => (await repo.readMap(mapPath)).bookPipeline };
@@ -312,7 +314,7 @@ test('finish at gate 2: a card added or removed pauses as map changed (no silent
     await r.runs.keepBookMap(r.mapPath);
     st = await r.stateOf();
     assert.equal(st.status, 'running');
-    assert.equal(st.phase, 'gate2');
+    assert.equal(st.phase, 'done', 'keeping the map lets the run finish by itself');
     if (kind === 'removed') assert.ok(st.removed.includes(gone));
     await r.runs.finishRun(r.mapPath);
     assert.equal((await r.stateOf()).phase, 'done', kind + ': finishes after keep');

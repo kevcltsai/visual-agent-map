@@ -247,7 +247,7 @@ export const aiBookProofStep: StepDefinition<AiBookProofRequest, RawAiProof> = {
     }),
   schema: AI_BOOK_PROOF_SCHEMA,
   policy: (prompt, request) => {
-    if (!request.chapters.some(chapter => chapter.text.trim())) fail("A whole-book proofread needs the chapter text");
+    if (!request.chapters.some(chapter => chapter.text.trim())) fail("A book proofread needs the text");
     overBudget(prompt, AI_BOOK_PROOF_SCHEMA);
   },
   parse: raw => parseAiProof(raw)

@@ -1,0 +1,1 @@
+You must search the web or open at least one of the sources listed below, and only those: a page that is not on the list is not evidence. When you cannot open a source, or it does not cover the claim, return the check as unverifiable with why source_unreachable.

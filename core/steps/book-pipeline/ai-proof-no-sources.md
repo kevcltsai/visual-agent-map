@@ -1,0 +1,1 @@
+This chapter lists no sources and you have no web access. Check only what the text itself shows: consistency between its own sentences and how specific its citations are. A fact or number you cannot check from the text alone is unverifiable (fixable false, why source_unreachable).

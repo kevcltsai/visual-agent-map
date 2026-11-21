@@ -17,6 +17,8 @@ import { prepareStep, renderTemplate, type StepDefinition } from "../../step-run
 import { arrayOf, fail, languageInstruction, overBudget, parseJson, recordOf, type BookStepBase } from "./base";
 import { planFailMessage, runPlanStep } from "./run";
 import template from "./ai-proof.md";
+import sourceRuleTemplate from "./ai-proof-sources.md";
+import noSourceRuleTemplate from "./ai-proof-no-sources.md";
 import bookTemplate from "./ai-proof-book.md";
 
 export const AI_PROOF_SEARCH_BUDGET = 4;
@@ -121,10 +123,8 @@ export function listedSources(sources: readonly AiProofSource[]): AiProofSource[
   return out;
 }
 
-const SOURCE_RULE =
-  "You must search the web or open at least one of the sources listed below, and only those: a page that is not on the list is not evidence. When you cannot open a source, or it does not cover the claim, return the check as unverifiable with why source_unreachable.";
-const NO_SOURCE_RULE =
-  "This chapter lists no sources and you have no web access. Check only what the text itself shows: consistency between its own sentences and how specific its citations are. A fact or number you cannot check from the text alone is unverifiable (fixable false, why source_unreachable).";
+const SOURCE_RULE = sourceRuleTemplate.trim();
+const NO_SOURCE_RULE = noSourceRuleTemplate.trim();
 
 /** The independent proofread of one chapter. */
 export const aiProofStep: StepDefinition<AiProofRequest, RawAiProof> = {

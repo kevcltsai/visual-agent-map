@@ -13420,7 +13420,7 @@ function foldCardPlan(content) {
 }
 var planLines2 = (content) => textNodesOf(content).map((node) => node.data).join("\n");
 function markPlanCallouts(root, env) {
-  var _a2, _b2;
+  var _a2, _b2, _c;
   const callouts = root.matches(CALLOUT) ? [root] : [];
   callouts.push(...Array.from(root.querySelectorAll(CALLOUT)));
   for (const callout2 of callouts) {
@@ -13435,10 +13435,13 @@ function markPlanCallouts(root, env) {
     const card = kind.kind === "book" ? "chapter" : cardKindOfPrompt(planLines2(content));
     if (kind.kind === "book") hideStructure(content);
     else foldCardPlan(content);
-    if (planStartsOpen(env.stage())) {
-      callout2.classList.remove("is-collapsed");
-      (_b2 = callout2.querySelector(".callout-fold")) == null ? void 0 : _b2.classList.remove("is-collapsed");
-      content.style.removeProperty("display");
+    if (planStartsOpen(env.stage()) && callout2.classList.contains("is-collapsed")) {
+      (_b2 = callout2.querySelector(".callout-title")) == null ? void 0 : _b2.click();
+      if (callout2.classList.contains("is-collapsed")) {
+        callout2.classList.remove("is-collapsed");
+        (_c = callout2.querySelector(".callout-fold")) == null ? void 0 : _c.classList.remove("is-collapsed");
+        content.style.removeProperty("display");
+      }
     }
     const locale = planLocale(env.language(), kind.zh);
     if (kind.zh) relabel(content, locale);

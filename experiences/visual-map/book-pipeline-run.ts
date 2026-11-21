@@ -71,7 +71,6 @@ import {
   nextActions,
   pauseForMap,
   recoverInterrupted,
-  reopenTrialFix,
   requestAutoFix,
   resetCard,
   resumeRun,
@@ -117,7 +116,6 @@ import {
   hidePipelineLog,
   findStoredProof,
   findStoredProofModels,
-  latestStoredProof,
   extractProofRecords,
   addPictureSources,
   carryImageSection,
@@ -1157,7 +1155,6 @@ export class BookPipelineRuns {
         });
         if (!moved) throw new BookPipelineRunError("not_gate1");
         this.log(drive, "gate1", "-", "write", "confirmed");
-        await this.queueTrialFixes(drive);
       },
       true
     );
@@ -2207,11 +2204,7 @@ export class BookPipelineRuns {
             state: advancePhase(state, this.stagesOf(drive), this.ports.now()),
             accepted: true
           }));
-          if (drive.store.state !== before) {
-            changed = true;
-            // The trial's gate 1 passes by itself: its chapters still needing a person join the full book's fix round, as at a confirmed gate.
-            if (before.phase === "gate1" && drive.store.state.phase === "writing") await this.queueTrialFixes(drive);
-          }
+          if (drive.store.state !== before) changed = true;
         } else if (action.type === "ai_proof" || action.type === "ai_fix") {
           if (inflight.size >= BOOK_POOL) continue;
           const key = action.nodeId;
@@ -2977,40 +2970,6 @@ export class BookPipelineRuns {
       await this.writeFailureSection(drive, nodeId, reason);
     this.syncReviewNotes(drive);
   }
-  /**
-   * Gate 1 confirmed: a trial chapter still needing a person (its proof's unmet points or its length) joins the full book's fix round,
-   * with the instruction its stored proof and its length give now. A hand-edited or kept chapter is not queued.
-   */
-  private async queueTrialFixes(drive: Drive): Promise<void> {
-    for (const id of drive.store.state.trial ?? []) {
-      const info = drive.cards.get(id);
-      if (!info || drive.stages.get(id) !== "needs-review") continue;
-      const card = await this.ports.readCard(info.path).catch(() => undefined);
-      if (
-        !card ||
-        isKeptRaw(card.raw) ||
-        /^write failed: hand_edited$/.test(String(card.fields.pipelineIssue ?? "").trim())
-      )
-        continue;
-      const proof = latestStoredProof(card.detail);
-      const length = await this.lengthOf(drive, id, lengthBody(chapterBody(card.detail)));
-      if (proof?.aggregate !== "needs-review" && !length) continue;
-      const done = await drive.store.commit(state => reopenTrialFix(state, id));
-      if (!done?.accepted) continue;
-      const items = (proof?.items ?? []).map(item => ({ ...item, sources: [...item.sources] }));
-      drive.fixable.set(
-        id,
-        proofFixInstruction(
-          items,
-          [...parseChecklist(card.prompt), ...BOOK_CHECKS],
-          length,
-          researchVoiceSentences(`${chapterBody(card.detail)}\n\n${readerCallouts(card.detail)}`)
-        )
-      );
-      drive.expand.add(id);
-    }
-  }
-
   /**
    * The one automatic redo (plan 2026 flow v3, E), after every card has had its first round: a card whose proofread named unmet points
    * gets its text written again by the author alone (the plan and the checklist stay, attempts are not reset), then proofread once more.

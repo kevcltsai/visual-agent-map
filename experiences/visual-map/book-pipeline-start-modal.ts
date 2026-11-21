@@ -5,6 +5,7 @@ import {
   BOOK_EXPAND_PASSES,
   BOOK_SETTING_FIELDS,
   DEFAULT_BUDGET_LIMIT,
+  MAX_AI_FIX_ROUNDS,
   MAX_AUTO_FIXES,
   type BookSettingField,
   type BookSettings,
@@ -34,7 +35,7 @@ export const BOOK_STEP_SECONDS: Record<"global" | keyof BookStartModels, { secon
   images: { seconds: 55, model: "haiku" },
   proof: { seconds: 19, model: "sonnet" }
 };
-/** One write of a chapter is followed by up to two picture searches (the second only when the first finds too little). */
+/** The first write of a chapter is followed by up to two picture searches (the second only when the first finds too little). */
 export const BOOK_IMAGE_SEARCHES = 2;
 /** Each picture search may be asked once more when its captions come back in another language. */
 export const BOOK_IMAGE_CALLS_PER_SEARCH = 2;
@@ -43,22 +44,25 @@ export { BOOK_EXPAND_PASSES };
 
 /**
  * The AI calls of one chapter at most, step by step: one plan, then each write (the first and the {@link MAX_AUTO_FIXES} automatic
- * redo) runs the author, the picture searches (each with its caption-language retry) and the proofread; the
- * {@link BOOK_EXPAND_PASSES} expand passes add writing calls. Failed-step retries are not in it.
+ * redo) runs the author and the author's own check; the {@link BOOK_EXPAND_PASSES} expand passes add writing calls. Only the first
+ * write searches for pictures (the redo and the expand passes edit the chapter in place and keep its pictures): the searches, each
+ * with its caption-language retry. Then the AI proofread: one check and up to {@link MAX_AI_FIX_ROUNDS}
+ * rounds of one fix and one more check. Failed-step retries are not in it.
  */
-export function bookChapterCalls(): { plan: number; write: number; images: number; proof: number } {
+export function bookChapterCalls(): { plan: number; write: number; images: number; proof: number; aiProof: number } {
   const writes = 1 + MAX_AUTO_FIXES;
   return {
     plan: 1,
     write: writes + BOOK_EXPAND_PASSES,
-    images: writes * BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH,
-    proof: writes
+    images: BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH,
+    proof: writes,
+    aiProof: 1 + 2 * MAX_AI_FIX_ROUNDS
   };
 }
 
-/** What a trial chapter's second fix round adds at most: one write, its picture searches (with language retry) and one proofread. */
-export function bookTrialExtraCalls(): number {
-  return 1 + BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH + 1;
+/** The whole-book layer at most: the whole-book plan, and (with two chapters to compare) the whole-book AI proofread with its fix rounds. */
+export function bookWholeCalls(cards: number): number {
+  return 1 + (cards >= 2 ? 1 + 2 * MAX_AI_FIX_ROUNDS : 0);
 }
 
 export interface BookStartEstimate {
@@ -85,20 +89,24 @@ export function bookStartEstimate(cards: number, trialCards: number, models?: Bo
   };
   const per = bookChapterCalls();
   const writes = 1 + MAX_AUTO_FIXES;
+  // The AI proofread of a chapter (and of the whole book): one check, then per fix round one fix (the author) and one more check.
+  // Not measured: each check is timed like one author's check and each fix like one write (an assumption).
+  const aiProof = time("proof") + MAX_AI_FIX_ROUNDS * (time("write") + time("proof"));
   const perCard =
     time("plan") +
-    writes * (time("write") + BOOK_IMAGE_SEARCHES * time("images") + time("proof")) +
-    BOOK_EXPAND_PASSES * time("write");
-  // The trial cards run first and wait for the owner; the rest follow, BOOK_POOL at a time.
+    writes * (time("write") + time("proof")) +
+    BOOK_IMAGE_SEARCHES * time("images") +
+    BOOK_EXPAND_PASSES * time("write") +
+    aiProof;
+  // The trial cards run first, the rest follow, BOOK_POOL at a time (nothing waits for the owner any more).
   const trial = Math.min(n, Math.max(0, Math.floor(trialCards)));
   const rounds = Math.ceil(trial / BOOK_POOL) + Math.ceil((n - trial) / BOOK_POOL);
   return {
     cards: n,
-    // The global plan, every chapter's calls, and the one whole-book consistency check once there are two chapters to compare.
-    // A trial chapter has a second fix round (before and after gate 1): one more write with its searches and proofread each.
-    calls: 1 + n * (per.plan + per.write + per.images + per.proof) + trial * bookTrialExtraCalls() + (n >= 2 ? 1 : 0),
+    // The whole-book plan and proofread, and every chapter's calls: an upper bound.
+    calls: bookWholeCalls(n) + n * (per.plan + per.write + per.images + per.proof + per.aiProof),
     limit: DEFAULT_BUDGET_LIMIT,
-    seconds: time("global") + rounds * perCard
+    seconds: time("global") + rounds * perCard + (n >= 2 ? aiProof : 0)
   };
 }
 export function bookStartEstimateText(
@@ -167,7 +175,7 @@ const MODEL_ROWS: { key: BookModelKey; step: keyof BookStartModels; label: Trans
   { key: "bookPlanModel", step: "plan", label: "ui.book_step_plan" },
   { key: "bookWriteModel", step: "write", label: "ui.book_step_write" },
   { key: "bookImageModel", step: "images", label: "ui.book_progress_step_images" },
-  { key: "bookProofModel", step: "proof", label: "ui.book_step_proof" }
+  { key: "bookProofModel", step: "proof", label: "ui.book_step_ai_proof" }
 ];
 export interface BookModelChoiceInput {
   /** The model id each step uses now. */
@@ -300,6 +308,11 @@ export function renderBookSettingsFields(
 
 /** The four model dropdowns (plan, author, pictures, proofread). Shared with the trial-confirmation screen. */
 export function renderBookModelChoice(parent: HTMLElement, input: BookModelChoiceInput): void {
+  let warning: HTMLElement | null = null;
+  // The AI proofread works best with a model other than the author's: a reminder (never a block) while they are the same.
+  const refreshWarning = (): void => {
+    warning?.setText(input.models.proof === input.models.write ? t("ui.book_start_proof_same_as_author") : "");
+  };
   for (const row of MODEL_ROWS) {
     const id = `vam-book-start-model-${row.step}`;
     const name = t(row.label);
@@ -315,9 +328,15 @@ export function renderBookModelChoice(parent: HTMLElement, input: BookModelChoic
     select.addEventListener("change", () => {
       if (!select.value) return;
       input.models[row.step] = select.value;
+      refreshWarning();
       input.onChange(row.key, select.value);
     });
+    if (row.step === "proof") {
+      warning = parent.createSpan({ cls: "vam-book-start-model-warning" });
+      warning.setAttr("role", "status");
+    }
   }
+  refreshWarning();
 }
 
 export class BookStartModal extends Modal {

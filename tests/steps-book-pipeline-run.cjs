@@ -2631,7 +2631,7 @@ test('T10c length: a chapter that is too short is asked for new text in change b
   assert.match((await r.note(1)).pipelineIssue, /^proof unmet: C2 length:over:\d+:100-200:字:v\d+$/, 'length does not lower the fact failure, and sits beside it');
 });
 
-test('R trial fix after gate 1: a trial chapter still too short after its trial redo gets one more fix round once gate 1 is confirmed; the log names why the author is called', async () => {
+test('R trial fix: a trial chapter still too short after its one redo gets no second fix round (gate 1 passes by itself; nobody read the trial); the log names why the author is called', async () => {
   const seen = [];
   const r = await lenRig({ trial: true });
   r.script.author = lengthAuthor(r, seen, 10, 10);
@@ -2640,22 +2640,21 @@ test('R trial fix after gate 1: a trial chapter still too short after its trial 
   const id = r.nodes[1].id;
   assert.ok((await r.state()).trial.includes(id), 'the chapter is in the trial');
   const fixes = () => seen.filter(([at, instruction]) => at === id && instruction !== undefined).length;
-  // The trial's gate 1 passes by itself now, so there is no stop between the trial redo and the round after it.
   assert.equal((await r.state()).phase, 'done');
-  assert.equal(fixes(), 2, 'the trial redo and one more fix round after the trial');
+  assert.equal(fixes(), 1, 'the one redo only: no second round after the trial');
   assert.equal(stageOf(r.raw(1)), 'needs-review');
   const log = r.stat.logs.join('\n');
   assert.match(log, new RegExp(`author_call [^\\n]*card=${id} [^\\n]*result=first_draft`));
-  assert.equal(log.split('\n').filter(line => line.includes('author_call') && line.includes(`card=${id} `) && line.includes('result=fix_round')).length, 2);
+  assert.equal(log.split('\n').filter(line => line.includes('author_call') && line.includes(`card=${id} `) && line.includes('result=fix_round')).length, 1);
 });
 
-test('W trial (live v6 〈土壤〉): the reasons a trial chapter had at gate 1 survive to gate 2 beside a failed fix after gate 1 (author_failed); the box names both', async () => {
+test('W trial (live v6 〈土壤〉): the reasons a trial chapter had survive to gate 2 beside a failed fix (author_failed); the box names both', async () => {
   const seen = [];
   const r = await lenRig({ trial: true, planReview: true, script: { ...factCard, proof: async request => verdictOf(request, 'unmet', 'WRONGDATE') } });
   const id = r.nodes[1].id;
   const write = lengthAuthor(r, seen, 10, 10);
   r.script.author = async input => {
-    if (input.nodeId === id && input.requirements !== undefined && seen.filter(([at, instruction]) => at === id && instruction !== undefined).length === 1) {
+    if (input.nodeId === id && input.requirements !== undefined) {
       seen.push([input.nodeId, input.instruction]);
       return { outcome: 'failed', reason: 'author_failed' };
     }
@@ -2664,7 +2663,7 @@ test('W trial (live v6 〈土壤〉): the reasons a trial chapter had at gate 1 
   await r.runs.start(r.mapPath); await idle(r);
   await r.runs.startTrial(r.mapPath); await idle(r);
   assert.equal((await r.state()).phase, 'done');
-  assert.equal(seen.filter(([at, instruction]) => at === id && instruction !== undefined).length, 2, 'the fix round after the trial ran');
+  assert.equal(seen.filter(([at, instruction]) => at === id && instruction !== undefined).length >= 1, true, 'the fix round ran and failed');
   const issue = (await r.note(1)).pipelineIssue;
   assert.match(issue, /^write failed: author_failed \+ /); assert.match(issue, /C2/); assert.match(issue, /length:under/);
   assert.equal(stageOf(r.raw(1)), 'needs-review');
@@ -2987,7 +2986,7 @@ test('expand passes (live v6 〈澆水〉, X): a fix round with no usable block 
   assert.ok(!/fix_no_edits/.test((await r.note(1)).pipelineIssue ?? ''));
 });
 
-test('expand passes: a trial chapter has two fix rounds (before and after gate 1) but at most BOOK_EXPAND_PASSES extra passes in all; its writing calls stay at draft + two fix rounds + the capped passes', async () => {
+test('expand passes: a trial chapter has one fix round and at most BOOK_EXPAND_PASSES extra passes; its writing calls stay at draft + one fix round + the capped passes', async () => {
   const seen = [];
   // The plan-review flow: the run stops at the plan review, "try" writes the trial to its gate 1, then the rest; the bound is the same.
   const r = await trialRig({ titles: ['A', 'B', 'C', 'D', 'E'], planReview: true });
@@ -3003,8 +3002,8 @@ test('expand passes: a trial chapter has two fix rounds (before and after gate 1
   const s = await r.state();
   for (const node of trial) {
     const calls = seen.filter(input => input.nodeId === node.id).length;
-    assert.equal(calls, 1 + 2 * MAX_AUTO_FIXES + BOOK_EXPAND_PASSES, 'draft, two fix rounds, the capped passes');
-    assert.ok(calls <= 1 + 2 * MAX_AUTO_FIXES + BOOK_EXPAND_PASSES, `${node.id}: ${calls} writing calls`);
+    assert.equal(calls, 1 + MAX_AUTO_FIXES + BOOK_EXPAND_PASSES, 'draft, the fix round, the capped passes');
+    assert.ok(calls <= 1 + MAX_AUTO_FIXES + BOOK_EXPAND_PASSES, `${node.id}: ${calls} writing calls`);
     assert.ok(log.split('\n').filter(line => line.includes('author_call') && line.includes(`card=${node.id} `) && line.includes('result=expand_pass')).length <= BOOK_EXPAND_PASSES);
     assert.ok((s.expandPasses?.[node.id] ?? 0) <= BOOK_EXPAND_PASSES);
   }
@@ -3966,5 +3965,48 @@ test('worst-case calls: every chapter redoes once, uses every AI round and nothi
     assert.equal(s.phase, 'done');
     assert.equal(s.budget.used, calls, 'the budget counts exactly the calls made');
     assert.equal(calls, 6 + 10 * titles.length, 'this mock: 1 global plan + 5 book calls + 10 per card (no picture search here)');
+  }
+});
+
+test('worst-case calls with picture search: every step uses its whole allowance (first-write picture searches each with a language retry, the redo, the expand passes, the AI rounds); the actual count equals the start card\'s estimate and stays within the 300 limit', async () => {
+  const { bookStartEstimate } = S.load('experiences/visual-map/book-pipeline-start-modal.ts', { obsidian: S.obsidian });
+  const MARKED = `${DRAFT}\n\n〔圖位 1：the route〕\n\n〔圖位 2：a port〕\n`;
+  const slots = [{ index: 1, kind: 'map', explains: 'the route', anchor: 'after paragraph 1' }, { index: 2, kind: 'photo', explains: 'a port', anchor: 'end' }];
+  for (const titles of [['R', 'A'], ['R', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']]) {
+    const seen = new Set();
+    const author = [];
+    let imageCalls = 0;
+    const holder = {};
+    const r = await aiRig({
+      card: request => ({ covers: `covers ${(request.chapters.findIndex(c => c.title === request.card.title) + 1)}`, entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }], images: slots }),
+      author: async input => {
+        author.push(input.nodeId);
+        await input.admission.reserve();
+        const mine = author.filter(id => id === input.nodeId).length;
+        const fix = input.requirements !== undefined;
+        const answer = ['@@insert after: ### 土壤', `### 新節${mine}`, '', `新節段落${'好'.repeat(mine < 4 ? 8 : 90)}`].join('\n');
+        const out = await holder.r.repo.updateNoteGuarded(input.path, { detail: fix ? answer : MARKED }, { authorize: input.authorize, finalize: input.finalize });
+        return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+      },
+      proof: async request => { const first = !seen.has(request.title); seen.add(request.title); return { items: request.checklist.map(c => ({ id: c.id, type: c.type, status: first ? 'unmet' : 'met', note: 'x', sources: [] })), aggregate: first ? 'needs-review' : 'checked' }; },
+      aiProof: async request => ({ checks: [problem(request)], prior: [], dropped: {} }),
+      aiFix: async request => [{ id: 'P1', quote: request.chapters[0].text.slice(0, 11), replacement: request.chapters[0].text.slice(0, 11) }],
+      aiBookProof: async request => ({ checks: [bookProblem(request, 1, 1)], prior: [], dropped: {} })
+    }, {
+      titles,
+      // One search call finds nothing; each call stands for up to BOOK_IMAGE_CALLS_PER_SEARCH model calls (the caption-language retry sits inside the real step).
+      ports: { findImages: async (request, run) => { for (let i = 0; i < 2; i++) { imageCalls++; await run.admission.reserve(); } return { bySlot: new Map(), found: 0, offTopic: 0 }; } }
+    });
+    holder.r = r;
+    await r.repo.writeBookSettings(r.nodes[0].path, { length: LEN_SETTING });
+    await finishAi(r);
+    const s = await r.state();
+    const calls = r.stat.plan.length + r.stat.author.length + r.stat.proof.length + r.stat.ai.length + imageCalls;
+    assert.equal(s.phase, 'done');
+    assert.equal(s.budget.used, calls, 'the budget counts exactly the calls made');
+    const estimate = bookStartEstimate(titles.length, titles.length).calls;
+    assert.equal(calls, estimate, `${titles.length} cards: the worst case is the estimate`);
+    assert.ok(calls <= 300);
+    if (titles.length === 10) assert.equal(estimate, 166);
   }
 });

@@ -2805,9 +2805,9 @@ export const en = {
   "ui.settings_book_image_name": "Pictures",
   "ui.settings_book_image_desc":
     "Searches the web for each chapter's pictures and suggests the start card's whole-book settings. A cheaper model is enough.",
-  "ui.settings_book_proof_name": "Proofread",
+  "ui.settings_book_proof_name": "AI proofread (different from the author)",
   "ui.settings_book_proof_desc":
-    "Checks facts independently by actually opening pages. A cheaper model is the default; pick a stronger one for stricter checks.",
+    "Checks each chapter's facts, numbers, consistency and citations and fixes what it finds. Best a different model from the author; Opus is suggested when the author is Sonnet.",
   "ui.settings_book_note": "Changes apply from the next pipeline run; a run in progress is not affected.",
   "ui.settings_group_ai": "AI",
   "ui.settings_group_notes": "Notes",
@@ -3322,10 +3322,13 @@ export const en = {
   "ui.book_start_intro":
     "From the topics and cards of this map, the AI plans, writes, finds pictures for and proofreads every chapter.",
   "ui.book_start_estimate_0_1_2_3":
-    "{0} cards · about {1} · up to {2} AI calls (a failed step's retry not included; the run pauses at {3}).",
+    "{0} cards · about {1} · up to {2} AI calls (including the AI proofread and automatic fixes; a failed step's retry not included; the run pauses at {3}).",
   "ui.book_start_under_minute": "under 1 minute",
   "ui.book_start_minutes_0": "{0} minutes",
-  "ui.book_start_stops": "It stops only twice for you to confirm.",
+  "ui.book_start_stops":
+    "It stops only once: after planning, to show you the book's direction. The AI does all the proofreading; you do not need to edit.",
+  "ui.book_step_ai_proof": "AI proofread (different from the author)",
+  "ui.book_start_proof_same_as_author": "Best a different model from the author",
   "ui.book_start_rerun_hint": "If one chapter is not good enough, you can rerun just that chapter.",
   "ui.book_start_suggesting": "Thinking up suggestions from this map's subject...",
   "ui.book_start_settings": "Whole-book settings (grey text is a suggestion; leave a field empty to use it)",
@@ -3444,9 +3447,9 @@ export const en = {
   "ui.book_progress_line_plan_cards_0_1": "Planning card {0}/{1}",
   "ui.book_progress_line_trial_cards_0_1": "Trying card {0}/{1} first",
   "ui.book_start_estimate_struct_0_1_2_3_4_5":
-    "Preface + {0} chapters + {1} sections ({2} cards) · about {3} · up to {4} AI calls (a failed step's retry not included; the run pauses at {5}).",
+    "Preface + {0} chapters + {1} sections ({2} cards) · about {3} · up to {4} AI calls (including the AI proofread and automatic fixes; a failed step's retry not included; the run pauses at {5}).",
   "ui.book_start_estimate_struct_0_1_2_3_4":
-    "Preface + {0} chapters ({1} cards) · about {2} · up to {3} AI calls (a failed step's retry not included; the run pauses at {4}).",
+    "Preface + {0} chapters ({1} cards) · about {2} · up to {3} AI calls (including the AI proofread and automatic fixes; a failed step's retry not included; the run pauses at {4}).",
   "ui.book_summary_done": "What it covers: ",
   "ui.book_issue_0": "Needs a look: {0}",
   "ui.book_issue_unknown": "Needs a manual look (the reason code is not recognized).",

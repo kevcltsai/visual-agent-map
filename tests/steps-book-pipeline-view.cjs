@@ -17,7 +17,7 @@ class OptionStub { constructor(text, value) { const o = dom.element('option', { 
 // One bundle, so the view, the screen parts and the language setting share one copy of the interface language.
 const bundle = loadSource(`
 export * from "./experiences/visual-map/book-pipeline-ui";
-export { bookChapterCalls, bookStartEstimate, bookStartEstimateText, bookSettingsPatch, BookStartModal, BOOK_SUGGEST_TIMEOUT_MS } from "./experiences/visual-map/book-pipeline-start-modal";
+export { bookChapterCalls, bookWholeCalls, bookStartEstimate, bookStartEstimateText, bookSettingsPatch, BookStartModal, BOOK_SUGGEST_TIMEOUT_MS } from "./experiences/visual-map/book-pipeline-start-modal";
 export { deletedChapterTitles, mentionedDeletedChapters, renderBookSettingsFields } from "./experiences/visual-map/book-pipeline-start-modal";
 export { BookStepError } from "./core/steps/book-pipeline/base";
 export { BookPipelineRunError, stepCounts } from "./experiences/visual-map/book-pipeline-run";
@@ -538,8 +538,8 @@ test('start card: opens with the estimate (every step counted, about minutes), t
   assert.ok(modal.isOpen);
   assert.equal(h.entries.length, 0, 'nothing starts before the owner presses Start');
   const all = texts(modal.modalEl);
-  assert.ok(all.includes('前言 + 2 章（3 張卡）· 約 24 分鐘 · 最多 59 次 AI 呼叫（步驟失敗重試另計；到 300 次會先停下）。'), all.join('|'));
-  assert.ok(all.includes('中間只會停兩次，讓你確認。'));
+  assert.ok(all.includes('前言 + 2 章（3 張卡）· 約 33 分鐘 · 最多 54 次 AI 呼叫（含 AI 校對和自動修正；步驟失敗重試另計；到 300 次會先停下）。'), all.join('|'));
+  assert.ok(all.includes('只會停一次：企劃好後讓你看全書方向。校對全部由 AI 做，你不用改稿。'));
   assert.ok(all.includes('某一章不滿意，可以只重跑那一章。'));
   assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined, 'no collapsed block: the settings are always open');
   const areas = dom.findAll(modal.modalEl, i => i.tag === 'textarea');
@@ -570,7 +570,7 @@ test('start card: the four dropdowns (plan, author, pictures, proofread) carry t
   const modal = await openCard(h);
   const selects = dom.findAll(modal.modalEl, i => i.tag === 'select');
   for (const select of selects) assert.ok(shown(select));
-  assert.deepEqual(selects.map(x => x.attrs['aria-label']), ['企劃', '寫作', '找圖', '校對']);
+  assert.deepEqual(selects.map(x => x.attrs['aria-label']), ['企劃', '寫作', '找圖', 'AI 校對（和作者不同）']);
   assert.deepEqual(selects[1].children.map(o => o.optionValue), ['claude:sonnet', 'claude:opus', 'claude:haiku']);
   assert.equal(selects[1].value, h.plugin.settings.bookWriteModel);
   const before = texts(modal.modalEl).find(x => x.startsWith('前言 + 2 章（3 張卡）'));
@@ -578,11 +578,26 @@ test('start card: the four dropdowns (plan, author, pictures, proofread) carry t
   assert.notEqual(h.plugin.settings.bookWriteModel, 'claude:sonnet', 'a pick is not saved while the card is open');
   assert.equal(h.ctl.saves.length, 0);
   const after = texts(modal.modalEl).find(x => x.startsWith('前言 + 2 章（3 張卡）'));
-  assert.match(before, /最多 59 次/); assert.match(after, /最多 59 次/);
+  assert.match(before, /最多 54 次/); assert.match(after, /最多 54 次/);
   assert.notEqual(before, after, 'the time follows the model');
   cardButton(modal, '開始').click(); await dom.tick();
   assert.equal(h.plugin.settings.bookWriteModel, 'claude:sonnet', 'Start saves the pick');
   assert.equal(h.ctl.saves.length, 1);
+});
+
+test('start card: the AI proofread dropdown reminds "best different from the author" only while it equals the author', async () => {
+  const h = await harness({ book: false });
+  const modal = await openCard(h);
+  const selects = dom.findAll(modal.modalEl, i => i.tag === 'select');
+  const warn = () => dom.find(modal.modalEl, i => i.cls.includes('vam-book-start-model-warning')).text;
+  selects[1].value = 'claude:sonnet'; selects[1].change();
+  selects[3].value = 'claude:opus'; selects[3].change();
+  assert.equal(warn(), '', 'different models: no reminder');
+  selects[3].value = 'claude:sonnet'; selects[3].change();
+  assert.equal(warn(), '最好和作者不同');
+  selects[1].value = 'claude:opus'; selects[1].change();
+  assert.equal(warn(), '', 'the author changed away: the reminder goes');
+  cardButton(modal, '取消').click();
 });
 
 test('start card: Cancel after changing the models leaves the saved models exactly as they were (nothing saved, nothing started)', async () => {
@@ -721,53 +736,38 @@ test('suggestions: the patch helper keeps typed text over a suggestion and ignor
   assert.equal(JSON.stringify(s.bookSettingsPatch({}, { reader: '' }, { reader: 'a\nb' })), JSON.stringify({ reader: 'a b' }));
 });
 
-test('start card: the estimate counts every step of a chapter (plan, write and its one automatic redo, two expand passes, two picture searches each with a language retry, proofread and re-proof) and bounds the live 15-chapter run', () => {
+test('start card: the estimate counts every step of a chapter (plan, write and its one automatic redo, two expand passes, two picture searches each with a language retry, the author check, the AI proofread with its fix rounds) and the whole-book layer', () => {
   const start = bundleStart;
-  assert.equal(JSON.stringify(start.bookChapterCalls()), JSON.stringify({ plan: 1, write: 4, images: 8, proof: 2 }));
-  const e15 = start.bookStartEstimate(15, 3);
-  // + 1: the one whole-book consistency check (owner-required, 2026-11-20).
-  // + 2 writing calls per chapter: the two extra expand passes (book v5).
-  assert.equal(e15.calls, 2 + 15 * 15 + 3 * 6, 'trial chapters: 3 x (one more write, its 4 search calls, one proofread)');
-  assert.equal(e15.limit, 300);
-  // The live full run of 2026-11-20 (owner models, 15 chapters, ai-usage.json): opus 16 (global + 15 plans), sonnet 29 writes and 29 proofs, haiku 58 searches, 132 calls in about 26 minutes.
+  assert.equal(JSON.stringify(start.bookChapterCalls()), JSON.stringify({ plan: 1, write: 4, images: 4, proof: 2, aiProof: 5 }));
   const per = start.bookChapterCalls();
-  assert.ok(1 + 15 * per.plan >= 16 && 15 * per.write >= 29 && 15 * per.proof >= 29 && 15 * per.images >= 58);
-  // A trial chapter's worst case: draft, two fix rounds (before and after gate 1) and the passes capped per chapter and run: one write more than the others (MAX_AUTO_FIXES 1, BOOK_EXPAND_PASSES 2).
-  assert.equal(1 + 2 * 1 + 2, per.write + 1, 'trial chapter write bound = write + the trial extra');
-  assert.ok(e15.calls >= 132, 'the bound holds for the live run');
-  // Time: the 20 s plan, then the trial round and three rounds of five, each card plan + 2 x (write + 2 searches + proof) + 2 expand writes at the measured seconds.
-  const owner = { plan: 'claude:opus', write: 'claude:sonnet', images: 'claude:haiku', proof: 'claude:sonnet' };
-  const perCard = 20 + 2 * (63 + 2 * 55 + 19) + 2 * 63;
-  assert.equal(start.bookStartEstimate(15, 3, owner).seconds, 20 + 4 * perCard);
-  assert.equal(start.bookStartEstimate(15, 3).seconds, 20 + 4 * perCard, 'no models: the measured ones');
-  assert.ok(start.bookStartEstimate(15, 3, owner).seconds >= 25 * 60, 'not under the live run\'s machine time');
-  // Another model scales its step: Sonnet for pictures doubles the picture time; Haiku for the plan cuts it.
-  assert.equal(start.bookStartEstimate(1, 3, { ...owner, images: 'claude:sonnet' }).seconds, 20 + 20 + 2 * (63 + 2 * 110 + 19) + 2 * 63);
-  assert.equal(JSON.stringify(start.bookStartEstimate(0, 3)), JSON.stringify({ cards: 0, calls: 1, limit: 300, seconds: 20 }));
-  assert.equal(start.bookStartEstimate(1, 3).calls, 1 + 15 + 6, 'one chapter: nothing to compare, no consistency check');
-  assert.equal(start.bookStartEstimate(2, 3).calls, 2 + 2 * 15 + 2 * 6, 'two chapters: one consistency check');
-  lang('zh-TW');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), '15 張卡 · 約 36 分鐘 · 最多 245 次 AI 呼叫（步驟失敗重試另計；到 300 次會先停下）。');
-  lang('en');
-  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), "15 cards · about 36 minutes · up to 245 AI calls (a failed step's retry not included; the run pauses at 300).");
-  lang('zh-TW');
-});
-
-test('start card: the estimate follows the trial size: 1 + 15 per card + 6 per trial card (+ 1 from two cards), and the rounds follow it', () => {
-  const start = bundleStart;
-  // 10 cards, the trial is the preface, chapter 1 and 2 sections = 4 cards.
-  assert.equal(start.bookStartEstimate(10, 4).calls, 1 + 15 * 10 + 6 * 4 + 1);
-  assert.equal(start.bookStartEstimate(10, 4).calls, 176);
-  // The trial with 8 sections is 10 cards: all of them.
-  assert.equal(start.bookStartEstimate(10, 10).calls, 212);
-  assert.equal(start.bookStartEstimate(2, 2).calls, 1 + 30 + 12 + 1, 'two cards: the one consistency check');
-  assert.equal(start.bookStartEstimate(1, 1).calls, 1 + 15 + 6, 'one card: no consistency check');
+  assert.equal(per.plan + per.write + per.images + per.proof + per.aiProof, 16, 'at most 16 calls a chapter (only the first write searches for pictures)');
+  assert.equal(start.bookWholeCalls(2), 6, 'the whole-book plan, the whole-book AI proofread and 2 x (fix + re-check)');
+  assert.equal(start.bookWholeCalls(1), 1, 'one chapter: nothing to compare across chapters');
+  assert.equal(start.bookStartEstimate(10, 4).calls, 166, '6 + 16 x 10');
+  assert.equal(start.bookStartEstimate(10, 10).calls, 166, 'the trial size does not change the calls (no second trial fix round)');
+  assert.equal(start.bookStartEstimate(2, 2).calls, 38);
+  assert.equal(start.bookStartEstimate(1, 1).calls, 17, 'one card: 1 + 16, no whole-book proofread');
+  assert.equal(start.bookStartEstimate(15, 3).calls, 246, 'within the 300 limit');
+  assert.equal(start.bookStartEstimate(15, 3).limit, 300);
   assert.equal(start.bookStartEstimate(20, 99).calls, start.bookStartEstimate(20, 20).calls, 'a trial cannot be larger than the book');
-  const perCard = 20 + 2 * (63 + 2 * 55 + 19) + 2 * 63;
+  // Time: the 20 s plan, the trial round and three rounds of five, each card plan + 2 x (write + author check) + 2 searches + 2 expand writes + the AI
+  // proofread (1 check + 2 x (fix as a write + check); an assumption, not measured), then the whole-book AI proofread the same way.
   const owner = { plan: 'claude:opus', write: 'claude:sonnet', images: 'claude:haiku', proof: 'claude:sonnet' };
+  const aiProof = 19 + 2 * (63 + 19);
+  const perCard = 20 + 2 * (63 + 19) + 2 * 55 + 2 * 63 + aiProof;
+  assert.equal(start.bookStartEstimate(15, 3, owner).seconds, 20 + 4 * perCard + aiProof);
+  assert.equal(start.bookStartEstimate(15, 3).seconds, 20 + 4 * perCard + aiProof, 'no models: the measured ones');
+  // Another model scales its step: Sonnet for pictures doubles the picture time.
+  assert.equal(start.bookStartEstimate(1, 3, { ...owner, images: 'claude:sonnet' }).seconds, 20 + 20 + 2 * (63 + 19) + 2 * 110 + 2 * 63 + aiProof);
+  assert.equal(JSON.stringify(start.bookStartEstimate(0, 3)), JSON.stringify({ cards: 0, calls: 1, limit: 300, seconds: 20 }));
   // Rounds: the trial in rounds of five, then the rest in rounds of five (BOOK_POOL = 5).
-  assert.equal(start.bookStartEstimate(10, 4, owner).seconds, 20 + (1 + 2) * perCard, '4 trial cards: 1 round; 6 more: 2 rounds');
-  assert.equal(start.bookStartEstimate(10, 10, owner).seconds, 20 + 2 * perCard, '10 trial cards: 2 rounds');
+  assert.equal(start.bookStartEstimate(10, 4, owner).seconds, 20 + (1 + 2) * perCard + aiProof, '4 trial cards: 1 round; 6 more: 2 rounds');
+  assert.equal(start.bookStartEstimate(10, 10, owner).seconds, 20 + 2 * perCard + aiProof, '10 trial cards: 2 rounds');
+  lang('zh-TW');
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), '15 張卡 · 約 44 分鐘 · 最多 246 次 AI 呼叫（含 AI 校對和自動修正；步驟失敗重試另計；到 300 次會先停下）。');
+  lang('en');
+  assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), "15 cards · about 44 minutes · up to 246 AI calls (including the AI proofread and automatic fixes; a failed step's retry not included; the run pauses at 300).");
+  lang('zh-TW');
 });
 
 test('start card: Start without touching the fields writes nothing to the root topic and starts once, even when pressed twice; the map file is not touched', async () => {
@@ -1832,7 +1832,7 @@ test('P4 gate words: counts, trial button, after-trial, progress use the new str
 test('P4 words in en and zh-CN; the start dialog line names preface + chapters + sections and omits 0 sections; card menu line', () => {
   const est = start => bundle.bookStartEstimateText(bundle.bookStartEstimate(10, 4), start);
   lang('zh-TW');
-  assert.match(est({ chapters: 3, sections: 6 }), /^前言 \+ 3 章 \+ 6 節（10 張卡）· 約 .+ · 最多 176 次 AI 呼叫/);
+  assert.match(est({ chapters: 3, sections: 6 }), /^前言 \+ 3 章 \+ 6 節（10 張卡）· 約 .+ · 最多 166 次 AI 呼叫（含 AI 校對和自動修正/);
   assert.match(est({ chapters: 3, sections: 0 }), /^前言 \+ 3 章（10 張卡）· 約 /);
   assert.doesNotMatch(est({ chapters: 3, sections: 0 }), /0 節/);
   assert.match(est(undefined), /^10 張卡 · 約/);

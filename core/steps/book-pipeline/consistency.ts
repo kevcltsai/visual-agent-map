@@ -1,5 +1,3 @@
-import type { AdmissionContext } from "../../admission";
-import type { AiCalls } from "../../ai-calls";
 import type { ConsistencyChapter } from "../../book-pipeline/consistency";
 import { singleLine } from "../../book-pipeline/text";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
@@ -14,7 +12,6 @@ import {
   textOf,
   type BookStepBase
 } from "./base";
-import { runPlanStep } from "./run";
 import template from "./consistency.md";
 
 /** The whole book as the check reads it: every chapter with text, in reading order (already cut to the budget by `compactChapters`). */
@@ -106,11 +103,3 @@ export const consistencyStep: StepDefinition<ConsistencyRequest, RawInconsistenc
   },
   parse: (raw, request) => parseConsistency(raw, request.chapters.length)
 };
-
-export function runConsistency(
-  aiCalls: AiCalls,
-  request: ConsistencyRequest,
-  run: { signal: AbortSignal; admission?: AdmissionContext }
-): Promise<RawInconsistency[]> {
-  return runPlanStep(aiCalls, consistencyStep, request, run);
-}

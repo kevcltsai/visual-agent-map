@@ -72,6 +72,8 @@ export interface BookCurrent {
   chapter?: number;
   /** Every chapter in work is in its one automatic fix round: the sentence keeps the whole-book count instead of going back to an early chapter. */
   fix?: true;
+  /** The card's place in the book (preface / chapter n / section by name); absent for a run whose structure cannot be derived. */
+  place?: { kind: "preface" | "chapter" | "section"; chapter?: number; title?: string };
 }
 
 const FAILURE_KEY: Record<string, TranslationKey> = {
@@ -103,7 +105,8 @@ export function bookBarState(
   progress: BookPipelineProgress | undefined,
   stageOf: (nodeId: string) => PipelineStage | undefined,
   mapIds?: readonly string[],
-  structure?: BookStructure
+  structure?: BookStructure,
+  titleOf?: (nodeId: string) => string | undefined
 ): BookBarState {
   // The saved "done" of the same run is final: a runner record that still says gate2 is older than the owner's acceptance.
   const savedDone = data.phase === "done" && (!progress || progress.runId === data.runId);
@@ -149,12 +152,26 @@ export function bookBarState(
       : status === "stopped" || interrupted
         ? "stopped"
         : phase;
-  const current = mode === "planning" || mode === "writing" ? currentOf(data, progress, stageOf) : undefined;
+  const baseCurrent = mode === "planning" || mode === "writing" ? currentOf(data, progress, stageOf) : undefined;
   // A run whose saved trial is not the structure's (an older run) keeps the old chapter wording.
   const trialIds = structure?.trialOf() ?? [];
   const placed =
     !!structure &&
     (!data.trial?.length || (data.trial.length === trialIds.length && data.trial.every((id, i) => id === trialIds[i])));
+  // The card in work is named by its place in the book ("preface", "chapter 1", a section by name), not by its position in the order.
+  const nowPlace =
+    placed && structure && baseCurrent?.chapter ? structure.placeOf(order[baseCurrent.chapter - 1] ?? "") : undefined;
+  const current =
+    baseCurrent && nowPlace
+      ? {
+          ...baseCurrent,
+          place: {
+            kind: nowPlace.kind,
+            ...(nowPlace.chapter ? { chapter: nowPlace.chapter } : {}),
+            title: titleOf?.(order[(baseCurrent.chapter as number) - 1]) ?? ""
+          }
+        }
+      : baseCurrent;
   const rerunning = !!progress?.active && !!progress.rerun && order.includes(progress.rerun.nodeId);
   return {
     mode,
@@ -526,19 +543,22 @@ function renderAsk(
 /** Chapters whose run is over (proofread, or stopped for a person): the "done" count of the one progress sentence. */
 const settledCount = (state: BookBarState): number => state.counts.checked + state.counts["needs-review"];
 
+/** The fix line of a run with a structure: the card is named by its place, the done count is in cards. */
+function fixLine(state: BookBarState, done: number, total: number): string {
+  const place = state.current?.place;
+  if (!state.structure || !place) return t("ui.book_progress_line_fix_0_1_2", state.current?.chapter ?? 1, done, total);
+  if (place.kind === "preface") return t("ui.book_progress_line_fix_preface_0_1", done, total);
+  if (place.kind === "chapter") return t("ui.book_progress_line_fix_card_0_1_2", place.chapter ?? 1, done, total);
+  return t("ui.book_progress_line_fix_section_0_1_2", place.title ?? "", done, total);
+}
+
 /** The one sentence of the bar: "Writing chapter 3/31 · 2/31 done"; the whole-book plan and the chapter plans have their own words. */
 export function bookProgressText(state: BookBarState): string {
   const { total } = state;
   if (state.mode === "planning" && state.trialSize && state.current?.step !== "global") {
     // The trial chapters go all the way to the proofread before gate 1; the first chapters of the reading order are the trial's.
     // Only fix rounds in work: a named fix line with the trial's done count, never "chapter 1/3" again.
-    if (state.current?.fix)
-      return t(
-        "ui.book_progress_line_fix_0_1_2",
-        state.current.chapter ?? 1,
-        Math.min(settledCount(state), state.trialSize),
-        state.trialSize
-      );
+    if (state.current?.fix) return fixLine(state, Math.min(settledCount(state), state.trialSize), state.trialSize);
     const settled = Math.min(state.counts.checked + state.counts["needs-review"], state.trialSize - 1);
     return t(
       state.structure ? "ui.book_progress_line_trial_cards_0_1" : "ui.book_progress_line_trial_0_1",
@@ -553,7 +573,7 @@ export function bookProgressText(state: BookBarState): string {
   if (state.mode === "writing")
     // Only fix rounds in work: a named fix line with the whole-book done count, never a restarted counter.
     return state.current?.fix
-      ? t("ui.book_progress_line_fix_0_1_2", state.current.chapter ?? 1, settledCount(state), total)
+      ? fixLine(state, settledCount(state), total)
       : t("ui.book_progress_line_write_0_1", at, total);
   const sentence =
     state.mode === "planning"

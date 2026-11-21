@@ -383,3 +383,13 @@ test('reading re-render: a view is drawn only once it holds the file text the wr
   assert.equal(pauses, 3);
   assert.equal(drawn.at(-1), 'stuck');
 });
+
+test('reconcile: at the plan gate (planReview) no card carries a trial box; once the trial starts they appear', async () => {
+  const r = rig(DATA({ phase: 'gate1', planReview: true, trial: ['n1', 'n2'] }));
+  await r.callouts.reconcile('M');
+  assert.deepEqual(r.kinds('n1'), [], 'no trial box on the first card at the plan gate');
+  assert.deepEqual(r.kinds('n2'), []);
+  r.map.bookPipeline = DATA({ phase: 'gate1', trial: ['n1', 'n2'] });
+  await r.callouts.reconcile('M');
+  assert.deepEqual(r.kinds('n1'), ['trial:r1']);
+});

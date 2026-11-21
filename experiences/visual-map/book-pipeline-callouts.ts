@@ -448,7 +448,8 @@ export class BookCallouts {
     };
     const wanted = new Map<string, WantedCallouts>();
     if (data.phase === "gate1") {
-      const trial = data.trial ?? [];
+      // At the plan gate (before the trial runs) no card carries a trial box: it appears once the trial has started.
+      const trial = data.planReview ? [] : (data.trial ?? []);
       // The same reasons the review box lists (one source: the card's issue and stored proof), so the first box a reader sees is true.
       const reasons = new Map(
         reviewEntries({

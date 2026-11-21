@@ -3360,6 +3360,9 @@ var en = {
   "ui.book_progress_line_sep": ", ",
   "ui.book_progress_line_done_0_1": "{0}/{1} chapters done",
   "ui.book_progress_line_fix_0_1_2": "Fixing chapter {0} \xB7 {1}/{2} chapters done",
+  "ui.book_progress_line_fix_preface_0_1": "Fixing the preface \xB7 {0}/{1} cards done",
+  "ui.book_progress_line_fix_card_0_1_2": "Fixing chapter {0} \xB7 {1}/{2} cards done",
+  "ui.book_progress_line_fix_section_0_1_2": "Fixing \u201C{0}\u201D \xB7 {1}/{2} cards done",
   "ui.book_progress_line_check_0_1": "Checking the whole book for consistency \xB7 {0}/{1} chapters done",
   "ui.book_panel_rerun_card": "Rerun this card",
   "ui.book_panel_rerun_card_0": "Rerun this book card: {0} (plan \u2192 write \u2192 check)",
@@ -6637,6 +6640,9 @@ var zhCN = {
   "ui.book_progress_line_sep": "\uFF0C",
   "ui.book_progress_line_done_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
   "ui.book_progress_line_fix_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u7B2C {0} \u7AE0\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u7AE0",
+  "ui.book_progress_line_fix_preface_0_1": "\u6B63\u5728\u4FEE\u6B63\u524D\u8A00\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u5F20\u5361",
+  "ui.book_progress_line_fix_card_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u7B2C {0} \u7AE0\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u5F20\u5361",
+  "ui.book_progress_line_fix_section_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u300C{0}\u300D\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u5F20\u5361",
   "ui.book_progress_line_check_0_1": "\u6B63\u5728\u68C0\u67E5\u5168\u4E66\u4E00\u81F4\u6027\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
   "ui.book_panel_rerun_card": "\u91CD\u8DD1\u8FD9\u5F20",
   "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u56FE\u6587\u4E66\u8FD9\u4E00\u5F20\uFF1A{0}\uFF08\u4F01\u5212 \u2192 \u5199 \u2192 \u6821\uFF09",
@@ -9914,6 +9920,9 @@ var zhTW = {
   "ui.book_progress_line_sep": "\uFF0C",
   "ui.book_progress_line_done_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
   "ui.book_progress_line_fix_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u7B2C {0} \u7AE0\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u7AE0",
+  "ui.book_progress_line_fix_preface_0_1": "\u6B63\u5728\u4FEE\u6B63\u524D\u8A00\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u5F35\u5361",
+  "ui.book_progress_line_fix_card_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u7B2C {0} \u7AE0\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u5F35\u5361",
+  "ui.book_progress_line_fix_section_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u300C{0}\u300D\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u5F35\u5361",
   "ui.book_progress_line_check_0_1": "\u6B63\u5728\u6AA2\u67E5\u5168\u66F8\u4E00\u81F4\u6027\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
   "ui.book_panel_rerun_card": "\u91CD\u8DD1\u9019\u5F35",
   "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u5716\u6587\u66F8\u9019\u4E00\u5F35\uFF1A{0}\uFF08\u4F01\u5283 \u2192 \u5BEB \u2192 \u6821\uFF09",
@@ -56885,8 +56894,8 @@ var PHASE_KEY = {
   gate2: "ui.book_phase_gate2",
   done: "ui.book_phase_done"
 };
-function bookBarState(data, progress, stageOf, mapIds, structure2) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+function bookBarState(data, progress, stageOf, mapIds, structure2, titleOf) {
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
   const savedDone = data.phase === "done" && (!progress || progress.runId === data.runId);
   const phase = savedDone ? "done" : (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : data.phase;
   const status = savedDone ? data.status : (_b2 = progress == null ? void 0 : progress.status) != null ? _b2 : data.status;
@@ -56905,9 +56914,18 @@ function bookBarState(data, progress, stageOf, mapIds, structure2) {
   const gateChange = !mapChange && mapIds && (phase === "done" || !active && status !== "stopped" && (phase === "gate1" || phase === "gate2")) ? countChange(mapDifference(data, mapIds)) : void 0;
   const reordered = phase === "done" && gateChange && !gateChange.added && !gateChange.missing && mapIds ? sameOrder(order, mapIds) ? void 0 : { added: 0, missing: 0, reordered: true } : void 0;
   const mode = mapChange ? "changed" : status === "stopped" && pauseReason === "budget" ? "budget" : status === "stopped" || interrupted ? "stopped" : phase;
-  const current = mode === "planning" || mode === "writing" ? currentOf2(data, progress, stageOf) : void 0;
+  const baseCurrent = mode === "planning" || mode === "writing" ? currentOf2(data, progress, stageOf) : void 0;
   const trialIds = (_l = structure2 == null ? void 0 : structure2.trialOf()) != null ? _l : [];
   const placed = !!structure2 && (!((_m = data.trial) == null ? void 0 : _m.length) || data.trial.length === trialIds.length && data.trial.every((id, i) => id === trialIds[i]));
+  const nowPlace = placed && structure2 && (baseCurrent == null ? void 0 : baseCurrent.chapter) ? structure2.placeOf((_n = order[baseCurrent.chapter - 1]) != null ? _n : "") : void 0;
+  const current = baseCurrent && nowPlace ? {
+    ...baseCurrent,
+    place: {
+      kind: nowPlace.kind,
+      ...nowPlace.chapter ? { chapter: nowPlace.chapter } : {},
+      title: (_o = titleOf == null ? void 0 : titleOf(order[baseCurrent.chapter - 1])) != null ? _o : ""
+    }
+  } : baseCurrent;
   const rerunning = !!(progress == null ? void 0 : progress.active) && !!progress.rerun && order.includes(progress.rerun.nodeId);
   return {
     mode,
@@ -56923,13 +56941,13 @@ function bookBarState(data, progress, stageOf, mapIds, structure2) {
       }
     } : {},
     ...current ? { current } : {},
-    ...!current && mode === "writing" && active && ((_n = data.consistency) == null ? void 0 : _n.done) === false ? { checking: true } : {},
-    ...((_o = data.trial) == null ? void 0 : _o.length) && !data.planReview && mode === "planning" && data.globalPlanned ? { trialSize: data.trial.length } : {},
+    ...!current && mode === "writing" && active && ((_p = data.consistency) == null ? void 0 : _p.done) === false ? { checking: true } : {},
+    ...((_q = data.trial) == null ? void 0 : _q.length) && !data.planReview && mode === "planning" && data.globalPlanned ? { trialSize: data.trial.length } : {},
     ...rerunning ? { rerun: true } : {},
     ...mapChange ? { mapChange } : {},
     ...gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {},
     ...reordered ? { mapChange: reordered } : {},
-    ...mode === "gate1" && ((_p = data.trial) == null ? void 0 : _p.length) ? data.planReview ? { planReview: true, trialCount: data.trial.length } : { trialCount: data.trial.length } : {},
+    ...mode === "gate1" && ((_r = data.trial) == null ? void 0 : _r.length) ? data.planReview ? { planReview: true, trialCount: data.trial.length } : { trialCount: data.trial.length } : {},
     ...mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {},
     ...(progress == null ? void 0 : progress.etaSeconds) !== void 0 && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0 ? { etaSeconds: progress.etaSeconds } : {}
   };
@@ -57177,30 +57195,32 @@ function renderAsk(bar, cls, question, goText, ask) {
   });
 }
 var settledCount = (state) => state.counts.checked + state.counts["needs-review"];
+function fixLine(state, done, total2) {
+  var _a2, _b2, _c, _d, _e;
+  const place = (_a2 = state.current) == null ? void 0 : _a2.place;
+  if (!state.structure || !place) return t("ui.book_progress_line_fix_0_1_2", (_c = (_b2 = state.current) == null ? void 0 : _b2.chapter) != null ? _c : 1, done, total2);
+  if (place.kind === "preface") return t("ui.book_progress_line_fix_preface_0_1", done, total2);
+  if (place.kind === "chapter") return t("ui.book_progress_line_fix_card_0_1_2", (_d = place.chapter) != null ? _d : 1, done, total2);
+  return t("ui.book_progress_line_fix_section_0_1_2", (_e = place.title) != null ? _e : "", done, total2);
+}
 function bookProgressText(state) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h;
   const { total: total2 } = state;
   if (state.mode === "planning" && state.trialSize && ((_a2 = state.current) == null ? void 0 : _a2.step) !== "global") {
-    if ((_b2 = state.current) == null ? void 0 : _b2.fix)
-      return t(
-        "ui.book_progress_line_fix_0_1_2",
-        (_c = state.current.chapter) != null ? _c : 1,
-        Math.min(settledCount(state), state.trialSize),
-        state.trialSize
-      );
+    if ((_b2 = state.current) == null ? void 0 : _b2.fix) return fixLine(state, Math.min(settledCount(state), state.trialSize), state.trialSize);
     const settled2 = Math.min(state.counts.checked + state.counts["needs-review"], state.trialSize - 1);
     return t(
       state.structure ? "ui.book_progress_line_trial_cards_0_1" : "ui.book_progress_line_trial_0_1",
-      Math.min((_e = (_d = state.current) == null ? void 0 : _d.chapter) != null ? _e : settled2 + 1, state.trialSize),
+      Math.min((_d = (_c = state.current) == null ? void 0 : _c.chapter) != null ? _d : settled2 + 1, state.trialSize),
       state.trialSize
     );
   }
-  const at = Math.min((_g = (_f = state.current) == null ? void 0 : _f.chapter) != null ? _g : settledCount(state) + 1, Math.max(total2, 1));
+  const at = Math.min((_f = (_e = state.current) == null ? void 0 : _e.chapter) != null ? _f : settledCount(state) + 1, Math.max(total2, 1));
   if (state.mode === "writing" && state.checking)
     return t("ui.book_progress_line_check_0_1", settledCount(state), total2);
   if (state.mode === "writing")
-    return ((_h = state.current) == null ? void 0 : _h.fix) ? t("ui.book_progress_line_fix_0_1_2", (_i = state.current.chapter) != null ? _i : 1, settledCount(state), total2) : t("ui.book_progress_line_write_0_1", at, total2);
-  const sentence = state.mode === "planning" ? !state.globalDone || ((_j = state.current) == null ? void 0 : _j.step) === "global" ? t("ui.book_progress_line_global") : t(state.structure ? "ui.book_progress_line_plan_cards_0_1" : "ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
+    return ((_g = state.current) == null ? void 0 : _g.fix) ? fixLine(state, settledCount(state), total2) : t("ui.book_progress_line_write_0_1", at, total2);
+  const sentence = state.mode === "planning" ? !state.globalDone || ((_h = state.current) == null ? void 0 : _h.step) === "global" ? t("ui.book_progress_line_global") : t(state.structure ? "ui.book_progress_line_plan_cards_0_1" : "ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
   return `${sentence}${t("ui.book_progress_line_sep")}${t("ui.book_progress_line_done_0_1", settledCount(state), total2)}`;
 }
 function renderProgressLine(bar, state, text10) {
@@ -58162,7 +58182,7 @@ var BookCallouts = class {
     };
     const wanted = /* @__PURE__ */ new Map();
     if (data.phase === "gate1") {
-      const trial = (_a2 = data.trial) != null ? _a2 : [];
+      const trial = data.planReview ? [] : (_a2 = data.trial) != null ? _a2 : [];
       const reasons = new Map(
         reviewEntries({
           proofContext: { runId: data.runId, revisionOf: (id) => cardRevision(data, id) },
@@ -88276,7 +88296,11 @@ ${t("ui.book_role_running_suffix")}` : first);
       },
       // A run paused for a map change, a gate or a finished book counts the map as it is now, the way the runner reads it.
       bookReadingOrder(map),
-      this.bookStructureOf(effectiveOrder(read.data))
+      this.bookStructureOf(effectiveOrder(read.data)),
+      (id) => {
+        var _a3;
+        return (_a3 = this.notes.get(id)) == null ? void 0 : _a3.title;
+      }
     );
     if (state.mode !== "changed") this.bookMapFocusedRun = null;
     else if (this.bookMapFocusedRun !== read.data.runId) {

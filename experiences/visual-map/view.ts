@@ -17385,7 +17385,8 @@ export class VisualAgentMapView extends ItemView {
       id => readPipelineStage(this.notes.get(id)?.pipelineStage),
       // A run paused for a map change, a gate or a finished book counts the map as it is now, the way the runner reads it.
       bookReadingOrder(map),
-      this.bookStructureOf(effectiveOrder(read.data))
+      this.bookStructureOf(effectiveOrder(read.data)),
+      id => this.notes.get(id)?.title
     );
     // The map-changed choice takes the keyboard once when it appears (the same way the inline asks do).
     if (state.mode !== "changed") this.bookMapFocusedRun = null;

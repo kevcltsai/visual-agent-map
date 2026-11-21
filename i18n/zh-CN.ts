@@ -3297,6 +3297,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_ai_box_title_0_1_2": "AI 校对：查了 {0} 项，修了 {1} 处，{2} 处没修好",
   "ui.book_ai_box_title_incomplete": "AI 校对：这章没有查完，已列到书末",
   "ui.book_ai_box_fixed_0": "修了：{0}",
+  "ui.book_ai_box_fixed_0_1": "修了：{0}，改为「{1}」",
+  "ui.book_ai_box_fixed_replaced_0": "修了：改为「{0}」",
   "ui.book_ai_box_book_fixed_0": "全书校对另修了 {0} 处：",
   "ui.book_ai_box_open_0": "没修好：{0}，已列到书末",
   "ui.book_ai_box_sep": "，",

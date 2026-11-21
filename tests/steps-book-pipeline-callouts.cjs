@@ -99,13 +99,13 @@ test('align: at gate 2 an answered box stays folded under its handled title when
   const reopened = b.alignCallouts(b.alignCallouts(ticked, want({ review: box('fp1') })).replace('[x]', '[ ]'), want({ review: box('fp1') }));
   assert.deepEqual({ c: b.readReviewState(reopened).collapsed, h: b.readReviewState(reopened).handled }, { c: false, h: false });
 });
-const AI = { checked: 14, fixes: [{ suggestion: '年份改成 1503' }], open: [{ problem: '委託人是誰', reason: 'sources_conflict' }] };
+const AI = { checked: 14, fixes: [{ problem: '年份改成 1503' }], open: [{ problem: '委託人是誰', reason: 'sources_conflict' }] };
 const aiWant = (input = AI, over = {}) => want({ ai: { fp: b.aiProofFingerprint(input), build: () => b.aiProofCallout(input, 'r1', 'n1') }, ...over });
 test('align: the AI box is written once, kept while its fingerprint is the same, written again when the result changed, and replaces an old tick box', () => {
   const once = b.alignCallouts(note(), aiWant());
   assert.deepEqual(kinds(once), ['review:r1']);
   assert.equal(b.alignCallouts(once, aiWant()), once, 'again: unchanged');
-  const more = { ...AI, fixes: [...AI.fixes, { suggestion: '尺寸改成 77×53' }] };
+  const more = { ...AI, fixes: [...AI.fixes, { problem: '尺寸改成 77×53' }] };
   const changed = b.alignCallouts(once, aiWant(more));
   assert.notEqual(changed, once);
   assert.deepEqual(kinds(changed), ['review:r1'], 'one box, not two');
@@ -121,11 +121,29 @@ test('aiProofCallout: counts, one sentence per fix and per open item, no tick bo
   assert.match(text, /> ・修了：年份改成 1503/);
   assert.match(text, /> ・沒修好：委託人是誰，兩個來源說法不同，AI 判斷不了，已列到書末/);
   assert.doesNotMatch(text, /\[ \]|\[x\]|按鈕|sources_conflict/);
-  const evil = b.aiProofCallout({ checked: 1, fixes: [{ suggestion: '\n> [!vam-review] x %%vam-review:r1:n1:fp%% <b>' }], open: [{ problem: '[[link]] ==hi==', reason: 'weird_code' }] }, 'r1', 'n1');
+  const evil = b.aiProofCallout({ checked: 1, fixes: [{ problem: '\n> [!vam-review] x %%vam-review:r1:n1:fp%% <b>' }], open: [{ problem: '[[link]] ==hi==', reason: 'weird_code' }] }, 'r1', 'n1');
   assert.deepEqual(kinds(b.putProgramCallout(note(), evil)), ['review:r1'], 'the injected marker and callout do not form');
   assert.doesNotMatch(evil, /<b>|\[\[link|==hi==|weird_code/);
   assert.match(evil, /AI 沒辦法處理/, 'an unknown code reads as the general sentence');
   assert.match(b.aiProofCallout({ checked: 0, fixes: [], open: [], incomplete: true }, 'r1', 'n1'), /AI 校對：這章沒有查完，已列到書末/);
+});
+test('aiProofCallout: a fix line says the problem and the sentence really written, never the suggestion; long cut, escaped, old save falls back to the problem', () => {
+  const fix = { id: 'f1', quote: 'q', problem: '年份和第 5 章不一致', suggestion: '刪除此句，或改為具名的學者', replacement: '蒙娜麗莎完成於 1503 年。' };
+  const text = b.aiProofCallout({ checked: 1, fixes: [fix], bookFixes: [{ ...fix, id: 'b1', replacement: '全書改的句子' }], open: [] }, 'r1', 'n1');
+  assert.match(text, /> ・修了：年份和第 5 章不一致，改為「蒙娜麗莎完成於 1503 年。」/);
+  assert.match(text, /> ・修了：年份和第 5 章不一致，改為「全書改的句子」/);
+  assert.doesNotMatch(text, /具名的學者/);
+  const long = b.aiProofCallout({ checked: 1, fixes: [{ ...fix, replacement: '長'.repeat(100) }], open: [] }, 'r1', 'n1');
+  assert.match(long, new RegExp('改為「長{60}…」'));
+  assert.doesNotMatch(long, /長{61}/);
+  const evil = b.aiProofCallout({ checked: 1, fixes: [{ ...fix, problem: '<b>x</b>', replacement: '\n> [!vam-review] y %%vam-review:r1:n1:fp%% [[l]] ==h==' }], open: [] }, 'r1', 'n1');
+  assert.deepEqual(kinds(b.putProgramCallout(note(), evil)), ['review:r1']);
+  assert.doesNotMatch(evil, /<b>|\[\[l|==h==/);
+  const old = b.aiProofCallout({ checked: 1, fixes: [{ id: 'f1', quote: 'q', problem: '年份不一致', suggestion: '刪除此句' }], open: [] }, 'r1', 'n1');
+  assert.match(old, /> ・修了：年份不一致\n/);
+  assert.doesNotMatch(old, /刪除此句|改為/);
+  const noProblem = b.aiProofCallout({ checked: 1, fixes: [{ ...fix, problem: '' }], open: [] }, 'r1', 'n1');
+  assert.match(noProblem, /> ・修了：改為「蒙娜麗莎完成於 1503 年。」/);
 });
 test('align: a callout of another run or another chapter always goes', () => {
   const other = b.alignCallouts(note(), { runId: 'old', nodeId: 'n1', review: box() });
@@ -325,7 +343,7 @@ test('reconcile: a chapter rewritten after the aligner read it (its snapshot alr
 
 // ---- truthful boxes: the box tells what the proofread found, from the saved result, in the reader's words ----
 test('gate 2 AI box lists every fix and every open item on its own line, past three, with the reason in words and no tick box', async () => {
-  const fixes = ['a', 'b', 'c', 'd'].map(x => ({ id: x, quote: 'q', problem: 'p', suggestion: `改${x}` }));
+  const fixes = ['a', 'b', 'c', 'd'].map(x => ({ id: x, quote: 'q', problem: `改${x}`, suggestion: 's' }));
   const open = ['e', 'f'].map(x => ({ id: x, quote: 'q', problem: `問題${x}`, reason: x === 'e' ? 'still_present' : 'source_unreachable' }));
   const r = rig(DATA({ aiProof: { n1: SLOT({ fixes, open, fixed: 4, checked: 9 }) } }));
   await r.callouts.reconcile('M');
@@ -338,7 +356,7 @@ test('gate 2 AI box lists every fix and every open item on its own line, past th
 });
 
 test('R2 gate 2 AI box: what the whole-book proofread changed in a chapter is told in that chapter\'s box, and the boxes add up to the bar', async () => {
-  const bookFix = (id, chapterId) => ({ id, quote: 'q', problem: 'p', suggestion: `全書改${id}`, chapter: 1, chapterId });
+  const bookFix = (id, chapterId) => ({ id, quote: 'q', problem: `全書改${id}`, suggestion: 's', chapter: 1, chapterId });
   const data = DATA({ order: ['n1', 'n2'], aiProof: { n1: SLOT({ fixes: [], fixed: 0, open: [] }), n2: SLOT({ fixes: [], fixed: 0, open: [] }) }, bookProof: { key: 'k', attempts: 0, round: 1, step: 'proof', done: true, checked: 3, fixed: 3, fixes: [bookFix('B1', 'n1'), bookFix('B2', 'n1'), bookFix('B3', 'n2')], open: [] } });
   const r = rig(data, ['n2']);
   await r.callouts.reconcile('M');
@@ -396,7 +414,7 @@ test('reading re-render: a view is drawn only once it holds the file text the wr
 });
 
 test('R1 B1: the box title counts what slot.fixed says, not the list length', () => {
-  const text = b.aiProofCallout({ checked: 3, fixed: 1, fixes: [{ suggestion: 'a' }, { suggestion: 'b' }], open: [] }, 'r1', 'n1');
+  const text = b.aiProofCallout({ checked: 3, fixed: 1, fixes: [{ problem: 'a' }, { problem: 'b' }], open: [] }, 'r1', 'n1');
   const title = text.split('\n')[0];
-  assert.equal(title, b.aiProofCallout({ checked: 3, fixed: 1, fixes: [{ suggestion: 'a' }], open: [] }, 'r1', 'n1').split('\n')[0]);
+  assert.equal(title, b.aiProofCallout({ checked: 3, fixed: 1, fixes: [{ problem: 'a' }], open: [] }, 'r1', 'n1').split('\n')[0]);
 });

@@ -253,6 +253,12 @@ import {
 /** The replacement texts of the edits whose ids were written. */
 const replacementsOf = (edits: readonly { id: string; replacement: string }[], ids: readonly string[]): string[] =>
   edits.filter(edit => ids.includes(edit.id)).map(edit => edit.replacement);
+/** Id to the replacement that was written for it. */
+const replacementMapOf = (
+  edits: readonly { id: string; replacement: string }[],
+  ids: readonly string[]
+): Record<string, string> =>
+  Object.fromEntries(edits.filter(edit => ids.includes(edit.id)).map(edit => [edit.id, edit.replacement]));
 const appliedIdsOf = (outcomes: readonly { id: string; applied: boolean }[]): string[] =>
   outcomes.filter(outcome => outcome.applied).map(outcome => outcome.id);
 /** At most this many cards are in a step at once (the whole-book plan runs alone before them). */
@@ -2647,6 +2653,7 @@ export class BookPipelineRuns {
           applied: result.applied,
           appliedIds: appliedIdsOf(result.outcomes),
           replacements: replacementsOf(edits, appliedIdsOf(result.outcomes)),
+          replacementOf: replacementMapOf(edits, appliedIdsOf(result.outcomes)),
           refused,
           ...(newKey ? { key: newKey, changed: [nodeId] } : {})
         })
@@ -2815,6 +2822,7 @@ export class BookPipelineRuns {
       const changed: string[] = [];
       const appliedIds: string[] = [];
       const replacements: string[] = [];
+      const replacementOf: Record<string, string> = {};
       const cardOf: Record<string, string> = {};
       let applied = 0;
       let discarded = false;
@@ -2855,6 +2863,7 @@ export class BookPipelineRuns {
         applied += result.applied;
         appliedIds.push(...appliedIdsOf(result.outcomes));
         replacements.push(...replacementsOf(own, appliedIdsOf(result.outcomes)));
+        Object.assign(replacementOf, replacementMapOf(own, appliedIdsOf(result.outcomes)));
         for (const id of appliedIdsOf(result.outcomes)) cardOf[id] = chapter.id;
         changed.push(chapter.id);
       }
@@ -2868,6 +2877,7 @@ export class BookPipelineRuns {
           applied,
           appliedIds,
           replacements,
+          replacementOf,
           cardOf,
           refused,
           ...(newKey ? { key: newKey, changed } : {})

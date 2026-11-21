@@ -205,6 +205,8 @@ export interface AiProofPending {
   chapter?: number;
   /** A whole-book fix: the card whose text it changed (`chapter` is only the position in the book's text). */
   chapterId?: string;
+  /** A fix that was written: the sentence the fix put in the text (absent in an older save; the box then shows the problem). */
+  replacement?: string;
 }
 /** A problem still open once the proofread is over, with a neutral reason code (the screen turns it into a plain sentence). */
 export interface AiProofOpen {

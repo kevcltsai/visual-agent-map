@@ -3536,6 +3536,8 @@ export const en = {
   "ui.book_ai_box_title_0_1_2": "AI proofread: checked {0}, fixed {1}, {2} not fixed",
   "ui.book_ai_box_title_incomplete": "AI proofread: this chapter was not fully checked, listed on the book's last page",
   "ui.book_ai_box_fixed_0": "Fixed: {0}",
+  "ui.book_ai_box_fixed_0_1": "Fixed: {0}; now reads “{1}”",
+  "ui.book_ai_box_fixed_replaced_0": "Fixed: now reads “{0}”",
   "ui.book_ai_box_book_fixed_0": "The whole-book proofread also fixed {0}:",
   "ui.book_ai_box_open_0": "Not fixed: {0}, listed on the book's last page",
   "ui.book_ai_box_sep": ", ",

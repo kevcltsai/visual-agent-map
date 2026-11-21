@@ -575,13 +575,19 @@ export function reviewCallout(
 }
 
 /** What one chapter's AI proofread box tells: how many items were checked, each place that was fixed, each that was not (with its reason code). */
+/** A fixed place: what was wrong and the sentence written; `suggestion` is the model's advice and is never shown. */
+export interface AiBoxFix {
+  problem?: string;
+  replacement?: string;
+  suggestion?: string;
+}
 export interface AiBoxInput {
   checked: number;
   /** The count the title shows (the tool bar's number); absent: the length of `fixes`. */
   fixed?: number;
-  fixes: readonly { suggestion: string }[];
+  fixes: readonly AiBoxFix[];
   /** Places the whole-book proofread changed in this chapter (already counted in the bar's total, so not in `fixed`). */
-  bookFixes?: readonly { suggestion: string }[];
+  bookFixes?: readonly AiBoxFix[];
   open: readonly { problem: string; reason: string }[];
   /** The proofread did not finish: the box says so instead of counting. */
   incomplete?: boolean;
@@ -606,6 +612,19 @@ const AI_REASON_KEY: Record<string, TranslationKey> = {
 export const aiReasonText = (reason: string): string =>
   t(Object.prototype.hasOwnProperty.call(AI_REASON_KEY, reason) ? AI_REASON_KEY[reason] : "ui.book_ai_reason_other");
 
+const FIX_SHOWN_CHARS = 60;
+/** One fix as a line: what was wrong and the sentence now in the text (never the model's suggestion, which may not be what was written). */
+const fixLine = (fix: AiBoxFix): string => {
+  const problem = plainText(fix.problem);
+  const raw = typeof fix.replacement === "string" ? fix.replacement : "";
+  const cut = Array.from(raw.replace(/\s+/g, " ").trim());
+  const written = cut.length
+    ? plainText(cut.slice(0, FIX_SHOWN_CHARS).join("")) + (cut.length > FIX_SHOWN_CHARS ? "…" : "")
+    : "";
+  if (!written) return `> ・${t("ui.book_ai_box_fixed_0", problem)}`;
+  return `> ・${problem ? t("ui.book_ai_box_fixed_0_1", problem, written) : t("ui.book_ai_box_fixed_replaced_0", written)}`;
+};
+
 /**
  * The box at the top of a chapter the AI proofread: one title with the counts, one plain sentence per fix, one per problem it could not
  * fix (why, and that the book's last page lists it). Nothing in it asks the reader to do anything: no tick box, no button. Every word a
@@ -617,12 +636,9 @@ export function aiProofCallout(input: AiBoxInput, runId: string, nodeId: string)
     ? t("ui.book_ai_box_title_incomplete")
     : t("ui.book_ai_box_title_0_1_2", input.checked, input.fixed ?? input.fixes.length, input.open.length);
   const lines = [
-    ...input.fixes.map(fix => `> ・${t("ui.book_ai_box_fixed_0", plainText(fix.suggestion))}`),
+    ...input.fixes.map(fixLine),
     ...(input.bookFixes?.length
-      ? [
-          `> ・${t("ui.book_ai_box_book_fixed_0", input.bookFixes.length)}`,
-          ...input.bookFixes.map(fix => `> ・${t("ui.book_ai_box_fixed_0", plainText(fix.suggestion))}`)
-        ]
+      ? [`> ・${t("ui.book_ai_box_book_fixed_0", input.bookFixes.length)}`, ...input.bookFixes.map(fixLine)]
       : []),
     ...input.open.map(item => {
       const why = aiReasonText(item.reason);

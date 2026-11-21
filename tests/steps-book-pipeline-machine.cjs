@@ -942,3 +942,14 @@ test('ai proof R4: a chapter proofread for a text that a later write changed is 
   const abandoned = machine.abandonAi(state, 'a');
   assert.equal(machine.invalidateStaleAiChapters({ ...abandoned, revisions: { a: 3 } }).accepted, false, 'a given-up slot (no key) is not looped');
 });
+
+test('ai fix: each recorded fix keeps the replacement actually written for its id', () => {
+  const { state: start } = checkedRun();
+  const p = begin(start, { nodeId: 'a' }, 'k0', 'proof');
+  const proved = machine.applyAiProof(p.state, p.token, { checked: 3, pending: [pending()], open: [] });
+  const f = begin(proved.state, { nodeId: 'a' }, 'k0', 'fix');
+  const res = machine.applyAiFix(f.state, f.token, { applied: 1, appliedIds: ['P1'], replacements: ['新句子。'], replacementOf: { P1: '新句子。' }, key: 'k1', changed: ['a'] });
+  const fixes = plain(res.state.aiProof.a.fixes);
+  assert.equal(fixes[0].replacement, '新句子。');
+  assert.equal(fixes[0].suggestion !== undefined, true);
+});

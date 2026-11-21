@@ -206,3 +206,13 @@ test('runAiBookProof: a text-only call; the quote is checked in the chapter it n
   assert.notEqual(h.runs[0][4].webSearchOnly, true);
   assert.match(JSON.stringify(h.log.getEntries()), /Book pipeline AI proof \(whole book\)/, 'usage topic names it as an AI proofread, not the plan');
 });
+
+test('prompts require every reader-facing field in the book language, and carry that language', () => {
+  const zh = stepMod.aiProofStep.render(request());
+  const en = stepMod.aiProofStep.render(request({ language: 'en', body: 'The Mona Lisa was finished in 1503.' }));
+  const zhBook = stepMod.aiBookProofStep.render(bookRequest());
+  for (const prompt of [zh, en, zhBook]) assert.match(prompt, /problem, suggestion[^\n]*(same language|language named)/i);
+  assert.match(zh, /Traditional Chinese|繁體|zh-TW|Chinese/i);
+  assert.match(en, /Write in English/i);
+  assert.match(zhBook, /Chinese|繁體|zh-TW/i);
+});

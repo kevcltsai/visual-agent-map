@@ -418,3 +418,13 @@ test('R1 B1: the box title counts what slot.fixed says, not the list length', ()
   const title = text.split('\n')[0];
   assert.equal(title, b.aiProofCallout({ checked: 3, fixed: 1, fixes: [{ problem: 'a' }], open: [] }, 'r1', 'n1').split('\n')[0]);
 });
+
+test('reconcile: no card carries a trial box at the plan gate, nor once the trial has started (the trial hint is gone)', async () => {
+  const r = rig(DATA({ phase: 'gate1', planReview: true, trial: ['n1', 'n2'] }));
+  await r.callouts.reconcile('M');
+  assert.deepEqual(r.kinds('n1'), [], 'no trial box on the first card at the plan gate');
+  assert.deepEqual(r.kinds('n2'), []);
+  r.map.bookPipeline = DATA({ phase: 'gate1', trial: ['n1', 'n2'] });
+  await r.callouts.reconcile('M');
+  assert.deepEqual(r.kinds('n1'), []);
+});

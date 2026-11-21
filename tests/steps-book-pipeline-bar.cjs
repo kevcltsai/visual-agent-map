@@ -599,3 +599,23 @@ test('P8c bar: a finished book shows the chapters, what the AI fixed and the ope
   bundle.renderBookBar(clean, bundle.bookBarState(aiData({ phase: 'done' }), undefined, () => undefined), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, openIssues() {} });
   assert.equal(one(clean, 'vam-book-done-counts').text, '4 章・AI 修了 0 處・仍有問題 0 項');
 });
+
+test('bar: with a book structure the fix line names the card by its place (preface / chapter / section) and counts cards', () => {
+  const order = ['p', 'c1', 's1', 'c2'];
+  const places = { p: { kind: 'preface' }, c1: { kind: 'chapter', chapter: 1 }, s1: { kind: 'section', chapterId: 'c1', sectionIndex: 1, sectionCount: 1 }, c2: { kind: 'chapter', chapter: 2 } };
+  const structure = { placeOf: id => places[id], chapters: ['c1', 'c2'], sectionsOf: id => (id === 'c1' ? ['s1'] : []), trialOf: () => ['p', 'c1', 's1'], neighboursOf: () => ({}) };
+  const titles = { p: '前言', c1: '沒有錢的世界', s1: '以物易物', c2: 'x' };
+  const data = { v: 1, runId: 'r', phase: 'writing', status: 'running', order, trial: ['p', 'c1', 's1'], globalPlanned: true, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', autoFixes: { p: 1, c1: 1, s1: 1 } };
+  const progress = { runId: 'r', phase: 'writing', status: 'running', active: true, total: 4, counts: { pending: 1, planned: 0, written: 0, checked: 3, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [] };
+  const text = (language, nodeId) => { setUiLanguage(language); return bundle.bookProgressText(bundle.bookBarState(data, { ...progress, current: [{ nodeId, step: 'write', startedAt: 1 }] }, () => undefined, undefined, structure, id => titles[id])); };
+  assert.equal(text('zh-TW', 'p'), '正在修正前言・已完成 3／4 張卡');
+  assert.equal(text('zh-TW', 'c1'), '正在修正第 1 章・已完成 3／4 張卡', 'the first chapter is chapter 1, not 2');
+  assert.equal(text('zh-TW', 's1'), '正在修正「以物易物」・已完成 3／4 張卡');
+  assert.equal(text('zh-CN', 'c1'), '正在修正第 1 章・已完成 3／4 张卡');
+  assert.equal(text('en', 'c1'), 'Fixing chapter 1 · 3/4 cards done');
+  // A run whose trial is not the structure's keeps the old wording.
+  setUiLanguage('zh-TW');
+  const old = bundle.bookProgressText(bundle.bookBarState({ ...data, trial: ['c1', 's1'] }, { ...progress, current: [{ nodeId: 'c1', step: 'write', startedAt: 1 }] }, () => undefined, undefined, structure, id => titles[id]));
+  assert.equal(old, '正在修正第 2 章・已完成 3／4 章', 'old wording kept');
+  assert.ok(!old.includes('張卡'));
+});

@@ -290,6 +290,14 @@ const appliedIdsOf = (outcomes: readonly { id: string; applied: boolean }[]): st
 export const BOOK_POOL = 5;
 /** The run keeps this many gate-press trace lines (the newest). */
 const GATE_TRACE_MAX = 20;
+/**
+ * At most this many cards are in their post-write work at once: finding and placing pictures (cover download included) after the
+ * author's call, and the proofreads (card_proof, AI proof, AI fix). A card in this phase does not hold a {@link BOOK_POOL} slot, so
+ * the next write starts when a write ends. 10, not 5: a card's picture search and checks take about three times as long as its
+ * write (about 75 s and 30 s against 45 s on a real 22-card book), so a cap of 5 would hold the writers back again. With 5 writes that
+ * keeps the run at about 15 model calls at once, inside the 10 to 26 the old run already reached.
+ */
+export const BOOK_POST_POOL = 10;
 
 export type BookRunRefusal =
   | "busy"
@@ -633,6 +641,11 @@ interface Drive {
   /** In memory only: the sub-step each running card (or `global`) is in, and the cards whose pictures are in but whose write step has not ended. */
   sub: Map<string, { step: BookSubStep; startedAt: number }>;
   imagesDone: Set<string>;
+  /** In memory only: the cards in their post-write work (counted against {@link BOOK_POST_POOL}, not {@link BOOK_POOL}); waiters for a free place. */
+  post: Set<string>;
+  postWaiters: Array<() => void>;
+  /** Wakes the loop (a write has moved on to its pictures, so a new write may start). */
+  wake?: () => void;
   /** In memory only: the step that marked each card needs-review in this drive. */
   reviewStep: Map<string, PipelineStep>;
   fatal?: unknown;
@@ -2147,6 +2160,8 @@ export class BookPipelineRuns {
       durations: { plan: [], write: [] },
       sub: new Map(),
       imagesDone: new Set(),
+      post: new Set(),
+      postWaiters: [],
       reviewStep: new Map(),
       stopRequested: false,
       disposed: false,
@@ -2403,6 +2418,19 @@ export class BookPipelineRuns {
   }
   private async loop(drive: Drive): Promise<void> {
     const inflight = new Map<string, Promise<void>>();
+    // Work in its post-write phase does not count against the write pool.
+    const writing = (): number => [...inflight.keys()].filter(key => !drive.post.has(key)).length;
+    const postDone = (key: string): void => {
+      drive.post.delete(key);
+      const waiting = drive.postWaiters.splice(0);
+      for (const wake of waiting) wake();
+    };
+    let woken = false;
+    let wakeLoop: () => void = () => undefined;
+    drive.wake = () => {
+      woken = true;
+      wakeLoop();
+    };
     while (!this.dead(drive) && drive.fatal === undefined) {
       // Before each step: the map's cards against the accepted set. A difference pauses the run (nothing new is admitted).
       if (await this.pauseOnMapChange(drive)) {
@@ -2452,15 +2480,17 @@ export class BookPipelineRuns {
           }));
           if (drive.store.state !== before) changed = true;
         } else if (action.type === "ai_proof" || action.type === "ai_fix") {
-          if (inflight.size >= BOOK_POOL) continue;
+          if (drive.post.size >= BOOK_POST_POOL) continue;
           const key = action.nodeId;
           drive.busy.add(key);
+          drive.post.add(key);
           started++;
           inflight.set(
             key,
             this.aiChapter(drive, key, action.type === "ai_fix" ? "fix" : "proof").finally(() => {
               drive.busy.delete(key);
               inflight.delete(key);
+              postDone(key);
             })
           );
         } else if (action.type === "book_ai_proof" || action.type === "book_ai_fix") {
@@ -2480,7 +2510,10 @@ export class BookPipelineRuns {
           );
         } else {
           const key = action.type === "global_plan" ? "global" : action.nodeId;
-          if (action.type !== "global_plan" && inflight.size >= BOOK_POOL) continue;
+          if (action.type === "card_proof") {
+            if (drive.post.size >= BOOK_POST_POOL) continue;
+            drive.post.add(key);
+          } else if (action.type !== "global_plan" && writing() >= BOOK_POOL) continue;
           drive.busy.add(key);
           started++;
           inflight.set(
@@ -2490,13 +2523,22 @@ export class BookPipelineRuns {
               .finally(() => {
                 drive.busy.delete(key);
                 inflight.delete(key);
+                postDone(key);
               })
           );
         }
       }
       if (changed && !started) continue;
-      if (inflight.size) await Promise.race(inflight.values());
-      else if (!started && !changed) break;
+      if (woken) {
+        woken = false;
+        continue;
+      }
+      if (inflight.size) {
+        const nudge = new Promise<void>(resolve => (wakeLoop = resolve));
+        await Promise.race([...inflight.values(), nudge]);
+        wakeLoop = () => undefined;
+        woken = false;
+      } else if (!started && !changed) break;
     }
     await Promise.all(inflight.values());
   }
@@ -3972,6 +4014,13 @@ export class BookPipelineRuns {
       });
       if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
     }
+    // The author is done: the picture work (search, probes, cover download) runs under its own cap and frees this write's pool place.
+    if (!expanding && slots) {
+      while (drive.post.size >= BOOK_POST_POOL)
+        await untilAborted(signal, new Promise<void>(resolve => drive.postWaiters.push(resolve)));
+      drive.post.add(nodeId);
+      drive.wake?.();
+    }
     // The picture slots (T2): the author's markers become verified pictures in one guarded write, or the stage does not advance.
     drive.sub.set(nodeId, { step: "images", startedAt: Date.parse(this.ports.now()) });
     this.ports.progressed?.(drive.mapPath);
@@ -4857,7 +4906,9 @@ export class BookPipelineRuns {
       return planning ? stage === undefined : stage !== "checked" && stage !== "needs-review";
     }).length;
     const average = list.reduce((sum, ms) => sum + ms, 0) / list.length;
-    return Math.max(0, Math.round((average * left) / BOOK_POOL / 1000));
+    // Planning runs BOOK_POOL cards at once; writing has cards in both the write and the post-write places.
+    const atOnce = planning ? BOOK_POOL : BOOK_POOL + BOOK_POST_POOL;
+    return Math.max(0, Math.round((average * left) / atOnce / 1000));
   }
   /** One line per proofread call: the numbers only (the call has no content log, so this is the trace of what it did). */
   private logProofCounts(drive: Drive, runId: string, nodeId: string, counts: ProofCounts, result: string): void {

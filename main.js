@@ -13003,7 +13003,7 @@ function problem(raw) {
     return "aiProof";
   if (raw.bookProof !== void 0 && !aiProofShape(raw.bookProof)) return "bookProof";
   if (raw.stopEpoch !== void 0 && !isCount(raw.stopEpoch)) return "stopEpoch";
-  if (raw.gateTrace !== void 0 && (!Array.isArray(raw.gateTrace) || raw.gateTrace.some((line3) => typeof line3 !== "string" || line3.length > 120)))
+  if (raw.gateTrace !== void 0 && (!Array.isArray(raw.gateTrace) || raw.gateTrace.some((line3) => typeof line3 !== "string")))
     return "gateTrace";
   if (!isCount(raw.revision)) return "revision";
   if (typeof raw.startedAt !== "string" || typeof raw.phaseStartedAt !== "string") return "timestamps";
@@ -54699,6 +54699,7 @@ var replacementMapOf = (edits, ids2) => Object.fromEntries(edits.filter((edit) =
 var appliedIdsOf = (outcomes) => outcomes.filter((outcome) => outcome.applied).map((outcome) => outcome.id);
 var BOOK_POOL = 5;
 var GATE_TRACE_MAX = 20;
+var BOOK_POST_POOL = 10;
 function unmetIds(items) {
   const unmet = items.filter((item) => item.status === "unmet");
   const pick9 = unmet.filter((item) => item.type === "fact");
@@ -55904,7 +55905,8 @@ var BookPipelineRuns = class {
   windingDownAtGate(drive) {
     var _a2;
     const state = (_a2 = drive.store) == null ? void 0 : _a2.state;
-    return !!state && !drive.job && (state.phase === "gate1" || state.phase === "gate2") && state.status === "running" && !drive.stopRequested && drive.fatal === void 0 && !this.dead(drive);
+    return !!state && !drive.job && // Only a gate that waits for the owner: at any other gate phase the drive is still working (a trial being written, the last fixes).
+    (state.phase === "gate1" && gateWaitsForPerson(state, state.planReview ? "plan" : "trial") || state.phase === "gate2" && gateWaitsForPerson(state, "final")) && state.status === "running" && !drive.stopRequested && drive.fatal === void 0 && !this.dead(drive);
   }
   /**
    * A gate button entry. A press made while the drive that reached the gate is still ending waits for that drive and then applies as
@@ -56012,6 +56014,8 @@ var BookPipelineRuns = class {
       durations: { plan: [], write: [] },
       sub: /* @__PURE__ */ new Map(),
       imagesDone: /* @__PURE__ */ new Set(),
+      post: /* @__PURE__ */ new Set(),
+      postWaiters: [],
       reviewStep: /* @__PURE__ */ new Map(),
       stopRequested: false,
       disposed: false,
@@ -56232,6 +56236,18 @@ var BookPipelineRuns = class {
   async loop(drive) {
     var _a2, _b2;
     const inflight = /* @__PURE__ */ new Map();
+    const writing = () => [...inflight.keys()].filter((key4) => !drive.post.has(key4)).length;
+    const postDone = (key4) => {
+      drive.post.delete(key4);
+      const waiting = drive.postWaiters.splice(0);
+      for (const wake of waiting) wake();
+    };
+    let woken = false;
+    let wakeLoop = () => void 0;
+    drive.wake = () => {
+      woken = true;
+      wakeLoop();
+    };
     while (!this.dead(drive) && drive.fatal === void 0) {
       if (await this.pauseOnMapChange(drive)) {
         drive.skippedRefreshed = false;
@@ -56279,15 +56295,17 @@ var BookPipelineRuns = class {
           }));
           if (drive.store.state !== before) changed = true;
         } else if (action.type === "ai_proof" || action.type === "ai_fix") {
-          if (inflight.size >= BOOK_POOL) continue;
+          if (drive.post.size >= BOOK_POST_POOL) continue;
           const key4 = action.nodeId;
           drive.busy.add(key4);
+          drive.post.add(key4);
           started++;
           inflight.set(
             key4,
             this.aiChapter(drive, key4, action.type === "ai_fix" ? "fix" : "proof").finally(() => {
               drive.busy.delete(key4);
               inflight.delete(key4);
+              postDone(key4);
             })
           );
         } else if (action.type === "book_ai_proof" || action.type === "book_ai_fix") {
@@ -56306,7 +56324,10 @@ var BookPipelineRuns = class {
           );
         } else {
           const key4 = action.type === "global_plan" ? "global" : action.nodeId;
-          if (action.type !== "global_plan" && inflight.size >= BOOK_POOL) continue;
+          if (action.type === "card_proof") {
+            if (drive.post.size >= BOOK_POST_POOL) continue;
+            drive.post.add(key4);
+          } else if (action.type !== "global_plan" && writing() >= BOOK_POOL) continue;
           drive.busy.add(key4);
           started++;
           inflight.set(
@@ -56314,13 +56335,22 @@ var BookPipelineRuns = class {
             this.step(drive, action).then(() => void 0).finally(() => {
               drive.busy.delete(key4);
               inflight.delete(key4);
+              postDone(key4);
             })
           );
         }
       }
       if (changed && !started) continue;
-      if (inflight.size) await Promise.race(inflight.values());
-      else if (!started && !changed) break;
+      if (woken) {
+        woken = false;
+        continue;
+      }
+      if (inflight.size) {
+        const nudge = new Promise((resolve) => wakeLoop = resolve);
+        await Promise.race([...inflight.values(), nudge]);
+        wakeLoop = () => void 0;
+        woken = false;
+      } else if (!started && !changed) break;
     }
     await Promise.all(inflight.values());
   }
@@ -57312,7 +57342,7 @@ var BookPipelineRuns = class {
     return { kind: "ok", after: () => this.setStage(drive, nodeId, "planned", null) };
   }
   async execWrite(drive, token, nodeId) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     const signal = drive.controller.signal;
     const info = drive.cards.get(nodeId);
     const rootInfo = drive.cards.get(drive.rootId);
@@ -57654,8 +57684,14 @@ ${oldDetail}`);
       });
       if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
     }
+    if (!expanding && slots) {
+      while (drive.post.size >= BOOK_POST_POOL)
+        await untilAborted(signal, new Promise((resolve) => drive.postWaiters.push(resolve)));
+      drive.post.add(nodeId);
+      (_a2 = drive.wake) == null ? void 0 : _a2.call(drive);
+    }
     drive.sub.set(nodeId, { step: "images", startedAt: Date.parse(this.ports.now()) });
-    (_b2 = (_a2 = this.ports).progressed) == null ? void 0 : _b2.call(_a2, drive.mapPath);
+    (_c = (_b2 = this.ports).progressed) == null ? void 0 : _c.call(_b2, drive.mapPath);
     const filled = expanding ? await this.settleStrayMarkers(path, authorize) : await this.fillSlots(drive, token, nodeId, path, slots, authorize);
     if (filled) return filled;
     drive.imagesDone.add(nodeId);
@@ -58425,7 +58461,8 @@ ${caption}`, drive.config.language))
       return planning ? stage === void 0 : stage !== "checked" && stage !== "needs-review";
     }).length;
     const average = list2.reduce((sum2, ms) => sum2 + ms, 0) / list2.length;
-    return Math.max(0, Math.round(average * left / BOOK_POOL / 1e3));
+    const atOnce = planning ? BOOK_POOL : BOOK_POOL + BOOK_POST_POOL;
+    return Math.max(0, Math.round(average * left / atOnce / 1e3));
   }
   /** One line per proofread call: the numbers only (the call has no content log, so this is the trace of what it did). */
   logProofCounts(drive, runId, nodeId, counts, result) {

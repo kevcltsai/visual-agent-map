@@ -4414,3 +4414,104 @@ test('the gate trace is capped, kept by the drive\'s own state writes, and the r
   assert.match(s.gateTrace.at(-1), /startTrial applied/);
   assert.ok(s.gateTrace.every(l => !/Secret/.test(l)), 'no owner text');
 });
+
+// ---- Picture work does not hold a write place: its own cap (BOOK_POST_POOL) ----
+const { BOOK_POOL, BOOK_POST_POOL } = S.load('experiences/visual-map/book-pipeline-run.ts');
+async function postRig(count, over = {}) {
+  const titles = Array.from({ length: count }, (_, i) => `T${i}`);
+  const gates = new Map();
+  const live = { writes: 0, peakWrites: 0, searches: 0, peakSearches: 0, proofs: 0, peakPost: 0, started: [] };
+  const MARKED = `${DRAFT}\n\n〔圖位 1：the route〕\n`;
+  const slots = [{ index: 1, kind: 'map', explains: 'the route', anchor: 'after paragraph 1' }];
+  const holder = {};
+  const post = () => live.searches + live.proofs;
+  const r = await rig({
+    titles,
+    script: {
+      card: request => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }], images: slots }),
+      author: async input => {
+        live.writes++; live.peakWrites = Math.max(live.peakWrites, live.writes); live.started.push(input.nodeId);
+        try {
+          await input.admission.reserve();
+          await tick();
+          const out = await holder.r.repo.updateNoteGuarded(input.path, { detail: `${MARKED}\n唯一${input.nodeId}\n` }, { authorize: input.authorize, finalize: input.finalize });
+          return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+        } finally { live.writes--; }
+      },
+      proof: async request => { live.proofs++; live.peakPost = Math.max(live.peakPost, post()); await tick(); live.proofs--; return { items: request.checklist.map(c => ({ id: c.id, type: c.type, status: 'met', note: 'x', sources: [] })), aggregate: 'checked' }; }
+    },
+    ports: {
+      findImages: async (request, run) => {
+        live.searches++; live.peakSearches = Math.max(live.peakSearches, live.searches); live.peakPost = Math.max(live.peakPost, post());
+        const key = request.chapter;
+        if (!gates.has(key)) gates.set(key, defer());
+        try {
+          await new Promise((resolve, reject) => { gates.get(key).promise.then(resolve); run.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }); });
+          return { bySlot: new Map(), found: 0, offTopic: 0 };
+        } finally { live.searches--; }
+      },
+      ...over.ports
+    }
+  });
+  holder.r = r;
+  return { r, live, gates };
+}
+const open = gates => { for (const g of gates.values()) g.resolve(); };
+
+test('picture work: with every search held open, more than BOOK_POOL writes complete and later cards start writing; writes never exceed BOOK_POOL, picture work never exceeds BOOK_POST_POOL', async () => {
+  const cards = BOOK_POOL + BOOK_POST_POOL + 2; // more cards than both caps together, so both fill
+  const { r, live, gates } = await postRig(cards);
+  await r.runs.start(r.mapPath);
+  const running = r.runs.confirmGate1(r.mapPath);
+  await settle();
+  assert.equal(live.searches, BOOK_POST_POOL, 'the picture searches fill their own cap');
+  assert.ok(live.started.length > BOOK_POOL + BOOK_POST_POOL - 1, `later cards started writing while searches are open: ${live.started.length}`);
+  assert.ok(live.peakWrites <= BOOK_POOL, `writes at most BOOK_POOL: ${live.peakWrites}`);
+  assert.ok(live.peakSearches <= BOOK_POST_POOL, `searches at most the cap: ${live.peakSearches}`);
+  // Let everything finish, searches included.
+  for (let i = 0; i < 400 && r.runs.isRunning(r.mapPath); i++) { open(gates); await tick(); }
+  await running;
+  assert.equal((await r.state()).phase, 'done');
+  assert.ok(live.peakWrites <= BOOK_POOL && live.peakSearches <= BOOK_POST_POOL && live.peakPost <= BOOK_POST_POOL, `peaks ${live.peakWrites}/${live.peakSearches}/${live.peakPost}`);
+  assert.equal(new Set(live.started).size, cards);
+});
+
+test('picture work: a card is proofread only after its own pictures settled, while others still search', async () => {
+  const { r, live, gates } = await postRig(4);
+  await r.runs.start(r.mapPath);
+  const running = r.runs.confirmGate1(r.mapPath);
+  await settle();
+  assert.equal(r.stat.proof.length, 0, 'no proofread while every card is still searching');
+  assert.ok(gates.size >= 2, `one gate per card: ${gates.size}`);
+  const first = [...gates.values()][0];
+  first.resolve();
+  await settle();
+  assert.ok(r.stat.proof.length >= 1, 'the card whose pictures settled is proofread');
+  assert.ok(r.stat.proof.length < 4, 'others are not');
+  for (const request of r.stat.proof) assert.ok(/^T\d+$/.test(request.title));
+  for (let i = 0; i < 400 && r.runs.isRunning(r.mapPath); i++) { open(gates); await tick(); }
+  await running;
+  assert.equal((await r.state()).phase, 'done');
+});
+
+test('picture work: stop while writes and searches are both in flight cancels both and leaves no late write-back', async () => {
+  const { r, live, gates } = await postRig(12);
+  await r.runs.start(r.mapPath);
+  const running = r.runs.confirmGate1(r.mapPath);
+  await settle();
+  assert.ok(live.searches > 0 && live.started.length > BOOK_POST_POOL);
+  await r.runs.stop(r.mapPath);
+  await running.catch(() => undefined);
+  const before = r.mapRaw();
+  const notes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(i => r.raw(i));
+  const authored = r.stat.author.length;
+  open(gates);
+  await settle();
+  assert.equal(live.searches, 0, 'no search left running');
+  assert.equal(r.stat.author.length, authored, 'no new write after the stop');
+  assert.equal(r.mapRaw(), before, 'the saved run is unchanged by late results');
+  assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(i => r.raw(i)), notes, 'no card text changed after the stop');
+  const s = await r.state();
+  assert.equal(s.status, 'stopped');
+  for (let i = 0; i < 12; i++) assert.notEqual(stageOf(r.raw(i)), 'checked');
+});

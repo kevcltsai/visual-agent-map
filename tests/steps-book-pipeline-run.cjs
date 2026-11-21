@@ -3724,6 +3724,16 @@ test('P3 structure: the plan gate writes ### 全書結構 after the thread in th
   assert.equal(replaceBookStructure(raw, composeBookStructure([{ kind: 'preface', title: 'BookRoot', points: ['BookRoot a', 'BookRoot b', 'BookRoot c'] }, { kind: 'chapter', chapter: 1, title: 'ChapA', points: ['ChapA a', 'ChapA b', 'ChapA c'] }, { kind: 'section', title: 'SecA1', points: ['SecA1 a', 'SecA1 b', 'SecA1 c'] }, { kind: 'section', title: 'SecA2', points: ['SecA2 a', 'SecA2 b', 'SecA2 c'] }, { kind: 'chapter', chapter: 2, title: 'ChapB', points: ['ChapB a', 'ChapB b', 'ChapB c'] }], 'zh-TW')), raw, 'idempotent');
 });
 
+test('P3 structure: the last section of a chapter is planned with the next chapter carrying its number; the section\'s own neighbours stay unnumbered', async () => {
+  const seen = [];
+  const r = await sectionRig({ script: { card: (request, n) => { seen.push(request); return POINTED.card(request, n); } } });
+  await r.runs.start(r.mapPath);
+  const last = seen.find(request => request.card.id === r.nodes[3].id);
+  assert.ok(last, 'SecA2 was planned');
+  assert.deepEqual([last.nextChapter.title, last.nextChapter.position], ['ChapB', 2], 'the next chapter keeps its chapter number');
+  assert.equal(last.previous.position, undefined, 'the previous section is named by title only');
+});
+
 test('P3 structure: back to the plan writes it again from the plans as the owner edited them; a stale root note is left and structure_skipped is logged, the gate still shows', async () => {
   const r = await sectionRig();
   await r.runs.start(r.mapPath);
@@ -4266,8 +4276,8 @@ test('R4 combo: a needs-review chapter is rewritten by its one automatic redo BE
 
 // ---- gate presses while the drive that reached the gate is still ending ----------------------------------------------------------
 /** A plan-review run whose start drive stays alive after it saved gate 1 (its next map read waits), plus controls over that wait. */
-async function lingerRig() {
-  const r = await trialRig({ planReview: true });
+async function lingerRig(over = {}) {
+  const r = await trialRig({ planReview: true, ...over });
   const ctl = { on: false, block: false, blocked: 0, fail: false, hold: defer() };
   const update = r.ports.updateMap, readMap = r.ports.readMap;
   r.ports.updateMap = async (path, change) => { const x = await update(path, change); const s = await r.state(); if (!ctl.on && s.phase === 'gate1' && s.planReview) { ctl.on = true; ctl.block = true; } return x; };
@@ -4360,7 +4370,24 @@ test('gate press while a different operation runs (the plan phase) is refused bu
   assert.equal(r.stat.author.length, 0);
 });
 
-test('waiting gate press when the ending drive is stopped: the press does nothing (cancelled), the run stays stopped at the gate', async () => {
+test('waiting gate press: the progress says gateWaiting while it waits, and progressed fires when the wait starts and ends', async () => {
+  const seen = [];
+  let runs;
+  const { r, ctl, start } = await lingerRig({ ports: { progressed: () => seen.push(runs?.getProgress(r0.mapPath)?.gateWaiting === true) } });
+  const r0 = r; runs = r.runs;
+  assert.equal(r.runs.getProgress(r.mapPath)?.gateWaiting, undefined);
+  seen.length = 0;
+  const press = r.runs.startTrial(r.mapPath);
+  await settle();
+  assert.equal(r.runs.getProgress(r.mapPath)?.gateWaiting, true);
+  assert.ok(seen.includes(true), 'progressed fired when the wait began');
+  ctl.hold.resolve();
+  await start; await press; await idle(r);
+  assert.equal(r.runs.getProgress(r.mapPath)?.gateWaiting, undefined);
+  assert.ok(seen.slice(seen.indexOf(true)).includes(false), 'progressed fired when the wait ended');
+});
+
+test('waiting gate press when the ending drive is stopped: the press does nothing (gate_cancelled), the run stays stopped at the gate', async () => {
   const { r, ctl, start, trace } = await lingerRig();
   const press = r.runs.startTrial(r.mapPath).then(() => 'ok', e => e.code);
   await settle();
@@ -4368,26 +4395,26 @@ test('waiting gate press when the ending drive is stopped: the press does nothin
   await settle();
   ctl.hold.resolve();
   await start; await stopping;
-  assert.equal(await press, 'cancelled');
+  assert.equal(await press, 'gate_cancelled');
   await settle();
   const s = await r.state();
   assert.deepEqual([s.phase, s.status, s.planReview], ['gate1', 'stopped', true]);
   assert.equal(r.stat.author.length, 0); assert.equal(r.runs.isRunning(r.mapPath), false, 'no drive was started');
-  assert.match((await trace()).at(-1), /startTrial refused:cancelled/);
+  assert.match((await trace()).at(-1), /startTrial refused:gate_cancelled/);
 });
 
-test('waiting gate press when the ending drive fails: the press does nothing (cancelled), does not hang, starts no drive', async () => {
+test('waiting gate press when the ending drive fails: the press does nothing (gate_cancelled), does not hang, starts no drive', async () => {
   const { r, ctl, start, trace } = await lingerRig();
   const press = r.runs.confirmGate1(r.mapPath).then(() => 'ok', e => e.code);
   await settle();
   ctl.fail = true; ctl.hold.resolve();
   await start;
-  assert.equal(await press, 'cancelled');
+  assert.equal(await press, 'gate_cancelled');
   await settle();
   const s = await r.state();
   assert.equal(s.status, 'stopped'); assert.notEqual(s.phase, 'done');
   assert.equal(r.stat.author.length, 0); assert.equal(r.runs.isRunning(r.mapPath), false);
-  assert.match((await trace()).at(-1), /confirmGate1 refused:cancelled/);
+  assert.match((await trace()).at(-1), /confirmGate1 refused:gate_cancelled/);
 });
 
 test('waiting gate press when the plugin is disposed: refused disposed, nothing is written afterwards', async () => {

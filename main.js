@@ -3356,6 +3356,9 @@ var en = {
   "ui.book_note_review_keep": "Keep my version",
   "ui.book_note_review_rewrite": "Rewrite this chapter with AI (overwrites your edits; backed up first)",
   "ui.book_plain_write_hand_edited": "The chapter has your own edits, so it was left as it is.",
+  "ui.book_plain_write_author_failed": 'The writing call failed this time, so the card is unchanged. Use "Rerun this card" to write it again.',
+  "ui.book_refused_gate_cancelled": "Stopped. The button you pressed was not applied; the book stays where it was.",
+  "ui.book_gate_waiting": "Wrapping up the last step. Your button press applies as soon as it is done.",
   "ui.book_refused_text_changed": "The chapter text changed since you chose to rewrite it, so nothing was overwritten.",
   "ui.book_review_hand_queued": "\u23F3 Queued; it will be rewritten after the whole book finishes",
   "ui.book_review_hand_failed_0": "\u26A0 Not rewritten: {0}",
@@ -6645,6 +6648,9 @@ var zhCN = {
   "ui.book_note_review_keep": "\u4FDD\u7559\u6211\u7684\u7248\u672C",
   "ui.book_note_review_rewrite": "\u7528 AI \u91CD\u5199\u8FD9\u7AE0\uFF08\u4F1A\u76D6\u6389\u4F60\u7684\u4FEE\u6539\uFF0C\u6539\u524D\u5148\u5907\u4EFD\uFF09",
   "ui.book_plain_write_hand_edited": "\u8FD9\u7AE0\u6709\u4F60\u624B\u6539\u7684\u5185\u5BB9\uFF0C\u6240\u4EE5\u6CA1\u6709\u52A8\u5B83\u3002",
+  "ui.book_plain_write_author_failed": "\u5199\u4F5C\u8C03\u7528\u5931\u8D25\uFF0C\u5361\u7247\u4FDD\u6301\u539F\u6837\u3002\u8BF7\u70B9\u201C\u91CD\u8DD1\u8FD9\u5F20\u201D\u518D\u5199\u4E00\u6B21\u3002",
+  "ui.book_refused_gate_cancelled": "\u5DF2\u505C\u6B62\uFF0C\u4F60\u521A\u6309\u7684\u6309\u952E\u6CA1\u6709\u5957\u7528\uFF0C\u8FD9\u672C\u4E66\u4FDD\u6301\u539F\u72B6\u3002",
+  "ui.book_gate_waiting": "\u6B63\u5728\u6536\u5C3E\u4E0A\u4E00\u6B65\uFF0C\u597D\u4E86\u5C31\u5957\u7528\u4F60\u521A\u6309\u7684\u6309\u952E\u3002",
   "ui.book_refused_text_changed": "\u4F60\u9009\u62E9\u91CD\u5199\u4E4B\u540E\uFF0C\u8FD9\u7AE0\u7684\u6587\u5B57\u53C8\u53D8\u4E86\uFF0C\u6240\u4EE5\u6CA1\u6709\u76D6\u6389\u4EFB\u4F55\u4E1C\u897F\u3002",
   "ui.book_review_hand_queued": "\u23F3 \u5DF2\u6392\u5165\uFF0C\u5168\u4E66\u8DD1\u5B8C\u540E\u91CD\u5199",
   "ui.book_review_hand_failed_0": "\u26A0 \u6CA1\u6709\u91CD\u5199\uFF1A{0}",
@@ -9934,6 +9940,9 @@ var zhTW = {
   "ui.book_note_review_keep": "\u4FDD\u7559\u6211\u7684\u7248\u672C",
   "ui.book_note_review_rewrite": "\u7528 AI \u91CD\u5BEB\u9019\u7AE0\uFF08\u6703\u84CB\u6389\u4F60\u7684\u4FEE\u6539\uFF0C\u6539\u524D\u5148\u5099\u4EFD\uFF09",
   "ui.book_plain_write_hand_edited": "\u9019\u7AE0\u6709\u4F60\u624B\u6539\u7684\u5167\u5BB9\uFF0C\u6240\u4EE5\u6C92\u6709\u52D5\u5B83\u3002",
+  "ui.book_plain_write_author_failed": "\u5BEB\u4F5C\u547C\u53EB\u5931\u6557\uFF0C\u5361\u7247\u7DAD\u6301\u539F\u6A23\u3002\u8ACB\u6309\u300C\u91CD\u8DD1\u9019\u5F35\u300D\u518D\u5BEB\u4E00\u6B21\u3002",
+  "ui.book_refused_gate_cancelled": "\u5DF2\u505C\u6B62\uFF0C\u4F60\u525B\u6309\u7684\u6309\u9375\u6C92\u6709\u5957\u7528\uFF0C\u9019\u672C\u66F8\u7DAD\u6301\u539F\u72C0\u3002",
+  "ui.book_gate_waiting": "\u6B63\u5728\u6536\u5C3E\u4E0A\u4E00\u6B65\uFF0C\u597D\u4E86\u5C31\u5957\u7528\u4F60\u525B\u6309\u7684\u6309\u9375\u3002",
   "ui.book_refused_text_changed": "\u4F60\u9078\u64C7\u91CD\u5BEB\u4E4B\u5F8C\uFF0C\u9019\u7AE0\u7684\u6587\u5B57\u53C8\u8B8A\u4E86\uFF0C\u6240\u4EE5\u6C92\u6709\u84CB\u6389\u4EFB\u4F55\u6771\u897F\u3002",
   "ui.book_review_hand_queued": "\u23F3 \u5DF2\u6392\u5165\uFF0C\u5168\u66F8\u8DD1\u5B8C\u5F8C\u91CD\u5BEB",
   "ui.book_review_hand_failed_0": "\u26A0 \u6C92\u6709\u91CD\u5BEB\uFF1A{0}",
@@ -11142,12 +11151,12 @@ function parseOne(markdown) {
       const value = splitInsightText(line3.trim());
       const summary = value.summary.replace(/^>\s?/, "").trim();
       if (summary) {
-        const sentence = ((_h = (_g = summary.match(/^.{1,180}?(?:[。！？.!?](?=\s|$)|$)/u)) == null ? void 0 : _g[0]) == null ? void 0 : _h.trim()) || summary.slice(0, 180);
+        const sentence2 = ((_h = (_g = summary.match(/^.{1,180}?(?:[。！？.!?](?=\s|$)|$)/u)) == null ? void 0 : _g[0]) == null ? void 0 : _h.trim()) || summary.slice(0, 180);
         current = {
           id: newId(),
           category,
-          summary: sentence,
-          detail: summary === sentence ? "" : summary,
+          summary: sentence2,
+          detail: summary === sentence2 ? "" : summary,
           sources: value.sources,
           mergedIds: []
         };
@@ -13271,10 +13280,10 @@ function escapeMarkdownText(value, max = 400) {
   if (typeof value !== "string") return "";
   const kept = value.replace(/[^\p{L}\p{N}\p{M}\p{P}\p{S}]+/gu, " ").replace(/ +/g, " ").trim();
   const text10 = Array.from(kept).slice(0, max).join("");
-  return text10.replace(/</g, "\uFF1C").replace(/>/g, "\uFF1E").replace(/%/g, "\uFF05").replace(/[\\`*_[\]()!|~#$]/g, "\\$&").replace(/^([-+])(?=[ ]|$)/, "\\$1").replace(/^(\d+)([.)])/, "$1\\$2");
+  return text10.replace(/</g, "\uFF1C").replace(/>/g, "\uFF1E").replace(/%/g, "\uFF05").replace(/[\\`*_[\]()!|~#$]/g, "\\$&").replace(/^([-+])(?=[ ]|$)/, "\\$1").replace(/^(\d+)([.)])/, "$1\\$2").replace(/^([=-])(?=[=-]*$)/, "\\$1");
 }
 function unescapeMarkdownText(text10) {
-  return text10.replace(/\\([\\`*_[\]()!|~#$.+-])/g, "$1");
+  return text10.replace(/\\([\\`*_[\]()!|~#$.+=-])/g, "$1");
 }
 function hashText(text10) {
   return (0, import_node_crypto.createHash)("sha256").update(text10.replace(/\r\n?/g, "\n")).digest("hex").slice(0, 16);
@@ -14088,8 +14097,8 @@ var POINT_SEPARATOR = " \xB7 ";
 var pointsText = (points) => points.map((point) => safe(point, 40).replace(/·/g, "\u30FB")).filter(Boolean).join(POINT_SEPARATOR);
 function neighbourText(n, language2) {
   const where = n.position === void 0 ? "" : `(${n.position === "preface" ? PREFACE_WORDS[language2] : n.position}) `;
-  const sentence = neighbourSentence(n.summary);
-  return `${where}${safe(n.title, 120)}${sentence ? ` \u2014 ${sentence}` : ""}`;
+  const sentence2 = neighbourSentence(n.summary);
+  return `${where}${safe(n.title, 120)}${sentence2 ? ` \u2014 ${sentence2}` : ""}`;
 }
 function composeCardPrompt(plan, language2) {
   var _a2;
@@ -14722,13 +14731,13 @@ function sentencesOf(text10) {
   return text10.replace(/\r\n?/g, "\n").split("\n").flatMap((line3) => {
     var _a2;
     return (_a2 = line3.match(/[^。！？!?]*?(?:[。！？!?]+|\.(?=\s|$)|$)/gu)) != null ? _a2 : [];
-  }).map((sentence) => sentence.trim()).filter(Boolean);
+  }).map((sentence2) => sentence2.trim()).filter(Boolean);
 }
 function researchVoiceSentences(body) {
-  return sentencesOf(body).filter((sentence) => researchVoiceHits(sentence).length);
+  return sentencesOf(body).filter((sentence2) => researchVoiceHits(sentence2).length);
 }
-function isProcessNoteSentence(sentence) {
-  return processVoiceHits(sentence).length > 0 && !/[\p{Nd}[\]()（）*`]|https?:/u.test(sentence);
+function isProcessNoteSentence(sentence2) {
+  return processVoiceHits(sentence2).length > 0 && !/[\p{Nd}[\]()（）*`]|https?:/u.test(sentence2);
 }
 var DOT = /[・·•‧･]/gu;
 var HAN_NAME = /^[\p{Script=Han}\-－‐]+(?:・[\p{Script=Han}\-－‐]+)+$/u;
@@ -14776,8 +14785,8 @@ function headingNamesChapter(heading, others) {
     return !!t2 && (key4.includes(t2) || lead.length >= 2 && t2.includes(lead));
   });
 }
-var sentenceNamesChapters = (sentence, others) => {
-  const key4 = titleKey(sentence);
+var sentenceNamesChapters = (sentence2, others) => {
+  const key4 = titleKey(sentence2);
   return others.filter((title) => titleKey(title) && key4.includes(titleKey(title)));
 };
 var INTRO_PREVIEW_MAX = 2;
@@ -14791,8 +14800,8 @@ function introPreviewHits(body, others) {
       if (named) over.add(named);
       continue;
     }
-    for (const sentence of sentencesOf(line3))
-      for (const title of sentenceNamesChapters(sentence, others)) counts.set(title, ((_a2 = counts.get(title)) != null ? _a2 : 0) + 1);
+    for (const sentence2 of sentencesOf(line3))
+      for (const title of sentenceNamesChapters(sentence2, others)) counts.set(title, ((_a2 = counts.get(title)) != null ? _a2 : 0) + 1);
   }
   for (const [title, n] of counts) if (n > INTRO_PREVIEW_MAX) over.add(title);
   return others.filter((title) => over.has(title));
@@ -15807,15 +15816,15 @@ function dropProcessNotes(detail) {
   const out = [];
   for (let i = 0; i < lines.length; i++) {
     const line3 = lines[i];
-    const sentences = region[i] && !fenced[i] && !HEADING.test(line3) ? sentencesOf(line3) : [];
-    if (!sentences.some(isProcessNoteSentence)) {
+    const sentences2 = region[i] && !fenced[i] && !HEADING.test(line3) ? sentencesOf(line3) : [];
+    if (!sentences2.some(isProcessNoteSentence)) {
       out.push(line3);
       continue;
     }
     const prefix = (_b2 = (_a2 = /^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?/.exec(line3)) == null ? void 0 : _a2[0]) != null ? _b2 : "";
     const rest = sentencesOf(line3.slice(prefix.length));
     removed.push(...rest.filter(isProcessNoteSentence));
-    const kept = rest.filter((sentence) => !isProcessNoteSentence(sentence)).join(/\p{Script=Han}/u.test(line3) ? "" : " ");
+    const kept = rest.filter((sentence2) => !isProcessNoteSentence(sentence2)).join(/\p{Script=Han}/u.test(line3) ? "" : " ");
     if (kept) out.push(prefix + kept);
     else if (i + 1 < lines.length && !lines[i + 1].trim() && (!out.length || !out[out.length - 1].trim())) i++;
   }
@@ -15848,7 +15857,7 @@ function dropVoiceSentences(text10, stats) {
     }
     const prefix = (_b2 = (_a2 = /^[ \t>]*(?:(?:[-*+]|\d+[.)])[ \t]+)?/.exec(line3)) == null ? void 0 : _a2[0]) != null ? _b2 : "";
     const rest = sentencesOf(line3.slice(prefix.length));
-    const kept = rest.filter((sentence) => !(researchVoiceHits(sentence).length && ++stats.voice));
+    const kept = rest.filter((sentence2) => !(researchVoiceHits(sentence2).length && ++stats.voice));
     if (kept.length === rest.length) {
       stats.voice++;
       continue;
@@ -15937,10 +15946,10 @@ var BOOK_AUTHOR_RULES = [
   "- Write the chapter as the role named in the brief says.",
   "- The chapter text itself is required and comes first in the Detail, before any sources or notes sections: a result with only sources and notes, and no chapter text, is invalid. Do the research, then write the chapter in full.",
   "- Open with this chapter's own scene, question or claim, as the brief's entry says. Do not open by recapping or pointing back to the previous chapter (no opening such as \u300C\u4E0A\u4E00\u7AE0\u2026\u300D\u300C\u524D\u4E00\u7AE0\u2026\u300D).",
-  "- Somewhere after the opening (not as the opening), one paragraph gathers the earlier ideas named in the brief's line about the previous chapter or section (\u4E0A\u4E00\u7AE0 / \u524D\u4E00\u7BC0 / Previous chapter / Previous section; skip this when that line says there is none), in the reader's terms, and shows why they lead to this chapter's new idea: a few sentences, without retelling the earlier chapters' stories.",
+  "- Somewhere after the opening (not as the opening), one paragraph gathers the earlier ideas named in the brief's line about the previous chapter or section (\u4E0A\u4E00\u7AE0 / \u524D\u4E00\u7BC0 / Previous chapter / Previous section; skip it when that line says there is none) and shows, in the reader's terms, why they lead to this chapter's new idea: a few sentences, never a retelling of the earlier stories.",
   "- Call the parts of the book chapters, never cards (no \u300C\u5361\u7247\u300D\u300C\u4E0B\u4E00\u5F35\u300D in the text).",
   "- End the last paragraph on the open question the brief's handoff leaves, stated through this chapter's own material and what is at stake. Do not name, number or announce the next chapter or section (no \u300C\u4E0B\u4E00\u7AE0\u2026\u300D\u300C\u4E0B\u4E00\u7BC0\u2026\u300D\u300C\u5C31\u5F9E\u9019\u88E1\u8AC7\u8D77\u300D). Only the book's last card (a brief with neither a next section nor a next chapter) closes the whole book instead: it ends by answering the preface's question from the ideas the chapters built, as the brief's handoff says, not by a new topic or a generic outlook.",
-  "- The closing sentence belongs to the last paragraph of the chapter's own text, before any open-questions, sources or notes sections the template adds; those sections are not the chapter's ending.",
+  "- That closing sentence is the end of the chapter's own text: it comes before any open-questions, sources or notes sections the template adds, and those sections are not the chapter's ending.",
   ...BOOK_VOICE_RULES,
   "- An intro chapter is a guide only: at most one or two sentences of preview for each later chapter, no section of its own for a later chapter, and none of a later chapter's details (numbers, steps, tables, stories, examples). Its own substance is what the later chapters show together and why, as the brief's covers says, not a retelling of them.",
   "- A body chapter or section does not preview the whole book's route or list the other chapters; that is the preface's job.",
@@ -47634,9 +47643,9 @@ var QUANTITY = new RegExp(
   String.raw`(第)?(至少|最少|起碼|起码|超過|超过|不到|最多|頂多|顶多)?\s*(${NUM2})(?:\s*(?:到|至|~|～|-|–|—|－)\s*(${NUM2}))?\s*(?:(個多|个多|個|个|多)\s*)?(小時|小时|鐘頭|钟头|公分|厘米|釐米|公釐|毫米|公尺|毫升|公升|升|公斤|公克|克|月|週|周|星期|天|年|度|cm|mm|ml|kg)(以上|以下|以內|以内|之內|之内)?`,
   "giu"
 );
-function quantitiesIn(sentence) {
+function quantitiesIn(sentence2) {
   const out = [];
-  for (const match of sentence.matchAll(QUANTITY)) {
+  for (const match of sentence2.matchAll(QUANTITY)) {
     const [said, ordinal, before, first, second, counter, unitWord, after] = match;
     if (ordinal) continue;
     const unit2 = UNIT_CLASS[unitWord.toLowerCase()];
@@ -47780,19 +47789,19 @@ var shared = (x, y) => [...x].filter((word) => y.has(word)).length;
 var disjoint = (x, y) => x.high < y.low || y.high < x.low;
 var normal = (value) => value.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, "");
 function numericFindings(chapters, known = []) {
-  const sentences = chapters.flatMap((chapter, at) => sentencesOf2(at, chapter.text));
+  const sentences2 = chapters.flatMap((chapter, at) => sentencesOf2(at, chapter.text));
   const subjects = subjectsOf(chapters);
-  const named = new Map(sentences.map((sentence) => [sentence, subjects.filter((name2) => sentence.text.includes(name2))]));
+  const named = new Map(sentences2.map((sentence2) => [sentence2, subjects.filter((name2) => sentence2.text.includes(name2))]));
   const otherThings = (x, y) => {
     var _a2, _b2;
     const [sx, sy] = [(_a2 = named.get(x)) != null ? _a2 : [], (_b2 = named.get(y)) != null ? _b2 : []];
     return sx.length > 0 && sy.length > 0 && !sx.some((name2) => sy.includes(name2));
   };
   const best = /* @__PURE__ */ new Map();
-  for (let i = 0; i < sentences.length; i++) {
-    for (let j = i + 1; j < sentences.length; j++) {
-      const x = sentences[i];
-      const y = sentences[j];
+  for (let i = 0; i < sentences2.length; i++) {
+    for (let j = i + 1; j < sentences2.length; j++) {
+      const x = sentences2[i];
+      const y = sentences2[j];
       if (x.chapter === y.chapter && x.paragraph === y.paragraph || ![...x.units].some((unit2) => y.units.has(unit2)))
         continue;
       const score = shared(x.about, y.about);
@@ -47831,12 +47840,12 @@ function directionFindings(chapters) {
   chapters.forEach((chapter, self) => {
     for (const paragraph of chapter.text.split(/\n\s*\n/)) {
       if (SKIP_LINE.test(paragraph)) continue;
-      for (const sentence of paragraph.split(/(?<=[。！？!?])|\n/u)) {
-        const pointer = POINTER.exec(sentence);
+      for (const sentence2 of paragraph.split(/(?<=[。！？!?])|\n/u)) {
+        const pointer = POINTER.exec(sentence2);
         POINTER.lastIndex = 0;
         if (!pointer) continue;
         const later = pointer[1] !== void 0;
-        const hits = words2.map((list2, at) => at === self ? 0 : list2.filter((word) => sentence.includes(word)).length);
+        const hits = words2.map((list2, at) => at === self ? 0 : list2.filter((word) => sentence2.includes(word)).length);
         const most = Math.max(...hits);
         if (!most || hits.filter((n) => n === most).length > 1) continue;
         const target = hits.indexOf(most);
@@ -47847,7 +47856,7 @@ function directionFindings(chapters) {
           kind: "direction",
           a: chapter.id,
           b: chapters[target].id,
-          claimA: singleLine(sentence.replace(/^[\s>*-]*(?:\[[ xX]\]\s*)?/, ""), QUOTE_MAX),
+          claimA: singleLine(sentence2.replace(/^[\s>*-]*(?:\[[ xX]\]\s*)?/, ""), QUOTE_MAX),
           claimB: pointer[0],
           suggestion: `${side}\u7684\u7B2C${target + 1}\u7AE0`
         });
@@ -47866,11 +47875,11 @@ function verbatimQuote(claim2, text10) {
   for (const line3 of text10.split("\n")) {
     if (SKIP_LINE.test(line3)) continue;
     for (const part of line3.split(/(?<=[。！？!?])/u)) {
-      const sentence = part.replace(/^[\s>*-]*(?:\[[ xX]\]\s*)?/, "").trim();
-      const own2 = quantitiesIn(sentence);
+      const sentence2 = part.replace(/^[\s>*-]*(?:\[[ xX]\]\s*)?/, "").trim();
+      const own2 = quantitiesIn(sentence2);
       if (!amounts.some((x) => own2.some((y) => x.unit === y.unit && x.low === y.low && x.high === y.high))) continue;
-      const score = shared(words2, topicWords(sentence));
-      if (!best || score > best.score) best = { sentence, score };
+      const score = shared(words2, topicWords(sentence2));
+      if (!best || score > best.score) best = { sentence: sentence2, score };
     }
   }
   return best && singleLine(best.sentence, QUOTE_MAX);
@@ -48479,21 +48488,21 @@ function factExtract(text10) {
       continue;
     }
     tableHead = "";
-    const sentences = line3.split(SENTENCE).map((sentence) => sentence.trim()).filter(Boolean);
+    const sentences2 = line3.split(SENTENCE).map((sentence2) => sentence2.trim()).filter(Boolean);
     const kept = /* @__PURE__ */ new Set();
-    sentences.forEach((sentence, at) => {
-      if (!FACT.test(sentence)) return;
+    sentences2.forEach((sentence2, at) => {
+      if (!FACT.test(sentence2)) return;
       if (at > 0) kept.add(at - 1);
       kept.add(at);
     });
     if (!kept.size) continue;
     lead();
     let run = "";
-    sentences.forEach((sentence, at) => {
+    sentences2.forEach((sentence2, at) => {
       if (!kept.has(at)) {
         if (run) out.push(run);
         run = "";
-      } else run += sentence;
+      } else run += sentence2;
     });
     if (run) out.push(run);
   }
@@ -48585,12 +48594,12 @@ function removedChapterRefs(data, chapters) {
     if (Array.from(title).length < 2 || present.has(title)) continue;
     for (const chapter of chapters) {
       if (!chapter.text.includes(title)) continue;
-      const sentence = (_g = (_f = chapter.text.split(QUOTE_SPLIT).find((part) => part.includes(title))) == null ? void 0 : _f.trim()) != null ? _g : title;
+      const sentence2 = (_g = (_f = chapter.text.split(QUOTE_SPLIT).find((part) => part.includes(title))) == null ? void 0 : _f.trim()) != null ? _g : title;
       out.push({
         kind: "removed",
         a: chapter.id,
         b: id,
-        claimA: Array.from(sentence).slice(0, REMOVED_QUOTE_MAX).join(""),
+        claimA: Array.from(sentence2).slice(0, REMOVED_QUOTE_MAX).join(""),
         claimB: title,
         suggestion: ""
       });
@@ -49838,6 +49847,9 @@ var card_plan_images_role_default = "- images: the picture plan for this chapter
 // core/steps/book-pipeline/card-plan-images-owner.md
 var card_plan_images_owner_default = "- images: the picture plan for this chapter. The owner set the number of pictures per chapter in the whole-book settings: give {{count}} for this chapter, whatever its role (an introduction, a closing or a gallery chapter too). Plan fewer than {{min}} only when the chapter truly has nothing to picture. Spread them over the points the chapter makes, one picture per point, each beside something the chapter's text talks about. Each slot has: kind (the kind of picture, for example painting, photograph, map, diagram, portrait; a few words), explains (what the picture shows or explains, one sentence that names something the chapter's text talks about), anchor (where it sits: the paragraph or point in the chapter it goes beside) and search (2 to 4 English search terms for a Wikimedia Commons file search, a few words each, most specific first: the work's or object's usual English name, the artist or person, the place; always in English, whatever the book's language). Do not number the slots. Do not write image links or addresses; a picture is found later.\n";
 
+// core/steps/book-pipeline/card-plan-continuity.md
+var card_plan_continuity_default = "[parent]\nChapter this section belongs to (JSON object):\n\n[next-chapter]\nNext chapter, which this section's handoff leads to (JSON object):\n\n[own]\nits entry grows from its own subject and does not pick up or retell the previous card.\n\n[section-next-chapter]\nAs the last section of the chapter, its handoff leaves the open question the next chapter (the one given below) takes up, without naming it.\n\n[section-next]\nIts handoff leaves the open question the next section takes up, without naming it.\n\n[section-last]\nIt is the last section of the last chapter, so it closes the book as the handoff rule says for the last card.\n\n[preface]\nContinuity: this is the preface; its entry opens the book, and its handoff leaves the open question chapter 1 takes up, without naming it.\n\n[chapter-first]\nContinuity: the entry opens the book's first chapter.\n\n[chapter-sections]\nThis chapter has sections, so its handoff leaves the open question its own first section takes up.\n\n[chapter-next]\nIts handoff leaves the open question the next chapter takes up, without naming it.\n\n[chapter-last]\nThis chapter has no sections and is the last, so it closes the book as the handoff rule says for the last card.\n";
+
 // core/steps/book-pipeline/card-plan.ts
 var placeText = (p) => p.kind === "preface" ? "preface" : p.kind === "chapter" ? `chapter ${p.chapter}` : `section ${p.sectionIndex} of ${p.sectionCount} in chapter ${p.chapter}`;
 var MAX_CHECKLIST = 8;
@@ -49980,15 +49992,21 @@ var neighbour = (n) => JSON.stringify(
     summary: cap(n.summary, 500)
   } : null
 );
+var sentences = new Map(
+  card_plan_continuity_default.split(/^\[([a-z-]+)\]\n/m).slice(1).reduce((all, part, at, parts) => at % 2 ? all : [...all, [part, parts[at + 1].trim()]], [])
+);
+var sentence = (key4) => {
+  var _a2;
+  return (_a2 = sentences.get(key4)) != null ? _a2 : "";
+};
 var relations = (request) => {
   const parts = [];
   if (request.parent)
     parts.push(
-      `Chapter this section belongs to (JSON object):
+      `${sentence("parent")}
 ${JSON.stringify({ place: placeText({ kind: "chapter", chapter: request.parent.position }), title: cap(request.parent.title, 200) })}`
     );
-  if (request.nextChapter)
-    parts.push(`Next chapter, which this section's handoff leads to (JSON object):
+  if (request.nextChapter) parts.push(`${sentence("next-chapter")}
 ${neighbour(request.nextChapter)}`);
   return parts.length ? `
 
@@ -49996,17 +50014,16 @@ ${parts.join("\n\n")}` : "";
 };
 var continuity = (request, hasChildren) => {
   const kind = request.card.kind;
-  const own2 = "its entry grows from its own subject and does not pick up or retell the previous card.";
+  const own2 = sentence("own");
   if (kind === "section")
     return [
       `Continuity: ${own2}`,
-      request.nextChapter ? "As the last section of the chapter, its handoff leaves the open question the next chapter (the one given below) takes up, without naming it." : request.next ? "Its handoff leaves the open question the next section takes up, without naming it." : "It is the last section of the last chapter, so it closes the book as the handoff rule says for the last card."
+      request.nextChapter ? sentence("section-next-chapter") : request.next ? sentence("section-next") : sentence("section-last")
     ].join(" ");
-  if (kind === "preface")
-    return "Continuity: this is the preface; its entry opens the book, and its handoff leaves the open question chapter 1 takes up, without naming it.";
+  if (kind === "preface") return sentence("preface");
   return [
-    request.previous ? `Continuity: ${own2}` : "Continuity: the entry opens the book's first chapter.",
-    hasChildren ? "This chapter has sections, so its handoff leaves the open question its own first section takes up." : request.next ? "Its handoff leaves the open question the next chapter takes up, without naming it." : "This chapter has no sections and is the last, so it closes the book as the handoff rule says for the last card."
+    request.previous ? `Continuity: ${own2}` : sentence("chapter-first"),
+    hasChildren ? sentence("chapter-sections") : request.next ? sentence("chapter-next") : sentence("chapter-last")
   ].join(" ");
 };
 var INSTRUCTION_MAX = 1300;
@@ -54675,8 +54692,8 @@ function proofFixInstruction(items, checklist, length, voice = []) {
   const voiceIntro = "These sentences of the chapter attribute a fact to a vague source or carry research voice (JSON strings, each a whole sentence): for each, @@replace the whole line that holds it, copied exactly, with that line stating the fact as the book's own (or without the sentence); the source belongs only in the sources section. ";
   const quoted2 = [];
   let voiceRoom = FIX_VOICE_MAX - voiceIntro.length;
-  for (const sentence of voiceUnmet ? voice : []) {
-    const point = JSON.stringify(oneLine2(sentence, FIX_VOICE_SENTENCE_MAX));
+  for (const sentence2 of voiceUnmet ? voice : []) {
+    const point = JSON.stringify(oneLine2(sentence2, FIX_VOICE_SENTENCE_MAX));
     if (point.length + 1 > voiceRoom) continue;
     quoted2.push(point);
     voiceRoom -= point.length + 1;
@@ -55080,7 +55097,8 @@ var BookPipelineRuns = class {
   /** The live drive's numbers, or what the last drive left; undefined when this plugin session never ran the map. */
   getProgress(mapPath) {
     const drive = this.drives.get(mapPath);
-    if (drive) return drive.store ? this.progressOf(drive, true) : void 0;
+    if (drive)
+      return drive.store ? { ...this.progressOf(drive, true), ...this.gateWaiting.has(mapPath) ? { gateWaiting: true } : {} } : void 0;
     return this.last.get(mapPath);
   }
   /** Starts a new run (writes `bookPipeline` to the map file) and drives it until it ends, pauses or reaches a gate. */
@@ -55941,10 +55959,11 @@ var BookPipelineRuns = class {
   }
   /**
    * A gate button entry. A press made while the drive that reached the gate is still ending waits for that drive and then applies as
-   * it would have (a stopped, failed or disposed drive: the press does nothing, "cancelled"); a press while a different operation runs,
+   * it would have (a stopped, failed or disposed drive: the press does nothing, "gate_cancelled"); a press while a different operation runs,
    * or a second press while one waits, is refused "busy". Every press leaves one short trace line in the run (action, outcome, wait).
    */
   async gateEnter(action, mapPath, setup, early = false) {
+    var _a2, _b2, _c, _d;
     const runId = await this.ports.readMap(mapPath).then(
       (map) => {
         const read = readBookPipeline(map);
@@ -55958,15 +55977,17 @@ var BookPipelineRuns = class {
       const drive = this.drives.get(mapPath);
       if (drive && !this.gateWaiting.has(mapPath) && this.windingDownAtGate(drive)) {
         this.gateWaiting.add(mapPath);
+        (_b2 = (_a2 = this.ports).progressed) == null ? void 0 : _b2.call(_a2, mapPath);
         try {
           await drive.done.catch(() => void 0);
         } finally {
           this.gateWaiting.delete(mapPath);
+          (_d = (_c = this.ports).progressed) == null ? void 0 : _d.call(_c, mapPath);
         }
         waited = Date.now() - startedAt;
         if (this.disposed) throw new BookPipelineRunError("disposed");
         if (drive.stopRequested || drive.fatal !== void 0 || this.dead(drive))
-          throw new BookPipelineRunError("cancelled");
+          throw new BookPipelineRunError("gate_cancelled");
       }
       await this.enter(mapPath, setup, early);
       await this.traceGate(mapPath, runId, action, "applied", waited, true);
@@ -57277,11 +57298,11 @@ var BookPipelineRuns = class {
     const structure2 = this.structureOf(drive, order);
     const around = structure2.neighboursOf(nodeId);
     const kind = (_b2 = (_a2 = structure2.placeOf(nodeId)) == null ? void 0 : _a2.kind) != null ? _b2 : "chapter";
-    const side = (id) => {
+    const side = (id, numbered = kind !== "section") => {
       const other = id === void 0 ? void 0 : drive.cards.get(id);
       if (!other || id === void 0) return void 0;
       const place = structure2.placeOf(id);
-      const position = kind === "section" ? void 0 : (place == null ? void 0 : place.kind) === "preface" ? "preface" : place == null ? void 0 : place.chapter;
+      const position = !numbered ? void 0 : (place == null ? void 0 : place.kind) === "preface" ? "preface" : place == null ? void 0 : place.chapter;
       return {
         ...position === void 0 ? {} : { position },
         title: other.title,
@@ -57290,7 +57311,7 @@ var BookPipelineRuns = class {
     };
     const previous = side(around.previous);
     const next = side(around.next);
-    const nextChapter = side(around.nextChapter);
+    const nextChapter = side(around.nextChapter, true);
     const parentCard = around.parent === void 0 ? void 0 : drive.cards.get(around.parent);
     const parentChapter = around.parent === void 0 ? void 0 : (_c = structure2.placeOf(around.parent)) == null ? void 0 : _c.chapter;
     const children = this.childCardsOf(drive, nodeId);
@@ -58606,6 +58627,7 @@ function bookBarState(data, progress, stageOf, mapIds, structure2, titleOf) {
     } : {},
     ...current ? { current } : {},
     ...rerunning ? { rerun: true } : {},
+    ...(progress == null ? void 0 : progress.gateWaiting) ? { gateWaiting: true } : {},
     ...mapChange ? { mapChange } : {},
     ...gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {},
     ...reordered ? { mapChange: reordered } : {},
@@ -58781,6 +58803,11 @@ function renderBookBar(parent, state, actions) {
     );
   const progressText = bookProgressText(state);
   renderProgressLine(bar, state, progressText);
+  if (state.gateWaiting)
+    bar.createDiv("vam-book-now vam-book-gate-waiting").createSpan({
+      cls: "vam-book-now-text",
+      text: t("ui.book_gate_waiting")
+    });
   const track = bar.createDiv("vam-book-track");
   track.setAttr("role", "progressbar");
   track.setAttr("aria-label", t("ui.book_bar_label"));
@@ -58830,8 +58857,8 @@ function bookProgressText(state) {
   const at = Math.min((_b2 = (_a2 = state.current) == null ? void 0 : _a2.chapter) != null ? _b2 : settledCount(state) + 1, Math.max(total2, 1));
   if (state.mode === "writing")
     return ((_c = state.current) == null ? void 0 : _c.fix) ? fixLine(state, settledCount(state), total2) : t("ui.book_progress_line_write_0_1", at, total2);
-  const sentence = state.mode === "planning" ? !state.globalDone || ((_d = state.current) == null ? void 0 : _d.step) === "global" ? t("ui.book_progress_line_global") : t(state.structure ? "ui.book_progress_line_plan_cards_0_1" : "ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
-  return `${sentence}${t("ui.book_progress_line_sep")}${t("ui.book_progress_line_done_0_1", settledCount(state), total2)}`;
+  const sentence2 = state.mode === "planning" ? !state.globalDone || ((_d = state.current) == null ? void 0 : _d.step) === "global" ? t("ui.book_progress_line_global") : t(state.structure ? "ui.book_progress_line_plan_cards_0_1" : "ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
+  return `${sentence2}${t("ui.book_progress_line_sep")}${t("ui.book_progress_line_done_0_1", settledCount(state), total2)}`;
 }
 function renderProgressLine(bar, state, text10) {
   const running2 = state.mode === "planning" || state.mode === "writing";
@@ -58869,6 +58896,7 @@ var REFUSAL_KEY = {
   notes_busy: "ui.book_refused_notes_busy",
   drive_running: "ui.book_refused_drive_running",
   cancelled: "ui.book_refused_cancelled",
+  gate_cancelled: "ui.book_refused_gate_cancelled",
   stale: "ui.book_refused_stale",
   backup_failed: "ui.book_refused_backup_failed",
   text_changed: "ui.book_refused_text_changed",
@@ -58927,6 +58955,7 @@ var REASON_KEY = {
 };
 var PLAIN_KEY = {
   "write:no_body": "ui.book_plain_write_no_body",
+  "write:author_failed": "ui.book_plain_write_author_failed",
   "write:hand_edited": "ui.book_plain_write_hand_edited",
   "proof:no_body": "ui.book_plain_proof_no_body",
   "proof:empty_list": "ui.book_plain_proof_empty_list",
@@ -58942,12 +58971,12 @@ function bookIssueText(issue2) {
   const carried = splitCarriedIssue(issue2);
   if (carried) return joinReasons([bookIssueText(carried.failure), bookIssueText(carried.carried)]);
   const pictures = splitPictureIssue(issue2);
-  const sentences = pictureSentences(pictures);
-  if (sentences.length) return joinReasons(pictures.rest ? [bookIssueText(pictures.rest), ...sentences] : sentences);
+  const sentences2 = pictureSentences(pictures);
+  if (sentences2.length) return joinReasons(pictures.rest ? [bookIssueText(pictures.rest), ...sentences2] : sentences2);
   const { rest, length } = splitLengthIssue(issue2);
   if (!length) return plainIssueText(issue2);
-  const sentence = lengthText(length);
-  return rest ? joinReasons([plainIssueText(rest), sentence]) : sentence;
+  const sentence2 = lengthText(length);
+  return rest ? joinReasons([plainIssueText(rest), sentence2]) : sentence2;
 }
 function shortfallText(shortfall) {
   return t("ui.book_reason_images_under_0_1", String(shortfall.placed), String(shortfall.minimum));
@@ -59081,8 +59110,8 @@ var PROBLEM_RULES = [
           return t("ui.book_reason_chapter_ref_0_1_2_3", item.own, item.theirs, item.otherTitle, item.suggestion);
         const own2 = t(item.ownLoose ? "ui.book_paraphrase_0" : "ui.book_quote_0", item.own);
         const theirs = t(item.theirsLoose ? "ui.book_paraphrase_0" : "ui.book_quote_0", item.theirs);
-        const sentence = item.other === card.id ? t("ui.book_reason_inconsistent_self_0_1", own2, theirs) : t("ui.book_reason_inconsistent_0_1_2", item.otherTitle, own2, theirs);
-        return item.suggestion ? `${sentence}${t("ui.book_panel_lead_sep")}${item.suggestion}` : sentence;
+        const sentence2 = item.other === card.id ? t("ui.book_reason_inconsistent_self_0_1", own2, theirs) : t("ui.book_reason_inconsistent_0_1_2", item.otherTitle, own2, theirs);
+        return item.suggestion ? `${sentence2}${t("ui.book_panel_lead_sep")}${item.suggestion}` : sentence2;
       }) : void 0;
     }
   },
@@ -59120,12 +59149,12 @@ function reasonParts(issue2, proof, all) {
   const carried = splitCarriedIssue(issue2);
   if (carried) return [bookIssueText(carried.failure), ...reasonParts(carried.carried, proof, all)];
   const pictures = splitPictureIssue(issue2);
-  const sentences = pictureSentences(pictures);
-  if (sentences.length) return pictures.rest ? [...reasonParts(pictures.rest, proof, all), ...sentences] : sentences;
+  const sentences2 = pictureSentences(pictures);
+  if (sentences2.length) return pictures.rest ? [...reasonParts(pictures.rest, proof, all), ...sentences2] : sentences2;
   const { rest, length } = splitLengthIssue(issue2);
   if (length) {
-    const sentence = lengthText(length);
-    return rest ? [...reasonParts(rest, proof, all), sentence] : [sentence];
+    const sentence2 = lengthText(length);
+    return rest ? [...reasonParts(rest, proof, all), sentence2] : [sentence2];
   }
   if (!/^proof unmet/.test(issue2.trim())) return [bookIssueText(issue2)];
   if (/facts_unverified/.test(issue2)) return [t("ui.book_reason_all_facts_unverified")];
@@ -62590,10 +62619,10 @@ function localStamp(date) {
 function chatFirstSentence(message) {
   const text10 = skipBlank(message);
   const end = text10.search(SENTENCE_END2);
-  const sentence = end >= 0 ? text10.slice(0, end) : text10;
+  const sentence2 = end >= 0 ? text10.slice(0, end) : text10;
   let cut = "";
   let count4 = 0;
-  for (const part of graphemesOf(sentence)) {
+  for (const part of graphemesOf(sentence2)) {
     if (count4 === CHAT_NAME_LIMIT) break;
     cut += part;
     count4++;
@@ -74239,12 +74268,12 @@ var TopicChatRun = class {
       const problems = lines.filter(
         (line3, index) => line3.status !== "done" && (index >= result.actions.length || verdicts[index] === "ok")
       );
-      let sentence = result.reply.trim() || lines.map((line3) => line3.text).join("\n");
-      if (problems.length) sentence = [sentence, ...problems.map((line3) => line3.text)].filter(Boolean).join("\n\n");
-      if (refused) sentence = [sentence, t("ui.topic_chat_out_of_scope")].filter(Boolean).join("\n\n");
-      if (!sentence) sentence = t("ui.topic_chat_result_unknown");
+      let sentence2 = result.reply.trim() || lines.map((line3) => line3.text).join("\n");
+      if (problems.length) sentence2 = [sentence2, ...problems.map((line3) => line3.text)].filter(Boolean).join("\n\n");
+      if (refused) sentence2 = [sentence2, t("ui.topic_chat_out_of_scope")].filter(Boolean).join("\n\n");
+      if (!sentence2) sentence2 = t("ui.topic_chat_result_unknown");
       if (controller.signal.aborted) this.settle(entry, t("ui.topic_chat_stopped"), live2, false, "stopped", true);
-      else this.settle(entry, sentence, live2, true, problems.length ? "failed" : "done", true);
+      else this.settle(entry, sentence2, live2, true, problems.length ? "failed" : "done", true);
     } catch (error) {
       end();
       const stopped = controller.signal.aborted;
@@ -74259,7 +74288,7 @@ var TopicChatRun = class {
     }
   }
   /** Ends a run: the window (if open) shows one sentence; a closed window gets a Notice when `notice` says the task did not tell it. */
-  settle(entry, sentence, live2, notice, status, markdown = false, plan = false) {
+  settle(entry, sentence2, live2, notice, status, markdown = false, plan = false) {
     if (!this.holdsSteers(entry)) entry.session.running = false;
     entry.steerEnd = { status, plan };
     entry.session.progress = void 0;
@@ -74272,11 +74301,11 @@ var TopicChatRun = class {
         id: turnId,
         at: (/* @__PURE__ */ new Date()).toISOString(),
         status,
-        text: sentence
+        text: sentence2
       });
-    entry.session.turns.push({ role: "ai", text: sentence, ...markdown ? { markdown: true } : {} });
+    entry.session.turns.push({ role: "ai", text: sentence2, ...markdown ? { markdown: true } : {} });
     this.ports.notify(entry);
-    if (notice && !this.ports.window(entry)) this.ports.notice(sentence);
+    if (notice && !this.ports.window(entry)) this.ports.notice(sentence2);
   }
   /** True when the task has additions of any kind: then `running` stays on until they are settled (the gap after the reply). */
   holdsSteers(entry) {
@@ -75045,6 +75074,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     __publicField(this, "paintChildIndex", null);
     /** The map's nodes by id and their depths while a paint draws its cards; null otherwise. */
     __publicField(this, "paintCardIndex", null);
+    /** The book structure computed once for a whole paint (every card asks for its place); null outside a paint. */
+    __publicField(this, "paintBookStructure", null);
     /** Card measurements waiting for the paint to finish building every card; null outside a paint. */
     __publicField(this, "pendingCardFits", null);
     __publicField(this, "cardChecks", /* @__PURE__ */ new Map());
@@ -75498,6 +75529,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
     this.renderingCard = true;
     this.paintChildIndex = childIndex(this.map.nodes);
     this.paintCardIndex = cardIndex(this.map.nodes);
+    this.paintBookStructure = { value: this.bookStructureNow() };
     this.pendingCardFits = fits;
     try {
       for (const id of ids2) {
@@ -75515,6 +75547,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian38.Ite
       this.renderingCard = false;
       this.paintChildIndex = null;
       this.paintCardIndex = null;
+      this.paintBookStructure = null;
       this.pendingCardFits = null;
     }
     for (const fit of fits) fit();
@@ -85057,6 +85090,7 @@ ${t("ui.book_role_running_suffix")}` : first);
     this.renderingCard = true;
     this.paintChildIndex = this.map ? childIndex(this.map.nodes) : null;
     this.paintCardIndex = this.map ? cardIndex(this.map.nodes) : null;
+    this.paintBookStructure = { value: this.bookStructureNow() };
     const fits = [];
     this.pendingCardFits = fits;
     try {
@@ -85065,6 +85099,7 @@ ${t("ui.book_role_running_suffix")}` : first);
       this.renderingCard = false;
       this.paintChildIndex = null;
       this.paintCardIndex = null;
+      this.paintBookStructure = null;
       this.pendingCardFits = null;
     }
     for (const fit of fits) fit();
@@ -85200,7 +85235,7 @@ ${t("ui.book_role_running_suffix")}` : first);
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J;
     if (!this.stageEl) return;
     const index = (_c = this.paintCardIndex) != null ? _c : cardIndex((_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []);
     const node = (_d = index.node(shownNode.id)) != null ? _d : shownNode;
@@ -85292,11 +85327,7 @@ ${t("ui.book_role_running_suffix")}` : first);
         cardRevision(read.data, node.id)
       );
     })();
-    const bookPlace = note && this.hasBookPipeline() ? (() => {
-      var _a3;
-      const read = this.map ? readBookPipeline(this.map) : void 0;
-      return (read == null ? void 0 : read.kind) === "usable" ? (_a3 = this.bookStructureOf(effectiveOrder(read.data))) == null ? void 0 : _a3.placeOf(node.id) : void 0;
-    })() : void 0;
+    const bookPlace = note && this.hasBookPipeline() ? (_l = this.paintBookStructure ? this.paintBookStructure.value : this.bookStructureNow()) == null ? void 0 : _l.placeOf(node.id) : void 0;
     const bookCard = bookCardView(note != null ? note : {}, bookDone, bookStale, this.isBookCardResolved(node.id), bookPlace);
     if (!loading) {
       const statusText = research ? this.researchStageText(research) : merging ? t("ui.merging") : active ? t("ui.ai_running") : queued ? t("ui.research_queued") : (note == null ? void 0 : note.status) === "completed" ? t("ui.researched") : note ? topicStatusLabel(note.status, this.plugin.settings.language) : t("ui.note_missing");
@@ -85314,7 +85345,7 @@ ${t("ui.book_role_running_suffix")}` : first);
           header3.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
       } else if (!note || note.status !== "idea" || active || queued) {
         const chip = header3.createSpan({
-          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_l = note == null ? void 0 : note.status) != null ? _l : "error"}`,
+          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_m = note == null ? void 0 : note.status) != null ? _m : "error"}`,
           text: statusText
         });
         if (active) chip.setAttr("role", "status");
@@ -85340,7 +85371,7 @@ ${t("ui.book_role_running_suffix")}` : first);
         rerun.addClass("vam-node-rerun");
         (0, import_obsidian38.setIcon)(rerun.createSpan({ cls: "vam-node-rerun-icon" }), "refresh-cw");
         rerun.createSpan({ text: t("ui.book_panel_rerun_card") });
-        const rerunName = t("ui.book_panel_rerun_card_0", (_m = note == null ? void 0 : note.title) != null ? _m : node.path);
+        const rerunName = t("ui.book_panel_rerun_card_0", (_n = note == null ? void 0 : note.title) != null ? _n : node.path);
         rerun.setAttr("aria-label", rerunName);
         rerun.setAttr("title", rerunName);
         if (rerunWhy) {
@@ -85355,7 +85386,7 @@ ${t("ui.book_role_running_suffix")}` : first);
         else this.labelCard(card, note.title);
       }
     }
-    const relevance = !node.aimKind && !((_n = this.map) == null ? void 0 : _n.aim) ? note == null ? void 0 : note.relevance : void 0;
+    const relevance = !node.aimKind && !((_o = this.map) == null ? void 0 : _o.aim) ? note == null ? void 0 : note.relevance : void 0;
     if (relevance) {
       const tierLabel = t(RELEVANCE_LABEL[relevance.tier]);
       card.dataset.relevance = relevance.tier;
@@ -85365,14 +85396,14 @@ ${t("ui.book_role_running_suffix")}` : first);
         tierLabel,
         t("ui.relevance_tag_label_0", tierLabel),
         (button) => this.openRelevanceMenu(node, relevance.tier, button),
-        ((_o = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _o.status) === "running"
+        ((_p = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _p.status) === "running"
       );
       if (relevance.manual) {
         const manualText = t("ui.relevance_manual_reason");
         (0, import_obsidian38.setTooltip)(tagButton, manualText);
         card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, manualText));
       }
-      const named = (_p = cardLabels.get(card)) == null ? void 0 : _p.textContent;
+      const named = (_q = cardLabels.get(card)) == null ? void 0 : _q.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
     if (argumentView) {
@@ -85385,7 +85416,7 @@ ${t("ui.book_role_running_suffix")}` : first);
       const kindText = strength && leaning ? hypothesisTagText(leaning, strength, t) : t(TOPIC_KIND_SHAPES[kind].labelKey);
       if (strength && leaning) renderHypothesisTag(header3, leaning, strength, kindText);
       else header3.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
-      const named = (_q = cardLabels.get(card)) == null ? void 0 : _q.textContent;
+      const named = (_r = cardLabels.get(card)) == null ? void 0 : _r.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     this.paintCardMarkers(card, header3, node.id);
@@ -85395,7 +85426,7 @@ ${t("ui.book_role_running_suffix")}` : first);
     this.paintCardStyle(card, note);
     if (header3) this.paintAiLock(card, header3, node);
     const errorDetails = [];
-    if ((_r = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _r.length) {
+    if ((_s = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _s.length) {
       const issue2 = header3.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
       issue2.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
@@ -85407,8 +85438,8 @@ ${t("ui.book_role_running_suffix")}` : first);
       if (failure.technical) technicalDetails.push(failure.technical);
     }
     if (batch) {
-      const currentNode = batch.currentPath ? (_s = this.map) == null ? void 0 : _s.nodes.find((item) => item.path === batch.currentPath) : void 0;
-      const currentTitle = currentNode ? (_t = this.notes.get(currentNode.id)) == null ? void 0 : _t.title : void 0;
+      const currentNode = batch.currentPath ? (_t = this.map) == null ? void 0 : _t.nodes.find((item) => item.path === batch.currentPath) : void 0;
+      const currentTitle = currentNode ? (_u = this.notes.get(currentNode.id)) == null ? void 0 : _u.title : void 0;
       const label = this.batchProgressLabel(
         t("ui.shallow_research_counts", batch.succeeded, batch.total),
         batch,
@@ -85436,15 +85467,15 @@ ${t("ui.book_role_running_suffix")}` : first);
     }
     const ownSynthesis = this.plugin.topicRuns.syntheses(this).topics.get(node.path);
     const parentNode = node.parentId ? this.mapNodeById(node.parentId) : void 0;
-    const batchChild = !!parentNode && !!((_u = this.plugin.expansionCoordinator) == null ? void 0 : _u.isRunning(parentNode.path));
-    const stoppable = this.startingTasks.has(node.path) || ((_v = this.plugin.quickExpandPending) == null ? void 0 : _v.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
+    const batchChild = !!parentNode && !!((_v = this.plugin.expansionCoordinator) == null ? void 0 : _v.isRunning(parentNode.path));
+    const stoppable = this.startingTasks.has(node.path) || ((_w = this.plugin.quickExpandPending) == null ? void 0 : _w.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
     if (stoppable && (batch == null ? void 0 : batch.status) !== "running" && !((ownSynthesis == null ? void 0 : ownSynthesis.state) === "running" && ownSynthesis.mapPath === this.path)) {
       this.button(
         header3,
         t(
           stopLabelKey(
             this.plugin.topicRuns.runKind(node.path),
-            !!((_w = this.plugin.quickExpandPending) == null ? void 0 : _w.has(node.path)),
+            !!((_x = this.plugin.quickExpandPending) == null ? void 0 : _x.has(node.path)),
             this.startingTasks.has(node.path) && this.startingExpand.has(node.path)
           )
         ),
@@ -85461,7 +85492,7 @@ ${t("ui.book_role_running_suffix")}` : first);
       });
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header3, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
-    const pendingCount = (_y = (_x = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _x.length) != null ? _y : 0;
+    const pendingCount = (_z = (_y = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _y.length) != null ? _z : 0;
     if (pendingCount && !this.selection.state.multiSelectMode)
       this.button(
         header3,
@@ -85550,11 +85581,11 @@ ${t("ui.book_role_running_suffix")}` : first);
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
     if (note) this.paintCover(card, node.path);
-    const shownTitle = loading ? this.preReadTitle(node) : argumentView ? this.argumentTitleOf(argumentView, note) : (_z = note == null ? void 0 : note.title) != null ? _z : node.path;
+    const shownTitle = loading ? this.preReadTitle(node) : argumentView ? this.argumentTitleOf(argumentView, note) : (_A = note == null ? void 0 : note.title) != null ? _A : node.path;
     const title = card.createEl("h3", { text: shownTitle, cls: "vam-card-title" });
     title.setAttr("title", shownTitle);
     title.setAttr("dir", "auto");
-    if (note && ((_A = this.inlineName) == null ? void 0 : _A.target) === "card" && this.inlineName.id === node.id) {
+    if (note && ((_B = this.inlineName) == null ? void 0 : _B.target) === "card" && this.inlineName.id === node.id) {
       title.addClass("vam-sr-only");
       this.paintCardNameEdit(card, node, note);
     }
@@ -85571,8 +85602,8 @@ ${t("ui.book_role_running_suffix")}` : first);
           requestArgumentResume(this.plugin, this.path, button, () => this.argumentBarPressed = null);
         }
       );
-    else if (textEditable && ((_B = this.inlineSummary) == null ? void 0 : _B.id) === node.id) this.paintCardSummaryEdit(card, node);
-    else if ((_C = research == null ? void 0 : research.preview) == null ? void 0 : _C.summary)
+    else if (textEditable && ((_C = this.inlineSummary) == null ? void 0 : _C.id) === node.id) this.paintCardSummaryEdit(card, node);
+    else if ((_D = research == null ? void 0 : research.preview) == null ? void 0 : _D.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
     else if (loading) {
       const bars = card.createDiv({ cls: "vam-card-loading-bars" });
@@ -85585,8 +85616,8 @@ ${t("ui.book_role_running_suffix")}` : first);
     } else if (!note || !isPlaceholder(note.summary)) {
       const summaryText3 = card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_D = note == null ? void 0 : note.summary) != null ? _D : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
-        attr: { title: (_E = note == null ? void 0 : note.summary) != null ? _E : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
+        text: (_E = note == null ? void 0 : note.summary) != null ? _E : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: (_F = note == null ? void 0 : note.summary) != null ? _F : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
       if (textEditable) summaryText3.addClass("is-inline-editable");
       if (note && bookCard.summaryPrefix && this.hasBookPipeline())
@@ -85597,9 +85628,9 @@ ${t("ui.book_role_running_suffix")}` : first);
     }
     if (note && bookCard.issueText && this.hasBookPipeline())
       card.createEl("p", { cls: "vam-card-book-issue", text: bookCard.issueText });
-    if (!argumentView && textEditable && !((_F = research == null ? void 0 : research.preview) == null ? void 0 : _F.summary) && ((_G = this.inlineSummary) == null ? void 0 : _G.id) !== node.id && isPlaceholder(note.summary))
+    if (!argumentView && textEditable && !((_G = research == null ? void 0 : research.preview) == null ? void 0 : _G.summary) && ((_H = this.inlineSummary) == null ? void 0 : _H.id) !== node.id && isPlaceholder(note.summary))
       card.createEl("p", { cls: "vam-card-summary-add", text: t("ui.card_summary_add_hint") });
-    else if (((_H = this.inlineSummary) == null ? void 0 : _H.id) === node.id && !textEditable) this.inlineSummary = null;
+    else if (((_I = this.inlineSummary) == null ? void 0 : _I.id) === node.id && !textEditable) this.inlineSummary = null;
     this.paintCardImageRelations(card, node.id);
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
@@ -85619,7 +85650,7 @@ ${t("ui.book_role_running_suffix")}` : first);
       node,
       (point, wasSelected) => this.switchTopicChat(node, point.target) || this.openCardTextEditor(point, card, node, wasSelected)
     );
-    if (!this.selection.state.multiSelectMode && !((_I = this.map) == null ? void 0 : _I.aim) && !node.aimKind) {
+    if (!this.selection.state.multiSelectMode && !((_J = this.map) == null ? void 0 : _J.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
@@ -89821,6 +89852,12 @@ ${t("ui.book_role_running_suffix")}` : first);
     });
   }
   /** The book's structure over the cards the run works on (the root is the preface); undefined without a single root. */
+  /** The structure of the current run's cards, or undefined (no book run, an unreadable one, or no single root). */
+  bookStructureNow() {
+    if (!this.map || !this.hasBookPipeline()) return void 0;
+    const read = readBookPipeline(this.map);
+    return read.kind === "usable" ? this.bookStructureOf(effectiveOrder(read.data)) : void 0;
+  }
   bookStructureOf(order) {
     const map = this.map;
     const root = map == null ? void 0 : map.nodes.find((node) => !node.parentId);
@@ -98000,9 +98037,12 @@ async function downloadCover(imageUrl, fetch, options = {}) {
   });
   const timers = [];
   let waited = false;
-  const get = async (url) => {
+  const get = async (url, method) => {
     const result = await Promise.race([
-      fetch(url, { headers }).catch(() => ({ ok: false, reason: "failed" })),
+      fetch(url, method ? { headers, method } : { headers }).catch(() => ({
+        ok: false,
+        reason: "failed"
+      })),
       stop
     ]);
     if (signal == null ? void 0 : signal.aborted) return { ok: false, reason: "aborted" };
@@ -98015,13 +98055,21 @@ async function downloadCover(imageUrl, fetch, options = {}) {
       stop
     ]);
     if (slept) return slept;
-    return (signal == null ? void 0 : signal.aborted) ? { ok: false, reason: "aborted" } : get(url);
+    return (signal == null ? void 0 : signal.aborted) ? { ok: false, reason: "aborted" } : get(url, method);
   };
   try {
     let response = await get(thumb);
     if ("ok" in response) return response;
     const original = coverOriginalUrl(imageUrl);
     if (original && response.status >= 400 && response.status < 500 && response.status !== 429) {
+      const probe = await get(original, "HEAD");
+      if ("ok" in probe) {
+        if (!probe.ok && (probe.reason === "aborted" || probe.reason === "timeout")) return probe;
+      } else {
+        const length = Number(header2(probe.headers, "content-length"));
+        if (probe.status === 200 && Number.isFinite(length) && length > COVER_MAX_BYTES)
+          return { ok: false, reason: "size" };
+      }
       const second = await get(original);
       if ("ok" in second) return second;
       return judge(second, original);
@@ -110819,8 +110867,18 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
       fetchCoverImage: (url, signal) => downloadCover(
         url,
         async (address, init) => {
-          const response = await (0, import_obsidian52.requestUrl)({ url: address, method: "GET", headers: init.headers, throw: false });
-          return { status: response.status, headers: response.headers, bytes: response.arrayBuffer };
+          var _a2;
+          const response = await (0, import_obsidian52.requestUrl)({
+            url: address,
+            method: (_a2 = init.method) != null ? _a2 : "GET",
+            headers: init.headers,
+            throw: false
+          });
+          return {
+            status: response.status,
+            headers: response.headers,
+            bytes: init.method ? new ArrayBuffer(0) : response.arrayBuffer
+          };
         },
         { signal, userAgent: `VisualAgentMap-Obsidian-plugin/${this.manifest.version} (${PUBLIC_REPO_URL})` }
       ),

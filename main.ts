@@ -929,8 +929,17 @@ export default class VisualAgentMapPlugin extends Plugin {
       downloadCover(
         url,
         async (address, init) => {
-          const response = await requestUrl({ url: address, method: "GET", headers: init.headers, throw: false });
-          return { status: response.status, headers: response.headers, bytes: response.arrayBuffer };
+          const response = await requestUrl({
+            url: address,
+            method: init.method ?? "GET",
+            headers: init.headers,
+            throw: false
+          });
+          return {
+            status: response.status,
+            headers: response.headers,
+            bytes: init.method ? new ArrayBuffer(0) : response.arrayBuffer
+          };
         },
         { signal, userAgent: `VisualAgentMap-Obsidian-plugin/${this.manifest.version} (${PUBLIC_REPO_URL})` }
       ),

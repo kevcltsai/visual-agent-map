@@ -75,3 +75,14 @@ test('CRLF, long and Unicode text: one line per item, titles and problems are cu
   assert.equal(items.length, 1); assert.ok(items[0].length < 900); assert.doesNotMatch(text, /\r/);
   assert.match(text, /AI 校對查了 0 項，仍有 1 項沒解決/);
 });
+
+test('the summary counts AI items only; chapter status items get their own line; every item is one bullet (the bar total)', () => {
+  const issues = [issue(), issue({ reason: 'sources_conflict' }), { source: 'chapter', chapterId: 'n2', chapterTitle: '土壤', problem: '', reason: 'too_short' }];
+  const text = note(issues);
+  assert.match(text, /AI 校對查了 12 項，仍有 2 項沒解決。 另有 1 項章節狀態問題。/);
+  assert.equal(text.split('\n').filter(l => l.startsWith('- ')).length, issues.length, 'bullets = the bar total');
+  const onlyChapter = note([issues[2]], { checked: 0 });
+  assert.match(onlyChapter, /另有 1 項章節狀態問題/); assert.doesNotMatch(onlyChapter, /沒有可列的項目|全部解決|仍有 \d+ 項沒解決/);
+  assert.match(note([issues[2]]), /AI 校對查了 12 項，全部解決。 另有 1 項章節狀態問題。/);
+  assert.match(oi.composeOpenIssuesNote({ bookTitle: 'Art', language: 'en', checked: 3, issues: [issues[2]] }), /all solved\. 1 more chapter status issues\./);
+});

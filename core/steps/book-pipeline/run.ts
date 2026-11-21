@@ -15,7 +15,7 @@ export async function runPlanStep<Request extends BookStepBase, Output>(
   aiCalls: AiCalls,
   step: StepDefinition<Request, Output>,
   request: Request,
-  run: { signal: AbortSignal; admission?: AdmissionContext }
+  run: { signal: AbortSignal; admission?: AdmissionContext; topic?: string }
 ): Promise<Output> {
   const prepared = prepareStep(step, request);
   return aiCalls.run(
@@ -23,7 +23,7 @@ export async function runPlanStep<Request extends BookStepBase, Output>(
     {
       model: request.model,
       effort: stepEffort(request.reasoning),
-      topic: "Book pipeline plan",
+      topic: run.topic ?? "Book pipeline plan",
       taskName: "book-pipeline-plan",
       signal: run.signal,
       localCodex: true,

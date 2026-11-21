@@ -204,4 +204,5 @@ test('runAiBookProof: a text-only call; the quote is checked in the chapter it n
   assert.deepEqual(plain(result.checks.map(c => [c.id, c.chapter, c.otherChapter])), [['B1', 2, 1]]);
   assert.equal(result.dropped.quote, 1);
   assert.notEqual(h.runs[0][4].webSearchOnly, true);
+  assert.match(JSON.stringify(h.log.getEntries()), /Book pipeline AI proof \(whole book\)/, 'usage topic names it as an AI proofread, not the plan');
 });

@@ -130,6 +130,10 @@ const SOME_OPEN = (n: number, open: number): Words => ({
   zh: `AI 校對查了 ${n} 項，仍有 ${open} 項沒解決。`,
   en: `The AI proofread checked ${n} items; ${open} still open.`
 });
+const OTHER_OPEN = (k: number): Words => ({
+  zh: `另有 ${k} 項章節狀態問題。`,
+  en: `${k} more chapter status issues.`
+});
 const NONE_CHECKED: Words = { zh: "沒有可列的項目。", en: "Nothing to list." };
 
 /** The file name the page is meant to have (no folder). */
@@ -167,11 +171,16 @@ export function composeOpenIssuesNote(input: OpenIssuesInput): string {
   const { language, issues } = input;
   const n = Math.max(0, Math.trunc(input.checked));
   const colon = instructionLanguageOf(language) === "zh" ? "：" : ": ";
-  const summary = issues.length
-    ? pick(SOME_OPEN(n, issues.length), language)
+  const aiOpen = issues.filter(issue => issue.source === "ai-proof").length;
+  const otherOpen = issues.length - aiOpen;
+  const aiSummary = aiOpen
+    ? pick(SOME_OPEN(n, aiOpen), language)
     : n > 0
       ? pick(ALL_SOLVED(n), language)
-      : pick(NONE_CHECKED, language);
+      : otherOpen
+        ? ""
+        : pick(NONE_CHECKED, language);
+  const summary = [aiSummary, otherOpen ? pick(OTHER_OPEN(otherOpen), language) : ""].filter(Boolean).join(" ");
   const out = [
     OPEN_ISSUES_MARKER,
     "",

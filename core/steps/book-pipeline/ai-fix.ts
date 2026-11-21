@@ -101,5 +101,5 @@ export function runAiFix(
   request: AiFixRequest,
   run: { signal: AbortSignal; admission?: AdmissionContext }
 ): Promise<RawAiEdit[]> {
-  return runPlanStep(aiCalls, aiFixStep, request, run);
+  return runPlanStep(aiCalls, aiFixStep, request, { ...run, topic: "Book pipeline AI proof fix" });
 }

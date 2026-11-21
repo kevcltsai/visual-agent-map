@@ -22,6 +22,8 @@ export const MAX_STEP_ATTEMPTS = 3;
 export const MAX_AUTO_FIXES = 1;
 /** The extra in-place expand passes of a short chapter: writing-model calls only (no picture search, no proofread of their own). */
 export const BOOK_EXPAND_PASSES = 2;
+/** The most fix rounds (one fix call, then one re-check) the AI proofread may spend on one chapter, and on the whole book. */
+export const MAX_AI_FIX_ROUNDS = 2;
 export const STEPS = ["plan", "write", "proof"] as const;
 export type PipelineStep = (typeof STEPS)[number];
 
@@ -180,6 +182,10 @@ export interface BookPipelineData {
   /** The chapters at start or replan: card id -> its title and note path then. Lets a later run name and clean a card that is already gone from the map. Absent = older data (nothing known). */
   chapters?: Record<string, { title: string; path: string }>;
   budget: PipelineBudget;
+  /** Per chapter, the independent AI proofread and its in-place fixes. Absent = none yet (or an older run). */
+  aiProof?: Record<string, AiProofState>;
+  /** The whole-book AI proofread (replaces the consistency check). Absent = not started (or an older run). */
+  bookProof?: AiProofState;
   /** The whole-book consistency check of the writing phase (one call). Absent: not asked yet (or older data). */
   consistency?: BookConsistency;
   /** Raised by every owner stop; a step result carries the one it started under (absent = 0). */
@@ -188,6 +194,45 @@ export interface BookPipelineData {
   revision: number;
   startedAt: string;
   phaseStartedAt: string;
+}
+
+/** A fixable problem the proofreader found, waiting for a fix call (`chapter`: whole-book only, 1-based). */
+export interface AiProofPending {
+  id: string;
+  quote: string;
+  problem: string;
+  suggestion: string;
+  chapter?: number;
+}
+/** A problem still open once the proofread is over, with a neutral reason code (the screen turns it into a plain sentence). */
+export interface AiProofOpen {
+  id: string;
+  chapter?: number;
+  quote: string;
+  problem: string;
+  reason: string;
+}
+/** One AI proofread (a chapter's or the book's): which step is next, the calls used for it, and what it found. */
+export interface AiProofState {
+  /** The text it was asked about (revision and body hash); a result for another key is dropped. */
+  key: string;
+  /** Calls started for the current `step` of the current `round` (counted before the call, given back on a stop or budget pause). */
+  attempts: number;
+  /** Fix rounds finished so far (0..{@link MAX_AI_FIX_ROUNDS}). */
+  round: number;
+  step: "proof" | "fix";
+  done?: boolean;
+  /** The proofread could not finish (every attempt failed): never shown as all solved. */
+  incomplete?: boolean;
+  /** Items the proofreader checked whose quote stood in the text (N). */
+  checked: number;
+  /** Places the fix calls changed. */
+  fixed: number;
+  open: AiProofOpen[];
+  /** With step "fix": what the fix call must repair. */
+  pending?: AiProofPending[];
+  /** Reason codes of fixes that were blocked, by item id. */
+  refused?: Record<string, string>;
 }
 
 /**
@@ -257,6 +302,28 @@ function consistencyShape(value: unknown): boolean {
           isText(item.suggestion)
       ))
   );
+}
+
+function aiProofShape(value: unknown): boolean {
+  if (!isObject(value) || !isText(value.key) || !isCount(value.attempts) || !isCount(value.round)) return false;
+  if (value.round > MAX_AI_FIX_ROUNDS || (value.step !== "proof" && value.step !== "fix")) return false;
+  if (value.done !== undefined && typeof value.done !== "boolean") return false;
+  if (value.incomplete !== undefined && typeof value.incomplete !== "boolean") return false;
+  if (!isCount(value.checked) || !isCount(value.fixed)) return false;
+  const items = (list: unknown, extra: readonly string[]): boolean =>
+    Array.isArray(list) &&
+    list.every(
+      item =>
+        isObject(item) &&
+        isText(item.id) &&
+        isText(item.quote) &&
+        isText(item.problem) &&
+        extra.every(key => isText(item[key])) &&
+        (item.chapter === undefined || isCount(item.chapter))
+    );
+  if (!items(value.open, ["reason"])) return false;
+  if (value.pending !== undefined && !items(value.pending, ["suggestion"])) return false;
+  return value.refused === undefined || (isObject(value.refused) && Object.values(value.refused).every(isText));
 }
 
 function problem(raw: unknown): string | undefined {
@@ -334,6 +401,9 @@ function problem(raw: unknown): string | undefined {
   if (!isObject(raw.budget) || !isCount(raw.budget.used) || !isCount(raw.budget.limit) || raw.budget.limit < 1)
     return "budget";
   if (raw.consistency !== undefined && !consistencyShape(raw.consistency)) return "consistency";
+  if (raw.aiProof !== undefined && (!isObject(raw.aiProof) || !Object.values(raw.aiProof).every(aiProofShape)))
+    return "aiProof";
+  if (raw.bookProof !== undefined && !aiProofShape(raw.bookProof)) return "bookProof";
   if (raw.stopEpoch !== undefined && !isCount(raw.stopEpoch)) return "stopEpoch";
   if (!isCount(raw.revision)) return "revision";
   if (typeof raw.startedAt !== "string" || typeof raw.phaseStartedAt !== "string") return "timestamps";

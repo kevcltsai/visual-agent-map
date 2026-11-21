@@ -2190,6 +2190,14 @@ export class BookPipelineRuns {
             accepted: true
           }));
           if (drive.store.state !== before) changed = true;
+        } else if (
+          action.type === "ai_proof" ||
+          action.type === "ai_fix" ||
+          action.type === "book_ai_proof" ||
+          action.type === "book_ai_fix"
+        ) {
+          // The AI proofread actions are only planned when the loop passes `aiProof` to nextActions (it does not yet).
+          continue;
         } else {
           const key = action.type === "global_plan" ? "global" : action.nodeId;
           if (action.type !== "global_plan" && inflight.size >= BOOK_POOL) continue;

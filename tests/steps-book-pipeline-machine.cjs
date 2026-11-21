@@ -51,7 +51,8 @@ test('transitions: global plan, every card plan, gate 1, confirm, write, proof, 
   for (const id of IDS) { state = succeed(state, 'proof', id); stages[id] = 'checked'; assert.equal(machine.cardRevision(state, id), 2, 'a proof does not raise the revision'); }
   state = machine.advancePhase(state, stages, NOW);
   assert.equal(state.phase, 'gate2');
-  assert.deepEqual(actionsOf(state, stages), { actions: [], hold: 'gate2' });
+  assert.deepEqual(actionsOf(state, stages), { actions: [{ type: 'advance_phase' }] }, 'the final gate passes by itself');
+  assert.equal(machine.advancePhase(state, stages, NOW).phase, 'done');
   state = machine.finishRun(state, NOW);
   assert.equal(state.phase, 'done');
   assert.deepEqual(actionsOf(state, stages), { actions: [], hold: 'done' });
@@ -501,9 +502,10 @@ test('trial: a new run carries the first three cards; every card is planned firs
   assert.deepEqual(actionsOf(state, stages).actions, [{ type: 'advance_phase' }]);
   state = machine.advancePhase(state, stages, NOW);
   assert.equal(state.phase, 'gate1', 'a needs-review trial card does not hold gate 1 back');
-  assert.deepEqual(actionsOf(state, stages), { actions: [], hold: 'gate1' });
+  assert.deepEqual(actionsOf(state, stages), { actions: [{ type: 'advance_phase' }] }, 'the trial gate passes by itself');
   const back = machine.backToPlan(state, NOW);
   assert.equal(back.phase, 'gate1'); assert.equal(back.planReview, true, 'back to the plan review');
+  assert.deepEqual(actionsOf(back, stages), { actions: [], hold: 'gate1' }, 'the plan review still waits');
   assert.deepEqual(plain(back.attempts.a), { plan: 0, write: 0, proof: 0 }, 'the trial counters start over');
   assert.equal(machine.cardRevision(back, 'a'), machine.cardRevision(state, 'a') + 1, 'a result still in flight can no longer commit');
   state = machine.confirmGate1(state, NOW);
@@ -628,4 +630,183 @@ test('expand passes: useExpandPass counts per card, stops at BOOK_EXPAND_PASSES,
   assert.equal(machine.useExpandPass(two.state, 'a').accepted, false, 'the cap is per chapter and run');
   assert.equal(machine.useExpandPass(two.state, 'b').accepted, true, 'another chapter has its own');
   assert.equal(machine.expandPassesOf(machine.resetCard(two.state, 'a'), 'a'), 0);
+});
+
+// ---- The independent AI proofread: chapter and book steps, rounds, fences, old saves ------------------------------------------------
+const AI = { aiProof: true };
+const checkedRun = (extra = {}) => {
+  const order = ['a', 'b'];
+  let state = machine.newBookPipeline({ runId: 'run-ai', order, now: NOW, ...extra });
+  delete state.trial; delete state.planReview;
+  state = { ...state, phase: 'writing', globalPlanned: true };
+  return { state, stages: { a: 'checked', b: 'checked' } };
+};
+const pending = (id = 'P1') => ({ id, quote: 'q', problem: 'p', suggestion: 's' });
+const begin = (state, scope, key, step) => { const d = machine.beginAiStep(state, scope, key, step); assert.ok(d, `begin ${step}`); return d; };
+
+test('ai proof: a checked chapter gets ai_proof; with fixable problems the rounds go proof, fix, proof, fix, proof and stop at MAX_AI_FIX_ROUNDS', () => {
+  assert.equal(model.MAX_AI_FIX_ROUNDS, 2);
+  const { state: start, stages } = checkedRun();
+  assert.deepEqual(plain(machine.nextActions(start, stages, new Set(), AI).actions), [{ type: 'ai_proof', nodeId: 'a' }, { type: 'ai_proof', nodeId: 'b' }]);
+  assert.deepEqual(plain(machine.nextActions(start, stages, new Set(['a']), AI).actions), [{ type: 'ai_proof', nodeId: 'b' }], 'a chapter in flight is skipped');
+  assert.deepEqual(plain(machine.nextActions(start, stages)).actions, [{ type: 'advance_phase' }], 'without the option the run is as before');
+  let state = start;
+  const seen = [];
+  let key = 'k0';
+  for (let round = 0; round < 3; round++) {
+    const p = begin(state, { nodeId: 'a' }, key, 'proof');
+    assert.equal(p.token.round, round);
+    const res = machine.applyAiProof(p.state, p.token, { checked: 3, pending: [pending()], open: [] });
+    assert.equal(res.accepted, true);
+    state = res.state;
+    seen.push(state.aiProof.a.step);
+    if (state.aiProof.a.done) break;
+    assert.equal(plain(machine.nextActions(state, stages, new Set(), AI).actions)[0].type, 'ai_fix');
+    const f = begin(state, { nodeId: 'a' }, key, 'fix');
+    key = `k${round + 1}`;
+    const fixed = machine.applyAiFix(f.state, f.token, { applied: 1, key, changed: ['a'] });
+    state = fixed.state;
+    assert.equal(machine.cardRevision(state, 'a'), machine.cardRevision(start, 'a') + round + 1, 'a fix that wrote raises the revision');
+  }
+  assert.deepEqual(seen, ['fix', 'fix', 'proof'], 'proof, fix, proof, fix, proof');
+  const done = state.aiProof.a;
+  assert.deepEqual([done.done, done.round, done.fixed, done.checked], [true, 2, 2, 3]);
+  assert.deepEqual(plain(done.open), [{ id: 'P1', quote: 'q', problem: 'p', reason: 'still_present' }], 'a problem still reported after the last round stays open');
+  assert.equal(model.readBookPipeline({ bookPipeline: plain(state) }).kind, 'usable');
+  assert.deepEqual(plain(machine.nextActions(state, stages, new Set(['b']), AI).actions), [], 'a finished chapter asks for nothing');
+});
+
+test('ai proof: nothing fixable ends the chapter at once; unfixable items are kept as open with their own reason, a blocked fix keeps its reason', () => {
+  const { state: start } = checkedRun();
+  const p = begin(start, { nodeId: 'a' }, 'k0', 'proof');
+  const res = machine.applyAiProof(p.state, p.token, { checked: 2, pending: [], open: [{ id: 'P2', quote: 'x', problem: 'y', reason: 'sources_conflict' }] });
+  assert.deepEqual([res.state.aiProof.a.done, res.state.aiProof.a.round], [true, 0]);
+  assert.deepEqual(plain(res.state.aiProof.a.open), [{ id: 'P2', quote: 'x', problem: 'y', reason: 'sources_conflict' }]);
+  const q = begin(start, { nodeId: 'b' }, 'k0', 'proof');
+  let state = machine.applyAiProof(q.state, q.token, { checked: 1, pending: [pending()], open: [] }).state;
+  const f = begin(state, { nodeId: 'b' }, 'k0', 'fix');
+  state = machine.applyAiFix(f.state, f.token, { applied: 0, refused: { P1: 'fix_refused_picture' } }).state;
+  assert.equal(machine.cardRevision(state, 'b'), 0, 'nothing written: the revision does not move');
+  for (let n = 0; n < 2; n++) {
+    const r = begin(state, { nodeId: 'b' }, 'k0', 'proof');
+    state = machine.applyAiProof(r.state, r.token, { checked: 1, pending: [pending()], open: [] }).state;
+    if (state.aiProof.b.done) break;
+    const g = begin(state, { nodeId: 'b' }, 'k0', 'fix');
+    state = machine.applyAiFix(g.state, g.token, { applied: 0 }).state;
+  }
+  assert.equal(state.aiProof.b.open[0].reason, 'fix_refused_picture');
+});
+
+test('ai proof: three failed checks end it as incomplete (never solved); three failed fixes leave the problems open as fix_failed and open no further round', () => {
+  const { state: start } = checkedRun();
+  let state = start;
+  for (let n = 1; n <= 3; n++) {
+    const p = begin(state, { nodeId: 'a' }, 'k0', 'proof');
+    assert.equal(p.state.aiProof.a.attempts, n);
+    const r = machine.applyAiFailure(p.state, p.token);
+    state = r.state;
+    assert.equal(!!r.finished, n === 3);
+  }
+  assert.deepEqual([state.aiProof.a.done, state.aiProof.a.incomplete], [true, true]);
+  assert.equal(machine.beginAiStep(state, { nodeId: 'a' }, 'k0', 'proof'), null, 'a finished proofread does not start again');
+  let s2 = start;
+  const p = begin(s2, { nodeId: 'b' }, 'k0', 'proof');
+  s2 = machine.applyAiProof(p.state, p.token, { checked: 1, pending: [pending()], open: [] }).state;
+  for (let n = 1; n <= 3; n++) {
+    const f = begin(s2, { nodeId: 'b' }, 'k0', 'fix');
+    s2 = machine.applyAiFailure(f.state, f.token).state;
+  }
+  assert.deepEqual([s2.aiProof.b.done, s2.aiProof.b.incomplete, s2.aiProof.b.round], [true, undefined, 0]);
+  assert.deepEqual(plain(s2.aiProof.b.open.map(item => item.reason)), ['fix_failed']);
+});
+
+test('ai proof: a stop or a changed text drops the result and gives the attempt back; a budget pause resumes at the same step without repeating the fix', () => {
+  const { state: start } = checkedRun();
+  const p = begin(start, { nodeId: 'a' }, 'k0', 'proof');
+  const stopped = machine.stopRun(p.state);
+  assert.equal(machine.applyAiProof(stopped, p.token, { checked: 1, pending: [], open: [] }).accepted, false, 'late result after a stop');
+  assert.equal(machine.applyAiStopped(stopped, p.token, false).state.aiProof.a.attempts, 0, 'attempt given back');
+  const resumed = machine.resumeRun(machine.applyAiStopped(stopped, p.token, false).state);
+  assert.equal(machine.applyAiProof(resumed, p.token, { checked: 1, pending: [], open: [] }).accepted, false, 'a result from before the stop never commits after the resume');
+  const hand = { ...p.state, revisions: { ...p.state.revisions, a: 5 } };
+  assert.equal(machine.applyAiProof(hand, p.token, { checked: 1, pending: [], open: [] }).accepted, false, 'revision changed: dropped');
+  const wrongStep = machine.applyAiFix(p.state, { ...p.token, step: 'fix' }, { applied: 1 });
+  assert.equal(wrongStep.accepted, false);
+  // Budget during a fix: the run pauses, the attempt comes back, and the resume starts the fix again (once) instead of a new proof.
+  let state = machine.applyAiProof(p.state, p.token, { checked: 2, pending: [pending()], open: [] }).state;
+  const f = begin(state, { nodeId: 'a' }, 'k0', 'fix');
+  const paused = machine.applyAiStopped(f.state, f.token, true).state;
+  assert.deepEqual([paused.status, paused.pauseReason, paused.aiProof.a.attempts, paused.aiProof.a.step], ['stopped', 'budget', 0, 'fix']);
+  assert.deepEqual(plain(machine.nextActions(paused, { a: 'checked', b: 'checked' }, new Set(), AI)), { actions: [], hold: 'budget' });
+  const back = machine.resumeRun(machine.addBudget(paused, 10));
+  assert.equal(plain(machine.nextActions(back, { a: 'checked', b: 'checked' }, new Set(), AI).actions)[0].type, 'ai_fix');
+  // A changed text starts a chapter's proofread over from the check.
+  const fresh2 = machine.beginAiStep(back, { nodeId: 'a' }, 'other', 'proof');
+  assert.deepEqual([fresh2.state.aiProof.a.round, fresh2.state.aiProof.a.attempts], [0, 1]);
+  assert.equal(machine.beginAiStep(back, { nodeId: 'a' }, 'other', 'fix'), null, 'a fix needs the proof that asked for it');
+});
+
+test('ai proof: the book proofread starts after every chapter is done; once begun the chapter proofreads do not reopen (no loop); its fix never calls the author', () => {
+  const { state: start, stages } = checkedRun();
+  let state = start;
+  for (const id of ['a', 'b']) {
+    const p = begin(state, { nodeId: id }, 'k0', 'proof');
+    state = machine.applyAiProof(p.state, p.token, { checked: 1, pending: [], open: [] }).state;
+  }
+  assert.deepEqual(plain(machine.nextActions(state, stages, new Set(['#book-proof']), AI).actions), [], 'busy book proofread');
+  assert.deepEqual(plain(machine.nextActions(state, stages, new Set(), AI).actions), [{ type: 'book_ai_proof' }]);
+  const b = begin(state, {}, 'bk0', 'proof');
+  assert.equal(b.token.nodeId, undefined);
+  state = machine.applyAiProof(b.state, b.token, { checked: 4, pending: [{ ...pending(), chapter: 1 }], open: [] }).state;
+  assert.deepEqual(plain(machine.nextActions(state, stages, new Set(), AI).actions), [{ type: 'book_ai_fix' }]);
+  const f = begin(state, {}, 'bk0', 'fix');
+  state = machine.applyAiFix(f.state, f.token, { applied: 1, key: 'bk1', changed: ['a'] }).state;
+  assert.equal(machine.cardRevision(state, 'a'), 1, 'a cross-chapter fix raises the revision of the chapter it changed');
+  assert.equal(machine.aiChapterDue(state, 'a'), false);
+  const reopened = { ...state, aiProof: {} };
+  assert.deepEqual(plain(machine.nextActions(reopened, stages, new Set(), AI).actions), [{ type: 'book_ai_proof' }], 'a chapter without a record is not proofread again once the book one began');
+  const r = begin(state, {}, 'bk1', 'proof');
+  state = machine.applyAiProof(r.state, r.token, { checked: 4, pending: [], open: [] }).state;
+  assert.equal(state.bookProof.done, true);
+  assert.deepEqual(plain(machine.nextActions(state, stages, new Set(), AI).actions), [{ type: 'advance_phase' }]);
+  assert.equal(machine.advancePhase(state, stages, NOW).phase, 'gate2');
+  assert.equal(model.readBookPipeline({ bookPipeline: plain(state) }).kind, 'usable');
+});
+
+test('ai proof: a chapter that needs a person is not proofread; a trial chapter is proofread before the trial gate passes; a plan review waits', () => {
+  const run = trialRun(['a', 'b', 'c', 'd']);
+  let state = { ...run, phase: 'planning', globalPlanned: true };
+  delete state.planReview;
+  const stages = { a: 'checked', b: 'needs-review', c: 'checked', d: 'planned' };
+  assert.deepEqual(plain(machine.nextActions(state, stages, new Set(), AI).actions), [{ type: 'ai_proof', nodeId: 'a' }, { type: 'ai_proof', nodeId: 'c' }], 'the trial chapters, not the needs-review one');
+  assert.equal(machine.aiChapterDue({ ...state, planReview: true }, 'a'), false, 'nothing is proofread at the plan review');
+  assert.deepEqual(plain(machine.nextActions({ ...state, phase: 'gate1', planReview: true }, stages, new Set(), AI)), { actions: [], hold: 'gate1' });
+});
+
+test('old saves: a run parked at gate2 does the whole-book proofread and then finishes; a trial gate1 goes on; the plan review still waits; consistency stays readable', () => {
+  const { state: start, stages } = checkedRun();
+  const consistency = { key: 'x', attempts: 1, done: true, findings: [] };
+  const old = { ...start, phase: 'gate2', consistency };
+  assert.equal(model.readBookPipeline({ bookPipeline: plain(old) }).kind, 'usable', 'consistency field still reads');
+  assert.deepEqual(plain(machine.nextActions(old, stages, new Set(), AI).actions), [{ type: 'book_ai_proof' }], 'no chapter proofread for an old gate2 run');
+  assert.deepEqual(plain(machine.nextActions(old, stages, new Set(['#book-proof']), AI).actions), []);
+  const b = begin(old, {}, 'bk', 'proof');
+  const done = machine.applyAiProof(b.state, b.token, { checked: 0, pending: [], open: [] }).state;
+  assert.deepEqual(plain(machine.nextActions(done, stages, new Set(), AI).actions), [{ type: 'advance_phase' }]);
+  assert.equal(machine.advancePhase(done, stages, NOW).phase, 'done');
+  const gate1 = { ...start, phase: 'gate1', trial: ['a'] };
+  assert.deepEqual(plain(machine.nextActions(gate1, stages, new Set(), AI).actions), [{ type: 'advance_phase' }]);
+  assert.equal(machine.advancePhase(gate1, stages, NOW).phase, 'writing');
+  assert.deepEqual(plain(machine.nextActions({ ...gate1, planReview: true }, stages, new Set(), AI)), { actions: [], hold: 'gate1' });
+});
+
+test('ai proof: the saved records are validated; a rerun or a trial reset clears the chapter record', () => {
+  const { state: start } = checkedRun();
+  const p = begin(start, { nodeId: 'a' }, 'k0', 'proof');
+  const ok = plain(p.state);
+  assert.equal(model.readBookPipeline({ bookPipeline: ok }).kind, 'usable');
+  for (const bad of [{ ...ok, aiProof: { a: { ...ok.aiProof.a, round: 3 } } }, { ...ok, aiProof: { a: { ...ok.aiProof.a, step: 'x' } } }, { ...ok, bookProof: { key: 1 } }, { ...ok, aiProof: { a: { ...ok.aiProof.a, open: [{ id: 'x' }] } } }])
+    assert.equal(model.readBookPipeline({ bookPipeline: bad }).kind, 'unusable');
+  assert.equal(machine.resetCard(p.state, 'a').aiProof.a, undefined);
+  assert.equal(p.state.aiProof.a.key, 'k0', 'reducers leave their input alone');
 });

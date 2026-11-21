@@ -151,10 +151,10 @@ test('trial: when every trial card is removed, "carry on as before" picks the tr
   assert.equal(some.phase, 'gate1');
 });
 
-test('gates: gateWaitsForPerson holds every gate by default, so the plan review, the trial and the final gate behave as before', () => {
+test('gates: gateWaitsForPerson holds only the plan review; the trial and the final gate pass by themselves', () => {
   const run = machine.newBookPipeline({ runId: 'g', order: ['r', 'a'], now: NOW });
-  for (const gate of ['plan', 'trial', 'final']) assert.equal(machine.gateWaitsForPerson(run, gate), true, gate);
+  assert.deepEqual(['plan', 'trial', 'final'].map(gate => machine.gateWaitsForPerson(run, gate)), [true, false, false]);
   assert.deepEqual(plain(machine.nextActions({ ...run, phase: 'gate1' }, {})), { actions: [], hold: 'gate1' });
-  assert.deepEqual(plain(machine.nextActions({ ...run, phase: 'gate1', planReview: undefined }, {})), { actions: [], hold: 'gate1' });
-  assert.deepEqual(plain(machine.nextActions({ ...run, phase: 'gate2' }, {})), { actions: [], hold: 'gate2' });
+  assert.deepEqual(plain(machine.nextActions({ ...run, phase: 'gate1', planReview: undefined }, {})), { actions: [{ type: 'advance_phase' }] });
+  assert.deepEqual(plain(machine.nextActions({ ...run, phase: 'gate2' }, {})), { actions: [{ type: 'advance_phase' }] });
 });

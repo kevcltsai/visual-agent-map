@@ -12,12 +12,16 @@ import {
   DEFAULT_BUDGET_LIMIT,
   FAILURE_CODE,
   BOOK_EXPAND_PASSES,
+  MAX_AI_FIX_ROUNDS,
   MAX_AUTO_FIXES,
   MAX_STEP_ATTEMPTS,
   attemptsOf,
   effectiveOrder,
   emptyAttempts,
   mapDifference,
+  type AiProofOpen,
+  type AiProofPending,
+  type AiProofState,
   type BookPipelineData,
   type ConsistencyFinding,
   type PipelineStage,
@@ -33,12 +37,20 @@ export type PipelineAction =
   | { type: "card_plan" | "card_write" | "card_proof"; nodeId: string }
   /** The step's attempts are used up: write `needs-review` on the card, then keep going. */
   | { type: "mark_needs_review"; nodeId: string; step: PipelineStep }
-  /** Every chapter is written and proofread: the one whole-book consistency check runs before the phase moves on. */
+  /** A written and checked chapter: the independent AI proofread (`ai_proof`) or the in-place fix it asked for (`ai_fix`). */
+  | { type: "ai_proof"; nodeId: string }
+  | { type: "ai_fix"; nodeId: string }
+  /** Every chapter is done: the whole-book AI proofread, or the fix across chapters it asked for. */
+  | { type: "book_ai_proof" }
+  | { type: "book_ai_fix" }
+  /** Every chapter is written and proofread: the one whole-book consistency check runs before the phase moves on (runs without the AI proofread). */
   | { type: "book_consistency" }
   | { type: "advance_phase" };
 
 /** The busy key of the consistency check (never a card id: card ids are map node ids). */
 export const CONSISTENCY_BUSY = "#consistency";
+/** The busy key of the whole-book AI proofread and its fix (never a card id). */
+export const BOOK_PROOF_BUSY = "#book-proof";
 
 /** Why nothing (more) runs. `gate1`/`gate2` wait for the owner; `done` is final. */
 export type PipelineHold = "stopped" | "budget" | "global_failed" | "gate1" | "gate2" | "done" | "empty";
@@ -114,11 +126,11 @@ export function cardRevision(data: BookPipelineData, nodeId: string): number {
 /** The three gates of a run: the plan review, the trial's result, and the one before the book counts as done. */
 export type PipelineGate = "plan" | "trial" | "final";
 /**
- * Whether the run stops at a gate until the owner confirms. The one place that decides it: today every gate waits for a person
- * (a switch to let a gate pass by itself is a later change, and belongs here, not at the gates).
+ * Whether the run stops at a gate until the owner confirms. The one place that decides it: only the plan review waits (the direction is
+ * the owner's); the trial's result and the final gate pass by themselves, the AI proofread being the check that follows.
  */
-export function gateWaitsForPerson(_data: BookPipelineData, _gate: PipelineGate): boolean {
-  return true;
+export function gateWaitsForPerson(_data: BookPipelineData, gate: PipelineGate): boolean {
+  return gate === "plan";
 }
 
 /**
@@ -130,7 +142,10 @@ export function nextActions(
   stages: CardStages,
   busy: ReadonlySet<string> = new Set(),
   /** `consistency`: the runner can run the whole-book check (absent: the writing phase moves on without it, as before). */
-  options: { consistency?: boolean } = {}
+  options: {
+    consistency?: boolean;
+    /** The runner can run the AI proofread (chapter and book). */ aiProof?: boolean;
+  } = {}
 ): PipelinePlan {
   if (data.status === "stopped") return { actions: [], hold: data.pauseReason === "budget" ? "budget" : "stopped" };
   if (data.phase === "done") return { actions: [], hold: "done" };
@@ -143,9 +158,17 @@ export function nextActions(
       ? { actions: resets.map(nodeId => ({ type: "reset_stage", nodeId })) }
       : { actions: [{ type: "advance_phase" }] };
   }
-  if (data.phase === "gate1" && gateWaitsForPerson(data, data.planReview ? "plan" : "trial"))
-    return { actions: [], hold: "gate1" };
-  if (data.phase === "gate2" && gateWaitsForPerson(data, "final")) return { actions: [], hold: "gate2" };
+  if (data.phase === "gate1") {
+    if (gateWaitsForPerson(data, data.planReview ? "plan" : "trial")) return { actions: [], hold: "gate1" };
+    return { actions: [{ type: "advance_phase" }] };
+  }
+  if (data.phase === "gate2") {
+    if (gateWaitsForPerson(data, "final")) return { actions: [], hold: "gate2" };
+    // An older run parked at gate 2: the whole-book AI proofread still runs, then the run is done.
+    if (options.aiProof && bookProofDue(data))
+      return busy.size ? { actions: [] } : { actions: [bookProofAction(data)] };
+    return busy.size ? { actions: [] } : { actions: [{ type: "advance_phase" }] };
+  }
   const actions: PipelineAction[] = [];
   if (data.phase === "planning") {
     if (!data.globalPlanned) {
@@ -158,6 +181,10 @@ export function nextActions(
   for (const nodeId of order) {
     if (busy.has(nodeId)) continue;
     const stage = stages[nodeId];
+    if (stage === "checked" && options.aiProof && aiChapterDue(data, nodeId)) {
+      actions.push({ type: data.aiProof?.[nodeId]?.step === "fix" ? "ai_fix" : "ai_proof", nodeId });
+      continue;
+    }
     if (stage === "needs-review" || stage === "checked") continue;
     const attempts = attemptsOf(data, nodeId);
     // The stage a card needs a step for: every card is planned first; then the planning phase writes and proofs its trial cards only
@@ -178,7 +205,8 @@ export function nextActions(
   if (actions.length) return { actions };
   // Nothing left to start. Busy cards are still working; otherwise the phase is complete.
   if (busy.size) return { actions: [] };
-  if (data.phase === "writing" && options.consistency && consistencyDue(data))
+  if (data.phase === "writing" && options.aiProof && bookProofDue(data)) return { actions: [bookProofAction(data)] };
+  if (data.phase === "writing" && !options.aiProof && options.consistency && consistencyDue(data))
     return { actions: [{ type: "book_consistency" }] };
   return { actions: [{ type: "advance_phase" }] };
 }
@@ -251,6 +279,196 @@ export function applyConsistencyStopped(data: BookPipelineData, token: Consisten
   return { state: next, accepted: true };
 }
 
+/* ---- The independent AI proofread (a chapter's, then the book's) and its in-place fixes ---- */
+
+/** Whether a chapter still needs its AI proofread: not done, and the whole-book one has not begun (that begin is the fence against a loop). */
+export function aiChapterDue(data: BookPipelineData, nodeId: string): boolean {
+  if (data.bookProof || data.aiProof?.[nodeId]?.done) return false;
+  return data.phase === "writing" || (data.phase === "planning" && !!data.trial?.includes(nodeId) && !data.planReview);
+}
+/** Whether the whole-book AI proofread still has to run (it is the last step before the book counts as done). */
+export function bookProofDue(data: BookPipelineData): boolean {
+  return !data.bookProof?.done;
+}
+const bookProofAction = (data: BookPipelineData): PipelineAction => ({
+  type: data.bookProof?.step === "fix" ? "book_ai_fix" : "book_ai_proof"
+});
+
+/** A dispatched AI step: the run, stop generation, text (card revision and `key`), fix round and step it started under. `nodeId` absent = the whole book. */
+export interface AiToken {
+  runId: string;
+  stopEpoch: number;
+  nodeId?: string;
+  revision: number;
+  key: string;
+  round: number;
+  step: "proof" | "fix";
+}
+const aiSlot = (data: BookPipelineData, nodeId?: string): AiProofState | undefined =>
+  nodeId === undefined ? data.bookProof : data.aiProof?.[nodeId];
+function setAiSlot(next: BookPipelineData, nodeId: string | undefined, state: AiProofState): void {
+  if (nodeId === undefined) next.bookProof = state;
+  else next.aiProof = { ...(next.aiProof ?? {}), [nodeId]: state };
+}
+const aiCurrent = (data: BookPipelineData, token: AiToken): AiProofState | undefined => {
+  if (data.runId !== token.runId || data.status !== "running" || (data.stopEpoch ?? 0) !== token.stopEpoch)
+    return undefined;
+  if (
+    token.nodeId !== undefined &&
+    (!effectiveOrder(data).includes(token.nodeId) || cardRevision(data, token.nodeId) !== token.revision)
+  )
+    return undefined;
+  const slot = aiSlot(data, token.nodeId);
+  return slot && !slot.done && slot.key === token.key && slot.round === token.round && slot.step === token.step
+    ? slot
+    : undefined;
+};
+/**
+ * Starts an AI step: counts one attempt (saved before the call). A first begin, or one for a text that changed meanwhile (a hand edit),
+ * starts the proofread over from the check. Null when it may not start: stopped, finished, the step used up its attempts, a card that is
+ * gone, or a `step` that is not the next one.
+ */
+export function beginAiStep(
+  data: BookPipelineData,
+  scope: { nodeId?: string },
+  key: string,
+  step: "proof" | "fix"
+): { state: BookPipelineData; token: AiToken } | null {
+  const nodeId = scope.nodeId;
+  if (data.status !== "running" || data.phase === "done") return null;
+  if (nodeId === undefined ? data.phase !== "writing" && data.phase !== "gate2" : !aiChapterDue(data, nodeId))
+    return null;
+  if (nodeId !== undefined && !effectiveOrder(data).includes(nodeId)) return null;
+  const found = aiSlot(data, nodeId);
+  if (found?.done) return null;
+  const fresh = !found || found.key !== key;
+  if (fresh && step !== "proof") return null;
+  const slot: AiProofState = fresh
+    ? { key, attempts: 0, round: 0, step: "proof", checked: 0, fixed: 0, open: [] }
+    : { ...found };
+  if (slot.step !== step || slot.attempts >= MAX_STEP_ATTEMPTS) return null;
+  slot.attempts++;
+  const next = clone(data);
+  setAiSlot(next, nodeId, slot);
+  next.revision++;
+  return {
+    state: next,
+    token: {
+      runId: next.runId,
+      stopEpoch: next.stopEpoch ?? 0,
+      ...(nodeId !== undefined ? { nodeId } : {}),
+      revision: nodeId !== undefined ? cardRevision(next, nodeId) : 0,
+      key,
+      round: slot.round,
+      step
+    }
+  };
+}
+const withOpen = (
+  open: readonly AiProofOpen[],
+  pending: readonly AiProofPending[],
+  reasonOf: (id: string) => string
+): AiProofOpen[] => [
+  ...open,
+  ...pending.map(item => ({
+    id: item.id,
+    ...(item.chapter ? { chapter: item.chapter } : {}),
+    quote: item.quote,
+    problem: item.problem,
+    reason: reasonOf(item.id)
+  }))
+];
+/**
+ * A proofread call finished. `pending` are the fixable problems found, `open` the ones no edit can fix (the proofreader's own verdict).
+ * Fixable problems and rounds left: the next step is a fix. Otherwise the proofread is done, and the fixable ones left are open
+ * (`still_present`, or the reason a fix was blocked). A result under an old token is dropped.
+ */
+export function applyAiProof(
+  data: BookPipelineData,
+  token: AiToken,
+  result: { checked: number; pending: readonly AiProofPending[]; open: readonly AiProofOpen[] }
+): Committed {
+  const found = token.step === "proof" ? aiCurrent(data, token) : undefined;
+  if (!found) return { state: data, accepted: false };
+  const next = clone(data);
+  const slot: AiProofState = { ...found, checked: Math.max(found.checked, result.checked), attempts: 0 };
+  delete slot.pending;
+  if (result.pending.length && slot.round < MAX_AI_FIX_ROUNDS) {
+    slot.step = "fix";
+    slot.pending = result.pending.map(item => ({ ...item }));
+    slot.open = result.open.map(item => ({ ...item }));
+  } else {
+    slot.done = true;
+    slot.open = withOpen(result.open, result.pending, id => slot.refused?.[id] ?? "still_present");
+  }
+  setAiSlot(next, token.nodeId, slot);
+  next.revision++;
+  return { state: next, accepted: true };
+}
+/**
+ * A fix call finished. `applied` places were changed (in `changed`, the cards whose text changed: their revision rises, and `key` is the
+ * new text's key), `refused` maps the ids whose edit was blocked to the reason. The fix round is spent; the next step is the re-check.
+ */
+export function applyAiFix(
+  data: BookPipelineData,
+  token: AiToken,
+  result: { applied: number; refused?: Readonly<Record<string, string>>; key?: string; changed?: readonly string[] }
+): Committed {
+  const found = token.step === "fix" ? aiCurrent(data, token) : undefined;
+  if (!found) return { state: data, accepted: false };
+  const next = clone(data);
+  const slot: AiProofState = {
+    ...found,
+    key: result.key ?? found.key,
+    attempts: 0,
+    round: found.round + 1,
+    step: "proof",
+    fixed: found.fixed + result.applied,
+    refused: { ...(found.refused ?? {}), ...(result.refused ?? {}) }
+  };
+  delete slot.pending;
+  if (!Object.keys(slot.refused ?? {}).length) delete slot.refused;
+  for (const id of result.changed ?? [])
+    if (effectiveOrder(next).includes(id)) next.revisions[id] = cardRevision(next, id) + 1;
+  setAiSlot(next, token.nodeId, slot);
+  next.revision++;
+  return { state: next, accepted: true };
+}
+/**
+ * An AI call failed (the attempt was counted at its start). Its third failure ends the proofread for good: a failed check is
+ * `incomplete` (never shown as all solved), a failed fix leaves its problems open as `fix_failed` and opens no further round.
+ */
+export function applyAiFailure(data: BookPipelineData, token: AiToken): Committed & { finished?: boolean } {
+  const found = aiCurrent(data, token);
+  if (!found) return { state: data, accepted: false };
+  const next = clone(data);
+  const slot: AiProofState = { ...found };
+  if (slot.attempts >= MAX_STEP_ATTEMPTS) {
+    slot.done = true;
+    if (slot.step === "proof") slot.incomplete = true;
+    else slot.open = withOpen(slot.open, slot.pending ?? [], () => "fix_failed");
+    delete slot.pending;
+  }
+  setAiSlot(next, token.nodeId, slot);
+  next.revision++;
+  return { state: next, accepted: true, ...(slot.done ? { finished: true } : {}) };
+}
+/** An AI call was stopped (or the budget ran out): the attempt is given back, nothing is written; with `budget` the run pauses for it. */
+export function applyAiStopped(data: BookPipelineData, token: AiToken, budget: boolean): Committed {
+  if (data.runId !== token.runId) return { state: data, accepted: false };
+  const next = clone(data);
+  const slot = aiSlot(next, token.nodeId);
+  if (slot && !slot.done && slot.key === token.key && slot.round === token.round && slot.step === token.step)
+    slot.attempts = Math.max(0, slot.attempts - 1);
+  if (budget) {
+    next.status = "stopped";
+    next.pauseReason = "budget";
+    delete next.failureCode;
+  }
+  next.revision++;
+  return { state: next, accepted: true };
+}
+
 /** Moves the phase on when it is complete (planning to gate1, writing to gate2); a no-op elsewhere. */
 export function advancePhase(data: BookPipelineData, stages: CardStages, now: string): BookPipelineData {
   if (data.status !== "running") return data;
@@ -268,6 +486,9 @@ export function advancePhase(data: BookPipelineData, stages: CardStages, now: st
     next.trial && !next.planReview ? next.trial.every(id => !order.includes(id) || ranked(stages[id]) >= 3) : all(1);
   if (next.phase === "planning" && next.globalPlanned && trialDone) next.phase = "gate1";
   else if (next.phase === "writing" && all(3)) next.phase = "gate2";
+  else if (next.phase === "gate1" && !gateWaitsForPerson(next, next.planReview ? "plan" : "trial"))
+    next.phase = "writing";
+  else if (next.phase === "gate2" && !gateWaitsForPerson(next, "final")) next.phase = "done";
   else return data;
   next.phaseStartedAt = now;
   next.revision++;
@@ -292,6 +513,7 @@ export function retryTrial(data: BookPipelineData, now: string): BookPipelineDat
     next.revisions[id] = cardRevision(next, id) + 1;
     if (next.autoFixes) delete next.autoFixes[id];
     if (next.expandPasses) delete next.expandPasses[id];
+    if (next.aiProof) delete next.aiProof[id];
   }
   next.revision++;
   return next;
@@ -323,6 +545,7 @@ export function backToPlan(data: BookPipelineData, now: string): BookPipelineDat
     next.revisions[id] = cardRevision(next, id) + 1;
     if (next.autoFixes) delete next.autoFixes[id];
     if (next.expandPasses) delete next.expandPasses[id];
+    if (next.aiProof) delete next.aiProof[id];
   }
   next.revision++;
   return next;
@@ -628,6 +851,7 @@ export function resetCard(data: BookPipelineData, nodeId: string): BookPipelineD
   const next = clone(data);
   next.attempts[nodeId] = emptyAttempts();
   if (next.expandPasses) delete next.expandPasses[nodeId];
+  if (next.aiProof) delete next.aiProof[nodeId];
   next.revisions[nodeId] = cardRevision(next, nodeId) + 1;
   next.revision++;
   return next;

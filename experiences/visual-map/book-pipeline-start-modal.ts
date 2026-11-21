@@ -40,11 +40,11 @@ export const BOOK_IMAGE_SEARCHES = 2;
 /** Each picture search may be asked once more when its captions come back in another language. */
 export const BOOK_IMAGE_CALLS_PER_SEARCH = 2;
 
-/**
- * The most AI calls a cover can add to a whole run: chapters and sections add none (the cover rides in the first picture search the card
- * already makes); the book's own cover adds one search and its caption-language retry, and only when the root card has no picture slots.
+/*
+ * The cover adds nothing to the estimate: a chapter's or section's cover rides in the first picture search the card already makes, and the
+ * book's own cover (a root with no picture slots) is one search plus its caption-language retry, 2 calls, inside the 4 picture calls
+ * bookChapterCalls() already reserves for every card. So the estimate stays the real maximum, 6 + 16 n.
  */
-export const BOOK_COVER_CALLS = 2;
 
 export { BOOK_EXPAND_PASSES };
 
@@ -109,14 +109,10 @@ export function bookStartEstimate(cards: number, trialCards: number, models?: Bo
   const rounds = Math.ceil(trial / BOOK_POOL) + Math.ceil((n - trial) / BOOK_POOL);
   return {
     cards: n,
-    // The whole-book plan and proofread, every chapter's calls and the book cover's headroom: an upper bound.
-    calls:
-      bookWholeCalls(n) +
-      n * (per.plan + per.write + per.images + per.proof + per.aiProof) +
-      (n >= 1 ? BOOK_COVER_CALLS : 0),
+    // The whole-book plan and proofread, and every chapter's calls: an upper bound.
+    calls: bookWholeCalls(n) + n * (per.plan + per.write + per.images + per.proof + per.aiProof),
     limit: DEFAULT_BUDGET_LIMIT,
-    // The root's cover search (one picture search) comes on top of the plan.
-    seconds: time("global") + rounds * perCard + (n >= 2 ? aiProof : 0) + (n >= 1 ? time("images") : 0)
+    seconds: time("global") + rounds * perCard + (n >= 2 ? aiProof : 0)
   };
 }
 export function bookStartEstimateText(

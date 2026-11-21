@@ -3973,8 +3973,8 @@ test('worst-case calls: every chapter redoes once, uses every AI round and nothi
   }
 });
 
-test('worst-case calls with picture search: every step uses its whole allowance (first-write picture searches each with a language retry, the redo, the expand passes, the AI rounds); the actual count is the start card\'s estimate less the cover headroom (a cover adds none to a card with picture slots), and with a bare root (no picture slots) the cover search stays inside the estimate; within the 300 limit', async () => {
-  const { bookStartEstimate, BOOK_COVER_CALLS } = S.load('experiences/visual-map/book-pipeline-start-modal.ts', { obsidian: S.obsidian });
+test('worst-case calls with picture search: every step uses its whole allowance (first-write picture searches each with a language retry, the redo, the expand passes, the AI rounds); the actual count equals the start card\'s estimate (the covers add nothing), and with a bare root (no picture slots) the cover search stays inside it; within the 300 limit', async () => {
+  const { bookStartEstimate } = S.load('experiences/visual-map/book-pipeline-start-modal.ts', { obsidian: S.obsidian });
   const counted = new Map();
   for (const variant of ['plain', 'cover', 'cover-bare-root']) {
   const MARKED = `${DRAFT}\n\n〔圖位 1：the route〕\n\n〔圖位 2：a port〕\n`;
@@ -4013,18 +4013,18 @@ test('worst-case calls with picture search: every step uses its whole allowance 
     assert.equal(s.phase, 'done');
     assert.equal(s.budget.used, calls, 'the budget counts exactly the calls made');
     const estimate = bookStartEstimate(titles.length, titles.length).calls;
-    assert.equal(estimate, 6 + 16 * titles.length + BOOK_COVER_CALLS, 'the estimate is the whole-book calls, 16 per card and the cover headroom');
+    assert.equal(estimate, 6 + 16 * titles.length, 'the estimate is the whole-book calls and 16 per card; the covers add nothing');
     counted.set(`${variant}:${titles.length}`, calls);
     if (variant === 'cover-bare-root') {
       assert.ok(coverAsked >= 1, 'the bare root searched for its cover alone');
       assert.ok(calls <= estimate, `${titles.length} cards, bare root: ${calls} calls within the estimate ${estimate}`);
       assert.equal(calls, counted.get(`plain:${titles.length}`) - 4 + 2, 'the bare root swaps its own picture searches (none: no slots) for the one cover search with its language retry');
     } else {
-      assert.equal(calls, estimate - BOOK_COVER_CALLS, `${titles.length} cards: every card with picture slots spends its whole allowance, and the cover adds none`);
+      assert.equal(calls, estimate, `${titles.length} cards: every card with picture slots spends its whole allowance, and the cover adds none: the real maximum is the estimate`);
       assert.equal(calls, counted.get(`plain:${titles.length}`), 'with and without a cover the same number of calls');
     }
     assert.ok(calls <= estimate && calls <= 300);
-    if (titles.length === 10 && variant === 'plain') assert.equal(estimate, 168);
+    if (titles.length === 10 && variant === 'plain') assert.equal(estimate, 166);
   }
   }
 });

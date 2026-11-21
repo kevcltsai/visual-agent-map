@@ -56832,15 +56832,15 @@ var BookPipelineRuns = class {
     counts.changes = changes.length;
     const authorize = () => !this.dead(drive) && !signal.aborted && isPlanEditCurrent(drive.store.state, token);
     const locked = new Set(cards.filter((card) => card.locked).map((card) => card.id));
+    counts.rejected = changes.filter(
+      (change2) => !locked.has(change2.id) && changesBrief(change2) && !change2.checklist
+    ).length;
+    if (counts.rejected) return { kind: "failed", reason: "checklist_missing" };
     const moved = [];
     for (const change2 of changes) {
       if (!authorize()) return { kind: "cancelled" };
       const before = seen.get(change2.id);
       if (!before || locked.has(change2.id)) continue;
-      if (changesBrief(change2) && !change2.checklist) {
-        counts.rejected++;
-        continue;
-      }
       const path = await this.stillOnMap(drive, change2.id);
       if (!path) continue;
       const current = await this.ports.readCard(path);

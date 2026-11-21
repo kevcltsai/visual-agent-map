@@ -4089,3 +4089,93 @@ test('R1 T1: a chapter that ends needs-review (author check unmet) still gets it
   assert.ok(s.aiProof[r.nodes[1].id]?.done, 'the needs-review chapter was proofread');
   assert.ok(aiRuns(r, 'proof', 'SecretTitleA').length >= 1);
 });
+
+// ---- R2 diagnostic reset: the AI slot lifecycle as invariants (I1-I4), checked after every combination of proof result, fix outcome, stop and budget ----
+const { checkAiProofInvariants } = require('./support-ai-proof-invariants.cjs');
+const invariantsOf = async (r, v, extra = {}) => checkAiProofInvariants(await r.state(), { stageOf: id => stageOf(r.raw(r.nodes.findIndex(n => n.id === id))), page: pageText(v), ...extra });
+const plain = value => JSON.parse(JSON.stringify(value));
+const idA = r => r.nodes[1].id;
+const quoteOf = (request, from = 0, to = 11) => request.body.slice(from, to);
+const probOf = (request, id = 'P1', from = 0, to = 11) => ({ ...problem(request, id), quote: quoteOf(request, from, to) });
+
+test('R2 combo N1: the fix was written but the re-check still finds the (new) sentence: still_present, never "not fixed in time"', async () => {
+  const v = pageVault(); const applied = [];
+  const r = await aiRig({
+    aiProof: async request => ({ checks: request.title === 'SecretTitleA' ? [probOf(request)] : [okCheck(request)], prior: [], dropped: {} }),
+    aiFix: async request => { const replacement = `Corrected${applied.length + 1}`; applied.push(replacement); return [{ id: 'P1', quote: request.chapters[0].text.slice(0, 11), replacement }]; }
+  }, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  same(await invariantsOf(r, v, { applied: { [idA(r)]: applied } }), []);
+  const slot = (await r.state()).aiProof[idA(r)];
+  assert.deepEqual(plain(slot.open.map(i => i.reason)), ['still_present']);
+});
+
+test('R2 combo M-a: a refusal from an earlier round is not carried to a problem that reuses its id', async () => {
+  const v = pageVault(); let fixes = 0;
+  const r = await aiRig({
+    aiProof: async request => ({ checks: request.title === 'SecretTitleA' ? [fixes === 0 ? probOf(request) : probOf(request, 'P1', 12, 20)] : [okCheck(request)], prior: [], dropped: {} }),
+    aiFix: async request => { fixes++; return fixes === 1 ? [{ id: 'P1', quote: 'not in the text', replacement: 'x' }] : []; }
+  }, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  same(await invariantsOf(r, v, { refusedQuotes: [] }), []);
+  const slot = (await r.state()).aiProof[idA(r)];
+  assert.deepEqual(plain(slot.open.map(i => i.reason)), ['still_present']);
+});
+
+// A finished book, one chapter written again, and the run cut short while that chapter is being proofread again.
+const cutRerun = async (how, stepOfCut) => {
+  const v = pageVault(); let armed = false; const hold = defer(); let reached = false;
+  const r = await aiRig({
+    aiProof: async (request, n, run) => {
+      const here = armed && request.title === 'SecretTitleA';
+      if (here && stepOfCut === 'proof') { reached = true; if (how === 'budget') for (;;) await run.admission.reserve(); await hold.promise; }
+      return { checks: [here && stepOfCut === 'fix' ? probOf(request) : okCheck(request)], prior: [], dropped: {} };
+    },
+    aiFix: async (request, n, run) => { reached = true; if (how === 'budget') for (;;) await run.admission.reserve(); await hold.promise; return []; }
+  }, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  assert.equal((await r.state()).phase, 'done');
+  same(await invariantsOf(r, v), [], 'the finished book holds the invariants');
+  armed = true;
+  const running = r.runs.rerunCard(r.mapPath, idA(r)).catch(() => undefined);
+  while (!reached && r.runs.isRunning(r.mapPath)) await tick();
+  if (how === 'stop') { await r.runs.stop(r.mapPath); hold.resolve(); }
+  await running;
+  while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+  return { r, v };
+};
+for (const how of ['stop', 'budget']) for (const at of ['proof', 'fix']) {
+  test(`R2 combo N2: a finished book, one chapter written again, ${how} during its AI ${at}: the chapter is incomplete and the page says so`, async () => {
+    const { r, v } = await cutRerun(how, at);
+    same(await invariantsOf(r, v), []);
+    const s = await r.state();
+    const slot = s.aiProof[idA(r)];
+    assert.ok(slot?.done && slot.incomplete, `slot ${JSON.stringify(slot)}`);
+    assert.match(pageText(v), /沒有跑完/i);
+    assert.doesNotMatch(pageText(v), /全部解決/);
+    same(await invariantsOf(r, v), []);
+  });
+}
+
+// A "budget" in the proof step is a failing call here (the proof step retries it), so the budget cut is pinned on the fix step only.
+for (const [how, at] of [['stop', 'proof'], ['stop', 'fix'], ['budget', 'fix']]) {
+  test(`R2 combo first run: ${how} during the chapter's ${at}, then resume: every state on the way holds the invariants`, async () => {
+    const v = pageVault(); const hold = defer(); let calls = 0, fixed = false;
+    const r = await aiRig({
+      aiProof: async (request, n, run) => {
+        if (at === 'proof' && request.title === 'SecretTitleA' && ++calls === 1) { if (how === 'budget') for (;;) await run.admission.reserve(); await hold.promise; }
+        return { checks: [request.title === 'SecretTitleA' && !fixed ? probOf(request) : okCheck(request)], prior: [], dropped: {} };
+      },
+      aiFix: async (request, n, run) => { if (at === 'fix' && ++calls === 1) { if (how === 'budget') for (;;) await run.admission.reserve(); await hold.promise; } fixed = true; return [{ id: 'P1', quote: request.chapters[0].text.slice(0, 11), replacement: 'Corrected b' }]; }
+    }, { ports: { writeOpenIssues: v.port } });
+    await r.runs.start(r.mapPath); r.runs.confirmGate1(r.mapPath).catch(() => undefined);
+    while (calls === 0) await tick();
+    if (how === 'stop') { await r.runs.stop(r.mapPath); hold.resolve(); }
+    while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+    same(await invariantsOf(r, v), [], 'stopped');
+    await r.runs.resume(r.mapPath, how === 'budget' ? { addBudget: 100 } : undefined); while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+    const s = await r.state();
+    assert.equal(s.phase, 'done');
+    same(await invariantsOf(r, v, { applied: { [idA(r)]: ['Corrected b'] } }), [], 'finished');
+  });
+}

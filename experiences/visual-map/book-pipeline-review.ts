@@ -423,157 +423,12 @@ export function reviewEntries(input: {
 export const plainText = (value: unknown, max = 300): string =>
   escapeMarkdownText(value, max).replace(/=/g, "＝").replace(/:\/\//g, ":／／");
 
-/** A chapter the callout links to: the note path (the link target) and its title. */
-export interface BookNoteLink {
-  path: string;
-  title: string;
-}
-const linkPart = (value: string, max: number): string =>
-  Array.from(
-    value
-      .replace(/[\p{Cc}[\]|#^\\<>%=]/gu, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-  )
-    .slice(0, max)
-    .join("");
-const noteLink = (link: BookNoteLink | undefined): string => {
-  const path = link ? linkPart(link.path.replace(/\.md$/i, ""), 200) : "";
-  if (!link || !path) return "";
-  const title = linkPart(link.title, 60);
-  return title ? `[[${path}|${title}]]` : `[[${path}]]`;
-};
 export const idPart = (value: string): string => value.replace(/[^\w.-]/g, "");
 
 // ---- the callouts ----
 
 const VERSION_LINE = "> %%vam-callout-version:1%%";
-/** Reasons a box lists (every length, picture and proof reason of one chapter fits; the cap only guards a runaway list). */
-const MAX_REASONS = 12;
 const quoted = (lines: string[]): string => lines.join("\n");
-type LinkKey = "ui.book_note_prev_0" | "ui.book_note_next_0" | "ui.book_note_review_next_0";
-const linksLine = (pairs: [LinkKey, BookNoteLink | undefined][]): string | undefined => {
-  const parts = pairs.map(([key, link]) => ({ key, link: noteLink(link) })).filter(part => part.link);
-  return parts.length ? `> ${parts.map(part => t(part.key, part.link)).join("　")}` : undefined;
-};
-
-/** Where a trial card is in the book (the book's structure), for its hint: a preface, a chapter (its sections), or a section of a chapter. */
-export interface TrialPlace {
-  kind: "preface" | "chapter" | "section";
-  chapter?: number;
-  /** The chapter's title (a chapter or a section). */
-  chapterTitle?: string;
-  sectionIndex?: number;
-  sectionCount?: number;
-  /** A chapter's section titles, in reading order. */
-  sectionTitles?: readonly string[];
-  /** Preface: next. Chapter: previous and next. Section: parent, previous and next section (never the next chapter). */
-  previous?: BookNoteLink;
-  next?: BookNoteLink;
-  parent?: BookNoteLink;
-}
-
-const none = (): string => t("ui.book_note_none");
-/** A line of links of the structure-aware hint: a missing link reads "none" so the reader sees there is nothing there. */
-const placeLinksLine = (pairs: [string, BookNoteLink | undefined][]): string =>
-  `> ${pairs.map(([key, link]) => t(key as LinkKey, noteLink(link) || none())).join("　")}`;
-
-function trialPlaceLines(place: TrialPlace): { title: string; links: string[] } {
-  if (place.kind === "preface")
-    return {
-      title: t("ui.book_note_trial_title_preface"),
-      links: [placeLinksLine([["ui.book_note_next_0", place.next]])]
-    };
-  const chapterTitle = plainText(place.chapterTitle ?? "", 120);
-  if (place.kind === "chapter") {
-    const sections = (place.sectionTitles ?? []).map(title => plainText(title, 80));
-    return {
-      title: t("ui.book_note_trial_title_chapter_0_1", place.chapter ?? 0, chapterTitle),
-      links: [
-        placeLinksLine([
-          ["ui.book_note_prev_0", place.previous],
-          ["ui.book_note_next_0", place.next]
-        ]),
-        ...(sections.length ? [`> ${t("ui.book_note_sections_0", sections.join(t("ui.book_note_sections_sep")))}`] : [])
-      ]
-    };
-  }
-  return {
-    title: t(
-      "ui.book_note_trial_title_section_0_1_2_3",
-      place.chapter ?? 0,
-      chapterTitle,
-      place.sectionIndex ?? 0,
-      place.sectionCount ?? 0
-    ),
-    links: [
-      placeLinksLine([
-        ["ui.book_note_parent_0", place.parent],
-        ["ui.book_note_prev_section_0", place.previous],
-        ["ui.book_note_next_section_0", place.next]
-      ])
-    ]
-  };
-}
-
-/**
- * The hint at the top of a trial chapter: where it is in the trial, what to do next, links to the neighbours; while stopped it says to
- * press Continue first. With `place` (a run whose trial is the preface and chapter 1) it names the card's place in the book; without
- * (an older trial) it keeps "chapter i of n".
- */
-export function trialCallout(
-  i: number,
-  n: number,
-  prevLink: BookNoteLink | undefined,
-  nextLink: BookNoteLink | undefined,
-  stopped: boolean | undefined,
-  owner: { runId: string; nodeId: string },
-  reasons: readonly string[] = [],
-  place?: TrialPlace
-): string {
-  const placed = place ? trialPlaceLines(place) : undefined;
-  const links = placed
-    ? undefined
-    : linksLine([
-        ["ui.book_note_prev_0", prevLink],
-        ["ui.book_note_next_0", nextLink]
-      ]);
-  return quoted([
-    `> [!vam-trial] ${placed ? placed.title : t("ui.book_note_trial_title_0", i, n)}`,
-    ...(reasons.length ? [`> ${t("ui.book_note_trial_problems")}`] : []),
-    ...reasons.slice(0, MAX_REASONS).map(reason => `> ・${plainText(reason)}`),
-    `> ${stopped ? t("ui.book_note_trial_stopped") : t("ui.book_note_trial_next")}`,
-    `> ${t("ui.book_note_trial_edit")}`,
-    ...(placed ? placed.links : links ? [links] : []),
-    `> %%vam-trial:${idPart(owner.runId)}:${idPart(owner.nodeId)}%%`,
-    VERSION_LINE
-  ]);
-}
-
-/** The box at the top of a chapter that needs a look: the reasons as plain text, the two checkboxes, a link to the next one. */
-export function reviewCallout(
-  card: Pick<Gate2Card, "id" | "title">,
-  reasons: readonly string[],
-  nextLink: BookNoteLink | undefined,
-  fp: string,
-  runId: string,
-  hand?: HandEditBox
-): string {
-  const next = linksLine([["ui.book_note_review_next_0", nextLink]]);
-  return quoted([
-    `> [!vam-review] ${t("ui.book_note_review_title")}`,
-    ...reasons.slice(0, MAX_REASONS).map(reason => `> ・${plainText(reason)}`),
-    // A hand-edited chapter has two separate answers: keep it (a resolution) or rewrite it (a one-time command bound to the text and to `op`).
-    `> - [ ] ${t(hand ? "ui.book_note_review_keep" : "ui.book_note_review_accept")}`,
-    // A queued rewrite keeps its tick when the box is written again (the queue lives in the box: the tick is what a later drain reads).
-    `> - [${hand?.queued ? "x" : " "}] ${t(hand ? "ui.book_note_review_rewrite" : "ui.book_note_review_fixed")}`,
-    ...(hand?.status ? [`> ${plainText(hand.status)}`] : []),
-    ...(next ? [next] : []),
-    `> %%vam-review:${idPart(runId)}:${idPart(card.id)}:${idPart(fp)}${handSuffix(hand)}%%`,
-    VERSION_LINE
-  ]);
-}
-
 /** What one chapter's AI proofread box tells: how many items were checked, each place that was fixed, each that was not (with its reason code). */
 /** A fixed place: what was wrong and the sentence written; `suggestion` is the model's advice and is never shown. */
 export interface AiBoxFix {
@@ -660,16 +515,6 @@ export const aiProofFingerprint = (input: AiBoxInput): string => {
   return marker?.[1] ?? "";
 };
 
-/** What a hand-edited chapter's box carries besides the usual: the operation id, the text it was written for, a queued rewrite, a status line. */
-export interface HandEditBox {
-  op: string;
-  ifp: string;
-  queued?: boolean;
-  /** One plain line under the two boxes ("queued", why the last rewrite did not happen); it starts with ⏳ or ⚠. */
-  status?: string;
-}
-const handSuffix = (hand: HandEditBox | undefined): string =>
-  hand ? `:${idPart(hand.op)}:${idPart(hand.ifp)}${hand.queued ? ":q" : ""}` : "";
 const STATUS_LINE = /^[ \t]{0,3}>[ \t]?[⏳⚠]/u;
 
 // ---- reading and editing a note's raw text ----
@@ -719,7 +564,7 @@ export const removeProgramCallouts = (text: string, kind?: "trial" | "review"): 
   removeProgramCalloutsWhere(text, c => !kind || c.kind === kind);
 
 /**
- * `callout` (a {@link trialCallout} or {@link reviewCallout} text) at the top of the Detail block, replacing the program's callouts of the
+ * `callout` (an {@link aiProofCallout} text) at the top of the Detail block, replacing the program's callouts of the
  * same kind. Running it twice with the same callout gives the same text. A text without a Detail block, or a callout of no known kind,
  * comes back unchanged.
  */

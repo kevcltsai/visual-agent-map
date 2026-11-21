@@ -24,11 +24,12 @@ export { BookPipelineRunError, stepCounts } from "./experiences/visual-map/book-
 export { readBookPipeline } from "./core/book-pipeline/model";
 export { bookStructure } from "./core/book-pipeline/structure";
 export { OPEN_ISSUES_MARKER } from "./core/book-pipeline/open-issues";
-export { reviewEntries, reviewCallout, putProgramCallout, collapseReviewCallouts, markReviewHandled } from "./experiences/visual-map/book-pipeline-review";
+export { reviewEntries, putProgramCallout, collapseReviewCallouts, markReviewHandled } from "./experiences/visual-map/book-pipeline-review";
 export { VisualAgentMapView } from "./experiences/visual-map/view";
 export { setUiLanguage, t } from "./i18n";
 `, { obsidian: { ...support.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice(notices), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, Option: OptionStub, window: { setTimeout: (fn, ms) => (ms === 20000 && timers.hold ? (timers.held.push(fn), 99) : setTimeout(fn, ms)), clearTimeout, setInterval, clearInterval } });
 const { setUiLanguage, t: tr } = bundle;
+const legacy = require('./support-legacy-boxes.cjs')(bundle);
 const { OPEN_ISSUES_MARKER } = bundle;
 const ui = bundle, runModule = bundle, model = bundle, bundleStart = bundle;
 const flat = text => text.replace(/\s+/g, ' ');
@@ -1410,7 +1411,7 @@ markHandled: async path => { calls.handled.push(path); await g.view.app.vault.pr
   const writeBox = async ({ ticked, fp }) => {
     const e = await fresh();
     await g.view.app.vault.process(file, raw => {
-      const text = bundle.putProgramCallout(raw, bundle.reviewCallout(e.card, ['x'], undefined, fp ?? e.fp, 'r1'));
+      const text = bundle.putProgramCallout(raw, legacy.reviewCallout(e.card, ['x'], undefined, fp ?? e.fp, 'r1'));
       return ticked ? text.replace('[ ]', '[x]') : text;
     });
     return e;
@@ -1487,7 +1488,7 @@ async function handRig() {
   const e = await r.fresh();
   assert.equal(e.card.handEdited, true);
   const file = r.view.app.vault.getAbstractFileByPath(r.node.path);
-  await r.view.app.vault.process(file, raw => bundle.putProgramCallout(raw, bundle.reviewCallout(e.card, ['x'], undefined, e.fp, 'r1', { op: 'op1', ifp: e.card.bodyFp })));
+  await r.view.app.vault.process(file, raw => bundle.putProgramCallout(raw, legacy.reviewCallout(e.card, ['x'], undefined, e.fp, 'r1', { op: 'op1', ifp: e.card.bodyFp })));
   const tickAt = at => r.view.app.vault.process(file, raw => { let n = 0; return raw.replace(/\[ \]/g, m => (n++ === at ? '[x]' : m)); });
   return { ...r, e, tickAt };
 }

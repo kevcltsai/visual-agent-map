@@ -8,14 +8,15 @@ const { loadSource } = require('./support-replay.cjs');
 
 const b = loadSource(`
 export * from "./experiences/visual-map/book-pipeline-callouts";
-export { findProgramCallouts, readReviewState, putProgramCallout, reviewCallout, trialCallout, aiProofCallout, aiProofFingerprint } from "./experiences/visual-map/book-pipeline-review";
-export { setUiLanguage } from "./i18n";
+export { findProgramCallouts, readReviewState, putProgramCallout, aiProofCallout, aiProofFingerprint } from "./experiences/visual-map/book-pipeline-review";
+export { setUiLanguage, t } from "./i18n";
 export { composeProofRecord, proofKey } from "./core/book-pipeline/proof";
 export { replaceResearchRecord, chapterBody } from "./core/book-pipeline/note-sections";
 export { projectProofBody } from "./core/book-pipeline/book-notes";
 export { stripImageLines } from "./core/book-pipeline/image-slots";
 `, { obsidian: { ...S.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice([]), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
 b.setUiLanguage('zh-TW');
+const legacy = require('./support-legacy-boxes.cjs')(b);
 
 const START = '<!-- visual-agent-map:detail:start -->';
 const END = '<!-- visual-agent-map:detail:end -->';
@@ -69,7 +70,7 @@ test('writer: a refused file write with no view to retry on stays refused', asyn
 
 // ---- the aligner ----
 const want = (over = {}) => ({ runId: 'r1', nodeId: 'n1', ...over });
-const box = (fp = 'fp1') => ({ fp, build: () => b.reviewCallout({ id: 'n1', index: 1, title: 'T', stage: 'needs-review', structureUnmet: 0, factsOpen: 0, galleryBare: false, seam: false }, ['x'], undefined, fp, 'r1') });
+const box = (fp = 'fp1') => ({ fp, build: () => legacy.reviewCallout({ id: 'n1', index: 1, title: 'T', stage: 'needs-review', structureUnmet: 0, factsOpen: 0, galleryBare: false, seam: false }, ['x'], undefined, fp, 'r1') });
 test('align: running it again changes nothing; no want removes every program callout', () => {
   const once = b.alignCallouts(note(), want({ review: box() }));
   assert.deepEqual(kinds(once), ['review:r1']);
@@ -170,7 +171,7 @@ function rig(data, extra = []) {
   });
   return { callouts, notes, map, logs, fail, kinds: id => kinds(notes.get(`N/${id}.md`)) };
 }
-const oldTrial = (id, runId = 'r1') => b.putProgramCallout(note(`Body ${id}`), b.trialCallout(1, 2, undefined, undefined, false, { runId, nodeId: id }));
+const oldTrial = (id, runId = 'r1') => b.putProgramCallout(note(`Body ${id}`), legacy.trialCallout(1, 2, undefined, undefined, false, { runId, nodeId: id }));
 test('reconcile: gate 1 draws no trial hint and takes an old one off', async () => {
   const r = rig(DATA({ phase: 'gate1', trial: ['n1', 'n2'] }));
   r.notes.set('N/n1.md', oldTrial('n1'));
@@ -200,9 +201,9 @@ test('reconcile: the AI box is drawn at gate 2 and when done on a chapter whose 
 });
 test('reconcile: a callout of another run goes, on a chapter and on a note that is not a chapter of the run', async () => {
   const r = rig(DATA(), ['x1']);
-  const old = b.putProgramCallout(note('Body'), b.trialCallout(1, 2, undefined, undefined, false, { runId: 'old', nodeId: 'x1' }));
+  const old = b.putProgramCallout(note('Body'), legacy.trialCallout(1, 2, undefined, undefined, false, { runId: 'old', nodeId: 'x1' }));
   r.notes.set('N/x1.md', old);
-  r.notes.set('N/n2.md', b.putProgramCallout(note('B2'), b.trialCallout(1, 2, undefined, undefined, false, { runId: 'old', nodeId: 'n2' })));
+  r.notes.set('N/n2.md', b.putProgramCallout(note('B2'), legacy.trialCallout(1, 2, undefined, undefined, false, { runId: 'old', nodeId: 'n2' })));
   await r.callouts.reconcile('M');
   assert.deepEqual(r.kinds('x1'), []);
   assert.deepEqual(r.kinds('n2'), []);
@@ -231,7 +232,7 @@ test('reconcile: after a restart whose clear failed, the old run callouts go on 
 });
 test('reconcile: an unusable bookPipeline is left alone; a failed write is logged and never thrown; dispose stops writes', async () => {
   const bad = rig({ v: 9 });
-  bad.notes.set('N/n1.md', b.putProgramCallout(note(), b.trialCallout(1, 1, undefined, undefined, false, { runId: 'r1', nodeId: 'n1' })));
+  bad.notes.set('N/n1.md', b.putProgramCallout(note(), legacy.trialCallout(1, 1, undefined, undefined, false, { runId: 'r1', nodeId: 'n1' })));
   await bad.callouts.reconcile('M');
   assert.deepEqual(bad.kinds('n1'), ['trial:r1']);
   const r = rig(DATA());
@@ -281,7 +282,7 @@ test('reconcile: with a hint, a map of plain notes (no picture book, or no marke
 });
 test('reconcile: with a hint, only a note that may carry a callout is read and rewritten; unknown is read', async () => {
   const r = rig(undefined, ['x1', 'x2']);
-  const stale = b.putProgramCallout(note('B'), b.trialCallout(1, 2, undefined, undefined, false, { runId: 'old', nodeId: 'x1' }));
+  const stale = b.putProgramCallout(note('B'), legacy.trialCallout(1, 2, undefined, undefined, false, { runId: 'old', nodeId: 'x1' }));
   r.notes.set('N/x1.md', stale);
   r.notes.set('N/x2.md', stale);
   await r.callouts.reconcile('M', id => (id === 'x1' ? true : id === 'x2' ? false : undefined));

@@ -427,7 +427,7 @@ import {
   statusBarClearance
 } from "./viewport-inset";
 import { RelevanceSummaryModal } from "./relevance-summary-modal";
-import { RelevanceGradeRun } from "./relevance-grade-run";
+import { gradingUndone, RelevanceGradeRun } from "./relevance-grade-run";
 import {
   MapChatPanel,
   type MapChatChip,
@@ -4797,7 +4797,7 @@ export class VisualAgentMapView extends ItemView {
   /** Status bar under the toolbar, same place and look as the AIM and multi-research bars. */
   private renderRelevanceStatus(parent: HTMLElement): void {
     const run = this.plugin.relevanceGrades.get(this.path);
-    if (!run) return;
+    if (!run || gradingUndone(run)) return;
     const running = run.status === "running";
     const bar = parent.createDiv(`vam-aim-statusbar vam-relevance-statusbar${running ? " is-active" : ""}`);
     bar.setAttr("aria-live", "polite");

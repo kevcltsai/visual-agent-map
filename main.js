@@ -61263,6 +61263,10 @@ function errorMessage2(error) {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 }
+var undoneGradings = /* @__PURE__ */ new WeakSet();
+function gradingUndone(run) {
+  return !!run.historyEntry && undoneGradings.has(run.historyEntry);
+}
 var relevanceRunToken = 0;
 var RelevanceGradeRun = class {
   constructor(owner, ports) {
@@ -61556,8 +61560,14 @@ var RelevanceGradeRun = class {
         const changes = outcome.changes;
         const entry = {
           label: t("ui.relevance_history_label"),
-          undo: () => this.restore(changes, "undo"),
-          redo: () => this.restore(changes, "redo")
+          undo: () => {
+            undoneGradings.add(entry);
+            return this.restore(changes, "undo");
+          },
+          redo: () => {
+            undoneGradings.delete(entry);
+            return this.restore(changes, "redo");
+          }
         };
         this.history.push(entry);
         run.historyEntry = entry;
@@ -78011,7 +78021,7 @@ ${request.requirements}` : preset.text,
   renderRelevanceStatus(parent) {
     var _a2, _b2;
     const run = this.plugin.relevanceGrades.get(this.path);
-    if (!run) return;
+    if (!run || gradingUndone(run)) return;
     const running2 = run.status === "running";
     const bar = parent.createDiv(`vam-aim-statusbar vam-relevance-statusbar${running2 ? " is-active" : ""}`);
     bar.setAttr("aria-live", "polite");

@@ -33,6 +33,12 @@ function errorMessage(error: unknown): string {
   const message = (error as { message?: unknown } | null)?.message;
   return typeof message === "string" ? message : String(error);
 }
+/** History entries of grading runs that are currently undone (shared by every view of the map; redo takes it out). */
+const undoneGradings = new WeakSet<object>();
+/** True while a finished run's grading step is undone: its result no longer stands, so the status bar is not shown. */
+export function gradingUndone(run: GoalRecommendRun): boolean {
+  return !!run.historyEntry && undoneGradings.has(run.historyEntry);
+}
 /** Identifies one relevance grading run, so a late result can tell it is no longer the current one. */
 let relevanceRunToken = 0;
 export interface RelevanceGradePorts {
@@ -372,8 +378,14 @@ export class RelevanceGradeRun {
         const changes = outcome.changes;
         const entry: Action = {
           label: t("ui.relevance_history_label"),
-          undo: () => this.restore(changes, "undo"),
-          redo: () => this.restore(changes, "redo")
+          undo: () => {
+            undoneGradings.add(entry);
+            return this.restore(changes, "undo");
+          },
+          redo: () => {
+            undoneGradings.delete(entry);
+            return this.restore(changes, "redo");
+          }
         };
         this.history.push(entry);
         run.historyEntry = entry;

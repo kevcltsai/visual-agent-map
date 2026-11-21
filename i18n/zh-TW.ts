@@ -3312,6 +3312,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_ai_reason_hand_edited": "這章你手改過，AI 不蓋掉你的字",
   "ui.book_ai_reason_fix_failed": "AI 改的時候失敗了",
   "ui.book_ai_reason_proof_incomplete": "校對沒有跑完",
+  "ui.book_ai_reason_not_fixed_in_time": "還沒來得及修，最後一輪才查到",
   "ui.book_ai_reason_other": "AI 沒辦法處理",
   "ui.book_note_review_accept": "接受現在這樣，不用改",
   "ui.book_note_review_fixed": "我改好了",

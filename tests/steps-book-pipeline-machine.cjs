@@ -843,3 +843,60 @@ test('ai fix records what it changed: the targets that were not blocked, kept ac
   other = machine.applyAiFix(h.state, h.token, { applied: 0, refused: { P1: 'fix_refused_picture' } }).state;
   assert.equal(other.aiProof.b.fixes, undefined, 'nothing applied: no fix recorded');
 });
+
+const pq = (id, quote) => ({ id, quote, problem: `p-${quote}`, suggestion: `s-${quote}` });
+test('R1 B1: a target the model gave no edit for is not recorded as a fix (only ids that were applied)', () => {
+  const { state: start } = checkedRun();
+  const p = begin(start, { nodeId: 'a' }, 'k0', 'proof');
+  let state = machine.applyAiProof(p.state, p.token, { checked: 3, pending: [pq('P1', 'qa'), pq('P2', 'qb')], open: [] }).state;
+  const f = begin(state, { nodeId: 'a' }, 'k0', 'fix');
+  state = machine.applyAiFix(f.state, f.token, { applied: 1, appliedIds: ['P1'], key: 'k1', changed: ['a'] }).state;
+  assert.deepEqual(plain(state.aiProof.a.fixes.map(item => item.id)), ['P1'], 'P2 was skipped by the model: no fix');
+  assert.equal(state.aiProof.a.fixed, state.aiProof.a.fixes.length, 'the number and the list agree');
+});
+
+test('R1 B2: ids renumbered between rounds: the reason follows the quote, a stale refusal of a reused id is not carried over', () => {
+  const { state: start } = checkedRun();
+  const p0 = begin(start, { nodeId: 'a' }, 'k0', 'proof');
+  let state = machine.applyAiProof(p0.state, p0.token, { checked: 1, pending: [pq('P1', 'qa')], open: [] }).state;
+  const f0 = begin(state, { nodeId: 'a' }, 'k0', 'fix');
+  state = machine.applyAiFix(f0.state, f0.token, { applied: 0, refused: { P1: 'fix_refused_picture' } }).state;
+  const p1 = begin(state, { nodeId: 'a' }, 'k0', 'proof');
+  // qa is gone; a different problem now carries the id P1
+  state = machine.applyAiProof(p1.state, p1.token, { checked: 1, pending: [pq('P1', 'qb')], open: [] }).state;
+  const f1 = begin(state, { nodeId: 'a' }, 'k0', 'fix');
+  state = machine.applyAiFix(f1.state, f1.token, { applied: 1, appliedIds: ['P1'], key: 'k1', changed: ['a'] }).state;
+  const p2 = begin(state, { nodeId: 'a' }, 'k1', 'proof');
+  state = machine.applyAiProof(p2.state, p2.token, { checked: 1, pending: [pq('P1', 'qb')], open: [] }).state;
+  assert.deepEqual(plain(state.aiProof.a.open.map(item => [item.quote, item.reason])), [['qb', 'still_present']], 'same quote under a new id: still present, not the old picture refusal');
+});
+
+test('R1 B2: a problem first found in the last check is not_fixed_in_time, not "fixed twice and still there"', () => {
+  const { state: start } = checkedRun();
+  let state = start;
+  let key = 'k0';
+  for (let round = 0; round < 3; round++) {
+    const p = begin(state, { nodeId: 'a' }, key, 'proof');
+    const found = round < 2 ? pq('P1', 'old') : pq('N9', 'brand new');
+    state = machine.applyAiProof(p.state, p.token, { checked: 2, pending: [found], open: [] }).state;
+    if (state.aiProof.a.done) break;
+    const f = begin(state, { nodeId: 'a' }, key, 'fix');
+    key = `k${round + 1}`;
+    state = machine.applyAiFix(f.state, f.token, { applied: 1, appliedIds: ['P1'], key, changed: ['a'] }).state;
+  }
+  assert.deepEqual(plain(state.aiProof.a.open.map(item => [item.quote, item.reason])), [['brand new', 'not_fixed_in_time']]);
+});
+
+test('R1 B2: ids renumbered: a refused problem reported again under another id keeps its own refusal reason (matched by the quote)', () => {
+  const { state: start } = checkedRun();
+  let state = start;
+  let key = 'k0';
+  for (let round = 0; round < 3; round++) {
+    const p = begin(state, { nodeId: 'a' }, key, 'proof');
+    state = machine.applyAiProof(p.state, p.token, { checked: 2, pending: [pq(round === 2 ? 'Z5' : 'P1', 'qa')], open: [] }).state;
+    if (state.aiProof.a.done) break;
+    const f = begin(state, { nodeId: 'a' }, key, 'fix');
+    state = machine.applyAiFix(f.state, f.token, { applied: 0, refused: { P1: 'fix_refused_picture' } }).state;
+  }
+  assert.deepEqual(plain(state.aiProof.a.open.map(item => [item.id, item.reason])), [['Z5', 'fix_refused_picture']]);
+});

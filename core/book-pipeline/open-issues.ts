@@ -61,6 +61,10 @@ export const OPEN_ISSUE_SOURCES: Record<string, IssueSource> = {
         zh: "這處是你手改或加註的內容，程式不動",
         en: "This is text you edited or annotated, so it was left alone"
       },
+      not_fixed_in_time: {
+        zh: "最後一輪才查到這處，來不及修",
+        en: "It was first found in the last check, so there was no round left to fix it"
+      },
       fix_failed: { zh: "修正這步一直失敗", en: "The fix step kept failing" },
       proof_incomplete: {
         zh: "AI 校對沒有跑完，這章沒有完整查過",
@@ -76,7 +80,11 @@ export const OPEN_ISSUE_SOURCES: Record<string, IssueSource> = {
       too_long: { zh: "字數高於設定的上限", en: "The chapter is above the asked length" },
       few_images: { zh: "圖片少於設定的張數", en: "The chapter has fewer pictures than asked" },
       step_failed: { zh: "有一個步驟失敗了", en: "A step failed" },
-      no_text: { zh: "這章沒有正文", en: "The chapter has no text" }
+      no_text: { zh: "這章沒有正文", en: "The chapter has no text" },
+      hand_edited: {
+        zh: "這章是你手改過的，程式不動",
+        en: "You edited this chapter by hand, so it was left alone"
+      }
     },
     fallback: { zh: "這章還有狀態沒解決", en: "The chapter still has an unresolved state" }
   }

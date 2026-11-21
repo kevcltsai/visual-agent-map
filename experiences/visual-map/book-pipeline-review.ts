@@ -577,6 +577,8 @@ export function reviewCallout(
 /** What one chapter's AI proofread box tells: how many items were checked, each place that was fixed, each that was not (with its reason code). */
 export interface AiBoxInput {
   checked: number;
+  /** The count the title shows (the tool bar's number); absent: the length of `fixes`. */
+  fixed?: number;
   fixes: readonly { suggestion: string }[];
   open: readonly { problem: string; reason: string }[];
   /** The proofread did not finish: the box says so instead of counting. */
@@ -594,7 +596,8 @@ const AI_REASON_KEY: Record<string, TranslationKey> = {
   fix_forbidden_syntax: "ui.book_ai_reason_fix_forbidden_syntax",
   hand_edited: "ui.book_ai_reason_hand_edited",
   fix_failed: "ui.book_ai_reason_fix_failed",
-  proof_incomplete: "ui.book_ai_reason_proof_incomplete"
+  proof_incomplete: "ui.book_ai_reason_proof_incomplete",
+  not_fixed_in_time: "ui.book_ai_reason_not_fixed_in_time"
 };
 /** A reason code in words (an unknown code reads as the general sentence; the code itself is never shown). */
 export const aiReasonText = (reason: string): string =>
@@ -609,7 +612,7 @@ export const aiReasonText = (reason: string): string =>
 export function aiProofCallout(input: AiBoxInput, runId: string, nodeId: string): string {
   const title = input.incomplete
     ? t("ui.book_ai_box_title_incomplete")
-    : t("ui.book_ai_box_title_0_1_2", input.checked, input.fixes.length, input.open.length);
+    : t("ui.book_ai_box_title_0_1_2", input.checked, input.fixed ?? input.fixes.length, input.open.length);
   const lines = [
     ...input.fixes.map(fix => `> ・${t("ui.book_ai_box_fixed_0", plainText(fix.suggestion))}`),
     ...input.open.map(item => {

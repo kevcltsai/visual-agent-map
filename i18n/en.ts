@@ -3549,6 +3549,7 @@ export const en = {
   "ui.book_ai_reason_hand_edited": "you edited this chapter by hand, so the AI did not overwrite it",
   "ui.book_ai_reason_fix_failed": "the AI's fix did not work",
   "ui.book_ai_reason_proof_incomplete": "the proofread did not finish",
+  "ui.book_ai_reason_not_fixed_in_time": "found in the last check, no round left to fix it",
   "ui.book_ai_reason_other": "the AI could not handle it",
   "ui.book_note_review_accept": "Accept it as it is, no change needed",
   "ui.book_note_review_fixed": "I fixed it",

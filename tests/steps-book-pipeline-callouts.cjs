@@ -380,3 +380,9 @@ test('reading re-render: a view is drawn only once it holds the file text the wr
   assert.equal(pauses, 3);
   assert.equal(drawn.at(-1), 'stuck');
 });
+
+test('R1 B1: the box title counts what slot.fixed says, not the list length', () => {
+  const text = b.aiProofCallout({ checked: 3, fixed: 1, fixes: [{ suggestion: 'a' }, { suggestion: 'b' }], open: [] }, 'r1', 'n1');
+  const title = text.split('\n')[0];
+  assert.equal(title, b.aiProofCallout({ checked: 3, fixed: 1, fixes: [{ suggestion: 'a' }], open: [] }, 'r1', 'n1').split('\n')[0]);
+});

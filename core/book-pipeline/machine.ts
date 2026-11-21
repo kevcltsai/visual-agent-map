@@ -267,14 +267,17 @@ export function abandonAi(data: BookPipelineData, nodeId?: string): BookPipeline
  */
 export function beginAiStep(
   data: BookPipelineData,
-  scope: { nodeId?: string },
+  scope: { nodeId?: string; /** One chapter written again after the book was proofread: its chapter proofread starts again in any phase. */ rerun?: boolean },
   key: string,
   step: "proof" | "fix"
 ): { state: BookPipelineData; token: AiToken } | null {
   const nodeId = scope.nodeId;
-  if (data.status !== "running" || data.phase === "done") return null;
-  if (nodeId === undefined ? data.phase !== "writing" && data.phase !== "gate2" : !aiChapterDue(data, nodeId))
-    return null;
+  if (data.status !== "running") return null;
+  if (!(scope.rerun && nodeId !== undefined)) {
+    if (data.phase === "done") return null;
+    if (nodeId === undefined ? data.phase !== "writing" && data.phase !== "gate2" : !aiChapterDue(data, nodeId))
+      return null;
+  }
   if (nodeId !== undefined && !effectiveOrder(data).includes(nodeId)) return null;
   const found = aiSlot(data, nodeId);
   if (found?.done) return null;
@@ -336,7 +339,19 @@ export function applyAiProof(
     slot.open = result.open.map(item => ({ ...item }));
   } else {
     slot.done = true;
-    slot.open = withOpen(result.open, result.pending, id => slot.refused?.[id] ?? "still_present");
+    // Ids are renumbered by every check, so an item is matched to the last fix round's targets by its quote: a match keeps that
+    // target's blocked reason (or is still present); one the earlier rounds never saw (first found in this last check) was not fixed in time.
+    const squash = (text: string): string => text.replace(/\s+/g, "");
+    const prior = found.pending ?? [];
+    slot.open = withOpen(result.open, result.pending, id => {
+      const item = result.pending.find(entry => entry.id === id);
+      const before = item
+        ? prior.find(
+            target => squash(target.quote) === squash(item.quote) && (target.chapter ?? 1) === (item.chapter ?? 1)
+          )
+        : undefined;
+      return before ? (slot.refused?.[before.id] ?? "still_present") : "not_fixed_in_time";
+    });
   }
   setAiSlot(next, token.nodeId, slot);
   next.revision++;
@@ -349,7 +364,14 @@ export function applyAiProof(
 export function applyAiFix(
   data: BookPipelineData,
   token: AiToken,
-  result: { applied: number; refused?: Readonly<Record<string, string>>; key?: string; changed?: readonly string[] }
+  result: {
+    applied: number;
+    refused?: Readonly<Record<string, string>>;
+    /** The ids whose edit was written; when given, only these become fixes (a target the model skipped is neither). */
+    appliedIds?: readonly string[];
+    key?: string;
+    changed?: readonly string[];
+  }
 ): Committed {
   const found = token.step === "fix" ? aiCurrent(data, token) : undefined;
   if (!found) return { state: data, accepted: false };
@@ -363,11 +385,17 @@ export function applyAiFix(
     fixed: found.fixed + result.applied,
     refused: { ...(found.refused ?? {}), ...(result.refused ?? {}) }
   };
+  // An id applied this round no longer carries an older refusal (ids are renumbered, so a reused one is another problem).
+  for (const id of result.appliedIds ?? []) delete slot.refused?.[id];
   // `pending` stays: the next check reads it as the earlier findings (`priorOf`); the next `applyAiProof` replaces it.
   if (!Object.keys(slot.refused ?? {}).length) delete slot.refused;
   // What this call changed, as described: every target of the call that was not blocked (each is applied or refused).
   const blocked = result.refused ?? {};
-  const done = result.applied > 0 ? (found.pending ?? []).filter(item => !(item.id in blocked)) : [];
+  const written = result.appliedIds ? new Set(result.appliedIds) : undefined;
+  const done =
+    result.applied > 0
+      ? (found.pending ?? []).filter(item => (written ? written.has(item.id) : !(item.id in blocked)))
+      : [];
   if (done.length) slot.fixes = [...(found.fixes ?? []), ...done.map(item => ({ ...item }))];
   for (const id of result.changed ?? [])
     if (effectiveOrder(next).includes(id)) next.revisions[id] = cardRevision(next, id) + 1;

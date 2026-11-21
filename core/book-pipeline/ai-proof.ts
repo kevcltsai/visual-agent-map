@@ -35,7 +35,8 @@ export const AI_OPEN_REASONS = [
   "fix_forbidden_syntax",
   "hand_edited",
   "fix_failed",
-  "proof_incomplete"
+  "proof_incomplete",
+  "not_fixed_in_time"
 ] as const;
 export type AiOpenReason = (typeof AI_OPEN_REASONS)[number];
 

@@ -422,6 +422,7 @@ export class BookCallouts {
         if (!slot || !(slot.done || slot.incomplete)) continue;
         const input: AiBoxInput = {
           checked: slot.checked,
+          fixed: slot.fixed,
           fixes: slot.fixes ?? [],
           open: slot.open,
           ...(slot.incomplete ? { incomplete: true } : {})

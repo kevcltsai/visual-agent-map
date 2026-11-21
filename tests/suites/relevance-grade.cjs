@@ -209,12 +209,15 @@ integrationTest('relevance: one undo restores every graded note (absent before m
   button(h.bar(), 'Undo').click(); await afterTravel(h);
   assert.deepEqual(await h.allRelevance(), before, 'a single undo puts back every previous value');
   assert.equal(await h.repo.readRelevanceGoal(MAP), 'Goal', 'the goal is its own undo step and stays');
-  assert.equal(h.barButtons().includes('Undo'), false, 'Undo is only offered while the grading is the latest step');
+  assert.equal(h.bar(), undefined, 'after undo the status bar is gone, as before the run (no stale "Updated N topics")');
   await h.view.travel(false);
   assert.equal(await h.repo.readRelevanceGoal(MAP), undefined, 'the second undo removes the goal');
   assert.doesNotMatch(h.contents.get(MAP), /relevance-goal/);
   await h.view.travel(true); await h.view.travel(true);
   assert.equal(await h.repo.readRelevanceGoal(MAP), 'Goal'); assert.equal(await h.relevanceOf('c'), 'side', 'redo grades again');
+  assert.ok(h.barText().startsWith('Updated'), 'redo brings the result back'); assert.deepEqual(h.barButtons(), ['View changes', 'Undo', 'Dismiss']);
+  await h.view.travel(false);
+  assert.equal(h.bar(), undefined, 'undo by keyboard hides it too');
 });
 
 integrationTest('relevance: undo and redo never overwrite a note the owner edited after grading; they say how many were left', async () => {
@@ -476,11 +479,12 @@ integrationTest('relevance: focus inside the status bar survives a repaint (Stop
   assert.ok(h.barText().startsWith('Updated'));
   h.view.render();
   assert.equal(doc.activeElement.text, 'View changes', 'focus lands on a button that still exists, not on the page');
-  // Undo by keyboard: the bar is repainted without the Undo button.
+  // Undo by keyboard: the bar goes away and the keyboard lands on the goal text.
   focus(button(h.bar(), 'Undo')); button(h.bar(), 'Undo').click(); await afterTravel(h);
-  assert.equal(h.barButtons().includes('Undo'), false);
-  assert.ok(h.bar().contains(doc.activeElement), 'focus stays in the status bar after Undo');
-  // Focus elsewhere is left alone.
+  assert.equal(h.bar(), undefined, 'Undo hides the status bar');
+  assert.equal(doc.activeElement, h.chip(), 'focus moves to the goal text, not to the page');
+  // Focus elsewhere is left alone (redo brings the bar back first).
+  await h.view.travel(true);
   const chip = h.chip(); focus(chip); h.view.render();
   assert.equal(h.bar().contains(doc.activeElement), false, 'a repaint never pulls focus into the bar');
   assert.equal(doc.activeElement, chip);

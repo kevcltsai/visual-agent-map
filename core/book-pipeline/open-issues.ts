@@ -36,15 +36,36 @@ export const OPEN_ISSUE_SOURCES: Record<string, IssueSource> = {
     reasons: {
       still_present: { zh: "AI 修了兩輪，再查時問題還在", en: "The AI fixed it twice and the re-check still found it" },
       sources_conflict: { zh: "來源之間說法不同，沒辦法靠改字解決", en: "The sources disagree; no edit can settle it" },
-      source_unreachable: { zh: "來源打不開或沒寫到這件事，查不到依據", en: "The source cannot be opened or does not cover it" },
+      source_unreachable: {
+        zh: "來源打不開或沒寫到這件事，查不到依據",
+        en: "The source cannot be opened or does not cover it"
+      },
       unfixable: { zh: "AI 判斷這處不能靠改字解決", en: "The AI judged that an edit cannot fix it" },
-      fix_refused_picture: { zh: "修正會動到圖片，所以沒套用", en: "The fix would have changed a picture, so it was not applied" },
-      fix_refused_length: { zh: "修正會讓章節變得太短，所以沒套用", en: "The fix would have made the chapter too short, so it was not applied" },
-      fix_quote_missing: { zh: "AI 引的句子在原文找不到或不只一處，沒套用", en: "The sentence the AI quoted was not found once in the text, so nothing was applied" },
-      fix_forbidden_syntax: { zh: "修正含有不能寫進正文的語法，沒套用", en: "The fix held syntax that cannot go into the text, so it was not applied" },
-      hand_edited: { zh: "這處是你手改或加註的內容，程式不動", en: "This is text you edited or annotated, so it was left alone" },
+      fix_refused_picture: {
+        zh: "修正會動到圖片，所以沒套用",
+        en: "The fix would have changed a picture, so it was not applied"
+      },
+      fix_refused_length: {
+        zh: "修正會讓章節變得太短，所以沒套用",
+        en: "The fix would have made the chapter too short, so it was not applied"
+      },
+      fix_quote_missing: {
+        zh: "AI 引的句子在原文找不到或不只一處，沒套用",
+        en: "The sentence the AI quoted was not found once in the text, so nothing was applied"
+      },
+      fix_forbidden_syntax: {
+        zh: "修正含有不能寫進正文的語法，沒套用",
+        en: "The fix held syntax that cannot go into the text, so it was not applied"
+      },
+      hand_edited: {
+        zh: "這處是你手改或加註的內容，程式不動",
+        en: "This is text you edited or annotated, so it was left alone"
+      },
       fix_failed: { zh: "修正這步一直失敗", en: "The fix step kept failing" },
-      proof_incomplete: { zh: "AI 校對沒有跑完，這章沒有完整查過", en: "The AI proofread did not finish, so this chapter was not fully checked" }
+      proof_incomplete: {
+        zh: "AI 校對沒有跑完，這章沒有完整查過",
+        en: "The AI proofread did not finish, so this chapter was not fully checked"
+      }
     },
     fallback: { zh: "AI 沒能解決這處", en: "The AI could not settle this" }
   },
@@ -72,12 +93,16 @@ export const reasonText = (issue: Pick<BookOpenIssue, "source" | "reason">, lang
   const row = sourceOf(issue.source);
   return pick(row.reasons[issue.reason] ?? row.fallback, language);
 };
-export const sourceLabel = (source: string, language: ContentLanguage): string => pick(sourceOf(source).label, language);
+export const sourceLabel = (source: string, language: ContentLanguage): string =>
+  pick(sourceOf(source).label, language);
 
 /** The one marker line that makes a note this page. */
 export const OPEN_ISSUES_MARKER = "<!-- vam-book-open-issues:v1 -->";
 export const isOpenIssuesNote = (content: string): boolean => {
-  const first = content.replace(/^\uFEFF/, "").split(/\r?\n/).find(line => line.trim());
+  const first = content
+    .replace(/^\uFEFF/, "")
+    .split(/\r?\n/)
+    .find(line => line.trim());
   return first?.trim() === OPEN_ISSUES_MARKER;
 };
 
@@ -132,8 +157,18 @@ export function composeOpenIssuesNote(input: OpenIssuesInput): string {
   const { language, issues } = input;
   const n = Math.max(0, Math.trunc(input.checked));
   const colon = instructionLanguageOf(language) === "zh" ? "：" : ": ";
-  const summary = issues.length ? pick(SOME_OPEN(n, issues.length), language) : n > 0 ? pick(ALL_SOLVED(n), language) : pick(NONE_CHECKED, language);
-  const out = [OPEN_ISSUES_MARKER, "", `# ${line(input.bookTitle, 120)}${instructionLanguageOf(language) === "zh" ? "\u3000" : " - "}${pick(TITLE, language)}`, "", summary];
+  const summary = issues.length
+    ? pick(SOME_OPEN(n, issues.length), language)
+    : n > 0
+      ? pick(ALL_SOLVED(n), language)
+      : pick(NONE_CHECKED, language);
+  const out = [
+    OPEN_ISSUES_MARKER,
+    "",
+    `# ${line(input.bookTitle, 120)}${instructionLanguageOf(language) === "zh" ? "\u3000" : " - "}${pick(TITLE, language)}`,
+    "",
+    summary
+  ];
   if (issues.length) out.push("");
   for (const issue of issues) {
     const where = issue.chapterTitle ? `${line(issue.chapterTitle, 120)}${colon}` : "";

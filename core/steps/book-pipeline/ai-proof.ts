@@ -14,15 +14,7 @@ import { safeHref } from "../../book-pipeline/proof";
 import { singleLine } from "../../book-pipeline/text";
 import { stepEffort } from "../../provider-step-runner";
 import { prepareStep, renderTemplate, type StepDefinition } from "../../step-runner";
-import {
-  arrayOf,
-  fail,
-  languageInstruction,
-  overBudget,
-  parseJson,
-  recordOf,
-  type BookStepBase
-} from "./base";
+import { arrayOf, fail, languageInstruction, overBudget, parseJson, recordOf, type BookStepBase } from "./base";
 import { planFailMessage } from "./run";
 import template from "./ai-proof.md";
 
@@ -136,7 +128,9 @@ export const aiProofStep: StepDefinition<AiProofRequest, RawAiProof> = {
     renderTemplate(template, {
       languageInstruction: languageInstruction(request.language, request.body),
       maxItems: String(request.maxItems ?? AI_PROOF_MAX_ITEMS),
-      prior: JSON.stringify((request.prior ?? []).map(item => ({ id: item.id, quote: item.quote, problem: item.problem }))),
+      prior: JSON.stringify(
+        (request.prior ?? []).map(item => ({ id: item.id, quote: item.quote, problem: item.problem }))
+      ),
       title: JSON.stringify(singleLine(request.title, 200)),
       sources: JSON.stringify(listedSources(request.sources)),
       body: JSON.stringify(request.body)

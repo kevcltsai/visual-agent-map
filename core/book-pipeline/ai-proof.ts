@@ -101,7 +101,8 @@ export interface AiReviewInput {
   maxItems?: number;
 }
 
-const oneOf = <T extends string>(list: readonly T[], value: string): value is T => (list as readonly string[]).includes(value);
+const oneOf = <T extends string>(list: readonly T[], value: string): value is T =>
+  (list as readonly string[]).includes(value);
 const validChapter = (value: unknown, chapters: number): value is number =>
   typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= chapters;
 
@@ -144,7 +145,12 @@ export function reviewAiProof(raw: RawAiProof, input: AiReviewInput): AiProofRev
       continue;
     }
     const quote = typeof entry.quote === "string" ? entry.quote.trim() : "";
-    if (!quote || quote.length > AI_QUOTE_MAX || /[\r\n]/.test(quote) || verbatimQuote(quote, chapters[at - 1]) !== quote) {
+    if (
+      !quote ||
+      quote.length > AI_QUOTE_MAX ||
+      /[\r\n]/.test(quote) ||
+      verbatimQuote(quote, chapters[at - 1]) !== quote
+    ) {
       dropped.quote++;
       continue;
     }
@@ -163,7 +169,10 @@ export function reviewAiProof(raw: RawAiProof, input: AiReviewInput): AiProofRev
       if (opened && !opened.has(href)) continue;
       sources.push(href);
     }
-    const other = book && validChapter(entry.otherChapter, chapters.length) && entry.otherChapter !== at ? entry.otherChapter : undefined;
+    const other =
+      book && validChapter(entry.otherChapter, chapters.length) && entry.otherChapter !== at
+        ? entry.otherChapter
+        : undefined;
     kept.push({
       id,
       kind: entry.kind,

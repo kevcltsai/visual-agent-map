@@ -80,7 +80,11 @@ export const aiFixStep: StepDefinition<AiFixRequest, RawAiEdit[]> = {
         }))
       ),
       chapters: JSON.stringify(
-        request.chapters.map(chapter => ({ number: chapter.number, title: singleLine(chapter.title, 200), text: chapter.text }))
+        request.chapters.map(chapter => ({
+          number: chapter.number,
+          title: singleLine(chapter.title, 200),
+          text: chapter.text
+        }))
       )
     }),
   schema: AI_FIX_SCHEMA,

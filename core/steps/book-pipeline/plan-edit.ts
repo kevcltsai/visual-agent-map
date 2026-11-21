@@ -138,9 +138,7 @@ function parseChange(entry: unknown, known: ReadonlySet<string>): PlanEditChange
   }
   if (item.points !== undefined) {
     if (!Array.isArray(item.points) || item.points.some(point => typeof point !== "string")) return undefined;
-    const points = (item.points as string[])
-      .map(point => cap(point, POINT_MAX).replace(/·/g, "・"))
-      .filter(Boolean);
+    const points = (item.points as string[]).map(point => cap(point, POINT_MAX).replace(/·/g, "・")).filter(Boolean);
     if (points.length) {
       if (points.length < MIN_POINTS) return undefined;
       change.points = points.slice(0, MAX_POINTS);

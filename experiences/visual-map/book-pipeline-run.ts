@@ -245,7 +245,12 @@ import {
   type SlotOutcome
 } from "../../core/book-pipeline/image-slots";
 import { editedPrompt, readBrief } from "../../core/book-pipeline/plan-edit";
-import { planEditFits, planEditStep, type PlanEditCard, type PlanEditRequest } from "../../core/steps/book-pipeline/plan-edit";
+import {
+  planEditFits,
+  planEditStep,
+  type PlanEditCard,
+  type PlanEditRequest
+} from "../../core/steps/book-pipeline/plan-edit";
 import {
   cardPlanFits,
   cardPlanStep,
@@ -2753,11 +2758,7 @@ export class BookPipelineRuns {
       if (current.prompt !== before.prompt) continue;
       const prompt = editedPrompt(before.prompt, change, before.kind, drive.config.language);
       if (prompt === undefined) continue;
-      const written = await this.ports.updateNoteGuarded(
-        path,
-        { prompt },
-        { expectedContent: current.raw, authorize }
-      );
+      const written = await this.ports.updateNoteGuarded(path, { prompt }, { expectedContent: current.raw, authorize });
       if (written === "written") counts.written++;
     }
     return authorize() ? { kind: "ok" } : { kind: "cancelled" };

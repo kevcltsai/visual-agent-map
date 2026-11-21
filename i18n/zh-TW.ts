@@ -3299,6 +3299,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_ai_box_title_0_1_2": "AI 校對：查了 {0} 項，修了 {1} 處，{2} 處沒修好",
   "ui.book_ai_box_title_incomplete": "AI 校對：這章沒有查完，已列到書末",
   "ui.book_ai_box_fixed_0": "修了：{0}",
+  "ui.book_ai_box_book_fixed_0": "全書校對另修了 {0} 處：",
   "ui.book_ai_box_open_0": "沒修好：{0}，已列到書末",
   "ui.book_ai_box_sep": "，",
   "ui.book_ai_reason_still_present": "AI 修改後再查，問題仍在，修正次數已用完",

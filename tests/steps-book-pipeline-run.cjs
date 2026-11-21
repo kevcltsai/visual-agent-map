@@ -4053,6 +4053,8 @@ test('R1 M1: a whole-book fix that wrote chapter 1 and was refused on chapter 2 
   const s = await r.state();
   assert.ok(r.raw(1).includes('One corrected'), 'the first chapter was written');
   assert.ok(s.bookProof.fixed >= 1, 'and it is counted as fixed');
+  assert.ok(s.bookProof.fixes.every(fix => fix.chapterId === r.nodes[1].id), 'and recorded on the chapter it changed');
+  same(await invariantsOf(r, pageVault()), []);
 });
 
 test('R1 M2: chapter reasons on the page: no body reads as "no text", a hand edit as a hand edit (never "a step failed")', async () => {

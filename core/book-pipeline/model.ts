@@ -203,6 +203,8 @@ export interface AiProofPending {
   problem: string;
   suggestion: string;
   chapter?: number;
+  /** A whole-book fix: the card whose text it changed (`chapter` is only the position in the book's text). */
+  chapterId?: string;
 }
 /** A problem still open once the proofread is over, with a neutral reason code (the screen turns it into a plain sentence). */
 export interface AiProofOpen {
@@ -323,7 +325,8 @@ function aiProofShape(value: unknown): boolean {
         isText(item.quote) &&
         isText(item.problem) &&
         extra.every(key => isText(item[key])) &&
-        (item.chapter === undefined || isCount(item.chapter))
+        (item.chapter === undefined || isCount(item.chapter)) &&
+        (item.chapterId === undefined || isText(item.chapterId))
     );
   if (!items(value.open, ["reason"])) return false;
   if (value.pending !== undefined && !items(value.pending, ["suggestion"])) return false;

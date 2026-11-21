@@ -2774,6 +2774,7 @@ export class BookPipelineRuns {
       const changed: string[] = [];
       const appliedIds: string[] = [];
       const replacements: string[] = [];
+      const cardOf: Record<string, string> = {};
       let applied = 0;
       let discarded = false;
       const owner = new Map(targets.map(target => [target.id, target.chapter ?? 1]));
@@ -2813,6 +2814,7 @@ export class BookPipelineRuns {
         applied += result.applied;
         appliedIds.push(...appliedIdsOf(result.outcomes));
         replacements.push(...replacementsOf(own, appliedIdsOf(result.outcomes)));
+        for (const id of appliedIdsOf(result.outcomes)) cardOf[id] = chapter.id;
         changed.push(chapter.id);
       }
       let newKey: string | undefined;
@@ -2825,6 +2827,7 @@ export class BookPipelineRuns {
           applied,
           appliedIds,
           replacements,
+          cardOf,
           refused,
           ...(newKey ? { key: newKey, changed } : {})
         })

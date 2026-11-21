@@ -424,6 +424,7 @@ export class BookCallouts {
           checked: slot.checked,
           fixed: slot.fixed,
           fixes: slot.fixes ?? [],
+          bookFixes: (data.bookProof?.fixes ?? []).filter(fix => fix.chapterId === id),
           open: slot.open,
           ...(slot.incomplete ? { incomplete: true } : {})
         };

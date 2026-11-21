@@ -13,6 +13,7 @@ const REFUSED = /^(fix_refused_|hand_edited$|fix_quote_missing$|fix_forbidden_)/
  * - `stageOf(id)`: the card stage (counts needs-review chapters, which the bar and the page both list).
  * - `page`: the closing page text, when one was written.
  * - `refusedQuotes`: the quotes whose fix was blocked in the LAST fix round (I2).
+ * - `boxes`: per chapter id, the chapter's note text; the fix lines of all boxes (chapter and whole-book) must add up to the bar's number.
  * - `applied`: per chapter id (or "book"), the replacement texts the run wrote (I4).
  */
 function checkAiProofInvariants(data, options = {}) {
@@ -36,6 +37,14 @@ function checkAiProofInvariants(data, options = {}) {
       const hit = (options.applied?.[id] ?? []).some(text => squash(item.quote) && (squash(text).includes(squash(item.quote)) || squash(item.quote).includes(squash(text))));
       if (hit && item.reason !== 'still_present') out.push(`I4 ${id}: "${item.quote}" hits an applied replacement but is ${item.reason}`);
     }
+  }
+  // I2 (whole-book fixes): every one is recorded on the chapter it changed, so the chapters' boxes can tell it.
+  const bookFixes = data.bookProof?.fixes ?? [];
+  if (bookFixes.some(fix => !fix.chapterId)) out.push('I2 book: a whole-book fix is not recorded on a chapter');
+  const barFixed = bookBarState(data, undefined, stageOf).ai.fixed;
+  if (options.boxes) {
+    const listed = Object.values(options.boxes).reduce((sum, text) => sum + (text.match(/^> ・(?:修了：|Fixed: )/gm) ?? []).length, 0);
+    if (listed !== barFixed) out.push(`I2 boxes list ${listed} fixes but the bar says ${barFixed}`);
   }
   const needsReview = order.filter(id => stageOf(id) === 'needs-review').length;
   const aiOpen = all.reduce((sum, [, slot]) => sum + (slot.open?.length ?? 0) + (slot.incomplete ? 1 : 0), 0);

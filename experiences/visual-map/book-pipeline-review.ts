@@ -580,6 +580,8 @@ export interface AiBoxInput {
   /** The count the title shows (the tool bar's number); absent: the length of `fixes`. */
   fixed?: number;
   fixes: readonly { suggestion: string }[];
+  /** Places the whole-book proofread changed in this chapter (already counted in the bar's total, so not in `fixed`). */
+  bookFixes?: readonly { suggestion: string }[];
   open: readonly { problem: string; reason: string }[];
   /** The proofread did not finish: the box says so instead of counting. */
   incomplete?: boolean;
@@ -615,6 +617,12 @@ export function aiProofCallout(input: AiBoxInput, runId: string, nodeId: string)
     : t("ui.book_ai_box_title_0_1_2", input.checked, input.fixed ?? input.fixes.length, input.open.length);
   const lines = [
     ...input.fixes.map(fix => `> ・${t("ui.book_ai_box_fixed_0", plainText(fix.suggestion))}`),
+    ...(input.bookFixes?.length
+      ? [
+          `> ・${t("ui.book_ai_box_book_fixed_0", input.bookFixes.length)}`,
+          ...input.bookFixes.map(fix => `> ・${t("ui.book_ai_box_fixed_0", plainText(fix.suggestion))}`)
+        ]
+      : []),
     ...input.open.map(item => {
       const why = aiReasonText(item.reason);
       const problem = plainText(item.problem);

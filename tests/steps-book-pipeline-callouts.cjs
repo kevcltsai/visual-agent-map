@@ -337,6 +337,20 @@ test('gate 2 AI box lists every fix and every open item on its own line, past th
   assert.doesNotMatch(r.notes.get('N/n1.md'), /\[ \]|\[x\]/);
 });
 
+test('R2 gate 2 AI box: what the whole-book proofread changed in a chapter is told in that chapter\'s box, and the boxes add up to the bar', async () => {
+  const bookFix = (id, chapterId) => ({ id, quote: 'q', problem: 'p', suggestion: `全書改${id}`, chapter: 1, chapterId });
+  const data = DATA({ order: ['n1', 'n2'], aiProof: { n1: SLOT({ fixes: [], fixed: 0, open: [] }), n2: SLOT({ fixes: [], fixed: 0, open: [] }) }, bookProof: { key: 'k', attempts: 0, round: 1, step: 'proof', done: true, checked: 3, fixed: 3, fixes: [bookFix('B1', 'n1'), bookFix('B2', 'n1'), bookFix('B3', 'n2')], open: [] } });
+  const r = rig(data, ['n2']);
+  await r.callouts.reconcile('M');
+  const n1 = r.notes.get('N/n1.md');
+  assert.match(n1, /全書校對另修了 2 處/);
+  assert.equal((n1.match(/^> ・修了：全書改/gm) ?? []).length, 2);
+  assert.match(r.notes.get('N/n2.md'), /全書校對另修了 1 處/);
+  const bundle = S.load('experiences/visual-map/book-pipeline-ui.ts');
+  const listed = ['n1', 'n2'].reduce((sum, id) => sum + (r.notes.get(`N/${id}.md`).match(/^> ・修了：/gm) ?? []).length, 0);
+  assert.equal(listed, bundle.bookBarState(data, undefined, () => undefined).ai.fixed, 'the boxes list as many fixes as the bar counts');
+});
+
 // ---- the writer asks open reading views to render again (live v6fix2: tabs opened at gate 1 kept the old box) ----
 test('writer: a written note makes its reading views render again; unchanged or refused does not', async () => {
   const seen = [];

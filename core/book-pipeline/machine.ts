@@ -378,6 +378,8 @@ export function applyAiFix(
     refused?: Readonly<Record<string, string>>;
     /** The replacement texts that were written this round (kept so a later check can tell "fixed, still there" from "found too late"). */
     replacements?: readonly string[];
+    /** Whole-book fix: target id to the card it was written into (recorded on each fix, so that chapter's box can tell it). */
+    cardOf?: Readonly<Record<string, string>>;
     /** The ids whose edit was written; when given, only these become fixes (a target the model skipped is neither). */
     appliedIds?: readonly string[];
     key?: string;
@@ -408,7 +410,11 @@ export function applyAiFix(
     result.applied > 0
       ? (found.pending ?? []).filter(item => (written ? written.has(item.id) : !(item.id in blocked)))
       : [];
-  if (done.length) slot.fixes = [...(found.fixes ?? []), ...done.map(item => ({ ...item }))];
+  if (done.length)
+    slot.fixes = [
+      ...(found.fixes ?? []),
+      ...done.map(item => ({ ...item, ...(result.cardOf?.[item.id] ? { chapterId: result.cardOf[item.id] } : {}) }))
+    ];
   for (const id of result.changed ?? [])
     if (effectiveOrder(next).includes(id)) next.revisions[id] = cardRevision(next, id) + 1;
   setAiSlot(next, token.nodeId, slot);

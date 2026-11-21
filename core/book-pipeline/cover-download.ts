@@ -88,7 +88,10 @@ export async function downloadCover(
   let waited = false;
   const get = async (url: string, method?: "HEAD"): Promise<CoverResponse | CoverDownload> => {
     const result = await Promise.race([
-      fetch(url, method ? { headers, method } : { headers }).catch((): CoverDownload => ({ ok: false, reason: "failed" })),
+      fetch(url, method ? { headers, method } : { headers }).catch((): CoverDownload => ({
+        ok: false,
+        reason: "failed"
+      })),
       stop
     ]);
     // The fetch may answer in the same turn as an abort: the abort wins, the bytes are dropped.
@@ -117,7 +120,8 @@ export async function downloadCover(
         if (!probe.ok && (probe.reason === "aborted" || probe.reason === "timeout")) return probe;
       } else {
         const length = Number(header(probe.headers, "content-length"));
-        if (probe.status === 200 && Number.isFinite(length) && length > COVER_MAX_BYTES) return { ok: false, reason: "size" };
+        if (probe.status === 200 && Number.isFinite(length) && length > COVER_MAX_BYTES)
+          return { ok: false, reason: "size" };
       }
       const second = await get(original);
       if ("ok" in second) return second;

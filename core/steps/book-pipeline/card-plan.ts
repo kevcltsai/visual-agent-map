@@ -286,8 +286,7 @@ const relations = (request: CardPlanRequest): string => {
     parts.push(
       `${sentence("parent")}\n${JSON.stringify({ place: placeText({ kind: "chapter", chapter: request.parent.position }), title: cap(request.parent.title, 200) })}`
     );
-  if (request.nextChapter)
-    parts.push(`${sentence("next-chapter")}\n${neighbour(request.nextChapter)}`);
+  if (request.nextChapter) parts.push(`${sentence("next-chapter")}\n${neighbour(request.nextChapter)}`);
   return parts.length ? `\n\n${parts.join("\n\n")}` : "";
 };
 /** How this card joins its neighbours, by what it is (chapter, section) and whether it has sections. */

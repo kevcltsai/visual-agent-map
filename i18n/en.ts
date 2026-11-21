@@ -3612,7 +3612,8 @@ export const en = {
   "ui.book_note_review_keep": "Keep my version",
   "ui.book_note_review_rewrite": "Rewrite this chapter with AI (overwrites your edits; backed up first)",
   "ui.book_plain_write_hand_edited": "The chapter has your own edits, so it was left as it is.",
-  "ui.book_plain_write_author_failed": 'The writing call failed this time, so the card is unchanged. Use "Rerun this card" to write it again.',
+  "ui.book_plain_write_author_failed":
+    'The writing call failed this time, so the card is unchanged. Use "Rerun this card" to write it again.',
   "ui.book_refused_gate_cancelled": "Stopped. The button you pressed was not applied; the book stays where it was.",
   "ui.book_gate_waiting": "Wrapping up the last step. Your button press applies as soon as it is done.",
   "ui.book_refused_text_changed": "The chapter text changed since you chose to rewrite it, so nothing was overwritten.",

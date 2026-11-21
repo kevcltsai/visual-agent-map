@@ -30,15 +30,17 @@ export function escapeMarkdownText(value: unknown, max = 400): string {
     .replace(/ +/g, " ")
     .trim();
   const text = Array.from(kept).slice(0, max).join("");
-  return text
-    .replace(/</g, "＜")
-    .replace(/>/g, "＞")
-    .replace(/%/g, "％")
-    .replace(/[\\`*_[\]()!|~#$]/g, "\\$&")
-    .replace(/^([-+])(?=[ ]|$)/, "\\$1")
-    .replace(/^(\d+)([.)])/, "$1\\$2")
-    // A line of only `-` or `=` under another line would turn that line into a setext heading.
-    .replace(/^([=-])(?=[=-]*$)/, "\\$1");
+  return (
+    text
+      .replace(/</g, "＜")
+      .replace(/>/g, "＞")
+      .replace(/%/g, "％")
+      .replace(/[\\`*_[\]()!|~#$]/g, "\\$&")
+      .replace(/^([-+])(?=[ ]|$)/, "\\$1")
+      .replace(/^(\d+)([.)])/, "$1\\$2")
+      // A line of only `-` or `=` under another line would turn that line into a setext heading.
+      .replace(/^([=-])(?=[=-]*$)/, "\\$1")
+  );
 }
 
 /** Undoes the backslashes {@link escapeMarkdownText} added. */

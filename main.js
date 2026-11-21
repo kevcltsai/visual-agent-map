@@ -50003,8 +50003,7 @@ var relations = (request) => {
       `${sentence("parent")}
 ${JSON.stringify({ place: placeText({ kind: "chapter", chapter: request.parent.position }), title: cap(request.parent.title, 200) })}`
     );
-  if (request.nextChapter)
-    parts.push(`${sentence("next-chapter")}
+  if (request.nextChapter) parts.push(`${sentence("next-chapter")}
 ${neighbour(request.nextChapter)}`);
   return parts.length ? `
 
@@ -98019,7 +98018,10 @@ async function downloadCover(imageUrl, fetch, options = {}) {
   let waited = false;
   const get = async (url, method) => {
     const result = await Promise.race([
-      fetch(url, method ? { headers, method } : { headers }).catch(() => ({ ok: false, reason: "failed" })),
+      fetch(url, method ? { headers, method } : { headers }).catch(() => ({
+        ok: false,
+        reason: "failed"
+      })),
       stop
     ]);
     if (signal == null ? void 0 : signal.aborted) return { ok: false, reason: "aborted" };
@@ -98044,7 +98046,8 @@ async function downloadCover(imageUrl, fetch, options = {}) {
         if (!probe.ok && (probe.reason === "aborted" || probe.reason === "timeout")) return probe;
       } else {
         const length = Number(header2(probe.headers, "content-length"));
-        if (probe.status === 200 && Number.isFinite(length) && length > COVER_MAX_BYTES) return { ok: false, reason: "size" };
+        if (probe.status === 200 && Number.isFinite(length) && length > COVER_MAX_BYTES)
+          return { ok: false, reason: "size" };
       }
       const second = await get(original);
       if ("ok" in second) return second;
@@ -110844,8 +110847,17 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
         url,
         async (address, init) => {
           var _a2;
-          const response = await (0, import_obsidian52.requestUrl)({ url: address, method: (_a2 = init.method) != null ? _a2 : "GET", headers: init.headers, throw: false });
-          return { status: response.status, headers: response.headers, bytes: init.method ? new ArrayBuffer(0) : response.arrayBuffer };
+          const response = await (0, import_obsidian52.requestUrl)({
+            url: address,
+            method: (_a2 = init.method) != null ? _a2 : "GET",
+            headers: init.headers,
+            throw: false
+          });
+          return {
+            status: response.status,
+            headers: response.headers,
+            bytes: init.method ? new ArrayBuffer(0) : response.arrayBuffer
+          };
         },
         { signal, userAgent: `VisualAgentMap-Obsidian-plugin/${this.manifest.version} (${PUBLIC_REPO_URL})` }
       ),

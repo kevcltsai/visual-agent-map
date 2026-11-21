@@ -252,6 +252,8 @@ export interface AiToken {
   round: number;
   step: "proof" | "fix";
 }
+/** The shortest replacement that counts as "still there" when a later check quotes a longer stretch that contains it. */
+export const STILL_PRESENT_MIN_CHARS = 8;
 const aiSlot = (data: BookPipelineData, nodeId?: string): AiProofState | undefined =>
   nodeId === undefined ? data.bookProof : data.aiProof?.[nodeId];
 function setAiSlot(next: BookPipelineData, nodeId: string | undefined, state: AiProofState): void {
@@ -392,8 +394,13 @@ export function applyAiProof(
         : undefined;
       // A quote that is (part of) text a fix round wrote: the fix was applied and the problem is still there.
       const quote = item ? squash(item.quote) : "";
+      // A short replacement (a year, a name) inside a longer quote of something else proves nothing: that direction needs a sentence.
       const written =
-        quote && (found.applied ?? []).some(text => squash(text).includes(quote) || quote.includes(squash(text)));
+        quote &&
+        (found.applied ?? []).some(text => {
+          const wrote = squash(text);
+          return wrote.includes(quote) || (wrote.length >= STILL_PRESENT_MIN_CHARS && quote.includes(wrote));
+        });
       // The reason of the quote's last fix event (D6): blocked, or written and still there; a target no round wrote or blocked was not fixed.
       if (before) return slot.refused?.[before.id] ?? (written ? "still_present" : "not_fixed");
       return written ? "still_present" : "not_fixed_in_time";

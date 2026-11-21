@@ -964,3 +964,22 @@ test('resetCard drops the whole-book fixes that rewrote this chapter, keeps the 
   assert.equal(state.bookProof.fixes.length, 3, 'the input is not mutated');
   assert.doesNotThrow(() => machine.resetCard(plain(fresh()), 'a'), 'no bookProof at all');
 });
+
+test('N1 short replacement: a year written by a fix does not make a longer quote of something else "still present"; a sentence-long one still does', () => {
+  const pq = (id, quote) => ({ id, quote, problem: 'p', suggestion: 's' });
+  const run = (replacement, laterQuote) => {
+    let { state } = checkedRun();
+    let key = 'k0';
+    for (let round = 0; round < 3; round++) {
+      const p = begin(state, { nodeId: 'a' }, key, 'proof');
+      state = machine.applyAiProof(p.state, p.token, { checked: 1, pending: [pq('P1', round < 2 ? 'zz' : laterQuote)], open: [] }).state;
+      if (state.aiProof.a.done) break;
+      const f = begin(state, { nodeId: 'a' }, key, 'fix');
+      key = `k${round + 1}`;
+      state = machine.applyAiFix(f.state, f.token, { applied: 1, appliedIds: ['P1'], replacements: [replacement], key, changed: ['a'] }).state;
+    }
+    return plain(state.aiProof.a.open.map(item => item.reason));
+  };
+  assert.deepEqual(run('2020', '公司成立於 2019 年，與 2020 年的資料不同。'), ['not_fixed_in_time']);
+  assert.deepEqual(run('公司成立於 2019 年', '公司成立於 2019 年，與 2020 年的資料不同。'), ['still_present']);
+});

@@ -36,12 +36,14 @@ export function escapeMarkdownText(value: unknown, max = 400): string {
     .replace(/%/g, "％")
     .replace(/[\\`*_[\]()!|~#$]/g, "\\$&")
     .replace(/^([-+])(?=[ ]|$)/, "\\$1")
-    .replace(/^(\d+)([.)])/, "$1\\$2");
+    .replace(/^(\d+)([.)])/, "$1\\$2")
+    // A line of only `-` or `=` under another line would turn that line into a setext heading.
+    .replace(/^([=-])(?=[=-]*$)/, "\\$1");
 }
 
 /** Undoes the backslashes {@link escapeMarkdownText} added. */
 export function unescapeMarkdownText(text: string): string {
-  return text.replace(/\\([\\`*_[\]()!|~#$.+-])/g, "$1");
+  return text.replace(/\\([\\`*_[\]()!|~#$.+=-])/g, "$1");
 }
 
 /** A short stable hash of a text (line endings normalized), for revision keys. */

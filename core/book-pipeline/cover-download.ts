@@ -1,7 +1,7 @@
 /**
  * Downloading a cover picture into the vault (plan 2026-11-21-book-cover-image §6 security). The fetch is injected (production:
  * Obsidian's `requestUrl`, which cannot be aborted, so an answer that arrives after an abort or the timeout is simply dropped).
- * The order is fixed: address whitelist, request, status, content-length, real size, content-type, magic bytes agree with the header.
+ * The order is fixed: address whitelist, (for the full-size original: a HEAD whose content-length is checked first), request, status, content-length, real size, content-type, magic bytes agree with the header.
  * Only after all that does {@link saveCover} write, and only a new path: an existing file is reused, never overwritten or deleted.
  */
 
@@ -24,7 +24,10 @@ export interface CoverResponse {
   bytes: ArrayBuffer;
 }
 /** One GET; the headers are only the Wikimedia User-Agent policy pair (nothing about the user). */
-export type CoverFetch = (url: string, init: { headers: Record<string, string> }) => Promise<CoverResponse>;
+export type CoverFetch = (
+  url: string,
+  init: { headers: Record<string, string>; method?: "HEAD" }
+) => Promise<CoverResponse>;
 
 export type CoverFailure = "url" | "status" | "size" | "type" | "mismatch" | "timeout" | "aborted" | "failed" | "path";
 export type CoverDownload =
@@ -83,9 +86,9 @@ export async function downloadCover(
   });
   const timers: number[] = [];
   let waited = false;
-  const get = async (url: string): Promise<CoverResponse | CoverDownload> => {
+  const get = async (url: string, method?: "HEAD"): Promise<CoverResponse | CoverDownload> => {
     const result = await Promise.race([
-      fetch(url, { headers }).catch((): CoverDownload => ({ ok: false, reason: "failed" })),
+      fetch(url, method ? { headers, method } : { headers }).catch((): CoverDownload => ({ ok: false, reason: "failed" })),
       stop
     ]);
     // The fetch may answer in the same turn as an abort: the abort wins, the bytes are dropped.
@@ -100,13 +103,22 @@ export async function downloadCover(
       stop
     ]);
     if (slept) return slept;
-    return signal?.aborted ? { ok: false, reason: "aborted" } : get(url);
+    return signal?.aborted ? { ok: false, reason: "aborted" } : get(url, method);
   };
   try {
     let response = await get(thumb);
     if ("ok" in response) return response;
     const original = coverOriginalUrl(imageUrl);
     if (original && response.status >= 400 && response.status < 500 && response.status !== 429) {
+      // The original can be huge and requestUrl cannot stop a download midway: ask for its headers first and refuse an oversize one
+      // before any byte comes. A HEAD that fails or says nothing about the size is not a verdict; the GET below is judged as ever.
+      const probe = await get(original, "HEAD");
+      if ("ok" in probe) {
+        if (probe.reason === "aborted" || probe.reason === "timeout") return probe;
+      } else {
+        const length = Number(header(probe.headers, "content-length"));
+        if (probe.status === 200 && Number.isFinite(length) && length > COVER_MAX_BYTES) return { ok: false, reason: "size" };
+      }
       const second = await get(original);
       if ("ok" in second) return second;
       return judge(second, original);

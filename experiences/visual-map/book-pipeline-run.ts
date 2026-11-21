@@ -2821,7 +2821,13 @@ export class BookPipelineRuns {
         newKey = aiProofKey(0, joined(after.chapters.map(chapter => chapter.text)));
       }
       const done = await drive.store.commit(current =>
-        applyAiFix(current, token, { applied, appliedIds, replacements, refused, ...(newKey ? { key: newKey, changed } : {}) })
+        applyAiFix(current, token, {
+          applied,
+          appliedIds,
+          replacements,
+          refused,
+          ...(newKey ? { key: newKey, changed } : {})
+        })
       );
       if (discarded) return report("dropped", { applied, pending: targets.length });
       report(done?.accepted ? "ok" : "dropped", { applied, pending: targets.length });

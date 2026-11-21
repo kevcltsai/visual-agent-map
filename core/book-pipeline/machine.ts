@@ -357,7 +357,8 @@ export function applyAiProof(
       if (before) return slot.refused?.[before.id] ?? "still_present";
       // A quote that is (part of) text a fix round wrote: the fix was applied and the problem is still there, not found too late.
       const quote = item ? squash(item.quote) : "";
-      const written = quote && (found.applied ?? []).some(text => squash(text).includes(quote) || quote.includes(squash(text)));
+      const written =
+        quote && (found.applied ?? []).some(text => squash(text).includes(quote) || quote.includes(squash(text)));
       return written ? "still_present" : "not_fixed_in_time";
     });
   }

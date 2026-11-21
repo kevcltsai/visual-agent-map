@@ -3169,7 +3169,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_refused_backup_failed": "备份没存成功，所以没有改动章节。",
   "ui.book_refused_nothing": "这一章没有可套用的备注。",
   "ui.book_abandon": "放弃这本",
-  "ui.book_remove": "移除图文书",
+  "ui.book_remove": "改回普通心智图",
   "ui.book_abandon_title": "放弃这本图文书？",
   "ui.book_abandon_body":
     "已写好的章节正文会保留，只会去掉图文书放进笔记的提示框，并从这张心智图移除图文书的进度，它会变回普通心智图。之后按“图文书”可以重新开始。",

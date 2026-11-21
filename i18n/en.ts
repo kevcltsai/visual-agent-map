@@ -3393,7 +3393,7 @@ export const en = {
   "ui.book_refused_backup_failed": "The backup could not be saved, so the chapter was not changed.",
   "ui.book_refused_nothing": "This chapter has no note to apply.",
   "ui.book_abandon": "Give up this book",
-  "ui.book_remove": "Remove picture book",
+  "ui.book_remove": "Back to plain mind map",
   "ui.book_abandon_title": "Give up this picture book?",
   "ui.book_abandon_body":
     "The chapter text already written is kept; only the picture-book hint boxes in the notes are removed, along with the picture-book progress on this mind map, and it becomes a normal mind map again. You can press Picture book later to start fresh.",

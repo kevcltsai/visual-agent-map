@@ -2075,9 +2075,10 @@ export class BookPipelineRuns {
       // a port that throws must not stop the run
     }
   }
-  /** A card's result changed at gate 2 (a failure, a join to check, a rerun): its review box is written, rewritten or taken off. */
+  /** A card's result changed at gate 2 or after the run finished (a failure, a rerun): its AI proofread box is written, rewritten or taken off. */
   private syncReviewNotes(drive: Drive): void {
-    if (drive.store?.state.phase === "gate2") this.syncNotes(drive);
+    const phase = drive.store?.state.phase;
+    if (phase === "gate2" || phase === "done") this.syncNotes(drive);
   }
   /** Reads the saved state of a map for resume and gate confirmation, and loads the cards. */
   private async openSaved(

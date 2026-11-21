@@ -1,4 +1,4 @@
-import { t } from "../../i18n";
+import { t, type TranslationKey } from "../../i18n";
 import type { PipelineStage } from "../../core/book-pipeline/model";
 import {
   describeSlots,
@@ -573,6 +573,64 @@ export function reviewCallout(
     VERSION_LINE
   ]);
 }
+
+/** What one chapter's AI proofread box tells: how many items were checked, each place that was fixed, each that was not (with its reason code). */
+export interface AiBoxInput {
+  checked: number;
+  fixes: readonly { suggestion: string }[];
+  open: readonly { problem: string; reason: string }[];
+  /** The proofread did not finish: the box says so instead of counting. */
+  incomplete?: boolean;
+}
+/** The reason codes of an open item that have a sentence of their own (`ui.book_ai_reason_<code>`); any other code reads as the general one. */
+const AI_REASON_KEY: Record<string, TranslationKey> = {
+  still_present: "ui.book_ai_reason_still_present",
+  sources_conflict: "ui.book_ai_reason_sources_conflict",
+  source_unreachable: "ui.book_ai_reason_source_unreachable",
+  unfixable: "ui.book_ai_reason_unfixable",
+  fix_refused_picture: "ui.book_ai_reason_fix_refused_picture",
+  fix_refused_length: "ui.book_ai_reason_fix_refused_length",
+  fix_quote_missing: "ui.book_ai_reason_fix_quote_missing",
+  fix_forbidden_syntax: "ui.book_ai_reason_fix_forbidden_syntax",
+  hand_edited: "ui.book_ai_reason_hand_edited",
+  fix_failed: "ui.book_ai_reason_fix_failed",
+  proof_incomplete: "ui.book_ai_reason_proof_incomplete"
+};
+/** A reason code in words (an unknown code reads as the general sentence; the code itself is never shown). */
+export const aiReasonText = (reason: string): string =>
+  t(Object.prototype.hasOwnProperty.call(AI_REASON_KEY, reason) ? AI_REASON_KEY[reason] : "ui.book_ai_reason_other");
+
+/**
+ * The box at the top of a chapter the AI proofread: one title with the counts, one plain sentence per fix, one per problem it could not
+ * fix (why, and that the book's last page lists it). Nothing in it asks the reader to do anything: no tick box, no button. Every word a
+ * model wrote goes through {@link plainText}. It is a `vam-review` callout (the program's own kind), so it is found, replaced and
+ * taken off by the same code as before; its marker carries a fingerprint of its text, so an unchanged box is not written again.
+ */
+export function aiProofCallout(input: AiBoxInput, runId: string, nodeId: string): string {
+  const title = input.incomplete
+    ? t("ui.book_ai_box_title_incomplete")
+    : t("ui.book_ai_box_title_0_1_2", input.checked, input.fixes.length, input.open.length);
+  const lines = [
+    ...input.fixes.map(fix => `> ・${t("ui.book_ai_box_fixed_0", plainText(fix.suggestion))}`),
+    ...input.open.map(item => {
+      const why = aiReasonText(item.reason);
+      const problem = plainText(item.problem);
+      return `> ・${t("ui.book_ai_box_open_0", problem ? `${problem}${t("ui.book_ai_box_sep")}${why}` : why)}`;
+    })
+  ];
+  const fp = hashText([title, ...lines].join("\n"));
+  return quoted([
+    `> [!vam-review] ${title}`,
+    ...lines,
+    `> %%vam-review:${idPart(runId)}:${idPart(nodeId)}:${idPart(fp)}%%`,
+    VERSION_LINE
+  ]);
+}
+/** The fingerprint an {@link aiProofCallout} carries (what the aligner compares to know a box is already as wanted). */
+export const aiProofFingerprint = (input: AiBoxInput): string => {
+  const marker = /%%vam-review:[^:]*:[^:]*:([\w.-]+)%%/.exec(aiProofCallout(input, "r", "n"));
+  return marker?.[1] ?? "";
+};
 
 /** What a hand-edited chapter's box carries besides the usual: the operation id, the text it was written for, a queued rewrite, a status line. */
 export interface HandEditBox {

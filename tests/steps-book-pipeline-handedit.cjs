@@ -361,23 +361,15 @@ test('controller: a refused keep (the writer throws, or the note has no Detail b
 });
 
 // ---- H persistence: the queue lives in the box marker; a neighbour rerun that changes the box fingerprint does not lose it ----
-test('H persistence: queue, then a neighbour rerun changes the box fingerprint, then the queue survives (reopen included) and runs at gate 2', async () => {
+test('H persistence: a queued box survives a reconcile at gate 2 (reopen included; the aligner writes no hand-edit box of its own now) and runs when nothing is running', async () => {
   const r = rig({ running: true });
-  const cards = () => ({ path: PATH, title: 'T', summary: '', prompt: '', detail: r.state.raw.split(START + '\n')[1].split('\n' + END)[0], raw: r.state.raw, settings: {}, fields: { pipelineStage: 'needs-review', pipelineIssue: 'write failed: hand_edited', ...(r.seam ? { pipelineSeam: r.seam } : {}) } });
+  const cards = () => ({ path: PATH, title: 'T', summary: '', prompt: '', detail: r.state.raw.split(START + '\n')[1].split('\n' + END)[0], raw: r.state.raw, settings: {}, fields: { pipelineStage: 'needs-review', pipelineIssue: 'write failed: hand_edited' } });
   const callouts = new b.BookCallouts({ readMap: async () => r.map, readCard: async () => cards(), readText: async () => r.state.raw, write: r.write, log: () => {}, newId: () => 'fresh' });
-  // the box as the aligner builds it from the card (the box fingerprint is the card's attention fingerprint)
-  r.state.raw = note(r.state.raw.split(START + '\n')[1].split('\n' + END)[0]);
-  await callouts.reconcile(MAP);
-  const first = r.box();
-  assert.ok(first && first.op, 'the aligner wrote a hand-edited box');
   r.tickRewrite();
   await r.ctl.tick(MAP, 'n1');
   assert.equal(r.box().queued, true);
   const op = r.box().op;
-  // a neighbour rerun makes a join with this chapter a problem: the attention fingerprint (and with it the box) changes
-  r.seam = 'n:1';
   await callouts.reconcile(MAP);
-  assert.notEqual(r.box().fp, first.fp, 'the box was written again');
   assert.equal(r.box().op, op, 'same operation');
   assert.equal(r.box().queued, true, 'the queue survived');
   assert.equal(b.isRewriteAsked(r.box()), true, 'and still asks for the rewrite, so a drain can run it');

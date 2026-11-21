@@ -1,11 +1,6 @@
-import { t } from "../../i18n";
-import { cardRevision } from "../../core/book-pipeline/machine";
-import { chapterInconsistencies } from "../../core/book-pipeline/consistency";
 import type { MapDocument } from "../../map-model";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
-import { bookStructure } from "../../core/book-pipeline/structure";
 import { effectiveOrder, readBookPipeline, type BookPipelineData } from "../../core/book-pipeline/model";
-import { hashText } from "../../core/book-pipeline/text";
 import type { PipelineCard } from "./book-pipeline-run";
 import {
   collapseReviewCallouts,
@@ -18,21 +13,16 @@ import {
   readReviewState,
   removeProgramCallouts,
   removeProgramCalloutsWhere,
-  entryReasons,
-  reviewCallout,
-  reviewEntries,
-  type Gate2Card,
-  type HandEditBox,
-  trialCallout,
-  type TrialPlace,
-  type BookNoteLink,
+  aiProofCallout,
+  aiProofFingerprint,
+  type AiBoxInput,
   type ReviewState
 } from "./book-pipeline-review";
 
 /**
  * The program's callouts in the chapter notes of a picture book, and the one way every program write to a chapter note goes in.
- * `createNoteWriter` is that single write coordinator; `BookCallouts` aligns the notes of a map with its run (a trial hint at gate 1, a
- * review box at gate 2, nothing otherwise). Aligning is idempotent: it reads the run and the notes as they are now and writes only
+ * `createNoteWriter` is that single write coordinator; `BookCallouts` aligns the notes of a map with its run (the AI proofread box of a finished chapter at gate 2 and when done,
+ * nothing otherwise; an old trial hint or tick box is taken off). Aligning is idempotent: it reads the run and the notes as they are now and writes only
  * what differs, so any trigger (a phase change, a rerun, a map opening) can ask for it again without harm.
  */
 
@@ -206,6 +196,8 @@ export interface WantedCallouts {
   trial?: string;
   /** `build` gets the box the note carries now (when it is being written again): a queued rewrite of an unchanged hand-edited text is carried over. */
   review?: { fp: string; build: (prior?: ReviewState) => string };
+  /** The AI proofread box of a chapter the proofread finished: kept when its fingerprint is the same, otherwise written again; absent, any review-kind box goes. */
+  ai?: { fp: string; build: () => string };
   /** Gate 2: a review box the reader answered stays (folded) even when the chapter no longer asks for one. */
   keepAnswered?: boolean;
 }
@@ -220,7 +212,10 @@ export function alignCallouts(text: string, want: WantedCallouts | undefined): s
   if (!want) return removeProgramCallouts(text);
   let out = removeProgramCalloutsWhere(text, c => c.runId !== idPart(want.runId) || c.nodeId !== idPart(want.nodeId));
   out = want.trial ? putProgramCallout(out, want.trial) : removeProgramCallouts(out, "trial");
-  if (want.review) {
+  if (want.ai) {
+    const state = readReviewState(out);
+    if (!(state && state.fp === idPart(want.ai.fp))) out = putProgramCallout(out, want.ai.build());
+  } else if (want.review) {
     const state = readReviewState(out);
     if (state && state.fp === idPart(want.review.fp)) {
       if (isReviewResolved(state, state.fp)) out = collapseReviewCallouts(out);
@@ -355,16 +350,6 @@ export class BookCallouts {
     if (this.tails.get(mapPath) === tail) this.tails.delete(mapPath);
   }
 
-  /** The hand-edited chapter's box content: the queue (operation, text fingerprint, queued mark) is carried over while the text is the one it was queued for. */
-  private handBox(card: Gate2Card, prior: ReviewState | undefined): HandEditBox | undefined {
-    if (!card.handEdited) return undefined;
-    const ifp = card.bodyFp ?? "";
-    if (prior?.op && prior.queued && prior.ifp === idPart(ifp))
-      return { op: prior.op, ifp, queued: true, status: t("ui.book_review_hand_queued") };
-    const op = this.ports.newId?.() ?? hashText(`${Date.now()}:${Math.random()}`);
-    return { op, ifp };
-  }
-
   private fail(runId: string, nodeId: string, result: string): void {
     this.ports.log(
       formatPipelineLog({ event: "callout_failed", runId, card: nodeId, step: "proof", attempt: 0, result, ms: 0 })
@@ -415,19 +400,6 @@ export class BookCallouts {
     }
   }
 
-  private noteInput(card: PipelineCard | undefined) {
-    return card
-      ? {
-          prompt: card.prompt,
-          detail: card.detail,
-          pipelineStage: card.fields.pipelineStage,
-          pipelineIssue: card.fields.pipelineIssue,
-          pipelineSeam: card.fields.pipelineSeam,
-          bookRole: card.fields.bookRole
-        }
-      : undefined;
-  }
-
   private async align(mapPath: string, mayCarry?: MayCarryCallouts): Promise<void> {
     const clean = (id: string): boolean => mayCarry?.(id) === false;
     const map = await this.ports.readMap(mapPath);
@@ -438,117 +410,35 @@ export class BookCallouts {
     }
     if (read.kind !== "usable") return;
     const data = read.data;
-    // Gates need every chapter read (the trial hint, the review boxes); any other phase wants no callout, so a chapter known to have none is left unread.
-    const gate = data.phase === "gate1" || data.phase === "gate2";
+    // Gates need every chapter read (the old trial hint and review boxes go, the AI box comes); any other phase wants no callout, so a chapter known to have none is left unread.
+    const gate = data.phase === "gate1" || data.phase === "gate2" || data.phase === "done";
     const cards = await this.cardsOf(map, data, gate ? undefined : clean);
-    const byId = new Map(cards.map(item => [item.id, item.card]));
-    const link = (id: string | undefined): BookNoteLink | undefined => {
-      const card = id ? byId.get(id) : undefined;
-      return card ? { path: card.path, title: card.title } : undefined;
-    };
     const wanted = new Map<string, WantedCallouts>();
-    if (data.phase === "gate1") {
-      const trial = data.trial ?? [];
-      // The same reasons the review box lists (one source: the card's issue and stored proof), so the first box a reader sees is true.
-      const reasons = new Map(
-        reviewEntries({
-          proofContext: { runId: data.runId, revisionOf: id => cardRevision(data, id) },
-          order: trial.filter(id => byId.has(id)),
-          inconsistencies: id => chapterInconsistencies(data, id),
-          titleOf: id => byId.get(id)?.title ?? id,
-          noteOf: id => this.noteInput(byId.get(id))
-        }).map(entry => [entry.card.id, entryReasons(entry)] as const)
-      );
-      // A trial of the preface and chapter 1 names each card's place in the book; an older trial keeps "chapter i of n".
-      const rootId = map.nodes.find(node => !node.parentId)?.id ?? "";
-      const structure = bookStructure(
-        effectiveOrder(data),
-        id => map.nodes.find(node => node.id === id)?.parentId,
-        rootId
-      );
-      const wantedTrial = structure.trialOf();
-      const placed = trial.length === wantedTrial.length && trial.every(id => wantedTrial.includes(id));
-      const titleOf = (id: string | undefined): string => (id ? (byId.get(id)?.title ?? "") : "");
-      const placeOf = (id: string): TrialPlace | undefined => {
-        const place = structure.placeOf(id);
-        if (!placed || !place) return undefined;
-        const around = structure.neighboursOf(id);
-        if (place.kind === "preface") return { kind: "preface", next: link(around.next) };
-        if (place.kind === "chapter")
-          return {
-            kind: "chapter",
-            chapter: place.chapter,
-            chapterTitle: titleOf(id),
-            sectionTitles: structure.sectionsOf(id).map(titleOf),
-            previous: link(around.previous),
-            next: link(around.next)
-          };
-        return {
-          kind: "section",
-          chapter: structure.placeOf(place.chapterId as string)?.chapter,
-          chapterTitle: titleOf(place.chapterId),
-          sectionIndex: place.sectionIndex,
-          sectionCount: place.sectionCount,
-          parent: link(around.parent),
-          previous: link(around.previous),
-          next: link(around.next)
+    // The AI proofread box of every chapter whose proofread finished (or could not): at gate 2 and once the book is done (a rerun of one chapter
+    // after the run finished changes its box). Nothing else is written: the trial hint and the tick boxes are gone, and an old one is taken off.
+    if (data.phase === "gate2" || data.phase === "done") {
+      for (const { id } of cards) {
+        const slot = data.aiProof?.[id];
+        if (!slot || !(slot.done || slot.incomplete)) continue;
+        const input: AiBoxInput = {
+          checked: slot.checked,
+          fixes: slot.fixes ?? [],
+          open: slot.open,
+          ...(slot.incomplete ? { incomplete: true } : {})
         };
-      };
-      trial.forEach((id, at) => {
-        if (!byId.has(id)) return;
         wanted.set(id, {
           runId: data.runId,
           nodeId: id,
-          trial: trialCallout(
-            at + 1,
-            trial.length,
-            link(trial[at - 1]),
-            link(trial[at + 1]),
-            data.status === "stopped",
-            {
-              runId: data.runId,
-              nodeId: id
-            },
-            reasons.get(id),
-            placeOf(id)
-          )
+          ai: { fp: aiProofFingerprint(input), build: () => aiProofCallout(input, data.runId, id) }
         });
-      });
-    } else if (data.phase === "gate2") {
-      const entries = reviewEntries({
-        proofContext: { runId: data.runId, revisionOf: id => cardRevision(data, id) },
-        order: cards.map(item => item.id),
-        inconsistencies: id => chapterInconsistencies(data, id),
-        titleOf: id => byId.get(id)?.title ?? id,
-        noteOf: id => this.noteInput(byId.get(id))
-      });
-      entries.forEach((entry, at) => {
-        const next = entries.length > 1 ? entries[(at + 1) % entries.length].card.id : undefined;
-        wanted.set(entry.card.id, {
-          runId: data.runId,
-          nodeId: entry.card.id,
-          review: {
-            fp: entry.fp,
-            build: prior =>
-              reviewCallout(
-                entry.card,
-                entryReasons(entry),
-                link(next),
-                entry.fp,
-                data.runId,
-                this.handBox(entry.card, prior)
-              )
-          }
-        });
-      });
+      }
     }
     // Any other phase wants none: a callout left from an earlier phase or run goes now.
     for (const { id, card } of cards) {
       if (this.disposed) return;
       const want = wanted.get(id) ?? {
         runId: data.runId,
-        nodeId: id,
-        ...(data.phase === "gate2" ? { keepAnswered: true } : {})
+        nodeId: id
       };
       // The note as it is now, not as it was read with the cards: a chapter written meanwhile has lost its callouts.
       const now = await this.ports.readText(card.path).catch(() => card.raw);

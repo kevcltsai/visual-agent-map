@@ -1684,9 +1684,10 @@ test('review box: the modify listener goes through registerEvent (released with 
   r.view.bookResolved.set('x', 'y');
   assert.match(view_ts, /async onClose\(\): Promise<void> \{[^}]*this\.bookResolved\.clear\(\);/);
 });
-test('review box: the chapter callouts have their own look in the stylesheet (vam-trial info, vam-review warning) and vam-book stays hidden', () => {
+test('review box: the chapter callouts have their own look in the stylesheet (vam-trial info, vam-review the AI purple, light and dark) and vam-book stays hidden', () => {
   assert.match(css, /\.callout\[data-callout="vam-trial"\] \{[^}]*--callout-color: var\(--color-blue-rgb\)/);
-  assert.match(css, /\.callout\[data-callout="vam-review"\] \{[^}]*--callout-color: var\(--color-orange-rgb\)/);
+  assert.match(css, /^\.callout\[data-callout="vam-review"\] \{[^}]*--callout-color: 113, 82, 216/m);
+  assert.match(css, /^\.theme-dark \.callout\[data-callout="vam-review"\] \{[^}]*--callout-color: 166, 140, 255/m);
   assert.match(css, /\.callout\[data-callout="vam-book"\] \{ display: none; \}/);
 });
 

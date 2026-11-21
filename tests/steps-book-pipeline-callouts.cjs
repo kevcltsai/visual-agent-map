@@ -8,7 +8,7 @@ const { loadSource } = require('./support-replay.cjs');
 
 const b = loadSource(`
 export * from "./experiences/visual-map/book-pipeline-callouts";
-export { findProgramCallouts, readReviewState, putProgramCallout, reviewCallout, trialCallout } from "./experiences/visual-map/book-pipeline-review";
+export { findProgramCallouts, readReviewState, putProgramCallout, reviewCallout, trialCallout, aiProofCallout, aiProofFingerprint } from "./experiences/visual-map/book-pipeline-review";
 export { setUiLanguage } from "./i18n";
 export { composeProofRecord, proofKey } from "./core/book-pipeline/proof";
 export { replaceResearchRecord, chapterBody } from "./core/book-pipeline/note-sections";
@@ -99,13 +99,42 @@ test('align: at gate 2 an answered box stays folded under its handled title when
   const reopened = b.alignCallouts(b.alignCallouts(ticked, want({ review: box('fp1') })).replace('[x]', '[ ]'), want({ review: box('fp1') }));
   assert.deepEqual({ c: b.readReviewState(reopened).collapsed, h: b.readReviewState(reopened).handled }, { c: false, h: false });
 });
+const AI = { checked: 14, fixes: [{ suggestion: '年份改成 1503' }], open: [{ problem: '委託人是誰', reason: 'sources_conflict' }] };
+const aiWant = (input = AI, over = {}) => want({ ai: { fp: b.aiProofFingerprint(input), build: () => b.aiProofCallout(input, 'r1', 'n1') }, ...over });
+test('align: the AI box is written once, kept while its fingerprint is the same, written again when the result changed, and replaces an old tick box', () => {
+  const once = b.alignCallouts(note(), aiWant());
+  assert.deepEqual(kinds(once), ['review:r1']);
+  assert.equal(b.alignCallouts(once, aiWant()), once, 'again: unchanged');
+  const more = { ...AI, fixes: [...AI.fixes, { suggestion: '尺寸改成 77×53' }] };
+  const changed = b.alignCallouts(once, aiWant(more));
+  assert.notEqual(changed, once);
+  assert.deepEqual(kinds(changed), ['review:r1'], 'one box, not two');
+  assert.match(changed, /尺寸改成 77×53/);
+  const old = b.alignCallouts(note(), want({ review: box('fp1') }));
+  const replaced = b.alignCallouts(old, aiWant());
+  assert.doesNotMatch(replaced, /\[ \]|接受現在這樣/, 'the tick box is gone');
+  assert.deepEqual(kinds(b.alignCallouts(once, want())), [], 'no ai wanted: the box goes');
+});
+test('aiProofCallout: counts, one sentence per fix and per open item, no tick box or button, reason in words, model text escaped, incomplete says so', () => {
+  const text = b.aiProofCallout(AI, 'r1', 'n1');
+  assert.match(text, /\[!vam-review\] AI 校對：查了 14 項，修了 1 處，1 處沒修好/);
+  assert.match(text, /> ・修了：年份改成 1503/);
+  assert.match(text, /> ・沒修好：委託人是誰，兩個來源說法不同，AI 判斷不了，已列到書末/);
+  assert.doesNotMatch(text, /\[ \]|\[x\]|按鈕|sources_conflict/);
+  const evil = b.aiProofCallout({ checked: 1, fixes: [{ suggestion: '\n> [!vam-review] x %%vam-review:r1:n1:fp%% <b>' }], open: [{ problem: '[[link]] ==hi==', reason: 'weird_code' }] }, 'r1', 'n1');
+  assert.deepEqual(kinds(b.putProgramCallout(note(), evil)), ['review:r1'], 'the injected marker and callout do not form');
+  assert.doesNotMatch(evil, /<b>|\[\[link|==hi==|weird_code/);
+  assert.match(evil, /AI 沒辦法處理/, 'an unknown code reads as the general sentence');
+  assert.match(b.aiProofCallout({ checked: 0, fixes: [], open: [], incomplete: true }, 'r1', 'n1'), /AI 校對：這章沒有查完，已列到書末/);
+});
 test('align: a callout of another run or another chapter always goes', () => {
   const other = b.alignCallouts(note(), { runId: 'old', nodeId: 'n1', review: box() });
   assert.deepEqual(kinds(b.alignCallouts(other, want())), []);
 });
 
 // ---- the reconciler ----
-const DATA = (over = {}) => ({ v: 1, runId: 'r1', phase: 'gate2', status: 'running', order: ['n1', 'n2'], globalPlanned: true, attempts: { global: 1 }, revisions: {}, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'a', phaseStartedAt: 'a', ...over });
+const SLOT = (over = {}) => ({ key: '0:h', attempts: 0, round: 1, step: 'fix', done: true, checked: 14, fixed: 1, fixes: [{ id: 'f1', quote: 'q', problem: 'p', suggestion: '年份改成 1503' }], open: [{ id: 'o1', quote: 'q', problem: '委託人是誰', reason: 'sources_conflict' }], ...over });
+const DATA = (over = {}) => ({ v: 1, aiProof: { n1: SLOT() }, runId: 'r1', phase: 'gate2', status: 'running', order: ['n1', 'n2'], globalPlanned: true, attempts: { global: 1 }, revisions: {}, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'a', phaseStartedAt: 'a', ...over });
 function rig(data, extra = []) {
   const notes = new Map();
   const nodes = [];
@@ -123,29 +152,33 @@ function rig(data, extra = []) {
   });
   return { callouts, notes, map, logs, fail, kinds: id => kinds(notes.get(`N/${id}.md`)) };
 }
-test('reconcile: gate 1 draws the trial hint on the trial chapters (stopped wording when stopped), leaving gate 1 removes it', async () => {
+const oldTrial = (id, runId = 'r1') => b.putProgramCallout(note(`Body ${id}`), b.trialCallout(1, 2, undefined, undefined, false, { runId, nodeId: id }));
+test('reconcile: gate 1 draws no trial hint and takes an old one off', async () => {
   const r = rig(DATA({ phase: 'gate1', trial: ['n1', 'n2'] }));
+  r.notes.set('N/n1.md', oldTrial('n1'));
   await r.callouts.reconcile('M');
-  assert.deepEqual(r.kinds('n1'), ['trial:r1']);
-  assert.deepEqual(r.kinds('n2'), ['trial:r1']);
-  const running = r.notes.get('N/n1.md');
-  r.map.bookPipeline = DATA({ phase: 'gate1', status: 'stopped', trial: ['n1', 'n2'] });
-  await r.callouts.reconcile('M');
-  assert.notEqual(r.notes.get('N/n1.md'), running, 'the stopped wording replaced the running one');
+  assert.deepEqual(r.kinds('n1'), [], 'an old trial box goes');
+  assert.deepEqual(r.kinds('n2'), []);
   assert.equal(await r.callouts.reconcile('M'), undefined);
-  const before = r.notes.get('N/n1.md');
-  await r.callouts.reconcile('M');
-  assert.equal(r.notes.get('N/n1.md'), before, 'idempotent');
   r.map.bookPipeline = DATA({ phase: 'writing' });
   await r.callouts.reconcile('M');
   assert.deepEqual(r.kinds('n1'), []);
-  assert.deepEqual(r.kinds('n2'), []);
 });
-test('reconcile: gate 2 draws a review box only on a chapter that needs a look; an older gate 2 map reopened gets its boxes', async () => {
-  const r = rig(DATA());
+test('reconcile: the AI box is drawn at gate 2 and when done on a chapter whose proofread finished (or could not), not on one still being proofread; a rerun updates it', async () => {
+  const r = rig(DATA({ aiProof: { n1: SLOT(), n2: SLOT({ done: false, step: 'proof' }) } }));
   await r.callouts.reconcile('M');
   assert.deepEqual(r.kinds('n1'), ['review:r1']);
-  assert.deepEqual(r.kinds('n2'), []);
+  assert.deepEqual(r.kinds('n2'), [], 'not finished: no box');
+  assert.match(r.notes.get('N/n1.md'), /AI 校對：查了 14 項，修了 1 處，1 處沒修好/);
+  // the run is done and chapter 1 is run again: the box follows without any other event
+  r.map.bookPipeline = DATA({ phase: 'done', aiProof: { n1: SLOT({ fixes: [], fixed: 0, open: [] }), n2: SLOT({ done: false, incomplete: true, checked: 0, fixes: [], open: [] }) } });
+  await r.callouts.reconcile('M');
+  assert.match(r.notes.get('N/n1.md'), /AI 校對：查了 14 項，修了 0 處，0 處沒修好/);
+  assert.deepEqual(r.kinds('n1'), ['review:r1'], 'one box');
+  assert.match(r.notes.get('N/n2.md'), /AI 校對：這章沒有查完，已列到書末/);
+  r.map.bookPipeline = DATA({ phase: 'writing' });
+  await r.callouts.reconcile('M');
+  assert.deepEqual([r.kinds('n1'), r.kinds('n2')], [[], []], 'any other phase: gone');
 });
 test('reconcile: a callout of another run goes, on a chapter and on a note that is not a chapter of the run', async () => {
   const r = rig(DATA(), ['x1']);
@@ -157,13 +190,13 @@ test('reconcile: a callout of another run goes, on a chapter and on a note that 
   assert.deepEqual(r.kinds('n2'), []);
 });
 test('reconcile: an abandon whose clear failed leaves callouts; reopening the map with no run removes them', async () => {
-  const r = rig(DATA({ phase: 'gate1', trial: ['n1', 'n2'] }));
+  const r = rig(DATA({ phase: 'gate2' }));
   await r.callouts.reconcile('M');
-  assert.deepEqual(r.kinds('n1'), ['trial:r1']);
+  assert.deepEqual(r.kinds('n1'), ['review:r1']);
   r.fail.add('N/n1.md');
   assert.equal(await r.callouts.clear('M'), false, 'the clear reports it failed');
   assert.ok(r.logs.some(line => line.includes('callout_failed')));
-  assert.deepEqual(r.kinds('n1'), ['trial:r1'], 'the callout is still there');
+  assert.deepEqual(r.kinds('n1'), ['review:r1'], 'the callout is still there');
   r.fail.clear();
   delete r.map.bookPipeline;
   await r.callouts.reconcile('M');
@@ -171,8 +204,9 @@ test('reconcile: an abandon whose clear failed leaves callouts; reopening the ma
   assert.deepEqual(r.kinds('n2'), []);
 });
 test('reconcile: after a restart whose clear failed, the old run callouts go on the next open (the new run has its own)', async () => {
-  const r = rig(DATA({ phase: 'gate1', trial: ['n1'] }));
+  const r = rig(DATA({ phase: 'gate2' }));
   await r.callouts.reconcile('M');
+  assert.deepEqual(r.kinds('n1'), ['review:r1']);
   r.map.bookPipeline = DATA({ runId: 'r2', phase: 'writing', order: ['n2'] });
   await r.callouts.reconcile('M');
   assert.deepEqual(r.kinds('n1'), [], 'n1 is no chapter of the new run: its old callout is removed');
@@ -264,18 +298,16 @@ test('editorViewsOf: a view in live preview or source mode edits through the edi
 });
 
 // ---- fix packet 5: the third trial chapter ----
-test('reconcile: gate 1 with three trial chapters writes the callout on every one (numbering 1/3, 2/3, 3/3), also when one already carries an older one', async () => {
+test('reconcile: gate 1 with three chapters carrying older trial boxes takes every one off', async () => {
   const r = rig(DATA({ phase: 'gate1', order: ['n1', 'n2', 'n3'], trial: ['n1', 'n2', 'n3'] }), ['n3']);
-  // n3 was written before: it carries a trial callout of this run with another count, and a stale review box
-  r.notes.set('N/n3.md', b.putProgramCallout(note('B3'), b.trialCallout(1, 2, undefined, undefined, false, { runId: 'r1', nodeId: 'n3' })));
+  for (const id of ['n1', 'n2', 'n3']) r.notes.set(`N/${id}.md`, oldTrial(id));
   await r.callouts.reconcile('M');
-  for (const id of ['n1', 'n2', 'n3']) assert.deepEqual(r.kinds(id), ['trial:r1'], id);
-  assert.ok(r.notes.get('N/n3.md').includes('3／3') || r.notes.get('N/n3.md').includes('3/3'), 'third chapter says 3 of 3');
+  for (const id of ['n1', 'n2', 'n3']) assert.deepEqual(r.kinds(id), [], id);
 });
-test('reconcile: a chapter rewritten after the aligner read it (its snapshot already shows the callout) still gets the callout', async () => {
-  const r = rig(DATA({ phase: 'gate1', order: ['n1', 'n2', 'n3'], trial: ['n1', 'n2', 'n3'] }), ['n3']);
+test('reconcile: a chapter rewritten after the aligner read it (its snapshot already shows the box) still gets the AI box', async () => {
+  const r = rig(DATA({ order: ['n1', 'n2', 'n3'], aiProof: { n1: SLOT(), n2: SLOT(), n3: SLOT() } }), ['n3']);
   await r.callouts.reconcile('M');
-  assert.deepEqual(r.kinds('n3'), ['trial:r1']);
+  assert.deepEqual(r.kinds('n3'), ['review:r1']);
   const withHint = r.notes.get('N/n3.md');
   // n3 is read (callout present), then the chapter is written again (callout gone) before the aligner reaches it
   const snapshot = new Map(r.notes);
@@ -286,58 +318,23 @@ test('reconcile: a chapter rewritten after the aligner read it (its snapshot alr
     write: async (path, transform) => { const next = transform(r.notes.get(path)); if (next === r.notes.get(path)) return 'unchanged'; r.notes.set(path, next); return 'written'; },
     log: () => undefined
   });
-  assert.ok(withHint.includes('vam-trial'));
+  assert.ok(withHint.includes('vam-review'));
   await callouts.reconcile('M');
-  assert.deepEqual(r.kinds('n3'), ['trial:r1'], 'the rewritten chapter carries the hint again');
+  assert.deepEqual(r.kinds('n3'), ['review:r1'], 'the rewritten chapter carries the box again');
 });
 
-// ---- truthful boxes (live v6fix2): every unresolved reason is in the reader-visible box, from the same issue data as `pipeline-issue` ----
-const proofDetail = (nodeId, items, runId = 'r1') => {
-  const body = 'Body text';
-  const key = b.proofKey({ runId, nodeId, revision: 0, body: b.projectProofBody(b.stripImageLines(body)), checklist: [] });
-  const result = { aggregate: items.some(i => i.status !== 'met') ? 'needs-review' : 'checked', items: items.map(i => ({ type: 'structure', sources: [], ...i })) };
-  return b.replaceResearchRecord(body, b.composeProofRecord(key, result));
-};
-function truthRig(data, cards) {
-  const notes = new Map(); const nodes = [];
-  for (const id of Object.keys(cards)) { nodes.push({ id, path: `N/${id}.md` }); notes.set(`N/${id}.md`, note(cards[id].detail)); }
-  const map = { id: 'm', nodes, bookPipeline: data };
-  const callouts = new b.BookCallouts({
-    readMap: async () => map,
-    readCard: async path => { const raw = notes.get(path); const id = nodes.find(n => n.path === path).id; return { path, title: id, summary: '', prompt: '', detail: raw, raw, settings: {}, fields: { pipelineStage: 'needs-review', bookRole: 'body', pipelineIssue: cards[id].issue } }; },
-    readText: async path => notes.get(path),
-    write: async (path, transform) => { const next = transform(notes.get(path)); if (next === notes.get(path)) return 'unchanged'; notes.set(path, next); return 'written'; },
-    log: () => {}
-  });
-  return { callouts, notes, box: id => { const m = /^> \[!vam-(?:trial|review)\][^]*?%%vam-callout-version:1%%/m.exec(notes.get(`N/${id}.md`)); return m ? m[0] : ''; } };
-}
-const U = (id, note) => ({ id, status: 'unmet', note });
-test('gate 1 trial box lists length, images, mismatch and each unmet proof item (v6fix2 家庭菜園入門)', async () => {
-  const issue = 'proof unmet: C6 C7 length:under:4854:5000-8000:字:v2 images:under:4:6 images:off:5';
-  const r = truthRig(DATA({ phase: 'gate1', trial: ['n1'], order: ['n1'] }), { n1: { issue, detail: proofDetail('n1', [U('C6', '採收方式沒有交代'), U('C7', '結尾沒有接到下一章')]) } });
+// ---- truthful boxes: the box tells what the proofread found, from the saved result, in the reader's words ----
+test('gate 2 AI box lists every fix and every open item on its own line, past three, with the reason in words and no tick box', async () => {
+  const fixes = ['a', 'b', 'c', 'd'].map(x => ({ id: x, quote: 'q', problem: 'p', suggestion: `改${x}` }));
+  const open = ['e', 'f'].map(x => ({ id: x, quote: 'q', problem: `問題${x}`, reason: x === 'e' ? 'still_present' : 'source_unreachable' }));
+  const r = rig(DATA({ aiProof: { n1: SLOT({ fixes, open, fixed: 4, checked: 9 }) } }));
   await r.callouts.reconcile('M');
-  const box = r.box('n1');
-  assert.match(box, /\[!vam-trial\]/);
-  assert.match(box, /4854/); assert.match(box, /5000/);
-  assert.match(box, /採收方式沒有交代/); assert.match(box, /結尾沒有接到下一章/);
-  assert.match(box, /4.*6|6.*4/, 'image count against the minimum');
-  assert.match(box, /圖.*5|5.*圖/, 'image 5 does not match its text');
-});
-test('gate 2 review box lists every unmet proof item on its own line (v6fix2 澆水施肥與病蟲害)', async () => {
-  const issue = 'proof unmet: C5 C7 images:under:3:6';
-  const r = truthRig(DATA({ order: ['n1'] }), { n1: { issue, detail: proofDetail('n1', [U('C5', '練習並非最後一部分'), U('C7', '結尾並非談第一批收成'), { id: 'C1', status: 'met', note: 'ok' }]) } });
-  await r.callouts.reconcile('M');
-  const lines = r.box('n1').split('\n').filter(l => l.startsWith('> ・'));
-  assert.ok(lines.some(l => l.includes('練習並非最後一部分')), 'C5 has its own line');
-  assert.ok(lines.some(l => l.includes('結尾並非談第一批收成')), 'C7 has its own line');
-  assert.ok(lines.some(l => /3.*6/.test(l)), 'images under');
-  assert.ok(!lines.some(l => l.includes('練習並非最後一部分') && l.includes('結尾並非談')), 'not merged in one bullet');
-});
-test('gate 2 box keeps every unmet proof item even past three', async () => {
-  const items = ['a', 'b', 'c', 'd', 'e'].map((x, i) => U(`C${i + 1}`, `原因${x}`));
-  const r = truthRig(DATA({ order: ['n1'] }), { n1: { issue: 'proof unmet: C1 C2 C3 C4 C5', detail: proofDetail('n1', items) } });
-  await r.callouts.reconcile('M');
-  for (const x of ['a', 'b', 'c', 'd', 'e']) assert.match(r.box('n1'), new RegExp(`原因${x}`));
+  const lines = r.notes.get('N/n1.md').split('\n').filter(l => l.startsWith('> ・'));
+  assert.equal(lines.length, 6, 'one line each');
+  assert.ok(lines.some(l => l.includes('修了：改d')));
+  assert.ok(lines.some(l => l.includes('問題e') && l.includes('修過之後問題還在')));
+  assert.ok(lines.some(l => l.includes('問題f') && l.includes('查不到可靠的來源')));
+  assert.doesNotMatch(r.notes.get('N/n1.md'), /\[ \]|\[x\]/);
 });
 
 // ---- the writer asks open reading views to render again (live v6fix2: tabs opened at gate 1 kept the old box) ----

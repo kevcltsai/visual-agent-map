@@ -1768,6 +1768,11 @@ test('callouts: entering gate 1, entering gate 2 and a rerun at gate 2 each ask 
   await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'gate2'; });
   await r.runs.rerunCard(r.mapPath, r.nodes[1].id); await settle();
   assert.ok(spy.log.length > atGate2, 'a rerun at gate 2 redrew the box');
+  // A finished run too: the AI box of the chapter that was run again follows its new result at once.
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'done'; });
+  const atDone = spy.log.length;
+  await r.runs.rerunCard(r.mapPath, r.nodes[1].id); await settle();
+  assert.ok(spy.log.length > atDone, 'a rerun after the run finished redrew the box');
 });
 test('callouts: a throwing or rejecting port never stops the run', async () => {
   const r = await rig({ ports: { callouts: { reconcile: () => { throw new Error('x'); }, clear: async () => true } } });

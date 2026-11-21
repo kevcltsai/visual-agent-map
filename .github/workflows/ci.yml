@@ -6,6 +6,9 @@ name: CI
 # a change can reach (scripts/test-affected.mjs).
 # There is no pull_request trigger: a PR shows its branch's push run for the same commit, so one commit runs once.
 # The PR merge ref is not tested on its own; the full run on main after the merge covers it.
+# A full run is split over jobs: `checks` (lint, format, i18n, build, artifacts), `test` (4 runners, each a share of the unit and integration parts,
+# VAM_CI_SHARD=i/4) and `gate`. The gate is the only job whose result is the run's verdict that matters: it fails unless checks and every shard
+# succeeded and scripts/ci-shard-gate.mjs finds every test unit reported exactly once (a skipped job alone would not fail a run).
 run-name: "CI ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }}: ${{ github.event.head_commit.message || github.ref_name }}"
 
 on:
@@ -28,20 +31,23 @@ concurrency:
   group: ci-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+env:
+  MODE: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }}
+
 jobs:
-  verify:
-    name: verify (${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }})
-    timeout-minutes: 30
+  # On main, reuse a green FULL ci.yml run for the same head_sha (any branch). Any query failure leaves `run` empty, so the tests run.
+  reuse:
+    name: reuse
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 10
     runs-on: ubuntu-24.04
-    env:
-      MODE: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }}
+    outputs:
+      run: ${{ steps.reuse.outputs.run }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      # On main, reuse a green FULL ci.yml run for the same head_sha (any branch). Any query failure leaves `run` empty, so verify runs.
       - id: reuse
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -52,7 +58,7 @@ jobs:
           else
             echo "no reusable green full run for $GITHUB_SHA; running verify"
           fi
-      # Reusing a full run skips verify, so the table it made is carried over: downloaded from that run and cached for main. A failure here only leaves the table older (test-affected still selects soundly from an older table).
+      # Reusing a full run skips the tests, so the table it made is carried over: downloaded from that run and cached for main. A failure here only leaves the table older (test-affected still selects soundly from an older table).
       - if: steps.reuse.outputs.run != ''
         continue-on-error: true
         env:
@@ -76,36 +82,142 @@ jobs:
           name: test-deps
           path: test-deps.json
           retention-days: 30
+
+  # Full: the static checks and the build. Affected: the whole affected run in this one job (one command, as before).
+  checks:
+    name: checks (${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }})
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.outputs.run == '' }}
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v5
-        if: steps.reuse.outputs.run == ''
         with:
           node-version: 22
           cache: npm
-      - if: steps.reuse.outputs.run == ''
-        run: npm ci
+      - run: npm ci
       # Affected runs read the dependency table of the latest full run (cache key test-deps-<sha>); a miss makes test:affected run everything.
-      - if: steps.reuse.outputs.run == '' && env.MODE == 'affected'
+      - if: env.MODE == 'affected'
         uses: actions/cache/restore@v4
         with:
           path: test-deps.json
           key: test-deps-none-${{ github.sha }}
           restore-keys: test-deps-
-      - if: steps.reuse.outputs.run == '' && env.MODE == 'affected'
+      - if: env.MODE == 'affected'
         run: |
           npm run lint && npm run format:check && npm run check:i18n && npm run build && npm run test:affected \
             && git diff --exit-code -- main.js experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts
-      - if: steps.reuse.outputs.run == '' && env.MODE == 'full'
+      - if: env.MODE == 'full'
+        run: |
+          npm run lint && npm run format:check && npm run check:i18n && npm run build \
+            && git diff --exit-code -- main.js experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts
+
+  # Full only: 4 runners, each runs its share of the parts (scripts/test-integration.mjs shardParts) through `npm test`.
+  test:
+    name: test (shard ${{ matrix.shard }}/4)
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.outputs.run == '' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.full)) }}
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      VAM_CI_SHARD: ${{ matrix.shard }}/4
+      VAM_CI_REPORT_DIR: ${{ runner.temp }}/ci-reports
+      VAM_TEST_DEPS_DIR: ${{ runner.temp }}/test-deps-records
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-reports-${{ matrix.shard }}
+          path: ${{ runner.temp }}/ci-reports
+          retention-days: 7
+          if-no-files-found: error
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-deps-records-${{ matrix.shard }}
+          path: ${{ runner.temp }}/test-deps-records
+          retention-days: 7
+          if-no-files-found: error
+
+  # The verdict. A skipped or cancelled job does not fail a run by itself, so this job fails unless checks and test both succeeded (affected runs: checks alone).
+  gate:
+    name: gate
+    needs: [reuse, checks, test]
+    if: ${{ always() }}
+    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Reused green run passes
+        id: reused
         env:
-          VAM_TEST_DEPS_DIR: ${{ runner.temp }}/test-deps-records
-        run: npm run verify
-      - if: steps.reuse.outputs.run == '' && env.MODE == 'full'
-        run: node scripts/test-affected.mjs --write-deps "$RUNNER_TEMP/test-deps-records"
-      - if: steps.reuse.outputs.run == '' && env.MODE == 'full'
+          REUSE_RESULT: ${{ needs.reuse.result }}
+          REUSE_RUN: ${{ needs.reuse.outputs.run }}
+        run: |
+          if [ "$REUSE_RESULT" = success ] && [ -n "$REUSE_RUN" ]; then
+            echo "reused green full run $REUSE_RUN"
+            echo "reused=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Require checks and every test shard to succeed
+        if: steps.reused.outputs.reused != 'true'
+        env:
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          echo "checks: $CHECKS_RESULT, test: $TEST_RESULT, mode: $MODE"
+          [ "$CHECKS_RESULT" = success ] || { echo "checks did not succeed"; exit 1; }
+          if [ "$MODE" = full ]; then
+            [ "$TEST_RESULT" = success ] || { echo "test shards did not all succeed"; exit 1; }
+          fi
+      - if: steps.reused.outputs.reused != 'true' && env.MODE == 'full'
+        uses: actions/checkout@v5
+      - if: steps.reused.outputs.reused != 'true' && env.MODE == 'full'
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - if: steps.reused.outputs.reused != 'true' && env.MODE == 'full'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ci-reports-*
+          path: ${{ runner.temp }}/ci-reports
+      - if: steps.reused.outputs.reused != 'true' && env.MODE == 'full'
+        run: node scripts/ci-shard-gate.mjs "$RUNNER_TEMP/ci-reports" --shards=4
+      # Record files are named <pid>-<ms>.json per runner; the shard number is prefixed so records from different runners cannot overwrite each other.
+      - if: steps.reused.outputs.reused != 'true' && env.MODE == 'full'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-deps-records-*
+          path: ${{ runner.temp }}/test-deps-downloaded
+      - if: steps.reused.outputs.reused != 'true' && env.MODE == 'full'
+        run: |
+          mkdir -p "$RUNNER_TEMP/test-deps-records"
+          for dir in "$RUNNER_TEMP"/test-deps-downloaded/*/; do
+            for file in "$dir"*.json; do
+              cp "$file" "$RUNNER_TEMP/test-deps-records/$(basename "$dir")-$(basename "$file")"
+            done
+          done
+          node scripts/test-affected.mjs --write-deps "$RUNNER_TEMP/test-deps-records"
+      - if: steps.reused.outputs.reused != 'true' && env.MODE == 'full'
         uses: actions/cache/save@v4
         with:
           path: test-deps.json
           key: test-deps-${{ github.sha }}
-      - if: steps.reuse.outputs.run == '' && env.MODE == 'full'
+      - if: steps.reused.outputs.reused != 'true' && env.MODE == 'full'
         uses: actions/upload-artifact@v4
         with:
           name: test-deps

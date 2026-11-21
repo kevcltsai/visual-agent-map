@@ -49,6 +49,7 @@ const suites = [
   'check-test-timing.cjs',
   'check-test-wiring.cjs',
   'check-workflows.cjs',
+  'ci-shard.cjs',
   'heavy-lock.cjs',
   'obsidian-cdp-trust.cjs',
   'obsidian-cdp-input.cjs',

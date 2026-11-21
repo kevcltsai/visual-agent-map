@@ -39,14 +39,14 @@ const expand = word => {
   if (!found.length) throw new Error(`test-unit: ${word} matches no file`);
   return found;
 };
-const runnable = list => list.map(part => (part.args[0] === "--test" ? { ...part, args: ["--test", ...part.args.slice(1).flatMap(expand)] } : part));
+export const runnable = list => list.map(part => (part.args[0] === "--test" ? { ...part, args: ["--test", ...part.args.slice(1).flatMap(expand)] } : part));
 
 async function main() {
   const { enterHeavy } = await import("./heavy-lock.mjs");
   await enterHeavy("npm run test:unit");
   // Imported here so that importing this file (the wiring check does) does not load the runner.
-  const { runParts } = await import("./test-integration.mjs");
-  const failed = await runParts(runnable(parts));
+  const { runParts, shardParts, parseShard } = await import("./test-integration.mjs");
+  const failed = await runParts(shardParts(runnable(parts), parseShard(), { splitNodeTest: true }), "unit");
   if (failed.length) {
     process.stdout.write(`\ntest:unit FAILED in: ${failed.join(", ")}\n`);
     process.exitCode = 1; // not process.exit(1): on a pipe it can cut off the part output still being written

@@ -4015,3 +4015,67 @@ test('worst-case calls with picture search: every step uses its whole allowance 
     if (titles.length === 10) assert.equal(estimate, 166);
   }
 });
+
+
+// ---- R1 follow-ups: B3 rerun after done, M1 partial book fix, M2 chapter reasons, B1 skipped target ----
+const pageText = v => pageFiles(v)[0]?.[1] ?? '';
+const checkedTotal = s => Object.values(s.aiProof).reduce((sum, p) => sum + p.checked, 0) + s.bookProof.checked;
+
+test('R1 B3: a chapter written again after done gets its AI proofread in the same job; the closing page, the bar numbers and the chapter box agree', async () => {
+  const v = pageVault();
+  let fixedA = false;
+  const r = await aiRig({
+    aiProof: async request => ({ checks: request.title === 'SecretTitleA' && !fixedA ? [problem(request)] : [okCheck(request)], prior: [], dropped: {} }),
+    aiFix: async request => { fixedA = true; return [{ id: 'P1', quote: request.chapters[0].text.slice(0, 11), replacement: 'Corrected b' }]; }
+  }, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  assert.equal((await r.state()).phase, 'done');
+  const proofsBefore = aiRuns(r, 'proof', 'SecretTitleA').length;
+  await rerun(r, 1);
+  const s = await r.state();
+  assert.equal(s.phase, 'done');
+  const slot = s.aiProof[r.nodes[1].id];
+  assert.ok(slot && slot.done, 'the rewritten chapter was proofread again');
+  assert.ok(aiRuns(r, 'proof', 'SecretTitleA').length > proofsBefore);
+  assert.match(pageText(v), new RegExp(`AI 校對查了 ${checkedTotal(s)} 項`), 'the page counts what the bar counts');
+});
+
+test('R1 M1: a whole-book fix that wrote chapter 1 and was refused on chapter 2 still records chapter 1 (fixed, a new text key)', async () => {
+  let once = true;
+  const r = await aiRig({
+    aiBookProof: async request => ({ checks: once ? [bookProblem(request, 2, 3), { ...bookProblem(request, 3, 2), id: 'B2' }] : [], prior: [], dropped: {} }),
+    aiFix: async request => {
+      if (once) { once = false; await r.repo.updateNoteRawGuarded(r.nodes[2].path, c => c + '\nHANDMADE', {}); }
+      return [{ id: 'B1', chapter: 2, quote: request.chapters[1].text, replacement: 'One corrected' }, { id: 'B2', chapter: 3, quote: request.chapters[2].text, replacement: 'Two corrected' }];
+    }
+  });
+  await runToEnd(r); while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+  const s = await r.state();
+  assert.ok(r.raw(1).includes('One corrected'), 'the first chapter was written');
+  assert.ok(s.bookProof.fixed >= 1, 'and it is counted as fixed');
+});
+
+test('R1 M2: chapter reasons on the page: no body reads as "no text", a hand edit as a hand edit (never "a step failed")', async () => {
+  const v = pageVault();
+  const r = await aiRig({}, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  await r.repo.writePipelineFields(r.nodes[1].path, { pipelineStage: 'needs-review', pipelineIssue: 'write failed: no_body' });
+  await r.repo.writePipelineFields(r.nodes[2].path, { pipelineStage: 'needs-review', pipelineIssue: 'write failed: hand_edited' });
+  await rerun(r, 0);
+  const text = pageText(v);
+  assert.match(text, /SecretTitleA：這章沒有正文/);
+  assert.match(text, /SecretTitleB：這章是你手改過的/);
+  assert.doesNotMatch(text, /步驟失敗/);
+});
+
+test('R1 B1: the model skips one of two targets: only the applied one is a fix, and the number equals the list', async () => {
+  let fixed = false;
+  const r = await aiRig({
+    aiProof: async request => ({ checks: request.title === 'SecretTitleA' && !fixed ? [problem(request, 'P1'), { ...problem(request, 'P2'), quote: request.body.slice(12, 20) }] : [], prior: [], dropped: {} }),
+    aiFix: async request => { fixed = true; return [{ id: 'P1', quote: request.chapters[0].text.slice(0, 11), replacement: 'Corrected b' }]; }
+  });
+  await runToEnd(r); while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+  const slot = (await r.state()).aiProof[r.nodes[1].id];
+  same(slot.fixes.map(item => item.id), ['P1']);
+  assert.equal(slot.fixed, slot.fixes.length);
+});

@@ -249,6 +249,8 @@ import {
   stampRaw
 } from "../../core/book-pipeline/body-integrity";
 
+const appliedIdsOf = (outcomes: readonly { id: string; applied: boolean }[]): string[] =>
+  outcomes.filter(outcome => outcome.applied).map(outcome => outcome.id);
 /** At most this many cards are in a step at once (the whole-book plan runs alone before them). */
 export const BOOK_POOL = 5;
 
@@ -1376,6 +1378,7 @@ export class BookPipelineRuns {
         } finally {
           drive.rerun = undefined;
         }
+        if (track) await this.proofAfterRerun(drive, nodeId);
         // A rerun that made a new plan: the neighbours' plans still describe the old one (no AI call, only their previous/next line).
         if (track && drive.plans.get(nodeId) !== planBefore) await this.refreshNeighbourPlans(drive, nodeId);
         finish?.(drive, track ? { before, after: await this.cardSnapshot(drive, nodeId) } : undefined);
@@ -1383,6 +1386,29 @@ export class BookPipelineRuns {
       };
       this.log(drive, "rerun", nodeId, kinds[0], kinds.length === 1 ? "plan_only" : "full");
     });
+  }
+
+  /**
+   * A chapter written again after its chapter proofread was cleared (`resetCard`): the AI proofread runs on it here, in the same job (the
+   * usual rounds and limits), and a finished book's closing page is written again, so the bar, the chapter box and the page agree.
+   * A failed page write is logged and the book stays as it was (a finished book is not turned back).
+   */
+  private async proofAfterRerun(drive: Drive, nodeId: string): Promise<void> {
+    if (!this.ports.aiProof || !this.ports.aiFix || !this.ports.aiBookProof) return;
+    if (drive.stages.get(nodeId) !== "checked") return;
+    for (let turn = 0; turn < 20; turn++) {
+      const state = drive.store.state;
+      if (this.dead(drive) || drive.controller.signal.aborted || drive.fatal !== undefined) return;
+      if (state.status !== "running" || state.aiProof?.[nodeId]?.done) break;
+      drive.busy.add(nodeId);
+      try {
+        await this.aiChapter(drive, nodeId, state.aiProof?.[nodeId]?.step === "fix" ? "fix" : "proof", true);
+      } finally {
+        drive.busy.delete(nodeId);
+      }
+    }
+    if (drive.store.state.phase !== "done" || !drive.store.state.aiProof?.[nodeId]?.done) return;
+    if (!(await this.writeClosingPage(drive))) this.log(drive, "open_issues_write", nodeId, "proof", "failed");
   }
 
   /** The card's result as the rerun compares it (memory only); undefined when the card cannot be read. */
@@ -2426,7 +2452,7 @@ export class BookPipelineRuns {
    * One step of a chapter's independent AI proofread: the check (the proof model, web search) or the fix (the author model, edits
    * applied by the program). The attempt is counted before the call and saved; a stop or a text changed meanwhile drops the result.
    */
-  private async aiChapter(drive: Drive, nodeId: string, want: "proof" | "fix"): Promise<void> {
+  private async aiChapter(drive: Drive, nodeId: string, want: "proof" | "fix", rerun = false): Promise<void> {
     const info = drive.cards.get(nodeId);
     if (!info || !this.ports.aiProof || !this.ports.aiFix) return;
     const signal = drive.controller.signal;
@@ -2434,7 +2460,9 @@ export class BookPipelineRuns {
     if (this.dead(drive)) return;
     const giveUp = async (): Promise<void> => {
       await drive.store.commit(state =>
-        state.status === "running" && effectiveOrder(state).includes(nodeId) && aiChapterDue(state, nodeId)
+        state.status === "running" &&
+        effectiveOrder(state).includes(nodeId) &&
+        (rerun ? !state.aiProof?.[nodeId]?.done : aiChapterDue(state, nodeId))
           ? { state: abandonAi(state, nodeId), accepted: true }
           : { state, accepted: false }
       );
@@ -2447,7 +2475,7 @@ export class BookPipelineRuns {
     const same = stored?.key === key ? stored : undefined;
     const step = same ? want : "proof";
     const begun = await drive.store.commit(state => {
-      const dispatched = beginAiStep(state, { nodeId }, key, step);
+      const dispatched = beginAiStep(state, { nodeId, ...(rerun ? { rerun } : {}) }, key, step);
       return dispatched
         ? { state: dispatched.state, accepted: true, token: dispatched.token }
         : { state, accepted: false as const, token: undefined };
@@ -2514,7 +2542,7 @@ export class BookPipelineRuns {
       if ((state !== "clean" && state !== "empty") || isKeptRaw(raw)) {
         // The reader's own text (hand-edited, unknown or kept): no call, nothing is rewritten, every problem is left open.
         const refused = Object.fromEntries(targets.map(target => [target.id, "hand_edited"]));
-        const done = await drive.store.commit(current => applyAiFix(current, token, { applied: 0, refused }));
+        const done = await drive.store.commit(current => applyAiFix(current, token, { applied: 0, appliedIds: [], refused }));
         return report(done?.accepted ? "ok" : "dropped", { applied: 0, pending: targets.length });
       }
       const rootInfo = drive.cards.get(drive.rootId);
@@ -2559,6 +2587,7 @@ export class BookPipelineRuns {
       const done = await drive.store.commit(current =>
         applyAiFix(current, token, {
           applied: result.applied,
+          appliedIds: appliedIdsOf(result.outcomes),
           refused,
           ...(newKey ? { key: newKey, changed: [nodeId] } : {})
         })
@@ -2725,7 +2754,9 @@ export class BookPipelineRuns {
       if (this.dead(drive)) return;
       const refused: Record<string, AiFixRefusal> = {};
       const changed: string[] = [];
+      const appliedIds: string[] = [];
       let applied = 0;
+      let discarded = false;
       const owner = new Map(targets.map(target => [target.id, target.chapter ?? 1]));
       for (let at = 0; at < chapters.length; at++) {
         const mine = targets.filter(target => (target.chapter ?? 1) === at + 1);
@@ -2752,10 +2783,16 @@ export class BookPipelineRuns {
           authorize: () => !this.dead(drive) && !signal.aborted && isAiCurrent(drive.store.state, token)
         });
         if (written === "discarded") {
-          await drive.store.commit(current => applyAiStopped(current, token, false));
-          return report("dropped");
+          // Chapters written before this one are real: they are recorded (the fix round is spent) instead of being forgotten.
+          if (!changed.length) {
+            await drive.store.commit(current => applyAiStopped(current, token, false));
+            return report("dropped");
+          }
+          discarded = true;
+          break;
         }
         applied += result.applied;
+        appliedIds.push(...appliedIdsOf(result.outcomes));
         changed.push(chapter.id);
       }
       let newKey: string | undefined;
@@ -2764,8 +2801,9 @@ export class BookPipelineRuns {
         newKey = aiProofKey(0, joined(after.chapters.map(chapter => chapter.text)));
       }
       const done = await drive.store.commit(current =>
-        applyAiFix(current, token, { applied, refused, ...(newKey ? { key: newKey, changed } : {}) })
+        applyAiFix(current, token, { applied, appliedIds, refused, ...(newKey ? { key: newKey, changed } : {}) })
       );
+      if (discarded) return report("dropped", { applied, pending: targets.length });
       report(done?.accepted ? "ok" : "dropped", { applied, pending: targets.length });
     } catch (error) {
       if (this.dead(drive)) return;
@@ -2830,9 +2868,13 @@ export class BookPipelineRuns {
           ? "too_long"
           : /images:under/.test(issue)
             ? "few_images"
-            : /^(plan|write|proof) failed/.test(issue)
-              ? "step_failed"
-              : "";
+            : /no_body|no_text/.test(issue)
+              ? "no_text"
+              : /hand_edited/.test(issue)
+                ? "hand_edited"
+                : /^(plan|write|proof) failed/.test(issue)
+                  ? "step_failed"
+                  : "";
       issues.push({ source: "chapter", chapterId: id, chapterTitle: title(id), problem: "", reason });
     }
     return { checked, issues };

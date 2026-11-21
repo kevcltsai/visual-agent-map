@@ -1618,7 +1618,8 @@ export class BookPipelineRuns {
         if (!info || this.dead(drive) || signal.aborted) continue;
         const raw = await this.ports.readCard(info.path);
         if (!isUntouched(raw.detail)) continue;
-        const prompt = rewriteNeighbourLine(
+        // A `previous` line's sentence is the plan's own (the earlier ideas the card stands on), so it is kept; only a `next` line is rewritten.
+        const prompt = (key === "previous" ? retargetNeighbourLine : rewriteNeighbourLine)(
           raw.prompt,
           key,
           { position: this.neighbourPosition(structure, id as string, nodeId), title: card.title, summary: covers },
@@ -1675,7 +1676,12 @@ export class BookPipelineRuns {
             const neighbour = await this.ports.readCard(other.path);
             neighbourLine = this.neighbourCardOf(structure, nodeId, otherId, key, neighbour);
           }
-          const prompt = rewriteNeighbourLine(raw.prompt, key, neighbourLine, structure.placeOf(nodeId)?.kind);
+          const prompt = (key === "previous" ? retargetNeighbourLine : rewriteNeighbourLine)(
+            raw.prompt,
+            key,
+            neighbourLine,
+            structure.placeOf(nodeId)?.kind
+          );
           if (prompt === undefined) continue;
           await this.ports.updateNoteGuarded(
             own.path,

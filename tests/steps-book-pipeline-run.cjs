@@ -3326,7 +3326,7 @@ test('T12 neighbours: both neighbours get the rerun chapter\'s new covers on the
   assert.equal(r.stat.plan.length, planBefore + 1, 'only the rerun chapter was planned again');
   assert.equal(r.stat.proof.length, before.proof + 1, 'only the rerun chapter was proofread again');
   assert.equal((await promptLine(r, 1, '下一章')), `(2) SecretTitleB — NEWCOVERS 3`, 'left neighbour: next line');
-  assert.equal((await promptLine(r, 3, '上一章')), `(2) SecretTitleB — NEWCOVERS 3`, 'right neighbour: previous line');
+  assert.equal((await promptLine(r, 3, '上一章')), `(2) SecretTitleB — p`, 'right neighbour: its previous line keeps its own sentence (the earlier ideas it stands on)');
   assert.ok((await promptLine(r, 1, '上一章')).includes('(前言)'), 'its other line is not touched');
   assert.ok((await r.note(1)).pipelineSeam && (await r.note(3)).pipelineSeam, 'seams marked as before');
   assert.equal(integrityFpRaw(r.raw(1)), fps[0]); assert.equal(integrityFpRaw(r.raw(3)), fps[2]);
@@ -3336,7 +3336,7 @@ test('T12 neighbours: both neighbours get the rerun chapter\'s new covers on the
 test('T12 neighbours: the first and the last chapter have one neighbour; a removed neighbour is skipped for the next one over', async () => {
   const r = await neighbourRig();
   await rerun(r, 0);
-  assert.equal((await promptLine(r, 1, '上一章')), '(前言) SecretRootTitle — NEWCOVERS 1');
+  assert.equal((await promptLine(r, 1, '上一章')), '(前言) SecretRootTitle — p', 'a previous line keeps its own sentence');
   assert.ok(!/NEWCOVERS/.test((await promptLine(r, 2, '上一章'))));
   const last = await neighbourRig();
   await rerun(last, 3);
@@ -3367,7 +3367,7 @@ test('T12 neighbours: a neighbour whose text the reader edited by hand is not to
   const editedLine = await promptLine(r, 1, '下一章');
   await rerun(r, 2);
   assert.equal(await promptLine(r, 1, '下一章'), editedLine, 'the edited neighbour keeps its line');
-  assert.equal((await promptLine(r, 3, '上一章')), '(2) SecretTitleB — NEWCOVERS 3', 'the clean neighbour still follows');
+  assert.equal((await promptLine(r, 3, '上一章')), '(2) SecretTitleB — p', 'the clean neighbour keeps its own previous sentence');
   assert.ok((await r.note(1)).pipelineSeam, 'seam is marked');
   // Idempotent: the second rerun with the same covers writes no neighbour again.
   const writes = []; const base = r.ports.updateNoteGuarded;
@@ -3755,7 +3755,7 @@ test('P3 neighbours: a section gets 所屬章 / 前一節 / 後一節 and a chap
   assert.equal(await promptLine(r, 2, '所屬章'), '(1) ChapA', 'the section names its chapter, by number and title only');
   assert.equal(await promptLine(r, 2, '前一節'), '無');
   assert.ok((await promptLine(r, 2, '後一節')).startsWith('SecA2 — '), 'the next section has no number');
-  assert.equal(await promptLine(r, 3, '前一節'), 'SecA1 — NEWCOVERS 3', 'the next section follows the rerun');
+  assert.equal(await promptLine(r, 3, '前一節'), 'SecA1 — p', 'the next section keeps its own previous sentence');
   assert.equal(await promptLine(r, 3, '後一節'), '無', 'the last section names no next chapter');
   assert.ok(!/下一章/.test((await r.note(3)).prompt), 'no next-chapter line on a section');
   assert.ok((await promptLine(r, 1, '上一章')).startsWith('(前言) BookRoot'));

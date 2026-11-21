@@ -15938,7 +15938,7 @@ var BOOK_AUTHOR_RULES = [
   "- Write the chapter as the role named in the brief says.",
   "- The chapter text itself is required and comes first in the Detail, before any sources or notes sections: a result with only sources and notes, and no chapter text, is invalid. Do the research, then write the chapter in full.",
   "- Open with this chapter's own scene, question or claim, as the brief's entry says. Do not open by recapping or pointing back to the previous chapter (no opening such as \u300C\u4E0A\u4E00\u7AE0\u2026\u300D\u300C\u524D\u4E00\u7AE0\u2026\u300D).",
-  "- Somewhere after the opening (not as the opening), one paragraph gathers the earlier ideas the brief's previous line names, in the reader's terms, and shows why they lead to this chapter's new idea: a few sentences, without retelling the earlier chapters' stories.",
+  "- Somewhere after the opening (not as the opening), one paragraph gathers the earlier ideas named in the brief's line about the previous chapter or section (\u4E0A\u4E00\u7AE0 / \u524D\u4E00\u7BC0 / Previous chapter / Previous section; skip this when that line says there is none), in the reader's terms, and shows why they lead to this chapter's new idea: a few sentences, without retelling the earlier chapters' stories.",
   "- Call the parts of the book chapters, never cards (no \u300C\u5361\u7247\u300D\u300C\u4E0B\u4E00\u5F35\u300D in the text).",
   "- End the last paragraph on the open question the brief's handoff leaves, stated through this chapter's own material and what is at stake. Do not name, number or announce the next chapter or section (no \u300C\u4E0B\u4E00\u7AE0\u2026\u300D\u300C\u4E0B\u4E00\u7BC0\u2026\u300D\u300C\u5C31\u5F9E\u9019\u88E1\u8AC7\u8D77\u300D). Only the book's last card (a brief with neither a next section nor a next chapter) closes the whole book instead: it ends by answering the preface's question from the ideas the chapters built, as the brief's handoff says, not by a new topic or a generic outlook.",
   "- The closing sentence belongs to the last paragraph of the chapter's own text, before any open-questions, sources or notes sections the template adds; those sections are not the chapter's ending.",
@@ -49756,13 +49756,13 @@ Write the brief the card's author will follow and the proofreader will check ("c
 - points: 3 to 6 content headings of this card, in the order the card says them. Each is one short line of at most 40 characters, a heading and not a sentence, without the character "\xB7".
 - entry: how the chapter opens, one sentence. It grows from this chapter's own subject (its object, person, place, event or question), not from a generic everyday scene that could open any chapter of the book and not from an "imagine\u2026" set-up, unless the chapter is about that scene; it is not a recap of the previous chapter (for the first card: how it opens the book).
 - handoff: the open question this chapter leaves for the next chapter, one sentence, stated through this chapter's own material and what is at stake, without naming or announcing the next chapter. The chapter's last paragraph ends on this question, not on a lead-in sentence. For the last card (and role closing), covers and handoff return to the question the preface opened with and combine the book's main ideas into one answer to it. The author writes it in the chapter's closing paragraph; the template's open-questions, sources and notes sections come after that paragraph and are not part of the chapter body.
-- previous: which ideas established by earlier cards (any earlier card in the list, not only the neighbour) this chapter stands on, and the one new idea it adds because of them; one or two sentences; an empty string for the first card.
+- previous: which ideas established by earlier cards (any earlier card in the list, not only the neighbour; judge from the titles, the thread and the neighbour's summary) this chapter stands on, and the one new idea it adds because of them; one or two sentences; an empty string for the first card.
 - next: one sentence about the next chapter as it matters to this chapter; an empty string when there is no such card.
 - checklist: 2 to 8 acceptance items. Each is one objectively checkable statement about the finished chapter, with a type: structure (about the chapter's shape, scope or coverage, checkable from its text alone) or fact (a concrete claim that must hold in outside sources, such as a date, name or number). A chapter that only orients the reader may have structure items only. Do not number the items and do not write ids.
   - Allowed: what the chapter covers, what it leaves out, the order of its parts, and facts that outside sources can confirm. Write every structure item so it can be verified by quoting the chapter's text, for example: "the chapter states the claim 'X'", "the closing paragraph ends on the open question 'Y'", "the chapter names the work and its year".
-  - When previous is not empty, include one structure item of this form: the chapter names the earlier ideas "X" and "Y" and states that they lead to "Z".
-  - For the last card (and role closing), include one structure item: the closing paragraph answers the preface's question "Q" by combining the ideas "X" and "Y".
-  - Not allowed: anything subjective, evaluative or about style: no adjective or value-judgement items (noteworthy, brilliant, vivid, important, engaging and the like), nothing about tone, voice, readability, "plain" or "friendly" wording, no required opening or closing sentence pattern such as a question, and no requirement on exact wording. An item that cannot be checked by quoting the text is dropped by the program.
+  - When previous is not empty, include one structure item of this form: the chapter names the earlier ideas "X" and "Y" and states that they lead to "Z". X, Y and Z are labels for ideas, not wording the chapter must contain: the chapter may say them in its own words.
+  - For the last card (and role closing), include one structure item: the closing paragraph answers the book's opening question "Q" by combining the ideas "X" and "Y" (Q is the question the book title or the thread poses; when neither poses one, the item is: the closing paragraph combines the ideas "X" and "Y" into one closing claim).
+  - Not allowed: anything subjective, evaluative or about style: no adjective or value-judgement items (noteworthy, brilliant, vivid, important, engaging and the like), nothing about tone, voice, readability, "plain" or "friendly" wording, no required sentence form for the opening or the closing (the open question a closing paragraph ends on is checked by what it asks, not by its form), and no requirement on exact wording. An item that cannot be checked by quoting the text is dropped by the program.
   - Pictures: never put a picture requirement in the checklist (pictures are planned in images, below).
 {{imagesRule}}
 - cover: the one picture that stands for this whole card (for the preface: for the whole book), a thing the card's own text talks about. It is separate from the images above: it does not count toward them and is asked for even when images is empty. It has: explains (what the picture shows, one sentence) and search (2 to 4 English search terms for a Wikimedia Commons file search, a few words each, most specific first; always in English, whatever the book's language). Do not write image links or addresses; the cover is found later.
@@ -55543,7 +55543,7 @@ var BookPipelineRuns = class {
         if (!info || this.dead(drive) || signal.aborted) continue;
         const raw = await this.ports.readCard(info.path);
         if (!isUntouched(raw.detail)) continue;
-        const prompt = rewriteNeighbourLine(
+        const prompt = (key4 === "previous" ? retargetNeighbourLine : rewriteNeighbourLine)(
           raw.prompt,
           key4,
           { position: this.neighbourPosition(structure2, id, nodeId), title: card.title, summary: covers },
@@ -55597,7 +55597,12 @@ var BookPipelineRuns = class {
             const neighbour2 = await this.ports.readCard(other.path);
             neighbourLine = this.neighbourCardOf(structure2, nodeId, otherId, key4, neighbour2);
           }
-          const prompt = rewriteNeighbourLine(raw.prompt, key4, neighbourLine, (_a2 = structure2.placeOf(nodeId)) == null ? void 0 : _a2.kind);
+          const prompt = (key4 === "previous" ? retargetNeighbourLine : rewriteNeighbourLine)(
+            raw.prompt,
+            key4,
+            neighbourLine,
+            (_a2 = structure2.placeOf(nodeId)) == null ? void 0 : _a2.kind
+          );
           if (prompt === void 0) continue;
           await this.ports.updateNoteGuarded(
             own2.path,

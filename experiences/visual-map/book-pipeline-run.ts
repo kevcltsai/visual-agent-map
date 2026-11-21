@@ -618,7 +618,7 @@ interface Drive {
   extra: Map<string, string>;
   /** Cards whose `extra` line is a source swap: the author gets it too. */
   avoid: Set<string>;
-  /** Cards whose proofread named unmet points, waiting for the one automatic redo once every card has had its first round: the program-built request line. */
+  /** Cards whose proofread named unmet points, waiting for the one automatic redo once that card's own first round is over: the program-built request line. */
   fixable: Map<string, string>;
   /** Cards whose automatic redo edits the chapter in place (the program puts the author's change blocks in), never writing it anew. */
   expand: Set<string>;
@@ -2452,6 +2452,8 @@ export class BookPipelineRuns {
         await this.refreshSkippedPlans(drive);
         await this.refreshAroundRemoved(drive);
       }
+      // A card's automatic redo starts once its own first round is over (its proofread committed, its step out of `busy`), not when the whole book is idle.
+      if (drive.fixable.size && !drive.job && drive.store.state.status === "running") await this.startFixes(drive);
       await drive.store.commit(state => invalidateStaleAiChapters(state));
       const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy, {
         aiProof: !!this.ports.aiProof && !!this.ports.aiFix && !!this.ports.aiBookProof && !drive.job,
@@ -3315,15 +3317,16 @@ export class BookPipelineRuns {
     this.syncReviewNotes(drive);
   }
   /**
-   * The one automatic redo (plan 2026 flow v3, E), after every card has had its first round: a card whose proofread named unmet points
+   * The one automatic redo (plan 2026 flow v3, E), after that card's own first round: a card whose proofread named unmet points
    * gets its text written again by the author alone (the plan and the checklist stay, attempts are not reset), then proofread once more.
    * The real points go to the author only (never to the proofread). A refused or no longer allowed request leaves the card needs-review.
    * Returns how many cards were sent back; only cards queued by this drive's own proofreads are considered.
    */
   private async startFixes(drive: Drive): Promise<number> {
     let started = 0;
-    const queued = [...drive.fixable];
-    drive.fixable.clear();
+    // A card still in a step (its own proofread result is being written) stays queued for the next round of the loop.
+    const queued = [...drive.fixable].filter(([nodeId]) => !drive.busy.has(nodeId));
+    for (const [nodeId] of queued) drive.fixable.delete(nodeId);
     for (const [nodeId, instruction] of queued) {
       if (this.dead(drive) || drive.controller.signal.aborted) break;
       if (drive.stages.get(nodeId) !== "needs-review") continue;
@@ -4926,7 +4929,10 @@ export class BookPipelineRuns {
     if (list.length < ETA_MIN_CARDS) return undefined;
     const left = effectiveOrder(state).filter(id => {
       const stage = drive.stages.get(id);
-      return planning ? stage === undefined : stage !== "checked" && stage !== "needs-review";
+      // A needs-review card whose automatic redo is queued is not done yet.
+      return planning
+        ? stage === undefined
+        : (stage !== "checked" && stage !== "needs-review") || drive.fixable.has(id);
     }).length;
     const average = list.reduce((sum, ms) => sum + ms, 0) / list.length;
     // Planning runs BOOK_POOL cards at once; writing has cards in both the write and the post-write places.

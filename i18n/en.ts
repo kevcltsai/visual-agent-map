@@ -3629,7 +3629,6 @@ export const en = {
   "ui.book_progress_line_fix_preface_0_1": "Fixing the preface · {0}/{1} cards done",
   "ui.book_progress_line_fix_card_0_1_2": "Fixing chapter {0} · {1}/{2} cards done",
   "ui.book_progress_line_fix_section_0_1_2": "Fixing “{0}” · {1}/{2} cards done",
-  "ui.book_progress_line_check_0_1": "Checking the whole book for consistency · {0}/{1} chapters done",
   "ui.book_panel_rerun_card": "Rerun this card",
   "ui.book_panel_rerun_card_0": "Rerun this book card: {0} (plan → write → check)",
   "ui.book_seam_label": "Check seam",

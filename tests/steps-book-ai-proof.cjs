@@ -216,3 +216,12 @@ test('prompts require every reader-facing field in the book language, and carry 
   assert.match(en, /Write in English/i);
   assert.match(zhBook, /Chinese|繁體|zh-TW/i);
 });
+
+test('a chapter with no listed sources: an "ok" on a fact or a number becomes unverifiable; consistency and a problem verdict stay as said', () => {
+  const none = (...checks) => review(checks, { allowedSources: [] });
+  assert.equal(none(raw({ verdict: 'ok', sources: [] })).checks[0].verdict, 'unverifiable');
+  assert.equal(none(raw({ kind: 'number', verdict: 'ok', sources: [] })).checks[0].verdict, 'unverifiable');
+  assert.equal(none(raw({ kind: 'consistency', verdict: 'ok', sources: [] })).checks[0].verdict, 'ok');
+  assert.equal(none(raw({ verdict: 'problem', sources: [] })).checks[0].verdict, 'problem');
+  assert.equal(review([raw({ verdict: 'ok' })]).checks[0].verdict, 'ok', 'a chapter with sources is judged as before');
+});

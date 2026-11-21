@@ -296,3 +296,9 @@ test('rerun of the UI tester\'s card (fixture after one rerun): the log gains on
   const keep = sections.hidePipelineLog('正文\n\n> [!note]- 研究備註\n> 我自己的筆記\n', new Set(), undefined);
   assert.ok(keep.includes('> [!note]- 研究備註\n> 我自己的筆記'));
 });
+
+test('the AI proofread box leaves no blank block under its title: empty paragraphs of its hidden markers (and an all-empty content area) are not shown', () => {
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  assert.match(css, /\.callout\[data-callout="vam-review"\] \.callout-content > p:empty \{ display: none; \}/);
+  assert.match(css, /\.callout\[data-callout="vam-review"\] \.callout-content:has\(> p:empty:only-child\) \{ display: none; \}/);
+});

@@ -171,6 +171,11 @@ export function reviewAiProof(raw: RawAiProof, input: AiReviewInput): AiProofRev
       if (opened && !opened.has(href)) continue;
       sources.push(href);
     }
+    // A chapter that lists no sources gave the model nothing to check a fact or a number against: its "ok" is not a verification.
+    const verdict: AiVerdict =
+      entry.verdict === "ok" && input.allowedSources?.length === 0 && (entry.kind === "fact" || entry.kind === "number")
+        ? "unverifiable"
+        : entry.verdict;
     const other =
       book && validChapter(entry.otherChapter, chapters.length) && entry.otherChapter !== at
         ? entry.otherChapter
@@ -179,7 +184,7 @@ export function reviewAiProof(raw: RawAiProof, input: AiReviewInput): AiProofRev
       id,
       kind: entry.kind,
       quote,
-      verdict: entry.verdict,
+      verdict,
       problem,
       fixable: entry.verdict === "problem" && entry.fixable === true && !why,
       ...(why ? { why } : {}),

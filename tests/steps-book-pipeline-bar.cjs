@@ -518,15 +518,6 @@ test('T14 menu: handing the card to AI writes book-role-by ai and pipeline-role 
   assert.ok(notices.some(n => n.includes('交給 AI') && n.includes('下次載入才生效')), 'says it takes effect from the next load');
 });
 
-test('bar: while the whole-book consistency check runs the line says so, never writing', () => {
-  setUiLanguage('zh-TW');
-  const data = { v: 1, runId: 'r', phase: 'writing', status: 'running', order: ['a', 'b', 'c', 'd'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', consistency: { key: 'k', attempts: 1, done: false } };
-  const progress = { runId: 'r', phase: 'writing', status: 'running', active: true, total: 4, counts: { pending: 0, planned: 0, written: 0, checked: 3, 'needs-review': 1 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current: [] };
-  assert.equal(bundle.bookProgressText(bundle.bookBarState(data, progress, () => undefined)), '正在檢查全書一致性・已完成 4／4 章');
-  const idle = { ...data, consistency: { key: 'k', attempts: 1, done: true } };
-  assert.match(bundle.bookProgressText(bundle.bookBarState(idle, progress, () => undefined)), /^正在寫第/, 'a finished check is not shown');
-});
-
 // P8c: the AI proofread numbers on the bar, the plan review and the finished state.
 const aiData = over => ({ v: 1, runId: 'r', phase: 'writing', status: 'running', order: ['a', 'b', 'c', 'd'], accepted: ['a', 'b', 'c', 'd'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', ...over });
 const slot = over => ({ key: 'k', attempts: 0, round: 0, step: 'proof', checked: 0, fixed: 0, open: [], ...over });

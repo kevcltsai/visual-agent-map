@@ -128,8 +128,6 @@ jobs:
         shard: [1, 2, 3, 4]
     env:
       VAM_CI_SHARD: ${{ matrix.shard }}/4
-      VAM_CI_REPORT_DIR: ${{ runner.temp }}/ci-reports
-      VAM_TEST_DEPS_DIR: ${{ runner.temp }}/test-deps-records
     steps:
       - uses: actions/checkout@v5
         with:
@@ -139,7 +137,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
+      # The runner context is not available in job-level env, so the report and deps directories are set on this step.
+      - env:
+          VAM_CI_REPORT_DIR: ${{ runner.temp }}/ci-reports
+          VAM_TEST_DEPS_DIR: ${{ runner.temp }}/test-deps-records
+        run: npm test
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:

@@ -13415,7 +13415,7 @@ function foldCardPlan(content) {
 }
 var planLines2 = (content) => textNodesOf(content).map((node) => node.data).join("\n");
 function markPlanCallouts(root, env) {
-  var _a2;
+  var _a2, _b2;
   const callouts = root.matches(CALLOUT) ? [root] : [];
   callouts.push(...Array.from(root.querySelectorAll(CALLOUT)));
   for (const callout2 of callouts) {
@@ -13430,7 +13430,11 @@ function markPlanCallouts(root, env) {
     const card = kind.kind === "book" ? "chapter" : cardKindOfPrompt(planLines2(content));
     if (kind.kind === "book") hideStructure(content);
     else foldCardPlan(content);
-    if (planStartsOpen(env.stage())) callout2.classList.remove("is-collapsed");
+    if (planStartsOpen(env.stage())) {
+      callout2.classList.remove("is-collapsed");
+      (_b2 = callout2.querySelector(".callout-fold")) == null ? void 0 : _b2.classList.remove("is-collapsed");
+      content.style.removeProperty("display");
+    }
     const locale = planLocale(env.language(), kind.zh);
     if (kind.zh) relabel(content, locale);
     title.textContent = kind.kind === "book" ? translate(locale, "ui.book_plan_title_book", translate(locale, "ui.book_bar_plan_go")) : translate(locale, planTitleKey(kind.kind, card));

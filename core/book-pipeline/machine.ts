@@ -173,7 +173,8 @@ export function nextActions(
   for (const nodeId of order) {
     if (busy.has(nodeId)) continue;
     const stage = stages[nodeId];
-    if (stage === "checked" && options.aiProof && aiChapterDue(data, nodeId)) {
+    // A chapter that needs a person's look needs the AI's check most: it is proofread too (a chapter with no text is closed without a call).
+    if ((stage === "checked" || stage === "needs-review") && options.aiProof && aiChapterDue(data, nodeId)) {
       actions.push({ type: data.aiProof?.[nodeId]?.step === "fix" ? "ai_fix" : "ai_proof", nodeId });
       continue;
     }

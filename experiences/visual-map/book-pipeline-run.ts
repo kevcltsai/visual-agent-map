@@ -1395,7 +1395,8 @@ export class BookPipelineRuns {
    */
   private async proofAfterRerun(drive: Drive, nodeId: string): Promise<void> {
     if (!this.ports.aiProof || !this.ports.aiFix || !this.ports.aiBookProof) return;
-    if (drive.stages.get(nodeId) !== "checked") return;
+    const stage = drive.stages.get(nodeId);
+    if (stage !== "checked" && stage !== "needs-review") return;
     for (let turn = 0; turn < 20; turn++) {
       const state = drive.store.state;
       if (this.dead(drive) || drive.controller.signal.aborted || drive.fatal !== undefined) return;
@@ -2482,6 +2483,11 @@ export class BookPipelineRuns {
     });
     if (!begun?.accepted || !begun.token) return giveUp();
     const token = begun.token;
+    if (!body.trim()) {
+      // No chapter text: nothing to check and nothing to ask the model (the chapter's own state already lists it).
+      await drive.store.commit(state => applyAiProof(state, token, { checked: 0, pending: [], open: [] }));
+      return;
+    }
     const startedAt = Date.parse(this.ports.now());
     const report = (result: string, counts: Record<string, number> = {}): void => {
       const attempt = drive.store.state.aiProof?.[nodeId]?.attempts ?? 0;

@@ -4079,3 +4079,13 @@ test('R1 B1: the model skips one of two targets: only the applied one is a fix, 
   same(slot.fixes.map(item => item.id), ['P1']);
   assert.equal(slot.fixed, slot.fixes.length);
 });
+
+test('R1 T1: a chapter that ends needs-review (author check unmet) still gets its AI proofread; a chapter with no text is not sent', async () => {
+  const seen = [];
+  const r = await aiRig({ ...factCard, proof: async request => verdictOf(request, 'unmet', 'bad'), author: input => writeAs(r, seen)(input) });
+  await runToEnd(r); while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+  assert.equal(stageOf(r.raw(1)), 'needs-review');
+  const s = await r.state();
+  assert.ok(s.aiProof[r.nodes[1].id]?.done, 'the needs-review chapter was proofread');
+  assert.ok(aiRuns(r, 'proof', 'SecretTitleA').length >= 1);
+});

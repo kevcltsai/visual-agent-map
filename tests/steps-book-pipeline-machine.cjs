@@ -773,12 +773,12 @@ test('ai proof: the book proofread starts after every chapter is done; once begu
   assert.equal(model.readBookPipeline({ bookPipeline: plain(state) }).kind, 'usable');
 });
 
-test('ai proof: a chapter that needs a person is not proofread; a trial chapter is proofread before the trial gate passes; a plan review waits', () => {
+test('ai proof: a chapter that needs a person is proofread too (R1 T1); a trial chapter is proofread before the trial gate passes; a plan review waits', () => {
   const run = trialRun(['a', 'b', 'c', 'd']);
   let state = { ...run, phase: 'planning', globalPlanned: true };
   delete state.planReview;
   const stages = { a: 'checked', b: 'needs-review', c: 'checked', d: 'planned' };
-  assert.deepEqual(plain(machine.nextActions(state, stages, new Set(), AI).actions), [{ type: 'ai_proof', nodeId: 'a' }, { type: 'ai_proof', nodeId: 'c' }], 'the trial chapters, not the needs-review one');
+  assert.deepEqual(plain(machine.nextActions(state, stages, new Set(), AI).actions), [{ type: 'ai_proof', nodeId: 'a' }, { type: 'ai_proof', nodeId: 'b' }, { type: 'ai_proof', nodeId: 'c' }], 'the trial chapters, the needs-review one too');
   assert.equal(machine.aiChapterDue({ ...state, planReview: true }, 'a'), false, 'nothing is proofread at the plan review');
   assert.deepEqual(plain(machine.nextActions({ ...state, phase: 'gate1', planReview: true }, stages, new Set(), AI)), { actions: [], hold: 'gate1' });
 });
@@ -899,4 +899,9 @@ test('R1 B2: ids renumbered: a refused problem reported again under another id k
     state = machine.applyAiFix(f.state, f.token, { applied: 0, refused: { P1: 'fix_refused_picture' } }).state;
   }
   assert.deepEqual(plain(state.aiProof.a.open.map(item => [item.id, item.reason])), [['Z5', 'fix_refused_picture']]);
+});
+
+test('R1 T1: a needs-review chapter is also asked for its chapter AI proofread (it needs it most)', () => {
+  const { state: start } = checkedRun();
+  assert.deepEqual(plain(machine.nextActions(start, { a: 'needs-review', b: 'checked' }, new Set(), AI).actions), [{ type: 'ai_proof', nodeId: 'a' }, { type: 'ai_proof', nodeId: 'b' }]);
 });

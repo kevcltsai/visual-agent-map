@@ -13,7 +13,7 @@ import type { AdmissionContext } from "../../core/admission";
 import { carryIssue } from "./book-pipeline-reasons";
 import type { FindImagesRequest, FoundImages } from "../../core/steps/book-pipeline/find-images";
 import type { ConsistencyRequest, RawInconsistency } from "../../core/steps/book-pipeline/consistency";
-import type { AiProofRequest, AiProofRun } from "../../core/steps/book-pipeline/ai-proof";
+import type { AiBookProofRequest, AiProofRequest, AiProofRun } from "../../core/steps/book-pipeline/ai-proof";
 import type { AiFixRequest } from "../../core/steps/book-pipeline/ai-fix";
 import {
   aiProofBody,
@@ -24,7 +24,7 @@ import {
   priorOf,
   type AiProofReview
 } from "../../core/book-pipeline/ai-proof";
-import { applyAiEdits, refusedReasons, type RawAiEdit } from "../../core/book-pipeline/ai-fix";
+import { applyAiEdits, refusedReasons, type AiFixRefusal, type RawAiEdit } from "../../core/book-pipeline/ai-fix";
 import { chapterReferenceFindings, type ReferenceChapter } from "../../core/book-pipeline/chapter-references";
 import { bookStructure, type BookStructure } from "../../core/book-pipeline/structure";
 import { chapterInconsistencies, compactChapters, removedChapterRefs } from "../../core/book-pipeline/consistency";
@@ -60,6 +60,7 @@ import {
   isAiCurrent,
   beginConsistency,
   CONSISTENCY_BUSY,
+  BOOK_PROOF_BUSY,
   applyFailure,
   applyReset,
   applySuccess,
@@ -406,10 +407,7 @@ export interface BookPipelinePorts {
   /** Production: `runAiFix(aiCalls, request, run)`: the author model's edits for the problems the proofread found. */
   aiFix?(request: AiFixRequest, run: { signal: AbortSignal; admission?: AdmissionContext }): Promise<RawAiEdit[]>;
   /** The whole-book proofread (its request and runner come with the book step). */
-  aiBookProof?(
-    request: BookStepBase & { chapters: readonly { title: string; text: string }[] },
-    run: { signal: AbortSignal; admission?: AdmissionContext }
-  ): Promise<AiProofReview>;
+  aiBookProof?(request: AiBookProofRequest, run: AiProofRun): Promise<AiProofReview>;
   /** A drive of the map has ended (any way); queued work waits for this. Optional: fire and forget. */
   settled?(mapPath: string): void;
   /** The author step: the card's single-card research (charts off, fresh write-back). Never writes the card's frontmatter. */
@@ -2241,8 +2239,20 @@ export class BookPipelineRuns {
             })
           );
         } else if (action.type === "book_ai_proof" || action.type === "book_ai_fix") {
-          // The whole-book proofread is a later step: nothing starts for it yet.
-          continue;
+          // The automatic redos go first: the proofread reads the chapters as they end up.
+          if (await this.startFixes(drive)) {
+            changed = true;
+            continue;
+          }
+          drive.busy.add(BOOK_PROOF_BUSY);
+          started++;
+          inflight.set(
+            BOOK_PROOF_BUSY,
+            this.aiBook(drive, action.type === "book_ai_fix" ? "fix" : "proof").finally(() => {
+              drive.busy.delete(BOOK_PROOF_BUSY);
+              inflight.delete(BOOK_PROOF_BUSY);
+            })
+          );
         } else {
           const key = action.type === "global_plan" ? "global" : action.nodeId;
           if (action.type !== "global_plan" && inflight.size >= BOOK_POOL) continue;
@@ -2574,6 +2584,209 @@ export class BookPipelineRuns {
         })
       );
       report(done?.accepted ? "ok" : "dropped", { applied: result.applied, pending: targets.length });
+    } catch (error) {
+      if (this.dead(drive)) return;
+      const outcome = this.classify(drive, error);
+      if (outcome.kind === "budget" || outcome.kind === "cancelled") {
+        await drive.store.commit(current => applyAiStopped(current, token, outcome.kind === "budget"));
+        if (outcome.kind === "budget") drive.controller.abort();
+        return report(outcome.kind);
+      }
+      await drive.store.commit(current => applyAiFailure(current, token));
+      report(`failed:${code(outcome.kind === "failed" ? outcome.reason : "failed")}`);
+    }
+  }
+  /** The chapters with text in reading order, as the whole-book proofread reads them (prose only), with the program's own findings as hints. */
+  private async bookProofInput(drive: Drive): Promise<{
+    chapters: { id: string; title: string; text: string; raw: string }[];
+    hints: string[];
+  }> {
+    const ordered: (ReferenceChapter & { raw: string })[] = [];
+    const structure = this.structureOf(drive, effectiveOrder(drive.store.state));
+    for (const id of effectiveOrder(drive.store.state)) {
+      const info = drive.cards.get(id);
+      if (!info) continue;
+      const card = await this.ports.readCard(info.path).catch(() => undefined);
+      const place = structure.placeOf(id);
+      const chapter =
+        place?.kind === "chapter"
+          ? place.chapter
+          : place?.chapterId
+            ? structure.placeOf(place.chapterId)?.chapter
+            : undefined;
+      ordered.push({
+        id,
+        title: card?.title ?? info.title,
+        text: card ? aiProofBody(chapterBody(card.detail)) : "",
+        raw: card?.raw ?? "",
+        ...(chapter !== undefined ? { chapter } : {}),
+        ...(place?.kind === "section" ? { section: true as const } : {})
+      });
+    }
+    const chapters = ordered.filter(chapter => chapter.text);
+    const number = (id: string): string => {
+      const at = chapters.findIndex(chapter => chapter.id === id);
+      return at < 0 ? "?" : String(at + 1);
+    };
+    const findings = [
+      ...chapterReferenceFindings(ordered),
+      ...directionFindings(ordered),
+      ...numericFindings(chapters, []),
+      ...removedChapterRefs(drive.store.state, chapters)
+    ];
+    const hints = findings.map(
+      finding =>
+        `chapter ${number(finding.a)}: "${finding.claimA}"; ${
+          finding.kind === "removed" ? "names a removed chapter" : `chapter ${number(finding.b)}`
+        }: "${finding.claimB}"${finding.suggestion ? ` (${finding.suggestion})` : ""}`
+    );
+    return { chapters, hints };
+  }
+
+  /**
+   * One step of the whole-book AI proofread: the check (the proof model, text only, over every chapter) or the fix (the author model; the
+   * edits are applied chapter by chapter, each chapter written once). Same fences as {@link aiChapter}.
+   */
+  private async aiBook(drive: Drive, want: "proof" | "fix"): Promise<void> {
+    if (!this.ports.aiBookProof || !this.ports.aiFix) return;
+    const signal = drive.controller.signal;
+    const input = await this.bookProofInput(drive).catch(() => undefined);
+    if (this.dead(drive)) return;
+    const giveUp = async (): Promise<void> => {
+      await drive.store.commit(state =>
+        state.status === "running" ? { state: abandonAi(state), accepted: true } : { state, accepted: false }
+      );
+    };
+    if (!input) return giveUp();
+    const { chapters, hints } = input;
+    const joined = (texts: readonly string[]): string => texts.join("\n\u0000\n");
+    const key = aiProofKey(0, joined(chapters.map(chapter => chapter.text)));
+    const stored = drive.store.state.bookProof;
+    const same = stored?.key === key ? stored : undefined;
+    const step = same ? want : "proof";
+    const begun = await drive.store.commit(state => {
+      const dispatched = beginAiStep(state, {}, key, step);
+      return dispatched
+        ? { state: dispatched.state, accepted: true, token: dispatched.token }
+        : { state, accepted: false as const, token: undefined };
+    });
+    if (!begun?.accepted || !begun.token) return giveUp();
+    const token = begun.token;
+    const startedAt = Date.parse(this.ports.now());
+    const report = (result: string, counts: Record<string, number> = {}): void => {
+      const attempt = drive.store.state.bookProof?.attempts ?? 0;
+      const ms = Math.max(0, Date.parse(this.ports.now()) - startedAt || 0);
+      this.ports.log(
+        formatPipelineLog({
+          event: step === "fix" ? "ai_fix" : "ai_proof",
+          runId: token.runId,
+          card: "book",
+          step: "proof",
+          attempt,
+          result,
+          ms,
+          counts
+        })
+      );
+    };
+    const run = { signal, admission: drive.admission };
+    try {
+      if (step === "proof") {
+        const prior = priorOf(same?.pending ?? []);
+        const review = await untilAborted(
+          signal,
+          this.ports.aiBookProof(
+            {
+              ...this.base(drive, drive.config.proofModel),
+              chapters: compactChapters(chapters.map(chapter => ({ title: chapter.title, text: chapter.text }))),
+              hints,
+              ...(prior.length ? { prior } : {})
+            },
+            run
+          )
+        );
+        if (this.dead(drive)) return;
+        const pending = fixTargetsOf(review.checks);
+        const open = review.checks
+          .filter(check => checkState(check) === "unfixable")
+          .map(check => ({
+            id: check.id,
+            ...(check.chapter ? { chapter: check.chapter } : {}),
+            quote: check.quote,
+            problem: check.problem,
+            reason: check.why ?? "unfixable"
+          }));
+        const done = await drive.store.commit(state =>
+          applyAiProof(state, token, { checked: review.checks.length, pending, open })
+        );
+        if (!done?.accepted) {
+          await drive.store.commit(state => applyAiStopped(state, token, false));
+          return report("dropped");
+        }
+        return report("ok", { checked: review.checks.length, pending: pending.length, open: open.length });
+      }
+      const targets = same?.pending ?? [];
+      const rootInfo = drive.cards.get(drive.rootId);
+      const root = rootInfo ? await this.ports.readCard(rootInfo.path).catch(() => undefined) : undefined;
+      const range = root
+        ? lengthRange(effectiveSettings(root.settings, parseBookPlanDecisions(root.raw)).length)
+        : undefined;
+      const edits = await untilAborted(
+        signal,
+        this.ports.aiFix(
+          {
+            ...this.base(drive, drive.config.authorModel),
+            chapters: chapters.map((chapter, at) => ({ number: at + 1, title: chapter.title, text: chapter.text })),
+            targets
+          },
+          run
+        )
+      );
+      if (this.dead(drive)) return;
+      const refused: Record<string, AiFixRefusal> = {};
+      const changed: string[] = [];
+      let applied = 0;
+      const owner = new Map(targets.map(target => [target.id, target.chapter ?? 1]));
+      for (let at = 0; at < chapters.length; at++) {
+        const mine = targets.filter(target => (target.chapter ?? 1) === at + 1);
+        if (!mine.length) continue;
+        const chapter = chapters[at];
+        const state = bodyStateRaw(chapter.raw);
+        if ((state !== "clean" && state !== "empty") || isKeptRaw(chapter.raw)) {
+          for (const target of mine) refused[target.id] = "hand_edited";
+          continue;
+        }
+        const own = edits.filter(edit => owner.get(edit.id) === at + 1);
+        const result = applyAiEdits(detailBlockOf(chapter.raw) ?? "", mine, own, {
+          shown: chapter.text,
+          ...(range ? { length: { unit: range.unit, min: range.min } } : {})
+        });
+        Object.assign(refused, refusedReasons(result.outcomes));
+        if (result.applied === 0) continue;
+        const path = await this.stillOnMap(drive, chapter.id);
+        if (!path) throw new Error("card_removed");
+        if (!(await this.ensureBackup(drive, chapter.id, path, chapter.raw))) throw new Error("backup_failed");
+        const next = programStampRaw(chapter.raw, replaceDetailBlock(chapter.raw, result.text));
+        const written = await this.ports.updateNoteRawGuarded(path, () => next, {
+          expectedContent: chapter.raw,
+          authorize: () => !this.dead(drive) && !signal.aborted && isAiCurrent(drive.store.state, token)
+        });
+        if (written === "discarded") {
+          await drive.store.commit(current => applyAiStopped(current, token, false));
+          return report("dropped");
+        }
+        applied += result.applied;
+        changed.push(chapter.id);
+      }
+      let newKey: string | undefined;
+      if (changed.length) {
+        const after = await this.bookProofInput(drive);
+        newKey = aiProofKey(0, joined(after.chapters.map(chapter => chapter.text)));
+      }
+      const done = await drive.store.commit(current =>
+        applyAiFix(current, token, { applied, refused, ...(newKey ? { key: newKey, changed } : {}) })
+      );
+      report(done?.accepted ? "ok" : "dropped", { applied, pending: targets.length });
     } catch (error) {
       if (this.dead(drive)) return;
       const outcome = this.classify(drive, error);

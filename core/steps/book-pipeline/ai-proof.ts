@@ -15,8 +15,9 @@ import { singleLine } from "../../book-pipeline/text";
 import { stepEffort } from "../../provider-step-runner";
 import { prepareStep, renderTemplate, type StepDefinition } from "../../step-runner";
 import { arrayOf, fail, languageInstruction, overBudget, parseJson, recordOf, type BookStepBase } from "./base";
-import { planFailMessage } from "./run";
+import { planFailMessage, runPlanStep } from "./run";
 import template from "./ai-proof.md";
+import bookTemplate from "./ai-proof-book.md";
 
 export const AI_PROOF_SEARCH_BUDGET = 4;
 export const AI_PROOF_TIMEOUT_MS = 4 * 60 * 1000;
@@ -186,4 +187,81 @@ export async function runAiProof(aiCalls: AiCalls, request: AiProofRequest, run:
         ...(request.maxItems ? { maxItems: request.maxItems } : {})
       })
   );
+}
+
+/** One chapter as the whole-book proofread reads it: its title and the prose without pictures (`aiProofBody`). */
+export interface AiBookChapter {
+  title: string;
+  text: string;
+}
+/**
+ * What the whole-book proofreader sees: every chapter with text in reading order (cut to the budget by `compactChapters`) and the
+ * program's own findings as one-line hints (a hint is a lead to check, never a verdict). No web, no plan, no earlier review.
+ */
+export interface AiBookProofRequest extends BookStepBase {
+  chapters: readonly AiBookChapter[];
+  hints?: readonly string[];
+  prior?: readonly AiPriorIssue[];
+  maxItems?: number;
+}
+
+export const AI_BOOK_HINTS_MAX = 40;
+export const AI_BOOK_PROOF_SCHEMA = {
+  ...AI_PROOF_SCHEMA,
+  properties: {
+    ...AI_PROOF_SCHEMA.properties,
+    checks: {
+      type: "array",
+      items: {
+        ...AI_PROOF_SCHEMA.properties.checks.items,
+        properties: {
+          ...AI_PROOF_SCHEMA.properties.checks.items.properties,
+          chapter: { type: "integer", minimum: 1 },
+          otherChapter: { type: "integer", minimum: 0 }
+        },
+        required: [...AI_PROOF_SCHEMA.properties.checks.items.required, "chapter", "otherChapter"]
+      }
+    }
+  }
+};
+
+/** The whole-book proofread: one text-only call over the chapters (the book's contradictions and references; no web, no tools). */
+export const aiBookProofStep: StepDefinition<AiBookProofRequest, RawAiProof> = {
+  id: "book-pipeline.ai-proof-book",
+  version: 1,
+  render: request =>
+    renderTemplate(bookTemplate, {
+      languageInstruction: languageInstruction(request.language, request.chapters[0]?.text ?? ""),
+      maxItems: String(request.maxItems ?? AI_PROOF_MAX_ITEMS),
+      prior: JSON.stringify(
+        (request.prior ?? []).map(item => ({ id: item.id, quote: item.quote, problem: item.problem }))
+      ),
+      hints: JSON.stringify((request.hints ?? []).slice(0, AI_BOOK_HINTS_MAX).map(hint => singleLine(hint, 400))),
+      chapters: JSON.stringify(
+        request.chapters.map((chapter, at) => ({
+          number: at + 1,
+          title: singleLine(chapter.title, 200),
+          text: chapter.text
+        }))
+      )
+    }),
+  schema: AI_BOOK_PROOF_SCHEMA,
+  policy: (prompt, request) => {
+    if (!request.chapters.some(chapter => chapter.text.trim())) fail("A whole-book proofread needs the chapter text");
+    overBudget(prompt, AI_BOOK_PROOF_SCHEMA);
+  },
+  parse: raw => parseAiProof(raw)
+};
+
+/** One whole-book proofread call (text only). Quotes are checked against the chapters as sent (`chapters`), by their 1-based position. */
+export async function runAiBookProof(
+  aiCalls: AiCalls,
+  request: AiBookProofRequest,
+  run: AiProofRun
+): Promise<AiProofReview> {
+  const raw = await runPlanStep(aiCalls, aiBookProofStep, request, run);
+  return reviewAiProof(raw, {
+    body: request.chapters.map(chapter => chapter.text),
+    ...(request.maxItems ? { maxItems: request.maxItems } : {})
+  });
 }

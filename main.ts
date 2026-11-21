@@ -56,7 +56,7 @@ import { runPlanStep } from "./core/steps/book-pipeline/run";
 import { runProofread } from "./core/steps/book-pipeline/proofread";
 import { runFindImages } from "./core/steps/book-pipeline/find-images";
 import { runConsistency } from "./core/steps/book-pipeline/consistency";
-import { runAiProof } from "./core/steps/book-pipeline/ai-proof";
+import { runAiBookProof, runAiProof } from "./core/steps/book-pipeline/ai-proof";
 import { runAiFix } from "./core/steps/book-pipeline/ai-fix";
 import { COMMONS_API } from "./core/book-pipeline/commons-search";
 import { runSuggestSettings } from "./core/steps/book-pipeline/suggest-settings";
@@ -900,9 +900,9 @@ export default class VisualAgentMapPlugin extends Plugin {
     runPlan: (step, request, run) => runPlanStep(this.aiCalls, step, request, run),
     runProofread: (request, run) => runProofread(this.aiCalls, request, run),
     checkConsistency: (request, run) => runConsistency(this.aiCalls, request, run),
-    // The AI proofread stays off until the whole-book step (`aiBookProof`) is wired too.
     aiProof: (request, run) => runAiProof(this.aiCalls, request, run),
     aiFix: (request, run) => runAiFix(this.aiCalls, request, run),
+    aiBookProof: (request, run) => runAiBookProof(this.aiCalls, request, run),
     findImages: (request, run) => runFindImages(this.aiCalls, request, run),
     // requestUrl has no abort: searchCommons races its own timeout. Only the Commons API is asked (the address is built by the program).
     fetchCommons: async url => {

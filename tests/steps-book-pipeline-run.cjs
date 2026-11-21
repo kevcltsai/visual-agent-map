@@ -56,7 +56,7 @@ async function rig(over = {}) {
     card: request => ({ covers: `covers ${(request.chapters.findIndex(c => c.title === request.card.title) + 1)}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }] }),
     author: async input => { await input.admission.reserve(); const note = await repo.readNote(input.path); const r = await repo.updateNoteGuarded(input.path, { detail: input.requirements !== undefined ? fixOf(bodyOf(note.title)) : bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return r === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; },
     proof: async request => ({ items: request.checklist.map(c => ({ id: c.id, type: c.type, status: 'met', note: 'fine', sources: [] })), aggregate: 'checked' }),
-    // The independent AI proofread (opt-in with `over.ai`): by default no check. The whole-book step is not built yet, so a run with it stops there.
+    // The independent AI proofread (opt-in with `over.ai`): by default no check. 
     aiProof: async () => ({ checks: [], prior: [], dropped: {} }), aiFix: async () => [], aiBookProof: async () => ({ checks: [], prior: [], dropped: {} }),
     probe: async () => ({ ok: true }), ...over.script };
   const ports = {
@@ -3831,6 +3831,7 @@ test('ai chapter: the budget running out during the fix pauses the run; addBudge
   assert.ok(!(await r.note(1)).detail.includes('Corrected b'));
   await r.runs.resume(r.mapPath, { addBudget: 100 }); while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
   s = await r.state();
+  assert.equal(s.phase, 'done');
   assert.equal(fixCalls, 2, 'the fix is asked again once, not repeated after it was applied');
   assert.equal((await r.note(1)).detail.split('Corrected b').length - 1, 1);
   assert.equal(s.aiProof[id].fixed, 1);
@@ -3867,4 +3868,58 @@ test('ai chapter fix: a quote only in a hidden callout is refused and nothing is
   assert.ok(r.raw(1).includes(callouts));
   assert.ok(!r.raw(1).includes('Corrected b'));
   same((await r.state()).aiProof[r.nodes[1].id].open.map(item => item.reason), ['fix_quote_missing']);
+});
+
+// ---- P6a: the whole-book AI proofread (text only, over every chapter; fixes written chapter by chapter) ----
+const bookProblem = (request, chapter, other) => ({ id: 'B1', kind: 'consistency', chapter, otherChapter: other, quote: request.chapters[chapter - 1].text, verdict: 'problem', problem: 'chapters disagree', fixable: true, suggestion: 'use one value', why: '', sources: [] });
+
+test('ai book: a contradiction between chapters is found by the whole-book step, fixed in the chapter, re-checked, and the chapter proofread is not reopened', async () => {
+  let fixed = false;
+  const r = await aiRig({
+    aiBookProof: async request => ({ checks: fixed ? [] : [bookProblem(request, 2, 3)], prior: fixed ? [{ id: 'B1', status: 'resolved' }] : [], dropped: {} }),
+    aiFix: async request => { fixed = true; return [{ id: 'B1', chapter: 2, quote: request.chapters[1].text, replacement: 'Book corrected' }]; }
+  });
+  await runToEnd(r); while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+  const s = await r.state();
+  assert.equal(s.phase, 'done');
+  const books = r.stat.ai.filter(([k]) => k === 'book');
+  assert.equal(books.length, 2, 'checked, then re-checked');
+  assert.equal(books[0][1].model, 'm3', 'by the proof model');
+  same(books[0][1].chapters.map(c => c.title), ['SecretRootTitle', 'SecretTitleA', 'SecretTitleB']);
+  assert.equal(books[1][1].prior.length, 1, 'the re-check is told what was open');
+  const fixes = aiRuns(r, 'fix');
+  assert.equal(fixes.length, 1); assert.equal(fixes[0][1].model, 'm2', 'by the author model');
+  assert.equal((await r.note(1)).detail.split('Book corrected').length - 1, 1);
+  assert.equal(bodyStateRaw(r.raw(1)), 'clean');
+  assert.equal(aiRuns(r, 'proof', 'SecretTitleA').length, 1, 'the chapter proofread did not start again');
+  assert.equal(aiRuns(r, 'proof', 'SecretTitleB').length, 1);
+  const slot = s.bookProof;
+  assert.deepEqual([slot.done, slot.fixed, slot.incomplete, slot.open.length], [true, 1, undefined, 0]);
+  assert.ok(r.stat.logs.every(line => !/SecretBody|Book corrected/.test(line)));
+});
+
+test('ai book: a fix that touches two chapters writes each chapter once; a hand-edited chapter is refused and its problem stays open', async () => {
+  let edited = false;
+  const r = await aiRig({
+    aiBookProof: async request => {
+      if (!edited) { edited = true; await handEdit(r, 2); }
+      return { checks: [bookProblem(request, 2, 3), { ...bookProblem(request, 3, 2), id: 'B2' }], prior: [], dropped: {} };
+    },
+    aiFix: async request => [{ id: 'B1', chapter: 2, quote: request.chapters[1].text, replacement: 'Book corrected' }, { id: 'B2', chapter: 3, quote: request.chapters[2].text, replacement: 'Never' }]
+  });
+  await runToEnd(r); while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+  const s = await r.state();
+  assert.equal(s.phase, 'done');
+  assert.equal((await r.note(1)).detail.split('Book corrected').length - 1, 1);
+  assert.ok(!r.raw(2).includes('Never') && r.raw(2).includes(HAND), 'the reader\'s chapter is untouched');
+  assert.ok(s.bookProof.open.some(item => item.id === 'B2' && item.reason === 'hand_edited'));
+});
+
+test('ai book: three failed whole-book checks end it as incomplete and the run still finishes', async () => {
+  const r = await aiRig({ aiBookProof: async () => { throw new Error('boom'); } });
+  await runToEnd(r); while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
+  const s = await r.state();
+  assert.equal(s.phase, 'done');
+  assert.deepEqual([s.bookProof.done, s.bookProof.incomplete], [true, true]);
+  assert.equal(r.stat.ai.filter(([k]) => k === 'book').length, 3);
 });

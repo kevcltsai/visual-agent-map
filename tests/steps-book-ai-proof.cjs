@@ -174,3 +174,24 @@ test('runAiProof: web search only, budget 4, one reservation, sources only when 
   const bad = harness({ answer: 'not json' });
   await assert.rejects(stepMod.runAiProof(bad.calls, request(), { signal: signal() }));
 });
+
+// ---- P6a: the whole-book step ----
+const bookRequest = (extra = {}) => ({ ...base, chapters: [{ title: '一', text: '第一章說發芽要三天。' }, { title: '二', text: '第二章說發芽要一週。' }], ...extra });
+
+test('the book prompt carries every chapter with its number, the leads and the prior list; no web, no sources', () => {
+  const prompt = stepMod.aiBookProofStep.render(bookRequest({ hints: ['chapter 1 vs chapter 2'], prior: [{ id: 'B1', quote: 'q', problem: 'p' }] }));
+  assert.ok(prompt.includes('[{"number":1,"title":"一","text":"第一章說發芽要三天。"},{"number":2,'));
+  assert.ok(prompt.includes('["chapter 1 vs chapter 2"]')); assert.ok(prompt.includes('[{"id":"B1","quote":"q","problem":"p"}]'));
+  assert.ok(!prompt.includes(base.model));
+  assert.throws(() => stepMod.aiBookProofStep.policy('p', bookRequest({ chapters: [{ title: 'x', text: ' ' }] })), /needs the chapter text/);
+});
+
+test('runAiBookProof: a text-only call; the quote is checked in the chapter it names, other chapters are ignored, no web search', async () => {
+  const good = { id: 'B1', kind: 'consistency', chapter: 2, otherChapter: 1, quote: '第二章說發芽要一週。', verdict: 'problem', problem: '與第一章不同', fixable: true, why: '', suggestion: '統一', sources: [] };
+  const wrongChapter = { ...good, id: 'B2', chapter: 1 };
+  const h = harness({ answer: goodReply([good, wrongChapter]) });
+  const result = await stepMod.runAiBookProof(h.calls, bookRequest(), { signal: signal(), admission: { reserve: async () => {} } });
+  assert.deepEqual(plain(result.checks.map(c => [c.id, c.chapter, c.otherChapter])), [['B1', 2, 1]]);
+  assert.equal(result.dropped.quote, 1);
+  assert.notEqual(h.runs[0][4].webSearchOnly, true);
+});

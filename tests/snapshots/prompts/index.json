@@ -376,6 +376,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "book-plan-edit.en": {
+      "builder": "core/steps/book-pipeline/plan-edit.ts planEditStep",
+      "language": "en",
+      "schema": false
+    },
+    "book-plan-edit.zh": {
+      "builder": "core/steps/book-pipeline/plan-edit.ts planEditStep",
+      "language": "zh-TW",
+      "schema": false
+    },
+    "book-plan-edit.zh-CN": {
+      "builder": "core/steps/book-pipeline/plan-edit.ts planEditStep",
+      "language": "zh-CN",
+      "schema": false
+    },
     "book-proofread.en": {
       "builder": "core/steps/book-pipeline/proofread.ts proofreadStep",
       "language": "en",

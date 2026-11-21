@@ -97,8 +97,8 @@ export interface CardPlanResult {
   checklist: ChecklistItem[];
   /** The image plan: 0 to 8 slots, indexes `1..n` assigned here in order. */
   images: ImageSlot[];
-  /** The card's cover picture ask; absent when an older answer has none (the card then gets no cover line). */
-  cover?: CoverPlan;
+  /** The card's cover picture ask (required: an answer without it is refused and retried). */
+  cover: CoverPlan;
   /** How many items the subjective-word filter dropped (absent when none); the runner logs the count. */
   droppedSubjective?: number;
   /** How many items the unconditional-picture filter dropped (absent when none). */
@@ -172,22 +172,17 @@ const PICTURE_VERB = /[附放配含]|嵌入|插入|每段|需有|要有|需要�
 const CONDITION =
   /無圖|无图|沒有圖|没有图|找不到|若找得到|若有|若無|若无|如果|如有|有找到|\b(?:if|unless|when (?:available|found|possible)|no (?:image|picture)|without)\b/i;
 /** A picture item that is not conditional: the first author version has no image step, so it could never be met. */
-const unconditionalPicture = (text: string): boolean =>
+export const unconditionalPicture = (text: string): boolean =>
   (PICTURE_ALONE.test(text) || (PICTURE_NOUN.test(text) && PICTURE_VERB.test(text))) && !CONDITION.test(text);
 
 /** Adjective or value-judgement wording (Traditional and Simplified): an item with one cannot be checked from the text, so the program drops it. */
-const SUBJECTIVE =
+export const SUBJECTIVE =
   /值得(?:注意|關注|关注|一提|留意)|精彩|精采|生動|生动|重要|引人入勝|引人入胜|有趣|吸引人|動人|动人|優美|优美|流暢|流畅|深刻|震撼|\b(?:noteworthy|worth noting|brilliant|vivid|engaging|compelling|interesting|important)\b/i;
 
 export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanResult {
   const item = parseJson(raw);
-  // `cover` is asked for but optional here: an answer without it (an older one) is kept and its card gets no cover line.
-  exactKeys(
-    item,
-    "cover" in item
-      ? ["covers", "points", "entry", "handoff", "previous", "next", "checklist", "images", "cover"]
-      : ["covers", "points", "entry", "handoff", "previous", "next", "checklist", "images"]
-  );
+  // `cover` is required like the rest: an answer without it is a failure (retried), so a card never silently goes without its cover ask.
+  exactKeys(item, ["covers", "points", "entry", "handoff", "previous", "next", "checklist", "images", "cover"]);
   // Content headings: one line each, at most 40 characters, `·` (the Prompt line's separator) written as `・`; fewer than three is a failure (retried), more than six are cut.
   const points = arrayOf(item.points, "points")
     .map(value => singleLine(textOf(value, "points item"), POINT_MAX).replace(/·/g, "・"))
@@ -230,15 +225,12 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
       ...(terms.length ? { search: terms } : {})
     };
   });
-  let cover: CoverPlan | undefined;
-  if ("cover" in item) {
-    // Present but unusable (no description) is a failure (retried); search terms are optional like a slot's.
-    const one = recordOf(item.cover, "cover");
-    exactKeys(one, "search" in one ? ["explains", "search"] : ["explains"]);
-    const explains = cleanSlotText(singleLine(textOf(one.explains, "cover explains"), 400), 200);
-    if (!explains) fail("cover explains is empty");
-    cover = { explains, search: Array.isArray(one.search) ? cleanSearchTerms(one.search) : [] };
-  }
+  // An unusable cover (no description) is a failure (retried); search terms are optional like a slot's.
+  const one = recordOf(item.cover, "cover");
+  exactKeys(one, "search" in one ? ["explains", "search"] : ["explains"]);
+  const explains = cleanSlotText(singleLine(textOf(one.explains, "cover explains"), 400), 200);
+  if (!explains) fail("cover explains is empty");
+  const cover: CoverPlan = { explains, search: Array.isArray(one.search) ? cleanSearchTerms(one.search) : [] };
   const side = (value: unknown, present: boolean, what: string): string =>
     present ? singleLine(textOf(value, what), 240) : "";
   return {
@@ -250,7 +242,7 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
     next: side(item.next, !!request.next, "next"),
     checklist,
     images,
-    ...(cover ? { cover } : {}),
+    cover,
     ...(dropped ? { droppedSubjective: dropped } : {}),
     ...(droppedPicture ? { droppedPicture } : {})
   };

@@ -17,6 +17,7 @@ const requestFor = (role, bookSettings) => ({
 });
 const reply = count => JSON.stringify({
   covers: 'c', points: ['p1', 'p2', 'p3'], entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }],
+  cover: { explains: 'x', search: ['a b', 'c d'] },
   images: Array.from({ length: count }, (_, i) => ({ kind: 'diagram', explains: `point ${i + 1}`, anchor: `paragraph ${i + 1}` }))
 });
 

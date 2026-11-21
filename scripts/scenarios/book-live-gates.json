@@ -1,0 +1,102 @@
+{
+  "name": "book live: small book (3 cards, ~26 AI calls): gate 1 plan review, confirm, done, then remove",
+  "allowErrors": true,
+  "stepTimeoutMs": 1200000,
+  "steps": [
+    {
+      "wait": true
+    },
+    {
+      "trust": true
+    },
+    {
+      "eval": "app.plugins.plugins['visual-agent-map'].openMapInNewTab('Agent Workspace/Topics/Book Fixture Small/Map.md').then(view=>!!view)"
+    },
+    {
+      "waitFor": ".vam-book-button",
+      "timeoutMs": 30000
+    },
+    {
+      "click": ".vam-book-button"
+    },
+    {
+      "waitFor": ".vam-book-start-go",
+      "timeoutMs": 30000
+    },
+    {
+      "eval": "(()=>{const box=document.querySelectorAll('.vam-book-start-field')[4];box.value='每章約 100 字，不超過兩段';box.dispatchEvent(new Event('input',{bubbles:true}));return box.value})()"
+    },
+    {
+      "click": ".vam-book-start-go"
+    },
+    {
+      "waitFor": ".vam-book-bar[data-mode='planning'], .vam-book-bar[data-mode='gate1']",
+      "timeoutMs": 60000
+    },
+    {
+      "waitFor": ".vam-book-bar[data-mode='gate1']",
+      "timeoutMs": 900000
+    },
+    {
+      "assert": "gate 1 shows the confirm button",
+      "selector": ".vam-book-confirm",
+      "visible": true
+    },
+    {
+      "screenshot": "gate1"
+    },
+    {
+      "click": ".vam-book-confirm"
+    },
+    {
+      "waitUntil": "(()=>{const b=document.querySelector('.vam-book-bar');return !!b&&!b.innerText.includes('全書企劃好了')&&['gate1','gate2','stopped','budget','done'].includes(b.dataset.mode)})()",
+      "timeoutMs": 1200000
+    },
+    {
+      "assert": "the book finished (done bar); gate 2 passes by itself",
+      "selector": ".vam-book-bar[data-mode='done']",
+      "visible": true
+    },
+    {
+      "assert": "calls stayed within 30",
+      "eval": "(app.plugins.plugins['visual-agent-map'].getBookPipelineProgress('Agent Workspace/Topics/Book Fixture Small/Map.md')?.budget?.used ?? 99)<=30"
+    },
+    {
+      "assert": "open issues link",
+      "selector": ".vam-book-open-issues",
+      "visible": true
+    },
+    {
+      "assert": "progress track",
+      "selector": ".vam-book-track",
+      "visible": true
+    },
+    {
+      "assert": "cards carry a pipeline stage (the chip itself only draws while the tab is shown)",
+      "eval": "app.vault.getMarkdownFiles().filter(f=>f.path.includes('Book Fixture Small/Notes/')&&app.metadataCache.getFileCache(f)?.frontmatter?.['pipeline-stage']).length>=3"
+    },
+    {
+      "screenshot": "done"
+    },
+    {
+      "click": ".vam-book-abandon"
+    },
+    {
+      "waitFor": ".vam-book-abandon-confirm",
+      "timeoutMs": 10000
+    },
+    {
+      "click": ".vam-book-abandon-confirm"
+    },
+    {
+      "waitFor": ".vam-book-bar",
+      "gone": true,
+      "timeoutMs": 20000
+    },
+    {
+      "assert": "book state removed, no bar",
+      "selector": ".vam-book-bar",
+      "visible": false
+    }
+  ]
+}

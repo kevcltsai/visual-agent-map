@@ -114,3 +114,16 @@ test("trust step leaves Restricted Mode, and a prompt left open makes the run cr
   assert.equal((await run({ steps }, withTrust({ prompts: 1, leakedScopes: 0 }))).exitCode, 2);
   assert.equal((await run({ steps: [{ trust: false }, { assert: "a", eval: "ok" }] }, withTrust({ prompts: 0, leakedScopes: 0 }))).exitCode, 2);
 });
+
+test("book seeder --small: root + 2 chapters in its own topic folder, every card note written", () => {
+  const vault = tempVault();
+  const { mapPath, created } = seedBookMap({ vault, small: true });
+  assert.equal(created, true);
+  assert.match(mapPath, /Book Fixture Small\/Map\.md$/);
+  const map = JSON.parse(/```agent-map\n([\s\S]*?)\n```/.exec(readFileSync(join(vault, mapPath), "utf8"))[1]);
+  assert.equal(map.nodes.length, 3);
+  assert.equal(map.nodes.filter(node => !node.parentId).length, 1);
+  assert.equal(readdirSync(join(vault, mapPath, "../Notes")).length, 3);
+  assert.equal(seedBookMap({ vault }).created, true, "the full fixture sits beside it without colliding");
+  assert.match(seedCli([`--vault=${vault}`, "--small"]).text, /"created": false/);
+});

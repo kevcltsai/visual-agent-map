@@ -9,6 +9,7 @@ import { enterHeavy, keepProfile } from "./heavy-lock.mjs";
 export { focusAction };
 import { createTestVault, ensureSourceSelectionFixture } from "./create-onboarding-test-vault.mjs";
 import { assertOwnerIdle, waitOwnerIdle } from "./owner-idle.mjs";
+import { connectCdp } from "./obsidian-cdp.mjs";
 
 export const root = fileURLToPath(new URL("..", import.meta.url));
 // The owner's vault must survive reboots (macOS clears /private/tmp), so it lives beside the main checkout, never under the temp session prefix.
@@ -192,6 +193,20 @@ function installedObsidianRuntime() {
 
 // Opens in the background (`open -g`) so testing never takes over the owner's screen or focus. Port 0 lets Chromium
 // pick a free DevTools port and record it in <profile>/DevToolsActivePort for obsidian-cdp.mjs.
+// A running Obsidian keeps the plugin code it loaded when the plugin was enabled: new files on disk take effect only after the plugin
+// is reloaded in it (the owner's book of 2026-11-22 ran a days-old build after an install). Disable + enable (not the *AndSave forms,
+// so the enabled list on disk is untouched) reads main.js from disk again: a new plugin instance is the proof (the manifest version is read at
+// startup and is the same across builds, so it proves nothing). A plugin the owner switched off is left off. No window is focused.
+export const reloadPluginExpression = `(async()=>{const id="visual-agent-map";if(!app.plugins.enabledPlugins.has(id))return {enabled:false};const before=app.plugins.plugins[id];await app.plugins.disablePlugin(id);await app.plugins.enablePlugin(id);const after=app.plugins.plugins[id];return {enabled:true,reloaded:!!after&&after!==before}})()`;
+export async function reloadRunningPlugin(vault, connect = connectCdp) {
+  const cdp = await connect(vault);
+  let result;
+  try { result = await cdp.evaluate(reloadPluginExpression); } finally { cdp.close(); }
+  if (result?.enabled === false) return result;
+  if (!result?.reloaded) throw new Error(`The new build is installed, but the running Obsidian did not load it (${JSON.stringify(result)}): the old plugin is still running. Reload the plugin or restart Obsidian.`);
+  return result;
+}
+
 function launchObsidian(appProfile) {
   if (!existsSync(obsidianApp)) throw new Error(`Obsidian app bundle not found at ${obsidianApp}.`);
   if (instanceRunning(appProfile)) return;
@@ -349,7 +364,10 @@ export function main(args = process.argv.slice(2)) {
     const appProfile = join(canonicalVault, ".vam-app");
     if (!existsSync(join(appProfile, "obsidian.json")) || !readdirSync(appProfile).some(name => name.endsWith(".asar"))) prepareObsidianProfile(canonicalVault, installedObsidianRuntime());
     process.stdout.write(`${JSON.stringify({ vault: canonicalVault, version: record.version, hashes: record.hashes, updatedInPlace: true, appProfile }, null, 2)}\n`);
-    return launchObsidian(appProfile);
+    if (!instanceRunning(appProfile)) return launchObsidian(appProfile);
+    return reloadRunningPlugin(canonicalVault).then(result => {
+      process.stdout.write(result.enabled === false ? "The plugin is switched off in the running Obsidian; left off (the new files load when it is switched on).\n" : "Reloaded the plugin in the running Obsidian.\n");
+    });
   }
   const lock = `${canonicalVault}.lock`;
   if (prepare) mkdirSync(lock); // Exclusive writer; an existing lock requires investigation.
@@ -414,5 +432,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   // --help, --smoke, --session= and --which-installed are the paths that build nothing; every other form builds and runs the test layers.
   // --help must not wait for the heavy lock: it used to queue behind other test runs and never print.
   if (!isHelp(argv) && !argv.includes("--smoke") && !argv.includes("--which-installed") && !argv.some(arg => arg.startsWith("--session="))) await enterHeavy(`npm test ${argv.join(" ")}`.trim(), { blocking: true }); // main() runs spawnSync: see enterHeavy
-  main();
+  await main();
 }

@@ -3373,7 +3373,6 @@ var en = {
   "ui.book_progress_line_fix_preface_0_1": "Fixing the preface \xB7 {0}/{1} cards done",
   "ui.book_progress_line_fix_card_0_1_2": "Fixing chapter {0} \xB7 {1}/{2} cards done",
   "ui.book_progress_line_fix_section_0_1_2": "Fixing \u201C{0}\u201D \xB7 {1}/{2} cards done",
-  "ui.book_progress_line_check_0_1": "Checking the whole book for consistency \xB7 {0}/{1} chapters done",
   "ui.book_panel_rerun_card": "Rerun this card",
   "ui.book_panel_rerun_card_0": "Rerun this book card: {0} (plan \u2192 write \u2192 check)",
   "ui.book_seam_label": "Check seam",
@@ -6663,7 +6662,6 @@ var zhCN = {
   "ui.book_progress_line_fix_preface_0_1": "\u6B63\u5728\u4FEE\u6B63\u524D\u8A00\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u5F20\u5361",
   "ui.book_progress_line_fix_card_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u7B2C {0} \u7AE0\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u5F20\u5361",
   "ui.book_progress_line_fix_section_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u201C{0}\u201D\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u5F20\u5361",
-  "ui.book_progress_line_check_0_1": "\u6B63\u5728\u68C0\u67E5\u5168\u4E66\u4E00\u81F4\u6027\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
   "ui.book_panel_rerun_card": "\u91CD\u8DD1\u8FD9\u5F20",
   "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u56FE\u6587\u4E66\u8FD9\u4E00\u5F20\uFF1A{0}\uFF08\u4F01\u5212 \u2192 \u5199 \u2192 \u6821\uFF09",
   "ui.book_seam_label": "\u63A5\u7F1D\u9700\u770B",
@@ -9953,7 +9951,6 @@ var zhTW = {
   "ui.book_progress_line_fix_preface_0_1": "\u6B63\u5728\u4FEE\u6B63\u524D\u8A00\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u5F35\u5361",
   "ui.book_progress_line_fix_card_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u7B2C {0} \u7AE0\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u5F35\u5361",
   "ui.book_progress_line_fix_section_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u300C{0}\u300D\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u5F35\u5361",
-  "ui.book_progress_line_check_0_1": "\u6B63\u5728\u6AA2\u67E5\u5168\u66F8\u4E00\u81F4\u6027\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
   "ui.book_panel_rerun_card": "\u91CD\u8DD1\u9019\u5F35",
   "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u5716\u6587\u66F8\u9019\u4E00\u5F35\uFF1A{0}\uFF08\u4F01\u5283 \u2192 \u5BEB \u2192 \u6821\uFF09",
   "ui.book_seam_label": "\u63A5\u7E2B\u9700\u770B",
@@ -49500,7 +49497,11 @@ function resetCard(data, nodeId) {
   next.attempts[nodeId] = emptyAttempts();
   if (next.expandPasses) delete next.expandPasses[nodeId];
   if (next.aiProof) delete next.aiProof[nodeId];
-  if ((_a2 = next.bookProof) == null ? void 0 : _a2.fixes) next.bookProof.fixes = next.bookProof.fixes.filter((fix) => fix.chapterId !== nodeId);
+  if ((_a2 = next.bookProof) == null ? void 0 : _a2.fixes) {
+    const kept = next.bookProof.fixes.filter((fix) => fix.chapterId !== nodeId);
+    next.bookProof.fixed = Math.max(0, next.bookProof.fixed - (next.bookProof.fixes.length - kept.length));
+    next.bookProof.fixes = kept;
+  }
   next.revisions[nodeId] = cardRevision(next, nodeId) + 1;
   next.revision++;
   return next;

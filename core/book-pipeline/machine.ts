@@ -872,7 +872,12 @@ export function resetCard(data: BookPipelineData, nodeId: string): BookPipelineD
   if (next.expandPasses) delete next.expandPasses[nodeId];
   if (next.aiProof) delete next.aiProof[nodeId];
   // The whole-book fixes that rewrote this chapter's old text no longer describe it: its box must not list them.
-  if (next.bookProof?.fixes) next.bookProof.fixes = next.bookProof.fixes.filter(fix => fix.chapterId !== nodeId);
+  // The bar's fixed count drops with them, so the boxes still add up to the bar.
+  if (next.bookProof?.fixes) {
+    const kept = next.bookProof.fixes.filter(fix => fix.chapterId !== nodeId);
+    next.bookProof.fixed = Math.max(0, next.bookProof.fixed - (next.bookProof.fixes.length - kept.length));
+    next.bookProof.fixes = kept;
+  }
   next.revisions[nodeId] = cardRevision(next, nodeId) + 1;
   next.revision++;
   return next;

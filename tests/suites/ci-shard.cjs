@@ -39,6 +39,8 @@ test('ci shard: whole parts go round robin by position, also the single-file nod
   const list = [1, 2, 3].map(j => ({ name: `run ${j}`, args: ['tests/run.cjs', `--shard=${j}/3`] })).concat({ name: 'vault', args: ['--test', 'tests/test-vault.mjs'] });
   const names = i => shardParts(list, { index: i, count: 4 }, { sizeOf }).map(part => part.name);
   assert.deepEqual([1, 2, 3, 4].map(names), [['run 1'], ['run 2'], ['run 3'], ['vault']]);
+  const reversed = i => shardParts(list, { index: i, count: 4 }, { sizeOf, reverse: true }).map(part => part.name);
+  assert.deepEqual([1, 2, 3, 4].map(reversed), [['vault'], ['run 3'], ['run 2'], ['run 1']]);
 });
 test('ci shard: file split is deterministic, balanced to within one file and orders ties by path', async () => {
   const { splitFiles } = await mod('test-integration.mjs');
@@ -108,7 +110,7 @@ test('ci gate: the real part lists give a non-empty expected set that the real s
     const unit = [], integration = [];
     for (let i = 1; i <= n; i++) {
       unit.push(...shardParts(runnable(unitParts), { index: i, count: n }, { splitNodeTest: true }).flatMap(unitsOf));
-      integration.push(...shardParts(integrationParts, { index: i, count: n }).flatMap(unitsOf));
+      integration.push(...shardParts(integrationParts, { index: i, count: n }, { reverse: true }).flatMap(unitsOf));
     }
     assert.deepEqual(unit.sort(), expected.unit.slice().sort(), `n=${n} unit`);
     assert.deepEqual(integration.sort(), expected.integration.slice().sort(), `n=${n} integration`);

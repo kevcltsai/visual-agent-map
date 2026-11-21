@@ -44,7 +44,8 @@ export function splitFiles(files, count, sizeOf) {
   }
   return loads.map(load => load.files);
 }
-export function shardParts(list, shard, { splitNodeTest = false, sizeOf = file => statSync(`${root}${file}`).size } = {}) {
+// `reverse` deals whole parts from the last shard down: integration does this so its heaviest part (run.cjs 1/3, map-chat) does not land on shard 1, which already has the slowest unit load.
+export function shardParts(list, shard, { splitNodeTest = false, reverse = false, sizeOf = file => statSync(`${root}${file}`).size } = {}) {
   if (!shard) return list;
   const { index, count } = shard;
   let position = 0;
@@ -54,7 +55,8 @@ export function shardParts(list, shard, { splitNodeTest = false, sizeOf = file =
       return files.length ? [{ ...part, args: ["--test", ...files] }] : [];
     }
     position += 1;
-    return (position - 1) % count === index - 1 ? [part] : [];
+    const target = (position - 1) % count + 1;
+    return (reverse ? count + 1 - target : target) === index ? [part] : [];
   });
 }
 // What a part runs, as the names the gate counts: a `node --test` part lists its files, a tests/run.cjs part is one unit.
@@ -101,6 +103,6 @@ export async function runParts(list, layer = "integration", shard = parseShard()
 async function main() {
   const { enterHeavy } = await import("./heavy-lock.mjs");
   await enterHeavy("npm run test:integration");
-  process.exitCode = (await runParts(shardParts(parts, parseShard()))).length ? 1 : 0; // not process.exit: it can cut off piped output
+  process.exitCode = (await runParts(shardParts(parts, parseShard(), { reverse: true }))).length ? 1 : 0; // not process.exit: it can cut off piped output
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) await main();

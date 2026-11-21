@@ -40,6 +40,12 @@ export const BOOK_IMAGE_SEARCHES = 2;
 /** Each picture search may be asked once more when its captions come back in another language. */
 export const BOOK_IMAGE_CALLS_PER_SEARCH = 2;
 
+/*
+ * The cover adds nothing to the estimate: a chapter's or section's cover rides in the first picture search the card already makes, and the
+ * book's own cover (a root with no picture slots) is one search plus its caption-language retry, 2 calls, inside the 4 picture calls
+ * bookChapterCalls() already reserves for every card. So the estimate stays the real maximum, 6 + 16 n.
+ */
+
 export { BOOK_EXPAND_PASSES };
 
 /**

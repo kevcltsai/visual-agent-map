@@ -2802,7 +2802,7 @@ export const en = {
   "ui.settings_book_plan_desc": "Writes the global plan and each card's plan. Few calls, short output.",
   "ui.settings_book_write_name": "Author",
   "ui.settings_book_write_desc": "Writes the body text and finds sources. Decides the quality of the result.",
-  "ui.settings_book_image_name": "Pictures",
+  "ui.settings_book_image_name": "Pictures (with cover)",
   "ui.settings_book_image_desc":
     "Searches the web for each chapter's pictures and suggests the start card's whole-book settings. A cheaper model is enough.",
   "ui.settings_book_proof_name": "AI proofread (different from the author)",
@@ -3322,7 +3322,7 @@ export const en = {
   "ui.book_start_intro":
     "From the topics and cards of this map, the AI plans, writes, finds pictures for and proofreads every chapter.",
   "ui.book_start_estimate_0_1_2_3":
-    "{0} cards · about {1} · up to {2} AI calls (including the AI proofread and automatic fixes; a failed step's retry not included; the run pauses at {3}).",
+    "{0} cards · about {1} · up to {2} AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at {3}).",
   "ui.book_start_under_minute": "under 1 minute",
   "ui.book_start_minutes_0": "{0} minutes",
   "ui.book_start_stops":
@@ -3434,9 +3434,9 @@ export const en = {
   "ui.book_bar_plan_ready_struct_0": "The preface and {0} chapters are planned",
   "ui.book_progress_line_plan_cards_0_1": "Planning card {0}/{1}",
   "ui.book_start_estimate_struct_0_1_2_3_4_5":
-    "Preface + {0} chapters + {1} sections ({2} cards) · about {3} · up to {4} AI calls (including the AI proofread and automatic fixes; a failed step's retry not included; the run pauses at {5}).",
+    "Preface + {0} chapters + {1} sections ({2} cards) · about {3} · up to {4} AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at {5}).",
   "ui.book_start_estimate_struct_0_1_2_3_4":
-    "Preface + {0} chapters ({1} cards) · about {2} · up to {3} AI calls (including the AI proofread and automatic fixes; a failed step's retry not included; the run pauses at {4}).",
+    "Preface + {0} chapters ({1} cards) · about {2} · up to {3} AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at {4}).",
   "ui.book_summary_done": "What it covers: ",
   "ui.book_issue_0": "Needs a look: {0}",
   "ui.book_issue_unknown": "Needs a manual look (the reason code is not recognized).",
@@ -3457,6 +3457,7 @@ export const en = {
   "ui.book_reason_caption_latin": "A picture caption has an English word in the Chinese text: check the wording",
   "ui.book_reason_images_limited": "Commons temporarily limited requests; some picture positions were not filled",
   "ui.book_reason_images_off_0": "Pictures {0} do not match the text around them",
+  "ui.book_reason_cover_off": "The cover picture may not fit this chapter: check it",
   "ui.book_length_unit_chars": "characters",
   "ui.book_length_unit_words": "words",
   "ui.book_structure_unmet_0": "Structure: {0} item(s) unmet",

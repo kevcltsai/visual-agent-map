@@ -89,12 +89,12 @@ const mk = (n, text = `explains ${n} perspective`) => `〔圖位 ${n}：${text}�
 /** Two paragraphs, each followed by its marker line, then a Sources section. */
 const twoMarkers = title => `正文一。${title}\n\n${mk(1)}\n\n正文二。\n\n${mk(2)}\n\n正文三。\n\n### 來源\n- https://example.com/a\n`;
 /** A rig whose card plan arranges `slots` pictures (null: an old Prompt without an image plan) and whose author writes `text`; `finder` is the fake picture search (request, run, callNumber) -> found(). */
-async function picRig({ finder, probe, text = twoMarkers, titles, proof, slots = 2, ports, checklist } = {}) {
+async function picRig({ finder, probe, text = twoMarkers, titles, proof, slots = 2, ports, checklist, cover } = {}) {
   const calls = [];
   const holder = {};
   const r = await rig({
     titles: titles ?? ['SecretRootTitle', 'FillerChapter'],
-    script: { card: request => ({ covers: `covers ${(request.chapters.findIndex(c => c.title === request.card.title) + 1)}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: checklist ?? [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }], ...(slots === null ? {} : { images: Array.isArray(slots) ? slots : slotsOf(slots) }) }),
+    script: { card: request => ({ covers: `covers ${(request.chapters.findIndex(c => c.title === request.card.title) + 1)}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: checklist ?? [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }], ...(slots === null ? {} : { images: Array.isArray(slots) ? slots : slotsOf(slots) }), ...(cover ? { cover } : {}) }),
       author: (input, n) => writeAuthor(holder.r, text)(input), ...(probe ? { probe } : {}), ...(proof ? { proof } : {}) },
     // A Commons queue without the production 1 s spacing (the queue's own tests check the spacing and the 429 waits).
     ports: { commonsQueue: new C.CommonsQueue(0, async () => {}), findImages: async (request, run) => { if (!titles && /FillerChapter/.test(request.chapter)) { await run.admission.reserve(); return found({}); } calls.push(request); await run.admission.reserve(); return finder(request, run, calls.length); }, ...ports }
@@ -453,7 +453,7 @@ test('images: the find-images step keeps up to 3 candidates per slot with the ca
   assert.equal(parsed.offTopic, 2);
   assert.equal(parsed.found, 4);
   assert.equal(findImagesStep.parse('not json').found, 0);
-  assert.equal(findImagesStep.version, 8);
+  assert.equal(findImagesStep.version, 9);
   const prompt = findImagesStep.render({ chapter: 'q', slots: [{ index: 1, kind: 'diagram', explains: 'perspective' }], exclude: Array.from({ length: 40 }, (_, i) => `k${i}${'x'.repeat(200)}`), language: 'en', model: 'm', reasoning: 'low' });
   assert.equal(JSON.parse(/exclude list[^\[]*(\[.*\])/.exec(prompt)[1]).length, 30);
   assert.ok(!/x{121}/.test(prompt));
@@ -1472,4 +1472,77 @@ test('commons run: planned English terms are the first Commons query and count a
   await run(none);
   assert.match(none.stat.logs.join('\n'), /commons_nohint=1/, 'no planned terms and no finder words');
   assert.ok(!/commons_nohint=1/.test(r.stat.logs.join('\n')));
+});
+
+
+// ---- Cover image B2: the cover rides in the first search of its card ----
+const coverAsk = { explains: 'the dome of the cathedral', search: ['Florence Cathedral dome', 'Brunelleschi'] };
+const coverCand = (n, over = {}) => cand(n, { url: `https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Cover${n}.jpg/1280px-Cover${n}.jpg`, source: `https://commons.wikimedia.org/wiki/File:Cover${n}.jpg`, ...over });
+const coverSlotOf = request => request.slots.find(slot => slot.index === 0);
+
+test('cover search: the find-images prompt says what position 0 is only when the request has it; the version is 9; a request without a cover renders as before', () => {
+  const { findImagesStep } = require('./support-ai-calls.cjs').loadWithAiCalls('core/steps/book-pipeline/find-images.ts');
+  const base = { chapter: 'q', exclude: [], language: 'en', model: 'm', reasoning: 'low' };
+  const plainText = findImagesStep.render({ ...base, slots: [{ index: 1, kind: 'diagram', explains: 'p' }] });
+  const withCover = findImagesStep.render({ ...base, slots: [{ index: 1, kind: 'diagram', explains: 'p' }, { index: 0, kind: 'cover', explains: 'the dome' }] });
+  assert.ok(!/Position 0/.test(plainText)); assert.match(withCover, /Position 0 is not an illustration of one passage: it is the cover picture/);
+  assert.match(withCover, /upload\.wikimedia\.org \(Wikimedia Commons\)/); assert.match(withCover, /"slot":0,"kind":"cover","shows":"the dome"/);
+  assert.equal(withCover.replace(/\nPosition 0 is[^\n]*\n/, '\n').replace(/,\{"slot":0,"kind":"cover","shows":"the dome"\}/, ''), plainText, 'everything else is the same text');
+});
+
+test('cover search: a card with a cover line asks for it in its first search call, after the body slots, and never again in the repeat search', async () => {
+  const r = await picRig({ cover: coverAsk, finder: (request, run, n) => n === 1 ? found({ 1: [cand(1)], 0: [coverCand(1)] }) : found({ 2: [cand(2)] }) });
+  await run(r);
+  assert.equal(r.calls.length, 2, 'the first search, and the repeat search for the body slot it left empty');
+  assert.deepEqual(plain(r.calls[0].slots.map(s => [s.index, s.kind])), [[1, 'diagram'], [2, 'diagram'], [0, 'cover']]);
+  assert.equal(coverSlotOf(r.calls[0]).explains, coverAsk.explains);
+  assert.ok(r.calls[1].again && !coverSlotOf(r.calls[1]), 'the cover is not in the repeat search');
+  assert.deepEqual(plain(r.calls[1].slots.map(s => s.index)), [2]);
+});
+
+test('cover search: the same number of search calls with and without a cover when the card has body slots (the cover adds none)', async () => {
+  const finder = (request, run, n) => found({ 1: [cand(1)], 2: [cand(2)], ...(coverSlotOf(request) ? { 0: [coverCand(9)] } : {}) });
+  const without = await picRig({ finder }); await run(without);
+  const withCover = await picRig({ finder, cover: coverAsk }); await run(withCover);
+  assert.equal(withCover.calls.length, without.calls.length);
+  const lacking = (request, run, n) => found({ 1: [cand(1)] });
+  const a = await picRig({ finder: lacking }); await run(a);
+  const b = await picRig({ finder: lacking, cover: coverAsk }); await run(b);
+  assert.equal(b.calls.length, a.calls.length, 'also with the repeat search');
+  assert.deepEqual(plain(b.calls.map(call => call.slots.length - a.calls[b.calls.indexOf(call)].slots.length)), [1, 0], 'only the first call carries one more position');
+});
+
+test('cover search: a card with no body slots searches once for its cover alone; a card whose Prompt has no cover line searches for no cover', async () => {
+  const none = await picRig({ slots: 0, cover: coverAsk, finder: () => found({}) });
+  await run(none);
+  assert.equal(none.calls.length, 1); assert.deepEqual(plain(none.calls[0].slots.map(s => s.index)), [0]);
+  const old = await picRig({ slots: 0, finder: () => found({}) });
+  await run(old);
+  assert.equal(old.calls.length, 0, 'no body slots and no cover: no search at all');
+  const oldPrompt = await picRig({ slots: null, cover: coverAsk, finder: () => found({}) });
+  await run(oldPrompt);
+  assert.equal(oldPrompt.calls.length, 0, 'a Prompt without a picture plan (an older book) searches for nothing, cover line or not');
+});
+
+test('cover search: a cover the owner owns (topic-cover: none, or a file of the owner\'s with no block) is not searched for', async () => {
+  const seeded = async (value) => {
+    const r = await picRig({ slots: 1, text: title => `正文。${title}\n\n${mk(1)}\n`, cover: coverAsk, finder: () => found({ 1: [cand(1)] }) });
+    if (value) await r.repo.updateNoteRawGuarded(r.nodes[0].path, raw => raw.replace(/^---\n/, `---\ntopic-cover: ${value}\n`), {});
+    assert.equal(!value || /topic-cover/.test(r.raw(0)), true, 'the fixture carries the value');
+    await run(r);
+    return r;
+  };
+  assert.ok(coverSlotOf((await seeded(undefined)).calls[0]), 'a card with no cover is searched for');
+  assert.ok(!coverSlotOf((await seeded('none')).calls[0]), 'topic-cover: none');
+  assert.ok(!coverSlotOf((await seeded('"[[mine.png]]"')).calls[0]), 'a cover of the owner\'s with no block');
+});
+
+test('cover search: only Wikimedia upload addresses are probed and chosen for the cover; the cover wins a picture the body slot also offers', async () => {
+  const other = coverCand(2, { url: 'https://example.org/cover.jpg' });
+  const r = await picRig({ slots: 1, text: title => `正文。${title}\n\n${mk(1)}\n`, cover: coverAsk, finder: () => found({ 1: [cand(1), coverCand(3)], 0: [other, coverCand(3)] }) });
+  await run(r);
+  assert.ok(!r.stat.probes.some(url => /example\.org/.test(url)), 'a cover candidate on another host is never probed');
+  const body = (await r.note(0)).detail;
+  assert.ok(!body.includes('Cover3.jpg'), 'the body slot did not take the picture the cover took');
+  assert.match(body, /!\[Work 1\]/, 'it took its own other candidate');
 });

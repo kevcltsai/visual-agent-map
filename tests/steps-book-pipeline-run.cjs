@@ -1537,6 +1537,33 @@ test('T5 trial: retryTrial reruns only the trial cards with the models read agai
   assert.equal(r.stat.author.length, authored + 6, 'a second retry runs the trial again');
 });
 
+// ---- Cover image review M-2: the trial retry and back-to-plan paths give a card's cover key back (one picture once per book) ----
+test('cover key release: releasePictures frees a card\'s body picture keys and its cover key; retryTrial and backToPlan call it for every trial card that has a cover block', async () => {
+  const blockLib = S.load('core/book-pipeline/cover-block.ts');
+  const { imageKey: keyOf } = S.load('core/book-pipeline/image-dedupe.ts');
+  const COVER_URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/CoverX.jpg/1280px-CoverX.jpg';
+  const BODY_URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/BodyX.jpg/1280px-BodyX.jpg';
+  const block = blockLib.composeCoverBlock('chapter', 'zh', { file: 'B/封面圖/x.png', url: COVER_URL, caption: 'c', sourceUrl: 'https://commons.wikimedia.org/wiki/File:CoverX.jpg' });
+  const withCover = raw => blockLib.putCoverBlock(raw, block);
+  // 1. the method itself
+  const drive = { usedImages: new Set([keyOf(COVER_URL), keyOf(BODY_URL), 'other']) };
+  BookPipelineRuns.prototype.releasePictures.call({}, drive, { raw: withCover('# T\n\nx\n'), detail: `text\n\n![b](${BODY_URL})\n` });
+  assert.deepEqual([...drive.usedImages], ['other'], 'cover and body keys are gone, others stay');
+  // 2. the two paths
+  for (const path of ['retryTrial', 'backToPlan']) {
+    const r = await trialRig({ planReview: path === 'backToPlan' });
+    const released = [];
+    const original = BookPipelineRuns.prototype.releasePictures;
+    r.runs.releasePictures = function (drive, card) { released.push(blockLib.coverSourceKey(card.raw)); return original.call(this, drive, card); };
+    await r.runs.start(r.mapPath);
+    if (path === 'backToPlan') { await r.runs.startTrial(r.mapPath); await idle(r); } else await toTrialGate(r);
+    await toTrialGate(r);
+    for (let i = 0; i < 3; i++) r.contents.set(r.nodes[i].path, withCover(r.contents.get(r.nodes[i].path)));
+    await r.runs[path](r.mapPath); await idle(r);
+    assert.ok(released.filter(key => key === keyOf(COVER_URL)).length >= 3, `${path}: released the cover key of each of the 3 trial cards (${released.join('|')})`);
+  }
+});
+
 test('T5 trial: a run without a trial (older data) refuses retryTrial and keeps planning every card before gate 1', async () => {
   const r = await rig({ titles: T5_TITLES });
   await r.runs.start(r.mapPath);
@@ -3973,17 +4000,20 @@ test('worst-case calls: every chapter redoes once, uses every AI round and nothi
   }
 });
 
-test('worst-case calls with picture search: every step uses its whole allowance (first-write picture searches each with a language retry, the redo, the expand passes, the AI rounds); the actual count equals the start card\'s estimate and stays within the 300 limit', async () => {
+test('worst-case calls with picture search: every step uses its whole allowance (first-write picture searches each with a language retry, the redo, the expand passes, the AI rounds); the actual count equals the start card\'s estimate (the covers add nothing), and with a bare root (no picture slots) the cover search stays inside it; within the 300 limit', async () => {
   const { bookStartEstimate } = S.load('experiences/visual-map/book-pipeline-start-modal.ts', { obsidian: S.obsidian });
+  const counted = new Map();
+  for (const variant of ['plain', 'cover', 'cover-bare-root']) {
   const MARKED = `${DRAFT}\n\n〔圖位 1：the route〕\n\n〔圖位 2：a port〕\n`;
   const slots = [{ index: 1, kind: 'map', explains: 'the route', anchor: 'after paragraph 1' }, { index: 2, kind: 'photo', explains: 'a port', anchor: 'end' }];
   for (const titles of [['R', 'A'], ['R', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']]) {
     const seen = new Set();
     const author = [];
     let imageCalls = 0;
+    let coverAsked = 0;
     const holder = {};
     const r = await aiRig({
-      card: request => ({ covers: `covers ${(request.chapters.findIndex(c => c.title === request.card.title) + 1)}`, entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }], images: slots }),
+      card: request => ({ covers: `covers ${(request.chapters.findIndex(c => c.title === request.card.title) + 1)}`, entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }], images: variant === 'cover-bare-root' && request.card.kind === 'preface' ? [] : slots, ...(variant === 'plain' ? {} : { cover: { explains: 'a cover', search: ['route map', 'port'] } }) }),
       author: async input => {
         author.push(input.nodeId);
         await input.admission.reserve();
@@ -4000,7 +4030,7 @@ test('worst-case calls with picture search: every step uses its whole allowance 
     }, {
       titles,
       // One search call finds nothing; each call stands for up to BOOK_IMAGE_CALLS_PER_SEARCH model calls (the caption-language retry sits inside the real step).
-      ports: { findImages: async (request, run) => { for (let i = 0; i < 2; i++) { imageCalls++; await run.admission.reserve(); } return { bySlot: new Map(), found: 0, offTopic: 0 }; } }
+      ports: { findImages: async (request, run) => { if (request.slots.some(slot => slot.index === 0)) coverAsked++; for (let i = 0; i < 2; i++) { imageCalls++; await run.admission.reserve(); } return { bySlot: new Map(), found: 0, offTopic: 0 }; } }
     });
     holder.r = r;
     await r.repo.writeBookSettings(r.nodes[0].path, { length: LEN_SETTING });
@@ -4010,9 +4040,19 @@ test('worst-case calls with picture search: every step uses its whole allowance 
     assert.equal(s.phase, 'done');
     assert.equal(s.budget.used, calls, 'the budget counts exactly the calls made');
     const estimate = bookStartEstimate(titles.length, titles.length).calls;
-    assert.equal(calls, estimate, `${titles.length} cards: the worst case is the estimate`);
-    assert.ok(calls <= 300);
-    if (titles.length === 10) assert.equal(estimate, 166);
+    assert.equal(estimate, 6 + 16 * titles.length, 'the estimate is the whole-book calls and 16 per card; the covers add nothing');
+    counted.set(`${variant}:${titles.length}`, calls);
+    if (variant === 'cover-bare-root') {
+      assert.ok(coverAsked >= 1, 'the bare root searched for its cover alone');
+      assert.ok(calls <= estimate, `${titles.length} cards, bare root: ${calls} calls within the estimate ${estimate}`);
+      assert.equal(calls, counted.get(`plain:${titles.length}`) - 4 + 2, 'the bare root swaps its own picture searches (none: no slots) for the one cover search with its language retry');
+    } else {
+      assert.equal(calls, estimate, `${titles.length} cards: every card with picture slots spends its whole allowance, and the cover adds none: the real maximum is the estimate`);
+      assert.equal(calls, counted.get(`plain:${titles.length}`), 'with and without a cover the same number of calls');
+    }
+    assert.ok(calls <= estimate && calls <= 300);
+    if (titles.length === 10 && variant === 'plain') assert.equal(estimate, 166);
+  }
   }
 });
 

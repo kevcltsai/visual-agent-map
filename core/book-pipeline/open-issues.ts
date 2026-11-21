@@ -30,7 +30,18 @@ interface IssueSource {
   /** The sentence for a reason code the row does not list. */
   fallback: Words;
 }
+const COVER_SOURCE: IssueSource = {
+  label: { zh: "封面圖", en: "Cover picture" },
+  reasons: {
+    mismatch: {
+      zh: "封面圖可能對不上這一章，請看一下",
+      en: "The cover picture may not fit this chapter; please check it"
+    }
+  },
+  fallback: { zh: "封面圖還有問題沒解決", en: "The cover picture has an unresolved problem" }
+};
 export const OPEN_ISSUE_SOURCES: Record<string, IssueSource> = {
+  cover: COVER_SOURCE,
   "ai-proof": {
     label: { zh: "AI 校對", en: "AI proofread" },
     reasons: {
@@ -138,6 +149,10 @@ const OTHER_OPEN = (k: number): Words => ({
   zh: `另有 ${k} 項章節狀態問題。`,
   en: `${k} more chapter status issues.`
 });
+const COVER_OPEN = (k: number): Words => ({
+  zh: `另有 ${k} 張封面圖可能對不上。`,
+  en: `${k} cover pictures may not fit.`
+});
 const NONE_CHECKED: Words = { zh: "沒有可列的項目。", en: "Nothing to list." };
 
 /** The file name the page is meant to have (no folder). */
@@ -176,15 +191,22 @@ export function composeOpenIssuesNote(input: OpenIssuesInput): string {
   const n = Math.max(0, Math.trunc(input.checked));
   const colon = instructionLanguageOf(language) === "zh" ? "：" : ": ";
   const aiOpen = issues.filter(issue => issue.source === "ai-proof").length;
-  const otherOpen = issues.length - aiOpen;
+  const coverOpen = issues.filter(issue => issue.source === "cover").length;
+  const otherOpen = issues.length - aiOpen - coverOpen;
   const aiSummary = aiOpen
     ? pick(SOME_OPEN(n, aiOpen), language)
     : n > 0
       ? pick(ALL_SOLVED(n), language)
-      : otherOpen
+      : otherOpen || coverOpen
         ? ""
         : pick(NONE_CHECKED, language);
-  const summary = [aiSummary, otherOpen ? pick(OTHER_OPEN(otherOpen), language) : ""].filter(Boolean).join(" ");
+  const summary = [
+    aiSummary,
+    otherOpen ? pick(OTHER_OPEN(otherOpen), language) : "",
+    coverOpen ? pick(COVER_OPEN(coverOpen), language) : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
   const out = [
     OPEN_ISSUES_MARKER,
     "",

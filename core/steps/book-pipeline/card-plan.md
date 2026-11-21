@@ -11,6 +11,7 @@ Write the brief the card's author will follow and the proofreader will check ("c
   - Not allowed: anything subjective, evaluative or about style: no adjective or value-judgement items (noteworthy, brilliant, vivid, important, engaging and the like), nothing about tone, voice, readability, "plain" or "friendly" wording, no required opening or closing sentence pattern such as a question, and no requirement on exact wording. An item that cannot be checked by quoting the text is dropped by the program.
   - Pictures: never put a picture requirement in the checklist (pictures are planned in images, below).
 {{imagesRule}}
+- cover: the one picture that stands for this whole card (for the preface: for the whole book), a thing the card's own text talks about. It is separate from the images above: it does not count toward them and is asked for even when images is empty. It has: explains (what the picture shows, one sentence) and search (2 to 4 English search terms for a Wikimedia Commons file search, a few words each, most specific first; always in English, whatever the book's language). Do not write image links or addresses; the cover is found later.
 
 Book structure: the root card is the preface (it has no chapter number), the cards directly under it are the chapters, numbered in reading order, and the cards below a chapter are that chapter's sections (named, never numbered). Every card of the book is in the list below with its place. Use only those names, and do not refer to a card that is not in the list: a topic that the settings, a summary or the thread mention but the list does not have is not a chapter, so do not preview it, cite it as a chapter or put it in the checklist. Number chapters only from this list: chapter n is the entry whose place is "chapter n"; the preface and the sections never get a chapter number. A topic the settings, a summary or the thread name that is not in the list never gets a chapter number and is never announced as a chapter, in any field (for example a chapter the owner removed).
 
@@ -20,7 +21,7 @@ An intro card is the book's guide: its covers previews each later chapter in at 
 
 The chapter's role is fixed by the plan: do not change it. Use plain single-line text in every field and no Markdown headings. Use only numbers and links that appear in the supplied text.
 
-Return only JSON: {"covers":"","points":["","",""],"entry":"","handoff":"","previous":"","next":"","checklist":[{"type":"structure|fact","text":""}],"images":[{"kind":"","explains":"","anchor":"","search":["",""]}]}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.
+Return only JSON: {"covers":"","points":["","",""],"entry":"","handoff":"","previous":"","next":"","checklist":[{"type":"structure|fact","text":""}],"images":[{"kind":"","explains":"","anchor":"","search":["",""]}],"cover":{"explains":"","search":["",""]}}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.
 
 {{languageInstruction}}
 

@@ -869,6 +869,8 @@ export const pictureMismatchToken = (indexes: readonly number[]): string => `ima
 const SHORTFALL = /(?:^|\s)images:under:(\d+):(\d+)(?=\s|$)/;
 const CAPTION_LATIN = /(?:^|\s)captions:latin(?=\s|$)/;
 const LIMITED = /(?:^|\s)images:limited(?=\s|$)/;
+/** The needs-review token of a card whose cover may not fit it (`coverOffToken` in cover.ts, which imports this file, so the word is written here too; a test keeps them equal). */
+const COVER_OFF = /(?:^|\s)cover:off(?=\s|$)/;
 const OFF = /(?:^|\s)images:off:(\d+(?:,\d+)*)(?=\s|$)/;
 /** An issue field split into its picture shortfall, Commons limit, mismatches and English left in captions (when it carries them) and the rest (`images unmet:` with only notice tokens left leaves nothing). */
 export function splitPictureIssue(issue: string): {
@@ -877,17 +879,20 @@ export function splitPictureIssue(issue: string): {
   limited?: true;
   off?: number[];
   captionLatin?: true;
+  coverOff?: true;
 } {
   const m = SHORTFALL.exec(issue);
   const o = OFF.exec(issue);
   const limited = LIMITED.test(issue);
   const latin = CAPTION_LATIN.test(issue);
-  if (!m && !o && !limited && !latin) return { rest: issue };
+  const coverOff = COVER_OFF.test(issue);
+  if (!m && !o && !limited && !latin && !coverOff) return { rest: issue };
   const rest = issue
     .replace(SHORTFALL, "")
     .replace(LIMITED, "")
     .replace(OFF, "")
     .replace(CAPTION_LATIN, "")
+    .replace(COVER_OFF, "")
     .trim()
     .replace(/^images unmet:(?:\s+\S+)*$|^images unmet$/, "");
   return {
@@ -895,7 +900,8 @@ export function splitPictureIssue(issue: string): {
     ...(m ? { shortfall: { placed: Number(m[1]), minimum: Number(m[2]) } } : {}),
     ...(limited ? { limited: true as const } : {}),
     ...(o ? { off: o[1].split(",").map(Number) } : {}),
-    ...(latin ? { captionLatin: true as const } : {})
+    ...(latin ? { captionLatin: true as const } : {}),
+    ...(coverOff ? { coverOff: true as const } : {})
   };
 }
 

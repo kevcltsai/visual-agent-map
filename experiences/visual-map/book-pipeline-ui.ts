@@ -646,7 +646,8 @@ export function pictureSentences(pictures: ReturnType<typeof splitPictureIssue>)
     ...(pictures.off?.length
       ? [t("ui.book_reason_images_off_0", pictures.off.map(String).join(t("ui.argument_list_sep")))]
       : []),
-    ...(pictures.captionLatin ? [t("ui.book_reason_caption_latin")] : [])
+    ...(pictures.captionLatin ? [t("ui.book_reason_caption_latin")] : []),
+    ...(pictures.coverOff ? [t("ui.book_reason_cover_off")] : [])
   ];
 }
 /** The sentence for a chapter outside the asked length: what was measured and the range (numbers and the unit only). */

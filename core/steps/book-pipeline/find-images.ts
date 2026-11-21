@@ -4,14 +4,16 @@ import type { ImageCandidate } from "../../image-candidates";
 import { stepEffort } from "../../provider-step-runner";
 import { prepareStep, renderTemplate, type StepDefinition } from "../../step-runner";
 import { bySubject, fileSourceOf } from "../../book-pipeline/image-quality";
+import { COVER_INDEX } from "../../book-pipeline/cover";
 import { MAX_IMAGE_SLOTS } from "../../book-pipeline/image-slots";
 import { parseImageCandidates } from "../image-search/step";
 import { languageInstruction, type BookStepBase } from "./base";
 import template from "./find-images.md";
+import coverTemplate from "./find-images-cover.md";
 import againTemplate from "./find-images-again.md";
 import retryTemplate from "./find-images-retry.md";
 
-/** One planned picture position as the search sees it (the planner's kind and what it must show; never the marker). */
+/** One planned picture position as the search sees it (the planner's kind and what it must show; never the marker). Index 0 is the card's cover (kind `cover`). */
 export interface FindImagesSlot {
   index: number;
   kind: string;
@@ -115,7 +117,7 @@ function parseFound(raw: string): FoundImages {
 /** The map chat's image candidates (same parser: https links with an https source page), asked per picture position for the book's sources. */
 export const findImagesStep: StepDefinition<FindImagesRequest, FoundImages> = {
   id: "book-pipeline.find-images",
-  version: 8,
+  version: 9,
   render: ({ chapter, slots, exclude, language, languageRetry, again }) =>
     renderTemplate(template, {
       chapter: JSON.stringify(chapter),
@@ -129,6 +131,7 @@ export const findImagesStep: StepDefinition<FindImagesRequest, FoundImages> = {
       languageInstruction: languageInstruction(language, chapter),
       languageRetry: languageRetry ? retryTemplate : "",
       again: again ? againTemplate : "",
+      cover: slots.some(slot => slot.index === COVER_INDEX) ? coverTemplate.trimEnd() : "",
       exclude: JSON.stringify((exclude ?? []).slice(0, EXCLUDE_MAX).map(key => key.slice(0, EXCLUDE_ITEM_MAX)))
     }),
   parse: raw => parseFound(raw)

@@ -452,3 +452,25 @@ test('trialCallout: without a place (an older trial) it keeps "chapter i of n" a
   assert.equal(bare.split('\n').filter(l => !l.startsWith('>')).length, 0, 'a title cannot start a line outside the box');
   assert.ok(!bare.includes('[[x]]'));
 });
+
+// ---- Cover image B4: a cover that may not fit is a reason to look (token cover:off) ----
+test('cover:off: the token reads as one plain sentence (alone or beside other picture reasons), never as a code; the same word as cover.ts', () => {
+  const cover = require('./support-replay.cjs').load('core/book-pipeline/cover.ts');
+  const slots = require('./support-replay.cjs').load('core/book-pipeline/image-slots.ts');
+  assert.equal(cover.coverOffToken, 'cover:off');
+  assert.deepEqual(JSON.parse(JSON.stringify(slots.splitPictureIssue(`images unmet: ${cover.coverOffToken}`))), { rest: '', coverOff: true });
+  const lone = b.reasonOf('images unmet: cover:off', undefined);
+  assert.match(lone, /封面圖可能對不上/); assert.ok(!/cover:off|unmet/.test(lone));
+  const mixed = b.reasonOf('images unmet: images:off:2 cover:off', undefined);
+  assert.match(mixed, /第 2 張圖和前後文對不上/); assert.match(mixed, /封面圖可能對不上/);
+  assert.deepEqual(b.reasonLinesOf('images unmet: images:under:1:3 cover:off', undefined).filter(line => /封面/.test(line)).length, 1);
+  assert.equal(b.bookIssueText('images unmet: cover:off'), lone);
+});
+test('cover:off: a needs-review card with the token is in the attention list with that sentence; without the token (a cover that fits) nothing changes', () => {
+  const of = issue => b.gate2Cards({ order: ['n1'], titleOf: () => 'T', noteOf: () => ({ detail: 'x', pipelineStage: 'needs-review', pipelineIssue: issue }) })[0];
+  const flagged = of('images unmet: cover:off');
+  assert.ok(b.needsAttention(flagged)); assert.ok(b.attentionReasons(flagged).some(text => /封面圖可能對不上/.test(text)));
+  assert.equal(b.attentionReasons(of('images unmet: images:off:1')).filter(text => /封面/.test(text)).length, 0);
+  const fp = issue => b.attentionFingerprint({ stage: 'needs-review', issue, proofKey: 'k', seam: '' });
+  assert.notEqual(fp('images unmet: cover:off'), fp('images unmet: images:off:1'), 'a ticked box for another picture reason does not cover this one');
+});

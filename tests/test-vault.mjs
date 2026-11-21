@@ -4,7 +4,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { canonicalVault, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, fetchDepsTable } from '../scripts/test-harness.mjs';
+import { canonicalVault, restorePreviousInstall, prepareTestVault, updateCurrentTestVault, verifyTestVault, sameRepoCleanMain, root, main, sourceFingerprint, assertSourceUnchanged, prepareObsidianProfile, selectObsidianRuntime, sessionVault, sessionVaultPrefix, ownerVaultPath, focusAction, whichInstalled, fetchDepsTable } from '../scripts/test-harness.mjs';
 import { ownerBusyReasons, waitOwnerIdle } from '../scripts/owner-idle.mjs';
 import { policyAction, applyPolicy, policyExpression } from '../scripts/keep-background.mjs';
 
@@ -548,4 +548,32 @@ test('fetchDepsTable fetches the latest green full main run once and fails soft'
   assert.equal(fetchDepsTable(folder, () => { throw new Error('gh missing'); }), false);
   assert.equal(existsSync(join(folder, 'test-deps.json')), false);
   assert.equal(fetchDepsTable(folder, () => ''), false); // no green full run
+});
+
+test('a refresh that fails part-way puts back the replaced artifacts and the ownership record', t => {
+  const { folder } = environment(t);
+  const plugin = join(folder, 'plugin'), staging = join(folder, 'staging');
+  mkdirSync(plugin); mkdirSync(staging);
+  const recordPath = join(plugin, '.vam-test-environment.json');
+  writeFileSync(join(plugin, 'main.js'), 'new main'); writeFileSync(join(plugin, 'styles.css'), 'new css'); writeFileSync(recordPath, 'new record');
+  writeFileSync(join(staging, 'main.js.previous'), 'old main'); writeFileSync(join(staging, 'styles.css.previous'), 'old css');
+  restorePreviousInstall({ staging, plugin, replaced: ['main.js'], recordPath });
+  assert.equal(readFileSync(join(plugin, 'main.js'), 'utf8'), 'old main', 'a replaced artifact comes back');
+  assert.equal(readFileSync(join(plugin, 'styles.css'), 'utf8'), 'new css', 'one that was never replaced is left alone');
+  assert.equal(readFileSync(recordPath, 'utf8'), 'new record', 'no record copy in staging: the record stays');
+  writeFileSync(join(staging, '.vam-test-environment.json.previous'), 'old record');
+  restorePreviousInstall({ staging, plugin, replaced: [], recordPath });
+  assert.equal(readFileSync(recordPath, 'utf8'), 'old record');
+});
+
+test('an unreadable appearance.json stops a refresh before any installed file or the record changes', t => {
+  const { vault } = environment(t); prepareTestVault({ vault });
+  const plugin = join(vault, '.obsidian/plugins/visual-agent-map');
+  writeFileSync(join(vault, '.obsidian/appearance.json'), '{ not json');
+  writeFileSync(join(plugin, 'main.js'), 'stale plugin build');
+  const record = readFileSync(join(vault, '.vam-test-environment.json'), 'utf8');
+  assert.throws(() => updateCurrentTestVault({ vault }));
+  assert.equal(readFileSync(join(plugin, 'main.js'), 'utf8'), 'stale plugin build');
+  assert.equal(readFileSync(join(vault, '.vam-test-environment.json'), 'utf8'), record);
+  assert.deepEqual(readdirSync(plugin).filter(name => name.startsWith('.vam-update-')), [], 'no staging left behind');
 });

@@ -200,6 +200,9 @@ export class BookNotesApply {
     if (outcome.restored) {
       await this.ports.flush(last.path).catch(() => undefined);
       if (!this.disposed) this.ports.undone(last.path);
+      // The repaint above ran before the open view had saved the restored text: its note count could still be the old one, and a view that
+      // shows the file reads it as it is now. Paint once more, from the saved text.
+      if (!this.disposed) this.ports.changed();
     }
     if (!outcome.restored) return this.ports.notice(t("ui.book_note_undo_none"));
     this.ports.notice(

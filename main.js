@@ -20103,8 +20103,8 @@ var AMBIGUOUS_SCORE_GAP = 0.18;
 var NEAR_DUPLICATE_SPEECH_SIMILARITY = 0.45;
 function tokens(value) {
   const result = /* @__PURE__ */ new Set();
-  const normalized2 = plainMarkdown(value).normalize("NFKC").toLocaleLowerCase();
-  for (const segment of normalized2.matchAll(
+  const normalized3 = plainMarkdown(value).normalize("NFKC").toLocaleLowerCase();
+  for (const segment of normalized3.matchAll(
     /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+|[\p{L}\p{N}]+/gu
   )) {
     const part = segment[0];
@@ -28195,9 +28195,9 @@ var LogManager = class {
     __publicField(this, "listeners", /* @__PURE__ */ new Set());
   }
   appendLog(level, message) {
-    const normalized2 = message.trim();
-    if (!normalized2) return;
-    this.entries.push({ timestamp: (/* @__PURE__ */ new Date()).toISOString(), level, message: normalized2 });
+    const normalized3 = message.trim();
+    if (!normalized3) return;
+    this.entries.push({ timestamp: (/* @__PURE__ */ new Date()).toISOString(), level, message: normalized3 });
     if (this.entries.length > this.limit) this.entries.splice(0, this.entries.length - this.limit);
     for (const listener of this.listeners) listener();
   }
@@ -34444,7 +34444,7 @@ var Repository = class {
     var _a2, _b2;
     const file = this.file(path), content = decodeCalloutSections(upgradeLegacyAimText(raw)), fm = frontmatter(content);
     const status = text5(fm.status, "idea");
-    const normalized2 = status === "review" || status === "accepted" ? "completed" : status;
+    const normalized3 = status === "review" || status === "accepted" ? "completed" : status;
     const source = text5(fm["model-source"], "workspace");
     const modelSource = ["workspace", "inherited", "manual"].includes(source) ? source : "workspace";
     const effective = await this.effectiveModel(
@@ -34495,7 +34495,7 @@ var Repository = class {
       ...readTopicStyle(fm).length ? { style: readTopicStyle(fm) } : {},
       detailFormatIssues: Array.isArray(fm["detail-format-issues"]) ? fm["detail-format-issues"].filter((v) => typeof v === "string") : [],
       lastError: text5(fm["last-error"]),
-      status: ["idea", "running", "completed", "error"].includes(normalized2) ? normalized2 : "idea",
+      status: ["idea", "running", "completed", "error"].includes(normalized3) ? normalized3 : "idea",
       mapId: text5(fm["agent-map-id"]),
       topicId: text5(fm["topic-id"], text5(fm["agent-map-id"])),
       topicState: ["active", "unassigned", "archived", "inbox"].includes(state) ? state : "active",
@@ -40916,6 +40916,10 @@ function isBucket(value) {
   if (value.providers === void 0) return true;
   return isRecord3(value.providers) && Object.entries(value.providers).every(([key4, maps]) => (key4 === "claude" || key4 === "codex") && isMaps(maps));
 }
+function normalizeUsageModel(model) {
+  return model.replace(/^(?:claude:){2,}/, "claude:");
+}
+var normalized = (entry) => entry.model === normalizeUsageModel(entry.model) ? entry : { ...entry, model: normalizeUsageModel(entry.model) };
 function localDayStart(now = Date.now()) {
   const date = new Date(now);
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
@@ -40958,7 +40962,7 @@ var AiUsageStore = class {
         throw new Error("ai-usage.json has an unexpected shape.");
       if (!parsed.entries.every(isEntry) || !Object.values(parsed.monthly).every(isBucket))
         throw new Error("ai-usage.json has invalid fields.");
-      this.entries = parsed.entries;
+      this.entries = parsed.entries.map(normalized);
       this.monthly = parsed.monthly;
       this.loadError = null;
       this.compact();
@@ -40986,7 +40990,7 @@ var AiUsageStore = class {
         }
         return;
       }
-      this.entries.push({ ...entry, at: (_a2 = entry.at) != null ? _a2 : new Date(this.now()).toISOString() });
+      this.entries.push(normalized({ ...entry, at: (_a2 = entry.at) != null ? _a2 : new Date(this.now()).toISOString() }));
       this.compact();
       this.save();
       this.emit();
@@ -43562,9 +43566,9 @@ function builtinBlockText(category, id, language2) {
   return category === "template" ? builtinTemplateText(id, language2) : findBuiltinBlock(category, id).body(language2);
 }
 function isUnmodifiedBlock(category, id, text10) {
-  const normalized2 = normalizeStyleContent(text10);
+  const normalized3 = normalizeStyleContent(text10);
   return CANONICAL_LANGUAGES.some(
-    (language2) => normalizeStyleContent(builtinBlockText(category, id, language2)) === normalized2
+    (language2) => normalizeStyleContent(builtinBlockText(category, id, language2)) === normalized3
   );
 }
 function uniqueBlockName(base, taken) {
@@ -49624,7 +49628,7 @@ function noIds(replyTexts, ids2) {
       );
   }
 }
-var normalized = (value) => value.normalize("NFKC").toLocaleLowerCase().replace(/[\s\p{P}]+/gu, " ").trim();
+var normalized2 = (value) => value.normalize("NFKC").toLocaleLowerCase().replace(/[\s\p{P}]+/gu, " ").trim();
 var idSchema = { type: "array", items: { type: "string", minLength: 1 }, minItems: 1 };
 function groundedLinks(replyTexts, sources) {
   const knownLinks = linksOf(sources);
@@ -52067,14 +52071,14 @@ function parseFacetHypotheses(raw, request) {
   const item = parseObject(raw, ["hypotheses"]);
   const entries = list(item.hypotheses, "hypotheses");
   if (entries.length !== request.count) throw new ArgumentStepError(`expected exactly ${request.count} hypotheses`);
-  const seen = new Set(request.existing.map(normalized));
-  const questions = new Set(request.causalQuestions.map(normalized));
+  const seen = new Set(request.existing.map(normalized2));
+  const questions = new Set(request.causalQuestions.map(normalized2));
   const hypotheses = entries.map((entry) => {
     const one = parseObject(JSON.stringify(entry), ["title", "statement", "alternative"]);
     const title = text6(one.title, "title");
     const statement = text6(one.statement, "statement");
     if (typeof one.alternative !== "boolean") throw new ArgumentStepError("alternative must be a boolean");
-    const key4 = normalized(title);
+    const key4 = normalized2(title);
     if (questions.has(key4)) throw new ArgumentStepError("a hypothesis title repeats a causal question");
     if (seen.has(key4)) throw new ArgumentStepError("a hypothesis repeats another one");
     seen.add(key4);
@@ -52219,12 +52223,12 @@ var rangeYears = (values) => values.flatMap(
   (value) => yearRanges(value).flatMap(([from, to]) => Array.from({ length: to - from + 1 }, (_, i) => String(from + i)))
 );
 var baselineMatches = (baseline, items) => {
-  const key4 = normalized(baseline);
+  const key4 = normalized2(baseline);
   const ranges = yearRanges(baseline);
   if (ranges.some(([from, to]) => items.some((item) => yearRanges(item.value).some(([f, t2]) => f === from && t2 === to))))
     return true;
   return items.some((item) => {
-    const value = normalized(item.value);
+    const value = normalized2(item.value);
     const [short, long] = key4.length <= value.length ? [key4, value] : [value, key4];
     return substantial(short) && long.includes(short);
   });
@@ -52268,7 +52272,7 @@ function parseFacetPlan(raw, request) {
   const causal = [];
   const causalKeys = /* @__PURE__ */ new Set();
   const addCausal = (question2) => {
-    const key4 = normalized(question2);
+    const key4 = normalized2(question2);
     if (causalKeys.has(key4)) return;
     causalKeys.add(key4);
     grounded([question2], withValues);
@@ -52292,7 +52296,7 @@ function parseFacetPlan(raw, request) {
         "a facet baseline must be one of the assumption values or a part of one (or contain one)"
       );
     grounded([criterion, baseline], [...withValues, ...effectiveItems.flatMap((a) => [a.label, a.reason])]);
-    const titleKey2 = normalized(title);
+    const titleKey2 = normalized2(title);
     if (titles.has(titleKey2)) throw new ArgumentStepError("a facet title repeats another one");
     titles.add(titleKey2);
     grounded([title], withValues);
@@ -52302,7 +52306,7 @@ function parseFacetPlan(raw, request) {
       const need = parseObject(JSON.stringify(raw2), ["need", "kind"]);
       const needText = text6(need.need, "need");
       if (!NEED_KINDS.includes(need.kind)) throw new ArgumentStepError("unknown need kind");
-      const key4 = normalized(needText);
+      const key4 = normalized2(needText);
       if (needKeys.has(key4)) throw new ArgumentStepError("a situation need repeats another one");
       needKeys.add(key4);
       grounded([needText], withValues);
@@ -52540,7 +52544,7 @@ function parseFacetJudge(raw, request) {
   const asked = new Set(
     request.facets.flatMap((f) => {
       var _a3;
-      return [...f.data.map((d) => d.need), ...(_a3 = f.notFoundNeeds) != null ? _a3 : []].map(normalized);
+      return [...f.data.map((d) => d.need), ...(_a3 = f.notFoundNeeds) != null ? _a3 : []].map(normalized2);
     })
   );
   let retryTotal = 0;
@@ -52567,7 +52571,7 @@ function parseFacetJudge(raw, request) {
     for (const raw2 of list(one.retryNeeds, "retryNeeds")) {
       const need = text6(raw2, "retry need");
       if (isCausal(need)) throw new ArgumentStepError("a retry need must ask for a fact, not a cause");
-      const key4 = normalized(need);
+      const key4 = normalized2(need);
       if (asked.has(key4)) throw new ArgumentStepError("a retry need repeats another need");
       asked.add(key4);
       grounded([need], sources);
@@ -52734,12 +52738,12 @@ function parseHypotheses(raw, request) {
   const entries = list(item.hypotheses, "hypotheses");
   if (entries.length !== request.count) throw new ArgumentStepError(`expected exactly ${request.count} hypotheses`);
   const allowed = new Set(request.data.map((d) => d.id));
-  const seen = new Set(request.existing.map(normalized));
+  const seen = new Set(request.existing.map(normalized2));
   const hypotheses = entries.map((entry) => {
     const one = parseObject(JSON.stringify(entry), ["title", "statement", "citedData"]);
     const title = text6(one.title, "title");
     const statement = text6(one.statement, "statement");
-    const key4 = normalized(title);
+    const key4 = normalized2(title);
     if (seen.has(key4)) throw new ArgumentStepError("a hypothesis repeats another one");
     seen.add(key4);
     grounded([title, statement], sourcesOf5(request));
@@ -52821,7 +52825,7 @@ function parseNeeds(raw, request) {
   const entries = list(item.needs, "needs");
   if (!entries.length || entries.length > request.max)
     throw new ArgumentStepError(`expected 1 to ${request.max} needs`);
-  const seen = new Set(request.existing.map((n) => normalized(n.text)));
+  const seen = new Set(request.existing.map((n) => normalized2(n.text)));
   const needs = entries.map((entry) => {
     const one = parseObject(
       JSON.stringify(entry),
@@ -52830,7 +52834,7 @@ function parseNeeds(raw, request) {
     if (one.core !== void 0 && typeof one.core !== "boolean") throw new ArgumentStepError("core must be a boolean");
     if (one.core === true && !request.core) throw new ArgumentStepError("no core need is asked for");
     const body = text6(one.text, "text");
-    const key4 = normalized(body);
+    const key4 = normalized2(body);
     if (seen.has(key4)) throw new ArgumentStepError("a need repeats another one");
     seen.add(key4);
     grounded([body], sourcesOf6(request));
@@ -52959,14 +52963,14 @@ function parseQuickCausal(raw, request) {
     ...plan.assumptions.items.map((a) => a.value),
     ...plan.causalQuestions
   ];
-  const questions = new Set(plan.causalQuestions.map(normalized));
+  const questions = new Set(plan.causalQuestions.map(normalized2));
   const seen = /* @__PURE__ */ new Set();
   const hypotheses = given.map((entry) => {
     const one = parseObject(JSON.stringify(entry), ["title", "statement", "alternative", "needs"]);
     const title = text6(one.title, "title");
     const statement = text6(one.statement, "statement");
     if (typeof one.alternative !== "boolean") throw new ArgumentStepError("alternative must be a boolean");
-    const key4 = normalized(title);
+    const key4 = normalized2(title);
     if (questions.has(key4)) throw new ArgumentStepError("a hypothesis title repeats a causal question");
     if (seen.has(key4)) throw new ArgumentStepError("a hypothesis repeats another one");
     seen.add(key4);
@@ -52979,7 +52983,7 @@ function parseQuickCausal(raw, request) {
       const need = parseObject(JSON.stringify(raw2), ["text", "core"]);
       if (typeof need.core !== "boolean") throw new ArgumentStepError("core must be a boolean");
       const body = text6(need.text, "text");
-      const needKey = normalized(body);
+      const needKey = normalized2(body);
       if (needKeys.has(needKey)) throw new ArgumentStepError("a need repeats another one");
       needKeys.add(needKey);
       grounded([body], [...sources, title, statement]);
@@ -70156,8 +70160,8 @@ function parseClipboard(raw) {
       pairs.add(key4);
       const relation = { kind, from, to };
       const description = own(item, "description");
-      const normalized2 = typeof description === "string" ? normalizeRelationDescription(description) : void 0;
-      if (normalized2 !== void 0) relation.description = normalized2;
+      const normalized3 = typeof description === "string" ? normalizeRelationDescription(description) : void 0;
+      if (normalized3 !== void 0) relation.description = normalized3;
       relations2.push(relation);
     }
     return {
@@ -97082,6 +97086,7 @@ var BookNotesApply = class {
     if (outcome.restored) {
       await this.ports.flush(last.path).catch(() => void 0);
       if (!this.disposed) this.ports.undone(last.path);
+      if (!this.disposed) this.ports.changed();
     }
     if (!outcome.restored) return this.ports.notice(t("ui.book_note_undo_none"));
     this.ports.notice(

@@ -11,6 +11,9 @@
 //   {"key": "Mod+Enter"}                        trusted key press
 //   {"sleep": 500}                              wait milliseconds
 //   {"screenshot": "name"}                      save <log dir>/name.png (path goes to the log)
+//   {"waitFor": "<css selector>", "timeoutMs"?: 30000, "gone"?: true}   poll until a visible match appears (gone: until none is visible)
+//   {"waitUntil": "<js>", "timeoutMs"?: 30000}   poll until the expression is truthy (a promise is awaited)
+//   A wait that times out is a FAIL (exit 1) naming what never came, not a crash; the scenario stops there. Polls every 250 ms.
 //   {"assert": "label", "eval": "<js>", "equals"?: <json>, "contains"?: "<text>"}   truthy value when neither is given
 //   {"assert": "label", "selector": "<css>", "visible"?: true|false}               element exists (and is shown / hidden)
 // Each step holds exactly one action; extra or unknown keys (or equals/contains without assert) are a format error (exit 2).
@@ -31,8 +34,10 @@ function judge(step, value) {
   if ("contains" in step) return { ok: String(value).includes(step.contains), detail: `got ${short(value)}, expected to contain ${short(step.contains)}` };
   return { ok: Boolean(value), detail: `got ${short(value)}, expected truthy` };
 }
-const ACTIONS = ["wait", "eval", "click", "key", "sleep", "screenshot"];
-const KNOWN = new Set([...ACTIONS, "assert", "selector", "visible", "equals", "contains"]);
+const ACTIONS = ["wait", "eval", "click", "key", "sleep", "screenshot", "waitFor", "waitUntil"];
+const KNOWN = new Set([...ACTIONS, "assert", "selector", "visible", "equals", "contains", "timeoutMs", "gone"]);
+const DEFAULT_WAIT_MS = 30_000;
+const POLL_MS = 250;
 // Returns an error text when a step is malformed, otherwise undefined.
 function validateStep(step, index) {
   const where = `step ${index + 1}`;
@@ -52,8 +57,12 @@ function validateStep(step, index) {
   const actions = keys.filter(key => ACTIONS.includes(key));
   if ("wait" in step && step.wait !== true) return `${where} wait must be true`;
   if (actions.length !== 1) return `${where} needs exactly one action (${ACTIONS.join("/")}) or assert, got ${actions.length ? actions.join("+") : "none"}`;
-  const stray = keys.filter(key => !ACTIONS.includes(key));
+  const isWait = "waitFor" in step || "waitUntil" in step;
+  const stray = keys.filter(key => !ACTIONS.includes(key) && !(isWait && (key === "timeoutMs" || (key === "gone" && "waitFor" in step))));
   if (stray.length) return `${where} has ${stray.join(", ")} without assert`;
+  if (isWait && "timeoutMs" in step && !(step.timeoutMs > 0)) return `${where} timeoutMs must be a positive number`;
+  if ("waitFor" in step && typeof step.waitFor !== "string") return `${where} waitFor must be a CSS selector string`;
+  if ("waitUntil" in step && typeof step.waitUntil !== "string") return `${where} waitUntil must be a JavaScript string`;
   return undefined;
 }
 
@@ -119,7 +128,20 @@ export async function runScenario(scenario, { logDir, connect = connectCdp, wait
       else if (step.click !== undefined) log(`  => ${JSON.stringify(await guard(clickSelector(cdp, step.click)))}`);
       else if (step.key !== undefined) await guard(cdp.press(step.key));
       else if (step.sleep !== undefined) await guard(delay(Number(step.sleep)), Number(step.sleep));
-      else if (step.screenshot !== undefined) log(`  => ${await guard(cdp.screenshot(join(logDir, `${String(step.screenshot).replace(/[^\w.-]/g, "_")}.png`)))}`);
+      else if (step.waitFor !== undefined || step.waitUntil !== undefined) {
+        const limit = step.timeoutMs ?? DEFAULT_WAIT_MS;
+        const want = step.waitFor !== undefined ? `${step.waitFor} to be ${step.gone ? "gone" : "visible"}` : `${step.waitUntil.slice(0, 80)} to be truthy`;
+        const deadline = Date.now() + limit;
+        let met = false;
+        for (;;) {
+          if (step.waitFor !== undefined) { const found = await guard(cdp.evaluate(visibleExpression(step.waitFor)), limit); met = step.gone ? found.count === 0 || !found.visible : found.visible; }
+          else met = Boolean(await guard(cdp.evaluate(step.waitUntil), limit));
+          if (met || Date.now() >= deadline) break;
+          await guard(delay(POLL_MS), POLL_MS);
+        }
+        log(`  => ${met ? "met" : "timed out"}: ${want}`);
+        if (!met) { fail(`wait for ${want}`, `not met within ${limit}ms`); break; }
+      } else if (step.screenshot !== undefined) log(`  => ${await guard(cdp.screenshot(join(logDir, `${String(step.screenshot).replace(/[^\w.-]/g, "_")}.png`)))}`);
     }
     let errors = [];
     if (cdp) { current = "reading app errors"; await delay(ERRORS_SETTLE_MS); errors = await guard(Promise.resolve().then(() => cdp.errors())); }
@@ -135,7 +157,7 @@ export async function runScenario(scenario, { logDir, connect = connectCdp, wait
   return results.every(r => r.ok) ? finish(0, "PASS") : finish(1, "FAIL");
 }
 
-export const usage = "Usage: node scripts/run-scenario.mjs <scenario.json> [--vault=<path>] [--log-dir=<dir>]";
+export const usage = "Usage: node scripts/run-scenario.mjs <scenario.json> [--vault=<path>] [--log-dir=<dir>] [--help]";
 
 // Writes the text, then exits once it is flushed. A stuck socket (app froze before it answered) keeps the event loop alive,
 // so the process must end explicitly; the write callback keeps a piped stdout from being cut off.
@@ -147,6 +169,7 @@ function exitAfterWrite(text, code) {
 }
 
 async function cli(args) {
+  if (args.includes("--help") || args.includes("-h")) return { code: 0, text: `${usage}\n` };
   const file = args.find(arg => !arg.startsWith("--"));
   if (!file) { process.stderr.write(`${usage}\n`); return { code: 2 }; }
   const option = name => args.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);

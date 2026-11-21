@@ -19,6 +19,61 @@
       "file": "core/steps/book-pipeline/card-plan.ts",
       "text": "The chapter list is too long for one request",
       "reason": "internal refusal message of the step policy (logged by code, never sent to a model or shown as owner text)"
+    },
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "Chapter this section belongs to (JSON object):",
+      "reason": "model-facing constant sentence of the card plan's continuity block, chosen by the card's kind; no owner or model text becomes part of it"
+    },
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "Next chapter, which this section's handoff leads to",
+      "reason": "model-facing constant sentence of the card plan's continuity block, chosen by the card's kind; no owner or model text becomes part of it"
+    },
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "Continuity: this is the first section of its chapter",
+      "reason": "model-facing constant sentence of the card plan's continuity block, chosen by the card's kind; no owner or model text becomes part of it"
+    },
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "Continuity: its entry takes up where the previous section",
+      "reason": "model-facing constant sentence of the card plan's continuity block, chosen by the card's kind; no owner or model text becomes part of it"
+    },
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "As the last section of the chapter, its handoff leads out",
+      "reason": "model-facing constant sentence of the card plan's continuity block, chosen by the card's kind; no owner or model text becomes part of it"
+    },
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "Its handoff leads into the next section.",
+      "reason": "model-facing constant sentence of the card plan's continuity block, chosen by the card's kind; no owner or model text becomes part of it"
+    },
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "Continuity: this is the preface;",
+      "reason": "model-facing constant sentence of the card plan's continuity block, chosen by the card's kind; no owner or model text becomes part of it"
+    },
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "Continuity: the entry takes up the end of the previous chapt",
+      "reason": "model-facing constant sentence of the card plan's continuity block, chosen by the card's kind; no owner or model text becomes part of it"
+    },
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "Continuity: the entry opens the book's first chapter.",
+      "reason": "model-facing constant sentence of the card plan's continuity block, chosen by the card's kind; no owner or model text becomes part of it"
+    },
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "This chapter has sections, so its handoff leads into its own",
+      "reason": "model-facing constant sentence of the card plan's continuity block, chosen by the card's kind; no owner or model text becomes part of it"
+    },
+    {
+      "file": "core/steps/book-pipeline/card-plan.ts",
+      "text": "This chapter has no sections, so its handoff leads into the ",
+      "reason": "model-facing constant sentence of the card plan's continuity block, chosen by the card's kind; no owner or model text becomes part of it"
     }
   ]
 }

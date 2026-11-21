@@ -457,7 +457,70 @@ const linksLine = (pairs: [LinkKey, BookNoteLink | undefined][]): string | undef
   return parts.length ? `> ${parts.map(part => t(part.key, part.link)).join("　")}` : undefined;
 };
 
-/** The hint at the top of a trial chapter: where it is in the trial, what to do next, links to the neighbours; while stopped it says to press Continue first. */
+/** Where a trial card is in the book (the book's structure), for its hint: a preface, a chapter (its sections), or a section of a chapter. */
+export interface TrialPlace {
+  kind: "preface" | "chapter" | "section";
+  chapter?: number;
+  /** The chapter's title (a chapter or a section). */
+  chapterTitle?: string;
+  sectionIndex?: number;
+  sectionCount?: number;
+  /** A chapter's section titles, in reading order. */
+  sectionTitles?: readonly string[];
+  /** Preface: next. Chapter: previous and next. Section: parent, previous and next section (never the next chapter). */
+  previous?: BookNoteLink;
+  next?: BookNoteLink;
+  parent?: BookNoteLink;
+}
+
+const none = (): string => t("ui.book_note_none");
+/** A line of links of the structure-aware hint: a missing link reads "none" so the reader sees there is nothing there. */
+const placeLinksLine = (pairs: [string, BookNoteLink | undefined][]): string =>
+  `> ${pairs.map(([key, link]) => t(key as LinkKey, noteLink(link) || none())).join("　")}`;
+
+function trialPlaceLines(place: TrialPlace): { title: string; links: string[] } {
+  if (place.kind === "preface")
+    return {
+      title: t("ui.book_note_trial_title_preface"),
+      links: [placeLinksLine([["ui.book_note_next_0", place.next]])]
+    };
+  const chapterTitle = plainText(place.chapterTitle ?? "", 120);
+  if (place.kind === "chapter") {
+    const sections = (place.sectionTitles ?? []).map(title => plainText(title, 80));
+    return {
+      title: t("ui.book_note_trial_title_chapter_0_1", place.chapter ?? 0, chapterTitle),
+      links: [
+        placeLinksLine([
+          ["ui.book_note_prev_0", place.previous],
+          ["ui.book_note_next_0", place.next]
+        ]),
+        ...(sections.length ? [`> ${t("ui.book_note_sections_0", sections.join(t("ui.book_note_sections_sep")))}`] : [])
+      ]
+    };
+  }
+  return {
+    title: t(
+      "ui.book_note_trial_title_section_0_1_2_3",
+      place.chapter ?? 0,
+      chapterTitle,
+      place.sectionIndex ?? 0,
+      place.sectionCount ?? 0
+    ),
+    links: [
+      placeLinksLine([
+        ["ui.book_note_parent_0", place.parent],
+        ["ui.book_note_prev_section_0", place.previous],
+        ["ui.book_note_next_section_0", place.next]
+      ])
+    ]
+  };
+}
+
+/**
+ * The hint at the top of a trial chapter: where it is in the trial, what to do next, links to the neighbours; while stopped it says to
+ * press Continue first. With `place` (a run whose trial is the preface and chapter 1) it names the card's place in the book; without
+ * (an older trial) it keeps "chapter i of n".
+ */
 export function trialCallout(
   i: number,
   n: number,
@@ -465,19 +528,23 @@ export function trialCallout(
   nextLink: BookNoteLink | undefined,
   stopped: boolean | undefined,
   owner: { runId: string; nodeId: string },
-  reasons: readonly string[] = []
+  reasons: readonly string[] = [],
+  place?: TrialPlace
 ): string {
-  const links = linksLine([
-    ["ui.book_note_prev_0", prevLink],
-    ["ui.book_note_next_0", nextLink]
-  ]);
+  const placed = place ? trialPlaceLines(place) : undefined;
+  const links = placed
+    ? undefined
+    : linksLine([
+        ["ui.book_note_prev_0", prevLink],
+        ["ui.book_note_next_0", nextLink]
+      ]);
   return quoted([
-    `> [!vam-trial] ${t("ui.book_note_trial_title_0", i, n)}`,
+    `> [!vam-trial] ${placed ? placed.title : t("ui.book_note_trial_title_0", i, n)}`,
     ...(reasons.length ? [`> ${t("ui.book_note_trial_problems")}`] : []),
     ...reasons.slice(0, MAX_REASONS).map(reason => `> ・${plainText(reason)}`),
     `> ${stopped ? t("ui.book_note_trial_stopped") : t("ui.book_note_trial_next")}`,
     `> ${t("ui.book_note_trial_edit")}`,
-    ...(links ? [links] : []),
+    ...(placed ? placed.links : links ? [links] : []),
     `> %%vam-trial:${idPart(owner.runId)}:${idPart(owner.nodeId)}%%`,
     VERSION_LINE
   ]);

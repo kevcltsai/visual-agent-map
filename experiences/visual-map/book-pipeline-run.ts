@@ -2750,17 +2750,18 @@ export class BookPipelineRuns {
     const authorize = (): boolean =>
       !this.dead(drive) && !signal.aborted && isPlanEditCurrent(drive.store.state, token);
     const locked = new Set(cards.filter(card => card.locked).map(card => card.id));
+    // A change to covers, points or previous without the checklist written for it would leave the old ideas checked. Changes can move a
+    // subject from one card to another, so one such change makes the whole reply unusable: nothing is written and the attempt counts.
+    counts.rejected = changes.filter(
+      change => !locked.has(change.id) && changesBrief(change) && !change.checklist
+    ).length;
+    if (counts.rejected) return { kind: "failed", reason: "checklist_missing" };
     const moved: string[] = [];
     for (const change of changes) {
       if (!authorize()) return { kind: "cancelled" };
       const before = seen.get(change.id);
       // A card the program may not rewrite (hand-edited chapter, kept) keeps its plan too.
       if (!before || locked.has(change.id)) continue;
-      // New covers, points or previous without the checklist written for them would leave the old ideas checked: the change is not applied.
-      if (changesBrief(change) && !change.checklist) {
-        counts.rejected++;
-        continue;
-      }
       const path = await this.stillOnMap(drive, change.id);
       if (!path) continue;
       const current = await this.ports.readCard(path);

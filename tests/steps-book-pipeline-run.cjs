@@ -4813,17 +4813,22 @@ test('plan edit: a book whose plans do not fit one request is refused before any
   assert.equal(s.budget.used, 1 + 40, 'the refused attempts cost no call');
 });
 
-test('plan edit: a change to covers, points or previous without its replacement checklist is not applied and counted rejected; the other changes still apply', async () => {
-  const r = await rig({ script: { planEdit: request => [{ id: request.cards[1].id, covers: 'edited covers' }, { id: request.cards[2].id, entry: 'edited entry', checklist: CL }] } });
+test('plan edit: one change to covers, points or previous without its replacement checklist makes the whole reply fail: nothing is written (a subject moved from one card to another cannot vanish), the attempt counts, and after the cap the run goes on', async () => {
+  const r = await rig({ script: { planEdit: request => [{ id: request.cards[1].id, covers: 'edited covers' }, { id: request.cards[2].id, covers: 'moved here', points: ['a', 'b', 'c'], checklist: CL }] } });
   await r.runs.start(r.mapPath);
   const before = await rig();
   await before.runs.start(before.mapPath);
-  assert.equal(await promptOf(r, 1), await promptOf(before, 1), 'the card with the bare covers change is as planned');
-  assert.equal(await promptOf(r, 0), await promptOf(before, 0), 'and its neighbour line is not refreshed');
+  for (const i of [0, 1, 2]) assert.equal(await promptOf(r, i), await promptOf(before, i), `card ${i} is as planned`);
   assert.equal((await r.note(1)).summary, 'covers 2', 'the summary stays too');
+  assert.equal(r.stat.planEdit.length, 3, 'each rejected reply counts as an attempt, up to the cap');
+  assert.equal((await r.state()).planEdited, true, 'after the cap the run passes on');
+});
+
+test('plan edit: a checklist sent without a covers, points or previous change is ignored; the rest of the change applies', async () => {
+  const r = await rig({ script: { planEdit: request => [{ id: request.cards[2].id, entry: 'edited entry', checklist: CL }] } });
+  await r.runs.start(r.mapPath);
   const two = await promptOf(r, 2);
-  assert.match(two, /edited entry/); assert.deepEqual([...parseChecklist(two).map(c => c.text)], ['has a beginning', 'has an end'], 'a checklist without covers/points/previous changes is ignored');
-  assert.ok(r.stat.logs.some(line => /plan_edit/.test(line) && /"rejected":1|rejected[=:]1/.test(line)), r.stat.logs.filter(l => /plan_edit/.test(l)).join('|'));
+  assert.match(two, /edited entry/); assert.deepEqual([...parseChecklist(two).map(c => c.text)], ['has a beginning', 'has an end']);
   assert.equal((await r.state()).planEdited, true);
 });
 

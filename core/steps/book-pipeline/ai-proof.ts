@@ -121,6 +121,11 @@ export function listedSources(sources: readonly AiProofSource[]): AiProofSource[
   return out;
 }
 
+const SOURCE_RULE =
+  "You must search the web or open at least one of the sources listed below, and only those: a page that is not on the list is not evidence. When you cannot open a source, or it does not cover the claim, return the check as unverifiable with why source_unreachable.";
+const NO_SOURCE_RULE =
+  "This chapter lists no sources and you have no web access. Check only what the text itself shows: consistency between its own sentences and how specific its citations are. A fact or number you cannot check from the text alone is unverifiable (fixable false, why source_unreachable).";
+
 /** The independent proofread of one chapter. */
 export const aiProofStep: StepDefinition<AiProofRequest, RawAiProof> = {
   id: "book-pipeline.ai-proof",
@@ -129,6 +134,7 @@ export const aiProofStep: StepDefinition<AiProofRequest, RawAiProof> = {
     renderTemplate(template, {
       languageInstruction: languageInstruction(request.language, request.body),
       maxItems: String(request.maxItems ?? AI_PROOF_MAX_ITEMS),
+      sourceRule: listedSources(request.sources).length ? SOURCE_RULE : NO_SOURCE_RULE,
       prior: JSON.stringify(
         (request.prior ?? []).map(item => ({ id: item.id, quote: item.quote, problem: item.problem }))
       ),
@@ -151,11 +157,12 @@ export interface AiProofRun {
 }
 
 /**
- * One AI proofread call: web search only (search budget 4), the opened-page events of this call collected. A source on a check is kept only
+ * One AI proofread call: web search only (search budget 4) when the chapter lists sources, text only (no search, so no SearchNotPerformed) when it lists none; the opened-page events of this call collected. A source on a check is kept only
  * when the chapter lists it and this call opened it. The exchange log never gets the chapter text or the reply (`noContentLog`).
  */
 export async function runAiProof(aiCalls: AiCalls, request: AiProofRequest, run: AiProofRun): Promise<AiProofReview> {
   const events: unknown[] = [];
+  const hasSources = listedSources(request.sources).length > 0;
   const prepared = prepareStep(aiProofStep, request);
   return aiCalls.run(
     prepared,
@@ -170,14 +177,16 @@ export async function runAiProof(aiCalls: AiCalls, request: AiProofRequest, run:
       failMessage: planFailMessage,
       usage: { action: "other", mapPath: request.usageMapPath },
       ...(run.admission ? { admission: run.admission } : {}),
-      task: {
-        webSearchOnly: true,
-        searchBudget: AI_PROOF_SEARCH_BUDGET,
-        timeoutMs: AI_PROOF_TIMEOUT_MS,
-        onWebSearchEvent: event => {
-          events.push(event);
-        }
-      }
+      task: hasSources
+        ? {
+            webSearchOnly: true,
+            searchBudget: AI_PROOF_SEARCH_BUDGET,
+            timeoutMs: AI_PROOF_TIMEOUT_MS,
+            onWebSearchEvent: event => {
+              events.push(event);
+            }
+          }
+        : { textOnly: true, searchBudget: 0, timeoutMs: AI_PROOF_TIMEOUT_MS }
     },
     raw =>
       reviewAiProof(prepared.parse(raw), {

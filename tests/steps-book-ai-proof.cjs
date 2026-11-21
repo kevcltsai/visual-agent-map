@@ -160,7 +160,7 @@ test('parse: only checks and prior are read; a reply that is not that shape fail
   assert.equal(stepMod.parseAiProof('{"checks":[]}').prior.length, 0);
 });
 
-test('runAiProof: web search only, budget 4, one reservation, sources only when listed and opened, nothing in the exchange log', async () => {
+test('runAiProof: with sources: web search only, budget 4, one reservation, sources only when listed and opened, nothing in the exchange log', async () => {
   const h = harness({ answer: goodReply([raw({ sources: [LISTED, 'https://other.example/x'] })]), events: [page(LISTED), page('https://other.example/x')] });
   let reserved = 0;
   const result = await stepMod.runAiProof(h.calls, request(), { signal: signal(), admission: { reserve: async () => { reserved += 1; } } });
@@ -173,6 +173,16 @@ test('runAiProof: web search only, budget 4, one reservation, sources only when 
   const dump = JSON.stringify(h.log.getEntries()); assert.ok(h.log.getEntries().length >= 1); assert.ok(!dump.includes('1503') && !dump.includes('蒙娜麗莎'), 'chapter text and reply stay out of the log');
   const bad = harness({ answer: 'not json' });
   await assert.rejects(stepMod.runAiProof(bad.calls, request(), { signal: signal() }));
+});
+
+test('runAiProof: a chapter with no sources is a text-only call (not blocked by SearchNotPerformed) and the prompt says so', async () => {
+  const h = harness({ answer: goodReply([raw({ sources: [] })]), events: [] });
+  await stepMod.runAiProof(h.calls, request({ sources: [] }), { signal: signal() });
+  const controls = h.runs[0][4];
+  assert.notEqual(controls.webSearchOnly, true); assert.equal(controls.textOnly, true); assert.equal(controls.searchBudget, 0);
+  assert.ok(stepMod.aiProofStep.render(request({ sources: [] })).includes('lists no sources'));
+  const withSources = stepMod.aiProofStep.render(request());
+  assert.ok(withSources.includes('source_unreachable') && !withSources.includes('lists no sources'));
 });
 
 // ---- P6a: the whole-book step ----

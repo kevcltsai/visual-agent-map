@@ -810,3 +810,16 @@ test('ai proof: the saved records are validated; a rerun or a trial reset clears
   assert.equal(machine.resetCard(p.state, 'a').aiProof.a, undefined);
   assert.equal(p.state.aiProof.a.key, 'k0', 'reducers leave their input alone');
 });
+
+test('ai proof: a fix keeps the findings for the re-check; isAiCurrent fences a token; abandonAi ends a stuck step as incomplete', () => {
+  const { state: start } = checkedRun();
+  let state = machine.applyAiProof(begin(start, { nodeId: 'a' }, 'k0', 'proof').state, begin(start, { nodeId: 'a' }, 'k0', 'proof').token, { checked: 2, pending: [pending()], open: [] }).state;
+  const f = begin(state, { nodeId: 'a' }, 'k0', 'fix');
+  assert.equal(machine.isAiCurrent(f.state, f.token), true);
+  assert.equal(machine.isAiCurrent(machine.stopRun(f.state), f.token), false, 'a stop closes the fence');
+  const fixed = machine.applyAiFix(f.state, f.token, { applied: 1 }).state;
+  assert.deepEqual(plain(fixed.aiProof.a.pending.map(item => item.id)), ['P1'], 'earlier findings kept for the re-check');
+  const gone = machine.abandonAi(start, 'a');
+  assert.deepEqual([gone.aiProof.a.done, gone.aiProof.a.incomplete], [true, true]);
+  assert.equal(machine.beginAiStep(gone, { nodeId: 'a' }, 'k0', 'proof'), null);
+});

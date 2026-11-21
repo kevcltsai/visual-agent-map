@@ -323,6 +323,21 @@ const aiCurrent = (data: BookPipelineData, token: AiToken): AiProofState | undef
     ? slot
     : undefined;
 };
+/** Whether `token` still names the live step (the run, stop generation, text and round are unchanged): the write fence for a fix. */
+export function isAiCurrent(data: BookPipelineData, token: AiToken): boolean {
+  return aiCurrent(data, token) !== undefined;
+}
+/** Gives up a stuck AI step (it can never begin again): the slot is done and `incomplete`, never shown as all solved. */
+export function abandonAi(data: BookPipelineData, nodeId?: string): BookPipelineData {
+  const next = clone(data);
+  const slot = aiSlot(next, nodeId);
+  const base: AiProofState = slot ?? { key: "", attempts: 0, round: 0, step: "proof", checked: 0, fixed: 0, open: [] };
+  const done: AiProofState = { ...base, done: true, incomplete: true };
+  delete done.pending;
+  setAiSlot(next, nodeId, done);
+  next.revision++;
+  return next;
+}
 /**
  * Starts an AI step: counts one attempt (saved before the call). A first begin, or one for a text that changed meanwhile (a hand edit),
  * starts the proofread over from the check. Null when it may not start: stopped, finished, the step used up its attempts, a card that is
@@ -426,7 +441,7 @@ export function applyAiFix(
     fixed: found.fixed + result.applied,
     refused: { ...(found.refused ?? {}), ...(result.refused ?? {}) }
   };
-  delete slot.pending;
+  // `pending` stays: the next check reads it as the earlier findings (`priorOf`); the next `applyAiProof` replaces it.
   if (!Object.keys(slot.refused ?? {}).length) delete slot.refused;
   for (const id of result.changed ?? [])
     if (effectiveOrder(next).includes(id)) next.revisions[id] = cardRevision(next, id) + 1;

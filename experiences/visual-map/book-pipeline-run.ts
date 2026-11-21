@@ -2189,7 +2189,11 @@ export class BookPipelineRuns {
             state: advancePhase(state, this.stagesOf(drive), this.ports.now()),
             accepted: true
           }));
-          if (drive.store.state !== before) changed = true;
+          if (drive.store.state !== before) {
+            changed = true;
+            // The trial's gate 1 passes by itself: its chapters still needing a person join the full book's fix round, as at a confirmed gate.
+            if (before.phase === "gate1" && drive.store.state.phase === "writing") await this.queueTrialFixes(drive);
+          }
         } else if (
           action.type === "ai_proof" ||
           action.type === "ai_fix" ||

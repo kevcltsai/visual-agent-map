@@ -50,9 +50,9 @@ test('downloadCover: oversize (content-length or real size), wrong type, mismatc
 test('downloadCover: a 4xx thumbnail falls back to the raster original once; an svg has no fallback; the fallback answer faces the same checks', async () => {
   let r = await reason(ORIGINAL, (url, n) => n === 1 ? { status: 400, headers: {}, bytes: new ArrayBuffer(0) } : answer(JPEG, 'image/jpeg'));
   assert.equal(r.out.ok, true);
-  assert.deepEqual(r.calls.map(c => c.url), [THUMB, ORIGINAL]);
+  assert.deepEqual(r.calls.map(c => [c.url, c.init.method]), [[THUMB, undefined], [ORIGINAL, 'HEAD'], [ORIGINAL, undefined]], 'the original is asked for its headers first');
   r = await reason(ORIGINAL, (url, n) => n === 1 ? { status: 404, headers: {}, bytes: new ArrayBuffer(0) } : answer(JPEG, 'text/html'));
-  assert.deepEqual([r.out.ok, r.out.reason, r.calls.length], [false, 'type', 2]);
+  assert.deepEqual([r.out.ok, r.out.reason, r.calls.length], [false, 'type', 3]);
   r = await reason('https://upload.wikimedia.org/wikipedia/commons/3/3a/Map.svg', () => ({ status: 400, headers: {}, bytes: new ArrayBuffer(0) }));
   assert.deepEqual([r.out.ok, r.out.reason, r.calls.length], [false, 'status', 1]);
   assert.equal(r.calls[0].url, 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Map.svg/1280px-Map.svg.png', 'svg asks only for the png thumbnail');
@@ -60,6 +60,14 @@ test('downloadCover: a 4xx thumbnail falls back to the raster original once; an 
   assert.equal(png.out.ext, 'png');
   r = await reason(ORIGINAL, () => ({ status: 500, headers: {}, bytes: new ArrayBuffer(0) }));
   assert.equal(r.calls.length, 1, '5xx does not fall back');
+});
+
+test('downloadCover: an oversize original is refused from its HEAD content-length, before the GET (the body is never requested)', async () => {
+  const big = { status: 200, headers: { 'content-length': String(6 * 1024 * 1024) }, bytes: new ArrayBuffer(0) };
+  let r = await reason(ORIGINAL, (url, n) => n === 1 ? { status: 404, headers: {}, bytes: new ArrayBuffer(0) } : big);
+  assert.deepEqual([r.out.ok, r.out.reason, r.calls.map(c => c.init.method)], [false, 'size', [undefined, 'HEAD']]);
+  r = await reason(ORIGINAL, (url, n) => n === 1 ? { status: 404, headers: {}, bytes: new ArrayBuffer(0) } : n === 2 ? { status: 405, headers: {}, bytes: new ArrayBuffer(0) } : answer(JPEG, 'image/jpeg'));
+  assert.equal(r.out.ok, true, 'a HEAD that is refused is no verdict');
 });
 
 test('downloadCover: a fetch that throws is a failure, not an exception', async () => {

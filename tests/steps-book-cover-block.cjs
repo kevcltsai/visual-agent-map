@@ -22,6 +22,14 @@ test('composeCoverBlock found: embed, caption, Commons file page as the source, 
   assert.equal(block.composeCoverBlock('chapter', 'en', found()).split('\n').at(-2), `Source: [Wikimedia Commons](${PAGE})`);
 });
 
+test('composeCoverBlock: a caption of only dashes or equals signs is escaped so it cannot turn the embed line into a setext heading', () => {
+  for (const caption of ['---', '===', '-', '=', '--']) {
+    const lines = block.composeCoverBlock('chapter', 'zh', found({ caption })).split('\n');
+    assert.match(lines[2], /^\\[-=][-=]*$/, caption);
+  }
+  assert.equal(block.composeCoverBlock('chapter', 'zh', found({ caption: 'a---b' })).split('\n')[2], 'a---b');
+});
+
 test('composeCoverBlock off: "這張圖可能對不上" follows the caption (en has its own sentence)', () => {
   const zh = block.composeCoverBlock('chapter', 'zh', found({ off: true })).split('\n');
   assert.deepEqual(zh.slice(2, 4), ['蒙娜麗莎，達文西作', '這張圖可能對不上']);

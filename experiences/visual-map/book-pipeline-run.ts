@@ -4921,7 +4921,9 @@ export class BookPipelineRuns {
     const left = effectiveOrder(state).filter(id => {
       const stage = drive.stages.get(id);
       // A needs-review card whose automatic redo is queued is not done yet.
-      return planning ? stage === undefined : (stage !== "checked" && stage !== "needs-review") || drive.fixable.has(id);
+      return planning
+        ? stage === undefined
+        : (stage !== "checked" && stage !== "needs-review") || drive.fixable.has(id);
     }).length;
     const average = list.reduce((sum, ms) => sum + ms, 0) / list.length;
     // Planning runs BOOK_POOL cards at once; writing has cards in both the write and the post-write places.

@@ -13375,7 +13375,7 @@ function planCalloutKind(title) {
 }
 function planLocale(language2, storedZh) {
   if (!storedZh) return "en";
-  return language2 === "zh-CN" ? "zh-CN" : "zh-TW";
+  return instructionLanguageOf(language2) === "zh" ? language2 : "zh-TW";
 }
 function planTitleKey(kind, card) {
   if (kind === "book") return "ui.book_plan_title_book";
@@ -13512,8 +13512,9 @@ function registerBookPlanView(plugin, language2) {
   const envOf = (path) => ({
     language: language2,
     stage: () => {
-      var _a2, _b2;
-      return path ? (_b2 = (_a2 = plugin.app.metadataCache.getCache(path)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["pipeline-stage"] : void 0;
+      var _a2;
+      const frontmatter2 = path ? (_a2 = plugin.app.metadataCache.getCache(path)) == null ? void 0 : _a2.frontmatter : void 0;
+      return frontmatter2 == null ? void 0 : frontmatter2["pipeline-stage"];
     }
   });
   plugin.registerMarkdownPostProcessor((element, ctx) => markPlanCallouts(element, envOf(ctx.sourcePath)));

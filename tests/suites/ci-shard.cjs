@@ -126,8 +126,27 @@ test('ci.yml: gate runs always, needs checks and test, and the matrix size match
   assert.equal(shardJob.env.VAM_CI_SHARD, '${{ matrix.shard }}/' + shards.length);
   assert.deepEqual(shards, Array.from({ length: shards.length }, (_, i) => i + 1));
   assert.equal(shardJob.strategy['fail-fast'], false);
-  assert.match(gateText, /TEST_RESULT[\s\S]*success/);
-  assert.match(gateText, /CHECKS_RESULT[\s\S]*success/);
   assert.equal(gate.env, undefined);
   assert.ok(checks && workflow.jobs.reuse);
+});
+// Runs the gate's "every job must succeed" step itself, so a skipped, cancelled or failed job is proven to fail the gate (a text match would pass with the check deleted).
+test('ci.yml: the gate step fails unless checks and, in full mode, every test shard succeeded', () => {
+  const { spawnSync } = require('node:child_process');
+  const workflow = YAML.parse(fs.readFileSync(path.join(root, '.github', 'workflows', 'ci.yml'), 'utf8'));
+  const step = workflow.jobs.gate.steps.find(item => item.name === 'Require checks and every test shard to succeed');
+  assert.ok(step && step.run, 'gate has the require-success step');
+  const cases = [
+    ['full', 'success', 'success', 0],
+    ['full', 'success', 'skipped', 1],
+    ['full', 'success', 'cancelled', 1],
+    ['full', 'success', 'failure', 1],
+    ['full', 'skipped', 'success', 1],
+    ['full', 'failure', 'success', 1],
+    ['affected', 'success', 'skipped', 0],
+    ['affected', 'skipped', 'skipped', 1],
+  ];
+  for (const [MODE, CHECKS_RESULT, TEST_RESULT, expected] of cases) {
+    const result = spawnSync('bash', ['-e', '-c', step.run], { env: { PATH: process.env.PATH, MODE, CHECKS_RESULT, TEST_RESULT }, encoding: 'utf8' });
+    assert.equal(result.status, expected, `MODE=${MODE} checks=${CHECKS_RESULT} test=${TEST_RESULT}: ${result.stdout}${result.stderr}`);
+  }
 });

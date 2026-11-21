@@ -142,6 +142,8 @@ jobs:
           VAM_CI_REPORT_DIR: ${{ runner.temp }}/ci-reports
           VAM_TEST_DEPS_DIR: ${{ runner.temp }}/test-deps-records
         run: npm test
+      # A test that rewrites a committed build artifact must fail here, as it did when verify ran the diff after npm test.
+      - run: git diff --exit-code -- main.js experiences/sharing/viewer-bundle.generated.ts
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:

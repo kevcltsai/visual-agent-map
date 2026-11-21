@@ -319,6 +319,8 @@ export type BookRunRefusal =
   | "notes_busy"
   | "drive_running"
   | "cancelled"
+  /** A gate button pressed while the drive was still ending: the drive stopped, failed or ended meanwhile, so the press did nothing. */
+  | "gate_cancelled"
   | "stale"
   | "backup_failed"
   | "nothing"
@@ -538,6 +540,8 @@ export interface BookPipelineProgress {
   steps?: BookStepCounts;
   /** Memory only: the single-card rerun running now and when it began (ms); gone when it ends, whatever way it ended. */
   rerun?: { nodeId: string; startedAt: number };
+  /** Memory only: a gate button press is waiting for the drive that reached the gate to finish ending. */
+  gateWaiting?: true;
 }
 /** What a single-card rerun tells its caller: a card that needed a person before and still does with the same result. */
 export interface BookRerunResult {
@@ -614,7 +618,7 @@ interface Drive {
   extra: Map<string, string>;
   /** Cards whose `extra` line is a source swap: the author gets it too. */
   avoid: Set<string>;
-  /** Cards whose proofread named unmet points, waiting for the one automatic redo once every card has had its first round: the program-built request line. */
+  /** Cards whose proofread named unmet points, waiting for the one automatic redo once that card's own first round is over: the program-built request line. */
   fixable: Map<string, string>;
   /** Cards whose automatic redo edits the chapter in place (the program puts the author's change blocks in), never writing it anew. */
   expand: Set<string>;
@@ -1095,7 +1099,10 @@ export class BookPipelineRuns {
   getProgress(mapPath: string): BookPipelineProgress | undefined {
     const drive = this.drives.get(mapPath);
     // A drive whose first write is still in progress has no store yet (a repaint during that write asks): nothing to report yet.
-    if (drive) return drive.store ? this.progressOf(drive, true) : undefined;
+    if (drive)
+      return drive.store
+        ? { ...this.progressOf(drive, true), ...(this.gateWaiting.has(mapPath) ? { gateWaiting: true as const } : {}) }
+        : undefined;
     return this.last.get(mapPath);
   }
 
@@ -2044,7 +2051,7 @@ export class BookPipelineRuns {
   }
   /**
    * A gate button entry. A press made while the drive that reached the gate is still ending waits for that drive and then applies as
-   * it would have (a stopped, failed or disposed drive: the press does nothing, "cancelled"); a press while a different operation runs,
+   * it would have (a stopped, failed or disposed drive: the press does nothing, "gate_cancelled"); a press while a different operation runs,
    * or a second press while one waits, is refused "busy". Every press leaves one short trace line in the run (action, outcome, wait).
    */
   private async gateEnter(
@@ -2066,15 +2073,17 @@ export class BookPipelineRuns {
       const drive = this.drives.get(mapPath);
       if (drive && !this.gateWaiting.has(mapPath) && this.windingDownAtGate(drive)) {
         this.gateWaiting.add(mapPath);
+        this.ports.progressed?.(mapPath);
         try {
           await drive.done.catch(() => undefined);
         } finally {
           this.gateWaiting.delete(mapPath);
+          this.ports.progressed?.(mapPath);
         }
         waited = Date.now() - startedAt;
         if (this.disposed) throw new BookPipelineRunError("disposed");
         if (drive.stopRequested || drive.fatal !== undefined || this.dead(drive))
-          throw new BookPipelineRunError("cancelled");
+          throw new BookPipelineRunError("gate_cancelled");
       }
       await this.enter(mapPath, setup, early);
       await this.traceGate(mapPath, runId, action, "applied", waited, true);
@@ -2443,6 +2452,8 @@ export class BookPipelineRuns {
         await this.refreshSkippedPlans(drive);
         await this.refreshAroundRemoved(drive);
       }
+      // A card's automatic redo starts once its own first round is over (its proofread committed, its step out of `busy`), not when the whole book is idle.
+      if (drive.fixable.size && !drive.job && drive.store.state.status === "running") await this.startFixes(drive);
       await drive.store.commit(state => invalidateStaleAiChapters(state));
       const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy, {
         aiProof: !!this.ports.aiProof && !!this.ports.aiFix && !!this.ports.aiBookProof && !drive.job,
@@ -3306,15 +3317,16 @@ export class BookPipelineRuns {
     this.syncReviewNotes(drive);
   }
   /**
-   * The one automatic redo (plan 2026 flow v3, E), after every card has had its first round: a card whose proofread named unmet points
+   * The one automatic redo (plan 2026 flow v3, E), after that card's own first round: a card whose proofread named unmet points
    * gets its text written again by the author alone (the plan and the checklist stay, attempts are not reset), then proofread once more.
    * The real points go to the author only (never to the proofread). A refused or no longer allowed request leaves the card needs-review.
    * Returns how many cards were sent back; only cards queued by this drive's own proofreads are considered.
    */
   private async startFixes(drive: Drive): Promise<number> {
     let started = 0;
-    const queued = [...drive.fixable];
-    drive.fixable.clear();
+    // A card still in a step (its own proofread result is being written) stays queued for the next round of the loop.
+    const queued = [...drive.fixable].filter(([nodeId]) => !drive.busy.has(nodeId));
+    for (const [nodeId] of queued) drive.fixable.delete(nodeId);
     for (const [nodeId, instruction] of queued) {
       if (this.dead(drive) || drive.controller.signal.aborted) break;
       if (drive.stages.get(nodeId) !== "needs-review") continue;
@@ -3514,11 +3526,13 @@ export class BookPipelineRuns {
     const structure = this.structureOf(drive, order);
     const around = structure.neighboursOf(nodeId);
     const kind = structure.placeOf(nodeId)?.kind ?? "chapter";
-    const side = (id: string | undefined): CardNeighbour | undefined => {
+    // A section's neighbours are named by title (sections are never numbered, and the previous/next section is a section); the next
+    // chapter it leads to is a chapter and keeps its number.
+    const side = (id: string | undefined, numbered = kind !== "section"): CardNeighbour | undefined => {
       const other = id === undefined ? undefined : drive.cards.get(id);
       if (!other || id === undefined) return undefined;
       const place = structure.placeOf(id);
-      const position = kind === "section" ? undefined : place?.kind === "preface" ? "preface" : place?.chapter;
+      const position = !numbered ? undefined : place?.kind === "preface" ? "preface" : place?.chapter;
       return {
         ...(position === undefined ? {} : { position }),
         title: other.title,
@@ -3527,7 +3541,7 @@ export class BookPipelineRuns {
     };
     const previous = side(around.previous);
     const next = side(around.next);
-    const nextChapter = side(around.nextChapter);
+    const nextChapter = side(around.nextChapter, true);
     const parentCard = around.parent === undefined ? undefined : drive.cards.get(around.parent);
     const parentChapter = around.parent === undefined ? undefined : structure.placeOf(around.parent)?.chapter;
     const children = this.childCardsOf(drive, nodeId);
@@ -4906,7 +4920,10 @@ export class BookPipelineRuns {
     if (list.length < ETA_MIN_CARDS) return undefined;
     const left = effectiveOrder(state).filter(id => {
       const stage = drive.stages.get(id);
-      return planning ? stage === undefined : stage !== "checked" && stage !== "needs-review";
+      // A needs-review card whose automatic redo is queued is not done yet.
+      return planning
+        ? stage === undefined
+        : (stage !== "checked" && stage !== "needs-review") || drive.fixable.has(id);
     }).length;
     const average = list.reduce((sum, ms) => sum + ms, 0) / list.length;
     // Planning runs BOOK_POOL cards at once; writing has cards in both the write and the post-write places.

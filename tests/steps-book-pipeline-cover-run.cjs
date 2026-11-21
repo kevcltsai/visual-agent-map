@@ -453,8 +453,13 @@ test('cover run (review L-1): when the finalize finds the cover held by the owne
   r.runs.ports.updateNoteGuarded = (path, patch, options) => options?.finalize && patch.detail !== undefined && /SecretRootTitle|Root/.test(path)
     ? inner(path, patch, { ...options, finalize: content => options.finalize(content.replace(/^---\n/, '---\ntopic-cover: none\n')) })
     : inner(path, patch, options);
+  const claimsAtKept = [];
+  const log = r.runs.ports.log;
+  r.runs.ports.log = line => { if (/cover_owner_kept/.test(line)) claimsAtKept.push([...r.runs.drives.get(r.mapPath).usedImages]); log(line); };
   await run(r);
   assert.ok(!/book-cover/.test(r.raw(0)), 'no block written');
   assert.match(r.raw(0), /^topic-cover: none$/m);
   assert.ok(r.stat.logs.some(line => /cover_owner_kept/.test(line)));
+  assert.equal(claimsAtKept.length, 1);
+  assert.ok(!claimsAtKept[0].some(key => /Cover1/.test(key)), 'the cover picture\'s claim is given back');
 });

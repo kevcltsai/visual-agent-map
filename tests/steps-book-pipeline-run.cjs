@@ -1371,7 +1371,7 @@ const factCard = { card: () => ({ covers: 'c', entry: 'e', handoff: 'h', previou
 const verdictOf = (request, factStatus, note = 'judged') => evaluateProof(request.checklist.map(c => ({ id: c.id, status: c.type === 'fact' ? factStatus : 'met', note: c.type === 'fact' ? note : 'ok', sources: c.type === 'fact' ? ['https://example.org/p'] : [] })), request.checklist, ['https://example.org/p']);
 const writeAs = (r, seen) => async input => { seen.push([input.nodeId, input.instruction]); await input.admission.reserve(); const note = await r.repo.readNote(input.path); const out = await r.repo.updateNoteGuarded(input.path, { detail: input.requirements !== undefined ? fixOf(bodyOf(note.title)) : bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; };
 
-test('T4 autofix: an unmet fact is redone once by the author alone, after every card had its first round; the reason goes to the author, never the plan or the proofread; the second verdict ends it', async () => {
+test('T4 autofix: an unmet fact is redone once by the author alone, after the card own first round; the reason goes to the author, never the plan or the proofread; the second verdict ends it', async () => {
   const seen = [];
   const planSeen = [];
   let proofs = 0;
@@ -1389,9 +1389,12 @@ test('T4 autofix: an unmet fact is redone once by the author alone, after every 
   assert.equal(r.stat.plan.filter(x => x === r.nodes[1].id).length, 1, 'no new plan: the plan and checklist stay');
   assert.ok(planSeen.every(x => x === undefined));
   assert.equal(seen.length, 4, 'three first rounds and one redo');
-  assert.ok(seen.slice(0, 3).every(([, instruction]) => instruction === undefined), 'the redo starts only after every card finished its first round');
-  assert.equal(seen[3][0], r.nodes[1].id);
-  assert.match(seen[3][1], /"a date \/ WRONGDATE"/);
+  assert.equal(seen.filter(([, instruction]) => instruction === undefined).length, 3, 'every card had exactly one first round');
+  const redoAt = seen.findIndex(([, instruction]) => instruction !== undefined);
+  assert.equal(seen.filter(([, instruction]) => instruction !== undefined).length, 1, 'exactly one redo');
+  assert.equal(seen[redoAt][0], r.nodes[1].id);
+  assert.ok(seen.findIndex(([id, instruction]) => id === r.nodes[1].id && instruction === undefined) < redoAt, 'the redo starts only after that card\'s own first round (not necessarily after the other cards\')');
+  assert.match(seen[redoAt][1], /"a date \/ WRONGDATE"/);
   assert.ok(r.stat.proof.every(request => !JSON.stringify(request).includes('WRONGDATE') && !JSON.stringify(request).includes('failed the fact check')));
   assert.equal(r.stat.proof.length, 4);
   assert.doesNotMatch(r.raw(1), /book-fix/);
@@ -3724,6 +3727,16 @@ test('P3 structure: the plan gate writes ### 全書結構 after the thread in th
   assert.equal(replaceBookStructure(raw, composeBookStructure([{ kind: 'preface', title: 'BookRoot', points: ['BookRoot a', 'BookRoot b', 'BookRoot c'] }, { kind: 'chapter', chapter: 1, title: 'ChapA', points: ['ChapA a', 'ChapA b', 'ChapA c'] }, { kind: 'section', title: 'SecA1', points: ['SecA1 a', 'SecA1 b', 'SecA1 c'] }, { kind: 'section', title: 'SecA2', points: ['SecA2 a', 'SecA2 b', 'SecA2 c'] }, { kind: 'chapter', chapter: 2, title: 'ChapB', points: ['ChapB a', 'ChapB b', 'ChapB c'] }], 'zh-TW')), raw, 'idempotent');
 });
 
+test('P3 structure: the last section of a chapter is planned with the next chapter carrying its number; the section\'s own neighbours stay unnumbered', async () => {
+  const seen = [];
+  const r = await sectionRig({ script: { card: (request, n) => { seen.push(request); return POINTED.card(request, n); } } });
+  await r.runs.start(r.mapPath);
+  const last = seen.find(request => request.card.id === r.nodes[3].id);
+  assert.ok(last, 'SecA2 was planned');
+  assert.deepEqual([last.nextChapter.title, last.nextChapter.position], ['ChapB', 2], 'the next chapter keeps its chapter number');
+  assert.equal(last.previous.position, undefined, 'the previous section is named by title only');
+});
+
 test('P3 structure: back to the plan writes it again from the plans as the owner edited them; a stale root note is left and structure_skipped is logged, the gate still shows', async () => {
   const r = await sectionRig();
   await r.runs.start(r.mapPath);
@@ -4266,8 +4279,8 @@ test('R4 combo: a needs-review chapter is rewritten by its one automatic redo BE
 
 // ---- gate presses while the drive that reached the gate is still ending ----------------------------------------------------------
 /** A plan-review run whose start drive stays alive after it saved gate 1 (its next map read waits), plus controls over that wait. */
-async function lingerRig() {
-  const r = await trialRig({ planReview: true });
+async function lingerRig(over = {}) {
+  const r = await trialRig({ planReview: true, ...over });
   const ctl = { on: false, block: false, blocked: 0, fail: false, hold: defer() };
   const update = r.ports.updateMap, readMap = r.ports.readMap;
   r.ports.updateMap = async (path, change) => { const x = await update(path, change); const s = await r.state(); if (!ctl.on && s.phase === 'gate1' && s.planReview) { ctl.on = true; ctl.block = true; } return x; };
@@ -4360,7 +4373,24 @@ test('gate press while a different operation runs (the plan phase) is refused bu
   assert.equal(r.stat.author.length, 0);
 });
 
-test('waiting gate press when the ending drive is stopped: the press does nothing (cancelled), the run stays stopped at the gate', async () => {
+test('waiting gate press: the progress says gateWaiting while it waits, and progressed fires when the wait starts and ends', async () => {
+  const seen = [];
+  let runs;
+  const { r, ctl, start } = await lingerRig({ ports: { progressed: () => seen.push(runs?.getProgress(r0.mapPath)?.gateWaiting === true) } });
+  const r0 = r; runs = r.runs;
+  assert.equal(r.runs.getProgress(r.mapPath)?.gateWaiting, undefined);
+  seen.length = 0;
+  const press = r.runs.startTrial(r.mapPath);
+  await settle();
+  assert.equal(r.runs.getProgress(r.mapPath)?.gateWaiting, true);
+  assert.ok(seen.includes(true), 'progressed fired when the wait began');
+  ctl.hold.resolve();
+  await start; await press; await idle(r);
+  assert.equal(r.runs.getProgress(r.mapPath)?.gateWaiting, undefined);
+  assert.ok(seen.slice(seen.indexOf(true)).includes(false), 'progressed fired when the wait ended');
+});
+
+test('waiting gate press when the ending drive is stopped: the press does nothing (gate_cancelled), the run stays stopped at the gate', async () => {
   const { r, ctl, start, trace } = await lingerRig();
   const press = r.runs.startTrial(r.mapPath).then(() => 'ok', e => e.code);
   await settle();
@@ -4368,26 +4398,26 @@ test('waiting gate press when the ending drive is stopped: the press does nothin
   await settle();
   ctl.hold.resolve();
   await start; await stopping;
-  assert.equal(await press, 'cancelled');
+  assert.equal(await press, 'gate_cancelled');
   await settle();
   const s = await r.state();
   assert.deepEqual([s.phase, s.status, s.planReview], ['gate1', 'stopped', true]);
   assert.equal(r.stat.author.length, 0); assert.equal(r.runs.isRunning(r.mapPath), false, 'no drive was started');
-  assert.match((await trace()).at(-1), /startTrial refused:cancelled/);
+  assert.match((await trace()).at(-1), /startTrial refused:gate_cancelled/);
 });
 
-test('waiting gate press when the ending drive fails: the press does nothing (cancelled), does not hang, starts no drive', async () => {
+test('waiting gate press when the ending drive fails: the press does nothing (gate_cancelled), does not hang, starts no drive', async () => {
   const { r, ctl, start, trace } = await lingerRig();
   const press = r.runs.confirmGate1(r.mapPath).then(() => 'ok', e => e.code);
   await settle();
   ctl.fail = true; ctl.hold.resolve();
   await start;
-  assert.equal(await press, 'cancelled');
+  assert.equal(await press, 'gate_cancelled');
   await settle();
   const s = await r.state();
   assert.equal(s.status, 'stopped'); assert.notEqual(s.phase, 'done');
   assert.equal(r.stat.author.length, 0); assert.equal(r.runs.isRunning(r.mapPath), false);
-  assert.match((await trace()).at(-1), /confirmGate1 refused:cancelled/);
+  assert.match((await trace()).at(-1), /confirmGate1 refused:gate_cancelled/);
 });
 
 test('waiting gate press when the plugin is disposed: refused disposed, nothing is written afterwards', async () => {
@@ -4419,6 +4449,7 @@ test('the gate trace is capped, kept by the drive\'s own state writes, and the r
 
 // ---- Picture work does not hold a write place: its own cap (BOOK_POST_POOL) ----
 const { BOOK_POOL, BOOK_POST_POOL } = S.load('experiences/visual-map/book-pipeline-run.ts');
+const { MAX_STEP_ATTEMPTS } = S.load('core/book-pipeline/model.ts');
 async function postRig(count, over = {}) {
   const titles = Array.from({ length: count }, (_, i) => `T${i}`);
   const gates = new Map();
@@ -4516,6 +4547,153 @@ test('picture work: stop while writes and searches are both in flight cancels bo
   const s = await r.state();
   assert.equal(s.status, 'stopped');
   for (let i = 0; i < 12; i++) assert.notEqual(stageOf(r.raw(i)), 'checked');
+});
+
+// ---- The automatic redo of a card starts once that card's own first round is over, not when the whole book is idle ----
+// Card T1's first proofread names an unmet fact; T2's picture search (and optionally its AI proofread) is held open.
+async function earlyRig(over = {}) {
+  const titles = Array.from({ length: over.count ?? 3 }, (_, i) => `T${i}`);
+  const gates = new Map();
+  const live = { calls: new Map(), peak: new Map(), seen: [], book: 0, proofOrder: [], stages: [], proofsAtBook: undefined };
+  const MARKED = `${DRAFT}\n\n〔圖位 1：the route〕\n`;
+  const slots = [{ index: 1, kind: 'map', explains: 'the route', anchor: 'after paragraph 1' }];
+  const holder = {};
+  const heldAi = defer();
+  let clock = 0;
+  const r = await rig({
+    titles, ai: !!over.ai,
+    script: {
+      card: () => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: FACTS, images: slots }),
+      author: async input => {
+        const id = input.nodeId;
+        live.calls.set(id, (live.calls.get(id) ?? 0) + 1); live.peak.set(id, Math.max(live.peak.get(id) ?? 0, live.calls.get(id)));
+        live.seen.push([id, input.instruction]);
+        try {
+          if (over.holdAuthorOfRedo && input.instruction !== undefined) await over.holdAuthorOfRedo.promise;
+          await input.admission.reserve();
+          await tick();
+          const detail = input.requirements !== undefined ? fixOf(`唯一${id}`, `唯一${id} 補`) : `${MARKED}\n唯一${id}\n`;
+          const out = await holder.r.repo.updateNoteGuarded(input.path, { detail }, { authorize: input.authorize, finalize: input.finalize });
+          return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
+        } finally { live.calls.set(id, live.calls.get(id) - 1); }
+      },
+      proof: async request => { live.proofOrder.push(request.title); return verdictOf(request, request.title === 'T1' && !live.proofOrder.slice(0, -1).includes('T1') ? 'unmet' : 'met', 'WRONGDATE'); },
+      aiProof: async request => { if (over.holdAi && request.title === 'T2') await heldAi.promise; return { checks: [], prior: [], dropped: {} }; },
+      aiBookProof: async () => { live.book++; live.proofsAtBook = live.proofOrder.length; return { checks: [], prior: [], dropped: {} }; }
+    },
+    ports: {
+      now: () => new Date(Date.UTC(2026, 10, 17) + (clock += 1000)).toISOString(),
+      writePipelineFields: async (path, patch) => {
+        if (over.stageGate && path === holder.r.nodes[1].path && patch.pipelineStage) {
+          live.stages.push(patch.pipelineStage);
+          if (patch.pipelineStage === 'needs-review') await over.stageGate.promise;
+        }
+        return holder.r.repo.writePipelineFields(path, patch);
+      },
+      findImages: async (request, run) => {
+        const key = request.chapter;
+        if (!gates.has(key)) gates.set(key, defer());
+        if (!key.includes('T2') || over.freeImages) gates.get(key).resolve();
+        await new Promise((resolve, reject) => { gates.get(key).promise.then(resolve); run.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }); });
+        return { bySlot: new Map(), found: 0, offTopic: 0 };
+      }
+    }
+  });
+  holder.r = r;
+  return { r, live, gates, heldAi };
+}
+const redoSeen = (live, title) => live.seen.filter(([id, instruction]) => id === title && instruction !== undefined);
+
+test('early redo: a card whose first round ended starts its automatic redo while another card\'s picture search is still open', async () => {
+  const { r, live, gates } = await earlyRig();
+  await r.runs.start(r.mapPath);
+  const running = r.runs.confirmGate1(r.mapPath);
+  await settle();
+  assert.ok([...gates.keys()].some(k => k.includes('T2')), 'T2 search is held');
+  const redo = live.seen.filter(([id, instruction]) => id === r.nodes[1].id && instruction !== undefined);
+  assert.equal(redo.length, 1, 'T1 redo author call started before T2\'s pictures were released');
+  assert.match(redo[0][1], /"a date \/ WRONGDATE"/);
+  assert.equal((await r.state()).autoFixes[r.nodes[1].id], 1);
+  for (let i = 0; i < 400 && r.runs.isRunning(r.mapPath); i++) { open(gates); await tick(); }
+  await running;
+  assert.equal((await r.state()).phase, 'done');
+  assert.equal((await r.state()).autoFixes[r.nodes[1].id], 1, 'still one redo');
+});
+
+const drain = async (r, gates) => { for (let i = 0; i < 400 && r.runs.isRunning(r.mapPath); i++) { open(gates); await tick(); } };
+
+test('early redo: another card\'s AI proofread still running does not hold the redo back', async () => {
+  const { r, live, gates, heldAi } = await earlyRig({ ai: true, holdAi: true, freeImages: true });
+  await r.runs.start(r.mapPath);
+  const running = r.runs.confirmGate1(r.mapPath);
+  await settle();
+  assert.ok(r.stat.ai.some(([kind, request]) => kind === 'proof' && request.title === 'T2'), 'T2 AI proofread is held open');
+  assert.equal(redoSeen(live, r.nodes[1].id).length, 1, 'T1 redo started while T2 AI proofread is held');
+  assert.equal(live.book, 0);
+  heldAi.resolve(); await drain(r, gates); await running;
+  assert.equal((await r.state()).phase, 'done');
+  assert.equal((await r.state()).autoFixes[r.nodes[1].id], 1);
+});
+
+test('early redo: stop and resume during the redo never dispatch twice: one redo, one call per card at a time, step attempts within the limit', async () => {
+  const hold = defer();
+  const { r, live, gates } = await earlyRig({ holdAuthorOfRedo: hold });
+  await r.runs.start(r.mapPath);
+  const running = r.runs.confirmGate1(r.mapPath);
+  await settle();
+  assert.equal(redoSeen(live, r.nodes[1].id).length, 1);
+  await r.runs.stop(r.mapPath);
+  hold.resolve(); await running.catch(() => undefined); await settle();
+  const resumed = r.runs.resume(r.mapPath);
+  await drain(r, gates); await resumed; await settle();
+  assert.equal(live.seen.filter(([id]) => id === r.nodes[1].id).length, 2, 'T1: one first round and one redo, no more');
+  assert.equal((await r.state()).autoFixes[r.nodes[1].id], 1);
+  assert.equal((await r.note(1)).pipelineIssue, 'proof unmet: fix interrupted');
+  assert.ok(live.seen.filter(([id]) => id === r.nodes[2].id).length <= MAX_STEP_ATTEMPTS, 'T2 write attempts within the limit');
+  for (const [id, peak] of live.peak) assert.ok(peak <= 1, `no card had two author calls at once: ${id}`);
+});
+
+test('early redo: the whole-book proofread waits for every card, the redone one included', async () => {
+  const { r, live, gates } = await earlyRig({ ai: true });
+  await r.runs.start(r.mapPath);
+  const running = r.runs.confirmGate1(r.mapPath);
+  await settle();
+  assert.equal(redoSeen(live, r.nodes[1].id).length, 1);
+  assert.equal(live.book, 0, 'no whole-book proofread while T2 searches and T1 is redone');
+  await drain(r, gates); await running;
+  assert.equal(live.book, 1);
+  assert.equal(live.proofsAtBook, 4, 'after the last proofread of every card (T0, T1, T2 and the redone T1)');
+});
+
+test('early redo: a card whose own proofread result is still being saved is not taken by the redo; its result is committed first', async () => {
+  const stageGate = defer();
+  const { r, live, gates } = await earlyRig({ stageGate });
+  await r.runs.start(r.mapPath);
+  const running = r.runs.confirmGate1(r.mapPath);
+  await settle();
+  assert.deepEqual(live.stages.filter(x => x === 'needs-review'), ['needs-review'], 'T1 reached the held needs-review write');
+  open(gates); await settle(); // another card finishes and wakes the loop
+  assert.equal(redoSeen(live, r.nodes[1].id).length, 0, 'no redo while the card is still in its step');
+  assert.equal((await r.state()).autoFixes?.[r.nodes[1].id], undefined, 'revision untouched, no use counted');
+  stageGate.resolve(); await drain(r, gates); await running;
+  const s = await r.state();
+  assert.equal(s.phase, 'done');
+  assert.equal(s.autoFixes[r.nodes[1].id], 1, 'one redo');
+  assert.equal(redoSeen(live, r.nodes[1].id).length, 1);
+  assert.equal(r.stat.proof.filter(p => p.title === 'T1').length, 2, 'the first proofread result was kept, then the redo was proofread');
+  assert.ok(live.stages.indexOf('needs-review') < live.stages.lastIndexOf('planned'), 'needs-review is written before the card goes back to planned');
+});
+
+test('early redo: the estimate counts a card whose redo is queued', async () => {
+  const stageGate = defer();
+  const { r, live, gates } = await earlyRig({ count: 6, freeImages: true, stageGate });
+  await r.runs.start(r.mapPath);
+  const running = r.runs.confirmGate1(r.mapPath);
+  await settle();
+  assert.deepEqual(live.stages.filter(x => x === 'needs-review'), ['needs-review'], 'T1 is held at its needs-review write, its redo queued');
+  assert.equal(r.runs.getProgress(r.mapPath).etaSeconds > 0, true, 'five finished cards, one still owed a redo: an estimate above zero');
+  stageGate.resolve(); await drain(r, gates); await running;
+  assert.equal((await r.state()).autoFixes[r.nodes[1].id], 1);
 });
 
 test('ai chapter: one failed card read does not end the chapter check; the read is tried once more', async () => {

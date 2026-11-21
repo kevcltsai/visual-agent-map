@@ -147,8 +147,43 @@ test('bar: a bar with nothing finished still has valid aria values (total 0 does
   assert.equal(dom.findAll(t, i => i.cls.includes('vam-book-seg')).length, 0);
 });
 
+test('gate press cancelled while waiting: the sentence is about the gate button, not about notes', () => {
+  for (const language of ['zh-TW', 'en', 'zh-CN']) {
+    lang(language);
+    const text = ui.bookRefusalText(new runModule.BookPipelineRunError('gate_cancelled'));
+    assert.notEqual(text, ui.bookRefusalText(new runModule.BookPipelineRunError('cancelled')), language);
+    assert.ok(!/備註|备注|notes/.test(text), `${language}: ${text}`);
+  }
+});
+
+test('bar: while a gate press waits for the ending drive, a plain waiting line shows; otherwise none', () => {
+  lang('zh-TW');
+  const on = draw(bookData({ phase: 'gate1', status: 'running' }), progress({ phase: 'gate1', gateWaiting: true }));
+  const off = draw(bookData({ phase: 'gate1', status: 'running' }), progress({ phase: 'gate1' }));
+  assert.ok(dom.findAll(on.bar, i => (i.cls ?? '').includes('vam-book-gate-waiting')).length === 1);
+  assert.ok(dom.findAll(on.bar, i => i.text === '正在收尾上一步，好了就套用你剛按的按鍵。').length === 1);
+  assert.equal(dom.findAll(off.bar, i => (i.cls ?? '').includes('vam-book-gate-waiting')).length, 0);
+});
+
+test('write failed: author_failed has its own plain sentence that says the card is unchanged and keeps the failure words', () => {
+  for (const [language, unchanged] of [['zh-TW', /維持原樣/], ['zh-CN', /保持原样/], ['en', /unchanged/]]) {
+    lang(language);
+    const text = ui.bookIssueText('write failed: author_failed');
+    assert.match(text, unchanged, language);
+  }
+  lang('zh-TW');
+  assert.match(ui.bookIssueText('write failed: author_failed'), /寫作呼叫失敗/);
+});
+
+test('paint: the partial repaint of loaded cards computes the book structure once for the batch, like the full paint', () => {
+  const at = view_ts.indexOf('private rebuildLoadedCards(');
+  const body = view_ts.slice(at, view_ts.indexOf('this.drawEdges()', at));
+  assert.match(body, /this\.paintBookStructure = \{ value: this\.bookStructureNow\(\) \}/);
+  assert.match(body, /this\.paintBookStructure = null/);
+});
+
 test('refusal text: every refusal code has a Chinese sentence in all three languages; unknown errors get the generic line; nothing throws', async () => {
-  const codes = ['busy', 'blocked', 'root', 'exists', 'unusable', 'missing', 'finished', 'budget', 'disposed', 'unreadable', 'not_gate1'];
+  const codes = ['busy', 'blocked', 'root', 'exists', 'unusable', 'missing', 'finished', 'budget', 'disposed', 'unreadable', 'not_gate1', 'gate_cancelled'];
   for (const language of ['zh-TW', 'en', 'zh-CN']) {
     lang(language);
     const seen = new Set();

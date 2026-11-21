@@ -3590,6 +3590,10 @@ export const en = {
   "ui.book_review_hand_before_book":
     "This card had its own text before it joined the book; this rerun did not rewrite it",
   "ui.book_plain_write_hand_edited": "The chapter has your own edits, so it was left as it is.",
+  "ui.book_plain_write_author_failed":
+    'The writing call failed this time, so the card is unchanged. Use "Rerun this card" to write it again.',
+  "ui.book_refused_gate_cancelled": "Stopped. The button you pressed was not applied; the book stays where it was.",
+  "ui.book_gate_waiting": "Wrapping up the last step. Your button press applies as soon as it is done.",
   "ui.book_refused_text_changed": "The chapter text changed since you chose to rewrite it, so nothing was overwritten.",
   "ui.book_review_hand_queued": "⏳ Queued; it will be rewritten after the whole book finishes",
   "ui.book_review_hand_failed_0": "⚠ Not rewritten: {0}",

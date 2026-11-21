@@ -161,7 +161,8 @@ export function coverSourceKey(raw: string): string | undefined {
 
 /**
  * The exact text of the cover block the note already has directly under its `# Title` (the program's, or one the owner edited: both are
- * the note's own text, put back as they were). Call it on the note as it was before a write, never on text an author just wrote.
+ * the note's own text, put back as they were). Call it on the note as it stands in the vault (the text a write is about to replace, or
+ * the note the program itself just wrote), never on text an author produced: a block inside an author's text is only text.
  */
 export function trustedCoverBlock(raw: string): string | undefined {
   const block = readCoverBlock(raw);

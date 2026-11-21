@@ -62,3 +62,19 @@ test('connectCdp fails and runs nothing when no window has the requested vault o
     for (const window of windows) assert.ok(!window.methods.includes('Runtime.enable'));
   });
 });
+
+test('connectCdp turns on focus emulation for a session vault and never for an owner-identity vault', async () => {
+  const { connectCdp } = await lib();
+  await withDevTools(vault => [vaultWindow(vault)], async (vault, [session]) => {
+    (await connectCdp(vault)).close();
+    assert.ok(session.methods.includes('Emulation.setFocusEmulationEnabled'));
+  });
+  const real = process.env.VAM_OWNER_VAULT;
+  try {
+    await withDevTools(vault => { process.env.VAM_OWNER_VAULT = vault; return [vaultWindow(vault)]; }, async (vault, [owner]) => {
+      (await connectCdp(vault)).close();
+      assert.ok(owner.methods.includes('Runtime.enable'), 'it still connects');
+      assert.ok(!owner.methods.includes('Emulation.setFocusEmulationEnabled'));
+    });
+  } finally { if (real === undefined) delete process.env.VAM_OWNER_VAULT; else process.env.VAM_OWNER_VAULT = real; }
+});

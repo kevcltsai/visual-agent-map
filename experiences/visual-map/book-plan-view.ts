@@ -135,11 +135,16 @@ export function markPlanCallouts(root: HTMLElement, env: PlanViewEnv): void {
     const card = kind.kind === "book" ? "chapter" : cardKindOfPrompt(planLines(content));
     if (kind.kind === "book") hideStructure(content);
     else foldCardPlan(content);
-    // Obsidian folds a `]-` callout three ways (the callout's class, the chevron's class and the content's inline display): undo all three.
-    if (planStartsOpen(env.stage())) {
-      callout.classList.remove("is-collapsed");
-      callout.querySelector(".callout-fold")?.classList.remove("is-collapsed");
-      content.style.removeProperty("display");
+    if (planStartsOpen(env.stage()) && callout.classList.contains("is-collapsed")) {
+      // Open it through Obsidian's own fold toggle, so its fold state agrees and the owner's first click folds it. A synthetic click
+      // has no mousedown, so live preview does not move the cursor.
+      callout.querySelector<HTMLElement>(".callout-title")?.click();
+      // No toggle answered: undo the three places Obsidian folds a `]-` callout (callout class, chevron class, content's inline display).
+      if (callout.classList.contains("is-collapsed")) {
+        callout.classList.remove("is-collapsed");
+        callout.querySelector(".callout-fold")?.classList.remove("is-collapsed");
+        content.style.removeProperty("display");
+      }
     }
     const locale = planLocale(env.language(), kind.zh);
     if (kind.zh) relabel(content, locale);

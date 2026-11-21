@@ -36,7 +36,7 @@ test('fold labels and relabelled fields: stored labels are matched in both langu
 // A minimal element: enough for the early exits (no DOM Range needed).
 function el(attrs, children = {}) {
   const classes = new Set(); const a = { ...attrs };
-  return { classList: { add: c => classes.add(c), remove: c => classes.delete(c), has: c => classes.has(c) }, hasAttribute: n => n in a, setAttribute: (n, v) => { a[n] = v; }, matches: s => s.startsWith('.callout['), querySelector: s => children[s] ?? null, querySelectorAll: () => [], classes };
+  return { classList: { add: c => classes.add(c), remove: c => classes.delete(c), has: c => classes.has(c), contains: c => classes.has(c) }, hasAttribute: n => n in a, setAttribute: (n, v) => { a[n] = v; }, matches: s => s.startsWith('.callout['), querySelector: s => children[s] ?? null, querySelectorAll: () => [], classes };
 }
 const title = text => ({ textContent: text });
 
@@ -75,27 +75,35 @@ test('planStartsOpen: open before anything is written (no stage, planned, unread
   for (const stage of ['written', 'checked', 'needs-review']) assert.equal(view.planStartsOpen(stage), false, stage);
 });
 
-test('markPlanCallouts: a plan callout opens (is-collapsed removed) only while the note is unwritten; a written one keeps Obsidian\'s folded rendering; the data attribute is set once', () => {
+test('markPlanCallouts: an unwritten note opens its plan through Obsidian\'s own fold toggle (so the first click folds it), with a DOM fallback; a written one keeps the fold; the data attribute is set once', () => {
   const make = () => {
-    const c = el({}, { '.callout-title-inner': { textContent: '全書企劃' }, '.callout-content': { childNodes: [], querySelectorAll: () => [], children: [], ownerDocument: { createTreeWalker: () => ({ nextNode: () => null }) } } });
-    c.classes.add('is-collapsed'); return c;
+    const c = el({}, {});
+    c.classes.add('is-collapsed');
+    return c;
   };
   // Obsidian folds a `]-` callout three ways: the callout's class, the chevron's class and the content's inline display.
-  const parts = () => {
+  const parts = (callout, withToggle) => {
     const style = { display: 'none', removeProperty(name) { delete this[name]; } };
     const fold = { classes: new Set(['is-collapsed']) };
     fold.classList = { remove: c => fold.classes.delete(c) };
     const content = { childNodes: [{}], children: [], style, ownerDocument: { createTreeWalker: () => ({ nextNode: () => null }) } };
-    const query = s => (s === '.callout-title-inner' ? { textContent: '全書企劃' } : s === '.callout-fold' ? fold : content);
-    return { style, fold, query };
+    const toggle = { clicks: 0, open: false };
+    const head = { click: () => { toggle.clicks++; toggle.open = !toggle.open; callout.classes[toggle.open ? 'delete' : 'add']('is-collapsed'); fold.classes[toggle.open ? 'delete' : 'add']('is-collapsed'); if (toggle.open) delete style.display; else style.display = 'none'; } };
+    callout.querySelector = s => (s === '.callout-title-inner' ? { textContent: '全書企劃' } : s === '.callout-fold' ? fold : s === '.callout-title' ? (withToggle ? head : null) : content);
+    return { style, fold, toggle };
   };
-  const open = make(); const o = parts(); open.querySelector = o.query;
+  const open = make(); const o = parts(open, true);
   dom.markPlanCallouts(open, env('planned'));
-  assert.ok(!open.classes.has('is-collapsed')); assert.ok(!o.fold.classes.has('is-collapsed'), 'the chevron opens too');
-  assert.equal(o.style.display, undefined, "the content's inline display:none is removed"); assert.ok(open.hasAttribute('data-vam-plan-view'));
-  const written = make(); const w = parts(); written.querySelector = w.query;
+  assert.equal(o.toggle.clicks, 1, "opened by Obsidian's own toggle"); assert.equal(o.toggle.open, true, 'its fold state agrees with what is shown');
+  assert.ok(!open.classes.has('is-collapsed')); assert.ok(!o.fold.classes.has('is-collapsed')); assert.equal(o.style.display, undefined);
+  assert.ok(open.hasAttribute('data-vam-plan-view'));
+  dom.markPlanCallouts(open, env('planned')); assert.equal(o.toggle.clicks, 1, 'not toggled again');
+  const bare = make(); const b = parts(bare, false);
+  dom.markPlanCallouts(bare, env('planned'));
+  assert.ok(!bare.classes.has('is-collapsed') && !b.fold.classes.has('is-collapsed') && b.style.display === undefined, 'no toggle answered: the DOM fallback opens it');
+  const written = make(); const w = parts(written, true);
   dom.markPlanCallouts(written, env('written'));
-  assert.ok(written.classes.has('is-collapsed')); assert.ok(w.fold.classes.has('is-collapsed')); assert.equal(w.style.display, 'none', 'a written note keeps the fold');
+  assert.equal(w.toggle.clicks, 0); assert.ok(written.classes.has('is-collapsed')); assert.equal(w.style.display, 'none', 'a written note keeps the fold');
 });
 
 test('planLocale: Chinese-stored notes follow the book language (zh-CN is not zh-TW), English-stored notes keep their stored labels', () => {

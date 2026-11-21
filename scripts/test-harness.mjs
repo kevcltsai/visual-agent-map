@@ -104,6 +104,16 @@ function ensureNativeMenusOff(vault) {
   writeFileSync(path, JSON.stringify({ ...current, nativeMenus: false }, null, 2));
 }
 
+// A refresh that failed part-way puts back every artifact it had already replaced and the ownership record (from the copies in staging).
+export function restorePreviousInstall({ staging, plugin, replaced, recordPath }) {
+  for (const name of [...replaced].reverse()) {
+    const previous = join(staging, `${name}.previous`);
+    if (existsSync(previous)) renameSync(previous, join(plugin, name));
+  }
+  const previousRecord = join(staging, `${marker}.previous`);
+  if (existsSync(previousRecord)) renameSync(previousRecord, recordPath);
+}
+
 // Refresh only installed code in an owned Vault. Preserve every fixture, note, and attachment.
 // The owner's vault is refused while the owner may be using it (scripts/owner-idle.mjs) unless the session that has the owner's
 // own 「可以裝」 passes ownerIdleConfirmed (--owner-idle-confirmed).
@@ -133,12 +143,7 @@ export function updateCurrentTestVault({ vault = canonicalVault, artifact = root
       renameSync(join(staging, marker), recordPath);
       return verifyTestVault(vault, artifact, owner);
     } catch (error) {
-      for (const name of replaced.reverse()) {
-        const previous = join(staging, `${name}.previous`);
-        if (existsSync(previous)) renameSync(previous, join(plugin, name));
-      }
-      const previousRecord = join(staging, `${marker}.previous`);
-      if (existsSync(previousRecord)) renameSync(previousRecord, recordPath);
+      restorePreviousInstall({ staging, plugin, replaced, recordPath });
       throw error;
     }
   } finally { rmSync(staging, { recursive: true, force: true }); }
@@ -296,7 +301,14 @@ function assertObsidianClosed() {
 // The name "smoke" stays reserved for a session vault: the old AIM smoke profile used this vault path.
 export const smokeVault = process.platform === "darwin" ? "/private/tmp/vam-e2e-smoke" : join(tmpdir(), "vam-e2e-smoke");
 
+export const usage = `Usage: node scripts/test-harness.mjs [--ui | --prepare [--profile=normal|onboarding|reinstall] | --update-current [--wait-idle | --owner-idle-confirmed] | --session=<name> [--stop] [--profile=...] | --which-installed | --help]
+  (no option)        build + unit + integration tests only
+  --session=<name>   isolated vault /private/tmp/vam-e2e-<name>, background Obsidian driven over CDP (see scripts/obsidian-cdp.mjs, scripts/run-scenario.mjs)
+  seed a picture-book map into a session vault: node scripts/book-fixture.mjs --session=<name>`;
+export const isHelp = args => args.includes("--help") || args.includes("-h");
+
 export function main(args = process.argv.slice(2)) {
+  if (isHelp(args)) return process.stdout.write(`${usage}\n`);
   if (args.some(arg => arg.startsWith("--session="))) return sessionMain(args);
   if (args.includes("--which-installed")) {
     if (args.length !== 1) throw new Error("--which-installed takes no other options.");
@@ -399,7 +411,8 @@ export function whichInstalled(vault = canonicalVault, checkout = root) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2);
-  // --smoke, --session= and --which-installed are the paths that build nothing; every other form builds and runs the test layers.
-  if (!argv.includes("--smoke") && !argv.includes("--which-installed") && !argv.some(arg => arg.startsWith("--session="))) await enterHeavy(`npm test ${argv.join(" ")}`.trim(), { blocking: true }); // main() runs spawnSync: see enterHeavy
+  // --help, --smoke, --session= and --which-installed are the paths that build nothing; every other form builds and runs the test layers.
+  // --help must not wait for the heavy lock: it used to queue behind other test runs and never print.
+  if (!isHelp(argv) && !argv.includes("--smoke") && !argv.includes("--which-installed") && !argv.some(arg => arg.startsWith("--session="))) await enterHeavy(`npm test ${argv.join(" ")}`.trim(), { blocking: true }); // main() runs spawnSync: see enterHeavy
   main();
 }

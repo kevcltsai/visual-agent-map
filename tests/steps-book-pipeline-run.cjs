@@ -4149,7 +4149,9 @@ test('R1 T1: a chapter that ends needs-review (author check unmet) still gets it
 const { checkAiProofInvariants } = require('./support-ai-proof-invariants.cjs');
 const { aiProofKey, aiProofBody } = S.load('core/book-pipeline/ai-proof.ts');
 const currentKeys = async r => { const s = await r.state(); const keys = {}; for (const [i, n] of r.nodes.entries()) if (i > 0) { const note = await r.repo.readNote(n.path); keys[n.id] = aiProofKey(s.revisions[n.id] ?? 0, aiProofBody(chapterBody(note.detail))); } return keys; };
-const invariantsOf = async (r, v, extra = {}) => checkAiProofInvariants(await r.state(), { stageOf: id => stageOf(r.raw(r.nodes.findIndex(n => n.id === id))), page: pageText(v), keys: await currentKeys(r), ...extra });
+// The boxes the callouts writer wants from the saved state (same input as `BookCallouts.reconcile`; this rig does not run that writer).
+const boxesOf = data => Object.fromEntries(Object.entries(data.aiProof ?? {}).filter(([, slot]) => slot.done || slot.incomplete).map(([id, slot]) => [id, review.aiProofCallout({ checked: slot.checked, fixed: slot.fixed, fixes: slot.fixes ?? [], bookFixes: (data.bookProof?.fixes ?? []).filter(fix => fix.chapterId === id), open: slot.open, ...(slot.incomplete ? { incomplete: true } : {}) }, data.runId, id)]));
+const invariantsOf = async (r, v, extra = {}) => { const data = await r.state(); return checkAiProofInvariants(data, { stageOf: id => stageOf(r.raw(r.nodes.findIndex(n => n.id === id))), page: pageText(v), keys: await currentKeys(r), ...(data.phase === 'done' ? { boxes: boxesOf(data) } : {}), ...extra }); };
 const plain = value => JSON.parse(JSON.stringify(value));
 const idA = r => r.nodes[1].id;
 const quoteOf = (request, from = 0, to = 11) => request.body.slice(from, to);
@@ -4541,4 +4543,16 @@ test('picture work: stop while writes and searches are both in flight cancels bo
   const s = await r.state();
   assert.equal(s.status, 'stopped');
   for (let i = 0; i < 12; i++) assert.notEqual(stageOf(r.raw(i)), 'checked');
+});
+
+test('ai chapter: one failed card read does not end the chapter check; the read is tried once more', async () => {
+  let throws = 0;
+  const r = await aiRig({}, {
+    ports: { readCard: async path => { if (throws === 0 && path === r.nodes[1].path && /aiChapter/.test(new Error().stack)) { throws++; throw new Error('read boom'); } return r.__readCard(path); } } });
+  r.__readCard = path => r.repo.readNote(path).then(note => ({ path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: r.contents.get(path), settings: note.bookSettings ?? {}, fields: {} }));
+  await runToEnd(r);
+  assert.equal(throws, 1, 'the read failed once');
+  assert.equal(aiRuns(r, 'proof', 'SecretTitleA').length, 1, 'the chapter was still checked');
+  const slot = (await r.state()).aiProof[r.nodes[1].id];
+  assert.deepEqual([slot.done, slot.incomplete], [true, undefined]);
 });

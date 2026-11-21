@@ -22,6 +22,20 @@ const same = (actual, expected, message) => assert.deepStrictEqual(JSON.parse(JS
 const ok = result => { assert.equal(result.status, 'ready'); return result.value; };
 
 // ---- store ----
+test('usage store: a doubled claude: prefix collapses to one on record and on load, and a load does not rewrite the file', async () => {
+  const file = tempFile();
+  const old = { at: new Date().toISOString(), action: 'research', provider: 'claude', model: 'claude:claude:opus', inputTokens: 1, outputTokens: 1, estimated: false };
+  const text = JSON.stringify({ version: 1, entries: [old], monthly: {} });
+  fs.writeFileSync(file, text);
+  const store = newStore(file);
+  await store.load();
+  await store.idle?.();
+  assert.equal(fs.readFileSync(file, 'utf8'), text, 'a load alone leaves the file as it was');
+  store.record(row({ model: 'claude:claude:claude:haiku' }));
+  store.record(row({ model: 'claude:sonnet' }));
+  store.record(row({ provider: 'codex', model: 'gpt-6-luna' }));
+  same(ok(store.recent(undefined, 10)).map(r => r.model).sort(), ['claude:haiku', 'claude:opus', 'claude:sonnet', 'gpt-6-luna']);
+});
 test('usage store: totals, byAction and recent follow the map path; byAction sums to the map total; the file round-trips', async () => {
   const file = tempFile();
   const store = newStore(file);

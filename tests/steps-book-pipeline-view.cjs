@@ -1432,7 +1432,8 @@ async function boxRig({ stage = 'needs-review', seam } = {}) {
   const g = await gateRig({ phase: 'gate2' });
   const calls = { collapse: [], reconcile: [], seam: [], renders: 0, drain: [], tick: [], keep: [], handled: [], reopen: [] };
   g.plugin.bookHandEdits = { drain: async path => { calls.drain.push(path); }, tick: async (path, id) => { calls.tick.push([path, id]); }, keep: async (path, accept) => { calls.keep.push(accept ? [path, 'accept'] : path); } };
-  g.plugin.bookCallouts = { collapse: async path => { calls.collapse.push(path); return 'written'; }, reconcile: async path => { calls.reconcile.push(path); }, markHandled: async path => { calls.handled.push(path); return 'written'; }, reopen: async path => { calls.reopen.push(path); return 'written'; } };
+  g.plugin.bookCallouts = { collapse: async path => { calls.collapse.push(path); return 'written'; }, reconcile: async path => { calls.reconcile.push(path); }, // Like the product, it writes the "handled" title into the note: a later resolution reads it and does not record the answer again.
+markHandled: async path => { calls.handled.push(path); await g.view.app.vault.process(g.view.app.vault.getAbstractFileByPath(path), bundle.markReviewHandled); return 'written'; }, reopen: async path => { calls.reopen.push(path); return 'written'; } };
   // The fold waits three seconds in the product; here it waits for the next timer turn (see `folded`).
   g.view.bookFoldDelayMs = 0;
   g.plugin.confirmBookSeam = async (path, id) => { calls.seam.push([path, id]); };

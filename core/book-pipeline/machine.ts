@@ -252,6 +252,8 @@ export interface AiToken {
   round: number;
   step: "proof" | "fix";
 }
+/** The shortest replacement that counts as "still there" when a later check quotes a longer stretch that contains it. */
+export const STILL_PRESENT_MIN_CHARS = 8;
 const aiSlot = (data: BookPipelineData, nodeId?: string): AiProofState | undefined =>
   nodeId === undefined ? data.bookProof : data.aiProof?.[nodeId];
 function setAiSlot(next: BookPipelineData, nodeId: string | undefined, state: AiProofState): void {
@@ -392,8 +394,13 @@ export function applyAiProof(
         : undefined;
       // A quote that is (part of) text a fix round wrote: the fix was applied and the problem is still there.
       const quote = item ? squash(item.quote) : "";
+      // A short replacement (a year, a name) inside a longer quote of something else proves nothing: that direction needs a sentence.
       const written =
-        quote && (found.applied ?? []).some(text => squash(text).includes(quote) || quote.includes(squash(text)));
+        quote &&
+        (found.applied ?? []).some(text => {
+          const wrote = squash(text);
+          return wrote.includes(quote) || (wrote.length >= STILL_PRESENT_MIN_CHARS && quote.includes(wrote));
+        });
       // The reason of the quote's last fix event (D6): blocked, or written and still there; a target no round wrote or blocked was not fixed.
       if (before) return slot.refused?.[before.id] ?? (written ? "still_present" : "not_fixed");
       return written ? "still_present" : "not_fixed_in_time";
@@ -857,24 +864,6 @@ export function useExpandPass(data: BookPipelineData, nodeId: string): Committed
   return { state: next, accepted: true };
 }
 
-/**
- * After gate 1 a trial chapter that still needs a person gets the full book's fix round like every other chapter (live v5: two short
- * trial chapters were never fixed again): its automatic-redo count starts over once. Only in the writing phase, only for a trial card.
- */
-export function reopenTrialFix(data: BookPipelineData, nodeId: string): Committed {
-  if (
-    data.phase !== "writing" ||
-    data.status !== "running" ||
-    !data.trial?.includes(nodeId) ||
-    !autoFixesOf(data, nodeId)
-  )
-    return { state: data, accepted: false };
-  const next = clone(data);
-  if (next.autoFixes) delete next.autoFixes[nodeId];
-  next.revision++;
-  return { state: next, accepted: true };
-}
-
 /** A card was reset by the owner or needs another pass (single-card rerun): its counters and its stage start over. */
 export function resetCard(data: BookPipelineData, nodeId: string): BookPipelineData {
   if (!effectiveOrder(data).includes(nodeId)) return data;
@@ -882,6 +871,13 @@ export function resetCard(data: BookPipelineData, nodeId: string): BookPipelineD
   next.attempts[nodeId] = emptyAttempts();
   if (next.expandPasses) delete next.expandPasses[nodeId];
   if (next.aiProof) delete next.aiProof[nodeId];
+  // The whole-book fixes that rewrote this chapter's old text no longer describe it: its box must not list them.
+  // The bar's fixed count drops with them, so the boxes still add up to the bar.
+  if (next.bookProof?.fixes) {
+    const kept = next.bookProof.fixes.filter(fix => fix.chapterId !== nodeId);
+    next.bookProof.fixed = Math.max(0, next.bookProof.fixed - (next.bookProof.fixes.length - kept.length));
+    next.bookProof.fixes = kept;
+  }
   next.revisions[nodeId] = cardRevision(next, nodeId) + 1;
   next.revision++;
   return next;

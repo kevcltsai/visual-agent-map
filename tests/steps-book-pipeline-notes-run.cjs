@@ -45,6 +45,7 @@ function rig({ run, text = '', busy = null } = {}) {
   const c = clock();
   const r = { c, notices: [], actions: [], writes: [], highlights: [], undones: [], order: [], releases: 0, changed: 0, cancels: [], text, busy };
   r.deferred = null;
+  r.seq = [];
   r.ports = {
     run: (path, signal) => run ? run(path, signal, r) : new Promise((resolve, reject) => { r.deferred = { resolve, reject }; signal.addEventListener('abort', () => reject(Object.assign(new Error('cancelled'), { code: 'cancelled' }))); }),
     cancel: path => { r.cancels.push(path); r.deferred?.reject(Object.assign(new Error('cancelled'), { code: 'cancelled' })); },
@@ -57,9 +58,9 @@ function rig({ run, text = '', busy = null } = {}) {
     noticeAction: (message, label, onClick, ms) => { const a = { message, label, onClick, ms, hidden: false }; r.actions.push(a); return { hide: () => { a.hidden = true; } }; },
     highlight: (path, ranges) => r.highlights.push({ path, ranges }),
     releaseHighlight: () => { r.releases++; },
-    flush: async path => { r.order.push('flush:' + path); },
+    flush: async path => { r.order.push('flush:' + path); r.seq.push('flush'); },
     undone: path => { r.order.push('undone'); r.undones.push(path); },
-    changed: () => { r.changed++; },
+    changed: () => { r.changed++; r.seq.push('changed'); },
     now: () => c.t, setTimer: c.set, clearTimer: c.clear, setTick: c.tick, clearTick: c.clear
   };
   r.ctl = new b.BookNotesApply(r.ports);
@@ -161,6 +162,19 @@ test('undo repaints the header action at once (live v4 P: reading mode has no ed
   const before = r.changed;
   await r.ctl.undo();
   assert.ok(r.changed > before);
+});
+test('undo repaints the header action again after the open view saved the restored text (first undo could leave the old count until the next event)', async () => {
+  const r = rig({ text: detail(`${P_NEW}\n\n別的段`), run: async () => applied() });
+  r.ctl.press('N/c.md'); await flush();
+  r.seq.length = 0;
+  await r.ctl.undo();
+  assert.equal(r.seq.at(-1), 'changed', 'the last thing an undo does is repaint');
+  assert.ok(r.seq.indexOf('flush') < r.seq.lastIndexOf('changed'), 'a repaint comes after the save');
+  const q = rig({ text: detail('something else entirely'), run: async () => applied() });
+  q.ctl.press('N/c.md'); await flush();
+  q.seq.length = 0;
+  await q.ctl.undo();
+  assert.equal(q.seq.includes('flush'), false, 'nothing restored: no save, no extra repaint after it');
 });
 test('undo (review-a M3): a successful undo asks for the map boxes to be aligned again; a refused or empty one does not', async () => {
   const r = rig({ text: detail(`${P_NEW}\n\n別的段`), run: async () => applied() });

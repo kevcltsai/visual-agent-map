@@ -953,3 +953,33 @@ test('ai fix: each recorded fix keeps the replacement actually written for its i
   assert.equal(fixes[0].replacement, '新句子。');
   assert.equal(fixes[0].suggestion !== undefined, true);
 });
+
+test('resetCard drops the whole-book fixes that rewrote this chapter, keeps the other chapters\' and lowers the fixed count by the dropped ones', () => {
+  const state = fresh();
+  const pending = (id, chapterId) => ({ id, quote: 'q', problem: 'p', suggestion: 's', chapter: 1, chapterId });
+  state.bookProof = { key: 'k', attempts: 0, round: 1, step: 'proof', done: true, checked: 3, fixed: 2, open: [], fixes: [pending('B1', 'a'), pending('B2', 'b'), pending('B0')] };
+  const next = machine.resetCard(plain(state), 'a');
+  assert.deepEqual(plain(next.bookProof.fixes.map(f => f.id)), ['B2', 'B0'], 'only the chapter\'s own fix goes (a fix with no chapterId is not guessed)');
+  assert.deepEqual([next.bookProof.fixed, next.bookProof.checked], [1, 3], 'the bar\'s fixed count matches what the boxes still list');
+  assert.equal(state.bookProof.fixes.length, 3, 'the input is not mutated');
+  assert.doesNotThrow(() => machine.resetCard(plain(fresh()), 'a'), 'no bookProof at all');
+});
+
+test('N1 short replacement: a year written by a fix does not make a longer quote of something else "still present"; a sentence-long one still does', () => {
+  const pq = (id, quote) => ({ id, quote, problem: 'p', suggestion: 's' });
+  const run = (replacement, laterQuote) => {
+    let { state } = checkedRun();
+    let key = 'k0';
+    for (let round = 0; round < 3; round++) {
+      const p = begin(state, { nodeId: 'a' }, key, 'proof');
+      state = machine.applyAiProof(p.state, p.token, { checked: 1, pending: [pq('P1', round < 2 ? 'zz' : laterQuote)], open: [] }).state;
+      if (state.aiProof.a.done) break;
+      const f = begin(state, { nodeId: 'a' }, key, 'fix');
+      key = `k${round + 1}`;
+      state = machine.applyAiFix(f.state, f.token, { applied: 1, appliedIds: ['P1'], replacements: [replacement], key, changed: ['a'] }).state;
+    }
+    return plain(state.aiProof.a.open.map(item => item.reason));
+  };
+  assert.deepEqual(run('2020', '公司成立於 2019 年，與 2020 年的資料不同。'), ['not_fixed_in_time']);
+  assert.deepEqual(run('公司成立於 2019 年', '公司成立於 2019 年，與 2020 年的資料不同。'), ['still_present']);
+});

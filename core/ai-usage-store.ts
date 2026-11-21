@@ -93,6 +93,13 @@ function isBucket(value: unknown): value is MonthlyBucket {
   );
 }
 
+/** A Claude model id carries one `claude:` prefix (`claude:opus`); a repeated one (`claude:claude:opus`) collapses to it. Other ids are untouched. */
+export function normalizeUsageModel(model: string): string {
+  return model.replace(/^(?:claude:){2,}/, "claude:");
+}
+const normalized = (entry: UsageEntry): UsageEntry =>
+  entry.model === normalizeUsageModel(entry.model) ? entry : { ...entry, model: normalizeUsageModel(entry.model) };
+
 /** Local-time midnight of the day containing `now` ("today" is the user's local day). */
 export function localDayStart(now: number | Date = Date.now()): number {
   const date = new Date(now);
@@ -151,7 +158,8 @@ export class AiUsageStore {
         throw new Error("ai-usage.json has an unexpected shape.");
       if (!parsed.entries.every(isEntry) || !Object.values(parsed.monthly).every(isBucket))
         throw new Error("ai-usage.json has invalid fields.");
-      this.entries = parsed.entries;
+      // Normalised in memory only: the user's file is not rewritten by a load.
+      this.entries = parsed.entries.map(normalized);
       this.monthly = parsed.monthly as Record<string, MonthlyBucket>;
       this.loadError = null;
       this.compact();
@@ -181,7 +189,7 @@ export class AiUsageStore {
         }
         return;
       }
-      this.entries.push({ ...entry, at: entry.at ?? new Date(this.now()).toISOString() });
+      this.entries.push(normalized({ ...entry, at: entry.at ?? new Date(this.now()).toISOString() }));
       this.compact();
       this.save();
       this.emit();

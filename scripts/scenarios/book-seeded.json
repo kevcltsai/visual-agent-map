@@ -1,0 +1,17 @@
+{
+  "name": "book fixture: map opens, Start dialog shows (no AI run)",
+  "allowErrors": true,
+  "steps": [
+    { "wait": true },
+    { "eval": "app.plugins.plugins['visual-agent-map'].openMapInNewTab('Agent Workspace/Topics/Book Fixture/Map.md').then(view=>!!view)" },
+    { "waitFor": ".vam-book-button", "timeoutMs": 30000 },
+    { "assert": "book fixture map is open", "eval": "document.querySelectorAll('.vam-book-button').length>=1" },
+    { "click": ".vam-book-button" },
+    { "waitFor": ".vam-book-start-go", "timeoutMs": 30000 },
+    { "assert": "Start dialog shows the setting boxes", "selector": ".vam-book-start-field", "visible": true },
+    { "screenshot": "book-start-dialog" },
+    { "key": "Escape" },
+    { "waitFor": ".vam-book-start-go", "gone": true, "timeoutMs": 10000 },
+    { "assert": "no book run was started", "selector": ".vam-book-bar", "visible": false }
+  ]
+}

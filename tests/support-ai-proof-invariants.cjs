@@ -2,6 +2,7 @@
 // (empty = all hold); every state a run leaves behind must satisfy it, so a branch that is wrong shows up whichever path reached it.
 const S = require('./support.cjs');
 const { effectiveOrder } = S.load('core/book-pipeline/model.ts');
+const machine = S.load('core/book-pipeline/machine.ts');
 const { bookBarState } = S.load('experiences/visual-map/book-pipeline-ui.ts');
 
 const squash = text => String(text).replace(/\s+/g, '');
@@ -42,7 +43,7 @@ function checkAiProofInvariants(data, options = {}) {
     for (const item of slot.open ?? []) {
       if (REFUSED.test(item.reason) && !(options.refusedQuotes ?? []).some(q => squash(q) === squash(item.quote)))
         out.push(`I2 ${id}: open "${item.quote}" carries a blocked reason ${item.reason} but its last fix event was not a block`);
-      const hit = (options.applied?.[id] ?? []).some(text => squash(item.quote) && (squash(text).includes(squash(item.quote)) || squash(item.quote).includes(squash(text))));
+      const hit = (options.applied?.[id] ?? []).some(text => squash(item.quote) && (squash(text).includes(squash(item.quote)) || (squash(text).length >= machine.STILL_PRESENT_MIN_CHARS && squash(item.quote).includes(squash(text)))));
       if (hit && item.reason !== 'still_present') out.push(`I4 ${id}: "${item.quote}" hits an applied replacement but is ${item.reason}`);
       if (!hit && item.reason === 'still_present' && options.applied && id in options.applied) out.push(`I4 ${id}: "${item.quote}" is still_present but no replacement was written for it`);
     }

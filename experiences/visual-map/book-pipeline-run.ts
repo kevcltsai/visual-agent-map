@@ -2726,7 +2726,10 @@ export class BookPipelineRuns {
     const info = drive.cards.get(nodeId);
     if (!info || !this.ports.aiProof || !this.ports.aiFix) return;
     const signal = drive.controller.signal;
-    const card = await this.ports.readCard(info.path).catch(() => undefined);
+    // One unreadable moment (the note is being saved) is not the end of the chapter's check: read once more before giving up.
+    const card =
+      (await this.ports.readCard(info.path).catch(() => undefined)) ??
+      (this.dead(drive) ? undefined : await this.ports.readCard(info.path).catch(() => undefined));
     if (this.dead(drive)) return;
     const giveUp = async (): Promise<void> => {
       await drive.store.commit(state =>

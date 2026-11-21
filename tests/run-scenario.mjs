@@ -108,8 +108,9 @@ test("malformed steps are format errors (exit 2): assert typos, mixed actions, u
 });
 
 test("shipped smoke scenarios are valid", async () => {
-  for (const name of ["smoke-ok", "smoke-fail"]) {
+  for (const name of ["smoke-ok", "smoke-fail", "book-seeded"]) {
     const scenario = JSON.parse(readFileSync(resolve("scripts/scenarios", `${name}.json`), "utf8"));
+    for (const step of scenario.steps) if ("waitFor" in step) step.timeoutMs = 50; // the fake app never shows elements; only the format matters here
     const r = await run(scenario, fakeApp());
     assert.ok(!r.lines.some(l => l.startsWith("CRASH")), name);
   }

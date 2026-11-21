@@ -33267,35 +33267,45 @@ function lineStarts(raw) {
   for (let at = raw.indexOf("\n"); at >= 0; at = raw.indexOf("\n", at + 1)) starts.push(at + 1);
   return starts;
 }
+function titleIndex(lines, fenced) {
+  var _a2;
+  let at = 0;
+  if (/^---\r?$/.test((_a2 = lines[0]) != null ? _a2 : "")) {
+    const close = lines.findIndex((value, i) => i > 0 && /^---\r?$/.test(value));
+    at = close < 0 ? 0 : close + 1;
+  }
+  for (let i = at; i < lines.length; i++) if (!fenced[i] && /^# /.test(lines[i])) return i;
+  return -1;
+}
 function readCoverBlock(raw) {
   const lines = raw.split("\n");
   const fenced = fencedLines(lines);
+  const title = titleIndex(lines, fenced);
+  if (title < 0) return void 0;
+  let i = title + 1;
+  while (i < lines.length && lines[i].trim() === "") i++;
+  const m = i < lines.length && !fenced[i] ? START.exec(lines[i].replace(/\r$/, "")) : null;
+  if (!m) return void 0;
   const starts = lineStarts(raw);
-  for (let i = 0; i < lines.length; i++) {
-    const line3 = lines[i].replace(/\r$/, "");
-    const m = !fenced[i] ? START.exec(line3) : null;
-    if (!m) continue;
-    let record;
-    try {
-      record = JSON.parse(m[1]);
-    } catch (e) {
-      continue;
-    }
-    if (typeof record.hash !== "string") continue;
-    const end = lines.findIndex((value, at) => at > i && !fenced[at] && value.replace(/\r$/, "") === END_LINE);
-    if (end < 0) continue;
-    const inner = lines.slice(i + 1, end).map((value) => value.replace(/\r$/, "")).join("\n");
-    return {
-      ...typeof record.file === "string" ? { file: record.file } : {},
-      ...typeof record.key === "string" ? { key: record.key } : {},
-      missing: record.missing === 1,
-      off: record.off === 1,
-      intact: hashText(inner) === record.hash,
-      from: starts[i],
-      to: starts[end] + lines[end].replace(/\r$/, "").length
-    };
+  let record;
+  try {
+    record = JSON.parse(m[1]);
+  } catch (e) {
+    return void 0;
   }
-  return void 0;
+  if (typeof record.hash !== "string") return void 0;
+  const end = lines.findIndex((value, at) => at > i && !fenced[at] && value.replace(/\r$/, "") === END_LINE);
+  if (end < 0) return void 0;
+  const inner = lines.slice(i + 1, end).map((value) => value.replace(/\r$/, "")).join("\n");
+  return {
+    ...typeof record.file === "string" ? { file: record.file } : {},
+    ...typeof record.key === "string" ? { key: record.key } : {},
+    missing: record.missing === 1,
+    off: record.off === 1,
+    intact: hashText(inner) === record.hash,
+    from: starts[i],
+    to: starts[end] + lines[end].replace(/\r$/, "").length
+  };
 }
 function coverSourceKey(raw) {
   var _a2;
@@ -33303,15 +33313,7 @@ function coverSourceKey(raw) {
 }
 function trustedCoverBlock(raw) {
   const block = readCoverBlock(raw);
-  const title = titleLine(raw);
-  if (!block || !title) return void 0;
-  if (raw.slice(title.end, block.from).trim() !== "") return void 0;
-  return raw.slice(block.from, block.to).replace(/\r$/, "");
-}
-function stripAllCoverBlocks(raw) {
-  let text10 = raw;
-  for (let i = 0; i < 20 && readCoverBlock(text10); i++) text10 = stripCoverBlock(text10);
-  return text10;
+  return block ? raw.slice(block.from, block.to).replace(/\r$/, "") : void 0;
 }
 function coverIsOff(raw) {
   const block = readCoverBlock(raw);
@@ -33327,6 +33329,11 @@ function coverOwnership(raw) {
   if (block.missing || !block.file) return "owner";
   const target = (_a2 = /^\[\[([^\]|]*)(?:\|[^\]]*)?\]\]$/.exec(declared)) == null ? void 0 : _a2[1].trim();
   return target === block.file ? "program" : "owner";
+}
+function coverDeclaredTarget(raw) {
+  var _a2;
+  const declared = declaredCover(raw);
+  return declared === void 0 ? void 0 : (_a2 = /^\[\[([^\]|]*)(?:\|[^\]]*)?\]\]$/.exec(declared)) == null ? void 0 : _a2[1].trim();
 }
 function declaredCover(raw) {
   const frontmatter2 = /^---\r?\n([\s\S]*?)\r?\n---/.exec(raw);
@@ -57372,10 +57379,10 @@ ${oldDetail}`);
       }
       return stampRaw(merged);
     };
-    const trustedCover = trustedCoverBlock(card.raw);
     const finalize = (original) => {
-      const out = finalizeText(stripAllCoverBlocks(original));
-      return out === null || trustedCover === void 0 ? out : putCoverBlock(out, trustedCover);
+      const cover = trustedCoverBlock(original);
+      const out = finalizeText(cover === void 0 ? original : stripCoverBlock(original));
+      return out === null || cover === void 0 ? out : putCoverBlock(out, cover);
     };
     const attempt = attemptsOf(drive.store.state, nodeId).write;
     const callAuthor = (pass) => {
@@ -57533,8 +57540,11 @@ ${oldDetail}`);
       if (!probed.ok) replacements.set(url, noPicture(drive.config.language, probed.reason));
     }
     if (replacements.size) {
-      const held = holdProofLines(written2.raw, knownLines);
-      const cleaned = programStampRaw(written2.raw, held.restore(replaceBodyImages(held.text, replacements)));
+      const cover = trustedCoverBlock(written2.raw);
+      const bare3 = cover === void 0 ? written2.raw : stripCoverBlock(written2.raw);
+      const held = holdProofLines(bare3, knownLines);
+      const rebuilt = programStampRaw(bare3, held.restore(replaceBodyImages(held.text, replacements)));
+      const cleaned = cover === void 0 ? rebuilt : putCoverBlock(rebuilt, cover);
       const outcome = await this.ports.updateNoteRawGuarded(path, () => cleaned, {
         expectedContent: written2.raw,
         authorize
@@ -57877,6 +57887,10 @@ ${oldDetail}`);
         release2();
         return { kind: "failed", reason: result };
       }
+      if (coverWrite == null ? void 0 : coverWrite.held) {
+        coverResult = "owner_kept";
+        releaseCover();
+      }
       if (coverResult)
         this.ports.log(
           formatPipelineLog({
@@ -58038,9 +58052,13 @@ ${caption}`, drive.config.language))
         authorize,
         finalize: (content) => {
           if (residualMarkerLines(content).length > Math.max(0, outside)) return null;
-          if (!cover || coverOwnership(content) === "owner") return content;
+          if (!cover) return content;
+          if (coverOwnership(content) === "owner") {
+            cover.held = true;
+            return content;
+          }
           const placed = putCoverBlock(content, cover.block);
-          return cover.link && this.ports.setCoverLink ? this.ports.setCoverLink(placed, cover.link) : placed;
+          return cover.link && coverDeclaredTarget(placed) !== cover.link && this.ports.setCoverLink ? this.ports.setCoverLink(placed, cover.link) : placed;
         }
       }
     );
@@ -71794,7 +71812,6 @@ var BOOK_STEP_SECONDS = {
 };
 var BOOK_IMAGE_SEARCHES = 2;
 var BOOK_IMAGE_CALLS_PER_SEARCH = 2;
-var BOOK_COVER_CALLS = 2;
 function bookChapterCalls() {
   const writes = 1 + MAX_AUTO_FIXES;
   return {
@@ -71827,11 +71844,10 @@ function bookStartEstimate(cards, trialCards, models) {
   const rounds = Math.ceil(trial / BOOK_POOL) + Math.ceil((n - trial) / BOOK_POOL);
   return {
     cards: n,
-    // The whole-book plan and proofread, every chapter's calls and the book cover's headroom: an upper bound.
-    calls: bookWholeCalls(n) + n * (per.plan + per.write + per.images + per.proof + per.aiProof) + (n >= 1 ? BOOK_COVER_CALLS : 0),
+    // The whole-book plan and proofread, and every chapter's calls: an upper bound.
+    calls: bookWholeCalls(n) + n * (per.plan + per.write + per.images + per.proof + per.aiProof),
     limit: DEFAULT_BUDGET_LIMIT,
-    // The root's cover search (one picture search) comes on top of the plan.
-    seconds: time("global") + rounds * perCard + (n >= 2 ? aiProof : 0) + (n >= 1 ? time("images") : 0)
+    seconds: time("global") + rounds * perCard + (n >= 2 ? aiProof : 0)
   };
 }
 function bookStartEstimateText(estimate, structure2) {
@@ -97748,6 +97764,7 @@ function runAiFix(aiCalls, request, run) {
 
 // core/book-pipeline/cover-download.ts
 var COVER_TIMEOUT_MS = 15e3;
+var COVER_RETRY_MAX_MS = 8e3;
 var DEFAULT_AGENT = "VisualAgentMap-Obsidian-plugin";
 var ALLOWED = /* @__PURE__ */ new Set(["image/png", "image/jpeg", "image/webp"]);
 function header2(headers, name2) {
@@ -97783,12 +97800,24 @@ async function downloadCover(imageUrl, fetch, options = {}) {
     signal == null ? void 0 : signal.addEventListener("abort", onAbort, { once: true });
     timer = window.setTimeout(() => resolve({ ok: false, reason: "timeout" }), (_a3 = options.timeoutMs) != null ? _a3 : COVER_TIMEOUT_MS);
   });
+  const timers = [];
+  let waited = false;
   const get = async (url) => {
     const result = await Promise.race([
       fetch(url, { headers }).catch(() => ({ ok: false, reason: "failed" })),
       stop
     ]);
-    return (signal == null ? void 0 : signal.aborted) ? { ok: false, reason: "aborted" } : result;
+    if (signal == null ? void 0 : signal.aborted) return { ok: false, reason: "aborted" };
+    if ("ok" in result || result.status !== 429 || waited) return result;
+    const ms = retryAfterMs(result.headers, Date.now());
+    if (ms === void 0 || ms > COVER_RETRY_MAX_MS) return result;
+    waited = true;
+    const slept = await Promise.race([
+      new Promise((resolve) => timers.push(window.setTimeout(() => resolve(void 0), ms))),
+      stop
+    ]);
+    if (slept) return slept;
+    return (signal == null ? void 0 : signal.aborted) ? { ok: false, reason: "aborted" } : get(url);
   };
   try {
     let response = await get(thumb);
@@ -97802,6 +97831,7 @@ async function downloadCover(imageUrl, fetch, options = {}) {
     return judge(response, thumb);
   } finally {
     window.clearTimeout(timer);
+    for (const waiting of timers) window.clearTimeout(waiting);
     signal == null ? void 0 : signal.removeEventListener("abort", onAbort);
   }
 }

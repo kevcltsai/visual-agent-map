@@ -6,6 +6,7 @@
 //
 // Scenario file (JSON): { "name", "vault"?, "allowErrors"?, "steps": [ ... ] }. Steps:
 //   {"wait": true}                              wait for the workspace to be ready
+//   {"trust": true}                             leave Restricted Mode and enable the vault's plugins (a fresh session vault needs this once, before any plugin eval)
 //   {"eval": "<js>"}                            run JavaScript in the app window (result goes to the log)
 //   {"click": "<css selector>"}                 trusted click on the first visible match
 //   {"key": "Mod+Enter"}                        trusted key press
@@ -25,7 +26,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
-import { clickSelector, connectCdp, waitForInstance } from "./obsidian-cdp.mjs";
+import { assertTrusted, clickSelector, connectCdp, trustExpression, waitForInstance } from "./obsidian-cdp.mjs";
 
 const visibleExpression = selector => `(()=>{const els=[...document.querySelectorAll(${JSON.stringify(selector)})];return {count:els.length,visible:els.some(el=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0})}})()`;
 
@@ -34,7 +35,7 @@ function judge(step, value) {
   if ("contains" in step) return { ok: String(value).includes(step.contains), detail: `got ${short(value)}, expected to contain ${short(step.contains)}` };
   return { ok: Boolean(value), detail: `got ${short(value)}, expected truthy` };
 }
-const ACTIONS = ["wait", "eval", "click", "key", "sleep", "screenshot", "waitFor", "waitUntil"];
+const ACTIONS = ["wait", "trust", "eval", "click", "key", "sleep", "screenshot", "waitFor", "waitUntil"];
 const KNOWN = new Set([...ACTIONS, "assert", "selector", "visible", "equals", "contains", "timeoutMs", "gone"]);
 const DEFAULT_WAIT_MS = 30_000;
 const POLL_MS = 250;
@@ -56,6 +57,7 @@ function validateStep(step, index) {
   }
   const actions = keys.filter(key => ACTIONS.includes(key));
   if ("wait" in step && step.wait !== true) return `${where} wait must be true`;
+  if ("trust" in step && step.trust !== true) return `${where} trust must be true`;
   if (actions.length !== 1) return `${where} needs exactly one action (${ACTIONS.join("/")}) or assert, got ${actions.length ? actions.join("+") : "none"}`;
   const isWait = "waitFor" in step || "waitUntil" in step;
   const stray = keys.filter(key => !ACTIONS.includes(key) && !(isWait && (key === "timeoutMs" || (key === "gone" && "waitFor" in step))));
@@ -124,7 +126,8 @@ export async function runScenario(scenario, { logDir, connect = connectCdp, wait
         log(`  assert ${step.assert}: ${short(value)}`);
         const verdict = judge(step, value);
         if (verdict.ok) { results.push({ label: step.assert, ok: true }); lines.push(`PASS ${step.assert}`); } else fail(step.assert, verdict.detail);
-      } else if (step.eval !== undefined) log(`  => ${short(await evaluate(step.eval))}`);
+      } else if (step.trust) log(`  => ${JSON.stringify(assertTrusted(await evaluate(trustExpression)))}`);
+      else if (step.eval !== undefined) log(`  => ${short(await evaluate(step.eval))}`);
       else if (step.click !== undefined) log(`  => ${JSON.stringify(await guard(clickSelector(cdp, step.click)))}`);
       else if (step.key !== undefined) await guard(cdp.press(step.key));
       else if (step.sleep !== undefined) await guard(delay(Number(step.sleep)), Number(step.sleep));

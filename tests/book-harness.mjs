@@ -106,3 +106,11 @@ test("waitUntil polls a JavaScript expression; bad wait steps are format errors"
     assert.equal(bad.exitCode, 2, JSON.stringify(step));
   }
 });
+
+test("trust step leaves Restricted Mode, and a prompt left open makes the run crash instead of continue", async () => {
+  const withTrust = result => async () => ({ async evaluate(expr) { return expr.includes("getWindowStack") ? result : true; }, async click() {}, async press() {}, async screenshot(p) { return p; }, errors: () => [], close() {} });
+  const steps = [{ trust: true }, { assert: "a", eval: "ok" }];
+  assert.equal((await run({ steps }, withTrust({ prompts: 0, leakedScopes: 0 }))).exitCode, 0);
+  assert.equal((await run({ steps }, withTrust({ prompts: 1, leakedScopes: 0 }))).exitCode, 2);
+  assert.equal((await run({ steps: [{ trust: false }, { assert: "a", eval: "ok" }] }, withTrust({ prompts: 0, leakedScopes: 0 }))).exitCode, 2);
+});

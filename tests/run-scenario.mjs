@@ -111,7 +111,8 @@ test("shipped smoke scenarios are valid", async () => {
   for (const name of ["smoke-ok", "smoke-fail", "book-seeded"]) {
     const scenario = JSON.parse(readFileSync(resolve("scripts/scenarios", `${name}.json`), "utf8"));
     for (const step of scenario.steps) if ("waitFor" in step) step.timeoutMs = 50; // the fake app never shows elements; only the format matters here
-    const r = await run(scenario, fakeApp());
+    const app = fakeApp(); const trusting = async () => { const cdp = await app(); const inner = cdp.evaluate; cdp.evaluate = expr => expr.includes('getWindowStack') ? { prompts: 0, leakedScopes: 0 } : inner(expr); return cdp; };
+    const r = await run(scenario, trusting);
     assert.ok(!r.lines.some(l => l.startsWith("CRASH")), name);
   }
 });

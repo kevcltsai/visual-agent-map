@@ -3269,22 +3269,6 @@ var en = {
   "ui.book_panel_g2_reason_images": "This is a picture chapter but no fitting picture was found",
   "ui.book_panel_g2_reason_seam": "A neighbouring chapter changed; the join is not confirmed",
   "ui.book_panel_g2_reason_seam_0": '"{0}" changed; its join with this chapter is not confirmed',
-  "ui.book_note_trial_title_0": "Trial chapter {0} of {1}",
-  "ui.book_note_trial_next": "Once you have read it, go back to the mind map and press \u201CRun the whole book\u201D.",
-  "ui.book_note_trial_stopped": "The book is stopped. Press \u201CContinue\u201D on the mind map toolbar first, then \u201CRun the whole book\u201D.",
-  "ui.book_note_trial_edit": "To change a passage: select the text, right-click and choose \u201CAdd a note\u201D.",
-  "ui.book_note_trial_problems": "This chapter still has problems:",
-  "ui.book_note_prev_0": "Previous chapter: {0}",
-  "ui.book_note_next_0": "Next chapter: {0}",
-  "ui.book_note_trial_title_preface": "Trial: preface",
-  "ui.book_note_trial_title_chapter_0_1": "Trial: chapter {0} \u201C{1}\u201D",
-  "ui.book_note_trial_title_section_0_1_2_3": "Trial: chapter {0} \u201C{1}\u201D \xB7 section {2} of {3}",
-  "ui.book_note_parent_0": "Chapter: {0}",
-  "ui.book_note_prev_section_0": "Previous section: {0}",
-  "ui.book_note_next_section_0": "Next section: {0}",
-  "ui.book_note_sections_0": "Sections of this chapter: {0}",
-  "ui.book_note_none": "none",
-  "ui.book_note_sections_sep": ", ",
   "ui.book_note_review_title": "This chapter needs a look",
   "ui.book_ai_box_title_0_1_2": "AI proofread: checked {0}, fixed {1}, {2} not fixed",
   "ui.book_ai_box_title_incomplete": "AI proofread: this chapter was not fully checked, listed on the book's last page",
@@ -3308,9 +3292,6 @@ var en = {
   "ui.book_ai_reason_not_fixed": "the AI did not fix this one",
   "ui.book_ai_reason_not_fixed_in_time": "found in the last check, no round left to fix it",
   "ui.book_ai_reason_other": "the AI could not handle it",
-  "ui.book_note_review_accept": "Accept it as it is, no change needed",
-  "ui.book_note_review_fixed": "I fixed it",
-  "ui.book_note_review_next_0": "Next chapter to check: {0}",
   "ui.book_note_review_handled_0": "Handled (you chose \u201C{0}\u201D)",
   "ui.book_note_add": "Picture book: add a note",
   "ui.book_note_add_disabled_0": "Picture book: add a note ({0})",
@@ -3353,8 +3334,6 @@ var en = {
   "ui.book_note_undo_partial_0_1": "Restored {0} paragraph(s); {1} were edited after the rewrite and were not restored.",
   "ui.book_review_hand_edited": "This chapter has your own edits; this rerun did not rewrite it",
   "ui.book_review_hand_before_book": "This card had its own text before it joined the book; this rerun did not rewrite it",
-  "ui.book_note_review_keep": "Keep my version",
-  "ui.book_note_review_rewrite": "Rewrite this chapter with AI (overwrites your edits; backed up first)",
   "ui.book_plain_write_hand_edited": "The chapter has your own edits, so it was left as it is.",
   "ui.book_plain_write_author_failed": 'The writing call failed this time, so the card is unchanged. Use "Rerun this card" to write it again.',
   "ui.book_refused_gate_cancelled": "Stopped. The button you pressed was not applied; the book stays where it was.",
@@ -6561,22 +6540,6 @@ var zhCN = {
   "ui.book_panel_g2_reason_images": "\u8FD9\u7AE0\u662F\u56FE\u96C6\uFF0C\u5374\u6CA1\u6709\u627E\u5230\u5408\u9002\u7684\u56FE",
   "ui.book_panel_g2_reason_seam": "\u524D\u540E\u7AE0\u6539\u8FC7\uFF0C\u8854\u63A5\u8FD8\u6CA1\u786E\u8BA4",
   "ui.book_panel_g2_reason_seam_0": "\u201C{0}\u201D\u6539\u8FC7\uFF0C\u548C\u8FD9\u7AE0\u7684\u8854\u63A5\u8FD8\u6CA1\u786E\u8BA4",
-  "ui.book_note_trial_title_0": "\u8BD5\u8DD1\u7B2C {0}\uFF0F{1} \u7AE0",
-  "ui.book_note_trial_next": "\u770B\u5B8C\u540E\u56DE\u5FC3\u667A\u56FE\uFF0C\u6309\u201C\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66\u201D\u3002",
-  "ui.book_note_trial_stopped": "\u8FD9\u672C\u4E66\u5DF2\u505C\u6B62\u3002\u5148\u5728\u5FC3\u667A\u56FE\u5DE5\u5177\u680F\u6309\u201C\u7EE7\u7EED\u201D\uFF0C\u518D\u6309\u201C\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66\u201D\u3002",
-  "ui.book_note_trial_edit": "\u60F3\u6539\u54EA\u4E00\u6BB5\uFF1A\u9009\u53D6\u6587\u5B57\uFF0C\u53F3\u952E\u201C\u52A0\u5907\u6CE8\u201D\u3002",
-  "ui.book_note_trial_problems": "\u8FD9\u7AE0\u8FD8\u6709\u95EE\u9898\u6CA1\u89E3\u51B3\uFF1A",
-  "ui.book_note_prev_0": "\u4E0A\u4E00\u7AE0\uFF1A{0}",
-  "ui.book_note_next_0": "\u4E0B\u4E00\u7AE0\uFF1A{0}",
-  "ui.book_note_trial_title_preface": "\u8BD5\u8DD1\uFF1A\u524D\u8A00",
-  "ui.book_note_trial_title_chapter_0_1": "\u8BD5\u8DD1\uFF1A\u7B2C {0} \u7AE0\u201C{1}\u201D",
-  "ui.book_note_trial_title_section_0_1_2_3": "\u8BD5\u8DD1\uFF1A\u7B2C {0} \u7AE0\u201C{1}\u201D\xB7 \u7B2C {2} \u8282\uFF0C\u5171 {3} \u8282",
-  "ui.book_note_parent_0": "\u6240\u5C5E\u7AE0\uFF1A{0}",
-  "ui.book_note_prev_section_0": "\u524D\u4E00\u8282\uFF1A{0}",
-  "ui.book_note_next_section_0": "\u540E\u4E00\u8282\uFF1A{0}",
-  "ui.book_note_sections_0": "\u672C\u7AE0\u7684\u8282\uFF1A{0}",
-  "ui.book_note_none": "\u65E0",
-  "ui.book_note_sections_sep": "\u3001",
   "ui.book_note_review_title": "\u8FD9\u7AE0\u8981\u4F60\u770B",
   "ui.book_ai_box_title_0_1_2": "AI \u6821\u5BF9\uFF1A\u67E5\u4E86 {0} \u9879\uFF0C\u4FEE\u4E86 {1} \u5904\uFF0C{2} \u5904\u6CA1\u4FEE\u597D",
   "ui.book_ai_box_title_incomplete": "AI \u6821\u5BF9\uFF1A\u8FD9\u7AE0\u6CA1\u6709\u67E5\u5B8C\uFF0C\u5DF2\u5217\u5230\u4E66\u672B",
@@ -6600,9 +6563,6 @@ var zhCN = {
   "ui.book_ai_reason_not_fixed": "AI \u6CA1\u6709\u4FEE\u5230\u8FD9\u5904",
   "ui.book_ai_reason_not_fixed_in_time": "\u8FD8\u6CA1\u6765\u5F97\u53CA\u4FEE\uFF0C\u6700\u540E\u4E00\u8F6E\u624D\u67E5\u5230",
   "ui.book_ai_reason_other": "AI \u6CA1\u529E\u6CD5\u5904\u7406",
-  "ui.book_note_review_accept": "\u63A5\u53D7\u73B0\u5728\u8FD9\u6837\uFF0C\u4E0D\u7528\u6539",
-  "ui.book_note_review_fixed": "\u6211\u6539\u597D\u4E86",
-  "ui.book_note_review_next_0": "\u4E0B\u4E00\u7AE0\u8981\u770B\u7684\uFF1A{0}",
   "ui.book_note_review_handled_0": "\u5DF2\u5904\u7406\uFF08\u4F60\u9009\u4E86\u201C{0}\u201D\uFF09",
   "ui.book_note_add": "\u56FE\u6587\u4E66\uFF1A\u52A0\u5907\u6CE8",
   "ui.book_note_add_disabled_0": "\u56FE\u6587\u4E66\uFF1A\u52A0\u5907\u6CE8\uFF08{0}\uFF09",
@@ -6645,8 +6605,6 @@ var zhCN = {
   "ui.book_note_undo_partial_0_1": "\u5DF2\u8FD8\u539F {0} \u6BB5\uFF1B\u53E6\u6709 {1} \u6BB5\u5728\u6539\u5199\u540E\u53C8\u88AB\u6539\u8FC7\uFF0C\u6CA1\u6709\u8FD8\u539F\u3002",
   "ui.book_review_hand_edited": "\u8FD9\u7AE0\u6709\u4F60\u624B\u6539\u7684\u5185\u5BB9\uFF0C\u8FD9\u6B21\u91CD\u8DD1\u6CA1\u6709\u91CD\u5199\u5B83",
   "ui.book_review_hand_before_book": "\u8FD9\u5F20\u5361\u52A0\u5165\u4E66\u4E4B\u524D\u5C31\u6709\u5185\u5BB9\uFF0C\u8FD9\u6B21\u91CD\u8DD1\u6CA1\u6709\u91CD\u5199\u5B83",
-  "ui.book_note_review_keep": "\u4FDD\u7559\u6211\u7684\u7248\u672C",
-  "ui.book_note_review_rewrite": "\u7528 AI \u91CD\u5199\u8FD9\u7AE0\uFF08\u4F1A\u76D6\u6389\u4F60\u7684\u4FEE\u6539\uFF0C\u6539\u524D\u5148\u5907\u4EFD\uFF09",
   "ui.book_plain_write_hand_edited": "\u8FD9\u7AE0\u6709\u4F60\u624B\u6539\u7684\u5185\u5BB9\uFF0C\u6240\u4EE5\u6CA1\u6709\u52A8\u5B83\u3002",
   "ui.book_plain_write_author_failed": "\u5199\u4F5C\u8C03\u7528\u5931\u8D25\uFF0C\u5361\u7247\u4FDD\u6301\u539F\u6837\u3002\u8BF7\u70B9\u201C\u91CD\u8DD1\u8FD9\u5F20\u201D\u518D\u5199\u4E00\u6B21\u3002",
   "ui.book_refused_gate_cancelled": "\u5DF2\u505C\u6B62\uFF0C\u4F60\u521A\u6309\u7684\u6309\u952E\u6CA1\u6709\u5957\u7528\uFF0C\u8FD9\u672C\u4E66\u4FDD\u6301\u539F\u72B6\u3002",
@@ -9853,22 +9811,6 @@ var zhTW = {
   "ui.book_panel_g2_reason_images": "\u9019\u7AE0\u662F\u5716\u96C6\uFF0C\u537B\u6C92\u6709\u627E\u5230\u5408\u9069\u7684\u5716",
   "ui.book_panel_g2_reason_seam": "\u524D\u5F8C\u7AE0\u6539\u904E\uFF0C\u929C\u63A5\u9084\u6C92\u78BA\u8A8D",
   "ui.book_panel_g2_reason_seam_0": "\u300C{0}\u300D\u6539\u904E\uFF0C\u548C\u9019\u7AE0\u7684\u929C\u63A5\u9084\u6C92\u78BA\u8A8D",
-  "ui.book_note_trial_title_0": "\u8A66\u8DD1\u7B2C {0}\uFF0F{1} \u7AE0",
-  "ui.book_note_trial_next": "\u770B\u5B8C\u5F8C\u56DE\u5FC3\u667A\u5716\uFF0C\u6309\u300C\u9019\u6A23\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u66F8\u300D\u3002",
-  "ui.book_note_trial_stopped": "\u9019\u672C\u66F8\u5DF2\u505C\u6B62\u3002\u5148\u5728\u5FC3\u667A\u5716\u5DE5\u5177\u5217\u6309\u300C\u7E7C\u7E8C\u300D\uFF0C\u518D\u6309\u300C\u9019\u6A23\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u66F8\u300D\u3002",
-  "ui.book_note_trial_edit": "\u60F3\u6539\u54EA\u4E00\u6BB5\uFF1A\u9078\u53D6\u6587\u5B57\uFF0C\u53F3\u9375\u300C\u52A0\u5099\u8A3B\u300D\u3002",
-  "ui.book_note_trial_problems": "\u9019\u7AE0\u9084\u6709\u554F\u984C\u6C92\u89E3\u6C7A\uFF1A",
-  "ui.book_note_prev_0": "\u4E0A\u4E00\u7AE0\uFF1A{0}",
-  "ui.book_note_next_0": "\u4E0B\u4E00\u7AE0\uFF1A{0}",
-  "ui.book_note_trial_title_preface": "\u8A66\u8DD1\uFF1A\u524D\u8A00",
-  "ui.book_note_trial_title_chapter_0_1": "\u8A66\u8DD1\uFF1A\u7B2C {0} \u7AE0\u300C{1}\u300D",
-  "ui.book_note_trial_title_section_0_1_2_3": "\u8A66\u8DD1\uFF1A\u7B2C {0} \u7AE0\u300C{1}\u300D\xB7 \u7B2C {2} \u7BC0\uFF0C\u5171 {3} \u7BC0",
-  "ui.book_note_parent_0": "\u6240\u5C6C\u7AE0\uFF1A{0}",
-  "ui.book_note_prev_section_0": "\u524D\u4E00\u7BC0\uFF1A{0}",
-  "ui.book_note_next_section_0": "\u5F8C\u4E00\u7BC0\uFF1A{0}",
-  "ui.book_note_sections_0": "\u672C\u7AE0\u7684\u7BC0\uFF1A{0}",
-  "ui.book_note_none": "\u7121",
-  "ui.book_note_sections_sep": "\u3001",
   "ui.book_note_review_title": "\u9019\u7AE0\u8981\u4F60\u770B",
   "ui.book_ai_box_title_0_1_2": "AI \u6821\u5C0D\uFF1A\u67E5\u4E86 {0} \u9805\uFF0C\u4FEE\u4E86 {1} \u8655\uFF0C{2} \u8655\u6C92\u4FEE\u597D",
   "ui.book_ai_box_title_incomplete": "AI \u6821\u5C0D\uFF1A\u9019\u7AE0\u6C92\u6709\u67E5\u5B8C\uFF0C\u5DF2\u5217\u5230\u66F8\u672B",
@@ -9892,9 +9834,6 @@ var zhTW = {
   "ui.book_ai_reason_not_fixed": "AI \u6C92\u6709\u4FEE\u5230\u9019\u8655",
   "ui.book_ai_reason_not_fixed_in_time": "\u9084\u6C92\u4F86\u5F97\u53CA\u4FEE\uFF0C\u6700\u5F8C\u4E00\u8F2A\u624D\u67E5\u5230",
   "ui.book_ai_reason_other": "AI \u6C92\u8FA6\u6CD5\u8655\u7406",
-  "ui.book_note_review_accept": "\u63A5\u53D7\u73FE\u5728\u9019\u6A23\uFF0C\u4E0D\u7528\u6539",
-  "ui.book_note_review_fixed": "\u6211\u6539\u597D\u4E86",
-  "ui.book_note_review_next_0": "\u4E0B\u4E00\u7AE0\u8981\u770B\u7684\uFF1A{0}",
   "ui.book_note_review_handled_0": "\u5DF2\u8655\u7406\uFF08\u4F60\u9078\u4E86\u300C{0}\u300D\uFF09",
   "ui.book_note_add": "\u5716\u6587\u66F8\uFF1A\u52A0\u5099\u8A3B",
   "ui.book_note_add_disabled_0": "\u5716\u6587\u66F8\uFF1A\u52A0\u5099\u8A3B\uFF08{0}\uFF09",
@@ -9937,8 +9876,6 @@ var zhTW = {
   "ui.book_note_undo_partial_0_1": "\u5DF2\u9084\u539F {0} \u6BB5\uFF1B\u53E6\u6709 {1} \u6BB5\u5728\u6539\u5BEB\u5F8C\u53C8\u88AB\u6539\u904E\uFF0C\u6C92\u6709\u9084\u539F\u3002",
   "ui.book_review_hand_edited": "\u9019\u7AE0\u6709\u4F60\u624B\u6539\u7684\u5167\u5BB9\uFF0C\u9019\u6B21\u91CD\u8DD1\u6C92\u6709\u91CD\u5BEB\u5B83",
   "ui.book_review_hand_before_book": "\u9019\u5F35\u5361\u52A0\u5165\u66F8\u4E4B\u524D\u5C31\u6709\u5167\u5BB9\uFF0C\u9019\u6B21\u91CD\u8DD1\u6C92\u6709\u91CD\u5BEB\u5B83",
-  "ui.book_note_review_keep": "\u4FDD\u7559\u6211\u7684\u7248\u672C",
-  "ui.book_note_review_rewrite": "\u7528 AI \u91CD\u5BEB\u9019\u7AE0\uFF08\u6703\u84CB\u6389\u4F60\u7684\u4FEE\u6539\uFF0C\u6539\u524D\u5148\u5099\u4EFD\uFF09",
   "ui.book_plain_write_hand_edited": "\u9019\u7AE0\u6709\u4F60\u624B\u6539\u7684\u5167\u5BB9\uFF0C\u6240\u4EE5\u6C92\u6709\u52D5\u5B83\u3002",
   "ui.book_plain_write_author_failed": "\u5BEB\u4F5C\u547C\u53EB\u5931\u6557\uFF0C\u5361\u7247\u7DAD\u6301\u539F\u6A23\u3002\u8ACB\u6309\u300C\u91CD\u8DD1\u9019\u5F35\u300D\u518D\u5BEB\u4E00\u6B21\u3002",
   "ui.book_refused_gate_cancelled": "\u5DF2\u505C\u6B62\uFF0C\u4F60\u525B\u6309\u7684\u6309\u9375\u6C92\u6709\u5957\u7528\uFF0C\u9019\u672C\u66F8\u7DAD\u6301\u539F\u72C0\u3002",
@@ -56299,6 +56236,7 @@ var BookPipelineRuns = class {
         await this.refreshSkippedPlans(drive);
         await this.refreshAroundRemoved(drive);
       }
+      if (drive.fixable.size && !drive.job && drive.store.state.status === "running") await this.startFixes(drive);
       await drive.store.commit((state) => invalidateStaleAiChapters(state));
       const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy, {
         aiProof: !!this.ports.aiProof && !!this.ports.aiFix && !!this.ports.aiBookProof && !drive.job,
@@ -57091,7 +57029,7 @@ var BookPipelineRuns = class {
     this.syncReviewNotes(drive);
   }
   /**
-   * The one automatic redo (plan 2026 flow v3, E), after every card has had its first round: a card whose proofread named unmet points
+   * The one automatic redo (plan 2026 flow v3, E), after that card's own first round: a card whose proofread named unmet points
    * gets its text written again by the author alone (the plan and the checklist stay, attempts are not reset), then proofread once more.
    * The real points go to the author only (never to the proofread). A refused or no longer allowed request leaves the card needs-review.
    * Returns how many cards were sent back; only cards queued by this drive's own proofreads are considered.
@@ -57099,8 +57037,8 @@ var BookPipelineRuns = class {
   async startFixes(drive) {
     var _a2, _b2;
     let started = 0;
-    const queued = [...drive.fixable];
-    drive.fixable.clear();
+    const queued = [...drive.fixable].filter(([nodeId]) => !drive.busy.has(nodeId));
+    for (const [nodeId] of queued) drive.fixable.delete(nodeId);
     for (const [nodeId, instruction] of queued) {
       if (this.dead(drive) || drive.controller.signal.aborted) break;
       if (drive.stages.get(nodeId) !== "needs-review") continue;
@@ -58498,7 +58436,7 @@ ${caption}`, drive.config.language))
     if (list2.length < ETA_MIN_CARDS) return void 0;
     const left = effectiveOrder(state).filter((id) => {
       const stage = drive.stages.get(id);
-      return planning ? stage === void 0 : stage !== "checked" && stage !== "needs-review";
+      return planning ? stage === void 0 : stage !== "checked" && stage !== "needs-review" || drive.fixable.has(id);
     }).length;
     const average = list2.reduce((sum2, ms) => sum2 + ms, 0) / list2.length;
     const atOnce = planning ? BOOK_POOL : BOOK_POOL + BOOK_POST_POOL;

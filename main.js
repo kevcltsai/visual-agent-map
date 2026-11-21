@@ -3288,9 +3288,10 @@ var en = {
   "ui.book_ai_box_title_0_1_2": "AI proofread: checked {0}, fixed {1}, {2} not fixed",
   "ui.book_ai_box_title_incomplete": "AI proofread: this chapter was not fully checked, listed on the book's last page",
   "ui.book_ai_box_fixed_0": "Fixed: {0}",
+  "ui.book_ai_box_book_fixed_0": "The whole-book proofread also fixed {0}:",
   "ui.book_ai_box_open_0": "Not fixed: {0}, listed on the book's last page",
   "ui.book_ai_box_sep": ", ",
-  "ui.book_ai_reason_still_present": "still wrong after the fix",
+  "ui.book_ai_reason_still_present": "still there after the AI fixed it and checked again; no fix rounds left",
   "ui.book_ai_reason_sources_conflict": "two sources disagree and the AI cannot decide",
   "ui.book_ai_reason_source_unreachable": "no reliable source could be reached",
   "ui.book_ai_reason_unfixable": "needs the author's own judgment",
@@ -6570,9 +6571,10 @@ var zhCN = {
   "ui.book_ai_box_title_0_1_2": "AI \u6821\u5BF9\uFF1A\u67E5\u4E86 {0} \u9879\uFF0C\u4FEE\u4E86 {1} \u5904\uFF0C{2} \u5904\u6CA1\u4FEE\u597D",
   "ui.book_ai_box_title_incomplete": "AI \u6821\u5BF9\uFF1A\u8FD9\u7AE0\u6CA1\u6709\u67E5\u5B8C\uFF0C\u5DF2\u5217\u5230\u4E66\u672B",
   "ui.book_ai_box_fixed_0": "\u4FEE\u4E86\uFF1A{0}",
+  "ui.book_ai_box_book_fixed_0": "\u5168\u4E66\u6821\u5BF9\u53E6\u4FEE\u4E86 {0} \u5904\uFF1A",
   "ui.book_ai_box_open_0": "\u6CA1\u4FEE\u597D\uFF1A{0}\uFF0C\u5DF2\u5217\u5230\u4E66\u672B",
   "ui.book_ai_box_sep": "\uFF0C",
-  "ui.book_ai_reason_still_present": "\u4FEE\u8FC7\u4E4B\u540E\u95EE\u9898\u8FD8\u5728",
+  "ui.book_ai_reason_still_present": "AI \u4FEE\u6539\u540E\u518D\u67E5\uFF0C\u95EE\u9898\u4ECD\u5728\uFF0C\u4FEE\u6B63\u6B21\u6570\u5DF2\u7528\u5B8C",
   "ui.book_ai_reason_sources_conflict": "\u4E24\u4E2A\u6765\u6E90\u8BF4\u6CD5\u4E0D\u540C\uFF0CAI \u5224\u65AD\u4E0D\u4E86",
   "ui.book_ai_reason_source_unreachable": "\u67E5\u4E0D\u5230\u53EF\u9760\u7684\u6765\u6E90",
   "ui.book_ai_reason_unfixable": "\u9700\u8981\u4F5C\u8005\u81EA\u5DF1\u5224\u65AD",
@@ -9852,9 +9854,10 @@ var zhTW = {
   "ui.book_ai_box_title_0_1_2": "AI \u6821\u5C0D\uFF1A\u67E5\u4E86 {0} \u9805\uFF0C\u4FEE\u4E86 {1} \u8655\uFF0C{2} \u8655\u6C92\u4FEE\u597D",
   "ui.book_ai_box_title_incomplete": "AI \u6821\u5C0D\uFF1A\u9019\u7AE0\u6C92\u6709\u67E5\u5B8C\uFF0C\u5DF2\u5217\u5230\u66F8\u672B",
   "ui.book_ai_box_fixed_0": "\u4FEE\u4E86\uFF1A{0}",
+  "ui.book_ai_box_book_fixed_0": "\u5168\u66F8\u6821\u5C0D\u53E6\u4FEE\u4E86 {0} \u8655\uFF1A",
   "ui.book_ai_box_open_0": "\u6C92\u4FEE\u597D\uFF1A{0}\uFF0C\u5DF2\u5217\u5230\u66F8\u672B",
   "ui.book_ai_box_sep": "\uFF0C",
-  "ui.book_ai_reason_still_present": "\u4FEE\u904E\u4E4B\u5F8C\u554F\u984C\u9084\u5728",
+  "ui.book_ai_reason_still_present": "AI \u4FEE\u6539\u5F8C\u518D\u67E5\uFF0C\u554F\u984C\u4ECD\u5728\uFF0C\u4FEE\u6B63\u6B21\u6578\u5DF2\u7528\u5B8C",
   "ui.book_ai_reason_sources_conflict": "\u5169\u500B\u4F86\u6E90\u8AAA\u6CD5\u4E0D\u540C\uFF0CAI \u5224\u65B7\u4E0D\u4E86",
   "ui.book_ai_reason_source_unreachable": "\u67E5\u4E0D\u5230\u53EF\u9760\u7684\u4F86\u6E90",
   "ui.book_ai_reason_unfixable": "\u9700\u8981\u4F5C\u8005\u81EA\u5DF1\u5224\u65B7",
@@ -12921,11 +12924,12 @@ function aiProofShape(value) {
   if (value.incomplete !== void 0 && typeof value.incomplete !== "boolean") return false;
   if (!isCount(value.checked) || !isCount(value.fixed)) return false;
   const items = (list2, extra) => Array.isArray(list2) && list2.every(
-    (item) => isObject(item) && isText(item.id) && isText(item.quote) && isText(item.problem) && extra.every((key4) => isText(item[key4])) && (item.chapter === void 0 || isCount(item.chapter))
+    (item) => isObject(item) && isText(item.id) && isText(item.quote) && isText(item.problem) && extra.every((key4) => isText(item[key4])) && (item.chapter === void 0 || isCount(item.chapter)) && (item.chapterId === void 0 || isText(item.chapterId))
   );
   if (!items(value.open, ["reason"])) return false;
   if (value.pending !== void 0 && !items(value.pending, ["suggestion"])) return false;
   if (value.fixes !== void 0 && !items(value.fixes, ["suggestion"])) return false;
+  if (value.applied !== void 0 && !(Array.isArray(value.applied) && value.applied.every(isText))) return false;
   return value.refused === void 0 || isObject(value.refused) && Object.values(value.refused).every(isText);
 }
 function problem(raw) {
@@ -26237,7 +26241,10 @@ var OPEN_ISSUE_SOURCES = {
   "ai-proof": {
     label: { zh: "AI \u6821\u5C0D", en: "AI proofread" },
     reasons: {
-      still_present: { zh: "AI \u4FEE\u4E86\u5169\u8F2A\uFF0C\u518D\u67E5\u6642\u554F\u984C\u9084\u5728", en: "The AI fixed it twice and the re-check still found it" },
+      still_present: {
+        zh: "AI \u4FEE\u6539\u5F8C\u518D\u67E5\uFF0C\u554F\u984C\u4ECD\u5728\uFF0C\u4FEE\u6B63\u6B21\u6578\u5DF2\u7528\u5B8C",
+        en: "The problem was still there after the AI fixed it and checked again; no fix rounds are left"
+      },
       sources_conflict: { zh: "\u4F86\u6E90\u4E4B\u9593\u8AAA\u6CD5\u4E0D\u540C\uFF0C\u6C92\u8FA6\u6CD5\u9760\u6539\u5B57\u89E3\u6C7A", en: "The sources disagree; no edit can settle it" },
       source_unreachable: {
         zh: "\u4F86\u6E90\u6253\u4E0D\u958B\u6216\u6C92\u5BEB\u5230\u9019\u4EF6\u4E8B\uFF0C\u67E5\u4E0D\u5230\u4F9D\u64DA",
@@ -48712,7 +48719,7 @@ var withOpen = (open2, pending2, reasonOf3) => [
   }))
 ];
 function applyAiProof(data, token, result) {
-  var _a2;
+  var _a2, _b2, _c;
   const found = token.step === "proof" ? aiCurrent(data, token) : void 0;
   if (!found) return { state: data, accepted: false };
   const next = clone2(data);
@@ -48720,22 +48727,37 @@ function applyAiProof(data, token, result) {
   delete slot.pending;
   if (result.pending.length && slot.round < MAX_AI_FIX_ROUNDS) {
     slot.step = "fix";
+    const same2 = (a, b) => {
+      var _a3, _b3;
+      return a.quote.replace(/\s+/g, "") === b.quote.replace(/\s+/g, "") && ((_a3 = a.chapter) != null ? _a3 : 1) === ((_b3 = b.chapter) != null ? _b3 : 1);
+    };
+    const carried = {};
+    for (const [oldId, reason] of Object.entries((_a2 = found.refused) != null ? _a2 : {})) {
+      const old = ((_b2 = found.pending) != null ? _b2 : []).find((target) => target.id === oldId);
+      const now = old ? result.pending.find((item) => same2(item, old)) : void 0;
+      if (now) carried[now.id] = reason;
+    }
+    if (Object.keys(carried).length) slot.refused = carried;
+    else delete slot.refused;
     slot.pending = result.pending.map((item) => ({ ...item }));
     slot.open = result.open.map((item) => ({ ...item }));
   } else {
     slot.done = true;
     const squash2 = (text10) => text10.replace(/\s+/g, "");
-    const prior = (_a2 = found.pending) != null ? _a2 : [];
+    const prior = (_c = found.pending) != null ? _c : [];
     slot.open = withOpen(result.open, result.pending, (id) => {
-      var _a3, _b2;
+      var _a3, _b3, _c2;
       const item = result.pending.find((entry) => entry.id === id);
       const before = item ? prior.find(
         (target) => {
-          var _a4, _b3;
-          return squash2(target.quote) === squash2(item.quote) && ((_a4 = target.chapter) != null ? _a4 : 1) === ((_b3 = item.chapter) != null ? _b3 : 1);
+          var _a4, _b4;
+          return squash2(target.quote) === squash2(item.quote) && ((_a4 = target.chapter) != null ? _a4 : 1) === ((_b4 = item.chapter) != null ? _b4 : 1);
         }
       ) : void 0;
-      return before ? (_b2 = (_a3 = slot.refused) == null ? void 0 : _a3[before.id]) != null ? _b2 : "still_present" : "not_fixed_in_time";
+      if (before) return (_b3 = (_a3 = slot.refused) == null ? void 0 : _a3[before.id]) != null ? _b3 : "still_present";
+      const quote3 = item ? squash2(item.quote) : "";
+      const written2 = quote3 && ((_c2 = found.applied) != null ? _c2 : []).some((text10) => squash2(text10).includes(quote3) || quote3.includes(squash2(text10)));
+      return written2 ? "still_present" : "not_fixed_in_time";
     });
   }
   setAiSlot(next, token.nodeId, slot);
@@ -48743,7 +48765,7 @@ function applyAiProof(data, token, result) {
   return { state: next, accepted: true };
 }
 function applyAiFix(data, token, result) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
   const found = token.step === "fix" ? aiCurrent(data, token) : void 0;
   if (!found) return { state: data, accepted: false };
   const next = clone2(data);
@@ -48754,15 +48776,24 @@ function applyAiFix(data, token, result) {
     round: found.round + 1,
     step: "proof",
     fixed: found.fixed + result.applied,
+    // `found.refused` already names this round's targets (see applyAiProof); this round's refusals are added.
     refused: { ...(_b2 = found.refused) != null ? _b2 : {}, ...(_c = result.refused) != null ? _c : {} }
   };
-  for (const id of (_d = result.appliedIds) != null ? _d : []) (_e = slot.refused) == null ? true : delete _e[id];
-  if (!Object.keys((_f = slot.refused) != null ? _f : {}).length) delete slot.refused;
-  const blocked = (_g = result.refused) != null ? _g : {};
+  if ((_d = result.replacements) == null ? void 0 : _d.length) slot.applied = [...(_e = found.applied) != null ? _e : [], ...result.replacements];
+  for (const id of (_f = result.appliedIds) != null ? _f : []) (_g = slot.refused) == null ? true : delete _g[id];
+  if (!Object.keys((_h = slot.refused) != null ? _h : {}).length) delete slot.refused;
+  const blocked = (_i = result.refused) != null ? _i : {};
   const written2 = result.appliedIds ? new Set(result.appliedIds) : void 0;
-  const done = result.applied > 0 ? ((_h = found.pending) != null ? _h : []).filter((item) => written2 ? written2.has(item.id) : !(item.id in blocked)) : [];
-  if (done.length) slot.fixes = [...(_i = found.fixes) != null ? _i : [], ...done.map((item) => ({ ...item }))];
-  for (const id of (_j = result.changed) != null ? _j : [])
+  const done = result.applied > 0 ? ((_j = found.pending) != null ? _j : []).filter((item) => written2 ? written2.has(item.id) : !(item.id in blocked)) : [];
+  if (done.length)
+    slot.fixes = [
+      ...(_k = found.fixes) != null ? _k : [],
+      ...done.map((item) => {
+        var _a3;
+        return { ...item, ...((_a3 = result.cardOf) == null ? void 0 : _a3[item.id]) ? { chapterId: result.cardOf[item.id] } : {} };
+      })
+    ];
+  for (const id of (_l = result.changed) != null ? _l : [])
     if (effectiveOrder(next).includes(id)) next.revisions[id] = cardRevision(next, id) + 1;
   setAiSlot(next, token.nodeId, slot);
   next.revision++;
@@ -54266,6 +54297,7 @@ function sameReviewResult(before, after) {
 }
 
 // experiences/visual-map/book-pipeline-run.ts
+var replacementsOf = (edits, ids2) => edits.filter((edit) => ids2.includes(edit.id)).map((edit) => edit.replacement);
 var appliedIdsOf = (outcomes) => outcomes.filter((outcome) => outcome.applied).map((outcome) => outcome.id);
 var BOOK_POOL = 5;
 function unmetIds(items) {
@@ -54948,10 +54980,11 @@ var BookPipelineRuns = class {
     var _a2, _b2, _c, _d, _e, _f;
     if (!this.ports.aiProof || !this.ports.aiFix || !this.ports.aiBookProof) return;
     const stage = drive.stages.get(nodeId);
-    if (stage !== "checked" && stage !== "needs-review") return;
-    for (let turn = 0; turn < 20; turn++) {
+    const proofread = stage === "checked" || stage === "needs-review";
+    for (let turn = 0; proofread && turn < 20; turn++) {
       const state = drive.store.state;
-      if (this.dead(drive) || drive.controller.signal.aborted || drive.fatal !== void 0) return;
+      if (this.dead(drive)) return;
+      if (drive.controller.signal.aborted || drive.fatal !== void 0) break;
       if (state.status !== "running" || ((_b2 = (_a2 = state.aiProof) == null ? void 0 : _a2[nodeId]) == null ? void 0 : _b2.done)) break;
       drive.busy.add(nodeId);
       try {
@@ -54960,7 +54993,9 @@ var BookPipelineRuns = class {
         drive.busy.delete(nodeId);
       }
     }
-    if (drive.store.state.phase !== "done" || !((_f = (_e = drive.store.state.aiProof) == null ? void 0 : _e[nodeId]) == null ? void 0 : _f.done)) return;
+    if (this.dead(drive) || drive.store.state.phase !== "done") return;
+    if (!((_f = (_e = drive.store.state.aiProof) == null ? void 0 : _e[nodeId]) == null ? void 0 : _f.done) && effectiveOrder(drive.store.state).includes(nodeId))
+      await drive.store.commit((state) => ({ state: abandonAi(state, nodeId), accepted: true }));
     if (!await this.writeClosingPage(drive)) this.log(drive, "open_issues_write", nodeId, "proof", "failed");
   }
   /** The card's result as the rerun compares it (memory only); undefined when the card cannot be read. */
@@ -56045,6 +56080,7 @@ var BookPipelineRuns = class {
         (current) => applyAiFix(current, token, {
           applied: result.applied,
           appliedIds: appliedIdsOf(result.outcomes),
+          replacements: replacementsOf(edits, appliedIdsOf(result.outcomes)),
           refused,
           ...newKey ? { key: newKey, changed: [nodeId] } : {}
         })
@@ -56200,6 +56236,8 @@ var BookPipelineRuns = class {
       const refused = {};
       const changed = [];
       const appliedIds = [];
+      const replacements = [];
+      const cardOf = {};
       let applied = 0;
       let discarded = false;
       const owner = new Map(targets.map((target) => {
@@ -56243,6 +56281,8 @@ var BookPipelineRuns = class {
         }
         applied += result.applied;
         appliedIds.push(...appliedIdsOf(result.outcomes));
+        replacements.push(...replacementsOf(own2, appliedIdsOf(result.outcomes)));
+        for (const id of appliedIdsOf(result.outcomes)) cardOf[id] = chapter.id;
         changed.push(chapter.id);
       }
       let newKey;
@@ -56251,7 +56291,14 @@ var BookPipelineRuns = class {
         newKey = aiProofKey(0, joined(after.chapters.map((chapter) => chapter.text)));
       }
       const done = await drive.store.commit(
-        (current) => applyAiFix(current, token, { applied, appliedIds, refused, ...newKey ? { key: newKey, changed } : {} })
+        (current) => applyAiFix(current, token, {
+          applied,
+          appliedIds,
+          replacements,
+          cardOf,
+          refused,
+          ...newKey ? { key: newKey, changed } : {}
+        })
       );
       if (discarded) return report("dropped", { applied, pending: targets.length });
       report((done == null ? void 0 : done.accepted) ? "ok" : "dropped", { applied, pending: targets.length });
@@ -58409,10 +58456,14 @@ var AI_REASON_KEY = {
 };
 var aiReasonText = (reason) => t(Object.prototype.hasOwnProperty.call(AI_REASON_KEY, reason) ? AI_REASON_KEY[reason] : "ui.book_ai_reason_other");
 function aiProofCallout(input2, runId, nodeId) {
-  var _a2;
+  var _a2, _b2;
   const title = input2.incomplete ? t("ui.book_ai_box_title_incomplete") : t("ui.book_ai_box_title_0_1_2", input2.checked, (_a2 = input2.fixed) != null ? _a2 : input2.fixes.length, input2.open.length);
   const lines = [
     ...input2.fixes.map((fix) => `> \u30FB${t("ui.book_ai_box_fixed_0", plainText(fix.suggestion))}`),
+    ...((_b2 = input2.bookFixes) == null ? void 0 : _b2.length) ? [
+      `> \u30FB${t("ui.book_ai_box_book_fixed_0", input2.bookFixes.length)}`,
+      ...input2.bookFixes.map((fix) => `> \u30FB${t("ui.book_ai_box_fixed_0", plainText(fix.suggestion))}`)
+    ] : [],
     ...input2.open.map((item) => {
       const why2 = aiReasonText(item.reason);
       const problem3 = plainText(item.problem);
@@ -58840,7 +58891,7 @@ var BookCallouts = class {
     }
   }
   async align(mapPath, mayCarry) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d, _e;
     const clean3 = (id) => (mayCarry == null ? void 0 : mayCarry(id)) === false;
     const map = await this.ports.readMap(mapPath);
     const read = readBookPipeline(map);
@@ -58861,6 +58912,7 @@ var BookCallouts = class {
           checked: slot.checked,
           fixed: slot.fixed,
           fixes: (_b2 = slot.fixes) != null ? _b2 : [],
+          bookFixes: ((_d = (_c = data.bookProof) == null ? void 0 : _c.fixes) != null ? _d : []).filter((fix) => fix.chapterId === id),
           open: slot.open,
           ...slot.incomplete ? { incomplete: true } : {}
         };
@@ -58873,7 +58925,7 @@ var BookCallouts = class {
     }
     for (const { id, card } of cards) {
       if (this.disposed) return;
-      const want = (_c = wanted.get(id)) != null ? _c : {
+      const want = (_e = wanted.get(id)) != null ? _e : {
         runId: data.runId,
         nodeId: id
       };

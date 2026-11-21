@@ -37,7 +37,7 @@ test('the registry is generic: a chapter-status source and an unknown source or 
   const text = note([issue({ source: 'chapter', chapterTitle: '採收', problem: '', reason: 'too_short' })]);
   assert.match(text, /^- 採收：字數低於設定的下限$/m);
   // the registry must give every AI reason code a sentence in both languages
-  for (const code of ['still_present', 'sources_conflict', 'source_unreachable', 'unfixable', 'fix_refused_picture', 'fix_refused_length', 'fix_quote_missing', 'fix_forbidden_syntax', 'hand_edited', 'fix_failed', 'proof_incomplete'])
+  for (const code of ['still_present', 'sources_conflict', 'source_unreachable', 'unfixable', 'fix_refused_picture', 'fix_refused_length', 'fix_quote_missing', 'fix_forbidden_syntax', 'hand_edited', 'fix_failed', 'proof_incomplete', 'not_fixed', 'not_fixed_in_time'])
     for (const lang of ['zh-TW', 'en']) assert.notEqual(oi.reasonText({ source: 'ai-proof', reason: code }, lang), oi.reasonText({ source: 'ai-proof', reason: 'brand_new' }, lang), `${code} ${lang}`);
 });
 

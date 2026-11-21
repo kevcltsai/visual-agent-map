@@ -287,6 +287,8 @@ const appliedIdsOf = (outcomes: readonly { id: string; applied: boolean }[]): st
   outcomes.filter(outcome => outcome.applied).map(outcome => outcome.id);
 /** At most this many cards are in a step at once (the whole-book plan runs alone before them). */
 export const BOOK_POOL = 5;
+/** The run keeps this many gate-press trace lines (the newest). */
+const GATE_TRACE_MAX = 20;
 
 export type BookRunRefusal =
   | "busy"
@@ -1052,6 +1054,10 @@ export interface NotesApplyResult {
 
 export class BookPipelineRuns {
   private readonly drives = new Map<string, Drive>();
+  /** Maps with a gate press waiting for the drive that reached the gate to end (a second press meanwhile is refused as busy). */
+  private readonly gateWaiting = new Set<string>();
+  /** Trace lines of applied presses that ride on the drive's next state write (written alone when the drive ends first). */
+  private readonly pendingTrace = new Map<string, { runId: string; lines: string[] }>();
   private readonly last = new Map<string, BookPipelineProgress>();
   /** The notes slot: one apply-notes job per map, exclusive with a drive (both directions are checked synchronously). */
   private readonly notesJobs = new Map<string, AbortController>();
@@ -1194,7 +1200,8 @@ export class BookPipelineRuns {
 
   /** The owner confirmed gate 1: writing starts (or a stopped run at gate 1 continues into it). */
   async confirmGate1(mapPath: string): Promise<void> {
-    return this.enter(
+    return this.gateEnter(
+      "confirmGate1",
       mapPath,
       async drive => {
         await this.openSaved(drive, mapPath);
@@ -1216,7 +1223,7 @@ export class BookPipelineRuns {
    * press is harmless), any other phase is refused. Cards are not touched.
    */
   async finishRun(mapPath: string): Promise<void> {
-    return this.enter(mapPath, async drive => {
+    return this.gateEnter("finishRun", mapPath, async drive => {
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       if (data.phase === "done") return;
       if (data.phase !== "gate2") throw new BookPipelineRunError("not_gate");
@@ -1250,7 +1257,8 @@ export class BookPipelineRuns {
    * without a trial.
    */
   async retryTrial(mapPath: string): Promise<void> {
-    return this.enter(
+    return this.gateEnter(
+      "retryTrial",
       mapPath,
       async drive => {
         await this.openSaved(drive, mapPath);
@@ -1274,7 +1282,8 @@ export class BookPipelineRuns {
 
   /** The plan review: the owner chose to run the trial. The trial chapters are written from their plans as they are now. Refused (not_gate1) elsewhere. */
   async startTrial(mapPath: string): Promise<void> {
-    return this.enter(
+    return this.gateEnter(
+      "startTrial",
       mapPath,
       async drive => {
         await this.openSaved(drive, mapPath);
@@ -1296,7 +1305,7 @@ export class BookPipelineRuns {
    * planned (their plans stay for the owner to edit; their text stays until the next trial rewrites it). Refused (not_gate1) elsewhere.
    */
   async backToPlan(mapPath: string): Promise<void> {
-    return this.enter(mapPath, async drive => {
+    return this.gateEnter("backToPlan", mapPath, async drive => {
       await this.openSaved(drive, mapPath);
       let moved = false;
       await drive.store.commit(state => {
@@ -2004,6 +2013,99 @@ export class BookPipelineRuns {
   }
 
   // ---- lifecycle ---------------------------------------------------------------------------------------------------------------
+  /** True while the drive is only winding down after it reached a gate (it started no job of its own and nothing stopped it). */
+  private windingDownAtGate(drive: Drive): boolean {
+    const state = drive.store?.state;
+    return (
+      !!state &&
+      !drive.job &&
+      (state.phase === "gate1" || state.phase === "gate2") &&
+      state.status === "running" &&
+      !drive.stopRequested &&
+      drive.fatal === undefined &&
+      !this.dead(drive)
+    );
+  }
+  /**
+   * A gate button entry. A press made while the drive that reached the gate is still ending waits for that drive and then applies as
+   * it would have (a stopped, failed or disposed drive: the press does nothing, "cancelled"); a press while a different operation runs,
+   * or a second press while one waits, is refused "busy". Every press leaves one short trace line in the run (action, outcome, wait).
+   */
+  private async gateEnter(
+    action: string,
+    mapPath: string,
+    setup: (drive: Drive) => Promise<void>,
+    early = false
+  ): Promise<void> {
+    const runId = await this.ports.readMap(mapPath).then(
+      map => {
+        const read = readBookPipeline(map);
+        return read.kind === "usable" ? read.data.runId : undefined;
+      },
+      () => undefined
+    );
+    const startedAt = Date.now();
+    let waited = 0;
+    try {
+      const drive = this.drives.get(mapPath);
+      if (drive && !this.gateWaiting.has(mapPath) && this.windingDownAtGate(drive)) {
+        this.gateWaiting.add(mapPath);
+        try {
+          await drive.done.catch(() => undefined);
+        } finally {
+          this.gateWaiting.delete(mapPath);
+        }
+        waited = Date.now() - startedAt;
+        if (this.disposed) throw new BookPipelineRunError("disposed");
+        if (drive.stopRequested || drive.fatal !== undefined || this.dead(drive))
+          throw new BookPipelineRunError("cancelled");
+      }
+      await this.enter(mapPath, setup, early);
+      await this.traceGate(mapPath, runId, action, "applied", waited, true);
+    } catch (error) {
+      await this.traceGate(
+        mapPath,
+        runId,
+        action,
+        `refused:${error instanceof BookPipelineRunError ? error.code : "error"}`,
+        waited
+      );
+      throw error;
+    }
+  }
+  private async traceGate(
+    mapPath: string,
+    runId: string | undefined,
+    action: string,
+    outcome: string,
+    waited: number,
+    defer = false
+  ): Promise<void> {
+    if (this.disposed || runId === undefined) return;
+    const line = `${this.ports.now()} ${action} ${outcome}${waited > 0 ? ` wait=${waited}` : ""}`;
+    if (defer && this.drives.has(mapPath)) {
+      const pending = this.pendingTrace.get(mapPath);
+      if (pending?.runId === runId) pending.lines.push(line);
+      else this.pendingTrace.set(mapPath, { runId, lines: [line] });
+      return;
+    }
+    await this.writeTrace(mapPath, runId, [line]);
+  }
+  private async writeTrace(mapPath: string, runId: string, lines: string[]): Promise<void> {
+    if (this.disposed) return;
+    try {
+      await this.ports.mutate(async () => {
+        if (this.disposed) return;
+        await this.ports.updateMap(mapPath, doc => {
+          const data = doc.bookPipeline as { runId?: unknown; gateTrace?: string[] } | undefined;
+          if (!data || data.runId !== runId) return;
+          data.gateTrace = [...(data.gateTrace ?? []), ...lines].slice(-GATE_TRACE_MAX);
+        });
+      });
+    } catch {
+      // the trace never changes what a press did
+    }
+  }
   private dead(drive: Drive): boolean {
     return drive.disposed || this.disposed;
   }
@@ -2100,6 +2202,9 @@ export class BookPipelineRuns {
           drive.store.dispose();
         }
       } finally {
+        const left = this.pendingTrace.get(drive.mapPath);
+        this.pendingTrace.delete(drive.mapPath);
+        if (left) await this.writeTrace(drive.mapPath, left.runId, left.lines);
         this.drives.delete(drive.mapPath);
         // The toolbar shows the run's state (gate 1's question, a finished round): redraw it now the drive is no longer running.
         if (!this.disposed)
@@ -2185,9 +2290,16 @@ export class BookPipelineRuns {
   private persist(drive: Drive, state: BookPipelineData): Promise<void> {
     return this.ports.mutate(async () => {
       if (this.dead(drive) || drive.store.isDisposed) return;
+      const lines = this.pendingTrace.get(drive.mapPath);
       await this.ports.updateMap(drive.mapPath, doc => {
-        doc.bookPipeline = state;
+        // The gate-press trace is written beside the drive's state: a state write keeps the trace the file has now (not the copy the
+        // drive loaded) and carries the applied-press lines that wait for this write.
+        const kept = (doc.bookPipeline as { gateTrace?: string[] } | undefined)?.gateTrace;
+        const own = lines?.runId === state.runId ? lines.lines : [];
+        const trace = [...(kept ?? []), ...own].slice(-GATE_TRACE_MAX);
+        doc.bookPipeline = trace.length ? { ...state, gateTrace: trace } : state;
       });
+      if (lines && this.pendingTrace.get(drive.mapPath) === lines) this.pendingTrace.delete(drive.mapPath);
       // A new phase or a stop/resume changes what the chapter notes should say (the trial hint, the review box).
       const key = `${state.phase}:${state.status}`;
       if (drive.syncKey !== undefined && drive.syncKey !== key) this.syncNotes(drive);

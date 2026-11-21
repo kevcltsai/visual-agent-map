@@ -4261,3 +4261,143 @@ test('R4 combo: a needs-review chapter is rewritten by its one automatic redo BE
   assert.equal((await r.state()).phase, 'done');
   same(await invariantsOf(r, v, { applied: { [idA(r)]: ['Corrected b'] } }), []);
 });
+
+// ---- gate presses while the drive that reached the gate is still ending ----------------------------------------------------------
+/** A plan-review run whose start drive stays alive after it saved gate 1 (its next map read waits), plus controls over that wait. */
+async function lingerRig() {
+  const r = await trialRig({ planReview: true });
+  const ctl = { on: false, block: false, blocked: 0, fail: false, hold: defer() };
+  const update = r.ports.updateMap, readMap = r.ports.readMap;
+  r.ports.updateMap = async (path, change) => { const x = await update(path, change); const s = await r.state(); if (!ctl.on && s.phase === 'gate1' && s.planReview) { ctl.on = true; ctl.block = true; } return x; };
+  r.ports.readMap = async path => { if (ctl.block) { ctl.blocked++; await ctl.hold.promise; if (ctl.fail) throw new Error('boom'); } return readMap(path); };
+  const start = r.runs.start(r.mapPath);
+  while (!ctl.blocked) await tick();
+  ctl.block = false; // later reads (the press, the tests) pass; the drive stays held where it is
+  assert.equal(r.runs.isRunning(r.mapPath), true, 'the drive that reached the gate is still ending');
+  assert.equal((await r.state()).phase, 'gate1');
+  const trace = async () => (await r.state()).gateTrace ?? [];
+  const pending = p => { const box = { done: false }; p.then(() => { box.done = true; }, () => { box.done = true; }); return box; };
+  return { r, ctl, start, trace, pending };
+}
+
+test('gate press while the gate-reaching drive is ending: waits, then applies once (startTrial and confirmGate1)', async () => {
+  for (const action of ['startTrial', 'confirmGate1']) {
+    const { r, ctl, start, trace, pending } = await lingerRig();
+    const press = r.runs[action](r.mapPath); const box = pending(press);
+    await settle();
+    assert.equal(box.done, false, `${action} waits instead of refusing busy`);
+    assert.equal(r.stat.author.length, 0);
+    await new Promise(resolve => setTimeout(resolve, 5));
+    ctl.hold.resolve();
+    await start; await press; await idle(r);
+    const s = await r.state();
+    assert.equal(s.phase, 'done'); assert.equal(s.planReview, undefined);
+    assert.ok(r.stat.author.length >= 3, 'writing started');
+    const lines = await trace();
+    assert.equal(lines.length, 1, JSON.stringify(lines));
+    assert.match(lines[0], new RegExp(`^2026-11-17T00:00:00.000Z ${action} applied wait=\\d+$`));
+  }
+});
+
+test('gate press while waiting: a second click is refused busy and applies nothing twice; wrong-gate presses wait and are refused not_gate1', async () => {
+  const { r, ctl, start, trace } = await lingerRig();
+  const first = r.runs.startTrial(r.mapPath);
+  await settle();
+  await assert.rejects(() => r.runs.startTrial(r.mapPath), e => e.code === 'busy', 'double click');
+  await assert.rejects(() => r.runs.confirmGate1(r.mapPath), e => e.code === 'busy', 'another gate press while one waits');
+  const wrong = r.runs.backToPlan(r.mapPath).then(() => 'ok', e => e.code); // already at the plan: refused after the wait, but only the first waiter exists
+  await settle();
+  ctl.hold.resolve();
+  await start; await first; await idle(r);
+  assert.equal(await wrong, 'busy');
+  assert.equal((await r.state()).phase, 'done');
+  assert.equal(r.stat.plan.filter(x => x === 'global').length, 1, 'planned once');
+  const lines = await trace();
+  assert.equal(lines.filter(l => /startTrial applied/.test(l)).length, 1);
+  assert.ok(lines.some(l => /startTrial refused:busy/.test(l)) && lines.some(l => /confirmGate1 refused:busy/.test(l)), JSON.stringify(lines));
+});
+
+test('gate press while the drive that reached the gate is ending: a stale-phase press (backToPlan at the plan) waits, then is refused not_gate1', async () => {
+  const { r, ctl, start, trace } = await lingerRig();
+  const press = r.runs.backToPlan(r.mapPath).then(() => 'ok', e => e.code);
+  await settle();
+  ctl.hold.resolve();
+  await start;
+  assert.equal(await press, 'not_gate1');
+  const s = await r.state(); assert.equal(s.phase, 'gate1'); assert.equal(s.planReview, true);
+  assert.match((await trace())[0], /backToPlan refused:not_gate1 wait=|backToPlan refused:not_gate1$/);
+});
+
+test('gate press while a different operation runs (the plan phase) is refused busy at once and is traced', async () => {
+  const gate = defer();
+  const holder = { r: null };
+  const r = await rig({ script: { global: async () => { await gate.promise; return { thread: 't', cards: holder.r.nodes.map((n, i) => ({ id: n.id, role: i ? 'body' : 'intro' })), materials: [{ name: 'm', use: 'u' }], decisions: { reader: 'kids' } }; } } });
+  holder.r = r;
+  const start = r.runs.start(r.mapPath);
+  await settle();
+  assert.equal(r.runs.isRunning(r.mapPath), true);
+  for (const action of ['confirmGate1', 'startTrial', 'backToPlan', 'retryTrial', 'finishRun'])
+    await assert.rejects(() => r.runs[action](r.mapPath), e => e.code === 'busy', action);
+  gate.resolve(); await start;
+  const lines = (await r.state()).gateTrace ?? [];
+  assert.equal(lines.length, 5, JSON.stringify(lines));
+  assert.ok(lines.every(l => /refused:busy$/.test(l)));
+  assert.equal(r.stat.author.length, 0);
+});
+
+test('waiting gate press when the ending drive is stopped: the press does nothing (cancelled), the run stays stopped at the gate', async () => {
+  const { r, ctl, start, trace } = await lingerRig();
+  const press = r.runs.startTrial(r.mapPath).then(() => 'ok', e => e.code);
+  await settle();
+  const stopping = r.runs.stop(r.mapPath);
+  await settle();
+  ctl.hold.resolve();
+  await start; await stopping;
+  assert.equal(await press, 'cancelled');
+  await settle();
+  const s = await r.state();
+  assert.deepEqual([s.phase, s.status, s.planReview], ['gate1', 'stopped', true]);
+  assert.equal(r.stat.author.length, 0); assert.equal(r.runs.isRunning(r.mapPath), false, 'no drive was started');
+  assert.match((await trace()).at(-1), /startTrial refused:cancelled/);
+});
+
+test('waiting gate press when the ending drive fails: the press does nothing (cancelled), does not hang, starts no drive', async () => {
+  const { r, ctl, start, trace } = await lingerRig();
+  const press = r.runs.confirmGate1(r.mapPath).then(() => 'ok', e => e.code);
+  await settle();
+  ctl.fail = true; ctl.hold.resolve();
+  await start;
+  assert.equal(await press, 'cancelled');
+  await settle();
+  const s = await r.state();
+  assert.equal(s.status, 'stopped'); assert.notEqual(s.phase, 'done');
+  assert.equal(r.stat.author.length, 0); assert.equal(r.runs.isRunning(r.mapPath), false);
+  assert.match((await trace()).at(-1), /confirmGate1 refused:cancelled/);
+});
+
+test('waiting gate press when the plugin is disposed: refused disposed, nothing is written afterwards', async () => {
+  const { r, ctl, start, trace } = await lingerRig();
+  const press = r.runs.startTrial(r.mapPath).then(() => 'ok', e => e.code);
+  await settle();
+  r.runs.dispose();
+  const before = r.mapRaw();
+  ctl.hold.resolve();
+  await start;
+  assert.equal(await press, 'disposed');
+  await settle();
+  assert.equal(r.mapRaw(), before, 'no late write-back, not even a trace line');
+  assert.equal(r.stat.author.length, 0);
+});
+
+test('the gate trace is capped, kept by the drive\'s own state writes, and the run file still reads', async () => {
+  const r = await trialRig({ planReview: true });
+  await r.runs.start(r.mapPath);
+  for (let i = 0; i < 25; i++) await assert.rejects(() => r.runs.backToPlan(r.mapPath), e => e.code === 'not_gate1');
+  let s = await r.state();
+  assert.equal(s.gateTrace.length, 20);
+  await r.runs.startTrial(r.mapPath); await idle(r);
+  s = await r.state();
+  assert.equal(s.phase, 'done'); assert.equal(s.gateTrace.length, 20, 'later state writes keep the trace');
+  assert.match(s.gateTrace.at(-1), /startTrial applied/);
+  assert.ok(s.gateTrace.every(l => !/Secret/.test(l)), 'no owner text');
+});

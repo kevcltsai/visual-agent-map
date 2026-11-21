@@ -190,6 +190,8 @@ export interface BookPipelineData {
   consistency?: BookConsistency;
   /** Raised by every owner stop; a step result carries the one it started under (absent = 0). */
   stopEpoch?: number;
+  /** The last gate presses and what became of them, newest last (`<time> <action> <outcome> [wait=<ms>]`; codes and times only, never owner text). Written beside the state, kept by every state write. Absent = none. */
+  gateTrace?: string[];
   /** Raised on every committed transition of the whole state. */
   revision: number;
   startedAt: string;
@@ -416,6 +418,11 @@ function problem(raw: unknown): string | undefined {
     return "aiProof";
   if (raw.bookProof !== undefined && !aiProofShape(raw.bookProof)) return "bookProof";
   if (raw.stopEpoch !== undefined && !isCount(raw.stopEpoch)) return "stopEpoch";
+  if (
+    raw.gateTrace !== undefined &&
+    (!Array.isArray(raw.gateTrace) || raw.gateTrace.some(line => typeof line !== "string" || line.length > 120))
+  )
+    return "gateTrace";
   if (!isCount(raw.revision)) return "revision";
   if (typeof raw.startedAt !== "string" || typeof raw.phaseStartedAt !== "string") return "timestamps";
   return undefined;

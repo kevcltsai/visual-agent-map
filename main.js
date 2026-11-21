@@ -16045,6 +16045,7 @@ var BOOK_AUTHOR_RULES = [
   "- That closing sentence is the end of the chapter's own text: it comes before any open-questions, sources or notes sections the template adds, and those sections are not the chapter's ending.",
   ...BOOK_VOICE_RULES,
   "- An intro chapter is a guide only: at most one or two sentences of preview for each later chapter, no section of its own for a later chapter, and none of a later chapter's details (numbers, steps, tables, stories, examples). Its own substance is what the later chapters show together and why, as the brief's covers says, not a retelling of them.",
+  "- A body chapter or section does not preview the whole book's route or list the other chapters; that is the preface's job.",
   "- Never write image links or Markdown images yourself; the system searches for pictures after the writing and embeds the verified ones itself.",
   "- Image slots: when an image plan is given below, put one marker for each slot on a line of its own, right after the paragraph the slot belongs to (its position), in exactly this form: \u3014\u5716\u4F4D n\uFF1Awhat the picture explains\u3015 (n is the slot number; copy the wording of what it explains from the plan). One marker per slot, each number once; do not invent, repeat, merge or reword markers; never put a marker inside a code block or a quote, or inside a sentence. The chapter must read in full without the markers. When no image plan is given, or it lists no slot, leave no marker at all.",
   '- Do not end the chapter with an update log, a change note or a "this version" remark; those are added by the system.'
@@ -49895,6 +49896,8 @@ Book structure: the root card is the preface (it has no chapter number), the car
 {{continuity}}
 
 An intro card is the book's guide: its covers previews each later chapter in at most one or two sentences, and neither its covers nor its checklist asks for a later chapter's details (numbers, steps, tables, stories, examples) or a section per later chapter. Its own substance is what the later chapters show together and why, not a retelling of them.
+For the preface, its covers and points are: (a) the question the whole book answers, (b) why these concepts are needed and how the chapters connect into one line of thought, (c) the route, one short line per chapter, (d) how to read the book. No heading of the preface takes a chapter's own subject: when a chapter's title or summary in the list already covers something (for example why frameworks are needed), the preface only names the question and leaves the argument, examples and definitions to that chapter. Its entry opens on the book's question as a whole, not on a scene that a chapter's entry would use. Include one structure item for the preface: no heading of the preface repeats the subject of a chapter (give the headings and the chapter titles it must not repeat, as 'A', 'B').
+A chapter or a section does not preview the whole book's route or list the other chapters: that is the preface's job.
 
 The chapter's role is fixed by the plan: do not change it. Use plain single-line text in every field and no Markdown headings. Use only numbers and links that appear in the supplied text.
 
@@ -49922,7 +49925,7 @@ Next card (JSON object or null):
 Material register (JSON array):
 {{materials}}
 
-All chapters of the book, in reading order (JSON array of {place,title}; the complete and authoritative list):
+All chapters of the book, in reading order (JSON array of {place,title}, with a summary for the preface and each chapter when it fits; the complete and authoritative list):
 {{chapters}}`;
 
 // core/steps/book-pipeline/card-plan-request.md
@@ -50137,7 +50140,8 @@ var imagesRule = (request) => {
     min: String(min)
   }).trimEnd();
 };
-var baseRender = (request) => {
+var CHAPTER_SUMMARY_MAX = 160;
+var baseRender = (request, withSummaries) => {
   var _a2;
   return renderTemplate(card_plan_default, {
     imagesRule: imagesRule(request),
@@ -50155,7 +50159,13 @@ var baseRender = (request) => {
     relations: relations(request),
     continuity: continuity(request, !!((_a2 = request.children) == null ? void 0 : _a2.length)),
     materials: JSON.stringify(request.materials.map((m) => ({ name: cap(m.name, 120), use: cap(m.use, 240) }))),
-    chapters: JSON.stringify(request.chapters.map((c) => ({ place: c.place, title: wholeLine(c.title) })))
+    chapters: JSON.stringify(
+      request.chapters.map((c) => ({
+        place: c.place,
+        title: wholeLine(c.title),
+        ...withSummaries && c.summary ? { summary: cap(c.summary, CHAPTER_SUMMARY_MAX) } : {}
+      }))
+    )
   });
 };
 var childSection = (items, shown) => items.length ? `
@@ -50170,9 +50180,11 @@ function fitCardPlan(request) {
     title: cap(c.title, CHILD_TITLE_MAX),
     summary: cap(c.summary, CHILD_SUMMARY_MAX)
   }));
-  const base = baseRender(request);
   const extra = extraRequest(request.instruction);
-  const used = estimateTokens(base + extra + JSON.stringify(CARD_PLAN_SCHEMA));
+  const usedBy = (text10) => estimateTokens(text10 + extra + JSON.stringify(CARD_PLAN_SCHEMA));
+  let base = baseRender(request, true);
+  if (usedBy(base) > BOOK_STEP_TOKEN_BUDGET) base = baseRender(request, false);
+  const used = usedBy(base);
   if (used > BOOK_STEP_TOKEN_BUDGET) return void 0;
   const room = Math.min(CHILD_CARDS_TOKENS, BOOK_STEP_TOKEN_BUDGET - used);
   const tokens3 = (k) => estimateTokens(childSection(items, k));
@@ -50194,7 +50206,7 @@ var cardPlanStep = {
   version: 2,
   render: (request) => {
     const fitted = fitCardPlan(request);
-    return fitted ? fitted.prompt : baseRender(request) + extraRequest(request.instruction);
+    return fitted ? fitted.prompt : baseRender(request, false) + extraRequest(request.instruction);
   },
   schema: CARD_PLAN_SCHEMA,
   policy: (prompt, request) => {
@@ -57360,9 +57372,18 @@ var BookPipelineRuns = class {
       settings,
       materials: book.materials,
       chapters: order.flatMap((id) => {
-        var _a3;
+        var _a3, _b3, _c2, _d2;
         const own2 = id === nodeId ? card.title : (_a3 = drive.cards.get(id)) == null ? void 0 : _a3.title;
-        return own2 === void 0 ? [] : [{ place: this.placeOf(drive, structure2, id), title: own2 }];
+        if (own2 === void 0) return [];
+        const at = (_b3 = structure2.placeOf(id)) == null ? void 0 : _b3.kind;
+        const summary = summaryText2(id === nodeId ? card.summary : (_d2 = (_c2 = drive.cards.get(id)) == null ? void 0 : _c2.summary) != null ? _d2 : "").trim();
+        return [
+          {
+            place: this.placeOf(drive, structure2, id),
+            title: own2,
+            ...summary && (at === "preface" || at === "chapter") ? { summary } : {}
+          }
+        ];
       }),
       ...children.length ? { children } : {},
       card: {

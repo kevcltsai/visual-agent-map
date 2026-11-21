@@ -2623,8 +2623,8 @@ var en = {
   "ui.settings_book_write_desc": "Writes the body text and finds sources. Decides the quality of the result.",
   "ui.settings_book_image_name": "Pictures",
   "ui.settings_book_image_desc": "Searches the web for each chapter's pictures and suggests the start card's whole-book settings. A cheaper model is enough.",
-  "ui.settings_book_proof_name": "Proofread",
-  "ui.settings_book_proof_desc": "Checks facts independently by actually opening pages. A cheaper model is the default; pick a stronger one for stricter checks.",
+  "ui.settings_book_proof_name": "AI proofread (different from the author)",
+  "ui.settings_book_proof_desc": "Checks each chapter's facts, numbers, consistency and citations and fixes what it finds. Best a different model from the author; Opus is suggested when the author is Sonnet.",
   "ui.settings_book_note": "Changes apply from the next pipeline run; a run in progress is not affected.",
   "ui.settings_group_ai": "AI",
   "ui.settings_group_notes": "Notes",
@@ -3098,10 +3098,12 @@ var en = {
   "ui.book_button_title": "Start the picture-book pipeline: plan, confirm, write, proofread",
   "ui.book_start_title": "Turn this map into a book with pictures",
   "ui.book_start_intro": "From the topics and cards of this map, the AI plans, writes, finds pictures for and proofreads every chapter.",
-  "ui.book_start_estimate_0_1_2_3": "{0} cards \xB7 about {1} \xB7 up to {2} AI calls (a failed step's retry not included; the run pauses at {3}).",
+  "ui.book_start_estimate_0_1_2_3": "{0} cards \xB7 about {1} \xB7 up to {2} AI calls (including the AI proofread and automatic fixes; a failed step's retry not included; the run pauses at {3}).",
   "ui.book_start_under_minute": "under 1 minute",
   "ui.book_start_minutes_0": "{0} minutes",
-  "ui.book_start_stops": "It stops only twice for you to confirm.",
+  "ui.book_start_stops": "It stops only once: after planning, to show you the book's direction. The AI does all the proofreading; you do not need to edit.",
+  "ui.book_step_ai_proof": "AI proofread (different from the author)",
+  "ui.book_start_proof_same_as_author": "Best a different model from the author",
   "ui.book_start_rerun_hint": "If one chapter is not good enough, you can rerun just that chapter.",
   "ui.book_start_suggesting": "Thinking up suggestions from this map's subject...",
   "ui.book_start_settings": "Whole-book settings (grey text is a suggestion; leave a field empty to use it)",
@@ -3211,8 +3213,8 @@ var en = {
   "ui.book_bar_trial_review_cards_0_1": "The {0} trial cards are written, {1} need a look",
   "ui.book_progress_line_plan_cards_0_1": "Planning card {0}/{1}",
   "ui.book_progress_line_trial_cards_0_1": "Trying card {0}/{1} first",
-  "ui.book_start_estimate_struct_0_1_2_3_4_5": "Preface + {0} chapters + {1} sections ({2} cards) \xB7 about {3} \xB7 up to {4} AI calls (a failed step's retry not included; the run pauses at {5}).",
-  "ui.book_start_estimate_struct_0_1_2_3_4": "Preface + {0} chapters ({1} cards) \xB7 about {2} \xB7 up to {3} AI calls (a failed step's retry not included; the run pauses at {4}).",
+  "ui.book_start_estimate_struct_0_1_2_3_4_5": "Preface + {0} chapters + {1} sections ({2} cards) \xB7 about {3} \xB7 up to {4} AI calls (including the AI proofread and automatic fixes; a failed step's retry not included; the run pauses at {5}).",
+  "ui.book_start_estimate_struct_0_1_2_3_4": "Preface + {0} chapters ({1} cards) \xB7 about {2} \xB7 up to {3} AI calls (including the AI proofread and automatic fixes; a failed step's retry not included; the run pauses at {4}).",
   "ui.book_summary_done": "What it covers: ",
   "ui.book_issue_0": "Needs a look: {0}",
   "ui.book_issue_unknown": "Needs a manual look (the reason code is not recognized).",
@@ -5900,8 +5902,8 @@ var zhCN = {
   "ui.settings_book_write_desc": "\u5199\u6B63\u6587\u4E0E\u627E\u8D44\u6599\uFF0C\u5F71\u54CD\u6210\u54C1\u8D28\u91CF\u3002",
   "ui.settings_book_image_name": "\u627E\u56FE",
   "ui.settings_book_image_desc": "\u4E3A\u6BCF\u7AE0\u4E0A\u7F51\u627E\u56FE\uFF0C\u4E5F\u8D1F\u8D23\u8D77\u59CB\u786E\u8BA4\u5361\u7684\u5168\u4E66\u8BBE\u7F6E\u5EFA\u8BAE\u3002\u7528\u4FBF\u5B9C\u6A21\u578B\u5373\u53EF\u3002",
-  "ui.settings_book_proof_name": "\u6821\u5BF9",
-  "ui.settings_book_proof_desc": "\u72EC\u7ACB\u67E5\u8BC1\uFF0C\u8981\u5B9E\u9645\u6253\u5F00\u9875\u9762\u3002\u9ED8\u8BA4\u7528\u4FBF\u5B9C\u6A21\u578B\uFF1B\u8981\u66F4\u4E25\u683C\u53EF\u6539\u7528\u8F83\u5F3A\u6A21\u578B\u3002",
+  "ui.settings_book_proof_name": "AI \u6821\u5BF9\uFF08\u548C\u4F5C\u8005\u4E0D\u540C\uFF09",
+  "ui.settings_book_proof_desc": "\u9010\u7AE0\u67E5\u4E8B\u5B9E\u3001\u6570\u5B57\u3001\u524D\u540E\u4E00\u81F4\u548C\u5F15\u7528\uFF0C\u67E5\u5230\u5C31\u76F4\u63A5\u4FEE\u3002\u6700\u597D\u548C\u4F5C\u8005\u7528\u4E0D\u540C\u7684\u6A21\u578B\uFF1B\u4F5C\u8005\u7528 Sonnet \u65F6\u5EFA\u8BAE Opus\u3002",
   "ui.settings_book_note": "\u53D8\u66F4\u4E0B\u4E00\u6B21\u6D41\u6C34\u7EBF\u624D\u751F\u6548\uFF0C\u8FDB\u884C\u4E2D\u7684\u4E0D\u53D7\u5F71\u54CD\u3002",
   "ui.settings_group_ai": "AI",
   "ui.settings_group_notes": "\u7B14\u8BB0",
@@ -6375,10 +6377,12 @@ var zhCN = {
   "ui.book_button_title": "\u5F00\u59CB\u56FE\u6587\u4E66\u6D41\u6C34\u7EBF\uFF1A\u4F01\u5212\u3001\u786E\u8BA4\u3001\u4F5C\u8005\u3001\u6821\u5BF9",
   "ui.book_start_title": "\u628A\u8FD9\u5F20\u601D\u7EF4\u5BFC\u56FE\u53D8\u6210\u4E00\u672C\u6709\u56FE\u7684\u4E66",
   "ui.book_start_intro": "\u4F1A\u4F9D\u8FD9\u5F20\u601D\u7EF4\u5BFC\u56FE\u7684\u4E3B\u9898\u4E0E\u5361\u7247\uFF0C\u7531 AI \u4F01\u5212\u3001\u5199\u4F5C\u3001\u627E\u56FE\u3001\u6821\u5BF9\u6BCF\u4E00\u7AE0\u3002",
-  "ui.book_start_estimate_0_1_2_3": "{0} \u5F20\u5361 \xB7 \u7EA6 {1} \xB7 \u6700\u591A {2} \u6B21 AI \u8C03\u7528\uFF08\u6B65\u9AA4\u5931\u8D25\u91CD\u8BD5\u53E6\u8BA1\uFF1B\u5230 {3} \u6B21\u4F1A\u5148\u505C\u4E0B\uFF09\u3002",
+  "ui.book_start_estimate_0_1_2_3": "{0} \u5F20\u5361 \xB7 \u7EA6 {1} \xB7 \u6700\u591A {2} \u6B21 AI \u8C03\u7528\uFF08\u542B AI \u6821\u5BF9\u548C\u81EA\u52A8\u4FEE\u6B63\uFF1B\u6B65\u9AA4\u5931\u8D25\u91CD\u8BD5\u53E6\u8BA1\uFF1B\u5230 {3} \u6B21\u4F1A\u5148\u505C\u4E0B\uFF09\u3002",
   "ui.book_start_under_minute": "\u4E0D\u5230 1 \u5206\u949F",
   "ui.book_start_minutes_0": "{0} \u5206\u949F",
-  "ui.book_start_stops": "\u4E2D\u95F4\u53EA\u4F1A\u505C\u4E24\u6B21\uFF0C\u8BA9\u4F60\u786E\u8BA4\u3002",
+  "ui.book_start_stops": "\u53EA\u4F1A\u505C\u4E00\u6B21\uFF1A\u4F01\u5212\u597D\u540E\u8BA9\u4F60\u770B\u5168\u4E66\u65B9\u5411\u3002\u6821\u5BF9\u5168\u90E8\u7531 AI \u505A\uFF0C\u4F60\u4E0D\u7528\u6539\u7A3F\u3002",
+  "ui.book_step_ai_proof": "AI \u6821\u5BF9\uFF08\u548C\u4F5C\u8005\u4E0D\u540C\uFF09",
+  "ui.book_start_proof_same_as_author": "\u6700\u597D\u548C\u4F5C\u8005\u4E0D\u540C",
   "ui.book_start_rerun_hint": "\u67D0\u4E00\u7AE0\u4E0D\u6EE1\u610F\uFF0C\u53EF\u4EE5\u53EA\u91CD\u8DD1\u90A3\u4E00\u7AE0\u3002",
   "ui.book_start_suggesting": "\u6B63\u5728\u4F9D\u8FD9\u5F20\u601D\u7EF4\u5BFC\u56FE\u7684\u4E3B\u9898\u60F3\u5EFA\u8BAE\u2026\u2026",
   "ui.book_start_settings": "\u5168\u4E66\u8BBE\u5B9A\uFF08\u7070\u5B57\u662F\u5EFA\u8BAE\uFF0C\u4E0D\u586B\u5C31\u7528\u5B83\uFF09",
@@ -6488,8 +6492,8 @@ var zhCN = {
   "ui.book_bar_trial_review_cards_0_1": "\u8BD5\u8DD1\u7684 {0} \u5F20\u5361\u5199\u597D\u4E86\uFF0C{1} \u5F20\u8981\u4F60\u770B",
   "ui.book_progress_line_plan_cards_0_1": "\u6B63\u5728\u4F01\u5212\u7B2C {0}\uFF0F{1} \u5F20\u5361",
   "ui.book_progress_line_trial_cards_0_1": "\u6B63\u5728\u8BD5\u8DD1\u7B2C {0}\uFF0F{1} \u5F20\u5361",
-  "ui.book_start_estimate_struct_0_1_2_3_4_5": "\u524D\u8A00 + {0} \u7AE0 + {1} \u8282\uFF08{2} \u5F20\u5361\uFF09\xB7 \u7EA6 {3} \xB7 \u6700\u591A {4} \u6B21 AI \u8C03\u7528\uFF08\u6B65\u9AA4\u5931\u8D25\u91CD\u8BD5\u53E6\u8BA1\uFF1B\u5230 {5} \u6B21\u4F1A\u5148\u505C\u4E0B\uFF09\u3002",
-  "ui.book_start_estimate_struct_0_1_2_3_4": "\u524D\u8A00 + {0} \u7AE0\uFF08{1} \u5F20\u5361\uFF09\xB7 \u7EA6 {2} \xB7 \u6700\u591A {3} \u6B21 AI \u8C03\u7528\uFF08\u6B65\u9AA4\u5931\u8D25\u91CD\u8BD5\u53E6\u8BA1\uFF1B\u5230 {4} \u6B21\u4F1A\u5148\u505C\u4E0B\uFF09\u3002",
+  "ui.book_start_estimate_struct_0_1_2_3_4_5": "\u524D\u8A00 + {0} \u7AE0 + {1} \u8282\uFF08{2} \u5F20\u5361\uFF09\xB7 \u7EA6 {3} \xB7 \u6700\u591A {4} \u6B21 AI \u8C03\u7528\uFF08\u542B AI \u6821\u5BF9\u548C\u81EA\u52A8\u4FEE\u6B63\uFF1B\u6B65\u9AA4\u5931\u8D25\u91CD\u8BD5\u53E6\u8BA1\uFF1B\u5230 {5} \u6B21\u4F1A\u5148\u505C\u4E0B\uFF09\u3002",
+  "ui.book_start_estimate_struct_0_1_2_3_4": "\u524D\u8A00 + {0} \u7AE0\uFF08{1} \u5F20\u5361\uFF09\xB7 \u7EA6 {2} \xB7 \u6700\u591A {3} \u6B21 AI \u8C03\u7528\uFF08\u542B AI \u6821\u5BF9\u548C\u81EA\u52A8\u4FEE\u6B63\uFF1B\u6B65\u9AA4\u5931\u8D25\u91CD\u8BD5\u53E6\u8BA1\uFF1B\u5230 {4} \u6B21\u4F1A\u5148\u505C\u4E0B\uFF09\u3002",
   "ui.book_summary_done": "\u5B9E\u9645\u8BB2\u4E86\uFF1A",
   "ui.book_issue_0": "\u9700\u4EBA\u770B\uFF1A{0}",
   "ui.book_issue_unknown": "\u9700\u8981\u4EBA\u5DE5\u67E5\u770B\uFF08\u539F\u56E0\u4EE3\u7801\u65E0\u6CD5\u8BC6\u522B\uFF09\u3002",
@@ -9177,8 +9181,8 @@ var zhTW = {
   "ui.settings_book_write_desc": "\u5BEB\u6B63\u6587\u8207\u627E\u8CC7\u6599\uFF0C\u5F71\u97FF\u6210\u54C1\u54C1\u8CEA\u3002",
   "ui.settings_book_image_name": "\u627E\u5716",
   "ui.settings_book_image_desc": "\u66FF\u6BCF\u7AE0\u4E0A\u7DB2\u627E\u5716\uFF0C\u4E5F\u8CA0\u8CAC\u8D77\u59CB\u78BA\u8A8D\u5361\u7684\u5168\u66F8\u8A2D\u5B9A\u5EFA\u8B70\u3002\u7528\u4FBF\u5B9C\u6A21\u578B\u5373\u53EF\u3002",
-  "ui.settings_book_proof_name": "\u6821\u5C0D",
-  "ui.settings_book_proof_desc": "\u7368\u7ACB\u67E5\u8B49\uFF0C\u8981\u5BE6\u969B\u958B\u9801\u3002\u9810\u8A2D\u7528\u4FBF\u5B9C\u6A21\u578B\uFF1B\u8981\u66F4\u56B4\u683C\u53EF\u6539\u7528\u8F03\u5F37\u6A21\u578B\u3002",
+  "ui.settings_book_proof_name": "AI \u6821\u5C0D\uFF08\u548C\u4F5C\u8005\u4E0D\u540C\uFF09",
+  "ui.settings_book_proof_desc": "\u9010\u7AE0\u67E5\u4E8B\u5BE6\u3001\u6578\u5B57\u3001\u524D\u5F8C\u4E00\u81F4\u548C\u5F15\u7528\uFF0C\u67E5\u5230\u5C31\u76F4\u63A5\u4FEE\u3002\u6700\u597D\u548C\u4F5C\u8005\u7528\u4E0D\u540C\u7684\u6A21\u578B\uFF1B\u4F5C\u8005\u7528 Sonnet \u6642\u5EFA\u8B70 Opus\u3002",
   "ui.settings_book_note": "\u8B8A\u66F4\u4E0B\u4E00\u6B21\u6D41\u6C34\u7DDA\u624D\u751F\u6548\uFF0C\u9032\u884C\u4E2D\u7684\u4E0D\u53D7\u5F71\u97FF\u3002",
   "ui.settings_group_ai": "AI",
   "ui.settings_group_notes": "\u7B46\u8A18",
@@ -9652,10 +9656,12 @@ var zhTW = {
   "ui.book_button_title": "\u958B\u59CB\u5716\u6587\u66F8\u6D41\u6C34\u7DDA\uFF1A\u4F01\u5283\u3001\u78BA\u8A8D\u3001\u4F5C\u8005\u3001\u6821\u5C0D",
   "ui.book_start_title": "\u628A\u9019\u5F35\u5FC3\u667A\u5716\u8B8A\u6210\u4E00\u672C\u6709\u5716\u7684\u66F8",
   "ui.book_start_intro": "\u6703\u4F9D\u9019\u5F35\u5FC3\u667A\u5716\u7684\u4E3B\u984C\u8207\u5361\u7247\uFF0C\u7531 AI \u4F01\u5283\u3001\u5BEB\u4F5C\u3001\u627E\u5716\u3001\u6821\u5C0D\u6BCF\u4E00\u7AE0\u3002",
-  "ui.book_start_estimate_0_1_2_3": "{0} \u5F35\u5361 \xB7 \u7D04 {1} \xB7 \u6700\u591A {2} \u6B21 AI \u547C\u53EB\uFF08\u6B65\u9A5F\u5931\u6557\u91CD\u8A66\u53E6\u8A08\uFF1B\u5230 {3} \u6B21\u6703\u5148\u505C\u4E0B\uFF09\u3002",
+  "ui.book_start_estimate_0_1_2_3": "{0} \u5F35\u5361 \xB7 \u7D04 {1} \xB7 \u6700\u591A {2} \u6B21 AI \u547C\u53EB\uFF08\u542B AI \u6821\u5C0D\u548C\u81EA\u52D5\u4FEE\u6B63\uFF1B\u6B65\u9A5F\u5931\u6557\u91CD\u8A66\u53E6\u8A08\uFF1B\u5230 {3} \u6B21\u6703\u5148\u505C\u4E0B\uFF09\u3002",
   "ui.book_start_under_minute": "\u4E0D\u5230 1 \u5206\u9418",
   "ui.book_start_minutes_0": "{0} \u5206\u9418",
-  "ui.book_start_stops": "\u4E2D\u9593\u53EA\u6703\u505C\u5169\u6B21\uFF0C\u8B93\u4F60\u78BA\u8A8D\u3002",
+  "ui.book_start_stops": "\u53EA\u6703\u505C\u4E00\u6B21\uFF1A\u4F01\u5283\u597D\u5F8C\u8B93\u4F60\u770B\u5168\u66F8\u65B9\u5411\u3002\u6821\u5C0D\u5168\u90E8\u7531 AI \u505A\uFF0C\u4F60\u4E0D\u7528\u6539\u7A3F\u3002",
+  "ui.book_step_ai_proof": "AI \u6821\u5C0D\uFF08\u548C\u4F5C\u8005\u4E0D\u540C\uFF09",
+  "ui.book_start_proof_same_as_author": "\u6700\u597D\u548C\u4F5C\u8005\u4E0D\u540C",
   "ui.book_start_rerun_hint": "\u67D0\u4E00\u7AE0\u4E0D\u6EFF\u610F\uFF0C\u53EF\u4EE5\u53EA\u91CD\u8DD1\u90A3\u4E00\u7AE0\u3002",
   "ui.book_start_suggesting": "\u6B63\u5728\u4F9D\u9019\u5F35\u5FC3\u667A\u5716\u7684\u4E3B\u984C\u60F3\u5EFA\u8B70\u22EF\u22EF",
   "ui.book_start_settings": "\u5168\u66F8\u8A2D\u5B9A\uFF08\u7070\u5B57\u662F\u5EFA\u8B70\uFF0C\u4E0D\u586B\u5C31\u7528\u5B83\uFF09",
@@ -9765,8 +9771,8 @@ var zhTW = {
   "ui.book_bar_trial_review_cards_0_1": "\u8A66\u8DD1\u7684 {0} \u5F35\u5361\u5BEB\u597D\u4E86\uFF0C{1} \u5F35\u8981\u4F60\u770B",
   "ui.book_progress_line_plan_cards_0_1": "\u6B63\u5728\u4F01\u5283\u7B2C {0}\uFF0F{1} \u5F35\u5361",
   "ui.book_progress_line_trial_cards_0_1": "\u6B63\u5728\u8A66\u8DD1\u7B2C {0}\uFF0F{1} \u5F35\u5361",
-  "ui.book_start_estimate_struct_0_1_2_3_4_5": "\u524D\u8A00 + {0} \u7AE0 + {1} \u7BC0\uFF08{2} \u5F35\u5361\uFF09\xB7 \u7D04 {3} \xB7 \u6700\u591A {4} \u6B21 AI \u547C\u53EB\uFF08\u6B65\u9A5F\u5931\u6557\u91CD\u8A66\u53E6\u8A08\uFF1B\u5230 {5} \u6B21\u6703\u5148\u505C\u4E0B\uFF09\u3002",
-  "ui.book_start_estimate_struct_0_1_2_3_4": "\u524D\u8A00 + {0} \u7AE0\uFF08{1} \u5F35\u5361\uFF09\xB7 \u7D04 {2} \xB7 \u6700\u591A {3} \u6B21 AI \u547C\u53EB\uFF08\u6B65\u9A5F\u5931\u6557\u91CD\u8A66\u53E6\u8A08\uFF1B\u5230 {4} \u6B21\u6703\u5148\u505C\u4E0B\uFF09\u3002",
+  "ui.book_start_estimate_struct_0_1_2_3_4_5": "\u524D\u8A00 + {0} \u7AE0 + {1} \u7BC0\uFF08{2} \u5F35\u5361\uFF09\xB7 \u7D04 {3} \xB7 \u6700\u591A {4} \u6B21 AI \u547C\u53EB\uFF08\u542B AI \u6821\u5C0D\u548C\u81EA\u52D5\u4FEE\u6B63\uFF1B\u6B65\u9A5F\u5931\u6557\u91CD\u8A66\u53E6\u8A08\uFF1B\u5230 {5} \u6B21\u6703\u5148\u505C\u4E0B\uFF09\u3002",
+  "ui.book_start_estimate_struct_0_1_2_3_4": "\u524D\u8A00 + {0} \u7AE0\uFF08{1} \u5F35\u5361\uFF09\xB7 \u7D04 {2} \xB7 \u6700\u591A {3} \u6B21 AI \u547C\u53EB\uFF08\u542B AI \u6821\u5C0D\u548C\u81EA\u52D5\u4FEE\u6B63\uFF1B\u6B65\u9A5F\u5931\u6557\u91CD\u8A66\u53E6\u8A08\uFF1B\u5230 {4} \u6B21\u6703\u5148\u505C\u4E0B\uFF09\u3002",
   "ui.book_summary_done": "\u5BE6\u969B\u8B1B\u4E86\uFF1A",
   "ui.book_issue_0": "\u9700\u4EBA\u770B\uFF1A{0}",
   "ui.book_issue_unknown": "\u9700\u8981\u4EBA\u5DE5\u67E5\u770B\uFF08\u539F\u56E0\u4EE3\u78BC\u7121\u6CD5\u8FA8\u8B58\uFF09\u3002",
@@ -49020,15 +49026,6 @@ function useExpandPass(data, nodeId) {
   next.revision++;
   return { state: next, accepted: true };
 }
-function reopenTrialFix(data, nodeId) {
-  var _a2;
-  if (data.phase !== "writing" || data.status !== "running" || !((_a2 = data.trial) == null ? void 0 : _a2.includes(nodeId)) || !autoFixesOf(data, nodeId))
-    return { state: data, accepted: false };
-  const next = clone2(data);
-  if (next.autoFixes) delete next.autoFixes[nodeId];
-  next.revision++;
-  return { state: next, accepted: true };
-}
 function resetCard(data, nodeId) {
   if (!effectiveOrder(data).includes(nodeId)) return data;
   const next = clone2(data);
@@ -54688,7 +54685,6 @@ var BookPipelineRuns = class {
         });
         if (!moved) throw new BookPipelineRunError("not_gate1");
         this.log(drive, "gate1", "-", "write", "confirmed");
-        await this.queueTrialFixes(drive);
       },
       true
     );
@@ -55634,10 +55630,7 @@ var BookPipelineRuns = class {
             state: advancePhase(state, this.stagesOf(drive), this.ports.now()),
             accepted: true
           }));
-          if (drive.store.state !== before) {
-            changed = true;
-            if (before.phase === "gate1" && drive.store.state.phase === "writing") await this.queueTrialFixes(drive);
-          }
+          if (drive.store.state !== before) changed = true;
         } else if (action.type === "ai_proof" || action.type === "ai_fix") {
           if (inflight.size >= BOOK_POOL) continue;
           const key4 = action.nodeId;
@@ -56342,38 +56335,6 @@ var BookPipelineRuns = class {
     if (step !== "plan" && issue2 === failure && !NO_FAILURE_SECTION.has(reason))
       await this.writeFailureSection(drive, nodeId, reason);
     this.syncReviewNotes(drive);
-  }
-  /**
-   * Gate 1 confirmed: a trial chapter still needing a person (its proof's unmet points or its length) joins the full book's fix round,
-   * with the instruction its stored proof and its length give now. A hand-edited or kept chapter is not queued.
-   */
-  async queueTrialFixes(drive) {
-    var _a2, _b2, _c;
-    for (const id of (_a2 = drive.store.state.trial) != null ? _a2 : []) {
-      const info = drive.cards.get(id);
-      if (!info || drive.stages.get(id) !== "needs-review") continue;
-      const card = await this.ports.readCard(info.path).catch(() => void 0);
-      if (!card || isKeptRaw(card.raw) || /^write failed: hand_edited$/.test(String((_b2 = card.fields.pipelineIssue) != null ? _b2 : "").trim()))
-        continue;
-      const proof = latestStoredProof(card.detail);
-      const length = await this.lengthOf(drive, id, lengthBody(chapterBody(card.detail)));
-      if ((proof == null ? void 0 : proof.aggregate) !== "needs-review" && !length) continue;
-      const done = await drive.store.commit((state) => reopenTrialFix(state, id));
-      if (!(done == null ? void 0 : done.accepted)) continue;
-      const items = ((_c = proof == null ? void 0 : proof.items) != null ? _c : []).map((item) => ({ ...item, sources: [...item.sources] }));
-      drive.fixable.set(
-        id,
-        proofFixInstruction(
-          items,
-          [...parseChecklist(card.prompt), ...BOOK_CHECKS],
-          length,
-          researchVoiceSentences(`${chapterBody(card.detail)}
-
-${readerCallouts(card.detail)}`)
-        )
-      );
-      drive.expand.add(id);
-    }
   }
   /**
    * The one automatic redo (plan 2026 flow v3, E), after every card has had its first round: a card whose proofread named unmet points
@@ -71288,12 +71249,13 @@ function bookChapterCalls() {
   return {
     plan: 1,
     write: writes + BOOK_EXPAND_PASSES,
-    images: writes * BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH,
-    proof: writes
+    images: BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH,
+    proof: writes,
+    aiProof: 1 + 2 * MAX_AI_FIX_ROUNDS
   };
 }
-function bookTrialExtraCalls() {
-  return 1 + BOOK_IMAGE_SEARCHES * BOOK_IMAGE_CALLS_PER_SEARCH + 1;
+function bookWholeCalls(cards) {
+  return 1 + (cards >= 2 ? 1 + 2 * MAX_AI_FIX_ROUNDS : 0);
 }
 function bookModelSpeed(model) {
   const id = model.toLowerCase();
@@ -71308,16 +71270,16 @@ function bookStartEstimate(cards, trialCards, models) {
   };
   const per = bookChapterCalls();
   const writes = 1 + MAX_AUTO_FIXES;
-  const perCard = time("plan") + writes * (time("write") + BOOK_IMAGE_SEARCHES * time("images") + time("proof")) + BOOK_EXPAND_PASSES * time("write");
+  const aiProof = time("proof") + MAX_AI_FIX_ROUNDS * (time("write") + time("proof"));
+  const perCard = time("plan") + writes * (time("write") + time("proof")) + BOOK_IMAGE_SEARCHES * time("images") + BOOK_EXPAND_PASSES * time("write") + aiProof;
   const trial = Math.min(n, Math.max(0, Math.floor(trialCards)));
   const rounds = Math.ceil(trial / BOOK_POOL) + Math.ceil((n - trial) / BOOK_POOL);
   return {
     cards: n,
-    // The global plan, every chapter's calls, and the one whole-book consistency check once there are two chapters to compare.
-    // A trial chapter has a second fix round (before and after gate 1): one more write with its searches and proofread each.
-    calls: 1 + n * (per.plan + per.write + per.images + per.proof) + trial * bookTrialExtraCalls() + (n >= 2 ? 1 : 0),
+    // The whole-book plan and proofread, and every chapter's calls: an upper bound.
+    calls: bookWholeCalls(n) + n * (per.plan + per.write + per.images + per.proof + per.aiProof),
     limit: DEFAULT_BUDGET_LIMIT,
-    seconds: time("global") + rounds * perCard
+    seconds: time("global") + rounds * perCard + (n >= 2 ? aiProof : 0)
   };
 }
 function bookStartEstimateText(estimate, structure2) {
@@ -71363,7 +71325,7 @@ var MODEL_ROWS = [
   { key: "bookPlanModel", step: "plan", label: "ui.book_step_plan" },
   { key: "bookWriteModel", step: "write", label: "ui.book_step_write" },
   { key: "bookImageModel", step: "images", label: "ui.book_progress_step_images" },
-  { key: "bookProofModel", step: "proof", label: "ui.book_step_proof" }
+  { key: "bookProofModel", step: "proof", label: "ui.book_step_ai_proof" }
 ];
 var FIELD_LABEL = {
   reader: "coffee.book_reader",
@@ -71437,6 +71399,10 @@ ${t("ui.book_deleted_chapter_hint_keep")}` : ""
   };
 }
 function renderBookModelChoice(parent, input2) {
+  let warning = null;
+  const refreshWarning = () => {
+    warning == null ? void 0 : warning.setText(input2.models.proof === input2.models.write ? t("ui.book_start_proof_same_as_author") : "");
+  };
   for (const row of MODEL_ROWS) {
     const id = `vam-book-start-model-${row.step}`;
     const name2 = t(row.label);
@@ -71452,9 +71418,15 @@ function renderBookModelChoice(parent, input2) {
     select.addEventListener("change", () => {
       if (!select.value) return;
       input2.models[row.step] = select.value;
+      refreshWarning();
       input2.onChange(row.key, select.value);
     });
+    if (row.step === "proof") {
+      warning = parent.createSpan({ cls: "vam-book-start-model-warning" });
+      warning.setAttr("role", "status");
+    }
   }
+  refreshWarning();
 }
 var BookStartModal = class extends import_obsidian32.Modal {
   constructor(app, input2) {

@@ -145,17 +145,17 @@ test('bar: the automatic fix round keeps the whole-book count; a first-time chap
   assert.equal(text([{ nodeId: 'b', step: 'write', startedAt: 1 }]), '正在寫第 2／4 章', 'no fix round: unchanged');
 });
 
-test('bar: in the trial the fix round shows the trial done count, not chapter 1/3; an initial trial write is still named', () => {
+test('bar: a run saved in the old trial planning step reads as writing: the fix round keeps the whole-book done count; an initial write is still named', () => {
   setUiLanguage('zh-TW');
-  const data = { v: 1, runId: 'r', phase: 'planning', status: 'running', order: ['a', 'b', 'c', 'd', 'e'], trial: ['a', 'b', 'c'], globalPlanned: true, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', autoFixes: { a: 1 } };
-  const progress = current => ({ runId: 'r', phase: 'planning', status: 'running', active: true, total: 5, counts: { pending: 2, planned: 0, written: 0, checked: 3, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current });
+  const data = { v: 1, runId: 'r', phase: 'writing', status: 'running', order: ['a', 'b', 'c', 'd', 'e'], trial: ['a', 'b', 'c'], globalPlanned: true, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', autoFixes: { a: 1 } };
+  const progress = current => ({ runId: 'r', phase: 'writing', status: 'running', active: true, total: 5, counts: { pending: 2, planned: 0, written: 0, checked: 3, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current });
   const text = current => bundle.bookProgressText(bundle.bookBarState(data, progress(current), () => undefined));
-  assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }]), '正在修正第 1 章・已完成 3／3 章', 'fix only: named fix line with the trial done count');
-  assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }, { nodeId: 'c', step: 'write', startedAt: 2 }]), '正在試跑第 3／3 章', 'initial write alongside a fix is named');
-  assert.equal(text([{ nodeId: 'b', step: 'write', startedAt: 1 }]), '正在試跑第 2／3 章', 'a trial chapter in its first write is named');
+  assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }]), '正在修正第 1 章・已完成 3／5 章', 'fix only: named fix line with the whole-book done count');
+  assert.equal(text([{ nodeId: 'a', step: 'write', startedAt: 1 }, { nodeId: 'c', step: 'write', startedAt: 2 }]), '正在寫第 3／5 章', 'initial write alongside a fix is named');
+  assert.equal(text([{ nodeId: 'b', step: 'write', startedAt: 1 }]), '正在寫第 2／5 章', 'a chapter in its first write is named');
 });
 
-test('bar (live v6): in the trial fix round the fix line names the chapter still being fixed as the fixes finish out of order, also for a trial that is not the first chapters', () => {
+test('bar (live v6): in the fix round the fix line names the chapter still being fixed as the fixes finish out of order, also for fixes that are not the first chapters', () => {
   setUiLanguage('zh-TW');
   const stages = {};
   const counts = () => {
@@ -163,38 +163,38 @@ test('bar (live v6): in the trial fix round the fix line names the chapter still
     return { pending: 6 - 3, planned: 0, written: 3 - done, checked: done, 'needs-review': 0 };
   };
   const run = (order, trial) => {
-    const data = { v: 1, runId: 'r', phase: 'planning', status: 'running', order, trial, globalPlanned: true, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', autoFixes: Object.fromEntries(trial.map(id => [id, 1])) };
-    const progress = current => ({ runId: 'r', phase: 'planning', status: 'running', active: true, total: order.length, counts: counts(), budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current });
+    const data = { v: 1, runId: 'r', phase: 'writing', status: 'running', order, globalPlanned: true, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', autoFixes: Object.fromEntries(trial.map(id => [id, 1])) };
+    const progress = current => ({ runId: 'r', phase: 'writing', status: 'running', active: true, total: order.length, counts: counts(), budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current });
     return busy => bundle.bookProgressText(bundle.bookBarState(data, progress(busy.map((nodeId, i) => ({ nodeId, step: 'proof', startedAt: i + 1 }))), id => stages[id]));
   };
   // v6: the three trial fixes run together; chapter 3 finishes first, then chapter 1, then chapter 2.
   for (const key of Object.keys(stages)) delete stages[key];
   let text = run(['a', 'b', 'c', 'd', 'e', 'f'], ['a', 'b', 'c']);
-  assert.equal(text(['a', 'b', 'c']), '正在修正第 1 章・已完成 0／3 章');
+  assert.equal(text(['a', 'b', 'c']), '正在修正第 1 章・已完成 0／6 章');
   stages.c = 'checked';
-  assert.equal(text(['a', 'b', 'c']), '正在修正第 1 章・已完成 1／3 章', 'chapter 1 is still being fixed');
+  assert.equal(text(['a', 'b', 'c']), '正在修正第 1 章・已完成 1／6 章', 'chapter 1 is still being fixed');
   stages.a = 'checked';
-  assert.equal(text(['a', 'b']), '正在修正第 2 章・已完成 2／3 章', 'chapter 1 is done: chapter 2 is named');
-  assert.equal(text(['b']), '正在修正第 2 章・已完成 2／3 章');
+  assert.equal(text(['a', 'b']), '正在修正第 2 章・已完成 2／6 章', 'chapter 1 is done: chapter 2 is named');
+  assert.equal(text(['b']), '正在修正第 2 章・已完成 2／6 章');
   // A trial picked from the middle of the book (reading order d, b, f): the chapter numbers are the book's.
   for (const key of Object.keys(stages)) delete stages[key];
   text = run(['a', 'b', 'c', 'd', 'e', 'f'], ['d', 'b', 'f']);
-  assert.equal(text(['d', 'b', 'f']), '正在修正第 2 章・已完成 0／3 章');
+  assert.equal(text(['d', 'b', 'f']), '正在修正第 2 章・已完成 0／6 章');
   stages.b = 'needs-review';
-  assert.equal(text(['d', 'f']), '正在修正第 4 章・已完成 1／3 章');
+  assert.equal(text(['d', 'f']), '正在修正第 4 章・已完成 1／6 章');
   stages.d = 'checked';
-  assert.equal(text(['f']), '正在修正第 6 章・已完成 2／3 章');
-  assert.equal(text([]), '正在修正第 6 章・已完成 2／3 章', 'between two steps of chapter 6\'s fix');
+  assert.equal(text(['f']), '正在修正第 6 章・已完成 2／6 章');
+  assert.equal(text([]), '正在修正第 6 章・已完成 2／6 章', 'between two steps of chapter 6\'s fix');
 });
 
 test('bar: the fix line follows the chapter still being fixed and keeps the fix label between its steps', () => {
   setUiLanguage('zh-TW');
-  const trial = { v: 1, runId: 'r', phase: 'planning', status: 'running', order: ['a', 'b', 'c', 'd'], trial: ['a', 'b', 'c'], globalPlanned: true, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', autoFixes: { a: 1, b: 1, c: 1 } };
-  const tp = current => ({ runId: 'r', phase: 'planning', status: 'running', active: true, total: 4, counts: { pending: 1, planned: 0, written: 2, checked: 1, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current });
+  const trial = { v: 1, runId: 'r', phase: 'writing', status: 'running', order: ['a', 'b', 'c', 'd'], globalPlanned: true, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', autoFixes: { a: 1, b: 1, c: 1 } };
+  const tp = current => ({ runId: 'r', phase: 'writing', status: 'running', active: true, total: 4, counts: { pending: 1, planned: 0, written: 2, checked: 1, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current });
   const done = { a: 'checked' };
   const ttext = current => bundle.bookProgressText(bundle.bookBarState(trial, tp(current), id => done[id]));
   // chapter 1 is proofread (counted done) but its step has not left the runner yet: chapter 2, still in its fix, is named
-  assert.equal(ttext([{ nodeId: 'a', step: 'proof', startedAt: 1 }, { nodeId: 'b', step: 'write', startedAt: 2 }, { nodeId: 'c', step: 'write', startedAt: 3 }]), '正在修正第 2 章・已完成 1／3 章');
+  assert.equal(ttext([{ nodeId: 'a', step: 'proof', startedAt: 1 }, { nodeId: 'b', step: 'write', startedAt: 2 }, { nodeId: 'c', step: 'write', startedAt: 3 }]), '正在修正第 2 章・已完成 1／4 章');
   const whole = { v: 1, runId: 'r', phase: 'writing', status: 'running', order: ['a', 'b', 'c', 'd', 'e', 'f'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', autoFixes: { f: 1 } };
   const wp = current => ({ runId: 'r', phase: 'writing', status: 'running', active: true, total: 6, counts: { pending: 0, planned: 0, written: 1, checked: 5, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current });
   const stages = { a: 'checked', b: 'checked', c: 'checked', d: 'checked', e: 'checked', f: 'written' };
@@ -246,8 +246,8 @@ test('bar: a run paused for a map change counts the map as it is now (a card rem
 
 test('bar: waiting at gate 1 or gate 2, or a finished book, shows the map-change line with live counts, and nothing when the map matches', () => {
   setUiLanguage('zh-TW');
-  for (const phase of ['gate1', 'gate2', 'done']) {
-    const data = { v: 1, runId: 'r', phase, status: 'running', order: ['a', 'b', 'c'], accepted: ['a', 'b', 'c'], trial: ['a'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x' };
+  for (const phase of ['gate1', 'done']) {
+    const data = { v: 1, runId: 'r', phase, status: 'running', order: ['a', 'b', 'c'], accepted: ['a', 'b', 'c'], ...(phase === 'gate1' ? { planReview: true, trial: ['a'] } : {}), budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x' };
     const line = mapIds => {
       const state = bundle.bookBarState(data, undefined, () => undefined, mapIds);
       assert.equal(state.mode, phase);
@@ -525,4 +525,77 @@ test('bar: while the whole-book consistency check runs the line says so, never w
   assert.equal(bundle.bookProgressText(bundle.bookBarState(data, progress, () => undefined)), '正在檢查全書一致性・已完成 4／4 章');
   const idle = { ...data, consistency: { key: 'k', attempts: 1, done: true } };
   assert.match(bundle.bookProgressText(bundle.bookBarState(idle, progress, () => undefined)), /^正在寫第/, 'a finished check is not shown');
+});
+
+// P8c: the AI proofread numbers on the bar, the plan review and the finished state.
+const aiData = over => ({ v: 1, runId: 'r', phase: 'writing', status: 'running', order: ['a', 'b', 'c', 'd'], accepted: ['a', 'b', 'c', 'd'], budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', ...over });
+const slot = over => ({ key: 'k', attempts: 0, round: 0, step: 'proof', checked: 0, fixed: 0, open: [], ...over });
+const writingProgress = { runId: 'r', phase: 'writing', status: 'running', active: true, total: 4, counts: { pending: 0, planned: 0, written: 1, checked: 2, 'needs-review': 1 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current: [{ nodeId: 'c', step: 'proof', startedAt: 1 }] };
+
+test('P8c bar: the AI numbers count chapters in a fix round and the same open items as the closing page; a done slot is not fixing', () => {
+  const data = aiData({
+    aiProof: {
+      a: slot({ step: 'fix', round: 1, fixed: 1, checked: 5 }),
+      b: slot({ step: 'fix', done: true, fixed: 2, open: [{ problem: 'p', reason: 'r' }, { problem: 'q', reason: 'r' }] }),
+      c: slot({ done: true, incomplete: true, open: [] })
+    },
+    bookProof: slot({ done: true, fixed: 4, open: [{ problem: 'z', reason: 'r' }] })
+  });
+  const state = bundle.bookBarState(data, writingProgress, () => undefined);
+  // fixing: only a; open: 2 (b) + 1 (c incomplete) + 1 (book) + 1 (needs-review chapter); fixed: 1 + 2 + 4
+  assert.equal(JSON.stringify(state.ai), JSON.stringify({ fixing: 1, open: 5, fixed: 7 }));
+  assert.equal(JSON.stringify(bundle.bookBarState(aiData({}), writingProgress, () => undefined).ai), JSON.stringify({ fixing: 0, open: 1, fixed: 0 }), 'no slots: only the chapter needing a look');
+});
+
+test('P8c bar: while running the bar says how many chapters the AI is fixing and how many issues are open; nothing asks the owner to review', () => {
+  setUiLanguage('zh-TW');
+  const data = aiData({ aiProof: { a: slot({ step: 'fix', round: 1 }), b: slot({ done: true, open: [{ problem: 'p', reason: 'r' }] }) } });
+  const bar = dom.element('div');
+  bundle.renderBookBar(bar, bundle.bookBarState(data, writingProgress, () => undefined), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {} });
+  assert.equal(one(bar, 'vam-book-ai-counts').text, 'AI 修正中 1・仍有問題 2');
+  assert.equal(one(bar, 'vam-book-now').children.some(child => child.cls?.includes('vam-book-ai-counts')), true);
+  const words = texts(bar).join('|');
+  assert.ok(!/要你看|需人看|驗收|仍要完成/.test(words), words);
+  // gate 2 and a gate 1 without a plan review are the writing state; nothing drives them after a reload, so they read as stopped
+  const gate2 = bundle.bookBarState(aiData({ phase: 'gate2' }), { ...writingProgress, phase: 'gate2' }, () => undefined);
+  assert.equal(gate2.mode, 'writing');
+  assert.equal(bundle.bookBarState(aiData({ phase: 'gate2' }), undefined, () => undefined).mode, 'stopped');
+  assert.equal(bundle.bookBarState(aiData({ phase: 'gate1', trial: ['a'] }), { ...writingProgress, phase: 'gate1' }, () => undefined).mode, 'writing');
+});
+
+test('P8c bar: the plan review has three buttons; "back to editing" is its own action and never the confirm', () => {
+  setUiLanguage('zh-TW');
+  const state = bundle.bookBarState(aiData({ phase: 'gate1', planReview: true, trial: ['a', 'b'] }), undefined, () => undefined);
+  assert.equal(state.mode, 'gate1');
+  assert.equal(state.planReview, true);
+  const calls = [];
+  const bar = dom.element('div');
+  bundle.renderBookBar(bar, state, { stop() {}, resume() {}, addBudget() {}, confirmGate1: () => calls.push('go'), openPlan: () => calls.push('open'), editPlan: () => calls.push('edit') });
+  assert.equal(bundle.bookTitleText(state), '圖文書：全書企劃好了，看方向對不對');
+  const buttons = dom.findAll(bar, i => i.tag === 'button').map(i => i.text);
+  assert.deepEqual(buttons, ['打開全書摘要', '方向對，開始寫', '回去改企劃', '停止']);
+  for (const cls of ['vam-book-open-plan', 'vam-book-confirm', 'vam-book-back-to-plan']) one(bar, cls).click();
+  assert.deepEqual(calls, ['open', 'go', 'edit']);
+  assert.ok(!/試跑|跳過/.test(texts(bar).join('|')), 'no trial buttons');
+});
+
+test('P8c bar: a finished book shows the chapters, what the AI fixed and the open issues, with a button to the closing page', () => {
+  setUiLanguage('zh-TW');
+  const data = aiData({ phase: 'done', aiProof: { a: slot({ done: true, fixed: 3, open: [{ problem: 'p', reason: 'r' }] }), b: slot({ done: true, fixed: 2 }) }, bookProof: slot({ done: true, fixed: 1, open: [{ problem: 'q', reason: 'r' }] }) });
+  const state = bundle.bookBarState(data, undefined, () => undefined);
+  assert.equal(state.mode, 'done');
+  const calls = [];
+  const bar = dom.element('div');
+  bundle.renderBookBar(bar, state, { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, openIssues: () => calls.push('issues') });
+  assert.equal(bundle.bookTitleText(state), '圖文書：已完成');
+  assert.equal(one(bar, 'vam-book-done-counts').text, '4 章・AI 修了 6 處・仍有問題 2 項');
+  const button = one(bar, 'vam-book-open-issues');
+  assert.equal(button.text, '看仍有問題');
+  button.click();
+  assert.deepEqual(calls, ['issues']);
+  assert.ok(!/驗收|仍要完成|下一章要看/.test(texts(bar).join('|')));
+  // nothing open still says so in numbers, never an empty line
+  const clean = dom.element('div');
+  bundle.renderBookBar(clean, bundle.bookBarState(aiData({ phase: 'done' }), undefined, () => undefined), { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, openIssues() {} });
+  assert.equal(one(clean, 'vam-book-done-counts').text, '4 章・AI 修了 0 處・仍有問題 0 項');
 });

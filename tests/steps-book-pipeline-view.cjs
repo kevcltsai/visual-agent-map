@@ -75,16 +75,20 @@ test('bar: running writing phase shows the phase, one plain sentence with the pr
   assert.ok(!texts(d.bar).some(x => /全書企劃|逐章企劃|找圖 |校對 \d/.test(x)), JSON.stringify(texts(d.bar)));
 });
 
-test('bar: every phase and status has its own words (zh-TW, en, zh-CN)', () => {
+test('bar: every phase and status has its own words (zh-TW, en, zh-CN); gate 2 and a gate 1 without a plan review read as writing', () => {
   const words = {
-    'zh-TW': { planning: '圖文書：企劃中', gate1: '圖文書：等你確認', writing: '圖文書：寫作、找圖與校對中', gate2: '圖文書：完成待驗收', stopped: '圖文書：已停止', budget: '圖文書：額度用完' },
-    en: { planning: 'Picture book: Planning', gate1: 'Picture book: Waiting for your confirmation', writing: 'Picture book: Writing, finding pictures and proofreading', gate2: 'Picture book: Done, waiting for review', stopped: 'Picture book: Stopped', budget: 'Picture book: Call budget used up' },
-    'zh-CN': { planning: '图文书：企划中', gate1: '图文书：等你确认', writing: '图文书：写作、找图与校对中', gate2: '图文书：完成待验收', stopped: '图文书：已停止', budget: '图文书：额度用完' }
+    'zh-TW': { planning: '圖文書：企劃中', gate1: '圖文書：全書企劃好了，看方向對不對', writing: '圖文書：寫作、找圖與校對中', done: '圖文書：已完成', stopped: '圖文書：已停止', budget: '圖文書：額度用完' },
+    en: { planning: 'Picture book: Planning', gate1: 'Picture book: Whole-book plan ready, check the direction', writing: 'Picture book: Writing, finding pictures and proofreading', done: 'Picture book: Finished', stopped: 'Picture book: Stopped', budget: 'Picture book: Call budget used up' },
+    'zh-CN': { planning: '图文书：企划中', gate1: '图文书：全书企划好了，看方向对不对', writing: '图文书：写作、找图与校对中', done: '图文书：已完成', stopped: '图文书：已停止', budget: '图文书：额度用完' }
   };
   for (const [language, expected] of Object.entries(words)) {
     lang(language);
-    for (const phase of ['planning', 'gate1', 'writing', 'gate2'])
-      assert.equal(ui.bookTitleText(ui.bookBarState(bookData({ phase }), progress({ phase }), noStage)), expected[phase], `${language} ${phase}`);
+    for (const phase of ['planning', 'gate1', 'writing', 'gate2']) {
+      const over = phase === 'gate1' ? { phase, planReview: true, trial: ['a'] } : { phase };
+      assert.equal(ui.bookTitleText(ui.bookBarState(bookData(over), progress({ phase }), noStage)), expected[phase === 'gate2' ? 'writing' : phase], `${language} ${phase}`);
+    }
+    assert.equal(ui.bookTitleText(ui.bookBarState(bookData({ phase: 'gate1', trial: ['a'] }), progress({ phase: 'gate1' }), noStage)), expected.writing, `${language} gate1 without a plan review`);
+    assert.equal(ui.bookTitleText(ui.bookBarState(bookData({ phase: 'done' }), undefined, noStage)), expected.done, `${language} done`);
     assert.equal(ui.bookTitleText(ui.bookBarState(bookData({ status: 'stopped' }), progress({ status: 'stopped', active: false }), noStage)), expected.stopped);
     assert.equal(ui.bookTitleText(ui.bookBarState(bookData(), progress({ status: 'stopped', active: false, pauseReason: 'budget' }), noStage)), expected.budget);
   }
@@ -123,13 +127,14 @@ test('bar: budget exhausted shows the used-up line with "add 100" and "stop"; ad
 
 test('bar: at gate 1 the confirm button shows (and calls confirmGate1); not in other phases', () => {
   lang('zh-TW');
-  const gate = draw(bookData({ phase: 'gate1' }), progress({ phase: 'gate1', active: false }));
-  assert.ok(buttonsOf(gate.bar).some(b => b.text === '這樣可以，跑完全書'));
-  assert.ok(texts(gate.bar).includes('圖文書：等你確認'));
-  buttonsOf(gate.bar).find(b => b.text === '這樣可以，跑完全書').click();
+  const gate = draw(bookData({ phase: 'gate1', planReview: true }), progress({ phase: 'gate1', active: false }));
+  assert.ok(buttonsOf(gate.bar).some(b => b.text === '方向對，開始寫'));
+  assert.ok(texts(gate.bar).includes('圖文書：全書企劃好了，看方向對不對'));
+  buttonsOf(gate.bar).find(b => b.text === '方向對，開始寫').click();
   assert.deepEqual(gate.log, ['confirm']);
   for (const phase of ['planning', 'writing', 'gate2'])
-    assert.ok(!buttonsOf(draw(bookData({ phase }), progress({ phase })).bar).some(b => b.text === '這樣可以，跑完全書'), phase);
+    assert.ok(!buttonsOf(draw(bookData({ phase }), progress({ phase })).bar).some(b => b.text === '方向對，開始寫'), phase);
+  assert.ok(!buttonsOf(draw(bookData({ phase: 'gate1' }), progress({ phase: 'gate1' })).bar).some(b => b.text === '方向對，開始寫'), 'a gate 1 without a plan review is writing');
 });
 
 test('bar: a bar with nothing finished still has valid aria values (total 0 does not divide)', () => {
@@ -403,12 +408,13 @@ test('T3 view close: no rerun clock is left on a one-second timer (the card chip
 
 test('view: the bar draws for a book map from getBookPipelineProgress and its buttons call the plugin entries with this map', async () => {
   const h = await harness({ book: true });
+  h.view.map.bookPipeline.planReview = true;
   h.plugin.getBookPipelineProgress = p => (p === MAP ? progress({ phase: 'gate1', active: false }) : undefined);
   const toolbar = dom.element('div');
   h.view.renderBookPipelineBar(toolbar);
   const bar = toolbar.children[0];
   assert.equal(bar.cls, 'vam-book-bar');
-  const confirm = buttonsOf(bar).find(b => b.text === '這樣可以，跑完全書');
+  const confirm = buttonsOf(bar).find(b => b.text === '方向對，開始寫');
   confirm.click();
   await dom.tick();
   assert.equal(JSON.stringify(h.entries), JSON.stringify([['confirm', MAP]]));
@@ -868,7 +874,8 @@ test('bar: the remaining time sits on the "now" line and only when the runner ga
   const draw2 = over => { const parent = dom.element('div'); ui.renderBookBar(parent, ui.bookBarState(bookData(), progress({ current: cur, ...over }), noStage), calls().actions); return parent; };
   assert.equal(dom.find(draw2({}), i => i.cls.includes('vam-book-bar-eta')), undefined);
   assert.equal(dom.find(draw2({ etaSeconds: 130 }), i => i.cls.includes('vam-book-bar-eta')).text, '約剩 2 分鐘');
-  assert.equal(dom.find(draw2({}), i => i.cls.includes('vam-book-now')).children.length, 1);
+  assert.equal(dom.find(draw2({}), i => i.cls.includes('vam-book-now')).children.length, 2, 'the sentence and the AI numbers; no time');
+  assert.equal(dom.find(draw2({ etaSeconds: 130 }), i => i.cls.includes('vam-book-now')).children.length, 3);
 });
 
 test('bar: a saved v1 map is only read: the data is not changed, and after a reload the progress comes from the cards\' stages', () => {
@@ -1042,24 +1049,24 @@ export { BookStartModal } from "./experiences/visual-map/book-pipeline-start-mod
   }
 });
 
-test('T5 bar: while a run with a trial is planning, the sentence says which trial chapter is tried; the whole-book plan and a run without a trial keep their words', () => {
+test('T5 bar: a run saved in the old trial planning step gets no trial wording any more; the whole-book plan and a run without a trial keep their words', () => {
   lang('zh-TW');
   const trialState = (current, over = {}) => ui.bookBarState(bookData({ phase: 'planning', trial: ['a', 'b', 'c'], ...over }), progress({ phase: 'planning', current }), noStage);
-  assert.equal(ui.bookProgressText(trialState([{ nodeId: 'b', step: 'write', startedAt: 1 }])), '正在試跑第 2／3 章');
+  assert.equal(ui.bookProgressText(trialState([{ nodeId: 'b', step: 'write', startedAt: 1 }])), '正在企劃第 2／4 章，已完成 2／4 章');
   assert.equal(ui.bookProgressText(trialState([{ nodeId: 'global', step: 'plan', startedAt: 1 }])), '正在規劃全書，已完成 2／4 章', 'the whole-book plan comes first');
-  assert.equal(ui.bookProgressText(trialState(undefined)), '正在試跑第 3／3 章', 'no current card: the next unsettled trial chapter, never past the trial size');
   assert.equal(ui.bookProgressText(trialState([{ nodeId: 'b', step: 'plan', startedAt: 1 }], { trial: undefined })), '正在企劃第 2／4 章，已完成 2／4 章', 'an older run');
-  lang('en');
-  assert.equal(ui.bookProgressText(trialState([{ nodeId: 'a', step: 'plan', startedAt: 1 }])), 'Trying chapter 1/3 first');
-  lang('zh-CN');
-  assert.equal(ui.bookProgressText(trialState([{ nodeId: 'a', step: 'plan', startedAt: 1 }])), '正在试跑第 1／3 章');
+  for (const language of ['en', 'zh-CN']) {
+    lang(language);
+    assert.ok(!/rial|试跑/.test(ui.bookProgressText(trialState([{ nodeId: 'a', step: 'plan', startedAt: 1 }]))), language);
+  }
   lang('zh-TW');
 });
 
 test('stop and restart: stop shows at gate 1 and gate 2 (not at done); a stopped run in any phase before done shows continue, restart and give up; a budget pause and a running run show no restart', () => {
   lang('zh-TW');
   for (const phase of ['gate1', 'gate2']) {
-    const d = draw(bookData({ phase }), progress({ phase, active: false }), noStage, true);
+    // gate 2 is the writing state now: a running run with a stop button
+    const d = draw(bookData(phase === 'gate1' ? { phase, planReview: true } : { phase }), progress({ phase, active: phase === 'gate2' }), noStage, true);
     assert.ok(buttonsOf(d.bar).some(b => b.text === '停止'), `stop at ${phase}`);
     buttonsOf(d.bar).find(b => b.text === '停止').click();
     assert.deepEqual(d.log, ['stop']);
@@ -1079,7 +1086,7 @@ test('stop and restart: stop shows at gate 1 and gate 2 (not at done); a stopped
   const budget = draw(bookData({ status: 'stopped', pauseReason: 'budget' }), progress({ status: 'stopped', active: false, pauseReason: 'budget' }), noStage, true);
   assert.ok(!buttonsOf(budget.bar).some(b => b.text === '重新設定再開始'));
   const gate1Stopped = draw(bookData({ status: 'stopped', phase: 'gate1' }), progress({ status: 'stopped', active: false, phase: 'gate1' }), noStage, true);
-  assert.ok(!buttonsOf(gate1Stopped.bar).some(b => b.text === '這樣可以，跑完全書'), 'a stopped gate 1 shows no confirm beside the three choices');
+  assert.ok(!buttonsOf(gate1Stopped.bar).some(b => b.text === '方向對，開始寫'), 'a stopped gate 1 shows no confirm beside the three choices');
 });
 
 test('abandon: stopped, budget pause and done show the entry (放棄這本 / 移除圖文書); running and the waiting gates do not; the confirmation card has the notes-kept sentence, Cancel and confirm', () => {
@@ -1096,7 +1103,7 @@ test('abandon: stopped, budget pause and done show the entry (放棄這本 / 移
   const budgetTexts = labelOf(bookData({ status: 'stopped', pauseReason: 'budget' }), progress({ status: 'stopped', active: false, pauseReason: 'budget' }))[0];
   assert.ok(budgetTexts.includes('放棄這本'));
   assert.deepEqual(labelOf(bookData({ phase: 'done' }), progress({ phase: 'done', active: false }))[0].filter(x => x.includes('移除') || x.includes('放棄')), ['移除圖文書']);
-  for (const phase of ['writing', 'gate1', 'gate2']) assert.ok(!labelOf(bookData({ phase }), progress({ phase, active: phase === 'writing' }))[0].some(x => x === '放棄這本' || x === '移除圖文書'), phase);
+  for (const phase of ['writing', 'gate1', 'gate2']) assert.ok(!labelOf(bookData(phase === 'gate1' ? { phase, planReview: true } : { phase }), progress({ phase, active: phase !== 'gate1' }))[0].some(x => x === '放棄這本' || x === '移除圖文書'), phase);
   for (const data of [bookData({ status: 'stopped', phase: 'writing' }), bookData({ phase: 'done' })]) {
     const a = abandon(true);
     const bar = drawWith(data, progress({ phase: data.phase, status: data.status, active: false }), a);

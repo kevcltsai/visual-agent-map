@@ -84,6 +84,7 @@ import {
   type PresentationState
 } from "./presentation-mode";
 import { bookStructure, type BookStructure } from "../../core/book-pipeline/structure";
+import { isOpenIssuesNote, openIssuesFileName } from "../../core/book-pipeline/open-issues";
 import { alignSiblingsToScreen, bookReadingOrder, bySiblingAxis, readingOrder } from "./presentation-order";
 import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
 import { MergeDrafts, type ChatReplyStep, type MergeTask } from "./merge-drafts";
@@ -355,13 +356,11 @@ import {
 import { hasProgramCallouts } from "./book-pipeline-callouts";
 import {
   BookReviewMemory,
-  countNotes,
   isReviewResolved,
   isRewriteAsked,
   proofIsStale,
   readReviewState,
   reviewEntries,
-  reviewProblems,
   runTrackedRerun,
   type Gate2Card,
   type ReviewProblem,
@@ -17393,21 +17392,6 @@ export class VisualAgentMapView extends ItemView {
       this.bookMapFocusedRun = read.data.runId;
       this.bookBarFocus = "map-go";
     }
-    // A question left over from another phase (the chat's "continue" moved the run on) is dropped.
-    if (state.mode !== "gate1") this.bookGate1Ask = null;
-    if (state.mode !== "gate2") this.bookFinishAsking = null;
-    const gate2Attention = state.mode === "gate2" ? this.bookReviewCards(read.data) : [];
-    if (state.mode === "gate2") {
-      // Chapters that only wait for a join to be confirmed are told apart (a rewrite marks its neighbours; that is not a new problem).
-      const seam = gate2Attention.filter(card => reviewProblems(card).every(problem => problem.kind === "seam")).length;
-      state.review = { total: state.total, attention: gate2Attention.length, ...(seam ? { seam } : {}) };
-    }
-    if (state.mode === "gate1" && state.trialCount) {
-      const trial = new Set(this.effectiveTrial(read.data));
-      const n = this.bookReviewCards(read.data).filter(card => trial.has(card.id)).length;
-      if (n > 0) state.trialAttention = n;
-    }
-    const gate1Ask = this.bookGate1Ask?.path === path ? this.bookGate1Ask : null;
     const rerunAsk = this.bookRerunAskFor(path);
     renderBookBar(toolbar, state, {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
@@ -17430,61 +17414,23 @@ export class VisualAgentMapView extends ItemView {
         }
       },
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
-      confirmGate1: () => void this.pressBookGate1(path, this.effectiveTrial(read.data)),
-      openTrial: () => {
-        const first = this.effectiveTrial(read.data)[0];
-        if (first) void this.openBookNote(first);
-      },
+      confirmGate1: () => void this.bookEntry(() => this.plugin.confirmBookGate1(path)),
       openPlan: () => {
         const root = this.map?.nodes.find(node => !node.parentId);
         if (root) void this.openBookNote(root.id);
       },
-      startTrial: () => void this.bookEntry(() => this.plugin.startBookTrial(path)),
-      backToPlan: () => void this.bookEntry(() => this.plugin.backBookToPlan(path)),
-      ...(gate1Ask
-        ? {
-            gate1Ask: {
-              count: gate1Ask.count,
-              cancel: () => {
-                this.bookGate1Ask = null;
-                this.bookBarFocus = "gate1-opener";
-                if (!this.closed) this.render();
-              },
-              confirm: () => {
-                this.bookGate1Ask = null;
-                void this.bookEntry(() => this.plugin.confirmBookGate1(path));
-              },
-              ...(this.bookBarFocus === "gate1-go" ? { focus: "go" as const } : {})
-            }
-          }
-        : {}),
-      ...(rerunAsk ? { rerunAsk } : {}),
-      nextReview: () => {
-        const next = this.nextBookReviewCard(gate2Attention);
-        if (next) void this.openBookNote(next.id);
+      // "Back to editing the plan" only opens the plan and says how to change it; the run stays at the gate.
+      editPlan: () => {
+        const root = this.map?.nodes.find(node => !node.parentId);
+        if (root) void this.openBookNote(root.id);
+        new Notice(t("ui.book_bar_plan_edit_hint"));
       },
-      finish: {
-        asking: this.bookFinishAsking === path,
-        ask: () => {
-          this.bookFinishAsking = path;
-          this.bookBarFocus = "finish-go";
-          if (!this.closed) this.render();
-        },
-        cancel: () => {
-          this.bookFinishAsking = null;
-          this.bookBarFocus = "finish-opener";
-          if (!this.closed) this.render();
-        },
-        confirm: () => {
-          this.bookFinishAsking = null;
-          void this.bookEntry(() => this.plugin.finishBookRun(path));
-        }
-      }
+      openIssues: () => void this.openBookOpenIssues(),
+      ...(rerunAsk ? { rerunAsk } : {})
     });
   }
   /** What the bar and the card reruns remember in memory (the repaint rebuilds the DOM). */
   private readonly bookReview = new BookReviewMemory();
-  /** The trial chapters that are still on the run (a removed chapter is not shown or counted). */
   /** The book's structure over the cards the run works on (the root is the preface); undefined without a single root. */
   private bookStructureOf(order: readonly string[]): BookStructure | undefined {
     const map = this.map;
@@ -17493,31 +17439,15 @@ export class VisualAgentMapView extends ItemView {
     const parents = new Map(map.nodes.map(node => [node.id, node.parentId]));
     return bookStructure(order, id => parents.get(id), root.id);
   }
-  private effectiveTrial(data: BookPipelineData): string[] {
-    const order = effectiveOrder(data);
-    return (data.trial ?? []).filter(id => order.includes(id));
-  }
-  /** The map whose bar is asking "run the whole book anyway?" (unapplied notes in the trial), with the count it found. */
-  private bookGate1Ask: { path: string; count: number } | null = null;
-  private bookGate1Checking = false;
-  /** The map whose bar is asking "finish anyway?" (chapters still need a look). */
-  private bookFinishAsking: string | null = null;
   /** Where the keyboard goes after the next paint of the bar (the repaint rebuilds the buttons). */
-  private bookBarFocus:
-    "gate1-go" | "gate1-opener" | "finish-go" | "finish-opener" | "rerun-go" | "rerun-opener" | "map-go" | null = null;
+  private bookBarFocus: "rerun-go" | "rerun-opener" | "map-go" | null = null;
   /** The run whose map-changed choice already took the keyboard. */
   private bookMapFocusedRun: string | null = null;
-  /** The chapter the "next chapter to check" link opened last (the link cycles from there in reading order). */
-  private bookReviewLast: string | null = null;
   private applyBookBarFocus(): void {
     const focus = this.bookBarFocus;
     this.bookBarFocus = null;
     if (!focus || this.closed) return;
     const selector = {
-      "gate1-go": ".vam-book-gate1-ask .vam-book-ask-go",
-      "gate1-opener": ".vam-book-confirm",
-      "finish-go": ".vam-book-finish-ask .vam-book-ask-go",
-      "finish-opener": ".vam-book-finish",
       "rerun-go": ".vam-book-rerun-ask .vam-book-ask-go",
       "rerun-opener": ".vam-node-rerun",
       "map-go": ".vam-book-map-replan"
@@ -17684,37 +17614,6 @@ export class VisualAgentMapView extends ItemView {
       // Fire and forget from the map opening: the aligner logs its own failures, and nothing here may break the map.
     }
   }
-  /** The attention chapter after the one opened last (wraps around); the first one when none was opened yet. */
-  private nextBookReviewCard(cards: readonly Gate2Card[]): Gate2Card | undefined {
-    if (!cards.length) return undefined;
-    const at = cards.findIndex(card => card.id === this.bookReviewLast);
-    const next = cards[(at + 1) % cards.length];
-    this.bookReviewLast = next.id;
-    return next;
-  }
-  /** "Run the whole book": with notes still unapplied in the trial chapters, the first press only asks (once, in the bar). */
-  private async pressBookGate1(path: string, trial: readonly string[]): Promise<void> {
-    if (this.bookGate1Checking) return;
-    this.bookGate1Checking = true;
-    let count = 0;
-    try {
-      for (const id of trial) {
-        const node = this.map?.nodes.find(item => item.id === id);
-        const file = node ? this.app.vault.getAbstractFileByPath(node.path) : null;
-        if (file instanceof TFile) count += countNotes(await this.app.vault.read(file).catch(() => ""));
-      }
-    } finally {
-      this.bookGate1Checking = false;
-    }
-    if (this.closed || this.path !== path) return;
-    if (count > 0) {
-      this.bookGate1Ask = { path, count };
-      this.bookBarFocus = "gate1-go";
-      this.render();
-      return;
-    }
-    await this.bookEntry(() => this.plugin.confirmBookGate1(path));
-  }
   /** The map whose bar shows the "give up this book" confirmation card (in-page; never window.confirm). */
   private bookAbandonAsking: string | null = null;
   private askBookAbandon(path: string, asking: boolean): void {
@@ -17732,6 +17631,27 @@ export class VisualAgentMapView extends ItemView {
         void this.plugin.saveSettings();
       }
     };
+  }
+  /** "See what is still open": opens the book's closing page (the marked file named "Still open" in the book's folder). */
+  private async openBookOpenIssues(): Promise<void> {
+    const root = this.map?.nodes.find(node => !node.parentId);
+    const folder = root?.path.includes("/") ? root.path.slice(0, root.path.lastIndexOf("/")) : "";
+    for (let copy = 1; copy <= 20; copy++) {
+      for (const language of ["zh-TW", "en"] as const) {
+        const name = openIssuesFileName(language, copy);
+        const file = this.app.vault.getAbstractFileByPath(folder ? `${folder}/${name}` : name);
+        if (!(file instanceof TFile)) continue;
+        const text = await this.app.vault.read(file).catch(() => "");
+        if (!isOpenIssuesNote(text)) continue;
+        try {
+          await this.app.workspace.getLeaf("tab").openFile(file);
+        } catch (error) {
+          new Notice(error instanceof Error ? error.message : String(error));
+        }
+        return;
+      }
+    }
+    new Notice(t("ui.book_bar_open_issues_missing"));
   }
   /** A card's note opens in a tab. */
   private async openBookNote(id: string): Promise<void> {
@@ -17766,12 +17686,10 @@ export class VisualAgentMapView extends ItemView {
     const read = this.map ? readBookPipeline(this.map) : null;
     if (!path || !read || read.kind !== "usable") return null;
     if (!isBookGate1Waiting(this.plugin.getBookPipelineProgress(path), read.data)) return null;
-    // At the plan review "continue" runs the trial (the suggested way); skipping it is the toolbar's own button.
-    const review = read.data.planReview === true && !!read.data.trial?.length;
-    return (review ? this.plugin.startBookTrial(path) : this.plugin.confirmBookGate1(path)).then(
+    return this.plugin.confirmBookGate1(path).then(
       () => {
         if (!this.closed) this.render();
-        return t(review ? "ui.book_chat_trial_started" : "ui.book_chat_gate1_confirmed");
+        return t("ui.book_chat_gate1_confirmed");
       },
       error => {
         if (!this.closed) this.render();

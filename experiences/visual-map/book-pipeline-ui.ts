@@ -50,20 +50,17 @@ export interface BookBarState {
   current?: BookCurrent;
   /** The whole-book consistency check is running (no chapter step is): the sentence says so instead of "writing". */
   checking?: true;
-  /** The run has a trial (the first chapters before gate 1): while it is planning, the bar says which trial chapter is written. */
-  trialSize?: number;
   /** A single-card rerun is in progress (memory only): the bar keeps its stop button; the card itself says "working". */
   rerun?: true;
-  /** Gate 1: how many chapters the trial has ("the 3 trial chapters are written"); absent for a run without a trial. */
-  trialCount?: number;
-  /** Gate 1 before the trial: every chapter is planned and the owner looks at the plan (try the trial, or skip it). */
+  /** Gate 1: every chapter is planned and the owner looks at the plan's direction (the one stop of the automatic run). */
   planReview?: true;
   /** The trial is the book structure's (preface, chapter 1 and its sections): the bar counts cards and names the preface; absent for an older run. */
   structure?: { chapters: number; sections: number };
-  /** Gate 1: how many of the trial chapters need a look (shown after the trial sentence; nothing when 0). */
-  trialAttention?: number;
-  /** Gate 2: the chapters written and how many still need a look; the view fills it from the notes (see its `bookReviewCount`). */
-  review?: { total: number; attention: number; seam?: number };
+  /**
+   * The AI proofread in numbers: chapters in their fix round now, places fixed so far, and the open issues (the same items as the
+   * closing page: open findings, unfinished proofreads, chapters that still need a look).
+   */
+  ai: { fixing: number; open: number; fixed: number };
 }
 export interface BookCurrent {
   /** The whole-book plan, or a chapter step. */
@@ -116,7 +113,9 @@ export function bookBarState(
   const total = progress?.total ?? order.length;
   const budget = progress?.budget ?? data.budget;
   const failure = progress ? progress.failureCode : data.failureCode;
-  const interrupted = (phase === "planning" || phase === "writing") && !active;
+  // The trial and the final gate pass by themselves now: a run in one of them reads as writing (and as stopped when nothing drives it).
+  const writingLike = phase === "writing" || phase === "gate2" || (phase === "gate1" && !data.planReview);
+  const interrupted = (phase === "planning" || writingLike) && !active;
   const mapChange =
     status === "stopped" && pauseReason === "map" && !active
       ? mapIds
@@ -148,13 +147,16 @@ export function bookBarState(
       ? "budget"
       : status === "stopped" || interrupted
         ? "stopped"
-        : phase;
+        : writingLike
+          ? "writing"
+          : phase;
   const current = mode === "planning" || mode === "writing" ? currentOf(data, progress, stageOf) : undefined;
   // A run whose saved trial is not the structure's (an older run) keeps the old chapter wording.
   const trialIds = structure?.trialOf() ?? [];
   const placed =
     !!structure &&
     (!data.trial?.length || (data.trial.length === trialIds.length && data.trial.every((id, i) => id === trialIds[i])));
+  const ai = aiNumbers(data, order, counts["needs-review"]);
   const rerunning = !!progress?.active && !!progress.rerun && order.includes(progress.rerun.nodeId);
   return {
     mode,
@@ -163,6 +165,7 @@ export function bookBarState(
     counts,
     budget,
     globalDone: data.globalPlanned === true,
+    ai,
     ...(placed && structure
       ? {
           structure: {
@@ -175,23 +178,35 @@ export function bookBarState(
     ...(!current && mode === "writing" && active && data.consistency?.done === false
       ? { checking: true as const }
       : {}),
-    ...(data.trial?.length && !data.planReview && mode === "planning" && data.globalPlanned
-      ? { trialSize: data.trial.length }
-      : {}),
     ...(rerunning ? { rerun: true as const } : {}),
     ...(mapChange ? { mapChange } : {}),
     ...(gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {}),
     ...(reordered ? { mapChange: reordered } : {}),
-    ...(mode === "gate1" && data.trial?.length
-      ? data.planReview
-        ? { planReview: true as const, trialCount: data.trial.length }
-        : { trialCount: data.trial.length }
-      : {}),
+    ...(mode === "gate1" && data.planReview ? { planReview: true as const } : {}),
     ...(mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {}),
     ...(progress?.etaSeconds !== undefined && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0
       ? { etaSeconds: progress.etaSeconds }
       : {})
   };
+}
+
+/** The bar's AI numbers; "open" counts the same items the closing page lists (see the runner's `openIssuesOf`). */
+function aiNumbers(data: BookPipelineData, order: readonly string[], needsReview: number): BookBarState["ai"] {
+  let fixing = 0;
+  let open = needsReview;
+  let fixed = 0;
+  for (const id of order) {
+    const slot = data.aiProof?.[id];
+    if (!slot) continue;
+    if (!slot.done && slot.step === "fix") fixing++;
+    open += slot.open.length + (slot.incomplete ? 1 : 0);
+    fixed += slot.fixed;
+  }
+  if (data.bookProof) {
+    open += data.bookProof.open.length + (data.bookProof.incomplete ? 1 : 0);
+    fixed += data.bookProof.fixed;
+  }
+  return { fixing, open, fixed };
 }
 
 /** Whether the map lists the book's chapters in the book's order (cards that are not chapters are skipped). */
@@ -261,27 +276,13 @@ export interface BookBarActions {
   abandon?: { asking: boolean; ask: () => void; cancel: () => void; confirm: () => void };
   addBudget: () => void;
   confirmGate1: () => void;
-  /** Gate 1: "open chapter 1" (the first trial chapter's note); a bar drawn without it shows no such link. */
-  openTrial?: () => void;
-  /** The plan review: "open the whole-book plan" (the root note), "run the trial"; the trial's gate 1: "back to the plan". */
+  /** The plan review: "open the whole-book summary" (the root note) and "back to editing the plan" (opens it; the run does not move on). */
   openPlan?: () => void;
-  startTrial?: () => void;
-  backToPlan?: () => void;
-  /** Gate 1: the first press found unapplied notes in the trial; the bar asks once. `focus`: where the keyboard goes after this paint. */
-  gate1Ask?: { count: number; cancel: () => void; confirm: () => void; focus?: "go" | "opener" };
+  editPlan?: () => void;
+  /** A finished book: "see what is still open" (opens the closing page). */
+  openIssues?: () => void;
   /** Gate 2 or done: a card rerun found a hand-edited chapter; the bar asks once before it overwrites it (decision G). */
   rerunAsk?: { cancel: () => void; confirm: () => void; focus?: "go" | "opener" };
-  /** Gate 2: the link that opens the next chapter that needs a look (the view cycles in reading order). */
-  nextReview?: () => void;
-  /** Gate 2: "review finished". With chapters left (`state.review.attention` > 0) the bar asks once in place before it calls `confirm`. */
-  finish?: {
-    asking: boolean;
-    ask: () => void;
-    cancel: () => void;
-    confirm: () => void;
-    /** Where the keyboard goes after this paint (the view applies it once the bar is in the document). */
-    focus?: "go" | "opener";
-  };
 }
 
 export function bookTitleText(state: BookBarState): string {
@@ -292,9 +293,7 @@ export function bookTitleText(state: BookBarState): string {
         ? t("ui.book_phase_budget")
         : state.mode === "gate1" && state.planReview
           ? t("ui.book_phase_plan_review")
-          : state.mode === "gate1" && state.trialCount
-            ? t("ui.book_phase_trial_review")
-            : t(PHASE_KEY[state.mode]);
+          : t(PHASE_KEY[state.mode]);
   return t("ui.book_bar_title_0", word);
 }
 
@@ -338,7 +337,7 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     }
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   }
-  if ((state.mode === "gate1" || state.mode === "gate2" || state.mode === "done") && state.mapChange)
+  if ((state.mode === "gate1" || state.mode === "done") && state.mapChange)
     top.createSpan({ cls: "vam-book-bar-counts vam-book-map-changed", text: mapChangeText(state.mapChange) });
   if (state.mode === "gate1" && state.planReview) {
     top.createSpan({
@@ -352,68 +351,16 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     top.createSpan({ cls: "vam-book-bar-counts vam-book-plan-hint", text: t("ui.book_bar_plan_hint") });
     if (actions.openPlan)
       makeButton(buttons, t("ui.book_bar_open_plan"), "vam-book-link vam-book-open-plan", actions.openPlan);
-    if (actions.startTrial)
-      makeButton(
-        buttons,
-        state.structure
-          ? t("ui.book_bar_start_trial_cards_0", state.trialCount ?? 0)
-          : t("ui.book_bar_start_trial_0", state.trialCount ?? 0),
-        "mod-cta vam-book-start-trial",
-        actions.startTrial
-      );
-  } else if (state.mode === "gate1" && state.trialCount) {
+    makeButton(buttons, t("ui.book_bar_plan_go"), "mod-cta vam-book-confirm", actions.confirmGate1);
+    if (actions.editPlan) makeButton(buttons, t("ui.book_bar_back_to_plan"), "vam-book-back-to-plan", actions.editPlan);
+  }
+  if (state.mode === "done") {
     top.createSpan({
-      cls: "vam-book-bar-counts",
-      text: state.trialAttention
-        ? t(
-            state.structure ? "ui.book_bar_trial_review_cards_0_1" : "ui.book_bar_trial_review_0_1",
-            state.trialCount,
-            state.trialAttention
-          )
-        : t(state.structure ? "ui.book_bar_trial_ready_cards_0" : "ui.book_bar_trial_ready_0", state.trialCount)
+      cls: "vam-book-bar-counts vam-book-done-counts",
+      text: t("ui.book_bar_done_0_1_2", total, state.ai.fixed, state.ai.open)
     });
-    if (actions.openTrial)
-      makeButton(
-        buttons,
-        t(state.structure ? "ui.book_bar_open_preface" : "ui.book_bar_open_first"),
-        "vam-book-link vam-book-open-first",
-        actions.openTrial
-      );
-    if (actions.backToPlan && !state.rerun)
-      makeButton(buttons, t("ui.book_bar_back_to_plan"), "vam-book-back-to-plan", actions.backToPlan);
-  }
-  if (state.mode === "gate2" && state.review) {
-    top.createSpan({
-      cls: "vam-book-bar-counts",
-      text: state.review.seam
-        ? t(
-            "ui.book_bar_review_seam_0_1_2",
-            state.review.total,
-            state.review.attention - state.review.seam,
-            state.review.seam
-          )
-        : t("ui.book_bar_review_0_1", state.review.total, state.review.attention)
-    });
-    if (actions.nextReview && state.review.attention > 0)
-      makeButton(buttons, t("ui.book_bar_next_review"), "vam-book-link vam-book-next-review", actions.nextReview);
-  }
-  if (state.phase === "gate1" && state.mode !== "done" && state.mode !== "stopped") {
-    // At the plan review the same confirmation skips the trial (a plain button: the trial is the suggested way).
-    if (state.mode === "gate1" && state.planReview)
-      makeButton(buttons, t("ui.book_skip_trial"), "vam-book-confirm vam-book-skip-trial", actions.confirmGate1);
-    else makeButton(buttons, t("ui.book_confirm_gate1"), "mod-cta vam-book-confirm", actions.confirmGate1);
-  }
-  if (state.mode === "gate2" && actions.finish && state.review) {
-    // Nothing left to look at: finish at once; otherwise the first press asks in place.
-    const left = (state.review?.attention ?? 0) > 0;
-    const finish = makeButton(
-      buttons,
-      t("ui.book_bar_finish"),
-      "mod-cta vam-book-finish",
-      left ? actions.finish.ask : actions.finish.confirm
-    );
-    finish.dataset.act = "finish";
-    finish.setAttr("aria-expanded", String(actions.finish.asking));
+    if (actions.openIssues)
+      makeButton(buttons, t("ui.book_bar_open_issues"), "vam-book-link vam-book-open-issues", actions.openIssues);
   }
   if (state.mode === "budget") {
     makeButton(buttons, t("ui.book_add_budget"), "mod-cta vam-book-add-budget", actions.addBudget);
@@ -430,9 +377,10 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
   } else if (state.mode === "planning" || state.mode === "writing")
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   // At a gate nothing runs unless a trial retry or a card rerun does (their own stop is below); stopping only holds the run.
-  else if ((state.mode === "gate1" || state.mode === "gate2") && !state.rerun)
+  else if (state.mode === "gate1" && !state.rerun)
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
-  if (state.rerun) makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+  if (state.rerun && state.mode !== "planning" && state.mode !== "writing")
+    makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   if (actions.abandon && (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")) {
     const abandon = actions.abandon;
     const ask = makeButton(
@@ -454,23 +402,7 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     makeButton(row, t("ui.cancel"), "vam-book-abandon-cancel", abandon.cancel);
     makeButton(row, t("ui.book_abandon_confirm"), "mod-warning vam-book-abandon-confirm", abandon.confirm);
   }
-  if (state.mode === "gate1" && actions.gate1Ask)
-    renderAsk(
-      bar,
-      "vam-book-gate1-ask",
-      t("ui.book_bar_notes_ask_0", actions.gate1Ask.count),
-      t("ui.book_bar_go_anyway"),
-      actions.gate1Ask
-    );
-  if (state.mode === "gate2" && actions.finish?.asking && state.review && state.review.attention > 0)
-    renderAsk(
-      bar,
-      "vam-book-finish-ask",
-      t("ui.book_bar_finish_ask_0", state.review.attention),
-      t("ui.book_bar_finish_go"),
-      actions.finish
-    );
-  if ((state.mode === "gate2" || state.mode === "done") && actions.rerunAsk)
+  if ((state.mode === "writing" || state.mode === "done") && actions.rerunAsk)
     renderAsk(
       bar,
       "vam-book-rerun-ask",
@@ -529,23 +461,6 @@ const settledCount = (state: BookBarState): number => state.counts.checked + sta
 /** The one sentence of the bar: "Writing chapter 3/31 · 2/31 done"; the whole-book plan and the chapter plans have their own words. */
 export function bookProgressText(state: BookBarState): string {
   const { total } = state;
-  if (state.mode === "planning" && state.trialSize && state.current?.step !== "global") {
-    // The trial chapters go all the way to the proofread before gate 1; the first chapters of the reading order are the trial's.
-    // Only fix rounds in work: a named fix line with the trial's done count, never "chapter 1/3" again.
-    if (state.current?.fix)
-      return t(
-        "ui.book_progress_line_fix_0_1_2",
-        state.current.chapter ?? 1,
-        Math.min(settledCount(state), state.trialSize),
-        state.trialSize
-      );
-    const settled = Math.min(state.counts.checked + state.counts["needs-review"], state.trialSize - 1);
-    return t(
-      state.structure ? "ui.book_progress_line_trial_cards_0_1" : "ui.book_progress_line_trial_0_1",
-      Math.min(state.current?.chapter ?? settled + 1, state.trialSize),
-      state.trialSize
-    );
-  }
   const at = Math.min(state.current?.chapter ?? settledCount(state) + 1, Math.max(total, 1));
   // Writing the whole book is one plain line ("Writing chapter 3/31"): the bar below shows how many are done.
   if (state.mode === "writing" && state.checking)
@@ -570,6 +485,8 @@ function renderProgressLine(bar: HTMLElement, state: BookBarState, text: string)
   now.createSpan({ cls: "vam-book-now-text", text });
   // "About N minutes left" only when the runner has a real estimate (at least five finished cards); no number is made up.
   if (state.etaSeconds !== undefined) now.createSpan({ cls: "vam-book-bar-eta", text: bookEtaText(state.etaSeconds) });
+  if (state.mode === "writing")
+    now.createSpan({ cls: "vam-book-ai-counts", text: t("ui.book_bar_ai_0_1", state.ai.fixing, state.ai.open) });
 }
 
 function makeButton(parent: HTMLElement, text: string, cls: string, action: () => void): HTMLButtonElement {
@@ -639,7 +556,7 @@ const ROLE_KEY: Record<BookRole, TranslationKey> = {
   gallery: "ui.book_role_gallery",
   closing: "ui.book_role_closing"
 };
-const STEP_KEY = { plan: "ui.book_step_plan", write: "ui.book_step_write", proof: "ui.book_step_proof" } as const;
+const STEP_KEY = { plan: "ui.book_step_plan", write: "ui.book_step_write", proof: "ui.book_step_self_check" } as const;
 const REASON_KEY: Record<string, TranslationKey> = {
   missing: "ui.book_reason_missing",
   card_removed: "ui.book_reason_card_removed",

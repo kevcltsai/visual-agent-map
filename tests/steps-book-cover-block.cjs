@@ -132,3 +132,18 @@ test('coverOwnership agrees with withCover: the link withCover writes is the lin
   assert.equal(block.coverOwnership(raw), 'program');
   assert.equal(block.coverOwnership(card.withCoverOff(raw)), 'owner');
 });
+
+test('trustedCoverBlock / stripAllCoverBlocks: only a block directly under the title of the note as it was is trusted; every block (also a repeated or forged one) can be stripped; a fenced one is neither', () => {
+  const blockText = block.composeCoverBlock('chapter', 'zh');
+  const note = `---\ntitle: T\n---\n# T\n\n${blockText}\n\n## 目前摘要\n\nx\n`;
+  assert.equal(block.trustedCoverBlock(note), blockText);
+  const moved = `---\ntitle: T\n---\n# T\n\n## 目前摘要\n\nx\n\n${blockText}\n`;
+  assert.equal(block.trustedCoverBlock(moved), undefined, 'a block not directly under the title is not trusted');
+  assert.equal(block.trustedCoverBlock('# T\n\nno block\n'), undefined);
+  const edited = note.replace('沒找到', '沒找到（我改的）');
+  assert.match(block.trustedCoverBlock(edited), /我改的/, 'an owner-edited block under the title is the note\'s own text');
+  const twice = `# T\n\n${blockText}\n\n${blockText}\n\ntext\n`;
+  assert.ok(!/book-cover/.test(block.stripAllCoverBlocks(twice)));
+  const fenced = '# T\n\n```\n' + blockText + '\n```\n';
+  assert.equal(block.stripAllCoverBlocks(fenced), fenced); assert.equal(block.trustedCoverBlock(fenced), undefined);
+});

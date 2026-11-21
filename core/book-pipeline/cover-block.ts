@@ -80,7 +80,7 @@ export function composeCoverBlock(level: CoverLevel, language: CoverLanguage, fo
   ]
     .filter(Boolean)
     .join("\n");
-  return wrap({ file, key: imageKey(found.url), hash: hashText(inner) }, inner);
+  return wrap({ file, key: imageKey(found.url), hash: hashText(inner), ...(found.off ? { off: 1 } : {}) }, inner);
 }
 
 export interface CoverBlock {
@@ -89,6 +89,8 @@ export interface CoverBlock {
   /** The placed picture's key (absent on a "not found" block). */
   key?: string;
   missing: boolean;
+  /** The placed picture may not fit the card (the block says so; the card is flagged for a look). */
+  off: boolean;
   /** The block's text still hashes to the recorded hash: nobody edited it. */
   intact: boolean;
   /** Offsets of the block (start marker to end marker) in the raw text, end exclusive and without the line break after it. */
@@ -111,7 +113,7 @@ export function readCoverBlock(raw: string): CoverBlock | undefined {
     const line = lines[i].replace(/\r$/, "");
     const m = !fenced[i] ? START.exec(line) : null;
     if (!m) continue;
-    let record: { file?: unknown; key?: unknown; hash?: unknown; missing?: unknown };
+    let record: { file?: unknown; key?: unknown; hash?: unknown; missing?: unknown; off?: unknown };
     try {
       record = JSON.parse(m[1]) as typeof record;
     } catch {
@@ -128,6 +130,7 @@ export function readCoverBlock(raw: string): CoverBlock | undefined {
       ...(typeof record.file === "string" ? { file: record.file } : {}),
       ...(typeof record.key === "string" ? { key: record.key } : {}),
       missing: record.missing === 1,
+      off: record.off === 1,
       intact: hashText(inner) === record.hash,
       from: starts[i],
       to: starts[end] + lines[end].replace(/\r$/, "").length
@@ -139,6 +142,32 @@ export function readCoverBlock(raw: string): CoverBlock | undefined {
 /** The picture key a card's cover block records (other cards read it, so the same picture is not used twice in a book). */
 export function coverSourceKey(raw: string): string | undefined {
   return readCoverBlock(raw)?.key;
+}
+
+/**
+ * The exact text of the cover block the note already had before a write: it sits directly under the `# Title` line (blank lines only
+ * between). It may be the program's or one the owner edited (both are the note's own text, put back as they were); a block anywhere else
+ * is not trusted. Call it on the note as it was before the write, never on text an author just wrote.
+ */
+export function trustedCoverBlock(raw: string): string | undefined {
+  const block = readCoverBlock(raw);
+  const title = titleLine(raw);
+  if (!block || !title) return undefined;
+  if (raw.slice(title.end, block.from).trim() !== "") return undefined;
+  return raw.slice(block.from, block.to).replace(/\r$/, "");
+}
+
+/** Removes every cover block (outside code fences) and the blank lines after each; used on text that is not the program's. */
+export function stripAllCoverBlocks(raw: string): string {
+  let text = raw;
+  for (let i = 0; i < 20 && readCoverBlock(text); i++) text = stripCoverBlock(text);
+  return text;
+}
+
+/** The note's placed cover is the program's own intact block and says the picture may not fit its ask. */
+export function coverIsOff(raw: string): boolean {
+  const block = readCoverBlock(raw);
+  return !!block && block.intact && block.off;
 }
 
 /**

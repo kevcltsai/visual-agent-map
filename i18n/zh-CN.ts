@@ -3229,6 +3229,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_reason_caption_latin": "图说的中文里夹着英文字，请检查用字",
   "ui.book_reason_images_limited": "Commons 暂时限制请求，图位未补齐",
   "ui.book_reason_images_off_0": "第 {0} 张图和前后文对不上",
+  "ui.book_reason_cover_off": "封面图可能对不上这一章，请看一下",
   "ui.book_length_unit_chars": "字",
   "ui.book_length_unit_words": "个英文词",
   "ui.book_structure_unmet_0": "结构 {0} 项未达成",

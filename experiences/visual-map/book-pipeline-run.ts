@@ -191,17 +191,19 @@ import {
   captionIsFileName,
   coverAsSlot,
   coverCandidates,
-  coverFolderName
+  coverFolderName,
+  coverOffToken
 } from "../../core/book-pipeline/cover";
 import type { CoverDownload, CoverSaved } from "../../core/book-pipeline/cover-download";
 import {
   composeCoverBlock,
+  coverIsOff,
   coverLinkOf,
   coverOwnership,
   coverSourceKey,
   putCoverBlock,
-  readCoverBlock,
-  stripCoverBlock,
+  stripAllCoverBlocks,
+  trustedCoverBlock,
   type CoverLevel
 } from "../../core/book-pipeline/cover-block";
 import type { ReasoningLevel } from "../../ai/types";
@@ -2976,10 +2978,15 @@ export class BookPipelineRuns {
       if (state.bookProof.incomplete) incomplete("");
     }
     for (const id of effectiveOrder(state)) {
-      if (drive.stages.get(id) !== "needs-review") continue;
       const info = drive.cards.get(id);
       const card = info ? await this.ports.readCard(info.path).catch(() => undefined) : undefined;
+      // A placed cover that the program's own check found off its ask: one item of its own, whatever the chapter's stage.
+      if (card && coverIsOff(card.raw))
+        issues.push({ source: "cover", chapterId: id, chapterTitle: title(id), problem: "", reason: "mismatch" });
+      if (drive.stages.get(id) !== "needs-review") continue;
       const issue = String(card?.fields.pipelineIssue ?? "");
+      // Only the cover is the reason to look: the cover item above says it, a chapter-status line would be empty.
+      if (issue.trim() === `images unmet: ${coverOffToken}`) continue;
       const reason = /length:under/.test(issue)
         ? "too_short"
         : /length:over/.test(issue)
@@ -3638,12 +3645,12 @@ export class BookPipelineRuns {
     };
     // The cover block (under the title) is not the author's text: it is taken out before the cleaning and put back under the title after,
     // so neither the tag neutralizing nor the section rules can touch or move it.
+    // Only the block the program itself placed (read from the note as it was before this write: intact, directly under the title) is put
+    // back, as that exact text. A cover block in what the author wrote is never carried through: it is removed before the cleaning.
+    const trustedCover = trustedCoverBlock(card.raw);
     const finalize = (original: string): string | null => {
-      const block = readCoverBlock(original);
-      if (!block) return finalizeText(original);
-      const text = original.slice(block.from, block.to).replace(/\r$/, "");
-      const out = finalizeText(stripCoverBlock(original));
-      return out === null ? null : putCoverBlock(out, text);
+      const out = finalizeText(stripAllCoverBlocks(original));
+      return out === null || trustedCover === undefined ? out : putCoverBlock(out, trustedCover);
     };
     // Why the author is called now (live v5: an intro's second writing call had no visible reason in the log).
     const attempt = attemptsOf(drive.store.state, nodeId).write;
@@ -4451,6 +4458,8 @@ export class BookPipelineRuns {
         : []),
       ...(limited ? [PICTURE_LIMITED_TOKEN] : []),
       ...(offIndexes.length ? [pictureMismatchToken(offIndexes)] : []),
+      // The cover is not a counted picture, but a cover the block itself says may not fit is a reason to look too.
+      ...(coverIsOff(card.raw) ? [coverOffToken] : []),
       // So is a lowercase English word left in a Chinese caption (live v5: 「果實long在藤上」).
       ...[captionLatinIssue(chapter, drive.config.language)].filter(Boolean)
     ].join(" ");

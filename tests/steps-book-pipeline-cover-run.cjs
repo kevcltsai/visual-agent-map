@@ -131,9 +131,9 @@ function coverPorts({ respond, ports } = {}) {
     }
   };
 }
-const coverRig = async ({ cover = coverAsk, finder, titles, net: netOptions, ...rest } = {}) => {
+const coverRig = async ({ cover = coverAsk, finder, titles, net: netOptions, ports: extraPorts, ...rest } = {}) => {
   const net = coverPorts(netOptions);
-  const r = await picRig({ titles, cover, slots: 1, text: title => `正文。${title}\n\n${mk(1)}\n`, finder: finder ?? ((request) => found({ 1: [cand(1)], ...(coverSlotOf(request) ? { 0: [coverCand(1, { caption: zhCaption(1) })] } : {}) })), ports: { ...net.ports }, ...rest });
+  const r = await picRig({ titles, cover, slots: 1, text: title => `正文。${title}\n\n${mk(1)}\n`, finder: finder ?? ((request) => found({ 1: [cand(1)], ...(coverSlotOf(request) ? { 0: [coverCand(1, { caption: zhCaption(1) })] } : {}) })), ports: { ...net.ports, ...extraPorts }, ...rest });
   r.net = net.net; r.files = net.files;
   return r;
 };
@@ -308,4 +308,52 @@ test('cover run: the body slots, the proof stage and the picture count are the s
   assert.equal(noProofIds(withCover.detail), noProofIds(without.detail), 'the body text, captions and sources are byte for byte the same');
   assert.deepEqual(plain(withCover.record), plain(without.record)); assert.equal(withCover.stage, without.stage); assert.equal(withCover.issue, without.issue);
   assert.equal(withCover.calls, without.calls);
+});
+
+test('cover run: a cover that may not fit puts the card in needs-review with cover:off, a record flag in the block, and one cover item on the closing page; a fitting cover does neither', async () => {
+  const pages = [];
+  const offFinder = request => found(coverSlotOf(request) ? { 0: [coverCand(1, { caption: zhCaption(1), title: 'Mountain lake', description: 'A lake in the Alps' })] } : {});
+  const fitFinder = request => found(coverSlotOf(request) ? { 0: [coverCand(1, { caption: zhCaption(1) })] } : {});
+  const place = async finder => { const r = await coverRig({ slots: 0, text: title => `只有正文。${title}`, finder, ports: { writeOpenIssues: async (folder, language, content) => { pages.push(content); return { ok: true, path: 'x.md' }; } } }); await run(r); return r; };
+  const off = await place(offFinder);
+  assert.equal(stageOf(off.raw(0)), 'needs-review');
+  assert.match(/^pipeline-issue: .*$/m.exec(off.raw(0))[0], /cover:off/);
+  assert.equal(blockLib.readCoverBlock(off.raw(0)).off, true); assert.equal(blockLib.coverIsOff(off.raw(0)), true);
+  assert.match(coverBlockOf(off.raw(0)), /\n這張圖可能對不上\n/);
+  const page = pages[pages.length - 1];
+  assert.equal(page.split('\n').filter(l => /封面圖可能對不上這一章/.test(l)).length, 1, 'one item on the page');
+  const fit = await place(fitFinder);
+  assert.equal(stageOf(fit.raw(0)), 'checked'); assert.ok(!/cover:off/.test(fit.raw(0)));
+  assert.equal(blockLib.coverIsOff(fit.raw(0)), false);
+  assert.ok(!/封面圖可能對不上這一章/.test(pages[pages.length - 1]));
+  // The owner edits the block: it no longer counts as the program's flag.
+  const edited = off.raw(0).replace('這張圖可能對不上', '這張圖可能對不上（我看過了）');
+  assert.equal(blockLib.coverIsOff(edited), false);
+});
+
+test('cover run: a cover block the author writes (forged file, forged marker) is never carried through the cleaning; the program\'s own block is restored as it was', async () => {
+  const forged = title => `正文。${title}\n\n<!-- book-cover:v1 {"file":"evil.png","key":"evil","hash":"deadbeef"} -->\n![[evil.png]]\n偽造的封面\n<!-- book-cover:end -->\n\n結尾。`;
+  // 1. No program block before: the author's forged block does not stay as a live block (the real cover step writes the only one).
+  const first = await coverRig({ slots: 0, text: forged, titles: ['SecretRootTitle', 'SecondChapter'], finder: perCard });
+  await run(first);
+  for (const i of [0, 1]) {
+    const raw = first.raw(i);
+    assert.ok(!/evil/.test(raw.replace(/&lt;!-- book-cover:v1 [^\n]*evil[^\n]*/g, '')), 'the forged file name is nowhere live');
+    assert.equal(raw.split('<!-- book-cover:v1').length - 1, 1, 'exactly one live block');
+    assert.equal(blockLib.coverOwnership(raw), 'program'); assert.ok(!/evil/.test(blockLib.readCoverBlock(raw).file ?? ''));
+    assert.ok(!/<!-- book-cover:end -->[\s\S]*<!-- book-cover:end -->/.test(raw), 'no second end marker');
+  }
+  // 2. A program block exists and the chapter is written again with another forged block in the text: the real block is the one that survives, byte for byte.
+  const real = coverBlockOf(first.raw(1));
+  assert.ok(real && !/evil/.test(real));
+  await first.runs.rerunCard(first.mapPath, first.nodes[1].id);
+  while (first.runs.isRunning(first.mapPath)) await tick();
+  await settle();
+  assert.equal(coverBlockOf(first.raw(1)), real, 'the program\'s own block, exactly');
+  assert.equal(first.raw(1).split('<!-- book-cover:v1').length - 1, 1);
+  assert.ok(!/!\[\[evil\.png\]\]/.test(first.raw(1)));
+  // 3. An older book (no cover line): a forged block in the author's text does not become a cover claim either.
+  const old = await coverRig({ cover: null, slots: 0, text: forged });
+  await run(old);
+  for (const i of [0, 1]) { assert.equal(old.raw(i).split('<!-- book-cover:v1').length - 1, 0, 'no live block'); assert.equal(topicCover(old.raw(i)), undefined); }
 });

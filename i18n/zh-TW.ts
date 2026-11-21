@@ -3231,6 +3231,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_reason_caption_latin": "圖說的中文裡夾著英文字，請檢查用字",
   "ui.book_reason_images_limited": "Commons 暫時限制請求，圖位未補齊",
   "ui.book_reason_images_off_0": "第 {0} 張圖和前後文對不上",
+  "ui.book_reason_cover_off": "封面圖可能對不上這一章，請看一下",
   "ui.book_length_unit_chars": "字",
   "ui.book_length_unit_words": "個英文字",
   "ui.book_structure_unmet_0": "結構 {0} 項未達成",

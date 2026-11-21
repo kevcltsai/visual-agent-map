@@ -3457,6 +3457,7 @@ export const en = {
   "ui.book_reason_caption_latin": "A picture caption has an English word in the Chinese text: check the wording",
   "ui.book_reason_images_limited": "Commons temporarily limited requests; some picture positions were not filled",
   "ui.book_reason_images_off_0": "Pictures {0} do not match the text around them",
+  "ui.book_reason_cover_off": "The cover picture may not fit this chapter: check it",
   "ui.book_length_unit_chars": "characters",
   "ui.book_length_unit_words": "words",
   "ui.book_structure_unmet_0": "Structure: {0} item(s) unmet",

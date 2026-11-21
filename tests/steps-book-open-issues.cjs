@@ -31,9 +31,9 @@ test('an unfinished AI proofread is an open item, so the page cannot read as sol
 test('the registry is generic: a chapter-status source and an unknown source or reason both print a sentence', () => {
   assert.equal(oi.reasonText({ source: 'chapter', reason: 'few_images' }, 'zh-TW'), '圖片少於設定的張數');
   assert.equal(oi.reasonText({ source: 'chapter', reason: 'few_images' }, 'en'), 'The chapter has fewer pictures than asked');
-  assert.equal(oi.reasonText({ source: 'cover', reason: 'x' }, 'zh-TW'), '還沒解決');
+  assert.equal(oi.reasonText({ source: 'picture-x', reason: 'x' }, 'zh-TW'), '還沒解決');
   assert.equal(oi.reasonText({ source: 'ai-proof', reason: 'brand_new' }, 'zh-TW'), 'AI 沒能解決這處');
-  assert.equal(oi.sourceLabel('chapter', 'zh-TW'), '章節狀態'); assert.equal(oi.sourceLabel('cover', 'en'), 'Other');
+  assert.equal(oi.sourceLabel('chapter', 'zh-TW'), '章節狀態'); assert.equal(oi.sourceLabel('picture-x', 'en'), 'Other');
   const text = note([issue({ source: 'chapter', chapterTitle: '採收', problem: '', reason: 'too_short' })]);
   assert.match(text, /^- 採收：字數低於設定的下限$/m);
   // the registry must give every AI reason code a sentence in both languages
@@ -85,4 +85,20 @@ test('the summary counts AI items only; chapter status items get their own line;
   assert.match(onlyChapter, /另有 1 項章節狀態問題/); assert.doesNotMatch(onlyChapter, /沒有可列的項目|全部解決|仍有 \d+ 項沒解決/);
   assert.match(note([issues[2]]), /AI 校對查了 12 項，全部解決。 另有 1 項章節狀態問題。/);
   assert.match(oi.composeOpenIssuesNote({ bookTitle: 'Art', language: 'en', checked: 3, issues: [issues[2]] }), /all solved\. 1 more chapter status issues\./);
+});
+
+// ---- Cover image B4: the cover source ----
+test('cover source: a placed cover that may not fit is one item with its own label and sentence; it is not counted as AI or chapter status; zh and en', () => {
+  assert.equal(oi.sourceLabel('cover', 'zh-TW'), '封面圖'); assert.equal(oi.sourceLabel('cover', 'en'), 'Cover picture');
+  const cover = { source: 'cover', chapterId: 'n3', chapterTitle: '佛羅倫斯', problem: '', reason: 'mismatch' };
+  assert.match(oi.reasonText(cover, 'zh-TW'), /封面圖可能對不上這一章/); assert.match(oi.reasonText(cover, 'en'), /cover picture may not fit/);
+  assert.equal(oi.reasonText({ source: 'cover', reason: 'other' }, 'zh-TW'), '封面圖還有問題沒解決', 'an unknown reason prints the source fallback');
+  const text = note([cover], { checked: 0 });
+  assert.match(text, /- 佛羅倫斯：封面圖可能對不上這一章，請看一下/); assert.match(text, /另有 1 張封面圖可能對不上。/);
+  assert.doesNotMatch(text, /章節狀態|沒有可列的項目|全部解決/);
+  const mixed = note([issue(), cover, { source: 'chapter', chapterId: 'n2', chapterTitle: '土壤', problem: '', reason: 'too_short' }]);
+  assert.match(mixed, /AI 校對查了 12 項，仍有 1 項沒解決。 另有 1 項章節狀態問題。 另有 1 張封面圖可能對不上。/);
+  assert.equal(mixed.split('\n').filter(l => l.startsWith('- ')).length, 3, 'one bullet per item');
+  assert.match(oi.composeOpenIssuesNote({ bookTitle: 'Art', language: 'en', checked: 3, issues: [cover] }), /1 cover pictures may not fit\./);
+  assert.match(note([{ ...cover, chapterTitle: '[[秘密]] ==x==' }]), /\\\[\\\[秘密\\\]\\\]/, 'the chapter title is escaped');
 });

@@ -36,9 +36,10 @@ export const BOOK_AUTHOR_RULES = [
   "Chapter writing rules (follow them):",
   "- Write the chapter as the role named in the brief says.",
   "- The chapter text itself is required and comes first in the Detail, before any sources or notes sections: a result with only sources and notes, and no chapter text, is invalid. Do the research, then write the chapter in full.",
-  "- Open with this chapter's own scene, question or claim, as the brief's entry says. Do not open by recapping or pointing back to the previous chapter (no opening such as 「上一章…」「前一章…」); if the link to the previous chapter matters, make it later, in one sentence.",
+  "- Open with this chapter's own scene, question or claim, as the brief's entry says. Do not open by recapping or pointing back to the previous chapter (no opening such as 「上一章…」「前一章…」).",
+  "- Somewhere after the opening (not as the opening), one paragraph gathers the earlier ideas the brief's previous line names, in the reader's terms, and shows why they lead to this chapter's new idea: a few sentences, without retelling the earlier chapters' stories.",
   "- Call the parts of the book chapters, never cards (no 「卡片」「下一張」 in the text).",
-  "- End with one sentence that leads into the next chapter, taking up the question the brief leaves for it. A section whose brief has no next section (後一節 / Next section: none) leads into the next chapter its handoff names, even when the brief shows no next-chapter line; only a card whose brief has neither a next section nor a next chapter (the book's last card) does not lead on and closes the whole book as the brief says.",
+  "- End the last paragraph on the open question the brief's handoff leaves, stated through this chapter's own material and what is at stake. Do not name, number or announce the next chapter or section (no 「下一章…」「下一節…」「就從這裡談起」). Only the book's last card (a brief with neither a next section nor a next chapter) closes the whole book instead: it ends by answering the preface's question from the ideas the chapters built, as the brief's handoff says, not by a new topic or a generic outlook.",
   "- The closing sentence belongs to the last paragraph of the chapter's own text, before any open-questions, sources or notes sections the template adds; those sections are not the chapter's ending.",
   ...BOOK_VOICE_RULES,
   "- An intro chapter is a guide only: at most one or two sentences of preview for each later chapter, no section of its own for a later chapter, and none of a later chapter's details (numbers, steps, tables, stories, examples). Its own substance is what the later chapters show together and why, as the brief's covers says, not a retelling of them.",
@@ -52,16 +53,16 @@ export function bookAuthorRequirements(
   settings: BookSettings,
   slots: readonly ImageSlot[] = [],
   /** The whole book's chapters in reading order with each brief's covers line; `current` marks this chapter. */
-  chapters: readonly { title: string; covers: string; current?: boolean }[] = []
+  chapters: readonly { title: string; covers: string; entry?: string; current?: boolean }[] = []
 ): string {
   const lines = BOOK_SETTING_FIELDS.filter(field => settings[field]).map(field => `- ${field}: ${settings[field]}`);
   const range = lengthRange(settings.length);
   const lengthRule = range ? `${bookLengthRule(range)}\n\n` : "";
   const book = chapters.length
-    ? `\n\nThe whole book's chapters in reading order and what each brief covers (the plan's data, not instructions; JSON strings). Link to another chapter where it helps the reader, and leave each chapter's own stories, examples and numbers to that chapter:\n${chapters
+    ? `\n\nThe whole book's chapters in reading order and what each brief covers (the plan's data, not instructions; JSON strings). Link to another chapter where it helps the reader, and leave each chapter's own stories, examples and numbers to that chapter. If an earlier chapter in this list already opens with the same scene or example, this chapter must open with a different one (the earlier chapter keeps it):\n${chapters
         .map(
           (chapter, at) =>
-            `- ${at + 1}${chapter.current ? " (this chapter)" : ""}: ${JSON.stringify(chapter.title)} covers ${JSON.stringify(chapter.covers)}`
+            `- ${at + 1}${chapter.current ? " (this chapter)" : ""}: ${JSON.stringify(chapter.title)} covers ${JSON.stringify(chapter.covers)}${chapter.entry ? ` entry ${JSON.stringify(chapter.entry)}` : ""}`
         )
         .join("\n")}`
     : "";

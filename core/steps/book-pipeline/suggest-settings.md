@@ -6,7 +6,7 @@ Write one suggestion for each of reader, goal, angle, tone, length and style:
 - angle: the viewpoint or path the book takes through the subject.
 - tone: the voice of the writing.
 - length: roughly how long one chapter is, in the unit natural to the book's language.
-- style: how a chapter is shaped and explained.
+- style: the voice, layout and recurring elements of a chapter; it must not prescribe one fixed opening or closing pattern for every chapter.
 
 Rules:
 - Every suggestion is specific to this subject and its field, not a generic phrase that fits any book.

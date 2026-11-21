@@ -583,12 +583,14 @@ test('proofread: a whole-card failure carries the judged items as a partial resu
 
 test('author requirements: the fixed chapter rules always come first, the settings after', () => {
   const none = settings.bookAuthorRequirements({});
-  assert.match(none, /Open with this chapter's own scene, question or claim/); assert.match(none, /Do not open by recapping or pointing back to the previous chapter/); assert.match(none, /never cards/); assert.match(none, /End with one sentence that leads into the next chapter/); assert.match(none, /Do not end the chapter with an update log/); assert.match(none, /A section whose brief has no next section .* leads into the next chapter its handoff names/); assert.match(none, /neither a next section nor a next chapter \(the book's last card\).*closes the whole book/); assert.match(none, /what the later chapters show together and why/);
+  assert.match(none, /Open with this chapter's own scene, question or claim/); assert.match(none, /Do not open by recapping or pointing back to the previous chapter/); assert.match(none, /never cards/); assert.match(none, /End the last paragraph on the open question the brief's handoff leaves/); assert.match(none, /Do not name, number or announce the next chapter or section/); assert.match(none, /Somewhere after the opening \(not as the opening\), one paragraph gathers the earlier ideas/); assert.doesNotMatch(none, /End with one sentence that leads into the next chapter/); assert.match(none, /Do not end the chapter with an update log/); assert.match(none, /the book's last card \(a brief with neither a next section nor a next chapter\).*answering the preface's question/); assert.match(none, /what the later chapters show together and why/);
   const some = settings.bookAuthorRequirements({ tone: 'warm' });
   assert.ok(some.startsWith(none)); assert.match(some, /- tone: warm/);
   assert.doesNotMatch(none, /The whole book's chapters/, 'no chapter list when none is given');
   const book = settings.bookAuthorRequirements({}, [], [{ title: 'A', covers: 'a "x"' }, { title: 'B', covers: 'b', current: true }]);
-  assert.match(book, /The whole book's chapters in reading order/);
+  assert.match(book, /The whole book's chapters in reading order/); assert.match(book, /already opens with the same scene or example, this chapter must open with a different one/);
+  const withEntry = settings.bookAuthorRequirements({}, [], [{ title: 'A', covers: 'a', entry: 'a "scene"' }, { title: 'B', covers: 'b', current: true }]);
+  assert.match(withEntry, /- 1: "A" covers "a" entry "a \\"scene\\""/); assert.match(withEntry, /- 2 \(this chapter\): "B" covers "b"\n?$/m);
   assert.match(book, /- 1: "A" covers "a \\"x\\""/); assert.match(book, /- 2 \(this chapter\): "B" covers "b"/);
 });
 
@@ -1094,23 +1096,24 @@ test('A6 card plan request: a section prompt carries its chapter and (last secti
   assert.match(section, /"place":"section 2 of 2 in chapter 2"/);
   assert.match(section, /Chapter this section belongs to \(JSON object\):\n\{"place":"chapter 2","title":"Chapter two"\}/);
   assert.match(section, /Next chapter, which this section's handoff leads to \(JSON object\):\n\{"place":"chapter 3","title":"Outro"/);
-  assert.match(section, /its entry takes up where the previous section ended/);
-  assert.match(section, /last section of the chapter, its handoff leads out to the next chapter/);
+  assert.match(section, /its entry grows from its own subject and does not pick up or retell the previous card/);
+  assert.match(section, /last section of the chapter, its handoff leaves the open question the next chapter .* takes up, without naming it/);
   const firstSection = cardPlan.cardPlanStep.render(planBase({ card: { id: 's1', kind: 'section', chapter: 2, sectionIndex: 1, sectionCount: 2, role: 'body', title: 'One', summary: 's' }, parent: { position: 2, title: 'Chapter two' }, next: { title: 'Two', summary: 't' } }));
-  assert.match(firstSection, /first section of its chapter, so its entry takes up the chapter's own text/);
+  assert.match(firstSection, /its entry grows from its own subject/);
   assert.ok(!/Next chapter, which/.test(firstSection));
   const chapter = cardPlan.cardPlanStep.render(planBase({ previous: { position: 'preface', title: 'Intro', summary: 'i' }, next: { position: 2, title: 'Next', summary: 'n' } }));
   assert.ok(!/belongs to|Next chapter, which/.test(chapter));
   assert.match(chapter, /"place":"preface","title":"Intro"/);
-  assert.match(chapter, /takes up the end of the previous chapter .* and does not retell it\. This chapter has no sections, so its handoff leads into the next chapter\./);
+  assert.match(chapter, /does not pick up or retell the previous card\. Its handoff leaves the open question the next chapter takes up, without naming it\./);
   const lastChapter = cardPlan.cardPlanStep.render(planBase({ previous: { position: 1, title: 'One', summary: 'o' } }));
-  assert.match(lastChapter, /has no sections and is the last, so its handoff closes the book/);
-  assert.ok(!/leads into the next chapter/.test(lastChapter));
+  assert.match(lastChapter, /has no sections and is the last, so it closes the book as the handoff rule says for the last card/);
+  assert.match(lastChapter, /return to the question the preface opened with/);
+  assert.ok(!/takes up, without naming/.test(lastChapter));
   const lastSection = cardPlan.cardPlanStep.render(planBase({ card: { id: 's2', kind: 'section', chapter: 2, sectionIndex: 2, sectionCount: 2, role: 'body', title: 'Two', summary: 's' }, parent: { position: 2, title: 'Chapter two' }, previous: { title: 'One', summary: 'o' } }));
-  assert.match(lastSection, /last section of the last chapter, so its handoff closes the book/);
+  assert.match(lastSection, /last section of the last chapter, so it closes the book/);
   assert.ok(!/closes the chapter|leads out to the next chapter/.test(lastSection));
   const withSections = cardPlan.cardPlanStep.render(planBase({ children: [{ title: 'S1', summary: 'a' }] }));
-  assert.match(withSections, /handoff leads into its own first section/);
+  assert.match(withSections, /handoff leaves the open question its own first section takes up/);
 });
 
 test('A6 global plan: every card carries its place, and the prompt explains the preface, chapters and sections', () => {

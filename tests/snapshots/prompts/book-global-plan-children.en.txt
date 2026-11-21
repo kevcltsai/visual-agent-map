@@ -9,7 +9,7 @@ Rules:
 - role is one of intro (opens the book or a part; a guide that previews each later chapter in one or two sentences only), body (a main chapter), gallery (a visual walk-through of materials), closing (wraps up).
 - thread: 2 to 4 sentences, one paragraph, no headings or lists.
 - materials: each has a short name and one sentence on how the book uses it. Use only things the titles and summaries point to; an empty list is allowed when they point to none.
-- decisions: one short value (at most one sentence) for each of reader, goal, angle, tone, length and style. For a setting the owner already filled (shown below), return an empty string. Never contradict a filled setting.
+- decisions: one short value (at most one sentence) for each of reader, goal, angle, tone, length and style (style describes voice, layout and recurring elements, and must not prescribe one fixed opening or closing pattern for every chapter). For a setting the owner already filled (shown below), return an empty string. Never contradict a filled setting.
 - Write plain single-line text in every field. Do not write Markdown headings or numbered ids.
 
 Return only JSON: {"thread":"","cards":[{"id":"","role":"intro|body|gallery|closing"}],"materials":[{"name":"","use":""}],"decisions":{"reader":"","goal":"","angle":"","tone":"","length":"","style":""}}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.

@@ -4603,9 +4603,14 @@ export class BookPipelineRuns {
     drive: Drive,
     nodeId: string,
     card: { title: string; prompt: string }
-  ): Promise<{ title: string; covers: string; current?: boolean }[]> {
+  ): Promise<{ title: string; covers: string; entry?: string; current?: boolean }[]> {
     const ids = effectiveOrder(drive.store.state).filter(id => drive.cards.has(id));
-    const chapters = await this.proofChapters(drive, nodeId, card);
+    const chapters: { title: string; covers: string; entry?: string }[] = await this.proofChapters(
+      drive,
+      nodeId,
+      card,
+      true
+    );
     return chapters.map((chapter, at) => (ids[at] === nodeId ? { ...chapter, current: true } : chapter));
   }
 
@@ -4613,15 +4618,22 @@ export class BookPipelineRuns {
   private async proofChapters(
     drive: Drive,
     nodeId: string,
-    card: { title: string; prompt: string }
-  ): Promise<{ title: string; covers: string }[]> {
-    const chapters: { title: string; covers: string }[] = [];
+    card: { title: string; prompt: string },
+    withEntry = false
+  ): Promise<{ title: string; covers: string; entry?: string }[]> {
+    const chapters: { title: string; covers: string; entry?: string }[] = [];
     for (const id of effectiveOrder(drive.store.state)) {
       const info = drive.cards.get(id);
       if (!info) continue;
       const other = id === nodeId ? card : await this.ports.readCard(info.path).catch(() => undefined);
       const covers = other ? (parseCardPrompt(other.prompt).covers ?? "") : "";
-      chapters.push({ title: other?.title ?? info.title, covers: singleLineText(covers, PROOF_COVERS_MAX) });
+      const entry =
+        withEntry && other ? singleLineText(parseCardPrompt(other.prompt).entry ?? "", PROOF_COVERS_MAX) : "";
+      chapters.push({
+        title: other?.title ?? info.title,
+        covers: singleLineText(covers, PROOF_COVERS_MAX),
+        ...(entry ? { entry } : {})
+      });
     }
     return chapters;
   }

@@ -284,28 +284,25 @@ const relations = (request: CardPlanRequest): string => {
 /** How this card joins its neighbours, by what it is (chapter, section) and whether it has sections. */
 const continuity = (request: CardPlanRequest, hasChildren: boolean): string => {
   const kind = request.card.kind;
+  const own = "its entry grows from its own subject and does not pick up or retell the previous card.";
   if (kind === "section")
     return [
-      request.card.sectionIndex === 1
-        ? "Continuity: this is the first section of its chapter, so its entry takes up the chapter's own text (what the chapter has just said) and does not repeat it."
-        : "Continuity: its entry takes up where the previous section ended and does not repeat it.",
+      `Continuity: ${own}`,
       request.nextChapter
-        ? "As the last section of the chapter, its handoff leads out to the next chapter (the one given below), not to a section."
+        ? "As the last section of the chapter, its handoff leaves the open question the next chapter (the one given below) takes up, without naming it."
         : request.next
-          ? "Its handoff leads into the next section."
-          : "It is the last section of the last chapter, so its handoff closes the book."
+          ? "Its handoff leaves the open question the next section takes up, without naming it."
+          : "It is the last section of the last chapter, so it closes the book as the handoff rule says for the last card."
     ].join(" ");
   if (kind === "preface")
-    return "Continuity: this is the preface; its entry opens the book, and its handoff leads into chapter 1.";
+    return "Continuity: this is the preface; its entry opens the book, and its handoff leaves the open question chapter 1 takes up, without naming it.";
   return [
-    request.previous
-      ? "Continuity: the entry takes up the end of the previous chapter (or the preface) and does not retell it."
-      : "Continuity: the entry opens the book's first chapter.",
+    request.previous ? `Continuity: ${own}` : "Continuity: the entry opens the book's first chapter.",
     hasChildren
-      ? "This chapter has sections, so its handoff leads into its own first section, not into the next chapter."
+      ? "This chapter has sections, so its handoff leaves the open question its own first section takes up."
       : request.next
-        ? "This chapter has no sections, so its handoff leads into the next chapter."
-        : "This chapter has no sections and is the last, so its handoff closes the book."
+        ? "Its handoff leaves the open question the next chapter takes up, without naming it."
+        : "This chapter has no sections and is the last, so it closes the book as the handoff rule says for the last card."
   ].join(" ");
 };
 

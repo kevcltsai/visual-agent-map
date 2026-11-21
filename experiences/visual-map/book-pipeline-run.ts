@@ -136,6 +136,7 @@ import {
 } from "../../core/book-pipeline/plan-text";
 import {
   composeProofRecord,
+  relabelProofRecord,
   composeProofSection,
   failedProofKey,
   isProofFailure,
@@ -3607,6 +3608,28 @@ export class BookPipelineRuns {
       body,
       checklist
     });
+    // The length rule: a third reason beside the facts and the structure. It never lowers another failure; with nothing else wrong it
+    // still makes the chapter need a look, and it stays so once the one automatic redo is spent (no silent "checked").
+    const length = await this.lengthOf(drive, nodeId, lengthBody(chapter));
+    const lengthIssue = length ? lengthToken(length) : "";
+    // Fewer pictures than the owner's minimum, and any placed picture off its text, are reasons to look (never a rewrite of the
+    // text): see pictureShortfallToken and pictureMismatchToken.
+    const minimum = await this.pictureMinimum(drive);
+    const limited = imageCheck.issues.some(issue => issue.code === "rate_limited");
+    const offIndexes = imageCheck.issues.flatMap(issue =>
+      issue.code === "mismatch" && issue.index !== undefined ? [issue.index] : []
+    );
+    const pictureIssue = [
+      ...(minimum !== undefined && imageCheck.placed < minimum
+        ? [pictureShortfallToken(imageCheck.placed, minimum)]
+        : []),
+      ...(limited ? [PICTURE_LIMITED_TOKEN] : []),
+      ...(offIndexes.length ? [pictureMismatchToken(offIndexes)] : []),
+      // So is a lowercase English word left in a Chinese caption (live v5: 「果實long在藤上」).
+      ...[captionLatinIssue(chapter, drive.config.language)].filter(Boolean)
+    ].join(" ");
+    // The proof line says 「已校」 only when no length or picture reason is left beside a clean proof.
+    const unresolved = !!lengthIssue || !!pictureIssue;
     let result: ProofResult | undefined = findStoredProof(card.detail, key);
     if (!result) {
       // A whole-card failure keeps the judgments already made (the structure items) in the research notes; the card still needs a human.
@@ -3645,7 +3668,7 @@ export class BookPipelineRuns {
       const models = { model: drive.config.proofModel, authorModel: drive.authorModels.get(nodeId) };
       const written = await this.ports.updateNoteGuarded(
         path,
-        { detail: replaceResearchRecord(card.detail, composeProofRecord(key, result, undefined, models)) },
+        { detail: replaceResearchRecord(card.detail, composeProofRecord(key, result, undefined, models, unresolved)) },
         {
           expectedContent: card.raw,
           authorize: this.authorize(drive, token),
@@ -3662,9 +3685,10 @@ export class BookPipelineRuns {
         authorModel: drive.authorModels.get(nodeId) ?? stored?.authorModel
       };
       const judged: ProofResult = { ...result, aggregate: proofVerdict(result, false) };
+      const relabeled = relabelProofRecord(card.raw, unresolved);
       const next = programStampRaw(
-        card.raw,
-        this.proofSectionOf(drive, { result: judged }, models, imageLine)(card.raw)
+        relabeled,
+        this.proofSectionOf(drive, { result: judged }, models, imageLine)(relabeled)
       );
       if (next !== card.raw) {
         const path = await this.stillOnMap(drive, nodeId);
@@ -3680,31 +3704,11 @@ export class BookPipelineRuns {
     }
     // The same reducer judges a fresh and a stored proof; a stored "checked" with every structure point unmet is needs-review.
     const verdict: ProofResult = { ...result, aggregate: proofVerdict(result, !body.trim()) };
-    // The length rule: a third reason beside the facts and the structure. It never lowers another failure; with nothing else wrong it
-    // still makes the chapter need a look, and it stays so once the one automatic redo is spent (no silent "checked").
-    const length = await this.lengthOf(drive, nodeId, lengthBody(chapter));
-    const lengthIssue = length ? lengthToken(length) : "";
     // Some unmet structure items do not stop the card: it stays checked, and the count is kept in its issue field for the card's small note.
     const structureUnmet = verdict.items
       .filter(item => item.type !== "fact" && item.status === "unmet")
       .map(item => code(item.id));
     const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
-    // Fewer pictures than the owner's minimum, and any placed picture off its text, are reasons to look (never a rewrite of the
-    // text): see pictureShortfallToken and pictureMismatchToken.
-    const minimum = await this.pictureMinimum(drive);
-    const limited = imageCheck.issues.some(issue => issue.code === "rate_limited");
-    const offIndexes = imageCheck.issues.flatMap(issue =>
-      issue.code === "mismatch" && issue.index !== undefined ? [issue.index] : []
-    );
-    const pictureIssue = [
-      ...(minimum !== undefined && imageCheck.placed < minimum
-        ? [pictureShortfallToken(imageCheck.placed, minimum)]
-        : []),
-      ...(limited ? [PICTURE_LIMITED_TOKEN] : []),
-      ...(offIndexes.length ? [pictureMismatchToken(offIndexes)] : []),
-      // So is a lowercase English word left in a Chinese caption (live v5: 「果實long在藤上」).
-      ...[captionLatinIssue(chapter, drive.config.language)].filter(Boolean)
-    ].join(" ");
     return {
       kind: "ok",
       after: async () => {

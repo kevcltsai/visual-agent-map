@@ -10,6 +10,10 @@ const b = loadSource(`
 export * from "./experiences/visual-map/book-pipeline-callouts";
 export { findProgramCallouts, readReviewState, putProgramCallout, reviewCallout, trialCallout } from "./experiences/visual-map/book-pipeline-review";
 export { setUiLanguage } from "./i18n";
+export { composeProofRecord, proofKey } from "./core/book-pipeline/proof";
+export { replaceResearchRecord, chapterBody } from "./core/book-pipeline/note-sections";
+export { projectProofBody } from "./core/book-pipeline/book-notes";
+export { stripImageLines } from "./core/book-pipeline/image-slots";
 `, { obsidian: { ...S.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice([]), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
 b.setUiLanguage('zh-TW');
 
@@ -285,4 +289,69 @@ test('reconcile: a chapter rewritten after the aligner read it (its snapshot alr
   assert.ok(withHint.includes('vam-trial'));
   await callouts.reconcile('M');
   assert.deepEqual(r.kinds('n3'), ['trial:r1'], 'the rewritten chapter carries the hint again');
+});
+
+// ---- truthful boxes (live v6fix2): every unresolved reason is in the reader-visible box, from the same issue data as `pipeline-issue` ----
+const proofDetail = (nodeId, items, runId = 'r1') => {
+  const body = 'Body text';
+  const key = b.proofKey({ runId, nodeId, revision: 0, body: b.projectProofBody(b.stripImageLines(body)), checklist: [] });
+  const result = { aggregate: items.some(i => i.status !== 'met') ? 'needs-review' : 'checked', items: items.map(i => ({ type: 'structure', sources: [], ...i })) };
+  return b.replaceResearchRecord(body, b.composeProofRecord(key, result));
+};
+function truthRig(data, cards) {
+  const notes = new Map(); const nodes = [];
+  for (const id of Object.keys(cards)) { nodes.push({ id, path: `N/${id}.md` }); notes.set(`N/${id}.md`, note(cards[id].detail)); }
+  const map = { id: 'm', nodes, bookPipeline: data };
+  const callouts = new b.BookCallouts({
+    readMap: async () => map,
+    readCard: async path => { const raw = notes.get(path); const id = nodes.find(n => n.path === path).id; return { path, title: id, summary: '', prompt: '', detail: raw, raw, settings: {}, fields: { pipelineStage: 'needs-review', bookRole: 'body', pipelineIssue: cards[id].issue } }; },
+    readText: async path => notes.get(path),
+    write: async (path, transform) => { const next = transform(notes.get(path)); if (next === notes.get(path)) return 'unchanged'; notes.set(path, next); return 'written'; },
+    log: () => {}
+  });
+  return { callouts, notes, box: id => { const m = /^> \[!vam-(?:trial|review)\][^]*?%%vam-callout-version:1%%/m.exec(notes.get(`N/${id}.md`)); return m ? m[0] : ''; } };
+}
+const U = (id, note) => ({ id, status: 'unmet', note });
+test('gate 1 trial box lists length, images, mismatch and each unmet proof item (v6fix2 家庭菜園入門)', async () => {
+  const issue = 'proof unmet: C6 C7 length:under:4854:5000-8000:字:v2 images:under:4:6 images:off:5';
+  const r = truthRig(DATA({ phase: 'gate1', trial: ['n1'], order: ['n1'] }), { n1: { issue, detail: proofDetail('n1', [U('C6', '採收方式沒有交代'), U('C7', '結尾沒有接到下一章')]) } });
+  await r.callouts.reconcile('M');
+  const box = r.box('n1');
+  assert.match(box, /\[!vam-trial\]/);
+  assert.match(box, /4854/); assert.match(box, /5000/);
+  assert.match(box, /採收方式沒有交代/); assert.match(box, /結尾沒有接到下一章/);
+  assert.match(box, /4.*6|6.*4/, 'image count against the minimum');
+  assert.match(box, /圖.*5|5.*圖/, 'image 5 does not match its text');
+});
+test('gate 2 review box lists every unmet proof item on its own line (v6fix2 澆水施肥與病蟲害)', async () => {
+  const issue = 'proof unmet: C5 C7 images:under:3:6';
+  const r = truthRig(DATA({ order: ['n1'] }), { n1: { issue, detail: proofDetail('n1', [U('C5', '練習並非最後一部分'), U('C7', '結尾並非談第一批收成'), { id: 'C1', status: 'met', note: 'ok' }]) } });
+  await r.callouts.reconcile('M');
+  const lines = r.box('n1').split('\n').filter(l => l.startsWith('> ・'));
+  assert.ok(lines.some(l => l.includes('練習並非最後一部分')), 'C5 has its own line');
+  assert.ok(lines.some(l => l.includes('結尾並非談第一批收成')), 'C7 has its own line');
+  assert.ok(lines.some(l => /3.*6/.test(l)), 'images under');
+  assert.ok(!lines.some(l => l.includes('練習並非最後一部分') && l.includes('結尾並非談')), 'not merged in one bullet');
+});
+test('gate 2 box keeps every unmet proof item even past three', async () => {
+  const items = ['a', 'b', 'c', 'd', 'e'].map((x, i) => U(`C${i + 1}`, `原因${x}`));
+  const r = truthRig(DATA({ order: ['n1'] }), { n1: { issue: 'proof unmet: C1 C2 C3 C4 C5', detail: proofDetail('n1', items) } });
+  await r.callouts.reconcile('M');
+  for (const x of ['a', 'b', 'c', 'd', 'e']) assert.match(r.box('n1'), new RegExp(`原因${x}`));
+});
+
+// ---- the writer asks open reading views to render again (live v6fix2: tabs opened at gate 1 kept the old box) ----
+test('writer: a written note makes its reading views render again; unchanged or refused does not', async () => {
+  const seen = [];
+  let file = 'abc';
+  const write = b.createNoteWriter({ openViews: () => [], rawGuarded: async (p, t) => { file = t(file); return 'written'; }, rerender: p => seen.push(p) });
+  assert.equal(await write('N/a.md', upper), 'written');
+  assert.deepEqual(seen, ['N/a.md']);
+  assert.equal(await write('N/a.md', upper), 'unchanged');
+  const refused = b.createNoteWriter({ openViews: () => [], rawGuarded: async () => 'discarded', rerender: p => seen.push(p) });
+  assert.equal(await refused('N/b.md', upper), 'refused');
+  assert.deepEqual(seen, ['N/a.md']);
+  const viaEditor = b.createNoteWriter({ openViews: () => [view('abc')], rawGuarded: async () => 'written', rerender: p => seen.push(p) });
+  assert.equal(await viaEditor('N/c.md', upper), 'written');
+  assert.deepEqual(seen, ['N/a.md', 'N/c.md']);
 });

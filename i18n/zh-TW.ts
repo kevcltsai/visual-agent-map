@@ -3277,6 +3277,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_note_trial_next": "看完後回心智圖，按「這樣可以，跑完全書」。",
   "ui.book_note_trial_stopped": "這本書已停止。先在心智圖工具列按「繼續」，再按「這樣可以，跑完全書」。",
   "ui.book_note_trial_edit": "想改哪一段：選取文字，右鍵「加備註」。",
+  "ui.book_note_trial_problems": "這章還有問題沒解決：",
   "ui.book_note_prev_0": "上一章：{0}",
   "ui.book_note_next_0": "下一章：{0}",
   "ui.book_note_review_title": "這章要你看",

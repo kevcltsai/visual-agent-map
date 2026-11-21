@@ -159,9 +159,10 @@ test('trial callout: title, next step, links, owner marker and version; stopped 
   assert.ok(!/\[!vam-book\]/i.test(t1 + review()), 'never the hidden type');
 });
 test('review callout: reasons as plain lines, two unticked boxes, next link, marker with fp', () => {
-  const r = review({}, ['A', 'B', 'C', 'D', 'E', 'F']);
+  // v6fix2: the cap moved from 5 to 12 so that every unmet proof item, length and picture reason fits (a box never hides an unresolved reason).
+  const r = review({}, ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N']);
   assert.match(r, /^> \[!vam-review\] 這章要你看\n/);
-  assert.equal((r.match(/^> ・/gm) ?? []).length, 5, 'capped');
+  assert.equal((r.match(/^> ・/gm) ?? []).length, 12, 'capped');
   assert.deepEqual(r.match(/^> - \[ \] .*$/gm), ['> - [ ] 接受現在這樣，不用改', '> - [ ] 我改好了']);
   assert.match(r, /下一章要看的：\[\[Notes\/Next\|第二章\]\]/);
   assert.match(r, /\n> %%vam-review:run-1:n1:abc123%%\n/);

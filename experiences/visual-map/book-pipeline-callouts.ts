@@ -17,6 +17,7 @@ import {
   readReviewState,
   removeProgramCallouts,
   removeProgramCalloutsWhere,
+  entryReasons,
   reviewCallout,
   reviewEntries,
   type Gate2Card,
@@ -50,6 +51,11 @@ export interface NoteWritePorts {
     transform: (content: string) => string,
     options: { authorize: () => boolean }
   ): Promise<"written" | "discarded">;
+  /**
+   * The note's text was changed by the program: its open reading-mode views render it again. A reading view keeps the sections it
+   * rendered when the file is changed under it (live: a tab opened at gate 1 kept the trial box through gate 2 and done).
+   */
+  rerender?(path: string): void;
 }
 /** written: the text changed; unchanged: it already was as wanted; refused: nothing was written (views disagree, or the note changed under us). */
 export type NoteWriteResult = "written" | "unchanged" | "refused";
@@ -125,7 +131,7 @@ export function createNoteWriter(
     if (next === texts[0]) return "unchanged";
     return views[0].replace(next) ? "written" : "refused";
   };
-  return async (path, transform) => {
+  const write = async (path: string, transform: (text: string) => string): Promise<NoteWriteResult> => {
     const views = ports.openViews(path);
     if (views.length) return viaEditor(views, transform);
     let opened = false;
@@ -148,6 +154,11 @@ export function createNoteWriter(
     if (!opened) return "refused";
     const now = ports.openViews(path);
     return now.length ? viaEditor(now, transform) : "refused";
+  };
+  return async (path, transform) => {
+    const result = await write(path, transform);
+    if (result === "written") ports.rerender?.(path);
+    return result;
   };
 }
 
@@ -369,6 +380,19 @@ export class BookCallouts {
     }
   }
 
+  private noteInput(card: PipelineCard | undefined) {
+    return card
+      ? {
+          prompt: card.prompt,
+          detail: card.detail,
+          pipelineStage: card.fields.pipelineStage,
+          pipelineIssue: card.fields.pipelineIssue,
+          pipelineSeam: card.fields.pipelineSeam,
+          bookRole: card.fields.bookRole
+        }
+      : undefined;
+  }
+
   private async align(mapPath: string, mayCarry?: MayCarryCallouts): Promise<void> {
     const clean = (id: string): boolean => mayCarry?.(id) === false;
     const map = await this.ports.readMap(mapPath);
@@ -390,6 +414,16 @@ export class BookCallouts {
     const wanted = new Map<string, WantedCallouts>();
     if (data.phase === "gate1") {
       const trial = data.trial ?? [];
+      // The same reasons the review box lists (one source: the card's issue and stored proof), so the first box a reader sees is true.
+      const reasons = new Map(
+        reviewEntries({
+          proofContext: { runId: data.runId, revisionOf: id => cardRevision(data, id) },
+          order: trial.filter(id => byId.has(id)),
+          inconsistencies: id => chapterInconsistencies(data, id),
+          titleOf: id => byId.get(id)?.title ?? id,
+          noteOf: id => this.noteInput(byId.get(id))
+        }).map(entry => [entry.card.id, entryReasons(entry)] as const)
+      );
       trial.forEach((id, at) => {
         if (!byId.has(id)) return;
         wanted.set(id, {
@@ -404,7 +438,8 @@ export class BookCallouts {
             {
               runId: data.runId,
               nodeId: id
-            }
+            },
+            reasons.get(id)
           )
         });
       });
@@ -414,19 +449,7 @@ export class BookCallouts {
         order: cards.map(item => item.id),
         inconsistencies: id => chapterInconsistencies(data, id),
         titleOf: id => byId.get(id)?.title ?? id,
-        noteOf: id => {
-          const card = byId.get(id);
-          return card
-            ? {
-                prompt: card.prompt,
-                detail: card.detail,
-                pipelineStage: card.fields.pipelineStage,
-                pipelineIssue: card.fields.pipelineIssue,
-                pipelineSeam: card.fields.pipelineSeam,
-                bookRole: card.fields.bookRole
-              }
-            : undefined;
-        }
+        noteOf: id => this.noteInput(byId.get(id))
       });
       entries.forEach((entry, at) => {
         const next = entries.length > 1 ? entries[(at + 1) % entries.length].card.id : undefined;
@@ -438,7 +461,7 @@ export class BookCallouts {
             build: prior =>
               reviewCallout(
                 entry.card,
-                entry.problems.map(problem => problem.text),
+                entryReasons(entry),
                 link(next),
                 entry.fp,
                 data.runId,

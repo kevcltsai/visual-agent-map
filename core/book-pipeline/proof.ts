@@ -324,6 +324,18 @@ function cleanResult(result: ProofResult): ProofResult {
   };
 }
 
+/** The proof line's label: 「已校」 only when the chapter has no unresolved issue (length, pictures); a clean proof beside one says so. */
+const PROOF_LABEL_CHECKED = "已校";
+const PROOF_LABEL_OPEN = "有問題要你看";
+/**
+ * A stored record's label made true for the chapter as it is now (the record itself is reused while its text is unchanged, so a
+ * picture or length reason that came or went later changes only this word). Other labels (需人看, a failure) are left alone.
+ */
+export function relabelProofRecord(text: string, unresolved: boolean): string {
+  const [from, to] = unresolved ? [PROOF_LABEL_CHECKED, PROOF_LABEL_OPEN] : [PROOF_LABEL_OPEN, PROOF_LABEL_CHECKED];
+  return text.replace(new RegExp(`^(>? ?)校對（${from}）`, "m"), `$1校對（${to}）`);
+}
+
 /**
  * The lines appended to the research notes for one proof: readable plain lines and one machine record. The only place the
  * note and sources are made safe (escaped text; https addresses as inline code, so nothing is clickable or loadable).
@@ -333,7 +345,8 @@ export function composeProofRecord(
   key: string,
   result: ProofResult,
   failure?: ProofFailureCode,
-  models?: ProofModels
+  models?: ProofModels,
+  unresolved?: boolean
 ): string {
   const clean = cleanResult(result);
   const model = safeModelId(models?.model);
@@ -341,7 +354,7 @@ export function composeProofRecord(
   const lines = [
     (failure
       ? `校對失敗（原因：${failure}；以下是已判斷的結果，仍需人看）`
-      : `校對（${clean.aggregate === "checked" ? "已校" : clean.factsUnverified ? "需人看；事實項目皆待查" : "需人看"}）`) +
+      : `校對（${clean.aggregate === "checked" ? (unresolved ? PROOF_LABEL_OPEN : PROOF_LABEL_CHECKED) : clean.factsUnverified ? "需人看；事實項目皆待查" : "需人看"}）`) +
       (clean.counts ? ` 開頁 ${clean.counts.openedPages} 次、搜尋 ${clean.counts.searches} 次` : "")
   ];
   for (const item of clean.items)

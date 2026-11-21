@@ -45,6 +45,8 @@ export interface Gate2Card {
   role?: string;
   /** The plain sentence of a needs-review card (never a code). */
   failureText?: string;
+  /** The same reasons one by one (every unmet proof item, length, pictures): what the reader-visible boxes list. */
+  failureLines?: string[];
   /** Checked cards: structure items the proofreader found unmet (picture tokens are not counted). */
   structureUnmet: number;
   /** Checked cards: fact items that were not confirmed against a source. */
@@ -174,25 +176,35 @@ export const plainNote = (text: string): string =>
 
 export { joinReasons };
 
-/** The reason of a needs-review card in words: the proof's own notes of the items not met, else the count, else a plain sentence; never a code. */
-export function reasonOf(issue: string, proof: StoredProofView | undefined): string {
+/**
+ * The reasons of a needs-review card as separate pieces (length, pictures, each proof item not met by its own note, a carried failure);
+ * `all` lists every open proof item, else at most 3 distinct notes (what the one-line reason uses).
+ */
+function reasonParts(issue: string, proof: StoredProofView | undefined, all: boolean): string[] {
   const carried = splitCarriedIssue(issue);
-  if (carried) return joinReasons([bookIssueText(carried.failure), reasonOf(carried.carried, proof)]);
+  if (carried) return [bookIssueText(carried.failure), ...reasonParts(carried.carried, proof, all)];
   const pictures = splitPictureIssue(issue);
   const sentences = pictureSentences(pictures);
-  if (sentences.length) return joinReasons(pictures.rest ? [reasonOf(pictures.rest, proof), ...sentences] : sentences);
+  if (sentences.length) return pictures.rest ? [...reasonParts(pictures.rest, proof, all), ...sentences] : sentences;
   const { rest, length } = splitLengthIssue(issue);
   if (length) {
     const sentence = lengthText(length);
-    return rest ? joinReasons([reasonOf(rest, proof), sentence]) : sentence;
+    return rest ? [...reasonParts(rest, proof, all), sentence] : [sentence];
   }
-  if (!/^proof unmet/.test(issue.trim())) return bookIssueText(issue);
-  if (/facts_unverified/.test(issue)) return t("ui.book_reason_all_facts_unverified");
+  if (!/^proof unmet/.test(issue.trim())) return [bookIssueText(issue)];
+  if (/facts_unverified/.test(issue)) return [t("ui.book_reason_all_facts_unverified")];
   const open = (proof?.items ?? []).filter(item => item.status !== "met");
-  const notes = [...new Set(open.map(item => plainNote(unescapeMarkdownText(item.note))).filter(Boolean))].slice(0, 3);
-  if (notes.length) return joinReasons(notes);
-  return open.length ? t("ui.book_panel_reason_unchecked_0", open.length) : t("ui.book_panel_reason_unmet_plain");
+  const notes = [...new Set(open.map(item => plainNote(unescapeMarkdownText(item.note))).filter(Boolean))];
+  if (notes.length) return all ? notes : notes.slice(0, 3);
+  return [open.length ? t("ui.book_panel_reason_unchecked_0", open.length) : t("ui.book_panel_reason_unmet_plain")];
 }
+
+/** The reason of a needs-review card in words: the proof's own notes of the items not met, else the count, else a plain sentence; never a code. */
+export const reasonOf = (issue: string, proof: StoredProofView | undefined): string =>
+  joinReasons(reasonParts(issue, proof, false));
+/** The same reasons, one line each and none left out: what the reader-visible boxes list. */
+export const reasonLinesOf = (issue: string, proof: StoredProofView | undefined): string[] =>
+  reasonParts(issue, proof, true);
 
 /** Whether the chapter's pictures are a hole in a gallery chapter (uses the stored slot record and the picture addresses now in the text). */
 export function galleryBare(role: string | undefined, note: GalleryNote | undefined): boolean {
@@ -282,7 +294,9 @@ export function gate2Cards(input: {
       title: input.titleOf(id),
       stage: view.stage,
       ...(role ? { role } : {}),
-      ...(view.stage === "needs-review" && issue ? { failureText: reasonOf(issue, proof) } : {}),
+      ...(view.stage === "needs-review" && issue
+        ? { failureText: reasonOf(issue, proof), failureLines: reasonLinesOf(issue, proof) }
+        : {}),
       structureUnmet:
         checked && structure && !kept ? structure[1].split(" ").filter(token => !token.startsWith("image_")).length : 0,
       factsOpen:
@@ -361,6 +375,11 @@ export interface ReviewEntry {
   problems: ReviewProblem[];
   fp: string;
 }
+/** Every reason of an entry as one line each, for the callout boxes: the failure sentence is split into its pieces, none dropped. */
+export const entryReasons = (entry: ReviewEntry): string[] =>
+  entry.problems.flatMap(problem =>
+    problem.kind === "failed" && entry.card.failureLines?.length ? entry.card.failureLines : [problem.text]
+  );
 /** The chapters of the run that need a look, in reading order, from their notes; the one function the callouts, the cards and the bar all read. */
 export function reviewEntries(input: {
   order: readonly string[];
@@ -429,6 +448,8 @@ export const idPart = (value: string): string => value.replace(/[^\w.-]/g, "");
 // ---- the callouts ----
 
 const VERSION_LINE = "> %%vam-callout-version:1%%";
+/** Reasons a box lists (every length, picture and proof reason of one chapter fits; the cap only guards a runaway list). */
+const MAX_REASONS = 12;
 const quoted = (lines: string[]): string => lines.join("\n");
 type LinkKey = "ui.book_note_prev_0" | "ui.book_note_next_0" | "ui.book_note_review_next_0";
 const linksLine = (pairs: [LinkKey, BookNoteLink | undefined][]): string | undefined => {
@@ -443,7 +464,8 @@ export function trialCallout(
   prevLink: BookNoteLink | undefined,
   nextLink: BookNoteLink | undefined,
   stopped: boolean | undefined,
-  owner: { runId: string; nodeId: string }
+  owner: { runId: string; nodeId: string },
+  reasons: readonly string[] = []
 ): string {
   const links = linksLine([
     ["ui.book_note_prev_0", prevLink],
@@ -451,6 +473,8 @@ export function trialCallout(
   ]);
   return quoted([
     `> [!vam-trial] ${t("ui.book_note_trial_title_0", i, n)}`,
+    ...(reasons.length ? [`> ${t("ui.book_note_trial_problems")}`] : []),
+    ...reasons.slice(0, MAX_REASONS).map(reason => `> ・${plainText(reason)}`),
     `> ${stopped ? t("ui.book_note_trial_stopped") : t("ui.book_note_trial_next")}`,
     `> ${t("ui.book_note_trial_edit")}`,
     ...(links ? [links] : []),
@@ -471,7 +495,7 @@ export function reviewCallout(
   const next = linksLine([["ui.book_note_review_next_0", nextLink]]);
   return quoted([
     `> [!vam-review] ${t("ui.book_note_review_title")}`,
-    ...reasons.slice(0, 5).map(reason => `> ・${plainText(reason)}`),
+    ...reasons.slice(0, MAX_REASONS).map(reason => `> ・${plainText(reason)}`),
     // A hand-edited chapter has two separate answers: keep it (a resolution) or rewrite it (a one-time command bound to the text and to `op`).
     `> - [ ] ${t(hand ? "ui.book_note_review_keep" : "ui.book_note_review_accept")}`,
     // A queued rewrite keeps its tick when the box is written again (the queue lives in the box: the tick is what a later drain reads).

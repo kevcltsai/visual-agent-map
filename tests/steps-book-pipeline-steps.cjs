@@ -401,6 +401,14 @@ test('proof record: the key has five parts, a second append is skipped, and a re
   assert.match(first.text, /（開頁：`https:\/\/example\.org\/a`）/); assert.equal(first.text.replace(/^<!-- book-proof:v1 .* -->$/m, '').includes('<'), false, 'no tag survives in the readable lines'); assert.equal(first.text.split('\n').filter(l => l.includes('-->') && !l.startsWith('<!-- book-proof')).length, 0, 'no comment end outside the record line');
   assert.equal(proof.findProofRecord('<!-- book-proof:v1 {broken} -->', key), undefined);
   assert.equal(proof.appendProofRecord('', key, result).text.startsWith('校對（已校）'), true);
+  // v6fix2: 「已校」 only when nothing is left unresolved (length, pictures); the label of a stored record follows the chapter as it is now.
+  assert.match(proof.composeProofRecord(key, result, undefined, undefined, true), /^校對（有問題要你看）/);
+  assert.match(proof.composeProofRecord(key, result, undefined, undefined, false), /^校對（已校）/);
+  assert.match(proof.composeProofRecord(key, { ...result, aggregate: 'needs-review' }, undefined, undefined, true), /^校對（需人看）/);
+  const open = proof.composeProofRecord(key, result, undefined, undefined, true);
+  assert.match(proof.relabelProofRecord(`x\n> ${open}`, false), /> 校對（已校）/);
+  assert.match(proof.relabelProofRecord(proof.composeProofRecord(key, result), true), /^校對（有問題要你看）/);
+  assert.equal(proof.relabelProofRecord('> 校對（需人看）', true), '> 校對（需人看）');
 });
 
 // ---- text safety: nothing written into a note can load a remote resource, hide text or open a section ----

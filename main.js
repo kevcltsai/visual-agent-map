@@ -3271,6 +3271,7 @@ var en = {
   "ui.book_note_trial_next": "Once you have read it, go back to the mind map and press \u201CRun the whole book\u201D.",
   "ui.book_note_trial_stopped": "The book is stopped. Press \u201CContinue\u201D on the mind map toolbar first, then \u201CRun the whole book\u201D.",
   "ui.book_note_trial_edit": "To change a passage: select the text, right-click and choose \u201CAdd a note\u201D.",
+  "ui.book_note_trial_problems": "This chapter still has problems:",
   "ui.book_note_prev_0": "Previous chapter: {0}",
   "ui.book_note_next_0": "Next chapter: {0}",
   "ui.book_note_review_title": "This chapter needs a look",
@@ -6525,6 +6526,7 @@ var zhCN = {
   "ui.book_note_trial_next": "\u770B\u5B8C\u540E\u56DE\u5FC3\u667A\u56FE\uFF0C\u6309\u201C\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66\u201D\u3002",
   "ui.book_note_trial_stopped": "\u8FD9\u672C\u4E66\u5DF2\u505C\u6B62\u3002\u5148\u5728\u5FC3\u667A\u56FE\u5DE5\u5177\u680F\u6309\u201C\u7EE7\u7EED\u201D\uFF0C\u518D\u6309\u201C\u8FD9\u6837\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u4E66\u201D\u3002",
   "ui.book_note_trial_edit": "\u60F3\u6539\u54EA\u4E00\u6BB5\uFF1A\u9009\u53D6\u6587\u5B57\uFF0C\u53F3\u952E\u201C\u52A0\u5907\u6CE8\u201D\u3002",
+  "ui.book_note_trial_problems": "\u8FD9\u7AE0\u8FD8\u6709\u95EE\u9898\u6CA1\u89E3\u51B3\uFF1A",
   "ui.book_note_prev_0": "\u4E0A\u4E00\u7AE0\uFF1A{0}",
   "ui.book_note_next_0": "\u4E0B\u4E00\u7AE0\uFF1A{0}",
   "ui.book_note_review_title": "\u8FD9\u7AE0\u8981\u4F60\u770B",
@@ -9779,6 +9781,7 @@ var zhTW = {
   "ui.book_note_trial_next": "\u770B\u5B8C\u5F8C\u56DE\u5FC3\u667A\u5716\uFF0C\u6309\u300C\u9019\u6A23\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u66F8\u300D\u3002",
   "ui.book_note_trial_stopped": "\u9019\u672C\u66F8\u5DF2\u505C\u6B62\u3002\u5148\u5728\u5FC3\u667A\u5716\u5DE5\u5177\u5217\u6309\u300C\u7E7C\u7E8C\u300D\uFF0C\u518D\u6309\u300C\u9019\u6A23\u53EF\u4EE5\uFF0C\u8DD1\u5B8C\u5168\u66F8\u300D\u3002",
   "ui.book_note_trial_edit": "\u60F3\u6539\u54EA\u4E00\u6BB5\uFF1A\u9078\u53D6\u6587\u5B57\uFF0C\u53F3\u9375\u300C\u52A0\u5099\u8A3B\u300D\u3002",
+  "ui.book_note_trial_problems": "\u9019\u7AE0\u9084\u6709\u554F\u984C\u6C92\u89E3\u6C7A\uFF1A",
   "ui.book_note_prev_0": "\u4E0A\u4E00\u7AE0\uFF1A{0}",
   "ui.book_note_next_0": "\u4E0B\u4E00\u7AE0\uFF1A{0}",
   "ui.book_note_review_title": "\u9019\u7AE0\u8981\u4F60\u770B",
@@ -14183,12 +14186,18 @@ function cleanResult(result) {
     ...result.counts ? { counts: { openedPages: safeCount(result.counts.openedPages), searches: safeCount(result.counts.searches) } } : {}
   };
 }
-function composeProofRecord(key4, result, failure, models) {
+var PROOF_LABEL_CHECKED = "\u5DF2\u6821";
+var PROOF_LABEL_OPEN = "\u6709\u554F\u984C\u8981\u4F60\u770B";
+function relabelProofRecord(text10, unresolved) {
+  const [from, to] = unresolved ? [PROOF_LABEL_CHECKED, PROOF_LABEL_OPEN] : [PROOF_LABEL_OPEN, PROOF_LABEL_CHECKED];
+  return text10.replace(new RegExp(`^(>? ?)\u6821\u5C0D\uFF08${from}\uFF09`, "m"), `$1\u6821\u5C0D\uFF08${to}\uFF09`);
+}
+function composeProofRecord(key4, result, failure, models, unresolved) {
   const clean3 = cleanResult(result);
   const model = safeModelId(models == null ? void 0 : models.model);
   const authorModel = safeModelId(models == null ? void 0 : models.authorModel);
   const lines = [
-    (failure ? `\u6821\u5C0D\u5931\u6557\uFF08\u539F\u56E0\uFF1A${failure}\uFF1B\u4EE5\u4E0B\u662F\u5DF2\u5224\u65B7\u7684\u7D50\u679C\uFF0C\u4ECD\u9700\u4EBA\u770B\uFF09` : `\u6821\u5C0D\uFF08${clean3.aggregate === "checked" ? "\u5DF2\u6821" : clean3.factsUnverified ? "\u9700\u4EBA\u770B\uFF1B\u4E8B\u5BE6\u9805\u76EE\u7686\u5F85\u67E5" : "\u9700\u4EBA\u770B"}\uFF09`) + (clean3.counts ? ` \u958B\u9801 ${clean3.counts.openedPages} \u6B21\u3001\u641C\u5C0B ${clean3.counts.searches} \u6B21` : "")
+    (failure ? `\u6821\u5C0D\u5931\u6557\uFF08\u539F\u56E0\uFF1A${failure}\uFF1B\u4EE5\u4E0B\u662F\u5DF2\u5224\u65B7\u7684\u7D50\u679C\uFF0C\u4ECD\u9700\u4EBA\u770B\uFF09` : `\u6821\u5C0D\uFF08${clean3.aggregate === "checked" ? unresolved ? PROOF_LABEL_OPEN : PROOF_LABEL_CHECKED : clean3.factsUnverified ? "\u9700\u4EBA\u770B\uFF1B\u4E8B\u5BE6\u9805\u76EE\u7686\u5F85\u67E5" : "\u9700\u4EBA\u770B"}\uFF09`) + (clean3.counts ? ` \u958B\u9801 ${clean3.counts.openedPages} \u6B21\u3001\u641C\u5C0B ${clean3.counts.searches} \u6B21` : "")
   ];
   for (const item of clean3.items)
     lines.push(
@@ -56125,6 +56134,21 @@ ${oldDetail}`);
       body,
       checklist
     });
+    const length = await this.lengthOf(drive, nodeId, lengthBody(chapter));
+    const lengthIssue = length ? lengthToken(length) : "";
+    const minimum = await this.pictureMinimum(drive);
+    const limited = imageCheck.issues.some((issue2) => issue2.code === "rate_limited");
+    const offIndexes = imageCheck.issues.flatMap(
+      (issue2) => issue2.code === "mismatch" && issue2.index !== void 0 ? [issue2.index] : []
+    );
+    const pictureIssue = [
+      ...minimum !== void 0 && imageCheck.placed < minimum ? [pictureShortfallToken(imageCheck.placed, minimum)] : [],
+      ...limited ? [PICTURE_LIMITED_TOKEN] : [],
+      ...offIndexes.length ? [pictureMismatchToken(offIndexes)] : [],
+      // So is a lowercase English word left in a Chinese caption (live v5: 「果實long在藤上」).
+      ...[captionLatinIssue(chapter, drive.config.language)].filter(Boolean)
+    ].join(" ");
+    const unresolved = !!lengthIssue || !!pictureIssue;
     let result = findStoredProof(card.detail, key4);
     if (!result) {
       const call = this.ports.runProofread(
@@ -56160,7 +56184,7 @@ ${oldDetail}`);
       const models = { model: drive.config.proofModel, authorModel: drive.authorModels.get(nodeId) };
       const written2 = await this.ports.updateNoteGuarded(
         path,
-        { detail: replaceResearchRecord(card.detail, composeProofRecord(key4, result, void 0, models)) },
+        { detail: replaceResearchRecord(card.detail, composeProofRecord(key4, result, void 0, models, unresolved)) },
         {
           expectedContent: card.raw,
           authorize: this.authorize(drive, token),
@@ -56175,9 +56199,10 @@ ${oldDetail}`);
         authorModel: (_b2 = drive.authorModels.get(nodeId)) != null ? _b2 : stored == null ? void 0 : stored.authorModel
       };
       const judged = { ...result, aggregate: proofVerdict(result, false) };
+      const relabeled = relabelProofRecord(card.raw, unresolved);
       const next = programStampRaw(
-        card.raw,
-        this.proofSectionOf(drive, { result: judged }, models, imageLine)(card.raw)
+        relabeled,
+        this.proofSectionOf(drive, { result: judged }, models, imageLine)(relabeled)
       );
       if (next !== card.raw) {
         const path = await this.stillOnMap(drive, nodeId);
@@ -56192,22 +56217,8 @@ ${oldDetail}`);
       }
     }
     const verdict = { ...result, aggregate: proofVerdict(result, !body.trim()) };
-    const length = await this.lengthOf(drive, nodeId, lengthBody(chapter));
-    const lengthIssue = length ? lengthToken(length) : "";
     const structureUnmet = verdict.items.filter((item) => item.type !== "fact" && item.status === "unmet").map((item) => code2(item.id));
     const noticed = [...structureUnmet, ...imageIssueTokens(imageCheck)];
-    const minimum = await this.pictureMinimum(drive);
-    const limited = imageCheck.issues.some((issue2) => issue2.code === "rate_limited");
-    const offIndexes = imageCheck.issues.flatMap(
-      (issue2) => issue2.code === "mismatch" && issue2.index !== void 0 ? [issue2.index] : []
-    );
-    const pictureIssue = [
-      ...minimum !== void 0 && imageCheck.placed < minimum ? [pictureShortfallToken(imageCheck.placed, minimum)] : [],
-      ...limited ? [PICTURE_LIMITED_TOKEN] : [],
-      ...offIndexes.length ? [pictureMismatchToken(offIndexes)] : [],
-      // So is a lowercase English word left in a Chinese caption (live v5: 「果實long在藤上」).
-      ...[captionLatinIssue(chapter, drive.config.language)].filter(Boolean)
-    ].join(" ");
     return {
       kind: "ok",
       after: async () => {
@@ -56959,25 +56970,27 @@ function reviewProblems(card) {
   return out;
 }
 var plainNote = (text10) => text10.replace(/\b[CN]\d+\b\s*[:：]?/g, "").replace(/\s+/g, " ").trim();
-function reasonOf2(issue2, proof) {
+function reasonParts(issue2, proof, all) {
   var _a2;
   const carried = splitCarriedIssue(issue2);
-  if (carried) return joinReasons([bookIssueText(carried.failure), reasonOf2(carried.carried, proof)]);
+  if (carried) return [bookIssueText(carried.failure), ...reasonParts(carried.carried, proof, all)];
   const pictures = splitPictureIssue(issue2);
   const sentences = pictureSentences(pictures);
-  if (sentences.length) return joinReasons(pictures.rest ? [reasonOf2(pictures.rest, proof), ...sentences] : sentences);
+  if (sentences.length) return pictures.rest ? [...reasonParts(pictures.rest, proof, all), ...sentences] : sentences;
   const { rest, length } = splitLengthIssue(issue2);
   if (length) {
     const sentence = lengthText(length);
-    return rest ? joinReasons([reasonOf2(rest, proof), sentence]) : sentence;
+    return rest ? [...reasonParts(rest, proof, all), sentence] : [sentence];
   }
-  if (!/^proof unmet/.test(issue2.trim())) return bookIssueText(issue2);
-  if (/facts_unverified/.test(issue2)) return t("ui.book_reason_all_facts_unverified");
+  if (!/^proof unmet/.test(issue2.trim())) return [bookIssueText(issue2)];
+  if (/facts_unverified/.test(issue2)) return [t("ui.book_reason_all_facts_unverified")];
   const open2 = ((_a2 = proof == null ? void 0 : proof.items) != null ? _a2 : []).filter((item) => item.status !== "met");
-  const notes = [...new Set(open2.map((item) => plainNote(unescapeMarkdownText(item.note))).filter(Boolean))].slice(0, 3);
-  if (notes.length) return joinReasons(notes);
-  return open2.length ? t("ui.book_panel_reason_unchecked_0", open2.length) : t("ui.book_panel_reason_unmet_plain");
+  const notes = [...new Set(open2.map((item) => plainNote(unescapeMarkdownText(item.note))).filter(Boolean))];
+  if (notes.length) return all ? notes : notes.slice(0, 3);
+  return [open2.length ? t("ui.book_panel_reason_unchecked_0", open2.length) : t("ui.book_panel_reason_unmet_plain")];
 }
+var reasonOf2 = (issue2, proof) => joinReasons(reasonParts(issue2, proof, false));
+var reasonLinesOf = (issue2, proof) => reasonParts(issue2, proof, true);
 function galleryBare(role, note) {
   var _a2, _b2, _c;
   if (role !== "gallery") return false;
@@ -57027,7 +57040,7 @@ function gate2Cards(input2) {
       title: input2.titleOf(id),
       stage: view.stage,
       ...role ? { role } : {},
-      ...view.stage === "needs-review" && issue2 ? { failureText: reasonOf2(issue2, proof) } : {},
+      ...view.stage === "needs-review" && issue2 ? { failureText: reasonOf2(issue2, proof), failureLines: reasonLinesOf(issue2, proof) } : {},
       structureUnmet: checked2 && structure2 && !kept ? structure2[1].split(" ").filter((token) => !token.startsWith("image_")).length : 0,
       factsOpen: checked2 && !kept ? ((_i = proof == null ? void 0 : proof.items) != null ? _i : []).filter((item) => item.type === "fact" && item.status !== "met").length : 0,
       galleryBare: checked2 && galleryBare(role, note),
@@ -57069,6 +57082,12 @@ var proofFingerprint = (detail) => {
   const proof = latestStoredProof(detail);
   return proof ? hashText(JSON.stringify(proof)) : "";
 };
+var entryReasons = (entry) => entry.problems.flatMap(
+  (problem3) => {
+    var _a2;
+    return problem3.kind === "failed" && ((_a2 = entry.card.failureLines) == null ? void 0 : _a2.length) ? entry.card.failureLines : [problem3.text];
+  }
+);
 function reviewEntries(input2) {
   var _a2, _b2;
   const out = [];
@@ -57108,18 +57127,21 @@ var noteLink2 = (link) => {
 };
 var idPart = (value) => value.replace(/[^\w.-]/g, "");
 var VERSION_LINE = "> %%vam-callout-version:1%%";
+var MAX_REASONS = 12;
 var quoted = (lines) => lines.join("\n");
 var linksLine = (pairs) => {
   const parts = pairs.map(([key4, link]) => ({ key: key4, link: noteLink2(link) })).filter((part) => part.link);
   return parts.length ? `> ${parts.map((part) => t(part.key, part.link)).join("\u3000")}` : void 0;
 };
-function trialCallout(i, n, prevLink, nextLink, stopped, owner) {
+function trialCallout(i, n, prevLink, nextLink, stopped, owner, reasons = []) {
   const links = linksLine([
     ["ui.book_note_prev_0", prevLink],
     ["ui.book_note_next_0", nextLink]
   ]);
   return quoted([
     `> [!vam-trial] ${t("ui.book_note_trial_title_0", i, n)}`,
+    ...reasons.length ? [`> ${t("ui.book_note_trial_problems")}`] : [],
+    ...reasons.slice(0, MAX_REASONS).map((reason) => `> \u30FB${plainText(reason)}`),
     `> ${stopped ? t("ui.book_note_trial_stopped") : t("ui.book_note_trial_next")}`,
     `> ${t("ui.book_note_trial_edit")}`,
     ...links ? [links] : [],
@@ -57131,7 +57153,7 @@ function reviewCallout(card, reasons, nextLink, fp, runId, hand) {
   const next = linksLine([["ui.book_note_review_next_0", nextLink]]);
   return quoted([
     `> [!vam-review] ${t("ui.book_note_review_title")}`,
-    ...reasons.slice(0, 5).map((reason) => `> \u30FB${plainText(reason)}`),
+    ...reasons.slice(0, MAX_REASONS).map((reason) => `> \u30FB${plainText(reason)}`),
     // A hand-edited chapter has two separate answers: keep it (a resolution) or rewrite it (a one-time command bound to the text and to `op`).
     `> - [ ] ${t(hand ? "ui.book_note_review_keep" : "ui.book_note_review_accept")}`,
     // A queued rewrite keeps its tick when the box is written again (the queue lives in the box: the tick is what a later drain reads).
@@ -57355,7 +57377,7 @@ function createNoteWriter(ports) {
     if (next === texts[0]) return "unchanged";
     return views[0].replace(next) ? "written" : "refused";
   };
-  return async (path, transform) => {
+  const write = async (path, transform) => {
     const views = ports.openViews(path);
     if (views.length) return viaEditor(views, transform);
     let opened = false;
@@ -57378,6 +57400,12 @@ function createNoteWriter(ports) {
     if (!opened) return "refused";
     const now = ports.openViews(path);
     return now.length ? viaEditor(now, transform) : "refused";
+  };
+  return async (path, transform) => {
+    var _a2;
+    const result = await write(path, transform);
+    if (result === "written") (_a2 = ports.rerender) == null ? void 0 : _a2.call(ports, path);
+    return result;
   };
 }
 function alignCallouts(text10, want) {
@@ -57539,6 +57567,16 @@ var BookCallouts = class {
       return false;
     }
   }
+  noteInput(card) {
+    return card ? {
+      prompt: card.prompt,
+      detail: card.detail,
+      pipelineStage: card.fields.pipelineStage,
+      pipelineIssue: card.fields.pipelineIssue,
+      pipelineSeam: card.fields.pipelineSeam,
+      bookRole: card.fields.bookRole
+    } : void 0;
+  }
   async align(mapPath, mayCarry) {
     var _a2, _b2;
     const clean3 = (id) => (mayCarry == null ? void 0 : mayCarry(id)) === false;
@@ -57560,6 +57598,18 @@ var BookCallouts = class {
     const wanted = /* @__PURE__ */ new Map();
     if (data.phase === "gate1") {
       const trial = (_a2 = data.trial) != null ? _a2 : [];
+      const reasons = new Map(
+        reviewEntries({
+          proofContext: { runId: data.runId, revisionOf: (id) => cardRevision(data, id) },
+          order: trial.filter((id) => byId.has(id)),
+          inconsistencies: (id) => chapterInconsistencies(data, id),
+          titleOf: (id) => {
+            var _a3, _b3;
+            return (_b3 = (_a3 = byId.get(id)) == null ? void 0 : _a3.title) != null ? _b3 : id;
+          },
+          noteOf: (id) => this.noteInput(byId.get(id))
+        }).map((entry) => [entry.card.id, entryReasons(entry)])
+      );
       trial.forEach((id, at) => {
         if (!byId.has(id)) return;
         wanted.set(id, {
@@ -57574,7 +57624,8 @@ var BookCallouts = class {
             {
               runId: data.runId,
               nodeId: id
-            }
+            },
+            reasons.get(id)
           )
         });
       });
@@ -57587,17 +57638,7 @@ var BookCallouts = class {
           var _a3, _b3;
           return (_b3 = (_a3 = byId.get(id)) == null ? void 0 : _a3.title) != null ? _b3 : id;
         },
-        noteOf: (id) => {
-          const card = byId.get(id);
-          return card ? {
-            prompt: card.prompt,
-            detail: card.detail,
-            pipelineStage: card.fields.pipelineStage,
-            pipelineIssue: card.fields.pipelineIssue,
-            pipelineSeam: card.fields.pipelineSeam,
-            bookRole: card.fields.bookRole
-          } : void 0;
-        }
+        noteOf: (id) => this.noteInput(byId.get(id))
       });
       entries.forEach((entry, at) => {
         const next = entries.length > 1 ? entries[(at + 1) % entries.length].card.id : void 0;
@@ -57608,7 +57649,7 @@ var BookCallouts = class {
             fp: entry.fp,
             build: (prior) => reviewCallout(
               entry.card,
-              entry.problems.map((problem3) => problem3.text),
+              entryReasons(entry),
               link(next),
               entry.fp,
               data.runId,
@@ -108152,7 +108193,18 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
     /** The write coordinator of the chapter notes: the callouts, the reader's notes and (T6) the rewrite all go through it. */
     __publicField(this, "bookNoteWriter", createNoteWriter({
       openViews: (path) => this.openMarkdownViews(path),
-      rawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options)
+      rawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
+      rerender: (path) => rerenderReadingViews(
+        this.app.workspace.getLeavesOfType("markdown").flatMap((leaf) => leaf.view instanceof import_obsidian52.MarkdownView ? [leaf.view] : []).map((view) => {
+          var _a2;
+          return {
+            path: (_a2 = view.file) == null ? void 0 : _a2.path,
+            reading: view.getMode() === "preview",
+            rerender: () => view.previewMode.rerender(true)
+          };
+        }),
+        path
+      )
     }));
     __publicField(this, "bookCallouts", new BookCallouts({
       readMap: (path) => this.repo.readMap(path),

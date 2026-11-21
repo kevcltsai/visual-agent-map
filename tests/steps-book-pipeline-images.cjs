@@ -1156,6 +1156,9 @@ test('shortfall: under the owner\'s minimum the chapter ends needs-review with a
   const issue = (await r.note(0)).pipelineIssue;
   assert.equal(issue, 'images unmet: images:under:1:2 image_2');
   assert.equal(r.stat.author.filter(id => id === r.nodes[0].id).length, 1, 'no automatic rewrite for too few pictures');
+  // v6fix2: a clean proof beside an unresolved picture shortfall is not labelled 「已校」.
+  assert.match((await r.note(0)).detail, /> 校對（有問題要你看）/);
+  assert.ok(!/> 校對（已校）/.test((await r.note(0)).detail), 'no 「已校」 on a chapter with an unresolved issue');
   const review = S.load('experiences/visual-map/book-pipeline-review.ts');
   assert.equal(review.reasonOf(issue, undefined), 'Too few pictures: 1 placed, the setting asks for at least 2', 'test locale is en');
   const both = review.reasonOf('proof unmet: facts_unverified images:under:0:6', undefined);
@@ -1166,6 +1169,7 @@ test('shortfall: under the owner\'s minimum the chapter ends needs-review with a
   await ok.repo.writeBookSettings(ok.nodes[0].path, { style: '每章圖片 2 張' });
   await run(ok);
   assert.equal(stageOf(ok.raw(0)), 'checked');
+  assert.match((await ok.note(0)).detail, /> 校對（已校）/, 'nothing unresolved: 「已校」 stays');
   assert.ok(!/images:under|images unmet/.test((await ok.note(0)).pipelineIssue ?? ''), 'no shortfall (picture notices may remain)');
 });
 

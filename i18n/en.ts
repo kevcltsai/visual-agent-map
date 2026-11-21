@@ -3515,6 +3515,7 @@ export const en = {
   "ui.book_note_trial_stopped":
     "The book is stopped. Press “Continue” on the mind map toolbar first, then “Run the whole book”.",
   "ui.book_note_trial_edit": "To change a passage: select the text, right-click and choose “Add a note”.",
+  "ui.book_note_trial_problems": "This chapter still has problems:",
   "ui.book_note_prev_0": "Previous chapter: {0}",
   "ui.book_note_next_0": "Next chapter: {0}",
   "ui.book_note_review_title": "This chapter needs a look",

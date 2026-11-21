@@ -367,3 +367,12 @@ test('the review box: a paraphrase is not shown in quotes, a chapter that contra
   assert.equal(en[0].problems[0].text, 'Says something differently from 〈照顧〉: this chapter says “三天就發芽。”, 〈照顧〉 says (paraphrased) 第3章說一到兩天');
   review.setUiLanguage('zh-TW');
 });
+
+test('compactChapters: sentences that were apart in the chapter never touch (a quote cannot read across a gap)', () => {
+  const text = '價格是 5 元。風很大。天很藍。山很高。重量 8 公斤。';
+  const out = plain(consistency.compactChapters([{ title: 'A', text: text.repeat(3) }], 20));
+  const line = out[0].text.split('\n');
+  assert.ok(line.length > 1, 'the gap became a line break');
+  assert.ok(!out[0].text.includes('價格是 5 元。山很高'), 'two kept sentences from different places are not glued');
+  for (const piece of line) assert.ok(text.repeat(3).includes(piece) || piece === '', 'every line is a stretch of the chapter');
+});

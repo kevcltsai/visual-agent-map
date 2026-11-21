@@ -2294,6 +2294,9 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 /* The AI proofread box of a chapter (the program's own [!vam-review] kind): purple, set apart from the orange warnings. */
 .callout[data-callout="vam-review"] { --callout-color: 113, 82, 216; --callout-icon: lucide-sparkles; }
 .theme-dark .callout[data-callout="vam-review"] { --callout-color: 166, 140, 255; }
+/* The box's hidden %%marker%% lines leave empty paragraphs in reading view: they must not stretch the box into a blank block under its title. */
+.callout[data-callout="vam-review"] .callout-content > p:empty { display: none; }
+.callout[data-callout="vam-review"] .callout-content:has(> p:empty:only-child) { display: none; }
 .view-action.vam-book-apply-notes { width: auto; gap: 4px; padding-inline: 6px; }
 .vam-book-apply-label { font-size: var(--font-ui-smaller); }
 .vam-book-note-selected { margin-block: 0 8px; padding: 4px 8px; border-left: 3px solid var(--interactive-accent); color: var(--text-muted); }

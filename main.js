@@ -3377,7 +3377,6 @@ var en = {
   "ui.book_progress_line_fix_preface_0_1": "Fixing the preface \xB7 {0}/{1} cards done",
   "ui.book_progress_line_fix_card_0_1_2": "Fixing chapter {0} \xB7 {1}/{2} cards done",
   "ui.book_progress_line_fix_section_0_1_2": "Fixing \u201C{0}\u201D \xB7 {1}/{2} cards done",
-  "ui.book_progress_line_check_0_1": "Checking the whole book for consistency \xB7 {0}/{1} chapters done",
   "ui.book_panel_rerun_card": "Rerun this card",
   "ui.book_panel_rerun_card_0": "Rerun this book card: {0} (plan \u2192 write \u2192 check)",
   "ui.book_seam_label": "Check seam",
@@ -6672,7 +6671,6 @@ var zhCN = {
   "ui.book_progress_line_fix_preface_0_1": "\u6B63\u5728\u4FEE\u6B63\u524D\u8A00\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u5F20\u5361",
   "ui.book_progress_line_fix_card_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u7B2C {0} \u7AE0\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u5F20\u5361",
   "ui.book_progress_line_fix_section_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u201C{0}\u201D\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u5F20\u5361",
-  "ui.book_progress_line_check_0_1": "\u6B63\u5728\u68C0\u67E5\u5168\u4E66\u4E00\u81F4\u6027\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
   "ui.book_panel_rerun_card": "\u91CD\u8DD1\u8FD9\u5F20",
   "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u56FE\u6587\u4E66\u8FD9\u4E00\u5F20\uFF1A{0}\uFF08\u4F01\u5212 \u2192 \u5199 \u2192 \u6821\uFF09",
   "ui.book_seam_label": "\u63A5\u7F1D\u9700\u770B",
@@ -9967,7 +9965,6 @@ var zhTW = {
   "ui.book_progress_line_fix_preface_0_1": "\u6B63\u5728\u4FEE\u6B63\u524D\u8A00\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u5F35\u5361",
   "ui.book_progress_line_fix_card_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u7B2C {0} \u7AE0\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u5F35\u5361",
   "ui.book_progress_line_fix_section_0_1_2": "\u6B63\u5728\u4FEE\u6B63\u300C{0}\u300D\u30FB\u5DF2\u5B8C\u6210 {1}\uFF0F{2} \u5F35\u5361",
-  "ui.book_progress_line_check_0_1": "\u6B63\u5728\u6AA2\u67E5\u5168\u66F8\u4E00\u81F4\u6027\u30FB\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u7AE0",
   "ui.book_panel_rerun_card": "\u91CD\u8DD1\u9019\u5F35",
   "ui.book_panel_rerun_card_0": "\u91CD\u8DD1\u5716\u6587\u66F8\u9019\u4E00\u5F35\uFF1A{0}\uFF08\u4F01\u5283 \u2192 \u5BEB \u2192 \u6821\uFF09",
   "ui.book_seam_label": "\u63A5\u7E2B\u9700\u770B",
@@ -47995,7 +47992,7 @@ var validChapter = (value, chapters) => typeof value === "number" && Number.isIn
 var aiProofBody = (chapter) => projectProofBody(stripImageLines(chapter)).trim();
 var aiProofKey = (revision, body) => `${revision}:${hashText(body)}`;
 function reviewAiProof(raw, input2) {
-  var _a2, _b2;
+  var _a2, _b2, _c;
   const limit = (_a2 = input2.maxItems) != null ? _a2 : AI_PROOF_MAX_ITEMS;
   const chapters = typeof input2.body === "string" ? [input2.body] : [...input2.body];
   const book = typeof input2.body !== "string";
@@ -48047,12 +48044,13 @@ function reviewAiProof(raw, input2) {
       if (opened && !opened.has(href)) continue;
       sources.push(href);
     }
+    const verdict = entry.verdict === "ok" && ((_c = input2.allowedSources) == null ? void 0 : _c.length) === 0 && (entry.kind === "fact" || entry.kind === "number") ? "unverifiable" : entry.verdict;
     const other = book && validChapter(entry.otherChapter, chapters.length) && entry.otherChapter !== at ? entry.otherChapter : void 0;
     kept.push({
       id,
       kind: entry.kind,
       quote: quote3,
-      verdict: entry.verdict,
+      verdict,
       problem: problem3,
       fixable: entry.verdict === "problem" && entry.fixable === true && !why2,
       ...why2 ? { why: why2 } : {},
@@ -48594,7 +48592,14 @@ function factExtract(text10) {
     });
     if (!kept.size) continue;
     lead();
-    out.push(sentences.filter((_, at) => kept.has(at)).join(""));
+    let run = "";
+    sentences.forEach((sentence, at) => {
+      if (!kept.has(at)) {
+        if (run) out.push(run);
+        run = "";
+      } else run += sentence;
+    });
+    if (run) out.push(run);
   }
   return out.join("\n");
 }
@@ -49120,6 +49125,7 @@ var bookProofAction = (data) => {
     type: ((_a2 = data.bookProof) == null ? void 0 : _a2.step) === "fix" ? "book_ai_fix" : "book_ai_proof"
   };
 };
+var STILL_PRESENT_MIN_CHARS = 8;
 var aiSlot = (data, nodeId) => {
   var _a2;
   return nodeId === void 0 ? data.bookProof : (_a2 = data.aiProof) == null ? void 0 : _a2[nodeId];
@@ -49231,7 +49237,10 @@ function applyAiProof(data, token, result) {
         }
       ) : void 0;
       const quote3 = item ? squash2(item.quote) : "";
-      const written2 = quote3 && ((_a3 = found.applied) != null ? _a3 : []).some((text10) => squash2(text10).includes(quote3) || quote3.includes(squash2(text10)));
+      const written2 = quote3 && ((_a3 = found.applied) != null ? _a3 : []).some((text10) => {
+        const wrote = squash2(text10);
+        return wrote.includes(quote3) || wrote.length >= STILL_PRESENT_MIN_CHARS && quote3.includes(wrote);
+      });
       if (before) return (_c2 = (_b3 = slot.refused) == null ? void 0 : _b3[before.id]) != null ? _c2 : written2 ? "still_present" : "not_fixed";
       return written2 ? "still_present" : "not_fixed_in_time";
     });
@@ -49587,11 +49596,17 @@ function useExpandPass(data, nodeId) {
   return { state: next, accepted: true };
 }
 function resetCard(data, nodeId) {
+  var _a2;
   if (!effectiveOrder(data).includes(nodeId)) return data;
   const next = clone2(data);
   next.attempts[nodeId] = emptyAttempts();
   if (next.expandPasses) delete next.expandPasses[nodeId];
   if (next.aiProof) delete next.aiProof[nodeId];
+  if ((_a2 = next.bookProof) == null ? void 0 : _a2.fixes) {
+    const kept = next.bookProof.fixes.filter((fix) => fix.chapterId !== nodeId);
+    next.bookProof.fixed = Math.max(0, next.bookProof.fixed - (next.bookProof.fixes.length - kept.length));
+    next.bookProof.fixes = kept;
+  }
   next.revisions[nodeId] = cardRevision(next, nodeId) + 1;
   next.revision++;
   return next;
@@ -56574,11 +56589,11 @@ var BookPipelineRuns = class {
    * applied by the program). The attempt is counted before the call and saved; a stop or a text changed meanwhile drops the result.
    */
   async aiChapter(drive, nodeId, want, rerun = false) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     const info = drive.cards.get(nodeId);
     if (!info || !this.ports.aiProof || !this.ports.aiFix) return;
     const signal = drive.controller.signal;
-    const card = await this.ports.readCard(info.path).catch(() => void 0);
+    const card = (_a2 = await this.ports.readCard(info.path).catch(() => void 0)) != null ? _a2 : this.dead(drive) ? void 0 : await this.ports.readCard(info.path).catch(() => void 0);
     if (this.dead(drive)) return;
     const giveUp = async () => {
       await drive.store.commit(
@@ -56592,7 +56607,7 @@ var BookPipelineRuns = class {
     const body = aiProofBody(chapterBody(card.detail));
     const revision = cardRevision(drive.store.state, nodeId);
     const key4 = aiProofKey(revision, body);
-    const stored = (_a2 = drive.store.state.aiProof) == null ? void 0 : _a2[nodeId];
+    const stored = (_b2 = drive.store.state.aiProof) == null ? void 0 : _b2[nodeId];
     const same2 = (stored == null ? void 0 : stored.key) === key4 ? stored : void 0;
     const step = same2 ? want : "proof";
     const begun = await drive.store.commit((state) => {
@@ -56626,7 +56641,7 @@ var BookPipelineRuns = class {
     const run = { signal, admission: drive.admission };
     try {
       if (step === "proof") {
-        const prior = priorOf((_b2 = same2 == null ? void 0 : same2.pending) != null ? _b2 : []);
+        const prior = priorOf((_c = same2 == null ? void 0 : same2.pending) != null ? _c : []);
         const review = await untilAborted(
           signal,
           this.ports.aiProof(
@@ -56661,7 +56676,7 @@ var BookPipelineRuns = class {
         }
         return report("ok", { checked: review.checks.length, pending: pending2.length, open: open2.length });
       }
-      const targets = (_c = same2 == null ? void 0 : same2.pending) != null ? _c : [];
+      const targets = (_d = same2 == null ? void 0 : same2.pending) != null ? _d : [];
       const raw = card.raw;
       const state = bodyStateRaw(raw);
       if (state !== "clean" && state !== "empty" || isKeptRaw(raw)) {
@@ -56686,7 +56701,7 @@ var BookPipelineRuns = class {
         )
       );
       if (this.dead(drive)) return;
-      const result = applyAiEdits((_d = detailBlockOf(raw)) != null ? _d : "", targets, edits, {
+      const result = applyAiEdits((_e = detailBlockOf(raw)) != null ? _e : "", targets, edits, {
         shown: body,
         ...range ? { length: { unit: range.unit, min: range.min } } : {}
       });
@@ -56706,7 +56721,7 @@ var BookPipelineRuns = class {
           return report("dropped");
         }
         const after = await this.ports.readCard(path).catch(() => void 0);
-        newKey = aiProofKey(token.revision + 1, aiProofBody(chapterBody((_e = after == null ? void 0 : after.detail) != null ? _e : card.detail)));
+        newKey = aiProofKey(token.revision + 1, aiProofBody(chapterBody((_f = after == null ? void 0 : after.detail) != null ? _f : card.detail)));
       }
       const done = await drive.store.commit(
         (current) => applyAiFix(current, token, {
@@ -58582,7 +58597,7 @@ var PHASE_KEY = {
   done: "ui.book_phase_done"
 };
 function bookBarState(data, progress, stageOf, mapIds, structure2, titleOf) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
   const savedDone = data.phase === "done" && (!progress || progress.runId === data.runId);
   const phase = savedDone ? "done" : (_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : data.phase;
   const status = savedDone ? data.status : (_b2 = progress == null ? void 0 : progress.status) != null ? _b2 : data.status;
@@ -58631,7 +58646,6 @@ function bookBarState(data, progress, stageOf, mapIds, structure2, titleOf) {
       }
     } : {},
     ...current ? { current } : {},
-    ...!current && mode === "writing" && active && ((_p = data.consistency) == null ? void 0 : _p.done) === false ? { checking: true } : {},
     ...rerunning ? { rerun: true } : {},
     ...mapChange ? { mapChange } : {},
     ...gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {},
@@ -58855,8 +58869,6 @@ function bookProgressText(state) {
   var _a2, _b2, _c, _d;
   const { total: total2 } = state;
   const at = Math.min((_b2 = (_a2 = state.current) == null ? void 0 : _a2.chapter) != null ? _b2 : settledCount(state) + 1, Math.max(total2, 1));
-  if (state.mode === "writing" && state.checking)
-    return t("ui.book_progress_line_check_0_1", settledCount(state), total2);
   if (state.mode === "writing")
     return ((_c = state.current) == null ? void 0 : _c.fix) ? fixLine(state, settledCount(state), total2) : t("ui.book_progress_line_write_0_1", at, total2);
   const sentence = state.mode === "planning" ? !state.globalDone || ((_d = state.current) == null ? void 0 : _d.step) === "global" ? t("ui.book_progress_line_global") : t(state.structure ? "ui.book_progress_line_plan_cards_0_1" : "ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);

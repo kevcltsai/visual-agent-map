@@ -16,7 +16,7 @@ const NOW = '2026-11-16T00:00:00.000Z';
 const IDS = ['a', 'b', 'c'];
 // An older run (no trial): every card is planned before gate 1. The trial tests below build theirs with `trialRun`.
 const fresh = (extra = {}) => { const state = machine.newBookPipeline({ runId: 'run-1', order: IDS, now: NOW, ...extra }); delete state.trial; return state; };
-const trialRun = (order = IDS) => machine.newBookPipeline({ runId: 'run-t', order, now: NOW });
+const trialRun = (order = IDS) => machine.newBookPipeline({ runId: 'run-t', order, now: NOW, trial: order.slice(0, 3) });
 const none = () => Object.fromEntries(IDS.map(id => [id, undefined]));
 const actionsOf = (state, stages, busy) => plain(machine.nextActions(state, stages, busy));
 /** Runs `kind` for `nodeId` to success the way a runner would (dispatch, then commit). */

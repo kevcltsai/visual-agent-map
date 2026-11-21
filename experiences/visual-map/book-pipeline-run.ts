@@ -13,7 +13,8 @@ import type { AdmissionContext } from "../../core/admission";
 import { carryIssue } from "./book-pipeline-reasons";
 import type { FindImagesRequest, FoundImages } from "../../core/steps/book-pipeline/find-images";
 import type { ConsistencyRequest, RawInconsistency } from "../../core/steps/book-pipeline/consistency";
-import { chapterReferenceFindings } from "../../core/book-pipeline/chapter-references";
+import { chapterReferenceFindings, type ReferenceChapter } from "../../core/book-pipeline/chapter-references";
+import { bookStructure, type BookStructure } from "../../core/book-pipeline/structure";
 import { chapterInconsistencies, compactChapters, removedChapterRefs } from "../../core/book-pipeline/consistency";
 import { directionFindings, numericFindings, verbatimQuote } from "../../core/book-pipeline/cross-checks";
 import { isBudgetExhausted } from "../../core/admission";
@@ -1016,6 +1017,7 @@ export class BookPipelineRuns {
         const state = newBookPipeline({
           runId,
           order,
+          trial: this.structureOf(drive, order).trialOf(),
           now: this.ports.now(),
           staleStages: stale,
           chapters: Object.fromEntries(
@@ -1905,6 +1907,10 @@ export class BookPipelineRuns {
     if (refusal) throw refusal;
   }
 
+  /** The book's structure of `order` (the cards the run works on) from the parents as the drive loaded them. */
+  private structureOf(drive: Drive, order: readonly string[]): BookStructure {
+    return bookStructure(order, id => drive.parents.get(id), drive.rootId);
+  }
   private orderOf(map: MapDocument): string[] {
     const roots = map.nodes.filter(node => !node.parentId);
     if (roots.length !== 1) throw new BookPipelineRunError("root");
@@ -2144,7 +2150,10 @@ export class BookPipelineRuns {
       const data = await this.openSaved(drive, mapPath);
       if (data.status !== "stopped" || data.pauseReason !== "map") throw new BookPipelineRunError("not_stopped");
       const ids = this.mapIds(await this.ports.readMap(mapPath));
-      await drive.store.commit(state => ({ state: acceptMapChange(state, ids, this.ports.now()), accepted: true }));
+      await drive.store.commit(state => ({
+        state: acceptMapChange(state, ids, this.ports.now(), left => this.structureOf(drive, left).trialOf()),
+        accepted: true
+      }));
       this.log(drive, "map_keep", "-", "plan", "ok");
     });
   }
@@ -2296,15 +2305,29 @@ export class BookPipelineRuns {
       );
     };
     try {
-      const ordered: { id: string; title: string; text: string }[] = [];
+      const ordered: ReferenceChapter[] = [];
+      const structure = this.structureOf(drive, effectiveOrder(drive.store.state));
       for (const id of effectiveOrder(drive.store.state)) {
         const info = drive.cards.get(id);
         if (!info) continue;
         const card = await this.ports.readCard(info.path).catch(() => undefined);
         const text = card ? projectProofBody(stripImageLines(chapterBody(card.detail))).trim() : "";
-        ordered.push({ id, title: card?.title ?? info.title, text });
+        const place = structure.placeOf(id);
+        const chapter =
+          place?.kind === "chapter"
+            ? place.chapter
+            : place?.chapterId
+              ? structure.placeOf(place.chapterId)?.chapter
+              : undefined;
+        ordered.push({
+          id,
+          title: card?.title ?? info.title,
+          text,
+          ...(chapter !== undefined ? { chapter } : {}),
+          ...(place?.kind === "section" ? { section: true as const } : {})
+        });
       }
-      // Chapter numbers count every chapter in order; the model compares the ones with text.
+      // Chapter numbers count the first-level cards only (the preface and the sections are not chapters); the model compares the ones with text.
       const references = chapterReferenceFindings(ordered);
       const chapters = ordered.filter(chapter => chapter.text);
       // The removed-chapter check is the program's own too (no call).

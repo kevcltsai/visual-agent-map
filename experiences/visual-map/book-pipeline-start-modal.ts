@@ -6,7 +6,6 @@ import {
   BOOK_SETTING_FIELDS,
   DEFAULT_BUDGET_LIMIT,
   MAX_AUTO_FIXES,
-  TRIAL_SIZE,
   type BookSettingField,
   type BookSettings,
   type BookSettingsPatch
@@ -76,7 +75,8 @@ export function bookModelSpeed(model: string): number {
   const id = model.toLowerCase();
   return id.includes("haiku") ? 0.5 : id.includes("opus") ? 1.8 : 1;
 }
-export function bookStartEstimate(cards: number, models?: BookStartModels): BookStartEstimate {
+/** `trialCards`: how many of the cards the trial covers (the preface, chapter 1 and its sections). */
+export function bookStartEstimate(cards: number, trialCards: number, models?: BookStartModels): BookStartEstimate {
   const n = Math.max(0, Math.floor(cards));
   const time = (step: keyof typeof BOOK_STEP_SECONDS): number => {
     const measured = BOOK_STEP_SECONDS[step];
@@ -90,7 +90,7 @@ export function bookStartEstimate(cards: number, models?: BookStartModels): Book
     writes * (time("write") + BOOK_IMAGE_SEARCHES * time("images") + time("proof")) +
     BOOK_EXPAND_PASSES * time("write");
   // The trial cards run first and wait for the owner; the rest follow, BOOK_POOL at a time.
-  const trial = Math.min(n, TRIAL_SIZE);
+  const trial = Math.min(n, Math.max(0, Math.floor(trialCards)));
   const rounds = Math.ceil(trial / BOOK_POOL) + Math.ceil((n - trial) / BOOK_POOL);
   return {
     cards: n,
@@ -164,6 +164,8 @@ export interface BookModelChoiceInput {
 
 export interface BookStartInput {
   cards: number;
+  /** How many of the cards the trial covers (`bookStructure().trialOf()`). */
+  trialCards: number;
   /** The model ids the four steps use (from the settings). */
   models: BookStartModels;
   /** Lists and labels for the four dropdowns, and where a pick is saved. */
@@ -377,7 +379,9 @@ export class BookStartModal extends Modal {
   }
   /** The estimate follows the models in the dropdowns. */
   private refreshEstimate(): void {
-    this.estimateEl?.setText(bookStartEstimateText(bookStartEstimate(this.input.cards, this.input.models)));
+    this.estimateEl?.setText(
+      bookStartEstimateText(bookStartEstimate(this.input.cards, this.input.trialCards, this.input.models))
+    );
   }
   onClose(): void {
     this.opened = false;

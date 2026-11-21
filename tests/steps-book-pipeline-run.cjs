@@ -46,6 +46,8 @@ async function rig(over = {}) {
   const nodes = [];
   for (const title of over.titles ?? TITLES) nodes.push(await repo.createNote(title, 'model-a', doc, mapPath, 'workspace', { summary: `summary of ${title}` }));
   nodes.forEach((node, i) => { node.x = i * 300; node.y = 0; if (i) node.parentId = nodes[0].id; });
+  // `over.nested`: the third card is a section of the second, so the trial (preface, chapter 1 and its sections) is the first three cards.
+  if (over.nested && nodes.length > 2) nodes[2].parentId = nodes[1].id;
   await repo.updateMap(mapPath, d => { d.nodes.push(...nodes); });
   const stat = { logs: [], plan: [], author: [], proof: [], probes: [], backups: [], writes: 0 };
   let queue = Promise.resolve();
@@ -1470,7 +1472,7 @@ const same = (actual, expected, message) => assert.equal(JSON.stringify(actual),
 const T5_TITLES = ['T0', 'T1', 'T2', 'T3', 'T4'];
 const trialRig = (over = {}) => {
   const models = { plan: 'm1', author: 'm2', proof: 'm3' };
-  return rig({ trial: true, titles: T5_TITLES, ...over, ports: { config: () => ({ planModel: models.plan, authorModel: models.author, imageModel: 'm4', proofModel: models.proof, reasoning: 'low', language: 'zh-TW' }), ...over.ports } }).then(r => ({ ...r, models }));
+  return rig({ trial: true, nested: true, titles: T5_TITLES, ...over, ports: { config: () => ({ planModel: models.plan, authorModel: models.author, imageModel: 'm4', proofModel: models.proof, reasoning: 'low', language: 'zh-TW' }), ...over.ports } }).then(r => ({ ...r, models }));
 };
 
 test('T5 trial: every card is planned, then only the first three are written and proofread before gate 1; after confirm the rest run and the trial cards get no more calls', async () => {
@@ -3562,13 +3564,14 @@ test('consistency: one check after every chapter is proofread costs one call, ma
   assert.ok(!r.stat.logs.some(line => line.includes('三天')), 'the log carries no claim text');
 });
 
+// The root is the preface, so TITLES[1] is chapter 1 and TITLES[2] is chapter 2.
 test('consistency: a wrong chapter number in a chapter is found without a model call and marks only that chapter', async () => {
   const { chapterInconsistencies } = S.load('core/book-pipeline/consistency.ts');
   let r;
   const asked = [];
   r = await rig({
     ports: { checkConsistency: async (request, run) => { asked.push(request); await run.admission.reserve(); return []; } },
-    script: { author: async input => { await input.admission.reserve(); const note = await r.repo.readNote(input.path); const extra = note.title === TITLES[0] ? `\n\n細節都留給第二章「${TITLES[2]}」。` : ''; await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) + extra }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } }
+    script: { author: async input => { await input.admission.reserve(); const note = await r.repo.readNote(input.path); const extra = note.title === TITLES[0] ? `\n\n細節都留給第一章「${TITLES[2]}」。` : ''; await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) + extra }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } }
   });
   await r.runs.start(r.mapPath);
   await confirmDone(r.runs, r.mapPath);
@@ -3578,7 +3581,7 @@ test('consistency: a wrong chapter number in a chapter is found without a model 
   assert.equal(s.budget.used, 1 + 3 + 3 + 3 + 1);
   assert.deepEqual([stageOf(r.raw(0)), stageOf(r.raw(1)), stageOf(r.raw(2))], ['needs-review', 'checked', 'checked']);
   const ids = r.nodes.map(n => n.id);
-  assert.deepEqual(JSON.parse(JSON.stringify(chapterInconsistencies(s, ids[0]))), [{ other: ids[2], own: `細節都留給第二章「${TITLES[2]}」。`, theirs: '第二章', suggestion: '第三章', reference: true }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(chapterInconsistencies(s, ids[0]))), [{ other: ids[2], own: `細節都留給第一章「${TITLES[2]}」。`, theirs: '第一章', suggestion: '第二章', reference: true }]);
 });
 
 test('consistency: the model\'s paraphrase becomes the chapter\'s sentence, and the program adds a number and a direction the model missed, still one call', async () => {

@@ -22,8 +22,6 @@ export const MAX_STEP_ATTEMPTS = 3;
 export const MAX_AUTO_FIXES = 1;
 /** The extra in-place expand passes of a short chapter: writing-model calls only (no picture search, no proofread of their own). */
 export const BOOK_EXPAND_PASSES = 2;
-/** How many cards (the first in reading order) the trial run before gate 1 covers. */
-export const TRIAL_SIZE = 3;
 export const STEPS = ["plan", "write", "proof"] as const;
 export type PipelineStep = (typeof STEPS)[number];
 
@@ -169,7 +167,7 @@ export interface BookPipelineData {
   autoFixes?: Record<string, number>;
   /** Per card, the extra expand passes used in this run across all its fix rounds (at most {@link BOOK_EXPAND_PASSES}). Absent = none; a reopen keeps it. */
   expandPasses?: Record<string, number>;
-  /** The trial cards (the first in reading order): only they run before gate 1, which shows their finished result. Absent = an older run: every card is planned before gate 1 as before. */
+  /** The trial cards (the preface, chapter 1 and its sections, see `bookStructure().trialOf`): only they run before gate 1, which shows their finished result. Absent = an older run: every card is planned before gate 1 as before. */
   trial?: string[];
   /** True while the run waits (or will wait) at the plan review: every chapter is planned, then gate 1 shows the plan before the trial. Absent = the trial runs (or an older run). */
   planReview?: boolean;

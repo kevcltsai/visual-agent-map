@@ -83,6 +83,7 @@ import {
   type PresentationAction,
   type PresentationState
 } from "./presentation-mode";
+import { bookStructure } from "../../core/book-pipeline/structure";
 import { alignSiblingsToScreen, bookReadingOrder, bySiblingAxis, readingOrder } from "./presentation-order";
 import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
 import { MergeDrafts, type ChatReplyStep, type MergeTask } from "./merge-drafts";
@@ -17787,8 +17788,11 @@ export class VisualAgentMapView extends ItemView {
         this.notes.get(node.id)?.title ?? (node.path.split("/").pop() ?? "").replace(/\.md$/, "")
       ])
     );
+    const startOrder = bookReadingOrder(map);
+    const parentIds = new Map(map.nodes.map(node => [node.id, node.parentId]));
     const modal = new BookStartModal(this.app, {
-      cards: readingOrder(map.nodes, { includeHidden: true }).length,
+      cards: startOrder.length,
+      trialCards: bookStructure(startOrder, id => parentIds.get(id), root?.id ?? "").trialOf().length,
       models: {
         plan: settings.bookPlanModel,
         write: settings.bookWriteModel,

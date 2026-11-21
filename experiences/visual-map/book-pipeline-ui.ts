@@ -2,6 +2,8 @@ import type { TranslationKey } from "../../i18n";
 import { t } from "../../i18n";
 import { isBookStepError } from "../../core/steps/book-pipeline/base";
 import { splitLengthIssue, type LengthReason } from "../../core/book-pipeline/settings";
+import { parseCardPoints } from "../../core/book-pipeline/plan-text";
+import type { BookStructure, CardPlace } from "../../core/book-pipeline/structure";
 import { splitPictureIssue } from "../../core/book-pipeline/image-slots";
 import { joinReasons, splitCarriedIssue } from "./book-pipeline-reasons";
 import {
@@ -56,6 +58,8 @@ export interface BookBarState {
   trialCount?: number;
   /** Gate 1 before the trial: every chapter is planned and the owner looks at the plan (try the trial, or skip it). */
   planReview?: true;
+  /** The trial is the book structure's (preface, chapter 1 and its sections): the bar counts cards and names the preface; absent for an older run. */
+  structure?: { chapters: number; sections: number };
   /** Gate 1: how many of the trial chapters need a look (shown after the trial sentence; nothing when 0). */
   trialAttention?: number;
   /** Gate 2: the chapters written and how many still need a look; the view fills it from the notes (see its `bookReviewCount`). */
@@ -98,7 +102,8 @@ export function bookBarState(
   data: BookPipelineData,
   progress: BookPipelineProgress | undefined,
   stageOf: (nodeId: string) => PipelineStage | undefined,
-  mapIds?: readonly string[]
+  mapIds?: readonly string[],
+  structure?: BookStructure
 ): BookBarState {
   // The saved "done" of the same run is final: a runner record that still says gate2 is older than the owner's acceptance.
   const savedDone = data.phase === "done" && (!progress || progress.runId === data.runId);
@@ -145,6 +150,11 @@ export function bookBarState(
         ? "stopped"
         : phase;
   const current = mode === "planning" || mode === "writing" ? currentOf(data, progress, stageOf) : undefined;
+  // A run whose saved trial is not the structure's (an older run) keeps the old chapter wording.
+  const trialIds = structure?.trialOf() ?? [];
+  const placed =
+    !!structure &&
+    (!data.trial?.length || (data.trial.length === trialIds.length && data.trial.every((id, i) => id === trialIds[i])));
   const rerunning = !!progress?.active && !!progress.rerun && order.includes(progress.rerun.nodeId);
   return {
     mode,
@@ -153,6 +163,14 @@ export function bookBarState(
     counts,
     budget,
     globalDone: data.globalPlanned === true,
+    ...(placed && structure
+      ? {
+          structure: {
+            chapters: structure.chapters.length,
+            sections: structure.chapters.reduce((sum, id) => sum + structure.sectionsOf(id).length, 0)
+          }
+        }
+      : {}),
     ...(current ? { current } : {}),
     ...(!current && mode === "writing" && active && data.consistency?.done === false
       ? { checking: true as const }
@@ -323,14 +341,23 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
   if ((state.mode === "gate1" || state.mode === "gate2" || state.mode === "done") && state.mapChange)
     top.createSpan({ cls: "vam-book-bar-counts vam-book-map-changed", text: mapChangeText(state.mapChange) });
   if (state.mode === "gate1" && state.planReview) {
-    top.createSpan({ cls: "vam-book-bar-counts", text: t("ui.book_bar_plan_ready_0", total) });
+    top.createSpan({
+      cls: "vam-book-bar-counts",
+      text: state.structure
+        ? state.structure.sections
+          ? t("ui.book_bar_plan_ready_struct_0_1", state.structure.chapters, state.structure.sections)
+          : t("ui.book_bar_plan_ready_struct_0", state.structure.chapters)
+        : t("ui.book_bar_plan_ready_0", total)
+    });
     top.createSpan({ cls: "vam-book-bar-counts vam-book-plan-hint", text: t("ui.book_bar_plan_hint") });
     if (actions.openPlan)
       makeButton(buttons, t("ui.book_bar_open_plan"), "vam-book-link vam-book-open-plan", actions.openPlan);
     if (actions.startTrial)
       makeButton(
         buttons,
-        t("ui.book_bar_start_trial_0", state.trialCount ?? 0),
+        state.structure
+          ? t("ui.book_bar_start_trial_cards_0", state.trialCount ?? 0)
+          : t("ui.book_bar_start_trial_0", state.trialCount ?? 0),
         "mod-cta vam-book-start-trial",
         actions.startTrial
       );
@@ -338,11 +365,20 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     top.createSpan({
       cls: "vam-book-bar-counts",
       text: state.trialAttention
-        ? t("ui.book_bar_trial_review_0_1", state.trialCount, state.trialAttention)
-        : t("ui.book_bar_trial_ready_0", state.trialCount)
+        ? t(
+            state.structure ? "ui.book_bar_trial_review_cards_0_1" : "ui.book_bar_trial_review_0_1",
+            state.trialCount,
+            state.trialAttention
+          )
+        : t(state.structure ? "ui.book_bar_trial_ready_cards_0" : "ui.book_bar_trial_ready_0", state.trialCount)
     });
     if (actions.openTrial)
-      makeButton(buttons, t("ui.book_bar_open_first"), "vam-book-link vam-book-open-first", actions.openTrial);
+      makeButton(
+        buttons,
+        t(state.structure ? "ui.book_bar_open_preface" : "ui.book_bar_open_first"),
+        "vam-book-link vam-book-open-first",
+        actions.openTrial
+      );
     if (actions.backToPlan && !state.rerun)
       makeButton(buttons, t("ui.book_bar_back_to_plan"), "vam-book-back-to-plan", actions.backToPlan);
   }
@@ -505,7 +541,7 @@ export function bookProgressText(state: BookBarState): string {
       );
     const settled = Math.min(state.counts.checked + state.counts["needs-review"], state.trialSize - 1);
     return t(
-      "ui.book_progress_line_trial_0_1",
+      state.structure ? "ui.book_progress_line_trial_cards_0_1" : "ui.book_progress_line_trial_0_1",
       Math.min(state.current?.chapter ?? settled + 1, state.trialSize),
       state.trialSize
     );
@@ -523,7 +559,7 @@ export function bookProgressText(state: BookBarState): string {
     state.mode === "planning"
       ? !state.globalDone || state.current?.step === "global"
         ? t("ui.book_progress_line_global")
-        : t("ui.book_progress_line_plan_0_1", at, total)
+        : t(state.structure ? "ui.book_progress_line_plan_cards_0_1" : "ui.book_progress_line_plan_0_1", at, total)
       : t("ui.book_progress_line_write_0_1", at, total);
   return `${sentence}${t("ui.book_progress_line_sep")}${t("ui.book_progress_line_done_0_1", settledCount(state), total)}`;
 }
@@ -719,11 +755,16 @@ export interface BookCardInput {
   bookRole?: unknown;
   pipelineIssue?: unknown;
   pipelineSeam?: unknown;
+  prompt?: unknown;
 }
 export interface BookCardView {
   stage: PipelineStage | "pending";
   stageText: string;
   roleText?: string;
+  /** Preface / chapter n / section, from the book structure; replaces the role chip when the card has a place. */
+  placeText?: string;
+  /** A planned card's content headings (a short list instead of the summary); absent when the Prompt has none. */
+  points?: string[];
   issueText?: string;
   /** True when a neighbouring card changed and the owner has not confirmed the join yet. */
   seam: boolean;
@@ -739,14 +780,23 @@ export interface BookCardView {
  * `accepted`: the book's phase is done; the proof marks (needs-review pill, issue line, seam pill) are hidden, the data is untouched.
  * `resolved`: the reader ticked this chapter's box for the attention it has now; its marks go the same way (review-a B3).
  */
-export function bookCardView(note: BookCardInput, accepted = false, stale = false, resolved = false): BookCardView {
+export function bookCardView(
+  note: BookCardInput,
+  accepted = false,
+  stale = false,
+  resolved = false,
+  place?: CardPlace
+): BookCardView {
   accepted = accepted || resolved;
   const stage = readPipelineStage(note.pipelineStage) ?? "pending";
   const role = readBookRole(note.bookRole);
   const issue = typeof note.pipelineIssue === "string" && note.pipelineIssue ? note.pipelineIssue : undefined;
+  const points = stage === "planned" && typeof note.prompt === "string" ? parseCardPoints(note.prompt) : undefined;
   return {
     stage,
     stageText: t(STAGE_KEY[stage]),
+    ...(place ? { placeText: placeLabel(place) } : {}),
+    ...(points ? { points } : {}),
     ...(!accepted && stale && stage === "checked" ? { edited: true } : {}),
     seam: !accepted && typeof note.pipelineSeam === "string" && note.pipelineSeam.trim() !== "",
     ...(accepted && stage === "needs-review" ? { hideStage: true } : {}),
@@ -759,6 +809,14 @@ export function bookCardView(note: BookCardInput, accepted = false, stale = fals
       ? {}
       : { summaryPrefix: t(stage === "planned" ? "ui.book_summary_plan" : "ui.book_summary_done") })
   };
+}
+
+function placeLabel(place: CardPlace): string {
+  return place.kind === "preface"
+    ? t("ui.book_place_preface")
+    : place.kind === "chapter"
+      ? t("ui.book_place_chapter_0", place.chapter ?? 0)
+      : t("ui.book_place_section");
 }
 
 const WORKING_KEY: Record<BookSubStep, TranslationKey> = {
@@ -798,7 +856,8 @@ export function renderBookCardLabels(
     const seam = header.createSpan({ cls: "vam-status vam-book-state is-seam", text: t("ui.book_seam_label") });
     seam.setAttr("title", t("ui.book_seam_reason"));
   }
-  if (view.roleText) header.createSpan({ cls: "vam-book-role", text: view.roleText });
+  const label = view.placeText ?? view.roleText;
+  if (label) header.createSpan({ cls: "vam-book-role", text: label });
 }
 
 /** The run waits at gate 1 for the owner (not driving): the only state in which a chat "continue" confirms the plan. */

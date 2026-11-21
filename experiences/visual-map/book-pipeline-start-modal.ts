@@ -101,15 +101,32 @@ export function bookStartEstimate(cards: number, trialCards: number, models?: Bo
     seconds: time("global") + rounds * perCard
   };
 }
-export function bookStartEstimateText(estimate: BookStartEstimate): string {
+export function bookStartEstimateText(
+  estimate: BookStartEstimate,
+  structure?: { chapters: number; sections: number }
+): string {
   const minutes = Math.round(estimate.seconds / 60);
-  return t(
-    "ui.book_start_estimate_0_1_2_3",
-    estimate.cards,
-    minutes < 1 ? t("ui.book_start_under_minute") : t("ui.book_start_minutes_0", minutes),
-    estimate.calls,
-    estimate.limit
-  );
+  const time = minutes < 1 ? t("ui.book_start_under_minute") : t("ui.book_start_minutes_0", minutes);
+  if (structure)
+    return structure.sections
+      ? t(
+          "ui.book_start_estimate_struct_0_1_2_3_4_5",
+          structure.chapters,
+          structure.sections,
+          estimate.cards,
+          time,
+          estimate.calls,
+          estimate.limit
+        )
+      : t(
+          "ui.book_start_estimate_struct_0_1_2_3_4",
+          structure.chapters,
+          estimate.cards,
+          time,
+          estimate.calls,
+          estimate.limit
+        );
+  return t("ui.book_start_estimate_0_1_2_3", estimate.cards, time, estimate.calls, estimate.limit);
 }
 
 /**
@@ -166,6 +183,8 @@ export interface BookStartInput {
   cards: number;
   /** How many of the cards the trial covers (`bookStructure().trialOf()`). */
   trialCards: number;
+  /** The preface + chapters + sections the estimate names (`bookStructure()`); absent: the plain card count. */
+  structure?: { chapters: number; sections: number };
   /** The model ids the four steps use (from the settings). */
   models: BookStartModels;
   /** Lists and labels for the four dropdowns, and where a pick is saved. */
@@ -380,7 +399,10 @@ export class BookStartModal extends Modal {
   /** The estimate follows the models in the dropdowns. */
   private refreshEstimate(): void {
     this.estimateEl?.setText(
-      bookStartEstimateText(bookStartEstimate(this.input.cards, this.input.trialCards, this.input.models))
+      bookStartEstimateText(
+        bookStartEstimate(this.input.cards, this.input.trialCards, this.input.models),
+        this.input.structure
+      )
     );
   }
   onClose(): void {

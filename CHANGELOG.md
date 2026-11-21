@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Picture-book maps now treat the root card as a preface, the first level as chapters (numbered) and the cards below as sections. Cards are labelled Preface, Chapter n or Section, and a planned card lists its content headings. The trial is the preface, chapter 1 and its sections, and the gate, progress lines and start dialog count cards, chapters and sections.
 - Map chat now searches for images when you set picture rules (put pictures in, image URLs, captions) even without saying "search for images", and keeps doing so in every round of an automatic continuation.
 - A mind map's data sources are now used by expand, merge, multi-topic research and its retries, rerun with Standard, chat synthesis, topic chat and map chat replies, and outline import. Sources stay read-only, untrusted reference material.
 - Hypothesis research now tells fact questions from causal questions. The current-situation card shows the type, and you can change it on the definitions card before you re-run.

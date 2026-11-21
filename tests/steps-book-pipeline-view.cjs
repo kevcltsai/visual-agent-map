@@ -22,6 +22,7 @@ export { deletedChapterTitles, mentionedDeletedChapters, renderBookSettingsField
 export { BookStepError } from "./core/steps/book-pipeline/base";
 export { BookPipelineRunError, stepCounts } from "./experiences/visual-map/book-pipeline-run";
 export { readBookPipeline } from "./core/book-pipeline/model";
+export { bookStructure } from "./core/book-pipeline/structure";
 export { reviewEntries, reviewCallout, putProgramCallout, collapseReviewCallouts, markReviewHandled } from "./experiences/visual-map/book-pipeline-review";
 export { VisualAgentMapView } from "./experiences/visual-map/view";
 export { setUiLanguage, t } from "./i18n";
@@ -319,7 +320,7 @@ test('view: a bookPipeline map shows the stage and role labels, the summary pref
   const stage = h.paint();
   const states = dom.findAll(stage, i => i.cls.includes('vam-book-state')).map(i => i.text);
   assert.deepEqual(states, ['已企劃', '已校', '需人看']);
-  assert.deepEqual(dom.findAll(stage, i => i.cls === 'vam-book-role').map(i => i.text), ['導讀', '本文', '本文']);
+  assert.deepEqual(dom.findAll(stage, i => i.cls === 'vam-book-role').map(i => i.text), ['前言', '第 1 章', '第 2 章']);
   assert.deepEqual(dom.findAll(stage, i => i.cls.includes('vam-book-summary-prefix')).map(i => i.text), ['本章會講：', '實際講了：', '實際講了：']);
   assert.deepEqual(dom.findAll(stage, i => i.cls.includes('vam-card-book-issue')).map(i => i.text), ['需人看：寫作失敗：AI 回覆格式不符']);
   const summary = dom.find(stage, i => i.cls.includes('vam-card-summary'));
@@ -537,7 +538,7 @@ test('start card: opens with the estimate (every step counted, about minutes), t
   assert.ok(modal.isOpen);
   assert.equal(h.entries.length, 0, 'nothing starts before the owner presses Start');
   const all = texts(modal.modalEl);
-  assert.ok(all.includes('3 張卡 · 約 24 分鐘 · 最多 59 次 AI 呼叫（步驟失敗重試另計；到 300 次會先停下）。'), all.join('|'));
+  assert.ok(all.includes('前言 + 2 章（3 張卡）· 約 24 分鐘 · 最多 59 次 AI 呼叫（步驟失敗重試另計；到 300 次會先停下）。'), all.join('|'));
   assert.ok(all.includes('中間只會停兩次，讓你確認。'));
   assert.ok(all.includes('某一章不滿意，可以只重跑那一章。'));
   assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined, 'no collapsed block: the settings are always open');
@@ -572,11 +573,11 @@ test('start card: the four dropdowns (plan, author, pictures, proofread) carry t
   assert.deepEqual(selects.map(x => x.attrs['aria-label']), ['企劃', '寫作', '找圖', '校對']);
   assert.deepEqual(selects[1].children.map(o => o.optionValue), ['claude:sonnet', 'claude:opus', 'claude:haiku']);
   assert.equal(selects[1].value, h.plugin.settings.bookWriteModel);
-  const before = texts(modal.modalEl).find(x => x.startsWith('3 張卡'));
+  const before = texts(modal.modalEl).find(x => x.startsWith('前言 + 2 章（3 張卡）'));
   selects[1].value = 'claude:sonnet'; selects[1].change();
   assert.notEqual(h.plugin.settings.bookWriteModel, 'claude:sonnet', 'a pick is not saved while the card is open');
   assert.equal(h.ctl.saves.length, 0);
-  const after = texts(modal.modalEl).find(x => x.startsWith('3 張卡'));
+  const after = texts(modal.modalEl).find(x => x.startsWith('前言 + 2 章（3 張卡）'));
   assert.match(before, /最多 59 次/); assert.match(after, /最多 59 次/);
   assert.notEqual(before, after, 'the time follows the model');
   cardButton(modal, '開始').click(); await dom.tick();
@@ -1744,4 +1745,107 @@ test('T14 hint: the start card of a finished book with a snapshot shows the line
   dom.findAll(modal.modalEl, i => i.tag === 'button').find(b => b.text === '開始').click();
   await dom.tick();
   assert.ok(h.entries.some(e => e[0] === 'start'), 'only a hint: the run starts');
+});
+
+// ---- P4: preface / chapter / section on the cards, headings, gate words ----
+// root r = preface; a, b = chapters; a1, a2 = sections of a.
+const structOf = (order = ['r', 'a', 'a1', 'a2', 'b']) => {
+  const parents = { a: 'r', b: 'r', a1: 'a', a2: 'a' };
+  return bundle.bookStructure(order, id => parents[id], 'r');
+};
+const gateData = (over = {}) => bookData({ phase: 'gate1', status: 'running', order: ['r', 'a', 'a1', 'a2', 'b'], trial: ['r', 'a', 'a1', 'a2'], planReview: true, ...over });
+const drawStruct = (data, prog, structure) => {
+  const parent = dom.element('div');
+  const state = ui.bookBarState(data, prog, noStage, undefined, structure);
+  const bar = ui.renderBookBar(parent, state, { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, startTrial() {}, openTrial() {}, openPlan() {} });
+  return { state, texts: texts(bar), buttons: buttonsOf(bar).map(b => b.text) };
+};
+
+test('P4 card label: preface / chapter n / section from the structure replace the role chip; no place = old role chip, old card unchanged', () => {
+  const st = structOf();
+  const want = { zh: ['前言', '第 1 章', '節', '第 2 章'], en: ['Preface', 'Chapter 1', 'Section', 'Chapter 2'], cn: ['前言', '第 1 章', '节', '第 2 章'] };
+  for (const [language, key] of [['zh-TW', 'zh'], ['en', 'en'], ['zh-CN', 'cn']]) {
+    lang(language);
+    assert.deepEqual(['r', 'a', 'a1', 'b'].map(id => ui.bookCardView({ bookRole: 'body' }, false, false, false, st.placeOf(id)).placeText), want[key]);
+  }
+  lang('zh-TW');
+  const withPlace = ui.bookCardView({ bookRole: 'intro' }, false, false, false, st.placeOf('a'));
+  const header = dom.element('div');
+  ui.renderBookCardLabels(header, withPlace);
+  assert.deepEqual(texts(header).filter(x => x === '第 1 章' || x === '導讀'), ['第 1 章']);
+  const old = ui.bookCardView({ bookRole: 'intro', pipelineStage: 'planned', prompt: '請寫' });
+  assert.equal(old.placeText, undefined);
+  assert.equal(old.points, undefined);
+  assert.equal(old.roleText, '導讀');
+  assert.equal(old.summaryPrefix, '本章會講：');
+  const h2 = dom.element('div');
+  ui.renderBookCardLabels(h2, old);
+  assert.ok(texts(h2).includes('導讀'));
+});
+
+test('P4 headings: a planned card with 內容標題 shows them; written/checked and cards without headings are unchanged', () => {
+  lang('zh-TW');
+  const prompt = '目標：x\n內容標題：市集裡的一天 · 交換為什麼卡住 · 替代品\n上一章：無';
+  assert.deepEqual([...ui.bookCardView({ pipelineStage: 'planned', prompt }).points], ['市集裡的一天', '交換為什麼卡住', '替代品']);
+  assert.equal(ui.bookCardView({ pipelineStage: 'written', prompt }).points, undefined);
+  assert.equal(ui.bookCardView({ pipelineStage: 'checked', prompt }).points, undefined);
+  assert.equal(ui.bookCardView({ pipelineStage: 'planned', prompt: '目標：x' }).points, undefined);
+  assert.equal(ui.bookCardView({ pipelineStage: 'planned' }).points, undefined);
+  assert.match(view_ts, /bookCard\.points && this\.hasBookPipeline\(\)/);
+  assert.match(view_ts, /bookCardView\(note \?\? \{\}, bookDone, bookStale, this\.isBookCardResolved\(node\.id\), bookPlace\)/);
+  assert.match(css, /\.vam-book-points \{/);
+});
+
+test('P4 gate words: counts, trial button, after-trial, progress use the new strings in place; an old saved trial keeps the old text', () => {
+  lang('zh-TW');
+  const st = structOf();
+  const a = drawStruct(gateData(), progress({ phase: 'gate1', active: false, total: 5 }), st);
+  assert.ok(a.texts.includes('前言、2 章、2 節都企劃好了'), a.texts.join('|'));
+  assert.ok(a.buttons.includes('試跑前言＋第 1 章（4 張卡）'), a.buttons.join('|'));
+  const noSections = structOf(['r', 'a', 'b']);
+  const b = drawStruct(gateData({ order: ['r', 'a', 'b'], trial: ['r', 'a'] }), progress({ phase: 'gate1', active: false, total: 3 }), noSections);
+  assert.ok(b.texts.includes('前言、2 章都企劃好了'));
+  assert.ok(b.buttons.includes('試跑前言＋第 1 章（2 張卡）'));
+  // After the trial: open the preface, cards wording.
+  const c = drawStruct(gateData({ planReview: undefined }), progress({ phase: 'gate1', active: false, total: 5 }), st);
+  assert.ok(c.texts.includes('試跑的 4 張卡寫好了'));
+  assert.ok(c.buttons.includes('打開前言'));
+  assert.ok(!c.buttons.includes('打開第 1 章'));
+  assert.equal(tr('ui.book_bar_trial_review_cards_0_1', 4, 1), '試跑的 4 張卡寫好了，1 張要你看');
+  // Progress lines.
+  const plan = ui.bookProgressText(ui.bookBarState(bookData({ phase: 'planning', planReview: true, order: ['r', 'a', 'a1', 'a2', 'b'], trial: ['r', 'a', 'a1', 'a2'] }), progress({ phase: 'planning', total: 5, current: [{ nodeId: 'a1', step: 'plan', startedAt: 1 }] }), noStage, undefined, st));
+  assert.match(plan, /正在企劃第 3／5 張卡/);
+  const trial = ui.bookProgressText(ui.bookBarState(bookData({ phase: 'planning', order: ['r', 'a', 'a1', 'a2', 'b'], trial: ['r', 'a', 'a1', 'a2'] }), progress({ phase: 'planning', total: 5, current: [{ nodeId: 'a1', step: 'plan', startedAt: 1 }] }), noStage, undefined, st));
+  assert.match(trial, /正在試跑第 3／4 張卡/);
+  // Old saved trial (first 3 cards, not the structure's): the old wording stays.
+  const old = drawStruct(gateData({ trial: ['r', 'a', 'a1'] }), progress({ phase: 'gate1', active: false, total: 5 }), st);
+  assert.equal(old.state.structure, undefined);
+  assert.ok(old.texts.includes('5 章都企劃好了'));
+  assert.ok(old.buttons.includes('試跑 3 章'));
+  const oldAfter = drawStruct(gateData({ trial: ['r', 'a', 'a1'], planReview: undefined }), progress({ phase: 'gate1', active: false, total: 5 }), st);
+  assert.ok(oldAfter.buttons.includes('打開第 1 章'));
+  assert.ok(oldAfter.texts.includes('試跑的 3 章寫好了'));
+  // No structure at all: old wording.
+  assert.equal(drawStruct(gateData(), progress({ phase: 'gate1', active: false, total: 5 }), undefined).state.structure, undefined);
+});
+
+test('P4 words in en and zh-CN; the start dialog line names preface + chapters + sections and omits 0 sections; card menu line', () => {
+  const est = start => bundle.bookStartEstimateText(bundle.bookStartEstimate(10, 4), start);
+  lang('zh-TW');
+  assert.match(est({ chapters: 3, sections: 6 }), /^前言 \+ 3 章 \+ 6 節（10 張卡）· 約 .+ · 最多 176 次 AI 呼叫/);
+  assert.match(est({ chapters: 3, sections: 0 }), /^前言 \+ 3 章（10 張卡）· 約 /);
+  assert.doesNotMatch(est({ chapters: 3, sections: 0 }), /0 節/);
+  assert.match(est(undefined), /^10 張卡 · 約/);
+  lang('en');
+  assert.match(est({ chapters: 3, sections: 6 }), /^Preface \+ 3 chapters \+ 6 sections \(10 cards\)/);
+  assert.equal(tr('ui.book_bar_plan_ready_struct_0_1', 3, 6), 'The preface, 3 chapters and 6 sections are planned');
+  assert.equal(tr('ui.book_bar_open_preface'), 'Open the preface');
+  lang('zh-CN');
+  assert.equal(tr('ui.book_bar_plan_ready_struct_0_1', 3, 6), '前言、3 章、6 节都企划好了');
+  assert.equal(tr('ui.book_bar_start_trial_cards_0', 4), '试跑前言＋第 1 章（4 张卡）');
+  assert.equal(tr('ui.book_progress_line_trial_cards_0_1', 2, 4), '正在试跑第 2／4 张卡');
+  assert.ok(tr('ui.book_card_menu_rerun_sub').includes('连接行'));
+  lang('zh-TW');
+  assert.ok(tr('ui.book_card_menu_rerun_sub').includes('只更新前後章節的連接行'));
+  assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /structure: \{\s*chapters: startStructure\.chapters\.length/);
 });

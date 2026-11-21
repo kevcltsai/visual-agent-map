@@ -64,6 +64,7 @@ export const OPEN_ISSUE_SOURCES: Record<string, IssueSource> = {
         zh: "這處是你手改或加註的內容，程式不動",
         en: "This is text you edited or annotated, so it was left alone"
       },
+      not_fixed: { zh: "AI 沒有修到這處", en: "The AI did not fix this one" },
       not_fixed_in_time: {
         zh: "最後一輪才查到這處，來不及修",
         en: "It was first found in the last check, so there was no round left to fix it"

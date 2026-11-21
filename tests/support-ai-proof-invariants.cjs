@@ -12,7 +12,7 @@ const REFUSED = /^(fix_refused_|hand_edited$|fix_quote_missing$|fix_forbidden_)/
  * - `bodyIds`: the chapters that have text (default: every chapter of the book).
  * - `stageOf(id)`: the card stage (counts needs-review chapters, which the bar and the page both list).
  * - `page`: the closing page text, when one was written.
- * - `refusedQuotes`: the quotes whose fix was blocked in the LAST fix round (I2).
+ * - `refusedQuotes`: the quotes whose LAST fix event (the latest round that targeted that quote) was a block (I2, D6): their blocked reason is carried to the final check.
  * - `boxes`: per chapter id, the chapter's note text; the fix lines of all boxes (chapter and whole-book) must add up to the bar's number.
  * - `applied`: per chapter id (or "book"), the replacement texts the run wrote (I4).
  */
@@ -33,9 +33,10 @@ function checkAiProofInvariants(data, options = {}) {
     if (slot.fixed !== (slot.fixes?.length ?? 0)) out.push(`I2 ${id}: fixed=${slot.fixed} but fixes.length=${slot.fixes?.length ?? 0}`);
     for (const item of slot.open ?? []) {
       if (REFUSED.test(item.reason) && !(options.refusedQuotes ?? []).some(q => squash(q) === squash(item.quote)))
-        out.push(`I2 ${id}: open "${item.quote}" carries an old round's reason ${item.reason}`);
+        out.push(`I2 ${id}: open "${item.quote}" carries a blocked reason ${item.reason} but its last fix event was not a block`);
       const hit = (options.applied?.[id] ?? []).some(text => squash(item.quote) && (squash(text).includes(squash(item.quote)) || squash(item.quote).includes(squash(text))));
       if (hit && item.reason !== 'still_present') out.push(`I4 ${id}: "${item.quote}" hits an applied replacement but is ${item.reason}`);
+      if (!hit && item.reason === 'still_present' && options.applied && id in options.applied) out.push(`I4 ${id}: "${item.quote}" is still_present but no replacement was written for it`);
     }
   }
   // I2 (whole-book fixes): every one is recorded on the chapter it changed, so the chapters' boxes can tell it.

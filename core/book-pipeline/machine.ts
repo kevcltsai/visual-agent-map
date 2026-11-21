@@ -365,11 +365,12 @@ export function applyAiProof(
             target => squash(target.quote) === squash(item.quote) && (target.chapter ?? 1) === (item.chapter ?? 1)
           )
         : undefined;
-      if (before) return slot.refused?.[before.id] ?? "still_present";
-      // A quote that is (part of) text a fix round wrote: the fix was applied and the problem is still there, not found too late.
+      // A quote that is (part of) text a fix round wrote: the fix was applied and the problem is still there.
       const quote = item ? squash(item.quote) : "";
       const written =
         quote && (found.applied ?? []).some(text => squash(text).includes(quote) || quote.includes(squash(text)));
+      // The reason of the quote's last fix event (D6): blocked, or written and still there; a target no round wrote or blocked was not fixed.
+      if (before) return slot.refused?.[before.id] ?? (written ? "still_present" : "not_fixed");
       return written ? "still_present" : "not_fixed_in_time";
     });
   }

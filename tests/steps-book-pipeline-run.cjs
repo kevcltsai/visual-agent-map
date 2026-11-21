@@ -4124,7 +4124,19 @@ test('R2 combo M-a: a refusal from an earlier round is not carried to a problem 
   await finishAi(r);
   same(await invariantsOf(r, v, { refusedQuotes: [] }), []);
   const slot = (await r.state()).aiProof[idA(r)];
-  assert.deepEqual(plain(slot.open.map(i => i.reason)), ['still_present']);
+  assert.deepEqual(plain(slot.open.map(i => i.reason)), ['not_fixed']);
+});
+
+test('R3 M-R3-1: the same quote comes back under a new id and the model skips it: the reason stays the round-1 refusal (D6), invariants empty', async () => {
+  const v = pageVault(); let fixes = 0;
+  const r = await aiRig({
+    aiProof: async request => ({ checks: request.title === 'SecretTitleA' ? [probOf(request, fixes === 0 ? 'P1' : 'P2')] : [okCheck(request)], prior: [], dropped: {} }),
+    aiFix: async request => { fixes++; return fixes === 1 ? [{ id: 'P1', quote: 'not in the text', replacement: 'x' }] : []; }
+  }, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  same(await invariantsOf(r, v, { refusedQuotes: (await r.state()).aiProof[idA(r)].open.map(i => i.quote) }), []);
+  const slot = (await r.state()).aiProof[idA(r)];
+  assert.deepEqual(plain(slot.open.map(i => i.reason)), ['fix_quote_missing']);
 });
 
 // A finished book, one chapter written again, and the run cut short while that chapter is being proofread again.

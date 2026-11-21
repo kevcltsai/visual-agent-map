@@ -3311,6 +3311,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_ai_reason_hand_edited": "这章你手改过，AI 不覆盖你的字",
   "ui.book_ai_reason_fix_failed": "AI 改的时候失败了",
   "ui.book_ai_reason_proof_incomplete": "校对没有跑完",
+  "ui.book_ai_reason_not_fixed": "AI 没有修到这处",
   "ui.book_ai_reason_not_fixed_in_time": "还没来得及修，最后一轮才查到",
   "ui.book_ai_reason_other": "AI 没办法处理",
   "ui.book_note_review_accept": "接受现在这样，不用改",

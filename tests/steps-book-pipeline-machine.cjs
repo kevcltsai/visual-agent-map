@@ -664,7 +664,7 @@ test('ai proof: a checked chapter gets ai_proof; with fixable problems the round
     assert.equal(plain(machine.nextActions(state, stages, new Set(), AI).actions)[0].type, 'ai_fix');
     const f = begin(state, { nodeId: 'a' }, key, 'fix');
     key = `k${round + 1}`;
-    const fixed = machine.applyAiFix(f.state, f.token, { applied: 1, key, changed: ['a'] });
+    const fixed = machine.applyAiFix(f.state, f.token, { applied: 1, replacements: ['qq'], key, changed: ['a'] });
     state = fixed.state;
     assert.equal(machine.cardRevision(state, 'a'), machine.cardRevision(start, 'a') + round + 1, 'a fix that wrote raises the revision');
   }
@@ -865,7 +865,7 @@ test('R1 B2: ids renumbered between rounds: the reason follows the quote, a stal
   // qa is gone; a different problem now carries the id P1
   state = machine.applyAiProof(p1.state, p1.token, { checked: 1, pending: [pq('P1', 'qb')], open: [] }).state;
   const f1 = begin(state, { nodeId: 'a' }, 'k0', 'fix');
-  state = machine.applyAiFix(f1.state, f1.token, { applied: 1, appliedIds: ['P1'], key: 'k1', changed: ['a'] }).state;
+  state = machine.applyAiFix(f1.state, f1.token, { applied: 1, appliedIds: ['P1'], replacements: ['qb fixed'], key: 'k1', changed: ['a'] }).state;
   const p2 = begin(state, { nodeId: 'a' }, 'k1', 'proof');
   state = machine.applyAiProof(p2.state, p2.token, { checked: 1, pending: [pq('P1', 'qb')], open: [] }).state;
   assert.deepEqual(plain(state.aiProof.a.open.map(item => [item.quote, item.reason])), [['qb', 'still_present']], 'same quote under a new id: still present, not the old picture refusal');
@@ -885,6 +885,19 @@ test('R1 B2: a problem first found in the last check is not_fixed_in_time, not "
     state = machine.applyAiFix(f.state, f.token, { applied: 1, appliedIds: ['P1'], key, changed: ['a'] }).state;
   }
   assert.deepEqual(plain(state.aiProof.a.open.map(item => [item.quote, item.reason])), [['brand new', 'not_fixed_in_time']]);
+});
+
+test('R3 M-R3-2: a target the model skipped (nothing written, nothing refused) and still reported is not_fixed, never "still there after the AI fixed it"', () => {
+  const { state: start } = checkedRun();
+  let state = start;
+  for (let round = 0; round < 3; round++) {
+    const p = begin(state, { nodeId: 'a' }, 'k0', 'proof');
+    state = machine.applyAiProof(p.state, p.token, { checked: 1, pending: [pq('P1', 'qs')], open: [] }).state;
+    if (state.aiProof.a.done) break;
+    const f = begin(state, { nodeId: 'a' }, 'k0', 'fix');
+    state = machine.applyAiFix(f.state, f.token, { applied: 0, appliedIds: [] }).state;
+  }
+  assert.deepEqual(plain(state.aiProof.a.open.map(item => [item.quote, item.reason])), [['qs', 'not_fixed']]);
 });
 
 test('R1 B2: ids renumbered: a refused problem reported again under another id keeps its own refusal reason (matched by the quote)', () => {

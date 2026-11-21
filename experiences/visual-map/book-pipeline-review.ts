@@ -599,6 +599,7 @@ const AI_REASON_KEY: Record<string, TranslationKey> = {
   hand_edited: "ui.book_ai_reason_hand_edited",
   fix_failed: "ui.book_ai_reason_fix_failed",
   proof_incomplete: "ui.book_ai_reason_proof_incomplete",
+  not_fixed: "ui.book_ai_reason_not_fixed",
   not_fixed_in_time: "ui.book_ai_reason_not_fixed_in_time"
 };
 /** A reason code in words (an unknown code reads as the general sentence; the code itself is never shown). */

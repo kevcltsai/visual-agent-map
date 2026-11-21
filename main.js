@@ -57356,6 +57356,18 @@ function editorViewsOf(path, views) {
   }
   return out;
 }
+async function rerenderReadingViewsWhenLoaded(views, path, read, pause2, tries = 40) {
+  const open2 = views.filter((view) => view.path === path && view.reading);
+  if (!open2.length) return 0;
+  const text10 = await read();
+  let drawn = 0;
+  for (const view of open2) {
+    for (let i = 0; i < tries && view.data() !== text10; i++) await pause2(50);
+    view.rerender();
+    drawn++;
+  }
+  return drawn;
+}
 function shownText(view) {
   return view.getMode() === "preview" ? view.getViewData() : view.editor.getValue();
 }
@@ -57404,7 +57416,7 @@ function createNoteWriter(ports) {
   return async (path, transform) => {
     var _a2;
     const result = await write(path, transform);
-    if (result === "written") (_a2 = ports.rerender) == null ? void 0 : _a2.call(ports, path);
+    if (result === "written") void Promise.resolve((_a2 = ports.rerender) == null ? void 0 : _a2.call(ports, path)).catch(() => void 0);
     return result;
   };
 }
@@ -108194,16 +108206,23 @@ var VisualAgentMapPlugin = class extends import_obsidian52.Plugin {
     __publicField(this, "bookNoteWriter", createNoteWriter({
       openViews: (path) => this.openMarkdownViews(path),
       rawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
-      rerender: (path) => rerenderReadingViews(
+      rerender: (path) => rerenderReadingViewsWhenLoaded(
         this.app.workspace.getLeavesOfType("markdown").flatMap((leaf) => leaf.view instanceof import_obsidian52.MarkdownView ? [leaf.view] : []).map((view) => {
           var _a2;
           return {
             path: (_a2 = view.file) == null ? void 0 : _a2.path,
             reading: view.getMode() === "preview",
+            data: () => view.getViewData(),
             rerender: () => view.previewMode.rerender(true)
           };
         }),
-        path
+        path,
+        async () => {
+          const file = this.app.vault.getAbstractFileByPath(path);
+          if (!(file instanceof import_obsidian52.TFile)) throw new Error("missing");
+          return this.app.vault.read(file);
+        },
+        (ms) => new Promise((done) => window.setTimeout(done, ms))
       )
     }));
     __publicField(this, "bookCallouts", new BookCallouts({

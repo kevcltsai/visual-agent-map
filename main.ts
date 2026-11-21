@@ -26,6 +26,7 @@ import {
   BookCallouts,
   createNoteWriter,
   editorViewsOf,
+  rerenderReadingViewsWhenLoaded,
   shownText,
   type OpenNoteView
 } from "./experiences/visual-map/book-pipeline-callouts";
@@ -501,16 +502,23 @@ export default class VisualAgentMapPlugin extends Plugin {
     openViews: path => this.openMarkdownViews(path),
     rawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
     rerender: path =>
-      rerenderReadingViews(
+      rerenderReadingViewsWhenLoaded(
         this.app.workspace
           .getLeavesOfType("markdown")
           .flatMap(leaf => (leaf.view instanceof MarkdownView ? [leaf.view] : []))
           .map(view => ({
             path: view.file?.path,
             reading: view.getMode() === "preview",
+            data: () => view.getViewData(),
             rerender: () => view.previewMode.rerender(true)
           })),
-        path
+        path,
+        async () => {
+          const file = this.app.vault.getAbstractFileByPath(path);
+          if (!(file instanceof TFile)) throw new Error("missing");
+          return this.app.vault.read(file);
+        },
+        ms => new Promise(done => window.setTimeout(done, ms))
       )
   });
   readonly bookCallouts = new BookCallouts({

@@ -355,3 +355,31 @@ test('writer: a written note makes its reading views render again; unchanged or 
   assert.equal(await viaEditor('N/c.md', upper), 'written');
   assert.deepEqual(seen, ['N/a.md', 'N/c.md']);
 });
+
+// ---- the render waits for the view to hold the new text (live: the write returns before Obsidian loads it into the view) ----
+test('reading re-render: a view is drawn only once it holds the file text the write left; others are left alone', async () => {
+  let file = '[!vam-trial]';
+  const drawn = [];
+  // Obsidian loads the written file into the view a few ticks after the write returns.
+  const lagging = { held: '[!vam-trial]', draws: drawn };
+  const views = [
+    { path: 'N/a.md', reading: true, data: () => lagging.held, rerender: () => drawn.push(lagging.held) },
+    { path: 'N/a.md', reading: false, data: () => 'x', rerender: () => drawn.push('editing') },
+    { path: 'N/b.md', reading: true, data: () => 'x', rerender: () => drawn.push('other') }
+  ];
+  const write = b.createNoteWriter({
+    openViews: () => [],
+    rawGuarded: async (p, t) => { file = t(file); return 'written'; },
+    rerender: path => b.rerenderReadingViewsWhenLoaded(views, path, async () => file, async () => { lagging.held = file; })
+  });
+  assert.equal(await write('N/a.md', () => '[!vam-review]'), 'written');
+  await new Promise(done => setImmediate(done));
+  assert.deepEqual(drawn, ['[!vam-review]']);
+  assert.equal(await b.rerenderReadingViewsWhenLoaded([], 'N/a.md', async () => file, async () => undefined), 0);
+  // a view that never catches up is drawn anyway after the allowed pauses
+  let pauses = 0;
+  const stuck = [{ path: 'N/a.md', reading: true, data: () => 'old', rerender: () => drawn.push('stuck') }];
+  assert.equal(await b.rerenderReadingViewsWhenLoaded(stuck, 'N/a.md', async () => 'new', async () => { pauses++; }, 3), 1);
+  assert.equal(pauses, 3);
+  assert.equal(drawn.at(-1), 'stuck');
+});

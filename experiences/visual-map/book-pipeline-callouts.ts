@@ -54,8 +54,9 @@ export interface NoteWritePorts {
   /**
    * The note's text was changed by the program: its open reading-mode views render it again. A reading view keeps the sections it
    * rendered when the file is changed under it (live: a tab opened at gate 1 kept the trial box through gate 2 and done).
+   * It runs when the write has returned, which is before Obsidian has loaded the new text into the view: the port must wait for that.
    */
-  rerender?(path: string): void;
+  rerender?(path: string): void | Promise<unknown>;
 }
 /** written: the text changed; unchanged: it already was as wanted; refused: nothing was written (views disagree, or the note changed under us). */
 export type NoteWriteResult = "written" | "unchanged" | "refused";
@@ -96,6 +97,38 @@ export function editorViewsOf(path: string, views: MarkdownViewLike[]): OpenNote
     });
   }
   return out;
+}
+
+/** A reading view as the forced re-render needs it: whether it shows `path` in reading mode, the text it holds, and how to render. */
+export interface ReadingViewLike {
+  path: string | undefined;
+  reading: boolean;
+  data(): string;
+  rerender(): void;
+}
+/**
+ * The open reading views of `path` render again, but only once each holds the file's current text. The write returns before
+ * Obsidian has loaded the new text into its views, and `previewMode.rerender` draws the text the view holds: called at once it draws the old
+ * box again (live: a tab opened at gate 1 still showed the trial box at gate 2). A view that never catches up within `tries` pauses is drawn anyway.
+ * Returns how many views were drawn.
+ */
+export async function rerenderReadingViewsWhenLoaded(
+  views: readonly ReadingViewLike[],
+  path: string,
+  read: () => Promise<string>,
+  pause: (ms: number) => Promise<void>,
+  tries = 40
+): Promise<number> {
+  const open = views.filter(view => view.path === path && view.reading);
+  if (!open.length) return 0;
+  const text = await read();
+  let drawn = 0;
+  for (const view of open) {
+    for (let i = 0; i < tries && view.data() !== text; i++) await pause(50);
+    view.rerender();
+    drawn++;
+  }
+  return drawn;
 }
 
 /** The text a markdown view shows now: its editor in source and live preview; in reading mode the view's data (the editor is not kept in step there). */
@@ -157,7 +190,7 @@ export function createNoteWriter(
   };
   return async (path, transform) => {
     const result = await write(path, transform);
-    if (result === "written") ports.rerender?.(path);
+    if (result === "written") void Promise.resolve(ports.rerender?.(path)).catch(() => undefined);
     return result;
   };
 }

@@ -13003,6 +13003,8 @@ function problem(raw) {
     return "aiProof";
   if (raw.bookProof !== void 0 && !aiProofShape(raw.bookProof)) return "bookProof";
   if (raw.stopEpoch !== void 0 && !isCount(raw.stopEpoch)) return "stopEpoch";
+  if (raw.gateTrace !== void 0 && (!Array.isArray(raw.gateTrace) || raw.gateTrace.some((line3) => typeof line3 !== "string" || line3.length > 120)))
+    return "gateTrace";
   if (!isCount(raw.revision)) return "revision";
   if (typeof raw.startedAt !== "string" || typeof raw.phaseStartedAt !== "string") return "timestamps";
   return void 0;
@@ -54696,6 +54698,7 @@ var replacementsOf = (edits, ids2) => edits.filter((edit) => ids2.includes(edit.
 var replacementMapOf = (edits, ids2) => Object.fromEntries(edits.filter((edit) => ids2.includes(edit.id)).map((edit) => [edit.id, edit.replacement]));
 var appliedIdsOf = (outcomes) => outcomes.filter((outcome) => outcome.applied).map((outcome) => outcome.id);
 var BOOK_POOL = 5;
+var GATE_TRACE_MAX = 20;
 function unmetIds(items) {
   const unmet = items.filter((item) => item.status === "unmet");
   const pick9 = unmet.filter((item) => item.type === "fact");
@@ -55021,6 +55024,10 @@ var BookPipelineRuns = class {
   constructor(ports) {
     this.ports = ports;
     __publicField(this, "drives", /* @__PURE__ */ new Map());
+    /** Maps with a gate press waiting for the drive that reached the gate to end (a second press meanwhile is refused as busy). */
+    __publicField(this, "gateWaiting", /* @__PURE__ */ new Set());
+    /** Trace lines of applied presses that ride on the drive's next state write (written alone when the drive ends first). */
+    __publicField(this, "pendingTrace", /* @__PURE__ */ new Map());
     __publicField(this, "last", /* @__PURE__ */ new Map());
     /** The notes slot: one apply-notes job per map, exclusive with a drive (both directions are checked synchronously). */
     __publicField(this, "notesJobs", /* @__PURE__ */ new Map());
@@ -55150,7 +55157,8 @@ var BookPipelineRuns = class {
   }
   /** The owner confirmed gate 1: writing starts (or a stopped run at gate 1 continues into it). */
   async confirmGate1(mapPath) {
-    return this.enter(
+    return this.gateEnter(
+      "confirmGate1",
       mapPath,
       async (drive) => {
         await this.openSaved(drive, mapPath);
@@ -55172,7 +55180,7 @@ var BookPipelineRuns = class {
    * press is harmless), any other phase is refused. Cards are not touched.
    */
   async finishRun(mapPath) {
-    return this.enter(mapPath, async (drive) => {
+    return this.gateEnter("finishRun", mapPath, async (drive) => {
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       if (data.phase === "done") return;
       if (data.phase !== "gate2") throw new BookPipelineRunError("not_gate");
@@ -55204,7 +55212,8 @@ var BookPipelineRuns = class {
    * without a trial.
    */
   async retryTrial(mapPath) {
-    return this.enter(
+    return this.gateEnter(
+      "retryTrial",
       mapPath,
       async (drive) => {
         var _a2;
@@ -55229,7 +55238,8 @@ var BookPipelineRuns = class {
   }
   /** The plan review: the owner chose to run the trial. The trial chapters are written from their plans as they are now. Refused (not_gate1) elsewhere. */
   async startTrial(mapPath) {
-    return this.enter(
+    return this.gateEnter(
+      "startTrial",
       mapPath,
       async (drive) => {
         await this.openSaved(drive, mapPath);
@@ -55251,7 +55261,7 @@ var BookPipelineRuns = class {
    * planned (their plans stay for the owner to edit; their text stays until the next trial rewrites it). Refused (not_gate1) elsewhere.
    */
   async backToPlan(mapPath) {
-    return this.enter(mapPath, async (drive) => {
+    return this.gateEnter("backToPlan", mapPath, async (drive) => {
       var _a2;
       await this.openSaved(drive, mapPath);
       let moved = false;
@@ -55890,6 +55900,80 @@ var BookPipelineRuns = class {
     }
   }
   // ---- lifecycle ---------------------------------------------------------------------------------------------------------------
+  /** True while the drive is only winding down after it reached a gate (it started no job of its own and nothing stopped it). */
+  windingDownAtGate(drive) {
+    var _a2;
+    const state = (_a2 = drive.store) == null ? void 0 : _a2.state;
+    return !!state && !drive.job && (state.phase === "gate1" || state.phase === "gate2") && state.status === "running" && !drive.stopRequested && drive.fatal === void 0 && !this.dead(drive);
+  }
+  /**
+   * A gate button entry. A press made while the drive that reached the gate is still ending waits for that drive and then applies as
+   * it would have (a stopped, failed or disposed drive: the press does nothing, "cancelled"); a press while a different operation runs,
+   * or a second press while one waits, is refused "busy". Every press leaves one short trace line in the run (action, outcome, wait).
+   */
+  async gateEnter(action, mapPath, setup, early = false) {
+    const runId = await this.ports.readMap(mapPath).then(
+      (map) => {
+        const read = readBookPipeline(map);
+        return read.kind === "usable" ? read.data.runId : void 0;
+      },
+      () => void 0
+    );
+    const startedAt = Date.now();
+    let waited = 0;
+    try {
+      const drive = this.drives.get(mapPath);
+      if (drive && !this.gateWaiting.has(mapPath) && this.windingDownAtGate(drive)) {
+        this.gateWaiting.add(mapPath);
+        try {
+          await drive.done.catch(() => void 0);
+        } finally {
+          this.gateWaiting.delete(mapPath);
+        }
+        waited = Date.now() - startedAt;
+        if (this.disposed) throw new BookPipelineRunError("disposed");
+        if (drive.stopRequested || drive.fatal !== void 0 || this.dead(drive))
+          throw new BookPipelineRunError("cancelled");
+      }
+      await this.enter(mapPath, setup, early);
+      await this.traceGate(mapPath, runId, action, "applied", waited, true);
+    } catch (error) {
+      await this.traceGate(
+        mapPath,
+        runId,
+        action,
+        `refused:${error instanceof BookPipelineRunError ? error.code : "error"}`,
+        waited
+      );
+      throw error;
+    }
+  }
+  async traceGate(mapPath, runId, action, outcome, waited, defer = false) {
+    if (this.disposed || runId === void 0) return;
+    const line3 = `${this.ports.now()} ${action} ${outcome}${waited > 0 ? ` wait=${waited}` : ""}`;
+    if (defer && this.drives.has(mapPath)) {
+      const pending2 = this.pendingTrace.get(mapPath);
+      if ((pending2 == null ? void 0 : pending2.runId) === runId) pending2.lines.push(line3);
+      else this.pendingTrace.set(mapPath, { runId, lines: [line3] });
+      return;
+    }
+    await this.writeTrace(mapPath, runId, [line3]);
+  }
+  async writeTrace(mapPath, runId, lines) {
+    if (this.disposed) return;
+    try {
+      await this.ports.mutate(async () => {
+        if (this.disposed) return;
+        await this.ports.updateMap(mapPath, (doc) => {
+          var _a2;
+          const data = doc.bookPipeline;
+          if (!data || data.runId !== runId) return;
+          data.gateTrace = [...(_a2 = data.gateTrace) != null ? _a2 : [], ...lines].slice(-GATE_TRACE_MAX);
+        });
+      });
+    } catch (e) {
+    }
+  }
   dead(drive) {
     return drive.disposed || this.disposed;
   }
@@ -55985,6 +56069,9 @@ var BookPipelineRuns = class {
           drive.store.dispose();
         }
       } finally {
+        const left = this.pendingTrace.get(drive.mapPath);
+        this.pendingTrace.delete(drive.mapPath);
+        if (left) await this.writeTrace(drive.mapPath, left.runId, left.lines);
         this.drives.delete(drive.mapPath);
         if (!this.disposed)
           try {
@@ -56058,9 +56145,15 @@ var BookPipelineRuns = class {
   persist(drive, state) {
     return this.ports.mutate(async () => {
       if (this.dead(drive) || drive.store.isDisposed) return;
+      const lines = this.pendingTrace.get(drive.mapPath);
       await this.ports.updateMap(drive.mapPath, (doc) => {
-        doc.bookPipeline = state;
+        var _a2;
+        const kept = (_a2 = doc.bookPipeline) == null ? void 0 : _a2.gateTrace;
+        const own2 = (lines == null ? void 0 : lines.runId) === state.runId ? lines.lines : [];
+        const trace = [...kept != null ? kept : [], ...own2].slice(-GATE_TRACE_MAX);
+        doc.bookPipeline = trace.length ? { ...state, gateTrace: trace } : state;
       });
+      if (lines && this.pendingTrace.get(drive.mapPath) === lines) this.pendingTrace.delete(drive.mapPath);
       const key4 = `${state.phase}:${state.status}`;
       if (drive.syncKey !== void 0 && drive.syncKey !== key4) this.syncNotes(drive);
       drive.syncKey = key4;

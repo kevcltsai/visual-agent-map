@@ -332,7 +332,7 @@ test('gate 2 AI box lists every fix and every open item on its own line, past th
   const lines = r.notes.get('N/n1.md').split('\n').filter(l => l.startsWith('> ・'));
   assert.equal(lines.length, 6, 'one line each');
   assert.ok(lines.some(l => l.includes('修了：改d')));
-  assert.ok(lines.some(l => l.includes('問題e') && l.includes('修過之後問題還在')));
+  assert.ok(lines.some(l => l.includes('問題e') && l.includes('AI 修改後再查，問題仍在，修正次數已用完')));
   assert.ok(lines.some(l => l.includes('問題f') && l.includes('查不到可靠的來源')));
   assert.doesNotMatch(r.notes.get('N/n1.md'), /\[ \]|\[x\]/);
 });

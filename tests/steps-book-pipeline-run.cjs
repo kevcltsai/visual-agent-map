@@ -4082,12 +4082,15 @@ test('R1 B1: the model skips one of two targets: only the applied one is a fix, 
 
 test('R1 T1: a chapter that ends needs-review (author check unmet) still gets its AI proofread; a chapter with no text is not sent', async () => {
   const seen = [];
-  const r = await aiRig({ ...factCard, proof: async request => verdictOf(request, 'unmet', 'bad'), author: input => writeAs(r, seen)(input) });
+  const r = await aiRig({ ...factCard, proof: async request => verdictOf(request, 'unmet', 'bad'), author: input => input.nodeId === r.nodes[2].id ? { outcome: 'written' } : writeAs(r, seen)(input) });
   await runToEnd(r); while (r.runs.isRunning(r.mapPath)) await tick(); await settle();
   assert.equal(stageOf(r.raw(1)), 'needs-review');
   const s = await r.state();
   assert.ok(s.aiProof[r.nodes[1].id]?.done, 'the needs-review chapter was proofread');
   assert.ok(aiRuns(r, 'proof', 'SecretTitleA').length >= 1);
+  assert.equal(aiRuns(r, 'proof', 'SecretTitleB').length, 0, 'the chapter with no text is not sent to the model');
+  const empty = s.aiProof[r.nodes[2].id];
+  assert.ok(empty?.done && empty.checked === 0 && !empty.incomplete, `empty chapter slot ${JSON.stringify(empty)}`);
 });
 
 // ---- R2 diagnostic reset: the AI slot lifecycle as invariants (I1-I4), checked after every combination of proof result, fix outcome, stop and budget ----

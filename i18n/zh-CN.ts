@@ -3299,7 +3299,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_ai_box_fixed_0": "修了：{0}",
   "ui.book_ai_box_open_0": "没修好：{0}，已列到书末",
   "ui.book_ai_box_sep": "，",
-  "ui.book_ai_reason_still_present": "修过之后问题还在",
+  "ui.book_ai_reason_still_present": "AI 修改后再查，问题仍在，修正次数已用完",
   "ui.book_ai_reason_sources_conflict": "两个来源说法不同，AI 判断不了",
   "ui.book_ai_reason_source_unreachable": "查不到可靠的来源",
   "ui.book_ai_reason_unfixable": "需要作者自己判断",

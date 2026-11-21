@@ -233,8 +233,10 @@ export interface AiProofState {
   pending?: AiProofPending[];
   /** The places a fix call changed, as the proofreader described them (the chapter's box tells each in one sentence). */
   fixes?: AiProofPending[];
-  /** Reason codes of fixes that were blocked, by item id. */
+  /** Reason codes of fixes that were blocked in the last fix round, by item id. */
   refused?: Record<string, string>;
+  /** The replacement texts the fix rounds wrote: a later check that still quotes one of them found the problem still present. */
+  applied?: string[];
 }
 
 /**
@@ -326,6 +328,7 @@ function aiProofShape(value: unknown): boolean {
   if (!items(value.open, ["reason"])) return false;
   if (value.pending !== undefined && !items(value.pending, ["suggestion"])) return false;
   if (value.fixes !== undefined && !items(value.fixes, ["suggestion"])) return false;
+  if (value.applied !== undefined && !(Array.isArray(value.applied) && value.applied.every(isText))) return false;
   return value.refused === undefined || (isObject(value.refused) && Object.values(value.refused).every(isText));
 }
 

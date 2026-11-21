@@ -19,7 +19,7 @@ test('nothing open after checked items reads "checked N, all solved"; nothing ch
 test('an open item makes the page list chapter, problem and why it is not solved, and never says "all solved"', () => {
   const text = note([issue(), issue({ chapterTitle: '土壤', problem: '兩個來源說法不同', reason: 'sources_conflict' })]);
   assert.doesNotMatch(text, /全部解決/); assert.match(text, /仍有 2 項沒解決/);
-  assert.match(text, /^- 蒙娜麗莎：年份與來源不符：AI 修了兩輪，再查時問題還在$/m);
+  assert.match(text, /^- 蒙娜麗莎：年份與來源不符：AI 修改後再查，問題仍在，修正次數已用完$/m);
   assert.match(text, /^- 土壤：兩個來源說法不同：來源之間說法不同/m);
 });
 

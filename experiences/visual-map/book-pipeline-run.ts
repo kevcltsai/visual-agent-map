@@ -249,6 +249,9 @@ import {
   stampRaw
 } from "../../core/book-pipeline/body-integrity";
 
+/** The replacement texts of the edits whose ids were written. */
+const replacementsOf = (edits: readonly { id: string; replacement: string }[], ids: readonly string[]): string[] =>
+  edits.filter(edit => ids.includes(edit.id)).map(edit => edit.replacement);
 const appliedIdsOf = (outcomes: readonly { id: string; applied: boolean }[]): string[] =>
   outcomes.filter(outcome => outcome.applied).map(outcome => outcome.id);
 /** At most this many cards are in a step at once (the whole-book plan runs alone before them). */
@@ -1396,10 +1399,11 @@ export class BookPipelineRuns {
   private async proofAfterRerun(drive: Drive, nodeId: string): Promise<void> {
     if (!this.ports.aiProof || !this.ports.aiFix || !this.ports.aiBookProof) return;
     const stage = drive.stages.get(nodeId);
-    if (stage !== "checked" && stage !== "needs-review") return;
-    for (let turn = 0; turn < 20; turn++) {
+    const proofread = stage === "checked" || stage === "needs-review";
+    for (let turn = 0; proofread && turn < 20; turn++) {
       const state = drive.store.state;
-      if (this.dead(drive) || drive.controller.signal.aborted || drive.fatal !== undefined) return;
+      if (this.dead(drive)) return;
+      if (drive.controller.signal.aborted || drive.fatal !== undefined) break;
       if (state.status !== "running" || state.aiProof?.[nodeId]?.done) break;
       drive.busy.add(nodeId);
       try {
@@ -1408,7 +1412,12 @@ export class BookPipelineRuns {
         drive.busy.delete(nodeId);
       }
     }
-    if (drive.store.state.phase !== "done" || !drive.store.state.aiProof?.[nodeId]?.done) return;
+    if (this.dead(drive) || drive.store.state.phase !== "done") return;
+    // A rerun that ended without its chapter proofread (stopped, out of budget, failed, not written): the chapter's cleared slot is
+    // closed as incomplete, so the bar and the page never show the book as solved, and the page is written again (a stopped run
+    // may still write this: the book is finished, only this chapter's check is not).
+    if (!drive.store.state.aiProof?.[nodeId]?.done && effectiveOrder(drive.store.state).includes(nodeId))
+      await drive.store.commit(state => ({ state: abandonAi(state, nodeId), accepted: true }));
     if (!(await this.writeClosingPage(drive))) this.log(drive, "open_issues_write", nodeId, "proof", "failed");
   }
 
@@ -2596,6 +2605,7 @@ export class BookPipelineRuns {
         applyAiFix(current, token, {
           applied: result.applied,
           appliedIds: appliedIdsOf(result.outcomes),
+          replacements: replacementsOf(edits, appliedIdsOf(result.outcomes)),
           refused,
           ...(newKey ? { key: newKey, changed: [nodeId] } : {})
         })
@@ -2763,6 +2773,7 @@ export class BookPipelineRuns {
       const refused: Record<string, AiFixRefusal> = {};
       const changed: string[] = [];
       const appliedIds: string[] = [];
+      const replacements: string[] = [];
       let applied = 0;
       let discarded = false;
       const owner = new Map(targets.map(target => [target.id, target.chapter ?? 1]));
@@ -2801,6 +2812,7 @@ export class BookPipelineRuns {
         }
         applied += result.applied;
         appliedIds.push(...appliedIdsOf(result.outcomes));
+        replacements.push(...replacementsOf(own, appliedIdsOf(result.outcomes)));
         changed.push(chapter.id);
       }
       let newKey: string | undefined;
@@ -2809,7 +2821,7 @@ export class BookPipelineRuns {
         newKey = aiProofKey(0, joined(after.chapters.map(chapter => chapter.text)));
       }
       const done = await drive.store.commit(current =>
-        applyAiFix(current, token, { applied, appliedIds, refused, ...(newKey ? { key: newKey, changed } : {}) })
+        applyAiFix(current, token, { applied, appliedIds, replacements, refused, ...(newKey ? { key: newKey, changed } : {}) })
       );
       if (discarded) return report("dropped", { applied, pending: targets.length });
       report(done?.accepted ? "ok" : "dropped", { applied, pending: targets.length });

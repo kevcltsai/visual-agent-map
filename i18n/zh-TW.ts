@@ -3301,7 +3301,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_ai_box_fixed_0": "修了：{0}",
   "ui.book_ai_box_open_0": "沒修好：{0}，已列到書末",
   "ui.book_ai_box_sep": "，",
-  "ui.book_ai_reason_still_present": "修過之後問題還在",
+  "ui.book_ai_reason_still_present": "AI 修改後再查，問題仍在，修正次數已用完",
   "ui.book_ai_reason_sources_conflict": "兩個來源說法不同，AI 判斷不了",
   "ui.book_ai_reason_source_unreachable": "查不到可靠的來源",
   "ui.book_ai_reason_unfixable": "需要作者自己判斷",

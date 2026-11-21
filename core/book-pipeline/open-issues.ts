@@ -34,7 +34,10 @@ export const OPEN_ISSUE_SOURCES: Record<string, IssueSource> = {
   "ai-proof": {
     label: { zh: "AI 校對", en: "AI proofread" },
     reasons: {
-      still_present: { zh: "AI 修了兩輪，再查時問題還在", en: "The AI fixed it twice and the re-check still found it" },
+      still_present: {
+        zh: "AI 修改後再查，問題仍在，修正次數已用完",
+        en: "The problem was still there after the AI fixed it and checked again; no fix rounds are left"
+      },
       sources_conflict: { zh: "來源之間說法不同，沒辦法靠改字解決", en: "The sources disagree; no edit can settle it" },
       source_unreachable: {
         zh: "來源打不開或沒寫到這件事，查不到依據",

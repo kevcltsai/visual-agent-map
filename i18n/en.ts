@@ -3538,7 +3538,7 @@ export const en = {
   "ui.book_ai_box_fixed_0": "Fixed: {0}",
   "ui.book_ai_box_open_0": "Not fixed: {0}, listed on the book's last page",
   "ui.book_ai_box_sep": ", ",
-  "ui.book_ai_reason_still_present": "still wrong after the fix",
+  "ui.book_ai_reason_still_present": "still there after the AI fixed it and checked again; no fix rounds left",
   "ui.book_ai_reason_sources_conflict": "two sources disagree and the AI cannot decide",
   "ui.book_ai_reason_source_unreachable": "no reliable source could be reached",
   "ui.book_ai_reason_unfixable": "needs the author's own judgment",

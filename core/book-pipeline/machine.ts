@@ -354,7 +354,11 @@ export function applyAiProof(
             target => squash(target.quote) === squash(item.quote) && (target.chapter ?? 1) === (item.chapter ?? 1)
           )
         : undefined;
-      return before ? (slot.refused?.[before.id] ?? "still_present") : "not_fixed_in_time";
+      if (before) return slot.refused?.[before.id] ?? "still_present";
+      // A quote that is (part of) text a fix round wrote: the fix was applied and the problem is still there, not found too late.
+      const quote = item ? squash(item.quote) : "";
+      const written = quote && (found.applied ?? []).some(text => squash(text).includes(quote) || quote.includes(squash(text)));
+      return written ? "still_present" : "not_fixed_in_time";
     });
   }
   setAiSlot(next, token.nodeId, slot);
@@ -371,6 +375,8 @@ export function applyAiFix(
   result: {
     applied: number;
     refused?: Readonly<Record<string, string>>;
+    /** The replacement texts that were written this round (kept so a later check can tell "fixed, still there" from "found too late"). */
+    replacements?: readonly string[];
     /** The ids whose edit was written; when given, only these become fixes (a target the model skipped is neither). */
     appliedIds?: readonly string[];
     key?: string;
@@ -387,9 +393,10 @@ export function applyAiFix(
     round: found.round + 1,
     step: "proof",
     fixed: found.fixed + result.applied,
-    refused: { ...(found.refused ?? {}), ...(result.refused ?? {}) }
+    // Ids are renumbered by every check: only this round's refusals name this round's targets.
+    refused: { ...(result.refused ?? {}) }
   };
-  // An id applied this round no longer carries an older refusal (ids are renumbered, so a reused one is another problem).
+  if (result.replacements?.length) slot.applied = [...(found.applied ?? []), ...result.replacements];
   for (const id of result.appliedIds ?? []) delete slot.refused?.[id];
   // `pending` stays: the next check reads it as the earlier findings (`priorOf`); the next `applyAiProof` replaces it.
   if (!Object.keys(slot.refused ?? {}).length) delete slot.refused;

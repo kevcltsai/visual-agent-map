@@ -158,3 +158,26 @@ test('saveCover: after an abort nothing is written (a download that arrives late
   const late = await dl.saveCover(aborting.ports, 'B/c', 't', ORIGINAL, good(), mid.signal);
   assert.deepEqual([late.ok, late.reason, aborting.writes.length], [false, 'aborted', 0]);
 });
+
+test('downloadCover (review B-4): a 429 with Retry-After is waited out once and asked again; a longer wait than 8 s (or none) is a failed download without waiting; a second 429 is a failure; a stop during the wait ends it', async () => {
+  const tooMany = retry => ({ status: 429, headers: retry === undefined ? {} : { 'Retry-After': retry }, bytes: new ArrayBuffer(0) });
+  let began = Date.now();
+  let r = await reason(ORIGINAL, (url, n) => n === 1 ? tooMany('1') : answer(JPEG, 'image/jpeg'));
+  assert.equal(r.out.ok, true); assert.equal(r.calls.length, 2); assert.equal(r.calls[1].url, THUMB, 'the same address again');
+  assert.ok(Date.now() - began >= 900, 'it waited the one second');
+  began = Date.now();
+  r = await reason(ORIGINAL, () => tooMany('9'));
+  assert.deepEqual([r.out.ok, r.out.reason, r.calls.length], [false, 'status', 1]); assert.ok(Date.now() - began < 500, 'over the limit: no wait');
+  r = await reason(ORIGINAL, () => tooMany('Wed, 21 Oct 2099 07:28:00 GMT'));
+  assert.deepEqual([r.out.reason, r.calls.length], ['status', 1], 'a date far away is over the limit too');
+  r = await reason(ORIGINAL, () => tooMany(undefined));
+  assert.deepEqual([r.out.reason, r.calls.length], ['status', 1], 'no Retry-After: no retry');
+  r = await reason(ORIGINAL, () => tooMany('1'));
+  assert.deepEqual([r.out.reason, r.calls.length], ['status', 2], 'the wait happens once: a second 429 is a failure');
+  const controller = new AbortController();
+  began = Date.now();
+  const pending = reason(ORIGINAL, () => tooMany('5'), { signal: controller.signal });
+  setTimeout(() => controller.abort(), 60);
+  r = await pending;
+  assert.deepEqual([r.out.ok, r.out.reason, r.calls.length], [false, 'aborted', 1]); assert.ok(Date.now() - began < 1500, 'the stop ended the wait');
+});

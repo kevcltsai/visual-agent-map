@@ -5,6 +5,7 @@
  * Only after all that does {@link saveCover} write, and only a new path: an existing file is reused, never overwritten or deleted.
  */
 
+import { retryAfterMs } from "./commons-search";
 import {
   COVER_MAX_BYTES,
   coverDownloadUrl,
@@ -37,6 +38,8 @@ export interface CoverDownloadOptions {
 }
 
 export const COVER_TIMEOUT_MS = 15_000;
+/** A 429 answer is waited out once, as long as its Retry-After says, at most this long; a longer (or no) wait is a failed download. */
+export const COVER_RETRY_MAX_MS = 8000;
 const DEFAULT_AGENT = "VisualAgentMap-Obsidian-plugin";
 const ALLOWED = new Set<string>(["image/png", "image/jpeg", "image/webp"]);
 
@@ -78,13 +81,26 @@ export async function downloadCover(
     signal?.addEventListener("abort", onAbort, { once: true });
     timer = window.setTimeout(() => resolve({ ok: false, reason: "timeout" }), options.timeoutMs ?? COVER_TIMEOUT_MS);
   });
+  const timers: number[] = [];
+  let waited = false;
   const get = async (url: string): Promise<CoverResponse | CoverDownload> => {
     const result = await Promise.race([
       fetch(url, { headers }).catch((): CoverDownload => ({ ok: false, reason: "failed" })),
       stop
     ]);
     // The fetch may answer in the same turn as an abort: the abort wins, the bytes are dropped.
-    return signal?.aborted ? { ok: false, reason: "aborted" } : result;
+    if (signal?.aborted) return { ok: false, reason: "aborted" };
+    if ("ok" in result || result.status !== 429 || waited) return result;
+    // Too many requests: wait the Retry-After once (never longer than the limit, and a stop or the timeout ends the wait), then ask again.
+    const ms = retryAfterMs(result.headers, Date.now());
+    if (ms === undefined || ms > COVER_RETRY_MAX_MS) return result;
+    waited = true;
+    const slept = await Promise.race([
+      new Promise<undefined>(resolve => timers.push(window.setTimeout(() => resolve(undefined), ms))),
+      stop
+    ]);
+    if (slept) return slept;
+    return signal?.aborted ? { ok: false, reason: "aborted" } : get(url);
   };
   try {
     let response = await get(thumb);
@@ -98,6 +114,7 @@ export async function downloadCover(
     return judge(response, thumb);
   } finally {
     window.clearTimeout(timer);
+    for (const waiting of timers) window.clearTimeout(waiting);
     signal?.removeEventListener("abort", onAbort);
   }
 }

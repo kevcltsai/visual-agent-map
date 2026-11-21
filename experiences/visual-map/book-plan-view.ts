@@ -135,7 +135,12 @@ export function markPlanCallouts(root: HTMLElement, env: PlanViewEnv): void {
     const card = kind.kind === "book" ? "chapter" : cardKindOfPrompt(planLines(content));
     if (kind.kind === "book") hideStructure(content);
     else foldCardPlan(content);
-    if (planStartsOpen(env.stage())) callout.classList.remove("is-collapsed");
+    // Obsidian folds a `]-` callout three ways (the callout's class, the chevron's class and the content's inline display): undo all three.
+    if (planStartsOpen(env.stage())) {
+      callout.classList.remove("is-collapsed");
+      callout.querySelector(".callout-fold")?.classList.remove("is-collapsed");
+      content.style.removeProperty("display");
+    }
     const locale = planLocale(env.language(), kind.zh);
     if (kind.zh) relabel(content, locale);
     title.textContent =

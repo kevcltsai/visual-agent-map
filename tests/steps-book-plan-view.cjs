@@ -80,10 +80,22 @@ test('markPlanCallouts: a plan callout opens (is-collapsed removed) only while t
     const c = el({}, { '.callout-title-inner': { textContent: '全書企劃' }, '.callout-content': { childNodes: [], querySelectorAll: () => [], children: [], ownerDocument: { createTreeWalker: () => ({ nextNode: () => null }) } } });
     c.classes.add('is-collapsed'); return c;
   };
-  const open = make(); open.querySelector = s => (s === '.callout-title-inner' ? { textContent: '全書企劃' } : { childNodes: [{}], children: [], ownerDocument: { createTreeWalker: () => ({ nextNode: () => null }) } });
-  dom.markPlanCallouts(open, env('planned')); assert.ok(!open.classes.has('is-collapsed')); assert.ok(open.hasAttribute('data-vam-plan-view'));
-  const written = make(); written.querySelector = open.querySelector;
-  dom.markPlanCallouts(written, env('written')); assert.ok(written.classes.has('is-collapsed'));
+  // Obsidian folds a `]-` callout three ways: the callout's class, the chevron's class and the content's inline display.
+  const parts = () => {
+    const style = { display: 'none', removeProperty(name) { delete this[name]; } };
+    const fold = { classes: new Set(['is-collapsed']) };
+    fold.classList = { remove: c => fold.classes.delete(c) };
+    const content = { childNodes: [{}], children: [], style, ownerDocument: { createTreeWalker: () => ({ nextNode: () => null }) } };
+    const query = s => (s === '.callout-title-inner' ? { textContent: '全書企劃' } : s === '.callout-fold' ? fold : content);
+    return { style, fold, query };
+  };
+  const open = make(); const o = parts(); open.querySelector = o.query;
+  dom.markPlanCallouts(open, env('planned'));
+  assert.ok(!open.classes.has('is-collapsed')); assert.ok(!o.fold.classes.has('is-collapsed'), 'the chevron opens too');
+  assert.equal(o.style.display, undefined, "the content's inline display:none is removed"); assert.ok(open.hasAttribute('data-vam-plan-view'));
+  const written = make(); const w = parts(); written.querySelector = w.query;
+  dom.markPlanCallouts(written, env('written'));
+  assert.ok(written.classes.has('is-collapsed')); assert.ok(w.fold.classes.has('is-collapsed')); assert.equal(w.style.display, 'none', 'a written note keeps the fold');
 });
 
 test('planLocale: Chinese-stored notes follow the book language (zh-CN is not zh-TW), English-stored notes keep their stored labels', () => {

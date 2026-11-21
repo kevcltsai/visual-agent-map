@@ -54696,6 +54696,7 @@ var replacementsOf = (edits, ids2) => edits.filter((edit) => ids2.includes(edit.
 var replacementMapOf = (edits, ids2) => Object.fromEntries(edits.filter((edit) => ids2.includes(edit.id)).map((edit) => [edit.id, edit.replacement]));
 var appliedIdsOf = (outcomes) => outcomes.filter((outcome) => outcome.applied).map((outcome) => outcome.id);
 var BOOK_POOL = 5;
+var BOOK_POST_POOL = 5;
 function unmetIds(items) {
   const unmet = items.filter((item) => item.status === "unmet");
   const pick9 = unmet.filter((item) => item.type === "fact");
@@ -55928,6 +55929,8 @@ var BookPipelineRuns = class {
       durations: { plan: [], write: [] },
       sub: /* @__PURE__ */ new Map(),
       imagesDone: /* @__PURE__ */ new Set(),
+      post: /* @__PURE__ */ new Set(),
+      postWaiters: [],
       reviewStep: /* @__PURE__ */ new Map(),
       stopRequested: false,
       disposed: false,
@@ -56139,6 +56142,18 @@ var BookPipelineRuns = class {
   async loop(drive) {
     var _a2, _b2;
     const inflight = /* @__PURE__ */ new Map();
+    const writing = () => [...inflight.keys()].filter((key4) => !drive.post.has(key4)).length;
+    const postDone = (key4) => {
+      drive.post.delete(key4);
+      const waiting = drive.postWaiters.splice(0);
+      for (const wake of waiting) wake();
+    };
+    let woken = false;
+    let wakeLoop = () => void 0;
+    drive.wake = () => {
+      woken = true;
+      wakeLoop();
+    };
     while (!this.dead(drive) && drive.fatal === void 0) {
       if (await this.pauseOnMapChange(drive)) {
         drive.skippedRefreshed = false;
@@ -56186,15 +56201,17 @@ var BookPipelineRuns = class {
           }));
           if (drive.store.state !== before) changed = true;
         } else if (action.type === "ai_proof" || action.type === "ai_fix") {
-          if (inflight.size >= BOOK_POOL) continue;
+          if (drive.post.size >= BOOK_POST_POOL) continue;
           const key4 = action.nodeId;
           drive.busy.add(key4);
+          drive.post.add(key4);
           started++;
           inflight.set(
             key4,
             this.aiChapter(drive, key4, action.type === "ai_fix" ? "fix" : "proof").finally(() => {
               drive.busy.delete(key4);
               inflight.delete(key4);
+              postDone(key4);
             })
           );
         } else if (action.type === "book_ai_proof" || action.type === "book_ai_fix") {
@@ -56213,7 +56230,10 @@ var BookPipelineRuns = class {
           );
         } else {
           const key4 = action.type === "global_plan" ? "global" : action.nodeId;
-          if (action.type !== "global_plan" && inflight.size >= BOOK_POOL) continue;
+          if (action.type === "card_proof") {
+            if (drive.post.size >= BOOK_POST_POOL) continue;
+            drive.post.add(key4);
+          } else if (action.type !== "global_plan" && writing() >= BOOK_POOL) continue;
           drive.busy.add(key4);
           started++;
           inflight.set(
@@ -56221,13 +56241,22 @@ var BookPipelineRuns = class {
             this.step(drive, action).then(() => void 0).finally(() => {
               drive.busy.delete(key4);
               inflight.delete(key4);
+              postDone(key4);
             })
           );
         }
       }
       if (changed && !started) continue;
-      if (inflight.size) await Promise.race(inflight.values());
-      else if (!started && !changed) break;
+      if (woken) {
+        woken = false;
+        continue;
+      }
+      if (inflight.size) {
+        const nudge = new Promise((resolve) => wakeLoop = resolve);
+        await Promise.race([...inflight.values(), nudge]);
+        wakeLoop = () => void 0;
+        woken = false;
+      } else if (!started && !changed) break;
     }
     await Promise.all(inflight.values());
   }
@@ -57219,7 +57248,7 @@ var BookPipelineRuns = class {
     return { kind: "ok", after: () => this.setStage(drive, nodeId, "planned", null) };
   }
   async execWrite(drive, token, nodeId) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     const signal = drive.controller.signal;
     const info = drive.cards.get(nodeId);
     const rootInfo = drive.cards.get(drive.rootId);
@@ -57561,8 +57590,14 @@ ${oldDetail}`);
       });
       if (outcome === "discarded") return { kind: "failed", reason: "discarded" };
     }
+    if (!expanding && slots) {
+      while (drive.post.size >= BOOK_POST_POOL)
+        await untilAborted(signal, new Promise((resolve) => drive.postWaiters.push(resolve)));
+      drive.post.add(nodeId);
+      (_a2 = drive.wake) == null ? void 0 : _a2.call(drive);
+    }
     drive.sub.set(nodeId, { step: "images", startedAt: Date.parse(this.ports.now()) });
-    (_b2 = (_a2 = this.ports).progressed) == null ? void 0 : _b2.call(_a2, drive.mapPath);
+    (_c = (_b2 = this.ports).progressed) == null ? void 0 : _c.call(_b2, drive.mapPath);
     const filled = expanding ? await this.settleStrayMarkers(path, authorize) : await this.fillSlots(drive, token, nodeId, path, slots, authorize);
     if (filled) return filled;
     drive.imagesDone.add(nodeId);

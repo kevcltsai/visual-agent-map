@@ -1,5 +1,5 @@
 // Picture-book whole-book consistency check: the research-voice patterns (V1), the reply parser and chapter compaction, the machine
-// gate (due, begin, apply, stop, resume), and the review box sentence a finding gives. The runner path is in steps-book-pipeline-run.cjs.
+// gate (no consistency call any more; an old save still reads), and the review box sentence a finding gives. The runner path is in steps-book-pipeline-run.cjs.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('./support.cjs');
@@ -143,67 +143,32 @@ function written() {
 const types = (state, stages, options) => plain(machine.nextActions(state, stages, new Set(), options)).actions.map(a => a.type);
 const finding = { a: 'a', b: 'c', claimA: '三天', claimB: '一到兩天', suggestion: '統一寫一到三天' };
 
-test('machine: with the runner able to check, the writing phase asks for the check once before it moves on; without, as before', () => {
+// An older save holds the finished check as the pipeline kept it; nothing writes it any more, the review box still reads it.
+function withFindings(state, findings) {
+  const revisions = Object.fromEntries(IDS.map(id => [id, state.revisions[id] ?? 0]));
+  return { ...state, consistency: { key: consistency.consistencyKey(state), attempts: 1, done: true, revisions, findings } };
+}
+
+test('machine: the old whole-book consistency call is gone: no book_consistency action, and a save that holds an old check stays readable and shows its findings until the chapter changes', () => {
   const { state, stages } = written();
   assert.deepEqual(types(state, stages), ['advance_phase']);
-  assert.deepEqual(types(state, stages, { consistency: true }), ['book_consistency']);
-  assert.equal(machine.consistencyDue(state), true);
-  const begun = machine.beginConsistency(state);
-  assert.equal(begun.state.consistency.attempts, 1);
-  assert.equal(begun.token.key, consistency.consistencyKey(state));
-  const done = machine.applyConsistency(begun.state, begun.token, [finding]);
-  assert.equal(done.accepted, true);
-  assert.equal(done.state.consistency.done, true);
-  assert.deepEqual(plain(done.state.consistency.revisions), { a: 2, b: 2, c: 2 });
-  assert.equal(machine.consistencyDue(done.state), false);
-  assert.deepEqual(types(done.state, stages, { consistency: true }), ['advance_phase']);
-  assert.equal(machine.beginConsistency(done.state), null, 'a finished check for the same chapters is not asked again');
-  assert.deepEqual(plain(consistency.chapterInconsistencies(done.state, 'c')), [{ other: 'a', own: '一到兩天', theirs: '三天', suggestion: '統一寫一到三天' }]);
-  assert.deepEqual(plain(consistency.chapterInconsistencies(done.state, 'b')), []);
-});
-
-test('machine: resume skips the check while no chapter changed; a chapter written again asks again and drops its old findings', () => {
-  const { state, stages } = written();
-  const begun = machine.beginConsistency(state);
-  const done = machine.applyConsistency(begun.state, begun.token, [finding]).state;
-  const stopped = machine.stopRun(done);
-  assert.equal(machine.consistencyDue(stopped), false, 'same key: a resume does not ask again');
+  assert.equal(machine.beginConsistency, undefined);
+  assert.equal(machine.applyConsistency, undefined);
+  assert.equal(machine.consistencyDue, undefined);
+  assert.equal(machine.CONSISTENCY_BUSY, undefined);
+  const done = withFindings(state, [finding]);
+  assert.equal(model.readBookPipeline({ bookPipeline: plain(done) }).kind, 'usable');
+  assert.deepEqual(plain(consistency.chapterInconsistencies(done, 'c')), [{ other: 'a', own: '一到兩天', theirs: '三天', suggestion: '統一寫一到三天' }]);
+  assert.deepEqual(plain(consistency.chapterInconsistencies(done, 'b')), []);
   const rewritten = succeed(done, 'write', 'c');
-  assert.equal(machine.consistencyDue(rewritten), true);
   assert.deepEqual(plain(consistency.chapterInconsistencies(rewritten, 'c')), [], 'the changed chapter no longer shows the finding');
   assert.equal(consistency.chapterInconsistencies(rewritten, 'a').length, 1, 'the unchanged one still does');
-  void stages;
-});
-
-test('machine: a result for chapters that changed meanwhile is dropped; three failures for the same chapters never hold the run', () => {
-  const { state, stages } = written();
-  const begun = machine.beginConsistency(state);
-  const changed = succeed(begun.state, 'write', 'b');
-  assert.equal(machine.applyConsistency(changed, begun.token, [finding]).accepted, false);
-  let s = state;
-  for (let i = 0; i < 3; i++) s = machine.beginConsistency(s).state; // each attempt fails (nothing committed)
-  assert.equal(s.consistency.attempts, 3);
-  assert.equal(machine.consistencyDue(s), false);
-  assert.equal(machine.beginConsistency(s), null);
-  assert.deepEqual(types(s, stages, { consistency: true }), ['advance_phase']);
-});
-
-test('machine: a stopped or budget-paused check gives its attempt back; a budget pause stops the run', () => {
-  const { state } = written();
-  const begun = machine.beginConsistency(state);
-  const cancelled = machine.applyConsistencyStopped(begun.state, begun.token, false);
-  assert.equal(cancelled.state.consistency.attempts, 0);
-  assert.equal(cancelled.state.status, 'running');
-  const budget = machine.applyConsistencyStopped(begun.state, begun.token, true).state;
-  assert.deepEqual([budget.consistency.attempts, budget.status, budget.pauseReason], [0, 'stopped', 'budget']);
-  assert.equal(machine.applyConsistencyStopped(begun.state, { ...begun.token, runId: 'other' }, true).accepted, false);
 });
 
 test('chapter references: kept with the check\'s findings, shown only on the chapter that says it, and read back from the map', () => {
   const { state } = written();
-  const begun = machine.beginConsistency(state);
   const ref = { kind: 'reference', a: 'a', b: 'c', claimA: '細節都留給第二章。', claimB: '第二章', suggestion: '第三章' };
-  const data = machine.applyConsistency(begun.state, begun.token, [ref]).state;
+  const data = withFindings(state, [ref]);
   assert.deepEqual(plain(consistency.chapterInconsistencies(data, 'a')), [{ other: 'c', own: '細節都留給第二章。', theirs: '第二章', suggestion: '第三章', reference: true }]);
   assert.deepEqual(plain(consistency.chapterInconsistencies(data, 'c')), [], 'the chapter it should name has nothing to fix');
   assert.equal(model.readBookPipeline({ bookPipeline: plain(data) }).kind, 'usable');
@@ -220,8 +185,7 @@ test('chapter references: kept with the check\'s findings, shown only on the cha
 test('review box: a chapter marked for the check says what differs and the fix, not the generic reason; the fingerprint holds the findings only when present', () => {
   review.setUiLanguage('zh-TW');
   const { state } = written();
-  const begun = machine.beginConsistency(state);
-  const data = machine.applyConsistency(begun.state, begun.token, [finding]).state;
+  const data = withFindings(state, [finding]);
   const titles = { a: '發芽', b: '換盆', c: '照顧' };
   const notes = { a: { pipelineStage: 'needs-review', pipelineIssue: 'consistency' }, b: { pipelineStage: 'checked' }, c: { pipelineStage: 'needs-review', pipelineIssue: 'consistency' } };
   const entries = with_ => review.reviewEntries({ order: IDS, titleOf: id => titles[id], noteOf: id => notes[id], ...(with_ ? { inconsistencies: id => consistency.chapterInconsistencies(data, id) } : {}) });
@@ -266,8 +230,7 @@ test('removed reference through the check: stored with its kind, shown on the na
   state.removed = ['b'];
   state.chapters = { a: { title: '發芽', path: 'A' }, b: { title: '換盆', path: 'B' }, c: { title: '照顧', path: 'C' } };
   const refs = consistency.removedChapterRefs(state, [{ id: 'a', title: '發芽', text: '之後見換盆。' }, { id: 'c', title: '照顧', text: '照顧好。' }]);
-  const begun = machine.beginConsistency(state);
-  const data = machine.applyConsistency(begun.state, begun.token, [finding, ...refs]).state;
+  const data = withFindings(state, [finding, ...refs]);
   assert.deepEqual(plain(consistency.chapterInconsistencies(data, 'a')), [
     { other: 'c', own: '三天', theirs: '一到兩天', suggestion: '統一寫一到三天' },
     { kind: 'removed', other: 'b', own: '之後見換盆。', theirs: '換盆', suggestion: '' }
@@ -381,13 +344,12 @@ test('verbatimQuote: the model\'s quote is kept when the chapter has it; a parap
 test('the review box: a paraphrase is not shown in quotes, a chapter that contradicts itself says so, a wrong direction names where the chapter is; the stored kinds read back', () => {
   review.setUiLanguage('zh-TW');
   const { state } = written();
-  const begun = machine.beginConsistency(state);
   const found = [
     { a: 'a', b: 'c', claimA: '三天就發芽。', claimB: '第3章說一到兩天', suggestion: '', looseB: true },
     { a: 'c', b: 'c', claimA: '放 3 到 7 天。', claimB: '有的說 1 到 2 天。', suggestion: '' },
     { kind: 'direction', a: 'c', b: 'a', claimA: '發芽留到後面的章節再講。', claimB: '留到後面', suggestion: '前面的第1章' }
   ];
-  const data = machine.applyConsistency(begun.state, begun.token, found).state;
+  const data = withFindings(state, found);
   assert.equal(model.readBookPipeline({ bookPipeline: plain(data) }).kind, 'usable');
   const bad = plain(data); bad.consistency.findings[0].looseB = false;
   assert.equal(model.readBookPipeline({ bookPipeline: bad }).kind, 'unusable');

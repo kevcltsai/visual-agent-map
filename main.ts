@@ -22,6 +22,7 @@ import {
 } from "./experiences/visual-map/book-pipeline-run";
 import { bookErrorReason, bookRefusalText } from "./experiences/visual-map/book-pipeline-ui";
 import { backupNoteFile } from "./experiences/visual-map/note-backup";
+import { writeOpenIssuesFile } from "./experiences/visual-map/book-open-issues-file";
 import {
   BookCallouts,
   createNoteWriter,
@@ -55,7 +56,6 @@ import { effectiveOrder, readBookPipeline } from "./core/book-pipeline/model";
 import { runPlanStep } from "./core/steps/book-pipeline/run";
 import { runProofread } from "./core/steps/book-pipeline/proofread";
 import { runFindImages } from "./core/steps/book-pipeline/find-images";
-import { runConsistency } from "./core/steps/book-pipeline/consistency";
 import { runAiBookProof, runAiProof } from "./core/steps/book-pipeline/ai-proof";
 import { runAiFix } from "./core/steps/book-pipeline/ai-fix";
 import { COMMONS_API } from "./core/book-pipeline/commons-search";
@@ -899,7 +899,6 @@ export default class VisualAgentMapPlugin extends Plugin {
     updateNoteRawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
     runPlan: (step, request, run) => runPlanStep(this.aiCalls, step, request, run),
     runProofread: (request, run) => runProofread(this.aiCalls, request, run),
-    checkConsistency: (request, run) => runConsistency(this.aiCalls, request, run),
     aiProof: (request, run) => runAiProof(this.aiCalls, request, run),
     aiFix: (request, run) => runAiFix(this.aiCalls, request, run),
     aiBookProof: (request, run) => runAiBookProof(this.aiCalls, request, run),
@@ -928,6 +927,26 @@ export default class VisualAgentMapPlugin extends Plugin {
       return view ? view.probeBookImage(url, signal) : { ok: false, reason: "no_view" };
     },
     backupNote: (path, raw) => this.backupBookNote(path, raw),
+    writeOpenIssues: (folder, language, content) =>
+      writeOpenIssuesFile(
+        {
+          read: async path => {
+            const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
+            return file instanceof TFile ? this.app.vault.read(file) : undefined;
+          },
+          create: async (path, text) => {
+            await this.app.vault.create(normalizePath(path), text);
+          },
+          modify: async (path, text) => {
+            const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
+            if (!(file instanceof TFile)) throw new Error(path);
+            await this.app.vault.modify(file, text);
+          }
+        },
+        folder,
+        language,
+        content
+      ),
     notes: {
       readText: async path => {
         const open = this.openMarkdownViews(path)[0];

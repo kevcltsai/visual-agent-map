@@ -12,7 +12,6 @@
 import type { AdmissionContext } from "../../core/admission";
 import { carryIssue } from "./book-pipeline-reasons";
 import type { FindImagesRequest, FoundImages } from "../../core/steps/book-pipeline/find-images";
-import type { ConsistencyRequest, RawInconsistency } from "../../core/steps/book-pipeline/consistency";
 import type { AiBookProofRequest, AiProofRequest, AiProofRun } from "../../core/steps/book-pipeline/ai-proof";
 import type { AiFixRequest } from "../../core/steps/book-pipeline/ai-fix";
 import {
@@ -27,8 +26,8 @@ import {
 import { applyAiEdits, refusedReasons, type AiFixRefusal, type RawAiEdit } from "../../core/book-pipeline/ai-fix";
 import { chapterReferenceFindings, type ReferenceChapter } from "../../core/book-pipeline/chapter-references";
 import { bookStructure, type BookStructure } from "../../core/book-pipeline/structure";
-import { chapterInconsistencies, compactChapters, removedChapterRefs } from "../../core/book-pipeline/consistency";
-import { directionFindings, numericFindings, verbatimQuote } from "../../core/book-pipeline/cross-checks";
+import { compactChapters, removedChapterRefs } from "../../core/book-pipeline/consistency";
+import { directionFindings, numericFindings } from "../../core/book-pipeline/cross-checks";
 import { isBudgetExhausted } from "../../core/admission";
 import { createBudgetAdmission, createStoreBudgetPort } from "../../core/book-pipeline/budget";
 import { imageKey } from "../../core/book-pipeline/image-dedupe";
@@ -41,6 +40,7 @@ import {
   type CommonsRunBudget
 } from "../../core/book-pipeline/commons-search";
 import { askWords, wordHits } from "../../core/book-pipeline/file-fit";
+import { composeOpenIssuesNote, type BookOpenIssue } from "../../core/book-pipeline/open-issues";
 import {
   PipelineStore,
   addBudget,
@@ -48,8 +48,6 @@ import {
   advancePhase,
   applyBudgetExhausted,
   applyCancelled,
-  applyConsistency,
-  applyConsistencyStopped,
   abandonAi,
   aiChapterDue,
   applyAiFailure,
@@ -58,8 +56,6 @@ import {
   applyAiStopped,
   beginAiStep,
   isAiCurrent,
-  beginConsistency,
-  CONSISTENCY_BUSY,
   BOOK_PROOF_BUSY,
   applyFailure,
   applyReset,
@@ -100,7 +96,6 @@ import {
   type BookPipelineData,
   type BookRole,
   type BookSettings,
-  type ConsistencyFinding,
   type PipelineFields,
   type PipelineFieldsPatch,
   type PipelinePhase,
@@ -392,13 +387,14 @@ export interface BookPipelinePorts {
   /** Production: `runProofread(aiCalls, request, run)`. */
   runProofread(request: ProofreadRequest, run: ProofreadRun): Promise<ProofResult>;
   /**
-   * Production: `runConsistency(aiCalls, request, run)`: the one whole-book consistency check after every chapter is proofread.
-   * Absent: the writing phase moves on to gate 2 without it.
+   * The book's closing page ("still open") in `folder`: creates it, or rewrites an earlier one of ours; a same-named note that is not ours
+   * is never touched (another name is used). Absent: no page is written and the book is done without it.
    */
-  checkConsistency?(
-    request: ConsistencyRequest,
-    run: { signal: AbortSignal; admission?: AdmissionContext }
-  ): Promise<RawInconsistency[]>;
+  writeOpenIssues?(
+    folder: string,
+    language: ContentLanguage,
+    content: string
+  ): Promise<{ ok: true; path: string } | { ok: false }>;
   /**
    * Production: `runAiProof(aiCalls, request, run)`: the independent proofread of one chapter (a different model from the author's).
    * The AI proofread runs only when `aiProof`, `aiFix` and `aiBookProof` are all given.
@@ -2179,7 +2175,6 @@ export class BookPipelineRuns {
         await this.refreshAroundRemoved(drive);
       }
       const plan = nextActions(drive.store.state, this.stagesOf(drive), drive.busy, {
-        consistency: !!this.ports.checkConsistency && !drive.job,
         aiProof: !!this.ports.aiProof && !!this.ports.aiFix && !!this.ports.aiBookProof && !drive.job
       });
       if (plan.hold === "global_failed") drive.failure = drive.reasons.get("global") ?? "failed";
@@ -2195,28 +2190,19 @@ export class BookPipelineRuns {
         } else if (action.type === "mark_needs_review") {
           await this.markReview(drive, action.nodeId, action.step, drive.reasons.get(action.nodeId) ?? "failed");
           changed = true;
-        } else if (action.type === "book_consistency") {
-          // The automatic redos go first: the check reads the chapters as they end up.
-          if (await this.startFixes(drive)) {
-            changed = true;
-            continue;
-          }
-          drive.busy.add(CONSISTENCY_BUSY);
-          started++;
-          inflight.set(
-            CONSISTENCY_BUSY,
-            this.consistency(drive).finally(() => {
-              drive.busy.delete(CONSISTENCY_BUSY);
-              inflight.delete(CONSISTENCY_BUSY);
-            })
-          );
         } else if (action.type === "advance_phase") {
           if (await this.startFixes(drive)) {
             changed = true;
             continue;
           }
-          if (await this.markInconsistent(drive)) changed = true;
           const before = drive.store.state;
+          // The book is done only once its closing page is written (a failed write is retried once, then the run stops).
+          if (before.phase === "gate2" && this.ports.writeOpenIssues && !(await this.writeClosingPage(drive))) {
+            if (!this.dead(drive))
+              await drive.store.commit(state => ({ state: failRun(state, "open_issues_write"), accepted: true }));
+            changed = true;
+            continue;
+          }
           await drive.store.commit(state => ({
             state: advancePhase(state, this.stagesOf(drive), this.ports.now()),
             accepted: true
@@ -2799,130 +2785,86 @@ export class BookPipelineRuns {
       report(`failed:${code(outcome.kind === "failed" ? outcome.reason : "failed")}`);
     }
   }
-  /**
-   * The one whole-book consistency check (writing phase, every chapter proofread, the automatic redos done): the chapters' texts go
-   * to the proof model in one text-only call; what it finds is kept in the run and marks the chapters it names (see
-   * {@link markInconsistent}). A failure is retried like a step and never holds the run: after the last attempt the phase moves on.
-   */
-  private async consistency(drive: Drive): Promise<void> {
-    if (!this.ports.checkConsistency) return;
-    const begun = await drive.store.commit(state => {
-      const dispatched = beginConsistency(state);
-      return dispatched
-        ? { state: dispatched.state, accepted: true, token: dispatched.token }
-        : { state, accepted: false as const, token: undefined };
-    });
-    if (!begun?.accepted || !begun.token) return;
-    const token = begun.token;
-    const startedAt = Date.parse(this.ports.now());
-    const report = (result: string): void => {
-      const attempt = drive.store.state.consistency?.attempts ?? 0;
-      const ms = Math.max(0, Date.parse(this.ports.now()) - startedAt || 0);
-      this.ports.log(
-        formatPipelineLog({
-          event: "step",
-          runId: token.runId,
-          card: "consistency",
-          step: "proof",
-          attempt,
-          result,
-          ms
-        })
-      );
+  /** The issues of the closing page, as items: open AI findings, an unfinished proofread, chapters still needing a look. */
+  private async openIssuesOf(drive: Drive): Promise<{ checked: number; issues: BookOpenIssue[] }> {
+    const state = drive.store.state;
+    const title = (id: string): string => drive.cards.get(id)?.title ?? "";
+    const issues: BookOpenIssue[] = [];
+    let checked = 0;
+    const incomplete = (chapterTitle: string): void => {
+      issues.push({ source: "ai-proof", chapterTitle, problem: "", reason: "proof_incomplete" });
     };
-    try {
-      const ordered: ReferenceChapter[] = [];
-      const structure = this.structureOf(drive, effectiveOrder(drive.store.state));
-      for (const id of effectiveOrder(drive.store.state)) {
-        const info = drive.cards.get(id);
-        if (!info) continue;
-        const card = await this.ports.readCard(info.path).catch(() => undefined);
-        const text = card ? projectProofBody(stripImageLines(chapterBody(card.detail))).trim() : "";
-        const place = structure.placeOf(id);
-        const chapter =
-          place?.kind === "chapter"
-            ? place.chapter
-            : place?.chapterId
-              ? structure.placeOf(place.chapterId)?.chapter
-              : undefined;
-        ordered.push({
-          id,
-          title: card?.title ?? info.title,
-          text,
-          ...(chapter !== undefined ? { chapter } : {}),
-          ...(place?.kind === "section" ? { section: true as const } : {})
+    for (const id of effectiveOrder(state)) {
+      const proof = state.aiProof?.[id];
+      if (!proof) continue;
+      checked += proof.checked;
+      for (const open of proof.open)
+        issues.push({
+          source: "ai-proof",
+          chapterId: id,
+          chapterTitle: title(id),
+          problem: open.problem,
+          reason: open.reason
+        });
+      if (proof.incomplete) incomplete(title(id));
+    }
+    if (state.bookProof) {
+      checked += state.bookProof.checked;
+      const chapters = state.bookProof.open.some(open => open.chapter !== undefined)
+        ? (await this.bookProofInput(drive).catch(() => ({ chapters: [] }))).chapters
+        : [];
+      for (const open of state.bookProof.open) {
+        const chapter = open.chapter === undefined ? undefined : chapters[open.chapter - 1];
+        issues.push({
+          source: "ai-proof",
+          ...(chapter ? { chapterId: chapter.id } : {}),
+          chapterTitle: chapter?.title ?? "",
+          problem: open.problem,
+          reason: open.reason
         });
       }
-      // Chapter numbers count the first-level cards only (the preface and the sections are not chapters); the model compares the ones with text.
-      const references = chapterReferenceFindings(ordered);
-      const chapters = ordered.filter(chapter => chapter.text);
-      // The removed-chapter check is the program's own too (no call).
-      const removed = removedChapterRefs(drive.store.state, chapters);
-      // Fewer than two chapters with text: nothing to compare, no call.
-      const found =
-        chapters.length < 2
-          ? []
-          : await this.ports.checkConsistency(
-              { ...this.base(drive, drive.config.proofModel), chapters: compactChapters(chapters) },
-              { signal: drive.controller.signal, admission: drive.admission }
-            );
-      if (this.dead(drive)) return;
-      // The model's quotes are checked against the chapters: a claim no sentence matches is shown as a paraphrase.
-      const modelFindings = found.map((issue): ConsistencyFinding => {
-        const [x, y] = [chapters[issue.a - 1], chapters[issue.b - 1]];
-        const quoteA = verbatimQuote(issue.claimA, x.text);
-        const quoteB = verbatimQuote(issue.claimB, y.text);
-        return {
-          a: x.id,
-          b: y.id,
-          claimA: quoteA ?? issue.claimA,
-          claimB: quoteB ?? issue.claimB,
-          suggestion: issue.suggestion,
-          ...(quoteA === undefined ? { looseA: true as const } : {}),
-          ...(quoteB === undefined ? { looseB: true as const } : {})
-        };
-      });
-      // The program's own checks: numbers the model missed, and 「後面的章節」/「前面講過」 that point the wrong way.
-      const findings: ConsistencyFinding[] = [
-        ...references,
-        ...directionFindings(ordered),
-        ...modelFindings,
-        ...numericFindings(chapters, modelFindings),
-        ...removed
-      ];
-      const done = await drive.store.commit(state => applyConsistency(state, token, findings));
-      if (!done?.accepted) {
-        report("dropped");
-        return;
-      }
-      await this.markInconsistent(drive);
-      report(`ok:${findings.length}`);
-    } catch (error) {
-      if (this.dead(drive)) return;
-      const outcome = this.classify(drive, error);
-      if (outcome.kind === "budget" || outcome.kind === "cancelled") {
-        await drive.store.commit(state => applyConsistencyStopped(state, token, outcome.kind === "budget"));
-        if (outcome.kind === "budget") drive.controller.abort();
-        report(outcome.kind);
-        return;
-      }
-      report(`failed:${code(outcome.kind === "failed" ? outcome.reason : "failed")}`);
+      if (state.bookProof.incomplete) incomplete("");
     }
-  }
-  /**
-   * The chapters the last consistency check named (and that were not written again since) become needs-review with the issue
-   * `consistency`; their review box says what differs. A chapter already needing review keeps its own issue. Idempotent.
-   */
-  private async markInconsistent(drive: Drive): Promise<boolean> {
-    const state = drive.store.state;
-    if (state.phase !== "writing" || !state.consistency?.findings?.length) return false;
-    let marked = false;
     for (const id of effectiveOrder(state)) {
-      if (drive.stages.get(id) !== "checked" || !chapterInconsistencies(state, id).length) continue;
-      await this.setStage(drive, id, "needs-review", "consistency");
-      marked = true;
+      if (drive.stages.get(id) !== "needs-review") continue;
+      const info = drive.cards.get(id);
+      const card = info ? await this.ports.readCard(info.path).catch(() => undefined) : undefined;
+      const issue = String(card?.fields.pipelineIssue ?? "");
+      const reason = /length:under/.test(issue)
+        ? "too_short"
+        : /length:over/.test(issue)
+          ? "too_long"
+          : /images:under/.test(issue)
+            ? "few_images"
+            : /^(plan|write|proof) failed/.test(issue)
+              ? "step_failed"
+              : "";
+      issues.push({ source: "chapter", chapterId: id, chapterTitle: title(id), problem: "", reason });
     }
-    return marked;
+    return { checked, issues };
+  }
+  /** Writes the closing page (one retry). False when it could not be written: the book must not show as done. */
+  private async writeClosingPage(drive: Drive): Promise<boolean> {
+    const root = drive.cards.get(drive.rootId);
+    if (!this.ports.writeOpenIssues || !root) return !this.ports.writeOpenIssues;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (this.dead(drive)) return false;
+      try {
+        const { checked, issues } = await this.openIssuesOf(drive);
+        const content = composeOpenIssuesNote({
+          bookTitle: root.title,
+          language: drive.config.language,
+          checked,
+          issues
+        });
+        const folder = root.path.includes("/") ? root.path.slice(0, root.path.lastIndexOf("/")) : "";
+        const written = await this.ports.writeOpenIssues(folder, drive.config.language, content);
+        if (written.ok) return true;
+      } catch {
+        // retried once
+      }
+    }
+    return false;
   }
 
   /** A card that finished its phase's last step (planned in planning, proofread in writing) adds its wall time to the estimate. */

@@ -3547,96 +3547,121 @@ test('fix5 whole-book rerun after the book title (root topic) is renamed: plans 
   assert.ok((await promptLine(r, 1, '接入點')).includes('BrandNewBookTitle'));
 });
 
-// ---- the whole-book consistency check ----
+// ---- P6b: the closing "still open" page is written before the book counts as done (the old consistency call is gone) ----
+const { writeOpenIssuesFile } = S.load('experiences/visual-map/book-open-issues-file.ts');
+const folderOf = path => (path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
+/** An in-memory vault for the page: `files` maps path to text; `fail` makes every write fail. */
+const pageVault = (files = new Map(), state = { fail: false, calls: 0 }) => {
+  const vault = { read: async path => files.get(path), create: async (path, text) => { files.set(path, text); }, modify: async (path, text) => { files.set(path, text); } };
+  const port = async (folder, language, content) => { state.calls++; return state.fail ? { ok: false } : writeOpenIssuesFile(vault, folder, language, content); };
+  return { files, state, port };
+};
+const pageFiles = v => [...v.files.entries()].filter(([path]) => /仍有問題/.test(path));
+const finishAi = async r => { await runToEnd(r); while (r.runs.isRunning(r.mapPath)) await tick(); await settle(); };
+const okCheck = (request, id = 'P9') => ({ id, kind: 'fact', quote: request.body.slice(0, 11), verdict: 'ok', problem: '', fixable: false, suggestion: '', sources: [] });
 
-test('consistency: one check after every chapter is proofread costs one call, marks the two chapters it names needs-review, and their review box says what differs', async () => {
-  const { reviewEntries } = S.load('experiences/visual-map/book-pipeline-review.ts');
-  const { chapterInconsistencies } = S.load('core/book-pipeline/consistency.ts');
-  const asked = [];
-  const r = await rig({ ports: { checkConsistency: async (request, run) => { asked.push(request); await run.admission.reserve(); return [{ a: 1, b: 3, claimA: '三天', claimB: '一到兩天', suggestion: '統一寫一到三天' }]; } } });
-  await r.runs.start(r.mapPath);
-  await confirmDone(r.runs, r.mapPath);
+test('open issues page: everything solved writes "AI 校對查了 N 項，全部解決" into the book\'s folder, beside no map card, then the book is done', async () => {
+  const v = pageVault();
+  const r = await aiRig({ aiProof: async request => ({ checks: [okCheck(request)], prior: [], dropped: {} }) }, { ports: { writeOpenIssues: v.port } });
+  const nodesBefore = (await r.repo.readMap(r.mapPath)).nodes.length;
+  await finishAi(r);
   const s = await r.state();
   assert.equal(s.phase, 'done');
-  assert.equal(asked.length, 1);
-  assert.deepEqual(JSON.parse(JSON.stringify(asked[0].chapters.map(c => c.title))), TITLES);
-  assert.ok(asked[0].chapters.every((c, i) => c.text.includes(bodyOf(TITLES[i]))));
-  assert.equal(s.budget.used, 1 + 3 + 3 + 3 + 1);
-  assert.deepEqual([stageOf(r.raw(0)), stageOf(r.raw(1)), stageOf(r.raw(2))], ['needs-review', 'checked', 'needs-review']);
-  assert.equal(r.runs.getProgress(r.mapPath).counts.checked, 1);
-  assert.equal((await r.note(2)).pipelineIssue, 'consistency');
-  const ids = r.nodes.map(n => n.id);
-  const entries = reviewEntries({ order: ids, titleOf: id => TITLES[ids.indexOf(id)], noteOf: id => ({ pipelineStage: stageOf(r.raw(ids.indexOf(id))), pipelineIssue: 'consistency' }), inconsistencies: id => chapterInconsistencies(s, id) });
-  // Neither claim is in the chapters (bodies are `SecretBody <title>`): both are shown as paraphrases, not quotes.
-  assert.equal(entries.find(e => e.card.id === ids[2]).problems[0].text, `Says something differently from 〈${TITLES[0]}〉: this chapter says (paraphrased) 一到兩天, 〈${TITLES[0]}〉 says (paraphrased) 三天, 統一寫一到三天`);
-  assert.ok(r.stat.logs.some(line => /consistency/.test(line) && /ok:1/.test(line)));
-  assert.ok(!r.stat.logs.some(line => line.includes('三天')), 'the log carries no claim text');
+  const pages = pageFiles(v);
+  assert.equal(pages.length, 1);
+  assert.equal(folderOf(pages[0][0]), folderOf(r.nodes[0].path));
+  const n = Object.values(s.aiProof).reduce((sum, p) => sum + p.checked, 0) + s.bookProof.checked;
+  assert.ok(n >= 3);
+  assert.match(pages[0][1], new RegExp(`AI 校對查了 ${n} 項，全部解決`));
+  assert.ok(pages[0][1].startsWith('<!-- vam-book-open-issues:v1 -->'));
+  assert.equal((await r.repo.readMap(r.mapPath)).nodes.length, nodesBefore, 'the page is not a map card');
 });
 
-// The root is the preface, so TITLES[1] is chapter 1 and TITLES[2] is chapter 2.
-test('consistency: a wrong chapter number in a chapter is found without a model call and marks only that chapter', async () => {
-  const { chapterInconsistencies } = S.load('core/book-pipeline/consistency.ts');
-  let r;
-  const asked = [];
-  r = await rig({
-    ports: { checkConsistency: async (request, run) => { asked.push(request); await run.admission.reserve(); return []; } },
-    script: { author: async input => { await input.admission.reserve(); const note = await r.repo.readNote(input.path); const extra = note.title === TITLES[0] ? `\n\n細節都留給第一章「${TITLES[2]}」。` : ''; await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) + extra }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } }
+test('open issues page: a failed write is retried once, then the run stops with open_issues_write and is not done; a later resume writes it and finishes', async () => {
+  const v = pageVault(new Map(), { fail: true, calls: 0 });
+  const r = await aiRig({}, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  let s = await r.state();
+  assert.equal(s.phase, 'gate2');
+  assert.deepEqual([s.status, s.pauseReason, s.failureCode], ['stopped', 'failed', 'open_issues_write']);
+  assert.equal(v.state.calls, 2, 'one try and one retry');
+  assert.equal(pageFiles(v).length, 0);
+  v.state.fail = false;
+  await r.runs.resume(r.mapPath); await settle();
+  s = await r.state();
+  assert.equal(s.phase, 'done');
+  assert.equal(pageFiles(v).length, 1);
+});
+
+test('open issues page: a same-named note without the marker is never overwritten (the next name is used); an earlier page of ours is rewritten', async () => {
+  const files = new Map();
+  const v = pageVault(files);
+  const r = await aiRig({}, { ports: { writeOpenIssues: v.port } });
+  const dir = folderOf(r.nodes[0].path);
+  const mine = `${dir ? `${dir}/` : ''}仍有問題.md`;
+  files.set(mine, 'my own note, no marker');
+  await finishAi(r);
+  assert.equal((await r.state()).phase, 'done');
+  assert.equal(files.get(mine), 'my own note, no marker');
+  const pages = pageFiles(v).filter(([path]) => path !== mine);
+  assert.equal(pages.length, 1);
+  assert.match(pages[0][0], /仍有問題 \(2\)\.md$/);
+  // A rerun rewrites the same page (it has the marker), no third file.
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'gate2'; d.bookPipeline.status = 'stopped'; delete d.bookPipeline.pauseReason; });
+  files.set(pages[0][0], '<!-- vam-book-open-issues:v1 -->\nold');
+  await r.runs.resume(r.mapPath); await settle();
+  assert.equal((await r.state()).phase, 'done');
+  assert.equal(pageFiles(v).length, 2);
+  assert.ok(files.get(pages[0][0]).length > 40 && !files.get(pages[0][0]).includes('\nold'));
+});
+
+test('open issues page: an unfinished AI proofread never reads as all solved; a chapter needing review and an unsolved finding are listed with their reasons', async () => {
+  const v = pageVault();
+  const r = await aiRig({
+    aiBookProof: async () => { throw new Error('boom'); },
+    aiProof: async request => ({ checks: request.title === 'SecretTitleA' ? [{ ...problem(request), fixable: false }] : [], prior: [], dropped: {} })
+  }, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  const s = await r.state();
+  assert.equal(s.phase, 'done');
+  assert.equal(s.bookProof.incomplete, true);
+  const text = pageFiles(v)[0][1];
+  assert.doesNotMatch(text, /全部解決/);
+  assert.match(text, /AI 校對沒有跑完/);
+  assert.match(text, /AI 判斷這處不能靠改字解決/);
+  assert.match(text, /SecretTitleA/);
+});
+
+test('open issues page: a chapter that needs review is listed as a chapter-status item with a plain reason', async () => {
+  const v = pageVault();
+  const bad = { id: '' };
+  const r = await aiRig({ author: async (input) => { if (input.nodeId === bad.id) throw new Error('boom'); await input.admission.reserve(); const note = await r.repo.readNote(input.path); await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } }, { ports: { writeOpenIssues: v.port } });
+  bad.id = r.nodes[1].id;
+  await finishAi(r);
+  assert.equal((await r.state()).phase, 'done');
+  const text = pageFiles(v)[0][1];
+  assert.doesNotMatch(text, /全部解決/);
+  assert.match(text, /SecretTitleA：有一個步驟失敗了/);
+});
+
+test('open issues page: a run an older build left at gate 2 (no whole-book proofread yet, an old consistency field) does the whole-book proofread, writes the page, and is done', async () => {
+  const v = pageVault();
+  const r = await aiRig({}, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  const books = () => r.stat.ai.filter(([k]) => k === 'book').length;
+  assert.equal(books(), 1);
+  await r.repo.updateMap(r.mapPath, d => {
+    const b = d.bookPipeline;
+    b.phase = 'gate2'; b.status = 'stopped'; delete b.pauseReason; delete b.bookProof;
+    b.consistency = { key: 'old', attempts: 1, done: true, revisions: {}, findings: [] };
   });
-  await r.runs.start(r.mapPath);
-  await confirmDone(r.runs, r.mapPath);
+  v.files.clear();
+  await r.runs.resume(r.mapPath); await settle();
   const s = await r.state();
   assert.equal(s.phase, 'done');
-  assert.equal(asked.length, 1, 'still one call per book');
-  assert.equal(s.budget.used, 1 + 3 + 3 + 3 + 1);
-  assert.deepEqual([stageOf(r.raw(0)), stageOf(r.raw(1)), stageOf(r.raw(2))], ['needs-review', 'checked', 'checked']);
-  const ids = r.nodes.map(n => n.id);
-  assert.deepEqual(JSON.parse(JSON.stringify(chapterInconsistencies(s, ids[0]))), [{ other: ids[2], own: `細節都留給第一章「${TITLES[2]}」。`, theirs: '第一章', suggestion: '第二章', reference: true }]);
-});
-
-test('consistency: the model\'s paraphrase becomes the chapter\'s sentence, and the program adds a number and a direction the model missed, still one call', async () => {
-  const { chapterInconsistencies } = S.load('core/book-pipeline/consistency.ts');
-  const extra = [
-    '\n\n大多數蔬菜都喜歡日照，一天最好有四到六小時的光。',
-    '\n\n小白菜的盆，盆土深度至少 10 公分就可以。',
-    '\n\n一般來說，大部分蔬菜最喜歡日照，一天有八小時左右的光。\n\n至於SecretTitleA，留到後面的章節再講。'
-  ];
-  let r;
-  const asked = [];
-  r = await rig({
-    ports: { checkConsistency: async (request, run) => { asked.push(request); await run.admission.reserve(); return [{ a: 2, b: 3, claimA: '第2章說盆深至少十公分', claimB: '第3章說盆深三十公分', suggestion: '' }]; } },
-    script: { author: async input => { await input.admission.reserve(); const note = await r.repo.readNote(input.path); await r.repo.updateNoteGuarded(input.path, { detail: bodyOf(note.title) + extra[TITLES.indexOf(note.title)] }, { authorize: input.authorize, finalize: input.finalize }); return { outcome: 'written' }; } }
-  });
-  await r.runs.start(r.mapPath);
-  await confirmDone(r.runs, r.mapPath);
-  const s = await r.state();
-  assert.equal(asked.length, 1, 'one call per book');
-  assert.equal(s.budget.used, 1 + 3 + 3 + 3 + 1);
-  const ids = r.nodes.map(n => n.id);
-  const plainOf = value => JSON.parse(JSON.stringify(value));
-  assert.deepEqual(plainOf(chapterInconsistencies(s, ids[1])), [
-    { other: ids[2], own: '小白菜的盆，盆土深度至少 10 公分就可以。', theirs: '第3章說盆深三十公分', suggestion: '', theirsLoose: true }
-  ]);
-  assert.deepEqual(plainOf(chapterInconsistencies(s, ids[0])), [
-    { other: ids[2], own: '大多數蔬菜都喜歡日照，一天最好有四到六小時的光。', theirs: '一般來說，大部分蔬菜最喜歡日照，一天有八小時左右的光。', suggestion: '' }
-  ]);
-  const third = plainOf(chapterInconsistencies(s, ids[2]));
-  assert.ok(third.some(item => item.kind === 'direction' && item.other === ids[1] && item.theirs === '留到後面' && item.suggestion === '前面的第2章'));
-  assert.deepEqual([stageOf(r.raw(0)), stageOf(r.raw(1)), stageOf(r.raw(2))], ['needs-review', 'needs-review', 'needs-review']);
-});
-
-test('consistency: a check that fails three times never holds the run (gate 2, no chapter marked); no port means no check', async () => {
-  let calls = 0;
-  const r = await rig({ ports: { checkConsistency: async () => { calls++; throw new Error('bad reply'); } } });
-  await r.runs.start(r.mapPath);
-  await confirmDone(r.runs, r.mapPath);
-  const s = await r.state();
-  assert.equal(s.phase, 'done');
-  assert.equal(calls, 3);
-  for (let i = 0; i < 3; i++) assert.equal(stageOf(r.raw(i)), 'checked');
-  const none = await rig();
-  await none.runs.start(none.mapPath);
-  await confirmDone(none.runs, none.mapPath);
-  assert.equal((await none.state()).consistency, undefined);
+  assert.equal(books(), 2, 'the whole-book proofread ran again');
+  assert.equal(pageFiles(v).length, 1);
+  assert.ok(s.consistency, 'the old field is still read');
 });
 
 // ---- P3: sections' neighbour lines (structure.neighboursOf) and the plan's 全書結構 ----
@@ -3922,4 +3947,24 @@ test('ai book: three failed whole-book checks end it as incomplete and the run s
   assert.equal(s.phase, 'done');
   assert.deepEqual([s.bookProof.done, s.bookProof.incomplete], [true, true]);
   assert.equal(r.stat.ai.filter(([k]) => k === 'book').length, 3);
+});
+
+test('worst-case calls: every chapter redoes once, uses every AI round and nothing is ever solved; the runner\'s actual call count is the sum its steps made (P7 sets the budget formula from it)', async () => {
+  const seen = new Set();
+  for (const titles of [['SecretRootTitle', 'SecretTitleA'], ['SecretRootTitle', 'SecretTitleA', 'SecretTitleB']]) {
+    seen.clear();
+    const r = await aiRig({
+      // The first proof of every card is unmet (the one automatic redo), the later ones are met.
+      proof: async request => { const first = !seen.has(request.title); seen.add(request.title); return { items: request.checklist.map(c => ({ id: c.id, type: c.type, status: first ? 'unmet' : 'met', note: 'x', sources: [] })), aggregate: first ? 'needs-review' : 'checked' }; },
+      aiProof: async request => ({ checks: [problem(request)], prior: [], dropped: {} }),
+      aiFix: async request => [{ id: 'P1', quote: request.chapters[0].text.slice(0, 11), replacement: request.chapters[0].text.slice(0, 11) }],
+      aiBookProof: async request => ({ checks: [bookProblem(request, 1, 1)], prior: [], dropped: {} })
+    }, { titles });
+    await finishAi(r);
+    const s = await r.state();
+    const calls = r.stat.plan.length + r.stat.author.length + r.stat.proof.length + r.stat.ai.length;
+    assert.equal(s.phase, 'done');
+    assert.equal(s.budget.used, calls, 'the budget counts exactly the calls made');
+    assert.equal(calls, 6 + 10 * titles.length, 'this mock: 1 global plan + 5 book calls + 10 per card (no picture search here)');
+  }
 });

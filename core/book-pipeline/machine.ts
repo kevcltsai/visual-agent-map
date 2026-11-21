@@ -14,7 +14,6 @@ import {
   BOOK_EXPAND_PASSES,
   MAX_AUTO_FIXES,
   MAX_STEP_ATTEMPTS,
-  TRIAL_SIZE,
   attemptsOf,
   effectiveOrder,
   emptyAttempts,
@@ -64,6 +63,8 @@ export interface StepToken {
   stopEpoch: number;
 }
 
+/** The trial of a book without a known structure: the preface and chapter 1. */
+const FLAT_TRIAL = 2;
 const clone = (data: BookPipelineData): BookPipelineData => JSON.parse(JSON.stringify(data)) as BookPipelineData;
 const ranked = (stage: PipelineStage | undefined): number =>
   stage === undefined ? 0 : stage === "planned" ? 1 : stage === "written" ? 2 : 3;
@@ -79,6 +80,8 @@ export function newBookPipeline(input: {
   autoRoles?: readonly string[];
   /** The id -> title and note path of every chapter now (see `BookPipelineData.chapters`). */
   chapters?: Readonly<Record<string, { title: string; path: string }>>;
+  /** The trial cards (`bookStructure().trialOf()`). Absent: the first two cards (a book of chapters only: the preface and chapter 1). */
+  trial?: readonly string[];
 }): BookPipelineData {
   if (!input.order.length) throw new Error("empty order");
   if (input.order.includes("global")) throw new Error("reserved node id");
@@ -95,7 +98,7 @@ export function newBookPipeline(input: {
     revisions: {},
     ...(input.staleStages?.length ? { pendingReset: [...input.staleStages] } : {}),
     ...(input.autoRoles?.length ? { autoRoles: [...input.autoRoles] } : {}),
-    trial: input.order.slice(0, TRIAL_SIZE),
+    trial: input.trial ? input.trial.slice() : input.order.slice(0, FLAT_TRIAL),
     planReview: true,
     budget: { used: 0, limit: input.budgetLimit ?? DEFAULT_BUDGET_LIMIT },
     revision: 0,
@@ -106,6 +109,16 @@ export function newBookPipeline(input: {
 
 export function cardRevision(data: BookPipelineData, nodeId: string): number {
   return data.revisions[nodeId] ?? 0;
+}
+
+/** The three gates of a run: the plan review, the trial's result, and the one before the book counts as done. */
+export type PipelineGate = "plan" | "trial" | "final";
+/**
+ * Whether the run stops at a gate until the owner confirms. The one place that decides it: today every gate waits for a person
+ * (a switch to let a gate pass by itself is a later change, and belongs here, not at the gates).
+ */
+export function gateWaitsForPerson(_data: BookPipelineData, _gate: PipelineGate): boolean {
+  return true;
 }
 
 /**
@@ -130,8 +143,9 @@ export function nextActions(
       ? { actions: resets.map(nodeId => ({ type: "reset_stage", nodeId })) }
       : { actions: [{ type: "advance_phase" }] };
   }
-  if (data.phase === "gate1") return { actions: [], hold: "gate1" };
-  if (data.phase === "gate2") return { actions: [], hold: "gate2" };
+  if (data.phase === "gate1" && gateWaitsForPerson(data, data.planReview ? "plan" : "trial"))
+    return { actions: [], hold: "gate1" };
+  if (data.phase === "gate2" && gateWaitsForPerson(data, "final")) return { actions: [], hold: "gate2" };
   const actions: PipelineAction[] = [];
   if (data.phase === "planning") {
     if (!data.globalPlanned) {
@@ -468,7 +482,13 @@ export function pauseForMap(data: BookPipelineData, change: { added: string[]; m
  * "Carry on as before": the new cards are recorded as ignored, the missing ones become removed (terminal), the map's card set becomes
  * the accepted one and the run goes on (or waits for budget). A trial left with no card gets the first chapters that remain.
  */
-export function acceptMapChange(data: BookPipelineData, mapIds: readonly string[], now: string): BookPipelineData {
+export function acceptMapChange(
+  data: BookPipelineData,
+  mapIds: readonly string[],
+  now: string,
+  /** The trial of the cards that remain (`bookStructure().trialOf()`); absent: the first two. */
+  trialOf?: (order: readonly string[]) => string[]
+): BookPipelineData {
   const { added, missing } = mapDifference(data, mapIds);
   const next = clone(data);
   next.accepted = [...mapIds];
@@ -480,7 +500,7 @@ export function acceptMapChange(data: BookPipelineData, mapIds: readonly string[
     if (!next.pendingReset.length) delete next.pendingReset;
   }
   if (next.trial && !next.trial.some(id => order.includes(id))) {
-    next.trial = order.slice(0, TRIAL_SIZE);
+    next.trial = trialOf ? trialOf(order) : order.slice(0, FLAT_TRIAL);
     if (next.phase === "gate1") {
       next.phase = "planning";
       next.phaseStartedAt = now;

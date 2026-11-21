@@ -144,10 +144,14 @@ test('T1 fallback: the frozen T1 parseCardPrompt / parseChecklist read a new-for
   for (const lang of ['zh-TW', 'en']) {
     const prompt = planText.composeCardPrompt({ ...plan, images }, lang);
     const oldPrompt = planText.composeCardPrompt(plan, lang);
-    assert.deepEqual(plain(t1ParseCardPrompt(prompt)), plain(planText.parseCardPrompt(prompt)));
+    // The frozen reader knows only the old 前一張 / 後一張 labels, so the comparison is of the four lines it shares.
+    const shared = ({ role, covers, entry, handoff }) => ({ role, covers, entry, handoff });
+    assert.deepEqual(plain(t1ParseCardPrompt(prompt)), plain(shared(planText.parseCardPrompt(prompt))));
     assert.deepEqual(plain(t1ParseCardPrompt(prompt)), plain(t1ParseCardPrompt(oldPrompt)), 'slot lines add nothing to the labelled lines');
     assert.deepEqual(plain(t1ParseChecklist(prompt)), plain(t1ParseChecklist(oldPrompt)), 'slot lines are not checklist items');
     assert.equal(t1ParseChecklist(prompt).length, 2);
+    assert.equal(t1ParseCardPrompt(prompt).previous, undefined, 'the frozen reader knows no new label');
+    assert.equal(t1ParseCardPrompt(prompt).next, undefined);
     assert.equal(t1ParseCardPrompt(planText.composeCardPrompt({ ...plan, images: [] }, lang)).covers, 'c');
   }
 });

@@ -393,6 +393,7 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-card-frame-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin: 12px 0 0; }
 .vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }
 .vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.vam-card-summary.vam-book-points { display: block; -webkit-line-clamp: unset; padding-left: 1.3em; list-style: disc; }
 .vam-card-error-details { margin: 4px 0 0; font-size: var(--font-ui-smaller); }
 .vam-card-error-details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 8em; overflow: auto; user-select: text; }
 .vam-map-chat-error-details { margin: 6px 0 0; font-size: var(--font-ui-smaller); }

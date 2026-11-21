@@ -19,6 +19,8 @@ import childrenTemplate from "./global-plan-children.md";
 
 export interface GlobalPlanCard {
   id: string;
+  /** Where the card is in the book: `preface`, `chapter 2`, `section 1 of 3 in chapter 2`. */
+  place: string;
   title: string;
   summary: string;
   /** Titles of the card's child cards on the map, in reading order (titles only). */
@@ -119,10 +121,22 @@ const cap = (value: string, max: number): string => singleLine(value, max);
 export const GLOBAL_CHILD_TITLE_MAX = 80;
 /** All child titles together are cut to about this many tokens (the existing estimate), in reading order. */
 export const GLOBAL_CHILD_TOKENS = 3000;
-type CardEntry = { id: string; title: string; summary: string; children?: string[]; moreChildren?: number };
+type CardEntry = {
+  id: string;
+  place: string;
+  title: string;
+  summary: string;
+  children?: string[];
+  moreChildren?: number;
+};
 const entriesOf = (request: GlobalPlanRequest, shown: ReadonlyMap<number, number>): CardEntry[] =>
   request.cards.map((card, at) => {
-    const entry: CardEntry = { id: card.id, title: cap(card.title, 200), summary: cap(card.summary, 500) };
+    const entry: CardEntry = {
+      id: card.id,
+      place: card.place,
+      title: cap(card.title, 200),
+      summary: cap(card.summary, 500)
+    };
     const all = (card.children ?? []).map(title => cap(title, GLOBAL_CHILD_TITLE_MAX));
     if (!all.length) return entry;
     const k = shown.get(at) ?? 0;

@@ -83,6 +83,7 @@ import {
   type PresentationAction,
   type PresentationState
 } from "./presentation-mode";
+import { bookStructure, type BookStructure } from "../../core/book-pipeline/structure";
 import { alignSiblingsToScreen, bookReadingOrder, bySiblingAxis, readingOrder } from "./presentation-order";
 import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
 import { MergeDrafts, type ChatReplyStep, type MergeTask } from "./merge-drafts";
@@ -12544,7 +12545,16 @@ export class VisualAgentMapView extends ItemView {
         cardRevision(read.data, node.id)
       );
     })();
-    const bookCard = bookCardView(note ?? {}, bookDone, bookStale, this.isBookCardResolved(node.id));
+    const bookPlace =
+      note && this.hasBookPipeline()
+        ? (() => {
+            const read = this.map ? readBookPipeline(this.map) : undefined;
+            return read?.kind === "usable"
+              ? this.bookStructureOf(effectiveOrder(read.data))?.placeOf(node.id)
+              : undefined;
+          })()
+        : undefined;
+    const bookCard = bookCardView(note ?? {}, bookDone, bookStale, this.isBookCardResolved(node.id), bookPlace);
     if (!loading) {
       const statusText = research
         ? this.researchStageText(research)
@@ -12886,6 +12896,10 @@ export class VisualAgentMapView extends ItemView {
       bars.setAttr("aria-hidden", "true");
       bars.createSpan({ cls: "vam-loading-bar" });
       bars.createSpan({ cls: "vam-loading-bar" });
+    } else if (note && bookCard.points && this.hasBookPipeline()) {
+      // A planned card shows its content headings instead of the summary (the note keeps both).
+      const list = card.createEl("ul", { cls: "vam-card-summary vam-book-points" });
+      for (const point of bookCard.points) list.createEl("li", { text: point });
     } else if (!note || !isPlaceholder(note.summary)) {
       const summaryText = card.createEl("p", {
         cls: "vam-card-summary",
@@ -17370,7 +17384,8 @@ export class VisualAgentMapView extends ItemView {
       this.plugin.getBookPipelineProgress(path),
       id => readPipelineStage(this.notes.get(id)?.pipelineStage),
       // A run paused for a map change, a gate or a finished book counts the map as it is now, the way the runner reads it.
-      bookReadingOrder(map)
+      bookReadingOrder(map),
+      this.bookStructureOf(effectiveOrder(read.data))
     );
     // The map-changed choice takes the keyboard once when it appears (the same way the inline asks do).
     if (state.mode !== "changed") this.bookMapFocusedRun = null;
@@ -17470,6 +17485,14 @@ export class VisualAgentMapView extends ItemView {
   /** What the bar and the card reruns remember in memory (the repaint rebuilds the DOM). */
   private readonly bookReview = new BookReviewMemory();
   /** The trial chapters that are still on the run (a removed chapter is not shown or counted). */
+  /** The book's structure over the cards the run works on (the root is the preface); undefined without a single root. */
+  private bookStructureOf(order: readonly string[]): BookStructure | undefined {
+    const map = this.map;
+    const root = map?.nodes.find(node => !node.parentId);
+    if (!map || !root) return undefined;
+    const parents = new Map(map.nodes.map(node => [node.id, node.parentId]));
+    return bookStructure(order, id => parents.get(id), root.id);
+  }
   private effectiveTrial(data: BookPipelineData): string[] {
     const order = effectiveOrder(data);
     return (data.trial ?? []).filter(id => order.includes(id));
@@ -17787,8 +17810,16 @@ export class VisualAgentMapView extends ItemView {
         this.notes.get(node.id)?.title ?? (node.path.split("/").pop() ?? "").replace(/\.md$/, "")
       ])
     );
+    const startOrder = bookReadingOrder(map);
+    const parentIds = new Map(map.nodes.map(node => [node.id, node.parentId]));
+    const startStructure = bookStructure(startOrder, id => parentIds.get(id), root?.id ?? "");
     const modal = new BookStartModal(this.app, {
-      cards: readingOrder(map.nodes, { includeHidden: true }).length,
+      cards: startOrder.length,
+      trialCards: startStructure.trialOf().length,
+      structure: {
+        chapters: startStructure.chapters.length,
+        sections: startStructure.chapters.reduce((sum, id) => sum + startStructure.sectionsOf(id).length, 0)
+      },
       models: {
         plan: settings.bookPlanModel,
         write: settings.bookWriteModel,

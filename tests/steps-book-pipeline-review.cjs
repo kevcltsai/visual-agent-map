@@ -426,3 +426,29 @@ test('C7 hand-edited wording: text the program never wrote (no fingerprint, no [
   const notHand = b.gate2Cards({ order: ['n1'], titleOf: () => 'T', noteOf: () => ({ detail: 'x', pipelineStage: 'needs-review', pipelineIssue: 'proof failed: timeout' }) })[0];
   assert.equal(notHand.handBeforeBook, undefined, 'only a hand-edited skip');
 });
+
+// ---- P3: the trial hint names the card's place in the book ----
+const lk = title => ({ path: `Notes/${title}`, title });
+const placed = (place, over = {}) => b.trialCallout(1, 4, undefined, undefined, false, { runId: 'run-1', nodeId: 'n1' }, [], place);
+test('trialCallout: the preface names the next chapter only; a chapter names both neighbours and its sections; a section names its chapter and the sections around it, never the next chapter', () => {
+  const pre = placed({ kind: 'preface', next: lk('沒有錢的世界') });
+  assert.ok(pre.includes('[!vam-trial] 試跑：前言'));
+  assert.ok(pre.includes('下一章：[[Notes/沒有錢的世界|沒有錢的世界]]') && !pre.includes('上一章'));
+  const chapter = placed({ kind: 'chapter', chapter: 1, chapterTitle: '沒有錢的世界', sectionTitles: ['以物易物', '貝殼與鹽'], previous: lk('前言'), next: undefined });
+  assert.ok(chapter.includes('[!vam-trial] 試跑：第 1 章「沒有錢的世界」'));
+  assert.ok(chapter.includes('上一章：[[Notes/前言|前言]]　下一章：無'), 'none reads 無');
+  assert.ok(chapter.includes('> 本章的節：以物易物、貝殼與鹽'));
+  const first = placed({ kind: 'section', chapter: 1, chapterTitle: '沒有錢的世界', sectionIndex: 1, sectionCount: 2, parent: lk('沒有錢的世界'), next: lk('貝殼與鹽') });
+  assert.ok(first.includes('[!vam-trial] 試跑：第 1 章「沒有錢的世界」· 第 1 節，共 2 節'));
+  assert.ok(first.includes('所屬章：[[Notes/沒有錢的世界|沒有錢的世界]]　前一節：無　後一節：[[Notes/貝殼與鹽|貝殼與鹽]]'));
+  assert.ok(!first.includes('下一章') && !first.includes('上一章'));
+  for (const text of [pre, chapter, first]) assert.ok(text.includes('%%vam-trial:run-1:n1%%') && text.includes('試跑') && text.includes('回心智圖'));
+});
+
+test('trialCallout: without a place (an older trial) it keeps "chapter i of n" and the two links; a chapter without sections has no section line; the titles are plain text', () => {
+  assert.ok(trial(false).includes('試跑第 1／3 章'));
+  const bare = placed({ kind: 'chapter', chapter: 2, chapterTitle: 'A\n> [!note] [[x]]', sectionTitles: [], previous: lk('P'), next: lk('N') });
+  assert.ok(!bare.includes('本章的節'));
+  assert.equal(bare.split('\n').filter(l => !l.startsWith('>')).length, 0, 'a title cannot start a line outside the box');
+  assert.ok(!bare.includes('[[x]]'));
+});

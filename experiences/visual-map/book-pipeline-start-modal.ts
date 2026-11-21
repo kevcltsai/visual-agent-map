@@ -6,7 +6,6 @@ import {
   BOOK_SETTING_FIELDS,
   DEFAULT_BUDGET_LIMIT,
   MAX_AUTO_FIXES,
-  TRIAL_SIZE,
   type BookSettingField,
   type BookSettings,
   type BookSettingsPatch
@@ -76,7 +75,8 @@ export function bookModelSpeed(model: string): number {
   const id = model.toLowerCase();
   return id.includes("haiku") ? 0.5 : id.includes("opus") ? 1.8 : 1;
 }
-export function bookStartEstimate(cards: number, models?: BookStartModels): BookStartEstimate {
+/** `trialCards`: how many of the cards the trial covers (the preface, chapter 1 and its sections). */
+export function bookStartEstimate(cards: number, trialCards: number, models?: BookStartModels): BookStartEstimate {
   const n = Math.max(0, Math.floor(cards));
   const time = (step: keyof typeof BOOK_STEP_SECONDS): number => {
     const measured = BOOK_STEP_SECONDS[step];
@@ -90,7 +90,7 @@ export function bookStartEstimate(cards: number, models?: BookStartModels): Book
     writes * (time("write") + BOOK_IMAGE_SEARCHES * time("images") + time("proof")) +
     BOOK_EXPAND_PASSES * time("write");
   // The trial cards run first and wait for the owner; the rest follow, BOOK_POOL at a time.
-  const trial = Math.min(n, TRIAL_SIZE);
+  const trial = Math.min(n, Math.max(0, Math.floor(trialCards)));
   const rounds = Math.ceil(trial / BOOK_POOL) + Math.ceil((n - trial) / BOOK_POOL);
   return {
     cards: n,
@@ -101,15 +101,32 @@ export function bookStartEstimate(cards: number, models?: BookStartModels): Book
     seconds: time("global") + rounds * perCard
   };
 }
-export function bookStartEstimateText(estimate: BookStartEstimate): string {
+export function bookStartEstimateText(
+  estimate: BookStartEstimate,
+  structure?: { chapters: number; sections: number }
+): string {
   const minutes = Math.round(estimate.seconds / 60);
-  return t(
-    "ui.book_start_estimate_0_1_2_3",
-    estimate.cards,
-    minutes < 1 ? t("ui.book_start_under_minute") : t("ui.book_start_minutes_0", minutes),
-    estimate.calls,
-    estimate.limit
-  );
+  const time = minutes < 1 ? t("ui.book_start_under_minute") : t("ui.book_start_minutes_0", minutes);
+  if (structure)
+    return structure.sections
+      ? t(
+          "ui.book_start_estimate_struct_0_1_2_3_4_5",
+          structure.chapters,
+          structure.sections,
+          estimate.cards,
+          time,
+          estimate.calls,
+          estimate.limit
+        )
+      : t(
+          "ui.book_start_estimate_struct_0_1_2_3_4",
+          structure.chapters,
+          estimate.cards,
+          time,
+          estimate.calls,
+          estimate.limit
+        );
+  return t("ui.book_start_estimate_0_1_2_3", estimate.cards, time, estimate.calls, estimate.limit);
 }
 
 /**
@@ -164,6 +181,10 @@ export interface BookModelChoiceInput {
 
 export interface BookStartInput {
   cards: number;
+  /** How many of the cards the trial covers (`bookStructure().trialOf()`). */
+  trialCards: number;
+  /** The preface + chapters + sections the estimate names (`bookStructure()`); absent: the plain card count. */
+  structure?: { chapters: number; sections: number };
   /** The model ids the four steps use (from the settings). */
   models: BookStartModels;
   /** Lists and labels for the four dropdowns, and where a pick is saved. */
@@ -377,7 +398,12 @@ export class BookStartModal extends Modal {
   }
   /** The estimate follows the models in the dropdowns. */
   private refreshEstimate(): void {
-    this.estimateEl?.setText(bookStartEstimateText(bookStartEstimate(this.input.cards, this.input.models)));
+    this.estimateEl?.setText(
+      bookStartEstimateText(
+        bookStartEstimate(this.input.cards, this.input.trialCards, this.input.models),
+        this.input.structure
+      )
+    );
   }
   onClose(): void {
     this.opened = false;

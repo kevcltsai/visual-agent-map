@@ -35,7 +35,7 @@ async function rig(over = {}) {
   let queue = Promise.resolve();
   let ids = 0;
   const script = { global: () => ({ thread: 'one thread', cards: nodes.map((n, i) => ({ id: n.id, role: i ? 'body' : 'intro' })), materials: [{ name: 'm', use: 'u' }], decisions: { reader: 'kids' } }),
-    card: request => ({ covers: `covers ${request.card.position}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }] }),
+    card: request => ({ covers: `covers ${(request.chapters.findIndex(c => c.title === request.card.title) + 1)}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }] }),
     author: async input => { await input.admission.reserve(); const note = await repo.readNote(input.path); const r = await repo.updateNoteGuarded(input.path, { detail: input.requirements !== undefined ? fixOf(bodyOf(note.title)) : bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return r === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; },
     proof: async request => ({ items: request.checklist.map(c => ({ id: c.id, type: c.type, status: 'met', note: 'fine', sources: [] })), aggregate: 'checked' }),
     probe: async () => ({ ok: true }), ...over.script };
@@ -115,7 +115,7 @@ test('rerunCard at gate 2 runs plan, author and proofread of that card only; nei
   assert.deepEqual(r.stat.plan.slice(base.plan), [r.nodes[2].id]); assert.deepEqual(r.stat.author.slice(base.author), [r.nodes[2].id]); assert.equal(r.stat.proof.length, base.proof + 1);
   assert.equal(seen.length, 1); assert.equal(seen[0].phase, 'gate2'); assert.equal(seen[0].active, true); assert.deepEqual([...seen[0].busyCards], [r.nodes[2].id]);
   // The neighbours' text (Detail) is untouched; only their previous/next plan line (T12) and the write's own `updated`/quoting differ.
-  const keepText = raw => noSeam(raw).replace(/^updated: .*\n/m, '').replace(/^pipeline-stage: "?(\S+?)"?$/m, 'pipeline-stage: $1').replace(/^> (前一張|後一張)：.*$/gm, '> $1');
+  const keepText = raw => noSeam(raw).replace(/^updated: .*\n/m, '').replace(/^pipeline-stage: "?(\S+?)"?$/m, 'pipeline-stage: $1').replace(/^> (上一章|下一章|前一張|後一張)：.*$/gm, "> $1");
   assert.equal(noSeam(r.raw(0)), before[0], 'card 0 (not a neighbour)');
   for (const i of [1, 3]) assert.equal(keepText(r.raw(i)), keepText(before[i]), `card ${i}`);
   for (const i of [1, 3]) assert.match(seamOf(r.raw(i)), /鄰卡企劃或正文已變更/);
@@ -260,7 +260,7 @@ test('etaSeconds: absent until five cards of the phase finished (and while not d
   const clock = { t: Date.parse('2026-11-17T00:00:00.000Z') };
   const samples = []; let R;
   const titles = ['Root', 'A', 'B', 'C', 'D', 'E', 'F'];
-  const r = await rig({ titles, script: { card: (request, n) => { if (n === 1 && request.card.position === 1) clock.t += 60000; return { covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }] }; } },
+  const r = await rig({ titles, script: { card: (request, n) => { if (n === 1 && (request.chapters.findIndex(c => c.title === request.card.title) + 1) === 1) clock.t += 60000; return { covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }] }; } },
     ports: { now: () => new Date(clock.t).toISOString(), log: line => { if (/^book-pipeline step .*step=plan .*result=ok/.test(line) && R) samples.push(R.runs.getProgress(R.mapPath)); } } });
   R = r;
   await r.runs.start(r.mapPath);

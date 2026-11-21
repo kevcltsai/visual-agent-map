@@ -529,3 +529,52 @@ test('@@replace matches the chapter lines after whitespace normalisation (a re-s
   assert.equal(part.applied, 0, 'part of a line is never a match');
   assert.equal(part.mismatched, 1);
 });
+
+// ---- P3: the plan's ### 全書結構 ----
+const entries = [
+  { kind: 'preface', title: '錢的故事', points: ['問題', '路線'] },
+  { kind: 'chapter', chapter: 1, title: '沒有錢的世界', points: ['市集', '卡住'] },
+  { kind: 'section', title: '以物易物', points: ['剛好相合', '換不開'] },
+  { kind: 'chapter', chapter: 2, title: '金屬貨幣', points: [] }
+];
+const planNote = (extra = '') => sections.replaceBookPlanSection('# Root\n\nintro\n\n## 其他\n\nkeep me\n', planText.composeBookPlan({ thread: '主線一句。', decisions: { reader: '孩子' }, materials: [{ name: '素材', use: '用途' }], ...extra }, 'zh-TW').replace(/^## .*\n\n?/, ''));
+
+test('composeBookStructure: preface / chapter lines with their headings, sections as "- 節：標題 — a · b", a card without headings has no list line', () => {
+  assert.equal(planText.composeBookStructure(entries, 'zh-TW'), ['### 全書結構', '**前言：錢的故事**', '問題 · 路線', '**第 1 章　沒有錢的世界**', '市集 · 卡住', '- 節：以物易物 — 剛好相合 · 換不開', '**第 2 章　金屬貨幣**', ''].join('\n'));
+  assert.ok(planText.composeBookStructure(entries, 'en').includes('**Chapter 1: 沒有錢的世界**'));
+});
+
+test('replaceBookStructure: inserted right after the thread, other lines byte-identical, the same text twice changes nothing, a changed text replaces in place', () => {
+  const base = planNote();
+  const md = planText.composeBookStructure(entries, 'zh-TW');
+  const once = sections.replaceBookStructure(base, md);
+  const lines = once.split('\n');
+  const first = lines.findIndex(l => l === '> ### 全書結構');
+  assert.equal(lines[first - 2], '> 主線一句。'); assert.equal(lines[first - 1], '>');
+  assert.ok(lines.findIndex(l => l === '> ### 編輯決定') > first);
+  // the base is exactly the result with the part's lines taken out
+  const stripped = lines.filter((_, i) => i < first || i > first + 7);
+  assert.equal(stripped.join('\n'), base, 'every other line is as it was');
+  assert.equal(sections.replaceBookStructure(once, md), once, 'idempotent');
+  const changed = sections.replaceBookStructure(once, planText.composeBookStructure([{ kind: 'preface', title: 'X', points: ['a'] }], 'zh-TW'));
+  assert.ok(changed.includes('> **前言：X**') && !changed.includes('錢的故事'));
+  assert.equal(count(changed, '### 全書結構'), 1);
+  assert.equal(changed.split('\n').filter(l => /^> ### /.test(l)).length, 4, 'thread, structure, decisions, materials');
+  assert.ok(changed.includes('## 其他\n\nkeep me'), 'the text after the callout is untouched');
+});
+
+test('replaceBookStructure: no plan callout leaves the note as it is; a CRLF callout keeps its line ends; parse skips the part', () => {
+  const old = '# Root\n\n## 全書企劃\n\n### 全書主線\n\nx\n';
+  assert.equal(sections.replaceBookStructure(old, planText.composeBookStructure(entries, 'zh-TW')), old);
+  const crlf = planNote().replace(/\n/g, '\r\n');
+  const out = sections.replaceBookStructure(crlf, planText.composeBookStructure(entries, 'zh-TW'));
+  assert.ok(!/[^\r]\n/.test(out), 'every line end is still CRLF');
+  const withPart = sections.replaceBookStructure(planNote(), planText.composeBookStructure(entries, 'zh-TW'));
+  const body = planText.parseBookPlanBody(withPart);
+  assert.deepEqual(body, planText.parseBookPlanBody(planNote()));
+  assert.deepEqual(planText.parseBookPlanDecisions(withPart), planText.parseBookPlanDecisions(planNote()));
+  assert.equal(body.thread, '主線一句。');
+  const inCompose = planText.composeBookPlan({ thread: 't', decisions: {}, materials: [], structure: planText.composeBookStructure(entries, 'zh-TW') }, 'zh-TW');
+  assert.ok(inCompose.indexOf('### 全書主線') < inCompose.indexOf('### 全書結構') && inCompose.indexOf('### 全書結構') < inCompose.indexOf('### 編輯決定'));
+  assert.equal(planText.parseBookPlanBody(inCompose).thread, 't');
+});

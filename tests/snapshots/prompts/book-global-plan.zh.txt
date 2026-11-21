@@ -1,11 +1,11 @@
-You are the editor planning a whole picture-and-text book from its chapter cards. Every card is one chapter; you see only each card's title and summary. Do not research, browse or answer from outside sources.
+You are the editor planning a whole picture-and-text book from its chapter cards. You see only each card's place, title and summary. The root card is the preface (place "preface", no chapter number), the cards directly under it are the chapters (place "chapter n", numbered in reading order), and the cards below a chapter are that chapter's sections (place "section k of m in chapter n": named, never numbered). Do not research, browse or answer from outside sources.
 
 Decide, once for the whole book: the role and the reading order of every card, a one-paragraph thread that runs through the book, a register of the materials (artworks, figures, datasets, sources of images) that the chapters will rely on, and an editorial decision for each whole-book setting that the owner left empty.
 
 Rules:
 - Return every card exactly once, by its id, copied exactly from the list, in the order the book should be read. Do not add, drop, rename or merge cards.
-- The book's chapters are exactly the cards in the list below. A topic that the settings or a summary mention but that is not a card is not a chapter: do not treat it as one.
-- Number chapters only from this list: chapter n is the n-th card in the order you return. In the thread and the decisions, never give a chapter number to, preview or announce as a chapter a topic that is not a card, even when the settings name it (for example a chapter the owner removed).
+- The book's chapters are exactly the cards whose place is a chapter in the list below (the preface and the sections are not chapters). A topic that the settings or a summary mention but that is not a card is not a chapter: do not treat it as one.
+- Number chapters only from this list: chapter n is the card whose place says chapter n; keep the places as given (a section stays in its chapter). In the thread and the decisions, never give a chapter number to, preview or announce as a chapter a topic that is not a card, even when the settings name it (for example a chapter the owner removed).
 - role is one of intro (opens the book or a part; a guide that previews each later chapter in one or two sentences only), body (a main chapter), gallery (a visual walk-through of materials), closing (wraps up).
 - thread: 2 to 4 sentences, one paragraph, no headings or lists.
 - materials: each has a short name and one sentence on how the book uses it. Use only things the titles and summaries point to; an empty list is allowed when they point to none.
@@ -24,5 +24,5 @@ Book title (JSON string):
 Settings the owner already filled (JSON object):
 {"reader":"Curious adults"}
 
-Cards, in their current order (JSON array of {id,title,summary}):
-[{"id":"n1","title":"Introduction to Western art","summary":"What the book covers"},{"id":"n2","title":"Renaissance","summary":"Perspective and the workshop"},{"id":"n3","title":"Baroque","summary":"Light and drama"}]
+Cards, in their current order (JSON array of {id,place,title,summary}):
+[{"id":"n1","place":"preface","title":"Introduction to Western art","summary":"What the book covers"},{"id":"n2","place":"chapter 1","title":"Renaissance","summary":"Perspective and the workshop"},{"id":"n3","place":"chapter 2","title":"Baroque","summary":"Light and drama"}]

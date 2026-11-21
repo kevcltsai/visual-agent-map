@@ -59,7 +59,7 @@ async function rig() {
     runPlan: async (step, request, run) => {
       await run.admission.reserve();
       if (step.id === 'book-pipeline.global-plan') return { thread: 'one thread', cards: nodes.map((n, i) => ({ id: n.id, role: i ? 'body' : 'intro' })), materials: [{ name: 'm', use: 'u' }], decisions: {} };
-      return { covers: `covers ${request.card.position}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }] };
+      return { covers: `covers ${(request.chapters.findIndex(c => c.title === request.card.title) + 1)}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }] };
     },
     runProofread: async (request, run) => { stat.proof.push(request); await run.admission.reserve(); return script.proof(request); },
     author: input => { stat.author.push(input.nodeId); return script.author(input); },
@@ -365,7 +365,7 @@ test('right-click: the rerun item and its disabled sub line show at gate 2 and d
     assert.ok(at >= 0, phase);
     assert.equal(items[at].disabled, false);
     // The second line is a note (never the permanent grey "disabled" line it was): it describes the rerun while it can be used.
-    assert.equal(items[at + 1].title, '企劃 → 寫 → 校，約 2 分鐘；前後章正文不動，只更新「前一張／後一張」並標「接縫需看」');
+    assert.equal(items[at + 1].title, '企劃 → 寫 → 校，約 2 分鐘；前後章正文不動，只更新前後章節的連接行並標「接縫需看」');
     assert.notEqual(items[at + 1].disabled, true);
   }
   // When it cannot be used the second line says why.

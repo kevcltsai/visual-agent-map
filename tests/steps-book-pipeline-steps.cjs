@@ -127,8 +127,8 @@ test('global plan: every card once with a role, only empty settings decided, str
 });
 
 test('card plan: ids and types assigned, neighbours only when they exist, an empty checklist is refused', () => {
-  const request = { ...base, thread: 'thread', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }, { position: 3, title: 'Outro' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' }, previous: { position: 1, title: 'Intro', summary: 'sum' } };
-  const good = over => JSON.stringify({ covers: 'covers\n## Detail', entry: 'entry', handoff: 'next q', previous: 'prev line', next: 'should be dropped', images: [], checklist: [{ type: 'structure', text: 'Shape' }, { type: 'fact', text: 'Date 1415' }], ...over });
+  const request = { ...base, thread: 'thread', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }, { place: 'chapter 2', title: 'Outro' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 's' }, previous: { position: 1, title: 'Intro', summary: 'sum' } };
+  const good = over => JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'covers\n## Detail', entry: 'entry', handoff: 'next q', previous: 'prev line', next: 'should be dropped', images: [], checklist: [{ type: 'structure', text: 'Shape' }, { type: 'fact', text: 'Date 1415' }], ...over });
   const result = plain(cardPlan.cardPlanStep.parse(good(), request));
   assert.deepEqual(result.checklist.map(c => `${c.id}:${c.type}`), ['C1:structure', 'C2:fact']);
   assert.equal(result.covers, 'covers ## Detail'); assert.equal(result.previous, 'prev line'); assert.equal(result.next, '');
@@ -498,8 +498,8 @@ const noContent = (log, spy, what) => {
 test('exchange log: success, parse error and provider error keep titles, chapter text and replies out of the log', async () => {
   const spy = consoleSpy();
   try {
-    const request = { ...base, thread: 'thread', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }, { position: 3, title: 'Outro' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 'SECRET-BODY summary' } };
-    const goodPlan = JSON.stringify({ covers: 'SECRET-REPLY covers', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: [{ type: 'fact', text: 'SECRET-REPLY' }] });
+    const request = { ...base, thread: 'thread', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }, { place: 'chapter 2', title: 'Outro' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 'SECRET-BODY summary' } };
+    const goodPlan = JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'SECRET-REPLY covers', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: [{ type: 'fact', text: 'SECRET-REPLY' }] });
     const ok = harness({ answer: goodPlan });
     const parsed = await runMod.runPlanStep(ok.planCalls, cardPlan.cardPlanStep, request, { signal: signal() });
     assert.equal(parsed.checklist.length, 1); noContent(ok.log, spy, 'plan success');
@@ -541,8 +541,8 @@ test('pipeline log line: only ids, counts, codes and milliseconds', () => {
 });
 
 test('card plan: an unconditional picture requirement is dropped by program, a conditional one stays, none left is a failure', () => {
-  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }, { position: 3, title: 'Outro' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
-  const good = list => JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: list });
+  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }, { place: 'chapter 2', title: 'Outro' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 's' } };
+  const good = list => JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: list });
   const result = plain(cardPlan.cardPlanStep.parse(good([
     { type: 'structure', text: '本章以圖為主、文字為輔' },
     { type: 'structure', text: 'The chapter is illustrated with pictures' },
@@ -555,8 +555,8 @@ test('card plan: an unconditional picture requirement is dropped by program, a c
 });
 
 test('card plan: objective art-history items are kept, picture requirements (traditional and simplified) are dropped, 若干 is not a condition', () => {
-  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }, { position: 3, title: 'Outro' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
-  const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: texts.map(text => ({ type: 'fact', text })) }), request)).checklist.map(c => c.text);
+  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }, { place: 'chapter 2', title: 'Outro' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 's' } };
+  const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: texts.map(text => ({ type: 'fact', text })) }), request)).checklist.map(c => c.text);
   assert.deepEqual(run(['圖像學特徵說明正確', '聖像的圖像特徵描述正確', '每段附一張圖片', '每段配图', '每段附一张图片', '若干作品列出年代']), ['圖像學特徵說明正確', '聖像的圖像特徵描述正確', '若干作品列出年代']);
 });
 
@@ -583,7 +583,7 @@ test('proofread: a whole-card failure carries the judged items as a partial resu
 
 test('author requirements: the fixed chapter rules always come first, the settings after', () => {
   const none = settings.bookAuthorRequirements({});
-  assert.match(none, /Open with this chapter's own scene, question or claim/); assert.match(none, /Do not open by recapping or pointing back to the previous chapter/); assert.match(none, /never cards/); assert.match(none, /End with one sentence that leads into the next chapter/); assert.match(none, /Do not end the chapter with an update log/); assert.match(none, /no next chapter \(the last card\).*close the whole book/); assert.match(none, /what the later chapters show together and why/);
+  assert.match(none, /Open with this chapter's own scene, question or claim/); assert.match(none, /Do not open by recapping or pointing back to the previous chapter/); assert.match(none, /never cards/); assert.match(none, /End with one sentence that leads into the next chapter/); assert.match(none, /Do not end the chapter with an update log/); assert.match(none, /A section whose brief has no next section .* leads into the next chapter its handoff names/); assert.match(none, /neither a next section nor a next chapter \(the book's last card\).*closes the whole book/); assert.match(none, /what the later chapters show together and why/);
   const some = settings.bookAuthorRequirements({ tone: 'warm' });
   assert.ok(some.startsWith(none)); assert.match(some, /- tone: warm/);
   assert.doesNotMatch(none, /The whole book's chapters/, 'no chapter list when none is given');
@@ -595,8 +595,8 @@ test('author requirements: the fixed chapter rules always come first, the settin
 // ---- second device acceptance: subjective items, proofread counts, author picture rule ----
 
 test('card plan: subjective or evaluative items (Traditional and Simplified) are dropped and counted; structural quote-checkable items stay', () => {
-  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }, { position: 3, title: 'Outro' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
-  const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: texts.map(text => ({ type: 'structure', text })) }), request));
+  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }, { place: 'chapter 2', title: 'Outro' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 's' } };
+  const run = texts => plain(cardPlan.cardPlanStep.parse(JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: texts.map(text => ({ type: 'structure', text })) }), request));
   const result = run(['開頭說明為何值得注意', '開头段落提及接入点「透視法」', '本章内容精彩生动', '結尾段落回應「留給下一張的問題」', '這個發明很重要', '出現作品名與年份', '文字引人入勝', '开头说明为何值得关注']);
   assert.deepEqual(result.checklist.map(c => c.text), ['開头段落提及接入点「透視法」', '結尾段落回應「留給下一張的問題」', '出現作品名與年份']);
   assert.equal(result.droppedSubjective, 5);
@@ -675,8 +675,8 @@ const slots = load('core/book-pipeline/image-slots.ts');
 const slot = (index, extra = {}) => ({ index, kind: 'painting', explains: `shows thing ${index}`, anchor: `after paragraph ${index}`, ...extra });
 
 test('card plan images: indexes 1..n assigned by program, 0 to 8 slots (cut to 8 without an owner count, refused past 12), fields single-line without marker brackets or the separator; missing/extra keys refused', () => {
-  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }, { position: 3, title: 'Outro' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
-  const good = images => JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images });
+  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }, { place: 'chapter 2', title: 'Outro' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 's' } };
+  const good = images => JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images });
   assert.deepEqual(plain(cardPlan.cardPlanStep.parse(good([]), request).images), []);
   const two = plain(cardPlan.cardPlanStep.parse(good([{ kind: 'map', explains: 'the 〔圖位 9：x〕 route\nof trade｜x', anchor: 'after the first paragraph' }, { kind: 'photo', explains: 'a port', anchor: 'end' }]), request).images);
   assert.deepEqual(two.map(s => s.index), [1, 2]);
@@ -686,14 +686,14 @@ test('card plan images: indexes 1..n assigned by program, 0 to 8 slots (cut to 8
   assert.throws(() => cardPlan.cardPlanStep.parse(good(Array.from({ length: 13 }, () => nine[0])), request), /0 to 12/);
   assert.throws(() => cardPlan.cardPlanStep.parse(good([{ kind: 'k', explains: 'e' }]), request), /unexpected fields/);
   assert.throws(() => cardPlan.cardPlanStep.parse(good([{ kind: 'k', explains: '〔〕', anchor: 'a' }]), request), /image explains/);
-  assert.throws(() => cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }] }), request), /unexpected fields/);
+  assert.throws(() => cardPlan.cardPlanStep.parse(JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }] }), request), /unexpected fields/);
   assert.equal(cardPlan.CARD_PLAN_SCHEMA.properties.images.maxItems, 12); assert.ok(cardPlan.CARD_PLAN_SCHEMA.required.includes('images'));
   assert.match(cardPlan.cardPlanStep.render(request), /"images":\[\{"kind":"","explains":"","anchor":"","search":\["",""\]\}\]/);
 });
 
 test('card plan images: each slot asks for 2 to 4 English search terms; kept cleaned (no separator, Latin only, at most 4), and a slot without them still parses', () => {
-  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Chapter two' }, { position: 3, title: 'Outro' }], card: { id: 'n2', position: 2, total: 3, role: 'body', title: TITLE, summary: 's' } };
-  const good = images => JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images });
+  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }, { place: 'chapter 2', title: 'Outro' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 's' } };
+  const good = images => JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images });
   const search = cardPlan.CARD_PLAN_SCHEMA.properties.images.items.properties.search;
   assert.equal(search.minItems, 2); assert.equal(search.maxItems, 4); assert.ok(cardPlan.CARD_PLAN_SCHEMA.properties.images.items.required.includes('search'));
   assert.match(cardPlan.cardPlanStep.render(request), /search \(2 to 4 English search terms for a Wikimedia Commons file search/);
@@ -906,7 +906,7 @@ test('verdict reducer: any unmet point (some structure points included) or an em
 
 // ---- T10c: child cards in the card plan, chapter titles in the global plan (Bug4) ----
 const { estimateTokens } = load('ai/context-builder.ts');
-const planBase = (over = {}) => ({ ...base, thread: 'thread', settings: {}, materials: [], chapters: [{ position: 1, title: 'Intro' }, { position: 2, title: 'Two' }], card: { id: 'n2', position: 2, total: 2, role: 'body', title: 'Two', summary: 's' }, ...over });
+const planBase = (over = {}) => ({ ...base, thread: 'thread', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Two' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: 'Two', summary: 's' }, ...over });
 const kids = (n, make = i => ({ title: `Kid ${i + 1}`, summary: `Kid summary ${i + 1}` })) => Array.from({ length: n }, (_, i) => make(i));
 const childBlock = prompt => { const at = prompt.indexOf('Child cards of this chapter (JSON array):\n'); return at < 0 ? null : JSON.parse(prompt.slice(at + 'Child cards of this chapter (JSON array):\n'.length).split('\n\n')[0]); };
 
@@ -946,7 +946,7 @@ test('T10c card plan: long child titles are cut at 80 and summaries at 200 chara
 });
 
 test('T10c card plan: near the 32,000-token budget the child cards go first; a chapter list that does not fit refuses the step and is never cut', () => {
-  const chaptersOf = (n, len) => Array.from({ length: n }, (_, i) => ({ position: i + 1, title: `${i}`.padEnd(len, '章') }));
+  const chaptersOf = (n, len) => Array.from({ length: n }, (_, i) => ({ place: `chapter ${i + 1}`, title: `${i}`.padEnd(len, '章') }));
   const roomy = planBase({ chapters: chaptersOf(100, 20), children: kids(60, i => ({ title: `T${i}`.padEnd(80, '題'), summary: '摘'.repeat(200) })) });
   const alone = cardPlan.fitCardPlan({ ...roomy, children: [] });
   const withKids = cardPlan.fitCardPlan(roomy);
@@ -956,23 +956,23 @@ test('T10c card plan: near the 32,000-token budget the child cards go first; a c
   while (n < 5000) { const request = planBase({ chapters: chaptersOf(n, 40), children: roomy.children }); const f = cardPlan.fitCardPlan(request); if (f && f.shown < 60) { tight = { request, f }; break; } n += 25; }
   assert.ok(tight, 'a list size exists where children are trimmed but the step still fits');
   assert.ok(estimateTokens(tight.f.prompt + JSON.stringify(cardPlan.CARD_PLAN_SCHEMA)) <= 32000);
-  assert.equal(JSON.parse(tight.f.prompt.match(/\[\{"position":1,"title".*?\}\]/s)[0].replace(/\n.*/s, '')).length, n, 'every chapter is still listed');
+  assert.equal(JSON.parse(tight.f.prompt.match(/\[\{"place":"chapter 1","title".*?\}\]/s)[0].replace(/\n.*/s, '')).length, n, 'every chapter is still listed');
   // too many chapters: refused, not shortened
   const huge = planBase({ chapters: chaptersOf(3000, 200), children: kids(3) });
   assert.equal(cardPlan.cardPlanFits(huge), false);
   assert.equal(cardPlan.fitCardPlan(huge), undefined);
   assert.throws(() => cardPlan.cardPlanStep.policy(cardPlan.cardPlanStep.render(huge), huge), /chapter list is too long/);
-  assert.ok(cardPlan.cardPlanStep.render(huge).includes(`"position":3000`), 'render never drops a chapter');
+  assert.ok(cardPlan.cardPlanStep.render(huge).includes(`"place":"chapter 3000"`), 'render never drops a chapter');
 });
 
 test('T10c card plan: a legal chapter past the cut point is still in the chapter list', () => {
-  const chapters = Array.from({ length: 400 }, (_, i) => ({ position: i + 1, title: `Chapter ${i + 1}` }));
-  const request = planBase({ chapters, card: { id: 'n9', position: 400, total: 400, role: 'body', title: 'Last', summary: 's' }, children: kids(120, i => ({ title: `T${i}`.padEnd(80, '題'), summary: '摘'.repeat(200) })) });
+  const chapters = Array.from({ length: 400 }, (_, i) => ({ place: `chapter ${i + 1}`, title: `Chapter ${i + 1}` }));
+  const request = planBase({ chapters, card: { id: 'n9', kind: 'chapter', chapter: 400, role: 'body', title: 'Last', summary: 's' }, children: kids(120, i => ({ title: `T${i}`.padEnd(80, '題'), summary: '摘'.repeat(200) })) });
   const fitted = cardPlan.fitCardPlan(request);
   assert.ok(fitted.shown < 120, 'the children were cut');
-  assert.ok(fitted.prompt.includes('"position":400,"title":"Chapter 400"'));
-  assert.ok(fitted.prompt.includes('"position":1,"title":"Chapter 1"'));
-  const parsed = cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: [{ type: 'structure', text: 'Shape' }] }), request);
+  assert.ok(fitted.prompt.includes('"place":"chapter 400","title":"Chapter 400"'));
+  assert.ok(fitted.prompt.includes('"place":"chapter 1","title":"Chapter 1"'));
+  const parsed = cardPlan.cardPlanStep.parse(JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: [{ type: 'structure', text: 'Shape' }] }), request);
   assert.ok(parsed);
 });
 
@@ -999,9 +999,124 @@ test('T10c global plan: child titles ride per card with moreChildren, only with 
 
 test('rerun fix 3: card and global plan prompts number chapters only from the authoritative list and never number a non-listed topic', () => {
   const card = cardPlan.cardPlanStep.render(planBase());
-  assert.match(card, /Number chapters only from this list: chapter n is the entry with position n\./);
+  assert.match(card, /Number chapters only from this list: chapter n is the entry whose place is "chapter n"; the preface and the sections never get a chapter number\./);
   assert.match(card, /never gets a chapter number and is never announced as a chapter/);
   const global = globalPlan.globalPlanStep.render(globalRequest());
-  assert.match(global, /Number chapters only from this list: chapter n is the n-th card in the order you return\./);
+  assert.match(global, /Number chapters only from this list: chapter n is the card whose place says chapter n; keep the places as given/);
   assert.match(global, /never give a chapter number to, preview or announce as a chapter a topic that is not a card/);
+});
+
+// ---- book-chapter-plan P2: content headings (points) and the neighbour lines by card kind ----
+const pointsReply = points => JSON.stringify({ covers: 'c', points, entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: [{ type: 'structure', text: 'Shape' }] });
+
+test('A5 card plan points: two are refused, seven are cut to six, one line each of at most 40 characters, "·" written as "・", empty ones do not count', () => {
+  const request = planBase();
+  assert.throws(() => cardPlan.cardPlanStep.parse(pointsReply(['a', 'b']), request), /points/);
+  assert.throws(() => cardPlan.cardPlanStep.parse(pointsReply(['a', 'b', '  ', '']), request), /points/, 'blank items do not count');
+  assert.throws(() => cardPlan.cardPlanStep.parse(JSON.stringify({ covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', images: [], checklist: [{ type: 'structure', text: 'Shape' }] }), request), undefined, 'points are required');
+  const seven = cardPlan.cardPlanStep.parse(pointsReply(['1', '2', '3', '4', '5', '6', '7']), request);
+  assert.deepEqual(plain(seven.points), ['1', '2', '3', '4', '5', '6']);
+  const odd = cardPlan.cardPlanStep.parse(pointsReply(['a · b', 'x\ny', '題'.repeat(60)]), request);
+  assert.deepEqual(plain(odd.points.slice(0, 2)), ['a ・ b', 'x y']);
+  assert.equal(Array.from(odd.points[2]).length, 40);
+  assert.ok(cardPlan.CARD_PLAN_SCHEMA.required.includes('points'));
+});
+
+test('A5 card plan Prompt: the 內容標題 / Content headings line is written after covers and read back; a Prompt without it reads as undefined', () => {
+  const plan = { role: 'body', covers: 'c', points: ['Dome', 'Light · shade', 'Workshops'], entry: 'e', handoff: 'h', checklist: [{ id: 'C1', type: 'fact', text: 'Date 1415' }] };
+  const zh = planText.composeCardPrompt(plan, 'zh-TW');
+  const en = planText.composeCardPrompt(plan, 'en');
+  assert.match(zh, /^本章會講：c\n內容標題：Dome · Light ・ shade · Workshops\n接入點：/m);
+  assert.match(en, /^Content headings: Dome · Light ・ shade · Workshops$/m);
+  assert.deepEqual(plain(planText.parseCardPoints(zh)), ['Dome', 'Light ・ shade', 'Workshops']);
+  assert.deepEqual(plain(planText.parseCardPoints(en)), ['Dome', 'Light ・ shade', 'Workshops']);
+  const old = planText.composeCardPrompt({ ...plan, points: undefined }, 'zh-TW');
+  assert.equal(planText.parseCardPoints(old), undefined);
+  assert.equal(planText.parseCardPrompt(zh).covers, 'c', 'covers stays');
+});
+
+test('A6 neighbour lines: chapter labels with the preface before chapter 1; section labels without numbers; 無 when none; English labels', () => {
+  const base = { role: 'body', covers: 'c', entry: 'e', handoff: 'h', checklist: [{ id: 'C1', type: 'structure', text: 'x' }] };
+  const first = planText.composeCardPrompt({ ...base, kind: 'chapter', previous: { position: 'preface', title: 'Intro', summary: 's1' }, next: { position: 2, title: 'Two', summary: 's2' } }, 'zh-TW');
+  assert.match(first, /^上一章：\(前言\) Intro — s1$/m);
+  assert.match(first, /^下一章：\(2\) Two — s2$/m);
+  const last = planText.composeCardPrompt({ ...base, kind: 'chapter', previous: { position: 1, title: 'One', summary: 's' } }, 'en');
+  assert.match(last, /^Previous chapter: \(1\) One — s$/m);
+  assert.match(last, /^Next chapter: none$/m);
+  assert.match(planText.composeCardPrompt({ ...base, kind: 'chapter', previous: { position: 'preface', title: 'Intro', summary: '' } }, 'en'), /^Previous chapter: \(Preface\) Intro$/m);
+  const section = planText.composeCardPrompt({ ...base, kind: 'section', parent: { position: 2, title: 'Two' }, next: { title: 'S2', summary: 'after' } }, 'zh-TW');
+  assert.match(section, /^所屬章：\(2\) Two$/m);
+  assert.match(section, /^前一節：無$/m);
+  assert.match(section, /^後一節：S2 — after$/m);
+  const sectionEn = planText.composeCardPrompt({ ...base, kind: 'section', parent: { position: 2, title: 'Two' }, previous: { title: 'S1', summary: 'before' } }, 'en');
+  assert.match(sectionEn, /^Chapter: \(2\) Two$/m);
+  assert.match(sectionEn, /^Previous section: S1 — before$/m);
+  assert.match(sectionEn, /^Next section: none$/m);
+});
+
+test('A6 parseCardPrompt reads the new labels, the old 前一張 / 後一張 (zh, en) and the parent line under the same keys', () => {
+  const parsed = planText.parseCardPrompt('角色：本文\n所屬章：(2) Two\n前一節：S1 — a\n後一節：無');
+  assert.equal(parsed.parent, '(2) Two'); assert.equal(parsed.previous, 'S1 — a'); assert.equal(parsed.next, '無');
+  assert.equal(planText.parseCardPrompt('上一章：(前言) I — x\n下一章：(2) T').previous, '(前言) I — x');
+  assert.equal(planText.parseCardPrompt('前一張：(1) A — x\n後一張：(3) C').next, '(3) C');
+  assert.equal(planText.parseCardPrompt('Previous card: (1) A\nNext card: (3) C').previous, '(1) A');
+  assert.equal(planText.parseCardPrompt('Previous chapter: (1) A\nNext chapter: (3) C\nChapter: (2) B').parent, '(2) B');
+  assert.equal(planText.parseCardPrompt('Previous section: A\nNext section: B').next, 'B');
+});
+
+test('A6 neighbourLineTitle / rewriteNeighbourLine / retargetNeighbourLine take the kind, write the new label and survive (前言)', () => {
+  const { neighbourLineTitle, rewriteNeighbourLine, retargetNeighbourLine } = planText;
+  assert.equal(neighbourLineTitle('上一章：(前言) Intro — x', 'previous'), 'Intro');
+  assert.equal(neighbourLineTitle('Previous chapter: (Preface) Intro', 'previous'), 'Intro');
+  assert.equal(neighbourLineTitle('前一張：(3) Old — x', 'previous'), 'Old', 'an old line is read');
+  assert.equal(neighbourLineTitle('前一節：S1 — x', 'previous', 'section'), 'S1');
+  assert.equal(neighbourLineTitle('前一張：(3) X — s', 'previous', 'section'), 'X', 'an old numbered line read for a section');
+  assert.equal(neighbourLineTitle('所屬章：(2) Two', 'parent', 'section'), 'Two');
+  assert.equal(neighbourLineTitle('前一節：無', 'previous', 'section'), undefined);
+  assert.equal(neighbourLineTitle('上一章：無', 'previous'), undefined);
+  // rewrite: an old line takes the label of the kind; the preface may be the position
+  assert.equal(rewriteNeighbourLine('前一張：(2) A — a', 'previous', { position: 'preface', title: 'Intro', summary: 'i' }, 'chapter'), '上一章：(前言) Intro — i');
+  assert.equal(rewriteNeighbourLine('Previous card: (2) A', 'previous', { position: 'preface', title: 'Intro', summary: '' }, 'chapter'), 'Previous chapter: (Preface) Intro');
+  assert.equal(rewriteNeighbourLine('後一張：(3) C — c', 'next', { title: 'S2', summary: 'two' }, 'section'), '後一節：S2 — two');
+  assert.equal(rewriteNeighbourLine('Next card: (3) C', 'next', null, 'section'), 'Next section: none');
+  assert.equal(rewriteNeighbourLine('上一章：(1) A — a', 'previous', { position: 1, title: 'A', summary: 'a' }, 'chapter'), undefined, 'already says it');
+  // retarget: (前言) is a position like any other
+  const line = '上一章：(前言) Intro — about';
+  assert.equal(retargetNeighbourLine(line, 'previous', { position: 'preface', title: 'Intro', summary: 'new' }, 'chapter'), undefined, 'names it already');
+  assert.equal(retargetNeighbourLine(line, 'previous', { position: 1, title: 'Intro', summary: 'new' }, 'chapter'), '上一章：(1) Intro — about', 'only the position moved: the sentence is kept');
+  assert.equal(retargetNeighbourLine('上一章：(1) A — a', 'previous', { position: 'preface', title: 'Intro', summary: 'n' }, 'chapter'), '上一章：(前言) Intro — n');
+  assert.equal(retargetNeighbourLine('前一節：S1 — about', 'previous', { title: 'S1', summary: 'new' }, 'section'), undefined);
+  assert.equal(retargetNeighbourLine('前一節：S1 — about', 'previous', { title: 'S0', summary: 'new' }, 'section'), '前一節：S0 — new');
+});
+
+test('A6 card plan request: a section prompt carries its chapter and (last section) the next chapter; a chapter prompt has no section lines; continuity rules follow the kind', () => {
+  const section = cardPlan.cardPlanStep.render(planBase({ card: { id: 's2', kind: 'section', chapter: 2, sectionIndex: 2, sectionCount: 2, role: 'body', title: 'Two', summary: 's' }, parent: { position: 2, title: 'Chapter two' }, previous: { title: 'One', summary: 'o' }, nextChapter: { position: 3, title: 'Outro', summary: 'x' } }));
+  assert.match(section, /"place":"section 2 of 2 in chapter 2"/);
+  assert.match(section, /Chapter this section belongs to \(JSON object\):\n\{"place":"chapter 2","title":"Chapter two"\}/);
+  assert.match(section, /Next chapter, which this section's handoff leads to \(JSON object\):\n\{"place":"chapter 3","title":"Outro"/);
+  assert.match(section, /its entry takes up where the previous section ended/);
+  assert.match(section, /last section of the chapter, its handoff leads out to the next chapter/);
+  const firstSection = cardPlan.cardPlanStep.render(planBase({ card: { id: 's1', kind: 'section', chapter: 2, sectionIndex: 1, sectionCount: 2, role: 'body', title: 'One', summary: 's' }, parent: { position: 2, title: 'Chapter two' }, next: { title: 'Two', summary: 't' } }));
+  assert.match(firstSection, /first section of its chapter, so its entry takes up the chapter's own text/);
+  assert.ok(!/Next chapter, which/.test(firstSection));
+  const chapter = cardPlan.cardPlanStep.render(planBase({ previous: { position: 'preface', title: 'Intro', summary: 'i' }, next: { position: 2, title: 'Next', summary: 'n' } }));
+  assert.ok(!/belongs to|Next chapter, which/.test(chapter));
+  assert.match(chapter, /"place":"preface","title":"Intro"/);
+  assert.match(chapter, /takes up the end of the previous chapter .* and does not retell it\. This chapter has no sections, so its handoff leads into the next chapter\./);
+  const lastChapter = cardPlan.cardPlanStep.render(planBase({ previous: { position: 1, title: 'One', summary: 'o' } }));
+  assert.match(lastChapter, /has no sections and is the last, so its handoff closes the book/);
+  assert.ok(!/leads into the next chapter/.test(lastChapter));
+  const lastSection = cardPlan.cardPlanStep.render(planBase({ card: { id: 's2', kind: 'section', chapter: 2, sectionIndex: 2, sectionCount: 2, role: 'body', title: 'Two', summary: 's' }, parent: { position: 2, title: 'Chapter two' }, previous: { title: 'One', summary: 'o' } }));
+  assert.match(lastSection, /last section of the last chapter, so its handoff closes the book/);
+  assert.ok(!/closes the chapter|leads out to the next chapter/.test(lastSection));
+  const withSections = cardPlan.cardPlanStep.render(planBase({ children: [{ title: 'S1', summary: 'a' }] }));
+  assert.match(withSections, /handoff leads into its own first section/);
+});
+
+test('A6 global plan: every card carries its place, and the prompt explains the preface, chapters and sections', () => {
+  const text = globalPlan.globalPlanStep.render(globalRequest({ cards: [{ id: 'r', place: 'preface', title: 'Root', summary: 's' }, { id: 'a', place: 'chapter 1', title: 'A', summary: 's' }, { id: 'b', place: 'section 1 of 1 in chapter 1', title: 'B', summary: 's' }] }));
+  assert.match(text, /\{"id":"r","place":"preface","title":"Root"/);
+  assert.match(text, /\{"id":"b","place":"section 1 of 1 in chapter 1"/);
+  assert.match(text, /The root card is the preface/);
+  assert.ok(!/Every card is one chapter/.test(text));
 });

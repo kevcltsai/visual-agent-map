@@ -3,6 +3,7 @@ import { cardRevision } from "../../core/book-pipeline/machine";
 import { chapterInconsistencies } from "../../core/book-pipeline/consistency";
 import type { MapDocument } from "../../map-model";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
+import { bookStructure } from "../../core/book-pipeline/structure";
 import { effectiveOrder, readBookPipeline, type BookPipelineData } from "../../core/book-pipeline/model";
 import { hashText } from "../../core/book-pipeline/text";
 import type { PipelineCard } from "./book-pipeline-run";
@@ -23,6 +24,7 @@ import {
   type Gate2Card,
   type HandEditBox,
   trialCallout,
+  type TrialPlace,
   type BookNoteLink,
   type ReviewState
 } from "./book-pipeline-review";
@@ -457,6 +459,41 @@ export class BookCallouts {
           noteOf: id => this.noteInput(byId.get(id))
         }).map(entry => [entry.card.id, entryReasons(entry)] as const)
       );
+      // A trial of the preface and chapter 1 names each card's place in the book; an older trial keeps "chapter i of n".
+      const rootId = map.nodes.find(node => !node.parentId)?.id ?? "";
+      const structure = bookStructure(
+        effectiveOrder(data),
+        id => map.nodes.find(node => node.id === id)?.parentId,
+        rootId
+      );
+      const wantedTrial = structure.trialOf();
+      const placed = trial.length === wantedTrial.length && trial.every(id => wantedTrial.includes(id));
+      const titleOf = (id: string | undefined): string => (id ? (byId.get(id)?.title ?? "") : "");
+      const placeOf = (id: string): TrialPlace | undefined => {
+        const place = structure.placeOf(id);
+        if (!placed || !place) return undefined;
+        const around = structure.neighboursOf(id);
+        if (place.kind === "preface") return { kind: "preface", next: link(around.next) };
+        if (place.kind === "chapter")
+          return {
+            kind: "chapter",
+            chapter: place.chapter,
+            chapterTitle: titleOf(id),
+            sectionTitles: structure.sectionsOf(id).map(titleOf),
+            previous: link(around.previous),
+            next: link(around.next)
+          };
+        return {
+          kind: "section",
+          chapter: structure.placeOf(place.chapterId as string)?.chapter,
+          chapterTitle: titleOf(place.chapterId),
+          sectionIndex: place.sectionIndex,
+          sectionCount: place.sectionCount,
+          parent: link(around.parent),
+          previous: link(around.previous),
+          next: link(around.next)
+        };
+      };
       trial.forEach((id, at) => {
         if (!byId.has(id)) return;
         wanted.set(id, {
@@ -472,7 +509,8 @@ export class BookCallouts {
               runId: data.runId,
               nodeId: id
             },
-            reasons.get(id)
+            reasons.get(id),
+            placeOf(id)
           )
         });
       });

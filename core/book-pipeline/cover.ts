@@ -90,7 +90,9 @@ function parseCommonsUrl(value: string): Parsed | undefined {
 
 /** Candidates whose address passes the download rule; every other host is dropped before a cover is chosen. */
 export function coverCandidates<T extends { url: string }>(candidates: readonly T[]): T[] {
-  return candidates.filter(candidate => parseCommonsUrl(candidate.url) !== undefined && coverDownloadUrl(candidate.url) !== undefined);
+  return candidates.filter(
+    candidate => parseCommonsUrl(candidate.url) !== undefined && coverDownloadUrl(candidate.url) !== undefined
+  );
 }
 
 const BASE = `https://${HOST}/wikipedia/commons`;
@@ -137,7 +139,10 @@ export function coverFileName(title: string, sourceUrl: string, ext: string): st
     .replace(/\.{2,}/g, ".")
     .replace(/\s+/g, " ")
     .trim();
-  const name = Array.from(cleaned.replace(/^[.\s]+/, "")).slice(0, TITLE_MAX).join("").replace(/[.\s]+$/, "");
+  const name = Array.from(cleaned.replace(/^[.\s]+/, ""))
+    .slice(0, TITLE_MAX)
+    .join("")
+    .replace(/[.\s]+$/, "");
   return `${name || "cover"}-${shortHash(sourceUrl)}.${ext}`;
 }
 
@@ -147,4 +152,30 @@ export function coverPath(folder: string, fileName: string): string | undefined 
   const segments = folder.split("/").filter(Boolean);
   if (segments.some(segment => segment === "." || segment === ".." || segment.includes("\\"))) return undefined;
   return [...segments, fileName].join("/");
+}
+
+/** The folder of a book's saved covers, inside the book's own folder. */
+export const coverFolderName = (language: string): string => (/^zh/i.test(language) ? "封面圖" : "Covers");
+
+/** A caption that only names the file (`File:Foo.jpg`, `Foo_bar.jpg`, or the picture address's own file name): not placed as a caption. */
+export function captionIsFileName(caption: string, imageUrl: string): boolean {
+  const text = caption.replace(/^\s*(?:File|檔案|文件|Image):\s*/i, "").trim();
+  if (!text) return false;
+  if (/\.(?:jpe?g|png|webp|svg|gif|tiff?)$/i.test(text)) return true;
+  const stem = (value: string): string =>
+    value
+      .replace(/\.(?:jpe?g|png|webp|svg|gif)(?:\.png)?$/i, "")
+      .replace(/^\d+px-/, "")
+      .replace(/[_\s]+/g, " ")
+      .trim()
+      .toLowerCase();
+  let name = "";
+  try {
+    const parts = new URL(imageUrl).pathname.split("/");
+    // A thumbnail address ends in the sized name; the file's own name is the segment before it.
+    name = decodeURIComponent(parts[parts.length - (parts.includes("thumb") ? 2 : 1)] ?? "");
+  } catch {
+    return false;
+  }
+  return !!name && stem(text) === stem(name);
 }

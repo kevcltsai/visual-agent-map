@@ -59,6 +59,8 @@ import { runFindImages } from "./core/steps/book-pipeline/find-images";
 import { runAiBookProof, runAiProof } from "./core/steps/book-pipeline/ai-proof";
 import { runAiFix } from "./core/steps/book-pipeline/ai-fix";
 import { COMMONS_API } from "./core/book-pipeline/commons-search";
+import { downloadCover, saveCover } from "./core/book-pipeline/cover-download";
+import { withCover } from "./experiences/visual-map/card-cover";
 import { runSuggestSettings } from "./core/steps/book-pipeline/suggest-settings";
 import type { BookSettings } from "./core/book-pipeline/model";
 import {
@@ -386,6 +388,9 @@ interface PendingRename {
   file: TFile;
   external: boolean;
 }
+/** The plugin's public repository page (the README's address): the contact part of the Wikimedia User-Agent. */
+const PUBLIC_REPO_URL = "https://github.com/kevcltsai/visual-agent-map";
+
 export default class VisualAgentMapPlugin extends Plugin {
   /** Diagnostics for the mermaid zoom viewer (observer count); read by UI checks only. */
   mermaidZoom: MermaidZoomHandle | null = null;
@@ -917,6 +922,38 @@ export default class VisualAgentMapPlugin extends Plugin {
       });
       return { status: response.status, text: response.text, headers: response.headers };
     },
+    // The cover picture: only upload.wikimedia.org (downloadCover refuses every other address before any request). requestUrl cannot
+    // be aborted, so downloadCover drops an answer that arrives late. Wikimedia's policy asks for the client name, version and a contact
+    // address; the plugin's public repository page is that address (no user data is sent).
+    fetchCoverImage: (url, signal) =>
+      downloadCover(
+        url,
+        async (address, init) => {
+          const response = await requestUrl({ url: address, method: "GET", headers: init.headers, throw: false });
+          return { status: response.status, headers: response.headers, bytes: response.arrayBuffer };
+        },
+        { signal, userAgent: `VisualAgentMap-Obsidian-plugin/${this.manifest.version} (${PUBLIC_REPO_URL})` }
+      ),
+    setCoverLink: (content, link) => withCover(content, link),
+    saveCover: (folder, title, sourceUrl, download, signal) =>
+      saveCover(
+        {
+          exists: path => this.app.vault.adapter.exists(normalizePath(path)),
+          createBinary: (path, data) => this.app.vault.createBinary(normalizePath(path), data),
+          ensureFolder: async path => {
+            let current = "";
+            for (const part of normalizePath(path).split("/")) {
+              current = current ? `${current}/${part}` : part;
+              if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
+            }
+          }
+        },
+        folder,
+        title,
+        sourceUrl,
+        download,
+        signal
+      ),
     author: async input => {
       const view = this.views().find(item => item.mapPath === input.mapPath);
       if (view) return view.runBookAuthor(input);

@@ -27,8 +27,7 @@ export type CoverFetch = (url: string, init: { headers: Record<string, string> }
 
 export type CoverFailure = "url" | "status" | "size" | "type" | "mismatch" | "timeout" | "aborted" | "failed" | "path";
 export type CoverDownload =
-  | { ok: true; bytes: Uint8Array; mime: CoverMime; ext: CoverExt; url: string }
-  | { ok: false; reason: CoverFailure };
+  { ok: true; bytes: Uint8Array; mime: CoverMime; ext: CoverExt; url: string } | { ok: false; reason: CoverFailure };
 
 export interface CoverDownloadOptions {
   signal?: AbortSignal;
@@ -132,9 +131,13 @@ export async function saveCover(
   try {
     await ports.ensureFolder?.(folder);
     if (signal?.aborted) return { ok: false, reason: "aborted" };
-    if (await ports.exists(path)) return signal?.aborted ? { ok: false, reason: "aborted" } : { ok: true, path, reused: true };
+    if (await ports.exists(path))
+      return signal?.aborted ? { ok: false, reason: "aborted" } : { ok: true, path, reused: true };
     if (signal?.aborted) return { ok: false, reason: "aborted" };
-    const data = download.bytes.buffer.slice(download.bytes.byteOffset, download.bytes.byteOffset + download.bytes.byteLength) as ArrayBuffer;
+    const data = download.bytes.buffer.slice(
+      download.bytes.byteOffset,
+      download.bytes.byteOffset + download.bytes.byteLength
+    ) as ArrayBuffer;
     await ports.createBinary(path, data);
     return { ok: true, path, reused: false };
   } catch {

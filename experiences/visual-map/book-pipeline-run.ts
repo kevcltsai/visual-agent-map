@@ -33,6 +33,7 @@ import { createBudgetAdmission, createStoreBudgetPort } from "../../core/book-pi
 import { imageKey } from "../../core/book-pipeline/image-dedupe";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
 import {
+  commonsQueue,
   searchCommons,
   type CommonsFetch,
   type CommonsQueue,
@@ -185,10 +186,26 @@ import {
   type LengthReason
 } from "../../core/book-pipeline/settings";
 import { escapeMarkdownText, unescapeMarkdownText } from "../../core/book-pipeline/text";
-import { COVER_INDEX, coverAsSlot, coverCandidates } from "../../core/book-pipeline/cover";
-import { coverOwnership, coverSourceKey } from "../../core/book-pipeline/cover-block";
+import {
+  COVER_INDEX,
+  captionIsFileName,
+  coverAsSlot,
+  coverCandidates,
+  coverFolderName
+} from "../../core/book-pipeline/cover";
+import type { CoverDownload, CoverSaved } from "../../core/book-pipeline/cover-download";
+import {
+  composeCoverBlock,
+  coverLinkOf,
+  coverOwnership,
+  coverSourceKey,
+  putCoverBlock,
+  readCoverBlock,
+  stripCoverBlock,
+  type CoverLevel
+} from "../../core/book-pipeline/cover-block";
 import type { ReasoningLevel } from "../../ai/types";
-import type { ContentLanguage } from "../../i18n";
+import { instructionLanguageOf, type ContentLanguage } from "../../i18n";
 import type { MapDocument } from "../../map-model";
 import { isPlaceholder } from "../../core/note-placeholder";
 import type { NotePatch } from "../../repository";
@@ -213,6 +230,7 @@ import {
   type FillResult,
   type ImageSlot,
   type ProbedCandidate,
+  type SlotFigure,
   type SlotOutcome
 } from "../../core/book-pipeline/image-slots";
 import {
@@ -431,6 +449,21 @@ export interface BookPipelinePorts {
   fetchCommons?: CommonsFetch;
   /** The queue every Commons request waits in. Absent: the shared production queue (1 s between requests); tests pass one without real waits. */
   commonsQueue?: CommonsQueue;
+  /**
+   * Production: `downloadCover(url, requestUrl-based fetch, { signal, userAgent })`: the cover picture's bytes, after the address, size, type
+   * and magic-byte checks (only upload.wikimedia.org is ever asked). Absent: no cover is downloaded (the card's cover reads "not found").
+   */
+  fetchCoverImage?(url: string, signal: AbortSignal): Promise<CoverDownload>;
+  /** Production: `saveCover(vault ports, folder, title, url, download, signal)`: a new file in the cover folder, or the one already there; never overwrites. */
+  saveCover?(
+    folder: string,
+    title: string,
+    sourceUrl: string,
+    download: CoverDownload,
+    signal: AbortSignal
+  ): Promise<CoverSaved>;
+  /** Production: `withCover`: the note text with `topic-cover: "[[link]]"` (the card's cover). Absent: the cover block is written without it. */
+  setCoverLink?(content: string, link: string): string;
   backupNote(path: string, raw: string): Promise<{ ok: true; path: string } | { ok: false }>;
   /**
    * Applying the reader's notes (absent: refused as unreadable). `readText` is the note as the writer will see it (an open editor's text
@@ -3543,7 +3576,7 @@ export class BookPipelineRuns {
     // Which check refused the write (logged: live v5 showed only `unsafe_body`).
     let unsafeRule = "";
     let emptyBody = false;
-    const finalize = (original: string): string | null => {
+    const finalizeText = (original: string): string | null => {
       // The card's own stored records come back from the card (carried below), never from what the author kept of them: an exact copy is cut out first.
       const cut = ownRecords.reduce((text, record) => text.split(record).join(""), original);
       const held = holdProofLines(cut, knownLines);
@@ -3602,6 +3635,15 @@ export class BookPipelineRuns {
         return null;
       }
       return stampRaw(merged);
+    };
+    // The cover block (under the title) is not the author's text: it is taken out before the cleaning and put back under the title after,
+    // so neither the tag neutralizing nor the section rules can touch or move it.
+    const finalize = (original: string): string | null => {
+      const block = readCoverBlock(original);
+      if (!block) return finalizeText(original);
+      const text = original.slice(block.from, block.to).replace(/\r$/, "");
+      const out = finalizeText(stripCoverBlock(original));
+      return out === null ? null : putCoverBlock(out, text);
     };
     // Why the author is called now (live v5: an intro's second writing call had no visible reason in the log).
     const attempt = attemptsOf(drive.store.state, nodeId).write;
@@ -3863,7 +3905,20 @@ export class BookPipelineRuns {
     // The cover ask (plan 2026-11-21-book-cover-image): only a card whose Prompt has the cover line (an older book has none), and only
     // while the cover is not the owner's (a replaced, switched-off or edited cover is never searched for again).
     const coverPlan = parseCardCover(first.prompt);
-    const coverSlot = coverPlan && coverOwnership(first.raw) !== "owner" ? coverAsSlot(coverPlan) : undefined;
+    const coverHeld = !!coverPlan && coverOwnership(first.raw) === "owner";
+    const coverSlot = coverPlan && !coverHeld ? coverAsSlot(coverPlan) : undefined;
+    if (coverHeld)
+      this.ports.log(
+        formatPipelineLog({
+          event: "cover_owner_kept",
+          runId: token.runId,
+          card: nodeId,
+          step: "write",
+          attempt,
+          result: "ok",
+          ms: 0
+        })
+      );
     const others = new Set<string>();
     if (slots.length || coverSlot) {
       // What the other chapters already show (not this card's own old pictures: a rerun may pick again).
@@ -4050,7 +4105,7 @@ export class BookPipelineRuns {
       throw error;
     }
     // Re-read the latest text: the search and the probes took time, and the owner may have edited the card.
-    const latest = await this.ports.readCard(path);
+    let latest = await this.ports.readCard(path);
     // The card may have left the map while the search and the probes ran: nothing is claimed or written for it.
     if (!(await this.stillOnMap(drive, nodeId))) return { kind: "failed", reason: "card_removed" };
     // Addresses or works refused because this book already shows them (counted for the log).
@@ -4100,13 +4155,71 @@ export class BookPipelineRuns {
       for (const key of claimed) drive.usedImages.delete(key);
       for (const key of works) drive.usedWorks.delete(key);
     };
+    // The cover: download and save its file, then re-read the card (the download took time) before the one write that carries it.
+    const coverOutcome = coverSlot ? outcomes.get(COVER_INDEX) : undefined;
+    const coverFigure = coverOutcome && "figure" in coverOutcome ? coverOutcome.figure : undefined;
+    const coverKey = coverFigure ? imageKey(coverFigure.href) : undefined;
+    // A cover claim that ends up on no card is given back so another card may use that picture.
+    const releaseCover = (): void => {
+      if (coverKey) drive.usedImages.delete(coverKey);
+      if (coverFigure?.work && works.includes(coverFigure.work)) drive.usedWorks.delete(coverFigure.work);
+    };
+    let coverWrite: { block: string; link?: string } | undefined;
+    let coverResult: "placed" | "missing" | "download_failed" | "owner_kept" | undefined;
+    if (coverSlot) {
+      try {
+        const placed = coverFigure
+          ? (perSlot.get(COVER_INDEX) ?? []).find(item => item.href === coverFigure.href)?.candidate
+          : undefined;
+        const words = askWords({ explains: coverSlot.explains, terms: coverSlot.search, ...hints.get(COVER_INDEX) });
+        const coverOff =
+          !!placed && words.length > 0 && !wordHits(words, `${placed.title} ${placed.description ?? placed.caption}`);
+        const prepared = await this.prepareCover(drive, nodeId, latest.title, coverFigure, coverOff);
+        if (!(await this.stillOnMap(drive, nodeId))) {
+          release();
+          return { kind: "failed", reason: "card_removed" };
+        }
+        latest = await this.ports.readCard(path);
+        const ownership = coverOwnership(latest.raw);
+        if (ownership === "owner") {
+          coverResult = "owner_kept";
+          releaseCover();
+        } else if (prepared.kind === "placed") {
+          coverResult = "placed";
+          coverWrite = { block: prepared.block, link: prepared.link };
+        } else {
+          coverResult = prepared.kind === "failed" ? "download_failed" : "missing";
+          releaseCover();
+          // A cover the program placed earlier stays when this run finds none (a flaky search must not take a good cover away).
+          if (ownership === "none") {
+            const block = composeCoverBlock(this.coverLevelOf(drive, nodeId), instructionLanguageOf(language));
+            if (block) coverWrite = { block };
+          }
+        }
+      } catch (error) {
+        release();
+        throw error;
+      }
+    }
     try {
       const bodyOutcomes = new Map([...outcomes].filter(([index]) => index !== COVER_INDEX));
-      const result = await this.writeFilled(latest, slots, bodyOutcomes, language, authorize, off);
+      const result = await this.writeFilled(latest, slots, bodyOutcomes, language, authorize, off, coverWrite);
       if (typeof result === "string") {
         release();
         return { kind: "failed", reason: result };
       }
+      if (coverResult)
+        this.ports.log(
+          formatPipelineLog({
+            event: `cover_${coverResult}`,
+            runId: token.runId,
+            card: nodeId,
+            step: "write",
+            attempt,
+            result: "ok",
+            ms: 0
+          })
+        );
       this.ports.log(
         formatPipelineLog({
           event: "slots",
@@ -4143,6 +4256,72 @@ export class BookPipelineRuns {
       release();
       throw error;
     }
+  }
+
+  /** The card's level for the cover block's "not found" line: the preface is the book, first-level cards are chapters, the rest sections. */
+  private coverLevelOf(drive: Drive, nodeId: string): CoverLevel {
+    const kind = this.structureOf(drive, effectiveOrder(drive.store.state)).placeOf(nodeId)?.kind;
+    return kind === "preface" ? "book" : kind === "section" ? "section" : "chapter";
+  }
+
+  /**
+   * Downloads the chosen cover (one at a time through the Commons queue, so Wikimedia sees one request a second at most), saves its file in
+   * the book's cover folder and composes the block. `missing`: nothing was chosen; `failed`: the picture could not be downloaded or saved;
+   * a stop or timeout of the run throws like any other step. Nothing is written to the note here.
+   */
+  private async prepareCover(
+    drive: Drive,
+    nodeId: string,
+    title: string,
+    figure: SlotFigure | undefined,
+    off: boolean
+  ): Promise<{ kind: "placed"; block: string; link: string } | { kind: "missing" } | { kind: "failed" }> {
+    if (!figure) return { kind: "missing" };
+    const signal = drive.controller.signal;
+    const ports = this.ports;
+    if (!ports.fetchCoverImage || !ports.saveCover) return { kind: "failed" };
+    const queue = this.ports.commonsQueue ?? commonsQueue;
+    const download = await untilAborted(
+      signal,
+      queue.turn(
+        () => signal.aborted,
+        async () => ports.fetchCoverImage?.(figure.href, signal)
+      )
+    ).catch((error: unknown) => {
+      if (signal.aborted) throw error;
+      return undefined;
+    });
+    if (signal.aborted || (download && !download.ok && download.reason === "aborted")) throw new Error("aborted");
+    if (!download?.ok) return { kind: "failed" };
+    const root = drive.cards.get(drive.rootId);
+    const book = root && root.path.includes("/") ? root.path.slice(0, root.path.lastIndexOf("/")) : "";
+    const folder = [book, coverFolderName(drive.config.language)].filter(Boolean).join("/");
+    const saved = await untilAborted(
+      signal,
+      ports.saveCover?.(folder, title, figure.href, download, signal) ?? Promise.resolve(undefined)
+    ).catch((error: unknown) => {
+      if (signal.aborted) throw error;
+      return undefined;
+    });
+    if (signal.aborted || (saved && !saved.ok && saved.reason === "aborted")) throw new Error("aborted");
+    if (!saved?.ok) return { kind: "failed" };
+    // The caption is the finder's own plain sentence: one that only names the file, or is in another script than the book, is left out.
+    let caption = unescapeMarkdownText(figure.caption);
+    const wrongScript = /^zh/i.test(drive.config.language) && !/[\u3400-\u9fff]/.test(caption);
+    if (
+      wrongScript ||
+      captionIsFileName(caption, figure.href) ||
+      captionLatinIssue(`![](x)\n${caption}`, drive.config.language)
+    )
+      caption = "";
+    const block = composeCoverBlock(this.coverLevelOf(drive, nodeId), instructionLanguageOf(drive.config.language), {
+      file: saved.path,
+      url: figure.href,
+      caption,
+      sourceUrl: figure.source?.href ?? "",
+      ...(off ? { off: true } : {})
+    });
+    return block ? { kind: "placed", block, link: coverLinkOf(saved.path) } : { kind: "missing" };
   }
 
   /** One probe through the run-wide gate: true when the picture loads. A probe that throws (not a Stop) counts as not loaded. */
@@ -4189,7 +4368,8 @@ export class BookPipelineRuns {
     outcomes: ReadonlyMap<number, SlotOutcome>,
     language: string,
     authorize: () => boolean,
-    off?: ReadonlySet<number>
+    off?: ReadonlySet<number>,
+    cover?: { block: string; link?: string }
   ): Promise<FillResult | string> {
     const result = fillSlotMarkers(latest.detail, slots, outcomes);
     const bad = verifyFill(latest.detail, result, slots);
@@ -4200,7 +4380,7 @@ export class BookPipelineRuns {
     const slotted = slots.length ? replaceResearchRecord(withSources, composeSlotsRecord(result, off)) : withSources;
     // The slot fill is the program's own change of the text: its fingerprint follows only if the text it started from still had it.
     const detail = programStamp(latest.detail, slotted);
-    if (detail === latest.detail) return result;
+    if (detail === latest.detail && !cover) return result;
     const outside = residualMarkerLines(latest.raw).length - residualMarkerLines(latest.detail).length;
     const outcome = await this.ports.updateNoteGuarded(
       latest.path,
@@ -4208,7 +4388,13 @@ export class BookPipelineRuns {
       {
         expectedContent: latest.raw,
         authorize,
-        finalize: content => (residualMarkerLines(content).length > Math.max(0, outside) ? null : content)
+        finalize: content => {
+          if (residualMarkerLines(content).length > Math.max(0, outside)) return null;
+          // The cover block and `topic-cover` go in the same write; a cover the owner took over meanwhile is left alone.
+          if (!cover || coverOwnership(content) === "owner") return content;
+          const placed = putCoverBlock(content, cover.block);
+          return cover.link && this.ports.setCoverLink ? this.ports.setCoverLink(placed, cover.link) : placed;
+        }
       }
     );
     return outcome === "discarded" ? "discarded" : result;

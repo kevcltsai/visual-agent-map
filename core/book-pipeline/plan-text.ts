@@ -454,7 +454,14 @@ export function composeBookStructure(entries: readonly StructureEntry[], languag
   const zh = instructionLanguageOf(language) === "zh";
   const pts = (e: StructureEntry): string => pointsText(e.points);
   const coverLine = (e: StructureEntry): string[] =>
-    e.cover ? [composeCoverLine({ explains: safe(cleanSlotText(e.cover.explains, 200), 200), search: [] }, instructionLanguageOf(language))] : [];
+    e.cover
+      ? [
+          composeCoverLine(
+            { explains: safe(cleanSlotText(e.cover.explains, 200), 200), search: [] },
+            instructionLanguageOf(language)
+          )
+        ]
+      : [];
   const lines: string[] = [`### ${pick(L.structure, language)}`];
   for (const e of entries) {
     if (e.kind === "section") {

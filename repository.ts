@@ -321,7 +321,11 @@ export interface OrganizePlan {
 const BOOK_PLAN_MODEL = "claude:sonnet";
 const BOOK_WRITE_MODEL = "claude:opus";
 const BOOK_IMAGE_MODEL = "claude:haiku";
-const BOOK_PROOF_MODEL = "claude:haiku";
+/** The AI proofread model when none is set: not the author's own model and not weaker (opus: sonnet, sonnet: opus, haiku or unknown: sonnet). */
+export function defaultProofModel(authorModel: string): string {
+  return authorModel.includes("sonnet") ? "claude:opus" : "claude:sonnet";
+}
+const BOOK_PROOF_MODEL = defaultProofModel(BOOK_WRITE_MODEL);
 export const DEFAULT_SETTINGS: Settings = {
   detailTemplates: [],
   coffeeStyles: [],

@@ -123,6 +123,7 @@ import { type MapDocument } from "./map-model";
 import { chainRebase, touchedPaths, type RenamePair } from "./core/rename-batch";
 import {
   DEFAULT_SETTINGS,
+  defaultProofModel,
   isManagedMapPath,
   normalizeReasoningLevel,
   normalizeMapChatWidth,
@@ -284,6 +285,7 @@ function savedModel(value: unknown, fallback: string): string {
 export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: string): Settings {
   const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
   const savedWorkspace = saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder;
+  const bookWriteModel = savedModel(saved?.bookWriteModel, DEFAULT_SETTINGS.bookWriteModel);
   return {
     ...DEFAULT_SETTINGS,
     detailTemplates: normalizeTemplates(saved?.detailTemplates),
@@ -339,9 +341,9 @@ export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: s
     mapChatRecords: saved?.mapChatRecords === true,
     experimentalArgumentMap: saved?.experimentalArgumentMap === true,
     bookPlanModel: savedModel(saved?.bookPlanModel, DEFAULT_SETTINGS.bookPlanModel),
-    bookWriteModel: savedModel(saved?.bookWriteModel, DEFAULT_SETTINGS.bookWriteModel),
+    bookWriteModel,
     bookImageModel: savedModel(saved?.bookImageModel, DEFAULT_SETTINGS.bookImageModel),
-    bookProofModel: savedModel(saved?.bookProofModel, DEFAULT_SETTINGS.bookProofModel),
+    bookProofModel: savedModel(saved?.bookProofModel, defaultProofModel(bookWriteModel)),
     cliReasoning: normalizeReasoningLevel(saved?.cliReasoning),
     previewScale:
       saved?.previewScale !== undefined

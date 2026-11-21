@@ -161,11 +161,19 @@ for (const [name, change] of Object.entries(corrupt))
     assert.equal(roundTrip(text), text);
   });
 
-test('the four model defaults are sonnet, opus, haiku, haiku; saved ids are kept (old data.json gets the new field only); blanks fall back', () => {
+test('R1 M3: an unset AI proofread model is different from and not weaker than the author: opus -> sonnet, sonnet -> opus, haiku -> sonnet; a set one is kept', () => {
+  const proofOf = author => Main.settingsFromSaved({ bookWriteModel: author }).bookProofModel;
+  assert.equal(proofOf('claude:opus'), 'claude:sonnet');
+  assert.equal(proofOf('claude:sonnet'), 'claude:opus');
+  assert.equal(proofOf('claude:haiku'), 'claude:sonnet');
+  assert.equal(Main.settingsFromSaved({ bookWriteModel: 'claude:sonnet', bookProofModel: 'claude:haiku' }).bookProofModel, 'claude:haiku');
+});
+
+test('the four model defaults are sonnet, opus, haiku, sonnet; saved ids are kept (old data.json gets the new field only); blanks fall back', () => {
   const fresh = Main.settingsFromSaved(null);
-  assert.deepEqual([fresh.bookPlanModel, fresh.bookWriteModel, fresh.bookImageModel, fresh.bookProofModel], ['claude:sonnet', 'claude:opus', 'claude:haiku', 'claude:haiku']);
+  assert.deepEqual([fresh.bookPlanModel, fresh.bookWriteModel, fresh.bookImageModel, fresh.bookProofModel], ['claude:sonnet', 'claude:opus', 'claude:haiku', 'claude:sonnet']);
   const saved = Main.settingsFromSaved({ bookPlanModel: ' claude:opus ', bookWriteModel: '', bookProofModel: 5 });
-  assert.deepEqual([saved.bookPlanModel, saved.bookWriteModel, saved.bookImageModel, saved.bookProofModel], ['claude:opus', 'claude:opus', 'claude:haiku', 'claude:haiku']);
+  assert.deepEqual([saved.bookPlanModel, saved.bookWriteModel, saved.bookImageModel, saved.bookProofModel], ['claude:opus', 'claude:opus', 'claude:haiku', 'claude:sonnet']);
   const oldOwner = Main.settingsFromSaved({ bookPlanModel: 'claude:haiku', bookWriteModel: 'claude:sonnet', bookProofModel: 'claude:sonnet' });
   assert.deepEqual([oldOwner.bookPlanModel, oldOwner.bookWriteModel, oldOwner.bookImageModel, oldOwner.bookProofModel], ['claude:haiku', 'claude:sonnet', 'claude:haiku', 'claude:sonnet']);
   const old = Main.settingsFromSaved({ cliModel: 'claude:sonnet' });

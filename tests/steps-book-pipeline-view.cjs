@@ -546,7 +546,7 @@ test('start card: opens with the estimate (every step counted, about minutes), t
   assert.ok(modal.isOpen);
   assert.equal(h.entries.length, 0, 'nothing starts before the owner presses Start');
   const all = texts(modal.modalEl);
-  assert.ok(all.includes('前言 + 2 章（3 張卡）· 約 33 分鐘 · 最多 54 次 AI 呼叫（含 AI 校對和自動修正；步驟失敗重試另計；到 300 次會先停下）。'), all.join('|'));
+  assert.ok(all.includes('前言 + 2 章（3 張卡）· 約 35 分鐘 · 最多 54 次 AI 呼叫（含 AI 校對和自動修正；步驟失敗重試另計；到 300 次會先停下）。'), all.join('|'));
   assert.ok(all.includes('只會停一次：企劃好後讓你看全書方向。校對全部由 AI 做，你不用改稿。'));
   assert.ok(all.includes('某一章不滿意，可以只重跑那一章。'));
   assert.equal(dom.find(modal.modalEl, i => i.tag === 'details'), undefined, 'no collapsed block: the settings are always open');

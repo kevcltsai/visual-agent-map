@@ -25,12 +25,12 @@ function render(settings, models, spec) {
 }
 const [PLAN, WRITE, IMAGE, PROOF] = tab.BOOK_MODEL_SETTINGS;
 
-test('four book model settings exist with the defaults plan sonnet, author opus, pictures and proofread haiku', () => {
+test('four book model settings exist with the defaults plan sonnet, author opus, pictures haiku, proofread sonnet', () => {
   assert.deepEqual(S.plain(tab.BOOK_MODEL_SETTINGS.map(s => s.key)), ['bookPlanModel', 'bookWriteModel', 'bookImageModel', 'bookProofModel']);
   assert.equal(DEFAULT_SETTINGS.bookPlanModel, 'claude:sonnet');
   assert.equal(DEFAULT_SETTINGS.bookWriteModel, 'claude:opus');
   assert.equal(DEFAULT_SETTINGS.bookImageModel, 'claude:haiku');
-  assert.equal(DEFAULT_SETTINGS.bookProofModel, 'claude:haiku');
+  assert.equal(DEFAULT_SETTINGS.bookProofModel, 'claude:sonnet');
   const r = render({ ...DEFAULT_SETTINGS }, ['claude:haiku', 'claude:sonnet'], PLAN);
   assert.equal(r.select.value, 'claude:sonnet');
   const img = render({ ...DEFAULT_SETTINGS }, ['claude:haiku', 'claude:sonnet'], IMAGE);

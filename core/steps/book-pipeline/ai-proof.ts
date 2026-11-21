@@ -268,7 +268,10 @@ export async function runAiBookProof(
   request: AiBookProofRequest,
   run: AiProofRun
 ): Promise<AiProofReview> {
-  const raw = await runPlanStep(aiCalls, aiBookProofStep, request, { ...run, topic: "Book pipeline AI proof (whole book)" });
+  const raw = await runPlanStep(aiCalls, aiBookProofStep, request, {
+    ...run,
+    topic: "Book pipeline AI proof (whole book)"
+  });
   return reviewAiProof(raw, {
     body: request.chapters.map(chapter => chapter.text),
     ...(request.maxItems ? { maxItems: request.maxItems } : {})

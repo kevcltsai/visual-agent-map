@@ -268,7 +268,10 @@ export function abandonAi(data: BookPipelineData, nodeId?: string): BookPipeline
  */
 export function beginAiStep(
   data: BookPipelineData,
-  scope: { nodeId?: string; /** One chapter written again after the book was proofread: its chapter proofread starts again in any phase. */ rerun?: boolean },
+  scope: {
+    nodeId?: string;
+    /** One chapter written again after the book was proofread: its chapter proofread starts again in any phase. */ rerun?: boolean;
+  },
   key: string,
   step: "proof" | "fix"
 ): { state: BookPipelineData; token: AiToken } | null {

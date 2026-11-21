@@ -2548,7 +2548,9 @@ export class BookPipelineRuns {
       if ((state !== "clean" && state !== "empty") || isKeptRaw(raw)) {
         // The reader's own text (hand-edited, unknown or kept): no call, nothing is rewritten, every problem is left open.
         const refused = Object.fromEntries(targets.map(target => [target.id, "hand_edited"]));
-        const done = await drive.store.commit(current => applyAiFix(current, token, { applied: 0, appliedIds: [], refused }));
+        const done = await drive.store.commit(current =>
+          applyAiFix(current, token, { applied: 0, appliedIds: [], refused })
+        );
         return report(done?.accepted ? "ok" : "dropped", { applied: 0, pending: targets.length });
       }
       const rootInfo = drive.cards.get(drive.rootId);

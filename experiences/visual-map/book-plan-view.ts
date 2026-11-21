@@ -1,14 +1,16 @@
 import { EditorView, ViewPlugin } from "@codemirror/view";
-import type { Plugin } from "obsidian";
-import { translate } from "../../i18n";
+import { editorInfoField, type Plugin } from "obsidian";
+import { translate, type ContentLanguage } from "../../i18n";
+import { cardKindOfPrompt, isBookStructureTitle, type PlanDisplayField } from "../../core/book-pipeline/plan-text";
 import {
-  isBookStructureTitle,
-  isChecklistLabel,
-  isImagePlanLabel,
-  planDisplayField,
-  type PlanDisplayField
-} from "../../core/book-pipeline/plan-text";
-import { planCalloutKind } from "../../core/book-pipeline/plan-view";
+  foldLabelOf,
+  planCalloutKind,
+  planLocale,
+  planStartsOpen,
+  planTitleKey,
+  relabelLine,
+  type PlanLocale
+} from "../../core/book-pipeline/plan-view";
 
 /**
  * Display only: the pipeline stores its plan in hidden `[!vam-book]` callouts (the stylesheet hides that type). The root's book plan and a
@@ -25,7 +27,12 @@ const LABEL_KEY = {
   previous: "ui.book_plan_label_previous",
   handoff: "ui.book_plan_label_handoff"
 } as const satisfies Record<PlanDisplayField, Parameters<typeof translate>[1]>;
-const LABEL_LINE = /^(\s*)(.+?)([：:]\s*)(.*)$/s;
+
+/** What the view needs from its surroundings: the book's content language and the `pipeline-stage` of the note being shown. */
+export interface PlanViewEnv {
+  language: () => ContentLanguage;
+  stage: () => unknown;
+}
 
 const textNodesOf = (root: Node): Text[] => {
   const walker = root.ownerDocument!.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -34,12 +41,11 @@ const textNodesOf = (root: Node): Text[] => {
   return found;
 };
 
-/** Chinese notes: shows a plan line's label under its friendlier name (`接入點：` reads 怎麼開場：). Only the text node is changed, the file is not. */
-function relabel(content: HTMLElement): void {
+/** Chinese notes: shows a plan line's label under its friendlier name (`接入點：` reads 怎麼開場：) in the book's language. Only the text node is changed, the file is not. */
+function relabel(content: HTMLElement, locale: PlanLocale): void {
   for (const node of textNodesOf(content)) {
-    const m = LABEL_LINE.exec(node.data);
-    const field = m ? planDisplayField(m[2]) : undefined;
-    if (m && field) node.data = `${m[1]}${translate("zh-TW", LABEL_KEY[field])}${m[3]}${m[4]}`;
+    const shown = relabelLine(node.data, field => translate(locale, LABEL_KEY[field]));
+    if (shown !== undefined) node.data = shown;
   }
 }
 
@@ -53,11 +59,8 @@ function hideStructure(content: HTMLElement): void {
 }
 
 /** The text node that is a lone `圖安排：` / `驗收清單：` line (a label with text after it, like `圖安排：無`, has nothing to fold). */
-function labelNode(content: HTMLElement, isLabel: (word: string) => boolean): Text | undefined {
-  return textNodesOf(content).find(node => {
-    const m = /^\s*(.+?)[：:]\s*$/.exec(node.data);
-    return !!m && isLabel(m[1]);
-  });
+function labelNode(content: HTMLElement, which: "images" | "checklist"): Text | undefined {
+  return textNodesOf(content).find(node => foldLabelOf(node.data)?.fold === which);
 }
 
 /**
@@ -66,7 +69,7 @@ function labelNode(content: HTMLElement, isLabel: (word: string) => boolean): Te
  */
 function fold(content: HTMLElement, label: Text, end: Node | null): HTMLElement | undefined {
   const doc = content.ownerDocument;
-  const word = /^\s*(.+?)[：:]\s*$/.exec(label.data)![1];
+  const word = foldLabelOf(label.data)!.word;
   const marker = content.createSpan();
   const after = label.nextSibling;
   if (after && after.nodeName === "BR") after.parentNode!.removeChild(after);
@@ -100,14 +103,23 @@ function fold(content: HTMLElement, label: Text, end: Node | null): HTMLElement 
 
 /** A card's plan block: the picture plan and the acceptance checklist are closed folds. A structure that is not recognised is left as it is. */
 function foldCardPlan(content: HTMLElement): void {
-  const checklist = labelNode(content, isChecklistLabel);
-  const images = labelNode(content, isImagePlanLabel);
+  const checklist = labelNode(content, "checklist");
+  const images = labelNode(content, "images");
   const checklistFold = checklist ? fold(content, checklist, null) : undefined;
   if (images) fold(content, images, checklistFold ?? null);
 }
 
-/** Marks the plan callouts under `root` (and `root` itself) and gives them their display form. Idempotent. */
-export function markPlanCallouts(root: HTMLElement): void {
+/** The plan's lines as text (one per line break), for reading what kind of card it is. */
+const planLines = (content: HTMLElement): string =>
+  textNodesOf(content)
+    .map(node => node.data)
+    .join("\n");
+
+/**
+ * Marks the plan callouts under `root` (and `root` itself) and gives them their display form. Idempotent. Both plan callouts are stored
+ * folded; while the note has no written chapter (`planStartsOpen` of its `pipeline-stage`) they are shown open, once, so a click still folds them.
+ */
+export function markPlanCallouts(root: HTMLElement, env: PlanViewEnv): void {
   const callouts = root.matches(CALLOUT) ? [root] : [];
   callouts.push(...Array.from(root.querySelectorAll<HTMLElement>(CALLOUT)));
   for (const callout of callouts) {
@@ -120,15 +132,16 @@ export function markPlanCallouts(root: HTMLElement): void {
     // An empty body is not rendered yet: it is looked at again when it is.
     if (!content || !content.childNodes.length) continue;
     callout.setAttribute(DONE_ATTR, kind.kind);
+    const card = kind.kind === "book" ? "chapter" : cardKindOfPrompt(planLines(content));
     if (kind.kind === "book") hideStructure(content);
     else foldCardPlan(content);
-    if (kind.zh) {
-      relabel(content);
-      title.textContent =
-        kind.kind === "book"
-          ? translate("zh-TW", "ui.book_plan_title_book", translate("zh-TW", "ui.book_bar_plan_go"))
-          : translate("zh-TW", "ui.book_plan_title_card");
-    }
+    if (planStartsOpen(env.stage())) callout.classList.remove("is-collapsed");
+    const locale = planLocale(env.language(), kind.zh);
+    if (kind.zh) relabel(content, locale);
+    title.textContent =
+      kind.kind === "book"
+        ? translate(locale, "ui.book_plan_title_book", translate(locale, "ui.book_bar_plan_go"))
+        : translate(locale, planTitleKey(kind.kind, card));
   }
 }
 
@@ -140,18 +153,23 @@ const touchesCallout = (mutation: MutationRecord): boolean =>
   ) || !!(mutation.target as Element).closest?.(".cm-callout");
 
 /** Reading view (a markdown post processor) and live preview (a watcher on each editor, which Obsidian does not hand to post processors). */
-export function registerBookPlanView(plugin: Plugin): void {
-  plugin.registerMarkdownPostProcessor(element => markPlanCallouts(element));
+export function registerBookPlanView(plugin: Plugin, language: () => ContentLanguage): void {
+  const envOf = (path: string | undefined): PlanViewEnv => ({
+    language,
+    stage: () => (path ? plugin.app.metadataCache.getCache(path)?.frontmatter?.["pipeline-stage"] : undefined)
+  });
+  plugin.registerMarkdownPostProcessor((element, ctx) => markPlanCallouts(element, envOf(ctx.sourcePath)));
   plugin.registerEditorExtension(
     ViewPlugin.fromClass(
       class {
         private readonly observer: MutationObserver;
         constructor(view: EditorView) {
+          const env = (): PlanViewEnv => envOf(view.state.field(editorInfoField, false)?.file?.path);
           this.observer = new MutationObserver(mutations => {
-            if (mutations.some(touchesCallout)) markPlanCallouts(view.dom);
+            if (mutations.some(touchesCallout)) markPlanCallouts(view.dom, env());
           });
           this.observer.observe(view.dom, { childList: true, subtree: true });
-          markPlanCallouts(view.dom);
+          markPlanCallouts(view.dom, env());
         }
         destroy(): void {
           this.observer.disconnect();

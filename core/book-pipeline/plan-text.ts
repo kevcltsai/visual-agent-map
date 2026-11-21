@@ -480,6 +480,16 @@ export function planDisplayField(label: string): PlanDisplayField | undefined {
   return undefined;
 }
 
+/**
+ * What a card is, read from its stored Prompt (the structural lines, never the role or the wording): a section has a parent-chapter line
+ * (`所屬章`); the preface is the chapter-level card with nothing before it (every chapter has at least the preface before it); the rest are chapters.
+ */
+export function cardKindOfPrompt(prompt: string): CardKind {
+  const fields = parseCardPrompt(prompt);
+  if (fields.parent !== undefined) return "section";
+  return fields.previous !== undefined && matches(L.none, fields.previous.trim()) ? "preface" : "chapter";
+}
+
 const PLAN_CALLOUT = /^[ \t]{0,3}>[ \t]?\[!vam-book\][+-]?[ \t]+(.+?)[ \t]*$/i;
 const QUOTE_PREFIX = /^[ \t]{0,3}>[ \t]?/;
 

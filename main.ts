@@ -1361,7 +1361,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     registerInternalMarkerPresentation(this);
     for (const kind of TOPIC_KINDS) addIcon(kindIconId(kind), kindIconSvg(kind));
     this.mermaidZoom = registerMermaidZoom(this);
-    registerBookPlanView(this);
+    registerBookPlanView(this, () => this.settings.language);
     const markdownSelectionAi = (this.markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.currentModelChoice().model,
       imageNeedsCodex: () => this.runtimeIdFor(this.currentModelChoice().model) === "claude",

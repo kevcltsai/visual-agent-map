@@ -1964,6 +1964,7 @@ export class VisualAgentMapView extends ItemView {
     this.renderingCard = true;
     this.paintChildIndex = childIndex(this.map.nodes);
     this.paintCardIndex = cardIndex(this.map.nodes);
+    this.paintBookStructure = { value: this.bookStructureNow() };
     this.pendingCardFits = fits;
     try {
       for (const id of ids) {
@@ -1982,6 +1983,7 @@ export class VisualAgentMapView extends ItemView {
       this.renderingCard = false;
       this.paintChildIndex = null;
       this.paintCardIndex = null;
+      this.paintBookStructure = null;
       this.pendingCardFits = null;
     }
     for (const fit of fits) fit();

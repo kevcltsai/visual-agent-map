@@ -50,6 +50,8 @@ export interface BookBarState {
   current?: BookCurrent;
   /** The whole-book consistency check is running (no chapter step is): the sentence says so instead of "writing". */
   checking?: true;
+  /** A gate button press is waiting for the drive that reached the gate to finish ending (memory only): the bar says so. */
+  gateWaiting?: true;
   /** A single-card rerun is in progress (memory only): the bar keeps its stop button; the card itself says "working". */
   rerun?: true;
   /** Gate 1: every chapter is planned and the owner looks at the plan's direction (the one stop of the automatic run). */
@@ -196,6 +198,7 @@ export function bookBarState(
       ? { checking: true as const }
       : {}),
     ...(rerunning ? { rerun: true as const } : {}),
+    ...(progress?.gateWaiting ? { gateWaiting: true as const } : {}),
     ...(mapChange ? { mapChange } : {}),
     ...(gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {}),
     ...(reordered ? { mapChange: reordered } : {}),
@@ -429,6 +432,11 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     );
   const progressText = bookProgressText(state);
   renderProgressLine(bar, state, progressText);
+  if (state.gateWaiting)
+    bar.createDiv("vam-book-now vam-book-gate-waiting").createSpan({
+      cls: "vam-book-now-text",
+      text: t("ui.book_gate_waiting")
+    });
   const track = bar.createDiv("vam-book-track");
   track.setAttr("role", "progressbar");
   track.setAttr("aria-label", t("ui.book_bar_label"));
@@ -543,6 +551,7 @@ const REFUSAL_KEY: Record<BookRunRefusal, TranslationKey> = {
   notes_busy: "ui.book_refused_notes_busy",
   drive_running: "ui.book_refused_drive_running",
   cancelled: "ui.book_refused_cancelled",
+  gate_cancelled: "ui.book_refused_gate_cancelled",
   stale: "ui.book_refused_stale",
   backup_failed: "ui.book_refused_backup_failed",
   text_changed: "ui.book_refused_text_changed",
@@ -610,6 +619,7 @@ const REASON_KEY: Record<string, TranslationKey> = {
 /** A step failure with a plain sentence (cause and next step) instead of "step failed: reason"; keyed `step:code`. */
 const PLAIN_KEY: Record<string, TranslationKey> = {
   "write:no_body": "ui.book_plain_write_no_body",
+  "write:author_failed": "ui.book_plain_write_author_failed",
   "write:hand_edited": "ui.book_plain_write_hand_edited",
   "proof:no_body": "ui.book_plain_proof_no_body",
   "proof:empty_list": "ui.book_plain_proof_empty_list",

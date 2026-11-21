@@ -195,14 +195,15 @@ function installedObsidianRuntime() {
 // pick a free DevTools port and record it in <profile>/DevToolsActivePort for obsidian-cdp.mjs.
 // A running Obsidian keeps the plugin code it loaded when the plugin was enabled: new files on disk take effect only after the plugin
 // is reloaded in it (the owner's book of 2026-11-22 ran a days-old build after an install). Disable + enable (not the *AndSave forms,
-// so the enabled list on disk is untouched) loads main.js afresh; a plugin the owner switched off is left off. No window is focused.
-export const reloadPluginExpression = `(async()=>{const id="visual-agent-map";if(!app.plugins.enabledPlugins.has(id))return {enabled:false};const before=app.plugins.plugins[id];await app.plugins.disablePlugin(id);await app.plugins.enablePlugin(id);const after=app.plugins.plugins[id];return {enabled:true,reloaded:!!after&&after!==before,version:after?.manifest?.version??null}})()`;
-export async function reloadRunningPlugin(vault, version, connect = connectCdp) {
+// so the enabled list on disk is untouched) reads main.js from disk again: a new plugin instance is the proof (the manifest version is read at
+// startup and is the same across builds, so it proves nothing). A plugin the owner switched off is left off. No window is focused.
+export const reloadPluginExpression = `(async()=>{const id="visual-agent-map";if(!app.plugins.enabledPlugins.has(id))return {enabled:false};const before=app.plugins.plugins[id];await app.plugins.disablePlugin(id);await app.plugins.enablePlugin(id);const after=app.plugins.plugins[id];return {enabled:true,reloaded:!!after&&after!==before}})()`;
+export async function reloadRunningPlugin(vault, connect = connectCdp) {
   const cdp = await connect(vault);
   let result;
   try { result = await cdp.evaluate(reloadPluginExpression); } finally { cdp.close(); }
   if (result?.enabled === false) return result;
-  if (!result?.reloaded || result.version !== version) throw new Error(`Installed ${version}, but the running Obsidian did not load it (${JSON.stringify(result)}): the old plugin is still running. Reload the plugin or restart Obsidian.`);
+  if (!result?.reloaded) throw new Error(`The new build is installed, but the running Obsidian did not load it (${JSON.stringify(result)}): the old plugin is still running. Reload the plugin or restart Obsidian.`);
   return result;
 }
 
@@ -364,8 +365,8 @@ export function main(args = process.argv.slice(2)) {
     if (!existsSync(join(appProfile, "obsidian.json")) || !readdirSync(appProfile).some(name => name.endsWith(".asar"))) prepareObsidianProfile(canonicalVault, installedObsidianRuntime());
     process.stdout.write(`${JSON.stringify({ vault: canonicalVault, version: record.version, hashes: record.hashes, updatedInPlace: true, appProfile }, null, 2)}\n`);
     if (!instanceRunning(appProfile)) return launchObsidian(appProfile);
-    return reloadRunningPlugin(canonicalVault, record.version).then(result => {
-      process.stdout.write(result.enabled === false ? "The plugin is switched off in the running Obsidian; left off (the new files load when it is switched on).\n" : `Reloaded the plugin in the running Obsidian (${result.version}).\n`);
+    return reloadRunningPlugin(canonicalVault).then(result => {
+      process.stdout.write(result.enabled === false ? "The plugin is switched off in the running Obsidian; left off (the new files load when it is switched on).\n" : "Reloaded the plugin in the running Obsidian.\n");
     });
   }
   const lock = `${canonicalVault}.lock`;

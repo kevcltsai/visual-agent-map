@@ -591,12 +591,11 @@ test('a running Obsidian is made to load the new build: the plugin is disabled a
   };
   const connect = fake => async () => ({ evaluate: expression => vm.runInNewContext(expression, { app: fake.app }), close() {} });
   const live = fakeApp(true);
-  assert.deepEqual({ ...(await reloadRunningPlugin('/v', '0.34.0', connect(live))) }, { enabled: true, reloaded: true, version: '0.34.0' });
+  assert.deepEqual({ ...(await reloadRunningPlugin('/v', connect(live))) }, { enabled: true, reloaded: true });
   assert.deepEqual(live.calls, ['disable visual-agent-map', 'enable visual-agent-map'], 'the plugin is reloaded; the saved enabled list is never written');
-  await assert.rejects(reloadRunningPlugin('/v', '0.34.0', connect(fakeApp(true, false))), /old plugin is still running|did not load it/);
-  await assert.rejects(reloadRunningPlugin('/v', '0.35.0', connect(fakeApp(true))), /did not load it/, 'a version other than the installed one is not taken as loaded');
+  await assert.rejects(reloadRunningPlugin('/v', connect(fakeApp(true, false))), /old plugin is still running/);
   const off = fakeApp(false);
-  assert.equal((await reloadRunningPlugin('/v', '0.34.0', connect(off))).enabled, false);
+  assert.equal((await reloadRunningPlugin('/v', connect(off))).enabled, false);
   assert.deepEqual(off.calls, [], 'a plugin the owner switched off is left off');
   assert.doesNotMatch(reloadPluginExpression, /AndSave|focus|activate/);
 });

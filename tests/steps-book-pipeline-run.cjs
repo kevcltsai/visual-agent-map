@@ -1537,6 +1537,33 @@ test('T5 trial: retryTrial reruns only the trial cards with the models read agai
   assert.equal(r.stat.author.length, authored + 6, 'a second retry runs the trial again');
 });
 
+// ---- Cover image review M-2: the trial retry and back-to-plan paths give a card's cover key back (one picture once per book) ----
+test('cover key release: releasePictures frees a card\'s body picture keys and its cover key; retryTrial and backToPlan call it for every trial card that has a cover block', async () => {
+  const blockLib = S.load('core/book-pipeline/cover-block.ts');
+  const { imageKey: keyOf } = S.load('core/book-pipeline/image-dedupe.ts');
+  const COVER_URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/CoverX.jpg/1280px-CoverX.jpg';
+  const BODY_URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/BodyX.jpg/1280px-BodyX.jpg';
+  const block = blockLib.composeCoverBlock('chapter', 'zh', { file: 'B/封面圖/x.png', url: COVER_URL, caption: 'c', sourceUrl: 'https://commons.wikimedia.org/wiki/File:CoverX.jpg' });
+  const withCover = raw => blockLib.putCoverBlock(raw, block);
+  // 1. the method itself
+  const drive = { usedImages: new Set([keyOf(COVER_URL), keyOf(BODY_URL), 'other']) };
+  BookPipelineRuns.prototype.releasePictures.call({}, drive, { raw: withCover('# T\n\nx\n'), detail: `text\n\n![b](${BODY_URL})\n` });
+  assert.deepEqual([...drive.usedImages], ['other'], 'cover and body keys are gone, others stay');
+  // 2. the two paths
+  for (const path of ['retryTrial', 'backToPlan']) {
+    const r = await trialRig({ planReview: path === 'backToPlan' });
+    const released = [];
+    const original = BookPipelineRuns.prototype.releasePictures;
+    r.runs.releasePictures = function (drive, card) { released.push(blockLib.coverSourceKey(card.raw)); return original.call(this, drive, card); };
+    await r.runs.start(r.mapPath);
+    if (path === 'backToPlan') { await r.runs.startTrial(r.mapPath); await idle(r); } else await toTrialGate(r);
+    await toTrialGate(r);
+    for (let i = 0; i < 3; i++) r.contents.set(r.nodes[i].path, withCover(r.contents.get(r.nodes[i].path)));
+    await r.runs[path](r.mapPath); await idle(r);
+    assert.ok(released.filter(key => key === keyOf(COVER_URL)).length >= 3, `${path}: released the cover key of each of the 3 trial cards (${released.join('|')})`);
+  }
+});
+
 test('T5 trial: a run without a trial (older data) refuses retryTrial and keeps planning every card before gate 1', async () => {
   const r = await rig({ titles: T5_TITLES });
   await r.runs.start(r.mapPath);

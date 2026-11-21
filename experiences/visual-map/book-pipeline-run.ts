@@ -197,6 +197,7 @@ import {
 import type { CoverDownload, CoverSaved } from "../../core/book-pipeline/cover-download";
 import {
   composeCoverBlock,
+  coverDeclaredTarget,
   coverIsOff,
   coverLinkOf,
   coverOwnership,
@@ -4176,7 +4177,7 @@ export class BookPipelineRuns {
       if (coverKey) drive.usedImages.delete(coverKey);
       if (coverFigure?.work && works.includes(coverFigure.work)) drive.usedWorks.delete(coverFigure.work);
     };
-    let coverWrite: { block: string; link?: string } | undefined;
+    let coverWrite: { block: string; link?: string; held?: boolean } | undefined;
     let coverResult: "placed" | "missing" | "download_failed" | "owner_kept" | undefined;
     if (coverSlot) {
       try {
@@ -4219,6 +4220,11 @@ export class BookPipelineRuns {
       if (typeof result === "string") {
         release();
         return { kind: "failed", reason: result };
+      }
+      // The owner took the cover over between the re-read and the write: nothing was written for it, so its claim is given back.
+      if (coverWrite?.held) {
+        coverResult = "owner_kept";
+        releaseCover();
       }
       if (coverResult)
         this.ports.log(
@@ -4381,7 +4387,7 @@ export class BookPipelineRuns {
     language: string,
     authorize: () => boolean,
     off?: ReadonlySet<number>,
-    cover?: { block: string; link?: string }
+    cover?: { block: string; link?: string; held?: boolean }
   ): Promise<FillResult | string> {
     const result = fillSlotMarkers(latest.detail, slots, outcomes);
     const bad = verifyFill(latest.detail, result, slots);
@@ -4403,9 +4409,16 @@ export class BookPipelineRuns {
         finalize: content => {
           if (residualMarkerLines(content).length > Math.max(0, outside)) return null;
           // The cover block and `topic-cover` go in the same write; a cover the owner took over meanwhile is left alone.
-          if (!cover || coverOwnership(content) === "owner") return content;
+          if (!cover) return content;
+          if (coverOwnership(content) === "owner") {
+            cover.held = true;
+            return content;
+          }
           const placed = putCoverBlock(content, cover.block);
-          return cover.link && this.ports.setCoverLink ? this.ports.setCoverLink(placed, cover.link) : placed;
+          // `topic-cover` that already links this file is left as it is, so the owner's frame, size and position settings are kept.
+          return cover.link && coverDeclaredTarget(placed) !== cover.link && this.ports.setCoverLink
+            ? this.ports.setCoverLink(placed, cover.link)
+            : placed;
         }
       }
     );

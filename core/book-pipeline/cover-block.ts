@@ -198,6 +198,12 @@ export function coverOwnership(raw: string): "none" | "program" | "owner" {
   return target === block.file ? "program" : "owner";
 }
 
+/** The file `topic-cover` already links (`[[path]]` or `[[path|alias]]`), or undefined when there is none or it is not a link. */
+export function coverDeclaredTarget(raw: string): string | undefined {
+  const declared = declaredCover(raw);
+  return declared === undefined ? undefined : /^\[\[([^\]|]*)(?:\|[^\]]*)?\]\]$/.exec(declared)?.[1].trim();
+}
+
 /** The raw `topic-cover` value of the frontmatter (quotes removed), or undefined when the key is absent. */
 function declaredCover(raw: string): string | undefined {
   const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(raw);

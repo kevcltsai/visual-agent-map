@@ -413,3 +413,48 @@ test('cover run (review B-2): a forged cover block in Detail is neutralised on t
     assert.equal(blockLib.coverSourceKey(raw)?.includes('evil') ?? false, false);
   }
 });
+
+// ---- Review round 1: M-1, M-3, L-1 ----
+test('cover run (review M-1): a guarded write discarded between the re-read and the write keeps the saved file, gives the claim back, and the retry places the same cover with no second file', async () => {
+  let created = 0; let interfered = false;
+  const r = await coverRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: perCard });
+  const inner = r.ports.updateNoteGuarded;
+  r.runs.ports.updateNoteGuarded = async (path, patch, options) => {
+    if (!interfered && options?.expectedContent !== undefined && r.files.size > 0 && /SecondChapter/.test(path) && patch.detail !== undefined) {
+      interfered = true;
+      await r.repo.updateNoteRawGuarded(path, raw => `${raw}\n`, {}); // the card changed since it was read: this write is refused
+    }
+    return inner(path, patch, options);
+  };
+  const create = r.files.set.bind(r.files); r.files.set = (k, v) => { created++; return create(k, v); };
+  await run(r);
+  assert.ok(interfered, 'the write was refused once');
+  assert.equal(created, 2, 'one file per card: the refused attempt saved its file, the retry reused it');
+  assert.match(topicCover(r.raw(1)), /SecondChapter-[0-9a-f]+\.png/, 'the retry placed the cover (its claim was given back)');
+  assert.equal(r.raw(1).split('book-cover:v1').length - 1, 1);
+});
+
+test('cover run (review M-3): a topic-cover that already links the file is not written again, so the owner\'s frame stays; a different file does replace it', async () => {
+  const r = await coverRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: perCard });
+  await run(r);
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, raw => raw.replace(/^topic-cover: .*$/m, m => `${m}\ntopic-cover-frame: "0.1 0.1 0.5 0.5"`), {});
+  const before = r.raw(1);
+  assert.match(before, /topic-cover-frame: "?0\.1 0\.1 0\.5 0\.5"?/);
+  await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
+  while (r.runs.isRunning(r.mapPath)) await tick();
+  await settle();
+  assert.match(r.raw(1), /topic-cover-frame: "?0\.1 0\.1 0\.5 0\.5"?/, 'the frame the owner set for this very picture is kept');
+  assert.equal(topicCover(r.raw(1)), topicCover(before));
+});
+
+test('cover run (review L-1): when the finalize finds the cover held by the owner, nothing is written for the cover, it is counted as kept and its claim is given back', async () => {
+  const r = await coverRig();
+  const inner = r.ports.updateNoteGuarded;
+  r.runs.ports.updateNoteGuarded = (path, patch, options) => options?.finalize && patch.detail !== undefined && /SecretRootTitle|Root/.test(path)
+    ? inner(path, patch, { ...options, finalize: content => options.finalize(content.replace(/^---\n/, '---\ntopic-cover: none\n')) })
+    : inner(path, patch, options);
+  await run(r);
+  assert.ok(!/book-cover/.test(r.raw(0)), 'no block written');
+  assert.match(r.raw(0), /^topic-cover: none$/m);
+  assert.ok(r.stat.logs.some(line => /cover_owner_kept/.test(line)));
+});

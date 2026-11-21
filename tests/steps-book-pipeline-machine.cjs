@@ -19,6 +19,8 @@ const fresh = (extra = {}) => { const state = machine.newBookPipeline({ runId: '
 const trialRun = (order = IDS) => machine.newBookPipeline({ runId: 'run-t', order, now: NOW, trial: order.slice(0, 3) });
 const none = () => Object.fromEntries(IDS.map(id => [id, undefined]));
 const actionsOf = (state, stages, busy) => plain(machine.nextActions(state, stages, busy));
+/** The chief editor's pass run to success the way a runner would (dispatch, then commit). */
+const planEdited = state => { const d = machine.beginPlanEdit(state); return machine.applyPlanEditSuccess(d.state, d.token).state; };
 /** Runs `kind` for `nodeId` to success the way a runner would (dispatch, then commit). */
 const succeed = (state, kind, nodeId) => { const d = machine.beginStep(state, kind, nodeId); return machine.applySuccess(d.state, d.token).state; };
 
@@ -38,6 +40,8 @@ test('transitions: global plan, every card plan, gate 1, confirm, write, proof, 
   assert.equal(state.globalPlanned, true);
   assert.deepEqual(actionsOf(state, stages).actions.map(a => `${a.type}:${a.nodeId}`), ['card_plan:a', 'card_plan:b', 'card_plan:c']);
   for (const id of IDS) { state = succeed(state, 'plan', id); stages[id] = 'planned'; assert.equal(machine.cardRevision(state, id), 1); }
+  assert.deepEqual(actionsOf(state, stages).actions, [{ type: 'plan_edit' }], 'every card planned: the chief editor reads the plans before gate 1');
+  state = planEdited(state);
   assert.deepEqual(actionsOf(state, stages).actions, [{ type: 'advance_phase' }]);
   state = machine.advancePhase(state, stages, NOW);
   assert.equal(state.phase, 'gate1');
@@ -276,6 +280,13 @@ async function drive(w, { opens = 'saved' } = {}) {
       if (action.type === 'advance_phase') { await store.commit(state => ({ state: machine.advancePhase(state, w.stages, NOW), accepted: true })); continue; }
       if (action.type === 'reset_stage') { w.tick(); w.stages[action.nodeId] = undefined; w.tick(); await store.commit(state => ({ state: machine.applyReset(state, action.nodeId), accepted: true })); continue; }
       if (action.type === 'mark_needs_review') { w.tick(); w.stages[action.nodeId] = 'needs-review'; w.tick(); continue; }
+      if (action.type === 'plan_edit') {
+        const begun = await store.commit(state => { const d = machine.beginPlanEdit(state); return d ? { state: d.state, accepted: true, token: d.token } : { state, accepted: false }; });
+        if (!begun?.token) continue;
+        w.tick(); w.planEdits = (w.planEdits ?? 0) + 1; w.tick();
+        await store.commit(state => machine.applyPlanEditSuccess(state, begun.token));
+        continue;
+      }
       const kind = action.type === 'global_plan' ? 'global' : action.type.slice(5);
       const dispatched = await store.commit(state => machine.beginStep(state, kind, action.nodeId) ?? { state, accepted: false });
       const token = dispatched?.token;
@@ -485,6 +496,8 @@ test('trial: a new run carries the first three cards; every card is planned firs
   assert.deepEqual(actionsOf(state, stages, new Set(['e'])).actions, [], 'no chapter is written while another is still being planned');
   state = succeed(state, 'plan', 'e'); stages.e = 'planned';
   assert.equal(state.planReview, true, 'a new run waits at the plan review');
+  assert.deepEqual(actionsOf(state, stages).actions, [{ type: 'plan_edit' }], 'the chief editor reads the plans first');
+  state = planEdited(state);
   assert.deepEqual(actionsOf(state, stages).actions, [{ type: 'advance_phase' }], 'nothing is written before the owner saw the plan');
   state = machine.advancePhase(state, stages, NOW);
   assert.equal(state.phase, 'gate1');

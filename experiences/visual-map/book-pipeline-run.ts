@@ -25,7 +25,7 @@ import {
 } from "../../core/book-pipeline/ai-proof";
 import { applyAiEdits, refusedReasons, type AiFixRefusal, type RawAiEdit } from "../../core/book-pipeline/ai-fix";
 import { chapterReferenceFindings, type ReferenceChapter } from "../../core/book-pipeline/chapter-references";
-import { bookStructure, type BookStructure } from "../../core/book-pipeline/structure";
+import { bookStructure, type BookStructure, type CardKind } from "../../core/book-pipeline/structure";
 import { compactChapters, removedChapterRefs } from "../../core/book-pipeline/consistency";
 import { directionFindings, numericFindings } from "../../core/book-pipeline/cross-checks";
 import { isBudgetExhausted } from "../../core/admission";
@@ -49,6 +49,13 @@ import {
   advancePhase,
   applyBudgetExhausted,
   applyCancelled,
+  applyPlanEditFailure,
+  applyPlanEditStopped,
+  applyPlanEditSuccess,
+  beginPlanEdit,
+  isPlanEditCurrent,
+  PLAN_EDIT_BUSY,
+  type PlanEditToken,
   abandonAi,
   aiChapterDue,
   applyAiFailure,
@@ -237,6 +244,8 @@ import {
   type SlotFigure,
   type SlotOutcome
 } from "../../core/book-pipeline/image-slots";
+import { editedPrompt, readBrief } from "../../core/book-pipeline/plan-edit";
+import { planEditFits, planEditStep, type PlanEditCard, type PlanEditRequest } from "../../core/steps/book-pipeline/plan-edit";
 import {
   cardPlanFits,
   cardPlanStep,
@@ -2502,6 +2511,16 @@ export class BookPipelineRuns {
               postDone(key);
             })
           );
+        } else if (action.type === "plan_edit") {
+          drive.busy.add(PLAN_EDIT_BUSY);
+          started++;
+          inflight.set(
+            PLAN_EDIT_BUSY,
+            this.planEditPass(drive).finally(() => {
+              drive.busy.delete(PLAN_EDIT_BUSY);
+              inflight.delete(PLAN_EDIT_BUSY);
+            })
+          );
         } else if (action.type === "book_ai_proof" || action.type === "book_ai_fix") {
           // The automatic redos go first: the proofread reads the chapters as they end up.
           if (await this.startFixes(drive)) {
@@ -2601,6 +2620,145 @@ export class BookPipelineRuns {
       }));
       this.log(drive, "map_keep", "-", "plan", "ok");
     });
+  }
+
+  // ---- the chief editor's pass over the plans ----------------------------------------------------------------------------------
+  /**
+   * One call over every card's brief, then the changes it names are written. A failure, a stop or a late result never blocks the book:
+   * a stop gives the attempt back (the pass runs again after a resume), the third failure lets the run go on without the pass.
+   */
+  private async planEditPass(drive: Drive): Promise<void> {
+    const begun = await drive.store.commit(state => {
+      const dispatched = beginPlanEdit(state);
+      return dispatched
+        ? { state: dispatched.state, accepted: true, token: dispatched.token }
+        : { state, accepted: false as const, token: undefined };
+    });
+    if (!begun?.accepted || !begun.token) return;
+    const token = begun.token;
+    const startedAt = Date.parse(this.ports.now());
+    const counts = { changes: 0, written: 0 };
+    let outcome: Outcome;
+    try {
+      outcome = await this.execPlanEdit(drive, token, counts);
+    } catch (error) {
+      outcome = this.classify(drive, error);
+    }
+    if (this.dead(drive)) return;
+    const report = (result: string): void =>
+      this.ports.log(
+        formatPipelineLog({
+          event: "plan_edit",
+          runId: token.runId,
+          card: "book",
+          step: "plan",
+          attempt: drive.store.state.planEditAttempts ?? 0,
+          result,
+          ms: Math.max(0, Date.parse(this.ports.now()) - startedAt || 0),
+          counts
+        })
+      );
+    const stopped = (budget: boolean): Promise<unknown> =>
+      drive.store.commit(state => applyPlanEditStopped(state, token, budget));
+    if (outcome.kind === "ok") {
+      const done = await drive.store.commit(state => applyPlanEditSuccess(state, token));
+      if (!done) return;
+      if (!done.accepted) {
+        await stopped(false);
+        return report("dropped");
+      }
+      return report("ok");
+    }
+    if (outcome.kind === "cancelled") {
+      await stopped(false);
+      return report("cancelled");
+    }
+    if (outcome.kind === "budget") {
+      await stopped(true);
+      drive.controller.abort();
+      return report("budget");
+    }
+    const failed = await drive.store.commit(state => applyPlanEditFailure(state, token));
+    if (!failed) return;
+    if (!failed.accepted) {
+      await stopped(false);
+      return report("dropped");
+    }
+    drive.reasons.set("plan-edit", outcome.reason);
+    report(`failed:${code(outcome.reason)}`);
+  }
+  private async execPlanEdit(
+    drive: Drive,
+    token: PlanEditToken,
+    counts: { changes: number; written: number }
+  ): Promise<Outcome> {
+    const signal = drive.controller.signal;
+    const rootInfo = drive.cards.get(drive.rootId);
+    if (!rootInfo) return { kind: "failed", reason: "missing" };
+    const order = effectiveOrder(drive.store.state);
+    const structure = this.structureOf(drive, order);
+    const root = await this.ports.readCard(rootInfo.path);
+    const book = parseBookPlanBody(root.raw);
+    const seen = new Map<string, { prompt: string; kind: CardKind }>();
+    const cards: PlanEditCard[] = [];
+    for (const id of order) {
+      const info = drive.cards.get(id);
+      if (!info) return { kind: "failed", reason: "missing" };
+      const card = await this.ports.readCard(info.path);
+      const brief = readBrief(card.prompt);
+      seen.set(id, { prompt: card.prompt, kind: structure.placeOf(id)?.kind ?? "chapter" });
+      cards.push({
+        id,
+        place: this.placeOf(drive, structure, id),
+        role: info.role,
+        title: card.title,
+        covers: brief.covers,
+        points: brief.points,
+        entry: brief.entry,
+        handoff: brief.handoff,
+        previous: brief.previous,
+        next: brief.next,
+        checklist: brief.checklist.map(item => item.text)
+      });
+    }
+    const request: PlanEditRequest = {
+      ...this.base(drive, drive.config.planModel),
+      bookTitle: root.title,
+      thread: book.thread,
+      settings: effectiveSettings(root.settings, parseBookPlanDecisions(root.raw)),
+      cards
+    };
+    if (!planEditFits(request)) {
+      this.log(drive, "plan_refused", "-", "plan", "plans_too_long");
+      return { kind: "failed", reason: "plans_too_long" };
+    }
+    const changes = await untilAborted(
+      signal,
+      this.ports.runPlan(planEditStep, request, { signal, admission: drive.admission })
+    );
+    counts.changes = changes.length;
+    const authorize = (): boolean =>
+      !this.dead(drive) && !signal.aborted && isPlanEditCurrent(drive.store.state, token);
+    for (const change of changes) {
+      if (!authorize()) return { kind: "cancelled" };
+      const before = seen.get(change.id);
+      // A card the program may not rewrite (hand-edited chapter, kept) keeps its plan too.
+      if (!before || drive.planSkipped.has(change.id)) continue;
+      const path = await this.stillOnMap(drive, change.id);
+      if (!path) continue;
+      const current = await this.ports.readCard(path);
+      // Only the Prompt the planner wrote: one the owner edited meanwhile is left as it is.
+      if (current.prompt !== before.prompt) continue;
+      const prompt = editedPrompt(before.prompt, change, before.kind, drive.config.language);
+      if (prompt === undefined) continue;
+      const written = await this.ports.updateNoteGuarded(
+        path,
+        { prompt },
+        { expectedContent: current.raw, authorize }
+      );
+      if (written === "written") counts.written++;
+    }
+    return authorize() ? { kind: "ok" } : { kind: "cancelled" };
   }
 
   // ---- one step ----------------------------------------------------------------------------------------------------------------

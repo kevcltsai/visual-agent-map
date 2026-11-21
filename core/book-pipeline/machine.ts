@@ -33,6 +33,8 @@ export type PipelineAction =
   | { type: "reset_stage"; nodeId: string }
   | { type: "global_plan" }
   | { type: "card_plan" | "card_write" | "card_proof"; nodeId: string }
+  /** Every card is planned: the chief editor reads all the plans together once (one call), before gate 1. */
+  | { type: "plan_edit" }
   /** The step's attempts are used up: write `needs-review` on the card, then keep going. */
   | { type: "mark_needs_review"; nodeId: string; step: PipelineStep }
   /** A written and checked chapter: the independent AI proofread (`ai_proof`) or the in-place fix it asked for (`ai_fix`). */
@@ -45,6 +47,10 @@ export type PipelineAction =
 
 /** The busy key of the whole-book AI proofread and its fix (never a card id). */
 export const BOOK_PROOF_BUSY = "#book-proof";
+/** The busy key of the chief editor's pass over the plans. */
+export const PLAN_EDIT_BUSY = "#plan-edit";
+/** The pass needs this many cards to have anything to compare. */
+export const PLAN_EDIT_MIN_CARDS = 3;
 
 /** Why nothing (more) runs. `gate1`/`gate2` wait for the owner; `done` is final. */
 export type PipelineHold = "stopped" | "budget" | "global_failed" | "gate1" | "gate2" | "done" | "empty";
@@ -172,6 +178,18 @@ export function nextActions(
   }
   // Every chapter is planned before any chapter is written (a trial too): a brief written later cannot change a chapter already written.
   const allPlanned = order.every(id => ranked(stages[id]) >= 1);
+  // The chief editor's pass: once, when every card is planned and none is written yet, before the plan review. A trial run with no plan review
+  // pending (an older run, or a trial replanned after the owner passed the plan gate) is left alone.
+  if (
+    data.phase === "planning" &&
+    allPlanned &&
+    !data.planEdited &&
+    order.length >= PLAN_EDIT_MIN_CARDS &&
+    (data.planReview === true || !data.trial?.length) &&
+    (data.planEditAttempts ?? 0) < MAX_STEP_ATTEMPTS &&
+    order.every(id => ranked(stages[id]) === 1)
+  )
+    return { actions: busy.size ? [] : [{ type: "plan_edit" }] };
   for (const nodeId of order) {
     if (busy.has(nodeId)) continue;
     const stage = stages[nodeId];
@@ -506,6 +524,76 @@ export function applyAiStopped(data: BookPipelineData, token: AiToken, budget: b
   return { state: next, accepted: true };
 }
 
+/* ---- The chief editor's pass over every card's plan (one call per book, never blocks the run) ---- */
+
+/** A dispatched pass: the run, stop generation and the sum of the cards' revisions it read the plans under (a replanned card makes its result stale). */
+export interface PlanEditToken {
+  runId: string;
+  stopEpoch: number;
+  revision: number;
+}
+const planRevision = (data: BookPipelineData): number =>
+  effectiveOrder(data).reduce((sum, id) => sum + cardRevision(data, id), 0);
+/** The pass is forgotten (a replan: the plans it read are no longer the plans there are), so it runs again. */
+const clearPlanEdit = (next: BookPipelineData): void => {
+  delete next.planEdited;
+  delete next.planEditAttempts;
+};
+/** True while the pass's result may still be committed. */
+export function isPlanEditCurrent(data: BookPipelineData, token: PlanEditToken): boolean {
+  return (
+    data.runId === token.runId &&
+    data.status === "running" &&
+    data.phase === "planning" &&
+    !data.planEdited &&
+    (data.stopEpoch ?? 0) === token.stopEpoch &&
+    planRevision(data) === token.revision
+  );
+}
+/** Starts the pass: counts one attempt (saved before the call). Null when it may not start. */
+export function beginPlanEdit(data: BookPipelineData): { state: BookPipelineData; token: PlanEditToken } | null {
+  if (data.status !== "running" || data.phase !== "planning" || data.planEdited) return null;
+  if ((data.planEditAttempts ?? 0) >= MAX_STEP_ATTEMPTS) return null;
+  const next = clone(data);
+  next.planEditAttempts = (data.planEditAttempts ?? 0) + 1;
+  next.revision++;
+  return {
+    state: next,
+    token: { runId: next.runId, stopEpoch: next.stopEpoch ?? 0, revision: planRevision(next) }
+  };
+}
+/** The pass finished (changes applied or none): it is done for this plan. */
+export function applyPlanEditSuccess(data: BookPipelineData, token: PlanEditToken): Committed {
+  if (!isPlanEditCurrent(data, token)) return { state: data, accepted: false };
+  const next = clone(data);
+  next.planEdited = true;
+  next.revision++;
+  return { state: next, accepted: true };
+}
+/** The pass failed (the attempt was counted at its start); its last failure lets the book go on without it. */
+export function applyPlanEditFailure(data: BookPipelineData, token: PlanEditToken): Committed & { gaveUp?: boolean } {
+  if (!isPlanEditCurrent(data, token)) return { state: data, accepted: false };
+  const next = clone(data);
+  const gaveUp = (next.planEditAttempts ?? 0) >= MAX_STEP_ATTEMPTS;
+  if (gaveUp) next.planEdited = true;
+  next.revision++;
+  return { state: next, accepted: true, ...(gaveUp ? { gaveUp } : {}) };
+}
+/** The pass was stopped (or the budget ran out): the attempt is given back, nothing is set; with `budget` the run pauses for it. */
+export function applyPlanEditStopped(data: BookPipelineData, token: PlanEditToken, budget: boolean): Committed {
+  if (data.runId !== token.runId) return { state: data, accepted: false };
+  const next = clone(data);
+  next.planEditAttempts = Math.max(0, (next.planEditAttempts ?? 0) - 1);
+  if (!next.planEditAttempts) delete next.planEditAttempts;
+  if (budget) {
+    next.status = "stopped";
+    next.pauseReason = "budget";
+    delete next.failureCode;
+  }
+  next.revision++;
+  return { state: next, accepted: true };
+}
+
 /** Moves the phase on when it is complete (planning to gate1, writing to gate2); a no-op elsewhere. */
 export function advancePhase(data: BookPipelineData, stages: CardStages, now: string): BookPipelineData {
   if (data.status !== "running") return data;
@@ -544,6 +632,7 @@ export function retryTrial(data: BookPipelineData, now: string): BookPipelineDat
   const trial = data.trial.filter(id => live.includes(id));
   next.phase = "planning";
   next.phaseStartedAt = now;
+  clearPlanEdit(next);
   next.pendingReset = [...new Set([...(next.pendingReset ?? []), ...trial])];
   for (const id of trial) {
     next.attempts[id] = emptyAttempts();
@@ -577,6 +666,7 @@ export function backToPlan(data: BookPipelineData, now: string): BookPipelineDat
   const next = clone(data);
   next.planReview = true;
   next.phaseStartedAt = now;
+  clearPlanEdit(next);
   for (const id of data.trial) {
     next.attempts[id] = emptyAttempts();
     next.revisions[id] = cardRevision(next, id) + 1;
@@ -752,6 +842,7 @@ export function acceptMapChange(
   const { added, missing } = mapDifference(data, mapIds);
   const next = clone(data);
   next.accepted = [...mapIds];
+  if (added.length || missing.length) clearPlanEdit(next);
   if (added.length) next.ignored = [...new Set([...(next.ignored ?? []), ...added])];
   if (missing.length) next.removed = [...new Set([...(next.removed ?? []), ...missing])];
   const order = effectiveOrder(next);
@@ -869,6 +960,7 @@ export function resetCard(data: BookPipelineData, nodeId: string): BookPipelineD
   if (!effectiveOrder(data).includes(nodeId)) return data;
   const next = clone(data);
   next.attempts[nodeId] = emptyAttempts();
+  clearPlanEdit(next);
   if (next.expandPasses) delete next.expandPasses[nodeId];
   if (next.aiProof) delete next.aiProof[nodeId];
   // The whole-book fixes that rewrote this chapter's old text no longer describe it: its box must not list them.

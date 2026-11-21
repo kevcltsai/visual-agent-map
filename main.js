@@ -3302,6 +3302,7 @@ var en = {
   "ui.book_ai_reason_hand_edited": "you edited this chapter by hand, so the AI did not overwrite it",
   "ui.book_ai_reason_fix_failed": "the AI's fix did not work",
   "ui.book_ai_reason_proof_incomplete": "the proofread did not finish",
+  "ui.book_ai_reason_not_fixed": "the AI did not fix this one",
   "ui.book_ai_reason_not_fixed_in_time": "found in the last check, no round left to fix it",
   "ui.book_ai_reason_other": "the AI could not handle it",
   "ui.book_note_review_accept": "Accept it as it is, no change needed",
@@ -6585,6 +6586,7 @@ var zhCN = {
   "ui.book_ai_reason_hand_edited": "\u8FD9\u7AE0\u4F60\u624B\u6539\u8FC7\uFF0CAI \u4E0D\u8986\u76D6\u4F60\u7684\u5B57",
   "ui.book_ai_reason_fix_failed": "AI \u6539\u7684\u65F6\u5019\u5931\u8D25\u4E86",
   "ui.book_ai_reason_proof_incomplete": "\u6821\u5BF9\u6CA1\u6709\u8DD1\u5B8C",
+  "ui.book_ai_reason_not_fixed": "AI \u6CA1\u6709\u4FEE\u5230\u8FD9\u5904",
   "ui.book_ai_reason_not_fixed_in_time": "\u8FD8\u6CA1\u6765\u5F97\u53CA\u4FEE\uFF0C\u6700\u540E\u4E00\u8F6E\u624D\u67E5\u5230",
   "ui.book_ai_reason_other": "AI \u6CA1\u529E\u6CD5\u5904\u7406",
   "ui.book_note_review_accept": "\u63A5\u53D7\u73B0\u5728\u8FD9\u6837\uFF0C\u4E0D\u7528\u6539",
@@ -9868,6 +9870,7 @@ var zhTW = {
   "ui.book_ai_reason_hand_edited": "\u9019\u7AE0\u4F60\u624B\u6539\u904E\uFF0CAI \u4E0D\u84CB\u6389\u4F60\u7684\u5B57",
   "ui.book_ai_reason_fix_failed": "AI \u6539\u7684\u6642\u5019\u5931\u6557\u4E86",
   "ui.book_ai_reason_proof_incomplete": "\u6821\u5C0D\u6C92\u6709\u8DD1\u5B8C",
+  "ui.book_ai_reason_not_fixed": "AI \u6C92\u6709\u4FEE\u5230\u9019\u8655",
   "ui.book_ai_reason_not_fixed_in_time": "\u9084\u6C92\u4F86\u5F97\u53CA\u4FEE\uFF0C\u6700\u5F8C\u4E00\u8F2A\u624D\u67E5\u5230",
   "ui.book_ai_reason_other": "AI \u6C92\u8FA6\u6CD5\u8655\u7406",
   "ui.book_note_review_accept": "\u63A5\u53D7\u73FE\u5728\u9019\u6A23\uFF0C\u4E0D\u7528\u6539",
@@ -26271,6 +26274,7 @@ var OPEN_ISSUE_SOURCES = {
         zh: "\u9019\u8655\u662F\u4F60\u624B\u6539\u6216\u52A0\u8A3B\u7684\u5167\u5BB9\uFF0C\u7A0B\u5F0F\u4E0D\u52D5",
         en: "This is text you edited or annotated, so it was left alone"
       },
+      not_fixed: { zh: "AI \u6C92\u6709\u4FEE\u5230\u9019\u8655", en: "The AI did not fix this one" },
       not_fixed_in_time: {
         zh: "\u6700\u5F8C\u4E00\u8F2A\u624D\u67E5\u5230\u9019\u8655\uFF0C\u4F86\u4E0D\u53CA\u4FEE",
         en: "It was first found in the last check, so there was no round left to fix it"
@@ -48754,9 +48758,9 @@ function applyAiProof(data, token, result) {
           return squash2(target.quote) === squash2(item.quote) && ((_a4 = target.chapter) != null ? _a4 : 1) === ((_b4 = item.chapter) != null ? _b4 : 1);
         }
       ) : void 0;
-      if (before) return (_b3 = (_a3 = slot.refused) == null ? void 0 : _a3[before.id]) != null ? _b3 : "still_present";
       const quote3 = item ? squash2(item.quote) : "";
-      const written2 = quote3 && ((_c2 = found.applied) != null ? _c2 : []).some((text10) => squash2(text10).includes(quote3) || quote3.includes(squash2(text10)));
+      const written2 = quote3 && ((_a3 = found.applied) != null ? _a3 : []).some((text10) => squash2(text10).includes(quote3) || quote3.includes(squash2(text10)));
+      if (before) return (_c2 = (_b3 = slot.refused) == null ? void 0 : _b3[before.id]) != null ? _c2 : written2 ? "still_present" : "not_fixed";
       return written2 ? "still_present" : "not_fixed_in_time";
     });
   }
@@ -54998,6 +55002,44 @@ var BookPipelineRuns = class {
       await drive.store.commit((state) => ({ state: abandonAi(state, nodeId), accepted: true }));
     if (!await this.writeClosingPage(drive)) this.log(drive, "open_issues_write", nodeId, "proof", "failed");
   }
+  /**
+   * A finished book is read again (the map opens; the one entry for this repair): a chapter with text that the book lists but that has
+   * no finished AI proofread slot (a rerun cut short by an unload: its slot was cleared or left open and nothing closed it) is closed as incomplete and the
+   * closing page is written again, so the bar and the page never show the book as solved. A book with no such chapter is not touched.
+   */
+  async repairFinished(mapPath) {
+    if (this.disposed || !this.ports.aiProof || !this.ports.aiFix || !this.ports.aiBookProof) return;
+    const read = readBookPipeline(await this.ports.readMap(mapPath));
+    if (read.kind !== "usable" || read.data.phase !== "done") return;
+    if (effectiveOrder(read.data).every((id) => {
+      var _a2, _b2;
+      return (_b2 = (_a2 = read.data.aiProof) == null ? void 0 : _a2[id]) == null ? void 0 : _b2.done;
+    })) return;
+    return this.enter(mapPath, async (drive) => {
+      var _a2, _b2;
+      const data = await this.openSaved(drive, mapPath, { allowDone: true });
+      const missing = [];
+      for (const id of effectiveOrder(data)) {
+        const info = drive.cards.get(id);
+        if (((_b2 = (_a2 = data.aiProof) == null ? void 0 : _a2[id]) == null ? void 0 : _b2.done) || !info || drive.stages.get(id) !== "checked" && drive.stages.get(id) !== "needs-review")
+          continue;
+        const card = await this.ports.readCard(info.path).catch(() => void 0);
+        if (card && aiProofBody(chapterBody(card.detail)).trim()) missing.push(id);
+      }
+      if (!missing.length || this.dead(drive)) return;
+      await drive.store.commit(
+        (state) => state.phase === "done" ? {
+          state: missing.reduce((next, id) => {
+            var _a3, _b3;
+            return ((_b3 = (_a3 = next.aiProof) == null ? void 0 : _a3[id]) == null ? void 0 : _b3.done) ? next : abandonAi(next, id);
+          }, state),
+          accepted: true
+        } : { state, accepted: false }
+      );
+      if (!await this.writeClosingPage(drive)) this.log(drive, "open_issues_write", missing[0], "proof", "failed");
+      this.syncNotes(drive);
+    });
+  }
   /** The card's result as the rerun compares it (memory only); undefined when the card cannot be read. */
   async cardSnapshot(drive, nodeId) {
     var _a2;
@@ -58452,6 +58494,7 @@ var AI_REASON_KEY = {
   hand_edited: "ui.book_ai_reason_hand_edited",
   fix_failed: "ui.book_ai_reason_fix_failed",
   proof_incomplete: "ui.book_ai_reason_proof_incomplete",
+  not_fixed: "ui.book_ai_reason_not_fixed",
   not_fixed_in_time: "ui.book_ai_reason_not_fixed_in_time"
 };
 var aiReasonText = (reason) => t(Object.prototype.hasOwnProperty.call(AI_REASON_KEY, reason) ? AI_REASON_KEY[reason] : "ui.book_ai_reason_other");
@@ -89126,7 +89169,9 @@ ${t("ui.book_role_running_suffix")}` : first);
   }
   /** After a map opens: its notes are aligned with its run (stale boxes of an earlier run removed, old runs drawn), then ticked boxes are read. */
   async reconcileBookNotes(path, isCurrent2) {
+    var _a2;
     try {
+      await ((_a2 = this.plugin.bookPipelineRuns) == null ? void 0 : _a2.repairFinished(path).catch(() => void 0));
       await this.plugin.bookCallouts.reconcile(path, this.bookMayCarryCallouts);
       if (this.closed || !isCurrent2() || !this.map) return;
       const read = readBookPipeline(this.map);

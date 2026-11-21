@@ -12,8 +12,8 @@ const sizeOf = file => 100 + (Number(file.slice(7, 9)) * 37) % 11; // varied, wi
 test('ci shard: unset VAM_CI_SHARD leaves the parts untouched', async () => {
   const { shardParts, parseShard } = await mod('test-integration.mjs');
   const list = [{ name: 'a', args: ['tests/run.cjs'] }, { name: 'b', args: ['--test', ...FILES] }];
-  assert.equal(parseShard(undefined), null);
-  assert.equal(shardParts(list, parseShard(undefined), { splitNodeTest: true, sizeOf }), list);
+  assert.equal(parseShard(''), null);
+  assert.equal(shardParts(list, parseShard(''), { splitNodeTest: true, sizeOf }), list);
 });
 test('ci shard: bad VAM_CI_SHARD values throw', async () => {
   const { parseShard } = await mod('test-integration.mjs');

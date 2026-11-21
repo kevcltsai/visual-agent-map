@@ -88,6 +88,7 @@ import {
   type PipelineStage
 } from "./core/book-pipeline/model";
 import { dedupeImageEmbeds, imageKey, imageKeysIn } from "./core/image-keys";
+import { readCoverBlock, stripCoverBlock } from "./core/book-pipeline/cover-block";
 export type { ReasoningLevel, ResearchDepth, ResearchMode, VisualMode, VisualReference } from "./ai/types";
 export { normalizeReasoningLevel } from "./ai/task-policy";
 
@@ -1048,13 +1049,15 @@ function noteBody(
   newFindings = "",
   leftover = "",
   layout: "answer-first" | "legacy" = "answer-first",
-  calloutType = "info"
+  calloutType = "info",
+  coverBlock = ""
 ): string {
   if (layout === "legacy") {
     const legacyBlock = `${DETAIL_START}\n${detailWithVisualReferences(detail, visualReferences, standardTemplate(language))}\n${DETAIL_END}`;
     return (
       [
         `# ${title}`,
+        coverBlock,
         `## Current Summary\n\n${summary.trim() || placeholder(language)}`,
         `## Prompt\n\n${prompt.trim()}`,
         rules.trim() ? `## Rules\n\n${rules.trim()}` : "",
@@ -1074,6 +1077,7 @@ function noteBody(
   return (
     [
       `# ${title}`,
+      coverBlock,
       `## Current Summary\n\n${summary.trim() || placeholder(language)}`,
       preview.trim() && !isPlaceholder(preview.trim())
         ? calloutSection(previewHeading(language), preview, calloutType)
@@ -1097,7 +1101,11 @@ function normalizeBodyOrder(
   textLanguage: NoteLanguage = language,
   book = false
 ): string {
-  const clean = ensurePreview(withoutReference(content), language, textLanguage);
+  // The cover block of a picture-book note (see core/book-pipeline/cover-block.ts) stays directly under the title wherever it was found;
+  // it is taken out first so its embed never feeds the Preview.
+  const cover = readCoverBlock(content);
+  const coverBlock = cover ? content.slice(cover.from, cover.to) : "";
+  const clean = ensurePreview(withoutReference(cover ? stripCoverBlock(content) : content), language, textLanguage);
   const currentSummary = section(clean, "Current Summary") || summaryFallback;
   const summary = isPlaceholder(currentSummary) ? placeholder(textLanguage) : currentSummary;
   const prompt = section(clean, "Prompt");
@@ -1142,7 +1150,8 @@ function normalizeBodyOrder(
     newFindings,
     leftover,
     legacy && !book ? "legacy" : "answer-first",
-    book ? "vam-book" : "info"
+    book ? "vam-book" : "info",
+    coverBlock
   );
 }
 

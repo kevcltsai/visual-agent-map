@@ -104,6 +104,16 @@ function ensureNativeMenusOff(vault) {
   writeFileSync(path, JSON.stringify({ ...current, nativeMenus: false }, null, 2));
 }
 
+// A refresh that failed part-way puts back every artifact it had already replaced and the ownership record (from the copies in staging).
+export function restorePreviousInstall({ staging, plugin, replaced, recordPath }) {
+  for (const name of [...replaced].reverse()) {
+    const previous = join(staging, `${name}.previous`);
+    if (existsSync(previous)) renameSync(previous, join(plugin, name));
+  }
+  const previousRecord = join(staging, `${marker}.previous`);
+  if (existsSync(previousRecord)) renameSync(previousRecord, recordPath);
+}
+
 // Refresh only installed code in an owned Vault. Preserve every fixture, note, and attachment.
 // The owner's vault is refused while the owner may be using it (scripts/owner-idle.mjs) unless the session that has the owner's
 // own 「可以裝」 passes ownerIdleConfirmed (--owner-idle-confirmed).
@@ -133,12 +143,7 @@ export function updateCurrentTestVault({ vault = canonicalVault, artifact = root
       renameSync(join(staging, marker), recordPath);
       return verifyTestVault(vault, artifact, owner);
     } catch (error) {
-      for (const name of replaced.reverse()) {
-        const previous = join(staging, `${name}.previous`);
-        if (existsSync(previous)) renameSync(previous, join(plugin, name));
-      }
-      const previousRecord = join(staging, `${marker}.previous`);
-      if (existsSync(previousRecord)) renameSync(previousRecord, recordPath);
+      restorePreviousInstall({ staging, plugin, replaced, recordPath });
       throw error;
     }
   } finally { rmSync(staging, { recursive: true, force: true }); }

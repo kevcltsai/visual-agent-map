@@ -4328,6 +4328,19 @@ test('gate press while the drive that reached the gate is ending: a stale-phase 
   assert.match((await trace())[0], /backToPlan refused:not_gate1 wait=|backToPlan refused:not_gate1$/);
 });
 
+test('gate press while a gate phase is still working (a trial being written, no owner gate): refused busy at once, never waits', async () => {
+  const r = await trialRig();
+  const gate = defer(); const base = r.script.author; let held = 0;
+  r.script.author = async input => { held++; await gate.promise; return base(input); };
+  const start = r.runs.start(r.mapPath);
+  while (!held) await tick();
+  const s = await r.state();
+  assert.ok(s.phase === 'gate1' || s.phase === 'writing' || s.phase === 'planning', s.phase);
+  assert.equal(r.runs.isRunning(r.mapPath), true);
+  for (const action of ['startTrial', 'retryTrial', 'backToPlan', 'finishRun', 'confirmGate1'])
+    await assert.rejects(() => r.runs[action](r.mapPath), e => e.code === 'busy', action);
+  gate.resolve(); await start; await idle(r);
+});
 test('gate press while a different operation runs (the plan phase) is refused busy at once and is traced', async () => {
   const gate = defer();
   const holder = { r: null };

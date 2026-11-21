@@ -66,6 +66,7 @@ import {
   beginStep,
   cardRevision,
   confirmGate1,
+  gateWaitsForPerson,
   finishRun,
   invalidateStaleAiChapters,
   isCurrent,
@@ -2019,7 +2020,9 @@ export class BookPipelineRuns {
     return (
       !!state &&
       !drive.job &&
-      (state.phase === "gate1" || state.phase === "gate2") &&
+      // Only a gate that waits for the owner: at any other gate phase the drive is still working (a trial being written, the last fixes).
+      ((state.phase === "gate1" && gateWaitsForPerson(state, state.planReview ? "plan" : "trial")) ||
+        (state.phase === "gate2" && gateWaitsForPerson(state, "final"))) &&
       state.status === "running" &&
       !drive.stopRequested &&
       drive.fatal === undefined &&

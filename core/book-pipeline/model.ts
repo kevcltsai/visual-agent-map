@@ -420,7 +420,7 @@ function problem(raw: unknown): string | undefined {
   if (raw.stopEpoch !== undefined && !isCount(raw.stopEpoch)) return "stopEpoch";
   if (
     raw.gateTrace !== undefined &&
-    (!Array.isArray(raw.gateTrace) || raw.gateTrace.some(line => typeof line !== "string" || line.length > 120))
+    (!Array.isArray(raw.gateTrace) || raw.gateTrace.some(line => typeof line !== "string"))
   )
     return "gateTrace";
   if (!isCount(raw.revision)) return "revision";

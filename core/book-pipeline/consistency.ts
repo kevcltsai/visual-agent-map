@@ -88,7 +88,15 @@ export function factExtract(text: string): string {
     });
     if (!kept.size) continue;
     lead();
-    out.push(sentences.filter((_, at) => kept.has(at)).join(""));
+    // Runs of neighbouring sentences are glued; a gap in the chapter is a line break, so no quote can read across it.
+    let run = "";
+    sentences.forEach((sentence, at) => {
+      if (!kept.has(at)) {
+        if (run) out.push(run);
+        run = "";
+      } else run += sentence;
+    });
+    if (run) out.push(run);
   }
   return out.join("\n");
 }

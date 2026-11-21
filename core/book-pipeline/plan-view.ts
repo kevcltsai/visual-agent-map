@@ -2,7 +2,7 @@
  * Which of the pipeline's hidden `[!vam-book]` callouts the owner may see: the root's book plan and a card's plan block (its Prompt, shown
  * as 提示 / Prompt). Judged by the title text, against the same label tables the notes are written with. Pure.
  */
-import { LANGUAGES, type ContentLanguage, type TranslationKey } from "../../i18n";
+import { instructionLanguageOf, LANGUAGES, type ContentLanguage, type TranslationKey } from "../../i18n";
 import { readPipelineStage } from "./model";
 import {
   isBookPlanTitle,
@@ -33,10 +33,11 @@ export function planCalloutKind(title: string): PlanCalloutKind | undefined {
 }
 
 /** The language the plan view shows its titles and relabelled fields in: the book's content language, for a note stored in Chinese; a note stored in English keeps its stored labels. */
-export type PlanLocale = "zh-TW" | "zh-CN" | "en";
+export type PlanLocale = ContentLanguage;
 export function planLocale(language: ContentLanguage, storedZh: boolean): PlanLocale {
   if (!storedZh) return "en";
-  return language === "zh-CN" ? "zh-CN" : "zh-TW";
+  // A Chinese-instruction language is an interface language with its own dictionary (zh-TW or zh-CN); any other book language falls back to zh-TW.
+  return instructionLanguageOf(language) === "zh" ? language : "zh-TW";
 }
 
 /** The callout title of the root's book plan, or of a card's plan by what the card is. */

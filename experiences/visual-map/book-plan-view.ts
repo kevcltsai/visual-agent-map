@@ -156,7 +156,12 @@ const touchesCallout = (mutation: MutationRecord): boolean =>
 export function registerBookPlanView(plugin: Plugin, language: () => ContentLanguage): void {
   const envOf = (path: string | undefined): PlanViewEnv => ({
     language,
-    stage: () => (path ? plugin.app.metadataCache.getCache(path)?.frontmatter?.["pipeline-stage"] : undefined)
+    stage: (): unknown => {
+      const frontmatter: Record<string, unknown> | undefined = path
+        ? plugin.app.metadataCache.getCache(path)?.frontmatter
+        : undefined;
+      return frontmatter?.["pipeline-stage"];
+    }
   });
   plugin.registerMarkdownPostProcessor((element, ctx) => markPlanCallouts(element, envOf(ctx.sourcePath)));
   plugin.registerEditorExtension(

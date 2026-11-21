@@ -49784,7 +49784,10 @@ var applyNotesStep = {
 function readBrief(prompt) {
   var _a2, _b2, _c, _d;
   const lines = parseCardPrompt(prompt);
-  const side = (value) => value && !NONE2.test(value.trim()) ? value : "";
+  const side = (value) => {
+    var _a3, _b3;
+    return (_b3 = (_a3 = neighbourOf(value)) == null ? void 0 : _a3.summary) != null ? _b3 : "";
+  };
   return {
     covers: (_a2 = lines.covers) != null ? _a2 : "",
     points: (_b2 = parseCardPoints(prompt)) != null ? _b2 : [],
@@ -49807,6 +49810,12 @@ function neighbourOf(value, sentence2) {
   const where = m ? /^\d+$/.test(m[1].trim()) ? Number(m[1].trim()) : "preface" : void 0;
   return { ...where === void 0 ? {} : { position: where }, title, summary: sentence2 != null ? sentence2 : old };
 }
+function bareSentence(value, title) {
+  var _a2, _b2;
+  const text11 = value.trim();
+  const body = (_b2 = (_a2 = POSITION.exec(text11)) == null ? void 0 : _a2[2]) != null ? _b2 : text11;
+  return title && body.startsWith(`${title} \u2014 `) ? body.slice(title.length + 3).trim() : text11;
+}
 function promptLanguage(prompt, fallback) {
   const same2 = (reference) => instructionLanguageOf(fallback) === instructionLanguageOf(reference);
   if (/^This chapter covers[:：]/m.test(prompt)) return same2("en") ? fallback : "en";
@@ -49821,7 +49830,9 @@ function editedPrompt(prompt, change2, kind, fallback) {
   const brief = readBrief(prompt);
   const points = ((_a2 = change2.points) == null ? void 0 : _a2.length) ? [...change2.points] : brief.points;
   const checklist = ((_b2 = change2.checklist) == null ? void 0 : _b2.length) ? change2.checklist.map((item, at) => ({ id: `C${at + 1}`, ...item })) : brief.checklist;
-  const previous = neighbourOf(lines.previous, change2.previous || void 0);
+  const old = neighbourOf(lines.previous);
+  const sentence2 = old && change2.previous ? bareSentence(change2.previous, old.title) : "";
+  const previous = old && sentence2 ? { ...old, summary: sentence2 } : old;
   const next = neighbourOf(lines.next);
   const parent = lines.parent === void 0 ? void 0 : neighbourOf(lines.parent);
   const cover = parseCardCover(prompt);
@@ -50199,13 +50210,14 @@ Return only the cards that need a change, so that the briefs fit together:
 - Each subject is owned by exactly one card. Where two briefs cover the same thing, move it to the card it belongs to or drop it from the other (change covers or points). A chapter's own subject is never a heading of the preface or of another chapter.
 - The preface (role intro) covers the question the whole book answers, why these concepts are needed and how they connect, one line of route per chapter, and how to read the book. No body chapter or section previews the whole book's route; a chapter looks only at its own subject.
 - No two cards open with the same scene or example. Rewrite the entry of the later card so it grows from that card's own subject.
-- Each previous names real ideas that earlier cards establish (check them against the earlier briefs) and the one new idea this card adds. An empty previous stays empty.
+- Each previous names real ideas that earlier cards establish (check them against the earlier briefs) and the one new idea this card adds. An empty previous stays empty. previous and next are shown as the sentence only (the neighbour's number and title are the neighbouring cards'); write previous as a sentence too, without a number or a title.
 - The last card's handoff answers the question the preface opened with, from the ideas the chapters built.
 
 Rules for a change:
 - Do not add, drop, rename, reorder or re-role cards, and do not touch pictures. Use only the ids given.
+- A card marked "locked":true must not change: return no change for it, and do not move a subject onto a locked card or off it (leave a subject that a locked card covers where it is, and do not add to it a subject it lacks).
 - A card that is fine as it is does not appear. Prefer the smallest change; do not rewrite a field that has no problem.
-- Every field except id is optional; leave a field out (or write an empty string) to keep it as it is. A field you return replaces the whole field. points is the complete list of {{pointsMin}} to {{pointsMax}} headings, each a short line of at most {{pointMax}} characters without the character "\xB7". checklist is returned only together with points, and is then the complete replacement list.
+- Every field except id is optional; leave a field out (or write an empty string) to keep it as it is. A field you return replaces the whole field. points is the complete list of {{pointsMin}} to {{pointsMax}} headings, each a short line of at most {{pointMax}} characters without the character "\xB7". When you change covers, points or previous, you must also return the full replacement checklist that matches the new briefs (a change without it is discarded): 2 to 8 items, the same rules as the card briefs follow (structure or fact only, each checkable by quoting the chapter's text; when previous is not empty, one structure item: the chapter names the earlier ideas "X" and "Y" and states that they lead to "Z"; for the last card, one structure item: the closing paragraph answers the book's opening question by combining the ideas the chapters built). A checklist returned without a change to covers, points or previous is ignored.
 - A checklist item is one objectively checkable statement about the finished chapter with a type: structure (shape, scope or coverage, checkable from its text alone by quoting it) or fact (a concrete claim that outside sources can confirm). Nothing subjective, about style or tone, or about pictures. Do not number the items.
 - Use plain single-line text in every field and no Markdown. Use only numbers and links that appear in the supplied text.
 
@@ -50224,7 +50236,7 @@ Whole-book thread (JSON string):
 Whole-book settings (JSON object):
 {{settings}}
 
-Every card in reading order (JSON array of {id,place,role,title,covers,points,entry,handoff,previous,next,checklist}):
+Every card in reading order (JSON array of {id,place,role,title,covers,points,entry,handoff,previous,next,checklist,locked?}):
 {{cards}}
 `;
 
@@ -50280,7 +50292,8 @@ var shown = (card) => ({
   handoff: cap2(card.handoff, PLAN_EDIT_TEXT_CHARS),
   previous: cap2(card.previous, PLAN_EDIT_TEXT_CHARS),
   next: cap2(card.next, PLAN_EDIT_TEXT_CHARS),
-  checklist: card.checklist.slice(0, MAX_CHECKLIST).map((item) => cap2(item, PLAN_EDIT_CHECK_CHARS))
+  checklist: card.checklist.slice(0, MAX_CHECKLIST).map((item) => cap2(item, PLAN_EDIT_CHECK_CHARS)),
+  ...card.locked ? { locked: true } : {}
 });
 var render = (request) => {
   var _a2, _b2;
@@ -50297,6 +50310,7 @@ var render = (request) => {
 };
 var planEditFits = (request) => estimateTokens(render(request) + JSON.stringify(PLAN_EDIT_SCHEMA)) <= BOOK_STEP_TOKEN_BUDGET;
 var text7 = (value, max) => typeof value === "string" ? cap2(value, max) : void 0;
+var changesBrief = (change2) => change2.covers !== void 0 || change2.points !== void 0 || change2.previous !== void 0;
 function parseChange(entry, known) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return void 0;
   const item = entry;
@@ -50328,15 +50342,14 @@ function parseChange(entry, known) {
       if (!body) return void 0;
       if (!SUBJECTIVE.test(body) && !unconditionalPicture(body)) list2.push({ type: one.type, text: body });
     }
-    if (change2.points && list2.length) change2.checklist = list2.slice(0, MAX_CHECKLIST);
-    else if (change2.points) return void 0;
+    if (changesBrief(change2) && list2.length) change2.checklist = list2.slice(0, MAX_CHECKLIST);
   }
   return Object.keys(change2).length > 1 ? change2 : void 0;
 }
 function parsePlanEdit(raw, request) {
   const value = parseJson(raw);
   if (Object.keys(value).length !== 1 || !("changes" in value)) fail2("The reply has unexpected fields");
-  const known = new Set(request.cards.map((card) => card.id));
+  const known = new Set(request.cards.filter((card) => !card.locked).map((card) => card.id));
   const seen = /* @__PURE__ */ new Set();
   const out = [];
   for (const entry of arrayOf(value.changes, "changes")) {
@@ -56717,7 +56730,7 @@ var BookPipelineRuns = class {
     if (!(begun == null ? void 0 : begun.accepted) || !begun.token) return;
     const token = begun.token;
     const startedAt = Date.parse(this.ports.now());
-    const counts = { changes: 0, written: 0 };
+    const counts = { changes: 0, written: 0, rejected: 0 };
     let outcome;
     try {
       outcome = await this.execPlanEdit(drive, token, counts);
@@ -56769,7 +56782,7 @@ var BookPipelineRuns = class {
     report(`failed:${code2(outcome.reason)}`);
   }
   async execPlanEdit(drive, token, counts) {
-    var _a2, _b2;
+    var _a2, _b2, _c, _d, _e, _f;
     const signal = drive.controller.signal;
     const rootInfo = drive.cards.get(drive.rootId);
     if (!rootInfo) return { kind: "failed", reason: "missing" };
@@ -56784,7 +56797,7 @@ var BookPipelineRuns = class {
       if (!info) return { kind: "failed", reason: "missing" };
       const card = await this.ports.readCard(info.path);
       const brief = readBrief(card.prompt);
-      seen.set(id, { prompt: card.prompt, kind: (_b2 = (_a2 = structure2.placeOf(id)) == null ? void 0 : _a2.kind) != null ? _b2 : "chapter" });
+      seen.set(id, { prompt: card.prompt, kind: (_b2 = (_a2 = structure2.placeOf(id)) == null ? void 0 : _a2.kind) != null ? _b2 : "chapter", title: card.title });
       cards.push({
         id,
         place: this.placeOf(drive, structure2, id),
@@ -56796,7 +56809,9 @@ var BookPipelineRuns = class {
         handoff: brief.handoff,
         previous: brief.previous,
         next: brief.next,
-        checklist: brief.checklist.map((item) => item.text)
+        checklist: brief.checklist.map((item) => item.text),
+        // A card the program may not rewrite, or one with no plan written by the planner, is not the editor's to change.
+        ...drive.planSkipped.has(id) || !brief.covers ? { locked: true } : {}
       });
     }
     const request = {
@@ -56816,18 +56831,55 @@ var BookPipelineRuns = class {
     );
     counts.changes = changes.length;
     const authorize = () => !this.dead(drive) && !signal.aborted && isPlanEditCurrent(drive.store.state, token);
+    const locked = new Set(cards.filter((card) => card.locked).map((card) => card.id));
+    const moved = [];
     for (const change2 of changes) {
       if (!authorize()) return { kind: "cancelled" };
       const before = seen.get(change2.id);
-      if (!before || drive.planSkipped.has(change2.id)) continue;
+      if (!before || locked.has(change2.id)) continue;
+      if (changesBrief(change2) && !change2.checklist) {
+        counts.rejected++;
+        continue;
+      }
       const path = await this.stillOnMap(drive, change2.id);
       if (!path) continue;
       const current = await this.ports.readCard(path);
       if (current.prompt !== before.prompt) continue;
-      const prompt = editedPrompt(before.prompt, change2, before.kind, drive.config.language);
+      const prompt = editedPrompt(
+        before.prompt,
+        changesBrief(change2) ? change2 : { ...change2, checklist: void 0 },
+        before.kind,
+        drive.config.language
+      );
       if (prompt === void 0) continue;
-      const written2 = await this.ports.updateNoteGuarded(path, { prompt }, { expectedContent: current.raw, authorize });
-      if (written2 === "written") counts.written++;
+      const patch = drive.ownSummary.has(change2.id) || !change2.covers ? { prompt } : { prompt, summary: change2.covers };
+      const written2 = await this.ports.updateNoteGuarded(path, patch, { expectedContent: current.raw, authorize });
+      if (written2 === "written") {
+        counts.written++;
+        if (change2.covers) moved.push(change2.id);
+      }
+    }
+    for (const id of moved) {
+      const above = structure2.neighboursOf(id).previous;
+      const info = above === void 0 ? void 0 : drive.cards.get(above);
+      const own2 = drive.cards.get(id);
+      if (above === void 0 || !info || !own2) continue;
+      if (!authorize()) return { kind: "cancelled" };
+      const raw = await this.ports.readCard(info.path);
+      if (!isUntouched(raw.detail)) continue;
+      const covers = summaryText2((_c = parseCardPrompt((await this.ports.readCard(own2.path)).prompt).covers) != null ? _c : "").trim();
+      const prompt = covers ? rewriteNeighbourLine(
+        raw.prompt,
+        "next",
+        {
+          position: this.neighbourPosition(structure2, above, id),
+          title: (_e = (_d = seen.get(id)) == null ? void 0 : _d.title) != null ? _e : "",
+          summary: covers
+        },
+        (_f = structure2.placeOf(above)) == null ? void 0 : _f.kind
+      ) : void 0;
+      if (prompt === void 0) continue;
+      await this.ports.updateNoteGuarded(info.path, { prompt }, { expectedContent: raw.raw, authorize });
     }
     return authorize() ? { kind: "ok" } : { kind: "cancelled" };
   }
@@ -72447,7 +72499,7 @@ function bookStartEstimate(cards, trialCards, models) {
     // The whole-book plan and proofread, and every chapter's calls: an upper bound.
     calls: bookWholeCalls(n) + n * (per.plan + per.write + per.images + per.proof + per.aiProof),
     limit: DEFAULT_BUDGET_LIMIT,
-    seconds: time("global") + rounds * perCard + (n >= 2 ? aiProof : 0)
+    seconds: time("global") + (n >= PLAN_EDIT_MIN_CARDS ? time("plan") : 0) + rounds * perCard + (n >= 2 ? aiProof : 0)
   };
 }
 function bookStartEstimateText(estimate, structure2) {

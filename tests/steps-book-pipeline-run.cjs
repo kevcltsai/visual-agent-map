@@ -4306,7 +4306,8 @@ async function postRig(count, over = {}) {
 const open = gates => { for (const g of gates.values()) g.resolve(); };
 
 test('picture work: with every search held open, more than BOOK_POOL writes complete and later cards start writing; writes never exceed BOOK_POOL, picture work never exceeds BOOK_POST_POOL', async () => {
-  const { r, live, gates } = await postRig(12);
+  const cards = BOOK_POOL + BOOK_POST_POOL + 2; // more cards than both caps together, so both fill
+  const { r, live, gates } = await postRig(cards);
   await r.runs.start(r.mapPath);
   const running = r.runs.confirmGate1(r.mapPath);
   await settle();
@@ -4319,7 +4320,7 @@ test('picture work: with every search held open, more than BOOK_POOL writes comp
   await running;
   assert.equal((await r.state()).phase, 'done');
   assert.ok(live.peakWrites <= BOOK_POOL && live.peakSearches <= BOOK_POST_POOL && live.peakPost <= BOOK_POST_POOL, `peaks ${live.peakWrites}/${live.peakSearches}/${live.peakPost}`);
-  assert.equal(new Set(live.started).size, 12);
+  assert.equal(new Set(live.started).size, cards);
 });
 
 test('picture work: a card is proofread only after its own pictures settled, while others still search', async () => {

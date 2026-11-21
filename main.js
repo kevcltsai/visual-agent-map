@@ -54696,7 +54696,7 @@ var replacementsOf = (edits, ids2) => edits.filter((edit) => ids2.includes(edit.
 var replacementMapOf = (edits, ids2) => Object.fromEntries(edits.filter((edit) => ids2.includes(edit.id)).map((edit) => [edit.id, edit.replacement]));
 var appliedIdsOf = (outcomes) => outcomes.filter((outcome) => outcome.applied).map((outcome) => outcome.id);
 var BOOK_POOL = 5;
-var BOOK_POST_POOL = 5;
+var BOOK_POST_POOL = 10;
 function unmetIds(items) {
   const unmet = items.filter((item) => item.status === "unmet");
   const pick9 = unmet.filter((item) => item.type === "fact");
@@ -58367,7 +58367,8 @@ ${caption}`, drive.config.language))
       return planning ? stage === void 0 : stage !== "checked" && stage !== "needs-review";
     }).length;
     const average = list2.reduce((sum2, ms) => sum2 + ms, 0) / list2.length;
-    return Math.max(0, Math.round(average * left / BOOK_POOL / 1e3));
+    const atOnce = planning ? BOOK_POOL : BOOK_POOL + BOOK_POST_POOL;
+    return Math.max(0, Math.round(average * left / atOnce / 1e3));
   }
   /** One line per proofread call: the numbers only (the call has no content log, so this is the trace of what it did). */
   logProofCounts(drive, runId, nodeId, counts, result) {

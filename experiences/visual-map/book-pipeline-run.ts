@@ -290,10 +290,11 @@ export const BOOK_POOL = 5;
 /**
  * At most this many cards are in their post-write work at once: finding and placing pictures (cover download included) after the
  * author's call, and the proofreads (card_proof, AI proof, AI fix). A card in this phase does not hold a {@link BOOK_POOL} slot, so
- * the next write starts when a write ends. 5 equals what the shared pool allowed for this work before; with 5 writes that keeps the
- * run at most about 10 model calls at once, the low end of the peaks measured on a real book.
+ * the next write starts when a write ends. 10, not 5: a card's picture search and checks take about three times as long as its
+ * write (about 75 s and 30 s against 45 s on a real 22-card book), so a cap of 5 would hold the writers back again. With 5 writes that
+ * keeps the run at about 15 model calls at once, inside the 10 to 26 the old run already reached.
  */
-export const BOOK_POST_POOL = 5;
+export const BOOK_POST_POOL = 10;
 
 export type BookRunRefusal =
   | "busy"
@@ -4790,7 +4791,9 @@ export class BookPipelineRuns {
       return planning ? stage === undefined : stage !== "checked" && stage !== "needs-review";
     }).length;
     const average = list.reduce((sum, ms) => sum + ms, 0) / list.length;
-    return Math.max(0, Math.round((average * left) / BOOK_POOL / 1000));
+    // Planning runs BOOK_POOL cards at once; writing has cards in both the write and the post-write places.
+    const atOnce = planning ? BOOK_POOL : BOOK_POOL + BOOK_POST_POOL;
+    return Math.max(0, Math.round((average * left) / atOnce / 1000));
   }
   /** One line per proofread call: the numbers only (the call has no content log, so this is the trace of what it did). */
   private logProofCounts(drive: Drive, runId: string, nodeId: string, counts: ProofCounts, result: string): void {

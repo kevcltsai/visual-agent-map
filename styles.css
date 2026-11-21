@@ -2283,6 +2283,12 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-book-menu-note { color: var(--text-muted); font-size: var(--font-ui-smaller); pointer-events: none; }
 /* The picture-book pipeline's work records (Prompt, proofread result, research notes) are written as [!vam-book] callouts: hidden in reading and live preview, still there in source mode. */
 .callout[data-callout="vam-book"] { display: none; }
+/* ...except the plan blocks the owner reads and edits (the root's book plan, a card's plan): marked by the plan view (book-plan-view.ts). */
+.callout[data-callout="vam-book"].vam-book-plan { display: block; }
+.vam-book-plan .vam-book-plan-hidden { display: none; }
+.vam-book-plan-fold { margin-block: 4px; }
+.vam-book-plan-fold > summary { cursor: pointer; color: var(--text-muted); font-weight: var(--font-semibold); }
+.vam-book-plan-fold > summary:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 /* The program's hint in a picture-book chapter is the AI proofread box (below). The old trial note keeps its info look in case a note still carries one. */
 .callout[data-callout="vam-trial"] { --callout-color: var(--color-blue-rgb); --callout-icon: lucide-info; }
 /* The AI proofread box of a chapter (the program's own [!vam-review] kind): purple, set apart from the orange warnings. */

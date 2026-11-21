@@ -124,7 +124,6 @@ import {
   carryImageSection,
   dropPlaceholderSections,
   replaceBookPlanSection,
-  replaceBookStructure,
   fencedLines,
   normalizeWorkRecords,
   workLogLines,
@@ -141,9 +140,6 @@ import {
 } from "../../core/book-pipeline/note-sections";
 import {
   composeBookPlan,
-  composeBookStructure,
-  parseCardPoints,
-  type StructureEntry,
   composeCardPrompt,
   parseBookPlanBody,
   parseBookPlanDecisions,
@@ -1572,48 +1568,6 @@ export class BookPipelineRuns {
   }
 
   /**
-   * The plan gate (gate 1 before the trial, every card planned): the root's `### 全書結構` is composed by the program from each card's
-   * content headings and written into the plan callout (no AI call). Written again every time the run is back at the gate (back to plan,
-   * a replan). A note that changed meanwhile or a drive that is over writes nothing: `structure_skipped` is logged, the gate shows anyway.
-   */
-  private async writeBookStructure(drive: Drive): Promise<void> {
-    const signal = drive.controller.signal;
-    if (this.dead(drive) || signal.aborted || drive.fatal !== undefined) return;
-    try {
-      const root = drive.cards.get(drive.rootId);
-      const order = effectiveOrder(drive.store.state);
-      const structure = this.structureOf(drive, order);
-      if (!root) throw new Error("no root");
-      const entries: StructureEntry[] = [];
-      for (const id of order) {
-        const info = drive.cards.get(id);
-        const place = structure.placeOf(id);
-        if (!info || !place) continue;
-        const card = await this.ports.readCard(info.path);
-        const cover = parseCardCover(card.prompt);
-        entries.push({
-          kind: place.kind,
-          ...(place.chapter === undefined ? {} : { chapter: place.chapter }),
-          title: info.title,
-          points: parseCardPoints(card.prompt) ?? [],
-          ...(cover ? { cover } : {})
-        });
-      }
-      const before = await this.ports.readCard(root.path);
-      const md = composeBookStructure(entries, drive.config.language);
-      const next = replaceBookStructure(before.raw, md);
-      if (next === before.raw) return;
-      const written = await this.ports.updateNoteRawGuarded(root.path, () => next, {
-        expectedContent: before.raw,
-        authorize: () => !this.dead(drive) && !signal.aborted
-      });
-      if (written === "discarded") this.log(drive, "gate1", "-", "plan", "structure_skipped");
-    } catch {
-      this.log(drive, "gate1", "-", "plan", "structure_skipped");
-    }
-  }
-
-  /**
    * After a single-chapter rerun: the left neighbour's `後一張` line and the right neighbour's `前一張` line are rewritten to the rerun
    * chapter's new "this chapter covers" sentence. Only that line of the Prompt changes (the chapter text, so its integrity fingerprint, is
    * not touched). A neighbour that is not on the map, whose text the reader edited by hand, or whose line already says it is left alone.
@@ -2449,7 +2403,6 @@ export class BookPipelineRuns {
         authorPending: new Set(drive.fixable.keys())
       });
       if (plan.hold === "global_failed") drive.failure = drive.reasons.get("global") ?? "failed";
-      if (plan.hold === "gate1" && drive.store.state.planReview) await this.writeBookStructure(drive);
       if (plan.hold) break;
       let started = 0;
       let changed = false;

@@ -3696,8 +3696,7 @@ test('open issues page: a run an older build left at gate 2 (no whole-book proof
 });
 
 // ---- P3: sections' neighbour lines (structure.neighboursOf) and the plan's 全書結構 ----
-const { replaceBookStructure } = S.load('core/book-pipeline/note-sections.ts');
-const { parseBookPlanBody, parseBookPlanDecisions, composeBookPlan, composeBookStructure } = S.load('core/book-pipeline/plan-text.ts');
+const { parseBookPlanBody, parseBookPlanDecisions, composeBookPlan } = S.load('core/book-pipeline/plan-text.ts');
 const POINTED = { card: request => ({ covers: `covers ${(request.chapters.findIndex(c => c.title === request.card.title) + 1)}`, points: [`${request.card.title} a`, `${request.card.title} b`, `${request.card.title} c`], entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }] }) };
 const SECT = ['BookRoot', 'ChapA', 'SecA1', 'SecA2', 'ChapB'];
 /** Root, chapter A with two sections, chapter B; the run waits at the plan review. */
@@ -3708,42 +3707,16 @@ async function sectionRig(over = {}) {
 }
 const rootRaw = r => r.raw(0);
 
-test('P3 structure: the plan gate writes ### 全書結構 after the thread in the plan callout, from the cards\' content headings; the other parts and the parse are unchanged', async () => {
+test('P3 structure: the plan gate no longer writes a ### 全書結構 part; the thread, decisions and materials are there and parse as before', async () => {
   const r = await sectionRig();
   await r.runs.start(r.mapPath);
   assert.equal((await r.state()).planReview, true);
   const raw = rootRaw(r);
-  const at = s => raw.indexOf(s);
-  assert.ok(at('> ### 全書主線') < at('> ### 全書結構') && at('> ### 全書結構') < at('> ### 編輯決定'), 'between the thread and the decisions');
-  for (const line of ['> **前言：BookRoot**', '> BookRoot a · BookRoot b · BookRoot c', '> **第 1 章　ChapA**', '> - 節：SecA1 — SecA1 a · SecA1 b · SecA1 c', '> - 節：SecA2 — SecA2 a · SecA2 b · SecA2 c', '> **第 2 章　ChapB**'])
-    assert.ok(raw.includes(line), `has ${line}`);
-  assert.ok(at('> - 節：SecA1') < at('> - 節：SecA2') && at('> - 節：SecA2') < at('> **第 2 章　ChapB**'), 'a chapter\'s sections stay under it');
+  assert.ok(!raw.includes('全書結構'), 'no structure part');
+  assert.ok(raw.indexOf('> ### 全書主線') < raw.indexOf('> ### 編輯決定'));
   const body = parseBookPlanBody(raw);
   assert.equal(body.thread, 'one thread'); same(body.materials, [{ name: 'm', use: 'u' }]);
   assert.equal(parseBookPlanDecisions(raw).reader, 'kids');
-  assert.equal(replaceBookStructure(raw, composeBookStructure([{ kind: 'preface', title: 'BookRoot', points: ['BookRoot a', 'BookRoot b', 'BookRoot c'] }, { kind: 'chapter', chapter: 1, title: 'ChapA', points: ['ChapA a', 'ChapA b', 'ChapA c'] }, { kind: 'section', title: 'SecA1', points: ['SecA1 a', 'SecA1 b', 'SecA1 c'] }, { kind: 'section', title: 'SecA2', points: ['SecA2 a', 'SecA2 b', 'SecA2 c'] }, { kind: 'chapter', chapter: 2, title: 'ChapB', points: ['ChapB a', 'ChapB b', 'ChapB c'] }], 'zh-TW')), raw, 'idempotent');
-});
-
-test('P3 structure: back to the plan writes it again from the plans as the owner edited them; a stale root note is left and structure_skipped is logged, the gate still shows', async () => {
-  const r = await sectionRig();
-  await r.runs.start(r.mapPath);
-  await r.runs.startTrial(r.mapPath); await idle(r);
-  await toTrialGate(r);
-  const note = await r.note(2);
-  await r.repo.updateNoteGuarded(r.nodes[2].path, { prompt: note.prompt.replace(/^內容標題[:：].*$/m, '內容標題：NEWX · NEWY · NEWZ') }, { authorize: () => true });
-  await r.runs.backToPlan(r.mapPath);
-  assert.ok(rootRaw(r).includes('> - 節：SecA1 — NEWX · NEWY · NEWZ'), 'rewritten on the way back to the plan');
-  assert.equal((await rootRaw(r).match(/### 全書結構/g)).length, 1, 'one part, replaced');
-  // A guard conflict: the write is refused, the root is as it was, and the gate still shows.
-  const before = rootRaw(r);
-  let refused = 0;
-  const r2 = await sectionRig({ ports: { updateNoteRawGuarded: async (path, transform, options) => { const cur = r2.contents.get(path); if (transform(cur).includes('### 全書結構') && !cur.includes('### 全書結構')) { refused++; return 'discarded'; } return r2.repo.updateNoteRawGuarded(path, transform, options); } } });
-  await r2.runs.start(r2.mapPath);
-  const s = await r2.state();
-  assert.equal(s.phase, 'gate1'); assert.equal(s.planReview, true);
-  assert.ok(refused >= 1 && !rootRaw(r2).includes('全書結構'), 'nothing written');
-  assert.ok(r2.stat.logs.some(l => /structure_skipped/.test(l)), 'logged');
-  assert.ok(before.includes('全書結構'));
 });
 
 test('P3 neighbours: a section gets 所屬章 / 前一節 / 後一節 and a chapter gets 上一章 / 下一章 after a rerun; sections never name the next chapter', async () => {

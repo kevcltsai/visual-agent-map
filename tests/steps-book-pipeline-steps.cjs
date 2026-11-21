@@ -1173,11 +1173,3 @@ test('cover plan: the cover line is one safe line (no heading, no link, no separ
   assert.equal(planText.parseImageSlots(edited).length, 1);
   assert.deepEqual(plain(planText.parseCardCover(edited)), { explains: 'dome', search: [] });
 });
-test('cover plan: the book structure gets one 封面要找 line per card (no search terms), a section\'s line is indented under its item; cards without a cover are unchanged', () => {
-  const entries = [{ kind: 'preface', title: '錢', points: ['a'], cover: { explains: '一枚古幣', search: ['coin'] } }, { kind: 'chapter', chapter: 1, title: '市集', points: ['b'], cover: { explains: '古代市集', search: [] } }, { kind: 'section', title: '以物易物', points: ['c'], cover: { explains: '交易場景', search: [] } }, { kind: 'chapter', chapter: 2, title: '金屬', points: [] }];
-  const md = planText.composeBookStructure(entries, 'zh-TW');
-  assert.equal(md, ['### 全書結構', '**前言：錢**', 'a', '封面要找：一枚古幣', '**第 1 章　市集**', 'b', '封面要找：古代市集', '- 節：以物易物 — c', '  封面要找：交易場景', '**第 2 章　金屬**', ''].join('\n'));
-  assert.ok(!md.includes('英文搜尋詞') && !md.includes('coin'));
-  assert.ok(planText.composeBookStructure(entries, 'en').includes('Cover to find: 古代市集'));
-  assert.equal(planText.composeBookStructure(entries.map(({ cover, ...rest }) => rest), 'zh-TW'), ['### 全書結構', '**前言：錢**', 'a', '**第 1 章　市集**', 'b', '- 節：以物易物 — c', '**第 2 章　金屬**', ''].join('\n'));
-});

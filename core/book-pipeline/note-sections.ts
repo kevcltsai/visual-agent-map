@@ -12,7 +12,7 @@ import {
 } from "../../ai/section-aliases";
 import { NOTE_LANGUAGES, translate, translateNote, type ContentLanguage } from "../../i18n";
 import type { BookRole } from "./model";
-import { isBookPlanTitle, isBookStructureTitle, isBookThreadTitle } from "./plan-text";
+import { isBookPlanTitle } from "./plan-text";
 import {
   headingNamesChapter,
   isProcessNoteSentence,
@@ -715,45 +715,6 @@ export function replaceBookPlanSection(content: string, markdown: string): strin
   }
   for (const edit of edits.sort((x, y) => y.at - x.at)) lines = spliceBlock(lines, edit.at, edit.end, edit.middle);
   return lines.join("\n");
-}
-
-/**
- * Sets the `### 全書結構` part of the root's book plan callout (`md` starts with that heading, see `composeBookStructure`) and nothing else.
- * An existing part is replaced in place; with none it is inserted right after the thread (`### 全書主線`). Every other line stays
- * byte-identical, the same `md` twice changes nothing. A root without the plan callout (an older `## 全書企劃` section) is returned as it is.
- */
-export function replaceBookStructure(content: string, md: string): string {
-  const lines = content.split("\n");
-  const fenced = fencedLines(lines);
-  const titleOf = (line: string): string =>
-    /^[ \t]{0,3}>[ \t]?\[![^\]]+\][+-]?[ \t]*(.*?)[ \t]*$/.exec(bare(line))?.[1] ?? "";
-  const callout = hiddenRanges(lines, fenced).find(range => isBookPlanTitle(titleOf(lines[range.start])));
-  if (!callout) return content;
-  const cr = lines[callout.start].endsWith("\r") ? "\r" : "";
-  const quoted = quoteAll(demoteHeadings(md.replace(/\r\n?/g, "\n")).trim())
-    .split("\n")
-    .map(line => `${line}${cr}`);
-  const SUB = /^[ \t]{0,3}>[ \t]?###[ \t]+(.+?)[ \t]*$/;
-  const BLANK = /^[ \t]{0,3}>[ \t]*$/;
-  const subs: { at: number; text: string }[] = [];
-  for (let i = callout.start + 1; i < callout.end; i++) {
-    const m = SUB.exec(bare(lines[i]));
-    if (m) subs.push({ at: i, text: m[1] });
-  }
-  const endOf = (index: number): number => (subs[index + 1] ? subs[index + 1].at : callout.end);
-  const own = subs.findIndex(sub => isBookStructureTitle(sub.text));
-  if (own >= 0) {
-    const from = subs[own].at;
-    let to = endOf(own);
-    while (to > from + 1 && BLANK.test(bare(lines[to - 1]))) to--;
-    return [...lines.slice(0, from), ...quoted, ...lines.slice(to)].join("\n");
-  }
-  const thread = subs.findIndex(sub => isBookThreadTitle(sub.text));
-  const at = thread >= 0 ? endOf(thread) : (subs[0]?.at ?? callout.end);
-  const blank = `>${cr}`;
-  const before = lines[at - 1] !== undefined && at > callout.start + 1 && !BLANK.test(bare(lines[at - 1]));
-  const block = at === callout.end ? [...(before ? [blank] : []), ...quoted] : [...quoted, blank];
-  return [...lines.slice(0, at), ...block, ...lines.slice(at)].join("\n");
 }
 
 const isUpdateLogHeading = (text: string): boolean =>

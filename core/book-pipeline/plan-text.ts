@@ -430,63 +430,10 @@ export function parseRoleWord(word: string): BookRole | undefined {
   return BOOK_ROLES.find(role => matches(ROLE_WORDS[role], word.trim()) || word.trim().toLowerCase() === role);
 }
 
-/** One card of the book structure: its place, title and content headings (none for a card planned before they existed). */
-export interface StructureEntry {
-  kind: CardKind;
-  /** The chapter number (chapters only). */
-  chapter?: number;
-  title: string;
-  points: readonly string[];
-  /** The card's cover ask (only its description is written, never the search terms); absent for a card planned before covers existed. */
-  cover?: CoverPlan;
-}
-
-/** Whether a `###` heading text is the book structure's (either language). */
-export const isBookThreadTitle = (title: string): boolean => matches(L.thread, title.trim());
+/** Whether a `###` heading text is the (no longer written) book structure part's, which an older root may still hold (either language). */
 export const isBookStructureTitle = (title: string): boolean => matches(L.structure, title.trim());
 
-/**
- * The plan's `### 全書結構` part, composed from the cards' content headings in reading order (no heading level above `###`, no AI call):
- * `前言：標題` and `第 n 章` + a full-width space + title lines, each followed by its headings, and a chapter's sections as `- 節：標題 — a · b · c`.
- * Ends with a newline.
- */
-export function composeBookStructure(entries: readonly StructureEntry[], language: ContentLanguage): string {
-  const zh = instructionLanguageOf(language) === "zh";
-  const pts = (e: StructureEntry): string => pointsText(e.points);
-  const coverLine = (e: StructureEntry): string[] =>
-    e.cover
-      ? [
-          composeCoverLine(
-            { explains: safe(cleanSlotText(e.cover.explains, 200), 200), search: [] },
-            instructionLanguageOf(language)
-          )
-        ]
-      : [];
-  const lines: string[] = [`### ${pick(L.structure, language)}`];
-  for (const e of entries) {
-    if (e.kind === "section") {
-      lines.push(`- ${zh ? "節：" : "Section: "}${safe(e.title, 120)}${e.points.length ? ` — ${pts(e)}` : ""}`);
-      lines.push(...coverLine(e).map(line => `  ${line}`));
-      continue;
-    }
-    const title = safe(e.title, 120);
-    const name =
-      e.kind === "preface"
-        ? `${zh ? "前言：" : "Preface: "}${title}`
-        : zh
-          ? `第 ${e.chapter} 章\u3000${title}`
-          : `Chapter ${e.chapter}: ${title}`;
-    lines.push(`**${name}**`);
-    if (e.points.length) lines.push(pts(e));
-    lines.push(...coverLine(e));
-  }
-  lines.push("");
-  return lines.join("\n");
-}
-
 export interface BookPlanText {
-  /** The composed `### 全書結構` part ({@link composeBookStructure}); put right after the thread. */
-  structure?: string;
   thread: string;
   /** Only the fields the owner left empty. */
   decisions: BookSettings;
@@ -506,7 +453,6 @@ export function composeBookPlan(plan: BookPlanText, language: ContentLanguage): 
     `### ${pick(L.thread, language)}`,
     safe(plan.thread, 1200),
     "",
-    ...(plan.structure?.trim() ? [...plan.structure.trim().split("\n"), ""] : []),
     `### ${pick(L.decisions, language)}`,
     ...decisions,
     "",
@@ -518,6 +464,21 @@ export function composeBookPlan(plan: BookPlanText, language: ContentLanguage): 
 
 /** Whether a callout or heading title is the book plan's (either language). */
 export const isBookPlanTitle = (title: string): boolean => matches(L.plan, title.trim());
+
+/** Whether a rendered text is the (colon-less) label of a card's image plan / acceptance checklist block (either language). */
+export const isImagePlanLabel = (label: string): boolean => matches(L.images, label.trim());
+export const isChecklistLabel = (label: string): boolean => matches(L.checklist, label.trim());
+
+/** The card plan fields the plan view shows under a friendlier name (Chinese notes only): the stored label stays as it is. */
+export type PlanDisplayField = "entry" | "handoff" | "previous";
+/** Which relabelled field a stored Chinese label (no colon) is: the entry point, the question left for the next card, the previous section or chapter. */
+export function planDisplayField(label: string): PlanDisplayField | undefined {
+  const word = label.trim();
+  if (word === L.entry.zh) return "entry";
+  if (word === L.handoff.zh) return "handoff";
+  if (word === NEIGHBOUR_WORDS.section.previous.zh || word === NEIGHBOUR_WORDS.chapter.previous.zh) return "previous";
+  return undefined;
+}
 
 const PLAN_CALLOUT = /^[ \t]{0,3}>[ \t]?\[!vam-book\][+-]?[ \t]+(.+?)[ \t]*$/i;
 const QUOTE_PREFIX = /^[ \t]{0,3}>[ \t]?/;

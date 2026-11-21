@@ -3414,6 +3414,11 @@ export const en = {
   "ui.book_bar_open_issues_missing": 'The "Still open" page was not found; it may have been renamed or moved.',
   "ui.book_step_self_check": "Author self-check",
   "ui.book_bar_back_to_plan": "Back to the plan",
+  "ui.book_plan_title_book": 'Book plan: edit freely, then press "{0}"',
+  "ui.book_plan_title_card": "This chapter's plan: edit freely",
+  "ui.book_plan_label_entry": "How it opens",
+  "ui.book_plan_label_previous": "Idea carried over",
+  "ui.book_plan_label_handoff": "Question left",
   "ui.book_bar_plan_hint":
     'To change it, edit the whole-book plan in the root note or a chapter\'s hint box, then press "Direction is right, start writing".',
   "ui.book_stage_pending": "To plan",

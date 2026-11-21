@@ -101,7 +101,10 @@ test('outline: a 5,000-line note parses in time linear in its size', () => {
   // Linear work gives a ratio near 1; quadratic work gives about 10. Both totals are tens of ms, so timer noise does not matter and no floor is used.
   const REPEATS = 20; const LIMIT = 4;
   const block = (text, times) => { let min = Infinity; for (let k = 0; k < 3; k++) { const t = process.hrtime.bigint(); for (let i = 0; i < times; i++) api.parseOutline(text); min = Math.min(min, Number(process.hrtime.bigint() - t) / 1e6); } return min; };
-  const bigMs = block(big, REPEATS); const smallMs = block(small, REPEATS * 10); const ratio = bigMs / smallMs;
+  // Big and small are measured in alternation, five rounds each (best of each), so a pause that hits one side (GC, another process) cannot decide the ratio.
+  let bigMs = Infinity; let smallMs = Infinity;
+  for (let round = 0; round < 5; round++) { bigMs = Math.min(bigMs, block(big, REPEATS)); smallMs = Math.min(smallMs, block(small, REPEATS * 10)); }
+  const ratio = bigMs / smallMs;
   process.stdout.write(`outline timing: ${bigMs.toFixed(1)} ms for ${REPEATS} large parses, ${smallMs.toFixed(1)} ms for ${REPEATS * 10} small ones, ratio ${ratio.toFixed(2)}\n`);
   assert.ok(ratio <= LIMIT, `${bigMs.toFixed(0)} ms is ${ratio.toFixed(1)} times ten parses of a tenth-size note (${smallMs.toFixed(0)} ms)`);
   assert.equal(api.parseOutline(big).nodes.length, 101);

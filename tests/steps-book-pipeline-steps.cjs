@@ -503,7 +503,7 @@ test('exchange log: success, parse error and provider error keep titles, chapter
     const ok = harness({ answer: goodPlan });
     const parsed = await runMod.runPlanStep(ok.planCalls, cardPlan.cardPlanStep, request, { signal: signal() });
     assert.equal(parsed.checklist.length, 1); noContent(ok.log, spy, 'plan success');
-    assert.equal(ok.log.getEntries()[0].status, 'completed'); assert.equal(ok.log.getEntries()[0].step, 'book-pipeline.card-plan@1');
+    assert.equal(ok.log.getEntries()[0].status, 'completed'); assert.equal(ok.log.getEntries()[0].step, 'book-pipeline.card-plan@2');
     assert.equal(ok.runs[0][0].includes(TITLE), true, 'the provider itself still gets the prompt');
     const bad = harness({ answer: 'SECRET-REPLY not json' });
     await assert.rejects(runMod.runPlanStep(bad.planCalls, cardPlan.cardPlanStep, request, { signal: signal() }));
@@ -1119,4 +1119,62 @@ test('A6 global plan: every card carries its place, and the prompt explains the 
   assert.match(text, /\{"id":"b","place":"section 1 of 1 in chapter 1"/);
   assert.match(text, /The root card is the preface/);
   assert.ok(!/Every card is one chapter/.test(text));
+});
+
+// ---- Cover image B1: the planner's cover ask (card-plan cover{explains,search}, the Prompt line, the structure copy) ----
+test('cover plan: schema and prompt ask for cover{explains, 2-4 search terms}; step version 2; an answer without it still parses (no cover); a cover without a description is refused', () => {
+  const request = { ...base, thread: 't', settings: {}, materials: [], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 's' } };
+  const answer = extra => JSON.stringify({ points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images: [], ...extra });
+  const cover = cardPlan.CARD_PLAN_SCHEMA.properties.cover;
+  assert.equal(cover.properties.search.minItems, 2); assert.equal(cover.properties.search.maxItems, 4);
+  assert.ok(cardPlan.CARD_PLAN_SCHEMA.required.includes('cover')); assert.equal(cardPlan.cardPlanStep.version, 2);
+  assert.match(cardPlan.cardPlanStep.render(request), /"cover":\{"explains":"","search":\["",""\]\}/);
+  assert.match(cardPlan.cardPlanStep.render(request), /does not count toward them and is asked for even when images is empty/);
+  assert.equal(cardPlan.cardPlanStep.parse(answer({}), request).cover, undefined, 'an older answer: no cover, still accepted');
+  const parsed = plain(cardPlan.cardPlanStep.parse(answer({ cover: { explains: 'the 〔dome｜top〕\nof Florence', search: ['Florence Cathedral dome', '中文', 'Brunelleschi', 'a', 'b', 'c'] } }), request).cover);
+  assert.equal(parsed.explains, 'the dome top of Florence'); assert.ok(parsed.search.length >= 1 && parsed.search.length <= 4); assert.ok(parsed.search.every(term => /^[\x20-\x7e]+$/.test(term)));
+  assert.deepEqual(plain(cardPlan.cardPlanStep.parse(answer({ cover: { explains: 'x' } }), request).cover), { explains: 'x', search: [] }, 'search terms are optional like a slot\'s');
+  assert.throws(() => cardPlan.cardPlanStep.parse(answer({ cover: { explains: '〔〕', search: ['a b'] } }), request), /cover explains/);
+  assert.throws(() => cardPlan.cardPlanStep.parse(answer({ cover: { explains: 'x', search: ['a b'], extra: 1 } }), request), /unexpected fields/);
+  assert.throws(() => cardPlan.cardPlanStep.parse(answer({ cover: 'x' }), request), /cover/);
+});
+
+const coverPrompt = (cover, images) => planText.composeCardPrompt({ role: 'body', covers: 'c', entry: 'e', handoff: 'h', checklist: [{ id: 'C1', type: 'structure', text: 'Shape' }], ...(images ? { images } : {}), ...(cover ? { cover } : {}) }, 'zh-TW');
+test('cover plan: the Prompt gets one 封面要找 line before the image plan (zh and en); parsing it back returns the ask; no cover = no line, and the prompt is byte-for-byte the old one', () => {
+  const plan = { explains: '佛羅倫斯大教堂圓頂 (1436)', search: ['Florence Cathedral dome', 'Brunelleschi'] };
+  const text = coverPrompt(plan, [slot(1), slot(2)]);
+  const lines = text.split('\n');
+  const at = lines.findIndex(line => line.startsWith('封面要找：'));
+  assert.ok(at > 0 && at < lines.findIndex(line => line.startsWith('圖安排：')), 'the line sits before the image plan, outside its list');
+  assert.match(lines[at], /｜英文搜尋詞：Florence Cathedral dome, Brunelleschi$/);
+  assert.deepEqual(plain(planText.parseCardCover(text)), plain(plan), 'escapes are undone');
+  assert.equal(lines.filter(line => line.startsWith('封面要找')).length, 1);
+  const en = planText.composeCardPrompt({ role: 'body', covers: 'c', entry: 'e', handoff: 'h', checklist: [], cover: plan }, 'en');
+  assert.match(en, /^Cover to find: .*｜Search terms: Florence Cathedral dome, Brunelleschi$/m);
+  assert.deepEqual(plain(planText.parseCardCover(en)), plain(plan));
+  // The cover line changes neither the image slots nor the checklist.
+  assert.deepEqual(plain(planText.parseImageSlots(text)), plain(planText.parseImageSlots(coverPrompt(undefined, [slot(1), slot(2)]))));
+  assert.deepEqual(plain(planText.parseImageSlots(coverPrompt(plan, []))), []);
+  assert.deepEqual(plain(planText.parseChecklist(text)), plain(planText.parseChecklist(coverPrompt(undefined, [slot(1), slot(2)]))));
+  assert.equal(planText.parseCardCover(coverPrompt(undefined, [slot(1)])), undefined, 'an older Prompt: no cover to find');
+  assert.equal(text.replace(/^封面要找.*\n/m, ''), coverPrompt(undefined, [slot(1), slot(2)]), 'removing the line gives the old Prompt');
+  assert.equal(planText.parseCardCover('封面要找：'), undefined, 'a line that names nothing is not a cover');
+});
+test('cover plan: the cover line is one safe line (no heading, no link, no separator inside); a cover line typed inside the 圖安排 list ends it there (the documented stop rule)', () => {
+  const text = coverPrompt({ explains: '## Detail\n![x](http://e.com) [[Note]] a｜b', search: ['Dome of Florence', 'x'] }, [slot(1)]);
+  const line = text.split('\n').find(l => l.startsWith('封面要找'));
+  assert.ok(!/[\r\n]/.test(line) && !line.includes('｜a｜b'), 'one line, the model\'s separator is gone');
+  assert.ok(text.split('\n').every(l => !/^#{1,2} /.test(l)), 'no model text starts a heading');
+  assert.ok(!/(?<!\\)\[\[/.test(line) && !/(?<!\\)!\[/.test(line), 'brackets are escaped');
+  const edited = ['圖安排：', '- 圖位 1｜map｜a｜位置：x', '封面要找：dome', '- 圖位 2｜map｜b｜位置：y'].join('\n');
+  assert.equal(planText.parseImageSlots(edited).length, 1);
+  assert.deepEqual(plain(planText.parseCardCover(edited)), { explains: 'dome', search: [] });
+});
+test('cover plan: the book structure gets one 封面要找 line per card (no search terms), a section\'s line is indented under its item; cards without a cover are unchanged', () => {
+  const entries = [{ kind: 'preface', title: '錢', points: ['a'], cover: { explains: '一枚古幣', search: ['coin'] } }, { kind: 'chapter', chapter: 1, title: '市集', points: ['b'], cover: { explains: '古代市集', search: [] } }, { kind: 'section', title: '以物易物', points: ['c'], cover: { explains: '交易場景', search: [] } }, { kind: 'chapter', chapter: 2, title: '金屬', points: [] }];
+  const md = planText.composeBookStructure(entries, 'zh-TW');
+  assert.equal(md, ['### 全書結構', '**前言：錢**', 'a', '封面要找：一枚古幣', '**第 1 章　市集**', 'b', '封面要找：古代市集', '- 節：以物易物 — c', '  封面要找：交易場景', '**第 2 章　金屬**', ''].join('\n'));
+  assert.ok(!md.includes('英文搜尋詞') && !md.includes('coin'));
+  assert.ok(planText.composeBookStructure(entries, 'en').includes('Cover to find: 古代市集'));
+  assert.equal(planText.composeBookStructure(entries.map(({ cover, ...rest }) => rest), 'zh-TW'), ['### 全書結構', '**前言：錢**', 'a', '**第 1 章　市集**', 'b', '- 節：以物易物 — c', '**第 2 章　金屬**', ''].join('\n'));
 });

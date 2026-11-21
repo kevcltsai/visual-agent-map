@@ -4,6 +4,7 @@
  * (labelled lines plus an acceptance checklist whose items carry a stable id and a type). Pure.
  */
 import { instructionLanguageOf, type ContentLanguage } from "../../i18n";
+import { composeCoverLine, parseCoverLine, type CoverPlan } from "./cover";
 import { cleanSearchTerms, cleanSlotText, MAX_IMAGE_SLOTS, type ImageSlot } from "./image-slots";
 import { BOOK_ROLES, BOOK_SETTING_FIELDS, type BookRole, type BookSettings } from "./model";
 import { demoteHeadings, escapeMarkdownText, singleLine, unescapeMarkdownText } from "./text";
@@ -123,6 +124,8 @@ export interface CardPlanText {
   checklist: readonly ChecklistItem[];
   /** The card's image plan (0 to 8 slots). Absent = no image plan line is written (a card planned before the image plan existed). */
   images?: readonly ImageSlot[];
+  /** The card's cover ask (`封面要找：…｜英文搜尋詞：…`). Absent = no cover line is written (a card planned before covers existed). */
+  cover?: CoverPlan;
 }
 
 const SLOT_SEPARATOR = "｜";
@@ -150,6 +153,28 @@ export function composeImageSlots(images: readonly ImageSlot[], language: Conten
           `- ${pick(L.imageSlot, language)} ${at + 1}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.kind, 40), 40)}${SLOT_SEPARATOR}${safe(cleanSlotText(slot.explains, 200), 200)}${SLOT_SEPARATOR}${pick(L.position, language)}${c}${safe(cleanSlotText(slot.anchor, 120), 120)}${searchPart(slot, language)}`
       )
   ];
+}
+
+/** The cover ask with model text made safe for a note line (the same escape every Prompt line gets); {@link parseCardCover} undoes it. */
+const coverForNote = (cover: CoverPlan): CoverPlan => ({
+  explains: safe(cleanSlotText(cover.explains, 200), 200),
+  search: cleanSearchTerms(cover.search).map(term => safe(term, 80))
+});
+
+/**
+ * The card's cover ask (the `封面要找：…` line, placed before the image plan so it is never a slot line). `undefined` = the Prompt has none:
+ * the card is from before covers existed (or the owner took the line out), so no cover is searched for and none is written.
+ */
+export function parseCardCover(prompt: string): CoverPlan | undefined {
+  for (const line of prompt.split(/\r?\n/)) {
+    const plan = parseCoverLine(line);
+    if (plan)
+      return {
+        explains: unescapeMarkdownText(plan.explains),
+        search: cleanSearchTerms(plan.search.map(term => unescapeMarkdownText(term)))
+      };
+  }
+  return undefined;
 }
 
 const POINT_SEPARATOR = " · ";
@@ -184,6 +209,7 @@ export function composeCardPrompt(plan: CardPlanText, language: ContentLanguage)
       : []),
     neighbour("previous", plan.previous),
     neighbour("next", plan.next),
+    ...(plan.cover ? [composeCoverLine(coverForNote(plan.cover), instructionLanguageOf(language))] : []),
     ...(plan.images ? composeImageSlots(plan.images, language) : []),
     `${pick(L.checklist, language)}${c.trim()}`,
     ...plan.checklist.map(item => `- ${item.id} [${pick(TYPE_WORDS[item.type], language)}] ${safe(item.text)}`)
@@ -411,6 +437,8 @@ export interface StructureEntry {
   chapter?: number;
   title: string;
   points: readonly string[];
+  /** The card's cover ask (only its description is written, never the search terms); absent for a card planned before covers existed. */
+  cover?: CoverPlan;
 }
 
 /** Whether a `###` heading text is the book structure's (either language). */
@@ -425,10 +453,13 @@ export const isBookStructureTitle = (title: string): boolean => matches(L.struct
 export function composeBookStructure(entries: readonly StructureEntry[], language: ContentLanguage): string {
   const zh = instructionLanguageOf(language) === "zh";
   const pts = (e: StructureEntry): string => pointsText(e.points);
+  const coverLine = (e: StructureEntry): string[] =>
+    e.cover ? [composeCoverLine({ explains: safe(cleanSlotText(e.cover.explains, 200), 200), search: [] }, instructionLanguageOf(language))] : [];
   const lines: string[] = [`### ${pick(L.structure, language)}`];
   for (const e of entries) {
     if (e.kind === "section") {
       lines.push(`- ${zh ? "節：" : "Section: "}${safe(e.title, 120)}${e.points.length ? ` — ${pts(e)}` : ""}`);
+      lines.push(...coverLine(e).map(line => `  ${line}`));
       continue;
     }
     const title = safe(e.title, 120);
@@ -440,6 +471,7 @@ export function composeBookStructure(entries: readonly StructureEntry[], languag
           : `Chapter ${e.chapter}: ${title}`;
     lines.push(`**${name}**`);
     if (e.points.length) lines.push(pts(e));
+    lines.push(...coverLine(e));
   }
   lines.push("");
   return lines.join("\n");

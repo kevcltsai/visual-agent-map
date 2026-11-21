@@ -147,6 +147,7 @@ import {
   parseBookPlanDecisions,
   parseCardPrompt,
   parseChecklist,
+  parseCardCover,
   parseImageSlots,
   dropEntryLine,
   dropParentLine,
@@ -1528,11 +1529,13 @@ export class BookPipelineRuns {
         const place = structure.placeOf(id);
         if (!info || !place) continue;
         const card = await this.ports.readCard(info.path);
+        const cover = parseCardCover(card.prompt);
         entries.push({
           kind: place.kind,
           ...(place.chapter === undefined ? {} : { chapter: place.chapter }),
           title: info.title,
-          points: parseCardPoints(card.prompt) ?? []
+          points: parseCardPoints(card.prompt) ?? [],
+          ...(cover ? { cover } : {})
         });
       }
       const before = await this.ports.readCard(root.path);
@@ -3385,7 +3388,8 @@ export class BookPipelineRuns {
         ...(previous ? { previous: { ...previous, summary: result.previous } } : {}),
         ...(next ? { next: { ...next, summary: result.next } } : {}),
         checklist: result.checklist,
-        images: result.images
+        images: result.images,
+        ...(result.cover ? { cover: result.cover } : {})
       },
       drive.config.language
     );

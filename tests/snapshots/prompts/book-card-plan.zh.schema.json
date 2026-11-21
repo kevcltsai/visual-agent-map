@@ -91,6 +91,29 @@
           "search"
         ]
       }
+    },
+    "cover": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "explains": {
+          "type": "string",
+          "minLength": 1
+        },
+        "search": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "explains",
+        "search"
+      ]
     }
   },
   "required": [
@@ -101,6 +124,7 @@
     "previous",
     "next",
     "checklist",
-    "images"
+    "images",
+    "cover"
   ]
 }

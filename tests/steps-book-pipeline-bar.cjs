@@ -59,7 +59,7 @@ async function rig() {
     runPlan: async (step, request, run) => {
       await run.admission.reserve();
       if (step.id === 'book-pipeline.global-plan') return { thread: 'one thread', cards: nodes.map((n, i) => ({ id: n.id, role: i ? 'body' : 'intro' })), materials: [{ name: 'm', use: 'u' }], decisions: {} };
-      return { covers: `covers ${request.card.position}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }] };
+      return { covers: `covers ${(request.chapters.findIndex(c => c.title === request.card.title) + 1)}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }] };
     },
     runProofread: async (request, run) => { stat.proof.push(request); await run.admission.reserve(); return script.proof(request); },
     author: input => { stat.author.push(input.nodeId); return script.author(input); },

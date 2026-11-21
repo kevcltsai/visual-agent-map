@@ -16,7 +16,7 @@ const requestFor = (role, bookSettings) => ({
   card: { id: 'n1', position: 1, total: 3, role, title: '導讀', summary: 's' }
 });
 const reply = count => JSON.stringify({
-  covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }],
+  covers: 'c', points: ['p1', 'p2', 'p3'], entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }],
   images: Array.from({ length: count }, (_, i) => ({ kind: 'diagram', explains: `point ${i + 1}`, anchor: `paragraph ${i + 1}` }))
 });
 

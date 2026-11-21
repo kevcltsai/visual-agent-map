@@ -6,6 +6,14 @@
       "type": "string",
       "minLength": 1
     },
+    "points": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "entry": {
       "type": "string",
       "minLength": 1
@@ -87,6 +95,7 @@
   },
   "required": [
     "covers",
+    "points",
     "entry",
     "handoff",
     "previous",

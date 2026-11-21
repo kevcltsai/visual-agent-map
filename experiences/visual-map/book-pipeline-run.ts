@@ -133,7 +133,8 @@ import {
   dropEntryNaming,
   neighbourLineTitle,
   retargetNeighbourLine,
-  rewriteNeighbourLine
+  rewriteNeighbourLine,
+  type NeighbourCard
 } from "../../core/book-pipeline/plan-text";
 import {
   composeProofRecord,
@@ -193,6 +194,9 @@ import {
 import {
   cardPlanFits,
   cardPlanStep,
+  placeText,
+  type CardNeighbour,
+  type CardPlanPlace,
   type CardPlanRequest,
   type CardPlanResult
 } from "../../core/steps/book-pipeline/card-plan";
@@ -1407,6 +1411,7 @@ export class BookPipelineRuns {
     const at = order.indexOf(nodeId);
     const own = drive.cards.get(nodeId);
     if (at < 0 || !own) return;
+    const structure = this.structureOf(drive, order);
     try {
       const card = await this.ports.readCard(own.path);
       const covers = summaryText(parseCardPrompt(card.prompt).covers ?? card.summary ?? "").trim();
@@ -1420,7 +1425,12 @@ export class BookPipelineRuns {
         if (!info || this.dead(drive) || signal.aborted) continue;
         const raw = await this.ports.readCard(info.path);
         if (!isUntouched(raw.detail)) continue;
-        const prompt = rewriteNeighbourLine(raw.prompt, key, { position: at + 1, title: card.title, summary: covers });
+        const prompt = rewriteNeighbourLine(
+          raw.prompt,
+          key,
+          { position: this.neighbourPosition(structure, id, nodeId), title: card.title, summary: covers },
+          structure.placeOf(id)?.kind
+        );
         if (prompt === undefined) continue;
         await this.ports.updateNoteGuarded(
           info.path,
@@ -1456,6 +1466,7 @@ export class BookPipelineRuns {
     const signal = drive.controller.signal;
     if (!drive.planSkipped.size || this.dead(drive) || signal.aborted || drive.fatal !== undefined) return;
     const order = effectiveOrder(drive.store.state);
+    const structure = this.structureOf(drive, order);
     try {
       for (const nodeId of [...drive.planSkipped]) {
         const at = order.indexOf(nodeId);
@@ -1469,16 +1480,16 @@ export class BookPipelineRuns {
           if (this.dead(drive) || signal.aborted) return;
           const raw = await this.ports.readCard(own.path);
           if (order[index] !== undefined && !other) continue;
-          let neighbourLine: { position: number; title: string; summary: string } | null = null;
+          let neighbourLine: NeighbourCard | null = null;
           if (other) {
             const neighbour = await this.ports.readCard(other.path);
             neighbourLine = {
-              position: index + 1,
+              position: this.neighbourPosition(structure, nodeId, order[index]),
               title: neighbour.title,
               summary: summaryText(parseCardPrompt(neighbour.prompt).covers ?? neighbour.summary ?? "").trim()
             };
           }
-          const prompt = rewriteNeighbourLine(raw.prompt, key, neighbourLine);
+          const prompt = rewriteNeighbourLine(raw.prompt, key, neighbourLine, structure.placeOf(nodeId)?.kind);
           if (prompt === undefined) continue;
           await this.ports.updateNoteGuarded(
             own.path,
@@ -1506,6 +1517,7 @@ export class BookPipelineRuns {
     const gone = (drive.store.state.removed ?? [])
       .map(id => drive.store.state.chapters?.[id]?.title?.trim() ?? "")
       .filter(title => title && !present.has(title));
+    const structure = this.structureOf(drive, order);
     try {
       for (const [at, nodeId] of order.entries()) {
         const own = drive.cards.get(nodeId);
@@ -1513,7 +1525,7 @@ export class BookPipelineRuns {
         // The `接入點` line that still names a removed chapter goes (Primary decision: a join that is no longer there).
         const before = await this.ports.readCard(own.path);
         // The entry point also goes when the previous line named a removed chapter (the entry paraphrases it, not always by its exact title).
-        const oldPrevious = neighbourLineTitle(before.prompt, "previous");
+        const oldPrevious = neighbourLineTitle(before.prompt, "previous", structure.placeOf(nodeId)?.kind);
         const previousId = order[at - 1];
         const previousGone =
           oldPrevious !== undefined &&
@@ -1538,16 +1550,16 @@ export class BookPipelineRuns {
           const other = order[index] === undefined ? undefined : drive.cards.get(order[index]);
           if (order[index] !== undefined && !other) continue;
           const raw = await this.ports.readCard(own.path);
-          let neighbourLine: { position: number; title: string; summary: string } | null = null;
+          let neighbourLine: NeighbourCard | null = null;
           if (other) {
             const neighbour = await this.ports.readCard(other.path);
             neighbourLine = {
-              position: index + 1,
+              position: this.neighbourPosition(structure, nodeId, order[index]),
               title: neighbour.title,
               summary: summaryText(parseCardPrompt(neighbour.prompt).covers ?? neighbour.summary ?? "").trim()
             };
           }
-          const prompt = retargetNeighbourLine(raw.prompt, key, neighbourLine);
+          const prompt = retargetNeighbourLine(raw.prompt, key, neighbourLine, structure.placeOf(nodeId)?.kind);
           if (prompt === undefined) continue;
           await this.ports.updateNoteGuarded(
             own.path,
@@ -1910,6 +1922,27 @@ export class BookPipelineRuns {
   /** The book's structure of `order` (the cards the run works on) from the parents as the drive loaded them. */
   private structureOf(drive: Drive, order: readonly string[]): BookStructure {
     return bookStructure(order, id => drive.parents.get(id), drive.rootId);
+  }
+  /** What a neighbour line says of `otherId` on the line of `ownId`: a chapter number (`"preface"` for the root), none beside a section. */
+  private neighbourPosition(structure: BookStructure, ownId: string, otherId: string): number | "preface" | undefined {
+    if (structure.placeOf(ownId)?.kind === "section") return undefined;
+    const place = structure.placeOf(otherId);
+    return place?.kind === "preface" ? "preface" : place?.chapter;
+  }
+  /** A card's place as the plan steps write it (`preface`, `chapter 2`, `section 1 of 3 in chapter 2`). */
+  private placeOf(drive: Drive, structure: BookStructure, id: string): string {
+    return placeText(this.planPlaceOf(drive, structure, id));
+  }
+  private planPlaceOf(drive: Drive, structure: BookStructure, id: string): CardPlanPlace {
+    const place = structure.placeOf(id);
+    if (!place || place.kind === "preface") return { kind: "preface" };
+    if (place.kind === "chapter") return { kind: "chapter", chapter: place.chapter };
+    return {
+      kind: "section",
+      chapter: structure.placeOf(place.chapterId as string)?.chapter,
+      sectionIndex: place.sectionIndex,
+      sectionCount: place.sectionCount
+    };
   }
   private orderOf(map: MapDocument): string[] {
     const roots = map.nodes.filter(node => !node.parentId);
@@ -2647,6 +2680,7 @@ export class BookPipelineRuns {
     const order = effectiveOrder(drive.store.state);
     if (!root || order.some(id => !drive.cards.has(id))) return { kind: "failed", reason: "missing" };
     const before = await this.ports.readCard(root.path);
+    const structure = this.structureOf(drive, order);
     const request: GlobalPlanRequest = {
       ...this.base(drive, drive.config.planModel),
       bookTitle: before.title,
@@ -2654,7 +2688,13 @@ export class BookPipelineRuns {
       cards: order.map(id => {
         const info = drive.cards.get(id) as CardInfo;
         const children = this.childCardsOf(drive, id).map(child => child.title);
-        return { id, title: info.title, summary: summaryText(info.summary), ...(children.length ? { children } : {}) };
+        return {
+          id,
+          place: this.placeOf(drive, structure, id),
+          title: info.title,
+          summary: summaryText(info.summary),
+          ...(children.length ? { children } : {})
+        };
       })
     };
     const result: GlobalPlanResult = await untilAborted(
@@ -2740,34 +2780,47 @@ export class BookPipelineRuns {
     const book = parseBookPlanBody(root.raw);
     const settings = effectiveSettings(root.settings, parseBookPlanDecisions(root.raw));
     const order = effectiveOrder(drive.store.state);
-    const index = order.indexOf(nodeId);
-    const side = (at: number): { position: number; title: string; summary: string } | undefined => {
-      const other = order[at] === undefined ? undefined : drive.cards.get(order[at]);
-      return other ? { position: at + 1, title: other.title, summary: summaryText(other.summary) } : undefined;
+    const structure = this.structureOf(drive, order);
+    const around = structure.neighboursOf(nodeId);
+    const kind = structure.placeOf(nodeId)?.kind ?? "chapter";
+    const side = (id: string | undefined): CardNeighbour | undefined => {
+      const other = id === undefined ? undefined : drive.cards.get(id);
+      if (!other || id === undefined) return undefined;
+      const place = structure.placeOf(id);
+      const position = kind === "section" ? undefined : place?.kind === "preface" ? "preface" : place?.chapter;
+      return {
+        ...(position === undefined ? {} : { position }),
+        title: other.title,
+        summary: summaryText(other.summary)
+      };
     };
-    const previous = side(index - 1);
-    const next = side(index + 1);
+    const previous = side(around.previous);
+    const next = side(around.next);
+    const nextChapter = side(around.nextChapter);
+    const parentCard = around.parent === undefined ? undefined : drive.cards.get(around.parent);
+    const parentChapter = around.parent === undefined ? undefined : structure.placeOf(around.parent)?.chapter;
     const children = this.childCardsOf(drive, nodeId);
     const request: CardPlanRequest = {
       ...this.base(drive, drive.config.planModel),
       thread: book.thread,
       settings,
       materials: book.materials,
-      chapters: order.flatMap((id, at) => {
+      chapters: order.flatMap(id => {
         const own = id === nodeId ? card.title : drive.cards.get(id)?.title;
-        return own === undefined ? [] : [{ position: at + 1, title: own }];
+        return own === undefined ? [] : [{ place: this.placeOf(drive, structure, id), title: own }];
       }),
       ...(children.length ? { children } : {}),
       card: {
         id: nodeId,
-        position: index + 1,
-        total: order.length,
+        ...this.planPlaceOf(drive, structure, nodeId),
         role: info.role,
         title: card.title,
         summary: card.summary
       },
       ...(previous ? { previous } : {}),
       ...(next ? { next } : {}),
+      ...(parentCard && parentChapter ? { parent: { position: parentChapter, title: parentCard.title } } : {}),
+      ...(nextChapter ? { nextChapter } : {}),
       ...(drive.extra.has(nodeId) ? { instruction: drive.extra.get(nodeId) } : {})
     };
     // The chapter list is the authority and is never shortened: when it alone does not fit, the step is refused here (no call is made).
@@ -2803,9 +2856,12 @@ export class BookPipelineRuns {
     const prompt = composeCardPrompt(
       {
         role: info.role,
+        kind,
         covers: result.covers,
+        ...(result.points ? { points: result.points } : {}),
         entry: result.entry,
         handoff: result.handoff,
+        ...(request.parent ? { parent: request.parent } : {}),
         ...(previous ? { previous: { ...previous, summary: result.previous } } : {}),
         ...(next ? { next: { ...next, summary: result.next } } : {}),
         checklist: result.checklist,

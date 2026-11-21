@@ -53,7 +53,7 @@ async function rig(over = {}) {
   let queue = Promise.resolve();
   let ids = 0;
   const script = { global: () => ({ thread: 'one thread', cards: nodes.map((n, i) => ({ id: n.id, role: i ? 'body' : 'intro' })), materials: [{ name: 'm', use: 'u' }], decisions: { reader: 'kids' } }),
-    card: request => ({ covers: `covers ${request.card.position}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }] }),
+    card: request => ({ covers: `covers ${(request.chapters.findIndex(c => c.title === request.card.title) + 1)}`, entry: 'entry', handoff: 'handoff', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }, { id: 'C2', type: 'structure', text: 'has an end' }] }),
     author: async input => { await input.admission.reserve(); const note = await repo.readNote(input.path); const r = await repo.updateNoteGuarded(input.path, { detail: input.requirements !== undefined ? fixOf(bodyOf(note.title)) : bodyOf(note.title) }, { authorize: input.authorize, finalize: input.finalize }); return r === 'written' ? { outcome: 'written' } : { outcome: 'discarded' }; },
     proof: async request => ({ items: request.checklist.map(c => ({ id: c.id, type: c.type, status: 'met', note: 'fine', sources: [] })), aggregate: 'checked' }),
     probe: async () => ({ ok: true }), ...over.script };
@@ -873,7 +873,7 @@ test('a chapter whose body already carries a picture is not given the no-picture
 });
 
 test('every accepted card plan logs one checklist_dropped line with counts only (zero included)', async () => {
-  const r = await rig({ script: { card: request => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }], ...(request.card.position === 2 ? { droppedSubjective: 2, droppedPicture: 1 } : {}) }) } });
+  const r = await rig({ script: { card: request => ({ covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }], ...((request.chapters.findIndex(c => c.title === request.card.title) + 1) === 2 ? { droppedSubjective: 2, droppedPicture: 1 } : {}) }) } });
   await r.runs.start(r.mapPath);
   const lines = r.stat.logs.filter(line => /book-pipeline checklist_dropped /.test(line));
   assert.equal(lines.length, 3);
@@ -1204,7 +1204,7 @@ test('image plan: the plan result is written to the Prompt and the author receiv
   const seen = new Map();
   const images = [{ index: 1, kind: 'map', explains: 'the route', anchor: 'after paragraph 1' }, { index: 2, kind: 'photo', explains: 'a port', anchor: 'end' }];
   const r = await rig({ script: {
-    card: request => ({ covers: `covers ${request.card.position}`, entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }], ...(request.card.position === 2 ? { images } : request.card.position === 3 ? { images: [] } : {}) }),
+    card: request => ({ covers: `covers ${(request.chapters.findIndex(c => c.title === request.card.title) + 1)}`, entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'has a beginning' }], ...((request.chapters.findIndex(c => c.title === request.card.title) + 1) === 2 ? { images } : (request.chapters.findIndex(c => c.title === request.card.title) + 1) === 3 ? { images: [] } : {}) }),
     author: async input => { seen.set(input.nodeId, plain(input.slots)); await input.admission.reserve(); return { outcome: 'discarded' }; }
   } });
   await r.runs.start(r.mapPath);
@@ -3063,7 +3063,7 @@ test('T10c plan request: the chapter list is the whole book on the map and the r
   await r.runs.start(r.mapPath);
   const root = requests.find(x => x.card.id === r.nodes[0].id);
   assert.deepEqual([...root.chapters.map(c => c.title)], TITLES);
-  assert.deepEqual([...root.chapters.map(c => c.position)], [1, 2, 3]);
+  assert.deepEqual([...root.chapters.map(c => c.place)], ['preface', 'chapter 1', 'chapter 2']);
   assert.deepEqual([...root.children.map(c => c.title)], [TITLES[1], TITLES[2]]);
   assert.match(root.children[0].summary, /summary of/);
   const leaf = requests.find(x => x.card.id === r.nodes[1].id);
@@ -3272,7 +3272,7 @@ async function neighbourRig(titles = FOUR) {
   const r = await rig({ titles });
   await r.runs.start(r.mapPath); await r.runs.confirmGate1(r.mapPath); await finished(r);
   assert.equal((await r.state()).phase, 'gate2');
-  const base = r.script.card; r.script.card = (request, n) => ({ ...base(request, n), covers: `NEWCOVERS ${request.card.position}` });
+  const base = r.script.card; r.script.card = (request, n) => ({ ...base(request, n), covers: `NEWCOVERS ${(request.chapters.findIndex(c => c.title === request.card.title) + 1)}` });
   return r;
 }
 const NEXT = /後一張|Next card/;
@@ -3285,9 +3285,9 @@ test('T12 neighbours: both neighbours get the rerun chapter\'s new covers on the
   await rerun(r, 2);
   assert.equal(r.stat.plan.length, planBefore + 1, 'only the rerun chapter was planned again');
   assert.equal(r.stat.proof.length, before.proof + 1, 'only the rerun chapter was proofread again');
-  assert.equal((await promptLine(r, 1, '後一張')), `(3) SecretTitleB — NEWCOVERS 3`, 'left neighbour: next line');
-  assert.equal((await promptLine(r, 3, '前一張')), `(3) SecretTitleB — NEWCOVERS 3`, 'right neighbour: previous line');
-  assert.ok((await promptLine(r, 1, '前一張')).includes('(1)'), 'its other line is not touched');
+  assert.equal((await promptLine(r, 1, '下一章')), `(2) SecretTitleB — NEWCOVERS 3`, 'left neighbour: next line');
+  assert.equal((await promptLine(r, 3, '上一章')), `(2) SecretTitleB — NEWCOVERS 3`, 'right neighbour: previous line');
+  assert.ok((await promptLine(r, 1, '上一章')).includes('(前言)'), 'its other line is not touched');
   assert.ok((await r.note(1)).pipelineSeam && (await r.note(3)).pipelineSeam, 'seams marked as before');
   assert.equal(integrityFpRaw(r.raw(1)), fps[0]); assert.equal(integrityFpRaw(r.raw(3)), fps[2]);
   for (const i of [1, 3]) assert.equal(bodyStateRaw(r.raw(i)), 'clean');
@@ -3296,11 +3296,11 @@ test('T12 neighbours: both neighbours get the rerun chapter\'s new covers on the
 test('T12 neighbours: the first and the last chapter have one neighbour; a removed neighbour is skipped for the next one over', async () => {
   const r = await neighbourRig();
   await rerun(r, 0);
-  assert.equal((await promptLine(r, 1, '前一張')), '(1) SecretRootTitle — NEWCOVERS 1');
-  assert.ok(!/NEWCOVERS/.test((await promptLine(r, 2, '前一張'))));
+  assert.equal((await promptLine(r, 1, '上一章')), '(前言) SecretRootTitle — NEWCOVERS 1');
+  assert.ok(!/NEWCOVERS/.test((await promptLine(r, 2, '上一章'))));
   const last = await neighbourRig();
   await rerun(last, 3);
-  assert.equal((await promptLine(last, 2, '後一張')), '(4) SecretTitleC — NEWCOVERS 4');
+  assert.equal((await promptLine(last, 2, '下一章')), '(3) SecretTitleC — NEWCOVERS 4');
   // A removed neighbour: chapter 2 is removed; rerunning chapter 3 changes chapter 1's next line (now the one before) and not the removed card.
   const gone = await neighbourRig();
   const removedBefore = gone.raw(2);
@@ -3308,7 +3308,7 @@ test('T12 neighbours: the first and the last chapter have one neighbour; a remov
   await gone.repo.updateMap(gone.mapPath, d => { d.bookPipeline.removed = [gone.nodes[2].id]; d.bookPipeline.accepted = d.bookPipeline.order.filter(id => id !== gone.nodes[2].id); d.bookPipeline.phase = 'gate2'; d.bookPipeline.status = 'stopped'; delete d.bookPipeline.pauseReason; });
   await rerun(gone, 3);
   assert.equal(gone.raw(2), removedBefore, 'the removed card is never written');
-  assert.equal((await promptLine(gone, 1, '後一張')), '(3) SecretTitleC — NEWCOVERS 3', 'the surviving neighbour on the left follows');
+  assert.equal((await promptLine(gone, 1, '下一章')), '(2) SecretTitleC — NEWCOVERS 3', 'the surviving neighbour on the left follows');
 });
 
 test('T12 neighbours, open items: an untouched neighbour with an AIM open-items marker saved after its Detail still gets its line refreshed', async () => {
@@ -3317,17 +3317,17 @@ test('T12 neighbours, open items: an untouched neighbour with an AIM open-items 
   assert.ok((await r.note(1)).detail.includes('aim-open-items'));
   assert.equal(bodyStateRaw(r.raw(1)), 'clean');
   await rerun(r, 2);
-  assert.equal((await promptLine(r, 1, '後一張')), `(3) SecretTitleB — NEWCOVERS 3`, 'left neighbour follows');
+  assert.equal((await promptLine(r, 1, '下一章')), `(2) SecretTitleB — NEWCOVERS 3`, 'left neighbour follows');
 });
 
 test('T12 neighbours: a neighbour whose text the reader edited by hand is not touched; its seam is still marked; running the rewrite again changes nothing', async () => {
   const r = await neighbourRig();
   await r.repo.updateNoteGuarded(r.nodes[1].path, { detail: `${(await r.note(1)).detail}\nreader added this line` }, {});
   assert.equal(bodyStateRaw(r.raw(1)), 'edited');
-  const editedLine = await promptLine(r, 1, '後一張');
+  const editedLine = await promptLine(r, 1, '下一章');
   await rerun(r, 2);
-  assert.equal(await promptLine(r, 1, '後一張'), editedLine, 'the edited neighbour keeps its line');
-  assert.equal((await promptLine(r, 3, '前一張')), '(3) SecretTitleB — NEWCOVERS 3', 'the clean neighbour still follows');
+  assert.equal(await promptLine(r, 1, '下一章'), editedLine, 'the edited neighbour keeps its line');
+  assert.equal((await promptLine(r, 3, '上一章')), '(2) SecretTitleB — NEWCOVERS 3', 'the clean neighbour still follows');
   assert.ok((await r.note(1)).pipelineSeam, 'seam is marked');
   // Idempotent: the second rerun with the same covers writes no neighbour again.
   const writes = []; const base = r.ports.updateNoteGuarded;
@@ -3351,7 +3351,7 @@ test('T12 rewriteNeighbourLine: keeps the label and colon (English, CRLF), write
   const { rewriteNeighbourLine } = S.load('core/book-pipeline/plan-text.ts');
   const n = { position: 2, title: 'T\n# x', summary: 'new [[link]]' };
   const out = rewriteNeighbourLine('Role: Body\r\nNext card: (3) old — old\r\nChecklist:', 'next', n);
-  assert.ok(/^Role: Body\r\nNext card: \(2\) T[^\n]* — [^\n]*\r\nChecklist:$/.test(out), out);
+  assert.ok(/^Role: Body\r\nNext chapter: \(2\) T[^\n]* — [^\n]*\r\nChecklist:$/.test(out), out);
   assert.equal(out.split('\n').length, 3, 'one line, no injected heading');
   assert.equal(rewriteNeighbourLine('Role: Body', 'next', n), undefined, 'no such line');
   assert.equal(rewriteNeighbourLine(out, 'next', n), undefined, 'already says it');
@@ -3362,14 +3362,14 @@ test('fix5 skipped chapter: a hand-edited chapter the plan step leaves alone get
   const r = await rig();
   await finish(r);
   await handEdit(r, 1);
-  const stale = await promptLine(r, 1, '後一張');
+  const stale = await promptLine(r, 1, '下一章');
   const fp = integrityFpRaw(r.raw(1));
-  const base = r.script.card; r.script.card = (request, n) => ({ ...base(request, n), covers: `NEWCOVERS ${request.card.position}` });
+  const base = r.script.card; r.script.card = (request, n) => ({ ...base(request, n), covers: `NEWCOVERS ${(request.chapters.findIndex(c => c.title === request.card.title) + 1)}` });
   await redo(r, [1, 2], null);
   assert.equal(stageOf(r.raw(1)), 'needs-review', 'chapter 1 was skipped');
-  assert.notEqual(stale, '(3) SecretTitleB — NEWCOVERS 3');
-  assert.equal(await promptLine(r, 1, '後一張'), '(3) SecretTitleB — NEWCOVERS 3', 'next line follows the neighbour\'s current covers');
-  assert.ok((await promptLine(r, 1, '前一張')).startsWith('(1) SecretRootTitle'), 'previous line names the current previous chapter');
+  assert.notEqual(stale, '(2) SecretTitleB — NEWCOVERS 3');
+  assert.equal(await promptLine(r, 1, '下一章'), '(2) SecretTitleB — NEWCOVERS 3', 'next line follows the neighbour\'s current covers');
+  assert.ok((await promptLine(r, 1, '上一章')).startsWith('(前言) SecretRootTitle'), 'previous line names the current previous chapter');
   assert.equal(integrityFpRaw(r.raw(1)), fp, 'the integrity fingerprint is not touched');
   assert.equal(bodyStateRaw(r.raw(1)), 'edited');
   assert.ok((await r.note(1)).detail.includes(HAND));
@@ -3389,22 +3389,22 @@ test('fix5 placeholder: a neighbour whose summary is the "no conclusion yet" pla
   assert.equal(forA.next.summary, '', 'the placeholder is not a description');
   assert.equal(forA.previous.summary, 'summary of SecretRootTitle', 'a real summary is kept');
   assert.equal(globalRequest.cards.find(c => c.id === r.nodes[2].id).summary, '');
-  assert.ok(!/尚未形成結論/.test(await promptLine(r, 1, '後一張')), 'the written line has no placeholder');
+  assert.ok(!/尚未形成結論/.test(await promptLine(r, 1, '下一章')), 'the written line has no placeholder');
 });
 
 test('fix5 rewriteNeighbourLine: an empty summary leaves no dangling dash', () => {
   const { rewriteNeighbourLine } = S.load('core/book-pipeline/plan-text.ts');
   const out = rewriteNeighbourLine('後一張：(3) old — old', 'next', { position: 5, title: 'T', summary: '' });
-  assert.equal(out, '後一張：(5) T');
+  assert.equal(out, '下一章：(5) T', 'an old label is written as the new one');
 });
 
 // ---- fix packet 6: the no-neighbour form, and a redo that never plans still refreshes skipped chapters ----
 test('fix6 rewriteNeighbourLine: null writes the no-neighbour form for either end, in the line\'s own language, CRLF kept, idempotent', () => {
   const { rewriteNeighbourLine } = S.load('core/book-pipeline/plan-text.ts');
   const next = rewriteNeighbourLine('後一張：(3) old — old', 'next', null);
-  assert.equal(next, '後一張：無', 'last chapter, Chinese');
+  assert.equal(next, '下一章：無', 'last chapter, Chinese');
   const prev = rewriteNeighbourLine('Role: Body\r\nPrevious card: (1) old — old\r\nNext card: (3) x', 'previous', null);
-  assert.equal(prev, 'Role: Body\r\nPrevious card: none\r\nNext card: (3) x', 'first chapter, English, CRLF');
+  assert.equal(prev, 'Role: Body\r\nPrevious chapter: none\r\nNext card: (3) x', 'first chapter, English, CRLF');
   assert.equal(rewriteNeighbourLine(next, 'next', null), undefined, 'already says it');
 });
 
@@ -3412,14 +3412,14 @@ test('fix6 redo at planned: no plan step runs, yet a skipped (hand-edited) last 
   const r = await rig();
   await finish(r);
   await handEdit(r, 2);
-  const last = await promptLine(r, 2, '後一張');
+  const last = await promptLine(r, 2, '下一章');
   assert.equal(last, '無', 'the last chapter starts with none');
   await r.repo.updateNoteRawGuarded(r.nodes[2].path, c => c.replace(/^後一張[:：] ?.*$/m, '後一張：(9) stale — old'), {});
   const fp = integrityFpRaw(r.raw(2));
   let calls = 0;
   { const f = r.script.card; r.script.card = (...a) => { calls++; return f(...a); }; }
   await redo(r, [1]);
-  assert.equal(await promptLine(r, 2, '後一張'), '無');
+  assert.equal(await promptLine(r, 2, '下一章'), '無');
   assert.equal(integrityFpRaw(r.raw(2)), fp, 'fingerprint untouched');
   assert.ok((await r.note(2)).detail.includes(HAND));
   const before = r.raw(2);
@@ -3433,9 +3433,9 @@ test('fix3 retargetNeighbourLine: a line naming the neighbour is left; a moved p
   const { retargetNeighbourLine } = S.load('core/book-pipeline/plan-text.ts');
   const prompt = '角色：本文\n前一張：(2) A — about a\n後一張：(4) Gone — about gone';
   assert.equal(retargetNeighbourLine(prompt, 'previous', { position: 2, title: 'A', summary: 'new' }), undefined, 'already names it');
-  assert.equal(retargetNeighbourLine(prompt, 'previous', { position: 1, title: 'A', summary: 'new' }), '角色：本文\n前一張：(1) A — about a\n後一張：(4) Gone — about gone', 'only the position moved');
-  assert.equal(retargetNeighbourLine(prompt, 'next', { position: 4, title: 'C', summary: 'covers c' }), '角色：本文\n前一張：(2) A — about a\n後一張：(4) C — covers c', 'a removed chapter is replaced');
-  assert.equal(retargetNeighbourLine(prompt, 'next', null), '角色：本文\n前一張：(2) A — about a\n後一張：無');
+  assert.equal(retargetNeighbourLine(prompt, 'previous', { position: 1, title: 'A', summary: 'new' }), '角色：本文\n上一章：(1) A — about a\n後一張：(4) Gone — about gone', 'only the position moved');
+  assert.equal(retargetNeighbourLine(prompt, 'next', { position: 4, title: 'C', summary: 'covers c' }), '角色：本文\n前一張：(2) A — about a\n下一章：(4) C — covers c', 'a removed chapter is replaced');
+  assert.equal(retargetNeighbourLine(prompt, 'next', null), '角色：本文\n前一張：(2) A — about a\n下一章：無');
   assert.equal(retargetNeighbourLine('角色：本文', 'next', null), undefined, 'no such line');
 });
 
@@ -3453,10 +3453,10 @@ test('dropEntryNaming: the entry line goes only when it names a removed chapter;
 test('fix3 composeCardPrompt / rewriteNeighbourLine: a literal null or undefined description is never written (the title alone stays)', () => {
   const { composeCardPrompt, rewriteNeighbourLine } = S.load('core/book-pipeline/plan-text.ts');
   const prompt = composeCardPrompt({ role: 'body', covers: 'c', entry: 'e', handoff: 'h', previous: { position: 3, title: 'Seeds', summary: 'null' }, next: { position: 5, title: 'Veg', summary: ' undefined ' }, checklist: [{ id: 'C1', type: 'structure', text: 'x' }] }, 'zh-TW');
-  assert.ok(prompt.includes('前一張：(3) Seeds\n'), prompt);
-  assert.ok(prompt.includes('後一張：(5) Veg\n'), prompt);
+  assert.ok(prompt.includes('上一章：(3) Seeds\n'), prompt);
+  assert.ok(prompt.includes('下一章：(5) Veg\n'), prompt);
   assert.ok(!/null|undefined/.test(prompt));
-  assert.equal(rewriteNeighbourLine('後一張：(3) old — old', 'next', { position: 5, title: 'T', summary: 'NULL' }), '後一張：(5) T');
+  assert.equal(rewriteNeighbourLine('後一張：(3) old — old', 'next', { position: 5, title: 'T', summary: 'NULL' }), '下一章：(5) T');
 });
 
 test('fix3 a planned chapter whose plan step answers "null" for its neighbours writes their titles only', async () => {
@@ -3464,15 +3464,15 @@ test('fix3 a planned chapter whose plan step answers "null" for its neighbours w
   const base = r.script.card; r.script.card = (request, n) => ({ ...base(request, n), previous: 'null', next: 'null' });
   await r.runs.start(r.mapPath);
   await r.runs.confirmGate1(r.mapPath); await finished(r);
-  assert.equal(await promptLine(r, 2, '前一張'), '(2) SecretTitleA');
-  assert.equal(await promptLine(r, 2, '後一張'), '(4) SecretTitleC');
+  assert.equal(await promptLine(r, 2, '上一章'), '(1) SecretTitleA');
+  assert.equal(await promptLine(r, 2, '下一章'), '(3) SecretTitleC');
 });
 
 test('fix3 a chapter removed while writing, then "carry on": the neighbours\' previous/next lines skip it and roles do not change', async () => {
   const r = await rig({ titles: FOUR });
   await r.runs.start(r.mapPath);
   const roles = []; for (let i = 0; i < 4; i++) roles.push((await r.note(i)).bookRole);
-  assert.ok((await promptLine(r, 0, '後一張')).startsWith('(2) SecretTitleA'), 'planned against the old order');
+  assert.ok((await promptLine(r, 0, '下一章')).startsWith('(1) SecretTitleA'), 'planned against the old order');
   // The entry line of chapter 2 names the chapter that goes; chapter 3's names one that stays.
   const withEntry = async (i, text) => { const n = await r.note(i); assert.match(n.prompt, /^接入點：/m); await r.repo.updateNoteGuarded(r.nodes[i].path, { prompt: n.prompt.replace(/^接入點：.*$/m, `接入點：${text}`) }, {}); };
   await withEntry(2, '接著 SecretTitleA 講到的步驟');
@@ -3485,11 +3485,11 @@ test('fix3 a chapter removed while writing, then "carry on": the neighbours\' pr
   assert.equal((await r.state()).phase, 'gate2');
   assert.equal(await promptLine(r, 2, '接入點'), undefined, 'the entry line naming the removed chapter is gone (a join no longer there)');
   assert.equal(await promptLine(r, 3, '接入點'), '接著 SecretTitleB 的結尾', 'an entry line naming a chapter that stays is kept');
-  assert.equal(await promptLine(r, 0, '後一張'), '(2) SecretTitleB — covers 3', 'the previous chapter now points past the removed one');
-  assert.equal(await promptLine(r, 2, '前一張'), '(1) SecretRootTitle — covers 1', 'the next chapter names its new neighbour');
-  assert.equal(await promptLine(r, 3, '前一張'), '(2) SecretTitleB — p', 'only the position moved: the sentence is kept');
-  assert.equal(await promptLine(r, 2, '後一張'), '(3) SecretTitleC — n');
-  assert.equal(await promptLine(r, 3, '後一張'), '無', 'an unaffected line is left as it was');
+  assert.equal(await promptLine(r, 0, '下一章'), '(1) SecretTitleB — covers 3', 'the previous chapter now points past the removed one');
+  assert.equal(await promptLine(r, 2, '上一章'), '(前言) SecretRootTitle — covers 1', 'the next chapter names its new neighbour');
+  assert.equal(await promptLine(r, 3, '上一章'), '(1) SecretTitleB — p', 'only the position moved: the sentence is kept');
+  assert.equal(await promptLine(r, 2, '下一章'), '(2) SecretTitleC — n');
+  assert.equal(await promptLine(r, 3, '下一章'), '無', 'an unaffected line is left as it was');
   for (const i of [0, 2, 3]) assert.equal((await r.note(i)).bookRole, roles[i], `role of card ${i} unchanged`);
 });
 
@@ -3534,7 +3534,7 @@ test('fix5 whole-book rerun after the book title (root topic) is renamed: plans 
     assert.equal(n.pipelineIssue, undefined, `chapter ${i} has no issue`);
     assert.ok(!n.prompt.includes('SecretRootTitle'), `chapter ${i}: no old title in its prompt (entry, previous, next)`);
   }
-  assert.ok((await promptLine(r, 1, '前一張')).includes('BrandNewBookTitle'));
+  assert.ok((await promptLine(r, 1, '上一章')).includes('BrandNewBookTitle'));
   assert.ok((await promptLine(r, 1, '接入點')).includes('BrandNewBookTitle'));
 });
 

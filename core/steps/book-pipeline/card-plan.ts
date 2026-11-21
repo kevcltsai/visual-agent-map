@@ -1,4 +1,5 @@
 import type { BookRole, BookSettings } from "../../book-pipeline/model";
+import type { CardKind } from "../../book-pipeline/structure";
 import type { ChecklistItem, ChecklistType } from "../../book-pipeline/plan-text";
 import {
   cleanSearchTerms,
@@ -31,15 +32,30 @@ import roleImagesTemplate from "./card-plan-images-role.md";
 import ownerImagesTemplate from "./card-plan-images-owner.md";
 
 export interface CardNeighbour {
-  position: number;
+  /** The chapter number, or "preface"; absent for a section beside a section (sections have no number). */
+  position?: number | "preface";
   title: string;
   summary: string;
 }
-/** One chapter of the book as it is on the map now. */
+/** One card of the book as it is on the map now; `place` is {@link placeText}. */
 export interface CardPlanChapter {
-  position: number;
+  place: string;
   title: string;
 }
+/** Where a card is in the book (see core/book-pipeline/structure.ts). */
+export interface CardPlanPlace {
+  kind: CardKind;
+  chapter?: number;
+  sectionIndex?: number;
+  sectionCount?: number;
+}
+/** How a card's place is written in the request: `preface`, `chapter 2`, `section 1 of 3 in chapter 2`. */
+export const placeText = (p: CardPlanPlace): string =>
+  p.kind === "preface"
+    ? "preface"
+    : p.kind === "chapter"
+      ? `chapter ${p.chapter}`
+      : `section ${p.sectionIndex} of ${p.sectionCount} in chapter ${p.chapter}`;
 /** A child card of the chapter on the map (reading order). */
 export interface CardChild {
   title: string;
@@ -50,18 +66,25 @@ export interface CardPlanRequest extends BookStepBase {
   /** The effective settings (owner's current values first, then the saved editorial decisions). */
   settings: BookSettings;
   materials: readonly { name: string; use: string }[];
-  card: { id: string; position: number; total: number; role: BookRole; title: string; summary: string };
+  card: CardPlanPlace & { id: string; role: BookRole; title: string; summary: string };
   /** The complete current chapter list, in reading order: the authority for which chapters exist. Never shortened; a list that does not fit refuses the step. */
   chapters: readonly CardPlanChapter[];
   /** The chapter's child cards on the map, in reading order (supplementary owner data; trimmed to fit, never the chapter list). */
   children?: readonly CardChild[];
+  /** The previous / next chapter of a chapter (the previous of chapter 1 is the preface), the previous / next section of a section. */
   previous?: CardNeighbour;
   next?: CardNeighbour;
+  /** A section's chapter. */
+  parent?: { position: number; title: string };
+  /** The next chapter: only the last section of a chapter carries it (its handoff leads there). */
+  nextChapter?: CardNeighbour;
   /** The owner's one-line extra request for this card (single-card replan); absent on a normal plan. */
   instruction?: string;
 }
 export interface CardPlanResult {
   covers: string;
+  /** 3 to 6 content headings, one line each. */
+  points: string[];
   entry: string;
   handoff: string;
   previous: string;
@@ -77,11 +100,15 @@ export interface CardPlanResult {
 }
 
 export const MAX_CHECKLIST = 8;
+export const MIN_POINTS = 3;
+export const MAX_POINTS = 6;
+export const POINT_MAX = 40;
 export const CARD_PLAN_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
     covers: { type: "string", minLength: 1 },
+    points: { type: "array", minItems: MIN_POINTS, items: { type: "string", minLength: 1 } },
     entry: { type: "string", minLength: 1 },
     handoff: { type: "string", minLength: 1 },
     previous: { type: "string" },
@@ -119,7 +146,7 @@ export const CARD_PLAN_SCHEMA = {
       }
     }
   },
-  required: ["covers", "entry", "handoff", "previous", "next", "checklist", "images"]
+  required: ["covers", "points", "entry", "handoff", "previous", "next", "checklist", "images"]
 };
 
 /** Picture words that are a requirement by themselves, and picture nouns that count only beside a requirement verb (so "圖像學" is not a picture item). */
@@ -139,7 +166,12 @@ const SUBJECTIVE =
 
 export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanResult {
   const item = parseJson(raw);
-  exactKeys(item, ["covers", "entry", "handoff", "previous", "next", "checklist", "images"]);
+  exactKeys(item, ["covers", "points", "entry", "handoff", "previous", "next", "checklist", "images"]);
+  // Content headings: one line each, at most 40 characters, `·` (the Prompt line's separator) written as `・`; fewer than three is a failure (retried), more than six are cut.
+  const points = arrayOf(item.points, "points")
+    .map(value => singleLine(textOf(value, "points item"), POINT_MAX).replace(/·/g, "・"))
+    .filter(Boolean);
+  if (points.length < MIN_POINTS) fail(`points must have ${MIN_POINTS} to ${MAX_POINTS} items`);
   const entries = arrayOf(item.checklist, "checklist");
   if (entries.length < 1 || entries.length > MAX_CHECKLIST) fail(`checklist must have 1 to ${MAX_CHECKLIST} items`);
   const parsed = entries.map((entry): { type: ChecklistType; text: string } => {
@@ -181,6 +213,7 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
     present ? singleLine(textOf(value, what), 240) : "";
   return {
     covers: singleLine(textOf(item.covers, "covers")),
+    points: points.slice(0, MAX_POINTS),
     entry: singleLine(textOf(item.entry, "entry")),
     handoff: singleLine(textOf(item.handoff, "handoff")),
     previous: side(item.previous, !!request.previous, "previous"),
@@ -194,7 +227,57 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
 
 const cap = (value: string, max: number): string => singleLine(value, max);
 const neighbour = (n: CardNeighbour | undefined): string =>
-  JSON.stringify(n ? { position: n.position, title: cap(n.title, 200), summary: cap(n.summary, 500) } : null);
+  JSON.stringify(
+    n
+      ? {
+          ...(n.position === undefined
+            ? {}
+            : {
+                place: placeText(
+                  n.position === "preface" ? { kind: "preface" } : { kind: "chapter", chapter: n.position }
+                )
+              }),
+          title: cap(n.title, 200),
+          summary: cap(n.summary, 500)
+        }
+      : null
+  );
+/** The card's relatives beyond the previous and next card: a section's chapter and (last section) the next chapter. */
+const relations = (request: CardPlanRequest): string => {
+  const parts: string[] = [];
+  if (request.parent)
+    parts.push(
+      `Chapter this section belongs to (JSON object):\n${JSON.stringify({ place: placeText({ kind: "chapter", chapter: request.parent.position }), title: cap(request.parent.title, 200) })}`
+    );
+  if (request.nextChapter)
+    parts.push(`Next chapter, which this section's handoff leads to (JSON object):\n${neighbour(request.nextChapter)}`);
+  return parts.length ? `\n\n${parts.join("\n\n")}` : "";
+};
+/** How this card joins its neighbours, by what it is (chapter, section) and whether it has sections. */
+const continuity = (request: CardPlanRequest, hasChildren: boolean): string => {
+  const kind = request.card.kind;
+  if (kind === "section")
+    return [
+      request.card.sectionIndex === 1
+        ? "Continuity: this is the first section of its chapter, so its entry takes up the chapter's own text (what the chapter has just said) and does not repeat it."
+        : "Continuity: its entry takes up where the previous section ended and does not repeat it.",
+      request.nextChapter
+        ? "As the last section of the chapter, its handoff leads out to the next chapter (the one given below), not to a section."
+        : request.next
+          ? "Its handoff leads into the next section."
+          : "Its handoff closes the chapter."
+    ].join(" ");
+  if (kind === "preface")
+    return "Continuity: this is the preface; its entry opens the book, and its handoff leads into chapter 1.";
+  return [
+    request.previous
+      ? "Continuity: the entry takes up the end of the previous chapter (or the preface) and does not retell it."
+      : "Continuity: the entry opens the book's first chapter.",
+    hasChildren
+      ? "This chapter has sections, so its handoff leads into its own first section, not into the next chapter."
+      : "This chapter has no sections, so its handoff leads into the next chapter."
+  ].join(" ");
+};
 
 /** The longest instruction line (the owner's own line is cut to 300 by the runner; the program's "use other sources" line may list five addresses). */
 const INSTRUCTION_MAX = 1300;
@@ -231,16 +314,17 @@ const baseRender = (request: CardPlanRequest): string =>
     thread: JSON.stringify(cap(request.thread, 1200)),
     settings: JSON.stringify(request.settings),
     card: JSON.stringify({
-      position: request.card.position,
-      total: request.card.total,
+      place: placeText(request.card),
       role: request.card.role,
       title: cap(request.card.title, 200),
       summary: cap(request.card.summary, 500)
     }),
     previous: neighbour(request.previous),
     next: neighbour(request.next),
+    relations: relations(request),
+    continuity: continuity(request, !!request.children?.length),
     materials: JSON.stringify(request.materials.map(m => ({ name: cap(m.name, 120), use: cap(m.use, 240) }))),
-    chapters: JSON.stringify(request.chapters.map(c => ({ position: c.position, title: wholeLine(c.title) })))
+    chapters: JSON.stringify(request.chapters.map(c => ({ place: c.place, title: wholeLine(c.title) })))
   });
 const childSection = (items: readonly CardChild[], shown: number): string =>
   items.length

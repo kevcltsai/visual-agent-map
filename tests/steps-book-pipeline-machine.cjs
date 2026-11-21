@@ -953,3 +953,14 @@ test('ai fix: each recorded fix keeps the replacement actually written for its i
   assert.equal(fixes[0].replacement, '新句子。');
   assert.equal(fixes[0].suggestion !== undefined, true);
 });
+
+test('resetCard drops the whole-book fixes that rewrote this chapter, keeps the other chapters\' and the counts', () => {
+  const state = fresh();
+  const pending = (id, chapterId) => ({ id, quote: 'q', problem: 'p', suggestion: 's', chapter: 1, chapterId });
+  state.bookProof = { key: 'k', attempts: 0, round: 1, step: 'proof', done: true, checked: 3, fixed: 2, open: [], fixes: [pending('B1', 'a'), pending('B2', 'b'), pending('B0')] };
+  const next = machine.resetCard(plain(state), 'a');
+  assert.deepEqual(plain(next.bookProof.fixes.map(f => f.id)), ['B2', 'B0'], 'only the chapter\'s own fix goes (a fix with no chapterId is not guessed)');
+  assert.deepEqual([next.bookProof.fixed, next.bookProof.checked], [2, 3]);
+  assert.equal(state.bookProof.fixes.length, 3, 'the input is not mutated');
+  assert.doesNotThrow(() => machine.resetCard(plain(fresh()), 'a'), 'no bookProof at all');
+});

@@ -3724,6 +3724,16 @@ test('P3 structure: the plan gate writes ### 全書結構 after the thread in th
   assert.equal(replaceBookStructure(raw, composeBookStructure([{ kind: 'preface', title: 'BookRoot', points: ['BookRoot a', 'BookRoot b', 'BookRoot c'] }, { kind: 'chapter', chapter: 1, title: 'ChapA', points: ['ChapA a', 'ChapA b', 'ChapA c'] }, { kind: 'section', title: 'SecA1', points: ['SecA1 a', 'SecA1 b', 'SecA1 c'] }, { kind: 'section', title: 'SecA2', points: ['SecA2 a', 'SecA2 b', 'SecA2 c'] }, { kind: 'chapter', chapter: 2, title: 'ChapB', points: ['ChapB a', 'ChapB b', 'ChapB c'] }], 'zh-TW')), raw, 'idempotent');
 });
 
+test('P3 structure: the last section of a chapter is planned with the next chapter carrying its number; the section\'s own neighbours stay unnumbered', async () => {
+  const seen = [];
+  const r = await sectionRig({ script: { card: (request, n) => { seen.push(request); return POINTED.card(request, n); } } });
+  await r.runs.start(r.mapPath);
+  const last = seen.find(request => request.card.id === r.nodes[3].id);
+  assert.ok(last, 'SecA2 was planned');
+  assert.deepEqual([last.nextChapter.title, last.nextChapter.position], ['ChapB', 2], 'the next chapter keeps its chapter number');
+  assert.equal(last.previous.position, undefined, 'the previous section is named by title only');
+});
+
 test('P3 structure: back to the plan writes it again from the plans as the owner edited them; a stale root note is left and structure_skipped is logged, the gate still shows', async () => {
   const r = await sectionRig();
   await r.runs.start(r.mapPath);

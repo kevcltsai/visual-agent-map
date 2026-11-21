@@ -31,6 +31,7 @@ import requestTemplate from "./card-plan-request.md";
 import childrenTemplate from "./card-plan-children.md";
 import roleImagesTemplate from "./card-plan-images-role.md";
 import ownerImagesTemplate from "./card-plan-images-owner.md";
+import continuityTemplate from "./card-plan-continuity.md";
 
 export interface CardNeighbour {
   /** The chapter number, or "preface"; absent for a section beside a section (sections have no number). */
@@ -270,39 +271,42 @@ const neighbour = (n: CardNeighbour | undefined): string =>
         }
       : null
   );
+/** The continuity sentences of {@link continuityTemplate}: blocks of a `[key]` line and the sentence under it. */
+const sentences = new Map(
+  continuityTemplate
+    .split(/^\[([a-z-]+)\]\n/m)
+    .slice(1)
+    .reduce<[string, string][]>((all, part, at, parts) => (at % 2 ? all : [...all, [part, parts[at + 1].trim()]]), [])
+);
+const sentence = (key: string): string => sentences.get(key) ?? "";
 /** The card's relatives beyond the previous and next card: a section's chapter and (last section) the next chapter. */
 const relations = (request: CardPlanRequest): string => {
   const parts: string[] = [];
   if (request.parent)
     parts.push(
-      `Chapter this section belongs to (JSON object):\n${JSON.stringify({ place: placeText({ kind: "chapter", chapter: request.parent.position }), title: cap(request.parent.title, 200) })}`
+      `${sentence("parent")}\n${JSON.stringify({ place: placeText({ kind: "chapter", chapter: request.parent.position }), title: cap(request.parent.title, 200) })}`
     );
   if (request.nextChapter)
-    parts.push(`Next chapter, which this section's handoff leads to (JSON object):\n${neighbour(request.nextChapter)}`);
+    parts.push(`${sentence("next-chapter")}\n${neighbour(request.nextChapter)}`);
   return parts.length ? `\n\n${parts.join("\n\n")}` : "";
 };
 /** How this card joins its neighbours, by what it is (chapter, section) and whether it has sections. */
 const continuity = (request: CardPlanRequest, hasChildren: boolean): string => {
   const kind = request.card.kind;
-  const own = "its entry grows from its own subject and does not pick up or retell the previous card.";
+  const own = sentence("own");
   if (kind === "section")
     return [
       `Continuity: ${own}`,
       request.nextChapter
-        ? "As the last section of the chapter, its handoff leaves the open question the next chapter (the one given below) takes up, without naming it."
+        ? sentence("section-next-chapter")
         : request.next
-          ? "Its handoff leaves the open question the next section takes up, without naming it."
-          : "It is the last section of the last chapter, so it closes the book as the handoff rule says for the last card."
+          ? sentence("section-next")
+          : sentence("section-last")
     ].join(" ");
-  if (kind === "preface")
-    return "Continuity: this is the preface; its entry opens the book, and its handoff leaves the open question chapter 1 takes up, without naming it.";
+  if (kind === "preface") return sentence("preface");
   return [
-    request.previous ? `Continuity: ${own}` : "Continuity: the entry opens the book's first chapter.",
-    hasChildren
-      ? "This chapter has sections, so its handoff leaves the open question its own first section takes up."
-      : request.next
-        ? "Its handoff leaves the open question the next chapter takes up, without naming it."
-        : "This chapter has no sections and is the last, so it closes the book as the handoff rule says for the last card."
+    request.previous ? `Continuity: ${own}` : sentence("chapter-first"),
+    hasChildren ? sentence("chapter-sections") : request.next ? sentence("chapter-next") : sentence("chapter-last")
   ].join(" ");
 };
 

@@ -114,7 +114,7 @@ export async function downloadCover(
       // before any byte comes. A HEAD that fails or says nothing about the size is not a verdict; the GET below is judged as ever.
       const probe = await get(original, "HEAD");
       if ("ok" in probe) {
-        if (probe.reason === "aborted" || probe.reason === "timeout") return probe;
+        if (!probe.ok && (probe.reason === "aborted" || probe.reason === "timeout")) return probe;
       } else {
         const length = Number(header(probe.headers, "content-length"));
         if (probe.status === 200 && Number.isFinite(length) && length > COVER_MAX_BYTES) return { ok: false, reason: "size" };

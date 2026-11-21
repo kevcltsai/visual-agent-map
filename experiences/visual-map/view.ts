@@ -1840,6 +1840,8 @@ export class VisualAgentMapView extends ItemView {
   private paintChildIndex: Map<string, MapNode[]> | null = null;
   /** The map's nodes by id and their depths while a paint draws its cards; null otherwise. */
   private paintCardIndex: CardIndex | null = null;
+  /** The book structure computed once for a whole paint (every card asks for its place); null outside a paint. */
+  private paintBookStructure: { value: BookStructure | undefined } | null = null;
   /** The map node with this id: from the paint's index while a paint draws its cards, else a search of the map. */
   private mapNodeById(id: string | undefined): MapNode | undefined {
     if (id === undefined) return undefined;
@@ -12271,6 +12273,7 @@ export class VisualAgentMapView extends ItemView {
     // Every card shows its branch size: one child index per paint keeps that linear in the map size.
     this.paintChildIndex = this.map ? childIndex(this.map.nodes) : null;
     this.paintCardIndex = this.map ? cardIndex(this.map.nodes) : null;
+    this.paintBookStructure = { value: this.bookStructureNow() };
     const fits: Array<() => void> = [];
     this.pendingCardFits = fits;
     try {
@@ -12279,6 +12282,7 @@ export class VisualAgentMapView extends ItemView {
       this.renderingCard = false;
       this.paintChildIndex = null;
       this.paintCardIndex = null;
+      this.paintBookStructure = null;
       this.pendingCardFits = null;
     }
     for (const fit of fits) fit();
@@ -12546,12 +12550,7 @@ export class VisualAgentMapView extends ItemView {
     })();
     const bookPlace =
       note && this.hasBookPipeline()
-        ? (() => {
-            const read = this.map ? readBookPipeline(this.map) : undefined;
-            return read?.kind === "usable"
-              ? this.bookStructureOf(effectiveOrder(read.data))?.placeOf(node.id)
-              : undefined;
-          })()
+        ? (this.paintBookStructure ? this.paintBookStructure.value : this.bookStructureNow())?.placeOf(node.id)
         : undefined;
     const bookCard = bookCardView(note ?? {}, bookDone, bookStale, this.isBookCardResolved(node.id), bookPlace);
     if (!loading) {
@@ -17433,6 +17432,12 @@ export class VisualAgentMapView extends ItemView {
   /** What the bar and the card reruns remember in memory (the repaint rebuilds the DOM). */
   private readonly bookReview = new BookReviewMemory();
   /** The book's structure over the cards the run works on (the root is the preface); undefined without a single root. */
+  /** The structure of the current run's cards, or undefined (no book run, an unreadable one, or no single root). */
+  private bookStructureNow(): BookStructure | undefined {
+    if (!this.map || !this.hasBookPipeline()) return undefined;
+    const read = readBookPipeline(this.map);
+    return read.kind === "usable" ? this.bookStructureOf(effectiveOrder(read.data)) : undefined;
+  }
   private bookStructureOf(order: readonly string[]): BookStructure | undefined {
     const map = this.map;
     const root = map?.nodes.find(node => !node.parentId);

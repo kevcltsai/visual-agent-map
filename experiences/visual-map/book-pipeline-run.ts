@@ -3511,11 +3511,13 @@ export class BookPipelineRuns {
     const structure = this.structureOf(drive, order);
     const around = structure.neighboursOf(nodeId);
     const kind = structure.placeOf(nodeId)?.kind ?? "chapter";
-    const side = (id: string | undefined): CardNeighbour | undefined => {
+    // A section's neighbours are named by title (sections are never numbered, and the previous/next section is a section); the next
+    // chapter it leads to is a chapter and keeps its number.
+    const side = (id: string | undefined, numbered = kind !== "section"): CardNeighbour | undefined => {
       const other = id === undefined ? undefined : drive.cards.get(id);
       if (!other || id === undefined) return undefined;
       const place = structure.placeOf(id);
-      const position = kind === "section" ? undefined : place?.kind === "preface" ? "preface" : place?.chapter;
+      const position = !numbered ? undefined : place?.kind === "preface" ? "preface" : place?.chapter;
       return {
         ...(position === undefined ? {} : { position }),
         title: other.title,
@@ -3524,7 +3526,7 @@ export class BookPipelineRuns {
     };
     const previous = side(around.previous);
     const next = side(around.next);
-    const nextChapter = side(around.nextChapter);
+    const nextChapter = side(around.nextChapter, true);
     const parentCard = around.parent === undefined ? undefined : drive.cards.get(around.parent);
     const parentChapter = around.parent === undefined ? undefined : structure.placeOf(around.parent)?.chapter;
     const children = this.childCardsOf(drive, nodeId);

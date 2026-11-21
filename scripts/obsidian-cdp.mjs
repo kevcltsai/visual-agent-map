@@ -3,7 +3,7 @@
 // cannot address several test instances. Each harness-launched profile instead exposes its own DevTools port, which
 // Chromium records in <vault>/.vam-app/DevToolsActivePort. Nothing here focuses a window or touches the screen.
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -119,6 +119,12 @@ export async function clickSelector(cdp, selector) {
   return point;
 }
 
+// A hidden (background) test window gets no animation frames, so reading views never draw new sections and inactive leaves stay
+// empty: DOM reads there are unreliable. Focus emulation keeps frames running without focusing or raising the window. It
+// applies to this connection only and is never set for the owner's vault.
+export const ownerVaultName = "vam-e2e-current";
+export const rendersInBackground = vault => basename(resolve(vault)) !== ownerVaultName;
+
 export async function connectCdp(vault) {
   const page = await pageTarget(vault);
   const socket = new WebSocket(page.webSocketDebuggerUrl);
@@ -148,6 +154,7 @@ export async function connectCdp(vault) {
   });
   // Enabling Runtime replays the exceptions and console messages buffered since the page started.
   await send("Runtime.enable");
+  if (rendersInBackground(vault)) await send("Emulation.setFocusEmulationEnabled", { enabled: true });
   return {
     ...createInput(send),
     async evaluate(expression) {

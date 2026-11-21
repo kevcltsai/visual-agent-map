@@ -71,3 +71,11 @@ test('CLI click and key commands appear in the usage text', async () => {
   assert.match(usage, /click <selector>/);
   assert.match(usage, /key <combo>/);
 });
+
+test('background rendering is enabled for session vaults and never for the owner vault', async () => {
+  const { rendersInBackground } = await lib();
+  assert.equal(rendersInBackground('/private/tmp/vam-e2e-hrf'), true);
+  assert.equal(rendersInBackground('/x/vaults/vam-e2e-current'), false);
+  assert.equal(rendersInBackground('/x/vaults/vam-e2e-current/'), false);
+  assert.equal(rendersInBackground('/x/vaults/../vaults/vam-e2e-current'), false);
+});

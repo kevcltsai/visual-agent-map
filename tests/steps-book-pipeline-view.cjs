@@ -1091,7 +1091,7 @@ test('stop and restart: stop shows at gate 1 and gate 2 (not at done); a stopped
   assert.ok(!buttonsOf(gate1Stopped.bar).some(b => b.text === '方向對，開始寫'), 'a stopped gate 1 shows no confirm beside the three choices');
 });
 
-test('abandon: stopped, budget pause and done show the entry (放棄這本 / 移除圖文書); running and the waiting gates do not; the confirmation card has the notes-kept sentence, Cancel and confirm', () => {
+test('abandon: stopped, budget pause and done show the entry (放棄這本 / 改回一般心智圖); running and the waiting gates do not; the confirmation card has the notes-kept sentence, Cancel and confirm', () => {
   lang('zh-TW');
   const abandon = (asking = false) => { const log = []; return { log, abandon: { asking, ask: () => log.push('ask'), cancel: () => log.push('cancel'), confirm: () => log.push('confirm') } }; };
   const drawWith = (data, prog, a) => { const c = calls(); c.actions.abandon = a.abandon; c.actions.restart = () => undefined; const parent = dom.element('div'); return renderedBar(parent, data, prog, c); };
@@ -1104,8 +1104,8 @@ test('abandon: stopped, budget pause and done show the entry (放棄這本 / 移
   assert.ok(texts1.includes('放棄這本'));
   const budgetTexts = labelOf(bookData({ status: 'stopped', pauseReason: 'budget' }), progress({ status: 'stopped', active: false, pauseReason: 'budget' }))[0];
   assert.ok(budgetTexts.includes('放棄這本'));
-  assert.deepEqual(labelOf(bookData({ phase: 'done' }), progress({ phase: 'done', active: false }))[0].filter(x => x.includes('移除') || x.includes('放棄')), ['移除圖文書']);
-  for (const phase of ['writing', 'gate1', 'gate2']) assert.ok(!labelOf(bookData(phase === 'gate1' ? { phase, planReview: true } : { phase }), progress({ phase, active: phase !== 'gate1' }))[0].some(x => x === '放棄這本' || x === '移除圖文書'), phase);
+  assert.deepEqual(labelOf(bookData({ phase: 'done' }), progress({ phase: 'done', active: false }))[0].filter(x => x.includes('改回') || x.includes('放棄')), ['改回一般心智圖']);
+  for (const phase of ['writing', 'gate1', 'gate2']) assert.ok(!labelOf(bookData(phase === 'gate1' ? { phase, planReview: true } : { phase }), progress({ phase, active: phase !== 'gate1' }))[0].some(x => x === '放棄這本' || x === '改回一般心智圖'), phase);
   for (const data of [bookData({ status: 'stopped', phase: 'writing' }), bookData({ phase: 'done' })]) {
     const a = abandon(true);
     const bar = drawWith(data, progress({ phase: data.phase, status: data.status, active: false }), a);
@@ -1331,13 +1331,13 @@ test('toolbar writing: the AI numbers sit after the progress line and count the 
   assert.equal(span.text, 'AI 修正中 1・仍有問題 3', 'one needs-review card, one open in a, one open in the book proofread');
 });
 
-test('toolbar done: the sentence has the chapters, what the AI fixed and what is still open (card, chapter and book-level proofread); the buttons are 看仍有問題 and 移除圖文書; a map without a picture book draws nothing', async () => {
+test('toolbar done: the sentence has the chapters, what the AI fixed and what is still open (card, chapter and book-level proofread); the buttons are 看仍有問題 and 改回一般心智圖; a map without a picture book draws nothing', async () => {
   lang('zh-TW');
   const done = await gateRig({ phase: 'done', stages: { root: 'checked', a: 'checked', b: 'checked' } });
   done.view.map.bookPipeline.aiProof = { [done.ids.a]: aiSlot(true, 1, 2), [done.ids.b]: aiSlot(true, 0, 1) };
   done.view.map.bookPipeline.bookProof = aiSlot(true, 1, 2);
   const bar = done.drawBar();
-  assert.deepEqual(done.labels(bar), ['看仍有問題', '移除圖文書']);
+  assert.deepEqual(done.labels(bar), ['看仍有問題', '改回一般心智圖']);
   assert.ok(texts(bar).includes('3 章・AI 修了 5 處・仍有問題 2 項'), JSON.stringify(texts(bar)));
   for (const cls of ['vam-book-panel', 'vam-book-finish', 'vam-book-confirm', 'vam-book-gate1-ask']) assert.equal(dom.find(bar, i => i.cls.includes(cls)), undefined, cls);
   const plain = await harness({ book: false });

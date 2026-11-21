@@ -4613,7 +4613,7 @@ test('early redo: stop and resume during the redo never dispatch twice: one redo
   const running = r.runs.confirmGate1(r.mapPath);
   await settle();
   assert.equal(redoSeen(live, r.nodes[1].id).length, 1);
-    await r.runs.stop(r.mapPath);
+  await r.runs.stop(r.mapPath);
   hold.resolve(); await running.catch(() => undefined); await settle();
   const resumed = r.runs.resume(r.mapPath);
   await drain(r, gates); await resumed; await settle();
@@ -4655,7 +4655,7 @@ test('early redo: a card whose own proofread result is still being saved is not 
   assert.ok(live.stages.indexOf('needs-review') < live.stages.lastIndexOf('planned'), 'needs-review is written before the card goes back to planned');
 });
 
-test('early redo: the estimate counts a card whose redo is queued, and the redo\'s own time is a write sample', async () => {
+test('early redo: the estimate counts a card whose redo is queued', async () => {
   const stageGate = defer();
   const { r, live, gates } = await earlyRig({ count: 6, freeImages: true, stageGate });
   await r.runs.start(r.mapPath);

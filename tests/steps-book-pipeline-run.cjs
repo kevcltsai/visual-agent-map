@@ -4515,3 +4515,15 @@ test('picture work: stop while writes and searches are both in flight cancels bo
   assert.equal(s.status, 'stopped');
   for (let i = 0; i < 12; i++) assert.notEqual(stageOf(r.raw(i)), 'checked');
 });
+
+test('ai chapter: one failed card read does not end the chapter check; the read is tried once more', async () => {
+  let throws = 0;
+  const r = await aiRig({}, {
+    ports: { readCard: async path => { if (throws === 0 && path === r.nodes[1].path && /aiChapter/.test(new Error().stack)) { throws++; throw new Error('read boom'); } return r.__readCard(path); } } });
+  r.__readCard = path => r.repo.readNote(path).then(note => ({ path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: r.contents.get(path), settings: note.bookSettings ?? {}, fields: {} }));
+  await runToEnd(r);
+  assert.equal(throws, 1, 'the read failed once');
+  assert.equal(aiRuns(r, 'proof', 'SecretTitleA').length, 1, 'the chapter was still checked');
+  const slot = (await r.state()).aiProof[r.nodes[1].id];
+  assert.deepEqual([slot.done, slot.incomplete], [true, undefined]);
+});

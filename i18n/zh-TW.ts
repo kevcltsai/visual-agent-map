@@ -2616,7 +2616,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.settings_book_plan_desc": "全域與逐卡企劃。呼叫少、輸出短。",
   "ui.settings_book_write_name": "作者",
   "ui.settings_book_write_desc": "寫正文與找資料，影響成品品質。",
-  "ui.settings_book_image_name": "找圖",
+  "ui.settings_book_image_name": "找圖（含封面）",
   "ui.settings_book_image_desc": "替每章上網找圖，也負責起始確認卡的全書設定建議。用便宜模型即可。",
   "ui.settings_book_proof_name": "AI 校對（和作者不同）",
   "ui.settings_book_proof_desc":
@@ -3105,7 +3105,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_start_title": "把這張心智圖變成一本有圖的書",
   "ui.book_start_intro": "會依這張心智圖的主題與卡片，由 AI 企劃、寫作、找圖、校對每一章。",
   "ui.book_start_estimate_0_1_2_3":
-    "{0} 張卡 · 約 {1} · 最多 {2} 次 AI 呼叫（含 AI 校對和自動修正；步驟失敗重試另計；到 {3} 次會先停下）。",
+    "{0} 張卡 · 約 {1} · 最多 {2} 次 AI 呼叫（含 AI 校對、自動修正和封面圖；步驟失敗重試另計；到 {3} 次會先停下）。",
   "ui.book_start_under_minute": "不到 1 分鐘",
   "ui.book_start_minutes_0": "{0} 分鐘",
   "ui.book_start_stops": "只會停一次：企劃好後讓你看全書方向。校對全部由 AI 做，你不用改稿。",
@@ -3209,9 +3209,9 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_bar_plan_ready_struct_0": "前言、{0} 章都企劃好了",
   "ui.book_progress_line_plan_cards_0_1": "正在企劃第 {0}／{1} 張卡",
   "ui.book_start_estimate_struct_0_1_2_3_4_5":
-    "前言 + {0} 章 + {1} 節（{2} 張卡）· 約 {3} · 最多 {4} 次 AI 呼叫（含 AI 校對和自動修正；步驟失敗重試另計；到 {5} 次會先停下）。",
+    "前言 + {0} 章 + {1} 節（{2} 張卡）· 約 {3} · 最多 {4} 次 AI 呼叫（含 AI 校對、自動修正和封面圖；步驟失敗重試另計；到 {5} 次會先停下）。",
   "ui.book_start_estimate_struct_0_1_2_3_4":
-    "前言 + {0} 章（{1} 張卡）· 約 {2} · 最多 {3} 次 AI 呼叫（含 AI 校對和自動修正；步驟失敗重試另計；到 {4} 次會先停下）。",
+    "前言 + {0} 章（{1} 張卡）· 約 {2} · 最多 {3} 次 AI 呼叫（含 AI 校對、自動修正和封面圖；步驟失敗重試另計；到 {4} 次會先停下）。",
   "ui.book_summary_done": "實際講了：",
   "ui.book_issue_0": "需人看：{0}",
   "ui.book_issue_unknown": "需要人工查看（原因代碼無法辨識）。",

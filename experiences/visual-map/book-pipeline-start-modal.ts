@@ -40,6 +40,12 @@ export const BOOK_IMAGE_SEARCHES = 2;
 /** Each picture search may be asked once more when its captions come back in another language. */
 export const BOOK_IMAGE_CALLS_PER_SEARCH = 2;
 
+/**
+ * The most AI calls a cover can add to a whole run: chapters and sections add none (the cover rides in the first picture search the card
+ * already makes); the book's own cover adds one search and its caption-language retry, and only when the root card has no picture slots.
+ */
+export const BOOK_COVER_CALLS = 2;
+
 export { BOOK_EXPAND_PASSES };
 
 /**
@@ -103,10 +109,14 @@ export function bookStartEstimate(cards: number, trialCards: number, models?: Bo
   const rounds = Math.ceil(trial / BOOK_POOL) + Math.ceil((n - trial) / BOOK_POOL);
   return {
     cards: n,
-    // The whole-book plan and proofread, and every chapter's calls: an upper bound.
-    calls: bookWholeCalls(n) + n * (per.plan + per.write + per.images + per.proof + per.aiProof),
+    // The whole-book plan and proofread, every chapter's calls and the book cover's headroom: an upper bound.
+    calls:
+      bookWholeCalls(n) +
+      n * (per.plan + per.write + per.images + per.proof + per.aiProof) +
+      (n >= 1 ? BOOK_COVER_CALLS : 0),
     limit: DEFAULT_BUDGET_LIMIT,
-    seconds: time("global") + rounds * perCard + (n >= 2 ? aiProof : 0)
+    // The root's cover search (one picture search) comes on top of the plan.
+    seconds: time("global") + rounds * perCard + (n >= 2 ? aiProof : 0) + (n >= 1 ? time("images") : 0)
   };
 }
 export function bookStartEstimateText(

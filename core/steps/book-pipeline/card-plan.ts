@@ -233,7 +233,7 @@ export function parseCardPlan(raw: string, request: CardPlanRequest): CardPlanRe
     const one = recordOf(item.cover, "cover");
     exactKeys(one, "search" in one ? ["explains", "search"] : ["explains"]);
     const explains = cleanSlotText(singleLine(textOf(one.explains, "cover explains"), 400), 200);
-    if (!explains) fail("cover explains must be a non-empty string");
+    if (!explains) fail("cover explains is empty");
     cover = { explains, search: Array.isArray(one.search) ? cleanSearchTerms(one.search) : [] };
   }
   const side = (value: unknown, present: boolean, what: string): string =>

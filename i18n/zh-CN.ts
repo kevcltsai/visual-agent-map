@@ -2616,7 +2616,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.settings_book_plan_desc": "全局与逐卡企划。调用少、输出短。",
   "ui.settings_book_write_name": "作者",
   "ui.settings_book_write_desc": "写正文与找资料，影响成品质量。",
-  "ui.settings_book_image_name": "找图",
+  "ui.settings_book_image_name": "找图（含封面）",
   "ui.settings_book_image_desc": "为每章上网找图，也负责起始确认卡的全书设置建议。用便宜模型即可。",
   "ui.settings_book_proof_name": "AI 校对（和作者不同）",
   "ui.settings_book_proof_desc":
@@ -3104,7 +3104,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_start_title": "把这张思维导图变成一本有图的书",
   "ui.book_start_intro": "会依这张思维导图的主题与卡片，由 AI 企划、写作、找图、校对每一章。",
   "ui.book_start_estimate_0_1_2_3":
-    "{0} 张卡 · 约 {1} · 最多 {2} 次 AI 调用（含 AI 校对和自动修正；步骤失败重试另计；到 {3} 次会先停下）。",
+    "{0} 张卡 · 约 {1} · 最多 {2} 次 AI 调用（含 AI 校对、自动修正和封面图；步骤失败重试另计；到 {3} 次会先停下）。",
   "ui.book_start_under_minute": "不到 1 分钟",
   "ui.book_start_minutes_0": "{0} 分钟",
   "ui.book_start_stops": "只会停一次：企划好后让你看全书方向。校对全部由 AI 做，你不用改稿。",
@@ -3207,9 +3207,9 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_bar_plan_ready_struct_0": "前言、{0} 章都企划好了",
   "ui.book_progress_line_plan_cards_0_1": "正在企划第 {0}／{1} 张卡",
   "ui.book_start_estimate_struct_0_1_2_3_4_5":
-    "前言 + {0} 章 + {1} 节（{2} 张卡）· 约 {3} · 最多 {4} 次 AI 调用（含 AI 校对和自动修正；步骤失败重试另计；到 {5} 次会先停下）。",
+    "前言 + {0} 章 + {1} 节（{2} 张卡）· 约 {3} · 最多 {4} 次 AI 调用（含 AI 校对、自动修正和封面图；步骤失败重试另计；到 {5} 次会先停下）。",
   "ui.book_start_estimate_struct_0_1_2_3_4":
-    "前言 + {0} 章（{1} 张卡）· 约 {2} · 最多 {3} 次 AI 调用（含 AI 校对和自动修正；步骤失败重试另计；到 {4} 次会先停下）。",
+    "前言 + {0} 章（{1} 张卡）· 约 {2} · 最多 {3} 次 AI 调用（含 AI 校对、自动修正和封面图；步骤失败重试另计；到 {4} 次会先停下）。",
   "ui.book_summary_done": "实际讲了：",
   "ui.book_issue_0": "需人看：{0}",
   "ui.book_issue_unknown": "需要人工查看（原因代码无法识别）。",

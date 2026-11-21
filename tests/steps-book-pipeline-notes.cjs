@@ -13,7 +13,7 @@ export * from "./experiences/visual-map/book-pipeline-notes";
 export * from "./experiences/visual-map/book-pipeline-notes-ui";
 export { createNoteWriter } from "./experiences/visual-map/book-pipeline-callouts";
 export { countNotes, wrapNote } from "./core/book-pipeline/book-notes";
-export { reviewCallout, trialCallout, putProgramCallout } from "./experiences/visual-map/book-pipeline-review";
+export { putProgramCallout } from "./experiences/visual-map/book-pipeline-review";
 export { setUiLanguage } from "./i18n";
 `, { obsidian: { ...S.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice(log), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
 b.setUiLanguage('zh-TW');

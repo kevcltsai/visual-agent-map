@@ -4713,6 +4713,7 @@ test('ai chapter: one failed card read does not end the chapter check; the read 
 
 // ---- the chief editor's pass over the plans (every card planned, one call, before gate 1) ----
 const promptOf = async (r, i) => (await r.note(i)).prompt;
+const CL = [{ type: 'structure', text: 'names the earlier ideas "X" and "Y" and states that they lead to "Z"' }];
 const coversLine = prompt => /^本章會講[:：].*$/m.exec(prompt)?.[0];
 
 test('plan edit: one call sees every card; a change rewrites only the named card\'s Prompt and keeps its other lines and the others untouched', async () => {
@@ -4722,22 +4723,24 @@ test('plan edit: one call sees every card; a change rewrites only the named card
   for (let i = 0; i < 3; i++) before.push(await promptOf(plainRig, i));
   assert.equal(plainRig.stat.planEdit.length, 1, 'the pass is one call');
   assert.deepEqual([...plainRig.stat.planEdit[0].cards.map(c => c.title)], TITLES, 'it reads every card, in reading order');
-  const r = await rig({ script: { planEdit: request => [{ id: request.cards[1].id, covers: 'edited covers', previous: 'edited previous' }] } });
+  const r = await rig({ script: { planEdit: request => [{ id: request.cards[1].id, covers: 'edited covers', previous: 'edited previous', checklist: CL }] } });
   await r.runs.start(r.mapPath);
   const s = await r.state();
   assert.equal(s.phase, 'gate1'); assert.equal(s.planEdited, true);
-  assert.equal(await promptOf(r, 0), before[0]); assert.equal(await promptOf(r, 2), before[2]);
+  assert.equal(await promptOf(r, 0), before[0].replace('SecretTitleA — n', 'SecretTitleA — edited covers'), 'the card before: only its next line follows the new covers');
+  assert.equal(await promptOf(r, 2), before[2], 'the card after: its previous sentence (the plan\'s own) is untouched');
   const after = await promptOf(r, 1);
   assert.match(after, /本章會講[:：]\s*edited covers/);
   assert.match(after, /edited previous/);
-  assert.equal(after.replace('edited covers', 'covers 2').replace('edited previous', 'p'), before[1], 'every other line is carried over');
+  assert.deepEqual([...parseChecklist(after).map(c => c.text)], CL.map(c => c.text), 'the checklist is the replacement');
+  assert.equal(after.replace('edited covers', 'covers 2').replace('edited previous', 'p').replace(CL[0].text, 'has a beginning'), before[1].replace(/\n- C2 .*/, ''), 'every other line is carried over');
   assert.equal(r.runs.isRunning(r.mapPath), false);
   assert.ok(r.stat.logs.some(line => /plan_edit/.test(line) && /ok/.test(line)));
 });
 
 test('plan edit: a Prompt the owner edited while the call ran is not overwritten', async () => {
   const holder = {};
-  const r = await rig({ script: { planEdit: async request => { await holder.r.repo.updateNoteGuarded(holder.r.nodes[1].path, { prompt: 'the owner wrote this' }, {}); return [{ id: request.cards[1].id, covers: 'edited covers' }, { id: request.cards[2].id, covers: 'edited covers' }]; } } });
+  const r = await rig({ script: { planEdit: async request => { await holder.r.repo.updateNoteGuarded(holder.r.nodes[1].path, { prompt: 'the owner wrote this' }, {}); return [{ id: request.cards[1].id, covers: 'edited covers', checklist: CL }, { id: request.cards[2].id, covers: 'edited covers', checklist: CL }]; } } });
   holder.r = r;
   await r.runs.start(r.mapPath);
   assert.equal(await promptOf(r, 1), 'the owner wrote this');
@@ -4749,7 +4752,7 @@ test('plan edit: a stop during the call writes nothing and sets no flag; the pas
   const hold = defer();
   const holder = {};
   let first = true;
-  const r = await rig({ script: { planEdit: async request => { if (first) { first = false; await hold.promise; } return [{ id: request.cards[1].id, covers: 'edited covers' }]; } } });
+  const r = await rig({ script: { planEdit: async request => { if (first) { first = false; await hold.promise; } return [{ id: request.cards[1].id, covers: 'edited covers', checklist: CL }]; } } });
   holder.r = r;
   const started = r.runs.start(r.mapPath);
   await settle();
@@ -4795,4 +4798,45 @@ test('plan edit: a reload of the same planning run does not call the pass again;
   // a replan clears the flag
   await again.retryTrial(r.mapPath); await settle();
   assert.equal(r.stat.planEdit.length, 2, 'the replan runs the pass again');
+});
+
+test('plan edit: a book whose plans do not fit one request is refused before any call (plans_too_long), the attempts are used up and the book goes on to gate 1', async () => {
+  const titles = Array.from({ length: 40 }, (_, i) => `Card ${i}`);
+  const long = n => `${'x'.repeat(380)}${n}`;
+  const r = await rig({ titles, script: { card: () => ({ covers: long(1), entry: long(2), handoff: long(3), previous: long(4), next: long(5), checklist: Array.from({ length: 8 }, (_, i) => ({ id: `C${i + 1}`, type: 'structure', text: long(i) })) }) } });
+  await r.runs.start(r.mapPath);
+  const s = await r.state();
+  assert.equal(r.stat.planEdit.length, 0, 'no call was made');
+  assert.ok(r.stat.logs.some(line => line.includes('plan_refused') && line.includes('plans_too_long')), 'logged');
+  assert.equal(s.planEditAttempts, 3); assert.equal(s.planEdited, true); assert.equal(s.phase, 'gate1'); assert.equal(s.status, 'running');
+  assert.ok(r.stat.logs.some(line => /plan_edit/.test(line) && /failed:/.test(line)));
+  assert.equal(s.budget.used, 1 + 40, 'the refused attempts cost no call');
+});
+
+test('plan edit: a change to covers, points or previous without its replacement checklist is not applied and counted rejected; the other changes still apply', async () => {
+  const r = await rig({ script: { planEdit: request => [{ id: request.cards[1].id, covers: 'edited covers' }, { id: request.cards[2].id, entry: 'edited entry', checklist: CL }] } });
+  await r.runs.start(r.mapPath);
+  const before = await rig();
+  await before.runs.start(before.mapPath);
+  assert.equal(await promptOf(r, 1), await promptOf(before, 1), 'the card with the bare covers change is as planned');
+  assert.equal(await promptOf(r, 0), await promptOf(before, 0), 'and its neighbour line is not refreshed');
+  assert.equal((await r.note(1)).summary, 'covers 2', 'the summary stays too');
+  const two = await promptOf(r, 2);
+  assert.match(two, /edited entry/); assert.deepEqual([...parseChecklist(two).map(c => c.text)], ['has a beginning', 'has an end'], 'a checklist without covers/points/previous changes is ignored');
+  assert.ok(r.stat.logs.some(line => /plan_edit/.test(line) && /"rejected":1|rejected[=:]1/.test(line)), r.stat.logs.filter(l => /plan_edit/.test(l)).join('|'));
+  assert.equal((await r.state()).planEdited, true);
+});
+
+test('plan edit: new covers also set the map summary; a locked card (kept, hand-edited) is marked in the request and its change is dropped', async () => {
+  const r = await rig({ script: { planEdit: request => request.cards.slice(1).map(card => ({ id: card.id, covers: `edited ${card.title}`, checklist: CL })) } });
+  const RESEARCH = '### 核心結論\n\n這是讀者自己的研究正文。';
+  await r.repo.updateNoteGuarded(r.nodes[2].path, { detail: RESEARCH }, {});
+  const before2 = await promptOf(r, 2);
+  await r.runs.start(r.mapPath);
+  const request = r.stat.planEdit[0];
+  assert.deepEqual([...request.cards.map(c => !!c.locked)], [false, false, true], 'only the hand-written card is locked');
+  assert.equal((await r.note(1)).summary, 'edited SecretTitleA', 'the summary follows the covers like the plan step writes it');
+  assert.match(await promptOf(r, 1), /本章會講[:：]\s*edited SecretTitleA/);
+  assert.equal(await promptOf(r, 2), before2, 'the locked card keeps its plan');
+  assert.equal((await r.note(2)).summary, 'summary of SecretTitleB', 'and its summary');
 });

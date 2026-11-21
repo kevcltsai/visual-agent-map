@@ -4,13 +4,14 @@ Return only the cards that need a change, so that the briefs fit together:
 - Each subject is owned by exactly one card. Where two briefs cover the same thing, move it to the card it belongs to or drop it from the other (change covers or points). A chapter's own subject is never a heading of the preface or of another chapter.
 - The preface (role intro) covers the question the whole book answers, why these concepts are needed and how they connect, one line of route per chapter, and how to read the book. No body chapter or section previews the whole book's route; a chapter looks only at its own subject.
 - No two cards open with the same scene or example. Rewrite the entry of the later card so it grows from that card's own subject.
-- Each previous names real ideas that earlier cards establish (check them against the earlier briefs) and the one new idea this card adds. An empty previous stays empty.
+- Each previous names real ideas that earlier cards establish (check them against the earlier briefs) and the one new idea this card adds. An empty previous stays empty. previous and next are shown as the sentence only (the neighbour's number and title are the neighbouring cards'); write previous as a sentence too, without a number or a title.
 - The last card's handoff answers the question the preface opened with, from the ideas the chapters built.
 
 Rules for a change:
 - Do not add, drop, rename, reorder or re-role cards, and do not touch pictures. Use only the ids given.
+- A card marked "locked":true must not change: return no change for it, and do not move a subject onto a locked card or off it (leave a subject that a locked card covers where it is, and do not add to it a subject it lacks).
 - A card that is fine as it is does not appear. Prefer the smallest change; do not rewrite a field that has no problem.
-- Every field except id is optional; leave a field out (or write an empty string) to keep it as it is. A field you return replaces the whole field. points is the complete list of {{pointsMin}} to {{pointsMax}} headings, each a short line of at most {{pointMax}} characters without the character "·". checklist is returned only together with points, and is then the complete replacement list.
+- Every field except id is optional; leave a field out (or write an empty string) to keep it as it is. A field you return replaces the whole field. points is the complete list of {{pointsMin}} to {{pointsMax}} headings, each a short line of at most {{pointMax}} characters without the character "·". When you change covers, points or previous, you must also return the full replacement checklist that matches the new briefs (a change without it is discarded): 2 to 8 items, the same rules as the card briefs follow (structure or fact only, each checkable by quoting the chapter's text; when previous is not empty, one structure item: the chapter names the earlier ideas "X" and "Y" and states that they lead to "Z"; for the last card, one structure item: the closing paragraph answers the book's opening question by combining the ideas the chapters built). A checklist returned without a change to covers, points or previous is ignored.
 - A checklist item is one objectively checkable statement about the finished chapter with a type: structure (shape, scope or coverage, checkable from its text alone by quoting it) or fact (a concrete claim that outside sources can confirm). Nothing subjective, about style or tone, or about pictures. Do not number the items.
 - Use plain single-line text in every field and no Markdown. Use only numbers and links that appear in the supplied text.
 
@@ -29,5 +30,5 @@ Whole-book thread (JSON string):
 Whole-book settings (JSON object):
 {{settings}}
 
-Every card in reading order (JSON array of {id,place,role,title,covers,points,entry,handoff,previous,next,checklist}):
+Every card in reading order (JSON array of {id,place,role,title,covers,points,entry,handoff,previous,next,checklist,locked?}):
 {{cards}}

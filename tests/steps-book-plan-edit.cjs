@@ -59,6 +59,32 @@ test('plan edit machine: a stop gives the attempt back and sets no flag; a budge
   assert.equal(budget.status, 'stopped'); assert.equal(budget.pauseReason, 'budget');
 });
 
+test('plan edit machine accounting: applyPlanEditStopped gives back one attempt of several and keeps the flag unset; a stale or foreign token for it', () => {
+  let state = fresh();
+  const first = begin(state);
+  state = machine.applyPlanEditFailure(first.state, first.token).state;
+  const second = begin(state);
+  assert.equal(second.state.planEditAttempts, 2);
+  const stopped = machine.applyPlanEditStopped(second.state, second.token, false);
+  assert.equal(stopped.accepted, true);
+  assert.equal(stopped.state.planEditAttempts, 1, 'only the stopped attempt is given back');
+  assert.equal(stopped.state.status, 'running'); assert.equal(stopped.state.planEdited, undefined);
+  assert.equal(machine.applyPlanEditStopped(second.state, { ...second.token, runId: 'other' }, true).accepted, false, 'another run: refused');
+  assert.equal(machine.applyPlanEditStopped(stopped.state, second.token, false).state.planEditAttempts, undefined, 'never below zero');
+});
+
+test('plan edit machine accounting: applyPlanEditFailure counts up to three, gives up only on the last, and drops a stale result', () => {
+  let state = fresh();
+  const one = begin(state);
+  const failed = machine.applyPlanEditFailure(one.state, one.token);
+  assert.equal(failed.accepted, true); assert.equal(failed.gaveUp, undefined); assert.equal(failed.state.planEdited, undefined);
+  assert.equal(failed.state.planEditAttempts, 1, 'a failure does not change the count (it was counted at the start)');
+  const stale = machine.applyPlanEditFailure(one.state, { ...one.token, stopEpoch: one.token.stopEpoch + 1 });
+  assert.equal(stale.accepted, false); assert.equal(stale.state, one.state);
+  const done = machine.applyPlanEditSuccess(one.state, one.token).state;
+  assert.equal(machine.applyPlanEditFailure(done, one.token).accepted, false, 'after the flag is set a late failure is dropped');
+});
+
 test('plan edit machine: a result under an older stop generation or older card revisions is dropped', () => {
   const state = fresh();
   const d = begin(state);
@@ -136,13 +162,48 @@ test('plan edit step parse: valid changes kept in order; unknown ids, bad shapes
   assert.deepEqual(plain(step.planEditStep.parse('{"changes":[]}', request())), []);
 });
 
-test('plan edit step parse: a points list that is too short drops the change; a checklist without new points is ignored or drops; malformed replies throw', () => {
+test('plan edit step parse: a points list that is too short drops the change; a checklist without a new covers, points or previous is ignored; malformed replies throw', () => {
   const parse = changes => plain(step.planEditStep.parse(JSON.stringify({ changes }), request()));
   assert.deepEqual(parse([{ id: 'b', points: ['one'] }]), []);
   assert.deepEqual(parse([{ id: 'b', checklist: [{ type: 'fact', text: 'x' }] }]), []);
+  assert.deepEqual(parse([{ id: 'b', entry: 'e2', checklist: [{ type: 'fact', text: 'x' }] }]), [{ id: 'b', entry: 'e2' }], 'an entry change leaves the checklist alone');
   assert.throws(() => step.planEditStep.parse('not json', request()));
   assert.throws(() => step.planEditStep.parse('{"changes":[],"extra":1}', request()), /unexpected/);
   assert.throws(() => step.planEditStep.parse('{"changes":"x"}', request()));
+});
+
+test('plan edit step parse: a checklist replaces the whole list when covers, points or previous change; without one the change is flagged by changesBrief', () => {
+  const parse = changes => plain(step.planEditStep.parse(JSON.stringify({ changes }), request()));
+  const list = [{ type: 'structure', text: 'names the earlier ideas "X" and "Y" and states that they lead to "Z"' }];
+  for (const field of [{ covers: 'new' }, { previous: 'new prev' }, { points: ['one', 'two', 'three'] }]) {
+    const [out] = parse([{ id: 'b', ...field, checklist: list }]);
+    assert.deepEqual(out.checklist, list, JSON.stringify(field));
+    assert.equal(step.changesBrief(out), true);
+  }
+  const [bare] = parse([{ id: 'b', covers: 'new' }]);
+  assert.equal(bare.checklist, undefined); assert.equal(step.changesBrief(bare), true, 'the runner discards it');
+  const [emptied] = parse([{ id: 'b', covers: 'new', checklist: [{ type: 'structure', text: 'the prose is vivid' }] }]);
+  assert.equal(emptied.checklist, undefined, 'a list the filter empties is no replacement');
+  assert.equal(step.changesBrief({ id: 'b', entry: 'x' }), false);
+});
+
+test('plan edit step: a locked card is marked in the request and its changes are dropped; the prompt tells the editor so', () => {
+  const locked = request([card('a', 'intro'), card('b', 'body', { locked: true }), card('c', 'body')]);
+  const prompt = step.planEditStep.render(locked);
+  assert.match(prompt, /"id":"b"[^}]*"locked":true/);
+  assert.doesNotMatch(prompt, /"id":"a"[^}]*"locked"/);
+  assert.match(prompt, /locked.*must not change/);
+  const out = plain(step.planEditStep.parse(JSON.stringify({ changes: [{ id: 'b', entry: 'x' }, { id: 'c', entry: 'y' }] }), locked));
+  assert.deepEqual(out.map(c => c.id), ['c']);
+});
+
+test('plan edit step: previous and next are shown as the sentence only (readBrief)', () => {
+  const prompt = planText.composeCardPrompt(base, 'zh-TW');
+  assert.equal(readBrief(prompt).previous, 'old prev');
+  assert.equal(readBrief(prompt).next, 'a next');
+  const section = planText.composeCardPrompt({ ...base, kind: 'section', previous: { title: 'Sec One', summary: 'sec prev' }, parent: { position: 2, title: 'Chapter Two' } }, 'en');
+  assert.equal(readBrief(section).previous, 'sec prev');
+  assert.equal(readBrief(planText.composeCardPrompt({ ...base, previous: undefined }, 'en')).previous, '');
 });
 
 // ---- editedPrompt ----
@@ -187,4 +248,31 @@ test('editedPrompt: a section keeps its parent line; a card with no previous lin
   assert.doesNotMatch(out, /invented/);
   assert.equal(readBrief(out).handoff, 'new handoff');
   assert.equal(editedPrompt(prompt, { previous: 'invented' }, 'section', 'en'), undefined, 'only an ignored change: nothing to write');
+});
+
+test('editedPrompt: a previous reply that echoes the whole neighbour line is stored as the sentence only (chapter, preface, section)', () => {
+  const prompt = planText.composeCardPrompt(base, 'en');
+  const out = editedPrompt(prompt, { previous: '(1) First — new idea' }, 'chapter', 'en');
+  assert.match(out, /^Previous chapter: \(1\) First — new idea$/m);
+  assert.doesNotMatch(out, /First — \(1\)|First — First/);
+  const preface = planText.composeCardPrompt({ ...base, previous: { position: 'preface', title: 'Intro', summary: 'old' } }, 'zh-TW');
+  const outPreface = editedPrompt(preface, { previous: '(前言) Intro — 新的想法' }, 'chapter', 'zh-TW');
+  assert.match(outPreface, /\(前言\) Intro — 新的想法$/m); assert.equal((outPreface.match(/Intro/g) ?? []).length, 1);
+  const sec = planText.composeCardPrompt({ ...base, kind: 'section', parent: { position: 2, title: 'Chapter Two' }, previous: { title: 'Sec One', summary: 'old' } }, 'en');
+  const outSec = editedPrompt(sec, { previous: 'Sec One — a fresh idea' }, 'section', 'en');
+  assert.match(outSec, /Sec One — a fresh idea$/m); assert.equal((outSec.match(/Sec One/g) ?? []).length, 1);
+  const plainReply = editedPrompt(prompt, { previous: 'a sentence with a — dash' }, 'chapter', 'en');
+  assert.match(plainReply, /First — a sentence with a — dash$/m, 'a sentence that is not the line is kept whole');
+});
+
+test('editedPrompt: a zh-CN Prompt round trips unchanged and an edit keeps its labels and the other lines', () => {
+  const prompt = planText.composeCardPrompt(base, 'zh-CN');
+  assert.equal(editedPrompt(prompt, {}, 'chapter', 'zh-CN'), undefined, 'nothing to write');
+  assert.equal(readBrief(prompt).covers, 'old covers');
+  const out = editedPrompt(prompt, { covers: 'new covers', handoff: 'new handoff' }, 'chapter', 'zh-CN');
+  assert.ok(out);
+  assert.equal(readBrief(out).covers, 'new covers'); assert.equal(readBrief(out).handoff, 'new handoff');
+  assert.equal(readBrief(out).entry, 'old entry');
+  assert.equal(out.replace('new covers', 'old covers').replace('new handoff', 'old handoff'), prompt, 'only the two fields moved');
+  assert.deepEqual(plain(planText.parseImageSlots(out)), plain(planText.parseImageSlots(prompt)));
 });

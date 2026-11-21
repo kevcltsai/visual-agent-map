@@ -800,14 +800,16 @@ test('start card: the estimate counts every step of a chapter (plan, write and i
   const owner = { plan: 'claude:opus', write: 'claude:sonnet', images: 'claude:haiku', proof: 'claude:sonnet' };
   const aiProof = 19 + 2 * (63 + 19);
   const perCard = 20 + 2 * (63 + 19) + 2 * 55 + 2 * 63 + aiProof;
-  assert.equal(start.bookStartEstimate(15, 3, owner).seconds, 20 + 4 * perCard + aiProof);
-  assert.equal(start.bookStartEstimate(15, 3).seconds, 20 + 4 * perCard + aiProof, 'no models: the measured ones');
+  assert.equal(start.bookStartEstimate(15, 3, owner).seconds, 20 + 20 + 4 * perCard + aiProof);
+  assert.equal(start.bookStartEstimate(15, 3).seconds, 20 + 20 + 4 * perCard + aiProof, 'no models: the measured ones');
   // Another model scales its step: Sonnet for pictures doubles the picture time.
   assert.equal(start.bookStartEstimate(1, 3, { ...owner, images: 'claude:sonnet' }).seconds, 20 + 20 + 2 * (63 + 19) + 2 * 110 + 2 * 63 + aiProof);
   assert.equal(JSON.stringify(start.bookStartEstimate(0, 3)), JSON.stringify({ cards: 0, calls: 1, limit: 300, seconds: 20 }));
+  // The chief editor's one pass over the plans (three cards or more) is timed like one plan call; below three cards it adds nothing (two cards: none).
+  assert.equal(start.bookStartEstimate(3, 3, owner).seconds - start.bookStartEstimate(2, 2, owner).seconds, 20, 'a third card adds the plan edit (same rounds) and nothing else');
   // Rounds: the trial in rounds of five, then the rest in rounds of five (BOOK_POOL = 5).
-  assert.equal(start.bookStartEstimate(10, 4, owner).seconds, 20 + (1 + 2) * perCard + aiProof, '4 trial cards: 1 round; 6 more: 2 rounds');
-  assert.equal(start.bookStartEstimate(10, 10, owner).seconds, 20 + 2 * perCard + aiProof, '10 trial cards: 2 rounds');
+  assert.equal(start.bookStartEstimate(10, 4, owner).seconds, 20 + 20 + (1 + 2) * perCard + aiProof, '4 trial cards: 1 round; 6 more: 2 rounds');
+  assert.equal(start.bookStartEstimate(10, 10, owner).seconds, 20 + 20 + 2 * perCard + aiProof, '10 trial cards: 2 rounds');
   lang('zh-TW');
   assert.equal(start.bookStartEstimateText(start.bookStartEstimate(15, 3)), '15 張卡 · 約 44 分鐘 · 最多 247 次 AI 呼叫（含 AI 校對、自動修正和封面圖；步驟失敗重試另計；到 300 次會先停下）。');
   lang('en');

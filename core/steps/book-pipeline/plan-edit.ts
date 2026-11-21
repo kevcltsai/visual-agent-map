@@ -30,6 +30,8 @@ export interface PlanEditCard {
   previous: string;
   next: string;
   checklist: readonly string[];
+  /** True = the card's plan is not the program's to change (kept or hand-edited, or no readable plan): the editor leaves it alone. */
+  locked?: boolean;
 }
 export interface PlanEditRequest extends BookStepBase {
   bookTitle: string;
@@ -103,7 +105,8 @@ const shown = (card: PlanEditCard): Rec => ({
   handoff: cap(card.handoff, PLAN_EDIT_TEXT_CHARS),
   previous: cap(card.previous, PLAN_EDIT_TEXT_CHARS),
   next: cap(card.next, PLAN_EDIT_TEXT_CHARS),
-  checklist: card.checklist.slice(0, MAX_CHECKLIST).map(item => cap(item, PLAN_EDIT_CHECK_CHARS))
+  checklist: card.checklist.slice(0, MAX_CHECKLIST).map(item => cap(item, PLAN_EDIT_CHECK_CHARS)),
+  ...(card.locked ? { locked: true } : {})
 });
 const render = (request: PlanEditRequest): string =>
   renderTemplate(template, {
@@ -122,6 +125,10 @@ export const planEditFits = (request: PlanEditRequest): boolean =>
 
 const text = (value: unknown, max: number): string | undefined =>
   typeof value === "string" ? cap(value, max) : undefined;
+
+/** A change to covers, points or previous leaves the old checklist describing the old ideas: it must come with its replacement. */
+export const changesBrief = (change: PlanEditChange): boolean =>
+  change.covers !== undefined || change.points !== undefined || change.previous !== undefined;
 
 /** One change, or undefined when its shape is wrong (the change is dropped, never the reply). */
 function parseChange(entry: unknown, known: ReadonlySet<string>): PlanEditChange | undefined {
@@ -144,7 +151,7 @@ function parseChange(entry: unknown, known: ReadonlySet<string>): PlanEditChange
       change.points = points.slice(0, MAX_POINTS);
     }
   }
-  // A checklist belongs to the points it was written for: one that comes without new points is ignored.
+  // A checklist belongs to the ideas it was written for: it is kept only with a new covers, points or previous (and then replaces the whole list).
   if (item.checklist !== undefined) {
     if (!Array.isArray(item.checklist)) return undefined;
     const list: { type: ChecklistType; text: string }[] = [];
@@ -156,8 +163,7 @@ function parseChange(entry: unknown, known: ReadonlySet<string>): PlanEditChange
       if (!body) return undefined;
       if (!SUBJECTIVE.test(body) && !unconditionalPicture(body)) list.push({ type: one.type, text: body });
     }
-    if (change.points && list.length) change.checklist = list.slice(0, MAX_CHECKLIST);
-    else if (change.points) return undefined;
+    if (changesBrief(change) && list.length) change.checklist = list.slice(0, MAX_CHECKLIST);
   }
   return Object.keys(change).length > 1 ? change : undefined;
 }
@@ -169,7 +175,7 @@ function parseChange(entry: unknown, known: ReadonlySet<string>): PlanEditChange
 export function parsePlanEdit(raw: string, request: PlanEditRequest): PlanEditChange[] {
   const value = parseJson(raw);
   if (Object.keys(value).length !== 1 || !("changes" in value)) fail("The reply has unexpected fields");
-  const known = new Set(request.cards.map(card => card.id));
+  const known = new Set(request.cards.filter(card => !card.locked).map(card => card.id));
   const seen = new Set<string>();
   const out: PlanEditChange[] = [];
   for (const entry of arrayOf(value.changes, "changes")) {

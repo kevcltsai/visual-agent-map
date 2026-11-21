@@ -116,7 +116,7 @@ export function bookStartEstimate(cards: number, trialCards: number, models?: Bo
     // The whole-book plan and proofread, and every chapter's calls: an upper bound.
     calls: bookWholeCalls(n) + n * (per.plan + per.write + per.images + per.proof + per.aiProof),
     limit: DEFAULT_BUDGET_LIMIT,
-    seconds: time("global") + rounds * perCard + (n >= 2 ? aiProof : 0)
+    seconds: time("global") + (n >= PLAN_EDIT_MIN_CARDS ? time("plan") : 0) + rounds * perCard + (n >= 2 ? aiProof : 0)
   };
 }
 export function bookStartEstimateText(

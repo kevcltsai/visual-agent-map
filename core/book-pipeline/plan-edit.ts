@@ -29,7 +29,8 @@ export interface PromptBrief {
 }
 export function readBrief(prompt: string): PromptBrief {
   const lines = parseCardPrompt(prompt);
-  const side = (value: string | undefined): string => (value && !NONE.test(value.trim()) ? value : "");
+  // A neighbour line shows only its sentence: the position and title are the neighbour's own and are not the plan's to edit.
+  const side = (value: string | undefined): string => neighbourOf(value)?.summary ?? "";
   return {
     covers: lines.covers ?? "",
     points: parseCardPoints(prompt) ?? [],
@@ -53,6 +54,16 @@ function neighbourOf(value: string | undefined, sentence?: string): NeighbourCar
   const old = at < 0 ? "" : body.slice(at + 3);
   const where = m ? (/^\d+$/.test(m[1].trim()) ? Number(m[1].trim()) : "preface") : undefined;
   return { ...(where === undefined ? {} : { position: where }), title, summary: sentence ?? old };
+}
+
+/**
+ * A returned previous sentence without the neighbour's own heading: a model that echoes the whole line (`(1) Title — sentence`,
+ * `(前言) Title — sentence`, `Title — sentence`) is read as the sentence only. Only the line's own title is stripped.
+ */
+function bareSentence(value: string, title: string): string {
+  const text = value.trim();
+  const body = POSITION.exec(text)?.[2] ?? text;
+  return title && body.startsWith(`${title} — `) ? body.slice(title.length + 3).trim() : text;
 }
 
 /** The language the Prompt's own labels are written in (an edit never flips them); `fallback` when it cannot tell. */
@@ -91,7 +102,9 @@ export function editedPrompt(
   const checklist: ChecklistItem[] = change.checklist?.length
     ? change.checklist.map((item, at) => ({ id: `C${at + 1}`, ...item }))
     : brief.checklist;
-  const previous = neighbourOf(lines.previous, change.previous || undefined);
+  const old = neighbourOf(lines.previous);
+  const sentence = old && change.previous ? bareSentence(change.previous, old.title) : "";
+  const previous = old && sentence ? { ...old, summary: sentence } : old;
   const next = neighbourOf(lines.next);
   const parent = lines.parent === undefined ? undefined : neighbourOf(lines.parent);
   const cover = parseCardCover(prompt);

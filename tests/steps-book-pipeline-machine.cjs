@@ -823,3 +823,23 @@ test('ai proof: a fix keeps the findings for the re-check; isAiCurrent fences a 
   assert.deepEqual([gone.aiProof.a.done, gone.aiProof.a.incomplete], [true, true]);
   assert.equal(machine.beginAiStep(gone, { nodeId: 'a' }, 'k0', 'proof'), null);
 });
+
+test('ai fix records what it changed: the targets that were not blocked, kept across rounds, and still a readable state', () => {
+  const { state: start } = checkedRun();
+  const p = begin(start, { nodeId: 'a' }, 'k0', 'proof');
+  let state = machine.applyAiProof(p.state, p.token, { checked: 3, pending: [pending('P1'), pending('P2')], open: [] }).state;
+  const f = begin(state, { nodeId: 'a' }, 'k0', 'fix');
+  state = machine.applyAiFix(f.state, f.token, { applied: 1, refused: { P2: 'fix_quote_missing' }, key: 'k1', changed: ['a'] }).state;
+  assert.deepEqual(plain(state.aiProof.a.fixes.map(item => item.id)), ['P1'], 'the blocked target is not a fix');
+  const q = begin(state, { nodeId: 'a' }, 'k1', 'proof');
+  state = machine.applyAiProof(q.state, q.token, { checked: 3, pending: [pending('P3')], open: [] }).state;
+  const g = begin(state, { nodeId: 'a' }, 'k1', 'fix');
+  state = machine.applyAiFix(g.state, g.token, { applied: 1, key: 'k2', changed: ['a'] }).state;
+  assert.deepEqual(plain(state.aiProof.a.fixes.map(item => item.id)), ['P1', 'P3'], 'a second round adds to the first');
+  assert.equal(model.readBookPipeline({ bookPipeline: plain(state) }).kind, 'usable');
+  const none = begin(start, { nodeId: 'b' }, 'k0', 'proof');
+  let other = machine.applyAiProof(none.state, none.token, { checked: 1, pending: [pending()], open: [] }).state;
+  const h = begin(other, { nodeId: 'b' }, 'k0', 'fix');
+  other = machine.applyAiFix(h.state, h.token, { applied: 0, refused: { P1: 'fix_refused_picture' } }).state;
+  assert.equal(other.aiProof.b.fixes, undefined, 'nothing applied: no fix recorded');
+});

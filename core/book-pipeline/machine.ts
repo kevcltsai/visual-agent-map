@@ -365,6 +365,10 @@ export function applyAiFix(
   };
   // `pending` stays: the next check reads it as the earlier findings (`priorOf`); the next `applyAiProof` replaces it.
   if (!Object.keys(slot.refused ?? {}).length) delete slot.refused;
+  // What this call changed, as described: every target of the call that was not blocked (each is applied or refused).
+  const blocked = result.refused ?? {};
+  const done = result.applied > 0 ? (found.pending ?? []).filter(item => !(item.id in blocked)) : [];
+  if (done.length) slot.fixes = [...(found.fixes ?? []), ...done.map(item => ({ ...item }))];
   for (const id of result.changed ?? [])
     if (effectiveOrder(next).includes(id)) next.revisions[id] = cardRevision(next, id) + 1;
   setAiSlot(next, token.nodeId, slot);

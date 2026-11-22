@@ -22,7 +22,7 @@ function fakeChat(control) {
     begin(message, origin, again, stage) { chat.isBusy = true; const turn = { message, origin }; chat.turnsList.push(turn); chat.transcript.push({ role: 'user', text: message, origin }); chat.calls.push(['begin', message, stage]); return turn; },
     hasTurn: turn => chat.turnsList.includes(turn),
     retract(turn, draft) { if (!chat.turnsList.includes(turn)) return false; chat.turnsList.splice(chat.turnsList.indexOf(turn), 1); chat.isBusy = false; chat.calls.push(['retract', draft]); if (draft !== undefined) chat.draft = draft; return true; },
-    setStage: stage => chat.calls.push(['stage', stage]), clearSlow() {}, showSlow() {}, restartWaiting() {}, streamReply() {},
+    setStage: stage => chat.calls.push(['stage', stage]), clearSlow() {}, showSlow() {}, refreshSpeaker() {}, addOpening() {}, restartWaiting() {}, streamReply() {},
     finish(reply, lines) { chat.isBusy = false; chat.lines.push(lines); chat.transcript.push({ role: 'assistant', text: reply, lines }); chat.calls.push(['finish', reply]); },
     fail(text) { chat.isBusy = false; chat.calls.push(['fail', text]); },
     markStopped() { chat.isBusy = false; chat.calls.push(['stopped']); },

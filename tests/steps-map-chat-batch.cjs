@@ -125,7 +125,7 @@ function makePanel() {
   const calls = [];
   const panel = Object.create(MapChatPanel.prototype);
   Object.assign(panel, {
-    built: true, busy: false, logEl: dom.element('div'), liveEl: dom.element('div'), messages: [], rows: new WeakMap(), messageEls: [], bodyEls: [],
+    built: true, busy: false, logEl: dom.element('div'), liveEl: dom.element('div'), messages: [], openings: [], rows: new WeakMap(), messageEls: [], bodyEls: [],
     spokenLater: [], stage: null, chainWaitingState: null, chainWaitingLeft: '', host: { rerunBatch: message => calls.push(message), activeElement: () => null },
     cancelFrame() {}, atEnd: () => true, renderGuide() {}, refreshSave() {}, scrollToEnd() {}, markUnread() {}, renderBusy() {}
   });

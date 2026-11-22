@@ -355,9 +355,64 @@ test('bookPlanChatInput: only in the plan review; cards in reading order with th
   assert.deepEqual(input.cards.map(card => card.id), ['r', 'a', 'b', 'c']);
   assert.equal(input.prompts.b.prompt, w.prompts.b);
   assert.equal(input.prompts.b.kind, 'chapter');
+  assert.equal(input.prompts.b.title, 'B');
   w.doc.bookPipeline.phase = 'writing';
   assert.equal(await bookPlanChatInput(w.deps), undefined);
   const none = planWorld();
   none.state.memory = null;
   assert.equal(await bookPlanChatInput(none.deps), undefined);
+});
+
+test('edit_book_plan: skipped cards are named with the reason (locked / changed since the proposal); a no-change card is only counted', async () => {
+  const w = planWorld();
+  w.cards.get('b.md').prompt += '\nthe reader added a line';
+  const changed = plain(await applyBookPlanEdit(w.deps, bookAction([
+    { id: 'b', entry: 'new entry' }, { id: 'c', entry: 'other entry' }
+  ]), { bookPlan: w.baselineOf(['b', 'c']) }));
+  assert.match(changed.note, /\(1 cards left as they are\): B \(changed since the proposal\)$/);
+  const lockedWorld = planWorld();
+  const locked = plain(await applyBookPlanEdit(lockedWorld.deps, bookAction([
+    { id: 'b', entry: 'x' }, { id: 'c', entry: 'other entry' }
+  ]), { bookPlan: lockedWorld.baselineOf(['c']) }));
+  assert.match(locked.note, /\(1 cards left as they are\): b \(locked\)$/, 'a card outside the proposal falls back to its id');
+  const same = planWorld();
+  const noChange = plain(await applyBookPlanEdit(same.deps, bookAction([
+    { id: 'b', entry: 'e' }, { id: 'c', entry: 'other entry' }
+  ]), { bookPlan: same.baselineOf(['b', 'c']) }));
+  assert.match(noChange.note, /\(1 cards left as they are\)$/);
+  assert.doesNotMatch(noChange.note, /B/);
+});
+
+// ---- bookPlanDiff (the plan card's before / after) ----
+
+const { bookPlanDiff } = load('experiences/visual-map/book-plan-diff.ts', { obsidian: {} });
+
+test('bookPlanDiff: only the changed fields are shown, with the card title; points and checklist are joined', () => {
+  const w = planWorld();
+  const baseline = { bookPlan: { ...w.baselineOf(['b']), prompts: { b: { path: 'b.md', prompt: w.prompts.b, kind: 'chapter', title: 'B' } } } };
+  const cards = plain(bookPlanDiff(bookAction([
+    { id: 'b', entry: 'new entry', handoff: 'h', points: ['p1', 'p2'], checklist: [{ type: 'fact', text: 'who pays' }] }
+  ]), baseline));
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].title, 'B');
+  assert.deepEqual(cards[0].fields.map(f => f.label), [t('ui.map_chat_book_field_entry'), t('ui.map_chat_book_field_points'), t('ui.map_chat_book_field_checklist')]);
+  assert.deepEqual(cards[0].fields.map(f => [f.before, f.after]), [['e', 'new entry'], ['p1', 'p1, p2'], ['c1', 'who pays']]);
+});
+
+test('bookPlanDiff: an unknown id is skipped, a card with no real change is dropped, nothing left returns undefined', () => {
+  const w = planWorld();
+  const baseline = { bookPlan: w.baselineOf(['b', 'c']) };
+  const cards = plain(bookPlanDiff(bookAction([{ id: 'zzz', entry: 'x' }, { id: 'b', entry: 'e' }, { id: 'c', entry: 'new' }]), baseline));
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].title, 'c', 'a card without a title falls back to its id');
+  assert.equal(bookPlanDiff(bookAction([{ id: 'zzz', entry: 'x' }, { id: 'b', entry: 'e' }]), baseline), undefined);
+  assert.equal(bookPlanDiff(bookAction([{ id: 'b', entry: 'x' }]), undefined), undefined);
+  assert.equal(bookPlanDiff(bookAction([{ id: 'b', entry: 'x' }]), {}), undefined);
+});
+
+test('bookPlanDiff: a field that is empty before shows an empty before', () => {
+  const empty = planText.composeCardPrompt({ role: 'body', kind: 'chapter', covers: 'c', points: [], entry: '', handoff: 'h', checklist: [] }, 'en');
+  const baseline = { bookPlan: { runId: 'run-1', unlocked: ['b'], prompts: { b: { path: 'b.md', prompt: empty, kind: 'chapter', title: 'B' } } } };
+  const cards = plain(bookPlanDiff(bookAction([{ id: 'b', entry: 'fresh', points: ['p1', 'p2'] }]), baseline));
+  assert.deepEqual(cards[0].fields.map(f => [f.before, f.after]), [['', 'fresh'], ['', 'p1, p2']]);
 });

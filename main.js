@@ -33485,7 +33485,8 @@ function removeCoverCredit(detail, href, language2) {
     "\uE001"
   ).split(/[\uE000\uE001]/);
   const escape = (text11) => text11.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const shape2 = new RegExp(`^- ${escape(before)}.*${escape(middle)}.*\\]\\(${escape(href)}\\).*${escape(after)}\\r?$`);
+  const link = href.replace(/\(/g, "%28").replace(/\)/g, "%29");
+  const shape2 = new RegExp(`^- ${escape(before)}.*${escape(middle)}.*\\]\\(${escape(link)}\\).*${escape(after)}\\r?$`);
   return detail.split("\n").filter((line3) => !shape2.test(line3)).join("\n");
 }
 function migrateLegacyCover(raw, language2, title) {

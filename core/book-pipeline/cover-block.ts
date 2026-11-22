@@ -324,7 +324,9 @@ export function removeCoverCredit(detail: string, href: string, language: string
     "\uE001"
   ).split(/[\uE000\uE001]/);
   const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const shape = new RegExp(`^- ${escape(before)}.*${escape(middle)}.*\\]\\(${escape(href)}\\).*${escape(after)}\\r?$`);
+  // The credit's link has its parentheses encoded (as sourceOf writes it); the record keeps the page address as it is.
+  const link = href.replace(/\(/g, "%28").replace(/\)/g, "%29");
+  const shape = new RegExp(`^- ${escape(before)}.*${escape(middle)}.*\\]\\(${escape(link)}\\).*${escape(after)}\\r?$`);
   return detail
     .split("\n")
     .filter(line => !shape.test(line))

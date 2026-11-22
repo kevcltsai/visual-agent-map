@@ -279,3 +279,11 @@ test('removeCoverCredit: only the cover credit line of that Commons page goes; b
   const reworded = detail.replace('（封面）', '（我的封面）');
   assert.ok(block.removeCoverCredit(reworded, PAGE, 'zh-TW').includes('（我的封面）'), 'a line the owner reworded is not our shape and stays');
 });
+
+test('removeCoverCredit: a Commons page with parentheses matches its credit, whose link has them encoded', () => {
+  const raw = 'https://commons.wikimedia.org/wiki/File:Euro_(cropped).jpg';
+  const entry = '- 圖「歐元」（封面）：commons.wikimedia.org（[連結](https://commons.wikimedia.org/wiki/File:Euro_%28cropped%29.jpg)）';
+  const detail = `正文\n\n## 來源\n\n${entry}\n- 我自己的來源\n`;
+  assert.equal(block.removeCoverCredit(detail, raw, 'zh-TW'), '正文\n\n## 來源\n\n- 我自己的來源\n');
+  assert.equal(block.removeCoverCredit(detail, 'https://commons.wikimedia.org/wiki/File:Euro_%28cropped%29.jpg', 'zh-TW'), '正文\n\n## 來源\n\n- 我自己的來源\n');
+});

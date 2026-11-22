@@ -10043,6 +10043,47 @@ integrationTest('book plan chat: a refused structure apply (stale) says so and t
   assert.equal(lines.some(line => line.status === 'skipped' && /out of date/.test(line.text)), true, JSON.stringify(lines));
 });
 
+integrationTest('book plan chat: the plan card shows a mixed reply whole: thread before/after, plan diffs, structure lines, cost, buttons; a book code is worded', async () => {
+  const { h, chat } = await planReviewHarness();
+  const rootFile = h.app.vault.getAbstractFileByPath(h.node('root').path);
+  const compose = thread => planText.composeBookPlan({ thread, decisions: {}, materials: [] }, 'en').replace(/^## .*\n\n?/, '');
+  await h.app.vault.process(rootFile, raw => noteSections.replaceBookPlanSection(raw, compose('old thread')));
+  h.control.reply = async () => ({ reply: 'All three.', actions: [
+    { kind: 'edit_book_thread', content: 'a better thread' },
+    { kind: 'edit_book_plan', changes: [{ id: h.ids.a, entry: 'entry A2' }] },
+    { kind: 'edit_book_structure', items: [{ kind: 'add', parentId: h.ids.root, title: 'Photography arrives', summary: 's' }, { kind: 'rename', nodeId: h.ids.b, title: 'Renamed B' }] }
+  ], rejected: [] });
+  h.type('rework'); await h.view.sendMapChat();
+  openDetails(h.view.chat.logEl);
+  const card = planCard(h)[0]; const text = visibleText(card);
+  const at = needle => { const i = text.indexOf(needle); assert.ok(i >= 0, needle + ' in ' + text); return i; };
+  assert.ok(at('Main thread of the book') < at('entry A2') && at('entry A2') < at('Structure changes'), 'thread, plan diffs, structure in that order');
+  assert.equal(findAll(card, i => i.tag === 'del' && hasClass(i, 'vam-map-chat-diff-old')).some(i => i.text === 'old thread'), true, 'thread before is struck through');
+  assert.equal(findAll(card, i => i.tag === 'ins' && hasClass(i, 'vam-map-chat-diff-new')).some(i => i.text === 'a better thread'), true);
+  at('The chapter plans do not follow automatically'); at('Photography arrives'); at('Renamed B');
+  assert.match(text, /planned again, about \d+ AI calls|no AI planning is needed/);
+  assert.ok(findAll(card, i => i.tag === 'button').length >= 2, 'the two buttons');
+});
+
+integrationTest('map chat: dropped book codes are said in words once each, other drops stay a count', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const lines = await h.view.applyMapChatActions({ actions: [], rejected: [{ index: 0, code: 'book_duplicate' }, { index: 1, code: 'book_duplicate' }, { index: 2, code: 'book_busy' }, { index: 3, code: 'book_reorder' }, { index: 4, code: 'bad_item' }] }, {});
+  const texts = lines.map(line => line.text);
+  assert.equal(texts.filter(x => /changed twice/.test(x)).length, 1, JSON.stringify(texts));
+  assert.equal(texts.some(x => /planned again/.test(x)), true); assert.equal(texts.some(x => /Reordering everything/.test(x)), true);
+  assert.equal(texts.filter(x => /1 suggestion|invalid/i.test(x)).length, 1, JSON.stringify(texts));
+});
+
+integrationTest('book plan chat: a structure card lists remove with the archive note, and a refusal the rules already predict', async () => {
+  const { h } = await planReviewHarness();
+  h.control.reply = async () => ({ reply: 'Remove.', actions: [{ kind: 'edit_book_structure', items: [{ kind: 'remove', nodeId: h.ids.a }] }], rejected: [] });
+  h.type('drop a'); await h.view.sendMapChat();
+  openDetails(h.view.chat.logEl);
+  const text = visibleText(planCard(h)[0]);
+  assert.match(text, /Structure changes/);
+  assert.match(text, /archive|children|rules|edited by you/i, text);
+});
+
 integrationTest('book plan chat: a Prompt changed after the proposal is not overwritten on Apply (the baseline is the proposal turn\'s, not rebuilt at apply time)', async () => {
   const { h, chat } = await planReviewHarness();
   h.control.reply = async () => ({ reply: 'I will change chapter A.', actions: [{ kind: 'edit_book_plan', changes: [{ id: h.ids.a, entry: 'brand new entry' }] }], rejected: [] });

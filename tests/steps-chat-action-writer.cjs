@@ -413,7 +413,7 @@ test('edit_book_plan: skipped cards are named with the reason (locked / changed 
 
 // ---- bookPlanDiff (the plan card's before / after) ----
 
-const { bookPlanDiff } = load('experiences/visual-map/book-plan-diff.ts', { obsidian: {} });
+const { bookPlanDiff, bookThreadDiff, bookStructureCard } = load('experiences/visual-map/book-plan-diff.ts', { obsidian: {} });
 
 test('bookPlanDiff: only the changed fields are shown, with the card title; points and checklist are joined', () => {
   const w = planWorld();
@@ -568,4 +568,48 @@ test('bookPlanChatInput: thread, nodes in reading order (the shape the runner co
   assert.equal(busy.busy, true); assert.deepEqual(busy.cards, []); assert.equal(busy.thread, 'old thread');
   delete w.doc.bookPipeline.planEdited;
   assert.equal(await bookPlanChatInput(w.deps), undefined, 'planning without an edit is not a chat state');
+});
+
+// ---- bookThreadDiff / bookStructureCard (the plan card's thread and structure parts) ----
+
+const tree = (unlocked = ['ch1', 'ch2', 'sec']) => ({ bookPlan: { runId: 'r', unlocked, thread: 'old', prompts: {}, nodes: [
+  { id: 'root', parentId: null, title: 'Book' }, { id: 'ch1', parentId: 'root', title: 'One' },
+  { id: 'sec', parentId: 'ch1', title: 'Sec' }, { id: 'ch2', parentId: 'root', title: 'Two' }] } });
+const structure = items => ({ kind: 'edit_book_structure', items });
+const lineTexts = card => card.lines.map(l => l.text);
+
+test('bookThreadDiff: old and new thread, the note; nothing when unchanged or no baseline', () => {
+  const card = plain(bookThreadDiff({ kind: 'edit_book_thread', content: 'new' }, tree()));
+  assert.equal(card.title, t('ui.map_chat_book_thread_title')); assert.equal(card.place, 'first');
+  assert.deepEqual(card.fields, [{ label: '', before: 'old', after: 'new' }]); assert.equal(card.note, t('ui.map_chat_book_thread_note'));
+  assert.equal(bookThreadDiff({ kind: 'edit_book_thread', content: 'old' }, tree()), undefined);
+  assert.equal(bookThreadDiff({ kind: 'edit_book_thread', content: 'x' }, undefined), undefined);
+});
+
+test('bookStructureCard: add, move, rename, remove lines; the cost equals the runner rule (reviewAffected on the simulation)', () => {
+  const add = plain(bookStructureCard(structure([{ kind: 'add', parentId: 'root', title: 'New', summary: 's' }]), tree()));
+  assert.equal(add.title, t('ui.map_chat_book_struct_title')); assert.equal(add.place, 'last');
+  assert.deepEqual(lineTexts(add), [t('ui.book_struct_add_chapter_0_1', t('ui.book_struct_place_chapter_0', 3), 'New')]);
+  assert.equal(add.note, t('ui.map_chat_book_struct_cost_0_1', 1, 1));
+  const move = plain(bookStructureCard(structure([{ kind: 'move', nodeId: 'ch2', newParentId: 'root', beforeId: 'ch1' }]), tree()));
+  assert.deepEqual(lineTexts(move), [t('ui.book_struct_move_0_1_2', 'Two', t('ui.book_struct_place_chapter_0', 2), t('ui.book_struct_place_chapter_0', 1))]);
+  assert.equal(move.note, t('ui.map_chat_book_struct_cost_0_1', 1, 1));
+  const rename = plain(bookStructureCard(structure([{ kind: 'rename', nodeId: 'ch2', title: 'Deux' }]), tree()));
+  assert.deepEqual(lineTexts(rename), [t('ui.book_struct_rename_0_1', 'Two', 'Deux')]); assert.equal(rename.note, t('ui.map_chat_book_struct_cost_none'));
+  const remove = plain(bookStructureCard(structure([{ kind: 'remove', nodeId: 'ch2' }]), tree()));
+  assert.deepEqual(lineTexts(remove), [t('ui.book_struct_remove_0_1', 'Two', t('ui.book_struct_place_chapter_0', 2)), t('ui.map_chat_book_struct_archive_note')]);
+  assert.equal(remove.lines[1].small, true); assert.equal(remove.note, t('ui.map_chat_book_struct_cost_none'));
+});
+
+test('bookStructureCard: refusals the rules already predict (locked, has children, over the cap) and no cost when nothing applies', () => {
+  const locked = plain(bookStructureCard(structure([{ kind: 'rename', nodeId: 'ch2', title: 'X' }]), tree(['ch1', 'sec'])));
+  assert.deepEqual(lineTexts(locked), [t('ui.map_chat_skip_book_struct_locked_0', 'Two')]); assert.equal(locked.note, undefined);
+  const kids = plain(bookStructureCard(structure([{ kind: 'remove', nodeId: 'ch1' }]), tree()));
+  assert.deepEqual(lineTexts(kids), [t('ui.map_chat_skip_book_struct_children_0', 'One')]);
+  const branch = plain(bookStructureCard(structure([{ kind: 'remove', nodeId: 'ch1', branch: true }]), tree()));
+  assert.equal(branch.lines.length, 3, JSON.stringify(branch));
+  const many = plain(bookStructureCard(structure(Array.from({ length: 7 }, () => ({ kind: 'rename', nodeId: 'ch2', title: 'Z' }))), tree()));
+  assert.deepEqual(lineTexts(many), [t('ui.map_chat_book_struct_over_cap_0', 7)]); assert.equal(many.note, undefined);
+  assert.equal(bookStructureCard(structure([]), { bookPlan: { ...tree().bookPlan, nodes: [] } }), undefined);
+  assert.equal(bookStructureCard(structure([]), undefined), undefined);
 });

@@ -1358,6 +1358,16 @@ var en = {
   "ui.map_chat_line_book_plan_named_0": ": {0}",
   "ui.map_chat_skip_book_stale": "the plan was just changed, so this proposal is out of date; please say it again",
   "ui.map_chat_skip_book_busy": "the plan is being planned again; please try again when it is done",
+  "ui.map_chat_book_struct_title": "Structure changes",
+  "ui.map_chat_book_struct_archive_note": "The notes stay in the archive and can be restored",
+  "ui.map_chat_book_struct_over_cap_0": "At most 6 changes at a time, this one has {0}; please say them in parts",
+  "ui.map_chat_book_struct_cost_0_1": "After applying, {0} cards are planned again, about {1} AI calls.",
+  "ui.map_chat_book_struct_cost_none": "After applying, no AI planning is needed; only the lines linking the neighbouring chapters are updated.",
+  "ui.map_chat_book_thread_title": "Main thread of the book",
+  "ui.map_chat_book_thread_note": "The chapter plans do not follow automatically; the chapters that need to follow are listed with it.",
+  "ui.map_chat_rejected_book_busy": "The plan is being planned again, so this change is not applied for now.",
+  "ui.map_chat_rejected_book_reorder": "Reordering everything at once is not done; say which chapter goes where.",
+  "ui.map_chat_rejected_book_duplicate": "The same card was changed twice; only the first change is kept.",
   "ui.map_chat_skip_book_struct_locked_0": '"{0}" was edited by you, so it is left alone',
   "ui.map_chat_skip_book_struct_children_0": 'cannot change: "{0}" still has sections; to delete them together say "with its sections"',
   "ui.map_chat_skip_book_struct_rules": "this structure change breaks the structure rules",
@@ -4717,6 +4727,16 @@ var zhCN = {
   "ui.map_chat_line_book_plan_named_0": "\uFF1A{0}",
   "ui.map_chat_skip_book_stale": "\u4F01\u5212\u521A\u8C03\u6574\u8FC7\uFF0C\u8FD9\u4E2A\u63D0\u6848\u5DF2\u8FC7\u671F\uFF1B\u8BF7\u518D\u8BF4\u4E00\u6B21",
   "ui.map_chat_skip_book_busy": "\u4F01\u5212\u6B63\u5728\u91CD\u65B0\u4F01\u5212\uFF0C\u597D\u4E86\u518D\u8BF4\u4E00\u6B21",
+  "ui.map_chat_book_struct_title": "\u7ED3\u6784\u8C03\u6574",
+  "ui.map_chat_book_struct_archive_note": "\u7B14\u8BB0\u4F1A\u7559\u5728\u5C01\u5B58\uFF0C\u53EF\u4EE5\u8FD8\u539F",
+  "ui.map_chat_book_struct_over_cap_0": "\u4E00\u6B21\u6700\u591A\u6539 6 \u9879\uFF0C\u8FD9\u6B21\u6709 {0} \u9879\uFF0C\u8BF7\u5206\u6B21\u8BF4",
+  "ui.map_chat_book_struct_cost_0_1": "\u5E94\u7528\u540E\u4F1A\u91CD\u65B0\u4F01\u5212 {0} \u5F20\u5361\uFF0C\u7EA6 {1} \u6B21 AI \u8C03\u7528\u3002",
+  "ui.map_chat_book_struct_cost_none": "\u5E94\u7528\u540E\u4E0D\u7528 AI \u91CD\u65B0\u4F01\u5212\uFF0C\u53EA\u4F1A\u66F4\u65B0\u524D\u540E\u7AE0\u7684\u8854\u63A5\u53E5\u3002",
+  "ui.map_chat_book_thread_title": "\u5168\u4E66\u4E3B\u7EBF",
+  "ui.map_chat_book_thread_note": "\u5404\u7AE0\u4F01\u5212\u4E0D\u4F1A\u81EA\u52A8\u8DDF\u7740\u6539\uFF1B\u9700\u8981\u8DDF\u7740\u6539\u7684\u7AE0\u6211\u4F1A\u4E00\u8D77\u5217\u51FA\u6765\u3002",
+  "ui.map_chat_rejected_book_busy": "\u91CD\u65B0\u4F01\u5212\u4E2D\uFF0C\u8FD9\u6B21\u7684\u4FEE\u6539\u5148\u4E0D\u5E94\u7528",
+  "ui.map_chat_rejected_book_reorder": "\u4E00\u6B21\u91CD\u6392\u5168\u90E8\u987A\u5E8F\u8FD9\u4E00\u6B65\u4E0D\u505A\uFF0C\u8BF7\u8BF4\u8981\u628A\u54EA\u4E00\u7AE0\u79FB\u5230\u54EA\u91CC",
+  "ui.map_chat_rejected_book_duplicate": "\u540C\u4E00\u5F20\u5361\u6539\u4E86\u4E24\u6B21\uFF0C\u53EA\u4FDD\u7559\u7B2C\u4E00\u4E2A",
   "ui.map_chat_skip_book_struct_locked_0": "\u201C{0}\u201D\u4F60\u6539\u8FC7\uFF0C\u4E0D\u52A8\u5B83",
   "ui.map_chat_skip_book_struct_children_0": "\u6CA1\u529E\u6CD5\u6539\uFF1A\u201C{0}\u201D\u5E95\u4E0B\u8FD8\u6709\u8282\uFF0C\u8981\u4E00\u8D77\u5220\u5C31\u8BF4\u201C\u8FDE\u540C\u5404\u8282\u201D",
   "ui.map_chat_skip_book_struct_rules": "\u8FD9\u4E2A\u7ED3\u6784\u8C03\u6574\u4E0D\u7B26\u5408\u7ED3\u6784\u89C4\u5219",
@@ -8076,6 +8096,16 @@ var zhTW = {
   "ui.map_chat_line_book_plan_named_0": "\uFF1A{0}",
   "ui.map_chat_skip_book_stale": "\u4F01\u5283\u525B\u8ABF\u6574\u904E\uFF0C\u9019\u500B\u63D0\u6848\u5DF2\u904E\u671F\uFF1B\u8ACB\u518D\u8AAA\u4E00\u6B21",
   "ui.map_chat_skip_book_busy": "\u4F01\u5283\u6B63\u5728\u91CD\u65B0\u4F01\u5283\uFF0C\u597D\u4E86\u518D\u8AAA\u4E00\u6B21",
+  "ui.map_chat_book_struct_title": "\u7D50\u69CB\u8ABF\u6574",
+  "ui.map_chat_book_struct_archive_note": "\u7B46\u8A18\u6703\u7559\u5728\u5C01\u5B58\uFF0C\u53EF\u4EE5\u9084\u539F",
+  "ui.map_chat_book_struct_over_cap_0": "\u4E00\u6B21\u6700\u591A\u6539 6 \u9805\uFF0C\u9019\u6B21\u6709 {0} \u9805\uFF0C\u8ACB\u5206\u6B21\u8AAA",
+  "ui.map_chat_book_struct_cost_0_1": "\u5957\u7528\u5F8C\u6703\u91CD\u65B0\u4F01\u5283 {0} \u5F35\u5361\uFF0C\u7D04 {1} \u6B21 AI \u547C\u53EB\u3002",
+  "ui.map_chat_book_struct_cost_none": "\u5957\u7528\u5F8C\u4E0D\u7528 AI \u91CD\u65B0\u4F01\u5283\uFF0C\u53EA\u6703\u66F4\u65B0\u524D\u5F8C\u7AE0\u7684\u929C\u63A5\u53E5\u3002",
+  "ui.map_chat_book_thread_title": "\u5168\u66F8\u4E3B\u7DDA",
+  "ui.map_chat_book_thread_note": "\u5404\u7AE0\u4F01\u5283\u4E0D\u6703\u81EA\u52D5\u8DDF\u8457\u6539\uFF1B\u9700\u8981\u8DDF\u8457\u6539\u7684\u7AE0\u6211\u6703\u4E00\u8D77\u5217\u51FA\u4F86\u3002",
+  "ui.map_chat_rejected_book_busy": "\u91CD\u65B0\u4F01\u5283\u4E2D\uFF0C\u9019\u6B21\u7684\u4FEE\u6539\u5148\u4E0D\u5957\u7528",
+  "ui.map_chat_rejected_book_reorder": "\u4E00\u6B21\u91CD\u6392\u5168\u90E8\u9806\u5E8F\u9019\u4E00\u6B65\u4E0D\u505A\uFF0C\u8ACB\u8AAA\u8981\u628A\u54EA\u4E00\u7AE0\u79FB\u5230\u54EA\u88E1",
+  "ui.map_chat_rejected_book_duplicate": "\u540C\u4E00\u5F35\u5361\u6539\u4E86\u5169\u6B21\uFF0C\u53EA\u4FDD\u7559\u7B2C\u4E00\u500B",
   "ui.map_chat_skip_book_struct_locked_0": "\u300C{0}\u300D\u4F60\u6539\u904E\uFF0C\u4E0D\u52D5\u5B83",
   "ui.map_chat_skip_book_struct_children_0": "\u6C92\u8FA6\u6CD5\u6539\uFF1A\u300C{0}\u300D\u5E95\u4E0B\u9084\u6709\u7BC0\uFF0C\u8981\u4E00\u8D77\u522A\u5C31\u8AAA\u300C\u9023\u540C\u5404\u7BC0\u300D",
   "ui.map_chat_skip_book_struct_rules": "\u9019\u500B\u7D50\u69CB\u8ABF\u6574\u4E0D\u7B26\u5408\u7D50\u69CB\u898F\u5247",
@@ -61100,233 +61130,6 @@ ${caption}`, drive.config.language))
   }
 };
 
-// experiences/visual-map/book-plan-chat.ts
-function reviewRun(map) {
-  if (!map) return void 0;
-  const read = readBookPipeline(map);
-  if (read.kind !== "usable") return void 0;
-  const data = read.data;
-  return data.phase === "gate1" && data.status === "running" && data.planReview ? data : void 0;
-}
-function replanRun(map) {
-  if (!map) return void 0;
-  const read = readBookPipeline(map);
-  if (read.kind !== "usable") return void 0;
-  const data = read.data;
-  return data.phase === "planning" && data.planReview && data.planEdited ? data : void 0;
-}
-var structureOfMap = (map, order, rootId) => bookStructure(order, (id) => {
-  var _a2;
-  return (_a2 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _a2.parentId;
-}, rootId);
-var rootOf = (map) => {
-  const roots = map.nodes.filter((node) => !node.parentId);
-  return roots.length === 1 ? roots[0].id : void 0;
-};
-async function bookPlanChatInput(deps) {
-  var _a2, _b2, _c, _d;
-  const map = deps.map();
-  const reviewing = reviewRun(map);
-  const data = reviewing != null ? reviewing : replanRun(map);
-  const rootId = map ? rootOf(map) : void 0;
-  if (!map || !data || !rootId) return void 0;
-  const root = map.nodes.find((node) => node.id === rootId);
-  if (!root) return void 0;
-  const rootCard = await deps.readCard(root.path);
-  const thread = parseBookPlanBody(rootCard.raw).thread;
-  if (!reviewing)
-    return {
-      runId: data.runId,
-      phaseStartedAt: data.phaseStartedAt,
-      title: rootCard.title,
-      settings: effectiveSettings(rootCard.settings, parseBookPlanDecisions(rootCard.raw)),
-      thread,
-      cards: [],
-      nodes: [],
-      busy: true,
-      prompts: {}
-    };
-  const order = effectiveOrder(data);
-  const structure2 = structureOfMap(map, order, rootId);
-  const cards = [];
-  const nodes = [];
-  const prompts = {};
-  for (const id of order) {
-    const node = map.nodes.find((item) => item.id === id);
-    if (!node) return void 0;
-    const card = await deps.readCard(node.path);
-    const kind = (_b2 = (_a2 = structure2.placeOf(id)) == null ? void 0 : _a2.kind) != null ? _b2 : "chapter";
-    cards.push(
-      planEditCardOf(
-        id,
-        placeText(cardPlanPlaceOf(structure2, id)),
-        (_c = card.fields.bookRole) != null ? _c : "body",
-        card.title,
-        card.prompt,
-        planLockedRaw(card.raw, card.prompt)
-      )
-    );
-    nodes.push({ id, parentId: (_d = node.parentId) != null ? _d : null, title: card.title });
-    prompts[id] = { path: node.path, prompt: card.prompt, kind, title: card.title, summary: card.summary };
-  }
-  const settings = effectiveSettings(rootCard.settings, parseBookPlanDecisions(rootCard.raw));
-  const request = {
-    language: deps.language(),
-    model: "",
-    reasoning: "medium",
-    bookTitle: rootCard.title,
-    thread,
-    settings,
-    cards
-  };
-  const base = {
-    runId: data.runId,
-    phaseStartedAt: data.phaseStartedAt,
-    title: rootCard.title,
-    settings,
-    thread,
-    nodes,
-    busy: false,
-    ...data.planOpening ? { opening: data.planOpening } : {}
-  };
-  return planEditFits(request) ? { ...base, cards: cards.map(shown), prompts } : { ...base, cards: [], tooLarge: true, prompts: {} };
-}
-async function applyBookPlanEdit(deps, action, baseline) {
-  var _a2, _b2, _c, _d;
-  const plan = baseline.bookPlan;
-  const stillReview = (map2) => {
-    const run = reviewRun(map2);
-    return !!run && run.runId === (plan == null ? void 0 : plan.runId) && run.phaseStartedAt === plan.phaseStartedAt;
-  };
-  const started = () => ({ status: "skipped", reason: t("ui.map_chat_skip_book_started") });
-  if (!plan) return started();
-  const map = await deps.readMap();
-  const rootId = rootOf(map);
-  const data = reviewRun(map);
-  if (!rootId || !data || !stillReview(deps.map())) return started();
-  const structure2 = structureOfMap(map, effectiveOrder(data), rootId);
-  const authorize = () => stillReview(deps.map());
-  const pathOf = (id) => {
-    var _a3;
-    return (_a3 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _a3.path;
-  };
-  const seen = /* @__PURE__ */ new Map();
-  const locked = /* @__PURE__ */ new Set();
-  const ownSummary = /* @__PURE__ */ new Set();
-  for (const change2 of action.changes) {
-    const proposed = plan.prompts[change2.id];
-    const path = pathOf(change2.id);
-    if (!proposed || !path) {
-      locked.add(change2.id);
-      continue;
-    }
-    const now = await deps.readCard(path);
-    seen.set(change2.id, { prompt: proposed.prompt, kind: proposed.kind, title: now.title });
-    if (!plan.unlocked.includes(change2.id) || planLockedRaw(now.raw, now.prompt)) locked.add(change2.id);
-    if (now.summary !== ((_a2 = proposed.summary) != null ? _a2 : "") || isKeptRaw(now.raw) && bodyStateRaw(now.raw) !== "clean" || bodyStateRaw(now.raw) === "unknown" && !pipelineWroteRaw(now.raw))
-      ownSummary.add(change2.id);
-  }
-  const done = await writePlanEdits(
-    {
-      mapPathOf: async (id) => pathOf(id),
-      cardPathOf: pathOf,
-      readCard: (path) => deps.readCard(path),
-      updateNoteGuarded: (path, patch, options) => deps.updateNoteGuarded(path, patch, options)
-    },
-    { changes: action.changes, seen, locked, structure: structure2, ownSummary, language: deps.language(), authorize }
-  );
-  if (!done.written.length) {
-    return {
-      status: "skipped",
-      reason: t(authorize() ? "ui.map_chat_skip_book_cards" : "ui.map_chat_skip_book_started")
-    };
-  }
-  const left = action.changes.filter((change2) => !done.written.includes(change2.id));
-  const named = [];
-  for (const change2 of left) {
-    const known = seen.get(change2.id);
-    const path = pathOf(change2.id);
-    const changed = !!known && !!path && (await deps.readCard(path)).prompt !== known.prompt;
-    if (locked.has(change2.id) || changed)
-      named.push(
-        `${(_d = (_c = known == null ? void 0 : known.title) != null ? _c : (_b2 = plan.prompts[change2.id]) == null ? void 0 : _b2.title) != null ? _d : change2.id}${t(locked.has(change2.id) ? "ui.map_chat_skip_book_locked" : "ui.map_chat_skip_book_changed")}`
-      );
-  }
-  return {
-    status: "done",
-    note: t("ui.map_chat_line_book_plan_undo") + (left.length ? t("ui.map_chat_line_book_plan_left_0", left.length) + (named.length ? t("ui.map_chat_line_book_plan_named_0", named.join(t("ui.map_chat_count_separator"))) : "") : "")
-  };
-}
-var skip = (key4, ...args) => ({
-  status: "skipped",
-  reason: t(key4, ...args)
-});
-var sameReview = (map, plan) => {
-  const run = reviewRun(map);
-  return !!run && run.runId === plan.runId && run.phaseStartedAt === plan.phaseStartedAt;
-};
-var refusalKey = (code3) => code3 === "not_gate1" ? "ui.map_chat_skip_book_started" : code3 === "stale" ? "ui.map_chat_skip_book_stale" : ["busy", "blocked", "drive_running", "notes_busy"].includes(code3) ? "ui.map_chat_skip_book_busy" : void 0;
-async function applyBookThreadEdit(deps, action, baseline) {
-  const plan = baseline.bookPlan;
-  if (!plan || plan.busy || !sameReview(deps.map(), plan)) return skip("ui.map_chat_skip_book_started");
-  const map = await deps.readMap();
-  const rootId = rootOf(map);
-  const root = rootId ? map.nodes.find((node) => node.id === rootId) : void 0;
-  if (!root || !reviewRun(map)) return skip("ui.map_chat_skip_book_started");
-  const card = await deps.readCard(root.path);
-  if (parseBookPlanBody(card.raw).thread !== plan.thread) return skip("ui.map_chat_skip_book_thread_changed");
-  const next = replaceBookPlanThread(card.raw, action.content);
-  if (next === void 0) return skip("ui.map_chat_skip_book_thread_none");
-  if (next === card.raw) return skip("ui.map_chat_skip_book_cards");
-  const written2 = await deps.updateNoteRawGuarded(root.path, () => next, {
-    expectedContent: card.raw,
-    authorize: () => sameReview(deps.map(), plan)
-  });
-  if (written2 === "discarded")
-    return skip(
-      sameReview(deps.map(), plan) ? "ui.map_chat_skip_book_thread_changed" : "ui.map_chat_skip_book_started"
-    );
-  return { status: "done", note: t("ui.map_chat_line_book_thread") };
-}
-async function applyBookStructureEdit(deps, action, baseline) {
-  var _a2, _b2;
-  const plan = baseline.bookPlan;
-  if (!plan || plan.busy || !plan.nodes.length || !sameReview(deps.map(), plan))
-    return skip("ui.map_chat_skip_book_started");
-  const input2 = { rootId: plan.nodes[0].id, nodes: plan.nodes };
-  const ops = chatStructureOps(action.items, input2, Date.now().toString(36));
-  const locked = new Set(plan.nodes.map((node) => node.id).filter((id) => !plan.unlocked.includes(id)));
-  const sim = simulateStructure(input2, ops, locked);
-  const expected = reviewAffected(input2.rootId, plan.nodes, sim.result, sim.applied).size;
-  let result;
-  try {
-    result = await deps.editStructure(
-      ops,
-      { runId: plan.runId, phaseStartedAt: (_a2 = plan.phaseStartedAt) != null ? _a2 : "", nodes: plan.nodes },
-      expected ? t("ui.map_chat_opening_book_struct_0", expected) : t("ui.map_chat_opening_book_struct_none")
-    );
-  } catch (error) {
-    const code3 = (error == null ? void 0 : error.name) === "BookPipelineRunError" ? error.code : "";
-    const key4 = refusalKey(code3);
-    if (key4) return skip(key4);
-    throw error;
-  }
-  const titleOf = (id) => {
-    var _a3;
-    return ((_a3 = plan.nodes.find((node) => node.id === id)) == null ? void 0 : _a3.title) || id;
-  };
-  const reasons = result.refused.map((refused) => {
-    const op = ops.find((item) => item.id === refused.id);
-    const name2 = op && op.kind !== "add" ? titleOf(op.card) : (op == null ? void 0 : op.kind) === "add" ? op.title : "";
-    return refused.code === "locked" ? t("ui.map_chat_skip_book_struct_locked_0", name2) : refused.code === "has_children" ? t("ui.map_chat_skip_book_struct_children_0", name2) : t("ui.map_chat_skip_book_struct_rules");
-  });
-  if (!result.applied.length) return { status: "skipped", reason: (_b2 = reasons[0]) != null ? _b2 : t("ui.book_struct_over_cap") };
-  return {
-    status: "done",
-    note: (result.affected ? t("ui.map_chat_line_book_struct_0_1", result.affected, result.affected) : t("ui.map_chat_line_book_struct_none")) + (reasons.length ? t("ui.map_chat_line_book_struct_left_0", [...new Set(reasons)].join(t("ui.map_chat_count_separator"))) : "")
-  };
-}
-
 // experiences/visual-map/book-pipeline-ui.ts
 var FAILURE_KEY = {
   invalid_reply: "ui.book_fail_invalid_reply",
@@ -62070,6 +61873,325 @@ function renderBookCardLabels(header3, view, writing) {
 function isBookGate1Waiting(progress, data) {
   var _a2;
   return ((_a2 = progress == null ? void 0 : progress.phase) != null ? _a2 : data.phase) === "gate1" && !(progress == null ? void 0 : progress.active);
+}
+
+// experiences/visual-map/book-plan-diff.ts
+var FIELDS2 = ["covers", "entry", "points", "handoff", "previous", "checklist"];
+var LABEL = {
+  covers: "",
+  entry: "ui.map_chat_book_field_entry",
+  points: "ui.map_chat_book_field_points",
+  handoff: "ui.map_chat_book_field_handoff",
+  previous: "ui.map_chat_book_field_previous",
+  checklist: "ui.map_chat_book_field_checklist"
+};
+function bookPlanDiff(action, baseline) {
+  var _a2, _b2;
+  const prompts = (_a2 = baseline == null ? void 0 : baseline.bookPlan) == null ? void 0 : _a2.prompts;
+  if (!prompts) return void 0;
+  const join6 = (items) => items.join(t("ui.map_chat_count_separator"));
+  const cards = [];
+  for (const change2 of action.changes) {
+    const known = prompts[change2.id];
+    if (!known) continue;
+    const before = readBrief(known.prompt);
+    const text11 = (field, from) => {
+      if (from === "before")
+        return field === "points" ? join6(before.points) : field === "checklist" ? join6(before.checklist.map((item) => item.text)) : before[field];
+      const value = change2[field];
+      if (value === void 0) return void 0;
+      return field === "points" || field === "checklist" ? join6(
+        value.map((item) => typeof item === "string" ? item : item.text)
+      ) : value;
+    };
+    const fields = FIELDS2.flatMap((field) => {
+      var _a3;
+      const after = text11(field, "after");
+      const old = (_a3 = text11(field, "before")) != null ? _a3 : "";
+      return after === void 0 || after === old ? [] : [{ label: LABEL[field] && t(LABEL[field]), before: old, after }];
+    });
+    if (fields.length) cards.push({ title: (_b2 = known.title) != null ? _b2 : change2.id, fields });
+  }
+  return cards.length ? cards : void 0;
+}
+function bookThreadDiff(action, baseline) {
+  var _a2;
+  const before = (_a2 = baseline == null ? void 0 : baseline.bookPlan) == null ? void 0 : _a2.thread;
+  if (before === void 0 || before === action.content) return void 0;
+  return {
+    title: t("ui.map_chat_book_thread_title"),
+    fields: [{ label: "", before, after: action.content }],
+    note: t("ui.map_chat_book_thread_note"),
+    place: "first"
+  };
+}
+function structureRefusal(code3, name2) {
+  return code3 === "locked" ? t("ui.map_chat_skip_book_struct_locked_0", name2) : code3 === "has_children" ? t("ui.map_chat_skip_book_struct_children_0", name2) : t("ui.map_chat_skip_book_struct_rules");
+}
+function bookStructureCard(action, baseline) {
+  const plan = baseline == null ? void 0 : baseline.bookPlan;
+  if (!(plan == null ? void 0 : plan.nodes.length)) return void 0;
+  const rootId = plan.nodes[0].id;
+  const input2 = { rootId, nodes: plan.nodes };
+  const ops = chatStructureOps(action.items, input2, "card");
+  const locked = new Set(plan.nodes.map((node) => node.id).filter((id) => !plan.unlocked.includes(id)));
+  const sim = simulateStructure(input2, ops, locked);
+  const names3 = new Map(plan.nodes.map((node) => [node.id, node.title]));
+  for (const a of sim.applied) if (a.op.kind === "add") names3.set(a.op.ref, a.op.title);
+  const nameOf2 = (id) => {
+    var _a2;
+    return (_a2 = names3.get(id)) != null ? _a2 : "";
+  };
+  const before = placer(rootId, plan.nodes, nameOf2);
+  const after = placer(rootId, sim.result, nameOf2);
+  const lines = sim.applied.map((a) => ({
+    text: itemText(a, nameOf2(a.op.kind === "add" ? a.op.ref : a.op.card), rootId, before, after, nameOf2)
+  }));
+  if (sim.applied.some((a) => a.op.kind === "remove" || a.op.kind === "merge"))
+    lines.push({ text: t("ui.map_chat_book_struct_archive_note"), small: true });
+  if (sim.overCap) lines.push({ text: t("ui.map_chat_book_struct_over_cap_0", ops.length) });
+  for (const rejected of sim.rejected)
+    lines.push({
+      text: structureRefusal(
+        rejected.code,
+        rejected.op.kind === "add" ? rejected.op.title : nameOf2(rejected.op.card)
+      )
+    });
+  const cards = reviewAffected(rootId, plan.nodes, sim.result, sim.applied).size;
+  return {
+    title: t("ui.map_chat_book_struct_title"),
+    fields: [],
+    place: "last",
+    lines,
+    ...sim.applied.length ? { note: cards ? t("ui.map_chat_book_struct_cost_0_1", cards, cards) : t("ui.map_chat_book_struct_cost_none") } : {}
+  };
+}
+
+// experiences/visual-map/book-plan-chat.ts
+function reviewRun(map) {
+  if (!map) return void 0;
+  const read = readBookPipeline(map);
+  if (read.kind !== "usable") return void 0;
+  const data = read.data;
+  return data.phase === "gate1" && data.status === "running" && data.planReview ? data : void 0;
+}
+function replanRun(map) {
+  if (!map) return void 0;
+  const read = readBookPipeline(map);
+  if (read.kind !== "usable") return void 0;
+  const data = read.data;
+  return data.phase === "planning" && data.planReview && data.planEdited ? data : void 0;
+}
+var structureOfMap = (map, order, rootId) => bookStructure(order, (id) => {
+  var _a2;
+  return (_a2 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _a2.parentId;
+}, rootId);
+var rootOf = (map) => {
+  const roots = map.nodes.filter((node) => !node.parentId);
+  return roots.length === 1 ? roots[0].id : void 0;
+};
+async function bookPlanChatInput(deps) {
+  var _a2, _b2, _c, _d;
+  const map = deps.map();
+  const reviewing = reviewRun(map);
+  const data = reviewing != null ? reviewing : replanRun(map);
+  const rootId = map ? rootOf(map) : void 0;
+  if (!map || !data || !rootId) return void 0;
+  const root = map.nodes.find((node) => node.id === rootId);
+  if (!root) return void 0;
+  const rootCard = await deps.readCard(root.path);
+  const thread = parseBookPlanBody(rootCard.raw).thread;
+  if (!reviewing)
+    return {
+      runId: data.runId,
+      phaseStartedAt: data.phaseStartedAt,
+      title: rootCard.title,
+      settings: effectiveSettings(rootCard.settings, parseBookPlanDecisions(rootCard.raw)),
+      thread,
+      cards: [],
+      nodes: [],
+      busy: true,
+      prompts: {}
+    };
+  const order = effectiveOrder(data);
+  const structure2 = structureOfMap(map, order, rootId);
+  const cards = [];
+  const nodes = [];
+  const prompts = {};
+  for (const id of order) {
+    const node = map.nodes.find((item) => item.id === id);
+    if (!node) return void 0;
+    const card = await deps.readCard(node.path);
+    const kind = (_b2 = (_a2 = structure2.placeOf(id)) == null ? void 0 : _a2.kind) != null ? _b2 : "chapter";
+    cards.push(
+      planEditCardOf(
+        id,
+        placeText(cardPlanPlaceOf(structure2, id)),
+        (_c = card.fields.bookRole) != null ? _c : "body",
+        card.title,
+        card.prompt,
+        planLockedRaw(card.raw, card.prompt)
+      )
+    );
+    nodes.push({ id, parentId: (_d = node.parentId) != null ? _d : null, title: card.title });
+    prompts[id] = { path: node.path, prompt: card.prompt, kind, title: card.title, summary: card.summary };
+  }
+  const settings = effectiveSettings(rootCard.settings, parseBookPlanDecisions(rootCard.raw));
+  const request = {
+    language: deps.language(),
+    model: "",
+    reasoning: "medium",
+    bookTitle: rootCard.title,
+    thread,
+    settings,
+    cards
+  };
+  const base = {
+    runId: data.runId,
+    phaseStartedAt: data.phaseStartedAt,
+    title: rootCard.title,
+    settings,
+    thread,
+    nodes,
+    busy: false,
+    ...data.planOpening ? { opening: data.planOpening } : {}
+  };
+  return planEditFits(request) ? { ...base, cards: cards.map(shown), prompts } : { ...base, cards: [], tooLarge: true, prompts: {} };
+}
+async function applyBookPlanEdit(deps, action, baseline) {
+  var _a2, _b2, _c, _d;
+  const plan = baseline.bookPlan;
+  const stillReview = (map2) => {
+    const run = reviewRun(map2);
+    return !!run && run.runId === (plan == null ? void 0 : plan.runId) && run.phaseStartedAt === plan.phaseStartedAt;
+  };
+  const started = () => ({ status: "skipped", reason: t("ui.map_chat_skip_book_started") });
+  if (!plan) return started();
+  const map = await deps.readMap();
+  const rootId = rootOf(map);
+  const data = reviewRun(map);
+  if (!rootId || !data || !stillReview(deps.map())) return started();
+  const structure2 = structureOfMap(map, effectiveOrder(data), rootId);
+  const authorize = () => stillReview(deps.map());
+  const pathOf = (id) => {
+    var _a3;
+    return (_a3 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _a3.path;
+  };
+  const seen = /* @__PURE__ */ new Map();
+  const locked = /* @__PURE__ */ new Set();
+  const ownSummary = /* @__PURE__ */ new Set();
+  for (const change2 of action.changes) {
+    const proposed = plan.prompts[change2.id];
+    const path = pathOf(change2.id);
+    if (!proposed || !path) {
+      locked.add(change2.id);
+      continue;
+    }
+    const now = await deps.readCard(path);
+    seen.set(change2.id, { prompt: proposed.prompt, kind: proposed.kind, title: now.title });
+    if (!plan.unlocked.includes(change2.id) || planLockedRaw(now.raw, now.prompt)) locked.add(change2.id);
+    if (now.summary !== ((_a2 = proposed.summary) != null ? _a2 : "") || isKeptRaw(now.raw) && bodyStateRaw(now.raw) !== "clean" || bodyStateRaw(now.raw) === "unknown" && !pipelineWroteRaw(now.raw))
+      ownSummary.add(change2.id);
+  }
+  const done = await writePlanEdits(
+    {
+      mapPathOf: async (id) => pathOf(id),
+      cardPathOf: pathOf,
+      readCard: (path) => deps.readCard(path),
+      updateNoteGuarded: (path, patch, options) => deps.updateNoteGuarded(path, patch, options)
+    },
+    { changes: action.changes, seen, locked, structure: structure2, ownSummary, language: deps.language(), authorize }
+  );
+  if (!done.written.length) {
+    return {
+      status: "skipped",
+      reason: t(authorize() ? "ui.map_chat_skip_book_cards" : "ui.map_chat_skip_book_started")
+    };
+  }
+  const left = action.changes.filter((change2) => !done.written.includes(change2.id));
+  const named = [];
+  for (const change2 of left) {
+    const known = seen.get(change2.id);
+    const path = pathOf(change2.id);
+    const changed = !!known && !!path && (await deps.readCard(path)).prompt !== known.prompt;
+    if (locked.has(change2.id) || changed)
+      named.push(
+        `${(_d = (_c = known == null ? void 0 : known.title) != null ? _c : (_b2 = plan.prompts[change2.id]) == null ? void 0 : _b2.title) != null ? _d : change2.id}${t(locked.has(change2.id) ? "ui.map_chat_skip_book_locked" : "ui.map_chat_skip_book_changed")}`
+      );
+  }
+  return {
+    status: "done",
+    note: t("ui.map_chat_line_book_plan_undo") + (left.length ? t("ui.map_chat_line_book_plan_left_0", left.length) + (named.length ? t("ui.map_chat_line_book_plan_named_0", named.join(t("ui.map_chat_count_separator"))) : "") : "")
+  };
+}
+var skip = (key4, ...args) => ({
+  status: "skipped",
+  reason: t(key4, ...args)
+});
+var sameReview = (map, plan) => {
+  const run = reviewRun(map);
+  return !!run && run.runId === plan.runId && run.phaseStartedAt === plan.phaseStartedAt;
+};
+var refusalKey = (code3) => code3 === "not_gate1" ? "ui.map_chat_skip_book_started" : code3 === "stale" ? "ui.map_chat_skip_book_stale" : ["busy", "blocked", "drive_running", "notes_busy"].includes(code3) ? "ui.map_chat_skip_book_busy" : void 0;
+async function applyBookThreadEdit(deps, action, baseline) {
+  const plan = baseline.bookPlan;
+  if (!plan || plan.busy || !sameReview(deps.map(), plan)) return skip("ui.map_chat_skip_book_started");
+  const map = await deps.readMap();
+  const rootId = rootOf(map);
+  const root = rootId ? map.nodes.find((node) => node.id === rootId) : void 0;
+  if (!root || !reviewRun(map)) return skip("ui.map_chat_skip_book_started");
+  const card = await deps.readCard(root.path);
+  if (parseBookPlanBody(card.raw).thread !== plan.thread) return skip("ui.map_chat_skip_book_thread_changed");
+  const next = replaceBookPlanThread(card.raw, action.content);
+  if (next === void 0) return skip("ui.map_chat_skip_book_thread_none");
+  if (next === card.raw) return skip("ui.map_chat_skip_book_cards");
+  const written2 = await deps.updateNoteRawGuarded(root.path, () => next, {
+    expectedContent: card.raw,
+    authorize: () => sameReview(deps.map(), plan)
+  });
+  if (written2 === "discarded")
+    return skip(
+      sameReview(deps.map(), plan) ? "ui.map_chat_skip_book_thread_changed" : "ui.map_chat_skip_book_started"
+    );
+  return { status: "done", note: t("ui.map_chat_line_book_thread") };
+}
+async function applyBookStructureEdit(deps, action, baseline) {
+  var _a2, _b2;
+  const plan = baseline.bookPlan;
+  if (!plan || plan.busy || !plan.nodes.length || !sameReview(deps.map(), plan))
+    return skip("ui.map_chat_skip_book_started");
+  const input2 = { rootId: plan.nodes[0].id, nodes: plan.nodes };
+  const ops = chatStructureOps(action.items, input2, Date.now().toString(36));
+  const locked = new Set(plan.nodes.map((node) => node.id).filter((id) => !plan.unlocked.includes(id)));
+  const sim = simulateStructure(input2, ops, locked);
+  const expected = reviewAffected(input2.rootId, plan.nodes, sim.result, sim.applied).size;
+  let result;
+  try {
+    result = await deps.editStructure(
+      ops,
+      { runId: plan.runId, phaseStartedAt: (_a2 = plan.phaseStartedAt) != null ? _a2 : "", nodes: plan.nodes },
+      expected ? t("ui.map_chat_opening_book_struct_0", expected) : t("ui.map_chat_opening_book_struct_none")
+    );
+  } catch (error) {
+    const code3 = (error == null ? void 0 : error.name) === "BookPipelineRunError" ? error.code : "";
+    const key4 = refusalKey(code3);
+    if (key4) return skip(key4);
+    throw error;
+  }
+  const titleOf = (id) => {
+    var _a3;
+    return ((_a3 = plan.nodes.find((node) => node.id === id)) == null ? void 0 : _a3.title) || id;
+  };
+  const reasons = result.refused.map((refused) => {
+    const op = ops.find((item) => item.id === refused.id);
+    const name2 = op && op.kind !== "add" ? titleOf(op.card) : (op == null ? void 0 : op.kind) === "add" ? op.title : "";
+    return structureRefusal(refused.code, name2);
+  });
+  if (!result.applied.length) return { status: "skipped", reason: (_b2 = reasons[0]) != null ? _b2 : t("ui.book_struct_over_cap") };
+  return {
+    status: "done",
+    note: (result.affected ? t("ui.map_chat_line_book_struct_0_1", result.affected, result.affected) : t("ui.map_chat_line_book_struct_none")) + (reasons.length ? t("ui.map_chat_line_book_struct_left_0", [...new Set(reasons)].join(t("ui.map_chat_count_separator"))) : "")
+  };
 }
 
 // experiences/visual-map/book-pipeline-review.ts
@@ -68768,8 +68890,11 @@ ${shown2}` : t("ui.map_chat_model_label"));
   buildPlanDiff(parent, diff) {
     const list2 = parent.createDiv("vam-map-chat-diff");
     const one = (into, card) => {
+      var _a2;
       const box = into.createDiv("vam-map-chat-diff-card");
       box.createEl("strong", { cls: "vam-map-chat-diff-title", text: card.title });
+      for (const line3 of (_a2 = card.lines) != null ? _a2 : [])
+        box.createDiv({ cls: line3.small ? "vam-map-chat-diff-note" : "vam-map-chat-diff-line", text: line3.text });
       for (const field of card.fields) {
         const row = box.createDiv("vam-map-chat-diff-field");
         if (field.label) row.createSpan({ cls: "vam-map-chat-diff-label", text: field.label });
@@ -68780,10 +68905,16 @@ ${shown2}` : t("ui.map_chat_model_label"));
         row.createSpan({ cls: "vam-sr-only", text: t("ui.map_chat_diff_after") });
         row.createEl("ins", { cls: "vam-map-chat-diff-new", text: field.after });
       }
+      if (card.note) box.createDiv({ cls: "vam-map-chat-diff-note", text: card.note });
     };
-    for (const card of diff.slice(0, PLAN_DIFF_OPEN)) one(list2, card);
-    const rest = diff.slice(PLAN_DIFF_OPEN);
-    if (!rest.length) return;
+    for (const card of diff.filter((card2) => card2.place === "first")) one(list2, card);
+    const plans = diff.filter((card) => !card.place);
+    for (const card of plans.slice(0, PLAN_DIFF_OPEN)) one(list2, card);
+    const rest = plans.slice(PLAN_DIFF_OPEN);
+    if (rest.length) this.buildPlanDiffMore(list2, rest, one);
+    for (const card of diff.filter((card2) => card2.place === "last")) one(list2, card);
+  }
+  buildPlanDiffMore(list2, rest, one) {
     const more = list2.createEl("details", { cls: "vam-map-chat-diff-more" });
     more.createEl("summary", {
       text: t(
@@ -71635,46 +71766,6 @@ var MapChatChainRunner = class {
   }
 };
 
-// experiences/visual-map/book-plan-diff.ts
-var FIELDS2 = ["covers", "entry", "points", "handoff", "previous", "checklist"];
-var LABEL = {
-  covers: "",
-  entry: "ui.map_chat_book_field_entry",
-  points: "ui.map_chat_book_field_points",
-  handoff: "ui.map_chat_book_field_handoff",
-  previous: "ui.map_chat_book_field_previous",
-  checklist: "ui.map_chat_book_field_checklist"
-};
-function bookPlanDiff(action, baseline) {
-  var _a2, _b2;
-  const prompts = (_a2 = baseline == null ? void 0 : baseline.bookPlan) == null ? void 0 : _a2.prompts;
-  if (!prompts) return void 0;
-  const join6 = (items) => items.join(t("ui.map_chat_count_separator"));
-  const cards = [];
-  for (const change2 of action.changes) {
-    const known = prompts[change2.id];
-    if (!known) continue;
-    const before = readBrief(known.prompt);
-    const text11 = (field, from) => {
-      if (from === "before")
-        return field === "points" ? join6(before.points) : field === "checklist" ? join6(before.checklist.map((item) => item.text)) : before[field];
-      const value = change2[field];
-      if (value === void 0) return void 0;
-      return field === "points" || field === "checklist" ? join6(
-        value.map((item) => typeof item === "string" ? item : item.text)
-      ) : value;
-    };
-    const fields = FIELDS2.flatMap((field) => {
-      var _a3;
-      const after = text11(field, "after");
-      const old = (_a3 = text11(field, "before")) != null ? _a3 : "";
-      return after === void 0 || after === old ? [] : [{ label: LABEL[field] && t(LABEL[field]), before: old, after }];
-    });
-    if (fields.length) cards.push({ title: (_b2 = known.title) != null ? _b2 : change2.id, fields });
-  }
-  return cards.length ? cards : void 0;
-}
-
 // experiences/visual-map/topic-chat-steer.ts
 var TopicChatSteers = class {
   constructor(options = {}) {
@@ -71876,10 +71967,28 @@ var MapChatConversation = class {
         return action.kind === "edit_book_plan" ? (_a2 = bookPlanDiff(action, baseline)) != null ? _a2 : [] : [];
       }
     );
-    const diff = bookDiffs.length ? bookDiffs : void 0;
+    const threadCard = result.actions.flatMap(
+      (action) => {
+        var _a2;
+        return action.kind === "edit_book_thread" ? (_a2 = bookThreadDiff(action, baseline)) != null ? _a2 : [] : [];
+      }
+    );
+    const structureCards = result.actions.flatMap(
+      (action) => {
+        var _a2;
+        return action.kind === "edit_book_structure" ? (_a2 = bookStructureCard(action, baseline)) != null ? _a2 : [] : [];
+      }
+    );
+    const diffs = [...threadCard.slice(0, 1), ...bookDiffs, ...structureCards];
+    const diff = diffs.length ? diffs : void 0;
+    const carded = /* @__PURE__ */ new Set([
+      ...bookDiffs.length ? ["edit_book_plan"] : [],
+      ...threadCard.length ? ["edit_book_thread"] : [],
+      ...structureCards.length ? ["edit_book_structure"] : []
+    ]);
     const groups = CHAT_PLAN_GROUP_ORDER.flatMap((group) => {
       const own2 = items.filter(
-        (_, at) => chatPlanGroupOf(result.actions[shown2[at]].kind) === group && !(diff && result.actions[shown2[at]].kind === "edit_book_plan")
+        (_, at) => chatPlanGroupOf(result.actions[shown2[at]].kind) === group && !carded.has(result.actions[shown2[at]].kind)
       );
       return own2.length ? [
         {
@@ -97117,8 +97226,17 @@ ${note.detail.trim()}` : "",
       }
     }
     const all = [...lines].filter((_, index) => !hidden.has(index));
-    if (result.rejected.length)
-      all.push({ status: "skipped", text: t("ui.map_chat_rejected_0", result.rejected.length) });
+    const bookWhy = {
+      book_busy: "ui.map_chat_rejected_book_busy",
+      book_reorder: "ui.map_chat_rejected_book_reorder",
+      book_duplicate: "ui.map_chat_rejected_book_duplicate"
+    };
+    const worded = [
+      ...new Set(result.rejected.map((r) => r.code).filter((code3) => code3 in bookWhy))
+    ];
+    for (const code3 of worded) all.push({ status: "skipped", text: t(bookWhy[code3]) });
+    const counted = result.rejected.filter((r) => !(r.code in bookWhy)).length;
+    if (counted) all.push({ status: "skipped", text: t("ui.map_chat_rejected_0", counted) });
     if (later.some((index) => {
       var _a4;
       return result.actions[index].kind === "run_map_action" && ((_a4 = lines[index]) == null ? void 0 : _a4.status) === "done";

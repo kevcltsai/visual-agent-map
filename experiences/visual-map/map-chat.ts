@@ -180,6 +180,12 @@ export interface MapChatPlanCard {
 export interface MapChatPlanDiffCard {
   title: string;
   fields: { label: string; before: string; after: string }[];
+  /** A card of lines instead of fields (a structure change); `small` lines are notes. */
+  lines?: { text: string; small?: boolean }[];
+  /** One note under the card (the cost, or what a thread change does not do). */
+  note?: string;
+  /** The card is shown in its place, never folded: the thread first, the structure last. */
+  place?: "first" | "last";
 }
 /** The plan diff cards shown open before the rest fold under "N more cards". */
 export const PLAN_DIFF_OPEN = 2;
@@ -3518,6 +3524,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     const one = (into: HTMLElement, card: MapChatPlanDiffCard): void => {
       const box = into.createDiv("vam-map-chat-diff-card");
       box.createEl("strong", { cls: "vam-map-chat-diff-title", text: card.title });
+      for (const line of card.lines ?? [])
+        box.createDiv({ cls: line.small ? "vam-map-chat-diff-note" : "vam-map-chat-diff-line", text: line.text });
       for (const field of card.fields) {
         const row = box.createDiv("vam-map-chat-diff-field");
         if (field.label) row.createSpan({ cls: "vam-map-chat-diff-label", text: field.label });
@@ -3528,10 +3536,21 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         row.createSpan({ cls: "vam-sr-only", text: t("ui.map_chat_diff_after") });
         row.createEl("ins", { cls: "vam-map-chat-diff-new", text: field.after });
       }
+      if (card.note) box.createDiv({ cls: "vam-map-chat-diff-note", text: card.note });
     };
-    for (const card of diff.slice(0, PLAN_DIFF_OPEN)) one(list, card);
-    const rest = diff.slice(PLAN_DIFF_OPEN);
-    if (!rest.length) return;
+    // The thread and the structure card are never folded; the plan cards between them are.
+    for (const card of diff.filter(card => card.place === "first")) one(list, card);
+    const plans = diff.filter(card => !card.place);
+    for (const card of plans.slice(0, PLAN_DIFF_OPEN)) one(list, card);
+    const rest = plans.slice(PLAN_DIFF_OPEN);
+    if (rest.length) this.buildPlanDiffMore(list, rest, one);
+    for (const card of diff.filter(card => card.place === "last")) one(list, card);
+  }
+  private buildPlanDiffMore(
+    list: HTMLElement,
+    rest: MapChatPlanDiffCard[],
+    one: (into: HTMLElement, card: MapChatPlanDiffCard) => void
+  ): void {
     const more = list.createEl("details", { cls: "vam-map-chat-diff-more" });
     more.createEl("summary", {
       text: t(

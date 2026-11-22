@@ -33,6 +33,7 @@ import { planEditFits, shown, type PlanEditRequest } from "../../core/steps/book
 import type { MapChatContext, MapChatContextInput } from "../../core/map-chat-context";
 import type { MapChatAction } from "../../core/steps/map-chat/step";
 import type { MapDocument } from "../../map-model";
+import { structureRefusal } from "./book-plan-diff";
 import type { ChatOutcome } from "./chat-action-writer";
 
 export interface BookPlanCard extends PlanEditNote {
@@ -335,11 +336,7 @@ export async function applyBookStructureEdit(
   const reasons = result.refused.map(refused => {
     const op = ops.find(item => item.id === refused.id);
     const name = op && op.kind !== "add" ? titleOf(op.card) : op?.kind === "add" ? op.title : "";
-    return refused.code === "locked"
-      ? t("ui.map_chat_skip_book_struct_locked_0", name)
-      : refused.code === "has_children"
-        ? t("ui.map_chat_skip_book_struct_children_0", name)
-        : t("ui.map_chat_skip_book_struct_rules");
+    return structureRefusal(refused.code, name);
   });
   if (!result.applied.length) return { status: "skipped", reason: reasons[0] ?? t("ui.book_struct_over_cap") };
   return {

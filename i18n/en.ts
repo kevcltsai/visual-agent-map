@@ -1448,6 +1448,18 @@ export const en = {
   "ui.map_chat_line_book_plan_named_0": ": {0}",
   "ui.map_chat_skip_book_stale": "the plan was just changed, so this proposal is out of date; please say it again",
   "ui.map_chat_skip_book_busy": "the plan is being planned again; please try again when it is done",
+  "ui.map_chat_book_struct_title": "Structure changes",
+  "ui.map_chat_book_struct_archive_note": "The notes stay in the archive and can be restored",
+  "ui.map_chat_book_struct_over_cap_0": "At most 6 changes at a time, this one has {0}; please say them in parts",
+  "ui.map_chat_book_struct_cost_0_1": "After applying, {0} cards are planned again, about {1} AI calls.",
+  "ui.map_chat_book_struct_cost_none":
+    "After applying, no AI planning is needed; only the lines linking the neighbouring chapters are updated.",
+  "ui.map_chat_book_thread_title": "Main thread of the book",
+  "ui.map_chat_book_thread_note":
+    "The chapter plans do not follow automatically; the chapters that need to follow are listed with it.",
+  "ui.map_chat_rejected_book_busy": "The plan is being planned again, so this change is not applied for now.",
+  "ui.map_chat_rejected_book_reorder": "Reordering everything at once is not done; say which chapter goes where.",
+  "ui.map_chat_rejected_book_duplicate": "The same card was changed twice; only the first change is kept.",
   "ui.map_chat_skip_book_struct_locked_0": '"{0}" was edited by you, so it is left alone',
   "ui.map_chat_skip_book_struct_children_0":
     'cannot change: "{0}" still has sections; to delete them together say "with its sections"',

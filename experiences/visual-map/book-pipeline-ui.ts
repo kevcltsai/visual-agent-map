@@ -337,7 +337,7 @@ const structureOfNodes = (input: { rootId: string; nodes: readonly StructureNode
 };
 
 /** Where a card sits in a tree, in words: "preface", "chapter 3", or "the sections of <chapter>". */
-function placer(rootId: string, nodes: readonly StructureNode[], nameOf: (id: string) => string) {
+export function placer(rootId: string, nodes: readonly StructureNode[], nameOf: (id: string) => string) {
   const structure = structureOfNodes({ rootId, nodes });
   return (id: string): string => {
     const place: CardPlace | undefined = structure.placeOf(id);
@@ -348,7 +348,7 @@ function placer(rootId: string, nodes: readonly StructureNode[], nameOf: (id: st
   };
 }
 
-function itemText(
+export function itemText(
   a: AppliedOp,
   title: string,
   rootId: string,

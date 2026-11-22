@@ -21932,8 +21932,18 @@ export class VisualAgentMapView extends ItemView {
     }
     // One line per action (a continuation reads them by position); the chat window says the picture searches of the reply once.
     const all = [...lines].filter((_, index) => !hidden.has(index));
-    if (result.rejected.length)
-      all.push({ status: "skipped", text: t("ui.map_chat_rejected_0", result.rejected.length) });
+    // A book code is said in words (once each); the others stay a count.
+    const bookWhy = {
+      book_busy: "ui.map_chat_rejected_book_busy",
+      book_reorder: "ui.map_chat_rejected_book_reorder",
+      book_duplicate: "ui.map_chat_rejected_book_duplicate"
+    } as const;
+    const worded = [
+      ...new Set(result.rejected.map(r => r.code).filter(code => code in bookWhy))
+    ] as (keyof typeof bookWhy)[];
+    for (const code of worded) all.push({ status: "skipped", text: t(bookWhy[code]) });
+    const counted = result.rejected.filter(r => !(r.code in bookWhy)).length;
+    if (counted) all.push({ status: "skipped", text: t("ui.map_chat_rejected_0", counted) });
     // Undo takes the reply's writes back; the AI work it started records its own steps, so only then is anything said.
     if (later.some(index => result.actions[index].kind === "run_map_action" && lines[index]?.status === "done"))
       all.push({ status: "done", text: t("ui.map_chat_not_undoable") });

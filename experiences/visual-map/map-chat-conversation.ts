@@ -24,7 +24,7 @@ import type {
   MapChatTurnHandle
 } from "./map-chat";
 import { newChatWork, type ChatChainRun, type ChatRoundWork, type MapChatChainRunner } from "./map-chat-chain-run";
-import { bookPlanDiff } from "./book-plan-diff";
+import { bookPlanDiff, bookStructureCard, bookThreadDiff } from "./book-plan-diff";
 import type { TransactionEntry } from "./map-transaction";
 import type { MapChatTurnRecord, TurnEndFields } from "./map-chat-turn-record";
 import { TopicChatSteers, type TopicSteerEntry } from "./topic-chat-steer";
@@ -246,14 +246,27 @@ export class MapChatConversation {
     const bookDiffs = result.actions.flatMap(action =>
       action.kind === "edit_book_plan" ? (bookPlanDiff(action, baseline) ?? []) : []
     );
-    const diff = bookDiffs.length ? bookDiffs : undefined;
+    const threadCard = result.actions.flatMap(action =>
+      action.kind === "edit_book_thread" ? (bookThreadDiff(action, baseline) ?? []) : []
+    );
+    const structureCards = result.actions.flatMap(action =>
+      action.kind === "edit_book_structure" ? (bookStructureCard(action, baseline) ?? []) : []
+    );
+    // In the order the reply is applied: the thread, the cards' plans, the structure.
+    const diffs = [...threadCard.slice(0, 1), ...bookDiffs, ...structureCards];
+    const diff = diffs.length ? diffs : undefined;
+    // A kind whose card is shown is not listed again as a group line; a kind without a card (nothing to show) still is.
+    const carded = new Set<string>([
+      ...(bookDiffs.length ? ["edit_book_plan"] : []),
+      ...(threadCard.length ? ["edit_book_thread"] : []),
+      ...(structureCards.length ? ["edit_book_structure"] : [])
+    ]);
     // The same lines by kind of work, so a 100-action plan reads as five folded lists. Next to a diff the groups are the other actions
     // of the reply: the buttons apply all of them, so none may be left unseen.
     const groups = CHAT_PLAN_GROUP_ORDER.flatMap(group => {
       const own = items.filter(
         (_, at) =>
-          chatPlanGroupOf(result.actions[shown[at]].kind) === group &&
-          !(diff && result.actions[shown[at]].kind === "edit_book_plan")
+          chatPlanGroupOf(result.actions[shown[at]].kind) === group && !carded.has(result.actions[shown[at]].kind)
       );
       return own.length
         ? [

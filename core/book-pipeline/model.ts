@@ -194,6 +194,8 @@ export interface BookPipelineData {
   planEdited?: true;
   /** How many times that pass was started (counted before the call, given back by a stop); cleared with {@link BookPipelineData.planEdited}. Absent = none. */
   planEditAttempts?: number;
+  /** The chief editor's opening words to the author, written by that pass; shown once in the chat at the plan review. Cleared with {@link BookPipelineData.planEdited}. Absent = none. */
+  planOpening?: string;
   /** The map's card set (ids) the run accepted: the cards of the map when it started, or when the owner chose "carry on as before". Absent = older data: `order`. */
   accepted?: string[];
   /** New cards (not in `order`) the owner chose to leave out with "carry on as before". Absent = none. */
@@ -501,7 +503,12 @@ export function readBookPipeline(map: { bookPipeline?: unknown }): BookPipelineR
   if (map.bookPipeline === undefined) return { kind: "absent" };
   const found = problem(map.bookPipeline);
   if (found) return { kind: "unusable", reason: found, raw: map.bookPipeline };
-  const data = map.bookPipeline as BookPipelineData;
+  let data = map.bookPipeline as BookPipelineData;
+  // The opening is only words for the chat: a malformed or over-long one is dropped, never a reason to refuse the run.
+  if (data.planOpening !== undefined && (typeof data.planOpening !== "string" || data.planOpening.length > 2000)) {
+    const { planOpening: _opening, ...rest } = data;
+    data = rest;
+  }
   if (data.structureEdit !== undefined && !structureEditShape(data.structureEdit)) {
     const { structureEdit: _dropped, ...rest } = data;
     return { kind: "usable", data: rest, structureUnreadable: true };

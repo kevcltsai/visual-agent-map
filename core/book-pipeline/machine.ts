@@ -538,6 +538,7 @@ const planRevision = (data: BookPipelineData): number =>
 const clearPlanEdit = (next: BookPipelineData): void => {
   delete next.planEdited;
   delete next.planEditAttempts;
+  delete next.planOpening;
 };
 /** True while the pass's result may still be committed. */
 export function isPlanEditCurrent(data: BookPipelineData, token: PlanEditToken): boolean {
@@ -563,10 +564,11 @@ export function beginPlanEdit(data: BookPipelineData): { state: BookPipelineData
   };
 }
 /** The pass finished (changes applied or none): it is done for this plan. */
-export function applyPlanEditSuccess(data: BookPipelineData, token: PlanEditToken): Committed {
+export function applyPlanEditSuccess(data: BookPipelineData, token: PlanEditToken, opening?: string): Committed {
   if (!isPlanEditCurrent(data, token)) return { state: data, accepted: false };
   const next = clone(data);
   next.planEdited = true;
+  if (opening) next.planOpening = opening;
   next.revision++;
   return { state: next, accepted: true };
 }

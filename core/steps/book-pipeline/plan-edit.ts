@@ -33,9 +33,17 @@ export interface PlanEditCard {
   /** True = the card's plan is not the program's to change (kept or hand-edited, or no readable plan): the editor leaves it alone. */
   locked?: boolean;
 }
+/** One structure change the editor already made to this book before the pass (add, remove, merge, move, rename), with its reason. */
+export interface PlanEditStructureChange {
+  kind: string;
+  title: string;
+  reason: string;
+}
 export interface PlanEditRequest extends BookStepBase {
   bookTitle: string;
   thread: string;
+  /** The structure changes already applied in this run, so the opening can say why the book is shaped as it is. Absent = none. */
+  structureChanges?: readonly PlanEditStructureChange[];
   settings: BookSettings;
   /** Every card of the book, in reading order. */
   cards: readonly PlanEditCard[];
@@ -50,16 +58,24 @@ export interface PlanEditChange {
   previous?: string;
   checklist?: { type: ChecklistType; text: string }[];
 }
+/** What one pass returns: the card changes, and the chief editor's opening words to the author (absent when the reply had none). */
+export interface PlanEditResult {
+  changes: PlanEditChange[];
+  opening?: string;
+}
 
 /** Longest each field is shown (and accepted back); a field over its cap is cut. */
 export const PLAN_EDIT_TEXT_CHARS = 400;
 export const PLAN_EDIT_CHECK_CHARS = 200;
+/** Longest the opening is accepted (a longer one is cut). */
+export const PLAN_EDIT_OPENING_CHARS = 900;
 const FIELDS = ["id", "covers", "points", "entry", "handoff", "previous", "checklist"] as const;
 
 export const PLAN_EDIT_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
+    opening: { type: "string" },
     changes: {
       type: "array",
       items: {
@@ -94,7 +110,7 @@ export const PLAN_EDIT_SCHEMA = {
 };
 
 const cap = (value: string, max: number): string => singleLine(value, max);
-const shown = (card: PlanEditCard): Rec => ({
+export const shown = (card: PlanEditCard): Rec => ({
   id: card.id,
   place: card.place,
   role: card.role,
@@ -117,6 +133,13 @@ const render = (request: PlanEditRequest): string =>
     title: JSON.stringify(cap(request.bookTitle, 200)),
     thread: JSON.stringify(cap(request.thread, 1200)),
     settings: JSON.stringify(request.settings),
+    structure: JSON.stringify(
+      (request.structureChanges ?? []).map(change => ({
+        kind: cap(change.kind, 20),
+        title: cap(change.title, 200),
+        reason: cap(change.reason, 200)
+      }))
+    ),
     cards: JSON.stringify(request.cards.map(shown))
   });
 /** Whether the whole book's briefs fit one request (the runner asks before the call; a book that does not fit gets no pass and no call). */
@@ -131,7 +154,7 @@ export const changesBrief = (change: PlanEditChange): boolean =>
   change.covers !== undefined || change.points !== undefined || change.previous !== undefined;
 
 /** One change, or undefined when its shape is wrong (the change is dropped, never the reply). */
-function parseChange(entry: unknown, known: ReadonlySet<string>): PlanEditChange | undefined {
+export function parseChange(entry: unknown, known: ReadonlySet<string>): PlanEditChange | undefined {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return undefined;
   const item = entry as Rec;
   if (Object.keys(item).some(key => !(FIELDS as readonly string[]).includes(key))) return undefined;
@@ -169,12 +192,13 @@ function parseChange(entry: unknown, known: ReadonlySet<string>): PlanEditChange
 }
 
 /**
- * Reads `changes` and nothing else (anything else is a failure, retried). A change with an unknown id, a repeated id, an unknown field or a
- * wrong shape is dropped on its own; the valid ones are returned in the reply's order.
+ * Reads `changes` and the optional `opening` (anything else is a failure, retried). A change with an unknown id, a repeated id, an unknown
+ * field or a wrong shape is dropped on its own; the valid ones are returned in the reply's order. An opening that is not a string is ignored.
  */
-export function parsePlanEdit(raw: string, request: PlanEditRequest): PlanEditChange[] {
+export function parsePlanEdit(raw: string, request: PlanEditRequest): PlanEditResult {
   const value = parseJson(raw);
-  if (Object.keys(value).length !== 1 || !("changes" in value)) fail("The reply has unexpected fields");
+  if (!("changes" in value) || Object.keys(value).some(key => key !== "changes" && key !== "opening"))
+    fail("The reply has unexpected fields");
   const known = new Set(request.cards.filter(card => !card.locked).map(card => card.id));
   const seen = new Set<string>();
   const out: PlanEditChange[] = [];
@@ -184,13 +208,14 @@ export function parsePlanEdit(raw: string, request: PlanEditRequest): PlanEditCh
     seen.add(change.id);
     out.push(change);
   }
-  return out;
+  const opening = typeof value.opening === "string" ? value.opening.trim().slice(0, PLAN_EDIT_OPENING_CHARS) : "";
+  return opening ? { changes: out, opening } : { changes: out };
 }
 
 /** The chief editor's one pass over every card's brief: one text-only call (no web, no tools). */
-export const planEditStep: StepDefinition<PlanEditRequest, PlanEditChange[]> = {
+export const planEditStep: StepDefinition<PlanEditRequest, PlanEditResult> = {
   id: "book-pipeline.plan-edit",
-  version: 2,
+  version: 3,
   render,
   schema: PLAN_EDIT_SCHEMA,
   policy: (prompt, request) => {

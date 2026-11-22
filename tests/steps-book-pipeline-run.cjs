@@ -77,7 +77,7 @@ async function rig(over = {}) {
     updateNoteRawGuarded: (path, transform, options) => repo.updateNoteRawGuarded(path, transform, options),
     runPlan: async (step, request, run) => {
       if (step.id === 'book-pipeline.global-plan') { stat.plan.push('global'); await run.admission.reserve(); return script.global(request, stat.plan.filter(x => x === 'global').length); }
-      if (step.id === 'book-pipeline.plan-edit') { stat.planEdit.push(request); await run.admission.reserve(); return script.planEdit(request, stat.planEdit.length); }
+      if (step.id === 'book-pipeline.plan-edit') { stat.planEdit.push(request); await run.admission.reserve(); const out = await script.planEdit(request, stat.planEdit.length); return Array.isArray(out) ? { changes: out } : out; }
       stat.plan.push(request.card.id); await run.admission.reserve(); return script.card(request, stat.plan.filter(x => x === request.card.id).length);
     },
     runProofread: async (request, run) => { stat.proof.push(request); await run.admission.reserve(); return script.proof(request, stat.proof.length); },
@@ -5170,6 +5170,34 @@ test('P2b after the undo the run re-plans the affected cards and the editor read
   assert.ok(requests.card.length >= 2, 'the restored card and the merge target are planned again');
   assert.equal(r.stat.planEdit.length, editsBefore + 1, 'plan_edit runs once more');
   assert.equal((await r.state()).phase, 'gate1');
+});
+
+test('plan edit opening: the editor\'s opening is stored as planOpening; a reply without one stores none', async () => {
+  const withOpening = await rig({ script: { planEdit: () => ({ changes: [], opening: 'Hello author' }) } });
+  await withOpening.runs.start(withOpening.mapPath);
+  assert.equal((await withOpening.state()).planOpening, 'Hello author');
+  const without = await rig({ script: { planEdit: () => ({ changes: [] }) } });
+  await without.runs.start(without.mapPath);
+  assert.equal((await without.state()).planOpening, undefined);
+  const small = await rig({ titles: TITLES.slice(0, 2) });
+  await small.runs.start(small.mapPath);
+  assert.equal((await small.state()).planOpening, undefined, 'a book too small for the pass has no opening');
+});
+
+test('plan edit: structureChanges holds this run\'s applied ops that were not undone, and a replan after an undo drops the undone one', async () => {
+  const { r } = await structureRig(SOP);
+  await r.runs.start(r.mapPath);
+  const first = r.stat.planEdit[0];
+  assert.deepEqual([...first.structureChanges.map(c => c.kind)], ['merge', 'add', 'rename']);
+  assert.deepEqual([...first.structureChanges.map(c => c.title)], ['SecretTitleB', 'NewChapter', 'RenamedA']);
+  assert.equal(first.structureChanges[0].reason, 'same ground');
+  await r.runs.undoStructureEdit(r.mapPath, ['o1']); await settle();
+  const last = r.stat.planEdit[r.stat.planEdit.length - 1];
+  assert.ok(r.stat.planEdit.length > 1, 'the pass ran again');
+  assert.ok(!(last.structureChanges ?? []).some(c => c.kind === 'merge'), 'the undone op is not offered');
+  const plain = await rig();
+  await plain.runs.start(plain.mapPath);
+  assert.equal(plain.stat.planEdit[0].structureChanges, undefined, 'no structure changes: the field is absent');
 });
 
 test('P2b materials homed on a merged card are pointed back at it by the undo', async () => {

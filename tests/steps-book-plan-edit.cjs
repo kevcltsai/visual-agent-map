@@ -155,15 +155,15 @@ test('plan edit step parse: valid changes kept in order; unknown ids, bad shapes
     { id: 'c', entry: 'second change for c' },
     'text'
   ] });
-  const out = plain(step.planEditStep.parse(reply, request()));
+  const out = plain(step.planEditStep.parse(reply, request()).changes);
   assert.deepEqual(out.map(c => c.id), ['b', 'c']);
   assert.deepEqual(out[0], { id: 'b', covers: 'new covers', previous: 'prev' });
   assert.deepEqual(out[1].points, ['one', 'two', 'three', 'four']);
-  assert.deepEqual(plain(step.planEditStep.parse('{"changes":[]}', request())), []);
+  assert.deepEqual(plain(step.planEditStep.parse('{"changes":[]}', request()).changes), []);
 });
 
 test('plan edit step parse: a points list that is too short drops the change; a checklist without a new covers, points or previous is ignored; malformed replies throw', () => {
-  const parse = changes => plain(step.planEditStep.parse(JSON.stringify({ changes }), request()));
+  const parse = changes => plain(step.planEditStep.parse(JSON.stringify({ changes }), request()).changes);
   assert.deepEqual(parse([{ id: 'b', points: ['one'] }]), []);
   assert.deepEqual(parse([{ id: 'b', checklist: [{ type: 'fact', text: 'x' }] }]), []);
   assert.deepEqual(parse([{ id: 'b', entry: 'e2', checklist: [{ type: 'fact', text: 'x' }] }]), [{ id: 'b', entry: 'e2' }], 'an entry change leaves the checklist alone');
@@ -173,7 +173,7 @@ test('plan edit step parse: a points list that is too short drops the change; a 
 });
 
 test('plan edit step parse: a checklist replaces the whole list when covers, points or previous change; without one the change is flagged by changesBrief', () => {
-  const parse = changes => plain(step.planEditStep.parse(JSON.stringify({ changes }), request()));
+  const parse = changes => plain(step.planEditStep.parse(JSON.stringify({ changes }), request()).changes);
   const list = [{ type: 'structure', text: 'names the earlier ideas "X" and "Y" and states that they lead to "Z"' }];
   for (const field of [{ covers: 'new' }, { previous: 'new prev' }, { points: ['one', 'two', 'three'] }]) {
     const [out] = parse([{ id: 'b', ...field, checklist: list }]);
@@ -193,7 +193,7 @@ test('plan edit step: a locked card is marked in the request and its changes are
   assert.match(prompt, /"id":"b"[^}]*"locked":true/);
   assert.doesNotMatch(prompt, /"id":"a"[^}]*"locked"/);
   assert.match(prompt, /locked.*must not change/);
-  const out = plain(step.planEditStep.parse(JSON.stringify({ changes: [{ id: 'b', entry: 'x' }, { id: 'c', entry: 'y' }] }), locked));
+  const out = plain(step.planEditStep.parse(JSON.stringify({ changes: [{ id: 'b', entry: 'x' }, { id: 'c', entry: 'y' }] }), locked).changes);
   assert.deepEqual(out.map(c => c.id), ['c']);
 });
 
@@ -275,4 +275,39 @@ test('editedPrompt: a zh-CN Prompt round trips unchanged and an edit keeps its l
   assert.equal(readBrief(out).entry, 'old entry');
   assert.equal(out.replace('new covers', 'old covers').replace('new handoff', 'old handoff'), prompt, 'only the two fields moved');
   assert.deepEqual(plain(planText.parseImageSlots(out)), plain(planText.parseImageSlots(prompt)));
+});
+
+test('plan edit step parse: the opening is kept (trimmed, cut at its cap); absent or not a string means none; other extra fields still fail', () => {
+  const parse = value => plain(step.planEditStep.parse(JSON.stringify(value), request()));
+  assert.deepEqual(parse({ changes: [], opening: '  Hello  ' }), { changes: [], opening: 'Hello' });
+  assert.deepEqual(parse({ changes: [] }), { changes: [] });
+  assert.deepEqual(parse({ changes: [], opening: 5 }), { changes: [] }, 'a non-string opening is ignored');
+  assert.deepEqual(parse({ changes: [], opening: '   ' }), { changes: [] });
+  assert.equal(parse({ changes: [], opening: 'x'.repeat(5000) }).opening.length, step.PLAN_EDIT_OPENING_CHARS);
+  assert.throws(() => step.planEditStep.parse('{"changes":[],"opening":"a","extra":1}', request()), /unexpected/);
+  assert.throws(() => step.planEditStep.parse('{"opening":"a"}', request()), /unexpected/);
+});
+
+test('plan edit step: structure changes are rendered as data; none renders an empty list; the version moved', () => {
+  const none = step.planEditStep.render(request());
+  assert.match(none, /Structure changes already made[^\n]*\n\[\]/);
+  const withChanges = step.planEditStep.render({ ...request(), structureChanges: [{ kind: 'merge', title: 'T-b', reason: 'same ground' }] });
+  assert.ok(withChanges.includes('{"kind":"merge","title":"T-b","reason":"same ground"}'));
+  assert.match(withChanges, /opening/);
+  assert.equal(step.planEditStep.version, 3);
+});
+
+test('plan opening: a successful pass stores it; a pass without one stores none; a replan clears it; the reader drops a malformed or over-long one without refusing the run', () => {
+  const d = begin(fresh());
+  const done = machine.applyPlanEditSuccess(d.state, d.token, 'Hello author');
+  assert.equal(done.state.planOpening, 'Hello author');
+  assert.equal(machine.applyPlanEditSuccess(begin(fresh()).state, begin(fresh()).token).state.planOpening, undefined);
+  assert.equal(machine.backToPlan({ ...done.state, phase: 'gate1', planReview: undefined, trial: ['a'] }, NOW).planOpening, undefined, 'a replan forgets the pass and its opening');
+  const saved = read(done.state);
+  assert.equal(saved.kind, 'usable'); assert.equal(saved.data.planOpening, 'Hello author');
+  for (const bad of [5, ['x'], 'y'.repeat(2001)]) {
+    const r = read({ ...done.state, planOpening: bad });
+    assert.equal(r.kind, 'usable', 'the run is not refused');
+    assert.equal(r.data.planOpening, undefined, 'the bad value is dropped');
+  }
 });

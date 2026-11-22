@@ -257,7 +257,7 @@ import {
   type SlotFigure,
   type SlotOutcome
 } from "../../core/book-pipeline/image-slots";
-import { editedPrompt, readBrief } from "../../core/book-pipeline/plan-edit";
+import { cardPlanPlaceOf, neighbourPosition, planEditCardOf, writePlanEdits } from "../../core/book-pipeline/plan-edit";
 import {
   changesBrief,
   planEditFits,
@@ -2523,9 +2523,7 @@ export class BookPipelineRuns {
   }
   /** What a neighbour line says of `otherId` on the line of `ownId`: a chapter number (`"preface"` for the root), none beside a section. */
   private neighbourPosition(structure: BookStructure, ownId: string, otherId: string): number | "preface" | undefined {
-    if (structure.placeOf(ownId)?.kind === "section") return undefined;
-    const place = structure.placeOf(otherId);
-    return place?.kind === "preface" ? "preface" : place?.chapter;
+    return neighbourPosition(structure, ownId, otherId);
   }
   /** The lines of a card's Prompt that name another card, with the card each names now (`undefined` = none): a section's chapter, the previous and the next. */
   private neighbourSides(
@@ -2559,16 +2557,8 @@ export class BookPipelineRuns {
   private placeOf(drive: Drive, structure: BookStructure, id: string): string {
     return placeText(this.planPlaceOf(drive, structure, id));
   }
-  private planPlaceOf(drive: Drive, structure: BookStructure, id: string): CardPlanPlace {
-    const place = structure.placeOf(id);
-    if (!place || place.kind === "preface") return { kind: "preface" };
-    if (place.kind === "chapter") return { kind: "chapter", chapter: place.chapter };
-    return {
-      kind: "section",
-      chapter: structure.placeOf(place.chapterId as string)?.chapter,
-      sectionIndex: place.sectionIndex,
-      sectionCount: place.sectionCount
-    };
+  private planPlaceOf(_drive: Drive, structure: BookStructure, id: string): CardPlanPlace {
+    return cardPlanPlaceOf(structure, id);
   }
   private orderOf(map: MapDocument): string[] {
     const roots = map.nodes.filter(node => !node.parentId);
@@ -2902,9 +2892,10 @@ export class BookPipelineRuns {
     const token = begun.token;
     const startedAt = Date.parse(this.ports.now());
     const counts = { changes: 0, written: 0, rejected: 0 };
+    const out: { opening?: string } = {};
     let outcome: Outcome;
     try {
-      outcome = await this.execPlanEdit(drive, token, counts);
+      outcome = await this.execPlanEdit(drive, token, counts, out);
     } catch (error) {
       outcome = this.classify(drive, error);
     }
@@ -2925,7 +2916,7 @@ export class BookPipelineRuns {
     const stopped = (budget: boolean): Promise<unknown> =>
       drive.store.commit(state => applyPlanEditStopped(state, token, budget));
     if (outcome.kind === "ok") {
-      const done = await drive.store.commit(state => applyPlanEditSuccess(state, token));
+      const done = await drive.store.commit(state => applyPlanEditSuccess(state, token, out.opening));
       if (!done) return;
       if (!done.accepted) {
         await stopped(false);
@@ -2954,7 +2945,8 @@ export class BookPipelineRuns {
   private async execPlanEdit(
     drive: Drive,
     token: PlanEditToken,
-    counts: { changes: number; written: number; rejected: number }
+    counts: { changes: number; written: number; rejected: number },
+    out: { opening?: string }
   ): Promise<Outcome> {
     const signal = drive.controller.signal;
     const rootInfo = drive.cards.get(drive.rootId);
@@ -2965,43 +2957,52 @@ export class BookPipelineRuns {
     const book = parseBookPlanBody(root.raw);
     const seen = new Map<string, { prompt: string; kind: CardKind; title: string }>();
     const cards: PlanEditCard[] = [];
+    // The structure changes of this run that still stand: the chief editor's opening says why the book is shaped as it is.
+    const edit = drive.store.state.structureEdit;
+    const structureChanges =
+      edit && edit.runId === token.runId
+        ? edit.applied
+            .filter(a => !edit.undone?.includes(a.id))
+            .map(a => ({
+              kind: a.op.kind,
+              title: "title" in a.op ? a.op.title : a.before.title,
+              reason: a.op.reason
+            }))
+        : [];
     for (const id of order) {
       const info = drive.cards.get(id);
       if (!info) return { kind: "failed", reason: "missing" };
       const card = await this.ports.readCard(info.path);
-      const brief = readBrief(card.prompt);
       seen.set(id, { prompt: card.prompt, kind: structure.placeOf(id)?.kind ?? "chapter", title: card.title });
-      cards.push({
-        id,
-        place: this.placeOf(drive, structure, id),
-        role: info.role,
-        title: card.title,
-        covers: brief.covers,
-        points: brief.points,
-        entry: brief.entry,
-        handoff: brief.handoff,
-        previous: brief.previous,
-        next: brief.next,
-        checklist: brief.checklist.map(item => item.text),
-        // A card the program may not rewrite, or one with no plan written by the planner, is not the editor's to change.
-        ...(drive.planSkipped.has(id) || !brief.covers ? { locked: true } : {})
-      });
+      // A card the program may not rewrite, or one with no plan written by the planner, is not the editor's to change.
+      cards.push(
+        planEditCardOf(
+          id,
+          this.placeOf(drive, structure, id),
+          info.role,
+          card.title,
+          card.prompt,
+          drive.planSkipped.has(id)
+        )
+      );
     }
     const request: PlanEditRequest = {
       ...this.base(drive, drive.config.planModel),
       bookTitle: root.title,
       thread: book.thread,
       settings: effectiveSettings(root.settings, parseBookPlanDecisions(root.raw)),
-      cards
+      cards,
+      ...(structureChanges.length ? { structureChanges } : {})
     };
     if (!planEditFits(request)) {
       this.log(drive, "plan_refused", "-", "plan", "plans_too_long");
       return { kind: "failed", reason: "plans_too_long" };
     }
-    const changes = await untilAborted(
+    const result = await untilAborted(
       signal,
       this.ports.runPlan(planEditStep, request, { signal, admission: drive.admission })
     );
+    const changes = result.changes;
     counts.changes = changes.length;
     const authorize = (): boolean =>
       !this.dead(drive) && !signal.aborted && isPlanEditCurrent(drive.store.state, token);
@@ -3012,60 +3013,19 @@ export class BookPipelineRuns {
       change => !locked.has(change.id) && changesBrief(change) && !change.checklist
     ).length;
     if (counts.rejected) return { kind: "failed", reason: "checklist_missing" };
-    const moved: string[] = [];
-    for (const change of changes) {
-      if (!authorize()) return { kind: "cancelled" };
-      const before = seen.get(change.id);
-      // A card the program may not rewrite (hand-edited chapter, kept) keeps its plan too.
-      if (!before || locked.has(change.id)) continue;
-      const path = await this.stillOnMap(drive, change.id);
-      if (!path) continue;
-      const current = await this.ports.readCard(path);
-      // Only the Prompt the planner wrote: one the owner edited meanwhile is left as it is.
-      if (current.prompt !== before.prompt) continue;
-      // A checklist belongs to a changed covers, points or previous; on its own it is not applied.
-      const prompt = editedPrompt(
-        before.prompt,
-        changesBrief(change) ? change : { ...change, checklist: undefined },
-        before.kind,
-        drive.config.language
-      );
-      if (prompt === undefined) continue;
-      // The map's summary follows the covers the way the plan step writes it (a reader's own summary stays).
-      const patch = drive.ownSummary.has(change.id) || !change.covers ? { prompt } : { prompt, summary: change.covers };
-      const written = await this.ports.updateNoteGuarded(path, patch, { expectedContent: current.raw, authorize });
-      if (written === "written") {
-        counts.written++;
-        if (change.covers) moved.push(change.id);
-      }
-    }
-    // The card before a card whose covers changed still describes the old subject on its `next` line (the `previous` sentences are the
-    // plan's own earlier-ideas text and are kept).
-    for (const id of moved) {
-      const above = structure.neighboursOf(id).previous;
-      const info = above === undefined ? undefined : drive.cards.get(above);
-      const own = drive.cards.get(id);
-      if (above === undefined || !info || !own) continue;
-      if (!authorize()) return { kind: "cancelled" };
-      const raw = await this.ports.readCard(info.path);
-      if (!isUntouched(raw.detail)) continue;
-      const covers = summaryText(parseCardPrompt((await this.ports.readCard(own.path)).prompt).covers ?? "").trim();
-      const prompt = covers
-        ? rewriteNeighbourLine(
-            raw.prompt,
-            "next",
-            {
-              position: this.neighbourPosition(structure, above, id),
-              title: seen.get(id)?.title ?? "",
-              summary: covers
-            },
-            structure.placeOf(above)?.kind
-          )
-        : undefined;
-      if (prompt === undefined) continue;
-      await this.ports.updateNoteGuarded(info.path, { prompt }, { expectedContent: raw.raw, authorize });
-    }
-    return authorize() ? { kind: "ok" } : { kind: "cancelled" };
+    const done = await writePlanEdits(
+      {
+        mapPathOf: id => this.stillOnMap(drive, id),
+        cardPathOf: id => drive.cards.get(id)?.path,
+        readCard: path => this.ports.readCard(path),
+        updateNoteGuarded: (path, patch, options) => this.ports.updateNoteGuarded(path, patch, options)
+      },
+      { changes, seen, locked, structure, ownSummary: drive.ownSummary, language: drive.config.language, authorize }
+    );
+    counts.written = done.written.length;
+    if (done.cancelled) return { kind: "cancelled" };
+    out.opening = result.opening;
+    return { kind: "ok" };
   }
 
   // ---- one step ----------------------------------------------------------------------------------------------------------------

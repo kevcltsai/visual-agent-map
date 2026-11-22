@@ -29,6 +29,7 @@ import type { MapDocument } from "../../map-model";
 import type { ChatOutcome } from "./chat-action-writer";
 
 export interface BookPlanCard extends PlanEditNote {
+  summary: string;
   fields: { bookRole?: BookRole };
   settings: BookSettings;
 }
@@ -76,7 +77,7 @@ export async function bookPlanChatInput(deps: BookPlanChatDeps): Promise<MapChat
   const order = effectiveOrder(data);
   const structure = structureOfMap(map, order, rootId);
   const cards = [];
-  const prompts: Record<string, { path: string; prompt: string; kind: string; title?: string }> = {};
+  const prompts: Record<string, { path: string; prompt: string; kind: string; title?: string; summary?: string }> = {};
   for (const id of order) {
     const node = map.nodes.find(item => item.id === id);
     if (!node) return undefined;
@@ -92,7 +93,7 @@ export async function bookPlanChatInput(deps: BookPlanChatDeps): Promise<MapChat
         planLockedRaw(card.raw, card.prompt)
       )
     );
-    prompts[id] = { path: node.path, prompt: card.prompt, kind, title: card.title };
+    prompts[id] = { path: node.path, prompt: card.prompt, kind, title: card.title, summary: card.summary };
   }
   const settings = effectiveSettings(rootCard.settings, parseBookPlanDecisions(rootCard.raw));
   const request: PlanEditRequest = {
@@ -106,6 +107,7 @@ export async function bookPlanChatInput(deps: BookPlanChatDeps): Promise<MapChat
   };
   const base = {
     runId: data.runId,
+    phaseStartedAt: data.phaseStartedAt,
     title: rootCard.title,
     settings,
     ...(data.planOpening ? { opening: data.planOpening } : {})
@@ -125,7 +127,10 @@ export async function applyBookPlanEdit(
   baseline: Pick<MapChatContext, "bookPlan">
 ): Promise<ChatOutcome> {
   const plan = baseline.bookPlan;
-  const stillReview = (map: MapDocument | null): boolean => reviewRun(map)?.runId === plan?.runId;
+  const stillReview = (map: MapDocument | null): boolean => {
+    const run = reviewRun(map);
+    return !!run && run.runId === plan?.runId && run.phaseStartedAt === plan.phaseStartedAt;
+  };
   const started = (): ChatOutcome => ({ status: "skipped", reason: t("ui.map_chat_skip_book_started") });
   if (!plan) return { status: "skipped", reason: t("ui.map_chat_skip_map_changed") };
   const map = await deps.readMap();
@@ -148,8 +153,10 @@ export async function applyBookPlanEdit(
     const now = await deps.readCard(path);
     seen.set(change.id, { prompt: proposed.prompt, kind: proposed.kind as CardKind, title: now.title });
     if (!plan.unlocked.includes(change.id) || planLockedRaw(now.raw, now.prompt)) locked.add(change.id);
-    // The reader's own Summary (a kept chapter, or a card the pipeline never wrote that has text) stays when the covers change.
+    // The reader's own Summary (a kept chapter, a card the pipeline never wrote that has text, or one changed since the proposal)
+    // stays when the covers change.
     if (
+      now.summary !== (proposed.summary ?? "") ||
       (isKeptRaw(now.raw) && bodyStateRaw(now.raw) !== "clean") ||
       (bodyStateRaw(now.raw) === "unknown" && !pipelineWroteRaw(now.raw))
     )

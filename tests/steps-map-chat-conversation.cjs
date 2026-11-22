@@ -976,3 +976,19 @@ test('the plan apply ends through the instance flushSteers (a replaced one is ca
   await r.conv.applyChatPlan(card, r.conv.planToken, REPLY([act.child]), { selectedCount: 0 }, { ...ANCHOR }, null);
   assert.deepEqual(calls, [false, true]);
 });
+
+test('offer: a book plan diff next to a delete_topic still lists the delete group (with its danger mark) on the card', () => {
+  const planText = load('core/book-pipeline/plan-text.ts');
+  const prompt = planText.composeCardPrompt({ role: 'body', kind: 'chapter', covers: 'c', points: ['p'], entry: 'e', handoff: 'h', checklist: [{ id: 'C1', type: 'structure', text: 'c1' }] }, 'en');
+  const baseline = { selectedCount: 0, bookPlan: { runId: 'run-1', unlocked: ['b'], prompts: { b: { path: 'b.md', prompt, kind: 'chapter', title: 'B' } } } };
+  const edit = { kind: 'edit_book_plan', changes: [{ id: 'b', entry: 'new entry' }] };
+  const r = rig();
+  r.conv.offerChatPlan(resultOf([edit, act.del]), planOf({ reasons: ['book_plan_edit'] }), baseline, { ...ANCHOR }, 'm');
+  const card = r.panel.pending;
+  assert.equal(card.diff.length, 1, 'the before and after is there');
+  assert.deepEqual(card.groups.map(g => g.items), [['L:delete_topic']], 'the delete is listed, the book edit is not repeated');
+  assert.ok(card.groups[0].danger.mark, 'and marked as removing');
+  const alone = rig();
+  alone.conv.offerChatPlan(resultOf([edit]), planOf({ reasons: ['book_plan_edit'] }), baseline, { ...ANCHOR }, 'm');
+  assert.deepEqual(alone.panel.pending.groups, [], 'a diff alone has no group');
+});

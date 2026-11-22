@@ -287,6 +287,8 @@ export interface MapChatContextInput {
   /** A book plan under review (the caller checked the run is waiting for the author); omitted leaves the context exactly as it was. */
   bookPlan?: {
     runId: string;
+    /** The gate entry time of the plan, so a proposal made at an earlier gate is not applied to a later one. */
+    phaseStartedAt?: string;
     title: string;
     settings: unknown;
     /** The cards in reading order, already in the shape the plan editor is shown (`shown`); empty with `tooLarge`. */
@@ -296,7 +298,7 @@ export interface MapChatContextInput {
     /** The plan is too long to send whole. */
     tooLarge?: boolean;
     /** Card id -> where its Prompt lives and what the card showed when sent, the baseline an apply is checked against. */
-    prompts: Record<string, { path: string; prompt: string; kind: string; title?: string }>;
+    prompts: Record<string, { path: string; prompt: string; kind: string; title?: string; summary?: string }>;
   };
   /** Characters of research note text to send; default {@link MAP_CHAT_RESEARCH_BUDGET}. */
   researchBudget?: number;
@@ -325,8 +327,9 @@ export interface MapChatContext {
   /** Present only when `bookPlan` was sent: the run, the card ids a reply may change (not locked) and the Prompts as sent. Not serialized. */
   bookPlan?: {
     runId: string;
+    phaseStartedAt?: string;
     unlocked: string[];
-    prompts: Record<string, { path: string; prompt: string; kind: string; title?: string }>;
+    prompts: Record<string, { path: string; prompt: string; kind: string; title?: string; summary?: string }>;
   };
   /** Parent links of the outline, for the parser's cycle check. */
   parents: Record<string, string | null>;
@@ -929,6 +932,7 @@ function buildOnce(input: MapChatContextInput, shrink: Shrink): MapChatContext {
       ? {
           bookPlan: {
             runId: bookPlan.runId,
+            ...(bookPlan.phaseStartedAt ? { phaseStartedAt: bookPlan.phaseStartedAt } : {}),
             unlocked: bookPlan.cards
               .filter(card => !card.locked && typeof card.id === "string")
               .map(card => card.id as string),

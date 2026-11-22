@@ -194,7 +194,19 @@ const CASES = [
     [C.noRejected(), C.noKinds(["add_child"]), C.remaining(false)]),
   kase("L4", "接續", "圖文書第 4 輪：作者研究時要搜圖", "2026-11-15 圖文書實跑：使用者訂了圖片規則（放圖、圖檔網址、無圖寫原因）但沒說「搜圖」，每次研究都送 images=false，整本書沒有圖", ["run_map_action"], { message: PICTURE_BOOK, outline: STEAK,
     continuation: { round: 4, maxRounds: 8, remaining: "作者寫第 1–3 章（肋眼、菲力、紐約客）：先研究，定好作品和圖，再寫本文", lastResults: [{ text: "建立 圖文書/全書大綱.md", status: "done" }], research: [] } },
-    [C.noRejected(), C.runAction("research_standard", a => a.images === true, "images for a picture book")])
+    [C.noRejected(), C.runAction("research_standard", a => a.images === true, "images for a picture book")]),
+
+  // ---- M. the chief editor: a book plan under review ----
+  kase("M1", "總編輯", "審企劃：改第二章涵蓋範圍", "book plan chat: edit_book_plan 只改既有卡的簡報，改 covers／points／previous 要附整份新 checklist，不增刪卡", ["edit_book_plan"],
+    { message: "第二章改成只講煎牛排，不要講烤", outline: tree([["r", "牛排全書", null], ["c1", "認識部位", "r"], ["c2", "煎與烤", "r"]]),
+      bookPlan: { runId: "run-1", phaseStartedAt: "2026-11-22T00:00:00.000Z", title: "牛排全書", settings: {}, opening: "我排了兩章，你覺得怎麼樣？",
+        cards: [
+          { id: "c1", place: "第 1 章", role: "body", title: "認識部位", covers: "肋眼、菲力、紐約客的差異", points: ["部位", "油花"], entry: "", handoff: "下一章講煎烤", previous: "", next: "第 2 章：煎與烤", checklist: [{ id: "C1", type: "structure", text: "三個部位都有說明" }] },
+          { id: "c2", place: "第 2 章", role: "body", title: "煎與烤", covers: "煎和烤兩種做法", points: ["煎", "烤"], entry: "承接部位", handoff: "", previous: "第 1 章：認識部位", next: "", checklist: [{ id: "C1", type: "structure", text: "煎和烤都有步驟" }] }
+        ],
+        prompts: { c1: { path: "Maps/Notes/c1.md", prompt: "p1", kind: "chapter", title: "認識部位", summary: "s1" }, c2: { path: "Maps/Notes/c2.md", prompt: "p2", kind: "chapter", title: "煎與烤", summary: "s2" } } } },
+    [C.noRejected(), C.hasKind("edit_book_plan", 1, 1), C.noKinds(["add_child", "delete_topic", "move_topic", "reorder_topics"]),
+      C.hasAction("edit_book_plan", a => a.changes.every(c => c.id === "c2" || c.id === "c1") && a.changes.every(c => !(c.covers || (c.points && c.points.length) || c.previous) || (c.checklist && c.checklist.length)), "a change to covers, points or previous comes with its checklist")])
 ];
 
 const WEAK = "只檢查沒有多餘動作與有提到地圖內容，不能證明答對；要靠真實失敗案例庫（S3）定義什麼叫答對";

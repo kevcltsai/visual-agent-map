@@ -3463,22 +3463,24 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       return;
     }
     const diff = plan.diff?.length ? plan.diff : undefined;
-    if (!diff) this.buildPlanSummary(card.createDiv("vam-map-chat-plan-summary"), plan);
+    // A diff alone is the whole card; one next to other actions still says them (summary, danger mark, details) like any plan.
+    const diffOnly = !!diff && !plan.groups?.length;
+    if (!diffOnly) this.buildPlanSummary(card.createDiv("vam-map-chat-plan-summary"), plan);
     // Said before the button is pressed, not after: undo takes the plan's changes back, but not the AI work it starts. Always
     // shown (never behind "View details") and only for a plan that does start AI work.
     if (plan.aiWork) card.createDiv({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
     // A plan about a picture keeps its lists open: the user checks the anchors before they apply them, so nothing folds.
-    const folds = !plan.openGroups && !diff;
+    const folds = !plan.openGroups && !diffOnly;
     const open = !folds || message.linesOpen === true;
     const addDetail = (): void => {
-      if (!open || diff) return;
+      if (!open || diffOnly) return;
       const detail = card.createDiv("vam-map-chat-plan-detail");
       this.buildPlanBody(detail, plan, title);
       detail.createDiv({ cls: "vam-map-chat-plan-note", text: t("ui.map_chat_plan_intro") });
     };
     // A picture plan lists what it will do first, then asks; other plans put the buttons first and fold the detail after them.
     if (diff) this.buildPlanDiff(card, diff);
-    else if (!folds) addDetail();
+    if (!folds) addDetail();
     const buttons = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
     const apply = buttons.createEl("button", {
       cls: "mod-cta vam-map-chat-plan-apply",

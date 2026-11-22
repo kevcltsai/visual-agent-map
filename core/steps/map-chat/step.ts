@@ -63,6 +63,13 @@ export const MAP_CHAT_ACTION_KINDS = [
   "edit_book_plan"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
+/** The kinds that add, remove or move a card: dropped from a reply while a book plan is under review. */
+const BOOK_PLAN_STRUCTURE_KINDS: ReadonlySet<string> = new Set([
+  "add_child",
+  "delete_topic",
+  "move_topic",
+  "reorder_topics"
+]);
 export const MAP_RUN_ACTIONS = [
   "research_standard",
   "expand",
@@ -602,6 +609,8 @@ export function parseMapChat(
         throw new Dropped("unknown_kind");
       if (context.noEditableMap && !created && kind !== "create_map" && kind !== "open_map")
         throw new Dropped("bad_value");
+      // The chief editor edits the cards that exist: adding, deleting or moving one is not done while a book plan is under review.
+      if (context.bookPlan && BOOK_PLAN_STRUCTURE_KINDS.has(kind)) throw new Dropped("bad_value");
       /** The one annotated image a reply may act on: the one selected in this turn. */
       const image = (): void => {
         if (!shown || shown.kind !== "annotated" || text("imageId") !== shown.id) throw new Dropped("no_image");

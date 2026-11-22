@@ -1958,6 +1958,26 @@ test('book plan: unknown, locked and repeated ids and a brief change without che
   assert.equal(result.actions[0].changes[1].checklist.length, 1);
   assert.equal(result.rejected.length, 4);
 });
+test('book plan: while a plan is under review add, delete, move and reorder are dropped and counted; the book edit stays', () => {
+  const ctx = context({ bookPlan: bookPlan() });
+  const result = parse(reply(
+    planItem(planChange('c1', { entry: 'e' })),
+    item('add_child', { parentId: 'r', title: 'New', summary: 's' }),
+    item('delete_topic', { nodeId: 'a' }),
+    item('move_topic', { nodeId: 'a1', newParentId: 'b' }),
+    item('reorder_topics', { parentId: 'r', nodeIds: ['a', 'b'] }),
+    item('update_summary', { nodeId: 'a', summary: 'kept' })
+  ), ctx);
+  assert.deepEqual(result.actions.map(a => a.kind), ['edit_book_plan', 'update_summary']);
+  assert.deepEqual(result.rejected.map(r => r.code), ['bad_value', 'bad_value', 'bad_value', 'bad_value']);
+  assert.deepEqual(parse(reply(item('delete_topic', { nodeId: 'a' }))).actions.map(a => a.kind), ['delete_topic'], 'no book plan: unchanged');
+});
+test('book plan: the phase start and each card summary are carried into the baseline', () => {
+  const ctx = context({ bookPlan: bookPlan({ phaseStartedAt: 'T1', prompts: { c1: { path: 'B/c1.md', prompt: 'p1', kind: 'chapter', summary: 'S' } } }) });
+  assert.equal(ctx.bookPlan.phaseStartedAt, 'T1');
+  assert.equal(ctx.bookPlan.prompts.c1.summary, 'S');
+  assert.equal(JSON.stringify(JSON.parse(ctx.json)).includes('T1'), false, 'not sent to the model');
+});
 test('book plan: an action whose cards are all dropped is dropped', () => {
   const ctx = context({ bookPlan: bookPlan() });
   const result = parse(reply(planItem(planChange('c1', { covers: 'x' }))), ctx);

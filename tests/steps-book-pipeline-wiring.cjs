@@ -47,6 +47,7 @@ test('blocked: true while a conversation chain runs or a multi-research batch is
   const blocked = view => proto.bookPipelineBlocked.call(view);
   assert.equal(blocked(make()), false);
   assert.equal(blocked(make({ chatChainRunner: { current: {} } })), true);
+  assert.equal(blocked(make({ bookPlanApplying: true })), true, 'the chief editor writing the plan blocks "direction is right"');
   assert.equal(blocked(make({ plugin: { expansionBatches: new Map([['multi-research:M.vam', { status: 'running' }]]) } })), true);
   assert.equal(blocked(make({ plugin: { expansionBatches: new Map([['multi-research:M.vam', { status: 'done' }]]) , argumentRuns: { isRunning: () => false } } })), false);
   assert.equal(blocked(make({ plugin: { expansionBatches: new Map(), argumentRuns: { isRunning: path => path === 'M.vam' } } })), true, 'an argument-map run blocks');

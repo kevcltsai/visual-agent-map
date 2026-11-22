@@ -9830,6 +9830,20 @@ test('book plan chat: a diff card shows the first two cards open (title, label, 
   eq(findAll(log, i => i.tag === 'button' && /vam-map-chat-plan-(apply|cancel)/.test(i.cls)).map(i => i.text), ['Apply to the plan', 'Not now']);
 });
 
+test('book plan chat: a diff card with other actions also shows their summary (danger kept) and the folded details; a diff alone has neither', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  f.panel.begin('a'); f.panel.finish('ok', []);
+  f.panel.showPlan(bookDiffCard(diffCards(1), { groups: [{ label: 'Delete (1)', items: ['Delete B'], danger: { mark: 'Removes' } }] }));
+  const log = f.parts.log();
+  assert.equal(findAll(log, i => hasClass(i, 'vam-map-chat-plan-summary')).length, 1, 'the summary line is there');
+  assert.ok(find(log, i => hasClass(i, 'vam-map-chat-plan-mark')), 'the danger mark is drawn');
+  assert.match(visibleText(log), /Delete \(1\)/);
+  assert.equal(findAll(log, i => i.tag === 'ins').length, 1, 'the diff is still there');
+  const g = panelFixture(); g.panel.setOpen(true);
+  g.panel.begin('b'); g.panel.finish('ok', []); g.panel.showPlan(bookDiffCard(diffCards(1)));
+  assert.equal(findAll(g.parts.log(), i => hasClass(i, 'vam-map-chat-plan-summary')).length, 0, 'a diff alone: no summary line');
+});
+
 test('book plan chat: a diff card draws untrusted text as text, an empty before leaves no del, and a card without a diff keeps the usual buttons', () => {
   const f = panelFixture(); f.panel.setOpen(true);
   const html = '<img src=x onerror=alert(1)>';
@@ -9928,4 +9942,30 @@ integrationTest('book plan chat: with records on the opening is written as an ed
   again.view.syncChiefEditor(); await recordIdle(again);
   eq(openingRows(back), [FALLBACK], 'restored in place, not duplicated');
   eq(lineKinds(recordLines(again, recordFiles(again)[0])).filter(kind => kind === 'event:editor_opening'), ['event:editor_opening'], 'no second event');
+});
+
+integrationTest('book plan chat: a view that just switched to a plan-review map says no opening into the old conversation (toolbar renders before the chat is mounted)', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
+  await until(() => h.view.chatRestoring === false);
+  const before = recordFiles(h).length;
+  // The map is now another one; the chat still belongs to the old map until mountMapChat runs.
+  h.view.map.id = 'other-map'; h.view.map.bookPipeline = reviewData(h.view);
+  h.view.syncChiefEditor(); await recordIdle(h);
+  eq(openingRows(chat), [], 'no opening in the old conversation');
+  eq(recordFiles(h).length, before, 'no record file is made for the new map by the old conversation');
+  // Once the chat belongs to the map again, the opening comes.
+  h.view.chatMapId = 'other-map'; h.view.syncChiefEditor();
+  eq(openingRows(chat), [FALLBACK]);
+});
+
+integrationTest('book plan chat: while the chief editor writes the plan the book run is blocked, and free again after (also when the write fails)', async () => {
+  const h = await harness(); await h.view.hydrate(); h.open();
+  const seen = [];
+  // The harness plugin has no argument-map runs or batches; the other two reasons to block are off.
+  h.view.plugin.argumentRuns ??= { isRunning: () => false }; h.view.plugin.expansionBatches ??= new Map();
+  h.view.bookPlanChatDeps = () => ({ readMap: async () => { seen.push(h.view.bookPipelineBlocked()); throw new Error('boom'); } });
+  assert.equal(h.view.bookPipelineBlocked(), false);
+  await assert.rejects(h.view.chatWriter.ports.applyBookPlanEdit({ kind: 'edit_book_plan', changes: [] }, { bookPlan: { runId: 'run-1', unlocked: [], prompts: {} } }), /boom/);
+  eq(seen, [true], 'blocked during the write');
+  assert.equal(h.view.bookPipelineBlocked(), false, 'free again after');
 });

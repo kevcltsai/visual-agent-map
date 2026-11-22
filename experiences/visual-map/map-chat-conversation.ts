@@ -242,9 +242,17 @@ export class MapChatConversation {
     // A read_md_file is never shown (decision 2026-11-15-map-chat-file-bugs#2), on the plan card as in the result lines.
     const shown = result.actions.flatMap((action, index) => (action.kind === "read_md_file" ? [] : [index]));
     const items = shown.map(index => this.ports.actionLabel(result.actions[index], refTitles));
-    // The same lines by kind of work, so a 100-action plan reads as five folded lists.
+    // A change to the book plan shows each card as before and after, with its own two buttons.
+    const bookEdit = result.actions.find(action => action.kind === "edit_book_plan");
+    const diff = bookEdit?.kind === "edit_book_plan" ? bookPlanDiff(bookEdit, baseline) : undefined;
+    // The same lines by kind of work, so a 100-action plan reads as five folded lists. Next to a diff the groups are the other actions
+    // of the reply: the buttons apply all of them, so none may be left unseen.
     const groups = CHAT_PLAN_GROUP_ORDER.flatMap(group => {
-      const own = items.filter((_, at) => chatPlanGroupOf(result.actions[shown[at]].kind) === group);
+      const own = items.filter(
+        (_, at) =>
+          chatPlanGroupOf(result.actions[shown[at]].kind) === group &&
+          !(diff && result.actions[shown[at]].kind === "edit_book_plan")
+      );
       return own.length
         ? [
             {
@@ -256,9 +264,6 @@ export class MapChatConversation {
           ]
         : [];
     });
-    // A change to the book plan shows each card as before and after, with its own two buttons.
-    const bookEdit = result.actions.find(action => action.kind === "edit_book_plan");
-    const diff = bookEdit?.kind === "edit_book_plan" ? bookPlanDiff(bookEdit, baseline) : undefined;
     const card: MapChatPlanCard = {
       ...(diff ? { diff, applyLabel: t("ui.map_chat_book_apply"), cancelLabel: t("ui.map_chat_book_cancel") } : {}),
       // A plan about a picture shows its lists open: the user checks the anchors before they apply them.

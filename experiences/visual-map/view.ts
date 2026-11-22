@@ -21073,6 +21073,8 @@ export class VisualAgentMapView extends ItemView {
   private syncChiefEditor(): void {
     const chat = this.chat;
     if (!chat) return;
+    // The toolbar renders before the chat mounts for a new map: until then this conversation is still the old map's.
+    if (this.chatMapId !== this.map?.id) return;
     chat.refreshSpeaker();
     const data = reviewRun(this.map);
     if (!data || this.chatRestoring) return;

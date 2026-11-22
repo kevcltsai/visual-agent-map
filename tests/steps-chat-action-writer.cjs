@@ -264,7 +264,7 @@ function planWorld(options = {}) {
     language: () => 'en'
   };
   const baselineOf = ids => ({
-    runId: 'run-1', unlocked: ids, prompts: Object.fromEntries(ids.map(id => [id, { path: `${id}.md`, prompt: prompts[id], kind: 'chapter' }]))
+    runId: 'run-1', phaseStartedAt: doc.bookPipeline.phaseStartedAt, unlocked: ids, prompts: Object.fromEntries(ids.map(id => [id, { path: `${id}.md`, prompt: prompts[id], kind: 'chapter' }]))
   });
   return { deps, doc, cards, writes, state, baselineOf, prompts };
 }
@@ -318,16 +318,31 @@ test('edit_book_plan: nothing is written once the run has left the plan review, 
     w => { w.doc.bookPipeline.phase = 'writing'; },
     w => { w.doc.bookPipeline.planReview = false; },
     w => { w.doc.bookPipeline.status = 'stopped'; },
-    w => { w.doc.bookPipeline.runId = 'run-2'; }
+    w => { w.doc.bookPipeline.runId = 'run-2'; },
+    // The same run back at gate 1 a second time: a proposal made at the earlier gate is not applied to it.
+    w => { w.doc.bookPipeline.phaseStartedAt = '2026-11-18T00:00:00.000Z'; }
   ]) {
     const w = planWorld();
+    const baseline = w.baselineOf(['b']);
     change(w);
-    const outcome = plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', entry: 'x' }]), { bookPlan: w.baselineOf(['b']) }));
+    const outcome = plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', entry: 'x' }]), { bookPlan: baseline }));
     assert.deepEqual(outcome, skippedOutcome('ui.map_chat_skip_book_started'));
     assert.deepEqual(w.writes, []);
   }
   const w = planWorld();
   assert.equal(plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', entry: 'x' }]), {})).status, 'skipped', 'no bookPlan in the baseline');
+});
+
+test('edit_book_plan: a Summary the reader changed since the proposal stays, while the Prompt is still written; an unchanged one follows the covers', async () => {
+  const w = planWorld();
+  w.cards.get('b.md').summary = 'my own words';
+  const baseline = w.baselineOf(['b', 'c']);
+  baseline.prompts.b.summary = 'old b'; baseline.prompts.c.summary = '';
+  const outcome = plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', covers: 'new b', checklist: [{ id: 'C1', type: 'structure', text: 'n' }] }, { id: 'c', covers: 'new c', checklist: [{ id: 'C1', type: 'structure', text: 'n' }] }]), { bookPlan: baseline }));
+  assert.equal(outcome.status, 'done');
+  assert.match(w.cards.get('b.md').prompt, /new b/, 'the Prompt is written');
+  assert.equal(w.cards.get('b.md').summary, 'my own words', 'the reader\'s Summary is not overwritten');
+  assert.equal(w.cards.get('c.md').summary, 'new c', 'an untouched Summary follows the covers');
 });
 
 test('edit_book_plan: the view memory leaving the review mid-write stops the write (authorize)', async () => {

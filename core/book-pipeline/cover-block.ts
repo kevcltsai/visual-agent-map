@@ -320,9 +320,9 @@ export function removeCoverCredit(detail: string, href: string, language: string
   const [before, middle, after] = translateNote(
     language as ContentLanguage,
     "note.cover_source_entry_0_1",
-    "\u0001",
-    "\u0002"
-  ).split(/[\u0001\u0002]/);
+    "\uE000",
+    "\uE001"
+  ).split(/[\uE000\uE001]/);
   const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const shape = new RegExp(`^- ${escape(before)}.*${escape(middle)}.*\\]\\(${escape(href)}\\).*${escape(after)}\\r?$`);
   return detail

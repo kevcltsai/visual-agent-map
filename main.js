@@ -33481,9 +33481,9 @@ function removeCoverCredit(detail, href, language2) {
   const [before, middle, after] = translateNote(
     language2,
     "note.cover_source_entry_0_1",
-    "",
-    ""
-  ).split(/[\u0001\u0002]/);
+    "\uE000",
+    "\uE001"
+  ).split(/[\uE000\uE001]/);
   const escape = (text11) => text11.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const shape2 = new RegExp(`^- ${escape(before)}.*${escape(middle)}.*\\]\\(${escape(href)}\\).*${escape(after)}\\r?$`);
   return detail.split("\n").filter((line3) => !shape2.test(line3)).join("\n");

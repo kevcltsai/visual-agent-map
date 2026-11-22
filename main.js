@@ -3106,6 +3106,8 @@ var en = {
   "ui.book_abandon_title": "Give up this picture book?",
   "ui.book_abandon_body": "The chapter text already written is kept; only the picture-book hint boxes in the notes are removed, along with the picture-book progress on this mind map, and it becomes a normal mind map again. You can press Picture book later to start fresh.",
   "ui.book_abandon_confirm": "Yes, give it up",
+  "ui.book_remove_title": "Back to a plain mind map?",
+  "ui.book_remove_body": "This book is finished, and all its chapter text and pictures are kept. Only the picture-book hint boxes in the notes and this progress bar are removed; the mind map works as usual. You can press Picture book later to start again.",
   "ui.book_abandoned": "This is a normal mind map again. The chapter text was not changed; only the picture-book hint boxes were removed.",
   "ui.book_add_budget": "Add 100 calls",
   "ui.book_budget_used_up_0_1": "Call budget used up: {0}/{1} used",
@@ -6423,6 +6425,8 @@ var zhCN = {
   "ui.book_abandon_title": "\u653E\u5F03\u8FD9\u672C\u56FE\u6587\u4E66\uFF1F",
   "ui.book_abandon_body": "\u5DF2\u5199\u597D\u7684\u7AE0\u8282\u6B63\u6587\u4F1A\u4FDD\u7559\uFF0C\u53EA\u4F1A\u53BB\u6389\u56FE\u6587\u4E66\u653E\u8FDB\u7B14\u8BB0\u7684\u63D0\u793A\u6846\uFF0C\u5E76\u4ECE\u8FD9\u5F20\u5FC3\u667A\u56FE\u79FB\u9664\u56FE\u6587\u4E66\u7684\u8FDB\u5EA6\uFF0C\u5B83\u4F1A\u53D8\u56DE\u666E\u901A\u5FC3\u667A\u56FE\u3002\u4E4B\u540E\u6309\u201C\u56FE\u6587\u4E66\u201D\u53EF\u4EE5\u91CD\u65B0\u5F00\u59CB\u3002",
   "ui.book_abandon_confirm": "\u786E\u5B9A\u653E\u5F03",
+  "ui.book_remove_title": "\u6539\u56DE\u666E\u901A\u5FC3\u667A\u56FE\uFF1F",
+  "ui.book_remove_body": "\u8FD9\u672C\u4E66\u5DF2\u7ECF\u5B8C\u6210\uFF0C\u7AE0\u8282\u6B63\u6587\u548C\u56FE\u7247\u5168\u90E8\u4FDD\u7559\u3002\u53EA\u4F1A\u53BB\u6389\u56FE\u6587\u4E66\u653E\u8FDB\u7B14\u8BB0\u7684\u63D0\u793A\u6846\u548C\u8FD9\u6761\u8FDB\u5EA6\u6761\uFF0C\u5FC3\u667A\u56FE\u7167\u5E38\u4F7F\u7528\u3002\u4E4B\u540E\u6309\u201C\u56FE\u6587\u4E66\u201D\u53EF\u4EE5\u91CD\u65B0\u5F00\u59CB\u3002",
   "ui.book_abandoned": "\u5DF2\u53D8\u56DE\u666E\u901A\u5FC3\u667A\u56FE\uFF0C\u7AE0\u8282\u6B63\u6587\u6CA1\u6709\u88AB\u6539\u52A8\uFF0C\u53EA\u53BB\u6389\u4E86\u56FE\u6587\u4E66\u7684\u63D0\u793A\u6846\u3002",
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u989D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
@@ -9740,6 +9744,8 @@ var zhTW = {
   "ui.book_abandon_title": "\u653E\u68C4\u9019\u672C\u5716\u6587\u66F8\uFF1F",
   "ui.book_abandon_body": "\u5DF2\u5BEB\u597D\u7684\u7AE0\u7BC0\u6B63\u6587\u6703\u4FDD\u7559\uFF0C\u53EA\u6703\u62FF\u6389\u5716\u6587\u66F8\u653E\u9032\u7B46\u8A18\u7684\u63D0\u793A\u6846\uFF0C\u4E26\u5F9E\u9019\u5F35\u5FC3\u667A\u5716\u79FB\u9664\u5716\u6587\u66F8\u7684\u9032\u5EA6\uFF0C\u5B83\u6703\u8B8A\u56DE\u4E00\u822C\u5FC3\u667A\u5716\u3002\u4E4B\u5F8C\u6309\u300C\u5716\u6587\u66F8\u300D\u53EF\u4EE5\u91CD\u65B0\u958B\u59CB\u3002",
   "ui.book_abandon_confirm": "\u78BA\u5B9A\u653E\u68C4",
+  "ui.book_remove_title": "\u6539\u56DE\u4E00\u822C\u5FC3\u667A\u5716\uFF1F",
+  "ui.book_remove_body": "\u9019\u672C\u66F8\u5DF2\u7D93\u5B8C\u6210\uFF0C\u7AE0\u7BC0\u6B63\u6587\u548C\u5716\u7247\u5168\u90E8\u4FDD\u7559\u3002\u53EA\u6703\u62FF\u6389\u5716\u6587\u66F8\u653E\u9032\u7B46\u8A18\u7684\u63D0\u793A\u6846\u548C\u9019\u689D\u9032\u5EA6\u5217\uFF0C\u5FC3\u667A\u5716\u7167\u5E38\u4F7F\u7528\u3002\u4E4B\u5F8C\u6309\u300C\u5716\u6587\u66F8\u300D\u53EF\u4EE5\u91CD\u65B0\u958B\u59CB\u3002",
   "ui.book_abandoned": "\u5DF2\u8B8A\u56DE\u4E00\u822C\u5FC3\u667A\u5716\uFF0C\u7AE0\u7BC0\u6B63\u6587\u6C92\u6709\u88AB\u66F4\u52D5\uFF0C\u53EA\u62FF\u6389\u4E86\u5716\u6587\u66F8\u7684\u63D0\u793A\u6846\u3002",
   "ui.book_add_budget": "\u518D\u52A0 100 \u6B21",
   "ui.book_budget_used_up_0_1": "\u984D\u5EA6\u7528\u5B8C\uFF1A\u5DF2\u7528 {0}\uFF0F{1} \u6B21",
@@ -60856,14 +60862,21 @@ function renderBookBar(parent, state, actions) {
   }
   if (((_c = actions.abandon) == null ? void 0 : _c.asking) && (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")) {
     const abandon = actions.abandon;
+    const done = state.mode === "done";
+    const title = t(done ? "ui.book_remove_title" : "ui.book_abandon_title");
     const card = bar.createDiv("vam-book-abandon-card");
     card.setAttr("role", "group");
-    card.setAttr("aria-label", t("ui.book_abandon_title"));
-    card.createEl("b", { text: t("ui.book_abandon_title") });
-    card.createEl("p", { text: t("ui.book_abandon_body") });
+    card.setAttr("aria-label", title);
+    card.createEl("b", { text: title });
+    card.createEl("p", { text: t(done ? "ui.book_remove_body" : "ui.book_abandon_body") });
     const row = card.createDiv("vam-book-abandon-actions");
     makeButton(row, t("ui.cancel"), "vam-book-abandon-cancel", abandon.cancel);
-    makeButton(row, t("ui.book_abandon_confirm"), "mod-warning vam-book-abandon-confirm", abandon.confirm);
+    makeButton(
+      row,
+      t(done ? "ui.book_remove" : "ui.book_abandon_confirm"),
+      `${done ? "mod-cta" : "mod-warning"} vam-book-abandon-confirm`,
+      abandon.confirm
+    );
   }
   if (state.mode === "gate1" && state.planReview && state.structureEdit)
     renderStructureEdit(bar, state.structureEdit, actions);

@@ -330,7 +330,7 @@ test('edit_book_plan: nothing is written once the run has left the plan review, 
     assert.deepEqual(w.writes, []);
   }
   const w = planWorld();
-  assert.equal(plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', entry: 'x' }]), {})).status, 'skipped', 'no bookPlan in the baseline');
+  assert.deepEqual(plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', entry: 'x' }]), {})), skippedOutcome('ui.map_chat_skip_book_started'), 'no bookPlan in the baseline: not worded as a switched or closed map');
 });
 
 test('edit_book_plan: a Summary the reader changed since the proposal stays, while the Prompt is still written; an unchanged one follows the covers', async () => {

@@ -60839,7 +60839,7 @@ async function applyBookPlanEdit(deps, action, baseline) {
     return !!run && run.runId === (plan == null ? void 0 : plan.runId) && run.phaseStartedAt === plan.phaseStartedAt;
   };
   const started = () => ({ status: "skipped", reason: t("ui.map_chat_skip_book_started") });
-  if (!plan) return { status: "skipped", reason: t("ui.map_chat_skip_map_changed") };
+  if (!plan) return started();
   const map = await deps.readMap();
   const rootId = rootOf(map);
   const data = reviewRun(map);
@@ -71438,8 +71438,13 @@ var MapChatConversation = class {
     const refTitles = this.ports.refTitles(result.actions);
     const shown2 = result.actions.flatMap((action, index) => action.kind === "read_md_file" ? [] : [index]);
     const items = shown2.map((index) => this.ports.actionLabel(result.actions[index], refTitles));
-    const bookEdit = result.actions.find((action) => action.kind === "edit_book_plan");
-    const diff = (bookEdit == null ? void 0 : bookEdit.kind) === "edit_book_plan" ? bookPlanDiff(bookEdit, baseline) : void 0;
+    const bookDiffs = result.actions.flatMap(
+      (action) => {
+        var _a2;
+        return action.kind === "edit_book_plan" ? (_a2 = bookPlanDiff(action, baseline)) != null ? _a2 : [] : [];
+      }
+    );
+    const diff = bookDiffs.length ? bookDiffs : void 0;
     const groups = CHAT_PLAN_GROUP_ORDER.flatMap((group) => {
       const own2 = items.filter(
         (_, at) => chatPlanGroupOf(result.actions[shown2[at]].kind) === group && !(diff && result.actions[shown2[at]].kind === "edit_book_plan")
@@ -96380,7 +96385,9 @@ ${note.detail.trim()}` : "",
     const own2 = {
       mdHashes: baseline.mdHashes,
       topicHashes: { ...baseline.topicHashes },
-      mapSourcePaths: baseline.mapSourcePaths
+      mapSourcePaths: baseline.mapSourcePaths,
+      // The plan the proposal was made on (a plan edit is judged by it), not one read again now.
+      bookPlan: baseline.bookPlan
     };
     const chips = this.chatChipPaths.get(baseline);
     if (chips) this.chatChipPaths.set(own2, chips);

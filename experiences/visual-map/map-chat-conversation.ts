@@ -243,8 +243,10 @@ export class MapChatConversation {
     const shown = result.actions.flatMap((action, index) => (action.kind === "read_md_file" ? [] : [index]));
     const items = shown.map(index => this.ports.actionLabel(result.actions[index], refTitles));
     // A change to the book plan shows each card as before and after, with its own two buttons.
-    const bookEdit = result.actions.find(action => action.kind === "edit_book_plan");
-    const diff = bookEdit?.kind === "edit_book_plan" ? bookPlanDiff(bookEdit, baseline) : undefined;
+    const bookDiffs = result.actions.flatMap(action =>
+      action.kind === "edit_book_plan" ? (bookPlanDiff(action, baseline) ?? []) : []
+    );
+    const diff = bookDiffs.length ? bookDiffs : undefined;
     // The same lines by kind of work, so a 100-action plan reads as five folded lists. Next to a diff the groups are the other actions
     // of the reply: the buttons apply all of them, so none may be left unseen.
     const groups = CHAT_PLAN_GROUP_ORDER.flatMap(group => {

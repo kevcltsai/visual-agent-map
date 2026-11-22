@@ -9969,3 +9969,52 @@ integrationTest('book plan chat: while the chief editor writes the plan the book
   eq(seen, [true], 'blocked during the write');
   assert.equal(h.view.bookPipelineBlocked(), false, 'free again after');
 });
+
+// The real path: a chat turn on a plan-review map captures the plan (bookPlan) in its context, the reply's card holds it, Apply writes with it.
+const planText = load('core/book-pipeline/plan-text.ts');
+async function planReviewHarness() {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.plugin.readBookCardForChat = async path => {
+    const note = await h.repo.readNote(path); const file = h.app.vault.getAbstractFileByPath(path);
+    return { path, title: note.title, summary: note.summary, prompt: note.prompt, detail: note.detail, raw: await h.app.vault.read(file), settings: note.bookSettings ?? {}, fields: {} };
+  };
+  for (const key of ['a', 'b']) await h.repo.updateNote(h.node(key).path, { prompt: planText.composeCardPrompt({ role: 'body', kind: 'chapter', covers: `covers ${key}`, points: ['p'], entry: `entry ${key}`, handoff: 'h', checklist: [{ id: 'C1', type: 'structure', text: 'c1' }] }, 'en') });
+  await h.view.hydrate();
+  h.view.map.bookPipeline = reviewData(h.view);
+  // The run is in the map file too: the write reads the file, not the view's copy.
+  await h.app.vault.process(h.app.vault.getAbstractFileByPath(MAP), () => core.serializeMap(h.view.map));
+  return { h, chat };
+}
+const promptOf = async (h, key) => (await h.note(key)).prompt;
+
+integrationTest('book plan chat: Apply on the plan card of a real turn writes the proposed Prompt (the baseline carries the plan from the turn to the write)', async () => {
+  const { h, chat } = await planReviewHarness();
+  const before = await promptOf(h, 'a');
+  h.control.reply = async () => ({ reply: 'I will change chapter A.', actions: [{ kind: 'edit_book_plan', changes: [{ id: h.ids.a, entry: 'brand new entry' }] }], rejected: [] });
+  h.type('change a'); await h.view.sendMapChat();
+  const card = chat.pendingPlan(); assert.ok(card, 'a plan card waits'); assert.equal(await promptOf(h, 'a'), before, 'nothing is written before Apply');
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
+  const after = await promptOf(h, 'a');
+  assert.notEqual(after, before, 'the Prompt changed'); assert.match(after, /brand new entry/);
+  const lines = chat.transcript().at(-1).lines;
+  assert.equal(lines.some(line => line.status === 'done'), true, JSON.stringify(lines)); assert.equal(lines.some(line => /switched or closed/.test(line.text)), false);
+});
+
+integrationTest('book plan chat: a Prompt changed after the proposal is not overwritten on Apply (the baseline is the proposal turn\'s, not rebuilt at apply time)', async () => {
+  const { h, chat } = await planReviewHarness();
+  h.control.reply = async () => ({ reply: 'I will change chapter A.', actions: [{ kind: 'edit_book_plan', changes: [{ id: h.ids.a, entry: 'brand new entry' }] }], rejected: [] });
+  h.type('change a'); await h.view.sendMapChat(); assert.ok(chat.pendingPlan());
+  const own = planText.composeCardPrompt({ role: 'body', kind: 'chapter', covers: 'covers a', points: ['p'], entry: 'the author typed this', handoff: 'h', checklist: [{ id: 'C1', type: 'structure', text: 'c1' }] }, 'en');
+  await h.repo.updateNote(h.node('a').path, { prompt: own }); await h.view.hydrate();
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
+  assert.equal(await promptOf(h, 'a'), own, 'the author\'s own text stays');
+});
+
+integrationTest('book plan chat: a reply with two edit_book_plan actions shows both before and after on the plan card', async () => {
+  const { h, chat } = await planReviewHarness();
+  h.control.reply = async () => ({ reply: 'Two changes.', actions: [{ kind: 'edit_book_plan', changes: [{ id: h.ids.a, entry: 'entry A2' }] }, { kind: 'edit_book_plan', changes: [{ id: h.ids.b, entry: 'entry B2' }] }], rejected: [] });
+  h.type('change both'); await h.view.sendMapChat();
+  openDetails(h.view.chat.logEl);
+  const text = visibleText(planCard(h)[0]);
+  assert.match(text, /entry A2/); assert.match(text, /entry B2/);
+});

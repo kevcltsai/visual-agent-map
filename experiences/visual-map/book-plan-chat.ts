@@ -132,7 +132,8 @@ export async function applyBookPlanEdit(
     return !!run && run.runId === plan?.runId && run.phaseStartedAt === plan.phaseStartedAt;
   };
   const started = (): ChatOutcome => ({ status: "skipped", reason: t("ui.map_chat_skip_book_started") });
-  if (!plan) return { status: "skipped", reason: t("ui.map_chat_skip_map_changed") };
+  // No plan in the baseline: the turn was not made while the plan waited for the author, so there is nothing to edit from here.
+  if (!plan) return started();
   const map = await deps.readMap();
   const rootId = rootOf(map);
   const data = reviewRun(map);

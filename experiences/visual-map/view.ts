@@ -21486,7 +21486,7 @@ export class VisualAgentMapView extends ItemView {
       /** The user's message; an integration in the reply takes it as its direction. */
       message?: string;
     },
-    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths">,
+    baseline: Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths" | "bookPlan">,
     alive: () => boolean = () => true,
     anchor: { path: string; id: string | undefined } = { path: this.path, id: this.map?.id },
     /** A continuation's round: the context the basis of new cards is judged by, and where the work the reply starts is collected. */
@@ -21547,7 +21547,9 @@ export class VisualAgentMapView extends ItemView {
     const own = {
       mdHashes: baseline.mdHashes,
       topicHashes: { ...baseline.topicHashes },
-      mapSourcePaths: baseline.mapSourcePaths
+      mapSourcePaths: baseline.mapSourcePaths,
+      // The plan the proposal was made on (a plan edit is judged by it), not one read again now.
+      bookPlan: baseline.bookPlan
     };
     // The copy belongs to the same round: its chip paths are the request's, not the latest message's.
     const chips = this.chatChipPaths.get(baseline);

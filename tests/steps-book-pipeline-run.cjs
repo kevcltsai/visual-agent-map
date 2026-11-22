@@ -5372,6 +5372,29 @@ test('chat structure edit: ops appended, deleted note archived, new card planned
   same(back.s.order.filter(id => id !== created), original.map(n => n.id));
 });
 
+test('chat structure edit: resolves once the change is written (not after the re-plan), the opening line follows the runner\'s own count, and a failing card plan does not reject the call', async () => {
+  const gate = { current: null, fail: false };
+  const card = async () => {
+    if (gate.current) await gate.current.promise;
+    if (gate.fail) throw new Error('card plan down');
+    return { covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'x' }] };
+  };
+  const { r } = await structureRig(() => [], { script: { card } });
+  await r.runs.start(r.mapPath); await settle();
+  gate.current = defer(); gate.fail = true;
+  const asked = [];
+  const pending = r.runs.editStructureAtReview(r.mapPath, [CHAT_OPS(r)[0]], await expectOf(r), n => { asked.push(n); return `re-planning ${n}`; });
+  const early = await Promise.race([pending.then(() => 'resolved'), new Promise(res => setTimeout(() => res('waited'), 200))]);
+  assert.equal(early, 'resolved', 'the call does not wait for the card plans');
+  assert.ok(asked.length && asked.every(n => n === 1), 'the opening is built from the runner\'s affected count');
+  assert.equal((await r.state()).phase, 'planning', 'the re-plan is still running');
+  assert.equal((await pending).affected, 1);
+  gate.current.resolve(); await settle();
+  const s = await r.state();
+  assert.ok(s.phase === 'gate1' || s.status === 'stopped', 'a failed card plan is the run\'s own business: no rejection reaches the caller, the run settles');
+  await settle();
+});
+
 test('chat structure edit: a remove-only change costs no AI call and rewrites the neighbours', async () => {
   const { r, requests } = await chatRig();
   const calls = () => r.stat.plan.length + r.stat.planEdit.length + requests.card.length;

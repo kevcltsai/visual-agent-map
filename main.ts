@@ -2353,7 +2353,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     mapPath: string,
     ops: readonly StructureOp[],
     expect: { runId: string; phaseStartedAt: string; nodes: readonly StructureNode[] },
-    opening: string
+    opening: string | ((affected: number) => string)
   ): ReturnType<BookPipelineRuns["editStructureAtReview"]> {
     return this.bookPipelineRuns.editStructureAtReview(mapPath, ops, expect, opening);
   }

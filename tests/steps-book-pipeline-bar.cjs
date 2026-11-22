@@ -695,6 +695,23 @@ test('structure list: gate 1 lists each change with its kind, where it went and 
   assert.ok(texts(box).includes('全部還原會重新企劃 2 張卡，約 3 次 AI 呼叫。'), 'the put-back card and the merge target are planned again (the runner\'s rule); moves and renames are not');
 });
 
+test('structure list: a change made after an undone one is shown against the tree without the undone one (undo, then a chat move of the same card)', () => {
+  setUiLanguage('zh-TW');
+  const node = (id, parentId, title) => ({ id, parentId, title });
+  const before = { rootId: 'r', nodes: [node('r', null, 'Book'), node('a', 'r', 'Alpha'), node('b', 'r', 'Beta')] };
+  const applied = [
+    { id: 'o1', op: { id: 'o1', kind: 'remove', card: 'a', reason: 'x' }, before: { parent: 'r', title: 'Alpha' } },
+    { id: 'o2', op: { id: 'o2', kind: 'move', card: 'a', parent: 'r', after: 'b', reason: 'y' }, before: { parent: 'r', after: null, title: 'Alpha' } }
+  ];
+  const titles = { r: 'Book', a: 'Alpha', b: 'Beta' };
+  const data = { v: 1, runId: 'r1', phase: 'gate1', status: 'running', order: ['r', 'b', 'a'], planReview: true, globalPlanned: true, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', structureEdit: { runId: 'r1', applied, rejected: [], before, undone: ['o1'] } };
+  const st = bundle.bookBarState(data, undefined, () => undefined, undefined, bundle.bookStructure(['r', 'b', 'a'], id => 'r', 'r'), id => titles[id]);
+  const rows = st.structureEdit.items;
+  assert.equal(rows.find(i => i.id === 'o2').text, '「Alpha」第 1 章 → 第 2 章');
+  assert.equal(rows.find(i => i.id === 'o1').undone, true);
+  assert.match(rows.find(i => i.id === 'o1').text, /Alpha/);
+});
+
 test('structure list: nothing shows without changes, outside the plan review, or when nothing was applied or refused; the bar is then the same as before', () => {
   setUiLanguage('zh-TW');
   const { data, state, draw } = structureCase();

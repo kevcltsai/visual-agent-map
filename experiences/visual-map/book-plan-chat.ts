@@ -22,7 +22,6 @@ import { bodyStateRaw, isKeptRaw, pipelineWroteRaw } from "../../core/book-pipel
 import { parseBookPlanBody, parseBookPlanDecisions, replaceBookPlanThread } from "../../core/book-pipeline/plan-text";
 import {
   chatStructureOps,
-  reviewAffected,
   simulateStructure,
   type StructureNode,
   type StructureOp
@@ -62,7 +61,7 @@ export interface BookPlanChatDeps {
   editStructure(
     ops: readonly StructureOp[],
     expect: { runId: string; phaseStartedAt: string; nodes: readonly StructureNode[] },
-    opening: string
+    opening: string | ((affected: number) => string)
   ): Promise<{ applied: string[]; refused: { id: string; code: string }[]; affected: number }>;
 }
 
@@ -312,16 +311,25 @@ export async function applyBookStructureEdit(
     return skip("ui.map_chat_skip_book_started");
   const input = { rootId: plan.nodes[0].id, nodes: plan.nodes };
   const ops = chatStructureOps(action.items, input, Date.now().toString(36));
-  // The cost the owner is told before the work: the cards this edit plans again (the runner counts the same way).
+  // Only what the card showed as applicable goes to the runner (the card's lock rule and the runner's can differ).
   const locked = new Set(plan.nodes.map(node => node.id).filter(id => !plan.unlocked.includes(id)));
   const sim = simulateStructure(input, ops, locked);
-  const expected = reviewAffected(input.rootId, plan.nodes, sim.result, sim.applied).size;
+  const titleOf = (id: string): string => plan.nodes.find(node => node.id === id)?.title || id;
+  const reasonOf = (code: string, id: string): string => {
+    const op = ops.find(item => item.id === id);
+    return structureRefusal(code, op && op.kind !== "add" ? titleOf(op.card) : op?.kind === "add" ? op.title : "");
+  };
+  const reasons = sim.rejected.map(refused => reasonOf(refused.code, refused.op.id));
+  const shown = new Set(sim.applied.map(op => op.id));
+  const sent = ops.filter(op => shown.has(op.id));
+  if (!sent.length) return { status: "skipped", reason: reasons[0] ?? t("ui.book_struct_over_cap") };
   let result: Awaited<ReturnType<BookPlanChatDeps["editStructure"]>>;
   try {
     result = await deps.editStructure(
-      ops,
+      sent,
       { runId: plan.runId, phaseStartedAt: plan.phaseStartedAt ?? "", nodes: plan.nodes },
-      expected ? t("ui.map_chat_opening_book_struct_0", expected) : t("ui.map_chat_opening_book_struct_none")
+      affected =>
+        affected ? t("ui.map_chat_opening_book_struct_0", affected) : t("ui.map_chat_opening_book_struct_none")
     );
   } catch (error) {
     const code =
@@ -332,12 +340,7 @@ export async function applyBookStructureEdit(
     if (key) return skip(key);
     throw error;
   }
-  const titleOf = (id: string): string => plan.nodes.find(node => node.id === id)?.title || id;
-  const reasons = result.refused.map(refused => {
-    const op = ops.find(item => item.id === refused.id);
-    const name = op && op.kind !== "add" ? titleOf(op.card) : op?.kind === "add" ? op.title : "";
-    return structureRefusal(refused.code, name);
-  });
+  reasons.push(...result.refused.map(refused => reasonOf(refused.code, refused.id)));
   if (!result.applied.length) return { status: "skipped", reason: reasons[0] ?? t("ui.book_struct_over_cap") };
   return {
     status: "done",

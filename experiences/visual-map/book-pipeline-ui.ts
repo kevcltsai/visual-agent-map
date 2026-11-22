@@ -263,14 +263,23 @@ function structureEditField(
   for (const a of edit.applied) if (a.op.kind === "add") names.set(a.op.ref, a.op.title);
   const nameOf = (id: string): string => titleOf?.(id) ?? names.get(id) ?? "";
   const before = placer(edit.before.rootId, edit.before.nodes, nameOf);
-  const afterNodes = simulateStructure(
-    edit.before,
-    edit.applied.map(a => a.op),
-    new Set()
-  ).result;
-  const after = placer(edit.before.rootId, afterNodes, nameOf);
-  const items: BookStructureItem[] = edit.applied.map(a => {
+  const placeAfter = (ops: readonly AppliedOp[]): ReturnType<typeof placer> =>
+    placer(
+      edit.before.rootId,
+      simulateStructure(
+        edit.before,
+        ops.map(a => a.op),
+        new Set()
+      ).result,
+      nameOf
+    );
+  // An undone change is not in the tree any more: a later change is shown against the tree without it, and an undone one against the changes up to it.
+  const afterActive = placeAfter(edit.applied.filter(a => !undone.has(a.id)));
+  const items: BookStructureItem[] = edit.applied.map((a, index) => {
     const { op } = a;
+    const after = undone.has(a.id)
+      ? placeAfter(edit.applied.slice(0, index + 1).filter(x => x.id === a.id || !undone.has(x.id)))
+      : afterActive;
     const id = op.kind === "add" ? op.ref : op.card;
     const archivedPath =
       (op.kind === "merge" || op.kind === "remove") && edit.archived ? edit.archived[op.card] : undefined;

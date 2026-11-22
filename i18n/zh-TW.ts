@@ -1371,7 +1371,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_skip_book_changed": "（提案後被改過）",
   "ui.map_chat_line_book_plan_named_0": "：{0}",
   "ui.map_chat_skip_book_stale": "企劃剛調整過，這個提案已過期；請再說一次",
-  "ui.map_chat_skip_book_busy": "企劃正在重新企劃，好了再說一次",
+  "ui.map_chat_skip_book_busy": "企劃正忙著別的工作，好了再說一次",
   "ui.map_chat_book_struct_title": "結構調整",
   "ui.map_chat_book_struct_archive_note": "筆記會留在封存，可以還原",
   "ui.map_chat_book_struct_over_cap_0": "一次最多改 6 項，這次有 {0} 項，請分次說",

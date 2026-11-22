@@ -1333,9 +1333,29 @@ export class VisualAgentMapView extends ItemView {
       this.applyingBookPlan(() => applyBookPlanEdit(this.bookPlanChatDeps(), action, baseline)),
     applyBookThreadEdit: (action, baseline) =>
       this.applyingBookPlan(() => applyBookThreadEdit(this.bookPlanChatDeps(), action, baseline)),
-    applyBookStructureEdit: (action, baseline) =>
-      this.applyingBookPlan(() => applyBookStructureEdit(this.bookPlanChatDeps(), action, baseline))
+    applyBookStructureEdit: async (action, baseline) => {
+      // The runner's own gate entry asks bookPipelineBlocked: this chat turn's apply is not a reason to refuse itself
+      // (another entry meanwhile gets "busy" from the runner's drive slot).
+      this.bookStructureOwn = true;
+      try {
+        const outcome = await applyBookStructureEdit(this.bookPlanChatDeps(), action, baseline);
+        if (outcome.status === "done") await this.rereadBookRun();
+        return outcome;
+      } finally {
+        this.bookStructureOwn = false;
+      }
+    }
   });
+  /** The run goes to planning while the cards are planned again in the background: the bar reads the saved run now, as the undo path's repaint does. */
+  private async rereadBookRun(): Promise<void> {
+    if (this.closed || !this.map || !this.path) return;
+    const saved = await this.plugin.repo.readMap(this.path).catch(() => null);
+    if (!saved || this.closed || !this.map || saved.id !== this.map.id) return;
+    this.map.bookPipeline = saved.bookPipeline;
+    this.render();
+  }
+  /** True while the chat's own structure apply runs: the chat turn does not block the runner then (bookPipelineBlocked). */
+  private bookStructureOwn = false;
   /** True while the chat writes a plan edit to the cards: the book run does not start writing meanwhile. */
   private bookPlanApplying = false;
   /** The book run's own "direction is right" is blocked while the plan is being written (bookPipelineBlocked). */
@@ -17926,7 +17946,7 @@ export class VisualAgentMapView extends ItemView {
   /** True while a conversation chain or a multi-select research holds this map: a picture-book run must not start or write then. */
   bookPipelineBlocked(): boolean {
     return (
-      !!this.chatChainRunner?.current ||
+      (!!this.chatChainRunner?.current && !this.bookStructureOwn) ||
       this.bookPlanApplying ||
       this.plugin.expansionBatches.get(this.multiResearchKey())?.status === "running" ||
       (!!this.path && this.plugin.argumentRuns.isRunning(this.path))

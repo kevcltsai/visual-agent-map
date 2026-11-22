@@ -1585,94 +1585,101 @@ export class BookPipelineRuns {
    * At the plan review (gate 1, before the trial): applies the structure ops the owner asked for in chat. `expect` is the run and tree the
    * proposal was made on; a different run or phase start is refused "not_gate1", a different tree "stale", and a drive of the map "busy"; a
    * refusal writes nothing. Removed notes are parked in Archive. The ops are appended to the gate's list (so 還原 works on them), only the
-   * cards they touched are planned again (the editor's pass does not run), and the run returns to gate 1. Resolves with what was applied.
+   * cards they touched are planned again (the editor's pass does not run), and the run returns to gate 1. Resolves with what was applied
+   * as soon as the change is written (the re-plan goes on in the background; its failure is the run's own, shown by the bar).
+   * `opening` is the chief editor's return line, or a function of the number of cards planned again.
    */
   async editStructureAtReview(
     mapPath: string,
     ops: readonly StructureOp[],
     expect: { runId: string; phaseStartedAt: string; nodes: readonly StructureNode[] },
-    opening: string
+    opening: string | ((affected: number) => string)
   ): Promise<{ applied: string[]; refused: { id: string; code: string }[]; affected: number }> {
     const result = { applied: [] as string[], refused: [] as { id: string; code: string }[], affected: 0 };
-    await this.gateEnter("editStructure", mapPath, async drive => {
-      const data = await this.openSaved(drive, mapPath);
-      if (
-        data.phase !== "gate1" ||
-        data.status !== "running" ||
-        !data.planReview ||
-        data.runId !== expect.runId ||
-        data.phaseStartedAt !== expect.phaseStartedAt
-      )
-        throw new BookPipelineRunError("not_gate1");
-      if (!this.ports.editBookStructure) throw new BookPipelineRunError("missing");
-      const order = effectiveOrder(data);
-      const baseNodes: StructureNode[] = order.map(id => ({
-        id,
-        parentId: drive.parents.get(id) ?? null,
-        title: drive.cards.get(id)?.title ?? ""
-      }));
-      if (JSON.stringify(baseNodes) !== JSON.stringify(expect.nodes)) throw new BookPipelineRunError("stale");
-      const sim = simulateStructure(
-        { rootId: drive.rootId, nodes: baseNodes },
-        ops,
-        await this.lockedCards(drive, order)
-      );
-      result.refused = sim.rejected.map(r => ({ id: r.op.id, code: r.code }));
-      if (!sim.applied.length) return;
-      let affected: string[] = [];
-      const { work, next, archived } = this.structureWork(drive, sim, baseNodes, [], (state, parts) => {
-        const old = state.structureEdit;
-        affected = [...reviewAffected(drive.rootId, baseNodes, parts.nodes, parts.applied)];
-        return restructureAtReview(
-          {
-            ...state,
-            order: parts.order,
-            accepted: [...parts.order],
-            chapters: parts.chapters,
-            ...(state.trial ? { trial: parts.trial } : {}),
-            structureEdit: {
-              ...(old ?? { runId: state.runId, rejected: [], before: { rootId: drive.rootId, nodes: baseNodes } }),
-              applied: [...(old?.applied ?? []), ...parts.applied],
-              archived: { ...old?.archived, ...parts.archived }
-            }
-          },
-          this.ports.now(),
-          affected,
-          opening
+    await this.gateEnter(
+      "editStructure",
+      mapPath,
+      async drive => {
+        const data = await this.openSaved(drive, mapPath);
+        if (
+          data.phase !== "gate1" ||
+          data.status !== "running" ||
+          !data.planReview ||
+          data.runId !== expect.runId ||
+          data.phaseStartedAt !== expect.phaseStartedAt
+        )
+          throw new BookPipelineRunError("not_gate1");
+        if (!this.ports.editBookStructure) throw new BookPipelineRunError("missing");
+        const order = effectiveOrder(data);
+        const baseNodes: StructureNode[] = order.map(id => ({
+          id,
+          parentId: drive.parents.get(id) ?? null,
+          title: drive.cards.get(id)?.title ?? ""
+        }));
+        if (JSON.stringify(baseNodes) !== JSON.stringify(expect.nodes)) throw new BookPipelineRunError("stale");
+        const sim = simulateStructure(
+          { rootId: drive.rootId, nodes: baseNodes },
+          ops,
+          await this.lockedCards(drive, order)
         );
-      });
-      drive.structureBusy = true;
-      try {
-        let outcome: StructureResult = { ok: false, code: "cancelled" };
-        await this.ports.mutate(async () => {
-          if (this.dead(drive)) return;
-          outcome = (await this.ports.editBookStructure?.(mapPath, work)) ?? outcome;
+        result.refused = sim.rejected.map(r => ({ id: r.op.id, code: r.code }));
+        if (!sim.applied.length) return;
+        let affected: string[] = [];
+        const { work, next, archived } = this.structureWork(drive, sim, baseNodes, [], (state, parts) => {
+          const old = state.structureEdit;
+          affected = [...reviewAffected(drive.rootId, baseNodes, parts.nodes, parts.applied)];
+          return restructureAtReview(
+            {
+              ...state,
+              order: parts.order,
+              accepted: [...parts.order],
+              chapters: parts.chapters,
+              ...(state.trial ? { trial: parts.trial } : {}),
+              structureEdit: {
+                ...(old ?? { runId: state.runId, rejected: [], before: { rootId: drive.rootId, nodes: baseNodes } }),
+                applied: [...(old?.applied ?? []), ...parts.applied],
+                archived: { ...old?.archived, ...parts.archived }
+              }
+            },
+            this.ports.now(),
+            affected,
+            typeof opening === "function" ? opening(affected.length) : opening
+          );
         });
-        if (!outcome.ok) {
-          this.log(drive, "structure_chat_failed", "-", "plan", outcome.code);
-          if (outcome.rollbackFailed) throw new Error("structure_rollback");
-          throw new BookPipelineRunError(this.dead(drive) ? "disposed" : "stale");
+        drive.structureBusy = true;
+        try {
+          let outcome: StructureResult = { ok: false, code: "cancelled" };
+          await this.ports.mutate(async () => {
+            if (this.dead(drive)) return;
+            outcome = (await this.ports.editBookStructure?.(mapPath, work)) ?? outcome;
+          });
+          if (!outcome.ok) {
+            this.log(drive, "structure_chat_failed", "-", "plan", outcome.code);
+            if (outcome.rollbackFailed) throw new Error("structure_rollback");
+            throw new BookPipelineRunError(this.dead(drive) ? "disposed" : "stale");
+          }
+          await drive.store.commit(state => ({ state: next(state), accepted: true }));
+          const map = await this.ports.readMap(mapPath);
+          drive.cards.clear();
+          drive.stages.clear();
+          drive.skippedRefreshed = false;
+          await this.load(drive, map, effectiveOrder(drive.store.state), new Set(drive.store.state.autoRoles));
+          drive.members = new Set(map.nodes.map(node => node.id));
+          const parked = Object.entries(archived).map(([id, path]) => ({ id, path }));
+          if (parked.length && this.ports.callouts?.clearNotes)
+            await this.ports.callouts.clearNotes(mapPath, data.runId, parked).catch(() => false);
+        } finally {
+          drive.structureBusy = false;
         }
-        await drive.store.commit(state => ({ state: next(state), accepted: true }));
-        const map = await this.ports.readMap(mapPath);
-        drive.cards.clear();
-        drive.stages.clear();
-        drive.skippedRefreshed = false;
-        await this.load(drive, map, effectiveOrder(drive.store.state), new Set(drive.store.state.autoRoles));
-        drive.members = new Set(map.nodes.map(node => node.id));
-        const parked = Object.entries(archived).map(([id, path]) => ({ id, path }));
-        if (parked.length && this.ports.callouts?.clearNotes)
-          await this.ports.callouts.clearNotes(mapPath, data.runId, parked).catch(() => false);
-      } finally {
-        drive.structureBusy = false;
-      }
-      // The other cards' neighbour lines and numbers follow the new order (a program rewrite; the loop's first round does it).
-      for (const id of effectiveOrder(drive.store.state))
-        if (id !== drive.rootId && !affected.includes(id)) drive.planSkipped.add(id);
-      result.applied = sim.applied.map(a => a.id);
-      result.affected = affected.length;
-      this.log(drive, "gate1", "-", "plan", `edit_structure:${sim.applied.length}`);
-    });
+        // The other cards' neighbour lines and numbers follow the new order (a program rewrite; the loop's first round does it).
+        for (const id of effectiveOrder(drive.store.state))
+          if (id !== drive.rootId && !affected.includes(id)) drive.planSkipped.add(id);
+        result.applied = sim.applied.map(a => a.id);
+        result.affected = affected.length;
+        this.log(drive, "gate1", "-", "plan", `edit_structure:${sim.applied.length}`);
+      },
+      true
+    );
     return result;
   }
 

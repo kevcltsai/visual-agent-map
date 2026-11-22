@@ -1447,7 +1447,7 @@ export const en = {
   "ui.map_chat_skip_book_changed": " (changed since the proposal)",
   "ui.map_chat_line_book_plan_named_0": ": {0}",
   "ui.map_chat_skip_book_stale": "the plan was just changed, so this proposal is out of date; please say it again",
-  "ui.map_chat_skip_book_busy": "the plan is being planned again; please try again when it is done",
+  "ui.map_chat_skip_book_busy": "the plan is busy with other work; please try again when it is done",
   "ui.map_chat_book_struct_title": "Structure changes",
   "ui.map_chat_book_struct_archive_note": "The notes stay in the archive and can be restored",
   "ui.map_chat_book_struct_over_cap_0": "At most 6 changes at a time, this one has {0}; please say them in parts",

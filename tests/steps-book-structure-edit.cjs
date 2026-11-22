@@ -267,6 +267,16 @@ test('undo closure: undoing a rename takes nothing else, even when later ops add
   assert.deepEqual([...E.undoClosure(r2.applied, [sec[0].id], 'r')], [sec[0].id]);
 });
 
+test('undo closure: undoing a removal does not pull in the rename of the card that sat before it (a rename keeps its place), but a rename of the removed card\'s own undone add does', () => {
+  const ops = [op({ kind: 'remove', card: 'c3' }), op({ kind: 'rename', card: 'c2', title: 'Second' })];
+  const r = run(ops);
+  assert.equal(r.applied.length, 2);
+  assert.deepEqual([...E.undoClosure(r.applied, [ops[0].id], 'r')], [ops[0].id], 'c2 was before c3, but renaming it leans on nothing');
+  const add = [op({ kind: 'add', title: 'New', summary: 's', parent: 'r', ref: 'n9' }), op({ kind: 'rename', card: 'n9', title: 'Newer' })];
+  const r2 = run(add);
+  assert.deepEqual([...E.undoClosure(r2.applied, [add[0].id], 'r')].sort(), [add[0].id, add[1].id].sort());
+});
+
 test('undo closure: a chapter that sat under the root does not pull in later root-level adds or moves', () => {
   const ops = [op({ kind: 'move', card: 'c3', parent: 'c2' }), op({ kind: 'add', title: 'New', summary: 's', parent: 'r', ref: 'new1' })];
   const r = run(ops);

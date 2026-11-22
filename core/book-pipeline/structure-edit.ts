@@ -239,6 +239,8 @@ export function simulateStructure(
 export function undoClosure(applied: readonly AppliedOp[], opIds: Iterable<string>, rootId?: string): Set<string> {
   const picked = new Set(opIds);
   const touched = new Set<string>();
+  // The cards the picked ops are about themselves (not their old neighbours): a later rename leans on those only.
+  const named = new Set<string>();
   const refsOf = (op: StructureOp): string[] => [
     ...(op.kind !== "add" ? [op.card] : []),
     ...(op.kind === "add" || op.kind === "move" ? [op.parent, ...(op.after !== undefined ? [op.after] : [])] : []),
@@ -249,6 +251,7 @@ export function undoClosure(applied: readonly AppliedOp[], opIds: Iterable<strin
   // place, and the root is never removed, so neither one ties a later op to this one.
   const touch = (a: AppliedOp): void => {
     touched.add(nameOf(a.op));
+    named.add(nameOf(a.op));
     if (a.op.kind === "rename") return;
     if (a.before.parent && a.before.parent !== rootId) touched.add(a.before.parent);
     if (a.before.after) touched.add(a.before.after);
@@ -263,7 +266,7 @@ export function undoClosure(applied: readonly AppliedOp[], opIds: Iterable<strin
         seen = true;
         continue;
       }
-      if (seen && refsOf(a.op).some(r => touched.has(r))) {
+      if (seen && refsOf(a.op).some(r => (a.op.kind === "rename" ? named : touched).has(r))) {
         picked.add(a.id);
         touch(a);
         grew = true;

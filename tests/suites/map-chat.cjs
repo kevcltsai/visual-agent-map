@@ -10023,10 +10023,57 @@ integrationTest('book plan chat: Apply of a thread change and a structure change
   assert.equal(order[0].thread, 'a better thread', 'the thread was written before the structure');
   assert.equal(order[0].expect.runId, 'run-1');
   assert.deepEqual(plain(order[0].expect.nodes.map(n => n.id)), [h.ids.root, h.ids.a, h.ids.b, h.ids.c], 'the tree of the proposal, root first');
-  assert.deepEqual(plain(order[0].ops.map(op => op.kind)), ['move', 'remove']);
+  assert.deepEqual(plain(order[0].ops.map(op => op.kind)), ['move'], 'c has no covers: the card showed its removal as refused, so the runner is not asked for it');
   const lines = chat.transcript().at(-1).lines;
   assert.equal(lines.filter(line => line.status === 'done').length, 2, JSON.stringify(lines));
   assert.equal(lines.some(line => /switched or closed|started being written/.test(line.text)), false, JSON.stringify(lines));
+});
+
+integrationTest('book plan chat: a structure apply is not blocked by its own chat turn (the runner asks bookPipelineBlocked at call time), and another entry still is', async () => {
+  const { h, chat } = await planReviewHarness();
+  h.view.plugin.argumentRuns ??= { isRunning: () => false }; h.view.plugin.expansionBatches ??= new Map();
+  const seen = [];
+  h.plugin.editBookStructureAtReview = async (path, ops) => { seen.push(h.view.bookPipelineBlocked()); return { applied: ops.map(op => op.id), refused: [], affected: 1 }; };
+  h.control.reply = async () => ({ reply: 'Rename b.', actions: [{ kind: 'edit_book_structure', items: [{ kind: 'rename', nodeId: h.ids.b, title: 'Renamed B' }] }], rejected: [] });
+  h.type('rename b'); await h.view.sendMapChat();
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
+  eq(seen, [false], 'the runner finds the map free for its own apply');
+  assert.equal(h.view.bookPlanApplying, false);
+  // A chain still holds the map for every other entry (the start button).
+  h.view.chatChainRunner.current = { id: 'chain' };
+  assert.equal(h.view.bookPipelineBlocked(), true);
+  h.view.chatChainRunner.current = null;
+});
+
+integrationTest('book plan chat: the runner gets only the ops the card showed as applicable, the opening line is the runner\'s own count, and the card\'s refusal is still said', async () => {
+  const { h, chat } = await planReviewHarness();
+  h.view.plugin.argumentRuns ??= { isRunning: () => false }; h.view.plugin.expansionBatches ??= new Map();
+  const sent = [];
+  h.plugin.editBookStructureAtReview = async (path, ops, expect, opening) => { sent.push({ ops, line: typeof opening === 'function' ? opening(3) : opening }); return { applied: ops.map(op => op.id), refused: [], affected: 3 }; };
+  // b has a plan with covers and no hand edit; c has no covers at all (the card treats it as locked, the runner alone would not).
+  h.control.reply = async () => ({ reply: 'Two.', actions: [{ kind: 'edit_book_structure', items: [{ kind: 'rename', nodeId: h.ids.b, title: 'Renamed B' }, { kind: 'remove', nodeId: h.ids.c }] }], rejected: [] });
+  h.type('two'); await h.view.sendMapChat();
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
+  assert.equal(sent.length, 1); assert.deepEqual(plain(sent[0].ops.map(op => op.kind)), ['rename']);
+  assert.match(sent[0].line, /3/, 'the opening carries the runner\'s count');
+  const lines = chat.transcript().at(-1).lines;
+  assert.equal(lines.some(line => line.status === 'done' && /edited by you|rules|children/.test(line.text)), true, JSON.stringify(lines));
+});
+
+integrationTest('book plan chat: while the chat-started re-plan runs the bar shows planning, not the plan review with 方向對 (the apply returns early; the bar reads the saved run)', async () => {
+  const { h, chat } = await planReviewHarness();
+  h.view.plugin.argumentRuns ??= { isRunning: () => false }; h.view.plugin.expansionBatches ??= new Map();
+  h.plugin.getBookPipelineProgress = () => undefined;
+  // What the runner does at its setup: the run goes to planning in Map.md, then the call returns while the cards are planned in the background.
+  h.plugin.editBookStructureAtReview = async (path, ops) => {
+    await h.plugin.mutate(async () => { await h.repo.updateMap(MAP, doc => { doc.bookPipeline.phase = 'planning'; }); });
+    return { applied: ops.map(op => op.id), refused: [], affected: 1 };
+  };
+  h.control.reply = async () => ({ reply: 'Rename b.', actions: [{ kind: 'edit_book_structure', items: [{ kind: 'rename', nodeId: h.ids.b, title: 'Renamed B' }] }], rejected: [] });
+  h.type('rename b'); await h.view.sendMapChat();
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
+  await until(() => h.view.map.bookPipeline.phase === 'planning');
+  assert.equal(findAll(h.view.contentEl, i => hasClass(i, 'vam-book-confirm')).length, 0, 'no 方向對，開始寫 while planning');
 });
 
 integrationTest('book plan chat: a refused structure apply (stale) says so and the thread change of the same reply is still written', async () => {
@@ -10076,12 +10123,17 @@ integrationTest('map chat: dropped book codes are said in words once each, other
 
 integrationTest('book plan chat: a structure card lists remove with the archive note, and a refusal the rules already predict', async () => {
   const { h } = await planReviewHarness();
-  h.control.reply = async () => ({ reply: 'Remove.', actions: [{ kind: 'edit_book_structure', items: [{ kind: 'remove', nodeId: h.ids.a }] }], rejected: [] });
-  h.type('drop a'); await h.view.sendMapChat();
+  // c gets a plan too (a card with no covers counts as the author's); a still has a section.
+  await h.repo.updateNote(h.node('c').path, { prompt: planText.composeCardPrompt({ role: 'body', kind: 'chapter', covers: 'covers c', points: ['p'], entry: 'entry c', handoff: 'h', checklist: [{ id: 'C1', type: 'structure', text: 'c1' }] }, 'en') });
+  await h.view.hydrate(); h.view.map.bookPipeline = reviewData(h.view);
+  await h.app.vault.process(h.app.vault.getAbstractFileByPath(MAP), () => core.serializeMap(h.view.map));
+  h.control.reply = async () => ({ reply: 'Remove.', actions: [{ kind: 'edit_book_structure', items: [{ kind: 'remove', nodeId: h.ids.a }, { kind: 'remove', nodeId: h.ids.c }] }], rejected: [] });
+  h.type('drop a and c'); await h.view.sendMapChat();
   openDetails(h.view.chat.logEl);
   const text = visibleText(planCard(h)[0]);
   assert.match(text, /Structure changes/);
-  assert.match(text, /archive|children|rules|edited by you/i, text);
+  assert.ok(text.includes('The notes stay in the archive and can be restored'), text);
+  assert.ok(text.includes('still has sections'), text);
 });
 
 integrationTest('book plan chat: a Prompt changed after the proposal is not overwritten on Apply (the baseline is the proposal turn\'s, not rebuilt at apply time)', async () => {

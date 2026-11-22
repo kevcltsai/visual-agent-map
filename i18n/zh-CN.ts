@@ -1370,7 +1370,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_skip_book_changed": "（提案后被改过）",
   "ui.map_chat_line_book_plan_named_0": "：{0}",
   "ui.map_chat_skip_book_stale": "企划刚调整过，这个提案已过期；请再说一次",
-  "ui.map_chat_skip_book_busy": "企划正在重新企划，好了再说一次",
+  "ui.map_chat_skip_book_busy": "企划正忙着别的工作，好了再说一次",
   "ui.map_chat_book_struct_title": "结构调整",
   "ui.map_chat_book_struct_archive_note": "笔记会留在封存，可以还原",
   "ui.map_chat_book_struct_over_cap_0": "一次最多改 6 项，这次有 {0} 项，请分次说",

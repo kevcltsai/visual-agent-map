@@ -2473,6 +2473,8 @@ var en = {
   "share.mermaid_blocked_note": "[Diagram not drawn: Mermaid was not allowed when this file was made. Source shown instead.]",
   "share.mermaid_undrawn_note": "[Diagram did not finish drawing. Source shown instead.]",
   "share.leak_blocked_0": "Not saved: the file would contain private information ({0}). Remove that content from the source notes, or turn off the option that includes full notes, then share again.",
+  "share.leak_at_0": "In topic \u201C{0}\u201D",
+  "share.leak_at_0_1": "In topic \u201C{0}\u201D: {1}",
   "share.leak_category_vault-path": "the vault's location on this computer",
   "share.leak_category_external-path": "the location of a data folder on this computer",
   "share.leak_category_map-folder": "the map's folder name",
@@ -5790,6 +5792,8 @@ var zhCN = {
   "share.mermaid_blocked_note": "\uFF3B\u56FE\u8868\u672A\u7ED8\u5236\uFF1A\u5236\u4F5C\u6B64\u6587\u4EF6\u65F6\u5C1A\u672A\u5141\u8BB8 Mermaid\uFF0C\u6539\u663E\u793A\u6E90\u7801\u3002\uFF3D",
   "share.mermaid_undrawn_note": "\uFF3B\u56FE\u8868\u672A\u80FD\u753B\u5B8C\uFF0C\u6539\u663E\u793A\u6E90\u7801\u3002\uFF3D",
   "share.leak_blocked_0": "\u672A\u4FDD\u5B58\uFF1A\u6587\u4EF6\u4F1A\u542B\u6709\u79C1\u4EBA\u4FE1\u606F\uFF08{0}\uFF09\u3002\u8BF7\u4ECE\u6765\u6E90\u7B14\u8BB0\u79FB\u9664\u8FD9\u4E9B\u5185\u5BB9\uFF0C\u6216\u5173\u95ED\u4F1A\u5E26\u5165\u5B8C\u6574\u7B14\u8BB0\u7684\u9009\u9879\uFF0C\u518D\u91CD\u65B0\u5206\u4EAB\u3002",
+  "share.leak_at_0": "\u5728\u8BAE\u9898\u201C{0}\u201D",
+  "share.leak_at_0_1": "\u5728\u8BAE\u9898\u201C{0}\u201D\uFF1A{1}",
   "share.leak_category_vault-path": "\u8FD9\u53F0\u7535\u8111\u4E0A\u7684\u77E5\u8BC6\u5E93\u4F4D\u7F6E",
   "share.leak_category_external-path": "\u6587\u4EF6\u5939\u5728\u8FD9\u53F0\u7535\u8111\u4E0A\u7684\u4F4D\u7F6E",
   "share.leak_category_map-folder": "\u601D\u7EF4\u5BFC\u56FE\u7684\u6587\u4EF6\u5939\u540D\u79F0",
@@ -9107,6 +9111,8 @@ var zhTW = {
   "share.mermaid_blocked_note": "\uFF3B\u5716\u8868\u672A\u7E6A\u88FD\uFF1A\u88FD\u4F5C\u6B64\u6A94\u6642\u5C1A\u672A\u5141\u8A31 Mermaid\uFF0C\u6539\u986F\u793A\u539F\u59CB\u78BC\u3002\uFF3D",
   "share.mermaid_undrawn_note": "\uFF3B\u5716\u8868\u672A\u80FD\u756B\u5B8C\uFF0C\u6539\u986F\u793A\u539F\u59CB\u78BC\u3002\uFF3D",
   "share.leak_blocked_0": "\u672A\u5B58\u6A94\uFF1A\u6A94\u6848\u6703\u542B\u6709\u79C1\u4EBA\u8CC7\u8A0A\uFF08{0}\uFF09\u3002\u8ACB\u56DE\u5230\u4F86\u6E90\u7B46\u8A18\u79FB\u9664\u9019\u4E9B\u5167\u5BB9\uFF0C\u6216\u95DC\u9589\u6703\u5E36\u5165\u5B8C\u6574\u7B46\u8A18\u7684\u9078\u9805\uFF0C\u518D\u91CD\u65B0\u5206\u4EAB\u3002",
+  "share.leak_at_0": "\u5728\u8B70\u984C\u300C{0}\u300D",
+  "share.leak_at_0_1": "\u5728\u8B70\u984C\u300C{0}\u300D\uFF1A{1}",
   "share.leak_category_vault-path": "\u9019\u53F0\u96FB\u8166\u4E0A\u7684 Vault \u4F4D\u7F6E",
   "share.leak_category_external-path": "\u8CC7\u6599\u593E\u5728\u9019\u53F0\u96FB\u8166\u4E0A\u7684\u4F4D\u7F6E",
   "share.leak_category_map-folder": "\u5FC3\u667A\u5716\u7684\u8CC7\u6599\u593E\u540D\u7A31",
@@ -104069,6 +104075,27 @@ function scanPayloadForLeaks(payload, forbidden) {
   visit(payload, "");
   return hits;
 }
+function leakExcerpt(node, forbidden, radius = 20) {
+  const texts = [];
+  const visit = (value, key4) => {
+    if (typeof value === "string")
+      texts.push(
+        decodeHtmlEntities((key4 === "detailHtml" ? stripHtmlCode(value) : value).replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim()
+      );
+    else if (Array.isArray(value)) for (const item of value) visit(item, key4);
+    else if (value && typeof value === "object") for (const [name2, item] of Object.entries(value)) visit(item, name2);
+  };
+  visit(node, "");
+  for (const text11 of texts)
+    for (const { value } of forbidden) {
+      const index = text11.indexOf(value);
+      if (index < 0) continue;
+      const start = Math.max(0, index - radius);
+      const end = Math.min(text11.length, index + value.length + radius);
+      return `${start > 0 ? "\u2026" : ""}${text11.slice(start, end)}${end < text11.length ? "\u2026" : ""}`;
+    }
+  return void 0;
+}
 
 // experiences/sharing/share-dom.ts
 var BLOCKED_TAGS = /* @__PURE__ */ new Set([
@@ -106474,6 +106501,7 @@ ${fence}`, host, "", child);
     const leakCategories = [
       .../* @__PURE__ */ new Set([...hits.map((hit) => hit.category), ...renderedLeaks, ...rebuiltLeaks])
     ];
+    const leakTopics = leakCategories.length ? payload.nodes.filter((node) => scanPayloadForLeaks({ nodes: [node] }, forbidden).length).map((node) => ({ title: node.title, excerpt: leakExcerpt(node, forbidden) })) : [];
     const scoped = scopeCountsToMode(options, { notesWithContent, failedImages: failed.size });
     const counts = {
       topics: payload.nodes.length,
@@ -106484,6 +106512,7 @@ ${fence}`, host, "", child);
       payload,
       counts,
       leakCategories,
+      leakTopics,
       failedImages: scoped.failedImages,
       mermaidUndrawn: undrawn,
       mermaidBlocked: blocked
@@ -107140,6 +107169,8 @@ var ShareModal = class extends import_obsidian48.Modal {
         ),
         "vam-share-error"
       );
+      for (const { title, excerpt } of result.leakTopics)
+        add(excerpt ? t("share.leak_at_0_1", title, excerpt) : t("share.leak_at_0", title), "vam-share-error");
       return;
     }
     const thresholds = (_a2 = this.options.sizeThresholds) != null ? _a2 : {

@@ -81,6 +81,8 @@ export interface MapChatLine {
    * line in memory and in the conversation record. The panel shows it from P4 on.
    */
   basis?: MapChatBasis;
+  /** Shown on its own like a line the reader has to look at, not folded into the done count. */
+  loud?: boolean;
 }
 
 /** A search block that ended with a picture put into its card. */
@@ -173,6 +175,8 @@ export interface MapChatPlanCard {
   /** The words of the two buttons when they are not the usual ones. */
   applyLabel?: string;
   cancelLabel?: string;
+  /** Nothing in the plan can be applied: only the refusals and the cancel button are shown. */
+  noApply?: boolean;
   apply(): void;
   cancel(): void;
 }
@@ -3371,7 +3375,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
 
   /** A result the reader still has to look at: anything not done, and a picture line where some card got no picture. */
   private needsLook(line: MapChatLine): boolean {
-    return line.status !== "done" || !!line.imageGroup?.some(block => !placedImage(block));
+    return line.status !== "done" || !!line.loud || !!line.imageGroup?.some(block => !placedImage(block));
   }
   /** The toggle of "View details": one per reply, for the plan card and the results alike. Focus follows the rebuilt button. */
   private buildDetailToggle(parent: HTMLElement, message: MapChatMessage, open: boolean): void {
@@ -3488,11 +3492,13 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (diff) this.buildPlanDiff(card, diff);
     if (!folds) addDetail();
     const buttons = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
-    const apply = buttons.createEl("button", {
-      cls: "mod-cta vam-map-chat-plan-apply",
-      text: plan.applyLabel ?? t("ui.map_chat_plan_apply"),
-      attr: { type: "button" }
-    });
+    const apply = plan.noApply
+      ? undefined
+      : buttons.createEl("button", {
+          cls: "mod-cta vam-map-chat-plan-apply",
+          text: plan.applyLabel ?? t("ui.map_chat_plan_apply"),
+          attr: { type: "button" }
+        });
     const cancel = buttons.createEl("button", {
       cls: "vam-map-chat-plan-cancel",
       text: plan.cancelLabel ?? t("ui.map_chat_plan_cancel"),
@@ -3502,7 +3508,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     if (folds) addDetail();
     // A second press does nothing: the buttons stop working as soon as one is used. They disappear with the repaint, so the
     // keyboard goes back to the message field instead of falling to the page.
-    apply.addEventListener("click", () => {
+    apply?.addEventListener("click", () => {
       if (plan.state !== "pending") return;
       apply.disabled = cancel.disabled = true;
       plan.apply();
@@ -3510,7 +3516,8 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     });
     cancel.addEventListener("click", () => {
       if (plan.state !== "pending") return;
-      apply.disabled = cancel.disabled = true;
+      if (apply) apply.disabled = true;
+      cancel.disabled = true;
       plan.cancel();
       this.focusInput();
     });

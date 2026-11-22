@@ -3311,6 +3311,13 @@ integrationTest('B1 ui: result lines name their status in words; done lines fold
   openDetails(chat.logEl); eq(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line')).map(l => l.text.split(':')[0].split(' ')[0]), ['Skipped', 'Failed', 'Done', 'Undo'], 'View details brings the done line; the closing note stays last');
 });
 
+integrationTest('book plan chat: a loud done line is shown without View details, and is not folded into the count', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  chat.begin('q'); chat.finish('r', [{ status: 'done', text: 'Done: A' }, { status: 'done', loud: true, text: 'Done: B; wait for the re-plan' }]);
+  eq(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line')).map(l => l.text), ['Done: B; wait for the re-plan'], 'the loud line is shown');
+  assert.match(visibleText(find(chat.logEl, i => hasClass(i, 'vam-map-chat-lines-counts'))), /^1 done$/);
+});
+
 integrationTest('B1 ui: the auto-layout line is a note: it is neither spoken in the counts nor counted toward folding', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const writes = []; const setText = chat.liveEl.setText.bind(chat.liveEl); chat.liveEl.setText = value => { writes.push(value); setText(value); };
   const note = 'Arranged the map automatically after adding many topics';
@@ -6239,6 +6246,14 @@ integrationTest('persona 27b: a card drawn for the first time that covers nothin
   const stepsBefore = undoSteps(h);
   h.view.settleCardHeights(); await until(() => undoSteps(h) === stepsBefore + 1);
   eq(coverAny(h.view.map.nodes.filter(n => n.id !== 'fresh'), id => heights[id] ?? 180), [], 'the card that covered another is laid out again');
+});
+
+test('plan card with noApply: only the cancel button is shown, and pressing it cancels', () => {
+  const f = panelFixture({}); f.panel.setOpen(true); let cancelled = 0;
+  f.panel.begin('q'); f.panel.finish('a reply', []);
+  f.panel.showPlan({ reasons: ['r'], items: [], estimate: 'e', state: 'pending', noApply: true, diff: [{ title: 'T', fields: [], lines: [{ text: 'refused' }] }], apply() { throw new Error('no apply'); }, cancel() { cancelled++; } });
+  assert.equal(f.panel.logEl.querySelector('.vam-map-chat-plan-apply'), null);
+  const cancel = f.panel.logEl.querySelector('.vam-map-chat-plan-cancel'); assert.ok(cancel); cancel.click(); assert.equal(cancelled, 1);
 });
 
 // ---- F26: the plan card's Apply / Cancel must be scrolled into view after the hint line changed the log height ----------
@@ -10058,6 +10073,11 @@ integrationTest('book plan chat: the runner gets only the ops the card showed as
   assert.match(sent[0].line, /3/, 'the opening carries the runner\'s count');
   const lines = chat.transcript().at(-1).lines;
   assert.equal(lines.some(line => line.status === 'done' && /edited by you|rules|children/.test(line.text)), true, JSON.stringify(lines));
+  // The line counts what was applied (1), not what was proposed (2), and it is shown without opening "View details" (it tells the owner to wait).
+  const book = lines.find(line => /re-planning|Change the structure/.test(line.text));
+  assert.match(book.text, /Change the structure of the book plan: 1 changes/, book.text);
+  const visible = findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-line')).map(l => l.text);
+  assert.equal(visible.some(text => /Change the structure of the book plan: 1 changes/.test(text)), true, JSON.stringify(visible));
 });
 
 integrationTest('book plan chat: while the chat-started re-plan runs the bar shows planning, not the plan review with 方向對 (the apply returns early; the bar reads the saved run)', async () => {

@@ -1937,6 +1937,14 @@ test('book plan: context serialises bookPlan and its note only when given, and k
   assert.equal(ctx.bookPlan.runId, 'run1');
   assert.equal(JSON.parse(context({ bookPlan: bookPlan({ cards: [], tooLarge: true }) }).json).bookPlan.tooLarge, true);
 });
+test('book plan prompt: no card ids in the reply, and briefs that no longer fit are changed in the same reply without asking', () => {
+  const en = mapChatStep.render(request({ language: 'en' }));
+  assert.match(en, /Never show card ids \(such as "b-ch2"\) in "reply"/);
+  assert.match(en, /do not ask first: list the changes to those cards as edit_book_plan in the same reply/);
+  const zh = mapChatStep.render(request({ language: 'zh-TW' }));
+  assert.match(zh, /「reply」裡不要出現卡片 id（例如「b-ch2」）/);
+  assert.match(zh, /不要先問要不要改：同一次回覆就用 edit_book_plan/);
+});
 test('book plan: edit_book_plan is dropped without a bookPlan context', () => {
   const result = parse(reply(planItem(planChange('c1', { entry: 'e' }))));
   assert.deepEqual(result.actions, []);

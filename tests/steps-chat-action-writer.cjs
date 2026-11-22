@@ -304,6 +304,7 @@ test('edit_book_plan: a Prompt changed after the proposal is skipped and said so
   assert.equal(outcome.status, 'done');
   assert.match(outcome.note, /tell the chief editor/);
   assert.match(outcome.note, /1 cards left/);
+  assert.equal(outcome.label, t('ui.map_chat_do_edit_book_plan_0', 1), 'the line counts the cards written, not the 2 proposed');
   assert.deepEqual(w.writes, ['c.md']);
   const all = plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', entry: 'x' }]), { bookPlan: w.baselineOf(['b']) }));
   assert.deepEqual(all, skippedOutcome('ui.map_chat_skip_book_cards'));
@@ -499,14 +500,14 @@ test('edit_book_structure: the runner is called once with the proposal-time run,
   assert.equal('after' in w.calls[0].ops[0], false, 'before a, the first child: no previous sibling');
   assert.equal(w.calls[0].opening(1), t('ui.map_chat_opening_book_struct_0', 1), 'the opening line is built from the count the runner gives it');
   assert.equal(w.calls[0].opening(0), t('ui.map_chat_opening_book_struct_none'));
-  assert.deepEqual(outcome, { status: 'done', note: t('ui.map_chat_line_book_struct_0_1', 2, 2) });
+  assert.deepEqual(outcome, { status: 'done', loud: true, label: t('ui.map_chat_do_edit_book_structure_0', 1), note: t('ui.map_chat_line_book_struct_0_1', 2, 2) });
   assert.deepEqual(w.writes, [], 'no card is written by the generic path');
 });
 
 test('edit_book_structure: 0 re-planned cards gets the no-AI line', async () => {
   const w = planWorld({ structureResult: { applied: ['x'], refused: [], affected: 0 } });
   const outcome = plain(await applyBookStructureEdit(w.deps, structAction([{ kind: 'rename', nodeId: 'b', title: 'B2' }]), { bookPlan: w.baselineOf(['b']) }));
-  assert.deepEqual(outcome, { status: 'done', note: t('ui.map_chat_line_book_struct_none') });
+  assert.deepEqual(outcome, { status: 'done', loud: true, label: t('ui.map_chat_do_edit_book_structure_0', 1), note: t('ui.map_chat_line_book_struct_none') });
   assert.equal(w.calls[0].opening(0), t('ui.map_chat_opening_book_struct_none'));
 });
 
@@ -530,6 +531,7 @@ test('edit_book_structure: refusals map to the owner-readable lines (stale, not_
   w.deps.editStructure = async ops => ({ applied: [ops[0].id], refused: [{ id: ops[1].id, code: 'locked' }], affected: 0 });
   const part = plain(await applyBookStructureEdit(w.deps, structAction([{ kind: 'rename', nodeId: 'a', title: 'A2' }, { kind: 'remove', nodeId: 'c' }]), { bookPlan: w.baselineOf(['a', 'c']) }));
   assert.equal(part.status, 'done'); assert.match(part.note, /C/);
+  assert.equal(part.label, t('ui.map_chat_do_edit_book_structure_0', 1), 'the line counts what was applied, not the 2 proposed');
   // A card the card's own rule shows as the author's: the refusal is said, and the runner is not asked for it.
   const mine = planWorld();
   assert.deepEqual(plain(await applyBookStructureEdit(mine.deps, structAction(items), { bookPlan: mine.baselineOf([]) })), { status: 'skipped', reason: t('ui.map_chat_skip_book_struct_locked_0', 'B') });

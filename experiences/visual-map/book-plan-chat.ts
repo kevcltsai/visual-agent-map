@@ -237,6 +237,7 @@ export async function applyBookPlanEdit(
   }
   return {
     status: "done",
+    label: t("ui.map_chat_do_edit_book_plan_0", done.written.length),
     note:
       t("ui.map_chat_line_book_plan_undo") +
       (left.length
@@ -344,6 +345,9 @@ export async function applyBookStructureEdit(
   if (!result.applied.length) return { status: "skipped", reason: reasons[0] ?? t("ui.book_struct_over_cap") };
   return {
     status: "done",
+    // The line counts what the runner applied, and says the re-plan wait where it is seen without "View details".
+    label: t("ui.map_chat_do_edit_book_structure_0", result.applied.length),
+    loud: true,
     note:
       (result.affected
         ? t("ui.map_chat_line_book_struct_0_1", result.affected, result.affected)

@@ -992,3 +992,23 @@ test('offer: a book plan diff next to a delete_topic still lists the delete grou
   alone.conv.offerChatPlan(resultOf([edit]), planOf({ reasons: ['book_plan_edit'] }), baseline, { ...ANCHOR }, 'm');
   assert.deepEqual(alone.panel.pending.groups, [], 'a diff alone has no group');
 });
+
+test('offer: a structure card where every item is refused offers no apply; one with an applicable item, or next to another action, keeps it', () => {
+  const nodes = [
+    { id: 'root', parentId: null, title: 'Book' }, { id: 'ch1', parentId: 'root', title: 'One' },
+    { id: 'sec', parentId: 'ch1', title: 'Sec' }, { id: 'ch2', parentId: 'root', title: 'Two' }
+  ];
+  const baseline = { selectedCount: 0, bookPlan: { runId: 'r', unlocked: ['ch1', 'ch2', 'sec'], thread: '', prompts: {}, nodes } };
+  const refused = { kind: 'edit_book_structure', items: [{ kind: 'remove', nodeId: 'ch1' }] };
+  const fine = { kind: 'edit_book_structure', items: [{ kind: 'rename', nodeId: 'ch2', title: 'Deux' }] };
+  const shown = actions => {
+    const r = rig();
+    r.conv.offerChatPlan(resultOf(actions), planOf({ reasons: ['book_plan_edit'] }), baseline, { ...ANCHOR }, 'm');
+    return r.panel.pending;
+  };
+  assert.equal(shown([refused]).noApply, true, 'nothing applicable: refusal lines and cancel only');
+  assert.equal(shown([refused]).diff.length, 1, 'the refusal lines are still shown');
+  assert.equal(shown([fine]).noApply, undefined);
+  assert.equal(shown([refused, fine]).noApply, undefined);
+  assert.equal(shown([refused, act.del]).noApply, undefined, 'another action of the reply is still applicable');
+});

@@ -21441,8 +21441,9 @@ export class VisualAgentMapView extends ItemView {
       return {
         status: "done",
         ...(outcome.basis ? { basis: outcome.basis } : {}),
+        ...(outcome.loud ? { loud: true } : {}),
         text:
-          t("ui.map_chat_line_done_0", label) +
+          t("ui.map_chat_line_done_0", outcome.label ?? label) +
           (outcome.note ?? "") +
           (outcome.skippedCards ? t("ui.map_chat_line_cards_skipped_hidden_0", outcome.skippedCards) : "")
       };

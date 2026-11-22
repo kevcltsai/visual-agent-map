@@ -42,7 +42,17 @@ import type VisualAgentMapPlugin from "../../main";
 
 /** What one chat action came to: written, skipped with a reason (shown in the chat), or failed. */
 export type ChatOutcome =
-  | { status: "done"; images?: MapChatImages[]; skippedCards?: number; basis?: MapChatBasis; note?: string }
+  | {
+      status: "done";
+      images?: MapChatImages[];
+      skippedCards?: number;
+      basis?: MapChatBasis;
+      note?: string;
+      /** Replaces the action's label on the result line (a count of what was really done, not of what was proposed). */
+      label?: string;
+      /** The line is shown without "View details" (it tells the reader something to wait for). */
+      loud?: boolean;
+    }
   | { status: "skipped" | "failed"; reason: string; created?: boolean };
 /** What the writes of one reply have made so far: the real id behind each `ref`, and the cards created, in order. */
 export interface ChatRun {

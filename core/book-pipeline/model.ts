@@ -391,6 +391,7 @@ function structureEditShape(value: unknown): boolean {
     if (!(before.parent === null || isText(before.parent)) || !isText(before.title)) return false;
     if (before.after !== undefined && !isText(before.after)) return false;
     if (before.summary !== undefined && !isText(before.summary)) return false;
+    if (before.homes !== undefined && !isTextList(before.homes)) return false;
   }
   if (!Array.isArray(value.rejected) || !value.rejected.every(r => isObject(r) && isText(r.id) && isText(r.code))) return false;
   if (value.overCap !== undefined && value.overCap !== true) return false;

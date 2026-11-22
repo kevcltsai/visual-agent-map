@@ -5017,3 +5017,181 @@ test('P2a without the port the proposal is recorded and the map stays as it is',
   assert.equal((await idsNow(r)).length, 3);
   assert.ok(r.contents.has(r.nodes[2].path));
 });
+
+// ---- undoing the editor's structure changes (P2b) ----------------------------------------------------------------------------------
+const HOME_GLOBAL = holder => request => ({ ...planRoles(holder.r, ['intro', 'body', 'body']), materials: [{ name: 'Scene', use: 'u', home: holder.r.nodes[2].id }, { name: 'Other', use: 'u', home: holder.r.nodes[1].id }], structure: SOP(holder.r) });
+const undoRig = async (over = {}) => {
+  const out = await structureRig(SOP, over);
+  await out.r.runs.start(out.r.mapPath);
+  await settle();
+  return out;
+};
+const bodyOfRaw = raw => raw.slice(raw.indexOf('\n---\n') + 5);
+const noTrace = raw => raw.replace(/,?\s*"gateTrace": \[[^\]]*\]/, '');
+const codeOf = async p => p.then(() => undefined, e => e.code);
+
+test('P2b undo one op (the added card): it is parked, the others stay, the run goes back to planning and re-plans nothing it need not', async () => {
+  const { r, requests } = await undoRig();
+  const s1 = await r.state();
+  const created = s1.order[2];
+  const createdPath = (await mapNow(r)).nodes.find(n => n.id === created).path;
+  const plansBefore = requests.card.length;
+  await r.runs.undoStructureEdit(r.mapPath, ['o2']);
+  await settle();
+  const s = await r.state();
+  same(s.structureEdit.undone, ['o2']);
+  same(s.order, [r.nodes[0].id, r.nodes[1].id]);
+  same(await idsNow(r), s.order);
+  assert.match(s.structureEdit.archived[created], /\/Archive\//);
+  assert.ok(!r.contents.has(createdPath), 'the new card left Notes');
+  assert.match(r.contents.get(s.structureEdit.archived[created]), /title: NewChapter/);
+  assert.equal((await r.repo.readNote((await mapNow(r)).nodes.find(n => n.id === r.nodes[1].id).path)).title, 'RenamedA', 'the other ops stay');
+  assert.equal(s.phase, 'gate1', 'the run is at the gate again after the re-plan');
+  assert.ok(s.structureEdit.applied.length === 3);
+  assert.equal(requests.card.length, plansBefore, 'the dropped card is not planned; nothing else was affected');
+});
+
+test('P2b undo all: the merged card is back in Notes with its text, titles and places as before, the new card parked, nothing lost', async () => {
+  const { r, requests } = await undoRig();
+  const s1 = await r.state();
+  const created = s1.order[2];
+  const archivePath = s1.structureEdit.archived[r.nodes[2].id];
+  const archivedDetail = (await r.repo.readNote(archivePath)).detail;
+  requests.card.length = 0;
+  let hold = defer();
+  await r.runs.undoStructureEdit(r.mapPath, 'all');
+  await settle();
+  const s = await r.state();
+  same(s.structureEdit.undone.slice().sort(), ['o1', 'o2', 'o3']);
+  same(s.order, [r.nodes[0].id, r.nodes[1].id, r.nodes[2].id]);
+  same(await idsNow(r), s.order);
+  const map = await mapNow(r);
+  const bNode = map.nodes.find(n => n.id === r.nodes[2].id);
+  assert.match(bNode.path, /\/Notes\//);
+  assert.ok(!r.contents.has(archivePath), 'the archived note moved out of Archive');
+  assert.equal((await r.repo.readNote(bNode.path)).detail, archivedDetail, 'the text did not change');
+  assert.equal((await r.repo.readNote(bNode.path)).title, 'SecretTitleB');
+  assert.equal((await r.repo.readNote(map.nodes.find(n => n.id === r.nodes[1].id).path)).title, 'SecretTitleA', 'the rename was undone');
+  assert.equal(s.chapters[r.nodes[1].id].title, 'SecretTitleA');
+  assert.equal(map.nodes.find(n => n.id === created), undefined);
+  assert.match(s.structureEdit.archived[created], /\/Archive\//);
+  assert.equal(s.structureEdit.archived[r.nodes[2].id], undefined, 'restored ones are no longer archived');
+  same(mapDifference(s, bookReadingOrder(map)), { added: [], missing: [] });
+  assert.ok(requests.card.some(q => q.card.id === r.nodes[2].id), 'the put-back card is planned again');
+  assert.ok(requests.card.some(q => q.card.id === r.nodes[1].id), 'the merge target is planned again');
+  assert.ok(r.stat.logs.some(l => /undo_structure:3/.test(l)));
+  assert.ok(!r.stat.logs.some(l => /NewChapter|RenamedA/.test(l)));
+  void hold;
+});
+
+test('P2b undo one op that others lean on takes them too (the new card and its rename)', async () => {
+  const mk = r => [
+    { id: 'o1', kind: 'add', ref: 'n1', title: 'NewChapter', summary: 's', parent: r.nodes[0].id, after: r.nodes[1].id, reason: 'x' },
+    { id: 'o2', kind: 'rename', card: 'n1', title: 'NewName', reason: 'x' },
+    { id: 'o3', kind: 'rename', card: r.nodes[1].id, title: 'RenamedA', reason: 'x' }
+  ];
+  const { r } = await structureRig(mk);
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.state()).structureEdit.applied.length, 3);
+  await r.runs.undoStructureEdit(r.mapPath, ['o1']);
+  await settle();
+  const s = await r.state();
+  same(s.structureEdit.undone.slice().sort(), ['o1', 'o2']);
+  assert.equal(s.order.length, 3);
+  assert.equal((await r.repo.readNote((await mapNow(r)).nodes.find(n => n.id === r.nodes[1].id).path)).title, 'RenamedA');
+});
+
+test('P2b the run goes to planning with the affected cards in pendingReset (before the loop reads them)', async () => {
+  const gate = defer();
+  const holder = {};
+  let hold = false;
+  const { r } = await structureRig(SOP, { script: { card: async request => { if (hold) await gate.promise; return { covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'x' }] }; } } });
+  await r.runs.start(r.mapPath);
+  const before = await r.state();
+  hold = true;
+  const undoing = r.runs.undoStructureEdit(r.mapPath, ['o1']);
+  await settle();
+  const s = await r.state();
+  assert.equal(s.phase, 'planning');
+  assert.ok(s.revisions[r.nodes[2].id] > (before.revisions[r.nodes[2].id] ?? 0), 'the restored card has a new revision');
+  assert.ok(s.revisions[r.nodes[1].id] > (before.revisions[r.nodes[1].id] ?? 0), 'the merge target has a new revision');
+  gate.resolve(); await undoing; await settle();
+  assert.equal((await r.state()).phase, 'gate1');
+  void holder;
+});
+
+test('P2b undo is refused outside a running gate 1', async () => {
+  const { r } = await undoRig();
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.status = 'stopped'; });
+  assert.equal(await codeOf(r.runs.undoStructureEdit(r.mapPath, 'all')), 'not_gate1');
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.status = 'running'; d.bookPipeline.phase = 'writing'; });
+  assert.equal(await codeOf(r.runs.undoStructureEdit(r.mapPath, 'all')), 'not_gate1');
+  assert.equal((await r.state()).structureEdit.undone, undefined);
+});
+
+test('P2b undo is refused while a drive of the map runs', async () => {
+  const gate = defer();
+  const { r } = await structureRig(SOP, { script: { card: async () => { await gate.promise; return { covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'x' }] }; } } });
+  const started = r.runs.start(r.mapPath);
+  await settle();
+  assert.ok(r.runs.isRunning(r.mapPath));
+  assert.equal(await codeOf(r.runs.undoStructureEdit(r.mapPath, 'all')), 'busy');
+  gate.resolve(); await started.catch(() => undefined); await settle();
+});
+
+test('P2b a parked note that is gone: the whole undo is refused and nothing moves', async () => {
+  const { r } = await undoRig();
+  const s1 = await r.state();
+  r.contents.delete(s1.structureEdit.archived[r.nodes[2].id]);
+  const mapBefore = r.mapRaw();
+  const notesBefore = [...r.contents.keys()].sort();
+  assert.equal(await codeOf(r.runs.undoStructureEdit(r.mapPath, 'all')), 'missing');
+  assert.equal(noTrace(r.mapRaw()), noTrace(mapBefore));
+  same([...r.contents.keys()].sort(), notesBefore);
+  assert.equal((await r.state()).structureEdit.undone, undefined);
+});
+
+test('P2b undoing the same op twice: the second is a no-op, and unknown ids do nothing', async () => {
+  const { r } = await undoRig();
+  await r.runs.undoStructureEdit(r.mapPath, ['o2']); await settle();
+  const mapAfter = r.mapRaw();
+  const s1 = await r.state();
+  await r.runs.undoStructureEdit(r.mapPath, ['o2']); await settle();
+  await r.runs.undoStructureEdit(r.mapPath, ['zzz']); await settle();
+  assert.equal(noTrace(r.mapRaw()), noTrace(mapAfter));
+  same((await r.state()).structureEdit.undone, s1.structureEdit.undone);
+});
+
+test('P2b after the undo the run re-plans the affected cards and the editor reads the plan again (plan_edit)', async () => {
+  const { r, requests } = await undoRig();
+  const editsBefore = r.stat.planEdit.length;
+  requests.card.length = 0;
+  await r.runs.undoStructureEdit(r.mapPath, 'all'); await settle();
+  assert.ok(requests.card.length >= 2, 'the restored card and the merge target are planned again');
+  assert.equal(r.stat.planEdit.length, editsBefore + 1, 'plan_edit runs once more');
+  assert.equal((await r.state()).phase, 'gate1');
+});
+
+test('P2b materials homed on a merged card are pointed back at it by the undo', async () => {
+  const holder = {};
+  const { r } = await structureRig(SOP, { script: { global: request => HOME_GLOBAL(holder)(request) } });
+  holder.r = r;
+  await r.runs.start(r.mapPath);
+  const s1 = await r.state();
+  same(s1.structureEdit.applied.find(a => a.id === 'o1').before.homes, ['Scene']);
+  assert.match(r.raw(0), /Scene.*歸屬：RenamedA/);
+  await r.runs.undoStructureEdit(r.mapPath, 'all'); await settle();
+  assert.match(r.raw(0), /Scene.*歸屬：SecretTitleB/);
+  assert.match(r.raw(0), /Other.*歸屬：SecretTitleA/);
+});
+
+test('P2b a failed apply (rollback ok) writes the materials homes back to the cards as they were', async () => {
+  let throws = 1;
+  const wrap = repo => new Proxy(repo, { get: (t, k) => k === 'saveMap' ? (...a) => { if (throws-- > 0) throw new Error('disk'); return t.saveMap(...a); } : typeof t[k] === 'function' ? t[k].bind(t) : t[k] });
+  const holder = {};
+  const { r } = await structureRig(SOP, { wrap, script: { global: request => HOME_GLOBAL(holder)(request) } });
+  holder.r = r;
+  await r.runs.start(r.mapPath);
+  assert.ok(r.stat.logs.some(l => /structure_failed/.test(l)));
+  assert.match(r.raw(0), /Scene.*歸屬：SecretTitleB/, 'not the merge target\'s title');
+});

@@ -577,14 +577,22 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
   }
   if (actions.abandon?.asking && (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")) {
     const abandon = actions.abandon;
+    // A finished book is not given up: its own words, and the confirm is not a warning.
+    const done = state.mode === "done";
+    const title = t(done ? "ui.book_remove_title" : "ui.book_abandon_title");
     const card = bar.createDiv("vam-book-abandon-card");
     card.setAttr("role", "group");
-    card.setAttr("aria-label", t("ui.book_abandon_title"));
-    card.createEl("b", { text: t("ui.book_abandon_title") });
-    card.createEl("p", { text: t("ui.book_abandon_body") });
+    card.setAttr("aria-label", title);
+    card.createEl("b", { text: title });
+    card.createEl("p", { text: t(done ? "ui.book_remove_body" : "ui.book_abandon_body") });
     const row = card.createDiv("vam-book-abandon-actions");
     makeButton(row, t("ui.cancel"), "vam-book-abandon-cancel", abandon.cancel);
-    makeButton(row, t("ui.book_abandon_confirm"), "mod-warning vam-book-abandon-confirm", abandon.confirm);
+    makeButton(
+      row,
+      t(done ? "ui.book_remove" : "ui.book_abandon_confirm"),
+      `${done ? "mod-cta" : "mod-warning"} vam-book-abandon-confirm`,
+      abandon.confirm
+    );
   }
   if (state.mode === "gate1" && state.planReview && state.structureEdit)
     renderStructureEdit(bar, state.structureEdit, actions);

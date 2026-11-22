@@ -1150,7 +1150,18 @@ test('abandon: stopped, budget pause and done show the entry (放棄這本 / 改
     const bar = drawWith(data, progress({ phase: data.phase, status: data.status, active: false }), a);
     const card = dom.find(bar, i => i.cls.includes('vam-book-abandon-card'));
     assert.ok(card, 'the card is drawn in the bar (no window.confirm)');
-    assert.ok(texts(card).some(x => x.includes('已寫好的章節正文會保留，只會拿掉圖文書放進筆記的提示框')));
+    if (data.phase === 'done') {
+      // A finished book is not "given up": no 放棄 anywhere, it says the book is kept, and the confirm is not a warning.
+      assert.ok(!texts(card).join('').includes('放棄'), 'done: no 放棄 wording');
+      assert.ok(texts(card).includes('改回一般心智圖？'));
+      assert.ok(texts(card).some(x => x.includes('這本書已經完成，章節正文和圖片全部保留')));
+      const confirm = dom.find(card, i => i.cls.includes('vam-book-abandon-confirm'));
+      assert.equal(confirm.text, '改回一般心智圖');
+      assert.ok(!confirm.cls.includes('mod-warning'));
+    } else {
+      assert.ok(texts(card).some(x => x.includes('已寫好的章節正文會保留，只會拿掉圖文書放進筆記的提示框')));
+      assert.ok(texts(card).includes('放棄這本圖文書？'));
+    }
     assert.ok(!/地圖/.test(texts(card).join('')));
     dom.find(card, i => i.cls.includes('vam-book-abandon-cancel')).click();
     dom.find(card, i => i.cls.includes('vam-book-abandon-confirm')).click();

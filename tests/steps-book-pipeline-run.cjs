@@ -5343,6 +5343,7 @@ const againRig = async (over = {}) => {
       return { checks: [probOf(request, 'P1'), { ...probOf(request, 'P2', 12, 20), fixable: false, why: 'unfixable' }], prior: [], dropped: {} };
     },
     aiFix: async (request, n, run) => {
+      if (st.again && st.mode === 'fail-once') st.failOnce();
       if (st.again && st.mode === 'hold-fix') { st.hold?.reached(); if (st.hold?.budget) for (;;) await run.admission.reserve(); await st.hold?.promise; }
       const replacement = `Corrected${applied.length + 1}`; applied.push(replacement);
       return [{ id: 'P1', quote: request.chapters[0].text.slice(0, 11), replacement }];
@@ -5416,8 +5417,25 @@ test('P1 fix again: the call limit is raised to used + calls when short; no paus
   st.again = true;
   await r.runs.fixAgain(r.mapPath); await settleRuns(r);
   const s = await r.state();
-  assert.equal(s.budget.limit, used + 2, 'raised by exactly what was short (1 chapter = 2 calls)');
+  assert.equal(s.budget.limit, used + 6, 'raised by what was short: 1 chapter = 2 calls, each step with room for 3 attempts');
   assert.notEqual(s.pauseReason, 'budget');
+});
+
+test('A1 fix again: one failed fix call is retried inside the round without pausing on the budget (acceptance r1 finding)', async () => {
+  let failed = false;
+  const { r, v, applied, st } = await againRig();
+  const used = (await r.state()).budget.used;
+  await setLimit(r, used);
+  st.again = true;
+  st.mode = 'fail-once';
+  st.failOnce = () => { if (failed) return; failed = true; throw new Error('provider timeout'); };
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const s = await r.state();
+  assert.ok(failed, 'the first fix call failed');
+  assert.notEqual(s.pauseReason, 'budget', 'the retry fits in the raised limit');
+  assert.equal(s.aiProof[idA(r)].again, undefined);
+  assert.ok(r.raw(1).includes(applied.at(-1)), 'the retried fix was written');
+  same(await invariantsOf(r, v, { applied: { [idA(r)]: applied } }), [], 'after');
 });
 
 test('P1 fix again: a limit that already has room is left alone', async () => {
@@ -5512,7 +5530,7 @@ test('R1 fix again: the book slot and a chapter are both fixed in one round: eac
   await r.runs.fixAgain(r.mapPath); await settleRuns(r);
   const s = await r.state(); const now = finishedCalls(r);
   assert.deepEqual([now.fix - calls.fix, now.proofA - calls.proofA, now.book - calls.book, now.all - calls.all], [2, 1, 1, 4], 'one fix + one re-check for the chapter, one fix + one re-check for the book');
-  assert.equal(s.budget.limit, used + 4, 'raised by exactly the four calls that run');
+  assert.equal(s.budget.limit, used + 12, 'raised for the four calls that run, each with room for 3 attempts');
   assert.deepEqual([s.phase, s.aiProof[idA(r)].again, s.aiProof[idA(r)].done, s.bookProof.again, s.bookProof.done], ['done', undefined, true, undefined, true]);
   assert.deepEqual([s.aiProof[idA(r)].round, s.bookProof.round], [s0.aiProof[idA(r)].round, s0.bookProof.round], 'both rounds finished (the last round again)');
   assert.equal(s.aiProof[idA(r)].fixed, s0.aiProof[idA(r)].fixed + 1);

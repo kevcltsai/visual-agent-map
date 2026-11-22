@@ -1798,7 +1798,9 @@ export class BookPipelineRuns {
       const bookNow = await bookKey();
       const withBook = bookNow !== undefined && reopenAiRound(data, undefined, bookNow).accepted;
       if (!chapterIds.length && !withBook) throw new BookPipelineRunError("nothing");
-      const calls = 2 * chapterIds.length + (withBook ? 2 : 0);
+      // The card says about 2 calls per unit; a step may be tried up to MAX_STEP_ATTEMPTS times, so the limit leaves room for
+      // those retries (it is a cap, not a spend) and one failed call does not pause the round on "budget used up".
+      const calls = (2 * chapterIds.length + (withBook ? 2 : 0)) * MAX_STEP_ATTEMPTS;
       await drive.store.commit(state => {
         const short = state.budget.used + calls - state.budget.limit;
         const next = resumeRun(short > 0 ? addBudget(state, short) : state);

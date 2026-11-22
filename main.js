@@ -57344,7 +57344,7 @@ var BookPipelineRuns = class {
       const bookNow = await bookKey();
       const withBook = bookNow !== void 0 && reopenAiRound(data, void 0, bookNow).accepted;
       if (!chapterIds.length && !withBook) throw new BookPipelineRunError("nothing");
-      const calls = 2 * chapterIds.length + (withBook ? 2 : 0);
+      const calls = (2 * chapterIds.length + (withBook ? 2 : 0)) * MAX_STEP_ATTEMPTS;
       await drive.store.commit((state) => {
         const short = state.budget.used + calls - state.budget.limit;
         const next = resumeRun(short > 0 ? addBudget(state, short) : state);

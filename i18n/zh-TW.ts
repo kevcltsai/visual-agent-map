@@ -3179,6 +3179,9 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_abandon_body":
     "已寫好的章節正文會保留，只會拿掉圖文書放進筆記的提示框，並從這張心智圖移除圖文書的進度，它會變回一般心智圖。之後按「圖文書」可以重新開始。",
   "ui.book_abandon_confirm": "確定放棄",
+  "ui.book_remove_title": "改回一般心智圖？",
+  "ui.book_remove_body":
+    "這本書已經完成，章節正文和圖片全部保留。只會拿掉圖文書放進筆記的提示框和這條進度列，心智圖照常使用。之後按「圖文書」可以重新開始。",
   "ui.book_abandoned": "已變回一般心智圖，章節正文沒有被更動，只拿掉了圖文書的提示框。",
   "ui.book_add_budget": "再加 100 次",
   "ui.book_budget_used_up_0_1": "額度用完：已用 {0}／{1} 次",

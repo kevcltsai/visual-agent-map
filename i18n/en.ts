@@ -3402,6 +3402,9 @@ export const en = {
   "ui.book_abandon_body":
     "The chapter text already written is kept; only the picture-book hint boxes in the notes are removed, along with the picture-book progress on this mind map, and it becomes a normal mind map again. You can press Picture book later to start fresh.",
   "ui.book_abandon_confirm": "Yes, give it up",
+  "ui.book_remove_title": "Back to a plain mind map?",
+  "ui.book_remove_body":
+    "This book is finished, and all its chapter text and pictures are kept. Only the picture-book hint boxes in the notes and this progress bar are removed; the mind map works as usual. You can press Picture book later to start again.",
   "ui.book_abandoned":
     "This is a normal mind map again. The chapter text was not changed; only the picture-book hint boxes were removed.",
   "ui.book_add_budget": "Add 100 calls",

@@ -2305,6 +2305,10 @@ export default class VisualAgentMapPlugin extends Plugin {
   private styleNodeLeaf(leaf: WorkspaceLeaf | null): void {
     if (!(leaf?.view instanceof MarkdownView)) return;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
+    // A picture-book card (it has a book role) reads as a book page; see `.vam-book-page` in styles.css.
+    const bookRole: unknown =
+      leaf.view.file && this.app.metadataCache.getFileCache(leaf.view.file)?.frontmatter?.["book-role"];
+    leaf.view.containerEl.toggleClass("vam-book-page", typeof bookRole === "string" && bookRole !== "");
   }
   /** Picture-book pipeline entries (the screen and the commands call these; refusals are thrown as BookPipelineRunError). */
   startBookPipeline(mapPath: string, options: { restart?: boolean } = {}): Promise<void> {

@@ -309,3 +309,33 @@ test('expandPasses is optional: an old map reads without it, a valid one round-t
     assert.notEqual(model.readBookPipeline(core.parseMap(text)).kind, 'usable');
   }
 });
+
+test('structureEdit: absent reads as before, a well-formed one is read as saved, a malformed one is dropped and flagged without making the run unusable', () => {
+  const edit = {
+    runId: 'run-1',
+    applied: [{ id: 's1', op: { id: 's1', kind: 'move', card: 'b', parent: 'a', reason: 'r' }, before: { parent: 'root', after: 'a', title: 'B' } }],
+    rejected: [{ id: 's2', code: 'locked' }],
+    undone: ['s9'],
+    before: { rootId: 'root', nodes: [{ id: 'root', parentId: null, title: 'R' }, { id: 'b', parentId: 'root', title: 'B' }] }
+  };
+  const none = model.readBookPipeline({ bookPipeline: usable() });
+  assert.equal(none.kind, 'usable'); assert.equal(none.structureUnreadable, undefined); assert.equal('structureEdit' in none.data, false);
+  const ok = model.readBookPipeline({ bookPipeline: { ...usable(), structureEdit: edit } });
+  assert.equal(ok.kind, 'usable'); assert.equal(ok.structureUnreadable, undefined);
+  assert.deepEqual(plain(ok.data.structureEdit), edit);
+  const over = model.readBookPipeline({ bookPipeline: { ...usable(), structureEdit: { ...edit, applied: [], rejected: [], overCap: true } } });
+  assert.equal(over.data.structureEdit.overCap, true);
+  const broken = [
+    'text', { ...edit, runId: '' }, { ...edit, applied: 'x' }, { ...edit, applied: [{ id: 's1', op: { kind: 'move' }, before: {} }] },
+    { ...edit, applied: [{ ...edit.applied[0], op: { ...edit.applied[0].op, kind: 'teleport' } }] },
+    { ...edit, rejected: [{ id: 1, code: 'x' }] }, { ...edit, overCap: false }, { ...edit, undone: [1] }, { ...edit, before: { rootId: 'r', nodes: [{ id: 1 }] } }, { ...edit, before: undefined }
+  ];
+  for (const structureEdit of broken) {
+    const raw = { ...usable(), structureEdit };
+    const read = model.readBookPipeline({ bookPipeline: raw });
+    assert.equal(read.kind, 'usable', 'the run stays usable');
+    assert.equal(read.structureUnreadable, true);
+    assert.equal('structureEdit' in read.data, false);
+    assert.ok(raw.structureEdit === structureEdit, 'the saved map object is untouched');
+  }
+});

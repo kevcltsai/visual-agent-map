@@ -996,3 +996,54 @@ test('N1 short replacement: a year written by a fix does not make a longer quote
   assert.deepEqual(run('2020', '公司成立於 2019 年，與 2020 年的資料不同。'), ['not_fixed_in_time']);
   assert.deepEqual(run('公司成立於 2019 年', '公司成立於 2019 年，與 2020 年的資料不同。'), ['still_present']);
 });
+
+const editState = () => {
+  const order = ['a', 'b', 'c', 'd'];
+  const state = { ...plain(trialRun(order)), phase: 'gate1', planReview: true, planEdited: true, planEditAttempts: 1, globalPlanned: true,
+    structureEdit: { runId: 'run-t', applied: [], rejected: [], before: { rootId: 'r', nodes: [] } } };
+  state.attempts.a = { plan: 2, write: 1, proof: 0 }; state.autoFixes = { a: 1 }; state.expandPasses = { a: 1 };
+  return state;
+};
+
+test('undoStructure: back to planning at the plan review; ids recorded; affected cards reset (attempts, revision, pendingReset); the pass reruns', () => {
+  const state = editState();
+  const next = machine.undoStructure(state, ['s1', 's2'], 'later', ['a', 'zzz']);
+  assert.deepEqual([next.phase, next.phaseStartedAt, next.planReview, next.status], ['planning', 'later', true, 'running']);
+  assert.deepEqual(plain(next.structureEdit.undone), ['s1', 's2']);
+  assert.equal(next.planEdited, undefined); assert.equal(next.planEditAttempts, undefined);
+  assert.deepEqual(plain(next.pendingReset), ['a'], 'a card not on the run is ignored');
+  assert.deepEqual(plain(next.attempts.a), { plan: 0, write: 0, proof: 0 });
+  assert.equal(next.autoFixes.a, undefined); assert.equal(next.expandPasses.a, undefined);
+  assert.equal(machine.cardRevision(next, 'a'), machine.cardRevision(state, 'a') + 1);
+  assert.equal(machine.cardRevision(next, 'b'), machine.cardRevision(state, 'b'));
+  assert.equal(next.revision, state.revision + 1);
+  assert.equal(state.structureEdit.undone, undefined, 'the input is left alone');
+  const again = machine.undoStructure(next, ['s3'], 'x', []);
+  assert.equal(again, next, 'planning, not gate 1: a no-op');
+  const second = machine.undoStructure({ ...next, phase: 'gate1' }, ['s2', 's3'], 'x', ['b']);
+  assert.deepEqual(plain(second.structureEdit.undone), ['s1', 's2', 's3'], 'ids accumulate without repeats');
+  assert.deepEqual(plain(second.pendingReset), ['a', 'b']);
+  assert.equal(model.readBookPipeline({ bookPipeline: plain(next) }).kind, 'usable');
+});
+
+test('undoStructure: a no-op for a stopped run, outside gate 1 and without a structure edit', () => {
+  const state = editState();
+  assert.equal(machine.undoStructure(machine.stopRun(state), ['s1'], 'x', ['a']).phase, 'gate1');
+  assert.equal(machine.undoStructure(machine.stopRun(state), ['s1'], 'x', ['a']).structureEdit.undone, undefined);
+  const writing = { ...state, phase: 'writing' };
+  assert.equal(machine.undoStructure(writing, ['s1'], 'x', ['a']), writing);
+  const none = { ...state }; delete none.structureEdit;
+  assert.equal(machine.undoStructure(none, ['s1'], 'x', ['a']), none);
+});
+
+test('structureEdit is carried unchanged by backToPlan, retryTrial and acceptMapChange', () => {
+  const trial = () => { const s = editState(); delete s.planReview; return s; };
+  const keep = state => plain(state.structureEdit);
+  const edit = keep(editState());
+  assert.deepEqual(keep(machine.backToPlan(trial(), NOW)), edit);
+  assert.deepEqual(keep(machine.retryTrial(trial(), NOW)), edit);
+  const paused = machine.pauseForMap(trial(), { added: [], missing: ['a'] });
+  const accepted = machine.acceptMapChange(paused, ['b', 'c', 'd'], 'later');
+  assert.deepEqual(keep(accepted), edit);
+  assert.equal(model.readBookPipeline({ bookPipeline: plain(accepted) }).structureUnreadable, undefined);
+});

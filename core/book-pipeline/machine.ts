@@ -645,6 +645,33 @@ export function retryTrial(data: BookPipelineData, now: string): BookPipelineDat
   return next;
 }
 
+/**
+ * At the plan review: the owner undid structure changes (`ids`, already closed over their dependants). The run goes back to planning
+ * with the plan review kept; the cards the undo touched (`affected`) start over and are planned again, and the editor's pass reruns.
+ * A no-op (same state) outside a running gate 1 or without a structure edit. The caller restores the map and notes.
+ */
+export function undoStructure(data: BookPipelineData, ids: readonly string[], now: string, affected: readonly string[]): BookPipelineData {
+  if (data.phase !== "gate1" || data.status !== "running" || !data.structureEdit) return data;
+  const next = clone(data);
+  const edit = next.structureEdit!;
+  edit.undone = [...new Set([...(edit.undone ?? []), ...ids])];
+  next.phase = "planning";
+  next.phaseStartedAt = now;
+  clearPlanEdit(next);
+  const live = effectiveOrder(next);
+  const cards = [...new Set(affected)].filter(id => live.includes(id));
+  next.pendingReset = [...new Set([...(next.pendingReset ?? []), ...cards])];
+  for (const id of cards) {
+    next.attempts[id] = emptyAttempts();
+    next.revisions[id] = cardRevision(next, id) + 1;
+    if (next.autoFixes) delete next.autoFixes[id];
+    if (next.expandPasses) delete next.expandPasses[id];
+    if (next.aiProof) delete next.aiProof[id];
+  }
+  next.revision++;
+  return next;
+}
+
 /** At the plan review (gate 1 before the trial ran): the owner chose to run the trial. A no-op elsewhere. */
 export function startTrial(data: BookPipelineData, now: string): BookPipelineData {
   if (data.phase !== "gate1" || data.status !== "running" || !data.planReview || !data.trial?.length) return data;

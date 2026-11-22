@@ -90,6 +90,58 @@
         "length",
         "style"
       ]
+    },
+    "structure": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "add",
+              "remove",
+              "merge",
+              "move",
+              "rename"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "card": {
+            "type": "string"
+          },
+          "into": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "parent": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "reason"
+        ]
+      }
     }
   },
   "required": [

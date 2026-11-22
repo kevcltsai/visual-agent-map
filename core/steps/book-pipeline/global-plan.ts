@@ -1,4 +1,5 @@
 import { BOOK_ROLES, BOOK_SETTING_FIELDS, type BookRole, type BookSettings } from "../../book-pipeline/model";
+import type { StructureOp } from "../../book-pipeline/structure-edit";
 import { singleLine } from "../../book-pipeline/text";
 import { estimateTokens } from "../../../ai/context-builder";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
@@ -23,6 +24,8 @@ export interface GlobalPlanCard {
   place: string;
   title: string;
   summary: string;
+  /** True when the owner's hand is in this card (or the root): the editor may not remove, merge, move or rename it. */
+  locked?: true;
   /** Titles of the card's child cards on the map, in reading order (titles only). */
   children?: readonly string[];
 }
@@ -40,9 +43,15 @@ export interface GlobalPlanResult {
   materials: { name: string; use: string; home: string }[];
   /** Only fields the owner left empty. */
   decisions: BookSettings;
+  /** Structure changes the editor proposes (shape checked here; whether each one may apply is `simulateStructure`'s call). Default `[]`. */
+  structure: StructureOp[];
 }
 
 export const MAX_MATERIALS = 40;
+/** More proposals than this in a reply are not read (the structure cap itself is enforced by `simulateStructure`). */
+const MAX_STRUCTURE_READ = 30;
+const STRUCTURE_KINDS = ["add", "remove", "merge", "move", "rename"] as const;
+const STRUCTURE_FIELDS = ["id", "kind", "reason", "card", "into", "title", "summary", "parent", "after", "ref"] as const;
 export const GLOBAL_PLAN_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -77,14 +86,90 @@ export const GLOBAL_PLAN_SCHEMA = {
       additionalProperties: false,
       properties: Object.fromEntries(BOOK_SETTING_FIELDS.map(field => [field, { type: "string" }])),
       required: [...BOOK_SETTING_FIELDS]
+    },
+    structure: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          id: { type: "string", minLength: 1 },
+          kind: { type: "string", enum: [...STRUCTURE_KINDS] },
+          reason: { type: "string" },
+          card: { type: "string" },
+          into: { type: "string" },
+          title: { type: "string" },
+          summary: { type: "string" },
+          parent: { type: "string" },
+          after: { type: "string" },
+          ref: { type: "string" }
+        },
+        required: ["id", "kind", "reason"]
+      }
     }
   },
   required: ["thread", "cards", "materials", "decisions"]
 };
 
+const need = (one: Record<string, unknown>, key: string): string | undefined => {
+  const value = one[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+};
+/** One proposed change, or undefined when it is not the shape of its kind (a bad item is dropped, never fails the reply). */
+function structureOpOf(entry: unknown): StructureOp | undefined {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return undefined;
+  const one = entry as Record<string, unknown>;
+  if (Object.keys(one).some(key => !(STRUCTURE_FIELDS as readonly string[]).includes(key))) return undefined;
+  const id = need(one, "id");
+  const reason = typeof one.reason === "string" ? one.reason : undefined;
+  if (!id || reason === undefined) return undefined;
+  const base = { id, reason };
+  const after = need(one, "after");
+  if (one.after !== undefined && one.after !== "" && !after) return undefined;
+  switch (one.kind) {
+    case "add": {
+      const [title, summary, parent, ref] = ["title", "summary", "parent", "ref"].map(key => need(one, key));
+      return title && summary && parent && ref ? { ...base, kind: "add", title, summary, parent, ref, ...(after ? { after } : {}) } : undefined;
+    }
+    case "remove": {
+      const card = need(one, "card");
+      return card ? { ...base, kind: "remove", card } : undefined;
+    }
+    case "merge": {
+      const [card, into] = [need(one, "card"), need(one, "into")];
+      return card && into ? { ...base, kind: "merge", card, into } : undefined;
+    }
+    case "move": {
+      const [card, parent] = [need(one, "card"), need(one, "parent")];
+      return card && parent ? { ...base, kind: "move", card, parent, ...(after ? { after } : {}) } : undefined;
+    }
+    case "rename": {
+      const [card, title] = [need(one, "card"), need(one, "title")];
+      return card && title ? { ...base, kind: "rename", card, title } : undefined;
+    }
+    default:
+      return undefined;
+  }
+}
+function structureOf(value: unknown): StructureOp[] {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set<string>();
+  const ops: StructureOp[] = [];
+  for (const entry of value.slice(0, MAX_STRUCTURE_READ)) {
+    const op = structureOpOf(entry);
+    if (!op || ids.has(op.id)) continue;
+    ids.add(op.id);
+    ops.push(op);
+  }
+  return ops;
+}
+
 export function parseGlobalPlan(raw: string, request: GlobalPlanRequest): GlobalPlanResult {
   const item = parseJson(raw);
-  exactKeys(item, ["thread", "cards", "materials", "decisions"]);
+  exactKeys(
+    Object.fromEntries(Object.entries(item).filter(([key]) => key !== "structure")),
+    ["thread", "cards", "materials", "decisions"]
+  );
   const thread = singleLine(textOf(item.thread, "thread"), 1200);
   const wanted = new Set(request.cards.map(card => card.id));
   const seen = new Set<string>();
@@ -127,7 +212,7 @@ export function parseGlobalPlan(raw: string, request: GlobalPlanRequest): Global
     const line = singleLine(value, 300);
     if (line && !request.settings[field]?.trim()) decisions[field] = line;
   }
-  return { thread, cards, materials, decisions };
+  return { thread, cards, materials, decisions, structure: structureOf(item.structure) };
 }
 
 const cap = (value: string, max: number): string => singleLine(value, max);
@@ -140,6 +225,7 @@ type CardEntry = {
   place: string;
   title: string;
   summary: string;
+  locked?: true;
   children?: string[];
   moreChildren?: number;
 };
@@ -149,7 +235,8 @@ const entriesOf = (request: GlobalPlanRequest, shown: ReadonlyMap<number, number
       id: card.id,
       place: card.place,
       title: cap(card.title, 200),
-      summary: cap(card.summary, 500)
+      summary: cap(card.summary, 500),
+      ...(card.locked ? { locked: true as const } : {})
     };
     const all = (card.children ?? []).map(title => cap(title, GLOBAL_CHILD_TITLE_MAX));
     if (!all.length) return entry;

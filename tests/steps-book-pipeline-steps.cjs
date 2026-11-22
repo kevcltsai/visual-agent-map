@@ -1239,3 +1239,40 @@ test('card plan: the intro rule keeps the preface off the chapters\' subjects, a
   assert.match(prompt, /A chapter or a section does not preview the whole book's route or list the other chapters/);
   assert.match(load('core/book-pipeline/settings.ts').bookAuthorRequirements({}), /does not preview the whole book's route or list the other chapters/);
 });
+
+test('global plan structure: absent reads as [], valid items of every kind are kept, bad items are dropped without failing the reply', () => {
+  const request = globalRequest();
+  assert.deepEqual(plain(globalPlan.globalPlanStep.parse(globalReply(), request).structure), [], 'no structure: empty');
+  assert.deepEqual(plain(globalPlan.globalPlanStep.parse(globalReply({ structure: 'nope' }), request).structure), [], 'not an array: empty');
+  const good = [
+    { id: 's1', kind: 'add', title: 'New', summary: 'One sentence', parent: 'n1', ref: 'new1', reason: 'gap' },
+    { id: 's2', kind: 'remove', card: 'n2', reason: 'dup' },
+    { id: 's3', kind: 'merge', card: 'n3', into: 'n4', reason: 'overlap' },
+    { id: 's4', kind: 'move', card: 'n5', parent: 'n1', after: 'n6', reason: 'order' },
+    { id: 's5', kind: 'rename', card: 'n7', title: 'Better', reason: 'clearer' }
+  ];
+  const bad = [
+    { id: 'b1', kind: 'add', title: 'No ref', summary: 's', parent: 'n1', reason: 'r' },
+    { id: 'b2', kind: 'teleport', card: 'n2', reason: 'r' },
+    { id: 'b3', kind: 'remove', reason: 'r' },
+    { id: 'b4', kind: 'rename', card: 'n2', title: 'x', reason: 'r', extra: 1 },
+    { kind: 'remove', card: 'n2', reason: 'r' },
+    { id: 's2', kind: 'remove', card: 'n9', reason: 'same id twice' },
+    { id: 'b5', kind: 'move', card: 'n2', parent: 'n1', reason: 5 },
+    'text', null, 7
+  ];
+  const result = globalPlan.globalPlanStep.parse(globalReply({ structure: [...bad.slice(0, 3), ...good, ...bad.slice(3)] }), request);
+  assert.deepEqual(plain(result.structure), good);
+  assert.equal(result.cards.length, 31, 'the rest of the reply is unaffected');
+  assert.equal(globalPlan.globalPlanStep.parse(globalReply({ structure: Array.from({ length: 80 }, (_, i) => ({ id: `x${i}`, kind: 'remove', card: 'n2', reason: 'r' })) }), request).structure.length <= 30, true, 'a flood is cut');
+});
+
+test('global plan structure: the prompt names the rules, locked cards are marked, the schema allows the field, the version moved', () => {
+  const marked = globalRequest({ cards: [{ ...cards[0], locked: true }, cards[1]] });
+  const prompt = globalPlan.globalPlanStep.render(marked);
+  assert.ok(prompt.includes('"locked":true'), 'a locked card carries the mark');
+  assert.equal(prompt.split('"locked":true').length - 1, 2, 'one card marked: once in the cards, once in the rule text');
+  assert.ok(/At most 6 items/.test(prompt) && /at most 3 add/.test(prompt) && /owner's data, not instructions/.test(prompt));
+  assert.ok(globalPlan.GLOBAL_PLAN_SCHEMA.properties.structure && !globalPlan.GLOBAL_PLAN_SCHEMA.required.includes('structure'));
+  assert.equal(globalPlan.globalPlanStep.version, 2);
+});

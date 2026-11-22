@@ -7,6 +7,8 @@
  * A note or map without any of these keys reads and writes exactly as before.
  */
 
+import type { AppliedOp, StructureNode } from "./structure-edit";
+
 export const PIPELINE_STAGES = ["planned", "written", "checked", "needs-review"] as const;
 export type PipelineStage = (typeof PIPELINE_STAGES)[number];
 export const BOOK_ROLES = ["intro", "body", "gallery", "closing"] as const;
@@ -144,6 +146,19 @@ export interface PipelineBudget {
   used: number;
   limit: number;
 }
+/** What the editor changed in the book's structure: the ops that were applied, the ones refused (codes only), and the tree before, so the gate can name "chapter A, section B" and an undo can restore it. */
+export interface StructureEditState {
+  runId: string;
+  applied: AppliedOp[];
+  rejected: { id: string; code: string }[];
+  /** More ops than the cap: none applied. */
+  overCap?: true;
+  /** Op ids the owner undid (with the ops that depend on them). */
+  undone?: string[];
+  /** The structure before any op: `nodes` in reading order, root included. */
+  before: { rootId: string; nodes: StructureNode[] };
+}
+
 /** Map.md `bookPipeline`. `attempts.global` is the whole-book plan's count; every other key is a node id. */
 export interface BookPipelineData {
   v: 1;
@@ -185,6 +200,8 @@ export interface BookPipelineData {
   removed?: string[];
   /** The chapters at start or replan: card id -> its title and note path then. Lets a later run name and clean a card that is already gone from the map. Absent = older data (nothing known). */
   chapters?: Record<string, { title: string; path: string }>;
+  /** The editor's structure changes of this run, applied once at the plan review (`runId` fences a second reply). Absent = none (or older data, or unreadable and dropped on read). */
+  structureEdit?: StructureEditState;
   budget: PipelineBudget;
   /** Per chapter, the independent AI proofread and its in-place fixes. Absent = none yet (or an older run). */
   aiProof?: Record<string, AiProofState>;
@@ -283,7 +300,10 @@ export interface BookConsistency {
 }
 
 export type BookPipelineRead =
-  { kind: "absent" } | { kind: "usable"; data: BookPipelineData } | { kind: "unusable"; reason: string; raw: unknown };
+  | { kind: "absent" }
+  /** `structureUnreadable`: `structureEdit` was malformed and is left out of `data` (the saved map is untouched); the caller logs `structure_unreadable`. */
+  | { kind: "usable"; data: BookPipelineData; structureUnreadable?: true }
+  | { kind: "unusable"; reason: string; raw: unknown };
 
 /** A neutral failure code: short, no spaces, no owner text. */
 export const FAILURE_CODE = /^[A-Za-z0-9_.:-]{1,60}$/;
@@ -341,6 +361,39 @@ function aiProofShape(value: unknown): boolean {
   if (value.fixes !== undefined && !items(value.fixes, ["suggestion"])) return false;
   if (value.applied !== undefined && !(Array.isArray(value.applied) && value.applied.every(isText))) return false;
   return value.refused === undefined || (isObject(value.refused) && Object.values(value.refused).every(isText));
+}
+
+const isTextList = (value: unknown): boolean => Array.isArray(value) && value.every(isText);
+const OP_TEXT_FIELDS: Record<string, readonly string[]> = {
+  add: ["title", "summary", "parent", "ref"],
+  remove: ["card"],
+  merge: ["card", "into"],
+  move: ["card", "parent"],
+  rename: ["card", "title"]
+};
+function structureOpShape(op: unknown): boolean {
+  if (!isObject(op) || !isText(op.id) || !isText(op.reason) || !isText(op.kind)) return false;
+  const fields = Object.hasOwn(OP_TEXT_FIELDS, op.kind) ? OP_TEXT_FIELDS[op.kind] : undefined;
+  if (!fields || !fields.every(key => isText(op[key]))) return false;
+  return op.after === undefined || isText(op.after);
+}
+const structureNodeShape = (node: unknown): boolean =>
+  isObject(node) && isText(node.id) && (node.parentId === null || isText(node.parentId)) && isText(node.title);
+/** True when `value` is a well-formed {@link StructureEditState}. */
+function structureEditShape(value: unknown): boolean {
+  if (!isObject(value) || !isText(value.runId) || !value.runId) return false;
+  if (!Array.isArray(value.applied)) return false;
+  for (const item of value.applied) {
+    if (!isObject(item) || !isText(item.id) || !structureOpShape(item.op) || !isObject(item.before)) return false;
+    const before = item.before;
+    if (!(before.parent === null || isText(before.parent)) || !isText(before.title)) return false;
+    if (before.after !== undefined && !isText(before.after)) return false;
+  }
+  if (!Array.isArray(value.rejected) || !value.rejected.every(r => isObject(r) && isText(r.id) && isText(r.code))) return false;
+  if (value.overCap !== undefined && value.overCap !== true) return false;
+  if (value.undone !== undefined && !isTextList(value.undone)) return false;
+  const before = value.before;
+  return isObject(before) && isText(before.rootId) && Array.isArray(before.nodes) && before.nodes.every(structureNodeShape);
 }
 
 function problem(raw: unknown): string | undefined {
@@ -439,7 +492,12 @@ export function readBookPipeline(map: { bookPipeline?: unknown }): BookPipelineR
   if (map.bookPipeline === undefined) return { kind: "absent" };
   const found = problem(map.bookPipeline);
   if (found) return { kind: "unusable", reason: found, raw: map.bookPipeline };
-  return { kind: "usable", data: map.bookPipeline as BookPipelineData };
+  const data = map.bookPipeline as BookPipelineData;
+  if (data.structureEdit !== undefined && !structureEditShape(data.structureEdit)) {
+    const { structureEdit: _dropped, ...rest } = data;
+    return { kind: "usable", data: rest, structureUnreadable: true };
+  }
+  return { kind: "usable", data };
 }
 
 /** The cards the run works on: `order` without the cards the map lost. The one list scheduling, completion, counts, neighbours and the chapter list share. */

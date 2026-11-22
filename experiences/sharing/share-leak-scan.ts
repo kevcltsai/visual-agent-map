@@ -143,3 +143,31 @@ export function scanPayloadForLeaks(payload: SharePayload, forbidden: readonly F
   visit(payload, "");
   return hits;
 }
+
+/**
+ * Where a hit is, for the user only (shown in the dialog, never written to the file): the visible text of one payload
+ * node around the first forbidden value it holds, or undefined when the value sits only in markup (an attribute).
+ */
+export function leakExcerpt(node: unknown, forbidden: readonly ForbiddenString[], radius = 20): string | undefined {
+  const texts: string[] = [];
+  const visit = (value: unknown, key: string): void => {
+    if (typeof value === "string")
+      texts.push(
+        decodeHtmlEntities((key === "detailHtml" ? stripHtmlCode(value) : value).replace(/<[^>]*>/g, " "))
+          .replace(/\s+/g, " ")
+          .trim()
+      );
+    else if (Array.isArray(value)) for (const item of value) visit(item, key);
+    else if (value && typeof value === "object") for (const [name, item] of Object.entries(value)) visit(item, name);
+  };
+  visit(node, "");
+  for (const text of texts)
+    for (const { value } of forbidden) {
+      const index = text.indexOf(value);
+      if (index < 0) continue;
+      const start = Math.max(0, index - radius);
+      const end = Math.min(text.length, index + value.length + radius);
+      return `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
+    }
+  return undefined;
+}

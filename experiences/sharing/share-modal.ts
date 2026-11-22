@@ -767,6 +767,8 @@ export class ShareModal extends Modal {
         ),
         "vam-share-error"
       );
+      for (const { title, excerpt } of result.leakTopics)
+        add(excerpt ? t("share.leak_at_0_1", title, excerpt) : t("share.leak_at_0", title), "vam-share-error");
       return;
     }
     const thresholds = this.options.sizeThresholds ?? {

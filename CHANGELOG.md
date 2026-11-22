@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- When sharing is blocked because a note would leak private text, the share dialog now names each topic and shows the text around the problem (for example a `[[2,0],[0,1]]` matrix that reads as a link), so you know what to fix. That text is shown only in the dialog, never written to the file.
 - Picture books now give every card (the preface, each chapter and each section) one cover picture. It is found with the card's first picture search, saved in a `封面圖` (or `Covers`) folder inside the book's folder, and shown under the card's title and on the mind map card. A card with no suitable cover says so; a cover that may not fit is marked, needs a look and is listed on the closing page. A cover you replaced, turned off or edited is never searched for or changed again. The covers add no calls beyond the start dialog's estimate, which now says it includes them.
 - Picture-book progress now names the card being fixed by its place (preface, chapter n or the section name) and counts done cards; the plan gate no longer shows a trial note on the preface.
 - Picture-book maps now treat the root card as a preface, the first level as chapters (numbered) and the cards below as sections. Cards are labelled Preface, Chapter n or Section, and a planned card lists its content headings. The trial is the preface, chapter 1 and its sections, and the gate, progress lines and start dialog count cards, chapters and sections.

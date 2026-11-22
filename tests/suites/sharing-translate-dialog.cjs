@@ -53,7 +53,7 @@ function fakeExporter({ nodes = manyNodes(6), diagramResult = null } = {}) {
       const rebuilt = translation ? build.rebuildTranslationsForPayload(payload.nodes, translation.pieces, { parse: html.parse, serialize: html.serialize, createDiv: () => html.makeDom().createDiv() }) : null;
       const full = translation ? build.attachTranslations(payload, { ...translation, pieces: rebuilt.pieces }) : payload;
       const hits = [...scan.scanPayloadForLeaks(full, forbidden), ...(rebuilt ? rebuilt.pieces.flatMap(item => build.leakCategoriesInTranslation(item.language, item.piece, forbidden, rebuilt.rebuilt[item.language]).map(category => ({ category }))) : [])];
-      const base = { payload: full, bytes: 0, counts: { topics: nodes.length, notesWithContent: nodes.length, images: 0 }, leakCategories: [...new Set(hits.map(hit => hit.category))], failedImages: 0, mermaidUndrawn: 0, mermaidBlocked: 0 };
+      const base = { payload: full, bytes: 0, counts: { topics: nodes.length, notesWithContent: nodes.length, images: 0 }, leakCategories: [...new Set(hits.map(hit => hit.category))], leakTopics: [], failedImages: 0, mermaidUndrawn: 0, mermaidBlocked: 0 };
       if (base.leakCategories.length) return base;
       const text = `<html>${JSON.stringify({ languages: full.languages ?? null, defaultLanguage: full.defaultLanguage ?? null, ja: full.translations?.ja?.title ?? null, en: full.translations?.en?.title ?? null, svgs: (rebuilt?.rebuilt.en?.a ?? rebuilt?.rebuilt.ja?.a ?? '').match(/<svg/g)?.length ?? 0 })}</html>`;
       return { ...base, html: text, bytes: text.length };

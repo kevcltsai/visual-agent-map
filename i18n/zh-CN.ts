@@ -2528,6 +2528,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.mermaid_undrawn_note": "［图表未能画完，改显示源码。］",
   "share.leak_blocked_0":
     "未保存：文件会含有私人信息（{0}）。请从来源笔记移除这些内容，或关闭会带入完整笔记的选项，再重新分享。",
+  "share.leak_at_0": "在议题“{0}”",
+  "share.leak_at_0_1": "在议题“{0}”：{1}",
   "share.leak_category_vault-path": "这台电脑上的知识库位置",
   "share.leak_category_external-path": "文件夹在这台电脑上的位置",
   "share.leak_category_map-folder": "思维导图的文件夹名称",

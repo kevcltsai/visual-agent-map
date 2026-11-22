@@ -300,7 +300,7 @@ function modalHarness({ exporter, thresholds, saveEnvironment, writeClipboard } 
 }
 const tick = () => new Promise(resolve => setTimeout(resolve, 8));
 const stale = load('experiences/sharing/share-build.ts');
-const okResult = (overrides = {}) => ({ payload: {}, html: '<html>file</html>', bytes: 1536, counts: { topics: 2, notesWithContent: 1, images: 1 }, leakCategories: [], failedImages: 0, mermaidUndrawn: 0, mermaidBlocked: 0, ...overrides });
+const okResult = (overrides = {}) => ({ payload: {}, html: '<html>file</html>', bytes: 1536, counts: { topics: 2, notesWithContent: 1, images: 1 }, leakCategories: [], leakTopics: [], failedImages: 0, mermaidUndrawn: 0, mermaidBlocked: 0, ...overrides });
 function fakeExporter({ results = [], gate } = {}) {
   const calls = { render: 0, images: 0, assemble: [], disposed: 0 };
   const exporter = {
@@ -613,6 +613,28 @@ test('share exporter assemble: a note\'s markers reach the payload node, a note 
   assert.deepEqual(plain(result.payload.nodes[0].markers), ['done', 'priority-2']);
   assert.equal('markers' in result.payload.nodes[1], false);
   assert.equal(result.payload.version, 1);
+});
+
+test('share exporter: a blocked file names the topics whose text set off the leak gate, a clean file names none', () => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const map = { id: 'map-1', title: 'Map', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [{ id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false }, { id: 'b', path: 'Folder/B.md', parentId: 'a', x: 0, y: 0, collapsed: false }] };
+  const run = summary => new module.ShareExporter({ vault: { adapter: new FileSystemAdapter(), getName: () => 'V' } }, { map, notes: new Map([['a', { title: 'Alpha', summary: 'S', status: 'idea', model: '' }], ['b', { title: 'Matrices', summary, status: 'idea', model: '' }]]), mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en' }).assemble({ includeDetail: false, includeImages: false });
+  const blocked = run('stretch with [[2,0],[0,1]]');
+  assert.deepEqual(plain(blocked.leakCategories), ['wikilink']);
+  assert.deepEqual(plain(blocked.leakTopics), [{ title: 'Matrices', excerpt: 'stretch with [[2,0],[0,1]]' }]);
+  assert.equal(blocked.html, undefined);
+  assert.deepEqual(plain(run('clean').leakTopics), []);
+});
+
+test('share dialog: a leak warning also says where: the topic and the text around the hit', async () => {
+  const exporter = fakeExporter({ results: [okResult({ html: undefined, bytes: 0, leakCategories: ['wikilink'], leakTopics: [{ title: 'Linear algebra', excerpt: '…uses [[2,0],[0,1]] to stretch…' }, { title: 'Topology' }] })] });
+  const h = modalHarness({ exporter });
+  h.modal.open();
+  await tick(); await tick();
+  assert.match(h.text(), /In topic “Linear algebra”: …uses \[\[2,0\],\[0,1\]\] to stretch…/);
+  assert.match(h.text(), /In topic “Topology”/);
+  assert.equal(h.button('Save…').disabled, true);
 });
 
 // Ticket 37 P3: the exporter hands the note's colour to the payload.

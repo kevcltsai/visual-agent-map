@@ -49,6 +49,7 @@ import {
   forbiddenStringsFor,
   scanForLeaks,
   scanPayloadForLeaks,
+  leakExcerpt,
   type ForbiddenString,
   type LeakCategory
 } from "./share-leak-scan";
@@ -91,6 +92,8 @@ export interface ShareBuildResult {
   counts: { topics: number; notesWithContent: number; images: number };
   /** Categories only, never the matched text. Empty means the gate passed. */
   leakCategories: LeakCategory[];
+  /** The topics whose own text set off the gate, with the text around the hit, so the user knows what to fix. Shown in the dialog only. */
+  leakTopics: { title: string; excerpt?: string }[];
   failedImages: number;
   /** Diagrams left as source text because they did not draw in time. */
   mermaidUndrawn: number;
@@ -804,6 +807,11 @@ export class ShareExporter {
     const leakCategories = [
       ...new Set<LeakCategory>([...hits.map(hit => hit.category), ...renderedLeaks, ...rebuiltLeaks])
     ];
+    const leakTopics = leakCategories.length
+      ? payload.nodes
+          .filter(node => scanPayloadForLeaks({ nodes: [node] } as unknown as SharePayload, forbidden).length)
+          .map(node => ({ title: node.title, excerpt: leakExcerpt(node, forbidden) }))
+      : [];
     const scoped = scopeCountsToMode(options, { notesWithContent, failedImages: failed.size });
     const counts = {
       topics: payload.nodes.length,
@@ -814,6 +822,7 @@ export class ShareExporter {
       payload,
       counts,
       leakCategories,
+      leakTopics,
       failedImages: scoped.failedImages,
       mermaidUndrawn: undrawn,
       mermaidBlocked: blocked

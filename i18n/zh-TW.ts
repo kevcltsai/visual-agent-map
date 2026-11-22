@@ -2528,6 +2528,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.mermaid_undrawn_note": "［圖表未能畫完，改顯示原始碼。］",
   "share.leak_blocked_0":
     "未存檔：檔案會含有私人資訊（{0}）。請回到來源筆記移除這些內容，或關閉會帶入完整筆記的選項，再重新分享。",
+  "share.leak_at_0": "在議題「{0}」",
+  "share.leak_at_0_1": "在議題「{0}」：{1}",
   "share.leak_category_vault-path": "這台電腦上的 Vault 位置",
   "share.leak_category_external-path": "資料夾在這台電腦上的位置",
   "share.leak_category_map-folder": "心智圖的資料夾名稱",

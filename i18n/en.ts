@@ -2704,6 +2704,8 @@ export const en = {
   "share.mermaid_undrawn_note": "[Diagram did not finish drawing. Source shown instead.]",
   "share.leak_blocked_0":
     "Not saved: the file would contain private information ({0}). Remove that content from the source notes, or turn off the option that includes full notes, then share again.",
+  "share.leak_at_0": "In topic “{0}”",
+  "share.leak_at_0_1": "In topic “{0}”: {1}",
   "share.leak_category_vault-path": "the vault's location on this computer",
   "share.leak_category_external-path": "the location of a data folder on this computer",
   "share.leak_category_map-folder": "the map's folder name",

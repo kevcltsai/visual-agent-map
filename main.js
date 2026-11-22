@@ -104006,13 +104006,27 @@ function decodeHtmlEntities(text11) {
     }
   );
 }
+function isWikilinkStart(text11, index) {
+  if (text11[index + 2] === "[") return false;
+  for (let i = index + 2; i < text11.length; i++) {
+    const char = text11[i];
+    if (char === "[" || char === "<" || char === "\n" || char === "\r") return true;
+    if (char === "]") {
+      let next = i + 1;
+      while (text11[next] === " ") next++;
+      return !(text11[next] === "," || text11[next] === ";" || text11[next] === "[");
+    }
+  }
+  return true;
+}
 function occurrences(text11, category, value, hits) {
+  const wikilink = category === "wikilink" && value === "[[";
   let from = 0;
   for (; ; ) {
     const index = text11.indexOf(value, from);
     if (index < 0) break;
-    hits.push({ category, index });
-    from = index + value.length;
+    if (!wikilink || isWikilinkStart(text11, index)) hits.push({ category, index });
+    from = index + (wikilink ? 1 : value.length);
   }
 }
 function scanForLeaks(html, forbidden) {
@@ -104087,11 +104101,13 @@ function leakExcerpt(node, forbidden, radius = 20) {
   };
   visit(node, "");
   for (const text11 of texts)
-    for (const { value } of forbidden) {
-      const index = text11.indexOf(value);
-      if (index < 0) continue;
+    for (const item of forbidden) {
+      const hits = [];
+      occurrences(text11, item.category, item.value, hits);
+      if (!hits.length) continue;
+      const index = hits[0].index;
       const start = Math.max(0, index - radius);
-      const end = Math.min(text11.length, index + value.length + radius);
+      const end = Math.min(text11.length, index + item.value.length + radius);
       return `${start > 0 ? "\u2026" : ""}${text11.slice(start, end)}${end < text11.length ? "\u2026" : ""}`;
     }
   return void 0;

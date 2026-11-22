@@ -285,7 +285,7 @@ import {
   type CardResultSnapshot
 } from "./book-pipeline-rerun";
 import { bookReadingOrder } from "./presentation-order";
-import { applyInverseOps, inverseOps, simulateStructure, undoClosure, type SimulatedStructure, type StructureNode, type StructureOp } from "../../core/book-pipeline/structure-edit";
+import { applyInverseOps, inverseOps, simulateStructure, undoClosure, undoAffected, type SimulatedStructure, type StructureNode, type StructureOp } from "../../core/book-pipeline/structure-edit";
 import { arrangeMap, layoutOf } from "../../map-layout";
 import type { StructureResult, StructureWork } from "./book-structure-port";
 import {
@@ -1425,14 +1425,8 @@ export class BookPipelineRuns {
         if (!at || !(await this.ports.readCard(at).then(() => true, () => false))) throw new BookPipelineRunError("missing");
       }
       const titleOf = new Map(nodes.map(n => [n.id, n.title]));
-      const kindOf = (list: readonly StructureNode[]): Map<string, string> =>
-        new Map(list.map(n => [n.id, n.parentId === null ? "root" : n.parentId === drive.rootId ? "chapter" : "section"]));
-      const kindBefore = kindOf(current);
-      const kindAfter = kindOf(nodes);
       // The cards whose own plan no longer fits: the put-back ones, the merge targets, those that changed between chapter and section.
-      const affected = new Set<string>(restored);
-      for (const a of edit.applied) if (picked.has(a.id) && a.op.kind === "merge") affected.add(a.op.into);
-      for (const n of nodes) if (kindBefore.has(n.id) && kindBefore.get(n.id) !== kindAfter.get(n.id)) affected.add(n.id);
+      const affected = undoAffected(drive.rootId, current, nodes, edit.applied, picked);
       const renamed = nodes.filter(n => nowIds.has(n.id) && drive.cards.get(n.id)?.title !== n.title);
       const parkedNow: Record<string, string> = {};
       let next: ((state: BookPipelineData) => BookPipelineData) | undefined;

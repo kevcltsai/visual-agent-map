@@ -221,3 +221,26 @@ export function applyInverseOps(input: StructureInput, inverse: readonly Inverse
   }
   return tree.nodes();
 }
+
+/**
+ * The cards that are planned again after an undo: the ones put back, the merge targets of the undone merges, and the ones that change
+ * between chapter and section. `current` and `after` are the structure before and after the undo; `picked` the op ids being undone.
+ * The runner and the gate's "undo all" estimate both use this.
+ */
+export function undoAffected(
+  rootId: string,
+  current: readonly StructureNode[],
+  after: readonly StructureNode[],
+  applied: readonly AppliedOp[],
+  picked: ReadonlySet<string>
+): Set<string> {
+  const now = new Set(current.map(n => n.id));
+  const kindOf = (list: readonly StructureNode[]): Map<string, string> =>
+    new Map(list.map(n => [n.id, n.parentId === null ? "root" : n.parentId === rootId ? "chapter" : "section"]));
+  const kindBefore = kindOf(current);
+  const kindAfter = kindOf(after);
+  const affected = new Set<string>(after.map(n => n.id).filter(id => !now.has(id)));
+  for (const a of applied) if (picked.has(a.id) && a.op.kind === "merge") affected.add(a.op.into);
+  for (const n of after) if (kindBefore.has(n.id) && kindBefore.get(n.id) !== kindAfter.get(n.id)) affected.add(n.id);
+  return affected;
+}

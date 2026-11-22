@@ -3437,6 +3437,8 @@ export const en = {
   "ui.book_struct_why_rules": "they break the structure rules",
   "ui.book_struct_undo_all": "Undo all",
   "ui.book_struct_undo_all_note_0_1": "Undoing all plans {0} cards again, about {1} AI calls.",
+  "ui.book_struct_refused_missing": "The archived note was not found, so nothing was undone.",
+  "ui.book_struct_refused_stale": "The map was just changed, so nothing was undone. Press undo again.",
   "ui.book_struct_busy": "Undoing, please wait…",
   "ui.book_struct_failed": "The undo did not finish; the map is back as it was before.",
   "ui.book_bar_plan_go": "Direction is right, start writing",

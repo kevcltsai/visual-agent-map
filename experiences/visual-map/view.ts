@@ -17451,13 +17451,21 @@ export class VisualAgentMapView extends ItemView {
     return bookStructure(order, id => parents.get(id), root.id);
   }
   /** Where the keyboard goes after the next paint of the bar (the repaint rebuilds the buttons). */
-  private bookBarFocus: "rerun-go" | "rerun-opener" | "map-go" | null = null;
+  private bookBarFocus: "rerun-go" | "rerun-opener" | "map-go" | "structure-undo" | null = null;
+  /** After an undo: which of the remaining undo buttons takes the keyboard (the one at the place of the pressed row); -1 means "start writing". */
+  private bookStructureFocusAt = -1;
   /** The run whose map-changed choice already took the keyboard. */
   private bookMapFocusedRun: string | null = null;
   private applyBookBarFocus(): void {
     const focus = this.bookBarFocus;
     this.bookBarFocus = null;
     if (!focus || this.closed) return;
+    if (focus === "structure-undo") {
+      const undos = Array.from(this.contentEl.querySelectorAll<HTMLElement>(".vam-book-structure-undo"));
+      const next = undos[Math.min(this.bookStructureFocusAt, undos.length - 1)];
+      (this.bookStructureFocusAt >= 0 && next ? next : this.contentEl.querySelector<HTMLElement>(".vam-book-confirm"))?.focus();
+      return;
+    }
     const selector = {
       "rerun-go": ".vam-book-rerun-ask .vam-book-ask-go",
       "rerun-opener": ".vam-node-rerun",
@@ -17698,16 +17706,30 @@ export class VisualAgentMapView extends ItemView {
   private bookStructureUndo: "busy" | "failed" | undefined;
   private async undoBookStructure(path: string, ids: string[] | "all"): Promise<void> {
     if (this.bookStructureUndo === "busy") return;
+    const buttons = Array.from(this.contentEl.querySelectorAll<HTMLElement>(".vam-book-structure-row"));
+    // The keyboard goes to the undo button now at the pressed row's place (the next one), or to "start writing" when none is left.
+    this.bookStructureFocusAt = ids === "all" ? -1 : buttons.filter(r => !r.classList.contains("is-undone")).findIndex(r => ids.includes(r.dataset.op ?? ""));
     this.bookStructureUndo = "busy";
     this.render();
+    let failed = false;
     try {
       await this.plugin.undoBookStructure(path, ids);
-      this.bookStructureUndo = undefined;
     } catch (error) {
-      this.bookStructureUndo = "failed";
-      new Notice(bookRefusalText(error));
+      failed = true;
+      new Notice(this.structureUndoRefusalText(error));
     }
-    if (!this.closed) this.render();
+    this.bookStructureUndo = failed ? "failed" : undefined;
+    if (!this.closed) {
+      this.bookBarFocus = "structure-undo";
+      this.render();
+    }
+  }
+  /** An undo that was refused or failed: a plain sentence (nothing was changed). */
+  private structureUndoRefusalText(error: unknown): string {
+    const code = (error as { code?: unknown } | null)?.code;
+    if (code === "missing") return t("ui.book_struct_refused_missing");
+    if (code === "stale") return t("ui.book_struct_refused_stale");
+    return bookRefusalText(error);
   }
   /** After a replan or rerun: this card's note is read again so the panel shows the new plan without waiting for the repaint. */
   private async rereadBookCard(id: string): Promise<void> {

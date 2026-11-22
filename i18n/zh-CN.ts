@@ -3212,6 +3212,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_struct_why_rules": "不符合结构规则",
   "ui.book_struct_undo_all": "全部还原",
   "ui.book_struct_undo_all_note_0_1": "全部还原会重新企划 {0} 张卡，约 {1} 次 AI 调用。",
+  "ui.book_struct_refused_missing": "找不到封存的笔记，没有还原任何东西。",
+  "ui.book_struct_refused_stale": "心智图刚被改过，没有还原；请再按一次。",
   "ui.book_struct_busy": "还原中，请稍候…",
   "ui.book_struct_failed": "还原没有成功，心智图已回到还原前的样子。",
   "ui.book_bar_plan_go": "方向对，开始写",

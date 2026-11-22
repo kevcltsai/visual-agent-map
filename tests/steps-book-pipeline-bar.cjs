@@ -692,7 +692,7 @@ test('structure list: gate 1 lists each change with its kind, where it went and 
   assert.deepEqual(texts(box).filter(x => x.includes('調整了')), ['總編輯調整了 5 處結構']);
   assert.ok(texts(box).includes('現在 4 章 1 節（原本 4 章 1 節）'), 'the count is read from the current structure and from the tree before');
   assert.ok(texts(box).includes('另有 2 項沒套用：碰到你改過的卡、不符合結構規則。'));
-  assert.ok(texts(box).includes('全部還原會重新企劃 4 張卡，約 5 次 AI 呼叫。'), 'alpha, trust, digital and future are planned again; the added card just goes away');
+  assert.ok(texts(box).includes('全部還原會重新企劃 2 張卡，約 3 次 AI 呼叫。'), 'the put-back card and the merge target are planned again (the runner\'s rule); moves and renames are not');
 });
 
 test('structure list: nothing shows without changes, outside the plan review, or when nothing was applied or refused; the bar is then the same as before', () => {
@@ -756,5 +756,28 @@ test('structure list: the archived-note link opens the parked note; busy disable
   setUiLanguage('en');
   const en = draw(state(data()), { undoStructure() {} }).bar;
   assert.ok(texts(en).includes('The editor changed the structure in 5 places'));
+  setUiLanguage('zh-TW');
+});
+
+test('structure undo: the keyboard goes to the next remaining undo button, else to "start writing"; refusals read in plain words; undo all uses the runner\'s affected rule', async () => {
+  setUiLanguage('zh-TW');
+  const proto = bundle.VisualAgentMapView.prototype;
+  const focused = [];
+  const el = name => ({ focus: () => focused.push(name) });
+  const world = { undos: [el('u1'), el('u2')], confirm: el('go') };
+  const fake = (at, focus) => ({ closed: false, bookBarFocus: focus, bookStructureFocusAt: at, contentEl: { querySelectorAll: () => world.undos, querySelector: sel => (sel === '.vam-book-confirm' ? world.confirm : null) } });
+  proto.applyBookBarFocus.call(fake(0, 'structure-undo'));
+  proto.applyBookBarFocus.call(fake(5, 'structure-undo'));
+  proto.applyBookBarFocus.call(fake(-1, 'structure-undo'));
+  world.undos = [];
+  proto.applyBookBarFocus.call(fake(0, 'structure-undo'));
+  assert.equal(JSON.stringify(focused), JSON.stringify(['u1', 'u2', 'go', 'go']));
+  const text = code => proto.structureUndoRefusalText.call({}, new bundle.BookPipelineRunError(code));
+  assert.equal(text('missing'), '找不到封存的筆記，沒有還原任何東西。');
+  assert.equal(text('stale'), '心智圖剛被改過，沒有還原；請再按一次。');
+  assert.equal(text('busy'), bundle.bookRefusalText(new bundle.BookPipelineRunError('busy')));
+  assert.equal(text('not_gate1'), bundle.bookRefusalText(new bundle.BookPipelineRunError('not_gate1')));
+  setUiLanguage('en');
+  assert.equal(text('stale'), 'The map was just changed, so nothing was undone. Press undo again.');
   setUiLanguage('zh-TW');
 });

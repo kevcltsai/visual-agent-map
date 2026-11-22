@@ -4,7 +4,7 @@ import { isBookStepError } from "../../core/steps/book-pipeline/base";
 import { splitLengthIssue, type LengthReason } from "../../core/book-pipeline/settings";
 import { parseCardPoints } from "../../core/book-pipeline/plan-text";
 import { bookStructure as bookStructureOf, type BookStructure, type CardPlace } from "../../core/book-pipeline/structure";
-import { simulateStructure, undoClosure, type AppliedOp, type StructureNode } from "../../core/book-pipeline/structure-edit";
+import { applyInverseOps, inverseOps, simulateStructure, undoAffected, undoClosure, type AppliedOp, type StructureNode } from "../../core/book-pipeline/structure-edit";
 import { splitPictureIssue } from "../../core/book-pipeline/image-slots";
 import { joinReasons, splitCarriedIssue } from "./book-pipeline-reasons";
 import {
@@ -87,7 +87,7 @@ export interface BookStructureEditView {
   /** Proposals not applied: over the cap, or counted by why. */
   notApplied?: { overCap: boolean; locked: number; other: number };
   /** "Undo all" re-plans this many cards and costs about `calls` AI calls. */
-  undoAll: { cards: number; calls: number };
+  undoAll?: { cards: number; calls: number };
 }
 export interface BookCurrent {
   /** The whole-book plan, or a chapter step. */
@@ -272,13 +272,18 @@ function structureEditField(
     };
   });
   const active = items.filter(i => !i.undone);
-  // Undoing all re-plans the cards that exist before the editor's changes (a card it added just goes away).
-  const added = new Set(edit.applied.flatMap(a => (a.op.kind === "add" ? [a.op.ref] : [])));
-  const touched = new Set<string>();
-  for (const a of edit.applied) {
-    if (undone.has(a.id)) continue;
-    if (a.op.kind !== "add" && !added.has(a.op.card)) touched.add(a.op.card);
-    if (a.op.kind === "merge" && !added.has(a.op.into)) touched.add(a.op.into);
+  // Undoing all re-plans the same cards the runner does (one shared rule); needs the current structure to know who changes between chapter and section.
+  let undoAll: BookStructureEditView["undoAll"];
+  if (now) {
+    const rootId = edit.before.rootId;
+    const current: StructureNode[] = effectiveOrder(data).map(id => {
+      const place = now.placeOf(id);
+      return { id, parentId: id === rootId ? null : place?.kind === "section" ? (place.chapterId ?? rootId) : rootId, title: "" };
+    });
+    const picked = undoClosure(edit.applied, edit.applied.map(x => x.id).filter(x => !undone.has(x)));
+    const afterUndo = applyInverseOps({ rootId, nodes: current }, inverseOps(edit.applied, picked));
+    const cards = undoAffected(rootId, current, afterUndo, edit.applied, picked).size;
+    undoAll = { cards, calls: cards + 1 };
   }
   const rejected = edit.rejected;
   const locked = rejected.filter(r => r.code === "locked").length;
@@ -289,7 +294,7 @@ function structureEditField(
       active: active.length,
       ...(now ? { chapters: { now: shape(now), before: shape(structureOfNodes(edit.before)) } } : {}),
       ...(notApplied ? { notApplied } : {}),
-      undoAll: { cards: touched.size, calls: touched.size + 1 }
+      ...(undoAll ? { undoAll } : {})
     }
   };
 }
@@ -665,7 +670,8 @@ function renderStructureEdit(bar: HTMLElement, view: BookStructureEditView, acti
   }
   if (view.active && mayUndo) {
     const foot = box.createDiv("vam-book-structure-foot");
-    foot.createSpan({ text: t("ui.book_struct_undo_all_note_0_1", view.undoAll.cards, view.undoAll.calls) });
+    if (view.undoAll)
+      foot.createSpan({ text: t("ui.book_struct_undo_all_note_0_1", view.undoAll.cards, view.undoAll.calls) });
     const all = makeButton(foot, t("ui.book_struct_undo_all"), "vam-book-structure-undo-all", () =>
       actions.undoStructure?.("all")
     );

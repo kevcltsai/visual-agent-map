@@ -3213,6 +3213,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_struct_why_rules": "不符合結構規則",
   "ui.book_struct_undo_all": "全部還原",
   "ui.book_struct_undo_all_note_0_1": "全部還原會重新企劃 {0} 張卡，約 {1} 次 AI 呼叫。",
+  "ui.book_struct_refused_missing": "找不到封存的筆記，沒有還原任何東西。",
+  "ui.book_struct_refused_stale": "心智圖剛被改過，沒有還原；請再按一次。",
   "ui.book_struct_busy": "還原中，請稍候…",
   "ui.book_struct_failed": "還原沒有成功，心智圖已回到還原前的樣子。",
   "ui.book_bar_plan_go": "方向對，開始寫",

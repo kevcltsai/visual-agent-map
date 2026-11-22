@@ -2388,6 +2388,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "note.image_source_0_1": "{0}（{1}）",
   "note.image_source_label_0": "來源：{0}",
   "note.image_source_entry_0_1": "圖「{0}」：{1}",
+  "note.cover_source_entry_0_1": "圖「{0}」（封面）：{1}",
   "log.ai_split_failed": "AI 拆解失敗",
   "log.integration_directions_failed": "整合方向建議失敗",
   "log.child_integration_failed": "子議題整合失敗",

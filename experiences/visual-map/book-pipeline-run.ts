@@ -205,19 +205,23 @@ import {
 } from "../../core/book-pipeline/cover";
 import type { CoverDownload, CoverSaved } from "../../core/book-pipeline/cover-download";
 import {
-  composeCoverBlock,
+  commonsFilePage,
   coverDeclaredTarget,
   coverIsOff,
   coverLinkOf,
   coverOwnership,
   coverSourceKey,
+  migrateLegacyCover,
+  placeCover,
   putCoverBlock,
+  readCoverRecord,
+  removeCoverCredit,
   stripCoverBlock,
   trustedCoverBlock,
-  type CoverLevel
+  type CoverRecordValue
 } from "../../core/book-pipeline/cover-block";
 import type { ReasoningLevel } from "../../ai/types";
-import { instructionLanguageOf, type ContentLanguage } from "../../i18n";
+import type { ContentLanguage } from "../../i18n";
 import type { MapDocument } from "../../map-model";
 import { isPlaceholder } from "../../core/note-placeholder";
 import type { NotePatch } from "../../repository";
@@ -423,6 +427,17 @@ export type GuardOptions = {
   finalize?: (content: string) => string | null;
 };
 
+const DETAIL_START = "<!-- visual-agent-map:detail:start -->";
+const DETAIL_END = "<!-- visual-agent-map:detail:end -->";
+
+/** What one fill writes for the card's cover: its record, `topic-cover`'s link and its Sources entry; `held` is set when the owner took the cover over meanwhile. */
+interface CoverWrite {
+  record: CoverRecordValue;
+  link?: string;
+  source?: { href: string; entry: string };
+  held?: boolean;
+}
+
 /** Everything the runner touches. `mutate` is the plugin's serialized write queue; the others are repository/model/network seams. */
 export interface BookPipelinePorts {
   mutate(work: () => Promise<void>): Promise<void>;
@@ -494,7 +509,7 @@ export interface BookPipelinePorts {
     download: CoverDownload,
     signal: AbortSignal
   ): Promise<CoverSaved>;
-  /** Production: `withCover`: the note text with `topic-cover: "[[link]]"` (the card's cover). Absent: the cover block is written without it. */
+  /** Production: `withCover`: the note text with `topic-cover: "[[link]]"` (the card's cover). Absent: the cover is recorded without it. */
   setCoverLink?(content: string, link: string): string;
   backupNote(path: string, raw: string): Promise<{ ok: true; path: string } | { ok: false }>;
   /**
@@ -1549,6 +1564,59 @@ export class BookPipelineRuns {
       if (!(await this.writeClosingPage(drive))) this.log(drive, "open_issues_write", missing[0], "proof", "failed");
       this.syncNotes(drive);
     });
+  }
+
+  /**
+   * A map opens: each card of a book that is not running whose text still holds the program's own intact old cover block gets the
+   * `book-cover` key and a line in its Sources list instead (the block is taken out); an edited block stays as it is.
+   */
+  async migrateCovers(mapPath: string): Promise<void> {
+    if (this.disposed || this.drives.has(mapPath) || this.notesJobs.has(mapPath) || this.ports.blocked(mapPath)) return;
+    const doc = await this.ports.readMap(mapPath);
+    const read = readBookPipeline(doc);
+    if (read.kind !== "usable") return;
+    const language = this.ports.config(mapPath).language;
+    for (const id of effectiveOrder(read.data)) {
+      const path = doc.nodes.find(node => node.id === id)?.path;
+      if (!path) continue;
+      // A run that started meanwhile owns the cards from here on.
+      if (this.disposed || this.drives.has(mapPath) || this.notesJobs.has(mapPath) || this.ports.blocked(mapPath))
+        return;
+      try {
+        const card = await this.ports.readCard(path);
+        const moved = migrateLegacyCover(card.raw, language, card.title);
+        if (!moved || coverOwnership(card.raw) !== "program") continue;
+        // A text-only change: the block goes, the record line and the one credit line come in, everything else stays as the owner wrote it.
+        const start = card.raw.indexOf(DETAIL_START);
+        const end = card.raw.indexOf(DETAIL_END);
+        if (moved.credit && (start < 0 || end < start)) continue;
+        await this.ports.updateNoteRawGuarded(
+          path,
+          content => {
+            let next = content;
+            if (moved.credit) {
+              const from = start + DETAIL_START.length;
+              const inner = content.slice(from, end);
+              const core = inner.trim();
+              const lead = inner.slice(0, inner.indexOf(core));
+              const stamped = programStamp(core, addPictureSources(core, [moved.credit], language));
+              next = `${content.slice(0, from)}${lead}${stamped}${inner.slice(lead.length + core.length)}${content.slice(end)}`;
+            }
+            const placed = placeCover(next, moved.record);
+            const link = "file" in moved.record ? coverLinkOf(moved.record.file) : undefined;
+            return link && coverDeclaredTarget(placed) === undefined && this.ports.setCoverLink
+              ? this.ports.setCoverLink(placed, link)
+              : placed;
+          },
+          {
+            expectedContent: card.raw,
+            authorize: () => !this.disposed && !this.drives.has(mapPath) && !this.notesJobs.has(mapPath)
+          }
+        );
+      } catch {
+        // One card that cannot be read or written does not stop the others; it is tried again at the next open.
+      }
+    }
   }
 
   /** The card's result as the rerun compares it (memory only); undefined when the card cannot be read. */
@@ -4562,7 +4630,7 @@ export class BookPipelineRuns {
       if (coverKey) drive.usedImages.delete(coverKey);
       if (coverFigure?.work && works.includes(coverFigure.work)) drive.usedWorks.delete(coverFigure.work);
     };
-    let coverWrite: { block: string; link?: string; held?: boolean } | undefined;
+    let coverWrite: CoverWrite | undefined;
     let coverResult: "placed" | "missing" | "download_failed" | "owner_kept" | undefined;
     if (coverSlot) {
       try {
@@ -4572,7 +4640,7 @@ export class BookPipelineRuns {
         const words = askWords({ explains: coverSlot.explains, terms: coverSlot.search, ...hints.get(COVER_INDEX) });
         const coverOff =
           !!placed && words.length > 0 && !wordHits(words, `${placed.title} ${placed.description ?? placed.caption}`);
-        const prepared = await this.prepareCover(drive, nodeId, latest.title, coverFigure, coverOff);
+        const prepared = await this.prepareCover(drive, latest.title, coverFigure, coverOff);
         if (!(await this.stillOnMap(drive, nodeId))) {
           release();
           return { kind: "failed", reason: "card_removed" };
@@ -4584,15 +4652,12 @@ export class BookPipelineRuns {
           releaseCover();
         } else if (prepared.kind === "placed") {
           coverResult = "placed";
-          coverWrite = { block: prepared.block, link: prepared.link };
+          coverWrite = { record: prepared.record, link: prepared.link, source: prepared.source };
         } else {
           coverResult = prepared.kind === "failed" ? "download_failed" : "missing";
           releaseCover();
           // A cover the program placed earlier stays when this run finds none (a flaky search must not take a good cover away).
-          if (ownership === "none") {
-            const block = composeCoverBlock(this.coverLevelOf(drive, nodeId), instructionLanguageOf(language));
-            if (block) coverWrite = { block };
-          }
+          if (ownership === "none") coverWrite = { record: { missing: 1 } };
         }
       } catch (error) {
         release();
@@ -4661,24 +4726,21 @@ export class BookPipelineRuns {
     }
   }
 
-  /** The card's level for the cover block's "not found" line: the preface is the book, first-level cards are chapters, the rest sections. */
-  private coverLevelOf(drive: Drive, nodeId: string): CoverLevel {
-    const kind = this.structureOf(drive, effectiveOrder(drive.store.state)).placeOf(nodeId)?.kind;
-    return kind === "preface" ? "book" : kind === "section" ? "section" : "chapter";
-  }
-
   /**
    * Downloads the chosen cover (one at a time through the Commons queue, so Wikimedia sees one request a second at most), saves its file in
-   * the book's cover folder and composes the block. `missing`: nothing was chosen; `failed`: the picture could not be downloaded or saved;
+   * the book's cover folder and builds its record and credit. `missing`: nothing was chosen; `failed`: the picture could not be downloaded or saved;
    * a stop or timeout of the run throws like any other step. Nothing is written to the note here.
    */
   private async prepareCover(
     drive: Drive,
-    nodeId: string,
     title: string,
     figure: SlotFigure | undefined,
     off: boolean
-  ): Promise<{ kind: "placed"; block: string; link: string } | { kind: "missing" } | { kind: "failed" }> {
+  ): Promise<
+    | { kind: "placed"; record: CoverRecordValue; link: string; source: { href: string; entry: string } }
+    | { kind: "missing" }
+    | { kind: "failed" }
+  > {
     if (!figure) return { kind: "missing" };
     const signal = drive.controller.signal;
     const ports = this.ports;
@@ -4717,14 +4779,23 @@ export class BookPipelineRuns {
       captionLatinIssue(`![](x)\n${caption}`, drive.config.language)
     )
       caption = "";
-    const block = composeCoverBlock(this.coverLevelOf(drive, nodeId), instructionLanguageOf(drive.config.language), {
-      file: saved.path,
-      url: figure.href,
-      caption,
-      sourceUrl: figure.source?.href ?? "",
-      ...(off ? { off: true } : {})
-    });
-    return block ? { kind: "placed", block, link: coverLinkOf(saved.path) } : { kind: "missing" };
+    // Only a Commons file page can be the cover's credit; a picture without one is treated as not found.
+    const href = commonsFilePage(figure.source?.href ?? "");
+    const entry = figure.source?.coverEntry;
+    const file = coverLinkOf(saved.path);
+    if (!href || !entry || !file) return { kind: "missing" };
+    return {
+      kind: "placed",
+      record: {
+        file,
+        key: imageKey(figure.href),
+        ...(caption ? { caption: caption.slice(0, 200) } : {}),
+        source: href,
+        ...(off ? { off: 1 } : {})
+      },
+      link: file,
+      source: { href, entry }
+    };
   }
 
   /** One probe through the run-wide gate: true when the picture loads. A probe that throws (not a Stop) counts as not loaded. */
@@ -4772,14 +4843,22 @@ export class BookPipelineRuns {
     language: string,
     authorize: () => boolean,
     off?: ReadonlySet<number>,
-    cover?: { block: string; link?: string; held?: boolean }
+    cover?: CoverWrite
   ): Promise<FillResult | string> {
     const result = fillSlotMarkers(latest.detail, slots, outcomes);
     const bad = verifyFill(latest.detail, result, slots);
     if (bad) return `slots_${bad}`;
     // The exit check: nothing but the placed addresses may be an image in what this write adds.
     if (this.exitCheck(result.added.join("\n"), new Set(result.placed.map(item => item.href)))) return "slots_unsafe";
-    const withSources = addPictureSources(result.text, result.sources, language);
+    // A new cover replaces the credit line of the one it replaces (the card's cover has one credit).
+    const oldSource = cover?.source ? readCoverRecord(latest.raw)?.source : undefined;
+    const withSources = addPictureSources(
+      oldSource && oldSource !== cover?.source?.href
+        ? removeCoverCredit(result.text, oldSource, language)
+        : result.text,
+      cover?.source ? [...result.sources, cover.source] : result.sources,
+      language
+    );
     const slotted = slots.length ? replaceResearchRecord(withSources, composeSlotsRecord(result, off)) : withSources;
     // The slot fill is the program's own change of the text: its fingerprint follows only if the text it started from still had it.
     const detail = programStamp(latest.detail, slotted);
@@ -4793,13 +4872,13 @@ export class BookPipelineRuns {
         authorize,
         finalize: content => {
           if (residualMarkerLines(content).length > Math.max(0, outside)) return null;
-          // The cover block and `topic-cover` go in the same write; a cover the owner took over meanwhile is left alone.
+          // The cover record, its credit and `topic-cover` go in the same write; a cover the owner took over meanwhile is left alone.
           if (!cover) return content;
           if (coverOwnership(content) === "owner") {
             cover.held = true;
             return content;
           }
-          const placed = putCoverBlock(content, cover.block);
+          const placed = placeCover(content, cover.record);
           // `topic-cover` that already links this file is left as it is, so the owner's frame, size and position settings are kept.
           return cover.link && coverDeclaredTarget(placed) !== cover.link && this.ports.setCoverLink
             ? this.ports.setCoverLink(placed, cover.link)

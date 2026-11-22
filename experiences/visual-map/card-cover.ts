@@ -3,6 +3,7 @@
  * note body, and never touches the network: URLs are skipped, and a link only counts when `resolve` finds a local
  * image file. Pure functions, no DOM.
  */
+import { readCoverRecord } from "../../core/book-pipeline/cover-block";
 import { setFrontmatterKeys } from "../../repository";
 
 export type CoverResult = { path: string } | { off: true } | null;
@@ -212,9 +213,14 @@ export function withoutCover(content: string): string {
   return setFrontmatterKeys(content, { [COVER_KEY]: null, [COVER_FRAME_KEY]: null });
 }
 
-/** Removes only `topic-cover` (the topic menu's "turn cover on again"): the picture did not change, so its frame stays. */
+/**
+ * Removes only `topic-cover` (the topic menu's "turn cover on again"): the picture did not change, so its frame stays. A note whose
+ * `book-cover` record names a file has no picture in its text to fall back to, so `topic-cover` links that file instead.
+ */
 export function withCoverOn(content: string): string {
-  return setFrontmatterKeys(content, { [COVER_KEY]: null });
+  const file = readCoverRecord(content)?.file;
+  const safe = file ? safeLink(file) : "";
+  return setFrontmatterKeys(content, { [COVER_KEY]: safe ? `[[${safe}]]` : null });
 }
 
 /**

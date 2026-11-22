@@ -208,6 +208,9 @@ export class ChatActionWriter {
     const gone = skipped("ui.map_chat_skip_topic_gone");
     const done: ChatOutcome = { status: "done" };
     if (action.kind === "edit_book_plan") return this.ports.applyBookPlanEdit(action, baseline);
+    // TEMPORARY (book plan chat step 2, P3): the apply path of these two kinds comes in P4; until then they are skipped.
+    if (action.kind === "edit_book_structure" || action.kind === "edit_book_thread")
+      return skipped("ui.map_chat_skip_book_started");
     const configDir = this.app.vault.configDir;
     /** The real id behind an id of the reply; null when it names a card of this reply that was never created. */
     const real = (id: string): string | null =>

@@ -206,7 +206,26 @@ const CASES = [
         ],
         prompts: { c1: { path: "Maps/Notes/c1.md", prompt: "p1", kind: "chapter", title: "認識部位", summary: "s1" }, c2: { path: "Maps/Notes/c2.md", prompt: "p2", kind: "chapter", title: "煎與烤", summary: "s2" } } } },
     [C.noRejected(), C.hasKind("edit_book_plan", 1, 1), C.noKinds(["add_child", "delete_topic", "move_topic", "reorder_topics"]),
-      C.hasAction("edit_book_plan", a => a.changes.every(c => c.id === "c2" || c.id === "c1") && a.changes.every(c => !(c.covers || (c.points && c.points.length) || c.previous) || (c.checklist && c.checklist.length)), "a change to covers, points or previous comes with its checklist")])
+      C.hasAction("edit_book_plan", a => a.changes.every(c => c.id === "c2" || c.id === "c1") && a.changes.every(c => !(c.covers || (c.points && c.points.length) || c.previous) || (c.checklist && c.checklist.length)), "a change to covers, points or previous comes with its checklist")]),
+  kase("M2", "總編輯", "審企劃：改全書主線，並列出要跟著改的章", "book plan chat: 主線用 edit_book_thread，要跟著改的簡報同一次用 edit_book_plan 列出", ["edit_book_thread"],
+    { message: "全書主線改成：牛排好不好吃，取決於火候與熟度的掌控", outline: tree([["r", "牛排全書", null], ["c1", "認識部位", "r"], ["c2", "煎與烤", "r"]]),
+      bookPlan: { runId: "run-1", phaseStartedAt: "2026-11-22T00:00:00.000Z", title: "牛排全書", settings: {}, thread: "牛排好不好吃，取決於部位的選擇。", opening: "我排了兩章，你覺得怎麼樣？",
+        cards: [
+          { id: "c1", place: "第 1 章", role: "body", title: "認識部位", covers: "肋眼、菲力、紐約客的差異", points: ["部位", "油花"], entry: "", handoff: "下一章講煎烤", previous: "", next: "第 2 章：煎與烤", checklist: [{ id: "C1", type: "structure", text: "三個部位都有說明" }] },
+          { id: "c2", place: "第 2 章", role: "body", title: "煎與烤", covers: "煎和烤兩種做法", points: ["煎", "烤"], entry: "承接部位", handoff: "", previous: "第 1 章：認識部位", next: "", checklist: [{ id: "C1", type: "structure", text: "煎和烤都有步驟" }] }
+        ],
+        prompts: { c1: { path: "Maps/Notes/c1.md", prompt: "p1", kind: "chapter", title: "認識部位", summary: "s1" }, c2: { path: "Maps/Notes/c2.md", prompt: "p2", kind: "chapter", title: "煎與烤", summary: "s2" } } } },
+    [C.noRejected(), C.hasKind("edit_book_thread", 1, 1), C.noKinds(["add_child", "delete_topic", "move_topic", "reorder_topics"]),
+      C.hasAction("edit_book_thread", a => /火候/.test(a.content), "the thread says what the user asked")]),
+  kase("M3", "總編輯", "審企劃：對調兩章用 move_topic，不用 reorder", "book plan chat: 結構只用 add_child／move_topic／delete_topic／rename_topic，由 parser 合成 edit_book_structure；對調用 move_topic", [],
+    { message: "第 1、2 章對調", outline: tree([["r", "牛排全書", null], ["c1", "認識部位", "r"], ["c2", "煎與烤", "r"]]),
+      bookPlan: { runId: "run-1", phaseStartedAt: "2026-11-22T00:00:00.000Z", title: "牛排全書", settings: {}, thread: "", opening: "我排了兩章，你覺得怎麼樣？",
+        cards: [
+          { id: "c1", place: "第 1 章", role: "body", title: "認識部位", covers: "肋眼、菲力、紐約客的差異", points: ["部位"], entry: "", handoff: "下一章講煎烤", previous: "", next: "第 2 章：煎與烤", checklist: [{ id: "C1", type: "structure", text: "三個部位都有說明" }] },
+          { id: "c2", place: "第 2 章", role: "body", title: "煎與烤", covers: "煎和烤兩種做法", points: ["煎"], entry: "承接部位", handoff: "", previous: "第 1 章：認識部位", next: "", checklist: [{ id: "C1", type: "structure", text: "煎和烤都有步驟" }] }
+        ],
+        prompts: { c1: { path: "Maps/Notes/c1.md", prompt: "p1", kind: "chapter", title: "認識部位", summary: "s1" }, c2: { path: "Maps/Notes/c2.md", prompt: "p2", kind: "chapter", title: "煎與烤", summary: "s2" } } } },
+    [C.noRejected(), C.hasKind("edit_book_structure", 1, 1), C.noKinds(["reorder_topics"])])
 ];
 
 const WEAK = "只檢查沒有多餘動作與有提到地圖內容，不能證明答對；要靠真實失敗案例庫（S3）定義什麼叫答對";

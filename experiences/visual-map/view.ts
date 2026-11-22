@@ -21223,6 +21223,10 @@ export class VisualAgentMapView extends ItemView {
         return action.path;
       case "edit_book_plan":
         return t("ui.map_chat_do_edit_book_plan_0", action.changes.length);
+      case "edit_book_structure":
+        return t("ui.map_chat_do_edit_book_structure_0", action.items.length);
+      case "edit_book_thread":
+        return t("ui.map_chat_do_edit_book_thread");
       case "select_topics":
         return t("ui.map_chat_do_select_0", action.all ? nodes.length : action.nodeIds.length);
       case "create_map":

@@ -41,7 +41,8 @@
               "add_anchor",
               "link_anchor",
               "read_md_file",
-              "edit_book_plan"
+              "edit_book_plan",
+              "edit_book_thread"
             ]
           },
           "nodeId": {

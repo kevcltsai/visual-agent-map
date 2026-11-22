@@ -1361,6 +1361,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_skip_not_sibling": "要排在它後面的議題不在那個上層議題底下",
   "ui.map_chat_do_delete_0": "把「{0}」移到未歸類",
   "ui.map_chat_do_edit_book_plan_0": "修改 {0} 張卡的企劃",
+  "ui.map_chat_do_edit_book_structure_0": "調整書的結構：{0} 項",
+  "ui.map_chat_do_edit_book_thread": "修改書的主線",
   "ui.map_chat_skip_book_started": "已經開始寫了，企劃不再從這裡修改",
   "ui.map_chat_skip_book_cards": "那些卡已鎖定、在提案後被改過，或不會有變化",
   "ui.map_chat_line_book_plan_undo": "；要改回去，直接跟總編輯說",

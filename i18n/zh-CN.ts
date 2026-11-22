@@ -1360,6 +1360,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_skip_not_sibling": "要排在它后面的议题不在那个上层议题底下",
   "ui.map_chat_do_delete_0": "把“{0}”移到未归类",
   "ui.map_chat_do_edit_book_plan_0": "修改 {0} 张卡的企划",
+  "ui.map_chat_do_edit_book_structure_0": "调整书的结构：{0} 项",
+  "ui.map_chat_do_edit_book_thread": "修改书的主线",
   "ui.map_chat_skip_book_started": "已经开始写了，企划不再从这里修改",
   "ui.map_chat_skip_book_cards": "那些卡已锁定、在提案后被改过，或不会有变化",
   "ui.map_chat_line_book_plan_undo": "；要改回去，直接跟总编辑说",

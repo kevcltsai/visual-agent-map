@@ -129,7 +129,7 @@ test('parser rejects a malformed whole reply and caps the number of actions', ()
 test('schema lists exactly the kinds and run actions, and every property is required', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.kind.enum), plain(MAP_CHAT_ACTION_KINDS));
-  assert.equal(MAP_CHAT_ACTION_KINDS.length, 27);
+  assert.equal(MAP_CHAT_ACTION_KINDS.length, 28);
   assert.deepEqual(plain(properties.action.enum), [...plain(MAP_RUN_ACTIONS), '']);
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.actions.items.required).sort(), Object.keys(properties).sort());
 });
@@ -502,7 +502,7 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
 test('C1: the style is not part of the action schema, and the step version is 22 (version 22: auditing the whole map researches its main cards, not only the root, and no requested item is announced as skipped; version 21: a batch whose notes are not in the context selects the cards instead of asking the user to, and a title plus a list is one root card with the items as children; version 20: find_images takes several targets and the picture is put in automatically; version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 27);
+  assert.equal(mapChatStep.version, 28);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -575,7 +575,7 @@ test('B1 limit: the 100th action is kept and the 101st is dropped as too_many', 
   assert.equal(hundred.actions.length, 100); assert.deepEqual(hundred.rejected, []);
   const more = parse(reply(...rows(101)));
   assert.equal(more.actions.length, 100); assert.deepEqual(more.rejected, [{ index: 100, code: 'too_many' }]);
-  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-11, -4)), ['set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics']);
+  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-12, -5)), ['set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics']);
 });
 test('B1 compat: a step version 2 reply (no ref key anywhere) still parses', () => {
   const old = key => ({ kind: key, nodeId: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '' });
@@ -659,7 +659,7 @@ test('B1 schema: ref is a required string property and the kinds list ends with 
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.ref), { type: 'string' });
   assert.ok(MAP_CHAT_SCHEMA.properties.actions.items.required.includes('ref'));
-  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics', 'add_anchor', 'link_anchor', 'read_md_file', 'edit_book_plan']);
+  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics', 'add_anchor', 'link_anchor', 'read_md_file', 'edit_book_plan', 'edit_book_thread']);
 });
 test('B1 context: map titles (cleaned, at most 200) and the noEditableMap flag reach the model; the selection size is kept', () => {
   const titles = Array.from({ length: 260 }, (_, i) => `Map ${i}`);
@@ -1659,7 +1659,7 @@ test('hypothesis-leaning: S21 both prompts explain leaning (three values) and st
   assert.match(zh, /只走一層/); assert.match(zh, /絕不用標題表達議題類型/);
 });
 test('hypothesis-leaning: S21 the step version is 22 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
-  assert.equal(mapChatStep.version, 27);
+  assert.equal(mapChatStep.version, 28);
   const old = item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', strength: 'weak' }); delete old.leaning;
   const oldAdd = item('add_child', { parentId: 'a', title: 'Old', topicKind: 'hypothesis' }); delete oldAdd.leaning;
   assert.deepEqual(parse(reply(old, oldAdd)).actions, [
@@ -1958,19 +1958,77 @@ test('book plan: unknown, locked and repeated ids and a brief change without che
   assert.equal(result.actions[0].changes[1].checklist.length, 1);
   assert.equal(result.rejected.length, 4);
 });
-test('book plan: while a plan is under review add, delete, move and reorder are dropped and counted; the book edit stays', () => {
-  const ctx = context({ bookPlan: bookPlan() });
+test('book plan: structure actions become one edit_book_structure last; reorder is dropped with its reason; the book edit and other actions stay', () => {
+  const ctx = context({ bookPlan: bookPlan({ nodes: [] }) });
   const result = parse(reply(
     planItem(planChange('c1', { entry: 'e' })),
-    item('add_child', { parentId: 'r', title: 'New', summary: 's' }),
-    item('delete_topic', { nodeId: 'a' }),
+    item('add_child', { parentId: 'r', title: 'New', summary: 's', beforeId: 'b', note: 'why' }),
+    item('delete_topic', { nodeId: 'a', branch: true }),
     item('move_topic', { nodeId: 'a1', newParentId: 'b' }),
+    item('rename_topic', { nodeId: 'b', title: 'B2' }),
     item('reorder_topics', { parentId: 'r', nodeIds: ['a', 'b'] }),
     item('update_summary', { nodeId: 'a', summary: 'kept' })
   ), ctx);
-  assert.deepEqual(result.actions.map(a => a.kind), ['edit_book_plan', 'update_summary']);
-  assert.deepEqual(result.rejected.map(r => r.code), ['bad_value', 'bad_value', 'bad_value', 'bad_value']);
+  assert.deepEqual(result.actions.map(a => a.kind), ['edit_book_plan', 'update_summary', 'edit_book_structure']);
+  assert.deepEqual(result.actions[2].items, [
+    { kind: 'add', parentId: 'r', title: 'New', summary: 's', beforeId: 'b', reason: 'why' },
+    { kind: 'remove', nodeId: 'a', branch: true },
+    { kind: 'move', nodeId: 'a1', newParentId: 'b' },
+    { kind: 'rename', nodeId: 'b', title: 'B2' }
+  ]);
+  assert.deepEqual(result.rejected.map(r => r.code), ['book_reorder']);
   assert.deepEqual(parse(reply(item('delete_topic', { nodeId: 'a' }))).actions.map(a => a.kind), ['delete_topic'], 'no book plan: unchanged');
+  assert.equal(parse(reply(item('rename_topic', { nodeId: 'a', title: 'X' }))).actions[0].kind, 'rename_topic', 'no book plan: rename unchanged');
+});
+test('book plan: a structure item that is not valid is dropped alone; more than 6 items are cut; a new: parent is refused', () => {
+  const ctx = context({ bookPlan: bookPlan() });
+  const result = parse(reply(
+    item('add_child', { parentId: 'nope', title: 'X' }),
+    item('add_child', { parentId: 'r', title: 'N', ref: 'n1' }),
+    item('add_child', { parentId: 'new:n1', title: 'Sub' }),
+    item('move_topic', { nodeId: 'a', newParentId: 'a1' }),
+    item('move_topic', { nodeId: 'a', newParentId: 'r', beforeId: 'a1' }),
+    ...[1, 2, 3, 4, 5, 6].map(n => item('rename_topic', { nodeId: 'a', title: `T${n}` }))
+  ), ctx);
+  assert.deepEqual(result.actions[0].items.map(i => i.kind), ['add', 'rename', 'rename', 'rename', 'rename', 'rename']);
+  assert.deepEqual(result.rejected.map(r => r.code), ['unknown_node', 'bad_ref', 'cycle', 'not_sibling', 'too_many']);
+});
+test('book plan: with busy every book and structure action is dropped (book_busy); other actions stay; no book plan, no busy', () => {
+  const ctx = context({ bookPlan: bookPlan({ cards: [], busy: true }) });
+  assert.equal(ctx.bookPlan.busy, true);
+  assert.equal(JSON.parse(ctx.json).bookPlan.busy, true);
+  const result = parse(reply(
+    planItem(planChange('c1', { entry: 'e' })),
+    item('edit_book_thread', { content: 'T' }),
+    item('add_child', { parentId: 'r', title: 'N' }),
+    item('delete_topic', { nodeId: 'a' }),
+    item('move_topic', { nodeId: 'a1', newParentId: 'b' }),
+    item('rename_topic', { nodeId: 'b', title: 'B2' }),
+    item('reorder_topics', { parentId: 'r', nodeIds: ['a', 'b'] }),
+    item('update_summary', { nodeId: 'a', summary: 'kept' })
+  ), ctx);
+  assert.deepEqual(result.actions.map(a => a.kind), ['update_summary']);
+  assert.deepEqual(result.rejected.map(r => r.code), ['book_busy', 'book_busy', 'book_busy', 'book_busy', 'book_busy', 'book_busy', 'book_busy']);
+  assert.equal(context({ bookPlan: bookPlan() }).bookPlan.busy, false);
+  assert.equal(context({ bookPlan: bookPlan({ cards: [], tooLarge: true }) }).bookPlan.busy, true);
+});
+test('book plan: edit_book_thread needs a bookPlan and a text; a second thread is dropped; thread is sent and nodes are not', () => {
+  assert.deepEqual(parse(reply(item('edit_book_thread', { content: 'T' }))).rejected.map(r => r.code), ['bad_value']);
+  const nodes = [{ id: 'r', parentId: null, title: 'Root' }, { id: 'c1', parentId: 'r', title: 'ZZNODE' }];
+  const ctx = context({ bookPlan: bookPlan({ thread: 'Old thread', nodes }) });
+  assert.equal(JSON.parse(ctx.json).bookPlan.thread, 'Old thread');
+  assert.equal(ctx.json.includes('ZZNODE'), false, 'nodes are not sent to the model');
+  assert.deepEqual(plain(ctx.bookPlan.nodes), nodes);
+  assert.equal(ctx.bookPlan.thread, 'Old thread');
+  const result = parse(reply(item('edit_book_thread', { content: ' New ' }), item('edit_book_thread', { content: 'Again' }), item('edit_book_thread', { content: '' })), ctx);
+  assert.deepEqual(result.actions, [{ kind: 'edit_book_thread', content: 'New' }]);
+  assert.deepEqual(result.rejected.map(r => r.code), ['book_duplicate', 'missing_field']);
+});
+test('book plan: a card id that an earlier edit_book_plan already changed is dropped from a later one (counted)', () => {
+  const ctx = context({ bookPlan: bookPlan() });
+  const result = parse(reply(planItem(planChange('c1', { entry: 'one' })), planItem(planChange('c1', { entry: 'two' }), planChange('c2', { entry: 'x' })), planItem(planChange('c1', { entry: 'three' }))), ctx);
+  assert.deepEqual(result.actions.map(a => a.changes.map(c => c.id)), [['c1'], ['c2']]);
+  assert.deepEqual(result.rejected.map(r => r.code), ['book_duplicate', 'book_duplicate']);
 });
 test('book plan: the phase start and each card summary are carried into the baseline', () => {
   const ctx = context({ bookPlan: bookPlan({ phaseStartedAt: 'T1', prompts: { c1: { path: 'B/c1.md', prompt: 'p1', kind: 'chapter', summary: 'S' } } }) });
@@ -1990,9 +2048,9 @@ test('book plan: the schema lists changes and the prompts say the plan is untrus
   const prompt = mapChatStep.render(request());
   assert.match(prompt.user ?? prompt, /edit_book_plan/);
 });
-test('book plan: edit_book_plan is always a plan (also under autoApply) and costs no call', () => {
+test('book plan: edit_book_plan, edit_book_structure and edit_book_thread are always a plan (also under autoApply) and cost no call', () => {
   const ctx = context({ bookPlan: bookPlan() });
-  const action = { kind: 'edit_book_plan', changes: [{ id: 'c1', entry: 'e' }] };
+  for (const action of [{ kind: 'edit_book_plan', changes: [{ id: 'c1', entry: 'e' }] }, { kind: 'edit_book_structure', items: [{ kind: 'remove', nodeId: 'c1' }] }, { kind: 'edit_book_thread', content: 'T' }])
   for (const options of [undefined, { autoApply: true }]) {
     const result = planFor([action], ctx, options);
     assert.deepEqual(plain(result.reasons), ['book_plan_edit']);

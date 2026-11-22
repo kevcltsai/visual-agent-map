@@ -1437,6 +1437,8 @@ export const en = {
   "ui.map_chat_skip_not_sibling": "the topic to go in front of is not under that parent",
   "ui.map_chat_do_delete_0": "Move “{0}” to Unassigned",
   "ui.map_chat_do_edit_book_plan_0": "Change the plan of {0} cards",
+  "ui.map_chat_do_edit_book_structure_0": "Change the structure of the book plan: {0} changes",
+  "ui.map_chat_do_edit_book_thread": "Change the thread of the book plan",
   "ui.map_chat_skip_book_started": "the book has started being written, so the plan is not changed here any more",
   "ui.map_chat_skip_book_cards": "the cards were locked, changed since the proposal, or would not change",
   "ui.map_chat_line_book_plan_undo": "; to change it back, tell the chief editor",

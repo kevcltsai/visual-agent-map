@@ -8,6 +8,7 @@ import { renderTemplate, type StepDefinition } from "../../step-runner";
 import { ANCHOR_LIMIT, ANCHOR_RELATION_LIMIT, NOTE_LIMIT } from "../../../experiences/visual-map/canvas-items";
 import type { MapChatContext, MapChatImageScope, MapChatRelation } from "../../map-chat-context";
 import { changesBrief, parseChange, type PlanEditChange } from "../book-pipeline/plan-edit";
+import type { ChatStructureItem } from "../../book-pipeline/structure-edit";
 import {
   RELATION_DESCRIPTION_MAX_LENGTH,
   TOPIC_RELATION_KINDS,
@@ -60,16 +61,25 @@ export const MAP_CHAT_ACTION_KINDS = [
   "add_anchor",
   "link_anchor",
   "read_md_file",
-  "edit_book_plan"
+  "edit_book_plan",
+  "edit_book_thread"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
-/** The kinds that add, remove or move a card: dropped from a reply while a book plan is under review. */
+/** The kinds that change a book plan's structure or text: grouped into `edit_book_structure` (the first four) or dropped while the plan is being re-planned. */
 const BOOK_PLAN_STRUCTURE_KINDS: ReadonlySet<string> = new Set([
   "add_child",
   "delete_topic",
   "move_topic",
-  "reorder_topics"
+  "rename_topic"
 ]);
+const BOOK_PLAN_BUSY_KINDS: ReadonlySet<string> = new Set([
+  ...BOOK_PLAN_STRUCTURE_KINDS,
+  "reorder_topics",
+  "edit_book_plan",
+  "edit_book_thread"
+]);
+/** At most this many structure items in one reply (the whole-book plan's own cap). */
+const BOOK_STRUCTURE_ITEM_LIMIT = 6;
 export const MAP_RUN_ACTIONS = [
   "research_standard",
   "expand",
@@ -131,6 +141,10 @@ export type MapChatAction =
   | { kind: "read_md_file"; path: string }
   /** Changes to the brief fields of existing cards of a book plan under review (only when the context has `bookPlan`); a change to covers, points or previous carries its whole new checklist. Never adds, removes or moves a card. */
   | { kind: "edit_book_plan"; changes: PlanEditChange[] }
+  /** The structure changes of a book plan under review (only when the context has `bookPlan`): the parser's grouping of add_child, move_topic, delete_topic and rename_topic, always last in the reply. */
+  | { kind: "edit_book_structure"; items: ChatStructureItem[] }
+  /** The whole new thread of the book plan under review (only when the context has `bookPlan`). */
+  | { kind: "edit_book_thread"; content: string }
   /** `all` is true when the reply asked for every card; `nodeIds` then lists them all. */
   | { kind: "select_topics"; nodeIds: string[]; all: boolean }
   | {
@@ -237,6 +251,12 @@ export type MapChatRejectCode =
   | "too_many"
   /** A `ref` that is malformed or repeated, or a `new:` id that no earlier kept action defines (or one used where it cannot be). */
   | "bad_ref"
+  /** Book plan only: the plan is being re-planned, so no book or structure action is taken. */
+  | "book_busy"
+  /** Book plan only: reorder_topics is not done (move_topic is). */
+  | "book_reorder"
+  /** Book plan only: a card changed by an earlier edit_book_plan of the reply, or a second thread. */
+  | "book_duplicate"
   /** A topic type on a map that has none (AIM). An `add_child` that carries one is kept as an ordinary topic and counted here too. */
   | "no_topic_kinds"
   /** A relation action on a map that has no relations (AIM). */
@@ -500,7 +520,7 @@ export function linkSources(summary: string, paths: readonly string[] | undefine
 export function parseMapChat(
   raw: string,
   context: Pick<MapChatContext, "nodeIds" | "parents"> & {
-    bookPlan?: Pick<NonNullable<MapChatContext["bookPlan"]>, "unlocked">;
+    bookPlan?: Pick<NonNullable<MapChatContext["bookPlan"]>, "unlocked"> & { busy?: boolean };
     sourcePaths?: readonly string[];
     noEditableMap?: boolean;
     aim?: boolean;
@@ -545,6 +565,11 @@ export function parseMapChat(
   const total = body.actions.length;
   const actions: MapChatAction[] = [];
   const rejected: MapChatRejection[] = [];
+  // A book plan under review: the structure items of the reply (grouped into one action, last), the cards an edit_book_plan already
+  // changed, and whether a thread was already kept.
+  const items: ChatStructureItem[] = [];
+  const planned = new Set<string>();
+  let threaded = false;
   body.actions.forEach((entry: unknown, index: number) => {
     try {
       if (index >= MAP_CHAT_MAX_ACTIONS) throw new Dropped("too_many");
@@ -609,8 +634,11 @@ export function parseMapChat(
         throw new Dropped("unknown_kind");
       if (context.noEditableMap && !created && kind !== "create_map" && kind !== "open_map")
         throw new Dropped("bad_value");
-      // The chief editor edits the cards that exist: adding, deleting or moving one is not done while a book plan is under review.
-      if (context.bookPlan && BOOK_PLAN_STRUCTURE_KINDS.has(kind)) throw new Dropped("bad_value");
+      // A book plan being re-planned takes nothing; one under review takes structure changes only as `items` (below), never a reorder.
+      if (context.bookPlan?.busy && BOOK_PLAN_BUSY_KINDS.has(kind)) throw new Dropped("book_busy");
+      if (context.bookPlan && kind === "reorder_topics") throw new Dropped("book_reorder");
+      const book = !!context.bookPlan && BOOK_PLAN_STRUCTURE_KINDS.has(kind);
+      if (book && items.length >= BOOK_STRUCTURE_ITEM_LIMIT) throw new Dropped("too_many");
       /** The one annotated image a reply may act on: the one selected in this turn. */
       const image = (): void => {
         if (!shown || shown.kind !== "annotated" || text("imageId") !== shown.id) throw new Dropped("no_image");
@@ -624,6 +652,24 @@ export function parseMapChat(
       };
       switch (kind as MapChatActionKind) {
         case "add_child": {
+          if (book) {
+            // Under a chapter or the book (an existing card); a `new:` parent is not possible here. `note` is the reason.
+            const parentId = node("parentId");
+            const title = text("title");
+            const given = text("beforeId", false);
+            const beforeId = given ? node("beforeId") : "";
+            if (beforeId && parents[beforeId] !== parentId) throw new Dropped("not_sibling");
+            const reason = text("note", false);
+            items.push({
+              kind: "add",
+              parentId,
+              title,
+              summary: linkSources(text("summary", false), context.sourcePaths),
+              ...(beforeId ? { beforeId } : {}),
+              ...(reason ? { reason } : {})
+            });
+            break;
+          }
           const given = text("parentId", false);
           const parentId = given ? resolve(given, true) : "";
           const title = text("title");
@@ -652,6 +698,13 @@ export function parseMapChat(
           break;
         }
         case "rename_topic":
+          if (book) {
+            const nodeId = node("nodeId");
+            const title = text("title");
+            const reason = text("note", false);
+            items.push({ kind: "rename", nodeId, title, ...(reason ? { reason } : {}) });
+            break;
+          }
           actions.push({ kind: "rename_topic", nodeId: node("nodeId"), title: text("title") });
           break;
         case "update_summary":
@@ -668,7 +721,16 @@ export function parseMapChat(
           const beforeId = given ? resolve(given, true) : "";
           // The card to go before must already sit under the target parent (as the earlier items of this reply left it).
           if (beforeId && (beforeId === nodeId || parents[beforeId] !== newParentId)) throw new Dropped("not_sibling");
-          actions.push({ kind: "move_topic", nodeId, newParentId, ...(beforeId ? { beforeId } : {}) });
+          if (book) {
+            const reason = text("note", false);
+            items.push({
+              kind: "move",
+              nodeId,
+              newParentId,
+              ...(beforeId ? { beforeId } : {}),
+              ...(reason ? { reason } : {})
+            });
+          } else actions.push({ kind: "move_topic", nodeId, newParentId, ...(beforeId ? { beforeId } : {}) });
           parents[nodeId] = newParentId;
           break;
         }
@@ -682,6 +744,17 @@ export function parseMapChat(
           break;
         }
         case "delete_topic":
+          if (book) {
+            const nodeId = node("nodeId");
+            const reason = text("note", false);
+            items.push({
+              kind: "remove",
+              nodeId,
+              ...(flag("branch") ? { branch: true } : {}),
+              ...(reason ? { reason } : {})
+            });
+            break;
+          }
           actions.push({ kind: "delete_topic", nodeId: node("nodeId"), branch: flag("branch") });
           break;
         case "edit_md_file": {
@@ -712,6 +785,7 @@ export function parseMapChat(
             // A card with a bad shape, an unknown or locked id, or a repeated id is dropped on its own; so is a change to covers, points or
             // previous that comes without the checklist written for it (the old checklist would describe the old ideas).
             if (!change || seen.has(change.id)) codes.push("bad_value");
+            else if (planned.has(change.id)) codes.push("book_duplicate");
             else if (changesBrief(change) && !change.checklist) codes.push("missing_field");
             else {
               seen.add(change.id);
@@ -720,7 +794,16 @@ export function parseMapChat(
           }
           if (!changes.length) throw new Dropped(codes[0] ?? "missing_field");
           for (const code of codes) rejected.push({ index, code });
+          for (const change of changes) planned.add(change.id);
           actions.push({ kind: "edit_book_plan", changes });
+          break;
+        }
+        case "edit_book_thread": {
+          if (!context.bookPlan) throw new Dropped("bad_value");
+          const content = text("content");
+          if (threaded) throw new Dropped("book_duplicate");
+          threaded = true;
+          actions.push({ kind: "edit_book_thread", content });
           break;
         }
         case "read_md_file":
@@ -944,6 +1027,7 @@ export function parseMapChat(
       rejected.push({ index, code: error.code });
     }
   });
+  if (items.length) actions.push({ kind: "edit_book_structure", items });
   const progress = normalizeProgress(body.progress);
   return {
     reply: body.reply,
@@ -965,7 +1049,7 @@ export function renderMapChatSteer(text: string): string {
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 27,
+  version: 28,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

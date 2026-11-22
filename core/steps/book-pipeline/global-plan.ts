@@ -105,7 +105,12 @@ export function parseGlobalPlan(raw: string, request: GlobalPlanRequest): Global
       const one = recordOf(entry, "material");
       // `home` is new: an older reply or saved result without it still reads (an empty home).
       exactKeys(one, "home" in one ? ["name", "use", "home"] : ["name", "use"]);
-      const home = one.home === undefined || one.home === null ? "" : typeof one.home === "string" ? one.home.trim() : fail("material home must be a string");
+      const home =
+        one.home === undefined || one.home === null
+          ? ""
+          : typeof one.home === "string"
+            ? one.home.trim()
+            : fail("material home must be a string");
       return {
         name: singleLine(textOf(one.name, "material name"), 120),
         use: singleLine(textOf(one.use, "material use"), 240),

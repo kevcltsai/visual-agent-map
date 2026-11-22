@@ -12,7 +12,12 @@
 import type { AdmissionContext } from "../../core/admission";
 import { carryIssue } from "./book-pipeline-reasons";
 import type { FindImagesRequest, FoundImages } from "../../core/steps/book-pipeline/find-images";
-import type { AiBookChapter, AiBookProofRequest, AiProofRequest, AiProofRun } from "../../core/steps/book-pipeline/ai-proof";
+import type {
+  AiBookChapter,
+  AiBookProofRequest,
+  AiProofRequest,
+  AiProofRun
+} from "../../core/steps/book-pipeline/ai-proof";
 import type { AiFixRequest } from "../../core/steps/book-pipeline/ai-fix";
 import {
   aiProofBody,

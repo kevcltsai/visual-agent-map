@@ -2267,6 +2267,20 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-card-book-issue { margin: 6px 0 0; font-size: var(--font-ui-smaller); line-height: 1.45; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); overflow-wrap: anywhere; }
 .vam-book-bar button.vam-book-link { padding: 0 4px; border: 0; background: transparent; box-shadow: none; color: var(--text-accent); text-decoration: underline; cursor: pointer; }
 .vam-book-bar button.vam-book-link:hover { color: var(--text-accent-hover); }
+.vam-book-structure { display: grid; gap: 6px; min-width: 0; padding-top: 8px; border-top: 1px solid var(--background-modifier-border); font-size: var(--font-ui-small); }
+.vam-book-structure-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.vam-book-structure-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; padding: 6px 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: var(--background-primary); }
+.vam-book-structure-row.is-undone { border-style: dashed; color: var(--text-muted); }
+.vam-book-structure-kind { padding: 1px 7px; border: 1px solid currentColor; border-radius: 999px; font-size: var(--font-ui-smaller); font-weight: 600; white-space: nowrap; color: var(--text-muted); }
+.vam-book-structure-kind.is-add { color: var(--color-green); }
+.vam-book-structure-kind.is-move { color: var(--color-blue); }
+.vam-book-structure-kind.is-merge, .vam-book-structure-kind.is-remove { color: var(--color-orange); }
+.vam-book-structure-what { min-width: 0; overflow-wrap: anywhere; }
+.vam-book-structure-why, .vam-book-structure-dep, .vam-book-structure-skipped, .vam-book-structure-foot { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-book-structure-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.vam-book-structure-foot button { margin-left: auto; }
+.vam-book-structure-status.is-failed { color: var(--text-error); }
+.vam-book-structure button[disabled] { opacity: 0.5; cursor: not-allowed; }
 .vam-book-bar-eta { color: var(--text-muted); font-size: var(--font-ui-smaller); font-variant-numeric: tabular-nums; }
 .vam-book-state.is-seam { font-weight: 600; color: color-mix(in srgb, var(--color-orange) 75%, var(--text-normal)); }
 .vam-book-state.is-seam::before { background: var(--color-orange); }

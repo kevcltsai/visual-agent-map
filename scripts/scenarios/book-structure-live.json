@@ -1,0 +1,82 @@
+{
+  "name": "book live: structure edit (--structure fixture, ~30 AI calls): gate 1 lists the editor's changes, undo one, back at gate 1",
+  "allowErrors": true,
+  "stepTimeoutMs": 1200000,
+  "steps": [
+    {
+      "wait": true
+    },
+    {
+      "trust": true
+    },
+    {
+      "eval": "app.plugins.plugins['visual-agent-map'].openMapInNewTab('Agent Workspace/Topics/Book Fixture Structure/Map.md').then(view=>!!view)"
+    },
+    {
+      "waitFor": ".vam-book-button",
+      "timeoutMs": 30000
+    },
+    {
+      "click": ".vam-book-button"
+    },
+    {
+      "waitFor": ".vam-book-start-go",
+      "timeoutMs": 30000
+    },
+    {
+      "click": ".vam-book-start-go"
+    },
+    {
+      "waitFor": ".vam-book-bar[data-mode='gate1']",
+      "timeoutMs": 900000
+    },
+    {
+      "assert": "the plan review lists the editor's structure changes",
+      "selector": ".vam-book-structure",
+      "visible": true
+    },
+    {
+      "assert": "the map did not pause for a change (bar mode stays gate1)",
+      "eval": "document.querySelector('.vam-book-bar')?.dataset.mode==='gate1'"
+    },
+    {
+      "assert": "every change has a row, a reason and an undo button",
+      "eval": "(()=>{const rows=[...document.querySelectorAll('.vam-book-structure-row')];return rows.length>=1&&rows.every(r=>r.querySelector('.vam-book-structure-text')?.textContent&&r.querySelector('.vam-book-structure-undo'))})()"
+    },
+    {
+      "assert": "the locked card's note is still in Notes (not archived)",
+      "eval": "app.vault.getMarkdownFiles().filter(f=>f.path.includes('Book Fixture Structure/Notes/')&&f.basename==='book-mine').length===1"
+    },
+    {
+      "screenshot": "structure-gate1"
+    },
+    {
+      "eval": "(()=>{globalThis.__structureRows=document.querySelectorAll('.vam-book-structure-row:not(.is-undone)').length;return globalThis.__structureRows})()"
+    },
+    {
+      "click": ".vam-book-structure-row:not(.is-undone) .vam-book-structure-undo"
+    },
+    {
+      "waitFor": ".vam-book-bar[data-mode='planning'], .vam-book-bar[data-mode='gate1']",
+      "timeoutMs": 60000
+    },
+    {
+      "waitFor": ".vam-book-bar[data-mode='gate1']",
+      "timeoutMs": 900000
+    },
+    {
+      "assert": "one undo done: fewer standing changes (or the list is gone) and the bar is back at gate 1",
+      "eval": "(()=>{const now=document.querySelectorAll('.vam-book-structure-row:not(.is-undone)').length;return document.querySelector('.vam-book-bar')?.dataset.mode==='gate1'&&now<globalThis.__structureRows})()"
+    },
+    {
+      "assert": "no undo failure line",
+      "eval": "!document.querySelector('.vam-book-structure-status.is-failed')"
+    },
+    {
+      "screenshot": "structure-after-undo"
+    },
+    {
+      "click": ".vam-book-bar .vam-book-stop"
+    }
+  ]
+}

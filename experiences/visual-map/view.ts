@@ -17428,6 +17428,9 @@ export class VisualAgentMapView extends ItemView {
         new Notice(t("ui.book_bar_plan_edit_hint"));
       },
       openIssues: () => void this.openBookOpenIssues(),
+      undoStructure: ids => void this.undoBookStructure(path, ids),
+      openArchived: archived => void this.openBookArchived(archived),
+      ...(this.bookStructureUndo ? { structureUndo: this.bookStructureUndo } : {}),
       ...(rerunAsk ? { rerunAsk } : {})
     });
   }
@@ -17677,6 +17680,34 @@ export class VisualAgentMapView extends ItemView {
     } catch (error) {
       new Notice(error instanceof Error ? error.message : String(error));
     }
+  }
+  /** A parked (archived) note opens in a tab. */
+  private async openBookArchived(path: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) {
+      new Notice(t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"));
+      return;
+    }
+    try {
+      await this.app.workspace.getLeaf("tab").openFile(file);
+    } catch (error) {
+      new Notice(error instanceof Error ? error.message : String(error));
+    }
+  }
+  /** The structure list's undo: the buttons wait while it runs; a failure leaves one line (the runner has put the map back as it was). */
+  private bookStructureUndo: "busy" | "failed" | undefined;
+  private async undoBookStructure(path: string, ids: string[] | "all"): Promise<void> {
+    if (this.bookStructureUndo === "busy") return;
+    this.bookStructureUndo = "busy";
+    this.render();
+    try {
+      await this.plugin.undoBookStructure(path, ids);
+      this.bookStructureUndo = undefined;
+    } catch (error) {
+      this.bookStructureUndo = "failed";
+      new Notice(bookRefusalText(error));
+    }
+    if (!this.closed) this.render();
   }
   /** After a replan or rerun: this card's note is read again so the panel shows the new plan without waiting for the repaint. */
   private async rereadBookCard(id: string): Promise<void> {

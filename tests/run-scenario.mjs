@@ -108,7 +108,7 @@ test("malformed steps are format errors (exit 2): assert typos, mixed actions, u
 });
 
 test("shipped smoke scenarios are valid", async () => {
-  for (const name of ["smoke-ok", "smoke-fail", "book-seeded", "book-live-gates"]) {
+  for (const name of ["smoke-ok", "smoke-fail", "book-seeded", "book-live-gates", "book-structure-live"]) {
     const scenario = JSON.parse(readFileSync(resolve("scripts/scenarios", `${name}.json`), "utf8"));
     for (const step of scenario.steps) if ("waitFor" in step || "waitUntil" in step) step.timeoutMs = 50; // the fake app never shows elements; only the format matters here
     const app = fakeApp(); const trusting = async () => { const cdp = await app(); const inner = cdp.evaluate; cdp.evaluate = expr => expr.includes('getWindowStack') ? { prompts: 0, leakedScopes: 0 } : inner(expr); return cdp; };

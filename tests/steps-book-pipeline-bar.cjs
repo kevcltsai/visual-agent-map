@@ -18,6 +18,7 @@ export { BookPipelineRuns, BookPipelineRunError } from "./experiences/visual-map
 export { VisualAgentMapView } from "./experiences/visual-map/view";
 export { setUiLanguage } from "./i18n";
 export { shortHash } from "./core/book-pipeline/image-slots";
+export { bookStructure } from "./core/book-pipeline/structure";
 `, { obsidian: { ...S.obsidian, Modal: dom.makeModal(), Notice: dom.makeNotice(notices), Component: class {}, MarkdownRenderChild: class {} } }, { createFragment: dom.createFragment, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, window: { setTimeout, clearTimeout, setInterval, clearInterval } });
 const { setUiLanguage } = bundle;
 const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
@@ -644,4 +645,116 @@ test('bar: with a book structure the writing and done counts say cards, not chap
   assert.equal(text('zh-CN', 'planning', structure), '正在企划第 4／4 张卡，已完成 3／4 张卡');
   assert.equal(text('zh-TW', 'writing', undefined), '正在寫第 4／4 章', 'no structure: unchanged');
   assert.equal(text('zh-TW', 'planning', undefined), '正在企劃第 4／4 章，已完成 3／4 章', 'no structure: unchanged');
+});
+
+// ---- structure edit list (gate 1) ----
+const structureCase = () => {
+  const node = (id, parentId, title) => ({ id, parentId, title });
+  const before = { rootId: 'r', nodes: [node('r', null, 'Book'), node('a', 'r', 'Alpha'), node('b', 'r', 'Beta'), node('d', 'b', 'Digital'), node('t', 'r', 'Trust'), node('f', 'r', 'Future')] };
+  const evil = 'fine <img src=x onerror=alert(1)> ![pic](http://example.test/a.png)';
+  const applied = [
+    { id: 'o1', op: { id: 'o1', kind: 'move', card: 't', parent: 'r', after: 'a', reason: 'trust first' }, before: { parent: 'r', after: 'b', title: 'Trust' } },
+    { id: 'o2', op: { id: 'o2', kind: 'merge', card: 'd', into: 'f', reason: evil }, before: { parent: 'b', title: 'Digital' } },
+    { id: 'o3', op: { id: 'o3', kind: 'add', title: 'Bitcoin', summary: 's', parent: 'f', ref: 'n', reason: 'an example' }, before: { parent: null, title: '' } },
+    { id: 'o4', op: { id: 'o4', kind: 'rename', card: 'n', title: 'Bitcoin and CBDC', reason: 'clearer' }, before: { parent: 'f', title: 'Bitcoin' } },
+    { id: 'o5', op: { id: 'o5', kind: 'rename', card: 'a', title: 'Before money', reason: 'consistent' }, before: { parent: 'r', title: 'Alpha' } }
+  ];
+  const titles = { r: 'Book', a: 'Before money', t: 'Trust', b: 'Beta', f: 'Future', n: 'Bitcoin and CBDC' };
+  const parents = { a: 'r', t: 'r', b: 'r', f: 'r', n: 'f' };
+  const order = ['r', 'a', 't', 'b', 'f', 'n'];
+  const structure = bundle.bookStructure(order, id => parents[id], 'r');
+  const edit = { runId: 'r1', applied, rejected: [{ id: 'x', code: 'locked' }, { id: 'y', code: 'cycle' }], before, archived: { d: 'Archive/Digital.md' } };
+  const data = (over = {}, extra = {}) => ({ v: 1, runId: 'r1', phase: 'gate1', status: 'running', order, planReview: true, globalPlanned: true, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x', structureEdit: { ...edit, ...over }, ...extra });
+  const state = d => bundle.bookBarState(d, undefined, () => undefined, undefined, structure, id => titles[id]);
+  const draw = (st, actions = {}) => { const bar = dom.element('div'); const out = bundle.renderBookBar(bar, st, { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, ...actions }); return { bar, out }; };
+  return { data, state, draw, evil };
+};
+
+test('structure list: gate 1 lists each change with its kind, where it went and why; the summary line and the not-applied line are plain words', () => {
+  setUiLanguage('zh-TW');
+  const { data, state, draw, evil } = structureCase();
+  const { bar } = draw(state(data()), { undoStructure() {} });
+  const box = one(bar, 'vam-book-structure');
+  assert.equal(box.attrs.role, 'group');
+  assert.equal(box.attrs['aria-label'], '總編輯的結構調整');
+  assert.deepEqual(all(box, 'vam-book-structure-kind').map(k => k.text), ['移動', '合併', '新增', '改名', '改名']);
+  assert.deepEqual(all(box, 'vam-book-structure-text').map(k => k.text), [
+    '「Trust」第 3 章 → 第 2 章',
+    '「Digital」（Beta的節）併入「Future」',
+    '「Future」下新增一節「Bitcoin」',
+    '「Bitcoin」→「Bitcoin and CBDC」',
+    '「Alpha」→「Before money」'
+  ]);
+  const whys = all(box, 'vam-book-structure-why');
+  assert.equal(whys[0].children?.[0]?.text ?? texts(whys[0])[0], 'trust first');
+  assert.ok(texts(whys[1]).includes(evil), 'reason stays literal text, never markup');
+  assert.equal(dom.findAll(whys[1], i => i.tag === 'img' || i.tagName === 'IMG').length, 0);
+  assert.deepEqual(texts(box).filter(x => x.includes('調整了')), ['總編輯調整了 5 處結構']);
+  assert.ok(texts(box).includes('現在 4 章 1 節（原本 4 章 1 節）'), 'the count is read from the current structure and from the tree before');
+  assert.ok(texts(box).includes('另有 2 項沒套用：碰到你改過的卡、不符合結構規則。'));
+  assert.ok(texts(box).includes('全部還原會重新企劃 4 張卡，約 5 次 AI 呼叫。'), 'alpha, trust, digital and future are planned again; the added card just goes away');
+});
+
+test('structure list: nothing shows without changes, outside the plan review, or when nothing was applied or refused; the bar is then the same as before', () => {
+  setUiLanguage('zh-TW');
+  const { data, state, draw } = structureCase();
+  const plain = data({ applied: [], rejected: [] });
+  assert.equal(state(plain).structureEdit, undefined);
+  assert.equal(one(draw(state(plain)).bar, 'vam-book-structure'), undefined);
+  const noEdit = { ...data() }; delete noEdit.structureEdit;
+  assert.equal(state(noEdit).structureEdit, undefined);
+  assert.equal(state(data({}, { phase: 'writing', planReview: undefined })).structureEdit, undefined, 'only at the plan review');
+  assert.equal(state(data({}, { planReview: undefined })).structureEdit, undefined);
+  assert.equal(JSON.stringify({ ...state(plain), structureEdit: undefined }), JSON.stringify(state(noEdit)));
+  const capOnly = state(data({ applied: [], rejected: [], overCap: true }));
+  const text = texts(one(draw(capOnly).bar, 'vam-book-structure'));
+  assert.ok(text.includes('總編輯提的修改超過上限（每本最多 6 項），這次都沒套用。'));
+  assert.ok(!text.some(x => x.includes('全部還原')), 'no undo-all when nothing stands');
+});
+
+test('structure list: a change that leans on another names it for the undo button; an undone change shows "已還原" and no button', () => {
+  setUiLanguage('zh-TW');
+  const { data, state, draw } = structureCase();
+  const calls = [];
+  const { bar } = draw(state(data({ undone: ['o5'] })), { undoStructure: ids => calls.push(ids) });
+  const rows = all(bar, 'vam-book-structure-row');
+  const row3 = rows.find(r => r.dataset.op === 'o3');
+  const button = one(row3, 'vam-book-structure-undo');
+  const dep = dom.findAll(bar, i => i.id === button.attrs['aria-describedby']);
+  assert.equal(dep.length, 1);
+  assert.equal(dep[0].text, '還原這項也會還原：改名「Bitcoin and CBDC」');
+  assert.equal(button.attrs['aria-label'], '還原：「Future」下新增一節「Bitcoin」');
+  assert.equal(one(rows.find(r => r.dataset.op === 'o1'), 'vam-book-structure-undo').attrs['aria-describedby'], undefined);
+  const done = rows.find(r => r.dataset.op === 'o5');
+  assert.equal(one(done, 'vam-book-structure-undo'), undefined);
+  assert.ok(texts(done).some(x => x.includes('已還原')));
+  assert.deepEqual(texts(one(bar, 'vam-book-structure')).filter(x => x.includes('調整了')), ['總編輯調整了 4 處結構'], 'an undone change no longer counts');
+  button.listeners?.click?.[0]?.({ stopPropagation() {} });
+  one(bar, 'vam-book-structure-undo-all').listeners?.click?.[0]?.({ stopPropagation() {} });
+  assert.equal(JSON.stringify(calls), JSON.stringify([['o3'], 'all']));
+});
+
+test('structure list: the archived-note link opens the parked note; busy disables every undo; a failed undo leaves one line; no undo handler, no undo buttons', () => {
+  setUiLanguage('zh-TW');
+  const { data, state, draw } = structureCase();
+  const opened = [];
+  const click = el => el.listeners?.click?.[0]?.({ stopPropagation() {} });
+  const link = draw(state(data()), { undoStructure() {}, openArchived: p => opened.push(p) }).bar;
+  const archived = all(link, 'vam-book-structure-archived');
+  assert.equal(archived.length, 1, 'only the merged card has a parked note');
+  assert.equal(archived[0].text, '看封存的筆記');
+  click(archived[0]);
+  assert.deepEqual(opened, ['Archive/Digital.md']);
+  const busy = draw(state(data()), { undoStructure() {}, structureUndo: 'busy' }).bar;
+  assert.ok([...all(busy, 'vam-book-structure-undo'), ...all(busy, 'vam-book-structure-undo-all')].every(b => b.attrs.disabled === 'true'));
+  assert.ok(texts(busy).includes('還原中，請稍候…'));
+  const failed = draw(state(data()), { undoStructure() {}, structureUndo: 'failed' }).bar;
+  assert.ok(texts(failed).includes('還原沒有成功，心智圖已回到還原前的樣子。'));
+  assert.equal(all(failed, 'vam-book-structure-undo').some(b => b.attrs.disabled), false, 'the owner can try again');
+  const none = draw(state(data())).bar;
+  assert.equal(all(none, 'vam-book-structure-undo').length + all(none, 'vam-book-structure-undo-all').length, 0);
+  setUiLanguage('en');
+  const en = draw(state(data()), { undoStructure() {} }).bar;
+  assert.ok(texts(en).includes('The editor changed the structure in 5 places'));
+  setUiLanguage('zh-TW');
 });

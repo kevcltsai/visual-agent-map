@@ -3,7 +3,8 @@ import { t } from "../../i18n";
 import { isBookStepError } from "../../core/steps/book-pipeline/base";
 import { splitLengthIssue, type LengthReason } from "../../core/book-pipeline/settings";
 import { parseCardPoints } from "../../core/book-pipeline/plan-text";
-import type { BookStructure, CardPlace } from "../../core/book-pipeline/structure";
+import { bookStructure as bookStructureOf, type BookStructure, type CardPlace } from "../../core/book-pipeline/structure";
+import { simulateStructure, undoClosure, type AppliedOp, type StructureNode } from "../../core/book-pipeline/structure-edit";
 import { splitPictureIssue } from "../../core/book-pipeline/image-slots";
 import { joinReasons, splitCarriedIssue } from "./book-pipeline-reasons";
 import {
@@ -61,6 +62,32 @@ export interface BookBarState {
    * closing page: open findings, unfinished proofreads, chapters that still need a look).
    */
   ai: { fixing: number; open: number; fixed: number };
+  /** Gate 1 only: what the editor changed in the book's structure (absent when it changed nothing and refused nothing). */
+  structureEdit?: BookStructureEditView;
+}
+/** One structure change as the gate lists it. Every text here is the editor's own (untrusted): it is drawn as plain text only. */
+export interface BookStructureItem {
+  id: string;
+  kind: "add" | "remove" | "merge" | "move" | "rename";
+  /** The change in one sentence (card names and where it went). */
+  text: string;
+  reason: string;
+  undone: boolean;
+  /** Later changes that lean on this one: undoing this one undoes them too. */
+  dependents: { id: string; kind: BookStructureItem["kind"]; title: string }[];
+  /** Where a removed or merged card's note was parked. */
+  archivedPath?: string;
+}
+export interface BookStructureEditView {
+  items: BookStructureItem[];
+  /** Changes that stand (not undone). */
+  active: number;
+  /** The book now and before the editor changed it; absent when the structure cannot be derived. */
+  chapters?: { now: { chapters: number; sections: number }; before: { chapters: number; sections: number } };
+  /** Proposals not applied: over the cap, or counted by why. */
+  notApplied?: { overCap: boolean; locked: number; other: number };
+  /** "Undo all" re-plans this many cards and costs about `calls` AI calls. */
+  undoAll: { cards: number; calls: number };
 }
 export interface BookCurrent {
   /** The whole-book plan, or a chapter step. */
@@ -198,11 +225,117 @@ export function bookBarState(
     ...(gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {}),
     ...(reordered ? { mapChange: reordered } : {}),
     ...(mode === "gate1" && data.planReview ? { planReview: true as const } : {}),
+    ...(mode === "gate1" && data.planReview ? structureEditField(data, structure, titleOf) : {}),
     ...(mode === "stopped" && pauseReason === "failed" && failure ? { failure } : {}),
     ...(progress?.etaSeconds !== undefined && Number.isFinite(progress.etaSeconds) && progress.etaSeconds >= 0
       ? { etaSeconds: progress.etaSeconds }
       : {})
   };
+}
+
+const shape = (s: BookStructure): { chapters: number; sections: number } => ({
+  chapters: s.chapters.length,
+  sections: s.chapters.reduce((sum, id) => sum + s.sectionsOf(id).length, 0)
+});
+
+/** The gate's structure list: one item per applied change (reading the saved ops and the tree before), or nothing when the editor changed and refused nothing. */
+function structureEditField(
+  data: BookPipelineData,
+  now: BookStructure | undefined,
+  titleOf?: (nodeId: string) => string | undefined
+): { structureEdit?: BookStructureEditView } {
+  const edit = data.structureEdit;
+  if (!edit || (!edit.applied.length && !edit.rejected.length && !edit.overCap)) return {};
+  const undone = new Set(edit.undone ?? []);
+  const names = new Map<string, string>(edit.before.nodes.map(n => [n.id, n.title]));
+  for (const a of edit.applied) if (a.op.kind === "add") names.set(a.op.ref, a.op.title);
+  const nameOf = (id: string): string => titleOf?.(id) ?? names.get(id) ?? "";
+  const before = placer(edit.before.rootId, edit.before.nodes, nameOf);
+  const afterNodes = simulateStructure(edit.before, edit.applied.map(a => a.op), new Set()).result;
+  const after = placer(edit.before.rootId, afterNodes, nameOf);
+  const items: BookStructureItem[] = edit.applied.map(a => {
+    const { op } = a;
+    const id = op.kind === "add" ? op.ref : op.card;
+    const archivedPath = (op.kind === "merge" || op.kind === "remove") && edit.archived ? edit.archived[op.card] : undefined;
+    const dependents = [...undoClosure(edit.applied, [a.id])]
+      .filter(other => other !== a.id && !undone.has(other))
+      .map(other => edit.applied.find(x => x.id === other) as AppliedOp)
+      .map(x => ({ id: x.id, kind: x.op.kind, title: x.op.kind === "add" ? x.op.title : nameOf(x.op.card) }));
+    return {
+      id: a.id,
+      kind: op.kind,
+      text: itemText(a, nameOf(id), edit.before.rootId, before, after, nameOf),
+      reason: op.reason,
+      undone: undone.has(a.id),
+      dependents,
+      ...(archivedPath ? { archivedPath } : {})
+    };
+  });
+  const active = items.filter(i => !i.undone);
+  // Undoing all re-plans the cards that exist before the editor's changes (a card it added just goes away).
+  const added = new Set(edit.applied.flatMap(a => (a.op.kind === "add" ? [a.op.ref] : [])));
+  const touched = new Set<string>();
+  for (const a of edit.applied) {
+    if (undone.has(a.id)) continue;
+    if (a.op.kind !== "add" && !added.has(a.op.card)) touched.add(a.op.card);
+    if (a.op.kind === "merge" && !added.has(a.op.into)) touched.add(a.op.into);
+  }
+  const rejected = edit.rejected;
+  const locked = rejected.filter(r => r.code === "locked").length;
+  const notApplied = edit.overCap || rejected.length ? { overCap: edit.overCap === true, locked, other: rejected.length - locked } : undefined;
+  return {
+    structureEdit: {
+      items,
+      active: active.length,
+      ...(now ? { chapters: { now: shape(now), before: shape(structureOfNodes(edit.before)) } } : {}),
+      ...(notApplied ? { notApplied } : {}),
+      undoAll: { cards: touched.size, calls: touched.size + 1 }
+    }
+  };
+}
+
+const structureOfNodes = (input: { rootId: string; nodes: readonly StructureNode[] }): BookStructure => {
+  const parents = new Map(input.nodes.map(n => [n.id, n.parentId]));
+  return bookStructureOf(
+    input.nodes.map(n => n.id),
+    id => parents.get(id),
+    input.rootId
+  );
+};
+
+/** Where a card sits in a tree, in words: "preface", "chapter 3", or "the sections of <chapter>". */
+function placer(rootId: string, nodes: readonly StructureNode[], nameOf: (id: string) => string) {
+  const structure = structureOfNodes({ rootId, nodes });
+  return (id: string): string => {
+    const place: CardPlace | undefined = structure.placeOf(id);
+    if (!place) return "";
+    if (place.kind === "preface") return t("ui.book_struct_place_preface");
+    if (place.kind === "chapter") return t("ui.book_struct_place_chapter_0", place.chapter ?? 0);
+    return t("ui.book_struct_place_section_0", nameOf(place.chapterId as string));
+  };
+}
+
+function itemText(
+  a: AppliedOp,
+  title: string,
+  rootId: string,
+  before: (id: string) => string,
+  after: (id: string) => string,
+  nameOf: (id: string) => string
+): string {
+  const { op } = a;
+  if (op.kind === "add")
+    return op.parent === rootId
+      ? t("ui.book_struct_add_chapter_0_1", after(op.ref), op.title)
+      : t("ui.book_struct_add_section_0_1", nameOf(op.parent), op.title);
+  if (op.kind === "rename") return t("ui.book_struct_rename_0_1", a.before.title, op.title);
+  if (op.kind === "merge") return t("ui.book_struct_merge_0_1_2", title, before(op.card), nameOf(op.into));
+  if (op.kind === "remove") return t("ui.book_struct_remove_0_1", title, before(op.card));
+  const from = before(op.card);
+  const to = after(op.card);
+  return from === to
+    ? t("ui.book_struct_move_same_0", title)
+    : t("ui.book_struct_move_0_1_2", title, from, to);
 }
 
 /** The bar's AI numbers; "open" counts the same items the closing page lists (see the runner's `openIssuesOf`). */
@@ -298,6 +431,11 @@ export interface BookBarActions {
   openIssues?: () => void;
   /** Gate 2 or done: a card rerun found a hand-edited chapter; the bar asks once before it overwrites it (decision G). */
   rerunAsk?: { cancel: () => void; confirm: () => void; focus?: "go" | "opener" };
+  /** The plan review's structure list: undo some changes (by id) or all of them; open a parked note by its path. */
+  undoStructure?: (ids: string[] | "all") => void;
+  openArchived?: (path: string) => void;
+  /** An undo is running (every undo button waits) or just failed (the map is back as it was; one line says so). Kept by the view. */
+  structureUndo?: "busy" | "failed";
 }
 
 export function bookTitleText(state: BookBarState): string {
@@ -417,6 +555,8 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     makeButton(row, t("ui.cancel"), "vam-book-abandon-cancel", abandon.cancel);
     makeButton(row, t("ui.book_abandon_confirm"), "mod-warning vam-book-abandon-confirm", abandon.confirm);
   }
+  if (state.mode === "gate1" && state.planReview && state.structureEdit)
+    renderStructureEdit(bar, state.structureEdit, actions);
   if ((state.mode === "writing" || state.mode === "done") && actions.rerunAsk)
     renderAsk(
       bar,
@@ -450,6 +590,96 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     track.createSpan({ cls: `vam-book-seg is-${name}` }).style.width = `${(count / total) * 100}%`;
   }
   return bar;
+}
+
+const STRUCTURE_KIND_KEY: Record<BookStructureItem["kind"], TranslationKey> = {
+  add: "ui.book_struct_kind_add",
+  remove: "ui.book_struct_kind_remove",
+  merge: "ui.book_struct_kind_merge",
+  move: "ui.book_struct_kind_move",
+  rename: "ui.book_struct_kind_rename"
+};
+
+/** The plan review's list of what the editor changed in the structure, each with its reason and an undo. Plain text only: nothing here is rendered as Markdown or HTML. */
+function renderStructureEdit(bar: HTMLElement, view: BookStructureEditView, actions: BookBarActions): void {
+  const box = bar.createDiv("vam-book-structure");
+  box.setAttr("role", "group");
+  box.setAttr("aria-label", t("ui.book_struct_label"));
+  const busy = actions.structureUndo === "busy";
+  const head = box.createDiv("vam-book-structure-head");
+  head.createEl("b", {
+    text: view.active ? t("ui.book_struct_head_0", view.active) : t("ui.book_struct_head_all_undone")
+  });
+  if (view.chapters) {
+    const { now, before } = view.chapters;
+    head.createSpan({
+      cls: "vam-book-bar-counts",
+      text: t("ui.book_struct_now_0_1_2_3", now.chapters, now.sections, before.chapters, before.sections)
+    });
+  }
+  const mayUndo = !!actions.undoStructure;
+  for (const item of view.items) {
+    const row = box.createDiv(`vam-book-structure-row${item.undone ? " is-undone" : ""}`);
+    row.dataset.op = item.id;
+    row.createSpan({ cls: `vam-book-structure-kind is-${item.kind}`, text: t(STRUCTURE_KIND_KEY[item.kind]) });
+    const what = row.createDiv("vam-book-structure-what");
+    what.createSpan({ cls: "vam-book-structure-text", text: item.text });
+    if (item.undone) what.createSpan({ cls: "vam-book-structure-undone", text: ` ${t("ui.book_struct_undone")}` });
+    const why = what.createDiv("vam-book-structure-why");
+    if (item.reason) why.createSpan({ text: item.reason });
+    if (item.archivedPath && actions.openArchived) {
+      const path = item.archivedPath;
+      const open = actions.openArchived;
+      makeButton(why, t("ui.book_struct_open_archived"), "vam-book-link vam-book-structure-archived", () => open(path));
+    }
+    const dependents = item.undone ? [] : item.dependents;
+    if (dependents.length) {
+      const note = what.createDiv("vam-book-structure-dep");
+      note.id = `vam-book-structure-dep-${item.id}`;
+      note.setText(
+        t(
+          "ui.book_struct_dep_0",
+          dependents.map(d => `${t(STRUCTURE_KIND_KEY[d.kind])}「${d.title}」`).join(t("ui.book_struct_join"))
+        )
+      );
+    }
+    if (!item.undone && mayUndo) {
+      const undo = makeButton(row, t("ui.book_struct_undo"), "vam-book-structure-undo", () =>
+        actions.undoStructure?.([item.id])
+      );
+      undo.setAttr("aria-label", t("ui.book_struct_undo_0", item.text));
+      if (dependents.length) undo.setAttr("aria-describedby", `vam-book-structure-dep-${item.id}`);
+      if (busy) undo.setAttr("disabled", "true");
+    }
+  }
+  const na = view.notApplied;
+  if (na) {
+    const lines: string[] = [];
+    if (na.overCap) lines.push(t("ui.book_struct_over_cap"));
+    const reasons = [
+      ...(na.locked ? [t("ui.book_struct_why_locked")] : []),
+      ...(na.other ? [t("ui.book_struct_why_rules")] : [])
+    ];
+    if (reasons.length) lines.push(t("ui.book_struct_skipped_0_1", na.locked + na.other, reasons.join(t("ui.book_struct_join"))));
+    for (const line of lines) box.createDiv("vam-book-structure-skipped").setText(line);
+  }
+  if (view.active && mayUndo) {
+    const foot = box.createDiv("vam-book-structure-foot");
+    foot.createSpan({ text: t("ui.book_struct_undo_all_note_0_1", view.undoAll.cards, view.undoAll.calls) });
+    const all = makeButton(foot, t("ui.book_struct_undo_all"), "vam-book-structure-undo-all", () =>
+      actions.undoStructure?.("all")
+    );
+    if (busy) all.setAttr("disabled", "true");
+  }
+  if (actions.structureUndo === "busy") {
+    const line = box.createDiv("vam-book-structure-status");
+    line.setAttr("role", "status");
+    line.setText(t("ui.book_struct_busy"));
+  } else if (actions.structureUndo === "failed") {
+    const line = box.createDiv("vam-book-structure-status is-failed");
+    line.setAttr("role", "status");
+    line.setText(t("ui.book_struct_failed"));
+  }
 }
 
 /** The in-bar question (no modal): a sentence, Cancel and the answer button; Escape cancels. Same card as the abandon one. */

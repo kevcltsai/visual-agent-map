@@ -2335,6 +2335,9 @@ export default class VisualAgentMapPlugin extends Plugin {
   keepBookMap(mapPath: string): Promise<void> {
     return this.bookPipelineRuns.keepBookMap(mapPath);
   }
+  undoBookStructure(mapPath: string, opIds: readonly string[] | "all"): Promise<void> {
+    return this.bookPipelineRuns.undoStructureEdit(mapPath, opIds);
+  }
   confirmBookGate1(mapPath: string): Promise<void> {
     return this.bookPipelineRuns.confirmGate1(mapPath);
   }

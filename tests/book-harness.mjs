@@ -127,3 +127,15 @@ test("book seeder --small: root + 2 chapters in its own topic folder, every card
   assert.equal(seedBookMap({ vault }).created, true, "the full fixture sits beside it without colliding");
   assert.match(seedCli([`--vault=${vault}`, "--small"]).text, /"created": false/);
 });
+
+test("book seeder --structure: root + 5 chapters (one section), only the hand-written card has a Detail", () => {
+  const vault = tempVault();
+  const { mapPath, created } = seedBookMap({ vault, structure: true });
+  assert.equal(created, true);
+  assert.match(mapPath, /Book Fixture Structure\/Map\.md$/);
+  const map = JSON.parse(/```agent-map\n([\s\S]*?)\n```/.exec(readFileSync(join(vault, mapPath), "utf8"))[1]);
+  assert.equal(map.nodes.filter(node => node.parentId === "book-root").length, 5);
+  const details = readdirSync(join(vault, mapPath, "../Notes")).map(name => /## Detail\n\n([\s\S]*?)\n$/.exec(readFileSync(join(vault, mapPath, "../Notes", name), "utf8"))[1]);
+  assert.equal(details.filter(text => text.trim()).length, 1);
+  assert.match(seedCli([`--vault=${vault}`, "--structure"]).text, /"created": false/);
+});

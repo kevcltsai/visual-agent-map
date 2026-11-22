@@ -332,7 +332,15 @@ import type { UpdateMode } from "../../ai/note-style-recipe";
 import { backupNoteFile } from "./note-backup";
 import { stopLabelKey, type ResearchStart, type SelectionSynthesisTask, type WritebackHooks } from "./topic-run";
 import { BookPipelineRunError, type AuthorInput, type AuthorOutcome } from "./book-pipeline-run";
-import { applyBookPlanEdit, bookPlanChatInput, reviewRun, type BookPlanChatDeps } from "./book-plan-chat";
+import {
+  applyBookPlanEdit,
+  applyBookStructureEdit,
+  applyBookThreadEdit,
+  bookPlanChatInput,
+  replanRun,
+  reviewRun,
+  type BookPlanChatDeps
+} from "./book-plan-chat";
 import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
 import {
   BOOK_SETTING_FIELDS,
@@ -1321,25 +1329,34 @@ export class VisualAgentMapView extends ItemView {
       const file = this.app.vault.getAbstractFileByPath(path);
       return file instanceof TFile ? file : null;
     },
-    applyBookPlanEdit: async (action, baseline) => {
-      // The book run's own "direction is right" is blocked while the plan is being written (bookPipelineBlocked).
-      this.bookPlanApplying = true;
-      try {
-        return await applyBookPlanEdit(this.bookPlanChatDeps(), action, baseline);
-      } finally {
-        this.bookPlanApplying = false;
-      }
-    }
+    applyBookPlanEdit: (action, baseline) =>
+      this.applyingBookPlan(() => applyBookPlanEdit(this.bookPlanChatDeps(), action, baseline)),
+    applyBookThreadEdit: (action, baseline) =>
+      this.applyingBookPlan(() => applyBookThreadEdit(this.bookPlanChatDeps(), action, baseline)),
+    applyBookStructureEdit: (action, baseline) =>
+      this.applyingBookPlan(() => applyBookStructureEdit(this.bookPlanChatDeps(), action, baseline))
   });
   /** True while the chat writes a plan edit to the cards: the book run does not start writing meanwhile. */
   private bookPlanApplying = false;
+  /** The book run's own "direction is right" is blocked while the plan is being written (bookPipelineBlocked). */
+  private async applyingBookPlan<T>(work: () => Promise<T>): Promise<T> {
+    this.bookPlanApplying = true;
+    try {
+      return await work();
+    } finally {
+      this.bookPlanApplying = false;
+    }
+  }
   private bookPlanChatDeps(): BookPlanChatDeps {
     return {
       map: () => this.map,
       readMap: () => this.plugin.repo.readMap(this.path),
       readCard: path => this.plugin.readBookCardForChat(path),
       updateNoteGuarded: (path, patch, options) => this.plugin.repo.updateNoteGuarded(path, patch, options),
-      language: () => this.plugin.settings.language
+      language: () => this.plugin.settings.language,
+      updateNoteRawGuarded: (path, transform, options) =>
+        this.plugin.repo.updateNoteRawGuarded(path, transform, options),
+      editStructure: (ops, expect, opening) => this.plugin.editBookStructureAtReview(this.path, ops, expect, opening)
     };
   }
   /** Picture searches the chat started; the view owns them, so closing it or leaving the map stops them. */
@@ -20283,7 +20300,7 @@ export class VisualAgentMapView extends ItemView {
         void this.rerunChatBatch(message).catch(error => errorNotice(error));
       },
       modelName: id => this.plugin.modelLabel(id),
-      planReview: () => reviewRun(this.map) !== undefined,
+      planReview: () => reviewRun(this.map) !== undefined || replanRun(this.map) !== undefined,
       resolveLink: link => {
         const file = this.app.metadataCache.getFirstLinkpathDest(link, this.sourceMarkdownFile()?.path ?? "");
         return file && file.extension === "md" ? file.path : null;
@@ -21641,6 +21658,9 @@ export class VisualAgentMapView extends ItemView {
           // Auto-apply: no plan card stood in front of this write, so the file is copied to the backups folder first (once per chain).
           const unsaved = autoChain ? await this.backupBeforeAutoWrite(autoChain, write, run) : null;
           if (unsaved) box.outcome = unsaved;
+          else if (write.kind === "edit_book_structure")
+            // The run's own write takes the mutation queue, so this one must not wait inside it.
+            box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own, same, run));
           else
             await this.plugin.mutate(async () => {
               // Only this write's own entries join the reply; what another job pushes between two writes stays its own step.

@@ -225,12 +225,13 @@ test('chat action writer: a card locked for the AI is refused at apply time, rea
 
 // ---- edit_book_plan (the chief editor's apply path, book-plan-chat.ts) ----
 
-const { applyBookPlanEdit, bookPlanChatInput } = load('experiences/visual-map/book-plan-chat.ts', { obsidian: {} });
+const { applyBookPlanEdit, applyBookThreadEdit, applyBookStructureEdit, bookPlanChatInput } = load('experiences/visual-map/book-plan-chat.ts', { obsidian: {} });
 const machine = load('core/book-pipeline/machine.ts');
 const planText = load('core/book-pipeline/plan-text.ts');
 
 function planWorld(options = {}) {
   const writes = [];
+  const calls = [];
   const brief = (covers, extra = {}) => planText.composeCardPrompt({
     role: 'body', kind: 'chapter', covers, points: ['p1'], entry: 'e', handoff: 'h',
     checklist: [{ id: 'C1', type: 'structure', text: 'c1' }], ...extra
@@ -242,7 +243,7 @@ function planWorld(options = {}) {
     c: brief('old c', { previous: { position: 2, title: 'B', summary: 'old b' } })
   };
   const cards = new Map(Object.entries(prompts).map(([id, prompt]) => [`${id}.md`, {
-    path: `${id}.md`, title: id.toUpperCase(), summary: '', prompt, detail: '', raw: `raw-${id}`, fields: { bookRole: 'body' }, settings: {}
+    path: `${id}.md`, title: id.toUpperCase(), summary: '', prompt, detail: '', raw: id === 'r' && options.rootRaw ? options.rootRaw : `raw-${id}`, fields: { bookRole: 'body' }, settings: {}
   }]));
   const data = machine.newBookPipeline({ runId: 'run-1', order: ['r', 'a', 'b', 'c'], now: '2026-11-16T00:00:00.000Z' });
   delete data.trial; data.phase = 'gate1'; data.planReview = true;
@@ -261,12 +262,24 @@ function planWorld(options = {}) {
       writes.push(path); card.prompt = patch.prompt; if (patch.summary !== undefined) card.summary = patch.summary;
       return 'written';
     },
-    language: () => 'en'
+    language: () => 'en',
+    updateNoteRawGuarded: async (path, transform, guard) => {
+      const card = cards.get(path);
+      if (!guard.authorize() || guard.expectedContent !== card.raw) return 'discarded';
+      writes.push(path); card.raw = transform(card.raw);
+      return 'written';
+    },
+    editStructure: async (ops, expect, opening) => {
+      calls.push({ ops, expect, opening });
+      if (options.structureThrows) throw Object.assign(new Error('x'), { name: 'BookPipelineRunError', code: options.structureThrows });
+      return options.structureResult ?? { applied: ops.map(op => op.id), refused: [], affected: 1 };
+    }
   };
-  const baselineOf = ids => ({
-    runId: 'run-1', phaseStartedAt: doc.bookPipeline.phaseStartedAt, unlocked: ids, prompts: Object.fromEntries(ids.map(id => [id, { path: `${id}.md`, prompt: prompts[id], kind: 'chapter' }]))
+  const nodes = ['r', 'a', 'b', 'c'].map(id => ({ id, parentId: id === 'r' ? null : 'r', title: id.toUpperCase() }));
+  const baselineOf = (ids, extra = {}) => ({
+    runId: 'run-1', phaseStartedAt: doc.bookPipeline.phaseStartedAt, unlocked: ids, thread: options.thread ?? '', nodes, busy: false, ...extra, prompts: Object.fromEntries(ids.map(id => [id, { path: `${id}.md`, prompt: prompts[id], kind: 'chapter' }]))
   });
-  return { deps, doc, cards, writes, state, baselineOf, prompts };
+  return { deps, doc, cards, writes, calls, state, baselineOf, prompts };
 }
 const bookAction = changes => ({ kind: 'edit_book_plan', changes });
 
@@ -430,4 +443,129 @@ test('bookPlanDiff: a field that is empty before shows an empty before', () => {
   const baseline = { bookPlan: { runId: 'run-1', unlocked: ['b'], prompts: { b: { path: 'b.md', prompt: empty, kind: 'chapter', title: 'B' } } } };
   const cards = plain(bookPlanDiff(bookAction([{ id: 'b', entry: 'fresh', points: ['p1', 'p2'] }]), baseline));
   assert.deepEqual(cards[0].fields.map(f => [f.before, f.after]), [['', 'fresh'], ['', 'p1, p2']]);
+});
+
+// ---- edit_book_thread / edit_book_structure (P4: the apply paths) ----
+
+const sections = load('core/book-pipeline/note-sections.ts');
+const threadRoot = thread => sections.replaceBookPlanSection('# Root\n\nintro\n', planText.composeBookPlan({ thread, decisions: {}, materials: [] }, 'en').replace(/^## .*\n\n?/, ''));
+const threadAction = content => ({ kind: 'edit_book_thread', content });
+const structAction = items => ({ kind: 'edit_book_structure', items });
+
+test('edit_book_thread: writes only the thread lines of the root note; 0 pipeline calls', async () => {
+  const raw = threadRoot('old thread');
+  const w = planWorld({ rootRaw: raw, thread: 'old thread' });
+  const outcome = plain(await applyBookThreadEdit(w.deps, threadAction('a new thread'), { bookPlan: w.baselineOf(['a']) }));
+  assert.equal(outcome.status, 'done', JSON.stringify(outcome));
+  const now = w.cards.get('r.md').raw;
+  assert.equal(planText.parseBookPlanBody(now).thread, 'a new thread');
+  assert.equal(now, planText.replaceBookPlanThread(raw, 'a new thread'), 'nothing but the thread lines changed');
+  assert.deepEqual(w.writes, ['r.md']);
+  assert.deepEqual(w.calls, []);
+});
+
+test('edit_book_thread: a thread changed since the proposal, a run that left the review, a busy baseline, a note with no thread: skipped, nothing written', async () => {
+  const changed = planWorld({ rootRaw: threadRoot('typed by the author'), thread: 'old thread' });
+  assert.deepEqual(plain(await applyBookThreadEdit(changed.deps, threadAction('x'), { bookPlan: changed.baselineOf([]) })), skippedOutcome('ui.map_chat_skip_book_thread_changed'));
+  const left = planWorld({ rootRaw: threadRoot('old thread'), thread: 'old thread' });
+  left.doc.bookPipeline.phase = 'writing';
+  assert.deepEqual(plain(await applyBookThreadEdit(left.deps, threadAction('x'), { bookPlan: left.baselineOf([]) })), skippedOutcome('ui.map_chat_skip_book_started'));
+  const busy = planWorld({ rootRaw: threadRoot('old thread'), thread: 'old thread' });
+  assert.deepEqual(plain(await applyBookThreadEdit(busy.deps, threadAction('x'), { bookPlan: busy.baselineOf([], { busy: true }) })), skippedOutcome('ui.map_chat_skip_book_started'));
+  assert.deepEqual(plain(await applyBookThreadEdit(busy.deps, threadAction('x'), {})), skippedOutcome('ui.map_chat_skip_book_started'));
+  const none = planWorld({ rootRaw: '# Root\n\nno callout', thread: '' });
+  assert.deepEqual(plain(await applyBookThreadEdit(none.deps, threadAction('x'), { bookPlan: none.baselineOf([]) })), skippedOutcome('ui.map_chat_skip_book_thread_none'));
+  for (const w of [changed, left, busy, none]) assert.deepEqual(w.writes, []);
+});
+
+test('edit_book_thread: the run leaves the review between the read and the write: the write is discarded', async () => {
+  const w = planWorld({ rootRaw: threadRoot('old thread'), thread: 'old thread' });
+  const raw = w.deps.updateNoteRawGuarded;
+  w.deps.updateNoteRawGuarded = async (...args) => { w.doc.bookPipeline.phase = 'writing'; return raw(...args); };
+  assert.deepEqual(plain(await applyBookThreadEdit(w.deps, threadAction('x'), { bookPlan: w.baselineOf([]) })), skippedOutcome('ui.map_chat_skip_book_started'));
+  assert.deepEqual(w.writes, []);
+});
+
+test('edit_book_structure: the runner is called once with the proposal-time run, tree and the ops; the result line names the cards and calls', async () => {
+  const w = planWorld({ structureResult: { applied: ['x'], refused: [], affected: 2 } });
+  const baseline = { bookPlan: w.baselineOf(['a', 'b', 'c']) };
+  const outcome = plain(await applyBookStructureEdit(w.deps, structAction([
+    { kind: 'move', nodeId: 'c', newParentId: 'r', beforeId: 'a' },
+    { kind: 'rename', nodeId: 'b', title: 'B2' }
+  ]), baseline));
+  assert.equal(w.calls.length, 1);
+  assert.deepEqual(plain(w.calls[0].expect), plain({ runId: 'run-1', phaseStartedAt: w.doc.bookPipeline.phaseStartedAt, nodes: baseline.bookPlan.nodes }));
+  assert.deepEqual(plain(w.calls[0].ops).map(op => op.kind), ['move', 'rename']);
+  assert.equal('after' in w.calls[0].ops[0], false, 'before a, the first child: no previous sibling');
+  assert.equal(w.calls[0].opening, t('ui.map_chat_opening_book_struct_0', 1), 'the opening counts the moved card; the result line uses the runner\'s count');
+  assert.deepEqual(outcome, { status: 'done', note: t('ui.map_chat_line_book_struct_0_1', 2, 2) });
+  assert.deepEqual(w.writes, [], 'no card is written by the generic path');
+});
+
+test('edit_book_structure: 0 re-planned cards gets the no-AI line', async () => {
+  const w = planWorld({ structureResult: { applied: ['x'], refused: [], affected: 0 } });
+  const outcome = plain(await applyBookStructureEdit(w.deps, structAction([{ kind: 'rename', nodeId: 'b', title: 'B2' }]), { bookPlan: w.baselineOf(['b']) }));
+  assert.deepEqual(outcome, { status: 'done', note: t('ui.map_chat_line_book_struct_none') });
+  assert.equal(w.calls[0].opening, t('ui.map_chat_opening_book_struct_none'));
+});
+
+test('edit_book_structure: refusals map to the owner-readable lines (stale, not_gate1, busy, locked, has children, over the cap)', async () => {
+  const items = [{ kind: 'remove', nodeId: 'b' }];
+  const run = async options => {
+    const w = planWorld(options);
+    return plain(await applyBookStructureEdit(w.deps, structAction(items), { bookPlan: w.baselineOf(['b']) }));
+  };
+  assert.deepEqual(await run({ structureThrows: 'stale' }), skippedOutcome('ui.map_chat_skip_book_stale'));
+  assert.deepEqual(await run({ structureThrows: 'not_gate1' }), skippedOutcome('ui.map_chat_skip_book_started'));
+  assert.deepEqual(await run({ structureThrows: 'busy' }), skippedOutcome('ui.map_chat_skip_book_busy'));
+  const refused = code => ({ structureResult: { applied: [], refused: [{ id: 'will-not-match', code }], affected: 0 } });
+  const w = planWorld(refused('x'));
+  w.deps.editStructure = async ops => ({ applied: [], refused: [{ id: ops[0].id, code: 'locked' }], affected: 0 });
+  assert.deepEqual(plain(await applyBookStructureEdit(w.deps, structAction(items), { bookPlan: w.baselineOf([]) })), { status: 'skipped', reason: t('ui.map_chat_skip_book_struct_locked_0', 'B') });
+  w.deps.editStructure = async ops => ({ applied: [], refused: [{ id: ops[0].id, code: 'has_children' }], affected: 0 });
+  assert.deepEqual(plain(await applyBookStructureEdit(w.deps, structAction(items), { bookPlan: w.baselineOf([]) })), { status: 'skipped', reason: t('ui.map_chat_skip_book_struct_children_0', 'B') });
+  w.deps.editStructure = async () => ({ applied: [], refused: [], affected: 0 });
+  assert.deepEqual(plain(await applyBookStructureEdit(w.deps, structAction(items), { bookPlan: w.baselineOf([]) })), { status: 'skipped', reason: t('ui.book_struct_over_cap') });
+  w.deps.editStructure = async ops => ({ applied: [ops[0].id], refused: [{ id: ops[1].id, code: 'locked' }], affected: 0 });
+  const part = plain(await applyBookStructureEdit(w.deps, structAction([{ kind: 'rename', nodeId: 'a', title: 'A2' }, { kind: 'remove', nodeId: 'c' }]), { bookPlan: w.baselineOf([]) }));
+  assert.equal(part.status, 'done'); assert.match(part.note, /C/);
+  const other = planWorld({ structureThrows: 'missing' });
+  await assert.rejects(applyBookStructureEdit(other.deps, structAction(items), { bookPlan: other.baselineOf(['b']) }), /x/);
+});
+
+test('edit_book_structure: no plan, a busy plan or a run that left the review: the runner is not called', async () => {
+  const w = planWorld();
+  const items = [{ kind: 'remove', nodeId: 'b' }];
+  assert.deepEqual(plain(await applyBookStructureEdit(w.deps, structAction(items), {})), skippedOutcome('ui.map_chat_skip_book_started'));
+  assert.deepEqual(plain(await applyBookStructureEdit(w.deps, structAction(items), { bookPlan: w.baselineOf([], { busy: true }) })), skippedOutcome('ui.map_chat_skip_book_started'));
+  w.doc.bookPipeline.phase = 'writing';
+  assert.deepEqual(plain(await applyBookStructureEdit(w.deps, structAction(items), { bookPlan: w.baselineOf([]) })), skippedOutcome('ui.map_chat_skip_book_started'));
+  assert.deepEqual(w.calls, []);
+});
+
+test('chat action writer: edit_book_thread and edit_book_structure go to their ports with the baseline (thread, then plan, then structure is the reply order)', async () => {
+  const w = world();
+  const seen = [];
+  const ports = { ...w.ports,
+    applyBookThreadEdit: async (action, baseline) => { seen.push(['thread', baseline.bookPlan.thread]); return { status: 'done' }; },
+    applyBookPlanEdit: async () => { seen.push(['plan']); return { status: 'done' }; },
+    applyBookStructureEdit: async (action, baseline) => { seen.push(['structure', baseline.bookPlan.nodes.length]); return { status: 'done' }; } };
+  const writer = new ChatActionWriter(ports);
+  const baseline = w.baseline({ bookPlan: { runId: 'run-1', unlocked: [], thread: 'T', nodes: [{ id: 'r', parentId: null, title: 'R' }], busy: false, prompts: {} } });
+  for (const action of [threadAction('x'), bookAction([{ id: 'x', entry: 'y' }]), structAction([{ kind: 'remove', nodeId: 'b' }])])
+    assert.deepEqual(plain(await writer.write(action, baseline, () => true, w.run())), { status: 'done' });
+  assert.deepEqual(seen, [['thread', 'T'], ['plan'], ['structure', 1]]);
+});
+
+test('bookPlanChatInput: thread, nodes in reading order (the shape the runner compares) and busy while the plan is planned again', async () => {
+  const w = planWorld({ rootRaw: threadRoot('old thread') });
+  const input = plain(await bookPlanChatInput(w.deps));
+  assert.equal(input.thread, 'old thread');
+  assert.equal(input.busy, false);
+  assert.deepEqual(input.nodes, [{ id: 'r', parentId: null, title: 'R' }, { id: 'a', parentId: 'r', title: 'A' }, { id: 'b', parentId: 'r', title: 'B' }, { id: 'c', parentId: 'r', title: 'C' }]);
+  w.doc.bookPipeline.phase = 'planning'; w.doc.bookPipeline.planEdited = true;
+  const busy = plain(await bookPlanChatInput(w.deps));
+  assert.equal(busy.busy, true); assert.deepEqual(busy.cards, []); assert.equal(busy.thread, 'old thread');
+  delete w.doc.bookPipeline.planEdited;
+  assert.equal(await bookPlanChatInput(w.deps), undefined, 'planning without an edit is not a chat state');
 });

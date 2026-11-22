@@ -10000,6 +10000,49 @@ integrationTest('book plan chat: Apply on the plan card of a real turn writes th
   assert.equal(lines.some(line => line.status === 'done'), true, JSON.stringify(lines)); assert.equal(lines.some(line => /switched or closed/.test(line.text)), false);
 });
 
+const noteSections = load('core/book-pipeline/note-sections.ts');
+integrationTest('book plan chat: Apply of a thread change and a structure change on a real turn writes the thread and calls the runner with the proposal-time run and tree (thread first)', async () => {
+  const { h, chat } = await planReviewHarness();
+  const rootPath = h.node('root').path; const rootFile = h.app.vault.getAbstractFileByPath(rootPath);
+  const compose = thread => planText.composeBookPlan({ thread, decisions: {}, materials: [] }, 'en').replace(/^## .*\n\n?/, '');
+  await h.app.vault.process(rootFile, raw => noteSections.replaceBookPlanSection(raw, compose('old thread')));
+  const order = [];
+  h.plugin.editBookStructureAtReview = async (path, ops, expect, opening) => {
+    order.push({ path, ops, expect, opening, thread: planText.parseBookPlanBody(await h.app.vault.read(rootFile)).thread });
+    return { applied: ops.map(op => op.id), refused: [], affected: 1 };
+  };
+  h.control.reply = async () => ({ reply: 'New main line and an order change.', actions: [
+    { kind: 'edit_book_thread', content: 'a better thread' },
+    { kind: 'edit_book_structure', items: [{ kind: 'move', nodeId: h.ids.b, newParentId: h.ids.root, beforeId: h.ids.a }, { kind: 'remove', nodeId: h.ids.c }] }
+  ], rejected: [] });
+  h.type('rework'); await h.view.sendMapChat();
+  assert.ok(chat.pendingPlan(), 'a plan card waits'); assert.equal(order.length, 0, 'nothing runs before Apply');
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
+  assert.equal(planText.parseBookPlanBody(await h.app.vault.read(rootFile)).thread, 'a better thread');
+  assert.equal(order.length, 1, 'the runner is called once'); assert.equal(order[0].path, MAP);
+  assert.equal(order[0].thread, 'a better thread', 'the thread was written before the structure');
+  assert.equal(order[0].expect.runId, 'run-1');
+  assert.deepEqual(plain(order[0].expect.nodes.map(n => n.id)), [h.ids.root, h.ids.a, h.ids.b, h.ids.c], 'the tree of the proposal, root first');
+  assert.deepEqual(plain(order[0].ops.map(op => op.kind)), ['move', 'remove']);
+  const lines = chat.transcript().at(-1).lines;
+  assert.equal(lines.filter(line => line.status === 'done').length, 2, JSON.stringify(lines));
+  assert.equal(lines.some(line => /switched or closed|started being written/.test(line.text)), false, JSON.stringify(lines));
+});
+
+integrationTest('book plan chat: a refused structure apply (stale) says so and the thread change of the same reply is still written', async () => {
+  const { h, chat } = await planReviewHarness();
+  const rootFile = h.app.vault.getAbstractFileByPath(h.node('root').path);
+  const compose = thread => planText.composeBookPlan({ thread, decisions: {}, materials: [] }, 'en').replace(/^## .*\n\n?/, '');
+  await h.app.vault.process(rootFile, raw => noteSections.replaceBookPlanSection(raw, compose('old thread')));
+  h.plugin.editBookStructureAtReview = async () => { throw Object.assign(new Error('stale'), { name: 'BookPipelineRunError', code: 'stale' }); };
+  h.control.reply = async () => ({ reply: 'Both.', actions: [{ kind: 'edit_book_thread', content: 'newer thread' }, { kind: 'edit_book_structure', items: [{ kind: 'remove', nodeId: h.ids.b }] }], rejected: [] });
+  h.type('rework'); await h.view.sendMapChat();
+  planButton(h, 'apply').click(); await until(() => chat.pendingPlan() === null && !h.view.chatApplying);
+  assert.equal(planText.parseBookPlanBody(await h.app.vault.read(rootFile)).thread, 'newer thread');
+  const lines = chat.transcript().at(-1).lines;
+  assert.equal(lines.some(line => line.status === 'skipped' && /out of date/.test(line.text)), true, JSON.stringify(lines));
+});
+
 integrationTest('book plan chat: a Prompt changed after the proposal is not overwritten on Apply (the baseline is the proposal turn\'s, not rebuilt at apply time)', async () => {
   const { h, chat } = await planReviewHarness();
   h.control.reply = async () => ({ reply: 'I will change chapter A.', actions: [{ kind: 'edit_book_plan', changes: [{ id: h.ids.a, entry: 'brand new entry' }] }], rejected: [] });

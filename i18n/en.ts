@@ -1446,6 +1446,25 @@ export const en = {
   "ui.map_chat_skip_book_locked": " (locked)",
   "ui.map_chat_skip_book_changed": " (changed since the proposal)",
   "ui.map_chat_line_book_plan_named_0": ": {0}",
+  "ui.map_chat_skip_book_stale": "the plan was just changed, so this proposal is out of date; please say it again",
+  "ui.map_chat_skip_book_busy": "the plan is being planned again; please try again when it is done",
+  "ui.map_chat_skip_book_struct_locked_0": '"{0}" was edited by you, so it is left alone',
+  "ui.map_chat_skip_book_struct_children_0":
+    'cannot change: "{0}" still has sections; to delete them together say "with its sections"',
+  "ui.map_chat_skip_book_struct_rules": "this structure change breaks the structure rules",
+  "ui.map_chat_skip_book_thread_changed":
+    "the book's main line was changed since the proposal, so it is not overwritten; please say it again",
+  "ui.map_chat_skip_book_thread_none": "the book's main line was not found in the plan, so nothing was changed",
+  "ui.map_chat_line_book_thread": "; the book's main line is updated (the chapters' plans do not follow by themselves)",
+  "ui.map_chat_line_book_struct_0_1":
+    "; structure changed, planning {0} cards again (about {1} AI calls), I will tell you when it is done. To change it back, undo items in the structure list above",
+  "ui.map_chat_line_book_struct_none":
+    "; structure changed, no AI planning needed, only the links between chapters are updated. To change it back, undo items in the structure list above",
+  "ui.map_chat_line_book_struct_left_0": " (left as they are: {0})",
+  "ui.map_chat_opening_book_struct_0":
+    "Done: {0} cards are planned again to the new structure, and the links between chapters are updated too. What else would you like to change?",
+  "ui.map_chat_opening_book_struct_none":
+    "Done, and the links between chapters are updated too. What else would you like to change?",
   "ui.book_chief_editor": "Chief editor",
   "ui.map_chat_book_placeholder": "Tell the chief editor how you want to change this book...",
   "ui.map_chat_book_apply": "Apply to the plan",

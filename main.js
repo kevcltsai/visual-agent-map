@@ -1356,6 +1356,19 @@ var en = {
   "ui.map_chat_skip_book_locked": " (locked)",
   "ui.map_chat_skip_book_changed": " (changed since the proposal)",
   "ui.map_chat_line_book_plan_named_0": ": {0}",
+  "ui.map_chat_skip_book_stale": "the plan was just changed, so this proposal is out of date; please say it again",
+  "ui.map_chat_skip_book_busy": "the plan is being planned again; please try again when it is done",
+  "ui.map_chat_skip_book_struct_locked_0": '"{0}" was edited by you, so it is left alone',
+  "ui.map_chat_skip_book_struct_children_0": 'cannot change: "{0}" still has sections; to delete them together say "with its sections"',
+  "ui.map_chat_skip_book_struct_rules": "this structure change breaks the structure rules",
+  "ui.map_chat_skip_book_thread_changed": "the book's main line was changed since the proposal, so it is not overwritten; please say it again",
+  "ui.map_chat_skip_book_thread_none": "the book's main line was not found in the plan, so nothing was changed",
+  "ui.map_chat_line_book_thread": "; the book's main line is updated (the chapters' plans do not follow by themselves)",
+  "ui.map_chat_line_book_struct_0_1": "; structure changed, planning {0} cards again (about {1} AI calls), I will tell you when it is done. To change it back, undo items in the structure list above",
+  "ui.map_chat_line_book_struct_none": "; structure changed, no AI planning needed, only the links between chapters are updated. To change it back, undo items in the structure list above",
+  "ui.map_chat_line_book_struct_left_0": " (left as they are: {0})",
+  "ui.map_chat_opening_book_struct_0": "Done: {0} cards are planned again to the new structure, and the links between chapters are updated too. What else would you like to change?",
+  "ui.map_chat_opening_book_struct_none": "Done, and the links between chapters are updated too. What else would you like to change?",
   "ui.book_chief_editor": "Chief editor",
   "ui.map_chat_book_placeholder": "Tell the chief editor how you want to change this book...",
   "ui.map_chat_book_apply": "Apply to the plan",
@@ -4702,6 +4715,19 @@ var zhCN = {
   "ui.map_chat_skip_book_locked": "\uFF08\u5DF2\u9501\u5B9A\uFF09",
   "ui.map_chat_skip_book_changed": "\uFF08\u63D0\u6848\u540E\u88AB\u6539\u8FC7\uFF09",
   "ui.map_chat_line_book_plan_named_0": "\uFF1A{0}",
+  "ui.map_chat_skip_book_stale": "\u4F01\u5212\u521A\u8C03\u6574\u8FC7\uFF0C\u8FD9\u4E2A\u63D0\u6848\u5DF2\u8FC7\u671F\uFF1B\u8BF7\u518D\u8BF4\u4E00\u6B21",
+  "ui.map_chat_skip_book_busy": "\u4F01\u5212\u6B63\u5728\u91CD\u65B0\u4F01\u5212\uFF0C\u597D\u4E86\u518D\u8BF4\u4E00\u6B21",
+  "ui.map_chat_skip_book_struct_locked_0": "\u300C{0}\u300D\u4F60\u6539\u8FC7\uFF0C\u4E0D\u52A8\u5B83",
+  "ui.map_chat_skip_book_struct_children_0": "\u6CA1\u529E\u6CD5\u6539\uFF1A\u300C{0}\u300D\u5E95\u4E0B\u8FD8\u6709\u8282\uFF0C\u8981\u4E00\u8D77\u5220\u5C31\u8BF4\u300C\u8FDE\u540C\u5404\u8282\u300D",
+  "ui.map_chat_skip_book_struct_rules": "\u8FD9\u4E2A\u7ED3\u6784\u8C03\u6574\u4E0D\u7B26\u5408\u7ED3\u6784\u89C4\u5219",
+  "ui.map_chat_skip_book_thread_changed": "\u5168\u4E66\u4E3B\u7EBF\u5728\u63D0\u6848\u540E\u88AB\u6539\u8FC7\uFF0C\u4E0D\u8986\u76D6\uFF1B\u8BF7\u518D\u8BF4\u4E00\u6B21",
+  "ui.map_chat_skip_book_thread_none": "\u4F01\u5212\u91CC\u627E\u4E0D\u5230\u5168\u4E66\u4E3B\u7EBF\uFF0C\u6CA1\u6709\u6539",
+  "ui.map_chat_line_book_thread": "\uFF1B\u5168\u4E66\u4E3B\u7EBF\u5DF2\u66F4\u65B0\uFF08\u5404\u7AE0\u4F01\u5212\u4E0D\u4F1A\u81EA\u52A8\u8DDF\u7740\u6539\uFF09",
+  "ui.map_chat_line_book_struct_0_1": "\uFF1B\u5DF2\u6539\u597D\u7ED3\u6784\uFF0C\u6B63\u5728\u91CD\u65B0\u4F01\u5212 {0} \u5F20\u5361\uFF08\u7EA6 {1} \u6B21 AI \u8C03\u7528\uFF09\uFF0C\u597D\u4E86\u6211\u4F1A\u518D\u8DDF\u4F60\u8BF4\u3002\u8981\u8FD8\u539F\uFF0C\u4E0A\u65B9\u7ED3\u6784\u6E05\u5355\u53EF\u4EE5\u9010\u9879\u8FD8\u539F",
+  "ui.map_chat_line_book_struct_none": "\uFF1B\u5DF2\u6539\u597D\u7ED3\u6784\uFF0C\u4E0D\u7528 AI \u91CD\u65B0\u4F01\u5212\uFF0C\u53EA\u66F4\u65B0\u524D\u540E\u7AE0\u7684\u8854\u63A5\u53E5\u3002\u8981\u8FD8\u539F\uFF0C\u4E0A\u65B9\u7ED3\u6784\u6E05\u5355\u53EF\u4EE5\u9010\u9879\u8FD8\u539F",
+  "ui.map_chat_line_book_struct_left_0": "\uFF08\u6CA1\u6539\uFF1A{0}\uFF09",
+  "ui.map_chat_opening_book_struct_0": "\u6539\u597D\u4E86\uFF1A{0} \u5F20\u5361\u7167\u65B0\u7ED3\u6784\u91CD\u65B0\u4F01\u5212\u5B8C\uFF0C\u524D\u540E\u7AE0\u7684\u8854\u63A5\u4E5F\u66F4\u65B0\u4E86\u3002\u8FD8\u6709\u54EA\u91CC\u60F3\u8C03\u6574\uFF1F",
+  "ui.map_chat_opening_book_struct_none": "\u6539\u597D\u4E86\uFF0C\u524D\u540E\u7AE0\u7684\u8854\u63A5\u4E5F\u66F4\u65B0\u4E86\u3002\u8FD8\u6709\u54EA\u91CC\u60F3\u8C03\u6574\uFF1F",
   "ui.book_chief_editor": "\u603B\u7F16\u8F91",
   "ui.map_chat_book_placeholder": "\u8DDF\u603B\u7F16\u8F91\u8BF4\u60F3\u600E\u4E48\u6539\u8FD9\u672C\u4E66\u2026\u2026",
   "ui.map_chat_book_apply": "\u5E94\u7528\u5230\u4F01\u5212",
@@ -8048,6 +8074,19 @@ var zhTW = {
   "ui.map_chat_skip_book_locked": "\uFF08\u5DF2\u9396\u5B9A\uFF09",
   "ui.map_chat_skip_book_changed": "\uFF08\u63D0\u6848\u5F8C\u88AB\u6539\u904E\uFF09",
   "ui.map_chat_line_book_plan_named_0": "\uFF1A{0}",
+  "ui.map_chat_skip_book_stale": "\u4F01\u5283\u525B\u8ABF\u6574\u904E\uFF0C\u9019\u500B\u63D0\u6848\u5DF2\u904E\u671F\uFF1B\u8ACB\u518D\u8AAA\u4E00\u6B21",
+  "ui.map_chat_skip_book_busy": "\u4F01\u5283\u6B63\u5728\u91CD\u65B0\u4F01\u5283\uFF0C\u597D\u4E86\u518D\u8AAA\u4E00\u6B21",
+  "ui.map_chat_skip_book_struct_locked_0": "\u300C{0}\u300D\u4F60\u6539\u904E\uFF0C\u4E0D\u52D5\u5B83",
+  "ui.map_chat_skip_book_struct_children_0": "\u6C92\u8FA6\u6CD5\u6539\uFF1A\u300C{0}\u300D\u5E95\u4E0B\u9084\u6709\u7BC0\uFF0C\u8981\u4E00\u8D77\u522A\u5C31\u8AAA\u300C\u9023\u540C\u5404\u7BC0\u300D",
+  "ui.map_chat_skip_book_struct_rules": "\u9019\u500B\u7D50\u69CB\u8ABF\u6574\u4E0D\u7B26\u5408\u7D50\u69CB\u898F\u5247",
+  "ui.map_chat_skip_book_thread_changed": "\u5168\u66F8\u4E3B\u7DDA\u5728\u63D0\u6848\u5F8C\u88AB\u6539\u904E\uFF0C\u4E0D\u8986\u84CB\uFF1B\u8ACB\u518D\u8AAA\u4E00\u6B21",
+  "ui.map_chat_skip_book_thread_none": "\u4F01\u5283\u88E1\u627E\u4E0D\u5230\u5168\u66F8\u4E3B\u7DDA\uFF0C\u6C92\u6709\u6539",
+  "ui.map_chat_line_book_thread": "\uFF1B\u5168\u66F8\u4E3B\u7DDA\u5DF2\u66F4\u65B0\uFF08\u5404\u7AE0\u4F01\u5283\u4E0D\u6703\u81EA\u52D5\u8DDF\u8457\u6539\uFF09",
+  "ui.map_chat_line_book_struct_0_1": "\uFF1B\u5DF2\u6539\u597D\u7D50\u69CB\uFF0C\u6B63\u5728\u91CD\u65B0\u4F01\u5283 {0} \u5F35\u5361\uFF08\u7D04 {1} \u6B21 AI \u547C\u53EB\uFF09\uFF0C\u597D\u4E86\u6211\u6703\u518D\u8DDF\u4F60\u8AAA\u3002\u8981\u9084\u539F\uFF0C\u4E0A\u65B9\u7D50\u69CB\u6E05\u55AE\u53EF\u4EE5\u9010\u9805\u9084\u539F",
+  "ui.map_chat_line_book_struct_none": "\uFF1B\u5DF2\u6539\u597D\u7D50\u69CB\uFF0C\u4E0D\u7528 AI \u91CD\u65B0\u4F01\u5283\uFF0C\u53EA\u66F4\u65B0\u524D\u5F8C\u7AE0\u7684\u929C\u63A5\u53E5\u3002\u8981\u9084\u539F\uFF0C\u4E0A\u65B9\u7D50\u69CB\u6E05\u55AE\u53EF\u4EE5\u9010\u9805\u9084\u539F",
+  "ui.map_chat_line_book_struct_left_0": "\uFF08\u6C92\u6539\uFF1A{0}\uFF09",
+  "ui.map_chat_opening_book_struct_0": "\u6539\u597D\u4E86\uFF1A{0} \u5F35\u5361\u7167\u65B0\u7D50\u69CB\u91CD\u65B0\u4F01\u5283\u5B8C\uFF0C\u524D\u5F8C\u7AE0\u7684\u929C\u63A5\u4E5F\u66F4\u65B0\u4E86\u3002\u9084\u6709\u54EA\u88E1\u60F3\u8ABF\u6574\uFF1F",
+  "ui.map_chat_opening_book_struct_none": "\u6539\u597D\u4E86\uFF0C\u524D\u5F8C\u7AE0\u7684\u929C\u63A5\u4E5F\u66F4\u65B0\u4E86\u3002\u9084\u6709\u54EA\u88E1\u60F3\u8ABF\u6574\uFF1F",
   "ui.book_chief_editor": "\u7E3D\u7DE8\u8F2F",
   "ui.map_chat_book_placeholder": "\u8DDF\u7E3D\u7DE8\u8F2F\u8AAA\u60F3\u600E\u9EBC\u6539\u9019\u672C\u66F8\u2026\u2026",
   "ui.map_chat_book_apply": "\u5957\u7528\u5230\u4F01\u5283",
@@ -16435,6 +16474,33 @@ function planLines(markdown) {
     return !!m && matches(L.plan, m[1]);
   });
   return start < 0 ? void 0 : lines.slice(start + 1);
+}
+function replaceBookPlanThread(raw, thread) {
+  const lines = raw.split("\n");
+  const callout2 = lines.findIndex((line3) => {
+    const m = PLAN_CALLOUT.exec(line3.replace(/\r$/, ""));
+    return !!m && isBookPlanTitle(m[1]);
+  });
+  if (callout2 < 0) return void 0;
+  let end = callout2 + 1;
+  while (end < lines.length && QUOTE_PREFIX.test(lines[end])) end++;
+  const body = lines.slice(callout2 + 1, end).map((line3) => line3.replace(/\r$/, "").replace(QUOTE_PREFIX, ""));
+  const head2 = body.findIndex((line3) => {
+    const m = /^###[ \t]+(.+?)\s*$/.exec(line3);
+    return !!m && matches(L.thread, m[1]);
+  });
+  if (head2 < 0) return void 0;
+  let stop = head2 + 1;
+  while (stop < body.length && !/^###[ \t]/.test(body[stop])) stop++;
+  const text11 = body.slice(head2 + 1, stop);
+  const first = text11.findIndex((line3) => line3.trim());
+  const last = text11.length - 1 - [...text11].reverse().findIndex((line3) => line3.trim());
+  const cr = lines[callout2 + 1 + head2].endsWith("\r") ? "\r" : "";
+  const next = `> ${safe(thread, 1200)}${cr}`;
+  const from = callout2 + 1 + head2 + 1 + (first < 0 ? 0 : first);
+  const count4 = first < 0 ? 0 : last - first + 1;
+  lines.splice(from, count4, next);
+  return lines.join("\n");
 }
 function parseBookPlanDecisions(markdown) {
   const plan = planLines(markdown);
@@ -27617,9 +27683,9 @@ function alignSiblingsToScreen(nodes, axisOf) {
 }
 
 // experiences/visual-map/map-search-bar.ts
-function searchMap(nodes, skip, titleOf, query, siblingAxis, balanced = false) {
+function searchMap(nodes, skip2, titleOf, query, siblingAxis, balanced = false) {
   const order = readingOrder(
-    nodes.filter((node) => !skip.has(node.id)),
+    nodes.filter((node) => !skip2.has(node.id)),
     { includeHidden: true, siblingAxis, balanced }
   );
   return { order, matches: findMatches(order, titleOf, query) };
@@ -30476,9 +30542,9 @@ function uncross(points, slots, fixedLines, picked) {
     }
     return cache[key4] === 2;
   };
-  const cardCost = (a, skip) => {
+  const cardCost = (a, skip2) => {
     let c = hitsFixed[a][picked[a]] * FIXED_CROSSING_WEIGHT;
-    for (let b = 0; b < n; b++) if (b !== a && b !== skip && crossing(a, picked[a], b, picked[b])) c++;
+    for (let b = 0; b < n; b++) if (b !== a && b !== skip2 && crossing(a, picked[a], b, picked[b])) c++;
     return c;
   };
   const descend = () => {
@@ -38268,6 +38334,9 @@ function parseMapChat(raw, context) {
       rejected.push({ index, code: error.code });
     }
   });
+  const thread = actions.findIndex((action) => action.kind === "edit_book_thread");
+  const firstBrief = actions.findIndex((action) => action.kind === "edit_book_plan");
+  if (thread > firstBrief && firstBrief >= 0) actions.splice(firstBrief, 0, ...actions.splice(thread, 1));
   if (items.length) actions.push({ kind: "edit_book_structure", items });
   const progress = normalizeProgress(body.progress);
   return {
@@ -38370,8 +38439,8 @@ var ChatActionWriter = class {
     const gone = skipped("ui.map_chat_skip_topic_gone");
     const done = { status: "done" };
     if (action.kind === "edit_book_plan") return this.ports.applyBookPlanEdit(action, baseline);
-    if (action.kind === "edit_book_structure" || action.kind === "edit_book_thread")
-      return skipped("ui.map_chat_skip_book_started");
+    if (action.kind === "edit_book_thread") return this.ports.applyBookThreadEdit(action, baseline);
+    if (action.kind === "edit_book_structure") return this.ports.applyBookStructureEdit(action, baseline);
     const configDir = this.app.vault.configDir;
     const real = (id) => {
       var _a3;
@@ -50179,10 +50248,10 @@ var CommonsQueue = class {
     __publicField(this, "tail", Promise.resolve());
   }
   /** `run`'s answer, or undefined when `skip()` says no once the turn came. The next turn waits for this one to settle. */
-  turn(skip, run) {
+  turn(skip2, run) {
     let asked = false;
     const answer = this.tail.then(() => {
-      if (skip()) return void 0;
+      if (skip2()) return void 0;
       asked = true;
       return run();
     });
@@ -56355,6 +56424,64 @@ function reviewAffected(rootId, before, after, applied) {
   for (const n of after) if (kindBefore.has(n.id) && kindBefore.get(n.id) !== kindAfter.get(n.id)) affected.add(n.id);
   return affected;
 }
+function chatStructureOps(items, input2, stamp) {
+  const tree = new Tree(input2.rootId, copyNodes(input2.nodes));
+  const taken = new Set(input2.nodes.map((n) => n.id));
+  const fresh = (base) => {
+    let id = base;
+    for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
+    taken.add(id);
+    return id;
+  };
+  const ops = [];
+  const afterOf = (parent, beforeId) => {
+    if (beforeId === void 0) return tree.children(parent).at(-1);
+    const list2 = tree.children(parent);
+    const i = list2.indexOf(beforeId);
+    return i < 0 ? beforeId : i > 0 ? list2[i - 1] : void 0;
+  };
+  const push = (op) => {
+    var _a2;
+    ops.push({ ...op, id: fresh(`chat-${stamp}-${ops.length}`), reason: (_a2 = op.reason) != null ? _a2 : "" });
+  };
+  const deepestFirst = (id) => [...tree.children(id).flatMap(deepestFirst), id];
+  items.forEach((item, i) => {
+    if (item.kind === "add") {
+      const ref = fresh(`chat-${stamp}-new${i}`);
+      const after = afterOf(item.parentId, item.beforeId);
+      push({
+        kind: "add",
+        title: item.title,
+        summary: item.summary,
+        parent: item.parentId,
+        ref,
+        reason: item.reason,
+        ...after !== void 0 ? { after } : {}
+      });
+      if (tree.has(item.parentId)) tree.add(ref, item.title, item.parentId, after);
+    } else if (item.kind === "move") {
+      const after = afterOf(item.newParentId, item.beforeId);
+      push({
+        kind: "move",
+        card: item.nodeId,
+        parent: item.newParentId,
+        reason: item.reason,
+        ...after !== void 0 ? { after } : {}
+      });
+      if (tree.has(item.nodeId) && tree.has(item.newParentId) && after !== item.nodeId) {
+        tree.detach(item.nodeId);
+        tree.attach(item.nodeId, item.newParentId, after);
+      }
+    } else if (item.kind === "remove") {
+      const ids2 = item.branch && tree.has(item.nodeId) ? deepestFirst(item.nodeId) : [item.nodeId];
+      for (const id of ids2) {
+        push({ kind: "remove", card: id, reason: item.reason });
+        if (!tree.children(id).length) tree.drop(id);
+      }
+    } else push({ kind: "rename", card: item.nodeId, title: item.title, reason: item.reason });
+  });
+  return ops;
+}
 
 // experiences/visual-map/book-pipeline-run.ts
 var replacementsOf = (edits, ids2) => edits.filter((edit) => ids2.includes(edit.id)).map((edit) => edit.replacement);
@@ -60981,6 +61108,13 @@ function reviewRun(map) {
   const data = read.data;
   return data.phase === "gate1" && data.status === "running" && data.planReview ? data : void 0;
 }
+function replanRun(map) {
+  if (!map) return void 0;
+  const read = readBookPipeline(map);
+  if (read.kind !== "usable") return void 0;
+  const data = read.data;
+  return data.phase === "planning" && data.planReview && data.planEdited ? data : void 0;
+}
 var structureOfMap = (map, order, rootId) => bookStructure(order, (id) => {
   var _a2;
   return (_a2 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _a2.parentId;
@@ -60990,17 +61124,32 @@ var rootOf = (map) => {
   return roots.length === 1 ? roots[0].id : void 0;
 };
 async function bookPlanChatInput(deps) {
-  var _a2, _b2, _c;
+  var _a2, _b2, _c, _d;
   const map = deps.map();
-  const data = reviewRun(map);
+  const reviewing = reviewRun(map);
+  const data = reviewing != null ? reviewing : replanRun(map);
   const rootId = map ? rootOf(map) : void 0;
   if (!map || !data || !rootId) return void 0;
   const root = map.nodes.find((node) => node.id === rootId);
   if (!root) return void 0;
   const rootCard = await deps.readCard(root.path);
+  const thread = parseBookPlanBody(rootCard.raw).thread;
+  if (!reviewing)
+    return {
+      runId: data.runId,
+      phaseStartedAt: data.phaseStartedAt,
+      title: rootCard.title,
+      settings: effectiveSettings(rootCard.settings, parseBookPlanDecisions(rootCard.raw)),
+      thread,
+      cards: [],
+      nodes: [],
+      busy: true,
+      prompts: {}
+    };
   const order = effectiveOrder(data);
   const structure2 = structureOfMap(map, order, rootId);
   const cards = [];
+  const nodes = [];
   const prompts = {};
   for (const id of order) {
     const node = map.nodes.find((item) => item.id === id);
@@ -61017,6 +61166,7 @@ async function bookPlanChatInput(deps) {
         planLockedRaw(card.raw, card.prompt)
       )
     );
+    nodes.push({ id, parentId: (_d = node.parentId) != null ? _d : null, title: card.title });
     prompts[id] = { path: node.path, prompt: card.prompt, kind, title: card.title, summary: card.summary };
   }
   const settings = effectiveSettings(rootCard.settings, parseBookPlanDecisions(rootCard.raw));
@@ -61025,7 +61175,7 @@ async function bookPlanChatInput(deps) {
     model: "",
     reasoning: "medium",
     bookTitle: rootCard.title,
-    thread: parseBookPlanBody(rootCard.raw).thread,
+    thread,
     settings,
     cards
   };
@@ -61034,6 +61184,9 @@ async function bookPlanChatInput(deps) {
     phaseStartedAt: data.phaseStartedAt,
     title: rootCard.title,
     settings,
+    thread,
+    nodes,
+    busy: false,
     ...data.planOpening ? { opening: data.planOpening } : {}
   };
   return planEditFits(request) ? { ...base, cards: cards.map(shown), prompts } : { ...base, cards: [], tooLarge: true, prompts: {} };
@@ -61102,6 +61255,75 @@ async function applyBookPlanEdit(deps, action, baseline) {
   return {
     status: "done",
     note: t("ui.map_chat_line_book_plan_undo") + (left.length ? t("ui.map_chat_line_book_plan_left_0", left.length) + (named.length ? t("ui.map_chat_line_book_plan_named_0", named.join(t("ui.map_chat_count_separator"))) : "") : "")
+  };
+}
+var skip = (key4, ...args) => ({
+  status: "skipped",
+  reason: t(key4, ...args)
+});
+var sameReview = (map, plan) => {
+  const run = reviewRun(map);
+  return !!run && run.runId === plan.runId && run.phaseStartedAt === plan.phaseStartedAt;
+};
+var refusalKey = (code3) => code3 === "not_gate1" ? "ui.map_chat_skip_book_started" : code3 === "stale" ? "ui.map_chat_skip_book_stale" : ["busy", "blocked", "drive_running", "notes_busy"].includes(code3) ? "ui.map_chat_skip_book_busy" : void 0;
+async function applyBookThreadEdit(deps, action, baseline) {
+  const plan = baseline.bookPlan;
+  if (!plan || plan.busy || !sameReview(deps.map(), plan)) return skip("ui.map_chat_skip_book_started");
+  const map = await deps.readMap();
+  const rootId = rootOf(map);
+  const root = rootId ? map.nodes.find((node) => node.id === rootId) : void 0;
+  if (!root || !reviewRun(map)) return skip("ui.map_chat_skip_book_started");
+  const card = await deps.readCard(root.path);
+  if (parseBookPlanBody(card.raw).thread !== plan.thread) return skip("ui.map_chat_skip_book_thread_changed");
+  const next = replaceBookPlanThread(card.raw, action.content);
+  if (next === void 0) return skip("ui.map_chat_skip_book_thread_none");
+  if (next === card.raw) return skip("ui.map_chat_skip_book_cards");
+  const written2 = await deps.updateNoteRawGuarded(root.path, () => next, {
+    expectedContent: card.raw,
+    authorize: () => sameReview(deps.map(), plan)
+  });
+  if (written2 === "discarded")
+    return skip(
+      sameReview(deps.map(), plan) ? "ui.map_chat_skip_book_thread_changed" : "ui.map_chat_skip_book_started"
+    );
+  return { status: "done", note: t("ui.map_chat_line_book_thread") };
+}
+async function applyBookStructureEdit(deps, action, baseline) {
+  var _a2, _b2;
+  const plan = baseline.bookPlan;
+  if (!plan || plan.busy || !plan.nodes.length || !sameReview(deps.map(), plan))
+    return skip("ui.map_chat_skip_book_started");
+  const input2 = { rootId: plan.nodes[0].id, nodes: plan.nodes };
+  const ops = chatStructureOps(action.items, input2, Date.now().toString(36));
+  const locked = new Set(plan.nodes.map((node) => node.id).filter((id) => !plan.unlocked.includes(id)));
+  const sim = simulateStructure(input2, ops, locked);
+  const expected = reviewAffected(input2.rootId, plan.nodes, sim.result, sim.applied).size;
+  let result;
+  try {
+    result = await deps.editStructure(
+      ops,
+      { runId: plan.runId, phaseStartedAt: (_a2 = plan.phaseStartedAt) != null ? _a2 : "", nodes: plan.nodes },
+      expected ? t("ui.map_chat_opening_book_struct_0", expected) : t("ui.map_chat_opening_book_struct_none")
+    );
+  } catch (error) {
+    const code3 = (error == null ? void 0 : error.name) === "BookPipelineRunError" ? error.code : "";
+    const key4 = refusalKey(code3);
+    if (key4) return skip(key4);
+    throw error;
+  }
+  const titleOf = (id) => {
+    var _a3;
+    return ((_a3 = plan.nodes.find((node) => node.id === id)) == null ? void 0 : _a3.title) || id;
+  };
+  const reasons = result.refused.map((refused) => {
+    const op = ops.find((item) => item.id === refused.id);
+    const name2 = op && op.kind !== "add" ? titleOf(op.card) : (op == null ? void 0 : op.kind) === "add" ? op.title : "";
+    return refused.code === "locked" ? t("ui.map_chat_skip_book_struct_locked_0", name2) : refused.code === "has_children" ? t("ui.map_chat_skip_book_struct_children_0", name2) : t("ui.map_chat_skip_book_struct_rules");
+  });
+  if (!result.applied.length) return { status: "skipped", reason: (_b2 = reasons[0]) != null ? _b2 : t("ui.book_struct_over_cap") };
+  return {
+    status: "done",
+    note: (result.affected ? t("ui.map_chat_line_book_struct_0_1", result.affected, result.affected) : t("ui.map_chat_line_book_struct_none")) + (reasons.length ? t("ui.map_chat_line_book_struct_left_0", [...new Set(reasons)].join(t("ui.map_chat_count_separator"))) : "")
   };
 }
 
@@ -62470,10 +62692,10 @@ var BookCallouts = class {
     );
   }
   /** The cards of the run in reading order with their note paths; a card whose note cannot be read is left out (and logged). */
-  async cardsOf(map, data, skip) {
+  async cardsOf(map, data, skip2) {
     const out = [];
     for (const id of effectiveOrder(data)) {
-      if (skip == null ? void 0 : skip(id)) continue;
+      if (skip2 == null ? void 0 : skip2(id)) continue;
       const node = map.nodes.find((item) => item.id === id);
       if (!node) continue;
       try {
@@ -69234,13 +69456,13 @@ var MapChatFiles = class {
    * on them: the ones the chat asked to read (`requested`, taken from the queue, which this empties), then a 進度 file and the files of
    * the latest reply, then the rest, each group newest write first. `skip` are sent another way.
    */
-  async carry(skip) {
+  async carry(skip2) {
     var _a2;
     const found = [];
     const queue = this.readQueue.splice(0);
     for (const path of /* @__PURE__ */ new Set([...this.ownFiles.keys(), ...this.attached.keys()])) {
       const hashes = this.readableHashes(path);
-      if (skip.has(path) || !hashes) continue;
+      if (skip2.has(path) || !hashes) continue;
       const source = await this.ports.read(path);
       if (source && hashes.has(contentHash2(source.text)))
         found.push({
@@ -71707,9 +71929,9 @@ var MapChatConversation = class {
       this.planToken++;
       this.ports.clearPreview();
       this.ports.chain().interruptChain(run, "map_changed");
-      const skip = [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }];
-      chat.settlePlan(card, "cancelled", skip);
-      (_a2 = this.ports.plans().get(card)) == null ? void 0 : _a2.plan("cancelled", skip);
+      const skip2 = [{ status: "skipped", text: t("ui.map_chat_skip_map_changed") }];
+      chat.settlePlan(card, "cancelled", skip2);
+      (_a2 = this.ports.plans().get(card)) == null ? void 0 : _a2.plan("cancelled", skip2);
       return;
     }
     this.applying = true;
@@ -72857,15 +73079,15 @@ var GoalSuggest = class {
       });
     });
     const foot = panel.createDiv("vam-goal-suggest-foot");
-    const skip = foot.createEl("button", { cls: "vam-goal-suggest-skip", text: t("ui.goal_suggest_skip") });
+    const skip2 = foot.createEl("button", { cls: "vam-goal-suggest-skip", text: t("ui.goal_suggest_skip") });
     const add = foot.createEl("button", { cls: "vam-goal-suggest-add mod-cta" });
     const syncAdd = () => {
       add.setText(t("ui.goal_suggest_add_0", task.checked.size));
       add.disabled = applying || task.checked.size === 0;
     };
     syncAdd();
-    skip.disabled = applying;
-    skip.addEventListener("click", (event) => {
+    skip2.disabled = applying;
+    skip2.addEventListener("click", (event) => {
       event.stopPropagation();
       this.end(task, { refocus: true });
     });
@@ -77713,14 +77935,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
         const file = this.app.vault.getAbstractFileByPath(path);
         return file instanceof import_obsidian39.TFile ? file : null;
       },
-      applyBookPlanEdit: async (action, baseline) => {
-        this.bookPlanApplying = true;
-        try {
-          return await applyBookPlanEdit(this.bookPlanChatDeps(), action, baseline);
-        } finally {
-          this.bookPlanApplying = false;
-        }
-      }
+      applyBookPlanEdit: (action, baseline) => this.applyingBookPlan(() => applyBookPlanEdit(this.bookPlanChatDeps(), action, baseline)),
+      applyBookThreadEdit: (action, baseline) => this.applyingBookPlan(() => applyBookThreadEdit(this.bookPlanChatDeps(), action, baseline)),
+      applyBookStructureEdit: (action, baseline) => this.applyingBookPlan(() => applyBookStructureEdit(this.bookPlanChatDeps(), action, baseline))
     }));
     /** True while the chat writes a plan edit to the cards: the book run does not start writing meanwhile. */
     __publicField(this, "bookPlanApplying", false);
@@ -78171,13 +78388,24 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
   set chatChain(run) {
     this.chatChainRunner.current = run;
   }
+  /** The book run's own "direction is right" is blocked while the plan is being written (bookPipelineBlocked). */
+  async applyingBookPlan(work) {
+    this.bookPlanApplying = true;
+    try {
+      return await work();
+    } finally {
+      this.bookPlanApplying = false;
+    }
+  }
   bookPlanChatDeps() {
     return {
       map: () => this.map,
       readMap: () => this.plugin.repo.readMap(this.path),
       readCard: (path) => this.plugin.readBookCardForChat(path),
       updateNoteGuarded: (path, patch, options) => this.plugin.repo.updateNoteGuarded(path, patch, options),
-      language: () => this.plugin.settings.language
+      language: () => this.plugin.settings.language,
+      updateNoteRawGuarded: (path, transform, options) => this.plugin.repo.updateNoteRawGuarded(path, transform, options),
+      editStructure: (ops, expect, opening) => this.plugin.editBookStructureAtReview(this.path, ops, expect, opening)
     };
   }
   /** Files changed while VAM was writing that this view has not read back yet (the plugin fills it; see synchronize). */
@@ -95392,7 +95620,7 @@ ${note.detail.trim()}` : "",
         void this.rerunChatBatch(message).catch((error) => errorNotice(error));
       },
       modelName: (id) => this.plugin.modelLabel(id),
-      planReview: () => reviewRun(this.map) !== void 0,
+      planReview: () => reviewRun(this.map) !== void 0 || replanRun(this.map) !== void 0,
       resolveLink: (link) => {
         var _a2, _b2;
         const file = this.app.metadataCache.getFirstLinkpathDest(link, (_b2 = (_a2 = this.sourceMarkdownFile()) == null ? void 0 : _a2.path) != null ? _b2 : "");
@@ -96671,6 +96899,8 @@ ${note.detail.trim()}` : "",
         try {
           const unsaved = autoChain ? await this.backupBeforeAutoWrite(autoChain, write, run) : null;
           if (unsaved) box.outcome = unsaved;
+          else if (write.kind === "edit_book_structure")
+            box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own2, same2, run));
           else
             await this.plugin.mutate(async () => {
               box.outcome = await this.history.ownWrites(() => this.applyChatWrite(write, own2, same2, run));

@@ -162,6 +162,16 @@ export interface ChatWriterPorts {
     action: Extract<MapChatAction, { kind: "edit_book_plan" }>,
     baseline: Pick<MapChatContext, "bookPlan">
   ): Promise<ChatOutcome>;
+  /** Writes an `edit_book_thread` reply to the root note's thread lines. */
+  applyBookThreadEdit(
+    action: Extract<MapChatAction, { kind: "edit_book_thread" }>,
+    baseline: Pick<MapChatContext, "bookPlan">
+  ): Promise<ChatOutcome>;
+  /** Applies an `edit_book_structure` reply through the book run (never the generic map writer). */
+  applyBookStructureEdit(
+    action: Extract<MapChatAction, { kind: "edit_book_structure" }>,
+    baseline: Pick<MapChatContext, "bookPlan">
+  ): Promise<ChatOutcome>;
 }
 /** Writes the actions of a map chat reply (one action at a time) to the map and the vault; the view keeps the loop and the undo step. */
 export class ChatActionWriter {
@@ -208,9 +218,8 @@ export class ChatActionWriter {
     const gone = skipped("ui.map_chat_skip_topic_gone");
     const done: ChatOutcome = { status: "done" };
     if (action.kind === "edit_book_plan") return this.ports.applyBookPlanEdit(action, baseline);
-    // TEMPORARY (book plan chat step 2, P3): the apply path of these two kinds comes in P4; until then they are skipped.
-    if (action.kind === "edit_book_structure" || action.kind === "edit_book_thread")
-      return skipped("ui.map_chat_skip_book_started");
+    if (action.kind === "edit_book_thread") return this.ports.applyBookThreadEdit(action, baseline);
+    if (action.kind === "edit_book_structure") return this.ports.applyBookStructureEdit(action, baseline);
     const configDir = this.app.vault.configDir;
     /** The real id behind an id of the reply; null when it names a card of this reply that was never created. */
     const real = (id: string): string | null =>

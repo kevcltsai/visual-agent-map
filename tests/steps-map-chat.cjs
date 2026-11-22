@@ -2024,6 +2024,11 @@ test('book plan: edit_book_thread needs a bookPlan and a text; a second thread i
   assert.deepEqual(result.actions, [{ kind: 'edit_book_thread', content: 'New' }]);
   assert.deepEqual(result.rejected.map(r => r.code), ['book_duplicate', 'missing_field']);
 });
+test('book plan: the thread comes before the briefs and the structure last, whatever order the reply had', () => {
+  const ctx = context({ bookPlan: bookPlan() });
+  const result = parse(reply(item('rename_topic', { nodeId: 'b', title: 'B2' }), planItem(planChange('c1', { entry: 'one' })), item('edit_book_thread', { content: 'T' })), ctx);
+  assert.deepEqual(result.actions.map(a => a.kind), ['edit_book_thread', 'edit_book_plan', 'edit_book_structure']);
+});
 test('book plan: a card id that an earlier edit_book_plan already changed is dropped from a later one (counted)', () => {
   const ctx = context({ bookPlan: bookPlan() });
   const result = parse(reply(planItem(planChange('c1', { entry: 'one' })), planItem(planChange('c1', { entry: 'two' }), planChange('c2', { entry: 'x' })), planItem(planChange('c1', { entry: 'three' }))), ctx);

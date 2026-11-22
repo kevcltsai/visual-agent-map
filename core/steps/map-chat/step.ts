@@ -1027,6 +1027,10 @@ export function parseMapChat(
       rejected.push({ index, code: error.code });
     }
   });
+  // The thread goes in before the briefs that follow it, and the structure last (the apply order).
+  const thread = actions.findIndex(action => action.kind === "edit_book_thread");
+  const firstBrief = actions.findIndex(action => action.kind === "edit_book_plan");
+  if (thread > firstBrief && firstBrief >= 0) actions.splice(firstBrief, 0, ...actions.splice(thread, 1));
   if (items.length) actions.push({ kind: "edit_book_structure", items });
   const progress = normalizeProgress(body.progress);
   return {

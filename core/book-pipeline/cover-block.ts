@@ -1,18 +1,27 @@
 /**
- * The cover block of a picture-book note (plan 2026-11-21-book-cover-image, A2): it sits directly under `# Title`,
+ * The cover of a picture-book card (plan 2026-11-21-book-cover-image; moved out of the text by 2026-11-22-book-cover-placement). The
+ * picture is shown by the card and the export through `topic-cover`; the note's text has no cover in it. What the program needs to know
+ * about the cover it placed is one frontmatter key,
+ *
+ *   book-cover: "{\"file\":\"…\",\"key\":\"…\"}"        (or {"missing":1} when no cover was found; "off":1 when it may not fit)
+ *
+ * and the picture's credit is one line of the card's Sources list (`- 圖「…」（封面）：…`).
+ *
+ * Older notes have a cover block directly under `# Title` instead:
  *
  *   <!-- book-cover:v1 {"file":"…","key":"…","hash":"…"} -->
  *   ![[file]] / caption / 這張圖可能對不上 / 來源：[Wikimedia Commons](…)      (or the "no cover found" line)
  *   <!-- book-cover:end -->
  *
- * The marker records which file the program placed, the picture's key (other cards read it, so one picture is used once per book) and
- * a hash of the block's text; a block the owner edited no longer matches its hash and is then theirs. Pure: no I/O.
+ * It is still read (a block the owner edited no longer matches its hash and is then theirs), and {@link migrateLegacyCover} turns the
+ * program's own intact block into the key and the credit line. Pure: no I/O.
  */
 
 import { imageKey } from "./image-dedupe";
 import { fencedLines } from "./note-sections";
 import { safeHref } from "./proof";
 import { escapeMarkdownText, hashText } from "./text";
+import { translateNote, type ContentLanguage } from "../../i18n";
 
 export type CoverLevel = "chapter" | "section" | "book";
 export type CoverLanguage = "zh" | "en";
@@ -51,7 +60,7 @@ const json = (value: object): string => JSON.stringify(value).replace(/</g, "\\u
 const wrap = (record: object, inner: string): string => `<!-- book-cover:v1 ${json(record)} -->\n${inner}\n${END_LINE}`;
 
 /** A Commons file description page (`https://commons.wikimedia.org/wiki/File:…`) as a safe link, or undefined. */
-function commonsFilePage(value: string): string | undefined {
+export function commonsFilePage(value: string): string | undefined {
   const href = safeHref(value);
   if (!href) return undefined;
   const url = new URL(href);
@@ -154,9 +163,69 @@ export function readCoverBlock(raw: string): CoverBlock | undefined {
   };
 }
 
-/** The picture key a card's cover block records (other cards read it, so the same picture is not used twice in a book). */
+/** What the program recorded about a card's cover: the frontmatter `book-cover` key, or (older notes) the block under the title. */
+export interface CoverRecord {
+  file?: string;
+  key?: string;
+  caption?: string;
+  missing: boolean;
+  /** The placed picture may not fit the card (the card is flagged for a look). */
+  off: boolean;
+  /** Set when read from an old in-text block. */
+  block?: CoverBlock;
+}
+
+/** What {@link setCoverRecord} writes: a placed cover, or `{ missing: 1 }`. */
+export type CoverRecordValue = { file: string; key: string; caption?: string; off?: 1 } | { missing: 1 };
+
+const RECORD_KEY = "book-cover";
+
+/** The `book-cover` frontmatter line's value as a record, or undefined (no key, not JSON, neither a placed nor a missing record). */
+function frontmatterRecord(raw: string): CoverRecord | undefined {
+  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(raw);
+  const line = frontmatter ? new RegExp(`^${RECORD_KEY}:[ \\t]*(.*?)[ \\t]*$`, "m").exec(frontmatter[1]) : null;
+  if (!line) return undefined;
+  let value: unknown;
+  try {
+    // The key is written as a double-quoted YAML string; a tidy of the frontmatter may have turned it into a single-quoted or plain one.
+    const text = line[1].startsWith("'") && line[1].endsWith("'") ? line[1].slice(1, -1).replace(/''/g, "'") : line[1];
+    value = JSON.parse(text);
+    if (typeof value === "string") value = JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+  if (typeof value !== "object" || value === null) return undefined;
+  const record = value as { file?: unknown; key?: unknown; caption?: unknown; missing?: unknown; off?: unknown };
+  if (record.missing === 1) return { missing: true, off: false };
+  if (typeof record.file !== "string" || !record.file || typeof record.key !== "string") return undefined;
+  return {
+    file: record.file,
+    key: record.key,
+    ...(typeof record.caption === "string" ? { caption: record.caption } : {}),
+    missing: false,
+    off: record.off === 1
+  };
+}
+
+/** The cover the note records: the frontmatter key first, else an old block under the title (see {@link readCoverBlock}). */
+export function readCoverRecord(raw: string): CoverRecord | undefined {
+  const own = frontmatterRecord(raw);
+  if (own) return own;
+  const block = readCoverBlock(raw);
+  return block
+    ? {
+        ...(block.file ? { file: block.file } : {}),
+        ...(block.key ? { key: block.key } : {}),
+        missing: block.missing,
+        off: block.off,
+        block
+      }
+    : undefined;
+}
+
+/** The picture key a card's cover records (other cards read it, so the same picture is not used twice in a book). */
 export function coverSourceKey(raw: string): string | undefined {
-  return readCoverBlock(raw)?.key;
+  return readCoverRecord(raw)?.key;
 }
 
 /**
@@ -176,27 +245,26 @@ export function stripAllCoverBlocks(raw: string): string {
   return text;
 }
 
-/** The note's placed cover is the program's own intact block and says the picture may not fit its ask. */
+/** The note's placed cover is the program's own and its record says the picture may not fit its ask. */
 export function coverIsOff(raw: string): boolean {
-  const block = readCoverBlock(raw);
-  return !!block && block.intact && block.off;
+  const record = readCoverRecord(raw);
+  return !!record && record.off && coverOwnership(raw) === "program";
 }
 
 /**
- * Who owns a note's cover. `none`: no `topic-cover` and no block, the program may write one. `program`: the block is intact and agrees with
- * `topic-cover` (a placed block whose file `topic-cover` names, or a not-found block with no `topic-cover`; an intact placed block whose
- * `topic-cover` was only removed counts too, it is still the program's text). `owner`: everything else (`topic-cover: none`, a `topic-cover`
- * with no block or another file, a block whose text changed): the program must not find, write or replace anything.
+ * Who owns a note's cover. `none`: no record, no `topic-cover`, no block: the program may write one. `program`: the record agrees with
+ * `topic-cover` (a placed record whose file `topic-cover` names or that has no `topic-cover`; a not-found record with no `topic-cover`).
+ * An old block counts only while intact (unedited), by the same rule. `owner`: everything else (`topic-cover: none`, a `topic-cover`
+ * with no record or another file, an edited old block): the program must not find, write or replace anything.
  */
 export function coverOwnership(raw: string): "none" | "program" | "owner" {
   const declared = declaredCover(raw);
-  const block = readCoverBlock(raw);
-  if (!block) return declared === undefined ? "none" : "owner";
-  if (!block.intact) return "owner";
+  const record = readCoverRecord(raw);
+  if (!record) return declared === undefined ? "none" : "owner";
+  if (record.block && !record.block.intact) return "owner";
   if (declared === undefined) return "program";
-  if (block.missing || !block.file) return "owner";
-  const target = /^\[\[([^\]|]*)(?:\|[^\]]*)?\]\]$/.exec(declared)?.[1].trim();
-  return target === block.file ? "program" : "owner";
+  if (record.missing || !record.file) return "owner";
+  return coverDeclaredTarget(raw) === record.file ? "program" : "owner";
 }
 
 /** The file `topic-cover` already links (`[[path]]` or `[[path|alias]]`), or undefined when there is none or it is not a link. */
@@ -210,6 +278,61 @@ function declaredCover(raw: string): string | undefined {
   const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(raw);
   const line = frontmatter ? /^topic-cover:[ \t]*(.*?)[ \t]*$/m.exec(frontmatter[1]) : null;
   return line ? line[1].replace(/^["']|["']$/g, "") : undefined;
+}
+
+/**
+ * Sets the `book-cover` frontmatter line (a YAML double-quoted string holding the record's JSON); everything else stays as written. The
+ * JSON has no space in it (`\u0020`), so a YAML writer that folds long lines at spaces can never split it.
+ */
+export function setCoverRecord(raw: string, record: CoverRecordValue): string {
+  const eol = eolOf(raw);
+  const line = `${RECORD_KEY}: ${JSON.stringify(JSON.stringify(record).replace(/ /g, "\\u0020"))}`;
+  const match = /^---\r?\n([\s\S]*?)\r?\n---(?=\r?\n|$)/.exec(raw);
+  if (!match) return `---${eol}${line}${eol}---${eol}${raw}`;
+  const lines = match[1].split(/\r?\n/);
+  const at = lines.findIndex(value => value.startsWith(`${RECORD_KEY}:`));
+  if (at >= 0) lines[at] = line;
+  else lines.push(line);
+  return `---${eol}${lines.join(eol)}${eol}---${raw.slice(match[0].length)}`;
+}
+
+/** Takes an old block out of the text (if any) and records the cover in the frontmatter instead. */
+export function placeCover(raw: string, record: CoverRecordValue): string {
+  return setCoverRecord(stripCoverBlock(raw), record);
+}
+
+/**
+ * The program's own intact old block as what replaces it: the record and, for a placed cover, its credit (the Commons file page and the
+ * Sources-list entry). Undefined when the note has no such block, it was edited, it has another cover record already, or its source
+ * link cannot be read (it is then left as it is: still read as before).
+ */
+export function migrateLegacyCover(
+  raw: string,
+  language: string,
+  title: string
+): { record: CoverRecordValue; credit?: { href: string; entry: string } } | undefined {
+  const block = readCoverBlock(raw);
+  if (!block || !block.intact || frontmatterRecord(raw)) return undefined;
+  if (block.missing) return { record: { missing: 1 } };
+  if (!block.file || !block.key) return undefined;
+  const inner = raw.slice(block.from, block.to).replace(/\r/g, "").split("\n").slice(1, -1);
+  const href = commonsFilePage(/\]\((https:[^)\s]+)\)$/.exec(inner[inner.length - 1] ?? "")?.[1] ?? "");
+  if (!href) return undefined;
+  const caption = inner.slice(1, -1).filter(value => value !== OFF_TEXT.zh && value !== OFF_TEXT.en)[0] ?? "";
+  const lang = language as ContentLanguage;
+  const link = `[${translateNote(lang, "note.image_link")}](${href.replace(/\(/g, "%28").replace(/\)/g, "%29")})`;
+  return {
+    record: { file: block.file, key: block.key, ...(caption ? { caption } : {}), ...(block.off ? { off: 1 } : {}) },
+    credit: {
+      href,
+      entry: translateNote(
+        lang,
+        "note.cover_source_entry_0_1",
+        caption || escapeMarkdownText(title, 200),
+        translateNote(lang, "note.image_source_0_1", "commons.wikimedia.org", link)
+      )
+    }
+  };
 }
 
 /** The first `# Title` line outside the frontmatter and code fences: where it starts and where the line break after it ends. */

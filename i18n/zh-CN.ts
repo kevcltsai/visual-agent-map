@@ -2388,6 +2388,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "note.image_source_0_1": "{0}（{1}）",
   "note.image_source_label_0": "来源：{0}",
   "note.image_source_entry_0_1": "图“{0}”：{1}",
+  "note.cover_source_entry_0_1": "图“{0}”（封面）：{1}",
   "log.ai_split_failed": "AI 拆解失败",
   "log.integration_directions_failed": "整合方向建议失败",
   "log.child_integration_failed": "子议题整合失败",

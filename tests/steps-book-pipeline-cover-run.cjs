@@ -1,5 +1,5 @@
 // Cover image B3: download, save and write back of a card's cover (plan 2026-11-21-book-cover-image): the real downloadCover and saveCover run behind fake network and vault ports;
-// the block and topic-cover land in the one guarded write; owner-held, old-book, failed, stopped and parallel cases. (rig copied from steps-book-pipeline-images.cjs)
+// the book-cover record, the Sources credit and topic-cover land in the one guarded write (the note's text has no cover block); owner-held, old-book, failed, stopped, parallel and old-block migration cases. (rig copied from steps-book-pipeline-images.cjs)
 // allow-list of BookPipelineRuns, with fake ports over the real repository fixture. The provider, probe and step runner are fakes.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -141,21 +141,41 @@ const coverSlotOf = request => request.slots.find(slot => slot.index === 0);
 const topicCover = raw => /^topic-cover: "?(.*?)"?$/m.exec(raw)?.[1];
 const FOLDER_RE = /封面圖\/SecretRootTitle-[0-9a-z]+\.png/;
 
+const recordOf2 = raw => blockLib.readCoverRecord(raw);
+const recLine = raw => /^book-cover: .*$/m.exec(raw)?.[0];
+const noBlock = raw => !blockLib.readCoverBlock(raw) && !/^<!-- book-cover:(?:v1|end)/m.test(raw);
+const creditLines = detail => detail.split('\n').filter(line => /（封面）/.test(line));
+const withoutCredit = detail => detail.split('\n').filter(line => !/（封面）/.test(line)).join('\n');
+const OWN_LINK = 'topic-cover: "[[mine.png]]"';
+/** The note as an older run left it: the cover block (intact, or with `edit` applied to its source line) under the title and no record. */
+const toLegacy = (raw, n, edit) => {
+  const rec = blockLib.readCoverRecord(raw);
+  let text = blockLib.composeCoverBlock('chapter', 'zh', { file: rec.file, url: coverCand(n).url, caption: zhCaption(1), sourceUrl: coverCand(n).source });
+  if (edit) text = text.replace('來源：', '我自己加的一行\n來源：');
+  return blockLib.putCoverBlock(raw.replace(/^book-cover: .*\n/m, ''), text);
+};
 const coverBlockOf = raw => { const b = blockLib.readCoverBlock(raw); return b ? raw.slice(b.from, b.to) : undefined; };
 /** Each card is offered its own cover picture (the second chapter Cover2, the others Cover1), so no card loses its cover to another. */
 const perCard = request => found({ 1: [cand(/SecondChapter/.test(request.chapter) ? 2 : 1)], ...(coverSlotOf(request) ? { 0: [coverCand(/SecondChapter/.test(request.chapter) ? 2 : 1, { caption: zhCaption(1) })] } : {}) });
 const coverFiles = r => [...r.files.keys()];
 const html = () => ({ status: 200, headers: { 'content-type': 'text/html' }, bytes: Buffer.from('<html>').buffer.slice(0) });
 
-test('cover run: a found cover is downloaded (thumbnail only, policy headers only), saved in the book\'s cover folder and written in the one write: block under the title, topic-cover, source link, log counts only', async () => {
+test('cover run: a found cover is downloaded (thumbnail only, policy headers only), saved in the book\'s cover folder and written in the one write: book-cover record, topic-cover, Sources credit (nothing in the text), log counts only', async () => {
   const r = await coverRig();
   await run(r);
   const raw = r.raw(0);
-  assert.match(raw, /^# SecretRootTitle\n\n<!-- book-cover:v1 /m, 'the block sits directly under the title');
-  assert.match(raw, /\n!\[\[Agent Workspace\/Mind Maps\/Book\/Notes\/封面圖\/SecretRootTitle-[0-9a-f]+\.png\]\]\n大教堂圓頂的照片 1\n來源：\[Wikimedia Commons\]\(https:\/\/commons\.wikimedia\.org\/wiki\/File:Cover1\.jpg\)\n<!-- book-cover:end -->/);
+  assert.ok(noBlock(raw), 'the note\'s text has no cover block');
+  assert.ok(!/book-cover:(?:v1|end)/.test(raw) && !/!\[\[[^\]]*封面圖/.test(raw) && !/大教堂圓頂的照片/.test(raw.slice(raw.indexOf('\n---\n', 3))), 'no marker, picture or caption in the text');
+  assert.match(raw, /^# SecretRootTitle\n\n(?!<!--)/m);
   assert.match(topicCover(raw), /^\[\[Agent Workspace\/Mind Maps\/Book\/Notes\/封面圖\/SecretRootTitle-[0-9a-f]+\.png\]\]$/);
-  assert.equal(blockLib.coverOwnership(raw), 'program', 'block and topic-cover agree');
-  assert.equal(raw.split('book-cover:v1').length - 1, 1);
+  const rec = recordOf2(raw);
+  assert.match(rec.file, /^Agent Workspace\/Mind Maps\/Book\/Notes\/封面圖\/SecretRootTitle-[0-9a-f]+\.png$/);
+  assert.equal(rec.caption, zhCaption(1)); assert.equal(rec.off, false); assert.equal(rec.block, undefined);
+  assert.match(recLine(raw), /^book-cover: ["']\{\\?"file\\?":/, 'one JSON string in the frontmatter');
+  assert.equal(blockLib.coverOwnership(raw), 'program', 'record and topic-cover agree');
+  const credit = creditLines((await r.note(0)).detail);
+  assert.equal(credit.length, 1, 'one credit line in the Sources list');
+  assert.match(credit[0], /^- 圖「.+」（封面）：commons\.wikimedia\.org（\[連結\]\(https:\/\/commons\.wikimedia\.org\/wiki\/File:Cover1\.jpg\)/);
   assert.deepEqual(coverFiles(r).length, 1); assert.match(coverFiles(r)[0], /\/封面圖\/SecretRootTitle-[0-9a-f]+\.png$/);
   assert.deepEqual(plain(r.net.map(call => call.url)), ['https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Cover1.jpg/1280px-Cover1.jpg'].concat(r.net.length > 1 ? plain(r.net.slice(1).map(call => call.url)) : []).slice(0, r.net.length));
   assert.ok(r.net.every(call => /^https:\/\/upload\.wikimedia\.org\//.test(call.url)), 'only upload.wikimedia.org is asked');
@@ -166,16 +186,15 @@ test('cover run: a found cover is downloaded (thumbnail only, policy headers onl
   assert.ok(!/Cover1|wikimedia|封面圖|SecretRootTitle/.test(r.stat.logs.filter(line => line.includes('cover_')).join('\n')), 'the cover log lines carry no address, title or file name');
   // The picture's key is on the note, so another card reads it (one picture once per book).
   assert.equal(blockLib.coverSourceKey(raw), imageKey(coverCand(1).url));
+  assert.equal(raw.split('\nbook-cover: ').length - 1, 1);
 });
 
-test('cover run: nothing found is said at each level (book, chapter, section) and written as the only content of the block; no topic-cover, nothing borrowed from the level above', async () => {
+test('cover run: nothing found is recorded at each level (book, chapter, section) as {"missing":1} only: no sentence in the text, no credit, no topic-cover, nothing borrowed from the level above', async () => {
   const r = await coverRig({ titles: ['SecretRootTitle', 'ChapterA', 'SectionB'], finder: request => found({ 1: [cand(request.slots.length)], ...(/SecretRootTitle/.test(request.chapter) ? { 0: [coverCand(1, { caption: zhCaption(1) })] } : {}) }) });
   await r.repo.updateMap(r.mapPath, d => { d.nodes[2].parentId = d.nodes[1].id; });
   await run(r);
-  assert.match(coverBlockOf(r.raw(0)), /!\[\[/, 'the book has its cover');
-  assert.equal(coverBlockOf(r.raw(1)).split('\n').slice(1, -1).join('\n'), '這一章沒找到合適的封面圖。');
-  assert.equal(coverBlockOf(r.raw(2)).split('\n').slice(1, -1).join('\n'), '這一節沒找到合適的封面圖。');
-  for (const i of [1, 2]) { assert.equal(topicCover(r.raw(i)), undefined); assert.ok(!/封面圖\//.test(r.raw(i)), 'no file of the level above'); assert.equal(blockLib.coverOwnership(r.raw(i)), 'program'); }
+  assert.ok(recordOf2(r.raw(0)).file, 'the book has its cover');
+  for (const i of [1, 2]) { assert.deepEqual(plain(recordOf2(r.raw(i))), { missing: true, off: false }); assert.equal(r.raw(i).split('\nbook-cover: ').length - 1, 1); assert.ok(noBlock(r.raw(i)) && !/沒找到合適的封面圖/.test(r.raw(i)), 'no sentence in the text'); assert.equal(creditLines((await r.note(i)).detail).length, 0); assert.equal(topicCover(r.raw(i)), undefined); assert.ok(!/封面圖\//.test(r.raw(i)), 'no file of the level above'); assert.equal(blockLib.coverOwnership(r.raw(i)), 'program'); }
   assert.equal(coverFiles(r).length, 1);
   assert.ok(r.stat.logs.some(line => /cover_missing/.test(line)));
 });
@@ -185,7 +204,7 @@ test('cover run: the book root with no body slots searches for its cover alone a
   await run(none);
   assert.equal(none.calls.length, 2, 'one cover-only search for each card (no body slot anywhere)');
   assert.ok(none.calls.every(call => call.slots.length === 1 && call.slots[0].index === 0));
-  assert.ok(coverBlockOf(none.raw(0)) && coverBlockOf(none.raw(1)));
+  assert.ok(recordOf2(none.raw(0)) && recordOf2(none.raw(1)), 'each card has its cover record (both asked for the same picture: one has it, one is recorded as not found)');
 });
 
 test('cover run: a failed download (error status, html, six megabytes, bytes that are not the header\'s type, a thrown request) is "not found" with no file written and no topic-cover; the claim is given back so a rerun gets it', async () => {
@@ -196,7 +215,7 @@ test('cover run: a failed download (error status, html, six megabytes, bytes tha
     const r = await coverRig({ titles: ['SecretRootTitle', 'SecondChapter'], net: { respond: (url, n) => working ? { status: 200, headers: { 'content-type': 'image/png' }, bytes: PNG.buffer.slice(0) } : respond(url, n) }, finder: request => found({ 1: [cand(/SecondChapter/.test(request.chapter) ? 2 : 1)], ...(coverSlotOf(request) && /SecondChapter/.test(request.chapter) ? { 0: [coverCand(1, { caption: zhCaption(1) })] } : {}) }) });
     await run(r);
     assert.equal(r.files.size, 0, 'nothing written to the vault');
-    assert.equal(coverBlockOf(r.raw(1)).split('\n').slice(1, -1).join('\n'), '這一章沒找到合適的封面圖。');
+    assert.equal(recordOf2(r.raw(1)).missing, true); assert.ok(noBlock(r.raw(1)) && !/沒找到合適的封面圖/.test(r.raw(1)));
     assert.equal(topicCover(r.raw(1)), undefined);
     assert.ok(r.stat.logs.some(line => /cover_download_failed/.test(line)));
     // The network is back: the same card again. A claim left behind by the failure would keep it from the same picture.
@@ -209,7 +228,7 @@ test('cover run: a failed download (error status, html, six megabytes, bytes tha
   }
 });
 
-test('cover run: a cover the owner holds is left byte for byte: topic-cover none, a topic-cover of their own with no block, a block they edited', async () => {
+test('cover run: a cover the owner holds is left byte for byte: topic-cover none, a topic-cover of their own with no record, a topic-cover moved to another file, an old block they edited', async () => {
   for (const seed of ['topic-cover: none', 'topic-cover: "[[mine.png]]"']) {
     const r = await coverRig();
     await r.repo.updateNoteRawGuarded(r.nodes[0].path, raw => raw.replace(/^---\n/, `---\n${seed}\n`), {});
@@ -220,20 +239,34 @@ test('cover run: a cover the owner holds is left byte for byte: topic-cover none
     assert.equal(/^topic-cover: .*$/m.exec(raw)[0], seed, `${seed}: the line is as it was`);
     assert.equal(r.files.size, 0);
   }
-  // A block the owner edited: placed by a first run, then changed; the chapter written again leaves it as it is.
+  // A cover placed by a first run, then pointed at another picture by the owner: the chapter written again leaves it and the record as they are.
   const r = await coverRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: perCard });
   await run(r);
-  const placed = coverBlockOf(r.raw(1));
+  const placed = recLine(r.raw(1));
   assert.ok(placed);
-  const edited = placed.replace(/來源：/, '我自己加的一行\n來源：');
-  await r.repo.updateNoteRawGuarded(r.nodes[1].path, raw => raw.replace(placed, edited), {});
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, raw => raw.replace(/^topic-cover: .*$/m, OWN_LINK), {});
   const before = r.net.length;
   await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
   while (r.runs.isRunning(r.mapPath)) await tick();
   await settle();
-  assert.equal(coverBlockOf(r.raw(1)), edited, 'the edited block is untouched');
+  assert.equal(topicCover(r.raw(1)), '[[mine.png]]', 'their cover line is untouched');
+  assert.equal(recLine(r.raw(1)), placed, 'the record is untouched');
+  assert.equal(blockLib.coverOwnership(r.raw(1)), 'owner');
   assert.equal(r.net.length, before, 'no new download');
   assert.ok(r.stat.logs.some(line => /cover_owner_kept/.test(line)), 'the kept cover is counted');
+  // An old block the owner edited (no record): the chapter written again leaves it as it is, nothing is searched or downloaded for it.
+  const old = await coverRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: perCard });
+  await run(old);
+  await old.repo.updateNoteRawGuarded(old.nodes[1].path, raw => toLegacy(raw, 2, true), {});
+  const edited = coverBlockOf(old.raw(1));
+  assert.match(edited, /我自己加的一行/);
+  const oldBefore = old.net.length;
+  await old.runs.rerunCard(old.mapPath, old.nodes[1].id);
+  while (old.runs.isRunning(old.mapPath)) await tick();
+  await settle();
+  assert.equal(coverBlockOf(old.raw(1)), edited, 'the edited block is untouched');
+  assert.equal(recLine(old.raw(1)), undefined, 'no record written next to it');
+  assert.equal(old.net.length, oldBefore, 'no new download');
 });
 
 test('cover run: an older book (no cover line in the Prompt) gets no cover search, no block, no "not found" line, and no new request', async () => {
@@ -243,15 +276,15 @@ test('cover run: an older book (no cover line in the Prompt) gets no cover searc
   assert.equal(r.net.length, 0); assert.ok(r.calls.every(call => !coverSlotOf(call)));
 });
 
-test('cover run: the same chosen picture again is idempotent: the block and the file are the same after the card is written again', async () => {
+test('cover run: the same chosen picture again is idempotent: the record, the credit and the file are the same after the card is written again', async () => {
   const r = await coverRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: perCard });
   await run(r);
-  const first = coverBlockOf(r.raw(1)); const link = topicCover(r.raw(1)); const filesBefore = r.files.size;
-  assert.ok(first);
+  const first = recLine(r.raw(1)); const link = topicCover(r.raw(1)); const filesBefore = r.files.size; const credit = creditLines((await r.note(1)).detail);
+  assert.ok(first); assert.equal(credit.length, 1);
   await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
   while (r.runs.isRunning(r.mapPath)) await tick();
   await settle();
-  assert.equal(coverBlockOf(r.raw(1)), first); assert.equal(topicCover(r.raw(1)), link);
+  assert.equal(recLine(r.raw(1)), first); assert.equal(topicCover(r.raw(1)), link); assert.deepEqual(creditLines((await r.note(1)).detail), credit, 'the credit is not doubled');
   assert.equal(r.files.size, filesBefore, 'the rerun reused its file (nothing new saved)');
 });
 
@@ -261,27 +294,29 @@ test('cover run: three cards ask for the same picture at once: exactly one gets 
   const owners = [0, 1, 2].filter(i => topicCover(r.raw(i)));
   assert.equal(owners.length, 1, 'one card has the picture');
   assert.equal(r.net.length, 1);
-  assert.equal([0, 1, 2].filter(i => /沒找到合適的封面圖/.test(r.raw(i))).length, 2);
+  assert.equal([0, 1, 2].filter(i => recordOf2(r.raw(i))?.missing).length, 2);
   const keys = [0, 1, 2].map(i => blockLib.coverSourceKey(r.raw(i))).filter(Boolean);
   assert.deepEqual(keys, [imageKey(coverCand(1).url)]);
 });
 
-test('cover run: the caption: a file name alone, or another script than the book\'s, is left out; a placed cover that names none of what was asked says "this picture may not match"', async () => {
-  const run1 = async caption => { const r = await coverRig({ finder: request => found({ 1: [cand(1)], ...(coverSlotOf(request) ? { 0: [coverCand(1, { caption, title: 'Florence Cathedral dome' })] } : {}) }) }); await run(r); return coverBlockOf(r.raw(0)).split('\n').slice(1, -1); };
-  assert.equal((await run1('Cover1.jpg')).length, 2, 'embed and source only');
-  assert.equal((await run1('File:Cover1.jpg')).length, 2);
-  assert.equal((await run1('The dome of Florence cathedral seen from the south')).length, 2, 'an English caption in a Chinese book');
-  assert.equal((await run1(zhCaption(1))).length, 3, 'a Chinese caption stays');
+test('cover run: the caption: a file name alone, or another script than the book\'s, is left out of the record; a placed cover that names none of what was asked is recorded with off', async () => {
+  const run1 = async caption => { const r = await coverRig({ finder: request => found({ 1: [cand(1)], ...(coverSlotOf(request) ? { 0: [coverCand(1, { caption, title: 'Florence Cathedral dome' })] } : {}) }) }); await run(r); return recordOf2(r.raw(0)); };
+  assert.equal((await run1('Cover1.jpg')).caption, undefined, 'no caption in the record');
+  assert.equal((await run1('File:Cover1.jpg')).caption, undefined);
+  assert.equal((await run1('The dome of Florence cathedral seen from the south')).caption, undefined, 'an English caption in a Chinese book');
+  assert.equal((await run1(zhCaption(1))).caption, zhCaption(1), 'a Chinese caption stays');
+  assert.equal((await run1(zhCaption(1))).off, false);
   const r = await coverRig({ finder: request => found({ 1: [cand(1)], ...(coverSlotOf(request) ? { 0: [coverCand(1, { caption: zhCaption(1), title: 'Mountain lake', description: 'A lake in the Alps' })] } : {}) }) });
   await run(r);
-  assert.match(coverBlockOf(r.raw(0)), /\n這張圖可能對不上\n/);
+  assert.equal(recordOf2(r.raw(0)).off, true);
+  assert.ok(noBlock(r.raw(0)) && !/這張圖可能對不上/.test(r.raw(0)), 'said in the record and on the check list, not in the text');
 });
 
 test('cover run: a candidate whose source page is not a Commons file page cannot be placed: not found, no topic-cover', async () => {
   const r = await coverRig({ finder: request => found({ 1: [cand(1)], ...(coverSlotOf(request) ? { 0: [coverCand(1, { source: 'https://example.org/page', caption: zhCaption(1) })] } : {}) }) });
   await run(r);
   assert.equal(topicCover(r.raw(0)), undefined);
-  assert.match(coverBlockOf(r.raw(0)), /沒找到合適的封面圖/);
+  assert.equal(recordOf2(r.raw(0)).missing, true);
 });
 
 test('cover run: a stop during the download: the late bytes are dropped, no file, no block, no topic-cover', async () => {
@@ -304,13 +339,13 @@ test('cover run: the body slots, the proof stage and the picture count are the s
   const finder = request => found({ 1: [cand(1)], 2: [cand(2)], ...(coverSlotOf(request) ? { 0: [coverCand(7, { caption: zhCaption(7) })] } : {}) });
   const bodyOnly = async cover => { const r = await coverRig({ cover, slots: 2, text: twoMarkers, finder }); await run(r); const note = await r.note(0); return { detail: note.detail, stage: stageOf(r.raw(0)), record: recordOf(note.detail), issue: /^pipeline-issue: .*$/m.exec(r.raw(0))?.[0], calls: r.calls.length }; };
   const without = await bodyOnly(null); const withCover = await bodyOnly(coverAsk);
-  const noProofIds = text => text.replace(/^> <!-- book-proof:v1 .*$/gm, '');
-  assert.equal(noProofIds(withCover.detail), noProofIds(without.detail), 'the body text, captions and sources are byte for byte the same');
+  const noProofIds = text => text.replace(/^> <!-- book-proof:v1 .*$/gm, '').replace(/^> <!-- book-body:v1 .*$/gm, ''); // the body fingerprint follows the text, which has the credit line
+  assert.equal(noProofIds(withoutCredit(withCover.detail)), noProofIds(without.detail), 'the body text, captions and sources are byte for byte the same (the cover\'s one credit line apart)');
   assert.deepEqual(plain(withCover.record), plain(without.record)); assert.equal(withCover.stage, without.stage); assert.equal(withCover.issue, without.issue);
   assert.equal(withCover.calls, without.calls);
 });
 
-test('cover run: a cover that may not fit puts the card in needs-review with cover:off, a record flag in the block, and one cover item on the closing page; a fitting cover does neither', async () => {
+test('cover run: a cover that may not fit puts the card in needs-review with cover:off, a record flag in book-cover, and one cover item on the closing page; a fitting cover does neither', async () => {
   const pages = [];
   const offFinder = request => found(coverSlotOf(request) ? { 0: [coverCand(1, { caption: zhCaption(1), title: 'Mountain lake', description: 'A lake in the Alps' })] } : {});
   const fitFinder = request => found(coverSlotOf(request) ? { 0: [coverCand(1, { caption: zhCaption(1) })] } : {});
@@ -318,20 +353,19 @@ test('cover run: a cover that may not fit puts the card in needs-review with cov
   const off = await place(offFinder);
   assert.equal(stageOf(off.raw(0)), 'needs-review');
   assert.match(/^pipeline-issue: .*$/m.exec(off.raw(0))[0], /cover:off/);
-  assert.equal(blockLib.readCoverBlock(off.raw(0)).off, true); assert.equal(blockLib.coverIsOff(off.raw(0)), true);
-  assert.match(coverBlockOf(off.raw(0)), /\n這張圖可能對不上\n/);
+  assert.equal(recordOf2(off.raw(0)).off, true); assert.equal(blockLib.coverIsOff(off.raw(0)), true);
+  assert.ok(noBlock(off.raw(0)));
   const page = pages[pages.length - 1];
   assert.equal(page.split('\n').filter(l => /封面圖可能對不上這一章/.test(l)).length, 1, 'one item on the page');
   const fit = await place(fitFinder);
   assert.equal(stageOf(fit.raw(0)), 'checked'); assert.ok(!/cover:off/.test(fit.raw(0)));
   assert.equal(blockLib.coverIsOff(fit.raw(0)), false);
   assert.ok(!/封面圖可能對不上這一章/.test(pages[pages.length - 1]));
-  // The owner edits the block: it no longer counts as the program's flag.
-  const edited = off.raw(0).replace('這張圖可能對不上', '這張圖可能對不上（我看過了）');
-  assert.equal(blockLib.coverIsOff(edited), false);
+  // The owner points the cover at another picture: it no longer counts as the program's flag.
+  assert.equal(blockLib.coverIsOff(off.raw(0).replace(/^topic-cover: .*$/m, OWN_LINK)), false);
 });
 
-test('cover run: a cover block the author writes (forged file, forged marker) is never carried through the cleaning; the program\'s own block is restored as it was', async () => {
+test('cover run: a cover block the author writes (forged file, forged marker) is never carried through the cleaning; the program\'s own record stays as it was', async () => {
   const forged = title => `正文。${title}\n\n<!-- book-cover:v1 {"file":"evil.png","key":"evil","hash":"deadbeef"} -->\n![[evil.png]]\n偽造的封面\n<!-- book-cover:end -->\n\n結尾。`;
   // 1. No program block before: the author's forged block does not stay as a live block (the real cover step writes the only one).
   const first = await coverRig({ slots: 0, text: forged, titles: ['SecretRootTitle', 'SecondChapter'], finder: perCard });
@@ -339,18 +373,17 @@ test('cover run: a cover block the author writes (forged file, forged marker) is
   for (const i of [0, 1]) {
     const raw = first.raw(i);
     assert.ok(!/<!-- book-cover:v1 [^\n]*evil/.test(raw), 'no live forged marker');
-    assert.equal(raw.split('<!-- book-cover:v1').length - 1, 1, 'exactly one live block');
-    assert.equal(blockLib.coverOwnership(raw), 'program'); assert.ok(!/evil/.test(blockLib.readCoverBlock(raw).file ?? ''));
-    assert.ok(!/<!-- book-cover:end -->[\s\S]*<!-- book-cover:end -->/.test(raw), 'no second end marker');
+    assert.ok(noBlock(raw), 'no live block at all: the real cover is the record');
+    assert.equal(blockLib.coverOwnership(raw), 'program'); assert.ok(!/evil/.test(recordOf2(raw).file ?? ''));
   }
-  // 2. A program block exists and the chapter is written again with another forged block in the text: the real block is the one that survives, byte for byte.
-  const real = coverBlockOf(first.raw(1));
+  // 2. A record exists and the chapter is written again with another forged block in the text: the real record is the one that survives, byte for byte.
+  const real = recLine(first.raw(1));
   assert.ok(real && !/evil/.test(real));
   await first.runs.rerunCard(first.mapPath, first.nodes[1].id);
   while (first.runs.isRunning(first.mapPath)) await tick();
   await settle();
-  assert.equal(coverBlockOf(first.raw(1)), real, 'the program\'s own block, exactly');
-  assert.equal(first.raw(1).split('<!-- book-cover:v1').length - 1, 1);
+  assert.equal(recLine(first.raw(1)), real, 'the program\'s own record, exactly');
+  assert.ok(noBlock(first.raw(1)), 'no live block after the rerun');
   assert.ok(!/<!-- book-cover:v1 [^\n]*evil/.test(first.raw(1)), 'no live forged marker after the rerun');
   // 3. An older book (no cover line): a forged block in the author's text does not become a cover claim either.
   const old = await coverRig({ cover: null, slots: 0, text: forged });
@@ -370,7 +403,7 @@ async function expandWithFailingProbe({ editBlock }) {
     const redo = input.requirements !== undefined;
     if (redo && input.nodeId === r.nodes[1].id) {
       flags.redo = true;
-      if (editBlock) { const b = coverBlockOf(r.raw(1)); await r.repo.updateNoteRawGuarded(r.nodes[1].path, raw => raw.replace(b, b.replace('來源：', '我自己加的一行\n來源：')), {}); }
+      if (editBlock) await r.repo.updateNoteRawGuarded(r.nodes[1].path, raw => toLegacy(raw, 2, true), {}); // an older note whose block the owner edited
     }
     const out = await r.repo.updateNoteGuarded(input.path, { detail: redo ? EXPAND_ANSWER : EXPAND_DRAFT }, { authorize: input.authorize, finalize: input.finalize });
     return out === 'written' ? { outcome: 'written' } : { outcome: 'discarded' };
@@ -378,20 +411,20 @@ async function expandWithFailingProbe({ editBlock }) {
   await run(r);
   return r;
 }
-test('cover run (review B-1): a card with a cover goes through the expanding rewrite while a body picture\'s probe fails: the cover block and topic-cover stay byte for byte, and the failed picture is replaced', async () => {
+test('cover run (review B-1): a card with a cover goes through the expanding rewrite while a body picture\'s probe fails: the record, the credit and topic-cover stay as they were, and the failed picture is replaced', async () => {
   const r = await expandWithFailingProbe({ editBlock: false });
   const raw = r.raw(1);
   assert.match(raw, /無圖|沒有圖|no picture|探測|load_failed/i, 'the probe replacement ran');
   assert.ok(!/!\[Work 2\]/.test((await r.note(1)).detail), 'the failed picture is gone');
-  const block = coverBlockOf(raw);
-  assert.ok(block && !/&lt;/.test(block), 'a live, un-mangled block');
+  assert.ok(noBlock(raw), 'nothing of the cover in the text');
   assert.equal(blockLib.coverOwnership(raw), 'program');
+  assert.match(recordOf2(raw).file, /SecondChapter-[0-9a-f]+\.png/);
   assert.match(topicCover(raw), /SecondChapter-[0-9a-f]+\.png/);
-  assert.match(raw, /^# SecondChapter\n\n<!-- book-cover:v1 /m, 'still directly under the title');
-  assert.equal(raw.split('book-cover:v1').length - 1, 1);
+  assert.equal(raw.split('\nbook-cover: ').length - 1, 1);
+  assert.equal(creditLines((await r.note(1)).detail).length, 1, 'the cover credit is in the Sources list');
   assert.ok(r.stat.logs.some(line => /expand_merge/.test(line)), 'it was the expanding path');
 });
-test('cover run (review B-1): the same with a block the owner edited during the rewrite: the edited block and the cover line are untouched and still the owner\'s', async () => {
+test('cover run (review B-1): the same with an old block the owner edited during the rewrite: the edited block and the cover line are untouched and still the owner\'s', async () => {
   const r = await expandWithFailingProbe({ editBlock: true });
   const raw = r.raw(1);
   const block = coverBlockOf(raw);
@@ -400,16 +433,17 @@ test('cover run (review B-1): the same with a block the owner edited during the 
   assert.match(topicCover(raw), /SecondChapter-[0-9a-f]+\.png/);
   assert.match(raw, /^# SecondChapter\n\n<!-- book-cover:v1 /m);
   assert.equal(raw.split('book-cover:v1').length - 1, 1);
+  assert.equal(recLine(raw), undefined);
 });
-test('cover run (review B-2): a forged cover block in Detail is neutralised on the author write and never read as a cover; the real block is the only live one', async () => {
+test('cover run (review B-2): a forged cover block in Detail is neutralised on the author write and never read as a cover; the real cover is the record', async () => {
   const forged = title => `正文。${title}\n\n<!-- book-cover:v1 {"file":"evil.png","key":"evil","hash":"x"} -->\n<img src=x onerror=alert(1)>\n<!-- book-cover:end -->\n\n結尾。`;
   const r = await coverRig({ slots: 0, text: forged, titles: ['SecretRootTitle', 'SecondChapter'], finder: perCard });
   await run(r);
   for (const i of [0, 1]) {
     const raw = r.raw(i);
-    assert.equal(raw.split('<!-- book-cover:v1').length - 1, 1, 'one live marker: the real one');
+    assert.ok(noBlock(raw), 'no live marker');
     assert.ok(!/<img /.test(raw), 'no raw HTML got through');
-    assert.ok(!/evil\.png/.test(blockLib.readCoverBlock(raw).file ?? ''));
+    assert.ok(!/evil\.png/.test(recordOf2(raw).file ?? ''));
     assert.equal(blockLib.coverSourceKey(raw)?.includes('evil') ?? false, false);
   }
 });
@@ -431,7 +465,7 @@ test('cover run (review M-1): a guarded write discarded between the re-read and 
   assert.ok(interfered, 'the write was refused once');
   assert.equal(created, 2, 'one file per card: the refused attempt saved its file, the retry reused it');
   assert.match(topicCover(r.raw(1)), /SecondChapter-[0-9a-f]+\.png/, 'the retry placed the cover (its claim was given back)');
-  assert.equal(r.raw(1).split('book-cover:v1').length - 1, 1);
+  assert.equal(r.raw(1).split('\nbook-cover: ').length - 1, 1);
 });
 
 test('cover run (review M-3): a topic-cover that already links the file is not written again, so the owner\'s frame stays; a different file does replace it', async () => {
@@ -462,4 +496,94 @@ test('cover run (review L-1): when the finalize finds the cover held by the owne
   assert.ok(r.stat.logs.some(line => /cover_owner_kept/.test(line)));
   assert.equal(claimsAtKept.length, 1);
   assert.ok(!claimsAtKept[0].some(key => /Cover1/.test(key)), 'the cover picture\'s claim is given back');
+});
+
+// ---- 2026-11-22-book-cover-placement: the map opens and the program's own intact old block moves into the key and the Sources list ----
+const placedBook = async () => { const r = await coverRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: perCard }); await run(r); return r; };
+const setRaw = (r, i, change) => r.repo.updateNoteRawGuarded(r.nodes[i].path, change, {});
+const missingLegacy = raw => blockLib.putCoverBlock(raw.replace(/^book-cover: .*\n/m, ''), blockLib.composeCoverBlock('chapter', 'zh'));
+
+test('cover migration: an intact old block is taken out of the text, recorded in book-cover and credited in the Sources list; topic-cover is kept, or added when it was missing; a second open changes nothing', async () => {
+  const r = await placedBook();
+  const detailBefore = withoutCredit((await r.note(1)).detail);
+  await setRaw(r, 1, raw => toLegacy(raw, 2));
+  await setRaw(r, 0, raw => toLegacy(raw, 1).replace(/^topic-cover: .*\n/m, ''));
+  assert.ok(blockLib.readCoverBlock(r.raw(1)) && blockLib.readCoverBlock(r.raw(0)));
+  const files = r.files.size; const net = r.net.length;
+  await r.runs.migrateCovers(r.mapPath);
+  for (const i of [0, 1]) {
+    const raw = r.raw(i);
+    assert.ok(noBlock(raw), `card ${i}: no block`);
+    assert.match(recordOf2(raw).file, /封面圖\/.*\.png$/); assert.equal(recordOf2(raw).block, undefined);
+    assert.equal(blockLib.coverOwnership(raw), 'program');
+    assert.match(topicCover(raw), /封面圖\/.*\.png\]\]$/, `card ${i}: topic-cover is there`);
+    assert.equal(creditLines((await r.note(i)).detail).length, 1, `card ${i}: one credit line`);
+  }
+  assert.match(creditLines((await r.note(1)).detail)[0], /^- 圖「.+」（封面）：commons\.wikimedia\.org（\[連結\]\(https:\/\/commons\.wikimedia\.org\/wiki\/File:Cover2\.jpg\)）$/);
+  assert.equal(withoutCredit((await r.note(1)).detail), detailBefore, 'the rest of the text is as it was');
+  assert.equal(r.files.size, files); assert.equal(r.net.length, net, 'nothing downloaded');
+  const after = [r.raw(0), r.raw(1)];
+  await r.runs.migrateCovers(r.mapPath);
+  assert.deepEqual([r.raw(0), r.raw(1)], after, 'idempotent');
+});
+
+test('cover migration: an old not-found block becomes {"missing":1} with no credit and no topic-cover', async () => {
+  const r = await placedBook();
+  await setRaw(r, 1, raw => missingLegacy(raw).replace(/^topic-cover: .*\n/m, ''));
+  await r.repo.updateNoteGuarded(r.nodes[1].path, { detail: withoutCredit((await r.note(1)).detail) }, { authorize: () => true });
+  const detail = (await r.note(1)).detail;
+  await r.runs.migrateCovers(r.mapPath);
+  assert.deepEqual(plain(recordOf2(r.raw(1))), { missing: true, off: false });
+  assert.ok(noBlock(r.raw(1)) && !/沒找到合適的封面圖/.test(r.raw(1)));
+  assert.equal((await r.note(1)).detail, detail, 'no credit is added for a cover that was not found');
+});
+
+test('cover migration: a block the owner edited, an old block whose topic-cover is another file, and a note already recorded are left byte for byte', async () => {
+  const r = await placedBook();
+  await setRaw(r, 1, raw => toLegacy(raw, 2, true));
+  const edited = r.raw(1);
+  const other = await coverRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: perCard });
+  await run(other);
+  await setRaw(other, 1, raw => toLegacy(raw, 2).replace(/^topic-cover: .*$/m, OWN_LINK));
+  const repointed = other.raw(1); const recorded = other.raw(0);
+  await r.runs.migrateCovers(r.mapPath);
+  await other.runs.migrateCovers(other.mapPath);
+  assert.equal(r.raw(1), edited, 'edited');
+  assert.equal(other.raw(1), repointed, 'topic-cover is the owner\'s');
+  assert.equal(other.raw(0), recorded, 'already recorded');
+});
+
+test('cover migration: nothing moves while the book\'s run is going (a live run, an apply-notes job, a blocked map)', async () => {
+  const r = await placedBook();
+  await setRaw(r, 1, raw => toLegacy(raw, 2));
+  const legacy = r.raw(1);
+  r.runs.drives.set(r.mapPath, {});
+  await r.runs.migrateCovers(r.mapPath);
+  r.runs.drives.delete(r.mapPath);
+  assert.equal(r.raw(1), legacy, 'a live run');
+  r.runs.notesJobs.set(r.mapPath, new AbortController());
+  await r.runs.migrateCovers(r.mapPath);
+  r.runs.notesJobs.delete(r.mapPath);
+  assert.equal(r.raw(1), legacy, 'an apply-notes job');
+  r.runs.ports.blocked = () => true;
+  await r.runs.migrateCovers(r.mapPath);
+  r.runs.ports.blocked = () => false;
+  assert.equal(r.raw(1), legacy, 'blocked');
+  await r.runs.migrateCovers(r.mapPath);
+  assert.ok(noBlock(r.raw(1)), 'after the run it moves');
+});
+
+test('cover migration: a card that changed between the read and the write is not written (the guarded write is refused) and moves at the next open; a map without a book is ignored', async () => {
+  const r = await placedBook();
+  await setRaw(r, 1, raw => toLegacy(raw, 2));
+  const inner = r.runs.ports.updateNoteGuarded; let once = true;
+  r.runs.ports.updateNoteGuarded = async (path, patch, options) => { if (once && /SecondChapter/.test(path)) { once = false; await setRaw(r, 1, raw => `${raw}\nowner wrote this\n`); } return inner(path, patch, options); };
+  await r.runs.migrateCovers(r.mapPath);
+  assert.ok(blockLib.readCoverBlock(r.raw(1)), 'refused: still the old block');
+  assert.match(r.raw(1), /owner wrote this/);
+  r.runs.ports.updateNoteGuarded = inner;
+  await r.runs.migrateCovers(r.mapPath);
+  assert.ok(noBlock(r.raw(1)) && /owner wrote this/.test(r.raw(1)), 'moved at the next open, the owner\'s text kept');
+  const plainMap = await rig();
+  await plainMap.runs.migrateCovers(plainMap.mapPath);
 });

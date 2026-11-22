@@ -262,7 +262,7 @@ export interface SlotFigure {
   alt: string;
   caption: string;
   /** Where the picture came from; absent when the source page is not a usable https address. */
-  source?: { href: string; line: string; entry: string };
+  source?: { href: string; line: string; entry: string; coverEntry?: string };
   /** The work key (see workKey) when the author is known: the run claims it so no other chapter shows the same work under another file. */
   work?: string;
 }
@@ -290,7 +290,7 @@ export function sourceOf(
   candidate: SlotCandidate,
   alt: string,
   language: string
-): { href: string; line: string; entry: string } | undefined {
+): { href: string; line: string; entry: string; coverEntry: string } | undefined {
   let page: URL;
   try {
     page = new URL(candidate.sourceUrl.trim());
@@ -320,7 +320,9 @@ export function sourceOf(
   return {
     href: page.href,
     line: translateNote(lang, "note.image_source_label_0", detail),
-    entry: translateNote(lang, "note.image_source_entry_0_1", alt, detail)
+    entry: translateNote(lang, "note.image_source_entry_0_1", alt, detail),
+    /** The same entry when the picture is the card's cover (the cover has no caption line in the note, so this is its only credit). */
+    coverEntry: translateNote(lang, "note.cover_source_entry_0_1", alt, detail)
   };
 }
 

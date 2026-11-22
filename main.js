@@ -2399,6 +2399,7 @@ var en = {
   "note.image_source_0_1": "{0} ({1})",
   "note.image_source_label_0": "Source: {0}",
   "note.image_source_entry_0_1": "Picture \u201C{0}\u201D: {1}",
+  "note.cover_source_entry_0_1": "Picture \u201C{0}\u201D (cover): {1}",
   "log.ai_split_failed": "AI split failed",
   "log.integration_directions_failed": "Integration direction suggestions failed",
   "log.child_integration_failed": "Subtopic integration failed",
@@ -5677,6 +5678,7 @@ var zhCN = {
   "note.image_source_0_1": "{0}\uFF08{1}\uFF09",
   "note.image_source_label_0": "\u6765\u6E90\uFF1A{0}",
   "note.image_source_entry_0_1": "\u56FE\u201C{0}\u201D\uFF1A{1}",
+  "note.cover_source_entry_0_1": "\u56FE\u201C{0}\u201D\uFF08\u5C01\u9762\uFF09\uFF1A{1}",
   "log.ai_split_failed": "AI \u62C6\u89E3\u5931\u8D25",
   "log.integration_directions_failed": "\u6574\u5408\u65B9\u5411\u5EFA\u8BAE\u5931\u8D25",
   "log.child_integration_failed": "\u5B50\u8BAE\u9898\u6574\u5408\u5931\u8D25",
@@ -8955,6 +8957,7 @@ var zhTW = {
   "note.image_source_0_1": "{0}\uFF08{1}\uFF09",
   "note.image_source_label_0": "\u4F86\u6E90\uFF1A{0}",
   "note.image_source_entry_0_1": "\u5716\u300C{0}\u300D\uFF1A{1}",
+  "note.cover_source_entry_0_1": "\u5716\u300C{0}\u300D\uFF08\u5C01\u9762\uFF09\uFF1A{1}",
   "log.ai_split_failed": "AI \u62C6\u89E3\u5931\u6557",
   "log.integration_directions_failed": "\u6574\u5408\u65B9\u5411\u5EFA\u8B70\u5931\u6557",
   "log.child_integration_failed": "\u5B50\u8B70\u984C\u6574\u5408\u5931\u6557",
@@ -12209,7 +12212,9 @@ function sourceOf(candidate, alt, language2) {
   return {
     href: page.href,
     line: translateNote(lang, "note.image_source_label_0", detail),
-    entry: translateNote(lang, "note.image_source_entry_0_1", alt, detail)
+    entry: translateNote(lang, "note.image_source_entry_0_1", alt, detail),
+    /** The same entry when the picture is the card's cover (the cover has no caption line in the note, so this is its only credit). */
+    coverEntry: translateNote(lang, "note.cover_source_entry_0_1", alt, detail)
   };
 }
 var traditionalIf = (language2, text11) => /^zh-(?:TW|Hant)/i.test(language2) ? toTraditional(text11) : text11;
@@ -15016,8 +15021,8 @@ function observerGuidance(language2, customization) {
   });
 }
 function parseConvergenceProposals(raw, baselineIds) {
-  const json2 = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  const decoded3 = JSON.parse(json2);
+  const json = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  const decoded3 = JSON.parse(json);
   const proposalsValue = Array.isArray(decoded3) ? decoded3 : decoded3 && typeof decoded3 === "object" ? decoded3.proposals : void 0;
   if (!Array.isArray(proposalsValue)) throw new Error("Convergence response must contain a proposals array");
   const expected = new Set(baselineIds), accounted = /* @__PURE__ */ new Set();
@@ -24631,14 +24636,14 @@ function mapOutline(nodes, titleOf, summaryOf = () => "", mapTitle = "") {
   const oneLine5 = (value) => (value != null ? value : "").replace(/\s+/g, " ").trim();
   const lines = [];
   const seen = /* @__PURE__ */ new Set();
-  const wrap2 = roots.length > 1;
-  if (wrap2) lines.push(`# ${oneLine5(mapTitle) || "Map"}`);
+  const wrap = roots.length > 1;
+  if (wrap) lines.push(`# ${oneLine5(mapTitle) || "Map"}`);
   const walk2 = (node, depth) => {
     var _a3;
     if (seen.has(node.id)) return;
     seen.add(node.id);
     const title = oneLine5(titleOf(node.id)) || node.id;
-    lines.push(`${"#".repeat(Math.min(6, depth + 1 + (wrap2 ? 1 : 0)))} ${title}`);
+    lines.push(`${"#".repeat(Math.min(6, depth + 1 + (wrap ? 1 : 0)))} ${title}`);
     const summary = oneLine5(summaryOf(node.id));
     if (summary) lines.push("", `> ${summary}`, "");
     for (const child of (_a3 = children.get(node.id)) != null ? _a3 : []) walk2(child, depth + 1);
@@ -31774,7 +31779,7 @@ function buildOnce(input2, shrink) {
   if (turnsOmitted || earlierTurns.some((turn) => turn.truncated) || outlineOmitted || !shrink.outlineSummaries || userTexts.some((entry) => entry.sent.cut) || summaries.some((entry) => entry.sent.cut))
     shortened = true;
   const mapSources = ((_m = input2.mapSources) == null ? void 0 : _m.text) ? input2.mapSources : null;
-  const json2 = JSON.stringify({
+  const json = JSON.stringify({
     // First and fixed: the sources are the same text every turn, so the start of the prompt stays stable.
     ...mapSources ? { mapSources: { readOnly: true, text: mapSources.text }, mapSourcesNote: MAP_CHAT_MAP_SOURCES_NOTE } : {},
     mapTitle: input2.mapTitle,
@@ -31862,7 +31867,7 @@ function buildOnce(input2, shrink) {
     ...shortened ? { shortenedNote: MAP_CHAT_SHORTENED_NOTE } : {}
   });
   return {
-    json: json2,
+    json,
     nodeIds: [...ids2],
     selectedCount: input2.selected.length,
     noEditableMap: !!input2.noEditableMap,
@@ -33335,47 +33340,13 @@ function dedupeImageEmbeds(markdown, options = {}) {
 // core/book-pipeline/cover-block.ts
 var START = /^<!-- book-cover:v1 (\{.*\}) -->$/;
 var END_LINE = "<!-- book-cover:end -->";
-var MISSING_TEXT = {
-  zh: {
-    chapter: "\u9019\u4E00\u7AE0\u6C92\u627E\u5230\u5408\u9069\u7684\u5C01\u9762\u5716\u3002",
-    section: "\u9019\u4E00\u7BC0\u6C92\u627E\u5230\u5408\u9069\u7684\u5C01\u9762\u5716\u3002",
-    book: "\u9019\u672C\u66F8\u6C92\u627E\u5230\u5408\u9069\u7684\u5C01\u9762\u5716\u3002"
-  },
-  en: {
-    chapter: "No suitable cover picture was found for this chapter.",
-    section: "No suitable cover picture was found for this section.",
-    book: "No suitable cover picture was found for this book."
-  }
-};
 var OFF_TEXT = { zh: "\u9019\u5F35\u5716\u53EF\u80FD\u5C0D\u4E0D\u4E0A", en: "This picture may not match." };
-var SOURCE_LABEL = { zh: "\u4F86\u6E90\uFF1A", en: "Source: " };
 var coverLinkOf = (file) => file.replace(/[[\]|\r\n]/g, " ").trim();
-var json = (value) => JSON.stringify(value).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
-var wrap = (record, inner) => `<!-- book-cover:v1 ${json(record)} -->
-${inner}
-${END_LINE}`;
 function commonsFilePage(value) {
   const href = safeHref(value);
   if (!href) return void 0;
   const url = new URL(href);
   return url.hostname === "commons.wikimedia.org" && url.pathname.startsWith("/wiki/File:") ? href : void 0;
-}
-function composeCoverBlock(level, language2, found) {
-  if (!found) {
-    const inner2 = MISSING_TEXT[language2][level];
-    return wrap({ missing: 1, hash: hashText(inner2) }, inner2);
-  }
-  const file = coverLinkOf(found.file);
-  const href = commonsFilePage(found.sourceUrl);
-  if (!file || !href) return void 0;
-  const caption = escapeMarkdownText(found.caption, 200);
-  const inner = [
-    `![[${file}]]`,
-    caption,
-    found.off ? OFF_TEXT[language2] : "",
-    `${SOURCE_LABEL[language2]}[Wikimedia Commons](${href})`
-  ].filter(Boolean).join("\n");
-  return wrap({ file, key: imageKey(found.url), hash: hashText(inner), ...found.off ? { off: 1 } : {} }, inner);
 }
 function lineStarts(raw) {
   const starts = [0];
@@ -33422,28 +33393,63 @@ function readCoverBlock(raw) {
     to: starts[end] + lines[end].replace(/\r$/, "").length
   };
 }
+var RECORD_KEY2 = "book-cover";
+function frontmatterRecord(raw) {
+  const frontmatter2 = /^---\r?\n([\s\S]*?)\r?\n---/.exec(raw);
+  const line3 = frontmatter2 ? new RegExp(`^${RECORD_KEY2}:[ \\t]*(.*?)[ \\t]*$`, "m").exec(frontmatter2[1]) : null;
+  if (!line3) return void 0;
+  let value;
+  try {
+    const text11 = line3[1].startsWith("'") && line3[1].endsWith("'") ? line3[1].slice(1, -1).replace(/''/g, "'") : line3[1];
+    value = JSON.parse(text11);
+    if (typeof value === "string") value = JSON.parse(value);
+  } catch (e) {
+    return void 0;
+  }
+  if (typeof value !== "object" || value === null) return void 0;
+  const record = value;
+  if (record.missing === 1) return { missing: true, off: false };
+  if (typeof record.file !== "string" || !record.file || typeof record.key !== "string") return void 0;
+  return {
+    file: record.file,
+    key: record.key,
+    ...typeof record.caption === "string" ? { caption: record.caption } : {},
+    missing: false,
+    off: record.off === 1
+  };
+}
+function readCoverRecord(raw) {
+  const own2 = frontmatterRecord(raw);
+  if (own2) return own2;
+  const block = readCoverBlock(raw);
+  return block ? {
+    ...block.file ? { file: block.file } : {},
+    ...block.key ? { key: block.key } : {},
+    missing: block.missing,
+    off: block.off,
+    block
+  } : void 0;
+}
 function coverSourceKey(raw) {
   var _a2;
-  return (_a2 = readCoverBlock(raw)) == null ? void 0 : _a2.key;
+  return (_a2 = readCoverRecord(raw)) == null ? void 0 : _a2.key;
 }
 function trustedCoverBlock(raw) {
   const block = readCoverBlock(raw);
   return block ? raw.slice(block.from, block.to).replace(/\r$/, "") : void 0;
 }
 function coverIsOff(raw) {
-  const block = readCoverBlock(raw);
-  return !!block && block.intact && block.off;
+  const record = readCoverRecord(raw);
+  return !!record && record.off && coverOwnership(raw) === "program";
 }
 function coverOwnership(raw) {
-  var _a2;
   const declared = declaredCover(raw);
-  const block = readCoverBlock(raw);
-  if (!block) return declared === void 0 ? "none" : "owner";
-  if (!block.intact) return "owner";
+  const record = readCoverRecord(raw);
+  if (!record) return declared === void 0 ? "none" : "owner";
+  if (record.block && !record.block.intact) return "owner";
   if (declared === void 0) return "program";
-  if (block.missing || !block.file) return "owner";
-  const target = (_a2 = /^\[\[([^\]|]*)(?:\|[^\]]*)?\]\]$/.exec(declared)) == null ? void 0 : _a2[1].trim();
-  return target === block.file ? "program" : "owner";
+  if (record.missing || !record.file) return "owner";
+  return coverDeclaredTarget(raw) === record.file ? "program" : "owner";
 }
 function coverDeclaredTarget(raw) {
   var _a2;
@@ -33454,6 +33460,45 @@ function declaredCover(raw) {
   const frontmatter2 = /^---\r?\n([\s\S]*?)\r?\n---/.exec(raw);
   const line3 = frontmatter2 ? /^topic-cover:[ \t]*(.*?)[ \t]*$/m.exec(frontmatter2[1]) : null;
   return line3 ? line3[1].replace(/^["']|["']$/g, "") : void 0;
+}
+function setCoverRecord(raw, record) {
+  const eol2 = eolOf(raw);
+  const line3 = `${RECORD_KEY2}: ${JSON.stringify(JSON.stringify(record).replace(/ /g, "\\u0020"))}`;
+  const match = /^---\r?\n([\s\S]*?)\r?\n---(?=\r?\n|$)/.exec(raw);
+  if (!match) return `---${eol2}${line3}${eol2}---${eol2}${raw}`;
+  const lines = match[1].split(/\r?\n/);
+  const at = lines.findIndex((value) => value.startsWith(`${RECORD_KEY2}:`));
+  if (at >= 0) lines[at] = line3;
+  else lines.push(line3);
+  return `---${eol2}${lines.join(eol2)}${eol2}---${raw.slice(match[0].length)}`;
+}
+function placeCover(raw, record) {
+  return setCoverRecord(stripCoverBlock(raw), record);
+}
+function migrateLegacyCover(raw, language2, title) {
+  var _a2, _b2, _c, _d;
+  const block = readCoverBlock(raw);
+  if (!block || !block.intact || frontmatterRecord(raw)) return void 0;
+  if (block.missing) return { record: { missing: 1 } };
+  if (!block.file || !block.key) return void 0;
+  const inner = raw.slice(block.from, block.to).replace(/\r/g, "").split("\n").slice(1, -1);
+  const href = commonsFilePage((_c = (_b2 = /\]\((https:[^)\s]+)\)$/.exec((_a2 = inner[inner.length - 1]) != null ? _a2 : "")) == null ? void 0 : _b2[1]) != null ? _c : "");
+  if (!href) return void 0;
+  const caption = (_d = inner.slice(1, -1).filter((value) => value !== OFF_TEXT.zh && value !== OFF_TEXT.en)[0]) != null ? _d : "";
+  const lang = language2;
+  const link = `[${translateNote(lang, "note.image_link")}](${href.replace(/\(/g, "%28").replace(/\)/g, "%29")})`;
+  return {
+    record: { file: block.file, key: block.key, ...caption ? { caption } : {}, ...block.off ? { off: 1 } : {} },
+    credit: {
+      href,
+      entry: translateNote(
+        lang,
+        "note.cover_source_entry_0_1",
+        caption || escapeMarkdownText(title, 200),
+        translateNote(lang, "note.image_source_0_1", "commons.wikimedia.org", link)
+      )
+    }
+  };
 }
 function titleLine(raw) {
   var _a2;
@@ -38095,9 +38140,9 @@ function appendHighlighted(parent, text11, query) {
   if (at + needle.length < text11.length) parent.createSpan({ text: text11.slice(at + needle.length) });
 }
 function createCardSearchField(options) {
-  const wrap2 = options.parent.createDiv("vam-card-search");
-  (0, import_obsidian15.setIcon)(wrap2.createSpan({ cls: "vam-card-search-icon", attr: { "aria-hidden": "true" } }), "search");
-  const input2 = wrap2.createEl("input", {
+  const wrap = options.parent.createDiv("vam-card-search");
+  (0, import_obsidian15.setIcon)(wrap.createSpan({ cls: "vam-card-search-icon", attr: { "aria-hidden": "true" } }), "search");
+  const input2 = wrap.createEl("input", {
     cls: "vam-card-search-input",
     type: "text",
     attr: {
@@ -55898,6 +55943,44 @@ var BookPipelineRuns = class {
       this.syncNotes(drive);
     });
   }
+  /**
+   * A map opens: each card of a book that is not running whose text still holds the program's own intact old cover block gets the
+   * `book-cover` key and a line in its Sources list instead (the block is taken out); an edited block stays as it is.
+   */
+  async migrateCovers(mapPath) {
+    var _a2;
+    if (this.disposed || this.drives.has(mapPath) || this.notesJobs.has(mapPath) || this.ports.blocked(mapPath)) return;
+    const doc = await this.ports.readMap(mapPath);
+    const read = readBookPipeline(doc);
+    if (read.kind !== "usable") return;
+    const language2 = this.ports.config(mapPath).language;
+    for (const id of effectiveOrder(read.data)) {
+      const path = (_a2 = doc.nodes.find((node) => node.id === id)) == null ? void 0 : _a2.path;
+      if (!path) continue;
+      if (this.disposed || this.drives.has(mapPath) || this.notesJobs.has(mapPath) || this.ports.blocked(mapPath))
+        return;
+      try {
+        const card = await this.ports.readCard(path);
+        const moved = migrateLegacyCover(card.raw, language2, card.title);
+        if (!moved || coverOwnership(card.raw) !== "program") continue;
+        const detail = moved.credit ? addPictureSources(card.detail, [moved.credit], language2) : card.detail;
+        await this.ports.updateNoteGuarded(
+          path,
+          { detail: programStamp(card.detail, detail) },
+          {
+            expectedContent: card.raw,
+            authorize: () => !this.disposed && !this.drives.has(mapPath) && !this.notesJobs.has(mapPath),
+            finalize: (content) => {
+              const placed = placeCover(content, moved.record);
+              const link = "file" in moved.record ? coverLinkOf(moved.record.file) : void 0;
+              return link && coverDeclaredTarget(placed) === void 0 && this.ports.setCoverLink ? this.ports.setCoverLink(placed, link) : placed;
+            }
+          }
+        );
+      } catch (e) {
+      }
+    }
+  }
   /** The card's result as the rerun compares it (memory only); undefined when the card cannot be read. */
   async cardSnapshot(drive, nodeId) {
     var _a2;
@@ -58594,7 +58677,7 @@ ${oldDetail}`);
         const placed = coverFigure ? (_h = ((_g = perSlot.get(COVER_INDEX)) != null ? _g : []).find((item) => item.href === coverFigure.href)) == null ? void 0 : _h.candidate : void 0;
         const words2 = askWords({ explains: coverSlot.explains, terms: coverSlot.search, ...hints.get(COVER_INDEX) });
         const coverOff = !!placed && words2.length > 0 && !wordHits(words2, `${placed.title} ${(_i = placed.description) != null ? _i : placed.caption}`);
-        const prepared = await this.prepareCover(drive, nodeId, latest.title, coverFigure, coverOff);
+        const prepared = await this.prepareCover(drive, latest.title, coverFigure, coverOff);
         if (!await this.stillOnMap(drive, nodeId)) {
           release2();
           return { kind: "failed", reason: "card_removed" };
@@ -58606,14 +58689,11 @@ ${oldDetail}`);
           releaseCover();
         } else if (prepared.kind === "placed") {
           coverResult = "placed";
-          coverWrite = { block: prepared.block, link: prepared.link };
+          coverWrite = { record: prepared.record, link: prepared.link, source: prepared.source };
         } else {
           coverResult = prepared.kind === "failed" ? "download_failed" : "missing";
           releaseCover();
-          if (ownership2 === "none") {
-            const block = composeCoverBlock(this.coverLevelOf(drive, nodeId), instructionLanguageOf(language2));
-            if (block) coverWrite = { block };
-          }
+          if (ownership2 === "none") coverWrite = { record: { missing: 1 } };
         }
       } catch (error) {
         release2();
@@ -58678,19 +58758,13 @@ ${oldDetail}`);
       throw error;
     }
   }
-  /** The card's level for the cover block's "not found" line: the preface is the book, first-level cards are chapters, the rest sections. */
-  coverLevelOf(drive, nodeId) {
-    var _a2;
-    const kind = (_a2 = this.structureOf(drive, effectiveOrder(drive.store.state)).placeOf(nodeId)) == null ? void 0 : _a2.kind;
-    return kind === "preface" ? "book" : kind === "section" ? "section" : "chapter";
-  }
   /**
    * Downloads the chosen cover (one at a time through the Commons queue, so Wikimedia sees one request a second at most), saves its file in
-   * the book's cover folder and composes the block. `missing`: nothing was chosen; `failed`: the picture could not be downloaded or saved;
+   * the book's cover folder and builds its record and credit. `missing`: nothing was chosen; `failed`: the picture could not be downloaded or saved;
    * a stop or timeout of the run throws like any other step. Nothing is written to the note here.
    */
-  async prepareCover(drive, nodeId, title, figure, off) {
-    var _a2, _b2, _c, _d, _e;
+  async prepareCover(drive, title, figure, off) {
+    var _a2, _b2, _c, _d, _e, _f;
     if (!figure) return { kind: "missing" };
     const signal = drive.controller.signal;
     const ports = this.ports;
@@ -58728,14 +58802,21 @@ ${oldDetail}`);
     if (wrongScript || captionIsFileName(caption, figure.href) || captionLatinIssue(`![](x)
 ${caption}`, drive.config.language))
       caption = "";
-    const block = composeCoverBlock(this.coverLevelOf(drive, nodeId), instructionLanguageOf(drive.config.language), {
-      file: saved.path,
-      url: figure.href,
-      caption,
-      sourceUrl: (_e = (_d = figure.source) == null ? void 0 : _d.href) != null ? _e : "",
-      ...off ? { off: true } : {}
-    });
-    return block ? { kind: "placed", block, link: coverLinkOf(saved.path) } : { kind: "missing" };
+    const href = commonsFilePage((_e = (_d = figure.source) == null ? void 0 : _d.href) != null ? _e : "");
+    const entry = (_f = figure.source) == null ? void 0 : _f.coverEntry;
+    const file = coverLinkOf(saved.path);
+    if (!href || !entry || !file) return { kind: "missing" };
+    return {
+      kind: "placed",
+      record: {
+        file,
+        key: imageKey(figure.href),
+        ...caption ? { caption: caption.slice(0, 200) } : {},
+        ...off ? { off: 1 } : {}
+      },
+      link: file,
+      source: { href, entry }
+    };
   }
   /** One probe through the run-wide gate: true when the picture loads. A probe that throws (not a Stop) counts as not loaded. */
   async probeGated(drive, href) {
@@ -58779,7 +58860,11 @@ ${caption}`, drive.config.language))
     const bad = verifyFill(latest.detail, result, slots);
     if (bad) return `slots_${bad}`;
     if (this.exitCheck(result.added.join("\n"), new Set(result.placed.map((item) => item.href)))) return "slots_unsafe";
-    const withSources = addPictureSources(result.text, result.sources, language2);
+    const withSources = addPictureSources(
+      result.text,
+      (cover == null ? void 0 : cover.source) ? [...result.sources, cover.source] : result.sources,
+      language2
+    );
     const slotted = slots.length ? replaceResearchRecord(withSources, composeSlotsRecord(result, off)) : withSources;
     const detail = programStamp(latest.detail, slotted);
     if (detail === latest.detail && !cover) return result;
@@ -58797,7 +58882,7 @@ ${caption}`, drive.config.language))
             cover.held = true;
             return content;
           }
-          const placed = putCoverBlock(content, cover.block);
+          const placed = placeCover(content, cover.record);
           return cover.link && coverDeclaredTarget(placed) !== cover.link && this.ports.setCoverLink ? this.ports.setCoverLink(placed, cover.link) : placed;
         }
       }
@@ -73751,10 +73836,10 @@ var DraftReviewView = class {
     const toggle = toolbar.createEl("button", { text: t("ui.edit_draft"), cls: "vam-draft-toggle" });
     toggle.setAttr("aria-pressed", "false");
     const section3 = (label, value, rows2) => {
-      const wrap2 = content.createDiv("vam-draft-section");
-      wrap2.createEl("h4", { text: label });
-      const preview = wrap2.createDiv("vam-draft-preview markdown-rendered");
-      const input2 = wrap2.createEl("textarea", { cls: "vam-task-input", text: value });
+      const wrap = content.createDiv("vam-draft-section");
+      wrap.createEl("h4", { text: label });
+      const preview = wrap.createDiv("vam-draft-preview markdown-rendered");
+      const input2 = wrap.createEl("textarea", { cls: "vam-task-input", text: value });
       input2.rows = rows2;
       input2.hidden = true;
       input2.setAttr("aria-label", label);
@@ -90542,9 +90627,10 @@ ${t("ui.book_role_running_suffix")}` : first);
   }
   /** After a map opens: its notes are aligned with its run (stale boxes of an earlier run removed, old runs drawn), then ticked boxes are read. */
   async reconcileBookNotes(path, isCurrent2) {
-    var _a2;
+    var _a2, _b2;
     try {
       await ((_a2 = this.plugin.bookPipelineRuns) == null ? void 0 : _a2.repairFinished(path).catch(() => void 0));
+      await ((_b2 = this.plugin.bookPipelineRuns) == null ? void 0 : _b2.migrateCovers(path).catch(() => void 0));
       await this.plugin.bookCallouts.reconcile(path, this.bookMayCarryCallouts);
       if (this.closed || !isCurrent2() || !this.map) return;
       const read = readBookPipeline(this.map);
@@ -100292,12 +100378,12 @@ var NoteStyleManageModal = class extends import_obsidian44.Modal {
   }
   buildAddForm(panel) {
     const tab = this.tab;
-    const wrap2 = panel.createDiv({ cls: "vam-manage-add" });
-    const toggle = wrap2.createEl("button", {
+    const wrap = panel.createDiv({ cls: "vam-manage-add" });
+    const toggle = wrap.createEl("button", {
       text: t("ui.manage_add"),
       attr: { "aria-expanded": "false", "aria-controls": `vam-manage-form-${tab}` }
     });
-    const form = wrap2.createEl("fieldset", { cls: "vam-manage-form", attr: { id: `vam-manage-form-${tab}` } });
+    const form = wrap.createEl("fieldset", { cls: "vam-manage-form", attr: { id: `vam-manage-form-${tab}` } });
     form.hidden = true;
     form.createEl("legend", { text: t("ui.manage_add_legend") });
     let mode = "from";
@@ -107339,10 +107425,10 @@ var ClaudeStreamObserver = class {
         this.structuredJson += event.delta.partial_json;
         const attempt = this.attempts.get(block.id);
         if (attempt) attempt.chars = this.structuredJson.length;
-        const json2 = this.structuredJson;
+        const json = this.structuredJson;
         this.call(() => {
           var _a3, _b3;
-          return (_b3 = (_a3 = this.hooks).onStructuredJson) == null ? void 0 : _b3.call(_a3, json2);
+          return (_b3 = (_a3 = this.hooks).onStructuredJson) == null ? void 0 : _b3.call(_a3, json);
         });
         const fields = this.preview.snapshot();
         if (fields.summary && !this.milestoneData.previewSummaryAt) this.milestoneData.previewSummaryAt = this.now();
@@ -109695,9 +109781,9 @@ var MapChatService = class {
     return droppedOnRetry(attempts.slice(0, -1), raw) ? { ...result, droppedOnRetry: true } : result;
   }
 };
-function rawActionCount(json2) {
+function rawActionCount(json) {
   try {
-    const value = JSON.parse(json2);
+    const value = JSON.parse(json);
     const actions = value && typeof value === "object" ? value.actions : void 0;
     return Array.isArray(actions) ? actions.length : null;
   } catch (e) {
@@ -109707,9 +109793,9 @@ function rawActionCount(json2) {
 function droppedOnRetry(earlier, taken) {
   const final = rawActionCount(taken);
   if (final === null) return false;
-  return earlier.some((json2) => {
+  return earlier.some((json) => {
     var _a2;
-    return ((_a2 = rawActionCount(json2)) != null ? _a2 : -1) > final;
+    return ((_a2 = rawActionCount(json)) != null ? _a2 : -1) > final;
   });
 }
 

@@ -17613,6 +17613,7 @@ export class VisualAgentMapView extends ItemView {
     try {
       // A finished book whose rerun was cut short (the plugin was unloaded) is closed first, so the boxes below follow the repaired state.
       await this.plugin.bookPipelineRuns?.repairFinished(path).catch(() => undefined);
+      await this.plugin.bookPipelineRuns?.migrateCovers(path).catch(() => undefined);
       await this.plugin.bookCallouts.reconcile(path, this.bookMayCarryCallouts);
       if (this.closed || !isCurrent() || !this.map) return;
       const read = readBookPipeline(this.map);

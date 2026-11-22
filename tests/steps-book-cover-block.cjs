@@ -155,3 +155,106 @@ test('trustedCoverBlock / stripAllCoverBlocks: only a block directly under the t
   const fenced = '# T\n\n```\n' + blockText + '\n```\n';
   assert.equal(block.stripAllCoverBlocks(fenced), fenced); assert.equal(block.trustedCoverBlock(fenced), undefined);
 });
+
+// ---- 2026-11-22-book-cover-placement: the cover record lives in the frontmatter key `book-cover` ----
+const REC = { file: FILE, key: 'mona_lisa.jpg', caption: '蒙娜麗莎，達文西作' };
+const recNote = (rec, front = 'title: T', body = `# T\n\n${BODY}`) => block.setCoverRecord(note(body, front), rec);
+
+test('setCoverRecord / readCoverRecord: a placed record and a not-found record round-trip; the line is one YAML string with no space in the JSON', () => {
+  const raw = recNote(REC);
+  const line = /^book-cover: .*$/m.exec(raw)[0];
+  assert.match(line, /^book-cover: "\{\\"file\\":/);
+  assert.ok(!/ /.test(line.slice('book-cover: '.length)), 'no space for a YAML writer to fold at');
+  assert.deepEqual(plain(block.readCoverRecord(raw)), { file: FILE, key: 'mona_lisa.jpg', caption: '蒙娜麗莎，達文西作', missing: false, off: false });
+  assert.deepEqual(plain(block.readCoverRecord(recNote({ ...REC, off: 1 }))), { file: FILE, key: 'mona_lisa.jpg', caption: '蒙娜麗莎，達文西作', missing: false, off: true });
+  assert.deepEqual(plain(block.readCoverRecord(recNote({ missing: 1 }))), { missing: true, off: false });
+  assert.equal(block.coverSourceKey(raw), 'mona_lisa.jpg');
+  assert.equal(block.coverSourceKey(recNote({ missing: 1 })), undefined);
+  // The body is not touched, and writing again replaces the one line.
+  assert.equal(raw.slice(raw.indexOf('\n---\n')), `\n---\n# T\n\n${BODY}`);
+  const again = block.setCoverRecord(raw, { missing: 1 });
+  assert.equal(again.split('\nbook-cover: ').length - 1, 1);
+  assert.equal(block.readCoverRecord(again).missing, true);
+});
+
+test('readCoverRecord: a tidy that turned the line single-quoted or plain still reads; damaged, empty or half records are no record; CRLF and no frontmatter', () => {
+  const json = JSON.stringify(REC);
+  assert.equal(block.readCoverRecord(note('# T\n', `title: T\nbook-cover: '${json}'`)).file, FILE);
+  assert.equal(block.readCoverRecord(note('# T\n', `title: T\nbook-cover: ${json}`)).file, FILE);
+  for (const bad of ['"nope"', '{broken', '"{\\"file\\":\\"\\",\\"key\\":\\"k\\"}"', '"{\\"file\\":\\"a.png\\"}"', '""', '']) assert.equal(block.readCoverRecord(note('# T\n', `title: T\nbook-cover: ${bad}`)), undefined, bad);
+  const crlf = recNote(REC).replace(/\n/g, '\r\n');
+  assert.equal(block.readCoverRecord(crlf).file, FILE);
+  assert.ok(!/[^\r]\n/.test(block.setCoverRecord(crlf, { missing: 1 })), 'every line break stays CRLF');
+  const bare = block.setCoverRecord('# T\n', { missing: 1 });
+  assert.equal(bare, '---\nbook-cover: "{\\"missing\\":1}"\n---\n# T\n');
+  assert.equal(block.readCoverRecord(note('# T\n')), undefined);
+});
+
+test('readCoverRecord: the record wins over an old block; an old block alone is read as before (with the block attached)', () => {
+  const text = block.composeCoverBlock('chapter', 'zh', found());
+  const old = block.readCoverRecord(note(`# T\n\n${text}\n\n${BODY}`));
+  assert.deepEqual(plain({ file: old.file, key: old.key, missing: old.missing, off: old.off, intact: old.block.intact }), { file: FILE, key: 'mona_lisa.jpg', missing: false, off: false, intact: true });
+  const both = block.setCoverRecord(note(`# T\n\n${text}\n\n${BODY}`), { file: 'new.png', key: 'k2' });
+  assert.equal(block.readCoverRecord(both).file, 'new.png');
+  assert.equal(block.readCoverRecord(both).block, undefined);
+});
+
+test('placeCover: takes the old block out and records the cover; a note with no block only gets the key; idempotent', () => {
+  const text = block.composeCoverBlock('chapter', 'zh', found());
+  const placed = block.placeCover(note(`# 第一章\n\n${text}\n\n${BODY}`), REC);
+  assert.ok(!/book-cover:(?:v1|end)/.test(placed));
+  assert.equal(placed.slice(placed.indexOf('\n---\n')), `\n---\n# 第一章\n\n${BODY}`);
+  assert.equal(block.readCoverRecord(placed).file, FILE);
+  assert.equal(block.placeCover(placed, REC), placed);
+  assert.equal(block.placeCover(note(`# 第一章\n\n${BODY}`), REC), recNote(REC, 'title: 第一章', `# 第一章\n\n${BODY}`));
+});
+
+test('coverOwnership with the record: placed + same/no topic-cover is the program\'s, another file or none is the owner\'s; not found is the program\'s only without topic-cover', () => {
+  const placed = front => recNote(REC, front);
+  assert.equal(block.coverOwnership(placed('title: T')), 'program', 'topic-cover removed: still ours');
+  assert.equal(block.coverOwnership(placed(`title: T\ntopic-cover: "[[${FILE}]]"`)), 'program');
+  assert.equal(block.coverOwnership(placed(`title: T\ntopic-cover: "[[${FILE}|alias]]"`)), 'program');
+  assert.equal(block.coverOwnership(placed('title: T\ntopic-cover: "[[Mine/own.png]]"')), 'owner');
+  assert.equal(block.coverOwnership(placed('title: T\ntopic-cover: none')), 'owner');
+  assert.equal(block.coverOwnership(recNote({ missing: 1 })), 'program');
+  assert.equal(block.coverOwnership(recNote({ missing: 1 }, 'title: T\ntopic-cover: "[[Mine/own.png]]"')), 'owner');
+  assert.equal(block.coverOwnership(recNote({ missing: 1 }, 'title: T\ntopic-cover: none')), 'owner');
+  // Old blocks keep their hash rule (the older tests above); an edited one is the owner's even with a record absent.
+  const edited = block.composeCoverBlock('chapter', 'zh', found()).replace('蒙娜麗莎', '改過');
+  assert.equal(block.coverOwnership(note(`# T\n\n${edited}\n\n${BODY}`, `title: T\ntopic-cover: "[[${FILE}]]"`)), 'owner');
+  // The same ownership of the same picture with the owner's withCover frame setting.
+  assert.equal(block.coverOwnership(card.withCover(placed('title: T'), FILE)), 'program');
+});
+
+test('coverIsOff: the record\'s flag counts while the cover is still the program\'s; an old intact block\'s flag too; an edited block or a re-pointed cover does not', () => {
+  assert.equal(block.coverIsOff(recNote({ ...REC, off: 1 })), true);
+  assert.equal(block.coverIsOff(recNote(REC)), false);
+  assert.equal(block.coverIsOff(recNote({ ...REC, off: 1 }, 'title: T\ntopic-cover: "[[Mine/own.png]]"')), false);
+  const off = block.composeCoverBlock('chapter', 'zh', found({ off: true }));
+  assert.equal(block.coverIsOff(note(`# T\n\n${off}\n`)), true);
+  assert.equal(block.coverIsOff(note(`# T\n\n${off.replace('可能對不上', '可能對不上（看過）')}\n`)), false);
+  assert.equal(block.coverIsOff(note('# T\n')), false);
+});
+
+test('migrateLegacyCover: the program\'s intact block becomes the record and its credit; not found becomes {missing}; an edited block, a note with a record, no block or no readable source stay', () => {
+  const text = block.composeCoverBlock('chapter', 'zh', found({ off: true }));
+  const moved = block.migrateLegacyCover(note(`# T\n\n${text}\n\n${BODY}`), 'zh-TW', '第一章');
+  assert.deepEqual(plain(moved.record), { file: FILE, key: 'mona_lisa.jpg', caption: '蒙娜麗莎，達文西作', off: 1 });
+  assert.equal(moved.credit.href, PAGE);
+  assert.equal(moved.credit.entry, `圖「蒙娜麗莎，達文西作」（封面）：commons.wikimedia.org（[連結](${PAGE})）`);
+  const en = block.migrateLegacyCover(note(`# T\n\n${block.composeCoverBlock('chapter', 'en', found())}\n`), 'en', 'Chapter');
+  assert.match(en.credit.entry, /^Picture “蒙娜麗莎，達文西作” \(cover\): commons\.wikimedia\.org \(\[link\]\(https:\/\/commons\.wikimedia\.org\/wiki\/File:Mona_Lisa\.jpg\)\)$/);
+  const noCaption = block.migrateLegacyCover(note(`# T\n\n${block.composeCoverBlock('chapter', 'zh', found({ caption: '' }))}\n`), 'zh-TW', '第一章');
+  assert.equal(noCaption.record.caption, undefined);
+  assert.match(noCaption.credit.entry, /^圖「第一章」（封面）：/, 'the card\'s title stands in for a missing caption');
+  const paren = block.migrateLegacyCover(note(`# T\n\n${block.composeCoverBlock('chapter', 'zh', found({ sourceUrl: 'https://commons.wikimedia.org/wiki/File:A_(b).jpg' }))}\n`), 'zh-TW', 'T');
+  assert.equal(paren.credit.href, 'https://commons.wikimedia.org/wiki/File:A_%28b%29.jpg');
+  assert.ok(paren.credit.entry.includes('File:A_%28b%29.jpg)'), 'parentheses are encoded in the link');
+  assert.deepEqual(plain(block.migrateLegacyCover(note(`# T\n\n${block.composeCoverBlock('chapter', 'zh')}\n`), 'zh-TW', 'T')), { record: { missing: 1 } });
+  assert.equal(block.migrateLegacyCover(note(`# T\n\n${text.replace('蒙娜麗莎', '改過')}\n`), 'zh-TW', 'T'), undefined, 'edited');
+  assert.equal(block.migrateLegacyCover(block.setCoverRecord(note(`# T\n\n${text}\n`), { missing: 1 }), 'zh-TW', 'T'), undefined, 'a record exists');
+  assert.equal(block.migrateLegacyCover(note(`# T\n\n${BODY}`), 'zh-TW', 'T'), undefined, 'no block');
+  assert.equal(block.migrateLegacyCover(recNote(REC), 'zh-TW', 'T'), undefined, 'record only');
+  const crlf = block.migrateLegacyCover(note(`# T\n\n${text}\n\n${BODY}`).replace(/\n/g, '\r\n'), 'zh-TW', 'T');
+  assert.equal(crlf.credit.href, PAGE, 'CRLF');
+});

@@ -2558,6 +2558,7 @@ export const en = {
   "note.image_source_0_1": "{0} ({1})",
   "note.image_source_label_0": "Source: {0}",
   "note.image_source_entry_0_1": "Picture “{0}”: {1}",
+  "note.cover_source_entry_0_1": "Picture “{0}” (cover): {1}",
   "log.ai_split_failed": "AI split failed",
   "log.integration_directions_failed": "Integration direction suggestions failed",
   "log.child_integration_failed": "Subtopic integration failed",

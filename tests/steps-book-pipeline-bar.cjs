@@ -781,3 +781,21 @@ test('structure undo: the keyboard goes to the next remaining undo button, else 
   assert.equal(text('stale'), 'The map was just changed, so nothing was undone. Press undo again.');
   setUiLanguage('zh-TW');
 });
+
+test('fix again focus: opening the card puts the keyboard on Cancel, closing it gives it back to the 再修一輪 button; nothing happens without a target', () => {
+  const proto = bundle.VisualAgentMapView.prototype;
+  const asked = [];
+  const fake = focus => ({ closed: false, bookBarFocus: focus, contentEl: { querySelector: sel => ({ focus: () => asked.push(sel) }) } });
+  proto.applyBookBarFocus.call(fake('again-cancel'));
+  proto.applyBookBarFocus.call(fake('again-opener'));
+  assert.deepEqual(asked, ['.vam-book-fix-again-cancel', '.vam-book-fix-again']);
+  const gone = { closed: false, bookBarFocus: 'again-opener', contentEl: { querySelector: () => null } };
+  proto.applyBookBarFocus.call(gone);
+  assert.equal(gone.bookBarFocus, null, 'the request is used up');
+  const proto2 = bundle.VisualAgentMapView.prototype;
+  const asking = { bookAbandonAsking: 'p', bookFixAgainAsking: null, closed: true };
+  proto2.askBookFixAgain.call(asking, 'p', true);
+  assert.deepEqual([asking.bookAbandonAsking, asking.bookFixAgainAsking], [null, 'p'], 'asking one clears the other');
+  proto2.askBookAbandon.call(asking, 'p', true);
+  assert.deepEqual([asking.bookAbandonAsking, asking.bookFixAgainAsking], ['p', null]);
+});

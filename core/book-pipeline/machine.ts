@@ -546,9 +546,16 @@ export function applyAiStopped(data: BookPipelineData, token: AiToken, budget: b
 }
 
 /** The open problems no edit can fix: one more fix round never sends them (the AI judged so, the sources decide, or the text is the reader's). */
-export const AI_AGAIN_EXCLUDED: readonly string[] = ["unfixable", "sources_conflict", "source_unreachable", "hand_edited"];
+export const AI_AGAIN_EXCLUDED: readonly string[] = [
+  "unfixable",
+  "sources_conflict",
+  "source_unreachable",
+  "hand_edited"
+];
 const againTargets = (slot: AiProofState | undefined, key: string): AiProofOpen[] =>
-  slot?.done && !slot.incomplete && slot.key === key ? slot.open.filter(item => !AI_AGAIN_EXCLUDED.includes(item.reason)) : [];
+  slot?.done && !slot.incomplete && slot.key === key
+    ? slot.open.filter(item => !AI_AGAIN_EXCLUDED.includes(item.reason))
+    : [];
 /**
  * One more fix-and-check round over a finished AI proofread (the book's `nodeId` is undefined): the slot goes back to the last round's
  * fix with the fixable open problems as its targets (no suggestion: the fix reads the problem and the quote). `open` stays as it is, so
@@ -606,7 +613,8 @@ export function fixAgainPlan(
   let items = 0;
   let stubborn = 0;
   const count = (slot: AiProofState | undefined): number => {
-    const fixable = slot?.done && !slot.incomplete ? slot.open.filter(item => !AI_AGAIN_EXCLUDED.includes(item.reason)) : [];
+    const fixable =
+      slot?.done && !slot.incomplete ? slot.open.filter(item => !AI_AGAIN_EXCLUDED.includes(item.reason)) : [];
     stubborn += fixable.filter(item => item.reason === "still_present").length;
     return fixable.length;
   };

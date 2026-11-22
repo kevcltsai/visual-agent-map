@@ -3250,6 +3250,19 @@ export const zhCN: Record<TranslationKey, string> = {
     "已打开全书摘要。直接改根笔记的“全书企划”或各章、各节笔记里的“企划”，改好再按“方向对，开始写”。",
   "ui.book_bar_ai_0_1": "AI 修正中 {0}・仍有问题 {1}",
   "ui.book_bar_done_0_1_2": "{0} 章・AI 修了 {1} 处・仍有问题 {2} 项",
+  "ui.book_phase_fix_again": "AI 修正中",
+  "ui.book_bar_fix_again_0_1_2": "AI 修正中 {0} / {1}・仍有问题 {2}",
+  "ui.book_fix_again": "再修一轮",
+  "ui.book_fix_again_title": "让 AI 再修一轮？",
+  "ui.book_fix_again_body_0_1_2":
+    "{0} 章还有 {1} 项 AI 校对问题，每章修一次、再查一次，大约 {2} 次 AI 调用。额度不够的部分会一起加上。",
+  "ui.book_fix_again_body_book_0_1":
+    "全书校对还有 {0} 项问题，修一次、再查一次，大约 {1} 次 AI 调用。额度不够的部分会一起加上。",
+  "ui.book_fix_again_note_0_1":
+    "其中 {0} 项已经修过 2 轮，可能还是修不掉。另外 {1} 项是章节状态（校对没过、图片对不上），这一轮不处理。",
+  "ui.book_fix_again_note_stubborn_0": "其中 {0} 项已经修过 2 轮，可能还是修不掉。",
+  "ui.book_fix_again_note_status_0": "另外 {0} 项是章节状态（校对没过、图片对不上），这一轮不处理。",
+  "ui.book_fix_again_go": "开始修",
   "ui.book_bar_open_issues": "看仍有问题",
   "ui.book_bar_open_issues_missing": "找不到“仍有问题”那一页，可能被改名或移走了。",
   "ui.book_step_self_check": "作者自查",

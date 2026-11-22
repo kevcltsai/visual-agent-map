@@ -5466,6 +5466,18 @@ test('P1 fix again: the app closes (dispose) in the middle of the round; a new s
   again.dispose();
 });
 
+test('P2 fix again: the runner tells the bar how far the round is (done / total) while it runs, and says nothing before it starts or after it ends', async () => {
+  const { r, st } = await againRig();
+  assert.equal(r.runs.getProgress(r.mapPath)?.again, undefined, 'before the round');
+  st.again = true; st.mode = 'hold-fix'; let reached = false; const hold = defer();
+  st.hold = { reached: () => { reached = true; }, promise: hold.promise };
+  const running = r.runs.fixAgain(r.mapPath).catch(() => undefined);
+  while (!reached && r.runs.isRunning(r.mapPath)) await tick();
+  assert.deepEqual(plain(r.runs.getProgress(r.mapPath).again), { done: 0, total: 1 }, 'one chapter to work on, none finished');
+  hold.resolve(); await running; await settleRuns(r);
+  assert.equal(r.runs.getProgress(r.mapPath)?.again, undefined, 'after the round');
+});
+
 test('P1 fix again: a chapter the reader changed since its proofread (key differs) is skipped: no call for it, its text is not written, no round is left open', async () => {
   const { r, st } = await againRig();
   await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/Corrected\d+/, m => `${m} by the reader`), {});

@@ -2339,6 +2339,9 @@ export default class VisualAgentMapPlugin extends Plugin {
   abandonBookPipeline(mapPath: string): Promise<void> {
     return this.bookPipelineRuns.abandon(mapPath);
   }
+  fixBookAgain(mapPath: string): Promise<void> {
+    return this.bookPipelineRuns.fixAgain(mapPath);
+  }
   resumeBookPipeline(mapPath: string, options: { addBudget?: number } = {}): Promise<void> {
     return this.bookPipelineRuns.resume(mapPath, options);
   }

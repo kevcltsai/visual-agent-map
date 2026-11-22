@@ -3178,6 +3178,16 @@ var en = {
   "ui.book_bar_plan_edit_hint": 'The whole-book summary is open. Edit the whole-book plan in the root note, or the plan in a chapter or section note, then press "Direction is right, start writing".',
   "ui.book_bar_ai_0_1": "AI fixing {0} \xB7 still open {1}",
   "ui.book_bar_done_0_1_2": "{0} chapters \xB7 AI fixed {1} places \xB7 {2} still open",
+  "ui.book_phase_fix_again": "AI fixing",
+  "ui.book_bar_fix_again_0_1_2": "AI fixing {0} / {1} \xB7 still open {2}",
+  "ui.book_fix_again": "Fix another round",
+  "ui.book_fix_again_title": "Let the AI fix another round?",
+  "ui.book_fix_again_body_0_1_2": "{0} chapters still have {1} AI proofread problems. Each chapter gets one fix and one re-check, about {2} AI calls. If the call budget is short, the missing part is added.",
+  "ui.book_fix_again_body_book_0_1": "The whole-book proofread still has {0} problems. It gets one fix and one re-check, about {1} AI calls. If the call budget is short, the missing part is added.",
+  "ui.book_fix_again_note_0_1": "{0} of them were already fixed for 2 rounds and may still not go away. {1} more are chapter statuses (proofread not passed, pictures that do not match); this round does not touch them.",
+  "ui.book_fix_again_note_stubborn_0": "{0} of them were already fixed for 2 rounds and may still not go away.",
+  "ui.book_fix_again_note_status_0": "{0} more are chapter statuses (proofread not passed, pictures that do not match); this round does not touch them.",
+  "ui.book_fix_again_go": "Start fixing",
   "ui.book_bar_open_issues": "See what is still open",
   "ui.book_bar_open_issues_missing": 'The "Still open" page was not found; it may have been renamed or moved.',
   "ui.book_step_self_check": "Author self-check",
@@ -6522,6 +6532,16 @@ var zhCN = {
   "ui.book_bar_plan_edit_hint": "\u5DF2\u6253\u5F00\u5168\u4E66\u6458\u8981\u3002\u76F4\u63A5\u6539\u6839\u7B14\u8BB0\u7684\u201C\u5168\u4E66\u4F01\u5212\u201D\u6216\u5404\u7AE0\u3001\u5404\u8282\u7B14\u8BB0\u91CC\u7684\u201C\u4F01\u5212\u201D\uFF0C\u6539\u597D\u518D\u6309\u201C\u65B9\u5411\u5BF9\uFF0C\u5F00\u59CB\u5199\u201D\u3002",
   "ui.book_bar_ai_0_1": "AI \u4FEE\u6B63\u4E2D {0}\u30FB\u4ECD\u6709\u95EE\u9898 {1}",
   "ui.book_bar_done_0_1_2": "{0} \u7AE0\u30FBAI \u4FEE\u4E86 {1} \u5904\u30FB\u4ECD\u6709\u95EE\u9898 {2} \u9879",
+  "ui.book_phase_fix_again": "AI \u4FEE\u6B63\u4E2D",
+  "ui.book_bar_fix_again_0_1_2": "AI \u4FEE\u6B63\u4E2D {0} / {1}\u30FB\u4ECD\u6709\u95EE\u9898 {2}",
+  "ui.book_fix_again": "\u518D\u4FEE\u4E00\u8F6E",
+  "ui.book_fix_again_title": "\u8BA9 AI \u518D\u4FEE\u4E00\u8F6E\uFF1F",
+  "ui.book_fix_again_body_0_1_2": "{0} \u7AE0\u8FD8\u6709 {1} \u9879 AI \u6821\u5BF9\u95EE\u9898\uFF0C\u6BCF\u7AE0\u4FEE\u4E00\u6B21\u3001\u518D\u67E5\u4E00\u6B21\uFF0C\u5927\u7EA6 {2} \u6B21 AI \u8C03\u7528\u3002\u989D\u5EA6\u4E0D\u591F\u7684\u90E8\u5206\u4F1A\u4E00\u8D77\u52A0\u4E0A\u3002",
+  "ui.book_fix_again_body_book_0_1": "\u5168\u4E66\u6821\u5BF9\u8FD8\u6709 {0} \u9879\u95EE\u9898\uFF0C\u4FEE\u4E00\u6B21\u3001\u518D\u67E5\u4E00\u6B21\uFF0C\u5927\u7EA6 {1} \u6B21 AI \u8C03\u7528\u3002\u989D\u5EA6\u4E0D\u591F\u7684\u90E8\u5206\u4F1A\u4E00\u8D77\u52A0\u4E0A\u3002",
+  "ui.book_fix_again_note_0_1": "\u5176\u4E2D {0} \u9879\u5DF2\u7ECF\u4FEE\u8FC7 2 \u8F6E\uFF0C\u53EF\u80FD\u8FD8\u662F\u4FEE\u4E0D\u6389\u3002\u53E6\u5916 {1} \u9879\u662F\u7AE0\u8282\u72B6\u6001\uFF08\u6821\u5BF9\u6CA1\u8FC7\u3001\u56FE\u7247\u5BF9\u4E0D\u4E0A\uFF09\uFF0C\u8FD9\u4E00\u8F6E\u4E0D\u5904\u7406\u3002",
+  "ui.book_fix_again_note_stubborn_0": "\u5176\u4E2D {0} \u9879\u5DF2\u7ECF\u4FEE\u8FC7 2 \u8F6E\uFF0C\u53EF\u80FD\u8FD8\u662F\u4FEE\u4E0D\u6389\u3002",
+  "ui.book_fix_again_note_status_0": "\u53E6\u5916 {0} \u9879\u662F\u7AE0\u8282\u72B6\u6001\uFF08\u6821\u5BF9\u6CA1\u8FC7\u3001\u56FE\u7247\u5BF9\u4E0D\u4E0A\uFF09\uFF0C\u8FD9\u4E00\u8F6E\u4E0D\u5904\u7406\u3002",
+  "ui.book_fix_again_go": "\u5F00\u59CB\u4FEE",
   "ui.book_bar_open_issues": "\u770B\u4ECD\u6709\u95EE\u9898",
   "ui.book_bar_open_issues_missing": "\u627E\u4E0D\u5230\u201C\u4ECD\u6709\u95EE\u9898\u201D\u90A3\u4E00\u9875\uFF0C\u53EF\u80FD\u88AB\u6539\u540D\u6216\u79FB\u8D70\u4E86\u3002",
   "ui.book_step_self_check": "\u4F5C\u8005\u81EA\u67E5",
@@ -9866,6 +9886,16 @@ var zhTW = {
   "ui.book_bar_plan_edit_hint": "\u5DF2\u6253\u958B\u5168\u66F8\u6458\u8981\u3002\u76F4\u63A5\u6539\u6839\u7B46\u8A18\u7684\u300C\u5168\u66F8\u4F01\u5283\u300D\u6216\u5404\u7AE0\u3001\u5404\u7BC0\u7B46\u8A18\u88E1\u7684\u300C\u4F01\u5283\u300D\uFF0C\u6539\u597D\u518D\u6309\u300C\u65B9\u5411\u5C0D\uFF0C\u958B\u59CB\u5BEB\u300D\u3002",
   "ui.book_bar_ai_0_1": "AI \u4FEE\u6B63\u4E2D {0}\u30FB\u4ECD\u6709\u554F\u984C {1}",
   "ui.book_bar_done_0_1_2": "{0} \u7AE0\u30FBAI \u4FEE\u4E86 {1} \u8655\u30FB\u4ECD\u6709\u554F\u984C {2} \u9805",
+  "ui.book_phase_fix_again": "AI \u4FEE\u6B63\u4E2D",
+  "ui.book_bar_fix_again_0_1_2": "AI \u4FEE\u6B63\u4E2D {0} / {1}\u30FB\u4ECD\u6709\u554F\u984C {2}",
+  "ui.book_fix_again": "\u518D\u4FEE\u4E00\u8F2A",
+  "ui.book_fix_again_title": "\u8B93 AI \u518D\u4FEE\u4E00\u8F2A\uFF1F",
+  "ui.book_fix_again_body_0_1_2": "{0} \u7AE0\u9084\u6709 {1} \u9805 AI \u6821\u5C0D\u554F\u984C\uFF0C\u6BCF\u7AE0\u4FEE\u4E00\u6B21\u3001\u518D\u67E5\u4E00\u6B21\uFF0C\u5927\u7D04 {2} \u6B21 AI \u547C\u53EB\u3002\u984D\u5EA6\u4E0D\u5920\u7684\u90E8\u5206\u6703\u4E00\u8D77\u52A0\u4E0A\u3002",
+  "ui.book_fix_again_body_book_0_1": "\u5168\u66F8\u6821\u5C0D\u9084\u6709 {0} \u9805\u554F\u984C\uFF0C\u4FEE\u4E00\u6B21\u3001\u518D\u67E5\u4E00\u6B21\uFF0C\u5927\u7D04 {1} \u6B21 AI \u547C\u53EB\u3002\u984D\u5EA6\u4E0D\u5920\u7684\u90E8\u5206\u6703\u4E00\u8D77\u52A0\u4E0A\u3002",
+  "ui.book_fix_again_note_0_1": "\u5176\u4E2D {0} \u9805\u5DF2\u7D93\u4FEE\u904E 2 \u8F2A\uFF0C\u53EF\u80FD\u9084\u662F\u4FEE\u4E0D\u6389\u3002\u53E6\u5916 {1} \u9805\u662F\u7AE0\u7BC0\u72C0\u614B\uFF08\u6821\u5C0D\u6C92\u904E\u3001\u5716\u7247\u5C0D\u4E0D\u4E0A\uFF09\uFF0C\u9019\u4E00\u8F2A\u4E0D\u8655\u7406\u3002",
+  "ui.book_fix_again_note_stubborn_0": "\u5176\u4E2D {0} \u9805\u5DF2\u7D93\u4FEE\u904E 2 \u8F2A\uFF0C\u53EF\u80FD\u9084\u662F\u4FEE\u4E0D\u6389\u3002",
+  "ui.book_fix_again_note_status_0": "\u53E6\u5916 {0} \u9805\u662F\u7AE0\u7BC0\u72C0\u614B\uFF08\u6821\u5C0D\u6C92\u904E\u3001\u5716\u7247\u5C0D\u4E0D\u4E0A\uFF09\uFF0C\u9019\u4E00\u8F2A\u4E0D\u8655\u7406\u3002",
+  "ui.book_fix_again_go": "\u958B\u59CB\u4FEE",
   "ui.book_bar_open_issues": "\u770B\u4ECD\u6709\u554F\u984C",
   "ui.book_bar_open_issues_missing": "\u627E\u4E0D\u5230\u300C\u4ECD\u6709\u554F\u984C\u300D\u90A3\u4E00\u9801\uFF0C\u53EF\u80FD\u88AB\u6539\u540D\u6216\u79FB\u8D70\u4E86\u3002",
   "ui.book_step_self_check": "\u4F5C\u8005\u81EA\u67E5",
@@ -15942,6 +15972,7 @@ function aiProofShape(value) {
   if (value.round > MAX_AI_FIX_ROUNDS || value.step !== "proof" && value.step !== "fix") return false;
   if (value.done !== void 0 && typeof value.done !== "boolean") return false;
   if (value.incomplete !== void 0 && typeof value.incomplete !== "boolean") return false;
+  if (value.again !== void 0 && value.again !== true) return false;
   if (!isCount(value.checked) || !isCount(value.fixed)) return false;
   const items = (list2, extra) => Array.isArray(list2) && list2.every(
     (item) => isObject(item) && isText2(item.id) && isText2(item.quote) && isText2(item.problem) && extra.every((key4) => isText2(item[key4])) && (item.chapter === void 0 || isCount(item.chapter)) && (item.chapterId === void 0 || isText2(item.chapterId))
@@ -27867,7 +27898,14 @@ var OPEN_ISSUE_SOURCES = {
       hand_edited: {
         zh: "\u9019\u7AE0\u662F\u4F60\u624B\u6539\u904E\u7684\uFF0C\u7A0B\u5F0F\u4E0D\u52D5",
         en: "You edited this chapter by hand, so it was left alone"
-      }
+      },
+      fix_interrupted: { zh: "\u4FEE\u6B63\u505A\u5230\u4E00\u534A\u88AB\u4E2D\u65B7", en: "A fix was interrupted halfway" },
+      image_mismatch: {
+        zh: "\u5716\u7247\u53EF\u80FD\u5C0D\u4E0D\u4E0A\u9019\u4E00\u7BC0\uFF0C\u8ACB\u770B\u4E00\u4E0B",
+        en: "A picture may not fit this section; please check it"
+      },
+      proof_unmet: { zh: "\u5BEB\u5B8C\u5F8C\u7684\u6821\u5C0D\u6709\u5E7E\u8655\u6C92\u904E", en: "Some checks after writing did not pass" },
+      structure_unmet: { zh: "\u7AE0\u7BC0\u7D50\u69CB\u9084\u6C92\u7B26\u5408\u4F01\u5283", en: "The chapter structure does not match the plan yet" }
     },
     fallback: { zh: "\u9019\u7AE0\u9084\u6709\u72C0\u614B\u6C92\u89E3\u6C7A", en: "The chapter still has an unresolved state" }
   }
@@ -50415,7 +50453,7 @@ function beginAiStep(data, scope, key4, step) {
   var _a2;
   const nodeId = scope.nodeId;
   if (data.status !== "running") return null;
-  if (!(scope.rerun && nodeId !== void 0)) {
+  if (!scope.rerun) {
     if (data.phase === "done") return null;
     if (nodeId === void 0 ? data.phase !== "writing" && data.phase !== "gate2" : !aiChapterDue(data, nodeId))
       return null;
@@ -50481,7 +50519,7 @@ function applyAiProof(data, token, result) {
     slot.done = true;
     const squash2 = (text11) => text11.replace(/\s+/g, "");
     const prior = (_c = found.pending) != null ? _c : [];
-    slot.open = withOpen(result.open, result.pending, (id) => {
+    const fresh = withOpen(result.open, result.pending, (id) => {
       var _a3, _b3, _c2;
       const item = result.pending.find((entry) => entry.id === id);
       const before = item ? prior.find(
@@ -50498,6 +50536,16 @@ function applyAiProof(data, token, result) {
       if (before) return (_c2 = (_b3 = slot.refused) == null ? void 0 : _b3[before.id]) != null ? _c2 : written2 ? "still_present" : "not_fixed";
       return written2 ? "still_present" : "not_fixed_in_time";
     });
+    if (found.again) {
+      const squash3 = (text11) => text11.replace(/\s+/g, "");
+      const kept = found.open.filter((item) => AI_AGAIN_EXCLUDED.includes(item.reason));
+      const seen = (item) => kept.some((old) => {
+        var _a3, _b3;
+        return squash3(old.quote) === squash3(item.quote) && ((_a3 = old.chapter) != null ? _a3 : 1) === ((_b3 = item.chapter) != null ? _b3 : 1);
+      });
+      slot.open = [...kept, ...fresh.filter((item) => !seen(item))];
+      delete slot.again;
+    } else slot.open = fresh;
   }
   setAiSlot(next, token.nodeId, slot);
   next.revision++;
@@ -50543,7 +50591,7 @@ function applyAiFix(data, token, result) {
   return { state: next, accepted: true };
 }
 function applyAiFailure(data, token) {
-  var _a2;
+  var _a2, _b2;
   const found = aiCurrent(data, token);
   if (!found) return { state: data, accepted: false };
   const next = clone2(data);
@@ -50551,8 +50599,20 @@ function applyAiFailure(data, token) {
   if (slot.attempts >= MAX_STEP_ATTEMPTS) {
     slot.done = true;
     if (slot.step === "proof") slot.incomplete = true;
-    else slot.open = withOpen(slot.open, (_a2 = slot.pending) != null ? _a2 : [], () => "fix_failed");
+    else if (slot.again) {
+      const squash2 = (text11) => text11.replace(/\s+/g, "");
+      const tried = (_a2 = slot.pending) != null ? _a2 : [];
+      slot.open = slot.open.map(
+        (item) => tried.some(
+          (target) => {
+            var _a3, _b3;
+            return squash2(target.quote) === squash2(item.quote) && ((_a3 = target.chapter) != null ? _a3 : 1) === ((_b3 = item.chapter) != null ? _b3 : 1);
+          }
+        ) ? { ...item, reason: "fix_failed" } : item
+      );
+    } else slot.open = withOpen(slot.open, (_b2 = slot.pending) != null ? _b2 : [], () => "fix_failed");
     delete slot.pending;
+    delete slot.again;
   }
   setAiSlot(next, token.nodeId, slot);
   next.revision++;
@@ -50571,6 +50631,78 @@ function applyAiStopped(data, token, budget) {
   }
   next.revision++;
   return { state: next, accepted: true };
+}
+var AI_AGAIN_EXCLUDED = [
+  "unfixable",
+  "sources_conflict",
+  "source_unreachable",
+  "hand_edited"
+];
+var againTargets = (slot, key4) => (slot == null ? void 0 : slot.done) && !slot.incomplete && slot.key === key4 ? slot.open.filter((item) => !AI_AGAIN_EXCLUDED.includes(item.reason)) : [];
+function reopenAiRound(data, nodeId, key4) {
+  if (nodeId !== void 0 && !effectiveOrder(data).includes(nodeId)) return { state: data, accepted: false };
+  const found = aiSlot(data, nodeId);
+  const targets = againTargets(found, key4);
+  if (!found || !targets.length) return { state: data, accepted: false };
+  const next = clone2(data);
+  const slot = {
+    ...found,
+    step: "fix",
+    round: MAX_AI_FIX_ROUNDS - 1,
+    attempts: 0,
+    again: true,
+    pending: targets.map((item) => ({
+      id: item.id,
+      ...item.chapter ? { chapter: item.chapter } : {},
+      quote: item.quote,
+      problem: item.problem,
+      suggestion: ""
+    }))
+  };
+  delete slot.done;
+  delete slot.refused;
+  setAiSlot(next, nodeId, slot);
+  next.revision++;
+  return { state: next, accepted: true };
+}
+function closeAiRound(data, nodeId) {
+  const found = aiSlot(data, nodeId);
+  if (!(found == null ? void 0 : found.again) || found.done) return data;
+  const next = clone2(data);
+  const slot = { ...found, done: true, attempts: 0 };
+  delete slot.pending;
+  delete slot.again;
+  delete slot.refused;
+  setAiSlot(next, nodeId, slot);
+  next.revision++;
+  return next;
+}
+function fixAgainPlan(data, needsReview) {
+  var _a2;
+  let chapters = 0;
+  let items = 0;
+  let stubborn = 0;
+  const count4 = (slot) => {
+    const fixable = (slot == null ? void 0 : slot.done) && !slot.incomplete ? slot.open.filter((item) => !AI_AGAIN_EXCLUDED.includes(item.reason)) : [];
+    stubborn += fixable.filter((item) => item.reason === "still_present").length;
+    return fixable.length;
+  };
+  for (const id of effectiveOrder(data)) {
+    const found = count4((_a2 = data.aiProof) == null ? void 0 : _a2[id]);
+    if (!found) continue;
+    chapters++;
+    items += found;
+  }
+  const inBook = count4(data.bookProof);
+  items += inBook;
+  return {
+    chapters,
+    items,
+    calls: 2 * chapters + (inBook ? 2 : 0),
+    stubborn,
+    statusItems: Math.max(0, Math.trunc(needsReview) || 0),
+    book: inBook > 0
+  };
 }
 var planRevision = (data) => effectiveOrder(data).reduce((sum2, id) => sum2 + cardRevision(data, id), 0);
 var clearPlanEdit = (next) => {
@@ -57167,40 +57299,126 @@ var BookPipelineRuns = class {
     if (!await this.writeClosingPage(drive)) this.log(drive, "open_issues_write", nodeId, "proof", "failed");
   }
   /**
+   * One more fix-and-check round over a finished book (the "fix again" button): every chapter whose AI proofread left fixable problems
+   * gets one fix and one check, then the whole-book proofread the same way. The book stays done; the limit is raised to cover the calls
+   * when it is short. A round cut short (stop, out of budget, unload) is closed with the problems the slot had before it, so the counts
+   * the bar and the page show never move except by a finished round. Refused ("nothing") when no problem can be fixed.
+   */
+  async fixAgain(mapPath) {
+    return this.enter(mapPath, async (drive) => {
+      if (!this.ports.aiProof || !this.ports.aiFix || !this.ports.aiBookProof)
+        throw new BookPipelineRunError("nothing");
+      const data = await this.openSaved(drive, mapPath, { allowDone: true });
+      if (data.phase !== "done") throw new BookPipelineRunError("not_gate");
+      const plan = fixAgainPlan(data, 0);
+      if (!plan.items) throw new BookPipelineRunError("nothing");
+      await drive.store.commit((state) => {
+        const short = state.budget.used + plan.calls - state.budget.limit;
+        const next = resumeRun(short > 0 ? addBudget(state, short) : state);
+        return { state: next != null ? next : state, accepted: true };
+      });
+      if (drive.store.state.status !== "running") throw new BookPipelineRunError("budget");
+      drive.job = async () => {
+        var _a2;
+        drive.again = { done: 0, total: plan.chapters + (plan.book ? 1 : 0) };
+        const finished = () => {
+          if (drive.again) drive.again.done = Math.min(drive.again.total, drive.again.done + 1);
+        };
+        try {
+          for (const id of effectiveOrder(drive.store.state)) {
+            if (this.dead(drive) || drive.controller.signal.aborted || drive.fatal !== void 0) break;
+            if (drive.store.state.status !== "running") break;
+            const info = drive.cards.get(id);
+            const card = info ? await this.ports.readCard(info.path).catch(() => void 0) : void 0;
+            if (!card) continue;
+            const key4 = aiProofKey(cardRevision(drive.store.state, id), aiProofBody(chapterBody(card.detail)));
+            const opened = await drive.store.commit((state) => reopenAiRound(state, id, key4));
+            if (!(opened == null ? void 0 : opened.accepted)) continue;
+            drive.busy.add(id);
+            try {
+              for (let turn = 0; turn < 10; turn++) {
+                const slot = (_a2 = drive.store.state.aiProof) == null ? void 0 : _a2[id];
+                if (!(slot == null ? void 0 : slot.again) || slot.done || this.dead(drive) || drive.controller.signal.aborted) break;
+                if (drive.store.state.status !== "running" || drive.fatal !== void 0) break;
+                await this.aiChapter(drive, id, slot.step, true);
+              }
+            } finally {
+              drive.busy.delete(id);
+              finished();
+            }
+          }
+          if (!this.dead(drive) && !drive.controller.signal.aborted && drive.store.state.status === "running") {
+            const input2 = await this.bookProofInput(drive).catch(() => void 0);
+            const key4 = input2 ? aiProofKey(0, input2.chapters.map((chapter) => chapter.text).join("\n\0\n")) : "";
+            const opened = input2 ? await drive.store.commit((state) => reopenAiRound(state, void 0, key4)) : void 0;
+            for (let turn = 0; (opened == null ? void 0 : opened.accepted) && turn < 10; turn++) {
+              const slot = drive.store.state.bookProof;
+              if (!(slot == null ? void 0 : slot.again) || slot.done || this.dead(drive) || drive.controller.signal.aborted) break;
+              if (drive.store.state.status !== "running" || drive.fatal !== void 0) break;
+              await this.aiBook(drive, slot.step, true);
+            }
+            if (opened == null ? void 0 : opened.accepted) finished();
+          }
+        } finally {
+          drive.again = void 0;
+          if (!this.dead(drive)) {
+            await drive.store.commit((state) => {
+              let next = effectiveOrder(state).reduce((current, id) => closeAiRound(current, id), state);
+              next = closeAiRound(next);
+              return { state: next, accepted: true };
+            }).catch(() => void 0);
+            if (drive.store.state.phase === "done" && !await this.writeClosingPage(drive))
+              this.log(drive, "open_issues_write", "book", "proof", "failed");
+            this.syncReviewNotes(drive);
+          }
+        }
+      };
+      this.log(drive, "fix_again", "-", "proof", `calls:${plan.calls}`);
+    });
+  }
+  /**
    * A finished book is read again (the map opens; the one entry for this repair): a chapter with text that the book lists but that has
    * no finished AI proofread slot (a rerun cut short by an unload: its slot was cleared or left open and nothing closed it) is closed as incomplete and the
    * closing page is written again, so the bar and the page never show the book as solved. A book with no such chapter is not touched.
    */
   async repairFinished(mapPath) {
+    var _a2;
     if (this.disposed || !this.ports.aiProof || !this.ports.aiFix || !this.ports.aiBookProof) return;
     const read = readBookPipeline(await this.ports.readMap(mapPath));
     if (read.kind !== "usable" || read.data.phase !== "done") return;
     if (effectiveOrder(read.data).every((id) => {
-      var _a2, _b2;
-      return (_b2 = (_a2 = read.data.aiProof) == null ? void 0 : _a2[id]) == null ? void 0 : _b2.done;
-    })) return;
+      var _a3, _b2;
+      return (_b2 = (_a3 = read.data.aiProof) == null ? void 0 : _a3[id]) == null ? void 0 : _b2.done;
+    }) && !((_a2 = read.data.bookProof) == null ? void 0 : _a2.again)) return;
     return this.enter(mapPath, async (drive) => {
-      var _a2, _b2;
+      var _a3, _b2, _c, _d, _e, _f, _g;
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       const missing = [];
+      const again = effectiveOrder(data).filter((id) => {
+        var _a4, _b3;
+        return ((_b3 = (_a4 = data.aiProof) == null ? void 0 : _a4[id]) == null ? void 0 : _b3.again) && !data.aiProof[id].done;
+      });
+      const bookAgain = !!((_a3 = data.bookProof) == null ? void 0 : _a3.again) && !data.bookProof.done;
       for (const id of effectiveOrder(data)) {
         const info = drive.cards.get(id);
-        if (((_b2 = (_a2 = data.aiProof) == null ? void 0 : _a2[id]) == null ? void 0 : _b2.done) || !info || drive.stages.get(id) !== "checked" && drive.stages.get(id) !== "needs-review")
+        if (((_c = (_b2 = data.aiProof) == null ? void 0 : _b2[id]) == null ? void 0 : _c.done) || ((_e = (_d = data.aiProof) == null ? void 0 : _d[id]) == null ? void 0 : _e.again) || !info || drive.stages.get(id) !== "checked" && drive.stages.get(id) !== "needs-review")
           continue;
         const card = await this.ports.readCard(info.path).catch(() => void 0);
         if (card && aiProofBody(chapterBody(card.detail)).trim()) missing.push(id);
       }
-      if (!missing.length || this.dead(drive)) return;
-      await drive.store.commit(
-        (state) => state.phase === "done" ? {
-          state: missing.reduce((next, id) => {
-            var _a3, _b3;
-            return ((_b3 = (_a3 = next.aiProof) == null ? void 0 : _a3[id]) == null ? void 0 : _b3.done) ? next : abandonAi(next, id);
-          }, state),
-          accepted: true
-        } : { state, accepted: false }
-      );
-      if (!await this.writeClosingPage(drive)) this.log(drive, "open_issues_write", missing[0], "proof", "failed");
+      if (!missing.length && !again.length && !bookAgain || this.dead(drive)) return;
+      await drive.store.commit((state) => {
+        if (state.phase !== "done") return { state, accepted: false };
+        let next = again.reduce((current, id) => closeAiRound(current, id), state);
+        if (bookAgain) next = closeAiRound(next);
+        next = missing.reduce((current, id) => {
+          var _a4, _b3;
+          return ((_b3 = (_a4 = current.aiProof) == null ? void 0 : _a4[id]) == null ? void 0 : _b3.done) ? current : abandonAi(current, id);
+        }, next);
+        return { state: next, accepted: true };
+      });
+      if (!await this.writeClosingPage(drive))
+        this.log(drive, "open_issues_write", (_g = (_f = missing[0]) != null ? _f : again[0]) != null ? _g : "book", "proof", "failed");
       this.syncNotes(drive);
     });
   }
@@ -58624,7 +58842,7 @@ var BookPipelineRuns = class {
    * One step of the whole-book AI proofread: the check (the proof model, text only, over every chapter) or the fix (the author model; the
    * edits are applied chapter by chapter, each chapter written once). Same fences as {@link aiChapter}.
    */
-  async aiBook(drive, want) {
+  async aiBook(drive, want, again = false) {
     var _a2, _b2, _c;
     if (!this.ports.aiBookProof || !this.ports.aiFix) return;
     const signal = drive.controller.signal;
@@ -58643,7 +58861,7 @@ var BookPipelineRuns = class {
     const same2 = (stored == null ? void 0 : stored.key) === key4 ? stored : void 0;
     const step = same2 ? want : "proof";
     const begun = await drive.store.commit((state) => {
-      const dispatched = beginAiStep(state, {}, key4, step);
+      const dispatched = beginAiStep(state, again ? { rerun: true } : {}, key4, step);
       return dispatched ? { state: dispatched.state, accepted: true, token: dispatched.token } : { state, accepted: false, token: void 0 };
     });
     if (!(begun == null ? void 0 : begun.accepted) || !begun.token) return giveUp();
@@ -58807,7 +59025,7 @@ var BookPipelineRuns = class {
   }
   /** The issues of the closing page, as items: open AI findings, an unfinished proofread, chapters still needing a look. */
   async openIssuesOf(drive) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const state = drive.store.state;
     const title = (id) => {
       var _a3, _b3;
@@ -58856,7 +59074,17 @@ var BookPipelineRuns = class {
       const issue2 = String((_c = card == null ? void 0 : card.fields.pipelineIssue) != null ? _c : "");
       if (issue2.trim() === `images unmet: ${coverOffToken}`) continue;
       const reason = /length:under/.test(issue2) ? "too_short" : /length:over/.test(issue2) ? "too_long" : /images:under/.test(issue2) ? "few_images" : /no_body|no_text/.test(issue2) ? "no_text" : /hand_edited/.test(issue2) ? "hand_edited" : /^(plan|write|proof) failed/.test(issue2) ? "step_failed" : "";
-      issues.push({ source: "chapter", chapterId: id, chapterTitle: title(id), problem: "", reason });
+      const off = (_d = splitPictureIssue(issue2).off) != null ? _d : [...issue2.matchAll(/image_(\d+)_mismatch/g)].map((m) => Number(m[1]));
+      const zh = instructionLanguageOf(drive.config.language) === "zh";
+      const pictures = zh ? `\u7B2C ${off.join("\u3001")} \u5F35\u5716` : `${off.length > 1 ? "Pictures" : "Picture"} ${off.join(", ")}`;
+      const found = reason || (/fix interrupted/.test(issue2) ? "fix_interrupted" : off.length ? "image_mismatch" : /^proof unmet/.test(issue2) ? "proof_unmet" : /^structure unmet/.test(issue2) ? "structure_unmet" : "");
+      issues.push({
+        source: "chapter",
+        chapterId: id,
+        chapterTitle: title(id),
+        problem: found === "image_mismatch" ? pictures : "",
+        reason: found
+      });
     }
     return { checked: checked2, issues };
   }
@@ -60709,6 +60937,7 @@ ${caption}`, drive.config.language))
       busyCards: [...drive.busy].filter((id) => id !== "global"),
       ...eta === void 0 ? {} : { etaSeconds: eta },
       ...active && drive.rerun ? { rerun: { ...drive.rerun } } : {},
+      ...active && drive.again ? { again: { ...drive.again } } : {},
       ...active && drive.sub.size ? { current: [...drive.sub].map(([nodeId, sub]) => ({ nodeId, step: sub.step, startedAt: sub.startedAt })) } : {},
       steps: stepCounts(counts, imagesDone, {
         settled: state.phase === "gate2" || state.phase === "done",
@@ -60952,6 +61181,8 @@ function bookBarState(data, progress, stageOf, mapIds, structure2, titleOf) {
     }
   } : baseCurrent;
   const rerunning = !!(progress == null ? void 0 : progress.active) && !!progress.rerun && order.includes(progress.rerun.nodeId);
+  const again = mode === "done" && (progress == null ? void 0 : progress.active) && progress.again ? progress.again : void 0;
+  const fixAgain = mode === "done" && !again && !rerunning ? fixAgainPlan(data, counts["needs-review"]) : void 0;
   return {
     mode,
     phase,
@@ -60968,6 +61199,8 @@ function bookBarState(data, progress, stageOf, mapIds, structure2, titleOf) {
     } : {},
     ...current ? { current } : {},
     ...rerunning ? { rerun: true } : {},
+    ...again ? { again: { ...again } } : {},
+    ...(fixAgain == null ? void 0 : fixAgain.items) ? { fixAgain } : {},
     ...(progress == null ? void 0 : progress.gateWaiting) ? { gateWaiting: true } : {},
     ...mapChange ? { mapChange } : {},
     ...gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {},
@@ -61142,7 +61375,7 @@ function countStages(stages) {
   return counts;
 }
 function bookTitleText(state) {
-  const word = state.mode === "stopped" || state.mode === "changed" ? t("ui.book_phase_stopped") : state.mode === "budget" ? t("ui.book_phase_budget") : state.mode === "gate1" && state.planReview ? t("ui.book_phase_plan_review") : t(PHASE_KEY[state.mode]);
+  const word = state.mode === "stopped" || state.mode === "changed" ? t("ui.book_phase_stopped") : state.mode === "budget" ? t("ui.book_phase_budget") : state.mode === "gate1" && state.planReview ? t("ui.book_phase_plan_review") : state.again ? t("ui.book_phase_fix_again") : t(PHASE_KEY[state.mode]);
   return t("ui.book_bar_title_0", word);
 }
 function bookEtaText(seconds) {
@@ -61150,7 +61383,7 @@ function bookEtaText(seconds) {
   return minutes < 1 ? t("ui.book_eta_under_minute") : t("ui.book_eta_0", minutes);
 }
 function renderBookBar(parent, state, actions) {
-  var _a2, _b2, _c;
+  var _a2, _b2, _c, _d, _e;
   const { counts, total: total2 } = state;
   const bar = parent.createDiv("vam-book-bar");
   bar.dataset.mode = state.mode;
@@ -61193,10 +61426,17 @@ function renderBookBar(parent, state, actions) {
   if (state.mode === "done") {
     top.createSpan({
       cls: "vam-book-bar-counts vam-book-done-counts",
-      text: t("ui.book_bar_done_0_1_2", (_b2 = (_a2 = state.structure) == null ? void 0 : _a2.chapters) != null ? _b2 : total2, state.ai.fixed, state.ai.open)
+      text: state.again ? t("ui.book_bar_fix_again_0_1_2", state.again.done, state.again.total, state.ai.open) : t("ui.book_bar_done_0_1_2", (_b2 = (_a2 = state.structure) == null ? void 0 : _a2.chapters) != null ? _b2 : total2, state.ai.fixed, state.ai.open)
     });
-    if (actions.openIssues)
-      makeButton(buttons, t("ui.book_bar_open_issues"), "vam-book-link vam-book-open-issues", actions.openIssues);
+    if (state.again) makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+    else {
+      if (actions.openIssues)
+        makeButton(buttons, t("ui.book_bar_open_issues"), "vam-book-link vam-book-open-issues", actions.openIssues);
+      if (actions.fixAgain && state.fixAgain) {
+        const again = makeButton(buttons, t("ui.book_fix_again"), "vam-book-fix-again", actions.fixAgain.ask);
+        again.setAttr("aria-expanded", String(actions.fixAgain.asking));
+      }
+    }
   }
   if (state.mode === "budget") {
     makeButton(buttons, t("ui.book_add_budget"), "mod-cta vam-book-add-budget", actions.addBudget);
@@ -61216,7 +61456,7 @@ function renderBookBar(parent, state, actions) {
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   if (state.rerun && state.mode !== "planning" && state.mode !== "writing")
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
-  if (actions.abandon && (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")) {
+  if (actions.abandon && !state.again && (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")) {
     const abandon = actions.abandon;
     const ask = makeButton(
       buttons,
@@ -61244,6 +61484,8 @@ function renderBookBar(parent, state, actions) {
       abandon.confirm
     );
   }
+  if (((_d = actions.fixAgain) == null ? void 0 : _d.asking) && !((_e = actions.abandon) == null ? void 0 : _e.asking) && state.fixAgain && !state.again)
+    renderFixAgainCard(bar, state.fixAgain, actions.fixAgain);
   if (state.mode === "gate1" && state.planReview && state.structureEdit)
     renderStructureEdit(bar, state.structureEdit, actions);
   if ((state.mode === "writing" || state.mode === "done") && actions.rerunAsk)
@@ -61380,6 +61622,27 @@ function renderStructureEdit(bar, view, actions) {
     line3.setAttr("role", "status");
     line3.setText(t("ui.book_struct_failed"));
   }
+}
+function renderFixAgainCard(bar, plan, ask) {
+  const title = t("ui.book_fix_again_title");
+  const card = bar.createDiv("vam-book-abandon-card vam-book-fix-again-card");
+  card.setAttr("role", "group");
+  card.setAttr("aria-label", title);
+  card.createEl("b", { text: title });
+  card.createEl("p", {
+    text: plan.chapters ? t("ui.book_fix_again_body_0_1_2", plan.chapters, plan.items, plan.calls) : t("ui.book_fix_again_body_book_0_1", plan.items, plan.calls)
+  });
+  const note = plan.stubborn ? plan.statusItems ? t("ui.book_fix_again_note_0_1", plan.stubborn, plan.statusItems) : t("ui.book_fix_again_note_stubborn_0", plan.stubborn) : plan.statusItems ? t("ui.book_fix_again_note_status_0", plan.statusItems) : "";
+  if (note) card.createEl("p", { cls: "vam-book-fix-again-note", text: note });
+  const row = card.createDiv("vam-book-abandon-actions");
+  makeButton(row, t("ui.cancel"), "vam-book-fix-again-cancel", ask.cancel);
+  makeButton(row, t("ui.book_fix_again_go"), "mod-cta vam-book-fix-again-go", ask.confirm);
+  card.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.stopPropagation();
+    event.preventDefault();
+    ask.cancel();
+  });
 }
 function renderAsk(bar, cls, question, goText, ask) {
   const card = bar.createDiv(`vam-book-abandon-card ${cls}`);
@@ -77885,6 +78148,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian39.Ite
     });
     /** The map whose bar shows the "give up this book" confirmation card (in-page; never window.confirm). */
     __publicField(this, "bookAbandonAsking", null);
+    /** The map whose bar shows the "fix again" confirmation card. Cancel and Escape hand the keyboard back to the button that opened it. */
+    __publicField(this, "bookFixAgainAsking", null);
     /** The structure list's undo: the buttons wait while it runs; a failure leaves one line (the runner has put the map back as it was). */
     __publicField(this, "bookStructureUndo");
     /** The zoom the selected card's tool row was last fitted at. */
@@ -92539,6 +92804,7 @@ ${t("ui.book_role_running_suffix")}` : first);
       this.bookMapFocusedRun = read.data.runId;
       this.bookBarFocus = "map-go";
     }
+    if (this.bookFixAgainAsking === path && !state.fixAgain) this.bookFixAgainAsking = null;
     const rerunAsk = this.bookRerunAskFor(path);
     renderBookBar(toolbar, state, {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
@@ -92558,6 +92824,17 @@ ${t("ui.book_role_running_suffix")}` : first);
             await this.plugin.abandonBookPipeline(path);
             new import_obsidian39.Notice(t("ui.book_abandoned"));
           });
+        }
+      },
+      fixAgain: {
+        asking: this.bookFixAgainAsking === path,
+        ask: () => this.askBookFixAgain(path, true),
+        cancel: () => this.askBookFixAgain(path, false),
+        confirm: () => {
+          if (this.bookFixAgainAsking !== path) return;
+          this.bookFixAgainAsking = null;
+          void this.bookEntry(() => this.plugin.fixBookAgain(path));
+          if (!this.closed) this.render();
         }
       },
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
@@ -92609,7 +92886,9 @@ ${t("ui.book_role_running_suffix")}` : first);
     const selector = {
       "rerun-go": ".vam-book-rerun-ask .vam-book-ask-go",
       "rerun-opener": ".vam-node-rerun",
-      "map-go": ".vam-book-map-replan"
+      "map-go": ".vam-book-map-replan",
+      "again-cancel": ".vam-book-fix-again-cancel",
+      "again-opener": ".vam-book-fix-again"
     }[focus];
     (_b2 = this.contentEl.querySelector(selector)) == null ? void 0 : _b2.focus();
   }
@@ -92753,6 +93032,13 @@ ${t("ui.book_role_running_suffix")}` : first);
   }
   askBookAbandon(path, asking) {
     this.bookAbandonAsking = asking ? path : null;
+    if (asking) this.bookFixAgainAsking = null;
+    if (!this.closed) this.render();
+  }
+  askBookFixAgain(path, asking) {
+    this.bookFixAgainAsking = asking ? path : null;
+    if (asking) this.bookAbandonAsking = null;
+    this.bookBarFocus = asking ? "again-cancel" : "again-opener";
     if (!this.closed) this.render();
   }
   /** The lists, labels and save of the four model dropdowns (the start card and the trial screen share them with the settings page). */
@@ -115332,6 +115618,9 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   abandonBookPipeline(mapPath) {
     return this.bookPipelineRuns.abandon(mapPath);
+  }
+  fixBookAgain(mapPath) {
+    return this.bookPipelineRuns.fixAgain(mapPath);
   }
   resumeBookPipeline(mapPath, options = {}) {
     return this.bookPipelineRuns.resume(mapPath, options);

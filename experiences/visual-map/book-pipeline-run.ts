@@ -601,6 +601,8 @@ export interface BookPipelineProgress {
   steps?: BookStepCounts;
   /** Memory only: the single-card rerun running now and when it began (ms); gone when it ends, whatever way it ended. */
   rerun?: { nodeId: string; startedAt: number };
+  /** Memory only: a "fix again" round is running: slots finished of the slots it works on (the bar's "7 / 20"). */
+  again?: { done: number; total: number };
   /** Memory only: a gate button press is waiting for the drive that reached the gate to finish ending. */
   gateWaiting?: true;
 }
@@ -687,6 +689,8 @@ interface Drive {
   overwrite: Map<string, { runId: string; operation: string; fingerprint: string }>;
   /** In memory only: the single-card rerun in progress. */
   rerun?: { nodeId: string; startedAt: number };
+  /** In memory only: the "fix again" round in progress (slots finished / slots to work on). */
+  again?: { done: number; total: number };
   /** The plan a card's plan step wrote in this drive. */
   plans: Map<string, CardPlanResult>;
   /** Chapters this drive's plan step left alone (hand-edited, unknown or kept): their previous/next lines are refreshed by the program. */
@@ -1768,7 +1772,8 @@ export class BookPipelineRuns {
    */
   async fixAgain(mapPath: string): Promise<void> {
     return this.enter(mapPath, async drive => {
-      if (!this.ports.aiProof || !this.ports.aiFix || !this.ports.aiBookProof) throw new BookPipelineRunError("nothing");
+      if (!this.ports.aiProof || !this.ports.aiFix || !this.ports.aiBookProof)
+        throw new BookPipelineRunError("nothing");
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       if (data.phase !== "done") throw new BookPipelineRunError("not_gate");
       const plan = fixAgainPlan(data, 0);
@@ -1780,6 +1785,10 @@ export class BookPipelineRuns {
       });
       if (drive.store.state.status !== "running") throw new BookPipelineRunError("budget");
       drive.job = async () => {
+        drive.again = { done: 0, total: plan.chapters + (plan.book ? 1 : 0) };
+        const finished = (): void => {
+          if (drive.again) drive.again.done = Math.min(drive.again.total, drive.again.done + 1);
+        };
         try {
           for (const id of effectiveOrder(drive.store.state)) {
             if (this.dead(drive) || drive.controller.signal.aborted || drive.fatal !== undefined) break;
@@ -1800,6 +1809,7 @@ export class BookPipelineRuns {
               }
             } finally {
               drive.busy.delete(id);
+              finished();
             }
           }
           if (!this.dead(drive) && !drive.controller.signal.aborted && drive.store.state.status === "running") {
@@ -1812,8 +1822,10 @@ export class BookPipelineRuns {
               if (drive.store.state.status !== "running" || drive.fatal !== undefined) break;
               await this.aiBook(drive, slot.step, true);
             }
+            if (opened?.accepted) finished();
           }
         } finally {
+          drive.again = undefined;
           if (!this.dead(drive)) {
             await drive.store
               .commit(state => {
@@ -3695,7 +3707,9 @@ export class BookPipelineRuns {
       // What the status line itself says, once none of the six older causes is: the reason a person can act on (the old fallback was one vague sentence).
       const off = splitPictureIssue(issue).off ?? [...issue.matchAll(/image_(\d+)_mismatch/g)].map(m => Number(m[1]));
       const zh = instructionLanguageOf(drive.config.language) === "zh";
-      const pictures = zh ? `第 ${off.join("、")} 張圖` : `${off.length > 1 ? "Pictures" : "Picture"} ${off.join(", ")}`;
+      const pictures = zh
+        ? `第 ${off.join("、")} 張圖`
+        : `${off.length > 1 ? "Pictures" : "Picture"} ${off.join(", ")}`;
       const found =
         reason ||
         (/fix interrupted/.test(issue)
@@ -5799,6 +5813,7 @@ export class BookPipelineRuns {
       busyCards: [...drive.busy].filter(id => id !== "global"),
       ...(eta === undefined ? {} : { etaSeconds: eta }),
       ...(active && drive.rerun ? { rerun: { ...drive.rerun } } : {}),
+      ...(active && drive.again ? { again: { ...drive.again } } : {}),
       ...(active && drive.sub.size
         ? { current: [...drive.sub].map(([nodeId, sub]) => ({ nodeId, step: sub.step, startedAt: sub.startedAt })) }
         : {}),

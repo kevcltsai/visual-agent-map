@@ -332,6 +332,7 @@ import type { UpdateMode } from "../../ai/note-style-recipe";
 import { backupNoteFile } from "./note-backup";
 import { stopLabelKey, type ResearchStart, type SelectionSynthesisTask, type WritebackHooks } from "./topic-run";
 import { BookPipelineRunError, type AuthorInput, type AuthorOutcome } from "./book-pipeline-run";
+import { applyBookPlanEdit, bookPlanChatInput, type BookPlanChatDeps } from "./book-plan-chat";
 import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
 import {
   BOOK_SETTING_FIELDS,
@@ -1319,8 +1320,28 @@ export class VisualAgentMapView extends ItemView {
     fileOf: path => {
       const file = this.app.vault.getAbstractFileByPath(path);
       return file instanceof TFile ? file : null;
+    },
+    applyBookPlanEdit: async (action, baseline) => {
+      // The book run's own "direction is right" is blocked while the plan is being written (bookPipelineBlocked).
+      this.bookPlanApplying = true;
+      try {
+        return await applyBookPlanEdit(this.bookPlanChatDeps(), action, baseline);
+      } finally {
+        this.bookPlanApplying = false;
+      }
     }
   });
+  /** True while the chat writes a plan edit to the cards: the book run does not start writing meanwhile. */
+  private bookPlanApplying = false;
+  private bookPlanChatDeps(): BookPlanChatDeps {
+    return {
+      map: () => this.map,
+      readMap: () => this.plugin.repo.readMap(this.path),
+      readCard: path => this.plugin.readBookCardForChat(path),
+      updateNoteGuarded: (path, patch, options) => this.plugin.repo.updateNoteGuarded(path, patch, options),
+      language: () => this.plugin.settings.language
+    };
+  }
   /** Picture searches the chat started; the view owns them, so closing it or leaving the map stops them. */
   private chatImageFinder = new ChatImageFinder({
     where: () => ({ closed: this.closed, chat: this.chat, path: this.path, mapId: this.map?.id }),
@@ -17888,6 +17909,7 @@ export class VisualAgentMapView extends ItemView {
   bookPipelineBlocked(): boolean {
     return (
       !!this.chatChainRunner?.current ||
+      this.bookPlanApplying ||
       this.plugin.expansionBatches.get(this.multiResearchKey())?.status === "running" ||
       (!!this.path && this.plugin.argumentRuns.isRunning(this.path))
     );
@@ -20681,6 +20703,8 @@ export class VisualAgentMapView extends ItemView {
       if (key) sentPaths.add(key);
     }
     const ownFiles = await this.chatFiles.carry(sentPaths);
+    // The chief editor's turn: only while the plan waits for the author (gate1, plan review, running); everything else is as always.
+    const bookPlan = await bookPlanChatInput(this.bookPlanChatDeps()).catch(() => undefined);
     const context = buildMapChatContext({
       mapTitle: map.title,
       mapFolder: this.plugin.repo.topicRoot(this.path),
@@ -20706,6 +20730,7 @@ export class VisualAgentMapView extends ItemView {
       ...(picture ? { selectedImage: picture.selected } : {}),
       ...(researchNotes.length ? { researchNotes } : {}),
       ...(mapSources ? { mapSources } : {}),
+      ...(bookPlan ? { bookPlan } : {}),
       ...(continuation ? { continuation } : {})
     });
     // From this turn on the conversation holds source text (and what the model made of it): its writes need the user's yes.
@@ -21336,6 +21361,7 @@ export class VisualAgentMapView extends ItemView {
         ...(outcome.basis ? { basis: outcome.basis } : {}),
         text:
           t("ui.map_chat_line_done_0", label) +
+          (outcome.note ?? "") +
           (outcome.skippedCards ? t("ui.map_chat_line_cards_skipped_hidden_0", outcome.skippedCards) : "")
       };
     return {

@@ -42,7 +42,7 @@ import type VisualAgentMapPlugin from "../../main";
 
 /** What one chat action came to: written, skipped with a reason (shown in the chat), or failed. */
 export type ChatOutcome =
-  | { status: "done"; images?: MapChatImages[]; skippedCards?: number; basis?: MapChatBasis }
+  | { status: "done"; images?: MapChatImages[]; skippedCards?: number; basis?: MapChatBasis; note?: string }
   | { status: "skipped" | "failed"; reason: string; created?: boolean };
 /** What the writes of one reply have made so far: the real id behind each `ref`, and the cards created, in order. */
 export interface ChatRun {
@@ -103,7 +103,7 @@ export type ChatWriteAction = Exclude<
       "select_topics" | "run_map_action" | "create_map" | "rename_map" | "open_map" | "ask_topic_kind" | "read_md_file";
   }
 >;
-export type ChatWriteBaseline = Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths">;
+export type ChatWriteBaseline = Pick<MapChatContext, "mdHashes" | "topicHashes" | "mapSourcePaths" | "bookPlan">;
 export interface ChatWriterPorts {
   // Read from the view each time (never kept), so a view that has moved to another map or been closed is seen as it is now.
   map(): MapDocument | null;
@@ -157,6 +157,11 @@ export interface ChatWriterPorts {
   noteChatOwnFile(path: string, text: string, created: boolean): void;
   /** The vault file at `path`, or null when there is none (or it is not a file). */
   fileOf(path: string): TFile | null;
+  /** Writes an `edit_book_plan` reply to the cards of the book plan under review (see book-plan-chat.ts). */
+  applyBookPlanEdit(
+    action: Extract<MapChatAction, { kind: "edit_book_plan" }>,
+    baseline: Pick<MapChatContext, "bookPlan">
+  ): Promise<ChatOutcome>;
 }
 /** Writes the actions of a map chat reply (one action at a time) to the map and the vault; the view keeps the loop and the undo step. */
 export class ChatActionWriter {
@@ -202,8 +207,7 @@ export class ChatActionWriter {
     const nodeOf = (id: string): MapNode | undefined => this.map?.nodes.find(item => item.id === id);
     const gone = skipped("ui.map_chat_skip_topic_gone");
     const done: ChatOutcome = { status: "done" };
-    // Written by the book plan path (next packet); until it is wired the action is not applied.
-    if (action.kind === "edit_book_plan") return skipped("ui.map_chat_skip_map_changed");
+    if (action.kind === "edit_book_plan") return this.ports.applyBookPlanEdit(action, baseline);
     const configDir = this.app.vault.configDir;
     /** The real id behind an id of the reply; null when it names a card of this reply that was never created. */
     const real = (id: string): string | null =>

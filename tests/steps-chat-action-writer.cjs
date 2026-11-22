@@ -96,7 +96,7 @@ function world(options = {}) {
   });
   const run = () => ({ refs: new Map(), created: [], notes: new Set(), files: new Set(), parked: new Set() });
   const only = name => calls.filter(call => call[0] === name);
-  return { writer, map, notes, files, history, transactions, state, calls, only, nodeById, baseline, run };
+  return { writer, ports, map, notes, files, history, transactions, state, calls, only, nodeById, baseline, run };
 }
 const apply = (w, action, baseline = w.baseline(), run = w.run()) => w.writer.write(action, baseline, () => true, run).then(outcome => ({ outcome: plain(outcome), run }));
 
@@ -221,4 +221,143 @@ test('chat action writer: a card locked for the AI is refused at apply time, rea
   assert.deepEqual(removed.outcome, skippedOutcome('ui.ai_locked_notice'));
   assert.equal(w.only('freshNotes').length, 1);
   assert.deepEqual(w.only('removeToUnassignedEntry'), []);
+});
+
+// ---- edit_book_plan (the chief editor's apply path, book-plan-chat.ts) ----
+
+const { applyBookPlanEdit, bookPlanChatInput } = load('experiences/visual-map/book-plan-chat.ts', { obsidian: {} });
+const machine = load('core/book-pipeline/machine.ts');
+const planText = load('core/book-pipeline/plan-text.ts');
+
+function planWorld(options = {}) {
+  const writes = [];
+  const brief = (covers, extra = {}) => planText.composeCardPrompt({
+    role: 'body', kind: 'chapter', covers, points: ['p1'], entry: 'e', handoff: 'h',
+    checklist: [{ id: 'C1', type: 'structure', text: 'c1' }], ...extra
+  }, 'en');
+  const prompts = {
+    r: brief('root covers'),
+    a: brief('old a', { next: { position: 2, title: 'B', summary: 'old b' } }),
+    b: brief('old b', { previous: { position: 1, title: 'A', summary: 'old a' }, next: { position: 3, title: 'C', summary: 'old c' } }),
+    c: brief('old c', { previous: { position: 2, title: 'B', summary: 'old b' } })
+  };
+  const cards = new Map(Object.entries(prompts).map(([id, prompt]) => [`${id}.md`, {
+    path: `${id}.md`, title: id.toUpperCase(), summary: '', prompt, detail: '', raw: `raw-${id}`, fields: { bookRole: 'body' }, settings: {}
+  }]));
+  const data = machine.newBookPipeline({ runId: 'run-1', order: ['r', 'a', 'b', 'c'], now: '2026-11-16T00:00:00.000Z' });
+  delete data.trial; data.phase = 'gate1'; data.planReview = true;
+  const doc = {
+    id: 'map', title: 'Book', version: 1, topicRelations: [], canvasItems: [], viewport: { x: 0, y: 0, zoom: 1 },
+    nodes: ['r', 'a', 'b', 'c'].map(id => node(id, id === 'r' ? null : 'r')), bookPipeline: JSON.parse(JSON.stringify(data))
+  };
+  const state = { memory: doc, locked: new Set(options.locked ?? []) };
+  const deps = {
+    map: () => state.memory,
+    readMap: async () => doc,
+    readCard: async path => ({ ...cards.get(path) }),
+    updateNoteGuarded: async (path, patch, guard) => {
+      const card = cards.get(path);
+      if (!guard.authorize() || guard.expectedContent !== card.raw) return 'discarded';
+      writes.push(path); card.prompt = patch.prompt; if (patch.summary !== undefined) card.summary = patch.summary;
+      return 'written';
+    },
+    language: () => 'en'
+  };
+  const baselineOf = ids => ({
+    runId: 'run-1', unlocked: ids, prompts: Object.fromEntries(ids.map(id => [id, { path: `${id}.md`, prompt: prompts[id], kind: 'chapter' }]))
+  });
+  return { deps, doc, cards, writes, state, baselineOf, prompts };
+}
+const bookAction = changes => ({ kind: 'edit_book_plan', changes });
+
+test('edit_book_plan: writes the composed Prompt, follows covers into the summary and refreshes the previous card next line', async () => {
+  const w = planWorld();
+  const outcome = plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', covers: 'new b', checklist: [{ type: 'fact', text: 'who pays' }] }]), { bookPlan: w.baselineOf(['b']) }));
+  assert.equal(outcome.status, 'done');
+  assert.deepEqual(w.writes, ['b.md', 'a.md']);
+  assert.match(w.cards.get('b.md').prompt, /new b/);
+  assert.match(w.cards.get('b.md').prompt, /who pays/);
+  assert.equal(w.cards.get('b.md').summary, 'new b');
+  assert.match(w.cards.get('a.md').prompt, /new b/, 'the card before still says what comes next');
+  assert.doesNotMatch(w.cards.get('a.md').prompt, /old b/);
+});
+
+test('edit_book_plan: a Prompt changed after the proposal is skipped and said so; the others are still written', async () => {
+  const w = planWorld();
+  w.cards.get('b.md').prompt += '\nthe reader added a line';
+  const outcome = plain(await applyBookPlanEdit(w.deps, bookAction([
+    { id: 'b', entry: 'new entry' }, { id: 'c', entry: 'other entry' }
+  ]), { bookPlan: w.baselineOf(['b', 'c']) }));
+  assert.equal(outcome.status, 'done');
+  assert.match(outcome.note, /tell the chief editor/);
+  assert.match(outcome.note, /1 cards left/);
+  assert.deepEqual(w.writes, ['c.md']);
+  const all = plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', entry: 'x' }]), { bookPlan: w.baselineOf(['b']) }));
+  assert.deepEqual(all, skippedOutcome('ui.map_chat_skip_book_cards'));
+});
+
+test('edit_book_plan: a change that would not change the Prompt is skipped; nothing is written', async () => {
+  const w = planWorld();
+  const same = plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', entry: 'e' }]), { bookPlan: w.baselineOf(['b']) }));
+  assert.deepEqual(same, skippedOutcome('ui.map_chat_skip_book_cards'));
+  assert.deepEqual(w.writes, []);
+});
+
+test('edit_book_plan: a locked card is refused (not in the proposal, or hand-edited by now)', async () => {
+  const w = planWorld();
+  const notProposed = plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', entry: 'x' }]), { bookPlan: w.baselineOf([]) }));
+  assert.equal(notProposed.status, 'skipped');
+  w.cards.get('b.md').raw = '---\ntitle: B\n---\n\n<!-- visual-agent-map:detail:start -->\nhand text here\n<!-- visual-agent-map:detail:end -->\n';
+  const handEdited = plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', entry: 'x' }]), { bookPlan: w.baselineOf(['b']) }));
+  assert.equal(handEdited.status, 'skipped');
+  assert.deepEqual(w.writes, []);
+});
+
+test('edit_book_plan: nothing is written once the run has left the plan review, or is another run', async () => {
+  for (const change of [
+    w => { w.doc.bookPipeline.phase = 'writing'; },
+    w => { w.doc.bookPipeline.planReview = false; },
+    w => { w.doc.bookPipeline.status = 'stopped'; },
+    w => { w.doc.bookPipeline.runId = 'run-2'; }
+  ]) {
+    const w = planWorld();
+    change(w);
+    const outcome = plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', entry: 'x' }]), { bookPlan: w.baselineOf(['b']) }));
+    assert.deepEqual(outcome, skippedOutcome('ui.map_chat_skip_book_started'));
+    assert.deepEqual(w.writes, []);
+  }
+  const w = planWorld();
+  assert.equal(plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', entry: 'x' }]), {})).status, 'skipped', 'no bookPlan in the baseline');
+});
+
+test('edit_book_plan: the view memory leaving the review mid-write stops the write (authorize)', async () => {
+  const w = planWorld();
+  const guarded = w.deps.updateNoteGuarded;
+  w.deps.updateNoteGuarded = async (...args) => { w.state.memory = { ...w.doc, bookPipeline: { ...w.doc.bookPipeline, phase: 'writing' } }; return guarded(...args); };
+  const outcome = plain(await applyBookPlanEdit(w.deps, bookAction([{ id: 'b', entry: 'x' }, { id: 'c', entry: 'y' }]), { bookPlan: w.baselineOf(['b', 'c']) }));
+  assert.equal(outcome.status, 'skipped');
+  assert.deepEqual(w.writes, []);
+});
+
+test('chat action writer: edit_book_plan goes to the port with the baseline', async () => {
+  const w = world();
+  const seen = [];
+  const writer = new ChatActionWriter({ ...w.ports, applyBookPlanEdit: async (action, baseline) => { seen.push([action.kind, baseline.bookPlan.runId]); return { status: 'done' }; } });
+  const outcome = plain(await writer.write(bookAction([{ id: 'x', entry: 'y' }]), w.baseline({ bookPlan: { runId: 'run-1', unlocked: [], prompts: {} } }), () => true, w.run()));
+  assert.deepEqual(outcome, { status: 'done' });
+  assert.deepEqual(seen, [['edit_book_plan', 'run-1']]);
+});
+
+test('bookPlanChatInput: only in the plan review; cards in reading order with the proposal baseline; locked marked', async () => {
+  const w = planWorld();
+  const input = plain(await bookPlanChatInput(w.deps));
+  assert.equal(input.runId, 'run-1');
+  assert.deepEqual(input.cards.map(card => card.id), ['r', 'a', 'b', 'c']);
+  assert.equal(input.prompts.b.prompt, w.prompts.b);
+  assert.equal(input.prompts.b.kind, 'chapter');
+  w.doc.bookPipeline.phase = 'writing';
+  assert.equal(await bookPlanChatInput(w.deps), undefined);
+  const none = planWorld();
+  none.state.memory = null;
+  assert.equal(await bookPlanChatInput(none.deps), undefined);
 });

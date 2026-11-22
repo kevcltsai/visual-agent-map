@@ -1036,6 +1036,10 @@ export default class VisualAgentMapPlugin extends Plugin {
     // A drive is over: a rewrite the reader queued behind it may run now.
     settled: mapPath => void this.bookHandEdits.drain(mapPath)
   });
+  /** A card note as the picture-book runner reads it (fields, text and the raw file); the chat's chief editor reads cards the same way. */
+  async readBookCardForChat(path: string): Promise<PipelineCard> {
+    return this.readBookCard(path);
+  }
   /** A card note as the picture-book runner reads it (fields, text and the raw file). */
   private async readBookCard(path: string): Promise<PipelineCard> {
     const note = await this.repo.readNote(path);

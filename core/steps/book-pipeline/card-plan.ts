@@ -28,6 +28,7 @@ import {
 } from "./base";
 import template from "./card-plan.md";
 import requestTemplate from "./card-plan-request.md";
+import mergedTemplate from "./card-plan-merged.md";
 import childrenTemplate from "./card-plan-children.md";
 import roleImagesTemplate from "./card-plan-images-role.md";
 import ownerImagesTemplate from "./card-plan-images-owner.md";
@@ -80,6 +81,8 @@ export interface CardPlanRequest extends BookStepBase {
   previous?: CardNeighbour;
   /** The previous card's planned entry and handoff (its opening and ending), so this card does not repeat their types; absent while it is not planned. */
   previousStyle?: { entry: string; handoff: string };
+  /** Cards the editor folded into this one (title and summary as they were); absent when none. */
+  mergedFrom?: readonly { title: string; summary: string }[];
   next?: CardNeighbour;
   /** A section's chapter. */
   parent?: { position: number; title: string };
@@ -319,6 +322,12 @@ const extraRequest = (instruction: string | undefined): string => {
   return line ? `\n\n${renderTemplate(requestTemplate, { instruction: JSON.stringify(line) })}` : "";
 };
 
+/** Appended only when the editor folded cards into this one (so every other plan's prompt stays exactly as it was). */
+const mergedRequest = (request: CardPlanRequest): string =>
+  request.mergedFrom?.length
+    ? `\n\n${renderTemplate(mergedTemplate, { merged: JSON.stringify(request.mergedFrom.slice(0, 6).map(m => ({ title: cap(m.title, 200), summary: cap(m.summary, 500) }))) })}`
+    : "";
+
 /** The longest a child card's title and summary are in the request. */
 export const CHILD_TITLE_MAX = 80;
 export const CHILD_SUMMARY_MAX = 200;
@@ -393,7 +402,7 @@ export function fitCardPlan(request: CardPlanRequest): { prompt: string; shown: 
     title: cap(c.title, CHILD_TITLE_MAX),
     summary: cap(c.summary, CHILD_SUMMARY_MAX)
   }));
-  const extra = extraRequest(request.instruction);
+  const extra = mergedRequest(request) + extraRequest(request.instruction);
   const usedBy = (text: string): number => estimateTokens(text + extra + JSON.stringify(CARD_PLAN_SCHEMA));
   // The summaries are supplementary: when they make the list not fit, they are left out and only the whole list of titles must fit.
   let base = baseRender(request, true);

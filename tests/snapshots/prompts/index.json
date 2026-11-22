@@ -301,6 +301,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "book-card-plan-merged.en": {
+      "builder": "core/steps/book-pipeline/card-plan.ts cardPlanStep (cards folded into this one)",
+      "language": "en",
+      "schema": true
+    },
+    "book-card-plan-merged.zh": {
+      "builder": "core/steps/book-pipeline/card-plan.ts cardPlanStep (cards folded into this one)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "book-card-plan-merged.zh-CN": {
+      "builder": "core/steps/book-pipeline/card-plan.ts cardPlanStep (cards folded into this one)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "book-card-plan-section.en": {
       "builder": "core/steps/book-pipeline/card-plan.ts cardPlanStep (last section of a chapter, next chapter follows)",
       "language": "en",

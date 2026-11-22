@@ -57352,7 +57352,7 @@ var BookPipelineRuns = class {
       });
       if (drive.store.state.status !== "running") throw new BookPipelineRunError("budget");
       drive.job = async () => {
-        var _a2, _b2;
+        var _a2, _b2, _c, _d;
         drive.again = { done: 0, total: chapterIds.length + (withBook ? 1 : 0) };
         const finished = () => {
           if (drive.again) drive.again.done = Math.min(drive.again.total, drive.again.done + 1);
@@ -57386,6 +57386,14 @@ var BookPipelineRuns = class {
                 const slot = (_b2 = drive.store.state.aiProof) == null ? void 0 : _b2[id];
                 if (!(slot == null ? void 0 : slot.again) || slot.done || !live2()) break;
                 await this.aiChapter(drive, id, slot.step, true, true);
+                const written2 = chaptersKey !== void 0 ? await this.ports.readCard((_d = (_c = drive.cards.get(id)) == null ? void 0 : _c.path) != null ? _d : "").catch(() => void 0) : void 0;
+                const state = written2 ? bodyStateRaw(written2.raw) : void 0;
+                const mine = !!written2 && (state === "clean" || state === "empty") && !isKeptRaw(written2.raw);
+                const after = mine ? await bookKey() : void 0;
+                if (chaptersKey !== void 0 && after !== void 0 && after !== chaptersKey) {
+                  const rekeyed = await drive.store.commit((state2) => rekeyBookProof(state2, chaptersKey, after)).catch(() => void 0);
+                  if (rekeyed == null ? void 0 : rekeyed.accepted) chaptersKey = after;
+                }
               }
             } finally {
               drive.busy.delete(id);

@@ -5558,6 +5558,27 @@ test('R1 fix again: the reader edits the chapter in the middle of the round (aft
   assert.ok(r.raw(1).includes('BY-READER'), 'the reader\'s text is kept');
 });
 
+test('R2 fix again: the app closes after a chapter fix wrote (at its re-check, before the round ends): the book key follows the write, so a new session repairs the slot and the next press reopens the book slot (1 fix + 1 re-check), counts stay equal', async () => {
+  const { r, v } = await bothRig();
+  const orig = r.ports.aiProof; let closed = false; let wrote = false;
+  const write = r.ports.updateNoteRawGuarded;
+  r.ports.updateNoteRawGuarded = async (path, transform, options) => { const out = await write(path, transform, options); if (r.raw(1).includes('ChapterCorrected')) wrote = true; return out; };
+  // The re-check that follows the chapter's fix is where the app closes: the fix is written and its result is saved.
+  r.ports.aiProof = async (request, n, run) => { const out = await orig(request, n, run); if (wrote && !closed) { closed = true; r.runs.dispose(); } return out; };
+  await r.runs.fixAgain(r.mapPath); await settle();
+  assert.ok(closed, 'the app closed after the chapter fix was written');
+  r.ports.aiProof = orig; r.ports.updateNoteRawGuarded = write;
+  const again = new BookPipelineRuns(r.ports); await again.repairFinished(r.mapPath); await settle();
+  assert.ok((await r.state()).bookProof.done, 'the book slot is closed as done');
+  const calls = finishedCalls(r);
+  await again.fixAgain(r.mapPath); while (again.isRunning(r.mapPath)) await tick(); await settle();
+  const now = finishedCalls(r);
+  assert.deepEqual([now.fix - calls.fix, now.proofA - calls.proofA, now.book - calls.book], [2, 1, 1], 'the book slot reopened: one fix + one re-check (and the chapter once)');
+  const s = await r.state();
+  assert.equal(pageText(v).split('\n').filter(l => l.startsWith('- ')).length, [s.aiProof[idA(r)], s.bookProof].reduce((n, x) => n + x.open.length, 0), 'page items = open items');
+  again.dispose();
+});
+
 test('R1 fix again: the progress counts the units that run (chapter + book), and the book finished first is already counted while the chapter works', async () => {
   const { r, st } = await bothRig();
   let reached = false; const hold = defer(); st.hold = { reached: () => { reached = true; }, promise: hold.promise };

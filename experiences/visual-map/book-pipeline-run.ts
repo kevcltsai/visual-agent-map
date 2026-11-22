@@ -1847,6 +1847,21 @@ export class BookPipelineRuns {
                 const slot = drive.store.state.aiProof?.[id];
                 if (!slot?.again || slot.done || !live()) break;
                 await this.aiChapter(drive, id, slot.step, true, true);
+                // The book key follows the program's own write at once (not only when the round ends), so an unload at any point leaves it current.
+                // A chapter whose text is no longer what the program wrote (a reader edit) is left alone: the book key then stays as it is.
+                const written =
+                  chaptersKey !== undefined
+                    ? await this.ports.readCard(drive.cards.get(id)?.path ?? "").catch(() => undefined)
+                    : undefined;
+                const state = written ? bodyStateRaw(written.raw) : undefined;
+                const mine = !!written && (state === "clean" || state === "empty") && !isKeptRaw(written.raw);
+                const after = mine ? await bookKey() : undefined;
+                if (chaptersKey !== undefined && after !== undefined && after !== chaptersKey) {
+                  const rekeyed = await drive.store
+                    .commit(state => rekeyBookProof(state, chaptersKey!, after))
+                    .catch(() => undefined);
+                  if (rekeyed?.accepted) chaptersKey = after;
+                }
               }
             } finally {
               drive.busy.delete(id);

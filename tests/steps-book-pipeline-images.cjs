@@ -1628,12 +1628,12 @@ test('finder fit: file-page text that reads like an instruction is only words to
 });
 
 /** A one-slot chapter whose finder offers `cands`; `meta` answers the file-page lookup (the search address answers nothing). */
-async function fitRig({ cands, slot = { search: ['New Taiwan dollar banknote', 'paper money'] }, meta, hints, search, extra = {} }) {
+async function fitRig({ cands, slot = { search: ['New Taiwan dollar banknote', 'paper money'] }, meta, hints, search, again, extra = {} }) {
   const lookups = [];
   const searches = [];
   const r = await picRig({
     slots: [{ ...slotsOf(1)[0], explains: '新台幣鈔票的樣子', ...slot }], text: title => `正文。${title}\n\n${mk(1, '新台幣鈔票的樣子')}\n`, ...extra,
-    finder: (req, run, n) => n === 1 ? { ...found({ 1: cands }), ...(hints ? { hints } : {}) } : found({}),
+    finder: (req, run, n) => n === 1 ? { ...found({ 1: cands }), ...(hints ? { hints } : {}) } : found(again ? { 1: again } : {}),
     ports: { fetchCommons: async url => { if (new URL(url).searchParams.has('titles')) { lookups.push(titlesOf(url)); return meta ? meta(url) : { status: 200, text: '{}' }; } searches.push(queryOf(url)); return search ? search(url) : { status: 200, text: '{}' }; } }
   });
   r.lookups = lookups; r.searches = searches;
@@ -1669,7 +1669,7 @@ test('finder fit run: each real wrong-picture sample and the real gold certifica
     const r = await fitRig({ cands: [c], meta: realMeta(name), slot: { explains: slot.explains, search: slot.terms } });
     await run(r);
     const detail = (await r.note(0)).detail;
-    assert.ok(detail.includes(name.replace(/[^\w.-]/g, '').slice(0, 8)) || figures(detail).length === 1, name);
+    assert.ok(detail.includes(name) || detail.includes(encodeURI(name)) || detail.includes(encodeURIComponent(name)), `${name} is the placed file`);
     assert.equal(figures(detail).length, 1, `${name} is placed`);
     assert.deepEqual(plain(offSlots(detail)), [1], `${name} is recorded off`);
   }
@@ -1737,11 +1737,54 @@ test('finder fit run: the finder\'s English search words make a slot checkable w
   assert.match(r.stat.logs.join('\n'), /finder_unfit=1/);
 });
 
-test('finder fit run: the cover slot is not compared (its candidates are not looked up and are chosen as before)', async () => {
-  const unfitCover = coverCand(1);
-  const r2 = await picRig({ slots: 1, text: title => `正文。${title}\n\n${mk(1)}\n`, cover: coverAsk, finder: () => found({ 1: [cand(1)], 0: [unfitCover] }), ports: { fetchCommons: async url => { if (new URL(url).searchParams.has('titles')) r2.titles.push(titlesOf(url)); return { status: 200, text: '{}' }; } } });
+test('finder fit run: the cover slot is not compared (the body slot is checkable and looked up, the cover file is not, and the cover is chosen as before)', async () => {
+  const body = [{ ...slotsOf(1)[0], search: ['perspective drawing'] }];
+  const r2 = await picRig({ slots: body, text: title => `正文。${title}\n\n${mk(1)}\n`, cover: coverAsk, finder: () => found({ 1: [cand(1)], 0: [coverCand(1)] }), ports: { fetchCommons: async url => { if (new URL(url).searchParams.has('titles')) r2.titles.push(titlesOf(url)); return { status: 200, text: '{}' }; } } });
   r2.titles = [];
   await run(r2);
-  assert.ok(r2.titles.every(t => !/Cover1/.test(t)), 'the cover file is never in a lookup');
+  assert.ok(r2.titles.length >= 1 && r2.titles.every(t => t === 'File:W1.jpg'), 'only the body file is looked up: ' + JSON.stringify(r2.titles));
   assert.ok(r2.stat.probes.some(u => /Cover1/.test(u)), 'the cover candidate is probed as before');
+});
+
+test('finder fit run: the second (again) search goes through the fit too: a fitting candidate is placed and not off; an unfit one is held, placed last and off', async () => {
+  const fitting = await fitRig({ cands: [], again: [gold()], meta: realMeta('Us-gold-certificate-1922.jpg'), slot: { search: ['gold certificate', 'US gold certificate'] } });
+  await run(fitting);
+  assert.equal(fitting.calls.length, 2);
+  assert.deepEqual(plain(fitting.lookups), ['File:Us-gold-certificate-1922.jpg']);
+  assert.match((await fitting.note(0)).detail, /Us-gold-certificate-1922/);
+  assert.deepEqual(plain(offSlots((await fitting.note(0)).detail)), []);
+  const unfit = await fitRig({ cands: [], again: [euro()], meta: realMeta('50EuroFrontIR700.png'), slot: { search: ['gold certificate', 'US gold certificate'] } });
+  await run(unfit);
+  assert.deepEqual(plain(unfit.lookups), ['File:50EuroFrontIR700.png']);
+  assert.match((await unfit.note(0)).detail, /50EuroFrontIR700/);
+  assert.deepEqual(plain(offSlots((await unfit.note(0)).detail)), [1]);
+  assert.match(unfit.stat.logs.join('\n'), /finder_unfit=1/);
+});
+
+test('finder fit run: a fitting Commons-search picture replaces each of the 4 real wrong pictures; the wrong one is not placed and the slot is not off', async () => {
+  for (const [name, slot] of SAMPLES.filter(([sample]) => !/gold/i.test(sample))) {
+    const c = cand(1, { title: 'Sample', url: `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/${name}/1280px-${name}`, source: `https://commons.wikimedia.org/wiki/File:${name}` });
+    const r = await fitRig({ cands: [c], meta: realMeta(name), slot: { explains: slot.explains, search: slot.terms },
+      search: async () => ({ status: 200, text: commonsAnswer(['Right_alternative.jpg'], {}, slot.terms.join('|')) }) });
+    await run(r);
+    const detail = (await r.note(0)).detail;
+    assert.match(detail, /Right_alternative/, name);
+    assert.ok(!detail.includes(encodeURI(name)) && !detail.includes(name), `${name} is not placed`);
+    assert.deepEqual(plain(offSlots(detail)), [], name);
+  }
+});
+
+test('finder fit run: a held unfit picture is not fetched back by the Commons search (the search skips it), so it stays a last resort and the slot is off', async () => {
+  const r = await fitRig({ cands: [euro()], meta: realMeta('50EuroFrontIR700.png'), slot: { search: ['gold certificate'] },
+    search: async () => ({ status: 200, text: commonsAnswer(['50EuroFrontIR700.png'], {}, 'Gold certificate') }) });
+  await run(r);
+  const detail = (await r.note(0)).detail;
+  assert.match(detail, /50EuroFrontIR700/);
+  assert.deepEqual(plain(offSlots(detail)), [1], 'placed from the held list, not as a Commons-search pick');
+});
+
+test('finder fit run: a candidate whose source is not a Commons file page is counted as unchecked', async () => {
+  const r = await fitRig({ cands: [cand(1, { url: 'https://example.org/a.jpg', source: 'https://example.org/page' })], meta: realMeta('50EuroFrontIR700.png') });
+  await run(r);
+  assert.match(r.stat.logs.join('\n'), /finder_unchecked=1/);
 });

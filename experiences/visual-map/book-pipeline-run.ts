@@ -4530,7 +4530,6 @@ export class BookPipelineRuns {
         .filter(([index]) => index !== COVER_INDEX)
         .flatMap(([index, list]) => (slotOf(index) && slotCanBeChecked(slotOf(index)!) ? list : []))
         .flatMap(item => commonsFileNameOf(item.source) ?? []);
-      if (!names.length) return from;
       const found = await lookupCommonsFiles(names, fetchCommons, {
         signal,
         run: drive.commonsBudget,
@@ -4546,7 +4545,7 @@ export class BookPipelineRuns {
           const name = commonsFileNameOf(item.source);
           const page = slot && slotCanBeChecked(slot) && name ? commonsInfoFor(found.info, name) : undefined;
           if (!page) {
-            if (slot && name) finderUnchecked++;
+            if (slot) finderUnchecked++;
             kept.push(item);
           } else {
             const checked = {
@@ -4604,7 +4603,8 @@ export class BookPipelineRuns {
         if (lacking.length) {
           const seen = new Set([
             ...exclude,
-            ...[...perSlot.values()].flatMap(list => list.map(item => imageKey(item.candidate.imageUrl)))
+            ...[...perSlot.values()].flatMap(list => list.map(item => imageKey(item.candidate.imageUrl))),
+            ...[...heldUnfit.values()].flatMap(list => list.map(item => imageKey(item.url)))
           ]);
           const commons = await searchCommons(
             lacking.map(slot => ({

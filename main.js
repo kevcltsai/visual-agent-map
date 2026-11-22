@@ -58753,7 +58753,6 @@ ${oldDetail}`);
         var _a4;
         return (_a4 = commonsFileNameOf(item.source)) != null ? _a4 : [];
       });
-      if (!names3.length) return from;
       const found = await lookupCommonsFiles(names3, fetchCommons, {
         signal,
         run: drive.commonsBudget,
@@ -58769,7 +58768,7 @@ ${oldDetail}`);
           const name2 = commonsFileNameOf(item.source);
           const page = slot && slotCanBeChecked(slot) && name2 ? commonsInfoFor(found.info, name2) : void 0;
           if (!page) {
-            if (slot && name2) finderUnchecked++;
+            if (slot) finderUnchecked++;
             kept.push(item);
           } else {
             const checked2 = {
@@ -58829,7 +58828,8 @@ ${oldDetail}`);
         if (lacking2.length) {
           const seen = /* @__PURE__ */ new Set([
             ...exclude,
-            ...[...perSlot.values()].flatMap((list2) => list2.map((item) => imageKey(item.candidate.imageUrl)))
+            ...[...perSlot.values()].flatMap((list2) => list2.map((item) => imageKey(item.candidate.imageUrl))),
+            ...[...heldUnfit.values()].flatMap((list2) => list2.map((item) => imageKey(item.url)))
           ]);
           const commons = await searchCommons(
             lacking2.map((slot) => {

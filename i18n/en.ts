@@ -3420,7 +3420,7 @@ export const en = {
   "ui.book_plan_title_section": "Section plan — you can edit it here",
   "ui.book_plan_label_entry": "How it opens",
   "ui.book_plan_label_previous": "Idea carried over",
-  "ui.book_plan_label_handoff": "Question left",
+  "ui.book_plan_label_handoff": "Ending and what is left",
   "ui.book_bar_plan_hint":
     'To change it, edit the whole-book plan in the root note, or the plan in a chapter or section note, then press "Direction is right, start writing".',
   "ui.book_stage_pending": "To plan",

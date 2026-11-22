@@ -69,7 +69,8 @@ export interface CardPlanRequest extends BookStepBase {
   thread: string;
   /** The effective settings (owner's current values first, then the saved editorial decisions). */
   settings: BookSettings;
-  materials: readonly { name: string; use: string }[];
+  /** `home`: the title of the card that owns the material (empty or absent when unknown). */
+  materials: readonly { name: string; use: string; home?: string }[];
   card: CardPlanPlace & { id: string; role: BookRole; title: string; summary: string };
   /** The complete current chapter list, in reading order: the authority for which chapters exist. Never shortened; a list that does not fit refuses the step. */
   chapters: readonly CardPlanChapter[];
@@ -77,6 +78,8 @@ export interface CardPlanRequest extends BookStepBase {
   children?: readonly CardChild[];
   /** The previous / next chapter of a chapter (the previous of chapter 1 is the preface), the previous / next section of a section. */
   previous?: CardNeighbour;
+  /** The previous card's planned entry and handoff (its opening and ending), so this card does not repeat their types; absent while it is not planned. */
+  previousStyle?: { entry: string; handoff: string };
   next?: CardNeighbour;
   /** A section's chapter. */
   parent?: { position: number; title: string };
@@ -283,6 +286,11 @@ const relations = (request: CardPlanRequest): string => {
   if (request.nextChapter) parts.push(`${sentence("next-chapter")}\n${neighbour(request.nextChapter)}`);
   return parts.length ? `\n\n${parts.join("\n\n")}` : "";
 };
+/** The previous card's opening and ending, when planned: the book must not use one type of opening or ending throughout. */
+const styleSoFar = (request: CardPlanRequest): string =>
+  request.previousStyle
+    ? `\n\n${sentence("style-so-far")}\n${JSON.stringify({ entry: cap(request.previousStyle.entry, 300), handoff: cap(request.previousStyle.handoff, 300) })}`
+    : "";
 /** How this card joins its neighbours, by what it is (chapter, section) and whether it has sections. */
 const continuity = (request: CardPlanRequest, hasChildren: boolean): string => {
   const kind = request.card.kind;
@@ -349,8 +357,15 @@ const baseRender = (request: CardPlanRequest, withSummaries: boolean): string =>
     previous: neighbour(request.previous),
     next: neighbour(request.next),
     relations: relations(request),
+    styleSoFar: styleSoFar(request),
     continuity: continuity(request, !!request.children?.length),
-    materials: JSON.stringify(request.materials.map(m => ({ name: cap(m.name, 120), use: cap(m.use, 240) }))),
+    materials: JSON.stringify(
+      request.materials.map(m => ({
+        name: cap(m.name, 120),
+        use: cap(m.use, 240),
+        ...(m.home ? { home: cap(m.home, 120) } : {})
+      }))
+    ),
     chapters: JSON.stringify(
       request.chapters.map(c => ({
         place: c.place,
@@ -406,7 +421,7 @@ export const cardPlanFits = (request: CardPlanRequest): boolean => !!fitCardPlan
 /** One card's brief and acceptance checklist. Text-only. */
 export const cardPlanStep: StepDefinition<CardPlanRequest, CardPlanResult> = {
   id: "book-pipeline.card-plan",
-  version: 2,
+  version: 3,
   render: request => {
     const fitted = fitCardPlan(request);
     // A request that does not fit is refused by `policy` before it is sent; this only keeps `render` total.

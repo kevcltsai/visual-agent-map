@@ -3195,7 +3195,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_plan_title_section": "这一节的企划　可以直接改",
   "ui.book_plan_label_entry": "怎么开场",
   "ui.book_plan_label_previous": "承接的观念",
-  "ui.book_plan_label_handoff": "留下的问题",
+  "ui.book_plan_label_handoff": "结尾与留下的",
   "ui.book_bar_plan_hint": "想改：直接在根笔记的“全书企划”或各章、各节笔记里的“企划”改文字，改完再按“方向对，开始写”。",
   "ui.book_stage_pending": "待企划",
   "ui.book_stage_planned": "已企划",

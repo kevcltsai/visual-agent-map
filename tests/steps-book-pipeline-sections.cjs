@@ -323,6 +323,30 @@ test('expandChapterDetail: insertions go to the end of the named section or befo
   assert.ok(!detail.includes('@@') && !detail.includes('preamble'));
 });
 
+test('expandChapterDetail: new text never lands after the closing paragraph, whichever heading `@@insert after:` names; a middle section stays where it was', () => {
+  const { expandChapterDetail } = sections;
+  // the closing paragraph sits under the last heading (a bold heading, as the preface does, and a ### one)
+  for (const last of ['**怎麼讀這本書**', '### 小結']) {
+    const old = ['## 開場', '', '開場段落。', '', '### 土壤', '', '土壤段落。', '', last, '', '收尾段。', '', '## 來源', '', '- [舊來源](https://example.org/old)'].join('\n');
+    const lastAnchor = last.replace(/\*\*/g, '');
+    const out = expandChapterDetail(old, ['@@insert after: ' + (last.startsWith('###') ? last : '### 土壤'), '### 新節', '', '新段落。'].join('\n'), 'zh-TW').detail;
+    assert.ok(out.indexOf('新段落。') < out.indexOf('收尾段。'), `${last}: after the last heading the new text is before the closing paragraph`);
+    assert.ok(out.indexOf('收尾段。') > out.indexOf('土壤段落。'), 'the closing paragraph is still the last paragraph');
+    const middle = expandChapterDetail(old, ['@@insert after: ### 土壤', '### 新節', '', '新段落。'].join('\n'), 'zh-TW').detail;
+    assert.ok(middle.indexOf('新段落。') > middle.indexOf('土壤段落。') && middle.indexOf('新段落。') < middle.indexOf(last.startsWith('###') ? lastAnchor : '收尾段。'), `${last}: a middle section keeps its place (a bold line is no heading, so its section runs to the closing paragraph)`);
+  }
+  // no heading at all: before the last paragraph, with or without an anchor
+  const flat = '第一段內容。\n\n收尾段。\n';
+  for (const answer of ['@@insert\n新段落。', '@@insert after: ### 不存在\n新段落。']) {
+    const out = expandChapterDetail(flat, answer, 'zh-TW').detail;
+    assert.ok(out.indexOf('新段落。') > out.indexOf('第一段') && out.indexOf('新段落。') < out.indexOf('收尾段。'), answer);
+  }
+  // a bold last heading named as the anchor (`@@insert after: **怎麼讀這本書**`) is not a heading of the program's reading: it still lands before the closing paragraph
+  const bold = ['開場段落。', '', '**怎麼讀這本書**', '', '收尾段。'].join('\n');
+  const outBold = expandChapterDetail(bold, '@@insert after: **怎麼讀這本書**\n新段落。', 'zh-TW').detail;
+  assert.ok(outBold.indexOf('新段落。') < outBold.indexOf('收尾段。'));
+});
+
 test('expandChapterDetail: at most 3 new sections per expansion (over all insert blocks); the rest are dropped and counted, text without a heading stays', () => {
   const { expandChapterDetail, MAX_INSERTED_SECTIONS } = sections;
   assert.equal(MAX_INSERTED_SECTIONS, 3);
@@ -452,6 +476,14 @@ test('expandChapterDetail: a @@replace passage applies only as whole lines (neve
   assert.equal(expandChapterDetail(old, '\n@@replace\n段落有\n@@with\n![x](https://example.org/x.png)\n', 'zh-TW'), undefined, 'nothing applies');
   const whole = expandChapterDetail(old, '\n@@replace\n開場段落有圖。\n@@with\n開場段落（新）。\n', 'zh-TW');
   assert.equal(whole.applied, 1); assert.ok(whole.detail.includes('開場段落（新）。') && !whole.detail.includes('開場段落有圖。'));
+});
+
+test('bookExpandRequirements: new text may only develop what the plan and text hold (no new facts, numbers, people, places, cases or sources) and always goes before the closing paragraph', () => {
+  const { bookExpandRequirements } = load('core/book-pipeline/settings.ts');
+  const text = bookExpandRequirements({}, '內容', { kind: 'under', measured: 10, min: 100, max: 200, unit: '字', version: 1 });
+  assert.match(text, /No new facts \(hard requirement\)/);
+  assert.match(text, /Never bring in a new fact, number, person, place name, case or source/);
+  assert.match(text, /New text always goes before the closing paragraph, which stays the last paragraph of the chapter, whichever heading you name/);
 });
 
 test('bookExpandRequirements: the chapter goes in as data, the amount is the target minus the measure, the length setting is left out and the point list comes last', () => {

@@ -1106,19 +1106,30 @@ const headingKey = (text: string): string =>
     .trim()
     .toLowerCase();
 
-/** Where an insertion goes: the end of the named heading's section, else before the chapter's last heading (or its last paragraph). */
+/** Where an insertion goes: the end of the named heading's section (never after the closing paragraph), else before the chapter's last heading (or its last paragraph). */
 function insertAt(lines: string[], after: string | undefined): number {
   const region = chapterRegion(lines);
   const fenced = fencedLines(lines);
   const level = (i: number): number => (region[i] && !fenced[i] ? (HEADING.exec(bare(lines[i]))?.[1].length ?? 0) : 0);
   const heads = lines.map((_, i) => i).filter(i => level(i) > 0);
   const named = after ? heads.find(i => headingKey(bare(lines[i])) === headingKey(after)) : undefined;
+  const text = lines.map((_, i) => i).filter(i => region[i] && lines[i].trim());
+  // The closing paragraph: the last paragraph block of the chapter text. New text always goes before it, so it stays the last paragraph.
+  let closing: number | undefined;
+  if (text.length && level(text[text.length - 1]) === 0) {
+    closing = text[text.length - 1];
+    while (closing > 0 && region[closing - 1] && lines[closing - 1].trim()) closing--;
+  }
   if (named !== undefined) {
     const own = level(named);
-    for (let j = named + 1; j < lines.length; j++) if (!region[j] || (level(j) > 0 && level(j) <= own)) return j;
-    return lines.length;
+    let end = lines.length;
+    for (let j = named + 1; j < lines.length; j++)
+      if (!region[j] || (level(j) > 0 && level(j) <= own)) {
+        end = j;
+        break;
+      }
+    return closing !== undefined && end > closing ? closing : end;
   }
-  const text = lines.map((_, i) => i).filter(i => region[i] && lines[i].trim());
   if (!text.length) {
     const outside = region.indexOf(false);
     return outside < 0 ? lines.length : outside;

@@ -196,6 +196,22 @@ test('the book prompt carries every chapter with its number, the leads and the p
   assert.throws(() => stepMod.aiBookProofStep.policy('p', bookRequest({ chapters: [{ title: 'x', text: ' ' }] })), /needs the text/);
 });
 
+test('the book prompt labels every item by place (preface / chapter / section) and says the chapter count comes from place, not number', () => {
+  const places = [{ kind: 'preface' }, { kind: 'chapter', chapter: 1 }, { kind: 'section', chapter: 1, section: 1 }, { kind: 'chapter', chapter: 2 }];
+  const chapters = places.map((place, i) => ({ title: `t${i}`, text: `text ${i}`, place }));
+  const zh = stepMod.aiBookProofStep.render(bookRequest({ chapters }));
+  const json = zh.split('\n').find(line => line.startsWith('[{"number":1'));
+  assert.deepEqual(JSON.parse(json).map(c => [c.number, c.place]), [[1, '前言'], [2, '第 1 章'], [3, '第 1 章第 1 節'], [4, '第 2 章']]);
+  const en = stepMod.aiBookProofStep.render(bookRequest({ language: 'en', chapters }));
+  assert.deepEqual(JSON.parse(en.split('\n').find(line => line.startsWith('[{"number":1'))).map(c => c.place), ['Preface', 'Chapter 1', 'Chapter 1, section 1', 'Chapter 2']);
+  assert.match(zh, /`number` is only the item's position/);
+  assert.match(zh, /judge it by `place`, never by `number`/);
+  assert.match(zh, /number of chapters in the book is the number of items whose place is "Chapter n"/);
+  // no structure: no place key, nothing else changes
+  assert.ok(!stepMod.aiBookProofStep.render(bookRequest()).includes('"place"'));
+  assert.equal(stepMod.aiBookProofStep.version, 2);
+});
+
 test('runAiBookProof: a text-only call; the quote is checked in the chapter it names, other chapters are ignored, no web search', async () => {
   const good = { id: 'B1', kind: 'consistency', chapter: 2, otherChapter: 1, quote: '第二章說發芽要一週。', verdict: 'problem', problem: '與第一章不同', fixable: true, why: '', suggestion: '統一', sources: [] };
   const wrongChapter = { ...good, id: 'B2', chapter: 1 };

@@ -87,7 +87,8 @@ const L = {
   thread: { zh: "全書主線", en: "Book thread" },
   structure: { zh: "全書結構", en: "Book structure" },
   decisions: { zh: "編輯決定", en: "Editorial decisions" },
-  materials: { zh: "素材登記表", en: "Material register" }
+  materials: { zh: "素材登記表", en: "Material register" },
+  home: { zh: "歸屬", en: "Home" }
 } satisfies Record<string, Words>;
 
 /** One safe line of model text for a note: one line, no heading, and no Markdown/Obsidian syntax that could take effect. */
@@ -437,7 +438,8 @@ export interface BookPlanText {
   thread: string;
   /** Only the fields the owner left empty. */
   decisions: BookSettings;
-  materials: readonly { name: string; use: string }[];
+  /** `home`: the title of the card that owns the material (shown as its home); absent or empty when unknown. */
+  materials: readonly { name: string; use: string; home?: string }[];
 }
 
 /** The root's `## 全書企劃` section as composed (the pipeline stores its body in a hidden callout, see `replaceBookPlanSection`), ending with a newline. Sub-headings are `###`, so the section stays one section. */
@@ -446,7 +448,10 @@ export function composeBookPlan(plan: BookPlanText, language: ContentLanguage): 
   const decisions = BOOK_SETTING_FIELDS.filter(field => plan.decisions[field]?.trim()).map(
     field => `- ${pick(SETTING_WORDS[field], language)}${c}${safe(plan.decisions[field])}`
   );
-  const materials = plan.materials.map(m => `- ${safe(m.name, 120)}${c}${safe(m.use, 240)}`);
+  const materials = plan.materials.map(
+    m =>
+      `- ${safe(m.name, 120)}${c}${safe(m.use, 240)}${m.home?.trim() ? ` — ${pick(L.home, language)}${c}${safe(m.home, 120)}` : ""}`
+  );
   return [
     `## ${pick(L.plan, language)}`,
     "",
@@ -541,10 +546,13 @@ export function parseBookPlanDecisions(markdown: string): BookSettings {
 }
 
 /** The saved thread and material register of a `## 全書企劃` section found anywhere in the root's body ('' and [] when there is none). */
-export function parseBookPlanBody(markdown: string): { thread: string; materials: { name: string; use: string }[] } {
+export function parseBookPlanBody(markdown: string): {
+  thread: string;
+  materials: { name: string; use: string; home?: string }[];
+} {
   const plan = planLines(markdown);
   const thread: string[] = [];
-  const materials: { name: string; use: string }[] = [];
+  const materials: { name: string; use: string; home?: string }[] = [];
   if (!plan) return { thread: "", materials };
   let part: "thread" | "materials" | undefined;
   for (const line of plan) {
@@ -557,7 +565,15 @@ export function parseBookPlanBody(markdown: string): { thread: string; materials
     if (part === "thread" && line.trim()) thread.push(line.trim());
     if (part === "materials") {
       const m = /^[-*]\s+(.+?)[:：]\s*(.+?)\s*$/.exec(line);
-      if (m) materials.push({ name: unescapeMarkdownText(m[1]), use: unescapeMarkdownText(m[2]) });
+      if (m) {
+        // The trailing " — 歸屬：title" (either language) is the owning card; a line without it (an older plan) has none.
+        const owned = new RegExp(`^(.+?)\\s+—\\s+(?:${L.home.zh}|${L.home.en})[:：]\\s*(.+?)$`).exec(m[2]);
+        materials.push({
+          name: unescapeMarkdownText(m[1]),
+          use: unescapeMarkdownText(owned ? owned[1] : m[2]),
+          ...(owned ? { home: unescapeMarkdownText(owned[2]) } : {})
+        });
+      }
     }
   }
   return { thread: unescapeMarkdownText(thread.join(" ")), materials };

@@ -113,7 +113,7 @@ test('global plan: every card once with a role, only empty settings decided, str
   const result = plain(globalPlan.globalPlanStep.parse(globalReply(), request));
   assert.equal(result.cards.length, 31); assert.equal(result.cards[0].role, 'intro'); assert.equal(result.thread, 'One thread ## x', 'a heading mark inside a single line cannot start a section');
   assert.deepEqual(result.decisions, { goal: 'Goal', tone: 'Tone' }); // reader is the owner's, empty answers are dropped
-  assert.deepEqual(result.materials, [{ name: 'Mona Lisa', use: 'opens' }]);
+  assert.deepEqual(result.materials, [{ name: 'Mona Lisa', use: 'opens', home: '' }], 'an old reply without home reads, with an empty home');
   const reorder = JSON.parse(globalReply()); reorder.cards.reverse();
   assert.equal(globalPlan.globalPlanStep.parse(JSON.stringify(reorder), request).cards[0].id, 'n31', 'the reply order is the reading order');
   const bad = over => () => globalPlan.globalPlanStep.parse(globalReply(over), request);
@@ -124,6 +124,41 @@ test('global plan: every card once with a role, only empty settings decided, str
   assert.throws(bad({ extra: 1 }), /unexpected fields/);
   assert.throws(() => globalPlan.globalPlanStep.parse('nope', request), /not JSON/);
   assert.throws(() => globalPlan.globalPlanStep.policy('p', { ...request, cards: [] }), /needs cards/);
+});
+
+test('global plan: a material names the card that owns it (home); an unknown home or none is an empty string; the prompt asks for one home per scene', () => {
+  const request = globalRequest();
+  const withHome = materials => globalPlan.globalPlanStep.parse(globalReply({ materials }), request).materials;
+  assert.deepEqual(plain(withHome([{ name: 'Barter scene', use: 'opens', home: 'n3' }, { name: 'Coin', use: 'u', home: 'zzz' }, { name: 'Note', use: 'u', home: '' }])).map(m => m.home), ['n3', '', '']);
+  const prompt = globalPlan.globalPlanStep.render(request);
+  assert.match(prompt, /home: the id .* of the one card that owns it\. One scene or example belongs to one card only/);
+  assert.match(prompt, /"materials":\[\{"name":"","use":"","home":""\}\]/);
+  assert.match(prompt, /never require every chapter to open with a daily-life scene or to end on a question/);
+  assert.deepEqual(plain(globalPlan.GLOBAL_PLAN_SCHEMA.properties.materials.items.required), ['name', 'use', 'home']);
+  assert.equal(globalPlan.globalPlanStep.version, 2);
+});
+
+test('the material register shows each material\'s home and reads back; an old line without a home still reads', () => {
+  const zh = planText.composeBookPlan({ thread: 't', decisions: {}, materials: [{ name: '以物易物', use: '開場', home: '沒有錢的世界' }, { name: '貝殼', use: '舉例' }] }, 'zh-TW');
+  assert.ok(zh.includes('- 以物易物：開場 — 歸屬：沒有錢的世界'), zh);
+  assert.deepEqual(plain(planText.parseBookPlanBody(zh).materials), [{ name: '以物易物', use: '開場', home: '沒有錢的世界' }, { name: '貝殼', use: '舉例' }]);
+  const en = planText.composeBookPlan({ thread: 't', decisions: {}, materials: [{ name: 'Barter', use: 'opens', home: 'A world without money' }] }, 'en');
+  assert.ok(en.includes('- Barter: opens — Home: A world without money'), en);
+  assert.deepEqual(plain(planText.parseBookPlanBody(en).materials), [{ name: 'Barter', use: 'opens', home: 'A world without money' }]);
+});
+
+test('card plan: the request carries the previous card\'s opening and ending when planned, and the types, material homes and no-announcement rule', () => {
+  const request = { ...base, thread: 'thread', settings: {}, materials: [{ name: 'Barter', use: 'opens', home: 'Chapter two' }], chapters: [{ place: 'preface', title: 'Intro' }, { place: 'chapter 1', title: 'Chapter two' }], card: { id: 'n2', kind: 'chapter', chapter: 1, role: 'body', title: TITLE, summary: 's' }, previous: { position: 'preface', title: 'Intro', summary: 'sum' } };
+  const without = cardPlan.cardPlanStep.render(request);
+  assert.ok(!without.includes('previous card\'s opening and ending'), 'no previous brief: nothing is added');
+  const prompt = cardPlan.cardPlanStep.render({ ...request, previousStyle: { entry: '場景：一個市集', handoff: '問句：錢是什麼？' } });
+  assert.ok(prompt.includes('"entry":"場景：一個市集","handoff":"問句：錢是什麼？"'));
+  assert.match(prompt, /differ from these/);
+  assert.ok(prompt.includes('"home":"Chapter two"'));
+  assert.match(prompt, /one of 數據 \/ 史料 \/ 反問 \/ 場景/); assert.match(prompt, /one of 結論句 \/ 畫面 \/ 問句/);
+  assert.match(prompt, /When a material's home is another card than this one, this card brings it in with one sentence at most/);
+  assert.match(prompt, /no 「這一章要回答的就是…」/);
+  assert.equal(cardPlan.cardPlanStep.version, 3);
 });
 
 test('card plan: ids and types assigned, neighbours only when they exist, an empty checklist is refused', () => {
@@ -503,7 +538,7 @@ test('exchange log: success, parse error and provider error keep titles, chapter
     const ok = harness({ answer: goodPlan });
     const parsed = await runMod.runPlanStep(ok.planCalls, cardPlan.cardPlanStep, request, { signal: signal() });
     assert.equal(parsed.checklist.length, 1); noContent(ok.log, spy, 'plan success');
-    assert.equal(ok.log.getEntries()[0].status, 'completed'); assert.equal(ok.log.getEntries()[0].step, 'book-pipeline.card-plan@2');
+    assert.equal(ok.log.getEntries()[0].status, 'completed'); assert.equal(ok.log.getEntries()[0].step, 'book-pipeline.card-plan@3');
     assert.equal(ok.runs[0][0].includes(TITLE), true, 'the provider itself still gets the prompt');
     const bad = harness({ answer: 'SECRET-REPLY not json' });
     await assert.rejects(runMod.runPlanStep(bad.planCalls, cardPlan.cardPlanStep, request, { signal: signal() }));
@@ -583,7 +618,7 @@ test('proofread: a whole-card failure carries the judged items as a partial resu
 
 test('author requirements: the fixed chapter rules always come first, the settings after', () => {
   const none = settings.bookAuthorRequirements({});
-  assert.match(none, /Open with this chapter's own scene, question or claim/); assert.match(none, /Do not open by recapping or pointing back to the previous chapter/); assert.match(none, /never cards/); assert.match(none, /End the last paragraph on the open question the brief's handoff leaves/); assert.match(none, /Do not name, number or announce the next chapter or section/); assert.match(none, /Somewhere after the opening \(not as the opening\), one paragraph gathers the earlier ideas/); assert.doesNotMatch(none, /End with one sentence that leads into the next chapter/); assert.match(none, /Do not end the chapter with an update log/); assert.match(none, /the book's last card \(a brief with neither a next section nor a next chapter\).*answering the preface's question/); assert.match(none, /what the later chapters show together and why/);
+  assert.match(none, /Open as the brief's entry says; its opening may be a figure, a historical record, a question or a scene/); assert.match(none, /never open with a line that announces the chapter's task \(no 「這一章要回答的就是…」「這一章想問的是…」/); assert.match(none, /Do not open by recapping or pointing back to the previous chapter/); assert.match(none, /never cards/); assert.match(none, /End the last paragraph the way the brief's handoff says: a concluding sentence, an image or a question/); assert.match(none, /do not make every chapter end on an open question/); assert.doesNotMatch(none, /End the last paragraph on the open question/); assert.match(none, /Do not name, number or announce the next chapter or section/); assert.match(none, /Somewhere after the opening \(not as the opening\), one paragraph gathers the earlier ideas/); assert.doesNotMatch(none, /End with one sentence that leads into the next chapter/); assert.match(none, /Do not end the chapter with an update log/); assert.match(none, /the book's last card \(a brief with neither a next section nor a next chapter\).*answering the preface's question/); assert.match(none, /what the later chapters show together and why/);
   const some = settings.bookAuthorRequirements({ tone: 'warm' });
   assert.ok(some.startsWith(none)); assert.match(some, /- tone: warm/);
   assert.doesNotMatch(none, /The whole book's chapters/, 'no chapter list when none is given');
@@ -1130,7 +1165,7 @@ test('cover plan: schema and prompt ask for cover{explains, 2-4 search terms}; s
   const answer = extra => JSON.stringify({ cover: { explains: 'x', search: ['a b', 'c d'] }, points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images: [], ...extra });
   const cover = cardPlan.CARD_PLAN_SCHEMA.properties.cover;
   assert.equal(cover.properties.search.minItems, 2); assert.equal(cover.properties.search.maxItems, 4);
-  assert.ok(cardPlan.CARD_PLAN_SCHEMA.required.includes('cover')); assert.equal(cardPlan.cardPlanStep.version, 2);
+  assert.ok(cardPlan.CARD_PLAN_SCHEMA.required.includes('cover')); assert.equal(cardPlan.cardPlanStep.version, 3);
   assert.match(cardPlan.cardPlanStep.render(request), /"cover":\{"explains":"","search":\["",""\]\}/);
   assert.match(cardPlan.cardPlanStep.render(request), /does not count toward them and is asked for even when images is empty/);
   assert.throws(() => cardPlan.cardPlanStep.parse(answer({ cover: undefined }), request), /unexpected fields/, 'an answer without a cover is refused (retried), never a card silently without its cover line');

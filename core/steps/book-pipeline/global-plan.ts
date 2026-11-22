@@ -36,7 +36,8 @@ export interface GlobalPlanResult {
   thread: string;
   /** Every request card once, in reading order. */
   cards: { id: string; role: BookRole }[];
-  materials: { name: string; use: string }[];
+  /** `home`: the id of the card that owns the material (one scene or example belongs to one card); an empty string when unsure. */
+  materials: { name: string; use: string; home: string }[];
   /** Only fields the owner left empty. */
   decisions: BookSettings;
 }
@@ -63,8 +64,12 @@ export const GLOBAL_PLAN_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        properties: { name: { type: "string", minLength: 1 }, use: { type: "string", minLength: 1 } },
-        required: ["name", "use"]
+        properties: {
+          name: { type: "string", minLength: 1 },
+          use: { type: "string", minLength: 1 },
+          home: { type: "string" }
+        },
+        required: ["name", "use", "home"]
       }
     },
     decisions: {
@@ -98,10 +103,14 @@ export function parseGlobalPlan(raw: string, request: GlobalPlanRequest): Global
     .slice(0, MAX_MATERIALS)
     .map(entry => {
       const one = recordOf(entry, "material");
-      exactKeys(one, ["name", "use"]);
+      // `home` is new: an older reply or saved result without it still reads (an empty home).
+      exactKeys(one, "home" in one ? ["name", "use", "home"] : ["name", "use"]);
+      const home = one.home === undefined || one.home === null ? "" : typeof one.home === "string" ? one.home.trim() : fail("material home must be a string");
       return {
         name: singleLine(textOf(one.name, "material name"), 120),
-        use: singleLine(textOf(one.use, "material use"), 240)
+        use: singleLine(textOf(one.use, "material use"), 240),
+        // A home that is not a card of this book (an invented id) is not kept.
+        home: wanted.has(home) ? home : ""
       };
     });
   const raws = recordOf(item.decisions, "decisions");
@@ -181,7 +190,7 @@ function fitGlobalPlan(request: GlobalPlanRequest): string {
 /** The whole-book plan: one call over every card's title and summary. Text-only. */
 export const globalPlanStep: StepDefinition<GlobalPlanRequest, GlobalPlanResult> = {
   id: "book-pipeline.global-plan",
-  version: 1,
+  version: 2,
   render: request => fitGlobalPlan(request),
   schema: GLOBAL_PLAN_SCHEMA,
   policy: (prompt, request) => {

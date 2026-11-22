@@ -226,6 +226,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "book-ai-proof-book.en": {
+      "builder": "core/steps/book-pipeline/ai-proof.ts aiBookProofStep",
+      "language": "en",
+      "schema": true
+    },
+    "book-ai-proof-book.zh": {
+      "builder": "core/steps/book-pipeline/ai-proof.ts aiBookProofStep",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "book-ai-proof-book.zh-CN": {
+      "builder": "core/steps/book-pipeline/ai-proof.ts aiBookProofStep",
+      "language": "zh-CN",
+      "schema": true
+    },
     "book-apply-notes.en": {
       "builder": "core/steps/book-pipeline/apply-notes.ts applyNotesStep",
       "language": "en",
@@ -238,6 +253,21 @@
     },
     "book-apply-notes.zh-CN": {
       "builder": "core/steps/book-pipeline/apply-notes.ts applyNotesStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "book-author-rules.en": {
+      "builder": "core/book-pipeline/settings.ts bookAuthorRequirements",
+      "language": "en",
+      "schema": true
+    },
+    "book-author-rules.zh": {
+      "builder": "core/book-pipeline/settings.ts bookAuthorRequirements",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "book-author-rules.zh-CN": {
+      "builder": "core/book-pipeline/settings.ts bookAuthorRequirements",
       "language": "zh-CN",
       "schema": true
     },
@@ -313,6 +343,21 @@
     },
     "book-consistency.zh-CN": {
       "builder": "core/steps/book-pipeline/consistency.ts consistencyStep",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "book-expand-requirements.en": {
+      "builder": "core/book-pipeline/settings.ts bookExpandRequirements",
+      "language": "en",
+      "schema": true
+    },
+    "book-expand-requirements.zh": {
+      "builder": "core/book-pipeline/settings.ts bookExpandRequirements",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "book-expand-requirements.zh-CN": {
+      "builder": "core/book-pipeline/settings.ts bookExpandRequirements",
       "language": "zh-CN",
       "schema": true
     },

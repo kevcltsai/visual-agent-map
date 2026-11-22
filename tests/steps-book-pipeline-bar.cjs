@@ -610,3 +610,23 @@ test('bar: with a book structure the fix line names the card by its place (prefa
   assert.equal(old, '正在修正第 2 章・已完成 3／4 章', 'old wording kept');
   assert.ok(!old.includes('張卡'));
 });
+
+test('bar: a finished book with a preface, 8 chapters and 14 sections says 8 chapters, not the card count; an old state without structure falls back to cards', () => {
+  setUiLanguage('zh-TW');
+  const order = ['p'];
+  const places = { p: { kind: 'preface' } };
+  const chapters = [];
+  const sectionsOf = {};
+  for (let c = 1; c <= 8; c++) {
+    const id = `c${c}`;
+    order.push(id); chapters.push(id); places[id] = { kind: 'chapter', chapter: c }; sectionsOf[id] = [];
+    const n = c <= 6 ? 2 : 1;
+    for (let k = 1; k <= n; k++) { const sid = `${id}s${k}`; order.push(sid); sectionsOf[id].push(sid); places[sid] = { kind: 'section', chapterId: id, sectionIndex: k, sectionCount: n }; }
+  }
+  assert.equal(order.length, 23);
+  const structure = { placeOf: id => places[id], chapters, sectionsOf: id => sectionsOf[id] ?? [], trialOf: () => [], neighboursOf: () => ({}) };
+  const data = aiData({ phase: 'done', order, accepted: order, aiProof: {} });
+  const draw = st => { const bar = dom.element('div'); bundle.renderBookBar(bar, st, { stop() {}, resume() {}, addBudget() {}, confirmGate1() {}, openIssues() {} }); return one(bar, 'vam-book-done-counts').text; };
+  assert.equal(draw(bundle.bookBarState(data, undefined, () => undefined, undefined, structure)), '8 章・AI 修了 0 處・仍有問題 0 項');
+  assert.equal(draw(bundle.bookBarState(data, undefined, () => undefined)), '23 章・AI 修了 0 處・仍有問題 0 項', 'no structure: the card count, no throw');
+});

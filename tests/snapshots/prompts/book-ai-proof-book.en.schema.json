@@ -1,0 +1,104 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "number",
+              "consistency",
+              "citation"
+            ]
+          },
+          "quote": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "problem",
+              "unverifiable"
+            ]
+          },
+          "problem": {
+            "type": "string"
+          },
+          "fixable": {
+            "type": "boolean"
+          },
+          "why": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "chapter": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "otherChapter": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "quote",
+          "verdict",
+          "problem",
+          "fixable",
+          "why",
+          "suggestion",
+          "sources",
+          "chapter",
+          "otherChapter"
+        ]
+      }
+    },
+    "prior": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "resolved",
+              "still"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ]
+      }
+    }
+  },
+  "required": [
+    "checks",
+    "prior"
+  ]
+}

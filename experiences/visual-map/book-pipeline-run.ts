@@ -12,7 +12,7 @@
 import type { AdmissionContext } from "../../core/admission";
 import { carryIssue } from "./book-pipeline-reasons";
 import type { FindImagesRequest, FoundImages } from "../../core/steps/book-pipeline/find-images";
-import type { AiBookProofRequest, AiProofRequest, AiProofRun } from "../../core/steps/book-pipeline/ai-proof";
+import type { AiBookChapter, AiBookProofRequest, AiProofRequest, AiProofRun } from "../../core/steps/book-pipeline/ai-proof";
 import type { AiFixRequest } from "../../core/steps/book-pipeline/ai-fix";
 import {
   aiProofBody,
@@ -3051,10 +3051,10 @@ export class BookPipelineRuns {
   }
   /** The chapters with text in reading order, as the whole-book proofread reads them (prose only), with the program's own findings as hints. */
   private async bookProofInput(drive: Drive): Promise<{
-    chapters: { id: string; title: string; text: string; raw: string }[];
+    chapters: { id: string; title: string; text: string; raw: string; place?: AiBookChapter["place"] }[];
     hints: string[];
   }> {
-    const ordered: (ReferenceChapter & { raw: string })[] = [];
+    const ordered: (ReferenceChapter & { raw: string; place?: AiBookChapter["place"] })[] = [];
     const structure = this.structureOf(drive, effectiveOrder(drive.store.state));
     for (const id of effectiveOrder(drive.store.state)) {
       const info = drive.cards.get(id);
@@ -3073,7 +3073,16 @@ export class BookPipelineRuns {
         text: card ? aiProofBody(chapterBody(card.detail)) : "",
         raw: card?.raw ?? "",
         ...(chapter !== undefined ? { chapter } : {}),
-        ...(place?.kind === "section" ? { section: true as const } : {})
+        ...(place?.kind === "section" ? { section: true as const } : {}),
+        ...(place
+          ? {
+              place: {
+                kind: place.kind,
+                ...(chapter !== undefined ? { chapter } : {}),
+                ...(place.kind === "section" && place.sectionIndex ? { section: place.sectionIndex } : {})
+              }
+            }
+          : {})
       });
     }
     const chapters = ordered.filter(chapter => chapter.text);
@@ -3089,8 +3098,8 @@ export class BookPipelineRuns {
     ];
     const hints = findings.map(
       finding =>
-        `chapter ${number(finding.a)}: "${finding.claimA}"; ${
-          finding.kind === "removed" ? "names a removed chapter" : `chapter ${number(finding.b)}`
+        `item ${number(finding.a)}: "${finding.claimA}"; ${
+          finding.kind === "removed" ? "names a removed chapter" : `item ${number(finding.b)}`
         }: "${finding.claimB}"${finding.suggestion ? ` (${finding.suggestion})` : ""}`
     );
     return { chapters, hints };
@@ -3151,7 +3160,9 @@ export class BookPipelineRuns {
           this.ports.aiBookProof(
             {
               ...this.base(drive, drive.config.proofModel),
-              chapters: compactChapters(chapters.map(chapter => ({ title: chapter.title, text: chapter.text }))),
+              chapters: compactChapters(chapters.map(chapter => ({ title: chapter.title, text: chapter.text }))).map(
+                (chapter, at) => ({ ...chapter, ...(chapters[at].place ? { place: chapters[at].place } : {}) })
+              ),
               hints,
               ...(prior.length ? { prior } : {})
             },
@@ -3607,7 +3618,15 @@ export class BookPipelineRuns {
       return { kind: "failed", reason: "backup_failed" };
     // The section's own heading is added by replaceBookPlanSection; its body (the ### parts) is the composed text after it.
     const section = composeBookPlan(
-      { thread: result.thread, decisions: result.decisions, materials: result.materials },
+      {
+        thread: result.thread,
+        decisions: result.decisions,
+        // The owner reads the owning card by its title; the plan view and later card plans work from that title.
+        materials: result.materials.map(({ home, ...material }) => {
+          const title = home ? drive.cards.get(home)?.title : undefined;
+          return title ? { ...material, home: title } : material;
+        })
+      },
       drive.config.language
     ).replace(/^## .*\n\n?/, "");
     const written = await this.ports.updateNoteRawGuarded(path, content => replaceBookPlanSection(content, section), {
@@ -3702,6 +3721,8 @@ export class BookPipelineRuns {
     const previous = side(around.previous);
     const next = side(around.next);
     const nextChapter = side(around.nextChapter, true);
+    // The previous card's opening and ending as planned in this run (absent while it is not planned yet): this card must not use the same ones.
+    const previousBrief = around.previous === undefined ? undefined : drive.plans.get(around.previous);
     const parentCard = around.parent === undefined ? undefined : drive.cards.get(around.parent);
     const parentChapter = around.parent === undefined ? undefined : structure.placeOf(around.parent)?.chapter;
     const children = this.childCardsOf(drive, nodeId);
@@ -3732,6 +3753,9 @@ export class BookPipelineRuns {
         summary: card.summary
       },
       ...(previous ? { previous } : {}),
+      ...(previousBrief && (previousBrief.entry || previousBrief.handoff)
+        ? { previousStyle: { entry: previousBrief.entry, handoff: previousBrief.handoff } }
+        : {}),
       ...(next ? { next } : {}),
       ...(parentCard && parentChapter ? { parent: { position: parentChapter, title: parentCard.title } } : {}),
       ...(nextChapter ? { nextChapter } : {}),

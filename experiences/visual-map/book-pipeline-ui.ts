@@ -372,7 +372,7 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
   if (state.mode === "done") {
     top.createSpan({
       cls: "vam-book-bar-counts vam-book-done-counts",
-      text: t("ui.book_bar_done_0_1_2", total, state.ai.fixed, state.ai.open)
+      text: t("ui.book_bar_done_0_1_2", state.structure?.chapters ?? total, state.ai.fixed, state.ai.open)
     });
     if (actions.openIssues)
       makeButton(buttons, t("ui.book_bar_open_issues"), "vam-book-link vam-book-open-issues", actions.openIssues);

@@ -4,6 +4,9 @@ Chapter this section belongs to (JSON object):
 [next-chapter]
 Next chapter, which this section's handoff leads to (JSON object):
 
+[style-so-far]
+The previous card's opening and ending as planned (JSON object of {entry,handoff}). Give this card an opening type and an ending type that differ from these: the book must not open or end every chapter the same way.
+
 [own]
 its entry grows from its own subject and does not pick up or retell the previous card.
 

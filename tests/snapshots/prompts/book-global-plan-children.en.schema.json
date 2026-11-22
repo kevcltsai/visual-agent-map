@@ -47,11 +47,15 @@
           "use": {
             "type": "string",
             "minLength": 1
+          },
+          "home": {
+            "type": "string"
           }
         },
         "required": [
           "name",
-          "use"
+          "use",
+          "home"
         ]
       }
     },

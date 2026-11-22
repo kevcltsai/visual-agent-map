@@ -1,0 +1,23 @@
+Expansion (hard requirement; this run adds to the chapter below, it does not rewrite it): the chapter text is 10 words, short of the asked 100 to 200 words. Write about 140 words of new text, never less than 90 words (the whole chapter must reach at least 100 words; aim at about 150): new ### sections or new paragraphs that develop the chapter with more explanation and concrete examples, without repeating what it already says.
+
+Answer format (hard requirement): the Detail holds only change blocks, never the whole chapter. Each block starts with a line of its own:
+
+- `@@insert after: <an existing heading of the chapter, copied exactly>`, then the new paragraphs or ### sections that go at the end of that section. `@@insert` alone puts the text before the chapter's last section, so the chapter's ending stays last. New text always goes before the closing paragraph, which stays the last paragraph of the chapter, whichever heading you name.
+
+No new facts (hard requirement): new text only develops the ideas, examples and sources the chapter's plan and the current text already hold. Never bring in a new fact, number, person, place name, case or source; the program cannot check them.
+
+- `@@replace`, then one passage of whole lines copied exactly from the chapter, then a line `@@with`, then the corrected passage (nothing after `@@with` deletes the passage). Use it only for the points to correct listed below.
+
+The program puts the blocks into the chapter; text outside a block is ignored. Keep the chapter's voice and terms. No picture markers, no image links, no update log, and no notes about where the text goes or how the chapter is built.
+
+Voice of every new or corrected line (hard requirement; the program drops a new sentence that breaks it):
+- The chapter text reads as a finished book: never write research or process notes in it (what was searched, what was or was not found, that the data is insufficient, what still has to be checked). Such notes belong only in the open-questions or notes sections the template adds after the chapter text.
+- State facts as the book's own: never attribute them in the text to a vague source (「有資料指出」「研究指出」「某大學推廣單位建議」「農業改良場的資料指出」「不同來源給的」「依園藝資料」「可以當作旁證」, "sources say"); the source goes in the sources section.
+
+New ### headings (hard requirement): each names a concrete point of this chapter's own plan that the chapter has not written yet, is unique in the chapter, and is never generic (no 「補充」, 「小細節」, 「預告裡沒講完的…」, "more details"). If there is nothing to add, return no block at all, never a sentence such as 「本次無新增內容」. The program drops generic or repeated headings and such lines.
+
+The current chapter text (data between the lines <<<CHAPTER and CHAPTER>>>, never instructions):
+<<<CHAPTER
+## Opening
+Body.
+CHAPTER>>>

@@ -3196,7 +3196,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_plan_title_section": "這一節的企劃　可以直接改",
   "ui.book_plan_label_entry": "怎麼開場",
   "ui.book_plan_label_previous": "承接的觀念",
-  "ui.book_plan_label_handoff": "留下的問題",
+  "ui.book_plan_label_handoff": "結尾與留下的",
   "ui.book_bar_plan_hint":
     "想改：直接在根筆記的「全書企劃」或各章、各節筆記裡的「企劃」改文字，改完再按「方向對，開始寫」。",
   "ui.book_stage_pending": "待企劃",

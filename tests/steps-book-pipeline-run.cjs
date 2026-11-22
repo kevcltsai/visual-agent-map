@@ -3552,6 +3552,28 @@ test('fix5 an entry line that only paraphrases the removed chapter (no exact tit
   assert.equal(await promptLine(r, 3, '接入點') !== undefined, true, 'a chapter whose previous stays keeps its entry');
 });
 
+test('plan wiring: a material\'s home id is shown by the owning card\'s title in the root plan and in the card plans; a card plan carries the previous card\'s planned opening and ending once that card is planned', async () => {
+  const seen = [];
+  const r = await rig({ titles: ['SecretRootTitle', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6'] });
+  const g = r.script.global, c = r.script.card;
+  const homeId = r.nodes[1].id;
+  const indexOf = id => r.nodes.findIndex(n => n.id === id);
+  r.script.global = (request, n) => ({ ...g(request, n), materials: [{ name: 'Barter scene', use: 'opens', home: homeId }, { name: 'Shell', use: 'u', home: '' }] });
+  // The first five cards are planned at once; the later ones finish first, so card 6 starts after card 5 (its previous card) is planned.
+  r.script.card = async (request, n) => {
+    seen.push(request);
+    const at = indexOf(request.card.id);
+    if (at < 5) await new Promise(resolve => setTimeout(resolve, (5 - at) * 30));
+    return { ...c(request, n), entry: `場景：${at} 的開場`, handoff: `問句：${at} 之後呢` };
+  };
+  await finish(r);
+  assert.ok(/歸屬[：:]T1/.test(r.raw(0)), 'the root plan shows the owning card\'s title');
+  const forSix = seen.find(request => request.card.id === r.nodes[6].id);
+  assert.deepEqual(JSON.parse(JSON.stringify(forSix.materials)).map(m => [m.name, m.home]), [['Barter scene', 'T1'], ['Shell', undefined]]);
+  assert.deepEqual(JSON.parse(JSON.stringify(forSix.previousStyle)), { entry: '場景：5 的開場', handoff: '問句：5 之後呢' }, 'the previous card\'s opening and ending ride with the request');
+  assert.equal(seen.find(request => request.card.id === r.nodes[0].id).previousStyle, undefined, 'the preface has no previous card');
+});
+
 test('fix5 whole-book rerun after the book title (root topic) is renamed: plans and intro see the new title, the root is not hand-edited, no old title in entry or previous/next lines', async () => {
   const seen = [];
   const r = await rig({ titles: FOUR });
@@ -3931,6 +3953,7 @@ test('ai book: a contradiction between chapters is found by the whole-book step,
   assert.equal(books.length, 2, 'checked, then re-checked');
   assert.equal(books[0][1].model, 'm3', 'by the proof model');
   same(books[0][1].chapters.map(c => c.title), ['SecretRootTitle', 'SecretTitleA', 'SecretTitleB']);
+  same(books[0][1].chapters.map(c => c.place), [{ kind: 'preface' }, { kind: 'chapter', chapter: 1 }, { kind: 'chapter', chapter: 2 }], 'the whole-book proofread gets each card\'s place (preface, then chapters 1 and 2), not only its list position');
   assert.equal(books[1][1].prior.length, 1, 'the re-check is told what was open');
   const fixes = aiRuns(r, 'fix');
   assert.equal(fixes.length, 1); assert.equal(fixes[0][1].model, 'm2', 'by the author model');

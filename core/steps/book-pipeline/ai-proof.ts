@@ -1,4 +1,5 @@
 import type { AdmissionContext } from "../../admission";
+import { instructionLanguageOf, type ContentLanguage } from "../../../i18n";
 import type { AiCalls } from "../../ai-calls";
 import { openedUrlsFromEvents } from "../../argument-map/source-proof";
 import {
@@ -202,6 +203,17 @@ export async function runAiProof(aiCalls: AiCalls, request: AiProofRequest, run:
 export interface AiBookChapter {
   title: string;
   text: string;
+  /** Where the card sits in the book (from the book structure); the list position `number` is not a chapter number. */
+  place?: { kind: "preface" | "chapter" | "section"; chapter?: number; section?: number };
+}
+
+/** "Preface" / "Chapter 2" / "Chapter 2, section 3" (zh: 前言 / 第 2 章 / 第 2 章第 3 節): the label the proofreader reads a chapter by. */
+export function bookPlaceLabel(place: NonNullable<AiBookChapter["place"]>, language: ContentLanguage): string {
+  const zh = instructionLanguageOf(language) === "zh";
+  if (place.kind === "preface") return zh ? "前言" : "Preface";
+  const chapter = place.chapter ?? 0;
+  if (place.kind === "chapter" || !place.section) return zh ? `第 ${chapter} 章` : `Chapter ${chapter}`;
+  return zh ? `第 ${chapter} 章第 ${place.section} 節` : `Chapter ${chapter}, section ${place.section}`;
 }
 /**
  * What the whole-book proofreader sees: every chapter with text in reading order (cut to the budget by `compactChapters`) and the
@@ -237,7 +249,7 @@ export const AI_BOOK_PROOF_SCHEMA = {
 /** The whole-book proofread: one text-only call over the chapters (the book's contradictions and references; no web, no tools). */
 export const aiBookProofStep: StepDefinition<AiBookProofRequest, RawAiProof> = {
   id: "book-pipeline.ai-proof-book",
-  version: 1,
+  version: 2,
   render: request =>
     renderTemplate(bookTemplate, {
       languageInstruction: languageInstruction(request.language, request.chapters[0]?.text ?? ""),
@@ -249,6 +261,7 @@ export const aiBookProofStep: StepDefinition<AiBookProofRequest, RawAiProof> = {
       chapters: JSON.stringify(
         request.chapters.map((chapter, at) => ({
           number: at + 1,
+          ...(chapter.place ? { place: bookPlaceLabel(chapter.place, request.language) } : {}),
           title: singleLine(chapter.title, 200),
           text: chapter.text
         }))

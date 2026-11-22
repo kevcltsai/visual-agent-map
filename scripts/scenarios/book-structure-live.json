@@ -57,7 +57,7 @@
       "click": ".vam-book-structure-row:not(.is-undone) .vam-book-structure-undo"
     },
     {
-      "waitFor": ".vam-book-bar[data-mode='planning'], .vam-book-bar[data-mode='gate1']",
+      "waitFor": ".vam-book-bar[data-mode='planning']",
       "timeoutMs": 60000
     },
     {

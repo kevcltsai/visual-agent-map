@@ -113,6 +113,8 @@ export interface ShareModalOptions {
   /** Tests inject small thresholds to trigger the size warnings. */
   sizeThresholds?: { warn: number; large: number };
   mermaidTimeoutMs?: number;
+  /** Vault-relative folders VAM keeps its own files in; a path under one blocks the file. */
+  internalFolders?: readonly string[];
   saveEnvironment?: SaveEnvironment;
   /** Tests inject a clipboard; default is the system clipboard. */
   writeClipboard?: (text: string) => Promise<void>;
@@ -179,7 +181,8 @@ export class ShareModal extends Modal {
       new ShareExporter(app, options.source, {
         vamVersion: options.vamVersion,
         language: options.language,
-        mermaidTimeoutMs: options.mermaidTimeoutMs
+        mermaidTimeoutMs: options.mermaidTimeoutMs,
+        internalFolders: options.internalFolders
       });
   }
 

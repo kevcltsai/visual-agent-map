@@ -4,6 +4,7 @@ import type { SharePayload } from "./share-format";
 /** Last gate before writing a share file: any forbidden string in the final HTML blocks the export (fail closed). */
 export type LeakCategory =
   | "vault-path"
+  | "vault-folder"
   | "external-path"
   | "map-folder"
   | "note-path"
@@ -31,6 +32,8 @@ export interface ShareVaultInfo {
   mapFolder: string;
   /** Root paths (as typed and real) of this map's external data folders; they live only on this device. */
   externalPaths?: readonly string[];
+  /** Vault-relative folders VAM keeps its own files in (workspace, mind maps, note styles and their backups): a path under one names vault internals. */
+  internalFolders?: readonly string[];
 }
 
 export const INTERNAL_FIELD_NAMES = [
@@ -46,12 +49,26 @@ export const INTERNAL_FIELD_NAMES = [
   "content-language"
 ] as const;
 
-const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: "\u00a0" };
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: "\u00a0",
+  lsqb: "[",
+  lbrack: "[",
+  rsqb: "]",
+  rbrack: "]"
+};
 
-/** Text as a reader sees it: named (the common ones), decimal and hex character references turned into characters. */
+/**
+ * Text as a reader sees it: named (the common ones and the brackets), decimal and hex character references turned into
+ * characters. A numeric reference without its `;` counts too, as a browser reads `&#91` as `[`.
+ */
 export function decodeHtmlEntities(text: string): string {
   return text.replace(
-    /&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|([A-Za-z]+));/g,
+    /&(?:#(\d{1,7});?|#[xX]([0-9a-fA-F]{1,6});?|([A-Za-z]+);)/g,
     (original, dec?: string, hex?: string, name?: string) => {
       if (name) return NAMED_ENTITIES[name] ?? original;
       const code = dec ? Number(dec) : parseInt(hex ?? "", 16);
@@ -94,12 +111,12 @@ function occurrences(text: string, category: LeakCategory, value: string, hits: 
 
 export function scanForLeaks(html: string, forbidden: readonly ForbiddenString[]): LeakHit[] {
   const hits: LeakHit[] = [];
-  // A path with `&` is `&amp;` in HTML (text and attribute values alike): the outside-folder path is also looked for in the decoded text.
+  // Every value is also looked for in the text as a reader sees it: a path with `&` is `&amp;` in HTML, and `&#91;&#91;x]]` shows as `[[x]]`.
   const decoded = html.includes("&") ? decodeHtmlEntities(html) : html;
   for (const { category, value } of forbidden) {
     if (!value) continue;
     occurrences(html, category, value, hits);
-    if (category === "external-path" && decoded !== html) occurrences(decoded, category, value, hits);
+    if (decoded !== html) occurrences(decoded, category, value, hits);
   }
   return hits.sort((a, b) => a.index - b.index);
 }
@@ -115,6 +132,11 @@ export function forbiddenStringsFor(
     if (text) list.push({ category, value: text });
   };
   add("vault-path", vault.vaultPath);
+  // As a folder (`Agent Workspace/`): the bare name alone is ordinary text; a path under it is not.
+  for (const folder of vault.internalFolders ?? []) {
+    const name = folder.trim().replace(/^\/+|\/+$/g, "");
+    if (name) add("vault-folder", `${name}/`);
+  }
   for (const external of vault.externalPaths ?? []) add("external-path", external);
   add("map-folder", vault.mapFolder);
   for (const node of map.nodes) add("note-path", node.path);

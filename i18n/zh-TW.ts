@@ -2531,6 +2531,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.leak_at_0": "在議題「{0}」",
   "share.leak_at_0_1": "在議題「{0}」：{1}",
   "share.leak_category_vault-path": "這台電腦上的 Vault 位置",
+  "share.leak_category_vault-folder": "Vault 裡的資料夾路徑",
   "share.leak_category_external-path": "資料夾在這台電腦上的位置",
   "share.leak_category_map-folder": "心智圖的資料夾名稱",
   "share.leak_category_note-path": "筆記的檔案路徑",

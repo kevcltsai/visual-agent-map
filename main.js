@@ -2476,6 +2476,7 @@ var en = {
   "share.leak_at_0": "In topic \u201C{0}\u201D",
   "share.leak_at_0_1": "In topic \u201C{0}\u201D: {1}",
   "share.leak_category_vault-path": "the vault's location on this computer",
+  "share.leak_category_vault-folder": "a folder path inside the vault",
   "share.leak_category_external-path": "the location of a data folder on this computer",
   "share.leak_category_map-folder": "the map's folder name",
   "share.leak_category_note-path": "a note's file path",
@@ -5797,6 +5798,7 @@ var zhCN = {
   "share.leak_at_0": "\u5728\u8BAE\u9898\u201C{0}\u201D",
   "share.leak_at_0_1": "\u5728\u8BAE\u9898\u201C{0}\u201D\uFF1A{1}",
   "share.leak_category_vault-path": "\u8FD9\u53F0\u7535\u8111\u4E0A\u7684\u77E5\u8BC6\u5E93\u4F4D\u7F6E",
+  "share.leak_category_vault-folder": "\u77E5\u8BC6\u5E93\u91CC\u7684\u6587\u4EF6\u5939\u8DEF\u5F84",
   "share.leak_category_external-path": "\u6587\u4EF6\u5939\u5728\u8FD9\u53F0\u7535\u8111\u4E0A\u7684\u4F4D\u7F6E",
   "share.leak_category_map-folder": "\u601D\u7EF4\u5BFC\u56FE\u7684\u6587\u4EF6\u5939\u540D\u79F0",
   "share.leak_category_note-path": "\u7B14\u8BB0\u7684\u6587\u4EF6\u8DEF\u5F84",
@@ -9118,6 +9120,7 @@ var zhTW = {
   "share.leak_at_0": "\u5728\u8B70\u984C\u300C{0}\u300D",
   "share.leak_at_0_1": "\u5728\u8B70\u984C\u300C{0}\u300D\uFF1A{1}",
   "share.leak_category_vault-path": "\u9019\u53F0\u96FB\u8166\u4E0A\u7684 Vault \u4F4D\u7F6E",
+  "share.leak_category_vault-folder": "Vault \u88E1\u7684\u8CC7\u6599\u593E\u8DEF\u5F91",
   "share.leak_category_external-path": "\u8CC7\u6599\u593E\u5728\u9019\u53F0\u96FB\u8166\u4E0A\u7684\u4F4D\u7F6E",
   "share.leak_category_map-folder": "\u5FC3\u667A\u5716\u7684\u8CC7\u6599\u593E\u540D\u7A31",
   "share.leak_category_note-path": "\u7B46\u8A18\u7684\u6A94\u6848\u8DEF\u5F91",
@@ -104007,10 +104010,21 @@ var INTERNAL_FIELD_NAMES = [
   "map-sources",
   "content-language"
 ];
-var NAMED_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: "\xA0" };
+var NAMED_ENTITIES = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: "\xA0",
+  lsqb: "[",
+  lbrack: "[",
+  rsqb: "]",
+  rbrack: "]"
+};
 function decodeHtmlEntities(text11) {
   return text11.replace(
-    /&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|([A-Za-z]+));/g,
+    /&(?:#(\d{1,7});?|#[xX]([0-9a-fA-F]{1,6});?|([A-Za-z]+);)/g,
     (original, dec, hex, name2) => {
       var _a2;
       if (name2) return (_a2 = NAMED_ENTITIES[name2]) != null ? _a2 : original;
@@ -104048,19 +104062,23 @@ function scanForLeaks(html, forbidden) {
   for (const { category, value } of forbidden) {
     if (!value) continue;
     occurrences(html, category, value, hits);
-    if (category === "external-path" && decoded3 !== html) occurrences(decoded3, category, value, hits);
+    if (decoded3 !== html) occurrences(decoded3, category, value, hits);
   }
   return hits.sort((a, b) => a.index - b.index);
 }
 function forbiddenStringsFor(vault, map, notes = []) {
-  var _a2;
+  var _a2, _b2;
   const list2 = [];
   const add = (category, value) => {
     const text11 = value == null ? void 0 : value.trim();
     if (text11) list2.push({ category, value: text11 });
   };
   add("vault-path", vault.vaultPath);
-  for (const external of (_a2 = vault.externalPaths) != null ? _a2 : []) add("external-path", external);
+  for (const folder of (_a2 = vault.internalFolders) != null ? _a2 : []) {
+    const name2 = folder.trim().replace(/^\/+|\/+$/g, "");
+    if (name2) add("vault-folder", `${name2}/`);
+  }
+  for (const external of (_b2 = vault.externalPaths) != null ? _b2 : []) add("external-path", external);
   add("map-folder", vault.mapFolder);
   for (const node of map.nodes) add("note-path", node.path);
   add("wikilink", "[[");
@@ -104286,6 +104304,28 @@ function scrubMermaidSvg(root) {
   scrubShareTree(root, { allowStyle: true });
   dropRemoteReferences(root);
   return true;
+}
+function dropHiddenContent(root) {
+  let count4 = 0;
+  const classesOf2 = (element) => {
+    var _a2;
+    return ((_a2 = element.getAttribute("class")) != null ? _a2 : "").split(/\s+/);
+  };
+  const visit = (parent, inPlan) => {
+    var _a2;
+    for (const child of Array.from(parent.children)) {
+      const classes = classesOf2(child);
+      const workRecord = classes.includes("callout") && ((_a2 = child.getAttribute("data-callout")) == null ? void 0 : _a2.toLowerCase()) === "vam-book" && !classes.includes("vam-book-plan");
+      if (workRecord || inPlan && classes.includes("vam-book-plan-hidden") || classes.includes("vam-internal-marker-only")) {
+        child.remove();
+        count4++;
+        continue;
+      }
+      visit(child, inPlan || classes.includes("vam-book-plan"));
+    }
+  };
+  visit(root, false);
+  return count4;
 }
 function countLocalReferences(root) {
   let count4 = 0;
@@ -106251,6 +106291,7 @@ ${fence}`, host, "", child);
   /** Mermaid out, sanitize, scrub, mermaid back in. See share-dom.ts for why the diagrams take this detour. */
   finish(host, sources) {
     var _a2;
+    dropHiddenContent(host);
     const localRefs = countLocalReferences(host);
     const diagrams = [];
     const diagramSources = [];
@@ -106407,7 +106448,8 @@ ${fence}`, host, "", child);
           vaultPath: adapter instanceof import_obsidian47.FileSystemAdapter ? adapter.getBasePath() : void 0,
           vaultName: this.app.vault.getName(),
           mapFolder: folder,
-          externalPaths: externalForbiddenPaths(loadExternalSources(this.app, this.source.map.id))
+          externalPaths: externalForbiddenPaths(loadExternalSources(this.app, this.source.map.id)),
+          internalFolders: this.config.internalFolders
         },
         this.source.map,
         [...this.source.notes.values()]
@@ -106671,7 +106713,8 @@ var ShareModal = class extends import_obsidian48.Modal {
     this.exporter = (_b2 = (_a2 = options.createExporter) == null ? void 0 : _a2.call(options, app, options.source)) != null ? _b2 : new ShareExporter(app, options.source, {
       vamVersion: options.vamVersion,
       language: options.language,
-      mermaidTimeoutMs: options.mermaidTimeoutMs
+      mermaidTimeoutMs: options.mermaidTimeoutMs,
+      internalFolders: options.internalFolders
     });
   }
   onOpen() {
@@ -113763,6 +113806,7 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
       source: snapshot,
       vamVersion: this.manifest.version || "0.0.0",
       language: this.settings.language,
+      internalFolders: [this.settings.workspaceFolder, this.settings.mindMapsFolder, this.noteStyles.folder()],
       translation: {
         service: this.shareTranslate,
         cache: this.shareTranslationCache,

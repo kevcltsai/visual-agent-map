@@ -198,6 +198,38 @@ export function scrubMermaidSvg(root: Element): boolean {
 }
 
 /**
+ * Removes what the plugin's stylesheet hides in Obsidian, so the file shows only what the author sees: the picture-book
+ * pipeline's work records (`[!vam-book]` callouts, except the plan blocks the plan view marks `vam-book-plan`), the
+ * parts of a plan the plan view hides, and paragraphs that held only VAM's internal markers. Run on the renderer's
+ * output before anything else looks at it. Returns how many elements were removed.
+ */
+export function dropHiddenContent(root: Element): number {
+  let count = 0;
+  const classesOf = (element: Element): string[] => (element.getAttribute("class") ?? "").split(/\s+/);
+  const visit = (parent: Element, inPlan: boolean): void => {
+    for (const child of Array.from(parent.children)) {
+      const classes = classesOf(child);
+      const workRecord =
+        classes.includes("callout") &&
+        child.getAttribute("data-callout")?.toLowerCase() === "vam-book" &&
+        !classes.includes("vam-book-plan");
+      if (
+        workRecord ||
+        (inPlan && classes.includes("vam-book-plan-hidden")) ||
+        classes.includes("vam-internal-marker-only")
+      ) {
+        child.remove();
+        count++;
+        continue;
+      }
+      visit(child, inPlan || classes.includes("vam-book-plan"));
+    }
+  };
+  visit(root, false);
+  return count;
+}
+
+/**
  * How many links in the rendered tree lead somewhere that is not a web page, a mail address or the page itself:
  * Obsidian's `internal-link` anchors (unless they point inside the page) and any `<a>` whose href is not http(s),
  * mailto or `#…`. Run on the renderer's output BEFORE sanitizing: this is the privacy decision for note links, so it

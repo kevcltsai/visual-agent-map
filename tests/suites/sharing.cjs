@@ -647,3 +647,29 @@ test('sharing leak: an outside folder path containing & is found through HTML en
   assert.ok(!categories({ detailHtml: '<p>/outside/R&amp;E and R&amp;D alone</p>' }).has('external-path'));
   assert.equal(scan.decodeHtmlEntities('a&amp;lt;b &unknown; &#0;'), 'a&lt;b &unknown; &#0;', 'one pass, unknown references stay');
 });
+
+test('sharing leak: an entity-encoded wikilink is found after decoding; code and an encoded matrix row stay allowed', () => {
+  const forbidden = scan.forbiddenStringsFor({ mapFolder: 'Private Vault Folder/Share Map' }, fixtureMap(), []);
+  const categories = fields => new Set(scan.scanPayloadForLeaks(payloadWith(fields), forbidden).map(hit => hit.category));
+  for (const html of ['<p>&#91;&#91;Secret note]]</p>', '<p>&#x5b;&#X5B;Secret note&#93;&#93;</p>', '<p>&lsqb;&lbrack;Secret note]]</p>', '<p>&#91&#91Secret note]]</p>', '<p>[&#91;Secret note]]</p>'])
+    assert.ok(categories({ detailHtml: html }).has('wikilink'), html);
+  assert.ok(categories({ summary: '&#91;&#91;Secret note]]' }).has('wikilink'), 'plain string fields too');
+  assert.ok(!categories({ detailHtml: '<code>&#91;&#91;Secret note]]</code>' }).has('wikilink'), 'code stays allowed');
+  assert.ok(!categories({ detailHtml: '<p>&#91;&#91;2,0],[0,1]]</p>' }).has('wikilink'), 'a matrix row stays allowed');
+  assert.equal(scan.decodeHtmlEntities('&#91&#93;&rsqb;&rbrack;'), '[]]]');
+});
+
+test('sharing leak: a path under a VAM folder (note-style backup) blocks; the bare folder name and other text do not', () => {
+  const forbidden = scan.forbiddenStringsFor(
+    { mapFolder: 'Agent Workspace/Mind Maps/數學在幹嘛', internalFolders: ['Agent Workspace', '/Agent Workspace/Mind Maps/', 'Agent Workspace/筆記風格', ' '] },
+    fixtureMap(),
+    []
+  );
+  assert.ok(forbidden.some(item => item.category === 'vault-folder' && item.value === 'Agent Workspace/'));
+  assert.ok(!forbidden.some(item => item.category === 'vault-folder' && item.value === '/'), 'a blank folder adds nothing');
+  const categories = fields => new Set(scan.scanPayloadForLeaks(payloadWith(fields), forbidden).map(hit => hit.category));
+  const line = '<p>2026-11-22　已重新寫入，舊版備份在 Agent Workspace/筆記風格/備份/筆記/線性代數 2026-11-22 171239.md</p>';
+  assert.ok(categories({ detailHtml: line }).has('vault-folder'));
+  assert.ok(categories({ detailHtml: '<p>Agent&#32;Workspace&#47;Topics/x.md</p>' }).has('vault-folder'), 'encoded too');
+  assert.ok(!categories({ detailHtml: '<p>The Agent Workspace holds your maps.</p>' }).has('vault-folder'));
+});

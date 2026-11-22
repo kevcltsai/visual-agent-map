@@ -29,6 +29,7 @@ import {
 } from "./share-build";
 import {
   countLocalReferences,
+  dropHiddenContent,
   pickMermaidFallbackSource,
   scrubMermaidSvg,
   scrubShareTree,
@@ -118,6 +119,8 @@ interface ExporterConfig {
   language: ShareLanguage;
   /** Per-note wait for Mermaid diagrams. */
   mermaidTimeoutMs?: number;
+  /** Vault-relative folders VAM keeps its own files in; a path under one blocks the file (see ShareVaultInfo). */
+  internalFolders?: readonly string[];
   now?: () => Date;
   /** Parses and serializes note HTML to rebuild compact translations; defaults to the platform's DOMParser. */
   rebuildDom?: RebuildDom;
@@ -507,6 +510,8 @@ export class ShareExporter {
     diagrams: ShareTranslateDiagram[];
     unsourced: number;
   } {
+    // What Obsidian hides (work records with vault paths among them) is not shared: it goes before anything looks at the note.
+    dropHiddenContent(host);
     // The privacy decision about note links: count on the renderer's own output, before anything is rewritten.
     const localRefs = countLocalReferences(host);
     const diagrams: Element[] = [];
@@ -673,7 +678,8 @@ export class ShareExporter {
           vaultPath: adapter instanceof FileSystemAdapter ? adapter.getBasePath() : undefined,
           vaultName: this.app.vault.getName(),
           mapFolder: folder,
-          externalPaths: externalForbiddenPaths(loadExternalSources(this.app, this.source.map.id))
+          externalPaths: externalForbiddenPaths(loadExternalSources(this.app, this.source.map.id)),
+          internalFolders: this.config.internalFolders
         },
         this.source.map,
         [...this.source.notes.values()]

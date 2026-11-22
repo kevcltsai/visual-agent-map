@@ -2531,6 +2531,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.leak_at_0": "在议题“{0}”",
   "share.leak_at_0_1": "在议题“{0}”：{1}",
   "share.leak_category_vault-path": "这台电脑上的知识库位置",
+  "share.leak_category_vault-folder": "知识库里的文件夹路径",
   "share.leak_category_external-path": "文件夹在这台电脑上的位置",
   "share.leak_category_map-folder": "思维导图的文件夹名称",
   "share.leak_category_note-path": "笔记的文件路径",

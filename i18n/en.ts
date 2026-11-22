@@ -2707,6 +2707,7 @@ export const en = {
   "share.leak_at_0": "In topic “{0}”",
   "share.leak_at_0_1": "In topic “{0}”: {1}",
   "share.leak_category_vault-path": "the vault's location on this computer",
+  "share.leak_category_vault-folder": "a folder path inside the vault",
   "share.leak_category_external-path": "the location of a data folder on this computer",
   "share.leak_category_map-folder": "the map's folder name",
   "share.leak_category_note-path": "a note's file path",

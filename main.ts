@@ -1321,6 +1321,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       source: snapshot,
       vamVersion: this.manifest.version || "0.0.0",
       language: this.settings.language,
+      internalFolders: [this.settings.workspaceFolder, this.settings.mindMapsFolder, this.noteStyles.folder()],
       translation: {
         service: this.shareTranslate,
         cache: this.shareTranslationCache,

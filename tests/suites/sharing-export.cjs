@@ -886,3 +886,19 @@ test('share exporter: an outside folder path with & is blocked when the page tex
   for (const leak of ['/outside/R&D/a.md', '/outside/R&amp;D/a.md', '/outside/R&#38;D']) { const blocked = run(`see ${leak}`); assert.ok(blocked.leakCategories.includes('external-path'), leak); assert.equal(blocked.html, undefined); }
   assert.deepEqual(plain(run('see R&D label').leakCategories), []);
 });
+
+test('share dom: what the stylesheet hides in Obsidian (work-record callouts, hidden plan parts, marker-only paragraphs) is removed; the plan block stays', () => {
+  const record = el('div', { class: 'callout', 'data-callout': 'vam-book' }, [el('p', {}, [], '舊版備份在 Agent Workspace/筆記風格/備份/筆記/x.md')]);
+  const upper = el('div', { class: 'callout is-collapsed', 'data-callout': 'VAM-BOOK' }, [el('p', {}, [], 'slots')]);
+  const plan = el('div', { class: 'callout vam-book-plan', 'data-callout': 'vam-book' }, [
+    el('p', {}, [], 'shown plan'),
+    el('div', { class: 'vam-book-plan-hidden' }, [el('p', {}, [], 'structure')])
+  ]);
+  const info = el('div', { class: 'callout', 'data-callout': 'info' }, [el('p', {}, [], 'kept')]);
+  const ownHidden = el('span', { class: 'vam-book-plan-hidden' }, [], 'outside a plan: kept');
+  const marker = el('p', { class: 'vam-internal-marker-only' });
+  const root = el('div', {}, [el('section', {}, [record]), upper, plan, info, ownHidden, marker, el('p', {}, [], 'body')]);
+  assert.equal(dom.dropHiddenContent(root), 4);
+  const texts = node => [node.textContent, ...node.children.flatMap(texts)].filter(Boolean);
+  assert.deepEqual(texts(root), ['shown plan', 'kept', 'outside a plan: kept', 'body']);
+});

@@ -91,6 +91,13 @@ test('counter-example: the plugin changing the cover removes the old frame in th
   const off = cover.withCoverOff(note);
   assert.ok(!off.includes('topic-cover-frame') && off.includes('topic-cover: "none"'));
   assert.ok(!cover.withCoverOn(off).includes('topic-cover:'));
+  // A book card's text has no cover picture to fall back to: with a book-cover record, on again links its file (the frame stays).
+  const book = '---\ntitle: "T"\nbook-cover: "{\\"file\\":\\"img/a.png\\",\\"key\\":\\"a.png\\"}"\ntopic-cover: "[[img/a.png]]"\ntopic-cover-frame: "0.1 0.2 0.5 0.5"\n---\n# Body\n';
+  const bookOff = cover.withCoverOff(book);
+  assert.ok(bookOff.includes('topic-cover: "none"'));
+  const bookOn = cover.withCoverOn(bookOff);
+  assert.ok(bookOn.includes('topic-cover: "[[img/a.png]]"'), 'the same link as before');
+  assert.equal(cover.withCoverOn(cover.withCoverOff(book.replace(/^book-cover: .*\n/m, ''))).includes('topic-cover:'), false, 'no record: the key is dropped as before');
   // appendImageEmbed (the body) never touches the frame key.
   assert.ok(cover.appendImageEmbed(note, 'img/c.png').startsWith(note.slice(0, note.indexOf('# Body'))));
 });

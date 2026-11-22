@@ -33414,6 +33414,7 @@ function frontmatterRecord(raw) {
     file: record.file,
     key: record.key,
     ...typeof record.caption === "string" ? { caption: record.caption } : {},
+    ...typeof record.source === "string" ? { source: record.source } : {},
     missing: false,
     off: record.off === 1
   };
@@ -33473,7 +33474,19 @@ function setCoverRecord(raw, record) {
   return `---${eol2}${lines.join(eol2)}${eol2}---${raw.slice(match[0].length)}`;
 }
 function placeCover(raw, record) {
-  return setCoverRecord(stripCoverBlock(raw), record);
+  var _a2;
+  return setCoverRecord(((_a2 = readCoverBlock(raw)) == null ? void 0 : _a2.intact) ? stripCoverBlock(raw) : raw, record);
+}
+function removeCoverCredit(detail, href, language2) {
+  const [before, middle, after] = translateNote(
+    language2,
+    "note.cover_source_entry_0_1",
+    "",
+    ""
+  ).split(/[\u0001\u0002]/);
+  const escape = (text11) => text11.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const shape2 = new RegExp(`^- ${escape(before)}.*${escape(middle)}.*\\]\\(${escape(href)}\\).*${escape(after)}\\r?$`);
+  return detail.split("\n").filter((line3) => !shape2.test(line3)).join("\n");
 }
 function migrateLegacyCover(raw, language2, title) {
   var _a2, _b2, _c, _d;
@@ -33488,7 +33501,13 @@ function migrateLegacyCover(raw, language2, title) {
   const lang = language2;
   const link = `[${translateNote(lang, "note.image_link")}](${href.replace(/\(/g, "%28").replace(/\)/g, "%29")})`;
   return {
-    record: { file: block.file, key: block.key, ...caption ? { caption } : {}, ...block.off ? { off: 1 } : {} },
+    record: {
+      file: block.file,
+      key: block.key,
+      ...caption ? { caption } : {},
+      source: href,
+      ...block.off ? { off: 1 } : {}
+    },
     credit: {
       href,
       entry: translateNote(
@@ -39191,7 +39210,10 @@ function withCoverOff(content) {
   );
 }
 function withCoverOn(content) {
-  return setFrontmatterKeys(content, { [COVER_KEY]: null });
+  var _a2;
+  const file = (_a2 = readCoverRecord(content)) == null ? void 0 : _a2.file;
+  const safe2 = file ? safeLink(file) : "";
+  return setFrontmatterKeys(content, { [COVER_KEY]: safe2 ? `[[${safe2}]]` : null });
 }
 function appendImageEmbed(content, link) {
   const safe2 = safeLink(link);
@@ -55212,6 +55234,8 @@ var BookPipelineRunError = class extends Error {
     this.name = "BookPipelineRunError";
   }
 };
+var DETAIL_START4 = "<!-- visual-agent-map:detail:start -->";
+var DETAIL_END4 = "<!-- visual-agent-map:detail:end -->";
 function stepCounts(counts, imagesDone = 0, review = {}) {
   var _a2;
   const written2 = counts.written + counts.checked;
@@ -55963,18 +55987,28 @@ var BookPipelineRuns = class {
         const card = await this.ports.readCard(path);
         const moved = migrateLegacyCover(card.raw, language2, card.title);
         if (!moved || coverOwnership(card.raw) !== "program") continue;
-        const detail = moved.credit ? addPictureSources(card.detail, [moved.credit], language2) : card.detail;
-        await this.ports.updateNoteGuarded(
+        const start = card.raw.indexOf(DETAIL_START4);
+        const end = card.raw.indexOf(DETAIL_END4);
+        if (moved.credit && (start < 0 || end < start)) continue;
+        await this.ports.updateNoteRawGuarded(
           path,
-          { detail: programStamp(card.detail, detail) },
+          (content) => {
+            let next = content;
+            if (moved.credit) {
+              const from = start + DETAIL_START4.length;
+              const inner = content.slice(from, end);
+              const core2 = inner.trim();
+              const lead = inner.slice(0, inner.indexOf(core2));
+              const stamped = programStamp(core2, addPictureSources(core2, [moved.credit], language2));
+              next = `${content.slice(0, from)}${lead}${stamped}${inner.slice(lead.length + core2.length)}${content.slice(end)}`;
+            }
+            const placed = placeCover(next, moved.record);
+            const link = "file" in moved.record ? coverLinkOf(moved.record.file) : void 0;
+            return link && coverDeclaredTarget(placed) === void 0 && this.ports.setCoverLink ? this.ports.setCoverLink(placed, link) : placed;
+          },
           {
             expectedContent: card.raw,
-            authorize: () => !this.disposed && !this.drives.has(mapPath) && !this.notesJobs.has(mapPath),
-            finalize: (content) => {
-              const placed = placeCover(content, moved.record);
-              const link = "file" in moved.record ? coverLinkOf(moved.record.file) : void 0;
-              return link && coverDeclaredTarget(placed) === void 0 && this.ports.setCoverLink ? this.ports.setCoverLink(placed, link) : placed;
-            }
+            authorize: () => !this.disposed && !this.drives.has(mapPath) && !this.notesJobs.has(mapPath)
           }
         );
       } catch (e) {
@@ -58812,6 +58846,7 @@ ${caption}`, drive.config.language))
         file,
         key: imageKey(figure.href),
         ...caption ? { caption: caption.slice(0, 200) } : {},
+        source: href,
         ...off ? { off: 1 } : {}
       },
       link: file,
@@ -58856,12 +58891,14 @@ ${caption}`, drive.config.language))
    * (nothing was written): the three checks, the exit check, or a discarded write.
    */
   async writeFilled(latest, slots, outcomes, language2, authorize, off, cover) {
+    var _a2, _b2;
     const result = fillSlotMarkers(latest.detail, slots, outcomes);
     const bad = verifyFill(latest.detail, result, slots);
     if (bad) return `slots_${bad}`;
     if (this.exitCheck(result.added.join("\n"), new Set(result.placed.map((item) => item.href)))) return "slots_unsafe";
+    const oldSource = (cover == null ? void 0 : cover.source) ? (_a2 = readCoverRecord(latest.raw)) == null ? void 0 : _a2.source : void 0;
     const withSources = addPictureSources(
-      result.text,
+      oldSource && oldSource !== ((_b2 = cover == null ? void 0 : cover.source) == null ? void 0 : _b2.href) ? removeCoverCredit(result.text, oldSource, language2) : result.text,
       (cover == null ? void 0 : cover.source) ? [...result.sources, cover.source] : result.sources,
       language2
     );
@@ -59963,17 +60000,17 @@ var aiProofFingerprint = (input2) => {
   return (_a2 = marker3 == null ? void 0 : marker3[1]) != null ? _a2 : "";
 };
 var STATUS_LINE = /^[ \t]{0,3}>[ \t]?[⏳⚠]/u;
-var DETAIL_START4 = "<!-- visual-agent-map:detail:start -->";
-var DETAIL_END4 = "<!-- visual-agent-map:detail:end -->";
+var DETAIL_START5 = "<!-- visual-agent-map:detail:start -->";
+var DETAIL_END5 = "<!-- visual-agent-map:detail:end -->";
 var CHECKBOX = /^[ \t]{0,3}>[ \t]?[-*+][ \t]+\[([ xX])\]/;
 var REVIEW_SIGN = /\[!vam-review\][+-]?/i;
 var bare2 = (line3) => line3.replace(/\r$/, "");
 function detailSpan(lines) {
-  const from = lines.findIndex((line3) => bare2(line3).trim() === DETAIL_START4);
+  const from = lines.findIndex((line3) => bare2(line3).trim() === DETAIL_START5);
   if (from < 0) return void 0;
   let to = -1;
   for (let i = lines.length - 1; i > from; i--) {
-    if (bare2(lines[i]).trim() === DETAIL_END4) {
+    if (bare2(lines[i]).trim() === DETAIL_END5) {
       to = i;
       break;
     }

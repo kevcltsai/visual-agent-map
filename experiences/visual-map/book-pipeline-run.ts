@@ -209,6 +209,8 @@ import {
   migrateLegacyCover,
   placeCover,
   putCoverBlock,
+  readCoverRecord,
+  removeCoverCredit,
   stripCoverBlock,
   trustedCoverBlock,
   type CoverRecordValue
@@ -419,6 +421,9 @@ export type GuardOptions = {
   /** Runs inside the same write on the text the patch produced; null refuses the write. */
   finalize?: (content: string) => string | null;
 };
+
+const DETAIL_START = "<!-- visual-agent-map:detail:start -->";
+const DETAIL_END = "<!-- visual-agent-map:detail:end -->";
 
 /** What one fill writes for the card's cover: its record, `topic-cover`'s link and its Sources entry; `held` is set when the owner took the cover over meanwhile. */
 interface CoverWrite {
@@ -1576,20 +1581,31 @@ export class BookPipelineRuns {
         const card = await this.ports.readCard(path);
         const moved = migrateLegacyCover(card.raw, language, card.title);
         if (!moved || coverOwnership(card.raw) !== "program") continue;
-        const detail = moved.credit ? addPictureSources(card.detail, [moved.credit], language) : card.detail;
-        await this.ports.updateNoteGuarded(
+        // A text-only change: the block goes, the record line and the one credit line come in, everything else stays as the owner wrote it.
+        const start = card.raw.indexOf(DETAIL_START);
+        const end = card.raw.indexOf(DETAIL_END);
+        if (moved.credit && (start < 0 || end < start)) continue;
+        await this.ports.updateNoteRawGuarded(
           path,
-          { detail: programStamp(card.detail, detail) },
+          content => {
+            let next = content;
+            if (moved.credit) {
+              const from = start + DETAIL_START.length;
+              const inner = content.slice(from, end);
+              const core = inner.trim();
+              const lead = inner.slice(0, inner.indexOf(core));
+              const stamped = programStamp(core, addPictureSources(core, [moved.credit], language));
+              next = `${content.slice(0, from)}${lead}${stamped}${inner.slice(lead.length + core.length)}${content.slice(end)}`;
+            }
+            const placed = placeCover(next, moved.record);
+            const link = "file" in moved.record ? coverLinkOf(moved.record.file) : undefined;
+            return link && coverDeclaredTarget(placed) === undefined && this.ports.setCoverLink
+              ? this.ports.setCoverLink(placed, link)
+              : placed;
+          },
           {
             expectedContent: card.raw,
-            authorize: () => !this.disposed && !this.drives.has(mapPath) && !this.notesJobs.has(mapPath),
-            finalize: content => {
-              const placed = placeCover(content, moved.record);
-              const link = "file" in moved.record ? coverLinkOf(moved.record.file) : undefined;
-              return link && coverDeclaredTarget(placed) === undefined && this.ports.setCoverLink
-                ? this.ports.setCoverLink(placed, link)
-                : placed;
-            }
+            authorize: () => !this.disposed && !this.drives.has(mapPath) && !this.notesJobs.has(mapPath)
           }
         );
       } catch {
@@ -4745,6 +4761,7 @@ export class BookPipelineRuns {
         file,
         key: imageKey(figure.href),
         ...(caption ? { caption: caption.slice(0, 200) } : {}),
+        source: href,
         ...(off ? { off: 1 } : {})
       },
       link: file,
@@ -4804,8 +4821,12 @@ export class BookPipelineRuns {
     if (bad) return `slots_${bad}`;
     // The exit check: nothing but the placed addresses may be an image in what this write adds.
     if (this.exitCheck(result.added.join("\n"), new Set(result.placed.map(item => item.href)))) return "slots_unsafe";
+    // A new cover replaces the credit line of the one it replaces (the card's cover has one credit).
+    const oldSource = cover?.source ? readCoverRecord(latest.raw)?.source : undefined;
     const withSources = addPictureSources(
-      result.text,
+      oldSource && oldSource !== cover?.source?.href
+        ? removeCoverCredit(result.text, oldSource, language)
+        : result.text,
       cover?.source ? [...result.sources, cover.source] : result.sources,
       language
     );

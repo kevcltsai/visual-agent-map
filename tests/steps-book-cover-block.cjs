@@ -239,7 +239,7 @@ test('coverIsOff: the record\'s flag counts while the cover is still the program
 test('migrateLegacyCover: the program\'s intact block becomes the record and its credit; not found becomes {missing}; an edited block, a note with a record, no block or no readable source stay', () => {
   const text = block.composeCoverBlock('chapter', 'zh', found({ off: true }));
   const moved = block.migrateLegacyCover(note(`# T\n\n${text}\n\n${BODY}`), 'zh-TW', '第一章');
-  assert.deepEqual(plain(moved.record), { file: FILE, key: 'mona_lisa.jpg', caption: '蒙娜麗莎，達文西作', off: 1 });
+  assert.deepEqual(plain(moved.record), { file: FILE, key: 'mona_lisa.jpg', caption: '蒙娜麗莎，達文西作', source: PAGE, off: 1 });
   assert.equal(moved.credit.href, PAGE);
   assert.equal(moved.credit.entry, `圖「蒙娜麗莎，達文西作」（封面）：commons.wikimedia.org（[連結](${PAGE})）`);
   const en = block.migrateLegacyCover(note(`# T\n\n${block.composeCoverBlock('chapter', 'en', found())}\n`), 'en', 'Chapter');
@@ -257,4 +257,25 @@ test('migrateLegacyCover: the program\'s intact block becomes the record and its
   assert.equal(block.migrateLegacyCover(recNote(REC), 'zh-TW', 'T'), undefined, 'record only');
   const crlf = block.migrateLegacyCover(note(`# T\n\n${text}\n\n${BODY}`).replace(/\n/g, '\r\n'), 'zh-TW', 'T');
   assert.equal(crlf.credit.href, PAGE, 'CRLF');
+});
+
+test('placeCover: an old block that is not intact (edited or pasted by the owner) stays exactly as it is next to the record', () => {
+  const text = block.composeCoverBlock('chapter', 'zh', found());
+  const edited = text.replace('蒙娜麗莎', '我改的');
+  const raw = block.setCoverRecord(note(`# T\n\n${edited}\n\n${BODY}`), { file: 'a.png', key: 'k' });
+  const placed = block.placeCover(raw, { file: 'b.png', key: 'k2' });
+  assert.equal(block.trustedCoverBlock(placed), edited);
+  assert.equal(block.readCoverRecord(placed).file, 'b.png');
+  assert.ok(placed.includes(`\n${edited}\n`));
+});
+
+test('removeCoverCredit: only the cover credit line of that Commons page goes; body-picture credits, other covers and other text stay', () => {
+  const entry = `- 圖「大教堂」（封面）：commons.wikimedia.org（[連結](${PAGE})）`;
+  const body = `- 圖「大教堂」：commons.wikimedia.org（[連結](${PAGE})）`;
+  const other = '- 圖「別的」（封面）：commons.wikimedia.org（[連結](https://commons.wikimedia.org/wiki/File:Other.jpg)）';
+  const detail = `正文\n\n## 來源\n\n${entry}\n${body}\n${other}\n- 我自己的來源\n`;
+  assert.equal(block.removeCoverCredit(detail, PAGE, 'zh-TW'), `正文\n\n## 來源\n\n${body}\n${other}\n- 我自己的來源\n`);
+  assert.equal(block.removeCoverCredit(detail, 'https://commons.wikimedia.org/wiki/File:None.jpg', 'zh-TW'), detail);
+  const reworded = detail.replace('（封面）', '（我的封面）');
+  assert.ok(block.removeCoverCredit(reworded, PAGE, 'zh-TW').includes('（我的封面）'), 'a line the owner reworded is not our shape and stays');
 });

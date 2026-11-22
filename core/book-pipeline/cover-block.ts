@@ -168,6 +168,8 @@ export interface CoverRecord {
   file?: string;
   key?: string;
   caption?: string;
+  /** The Commons file page the credit line in the Sources list names (see {@link removeCoverCredit}). */
+  source?: string;
   missing: boolean;
   /** The placed picture may not fit the card (the card is flagged for a look). */
   off: boolean;
@@ -176,7 +178,8 @@ export interface CoverRecord {
 }
 
 /** What {@link setCoverRecord} writes: a placed cover, or `{ missing: 1 }`. */
-export type CoverRecordValue = { file: string; key: string; caption?: string; off?: 1 } | { missing: 1 };
+export type CoverRecordValue =
+  { file: string; key: string; caption?: string; source?: string; off?: 1 } | { missing: 1 };
 
 const RECORD_KEY = "book-cover";
 
@@ -195,13 +198,21 @@ function frontmatterRecord(raw: string): CoverRecord | undefined {
     return undefined;
   }
   if (typeof value !== "object" || value === null) return undefined;
-  const record = value as { file?: unknown; key?: unknown; caption?: unknown; missing?: unknown; off?: unknown };
+  const record = value as {
+    file?: unknown;
+    key?: unknown;
+    caption?: unknown;
+    source?: unknown;
+    missing?: unknown;
+    off?: unknown;
+  };
   if (record.missing === 1) return { missing: true, off: false };
   if (typeof record.file !== "string" || !record.file || typeof record.key !== "string") return undefined;
   return {
     file: record.file,
     key: record.key,
     ...(typeof record.caption === "string" ? { caption: record.caption } : {}),
+    ...(typeof record.source === "string" ? { source: record.source } : {}),
     missing: false,
     off: record.off === 1
   };
@@ -296,9 +307,28 @@ export function setCoverRecord(raw: string, record: CoverRecordValue): string {
   return `---${eol}${lines.join(eol)}${eol}---${raw.slice(match[0].length)}`;
 }
 
-/** Takes an old block out of the text (if any) and records the cover in the frontmatter instead. */
+/** Takes the program's own intact old block out of the text (one the owner edited or pasted stays as it is) and records the cover in the frontmatter. */
 export function placeCover(raw: string, record: CoverRecordValue): string {
-  return setCoverRecord(stripCoverBlock(raw), record);
+  return setCoverRecord(readCoverBlock(raw)?.intact ? stripCoverBlock(raw) : raw, record);
+}
+
+/**
+ * The Sources-list line the program wrote for the cover whose Commons page is `href` (the cover entry's shape and that link), taken out
+ * so a new cover replaces it. Any other line, body-picture credits included, stays.
+ */
+export function removeCoverCredit(detail: string, href: string, language: string): string {
+  const [before, middle, after] = translateNote(
+    language as ContentLanguage,
+    "note.cover_source_entry_0_1",
+    "\u0001",
+    "\u0002"
+  ).split(/[\u0001\u0002]/);
+  const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const shape = new RegExp(`^- ${escape(before)}.*${escape(middle)}.*\\]\\(${escape(href)}\\).*${escape(after)}\\r?$`);
+  return detail
+    .split("\n")
+    .filter(line => !shape.test(line))
+    .join("\n");
 }
 
 /**
@@ -322,7 +352,13 @@ export function migrateLegacyCover(
   const lang = language as ContentLanguage;
   const link = `[${translateNote(lang, "note.image_link")}](${href.replace(/\(/g, "%28").replace(/\)/g, "%29")})`;
   return {
-    record: { file: block.file, key: block.key, ...(caption ? { caption } : {}), ...(block.off ? { off: 1 } : {}) },
+    record: {
+      file: block.file,
+      key: block.key,
+      ...(caption ? { caption } : {}),
+      source: href,
+      ...(block.off ? { off: 1 } : {})
+    },
     credit: {
       href,
       entry: translateNote(

@@ -576,14 +576,58 @@ test('cover migration: nothing moves while the book\'s run is going (a live run,
 test('cover migration: a card that changed between the read and the write is not written (the guarded write is refused) and moves at the next open; a map without a book is ignored', async () => {
   const r = await placedBook();
   await setRaw(r, 1, raw => toLegacy(raw, 2));
-  const inner = r.runs.ports.updateNoteGuarded; let once = true;
-  r.runs.ports.updateNoteGuarded = async (path, patch, options) => { if (once && /SecondChapter/.test(path)) { once = false; await setRaw(r, 1, raw => `${raw}\nowner wrote this\n`); } return inner(path, patch, options); };
+  const inner = r.runs.ports.updateNoteRawGuarded; let once = true;
+  r.runs.ports.updateNoteRawGuarded = async (path, patch, options) => { if (once && /SecondChapter/.test(path)) { once = false; await setRaw(r, 1, raw => `${raw}\nowner wrote this\n`); } return inner(path, patch, options); };
   await r.runs.migrateCovers(r.mapPath);
   assert.ok(blockLib.readCoverBlock(r.raw(1)), 'refused: still the old block');
   assert.match(r.raw(1), /owner wrote this/);
-  r.runs.ports.updateNoteGuarded = inner;
+  r.runs.ports.updateNoteRawGuarded = inner;
   await r.runs.migrateCovers(r.mapPath);
   assert.ok(noBlock(r.raw(1)) && /owner wrote this/.test(r.raw(1)), 'moved at the next open, the owner\'s text kept');
   const plainMap = await rig();
   await plainMap.runs.migrateCovers(plainMap.mapPath);
+});
+
+test('cover (raw migration): the move changes only the block, the book-cover line and one credit line; the owner\'s own section, extra frontmatter (comment, odd quoting) and the updated stamp stay byte for byte', async () => {
+  const r = await placedBook();
+  await setRaw(r, 1, raw => toLegacy(raw, 2).replace(/^- .*（封面）.*\n/m, ''));
+  await setRaw(r, 1, raw => raw.replace(/^---\n/, '---\n# my own comment\nmy-key:   \'odd  quoting\'  \nanother: [1,   2]\n').replace(/\n## 目前摘要/, '\n## My own section\n\nmine\n\n## 目前摘要'));
+  const before = r.raw(1);
+  const block = blockLib.trustedCoverBlock(before);
+  assert.ok(block);
+  await r.runs.migrateCovers(r.mapPath);
+  const after = r.raw(1);
+  const recordLine = recLine(after);
+  assert.ok(recordLine);
+  const credit = creditLines(after);
+  assert.equal(credit.length, 1);
+  for (const kept of ['# my own comment\nmy-key:   \'odd  quoting\'  \nanother: [1,   2]\n', '## My own section\n\nmine\n\n', /^updated: .*$/m.exec(before)[0]]) assert.ok(after.includes(kept), kept);
+  assert.equal(after.replace(`${recordLine}\n`, '').replace(`${credit[0]}\n`, '').replace(/^(# SecondChapter\n\n)/m, `$1${block}\n\n`), before, 'putting the block back and taking the record and credit lines out gives the note as it was');
+});
+
+test('cover: a rerun that replaces the cover replaces its credit line too: exactly one cover credit, for the new picture', async () => {
+  let pick = 1;
+  const r = await coverRig({ titles: ['SecretRootTitle', 'SecondChapter'], finder: request => found({ 1: [cand(/SecondChapter/.test(request.chapter) ? 2 : 1)], ...(coverSlotOf(request) ? { 0: [coverCand(/SecondChapter/.test(request.chapter) ? 10 + pick : 1, { caption: zhCaption(1) })] } : {}) }) });
+  await run(r);
+  assert.match(creditLines((await r.note(1)).detail).join('\n'), /File:Cover11\.jpg/);
+  pick = 2;
+  await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
+  while (r.runs.isRunning(r.mapPath)) await tick();
+  await settle();
+  const credits = creditLines((await r.note(1)).detail);
+  assert.equal(credits.length, 1);
+  assert.match(credits[0], /File:Cover12\.jpg/);
+  assert.match(recordOf2(r.raw(1)).source, /File:Cover12\.jpg/);
+});
+
+test('cover: a record next to an old block the owner edited: a cover write leaves that block byte for byte', async () => {
+  const r = await placedBook();
+  await setRaw(r, 1, raw => blockLib.putCoverBlock(raw, blockLib.composeCoverBlock('chapter', 'zh', { file: 'x.png', url: coverCand(2).url, caption: zhCaption(1), sourceUrl: coverCand(2).source }).replace('來源：', '我貼的\n來源：')));
+  const pasted = coverBlockOf(r.raw(1));
+  assert.ok(pasted);
+  await r.runs.rerunCard(r.mapPath, r.nodes[1].id);
+  while (r.runs.isRunning(r.mapPath)) await tick();
+  await settle();
+  assert.equal(coverBlockOf(r.raw(1)), pasted);
+  assert.ok(recordOf2(r.raw(1)).file);
 });

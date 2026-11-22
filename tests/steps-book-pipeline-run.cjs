@@ -5327,3 +5327,82 @@ test('P2a while the structure port runs, the map-change check does not pause the
   const s = await r.state();
   assert.equal(s.status, 'running'); assert.notEqual(s.pauseReason, 'map');
 });
+
+// ---- the owner's structure changes at the plan review, through chat (editStructureAtReview) ----------------------------------------
+const treeOf = async r => { const s = await r.state(); const map = await mapNow(r); const at = new Map(map.nodes.map(n => [n.id, n])); const nodes = []; for (const id of s.order) nodes.push({ id, parentId: at.get(id).parentId ?? null, title: (await r.repo.readNote(at.get(id).path)).title }); return { s, nodes }; };
+const chatRig = async () => {
+  const out = await structureRig(() => []);
+  await out.r.runs.start(out.r.mapPath);
+  await settle();
+  return out;
+};
+const expectOf = async r => { const { s, nodes } = await treeOf(r); return { runId: s.runId, phaseStartedAt: s.phaseStartedAt, nodes }; };
+const CHAT_OPS = r => [
+  { id: 'c1', kind: 'add', ref: 'cn', title: 'ChatChapter', summary: 'chat summary', parent: r.nodes[0].id, after: r.nodes[1].id, reason: 'gap' },
+  { id: 'c2', kind: 'remove', card: r.nodes[2].id, reason: 'not needed' }
+];
+
+test('chat structure edit: ops appended, deleted note archived, new card planned, neighbours rewritten, back at gate1 without the editor pass; undo all restores', async () => {
+  const { r, requests } = await chatRig();
+  const original = (await treeOf(r)).nodes;
+  const bPath = r.nodes[2].path;
+  const bRaw = r.raw(2);
+  const editsBefore = r.stat.planEdit.length;
+  requests.card.length = 0;
+  const ops = CHAT_OPS(r);
+  const out = await r.runs.editStructureAtReview(r.mapPath, ops, await expectOf(r), 'returned line');
+  await settle();
+  same(out.applied, ['c1', 'c2']); same(out.refused, []); assert.equal(out.affected, 1);
+  const { s, nodes } = await treeOf(r);
+  assert.equal(s.phase, 'gate1'); assert.equal(s.status, 'running'); assert.equal(s.planOpening, 'returned line');
+  assert.equal(r.stat.planEdit.length, editsBefore, 'the editor pass did not run');
+  assert.equal(s.planEdited, true);
+  same(s.structureEdit.applied.map(a => a.id), ['c1', 'c2']);
+  const created = s.order[2];
+  assert.equal(nodes[2].title, 'ChatChapter');
+  same(requests.card.map(q => q.card.id), [created], 'only the new card is planned');
+  const archived = s.structureEdit.archived[r.nodes[2].id];
+  assert.match(archived, /\/Archive\//);
+  assert.ok(!r.contents.has(bPath)); assert.match(r.contents.get(archived), /title: SecretTitleB/);
+  assert.ok(r.contents.get(archived).includes(bRaw.slice(bRaw.indexOf('\n---\n') + 5)), 'its text is kept');
+  await r.runs.undoStructureEdit(r.mapPath, 'all');
+  await settle();
+  const back = await treeOf(r);
+  same(back.nodes.map(n => [n.parentId, n.title]), original.map(n => [n.parentId, n.title]));
+  same(back.s.order.filter(id => id !== created), original.map(n => n.id));
+});
+
+test('chat structure edit: a remove-only change costs no AI call and rewrites the neighbours', async () => {
+  const { r, requests } = await chatRig();
+  const calls = () => r.stat.plan.length + r.stat.planEdit.length + requests.card.length;
+  const before = calls();
+  const out = await r.runs.editStructureAtReview(r.mapPath, [CHAT_OPS(r)[1]], await expectOf(r), 'x');
+  await settle();
+  assert.equal(out.affected, 0); assert.equal(calls(), before);
+  const s = await r.state();
+  assert.equal(s.phase, 'gate1'); same(s.order, [r.nodes[0].id, r.nodes[1].id]);
+});
+
+test('chat structure edit: a stale tree, wrong gate, runId, phase start or a running drive is refused and nothing is written', async () => {
+  const { r } = await chatRig();
+  const ex = await expectOf(r);
+  const files = () => JSON.stringify([...r.contents.entries()].map(([k, v]) => [k, noTrace(v)]));
+  const snap = files();
+  const ops = CHAT_OPS(r);
+  assert.equal(await codeOf(r.runs.editStructureAtReview(r.mapPath, ops, { ...ex, nodes: ex.nodes.slice(1) }, 'x')), 'stale');
+  assert.equal(await codeOf(r.runs.editStructureAtReview(r.mapPath, ops, { ...ex, runId: 'other' }, 'x')), 'not_gate1');
+  assert.equal(await codeOf(r.runs.editStructureAtReview(r.mapPath, ops, { ...ex, phaseStartedAt: 'other' }, 'x')), 'not_gate1');
+  assert.equal(files(), snap);
+  const stateRaw = JSON.stringify((await mapNow(r)).bookPipeline).replace(/,?"gateTrace":\[[^\]]*\]/, '');
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'writing'; });
+  assert.equal(await codeOf(r.runs.editStructureAtReview(r.mapPath, ops, ex, 'x')), 'not_gate1');
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.phase = 'gate1'; });
+  assert.ok((await r.state()).structureEdit === undefined);
+  assert.ok(stateRaw.length > 0);
+  const gate = defer();
+  const busy = await structureRig(() => [], { script: { card: async () => { await gate.promise; return { covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'x' }] }; } } });
+  const started = busy.r.runs.start(busy.r.mapPath);
+  await settle();
+  assert.equal(await codeOf(busy.r.runs.editStructureAtReview(busy.r.mapPath, CHAT_OPS(busy.r), ex, 'x')), 'busy');
+  gate.resolve(); await started.catch(() => undefined); await settle();
+});

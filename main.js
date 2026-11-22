@@ -50694,6 +50694,15 @@ function resetAffected(next, affected) {
   }
   next.revision++;
 }
+function restructureAtReview(data, now, affected, opening) {
+  if (data.phase !== "gate1" || data.status !== "running" || !data.planReview) return data;
+  const next = clone2(data);
+  next.phase = "planning";
+  next.phaseStartedAt = now;
+  if (opening) next.planOpening = opening;
+  resetAffected(next, affected);
+  return next;
+}
 function startTrial(data, now) {
   var _a2;
   if (data.phase !== "gate1" || data.status !== "running" || !data.planReview || !((_a2 = data.trial) == null ? void 0 : _a2.length)) return data;
@@ -56251,6 +56260,19 @@ function undoAffected(rootId, current, after, applied, picked) {
   for (const n of after) if (kindBefore.has(n.id) && kindBefore.get(n.id) !== kindAfter.get(n.id)) affected.add(n.id);
   return affected;
 }
+function reviewAffected(rootId, before, after, applied) {
+  const kindOf = (list2) => new Map(list2.map((n) => [n.id, n.parentId === null ? "root" : n.parentId === rootId ? "chapter" : "section"]));
+  const kindBefore = kindOf(before);
+  const kindAfter = kindOf(after);
+  const live2 = new Set(after.map((n) => n.id));
+  const affected = /* @__PURE__ */ new Set();
+  for (const a of applied) {
+    if (a.op.kind === "add" && live2.has(a.op.ref)) affected.add(a.op.ref);
+    if (a.op.kind === "move" && live2.has(a.op.card)) affected.add(a.op.card);
+  }
+  for (const n of after) if (kindBefore.has(n.id) && kindBefore.get(n.id) !== kindAfter.get(n.id)) affected.add(n.id);
+  return affected;
+}
 
 // experiences/visual-map/book-pipeline-run.ts
 var replacementsOf = (edits, ids2) => edits.filter((edit) => ids2.includes(edit.id)).map((edit) => edit.replacement);
@@ -57009,6 +57031,94 @@ var BookPipelineRuns = class {
         if (id !== drive.rootId && !affected.has(id)) drive.planSkipped.add(id);
       this.log(drive, "gate1", "-", "plan", `undo_structure:${ids2.length}`);
     });
+  }
+  /**
+   * At the plan review (gate 1, before the trial): applies the structure ops the owner asked for in chat. `expect` is the run and tree the
+   * proposal was made on; a different run or phase start is refused "not_gate1", a different tree "stale", and a drive of the map "busy"; a
+   * refusal writes nothing. Removed notes are parked in Archive. The ops are appended to the gate's list (so 還原 works on them), only the
+   * cards they touched are planned again (the editor's pass does not run), and the run returns to gate 1. Resolves with what was applied.
+   */
+  async editStructureAtReview(mapPath, ops, expect, opening) {
+    const result = { applied: [], refused: [], affected: 0 };
+    await this.gateEnter("editStructure", mapPath, async (drive) => {
+      var _a2;
+      const data = await this.openSaved(drive, mapPath);
+      if (data.phase !== "gate1" || data.status !== "running" || !data.planReview || data.runId !== expect.runId || data.phaseStartedAt !== expect.phaseStartedAt)
+        throw new BookPipelineRunError("not_gate1");
+      if (!this.ports.editBookStructure) throw new BookPipelineRunError("missing");
+      const order = effectiveOrder(data);
+      const baseNodes = order.map((id) => {
+        var _a3, _b2, _c;
+        return {
+          id,
+          parentId: (_a3 = drive.parents.get(id)) != null ? _a3 : null,
+          title: (_c = (_b2 = drive.cards.get(id)) == null ? void 0 : _b2.title) != null ? _c : ""
+        };
+      });
+      if (JSON.stringify(baseNodes) !== JSON.stringify(expect.nodes)) throw new BookPipelineRunError("stale");
+      const sim = simulateStructure(
+        { rootId: drive.rootId, nodes: baseNodes },
+        ops,
+        await this.lockedCards(drive, order)
+      );
+      result.refused = sim.rejected.map((r) => ({ id: r.op.id, code: r.code }));
+      if (!sim.applied.length) return;
+      let affected = [];
+      const { work, next, archived } = this.structureWork(drive, sim, baseNodes, [], (state, parts) => {
+        var _a3;
+        const old = state.structureEdit;
+        affected = [...reviewAffected(drive.rootId, baseNodes, parts.nodes, parts.applied)];
+        return restructureAtReview(
+          {
+            ...state,
+            order: parts.order,
+            accepted: [...parts.order],
+            chapters: parts.chapters,
+            ...state.trial ? { trial: parts.trial } : {},
+            structureEdit: {
+              ...old != null ? old : { runId: state.runId, rejected: [], before: { rootId: drive.rootId, nodes: baseNodes } },
+              applied: [...(_a3 = old == null ? void 0 : old.applied) != null ? _a3 : [], ...parts.applied],
+              archived: { ...old == null ? void 0 : old.archived, ...parts.archived }
+            }
+          },
+          this.ports.now(),
+          affected,
+          opening
+        );
+      });
+      drive.structureBusy = true;
+      try {
+        let outcome = { ok: false, code: "cancelled" };
+        await this.ports.mutate(async () => {
+          var _a3, _b2, _c;
+          if (this.dead(drive)) return;
+          outcome = (_c = await ((_b2 = (_a3 = this.ports).editBookStructure) == null ? void 0 : _b2.call(_a3, mapPath, work))) != null ? _c : outcome;
+        });
+        if (!outcome.ok) {
+          this.log(drive, "structure_chat_failed", "-", "plan", outcome.code);
+          if (outcome.rollbackFailed) throw new Error("structure_rollback");
+          throw new BookPipelineRunError(this.dead(drive) ? "disposed" : "stale");
+        }
+        await drive.store.commit((state) => ({ state: next(state), accepted: true }));
+        const map = await this.ports.readMap(mapPath);
+        drive.cards.clear();
+        drive.stages.clear();
+        drive.skippedRefreshed = false;
+        await this.load(drive, map, effectiveOrder(drive.store.state), new Set(drive.store.state.autoRoles));
+        drive.members = new Set(map.nodes.map((node) => node.id));
+        const parked = Object.entries(archived).map(([id, path]) => ({ id, path }));
+        if (parked.length && ((_a2 = this.ports.callouts) == null ? void 0 : _a2.clearNotes))
+          await this.ports.callouts.clearNotes(mapPath, data.runId, parked).catch(() => false);
+      } finally {
+        drive.structureBusy = false;
+      }
+      for (const id of effectiveOrder(drive.store.state))
+        if (id !== drive.rootId && !affected.includes(id)) drive.planSkipped.add(id);
+      result.applied = sim.applied.map((a) => a.id);
+      result.affected = affected.length;
+      this.log(drive, "gate1", "-", "plan", `edit_structure:${sim.applied.length}`);
+    });
+    return result;
   }
   /** After an undo: the materials that were homed on a merged card (recorded at the merge) point at it again, and a home that names a card by the title of an undone rename names it by the old one. Best effort; a changed line is left. */
   async pointHomesBack(drive, edit, picked) {
@@ -59074,16 +59184,7 @@ var BookPipelineRuns = class {
     if (!root || order.some((id) => !drive.cards.has(id))) return { kind: "failed", reason: "missing" };
     const before = await this.ports.readCard(root.path);
     const structure2 = this.structureOf(drive, order);
-    const locked = /* @__PURE__ */ new Set([drive.rootId]);
-    for (const id of order) {
-      const info = drive.cards.get(id);
-      if (id === drive.rootId) continue;
-      const raw = await this.ports.readCard(info.path).then(
-        (card) => card.raw,
-        () => void 0
-      );
-      if (raw === void 0 || !this.mayOverwriteCard(drive, id, raw)) locked.add(id);
-    }
+    const locked = await this.lockedCards(drive, order);
     const request = {
       ...this.base(drive, drive.config.planModel),
       bookTitle: before.title,
@@ -59168,6 +59269,20 @@ var BookPipelineRuns = class {
       }
     };
   }
+  /** Cards the editor may not remove, merge, move or rename: the owner's hand is in them (and the root). A card that cannot be read now is the owner's too. */
+  async lockedCards(drive, order) {
+    const locked = /* @__PURE__ */ new Set([drive.rootId]);
+    for (const id of order) {
+      if (id === drive.rootId) continue;
+      const info = drive.cards.get(id);
+      const raw = await this.ports.readCard(info.path).then(
+        (card) => card.raw,
+        () => void 0
+      );
+      if (raw === void 0 || !this.mayOverwriteCard(drive, id, raw)) locked.add(id);
+    }
+    return locked;
+  }
   /** The title a card has once the proposal is applied (a merged card: its target's; a removed one: none). Without a proposal: as now. */
   titleAfter(drive, sim) {
     if (!sim) return (id) => {
@@ -59220,108 +59335,15 @@ var BookPipelineRuns = class {
       }));
       return "done";
     }
-    const finalTitle = new Map(sim.result.map((n) => [n.id, n.title]));
-    const oldIds = new Set(baseNodes.map((n) => n.id));
-    const gone = baseNodes.filter((n) => !finalTitle.has(n.id)).map((n) => n.id);
-    const refs = sim.applied.flatMap((a) => a.op.kind === "add" ? [a.op] : []);
-    const idOf = /* @__PURE__ */ new Map();
-    const archived = {};
-    const homesOf = (card) => materials.filter((m) => m.home === card).map((m) => m.name);
-    let next;
-    const work = {
-      create: refs.map((op) => {
-        var _a3;
-        return { ref: op.ref, title: (_a3 = finalTitle.get(op.ref)) != null ? _a3 : op.title, summary: op.summary };
-      }),
-      archive: gone.map((id) => ({ id, path: drive.cards.get(id).path })),
-      restore: [],
-      rename: baseNodes.filter((n) => finalTitle.has(n.id) && finalTitle.get(n.id) !== n.title).map((n) => ({
-        id: n.id,
-        path: drive.cards.get(n.id).path,
-        title: finalTitle.get(n.id)
-      })),
-      edit: (map, tools) => {
-        var _a3;
-        for (const op of refs) idOf.set(op.ref, tools.created(op.ref).id);
-        const real = (id) => {
-          var _a4;
-          return (_a4 = idOf.get(id)) != null ? _a4 : id;
-        };
-        const byId = new Map(map.nodes.map((node) => [node.id, node]));
-        const goneSet = new Set(gone);
-        const renamed = new Set(
-          baseNodes.filter((n) => finalTitle.has(n.id) && finalTitle.get(n.id) !== n.title).map((n) => n.id)
-        );
-        const nodes = sim.result.map((item) => {
-          const id = real(item.id);
-          const own2 = oldIds.has(item.id) ? byId.get(id) : void 0;
-          if (oldIds.has(item.id) && !own2) throw new Error("card missing from the map");
-          const parentId = item.parentId === null ? null : real(item.parentId);
-          if (own2) return { ...own2, parentId, ...renamed.has(id) ? { path: tools.pathOf(own2.path) } : {} };
-          const made2 = tools.created(item.id);
-          return { id: made2.id, path: made2.path, parentId, x: 0, y: 0, collapsed: false };
-        });
-        for (const id of gone) {
-          const node = byId.get(id);
-          if (!node) throw new Error("card missing from the map");
-          archived[id] = tools.pathOf(node.path);
-        }
-        const survivors = new Set(nodes.map((node) => node.id));
-        if (map.nodes.some((node) => !survivors.has(node.id) && !goneSet.has(node.id))) throw new Error("map changed");
-        map.nodes = arrangeMap(nodes, void 0, void 0, layoutOf(map));
-        const order = bookReadingOrder(map);
-        if (order.length !== nodes.length || order.some((id) => !survivors.has(id))) throw new Error("order differs");
-        const parentOf2 = new Map(map.nodes.map((node) => [node.id, node.parentId]));
-        const chapters = Object.fromEntries(
-          map.nodes.map((node) => {
-            var _a4, _b2, _c;
-            return [
-              node.id,
-              { title: (_c = (_b2 = finalTitle.get(node.id)) != null ? _b2 : (_a4 = drive.cards.get(node.id)) == null ? void 0 : _a4.title) != null ? _c : "", path: node.path }
-            ];
-          })
-        );
-        const fixed2 = (op) => {
-          const out = { ...op };
-          for (const key4 of ["ref", "card", "into", "parent", "after"])
-            if (typeof out[key4] === "string") out[key4] = real(out[key4]);
-          return out;
-        };
-        const edit = {
-          ...record,
-          applied: sim.applied.map((a) => {
-            var _a4, _b2;
-            return {
-              id: a.id,
-              op: fixed2(a.op),
-              before: {
-                parent: a.before.parent === null ? null : real(a.before.parent),
-                ...a.before.after !== void 0 ? { after: real(a.before.after) } : {},
-                title: a.before.title,
-                ...a.op.kind === "merge" ? { summary: summaryText2((_b2 = (_a4 = drive.cards.get(a.op.card)) == null ? void 0 : _a4.summary) != null ? _b2 : "") } : {},
-                ...a.op.kind === "merge" && homesOf(a.op.card).length ? { homes: homesOf(a.op.card) } : {}
-              }
-            };
-          }),
-          archived
-        };
-        next = (state) => {
-          const trial = bookStructure(order, (id) => parentOf2.get(id), drive.rootId).trialOf();
-          return {
-            ...state,
-            order,
-            accepted: [...order],
-            chapters,
-            ...state.trial ? { trial } : {},
-            structureEdit: edit,
-            revision: state.revision + 1
-          };
-        };
-        const kept = (_a3 = map.bookPipeline) == null ? void 0 : _a3.gateTrace;
-        const made = next(drive.store.state);
-        map.bookPipeline = kept ? { ...made, gateTrace: kept } : made;
-      }
-    };
+    const { work, next, archived } = this.structureWork(drive, sim, baseNodes, materials, (state, parts) => ({
+      ...state,
+      order: parts.order,
+      accepted: [...parts.order],
+      chapters: parts.chapters,
+      ...state.trial ? { trial: parts.trial } : {},
+      structureEdit: { ...record, applied: parts.applied, archived: parts.archived },
+      revision: state.revision + 1
+    }));
     drive.structureBusy = true;
     try {
       let outcome = { ok: false, code: "cancelled" };
@@ -59366,6 +59388,105 @@ var BookPipelineRuns = class {
       drive.structureBusy = false;
     }
     return "done";
+  }
+  /** The one transaction both structure paths write (the notes, Map.md and `bookPipeline`); `compose` makes the new run state from what the edit produced. */
+  structureWork(drive, sim, baseNodes, materials, compose2) {
+    const finalTitle = new Map(sim.result.map((n) => [n.id, n.title]));
+    const oldIds = new Set(baseNodes.map((n) => n.id));
+    const gone = baseNodes.filter((n) => !finalTitle.has(n.id)).map((n) => n.id);
+    const refs = sim.applied.flatMap((a) => a.op.kind === "add" ? [a.op] : []);
+    const idOf = /* @__PURE__ */ new Map();
+    const archived = {};
+    const homesOf = (card) => materials.filter((m) => m.home === card).map((m) => m.name);
+    let made;
+    const work = {
+      create: refs.map((op) => {
+        var _a2;
+        return { ref: op.ref, title: (_a2 = finalTitle.get(op.ref)) != null ? _a2 : op.title, summary: op.summary };
+      }),
+      archive: gone.map((id) => ({ id, path: drive.cards.get(id).path })),
+      restore: [],
+      rename: baseNodes.filter((n) => finalTitle.has(n.id) && finalTitle.get(n.id) !== n.title).map((n) => ({
+        id: n.id,
+        path: drive.cards.get(n.id).path,
+        title: finalTitle.get(n.id)
+      })),
+      edit: (map, tools) => {
+        var _a2;
+        for (const op of refs) idOf.set(op.ref, tools.created(op.ref).id);
+        const real = (id) => {
+          var _a3;
+          return (_a3 = idOf.get(id)) != null ? _a3 : id;
+        };
+        const byId = new Map(map.nodes.map((node) => [node.id, node]));
+        const goneSet = new Set(gone);
+        const renamed = new Set(
+          baseNodes.filter((n) => finalTitle.has(n.id) && finalTitle.get(n.id) !== n.title).map((n) => n.id)
+        );
+        const nodes = sim.result.map((item) => {
+          const id = real(item.id);
+          const own2 = oldIds.has(item.id) ? byId.get(id) : void 0;
+          if (oldIds.has(item.id) && !own2) throw new Error("card missing from the map");
+          const parentId = item.parentId === null ? null : real(item.parentId);
+          if (own2) return { ...own2, parentId, ...renamed.has(id) ? { path: tools.pathOf(own2.path) } : {} };
+          const made2 = tools.created(item.id);
+          return { id: made2.id, path: made2.path, parentId, x: 0, y: 0, collapsed: false };
+        });
+        for (const id of gone) {
+          const node = byId.get(id);
+          if (!node) throw new Error("card missing from the map");
+          archived[id] = tools.pathOf(node.path);
+        }
+        const survivors = new Set(nodes.map((node) => node.id));
+        if (map.nodes.some((node) => !survivors.has(node.id) && !goneSet.has(node.id))) throw new Error("map changed");
+        map.nodes = arrangeMap(nodes, void 0, void 0, layoutOf(map));
+        const order = bookReadingOrder(map);
+        if (order.length !== nodes.length || order.some((id) => !survivors.has(id))) throw new Error("order differs");
+        const parentOf2 = new Map(map.nodes.map((node) => [node.id, node.parentId]));
+        const chapters = Object.fromEntries(
+          map.nodes.map((node) => {
+            var _a3, _b2, _c;
+            return [
+              node.id,
+              { title: (_c = (_b2 = finalTitle.get(node.id)) != null ? _b2 : (_a3 = drive.cards.get(node.id)) == null ? void 0 : _a3.title) != null ? _c : "", path: node.path }
+            ];
+          })
+        );
+        const fixed2 = (op) => {
+          const out = { ...op };
+          for (const key4 of ["ref", "card", "into", "parent", "after"])
+            if (typeof out[key4] === "string") out[key4] = real(out[key4]);
+          return out;
+        };
+        const applied = sim.applied.map((a) => {
+          var _a3, _b2;
+          return {
+            id: a.id,
+            op: fixed2(a.op),
+            before: {
+              parent: a.before.parent === null ? null : real(a.before.parent),
+              ...a.before.after !== void 0 ? { after: real(a.before.after) } : {},
+              title: a.before.title,
+              ...a.op.kind === "merge" ? { summary: summaryText2((_b2 = (_a3 = drive.cards.get(a.op.card)) == null ? void 0 : _a3.summary) != null ? _b2 : "") } : {},
+              ...a.op.kind === "merge" && homesOf(a.op.card).length ? { homes: homesOf(a.op.card) } : {}
+            }
+          };
+        });
+        made = (state) => {
+          const trial = bookStructure(order, (id) => parentOf2.get(id), drive.rootId).trialOf();
+          const nodes2 = sim.result.map((item) => ({
+            id: real(item.id),
+            parentId: item.parentId === null ? null : real(item.parentId),
+            title: item.title
+          }));
+          return compose2(state, { order, chapters, trial, nodes: nodes2, applied, archived });
+        };
+        const kept = (_a2 = map.bookPipeline) == null ? void 0 : _a2.gateTrace;
+        const done = made(drive.store.state);
+        map.bookPipeline = kept ? { ...done, gateTrace: kept } : done;
+      }
+    };
+    return { work, next: (state) => made(state), archived };
   }
   /** A card's children: a chapter's are its sections (every level below it), the preface's the chapters, a section has none. */
   childCardsOf(drive, nodeId) {
@@ -115345,6 +115466,9 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   undoBookStructure(mapPath, opIds) {
     return this.bookPipelineRuns.undoStructureEdit(mapPath, opIds);
+  }
+  editBookStructureAtReview(mapPath, ops, expect, opening) {
+    return this.bookPipelineRuns.editStructureAtReview(mapPath, ops, expect, opening);
   }
   confirmBookGate1(mapPath) {
     return this.bookPipelineRuns.confirmGate1(mapPath);

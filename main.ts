@@ -22,6 +22,7 @@ import {
   type BookRerunResult,
   type NotesApplyResult
 } from "./experiences/visual-map/book-pipeline-run";
+import type { StructureNode, StructureOp } from "./core/book-pipeline/structure-edit";
 import { bookErrorReason, bookRefusalText } from "./experiences/visual-map/book-pipeline-ui";
 import { backupNoteFile } from "./experiences/visual-map/note-backup";
 import { writeOpenIssuesFile } from "./experiences/visual-map/book-open-issues-file";
@@ -2347,6 +2348,14 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   undoBookStructure(mapPath: string, opIds: readonly string[] | "all"): Promise<void> {
     return this.bookPipelineRuns.undoStructureEdit(mapPath, opIds);
+  }
+  editBookStructureAtReview(
+    mapPath: string,
+    ops: readonly StructureOp[],
+    expect: { runId: string; phaseStartedAt: string; nodes: readonly StructureNode[] },
+    opening: string
+  ): ReturnType<BookPipelineRuns["editStructureAtReview"]> {
+    return this.bookPipelineRuns.editStructureAtReview(mapPath, ops, expect, opening);
   }
   confirmBookGate1(mapPath: string): Promise<void> {
     return this.bookPipelineRuns.confirmGate1(mapPath);

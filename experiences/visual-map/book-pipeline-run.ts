@@ -100,6 +100,7 @@ import {
   startTrial,
   backToPlan,
   undoStructure,
+  restructureAtReview,
   stopRun,
   failRun,
   type PipelineAction,
@@ -296,12 +297,26 @@ import {
   simulateStructure,
   undoClosure,
   undoAffected,
+  reviewAffected,
+  type AppliedOp,
   type SimulatedStructure,
   type StructureNode,
   type StructureOp
 } from "../../core/book-pipeline/structure-edit";
 import { arrangeMap, layoutOf } from "../../map-layout";
 import type { StructureResult, StructureWork } from "./book-structure-port";
+
+/** What one structure edit produced, for the caller to build the new run state from. */
+interface StructureParts {
+  order: string[];
+  chapters: Record<string, { title: string; path: string }>;
+  trial: BookPipelineData["trial"];
+  /** The cards after the edit (the simulated tree, real ids), with their new titles. */
+  nodes: StructureNode[];
+  /** The ops that were applied, with the real ids of any new cards. */
+  applied: AppliedOp[];
+  archived: Record<string, string>;
+}
 import {
   bodyStateRaw,
   integrityFpRaw,
@@ -1564,6 +1579,101 @@ export class BookPipelineRuns {
         if (id !== drive.rootId && !affected.has(id)) drive.planSkipped.add(id);
       this.log(drive, "gate1", "-", "plan", `undo_structure:${ids.length}`);
     });
+  }
+
+  /**
+   * At the plan review (gate 1, before the trial): applies the structure ops the owner asked for in chat. `expect` is the run and tree the
+   * proposal was made on; a different run or phase start is refused "not_gate1", a different tree "stale", and a drive of the map "busy"; a
+   * refusal writes nothing. Removed notes are parked in Archive. The ops are appended to the gate's list (so 還原 works on them), only the
+   * cards they touched are planned again (the editor's pass does not run), and the run returns to gate 1. Resolves with what was applied.
+   */
+  async editStructureAtReview(
+    mapPath: string,
+    ops: readonly StructureOp[],
+    expect: { runId: string; phaseStartedAt: string; nodes: readonly StructureNode[] },
+    opening: string
+  ): Promise<{ applied: string[]; refused: { id: string; code: string }[]; affected: number }> {
+    const result = { applied: [] as string[], refused: [] as { id: string; code: string }[], affected: 0 };
+    await this.gateEnter("editStructure", mapPath, async drive => {
+      const data = await this.openSaved(drive, mapPath);
+      if (
+        data.phase !== "gate1" ||
+        data.status !== "running" ||
+        !data.planReview ||
+        data.runId !== expect.runId ||
+        data.phaseStartedAt !== expect.phaseStartedAt
+      )
+        throw new BookPipelineRunError("not_gate1");
+      if (!this.ports.editBookStructure) throw new BookPipelineRunError("missing");
+      const order = effectiveOrder(data);
+      const baseNodes: StructureNode[] = order.map(id => ({
+        id,
+        parentId: drive.parents.get(id) ?? null,
+        title: drive.cards.get(id)?.title ?? ""
+      }));
+      if (JSON.stringify(baseNodes) !== JSON.stringify(expect.nodes)) throw new BookPipelineRunError("stale");
+      const sim = simulateStructure(
+        { rootId: drive.rootId, nodes: baseNodes },
+        ops,
+        await this.lockedCards(drive, order)
+      );
+      result.refused = sim.rejected.map(r => ({ id: r.op.id, code: r.code }));
+      if (!sim.applied.length) return;
+      let affected: string[] = [];
+      const { work, next, archived } = this.structureWork(drive, sim, baseNodes, [], (state, parts) => {
+        const old = state.structureEdit;
+        affected = [...reviewAffected(drive.rootId, baseNodes, parts.nodes, parts.applied)];
+        return restructureAtReview(
+          {
+            ...state,
+            order: parts.order,
+            accepted: [...parts.order],
+            chapters: parts.chapters,
+            ...(state.trial ? { trial: parts.trial } : {}),
+            structureEdit: {
+              ...(old ?? { runId: state.runId, rejected: [], before: { rootId: drive.rootId, nodes: baseNodes } }),
+              applied: [...(old?.applied ?? []), ...parts.applied],
+              archived: { ...old?.archived, ...parts.archived }
+            }
+          },
+          this.ports.now(),
+          affected,
+          opening
+        );
+      });
+      drive.structureBusy = true;
+      try {
+        let outcome: StructureResult = { ok: false, code: "cancelled" };
+        await this.ports.mutate(async () => {
+          if (this.dead(drive)) return;
+          outcome = (await this.ports.editBookStructure?.(mapPath, work)) ?? outcome;
+        });
+        if (!outcome.ok) {
+          this.log(drive, "structure_chat_failed", "-", "plan", outcome.code);
+          if (outcome.rollbackFailed) throw new Error("structure_rollback");
+          throw new BookPipelineRunError(this.dead(drive) ? "disposed" : "stale");
+        }
+        await drive.store.commit(state => ({ state: next(state), accepted: true }));
+        const map = await this.ports.readMap(mapPath);
+        drive.cards.clear();
+        drive.stages.clear();
+        drive.skippedRefreshed = false;
+        await this.load(drive, map, effectiveOrder(drive.store.state), new Set(drive.store.state.autoRoles));
+        drive.members = new Set(map.nodes.map(node => node.id));
+        const parked = Object.entries(archived).map(([id, path]) => ({ id, path }));
+        if (parked.length && this.ports.callouts?.clearNotes)
+          await this.ports.callouts.clearNotes(mapPath, data.runId, parked).catch(() => false);
+      } finally {
+        drive.structureBusy = false;
+      }
+      // The other cards' neighbour lines and numbers follow the new order (a program rewrite; the loop's first round does it).
+      for (const id of effectiveOrder(drive.store.state))
+        if (id !== drive.rootId && !affected.includes(id)) drive.planSkipped.add(id);
+      result.applied = sim.applied.map(a => a.id);
+      result.affected = affected.length;
+      this.log(drive, "gate1", "-", "plan", `edit_structure:${sim.applied.length}`);
+    });
+    return result;
   }
 
   /** After an undo: the materials that were homed on a merged card (recorded at the merge) point at it again, and a home that names a card by the title of an undone rename names it by the old one. Best effort; a changed line is left. */
@@ -3855,18 +3965,7 @@ export class BookPipelineRuns {
     if (!root || order.some(id => !drive.cards.has(id))) return { kind: "failed", reason: "missing" };
     const before = await this.ports.readCard(root.path);
     const structure = this.structureOf(drive, order);
-    // Cards the editor may not remove, merge, move or rename: the owner's hand is in them (and the root).
-    const locked = new Set<string>([drive.rootId]);
-    for (const id of order) {
-      const info = drive.cards.get(id) as CardInfo;
-      if (id === drive.rootId) continue;
-      // A card that cannot be read now is treated as the owner's: the editor may not touch it.
-      const raw = await this.ports.readCard(info.path).then(
-        card => card.raw,
-        () => undefined
-      );
-      if (raw === undefined || !this.mayOverwriteCard(drive, id, raw)) locked.add(id);
-    }
+    const locked = await this.lockedCards(drive, order);
     const request: GlobalPlanRequest = {
       ...this.base(drive, drive.config.planModel),
       bookTitle: before.title,
@@ -3958,6 +4057,21 @@ export class BookPipelineRuns {
     };
   }
 
+  /** Cards the editor may not remove, merge, move or rename: the owner's hand is in them (and the root). A card that cannot be read now is the owner's too. */
+  private async lockedCards(drive: Drive, order: readonly string[]): Promise<Set<string>> {
+    const locked = new Set<string>([drive.rootId]);
+    for (const id of order) {
+      if (id === drive.rootId) continue;
+      const info = drive.cards.get(id) as CardInfo;
+      const raw = await this.ports.readCard(info.path).then(
+        card => card.raw,
+        () => undefined
+      );
+      if (raw === undefined || !this.mayOverwriteCard(drive, id, raw)) locked.add(id);
+    }
+    return locked;
+  }
+
   /** The title a card has once the proposal is applied (a merged card: its target's; a removed one: none). Without a proposal: as now. */
   private titleAfter(drive: Drive, sim: SimulatedStructure | undefined): (id: string) => string | undefined {
     if (!sim) return id => drive.cards.get(id)?.title;
@@ -4015,6 +4129,70 @@ export class BookPipelineRuns {
       }));
       return "done";
     }
+    const { work, next, archived } = this.structureWork(drive, sim, baseNodes, materials, (state, parts) => ({
+      ...state,
+      order: parts.order,
+      accepted: [...parts.order],
+      chapters: parts.chapters,
+      ...(state.trial ? { trial: parts.trial } : {}),
+      structureEdit: { ...record, applied: parts.applied, archived: parts.archived },
+      revision: state.revision + 1
+    }));
+    drive.structureBusy = true;
+    try {
+      let outcome: StructureResult = { ok: false, code: "cancelled" };
+      await this.ports.mutate(async () => {
+        if (!this.authorize(drive, token)()) return;
+        outcome = (await this.ports.editBookStructure?.(drive.mapPath, work)) ?? outcome;
+      });
+      if (!outcome.ok) {
+        this.log(drive, "structure_failed", "-", "plan", outcome.code);
+        if (outcome.rollbackFailed) {
+          drive.fatal = new Error("structure_rollback");
+          drive.failure = "structure_rollback";
+          return "fatal";
+        }
+        // Nothing was applied: the materials' homes go back to the cards as they are (the root's plan was written with the merge targets' titles).
+        if (sim.applied.some(a => a.op.kind === "merge")) {
+          try {
+            const now = await this.ports.readCard(rootPath);
+            await this.ports.updateNoteRawGuarded(rootPath, content => replaceBookPlanSection(content, plainSection), {
+              expectedContent: now.raw,
+              authorize: this.authorize(drive, token)
+            });
+          } catch {
+            // the homes keep the merge targets' titles; the plan reads the same
+          }
+        }
+        return "done";
+      }
+      await drive.store.commit(state => ({
+        state: next(state),
+        accepted: true
+      }));
+      const map = await this.ports.readMap(drive.mapPath);
+      drive.cards.clear();
+      drive.stages.clear();
+      drive.skippedRefreshed = false;
+      await this.load(drive, map, effectiveOrder(drive.store.state), new Set(drive.store.state.autoRoles));
+      drive.members = new Set(map.nodes.map(node => node.id));
+      const parked = Object.entries(archived).map(([id, path]) => ({ id, path }));
+      if (parked.length && this.ports.callouts?.clearNotes)
+        await this.ports.callouts.clearNotes(drive.mapPath, runId, parked).catch(() => false);
+    } finally {
+      drive.structureBusy = false;
+    }
+    return "done";
+  }
+
+  /** The one transaction both structure paths write (the notes, Map.md and `bookPipeline`); `compose` makes the new run state from what the edit produced. */
+  private structureWork(
+    drive: Drive,
+    sim: SimulatedStructure,
+    baseNodes: StructureNode[],
+    materials: readonly { name: string; home: string }[],
+    compose: (state: BookPipelineData, parts: StructureParts) => BookPipelineData
+  ): { work: StructureWork; next: (state: BookPipelineData) => BookPipelineData; archived: Record<string, string> } {
     const finalTitle = new Map(sim.result.map(n => [n.id, n.title]));
     const oldIds = new Set(baseNodes.map(n => n.id));
     const gone = baseNodes.filter(n => !finalTitle.has(n.id)).map(n => n.id);
@@ -4022,7 +4200,7 @@ export class BookPipelineRuns {
     const idOf = new Map<string, string>();
     const archived: Record<string, string> = {};
     const homesOf = (card: string): string[] => materials.filter(m => m.home === card).map(m => m.name);
-    let next: ((state: BookPipelineData) => BookPipelineData) | undefined;
+    let made: ((state: BookPipelineData) => BookPipelineData) | undefined;
     const work: StructureWork = {
       create: refs.map(op => ({ ref: op.ref, title: finalTitle.get(op.ref) ?? op.title, summary: op.summary })),
       archive: gone.map(id => ({ id, path: (drive.cards.get(id) as CardInfo).path })),
@@ -4074,83 +4252,32 @@ export class BookPipelineRuns {
             if (typeof out[key] === "string") out[key] = real(out[key]);
           return out as unknown as StructureOp;
         };
-        const edit: StructureEditState = {
-          ...record,
-          applied: sim.applied.map(a => ({
-            id: a.id,
-            op: fixed(a.op),
-            before: {
-              parent: a.before.parent === null ? null : real(a.before.parent),
-              ...(a.before.after !== undefined ? { after: real(a.before.after) } : {}),
-              title: a.before.title,
-              ...(a.op.kind === "merge" ? { summary: summaryText(drive.cards.get(a.op.card)?.summary ?? "") } : {}),
-              ...(a.op.kind === "merge" && homesOf(a.op.card).length ? { homes: homesOf(a.op.card) } : {})
-            }
-          })),
-          archived
-        };
-        next = state => {
+        const applied: AppliedOp[] = sim.applied.map(a => ({
+          id: a.id,
+          op: fixed(a.op),
+          before: {
+            parent: a.before.parent === null ? null : real(a.before.parent),
+            ...(a.before.after !== undefined ? { after: real(a.before.after) } : {}),
+            title: a.before.title,
+            ...(a.op.kind === "merge" ? { summary: summaryText(drive.cards.get(a.op.card)?.summary ?? "") } : {}),
+            ...(a.op.kind === "merge" && homesOf(a.op.card).length ? { homes: homesOf(a.op.card) } : {})
+          }
+        }));
+        made = state => {
           const trial = bookStructure(order, id => parentOf.get(id), drive.rootId).trialOf();
-          return {
-            ...state,
-            order,
-            accepted: [...order],
-            chapters,
-            ...(state.trial ? { trial } : {}),
-            structureEdit: edit,
-            revision: state.revision + 1
-          };
+          const nodes = sim.result.map(item => ({
+            id: real(item.id),
+            parentId: item.parentId === null ? null : real(item.parentId),
+            title: item.title
+          }));
+          return compose(state, { order, chapters, trial, nodes, applied, archived });
         };
         const kept = (map.bookPipeline as { gateTrace?: string[] } | undefined)?.gateTrace;
-        const made = next(drive.store.state);
-        map.bookPipeline = kept ? { ...made, gateTrace: kept } : made;
+        const done = made(drive.store.state);
+        map.bookPipeline = kept ? { ...done, gateTrace: kept } : done;
       }
     };
-    drive.structureBusy = true;
-    try {
-      let outcome: StructureResult = { ok: false, code: "cancelled" };
-      await this.ports.mutate(async () => {
-        if (!this.authorize(drive, token)()) return;
-        outcome = (await this.ports.editBookStructure?.(drive.mapPath, work)) ?? outcome;
-      });
-      if (!outcome.ok) {
-        this.log(drive, "structure_failed", "-", "plan", outcome.code);
-        if (outcome.rollbackFailed) {
-          drive.fatal = new Error("structure_rollback");
-          drive.failure = "structure_rollback";
-          return "fatal";
-        }
-        // Nothing was applied: the materials' homes go back to the cards as they are (the root's plan was written with the merge targets' titles).
-        if (sim.applied.some(a => a.op.kind === "merge")) {
-          try {
-            const now = await this.ports.readCard(rootPath);
-            await this.ports.updateNoteRawGuarded(rootPath, content => replaceBookPlanSection(content, plainSection), {
-              expectedContent: now.raw,
-              authorize: this.authorize(drive, token)
-            });
-          } catch {
-            // the homes keep the merge targets' titles; the plan reads the same
-          }
-        }
-        return "done";
-      }
-      await drive.store.commit(state => ({
-        state: (next as (s: BookPipelineData) => BookPipelineData)(state),
-        accepted: true
-      }));
-      const map = await this.ports.readMap(drive.mapPath);
-      drive.cards.clear();
-      drive.stages.clear();
-      drive.skippedRefreshed = false;
-      await this.load(drive, map, effectiveOrder(drive.store.state), new Set(drive.store.state.autoRoles));
-      drive.members = new Set(map.nodes.map(node => node.id));
-      const parked = Object.entries(archived).map(([id, path]) => ({ id, path }));
-      if (parked.length && this.ports.callouts?.clearNotes)
-        await this.ports.callouts.clearNotes(drive.mapPath, runId, parked).catch(() => false);
-    } finally {
-      drive.structureBusy = false;
-    }
-    return "done";
+    return { work, next: state => (made as (s: BookPipelineData) => BookPipelineData)(state), archived };
   }
 
   /** A card's children: a chapter's are its sections (every level below it), the preface's the chapters, a section has none. */

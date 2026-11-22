@@ -3508,6 +3508,20 @@ export const en = {
     'The whole-book summary is open. Edit the whole-book plan in the root note, or the plan in a chapter or section note, then press "Direction is right, start writing".',
   "ui.book_bar_ai_0_1": "AI fixing {0} · still open {1}",
   "ui.book_bar_done_0_1_2": "{0} chapters · AI fixed {1} places · {2} still open",
+  "ui.book_phase_fix_again": "AI fixing",
+  "ui.book_bar_fix_again_0_1_2": "AI fixing {0} / {1} · still open {2}",
+  "ui.book_fix_again": "Fix another round",
+  "ui.book_fix_again_title": "Let the AI fix another round?",
+  "ui.book_fix_again_body_0_1_2":
+    "{0} chapters still have {1} AI proofread problems. Each chapter gets one fix and one re-check, about {2} AI calls. If the call budget is short, the missing part is added.",
+  "ui.book_fix_again_body_book_0_1":
+    "The whole-book proofread still has {0} problems. It gets one fix and one re-check, about {1} AI calls. If the call budget is short, the missing part is added.",
+  "ui.book_fix_again_note_0_1":
+    "{0} of them were already fixed for 2 rounds and may still not go away. {1} more are chapter statuses (proofread not passed, pictures that do not match); this round does not touch them.",
+  "ui.book_fix_again_note_stubborn_0": "{0} of them were already fixed for 2 rounds and may still not go away.",
+  "ui.book_fix_again_note_status_0":
+    "{0} more are chapter statuses (proofread not passed, pictures that do not match); this round does not touch them.",
+  "ui.book_fix_again_go": "Start fixing",
   "ui.book_bar_open_issues": "See what is still open",
   "ui.book_bar_open_issues_missing": 'The "Still open" page was not found; it may have been renamed or moved.',
   "ui.book_step_self_check": "Author self-check",

@@ -68,6 +68,10 @@ import {
   PLAN_EDIT_BUSY,
   type PlanEditToken,
   abandonAi,
+  closeAiRound,
+  fixAgainPlan,
+  reopenAiRound,
+  rekeyBookProof,
   aiChapterDue,
   applyAiFailure,
   applyAiFix,
@@ -230,7 +234,7 @@ import {
   type CoverRecordValue
 } from "../../core/book-pipeline/cover-block";
 import type { ReasoningLevel } from "../../ai/types";
-import type { ContentLanguage } from "../../i18n";
+import { instructionLanguageOf, type ContentLanguage } from "../../i18n";
 import type { MapDocument } from "../../map-model";
 import { isPlaceholder } from "../../core/note-placeholder";
 import type { NotePatch } from "../../repository";
@@ -245,6 +249,7 @@ import {
   pictureShortfallToken,
   captionLatinIssue,
   pictureMismatchToken,
+  splitPictureIssue,
   PICTURE_LIMITED_TOKEN,
   stripImageLines,
   fillSlotMarkers,
@@ -612,6 +617,8 @@ export interface BookPipelineProgress {
   steps?: BookStepCounts;
   /** Memory only: the single-card rerun running now and when it began (ms); gone when it ends, whatever way it ended. */
   rerun?: { nodeId: string; startedAt: number };
+  /** Memory only: a "fix again" round is running: slots finished of the slots it works on (the bar's "7 / 20"). */
+  again?: { done: number; total: number };
   /** Memory only: a gate button press is waiting for the drive that reached the gate to finish ending. */
   gateWaiting?: true;
 }
@@ -698,6 +705,8 @@ interface Drive {
   overwrite: Map<string, { runId: string; operation: string; fingerprint: string }>;
   /** In memory only: the single-card rerun in progress. */
   rerun?: { nodeId: string; startedAt: number };
+  /** In memory only: the "fix again" round in progress (slots finished / slots to work on). */
+  again?: { done: number; total: number };
   /** The plan a card's plan step wrote in this drive. */
   plans: Map<string, CardPlanResult>;
   /** Chapters this drive's plan step left alone (hand-edited, unknown or kept): their previous/next lines are refreshed by the program. */
@@ -1874,6 +1883,135 @@ export class BookPipelineRuns {
   }
 
   /**
+   * One more fix-and-check round over a finished book (the "fix again" button): every chapter whose AI proofread left fixable problems
+   * gets one fix and one check, then the whole-book proofread the same way. The book stays done; the limit is raised to cover the calls
+   * when it is short. A round cut short (stop, out of budget, unload) is closed with the problems the slot had before it, so the counts
+   * the bar and the page show never move except by a finished round. Refused ("nothing") when no problem can be fixed.
+   */
+  async fixAgain(mapPath: string): Promise<void> {
+    return this.enter(mapPath, async drive => {
+      if (!this.ports.aiProof || !this.ports.aiFix || !this.ports.aiBookProof)
+        throw new BookPipelineRunError("nothing");
+      const data = await this.openSaved(drive, mapPath, { allowDone: true });
+      if (data.phase !== "done") throw new BookPipelineRunError("not_gate");
+      if (!fixAgainPlan(data, 0).items) throw new BookPipelineRunError("nothing");
+      // Only the units that will really run are counted (the same key check the round makes: a hand-edited chapter is skipped), so the limit is raised for them alone.
+      const chapterKey = async (id: string): Promise<string | undefined> => {
+        const info = drive.cards.get(id);
+        const card = info ? await this.ports.readCard(info.path).catch(() => undefined) : undefined;
+        return card
+          ? aiProofKey(cardRevision(drive.store.state, id), aiProofBody(chapterBody(card.detail)))
+          : undefined;
+      };
+      const bookKey = async (): Promise<string | undefined> => {
+        const input = await this.bookProofInput(drive).catch(() => undefined);
+        return input ? aiProofKey(0, input.chapters.map(chapter => chapter.text).join("\n\u0000\n")) : undefined;
+      };
+      const chapterIds: string[] = [];
+      for (const id of effectiveOrder(data)) {
+        const key = await chapterKey(id);
+        if (key !== undefined && reopenAiRound(data, id, key).accepted) chapterIds.push(id);
+      }
+      const bookNow = await bookKey();
+      const withBook = bookNow !== undefined && reopenAiRound(data, undefined, bookNow).accepted;
+      if (!chapterIds.length && !withBook) throw new BookPipelineRunError("nothing");
+      // The card says about 2 calls per unit; a step may be tried up to MAX_STEP_ATTEMPTS times, so the limit leaves room for
+      // those retries (it is a cap, not a spend) and one failed call does not pause the round on "budget used up".
+      const calls = (2 * chapterIds.length + (withBook ? 2 : 0)) * MAX_STEP_ATTEMPTS;
+      await drive.store.commit(state => {
+        const short = state.budget.used + calls - state.budget.limit;
+        const next = resumeRun(short > 0 ? addBudget(state, short) : state);
+        return { state: next ?? state, accepted: true };
+      });
+      if (drive.store.state.status !== "running") throw new BookPipelineRunError("budget");
+      drive.job = async () => {
+        drive.again = { done: 0, total: chapterIds.length + (withBook ? 1 : 0) };
+        const finished = (): void => {
+          if (drive.again) drive.again.done = Math.min(drive.again.total, drive.again.done + 1);
+        };
+        const live = (): boolean =>
+          !this.dead(drive) &&
+          !drive.controller.signal.aborted &&
+          drive.fatal === undefined &&
+          drive.store.state.status === "running";
+        // The book slot first: its key is current now unless the reader edited a chapter. The chapter slots a book fix changes follow it (applyAiFix).
+        let chaptersKey: string | undefined;
+        try {
+          if (withBook && live()) {
+            const key = await bookKey();
+            const opened =
+              key !== undefined ? await drive.store.commit(state => reopenAiRound(state, undefined, key)) : undefined;
+            for (let turn = 0; opened?.accepted && turn < 10; turn++) {
+              const slot = drive.store.state.bookProof;
+              if (!slot?.again || slot.done || !live()) break;
+              await this.aiBook(drive, slot.step, true);
+            }
+            finished();
+          }
+          // The finished book proofread follows the program's own chapter fixes below (not a hand edit): its key is known to be current here.
+          const before = await bookKey();
+          if (before !== undefined && drive.store.state.bookProof?.key === before) chaptersKey = before;
+          for (const id of chapterIds) {
+            if (!live()) break;
+            const key = await chapterKey(id);
+            const opened =
+              key !== undefined ? await drive.store.commit(state => reopenAiRound(state, id, key)) : undefined;
+            if (!opened?.accepted) {
+              finished();
+              continue;
+            }
+            drive.busy.add(id);
+            try {
+              for (let turn = 0; turn < 10; turn++) {
+                const slot = drive.store.state.aiProof?.[id];
+                if (!slot?.again || slot.done || !live()) break;
+                await this.aiChapter(drive, id, slot.step, true, true);
+                // The book key follows the program's own write at once (not only when the round ends), so an unload at any point leaves it current.
+                // A chapter whose text is no longer what the program wrote (a reader edit) is left alone: the book key then stays as it is.
+                const written =
+                  chaptersKey !== undefined
+                    ? await this.ports.readCard(drive.cards.get(id)?.path ?? "").catch(() => undefined)
+                    : undefined;
+                const state = written ? bodyStateRaw(written.raw) : undefined;
+                const mine = !!written && (state === "clean" || state === "empty") && !isKeptRaw(written.raw);
+                const after = mine ? await bookKey() : undefined;
+                if (chaptersKey !== undefined && after !== undefined && after !== chaptersKey) {
+                  const rekeyed = await drive.store
+                    .commit(state => rekeyBookProof(state, chaptersKey!, after))
+                    .catch(() => undefined);
+                  if (rekeyed?.accepted) chaptersKey = after;
+                }
+              }
+            } finally {
+              drive.busy.delete(id);
+              finished();
+            }
+          }
+        } finally {
+          drive.again = undefined;
+          if (!this.dead(drive)) {
+            await drive.store
+              .commit(state => {
+                let next = effectiveOrder(state).reduce((current, id) => closeAiRound(current, id), state);
+                next = closeAiRound(next);
+                return { state: next, accepted: true };
+              })
+              .catch(() => undefined);
+            const from = chaptersKey;
+            const after = from !== undefined ? await bookKey() : undefined;
+            if (from !== undefined && after !== undefined)
+              await drive.store.commit(state => rekeyBookProof(state, from, after)).catch(() => undefined);
+            if (drive.store.state.phase === "done" && !(await this.writeClosingPage(drive)))
+              this.log(drive, "open_issues_write", "book", "proof", "failed");
+            this.syncReviewNotes(drive);
+          }
+        }
+      };
+      this.log(drive, "fix_again", "-", "proof", `calls:${calls}`);
+    });
+  }
+
+  /**
    * A finished book is read again (the map opens; the one entry for this repair): a chapter with text that the book lists but that has
    * no finished AI proofread slot (a rerun cut short by an unload: its slot was cleared or left open and nothing closed it) is closed as incomplete and the
    * closing page is written again, so the bar and the page never show the book as solved. A book with no such chapter is not touched.
@@ -1882,14 +2020,18 @@ export class BookPipelineRuns {
     if (this.disposed || !this.ports.aiProof || !this.ports.aiFix || !this.ports.aiBookProof) return;
     const read = readBookPipeline(await this.ports.readMap(mapPath));
     if (read.kind !== "usable" || read.data.phase !== "done") return;
-    if (effectiveOrder(read.data).every(id => read.data.aiProof?.[id]?.done)) return;
+    if (effectiveOrder(read.data).every(id => read.data.aiProof?.[id]?.done) && !read.data.bookProof?.again) return;
     return this.enter(mapPath, async drive => {
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       const missing: string[] = [];
+      // A round of "fix again" cut short by an unload: the slot is closed with the problems it had, not given up as incomplete.
+      const again = effectiveOrder(data).filter(id => data.aiProof?.[id]?.again && !data.aiProof[id].done);
+      const bookAgain = !!data.bookProof?.again && !data.bookProof.done;
       for (const id of effectiveOrder(data)) {
         const info = drive.cards.get(id);
         if (
           data.aiProof?.[id]?.done ||
+          data.aiProof?.[id]?.again ||
           !info ||
           (drive.stages.get(id) !== "checked" && drive.stages.get(id) !== "needs-review")
         )
@@ -1897,16 +2039,16 @@ export class BookPipelineRuns {
         const card = await this.ports.readCard(info.path).catch(() => undefined);
         if (card && aiProofBody(chapterBody(card.detail)).trim()) missing.push(id);
       }
-      if (!missing.length || this.dead(drive)) return;
-      await drive.store.commit(state =>
-        state.phase === "done"
-          ? {
-              state: missing.reduce((next, id) => (next.aiProof?.[id]?.done ? next : abandonAi(next, id)), state),
-              accepted: true
-            }
-          : { state, accepted: false }
-      );
-      if (!(await this.writeClosingPage(drive))) this.log(drive, "open_issues_write", missing[0], "proof", "failed");
+      if ((!missing.length && !again.length && !bookAgain) || this.dead(drive)) return;
+      await drive.store.commit(state => {
+        if (state.phase !== "done") return { state, accepted: false };
+        let next = again.reduce((current, id) => closeAiRound(current, id), state);
+        if (bookAgain) next = closeAiRound(next);
+        next = missing.reduce((current, id) => (current.aiProof?.[id]?.done ? current : abandonAi(current, id)), next);
+        return { state: next, accepted: true };
+      });
+      if (!(await this.writeClosingPage(drive)))
+        this.log(drive, "open_issues_write", missing[0] ?? again[0] ?? "book", "proof", "failed");
       this.syncNotes(drive);
     });
   }
@@ -3264,7 +3406,13 @@ export class BookPipelineRuns {
    * One step of a chapter's independent AI proofread: the check (the proof model, web search) or the fix (the author model, edits
    * applied by the program). The attempt is counted before the call and saved; a stop or a text changed meanwhile drops the result.
    */
-  private async aiChapter(drive: Drive, nodeId: string, want: "proof" | "fix", rerun = false): Promise<void> {
+  private async aiChapter(
+    drive: Drive,
+    nodeId: string,
+    want: "proof" | "fix",
+    rerun = false,
+    again = false
+  ): Promise<void> {
     const info = drive.cards.get(nodeId);
     if (!info || !this.ports.aiProof || !this.ports.aiFix) return;
     const signal = drive.controller.signal;
@@ -3287,6 +3435,11 @@ export class BookPipelineRuns {
     const revision = cardRevision(drive.store.state, nodeId);
     const key = aiProofKey(revision, body);
     const stored = drive.store.state.aiProof?.[nodeId];
+    if (again && stored?.again && stored.key !== key) {
+      // The reader edited the chapter in the middle of the round: the round is closed with the problems it had, nothing is called or written.
+      await drive.store.commit(state => ({ state: closeAiRound(state, nodeId), accepted: true }));
+      return;
+    }
     const same = stored?.key === key ? stored : undefined;
     const step = same ? want : "proof";
     const begun = await drive.store.commit(state => {
@@ -3489,7 +3642,7 @@ export class BookPipelineRuns {
    * One step of the whole-book AI proofread: the check (the proof model, text only, over every chapter) or the fix (the author model; the
    * edits are applied chapter by chapter, each chapter written once). Same fences as {@link aiChapter}.
    */
-  private async aiBook(drive: Drive, want: "proof" | "fix"): Promise<void> {
+  private async aiBook(drive: Drive, want: "proof" | "fix", again = false): Promise<void> {
     if (!this.ports.aiBookProof || !this.ports.aiFix) return;
     const signal = drive.controller.signal;
     const input = await this.bookProofInput(drive).catch(() => undefined);
@@ -3507,7 +3660,7 @@ export class BookPipelineRuns {
     const same = stored?.key === key ? stored : undefined;
     const step = same ? want : "proof";
     const begun = await drive.store.commit(state => {
-      const dispatched = beginAiStep(state, {}, key, step);
+      const dispatched = beginAiStep(state, again ? { rerun: true } : {}, key, step);
       return dispatched
         ? { state: dispatched.state, accepted: true, token: dispatched.token }
         : { state, accepted: false as const, token: undefined };
@@ -3637,9 +3790,11 @@ export class BookPipelineRuns {
         changed.push(chapter.id);
       }
       let newKey: string | undefined;
+      const bodies: Record<string, string> = {};
       if (changed.length) {
         const after = await this.bookProofInput(drive);
         newKey = aiProofKey(0, joined(after.chapters.map(chapter => chapter.text)));
+        for (const chapter of after.chapters) if (changed.includes(chapter.id)) bodies[chapter.id] = chapter.text;
       }
       const done = await drive.store.commit(current =>
         applyAiFix(current, token, {
@@ -3649,7 +3804,7 @@ export class BookPipelineRuns {
           replacementOf,
           cardOf,
           refused,
-          ...(newKey ? { key: newKey, changed } : {})
+          ...(newKey ? { key: newKey, changed, bodies } : {})
         })
       );
       if (discarded) return report("dropped", { applied, pending: targets.length });
@@ -3729,7 +3884,30 @@ export class BookPipelineRuns {
                 : /^(plan|write|proof) failed/.test(issue)
                   ? "step_failed"
                   : "";
-      issues.push({ source: "chapter", chapterId: id, chapterTitle: title(id), problem: "", reason });
+      // What the status line itself says, once none of the six older causes is: the reason a person can act on (the old fallback was one vague sentence).
+      const off = splitPictureIssue(issue).off ?? [...issue.matchAll(/image_(\d+)_mismatch/g)].map(m => Number(m[1]));
+      const zh = instructionLanguageOf(drive.config.language) === "zh";
+      const pictures = zh
+        ? `第 ${off.join("、")} 張圖`
+        : `${off.length > 1 ? "Pictures" : "Picture"} ${off.join(", ")}`;
+      const found =
+        reason ||
+        (/fix interrupted/.test(issue)
+          ? "fix_interrupted"
+          : off.length
+            ? "image_mismatch"
+            : /^proof unmet/.test(issue)
+              ? "proof_unmet"
+              : /^structure unmet/.test(issue)
+                ? "structure_unmet"
+                : "");
+      issues.push({
+        source: "chapter",
+        chapterId: id,
+        chapterTitle: title(id),
+        problem: found === "image_mismatch" ? pictures : "",
+        reason: found
+      });
     }
     return { checked, issues };
   }
@@ -5832,6 +6010,7 @@ export class BookPipelineRuns {
       busyCards: [...drive.busy].filter(id => id !== "global"),
       ...(eta === undefined ? {} : { etaSeconds: eta }),
       ...(active && drive.rerun ? { rerun: { ...drive.rerun } } : {}),
+      ...(active && drive.again ? { again: { ...drive.again } } : {}),
       ...(active && drive.sub.size
         ? { current: [...drive.sub].map(([nodeId, sub]) => ({ nodeId, step: sub.step, startedAt: sub.startedAt })) }
         : {}),

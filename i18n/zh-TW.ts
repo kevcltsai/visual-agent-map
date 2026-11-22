@@ -3278,6 +3278,19 @@ export const zhTW: Record<TranslationKey, string> = {
     "已打開全書摘要。直接改根筆記的「全書企劃」或各章、各節筆記裡的「企劃」，改好再按「方向對，開始寫」。",
   "ui.book_bar_ai_0_1": "AI 修正中 {0}・仍有問題 {1}",
   "ui.book_bar_done_0_1_2": "{0} 章・AI 修了 {1} 處・仍有問題 {2} 項",
+  "ui.book_phase_fix_again": "AI 修正中",
+  "ui.book_bar_fix_again_0_1_2": "AI 修正中 {0} / {1}・仍有問題 {2}",
+  "ui.book_fix_again": "再修一輪",
+  "ui.book_fix_again_title": "讓 AI 再修一輪？",
+  "ui.book_fix_again_body_0_1_2":
+    "{0} 章還有 {1} 項 AI 校對問題，每章修一次、再查一次，大約 {2} 次 AI 呼叫。額度不夠的部分會一起加上。",
+  "ui.book_fix_again_body_book_0_1":
+    "全書校對還有 {0} 項問題，修一次、再查一次，大約 {1} 次 AI 呼叫。額度不夠的部分會一起加上。",
+  "ui.book_fix_again_note_0_1":
+    "其中 {0} 項已經修過 2 輪，可能還是修不掉。另外 {1} 項是章節狀態（校對沒過、圖片對不上），這一輪不處理。",
+  "ui.book_fix_again_note_stubborn_0": "其中 {0} 項已經修過 2 輪，可能還是修不掉。",
+  "ui.book_fix_again_note_status_0": "另外 {0} 項是章節狀態（校對沒過、圖片對不上），這一輪不處理。",
+  "ui.book_fix_again_go": "開始修",
   "ui.book_bar_open_issues": "看仍有問題",
   "ui.book_bar_open_issues_missing": "找不到「仍有問題」那一頁，可能被改名或移走了。",
   "ui.book_step_self_check": "作者自查",

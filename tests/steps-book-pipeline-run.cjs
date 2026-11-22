@@ -5429,3 +5429,323 @@ test('chat structure edit: a stale tree, wrong gate, runId, phase start or a run
   assert.equal(await codeOf(busy.r.runs.editStructureAtReview(busy.r.mapPath, CHAT_OPS(busy.r), ex, 'x')), 'busy');
   gate.resolve(); await started.catch(() => undefined); await settle();
 });
+
+// ---- P1 "fix again": one more fix-and-check round over a finished book (reopenAiRound / closeAiRound / fixAgain) ----
+const againOpen = slot => plain(slot.open.map(item => [item.reason, item.quote]));
+/** A finished book whose chapter A has one fixable problem (it is never solved: still_present) and one the AI called unfixable. `mode` decides what the re-check says during the again round. */
+const againRig = async (over = {}) => {
+  const v = pageVault(); const applied = []; const st = { again: false, mode: 'solve', hold: undefined, p2: undefined };
+  const r = await aiRig({
+    aiProof: async (request, n, run) => {
+      if (request.title !== 'SecretTitleA') return { checks: [okCheck(request)], prior: [], dropped: {} };
+      if (!st.again) st.p2 = quoteOf(request, 12, 20);
+      if (st.again && st.mode === 'solve') return { checks: [], prior: [], dropped: {} };
+      if (st.again && st.mode === 'redetect') return { checks: [{ ...probOf(request, 'P1'), quote: 'zzz none' }, { ...probOf(request, 'P2'), quote: st.p2, fixable: false, why: 'unfixable' }], prior: [], dropped: {} };
+      if (st.again && st.mode === 'hold-proof') { st.hold?.reached(); await st.hold?.promise; }
+      return { checks: [probOf(request, 'P1'), { ...probOf(request, 'P2', 12, 20), fixable: false, why: 'unfixable' }], prior: [], dropped: {} };
+    },
+    aiFix: async (request, n, run) => {
+      if (st.again && st.mode === 'fail-once') st.failOnce();
+      if (st.again && st.mode === 'hold-fix') { st.hold?.reached(); if (st.hold?.budget) for (;;) await run.admission.reserve(); await st.hold?.promise; }
+      const replacement = `Corrected${applied.length + 1}`; applied.push(replacement);
+      return [{ id: 'P1', quote: request.chapters[0].text.slice(0, 11), replacement }];
+    },
+    ...over
+  }, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  return { r, v, applied, st };
+};
+const finishedCalls = r => ({ fix: aiRuns(r, 'fix').length, proofA: aiRuns(r, 'proof', 'SecretTitleA').length, book: r.stat.ai.filter(([k]) => /book/i.test(k)).length, all: r.stat.ai.length });
+const settleRuns = async r => { while (r.runs.isRunning(r.mapPath)) await tick(); await settle(); };
+
+test('P1 fix again: the book was still_present + unfixable; one round = exactly one fix and one check for the chapter, nothing else is called; the unfixable one stays in front', async () => {
+  const { r, v, applied, st } = await againRig();
+  const before = (await r.state()).aiProof[idA(r)];
+  assert.deepEqual(plain(before.open.map(i => i.reason).sort()), ['still_present', 'unfixable']);
+  same(await invariantsOf(r, v, { applied: { [idA(r)]: applied } }), [], 'before');
+  const calls = finishedCalls(r); st.again = true;
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const after = await r.state(); const slot = after.aiProof[idA(r)];
+  const now = finishedCalls(r);
+  assert.deepEqual([now.fix - calls.fix, now.proofA - calls.proofA, now.all - calls.all], [1, 1, 2], 'one fix, one re-check, no other call (other chapters, the book)');
+  assert.deepEqual([after.phase, slot.done, slot.again, slot.pending, slot.round], ['done', true, undefined, undefined, 2]);
+  assert.deepEqual(againOpen(slot).map(x => x[0]), ['unfixable'], 'the fixed one is gone, the excluded one stays');
+  assert.equal(slot.fixed, before.fixed + 1);
+  same(await invariantsOf(r, v, { applied: { [idA(r)]: applied } }), [], 'after');
+  assert.ok(r.raw(1).includes(applied.at(-1)), 'the fix was written');
+  assert.ok(after.aiProof[r.nodes[2].id].again === undefined && !after.bookProof.again);
+});
+
+test('P1 fix again: a still-present problem after the round stays still_present (counts do not drop); the new check re-listing the unfixable one does not duplicate it', async () => {
+  const { r, v, applied, st } = await againRig();
+  st.again = true; st.mode = 'redetect';
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const slot = (await r.state()).aiProof[idA(r)];
+  assert.equal(slot.open.filter(i => i.reason === 'unfixable').length, 1, 'no duplicate of the excluded one');
+  assert.equal(slot.open[0].reason, 'unfixable', 'the original is in front');
+  same(await invariantsOf(r, v, { applied: { [idA(r)]: applied }, refusedQuotes: slot.open.map(i => i.quote) }), []);
+});
+
+test('P1 fix again: nothing fixable (all solved, or only unfixable left) is refused with "nothing"; no call, the saved state is not touched', async () => {
+  const v = pageVault();
+  const r = await aiRig({ aiProof: async request => ({ checks: [okCheck(request)], prior: [], dropped: {} }) }, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  const saved = JSON.stringify(await r.state()); const calls = r.stat.ai.length;
+  await assert.rejects(r.runs.fixAgain(r.mapPath), err => err instanceof BookPipelineRunError && err.code === 'nothing');
+  assert.equal(JSON.stringify(await r.state()), saved);
+  assert.equal(r.stat.ai.length, calls);
+});
+
+test('P1 fix again: unfixable-only chapter (excluded reasons) is not sent: refused "nothing" and the open items stay', async () => {
+  const v = pageVault();
+  const r = await aiRig({ aiProof: async request => ({ checks: request.title === 'SecretTitleA' ? [{ ...probOf(request, 'P2', 12, 20), fixable: false, why: 'sources_conflict' }] : [okCheck(request)], prior: [], dropped: {} }) }, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  const saved = JSON.stringify(await r.state());
+  await assert.rejects(r.runs.fixAgain(r.mapPath), err => err.code === 'nothing');
+  assert.equal(JSON.stringify(await r.state()), saved);
+});
+
+test('P1 fix again: a book that is not done is refused (not_gate) before anything changes', async () => {
+  const r = await aiRig({}, {});
+  await r.runs.start(r.mapPath);
+  await assert.rejects(r.runs.fixAgain(r.mapPath), err => err instanceof BookPipelineRunError && ['not_gate', 'busy'].includes(err.code));
+  r.runs.dispose();
+});
+
+test('P1 fix again: the call limit is raised to used + calls when short; no pause', async () => {
+  const { r, st } = await againRig();
+  const used = (await r.state()).budget.used;
+  await setLimit(r, used);
+  st.again = true;
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const s = await r.state();
+  assert.equal(s.budget.limit, used + 6, 'raised by what was short: 1 chapter = 2 calls, each step with room for 3 attempts');
+  assert.notEqual(s.pauseReason, 'budget');
+});
+
+test('A1 fix again: one failed fix call is retried inside the round without pausing on the budget (acceptance r1 finding)', async () => {
+  let failed = false;
+  const { r, v, applied, st } = await againRig();
+  const used = (await r.state()).budget.used;
+  await setLimit(r, used);
+  st.again = true;
+  st.mode = 'fail-once';
+  st.failOnce = () => { if (failed) return; failed = true; throw new Error('provider timeout'); };
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const s = await r.state();
+  assert.ok(failed, 'the first fix call failed');
+  assert.notEqual(s.pauseReason, 'budget', 'the retry fits in the raised limit');
+  assert.equal(s.aiProof[idA(r)].again, undefined);
+  assert.ok(r.raw(1).includes(applied.at(-1)), 'the retried fix was written');
+  same(await invariantsOf(r, v, { applied: { [idA(r)]: applied } }), [], 'after');
+});
+
+test('P1 fix again: a limit that already has room is left alone', async () => {
+  const { r, st } = await againRig();
+  const limit = (await r.state()).budget.limit; st.again = true;
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  assert.equal((await r.state()).budget.limit, limit);
+});
+
+for (const [how, at] of [['stop', 'hold-fix'], ['stop', 'hold-proof'], ['budget', 'hold-fix']]) {
+  test(`P1 fix again: ${how} during the round's ${at}: the slot is closed with the problems it had before (same open items), no again/pending, the invariants hold`, async () => {
+    const { r, v, applied, st } = await againRig();
+    const before = (await r.state()).aiProof[idA(r)];
+    st.again = true; st.mode = at; let reached = false; const hold = defer();
+    st.hold = { reached: () => { reached = true; }, promise: hold.promise, budget: how === 'budget' };
+    const running = r.runs.fixAgain(r.mapPath).catch(() => undefined);
+    while (!reached && r.runs.isRunning(r.mapPath)) await tick();
+    if (how === 'stop') { await r.runs.stop(r.mapPath); hold.resolve(); }
+    await running; await settleRuns(r);
+    const s = await r.state(); const slot = s.aiProof[idA(r)];
+    assert.ok(slot.done && !slot.again && !slot.pending && !slot.incomplete, JSON.stringify(slot));
+    assert.deepEqual(againOpen(slot), againOpen(before), 'open is what it was before the round');
+    assert.equal(s.phase, 'done');
+    if (how === 'budget') assert.equal(s.pauseReason, 'budget');
+    same(await invariantsOf(r, v, { applied: { [idA(r)]: applied }, refusedQuotes: slot.open.map(i => i.quote) }), []);
+    assert.equal(slot.open.length, before.open.length);
+  });
+}
+
+test('P1 fix again: the app closes (dispose) in the middle of the round; a new session repairFinished closes the slot (not incomplete) and the page lists the same items', async () => {
+  const { r, v, applied, st } = await againRig();
+  const before = (await r.state()).aiProof[idA(r)]; const pageBefore = pageText(v);
+  st.again = true; st.mode = 'hold-fix'; let reached = false; const hold = defer();
+  st.hold = { reached: () => { reached = true; }, promise: hold.promise };
+  const running = r.runs.fixAgain(r.mapPath).catch(() => undefined);
+  while (!reached && r.runs.isRunning(r.mapPath)) await tick();
+  r.runs.dispose(); hold.resolve(); await running; await settle();
+  const mid = (await r.state()).aiProof[idA(r)];
+  assert.ok(mid.again && !mid.done, 'the unload left the round open');
+  const again = new BookPipelineRuns(r.ports); await again.repairFinished(r.mapPath); await settle();
+  const slot = (await r.state()).aiProof[idA(r)];
+  assert.ok(slot.done && !slot.again && !slot.incomplete && !slot.pending, JSON.stringify(slot));
+  assert.deepEqual(againOpen(slot), againOpen(before));
+  assert.equal(pageText(v).split('\n').filter(l => l.startsWith('- ')).length, pageBefore.split('\n').filter(l => l.startsWith('- ')).length);
+  same(await invariantsOf(r, v, { applied: { [idA(r)]: applied }, refusedQuotes: slot.open.map(i => i.quote) }), []);
+  again.dispose();
+});
+
+test('P2 fix again: the runner tells the bar how far the round is (done / total) while it runs, and says nothing before it starts or after it ends', async () => {
+  const { r, st } = await againRig();
+  assert.equal(r.runs.getProgress(r.mapPath)?.again, undefined, 'before the round');
+  st.again = true; st.mode = 'hold-fix'; let reached = false; const hold = defer();
+  st.hold = { reached: () => { reached = true; }, promise: hold.promise };
+  const running = r.runs.fixAgain(r.mapPath).catch(() => undefined);
+  while (!reached && r.runs.isRunning(r.mapPath)) await tick();
+  assert.deepEqual(plain(r.runs.getProgress(r.mapPath).again), { done: 0, total: 1 }, 'one chapter to work on, none finished');
+  hold.resolve(); await running; await settleRuns(r);
+  assert.equal(r.runs.getProgress(r.mapPath)?.again, undefined, 'after the round');
+});
+
+test('P1 fix again: the only fixable chapter was changed by the reader (key differs): refused "nothing" with no call, no write, no limit change, the saved state untouched (R1 finding 3)', async () => {
+  const { r, st } = await againRig();
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/Corrected\d+/, m => `${m} by the reader`), {});
+  const rawBefore = r.raw(1); const calls = finishedCalls(r); const saved = JSON.stringify(await r.state()); st.again = true;
+  await assert.rejects(r.runs.fixAgain(r.mapPath), err => err instanceof BookPipelineRunError && err.code === 'nothing');
+  await settleRuns(r);
+  assert.equal(r.raw(1), rawBefore, 'nothing written');
+  assert.deepEqual(finishedCalls(r), calls, 'no call at all');
+  assert.equal(JSON.stringify(await r.state()), saved, 'no budget raise, no slot change');
+});
+
+/** A finished book where chapter A has a fixable problem the check keeps finding, and the whole-book check keeps finding one in chapter A (its fix writes there during the writing). */
+const bothRig = async () => {
+  const v = pageVault(); const st = { again: false, hold: undefined }; let n = 0;
+  const r = await aiRig({
+    aiProof: async request => request.title === 'SecretTitleA' ? { checks: [probOf(request, 'P1')], prior: [], dropped: {} } : { checks: [okCheck(request)], prior: [], dropped: {} },
+    aiBookProof: async request => ({ checks: [bookProblem(request, 2, 3)], prior: [], dropped: {} }),
+    aiFix: async request => request.targets[0].id === 'B1'
+      ? [{ id: 'B1', chapter: 2, quote: request.chapters[1].text, replacement: `BookCorrected${++n}` }]
+      : (st.hold?.reached(), await st.hold?.promise, [{ id: 'P1', quote: request.chapters[0].text.slice(0, 11), replacement: `ChapterCorrected${++n}` }])
+  }, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  return { r, v, st };
+};
+
+test('R1 fix again: the book slot and a chapter are both fixed in one round: each gets exactly one fix and one re-check, nothing is skipped as hand-edited, the limit covers both (findings 1A and 1B)', async () => {
+  const { r, v } = await bothRig();
+  const s0 = await r.state();
+  assert.ok(s0.bookProof.open.length && s0.aiProof[idA(r)].open.length, 'both have fixable problems left');
+  same(await invariantsOf(r, v), [], 'before: the program\'s own book write left the chapter slot current');
+  const calls = finishedCalls(r); const used = s0.budget.used; await setLimit(r, used);
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const s = await r.state(); const now = finishedCalls(r);
+  assert.deepEqual([now.fix - calls.fix, now.proofA - calls.proofA, now.book - calls.book, now.all - calls.all], [2, 1, 1, 4], 'one fix + one re-check for the chapter, one fix + one re-check for the book');
+  assert.equal(s.budget.limit, used + 12, 'raised for the four calls that run, each with room for 3 attempts');
+  assert.deepEqual([s.phase, s.aiProof[idA(r)].again, s.aiProof[idA(r)].done, s.bookProof.again, s.bookProof.done], ['done', undefined, true, undefined, true]);
+  assert.deepEqual([s.aiProof[idA(r)].round, s.bookProof.round], [s0.aiProof[idA(r)].round, s0.bookProof.round], 'both rounds finished (the last round again)');
+  assert.equal(s.aiProof[idA(r)].fixed, s0.aiProof[idA(r)].fixed + 1);
+  assert.equal(s.bookProof.fixed, s0.bookProof.fixed + 1);
+  same(await invariantsOf(r, v), [], 'after: the keys are current, page = bar = open items');
+  // A second round works too: the book slot followed the chapter's own fix.
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const again = finishedCalls(r);
+  assert.deepEqual([again.fix - now.fix, again.proofA - now.proofA, again.book - now.book], [2, 1, 1], 'a second press runs both again: neither slot looks hand-edited');
+});
+
+test('R1 fix again: the reader edited the only chapter that could run and the book slot too: nothing runs, the limit is not raised', async () => {
+  const { r } = await bothRig();
+  const s0 = await r.state(); const used = s0.budget.used; await setLimit(r, used);
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/(Chapter|Book)Corrected\d+/, m => `${m} by the reader`), {});
+  const calls = finishedCalls(r); const rawBefore = r.raw(1);
+  // the book slot's key no longer matches either (a chapter changed by the reader): nothing at all runs for it
+  await assert.rejects(r.runs.fixAgain(r.mapPath), err => err.code === 'nothing');
+  assert.deepEqual(finishedCalls(r), calls); assert.equal(r.raw(1), rawBefore);
+  assert.equal((await r.state()).budget.limit, used, 'no budget raise when nothing will run');
+});
+
+test('R1 fix again: the reader edits the chapter in the middle of the round (after the fix, before the re-check): the round is closed with the problems it had, no extra call, no new slot, counts do not drop', async () => {
+  const { r, v, applied, st } = await againRig({});
+  const before = (await r.state()).aiProof[idA(r)]; const pageBefore = pageText(v).split('\n').filter(l => l.startsWith('- ')).length;
+  const calls = finishedCalls(r); st.again = true;
+  const orig = r.ports.updateNoteRawGuarded; const read = r.ports.readCard; let once = false; let wrote = false; let reads = 0;
+  r.ports.updateNoteRawGuarded = async (path, transform, options) => { const out = await orig(path, transform, options); if (st.again) wrote = true; return out; };
+  // The fix's own read-back is the first read after the write; the next read (the re-check's) sees the reader's edit made just before it.
+  r.ports.readCard = async path => {
+    if (wrote && ++reads === 2 && !once) { once = true; await orig(path, c => c.replace(/Corrected\d+/, m => `${m} BY-READER`), {}); }
+    return read(path);
+  };
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const s = await r.state(); const slot = s.aiProof[idA(r)]; const now = finishedCalls(r);
+  assert.ok(once, 'the hand edit happened after the fix was written');
+  assert.deepEqual([now.fix - calls.fix, now.proofA - calls.proofA, now.all - calls.all], [1, 0, 1], 'the fix ran; no re-check and no fresh proofread call');
+  assert.ok(slot.done && !slot.again && !slot.pending && !slot.incomplete, JSON.stringify(slot));
+  assert.equal(slot.round, before.round, 'no fresh slot (round 0) was made');
+  assert.deepEqual(againOpen(slot), againOpen(before), 'open is what it was');
+  assert.equal(pageText(v).split('\n').filter(l => l.startsWith('- ')).length, pageBefore, 'the page keeps its items');
+  assert.equal(r.runs.getProgress(r.mapPath)?.again, undefined);
+  assert.ok(r.raw(1).includes('BY-READER'), 'the reader\'s text is kept');
+});
+
+test('R2 fix again: the app closes after a chapter fix wrote (at its re-check, before the round ends): the book key follows the write, so a new session repairs the slot and the next press reopens the book slot (1 fix + 1 re-check), counts stay equal', async () => {
+  const { r, v } = await bothRig();
+  const orig = r.ports.aiProof; let closed = false; let wrote = false;
+  const write = r.ports.updateNoteRawGuarded;
+  r.ports.updateNoteRawGuarded = async (path, transform, options) => { const out = await write(path, transform, options); if (r.raw(1).includes('ChapterCorrected')) wrote = true; return out; };
+  // The re-check that follows the chapter's fix is where the app closes: the fix is written and its result is saved.
+  r.ports.aiProof = async (request, n, run) => { const out = await orig(request, n, run); if (wrote && !closed) { closed = true; r.runs.dispose(); } return out; };
+  await r.runs.fixAgain(r.mapPath); await settle();
+  assert.ok(closed, 'the app closed after the chapter fix was written');
+  r.ports.aiProof = orig; r.ports.updateNoteRawGuarded = write;
+  const again = new BookPipelineRuns(r.ports); await again.repairFinished(r.mapPath); await settle();
+  assert.ok((await r.state()).bookProof.done, 'the book slot is closed as done');
+  const calls = finishedCalls(r);
+  await again.fixAgain(r.mapPath); while (again.isRunning(r.mapPath)) await tick(); await settle();
+  const now = finishedCalls(r);
+  assert.deepEqual([now.fix - calls.fix, now.proofA - calls.proofA, now.book - calls.book], [2, 1, 1], 'the book slot reopened: one fix + one re-check (and the chapter once)');
+  const s = await r.state();
+  assert.equal(pageText(v).split('\n').filter(l => l.startsWith('- ')).length, [s.aiProof[idA(r)], s.bookProof].reduce((n, x) => n + x.open.length, 0), 'page items = open items');
+  again.dispose();
+});
+
+test('R1 fix again: the progress counts the units that run (chapter + book), and the book finished first is already counted while the chapter works', async () => {
+  const { r, st } = await bothRig();
+  let reached = false; const hold = defer(); st.hold = { reached: () => { reached = true; }, promise: hold.promise };
+  const running = r.runs.fixAgain(r.mapPath).catch(() => undefined);
+  while (!reached && r.runs.isRunning(r.mapPath)) await tick();
+  assert.deepEqual(plain(r.runs.getProgress(r.mapPath).again), { done: 1, total: 2 }, 'the book (first) is done, the chapter is working');
+  hold.resolve(); await running; await settleRuns(r);
+  assert.equal(r.runs.getProgress(r.mapPath)?.again, undefined);
+});
+
+test('P1 fix again: an old save without `again` loads and runs a round; a saved `again` that is not true is rejected', async () => {
+  const { r, st } = await againRig();
+  const raw = (await r.repo.readMap(r.mapPath)).bookPipeline;
+  assert.ok(raw.aiProof[idA(r)] && !('again' in raw.aiProof[idA(r)]), 'the stored slot has no again field');
+  st.again = true; await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.aiProof[idA(r)].again = 'yes'; });
+  assert.equal(readBookPipeline(await r.repo.readMap(r.mapPath)).kind, 'unusable');
+});
+
+test('P1 chapter reasons: fix interrupted, off pictures (numbers in the problem), unmet proof and unmet structure each get their own sentence, after the older causes', async () => {
+  const v = pageVault();
+  const r = await aiRig({}, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  const mark = (i, issue) => r.repo.writePipelineFields(r.nodes[i].path, { pipelineStage: 'needs-review', pipelineIssue: issue });
+  await mark(1, 'proof unmet: fix interrupted'); await mark(2, 'images unmet: images:off:2,3');
+  await rerun(r, 0);
+  assert.match(pageText(v), /SecretTitleA：修正做到一半被中斷/);
+  assert.match(pageText(v), /SecretTitleB：第 2、3 張圖：圖片可能對不上這一節，請看一下/);
+  await mark(1, 'proof unmet: a1 a2'); await mark(2, 'structure unmet: s1');
+  await rerun(r, 0);
+  assert.match(pageText(v), /SecretTitleA：寫完後的校對有幾處沒過/);
+  assert.match(pageText(v), /SecretTitleB：章節結構還沒符合企劃/);
+  await mark(1, 'proof unmet: no_body'); await mark(2, 'proof unmet: fix interrupted images:under:1:3');
+  await rerun(r, 0);
+  assert.match(pageText(v), /SecretTitleA：這章沒有正文/, 'an older cause still wins');
+  assert.match(pageText(v), /SecretTitleB：圖片少於設定的張數/, 'few pictures wins over the new causes');
+  assert.doesNotMatch(pageText(v), /張圖：/);
+});
+
+test('P1 chapter reasons: English map language says "Picture 2" / "Pictures 2, 3" and English sentences', async () => {
+  const v = pageVault();
+  const r = await aiRig({}, { ports: { writeOpenIssues: v.port, config: () => ({ planModel: 'm1', authorModel: 'm2', imageModel: 'm4', proofModel: 'm3', reasoning: 'low', language: 'en' }) } });
+  await finishAi(r);
+  await r.repo.writePipelineFields(r.nodes[1].path, { pipelineStage: 'needs-review', pipelineIssue: 'images unmet: images:off:2' });
+  await r.repo.writePipelineFields(r.nodes[2].path, { pipelineStage: 'needs-review', pipelineIssue: 'images unmet: images:off:2,3' });
+  await rerun(r, 0);
+  const text = [...v.files.values()].filter(t => t.startsWith('<!-- vam-book-open-issues')).join('\n');
+  assert.match(text, /Picture 2: A picture may not fit this section/);
+  assert.match(text, /Pictures 2, 3: A picture may not fit this section/);
+});

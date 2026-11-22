@@ -268,6 +268,8 @@ export interface AiProofState {
   refused?: Record<string, string>;
   /** The replacement texts the fix rounds wrote: a later check that still quotes one of them found the problem still present. */
   applied?: string[];
+  /** One more fix-and-check round over a finished proofread is in progress (`reopenAiRound`); an older save has none. */
+  again?: true;
 }
 
 /**
@@ -347,6 +349,7 @@ function aiProofShape(value: unknown): boolean {
   if (value.round > MAX_AI_FIX_ROUNDS || (value.step !== "proof" && value.step !== "fix")) return false;
   if (value.done !== undefined && typeof value.done !== "boolean") return false;
   if (value.incomplete !== undefined && typeof value.incomplete !== "boolean") return false;
+  if (value.again !== undefined && value.again !== true) return false;
   if (!isCount(value.checked) || !isCount(value.fixed)) return false;
   const items = (list: unknown, extra: readonly string[]): boolean =>
     Array.isArray(list) &&

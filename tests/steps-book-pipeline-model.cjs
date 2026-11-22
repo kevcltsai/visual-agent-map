@@ -341,3 +341,12 @@ test('structureEdit: absent reads as before, a well-formed one is read as saved,
     assert.ok(raw.structureEdit === structureEdit, 'the saved map object is untouched');
   }
 });
+
+test('an AI slot carries the optional `again` marker: true is kept, anything else makes the saved run unusable, a save without it reads as before', () => {
+  const state = usable();
+  const slot = { key: 'k', attempts: 0, round: 1, step: 'fix', checked: 1, fixed: 0, open: [], pending: [{ id: 'P1', quote: 'q', problem: 'p', suggestion: '' }] };
+  const read = again => model.readBookPipeline({ bookPipeline: { ...state, aiProof: { a: again === undefined ? slot : { ...slot, again } } } });
+  assert.equal(read(undefined).kind, 'usable');
+  assert.equal(read(true).data.aiProof.a.again, true);
+  for (const bad of [false, 0, 'true', {}]) assert.equal(read(bad).kind, 'unusable', JSON.stringify(bad));
+});

@@ -17453,6 +17453,8 @@ export class VisualAgentMapView extends ItemView {
       this.bookMapFocusedRun = read.data.runId;
       this.bookBarFocus = "map-go";
     }
+    // A card left open while the book stopped being fixable (or a round started) does not come back by itself later.
+    if (this.bookFixAgainAsking === path && !state.fixAgain) this.bookFixAgainAsking = null;
     const rerunAsk = this.bookRerunAskFor(path);
     renderBookBar(toolbar, state, {
       stop: () => void this.bookEntry(() => this.plugin.stopBookPipeline(path, { saved: true })),
@@ -17472,6 +17474,18 @@ export class VisualAgentMapView extends ItemView {
             await this.plugin.abandonBookPipeline(path);
             new Notice(t("ui.book_abandoned"));
           });
+        }
+      },
+      fixAgain: {
+        asking: this.bookFixAgainAsking === path,
+        ask: () => this.askBookFixAgain(path, true),
+        cancel: () => this.askBookFixAgain(path, false),
+        confirm: () => {
+          // A second press on the same card (before the repaint takes it away) starts nothing.
+          if (this.bookFixAgainAsking !== path) return;
+          this.bookFixAgainAsking = null;
+          void this.bookEntry(() => this.plugin.fixBookAgain(path));
+          if (!this.closed) this.render();
         }
       },
       addBudget: () => void this.bookEntry(() => this.plugin.resumeBookPipeline(path, { addBudget: 100 })),
@@ -17510,7 +17524,8 @@ export class VisualAgentMapView extends ItemView {
     return bookStructure(order, id => parents.get(id), root.id);
   }
   /** Where the keyboard goes after the next paint of the bar (the repaint rebuilds the buttons). */
-  private bookBarFocus: "rerun-go" | "rerun-opener" | "map-go" | "structure-undo" | null = null;
+  private bookBarFocus:
+    "rerun-go" | "rerun-opener" | "map-go" | "structure-undo" | "again-cancel" | "again-opener" | null = null;
   /** After an undo: which of the remaining undo buttons takes the keyboard (the one at the place of the pressed row); -1 means "start writing". */
   private bookStructureFocusAt = -1;
   /** The run whose map-changed choice already took the keyboard. */
@@ -17531,7 +17546,9 @@ export class VisualAgentMapView extends ItemView {
     const selector = {
       "rerun-go": ".vam-book-rerun-ask .vam-book-ask-go",
       "rerun-opener": ".vam-node-rerun",
-      "map-go": ".vam-book-map-replan"
+      "map-go": ".vam-book-map-replan",
+      "again-cancel": ".vam-book-fix-again-cancel",
+      "again-opener": ".vam-book-fix-again"
     }[focus];
     this.contentEl.querySelector<HTMLElement>(selector)?.focus();
   }
@@ -17702,6 +17719,16 @@ export class VisualAgentMapView extends ItemView {
   private bookAbandonAsking: string | null = null;
   private askBookAbandon(path: string, asking: boolean): void {
     this.bookAbandonAsking = asking ? path : null;
+    // The two in-bar cards are never open together.
+    if (asking) this.bookFixAgainAsking = null;
+    if (!this.closed) this.render();
+  }
+  /** The map whose bar shows the "fix again" confirmation card. Cancel and Escape hand the keyboard back to the button that opened it. */
+  private bookFixAgainAsking: string | null = null;
+  private askBookFixAgain(path: string, asking: boolean): void {
+    this.bookFixAgainAsking = asking ? path : null;
+    if (asking) this.bookAbandonAsking = null;
+    this.bookBarFocus = asking ? "again-cancel" : "again-opener";
     if (!this.closed) this.render();
   }
   /** The lists, labels and save of the four model dropdowns (the start card and the trial screen share them with the settings page). */

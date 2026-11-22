@@ -22,6 +22,7 @@ export { deletedChapterTitles, mentionedDeletedChapters, renderBookSettingsField
 export { BookStepError } from "./core/steps/book-pipeline/base";
 export { BookPipelineRunError, stepCounts } from "./experiences/visual-map/book-pipeline-run";
 export { readBookPipeline } from "./core/book-pipeline/model";
+export { fixAgainPlan } from "./core/book-pipeline/machine";
 export { bookStructure } from "./core/book-pipeline/structure";
 export { OPEN_ISSUES_MARKER } from "./core/book-pipeline/open-issues";
 export { reviewEntries, putProgramCallout, collapseReviewCallouts, markReviewHandled } from "./experiences/visual-map/book-pipeline-review";
@@ -323,7 +324,8 @@ async function harness({ book, stages = {}, issue, phase }) {
     stopBookPipeline: async p => { entries.push(['stop', p]); },
     resumeBookPipeline: async (p, o) => { entries.push(['resume', p, o]); },
     confirmBookGate1: async p => { entries.push(['confirm', p]); },
-    abandonBookPipeline: async p => { entries.push(['abandon', p]); }
+    abandonBookPipeline: async p => { entries.push(['abandon', p]); },
+    fixBookAgain: async p => { entries.push(['again', p]); }
   });
   support.attachTopicRuns(plugin);
   const view = new VisualAgentMapView({ app }, plugin);
@@ -1387,7 +1389,7 @@ test('toolbar done: the sentence has the chapters, what the AI fixed and what is
   done.view.map.bookPipeline.aiProof = { [done.ids.a]: aiSlot(true, 1, 2), [done.ids.b]: aiSlot(true, 0, 1) };
   done.view.map.bookPipeline.bookProof = aiSlot(true, 1, 2);
   const bar = done.drawBar();
-  assert.deepEqual(done.labels(bar), ['看仍有問題', '改回一般心智圖']);
+  assert.deepEqual(done.labels(bar), ['看仍有問題', '再修一輪', '改回一般心智圖'], 'open AI proofread problems offer one more round');
   assert.ok(texts(bar).includes('3 章・AI 修了 5 處・仍有問題 2 項'), JSON.stringify(texts(bar)));
   for (const cls of ['vam-book-panel', 'vam-book-finish', 'vam-book-confirm', 'vam-book-gate1-ask']) assert.equal(dom.find(bar, i => i.cls.includes(cls)), undefined, cls);
   const plain = await harness({ book: false });
@@ -1865,4 +1867,152 @@ test('P4 words in en and zh-CN; the start dialog line names preface + chapters +
   lang('zh-TW');
   assert.ok(tr('ui.book_card_menu_rerun_sub').includes('只更新前後章節的連接行'));
   assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /structure: \{\s*chapters: startStructure\.chapters\.length/);
+});
+
+// ---- fix again: the done bar's button, its confirmation card and the running line ----
+const slot = (over = {}) => ({ key: 'k', attempts: 0, round: 2, step: 'proof', done: true, checked: 3, fixed: 1, open: [], ...over });
+const item = (id, reason = 'not_fixed') => ({ id, quote: 'q' + id, problem: 'p', reason });
+const againData = (aiProof, bookProof) => bookData({ phase: 'done', aiProof, ...(bookProof ? { bookProof } : {}) });
+const againActions = (asking = false) => { const log = []; return { log, fixAgain: { asking, ask: () => log.push('ask'), cancel: () => log.push('cancel'), confirm: () => log.push('confirm') } }; };
+const drawAgain = (data, prog, a, extra = {}) => {
+  const c = calls(); c.actions.fixAgain = a.fixAgain; c.actions.openIssues = () => {}; c.actions.abandon = { asking: false, ask() {}, cancel() {}, confirm() {}, ...extra };
+  const parent = dom.element('div');
+  return ui.renderBookBar(parent, ui.bookBarState(data, prog, id => (id === 'c' ? 'needs-review' : undefined)), c.actions);
+};
+const doneProg = (over = {}) => progress({ phase: 'done', active: false, counts: { pending: 0, planned: 0, written: 0, checked: 4, 'needs-review': 0 }, ...over });
+const doneProgStatus = (over = {}) => doneProg({ counts: { pending: 0, planned: 0, written: 0, checked: 3, 'needs-review': 1 }, ...over });
+const classOf = (bar, cls) => dom.find(bar, i => i.cls.includes(cls));
+
+test('fix again (bar): the button shows only when a round has something to fix, sits between the issues link and the remove button, and aria-expanded follows the asking state', () => {
+  lang('zh-TW');
+  const withItems = againData({ a: slot({ open: [item('1')] }) });
+  const a = againActions();
+  const bar = drawAgain(withItems, doneProg(), a);
+  assert.deepEqual(buttonsOf(bar).map(b => b.text), ['看仍有問題', '再修一輪', '改回一般心智圖']);
+  const btn = buttonsOf(bar).find(b => b.text === '再修一輪');
+  assert.equal(btn.attrs['aria-expanded'], 'false');
+  btn.click();
+  assert.deepEqual(a.log, ['ask']);
+  const asking = drawAgain(withItems, doneProg(), againActions(true));
+  assert.equal(buttonsOf(asking).find(b => b.text === '再修一輪').attrs['aria-expanded'], 'true');
+  // nothing fixable: no items, only excluded reasons, an incomplete slot -> no button
+  for (const data of [againData({}), againData({ a: slot({ open: [item('1', 'unfixable'), item('2', 'hand_edited')] }) }), againData({ a: slot({ incomplete: true, open: [item('1')] }) })])
+    assert.ok(!buttonsOf(drawAgain(data, doneProg(), againActions())).some(b => b.text === '再修一輪'));
+  // no action provided -> no button; a book not done -> no button
+  const c = calls(); c.actions.abandon = { asking: false, ask() {}, cancel() {}, confirm() {} };
+  assert.ok(!buttonsOf(ui.renderBookBar(dom.element('div'), ui.bookBarState(withItems, doneProg(), noStage), c.actions)).some(b => b.text === '再修一輪'));
+  const writing = drawAgain(bookData({ aiProof: { a: slot({ open: [item('1')] }) } }), progress(), againActions());
+  assert.ok(!buttonsOf(writing).some(b => b.text === '再修一輪'));
+  // a single-card rerun in progress at a finished book: no second job offered
+  assert.ok(!buttonsOf(drawAgain(withItems, doneProg({ active: true, rerun: { nodeId: 'a', startedAt: 1 } }), againActions())).some(b => b.text === '再修一輪'));
+});
+
+test('fix again (card): numbers come from fixAgainPlan, a zero clause is left out, the book-only plan reads sensibly, cancel and Escape close, the go button confirms, and the abandon card wins when both are asked', () => {
+  lang('zh-TW');
+  const data = againData({ a: slot({ open: [item('1'), item('2', 'still_present')] }), b: slot({ open: [item('3', 'still_present')] }) });
+  const plan = bundle.fixAgainPlan(data, 1);
+  const a = againActions(true);
+  const bar = drawAgain(data, doneProgStatus(), a);
+  const card = classOf(bar, 'vam-book-fix-again-card');
+  assert.ok(card);
+  assert.equal(card.attrs.role, 'group');
+  assert.equal(card.attrs['aria-label'], '讓 AI 再修一輪？');
+  assert.ok(texts(card).includes('讓 AI 再修一輪？'));
+  assert.equal(JSON.stringify({ c: plan.chapters, i: plan.items, k: plan.calls, s: plan.stubborn, t: plan.statusItems }), JSON.stringify({ c: 2, i: 3, k: 4, s: 2, t: 1 }));
+  assert.ok(texts(card).includes('2 章還有 3 項 AI 校對問題，每章修一次、再查一次，大約 4 次 AI 呼叫。額度不夠的部分會一起加上。'));
+  assert.ok(texts(card).includes('其中 2 項已經修過 2 輪，可能還是修不掉。另外 1 項是章節狀態（校對沒過、圖片對不上），這一輪不處理。'));
+  assert.deepEqual(buttonsOf(card).map(b => b.text), ['取消', '開始修']);
+  assert.ok(classOf(card, 'vam-book-fix-again-go').cls.includes('mod-cta'));
+  // zero clauses are omitted: no stubborn
+  const noStubborn = classOf(drawAgain(againData({ a: slot({ open: [item('1')] }) }), doneProgStatus(), againActions(true)), 'vam-book-fix-again-card');
+  assert.ok(texts(noStubborn).includes('另外 1 項是章節狀態（校對沒過、圖片對不上），這一輪不處理。'));
+  assert.ok(!texts(noStubborn).join('').includes('0 項') && !texts(noStubborn).join('').includes('已經修過'));
+  // no status chapters: the stubborn clause alone
+  const noStatus = bundle.bookBarState(data, doneProg(), noStage);
+  const cardNoStatus = classOf(ui.renderBookBar(dom.element('div'), noStatus, { ...calls().actions, fixAgain: againActions(true).fixAgain }), 'vam-book-fix-again-card');
+  assert.ok(texts(cardNoStatus).includes('其中 2 項已經修過 2 輪，可能還是修不掉。'));
+  assert.ok(!texts(cardNoStatus).join('').includes('章節狀態'));
+  // neither: no note paragraph at all
+  const plain = ui.renderBookBar(dom.element('div'), bundle.bookBarState(againData({ a: slot({ open: [item('1')] }) }), doneProg(), noStage), { ...calls().actions, fixAgain: againActions(true).fixAgain });
+  assert.equal(classOf(plain, 'vam-book-fix-again-note'), undefined);
+  // only the whole-book slot has items
+  const bookOnly = ui.renderBookBar(dom.element('div'), bundle.bookBarState(againData({}, slot({ open: [item('9')] })), doneProg(), noStage), { ...calls().actions, fixAgain: againActions(true).fixAgain });
+  assert.ok(texts(classOf(bookOnly, 'vam-book-fix-again-card')).includes('全書校對還有 1 項問題，修一次、再查一次，大約 2 次 AI 呼叫。額度不夠的部分會一起加上。'));
+  // cancel, Escape, confirm
+  dom.find(card, i => i.cls.includes('vam-book-fix-again-cancel')).click();
+  dom.find(card, i => i.cls.includes('vam-book-fix-again-go')).click();
+  const esc = { key: 'Escape', stopped: false, prevented: false, stopPropagation() { this.stopped = true; }, preventDefault() { this.prevented = true; } };
+  card.listeners.keydown.forEach(fn => fn(esc));
+  assert.deepEqual(a.log, ['cancel', 'confirm', 'cancel']);
+  assert.ok(esc.stopped && esc.prevented);
+  // both asked: only the abandon card is drawn
+  const both = drawAgain(data, doneProgStatus(), againActions(true), { asking: true });
+  assert.ok(classOf(both, 'vam-book-abandon-card') && !classOf(both, 'vam-book-fix-again-card'));
+  // other languages have every key
+  for (const language of ['en', 'zh-CN']) {
+    lang(language);
+    const l = drawAgain(data, doneProg(), againActions(true));
+    const text = texts(classOf(l, 'vam-book-fix-again-card')).join('|');
+    assert.ok(!/ui\.book/.test(text) && text.includes('2') && text.includes('3') && text.includes('4'), language);
+  }
+  lang('zh-TW');
+});
+
+test('fix again (running): the bar says AI 修正中 done / total with the open count and a single stop; no button, link or remove while it runs; the finished bar is the done bar again', () => {
+  lang('zh-TW');
+  const data = againData({ a: slot({ open: [item('1')] }) });
+  const a = againActions();
+  const c = calls(); c.actions.fixAgain = a.fixAgain; c.actions.abandon = { asking: false, ask() {}, cancel() {}, confirm() {} };
+  const state = ui.bookBarState(data, doneProg({ active: true, again: { done: 7, total: 20 } }), noStage);
+  const bar = ui.renderBookBar(dom.element('div'), state, c.actions);
+  assert.ok(texts(bar).includes('圖文書：AI 修正中'));
+  assert.ok(texts(bar).includes('AI 修正中 7 / 20・仍有問題 1'));
+  assert.deepEqual(buttonsOf(bar).map(b => b.text), ['停止']);
+  buttonsOf(bar)[0].click();
+  assert.deepEqual(c.log, ['stop']);
+  const after = drawAgain(data, doneProg(), againActions());
+  assert.ok(texts(after).includes('圖文書：已完成'));
+  assert.ok(buttonsOf(after).some(b => b.text === '再修一輪'));
+  // a stale `again` from a progress record whose drive ended is not drawn
+  assert.ok(!ui.bookBarState(data, doneProg({ active: false, again: { done: 1, total: 2 } }), noStage).again);
+  for (const language of ['en', 'zh-CN']) {
+    lang(language);
+    assert.ok(!/ui\.book/.test(texts(ui.renderBookBar(dom.element('div'), state, c.actions)).join('|')), language);
+  }
+  lang('zh-TW');
+});
+
+test('fix again (view): the button opens the card and moves the keyboard to Cancel; Cancel and Escape give it back to the button; confirm calls the plugin once even when pressed twice; the two in-bar cards are never open together', async () => {
+  const h = await harness({ book: true, phase: 'done' });
+  const ids = [h.ids.root, h.ids.a, h.ids.b];
+  h.view.map.bookPipeline = againData({ [h.ids.a]: slot({ open: [item('1')] }) });
+  h.view.map.bookPipeline.order = ids;
+  h.plugin.getBookPipelineProgress = () => progress({ phase: 'done', active: false });
+  const draw1 = () => { const tb = dom.element('div'); h.view.renderBookPipelineBar(tb); return tb.children[0]; };
+  assert.ok(buttonsOf(draw1()).some(b => b.text === '再修一輪'));
+  buttonsOf(draw1()).find(b => b.text === '再修一輪').click();
+  assert.equal(h.view.bookBarFocus, 'again-cancel');
+  assert.ok(classOf(draw1(), 'vam-book-fix-again-card'));
+  // opening the abandon card closes this one, and the reverse
+  buttonsOf(draw1()).find(b => b.text === '改回一般心智圖').click();
+  assert.equal(classOf(draw1(), 'vam-book-fix-again-card'), undefined);
+  assert.ok(classOf(draw1(), 'vam-book-abandon-confirm'));
+  buttonsOf(draw1()).find(b => b.text === '再修一輪').click();
+  assert.equal(classOf(draw1(), 'vam-book-abandon-confirm'), undefined);
+  assert.ok(classOf(draw1(), 'vam-book-fix-again-card'));
+  // Cancel closes without an entry and returns the keyboard to the opener
+  dom.find(draw1(), i => i.cls.includes('vam-book-fix-again-cancel')).click();
+  assert.equal(classOf(draw1(), 'vam-book-fix-again-card'), undefined);
+  assert.equal(h.view.bookBarFocus, 'again-opener');
+  assert.equal(h.entries.length, 0);
+  // confirm twice on the same card: one call
+  buttonsOf(draw1()).find(b => b.text === '再修一輪').click();
+  const go = dom.find(draw1(), i => i.cls.includes('vam-book-fix-again-go'));
+  go.click(); go.click();
+  await dom.tick();
+  assert.equal(JSON.stringify(h.entries), JSON.stringify([['again', MAP]]));
+  assert.equal(classOf(draw1(), 'vam-book-fix-again-card'), undefined);
+  // the keyboard targets exist in the bar
+  assert.ok(/\.vam-book-fix-again-cancel/.test(view_ts) && /\.vam-book-fix-again"/.test(view_ts));
+  assert.match(main_ts, /fixBookAgain\(mapPath: string\): Promise<void> \{\s*return this\.bookPipelineRuns\.fixAgain\(mapPath\);/);
 });

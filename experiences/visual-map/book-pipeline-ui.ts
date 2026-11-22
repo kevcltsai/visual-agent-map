@@ -18,6 +18,7 @@ import {
   type StructureNode
 } from "../../core/book-pipeline/structure-edit";
 import { splitPictureIssue } from "../../core/book-pipeline/image-slots";
+import { fixAgainPlan } from "../../core/book-pipeline/machine";
 import { joinReasons, splitCarriedIssue } from "./book-pipeline-reasons";
 import {
   effectiveOrder,
@@ -74,6 +75,10 @@ export interface BookBarState {
    * closing page: open findings, unfinished proofreads, chapters that still need a look).
    */
   ai: { fixing: number; open: number; fixed: number };
+  /** A "fix again" round is running (memory only): slots finished and slots to work on; the bar shows them with a stop button. */
+  again?: { done: number; total: number };
+  /** A finished book with AI proofread problems a round could fix: what the "fix again" button and its card say (absent: no button). */
+  fixAgain?: { chapters: number; items: number; calls: number; stubborn: number; statusItems: number; book: boolean };
   /** Gate 1 only: what the editor changed in the book's structure (absent when it changed nothing and refused nothing). */
   structureEdit?: BookStructureEditView;
 }
@@ -214,6 +219,8 @@ export function bookBarState(
         }
       : baseCurrent;
   const rerunning = !!progress?.active && !!progress.rerun && order.includes(progress.rerun.nodeId);
+  const again = mode === "done" && progress?.active && progress.again ? progress.again : undefined;
+  const fixAgain = mode === "done" && !again && !rerunning ? fixAgainPlan(data, counts["needs-review"]) : undefined;
   return {
     mode,
     phase,
@@ -232,6 +239,8 @@ export function bookBarState(
       : {}),
     ...(current ? { current } : {}),
     ...(rerunning ? { rerun: true as const } : {}),
+    ...(again ? { again: { ...again } } : {}),
+    ...(fixAgain?.items ? { fixAgain } : {}),
     ...(progress?.gateWaiting ? { gateWaiting: true as const } : {}),
     ...(mapChange ? { mapChange } : {}),
     ...(gateChange && (gateChange.added || gateChange.missing) ? { mapChange: gateChange } : {}),
@@ -469,6 +478,8 @@ export interface BookBarActions {
   editPlan?: () => void;
   /** A finished book: "see what is still open" (opens the closing page). */
   openIssues?: () => void;
+  /** A finished book with fixable AI proofread problems: "fix again" and its in-bar confirmation card; a bar drawn without it shows no such button. */
+  fixAgain?: { asking: boolean; ask: () => void; cancel: () => void; confirm: () => void };
   /** Gate 2 or done: a card rerun found a hand-edited chapter; the bar asks once before it overwrites it (decision G). */
   rerunAsk?: { cancel: () => void; confirm: () => void; focus?: "go" | "opener" };
   /** The plan review's structure list: undo some changes (by id) or all of them; open a parked note by its path. */
@@ -486,7 +497,9 @@ export function bookTitleText(state: BookBarState): string {
         ? t("ui.book_phase_budget")
         : state.mode === "gate1" && state.planReview
           ? t("ui.book_phase_plan_review")
-          : t(PHASE_KEY[state.mode]);
+          : state.again
+            ? t("ui.book_phase_fix_again")
+            : t(PHASE_KEY[state.mode]);
   return t("ui.book_bar_title_0", word);
 }
 
@@ -550,10 +563,19 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
   if (state.mode === "done") {
     top.createSpan({
       cls: "vam-book-bar-counts vam-book-done-counts",
-      text: t("ui.book_bar_done_0_1_2", state.structure?.chapters ?? total, state.ai.fixed, state.ai.open)
+      text: state.again
+        ? t("ui.book_bar_fix_again_0_1_2", state.again.done, state.again.total, state.ai.open)
+        : t("ui.book_bar_done_0_1_2", state.structure?.chapters ?? total, state.ai.fixed, state.ai.open)
     });
-    if (actions.openIssues)
-      makeButton(buttons, t("ui.book_bar_open_issues"), "vam-book-link vam-book-open-issues", actions.openIssues);
+    if (state.again) makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
+    else {
+      if (actions.openIssues)
+        makeButton(buttons, t("ui.book_bar_open_issues"), "vam-book-link vam-book-open-issues", actions.openIssues);
+      if (actions.fixAgain && state.fixAgain) {
+        const again = makeButton(buttons, t("ui.book_fix_again"), "vam-book-fix-again", actions.fixAgain.ask);
+        again.setAttr("aria-expanded", String(actions.fixAgain.asking));
+      }
+    }
   }
   if (state.mode === "budget") {
     makeButton(buttons, t("ui.book_add_budget"), "mod-cta vam-book-add-budget", actions.addBudget);
@@ -574,7 +596,11 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
   if (state.rerun && state.mode !== "planning" && state.mode !== "writing")
     makeButton(buttons, t("ui.book_stop"), "mod-warning vam-book-stop", actions.stop);
-  if (actions.abandon && (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")) {
+  if (
+    actions.abandon &&
+    !state.again &&
+    (state.mode === "stopped" || state.mode === "budget" || state.mode === "done")
+  ) {
     const abandon = actions.abandon;
     const ask = makeButton(
       buttons,
@@ -603,6 +629,8 @@ export function renderBookBar(parent: HTMLElement, state: BookBarState, actions:
       abandon.confirm
     );
   }
+  if (actions.fixAgain?.asking && !actions.abandon?.asking && state.fixAgain && !state.again)
+    renderFixAgainCard(bar, state.fixAgain, actions.fixAgain);
   if (state.mode === "gate1" && state.planReview && state.structureEdit)
     renderStructureEdit(bar, state.structureEdit, actions);
   if ((state.mode === "writing" || state.mode === "done") && actions.rerunAsk)
@@ -730,6 +758,41 @@ function renderStructureEdit(bar: HTMLElement, view: BookStructureEditView, acti
     line.setAttr("role", "status");
     line.setText(t("ui.book_struct_failed"));
   }
+}
+
+/** The "fix again" confirmation card: how many chapters and problems, the calls it costs, what will probably stay and what is not touched. Escape cancels. */
+function renderFixAgainCard(
+  bar: HTMLElement,
+  plan: NonNullable<BookBarState["fixAgain"]>,
+  ask: { cancel: () => void; confirm: () => void }
+): void {
+  const title = t("ui.book_fix_again_title");
+  const card = bar.createDiv("vam-book-abandon-card vam-book-fix-again-card");
+  card.setAttr("role", "group");
+  card.setAttr("aria-label", title);
+  card.createEl("b", { text: title });
+  card.createEl("p", {
+    text: plan.chapters
+      ? t("ui.book_fix_again_body_0_1_2", plan.chapters, plan.items, plan.calls)
+      : t("ui.book_fix_again_body_book_0_1", plan.items, plan.calls)
+  });
+  const note = plan.stubborn
+    ? plan.statusItems
+      ? t("ui.book_fix_again_note_0_1", plan.stubborn, plan.statusItems)
+      : t("ui.book_fix_again_note_stubborn_0", plan.stubborn)
+    : plan.statusItems
+      ? t("ui.book_fix_again_note_status_0", plan.statusItems)
+      : "";
+  if (note) card.createEl("p", { cls: "vam-book-fix-again-note", text: note });
+  const row = card.createDiv("vam-book-abandon-actions");
+  makeButton(row, t("ui.cancel"), "vam-book-fix-again-cancel", ask.cancel);
+  makeButton(row, t("ui.book_fix_again_go"), "mod-cta vam-book-fix-again-go", ask.confirm);
+  card.addEventListener("keydown", event => {
+    if (event.key !== "Escape") return;
+    event.stopPropagation();
+    event.preventDefault();
+    ask.cancel();
+  });
 }
 
 /** The in-bar question (no modal): a sentence, Cancel and the answer button; Escape cancels. Same card as the abandon one. */

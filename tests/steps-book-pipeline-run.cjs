@@ -5327,3 +5327,193 @@ test('P2a while the structure port runs, the map-change check does not pause the
   const s = await r.state();
   assert.equal(s.status, 'running'); assert.notEqual(s.pauseReason, 'map');
 });
+
+// ---- P1 "fix again": one more fix-and-check round over a finished book (reopenAiRound / closeAiRound / fixAgain) ----
+const againOpen = slot => plain(slot.open.map(item => [item.reason, item.quote]));
+/** A finished book whose chapter A has one fixable problem (it is never solved: still_present) and one the AI called unfixable. `mode` decides what the re-check says during the again round. */
+const againRig = async (over = {}) => {
+  const v = pageVault(); const applied = []; const st = { again: false, mode: 'solve', hold: undefined, p2: undefined };
+  const r = await aiRig({
+    aiProof: async (request, n, run) => {
+      if (request.title !== 'SecretTitleA') return { checks: [okCheck(request)], prior: [], dropped: {} };
+      if (!st.again) st.p2 = quoteOf(request, 12, 20);
+      if (st.again && st.mode === 'solve') return { checks: [], prior: [], dropped: {} };
+      if (st.again && st.mode === 'redetect') return { checks: [{ ...probOf(request, 'P1'), quote: 'zzz none' }, { ...probOf(request, 'P2'), quote: st.p2, fixable: false, why: 'unfixable' }], prior: [], dropped: {} };
+      if (st.again && st.mode === 'hold-proof') { st.hold?.reached(); await st.hold?.promise; }
+      return { checks: [probOf(request, 'P1'), { ...probOf(request, 'P2', 12, 20), fixable: false, why: 'unfixable' }], prior: [], dropped: {} };
+    },
+    aiFix: async (request, n, run) => {
+      if (st.again && st.mode === 'hold-fix') { st.hold?.reached(); if (st.hold?.budget) for (;;) await run.admission.reserve(); await st.hold?.promise; }
+      const replacement = `Corrected${applied.length + 1}`; applied.push(replacement);
+      return [{ id: 'P1', quote: request.chapters[0].text.slice(0, 11), replacement }];
+    },
+    ...over
+  }, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  return { r, v, applied, st };
+};
+const finishedCalls = r => ({ fix: aiRuns(r, 'fix').length, proofA: aiRuns(r, 'proof', 'SecretTitleA').length, book: r.stat.ai.filter(([k]) => /book/i.test(k)).length, all: r.stat.ai.length });
+const settleRuns = async r => { while (r.runs.isRunning(r.mapPath)) await tick(); await settle(); };
+
+test('P1 fix again: the book was still_present + unfixable; one round = exactly one fix and one check for the chapter, nothing else is called; the unfixable one stays in front', async () => {
+  const { r, v, applied, st } = await againRig();
+  const before = (await r.state()).aiProof[idA(r)];
+  assert.deepEqual(plain(before.open.map(i => i.reason).sort()), ['still_present', 'unfixable']);
+  same(await invariantsOf(r, v, { applied: { [idA(r)]: applied } }), [], 'before');
+  const calls = finishedCalls(r); st.again = true;
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const after = await r.state(); const slot = after.aiProof[idA(r)];
+  const now = finishedCalls(r);
+  assert.deepEqual([now.fix - calls.fix, now.proofA - calls.proofA, now.all - calls.all], [1, 1, 2], 'one fix, one re-check, no other call (other chapters, the book)');
+  assert.deepEqual([after.phase, slot.done, slot.again, slot.pending, slot.round], ['done', true, undefined, undefined, 2]);
+  assert.deepEqual(againOpen(slot).map(x => x[0]), ['unfixable'], 'the fixed one is gone, the excluded one stays');
+  assert.equal(slot.fixed, before.fixed + 1);
+  same(await invariantsOf(r, v, { applied: { [idA(r)]: applied } }), [], 'after');
+  assert.ok(r.raw(1).includes(applied.at(-1)), 'the fix was written');
+  assert.ok(after.aiProof[r.nodes[2].id].again === undefined && !after.bookProof.again);
+});
+
+test('P1 fix again: a still-present problem after the round stays still_present (counts do not drop); the new check re-listing the unfixable one does not duplicate it', async () => {
+  const { r, v, applied, st } = await againRig();
+  st.again = true; st.mode = 'redetect';
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const slot = (await r.state()).aiProof[idA(r)];
+  assert.equal(slot.open.filter(i => i.reason === 'unfixable').length, 1, 'no duplicate of the excluded one');
+  assert.equal(slot.open[0].reason, 'unfixable', 'the original is in front');
+  same(await invariantsOf(r, v, { applied: { [idA(r)]: applied }, refusedQuotes: slot.open.map(i => i.quote) }), []);
+});
+
+test('P1 fix again: nothing fixable (all solved, or only unfixable left) is refused with "nothing"; no call, the saved state is not touched', async () => {
+  const v = pageVault();
+  const r = await aiRig({ aiProof: async request => ({ checks: [okCheck(request)], prior: [], dropped: {} }) }, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  const saved = JSON.stringify(await r.state()); const calls = r.stat.ai.length;
+  await assert.rejects(r.runs.fixAgain(r.mapPath), err => err instanceof BookPipelineRunError && err.code === 'nothing');
+  assert.equal(JSON.stringify(await r.state()), saved);
+  assert.equal(r.stat.ai.length, calls);
+});
+
+test('P1 fix again: unfixable-only chapter (excluded reasons) is not sent: refused "nothing" and the open items stay', async () => {
+  const v = pageVault();
+  const r = await aiRig({ aiProof: async request => ({ checks: request.title === 'SecretTitleA' ? [{ ...probOf(request, 'P2', 12, 20), fixable: false, why: 'sources_conflict' }] : [okCheck(request)], prior: [], dropped: {} }) }, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  const saved = JSON.stringify(await r.state());
+  await assert.rejects(r.runs.fixAgain(r.mapPath), err => err.code === 'nothing');
+  assert.equal(JSON.stringify(await r.state()), saved);
+});
+
+test('P1 fix again: a book that is not done is refused (not_gate) before anything changes', async () => {
+  const r = await aiRig({}, {});
+  await r.runs.start(r.mapPath);
+  await assert.rejects(r.runs.fixAgain(r.mapPath), err => err instanceof BookPipelineRunError && ['not_gate', 'busy'].includes(err.code));
+  r.runs.dispose();
+});
+
+test('P1 fix again: the call limit is raised to used + calls when short; no pause', async () => {
+  const { r, st } = await againRig();
+  const used = (await r.state()).budget.used;
+  await setLimit(r, used);
+  st.again = true;
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const s = await r.state();
+  assert.equal(s.budget.limit, used + 2, 'raised by exactly what was short (1 chapter = 2 calls)');
+  assert.notEqual(s.pauseReason, 'budget');
+});
+
+test('P1 fix again: a limit that already has room is left alone', async () => {
+  const { r, st } = await againRig();
+  const limit = (await r.state()).budget.limit; st.again = true;
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  assert.equal((await r.state()).budget.limit, limit);
+});
+
+for (const [how, at] of [['stop', 'hold-fix'], ['stop', 'hold-proof'], ['budget', 'hold-fix']]) {
+  test(`P1 fix again: ${how} during the round's ${at}: the slot is closed with the problems it had before (same open items), no again/pending, the invariants hold`, async () => {
+    const { r, v, applied, st } = await againRig();
+    const before = (await r.state()).aiProof[idA(r)];
+    st.again = true; st.mode = at; let reached = false; const hold = defer();
+    st.hold = { reached: () => { reached = true; }, promise: hold.promise, budget: how === 'budget' };
+    const running = r.runs.fixAgain(r.mapPath).catch(() => undefined);
+    while (!reached && r.runs.isRunning(r.mapPath)) await tick();
+    if (how === 'stop') { await r.runs.stop(r.mapPath); hold.resolve(); }
+    await running; await settleRuns(r);
+    const s = await r.state(); const slot = s.aiProof[idA(r)];
+    assert.ok(slot.done && !slot.again && !slot.pending && !slot.incomplete, JSON.stringify(slot));
+    assert.deepEqual(againOpen(slot), againOpen(before), 'open is what it was before the round');
+    assert.equal(s.phase, 'done');
+    if (how === 'budget') assert.equal(s.pauseReason, 'budget');
+    same(await invariantsOf(r, v, { applied: { [idA(r)]: applied }, refusedQuotes: slot.open.map(i => i.quote) }), []);
+    assert.equal(slot.open.length, before.open.length);
+  });
+}
+
+test('P1 fix again: the app closes (dispose) in the middle of the round; a new session repairFinished closes the slot (not incomplete) and the page lists the same items', async () => {
+  const { r, v, applied, st } = await againRig();
+  const before = (await r.state()).aiProof[idA(r)]; const pageBefore = pageText(v);
+  st.again = true; st.mode = 'hold-fix'; let reached = false; const hold = defer();
+  st.hold = { reached: () => { reached = true; }, promise: hold.promise };
+  const running = r.runs.fixAgain(r.mapPath).catch(() => undefined);
+  while (!reached && r.runs.isRunning(r.mapPath)) await tick();
+  r.runs.dispose(); hold.resolve(); await running; await settle();
+  const mid = (await r.state()).aiProof[idA(r)];
+  assert.ok(mid.again && !mid.done, 'the unload left the round open');
+  const again = new BookPipelineRuns(r.ports); await again.repairFinished(r.mapPath); await settle();
+  const slot = (await r.state()).aiProof[idA(r)];
+  assert.ok(slot.done && !slot.again && !slot.incomplete && !slot.pending, JSON.stringify(slot));
+  assert.deepEqual(againOpen(slot), againOpen(before));
+  assert.equal(pageText(v).split('\n').filter(l => l.startsWith('- ')).length, pageBefore.split('\n').filter(l => l.startsWith('- ')).length);
+  same(await invariantsOf(r, v, { applied: { [idA(r)]: applied }, refusedQuotes: slot.open.map(i => i.quote) }), []);
+  again.dispose();
+});
+
+test('P1 fix again: a chapter the reader changed since its proofread (key differs) is skipped: no call for it, its text is not written, no round is left open', async () => {
+  const { r, st } = await againRig();
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/Corrected\d+/, m => `${m} by the reader`), {});
+  const rawBefore = r.raw(1); const calls = finishedCalls(r); st.again = true;
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  assert.equal(r.raw(1), rawBefore, 'nothing written');
+  assert.equal(finishedCalls(r).fix, calls.fix, 'no fix call');
+  const slot = (await r.state()).aiProof[idA(r)];
+  assert.ok(slot.done && !slot.again && !slot.pending, JSON.stringify(slot));
+});
+
+test('P1 fix again: an old save without `again` loads and runs a round; a saved `again` that is not true is rejected', async () => {
+  const { r, st } = await againRig();
+  const raw = (await r.repo.readMap(r.mapPath)).bookPipeline;
+  assert.ok(raw.aiProof[idA(r)] && !('again' in raw.aiProof[idA(r)]), 'the stored slot has no again field');
+  st.again = true; await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.aiProof[idA(r)].again = 'yes'; });
+  assert.equal(readBookPipeline(await r.repo.readMap(r.mapPath)).kind, 'unusable');
+});
+
+test('P1 chapter reasons: fix interrupted, off pictures (numbers in the problem), unmet proof and unmet structure each get their own sentence, after the older causes', async () => {
+  const v = pageVault();
+  const r = await aiRig({}, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  const mark = (i, issue) => r.repo.writePipelineFields(r.nodes[i].path, { pipelineStage: 'needs-review', pipelineIssue: issue });
+  await mark(1, 'proof unmet: fix interrupted'); await mark(2, 'images unmet: images:off:2,3');
+  await rerun(r, 0);
+  assert.match(pageText(v), /SecretTitleA：修正做到一半被中斷/);
+  assert.match(pageText(v), /SecretTitleB：第 2、3 張圖：圖片可能對不上這一節，請看一下/);
+  await mark(1, 'proof unmet: a1 a2'); await mark(2, 'structure unmet: s1');
+  await rerun(r, 0);
+  assert.match(pageText(v), /SecretTitleA：寫完後的校對有幾處沒過/);
+  assert.match(pageText(v), /SecretTitleB：章節結構還沒符合企劃/);
+  await mark(1, 'proof unmet: no_body'); await mark(2, 'proof unmet: fix interrupted images:under:1:3');
+  await rerun(r, 0);
+  assert.match(pageText(v), /SecretTitleA：這章沒有正文/, 'an older cause still wins');
+  assert.match(pageText(v), /SecretTitleB：圖片少於設定的張數/, 'few pictures wins over the new causes');
+  assert.doesNotMatch(pageText(v), /張圖：/);
+});
+
+test('P1 chapter reasons: English map language says "Picture 2" / "Pictures 2, 3" and English sentences', async () => {
+  const v = pageVault();
+  const r = await aiRig({}, { ports: { writeOpenIssues: v.port, config: () => ({ planModel: 'm1', authorModel: 'm2', imageModel: 'm4', proofModel: 'm3', reasoning: 'low', language: 'en' }) } });
+  await finishAi(r);
+  await r.repo.writePipelineFields(r.nodes[1].path, { pipelineStage: 'needs-review', pipelineIssue: 'images unmet: images:off:2' });
+  await r.repo.writePipelineFields(r.nodes[2].path, { pipelineStage: 'needs-review', pipelineIssue: 'images unmet: images:off:2,3' });
+  await rerun(r, 0);
+  const text = [...v.files.values()].filter(t => t.startsWith('<!-- vam-book-open-issues')).join('\n');
+  assert.match(text, /Picture 2: A picture may not fit this section/);
+  assert.match(text, /Pictures 2, 3: A picture may not fit this section/);
+});

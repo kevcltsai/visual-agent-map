@@ -68,6 +68,9 @@ import {
   PLAN_EDIT_BUSY,
   type PlanEditToken,
   abandonAi,
+  closeAiRound,
+  fixAgainPlan,
+  reopenAiRound,
   aiChapterDue,
   applyAiFailure,
   applyAiFix,
@@ -229,7 +232,7 @@ import {
   type CoverRecordValue
 } from "../../core/book-pipeline/cover-block";
 import type { ReasoningLevel } from "../../ai/types";
-import type { ContentLanguage } from "../../i18n";
+import { instructionLanguageOf, type ContentLanguage } from "../../i18n";
 import type { MapDocument } from "../../map-model";
 import { isPlaceholder } from "../../core/note-placeholder";
 import type { NotePatch } from "../../repository";
@@ -244,6 +247,7 @@ import {
   pictureShortfallToken,
   captionLatinIssue,
   pictureMismatchToken,
+  splitPictureIssue,
   PICTURE_LIMITED_TOKEN,
   stripImageLines,
   fillSlotMarkers,
@@ -1757,6 +1761,78 @@ export class BookPipelineRuns {
   }
 
   /**
+   * One more fix-and-check round over a finished book (the "fix again" button): every chapter whose AI proofread left fixable problems
+   * gets one fix and one check, then the whole-book proofread the same way. The book stays done; the limit is raised to cover the calls
+   * when it is short. A round cut short (stop, out of budget, unload) is closed with the problems the slot had before it, so the counts
+   * the bar and the page show never move except by a finished round. Refused ("nothing") when no problem can be fixed.
+   */
+  async fixAgain(mapPath: string): Promise<void> {
+    return this.enter(mapPath, async drive => {
+      if (!this.ports.aiProof || !this.ports.aiFix || !this.ports.aiBookProof) throw new BookPipelineRunError("nothing");
+      const data = await this.openSaved(drive, mapPath, { allowDone: true });
+      if (data.phase !== "done") throw new BookPipelineRunError("not_gate");
+      const plan = fixAgainPlan(data, 0);
+      if (!plan.items) throw new BookPipelineRunError("nothing");
+      await drive.store.commit(state => {
+        const short = state.budget.used + plan.calls - state.budget.limit;
+        const next = resumeRun(short > 0 ? addBudget(state, short) : state);
+        return { state: next ?? state, accepted: true };
+      });
+      if (drive.store.state.status !== "running") throw new BookPipelineRunError("budget");
+      drive.job = async () => {
+        try {
+          for (const id of effectiveOrder(drive.store.state)) {
+            if (this.dead(drive) || drive.controller.signal.aborted || drive.fatal !== undefined) break;
+            if (drive.store.state.status !== "running") break;
+            const info = drive.cards.get(id);
+            const card = info ? await this.ports.readCard(info.path).catch(() => undefined) : undefined;
+            if (!card) continue;
+            const key = aiProofKey(cardRevision(drive.store.state, id), aiProofBody(chapterBody(card.detail)));
+            const opened = await drive.store.commit(state => reopenAiRound(state, id, key));
+            if (!opened?.accepted) continue;
+            drive.busy.add(id);
+            try {
+              for (let turn = 0; turn < 10; turn++) {
+                const slot = drive.store.state.aiProof?.[id];
+                if (!slot?.again || slot.done || this.dead(drive) || drive.controller.signal.aborted) break;
+                if (drive.store.state.status !== "running" || drive.fatal !== undefined) break;
+                await this.aiChapter(drive, id, slot.step, true);
+              }
+            } finally {
+              drive.busy.delete(id);
+            }
+          }
+          if (!this.dead(drive) && !drive.controller.signal.aborted && drive.store.state.status === "running") {
+            const input = await this.bookProofInput(drive).catch(() => undefined);
+            const key = input ? aiProofKey(0, input.chapters.map(chapter => chapter.text).join("\n\u0000\n")) : "";
+            const opened = input ? await drive.store.commit(state => reopenAiRound(state, undefined, key)) : undefined;
+            for (let turn = 0; opened?.accepted && turn < 10; turn++) {
+              const slot = drive.store.state.bookProof;
+              if (!slot?.again || slot.done || this.dead(drive) || drive.controller.signal.aborted) break;
+              if (drive.store.state.status !== "running" || drive.fatal !== undefined) break;
+              await this.aiBook(drive, slot.step, true);
+            }
+          }
+        } finally {
+          if (!this.dead(drive)) {
+            await drive.store
+              .commit(state => {
+                let next = effectiveOrder(state).reduce((current, id) => closeAiRound(current, id), state);
+                next = closeAiRound(next);
+                return { state: next, accepted: true };
+              })
+              .catch(() => undefined);
+            if (drive.store.state.phase === "done" && !(await this.writeClosingPage(drive)))
+              this.log(drive, "open_issues_write", "book", "proof", "failed");
+            this.syncReviewNotes(drive);
+          }
+        }
+      };
+      this.log(drive, "fix_again", "-", "proof", `calls:${plan.calls}`);
+    });
+  }
+
+  /**
    * A finished book is read again (the map opens; the one entry for this repair): a chapter with text that the book lists but that has
    * no finished AI proofread slot (a rerun cut short by an unload: its slot was cleared or left open and nothing closed it) is closed as incomplete and the
    * closing page is written again, so the bar and the page never show the book as solved. A book with no such chapter is not touched.
@@ -1765,14 +1841,18 @@ export class BookPipelineRuns {
     if (this.disposed || !this.ports.aiProof || !this.ports.aiFix || !this.ports.aiBookProof) return;
     const read = readBookPipeline(await this.ports.readMap(mapPath));
     if (read.kind !== "usable" || read.data.phase !== "done") return;
-    if (effectiveOrder(read.data).every(id => read.data.aiProof?.[id]?.done)) return;
+    if (effectiveOrder(read.data).every(id => read.data.aiProof?.[id]?.done) && !read.data.bookProof?.again) return;
     return this.enter(mapPath, async drive => {
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       const missing: string[] = [];
+      // A round of "fix again" cut short by an unload: the slot is closed with the problems it had, not given up as incomplete.
+      const again = effectiveOrder(data).filter(id => data.aiProof?.[id]?.again && !data.aiProof[id].done);
+      const bookAgain = !!data.bookProof?.again && !data.bookProof.done;
       for (const id of effectiveOrder(data)) {
         const info = drive.cards.get(id);
         if (
           data.aiProof?.[id]?.done ||
+          data.aiProof?.[id]?.again ||
           !info ||
           (drive.stages.get(id) !== "checked" && drive.stages.get(id) !== "needs-review")
         )
@@ -1780,16 +1860,16 @@ export class BookPipelineRuns {
         const card = await this.ports.readCard(info.path).catch(() => undefined);
         if (card && aiProofBody(chapterBody(card.detail)).trim()) missing.push(id);
       }
-      if (!missing.length || this.dead(drive)) return;
-      await drive.store.commit(state =>
-        state.phase === "done"
-          ? {
-              state: missing.reduce((next, id) => (next.aiProof?.[id]?.done ? next : abandonAi(next, id)), state),
-              accepted: true
-            }
-          : { state, accepted: false }
-      );
-      if (!(await this.writeClosingPage(drive))) this.log(drive, "open_issues_write", missing[0], "proof", "failed");
+      if ((!missing.length && !again.length && !bookAgain) || this.dead(drive)) return;
+      await drive.store.commit(state => {
+        if (state.phase !== "done") return { state, accepted: false };
+        let next = again.reduce((current, id) => closeAiRound(current, id), state);
+        if (bookAgain) next = closeAiRound(next);
+        next = missing.reduce((current, id) => (current.aiProof?.[id]?.done ? current : abandonAi(current, id)), next);
+        return { state: next, accepted: true };
+      });
+      if (!(await this.writeClosingPage(drive)))
+        this.log(drive, "open_issues_write", missing[0] ?? again[0] ?? "book", "proof", "failed");
       this.syncNotes(drive);
     });
   }
@@ -3372,7 +3452,7 @@ export class BookPipelineRuns {
    * One step of the whole-book AI proofread: the check (the proof model, text only, over every chapter) or the fix (the author model; the
    * edits are applied chapter by chapter, each chapter written once). Same fences as {@link aiChapter}.
    */
-  private async aiBook(drive: Drive, want: "proof" | "fix"): Promise<void> {
+  private async aiBook(drive: Drive, want: "proof" | "fix", again = false): Promise<void> {
     if (!this.ports.aiBookProof || !this.ports.aiFix) return;
     const signal = drive.controller.signal;
     const input = await this.bookProofInput(drive).catch(() => undefined);
@@ -3390,7 +3470,7 @@ export class BookPipelineRuns {
     const same = stored?.key === key ? stored : undefined;
     const step = same ? want : "proof";
     const begun = await drive.store.commit(state => {
-      const dispatched = beginAiStep(state, {}, key, step);
+      const dispatched = beginAiStep(state, again ? { rerun: true } : {}, key, step);
       return dispatched
         ? { state: dispatched.state, accepted: true, token: dispatched.token }
         : { state, accepted: false as const, token: undefined };
@@ -3612,7 +3692,28 @@ export class BookPipelineRuns {
                 : /^(plan|write|proof) failed/.test(issue)
                   ? "step_failed"
                   : "";
-      issues.push({ source: "chapter", chapterId: id, chapterTitle: title(id), problem: "", reason });
+      // What the status line itself says, once none of the six older causes is: the reason a person can act on (the old fallback was one vague sentence).
+      const off = splitPictureIssue(issue).off ?? [...issue.matchAll(/image_(\d+)_mismatch/g)].map(m => Number(m[1]));
+      const zh = instructionLanguageOf(drive.config.language) === "zh";
+      const pictures = zh ? `第 ${off.join("、")} 張圖` : `${off.length > 1 ? "Pictures" : "Picture"} ${off.join(", ")}`;
+      const found =
+        reason ||
+        (/fix interrupted/.test(issue)
+          ? "fix_interrupted"
+          : off.length
+            ? "image_mismatch"
+            : /^proof unmet/.test(issue)
+              ? "proof_unmet"
+              : /^structure unmet/.test(issue)
+                ? "structure_unmet"
+                : "");
+      issues.push({
+        source: "chapter",
+        chapterId: id,
+        chapterTitle: title(id),
+        problem: found === "image_mismatch" ? pictures : "",
+        reason: found
+      });
     }
     return { checked, issues };
   }

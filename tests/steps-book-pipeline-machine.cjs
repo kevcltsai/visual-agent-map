@@ -1047,3 +1047,169 @@ test('structureEdit is carried unchanged by backToPlan, retryTrial and acceptMap
   assert.deepEqual(keep(accepted), edit);
   assert.equal(model.readBookPipeline({ bookPipeline: plain(accepted) }).structureUnreadable, undefined);
 });
+
+// ---- "fix again": reopenAiRound / closeAiRound / fixAgainPlan and the again branches of the AI reducers ----
+const itemOf = (id, reason, quote = `q${id}`, chapter) => ({ id, quote, problem: `p${id}`, reason, ...(chapter ? { chapter } : {}) });
+/** A finished book: chapter a has one slot with the given open items (done, key `k`), the book slot is done with `bookOpen`. */
+const doneBook = (open, bookOpen = [], extra = {}) => {
+  const { state } = checkedRun();
+  const slot = (items, more = {}) => ({ key: 'k', attempts: 0, round: 2, step: 'proof', checked: 3, fixed: 1, open: items, done: true, ...more });
+  return { ...state, phase: 'done', aiProof: { a: slot(open, extra), b: slot([]) }, bookProof: slot(bookOpen, { key: 'bk' }) };
+};
+const reopen = (state, id, key) => machine.reopenAiRound(state, id, key);
+
+test('again: reopening a finished slot goes to the last round\'s fix with the fixable open items as targets, open unchanged, no suggestion; the new symbols are exported', () => {
+  assert.equal(typeof machine.fixAgainPlan, 'function'); assert.equal(typeof machine.closeAiRound, 'function');
+  const state = doneBook([itemOf('1', 'still_present'), itemOf('2', 'unfixable'), itemOf('3', 'not_fixed_in_time', 'q3', 2)]);
+  const r = reopen(state, 'a', 'k');
+  assert.equal(r.accepted, true);
+  const slot = r.state.aiProof.a;
+  assert.deepEqual([slot.step, slot.round, slot.attempts, slot.again, slot.done, model.MAX_AI_FIX_ROUNDS], ['fix', 1, 0, true, undefined, 2]);
+  assert.deepEqual(plain(slot.pending), [{ id: '1', quote: 'q1', problem: 'p1', suggestion: '' }, { id: '3', chapter: 2, quote: 'q3', problem: 'p3', suggestion: '' }], 'the unfixable one is not a target');
+  assert.deepEqual(plain(slot.open), plain(state.aiProof.a.open), 'open does not move while it works');
+  assert.equal(state.aiProof.a.done, true, 'the input is left alone');
+  assert.equal(model.readBookPipeline({ bookPipeline: plain(r.state) }).kind, 'usable');
+});
+
+test('again: reopening is refused (state unchanged) for an unfinished slot, an incomplete one, another key, no slot, an unknown chapter, and nothing fixable', () => {
+  const open = [itemOf('1', 'still_present')];
+  const base = doneBook(open);
+  const cases = [
+    [{ ...base, aiProof: { ...base.aiProof, a: { ...base.aiProof.a, done: false } } }, 'a', 'k'],
+    [{ ...base, aiProof: { ...base.aiProof, a: { ...base.aiProof.a, incomplete: true } } }, 'a', 'k'],
+    [base, 'a', 'other'],
+    [base, 'zzz', 'k'],
+    [doneBook([itemOf('1', 'unfixable'), itemOf('2', 'sources_conflict'), itemOf('3', 'source_unreachable'), itemOf('4', 'hand_edited')]), 'a', 'k'],
+    [doneBook([]), 'a', 'k'],
+    [{ ...base, aiProof: {} }, 'a', 'k']
+  ];
+  for (const [state, id, key] of cases) { const r = reopen(state, id, key); assert.equal(r.accepted, false); assert.equal(r.state, state, 'same object: nothing changed'); }
+});
+
+test('again: one fix call and one check finish the round (2 calls); excluded items go back in front, a re-listed duplicate is dropped, the slot is closed without again', () => {
+  const state = doneBook([itemOf('1', 'still_present', 'one'), itemOf('2', 'unfixable', 'two'), itemOf('3', 'not_fixed', 'three')]);
+  let cur = reopen(state, 'a', 'k').state;
+  const f = begin(cur, { nodeId: 'a', rerun: true }, 'k', 'fix');
+  assert.equal(f.state.aiProof.a.attempts, 1);
+  cur = machine.applyAiFix(f.state, f.token, { applied: 1, appliedIds: ['1'], key: 'k2', changed: [] }).state;
+  assert.deepEqual([cur.aiProof.a.step, cur.aiProof.a.round, cur.aiProof.a.again, cur.aiProof.a.fixed], ['proof', 2, true, 2]);
+  const p = begin(cur, { nodeId: 'a', rerun: true }, 'k2', 'proof');
+  const done = machine.applyAiProof(p.state, p.token, { checked: 2, pending: [{ id: 'X', quote: ' t h r e e ', problem: 'again', suggestion: '' }, { id: 'Y', quote: 'new one', problem: 'n', suggestion: '' }], open: [{ id: 'Z', quote: 'two', problem: 'dup', reason: 'unfixable' }] });
+  assert.equal(done.accepted, true);
+  const slot = done.state.aiProof.a;
+  assert.deepEqual([slot.done, slot.again, slot.pending], [true, undefined, undefined]);
+  assert.deepEqual(plain(slot.open.map(i => [i.quote, i.reason])), [['two', 'unfixable'], [' t h r e e ', 'not_fixed'], ['new one', 'not_fixed_in_time']], 'the excluded original first, no duplicate of it, the rest from the new check');
+  assert.equal(machine.applyAiProof(done.state, p.token, { checked: 1, pending: [], open: [] }).accepted, false, 'the finished slot takes no second result');
+});
+
+test('again: a book slot reopens, begins in phase done (the rerun bypass without a card) and follows the same two calls; a chapter begin without rerun still refuses in phase done', () => {
+  const state = doneBook([], [itemOf('B1', 'still_present', 'bq', 1)]);
+  assert.equal(machine.beginAiStep(state, {}, 'bk', 'proof'), null, 'no rerun: phase done refuses');
+  const r = reopen(state, undefined, 'bk'); assert.equal(r.accepted, true);
+  assert.deepEqual([r.state.bookProof.again, r.state.bookProof.step, r.state.bookProof.pending[0].chapter], [true, 'fix', 1]);
+  assert.equal(machine.beginAiStep(r.state, {}, 'bk', 'fix'), null, 'without rerun a book fix still cannot start in phase done');
+  const f = begin(r.state, { rerun: true }, 'bk', 'fix');
+  assert.equal(f.token.nodeId, undefined);
+  const mid = machine.applyAiFix(f.state, f.token, { applied: 0, refused: { B1: 'fix_quote_missing' } }).state;
+  const p = begin(mid, { rerun: true }, 'bk', 'proof');
+  const end = machine.applyAiProof(p.state, p.token, { checked: 1, pending: [], open: [] }).state;
+  assert.deepEqual([end.bookProof.done, end.bookProof.again, end.bookProof.open.length], [true, undefined, 0]);
+});
+
+test('again: stale results are dropped (old stop generation, old run, a changed chapter, the closed slot)', () => {
+  const state = doneBook([itemOf('1', 'still_present')]);
+  const f = begin(reopen(state, 'a', 'k').state, { nodeId: 'a', rerun: true }, 'k', 'fix');
+  const stopped = machine.stopRun(f.state);
+  assert.equal(machine.applyAiFix(stopped, f.token, { applied: 1 }).accepted, false);
+  const resumed = machine.resumeRun(stopped);
+  assert.equal(machine.applyAiFix(resumed, f.token, { applied: 1 }).accepted, false, 'a result from before the stop never commits after the resume');
+  assert.equal(machine.applyAiFix({ ...f.state, runId: 'other' }, f.token, { applied: 1 }).accepted, false);
+  assert.equal(machine.applyAiFix({ ...f.state, revisions: { ...f.state.revisions, a: 9 } }, f.token, { applied: 1 }).accepted, false);
+  const closed = machine.closeAiRound(f.state, 'a');
+  assert.equal(machine.applyAiFix(closed, f.token, { applied: 1 }).accepted, false, 'a closed round takes no result');
+});
+
+test('again: stop and budget pause give the attempt back; closeAiRound returns the slot to done with the open items it had and no again/pending/refused', () => {
+  const open = [itemOf('1', 'still_present'), itemOf('2', 'unfixable')];
+  const state = doneBook(open);
+  const f = begin(reopen(state, 'a', 'k').state, { nodeId: 'a', rerun: true }, 'k', 'fix');
+  for (const budget of [false, true]) {
+    const stopped = machine.applyAiStopped(f.state, f.token, budget).state;
+    assert.equal(stopped.aiProof.a.attempts, 0);
+    assert.deepEqual(plain(stopped.aiProof.a.open), plain(open), 'open is not touched by the stop');
+    const closed = machine.closeAiRound(stopped, 'a');
+    const slot = closed.aiProof.a;
+    assert.deepEqual([slot.done, slot.again, slot.pending, slot.refused, slot.incomplete, slot.attempts], [true, undefined, undefined, undefined, undefined, 0]);
+    assert.deepEqual(plain(slot.open), plain(open));
+    assert.equal(model.readBookPipeline({ bookPipeline: plain(closed) }).kind, 'usable');
+  }
+  assert.equal(machine.closeAiRound(state, 'a'), state, 'a slot with no round open is left as it is');
+  assert.equal(machine.closeAiRound(state, 'zzz'), state);
+  const book = machine.closeAiRound(reopen(doneBook([], [itemOf('B1', 'still_present', 'bq', 1)]), undefined, 'bk').state);
+  assert.deepEqual([book.bookProof.done, book.bookProof.again, book.bookProof.open.length], [true, undefined, 1]);
+});
+
+test('again: the third failed fix keeps the problems open as fix_failed (listed once); a failed check ends the slot incomplete; again is cleared either way', () => {
+  const open = [itemOf('1', 'still_present', 'one'), itemOf('2', 'unfixable', 'two')];
+  let cur = reopen(doneBook(open), 'a', 'k').state;
+  let end;
+  for (let i = 0; i < 3; i++) { const f = begin(cur, { nodeId: 'a', rerun: true }, 'k', 'fix'); const r = machine.applyAiFailure(f.state, f.token); cur = r.state; end = r; }
+  assert.equal(end.finished, true);
+  assert.deepEqual(plain(cur.aiProof.a.open.map(i => [i.id, i.reason])), [['1', 'fix_failed'], ['2', 'unfixable']], 'no doubled items');
+  assert.deepEqual([cur.aiProof.a.done, cur.aiProof.a.again, cur.aiProof.a.pending], [true, undefined, undefined]);
+  // a check that fails after the fix was written
+  let c2 = reopen(doneBook(open), 'a', 'k').state;
+  const f = begin(c2, { nodeId: 'a', rerun: true }, 'k', 'fix');
+  c2 = machine.applyAiFix(f.state, f.token, { applied: 1, appliedIds: ['1'], key: 'k2' }).state;
+  for (let i = 0; i < 3; i++) { const p = begin(c2, { nodeId: 'a', rerun: true }, 'k2', 'proof'); c2 = machine.applyAiFailure(p.state, p.token).state; }
+  assert.deepEqual([c2.aiProof.a.done, c2.aiProof.a.incomplete, c2.aiProof.a.again], [true, true, undefined]);
+});
+
+test('again: fixAgainPlan on a 20-chapter book (39 open items, 13 still present, some excluded): the numbers the confirm card shows; incomplete and unfinished slots do not count', () => {
+  const order = Array.from({ length: 20 }, (_, i) => `c${i}`);
+  const base = machine.newBookPipeline({ runId: 'run-20', order, now: NOW });
+  delete base.trial;
+  const slot = items => ({ key: 'k', attempts: 0, round: 2, step: 'proof', checked: 3, fixed: 1, open: items, done: true });
+  const aiProof = {}; let n = 0;
+  order.forEach((id, at) => {
+    const items = [];
+    const count = at < 18 ? 2 : 1;
+    for (let i = 0; i < count; i++) items.push(itemOf(`${at}-${i}`, n < 13 ? 'still_present' : 'not_fixed_in_time', `q${n++}`));
+    aiProof[id] = slot(items);
+  });
+  aiProof.c19 = slot([itemOf('u', 'unfixable', 'qu')]);
+  aiProof.c18 = slot([itemOf('x', 'not_fixed_in_time', 'qx'), itemOf('y', 'hand_edited', 'qy')]);
+  const state = { ...base, phase: 'done', aiProof };
+  const plan = machine.fixAgainPlan(state, 26);
+  assert.deepEqual(plain(plan), { chapters: 19, items: 18 * 2 + 1 + 0, calls: 38, stubborn: 13, statusItems: 26, book: false });
+  const withBook = machine.fixAgainPlan({ ...state, bookProof: { ...slot([itemOf('b', 'not_fixed', 'bq', 1)]), key: 'bk' } }, 0);
+  assert.deepEqual([withBook.book, withBook.calls, withBook.items], [true, 40, 38]);
+  assert.deepEqual(plain(machine.fixAgainPlan({ ...state, aiProof: { c0: { ...aiProof.c0, incomplete: true } } }, 0)), { chapters: 0, items: 0, calls: 0, stubborn: 0, statusItems: 0, book: false }, 'an incomplete slot is not offered');
+  assert.equal(machine.fixAgainPlan({ ...state, aiProof: { c0: { ...aiProof.c0, done: false } } }, 0).items, 0, 'an unfinished slot is not offered');
+  assert.equal(machine.fixAgainPlan(base, 3).items, 0, 'no proof at all: nothing to fix, the status items alone never make a round');
+});
+
+test('again: every open reason of an excluded kind stays out of the plan and the targets (unfixable, sources_conflict, source_unreachable, hand_edited)', () => {
+  const state = doneBook(['unfixable', 'sources_conflict', 'source_unreachable', 'hand_edited', 'fix_failed', 'fix_quote_missing'].map((reason, i) => itemOf(String(i), reason)));
+  assert.equal(machine.fixAgainPlan(state, 0).items, 2);
+  assert.deepEqual(plain(reopen(state, 'a', 'k').state.aiProof.a.pending.map(i => i.id)), ['4', '5']);
+});
+
+test('again: a model slot with again is saved and read back; again must be true; an old save without it is usable', () => {
+  const state = reopen(doneBook([itemOf('1', 'still_present')]), 'a', 'k').state;
+  const ok = plain(state);
+  assert.equal(model.readBookPipeline({ bookPipeline: ok }).kind, 'usable');
+  assert.equal(model.readBookPipeline({ bookPipeline: ok }).data.aiProof.a.again, true);
+  for (const bad of [false, 1, 'yes', null]) assert.equal(model.readBookPipeline({ bookPipeline: { ...ok, aiProof: { ...ok.aiProof, a: { ...ok.aiProof.a, again: bad } } } }).kind, 'unusable');
+  const old = plain(doneBook([itemOf('1', 'still_present')]));
+  assert.equal('again' in old.aiProof.a, false);
+  assert.equal(model.readBookPipeline({ bookPipeline: old }).kind, 'usable');
+});
+
+test('again: the limit stays; addBudget by what is short lets a paused book go on', () => {
+  const state = { ...doneBook([itemOf('1', 'still_present')]), status: 'stopped', pauseReason: 'budget', budget: { used: 300, limit: 300 } };
+  assert.equal(machine.resumeRun(state), null);
+  const raised = machine.addBudget(state, 300 + machine.fixAgainPlan(state, 0).calls - 300);
+  assert.deepEqual([raised.budget.limit, raised.status], [302, 'running']);
+  assert.equal(model.MAX_AI_FIX_ROUNDS, 2);
+});

@@ -99,7 +99,14 @@ export const OPEN_ISSUE_SOURCES: Record<string, IssueSource> = {
       hand_edited: {
         zh: "這章是你手改過的，程式不動",
         en: "You edited this chapter by hand, so it was left alone"
-      }
+      },
+      fix_interrupted: { zh: "修正做到一半被中斷", en: "A fix was interrupted halfway" },
+      image_mismatch: {
+        zh: "圖片可能對不上這一節，請看一下",
+        en: "A picture may not fit this section; please check it"
+      },
+      proof_unmet: { zh: "寫完後的校對有幾處沒過", en: "Some checks after writing did not pass" },
+      structure_unmet: { zh: "章節結構還沒符合企劃", en: "The chapter structure does not match the plan yet" }
     },
     fallback: { zh: "這章還有狀態沒解決", en: "The chapter still has an unresolved state" }
   }

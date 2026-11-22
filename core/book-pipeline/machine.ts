@@ -315,14 +315,14 @@ export function beginAiStep(
   data: BookPipelineData,
   scope: {
     nodeId?: string;
-    /** One chapter written again after the book was proofread: its chapter proofread starts again in any phase. */ rerun?: boolean;
+    /** One chapter written again after the book was proofread, or one more fix round over a finished book (`reopenAiRound`): the step may start in any phase. */ rerun?: boolean;
   },
   key: string,
   step: "proof" | "fix"
 ): { state: BookPipelineData; token: AiToken } | null {
   const nodeId = scope.nodeId;
   if (data.status !== "running") return null;
-  if (!(scope.rerun && nodeId !== undefined)) {
+  if (!scope.rerun) {
     if (data.phase === "done") return null;
     if (nodeId === undefined ? data.phase !== "writing" && data.phase !== "gate2" : !aiChapterDue(data, nodeId))
       return null;
@@ -403,7 +403,7 @@ export function applyAiProof(
     // target's blocked reason (or is still present); one the earlier rounds never saw (first found in this last check) was not fixed in time.
     const squash = (text: string): string => text.replace(/\s+/g, "");
     const prior = found.pending ?? [];
-    slot.open = withOpen(result.open, result.pending, id => {
+    const fresh = withOpen(result.open, result.pending, id => {
       const item = result.pending.find(entry => entry.id === id);
       const before = item
         ? prior.find(
@@ -423,6 +423,15 @@ export function applyAiProof(
       if (before) return slot.refused?.[before.id] ?? (written ? "still_present" : "not_fixed");
       return written ? "still_present" : "not_fixed_in_time";
     });
+    if (found.again) {
+      // One more round over a finished proofread: the problems no edit can fix were never sent, so they stay (in front); the new check's duplicates of them are dropped.
+      const squash = (text: string): string => text.replace(/\s+/g, "");
+      const kept = found.open.filter(item => AI_AGAIN_EXCLUDED.includes(item.reason));
+      const seen = (item: AiProofOpen): boolean =>
+        kept.some(old => squash(old.quote) === squash(item.quote) && (old.chapter ?? 1) === (item.chapter ?? 1));
+      slot.open = [...kept, ...fresh.filter(item => !seen(item))];
+      delete slot.again;
+    } else slot.open = fresh;
   }
   setAiSlot(next, token.nodeId, slot);
   next.revision++;
@@ -501,8 +510,20 @@ export function applyAiFailure(data: BookPipelineData, token: AiToken): Committe
   if (slot.attempts >= MAX_STEP_ATTEMPTS) {
     slot.done = true;
     if (slot.step === "proof") slot.incomplete = true;
-    else slot.open = withOpen(slot.open, slot.pending ?? [], () => "fix_failed");
+    else if (slot.again) {
+      // The problems are already listed (one more round over a finished proofread): the ones this round tried are marked, not listed twice.
+      const squash = (text: string): string => text.replace(/\s+/g, "");
+      const tried = slot.pending ?? [];
+      slot.open = slot.open.map(item =>
+        tried.some(
+          target => squash(target.quote) === squash(item.quote) && (target.chapter ?? 1) === (item.chapter ?? 1)
+        )
+          ? { ...item, reason: "fix_failed" }
+          : item
+      );
+    } else slot.open = withOpen(slot.open, slot.pending ?? [], () => "fix_failed");
     delete slot.pending;
+    delete slot.again;
   }
   setAiSlot(next, token.nodeId, slot);
   next.revision++;
@@ -522,6 +543,89 @@ export function applyAiStopped(data: BookPipelineData, token: AiToken, budget: b
   }
   next.revision++;
   return { state: next, accepted: true };
+}
+
+/** The open problems no edit can fix: one more fix round never sends them (the AI judged so, the sources decide, or the text is the reader's). */
+export const AI_AGAIN_EXCLUDED: readonly string[] = ["unfixable", "sources_conflict", "source_unreachable", "hand_edited"];
+const againTargets = (slot: AiProofState | undefined, key: string): AiProofOpen[] =>
+  slot?.done && !slot.incomplete && slot.key === key ? slot.open.filter(item => !AI_AGAIN_EXCLUDED.includes(item.reason)) : [];
+/**
+ * One more fix-and-check round over a finished AI proofread (the book's `nodeId` is undefined): the slot goes back to the last round's
+ * fix with the fixable open problems as its targets (no suggestion: the fix reads the problem and the quote). `open` stays as it is, so
+ * the counts do not move while it works; the next `applyAiFix` and `applyAiProof` finish it. Not accepted (nothing changes) when the slot is
+ * not finished, was `incomplete`, was made for another text (`key`: a hand edit), or has no fixable problem.
+ */
+export function reopenAiRound(data: BookPipelineData, nodeId: string | undefined, key: string): Committed {
+  if (nodeId !== undefined && !effectiveOrder(data).includes(nodeId)) return { state: data, accepted: false };
+  const found = aiSlot(data, nodeId);
+  const targets = againTargets(found, key);
+  if (!found || !targets.length) return { state: data, accepted: false };
+  const next = clone(data);
+  const slot: AiProofState = {
+    ...found,
+    step: "fix",
+    round: MAX_AI_FIX_ROUNDS - 1,
+    attempts: 0,
+    again: true,
+    pending: targets.map(item => ({
+      id: item.id,
+      ...(item.chapter ? { chapter: item.chapter } : {}),
+      quote: item.quote,
+      problem: item.problem,
+      suggestion: ""
+    }))
+  };
+  delete slot.done;
+  delete slot.refused;
+  setAiSlot(next, nodeId, slot);
+  next.revision++;
+  return { state: next, accepted: true };
+}
+/** A round of {@link reopenAiRound} that did not finish (stopped, out of budget, closed with the map): the slot is closed again with the problems it had before. */
+export function closeAiRound(data: BookPipelineData, nodeId?: string): BookPipelineData {
+  const found = aiSlot(data, nodeId);
+  if (!found?.again || found.done) return data;
+  const next = clone(data);
+  const slot: AiProofState = { ...found, done: true, attempts: 0 };
+  delete slot.pending;
+  delete slot.again;
+  delete slot.refused;
+  setAiSlot(next, nodeId, slot);
+  next.revision++;
+  return next;
+}
+/**
+ * What one more round would do to a finished book (pure; the button and its confirm card read it). `needsReview` is the number of chapters
+ * whose own status is needs-review (not an AI proofread item: a round never touches them). `calls` is one fix and one check per chapter (and for the book).
+ */
+export function fixAgainPlan(
+  data: BookPipelineData,
+  needsReview: number
+): { chapters: number; items: number; calls: number; stubborn: number; statusItems: number; book: boolean } {
+  let chapters = 0;
+  let items = 0;
+  let stubborn = 0;
+  const count = (slot: AiProofState | undefined): number => {
+    const fixable = slot?.done && !slot.incomplete ? slot.open.filter(item => !AI_AGAIN_EXCLUDED.includes(item.reason)) : [];
+    stubborn += fixable.filter(item => item.reason === "still_present").length;
+    return fixable.length;
+  };
+  for (const id of effectiveOrder(data)) {
+    const found = count(data.aiProof?.[id]);
+    if (!found) continue;
+    chapters++;
+    items += found;
+  }
+  const inBook = count(data.bookProof);
+  items += inBook;
+  return {
+    chapters,
+    items,
+    calls: 2 * chapters + (inBook ? 2 : 0),
+    stubborn,
+    statusItems: Math.max(0, Math.trunc(needsReview) || 0),
+    book: inBook > 0
+  };
 }
 
 /* ---- The chief editor's pass over every card's plan (one call per book, never blocks the run) ---- */

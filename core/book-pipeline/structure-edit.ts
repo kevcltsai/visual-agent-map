@@ -20,13 +20,32 @@ export type StructureNode = { id: string; parentId: string | null; title: string
 export type StructureInput = { rootId: string; nodes: readonly StructureNode[] };
 
 export type RejectCode =
-  | "unknown_card" | "root" | "locked" | "has_children" | "chapter_has_sections" | "depends_on_rejected" | "cycle" | "bad_title" | "bad_ref";
+  | "unknown_card"
+  | "root"
+  | "locked"
+  | "has_children"
+  | "chapter_has_sections"
+  | "depends_on_rejected"
+  | "cycle"
+  | "bad_title"
+  | "bad_ref";
 
 /** What the card looked like before an op: where it sat (parent and previous sibling) and its title. */
-export type Before = { parent: string | null; after?: string; title: string; /** A merged card's summary when it was folded in (the target's plan reads it); set by the caller. */ summary?: string; /** A merged card's materials (names) whose home was this card; an undo points them back. Set by the caller. */ homes?: string[] };
+export type Before = {
+  parent: string | null;
+  after?: string;
+  title: string;
+  /** A merged card's summary when it was folded in (the target's plan reads it); set by the caller. */ summary?: string;
+  /** A merged card's materials (names) whose home was this card; an undo points them back. Set by the caller. */ homes?: string[];
+};
 export type AppliedOp = { id: string; op: StructureOp; before: Before };
 export type RejectedOp = { op: StructureOp; code: RejectCode };
-export type SimulatedStructure = { applied: AppliedOp[]; rejected: RejectedOp[]; result: StructureNode[]; overCap?: true };
+export type SimulatedStructure = {
+  applied: AppliedOp[];
+  rejected: RejectedOp[];
+  result: StructureNode[];
+  overCap?: true;
+};
 
 export type InverseOp =
   | { kind: "remove"; opId: string; card: string }
@@ -36,22 +55,41 @@ export type InverseOp =
 
 /** One line, no characters a file name or a `[[link]]` cannot carry, 1–80 long; undefined when nothing usable is left. */
 export function cleanStructureTitle(text: string): string | undefined {
-  const out = sanitizeGeneratedTitle(String(text ?? "")).replace(/\s+/g, " ").replace(/[\\/:*?"<>|#^[\]]/g, "").replace(/\s+/g, " ").trim();
+  const out = sanitizeGeneratedTitle(String(text ?? ""))
+    .replace(/\s+/g, " ")
+    .replace(/[\\/:*?"<>|#^[\]]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
   return out.length >= 1 && out.length <= MAX_TITLE ? out : undefined;
 }
 
-const cleanReason = (text: string): string => String(text ?? "").replace(/\s+/g, " ").trim().slice(0, MAX_REASON);
+const cleanReason = (text: string): string =>
+  String(text ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_REASON);
 
 class Tree {
   parent = new Map<string, string | null>();
   kids = new Map<string, string[]>();
   title = new Map<string, string>();
-  constructor(readonly rootId: string, nodes: readonly StructureNode[]) {
-    for (const n of nodes) { this.parent.set(n.id, n.parentId); this.title.set(n.id, n.title); this.kids.set(n.id, []); }
+  constructor(
+    readonly rootId: string,
+    nodes: readonly StructureNode[]
+  ) {
+    for (const n of nodes) {
+      this.parent.set(n.id, n.parentId);
+      this.title.set(n.id, n.title);
+      this.kids.set(n.id, []);
+    }
     for (const n of nodes) if (n.parentId !== null) this.kids.get(n.parentId)?.push(n.id);
   }
-  has(id: string): boolean { return this.parent.has(id); }
-  children(id: string): string[] { return this.kids.get(id) ?? []; }
+  has(id: string): boolean {
+    return this.parent.has(id);
+  }
+  children(id: string): string[] {
+    return this.kids.get(id) ?? [];
+  }
   previousSibling(id: string): string | undefined {
     const list = this.children(this.parent.get(id) ?? "");
     const i = list.indexOf(id);
@@ -59,7 +97,11 @@ class Tree {
   }
   detach(id: string): void {
     const p = this.parent.get(id);
-    if (p) { const list = this.kids.get(p) ?? []; const i = list.indexOf(id); if (i >= 0) list.splice(i, 1); }
+    if (p) {
+      const list = this.kids.get(p) ?? [];
+      const i = list.indexOf(id);
+      if (i >= 0) list.splice(i, 1);
+    }
   }
   attach(id: string, parent: string, after?: string): void {
     const list = this.kids.get(parent) ?? [];
@@ -69,9 +111,16 @@ class Tree {
     this.parent.set(id, parent);
   }
   add(id: string, title: string, parent: string, after?: string): void {
-    this.title.set(id, title); this.kids.set(id, []); this.attach(id, parent, after);
+    this.title.set(id, title);
+    this.kids.set(id, []);
+    this.attach(id, parent, after);
   }
-  drop(id: string): void { this.detach(id); this.parent.delete(id); this.kids.delete(id); this.title.delete(id); }
+  drop(id: string): void {
+    this.detach(id);
+    this.parent.delete(id);
+    this.kids.delete(id);
+    this.title.delete(id);
+  }
   isUnder(id: string, ancestor: string): boolean {
     for (let cur: string | null | undefined = id; cur; cur = this.parent.get(cur)) if (cur === ancestor) return true;
     return false;
@@ -92,10 +141,15 @@ class Tree {
 
 const copyNodes = (nodes: readonly StructureNode[]): StructureNode[] => nodes.map(n => ({ ...n }));
 
-export function simulateStructure(input: StructureInput, ops: readonly StructureOp[], locked: ReadonlySet<string>): SimulatedStructure {
+export function simulateStructure(
+  input: StructureInput,
+  ops: readonly StructureOp[],
+  locked: ReadonlySet<string>
+): SimulatedStructure {
   const original = copyNodes(input.nodes);
   const adds = ops.filter(o => o.kind === "add").length;
-  if (ops.length > MAX_STRUCTURE_OPS || adds > MAX_STRUCTURE_ADDS) return { applied: [], rejected: [], result: original, overCap: true };
+  if (ops.length > MAX_STRUCTURE_OPS || adds > MAX_STRUCTURE_ADDS)
+    return { applied: [], rejected: [], result: original, overCap: true };
 
   const tree = new Tree(input.rootId, original);
   const applied: AppliedOp[] = [];
@@ -165,10 +219,18 @@ export function simulateStructure(input: StructureInput, ops: readonly Structure
       tree.add(op.ref, title, op.parent, op.after);
       return { id: op.id, op: clean, before: { parent: null, title: "" } };
     }
-    const before: Before = { parent: tree.parent.get(op.card) ?? null, after: tree.previousSibling(op.card), title: tree.title.get(op.card) ?? "" };
-    if (op.kind === "remove" || op.kind === "merge") { tree.drop(op.card); gone.add(op.card); }
-    else if (op.kind === "move") { tree.detach(op.card); tree.attach(op.card, op.parent, op.after); }
-    else tree.title.set(op.card, cleanStructureTitle(op.title) as string);
+    const before: Before = {
+      parent: tree.parent.get(op.card) ?? null,
+      after: tree.previousSibling(op.card),
+      title: tree.title.get(op.card) ?? ""
+    };
+    if (op.kind === "remove" || op.kind === "merge") {
+      tree.drop(op.card);
+      gone.add(op.card);
+    } else if (op.kind === "move") {
+      tree.detach(op.card);
+      tree.attach(op.card, op.parent, op.after);
+    } else tree.title.set(op.card, cleanStructureTitle(op.title) as string);
     return { id: op.id, op: op.kind === "rename" ? { ...op, title: tree.title.get(op.card) as string } : op, before };
   }
 }
@@ -180,7 +242,7 @@ export function undoClosure(applied: readonly AppliedOp[], opIds: Iterable<strin
   const refsOf = (op: StructureOp): string[] => [
     ...(op.kind !== "add" ? [op.card] : []),
     ...(op.kind === "add" || op.kind === "move" ? [op.parent, ...(op.after !== undefined ? [op.after] : [])] : []),
-    ...(op.kind === "merge" ? [op.into] : []),
+    ...(op.kind === "merge" ? [op.into] : [])
   ];
   const nameOf = (op: StructureOp): string => (op.kind === "add" ? op.ref : op.card);
   for (const a of applied) if (picked.has(a.id)) touched.add(nameOf(a.op));
@@ -189,8 +251,15 @@ export function undoClosure(applied: readonly AppliedOp[], opIds: Iterable<strin
     grew = false;
     let seen = false;
     for (const a of applied) {
-      if (picked.has(a.id)) { seen = true; continue; }
-      if (seen && refsOf(a.op).some(r => touched.has(r))) { picked.add(a.id); touched.add(nameOf(a.op)); grew = true; }
+      if (picked.has(a.id)) {
+        seen = true;
+        continue;
+      }
+      if (seen && refsOf(a.op).some(r => touched.has(r))) {
+        picked.add(a.id);
+        touched.add(nameOf(a.op));
+        grew = true;
+      }
     }
   }
   return new Set(applied.filter(a => picked.has(a.id)).map(a => a.id));
@@ -203,8 +272,17 @@ export function inverseOps(applied: readonly AppliedOp[], ids: ReadonlySet<strin
     if (!ids.has(a.id)) continue;
     const { op, before } = a;
     if (op.kind === "add") out.push({ kind: "remove", opId: a.id, card: op.ref });
-    else if (op.kind === "remove" || op.kind === "merge") out.push({ kind: "restore", opId: a.id, card: op.card, title: before.title, parent: before.parent ?? "", after: before.after });
-    else if (op.kind === "move") out.push({ kind: "move", opId: a.id, card: op.card, parent: before.parent ?? "", after: before.after });
+    else if (op.kind === "remove" || op.kind === "merge")
+      out.push({
+        kind: "restore",
+        opId: a.id,
+        card: op.card,
+        title: before.title,
+        parent: before.parent ?? "",
+        after: before.after
+      });
+    else if (op.kind === "move")
+      out.push({ kind: "move", opId: a.id, card: op.card, parent: before.parent ?? "", after: before.after });
     else out.push({ kind: "rename", opId: a.id, card: op.card, title: before.title });
   }
   return out;
@@ -216,8 +294,10 @@ export function applyInverseOps(input: StructureInput, inverse: readonly Inverse
   for (const op of inverse) {
     if (op.kind === "remove") tree.drop(op.card);
     else if (op.kind === "restore") tree.add(op.card, op.title, op.parent, op.after);
-    else if (op.kind === "move") { tree.detach(op.card); tree.attach(op.card, op.parent, op.after); }
-    else tree.title.set(op.card, op.title);
+    else if (op.kind === "move") {
+      tree.detach(op.card);
+      tree.attach(op.card, op.parent, op.after);
+    } else tree.title.set(op.card, op.title);
   }
   return tree.nodes();
 }

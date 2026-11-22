@@ -17463,7 +17463,10 @@ export class VisualAgentMapView extends ItemView {
     if (focus === "structure-undo") {
       const undos = Array.from(this.contentEl.querySelectorAll<HTMLElement>(".vam-book-structure-undo"));
       const next = undos[Math.min(this.bookStructureFocusAt, undos.length - 1)];
-      (this.bookStructureFocusAt >= 0 && next ? next : this.contentEl.querySelector<HTMLElement>(".vam-book-confirm"))?.focus();
+      (this.bookStructureFocusAt >= 0 && next
+        ? next
+        : this.contentEl.querySelector<HTMLElement>(".vam-book-confirm")
+      )?.focus();
       return;
     }
     const selector = {
@@ -17708,7 +17711,10 @@ export class VisualAgentMapView extends ItemView {
     if (this.bookStructureUndo === "busy") return;
     const buttons = Array.from(this.contentEl.querySelectorAll<HTMLElement>(".vam-book-structure-row"));
     // The keyboard goes to the undo button now at the pressed row's place (the next one), or to "start writing" when none is left.
-    this.bookStructureFocusAt = ids === "all" ? -1 : buttons.filter(r => !r.classList.contains("is-undone")).findIndex(r => ids.includes(r.dataset.op ?? ""));
+    this.bookStructureFocusAt =
+      ids === "all"
+        ? -1
+        : buttons.filter(r => !r.classList.contains("is-undone")).findIndex(r => ids.includes(r.dataset.op ?? ""));
     this.bookStructureUndo = "busy";
     this.render();
     let failed = false;

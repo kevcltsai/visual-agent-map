@@ -13,17 +13,21 @@ export interface StructureWork {
   restore: { id: string; path: string }[];
   rename: { id: string; path: string; title: string }[];
   /** Rewrites the map: `pathOf(originalPath)` is where a moved, renamed or restored note is now. Throwing undoes everything. */
-  edit(map: MapDocument, tools: { created(ref: string): { id: string; path: string }; pathOf(path: string): string }): void;
+  edit(
+    map: MapDocument,
+    tools: { created(ref: string): { id: string; path: string }; pathOf(path: string): string }
+  ): void;
 }
 export type StructureResult = { ok: true } | { ok: false; code: string; rollbackFailed?: true };
 
 export interface StructurePortDeps {
-  repo: TransactionDeps["repo"] &
-    Pick<Repository, "createNote" | "resolveTopicModel" | "topicFolder" | "updateNote">;
+  repo: TransactionDeps["repo"] & Pick<Repository, "createNote" | "resolveTopicModel" | "topicFolder" | "updateNote">;
   rebuildDerivedData: () => Promise<void>;
 }
 
-export function createBookStructurePort(deps: StructurePortDeps): (mapPath: string, work: StructureWork) => Promise<StructureResult> {
+export function createBookStructurePort(
+  deps: StructurePortDeps
+): (mapPath: string, work: StructureWork) => Promise<StructureResult> {
   const { repo } = deps;
   return async (mapPath, work) => {
     const made: { ref: string; id: string; path: string }[] = [];
@@ -35,7 +39,9 @@ export function createBookStructurePort(deps: StructurePortDeps): (mapPath: stri
       if (!root) return { ok: false, code: "no_root" };
       const resolved = await repo.resolveTopicModel(root.path, map);
       for (const item of work.create) {
-        const node = await repo.createNote(item.title, resolved.model, map, mapPath, "inherited", { summary: item.summary });
+        const node = await repo.createNote(item.title, resolved.model, map, mapPath, "inherited", {
+          summary: item.summary
+        });
         made.push({ ref: item.ref, id: node.id, path: node.path });
       }
       const tx = begin({
@@ -68,7 +74,8 @@ export function createBookStructurePort(deps: StructurePortDeps): (mapPath: stri
       await tx.commit({ label: "structure" });
       return { ok: true };
     } catch (error) {
-      if (isTransactionError(error, "rollback-failed")) return { ok: false, code: "rollback_failed", rollbackFailed: true };
+      if (isTransactionError(error, "rollback-failed"))
+        return { ok: false, code: "rollback_failed", rollbackFailed: true };
       // The notes created for this edit are not in the map: park them as unassigned so none is left in Notes.
       for (const note of made) {
         try {

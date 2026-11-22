@@ -51,7 +51,18 @@ export const MAX_MATERIALS = 40;
 /** More proposals than this in a reply are not read (the structure cap itself is enforced by `simulateStructure`). */
 const MAX_STRUCTURE_READ = 30;
 const STRUCTURE_KINDS = ["add", "remove", "merge", "move", "rename"] as const;
-const STRUCTURE_FIELDS = ["id", "kind", "reason", "card", "into", "title", "summary", "parent", "after", "ref"] as const;
+const STRUCTURE_FIELDS = [
+  "id",
+  "kind",
+  "reason",
+  "card",
+  "into",
+  "title",
+  "summary",
+  "parent",
+  "after",
+  "ref"
+] as const;
 export const GLOBAL_PLAN_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -129,7 +140,9 @@ function structureOpOf(entry: unknown): StructureOp | undefined {
   switch (one.kind) {
     case "add": {
       const [title, summary, parent, ref] = ["title", "summary", "parent", "ref"].map(key => need(one, key));
-      return title && summary && parent && ref ? { ...base, kind: "add", title, summary, parent, ref, ...(after ? { after } : {}) } : undefined;
+      return title && summary && parent && ref
+        ? { ...base, kind: "add", title, summary, parent, ref, ...(after ? { after } : {}) }
+        : undefined;
     }
     case "remove": {
       const card = need(one, "card");
@@ -166,10 +179,12 @@ function structureOf(value: unknown): StructureOp[] {
 
 export function parseGlobalPlan(raw: string, request: GlobalPlanRequest): GlobalPlanResult {
   const item = parseJson(raw);
-  exactKeys(
-    Object.fromEntries(Object.entries(item).filter(([key]) => key !== "structure")),
-    ["thread", "cards", "materials", "decisions"]
-  );
+  exactKeys(Object.fromEntries(Object.entries(item).filter(([key]) => key !== "structure")), [
+    "thread",
+    "cards",
+    "materials",
+    "decisions"
+  ]);
   const thread = singleLine(textOf(item.thread, "thread"), 1200);
   const wanted = new Set(request.cards.map(card => card.id));
   const seen = new Set<string>();

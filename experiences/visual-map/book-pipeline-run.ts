@@ -285,7 +285,16 @@ import {
   type CardResultSnapshot
 } from "./book-pipeline-rerun";
 import { bookReadingOrder } from "./presentation-order";
-import { applyInverseOps, inverseOps, simulateStructure, undoClosure, undoAffected, type SimulatedStructure, type StructureNode, type StructureOp } from "../../core/book-pipeline/structure-edit";
+import {
+  applyInverseOps,
+  inverseOps,
+  simulateStructure,
+  undoClosure,
+  undoAffected,
+  type SimulatedStructure,
+  type StructureNode,
+  type StructureOp
+} from "../../core/book-pipeline/structure-edit";
 import { arrangeMap, layoutOf } from "../../map-layout";
 import type { StructureResult, StructureWork } from "./book-structure-port";
 import {
@@ -1403,7 +1412,9 @@ export class BookPipelineRuns {
       const edit = data.structureEdit;
       if (data.phase !== "gate1" || data.status !== "running" || !edit) throw new BookPipelineRunError("not_gate1");
       const undone = new Set(edit.undone ?? []);
-      const ids = [...undoClosure(edit.applied, opIds === "all" ? edit.applied.map(a => a.id) : opIds)].filter(id => !undone.has(id));
+      const ids = [...undoClosure(edit.applied, opIds === "all" ? edit.applied.map(a => a.id) : opIds)].filter(
+        id => !undone.has(id)
+      );
       if (!ids.length) return;
       if (!this.ports.editBookStructure) throw new BookPipelineRunError("missing");
       const picked = new Set(ids);
@@ -1422,7 +1433,14 @@ export class BookPipelineRuns {
       // Every parked note must still be there, or nothing is changed.
       for (const id of restored) {
         const at = parkedAt[id];
-        if (!at || !(await this.ports.readCard(at).then(() => true, () => false))) throw new BookPipelineRunError("missing");
+        if (
+          !at ||
+          !(await this.ports.readCard(at).then(
+            () => true,
+            () => false
+          ))
+        )
+          throw new BookPipelineRunError("missing");
       }
       const titleOf = new Map(nodes.map(n => [n.id, n.title]));
       // The cards whose own plan no longer fits: the put-back ones, the merge targets, those that changed between chapter and section.
@@ -1440,10 +1458,21 @@ export class BookPipelineRuns {
           const renamedIds = new Set(renamed.map(n => n.id));
           const placed = nodes.map(item => {
             if (!nowIds.has(item.id))
-              return { id: item.id, path: tools.pathOf(parkedAt[item.id]), parentId: item.parentId, x: 0, y: 0, collapsed: false };
+              return {
+                id: item.id,
+                path: tools.pathOf(parkedAt[item.id]),
+                parentId: item.parentId,
+                x: 0,
+                y: 0,
+                collapsed: false
+              };
             const own = byId.get(item.id);
             if (!own) throw new Error("card missing from the map");
-            return { ...own, parentId: item.parentId, ...(renamedIds.has(item.id) ? { path: tools.pathOf(own.path) } : {}) };
+            return {
+              ...own,
+              parentId: item.parentId,
+              ...(renamedIds.has(item.id) ? { path: tools.pathOf(own.path) } : {})
+            };
           });
           for (const id of dropped) {
             const node = byId.get(id);
@@ -1451,10 +1480,12 @@ export class BookPipelineRuns {
             parkedNow[id] = tools.pathOf(node.path);
           }
           const survivors = new Set(placed.map(node => node.id));
-          if (map.nodes.some(node => !survivors.has(node.id) && !dropped.includes(node.id))) throw new Error("map changed");
+          if (map.nodes.some(node => !survivors.has(node.id) && !dropped.includes(node.id)))
+            throw new Error("map changed");
           map.nodes = arrangeMap(placed, undefined, undefined, layoutOf(map));
           const reading = bookReadingOrder(map);
-          if (reading.length !== placed.length || reading.some(id => !survivors.has(id))) throw new Error("order differs");
+          if (reading.length !== placed.length || reading.some(id => !survivors.has(id)))
+            throw new Error("order differs");
           const parentOf = new Map(map.nodes.map(node => [node.id, node.parentId]));
           const chapters = Object.fromEntries(
             map.nodes.map(node => [node.id, { title: titleOf.get(node.id) ?? "", path: node.path }])
@@ -1493,7 +1524,10 @@ export class BookPipelineRuns {
           if (outcome.rollbackFailed) throw new Error("structure_rollback");
           throw new BookPipelineRunError(this.dead(drive) ? "disposed" : "stale");
         }
-        await drive.store.commit(state => ({ state: (next as (s: BookPipelineData) => BookPipelineData)(state), accepted: true }));
+        await drive.store.commit(state => ({
+          state: (next as (s: BookPipelineData) => BookPipelineData)(state),
+          accepted: true
+        }));
         const map = await this.ports.readMap(mapPath);
         drive.cards.clear();
         drive.stages.clear();
@@ -1508,7 +1542,8 @@ export class BookPipelineRuns {
       }
       await this.pointHomesBack(drive, edit, picked);
       // The other cards' neighbour lines and numbers follow the restored order (a program rewrite; the loop's first round does it).
-      for (const id of effectiveOrder(drive.store.state)) if (id !== drive.rootId && !affected.has(id)) drive.planSkipped.add(id);
+      for (const id of effectiveOrder(drive.store.state))
+        if (id !== drive.rootId && !affected.has(id)) drive.planSkipped.add(id);
       this.log(drive, "gate1", "-", "plan", `undo_structure:${ids.length}`);
     });
   }
@@ -3845,7 +3880,8 @@ export class BookPipelineRuns {
     const locked = new Set<string>([drive.rootId]);
     for (const id of order) {
       const info = drive.cards.get(id) as CardInfo;
-      if (id !== drive.rootId && !this.mayOverwriteCard(drive, id, (await this.ports.readCard(info.path)).raw)) locked.add(id);
+      if (id !== drive.rootId && !this.mayOverwriteCard(drive, id, (await this.ports.readCard(info.path)).raw))
+        locked.add(id);
     }
     const request: GlobalPlanRequest = {
       ...this.base(drive, drive.config.planModel),
@@ -3873,7 +3909,11 @@ export class BookPipelineRuns {
     if (!(await this.ensureBackup(drive, drive.rootId, path, before.raw)))
       return { kind: "failed", reason: "backup_failed" };
     // The editor's structure changes are checked on a plain tree first (once per run: a second reply of the same run changes nothing).
-    const baseNodes: StructureNode[] = order.map(id => ({ id, parentId: drive.parents.get(id) ?? null, title: (drive.cards.get(id) as CardInfo).title }));
+    const baseNodes: StructureNode[] = order.map(id => ({
+      id,
+      parentId: drive.parents.get(id) ?? null,
+      title: (drive.cards.get(id) as CardInfo).title
+    }));
     const sim =
       result.structure?.length && drive.store.state.structureEdit?.runId !== drive.store.state.runId
         ? simulateStructure({ rootId: drive.rootId, nodes: baseNodes }, result.structure, locked)
@@ -3899,7 +3939,18 @@ export class BookPipelineRuns {
       authorize: this.authorize(drive, token)
     });
     if (written === "discarded") return { kind: "failed", reason: "discarded" };
-    if (sim && (await this.applyStructure(drive, token, sim, baseNodes, result.materials, path, sectionWith(this.titleAfter(drive, undefined)))) === "fatal")
+    if (
+      sim &&
+      (await this.applyStructure(
+        drive,
+        token,
+        sim,
+        baseNodes,
+        result.materials,
+        path,
+        sectionWith(this.titleAfter(drive, undefined))
+      )) === "fatal"
+    )
       return { kind: "cancelled" };
     return {
       kind: "ok",
@@ -3967,11 +4018,17 @@ export class BookPipelineRuns {
     };
     if (!sim.applied.length) {
       if (record.rejected.length || record.overCap)
-        await drive.store.commit(state => ({ state: { ...state, structureEdit: record, revision: state.revision + 1 }, accepted: true }));
+        await drive.store.commit(state => ({
+          state: { ...state, structureEdit: record, revision: state.revision + 1 },
+          accepted: true
+        }));
       return "done";
     }
     if (!this.ports.editBookStructure) {
-      await drive.store.commit(state => ({ state: { ...state, structureEdit: record, revision: state.revision + 1 }, accepted: true }));
+      await drive.store.commit(state => ({
+        state: { ...state, structureEdit: record, revision: state.revision + 1 },
+        accepted: true
+      }));
       return "done";
     }
     const finalTitle = new Map(sim.result.map(n => [n.id, n.title]));
@@ -3988,7 +4045,11 @@ export class BookPipelineRuns {
       restore: [],
       rename: baseNodes
         .filter(n => finalTitle.has(n.id) && finalTitle.get(n.id) !== n.title)
-        .map(n => ({ id: n.id, path: (drive.cards.get(n.id) as CardInfo).path, title: finalTitle.get(n.id) as string })),
+        .map(n => ({
+          id: n.id,
+          path: (drive.cards.get(n.id) as CardInfo).path,
+          title: finalTitle.get(n.id) as string
+        })),
       edit: (map, tools) => {
         for (const op of refs) idOf.set(op.ref, tools.created(op.ref).id);
         const real = (id: string): string => idOf.get(id) ?? id;
@@ -4018,11 +4079,15 @@ export class BookPipelineRuns {
         if (order.length !== nodes.length || order.some(id => !survivors.has(id))) throw new Error("order differs");
         const parentOf = new Map(map.nodes.map(node => [node.id, node.parentId]));
         const chapters = Object.fromEntries(
-          map.nodes.map(node => [node.id, { title: finalTitle.get(node.id) ?? drive.cards.get(node.id)?.title ?? "", path: node.path }])
+          map.nodes.map(node => [
+            node.id,
+            { title: finalTitle.get(node.id) ?? drive.cards.get(node.id)?.title ?? "", path: node.path }
+          ])
         );
         const fixed = (op: StructureOp): StructureOp => {
           const out: Record<string, unknown> = { ...op };
-          for (const key of ["ref", "card", "into", "parent", "after"]) if (typeof out[key] === "string") out[key] = real(out[key]);
+          for (const key of ["ref", "card", "into", "parent", "after"])
+            if (typeof out[key] === "string") out[key] = real(out[key]);
           return out as unknown as StructureOp;
         };
         const edit: StructureEditState = {
@@ -4085,7 +4150,10 @@ export class BookPipelineRuns {
         }
         return "done";
       }
-      await drive.store.commit(state => ({ state: (next as (s: BookPipelineData) => BookPipelineData)(state), accepted: true }));
+      await drive.store.commit(state => ({
+        state: (next as (s: BookPipelineData) => BookPipelineData)(state),
+        accepted: true
+      }));
       const map = await this.ports.readMap(drive.mapPath);
       drive.cards.clear();
       drive.stages.clear();

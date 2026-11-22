@@ -3,8 +3,20 @@ import { t } from "../../i18n";
 import { isBookStepError } from "../../core/steps/book-pipeline/base";
 import { splitLengthIssue, type LengthReason } from "../../core/book-pipeline/settings";
 import { parseCardPoints } from "../../core/book-pipeline/plan-text";
-import { bookStructure as bookStructureOf, type BookStructure, type CardPlace } from "../../core/book-pipeline/structure";
-import { applyInverseOps, inverseOps, simulateStructure, undoAffected, undoClosure, type AppliedOp, type StructureNode } from "../../core/book-pipeline/structure-edit";
+import {
+  bookStructure as bookStructureOf,
+  type BookStructure,
+  type CardPlace
+} from "../../core/book-pipeline/structure";
+import {
+  applyInverseOps,
+  inverseOps,
+  simulateStructure,
+  undoAffected,
+  undoClosure,
+  type AppliedOp,
+  type StructureNode
+} from "../../core/book-pipeline/structure-edit";
 import { splitPictureIssue } from "../../core/book-pipeline/image-slots";
 import { joinReasons, splitCarriedIssue } from "./book-pipeline-reasons";
 import {
@@ -251,12 +263,17 @@ function structureEditField(
   for (const a of edit.applied) if (a.op.kind === "add") names.set(a.op.ref, a.op.title);
   const nameOf = (id: string): string => titleOf?.(id) ?? names.get(id) ?? "";
   const before = placer(edit.before.rootId, edit.before.nodes, nameOf);
-  const afterNodes = simulateStructure(edit.before, edit.applied.map(a => a.op), new Set()).result;
+  const afterNodes = simulateStructure(
+    edit.before,
+    edit.applied.map(a => a.op),
+    new Set()
+  ).result;
   const after = placer(edit.before.rootId, afterNodes, nameOf);
   const items: BookStructureItem[] = edit.applied.map(a => {
     const { op } = a;
     const id = op.kind === "add" ? op.ref : op.card;
-    const archivedPath = (op.kind === "merge" || op.kind === "remove") && edit.archived ? edit.archived[op.card] : undefined;
+    const archivedPath =
+      (op.kind === "merge" || op.kind === "remove") && edit.archived ? edit.archived[op.card] : undefined;
     const dependents = [...undoClosure(edit.applied, [a.id])]
       .filter(other => other !== a.id && !undone.has(other))
       .map(other => edit.applied.find(x => x.id === other) as AppliedOp)
@@ -278,16 +295,26 @@ function structureEditField(
     const rootId = edit.before.rootId;
     const current: StructureNode[] = effectiveOrder(data).map(id => {
       const place = now.placeOf(id);
-      return { id, parentId: id === rootId ? null : place?.kind === "section" ? (place.chapterId ?? rootId) : rootId, title: "" };
+      return {
+        id,
+        parentId: id === rootId ? null : place?.kind === "section" ? (place.chapterId ?? rootId) : rootId,
+        title: ""
+      };
     });
-    const picked = undoClosure(edit.applied, edit.applied.map(x => x.id).filter(x => !undone.has(x)));
+    const picked = undoClosure(
+      edit.applied,
+      edit.applied.map(x => x.id).filter(x => !undone.has(x))
+    );
     const afterUndo = applyInverseOps({ rootId, nodes: current }, inverseOps(edit.applied, picked));
     const cards = undoAffected(rootId, current, afterUndo, edit.applied, picked).size;
     undoAll = { cards, calls: cards + 1 };
   }
   const rejected = edit.rejected;
   const locked = rejected.filter(r => r.code === "locked").length;
-  const notApplied = edit.overCap || rejected.length ? { overCap: edit.overCap === true, locked, other: rejected.length - locked } : undefined;
+  const notApplied =
+    edit.overCap || rejected.length
+      ? { overCap: edit.overCap === true, locked, other: rejected.length - locked }
+      : undefined;
   return {
     structureEdit: {
       items,
@@ -338,9 +365,7 @@ function itemText(
   if (op.kind === "remove") return t("ui.book_struct_remove_0_1", title, before(op.card));
   const from = before(op.card);
   const to = after(op.card);
-  return from === to
-    ? t("ui.book_struct_move_same_0", title)
-    : t("ui.book_struct_move_0_1_2", title, from, to);
+  return from === to ? t("ui.book_struct_move_same_0", title) : t("ui.book_struct_move_0_1_2", title, from, to);
 }
 
 /** The bar's AI numbers; "open" counts the same items the closing page lists (see the runner's `openIssuesOf`). */
@@ -665,7 +690,8 @@ function renderStructureEdit(bar: HTMLElement, view: BookStructureEditView, acti
       ...(na.locked ? [t("ui.book_struct_why_locked")] : []),
       ...(na.other ? [t("ui.book_struct_why_rules")] : [])
     ];
-    if (reasons.length) lines.push(t("ui.book_struct_skipped_0_1", na.locked + na.other, reasons.join(t("ui.book_struct_join"))));
+    if (reasons.length)
+      lines.push(t("ui.book_struct_skipped_0_1", na.locked + na.other, reasons.join(t("ui.book_struct_join"))));
     for (const line of lines) box.createDiv("vam-book-structure-skipped").setText(line);
   }
   if (view.active && mayUndo) {

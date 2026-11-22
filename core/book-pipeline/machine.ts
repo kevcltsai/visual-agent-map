@@ -650,7 +650,12 @@ export function retryTrial(data: BookPipelineData, now: string): BookPipelineDat
  * with the plan review kept; the cards the undo touched (`affected`) start over and are planned again, and the editor's pass reruns.
  * A no-op (same state) outside a running gate 1 or without a structure edit. The caller restores the map and notes.
  */
-export function undoStructure(data: BookPipelineData, ids: readonly string[], now: string, affected: readonly string[]): BookPipelineData {
+export function undoStructure(
+  data: BookPipelineData,
+  ids: readonly string[],
+  now: string,
+  affected: readonly string[]
+): BookPipelineData {
   if (data.phase !== "gate1" || data.status !== "running" || !data.structureEdit) return data;
   const next = clone(data);
   const edit = next.structureEdit!;

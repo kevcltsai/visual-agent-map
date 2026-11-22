@@ -393,12 +393,16 @@ function structureEditShape(value: unknown): boolean {
     if (before.summary !== undefined && !isText(before.summary)) return false;
     if (before.homes !== undefined && !isTextList(before.homes)) return false;
   }
-  if (!Array.isArray(value.rejected) || !value.rejected.every(r => isObject(r) && isText(r.id) && isText(r.code))) return false;
+  if (!Array.isArray(value.rejected) || !value.rejected.every(r => isObject(r) && isText(r.id) && isText(r.code)))
+    return false;
   if (value.overCap !== undefined && value.overCap !== true) return false;
   if (value.undone !== undefined && !isTextList(value.undone)) return false;
-  if (value.archived !== undefined && !(isObject(value.archived) && Object.values(value.archived).every(isText))) return false;
+  if (value.archived !== undefined && !(isObject(value.archived) && Object.values(value.archived).every(isText)))
+    return false;
   const before = value.before;
-  return isObject(before) && isText(before.rootId) && Array.isArray(before.nodes) && before.nodes.every(structureNodeShape);
+  return (
+    isObject(before) && isText(before.rootId) && Array.isArray(before.nodes) && before.nodes.every(structureNodeShape)
+  );
 }
 
 function problem(raw: unknown): string | undefined {

@@ -4504,8 +4504,13 @@ export class BookPipelineRuns {
     let finderUnfit = 0;
     let finderUnchecked = 0;
     let finderLookups = 0;
+    const unfitKeys = new Set<string>();
+    let unfitPlaced = 0;
     // The finder's body-slot pictures go through the same fit test as the program's own Commons search, on the file page's title,
-    // description and categories (one request per chapter and search). Unfit ones are dropped; what cannot be checked is kept. The cover is not touched.
+    // description and categories (one request per chapter and search). An unfit one is not dropped (word matching also refuses correct
+    // pictures): it is held back here, so its slot still counts as lacking for the second search and the Commons search, and it is placed
+    // only when nothing else turned up, recorded as off its text. What cannot be checked is kept as it was. The cover is not touched.
+    const heldUnfit = new Map<number, FoundImage[]>();
     const fitFound = async (from: FoundImages | undefined): Promise<FoundImages | undefined> => {
       const fetchCommons = this.ports.fetchCommons;
       if (!from || !fetchCommons) return from;
@@ -4543,12 +4548,18 @@ export class BookPipelineRuns {
           if (!page) {
             if (slot && name) finderUnchecked++;
             kept.push(item);
-          } else if (unfitSlot(slot!, `${page.title} ${page.description} ${page.categories}`)) finderUnfit++;
-          else
-            kept.push({
+          } else {
+            const checked = {
               ...item,
               description: [page.description, page.categories].filter(Boolean).join(" · ").slice(0, 300)
-            });
+            };
+            if (!unfitSlot(slot!, `${page.title} ${page.description} ${page.categories}`)) kept.push(checked);
+            else {
+              finderUnfit++;
+              const held = heldUnfit.get(index) ?? [];
+              if (!held.some(have => have.url === checked.url)) heldUnfit.set(index, [...held, checked]);
+            }
+          }
         }
         bySlot.set(index, kept);
       }
@@ -4565,7 +4576,10 @@ export class BookPipelineRuns {
         const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
         const lacking = wanted.filter(slot => !("figure" in (provisional.get(slot.index) ?? {})));
         const tried = [
-          ...new Set([...perSlot.values()].flatMap(list => list.map(item => imageKey(item.candidate.imageUrl))))
+          ...new Set([
+            ...[...perSlot.values()].flatMap(list => list.map(item => imageKey(item.candidate.imageUrl))),
+            ...[...heldUnfit.values()].flatMap(list => list.map(item => imageKey(item.url)))
+          ])
         ];
         const second = await search(lacking, true, [...tried, ...exclude]);
         rounds.push(second);
@@ -4626,6 +4640,18 @@ export class BookPipelineRuns {
             perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
         }
       }
+      // Last resort: a slot still without a usable picture takes the finder's unfit one (probed now, placed last, recorded off).
+      if (heldUnfit.size) {
+        const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
+        const last = slots.filter(
+          slot => heldUnfit.has(slot.index) && !("figure" in (provisional.get(slot.index) ?? {}))
+        );
+        const asHeld: FoundImages = { bySlot: heldUnfit, found: 0, offTopic: 0 };
+        for (const [index, list] of await probeFound(last, asHeld)) {
+          for (const item of heldUnfit.get(index) ?? []) unfitKeys.add(`${index}|${item.url}`);
+          perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
+        }
+      }
     } catch (error) {
       if (isBudgetExhausted(error)) return { kind: "budget" };
       throw error;
@@ -4675,7 +4701,10 @@ export class BookPipelineRuns {
       if (!placed) continue;
       const about = `${placed.title} ${placed.description ?? placed.caption}`;
       const words = askWords({ explains: slot.explains, terms: slot.search, ...hints.get(slot.index) });
-      if (words.length && !wordHits(words, about)) off.add(slot.index);
+      if (unfitKeys.has(`${slot.index}|${placed.imageUrl}`)) {
+        off.add(slot.index);
+        unfitPlaced++;
+      } else if (words.length && !wordHits(words, about)) off.add(slot.index);
     }
     const release = (): void => {
       for (const key of claimed) drive.usedImages.delete(key);
@@ -4765,6 +4794,7 @@ export class BookPipelineRuns {
             ...(commonsNoHint ? { commons_nohint: commonsNoHint } : {}),
             ...(finderLookups ? { finder_lookup: finderLookups } : {}),
             ...(finderUnfit ? { finder_unfit: finderUnfit } : {}),
+            ...(unfitPlaced ? { finder_unfit_placed: unfitPlaced } : {}),
             ...(finderUnchecked ? { finder_unchecked: finderUnchecked } : {}),
             ...Object.fromEntries(
               rounds.flatMap((round, i) =>

@@ -58606,7 +58606,7 @@ ${oldDetail}`);
    * ends (budget, a refused or discarded write); undefined means the markers are settled and the card may advance to written.
    */
   async fillSlots(drive, token, nodeId, path, slots, authorize) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const signal = drive.controller.signal;
     const language2 = drive.config.language;
     const attempt = attemptsOf(drive.store.state, nodeId).write;
@@ -58731,23 +58731,27 @@ ${oldDetail}`);
     let finderUnfit = 0;
     let finderUnchecked = 0;
     let finderLookups = 0;
+    const unfitKeys = /* @__PURE__ */ new Set();
+    let unfitPlaced = 0;
+    const heldUnfit = /* @__PURE__ */ new Map();
     const fitFound = async (from) => {
+      var _a3;
       const fetchCommons = this.ports.fetchCommons;
       if (!from || !fetchCommons) return from;
       const slotOf = (index) => {
-        var _a3;
+        var _a4;
         const slot = slots.find((item) => item.index === index);
         return slot ? {
           index,
           kind: slot.kind,
           explains: slot.explains,
-          ...((_a3 = slot.search) == null ? void 0 : _a3.length) ? { terms: slot.search } : {},
+          ...((_a4 = slot.search) == null ? void 0 : _a4.length) ? { terms: slot.search } : {},
           ...hints.get(index)
         } : void 0;
       };
       const names3 = [...from.bySlot].filter(([index]) => index !== COVER_INDEX).flatMap(([index, list2]) => slotOf(index) && slotCanBeChecked(slotOf(index)) ? list2 : []).flatMap((item) => {
-        var _a3;
-        return (_a3 = commonsFileNameOf(item.source)) != null ? _a3 : [];
+        var _a4;
+        return (_a4 = commonsFileNameOf(item.source)) != null ? _a4 : [];
       });
       if (!names3.length) return from;
       const found = await lookupCommonsFiles(names3, fetchCommons, {
@@ -58767,12 +58771,18 @@ ${oldDetail}`);
           if (!page) {
             if (slot && name2) finderUnchecked++;
             kept.push(item);
-          } else if (unfitSlot(slot, `${page.title} ${page.description} ${page.categories}`)) finderUnfit++;
-          else
-            kept.push({
+          } else {
+            const checked2 = {
               ...item,
               description: [page.description, page.categories].filter(Boolean).join(" \xB7 ").slice(0, 300)
-            });
+            };
+            if (!unfitSlot(slot, `${page.title} ${page.description} ${page.categories}`)) kept.push(checked2);
+            else {
+              finderUnfit++;
+              const held = (_a3 = heldUnfit.get(index)) != null ? _a3 : [];
+              if (!held.some((have) => have.url === checked2.url)) heldUnfit.set(index, [...held, checked2]);
+            }
+          }
         }
         bySlot.set(index, kept);
       }
@@ -58791,7 +58801,10 @@ ${oldDetail}`);
           return !("figure" in ((_a3 = provisional.get(slot.index)) != null ? _a3 : {}));
         });
         const tried = [
-          ...new Set([...perSlot.values()].flatMap((list2) => list2.map((item) => imageKey(item.candidate.imageUrl))))
+          .../* @__PURE__ */ new Set([
+            ...[...perSlot.values()].flatMap((list2) => list2.map((item) => imageKey(item.candidate.imageUrl))),
+            ...[...heldUnfit.values()].flatMap((list2) => list2.map((item) => imageKey(item.url)))
+          ])
         ];
         const second = await search(lacking2, true, [...tried, ...exclude]);
         rounds.push(second);
@@ -58857,6 +58870,20 @@ ${oldDetail}`);
             perSlot.set(index, [...(_c = perSlot.get(index)) != null ? _c : [], ...list2]);
         }
       }
+      if (heldUnfit.size) {
+        const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language2);
+        const last = slots.filter(
+          (slot) => {
+            var _a3;
+            return heldUnfit.has(slot.index) && !("figure" in ((_a3 = provisional.get(slot.index)) != null ? _a3 : {}));
+          }
+        );
+        const asHeld = { bySlot: heldUnfit, found: 0, offTopic: 0 };
+        for (const [index, list2] of await probeFound(last, asHeld)) {
+          for (const item of (_d = heldUnfit.get(index)) != null ? _d : []) unfitKeys.add(`${index}|${item.url}`);
+          perSlot.set(index, [...(_e = perSlot.get(index)) != null ? _e : [], ...list2]);
+        }
+      }
     } catch (error) {
       if (isBudgetExhausted(error)) return { kind: "budget" };
       throw error;
@@ -58892,11 +58919,14 @@ ${oldDetail}`);
     for (const slot of slots) {
       const outcome = outcomes.get(slot.index);
       if (!outcome || !("figure" in outcome)) continue;
-      const placed = (_e = ((_d = perSlot.get(slot.index)) != null ? _d : []).find((item) => item.href === outcome.figure.href)) == null ? void 0 : _e.candidate;
+      const placed = (_g = ((_f = perSlot.get(slot.index)) != null ? _f : []).find((item) => item.href === outcome.figure.href)) == null ? void 0 : _g.candidate;
       if (!placed) continue;
-      const about = `${placed.title} ${(_f = placed.description) != null ? _f : placed.caption}`;
+      const about = `${placed.title} ${(_h = placed.description) != null ? _h : placed.caption}`;
       const words2 = askWords({ explains: slot.explains, terms: slot.search, ...hints.get(slot.index) });
-      if (words2.length && !wordHits(words2, about)) off.add(slot.index);
+      if (unfitKeys.has(`${slot.index}|${placed.imageUrl}`)) {
+        off.add(slot.index);
+        unfitPlaced++;
+      } else if (words2.length && !wordHits(words2, about)) off.add(slot.index);
     }
     const release2 = () => {
       for (const key4 of claimed) drive.usedImages.delete(key4);
@@ -58913,9 +58943,9 @@ ${oldDetail}`);
     let coverResult;
     if (coverSlot) {
       try {
-        const placed = coverFigure ? (_h = ((_g = perSlot.get(COVER_INDEX)) != null ? _g : []).find((item) => item.href === coverFigure.href)) == null ? void 0 : _h.candidate : void 0;
+        const placed = coverFigure ? (_j = ((_i = perSlot.get(COVER_INDEX)) != null ? _i : []).find((item) => item.href === coverFigure.href)) == null ? void 0 : _j.candidate : void 0;
         const words2 = askWords({ explains: coverSlot.explains, terms: coverSlot.search, ...hints.get(COVER_INDEX) });
-        const coverOff = !!placed && words2.length > 0 && !wordHits(words2, `${placed.title} ${(_i = placed.description) != null ? _i : placed.caption}`);
+        const coverOff = !!placed && words2.length > 0 && !wordHits(words2, `${placed.title} ${(_k = placed.description) != null ? _k : placed.caption}`);
         const prepared = await this.prepareCover(drive, latest.title, coverFigure, coverOff);
         if (!await this.stillOnMap(drive, nodeId)) {
           release2();
@@ -58979,6 +59009,7 @@ ${oldDetail}`);
             ...commonsNoHint ? { commons_nohint: commonsNoHint } : {},
             ...finderLookups ? { finder_lookup: finderLookups } : {},
             ...finderUnfit ? { finder_unfit: finderUnfit } : {},
+            ...unfitPlaced ? { finder_unfit_placed: unfitPlaced } : {},
             ...finderUnchecked ? { finder_unchecked: finderUnchecked } : {},
             ...Object.fromEntries(
               rounds.flatMap(

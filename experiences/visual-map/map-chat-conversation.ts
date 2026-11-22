@@ -24,6 +24,7 @@ import type {
   MapChatTurnHandle
 } from "./map-chat";
 import { newChatWork, type ChatChainRun, type ChatRoundWork, type MapChatChainRunner } from "./map-chat-chain-run";
+import { bookPlanDiff } from "./book-plan-diff";
 import type { TransactionEntry } from "./map-transaction";
 import type { MapChatTurnRecord, TurnEndFields } from "./map-chat-turn-record";
 import { TopicChatSteers, type TopicSteerEntry } from "./topic-chat-steer";
@@ -141,7 +142,7 @@ export interface MapChatConversationPorts {
 }
 type PlanBaseline = Pick<
   MapChatContext,
-  "mdHashes" | "topicHashes" | "selectedCount" | "basis" | "parents" | "research" | "mapSourcePaths"
+  "mdHashes" | "topicHashes" | "selectedCount" | "basis" | "parents" | "research" | "mapSourcePaths" | "bookPlan"
 >;
 
 /** The map chat's turn and plan flow: sending a message, its answer, the plan card under it, what Apply, Cancel and Stop do, and the state they share. */
@@ -255,7 +256,11 @@ export class MapChatConversation {
           ]
         : [];
     });
+    // A change to the book plan shows each card as before and after, with its own two buttons.
+    const bookEdit = result.actions.find(action => action.kind === "edit_book_plan");
+    const diff = bookEdit?.kind === "edit_book_plan" ? bookPlanDiff(bookEdit, baseline) : undefined;
     const card: MapChatPlanCard = {
+      ...(diff ? { diff, applyLabel: t("ui.map_chat_book_apply"), cancelLabel: t("ui.map_chat_book_cancel") } : {}),
       // A plan about a picture shows its lists open: the user checks the anchors before they apply them.
       ...(plan.reasons.some(reason => reason === "image_preview" || reason === "image_other_actions")
         ? { openGroups: true }

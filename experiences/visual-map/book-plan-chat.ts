@@ -47,7 +47,7 @@ export interface BookPlanChatDeps {
 }
 
 /** The run of the map when it waits for the author to confirm the plan (gate1, plan review, running); undefined otherwise. */
-function reviewRun(map: MapDocument | null): BookPipelineData | undefined {
+export function reviewRun(map: MapDocument | null): BookPipelineData | undefined {
   if (!map) return undefined;
   const read = readBookPipeline(map);
   if (read.kind !== "usable") return undefined;
@@ -76,7 +76,7 @@ export async function bookPlanChatInput(deps: BookPlanChatDeps): Promise<MapChat
   const order = effectiveOrder(data);
   const structure = structureOfMap(map, order, rootId);
   const cards = [];
-  const prompts: Record<string, { path: string; prompt: string; kind: string }> = {};
+  const prompts: Record<string, { path: string; prompt: string; kind: string; title?: string }> = {};
   for (const id of order) {
     const node = map.nodes.find(item => item.id === id);
     if (!node) return undefined;
@@ -92,7 +92,7 @@ export async function bookPlanChatInput(deps: BookPlanChatDeps): Promise<MapChat
         planLockedRaw(card.raw, card.prompt)
       )
     );
-    prompts[id] = { path: node.path, prompt: card.prompt, kind };
+    prompts[id] = { path: node.path, prompt: card.prompt, kind, title: card.title };
   }
   const settings = effectiveSettings(rootCard.settings, parseBookPlanDecisions(rootCard.raw));
   const request: PlanEditRequest = {
@@ -170,9 +170,25 @@ export async function applyBookPlanEdit(
       reason: t(authorize() ? "ui.map_chat_skip_book_cards" : "ui.map_chat_skip_book_started")
     };
   }
-  const left = action.changes.length - done.written.length;
+  // The cards left as they are, named with the reason (a card that would not change is only counted).
+  const left = action.changes.filter(change => !done.written.includes(change.id));
+  const named: string[] = [];
+  for (const change of left) {
+    const known = seen.get(change.id);
+    const path = pathOf(change.id);
+    const changed = !!known && !!path && (await deps.readCard(path)).prompt !== known.prompt;
+    if (locked.has(change.id) || changed)
+      named.push(
+        `${known?.title ?? plan.prompts[change.id]?.title ?? change.id}${t(locked.has(change.id) ? "ui.map_chat_skip_book_locked" : "ui.map_chat_skip_book_changed")}`
+      );
+  }
   return {
     status: "done",
-    note: t("ui.map_chat_line_book_plan_undo") + (left ? t("ui.map_chat_line_book_plan_left_0", left) : "")
+    note:
+      t("ui.map_chat_line_book_plan_undo") +
+      (left.length
+        ? t("ui.map_chat_line_book_plan_left_0", left.length) +
+          (named.length ? t("ui.map_chat_line_book_plan_named_0", named.join(t("ui.map_chat_count_separator"))) : "")
+        : "")
   };
 }

@@ -332,7 +332,7 @@ import type { UpdateMode } from "../../ai/note-style-recipe";
 import { backupNoteFile } from "./note-backup";
 import { stopLabelKey, type ResearchStart, type SelectionSynthesisTask, type WritebackHooks } from "./topic-run";
 import { BookPipelineRunError, type AuthorInput, type AuthorOutcome } from "./book-pipeline-run";
-import { applyBookPlanEdit, bookPlanChatInput, type BookPlanChatDeps } from "./book-plan-chat";
+import { applyBookPlanEdit, bookPlanChatInput, reviewRun, type BookPlanChatDeps } from "./book-plan-chat";
 import { bookAuthorRequirements } from "../../core/book-pipeline/settings";
 import {
   BOOK_SETTING_FIELDS,
@@ -17409,6 +17409,7 @@ export class VisualAgentMapView extends ItemView {
       this.bookStructureOf(effectiveOrder(read.data)),
       id => this.notes.get(id)?.title
     );
+    this.syncChiefEditor();
     // The map-changed choice takes the keyboard once when it appears (the same way the inline asks do).
     if (state.mode !== "changed") this.bookMapFocusedRun = null;
     else if (this.bookMapFocusedRun !== read.data.runId) {
@@ -20282,6 +20283,7 @@ export class VisualAgentMapView extends ItemView {
         void this.rerunChatBatch(message).catch(error => errorNotice(error));
       },
       modelName: id => this.plugin.modelLabel(id),
+      planReview: () => reviewRun(this.map) !== undefined,
       resolveLink: link => {
         const file = this.app.metadataCache.getFirstLinkpathDest(link, this.sourceMarkdownFile()?.path ?? "");
         return file && file.extension === "md" ? file.path : null;
@@ -21046,7 +21048,41 @@ export class VisualAgentMapView extends ItemView {
   /** The conversation left its map (or the view just opened): a new record conversation, and the map's latest one comes back. */
   private startChatRecords(): void {
     this.chatRecordSession.restart();
-    if (this.plugin.settings.mapChatRecords === true) void this.restoreChatRecords();
+    this.chiefOpened.clear();
+    const seq = ++this.chatRestoreSeq;
+    if (this.plugin.settings.mapChatRecords !== true) {
+      this.syncChiefEditor();
+      return;
+    }
+    // The opening waits until the record is back: a restore only runs on an empty conversation, and it knows the openings already said.
+    this.chatRestoring = true;
+    void this.restoreChatRecords().finally(() => {
+      if (seq !== this.chatRestoreSeq) return;
+      this.chatRestoring = false;
+      this.syncChiefEditor();
+    });
+  }
+  /** The plans (`runId:phaseStartedAt` of the gate) whose chief editor opening this conversation has; in memory, for a conversation with no record. */
+  private readonly chiefOpened = new Set<string>();
+  private chatRestoring = false;
+  private chatRestoreSeq = 0;
+  /**
+   * The chat speaks as the chief editor while the plan waits for the author, and says the opening once per conversation and plan.
+   * `phaseStartedAt` (set each time the run enters gate 1) is the plan's stable mark. The opening is the model's `planOpening`, or a fixed line.
+   */
+  private syncChiefEditor(): void {
+    const chat = this.chat;
+    if (!chat) return;
+    chat.refreshSpeaker();
+    const data = reviewRun(this.map);
+    if (!data || this.chatRestoring) return;
+    const key = `${data.runId}:${data.phaseStartedAt}`;
+    if (this.chiefOpened.has(key)) return;
+    this.chiefOpened.add(key);
+    const text = data.planOpening ?? t("ui.book_editor_opening_fallback");
+    chat.addOpening(text);
+    if (this.plugin.settings.mapChatRecords === true && isManagedMapPath(this.plugin.settings, this.path))
+      this.chatRecordSession.openingSaid(key, text);
   }
   /** "New conversation" (the panel is already empty): the next send starts a new file. */
   private newChatConversation(): void {
@@ -21057,6 +21093,8 @@ export class VisualAgentMapView extends ItemView {
     this.chat?.refreshAutoApply();
     this.chatPlanToken++;
     this.chatRecordSession.restart();
+    this.chiefOpened.clear();
+    this.syncChiefEditor();
   }
   /**
    * Shows the map's latest saved conversation again and goes on writing to its file. Nothing happens when the file's version is
@@ -21092,6 +21130,7 @@ export class VisualAgentMapView extends ItemView {
     const restored = restoreConversation(latest.id, latest.parsed.lines);
     chat.restore(restored);
     if (chat.conversationId !== restored.id) return;
+    for (const opening of restored.openings) this.chiefOpened.add(opening.key);
     // The file says this conversation started research: its turns keep the allow-list (an older file has no mark: false).
     if (restored.startedResearch) {
       this.chatStartedResearch = true;

@@ -1265,7 +1265,7 @@ test('toolbar plan review: the plan sentence and hint; "open the whole-book summ
   const bar = g.drawBar();
   assert.ok(texts(bar).includes('圖文書：' + tr('ui.book_phase_plan_review')), JSON.stringify(texts(bar)));
   assert.ok(texts(bar).includes('3 章都企劃好了'));
-  assert.ok(texts(bar).some(text => text.startsWith('想改：直接在根筆記的「全書企劃」')));
+  assert.ok(texts(bar).includes('想改：直接跟左邊的總編輯說；也可以自己改筆記裡的「企劃」。改完再按「方向對，開始寫」。'), JSON.stringify(texts(bar)));
   assert.deepEqual(g.labels(bar), ['打開全書摘要', '方向對，開始寫', '回去改企劃', '停止']);
   g.click(bar, '打開全書摘要');
   assert.deepEqual(g.opened, [g.ids.root]);

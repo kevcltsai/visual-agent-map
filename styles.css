@@ -895,6 +895,15 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-guide-icon .svg-icon { width: 24px; height: 24px; stroke-width: 1.5; }
 .vam-map-chat-guide.is-hidden, .vam-map-chat-plan-hint.is-hidden { display: none; }
 .vam-map-chat-plan.is-cancelled .vam-map-chat-plan-items { text-decoration: line-through; }
+.vam-map-chat-diff { display: flex; flex-direction: column; gap: 8px; font-size: var(--font-ui-small); overflow-wrap: anywhere; }
+.vam-map-chat-diff-card { display: flex; flex-direction: column; gap: 2px; }
+.vam-map-chat-diff-field { display: flex; flex-direction: column; }
+.vam-map-chat-diff-label { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-map-chat-diff-old { color: var(--text-muted); text-decoration: line-through; }
+.vam-map-chat-diff-new { color: var(--text-normal); text-decoration: underline; background: color-mix(in srgb, var(--color-green) 18%, transparent); }
+.vam-map-chat-diff-more > summary { cursor: pointer; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-map-chat-diff-more > summary:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-map-chat-diff-more[open] > .vam-map-chat-diff-card { margin-top: 8px; }
 .vam-map-chat-choices { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .vam-map-chat-choices-prompt { font-weight: var(--font-semibold); font-size: var(--font-ui-small); }
 .vam-map-chat-choice { height: auto; padding: 4px 8px; justify-content: flex-start; text-align: start; white-space: normal; }

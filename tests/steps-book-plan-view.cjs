@@ -142,6 +142,13 @@ test('foldLabelOf: a lone 圖安排 / 驗收清單 line folds (either language, 
 });
 
 test('the bar hints name what the owner now sees (root 全書企劃, the 企劃 of each chapter / section), not 提示', () => {
-  for (const dict of [zhTW, zhCN]) for (const key of ['ui.book_bar_plan_hint', 'ui.book_bar_plan_edit_hint']) assert.ok(!dict[key].includes('提示') && /企[劃划]/.test(dict[key]) && /各节|各節/.test(dict[key]), key);
-  for (const key of ['ui.book_bar_plan_hint', 'ui.book_bar_plan_edit_hint']) assert.ok(!/hint box/.test(en[key]) && /section note/.test(en[key]), key);
+  for (const dict of [zhTW, zhCN]) for (const key of ['ui.book_bar_plan_edit_hint']) assert.ok(!dict[key].includes('提示') && /企[劃划]/.test(dict[key]) && /各节|各節/.test(dict[key]), key);
+  for (const key of ['ui.book_bar_plan_edit_hint']) assert.ok(!/hint box/.test(en[key]) && /section note/.test(en[key]), key);
+});
+
+// Requirement change (owner-approved mockup 2026-11-22): the plan-review hint now points at the chief editor in the chat, not at the section notes.
+test('the plan-review bar hint sends the owner to the chief editor, then to the plan notes, then to "direction is right"', () => {
+  for (const [dict, editor, plan, go] of [[zhTW, '總編輯', '企劃', '方向對，開始寫'], [zhCN, '总编辑', '企划', '方向对，开始写'], [en, 'chief editor', 'plan', 'Direction is right, start writing']])
+    for (const word of [editor, plan, go]) assert.ok(dict['ui.book_bar_plan_hint'].includes(word), `${word} in ${dict['ui.book_bar_plan_hint']}`);
+  assert.ok(!zhTW['ui.book_bar_plan_hint'].includes('提示'));
 });

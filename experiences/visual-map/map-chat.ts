@@ -168,9 +168,21 @@ export interface MapChatPlanCard {
   state: "pending" | "applied" | "cancelled";
   /** Restored from a saved conversation: the card shows as no longer valid and its buttons do nothing. */
   stale?: boolean;
+  /** A change to a plan of cards, shown as before and after per card (all text is untrusted: text nodes only); it replaces the lists. */
+  diff?: MapChatPlanDiffCard[];
+  /** The words of the two buttons when they are not the usual ones. */
+  applyLabel?: string;
+  cancelLabel?: string;
   apply(): void;
   cancel(): void;
 }
+/** One card of a plan diff: its title and the fields that change (`label` empty = the card's main line, shown without a name). */
+export interface MapChatPlanDiffCard {
+  title: string;
+  fields: { label: string; before: string; after: string }[];
+}
+/** The plan diff cards shown open before the rest fold under "N more cards". */
+export const PLAN_DIFF_OPEN = 2;
 /** Maps (or anything else) the user has to pick from; picking runs `pick` once. */
 export interface MapChatChoices {
   prompt: string;
@@ -327,6 +339,8 @@ export interface MapChatRestoredConversation {
   id: string;
   /** The time of the last finished turn (ISO); the "restored" line shows it in local time. Null with no turn. */
   restoredAt: string | null;
+  /** The chief editor's openings and the last turn each followed (0 = before any); absent = none. */
+  openings?: { afterTurn: number; key: string; text: string }[];
   /** Where an interrupted chain goes on; it hangs under the answer of the turn numbered `resume.turn`. */
   resume?: RestoredChainResume;
   turns: {
@@ -408,6 +422,8 @@ export interface MapChatHost {
   watchModels(changed: () => void): () => void;
   /** The name the model menu shows for a model id (without any "unavailable" note); absent: the menu entry's label is used. */
   modelName?(id: string): string;
+  /** True while a book plan waits for the author: the chat speaks as the chief editor (label, hint of the field). */
+  planReview?(): boolean;
   /** The panel opened, closed, folded to the narrow edge or went to the opening screen; the view makes room for it. */
   layoutChanged(open: boolean): void;
   /** Width in pixels of the side window (the view remembers it). */
@@ -533,6 +549,8 @@ export function pickArgumentSuggestions<T>(pool: readonly T[], random: () => num
 export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTurnHandle> {
   private readonly id = `vam-map-chat-${++panelSequence}`;
   private messages: MapChatMessage[] = [];
+  /** The chief editor's openings: spoken words that are not a turn; each sits before `messages[at]` (at the end when `at` is past it). */
+  private openings: { at: number; message: MapChatMessage }[] = [];
   /** Finished turns already written by "save as a note"; reset with the conversation. */
   private savedTurnCount = 0;
   private chips: MapChatChip[] = [];
@@ -1365,6 +1383,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   }
   /** The model name written above a reply: the current model's menu name, or "" when there is none (the row then says "AI"). */
   private replyModelLabel(): string {
+    if (this.host.planReview?.()) return t("ui.book_chief_editor");
     const id = this.host.model();
     if (!id) return "";
     return (this.host.modelName?.(id) ?? this.currentModelLabel()).trim();
@@ -1759,6 +1778,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.cancelFrame();
     this.rows = new WeakMap();
     this.messages = [];
+    this.openings = [];
     this.savedTurnCount = 0;
     this.conversationId = null;
     this.restoredText = "";
@@ -1789,6 +1809,30 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   focusInput(): void {
     if (this.built) this.inputEl.focus();
   }
+  private openingMessage(text: string): MapChatMessage {
+    return { role: "assistant", text, lines: [], modelLabel: t("ui.book_chief_editor") };
+  }
+  /** The rows of the log in order: the messages, with each opening before the message it was said ahead of. */
+  private loggedMessages(): MapChatMessage[] {
+    const rows = this.messages.flatMap((message, index) => [
+      ...this.openings.filter(opening => opening.at === index).map(opening => opening.message),
+      message
+    ]);
+    return [
+      ...rows,
+      ...this.openings.filter(opening => opening.at >= this.messages.length).map(opening => opening.message)
+    ];
+  }
+  /** The chief editor says the opening of a plan under review, after the messages there are now. */
+  addOpening(text: string): void {
+    this.openings.push({ at: this.messages.length, message: this.openingMessage(text) });
+    this.renderLog(true);
+    this.renderPlaceholder();
+  }
+  /** The plan went into or out of review: the field's hint follows. */
+  refreshSpeaker(): void {
+    this.renderPlaceholder();
+  }
   /**
    * Shows a saved conversation again: its finished turns (their words go through the same reply renderer as live ones), with a
    * line on top saying when it was. Plan cards, picture candidates, retry and option lists are shown as no longer valid.
@@ -1800,6 +1844,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.cancelFrame();
     this.rows = new WeakMap();
     this.messages = [];
+    this.openings = [];
     this.savedTurnCount = 0;
     this.restoredText = "";
     this.spokenLater = [];
@@ -1807,7 +1852,17 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.chainWaitingState = null;
     this.stopWaitTimer();
     this.conversationId = conversation.id;
+    // An opening goes back before the first turn numbered after the one it followed (the end when there is none).
+    const openings = [...(conversation.openings ?? [])];
+    const placeOpenings = (before: number | undefined): void => {
+      for (const at of [...openings]) {
+        if (before !== undefined && at.afterTurn >= before) continue;
+        openings.splice(openings.indexOf(at), 1);
+        this.openings.push({ at: this.messages.length, message: this.openingMessage(at.text) });
+      }
+    };
     for (const turn of conversation.turns) {
+      placeOpenings(turn.turn ?? Number.MAX_SAFE_INTEGER);
       const question: MapChatMessage = {
         role: "user",
         text: turn.auto ? t("ui.map_chat_role_auto") : turn.message,
@@ -1891,6 +1946,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       }
       this.messages.push(answer);
     }
+    placeOpenings(undefined);
     const when = conversation.restoredAt ? new Date(conversation.restoredAt) : null;
     if (when && Number.isFinite(when.getTime()) && conversation.turns.length) {
       const pad = (value: number): string => String(value).padStart(2, "0");
@@ -2604,7 +2660,7 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
   /** An empty conversation in the side window shows one line of guidance in place of the log. */
   private renderGuide(): void {
     if (!this.built) return;
-    const empty = this.messages.length === 0 && !this.hero;
+    const empty = this.messages.length === 0 && this.openings.length === 0 && !this.hero;
     this.guideEl.hidden = !empty;
     this.guideEl.toggleClass("is-hidden", !empty);
     this.logEl.hidden = empty;
@@ -3071,16 +3127,17 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
     this.cancelFrame();
     const stick = forceEnd || this.atEnd();
     // Rows of messages that have not changed are kept as they are (no parsing, no new elements); only the rest is built.
-    const keys = this.messages.map(message => this.rowKey(message));
+    const logged = this.loggedMessages();
+    const keys = logged.map(message => this.rowKey(message));
     const kept = new Set<HTMLElement>();
-    this.messages.forEach((message, index) => {
+    logged.forEach((message, index) => {
       const entry = this.rows.get(message);
       if (entry && entry.key === keys[index]) kept.add(entry.row);
     });
     for (const child of Array.from(this.logEl.children)) if (!kept.has(child as HTMLElement)) child.remove();
     this.messageEls = [];
     this.bodyEls = [];
-    this.messages.forEach((message, index) => {
+    logged.forEach((message, index) => {
       let entry = this.rows.get(message);
       if (!entry || entry.key !== keys[index]) {
         entry = { ...this.buildRow(message), key: keys[index] };
@@ -3405,30 +3462,32 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       });
       return;
     }
-    this.buildPlanSummary(card.createDiv("vam-map-chat-plan-summary"), plan);
+    const diff = plan.diff?.length ? plan.diff : undefined;
+    if (!diff) this.buildPlanSummary(card.createDiv("vam-map-chat-plan-summary"), plan);
     // Said before the button is pressed, not after: undo takes the plan's changes back, but not the AI work it starts. Always
     // shown (never behind "View details") and only for a plan that does start AI work.
     if (plan.aiWork) card.createDiv({ cls: "vam-map-chat-plan-warning", text: t("ui.map_chat_plan_irreversible") });
     // A plan about a picture keeps its lists open: the user checks the anchors before they apply them, so nothing folds.
-    const folds = !plan.openGroups;
+    const folds = !plan.openGroups && !diff;
     const open = !folds || message.linesOpen === true;
     const addDetail = (): void => {
-      if (!open) return;
+      if (!open || diff) return;
       const detail = card.createDiv("vam-map-chat-plan-detail");
       this.buildPlanBody(detail, plan, title);
       detail.createDiv({ cls: "vam-map-chat-plan-note", text: t("ui.map_chat_plan_intro") });
     };
     // A picture plan lists what it will do first, then asks; other plans put the buttons first and fold the detail after them.
-    if (!folds) addDetail();
+    if (diff) this.buildPlanDiff(card, diff);
+    else if (!folds) addDetail();
     const buttons = card.createDiv({ cls: "vam-map-chat-plan-buttons" });
     const apply = buttons.createEl("button", {
       cls: "mod-cta vam-map-chat-plan-apply",
-      text: t("ui.map_chat_plan_apply"),
+      text: plan.applyLabel ?? t("ui.map_chat_plan_apply"),
       attr: { type: "button" }
     });
     const cancel = buttons.createEl("button", {
       cls: "vam-map-chat-plan-cancel",
-      text: t("ui.map_chat_plan_cancel"),
+      text: plan.cancelLabel ?? t("ui.map_chat_plan_cancel"),
       attr: { type: "button" }
     });
     if (folds) this.buildDetailToggle(buttons, message, open);
@@ -3447,6 +3506,39 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
       plan.cancel();
       this.focusInput();
     });
+  }
+  /**
+   * The cards of a plan diff: the first {@link PLAN_DIFF_OPEN} open, the rest folded under "N more cards". Before is struck through and
+   * after is marked as an insertion, and a screen reader hears the two words too; every text goes in as text.
+   */
+  private buildPlanDiff(parent: HTMLElement, diff: MapChatPlanDiffCard[]): void {
+    const list = parent.createDiv("vam-map-chat-diff");
+    const one = (into: HTMLElement, card: MapChatPlanDiffCard): void => {
+      const box = into.createDiv("vam-map-chat-diff-card");
+      box.createEl("strong", { cls: "vam-map-chat-diff-title", text: card.title });
+      for (const field of card.fields) {
+        const row = box.createDiv("vam-map-chat-diff-field");
+        if (field.label) row.createSpan({ cls: "vam-map-chat-diff-label", text: field.label });
+        if (field.before) {
+          row.createSpan({ cls: "vam-sr-only", text: t("ui.map_chat_diff_before") });
+          row.createEl("del", { cls: "vam-map-chat-diff-old", text: field.before });
+        }
+        row.createSpan({ cls: "vam-sr-only", text: t("ui.map_chat_diff_after") });
+        row.createEl("ins", { cls: "vam-map-chat-diff-new", text: field.after });
+      }
+    };
+    for (const card of diff.slice(0, PLAN_DIFF_OPEN)) one(list, card);
+    const rest = diff.slice(PLAN_DIFF_OPEN);
+    if (!rest.length) return;
+    const more = list.createEl("details", { cls: "vam-map-chat-diff-more" });
+    more.createEl("summary", {
+      text: t(
+        "ui.map_chat_diff_more_0_1",
+        rest.length,
+        rest.map(card => clip(card.title, 24)).join(t("ui.map_chat_count_separator"))
+      )
+    });
+    for (const card of rest) one(more, card);
   }
   /** The plan's one sentence: its own summary, or the reasons (a waiting plan says it needs the user's yes). */
   private planSentence(plan: MapChatPlanCard): string {
@@ -3646,9 +3738,11 @@ export class MapChatPanel implements MapChatChainPanel<MapChatOrigin, MapChatTur
         ? "ui.map_chat_chain_wait_placeholder"
         : this.researchMode()
           ? "ui.argument_tab_placeholder"
-          : this.hero
-            ? "ui.map_chat_hero_placeholder"
-            : "ui.map_chat_input_placeholder";
+          : this.host.planReview?.()
+            ? "ui.map_chat_book_placeholder"
+            : this.hero
+              ? "ui.map_chat_hero_placeholder"
+              : "ui.map_chat_input_placeholder";
     this.inputEl.setAttr("placeholder", t(key));
   }
   /** "Enter 補充" beside the stop key while a turn works and the field has text. */

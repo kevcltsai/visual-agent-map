@@ -215,6 +215,13 @@ export class MapChatRecordSession {
    * The writer's part of a restore: later lines go on in the restored file, and every turn number of it is taken (a late result of
    * one of them can never be written again). `file` is the vault file when the index lists it, else its path.
    */
+  /** The chief editor said the opening of a plan (`key` names the plan): kept after the turns there were, so a restore puts it back there. */
+  openingSaid(key: string, text: string): void {
+    const writer = this.ensure();
+    if (!writer) return;
+    writer.setTarget(this.ports.target());
+    writer.write({ type: "event", turn: this.turnSeq, kind: "editor_opening", key, text });
+  }
   resume(
     latest: NonNullable<ReturnType<typeof pickLatest>>,
     restored: ReturnType<typeof restoreConversation>,

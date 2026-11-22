@@ -296,7 +296,7 @@ export interface MapChatContextInput {
     /** The plan is too long to send whole. */
     tooLarge?: boolean;
     /** Card id -> where its Prompt lives and what the card showed when sent, the baseline an apply is checked against. */
-    prompts: Record<string, { path: string; prompt: string; kind: string }>;
+    prompts: Record<string, { path: string; prompt: string; kind: string; title?: string }>;
   };
   /** Characters of research note text to send; default {@link MAP_CHAT_RESEARCH_BUDGET}. */
   researchBudget?: number;
@@ -326,7 +326,7 @@ export interface MapChatContext {
   bookPlan?: {
     runId: string;
     unlocked: string[];
-    prompts: Record<string, { path: string; prompt: string; kind: string }>;
+    prompts: Record<string, { path: string; prompt: string; kind: string; title?: string }>;
   };
   /** Parent links of the outline, for the parser's cycle check. */
   parents: Record<string, string | null>;

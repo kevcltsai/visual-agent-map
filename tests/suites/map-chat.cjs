@@ -9803,3 +9803,129 @@ integrationTest('map chat records 18 counter-example: once the reply is in, a la
   gate.resolve(); await sending; await recordIdle(h);
   const kinds = lineKinds(recordLines(h, recordFiles(h)[0])); assert.ok(!kinds.includes('event:resend'), `no resend event: ${kinds}`); assert.equal(chat.transcript().at(-1).text, 'done');
 });
+
+// ---- the chief editor in the chat (book plan chat, P4) ------------------------------------------------------------------
+
+const bookDiffCard = (cards, extra = {}) => ({
+  reasons: ['r'], items: ['i'], estimate: 'e', state: 'pending', apply() {}, cancel() {},
+  diff: cards, applyLabel: 'Apply to the plan', cancelLabel: 'Not now', ...extra
+});
+const diffCards = n => Array.from({ length: n }, (_, i) => ({ title: `Card ${i + 1}`, fields: [{ label: i === 1 ? 'Opening' : '', before: `old ${i + 1}`, after: `new ${i + 1}` }] }));
+
+test('book plan chat: a diff card shows the first two cards open (title, label, struck-through before, after), the rest under "N more cards", and its own two buttons', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  f.panel.begin('change it'); f.panel.finish('ok', []); f.panel.showPlan(bookDiffCard(diffCards(4)));
+  const log = f.parts.log();
+  const titles = findAll(log, i => hasClass(i, 'vam-map-chat-diff-title'));
+  eq(titles.map(i => [i.tag, i.text]), [['strong', 'Card 1'], ['strong', 'Card 2'], ['strong', 'Card 3'], ['strong', 'Card 4']]);
+  const more = find(log, i => i.tag === 'details' && hasClass(i, 'vam-map-chat-diff-more'));
+  assert.ok(more, 'the rest is folded');
+  assert.equal(findAll(more, i => hasClass(i, 'vam-map-chat-diff-title')).length, 2, 'two cards inside the fold');
+  assert.equal(find(more, i => i.tag === 'summary').text, '2 more cards: Card 3, Card 4');
+  eq(findAll(log, i => i.tag === 'del').map(i => i.text), ['old 1', 'old 2', 'old 3', 'old 4']);
+  eq(findAll(log, i => i.tag === 'ins').map(i => i.text), ['new 1', 'new 2', 'new 3', 'new 4']);
+  eq(findAll(log, i => hasClass(i, 'vam-map-chat-diff-label')).map(i => i.text), ['Opening'], 'only a field with a name shows one');
+  const hidden = findAll(log, i => hasClass(i, 'vam-sr-only')).map(i => i.text);
+  assert.ok(hidden.includes('Before: ') && hidden.includes('After: '), 'a screen reader hears before and after');
+  eq(findAll(log, i => i.tag === 'button' && /vam-map-chat-plan-(apply|cancel)/.test(i.cls)).map(i => i.text), ['Apply to the plan', 'Not now']);
+});
+
+test('book plan chat: a diff card draws untrusted text as text, an empty before leaves no del, and a card without a diff keeps the usual buttons', () => {
+  const f = panelFixture(); f.panel.setOpen(true);
+  const html = '<img src=x onerror=alert(1)>';
+  f.panel.begin('a'); f.panel.finish('ok', []);
+  f.panel.showPlan(bookDiffCard([{ title: html, fields: [{ label: '', before: '', after: html }] }]));
+  const log = f.parts.log();
+  eq(findAll(log, i => i.tag === 'del'), [], 'no before, no struck-through line');
+  eq(findAll(log, i => i.tag === 'ins').map(i => i.text), [html]);
+  assert.equal(findAll(log, i => i.tag === 'img').length, 0);
+  f.panel.begin('b'); f.panel.finish('ok', []); f.panel.showPlan({ reasons: ['r'], items: ['i'], estimate: 'e', state: 'pending', apply() {}, cancel() {} });
+  const buttons = findAll(log, i => i.tag === 'button' && /vam-map-chat-plan-(apply|cancel)/.test(i.cls)).map(i => i.text);
+  eq(buttons.slice(-2), ['Apply', 'Cancel']);
+});
+
+test('book plan chat: while the plan is under review a turn is labelled by the chief editor and the field asks for changes to the book; otherwise as always', () => {
+  let review = true;
+  const f = panelFixture({ planReview: () => review }); f.panel.setOpen(true);
+  assert.equal(f.panel.inputEl.attrs.placeholder, 'Tell the chief editor how you want to change this book...');
+  f.panel.begin('q'); f.panel.finish('answer', []);
+  eq(f.panel.completedTurns().map(item => item.answer.modelLabel), ['Chief editor'], 'the label that is saved');
+  review = false; f.panel.refreshSpeaker();
+  assert.match(f.panel.inputEl.attrs.placeholder, /^Ask a question/);
+  f.panel.begin('q2'); f.panel.finish('answer', []);
+  eq(f.panel.completedTurns().map(item => item.answer.modelLabel), ['Chief editor', 'Haiku']);
+});
+
+test('book plan chat: an opening is an assistant row labelled by the chief editor, not a turn; it stays where it was said and restore puts it back in place', () => {
+  const f = panelFixture({ recordsEnabled: () => true, newConversation() {} }); f.panel.setOpen(true);
+  f.panel.addOpening('The plan is ready.');
+  assert.equal(f.panel.hasMessages, false, 'an opening is not a message of a turn');
+  eq(f.panel.turns(), []); eq(f.panel.completedTurns(), []);
+  f.panel.begin('first'); f.panel.finish('one', []);
+  f.panel.addOpening('Second plan.');
+  const rows = () => findAll(f.parts.log(), i => hasClass(i, 'vam-map-chat-msg')).map(row => visibleText(row));
+  eq(rows().map(text => text.slice(0, 40)), ['Chief editorThe plan is ready.', 'Youfirst', 'Haikuone', 'Chief editorSecond plan.']);
+  // Restore: an opening goes before the first turn numbered after the one it followed; one with no later turn goes to the end.
+  const g = panelFixture({ recordsEnabled: () => true, newConversation() {} }); g.panel.setOpen(true);
+  g.panel.restore(restoredConversation({
+    turns: [{ turn: 1, message: 'q1', reply: 'a1', lines: [], modelLabel: 'Haiku', stalePlan: false }, { turn: 2, message: 'q2', reply: 'a2', lines: [], modelLabel: 'Haiku', stalePlan: false }],
+    openings: [{ afterTurn: 0, key: 'k0', text: 'Early' }, { afterTurn: 1, key: 'k1', text: 'Middle' }, { afterTurn: 2, key: 'k2', text: 'Late' }]
+  }));
+  eq(findAll(g.parts.log(), i => hasClass(i, 'vam-map-chat-msg')).map(row => visibleText(row).slice(0, 30)), ['Chief editorEarly', 'Youq1', 'Haikua1', 'Chief editorMiddle', 'Youq2', 'Haikua2', 'Chief editorLate']);
+  // Only openings (a conversation whose only line is one): the log shows them, not the empty guidance.
+  const h = panelFixture({ recordsEnabled: () => true, newConversation() {} }); h.panel.setOpen(true);
+  h.panel.restore({ id: '20261105-134000-abcdef', restoredAt: null, turns: [], openings: [{ afterTurn: 0, key: 'k', text: 'Only' }] });
+  eq(findAll(h.parts.log(), i => hasClass(i, 'vam-map-chat-msg')).map(row => visibleText(row)), ['Chief editorOnly']);
+  assert.equal(h.panel.guideEl.hidden, true);
+  h.panel.reset();
+  eq(findAll(h.parts.log(), i => hasClass(i, 'vam-map-chat-msg')), [], 'a new conversation has no opening');
+});
+
+const { newBookPipeline } = load('core/book-pipeline/machine.ts');
+const reviewData = (view, extra = {}) => {
+  const data = newBookPipeline({ runId: 'run-1', order: view.map.nodes.map(node => node.id), now: '2026-11-16T00:00:00.000Z' });
+  delete data.trial; data.phase = 'gate1'; data.planReview = true;
+  return JSON.parse(JSON.stringify({ ...data, ...extra }));
+};
+const openingRows = chat => findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-msg')).map(row => visibleText(row)).filter(text => text.startsWith('Chief editor'));
+const FALLBACK = 'Chief editorThe plan is ready. Tell me anything you\'d like to change.';
+
+integrationTest('book plan chat: the opening comes once per conversation and plan (planOpening, else the fixed line); a new conversation says it again; leaving review says nothing', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.view.syncChiefEditor(); eq(openingRows(chat), [], 'no plan review, no opening');
+  h.view.map.bookPipeline = reviewData(h.view);
+  h.view.syncChiefEditor(); h.view.syncChiefEditor();
+  eq(openingRows(chat), [FALLBACK], 'once, with the fixed line when the plan has no opening');
+  assert.equal(chat.inputEl.attrs.placeholder, 'Tell the chief editor how you want to change this book...');
+  // A new conversation (the panel is empty again) says it again; this plan's own opening text is used.
+  h.view.map.bookPipeline = reviewData(h.view, { planOpening: 'I arranged 8 chapters. What do you think?' });
+  chat.reset(); h.view.newChatConversation(); h.view.syncChiefEditor();
+  eq(openingRows(chat), ['Chief editorI arranged 8 chapters. What do you think?']);
+  // The same book at its next gate (a new gate entry time) is a new plan: another opening, after the first one.
+  h.view.map.bookPipeline = reviewData(h.view, { phaseStartedAt: '2026-11-17T00:00:00.000Z' });
+  h.view.syncChiefEditor();
+  eq(openingRows(chat).length, 2);
+  // Leaving the review: no more openings, and the field is the usual one again.
+  h.view.map.bookPipeline = { ...reviewData(h.view), phase: 'writing', phaseStartedAt: '2026-11-18T00:00:00.000Z' };
+  h.view.syncChiefEditor();
+  eq(openingRows(chat).length, 2); assert.match(chat.inputEl.attrs.placeholder, /^Ask a question/);
+});
+
+integrationTest('book plan chat: with records on the opening is written as an editor_opening event, and after a reload it is put back and not said twice', async () => {
+  const h = await harness({ records: true }); await h.view.hydrate(); const chat = h.open();
+  await until(() => h.view.chatRestoring === false);
+  h.view.map.bookPipeline = reviewData(h.view);
+  h.view.syncChiefEditor(); await recordIdle(h);
+  eq(openingRows(chat), [FALLBACK]);
+  const [file] = recordFiles(h); const lines = recordLines(h, file);
+  const event = lines.find(line => line.kind === 'editor_opening');
+  assert.ok(event, lineKinds(lines).join());
+  assert.equal(event.key, 'run-1:2026-11-16T00:00:00.000Z'); assert.equal(event.turn, 0); assert.equal(event.text, FALLBACK.replace('Chief editor', ''));
+  const again = await harness({ records: true }); await again.view.hydrate();
+  again.view.map.bookPipeline = reviewData(again.view);
+  await seedRecord(again, lines.map(line => ({ ...line })), file.split('/').at(-1).replace('.jsonl', ''));
+  const back = again.open(); await until(() => again.view.chatRestoring === false);
+  again.view.syncChiefEditor(); await recordIdle(again);
+  eq(openingRows(back), [FALLBACK], 'restored in place, not duplicated');
+  eq(lineKinds(recordLines(again, recordFiles(again)[0])).filter(kind => kind === 'event:editor_opening'), ['event:editor_opening'], 'no second event');
+});

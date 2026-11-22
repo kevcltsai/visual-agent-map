@@ -1114,11 +1114,17 @@ function insertAt(lines: string[], after: string | undefined): number {
   const heads = lines.map((_, i) => i).filter(i => level(i) > 0);
   const named = after ? heads.find(i => headingKey(bare(lines[i])) === headingKey(after)) : undefined;
   const text = lines.map((_, i) => i).filter(i => region[i] && lines[i].trim());
-  // The closing paragraph: the last paragraph block of the chapter text. New text always goes before it, so it stays the last paragraph.
+  // The closing paragraph: the last ordinary prose paragraph of the chapter text. Images, embeds, quotes/callouts and fenced code are not
+  // prose (skipped); a heading ends the search. The paragraph starts after the previous blank line, heading, fence or non-prose line.
+  const prose = (i: number): boolean =>
+    region[i] && !fenced[i] && !!lines[i].trim() && level(i) === 0 && !/^[ \t]*(?:!\[|>)/.test(bare(lines[i]));
   let closing: number | undefined;
-  if (text.length && level(text[text.length - 1]) === 0) {
-    closing = text[text.length - 1];
-    while (closing > 0 && region[closing - 1] && lines[closing - 1].trim()) closing--;
+  for (let i = text.length - 1; i >= 0; i--) {
+    if (level(text[i]) > 0) break;
+    if (!prose(text[i])) continue;
+    closing = text[i];
+    while (closing > 0 && prose(closing - 1)) closing--;
+    break;
   }
   if (named !== undefined) {
     const own = level(named);

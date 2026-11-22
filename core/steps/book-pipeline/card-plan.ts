@@ -421,7 +421,7 @@ export const cardPlanFits = (request: CardPlanRequest): boolean => !!fitCardPlan
 /** One card's brief and acceptance checklist. Text-only. */
 export const cardPlanStep: StepDefinition<CardPlanRequest, CardPlanResult> = {
   id: "book-pipeline.card-plan",
-  version: 3,
+  version: 4,
   render: request => {
     const fitted = fitCardPlan(request);
     // A request that does not fit is refused by `policy` before it is sent; this only keeps `render` total.

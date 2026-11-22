@@ -3440,6 +3440,8 @@ export const en = {
   "ui.book_bar_plan_ready_struct_0_1": "The preface, {0} chapters and {1} sections are planned",
   "ui.book_bar_plan_ready_struct_0": "The preface and {0} chapters are planned",
   "ui.book_progress_line_plan_cards_0_1": "Planning card {0}/{1}",
+  "ui.book_progress_line_write_cards_0_1": "Writing card {0}/{1}",
+  "ui.book_progress_line_done_cards_0_1": "{0}/{1} cards done",
   "ui.book_start_estimate_struct_0_1_2_3_4_5":
     "Preface + {0} chapters + {1} sections ({2} cards) · about {3} · up to {4} AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at {5}).",
   "ui.book_start_estimate_struct_0_1_2_3_4":

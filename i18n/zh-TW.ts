@@ -3216,6 +3216,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_bar_plan_ready_struct_0_1": "前言、{0} 章、{1} 節都企劃好了",
   "ui.book_bar_plan_ready_struct_0": "前言、{0} 章都企劃好了",
   "ui.book_progress_line_plan_cards_0_1": "正在企劃第 {0}／{1} 張卡",
+  "ui.book_progress_line_write_cards_0_1": "正在寫第 {0}／{1} 張卡",
+  "ui.book_progress_line_done_cards_0_1": "已完成 {0}／{1} 張卡",
   "ui.book_start_estimate_struct_0_1_2_3_4_5":
     "前言 + {0} 章 + {1} 節（{2} 張卡）· 約 {3} · 最多 {4} 次 AI 呼叫（含 AI 校對、自動修正和封面圖；步驟失敗重試另計；到 {5} 次會先停下）。",
   "ui.book_start_estimate_struct_0_1_2_3_4":

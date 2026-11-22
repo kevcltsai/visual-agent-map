@@ -3,7 +3,7 @@ You are the chief editor of a picture-and-text book. Every card (the preface, th
 Return only the cards that need a change, so that the briefs fit together:
 - Each subject is owned by exactly one card. Where two briefs cover the same thing, move it to the card it belongs to or drop it from the other (change covers or points). A chapter's own subject is never a heading of the preface or of another chapter.
 - The preface (role intro) covers the question the whole book answers, why these concepts are needed and how they connect, one line of route per chapter, and how to read the book. No body chapter or section previews the whole book's route; a chapter looks only at its own subject.
-- No two cards open with the same scene or example. Rewrite the entry of the later card so it grows from that card's own subject.
+- No two cards open with the same scene or example. Rewrite the entry of the later card so it grows from that card's own subject. Keep the opening-type prefix an entry starts with (數據／史料／反問／場景 or Data／Record／Question／Scene) and the ending-type prefix a handoff starts with (結論句／畫面／問句 or Conclusion／Image／Question) when you rewrite one; change the type only to keep the book from opening or ending every chapter the same way.
 - Each previous names real ideas that earlier cards establish (check them against the earlier briefs) and the one new idea this card adds. An empty previous stays empty. previous and next are shown as the sentence only (the neighbour's number and title are the neighbouring cards'); write previous as a sentence too, without a number or a title.
 - The last card's handoff answers the question the preface opened with, from the ideas the chapters built.
 

@@ -3206,6 +3206,8 @@ var en = {
   "ui.book_bar_plan_ready_struct_0_1": "The preface, {0} chapters and {1} sections are planned",
   "ui.book_bar_plan_ready_struct_0": "The preface and {0} chapters are planned",
   "ui.book_progress_line_plan_cards_0_1": "Planning card {0}/{1}",
+  "ui.book_progress_line_write_cards_0_1": "Writing card {0}/{1}",
+  "ui.book_progress_line_done_cards_0_1": "{0}/{1} cards done",
   "ui.book_start_estimate_struct_0_1_2_3_4_5": "Preface + {0} chapters + {1} sections ({2} cards) \xB7 about {3} \xB7 up to {4} AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at {5}).",
   "ui.book_start_estimate_struct_0_1_2_3_4": "Preface + {0} chapters ({1} cards) \xB7 about {2} \xB7 up to {3} AI calls (including the AI proofread, automatic fixes and cover pictures; a failed step's retry not included; the run pauses at {4}).",
   "ui.book_summary_done": "What it covers: ",
@@ -6484,6 +6486,8 @@ var zhCN = {
   "ui.book_bar_plan_ready_struct_0_1": "\u524D\u8A00\u3001{0} \u7AE0\u3001{1} \u8282\u90FD\u4F01\u5212\u597D\u4E86",
   "ui.book_bar_plan_ready_struct_0": "\u524D\u8A00\u3001{0} \u7AE0\u90FD\u4F01\u5212\u597D\u4E86",
   "ui.book_progress_line_plan_cards_0_1": "\u6B63\u5728\u4F01\u5212\u7B2C {0}\uFF0F{1} \u5F20\u5361",
+  "ui.book_progress_line_write_cards_0_1": "\u6B63\u5728\u5199\u7B2C {0}\uFF0F{1} \u5F20\u5361",
+  "ui.book_progress_line_done_cards_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u5F20\u5361",
   "ui.book_start_estimate_struct_0_1_2_3_4_5": "\u524D\u8A00 + {0} \u7AE0 + {1} \u8282\uFF08{2} \u5F20\u5361\uFF09\xB7 \u7EA6 {3} \xB7 \u6700\u591A {4} \u6B21 AI \u8C03\u7528\uFF08\u542B AI \u6821\u5BF9\u3001\u81EA\u52A8\u4FEE\u6B63\u548C\u5C01\u9762\u56FE\uFF1B\u6B65\u9AA4\u5931\u8D25\u91CD\u8BD5\u53E6\u8BA1\uFF1B\u5230 {5} \u6B21\u4F1A\u5148\u505C\u4E0B\uFF09\u3002",
   "ui.book_start_estimate_struct_0_1_2_3_4": "\u524D\u8A00 + {0} \u7AE0\uFF08{1} \u5F20\u5361\uFF09\xB7 \u7EA6 {2} \xB7 \u6700\u591A {3} \u6B21 AI \u8C03\u7528\uFF08\u542B AI \u6821\u5BF9\u3001\u81EA\u52A8\u4FEE\u6B63\u548C\u5C01\u9762\u56FE\uFF1B\u6B65\u9AA4\u5931\u8D25\u91CD\u8BD5\u53E6\u8BA1\uFF1B\u5230 {4} \u6B21\u4F1A\u5148\u505C\u4E0B\uFF09\u3002",
   "ui.book_summary_done": "\u5B9E\u9645\u8BB2\u4E86\uFF1A",
@@ -9762,6 +9766,8 @@ var zhTW = {
   "ui.book_bar_plan_ready_struct_0_1": "\u524D\u8A00\u3001{0} \u7AE0\u3001{1} \u7BC0\u90FD\u4F01\u5283\u597D\u4E86",
   "ui.book_bar_plan_ready_struct_0": "\u524D\u8A00\u3001{0} \u7AE0\u90FD\u4F01\u5283\u597D\u4E86",
   "ui.book_progress_line_plan_cards_0_1": "\u6B63\u5728\u4F01\u5283\u7B2C {0}\uFF0F{1} \u5F35\u5361",
+  "ui.book_progress_line_write_cards_0_1": "\u6B63\u5728\u5BEB\u7B2C {0}\uFF0F{1} \u5F35\u5361",
+  "ui.book_progress_line_done_cards_0_1": "\u5DF2\u5B8C\u6210 {0}\uFF0F{1} \u5F35\u5361",
   "ui.book_start_estimate_struct_0_1_2_3_4_5": "\u524D\u8A00 + {0} \u7AE0 + {1} \u7BC0\uFF08{2} \u5F35\u5361\uFF09\xB7 \u7D04 {3} \xB7 \u6700\u591A {4} \u6B21 AI \u547C\u53EB\uFF08\u542B AI \u6821\u5C0D\u3001\u81EA\u52D5\u4FEE\u6B63\u548C\u5C01\u9762\u5716\uFF1B\u6B65\u9A5F\u5931\u6557\u91CD\u8A66\u53E6\u8A08\uFF1B\u5230 {5} \u6B21\u6703\u5148\u505C\u4E0B\uFF09\u3002",
   "ui.book_start_estimate_struct_0_1_2_3_4": "\u524D\u8A00 + {0} \u7AE0\uFF08{1} \u5F35\u5361\uFF09\xB7 \u7D04 {2} \xB7 \u6700\u591A {3} \u6B21 AI \u547C\u53EB\uFF08\u542B AI \u6821\u5C0D\u3001\u81EA\u52D5\u4FEE\u6B63\u548C\u5C01\u9762\u5716\uFF1B\u6B65\u9A5F\u5931\u6557\u91CD\u8A66\u53E6\u8A08\uFF1B\u5230 {4} \u6B21\u6703\u5148\u505C\u4E0B\uFF09\u3002",
   "ui.book_summary_done": "\u5BE6\u969B\u8B1B\u4E86\uFF1A",
@@ -11789,10 +11795,14 @@ function insertAt(lines, after) {
   const heads = lines.map((_, i) => i).filter((i) => level(i) > 0);
   const named = after ? heads.find((i) => headingKey(bare(lines[i])) === headingKey(after)) : void 0;
   const text11 = lines.map((_, i) => i).filter((i) => region[i] && lines[i].trim());
+  const prose = (i) => region[i] && !fenced[i] && !!lines[i].trim() && level(i) === 0 && !/^[ \t]*(?:!\[|>)/.test(bare(lines[i]));
   let closing;
-  if (text11.length && level(text11[text11.length - 1]) === 0) {
-    closing = text11[text11.length - 1];
-    while (closing > 0 && region[closing - 1] && lines[closing - 1].trim()) closing--;
+  for (let i = text11.length - 1; i >= 0; i--) {
+    if (level(text11[i]) > 0) break;
+    if (!prose(text11[i])) continue;
+    closing = text11[i];
+    while (closing > 0 && prose(closing - 1)) closing--;
+    break;
   }
   if (named !== void 0) {
     const own2 = level(named);
@@ -50118,7 +50128,7 @@ var card_plan_images_role_default = "- images: the picture plan for this chapter
 var card_plan_images_owner_default = "- images: the picture plan for this chapter. The owner set the number of pictures per chapter in the whole-book settings: give {{count}} for this chapter, whatever its role (an introduction, a closing or a gallery chapter too). Plan fewer than {{min}} only when the chapter truly has nothing to picture. Spread them over the points the chapter makes, one picture per point, each beside something the chapter's text talks about. Each slot has: kind (the kind of picture, for example painting, photograph, map, diagram, portrait; a few words), explains (what the picture shows or explains, one sentence that names something the chapter's text talks about), anchor (where it sits: the paragraph or point in the chapter it goes beside) and search (2 to 4 English search terms for a Wikimedia Commons file search, a few words each, most specific first: the work's or object's usual English name, the artist or person, the place; always in English, whatever the book's language). Do not number the slots. Do not write image links or addresses; a picture is found later.\n";
 
 // core/steps/book-pipeline/card-plan-continuity.md
-var card_plan_continuity_default = "[parent]\nChapter this section belongs to (JSON object):\n\n[next-chapter]\nNext chapter, which this section's handoff leads to (JSON object):\n\n[style-so-far]\nThe previous card's opening and ending as planned (JSON object of {entry,handoff}). Give this card an opening type and an ending type that differ from these: the book must not open or end every chapter the same way.\n\n[own]\nits entry grows from its own subject and does not pick up or retell the previous card.\n\n[section-next-chapter]\nAs the last section of the chapter, its handoff leaves the open question the next chapter (the one given below) takes up, without naming it.\n\n[section-next]\nIts handoff leaves the open question the next section takes up, without naming it.\n\n[section-last]\nIt is the last section of the last chapter, so it closes the book as the handoff rule says for the last card.\n\n[preface]\nContinuity: this is the preface; its entry opens the book, and its handoff leaves the open question chapter 1 takes up, without naming it.\n\n[chapter-first]\nContinuity: the entry opens the book's first chapter.\n\n[chapter-sections]\nThis chapter has sections, so its handoff leaves the open question its own first section takes up.\n\n[chapter-next]\nIts handoff leaves the open question the next chapter takes up, without naming it.\n\n[chapter-last]\nThis chapter has no sections and is the last, so it closes the book as the handoff rule says for the last card.\n";
+var card_plan_continuity_default = "[parent]\nChapter this section belongs to (JSON object):\n\n[next-chapter]\nNext chapter, which this section's handoff leads to (JSON object):\n\n[style-so-far]\nThe previous card's opening and ending as planned (JSON object of {entry,handoff}). Give this card an opening type and an ending type that differ from these: the book must not open or end every chapter the same way.\n\n[own]\nits entry grows from its own subject and does not pick up or retell the previous card.\n\n[section-next-chapter]\nAs the last section of the chapter, its handoff leaves what the next chapter (the one given below) takes up (an idea, an image or a question), without naming it.\n\n[section-next]\nIts handoff leaves what the next section takes up (an idea, an image or a question), without naming it.\n\n[section-last]\nIt is the last section of the last chapter, so it closes the book as the handoff rule says for the last card.\n\n[preface]\nContinuity: this is the preface; its entry opens the book, and its handoff leaves what chapter 1 takes up (an idea, an image or a question), without naming it.\n\n[chapter-first]\nContinuity: the entry opens the book's first chapter.\n\n[chapter-sections]\nThis chapter has sections, so its handoff leaves what its own first section takes up (an idea, an image or a question).\n\n[chapter-next]\nIts handoff leaves what the next chapter takes up (an idea, an image or a question), without naming it.\n\n[chapter-last]\nThis chapter has no sections and is the last, so it closes the book as the handoff rule says for the last card.\n";
 
 // core/steps/book-pipeline/card-plan.ts
 var placeText = (p) => p.kind === "preface" ? "preface" : p.kind === "chapter" ? `chapter ${p.chapter}` : `section ${p.sectionIndex} of ${p.sectionCount} in chapter ${p.chapter}`;
@@ -50385,7 +50395,7 @@ function fitCardPlan(request) {
 var cardPlanFits = (request) => !!fitCardPlan(request);
 var cardPlanStep = {
   id: "book-pipeline.card-plan",
-  version: 3,
+  version: 4,
   render: (request) => {
     const fitted = fitCardPlan(request);
     return fitted ? fitted.prompt : baseRender(request, false) + extraRequest(request.instruction);
@@ -50405,7 +50415,7 @@ var plan_edit_default = `You are the chief editor of a picture-and-text book. Ev
 Return only the cards that need a change, so that the briefs fit together:
 - Each subject is owned by exactly one card. Where two briefs cover the same thing, move it to the card it belongs to or drop it from the other (change covers or points). A chapter's own subject is never a heading of the preface or of another chapter.
 - The preface (role intro) covers the question the whole book answers, why these concepts are needed and how they connect, one line of route per chapter, and how to read the book. No body chapter or section previews the whole book's route; a chapter looks only at its own subject.
-- No two cards open with the same scene or example. Rewrite the entry of the later card so it grows from that card's own subject.
+- No two cards open with the same scene or example. Rewrite the entry of the later card so it grows from that card's own subject. Keep the opening-type prefix an entry starts with (\u6578\u64DA\uFF0F\u53F2\u6599\uFF0F\u53CD\u554F\uFF0F\u5834\u666F or Data\uFF0FRecord\uFF0FQuestion\uFF0FScene) and the ending-type prefix a handoff starts with (\u7D50\u8AD6\u53E5\uFF0F\u756B\u9762\uFF0F\u554F\u53E5 or Conclusion\uFF0FImage\uFF0FQuestion) when you rewrite one; change the type only to keep the book from opening or ending every chapter the same way.
 - Each previous names real ideas that earlier cards establish (check them against the earlier briefs) and the one new idea this card adds. An empty previous stays empty. previous and next are shown as the sentence only (the neighbour's number and title are the neighbouring cards'); write previous as a sentence too, without a number or a title.
 - The last card's handoff answers the question the preface opened with, from the ideas the chapters built.
 
@@ -50558,7 +50568,7 @@ function parsePlanEdit(raw, request) {
 }
 var planEditStep = {
   id: "book-pipeline.plan-edit",
-  version: 1,
+  version: 2,
   render,
   schema: PLAN_EDIT_SCHEMA,
   policy: (prompt, request) => {
@@ -59462,9 +59472,9 @@ function bookProgressText(state) {
   const { total: total2 } = state;
   const at = Math.min((_b2 = (_a2 = state.current) == null ? void 0 : _a2.chapter) != null ? _b2 : settledCount(state) + 1, Math.max(total2, 1));
   if (state.mode === "writing")
-    return ((_c = state.current) == null ? void 0 : _c.fix) ? fixLine(state, settledCount(state), total2) : t("ui.book_progress_line_write_0_1", at, total2);
-  const sentence2 = state.mode === "planning" ? !state.globalDone || ((_d = state.current) == null ? void 0 : _d.step) === "global" ? t("ui.book_progress_line_global") : t(state.structure ? "ui.book_progress_line_plan_cards_0_1" : "ui.book_progress_line_plan_0_1", at, total2) : t("ui.book_progress_line_write_0_1", at, total2);
-  return `${sentence2}${t("ui.book_progress_line_sep")}${t("ui.book_progress_line_done_0_1", settledCount(state), total2)}`;
+    return ((_c = state.current) == null ? void 0 : _c.fix) ? fixLine(state, settledCount(state), total2) : t(state.structure ? "ui.book_progress_line_write_cards_0_1" : "ui.book_progress_line_write_0_1", at, total2);
+  const sentence2 = state.mode === "planning" ? !state.globalDone || ((_d = state.current) == null ? void 0 : _d.step) === "global" ? t("ui.book_progress_line_global") : t(state.structure ? "ui.book_progress_line_plan_cards_0_1" : "ui.book_progress_line_plan_0_1", at, total2) : t(state.structure ? "ui.book_progress_line_write_cards_0_1" : "ui.book_progress_line_write_0_1", at, total2);
+  return `${sentence2}${t("ui.book_progress_line_sep")}${t(state.structure ? "ui.book_progress_line_done_cards_0_1" : "ui.book_progress_line_done_0_1", settledCount(state), total2)}`;
 }
 function renderProgressLine(bar, state, text11) {
   const running2 = state.mode === "planning" || state.mode === "writing";

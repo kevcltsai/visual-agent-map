@@ -3214,6 +3214,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_bar_plan_ready_struct_0_1": "前言、{0} 章、{1} 节都企划好了",
   "ui.book_bar_plan_ready_struct_0": "前言、{0} 章都企划好了",
   "ui.book_progress_line_plan_cards_0_1": "正在企划第 {0}／{1} 张卡",
+  "ui.book_progress_line_write_cards_0_1": "正在写第 {0}／{1} 张卡",
+  "ui.book_progress_line_done_cards_0_1": "已完成 {0}／{1} 张卡",
   "ui.book_start_estimate_struct_0_1_2_3_4_5":
     "前言 + {0} 章 + {1} 节（{2} 张卡）· 约 {3} · 最多 {4} 次 AI 调用（含 AI 校对、自动修正和封面图；步骤失败重试另计；到 {5} 次会先停下）。",
   "ui.book_start_estimate_struct_0_1_2_3_4":

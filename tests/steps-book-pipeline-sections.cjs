@@ -347,6 +347,23 @@ test('expandChapterDetail: new text never lands after the closing paragraph, whi
   assert.ok(outBold.indexOf('新段落。') < outBold.indexOf('收尾段。'));
 });
 
+test('expandChapterDetail: the closing paragraph is an ordinary prose paragraph; a heading ends the search, images, embeds, callouts and code fences are not it', () => {
+  const { expandChapterDetail } = sections;
+  const put = (lines, anchor) => expandChapterDetail(lines.join('\n'), `@@insert after: ${anchor}\n新段落。`, 'zh-TW').detail;
+  const at = (detail, text) => detail.indexOf(text);
+  // (a) no blank lines anywhere: a middle section's insert stays at that section's end
+  const tight = put(['## 開場', '開場段落。', '### 土壤', '土壤段落。', '### 小結', '收尾段。'], '### 土壤');
+  assert.ok(at(tight, '新段落。') > at(tight, '土壤段落。') && at(tight, '新段落。') < at(tight, '### 小結'), 'tight: the middle section keeps its place');
+  // (b) the last block is a code fence: nothing goes inside it, the new text is before the closing paragraph
+  const fence = put(['## 開場', '', '開場段落。', '', '### 小結', '', '收尾段。', '', '```', 'a', '', 'b', '```'], '### 小結');
+  assert.ok(at(fence, '新段落。') < at(fence, '收尾段。') && at(fence, '新段落。') < at(fence, '```'), 'fence: before the closing paragraph, never inside the fence');
+  // (c) an owner image line or a callout after the closing paragraph: still before the closing paragraph
+  for (const after of ['![[pic.png]]', '![alt](https://example.org/a.png)', '> [!note] 補充\n> 內容']) {
+    const out = put(['## 開場', '', '開場段落。', '', '### 小結', '', '收尾段。', '', ...after.split('\n')], '### 小結');
+    assert.ok(at(out, '新段落。') < at(out, '收尾段。'), `${after}: before the closing paragraph`);
+  }
+});
+
 test('expandChapterDetail: at most 3 new sections per expansion (over all insert blocks); the rest are dropped and counted, text without a heading stays', () => {
   const { expandChapterDetail, MAX_INSERTED_SECTIONS } = sections;
   assert.equal(MAX_INSERTED_SECTIONS, 3);

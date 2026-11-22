@@ -158,7 +158,7 @@ test('card plan: the request carries the previous card\'s opening and ending whe
   assert.match(prompt, /one of 數據 \/ 史料 \/ 反問 \/ 場景/); assert.match(prompt, /one of 結論句 \/ 畫面 \/ 問句/);
   assert.match(prompt, /When a material's home is another card than this one, this card brings it in with one sentence at most/);
   assert.match(prompt, /no 「這一章要回答的就是…」/);
-  assert.equal(cardPlan.cardPlanStep.version, 3);
+  assert.equal(cardPlan.cardPlanStep.version, 4);
 });
 
 test('card plan: ids and types assigned, neighbours only when they exist, an empty checklist is refused', () => {
@@ -538,7 +538,7 @@ test('exchange log: success, parse error and provider error keep titles, chapter
     const ok = harness({ answer: goodPlan });
     const parsed = await runMod.runPlanStep(ok.planCalls, cardPlan.cardPlanStep, request, { signal: signal() });
     assert.equal(parsed.checklist.length, 1); noContent(ok.log, spy, 'plan success');
-    assert.equal(ok.log.getEntries()[0].status, 'completed'); assert.equal(ok.log.getEntries()[0].step, 'book-pipeline.card-plan@3');
+    assert.equal(ok.log.getEntries()[0].status, 'completed'); assert.equal(ok.log.getEntries()[0].step, 'book-pipeline.card-plan@4');
     assert.equal(ok.runs[0][0].includes(TITLE), true, 'the provider itself still gets the prompt');
     const bad = harness({ answer: 'SECRET-REPLY not json' });
     await assert.rejects(runMod.runPlanStep(bad.planCalls, cardPlan.cardPlanStep, request, { signal: signal() }));
@@ -1132,14 +1132,14 @@ test('A6 card plan request: a section prompt carries its chapter and (last secti
   assert.match(section, /Chapter this section belongs to \(JSON object\):\n\{"place":"chapter 2","title":"Chapter two"\}/);
   assert.match(section, /Next chapter, which this section's handoff leads to \(JSON object\):\n\{"place":"chapter 3","title":"Outro"/);
   assert.match(section, /its entry grows from its own subject and does not pick up or retell the previous card/);
-  assert.match(section, /last section of the chapter, its handoff leaves the open question the next chapter .* takes up, without naming it/);
+  assert.match(section, /last section of the chapter, its handoff leaves what the next chapter .* takes up \(an idea, an image or a question\), without naming it/);
   const firstSection = cardPlan.cardPlanStep.render(planBase({ card: { id: 's1', kind: 'section', chapter: 2, sectionIndex: 1, sectionCount: 2, role: 'body', title: 'One', summary: 's' }, parent: { position: 2, title: 'Chapter two' }, next: { title: 'Two', summary: 't' } }));
   assert.match(firstSection, /its entry grows from its own subject/);
   assert.ok(!/Next chapter, which/.test(firstSection));
   const chapter = cardPlan.cardPlanStep.render(planBase({ previous: { position: 'preface', title: 'Intro', summary: 'i' }, next: { position: 2, title: 'Next', summary: 'n' } }));
   assert.ok(!/belongs to|Next chapter, which/.test(chapter));
   assert.match(chapter, /"place":"preface","title":"Intro"/);
-  assert.match(chapter, /does not pick up or retell the previous card\. Its handoff leaves the open question the next chapter takes up, without naming it\./);
+  assert.match(chapter, /does not pick up or retell the previous card\. Its handoff leaves what the next chapter takes up \(an idea, an image or a question\), without naming it\./);
   const lastChapter = cardPlan.cardPlanStep.render(planBase({ previous: { position: 1, title: 'One', summary: 'o' } }));
   assert.match(lastChapter, /has no sections and is the last, so it closes the book as the handoff rule says for the last card/);
   assert.match(lastChapter, /return to the question the preface opened with/);
@@ -1148,7 +1148,7 @@ test('A6 card plan request: a section prompt carries its chapter and (last secti
   assert.match(lastSection, /last section of the last chapter, so it closes the book/);
   assert.ok(!/closes the chapter|leads out to the next chapter/.test(lastSection));
   const withSections = cardPlan.cardPlanStep.render(planBase({ children: [{ title: 'S1', summary: 'a' }] }));
-  assert.match(withSections, /handoff leaves the open question its own first section takes up/);
+  assert.match(withSections, /handoff leaves what its own first section takes up \(an idea, an image or a question\)/);
 });
 
 test('A6 global plan: every card carries its place, and the prompt explains the preface, chapters and sections', () => {
@@ -1165,7 +1165,7 @@ test('cover plan: schema and prompt ask for cover{explains, 2-4 search terms}; s
   const answer = extra => JSON.stringify({ cover: { explains: 'x', search: ['a b', 'c d'] }, points: ['p1', 'p2', 'p3'], covers: 'c', entry: 'e', handoff: 'h', previous: '', next: '', checklist: [{ type: 'structure', text: 'Shape' }], images: [], ...extra });
   const cover = cardPlan.CARD_PLAN_SCHEMA.properties.cover;
   assert.equal(cover.properties.search.minItems, 2); assert.equal(cover.properties.search.maxItems, 4);
-  assert.ok(cardPlan.CARD_PLAN_SCHEMA.required.includes('cover')); assert.equal(cardPlan.cardPlanStep.version, 3);
+  assert.ok(cardPlan.CARD_PLAN_SCHEMA.required.includes('cover')); assert.equal(cardPlan.cardPlanStep.version, 4);
   assert.match(cardPlan.cardPlanStep.render(request), /"cover":\{"explains":"","search":\["",""\]\}/);
   assert.match(cardPlan.cardPlanStep.render(request), /does not count toward them and is asked for even when images is empty/);
   assert.throws(() => cardPlan.cardPlanStep.parse(answer({ cover: undefined }), request), /unexpected fields/, 'an answer without a cover is refused (retried), never a card silently without its cover line');

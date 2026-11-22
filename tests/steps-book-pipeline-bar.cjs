@@ -630,3 +630,18 @@ test('bar: a finished book with a preface, 8 chapters and 14 sections says 8 cha
   assert.equal(draw(bundle.bookBarState(data, undefined, () => undefined, undefined, structure)), '8 章・AI 修了 0 處・仍有問題 0 項');
   assert.equal(draw(bundle.bookBarState(data, undefined, () => undefined)), '23 章・AI 修了 0 處・仍有問題 0 項', 'no structure: the card count, no throw');
 });
+
+test('bar: with a book structure the writing and done counts say cards, not chapters; without one the old chapter wording stays', () => {
+  const places = { p: { kind: 'preface' }, c1: { kind: 'chapter', chapter: 1 }, s1: { kind: 'section', chapterId: 'c1', sectionIndex: 1, sectionCount: 1 }, c2: { kind: 'chapter', chapter: 2 } };
+  const structure = { placeOf: id => places[id], chapters: ['c1', 'c2'], sectionsOf: id => (id === 'c1' ? ['s1'] : []), trialOf: () => ['p', 'c1', 's1'], neighboursOf: () => ({}) };
+  const order = ['p', 'c1', 's1', 'c2'];
+  const base = { v: 1, runId: 'r', status: 'running', order, trial: ['p', 'c1', 's1'], globalPlanned: true, budget: { used: 1, limit: 300 }, revision: 1, startedAt: 'x', phaseStartedAt: 'x' };
+  const progress = phase => ({ runId: 'r', phase, status: 'running', active: true, total: 4, counts: { pending: 1, planned: 0, written: 0, checked: 3, 'needs-review': 0 }, budget: { used: 1, limit: 300 }, startedAt: 'x', phaseStartedAt: 'x', busyCards: [], current: [{ nodeId: 'c2', step: 'write', startedAt: 1 }] });
+  const text = (language, phase, struct) => { setUiLanguage(language); return bundle.bookProgressText(bundle.bookBarState({ ...base, phase }, progress(phase), () => undefined, undefined, struct, id => id)); };
+  assert.equal(text('zh-TW', 'writing', structure), '正在寫第 4／4 張卡');
+  assert.equal(text('en', 'writing', structure), 'Writing card 4/4');
+  assert.equal(text('zh-TW', 'planning', structure), '正在企劃第 4／4 張卡，已完成 3／4 張卡');
+  assert.equal(text('zh-CN', 'planning', structure), '正在企划第 4／4 张卡，已完成 3／4 张卡');
+  assert.equal(text('zh-TW', 'writing', undefined), '正在寫第 4／4 章', 'no structure: unchanged');
+  assert.equal(text('zh-TW', 'planning', undefined), '正在企劃第 4／4 章，已完成 3／4 章', 'no structure: unchanged');
+});

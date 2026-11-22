@@ -496,14 +496,14 @@ export function bookProgressText(state: BookBarState): string {
     // Only fix rounds in work: a named fix line with the whole-book done count, never a restarted counter.
     return state.current?.fix
       ? fixLine(state, settledCount(state), total)
-      : t("ui.book_progress_line_write_0_1", at, total);
+      : t(state.structure ? "ui.book_progress_line_write_cards_0_1" : "ui.book_progress_line_write_0_1", at, total);
   const sentence =
     state.mode === "planning"
       ? !state.globalDone || state.current?.step === "global"
         ? t("ui.book_progress_line_global")
         : t(state.structure ? "ui.book_progress_line_plan_cards_0_1" : "ui.book_progress_line_plan_0_1", at, total)
-      : t("ui.book_progress_line_write_0_1", at, total);
-  return `${sentence}${t("ui.book_progress_line_sep")}${t("ui.book_progress_line_done_0_1", settledCount(state), total)}`;
+      : t(state.structure ? "ui.book_progress_line_write_cards_0_1" : "ui.book_progress_line_write_0_1", at, total);
+  return `${sentence}${t("ui.book_progress_line_sep")}${t(state.structure ? "ui.book_progress_line_done_cards_0_1" : "ui.book_progress_line_done_0_1", settledCount(state), total)}`;
 }
 function renderProgressLine(bar: HTMLElement, state: BookBarState, text: string): void {
   const running = state.mode === "planning" || state.mode === "writing";

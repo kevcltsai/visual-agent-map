@@ -190,7 +190,7 @@ export function parsePlanEdit(raw: string, request: PlanEditRequest): PlanEditCh
 /** The chief editor's one pass over every card's brief: one text-only call (no web, no tools). */
 export const planEditStep: StepDefinition<PlanEditRequest, PlanEditChange[]> = {
   id: "book-pipeline.plan-edit",
-  version: 1,
+  version: 2,
   render,
   schema: PLAN_EDIT_SCHEMA,
   policy: (prompt, request) => {

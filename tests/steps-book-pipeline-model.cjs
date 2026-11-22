@@ -325,10 +325,12 @@ test('structureEdit: absent reads as before, a well-formed one is read as saved,
   assert.deepEqual(plain(ok.data.structureEdit), edit);
   const over = model.readBookPipeline({ bookPipeline: { ...usable(), structureEdit: { ...edit, applied: [], rejected: [], overCap: true } } });
   assert.equal(over.data.structureEdit.overCap, true);
+  const arch = model.readBookPipeline({ bookPipeline: { ...usable(), structureEdit: { ...edit, archived: { c1: 'Book/Archive/C1.md' } } } });
+  assert.equal(arch.structureUnreadable, undefined); assert.equal(arch.data.structureEdit.archived.c1, 'Book/Archive/C1.md');
   const broken = [
     'text', { ...edit, runId: '' }, { ...edit, applied: 'x' }, { ...edit, applied: [{ id: 's1', op: { kind: 'move' }, before: {} }] },
     { ...edit, applied: [{ ...edit.applied[0], op: { ...edit.applied[0].op, kind: 'teleport' } }] },
-    { ...edit, rejected: [{ id: 1, code: 'x' }] }, { ...edit, overCap: false }, { ...edit, undone: [1] }, { ...edit, before: { rootId: 'r', nodes: [{ id: 1 }] } }, { ...edit, before: undefined }
+    { ...edit, rejected: [{ id: 1, code: 'x' }] }, { ...edit, overCap: false }, { ...edit, undone: [1] }, { ...edit, archived: { c1: 3 } }, { ...edit, archived: 'x' }, { ...edit, before: { rootId: 'r', nodes: [{ id: 1 }] } }, { ...edit, before: undefined }
   ];
   for (const structureEdit of broken) {
     const raw = { ...usable(), structureEdit };

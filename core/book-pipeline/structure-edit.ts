@@ -23,7 +23,7 @@ export type RejectCode =
   | "unknown_card" | "root" | "locked" | "has_children" | "chapter_has_sections" | "depends_on_rejected" | "cycle" | "bad_title" | "bad_ref";
 
 /** What the card looked like before an op: where it sat (parent and previous sibling) and its title. */
-export type Before = { parent: string | null; after?: string; title: string };
+export type Before = { parent: string | null; after?: string; title: string; /** A merged card's summary when it was folded in (the target's plan reads it); set by the caller. */ summary?: string };
 export type AppliedOp = { id: string; op: StructureOp; before: Before };
 export type RejectedOp = { op: StructureOp; code: RejectCode };
 export type SimulatedStructure = { applied: AppliedOp[]; rejected: RejectedOp[]; result: StructureNode[]; overCap?: true };

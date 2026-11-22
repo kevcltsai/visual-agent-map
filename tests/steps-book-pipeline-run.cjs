@@ -4841,3 +4841,179 @@ test('plan edit: new covers also set the map summary; a locked card (kept, hand-
   assert.equal(await promptOf(r, 2), before2, 'the locked card keeps its plan');
   assert.equal((await r.note(2)).summary, 'summary of SecretTitleB', 'and its summary');
 });
+
+// ---- the editor's structure changes (P2a): apply, fences, failures ------------------------------------------------------------------
+const { createBookStructurePort } = S.load('experiences/visual-map/book-structure-port.ts', { obsidian: S.obsidian });
+const { bookReadingOrder } = S.load('experiences/visual-map/presentation-order.ts');
+const { mapDifference } = S.load('core/book-pipeline/model.ts');
+/** A rig whose global plan carries `structure(r)`; the real structure port runs over the fixture repository (`wrap(repo)` may make it fail). */
+async function structureRig(structure, over = {}) {
+  const holder = {};
+  const requests = { global: [], card: [] };
+  const r = await rig({
+    ...over,
+    script: {
+      global: request => { requests.global.push(request); return { ...planRoles(holder.r, ['intro', 'body', 'body']), structure: structure(holder.r) }; },
+      card: request => { requests.card.push(request); return { covers: 'c', entry: 'e', handoff: 'h', previous: 'p', next: 'n', checklist: [{ id: 'C1', type: 'structure', text: 'x' }] }; },
+      ...over.script
+    }
+  });
+  holder.r = r;
+  const repo = over.wrap ? over.wrap(r.repo) : r.repo;
+  r.ports.editBookStructure = (mapPath, work) => createBookStructurePort({ repo, rebuildDerivedData: over.rebuild ?? (async () => undefined) })(mapPath, work);
+  r.runs.ports = r.ports;
+  return { r, requests };
+}
+const mapNow = async r => r.repo.readMap(r.mapPath);
+const idsNow = async r => bookReadingOrder(await mapNow(r));
+const SOP = (r) => [
+  { id: 'o1', kind: 'merge', card: r.nodes[2].id, into: r.nodes[1].id, reason: 'same ground' },
+  { id: 'o2', kind: 'add', ref: 'n1', title: 'NewChapter', summary: 'fresh summary', parent: r.nodes[0].id, after: r.nodes[1].id, reason: 'gap' },
+  { id: 'o3', kind: 'rename', card: r.nodes[1].id, title: 'RenamedA', reason: 'clearer' }
+];
+const newRunner = r => new BookPipelineRuns(r.ports);
+
+test('P2a apply: add, merge (archive) and rename in one transaction; the map and the run agree and the run never pauses for the map change', async () => {
+  const { r, requests } = await structureRig(SOP);
+  const bRaw = r.raw(2);
+  const bPath = r.nodes[2].path;
+  await r.runs.start(r.mapPath);
+  const s = await r.state();
+  assert.equal(s.phase, 'gate1'); assert.equal(s.status, 'running');
+  assert.notEqual(s.pauseReason, 'map');
+  assert.ok(!r.stat.logs.some(l => /map_changed/.test(l)), 'pauseOnMapChange never fired');
+  const map = await mapNow(r);
+  same(mapDifference(s, bookReadingOrder(map)), { added: [], missing: [] });
+  assert.equal(s.order.length, 3);
+  same(s.order, bookReadingOrder(map));
+  assert.equal(s.order[0], r.nodes[0].id); assert.equal(s.order[1], r.nodes[1].id);
+  const created = s.order[2];
+  assert.ok(![r.nodes[1].id, r.nodes[0].id, r.nodes[2].id].includes(created));
+  assert.equal((await r.repo.readNote(map.nodes.find(n => n.id === created).path)).title, 'NewChapter');
+  assert.equal((await r.repo.readNote(map.nodes.find(n => n.id === r.nodes[1].id).path)).title, 'RenamedA');
+  assert.equal(s.chapters[r.nodes[1].id].title, 'RenamedA');
+  assert.equal(s.structureEdit.runId, s.runId);
+  assert.equal(s.structureEdit.applied.length, 3);
+  assert.equal(s.structureEdit.applied.find(a => a.id === 'o2').op.ref, created, 'the ref became the real id');
+  assert.equal(s.structureEdit.applied.find(a => a.id === 'o1').before.summary, 'summary of SecretTitleB');
+  const archivePath = s.structureEdit.archived[r.nodes[2].id];
+  assert.match(archivePath, /\/Archive\//);
+  const bodyOf2 = raw => raw.slice(raw.indexOf('\n---\n') + 5);
+  assert.equal(bodyOf2(r.contents.get(archivePath)), bodyOf2(bRaw), 'the archived note keeps its text (only the lifecycle fields change)');
+  assert.match(r.contents.get(archivePath), /title: SecretTitleB/);
+  assert.ok(!r.contents.has(bPath), 'and no longer in Notes');
+  assert.ok(r.stat.logs.some(l => /structure_edit/.test(l) && /add:1_remove:0_merge:1_move:0_rename:1_rejected:0/.test(l)), 'the log has counts only');
+  assert.ok(!r.stat.logs.some(l => /NewChapter|RenamedA|fresh summary/.test(l)));
+  // The merge target's plan carries the folded card; the new card is planned.
+  const target = requests.card.find(q => q.card.id === r.nodes[1].id);
+  same(target.mergedFrom, [{ title: 'SecretTitleB', summary: 'summary of SecretTitleB' }]);
+  assert.ok(requests.card.some(q => q.card.id === created), 'the new card is planned');
+  assert.ok(!requests.card.some(q => q.card.id === r.nodes[2].id), 'the archived card is not');
+  assert.ok(!requests.card.find(q => q.card.id === created).mergedFrom);
+});
+
+test('P2a a second global reply of the same run applies nothing again', async () => {
+  const { r } = await structureRig(SOP);
+  await r.runs.start(r.mapPath);
+  const s1 = await r.state();
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.globalPlanned = false; d.bookPipeline.phase = 'planning'; d.bookPipeline.attempts.global = 0; });
+  const before = JSON.stringify((await mapNow(r)).nodes.map(n => n.id));
+  const again = newRunner(r);
+  await again.resume(r.mapPath); await settle();
+  const s2 = await r.state();
+  assert.equal(r.stat.plan.filter(x => x === 'global').length, 2, 'the global plan did run again');
+  assert.equal(JSON.stringify((await mapNow(r)).nodes.map(n => n.id)), before);
+  assert.equal(s2.structureEdit.applied.length, 3);
+  same(s2.structureEdit.archived, s1.structureEdit.archived);
+});
+
+test('P2a a stop before the global result is used writes nothing of the structure', async () => {
+  const gate = defer();
+  const { r } = await structureRig(SOP, { script: { global: async () => { await gate.promise; return { thread: 't', cards: [], materials: [], decisions: {}, structure: SOP(r0.r) }; } } });
+  const r0 = { r };
+  const mapBefore = r.mapRaw();
+  const started = r.runs.start(r.mapPath);
+  await settle();
+  await r.runs.stop(r.mapPath, { saved: true });
+  gate.resolve(); await started.catch(() => undefined); await settle();
+  assert.equal(r.runs.isRunning(r.mapPath), false);
+  assert.ok(!r.contents.get(r.mapPath).includes('structureEdit'), 'no structure record');
+  assert.ok(r.contents.has(r.nodes[2].path), 'nothing archived');
+  assert.equal((await idsNow(r)).length, 3);
+  void mapBefore;
+});
+
+test('P2a a failed transaction (rollback ok): map and notes as before, the run goes on with the old structure, the failure is logged', async () => {
+  let throws = 1;
+  const wrap = repo => new Proxy(repo, { get: (t, k) => k === 'saveMap' ? (...a) => { if (throws-- > 0) throw new Error('disk'); return t.saveMap(...a); } : typeof t[k] === 'function' ? t[k].bind(t) : t[k] });
+  const { r, requests } = await structureRig(SOP, { wrap });
+  const order = await idsNow(r);
+  const raws = r.nodes.map((n, i) => r.raw(i));
+  const notesBefore = [...r.contents.keys()].filter(k => !k.endsWith('Map.md')).sort();
+  await r.runs.start(r.mapPath);
+  const s = await r.state();
+  assert.equal(s.phase, 'gate1'); assert.equal(s.status, 'running');
+  same(s.order, order);
+  assert.equal(s.structureEdit, undefined);
+  assert.ok(r.stat.logs.some(l => /structure_failed/.test(l)));
+  same(await idsNow(r), order);
+  const map = await mapNow(r);
+  for (let i = 0; i < 3; i++) assert.equal((await r.repo.readNote(map.nodes.find(n => n.id === r.nodes[i].id).path)).title, TITLES[i]);
+  assert.ok(r.contents.has(r.nodes[2].path), 'B is still in Notes');
+  const notesNow = [...r.contents.keys()].filter(k => !k.endsWith('Map.md') && !/\/Unassigned\//.test(k)).sort();
+  same(notesNow, notesBefore.filter(k => !/\/Unassigned\//.test(k)), 'no new note is left in Notes or Archive');
+  void raws; void requests;
+});
+
+test('P2a a failed rollback stops the run as failed (structure_rollback)', async () => {
+  let saves = 0;
+  const wrap = repo => new Proxy(repo, { get: (t, k) => k === 'saveMap' ? (...a) => { if (saves++ > 0) throw new Error('disk'); return t.saveMap(...a); } : typeof t[k] === 'function' ? t[k].bind(t) : t[k] });
+  const { r } = await structureRig(SOP, { wrap, rebuild: async () => { throw new Error('rebuild'); } });
+  await r.runs.start(r.mapPath);
+  const s = await r.state();
+  assert.equal(s.status, 'stopped');
+  assert.equal(s.failureCode, 'structure_rollback');
+  assert.equal(r.runs.isRunning(r.mapPath), false);
+});
+
+test('P2a a card with the owner\'s hand in it (and the root) is marked locked in the request, and changes to it are refused', async () => {
+  const { r, requests } = await structureRig(r => [
+    { id: 'o1', kind: 'rename', card: r.nodes[1].id, title: 'Nope', reason: 'x' },
+    { id: 'o2', kind: 'rename', card: r.nodes[2].id, title: 'Fine', reason: 'x' }
+  ]);
+  await r.repo.updateNote(r.nodes[1].path, { detail: 'my own words' });
+  assert.equal(bodyStateRaw(r.raw(1)), 'unknown');
+  await r.runs.start(r.mapPath);
+  const cards = requests.global[0].cards;
+  assert.equal(cards.find(c => c.id === r.nodes[0].id).locked, true);
+  assert.equal(cards.find(c => c.id === r.nodes[1].id).locked, true);
+  assert.equal(cards.find(c => c.id === r.nodes[2].id).locked, undefined);
+  const s = await r.state();
+  same(s.structureEdit.rejected, [{ id: 'o1', code: 'locked' }]);
+  assert.equal(s.structureEdit.applied.length, 1);
+  assert.equal((await r.note(1)).title, 'SecretTitleA');
+});
+
+test('P2a nothing applicable: only the record is written, and no port is called', async () => {
+  const { r } = await structureRig(r => [{ id: 'o1', kind: 'remove', card: r.nodes[0].id, reason: 'x' }]);
+  let called = 0;
+  const port = r.ports.editBookStructure;
+  r.ports.editBookStructure = (...a) => { called++; return port(...a); };
+  await r.runs.start(r.mapPath);
+  const s = await r.state();
+  assert.equal(called, 0);
+  same(s.structureEdit.applied, []);
+  same(s.structureEdit.rejected, [{ id: 'o1', code: 'root' }]);
+  assert.equal(s.structureEdit.before.nodes.length, 3);
+  assert.equal(s.order.length, 3);
+});
+
+test('P2a without the port the proposal is recorded and the map stays as it is', async () => {
+  const { r } = await structureRig(SOP);
+  delete r.ports.editBookStructure;
+  await r.runs.start(r.mapPath);
+  const s = await r.state();
+  assert.equal(s.structureEdit.applied.length, 0);
+  assert.equal((await idsNow(r)).length, 3);
+  assert.ok(r.contents.has(r.nodes[2].path));
+});

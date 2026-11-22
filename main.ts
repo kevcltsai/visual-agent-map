@@ -1,3 +1,4 @@
+import { createBookStructurePort } from "./experiences/visual-map/book-structure-port";
 import type { TopicMarker } from "./topic-markers";
 import { registerInternalMarkerPresentation } from "./experiences/markdown-context/internal-markers";
 import { registerBookPlanView } from "./experiences/visual-map/book-plan-view";
@@ -905,6 +906,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     writePipelineRole: (path, role) => this.repo.writePipelineRole(path, role),
     updateNoteGuarded: (path, patch, options) => this.repo.updateNoteGuarded(path, patch, options),
     updateNoteRawGuarded: (path, transform, options) => this.repo.updateNoteRawGuarded(path, transform, options),
+    editBookStructure: (mapPath, work) => createBookStructurePort({ repo: this.repo, rebuildDerivedData: () => this.rebuildDerivedData() })(mapPath, work),
     runPlan: (step, request, run) => runPlanStep(this.aiCalls, step, request, run),
     runProofread: (request, run) => runProofread(this.aiCalls, request, run),
     aiProof: (request, run) => runAiProof(this.aiCalls, request, run),

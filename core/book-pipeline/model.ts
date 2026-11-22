@@ -155,6 +155,8 @@ export interface StructureEditState {
   overCap?: true;
   /** Op ids the owner undid (with the ops that depend on them). */
   undone?: string[];
+  /** Where each removed or merged card's note was parked (card id -> Archive path), so an undo can put it back. */
+  archived?: Record<string, string>;
   /** The structure before any op: `nodes` in reading order, root included. */
   before: { rootId: string; nodes: StructureNode[] };
 }
@@ -388,10 +390,12 @@ function structureEditShape(value: unknown): boolean {
     const before = item.before;
     if (!(before.parent === null || isText(before.parent)) || !isText(before.title)) return false;
     if (before.after !== undefined && !isText(before.after)) return false;
+    if (before.summary !== undefined && !isText(before.summary)) return false;
   }
   if (!Array.isArray(value.rejected) || !value.rejected.every(r => isObject(r) && isText(r.id) && isText(r.code))) return false;
   if (value.overCap !== undefined && value.overCap !== true) return false;
   if (value.undone !== undefined && !isTextList(value.undone)) return false;
+  if (value.archived !== undefined && !(isObject(value.archived) && Object.values(value.archived).every(isText))) return false;
   const before = value.before;
   return isObject(before) && isText(before.rootId) && Array.isArray(before.nodes) && before.nodes.every(structureNodeShape);
 }

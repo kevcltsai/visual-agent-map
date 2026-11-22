@@ -1267,6 +1267,13 @@ test('global plan structure: absent reads as [], valid items of every kind are k
   assert.equal(globalPlan.globalPlanStep.parse(globalReply({ structure: Array.from({ length: 80 }, (_, i) => ({ id: `x${i}`, kind: 'remove', card: 'n2', reason: 'r' })) }), request).structure.length <= 30, true, 'a flood is cut');
 });
 
+test('global plan structure: an add summary is one line of at most 500 characters (a smuggled heading cannot start a new line)', () => {
+  const add = summary => ({ id: 's1', kind: 'add', title: 'New', summary, parent: 'n1', ref: 'new1', reason: 'gap' });
+  const one = summary => globalPlan.globalPlanStep.parse(globalReply({ structure: [add(summary)] }), globalRequest()).structure[0].summary;
+  assert.equal(one('Line one\n## Detail\nmore\r\nend'), 'Line one ## Detail more end');
+  assert.equal(one('x'.repeat(900)).length, 500);
+});
+
 test('global plan structure: the prompt names the rules, locked cards are marked, the schema allows the field, the version moved', () => {
   const marked = globalRequest({ cards: [{ ...cards[0], locked: true }, cards[1]] });
   const prompt = globalPlan.globalPlanStep.render(marked);

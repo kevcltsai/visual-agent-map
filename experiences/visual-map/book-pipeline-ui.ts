@@ -810,7 +810,8 @@ const REFUSAL_KEY: Record<BookRunRefusal, TranslationKey> = {
   stale: "ui.book_refused_stale",
   backup_failed: "ui.book_refused_backup_failed",
   text_changed: "ui.book_refused_text_changed",
-  nothing: "ui.book_refused_nothing"
+  nothing: "ui.book_refused_nothing",
+  unsafe: "ui.book_refused_unsafe"
 };
 
 /** A plain localized reason for an error that is not a runner refusal; the raw message (English, internal) is never shown. */

@@ -3169,6 +3169,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_refused_stale": "章节或这一轮运行在等待期间变了，所以没有改动，备注都还在。",
   "ui.book_refused_backup_failed": "备份没存成功，所以没有改动章节。",
   "ui.book_refused_nothing": "这一章没有可套用的备注。",
+  "ui.book_refused_unsafe": "这项还原会让卡片消失，没有还原任何东西。",
   "ui.book_abandon": "放弃这本",
   "ui.book_remove": "改回普通心智图",
   "ui.book_abandon_title": "放弃这本图文书？",

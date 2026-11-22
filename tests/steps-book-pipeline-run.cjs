@@ -5195,3 +5195,107 @@ test('P2b a failed apply (rollback ok) writes the materials homes back to the ca
   assert.ok(r.stat.logs.some(l => /structure_failed/.test(l)));
   assert.match(r.raw(0), /Scene.*歸屬：SecretTitleB/, 'not the merge target\'s title');
 });
+
+// ---- review round 1: undo closure follows the parent, the runner refuses an unsafe inverse, unreadable record, locked on read failure, busy ----
+const nestedRig = async (structure, over = {}) => {
+  const holder = {};
+  const out = await structureRig(structure, {
+    titles: ['SecretRootTitle', 'SecretTitleA', 'SecretTitleB', 'SecretTitleC'], nested: true,
+    ...over,
+    script: { global: () => ({ ...planRoles(holder.r, ['intro', 'body', 'body', 'body']), structure: structure(holder.r) }), ...over.script }
+  });
+  holder.r = out.r;
+  return out;
+};
+
+test('P2b undo closure: moving the only section out of a chapter, then removing the empty chapter: undoing the move takes the removal too, nothing is parked', async () => {
+  const { r } = await nestedRig(r => [
+    { id: 'o1', kind: 'move', card: r.nodes[2].id, parent: r.nodes[3].id, reason: 'x' },
+    { id: 'o2', kind: 'remove', card: r.nodes[1].id, reason: 'x' }
+  ]);
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.state()).structureEdit.applied.length, 2);
+  assert.ok(!(await idsNow(r)).includes(r.nodes[1].id));
+  await r.runs.undoStructureEdit(r.mapPath, ['o1']); await settle();
+  const s = await r.state();
+  same(s.structureEdit.undone.slice().sort(), ['o1', 'o2']);
+  same(Object.keys(s.structureEdit.archived).filter(id => id === r.nodes[2].id), [], 'the section was not parked');
+  const map = await mapNow(r);
+  assert.equal(map.nodes.find(n => n.id === r.nodes[2].id).parentId, r.nodes[1].id);
+  assert.ok(map.nodes.some(n => n.id === r.nodes[1].id));
+  assert.equal((await idsNow(r)).length, 4);
+  assert.ok(r.contents.has(r.nodes[2].path), 'the section is still in Notes');
+});
+
+test('P2b undo closure: removing a section, then merging its empty chapter away: undoing the removal takes the merge too, the section comes back', async () => {
+  const { r } = await nestedRig(r => [
+    { id: 'o1', kind: 'remove', card: r.nodes[2].id, reason: 'x' },
+    { id: 'o2', kind: 'merge', card: r.nodes[1].id, into: r.nodes[3].id, reason: 'x' }
+  ]);
+  await r.runs.start(r.mapPath);
+  assert.equal((await r.state()).structureEdit.applied.length, 2);
+  await r.runs.undoStructureEdit(r.mapPath, ['o1']); await settle();
+  const s = await r.state();
+  same(s.structureEdit.undone.slice().sort(), ['o1', 'o2']);
+  const ids = await idsNow(r);
+  for (const n of r.nodes) assert.ok(ids.includes(n.id), 'every card is back');
+  assert.equal((await mapNow(r)).nodes.find(n => n.id === r.nodes[2].id).parentId, r.nodes[1].id);
+});
+
+test('P2b the runner refuses an inverse that would make a card it did not add disappear (unsafe): nothing changes', async () => {
+  const { r } = await nestedRig(r => [{ id: 'o1', kind: 'move', card: r.nodes[2].id, parent: r.nodes[3].id, reason: 'x' }]);
+  await r.runs.start(r.mapPath);
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.structureEdit.applied[0].before.parent = 'ghost'; });
+  const mapBefore = r.mapRaw();
+  const notesBefore = [...r.contents.keys()].sort();
+  assert.equal(await codeOf(r.runs.undoStructureEdit(r.mapPath, ['o1'])), 'unsafe');
+  assert.equal(noTrace(r.mapRaw()), noTrace(mapBefore));
+  same([...r.contents.keys()].sort(), notesBefore);
+  assert.equal((await r.state()).structureEdit.undone, undefined);
+});
+
+test('structure record that cannot be read: the run opens without it and logs structure_unreadable once', async () => {
+  const { r } = await undoRig();
+  await r.repo.updateMap(r.mapPath, d => { d.bookPipeline.structureEdit = { junk: true }; });
+  const before = r.stat.logs.filter(l => /structure_unreadable/.test(l)).length;
+  assert.equal(await codeOf(r.runs.undoStructureEdit(r.mapPath, 'all')), 'not_gate1');
+  assert.equal(r.stat.logs.filter(l => /structure_unreadable/.test(l)).length, before + 1);
+});
+
+test('P2a a card that cannot be read when the editor is asked is treated as locked; the run does not fail', async () => {
+  const { r, requests } = await structureRig(r => [{ id: 'o1', kind: 'rename', card: r.nodes[2].id, title: 'Nope', reason: 'x' }]);
+  const read = r.ports.readCard;
+  r.ports.readCard = async path => {
+    if (path === r.nodes[2].path && /execGlobal/.test(new Error().stack)) throw new Error('unreadable');
+    return read(path);
+  };
+  await r.runs.start(r.mapPath);
+  assert.equal(requests.global[0].cards.find(c => c.id === r.nodes[2].id).locked, true);
+  const s = await r.state();
+  assert.equal(s.phase, 'gate1');
+  same(s.structureEdit.rejected, [{ id: 'o1', code: 'locked' }]);
+  assert.equal((await r.note(2)).title, 'SecretTitleB');
+});
+
+test('P2a while the structure port runs, the map-change check does not pause the run (structureBusy)', async () => {
+  const { r } = await structureRig(SOP);
+  const real = r.ports.editBookStructure;
+  const seen = [];
+  r.ports.editBookStructure = (mapPath, work) => real(mapPath, {
+    ...work,
+    edit: (map, tools) => {
+      const out = work.edit(map, tools);
+      // the transaction's own view of the map: its new cards differ from the accepted set
+      const readMap = r.ports.readMap;
+      r.ports.readMap = async () => map;
+      seen.push(r.runs.pauseOnMapChange(r.runs.drives.get(mapPath)));
+      r.ports.readMap = readMap;
+      return out;
+    }
+  });
+  await r.runs.start(r.mapPath);
+  assert.equal(seen.length, 1);
+  assert.equal(await seen[0], false, 'no pause in the middle of the transaction');
+  const s = await r.state();
+  assert.equal(s.status, 'running'); assert.notEqual(s.pauseReason, 'map');
+});

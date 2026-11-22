@@ -139,7 +139,8 @@ function structureOpOf(entry: unknown): StructureOp | undefined {
   if (one.after !== undefined && one.after !== "" && !after) return undefined;
   switch (one.kind) {
     case "add": {
-      const [title, summary, parent, ref] = ["title", "summary", "parent", "ref"].map(key => need(one, key));
+      const [title, rawSummary, parent, ref] = ["title", "summary", "parent", "ref"].map(key => need(one, key));
+      const summary = rawSummary?.replace(/\s+/g, " ").trim().slice(0, 500);
       return title && summary && parent && ref
         ? { ...base, kind: "add", title, summary, parent, ref, ...(after ? { after } : {}) }
         : undefined;

@@ -234,3 +234,21 @@ test('inverse: simulating on a locked-free mix of all five kinds and undoing eve
     op({ kind: 'add', title: 'N', summary: '', parent: 'c2', ref: 'n1' }),
   ]);
 });
+
+test('undo closure: moving the only section out of a chapter, then removing the empty chapter: undoing the move takes the removal too', () => {
+  const r = run([op({ kind: 'move', card: 's2a', parent: 'c3' }), op({ kind: 'remove', card: 'c2' })]);
+  assert.equal(r.applied.length, 2);
+  const ids = E.undoClosure(r.applied, [r.applied[0].id]);
+  assert.deepEqual(plain([...ids].sort()), plain(r.applied.map(a => a.id).sort()));
+  const back = E.applyInverseOps({ rootId: 'r', nodes: r.result }, E.inverseOps(r.applied, ids));
+  assert.equal(shape({ result: back }), shape({ result: INPUT.nodes }));
+});
+
+test('undo closure: removing a section, then merging its empty chapter away: undoing the removal takes the merge too', () => {
+  const r = run([op({ kind: 'remove', card: 's2a' }), op({ kind: 'merge', card: 'c2', into: 'c3' })]);
+  assert.equal(r.applied.length, 2);
+  const ids = E.undoClosure(r.applied, [r.applied[0].id]);
+  assert.deepEqual(plain([...ids].sort()), plain(r.applied.map(a => a.id).sort()));
+  const back = E.applyInverseOps({ rootId: 'r', nodes: r.result }, E.inverseOps(r.applied, ids));
+  assert.equal(shape({ result: back }), shape({ result: INPUT.nodes }));
+});

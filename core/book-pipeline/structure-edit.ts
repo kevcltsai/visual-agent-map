@@ -245,7 +245,13 @@ export function undoClosure(applied: readonly AppliedOp[], opIds: Iterable<strin
     ...(op.kind === "merge" ? [op.into] : [])
   ];
   const nameOf = (op: StructureOp): string => (op.kind === "add" ? op.ref : op.card);
-  for (const a of applied) if (picked.has(a.id)) touched.add(nameOf(a.op));
+  for (const a of applied) {
+    if (!picked.has(a.id)) continue;
+    touched.add(nameOf(a.op));
+    // undoing puts the card back under its old parent and after its old sibling: later ops on those must come along
+    if (a.before.parent) touched.add(a.before.parent);
+    if (a.before.after) touched.add(a.before.after);
+  }
   let grew = true;
   while (grew) {
     grew = false;

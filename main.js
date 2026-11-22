@@ -3100,6 +3100,7 @@ var en = {
   "ui.book_refused_stale": "The chapter or the run changed meanwhile, so nothing was changed. Your notes are still there.",
   "ui.book_refused_backup_failed": "The backup could not be saved, so the chapter was not changed.",
   "ui.book_refused_nothing": "This chapter has no note to apply.",
+  "ui.book_refused_unsafe": "This undo would make a card disappear, so nothing was undone.",
   "ui.book_abandon": "Give up this book",
   "ui.book_remove": "Back to plain mind map",
   "ui.book_abandon_title": "Give up this picture book?",
@@ -6416,6 +6417,7 @@ var zhCN = {
   "ui.book_refused_stale": "\u7AE0\u8282\u6216\u8FD9\u4E00\u8F6E\u8FD0\u884C\u5728\u7B49\u5F85\u671F\u95F4\u53D8\u4E86\uFF0C\u6240\u4EE5\u6CA1\u6709\u6539\u52A8\uFF0C\u5907\u6CE8\u90FD\u8FD8\u5728\u3002",
   "ui.book_refused_backup_failed": "\u5907\u4EFD\u6CA1\u5B58\u6210\u529F\uFF0C\u6240\u4EE5\u6CA1\u6709\u6539\u52A8\u7AE0\u8282\u3002",
   "ui.book_refused_nothing": "\u8FD9\u4E00\u7AE0\u6CA1\u6709\u53EF\u5957\u7528\u7684\u5907\u6CE8\u3002",
+  "ui.book_refused_unsafe": "\u8FD9\u9879\u8FD8\u539F\u4F1A\u8BA9\u5361\u7247\u6D88\u5931\uFF0C\u6CA1\u6709\u8FD8\u539F\u4EFB\u4F55\u4E1C\u897F\u3002",
   "ui.book_abandon": "\u653E\u5F03\u8FD9\u672C",
   "ui.book_remove": "\u6539\u56DE\u666E\u901A\u5FC3\u667A\u56FE",
   "ui.book_abandon_title": "\u653E\u5F03\u8FD9\u672C\u56FE\u6587\u4E66\uFF1F",
@@ -9732,6 +9734,7 @@ var zhTW = {
   "ui.book_refused_stale": "\u7AE0\u7BC0\u6216\u9019\u8F2A\u57F7\u884C\u5728\u7B49\u5F85\u671F\u9593\u8B8A\u4E86\uFF0C\u6240\u4EE5\u6C92\u6709\u6539\u52D5\uFF0C\u5099\u8A3B\u90FD\u9084\u5728\u3002",
   "ui.book_refused_backup_failed": "\u5099\u4EFD\u6C92\u5B58\u6210\u529F\uFF0C\u6240\u4EE5\u6C92\u6709\u6539\u52D5\u7AE0\u7BC0\u3002",
   "ui.book_refused_nothing": "\u9019\u4E00\u7AE0\u6C92\u6709\u53EF\u5957\u7528\u7684\u5099\u8A3B\u3002",
+  "ui.book_refused_unsafe": "\u9019\u9805\u9084\u539F\u6703\u8B93\u5361\u7247\u6D88\u5931\uFF0C\u6C92\u6709\u9084\u539F\u4EFB\u4F55\u6771\u897F\u3002",
   "ui.book_abandon": "\u653E\u68C4\u9019\u672C",
   "ui.book_remove": "\u6539\u56DE\u4E00\u822C\u5FC3\u667A\u5716",
   "ui.book_abandon_title": "\u653E\u68C4\u9019\u672C\u5716\u6587\u66F8\uFF1F",
@@ -51019,7 +51022,8 @@ function structureOpOf(entry) {
   if (one.after !== void 0 && one.after !== "" && !after) return void 0;
   switch (one.kind) {
     case "add": {
-      const [title, summary, parent, ref] = ["title", "summary", "parent", "ref"].map((key4) => need(one, key4));
+      const [title, rawSummary, parent, ref] = ["title", "summary", "parent", "ref"].map((key4) => need(one, key4));
+      const summary = rawSummary == null ? void 0 : rawSummary.replace(/\s+/g, " ").trim().slice(0, 500);
       return title && summary && parent && ref ? { ...base, kind: "add", title, summary, parent, ref, ...after ? { after } : {} } : void 0;
     }
     case "remove": {
@@ -55789,7 +55793,12 @@ function undoClosure(applied, opIds) {
     ...op.kind === "merge" ? [op.into] : []
   ];
   const nameOf2 = (op) => op.kind === "add" ? op.ref : op.card;
-  for (const a of applied) if (picked.has(a.id)) touched.add(nameOf2(a.op));
+  for (const a of applied) {
+    if (!picked.has(a.id)) continue;
+    touched.add(nameOf2(a.op));
+    if (a.before.parent) touched.add(a.before.parent);
+    if (a.before.after) touched.add(a.before.after);
+  }
   let grew = true;
   while (grew) {
     grew = false;
@@ -56481,6 +56490,10 @@ var BookPipelineRuns = class {
       const newIds = new Set(nodes.map((n) => n.id));
       const restored = nodes.map((n) => n.id).filter((id) => !nowIds.has(id));
       const dropped = order.filter((id) => !newIds.has(id));
+      const added = new Set(
+        edit.applied.filter((a) => picked.has(a.id) && a.op.kind === "add").map((a) => a.op.ref)
+      );
+      if (dropped.some((id) => !added.has(id))) throw new BookPipelineRunError("unsafe");
       const parkedAt = (_b2 = edit.archived) != null ? _b2 : {};
       for (const id of restored) {
         const at = parkedAt[id];
@@ -57554,6 +57567,7 @@ var BookPipelineRuns = class {
     await this.load(drive, map, effectiveOrder(read.data), new Set(read.data.autoRoles));
     if (this.dead(drive)) throw new BookPipelineRunError("disposed");
     this.attachStore(drive, read.data);
+    if (read.structureUnreadable) this.log(drive, "structure_unreadable", "-", "plan", "left_out");
     return read.data;
   }
   /** Reads every card of the run: its path, title, summary, role and stage (kept in memory, updated after each write). */
@@ -58703,8 +58717,12 @@ var BookPipelineRuns = class {
     const locked = /* @__PURE__ */ new Set([drive.rootId]);
     for (const id of order) {
       const info = drive.cards.get(id);
-      if (id !== drive.rootId && !this.mayOverwriteCard(drive, id, (await this.ports.readCard(info.path)).raw))
-        locked.add(id);
+      if (id === drive.rootId) continue;
+      const raw = await this.ports.readCard(info.path).then(
+        (card) => card.raw,
+        () => void 0
+      );
+      if (raw === void 0 || !this.mayOverwriteCard(drive, id, raw)) locked.add(id);
     }
     const request = {
       ...this.base(drive, drive.config.planModel),
@@ -60855,7 +60873,8 @@ var REFUSAL_KEY = {
   stale: "ui.book_refused_stale",
   backup_failed: "ui.book_refused_backup_failed",
   text_changed: "ui.book_refused_text_changed",
-  nothing: "ui.book_refused_nothing"
+  nothing: "ui.book_refused_nothing",
+  unsafe: "ui.book_refused_unsafe"
 };
 function bookErrorReason(error) {
   return t(isBookStepError(error) ? "ui.book_reason_invalid_reply" : "ui.book_reason_failed");

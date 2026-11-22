@@ -3170,6 +3170,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.book_refused_stale": "章節或這輪執行在等待期間變了，所以沒有改動，備註都還在。",
   "ui.book_refused_backup_failed": "備份沒存成功，所以沒有改動章節。",
   "ui.book_refused_nothing": "這一章沒有可套用的備註。",
+  "ui.book_refused_unsafe": "這項還原會讓卡片消失，沒有還原任何東西。",
   "ui.book_abandon": "放棄這本",
   "ui.book_remove": "改回一般心智圖",
   "ui.book_abandon_title": "放棄這本圖文書？",

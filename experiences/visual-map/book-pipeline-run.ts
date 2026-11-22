@@ -359,7 +359,9 @@ export type BookRunRefusal =
   | "backup_failed"
   | "nothing"
   /** A rewrite the reader allowed was for a text that has changed since: nothing is rewritten. */
-  | "text_changed";
+  | "text_changed"
+  /** An undo that would make a card the editor did not add disappear: nothing is changed. */
+  | "unsafe";
 /** The ids a needs-review proof names: its unmet fact points, else its unmet structure points, else the empty text. */
 function unmetIds(items: readonly { id: string; type: string; status: string }[]): string {
   const unmet = items.filter(item => item.status === "unmet");
@@ -1429,6 +1431,11 @@ export class BookPipelineRuns {
       const newIds = new Set(nodes.map(n => n.id));
       const restored = nodes.map(n => n.id).filter(id => !nowIds.has(id));
       const dropped = order.filter(id => !newIds.has(id));
+      // Only cards the editor added may vanish in an undo; anything else disappearing means the inverse is unsafe.
+      const added = new Set(
+        edit.applied.filter(a => picked.has(a.id) && a.op.kind === "add").map(a => (a.op as { ref: string }).ref)
+      );
+      if (dropped.some(id => !added.has(id))) throw new BookPipelineRunError("unsafe");
       const parkedAt = edit.archived ?? {};
       // Every parked note must still be there, or nothing is changed.
       for (const id of restored) {
@@ -2620,6 +2627,7 @@ export class BookPipelineRuns {
     await this.load(drive, map, effectiveOrder(read.data), new Set(read.data.autoRoles));
     if (this.dead(drive)) throw new BookPipelineRunError("disposed");
     this.attachStore(drive, read.data);
+    if (read.structureUnreadable) this.log(drive, "structure_unreadable", "-", "plan", "left_out");
     return read.data;
   }
   /** Reads every card of the run: its path, title, summary, role and stage (kept in memory, updated after each write). */
@@ -3880,8 +3888,13 @@ export class BookPipelineRuns {
     const locked = new Set<string>([drive.rootId]);
     for (const id of order) {
       const info = drive.cards.get(id) as CardInfo;
-      if (id !== drive.rootId && !this.mayOverwriteCard(drive, id, (await this.ports.readCard(info.path)).raw))
-        locked.add(id);
+      if (id === drive.rootId) continue;
+      // A card that cannot be read now is treated as the owner's: the editor may not touch it.
+      const raw = await this.ports.readCard(info.path).then(
+        card => card.raw,
+        () => undefined
+      );
+      if (raw === undefined || !this.mayOverwriteCard(drive, id, raw)) locked.add(id);
     }
     const request: GlobalPlanRequest = {
       ...this.base(drive, drive.config.planModel),

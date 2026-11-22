@@ -213,8 +213,19 @@ const leakCategories = fields => new Set(scan.scanPayloadForLeaks(payloadWith(fi
 const notePath = () => fixtureMap().nodes[0].path;
 
 test('sharing leak: [[ inside <pre>/<code> (code, mermaid source) is allowed; a Markdown detail field is not scanned as code any more', () => {
-  assert.ok(leakCategories({ detail: 'x\n```js\nconst a = [[1,[2]]];\n```' }).has('wikilink'), 'no Markdown code carve-out');
+  assert.ok(leakCategories({ detail: 'x\n```js\nconst a = [[x]];\n```' }).has('wikilink'), 'no Markdown code carve-out');
   assert.equal(leakCategories({ detailHtml: '<pre><code>[[1,[2]]]</code></pre><p>a <code>A[[x]]</code></p>' }).size, 0);
+});
+
+test('sharing leak: a matrix [[ does not block; link text, also next to it, still does', () => {
+  // A matrix written with escaped brackets renders to a literal [[2,0],[0,1]] (the math picture book, 2026-11-22).
+  assert.equal(leakCategories({ detailHtml: '<li dir="auto">C3：本節用 [[2,0],[0,1]] 示範伸縮，也用 [[0,-1],[1,0]] 示範旋轉。</li>' }).size, 0);
+  assert.equal(leakCategories({ summary: 'A = [[1, 2]; [3, 4]] and B = [[a] [b]]' }).size, 0);
+  assert.equal(leakCategories({ detailHtml: '<p>$$[[a],[b]]$$</p>' }).size, 0);
+  for (const leak of ['[[2,0],[0,1]] and [[私人]]', '[[[私人]]]', '[[私人|別名]]', '[[私人', '[[私人 <b>x</b>', '[[私人]</p>', '[[私人]', 'a [[私人\nb ]]', 'a [[私人]\r\nb', '[[私人#標題]]', '[[私人|see [1]]]', '[[私人 計畫, cf. [1] x', '[[私人] notes', '[[1,[2]]]'])
+    assert.ok(leakCategories({ detailHtml: `<p>${leak}</p>` }).has('wikilink'), leak);
+  assert.ok(leakCategories({ summary: 'cut off [[私人筆' }).has('wikilink'), 'a cut-off link still blocks');
+  assert.ok(leakCategories({ summary: 'ends [[私人]' }).has('wikilink'), 'a link missing one bracket at the end still blocks');
 });
 
 test('sharing leak: [[ outside code is blocked, including next to code in the same field', () => {

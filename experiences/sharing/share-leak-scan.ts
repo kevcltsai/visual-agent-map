@@ -17,7 +17,7 @@ export interface ForbiddenString {
   category: LeakCategory;
   value: string;
 }
-/** Category and offset only; the matched text is never returned so it cannot reach the UI or a log. */
+/** Category and offset only, never the matched text. (leakExcerpt shows the text around a hit in the share dialog, on request; it never goes into the file or a log.) */
 export interface LeakHit {
   category: LeakCategory;
   index: number;
@@ -60,13 +60,35 @@ export function decodeHtmlEntities(text: string): string {
   );
 }
 
+/**
+ * Whether the `[[` at `index` can be link text. Obsidian link targets cannot hold `[` or `]`, so only a matrix row
+ * is let through: a single `]` that, after spaces, is followed by `,`, `;` or `[`, as in `[[2,0],[0,1]]` or
+ * `[[1, 2]; [3, 4]]`. Everything else counts: `]]`, a cut-off `[[` (tag, line end, end of text), any other `[` or
+ * `]`. A `[[[` is decided by the `[[` one place on.
+ */
+export function isWikilinkStart(text: string, index: number): boolean {
+  if (text[index + 2] === "[") return false;
+  for (let i = index + 2; i < text.length; i++) {
+    const char = text[i];
+    if (char === "[" || char === "<" || char === "\n" || char === "\r") return true;
+    if (char === "]") {
+      let next = i + 1;
+      while (text[next] === " ") next++;
+      return !(text[next] === "," || text[next] === ";" || text[next] === "[");
+    }
+  }
+  return true;
+}
+
 function occurrences(text: string, category: LeakCategory, value: string, hits: LeakHit[]): void {
+  // Link text is looked for at every position, so `[[[x]]]` still finds the `[[x]]` inside.
+  const wikilink = category === "wikilink" && value === "[[";
   let from = 0;
   for (;;) {
     const index = text.indexOf(value, from);
     if (index < 0) break;
-    hits.push({ category, index });
-    from = index + value.length;
+    if (!wikilink || isWikilinkStart(text, index)) hits.push({ category, index });
+    from = index + (wikilink ? 1 : value.length);
   }
 }
 
@@ -162,11 +184,13 @@ export function leakExcerpt(node: unknown, forbidden: readonly ForbiddenString[]
   };
   visit(node, "");
   for (const text of texts)
-    for (const { value } of forbidden) {
-      const index = text.indexOf(value);
-      if (index < 0) continue;
+    for (const item of forbidden) {
+      const hits: LeakHit[] = [];
+      occurrences(text, item.category, item.value, hits);
+      if (!hits.length) continue;
+      const index = hits[0].index;
       const start = Math.max(0, index - radius);
-      const end = Math.min(text.length, index + value.length + radius);
+      const end = Math.min(text.length, index + item.value.length + radius);
       return `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
     }
   return undefined;

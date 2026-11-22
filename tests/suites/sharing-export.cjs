@@ -620,11 +620,14 @@ test('share exporter: a blocked file names the topics whose text set off the lea
   const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
   const map = { id: 'map-1', title: 'Map', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [{ id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false }, { id: 'b', path: 'Folder/B.md', parentId: 'a', x: 0, y: 0, collapsed: false }] };
   const run = summary => new module.ShareExporter({ vault: { adapter: new FileSystemAdapter(), getName: () => 'V' } }, { map, notes: new Map([['a', { title: 'Alpha', summary: 'S', status: 'idea', model: '' }], ['b', { title: 'Matrices', summary, status: 'idea', model: '' }]]), mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en' }).assemble({ includeDetail: false, includeImages: false });
-  const blocked = run('stretch with [[2,0],[0,1]]');
+  const blocked = run('stretch, see [[Private plan');
   assert.deepEqual(plain(blocked.leakCategories), ['wikilink']);
-  assert.deepEqual(plain(blocked.leakTopics), [{ title: 'Matrices', excerpt: 'stretch with [[2,0],[0,1]]' }]);
+  assert.deepEqual(plain(blocked.leakTopics), [{ title: 'Matrices', excerpt: 'stretch, see [[Private plan' }]);
   assert.equal(blocked.html, undefined);
   assert.deepEqual(plain(run('clean').leakTopics), []);
+  const matrix = run('stretch with [[2,0],[0,1]]');
+  assert.deepEqual(plain(matrix.leakCategories), [], 'a matrix is not link text');
+  assert.equal(typeof matrix.html, 'string');
 });
 
 test('share dialog: a leak warning also says where: the topic and the text around the hit', async () => {

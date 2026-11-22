@@ -50445,6 +50445,7 @@ function abandonAi(data, nodeId) {
   const base = slot != null ? slot : { key: "", attempts: 0, round: 0, step: "proof", checked: 0, fixed: 0, open: [] };
   const done = { ...base, done: true, incomplete: true };
   delete done.pending;
+  delete done.again;
   setAiSlot(next, nodeId, done);
   next.revision++;
   return next;
@@ -50552,7 +50553,7 @@ function applyAiProof(data, token, result) {
   return { state: next, accepted: true };
 }
 function applyAiFix(data, token, result) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
   const found = token.step === "fix" ? aiCurrent(data, token) : void 0;
   if (!found) return { state: data, accepted: false };
   const next = clone2(data);
@@ -50584,8 +50585,15 @@ function applyAiFix(data, token, result) {
         };
       })
     ];
-  for (const id of (_l = result.changed) != null ? _l : [])
-    if (effectiveOrder(next).includes(id)) next.revisions[id] = cardRevision(next, id) + 1;
+  for (const id of (_l = result.changed) != null ? _l : []) {
+    if (effectiveOrder(next).includes(id)) {
+      next.revisions[id] = cardRevision(next, id) + 1;
+      const body = (_m = result.bodies) == null ? void 0 : _m[id];
+      const own2 = id === token.nodeId ? void 0 : (_n = next.aiProof) == null ? void 0 : _n[id];
+      if (own2 && body !== void 0)
+        next.aiProof = { ...next.aiProof, [id]: { ...own2, key: aiProofKey(cardRevision(next, id), body) } };
+    }
+  }
   setAiSlot(next, token.nodeId, slot);
   next.revision++;
   return { state: next, accepted: true };
@@ -50676,6 +50684,14 @@ function closeAiRound(data, nodeId) {
   setAiSlot(next, nodeId, slot);
   next.revision++;
   return next;
+}
+function rekeyBookProof(data, from, to) {
+  var _a2;
+  if (!((_a2 = data.bookProof) == null ? void 0 : _a2.done) || data.bookProof.key !== from || from === to) return { state: data, accepted: false };
+  const next = clone2(data);
+  next.bookProof = { ...data.bookProof, key: to };
+  next.revision++;
+  return { state: next, accepted: true };
 }
 function fixAgainPlan(data, needsReview) {
   var _a2;
@@ -57310,54 +57326,71 @@ var BookPipelineRuns = class {
         throw new BookPipelineRunError("nothing");
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       if (data.phase !== "done") throw new BookPipelineRunError("not_gate");
-      const plan = fixAgainPlan(data, 0);
-      if (!plan.items) throw new BookPipelineRunError("nothing");
+      if (!fixAgainPlan(data, 0).items) throw new BookPipelineRunError("nothing");
+      const chapterKey = async (id) => {
+        const info = drive.cards.get(id);
+        const card = info ? await this.ports.readCard(info.path).catch(() => void 0) : void 0;
+        return card ? aiProofKey(cardRevision(drive.store.state, id), aiProofBody(chapterBody(card.detail))) : void 0;
+      };
+      const bookKey = async () => {
+        const input2 = await this.bookProofInput(drive).catch(() => void 0);
+        return input2 ? aiProofKey(0, input2.chapters.map((chapter) => chapter.text).join("\n\0\n")) : void 0;
+      };
+      const chapterIds = [];
+      for (const id of effectiveOrder(data)) {
+        const key4 = await chapterKey(id);
+        if (key4 !== void 0 && reopenAiRound(data, id, key4).accepted) chapterIds.push(id);
+      }
+      const bookNow = await bookKey();
+      const withBook = bookNow !== void 0 && reopenAiRound(data, void 0, bookNow).accepted;
+      if (!chapterIds.length && !withBook) throw new BookPipelineRunError("nothing");
+      const calls = 2 * chapterIds.length + (withBook ? 2 : 0);
       await drive.store.commit((state) => {
-        const short = state.budget.used + plan.calls - state.budget.limit;
+        const short = state.budget.used + calls - state.budget.limit;
         const next = resumeRun(short > 0 ? addBudget(state, short) : state);
         return { state: next != null ? next : state, accepted: true };
       });
       if (drive.store.state.status !== "running") throw new BookPipelineRunError("budget");
       drive.job = async () => {
-        var _a2;
-        drive.again = { done: 0, total: plan.chapters + (plan.book ? 1 : 0) };
+        var _a2, _b2;
+        drive.again = { done: 0, total: chapterIds.length + (withBook ? 1 : 0) };
         const finished = () => {
           if (drive.again) drive.again.done = Math.min(drive.again.total, drive.again.done + 1);
         };
+        const live2 = () => !this.dead(drive) && !drive.controller.signal.aborted && drive.fatal === void 0 && drive.store.state.status === "running";
+        let chaptersKey;
         try {
-          for (const id of effectiveOrder(drive.store.state)) {
-            if (this.dead(drive) || drive.controller.signal.aborted || drive.fatal !== void 0) break;
-            if (drive.store.state.status !== "running") break;
-            const info = drive.cards.get(id);
-            const card = info ? await this.ports.readCard(info.path).catch(() => void 0) : void 0;
-            if (!card) continue;
-            const key4 = aiProofKey(cardRevision(drive.store.state, id), aiProofBody(chapterBody(card.detail)));
-            const opened = await drive.store.commit((state) => reopenAiRound(state, id, key4));
-            if (!(opened == null ? void 0 : opened.accepted)) continue;
+          if (withBook && live2()) {
+            const key4 = await bookKey();
+            const opened = key4 !== void 0 ? await drive.store.commit((state) => reopenAiRound(state, void 0, key4)) : void 0;
+            for (let turn = 0; (opened == null ? void 0 : opened.accepted) && turn < 10; turn++) {
+              const slot = drive.store.state.bookProof;
+              if (!(slot == null ? void 0 : slot.again) || slot.done || !live2()) break;
+              await this.aiBook(drive, slot.step, true);
+            }
+            finished();
+          }
+          const before = await bookKey();
+          if (before !== void 0 && ((_a2 = drive.store.state.bookProof) == null ? void 0 : _a2.key) === before) chaptersKey = before;
+          for (const id of chapterIds) {
+            if (!live2()) break;
+            const key4 = await chapterKey(id);
+            const opened = key4 !== void 0 ? await drive.store.commit((state) => reopenAiRound(state, id, key4)) : void 0;
+            if (!(opened == null ? void 0 : opened.accepted)) {
+              finished();
+              continue;
+            }
             drive.busy.add(id);
             try {
               for (let turn = 0; turn < 10; turn++) {
-                const slot = (_a2 = drive.store.state.aiProof) == null ? void 0 : _a2[id];
-                if (!(slot == null ? void 0 : slot.again) || slot.done || this.dead(drive) || drive.controller.signal.aborted) break;
-                if (drive.store.state.status !== "running" || drive.fatal !== void 0) break;
-                await this.aiChapter(drive, id, slot.step, true);
+                const slot = (_b2 = drive.store.state.aiProof) == null ? void 0 : _b2[id];
+                if (!(slot == null ? void 0 : slot.again) || slot.done || !live2()) break;
+                await this.aiChapter(drive, id, slot.step, true, true);
               }
             } finally {
               drive.busy.delete(id);
               finished();
             }
-          }
-          if (!this.dead(drive) && !drive.controller.signal.aborted && drive.store.state.status === "running") {
-            const input2 = await this.bookProofInput(drive).catch(() => void 0);
-            const key4 = input2 ? aiProofKey(0, input2.chapters.map((chapter) => chapter.text).join("\n\0\n")) : "";
-            const opened = input2 ? await drive.store.commit((state) => reopenAiRound(state, void 0, key4)) : void 0;
-            for (let turn = 0; (opened == null ? void 0 : opened.accepted) && turn < 10; turn++) {
-              const slot = drive.store.state.bookProof;
-              if (!(slot == null ? void 0 : slot.again) || slot.done || this.dead(drive) || drive.controller.signal.aborted) break;
-              if (drive.store.state.status !== "running" || drive.fatal !== void 0) break;
-              await this.aiBook(drive, slot.step, true);
-            }
-            if (opened == null ? void 0 : opened.accepted) finished();
           }
         } finally {
           drive.again = void 0;
@@ -57367,13 +57400,17 @@ var BookPipelineRuns = class {
               next = closeAiRound(next);
               return { state: next, accepted: true };
             }).catch(() => void 0);
+            const from = chaptersKey;
+            const after = from !== void 0 ? await bookKey() : void 0;
+            if (from !== void 0 && after !== void 0)
+              await drive.store.commit((state) => rekeyBookProof(state, from, after)).catch(() => void 0);
             if (drive.store.state.phase === "done" && !await this.writeClosingPage(drive))
               this.log(drive, "open_issues_write", "book", "proof", "failed");
             this.syncReviewNotes(drive);
           }
         }
       };
-      this.log(drive, "fix_again", "-", "proof", `calls:${plan.calls}`);
+      this.log(drive, "fix_again", "-", "proof", `calls:${calls}`);
     });
   }
   /**
@@ -58637,7 +58674,7 @@ var BookPipelineRuns = class {
    * One step of a chapter's independent AI proofread: the check (the proof model, web search) or the fix (the author model, edits
    * applied by the program). The attempt is counted before the call and saved; a stop or a text changed meanwhile drops the result.
    */
-  async aiChapter(drive, nodeId, want, rerun = false) {
+  async aiChapter(drive, nodeId, want, rerun = false, again = false) {
     var _a2, _b2, _c, _d, _e, _f;
     const info = drive.cards.get(nodeId);
     if (!info || !this.ports.aiProof || !this.ports.aiFix) return;
@@ -58657,6 +58694,10 @@ var BookPipelineRuns = class {
     const revision = cardRevision(drive.store.state, nodeId);
     const key4 = aiProofKey(revision, body);
     const stored = (_b2 = drive.store.state.aiProof) == null ? void 0 : _b2[nodeId];
+    if (again && (stored == null ? void 0 : stored.again) && stored.key !== key4) {
+      await drive.store.commit((state) => ({ state: closeAiRound(state, nodeId), accepted: true }));
+      return;
+    }
     const same2 = (stored == null ? void 0 : stored.key) === key4 ? stored : void 0;
     const step = same2 ? want : "proof";
     const begun = await drive.store.commit((state) => {
@@ -58994,9 +59035,11 @@ var BookPipelineRuns = class {
         changed.push(chapter.id);
       }
       let newKey;
+      const bodies = {};
       if (changed.length) {
         const after = await this.bookProofInput(drive);
         newKey = aiProofKey(0, joined(after.chapters.map((chapter) => chapter.text)));
+        for (const chapter of after.chapters) if (changed.includes(chapter.id)) bodies[chapter.id] = chapter.text;
       }
       const done = await drive.store.commit(
         (current) => applyAiFix(current, token, {
@@ -59006,7 +59049,7 @@ var BookPipelineRuns = class {
           replacementOf,
           cardOf,
           refused,
-          ...newKey ? { key: newKey, changed } : {}
+          ...newKey ? { key: newKey, changed, bodies } : {}
         })
       );
       if (discarded) return report("dropped", { applied, pending: targets.length });

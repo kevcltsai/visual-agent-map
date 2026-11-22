@@ -71,6 +71,7 @@ import {
   closeAiRound,
   fixAgainPlan,
   reopenAiRound,
+  rekeyBookProof,
   aiChapterDue,
   applyAiFailure,
   applyAiFix,
@@ -1776,53 +1777,81 @@ export class BookPipelineRuns {
         throw new BookPipelineRunError("nothing");
       const data = await this.openSaved(drive, mapPath, { allowDone: true });
       if (data.phase !== "done") throw new BookPipelineRunError("not_gate");
-      const plan = fixAgainPlan(data, 0);
-      if (!plan.items) throw new BookPipelineRunError("nothing");
+      if (!fixAgainPlan(data, 0).items) throw new BookPipelineRunError("nothing");
+      // Only the units that will really run are counted (the same key check the round makes: a hand-edited chapter is skipped), so the limit is raised for them alone.
+      const chapterKey = async (id: string): Promise<string | undefined> => {
+        const info = drive.cards.get(id);
+        const card = info ? await this.ports.readCard(info.path).catch(() => undefined) : undefined;
+        return card
+          ? aiProofKey(cardRevision(drive.store.state, id), aiProofBody(chapterBody(card.detail)))
+          : undefined;
+      };
+      const bookKey = async (): Promise<string | undefined> => {
+        const input = await this.bookProofInput(drive).catch(() => undefined);
+        return input ? aiProofKey(0, input.chapters.map(chapter => chapter.text).join("\n\u0000\n")) : undefined;
+      };
+      const chapterIds: string[] = [];
+      for (const id of effectiveOrder(data)) {
+        const key = await chapterKey(id);
+        if (key !== undefined && reopenAiRound(data, id, key).accepted) chapterIds.push(id);
+      }
+      const bookNow = await bookKey();
+      const withBook = bookNow !== undefined && reopenAiRound(data, undefined, bookNow).accepted;
+      if (!chapterIds.length && !withBook) throw new BookPipelineRunError("nothing");
+      const calls = 2 * chapterIds.length + (withBook ? 2 : 0);
       await drive.store.commit(state => {
-        const short = state.budget.used + plan.calls - state.budget.limit;
+        const short = state.budget.used + calls - state.budget.limit;
         const next = resumeRun(short > 0 ? addBudget(state, short) : state);
         return { state: next ?? state, accepted: true };
       });
       if (drive.store.state.status !== "running") throw new BookPipelineRunError("budget");
       drive.job = async () => {
-        drive.again = { done: 0, total: plan.chapters + (plan.book ? 1 : 0) };
+        drive.again = { done: 0, total: chapterIds.length + (withBook ? 1 : 0) };
         const finished = (): void => {
           if (drive.again) drive.again.done = Math.min(drive.again.total, drive.again.done + 1);
         };
+        const live = (): boolean =>
+          !this.dead(drive) &&
+          !drive.controller.signal.aborted &&
+          drive.fatal === undefined &&
+          drive.store.state.status === "running";
+        // The book slot first: its key is current now unless the reader edited a chapter. The chapter slots a book fix changes follow it (applyAiFix).
+        let chaptersKey: string | undefined;
         try {
-          for (const id of effectiveOrder(drive.store.state)) {
-            if (this.dead(drive) || drive.controller.signal.aborted || drive.fatal !== undefined) break;
-            if (drive.store.state.status !== "running") break;
-            const info = drive.cards.get(id);
-            const card = info ? await this.ports.readCard(info.path).catch(() => undefined) : undefined;
-            if (!card) continue;
-            const key = aiProofKey(cardRevision(drive.store.state, id), aiProofBody(chapterBody(card.detail)));
-            const opened = await drive.store.commit(state => reopenAiRound(state, id, key));
-            if (!opened?.accepted) continue;
+          if (withBook && live()) {
+            const key = await bookKey();
+            const opened =
+              key !== undefined ? await drive.store.commit(state => reopenAiRound(state, undefined, key)) : undefined;
+            for (let turn = 0; opened?.accepted && turn < 10; turn++) {
+              const slot = drive.store.state.bookProof;
+              if (!slot?.again || slot.done || !live()) break;
+              await this.aiBook(drive, slot.step, true);
+            }
+            finished();
+          }
+          // The finished book proofread follows the program's own chapter fixes below (not a hand edit): its key is known to be current here.
+          const before = await bookKey();
+          if (before !== undefined && drive.store.state.bookProof?.key === before) chaptersKey = before;
+          for (const id of chapterIds) {
+            if (!live()) break;
+            const key = await chapterKey(id);
+            const opened =
+              key !== undefined ? await drive.store.commit(state => reopenAiRound(state, id, key)) : undefined;
+            if (!opened?.accepted) {
+              finished();
+              continue;
+            }
             drive.busy.add(id);
             try {
               for (let turn = 0; turn < 10; turn++) {
                 const slot = drive.store.state.aiProof?.[id];
-                if (!slot?.again || slot.done || this.dead(drive) || drive.controller.signal.aborted) break;
-                if (drive.store.state.status !== "running" || drive.fatal !== undefined) break;
-                await this.aiChapter(drive, id, slot.step, true);
+                if (!slot?.again || slot.done || !live()) break;
+                await this.aiChapter(drive, id, slot.step, true, true);
               }
             } finally {
               drive.busy.delete(id);
               finished();
             }
-          }
-          if (!this.dead(drive) && !drive.controller.signal.aborted && drive.store.state.status === "running") {
-            const input = await this.bookProofInput(drive).catch(() => undefined);
-            const key = input ? aiProofKey(0, input.chapters.map(chapter => chapter.text).join("\n\u0000\n")) : "";
-            const opened = input ? await drive.store.commit(state => reopenAiRound(state, undefined, key)) : undefined;
-            for (let turn = 0; opened?.accepted && turn < 10; turn++) {
-              const slot = drive.store.state.bookProof;
-              if (!slot?.again || slot.done || this.dead(drive) || drive.controller.signal.aborted) break;
-              if (drive.store.state.status !== "running" || drive.fatal !== undefined) break;
-              await this.aiBook(drive, slot.step, true);
-            }
-            if (opened?.accepted) finished();
           }
         } finally {
           drive.again = undefined;
@@ -1834,13 +1863,17 @@ export class BookPipelineRuns {
                 return { state: next, accepted: true };
               })
               .catch(() => undefined);
+            const from = chaptersKey;
+            const after = from !== undefined ? await bookKey() : undefined;
+            if (from !== undefined && after !== undefined)
+              await drive.store.commit(state => rekeyBookProof(state, from, after)).catch(() => undefined);
             if (drive.store.state.phase === "done" && !(await this.writeClosingPage(drive)))
               this.log(drive, "open_issues_write", "book", "proof", "failed");
             this.syncReviewNotes(drive);
           }
         }
       };
-      this.log(drive, "fix_again", "-", "proof", `calls:${plan.calls}`);
+      this.log(drive, "fix_again", "-", "proof", `calls:${calls}`);
     });
   }
 
@@ -3239,7 +3272,13 @@ export class BookPipelineRuns {
    * One step of a chapter's independent AI proofread: the check (the proof model, web search) or the fix (the author model, edits
    * applied by the program). The attempt is counted before the call and saved; a stop or a text changed meanwhile drops the result.
    */
-  private async aiChapter(drive: Drive, nodeId: string, want: "proof" | "fix", rerun = false): Promise<void> {
+  private async aiChapter(
+    drive: Drive,
+    nodeId: string,
+    want: "proof" | "fix",
+    rerun = false,
+    again = false
+  ): Promise<void> {
     const info = drive.cards.get(nodeId);
     if (!info || !this.ports.aiProof || !this.ports.aiFix) return;
     const signal = drive.controller.signal;
@@ -3262,6 +3301,11 @@ export class BookPipelineRuns {
     const revision = cardRevision(drive.store.state, nodeId);
     const key = aiProofKey(revision, body);
     const stored = drive.store.state.aiProof?.[nodeId];
+    if (again && stored?.again && stored.key !== key) {
+      // The reader edited the chapter in the middle of the round: the round is closed with the problems it had, nothing is called or written.
+      await drive.store.commit(state => ({ state: closeAiRound(state, nodeId), accepted: true }));
+      return;
+    }
     const same = stored?.key === key ? stored : undefined;
     const step = same ? want : "proof";
     const begun = await drive.store.commit(state => {
@@ -3612,9 +3656,11 @@ export class BookPipelineRuns {
         changed.push(chapter.id);
       }
       let newKey: string | undefined;
+      const bodies: Record<string, string> = {};
       if (changed.length) {
         const after = await this.bookProofInput(drive);
         newKey = aiProofKey(0, joined(after.chapters.map(chapter => chapter.text)));
+        for (const chapter of after.chapters) if (changed.includes(chapter.id)) bodies[chapter.id] = chapter.text;
       }
       const done = await drive.store.commit(current =>
         applyAiFix(current, token, {
@@ -3624,7 +3670,7 @@ export class BookPipelineRuns {
           replacementOf,
           cardOf,
           refused,
-          ...(newKey ? { key: newKey, changed } : {})
+          ...(newKey ? { key: newKey, changed, bodies } : {})
         })
       );
       if (discarded) return report("dropped", { applied, pending: targets.length });

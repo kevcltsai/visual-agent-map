@@ -26,6 +26,7 @@ import {
   type PipelineStage,
   type PipelineStep
 } from "./model";
+import { aiProofKey } from "./ai-proof";
 
 export type PipelineStepKind = "global" | PipelineStep;
 
@@ -302,6 +303,7 @@ export function abandonAi(data: BookPipelineData, nodeId?: string): BookPipeline
   const base: AiProofState = slot ?? { key: "", attempts: 0, round: 0, step: "proof", checked: 0, fixed: 0, open: [] };
   const done: AiProofState = { ...base, done: true, incomplete: true };
   delete done.pending;
+  delete done.again;
   setAiSlot(next, nodeId, done);
   next.revision++;
   return next;
@@ -457,6 +459,8 @@ export function applyAiFix(
     appliedIds?: readonly string[];
     key?: string;
     changed?: readonly string[];
+    /** Whole-book fix: the new text (as the chapter proofread reads it) of each changed chapter, so its own finished slot follows the program's write instead of looking hand-edited. */
+    bodies?: Readonly<Record<string, string>>;
   }
 ): Committed {
   const found = token.step === "fix" ? aiCurrent(data, token) : undefined;
@@ -492,8 +496,15 @@ export function applyAiFix(
         ...(result.replacementOf?.[item.id] ? { replacement: result.replacementOf[item.id] } : {})
       }))
     ];
-  for (const id of result.changed ?? [])
-    if (effectiveOrder(next).includes(id)) next.revisions[id] = cardRevision(next, id) + 1;
+  for (const id of result.changed ?? []) {
+    if (effectiveOrder(next).includes(id)) {
+      next.revisions[id] = cardRevision(next, id) + 1;
+      const body = result.bodies?.[id];
+      const own = id === token.nodeId ? undefined : next.aiProof?.[id];
+      if (own && body !== undefined)
+        next.aiProof = { ...next.aiProof, [id]: { ...own, key: aiProofKey(cardRevision(next, id), body) } };
+    }
+  }
   setAiSlot(next, token.nodeId, slot);
   next.revision++;
   return { state: next, accepted: true };
@@ -600,6 +611,14 @@ export function closeAiRound(data: BookPipelineData, nodeId?: string): BookPipel
   setAiSlot(next, nodeId, slot);
   next.revision++;
   return next;
+}
+/** The finished whole-book proofread follows the text the program's own chapter fixes left (a round of "fix again" wrote chapters): a hand edit is never told apart here, so the caller passes the key it knew was current before. */
+export function rekeyBookProof(data: BookPipelineData, from: string, to: string): Committed {
+  if (!data.bookProof?.done || data.bookProof.key !== from || from === to) return { state: data, accepted: false };
+  const next = clone(data);
+  next.bookProof = { ...data.bookProof, key: to };
+  next.revision++;
+  return { state: next, accepted: true };
 }
 /**
  * What one more round would do to a finished book (pure; the button and its confirm card read it). `needsReview` is the number of chapters

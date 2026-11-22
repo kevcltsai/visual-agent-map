@@ -1213,3 +1213,40 @@ test('again: the limit stays; addBudget by what is short lets a paused book go o
   assert.deepEqual([raised.budget.limit, raised.status], [302, 'running']);
   assert.equal(model.MAX_AI_FIX_ROUNDS, 2);
 });
+
+// ---- R1 fixes: the program's own writes are never a hand edit; a stuck round leaves no `again` ----
+const { aiProofKey: keyOf } = S.load('core/book-pipeline/ai-proof.ts');
+const bookFixing = () => {
+  const base = doneBook([itemOf('1', 'still_present')], [itemOf('B1', 'still_present', 'bq', 1)]);
+  const state = { ...base, status: 'running', revisions: { a: 3 }, aiProof: { ...base.aiProof, a: { ...base.aiProof.a, key: keyOf(3, 'old text') } } };
+  const reopened = reopen(state, undefined, 'bk').state;
+  return { state: reopened, token: { runId: reopened.runId, stopEpoch: reopened.stopEpoch ?? 0, revision: 0, key: 'bk', round: reopened.bookProof.round, step: 'fix' } };
+};
+
+test('R1 key: a whole-book fix that changes a chapter moves that chapter\'s finished slot key to the new text and revision (not a hand edit); an unchanged chapter keeps its key', () => {
+  const { state, token } = bookFixing();
+  const r = machine.applyAiFix(state, token, { applied: 1, changed: ['a'], bodies: { a: 'new text' }, key: 'bk2' });
+  assert.equal(r.accepted, true);
+  assert.equal(r.state.revisions.a, 4);
+  assert.equal(r.state.aiProof.a.key, keyOf(4, 'new text'), 'the slot follows the program write');
+  assert.equal(r.state.aiProof.b.key, 'k', 'a chapter the fix did not touch keeps its key');
+  assert.equal(r.state.bookProof.key, 'bk2');
+  const plainFix = machine.applyAiFix(state, token, { applied: 1, changed: ['a'], key: 'bk2' });
+  assert.equal(plainFix.state.aiProof.a.key, keyOf(3, 'old text'), 'no text given: the key is left alone');
+});
+
+test('R1 key: rekeyBookProof moves a finished book slot key only from the key the caller knew was current', () => {
+  const state = doneBook([], [itemOf('B1', 'still_present', 'bq', 1)]);
+  const moved = machine.rekeyBookProof(state, 'bk', 'bk9');
+  assert.deepEqual([moved.accepted, moved.state.bookProof.key, moved.state.revision > state.revision], [true, 'bk9', true]);
+  assert.equal(machine.rekeyBookProof(state, 'other', 'bk9').accepted, false, 'another key (a hand edit) is not followed');
+  assert.equal(machine.rekeyBookProof({ ...state, bookProof: { ...state.bookProof, done: undefined } }, 'bk', 'bk9').accepted, false, 'an open round is not touched');
+});
+
+test('R1 abandon: giving up a stuck round of "fix again" leaves a done, incomplete slot with no `again` and no pending', () => {
+  const opened = reopen(doneBook([itemOf('1', 'still_present')]), 'a', 'k').state;
+  assert.equal(opened.aiProof.a.again, true);
+  const slot = machine.abandonAi(opened, 'a').aiProof.a;
+  assert.deepEqual([slot.done, slot.incomplete, slot.again, slot.pending], [true, true, undefined, undefined]);
+  assert.equal(slot.open.length, 1, 'the problems stay listed');
+});

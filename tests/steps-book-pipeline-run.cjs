@@ -5478,15 +5478,94 @@ test('P2 fix again: the runner tells the bar how far the round is (done / total)
   assert.equal(r.runs.getProgress(r.mapPath)?.again, undefined, 'after the round');
 });
 
-test('P1 fix again: a chapter the reader changed since its proofread (key differs) is skipped: no call for it, its text is not written, no round is left open', async () => {
+test('P1 fix again: the only fixable chapter was changed by the reader (key differs): refused "nothing" with no call, no write, no limit change, the saved state untouched (R1 finding 3)', async () => {
   const { r, st } = await againRig();
   await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/Corrected\d+/, m => `${m} by the reader`), {});
-  const rawBefore = r.raw(1); const calls = finishedCalls(r); st.again = true;
-  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const rawBefore = r.raw(1); const calls = finishedCalls(r); const saved = JSON.stringify(await r.state()); st.again = true;
+  await assert.rejects(r.runs.fixAgain(r.mapPath), err => err instanceof BookPipelineRunError && err.code === 'nothing');
+  await settleRuns(r);
   assert.equal(r.raw(1), rawBefore, 'nothing written');
-  assert.equal(finishedCalls(r).fix, calls.fix, 'no fix call');
-  const slot = (await r.state()).aiProof[idA(r)];
-  assert.ok(slot.done && !slot.again && !slot.pending, JSON.stringify(slot));
+  assert.deepEqual(finishedCalls(r), calls, 'no call at all');
+  assert.equal(JSON.stringify(await r.state()), saved, 'no budget raise, no slot change');
+});
+
+/** A finished book where chapter A has a fixable problem the check keeps finding, and the whole-book check keeps finding one in chapter A (its fix writes there during the writing). */
+const bothRig = async () => {
+  const v = pageVault(); const st = { again: false, hold: undefined }; let n = 0;
+  const r = await aiRig({
+    aiProof: async request => request.title === 'SecretTitleA' ? { checks: [probOf(request, 'P1')], prior: [], dropped: {} } : { checks: [okCheck(request)], prior: [], dropped: {} },
+    aiBookProof: async request => ({ checks: [bookProblem(request, 2, 3)], prior: [], dropped: {} }),
+    aiFix: async request => request.targets[0].id === 'B1'
+      ? [{ id: 'B1', chapter: 2, quote: request.chapters[1].text, replacement: `BookCorrected${++n}` }]
+      : (st.hold?.reached(), await st.hold?.promise, [{ id: 'P1', quote: request.chapters[0].text.slice(0, 11), replacement: `ChapterCorrected${++n}` }])
+  }, { ports: { writeOpenIssues: v.port } });
+  await finishAi(r);
+  return { r, v, st };
+};
+
+test('R1 fix again: the book slot and a chapter are both fixed in one round: each gets exactly one fix and one re-check, nothing is skipped as hand-edited, the limit covers both (findings 1A and 1B)', async () => {
+  const { r, v } = await bothRig();
+  const s0 = await r.state();
+  assert.ok(s0.bookProof.open.length && s0.aiProof[idA(r)].open.length, 'both have fixable problems left');
+  same(await invariantsOf(r, v), [], 'before: the program\'s own book write left the chapter slot current');
+  const calls = finishedCalls(r); const used = s0.budget.used; await setLimit(r, used);
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const s = await r.state(); const now = finishedCalls(r);
+  assert.deepEqual([now.fix - calls.fix, now.proofA - calls.proofA, now.book - calls.book, now.all - calls.all], [2, 1, 1, 4], 'one fix + one re-check for the chapter, one fix + one re-check for the book');
+  assert.equal(s.budget.limit, used + 4, 'raised by exactly the four calls that run');
+  assert.deepEqual([s.phase, s.aiProof[idA(r)].again, s.aiProof[idA(r)].done, s.bookProof.again, s.bookProof.done], ['done', undefined, true, undefined, true]);
+  assert.deepEqual([s.aiProof[idA(r)].round, s.bookProof.round], [s0.aiProof[idA(r)].round, s0.bookProof.round], 'both rounds finished (the last round again)');
+  assert.equal(s.aiProof[idA(r)].fixed, s0.aiProof[idA(r)].fixed + 1);
+  assert.equal(s.bookProof.fixed, s0.bookProof.fixed + 1);
+  same(await invariantsOf(r, v), [], 'after: the keys are current, page = bar = open items');
+  // A second round works too: the book slot followed the chapter's own fix.
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const again = finishedCalls(r);
+  assert.deepEqual([again.fix - now.fix, again.proofA - now.proofA, again.book - now.book], [2, 1, 1], 'a second press runs both again: neither slot looks hand-edited');
+});
+
+test('R1 fix again: the reader edited the only chapter that could run and the book slot too: nothing runs, the limit is not raised', async () => {
+  const { r } = await bothRig();
+  const s0 = await r.state(); const used = s0.budget.used; await setLimit(r, used);
+  await r.repo.updateNoteRawGuarded(r.nodes[1].path, c => c.replace(/(Chapter|Book)Corrected\d+/, m => `${m} by the reader`), {});
+  const calls = finishedCalls(r); const rawBefore = r.raw(1);
+  // the book slot's key no longer matches either (a chapter changed by the reader): nothing at all runs for it
+  await assert.rejects(r.runs.fixAgain(r.mapPath), err => err.code === 'nothing');
+  assert.deepEqual(finishedCalls(r), calls); assert.equal(r.raw(1), rawBefore);
+  assert.equal((await r.state()).budget.limit, used, 'no budget raise when nothing will run');
+});
+
+test('R1 fix again: the reader edits the chapter in the middle of the round (after the fix, before the re-check): the round is closed with the problems it had, no extra call, no new slot, counts do not drop', async () => {
+  const { r, v, applied, st } = await againRig({});
+  const before = (await r.state()).aiProof[idA(r)]; const pageBefore = pageText(v).split('\n').filter(l => l.startsWith('- ')).length;
+  const calls = finishedCalls(r); st.again = true;
+  const orig = r.ports.updateNoteRawGuarded; const read = r.ports.readCard; let once = false; let wrote = false; let reads = 0;
+  r.ports.updateNoteRawGuarded = async (path, transform, options) => { const out = await orig(path, transform, options); if (st.again) wrote = true; return out; };
+  // The fix's own read-back is the first read after the write; the next read (the re-check's) sees the reader's edit made just before it.
+  r.ports.readCard = async path => {
+    if (wrote && ++reads === 2 && !once) { once = true; await orig(path, c => c.replace(/Corrected\d+/, m => `${m} BY-READER`), {}); }
+    return read(path);
+  };
+  await r.runs.fixAgain(r.mapPath); await settleRuns(r);
+  const s = await r.state(); const slot = s.aiProof[idA(r)]; const now = finishedCalls(r);
+  assert.ok(once, 'the hand edit happened after the fix was written');
+  assert.deepEqual([now.fix - calls.fix, now.proofA - calls.proofA, now.all - calls.all], [1, 0, 1], 'the fix ran; no re-check and no fresh proofread call');
+  assert.ok(slot.done && !slot.again && !slot.pending && !slot.incomplete, JSON.stringify(slot));
+  assert.equal(slot.round, before.round, 'no fresh slot (round 0) was made');
+  assert.deepEqual(againOpen(slot), againOpen(before), 'open is what it was');
+  assert.equal(pageText(v).split('\n').filter(l => l.startsWith('- ')).length, pageBefore, 'the page keeps its items');
+  assert.equal(r.runs.getProgress(r.mapPath)?.again, undefined);
+  assert.ok(r.raw(1).includes('BY-READER'), 'the reader\'s text is kept');
+});
+
+test('R1 fix again: the progress counts the units that run (chapter + book), and the book finished first is already counted while the chapter works', async () => {
+  const { r, st } = await bothRig();
+  let reached = false; const hold = defer(); st.hold = { reached: () => { reached = true; }, promise: hold.promise };
+  const running = r.runs.fixAgain(r.mapPath).catch(() => undefined);
+  while (!reached && r.runs.isRunning(r.mapPath)) await tick();
+  assert.deepEqual(plain(r.runs.getProgress(r.mapPath).again), { done: 1, total: 2 }, 'the book (first) is done, the chapter is working');
+  hold.resolve(); await running; await settleRuns(r);
+  assert.equal(r.runs.getProgress(r.mapPath)?.again, undefined);
 });
 
 test('P1 fix again: an old save without `again` loads and runs a round; a saved `again` that is not true is rejected', async () => {

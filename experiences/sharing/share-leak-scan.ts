@@ -59,7 +59,9 @@ const NAMED_ENTITIES: Record<string, string> = {
   lsqb: "[",
   lbrack: "[",
   rsqb: "]",
-  rbrack: "]"
+  rbrack: "]",
+  sol: "/",
+  colon: ":"
 };
 
 /**
@@ -68,7 +70,7 @@ const NAMED_ENTITIES: Record<string, string> = {
  */
 export function decodeHtmlEntities(text: string): string {
   return text.replace(
-    /&(?:#(\d{1,7});?|#[xX]([0-9a-fA-F]{1,6});?|([A-Za-z]+);)/g,
+    /&(?:#(\d+);?|#[xX]([0-9a-fA-F]+);?|([A-Za-z]+);)/g,
     (original, dec?: string, hex?: string, name?: string) => {
       if (name) return NAMED_ENTITIES[name] ?? original;
       const code = dec ? Number(dec) : parseInt(hex ?? "", 16);

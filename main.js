@@ -103924,6 +103924,19 @@ function splitWikilink(inner) {
   const alias = inner.slice(bar).replace(/^\\?\|/, "").trim();
   return { target, alias: alias || void 0 };
 }
+var escapeRegExp2 = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+var WRITEBACK_BACKUP_LINE = (() => {
+  const marker3 = "\0";
+  const shapes = NOTE_LANGUAGES.map(
+    (language2) => translate(language2, "note.writeback_fresh_replaced_0", marker3).split(marker3)
+  ).filter((parts) => parts.length === 2);
+  const path = "[^\\n]+ \\d{4}-\\d{2}-\\d{2} \\d{6}(?: \\(\\d+\\))?\\.md";
+  const texts = shapes.map(([head2, tail]) => `${escapeRegExp2(head2)}${path}${escapeRegExp2(tail)}`).join("|");
+  return new RegExp(`^(?:[ \\t]*>[ \\t]?)*(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000(?:${texts})[ \\t]*$`);
+})();
+function dropWritebackBackupLines(text11) {
+  return text11.split("\n").filter((line3) => !WRITEBACK_BACKUP_LINE.test(line3)).join("\n");
+}
 function cleanSegment(text11, ctx, out) {
   const attach = (ref) => {
     const decoded3 = decodeRef(ref.trim());
@@ -103990,10 +104003,10 @@ function cleanShareMarkdown(md, ctx) {
   let result = "";
   let from = 0;
   for (const range of markdownCodeRanges(text11)) {
-    result += cleanSegment(text11.slice(from, range.start), ctx, out) + text11.slice(range.start, range.end);
+    result += cleanSegment(dropWritebackBackupLines(text11.slice(from, range.start)), ctx, out) + text11.slice(range.start, range.end);
     from = range.end;
   }
-  out.markdown = result + cleanSegment(text11.slice(from), ctx, out);
+  out.markdown = result + cleanSegment(dropWritebackBackupLines(text11.slice(from)), ctx, out);
   return out;
 }
 
@@ -104020,11 +104033,13 @@ var NAMED_ENTITIES = {
   lsqb: "[",
   lbrack: "[",
   rsqb: "]",
-  rbrack: "]"
+  rbrack: "]",
+  sol: "/",
+  colon: ":"
 };
 function decodeHtmlEntities(text11) {
   return text11.replace(
-    /&(?:#(\d{1,7});?|#[xX]([0-9a-fA-F]{1,6});?|([A-Za-z]+);)/g,
+    /&(?:#(\d+);?|#[xX]([0-9a-fA-F]+);?|([A-Za-z]+);)/g,
     (original, dec, hex, name2) => {
       var _a2;
       if (name2) return (_a2 = NAMED_ENTITIES[name2]) != null ? _a2 : original;

@@ -5,6 +5,7 @@
  * `%%` and `<!-- -->` comments are NOT removed here: the renderer hides them (live-checked, D-2026-10-110), and what it
  * does not hide shows as plain text the author sees too.
  */
+import { NOTE_LANGUAGES, translate } from "../../i18n";
 import { markdownCodeRanges, normalizeNewlines } from "./share-code";
 
 export interface ShareCleanContext {
@@ -73,6 +74,30 @@ function splitWikilink(inner: string): { target: string; alias: string | undefin
     .replace(/^\\?\|/, "")
     .trim();
   return { target, alias: alias || undefined };
+}
+
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * The write-back's own "rewritten, old version backed up at <vault path>" log line, exactly as it writes it (any note
+ * language, in a quote or callout, as a list item or not): `<date>` U+3000 `<text><folder>/<note> <date> <HHmmss>[ (n)].md<text>`.
+ * A line the author changed in any way does not match, so the leak gate still sees it.
+ */
+const WRITEBACK_BACKUP_LINE = (() => {
+  const marker = "\u0000";
+  const shapes = NOTE_LANGUAGES.map(language =>
+    translate(language, "note.writeback_fresh_replaced_0", marker).split(marker)
+  ).filter(parts => parts.length === 2);
+  const path = "[^\\n]+ \\d{4}-\\d{2}-\\d{2} \\d{6}(?: \\(\\d+\\))?\\.md";
+  const texts = shapes.map(([head, tail]) => `${escapeRegExp(head)}${path}${escapeRegExp(tail)}`).join("|");
+  return new RegExp(`^(?:[ \\t]*>[ \\t]?)*(?:[-*+][ \\t]+)?\\d{4}-\\d{2}-\\d{2}\u3000(?:${texts})[ \\t]*$`);
+})();
+
+/** Removes the write-back's backup log lines (see WRITEBACK_BACKUP_LINE): they name a vault path and mean nothing to a reader. */
+export function dropWritebackBackupLines(text: string): string {
+  return text
+    .split("\n")
+    .filter(line => !WRITEBACK_BACKUP_LINE.test(line))
+    .join("\n");
 }
 
 function cleanSegment(text: string, ctx: ShareCleanContext, out: ShareCleanResult): string {
@@ -162,10 +187,12 @@ export function cleanShareMarkdown(md: string, ctx: ShareCleanContext): ShareCle
   let result = "";
   let from = 0;
   for (const range of markdownCodeRanges(text)) {
-    result += cleanSegment(text.slice(from, range.start), ctx, out) + text.slice(range.start, range.end);
+    result +=
+      cleanSegment(dropWritebackBackupLines(text.slice(from, range.start)), ctx, out) +
+      text.slice(range.start, range.end);
     from = range.end;
   }
-  out.markdown = result + cleanSegment(text.slice(from), ctx, out);
+  out.markdown = result + cleanSegment(dropWritebackBackupLines(text.slice(from)), ctx, out);
   return out;
 }
 

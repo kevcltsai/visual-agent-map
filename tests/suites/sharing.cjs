@@ -673,3 +673,32 @@ test('sharing leak: a path under a VAM folder (note-style backup) blocks; the ba
   assert.ok(categories({ detailHtml: '<p>Agent&#32;Workspace&#47;Topics/x.md</p>' }).has('vault-folder'), 'encoded too');
   assert.ok(!categories({ detailHtml: '<p>The Agent Workspace holds your maps.</p>' }).has('vault-folder'));
 });
+
+test('sharing leak: long numeric references and &sol; / &colon; decode as a browser reads them', () => {
+  assert.equal(scan.decodeHtmlEntities('&#00000091;&#x000005b;&sol;&colon;&#99999999999;'), '[[/:&#99999999999;');
+  const forbidden = scan.forbiddenStringsFor({ mapFolder: 'M', internalFolders: ['Agent Workspace'] }, fixtureMap(), []);
+  const categories = fields => new Set(scan.scanPayloadForLeaks(payloadWith(fields), forbidden).map(hit => hit.category));
+  assert.ok(categories({ detailHtml: '<p>Agent Workspace&sol;x.md</p>' }).has('vault-folder'));
+  assert.ok(categories({ detailHtml: '<p>app&colon;//x</p>' }).has('app-url'));
+});
+
+test('sharing clean: the write-back\'s own backup log line is removed (any note language, callout or list); an edited line or code stays', () => {
+  const md = [
+    '> [!note]- 研究備註',
+    '>',
+    '> 2026-11-22　已重新寫入，舊版備份在 Agent Workspace/筆記風格/備份/筆記/線性代數 2026-11-22 171239.md',
+    '> - 2026-11-20　Rewritten; the earlier version is backed up at Agent Workspace/Note styles/Backups/Notes/x 2026-11-20 012627 (2).md',
+    '2026-11-18　已重新寫入，舊版備份在 A/b 2026-11-18 233604.md',
+    '> 2026-11-22　已重新寫入，舊版備份在 Agent Workspace/筆記風格/備份/筆記/線性代數 2026-11-22 171239.md，我刪過一段',
+    '```',
+    '2026-11-22　已重新寫入，舊版備份在 Agent Workspace/x 2026-11-22 171239.md',
+    '```',
+    'body'
+  ].join('\n');
+  const out = cleanMd(md).markdown;
+  assert.ok(!out.includes('線性代數 2026-11-22 171239.md\n'), 'own zh-TW line gone');
+  assert.ok(!out.includes('012627 (2).md') && !out.includes('233604.md'), 'en list item and a line outside a callout gone');
+  assert.ok(out.includes('171239.md，我刪過一段'), 'an edited line stays for the leak gate');
+  assert.ok(out.includes('Agent Workspace/x 2026-11-22 171239.md'), 'code stays');
+  assert.ok(out.includes('> [!note]- 研究備註') && out.includes('body'));
+});

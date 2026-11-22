@@ -11,7 +11,7 @@
  */
 import type { AdmissionContext } from "../../core/admission";
 import { carryIssue } from "./book-pipeline-reasons";
-import type { FindImagesRequest, FoundImages } from "../../core/steps/book-pipeline/find-images";
+import type { FindImagesRequest, FoundImage, FoundImages } from "../../core/steps/book-pipeline/find-images";
 import type {
   AiBookChapter,
   AiBookProofRequest,
@@ -39,10 +39,16 @@ import { imageKey } from "../../core/book-pipeline/image-dedupe";
 import { formatPipelineLog } from "../../core/book-pipeline/log";
 import {
   commonsQueue,
+  commonsFileNameOf,
+  commonsInfoFor,
+  lookupCommonsFiles,
   searchCommons,
+  slotCanBeChecked,
+  unfitSlot,
   type CommonsFetch,
   type CommonsQueue,
   type CommonsRejection,
+  type CommonsSlot,
   type CommonsRunBudget
 } from "../../core/book-pipeline/commons-search";
 import { askWords, wordHits } from "../../core/book-pipeline/file-fit";
@@ -4495,11 +4501,65 @@ export class BookPipelineRuns {
     let commonsNoHint = 0;
     let commonsRejected: Partial<Record<CommonsRejection, number>> = {};
     const rounds: (FoundImages | undefined)[] = [];
+    let finderUnfit = 0;
+    let finderUnchecked = 0;
+    let finderLookups = 0;
+    // The finder's body-slot pictures go through the same fit test as the program's own Commons search, on the file page's title,
+    // description and categories (one request per chapter and search). Unfit ones are dropped; what cannot be checked is kept. The cover is not touched.
+    const fitFound = async (from: FoundImages | undefined): Promise<FoundImages | undefined> => {
+      const fetchCommons = this.ports.fetchCommons;
+      if (!from || !fetchCommons) return from;
+      const slotOf = (index: number): CommonsSlot | undefined => {
+        const slot = slots.find(item => item.index === index);
+        return slot
+          ? {
+              index,
+              kind: slot.kind,
+              explains: slot.explains,
+              ...(slot.search?.length ? { terms: slot.search } : {}),
+              ...hints.get(index)
+            }
+          : undefined;
+      };
+      const names = [...from.bySlot]
+        .filter(([index]) => index !== COVER_INDEX)
+        .flatMap(([index, list]) => (slotOf(index) && slotCanBeChecked(slotOf(index)!) ? list : []))
+        .flatMap(item => commonsFileNameOf(item.source) ?? []);
+      if (!names.length) return from;
+      const found = await lookupCommonsFiles(names, fetchCommons, {
+        signal,
+        run: drive.commonsBudget,
+        now: () => Date.parse(this.ports.now()),
+        ...(this.ports.commonsQueue ? { queue: this.ports.commonsQueue } : {})
+      });
+      finderLookups += found.requests;
+      const bySlot = new Map<number, FoundImage[]>();
+      for (const [index, list] of from.bySlot) {
+        const slot = index === COVER_INDEX ? undefined : slotOf(index);
+        const kept: FoundImage[] = [];
+        for (const item of list) {
+          const name = commonsFileNameOf(item.source);
+          const page = slot && slotCanBeChecked(slot) && name ? commonsInfoFor(found.info, name) : undefined;
+          if (!page) {
+            if (slot && name) finderUnchecked++;
+            kept.push(item);
+          } else if (unfitSlot(slot!, `${page.title} ${page.description} ${page.categories}`)) finderUnfit++;
+          else
+            kept.push({
+              ...item,
+              description: [page.description, page.categories].filter(Boolean).join(" · ").slice(0, 300)
+            });
+        }
+        bySlot.set(index, kept);
+      }
+      return { ...from, bySlot };
+    };
     try {
       const round1 = await search(asked, false, exclude);
       rounds.push(round1);
       keepHints(round1);
-      for (const [index, list] of await probeFound(asked, coverOnly(round1))) perSlot.set(index, list);
+      const fit1 = await fitFound(round1);
+      for (const [index, list] of await probeFound(asked, coverOnly(fit1))) perSlot.set(index, list);
       // A second search (once) for the slots the first one left without a usable picture: another direction, the tried addresses excluded.
       if (round1) {
         const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language);
@@ -4511,7 +4571,7 @@ export class BookPipelineRuns {
         rounds.push(second);
         keepHints(second);
         if (second) {
-          for (const [index, list] of await probeFound(lacking, second))
+          for (const [index, list] of await probeFound(lacking, await fitFound(second)))
             perSlot.set(index, [...(perSlot.get(index) ?? []), ...list]);
         }
       }
@@ -4703,6 +4763,9 @@ export class BookPipelineRuns {
             ...(commonsAsked ? { commons: commonsAsked } : {}),
             ...(commonsLimited ? { commons_limited: 1 } : {}),
             ...(commonsNoHint ? { commons_nohint: commonsNoHint } : {}),
+            ...(finderLookups ? { finder_lookup: finderLookups } : {}),
+            ...(finderUnfit ? { finder_unfit: finderUnfit } : {}),
+            ...(finderUnchecked ? { finder_unchecked: finderUnchecked } : {}),
             ...Object.fromEntries(
               rounds.flatMap((round, i) =>
                 round

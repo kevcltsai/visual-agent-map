@@ -48942,8 +48942,20 @@ function plainCredit(value, max = CREDIT_MAX) {
   if (typeof value !== "string") return "";
   return value.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().slice(0, max);
 }
+function unfitSlot(slot, said) {
+  var _a2, _b2;
+  const words2 = askWords(slot);
+  if (wordHits(words2, said) < Math.min(FIT_HITS, words2.length) || !words2.length) return "words";
+  const terms = (((_a2 = slot.terms) == null ? void 0 : _a2.length) ? slot.terms : [(_b2 = slot.search) != null ? _b2 : ""]).map((term) => askWords({ explains: "", search: term })).filter((term) => term.length);
+  const hit = terms.filter((term) => wordHits(term, said) === term.length).length;
+  return !terms.length || hit < Math.ceil(terms.length / 2) ? "caption" : void 0;
+}
+function slotCanBeChecked(slot) {
+  var _a2, _b2;
+  return !!(((_a2 = slot.terms) == null ? void 0 : _a2.length) ? slot.terms : [(_b2 = slot.search) != null ? _b2 : ""]).some((term) => askWords({ explains: "", search: term }).length);
+}
 function parseCommonsAnswer(text11, slot, rejected) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h;
+  var _a2, _b2, _c, _d, _e, _f;
   const refuse = (rule) => {
     var _a3;
     if (rejected) rejected[rule] = ((_a3 = rejected[rule]) != null ? _a3 : 0) + 1;
@@ -48980,16 +48992,10 @@ function parseCommonsAnswer(text11, slot, rejected) {
       refuse("genre");
       continue;
     }
-    const words2 = askWords(slot);
     const said = `${title} ${about} ${categories}`;
-    if (wordHits(words2, said) < Math.min(FIT_HITS, words2.length) || !words2.length) {
-      refuse("words");
-      continue;
-    }
-    const terms = (((_g = slot.terms) == null ? void 0 : _g.length) ? slot.terms : [(_h = slot.search) != null ? _h : ""]).map((term) => askWords({ explains: "", search: term })).filter((term) => term.length);
-    const hit = terms.filter((term) => wordHits(term, said) === term.length).length;
-    if (!terms.length || hit < Math.ceil(terms.length / 2)) {
-      refuse("caption");
+    const unfit = unfitSlot(slot, said);
+    if (unfit) {
+      refuse(unfit);
       continue;
     }
     const candidate = fileSourceOf({
@@ -49119,6 +49125,77 @@ async function searchCommons(slots, fetch, options) {
     else if (limited || run.spent) cut.push(slot.index);
   }
   return { bySlot, requests, limited: limited || run.spent, cut, rejected };
+}
+var LOOKUP_NAMES_MAX = 50;
+var fileKey = (name2) => name2.replace(/^File:/i, "").replace(/_/g, " ").trim().toLowerCase();
+function commonsFileNameOf(source) {
+  try {
+    const url = new URL(source);
+    const match = /^\/wiki\/File:(.+)$/i.exec(url.pathname);
+    return url.hostname === "commons.wikimedia.org" && match ? decodeURIComponent(match[1]).replace(/_/g, " ") : void 0;
+  } catch (e) {
+    return void 0;
+  }
+}
+async function lookupCommonsFiles(names3, fetch, options) {
+  var _a2, _b2, _c, _d, _e, _f, _g, _h;
+  const now = (_a2 = options.now) != null ? _a2 : Date.now;
+  const queue = (_b2 = options.queue) != null ? _b2 : commonsQueue;
+  const run = (_c = options.run) != null ? _c : { waited: 0, spent: false };
+  const info = /* @__PURE__ */ new Map();
+  let requests = 0;
+  const unique3 = [...new Set(names3)];
+  for (let from = 0; from < unique3.length; from += LOOKUP_NAMES_MAX) {
+    const params = {
+      action: "query",
+      format: "json",
+      formatversion: "2",
+      titles: unique3.slice(from, from + LOOKUP_NAMES_MAX).map((name2) => `File:${name2}`).join("|"),
+      prop: "imageinfo",
+      iiprop: "extmetadata",
+      iiextmetadatafilter: "Artist|LicenseShortName|ImageDescription|Categories"
+    };
+    const url = `${COMMONS_API}?${Object.entries(params).map(([key4, value]) => `${key4}=${encodeURIComponent(value)}`).join("&")}`;
+    const answer = await queue.turn(
+      () => run.spent || options.signal.aborted,
+      async () => {
+        var _a3;
+        requests++;
+        const got = await bounded(Promise.resolve().then(() => fetch(url)), COMMONS_REQUEST_MS, options.signal);
+        if ((got == null ? void 0 : got.status) === 429) {
+          const wait = (_a3 = retryAfterMs(got.headers, now())) != null ? _a3 : COMMONS_BACKOFF_MS[0];
+          if (run.waited + wait > COMMONS_RUN_BACKOFF_MS) run.spent = true;
+          else {
+            run.waited += wait;
+            await queue.sleep(wait, options.signal);
+          }
+        }
+        return got;
+      }
+    );
+    if ((answer == null ? void 0 : answer.status) !== 200) continue;
+    let pages;
+    try {
+      pages = (_e = (_d = JSON.parse(answer.text)) == null ? void 0 : _d.query) == null ? void 0 : _e.pages;
+    } catch (e) {
+      continue;
+    }
+    for (const page of Array.isArray(pages) ? pages : []) {
+      if (!page || typeof page.title !== "string" || page.missing) continue;
+      const first = Array.isArray(page.imageinfo) ? page.imageinfo[0] : void 0;
+      if (!first) continue;
+      const meta = (_f = first.extmetadata) != null ? _f : {};
+      info.set(fileKey(page.title), {
+        title: page.title.replace(/^File:/i, "").replace(/\.[a-z0-9]{2,5}$/i, "").replace(/_/g, " ").trim(),
+        description: plainCredit((_g = meta.ImageDescription) == null ? void 0 : _g.value, DESCRIPTION_MAX),
+        categories: plainCredit((_h = meta.Categories) == null ? void 0 : _h.value, DESCRIPTION_MAX).replace(/\|/g, "; ")
+      });
+    }
+  }
+  return { info, requests };
+}
+function commonsInfoFor(info, name2) {
+  return info.get(fileKey(name2));
 }
 
 // core/book-pipeline/machine.ts
@@ -58651,11 +58728,62 @@ ${oldDetail}`);
     let commonsNoHint = 0;
     let commonsRejected = {};
     const rounds = [];
+    let finderUnfit = 0;
+    let finderUnchecked = 0;
+    let finderLookups = 0;
+    const fitFound = async (from) => {
+      const fetchCommons = this.ports.fetchCommons;
+      if (!from || !fetchCommons) return from;
+      const slotOf = (index) => {
+        var _a3;
+        const slot = slots.find((item) => item.index === index);
+        return slot ? {
+          index,
+          kind: slot.kind,
+          explains: slot.explains,
+          ...((_a3 = slot.search) == null ? void 0 : _a3.length) ? { terms: slot.search } : {},
+          ...hints.get(index)
+        } : void 0;
+      };
+      const names3 = [...from.bySlot].filter(([index]) => index !== COVER_INDEX).flatMap(([index, list2]) => slotOf(index) && slotCanBeChecked(slotOf(index)) ? list2 : []).flatMap((item) => {
+        var _a3;
+        return (_a3 = commonsFileNameOf(item.source)) != null ? _a3 : [];
+      });
+      if (!names3.length) return from;
+      const found = await lookupCommonsFiles(names3, fetchCommons, {
+        signal,
+        run: drive.commonsBudget,
+        now: () => Date.parse(this.ports.now()),
+        ...this.ports.commonsQueue ? { queue: this.ports.commonsQueue } : {}
+      });
+      finderLookups += found.requests;
+      const bySlot = /* @__PURE__ */ new Map();
+      for (const [index, list2] of from.bySlot) {
+        const slot = index === COVER_INDEX ? void 0 : slotOf(index);
+        const kept = [];
+        for (const item of list2) {
+          const name2 = commonsFileNameOf(item.source);
+          const page = slot && slotCanBeChecked(slot) && name2 ? commonsInfoFor(found.info, name2) : void 0;
+          if (!page) {
+            if (slot && name2) finderUnchecked++;
+            kept.push(item);
+          } else if (unfitSlot(slot, `${page.title} ${page.description} ${page.categories}`)) finderUnfit++;
+          else
+            kept.push({
+              ...item,
+              description: [page.description, page.categories].filter(Boolean).join(" \xB7 ").slice(0, 300)
+            });
+        }
+        bySlot.set(index, kept);
+      }
+      return { ...from, bySlot };
+    };
     try {
       const round1 = await search(asked, false, exclude);
       rounds.push(round1);
       keepHints(round1);
-      for (const [index, list2] of await probeFound(asked, coverOnly(round1))) perSlot.set(index, list2);
+      const fit1 = await fitFound(round1);
+      for (const [index, list2] of await probeFound(asked, coverOnly(fit1))) perSlot.set(index, list2);
       if (round1) {
         const provisional = choosePictures({ id: nodeId, title: first.title }, slots, perSlot, taken, language2);
         const lacking2 = wanted.filter((slot) => {
@@ -58669,7 +58797,7 @@ ${oldDetail}`);
         rounds.push(second);
         keepHints(second);
         if (second) {
-          for (const [index, list2] of await probeFound(lacking2, second))
+          for (const [index, list2] of await probeFound(lacking2, await fitFound(second)))
             perSlot.set(index, [...(_a2 = perSlot.get(index)) != null ? _a2 : [], ...list2]);
         }
       }
@@ -58849,6 +58977,9 @@ ${oldDetail}`);
             ...commonsAsked ? { commons: commonsAsked } : {},
             ...commonsLimited ? { commons_limited: 1 } : {},
             ...commonsNoHint ? { commons_nohint: commonsNoHint } : {},
+            ...finderLookups ? { finder_lookup: finderLookups } : {},
+            ...finderUnfit ? { finder_unfit: finderUnfit } : {},
+            ...finderUnchecked ? { finder_unchecked: finderUnchecked } : {},
             ...Object.fromEntries(
               rounds.flatMap(
                 (round3, i) => round3 ? [

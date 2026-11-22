@@ -129,6 +129,28 @@ function plainCredit(value: unknown, max = CREDIT_MAX): string {
 }
 
 /**
+ * Whether a file's text (its title, description and categories) fits the slot: "words" when it names fewer than {@link FIT_HITS} of
+ * the slot's words (all of them when the slot has fewer; none: no fit), "caption" when it names fewer than half (rounded up) of the
+ * slot's English terms (the planner's, else the finder's search words as one term; a term counts when the text has all its words);
+ * undefined when it fits. The slot's line is the caption only when the file passes the second rule: a file's own name is no caption
+ * for a book. A slot with no English terms and no search words cannot be told ({@link slotCanBeChecked}).
+ */
+export function unfitSlot(slot: CommonsSlot, said: string): "words" | "caption" | undefined {
+  const words = askWords(slot);
+  if (wordHits(words, said) < Math.min(FIT_HITS, words.length) || !words.length) return "words";
+  const terms = (slot.terms?.length ? slot.terms : [slot.search ?? ""])
+    .map(term => askWords({ explains: "", search: term }))
+    .filter(term => term.length);
+  const hit = terms.filter(term => wordHits(term, said) === term.length).length;
+  return !terms.length || hit < Math.ceil(terms.length / 2) ? "caption" : undefined;
+}
+
+/** The slot has English terms or a finder search to compare a file with. */
+export function slotCanBeChecked(slot: CommonsSlot): boolean {
+  return !!(slot.terms?.length ? slot.terms : [slot.search ?? ""]).some(term => askWords({ explains: "", search: term }).length);
+}
+
+/**
  * One search answer as candidates in search order: a photograph or drawing (no document page), an https thumbnail, the file page as
  * source, the subject rule, a file that names what the slot asks for, and for a photo slot no print genre or map.
  */
@@ -187,21 +209,10 @@ export function parseCommonsAnswer(
       refuse("genre");
       continue;
     }
-    const words = askWords(slot);
     const said = `${title} ${about} ${categories}`;
-    if (wordHits(words, said) < Math.min(FIT_HITS, words.length) || !words.length) {
-      refuse("words");
-      continue;
-    }
-    // The slot's line is the caption only when the file names most (at least half, rounded up) of the slot's English terms, the
-    // planner's if it has them, else the finder's search words as one term; a term counts when the file has all its words. Else the
-    // file is not taken: its own name is no caption for a book (the slot stays empty and counts toward the shortfall).
-    const terms = (slot.terms?.length ? slot.terms : [slot.search ?? ""])
-      .map(term => askWords({ explains: "", search: term }))
-      .filter(term => term.length);
-    const hit = terms.filter(term => wordHits(term, said) === term.length).length;
-    if (!terms.length || hit < Math.ceil(terms.length / 2)) {
-      refuse("caption");
+    const unfit = unfitSlot(slot, said);
+    if (unfit) {
+      refuse(unfit);
       continue;
     }
     const candidate = fileSourceOf<CommonsCandidate>({
@@ -372,4 +383,105 @@ export async function searchCommons(
     else if (limited || run.spent) cut.push(slot.index);
   }
   return { bySlot, requests, limited: limited || run.spent, cut, rejected };
+}
+
+/** What a Commons file page says about a file, as {@link parseCommonsAnswer} reads it. */
+export interface CommonsFileInfo {
+  /** The file name without "File:" and the extension. */
+  title: string;
+  description: string;
+  categories: string;
+}
+
+const LOOKUP_NAMES_MAX = 50;
+const fileKey = (name: string): string => name.replace(/^File:/i, "").replace(/_/g, " ").trim().toLowerCase();
+
+/** The Commons file name a file page address (`commons.wikimedia.org/wiki/File:…`) names; undefined for any other address. */
+export function commonsFileNameOf(source: string): string | undefined {
+  try {
+    const url = new URL(source);
+    const match = /^\/wiki\/File:(.+)$/i.exec(url.pathname);
+    return url.hostname === "commons.wikimedia.org" && match ? decodeURIComponent(match[1]).replace(/_/g, " ") : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The file pages' description and categories for `names`, one request for up to 50 names (more: one more request per 50), through the
+ * same queue and run budget as {@link searchCommons}. A name the answer does not carry (failed request, timeout, 429, no such file)
+ * is absent from the map: the caller keeps what it cannot check. A 429 is not asked again. Never throws. Only file names are sent.
+ */
+export async function lookupCommonsFiles(
+  names: readonly string[],
+  fetch: CommonsFetch,
+  options: { signal: AbortSignal; now?: () => number; queue?: CommonsQueue; run?: CommonsRunBudget }
+): Promise<{ info: Map<string, CommonsFileInfo>; requests: number }> {
+  const now = options.now ?? Date.now;
+  const queue = options.queue ?? commonsQueue;
+  const run = options.run ?? { waited: 0, spent: false };
+  const info = new Map<string, CommonsFileInfo>();
+  let requests = 0;
+  const unique = [...new Set(names)];
+  for (let from = 0; from < unique.length; from += LOOKUP_NAMES_MAX) {
+    const params: Record<string, string> = {
+      action: "query",
+      format: "json",
+      formatversion: "2",
+      titles: unique
+        .slice(from, from + LOOKUP_NAMES_MAX)
+        .map(name => `File:${name}`)
+        .join("|"),
+      prop: "imageinfo",
+      iiprop: "extmetadata",
+      iiextmetadatafilter: "Artist|LicenseShortName|ImageDescription|Categories"
+    };
+    const url = `${COMMONS_API}?${Object.entries(params)
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+      .join("&")}`;
+    const answer = await queue.turn(
+      () => run.spent || options.signal.aborted,
+      async () => {
+        requests++;
+        const got = await bounded(Promise.resolve().then(() => fetch(url)), COMMONS_REQUEST_MS, options.signal);
+        if (got?.status === 429) {
+          const wait = retryAfterMs(got.headers, now()) ?? COMMONS_BACKOFF_MS[0];
+          if (run.waited + wait > COMMONS_RUN_BACKOFF_MS) run.spent = true;
+          else {
+            run.waited += wait;
+            await queue.sleep(wait, options.signal);
+          }
+        }
+        return got;
+      }
+    );
+    if (answer?.status !== 200) continue;
+    let pages: unknown;
+    try {
+      pages = (JSON.parse(answer.text) as { query?: { pages?: unknown } })?.query?.pages;
+    } catch {
+      continue;
+    }
+    for (const page of Array.isArray(pages) ? (pages as Array<Record<string, unknown> | null>) : []) {
+      if (!page || typeof page.title !== "string" || page.missing) continue;
+      const first = Array.isArray(page.imageinfo) ? (page.imageinfo[0] as Record<string, unknown> | undefined) : undefined;
+      if (!first) continue;
+      const meta = (first.extmetadata ?? {}) as Record<string, { value?: unknown } | undefined>;
+      info.set(fileKey(page.title), {
+        title: page.title
+          .replace(/^File:/i, "")
+          .replace(/\.[a-z0-9]{2,5}$/i, "")
+          .replace(/_/g, " ")
+          .trim(),
+        description: plainCredit(meta.ImageDescription?.value, DESCRIPTION_MAX),
+        categories: plainCredit(meta.Categories?.value, DESCRIPTION_MAX).replace(/\|/g, "; ")
+      });
+    }
+  }
+  return { info, requests };
+}
+
+/** The lookup's answer for a file name (undefined: not checked). */
+export function commonsInfoFor(info: ReadonlyMap<string, CommonsFileInfo>, name: string): CommonsFileInfo | undefined {
+  return info.get(fileKey(name));
 }

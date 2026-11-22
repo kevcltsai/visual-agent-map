@@ -48952,7 +48952,9 @@ function unfitSlot(slot, said) {
 }
 function slotCanBeChecked(slot) {
   var _a2, _b2;
-  return !!(((_a2 = slot.terms) == null ? void 0 : _a2.length) ? slot.terms : [(_b2 = slot.search) != null ? _b2 : ""]).some((term) => askWords({ explains: "", search: term }).length);
+  return !!(((_a2 = slot.terms) == null ? void 0 : _a2.length) ? slot.terms : [(_b2 = slot.search) != null ? _b2 : ""]).some(
+    (term) => askWords({ explains: "", search: term }).length
+  );
 }
 function parseCommonsAnswer(text11, slot, rejected) {
   var _a2, _b2, _c, _d, _e, _f;
@@ -49161,7 +49163,11 @@ async function lookupCommonsFiles(names3, fetch, options) {
       async () => {
         var _a3;
         requests++;
-        const got = await bounded(Promise.resolve().then(() => fetch(url)), COMMONS_REQUEST_MS, options.signal);
+        const got = await bounded(
+          Promise.resolve().then(() => fetch(url)),
+          COMMONS_REQUEST_MS,
+          options.signal
+        );
         if ((got == null ? void 0 : got.status) === 429) {
           const wait = (_a3 = retryAfterMs(got.headers, now())) != null ? _a3 : COMMONS_BACKOFF_MS[0];
           if (run.waited + wait > COMMONS_RUN_BACKOFF_MS) run.spent = true;

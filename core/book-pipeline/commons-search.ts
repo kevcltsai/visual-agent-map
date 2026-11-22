@@ -147,7 +147,9 @@ export function unfitSlot(slot: CommonsSlot, said: string): "words" | "caption" 
 
 /** The slot has English terms or a finder search to compare a file with. */
 export function slotCanBeChecked(slot: CommonsSlot): boolean {
-  return !!(slot.terms?.length ? slot.terms : [slot.search ?? ""]).some(term => askWords({ explains: "", search: term }).length);
+  return !!(slot.terms?.length ? slot.terms : [slot.search ?? ""]).some(
+    term => askWords({ explains: "", search: term }).length
+  );
 }
 
 /**
@@ -394,14 +396,21 @@ export interface CommonsFileInfo {
 }
 
 const LOOKUP_NAMES_MAX = 50;
-const fileKey = (name: string): string => name.replace(/^File:/i, "").replace(/_/g, " ").trim().toLowerCase();
+const fileKey = (name: string): string =>
+  name
+    .replace(/^File:/i, "")
+    .replace(/_/g, " ")
+    .trim()
+    .toLowerCase();
 
 /** The Commons file name a file page address (`commons.wikimedia.org/wiki/File:…`) names; undefined for any other address. */
 export function commonsFileNameOf(source: string): string | undefined {
   try {
     const url = new URL(source);
     const match = /^\/wiki\/File:(.+)$/i.exec(url.pathname);
-    return url.hostname === "commons.wikimedia.org" && match ? decodeURIComponent(match[1]).replace(/_/g, " ") : undefined;
+    return url.hostname === "commons.wikimedia.org" && match
+      ? decodeURIComponent(match[1]).replace(/_/g, " ")
+      : undefined;
   } catch {
     return undefined;
   }
@@ -443,7 +452,11 @@ export async function lookupCommonsFiles(
       () => run.spent || options.signal.aborted,
       async () => {
         requests++;
-        const got = await bounded(Promise.resolve().then(() => fetch(url)), COMMONS_REQUEST_MS, options.signal);
+        const got = await bounded(
+          Promise.resolve().then(() => fetch(url)),
+          COMMONS_REQUEST_MS,
+          options.signal
+        );
         if (got?.status === 429) {
           const wait = retryAfterMs(got.headers, now()) ?? COMMONS_BACKOFF_MS[0];
           if (run.waited + wait > COMMONS_RUN_BACKOFF_MS) run.spent = true;
@@ -464,7 +477,9 @@ export async function lookupCommonsFiles(
     }
     for (const page of Array.isArray(pages) ? (pages as Array<Record<string, unknown> | null>) : []) {
       if (!page || typeof page.title !== "string" || page.missing) continue;
-      const first = Array.isArray(page.imageinfo) ? (page.imageinfo[0] as Record<string, unknown> | undefined) : undefined;
+      const first = Array.isArray(page.imageinfo)
+        ? (page.imageinfo[0] as Record<string, unknown> | undefined)
+        : undefined;
       if (!first) continue;
       const meta = (first.extmetadata ?? {}) as Record<string, { value?: unknown } | undefined>;
       info.set(fileKey(page.title), {

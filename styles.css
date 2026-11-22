@@ -1012,6 +1012,25 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 /* A wide AI-written diagram keeps its natural, readable size and scrolls sideways instead of shrinking its text. */
 .visual-agent-map-node .mermaid, .mermaid.vam-mermaid-zoomable { overflow-x: auto; }
 .visual-agent-map-node .mermaid svg, .mermaid.vam-mermaid-zoomable svg { max-width: none; height: auto; }
+/* Node-note reading layout: the title leads, the format headings (level 2: summary, detail, links) step back to quiet section labels, the content headings (level 3) are the signposts, and a picture never fills a page. Sizes go through Obsidian's own variables so reading view and live preview agree. */
+.visual-agent-map-node { --line-height-normal: 1.75; --h1-size: 1.8em; --h1-weight: 700; --h2-size: 0.85em; --h2-weight: 600; --h2-color: var(--text-muted); --h3-size: 1.3em; --h3-weight: 700; }
+.markdown-preview-view.visual-agent-map-node h1, .markdown-preview-view.visual-agent-map-node h3 { text-wrap: balance; }
+.markdown-preview-view.visual-agent-map-node h2 { margin-block: 2.4em 0.8em; padding-bottom: 0.35em; border-bottom: 1px solid var(--background-modifier-border); }
+.markdown-preview-view.visual-agent-map-node h3 { margin-block: 2em 0.5em; }
+.visual-agent-map-node img:not([width]) { display: block; width: auto; max-height: 22em; margin-inline: auto; }
+/* A picture's paragraph is the picture plus its caption and source lines. */
+.markdown-preview-view.visual-agent-map-node p:has(> img, > .image-embed) { margin-block: 1.6em 2em; color: var(--text-muted); font-size: 0.85em; line-height: 1.55; text-align: center; text-wrap: balance; }
+.markdown-preview-view.visual-agent-map-node p:has(> img) > img + br { display: none; }
+/* The cap is 22 body ems; inside the smaller caption paragraph that is 22 / 0.85. */
+.markdown-preview-view.visual-agent-map-node p:has(> img) > img { max-height: 25.88em; margin-bottom: 0.5em; }
+/* Picture-book page (a card with a book role, marked on the leaf by styleNodeLeaf): set like a printed page. A serif face (Latin first, then Chinese), a narrower page, paragraphs told apart by a first-line indent instead of a gap, a paper-toned ground. Reading view only. */
+.vam-book-page .markdown-preview-view.visual-agent-map-node { --font-text: "Iowan Old Style", "Palatino Linotype", Georgia, "Songti TC", "Noto Serif TC", "PMingLiU", serif; --file-line-width: 33em; --line-height-normal: 1.9; --h3-size: 1.35em; background-color: color-mix(in srgb, var(--background-primary) 93%, var(--color-yellow)); }
+.vam-book-page .markdown-preview-view.visual-agent-map-node h1 { margin-block: 1.2em 1.6em; letter-spacing: 0.12em; text-align: center; }
+.vam-book-page .markdown-preview-view.visual-agent-map-node h2 { margin-block: 2.4em 1em; border-bottom: 0; letter-spacing: 0.3em; text-align: center; }
+.vam-book-page .markdown-preview-view.visual-agent-map-node h3 { margin-block: 2.2em 0.9em; }
+.vam-book-page .markdown-preview-view.visual-agent-map-node .markdown-preview-sizer > .el-p > p:not(:has(> img, > .image-embed)) { margin-block: 0; text-align: justify; }
+/* The first-line indent is an empty inline box: the `text-indent` property is outside the CSS lint's supported set. */
+.vam-book-page .markdown-preview-view.visual-agent-map-node .markdown-preview-sizer > .el-p > p:not(:has(> img, > .image-embed))::before { content: ""; display: inline-block; width: 2em; }
 @media (max-width: 900px) { .vam-inspector { width: 260px; } }
 @media (max-width: 600px) { .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); } .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; } }
 

@@ -114730,8 +114730,11 @@ ${t("ui.organize_link_wait_hint")}`;
     return marker3 === true || marker3 === "true" || file.extension === "md" && (file.path.startsWith(`${this.settings.notesFolder}/`) || isManagedMapPath(this.settings, file.path));
   }
   styleNodeLeaf(leaf) {
+    var _a2, _b2;
     if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian53.MarkdownView)) return;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
+    const bookRole = leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["book-role"]);
+    leaf.view.containerEl.toggleClass("vam-book-page", typeof bookRole === "string" && bookRole !== "");
   }
   /** Picture-book pipeline entries (the screen and the commands call these; refusals are thrown as BookPipelineRunError). */
   startBookPipeline(mapPath, options = {}) {

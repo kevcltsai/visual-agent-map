@@ -50903,7 +50903,7 @@ Rules:
 - thread: 2 to 4 sentences, one paragraph, no headings or lists.
 - materials: each has a short name, one sentence on how the book uses it, and home: the id (copied exactly from the list) of the one card that owns it. One scene or example belongs to one card only; give home an empty string when you are not sure which card owns it. Use only things the titles and summaries point to; an empty list is allowed when they point to none.
 - decisions: one short value (at most one sentence) for each of reader, goal, angle, tone, length and style (style describes voice, layout and recurring elements, and must not prescribe one fixed opening or closing pattern for every chapter: never require every chapter to open with a daily-life scene or to end on a question). For a setting the owner already filled (shown below), return an empty string. Never contradict a filled setting.
-- structure: optional, an array, empty when nothing is needed (the default). You may propose changes that make the whole book more complete and smoother to read: reorder chapters, change how many chapters or sections there are, merge overlapping cards, fill a gap, promote a section to a chapter or demote a chapter to a section, rename a card. At most 6 items, of which at most 3 add a card. Never touch the root card or a card marked "locked":true (do not remove, merge, move or rename it, or remove, merge or demote a chapter that holds one). Propose a change only when the book clearly needs it. Each item has a unique "id" (for example "s1"), a "kind", and a "reason": one sentence in the book's language saying why. Card ids and parents come from the list; a new card gets a "ref" of your own (for example "new1") that later items may use as a card or parent. Item shapes:
+- structure: required, an array. The chapter list was sketched on a mind map before anyone planned the book, so check it as the editor before you write the thread: (1) does each chapter build on the ones before it, or would the reader meet an idea before what it depends on; (2) is any chapter really one part of another chapter (it should be its section), or is any section big enough to be a chapter of its own; (3) do two cards cover the same subject; (4) is a step missing that the reader needs. For each problem you find, propose the change that fixes it: reorder chapters, change how many chapters or sections there are, merge overlapping cards, fill a gap, promote a section to a chapter or demote a chapter to a section, rename a card. Return an empty array only when the order and the split already read well. At most 6 items, of which at most 3 add a card. Never touch the root card or a card marked "locked":true (do not remove, merge, move or rename it, or remove, merge or demote a chapter that holds one). Each item has a unique "id" (for example "s1"), a "kind", and a "reason": one sentence in the book's language saying why. Card ids and parents come from the list; a new card gets a "ref" of your own (for example "new1") that later items may use as a card or parent. Item shapes:
   {"id":"s1","kind":"add","title":"","summary":"one sentence","parent":"<card id, ref or the root id>","after":"<sibling id or ref, optional>","ref":"new1","reason":""}
   {"id":"s2","kind":"remove","card":"<id>","reason":""} (only a card with no child cards)
   {"id":"s3","kind":"merge","card":"<id>","into":"<id>","reason":""} (the first card is folded into the second; only a card with no child cards)
@@ -51004,7 +51004,7 @@ var GLOBAL_PLAN_SCHEMA = {
       }
     }
   },
-  required: ["thread", "cards", "materials", "decisions"]
+  required: ["thread", "cards", "materials", "decisions", "structure"]
 };
 var need = (one, key4) => {
   const value = one[key4];
@@ -55784,7 +55784,7 @@ function simulateStructure(input2, ops, locked) {
     return { id: op.id, op: op.kind === "rename" ? { ...op, title: tree.title.get(op.card) } : op, before };
   }
 }
-function undoClosure(applied, opIds) {
+function undoClosure(applied, opIds, rootId) {
   const picked = new Set(opIds);
   const touched = /* @__PURE__ */ new Set();
   const refsOf = (op) => [
@@ -55793,12 +55793,13 @@ function undoClosure(applied, opIds) {
     ...op.kind === "merge" ? [op.into] : []
   ];
   const nameOf2 = (op) => op.kind === "add" ? op.ref : op.card;
-  for (const a of applied) {
-    if (!picked.has(a.id)) continue;
+  const touch = (a) => {
     touched.add(nameOf2(a.op));
-    if (a.before.parent) touched.add(a.before.parent);
+    if (a.op.kind === "rename") return;
+    if (a.before.parent && a.before.parent !== rootId) touched.add(a.before.parent);
     if (a.before.after) touched.add(a.before.after);
-  }
+  };
+  for (const a of applied) if (picked.has(a.id)) touch(a);
   let grew = true;
   while (grew) {
     grew = false;
@@ -55810,7 +55811,7 @@ function undoClosure(applied, opIds) {
       }
       if (seen && refsOf(a.op).some((r) => touched.has(r))) {
         picked.add(a.id);
-        touched.add(nameOf2(a.op));
+        touch(a);
         grew = true;
       }
     }
@@ -56470,9 +56471,9 @@ var BookPipelineRuns = class {
       const edit = data.structureEdit;
       if (data.phase !== "gate1" || data.status !== "running" || !edit) throw new BookPipelineRunError("not_gate1");
       const undone = new Set((_a2 = edit.undone) != null ? _a2 : []);
-      const ids2 = [...undoClosure(edit.applied, opIds === "all" ? edit.applied.map((a) => a.id) : opIds)].filter(
-        (id) => !undone.has(id)
-      );
+      const ids2 = [
+        ...undoClosure(edit.applied, opIds === "all" ? edit.applied.map((a) => a.id) : opIds, edit.before.rootId)
+      ].filter((id) => !undone.has(id));
       if (!ids2.length) return;
       if (!this.ports.editBookStructure) throw new BookPipelineRunError("missing");
       const picked = new Set(ids2);
@@ -60431,7 +60432,7 @@ function structureEditField(data, now, titleOf) {
     const { op } = a;
     const id = op.kind === "add" ? op.ref : op.card;
     const archivedPath = (op.kind === "merge" || op.kind === "remove") && edit.archived ? edit.archived[op.card] : void 0;
-    const dependents = [...undoClosure(edit.applied, [a.id])].filter((other) => other !== a.id && !undone.has(other)).map((other) => edit.applied.find((x) => x.id === other)).map((x) => ({ id: x.id, kind: x.op.kind, title: x.op.kind === "add" ? x.op.title : nameOf2(x.op.card) }));
+    const dependents = [...undoClosure(edit.applied, [a.id], edit.before.rootId)].filter((other) => other !== a.id && !undone.has(other)).map((other) => edit.applied.find((x) => x.id === other)).map((x) => ({ id: x.id, kind: x.op.kind, title: x.op.kind === "add" ? x.op.title : nameOf2(x.op.card) }));
     return {
       id: a.id,
       kind: op.kind,
@@ -60457,7 +60458,8 @@ function structureEditField(data, now, titleOf) {
     });
     const picked = undoClosure(
       edit.applied,
-      edit.applied.map((x) => x.id).filter((x) => !undone.has(x))
+      edit.applied.map((x) => x.id).filter((x) => !undone.has(x)),
+      rootId
     );
     const afterUndo = applyInverseOps({ rootId, nodes: current }, inverseOps(edit.applied, picked));
     const cards = undoAffected(rootId, current, afterUndo, edit.applied, picked).size;

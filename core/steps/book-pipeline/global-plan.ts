@@ -119,7 +119,7 @@ export const GLOBAL_PLAN_SCHEMA = {
       }
     }
   },
-  required: ["thread", "cards", "materials", "decisions"]
+  required: ["thread", "cards", "materials", "decisions", "structure"]
 };
 
 const need = (one: Record<string, unknown>, key: string): string | undefined => {

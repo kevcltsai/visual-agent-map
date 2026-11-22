@@ -1414,9 +1414,9 @@ export class BookPipelineRuns {
       const edit = data.structureEdit;
       if (data.phase !== "gate1" || data.status !== "running" || !edit) throw new BookPipelineRunError("not_gate1");
       const undone = new Set(edit.undone ?? []);
-      const ids = [...undoClosure(edit.applied, opIds === "all" ? edit.applied.map(a => a.id) : opIds)].filter(
-        id => !undone.has(id)
-      );
+      const ids = [
+        ...undoClosure(edit.applied, opIds === "all" ? edit.applied.map(a => a.id) : opIds, edit.before.rootId)
+      ].filter(id => !undone.has(id));
       if (!ids.length) return;
       if (!this.ports.editBookStructure) throw new BookPipelineRunError("missing");
       const picked = new Set(ids);

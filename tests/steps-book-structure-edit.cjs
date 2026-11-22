@@ -252,3 +252,60 @@ test('undo closure: removing a section, then merging its empty chapter away: und
   const back = E.applyInverseOps({ rootId: 'r', nodes: r.result }, E.inverseOps(r.applied, ids));
   assert.equal(shape({ result: back }), shape({ result: INPUT.nodes }));
 });
+
+test('undo closure: undoing a rename takes nothing else, even when later ops add or move cards around it', () => {
+  const ops = [
+    op({ kind: 'rename', card: 'c3', title: 'Third' }),
+    op({ kind: 'add', title: 'New', summary: 's', parent: 'r', ref: 'new1' }),
+    op({ kind: 'move', card: 'c2', parent: 'r' }),
+  ];
+  const r = run(ops);
+  assert.equal(r.applied.length, 3);
+  assert.deepEqual([...E.undoClosure(r.applied, [ops[0].id], 'r')], [ops[0].id]);
+  const sec = [op({ kind: 'rename', card: 's1a', title: 'A' }), op({ kind: 'add', title: 'Under', summary: 's', parent: 'c1', ref: 'new2' })];
+  const r2 = run(sec);
+  assert.deepEqual([...E.undoClosure(r2.applied, [sec[0].id], 'r')], [sec[0].id]);
+});
+
+test('undo closure: a chapter that sat under the root does not pull in later root-level adds or moves', () => {
+  const ops = [op({ kind: 'move', card: 'c3', parent: 'c2' }), op({ kind: 'add', title: 'New', summary: 's', parent: 'r', ref: 'new1' })];
+  const r = run(ops);
+  assert.equal(r.applied.length, 2);
+  assert.deepEqual([...E.undoClosure(r.applied, [ops[0].id], 'r')], [ops[0].id]);
+  // without the root id the old, wider rule still holds (callers always pass it)
+  assert.equal(E.undoClosure(r.applied, [ops[0].id]).size, 2);
+});
+
+test('undo closure: random edits, undoing any one op through its closure never loses a card that existed before', () => {
+  let seed = 7;
+  const rnd = k => ((seed = (seed * 1103515245 + 12345) % 2147483648), seed % k);
+  const ids = INPUT.nodes.map(x => x.id).filter(x => x !== 'r');
+  for (let round = 0; round < 3000; round++) {
+    const ops = [];
+    let refs = 0;
+    const pool = () => [...ids, ...Array.from({ length: refs }, (_, i) => `n${i}`)];
+    for (let k = 0, count = 1 + rnd(6); k < count; k++) {
+      const p = pool();
+      const pick = () => p[rnd(p.length)];
+      const kind = ['add', 'remove', 'merge', 'move', 'rename'][rnd(5)];
+      const parent = rnd(3) === 0 ? 'r' : pick();
+      if (kind === 'add' && refs < 3) ops.push({ id: `x${k}`, reason: 'r', kind, title: `T${k}`, summary: 's', parent, ref: `n${refs++}` });
+      else if (kind === 'remove') ops.push({ id: `x${k}`, reason: 'r', kind, card: pick() });
+      else if (kind === 'merge') ops.push({ id: `x${k}`, reason: 'r', kind, card: pick(), into: pick() });
+      else if (kind === 'move') ops.push({ id: `x${k}`, reason: 'r', kind, card: pick(), parent });
+      else ops.push({ id: `x${k}`, reason: 'r', kind: 'rename', card: pick(), title: `R${k}` });
+    }
+    const r = E.simulateStructure(INPUT, ops, NONE);
+    if (r.overCap || !r.applied.length) continue;
+    const after = { rootId: 'r', nodes: r.result };
+    for (const a of r.applied) {
+      const picked = E.undoClosure(r.applied, [a.id], 'r');
+      const back = E.applyInverseOps(after, E.inverseOps(r.applied, picked));
+      const present = new Set(back.map(x => x.id));
+      for (const x of r.result) {
+        if (x.id.startsWith('n')) continue;
+        assert.ok(present.has(x.id), `round ${round}: undoing ${a.id} lost ${x.id}`);
+      }
+    }
+  }
+});

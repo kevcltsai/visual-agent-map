@@ -274,7 +274,7 @@ function structureEditField(
     const id = op.kind === "add" ? op.ref : op.card;
     const archivedPath =
       (op.kind === "merge" || op.kind === "remove") && edit.archived ? edit.archived[op.card] : undefined;
-    const dependents = [...undoClosure(edit.applied, [a.id])]
+    const dependents = [...undoClosure(edit.applied, [a.id], edit.before.rootId)]
       .filter(other => other !== a.id && !undone.has(other))
       .map(other => edit.applied.find(x => x.id === other) as AppliedOp)
       .map(x => ({ id: x.id, kind: x.op.kind, title: x.op.kind === "add" ? x.op.title : nameOf(x.op.card) }));
@@ -303,7 +303,8 @@ function structureEditField(
     });
     const picked = undoClosure(
       edit.applied,
-      edit.applied.map(x => x.id).filter(x => !undone.has(x))
+      edit.applied.map(x => x.id).filter(x => !undone.has(x)),
+      rootId
     );
     const afterUndo = applyInverseOps({ rootId, nodes: current }, inverseOps(edit.applied, picked));
     const cards = undoAffected(rootId, current, afterUndo, edit.applied, picked).size;

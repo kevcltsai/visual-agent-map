@@ -236,7 +236,7 @@ export function simulateStructure(
 }
 
 /** The ids to undo when `opIds` are chosen: those, plus every later op that leans on what they made or changed. */
-export function undoClosure(applied: readonly AppliedOp[], opIds: Iterable<string>): Set<string> {
+export function undoClosure(applied: readonly AppliedOp[], opIds: Iterable<string>, rootId?: string): Set<string> {
   const picked = new Set(opIds);
   const touched = new Set<string>();
   const refsOf = (op: StructureOp): string[] => [
@@ -245,13 +245,15 @@ export function undoClosure(applied: readonly AppliedOp[], opIds: Iterable<strin
     ...(op.kind === "merge" ? [op.into] : [])
   ];
   const nameOf = (op: StructureOp): string => (op.kind === "add" ? op.ref : op.card);
-  for (const a of applied) {
-    if (!picked.has(a.id)) continue;
+  // Undoing puts the card back under its old parent and after its old sibling: later ops on those must come along. A rename keeps its
+  // place, and the root is never removed, so neither one ties a later op to this one.
+  const touch = (a: AppliedOp): void => {
     touched.add(nameOf(a.op));
-    // undoing puts the card back under its old parent and after its old sibling: later ops on those must come along
-    if (a.before.parent) touched.add(a.before.parent);
+    if (a.op.kind === "rename") return;
+    if (a.before.parent && a.before.parent !== rootId) touched.add(a.before.parent);
     if (a.before.after) touched.add(a.before.after);
-  }
+  };
+  for (const a of applied) if (picked.has(a.id)) touch(a);
   let grew = true;
   while (grew) {
     grew = false;
@@ -263,7 +265,7 @@ export function undoClosure(applied: readonly AppliedOp[], opIds: Iterable<strin
       }
       if (seen && refsOf(a.op).some(r => touched.has(r))) {
         picked.add(a.id);
-        touched.add(nameOf(a.op));
+        touch(a);
         grew = true;
       }
     }

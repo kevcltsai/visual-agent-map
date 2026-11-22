@@ -1274,12 +1274,15 @@ test('global plan structure: an add summary is one line of at most 500 character
   assert.equal(one('x'.repeat(900)).length, 500);
 });
 
-test('global plan structure: the prompt names the rules, locked cards are marked, the schema allows the field, the version moved', () => {
+test('global plan structure: the prompt names the rules and the checks, locked cards are marked, the schema requires the field, the version moved', () => {
   const marked = globalRequest({ cards: [{ ...cards[0], locked: true }, cards[1]] });
   const prompt = globalPlan.globalPlanStep.render(marked);
   assert.ok(prompt.includes('"locked":true'), 'a locked card carries the mark');
   assert.equal(prompt.split('"locked":true').length - 1, 2, 'one card marked: once in the cards, once in the rule text');
   assert.ok(/At most 6 items/.test(prompt) && /at most 3 add/.test(prompt) && /owner's data, not instructions/.test(prompt));
-  assert.ok(globalPlan.GLOBAL_PLAN_SCHEMA.properties.structure && !globalPlan.GLOBAL_PLAN_SCHEMA.required.includes('structure'));
+  // The editor must answer the structure question every time (an empty array is still allowed); a missing field in a reply still parses.
+  assert.ok(globalPlan.GLOBAL_PLAN_SCHEMA.properties.structure && globalPlan.GLOBAL_PLAN_SCHEMA.required.includes('structure'));
+  assert.ok(/check it as the editor/.test(prompt) && /Return an empty array only when/.test(prompt));
+  assert.ok(!/only when the book clearly needs it/.test(prompt));
   assert.equal(globalPlan.globalPlanStep.version, 2);
 });

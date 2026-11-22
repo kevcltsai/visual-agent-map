@@ -311,6 +311,38 @@ export function applyInverseOps(input: StructureInput, inverse: readonly Inverse
 }
 
 /**
+ * The structure after undoing `ids`: who is on the map and under which parent comes from the inverse ops on `current`; the order inside
+ * each parent comes from replaying the ops that stay (not undone before, not undone now) on the structure from before the edit, so undoing
+ * ops one at a time and in any order lands on the same sibling order as undoing them together. A card the replay does not place keeps
+ * its place after the ones it does.
+ */
+export function structureAfterUndo(
+  current: StructureInput,
+  original: StructureInput,
+  applied: readonly AppliedOp[],
+  ids: ReadonlySet<string>,
+  undoneBefore: ReadonlySet<string>
+): StructureNode[] {
+  const nodes = applyInverseOps(current, inverseOps(applied, ids));
+  const stay = applied.filter(a => !ids.has(a.id) && !undoneBefore.has(a.id)).map(a => a.op);
+  const replay = simulateStructure(original, stay, new Set()).result;
+  const rank = new Map(replay.map((n, at) => [n.id, at]));
+  const children = new Map<string | null, StructureNode[]>();
+  nodes.forEach(n => children.set(n.parentId, [...(children.get(n.parentId) ?? []), n]));
+  const seen = new Map(nodes.map((n, at) => [n.id, at]));
+  const key = (n: StructureNode): number => rank.get(n.id) ?? replay.length + (seen.get(n.id) ?? 0);
+  const out: StructureNode[] = [];
+  const walk = (parent: string | null): void => {
+    for (const child of [...(children.get(parent) ?? [])].sort((a, b) => key(a) - key(b))) {
+      out.push(child);
+      walk(child.id);
+    }
+  };
+  walk(null);
+  return out.length === nodes.length ? out : nodes;
+}
+
+/**
  * The cards that are planned again after an undo: the ones put back, the merge targets of the undone merges, and the ones that change
  * between chapter and section. `current` and `after` are the structure before and after the undo; `picked` the op ids being undone.
  * The runner and the gate's "undo all" estimate both use this.

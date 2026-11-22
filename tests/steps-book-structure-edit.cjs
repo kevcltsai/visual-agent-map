@@ -309,3 +309,42 @@ test('undo closure: random edits, undoing any one op through its closure never l
     }
   }
 });
+
+test('undo order: undoing ops one closure at a time, in any order, ends exactly on the original structure, sibling order included', () => {
+  let seed = 1;
+  const rnd = k => ((seed = (seed * 1103515245 + 12345) % 2147483648), seed % k);
+  const ids = INPUT.nodes.map(x => x.id).filter(x => x !== 'r');
+  const flat = nodes => nodes.map(x => `${x.id}<${x.parentId ?? ''}:${x.title}`).join(' ');
+  let checked = 0;
+  for (let round = 0; round < 40000; round++) {
+    if (round % 2000 === 0) seed = 1 + round / 2000;
+    const ops = [];
+    let refs = 0;
+    for (let k = 0, count = 1 + rnd(6); k < count; k++) {
+      const p = [...ids, ...Array.from({ length: refs }, (_, i) => `n${i}`)];
+      const pick = () => p[rnd(p.length)];
+      const kind = ['add', 'remove', 'merge', 'move', 'rename'][rnd(5)];
+      const parent = rnd(3) === 0 ? 'r' : pick();
+      if (kind === 'add' && refs < 3) ops.push({ id: `x${k}`, reason: 'r', kind, title: `T${k}`, summary: 's', parent, ref: `n${refs++}` });
+      else if (kind === 'remove') ops.push({ id: `x${k}`, reason: 'r', kind, card: pick() });
+      else if (kind === 'merge') ops.push({ id: `x${k}`, reason: 'r', kind, card: pick(), into: pick() });
+      else if (kind === 'move') ops.push({ id: `x${k}`, reason: 'r', kind, card: pick(), parent, ...(rnd(2) ? { after: pick() } : {}) });
+      else ops.push({ id: `x${k}`, reason: 'r', kind: 'rename', card: pick(), title: `R${k}` });
+    }
+    const r = E.simulateStructure(INPUT, ops, NONE);
+    if (r.overCap || r.applied.length < 2) continue;
+    let nodes = r.result;
+    const undone = new Set();
+    const order = [];
+    for (const left = r.applied.map(a => a.id); left.length; ) order.push(left.splice(rnd(left.length), 1)[0]);
+    for (const id of order) {
+      if (undone.has(id)) continue;
+      const picked = new Set([...E.undoClosure(r.applied, [id], 'r')].filter(x => !undone.has(x)));
+      nodes = E.structureAfterUndo({ rootId: 'r', nodes }, INPUT, r.applied, picked, undone);
+      picked.forEach(id => undone.add(id));
+    }
+    assert.equal(flat(nodes), flat(INPUT.nodes), `round ${round}`);
+    checked++;
+  }
+  assert.ok(checked > 20000, `enough rounds exercised: ${checked}`);
+});

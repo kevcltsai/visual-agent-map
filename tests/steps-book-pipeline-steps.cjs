@@ -1283,6 +1283,7 @@ test('global plan structure: the prompt names the rules and the checks, locked c
   // The editor must answer the structure question every time (an empty array is still allowed); a missing field in a reply still parses.
   assert.ok(globalPlan.GLOBAL_PLAN_SCHEMA.properties.structure && globalPlan.GLOBAL_PLAN_SCHEMA.required.includes('structure'));
   assert.ok(/check it as the editor/.test(prompt) && /Return an empty array only when/.test(prompt));
+  assert.ok(/do not rename or reorder for wording or taste alone/.test(prompt));
   assert.ok(!/only when the book clearly needs it/.test(prompt));
   assert.equal(globalPlan.globalPlanStep.version, 2);
 });

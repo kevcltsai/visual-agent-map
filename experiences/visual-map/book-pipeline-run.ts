@@ -286,8 +286,7 @@ import {
 } from "./book-pipeline-rerun";
 import { bookReadingOrder } from "./presentation-order";
 import {
-  applyInverseOps,
-  inverseOps,
+  structureAfterUndo,
   simulateStructure,
   undoClosure,
   undoAffected,
@@ -1426,7 +1425,13 @@ export class BookPipelineRuns {
         parentId: drive.parents.get(id) ?? null,
         title: drive.cards.get(id)?.title ?? ""
       }));
-      const nodes = applyInverseOps({ rootId: drive.rootId, nodes: current }, inverseOps(edit.applied, picked));
+      const nodes = structureAfterUndo(
+        { rootId: drive.rootId, nodes: current },
+        edit.before,
+        edit.applied,
+        picked,
+        undone
+      );
       const nowIds = new Set(order);
       const newIds = new Set(nodes.map(n => n.id));
       const restored = nodes.map(n => n.id).filter(id => !nowIds.has(id));

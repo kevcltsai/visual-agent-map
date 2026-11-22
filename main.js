@@ -50903,7 +50903,7 @@ Rules:
 - thread: 2 to 4 sentences, one paragraph, no headings or lists.
 - materials: each has a short name, one sentence on how the book uses it, and home: the id (copied exactly from the list) of the one card that owns it. One scene or example belongs to one card only; give home an empty string when you are not sure which card owns it. Use only things the titles and summaries point to; an empty list is allowed when they point to none.
 - decisions: one short value (at most one sentence) for each of reader, goal, angle, tone, length and style (style describes voice, layout and recurring elements, and must not prescribe one fixed opening or closing pattern for every chapter: never require every chapter to open with a daily-life scene or to end on a question). For a setting the owner already filled (shown below), return an empty string. Never contradict a filled setting.
-- structure: required, an array. The chapter list was sketched on a mind map before anyone planned the book, so check it as the editor before you write the thread: (1) does each chapter build on the ones before it, or would the reader meet an idea before what it depends on; (2) is any chapter really one part of another chapter (it should be its section), or is any section big enough to be a chapter of its own; (3) do two cards cover the same subject; (4) is a step missing that the reader needs. For each problem you find, propose the change that fixes it: reorder chapters, change how many chapters or sections there are, merge overlapping cards, fill a gap, promote a section to a chapter or demote a chapter to a section, rename a card. Return an empty array only when the order and the split already read well. At most 6 items, of which at most 3 add a card. Never touch the root card or a card marked "locked":true (do not remove, merge, move or rename it, or remove, merge or demote a chapter that holds one). Each item has a unique "id" (for example "s1"), a "kind", and a "reason": one sentence in the book's language saying why. Card ids and parents come from the list; a new card gets a "ref" of your own (for example "new1") that later items may use as a card or parent. Item shapes:
+- structure: required, an array. The chapter list was sketched on a mind map before anyone planned the book, so check it as the editor before you write the thread: (1) does each chapter build on the ones before it, or would the reader meet an idea before what it depends on; (2) is any chapter really one part of another chapter (it should be its section), or is any section big enough to be a chapter of its own; (3) do two cards cover the same subject; (4) is a step missing that the reader needs. For each problem you find, propose the change that fixes it: reorder chapters, change how many chapters or sections there are, merge overlapping cards, fill a gap, promote a section to a chapter or demote a chapter to a section, rename a card. Every change must fix one of these four problems: do not rename or reorder for wording or taste alone. Return an empty array only when the order and the split already read well. At most 6 items, of which at most 3 add a card. Never touch the root card or a card marked "locked":true (do not remove, merge, move or rename it, or remove, merge or demote a chapter that holds one). Each item has a unique "id" (for example "s1"), a "kind", and a "reason": one sentence in the book's language saying why. Card ids and parents come from the list; a new card gets a "ref" of your own (for example "new1") that later items may use as a card or parent. Item shapes:
   {"id":"s1","kind":"add","title":"","summary":"one sentence","parent":"<card id, ref or the root id>","after":"<sibling id or ref, optional>","ref":"new1","reason":""}
   {"id":"s2","kind":"remove","card":"<id>","reason":""} (only a card with no child cards)
   {"id":"s3","kind":"merge","card":"<id>","into":"<id>","reason":""} (the first card is folded into the second; only a card with no child cards)
@@ -55852,6 +55852,32 @@ function applyInverseOps(input2, inverse) {
   }
   return tree.nodes();
 }
+function structureAfterUndo(current, original, applied, ids2, undoneBefore) {
+  const nodes = applyInverseOps(current, inverseOps(applied, ids2));
+  const stay = applied.filter((a) => !ids2.has(a.id) && !undoneBefore.has(a.id)).map((a) => a.op);
+  const replay = simulateStructure(original, stay, /* @__PURE__ */ new Set()).result;
+  const rank = new Map(replay.map((n, at) => [n.id, at]));
+  const children = /* @__PURE__ */ new Map();
+  nodes.forEach((n) => {
+    var _a2;
+    return children.set(n.parentId, [...(_a2 = children.get(n.parentId)) != null ? _a2 : [], n]);
+  });
+  const seen = new Map(nodes.map((n, at) => [n.id, at]));
+  const key4 = (n) => {
+    var _a2, _b2;
+    return (_b2 = rank.get(n.id)) != null ? _b2 : replay.length + ((_a2 = seen.get(n.id)) != null ? _a2 : 0);
+  };
+  const out = [];
+  const walk2 = (parent) => {
+    var _a2;
+    for (const child of [...(_a2 = children.get(parent)) != null ? _a2 : []].sort((a, b) => key4(a) - key4(b))) {
+      out.push(child);
+      walk2(child.id);
+    }
+  };
+  walk2(null);
+  return out.length === nodes.length ? out : nodes;
+}
 function undoAffected(rootId, current, after, applied, picked) {
   const now = new Set(current.map((n) => n.id));
   const kindOf = (list2) => new Map(list2.map((n) => [n.id, n.parentId === null ? "root" : n.parentId === rootId ? "chapter" : "section"]));
@@ -56486,7 +56512,13 @@ var BookPipelineRuns = class {
           title: (_c2 = (_b3 = drive.cards.get(id)) == null ? void 0 : _b3.title) != null ? _c2 : ""
         };
       });
-      const nodes = applyInverseOps({ rootId: drive.rootId, nodes: current }, inverseOps(edit.applied, picked));
+      const nodes = structureAfterUndo(
+        { rootId: drive.rootId, nodes: current },
+        edit.before,
+        edit.applied,
+        picked,
+        undone
+      );
       const nowIds = new Set(order);
       const newIds = new Set(nodes.map((n) => n.id));
       const restored = nodes.map((n) => n.id).filter((id) => !nowIds.has(id));

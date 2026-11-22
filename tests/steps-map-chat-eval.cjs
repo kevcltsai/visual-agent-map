@@ -35,9 +35,9 @@ test('every case builds a context and renders a prompt; every case outside the s
   }
 });
 
-test('the set covers every action kind and every run action, except the two that need a real picture', () => {
+test('the set covers every action kind and every run action, except the two that need a real picture and the one that needs a book plan under review', () => {
   const covered = new Set(CASES.flatMap(k => k.covers));
-  const missing = MAP_CHAT_ACTION_KINDS.filter(kind => !covered.has(kind) && kind !== 'add_anchor' && kind !== 'link_anchor');
+  const missing = MAP_CHAT_ACTION_KINDS.filter(kind => !covered.has(kind) && kind !== 'add_anchor' && kind !== 'link_anchor' && kind !== 'edit_book_plan');
   assert.deepEqual([...missing], []);
   const runCovered = new Set(CASES.flatMap(k => k.checks.map(c => c.id)).filter(id => id.startsWith('runAction:')).map(id => id.split(':')[1]));
   assert.deepEqual([...MAP_RUN_ACTIONS].filter(a => !runCovered.has(a)), []);

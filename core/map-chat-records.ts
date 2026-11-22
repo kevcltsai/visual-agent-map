@@ -104,6 +104,7 @@ export interface RecordImagesLine extends RecordLineBase {
 /** `file_attached` notes a Markdown file the user dragged into the chat: its path and the hash of the text the chat was sent (it stays readable while the file holds that text). */
 /** `file_read` notes an own file the chat asked to read with `read_md_file` (accepted; its text goes in the next turn): path and characters. */
 /** `sources_read` marks that a turn sent the map's data sources (a restored conversation keeps its writes behind the plan). */
+/** `editor_opening` notes the chief editor's opening words of a book plan (`key` says which plan, `text` what was shown); `turn` is the last turn before it. */
 /** `research_started` marks that the conversation started web research (it keeps the plan allow-list on after a restore). */
 export type RecordEventKind =
   | "resend"
@@ -113,6 +114,7 @@ export type RecordEventKind =
   | "chain_end"
   | "research_started"
   | "sources_read"
+  | "editor_opening"
   | "file_written"
   | "file_attached"
   | "file_read"
@@ -138,6 +140,9 @@ export interface RecordEventLine extends RecordLineBase {
   /** `file_written` / `file_attached`: the file and the content hash of what was written / attached. */
   path?: string;
   hash?: string;
+  /** `editor_opening`: which plan the opening belongs to and the words shown. */
+  key?: string;
+  text?: string;
   /** `file_read`: the characters of the own file whose read the chat asked for (path above); a trace only, a restore ignores it. */
   chars?: number;
 }
@@ -400,6 +405,8 @@ export interface RestoredConversation {
   startedResearch: boolean;
   /** A turn of the file sent the map's data sources (an older file has no mark: false). */
   readsSources: boolean;
+  /** The chief editor's openings shown in this conversation, each after the turn it followed (0 = before any turn), oldest first. */
+  openings: { afterTurn: number; key: string; text: string }[];
   /** Files this conversation wrote (path and hash of each version), oldest first; only a safe vault path and a hex hash are kept. */
   ownFiles: { path: string; hash: string }[];
   /** Files the user attached (dragged in) with the hash each held then; same safety rules as `ownFiles` (an older file has none). */
@@ -491,6 +498,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
   const batches = new Map<number, ChatBatch>();
   let startedResearch = false;
   let readsSources = false;
+  const openings: { afterTurn: number; key: string; text: string }[] = [];
   const ownFiles: { path: string; hash: string }[] = [];
   const attachedFiles: { path: string; hash: string }[] = [];
   for (const line of lines) {
@@ -521,7 +529,19 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
       else if (line.kind === "redo") undone.set(line.turn, false);
       else if (line.kind === "research_started") startedResearch = true;
       else if (line.kind === "sources_read") readsSources = true;
-      else if (line.kind === "file_written" || line.kind === "file_attached") {
+      else if (line.kind === "editor_opening") {
+        // Plain text only, capped; one opening per key.
+        if (
+          typeof line.key === "string" &&
+          typeof line.text === "string" &&
+          line.key.length <= 200 &&
+          line.text.length <= 2000 &&
+          Number.isInteger(line.turn) &&
+          line.turn >= 0 &&
+          !openings.some(item => item.key === line.key)
+        )
+          openings.push({ afterTurn: line.turn, key: line.key, text: line.text });
+      } else if (line.kind === "file_written" || line.kind === "file_attached") {
         // A hand-edited file cannot make the chat read a path it was never allowed to write: only a normal vault path counts.
         const path = typeof line.path === "string" ? normalizeVaultPath(line.path) : null;
         if (
@@ -637,6 +657,7 @@ export function restoreConversation(id: string, lines: RecordLine[]): RestoredCo
     restoredAt: turns.length ? turns[turns.length - 1].at : null,
     startedResearch,
     readsSources,
+    openings,
     ownFiles,
     attachedFiles,
     ...(resume ? { resume } : {})

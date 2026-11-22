@@ -1291,6 +1291,7 @@ export const en = {
     "This round would take the automatic continuation past {0} AI calls; it waits for your confirmation",
   "ui.map_chat_plan_reason_auto_apply_confirm":
     "Automatic apply is on, but this reply deletes, merges, creates or switches mind maps, or changes files outside the map folder; it waits for your confirmation",
+  "ui.map_chat_plan_reason_book_plan_edit": "This changes the plan of your book; it waits for your confirmation",
   "ui.map_chat_flow_aria": "Whole flow progress",
   "ui.map_chat_flow_label": "Whole flow",
   "ui.map_chat_flow_step_0_1_2_3": "Step {0} of {1}: {3} · round {2}",
@@ -1435,6 +1436,7 @@ export const en = {
   "ui.map_chat_do_reorder_0_1": "Put {1} topics under “{0}” in a new order",
   "ui.map_chat_skip_not_sibling": "the topic to go in front of is not under that parent",
   "ui.map_chat_do_delete_0": "Move “{0}” to Unassigned",
+  "ui.map_chat_do_edit_book_plan_0": "Change the plan of {0} cards",
   "ui.map_chat_do_edit_md_0": "Edit {0}",
   "ui.map_chat_do_create_md_0": "Create {0}",
   "ui.map_chat_do_select_0": "Select {0} topics",

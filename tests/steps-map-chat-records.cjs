@@ -496,3 +496,13 @@ test('restoreConversation collects file_attached like file_written (safe path, h
   assert.deepEqual(JSON.parse(JSON.stringify(restored.attachedFiles)), [{ path: 'Maps/Steak/A.md', hash: '00ff12' }]); assert.equal(restored.ownFiles.length, 0);
   assert.equal(records.restoreConversation('20261106-100000-abcdef', []).attachedFiles.length, 0);
 });
+test('editor_opening events restore as openings after their turn, once per key, with bad values dropped', () => {
+  const ev = (turn, key, text) => ({ v: 1, type: 'event', turn, kind: 'editor_opening', key, text });
+  const lines = [
+    ev(0, 'run:1', 'first'), ev(0, 'run:1', 'again'), ev(2, 'run:2', 'second'),
+    ev(1, 'run:3', 7), ev(1, 5, 'x'), ev(1, 'run:4', 'y'.repeat(2001)), ev(-1, 'run:5', 'z')
+  ];
+  const restored = records.restoreConversation('id', lines);
+  assert.deepEqual(S.plain(restored.openings), [{ afterTurn: 0, key: 'run:1', text: 'first' }, { afterTurn: 2, key: 'run:2', text: 'second' }]);
+  assert.deepEqual(S.plain(records.restoreConversation('id', []).openings), []);
+});

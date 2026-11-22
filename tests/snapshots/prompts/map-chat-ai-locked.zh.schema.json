@@ -40,7 +40,8 @@
               "reorder_topics",
               "add_anchor",
               "link_anchor",
-              "read_md_file"
+              "read_md_file",
+              "edit_book_plan"
             ]
           },
           "nodeId": {
@@ -294,6 +295,68 @@
           },
           "note": {
             "type": "string"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "covers": {
+                  "type": "string"
+                },
+                "points": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "entry": {
+                  "type": "string"
+                },
+                "handoff": {
+                  "type": "string"
+                },
+                "previous": {
+                  "type": "string"
+                },
+                "checklist": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "structure",
+                          "fact"
+                        ]
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "text"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "covers",
+                "points",
+                "entry",
+                "handoff",
+                "previous",
+                "checklist"
+              ]
+            }
           }
         },
         "required": [
@@ -337,7 +400,8 @@
           "anchorId",
           "x",
           "y",
-          "note"
+          "note",
+          "changes"
         ]
       }
     },

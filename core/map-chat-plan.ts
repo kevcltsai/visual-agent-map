@@ -35,6 +35,8 @@ export const MAP_CHAT_EXPAND_CALLS_PER_CARD = 2;
  * `auto_apply_confirm` (auto-apply only): an action outside the allow-list (delete, maps, a file outside the map folder)
  * that no other reason already holds back.
  *
+ * `book_plan_edit`: the reply changes a book plan under review; it writes the author's cards, so it is always a plan, auto-apply or not.
+ *
  * `image_preview`: the reply places or links anchors and the user chose to see image changes first. `image_other_actions`: a turn
  * that sent an image also asked for something besides the image-safe actions; the picture is untrusted input, so this is
  * a plan in either mode.
@@ -49,7 +51,8 @@ export type MapChatPlanReason =
   | "research_text_other_actions"
   | "source_text_other_actions"
   | "call_budget"
-  | "auto_apply_confirm";
+  | "auto_apply_confirm"
+  | "book_plan_edit";
 
 /** "AI changes to an image: show me first" or "apply at once"; the setting `mapChatImageMode`. */
 export type MapChatImageMode = "preview" | "direct";
@@ -317,6 +320,7 @@ export function planFor(
   if (!auto && research > 0 && research + (options.chain?.researchSoFar ?? 0) >= MAP_CHAT_PLAN_RESEARCH_LIMIT)
     reasons.push("many_research");
   if (createsMap) reasons.push("new_map");
+  if (actions.some(action => action.kind === "edit_book_plan")) reasons.push("book_plan_edit");
   if (
     options.imageMode === "preview" &&
     actions.some(action => action.kind === "add_anchor" || action.kind === "link_anchor")

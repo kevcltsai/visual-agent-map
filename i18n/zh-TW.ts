@@ -1224,6 +1224,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_plan_reason_call_budget_0": "這一輪會讓自動接續超過 {0} 次 AI 呼叫，等你確認",
   "ui.map_chat_plan_reason_auto_apply_confirm":
     "自動套用打開時，刪除、合併、建立或切換心智圖、改心智圖資料夾外的檔案仍要你確認",
+  "ui.map_chat_plan_reason_book_plan_edit": "這會改動書的企劃，等你確認",
   "ui.map_chat_flow_aria": "整段流程進度",
   "ui.map_chat_flow_label": "整段流程",
   "ui.map_chat_flow_step_0_1_2_3": "第 {0}／{1} 步：{3}・第 {2} 輪",
@@ -1359,6 +1360,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_do_reorder_0_1": "重新排列「{0}」底下的 {1} 個議題順序",
   "ui.map_chat_skip_not_sibling": "要排在它後面的議題不在那個上層議題底下",
   "ui.map_chat_do_delete_0": "把「{0}」移到未歸類",
+  "ui.map_chat_do_edit_book_plan_0": "修改 {0} 張卡的企劃",
   "ui.map_chat_do_edit_md_0": "修改 {0}",
   "ui.map_chat_do_create_md_0": "建立 {0}",
   "ui.map_chat_do_select_0": "選取 {0} 個議題",

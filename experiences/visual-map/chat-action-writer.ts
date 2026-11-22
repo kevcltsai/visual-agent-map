@@ -202,6 +202,8 @@ export class ChatActionWriter {
     const nodeOf = (id: string): MapNode | undefined => this.map?.nodes.find(item => item.id === id);
     const gone = skipped("ui.map_chat_skip_topic_gone");
     const done: ChatOutcome = { status: "done" };
+    // Written by the book plan path (next packet); until it is wired the action is not applied.
+    if (action.kind === "edit_book_plan") return skipped("ui.map_chat_skip_map_changed");
     const configDir = this.app.vault.configDir;
     /** The real id behind an id of the reply; null when it names a card of this reply that was never created. */
     const real = (id: string): string | null =>

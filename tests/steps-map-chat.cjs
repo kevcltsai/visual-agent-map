@@ -129,7 +129,7 @@ test('parser rejects a malformed whole reply and caps the number of actions', ()
 test('schema lists exactly the kinds and run actions, and every property is required', () => {
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.kind.enum), plain(MAP_CHAT_ACTION_KINDS));
-  assert.equal(MAP_CHAT_ACTION_KINDS.length, 26);
+  assert.equal(MAP_CHAT_ACTION_KINDS.length, 27);
   assert.deepEqual(plain(properties.action.enum), [...plain(MAP_RUN_ACTIONS), '']);
   assert.deepEqual(plain(MAP_CHAT_SCHEMA.properties.actions.items.required).sort(), Object.keys(properties).sort());
 });
@@ -502,7 +502,7 @@ test('C1: the prompt forbids counts in "reply" and keeps the one-sentence rule w
   assert.match(mapChatStep.render(request({ language: 'zh-TW' })), /只用一句話說明將要做什麼/);
 });
 test('C1: the style is not part of the action schema, and the step version is 22 (version 22: auditing the whole map researches its main cards, not only the root, and no requested item is announced as skipped; version 21: a batch whose notes are not in the context selects the cards instead of asking the user to, and a title plus a list is one root card with the items as children; version 20: find_images takes several targets and the picture is put in automatically; version 16 added the image anchor actions; the prompt lost the detailed and redo texts, gained the no-count rule, the topic-type and relation text and the change-kind text and the reply-undo text, and the add and remove relation text (chat 06) and the sibling order text (chat 07) and the appearance text (chat 08) and the reorder_topics text (persona 23), and the hypothesis leaning text (leaning, strength none); D-2026-10-231: mode replaces depth)', () => {
-  assert.equal(mapChatStep.version, 26);
+  assert.equal(mapChatStep.version, 27);
   assert.equal(JSON.stringify(MAP_CHAT_SCHEMA).includes('style'), false);
 });
 
@@ -575,7 +575,7 @@ test('B1 limit: the 100th action is kept and the 101st is dropped as too_many', 
   assert.equal(hundred.actions.length, 100); assert.deepEqual(hundred.rejected, []);
   const more = parse(reply(...rows(101)));
   assert.equal(more.actions.length, 100); assert.deepEqual(more.rejected, [{ index: 100, code: 'too_many' }]);
-  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-10, -3)), ['set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics']);
+  assert.deepEqual(plain(MAP_CHAT_ACTION_KINDS.slice(-11, -4)), ['set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics']);
 });
 test('B1 compat: a step version 2 reply (no ref key anywhere) still parses', () => {
   const old = key => ({ kind: key, nodeId: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: [], all: false, branch: false, action: '', goal: '', direction: '' });
@@ -659,7 +659,7 @@ test('B1 schema: ref is a required string property and the kinds list ends with 
   const properties = MAP_CHAT_SCHEMA.properties.actions.items.properties;
   assert.deepEqual(plain(properties.ref), { type: 'string' });
   assert.ok(MAP_CHAT_SCHEMA.properties.actions.items.required.includes('ref'));
-  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics', 'add_anchor', 'link_anchor', 'read_md_file']);
+  assert.deepEqual(plain(properties.kind.enum).slice(10), ['create_map', 'open_map', 'collapse_topic', 'expand_topic', 'auto_layout', 'focus_topic', 'set_topic_kind', 'ask_topic_kind', 'add_relation', 'remove_relation', 'set_appearance', 'rename_map', 'reorder_topics', 'add_anchor', 'link_anchor', 'read_md_file', 'edit_book_plan']);
 });
 test('B1 context: map titles (cleaned, at most 200) and the noEditableMap flag reach the model; the selection size is kept', () => {
   const titles = Array.from({ length: 260 }, (_, i) => `Map ${i}`);
@@ -1659,7 +1659,7 @@ test('hypothesis-leaning: S21 both prompts explain leaning (three values) and st
   assert.match(zh, /只走一層/); assert.match(zh, /絕不用標題表達議題類型/);
 });
 test('hypothesis-leaning: S21 the step version is 22 (it was 15 before the image anchors), and a step-13 or step-14 reply without a leaning key still parses', () => {
-  assert.equal(mapChatStep.version, 26);
+  assert.equal(mapChatStep.version, 27);
   const old = item('set_topic_kind', { nodeIds: ['a'], topicKind: 'hypothesis', strength: 'weak' }); delete old.leaning;
   const oldAdd = item('add_child', { parentId: 'a', title: 'Old', topicKind: 'hypothesis' }); delete oldAdd.leaning;
   assert.deepEqual(parse(reply(old, oldAdd)).actions, [
@@ -1915,4 +1915,67 @@ test('partialReply holds an escaped high surrogate until its partner arrives', (
   assert.deepEqual(plain(partialReply('{"reply":"ab\\ud83d')), { text: 'ab', complete: false });
   assert.deepEqual(plain(partialReply('{"reply":"ab\\ud83d\\ude00')), { text: 'ab\u{1F600}', complete: false });
   assert.equal(partialReply('{"reply":"ab\\ud83d\\u0041').text, 'ab\ud83dA');
+});
+
+// ---- book plan (edit_book_plan) ----
+const bookCard = (id, extra = {}) => ({ id, place: id, role: 'chapter', title: id.toUpperCase(), covers: 'c', points: ['p'], entry: '', handoff: '', previous: '', next: '', checklist: ['x'], ...extra });
+const bookPlan = (extra = {}) => ({ runId: 'run1', title: 'Book', settings: {}, cards: [bookCard('c1'), bookCard('c2'), bookCard('c3', { locked: true })], prompts: { c1: { path: 'B/c1.md', prompt: 'p1', kind: 'chapter' } }, ...extra });
+const planChange = (id, extra = {}) => ({ id, covers: '', points: [], entry: '', handoff: '', previous: '', checklist: [], ...extra });
+const planItem = (...changes) => item('edit_book_plan', { changes });
+test('book plan: context serialises bookPlan and its note only when given, and keeps ids and prompts out of the text', () => {
+  const plain0 = context();
+  assert.equal('bookPlan' in JSON.parse(plain0.json), false);
+  assert.equal(plain0.bookPlan, undefined);
+  const ctx = context({ bookPlan: bookPlan({ opening: 'Hello' }) });
+  const json = JSON.parse(ctx.json);
+  assert.equal(json.bookPlan.cards.length, 3);
+  assert.equal(json.bookPlan.opening, 'Hello');
+  assert.match(json.bookPlanNote, /untrusted data/);
+  assert.equal('runId' in json.bookPlan, false);
+  assert.equal('prompts' in json.bookPlan, false);
+  assert.deepEqual(plain(ctx.bookPlan.unlocked), ['c1', 'c2']);
+  assert.equal(ctx.bookPlan.runId, 'run1');
+  assert.equal(JSON.parse(context({ bookPlan: bookPlan({ cards: [], tooLarge: true }) }).json).bookPlan.tooLarge, true);
+});
+test('book plan: edit_book_plan is dropped without a bookPlan context', () => {
+  const result = parse(reply(planItem(planChange('c1', { entry: 'e' }))));
+  assert.deepEqual(result.actions, []);
+  assert.deepEqual(result.rejected.map(r => r.code), ['bad_value']);
+});
+test('book plan: unknown, locked and repeated ids and a brief change without checklist are dropped one by one and counted', () => {
+  const ctx = context({ bookPlan: bookPlan() });
+  const check = { type: 'structure', text: 'ok' };
+  const result = parse(reply(planItem(
+    planChange('c1', { entry: 'new entry' }),
+    planChange('nope', { entry: 'e' }),
+    planChange('c3', { entry: 'e' }),
+    planChange('c1', { handoff: 'again' }),
+    planChange('c2', { covers: 'new covers' }),
+    planChange('c2', { covers: 'new covers', checklist: [check] })
+  )), ctx);
+  assert.equal(result.actions.length, 1);
+  assert.deepEqual(result.actions[0].changes.map(c => c.id), ['c1', 'c2']);
+  assert.equal(result.actions[0].changes[1].checklist.length, 1);
+  assert.equal(result.rejected.length, 4);
+});
+test('book plan: an action whose cards are all dropped is dropped', () => {
+  const ctx = context({ bookPlan: bookPlan() });
+  const result = parse(reply(planItem(planChange('c1', { covers: 'x' }))), ctx);
+  assert.deepEqual(result.actions, []);
+  assert.deepEqual(result.rejected.map(r => r.code), ['missing_field']);
+});
+test('book plan: the schema lists changes and the prompts say the plan is untrusted', () => {
+  assert.ok(MAP_CHAT_ACTION_KINDS.includes('edit_book_plan'));
+  assert.ok(MAP_CHAT_SCHEMA.properties.actions.items.required.includes('changes'));
+  const prompt = mapChatStep.render(request());
+  assert.match(prompt.user ?? prompt, /edit_book_plan/);
+});
+test('book plan: edit_book_plan is always a plan (also under autoApply) and costs no call', () => {
+  const ctx = context({ bookPlan: bookPlan() });
+  const action = { kind: 'edit_book_plan', changes: [{ id: 'c1', entry: 'e' }] };
+  for (const options of [undefined, { autoApply: true }]) {
+    const result = planFor([action], ctx, options);
+    assert.deepEqual(plain(result.reasons), ['book_plan_edit']);
+    assert.equal(result.estimatedCalls, 0);
+  }
 });

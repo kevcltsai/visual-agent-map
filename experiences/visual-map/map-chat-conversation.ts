@@ -213,6 +213,8 @@ export class MapChatConversation {
         return t("ui.map_chat_plan_reason_call_budget_0", MAP_CHAT_AUTO_MAX_CALLS);
       case "auto_apply_confirm":
         return t("ui.map_chat_plan_reason_auto_apply_confirm");
+      case "book_plan_edit":
+        return t("ui.map_chat_plan_reason_book_plan_edit");
     }
   }
   /** Shows the plan card under the answer; only its Apply button ever writes anything. */

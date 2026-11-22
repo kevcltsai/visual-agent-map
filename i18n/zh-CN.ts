@@ -1223,6 +1223,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_plan_reason_call_budget_0": "这一轮会让自动接续超过 {0} 次 AI 调用，等你确认",
   "ui.map_chat_plan_reason_auto_apply_confirm":
     "自动套用打开时，删除、合并、创建或切换思维导图、改思维导图文件夹外的文件仍要你确认",
+  "ui.map_chat_plan_reason_book_plan_edit": "这会改动书的企划，等你确认",
   "ui.map_chat_flow_aria": "整段流程进度",
   "ui.map_chat_flow_label": "整段流程",
   "ui.map_chat_flow_step_0_1_2_3": "第 {0}／{1} 步：{3}・第 {2} 轮",
@@ -1358,6 +1359,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_do_reorder_0_1": "重新排列“{0}”底下的 {1} 个议题顺序",
   "ui.map_chat_skip_not_sibling": "要排在它后面的议题不在那个上层议题底下",
   "ui.map_chat_do_delete_0": "把“{0}”移到未归类",
+  "ui.map_chat_do_edit_book_plan_0": "修改 {0} 张卡的企划",
   "ui.map_chat_do_edit_md_0": "修改 {0}",
   "ui.map_chat_do_create_md_0": "创建 {0}",
   "ui.map_chat_do_select_0": "选取 {0} 个议题",

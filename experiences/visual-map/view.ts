@@ -21155,6 +21155,8 @@ export class VisualAgentMapView extends ItemView {
         return t("ui.map_chat_do_create_md_0", action.path);
       case "read_md_file":
         return action.path;
+      case "edit_book_plan":
+        return t("ui.map_chat_do_edit_book_plan_0", action.changes.length);
       case "select_topics":
         return t("ui.map_chat_do_select_0", action.all ? nodes.length : action.nodeIds.length);
       case "create_map":

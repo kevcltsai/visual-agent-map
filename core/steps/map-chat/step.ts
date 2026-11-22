@@ -7,6 +7,7 @@ import { languageVariables } from "../_shared/fragments";
 import { renderTemplate, type StepDefinition } from "../../step-runner";
 import { ANCHOR_LIMIT, ANCHOR_RELATION_LIMIT, NOTE_LIMIT } from "../../../experiences/visual-map/canvas-items";
 import type { MapChatContext, MapChatImageScope, MapChatRelation } from "../../map-chat-context";
+import { changesBrief, parseChange, type PlanEditChange } from "../book-pipeline/plan-edit";
 import {
   RELATION_DESCRIPTION_MAX_LENGTH,
   TOPIC_RELATION_KINDS,
@@ -58,7 +59,8 @@ export const MAP_CHAT_ACTION_KINDS = [
   "reorder_topics",
   "add_anchor",
   "link_anchor",
-  "read_md_file"
+  "read_md_file",
+  "edit_book_plan"
 ] as const;
 export type MapChatActionKind = (typeof MAP_CHAT_ACTION_KINDS)[number];
 export const MAP_RUN_ACTIONS = [
@@ -120,6 +122,8 @@ export type MapChatAction =
   | { kind: "edit_md_file"; path: string; find: string; replace: string }
   | { kind: "create_md_file"; path: string; content: string }
   | { kind: "read_md_file"; path: string }
+  /** Changes to the brief fields of existing cards of a book plan under review (only when the context has `bookPlan`); a change to covers, points or previous carries its whole new checklist. Never adds, removes or moves a card. */
+  | { kind: "edit_book_plan"; changes: PlanEditChange[] }
   /** `all` is true when the reply asked for every card; `nodeIds` then lists them all. */
   | { kind: "select_topics"; nodeIds: string[]; all: boolean }
   | {
@@ -347,7 +351,33 @@ export const MAP_CHAT_SCHEMA = {
           anchorId: STRING,
           x: { type: "number" },
           y: { type: "number" },
-          note: STRING
+          note: STRING,
+          // edit_book_plan only: one entry per card to change; an empty string or list keeps that field (strict mode wants every field present).
+          changes: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                id: STRING,
+                covers: STRING,
+                points: { type: "array", items: STRING },
+                entry: STRING,
+                handoff: STRING,
+                previous: STRING,
+                checklist: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: { type: { type: "string", enum: ["structure", "fact"] }, text: STRING },
+                    required: ["type", "text"]
+                  }
+                }
+              },
+              required: ["id", "covers", "points", "entry", "handoff", "previous", "checklist"]
+            }
+          }
         },
         required: [
           "kind",
@@ -390,7 +420,8 @@ export const MAP_CHAT_SCHEMA = {
           "anchorId",
           "x",
           "y",
-          "note"
+          "note",
+          "changes"
         ]
       }
     },
@@ -462,6 +493,7 @@ export function linkSources(summary: string, paths: readonly string[] | undefine
 export function parseMapChat(
   raw: string,
   context: Pick<MapChatContext, "nodeIds" | "parents"> & {
+    bookPlan?: Pick<NonNullable<MapChatContext["bookPlan"]>, "unlocked">;
     sourcePaths?: readonly string[];
     noEditableMap?: boolean;
     aim?: boolean;
@@ -655,6 +687,31 @@ export function parseMapChat(
           const content = rawText("content");
           if (!content.trim()) throw new Dropped("missing_field");
           actions.push({ kind: "create_md_file", path, content });
+          break;
+        }
+        case "edit_book_plan": {
+          // Only while a book plan is under review (the context sent one): the cards it may name are the unlocked ones it listed.
+          const plan = context.bookPlan;
+          if (!plan) throw new Dropped("bad_value");
+          if (!Array.isArray(item.changes)) throw new Dropped("missing_field");
+          const known = new Set(plan.unlocked);
+          const seen = new Set<string>();
+          const changes: PlanEditChange[] = [];
+          const codes: MapChatRejectCode[] = [];
+          for (const one of item.changes) {
+            const change = parseChange(one, known);
+            // A card with a bad shape, an unknown or locked id, or a repeated id is dropped on its own; so is a change to covers, points or
+            // previous that comes without the checklist written for it (the old checklist would describe the old ideas).
+            if (!change || seen.has(change.id)) codes.push("bad_value");
+            else if (changesBrief(change) && !change.checklist) codes.push("missing_field");
+            else {
+              seen.add(change.id);
+              changes.push(change);
+            }
+          }
+          if (!changes.length) throw new Dropped(codes[0] ?? "missing_field");
+          for (const code of codes) rejected.push({ index, code });
+          actions.push({ kind: "edit_book_plan", changes });
           break;
         }
         case "read_md_file":
@@ -899,7 +956,7 @@ export function renderMapChatSteer(text: string): string {
 /** One conversation turn: the user's message plus the context the panel gathered. The reply is JSON; actions are applied by the view. */
 export const mapChatStep: StepDefinition<MapChatRequest, MapChatResult> = {
   id: "map-chat",
-  version: 26,
+  version: 27,
   render: request => {
     const language = request.contentLanguage ?? request.language;
     const zh = instructionLanguageOf(language) === "zh";

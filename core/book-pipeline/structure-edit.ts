@@ -364,3 +364,107 @@ export function undoAffected(
   for (const n of after) if (kindBefore.has(n.id) && kindBefore.get(n.id) !== kindAfter.get(n.id)) affected.add(n.id);
   return affected;
 }
+
+/**
+ * The cards planned again after a chat structure edit: the added ones, the moved ones, and the ones that change between chapter and
+ * section. Removes and renames need no AI call (the program rewrites the neighbour lines). `before` and `after` are the structure
+ * before and after the edit; `applied` the ops that were applied.
+ */
+export function reviewAffected(
+  rootId: string,
+  before: readonly StructureNode[],
+  after: readonly StructureNode[],
+  applied: readonly AppliedOp[]
+): Set<string> {
+  const kindOf = (list: readonly StructureNode[]): Map<string, string> =>
+    new Map(list.map(n => [n.id, n.parentId === null ? "root" : n.parentId === rootId ? "chapter" : "section"]));
+  const kindBefore = kindOf(before);
+  const kindAfter = kindOf(after);
+  const live = new Set(after.map(n => n.id));
+  const affected = new Set<string>();
+  for (const a of applied) {
+    if (a.op.kind === "add" && live.has(a.op.ref)) affected.add(a.op.ref);
+    if (a.op.kind === "move" && live.has(a.op.card)) affected.add(a.op.card);
+  }
+  for (const n of after) if (kindBefore.has(n.id) && kindBefore.get(n.id) !== kindAfter.get(n.id)) affected.add(n.id);
+  return affected;
+}
+
+/** One card change the chat asks for (the parser's `add_child`, `move_topic`, `delete_topic`, `rename_topic`, already kept as valid). */
+export type ChatStructureItem =
+  | { kind: "add"; parentId: string; title: string; summary: string; beforeId?: string; reason?: string; ref?: string }
+  | { kind: "move"; nodeId: string; newParentId: string; beforeId?: string; reason?: string }
+  | { kind: "remove"; nodeId: string; branch?: boolean; reason?: string }
+  | { kind: "rename"; nodeId: string; title: string; reason?: string };
+
+/**
+ * Chat items as structure ops on `input`. `beforeId` (put in front of that child) becomes `after` (the sibling before it), looked up in
+ * the tree as the items so far leave it; a branch delete becomes removes, deepest first. Ids are `chat-<stamp>-<i>`, new cards' refs
+ * `chat-<stamp>-new<i>`; both are unique among the tree's ids. `simulateStructure` still decides what is allowed.
+ */
+export function chatStructureOps(
+  items: readonly ChatStructureItem[],
+  input: StructureInput,
+  stamp: string
+): StructureOp[] {
+  const tree = new Tree(input.rootId, copyNodes(input.nodes));
+  const taken = new Set(input.nodes.map(n => n.id));
+  const fresh = (base: string): string => {
+    let id = base;
+    for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
+    taken.add(id);
+    return id;
+  };
+  const ops: StructureOp[] = [];
+  const afterOf = (parent: string, beforeId?: string): string | undefined => {
+    if (beforeId === undefined) return tree.children(parent).at(-1);
+    const list = tree.children(parent);
+    const i = list.indexOf(beforeId);
+    return i < 0 ? beforeId : i > 0 ? list[i - 1] : undefined;
+  };
+  type Draft = StructureOp extends infer O
+    ? O extends StructureOp
+      ? Omit<O, "id" | "reason"> & { reason?: string }
+      : never
+    : never;
+  const push = (op: Draft): void => {
+    ops.push({ ...op, id: fresh(`chat-${stamp}-${ops.length}`), reason: op.reason ?? "" });
+  };
+  const deepestFirst = (id: string): string[] => [...tree.children(id).flatMap(deepestFirst), id];
+  items.forEach((item, i) => {
+    if (item.kind === "add") {
+      const ref = fresh(`chat-${stamp}-new${i}`);
+      const after = afterOf(item.parentId, item.beforeId);
+      push({
+        kind: "add",
+        title: item.title,
+        summary: item.summary,
+        parent: item.parentId,
+        ref,
+        reason: item.reason,
+        ...(after !== undefined ? { after } : {})
+      });
+      if (tree.has(item.parentId)) tree.add(ref, item.title, item.parentId, after);
+    } else if (item.kind === "move") {
+      const after = afterOf(item.newParentId, item.beforeId);
+      push({
+        kind: "move",
+        card: item.nodeId,
+        parent: item.newParentId,
+        reason: item.reason,
+        ...(after !== undefined ? { after } : {})
+      });
+      if (tree.has(item.nodeId) && tree.has(item.newParentId) && after !== item.nodeId) {
+        tree.detach(item.nodeId);
+        tree.attach(item.nodeId, item.newParentId, after);
+      }
+    } else if (item.kind === "remove") {
+      const ids = item.branch && tree.has(item.nodeId) ? deepestFirst(item.nodeId) : [item.nodeId];
+      for (const id of ids) {
+        push({ kind: "remove", card: id, reason: item.reason });
+        if (!tree.children(id).length) tree.drop(id);
+      }
+    } else push({ kind: "rename", card: item.nodeId, title: item.title, reason: item.reason });
+  });
+  return ops;
+}

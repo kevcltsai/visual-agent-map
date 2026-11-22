@@ -665,6 +665,12 @@ export function undoStructure(
   next.phase = "planning";
   next.phaseStartedAt = now;
   clearPlanEdit(next);
+  resetAffected(next, affected);
+  return next;
+}
+
+/** The cards a structure change touched start over (attempts, revision, pendingReset); ones not on the run are ignored. */
+function resetAffected(next: BookPipelineData, affected: readonly string[]): void {
   const live = effectiveOrder(next);
   const cards = [...new Set(affected)].filter(id => live.includes(id));
   next.pendingReset = [...new Set([...(next.pendingReset ?? []), ...cards])];
@@ -676,6 +682,25 @@ export function undoStructure(
     if (next.aiProof) delete next.aiProof[id];
   }
   next.revision++;
+}
+
+/**
+ * At the plan review: the owner changed the structure through chat (the runner applied it). The run goes back to planning with the plan
+ * review kept; only the cards it touched (`affected`) start over. The editor's pass is NOT rerun (`planEdited` stays, so it cannot
+ * overwrite briefs the owner changed) and `opening` is the line shown on return. A no-op outside a running gate 1 plan review.
+ */
+export function restructureAtReview(
+  data: BookPipelineData,
+  now: string,
+  affected: readonly string[],
+  opening: string
+): BookPipelineData {
+  if (data.phase !== "gate1" || data.status !== "running" || !data.planReview) return data;
+  const next = clone(data);
+  next.phase = "planning";
+  next.phaseStartedAt = now;
+  if (opening) next.planOpening = opening;
+  resetAffected(next, affected);
   return next;
 }
 

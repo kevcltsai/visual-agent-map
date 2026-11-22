@@ -348,3 +348,49 @@ test('undo order: undoing ops one closure at a time, in any order, ends exactly 
   }
   assert.ok(checked > 20000, `enough rounds exercised: ${checked}`);
 });
+
+// ---- chat items -> ops, and the cards a chat edit plans again ----
+const items = list => E.chatStructureOps(list, INPUT, 'T');
+
+test('chatStructureOps: beforeId becomes the previous sibling (none = first), no beforeId = last, ids are unique', () => {
+  const ops = plain(items([
+    { kind: 'add', parentId: 'r', title: 'New', summary: 's', beforeId: 'c2', reason: 'why' },
+    { kind: 'add', parentId: 'r', title: 'Tail', summary: 's' },
+    { kind: 'move', nodeId: 'c3', newParentId: 'r', beforeId: 'c1' },
+  ]));
+  assert.equal(ops[0].after, 'c1');
+  assert.equal(ops[0].reason, 'why');
+  assert.equal(ops[1].after, 'c3', 'appended after the last child');
+  assert.equal(ops[2].after, undefined, 'in front of the first child');
+  assert.equal(new Set([...ops.map(o => o.id), ...ops.filter(o => o.ref).map(o => o.ref)]).size, 5);
+  const r = run(items([
+    { kind: 'add', parentId: 'r', title: 'New', summary: 's', beforeId: 'c2' },
+    { kind: 'move', nodeId: 'c3', newParentId: 'r', beforeId: 'c1' },
+  ]));
+  assert.equal(r.rejected.length, 0);
+  assert.equal(shape(r), 'r< c3<r c1<r s1a<c1 s1b<c1 chat-T-new0<r c2<r s2a<c2');
+});
+
+test('chatStructureOps: an id that clashes with the tree gets a suffix; a branch delete removes deepest first and simulates clean', () => {
+  const input = { rootId: 'r', nodes: [...INPUT.nodes, N('chat-T-0', 'r')] };
+  const [a] = E.chatStructureOps([{ kind: 'rename', nodeId: 'c1', title: 'X' }], input, 'T');
+  assert.equal(a.id, 'chat-T-0-2');
+  const ops = items([{ kind: 'remove', nodeId: 'c1', branch: true }]);
+  assert.deepEqual(plain(ops.map(o => o.card)), ['s1a', 's1b', 'c1']);
+  const r = run(ops);
+  assert.equal(r.rejected.length, 0);
+  assert.equal(shape(r), 'r< c2<r s2a<c2 c3<r');
+  assert.deepEqual(codes(run(items([{ kind: 'remove', nodeId: 'c1' }]))), ['has_children']);
+});
+
+test('reviewAffected: add, move and a chapter/section change are planned again; remove and rename are not', () => {
+  const after = (list, locked = NONE) => {
+    const r = run(items(list), locked);
+    return [...E.reviewAffected('r', INPUT.nodes, r.result, r.applied)].sort();
+  };
+  assert.deepEqual(after([{ kind: 'add', parentId: 'c3', title: 'S', summary: 's' }]), ['chat-T-new0']);
+  assert.deepEqual(after([{ kind: 'move', nodeId: 'c3', newParentId: 'r', beforeId: 'c1' }]), ['c3']);
+  assert.deepEqual(after([{ kind: 'move', nodeId: 'c3', newParentId: 'c1' }]), ['c3'], 'chapter to section');
+  assert.deepEqual(after([{ kind: 'remove', nodeId: 'c3' }, { kind: 'rename', nodeId: 'c2', title: 'Z' }]), []);
+  assert.deepEqual(after([{ kind: 'move', nodeId: 'c3', newParentId: 'r' }, { kind: 'remove', nodeId: 'c3' }]), [], 'a card removed later is not planned');
+});

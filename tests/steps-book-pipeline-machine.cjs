@@ -1047,3 +1047,28 @@ test('structureEdit is carried unchanged by backToPlan, retryTrial and acceptMap
   assert.deepEqual(keep(accepted), edit);
   assert.equal(model.readBookPipeline({ bookPipeline: plain(accepted) }).structureUnreadable, undefined);
 });
+
+test('restructureAtReview: back to planning, the pass is kept (planEdited), opening set, only the affected cards reset', () => {
+  const state = editState();
+  const next = machine.restructureAtReview(state, 'later', ['a', 'zzz'], 'back');
+  assert.deepEqual([next.phase, next.phaseStartedAt, next.planReview, next.status], ['planning', 'later', true, 'running']);
+  assert.equal(next.planEdited, true); assert.equal(next.planEditAttempts, 1); assert.equal(next.planOpening, 'back');
+  assert.deepEqual(plain(next.pendingReset), ['a']);
+  assert.deepEqual(plain(next.attempts.a), { plan: 0, write: 0, proof: 0 });
+  assert.equal(machine.cardRevision(next, 'a'), machine.cardRevision(state, 'a') + 1);
+  assert.equal(machine.cardRevision(next, 'b'), machine.cardRevision(state, 'b'));
+  assert.equal(next.revision, state.revision + 1);
+  assert.deepEqual(plain(next.structureEdit), plain(state.structureEdit));
+  assert.equal(model.readBookPipeline({ bookPipeline: plain(next) }).kind, 'usable');
+  assert.deepEqual(plain(machine.restructureAtReview(state, 'later', [], 'x').pendingReset), [], 'no card: nothing reset');
+});
+
+test('restructureAtReview: a no-op for a stopped run, outside gate 1 and without a plan review', () => {
+  const state = editState();
+  const stopped = machine.stopRun(state);
+  assert.equal(machine.restructureAtReview(stopped, 'x', ['a'], 'o'), stopped);
+  const writing = { ...state, phase: 'writing' };
+  assert.equal(machine.restructureAtReview(writing, 'x', ['a'], 'o'), writing);
+  const trial = { ...state }; delete trial.planReview;
+  assert.equal(machine.restructureAtReview(trial, 'x', ['a'], 'o'), trial);
+});

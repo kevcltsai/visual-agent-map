@@ -50669,7 +50669,7 @@ function retryTrial(data, now) {
   return next;
 }
 function undoStructure(data, ids2, now, affected) {
-  var _a2, _b2;
+  var _a2;
   if (data.phase !== "gate1" || data.status !== "running" || !data.structureEdit) return data;
   const next = clone2(data);
   const edit = next.structureEdit;
@@ -50677,9 +50677,14 @@ function undoStructure(data, ids2, now, affected) {
   next.phase = "planning";
   next.phaseStartedAt = now;
   clearPlanEdit(next);
+  resetAffected(next, affected);
+  return next;
+}
+function resetAffected(next, affected) {
+  var _a2;
   const live2 = effectiveOrder(next);
   const cards = [...new Set(affected)].filter((id) => live2.includes(id));
-  next.pendingReset = [.../* @__PURE__ */ new Set([...(_b2 = next.pendingReset) != null ? _b2 : [], ...cards])];
+  next.pendingReset = [.../* @__PURE__ */ new Set([...(_a2 = next.pendingReset) != null ? _a2 : [], ...cards])];
   for (const id of cards) {
     next.attempts[id] = emptyAttempts();
     next.revisions[id] = cardRevision(next, id) + 1;
@@ -50688,7 +50693,6 @@ function undoStructure(data, ids2, now, affected) {
     if (next.aiProof) delete next.aiProof[id];
   }
   next.revision++;
-  return next;
 }
 function startTrial(data, now) {
   var _a2;

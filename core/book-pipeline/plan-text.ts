@@ -523,6 +523,38 @@ function planLines(markdown: string): string[] | undefined {
   return start < 0 ? undefined : lines.slice(start + 1);
 }
 
+/**
+ * `raw` with the quoted thread lines under `### 全書主線` in the hidden book-plan callout replaced by `thread` (one escaped line);
+ * every other byte stays. Undefined when there is no callout or no thread heading.
+ */
+export function replaceBookPlanThread(raw: string, thread: string): string | undefined {
+  const lines = raw.split("\n");
+  const callout = lines.findIndex(line => {
+    const m = PLAN_CALLOUT.exec(line.replace(/\r$/, ""));
+    return !!m && isBookPlanTitle(m[1]);
+  });
+  if (callout < 0) return undefined;
+  let end = callout + 1;
+  while (end < lines.length && QUOTE_PREFIX.test(lines[end])) end++;
+  const body = lines.slice(callout + 1, end).map(line => line.replace(/\r$/, "").replace(QUOTE_PREFIX, ""));
+  const head = body.findIndex(line => {
+    const m = /^###[ \t]+(.+?)\s*$/.exec(line);
+    return !!m && matches(L.thread, m[1]);
+  });
+  if (head < 0) return undefined;
+  let stop = head + 1;
+  while (stop < body.length && !/^###[ \t]/.test(body[stop])) stop++;
+  const text = body.slice(head + 1, stop);
+  const first = text.findIndex(line => line.trim());
+  const last = text.length - 1 - [...text].reverse().findIndex(line => line.trim());
+  const cr = lines[callout + 1 + head].endsWith("\r") ? "\r" : "";
+  const next = `> ${safe(thread, 1200)}${cr}`;
+  const from = callout + 1 + head + 1 + (first < 0 ? 0 : first);
+  const count = first < 0 ? 0 : last - first + 1;
+  lines.splice(from, count, next);
+  return lines.join("\n");
+}
+
 /** The saved editorial decisions of a `## 全書企劃` section found anywhere in the root's body ({} when there is none). */
 export function parseBookPlanDecisions(markdown: string): BookSettings {
   const plan = planLines(markdown);

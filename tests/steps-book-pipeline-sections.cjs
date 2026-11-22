@@ -595,3 +595,18 @@ test('an older root with a ### 全書結構 part: it is not the thread, the othe
   assert.ok(!planText.composeBookPlan({ thread: 't', decisions: {}, materials: [] }, 'zh-TW').includes('全書結構'));
   assert.equal(sections.replaceBookPlanSection(withPart, planText.composeBookPlan({ thread: 'new', decisions: {}, materials: [] }, 'zh-TW')).includes('全書結構'), false);
 });
+
+// ---- replaceBookPlanThread: only the quoted thread lines change ----
+test('replaceBookPlanThread: replaces only the thread lines in the callout; CRLF kept; undefined without callout or heading', () => {
+  const base = planNote();
+  const out = planText.replaceBookPlanThread(base, '新的主線 [x]。');
+  assert.equal(out, base.replace('> 主線一句。', '> 新的主線 \\[x\\]。'));
+  assert.equal(planText.parseBookPlanBody(out).thread, '新的主線 [x]。');
+  assert.equal(planText.replaceBookPlanThread(out, '主線一句。'), base);
+  const crlf = base.replace(/\n/g, '\r\n');
+  assert.equal(planText.replaceBookPlanThread(crlf, 'Q'), crlf.replace('> 主線一句。', '> Q'));
+  assert.equal(planText.replaceBookPlanThread('# Root\n\n## 全書企劃\n\n### 全書主線\nx\n', 'Q'), undefined, 'older ## form: no callout');
+  assert.equal(planText.replaceBookPlanThread(base.replace('### 全書主線', '### 其他'), 'Q'), undefined);
+  const empty = base.replace('> 主線一句。\n', '');
+  assert.equal(planText.parseBookPlanBody(planText.replaceBookPlanThread(empty, 'Q')).thread, 'Q', 'an empty thread part gets the line');
+});

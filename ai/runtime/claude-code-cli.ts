@@ -1,5 +1,6 @@
 import { spawn as nodeSpawn } from "node:child_process";
 import { outputSchemaFor } from "./output-schema";
+import { BadRequestError, isBadRequest, ProviderError } from "../bad-request";
 import { t } from "../../i18n";
 import { searchNotPerformedError } from "../search-not-performed";
 import { createUtf8StreamDecoder } from "./utf8-stream";
@@ -147,7 +148,9 @@ export function claudeStructuredOutput(stdout: string, plainText = false): strin
     const details = Array.isArray(record.errors)
       ? record.errors.filter(item => typeof item === "string").join("\n")
       : "";
-    throw new Error(details || (typeof record.result === "string" ? record.result : t("ui.claude_task_failed")));
+    // The `errors` entries are the CLI's own error text; `result` may be the model's words, so it stays an unmarked error.
+    if (details) throw isBadRequest(details) ? new BadRequestError(details) : new ProviderError(details);
+    throw new Error(typeof record.result === "string" ? record.result : t("ui.claude_task_failed"));
   }
   if (plainText && typeof record.result === "string") return record.result;
   if (record.structured_output === undefined || record.structured_output === null)

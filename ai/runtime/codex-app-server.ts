@@ -6,6 +6,7 @@ import { createUtf8StreamDecoder } from "./utf8-stream";
 import { t } from "../../i18n";
 import { searchNotPerformedError } from "../search-not-performed";
 import { searchBudgetExhaustedMessage } from "./messages";
+import { BadRequestError, ProviderError } from "../bad-request";
 
 type ProcessEnvironment = Record<string, string | undefined>;
 interface NodeChunk {
@@ -128,6 +129,15 @@ export function codexTurnFailureMessage(
         ? status
         : translate("ui.failed");
   return translate("ui.codex_turn_0", shown);
+}
+/** The turn failed on a request the API refused as malformed: `codexErrorInfo` "badRequest" or an upstream HTTP status of 400. */
+export function codexBadRequest(turn: { error?: { codexErrorInfo?: unknown } | null } | undefined): boolean {
+  const info = turn?.error?.codexErrorInfo;
+  if (info === "badRequest") return true;
+  if (!info || typeof info !== "object") return false;
+  return Object.values(info as Record<string, unknown>).some(
+    detail => (detail as { httpStatusCode?: unknown } | null)?.httpStatusCode === 400
+  );
 }
 function describeFailure(failure: unknown): string {
   if (typeof failure === "string") return failure;
@@ -535,7 +545,8 @@ export class CodexAppServerRuntime {
       if (!entry) return;
       this.pending.delete(message.id);
       window.clearTimeout(entry.timeout);
-      if (message.error) entry.reject(new Error(message.error.message || t("ui.codex_app_server_returned_an_error")));
+      if (message.error)
+        entry.reject(new ProviderError(message.error.message || t("ui.codex_app_server_returned_an_error")));
       else entry.resolve(message.result);
       return;
     }
@@ -613,7 +624,8 @@ export class CodexAppServerRuntime {
       return;
     }
     if (message.method === "turn/completed") {
-      const turn = params?.turn as { status?: unknown; error?: { message?: unknown } | null } | undefined;
+      const turn = params?.turn as
+        { status?: unknown; error?: { message?: unknown; codexErrorInfo?: unknown } | null } | undefined;
       window.clearTimeout(state.timeout);
       this.turns.delete(threadId);
       if (turn?.status === "completed" && state.requireSearch && !state.webRetrievals.size)
@@ -632,7 +644,10 @@ export class CodexAppServerRuntime {
             ? [...state.visibleMessages.values()].join("\n\n").trim() || state.messages.at(-1)?.trim() || ""
             : state.messages.at(-1)?.trim() || ""
         );
-      else state.reject(new Error(codexTurnFailureMessage(turn)));
+      else {
+        const message = codexTurnFailureMessage(turn);
+        state.reject(codexBadRequest(turn) ? new BadRequestError(message) : new ProviderError(message));
+      }
     }
   }
 

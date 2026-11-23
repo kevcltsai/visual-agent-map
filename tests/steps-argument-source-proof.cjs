@@ -225,6 +225,20 @@ test('openedUrlsFromEvents: only completed openPage events with a url count', ()
   assert.deepEqual(plain(urls), ['https://a.example.org/x']);
 });
 
+test('openedUrlsFromEvents: a Codex page opened from a search result (action other, a turnNviewM result) counts; snippets do not', () => {
+  // Real Codex 0.164 shape (book proofread, 2026-11-24): opening a search hit reports action {type:'other'} and the page as a view result.
+  const item = (action, results) => ({ method: 'item/completed', params: { item: { id: 'i', type: 'webSearch', action, results } } });
+  const r = (ref_id, url) => ({ type: 'text_result', ref_id, url, domain: 'x', snippet: 's' });
+  const urls = sp.openedUrlsFromEvents([
+    item({ type: 'search', query: 'q' }, [r('turn0search0', 'https://snippet.example.org/a')]),
+    item({ type: 'other' }, [r('turn1view0', null), r('turn1view1', 'https://nigms.example.org/circadian')]),
+    item({ type: 'other' }, [r('turn2view0', 'https://nhlbi.example.org/why-sleep')]),
+    item({ type: 'other' }, [r('turn3search1', 'https://snippet.example.org/b')]),
+    { method: 'item/started', params: { item: { type: 'webSearch', action: { type: 'other' }, results: [r('turn4view0', 'https://started.example.org/')] } } }
+  ]);
+  assert.deepEqual(plain(urls), ['https://nigms.example.org/circadian', 'https://nhlbi.example.org/why-sleep']);
+});
+
 test('searchQueriesFromEvents: only completed search events count; queries and query are read, blanks and repeats are dropped', () => {
   const ev = (method, action) => ({ method, params: { item: { id: 'i', type: 'webSearch', action } } });
   const queries = sp.searchQueriesFromEvents([

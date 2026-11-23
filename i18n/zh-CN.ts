@@ -3413,6 +3413,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.book_note_attention_title": "这章要你看",
   "ui.book_note_attention_rerun": "重跑这一章",
   "ui.book_note_attention_open_map": "先打开这本书的心智图，再按一次",
+  "ui.book_note_attention_cannot_now": "这章现在不能重跑",
   "ui.book_ai_box_fixed_0": "修了：{0}",
   "ui.book_ai_box_fixed_0_1": "修了：{0}，改为“{1}”",
   "ui.book_ai_box_fixed_replaced_0": "修了：改为“{0}”",

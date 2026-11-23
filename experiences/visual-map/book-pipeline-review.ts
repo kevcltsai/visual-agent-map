@@ -1,4 +1,5 @@
 import { t, type TranslationKey } from "../../i18n";
+import { ATTENTION_HOOK } from "../../core/book-pipeline/plan-view";
 import type { PipelineStage } from "../../core/book-pipeline/model";
 import {
   describeSlots,
@@ -519,11 +520,12 @@ export function aiProofCallout(input: AiBoxInput, runId: string, nodeId: string)
  * The "please look at this chapter" box of a needs-review chapter: a title and the main reason in plain words, no tick box. The button
  * that reruns the chapter is added at display time (the note holds no button). Same shape as {@link aiProofCallout}, so it is put and taken off the same way.
  */
+const ATTENTION_HEAD = new RegExp(`^[ \\t]{0,3}>[ \\t]?\\[!vam-review\\|${ATTENTION_HOOK}\\]`, "i");
 export function attentionCallout(reason: string, runId: string, nodeId: string): string {
   const line = plainText(reason);
   const fp = hashText(`attention\n${line}`);
   return quoted([
-    `> [!vam-review] ${t("ui.book_note_attention_title")}`,
+    `> [!vam-review|${ATTENTION_HOOK}] ${t("ui.book_note_attention_title")}`,
     `> ${line}`,
     `> %%vam-review:${idPart(runId)}:${idPart(nodeId)}:${idPart(fp)}%%`,
     VERSION_LINE
@@ -592,7 +594,7 @@ export const removeProgramCallouts = (text: string, kind?: "trial" | "review"): 
  * comes back unchanged.
  */
 export function putProgramCallout(text: string, callout: string): string {
-  const head = /^>[ \t]?\[!vam-(trial|review)\]/i.exec(callout);
+  const head = /^>[ \t]?\[!vam-(trial|review)(?:\|[^\]]*)?\]/i.exec(callout);
   const kind = head ? (head[1].toLowerCase() === "trial" ? "trial" : "review") : undefined;
   if (!kind || !detailSpan(text.split("\n"))) return text;
   const cleared = removeProgramCallouts(text, kind);
@@ -632,7 +634,8 @@ function editReviewHeaders(text: string, edit: (box: ProgramCallout, lines: stri
   const lines = text.split("\n");
   let changed = false;
   for (const c of ownedIn(lines)) {
-    if (c.kind !== "review") continue;
+    // The please-look box has no ticks and keeps its own title and fold.
+    if (c.kind !== "review" || ATTENTION_HEAD.test(bare(lines[c.start]))) continue;
     const next = edit(c, lines);
     if (next === undefined || next === lines[c.start]) continue;
     lines[c.start] = next;
@@ -711,7 +714,9 @@ export function readReviewState(text: string): ReviewState | undefined {
     accept: ticks[0] === true,
     fixed: ticks[1] === true,
     collapsed: box.sign === "-",
-    handled: !bare(lines[box.start]).endsWith(` ${t("ui.book_note_review_title")}`),
+    handled:
+      !ATTENTION_HEAD.test(bare(lines[box.start])) &&
+      !bare(lines[box.start]).endsWith(` ${t("ui.book_note_review_title")}`),
     ...(box.op ? { op: box.op, ifp: box.ifp ?? "", ...(box.queued ? { queued: true } : {}) } : {})
   };
 }

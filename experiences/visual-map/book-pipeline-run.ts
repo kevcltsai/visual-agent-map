@@ -1845,32 +1845,36 @@ export class BookPipelineRuns {
       if (extra) drive.expand.delete(nodeId);
       const kinds = steps(data.phase);
       drive.job = async () => {
-        const before = track ? await this.cardSnapshot(drive, nodeId) : undefined;
-        const planBefore = drive.plans.get(nodeId);
-        if (track) drive.rerun = { nodeId, startedAt: Date.parse(this.ports.now()) };
         try {
-          await this.runCardJob(drive, nodeId, kinds);
+          const before = track ? await this.cardSnapshot(drive, nodeId) : undefined;
+          const planBefore = drive.plans.get(nodeId);
+          if (track) drive.rerun = { nodeId, startedAt: Date.parse(this.ports.now()) };
+          try {
+            await this.runCardJob(drive, nodeId, kinds);
+          } finally {
+            drive.rerun = undefined;
+          }
+          if (track) await this.proofAfterRerun(drive, nodeId);
+          // A rerun that made a new plan: the neighbours' plans still describe the old one (no AI call, only their previous/next line).
+          if (track && drive.plans.get(nodeId) !== planBefore) await this.refreshNeighbourPlans(drive, nodeId);
+          finish?.(drive, track ? { before, after: await this.cardSnapshot(drive, nodeId) } : undefined);
+          this.syncReviewNotes(drive);
         } finally {
-          drive.rerun = undefined;
-        }
-        if (track) await this.proofAfterRerun(drive, nodeId);
-        // A rerun that made a new plan: the neighbours' plans still describe the old one (no AI call, only their previous/next line).
-        if (track && drive.plans.get(nodeId) !== planBefore) await this.refreshNeighbourPlans(drive, nodeId);
-        finish?.(drive, track ? { before, after: await this.cardSnapshot(drive, nodeId) } : undefined);
-        this.syncReviewNotes(drive);
-        // A rerun beside a stopped book: the book is stopped again (a failed stop keeps its code), unless the rerun ended it another way.
-        if (stoppedWriting && !this.dead(drive)) {
-          await drive.store
-            .commit(state => ({
-              state:
-                state.phase === "writing" && state.status === "running"
-                  ? savedFailure !== undefined
-                    ? failRun(state, savedFailure)
-                    : stopRun(state)
-                  : state,
-              accepted: true
-            }))
-            .catch(() => undefined);
+          // A rerun beside a stopped book: the book is stopped again (a failed stop keeps its code), unless the rerun ended it another
+          // way. This runs even when the job threw, so the book is never left running.
+          if (stoppedWriting && !this.dead(drive)) {
+            await drive.store
+              .commit(state => ({
+                state:
+                  state.phase === "writing" && state.status === "running"
+                    ? savedFailure !== undefined
+                      ? failRun(state, savedFailure)
+                      : stopRun(state)
+                    : state,
+                accepted: true
+              }))
+              .catch(() => undefined);
+          }
         }
       };
       this.log(drive, "rerun", nodeId, kinds[0], kinds.length === 1 ? "plan_only" : "full");

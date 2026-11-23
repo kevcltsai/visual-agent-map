@@ -8,7 +8,7 @@ const { loadSource } = require('./support-replay.cjs');
 
 const b = loadSource(`
 export * from "./experiences/visual-map/book-pipeline-callouts";
-export { findProgramCallouts, readReviewState, putProgramCallout, aiProofCallout, aiProofFingerprint } from "./experiences/visual-map/book-pipeline-review";
+export { findProgramCallouts, readReviewState, putProgramCallout, aiProofCallout, aiProofFingerprint, attentionCallout, collapseReviewCallouts, reopenReviewCallouts, markReviewHandled, removeProgramCallouts } from "./experiences/visual-map/book-pipeline-review";
 export { setUiLanguage, t } from "./i18n";
 export { composeProofRecord, proofKey } from "./core/book-pipeline/proof";
 export { replaceResearchRecord, chapterBody } from "./core/book-pipeline/note-sections";
@@ -435,7 +435,7 @@ test('reconcile: a needs-review chapter gets the "please look" box with a plain 
   r.stages.n1 = 'needs-review'; r.issues.n1 = 'images unmet: images:under:0:1 captions:latin';
   await r.callouts.reconcile('M');
   const first = r.notes.get('N/n1.md');
-  assert.match(first, /\[!vam-review\] 這章要你看/);
+  assert.match(first, /\[!vam-review\|vam-attention\] 這章要你看/);
   assert.equal(r.kinds('n1').length, 1, 'one box: it replaces the AI box');
   assert.doesNotMatch(first, /AI 校對/);
   assert.doesNotMatch(first, /images:under|captions:latin|images unmet/, 'the raw issue code is not shown');
@@ -449,4 +449,31 @@ test('reconcile: a needs-review chapter gets the "please look" box with a plain 
   assert.match(r.notes.get('N/n1.md'), /這章要你看/, 'stopped writing');
   r.map.bookPipeline = DATA({ phase: 'writing', status: 'running' }); await r.callouts.reconcile('M');
   assert.deepEqual(r.kinds('n1'), [], 'a running writing phase wants none');
+});
+
+test('reconcile: gate 1 gets no please-look box even on a needs-review chapter', async () => {
+  const r = rig(DATA({ phase: 'gate1' }));
+  r.stages.n1 = 'needs-review'; r.issues.n1 = 'images unmet: images:under:0:1';
+  await r.callouts.reconcile('M');
+  assert.deepEqual(r.kinds('n1'), []);
+  assert.doesNotMatch(r.notes.get('N/n1.md'), /要你看/);
+});
+
+test('the please-look box carries its own render hook ([!vam-review|vam-attention]) and is still a program review box: found, replaced and taken off; never read as handled (en or zh) and never retitled by the tick-box helpers', () => {
+  for (const lang of ['zh-TW', 'en']) {
+    b.setUiLanguage(lang);
+    const text = b.putProgramCallout(note(), b.attentionCallout('Some reason', 'r1', 'n1'));
+    assert.match(text, /> \[!vam-review\|vam-attention\] /, lang);
+    assert.deepEqual(kinds(text), ['review:r1'], lang);
+    const state = b.readReviewState(text);
+    assert.equal(state.handled, false, `${lang}: not read as a handled box`);
+    assert.equal(b.collapseReviewCallouts(text), text, `${lang}: never folded`);
+    assert.equal(b.reopenReviewCallouts(text), text, `${lang}: never retitled`);
+    assert.equal(b.markReviewHandled(text), text);
+    assert.equal(b.putProgramCallout(text, b.attentionCallout('Some reason', 'r1', 'n1')), text, 'idempotent');
+    assert.equal(b.removeProgramCallouts(text, 'review'), note(), `${lang}: taken off`);
+    const ai = b.putProgramCallout(text, b.aiProofCallout({ checked: 1, fixes: [], open: [] }, 'r1', 'n1'));
+    assert.deepEqual(kinds(ai), ['review:r1'], `${lang}: replaced by one box`);
+  }
+  b.setUiLanguage('zh-TW');
 });

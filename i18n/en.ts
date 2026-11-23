@@ -3657,6 +3657,7 @@ export const en = {
   "ui.book_note_attention_title": "Please look at this chapter",
   "ui.book_note_attention_rerun": "Rerun this chapter",
   "ui.book_note_attention_open_map": "Open this book's mind map first, then try again",
+  "ui.book_note_attention_cannot_now": "This chapter can't be rerun right now",
   "ui.book_ai_box_fixed_0": "Fixed: {0}",
   "ui.book_ai_box_fixed_0_1": "Fixed: {0}; now reads “{1}”",
   "ui.book_ai_box_fixed_replaced_0": "Fixed: now reads “{0}”",

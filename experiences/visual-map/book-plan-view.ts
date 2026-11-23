@@ -3,6 +3,7 @@ import { editorInfoField, type Plugin } from "obsidian";
 import { t, translate, type ContentLanguage } from "../../i18n";
 import { cardKindOfPrompt, isBookStructureTitle, type PlanDisplayField } from "../../core/book-pipeline/plan-text";
 import {
+  ATTENTION_HOOK,
   foldLabelOf,
   planCalloutKind,
   planLocale,
@@ -158,13 +159,11 @@ export function markPlanCallouts(root: HTMLElement, env: PlanViewEnv): void {
 const ATTENTION_BUTTON = "vam-book-attention-rerun";
 /** Adds the "rerun this chapter" button to the "please look at this chapter" callouts under `root` (once each; the note itself holds no button). */
 export function markAttentionCallouts(root: HTMLElement, rerun: () => void): void {
-  const callouts = root.matches(CALLOUT_REVIEW) ? [root] : [];
-  callouts.push(...Array.from(root.querySelectorAll<HTMLElement>(CALLOUT_REVIEW)));
+  const callouts = root.matches(CALLOUT_ATTENTION) ? [root] : [];
+  callouts.push(...Array.from(root.querySelectorAll<HTMLElement>(CALLOUT_ATTENTION)));
   for (const callout of callouts) {
-    const title = callout.querySelector<HTMLElement>(".callout-title-inner")?.textContent?.trim();
     const content = callout.querySelector<HTMLElement>(".callout-content");
-    if (title !== t("ui.book_note_attention_title") || !content || content.querySelector(`.${ATTENTION_BUTTON}`))
-      continue;
+    if (!content || content.querySelector(`.${ATTENTION_BUTTON}`)) continue;
     const button = content.createEl("button", {
       cls: `mod-cta ${ATTENTION_BUTTON}`,
       text: t("ui.book_note_attention_rerun")
@@ -178,7 +177,7 @@ export function markAttentionCallouts(root: HTMLElement, rerun: () => void): voi
     });
   }
 }
-const CALLOUT_REVIEW = '.callout[data-callout="vam-review"]';
+const CALLOUT_ATTENTION = `.callout[data-callout="vam-review"][data-callout-metadata="${ATTENTION_HOOK}"]`;
 
 const touchesCallout = (mutation: MutationRecord): boolean =>
   Array.from(mutation.addedNodes).some(

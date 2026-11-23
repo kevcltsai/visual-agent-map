@@ -3334,6 +3334,7 @@ var en = {
   "ui.book_note_attention_title": "Please look at this chapter",
   "ui.book_note_attention_rerun": "Rerun this chapter",
   "ui.book_note_attention_open_map": "Open this book's mind map first, then try again",
+  "ui.book_note_attention_cannot_now": "This chapter can't be rerun right now",
   "ui.book_ai_box_fixed_0": "Fixed: {0}",
   "ui.book_ai_box_fixed_0_1": "Fixed: {0}; now reads \u201C{1}\u201D",
   "ui.book_ai_box_fixed_replaced_0": "Fixed: now reads \u201C{0}\u201D",
@@ -6730,6 +6731,7 @@ var zhCN = {
   "ui.book_note_attention_title": "\u8FD9\u7AE0\u8981\u4F60\u770B",
   "ui.book_note_attention_rerun": "\u91CD\u8DD1\u8FD9\u4E00\u7AE0",
   "ui.book_note_attention_open_map": "\u5148\u6253\u5F00\u8FD9\u672C\u4E66\u7684\u5FC3\u667A\u56FE\uFF0C\u518D\u6309\u4E00\u6B21",
+  "ui.book_note_attention_cannot_now": "\u8FD9\u7AE0\u73B0\u5728\u4E0D\u80FD\u91CD\u8DD1",
   "ui.book_ai_box_fixed_0": "\u4FEE\u4E86\uFF1A{0}",
   "ui.book_ai_box_fixed_0_1": "\u4FEE\u4E86\uFF1A{0}\uFF0C\u6539\u4E3A\u201C{1}\u201D",
   "ui.book_ai_box_fixed_replaced_0": "\u4FEE\u4E86\uFF1A\u6539\u4E3A\u201C{0}\u201D",
@@ -10126,6 +10128,7 @@ var zhTW = {
   "ui.book_note_attention_title": "\u9019\u7AE0\u8981\u4F60\u770B",
   "ui.book_note_attention_rerun": "\u91CD\u8DD1\u9019\u4E00\u7AE0",
   "ui.book_note_attention_open_map": "\u5148\u6253\u958B\u9019\u672C\u66F8\u7684\u5FC3\u667A\u5716\uFF0C\u518D\u6309\u4E00\u6B21",
+  "ui.book_note_attention_cannot_now": "\u9019\u7AE0\u73FE\u5728\u4E0D\u80FD\u91CD\u8DD1",
   "ui.book_ai_box_fixed_0": "\u4FEE\u4E86\uFF1A{0}",
   "ui.book_ai_box_fixed_0_1": "\u4FEE\u4E86\uFF1A{0}\uFF0C\u6539\u70BA\u300C{1}\u300D",
   "ui.book_ai_box_fixed_replaced_0": "\u4FEE\u4E86\uFF1A\u6539\u70BA\u300C{0}\u300D",
@@ -14365,7 +14368,7 @@ function neutralizeDetail(content) {
   const from = start + DETAIL_START.length;
   return `${content.slice(0, from)}${neutralize(content.slice(from, end))}${content.slice(end)}`;
 }
-var PROGRAM_HEAD = /^[ \t]{0,3}>[ \t]?\[!(vam-trial|vam-review)\]([+-])?(?:[ \t].*)?$/i;
+var PROGRAM_HEAD = /^[ \t]{0,3}>[ \t]?\[!(vam-trial|vam-review)(?:\|[^\]]*)?\]([+-])?(?:[ \t].*)?$/i;
 var OWNER_LINE = /^[ \t]{0,3}>[ \t]?%%vam-(trial|review):([\w.-]+):([\w.-]+)(?::([\w.-]+))?(?::([\w.-]+):([\w.-]+)(?::(q))?)?%%[ \t]*$/;
 function programCalloutRanges(lines, fenced = fencedLines(lines)) {
   var _a2;
@@ -16760,6 +16763,7 @@ function planCalloutKind(title) {
   if (CARD_TITLES.has(text11)) return { kind: "card", zh: CHINESE_TITLES.has(text11) };
   return void 0;
 }
+var ATTENTION_HOOK = "vam-attention";
 var planLocale = (language2) => language2;
 function planTitleKey(kind, card) {
   if (kind === "book") return "ui.book_plan_title_book";
@@ -16892,14 +16896,11 @@ function markPlanCallouts(root, env) {
 }
 var ATTENTION_BUTTON = "vam-book-attention-rerun";
 function markAttentionCallouts(root, rerun) {
-  var _a2, _b2;
-  const callouts = root.matches(CALLOUT_REVIEW) ? [root] : [];
-  callouts.push(...Array.from(root.querySelectorAll(CALLOUT_REVIEW)));
+  const callouts = root.matches(CALLOUT_ATTENTION) ? [root] : [];
+  callouts.push(...Array.from(root.querySelectorAll(CALLOUT_ATTENTION)));
   for (const callout2 of callouts) {
-    const title = (_b2 = (_a2 = callout2.querySelector(".callout-title-inner")) == null ? void 0 : _a2.textContent) == null ? void 0 : _b2.trim();
     const content = callout2.querySelector(".callout-content");
-    if (title !== t("ui.book_note_attention_title") || !content || content.querySelector(`.${ATTENTION_BUTTON}`))
-      continue;
+    if (!content || content.querySelector(`.${ATTENTION_BUTTON}`)) continue;
     const button = content.createEl("button", {
       cls: `mod-cta ${ATTENTION_BUTTON}`,
       text: t("ui.book_note_attention_rerun")
@@ -16912,7 +16913,7 @@ function markAttentionCallouts(root, rerun) {
     });
   }
 }
-var CALLOUT_REVIEW = '.callout[data-callout="vam-review"]';
+var CALLOUT_ATTENTION = `.callout[data-callout="vam-review"][data-callout-metadata="${ATTENTION_HOOK}"]`;
 var touchesCallout = (mutation) => {
   var _a2, _b2;
   return Array.from(mutation.addedNodes).some(
@@ -58212,23 +58213,26 @@ var BookPipelineRuns = class {
       if (extra) drive.expand.delete(nodeId);
       const kinds = steps(data.phase);
       drive.job = async () => {
-        const before = track ? await this.cardSnapshot(drive, nodeId) : void 0;
-        const planBefore = drive.plans.get(nodeId);
-        if (track) drive.rerun = { nodeId, startedAt: Date.parse(this.ports.now()) };
         try {
-          await this.runCardJob(drive, nodeId, kinds);
+          const before = track ? await this.cardSnapshot(drive, nodeId) : void 0;
+          const planBefore = drive.plans.get(nodeId);
+          if (track) drive.rerun = { nodeId, startedAt: Date.parse(this.ports.now()) };
+          try {
+            await this.runCardJob(drive, nodeId, kinds);
+          } finally {
+            drive.rerun = void 0;
+          }
+          if (track) await this.proofAfterRerun(drive, nodeId);
+          if (track && drive.plans.get(nodeId) !== planBefore) await this.refreshNeighbourPlans(drive, nodeId);
+          finish == null ? void 0 : finish(drive, track ? { before, after: await this.cardSnapshot(drive, nodeId) } : void 0);
+          this.syncReviewNotes(drive);
         } finally {
-          drive.rerun = void 0;
-        }
-        if (track) await this.proofAfterRerun(drive, nodeId);
-        if (track && drive.plans.get(nodeId) !== planBefore) await this.refreshNeighbourPlans(drive, nodeId);
-        finish == null ? void 0 : finish(drive, track ? { before, after: await this.cardSnapshot(drive, nodeId) } : void 0);
-        this.syncReviewNotes(drive);
-        if (stoppedWriting && !this.dead(drive)) {
-          await drive.store.commit((state) => ({
-            state: state.phase === "writing" && state.status === "running" ? savedFailure !== void 0 ? failRun(state, savedFailure) : stopRun(state) : state,
-            accepted: true
-          })).catch(() => void 0);
+          if (stoppedWriting && !this.dead(drive)) {
+            await drive.store.commit((state) => ({
+              state: state.phase === "writing" && state.status === "running" ? savedFailure !== void 0 ? failRun(state, savedFailure) : stopRun(state) : state,
+              accepted: true
+            })).catch(() => void 0);
+          }
         }
       };
       this.log(drive, "rerun", nodeId, kinds[0], kinds.length === 1 ? "plan_only" : "full");
@@ -63578,12 +63582,13 @@ function aiProofCallout(input2, runId, nodeId) {
     VERSION_LINE
   ]);
 }
+var ATTENTION_HEAD = new RegExp(`^[ \\t]{0,3}>[ \\t]?\\[!vam-review\\|${ATTENTION_HOOK}\\]`, "i");
 function attentionCallout(reason, runId, nodeId) {
   const line3 = plainText(reason);
   const fp = hashText(`attention
 ${line3}`);
   return quoted([
-    `> [!vam-review] ${t("ui.book_note_attention_title")}`,
+    `> [!vam-review|${ATTENTION_HOOK}] ${t("ui.book_note_attention_title")}`,
     `> ${line3}`,
     `> %%vam-review:${idPart(runId)}:${idPart(nodeId)}:${idPart(fp)}%%`,
     VERSION_LINE
@@ -63635,7 +63640,7 @@ function removeProgramCalloutsWhere(text11, drop) {
 }
 var removeProgramCallouts = (text11, kind) => removeProgramCalloutsWhere(text11, (c) => !kind || c.kind === kind);
 function putProgramCallout(text11, callout2) {
-  const head2 = /^>[ \t]?\[!vam-(trial|review)\]/i.exec(callout2);
+  const head2 = /^>[ \t]?\[!vam-(trial|review)(?:\|[^\]]*)?\]/i.exec(callout2);
   const kind = head2 ? head2[1].toLowerCase() === "trial" ? "trial" : "review" : void 0;
   if (!kind || !detailSpan(text11.split("\n"))) return text11;
   const cleared = removeProgramCallouts(text11, kind);
@@ -63667,7 +63672,7 @@ function editReviewHeaders(text11, edit) {
   const lines = text11.split("\n");
   let changed = false;
   for (const c of ownedIn(lines)) {
-    if (c.kind !== "review") continue;
+    if (c.kind !== "review" || ATTENTION_HEAD.test(bare2(lines[c.start]))) continue;
     const next = edit(c, lines);
     if (next === void 0 || next === lines[c.start]) continue;
     lines[c.start] = next;
@@ -63714,7 +63719,7 @@ function readReviewState(text11) {
     accept: ticks[0] === true,
     fixed: ticks[1] === true,
     collapsed: box.sign === "-",
-    handled: !bare2(lines[box.start]).endsWith(` ${t("ui.book_note_review_title")}`),
+    handled: !ATTENTION_HEAD.test(bare2(lines[box.start])) && !bare2(lines[box.start]).endsWith(` ${t("ui.book_note_review_title")}`),
     ...box.op ? { op: box.op, ifp: (_b2 = box.ifp) != null ? _b2 : "", ...box.queued ? { queued: true } : {} } : {}
   };
 }
@@ -87465,13 +87470,18 @@ ${JSON.stringify(mapGroups.map((item) => item.documents))}` : JSON.stringify(gro
     });
     return reason === "this" ? t("ui.book_card_menu_why_this") : reason === "other" ? t("ui.book_card_menu_why_other") : reason === "running" ? t("ui.book_card_menu_why_running") : reason === "blocked" ? t("ui.book_card_menu_why_blocked") : "";
   }
-  /** The "rerun this chapter" button in a chapter's note: the same rerun (and hand-edit question) as the card entry. False when this map has no such chapter or cannot rerun it now. */
+  /**
+   * The "rerun this chapter" button in a chapter's note: the same rerun (and hand-edit question) as the card entry.
+   * null: this map has no such chapter; "": the rerun started; otherwise the plain reason it cannot run now.
+   */
   rerunBookChapterFromNote(notePath) {
     var _a2;
     const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.path === notePath);
-    if (!node || this.bookRerunWhy(node) !== "") return false;
+    if (!node) return null;
+    const why2 = this.bookRerunWhy(node);
+    if (why2 !== "") return why2 || t("ui.book_note_attention_cannot_now");
     this.runBookCardRerun(node);
-    return true;
+    return "";
   }
   /** The rerun both entries share. The same "same result" mark as the panel's button: the old one goes first, a new one only if nothing changed. */
   runBookCardRerun(node) {
@@ -116400,12 +116410,17 @@ var VisualAgentMapPlugin = class extends import_obsidian53.Plugin {
   }
   /** The "rerun this chapter" button in a chapter note: the open map view of that book does the rerun; none open, the reader is told to open it. */
   rerunBookChapterFromNote(notePath) {
+    let why2;
     for (const view of this.views()) {
-      if (!view.rerunBookChapterFromNote(notePath)) continue;
-      void this.app.workspace.revealLeaf(view.leaf);
-      return;
+      const result = view.rerunBookChapterFromNote(notePath);
+      if (result === null) continue;
+      if (result === "") {
+        void this.app.workspace.revealLeaf(view.leaf);
+        return;
+      }
+      why2 != null ? why2 : why2 = result;
     }
-    new import_obsidian53.Notice(t("ui.book_note_attention_open_map"));
+    new import_obsidian53.Notice(why2 != null ? why2 : t("ui.book_note_attention_open_map"));
   }
   views() {
     return this.app.workspace.getLeavesOfType(VIEW_TYPE).map((leaf) => leaf.view).filter((view) => view instanceof VisualAgentMapView);

@@ -144,7 +144,7 @@ export function neutralizeDetail(content: string): string | null {
   return `${content.slice(0, from)}${neutralize(content.slice(from, end))}${content.slice(end)}`;
 }
 
-const PROGRAM_HEAD = /^[ \t]{0,3}>[ \t]?\[!(vam-trial|vam-review)\]([+-])?(?:[ \t].*)?$/i;
+const PROGRAM_HEAD = /^[ \t]{0,3}>[ \t]?\[!(vam-trial|vam-review)(?:\|[^\]]*)?\]([+-])?(?:[ \t].*)?$/i;
 const OWNER_LINE =
   /^[ \t]{0,3}>[ \t]?%%vam-(trial|review):([\w.-]+):([\w.-]+)(?::([\w.-]+))?(?::([\w.-]+):([\w.-]+)(?::(q))?)?%%[ \t]*$/;
 export interface ProgramCallout {

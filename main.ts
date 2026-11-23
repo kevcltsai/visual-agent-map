@@ -1257,12 +1257,17 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   /** The "rerun this chapter" button in a chapter note: the open map view of that book does the rerun; none open, the reader is told to open it. */
   rerunBookChapterFromNote(notePath: string): void {
+    let why: string | undefined;
     for (const view of this.views()) {
-      if (!view.rerunBookChapterFromNote(notePath)) continue;
-      void this.app.workspace.revealLeaf(view.leaf);
-      return;
+      const result = view.rerunBookChapterFromNote(notePath);
+      if (result === null) continue;
+      if (result === "") {
+        void this.app.workspace.revealLeaf(view.leaf);
+        return;
+      }
+      why ??= result;
     }
-    new Notice(t("ui.book_note_attention_open_map"));
+    new Notice(why ?? t("ui.book_note_attention_open_map"));
   }
   views(): VisualAgentMapView[] {
     return this.app.workspace

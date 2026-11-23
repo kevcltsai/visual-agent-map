@@ -10009,12 +10009,17 @@ export class VisualAgentMapView extends ItemView {
             ? t("ui.book_card_menu_why_blocked")
             : "";
   }
-  /** The "rerun this chapter" button in a chapter's note: the same rerun (and hand-edit question) as the card entry. False when this map has no such chapter or cannot rerun it now. */
-  rerunBookChapterFromNote(notePath: string): boolean {
+  /**
+   * The "rerun this chapter" button in a chapter's note: the same rerun (and hand-edit question) as the card entry.
+   * null: this map has no such chapter; "": the rerun started; otherwise the plain reason it cannot run now.
+   */
+  rerunBookChapterFromNote(notePath: string): string | null {
     const node = this.map?.nodes.find(item => item.path === notePath);
-    if (!node || this.bookRerunWhy(node) !== "") return false;
+    if (!node) return null;
+    const why = this.bookRerunWhy(node);
+    if (why !== "") return why || t("ui.book_note_attention_cannot_now");
     this.runBookCardRerun(node);
-    return true;
+    return "";
   }
   /** The rerun both entries share. The same "same result" mark as the panel's button: the old one goes first, a new one only if nothing changed. */
   private runBookCardRerun(node: MapNode): void {

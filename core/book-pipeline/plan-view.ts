@@ -32,6 +32,9 @@ export function planCalloutKind(title: string): PlanCalloutKind | undefined {
   return undefined;
 }
 
+/** The callout metadata of the please-look box (`[!vam-review|vam-attention]`): Obsidian renders it as `data-callout-metadata`, so the rerun button finds the box without reading its title. */
+export const ATTENTION_HOOK = "vam-attention";
+
 /** The language the plan view shows its titles and relabelled fields in: always the book's content language, whatever language the note was stored in. */
 export type PlanLocale = ContentLanguage;
 export const planLocale = (language: ContentLanguage): PlanLocale => language;
